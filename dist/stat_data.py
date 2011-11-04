@@ -35,8 +35,6 @@ connection_stats = [
 	Stat('rwlock_wrlock', 'rwlock writelock calls'),
 	Stat('total_read_io', 'total read I/Os'),
 	Stat('total_write_io', 'total write I/Os'),
-	Stat('workq_passes', 'workQ queue passes'),
-	Stat('workq_yield', 'workQ yields'),
 ]
 
 ##########################################

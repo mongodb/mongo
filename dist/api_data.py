@@ -354,7 +354,7 @@ flags = {
 ###################################################
 # Structure flag declarations
 ###################################################
-	'conn' : [ 'SERVER_RUN', 'WORKQ_RUN' ],
+	'conn' : [ 'SERVER_RUN' ],
 	'buf' : [ 'BUF_INUSE' ],
 	'session' : [ 'SESSION_INTERNAL', 'SESSION_SALVAGE_QUIET_ERR' ],
 }

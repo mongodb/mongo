@@ -28,7 +28,7 @@ __wt_sb_alloc(
 	 * We align allocations because we directly access WT_UPDATE structure
 	 * fields in the memory (the x86 handles unaligned accesses, but I don't
 	 * want to have to find and fix this code for a port to a system that
-	 * doesn't handle unaligned accesses).  It wastes space, but this memory
+	 * doesn't handle unaligned accesses).	It wastes space, but this memory
 	 * is never written to disk and there are fewer concerns about memory
 	 * than with on-disk structures.  Any other code allocating memory from
 	 * this buffer needs to align its allocations as well.
@@ -198,9 +198,9 @@ __wt_sb_decrement(WT_SESSION_IMPL *session, WT_SESSION_BUFFER *sb)
 	 * XXX
 	 * There's a race here in the above case #2: if this code, and the page
 	 * discard code race, it's possible neither will realize the buffer is
-	 * no longer needed and free it.  The fix is to involve the eviction or
-	 * workQ threads: they may need a linked list of buffers they review to
-	 * ensure it never happens.  I'm living with this now: it's an unlikely
+	 * no longer needed and free it.  The fix is to involve the eviction
+	 * thread: it may need a linked list of buffers they review to ensure
+	 * it never happens.  I'm living with this now: it's an unlikely
 	 * race, and it's a memory leak if it ever happens.
 	 */
 	if (sb->in == sb->out)

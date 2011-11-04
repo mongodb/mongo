@@ -30,8 +30,6 @@ The following statistics are available for the database in this release:
 @row{total memory frees}
 @row{total read I/Os}
 @row{total write I/Os}
-@row{workQ queue passes}
-@row{workQ yields}
 </table>
 
 \internal connection statistics section: END \endinternal

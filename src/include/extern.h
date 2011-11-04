@@ -194,8 +194,7 @@ extern int __wt_desc_update(WT_SESSION_IMPL *session);
 extern void __wt_page_out(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     uint32_t flags);
-extern void __wt_workq_evict_server(WT_CONNECTION_IMPL *conn, int force);
-extern void __wt_workq_evict_server_exit(WT_CONNECTION_IMPL *conn);
+extern void __wt_evict_server_wake(WT_CONNECTION_IMPL *conn, int force);
 extern void __wt_evict_file_serial_func(WT_SESSION_IMPL *session);
 extern void *__wt_cache_evict_server(void *arg);
 extern int __wt_btree_create(WT_SESSION_IMPL *session, const char *filename);
@@ -228,8 +227,7 @@ extern int __wt_page_inmem(WT_SESSION_IMPL *session,
     WT_REF *parent_ref,
     WT_PAGE_DISK *dsk,
     WT_PAGE **pagep);
-extern void __wt_workq_read_server(WT_CONNECTION_IMPL *conn, int force);
-extern void __wt_workq_read_server_exit(WT_CONNECTION_IMPL *conn);
+extern void __wt_read_server_wake(WT_CONNECTION_IMPL *conn, int force);
 extern void __wt_cache_read_serial_func(WT_SESSION_IMPL *session);
 extern void *__wt_cache_read_server(void *arg);
 extern int __wt_page_reconcile_int(WT_SESSION_IMPL *session,
@@ -295,7 +293,6 @@ extern void __wt_connection_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_open(WT_CONNECTION_IMPL *conn);
 extern int __wt_connection_close(WT_CONNECTION_IMPL *conn);
 extern void __wt_conn_stat_init(WT_SESSION_IMPL *session);
-extern void *__wt_workq_srvr(void *arg);
 extern int __wt_curbulk_init(WT_CURSOR_BULK *cbulk);
 extern int __wt_curconfig_open(WT_SESSION_IMPL *session,
     const char *uri,

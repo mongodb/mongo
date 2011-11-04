@@ -56,12 +56,12 @@ struct __wt_hazard {
 };
 
 typedef	enum {
-	WT_WORKQ_NONE=0,		/* No request */
-	WT_WORKQ_FUNC=1,		/* Function, then return */
-	WT_WORKQ_EVICT=2,		/* Function, then schedule evict */
-	WT_WORKQ_EVICT_SCHED=3,		/* Waiting on evict to complete */
-	WT_WORKQ_READ=4,		/* Function, then schedule read */
-	WT_WORKQ_READ_SCHED=5		/* Waiting on read to complete */
+	WT_SERIAL_NONE=0,		/* No request */
+	WT_SERIAL_FUNC=1,		/* Function, then return */
+	WT_SERIAL_EVICT=2,		/* Function, then schedule evict */
+	WT_SERIAL_EVICT_SCHED=3,	/* Waiting on evict to complete */
+	WT_SERIAL_READ=4,		/* Function, then schedule read */
+	WT_SERIAL_READ_SCHED=5		/* Waiting on read to complete */
 } wq_state_t;
 
 /* Get the connection implementation for a session. */
@@ -95,15 +95,13 @@ struct __wt_session_impl {
 	WT_BUF	logprint_buf;		/* Buffer for debug log records */
 
 	WT_BUF	**scratch;		/* Temporary memory for any function */
-	u_int	 scratch_alloc;		/* Currently allocated */
+	u_int	scratch_alloc;		/* Currently allocated */
 
-					/* WT_SESSION_IMPL workQ request */
+					/* Serialized operation state */
 	wq_state_t volatile wq_state;	/* Request state */
-	void    (*wq_func)		/* Function */
-		    (WT_SESSION_IMPL *);
-	void	 *wq_args;		/* Function argument */
-	int	  wq_sleeping;		/* Thread is blocked */
-	int	  wq_ret;		/* Return value */
+	void	*wq_args;		/* Operation arguments. */
+	int	wq_sleeping;		/* Thread is blocked */
+	int	wq_ret;			/* Return value */
 
 	WT_HAZARD *hazard;		/* Hazard reference array */
 
@@ -155,8 +153,7 @@ struct __wt_connection_impl {
 
 	WT_FH *lock_fh;			/* Lock file handle */
 
-	WT_SPINLOCK workq_lock;		/* workQ spinlock */
-	pthread_t workq_tid;		/* workQ thread ID */
+	WT_SPINLOCK serial_lock;	/* Serial function call spinlock */
 	pthread_t cache_evict_tid;	/* Cache eviction server thread ID */
 	pthread_t cache_read_tid;	/* Cache read server thread ID */
 
@@ -175,13 +172,13 @@ struct __wt_connection_impl {
 	/*
 	 * WiredTiger allocates space for 50 simultaneous sessions (threads of
 	 * control) by default.  Growing the number of threads dynamically is
-	 * possible, but tricky since the workQ is walking the array without
-	 * locking it.
+	 * possible, but tricky since server threads are walking the array
+	 * without locking it.
 	 *
 	 * There's an array of WT_SESSION_IMPL pointers that reference the
 	 * allocated array; we do it that way because we want an easy way for
-	 * the workQ code to avoid walking the entire array when only a few
-	 * threads are running.
+	 * the server thread code to avoid walking the entire array when only a
+	 * few threads are running.
 	 */
 	WT_SESSION_IMPL	**sessions;		/* Session reference */
 	void		 *session_array;	/* Session array */
@@ -280,7 +277,7 @@ extern WT_PROCESS __wt_process;
 #define	WT_REC_EVICT					0x00000004
 #define	WT_REC_LOCKED					0x00000002
 #define	WT_REC_SALVAGE					0x00000001
-#define	WT_SERVER_RUN					0x00000002
+#define	WT_SERVER_RUN					0x00000001
 #define	WT_SESSION_INTERNAL				0x00000002
 #define	WT_SESSION_SALVAGE_QUIET_ERR			0x00000001
 #define	WT_VERB_ALLOCATE				0x00000200
@@ -294,7 +291,6 @@ extern WT_PROCESS __wt_process;
 #define	WT_VERB_SALVAGE					0x00000002
 #define	WT_VERB_WRITE					0x00000001
 #define	WT_VERIFY					0x00000001
-#define	WT_WORKQ_RUN					0x00000001
 /*
  * API flags section: END
  * DO NOT EDIT: automatically built by dist/api_flags.py.

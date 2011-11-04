@@ -43,15 +43,12 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn)
 	WT_WRITE_BARRIER();
 
 	/* Start worker threads. */
-	F_SET(conn, WT_WORKQ_RUN | WT_SERVER_RUN);
+	F_SET(conn, WT_SERVER_RUN);
 
 	WT_ERR(__wt_thread_create(
 	    &conn->cache_evict_tid, __wt_cache_evict_server, conn));
 	WT_ERR(__wt_thread_create(
 	    &conn->cache_read_tid, __wt_cache_read_server, conn));
-#ifdef HAVE_WORKQ
-	WT_ERR(__wt_thread_create(&conn->workq_tid, __wt_workq_srvr, conn));
-#endif
 
 	return (0);
 
@@ -101,20 +98,10 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 
 	/* Shut down the server threads. */
 	F_CLR(conn, WT_SERVER_RUN);
-	__wt_workq_evict_server_exit(conn);
+	__wt_evict_server_wake(conn, 1);
 	WT_TRET(__wt_thread_join(conn->cache_evict_tid));
-	__wt_workq_read_server_exit(conn);
+	__wt_read_server_wake(conn, 1);
 	WT_TRET(__wt_thread_join(conn->cache_read_tid));
-
-#ifdef HAVE_WORKW
-	/*
-	 * Close down and wait for the workQ thread; this only happens after
-	 * all other server threads have exited, as they may be waiting on a
-	 * request from the workQ, or vice-versa.
-	 */
-	F_CLR(conn, WT_WORKQ_RUN);
-	WT_TRET(__wt_thread_join(conn->workq_tid));
-#endif
 
 	/* Discard the cache. */
 	__wt_cache_destroy(conn);

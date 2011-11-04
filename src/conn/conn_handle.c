@@ -27,8 +27,8 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	/* Statistics. */
 	WT_RET(__wt_stat_alloc_connection_stats(session, &conn->stats));
 
-	/* workQ spinlock. */
-	__wt_spin_init(session, &conn->workq_lock);
+	/* Serialized function call spinlock. */
+	__wt_spin_init(session, &conn->serial_lock);
 
 	/* Connection spinlock. */
 	__wt_spin_init(session, &conn->spinlock);

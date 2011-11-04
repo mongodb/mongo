@@ -47,11 +47,11 @@ __cache_read_req_clr(WT_READ_REQ *rr)
 }
 
 /*
- * __wt_workq_read_server --
+ * __wt_read_server_wake --
  *	See if the read server thread needs to be awakened.
  */
 void
-__wt_workq_read_server(WT_CONNECTION_IMPL *conn, int force)
+__wt_read_server_wake(WT_CONNECTION_IMPL *conn, int force)
 {
 	WT_CACHE *cache;
 	WT_SESSION_IMPL *session;
@@ -72,51 +72,22 @@ __wt_workq_read_server(WT_CONNECTION_IMPL *conn, int force)
 	if (!cache->read_lockout &&
 	    bytes_inuse > bytes_max + (bytes_max / 10)) {
 		WT_VERBOSE(session, READSERVER,
-		    "workQ locks out reads: "
+		    "read server locks out reads: "
 		    "bytes-inuse %" PRIu64 " of bytes-max %" PRIu64,
 		    bytes_inuse, bytes_max);
 		cache->read_lockout = 1;
 	}
 
-#ifdef HAVE_WORKQ
-	/*
-	 * If there is a workQ thread, reads are locked out and we're not
-	 * forcing the issue (that's when closing the environment, or if
-	 * there's a priority read waiting to be handled), we're done.
-	 */
-	if (!force && cache->read_lockout)
-		return;
-#else
-	/*
-	 * Wait for eviction to free some space: there is no workQ to wake us
-	 * up later.
-	 */
+	/* Wait for eviction to free some space. */
 	while (!force && cache->read_lockout) {
 		if (__wt_cache_bytes_inuse(cache) <=
 		    bytes_max - (bytes_max / 20))
 			cache->read_lockout = 0;
 		else {
-			__wt_workq_evict_server(conn, 1);
+			__wt_evict_server_wake(conn, 1);
 			__wt_yield();
 		}
 	}
-#endif
-
-	__wt_unlock(session, cache->mtx_read);
-}
-
-/*
- * __wt_workq_read_server_exit --
- *	The exit flag is set, wake the read server to exit.
- */
-void
-__wt_workq_read_server_exit(WT_CONNECTION_IMPL *conn)
-{
-	WT_CACHE *cache;
-	WT_SESSION_IMPL *session;
-
-	cache = conn->cache;
-	session = &conn->default_session;
 
 	__wt_unlock(session, cache->mtx_read);
 }

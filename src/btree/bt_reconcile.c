@@ -2924,12 +2924,11 @@ __rec_parent_update(WT_SESSION_IMPL *session, WT_PAGE *page,
 	 *
 	 * There's no chance we need to flush this write -- the eviction thread
 	 * is the only thread that eventually cares if the page is dirty or not,
-	 * and it's our update that's making it dirty.   (The workQ thread does
-	 * have to flush its set-page-modified update, of course).
+	 * and it's our update that's making it dirty.   (Other threads do
+	 * have to flush their set-page-modified update, of course).
 	 *
-	 * We don't care if we race with the workQ; if the workQ thread races
-	 * with us, the page will still be marked dirty and that's all we care
-	 * about.
+	 * We don't care if we race with updates: the page will still be marked
+	 * dirty and that's all we care about.
 	 */
 	if (!WT_PAGE_IS_ROOT(page))
 		WT_PAGE_SET_MODIFIED(page->parent);

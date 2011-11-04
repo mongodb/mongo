@@ -63,8 +63,9 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	/*
 	 * Replace the session reference we're closing with the last entry in
 	 * the table, then clear the last entry.  As far as the walk of the
-	 * workQ is concerned, it's OK if the session appears twice, or if it
-	 * doesn't appear at all, so these lines can race all they want.
+	 * server threads is concerned, it's OK if the session appears twice,
+	 * or if it doesn't appear at all, so these lines can race all they
+	 * want.
 	 */
 	for (tp = conn->sessions; *tp != session; ++tp)
 		;
@@ -469,7 +470,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 		F_SET(session_ret, WT_SESSION_INTERNAL);
 
 	/*
-	 * Publish: make the entry visible to the workQ.  There must be a
+	 * Publish: make the entry visible to server threads.  There must be a
 	 * barrier to ensure the structure fields are set before any other
 	 * thread can see the session.
 	 */

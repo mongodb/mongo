@@ -200,10 +200,6 @@ __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS *
 	stats->total_read_io.desc = "total read I/Os";
 	stats->total_write_io.name = "total_write_io";
 	stats->total_write_io.desc = "total write I/Os";
-	stats->workq_passes.name = "workq_passes";
-	stats->workq_passes.desc = "workQ queue passes";
-	stats->workq_yield.name = "workq_yield";
-	stats->workq_yield.desc = "workQ yields";
 
 	*statsp = stats;
 	return (0);
@@ -229,6 +225,4 @@ __wt_stat_clear_connection_stats(WT_STATS *stats_arg)
 	stats->rwlock_wrlock.v = 0;
 	stats->total_read_io.v = 0;
 	stats->total_write_io.v = 0;
-	stats->workq_passes.v = 0;
-	stats->workq_yield.v = 0;
 }

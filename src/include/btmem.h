@@ -101,28 +101,29 @@ struct __wt_page {
 	 uint64_t read_gen;
 
 	/*
-	 * The write generation is incremented after the workQ modifies a page
-	 * that is, it tracks page versions.
-	 *	The write generation value is used to detect changes scheduled
-	 * based on out-of-date information.  Two threads of control updating
-	 * the same page could both search the page in state A, and schedule
-	 * the change for the workQ.  Since the workQ performs changes serially,
-	 * one of the changes will happen after the page is modified, and the
-	 * search state for the other thread might no longer be applicable.  To
-	 * avoid this race, page write generations are copied into the search
-	 * stack whenever a page is read, and passed to the workQ thread when a
-	 * modification is scheduled.  The workQ thread compares each page's
-	 * current write generation to the generation copied in the read/search;
-	 * if the two values match, the search occurred on a current version of
-	 * the page and the modification can proceed.  If the two generations
-	 * differ, the workQ thread returns an error and the operation must be
-	 * restarted.
-	 *	The write-generation value could be stored on a per-entry basis
-	 * if there's sufficient contention for the page as a whole.
+	 * The write generation is incremented after a page is modified.  That
+	 * is, it tracks page versions.
+	 *
+	 * The write generation value is used to detect changes scheduled based
+	 * on out-of-date information.  Two threads of control updating the same
+	 * page could both search the page in state A.  When the updates are
+	 * performed serially, one of the changes will happen after the page is
+	 * modified, and the search state for the other thread might no longer
+	 * be applicable.  To avoid this race, page write generations are copied
+	 * into the search stack whenever a page is read, and check when a
+	 * modification is serialized.  The serialized function compares each
+	 * page's current write generation to the generation copied in the
+	 * read/search; if the two values match, the search occurred on a
+	 * current version of the page and the modification can proceed.  If the
+	 * two generations differ, the serialized call returns an error and the
+	 * operation must be restarted.
+	 *
+	 * The write-generation value could be stored on a per-entry basis if
+	 * there's sufficient contention for the page as a whole.
 	 *
 	 * The write-generation is not declared volatile: write-generation is
-	 * written by the workQ when modifying a page, and must be flushed in
-	 * a specific order as the workQ flushes its changes.
+	 * written by a serialized function when modifying a page, and must be
+	 * flushed in order as the serialized updates are flushed.
 	 *
 	 * XXX
 	 * 32-bit values are probably more than is needed: at some point we may

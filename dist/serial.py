@@ -16,7 +16,7 @@ class Serial:
 		self.args = args
 
 msgtypes = [
-Serial('col_append', 'WT_WORKQ_FUNC', [
+Serial('col_append', 'WT_SERIAL_FUNC', [
 		SerialArg('WT_INSERT_HEAD **', 'inshead'),
 		SerialArg('WT_INSERT ***', 'ins_stack'),
 		SerialArg('WT_INSERT_HEAD **', 'new_inslist', 1),
@@ -25,17 +25,17 @@ Serial('col_append', 'WT_WORKQ_FUNC', [
 		SerialArg('u_int', 'skipdepth'),
 	]),
 
-Serial('cache_read', 'WT_WORKQ_READ', [
+Serial('cache_read', 'WT_SERIAL_READ', [
 		SerialArg('WT_PAGE *', 'parent'),
 		SerialArg('WT_REF *', 'parent_ref'),
 		SerialArg('int', 'dsk_verify'),
 	 ]),
 
-Serial('evict_file', 'WT_WORKQ_EVICT', [
+Serial('evict_file', 'WT_SERIAL_EVICT', [
 		SerialArg('int', 'close_method'),
 	]),
 
-Serial('insert', 'WT_WORKQ_FUNC', [
+Serial('insert', 'WT_SERIAL_FUNC', [
 		SerialArg('WT_PAGE *', 'page'),
 		SerialArg('uint32_t', 'write_gen'),
 		SerialArg('WT_INSERT_HEAD **', 'inshead'),
@@ -46,13 +46,13 @@ Serial('insert', 'WT_WORKQ_FUNC', [
 		SerialArg('u_int', 'skipdepth'),
 	]),
 
-Serial('row_key', 'WT_WORKQ_FUNC', [
+Serial('row_key', 'WT_SERIAL_FUNC', [
 		SerialArg('WT_PAGE *', 'page'),
 		SerialArg('WT_ROW *', 'row_arg'),
 		SerialArg('WT_IKEY *', 'ikey'),
 	]),
 
-Serial('update', 'WT_WORKQ_FUNC', [
+Serial('update', 'WT_SERIAL_FUNC', [
 		SerialArg('WT_PAGE *', 'page'),
 		SerialArg('uint32_t', 'write_gen'),
 		SerialArg('WT_UPDATE **', 'srch_upd'),
@@ -79,7 +79,7 @@ def decl_p(l):
 	return o + '*' + l.name + 'p'
 
 # output --
-#	Create functions to schedule tasks for the workQ thread.
+#	Create serialized function calls.
 def output(entry, f):
 	# structure declaration
 	f.write('''
@@ -161,7 +161,7 @@ static inline void\n__wt_''' + entry.name + '_' + l.name + '''_taken(WT_SESSION_
 \targs->''' + l.name + '''_taken = 1;
 
 \tWT_ASSERT(session, args->''' + l.name + '''_size != 0);
-\t__wt_cache_page_workq_incr(session, page, args->''' + l.name + '''_size);
+\t__wt_cache_page_inmem_incr(session, page, args->''' + l.name + '''_size);
 }
 ''')
 

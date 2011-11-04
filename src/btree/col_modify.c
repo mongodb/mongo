@@ -73,17 +73,17 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 	 * Delete, insert or update a column-store entry.
 	 *
 	 * If modifying a previously modified record, create a new WT_UPDATE
-	 * entry and have the workQ link it into an existing WT_INSERT entry's
-	 * WT_UPDATE list.
+	 * entry and have a serialized function link it into an existing
+	 * WT_INSERT entry's WT_UPDATE list.
 	 *
 	 * Else, allocate an insert array as necessary, build a WT_INSERT and
-	 * WT_UPDATE structure pair, and schedule the workQ to insert the
-	 * WT_INSERT structure.
+	 * WT_UPDATE structure pair, and call a serialized function to insert
+	 * the WT_INSERT structure.
 	 */
 	if (cbt->compare == 0 && cbt->ins != NULL) {
 		WT_ERR(__wt_update_alloc(session, value, &upd));
 
-		/* workQ: insert the WT_UPDATE structure. */
+		/* Insert the WT_UPDATE structure. */
 		ret = __wt_update_serial(session, page,
 		    cbt->write_gen, &cbt->ins->upd, NULL, 0, upd);
 	} else {
@@ -139,7 +139,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 		cbt->ins = ins;
 
 		/*
-		 * workQ: insert or append the WT_INSERT structure.
+		 * Insert or append the WT_INSERT structure.
 		 */
 		if (op == 1) {
 			WT_ERR(__wt_col_append_serial(session,

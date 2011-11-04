@@ -6,18 +6,18 @@
  */
 
 /*
- * __wt_cache_page_workq_incr --
+ * __wt_cache_page_inmem_incr --
  *	Increment a page's memory footprint in the cache.
  */
 static inline void
-__wt_cache_page_workq_incr(
+__wt_cache_page_inmem_incr(
     WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 {
 	WT_CACHE *cache;
 
 	cache = S2C(session)->cache;
 
-	cache->bytes_workq += size;
+	cache->bytes_inmem += size;
 	page->memory_footprint += WT_STORE_SIZE(size);
 }
 
@@ -101,7 +101,7 @@ __wt_cache_bytes_inuse(WT_CACHE *cache)
 	 * (although "interesting" corruption is vanishingly unlikely, these
 	 * values just increment over time).
 	 */
-	bytes_in = cache->bytes_read + cache->bytes_workq;
+	bytes_in = cache->bytes_read + cache->bytes_inmem;
 	bytes_out = cache->bytes_evict;
 	return (bytes_in > bytes_out ? bytes_in - bytes_out : 0);
 }

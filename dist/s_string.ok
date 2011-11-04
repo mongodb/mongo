@@ -143,6 +143,7 @@ allocsize
 ap
 api
 arg
+async
 bigram
 bitfield
 bitfields
@@ -432,7 +433,6 @@ tstate
 tt
 tupdate
 tvalue
-tworkq
 txn
 typedef
 uB
@@ -461,9 +461,6 @@ vslot
 vunpack
 vupdate
 wiredtiger
-workQ
-workq
-wq
 wrapup
 writelock
 wrlock

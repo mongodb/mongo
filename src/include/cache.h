@@ -80,7 +80,7 @@ struct __wt_cache {
 	 */
 	uint64_t bytes_read;		/* Bytes/pages read by read server */
 	uint64_t pages_read;
-	uint64_t bytes_workq;		/* Bytes/pages created by workQ */
+	uint64_t bytes_inmem;		/* Bytes/pages created in memory */
 	uint64_t bytes_evict;		/* Bytes/pages discarded by eviction */
 	uint64_t pages_evict;
 };

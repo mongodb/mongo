@@ -239,7 +239,10 @@ next:		switch (direction) {
 	/* Serialize the swap of the key into place. */
 	ret = __wt_row_key_serial(session, page, rip_arg, ikey);
 
-	/* Free the WT_IKEY structure if the workQ didn't use it for the key. */
+	/*
+	 * Free the WT_IKEY structure if the serialized call didn't use it for
+	 * the key.
+	 */
 	if (rip_arg->key != ikey)
 		__wt_sb_decrement(session, ikey->sb);
 

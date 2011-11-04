@@ -11,7 +11,7 @@
  * Serialization: serialization support allows scheduling operations requiring
  * serialized access to a piece of memory, normally by a different thread of
  * control.  This includes reading pages into memory (a request of the read
- * thread), and updating Btree pages (a request of the workQ thread).
+ * thread), and updating Btree pages.
  *
  * __wt_session_serialize_func --
  *	Schedule a serialization request, and block or spin until it completes.
@@ -26,65 +26,35 @@ __wt_session_serialize_func(WT_SESSION_IMPL *session,
 
 	/*
 	 * Threads serializing access to data using a function:
-	 *	set a function/argument pair in the WT_SESSION_IMPL handle,
-	 *	flush memory,
-	 *	update the WT_SESSION_IMPL workq state, and
-	 *	spin or block.
-	 *
-	 * The workQ thread notices the state change and calls the serialization
-	 * function.
+	 *	call the function while holding a spinlock
+	 *	update the session sleeping state, and
+	 *	if necessary, block until an async action completes.
 	 */
 	session->wq_args = args;
-	session->wq_func = func;
-	session->wq_sleeping = op == WT_WORKQ_FUNC ? 0 : 1;
+	session->wq_sleeping = (op != WT_SERIAL_FUNC);
 
-#ifdef HAVE_WORKQ
-	/*
-	 * Publish: there must be a barrier to ensure the structure fields are
-	 * set before wq_state field change makes the entry visible to the workQ
-	 * thread.
-	 */
-	WT_PUBLISH(session->wq_state, op);
-
-	/*
-	 * Callers can spin on the session state (implying the call is quickly
-	 * satisfied), or block until its mutex is unlocked by another thread
-	 * when the operation has completed.
-	 */
-	if (op == WT_WORKQ_FUNC) {
-		while (session->wq_state != WT_WORKQ_NONE)
-			__wt_yield();
-
-		/*
-		 * Use a read-barrier to ensure we do not load the wq_ret field
-		 * until the wq_state field has been published.
-		 */
-		WT_READ_BARRIER();
-	} else
-		__wt_lock(session, session->mtx);
-#else
-	/*
-	 * Functions are called directly (holding a spinlock), only
-	 * communication with other threads goes through serialization.
-	 */
-	__wt_spin_lock(session, &conn->workq_lock);
+	/* Functions are serialized by holding a spinlock. */
+	__wt_spin_lock(session, &conn->serial_lock);
 	func(session);
-	__wt_spin_unlock(session, &conn->workq_lock);
+	__wt_spin_unlock(session, &conn->serial_lock);
 
 	switch (op) {
-	case WT_WORKQ_EVICT:
-		__wt_workq_evict_server(conn, 1);
-		__wt_lock(session, session->mtx);
+	case WT_SERIAL_EVICT:
+		__wt_evict_server_wake(conn, 1);
 		break;
-	case WT_WORKQ_READ:
-		__wt_workq_read_server(conn, 0);
-		__wt_lock(session, session->mtx);
+	case WT_SERIAL_READ:
+		__wt_read_server_wake(conn, 0);
 		break;
 	default:
-		break;
+		return (session->wq_ret);
 	}
-#endif
 
+	/*
+	 * If we are waiting on a server thread, block on the session
+	 * mutex: when the operation is complete, this will be unlocked
+	 * and we can continue.
+	 */
+	__wt_lock(session, session->mtx);
 	return (session->wq_ret);
 }
 
@@ -115,10 +85,11 @@ __wt_session_serialize_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int ret)
 	 * before the calling thread can see its results, and the page's new
 	 * write generation makes it to memory.  The latter isn't a correctness
 	 * issue, the write generation just needs to be updated so that readers
-	 * get credit for reading the right version of the page, otherwise, they
-	 * will get bounced by the workQ for reading an old version of the page.
+	 * get credit for reading the right version of the page, otherwise,
+	 * they will have to retry their update for reading an old version of
+	 * the page.
 	 */
-	WT_PUBLISH(session->wq_state, WT_WORKQ_NONE);
+	WT_PUBLISH(session->wq_state, WT_SERIAL_NONE);
 
 	/* If the calling thread is sleeping, wake it up. */
 	if (session->wq_sleeping)

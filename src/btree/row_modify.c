@@ -38,11 +38,12 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 
 	/*
 	 * Modify: allocate an update array as necessary, build a WT_UPDATE
-	 * structure, and schedule the workQ to insert the WT_UPDATE structure.
+	 * structure, and call a serialized function to insert the WT_UPDATE
+	 * structure.
 	 *
 	 * Insert: allocate an insert array as necessary, build a WT_INSERT
-	 * and WT_UPDATE structure pair, and schedule the workQ to insert the
-	 * WT_INSERT structure.
+	 * and WT_UPDATE structure pair, and call a serialized function to
+	 * insert the WT_INSERT structure.
 	 */
 	if (cbt->compare == 0) {
 		new_upd_size = 0;
@@ -66,7 +67,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		/* Allocate room for the new value from per-thread memory. */
 		WT_ERR(__wt_update_alloc(session, value, &upd));
 
-		/* workQ: insert the WT_UPDATE structure. */
+		/* Insert the WT_UPDATE structure. */
 		ret = __wt_update_serial(session, page,
 		    cbt->write_gen, upd_entry, &new_upd, new_upd_size, upd);
 	} else {
@@ -122,7 +123,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		ins->upd = upd;
 		cbt->ins = ins;
 
-		/* workQ: insert the WT_INSERT structure. */
+		/* Insert the WT_INSERT structure. */
 		ret = __wt_insert_serial(session, page, cbt->write_gen,
 		    inshead, cbt->ins_stack,
 		    &new_inslist, new_inslist_size,

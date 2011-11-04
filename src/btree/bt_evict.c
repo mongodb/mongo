@@ -91,11 +91,11 @@ __evict_req_clr(WT_SESSION_IMPL *session, WT_EVICT_REQ *r)
 }
 
 /*
- * __wt_workq_evict_server --
+ * __wt_evict_server_wake --
  *	See if the eviction server thread needs to be awakened.
  */
 void
-__wt_workq_evict_server(WT_CONNECTION_IMPL *conn, int force)
+__wt_evict_server_wake(WT_CONNECTION_IMPL *conn, int force)
 {
 	WT_CACHE *cache;
 	WT_SESSION_IMPL *session;
@@ -121,22 +121,6 @@ __wt_workq_evict_server(WT_CONNECTION_IMPL *conn, int force)
 	    bytes_inuse / WT_MEGABYTE,
 	    bytes_inuse <= bytes_max ? "<=" : ">",
 	    bytes_max / WT_MEGABYTE);
-
-	__wt_unlock(session, cache->mtx_evict);
-}
-
-/*
- * __wt_workq_evict_server_exit --
- *	The exit flag is set, wake the eviction server to exit.
- */
-void
-__wt_workq_evict_server_exit(WT_CONNECTION_IMPL *conn)
-{
-	WT_CACHE *cache;
-	WT_SESSION_IMPL *session;
-
-	cache = conn->cache;
-	session = &conn->default_session;
 
 	__wt_unlock(session, cache->mtx_evict);
 }
@@ -275,16 +259,11 @@ __evict_worker(WT_SESSION_IMPL *session)
 		bytes_max = WT_STAT(conn->stats, cache_bytes_max);
 		if (cache->read_lockout) {
 			if (bytes_inuse <= bytes_max - (bytes_max / 20)) {
-#ifndef HAVE_WORKQ
 				/*
-				 * If there is no workQ and we have freed
-				 * enough space to unlock reads, ping the read
-				 * server.  If there is a workQ, it will wake
-				 * up the read server next time around its
-				 * loop.
+				 * If we have freed enough space to unlock
+				 * reads, ping the read server.
 				 */
-				__wt_workq_read_server(conn, 0);
-#endif
+				__wt_read_server_wake(conn, 0);
 				break;
 			}
 		} else if (bytes_inuse < bytes_max)

@@ -43,10 +43,6 @@ __wt_session_dump(WT_SESSION_IMPL *session)
 	__wt_msg(session, "session: %s%s%p",
 	    session->name == NULL ? "" : session->name,
 	    session->name == NULL ? "" : " ", session);
-	if (session->wq_func == NULL)
-		__wt_msg(session, "\tworkq func: none");
-	else
-		__wt_msg(session, "\tworkq func: %p", session->wq_func);
 
 	__wt_msg(session, "\tstate: %s", __wt_session_print_state(session));
 
@@ -82,17 +78,17 @@ static const char *
 __wt_session_print_state(WT_SESSION_IMPL *session)
 {
 	switch (session->wq_state) {
-	case WT_WORKQ_EVICT:
+	case WT_SERIAL_EVICT:
 		return ("evict");
-	case WT_WORKQ_EVICT_SCHED:
+	case WT_SERIAL_EVICT_SCHED:
 		return ("evict scheduled");
-	case WT_WORKQ_READ:
+	case WT_SERIAL_READ:
 		return ("read");
-	case WT_WORKQ_READ_SCHED:
+	case WT_SERIAL_READ_SCHED:
 		return ("read scheduled");
-	case WT_WORKQ_FUNC:
+	case WT_SERIAL_FUNC:
 		return ("function");
-	case WT_WORKQ_NONE:
+	case WT_SERIAL_NONE:
 		return ("none");
 	}
 	return ("unknown");
