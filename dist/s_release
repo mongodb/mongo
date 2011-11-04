@@ -29,6 +29,9 @@ echo "Running swig to generate the Python API"
     (cd lang/python && make ../../../lang/python/wiredtiger_wrap.c) && \
     make distclean)
 
+echo "Building documentation"
+(cd "$DEST/dist" && sh s_docs > /dev/null)
+
 echo "Packing release into $RELEASE_DIR/$PKG.tar.bz2"
 (cd "$RELEASE_DIR" && tar cf - $PKG | bzip2 -9 > $PKG.tar.bz2)
 
