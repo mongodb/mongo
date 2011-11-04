@@ -86,7 +86,7 @@ class suite_subprocess:
         filesize = os.path.getsize(filename)
         if filesize == 0:
             print 'ERROR: ' + filename + ' should not be empty (this command expected error output)'
-        self.assertEqual(filesize, 0, filename + ': expected to not be empty')
+        self.assertNotEqual(filesize, 0, filename + ': expected to not be empty')
 
     def runWt(self, args, infilename=None, outfilename=None, errfilename=None, reopensession=True):
         """
