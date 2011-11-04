@@ -60,22 +60,6 @@ class test_util06(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertEqual(i, self.nentries)
         cursor.close()
 
-    def close_conn(self):
-        """
-        Close the connection if already open.
-        """
-        if self.conn != None:
-            self.conn.close(None)
-            self.conn = None
-
-    def open_conn(self):
-        """
-        Open the connection if already closed.
-        """
-        if self.conn == None:
-            self.conn = self.setUpConnectionOpen(".")
-            self.session = self.setUpSessionOpen(self.conn)
-
     def damage(self, tablename):
         """
         Open the file for the table, find the unique string

@@ -75,9 +75,9 @@ class suite_subprocess:
         if filesize > 0:
             with open(filename, 'r') as f:
                 contents = f.read(1000)
-                print 'ERROR: ' + filename + ' should be empty, but contains:\n'
+                print 'ERROR: ' + filename + ' expected to be empty, but contains:\n'
                 print contents + '...\n'
-        self.assertEqual(filesize, 0)
+        self.assertEqual(filesize, 0, filename + ': expected to be empty')
 
     def check_non_empty_file(self, filename):
         """
@@ -86,18 +86,16 @@ class suite_subprocess:
         filesize = os.path.getsize(filename)
         if filesize == 0:
             print 'ERROR: ' + filename + ' should not be empty (this command expected error output)'
-        self.assertNotEqual(filesize, 0)
+        self.assertEqual(filesize, 0, filename + ': expected to be not empty')
 
-    def runWt(self, args, outfilename=None, errfilename=None, reopensession=True):
+    def runWt(self, args, infilename=None, outfilename=None, errfilename=None, reopensession=True):
         """
         Run the 'wt' process
         """
 
         # we close the connection to guarantee everything is
         # flushed, and that we can open it from another process
-        if self.conn != None:
-            self.conn.close(None)
-            self.conn = None
+        self.close_conn()
 
         wtoutname = outfilename
         if wtoutname == None:
@@ -113,13 +111,20 @@ class suite_subprocess:
                     procargs = ["../../wt"]
                 procargs.extend(args)
                 if self._gdbSubprocess:
+                    infilepart = ""
+                    if infilename != None:
+                        infilepart = "<" + infilename + " "
                     print str(procargs)
                     print "*********************************************"
-                    print "**** Run 'wt' via: run " + " ".join(procargs[3:]) + ">" + wtoutname + " 2>" + wterrname
+                    print "**** Run 'wt' via: run " + " ".join(procargs[3:]) + infilepart + ">" + wtoutname + " 2>" + wterrname
                     print "*********************************************"
                     proc = subprocess.Popen(procargs)
                 else:
-                    proc = subprocess.Popen(procargs, stdout=wtout, stderr=wterr)
+                    if infilename != None:
+                        with open(infilename, "r") as wtin:
+                            proc = subprocess.Popen(procargs, stdin=wtin, stdout=wtout, stderr=wterr)
+                    else:
+                        proc = subprocess.Popen(procargs, stdout=wtout, stderr=wterr)
                 proc.wait()
         if errfilename == None:
             self.check_empty_file(wterrname)
@@ -128,5 +133,4 @@ class suite_subprocess:
 
         # Reestablish the connection if needed
         if reopensession:
-            self.conn = self.setUpConnectionOpen(".")
-            self.session = self.setUpSessionOpen(self.conn)
+            self.open_conn()
