@@ -91,7 +91,6 @@ class test_util06(wttest.WiredTigerTestCase, suite_subprocess):
         """
         Test salvage in a 'wt' process, using an empty table
         """
-        self.skipTest('TODO: salvage does not work on an empty table...')
         self.session.create('table:' + self.tablename, self.session_params)
         errfile = "salvageerr.out"
         self.runWt(["salvage", self.tablename + ".wt"], errfilename=errfile)
@@ -112,7 +111,6 @@ class test_util06(wttest.WiredTigerTestCase, suite_subprocess):
         """
         Test salvage via API, using an empty table
         """
-        self.skipTest('TODO: salvage does not work on an empty table...')
         self.session.create('table:' + self.tablename, self.session_params)
         self.session.salvage('table:' + self.tablename, None)
 

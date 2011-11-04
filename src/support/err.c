@@ -173,6 +173,6 @@ __wt_file_item_too_big(WT_SESSION_IMPL *session)
 int
 __wt_unknown_object_type(WT_SESSION_IMPL *session, const char *uri)
 {
-	__wt_errx(session, "unknown object type: %s", uri);
+	__wt_errx(session, "unknown or unsupported object type: %s", uri);
 	return (EINVAL);
 }

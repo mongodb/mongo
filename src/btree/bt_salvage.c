@@ -144,7 +144,7 @@ __slvg_empty(WT_SESSION_IMPL *session)
  *	Salvage a Btree.
  */
 int
-__wt_salvage(WT_SESSION_IMPL *session, const char *config)
+__wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_BTREE *btree;
 	WT_STUFF *ss, stuff;
@@ -152,7 +152,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *config)
 	uint32_t allocsize, i, leaf_cnt;
 	int ret;
 
-	WT_UNUSED(config);
+	WT_UNUSED(cfg);
 
 	btree = session->btree;
 	ret = 0;
@@ -186,9 +186,12 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *config)
 			WT_ERR(__wt_ftruncate(session, btree->fh, len));
 	}
 
-	/* If the file has no data pages, we're done. */
+	/*
+	 * If the file has no data pages, we're done; rewrite the description
+	 * and return success.
+	 */
 	if (btree->fh->file_size <= WT_BTREE_DESC_SECTOR)
-		WT_ERR(__slvg_empty(session));
+		goto desc_sector_only;
 
 	/*
 	 * Step 1:
@@ -314,6 +317,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *config)
 	 if (ss->merge_free)
 		WT_ERR(__slvg_merge_block_free(session, ss));
 
+desc_sector_only:
 	/*
 	 * Step 8:
 	 * Write out a file description block (closing the file will update it
@@ -321,12 +325,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *config)
 	 */
 	WT_ERR(__wt_desc_write(session, btree->fh));
 
-	if (0) {
-err:		if (ret == 0)
-			ret = WT_ERROR;
-	}
-
-	/* Discard the leaf and overflow page memory. */
+err:	/* Discard the leaf and overflow page memory. */
 	WT_TRET(__slvg_cleanup(session, ss));
 
 	/* Discard verbose print buffer. */

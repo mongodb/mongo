@@ -184,6 +184,26 @@ err:	API_END(session);
 }
 
 /*
+ * __session_dumpfile --
+ *	WT_SESSION->dumpfile method.
+ */
+static int
+__session_dumpfile(WT_SESSION *wt_session, const char *uri, const char *config)
+{
+	WT_SESSION_IMPL *session;
+	int ret;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+	ret = 0;
+
+	SESSION_API_CALL(session, dumpfile, config, cfg);
+	ret = __wt_schema_worker(session, uri, cfg,
+	    __wt_dumpfile, WT_BTREE_EXCLUSIVE | WT_BTREE_VERIFY);
+err:	API_END(session);
+	return (ret);
+}
+
+/*
  * __session_salvage --
  *	WT_SESSION->salvage method.
  */
@@ -194,30 +214,12 @@ __session_salvage(WT_SESSION *wt_session, const char *uri, const char *config)
 	int ret;
 
 	session = (WT_SESSION_IMPL *)wt_session;
-	ret = 0;
 
 	SESSION_API_CALL(session, salvage, config, cfg);
-	if (!WT_PREFIX_MATCH(uri, "file:")) {
-		ret = __wt_unknown_object_type(session, uri);
-		goto err;
-	}
-
-	/*
-	 * Open a btree handle.
-	 *
-	 * Tell the eviction thread to ignore this handle, we'll manage our own
-	 * pages.  Also tell open that we're going to salvage this handle, so
-	 * it skips loading metadata such as the free list, which could be
-	 * corrupted.
-	 */
-	WT_ERR(__wt_session_get_btree(session, uri, uri, NULL, cfg,
-	    WT_BTREE_EXCLUSIVE | WT_BTREE_NO_EVICTION | WT_BTREE_SALVAGE));
-
-	WT_TRET(__wt_salvage(session, config));
-
-	WT_TRET(__wt_session_release_btree(session));
+	ret = __wt_schema_worker(session, uri, cfg,
+	    __wt_salvage,
+	    WT_BTREE_EXCLUSIVE | WT_BTREE_NO_EVICTION | WT_BTREE_SALVAGE);
 err:	API_END(session);
-
 	return (ret);
 }
 
@@ -234,7 +236,7 @@ __session_sync(WT_SESSION *wt_session, const char *uri, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	SESSION_API_CALL(session, sync, config, cfg);
-	ret = __wt_schema_sync(session, uri, cfg);
+	ret = __wt_schema_worker(session, uri, cfg, __wt_btree_sync, 0);
 err:	API_END(session);
 	return (ret);
 }
@@ -269,47 +271,8 @@ __session_verify(WT_SESSION *wt_session, const char *uri, const char *config)
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	SESSION_API_CALL(session, verify, config, cfg);
-	ret = __wt_schema_verify(session, uri, cfg);
-err:	API_END(session);
-	return (ret);
-}
-
-/*
- * __session_dumpfile --
- *	WT_SESSION->dumpfile method.
- */
-static int
-__session_dumpfile(WT_SESSION *wt_session, const char *uri, const char *config)
-{
-	WT_SESSION_IMPL *session;
-	int ret;
-
-	session = (WT_SESSION_IMPL *)wt_session;
-	ret = 0;
-
-	SESSION_API_CALL(session, dumpfile, config, cfg);
-	if (!WT_PREFIX_MATCH(uri, "file:")) {
-		ret = __wt_unknown_object_type(session, uri);
-		goto err;
-	}
-
-	/*
-	 * Get a btree handle.
-	 *
-	 * Tell the eviction thread to ignore this handle, we'll manage our own
-	 * pages (it would be possible for us to let the eviction thread handle
-	 * us, but there's no reason to do so, we can be more aggressive
-	 * because we know what pages are no longer needed, regardless of LRU).
-	 *
-	 * Also tell open that we're going to verify this handle, so it skips
-	 * loading metadata such as the free list, which could be corrupted.
-	 */
-	WT_ERR(__wt_session_get_btree(session,
-	    uri, uri, NULL, cfg, WT_BTREE_EXCLUSIVE | WT_BTREE_VERIFY));
-
-	WT_TRET(__wt_dumpfile(session, cfg));
-
-	WT_TRET(__wt_session_release_btree(session));
+	ret = __wt_schema_worker(session, uri, cfg,
+	    __wt_verify, WT_BTREE_EXCLUSIVE | WT_BTREE_VERIFY);
 err:	API_END(session);
 	return (ret);
 }
