@@ -5,7 +5,7 @@
 # Copyright (c) 2008-2011 WiredTiger, Inc.
 #	All rights reserved.
 #
-# test_util05.py
+# test_util07.py
 # 	Utilities: wt read
 #
 
@@ -16,8 +16,8 @@ from suite_subprocess import suite_subprocess
 import os
 import struct
 
-class test_util06(wttest.WiredTigerTestCase, suite_subprocess):
-    tablename = 'test_util06.a'
+class test_util07(wttest.WiredTigerTestCase, suite_subprocess):
+    tablename = 'test_util07.a'
     nentries = 1000
     session_params = 'key_format=S,value_format=S'
 

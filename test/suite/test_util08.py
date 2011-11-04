@@ -5,7 +5,7 @@
 # Copyright (c) 2008-2011 WiredTiger, Inc.
 #	All rights reserved.
 #
-# test_util05.py
+# test_util08.py
 # 	Utilities: wt copyright
 #
 
@@ -14,7 +14,7 @@ from wiredtiger import WiredTigerError
 import wttest
 from suite_subprocess import suite_subprocess
 
-class test_util06(wttest.WiredTigerTestCase, suite_subprocess):
+class test_util08(wttest.WiredTigerTestCase, suite_subprocess):
     def test_copyright(self):
         """
         Test copyright in a 'wt' process

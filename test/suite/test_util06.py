@@ -5,7 +5,7 @@
 # Copyright (c) 2008-2011 WiredTiger, Inc.
 #	All rights reserved.
 #
-# test_util05.py
+# test_util06.py
 # 	Utilities: wt salvage
 #
 
@@ -152,7 +152,7 @@ class test_util06(wttest.WiredTigerTestCase, suite_subprocess):
 
         # damage() closed the session/connection, reopen them now.
         self.open_conn()
-        self.assertRaises(WiredTigerError, lambda: self.session.salvage('file:' + self.tablename + ".wt", None))
+        self.session.salvage('file:' + self.tablename + ".wt")
 
     def test_salvage_api_damaged(self):  #TODO
         """
