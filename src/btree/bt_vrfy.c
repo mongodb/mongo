@@ -60,6 +60,8 @@ __wt_dumpfile(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_UNUSED(cfg);			/* XXX: unused for now */
 
 #ifdef HAVE_DIAGNOSTIC
+	WT_RET(__wt_debug_desc(session, NULL));
+
 	/*
 	 * We use the verification code to do debugging dumps because if we're
 	 * dumping in debugging mode, we want to confirm the page is OK before

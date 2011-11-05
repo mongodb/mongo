@@ -324,6 +324,43 @@ __wt_debug_page(WT_SESSION_IMPL *session, WT_PAGE *page, const char *ofile)
 }
 
 /*
+ * __wt_debug_desc --
+ *	Dump the file's description sector.
+ */
+int
+__wt_debug_desc(WT_SESSION_IMPL *session, const char *ofile)
+{
+	WT_BTREE *btree;
+	WT_BTREE_DESC *desc;
+	WT_DBG *ds, _ds;
+	uint8_t buf[WT_BTREE_DESC_SECTOR];
+
+	btree = session->btree;
+
+	ds = &_ds;
+	WT_RET(__debug_config(session, ds, ofile));
+
+	__dmsg(ds, "%s%s\n", sep, btree->name);
+
+	WT_RET(__wt_read(session, btree->fh, (off_t)0, sizeof(buf), buf));
+	desc = (WT_BTREE_DESC *)buf;
+
+	__dmsg(ds, "magic: %" PRIu32 "\n", desc->magic);
+	__dmsg(ds, "major, minor: %" PRIu32 ", %" PRIu32 "\n",
+	    desc->majorv, desc->minorv);
+	__dmsg(ds, "checksum: %#" PRIx32 "\n", desc->checksum);
+	__dmsg(ds, "root addr, size: %" PRIu32 ", %" PRIu32 "\n",
+	    desc->root_addr, desc->root_size);
+	__dmsg(ds, "free addr, size: %" PRIu32 ", %" PRIu32 "\n",
+	    desc->free_addr, desc->free_size);
+	__dmsg(ds, "lsn: %" PRIu64 "\n", desc->lsn);
+
+	__dmsg(ds, "%s", sep);
+
+	return (0);
+}
+
+/*
  * __debug_page_work --
  *	Dump the in-memory information for an in-memory page.
  */
