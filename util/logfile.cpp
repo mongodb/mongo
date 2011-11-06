@@ -85,6 +85,14 @@ namespace mongo {
         }
     }
 
+    void LogFile::writeAt(unsigned offset, const void *_buf, size_t _len) { 
+        OVERLAPPED o;
+        memset(&o,0,sizeof(o));
+        o.Offset = offset;
+        BOOL ok= WriteFile(_fd, _buf, _len, 0, &o);
+        assert(ok);
+    }
+
     void LogFile::synchronousAppend(const void *_buf, size_t _len) {
         const size_t BlockSize = 8 * 1024 * 1024;
         assert(_fd);

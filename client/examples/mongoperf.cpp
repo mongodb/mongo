@@ -8,30 +8,82 @@
 #include "../dbclient.h" // the mongo c++ driver
 #include "../../util/mmap.h"
 #include <assert.h>
+#include "../../util/logfile.h"
+#include "../../util/time_support.h"
+#include "../../bson/util/atomic_int.h"
 
 using namespace std;
 using namespace mongo;
 using namespace bson;
 
-MemoryMappedFile m;
-bo options;
+LogFile *lf = 0;
 
-void writer() { 
+//MemoryMappedFile m;
+bo options;
+unsigned long long len; // file len
+const unsigned PG = 4096;
+unsigned nThreadsRunning = 0;
+
+AtomicUInt writes;
+
+void writer() {
+    long long su = options["sleepMicros"].numberLong();
+    char abuf[PG];
+    while( 1 ) { 
+        int x = rand();
+        unsigned long long ofs = (x * PG) % len;
+        lf->writeAt((unsigned) ofs, abuf, PG);
+        writes++;
+        long long micros = su / nThreadsRunning;
+        if( micros ) {
+            sleepmicros(micros);
+        }
+    }
 }
 
 void go() {
     cout << "create test file" << endl;
-    unsigned long long len = options["fileSizeMB"].numberLong();
+    len = options["fileSizeMB"].numberLong();
     if( len == 0 ) len = 1;
-    void *p = m.create("mongoperf__testfile__tmp", len * 1024 * 1024, true);
-    assert(p);
+    cout << "test fileSizeMB : " << len << endl;
+    len *= 1024 * 1024;
+    lf = new LogFile("mongoperf__testfile__tmp");
+    const unsigned sz = 1024 * 256;
+    char buf[sz];
+    for( unsigned i = 0; i < len; i+= sz ) { 
+        lf->synchronousAppend(buf, sz);
+    }
+
+    //void *p = m.create("mongoperf__testfile__tmp", len * 1024 * 1024, true);
+    //assert(p);
 
     cout << "testing..."<< endl;
 
     BSONObj& o = options;
-    int w = o["w"].Int();
-    for( int i = 0; i < w; i++ ) { 
-        boost::thread w(writer);
+    unsigned wthr = (unsigned) o["nThreads"].Int();
+    if( wthr < 1 ) { 
+        cout << "bad threads field value" << endl;
+        return;
+    }
+    unsigned i = 0;
+    unsigned d = 1;
+    unsigned &nthr = nThreadsRunning;
+    while( 1 ) {
+        if( i++ % 4 == 0 ) {
+            if( nthr < wthr ) {
+                while( nthr < wthr && nthr < d ) {
+                    nthr++;
+                    boost::thread w(writer);
+                }
+                cout << "new thread, total running : " << nthr << endl;
+                d *= 2;
+            }
+        }
+        sleepsecs(4);
+        unsigned long long w = writes.get();
+        writes.zero();
+        w /= 4;
+        cout << w << " ops/sec " << (w * PG / 1024 / 1024) << " MB/sec" << endl;
     }
 }
 
@@ -41,20 +93,19 @@ int main(int argc, char *argv[]) {
         cout << "mongoperf" << endl;
 
         if( argc > 1 ) { 
-            cout << "help\n" 
-                "  usage:\n"
-                "    cat myjsonconfigfile | mongoperf\n"
-                "  where myjsonconfigfile contains a json document which specifies the test to run.\n"
+            cout <<
+                "  usage:\n\n"
+                "    mongoperf < myjsonconfigfile\n\n"
                 "  json config doc fields:\n"
-                "    w:<n> number of write threads\n"
+                "    nThreads:<n> number of threads\n"
                 "    fileSizeMB:<n> test file size. if the file is small the heads will not move much\n"
-                "                   thus making the test not terribly informative.\n"
+                "      thus making the test not informative.\n"
+                "    sleepMicros:<n> pause for sleepMicros/#threadsrunning between each operation\n"
                 << endl;
             return 0;
         }
 
         cout << "use -h for help" << endl;
-        cout << "enter json operations object:" << endl;
 
         char input[1024];
         memset(input, 0, sizeof(input));
