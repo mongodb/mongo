@@ -11,7 +11,7 @@ s_dumpcmp: $(srcdir)/s_dumpcmp.in
 	cp $(srcdir)/s_dumpcmp.in $@
 
 backup:
-	rm -rf BACKUP && mkdir BACKUP && cp __* BACKUP/
+	rm -rf BACKUP && mkdir BACKUP && cp WiredTiger __* BACKUP/
 
 clean-local:
 	rm -rf BACKUP WiredTiger vgout.* __*
