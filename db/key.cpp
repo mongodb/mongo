@@ -179,6 +179,10 @@ namespace mongo {
         return oldCompare(_o, r._o, nullOrdering) == 0;
     }
 
+    bool KeyBson::strictEqual(const KeyBson& r) const {
+        return dataSize() == r.dataSize() && !memcmp(data(), r.data(), dataSize());
+    }
+
     // [ ][HASMORE][x][y][canontype_4bits]
     enum CanonicalsEtc { 
         cminkey=1,
@@ -661,6 +665,10 @@ namespace mongo {
                 break;
         }
         return true;
+    }
+
+    bool KeyV1::strictEqual(const KeyV1& r) const {
+        return dataSize() == r.dataSize() && !memcmp(data(), r.data(), dataSize());
     }
 
     struct CmpUnitTest : public UnitTest {

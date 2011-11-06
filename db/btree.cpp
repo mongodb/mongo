@@ -345,13 +345,18 @@ namespace mongo {
     /** add a key.  must be > all existing.  be careful to set next ptr right. */
     template< class V >
     bool BucketBasics<V>::_pushBack(const DiskLoc recordLoc, const Key& key, const Ordering &order, const DiskLoc prevChild) {
+        bool needDedup = false;
         int cmpResult = -1;
         if ( this->n ) {
-            cmpResult = keyNode(this->n-1).key.woCompare(key, order);
+            const Key &prevKey = keyNode(this->n-1).key;
+            cmpResult = prevKey.woCompare(key, order);
+            // we need to double check the binary representation is the same as well.
+            if ( !cmpResult && key.strictEqual( prevKey ) )
+                needDedup = true;
         }
 
         int bytesNeeded = sizeof(_KeyNode);
-        if ( cmpResult != 0 )
+        if ( !needDedup )
             bytesNeeded += key.dataSize();
         if ( bytesNeeded > this->emptySize )
             return false;
@@ -367,7 +372,7 @@ namespace mongo {
         _KeyNode& kn = k(this->n);
         kn.prevChildBucket = prevChild;
         kn.recordLoc = recordLoc;
-        if ( cmpResult == 0 ) {
+        if ( needDedup ) {
             kn.setKeyDataOfs( k(this->n-1).keyDataOfs() );
         }
         else {
@@ -395,9 +400,9 @@ namespace mongo {
         check( keypos >= 0 && keypos <= this->n );
 
         int cmpDupKeyResult = 0;
-        if ( keypos && key.woEqual( keyNode(keypos-1).key ) )
+        if ( keypos && key.strictEqual( keyNode(keypos-1).key ) )
             cmpDupKeyResult = -1;
-        if ( keypos < this->n && key.woEqual( keyNode(keypos).key ) )
+        else if ( keypos < this->n && key.strictEqual( keyNode(keypos).key ) )
             cmpDupKeyResult = 1;
 
         int bytesNeeded = sizeof(_KeyNode);
@@ -408,11 +413,12 @@ namespace mongo {
             _pack(thisLoc, order, keypos);
             // we have to re-check, because: the equality might not hold anymore
             // when previous or next one is marked as unused before we _pack().
-            cmpDupKeyResult = 0;
-            if ( keypos && key.woEqual( keyNode(keypos-1).key ) )
+            if ( keypos && key.strictEqual( keyNode(keypos-1).key ) )
                 cmpDupKeyResult = -1;
-            if ( keypos < this->n && key.woEqual( keyNode(keypos).key ) )
+            else if ( keypos < this->n && key.strictEqual( keyNode(keypos).key ) )
                 cmpDupKeyResult = 1;
+            else
+                cmpDupKeyResult = 0;
 
             bytesNeeded = sizeof(_KeyNode);
             if ( !cmpDupKeyResult )
@@ -477,7 +483,7 @@ namespace mongo {
         if ( this->flags & Packed ) {
 	  return V::BucketSize - this->emptySize - headerSize();
         }
-        short lastOfs = -1;
+        set<short> offsets;
         int size = 0;
         for( int j = 0; j < this->n; ++j ) {
             if ( mayDropKey( j, refPos ) ) {
@@ -485,8 +491,8 @@ namespace mongo {
             }
             size += sizeof( _KeyNode );
             short curOfs = k( j ).keyDataOfs();
-            if( curOfs != lastOfs ) {
-                lastOfs = curOfs;
+            if ( offsets.find( curOfs ) == offsets.end() ) {
+                offsets.insert( curOfs );
                 size += keyNode( j ).key.dataSize();
             }
         }
@@ -525,7 +531,7 @@ namespace mongo {
         int ofs = tdz;
         this->topSize = 0;
         int i = 0;
-        short lastOldOfs = -1;
+        set<short> offsets;
         for ( int j = 0; j < this->n; j++ ) {
             if( mayDropKey( j, refPos ) ) {
                 continue; // key is unused and has no children - drop it
@@ -537,15 +543,20 @@ namespace mongo {
                 k( i ) = k( j );
             }
             short ofsold = k(i).keyDataOfs();
-            if ( ofsold != lastOldOfs ) {
-                lastOldOfs = ofsold;
-
+            set<short>::iterator it = offsets.find( ofsold );
+            if ( it == offsets.end() ) {
+                // it's not deduped, allocate space as normal
+                offsets.insert( ofsold );
                 int sz = keyNode(i).key.dataSize();
                 ofs -= sz;
                 this->topSize += sz;
                 memcpy(temp+ofs, dataAt(ofsold), sz);
+                k(i).setKeyDataOfsSavingUse( ofs );
             }
-            k(i).setKeyDataOfsSavingUse( ofs );
+            else {
+                // deduped, then we set the offset accordingly
+                k(i).setKeyDataOfsSavingUse( *it );
+            }
             ++i;
         }
         if ( refPos == this->n ) {
@@ -604,13 +615,13 @@ namespace mongo {
         // when splitting a btree node, if the new key is greater than all the other keys, we should not do an even split, but a 90/10 split.
         // see SERVER-983
         // TODO I think we only want to do the 90% split on the rhs node of the tree.
-        short lastOfs = -1;
+        set<short> offsets;
         int rightSizeLimit = ( this->topSize + sizeof( _KeyNode ) * this->n ) / ( keypos == this->n ? 10 : 2 );
         for( int i = this->n - 1; i > -1; --i ) {
-            short currOfs = k( i ).keyDataOfs();
             rightSize += sizeof( _KeyNode );
-            if ( currOfs != lastOfs ) {
-                lastOfs = currOfs;
+            short ofs = k( i ).keyDataOfs();
+            if ( offsets.find( ofs ) == offsets.end() ) {
+                offsets.insert( ofs );
                 rightSize += keyNode( i ).key.dataSize();
             }
             if ( rightSize > rightSizeLimit ) {
@@ -1051,13 +1062,13 @@ namespace mongo {
         // This constraint should be ensured by only calling this function
         // if we go below the low water mark.
         assert( rightSizeLimit < BtreeBucket<V>::bodySize() );
-        int lastOfs = -1;
+        set<short> offsets;
         for( int i = r->n - 1; i > -1; --i ) {
             rightSize += KNS;
             short curOfs = r->k( i ).keyDataOfs();
-            if ( curOfs != lastOfs ) {
+            if ( offsets.find( curOfs ) == offsets.end() ) {
+                offsets.insert( curOfs );
                 rightSize += r->keyNode( i ).key.dataSize();
-                lastOfs = curOfs;
             }
             if ( rightSize > rightSizeLimit ) {
                 split = l->n + 1 + i;
@@ -1071,13 +1082,13 @@ namespace mongo {
             }
         }
         if ( split == -1 ) {
-            lastOfs = -1;
+            offsets.clear();
             for( int i = l->n - 1; i > -1; --i ) {
                 rightSize += KNS;
                 short curOfs = l->k( i ).keyDataOfs();
-                if ( curOfs != lastOfs ) {
+                if ( offsets.find( curOfs ) == offsets.end() ) {
+                    offsets.insert( curOfs );
                     rightSize += l->keyNode( i ).key.dataSize();
-                    lastOfs = curOfs;
                 }
                 if ( rightSize > rightSizeLimit ) {
                     split = i;
