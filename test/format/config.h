@@ -82,7 +82,7 @@ static CONFIG c[] = {
 
 	{ "leaf_node_max",
 	  "maximum size of Btree leaf nodes",
-	  0, 0, 9, 17, &g.c_leaf_node_max },
+	  0, 0, 9, 24, &g.c_leaf_node_max },
 
 	{ "ops",
 	  "the number of modification operations done per run",
