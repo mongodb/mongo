@@ -177,7 +177,7 @@ config_single(const char *s, int perm)
 
 	if ((ep = strchr(s, '=')) == NULL) {
 		fprintf(stderr,
-		    "%s: %s: illegal command-line value\n", g.progname, s);
+		    "%s: %s: illegal configuration value\n", g.progname, s);
 		exit(EXIT_FAILURE);
 	}
 
@@ -241,9 +241,8 @@ config_find(const char *s, size_t len)
 			return (cp);
 
 	fprintf(stderr,
-	    "%s: %s: unknown configuration keyword; use the -c option to "
-	    "display available configuration keywords\n",
-	    g.progname, s);
+	    "%s: %s: unknown configuration keyword\n", g.progname, s);
+	config_error();
 	exit(EXIT_FAILURE);
 }
 
