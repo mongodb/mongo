@@ -41,7 +41,7 @@ namespace mongo {
         BSONElement _firstElement() const { return _o.firstElement(); }
         bool isCompactFormat() const { return false; }
         bool woEqual(const KeyBson& r) const;
-        bool strictEqual(const KeyBson &r) const;
+        bool binaryEqual(const KeyBson &r) const;
         void assign(const KeyBson& rhs) { *this = rhs; }
     private:
         BSONObj _o;
@@ -73,7 +73,7 @@ namespace mongo {
 
         int woCompare(const KeyV1& r, const Ordering &o) const;
         bool woEqual(const KeyV1& r) const;
-        bool strictEqual(const KeyV1 &r) const;
+        bool binaryEqual(const KeyV1 &r) const;
         BSONObj toBson() const;
         string toString() const { return toBson().toString(); }
 

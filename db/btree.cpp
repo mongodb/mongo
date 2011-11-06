@@ -351,7 +351,7 @@ namespace mongo {
             const Key &prevKey = keyNode(this->n-1).key;
             cmpResult = prevKey.woCompare(key, order);
             // we need to double check the binary representation is the same as well.
-            if ( !cmpResult && key.strictEqual( prevKey ) )
+            if ( !cmpResult && key.binaryEqual( prevKey ) )
                 needDedup = true;
         }
 
@@ -400,9 +400,9 @@ namespace mongo {
         check( keypos >= 0 && keypos <= this->n );
 
         int cmpDupKeyResult = 0;
-        if ( keypos && key.strictEqual( keyNode(keypos-1).key ) )
+        if ( keypos && key.binaryEqual( keyNode(keypos-1).key ) )
             cmpDupKeyResult = -1;
-        else if ( keypos < this->n && key.strictEqual( keyNode(keypos).key ) )
+        else if ( keypos < this->n && key.binaryEqual( keyNode(keypos).key ) )
             cmpDupKeyResult = 1;
 
         int bytesNeeded = sizeof(_KeyNode);
@@ -413,9 +413,9 @@ namespace mongo {
             _pack(thisLoc, order, keypos);
             // we have to re-check, because: the equality might not hold anymore
             // when previous or next one is marked as unused before we _pack().
-            if ( keypos && key.strictEqual( keyNode(keypos-1).key ) )
+            if ( keypos && key.binaryEqual( keyNode(keypos-1).key ) )
                 cmpDupKeyResult = -1;
-            else if ( keypos < this->n && key.strictEqual( keyNode(keypos).key ) )
+            else if ( keypos < this->n && key.binaryEqual( keyNode(keypos).key ) )
                 cmpDupKeyResult = 1;
             else
                 cmpDupKeyResult = 0;
