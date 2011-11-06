@@ -45,7 +45,8 @@ __wt_row_key(
 		/*
 		 * Multiple threads of control may be searching this page, which
 		 * means the key may change underfoot, and here's where it gets
-		 * tricky: first, copy the key.
+		 * tricky: first, copy the key.  We don't need any barriers, the
+		 * key is updated atomically, and we just need a valid copy.
 		 */
 		key = rip->key;
 
@@ -70,11 +71,6 @@ __wt_row_key(
 		 * specifically, in this code when we're looking for a key we
 		 * can roll-forward to figure out the target key's prefix,
 		 * instantiated overflow keys aren't useful.
-		 *
-		 * Row-store internal and leaf pages have a bit array with one
-		 * element for each of the original keys on the page.  If that
-		 * bit is set, the instantiated key was an overflow key, else,
-		 * it wasn't.
 		 *
 		 * 1: the test for an on/off page reference.
 		 */
