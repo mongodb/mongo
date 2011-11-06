@@ -1673,6 +1673,19 @@
         }
     };
 
+    class NotDedupKey : public Base {
+    public:
+        void run() {
+            ArtificialTree::setTree( "{_diskloc:10,$5:null,_diskloc:20,$5:null,$6:null}", id() );
+            ArtificialTree *root = ArtificialTree::is( dl() );
+            unsigned previousEmptySize = root->getEmptySize();
+            BSONObj key = BSON( "" << 5LL );
+            ASSERT( root->insertAtPos( dl(), 1, key, recordLoc( 18 ) ) );
+            ASSERT_EQUALS( previousEmptySize, root->getEmptySize() + sizeof(_KeyNode) + key.objsize() );
+            ASSERT_EQUALS( 4, bt()->fullValidate( dl(), order(), 0, true ) );
+        }
+    };
+
     class SignedZeroDuplication : public Base {
     public:
         void run() {
@@ -1774,5 +1787,6 @@
             add< SignedZeroDuplication >();
             add< DupKeyWithPreviousOne >();
             add< DupKeyWithNextOne >();
+            add< NotDedupKey >();
         }
     } myall;
