@@ -531,7 +531,7 @@ namespace mongo {
         int ofs = tdz;
         this->topSize = 0;
         int i = 0;
-        set<short> offsets;
+        map<short, short> offsetsMap;
         for ( int j = 0; j < this->n; j++ ) {
             if( mayDropKey( j, refPos ) ) {
                 continue; // key is unused and has no children - drop it
@@ -543,19 +543,19 @@ namespace mongo {
                 k( i ) = k( j );
             }
             short ofsold = k(i).keyDataOfs();
-            set<short>::iterator it = offsets.find( ofsold );
-            if ( it == offsets.end() ) {
+            map<short, short>::iterator it = offsetsMap.find( ofsold );
+            if ( it == offsetsMap.end() ) {
                 // it's not deduped, allocate space as normal
-                offsets.insert( ofsold );
                 int sz = keyNode(i).key.dataSize();
                 ofs -= sz;
                 this->topSize += sz;
                 memcpy(temp+ofs, dataAt(ofsold), sz);
                 k(i).setKeyDataOfsSavingUse( ofs );
+                offsetsMap[ ofsold ] = ofs;
             }
             else {
                 // deduped, then we set the offset accordingly
-                k(i).setKeyDataOfsSavingUse( *it );
+                k(i).setKeyDataOfsSavingUse( it->second );
             }
             ++i;
         }
