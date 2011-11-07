@@ -12,6 +12,7 @@
 import unittest
 from wiredtiger import WiredTigerError
 import wttest
+from run import wt_builddir
 import subprocess
 import os
 
@@ -101,10 +102,10 @@ class suite_subprocess:
         wterrname = errfilename or "wt.err"
         with open(wterrname, "w") as wterr:
             with open(wtoutname, "w") as wtout:
+                procargs = [os.path.join(wt_builddir, "wt")]
                 if self._gdbSubprocess:
-                    procargs = ["gdb", "--args", "../../.libs/wt"]
-                else:
-                    procargs = ["../../wt"]
+                    procargs = [os.path.join(wt_builddir, "libtool"),
+                                "--mode=execute", "gdb", "--args"] + procargs
                 procargs.extend(args)
                 if self._gdbSubprocess:
                     infilepart = ""
