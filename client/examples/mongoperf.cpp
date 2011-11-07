@@ -1,7 +1,7 @@
 /* 
    How to build and run:
 
-    g++ -o mongoperf -I .. mongoperf.cpp mongo_client_lib.cpp -lboost_thread-mt -lboost_filesystem
+   (out of date) : g++ -o mongoperf -I .. mongoperf.cpp mongo_client_lib.cpp -lboost_thread-mt -lboost_filesystem
 */
 
 #include <iostream>
@@ -23,7 +23,7 @@ bo options;
 unsigned long long len; // file len
 const unsigned PG = 4096;
 unsigned nThreadsRunning = 0;
-
+char *mmf = 0;
 AtomicUInt writes;
 
 void writer() {
@@ -42,12 +42,14 @@ void writer() {
 }
 
 void go() {
+    MemoryMappedFile f;
     cout << "create test file" << endl;
     len = options["fileSizeMB"].numberLong();
     if( len == 0 ) len = 1;
     cout << "test fileSizeMB : " << len << endl;
     len *= 1024 * 1024;
-    lf = new LogFile("mongoperf__testfile__tmp");
+    const char *fname = "mongoperf__testfile__tmp";
+    lf = new LogFile(fname);
     const unsigned sz = 1024 * 256;
     char buf[sz];
     for( unsigned i = 0; i < len; i+= sz ) { 
@@ -56,6 +58,11 @@ void go() {
 
     //void *p = m.create("mongoperf__testfile__tmp", len * 1024 * 1024, true);
     //assert(p);
+
+    if( o["mmf"].trueValue() ) { 
+        mmf = f.map(fname);
+        assert( mmf );
+    }
 
     cout << "testing..."<< endl;
 
@@ -101,6 +108,7 @@ int main(int argc, char *argv[]) {
                 "    fileSizeMB:<n> test file size. if the file is small the heads will not move much\n"
                 "      thus making the test not informative.\n"
                 "    sleepMicros:<n> pause for sleepMicros/#threadsrunning between each operation\n"
+                "    mmf:true do i/o's via memory mapped files\n"
                 << endl;
             return 0;
         }

@@ -91,6 +91,19 @@
     <ClCompile Include="mongoperf.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\bson\bson-inl.h" />
+    <ClInclude Include="..\..\bson\bson.h" />
+    <ClInclude Include="..\..\bson\bsonelement.h" />
+    <ClInclude Include="..\..\bson\bsonmisc.h" />
+    <ClInclude Include="..\..\bson\bsonobj.h" />
+    <ClInclude Include="..\..\bson\bsonobjbuilder.h" />
+    <ClInclude Include="..\..\bson\bsonobjiterator.h" />
+    <ClInclude Include="..\..\bson\bsontypes.h" />
+    <ClInclude Include="..\..\bson\bson_db.h" />
+    <ClInclude Include="..\..\bson\inline_decls.h" />
+    <ClInclude Include="..\..\bson\oid.h" />
+    <ClInclude Include="..\..\bson\ordering.h" />
+    <ClInclude Include="..\..\bson\stringdata.h" />
     <ClInclude Include="..\..\util\logfile.h" />
     <ClInclude Include="..\..\util\mmap.h" />
   </ItemGroup>
