@@ -42,7 +42,15 @@ __wt_session_lock_btree(
 	WT_ASSERT(session, btree != NULL);
 
 	if (LF_ISSET(WT_BTREE_EXCLUSIVE)) {
-		__wt_writelock(session, btree->rwlock);
+		/*
+		 * Try to get an exclusive handle lock and fail immediately if
+		 * it unavailable.  We don't expect exclusive operations on
+		 * trees to be mixed with ordinary cursor access, but if there
+		 * is a use case in the future, we could make blocking here
+		 * configurable.
+		 */
+		WT_RET(__wt_try_writelock(session, btree->rwlock));
+
 		/*
 		 * Check if the handle needs to be reopened.  If the handle was
 		 * just opened, cfg is NULL, so there is no need to reopen in

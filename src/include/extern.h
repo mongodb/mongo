@@ -384,6 +384,7 @@ extern int __wt_rwlock_alloc( WT_SESSION_IMPL *session,
     const char *name,
     WT_RWLOCK **rwlockp);
 extern void __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
+extern int __wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
 extern void __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
 extern void __wt_rwunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
 extern int __wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);

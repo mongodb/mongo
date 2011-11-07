@@ -56,7 +56,7 @@ __wt_cond_wait(WT_SESSION_IMPL *session, WT_CONDVAR *cond)
 	 */
 	if (session != NULL)
 		WT_VERBOSE(
-		    session, MUTEX, "lock %s mutex (%p)",  cond->name, cond);
+		    session, MUTEX, "lock %s mutex (%p)", cond->name, cond);
 
 	WT_ERR(pthread_mutex_lock(&cond->mtx));
 
@@ -169,19 +169,42 @@ __wt_readlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	int ret;
 
 	WT_VERBOSE(session, MUTEX,
-	    "readlock %s rwlock (%p)",  rwlock->name, rwlock);
+	    "readlock %s rwlock (%p)", rwlock->name, rwlock);
 
 	WT_ERR(pthread_rwlock_rdlock(&rwlock->rwlock));
 	WT_CSTAT_INCR(session, rwlock_rdlock);
-	return;
 
-err:	__wt_err(session, ret, "rwlock readlock failed");
-	__wt_abort(session);
+	if (0) {
+err:		__wt_err(session, ret, "rwlock readlock failed");
+		__wt_abort(session);
+	}
+}
+
+/*
+ * __wt_try_writelock
+ *	Try to get an exclusive lock, or fail immediately if unavailable.
+ */
+int
+__wt_try_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
+{
+	int ret;
+
+	WT_VERBOSE(session, MUTEX,
+	    "try_writelock %s rwlock (%p)", rwlock->name, rwlock);
+
+	if ((ret = pthread_rwlock_trywrlock(&rwlock->rwlock)) == 0)
+		WT_CSTAT_INCR(session, rwlock_wrlock);
+	else if (ret != EBUSY) {
+		__wt_err(session, ret, "rwlock try_writelock failed");
+		__wt_abort(session);
+	}
+
+	return (ret);
 }
 
 /*
  * __wt_writelock
- *	Get an exclusive lock.
+ *	Wait to get an exclusive lock.
  */
 void
 __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
@@ -189,14 +212,15 @@ __wt_writelock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	int ret;
 
 	WT_VERBOSE(session, MUTEX,
-	    "writelock %s rwlock (%p)",  rwlock->name, rwlock);
+	    "writelock %s rwlock (%p)", rwlock->name, rwlock);
 
 	WT_ERR(pthread_rwlock_wrlock(&rwlock->rwlock));
-	WT_CSTAT_INCR(session, rwlock_rdlock);
-	return;
+	WT_CSTAT_INCR(session, rwlock_wrlock);
 
-err:	__wt_err(session, ret, "rwlock writelock failed");
-	__wt_abort(session);
+	if (0) {
+err:		__wt_err(session, ret, "rwlock writelock failed");
+		__wt_abort(session);
+	}
 }
 
 /*
@@ -209,13 +233,14 @@ __wt_rwunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock)
 	int ret;
 
 	WT_VERBOSE(session, MUTEX,
-	    "unlock %s rwlock (%p)",  rwlock->name, rwlock);
+	    "unlock %s rwlock (%p)", rwlock->name, rwlock);
 
 	WT_ERR(pthread_rwlock_unlock(&rwlock->rwlock));
-	return;
 
-err:	__wt_err(session, ret, "rwlock unlock failed");
-	__wt_abort(session);
+	if (0) {
+err:		__wt_err(session, ret, "rwlock unlock failed");
+		__wt_abort(session);
+	}
 }
 
 /*
