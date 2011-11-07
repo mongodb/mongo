@@ -873,7 +873,7 @@ namespace mongo {
             }
 
             // needed for killop / interrupt support
-            v8::Locker::StartPreemption( 50 );
+            v8::Locker::StartPreemption( 1 );
 
             //_global->Set( v8::String::New( "Mongo" ) , _engine->_externalTemplate->GetFunction() );
             _global->Set( getV8Str( "Mongo" ) , getMongoFunctionTemplate( this, true )->GetFunction() );
