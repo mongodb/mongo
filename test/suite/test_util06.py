@@ -71,20 +71,24 @@ class test_util06(wttest.WiredTigerTestCase, suite_subprocess):
         filename = tablename + ".wt"
 
         fp = open(filename, "r+b")
-        matchpos = 0
+        found = matchpos = 0
         match = self.unique
         matchlen = len(match)
         c = fp.read(1)
-        while c and matchpos < matchlen:
+        while c:
             if match[matchpos] == c:
                 matchpos += 1
+                if matchpos == matchlen:
+                    # We're already positioned, so alter it
+                    fp.seek(-1, 1)
+                    fp.write('G')
+                    matchpos = 0
+                    found = 1
             else:
                 matchpos = 0
             c = fp.read(1)
         # Make sure we found the embedded string
-        self.assertEqual(matchlen, matchpos)
-        # We're already positioned, so alter it
-        fp.write('1')
+        self.assertEqual(found, 1)
         fp.close()
 
     def test_salvage_process_empty(self):
@@ -134,7 +138,7 @@ class test_util06(wttest.WiredTigerTestCase, suite_subprocess):
 
         # damage() closed the session/connection, reopen them now.
         self.open_conn()
-        self.session.salvage('file:' + self.tablename + ".wt")
+        self.assertRaises(WiredTigerError, lambda: self.session.salvage('file:' + self.tablename + ".wt", None))
 
     def test_salvage_api_damaged(self):  #TODO
         """
@@ -150,7 +154,7 @@ class test_util06(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertRaises(WiredTigerError, lambda: self.session.verify('table:' + self.tablename, None))
 
         # and close, since that's required for salvage
-        self.session.salvage('file:' + self.tablename + ".wt", None)
+        self.assertRaises(WiredTigerError, lambda: self.session.salvage('file:' + self.tablename + ".wt", None))
 
     def test_salvage_process_damaged(self):
         """
