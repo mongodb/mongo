@@ -278,7 +278,7 @@ __verify_dsk_row(
 		}
 
 		/* Confirm the prefix compression count is possible. */
-		if (last->size != 0 && prefix > last->size) {
+		if (cell_num > 1 && prefix > last->size) {
 			WT_VRFY_ERR(session,
 			    "key %" PRIu32 " on page at addr %" PRIu32
 			    " has a prefix compression count of %" PRIu32
@@ -328,8 +328,15 @@ __verify_dsk_row(
 			}
 		}
 
-key_compare:	/* Compare the current key against the last key. */
-		if (last->size != 0) {
+key_compare:	/*
+		 * Compare the current key against the last key.
+		 *
+		 * Be careful about the 0th key on internal pages: we only store
+		 * the first byte and custom collators may not be able to handle
+		 * truncated keys.
+		 */
+		if ((dsk->type == WT_PAGE_ROW_INT && cell_num > 3) ||
+		    (dsk->type != WT_PAGE_ROW_INT && cell_num > 1)) {
 			WT_ERR(WT_BTREE_CMP(session, btree,
 			    (WT_ITEM *)last, (WT_ITEM *)current, cmp));
 			if (cmp >= 0) {
