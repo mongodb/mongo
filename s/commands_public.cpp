@@ -433,9 +433,13 @@ namespace mongo {
 
                 long long total = 0;
                 map<string,long long> shardCounts;
+                int numTries = 0;
+                bool hadToBreak = false;
 
                 ChunkManagerPtr cm = conf->getChunkManagerIfExists( fullns );
-                while ( true ) {
+                while ( numTries < 5 ) {
+                    numTries++;
+
                     if ( ! cm ) {
                         // probably unsharded now
                         return run( dbName , cmdObj , options , errmsg , result, false );
@@ -445,7 +449,7 @@ namespace mongo {
                     cm->getShardsForQuery( shards , filter );
                     assert( shards.size() );
 
-                    bool hadToBreak = false;
+                    hadToBreak = false;
 
                     for (set<Shard>::iterator it=shards.begin(), end=shards.end(); it != end; ++it) {
                         ShardConnection conn(*it, fullns);
@@ -473,7 +477,7 @@ namespace mongo {
                             // my version is old
                             total = 0;
                             shardCounts.clear();
-                            cm = conf->getChunkManagerIfExists( fullns , true );
+                            cm = conf->getChunkManagerIfExists( fullns , true, numTries > 2 ); // Force reload on third attempt
                             hadToBreak = true;
                             break;
                         }
@@ -485,6 +489,10 @@ namespace mongo {
                     }
                     if ( ! hadToBreak )
                         break;
+                }
+                if (hadToBreak) {
+                    errmsg = "Tried 5 times without success to get count for " + fullns + " from all shards";
+                    return false;
                 }
 
                 total = applySkipLimit( total , cmdObj );

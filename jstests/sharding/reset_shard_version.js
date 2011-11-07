@@ -28,6 +28,7 @@ assert.eq( collB.find().itcount(), 100 )
 jsTestLog( "Resetting connection version on shard..." )
 
 var admin = st.shard0.getDB( "admin" )
+
 printjson( admin.runCommand( {
     setShardVersion : "" + collA, version : new Timestamp( 0, 0 ), configdb : st._configDB, serverID : new ObjectId(),
     authoritative : true } ) )
@@ -35,4 +36,16 @@ printjson( admin.runCommand( {
 jsTestLog( "Querying with version reset..." )
 
 // This will cause a version check
-printjson( collA.findOne() )
+assert.eq(0, collA.findOne({_id:0})['_id'])
+
+jsTestLog( "Resetting connection version on shard again..." )
+
+printjson( admin.runCommand( {
+    setShardVersion : "" + collA, version : new Timestamp( 0, 0 ), configdb : st._configDB, serverID : new ObjectId(),
+    authoritative : true } ) )
+
+jsTestLog( "Doing count command with version reset..." )
+
+assert.eq(100, collA.count()) // Test for SERVER-4196
+
+st.stop()
