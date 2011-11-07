@@ -191,6 +191,25 @@ namespace mongo {
         }
     }
 
+    void LogFile::writeAt(unsigned offset, const void *buf, size_t len) { 
+        assert(((size_t)buf)%4096==0); // aligned
+        lseek(_fd, offset, SEEK_SET);
+        ssize_t written = pwrite(_fd, buf, len, offset);
+        if( written != (ssize_t) len ) {
+            log() << "writeAt fails " << errnoWithDescription() << endl;
+        }
+#if defined(__linux__)
+        fdatasync(_fd);
+#else
+        fsync(_fd);
+#endif
+    }
+
+    void LogFile::readAt(unsigned offset, void *_buf, size_t _len) { 
+        assert(((size_t)_buf)%4096==0); // aligned
+        pread(_fd, _buf, _len, offset);
+    }
+
     void LogFile::synchronousAppend(const void *b, size_t len) {
 #ifdef POSIX_FADV_DONTNEED
         const off_t pos = lseek(_fd, 0, SEEK_CUR); // doesn't actually seek

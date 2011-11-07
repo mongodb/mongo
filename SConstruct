@@ -1088,7 +1088,7 @@ for x in normalTools:
 #some special tools
 env.Program( "bsondump" , allToolFiles + [ "tools/bsondump.cpp" ] )
 env.Program( "mongobridge" , allToolFiles + [ "tools/bridge.cpp" ] )
-#env.Program( "mongoperf" , allToolFiles + [ "client/examples/mongoperf.cpp" ] )
+env.Program( "mongoperf" , allToolFiles + [ "client/examples/mongoperf.cpp" ] )
 
 # mongos
 mongos = env.Program( "mongos" , commonFiles + coreDbFiles + coreServerFiles + shardServerFiles )
@@ -1448,7 +1448,7 @@ def installBinary( e , name ):
 for x in normalTools:
     installBinary( env , "mongo" + x )
 installBinary( env , "bsondump" )
-#installBinary( env , "mongoperf" )
+installBinary( env , "mongoperf" )
 
 if mongosniff_built:
     installBinary(env, "mongosniff")

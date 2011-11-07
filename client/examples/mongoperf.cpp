@@ -18,7 +18,7 @@ using namespace bson;
 
 int dummy;
 LogFile *lf = 0;
-MemoryMappedFile mmfFile;
+MemoryMappedFile *mmfFile;
 char *mmf = 0;
 bo options;
 unsigned long long len; // file len
@@ -26,11 +26,22 @@ const unsigned PG = 4096;
 unsigned nThreadsRunning = 0;
 AtomicUInt iops;
 
+char* round(char* x) {
+    size_t f = (size_t) x;
+    char *p = (char *) ((f+PG-1)/PG*PG);
+    return p;
+}
+
+struct Aligned {
+    char x[8192];
+    char* addr() { return round(x); }
+}; 
+
 void workerThread() {
     bool r = options["r"].trueValue();
     bool w = options["w"].trueValue();
     long long su = options["sleepMicros"].numberLong();
-    char abuf[PG];
+    Aligned a;
     while( 1 ) { 
         unsigned long long rofs = (rand() * PG) % len;
         unsigned long long wofs = (rand() * PG) % len;
@@ -46,11 +57,11 @@ void workerThread() {
         }
         else {
             if( r ) {
-                lf->readAt((unsigned) rofs, abuf, PG);
+                lf->readAt((unsigned) rofs, a.addr(), PG);
                 iops++;
             }
             if( w ) {
-                lf->writeAt((unsigned) wofs, abuf, PG);
+                lf->writeAt((unsigned) wofs, a.addr(), PG);
                 iops++;
             }
         }
@@ -69,7 +80,7 @@ void go() {
     if( len == 0 ) len = 1;
     cout << "test fileSizeMB : " << len << endl;
     len *= 1024 * 1024;
-    const char *fname = "mongoperf__testfile__tmp";
+    const char *fname = "./mongoperf__testfile__tmp";
     try {
         boost::filesystem::remove(fname);
     }
@@ -79,9 +90,10 @@ void go() {
     }
     lf = new LogFile(fname,true);
     const unsigned sz = 1024 * 256;
-    char buf[sz];
+    char buf[sz+4096];
+    const char *p = round(buf);
     for( unsigned i = 0; i < len; i+= sz ) { 
-        lf->synchronousAppend(buf, sz);
+        lf->synchronousAppend(p, sz);
     }
     BSONObj& o = options;
 
@@ -91,7 +103,8 @@ void go() {
     if( o["mmf"].trueValue() ) { 
         delete lf;
         lf = 0;
-        mmf = (char *) mmfFile.map(fname);
+        mmfFile = new MemoryMappedFile();
+        mmf = (char *) mmfFile->map(fname);
         assert( mmf );
     }
 
