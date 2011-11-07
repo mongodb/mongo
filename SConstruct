@@ -151,7 +151,7 @@ add_option( "noshell", "don't build shell" , 0 , True )
 add_option( "safeshell", "don't let shell scripts run programs (still, don't run untrusted scripts)" , 0 , True )
 add_option( "win2008plus", "use newer operating system API features" , 0 , False )
 
-# dev tools
+# dev optoins
 add_option( "d", "debug build no optimization, etc..." , 0 , True , "debugBuild" )
 add_option( "dd", "debug build no optimization, additional debug logging, etc..." , 0 , False , "debugBuildAndLogging" )
 add_option( "durableDefaultOn" , "have durable default to on" , 0 , True )
@@ -1088,6 +1088,7 @@ for x in normalTools:
 #some special tools
 env.Program( "bsondump" , allToolFiles + [ "tools/bsondump.cpp" ] )
 env.Program( "mongobridge" , allToolFiles + [ "tools/bridge.cpp" ] )
+#env.Program( "mongoperf" , allToolFiles + [ "client/examples/mongoperf.cpp" ] )
 
 # mongos
 mongos = env.Program( "mongos" , commonFiles + coreDbFiles + coreServerFiles + shardServerFiles )
@@ -1447,6 +1448,7 @@ def installBinary( e , name ):
 for x in normalTools:
     installBinary( env , "mongo" + x )
 installBinary( env , "bsondump" )
+#installBinary( env , "mongoperf" )
 
 if mongosniff_built:
     installBinary(env, "mongosniff")
