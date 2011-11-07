@@ -77,8 +77,10 @@ if __name__ == '__main__':
     # Without arguments, do discovery
     if len(sys.argv) < 2:
         from discover import defaultTestLoader as loader
-        tests.addTests(generate_scenarios(loader.discover(suitedir)))
-
+        suites = loader.discover(suitedir)
+        suites = sorted(suites, key=lambda c: str(list(c)[0]))
+        tests.addTests(generate_scenarios(suites))
+        
     # Otherwise, turn numbers and ranges into test module names
     preserve = timestamp = debug = gdbSub = False
     for arg in sys.argv[1:]:
