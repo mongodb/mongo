@@ -16,24 +16,55 @@ using namespace std;
 using namespace mongo;
 using namespace bson;
 
+int dummy;
 LogFile *lf = 0;
-
-//MemoryMappedFile m;
+MemoryMappedFile *mmfFile;
+char *mmf = 0;
 bo options;
 unsigned long long len; // file len
 const unsigned PG = 4096;
 unsigned nThreadsRunning = 0;
-char *mmf = 0;
-AtomicUInt writes;
+AtomicUInt iops;
 
-void writer() {
+char* round(char* x) {
+    size_t f = (size_t) x;
+    char *p = (char *) ((f+PG-1)/PG*PG);
+    return p;
+}
+
+struct Aligned {
+    char x[8192];
+    char* addr() { return round(x); }
+}; 
+
+void workerThread() {
+    bool r = options["r"].trueValue();
+    bool w = options["w"].trueValue();
     long long su = options["sleepMicros"].numberLong();
-    char abuf[PG];
+    Aligned a;
     while( 1 ) { 
-        int x = rand();
-        unsigned long long ofs = (x * PG) % len;
-        lf->writeAt((unsigned) ofs, abuf, PG);
-        writes++;
+        unsigned long long rofs = (rand() * PG) % len;
+        unsigned long long wofs = (rand() * PG) % len;
+        if( mmf ) { 
+            if( r ) {
+                dummy += mmf[rofs];
+                iops++;
+            }
+            if( w ) {
+                mmf[wofs] = 3;
+                iops++;
+            }
+        }
+        else {
+            if( r ) {
+                lf->readAt((unsigned) rofs, a.addr(), PG);
+                iops++;
+            }
+            if( w ) {
+                lf->writeAt((unsigned) wofs, a.addr(), PG);
+                iops++;
+            }
+        }
         long long micros = su / nThreadsRunning;
         if( micros ) {
             sleepmicros(micros);
@@ -42,31 +73,43 @@ void writer() {
 }
 
 void go() {
+    assert( options["r"].trueValue() || options["w"].trueValue() );
     MemoryMappedFile f;
     cout << "create test file" << endl;
     len = options["fileSizeMB"].numberLong();
     if( len == 0 ) len = 1;
     cout << "test fileSizeMB : " << len << endl;
     len *= 1024 * 1024;
-    const char *fname = "mongoperf__testfile__tmp";
-    lf = new LogFile(fname);
-    const unsigned sz = 1024 * 256;
-    char buf[sz];
-    for( unsigned i = 0; i < len; i+= sz ) { 
-        lf->synchronousAppend(buf, sz);
+    const char *fname = "./mongoperf__testfile__tmp";
+    try {
+        boost::filesystem::remove(fname);
     }
+    catch(...) { 
+        cout << "error deleting file " << fname << endl;
+        return;
+    }
+    lf = new LogFile(fname,true);
+    const unsigned sz = 1024 * 256;
+    char buf[sz+4096];
+    const char *p = round(buf);
+    for( unsigned i = 0; i < len; i+= sz ) { 
+        lf->synchronousAppend(p, sz);
+    }
+    BSONObj& o = options;
 
     //void *p = m.create("mongoperf__testfile__tmp", len * 1024 * 1024, true);
     //assert(p);
 
     if( o["mmf"].trueValue() ) { 
-        mmf = f.map(fname);
+        delete lf;
+        lf = 0;
+        mmfFile = new MemoryMappedFile();
+        mmf = (char *) mmfFile->map(fname);
         assert( mmf );
     }
 
     cout << "testing..."<< endl;
 
-    BSONObj& o = options;
     unsigned wthr = (unsigned) o["nThreads"].Int();
     if( wthr < 1 ) { 
         cout << "bad threads field value" << endl;
@@ -80,17 +123,21 @@ void go() {
             if( nthr < wthr ) {
                 while( nthr < wthr && nthr < d ) {
                     nthr++;
-                    boost::thread w(writer);
+                    boost::thread w(workerThread);
                 }
                 cout << "new thread, total running : " << nthr << endl;
                 d *= 2;
             }
         }
         sleepsecs(4);
-        unsigned long long w = writes.get();
-        writes.zero();
-        w /= 4;
-        cout << w << " ops/sec " << (w * PG / 1024 / 1024) << " MB/sec" << endl;
+        unsigned long long w = iops.get();
+        iops.zero();
+        w /= 4; // 4 secs
+        cout << w << " ops/sec ";
+        if( mmf == 0 ) 
+            // only writing 4 bytes with mmf so we don't say this
+            cout << (w * PG / 1024 / 1024) << " MB/sec";
+        cout << endl;
     }
 }
 
@@ -100,16 +147,29 @@ int main(int argc, char *argv[]) {
         cout << "mongoperf" << endl;
 
         if( argc > 1 ) { 
-            cout <<
-                "  usage:\n\n"
-                "    mongoperf < myjsonconfigfile\n\n"
-                "  json config doc fields:\n"
-                "    nThreads:<n> number of threads\n"
-                "    fileSizeMB:<n> test file size. if the file is small the heads will not move much\n"
-                "      thus making the test not informative.\n"
-                "    sleepMicros:<n> pause for sleepMicros/#threadsrunning between each operation\n"
-                "    mmf:true do i/o's via memory mapped files\n"
-                << endl;
+cout <<
+
+"\n"
+"usage:\n"
+"\n"
+"  mongoperf < myjsonconfigfile\n"
+"\n"
+"  {\n"
+"    nThreads:<n>,     // number of threads\n"
+"    fileSizeMB:<n>,   // test file size\n"
+"    sleepMicros:<n>,  // pause for sleepMicros/nThreads between each operation\n"
+"    mmf:<bool>,       // if true do i/o's via memory mapped files\n"
+"    r:<bool>,         // do reads\n"
+"    w:<bool>          // do writes\n"
+"  }\n"
+"\n"
+"most fields are optional.\n"
+"non-mmf io is direct io (no caching). use a large file size to make the heads\n"
+"  move significantly\n"
+"mmf io uses caching (the file system cache).\n"
+"\n"
+
+<< endl;
             return 0;
         }
 
@@ -125,7 +185,14 @@ int main(int argc, char *argv[]) {
 
         string s = input;
         str::stripTrailing(s, "\n\r\0x1a");
-        options = fromjson(s);
+        try { 
+            options = fromjson(s);
+        }
+        catch(...) { 
+            cout << s << endl;
+            cout << "couldn't parse json options" << endl;
+            return -1;
+        }
         cout << "options:\n" << options.toString() << endl;
 
         go();

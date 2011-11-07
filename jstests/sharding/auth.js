@@ -152,6 +152,8 @@ login(adminUser);
 print("logged in");
 result = s.getDB("admin").runCommand({addShard : shardName})
 
+s.getDB("test").foo.remove({})
+
 var num = 100000;
 for (i=0; i<num; i++) {
     s.getDB("test").foo.insert({x:i, abc : "defg", date : new Date(), str : "all the talk on the market"});
@@ -170,7 +172,30 @@ assert(d1Chunks > 0 && d2Chunks > 0 && d1Chunks+d2Chunks == totalChunks);
 
 //SERVER-3645
 //assert.eq(s.getDB("test").foo.count(), num+1);
-assert.eq(s.getDB("test").foo.find().itcount(), num+1);
+var numDocs = s.getDB("test").foo.find().itcount()
+if (numDocs != num) {
+    // Missing documents. At this point we're already in a failure mode, the code in this statement
+    // is to get a better idea how/why it's failing.
+
+    var numDocsSeen = 0;
+    var lastDocNumber = -1;
+    var missingDocNumbers = [];
+    var docs = s.getDB("test").foo.find().sort({x:1}).toArray();
+    for (var i = 0; i < docs.length; i++) {
+        if (docs[i].x != lastDocNumber + 1) {
+            for (var missing = lastDocNumber + 1; missing < docs[i].x; missing++) {
+                missingDocNumbers.push(missing);
+            }
+        }
+        lastDocNumber = docs[i].x;
+        numDocsSeen++;
+    }
+    assert.eq(numDocs, numDocsSeen, "More docs discovered on second find() even though getLastError was already called")
+    assert.eq(num - numDocs, missingDocNumbers.length);
+
+    assert(false, "Number of docs found does not equal the number inserted. Missing docs: " + missingDocNumbers);
+}
+
 
 //SERVER-4031
 /*
@@ -189,7 +214,7 @@ while (cursor.hasNext()) {
     count++;
 }
 
-assert.eq(count, 501);
+assert.eq(count, 500);
 
 // check that dump doesn't get stuck with auth
 var x = runMongoProgram( "mongodump", "--host", "127.0.0.1:31000", "-d", testUser.db, "-u", testUser.username, "-p", testUser.password);

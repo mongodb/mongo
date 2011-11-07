@@ -426,7 +426,11 @@ namespace mongo {
 
     std::string toUtf8String(const std::wstring& wide);
 
+#if defined(_WIN32)
+    inline string errnoWithDescription(DWORD x = GetLastError()) {
+#else
     inline string errnoWithDescription(int x = errno) {
+#endif
         stringstream s;
         s << "errno:" << x << ' ';
 

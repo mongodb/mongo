@@ -21,7 +21,7 @@ namespace mongo {
         if ( _cachedEquality == -1 ) {
             _cachedEquality = ( _lower._inclusive && _upper._inclusive && _lower._bound.woCompare( _upper._bound, false ) == 0 );
         }
-        return _cachedEquality;
+        return _cachedEquality != 0;
     }
 
     inline bool FieldRange::equality() const {
