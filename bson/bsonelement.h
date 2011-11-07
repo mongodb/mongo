@@ -318,6 +318,11 @@ namespace mongo {
         */
         int woCompare( const BSONElement &e, bool considerFieldName = true ) const;
 
+        bool binaryEqual( const BSONElement &r) const {
+            int es = r.size();
+            return (size() == es && !memcmp(data, r.data, es));
+        }
+
         const char * rawdata() const { return data; }
 
         /** 0 == Equality, just not defined yet */

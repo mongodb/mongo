@@ -245,7 +245,7 @@ namespace mongo {
                 break;
             while ( j != r.end() && j->woCompare( *i ) < 0 )
                 j++;
-            if ( j == r.end() || i->woCompare(*j) != 0  ) {
+            if ( j == r.end() || i->binaryEqual(*j) == false ) {
                 const BSONObj *jo = &*i;
                 diff.push_back( (BSONObj *) jo );
             }
