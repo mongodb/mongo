@@ -318,6 +318,7 @@ namespace mongo {
         if (!done) {
             LOG(1) << "adding sharding hook" << endl;
             pool.addHook(new ShardingConnectionHook(false));
+            shardConnectionPool.addHook(new ShardingConnectionHook(true));
             done = true;
         }
     }
