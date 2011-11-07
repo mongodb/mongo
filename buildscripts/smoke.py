@@ -282,7 +282,6 @@ def runTest(test):
     sys.stderr.flush()
     print " *******************************************"
     print "         Test : " + os.path.basename(path) + " ..."
-    t1 = time.time()
     # FIXME: we don't handle the case where the subprocess
     # hangs... that's bad.
     if argv[0].endswith( 'mongo' ) and not '--eval' in argv :
@@ -298,6 +297,7 @@ def runTest(test):
     
     
     print argv
+    t1 = time.time()
     r = call(argv, cwd=test_path)
     t2 = time.time()
     print "                " + str((t2 - t1) * 1000) + "ms"
