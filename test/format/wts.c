@@ -130,6 +130,9 @@ wts_startup(int open_cursors)
 	if (intlovfl < 40)
 		intlovfl = 40;
 	leafmax = 1U << g.c_leaf_node_max;
+	/* Make sure at least 3 leaf pages can fix in cache. */
+	while (3 * leafmax > g.c_cache << 20)
+		leafmax >>= 1;
 	leafovfl = MMRAND(leafmax / 50, leafmax / 40);
 	if (leafovfl < 40)
 		leafovfl = 40;
