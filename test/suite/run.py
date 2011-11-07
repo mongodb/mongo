@@ -6,7 +6,7 @@
 #	All rights reserved.
 #
 # WiredTigerTestCase
-# 	parent class for all test cases
+#	parent class for all test cases
 #
 
 import os
@@ -28,7 +28,7 @@ import wttest
 from testscenarios.scenarios import generate_scenarios
 
 def usage():
-	print 'Usage:\n\
+    print 'Usage:\n\
   $ cd build_posix\n\
   $ python ../test/suite/run.py [ options ] [ tests ]\n\
 \n\
@@ -44,70 +44,69 @@ Tests:\n\
 '
 
 def addScenarioTests(tests, loader, testname):
-	loaded = loader.loadTestsFromName(testname)
-	tests.addTests(generate_scenarios(loaded))
+    loaded = loader.loadTestsFromName(testname)
+    tests.addTests(generate_scenarios(loaded))
 
 def testsFromArg(tests, loader, arg):
+    # If a group of test is mentioned, do all tests in that group
+    # e.g. 'run.py base'
+    groupedfiles = glob.glob(suitedir + os.sep + 'test_' + arg + '*.py')
+    if len(groupedfiles) > 0:
+        for file in groupedfiles:
+            testsFromArg(tests, loader, os.path.basename(file))
+        return
 
-	# If a group of test is mentioned, do all tests in that group
-        # e.g. 'run.py base'
-        groupedfiles = glob.glob(suitedir + os.sep + 'test_' + arg + '*.py')
-        if len(groupedfiles) > 0:
-		for file in groupedfiles:
-			testsFromArg(tests, loader, os.path.basename(file))
-		return
+    # Explicit test class names
+    if not arg[0].isdigit():
+        if arg.endswith('.py'):
+            arg = arg[:-3]
+        addScenarioTests(tests, loader, arg)
+        return
 
-	# Explicit test class names
-	if not arg[0].isdigit():
-		if arg.endswith('.py'):
-			arg = arg[:-3]
-		addScenarioTests(tests, loader, arg)
-		return
-
-	# Deal with ranges
-	if '-' in arg:
-		start, end = (int(a) for a in arg.split('-'))
-	else:
-		start, end = int(arg), int(arg)
-	for t in xrange(start, end+1):
-		addScenarioTests(tests, loader, 'test%03d' % t)
+    # Deal with ranges
+    if '-' in arg:
+        start, end = (int(a) for a in arg.split('-'))
+    else:
+        start, end = int(arg), int(arg)
+    for t in xrange(start, end+1):
+        addScenarioTests(tests, loader, 'test%03d' % t)
 
 if __name__ == '__main__':
-	tests = unittest.TestSuite()
+    tests = unittest.TestSuite()
 
-	# Without arguments, do discovery
-	if len(sys.argv) < 2:
-		from discover import defaultTestLoader as loader
-		tests.addTests(generate_scenarios(loader.discover(suitedir)))
+    # Without arguments, do discovery
+    if len(sys.argv) < 2:
+        from discover import defaultTestLoader as loader
+        tests.addTests(generate_scenarios(loader.discover(suitedir)))
 
-	# Otherwise, turn numbers and ranges into test module names
-	preserve = timestamp = debug = gdbSub = False
-	for arg in sys.argv[1:]:
-		from unittest import defaultTestLoader as loader
+    # Otherwise, turn numbers and ranges into test module names
+    preserve = timestamp = debug = gdbSub = False
+    for arg in sys.argv[1:]:
+        from unittest import defaultTestLoader as loader
 
-		# Command line options
-		if arg[0] == '-':
-			option = arg[1:]
-			if option == 'preserve' or option == 'p':
-				preserve = True
-				continue
-			if option == 'timestamp' or option == 't':
-				timestamp = True
-				continue
-                        if option == 'debug' or option == 'd':
-                                import pdb
-                                debug = True
-                                continue
-                        if option == 'gdb' or option == 'g':
-                                gdbSub = True
-                                continue
-                        usage()
-                        sys.exit(False)
+        # Command line options
+        if arg[0] == '-':
+            option = arg[1:]
+            if option == 'preserve' or option == 'p':
+                preserve = True
+                continue
+            if option == 'timestamp' or option == 't':
+                timestamp = True
+                continue
+            if option == 'debug' or option == 'd':
+                import pdb
+                debug = True
+                continue
+            if option == 'gdb' or option == 'g':
+                gdbSub = True
+                continue
+            usage()
+            sys.exit(False)
 
-		testsFromArg(tests, loader, arg)
+        testsFromArg(tests, loader, arg)
 
         if debug:
                 pdb.set_trace()
-	wttest.WiredTigerTestCase.globalSetup(preserve, timestamp, gdbSub)
-	result = wttest.runsuite(tests)
-	sys.exit(not result.wasSuccessful())
+    wttest.WiredTigerTestCase.globalSetup(preserve, timestamp, gdbSub)
+    result = wttest.runsuite(tests)
+    sys.exit(not result.wasSuccessful())
