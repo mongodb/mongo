@@ -97,12 +97,8 @@ class suite_subprocess:
         # flushed, and that we can open it from another process
         self.close_conn()
 
-        wtoutname = outfilename
-        if wtoutname == None:
-            wtoutname = "wt.out"
-        wterrname = errfilename
-        if wterrname == None:
-            wterrname = "wt.err"
+        wtoutname = outfilename or "wt.out"
+        wterrname = errfilename or "wt.err"
         with open(wterrname, "w") as wterr:
             with open(wtoutname, "w") as wtout:
                 if self._gdbSubprocess:
