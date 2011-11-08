@@ -310,6 +310,7 @@ memalloc
 membar
 memcpy
 memfree
+memsize
 metadata
 mfence
 minorp
