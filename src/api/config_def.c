@@ -140,7 +140,7 @@ __wt_confchk_session_commit_transaction =
 
 const char *
 __wt_confdfl_session_create =
-    "allocation_size=512B,block_compressor="",colgroups="",collator="","
+    "allocation_size=512B,block_compressor="",colgroups=(),collator="","
     "columns=(),columns=(),exclusive=false,filename="",huffman_key="","
     "huffman_value="",internal_key_truncate=true,internal_node_max=2KB,"
     "internal_overflow_size=64B,key_format=u,key_format=u,key_gap=10,"
@@ -150,15 +150,16 @@ __wt_confdfl_session_create =
 const char *
 __wt_confchk_session_create =
     "allocation_size=(type=int,min=512B,max=128MB),block_compressor=(),"
-    "colgroups=(),collator=(),columns=(type=list),columns=(type=list),"
-    "exclusive=(type=boolean),filename=(),huffman_key=(),huffman_value=(),"
-    "internal_key_truncate=(type=boolean),internal_node_max=(type=int,"
-    "min=512B,max=512MB),internal_overflow_size=(type=int,min=40B),"
-    "key_format=(type=format),key_format=(type=format),key_gap=(type=int,"
-    "min=0),leaf_node_max=(type=int,min=512B,max=512MB),"
-    "leaf_overflow_size=(type=int,min=40B),prefix_compression=(type=boolean),"
-    "split_pct=(type=int,min=25,max=100),type=(choices=[\"btree\"]),"
-    "value_format=(type=format),value_format=(type=format)";
+    "colgroups=(type=list),collator=(),columns=(type=list),"
+    "columns=(type=list),exclusive=(type=boolean),filename=(),huffman_key=(),"
+    "huffman_value=(),internal_key_truncate=(type=boolean),"
+    "internal_node_max=(type=int,min=512B,max=512MB),"
+    "internal_overflow_size=(type=int,min=40B),key_format=(type=format),"
+    "key_format=(type=format),key_gap=(type=int,min=0),"
+    "leaf_node_max=(type=int,min=512B,max=512MB),leaf_overflow_size=(type=int"
+    ",min=40B),prefix_compression=(type=boolean),split_pct=(type=int,min=25,"
+    "max=100),type=(choices=[\"btree\"]),value_format=(type=format),"
+    "value_format=(type=format)";
 
 const char *
 __wt_confdfl_session_drop =
@@ -246,11 +247,11 @@ __wt_confchk_session_verify =
 
 const char *
 __wt_confdfl_table_meta =
-    "colgroups="",columns=(),key_format=u,value_format=u";
+    "colgroups=(),columns=(),key_format=u,value_format=u";
 
 const char *
 __wt_confchk_table_meta =
-    "colgroups=(),columns=(type=list),key_format=(type=format),"
+    "colgroups=(type=list),columns=(type=list),key_format=(type=format),"
     "value_format=(type=format)";
 
 const char *

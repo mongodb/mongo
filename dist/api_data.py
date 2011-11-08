@@ -133,7 +133,7 @@ table_only_meta = [
 		stored together in a single file.  All value columns in the
 		table must appear in at least one column group.  Each column
 		group must be created with a separate call to
-		WT_SESSION::create'''),
+		WT_SESSION::create''', type='list'),
 ]
 
 colgroup_meta = column_meta + filename_meta

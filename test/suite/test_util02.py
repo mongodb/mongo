@@ -148,16 +148,6 @@ class test_util02(wttest.WiredTigerTestCase, suite_subprocess):
         # Create a placeholder for the new table.
         self.session.create('table:' + self.tablename2, params)
 
-        # TODO: this shouldn't be needed.
-        # The output of 'wt dump' includes 'colgroups=' and 'columns='
-        # which are not acceptable to 'wt load', so we need to patch that.
-        #with open("dump.out", "r+") as f:
-        #    old = f.read()
-        #    f.seek(0)
-        #    new = old.replace("colgroups=,columns=,", "colgroups=(),columns=(),")
-        #    f.write(new)
-        # end TODO
-
         self.runWt(["load", "-f", "dump.out", "-r", self.tablename2])
 
         cursor = self.session.open_cursor('table:' + self.tablename2, None, None)

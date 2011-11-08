@@ -120,7 +120,7 @@ class test_util01(wttest.WiredTigerTestCase, suite_subprocess):
                     expectout.write('Format=print\n')
                 expectout.write('Header\n')
                 expectout.write('table:' + self.tablename + '\n')
-                expectout.write('colgroups=,columns=,' + params + '\n')
+                expectout.write('colgroups=(),columns=(),' + params + '\n')
                 expectout.write('Data\n')
             for i in range(0, self.nentries):
                 key = self.get_key(i)
