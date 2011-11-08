@@ -17,24 +17,12 @@ int
 __wt_config_collapse(WT_SESSION_IMPL *session,
     const char **cfg, const char **config_ret)
 {
-	char *config, *end, *p;
-	const char **cp;
+	WT_BUF buf;
 	WT_CONFIG cparser;
 	WT_CONFIG_ITEM k, v;
 	int ret;
-	size_t len;
 
-	/*
-	 * Be conservative when allocating the buffer: it can't be longer
-	 * than the sum of the lengths of the layered configurations.
-	 * Add 2 to allow for a trailing comma and NUL.
-	 */
-	for (cp = cfg, len = 2; *cp != NULL; ++cp)
-		len += strlen(*cp);
-
-	WT_RET(__wt_calloc_def(session, len, &config));
-	p = config;
-	end = config + len;
+	WT_CLEAR(buf);
 
 	WT_RET(__wt_config_init(session, &cparser, cfg[0]));
 	while ((ret = __wt_config_next(&cparser, &k, &v)) == 0) {
@@ -44,24 +32,37 @@ __wt_config_collapse(WT_SESSION_IMPL *session,
 			return (EINVAL);
 		}
 		WT_ERR(__wt_config_get(session, cfg, &k, &v));
-		/* Include the quotes around string values. */
+		/* Include the quotes around string keys/values. */
+		if (k.type == ITEM_STRING) {
+			--k.str;
+			k.len += 2;
+		}
 		if (v.type == ITEM_STRING) {
 			--v.str;
 			v.len += 2;
 		}
-		p += snprintf(p, (size_t)(end - p), "%.*s=%.*s,",
-		    (int)k.len, k.str, (int)v.len, v.str);
+		WT_ERR(__wt_buf_catfmt(session, &buf, "%.*s=%.*s,",
+		    (int)k.len, k.str, (int)v.len, v.str));
 	}
 
-	if (ret == WT_NOTFOUND) {
-		ret = 0;
-		/* Strip off the trailing comma and NUL-terminate. */
-		if (p > config)
-			--p;
-		*p = '\0';
-		*config_ret = config;
-	} else {
-err:		__wt_free(session, config);
-	}
+	if (ret != WT_NOTFOUND)
+		goto err;
+
+	/*
+	 * If the caller passes us no valid configuration strings, we end up
+	 * here with no allocated memory to return.  Check the final buffer
+	 * size: empty configuration strings are possible, and paranoia is
+	 * good.
+	 */
+	if (buf.size == 0)
+		WT_RET(__wt_buf_initsize(session, &buf, 1));
+
+	/* Strip the trailing comma and NUL-terminate */
+	((char *)buf.data)[buf.size - 1] = '\0';
+
+	*config_ret = buf.data;
+	return (0);
+
+err:	__wt_buf_free(session, &buf);
 	return (ret);
 }

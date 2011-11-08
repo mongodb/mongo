@@ -365,7 +365,6 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_strndup(session, name, namelen, &table->name));
 
 	WT_ERR(__wt_config_getones(session, tconfig, "columns", &cval));
-	table->is_simple = (cval.len == 0);
 
 	WT_ERR(__wt_config_getones(session, tconfig, "key_format", &cval));
 	WT_ERR(__wt_strndup(session, cval.str, cval.len, &table->key_format));
@@ -377,10 +376,21 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_config_getones(session, table->config,
 	    "columns", &table->colconf));
 
+	/*
+	 * Count the number of columns: tables are "simple" if the columns
+	 * are not named.
+	 */
+	WT_ERR(__wt_config_subinit(session, &cparser, &table->colconf));
+	table->is_simple = 1;
+	while ((ret = __wt_config_next(&cparser, &ckey, &cval)) == 0)
+		table->is_simple = 0;
+	if (ret != WT_NOTFOUND)
+		goto err;
+
 	WT_ERR(__wt_config_getones(session, table->config,
 	    "colgroups", &table->cgconf));
 
-	/* Count the number of column groups; */
+	/* Count the number of column groups. */
 	WT_ERR(__wt_config_subinit(session, &cparser, &table->cgconf));
 	table->ncolgroups = 0;
 	while ((ret = __wt_config_next(&cparser, &ckey, &cval)) == 0)

@@ -142,6 +142,15 @@ def checkstr(c):
 		    ','.join('\\"' + s + '\\"' for s in choices) + ']')
 	return ','.join(result)
 
+def get_default(c):
+	t = gettype(c)
+	if c.default or t == 'int':
+		return str(c.default)
+	elif t == 'string':
+		return '""'
+	else:
+		return '()'
+
 for name in sorted(api_data.methods.keys()):
 	ctype = api_data.methods[name].config
 	name = name.replace('.', '_')
@@ -152,7 +161,7 @@ __wt_confdfl_%(name)s =
 ''' % {
 	'name' : name,
 	'config' : '\n'.join('    "%s"' % line
-		for line in w.wrap(','.join('%s=%s' % (c.name, c.default)
+		for line in w.wrap(','.join('%s=%s' % (c.name, get_default(c))
 			for c in sorted(ctype))) or [""]),
 })
 	tfile.write('''

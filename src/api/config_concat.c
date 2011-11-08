@@ -66,6 +66,9 @@ __wt_config_concat(
 	if (buf.size == 0)
 		WT_RET(__wt_buf_initsize(session, &buf, 1));
 
+	/* Strip the trailing comma and NUL-terminate */
+	((char *)buf.data)[buf.size - 1] = '\0';
+
 	*config_ret = buf.data;
 	return (0);
 

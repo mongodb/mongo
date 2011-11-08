@@ -4,7 +4,7 @@
 
 const char *
 __wt_confdfl_colgroup_meta =
-    "columns=,filename=";
+    "columns=(),filename=""";
 
 const char *
 __wt_confchk_colgroup_meta =
@@ -52,7 +52,7 @@ __wt_confchk_connection_close =
 
 const char *
 __wt_confdfl_connection_load_extension =
-    "entry=wiredtiger_extension_init,prefix=";
+    "entry=wiredtiger_extension_init,prefix=""";
 
 const char *
 __wt_confchk_connection_load_extension =
@@ -76,11 +76,11 @@ __wt_confchk_cursor_close =
 
 const char *
 __wt_confdfl_file_meta =
-    "allocation_size=512B,block_compressor=,collator=,columns=,huffman_key=,"
-    "huffman_value=,internal_key_truncate=true,internal_node_max=2KB,"
-    "internal_overflow_size=64B,key_format=u,key_gap=10,leaf_node_max=1MB,"
-    "leaf_overflow_size=470B,prefix_compression=true,split_pct=75,type=btree,"
-    "value_format=u";
+    "allocation_size=512B,block_compressor="",collator="",columns=(),"
+    "huffman_key="",huffman_value="",internal_key_truncate=true,"
+    "internal_node_max=2KB,internal_overflow_size=64B,key_format=u,key_gap=10"
+    ",leaf_node_max=1MB,leaf_overflow_size=470B,prefix_compression=true,"
+    "split_pct=75,type=btree,value_format=u";
 
 const char *
 __wt_confchk_file_meta =
@@ -95,7 +95,7 @@ __wt_confchk_file_meta =
 
 const char *
 __wt_confdfl_index_meta =
-    "columns=,filename=";
+    "columns=(),filename=""";
 
 const char *
 __wt_confchk_index_meta =
@@ -103,7 +103,7 @@ __wt_confchk_index_meta =
 
 const char *
 __wt_confdfl_session_begin_transaction =
-    "isolation=read-committed,name=,priority=0,sync=full";
+    "isolation=read-committed,name="",priority=0,sync=full";
 
 const char *
 __wt_confchk_session_begin_transaction =
@@ -140,9 +140,9 @@ __wt_confchk_session_commit_transaction =
 
 const char *
 __wt_confdfl_session_create =
-    "allocation_size=512B,block_compressor=,colgroups=,collator=,columns=,"
-    "columns=,exclusive=false,filename=,huffman_key=,huffman_value=,"
-    "internal_key_truncate=true,internal_node_max=2KB,"
+    "allocation_size=512B,block_compressor="",colgroups="",collator="","
+    "columns=(),columns=(),exclusive=false,filename="",huffman_key="","
+    "huffman_value="",internal_key_truncate=true,internal_node_max=2KB,"
     "internal_overflow_size=64B,key_format=u,key_format=u,key_gap=10,"
     "leaf_node_max=1MB,leaf_overflow_size=470B,prefix_compression=true,"
     "split_pct=75,type=btree,value_format=u,value_format=u";
@@ -186,8 +186,8 @@ __wt_confchk_session_log_printf =
 
 const char *
 __wt_confdfl_session_open_cursor =
-    "append=false,bulk=false,dump=,isolation=read-committed,overwrite=false,"
-    "raw=false,statistics=false";
+    "append=false,bulk=false,dump="",isolation=read-committed,overwrite=false"
+    ",raw=false,statistics=false";
 
 const char *
 __wt_confchk_session_open_cursor =
@@ -246,7 +246,7 @@ __wt_confchk_session_verify =
 
 const char *
 __wt_confdfl_table_meta =
-    "colgroups=,columns=,key_format=u,value_format=u";
+    "colgroups="",columns=(),key_format=u,value_format=u";
 
 const char *
 __wt_confchk_table_meta =
@@ -255,10 +255,10 @@ __wt_confchk_table_meta =
 
 const char *
 __wt_confdfl_wiredtiger_open =
-    "cache_size=20MB,create=false,error_prefix=,exclusive=false,extensions=,"
-    "hazard_max=30,home_environment=false,home_environment_priv=false,"
-    "logging=false,multiprocess=false,session_max=50,transactional=false,"
-    "verbose=";
+    "cache_size=20MB,create=false,error_prefix="",exclusive=false,"
+    "extensions=(),hazard_max=30,home_environment=false,"
+    "home_environment_priv=false,logging=false,multiprocess=false,"
+    "session_max=50,transactional=false,verbose=()";
 
 const char *
 __wt_confchk_wiredtiger_open =

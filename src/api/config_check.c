@@ -56,7 +56,7 @@ __wt_config_check(WT_SESSION_IMPL *session,
 				    (v.type != ITEM_NUM ||
 				    (v.val != 0 && v.val != 1))) ||
 				    (strncmp(cv.str, "list", cv.len) == 0 &&
-				    v.type != ITEM_STRUCT)) {
+				    v.len > 0 && v.type != ITEM_STRUCT)) {
 					__wt_errx(session, "Invalid value type "
 					    "for key '%.*s': expected a %.*s",
 					    (int)k.len, k.str,
