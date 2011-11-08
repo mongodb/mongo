@@ -216,6 +216,22 @@ while (cursor.hasNext()) {
 
 assert.eq(count, 500);
 
+logout(adminUser);
+
+login(testUser);
+print( "testing map reduce" );
+/* sharded map reduce can be tricky since all components talk to each other.
+   for example SERVER-4114 is triggered when 1 mongod connects to another for final reduce
+   it's not properly tested here since addresses are localhost, which is more permissive */
+var res = s.getDB("test").runCommand(
+    {mapreduce : "foo",
+     map : function() { emit(this.x, 1); },
+     reduce : function(key, values) { return values.length; },
+     out:"mrout"
+    });
+printjson(res);
+assert.commandWorked(res);
+
 // check that dump doesn't get stuck with auth
 var x = runMongoProgram( "mongodump", "--host", "127.0.0.1:31000", "-d", testUser.db, "-u", testUser.username, "-p", testUser.password);
 
