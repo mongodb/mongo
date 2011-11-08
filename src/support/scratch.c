@@ -65,20 +65,36 @@ int
 __wt_buf_grow(WT_SESSION_IMPL *session, WT_BUF *buf, size_t size)
 {
 	size_t offset;
+	int set_data;
 
 	WT_ASSERT(session, size <= UINT32_MAX);
 
 	if (size > buf->memsize) {
 		/*
-		 * Reallocate the buffer's memory, but maintain the previous
-		 * data reference.
+		 * Grow the buffer's memory: if the data reference is not set or
+		 * references the buffer's memory, maintain it.
+		 *
+		 * This test is complicated so it won't fail if buf->mem is non-
+		 * NULL and buf->memsize is 0.  That shouldn't be possible, but
+		 * I don't want to find out I'm wrong, either.
 		 */
-		offset = (buf->data == NULL) ? 0 :
-		    WT_PTRDIFF(buf->data, buf->mem);
+		if (buf->data == NULL || buf->data == buf->mem) {
+			offset = 0;
+			set_data = 1;
+		} else if (buf->data >= buf->mem &&
+		    (uint8_t *)buf->data <
+		    (uint8_t *)buf->mem + buf->memsize) {
+			offset = WT_PTRDIFF(buf->data, buf->mem);
+			set_data = 1;
+		} else {
+			offset = 0;
+			set_data = 0;
+		}
 
 		WT_RET(__wt_realloc(session, &buf->memsize, size, &buf->mem));
 
-		buf->data = (uint8_t *)buf->mem + offset;
+		if (set_data)
+			buf->data = (uint8_t *)buf->mem + offset;
 	}
 	return (0);
 }
