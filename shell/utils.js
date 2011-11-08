@@ -1052,7 +1052,11 @@ jsTestPath = function(){
 
 jsTestOptions = function(){
     if( TestData ) return { noJournal : TestData.noJournal,
-                            noJournalPrealloc : TestData.noJournalPrealloc }
+                            noJournalPrealloc : TestData.noJournalPrealloc,
+                            auth : TestData.auth,
+                            keyFile : TestData.keyFile,
+                            authUser : "__system",
+                            authPassword : TestData.keyFileData }
     return {}
 }
 
@@ -1077,6 +1081,77 @@ jsTest.randomize = function( seed ) {
     Random.srand( seed )
     print( "Random seed for test : " + seed ) 
 }
+
+/**
+* Adds a user to the admin DB on the given connection. This is only used for running the test suite
+* with authentication enabled.
+*/
+jsTest.addAuth = function(conn) {
+    print ("Adding admin user on connection: " + conn);
+    return conn.getDB('admin').addUser("admin", "password");
+}
+
+jsTest.authenticate = function(conn) {
+    conn.authenticated = true;
+    result1 = null;
+    result2 = null;
+    if (jsTest.options().auth) {
+        print ("Authenticating to admin user on connection: " + conn);
+        result1 = conn.getDB('admin').auth("admin", "password");
+    }
+    if (jsTest.options().keyFile && !jsTest.isMongos(conn)) {
+        print ("Authenticating to system user on connection: " + conn);
+        result2 = conn.getDB('local').auth(jsTestOptions().authUser, jsTestOptions().authPassword);
+    }
+
+    if (result1 == 1 || result2 == 1) {
+        return 1;
+    }
+
+    return result2 != null ? result2 : result1;
+}
+
+jsTest.authenticateNodes = function(nodes) {
+    jsTest.attempt({timeout:30000, desc: "Authenticate to nodes: " + nodes}, function() {
+        for (var i = 0; i < nodes.length; i++) {
+            // Don't try to authenticate to arbiters
+            res = nodes[i].getDB("admin").runCommand({replSetGetStatus: 1});
+            if(res.myState == 7) {
+                continue;
+            }
+            if(jsTest.authenticate(nodes[i]) != 1) {
+                return false;
+            }
+        }
+        return true;
+    });
+}
+
+jsTest.isMongos = function(conn) {
+    return conn.getDB('admin').isMaster().msg=='isdbgrid';
+}
+
+// Pass this method a function to call repeatedly until
+// that function returns true. Example:
+//   attempt({timeout: 20000, desc: "get master"}, function() { // return false until success })
+jsTest.attempt = function( opts, func ) {
+    var timeout = opts.timeout || 1000;
+    var tries   = 0;
+    var sleepTime = 500;
+    var result = null;
+    var context = opts.context || this;
+
+    while((result = func.apply(context)) == false) {
+        tries += 1;
+        sleep(sleepTime);
+        if( tries * sleepTime > timeout) {
+            throw('[' + opts['desc'] + ']' + " timed out after " + timeout + "ms ( " + tries + " tries )");
+        }
+    }
+
+    return result;
+}
+
 
 shellPrintHelper = function (x) {
     if (typeof (x) == "undefined") {
