@@ -75,10 +75,10 @@ void workerThread() {
 void go() {
     assert( options["r"].trueValue() || options["w"].trueValue() );
     MemoryMappedFile f;
-    cout << "create test file" << endl;
+    cout << "creating test file size:";
     len = options["fileSizeMB"].numberLong();
     if( len == 0 ) len = 1;
-    cout << "test fileSizeMB : " << len << endl;
+    cout << len << "MB ..." << endl;
     len *= 1024 * 1024;
     const char *fname = "./mongoperf__testfile__tmp";
     try {
@@ -89,16 +89,13 @@ void go() {
         return;
     }
     lf = new LogFile(fname,true);
-    const unsigned sz = 1024 * 256;
+    const unsigned sz = 1024 * 1024;
     char buf[sz+4096];
     const char *p = round(buf);
     for( unsigned i = 0; i < len; i+= sz ) { 
         lf->synchronousAppend(p, sz);
     }
     BSONObj& o = options;
-
-    //void *p = m.create("mongoperf__testfile__tmp", len * 1024 * 1024, true);
-    //assert(p);
 
     if( o["mmf"].trueValue() ) { 
         delete lf;
@@ -164,8 +161,8 @@ cout <<
 "  }\n"
 "\n"
 "most fields are optional.\n"
-"non-mmf io is direct io (no caching). use a large file size to make the heads\n"
-"  move significantly\n"
+"non-mmf io is direct io (no caching). use a large file size to test making the heads\n"
+"  move significantly and to avoid i/o coalescing\n"
 "mmf io uses caching (the file system cache).\n"
 "\n"
 
