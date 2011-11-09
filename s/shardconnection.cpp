@@ -24,38 +24,6 @@
 
 namespace mongo {
 
-    // The code in shardconnection may run not only in mongos context. When elsewhere, chunk shard versioning
-    // is disabled. To enable chunk shard versioning, provide the check/resetShardVerionCB's below
-    //
-    // TODO: better encapsulate this mechanism.
-
-    bool defaultIsVersionable( DBClientBase * conn ){
-        return false;
-    }
-
-    bool defaultInitShardVersion( DBClientBase & conn, BSONObj& result ){
-        return false;
-    }
-
-    bool defaultForceRemoteCheckShardVersion( const string& ns ){
-        return true;
-    }
-
-    bool defaultCheckShardVersion( DBClientBase & conn , const string& ns , bool authoritative , int tryNumber ) {
-        // no-op in mongod
-        return false;
-    }
-
-    void defaultResetShardVersion( DBClientBase * conn ) {
-        // no-op in mongod
-    }
-
-    boost::function1<bool, DBClientBase* > isVersionableCB = defaultIsVersionable;
-    boost::function2<bool, DBClientBase&, BSONObj& > initShardVersionCB = defaultInitShardVersion;
-    boost::function1<bool, const string& > forceRemoteCheckShardVersionCB = defaultForceRemoteCheckShardVersion;
-    boost::function4<bool, DBClientBase&, const string&, bool, int> checkShardVersionCB = defaultCheckShardVersion;
-    boost::function1<void, DBClientBase*> resetShardVersionCB = defaultResetShardVersion;
-
     DBConnectionPool shardConnectionPool;
 
     /**
@@ -83,7 +51,7 @@ namespace mongo {
                     /* if we're shutting down, don't want to initiate release mechanism as it is slow,
                        and isn't needed since all connections will be closed anyway */
                     if ( inShutdown() ) {
-                        if( isVersionableCB( ss->avail ) ) resetShardVersionCB( ss->avail );
+                        if( versionManager.isVersionableCB( ss->avail ) ) versionManager.resetShardVersionCB( ss->avail );
                         delete ss->avail;
                     }
                     else
@@ -157,7 +125,7 @@ namespace mongo {
                 if( ! s->avail )
                     s->avail = shardConnectionPool.get( sconnString );
 
-                checkShardVersionCB( *s->avail, ns, false, 1 );
+                versionManager.checkShardVersionCB( s->avail, ns, false, 1 );
 
             }
         }
@@ -192,18 +160,18 @@ namespace mongo {
 
     thread_specific_ptr<ClientConnections> ClientConnections::_perThread;
 
-    ShardConnection::ShardConnection( const Shard * s , const string& ns )
-        : _addr( s->getConnString() ) , _ns( ns ) {
+    ShardConnection::ShardConnection( const Shard * s , const string& ns, ChunkManagerPtr manager )
+        : _addr( s->getConnString() ) , _ns( ns ), _manager( manager ) {
         _init();
     }
 
-    ShardConnection::ShardConnection( const Shard& s , const string& ns )
-        : _addr( s.getConnString() ) , _ns( ns ) {
+    ShardConnection::ShardConnection( const Shard& s , const string& ns, ChunkManagerPtr manager )
+        : _addr( s.getConnString() ) , _ns( ns ), _manager( manager ) {
         _init();
     }
 
-    ShardConnection::ShardConnection( const string& addr , const string& ns )
-        : _addr( addr ) , _ns( ns ) {
+    ShardConnection::ShardConnection( const string& addr , const string& ns, ChunkManagerPtr manager )
+        : _addr( addr ) , _ns( ns ), _manager( manager ) {
         _init();
     }
 
@@ -218,10 +186,14 @@ namespace mongo {
             return;
         _finishedInit = true;
 
-        if ( _ns.size() && isVersionableCB( _conn ) ) {
-            _setVersion = checkShardVersionCB( *_conn , _ns , false , 1 );
+        if ( _ns.size() && versionManager.isVersionableCB( _conn ) ) {
+            // Make sure we specified a manager for the correct namespace
+            if( _manager ) assert( _manager->getns() == _ns );
+            _setVersion = versionManager.checkShardVersionCB( this , false , 1 );
         }
         else {
+            // Make sure we didn't specify a manager for an empty namespace
+            assert( ! _manager );
             _setVersion = false;
         }
 
@@ -237,7 +209,7 @@ namespace mongo {
 
     void ShardConnection::kill() {
         if ( _conn ) {
-            if( isVersionableCB( _conn ) ) resetShardVersionCB( _conn );
+            if( versionManager.isVersionableCB( _conn ) ) versionManager.resetShardVersionCB( _conn );
             delete _conn;
             _conn = 0;
             _finishedInit = true;

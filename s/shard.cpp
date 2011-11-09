@@ -365,12 +365,12 @@ namespace mongo {
                     conn->auth("local", internalSecurity.user, internalSecurity.pwd, err, false));
         }
 
-        if ( _shardedConnections && isVersionableCB( conn ) ) {
+        if ( _shardedConnections && versionManager.isVersionableCB( conn ) ) {
 
             // We must initialize sharding on all connections, so that we get exceptions if sharding is enabled on
             // the collection.
             BSONObj result;
-            bool ok = initShardVersionCB( *conn, result );
+            bool ok = versionManager.initShardVersionCB( conn, result );
 
             // assert that we actually successfully setup sharding
             uassert( 15907, str::stream() << "could not initialize sharding on connection " << (*conn).toString() <<
@@ -382,8 +382,8 @@ namespace mongo {
 
     void ShardingConnectionHook::onDestroy( DBClientBase * conn ) {
 
-        if( _shardedConnections && isVersionableCB( conn ) ){
-            resetShardVersionCB( conn );
+        if( _shardedConnections && versionManager.isVersionableCB( conn ) ){
+            versionManager.resetShardVersionCB( conn );
         }
 
     }

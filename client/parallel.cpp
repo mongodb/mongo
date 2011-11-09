@@ -783,7 +783,7 @@ namespace mongo {
             }
             catch ( RecvStaleConfigException& e ){
 
-                assert( isVersionableCB( _conn ) );
+                assert( versionManager.isVersionableCB( _conn ) );
 
                 if( i >= maxRetries ){
                     error() << "Future::spawnComand (part 2) stale config exception" << causedBy( e ) << endl;
@@ -791,13 +791,13 @@ namespace mongo {
                 }
 
                 if( i >= maxRetries / 2 ){
-                    if( ! forceRemoteCheckShardVersionCB( e.getns() ) ){
+                    if( ! versionManager.forceRemoteCheckShardVersionCB( e.getns() ) ){
                         error() << "Future::spawnComand (part 2) no config detected" << causedBy( e ) << endl;
                         throw e;
                     }
                 }
 
-                checkShardVersionCB( *_conn, e.getns(), false, 1 );
+                versionManager.checkShardVersionCB( _conn, e.getns(), false, 1 );
 
                 LOG( i > 1 ? 0 : 1 ) << "retrying lazy command" << causedBy( e ) << endl;
 

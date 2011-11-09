@@ -164,10 +164,20 @@ namespace mongo {
             : StaleConfigException( ns, raw + "(recv)", RecvStaleConfigCode, justConnection ) {}
     };
 
-    extern boost::function1<bool, DBClientBase* > isVersionableCB;
-    extern boost::function2<bool, DBClientBase&, BSONObj& > initShardVersionCB;
-    extern boost::function1<bool, const string& > forceRemoteCheckShardVersionCB;
-    extern boost::function4<bool, DBClientBase&, const string&, bool, int> checkShardVersionCB;
-    extern boost::function1<void, DBClientBase*> resetShardVersionCB;
+    class ShardConnection;
+    class VersionManager {
+    public:
+        VersionManager(){};
+
+        bool isVersionableCB( DBClientBase* );
+        bool initShardVersionCB( DBClientBase*, BSONObj& );
+        bool forceRemoteCheckShardVersionCB( const string& );
+        bool checkShardVersionCB( DBClientBase*, const string&, bool, int );
+        bool checkShardVersionCB( ShardConnection*, bool, int );
+        void resetShardVersionCB( DBClientBase* );
+
+    };
+
+    extern VersionManager versionManager;
 
 }
