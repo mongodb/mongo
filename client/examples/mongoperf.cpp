@@ -79,6 +79,11 @@ void go() {
     len = options["fileSizeMB"].numberLong();
     if( len == 0 ) len = 1;
     cout << len << "MB ..." << endl;
+    if( len > 2000 ) { 
+        // todo make tests use 64 bit offsets in their i/o
+        cout << "\nsizes > 2GB not yet supported" << endl;
+        return;
+    }
     len *= 1024 * 1024;
     const char *fname = "./mongoperf__testfile__tmp";
     try {
@@ -89,10 +94,10 @@ void go() {
         return;
     }
     lf = new LogFile(fname,true);
-    const unsigned sz = 1024 * 1024;
-    char buf[sz+4096];
+    const unsigned sz = 1024 * 1024 * 32;
+    char *buf = (char*) malloc(sz+4096);
     const char *p = round(buf);
-    for( unsigned i = 0; i < len; i+= sz ) { 
+    for( unsigned long long i = 0; i < len; i+= sz ) { 
         lf->synchronousAppend(p, sz);
     }
     BSONObj& o = options;
