@@ -444,8 +444,7 @@ namespace mongo {
             fname << "cf_";
             static int fnum = 1;
             fname << "_" << fnum++ << "_";
-
-
+            
             if ( ! hasFunctionIdentifier( raw ) ) {
                 string s = raw;
                 if ( isSimpleStatement( s ) ) {
@@ -461,7 +460,9 @@ namespace mongo {
             size_t start = code.find( '(' );
             assert( start != string::npos );
 
-            fname << "_f_" << trim( code.substr( 9 , start - 9 ) );
+            string fbase = trim( code.substr( 9 , start - 9 ) );
+
+            fname << "_f_" << fbase;
 
             code = code.substr( start + 1 );
             size_t end = code.find( ')' );
@@ -485,8 +486,13 @@ namespace mongo {
             boost::scoped_array<const char *> paramArray (new const char*[params.size()]);
             for ( size_t i=0; i<params.size(); i++ )
                 paramArray[i] = params[i].c_str();
+            
+            // avoid munging previously munged name (kludge; switching to v8 fixes underlying issue)
+            if ( fbase.find("cf__") != 0 && fbase.find("_f_") == string::npos ) {
+                fbase = fname.str();
+            }
 
-            JSFunction * func = JS_CompileFunction( _context , assoc , fname.str().c_str() , params.size() , paramArray.get() , code.c_str() , code.size() , "nofile_b" , 0 );
+            JSFunction * func = JS_CompileFunction( _context , assoc , fbase.c_str() , params.size() , paramArray.get() , code.c_str() , code.size() , "nofile_b" , 0 );
 
             if ( ! func ) {
                 log() << "compile failed for: " << raw << endl;
