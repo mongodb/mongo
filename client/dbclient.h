@@ -337,6 +337,13 @@ namespace mongo {
     */
 #define QUERY(x) mongo::Query( BSON(x) )
 
+    // Useful utilities for namespaces
+    /** @return the database name portion of an ns string */
+    string nsGetDB( const string &ns );
+
+    /** @return the collection name portion of an ns string */
+    string nsGetCollection( const string &ns );
+
     /**
        interface that handles communication with the db
      */
@@ -704,24 +711,6 @@ namespace mongo {
         }
 
         virtual string toString() = 0;
-
-        /** @return the database name portion of an ns string */
-        string nsGetDB( const string &ns ) {
-            string::size_type pos = ns.find( "." );
-            if ( pos == string::npos )
-                return ns;
-
-            return ns.substr( 0 , pos );
-        }
-
-        /** @return the collection name portion of an ns string */
-        string nsGetCollection( const string &ns ) {
-            string::size_type pos = ns.find( "." );
-            if ( pos == string::npos )
-                return "";
-
-            return ns.substr( pos + 1 );
-        }
 
     protected:
         bool isOk(const BSONObj&);
