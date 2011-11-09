@@ -18,6 +18,8 @@
 
 @section compressors Compression Algorithms
 
+See @subpage compression
+
 @todo explain custom collators
 
 @section extractors Custom Field Extractors

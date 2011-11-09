@@ -1,0 +1,6 @@
+/*! @page compression Compression Engines
+
+This section explains how to use compression engines with WiredTiger, including the builtin support for bzip2.
+
+@todo describe how to use compression
+ */

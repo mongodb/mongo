@@ -30,6 +30,7 @@ boolean
 br
 btree
 builtin
+bzip
 cachesize
 callbk
 cdb

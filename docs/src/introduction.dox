@@ -17,6 +17,9 @@ more efficient access and storage.
 
 For full details about using WiredTiger, see:
 
+- @subpage install\n
+  how to get, build and install WiredTiger.
+
 - @subpage using\n
   how to write WiredTiger applications.
 
