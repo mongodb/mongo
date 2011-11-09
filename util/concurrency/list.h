@@ -20,7 +20,9 @@
 
 namespace mongo {
 
-    /* this class uses a mutex for writes, but not for reads.
+    /* DONT USE THIS.  it was a dumb idea.
+    
+       this class uses a mutex for writes, but not for reads.
        we can get fancier later...
 
             struct Member : public List1<Member>::Base {

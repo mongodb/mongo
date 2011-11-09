@@ -95,6 +95,7 @@ namespace mongo {
             {
                 Client& me = cc();
                 scoped_lock bl(Client::clientsMutex);
+                auto_ptr<Matcher> m(new Matcher(q.query));
                 for( set<Client*>::iterator i = Client::clients.begin(); i != Client::clients.end(); i++ ) {
                     Client *c = *i;
                     assert( c );
@@ -103,8 +104,12 @@ namespace mongo {
                         continue;
                     }
                     assert( co );
-                    if( all || co->active() )
-                        vals.push_back( co->infoNoauth() );
+                    if( all || co->active() ) {
+                        BSONObj info = co->infoNoauth();
+                        if ( all || m->matches( info )) {
+                            vals.push_back( info );
+                        }
+                    }
                 }
             }
             b.append("inprog", vals);
@@ -174,23 +179,40 @@ namespace mongo {
 
         CurOp& op = *(c.curop());
 
+        shared_ptr<AssertionException> ex;
+
         try {
             dbresponse.exhaust = runQuery(m, q, op, *resp);
             assert( !resp->empty() );
         }
-        catch ( AssertionException& e ) {
+        catch ( SendStaleConfigException& e ){
+            ex.reset( new SendStaleConfigException( e.getns(), e.getInfo().msg ) );
             ok = false;
-            op.debug().exceptionInfo = e.getInfo();
+        }
+        catch ( AssertionException& e ) {
+            ex.reset( new AssertionException( e.getInfo().msg, e.getCode() ) );
+            ok = false;
+        }
+
+        if( ex ){
+
+            op.debug().exceptionInfo = ex->getInfo();
             LOGWITHRATELIMIT {
-                log() << "assertion " << e.toString() << " ns:" << q.ns << " query:" <<
+                log() << "assertion " << ex->toString() << " ns:" << q.ns << " query:" <<
                 (q.query.valid() ? q.query.toString() : "query object is corrupt") << endl;
                 if( q.ntoskip || q.ntoreturn )
                     log() << " ntoskip:" << q.ntoskip << " ntoreturn:" << q.ntoreturn << endl;
             }
 
+            SendStaleConfigException* scex = NULL;
+            if ( ex->getCode() == SendStaleConfigCode ) scex = static_cast<SendStaleConfigException*>( ex.get() );
+
             BSONObjBuilder err;
-            e.getInfo().append( err );
+            ex->getInfo().append( err );
+            if( scex ) err.append( "ns", scex->getns() );
             BSONObj errObj = err.done();
+
+            log() << errObj << endl;
 
             BufBuilder b;
             b.skip(sizeof(QueryResult));
@@ -201,8 +223,7 @@ namespace mongo {
             b.decouple();
             QueryResult *qr = msgdata;
             qr->_resultFlags() = ResultFlag_ErrSet;
-            if ( e.getCode() == StaleConfigInContextCode )
-                qr->_resultFlags() |= ResultFlag_ShardConfigStale;
+            if( scex ) qr->_resultFlags() |= ResultFlag_ShardConfigStale;
             qr->len = b.len();
             qr->setOperation(opReply);
             qr->cursorId = 0;
@@ -210,6 +231,7 @@ namespace mongo {
             qr->nReturned = 1;
             resp.reset( new Message() );
             resp->setData( msgdata, true );
+
         }
 
         op.debug().responseLength = resp->header()->dataLen();

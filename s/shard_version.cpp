@@ -31,6 +31,9 @@ namespace mongo {
 
     // when running in sharded mode, use chunk shard version control
 
+    static bool isVersionable( DBClientBase * conn );
+    static bool initShardVersion( DBClientBase & conn, BSONObj& result );
+    static bool forceRemoteCheckShardVersion( const string& ns );
     static bool checkShardVersion( DBClientBase & conn , const string& ns , bool authoritative = false , int tryNumber = 1 );
     static void resetShardVersion( DBClientBase * conn );
 
@@ -40,6 +43,9 @@ namespace mongo {
         //
         // TODO: Better encapsulate this mechanism.
         //
+        isVersionableCB = isVersionable;
+        initShardVersionCB = initShardVersion;
+        forceRemoteCheckShardVersionCB = forceRemoteCheckShardVersion;
         checkShardVersionCB = checkShardVersion;
         resetShardVersionCB = resetShardVersion;
     }
@@ -79,6 +85,76 @@ namespace mongo {
         connectionShardStatus.reset( conn );
     }
 
+    bool isVersionable( DBClientBase* conn ){
+        return conn->type() == ConnectionString::MASTER || conn->type() == ConnectionString::SET;
+    }
+
+    DBClientBase* getVersionable( DBClientBase* conn ){
+
+        switch ( conn->type() ) {
+        case ConnectionString::INVALID:
+           massert( 15904, str::stream() << "cannot set version on invalid connection " << conn->toString(), false );
+           return NULL;
+        case ConnectionString::MASTER:
+           return conn;
+        case ConnectionString::PAIR:
+           massert( 15905, str::stream() << "cannot set version or shard on pair connection " << conn->toString(), false );
+           return NULL;
+        case ConnectionString::SYNC:
+           massert( 15906, str::stream() << "cannot set version or shard on sync connection " << conn->toString(), false );
+           return NULL;
+        case ConnectionString::SET:
+           DBClientReplicaSet* set = (DBClientReplicaSet*) conn;
+           return &( set->masterConn() );
+        }
+
+        assert( false );
+        return NULL;
+    }
+
+    extern OID serverID;
+
+    bool initShardVersion( DBClientBase& conn_in, BSONObj& result ){
+
+        WriteBackListener::init( conn_in );
+
+        DBClientBase* conn = getVersionable( &conn_in );
+        assert( conn ); // errors thrown above
+
+        BSONObjBuilder cmdBuilder;
+
+        cmdBuilder.append( "setShardVersion" , "" );
+        cmdBuilder.appendBool( "init", true );
+        cmdBuilder.append( "configdb" , configServer.modelServer() );
+        cmdBuilder.appendOID( "serverID" , &serverID );
+        cmdBuilder.appendBool( "authoritative" , true );
+
+        BSONObj cmd = cmdBuilder.obj();
+
+        LOG(1) << "initializing shard connection to " << conn->toString() << endl;
+        LOG(2) << "initial sharding settings : " << cmd << endl;
+
+        bool ok = conn->runCommand( "admin" , cmd , result );
+
+        LOG(3) << "initial sharding result : " << result << endl;
+
+        return ok;
+
+    }
+
+    bool forceRemoteCheckShardVersion( const string& ns ){
+
+        DBConfigPtr conf = grid.getDBConfig( ns );
+        if ( ! conf ) return false;
+        conf->reload();
+
+        ChunkManagerPtr manager = conf->getChunkManagerIfExists( ns, true, true );
+        if( ! manager ) return false;
+
+        return true;
+
+    }
+
     /**
      * @return true if had to do something
      */
@@ -91,30 +167,8 @@ namespace mongo {
         if ( ! conf )
             return false;
 
-        DBClientBase* conn = 0;
-
-        switch ( conn_in.type() ) {
-        case ConnectionString::INVALID:
-            assert(0);
-            break;
-        case ConnectionString::MASTER:
-            // great
-            conn = &conn_in;
-            break;
-        case ConnectionString::PAIR:
-            assert( ! "pair not support for sharding" );
-            break;
-        case ConnectionString::SYNC:
-            // TODO: we should check later that we aren't actually sharded on this
-            conn = &conn_in;
-            break;
-        case ConnectionString::SET:
-            DBClientReplicaSet* set = (DBClientReplicaSet*)&conn_in;
-            conn = &(set->masterConn());
-            break;
-        }
-
-        assert(conn);
+        DBClientBase* conn = getVersionable( &conn_in );
+        assert(conn); // errors thrown above
 
         unsigned long long officialSequenceNumber = 0;
 

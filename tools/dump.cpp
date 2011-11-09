@@ -37,7 +37,7 @@ class Dump : public Tool {
         FILE* _f;
     };
 public:
-    Dump() : Tool( "dump" , ALL , "*" , "*" , false ) {
+    Dump() : Tool( "dump" , ALL , "" , "" , true ) {
         add_options()
         ("out,o", po::value<string>()->default_value("dump"), "output directory or \"-\" for stdout")
         ("query,q", po::value<string>() , "json query" )
@@ -45,6 +45,15 @@ public:
         ("repair", "try to recover a crashed database" )
         ("forceTableScan", "force a table scan (do not use $snapshot)" )
         ;
+    }
+
+    virtual void preSetup() {
+        string out = getParam("out");
+        if ( out == "-" ) {
+                // write output to standard error to avoid mangling output
+                // must happen early to avoid sending junk to stdout
+                useStandardOutput(false);
+        }
     }
 
     virtual void printExtraHelp(ostream& out) {
@@ -110,6 +119,7 @@ public:
         uassert(10262, errnoWithPrefix("couldn't open file"), f);
 
         ProgressMeter m( conn( true ).count( coll.c_str() , BSONObj() , QueryOption_SlaveOk ) );
+        m.setUnits("objects");
 
         doCollection(coll, f, &m);
 
@@ -133,14 +143,14 @@ public:
             const string name = obj.getField( "name" ).valuestr();
 
             // skip namespaces with $ in them only if we don't specify a collection to dump
-            if ( _coll == "*" && name.find( ".$" ) != string::npos ) {
+            if ( _coll == "" && name.find( ".$" ) != string::npos ) {
                 log(1) << "\tskipping collection: " << name << endl;
                 continue;
             }
 
             const string filename = name.substr( db.size() + 1 );
 
-            if ( _coll != "*" && db + "." + _coll != name && _coll != name )
+            if ( _coll != "" && db + "." + _coll != name && _coll != name )
                 continue;
 
             writeCollectionFile( name.c_str() , outdir / ( filename + ".bson" ) );
@@ -251,6 +261,7 @@ public:
         FilePtr f (fopen(outfile.string().c_str(), "wb"));
 
         ProgressMeter m( nsd->stats.nrecords * 2 );
+        m.setUnits("objects");
         
         Writer w( f , &m );
 
@@ -305,7 +316,7 @@ public:
             if ( str::contains( ns , ".tmp.mr." ) )
                 continue;
             
-            if ( _coll != "*" && ! str::endsWith( ns , _coll ) )
+            if ( _coll != "" && ! str::endsWith( ns , _coll ) )
                 continue;
 
             log() << "trying to recover: " << ns << endl;
@@ -373,7 +384,7 @@ public:
         // check if we're outputting to stdout
         string out = getParam("out");
         if ( out == "-" ) {
-            if ( _db != "*" && _coll != "*" ) {
+            if ( _db != "" && _coll != "" ) {
                 writeCollectionStdout( _db+"."+_coll );
                 return 0;
             }
@@ -388,7 +399,7 @@ public:
         path root( out );
         string db = _db;
 
-        if ( db == "*" ) {
+        if ( db == "" ) {
             cout << "all dbs" << endl;
             auth( "admin" );
 

@@ -584,6 +584,7 @@ namespace mongo {
         while( 1 ) {
             startupStatus = LOADINGCONFIG;
             startupStatusMsg.set("loading " + rsConfigNs + " config (LOADINGCONFIG)");
+            LOG(1) << "loadConfig() " << rsConfigNs << endl;
             try {
                 vector<ReplSetConfig> configs;
                 try {
@@ -618,7 +619,7 @@ namespace mongo {
                         configs.push_back(ReplSetConfig(replSettings.reconfig, true));
                     }
                     catch( DBException& re) {
-                        log() << "couldn't load reconfig: " << re.what() << endl;
+                        log() << "replSet couldn't load reconfig: " << re.what() << rsLog;
                         replSettings.reconfig = BSONObj();
                     }
                 }

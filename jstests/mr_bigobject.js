@@ -2,9 +2,11 @@
 t = db.mr_bigobject
 t.drop()
 
-s = "";
+// v8 requires large start string, otherwise UTF16
+var large = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+var s = large;
 while ( s.length < ( 6 * 1024 * 1024 ) ){
-    s += "asdasdasd";
+    s += large;
 }
 
 for ( i=0; i<5; i++ )

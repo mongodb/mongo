@@ -25,7 +25,6 @@ function durPassThrough() {
         function _run(x) {
             if (/[\/\\]_/.test(x.name) ||
                     !/\.js$/.test(x.name) ||
-		    x.name == 'jstests/mr_auth.js' ||
                     /repair/.test(x.name) ||
                     //		/numberlong/.test(x.name) ||
                     false // placeholder so all real tests end in ||

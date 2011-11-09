@@ -557,10 +557,10 @@ namespace mongo {
         auto_ptr<DBClientCursor> c =
             this->query(ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions);
 
-        uassert( 10276 ,  str::stream() << "DBClientBase::findN: transport error: " << getServerAddress() << " query: " << query.toString(), c.get() );
+        uassert( 10276 ,  str::stream() << "DBClientBase::findN: transport error: " << getServerAddress() << " ns: " << ns << " query: " << query.toString(), c.get() );
 
         if ( c->hasResultFlag( ResultFlag_ShardConfigStale ) )
-            throw StaleConfigException( ns , "findN stale config" );
+            throw RecvStaleConfigException( ns , "findN stale config" );
 
         for( int i = 0; i < nToReturn; i++ ) {
             if ( !c->more() )
@@ -583,13 +583,16 @@ namespace mongo {
 
     bool DBClientConnection::_connect( string& errmsg ) {
         _serverString = _server.toString();
+
         // we keep around SockAddr for connection life -- maybe MessagingPort
         // requires that?
         server.reset(new SockAddr(_server.host().c_str(), _server.port()));
         p.reset(new MessagingPort( _so_timeout, _logLevel ));
 
-        if (server->getAddr() == "0.0.0.0") {
-            _failed = true;
+        if (_server.host().empty() || server->getAddr() == "0.0.0.0") {
+            stringstream s;
+            errmsg = 
+                str::stream() << "couldn't connect to server " << _server.toString();
             return false;
         }
 
@@ -598,9 +601,7 @@ namespace mongo {
         //    log() << "Connecting to server " << _serverString << " timeout " << _so_timeout << endl;
         // }
         if ( !p->connect(*server) ) {
-            stringstream ss;
-            ss << "couldn't connect to server " << _serverString;
-            errmsg = ss.str();
+            errmsg = str::stream() << "couldn't connect to server " << _server.toString();
             _failed = true;
             return false;
         }
@@ -1045,5 +1046,25 @@ namespace mongo {
             return false;
         return true;
     }
+
+
+    /** @return the database name portion of an ns string */
+    string nsGetDB( const string &ns ) {
+        string::size_type pos = ns.find( "." );
+        if ( pos == string::npos )
+            return ns;
+
+        return ns.substr( 0 , pos );
+    }
+
+    /** @return the collection name portion of an ns string */
+    string nsGetCollection( const string &ns ) {
+        string::size_type pos = ns.find( "." );
+        if ( pos == string::npos )
+            return "";
+
+        return ns.substr( pos + 1 );
+    }
+
 
 } // namespace mongo

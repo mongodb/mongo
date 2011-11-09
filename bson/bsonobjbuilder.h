@@ -469,16 +469,13 @@ namespace mongo {
                    Use BinDataGeneral if you don't care about the type.
             @param data the byte array
         */
-        BSONObjBuilder& appendBinData( const StringData& fieldName, int len, BinDataType type, const char *data ) {
+        BSONObjBuilder& appendBinData( const StringData& fieldName, int len, BinDataType type, const void *data ) {
             _b.appendNum( (char) BinData );
             _b.appendStr( fieldName );
             _b.appendNum( len );
             _b.appendNum( (char) type );
-            _b.appendBuf( (void *) data, len );
+            _b.appendBuf( data, len );
             return *this;
-        }
-        BSONObjBuilder& appendBinData( const StringData& fieldName, int len, BinDataType type, const unsigned char *data ) {
-            return appendBinData(fieldName, len, type, (const char *) data);
         }
 
         /**
@@ -487,13 +484,13 @@ namespace mongo {
         @param data a byte array
         @param len the length of data
         */
-        BSONObjBuilder& appendBinDataArrayDeprecated( const char * fieldName , const char * data , int len ) {
+        BSONObjBuilder& appendBinDataArrayDeprecated( const char * fieldName , const void * data , int len ) {
             _b.appendNum( (char) BinData );
             _b.appendStr( fieldName );
             _b.appendNum( len + 4 );
             _b.appendNum( (char)0x2 );
             _b.appendNum( len );
-            _b.appendBuf( (void *) data, len );
+            _b.appendBuf( data, len );
             return *this;
         }
 

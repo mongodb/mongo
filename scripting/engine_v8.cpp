@@ -293,6 +293,12 @@ namespace mongo {
     void V8ScriptEngine::interrupt( unsigned opSpec ) {
         v8::Locker l;
         if ( __interruptSpecToThreadId.count( opSpec ) ) {
+            int thread = __interruptSpecToThreadId[ opSpec ];
+            if ( thread == -2 || thread == -3) {
+                // just mark as interrupted
+                __interruptSpecToThreadId[ opSpec ] = -3;
+                return;
+            }
             V8::TerminateExecution( __interruptSpecToThreadId[ opSpec ] );
         }
     }
@@ -455,11 +461,10 @@ namespace mongo {
      * for an old one
      */
     v8::Handle< v8::Value > V8Scope::v8Callback( const v8::Arguments &args ) {
-        disableV8Interrupt(); // we don't want to have to audit all v8 calls for termination exceptions, so we don't allow these exceptions during the callback
-        if ( globalScriptEngine->interrupted() ) {
-            v8::V8::TerminateExecution(); // experimentally it seems that TerminateExecution() will override the return value
-            return v8::Undefined();
-        }
+        // originally v8 interrupt where disabled here cause: don't want to have to audit all v8 calls for termination exceptions
+        // but we do need to keep interrupt because much time may be spent here (e.g. sleep)
+        bool paused = pauseV8Interrupt();
+
         Local< External > f = External::Cast( *args.Callee()->Get( v8::String::New( "_v8_function" ) ) );
         v8Function function = (v8Function)(f->Value());
         Local< External > scp = External::Cast( *args.Data() );
@@ -476,14 +481,15 @@ namespace mongo {
         catch( ... ) {
             exception = "unknown exception";
         }
-        enableV8Interrupt();
-        if ( globalScriptEngine->interrupted() ) {
-            v8::V8::TerminateExecution();
-            return v8::Undefined();
+        if (paused) {
+            bool resume = resumeV8Interrupt();
+            if ( !resume || globalScriptEngine->interrupted() ) {
+                v8::V8::TerminateExecution();
+                return v8::ThrowException( v8::String::New( "Interruption in V8 native callback" ) );
+            }
         }
         if ( !exception.empty() ) {
-            // technically, ThrowException is supposed to be the last v8 call before returning
-            ret = v8::ThrowException( v8::String::New( exception.c_str() ) );
+            return v8::ThrowException( v8::String::New( exception.c_str() ) );
         }
         return ret;
     }
@@ -849,7 +855,7 @@ namespace mongo {
     void V8Scope::gc() {
         cout << "in gc" << endl;
         V8Lock l;
-        while( !V8::IdleNotification() );
+        V8::LowMemoryNotification();
     }
 
     // ----- db access -----
@@ -867,7 +873,7 @@ namespace mongo {
             }
 
             // needed for killop / interrupt support
-            v8::Locker::StartPreemption( 50 );
+            v8::Locker::StartPreemption( 1 );
 
             //_global->Set( v8::String::New( "Mongo" ) , _engine->_externalTemplate->GetFunction() );
             _global->Set( getV8Str( "Mongo" ) , getMongoFunctionTemplate( this, true )->GetFunction() );
@@ -1434,7 +1440,8 @@ namespace mongo {
             }
             else if ( !value->ToObject()->GetHiddenValue( V8STR_DBPTR ).IsEmpty() ) {
                 OID oid;
-                oid.init( toSTLString( value->ToObject()->Get( getV8Str( "id" ) ) ) );
+                Local<Value> theid = value->ToObject()->Get( getV8Str( "id" ) );
+                oid.init( toSTLString( theid->ToObject()->Get(getV8Str("str")) ) );
                 string ns = toSTLString( value->ToObject()->Get( getV8Str( "ns" ) ) );
                 b.appendDBRef( sname, ns, oid );
             }
@@ -1545,7 +1552,7 @@ namespace mongo {
 
     Handle<v8::Value> V8Scope::GCV8(V8Scope* scope, const Arguments& args) {
         V8Lock l;
-        while( !V8::IdleNotification() );
+        v8::V8::LowMemoryNotification();
         return v8::Undefined();
     }
 

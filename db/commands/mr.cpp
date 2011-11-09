@@ -326,7 +326,6 @@ namespace mongo {
             if ( ! _onDisk )
                 return;
 
-            Client::GodScope _;
             if (_config.incLong != _config.tempLong) {
                 // create the inc collection and make sure we have index on "0" key
                 _db.dropCollection( _config.incLong );
@@ -427,33 +426,18 @@ namespace mongo {
             if ( _onDisk == false || _config.outType == Config::INMEMORY )
                 return _temp->size();
 
-            // Do following reads before writelock below so db.count's Context::_auth won't think we are trying to write when only trying to read. Needed when user has read-only permission. We allow read-only users to output only to new collections (or return inline).
-            bool newOutColl = !_db.exists( _config.finalLong );
-            long long tempLongCount = _db.count( _config.tempLong );
-
-            if (_config.outNonAtomic) {
-                postProcessCollectionNonAtomic(op, pm, newOutColl, tempLongCount);
-            } else {
-                writelock lock;
-                postProcessCollectionNonAtomic(op, pm, newOutColl, tempLongCount);
-            }
-            return _db.count( _config.finalLong );
+            if (_config.outNonAtomic)
+                return postProcessCollectionNonAtomic(op, pm);
+            writelock lock;
+            return postProcessCollectionNonAtomic(op, pm);
         }
 
-        void State::postProcessCollectionNonAtomic(CurOp* op, ProgressMeterHolder& pm, bool newOutColl, long long tempLongCount) {
+        long long State::postProcessCollectionNonAtomic(CurOp* op, ProgressMeterHolder& pm) {
 
             if ( _config.finalLong == _config.tempLong )
-                return;
+                return _db.count( _config.finalLong );
 
-            if ( newOutColl ) {
-                Client::GodScope _; // OK to output to new collection even if don't have write permission
-                writelock lock;
-                BSONObj info;
-                if ( ! _db.runCommand( "admin" , BSON( "renameCollection" << _config.tempLong << "to" << _config.finalLong ) , info ) ) {
-                    uasserted( 15897 , str::stream() << "rename failed: " << info );
-                }
-            }
-            else if ( _config.outType == Config::REPLACE ) {
+            if ( _config.outType == Config::REPLACE || _db.count( _config.finalLong ) == 0 ) {
                 writelock lock;
                 // replace: just rename from temp to final collection name, dropping previous collection
                 _db.dropCollection( _config.finalLong );
@@ -462,11 +446,11 @@ namespace mongo {
                     uasserted( 10076 ,  str::stream() << "rename failed: " << info );
                 }
                          
-                //_db.dropCollection( _config.tempLong );  why drop after rename? -tony
+                _db.dropCollection( _config.tempLong );
             }
             else if ( _config.outType == Config::MERGE ) {
                 // merge: upsert new docs into old collection
-                op->setMessage( "m/r: merge post processing" , tempLongCount );
+                op->setMessage( "m/r: merge post processing" , _db.count( _config.tempLong, BSONObj() ) );
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempLong , BSONObj() );
                 while ( cursor->more() ) {
                     writelock lock;
@@ -482,7 +466,7 @@ namespace mongo {
                 // reduce: apply reduce op on new result and existing one
                 BSONList values;
 
-                op->setMessage( "m/r: reduce post processing" , tempLongCount );
+                op->setMessage( "m/r: reduce post processing" , _db.count( _config.tempLong, BSONObj() ) );
                 auto_ptr<DBClientCursor> cursor = _db.query( _config.tempLong , BSONObj() );
                 while ( cursor->more() ) {
                     writelock lock;
@@ -511,6 +495,8 @@ namespace mongo {
                 _db.dropCollection( _config.tempLong );
                 pm.finished();
             }
+
+            return _db.count( _config.finalLong );
         }
 
         /**
@@ -529,7 +515,6 @@ namespace mongo {
          * Insert doc into the inc collection, taking proper lock
          */
         void State::insertToInc( BSONObj& o ) {
-            Client::GodScope _;
             writelock l(_config.incLong);
             Client::Context ctx(_config.incLong);
             _insertToInc(o);
@@ -619,7 +604,8 @@ namespace mongo {
                 // emit function that stays in JS
                 _scope->setFunction("emit", "function(key, value) { if (typeof(key) === 'object') { _bailFromJS(key, value); return; }; ++_emitCt; var map = _mrMap; var list = map[key]; if (!list) { ++_keyCt; list = []; map[key] = list; } else { ++_dupCt; } list.push(value); }");
                 _scope->injectNative("_bailFromJS", _bailFromJS, this);
-            } else {
+            }
+            else {
                 // emit now populates C++ map
                 _scope->injectNative( "emit" , fast_emit, this );
             }
@@ -670,14 +656,14 @@ namespace mongo {
          */
         void State::finalReduce( CurOp * op , ProgressMeterHolder& pm ) {
 
-            Client::GodScope _;
             if (_jsMode) {
                 // apply the reduce within JS
                 if (_onDisk) {
                     _scope->injectNative("_nativeToTemp", _nativeToTemp, this);
                     _scope->invoke(_reduceAndFinalizeAndInsert, 0, 0, 0, true);
                     return;
-                } else {
+                }
+                else {
                     _scope->invoke(_reduceAndFinalize, 0, 0, 0, true);
                     return;
                 }
@@ -804,7 +790,6 @@ namespace mongo {
                 return;
             }
 
-            Client::GodScope _;
             auto_ptr<InMemory> n( new InMemory() ); // for new data
             long nSize = 0;
             _dupCount = 0;
@@ -845,7 +830,6 @@ namespace mongo {
             if ( ! _onDisk )
                 return;
 
-            Client::GodScope _;
             writelock l(_config.incLong);
             Client::Context ctx(_config.incLong);
 
@@ -882,7 +866,6 @@ namespace mongo {
          * this method checks the size of in memory map and potentially flushes to disk
          */
         void State::checkSize() {
-            Client::GodScope _;
             if (_jsMode) {
                 // try to reduce if it is beneficial
                 int dupCt = _scope->getNumberInt("_dupCt");
@@ -892,7 +875,8 @@ namespace mongo {
                     // too many keys for JS, switch to mixed
                     _bailFromJS(BSONObj(), this);
                     // then fall through to check map size
-                } else if (dupCt > (keyCt * _config.reduceTriggerRatio)) {
+                }
+                else if (dupCt > (keyCt * _config.reduceTriggerRatio)) {
                     // reduce now to lower mem usage
                     _scope->invoke(_reduceAll, 0, 0, 0, true);
                     return;
@@ -959,7 +943,12 @@ namespace mongo {
         class MapReduceCommand : public Command {
         public:
             MapReduceCommand() : Command("mapReduce", false, "mapreduce") {}
+
+            /* why !replset ?
+               bad things happen with --slave (i think because of this)
+            */
             virtual bool slaveOk() const { return !replSet; }
+
             virtual bool slaveOverrideOk() { return true; }
 
             virtual void help( stringstream &help ) const {
@@ -967,7 +956,9 @@ namespace mongo {
                 help << "Note this is used for aggregation, not querying, in MongoDB.\n";
                 help << "http://www.mongodb.org/display/DOCS/MapReduce";
             }
+
             virtual LockType locktype() const { return NONE; }
+
             bool run(const string& dbname , BSONObj& cmd, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
                 Timer t;
                 Client& client = cc();
@@ -997,6 +988,11 @@ namespace mongo {
                         errmsg = "not master";
                         return false;
                     }
+                }
+
+                if (state.isOnDisk() && !client.getAuthenticationInfo()->isAuthorized(dbname)) {
+                	errmsg = "read-only user cannot output mapReduce to collection, use inline instead";
+                	return false;
                 }
 
                 try {
@@ -1126,6 +1122,10 @@ namespace mongo {
                     }
 
                 }
+                catch( SendStaleConfigException& e ){
+                    log() << "mr detected stale config, should retry" << causedBy(e) << endl;
+                    throw e;
+                }
                 // TODO:  The error handling code for queries is v. fragile,
                 // *requires* rethrow AssertionExceptions - should probably fix.
                 catch ( AssertionException& e ){
@@ -1157,6 +1157,7 @@ namespace mongo {
 
             virtual LockType locktype() const { return NONE; }
             bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+                ShardedConnectionInfo::addHook();
                 string shardedOutputCollection = cmdObj["shardedOutputCollection"].valuestrsafe();
                 string postProcessCollection = cmdObj["postProcessCollection"].valuestrsafe();
                 bool postProcessOnly = !(postProcessCollection.empty());
@@ -1183,7 +1184,8 @@ namespace mongo {
                         // nothing to do
                         return 1;
                     }
-                } else {
+                }
+                else {
                     set<ServerAndQuery> servers;
                     vector< auto_ptr<DBClientCursor> > shardCursors;
 

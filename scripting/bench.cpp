@@ -84,7 +84,7 @@ namespace mongo {
 
         BSONObj ops;
 
-        bool active; // true at starts, gets set to false when should stop
+        volatile bool active; // true at starts, gets set to false when should stop
         AtomicUInt threadsReady;
 
         bool error;
@@ -135,6 +135,7 @@ namespace mongo {
         
     } 
     
+    // TODO:  Make recursively fixing
     static void fixQuery( BSONObjBuilder& b  , const BSONObj& obj ) {
         BSONObjIterator i( obj );
         while ( i.more() ) {
@@ -219,6 +220,23 @@ namespace mongo {
                         }
 
                         if( ! config->hideResults || e["showResult"].trueValue() ) log() << "Result from benchRun thread [findOne] : " << result << endl;
+
+                    }
+                    else if ( op == "command" ) {
+
+                        BSONObj result;
+                        // TODO
+                        /* bool ok = */ conn->runCommand( ns , /* fixQuery( */ e["command"].Obj() /* ) */, result, e["options"].numberInt() );
+
+                        if( check ){
+                            int err = scope->invoke( scopeFunc , 0 , &result,  1000 * 60 , false );
+                            if( err ){
+                                log() << "Error checking in benchRun thread [command]" << causedBy( scope->getError() ) << endl;
+                                return;
+                            }
+                        }
+
+                        if( ! config->hideResults || e["showResult"].trueValue() ) log() << "Result from benchRun thread [command] : " << result << endl;
 
                     }
                     else if( op == "find" || op == "query" ) {
@@ -322,6 +340,12 @@ namespace mongo {
                                                    result["code"].eoo() ? 0 : result["code"].Int() );
                         }
                     }
+                    else if ( op == "createIndex" ) {
+                        conn->ensureIndex( ns , e["key"].Obj() , false , "" , false );
+                    }
+                    else if ( op == "dropIndex" ) {
+                        conn->dropIndex( ns , e["key"].Obj()  );
+                    }
                     else {
                         log() << "don't understand op: " << op << endl;
                         config->error = true;
@@ -394,7 +418,7 @@ namespace mongo {
         catch( ... ){
             error() << "Exception not handled in benchRun thread." << endl;
         }
-
+        conn->getLastError();
         config->threadsActive--;
         conn.done();
 
@@ -477,9 +501,13 @@ namespace mongo {
 
         void done(){
 
-            log() << "Ending!" << endl;
+            log() << "Ending! (waiting for " << threads.size() << " threads)" << endl;
 
-            config.active = false;
+            {
+                scoped_lock lock( config._mutex );
+                config.active = false;
+            }
+
             for ( unsigned i = 0; i < threads.size(); i++ ) threads[i]->join();
 
             // Get final stats

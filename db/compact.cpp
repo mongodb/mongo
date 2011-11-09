@@ -287,8 +287,34 @@ namespace mongo {
                 errmsg = "will not run compact on an active replica set primary as this is a slow blocking operation. use force:true to force";
                 return false;
             }
-
+            
             string ns = db + '.' + coll;
+            if ( ! NamespaceString::normal(ns.c_str()) ) {
+                errmsg = "bad namespace name";
+                return false;
+            }
+            
+            // parameter validation to avoid triggering assertions in compact()
+            if ( str::contains(ns, ".system.") ) {
+                errmsg = "can't compact a system namespace";
+                return false;
+            }
+            
+            {
+                writelock lk;
+                Client::Context ctx(ns);
+                NamespaceDetails *d = nsdetails(ns.c_str());
+                if( ! d ) {
+                    errmsg = "namespace does not exist";
+                    return false;
+                }
+
+                if ( d->capped ) {
+                    errmsg = "cannot compact a capped collection";
+                    return false;
+                }
+            }
+
             bool validate = !cmdObj.hasElement("validate") || cmdObj["validate"].trueValue(); // default is true at the moment
             bool ok = compact(ns, errmsg, validate, result);
             return ok;

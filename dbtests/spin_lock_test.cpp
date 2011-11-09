@@ -20,6 +20,7 @@
 #include <boost/thread/thread.hpp>
 #include "dbtests.h"
 #include "../util/concurrency/spin_lock.h"
+#include "../util/timer.h"
 
 namespace {
 
@@ -73,8 +74,10 @@ namespace {
             int counter = 0;
 
             const int threads = 64;
-            const int incs = 10000;
+            const int incs = 50000;
             LockTester* testers[threads];
+            
+            Timer timer;
 
             for ( int i = 0; i < threads; i++ ) {
                 testers[i] = new LockTester( &spin, &counter );
@@ -87,7 +90,10 @@ namespace {
                 ASSERT_EQUALS( testers[i]->requests(), incs );
                 delete testers[i];
             }
-
+      
+            int ms = timer.millis();
+            log() << "spinlock ConcurrentIncs time: " << ms << endl;
+            
             ASSERT_EQUALS( counter, threads*incs );
 #if defined(__linux__)
             ASSERT( SpinLock::isfast() );

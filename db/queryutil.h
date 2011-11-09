@@ -290,7 +290,7 @@ namespace mongo {
     class IndexSpec;
 
     /**
-     * An ordered list of fields and their FieldRanges, correspoinding to valid
+     * An ordered list of fields and their FieldRanges, corresponding to valid
      * index keys for a given index spec.
      */
     class FieldRangeVector {
@@ -332,7 +332,7 @@ namespace mongo {
         bool matchesElement( const BSONElement &e, int i, bool direction ) const;
         bool matchesKey( const BSONObj &key ) const;
         vector<FieldRange> _ranges;
-        const IndexSpec &_indexSpec;
+        IndexSpec _indexSpec;
         int _direction;
         vector<BSONObj> _queries; // make sure mem owned
         friend class FieldRangeVectorIterator;

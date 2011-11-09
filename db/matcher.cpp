@@ -818,8 +818,10 @@ namespace mongo {
     /* See if an object matches the query.
     */
     bool Matcher::matches(const BSONObj& jsobj , MatchDetails * details ) const {
+        LOG(5) << "Matcher::matches() " << jsobj.toString() << endl;
+
         /* assuming there is usually only one thing to match.  if more this
-        could be slow sometimes. */
+           could be slow sometimes. */
 
         // check normal non-regex cases:
         for ( unsigned i = 0; i < _basics.size(); i++ ) {

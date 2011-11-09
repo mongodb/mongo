@@ -121,7 +121,7 @@ namespace mongo {
     }
 
 
-    bool AuthenticationInfo::_isAuthorized(const string& dbname, int level) const {
+    bool AuthenticationInfo::_isAuthorized(const string& dbname, Auth::Level level) const {
         {
             scoped_spinlock lk(_lock);
 
@@ -140,7 +140,7 @@ namespace mongo {
         return _isAuthorizedSpecialChecks( dbname );
     }
 
-    bool AuthenticationInfo::_isAuthorizedSingle_inlock(const string& dbname, int level) const {
+    bool AuthenticationInfo::_isAuthorizedSingle_inlock(const string& dbname, Auth::Level level) const {
         MA::const_iterator i = _dbs.find(dbname);
         return i != _dbs.end() && i->second.level >= level;
     }

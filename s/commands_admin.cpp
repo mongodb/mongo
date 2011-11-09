@@ -464,6 +464,13 @@ namespace mongo {
 
                         // Is index key over the sharding key? Remember that.
                         if ( key.woCompare( idx["key"].embeddedObjectUserCheck() ) == 0 ) {
+
+                            if( idx["sparse"].trueValue() ){
+                                errmsg = (string)"can't shard collection " + ns + " with sparse shard key index";
+                                conn.done();
+                                return false;
+                            }
+
                             hasShardIndex = true;
                             hasUniqueShardIndex = uniqueIndex;
                             continue;
@@ -995,6 +1002,8 @@ namespace mongo {
         class CmdShardingGetPrevError : public Command {
         public:
             virtual LockType locktype() const { return NONE; }
+            virtual bool requiresAuth() { return false; }
+
             virtual bool slaveOk() const {
                 return true;
             }
@@ -1011,6 +1020,7 @@ namespace mongo {
         class CmdShardingGetLastError : public Command {
         public:
             virtual LockType locktype() const { return NONE; }
+            virtual bool requiresAuth() { return false; }
             virtual bool slaveOk() const {
                 return true;
             }

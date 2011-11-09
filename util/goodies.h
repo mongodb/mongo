@@ -159,12 +159,13 @@ namespace mongo {
 
     class ProgressMeter : boost::noncopyable {
     public:
-        ProgressMeter( unsigned long long total , int secondsBetween = 3 , int checkInterval = 100 ) {
+        ProgressMeter( unsigned long long total , int secondsBetween = 3 , int checkInterval = 100 , string units = "" ) : _units(units) {
             reset( total , secondsBetween , checkInterval );
         }
 
         ProgressMeter() {
             _active = 0;
+            _units = "";
         }
 
         // typically you do ProgressMeterHolder
@@ -194,7 +195,7 @@ namespace mongo {
          */
         bool hit( int n = 1 ) {
             if ( ! _active ) {
-                cout << "warning: hit on in-active ProgressMeter" << endl;
+                cout << "warning: hit an inactive ProgressMeter" << endl;
                 return false;
             }
 
@@ -209,10 +210,21 @@ namespace mongo {
 
             if ( _total > 0 ) {
                 int per = (int)( ( (double)_done * 100.0 ) / (double)_total );
-                cout << "\t\t" << _done << "/" << _total << "\t" << per << "%" << endl;
+                cout << "\t\t" << _done << "/" << _total << "\t" << per << "%";
+
+                if ( ! _units.empty() ) {
+                    cout << "\t(" << _units << ")" << endl;
+                }
+                else {
+                    cout << endl;
+                }
             }
             _lastTime = t;
             return true;
+        }
+
+        void setUnits( string units ) {
+            _units = units;
         }
 
         void setTotalWhileRunning( unsigned long long total ) {
@@ -230,6 +242,11 @@ namespace mongo {
                 return "";
             stringstream buf;
             buf << _done << "/" << _total << " " << (_done*100)/_total << "%";
+
+            if ( ! _units.empty() ) {
+                buf << "\t(" << _units << ")" << endl;
+            }
+
             return buf.str();
         }
 
@@ -247,6 +264,8 @@ namespace mongo {
         unsigned long long _done;
         unsigned long long _hits;
         int _lastTime;
+
+        string _units;
     };
 
     // e.g.: 

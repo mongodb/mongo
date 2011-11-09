@@ -278,11 +278,12 @@ namespace mongo {
                blocks until command is done
                returns ok()
              */
-            bool join();
+            bool join( int maxRetries = 1 );
 
         private:
 
             CommandResult( const string& server , const string& db , const BSONObj& cmd , int options , DBClientBase * conn );
+            void init();
 
             string _server;
             string _db;

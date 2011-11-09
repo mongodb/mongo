@@ -133,7 +133,14 @@ namespace mongo {
             return false;
         }
 
-        authenticate(dbname, user, userObj[ "readOnly" ].isBoolean() && userObj[ "readOnly" ].boolean());
+        bool readOnly = userObj["readOnly"].trueValue();
+        authenticate(dbname, user, readOnly );
+        
+        
+        result.append( "dbname" , dbname );
+        result.append( "user" , user );
+        result.appendBool( "readOnly" , readOnly );
+        
 
         return true;
     }

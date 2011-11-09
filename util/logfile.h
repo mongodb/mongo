@@ -25,7 +25,7 @@ namespace mongo {
         /** create the file and open.  must not already exist.
             throws UserAssertion on i/o error
         */
-        LogFile(string name);
+        LogFile(string name, bool readwrite = false);
 
         /** closes */
         ~LogFile();
@@ -35,6 +35,11 @@ namespace mongo {
             note direct i/o may have alignment requirements
         */
         void synchronousAppend(const void *buf, size_t len);
+
+        /** write at specified offset. must be aligned.  noreturn until physically written. thread safe */
+        void writeAt(unsigned offset, const void *_bug, size_t _len);
+
+        void readAt(unsigned offset, void *_buf, size_t _len);
 
         const string _name;
 

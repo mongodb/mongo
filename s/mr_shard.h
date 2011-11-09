@@ -162,6 +162,9 @@ namespace mongo {
                    INMEMORY // only store in memory, limited in size
                  } outType;
 
+            // if true, no lock during output operation
+            bool outNonAtomic;
+
             static AtomicUInt JOB_NUMBER;
         }; // end MRsetup
 

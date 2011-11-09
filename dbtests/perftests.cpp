@@ -653,7 +653,7 @@ namespace PerfTests {
 
     class New128 : public B {
     public:
-        virtual int howLongMillis() { return 14000; } 
+        virtual int howLongMillis() { return 2000; } 
         string name() { return "new128"; }
         void timed() {
             char *p = new char[128];
@@ -665,7 +665,7 @@ namespace PerfTests {
 
     class New8 : public B {
     public:
-        virtual int howLongMillis() { return 14000; } 
+        virtual int howLongMillis() { return 2000; } 
         string name() { return "new8"; }
         void timed() {
             char *p = new char[8];

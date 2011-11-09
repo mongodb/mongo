@@ -1060,9 +1060,29 @@ jsTestLog = function(msg){
     print( "\n\n----\n" + msg + "\n----\n\n" )
 }
 
+jsTest = {}
+
+jsTest.name = jsTestName
+jsTest.file = jsTestFile
+jsTest.path = jsTestPath
+jsTest.options = jsTestOptions
+jsTest.log = jsTestLog
+
+jsTest.dir = function(){
+    return jsTest.path().replace( /\/[^\/]+$/, "/" )
+}
+
+jsTest.randomize = function( seed ) {
+    if( seed == undefined ) seed = new Date().getTime()
+    Random.srand( seed )
+    print( "Random seed for test : " + seed ) 
+}
+
 shellPrintHelper = function (x) {
     if (typeof (x) == "undefined") {
-        if (__callLastError) {
+        // Make sure that we have a db var before we use it
+        // TODO: This implicit calling of GLE can cause subtle, hard to track issues - remove?
+        if (__callLastError && typeof( db ) != "undefined" && db.getMongo ) {
             __callLastError = false;
             // explicit w:1 so that replset getLastErrorDefaults aren't used here which would be bad.
             var err = db.getLastError(1);
@@ -1191,7 +1211,7 @@ shellAutocomplete = function (/*prefix*/){ // outer scope function called on ini
         try {
             __autocomplete__ = worker(prefix).sort();
         }catch (e){
-            print("exception durring autocomplete: " + tojson(e.message));
+            print("exception during autocomplete: " + tojson(e.message));
             __autocomplete__ = [];
         }
     }

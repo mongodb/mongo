@@ -65,6 +65,8 @@ namespace mongo {
             if( p == buf ) {
                 if( sz <= SZ ) return buf;
                 void *d = malloc(sz);
+                if ( d == 0 )
+                    msgasserted( 15912 , "out of memory StackAllocator::Realloc" );
                 memcpy(d, p, SZ);
                 return d;
             }
@@ -113,6 +115,8 @@ namespace mongo {
             if ( maxSize && size > maxSize ) {
                 al.Free(data);
                 data = (char*)al.Malloc(maxSize);
+                if ( data == 0 )
+                    msgasserted( 15913 , "out of memory BufBuilder::reset" );
                 size = maxSize;
             }
         }

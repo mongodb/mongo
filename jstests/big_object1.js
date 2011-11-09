@@ -4,11 +4,11 @@ t.drop();
 
 if ( db.adminCommand( "buildinfo" ).bits == 64 ){
     
-    s = ""
+    var large = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+    var s = large;
     while ( s.length < 850 * 1024 ){
-        s += "x";
+        s += large;
     }
-    
     x = 0;
     while ( true ){
         n = { _id : x , a : [] }

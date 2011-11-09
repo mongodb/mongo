@@ -30,6 +30,12 @@ namespace mongo {
 
     bool dbexitCalled = false;
 
+    string dynHostMyName() { return ""; }
+
+    void dynHostResolve(string& name, int& port) {
+        assert(false);
+    }
+
     void exitCleanly( ExitCode code ) {
         dbexit( code );
     }

@@ -21,6 +21,7 @@
 #define JSTIME_VIRTUAL_SKEW
 
 namespace mongo {
+    // jsTime_virtual_skew is just for testing. a test command manipulates it.
     long long jsTime_virtual_skew = 0;
     boost::thread_specific_ptr<long long> jsTime_virtual_thread_skew;
 }

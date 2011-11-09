@@ -308,6 +308,8 @@ namespace mongo {
         bool operator==(const BSONElement& r) const {
             return woCompare( r , true ) == 0;
         }
+        /** Returns true if elements are unequal. */
+        bool operator!=(const BSONElement& r) const { return !operator==(r); }
 
         /** Well ordered comparison.
             @return <0: l<r. 0:l==r. >0:l>r
@@ -389,7 +391,7 @@ namespace mongo {
                 fieldNameSize_ = -1;
                 if ( maxLen != -1 ) {
                     int size = (int) strnlen( fieldName(), maxLen - 1 );
-                    massert( 10333 ,  "Invalid field name", size != -1 );
+                    uassert( 10333 ,  "Invalid field name", size != -1 );
                     fieldNameSize_ = size + 1;
                 }
             }

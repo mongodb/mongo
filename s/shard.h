@@ -27,8 +27,7 @@ namespace mongo {
     class ShardStatus;
 
     /*
-     * A "shard" is a database (replica pair typically) which represents
-     * one partition of the overall database.
+     * A "shard" one partition of the overall database (and a replica set typically).
      */
 
     class Shard {
@@ -124,9 +123,7 @@ namespace mongo {
             return _name < o._name;
         }
 
-        bool ok() const {
-            return _addr.size() > 0 && _addr.size() > 0;
-        }
+        bool ok() const { return _addr.size() > 0; }
 
         BSONObj runCommand( const string& db , const string& simple ) const {
             return runCommand( db , BSON( simple << 1 ) );
@@ -213,9 +210,9 @@ namespace mongo {
 
     class ShardConnection : public AScopedConnection {
     public:
-        ShardConnection( const Shard * s , const string& ns, bool ignoreDirect = false );
-        ShardConnection( const Shard& s , const string& ns, bool ignoreDirect = false );
-        ShardConnection( const string& addr , const string& ns, bool ignoreDirect = false );
+        ShardConnection( const Shard * s , const string& ns );
+        ShardConnection( const Shard& s , const string& ns );
+        ShardConnection( const string& addr , const string& ns );
 
         ~ShardConnection();
 
@@ -267,7 +264,7 @@ namespace mongo {
         static void checkMyConnectionVersions( const string & ns );
 
     private:
-        void _init( bool ignoreDirect = false );
+        void _init();
         void _finishInit();
 
         bool _finishedInit;
@@ -290,7 +287,7 @@ namespace mongo {
 
         virtual void onCreate( DBClientBase * conn );
         virtual void onHandedOut( DBClientBase * conn );
-        virtual void onDestory( DBClientBase * conn );
+        virtual void onDestroy( DBClientBase * conn );
 
         bool _shardedConnections;
     };

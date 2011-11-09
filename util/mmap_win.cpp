@@ -166,7 +166,7 @@ namespace mongo {
 
             scoped_lock lk(*_flushMutex);
 
-            bool success = FlushViewOfFile(_view, 0); // 0 means whole mapping
+            BOOL success = FlushViewOfFile(_view, 0); // 0 means whole mapping
             if (!success) {
                 int err = GetLastError();
                 out() << "FlushViewOfFile failed " << err << " file: " << _filename << endl;

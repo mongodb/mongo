@@ -1,6 +1,6 @@
 // auto2.js
 
-s = new ShardingTest( "auto2" , 2 , 5 , 2 );
+s = new ShardingTest( "auto2" , 2 , 1 , 2 );
 
 s.adminCommand( { enablesharding : "test" } );
 s.adminCommand( { shardcollection : "test.foo" , key : { num : 1 } } );
@@ -111,9 +111,13 @@ for ( i=0; i<100; i++ ){
 }
 assert.eq( 0 , db.runCommand( "cursorInfo" ).totalOpen , "cursor2" );
 
+// Stop the balancer, otherwise it may grab some connections from the pool for itself
+s.stopBalancer()
+
 print( "checkpoint E")
 
 x = db.runCommand( "connPoolStats" );
+printjson( x )
 for ( host in x.hosts ){
     var foo = x.hosts[host];
     assert.lt( 0 , foo.available , "pool: " + host );

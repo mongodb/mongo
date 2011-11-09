@@ -101,7 +101,7 @@ static void edit(const string& var){
         return;
     }
 
-    for (const char* p=var.data(); *p ; p++){
+    for (const char* p=var.c_str(); *p ; p++){
         if (! (isalnum(*p) || *p == '_' || *p == '.')){
             cout << "can only edit variable or property" << endl;
             return;
@@ -417,7 +417,16 @@ bool isOpSymbol( char c ) {
     return false;
 }
 
+bool isUseCmd( string code ) {
+    string cmd = code;
+    if ( cmd.find( " " ) > 0 )
+        cmd = cmd.substr( 0 , cmd.find( " " ) );
+    return cmd == "use";
+}
+
 bool isBalanced( string code ) {
+    if (isUseCmd( code ))
+        return true;  // don't balance "use <dbname>" in case dbname contains special chars
     int brackets = 0;
     int parens = 0;
     bool danglingOp = false;
@@ -453,7 +462,10 @@ bool isBalanced( string code ) {
             }
             break;
         }
-
+        if (i>=code.size()) {
+            danglingOp = false;
+            break;
+        }
         if ( isOpSymbol( code[i] )) danglingOp = true;
         else if (! std::isspace( code[i] )) danglingOp = false;
     }
@@ -546,9 +558,12 @@ string sayReplSetMemberState() {
             if( latestConn->runCommand("admin", BSON( "replSetGetStatus" << 1 << "forShell" << 1 ) , info ) ) {
                 stringstream ss;
                 ss << info["set"].String() << ':';
+                
                 int s = info["myState"].Int();
                 MemberState ms(s);
-                return ms.toString();
+                ss << ms.toString();
+
+                return ss.str();
             }
             else {
                 string s = info.getStringField("info");
@@ -718,6 +733,12 @@ int _main(int argc, char* argv[]) {
         logLevel = 1;
     }
 
+    if ( url == "*" ) {
+        cout << "ERROR: " << "\"*\" is an invalid db address" << endl << endl;
+        show_help_text(argv[0], shell_options);
+        return mongo::EXIT_BADOPTIONS;
+    }
+
     if ( ! mongo::cmdLine.quiet )
         cout << "MongoDB shell version: " << mongo::versionString << endl;
 
@@ -811,15 +832,22 @@ int _main(int argc, char* argv[]) {
 //            shellMainScope->localConnect;
             //DBClientWithCommands *c = getConnection( JSContext *cx, JSObject *obj );
 
+            bool haveStringPrompt = false;
             promptType = scope->type("prompt");
-            if (promptType == String){
+            if( promptType == String ) {
                 prompt = scope->getString("prompt");
-            } else if (promptType  == Code) {
-                scope->exec("__prompt__ = prompt();", "", false, false, false, 0);
-                prompt = scope->getString("__prompt__");
-            } else {
-                prompt = sayReplSetMemberState()+"> ";
+                haveStringPrompt = true;
             }
+            else if( promptType == Code ) {
+                scope->exec("delete __prompt__;", "", false, false, false, 0);
+                scope->exec("__prompt__ = prompt();", "", false, false, false, 0);
+                if( scope->type("__prompt__") == String ) {
+                    prompt = scope->getString("__prompt__");
+                    haveStringPrompt = true;
+                }
+            }
+            if( !haveStringPrompt )
+                prompt = sayReplSetMemberState()+"> ";
 
             char * line = shellReadline( prompt.c_str() );
 

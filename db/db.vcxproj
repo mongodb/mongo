@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -497,6 +497,11 @@
     <ClCompile Include="..\util\version.cpp" />
     <ClCompile Include="btreebuilder.cpp" />
     <ClCompile Include="cap.cpp" />
+    <ClCompile Include="commands\cloud.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="commands\distinct.cpp">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
@@ -687,6 +692,10 @@
     <ClInclude Include="..\util\mongoutils\checksum.h" />
     <ClInclude Include="..\util\mongoutils\html.h" />
     <ClInclude Include="..\util\mongoutils\str.h" />
+    <ClInclude Include="..\util\net\hostandport.h" />
+    <ClInclude Include="..\util\net\listen.h" />
+    <ClInclude Include="..\util\net\message_port.h" />
+    <ClInclude Include="..\util\net\miniwebserver.h" />
     <ClInclude Include="..\util\paths.h" />
     <ClInclude Include="..\util\ramlog.h" />
     <ClInclude Include="..\util\text.h" />
@@ -698,6 +707,7 @@
     <ClInclude Include="dur_journalimpl.h" />
     <ClInclude Include="dur_stats.h" />
     <ClInclude Include="geo\core.h" />
+    <ClInclude Include="globals.h" />
     <ClInclude Include="helpers\dblogger.h" />
     <ClInclude Include="instance.h" />
     <ClInclude Include="mongommf.h" />
@@ -791,7 +801,6 @@
     <ClInclude Include="..\scripting\v8_wrapper.h" />
     <ClInclude Include="btree.h" />
     <ClInclude Include="repl\health.h" />
-    <ClInclude Include="..\util\hostandport.h" />
     <ClInclude Include="repl\rs.h" />
     <ClInclude Include="repl\rs_config.h" />
     <ClInclude Include="..\bson\bsonelement.h" />

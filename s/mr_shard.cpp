@@ -234,6 +234,10 @@ namespace mongo {
                 if (o.hasElement("db")) {
                     outDB = o["db"].String();
                 }
+
+                if (o.hasElement("nonAtomic")) {
+                    outNonAtomic = o["nonAtomic"].Bool();
+                }
             }
             else {
                 uasserted( 14840 , "'out' has to be a string or an object" );

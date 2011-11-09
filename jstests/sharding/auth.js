@@ -10,13 +10,26 @@ testUser = {
     password : "baz"
 };
 
-function login(userObj) {
-    var n = s.getDB(userObj.db).runCommand({getnonce: 1});
-    var a = s.getDB(userObj.db).runCommand({authenticate: 1, user: userObj.username, nonce: n.nonce, key: s.getDB("admin").__pwHash(n.nonce, userObj.username, userObj.password)});
+testUserReadOnly = {
+    db : "test",
+    username : "sad",
+    password : "bat"
+};
+
+
+function login(userObj , thingToUse ) {
+    if ( ! thingToUse )
+        thingToUse = s;
+    
+    var n = thingToUse.getDB(userObj.db).runCommand({getnonce: 1});
+    var a = thingToUse.getDB(userObj.db).runCommand({authenticate: 1, user: userObj.username, nonce: n.nonce, key: thingToUse.getDB("admin").__pwHash(n.nonce, userObj.username, userObj.password)});
     printjson(a);
 }
 
-function logout(userObj) {
+function logout(userObj, thingToUse ) {
+    if ( ! thingToUse )
+        thingToUse = s;
+
     s.getDB(userObj.db).runCommand({logout:1});
 }
 
@@ -97,7 +110,8 @@ assert.eq(result.ok, 1, tojson(result));
 s.getDB("admin").runCommand({enableSharding : "test"});
 s.getDB("admin").runCommand({shardCollection : "test.foo", key : {x : 1}});
 
-s.getDB(testUser.db).addUser(testUser.username, testUser.password);
+s.getDB(testUser.db).addUser(testUser.username, testUser.password , false );
+s.getDB(testUserReadOnly.db).addUser(testUserReadOnly.username, testUserReadOnly.password, true);
 
 logout(adminUser);
 
@@ -121,8 +135,9 @@ assert.eq(s.getDB("test").foo.findOne(), null);
 
 print("insert try 2");
 s.getDB("test").foo.insert({x:1});
-result = s.getDB("test").runCommand({getLastError : 1});
+result = s.getDB("test").getLastErrorObj();
 assert.eq(result.err, null);
+assert.eq( 1 , s.getDB( "test" ).foo.find().itcount() , tojson(result) );
 
 logout(testUser);
 
@@ -137,10 +152,15 @@ login(adminUser);
 print("logged in");
 result = s.getDB("admin").runCommand({addShard : shardName})
 
+s.getDB("test").foo.remove({})
+
 var num = 100000;
 for (i=0; i<num; i++) {
     s.getDB("test").foo.insert({x:i, abc : "defg", date : new Date(), str : "all the talk on the market"});
 }
+
+// Make sure all data gets sent through
+printjson( s.getDB("test").getLastError() )
 
 var d1Chunks = s.getDB("config").chunks.count({shard : "d1"});
 var d2Chunks = s.getDB("config").chunks.count({shard : "d2"});
@@ -152,7 +172,30 @@ assert(d1Chunks > 0 && d2Chunks > 0 && d1Chunks+d2Chunks == totalChunks);
 
 //SERVER-3645
 //assert.eq(s.getDB("test").foo.count(), num+1);
-assert.eq(s.getDB("test").foo.find().itcount(), num+1);
+var numDocs = s.getDB("test").foo.find().itcount()
+if (numDocs != num) {
+    // Missing documents. At this point we're already in a failure mode, the code in this statement
+    // is to get a better idea how/why it's failing.
+
+    var numDocsSeen = 0;
+    var lastDocNumber = -1;
+    var missingDocNumbers = [];
+    var docs = s.getDB("test").foo.find().sort({x:1}).toArray();
+    for (var i = 0; i < docs.length; i++) {
+        if (docs[i].x != lastDocNumber + 1) {
+            for (var missing = lastDocNumber + 1; missing < docs[i].x; missing++) {
+                missingDocNumbers.push(missing);
+            }
+        }
+        lastDocNumber = docs[i].x;
+        numDocsSeen++;
+    }
+    assert.eq(numDocs, numDocsSeen, "More docs discovered on second find() even though getLastError was already called")
+    assert.eq(num - numDocs, missingDocNumbers.length);
+
+    assert(false, "Number of docs found does not equal the number inserted. Missing docs: " + missingDocNumbers);
+}
+
 
 //SERVER-4031
 /*
@@ -171,12 +214,64 @@ while (cursor.hasNext()) {
     count++;
 }
 
-assert.eq(count, 501);
+assert.eq(count, 500);
+
+logout(adminUser);
+
+login(testUser);
+print( "testing map reduce" );
+/* sharded map reduce can be tricky since all components talk to each other.
+   for example SERVER-4114 is triggered when 1 mongod connects to another for final reduce
+   it's not properly tested here since addresses are localhost, which is more permissive */
+var res = s.getDB("test").runCommand(
+    {mapreduce : "foo",
+     map : function() { emit(this.x, 1); },
+     reduce : function(key, values) { return values.length; },
+     out:"mrout"
+    });
+printjson(res);
+assert.commandWorked(res);
 
 // check that dump doesn't get stuck with auth
 var x = runMongoProgram( "mongodump", "--host", "127.0.0.1:31000", "-d", testUser.db, "-u", testUser.username, "-p", testUser.password);
 
 print("result: "+x);
 
+// test read only users
+
+print( "starting read only tests" );
+
+readOnlyS = new Mongo( s.getDB( "test" ).getMongo().host )
+readOnlyDB = readOnlyS.getDB( "test" );
+
+print( "   testing find that should fail" );
+assert.throws( function(){ readOnlyDB.foo.findOne(); } )
+
+print( "   logging in" );
+login( testUserReadOnly , readOnlyS );
+
+print( "   testing find that should work" );
+readOnlyDB.foo.findOne();
+
+print( "   testing write that should fail" );
+readOnlyDB.foo.insert( { eliot : 1 } );
+result = readOnlyDB.getLastError();
+assert( ! result.ok , tojson( result ) )
+
+print( "   testing read command (should succeed)" );
+assert.commandWorked(readOnlyDB.runCommand({count : "foo"}));
+
+/*
+broken because of SERVER-4156
+print( "   testing write command (should fail)" );
+assert.commandFailed(readOnlyDB.runCommand(
+    {mapreduce : "foo",
+     map : function() { emit(this.y, 1); },
+     reduce : function(key, values) { return values.length; },
+     out:"blarg"
+    }));
+*/
+print( "   testing logout (should succeed)" );
+assert.commandWorked(readOnlyDB.runCommand({logout : 1}));
 
 s.stop();

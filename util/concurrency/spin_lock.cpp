@@ -16,7 +16,7 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "pch.h"
+#include "pch.h" // todo eliminate this include
 #include <time.h>
 #include "spin_lock.h"
 
@@ -41,12 +41,39 @@ namespace mongo {
     : _mutex( "SpinLock" ) { }
 #endif
 
-    void SpinLock::lock() {
-#if defined(_WIN32)
-        EnterCriticalSection(&_cs);
-#elif defined(__USE_XOPEN2K)
-        pthread_spin_lock( &_lock );
+#if defined(__USE_XOPEN2K)
+    NOINLINE_DECL void SpinLock::_lk() {
+        /**
+         * this is designed to perform close to the default spin lock
+         * the reason for the mild insanity is to prevent horrible performance
+         * when contention spikes 
+         * it allows spinlocks to be used in many more places
+         * which is good because even with this change they are about 8x faster on linux
+         */
+        
+        for ( int i=0; i<1000; i++ ) {            
+            if ( pthread_spin_trylock( &_lock ) == 0 )
+                return;
+            asm volatile ( "pause" ) ; // maybe trylock does this; just in case.
+        }
+
+        for ( int i=0; i<1000; i++ ) {
+            if ( pthread_spin_trylock( &_lock ) == 0 )
+                return;
+            pthread_yield();
+        }
+        
+        struct timespec t;
+        t.tv_sec = 0;
+        t.tv_nsec = 5000000;
+
+        while ( pthread_spin_trylock( &_lock ) != 0 ) {
+            nanosleep(&t, NULL);
+        }
+    }
 #elif defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
+    void SpinLock::lock() {
+
         // fast path
         if (!_locked && !__sync_lock_test_and_set(&_locked, true)) {
             return;
@@ -65,32 +92,11 @@ namespace mongo {
         while (__sync_lock_test_and_set(&_locked, true)) {
             nanosleep(&t, NULL);
         }
-#else
-        // WARNING Missing spin lock in this platform. This can potentially
-        // be slow.
-        _mutex.lock();
-
-#endif
     }
-
-    void SpinLock::unlock() {
-#if defined(_WIN32)
-        LeaveCriticalSection(&_cs);
-#elif defined(__USE_XOPEN2K)
-        pthread_spin_unlock(&_lock);
-#elif defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
-        __sync_lock_release(&_locked);
-#else
-        _mutex.unlock();
 #endif
-    }
 
     bool SpinLock::isfast() {
-#if defined(_WIN32)
-        return true;
-#elif defined(__USE_XOPEN2K)
-        return true;
-#elif defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
+#if defined(_WIN32) || defined(__USE_XOPEN2K) || defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
         return true;
 #else
         return false;

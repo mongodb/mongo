@@ -56,10 +56,10 @@ namespace mongo {
 
 namespace mongo {
 
-    LogFile::LogFile(string name) : _name(name) {
+    LogFile::LogFile(string name, bool readwrite) : _name(name) {
         _fd = CreateFile(
                   toNativeString(name.c_str()).c_str(),
-                  GENERIC_WRITE,
+                  (readwrite?GENERIC_READ:0)|GENERIC_WRITE,
                   FILE_SHARE_READ,
                   NULL,
                   OPEN_ALWAYS,
@@ -82,6 +82,28 @@ namespace mongo {
 
         if (!SetEndOfFile(_fd)){
             msgasserted(15871, "Couldn't truncate file: " + errnoWithDescription());
+        }
+    }
+
+    void LogFile::writeAt(unsigned offset, const void *_buf, size_t _len) { 
+        OVERLAPPED o;
+        memset(&o,0,sizeof(o));
+        o.Offset = offset;
+        BOOL ok= WriteFile(_fd, _buf, _len, 0, &o);
+        assert(ok);
+    }
+
+    void LogFile::readAt(unsigned offset, void *_buf, size_t _len) { 
+        OVERLAPPED o;
+        memset(&o,0,sizeof(o));
+        o.Offset = offset;
+        DWORD nr;
+        BOOL ok = ReadFile(_fd, _buf, _len, &nr, &o);
+        if( !ok ) {
+            string e = errnoWithDescription();
+            //DWORD e = GetLastError();
+            log() << "LogFile readAt(" << offset << ") len:" << _len << "errno:" << e << endl;
+            assert(false);
         }
     }
 
@@ -113,7 +135,7 @@ namespace mongo {
 
 #else
 
-// posix
+/// posix
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -122,9 +144,9 @@ namespace mongo {
 
 namespace mongo {
 
-    LogFile::LogFile(string name) : _name(name) {
+    LogFile::LogFile(string name, bool readwrite) : _name(name) {
         int options = O_CREAT
-                    | O_WRONLY
+                    | (readwrite?O_RDWR:O_WRONLY)
 #if defined(O_DIRECT)
                     | O_DIRECT
 #endif
@@ -167,6 +189,26 @@ namespace mongo {
         if (ftruncate(_fd, pos) != 0){
             msgasserted(15873, "Couldn't truncate file: " + errnoWithDescription());
         }
+    }
+
+    void LogFile::writeAt(unsigned offset, const void *buf, size_t len) { 
+        assert(((size_t)buf)%4096==0); // aligned
+        lseek(_fd, offset, SEEK_SET);
+        ssize_t written = pwrite(_fd, buf, len, offset);
+        if( written != (ssize_t) len ) {
+            log() << "writeAt fails " << errnoWithDescription() << endl;
+        }
+#if defined(__linux__)
+        fdatasync(_fd);
+#else
+        fsync(_fd);
+#endif
+    }
+
+    void LogFile::readAt(unsigned offset, void *_buf, size_t _len) { 
+        assert(((size_t)_buf)%4096==0); // aligned
+        ssize_t rd = pread(_fd, _buf, _len, offset);
+        assert( rd != -1 );
     }
 
     void LogFile::synchronousAppend(const void *b, size_t len) {

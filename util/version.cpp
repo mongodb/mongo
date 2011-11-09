@@ -83,7 +83,7 @@ namespace mongo {
 
     string mongodVersion() {
         stringstream ss;
-        ss << "db version v" << versionString << ", pdfile version " << VERSION << "." << VERSION_MINOR;
+        ss << "db version v" << versionString << ", pdfile version " << PDFILE_VERSION << "." << PDFILE_VERSION_MINOR;
         return ss.str();
     }
 

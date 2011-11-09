@@ -61,7 +61,7 @@ namespace mongo {
 
         // accessors
         const char* data() const { return _data; }
-        const unsigned size() const { return _size; }
+        unsigned size() const { return _size; }
 
     private:
         const char* const _data;  // is always null terminated

@@ -530,7 +530,7 @@ namespace ThreadedTests {
                     log() << x << ' ' << ch << " got " << endl;
                     if( what[x] == 'R' ) {
                         if( t.millis() > 15 ) { 
-                            log() << "warning: when in upgradable write locks are still greedy on this platform" << endl;
+                            log() << x << " warning: when in upgradable, write locks are still greedy on this platform" << endl;
                         }
                     }
                     sleepmillis(200);

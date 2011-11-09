@@ -25,48 +25,49 @@ namespace mongo {
 
     using namespace mongoutils;
 
+    void dynHostResolve(string& name, int& port);
+    string dynHostMyName();
+
     /** helper for manipulating host:port connection endpoints.
       */
     struct HostAndPort {
         HostAndPort() : _port(-1) { }
 
-        /** From a string hostname[:portnumber]
+        /** From a string hostname[:portnumber] or a #dynname
             Throws user assertion if bad config string or bad port #.
-            */
+        */
         HostAndPort(string s);
 
         /** @param p port number. -1 is ok to use default. */
-        HostAndPort(string h, int p /*= -1*/) : _host(h), _port(p) { }
-
-        HostAndPort(const SockAddr& sock )
-            : _host( sock.getAddr() ) , _port( sock.getPort() ) {
+        HostAndPort(string h, int p /*= -1*/) : _host(h), _port(p) { 
+            assert( !str::startsWith(h, '#') );
         }
 
-        static HostAndPort me() {
-            return HostAndPort("localhost", cmdLine.port);
-        }
+        HostAndPort(const SockAddr& sock ) : _host( sock.getAddr() ) , _port( sock.getPort() ) { }
+
+        static HostAndPort me() { return HostAndPort("localhost", cmdLine.port); }
 
         /* uses real hostname instead of localhost */
         static HostAndPort Me();
 
         bool operator<(const HostAndPort& r) const {
-            if( _host < r._host )
+            string h = host();
+            string rh = r.host();
+            if( h < rh )
                 return true;
-            if( _host == r._host )
+            if( h == rh )
                 return port() < r.port();
             return false;
         }
 
-        bool operator==(const HostAndPort& r) const {
-            return _host == r._host && port() == r.port();
+        bool operator==(const HostAndPort& r) const { 
+            return host() == r.host() && port() == r.port(); 
         }
 
-        bool operator!=(const HostAndPort& r) const {
-            return _host != r._host || port() != r.port();
-        }
+        bool operator!=(const HostAndPort& r) const { return !(*this == r); }
 
         /* returns true if the host/port combo identifies this process instance. */
-        bool isSelf() const; // defined in message.cpp
+        bool isSelf() const; // defined in isself.cpp
 
         bool isLocalHost() const;
 
@@ -75,21 +76,66 @@ namespace mongo {
          */
         string toString( bool includePort=true ) const;
 
+        // get the logical name if using a #dynhostname instead of resolving to current actual name
+        string dynString() const;
+        string toStringLong() const;
+
         operator string() const { return toString(); }
 
-        string host() const { return _host; }
-
-        int port() const { return _port >= 0 ? _port : CmdLine::DefaultDBPort; }
-        bool hasPort() const { return _port >= 0; }
-        void setPort( int port ) { _port = port; }
+        string host() const { 
+            if( !dyn() )
+                return _host; 
+            string h = _dynName;
+            int p;
+            dynHostResolve(h, p);
+            return h;
+        }
+        int port() const { 
+            int p = -2;
+            if( dyn() ) {
+                string h = _dynName;
+                dynHostResolve(h,p);
+            }
+            else {
+                p = _port;
+            }
+            return p >= 0 ? p : CmdLine::DefaultDBPort; 
+        }
+        bool hasPort() const { 
+            int p = -2;
+            if( dyn() ) {
+                string h = _dynName;
+                dynHostResolve(h,p);
+            }
+            else {
+                p = _port;
+            }
+            return p >= 0;
+        }
+        void setPort( int port ) { 
+            if( dyn() ) {
+                log() << "INFO skipping setPort() HostAndPort dyn()=true" << endl;
+                return;
+            }
+            _port = port; 
+        }
 
     private:
+        bool dyn() const { return !_dynName.empty(); }
+        void init(const char *);
         // invariant (except full obj assignment):
+        string _dynName; // when this is set, _host and _port aren't used, rather, we look up the dyn info every time.
         string _host;
         int _port; // -1 indicates unspecified
     };
 
     inline HostAndPort HostAndPort::Me() {
+        {
+            string s = dynHostMyName();
+            if( !s.empty() ) 
+                return HostAndPort(s);
+        }
+
         const char* ips = cmdLine.bind_ip.c_str();
         while(*ips) {
             string ip;
@@ -114,29 +160,41 @@ namespace mongo {
         return HostAndPort(h, cmdLine.port);
     }
 
+    inline string HostAndPort::dynString() const {
+        return dyn() ? _dynName : toString();
+    }
+
+    inline string HostAndPort::toStringLong() const {
+        return _dynName + ':' + toString();
+    }
+
     inline string HostAndPort::toString( bool includePort ) const {
+        string h = host();
+        int p = port();
+
         if ( ! includePort )
-            return _host;
+            return h;
 
         stringstream ss;
-        ss << _host;
-        if ( _port != -1 ) {
+        ss << h;
+        if ( p != -1 ) {
             ss << ':';
 #if defined(_DEBUG)
-            if( _port >= 44000 && _port < 44100 ) {
+            if( p >= 44000 && p < 44100 ) {
                 log() << "warning: special debug port 44xxx used" << endl;
-                ss << _port+1;
+                ss << p+1;
             }
             else
-                ss << _port;
+                ss << p;
 #else
-            ss << _port;
+            ss << p;
 #endif
         }
         return ss.str();
     }
 
     inline bool HostAndPort::isLocalHost() const {
+        string _host = host();
         return (  _host == "localhost"
                || startsWith(_host.c_str(), "127.")
                || _host == "::1"
@@ -145,9 +203,10 @@ namespace mongo {
                );
     }
 
-    inline HostAndPort::HostAndPort(string s) {
-        const char *p = s.c_str();
-        uassert(13110, "HostAndPort: bad config string", *p);
+    inline void HostAndPort::init(const char *p) {
+        uassert(13110, "HostAndPort: bad host:port config string", *p);
+        assert( *p != '#' );
+        assert( _dynName.empty() );
         const char *colon = strrchr(p, ':');
         if( colon ) {
             int port = atoi(colon+1);
@@ -159,6 +218,18 @@ namespace mongo {
             // no port specified.
             _host = p;
             _port = -1;
+        }
+    }
+
+    inline HostAndPort::HostAndPort(string s) {
+        const char *p = s.c_str();
+        if( *p == '#' ) {
+            _dynName = s;
+            _port = -2;
+            _host = "invalid_hostname_dyn_in_use";
+        }
+        else {
+            init(p);
         }
     }
 
