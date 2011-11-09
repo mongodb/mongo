@@ -317,6 +317,12 @@ namespace mongo {
         void getAllShards( set<Shard>& all ) const;
         void getShardsForRange(set<Shard>& shards, const BSONObj& min, const BSONObj& max, bool fullKeyReq = true) const; // [min, max)
 
+        /**
+         * Returns true if, for this shard, the chunks are identical in both chunk managers
+         */
+        bool compatibleWith( const ChunkManager& other, const Shard& shard );
+        bool compatibleWith( ChunkManagerPtr other, const Shard& shard ){ return compatibleWith( *other, shard ); }
+
         string toString() const;
 
         ShardChunkVersion getVersion( const Shard& shard ) const;

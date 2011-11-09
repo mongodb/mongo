@@ -1047,4 +1047,24 @@ namespace mongo {
         return true;
     }
 
+
+    /** @return the database name portion of an ns string */
+    string nsGetDB( const string &ns ) {
+        string::size_type pos = ns.find( "." );
+        if ( pos == string::npos )
+            return ns;
+
+        return ns.substr( 0 , pos );
+    }
+
+    /** @return the collection name portion of an ns string */
+    string nsGetCollection( const string &ns ) {
+        string::size_type pos = ns.find( "." );
+        if ( pos == string::npos )
+            return "";
+
+        return ns.substr( pos + 1 );
+    }
+
+
 } // namespace mongo
