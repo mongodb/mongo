@@ -207,8 +207,8 @@ namespace mongo {
 
     void LogFile::readAt(unsigned offset, void *_buf, size_t _len) { 
         assert(((size_t)_buf)%4096==0); // aligned
-        // TODO: should this be asserted? value needs to be used to prevent compilation error
-        (void)(pread(_fd, _buf, _len, offset) == -1);
+        ssize_t rd = pread(_fd, _buf, _len, offset);
+        assert( rd != -1 );
     }
 
     void LogFile::synchronousAppend(const void *b, size_t len) {
