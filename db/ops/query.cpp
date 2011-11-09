@@ -244,10 +244,16 @@ namespace mongo {
         bool simpleEqualityMatch;
         shared_ptr<Cursor> cursor = NamespaceDetailsTransient::getCursor( ns, query, BSONObj(), false, &simpleEqualityMatch );
         ClientCursor::CleanupPointer ccPointer;
-        ccPointer.reset( new ClientCursor( QueryOption_NoCursorTimeout, cursor, ns ) );
         try {
             while( cursor->ok() ) {
-                if ( !ccPointer->yieldSometimes( simpleEqualityMatch ? ClientCursor::DontNeed : ClientCursor::MaybeCovered ) ||
+                if ( !ccPointer ) {
+                    RARELY {
+                        // Lazily construct a ClientCursor, avoiding a performance regression when scanning a very
+                        // small number of documents.
+                        ccPointer.reset( new ClientCursor( QueryOption_NoCursorTimeout, cursor, ns ) );
+                    }
+                }
+                else if ( !ccPointer->yieldSometimes( simpleEqualityMatch ? ClientCursor::DontNeed : ClientCursor::MaybeCovered ) ||
                     !cursor->ok() ) {
                     break;
                 }
