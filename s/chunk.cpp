@@ -834,6 +834,11 @@ namespace mongo {
         all.insert(_shards.begin(), _shards.end());
     }
 
+    bool ChunkManager::compatibleWith( const ChunkManager& other, const Shard& shard ){
+        // TODO: Make this much smarter - currently returns true only if we're the same chunk manager
+        return getns() == other.getns() && getSequenceNumber() == other.getSequenceNumber();
+    }
+
     void ChunkManager::drop( ChunkManagerPtr me ) const {
         scoped_lock lk( _mutex );
 
