@@ -655,7 +655,7 @@ namespace mongo {
         _KeyNode &kn = k( i );
         kn.recordLoc = recordLoc;
         kn.prevChildBucket = prevChildBucket;
-        if ( i && key.woEqual( keyNode(i-1).key ) ) {
+        if ( i && key.binaryEqual( keyNode(i-1).key ) ) {
             kn.setKeyDataOfs( k(i-1).keyDataOfs() );
         }
         else {
