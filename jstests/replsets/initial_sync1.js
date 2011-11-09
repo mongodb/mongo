@@ -116,10 +116,17 @@ wait(function() {
 print("10. Insert some stuff");
 master = replTest.getMaster();
 for (var i=0; i<10000; i++) {
-  foo.bar.insert({date : new Date(), x : i, str : "all the talk on the market"});
+    master.getDB("foo").bar.insert({date : new Date(), x : i, str : "all the talk on the market"});
 }
 
 
 print("11. Everyone happy eventually");
 replTest.awaitReplication(300000);
 
+
+print("12. Build index in background");
+master.getDB("foo").bar.ensureIndex({x : 1}, {background : true});
+
+assert.soon(function() {
+    return replTest.liveNodes.slaves[0].getDB("foo").runCommand({count: 1}).ok == 1;
+});
