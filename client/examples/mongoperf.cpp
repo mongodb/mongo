@@ -24,7 +24,11 @@ bo options;
 unsigned long long len; // file len
 const unsigned PG = 4096;
 unsigned nThreadsRunning = 0;
+
+// as this is incremented A LOT, at some point this becomes a bottleneck if very high ops/second (in cache) things are happening.
 AtomicUInt iops;
+
+SimpleMutex m("mperf");
 
 char* round(char* x) {
     size_t f = (size_t) x;
@@ -37,14 +41,19 @@ struct Aligned {
     char* addr() { return round(x); }
 }; 
 
+unsigned long long rrand() { 
+    // RAND_MAX is very small on windows
+    return (static_cast<unsigned long long>(rand()) << 15) ^ rand();
+}
+
 void workerThread() {
     bool r = options["r"].trueValue();
     bool w = options["w"].trueValue();
     long long su = options["sleepMicros"].numberLong();
     Aligned a;
     while( 1 ) { 
-        unsigned long long rofs = (rand() * PG) % len;
-        unsigned long long wofs = (rand() * PG) % len;
+        unsigned long long rofs = (rrand() * PG) % len;
+        unsigned long long wofs = (rrand() * PG) % len;
         if( mmf ) { 
             if( r ) {
                 dummy += mmf[rofs];
@@ -79,9 +88,10 @@ void go() {
     len = options["fileSizeMB"].numberLong();
     if( len == 0 ) len = 1;
     cout << len << "MB ..." << endl;
-    if( len > 2000 ) { 
-        // todo make tests use 64 bit offsets in their i/o
-        cout << "\nsizes > 2GB not yet supported" << endl;
+
+    if( len > 2000 && !options["mmf"].trueValue() ) { 
+        // todo make tests use 64 bit offsets in their i/o -- i.e. adjust LogFile::writeAt and such
+        cout << "\nsizes > 2GB not yet supported with mmf:false" << endl; 
         return;
     }
     len *= 1024 * 1024;
@@ -94,11 +104,14 @@ void go() {
         return;
     }
     lf = new LogFile(fname,true);
-    const unsigned sz = 1024 * 1024 * 32;
+    const unsigned sz = 1024 * 1024 * 32; // needs to be big as we are using synchronousAppend.  if we used a regular MongoFile it wouldn't have to be
     char *buf = (char*) malloc(sz+4096);
     const char *p = round(buf);
-    for( unsigned long long i = 0; i < len; i+= sz ) { 
+    for( unsigned long long i = 0; i < len; i += sz ) { 
         lf->synchronousAppend(p, sz);
+        if( i % (1024ULL*1024*1024) == 0 && i ) {
+            cout << i / (1024ULL*1024*1024) << "GB..." << endl;
+        }
     }
     BSONObj& o = options;
 
