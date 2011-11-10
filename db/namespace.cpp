@@ -272,7 +272,15 @@ namespace mongo {
         @return null diskloc if no room - allocate a new extent then
     */
     DiskLoc NamespaceDetails::alloc(const char *ns, int lenToAlloc, DiskLoc& extentLoc) {
-        lenToAlloc = (lenToAlloc + 3) & 0xfffffffc;
+        {
+            // align very slightly.  
+            // note that if doing more coarse-grained quantization (really just if it isn't always
+            //   a constant amount but if it varied by record size) then that quantization should 
+            //   NOT be done here but rather in __stdAlloc so that we can grab a deletedrecord that 
+            //   is just big enough if we happen to run into one.
+            lenToAlloc = (lenToAlloc + 3) & 0xfffffffc;
+        }
+
         DiskLoc loc = _alloc(ns, lenToAlloc);
         if ( loc.isNull() )
             return loc;
@@ -292,14 +300,12 @@ namespace mongo {
         if ( capped == 0 ) {
             if ( left < 24 || left < (lenToAlloc >> 3) ) {
                 // you get the whole thing.
-                //DataFileMgr::grow(loc, regionlen);
                 return loc;
             }
         }
 
         /* split off some for further use. */
         getDur().writingInt(r->lengthWithHeaders) = lenToAlloc;
-        //DataFileMgr::grow(loc, lenToAlloc);
         DiskLoc newDelLoc = loc;
         newDelLoc.inc(lenToAlloc);
         DeletedRecord *newDel = DataFileMgr::makeDeletedRecord(newDelLoc, left);
@@ -314,7 +320,7 @@ namespace mongo {
     }
 
     /* for non-capped collections.
-       @param willBeAt just look up where and don't reserve
+       @param peekOnly just look up where and don't reserve
        returned item is out of the deleted list upon return
     */
     DiskLoc NamespaceDetails::__stdAlloc(int len, bool peekOnly) {
