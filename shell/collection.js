@@ -63,7 +63,6 @@ DBCollection.prototype.help = function () {
     print("\tdb." + shortName + ".validate( <full> ) - SLOW");;
     print("\tdb." + shortName + ".getShardVersion() - only for use with sharding");
     print("\tdb." + shortName + ".getShardDistribution() - prints statistics about data distribution in the cluster");
-    print("\tdb." + shortName + ".getSplitKeysForChunks( <maxChunkSize> ) - calculates split points over all chunks and returns splitter function");
     return __magicNoPrint;
 }
 
@@ -738,8 +737,8 @@ DBCollection.prototype.getShardDistribution = function(){
    
 }
 
-
-DBCollection.prototype.getSplitKeysForChunks = function( chunkSize ){
+// In testing phase, use with caution
+DBCollection.prototype._getSplitKeysForChunks = function( chunkSize ){
        
    var stats = this.stats()
    
