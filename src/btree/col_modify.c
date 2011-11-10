@@ -160,9 +160,9 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 
 	if (ret != 0) {
 err:		if (ins != NULL)
-			__wt_sb_decrement(session, ins->sb);
+			__wt_sb_decrement(session, ins->sb, ins);
 		if (upd != NULL)
-			__wt_sb_decrement(session, upd->sb);
+			__wt_sb_decrement(session, upd->sb, upd);
 	}
 
 	__wt_free(session, new_inslist);

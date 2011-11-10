@@ -132,9 +132,9 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 
 	if (ret != 0) {
 err:		if (ins != NULL)
-			__wt_sb_decrement(session, ins->sb);
+			__wt_sb_decrement(session, ins->sb, ins);
 		if (upd != NULL)
-			__wt_sb_decrement(session, upd->sb);
+			__wt_sb_decrement(session, upd->sb, upd);
 	}
 
 	/* Free any insert, update arrays. */

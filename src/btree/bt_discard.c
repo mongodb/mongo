@@ -146,7 +146,7 @@ __free_page_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	WT_ROW_REF_FOREACH(page, rref, i)
 		if ((ikey = rref->key) != NULL)
-			__wt_sb_free(session, ikey->sb);
+			__wt_sb_free(session, ikey->sb, ikey);
 
 	/* Free the subtree-reference array. */
 	__wt_free(session, page->u.row_int.t);
@@ -172,7 +172,7 @@ __free_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	WT_ROW_FOREACH(page, rip, i)
 		if ((ikey = rip->key) != NULL && __wt_off_page(page, ikey))
-			__wt_sb_free(session, ikey->sb);
+			__wt_sb_free(session, ikey->sb, ikey);
 	__wt_free(session, page->u.row_leaf.d);
 
 	/*
@@ -230,7 +230,7 @@ __free_insert_list(WT_SESSION_IMPL *session, WT_INSERT *ins)
 		__free_update_list(session, ins->upd);
 
 		next = WT_SKIP_NEXT(ins);
-		__wt_sb_free(session, ins->sb);
+		__wt_sb_free(session, ins->sb, ins);
 	} while ((ins = next) != NULL);
 }
 
@@ -268,6 +268,6 @@ __free_update_list(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 
 	do {
 		next = upd->next;
-		__wt_sb_free(session, upd->sb);
+		__wt_sb_free(session, upd->sb, upd);
 	} while ((upd = next) != NULL);
 }

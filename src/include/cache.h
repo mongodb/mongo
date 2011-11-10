@@ -21,6 +21,7 @@ struct __wt_evict_list {
 struct __wt_evict_req {
 	WT_SESSION_IMPL *session;		/* Requesting thread */
 	WT_BTREE *btree;			/* Btree */
+	WT_PAGE *page;                          /* Single page to flush */
 
 	WT_PAGE **retry;			/* Pages to retry */
 	uint32_t  retry_next;			/* Next retry slot */

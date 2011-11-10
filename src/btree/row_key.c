@@ -330,7 +330,7 @@ next:		switch (direction) {
 	 * the key.
 	 */
 	if (rip_arg->key != ikey)
-		__wt_sb_decrement(session, ikey->sb);
+		__wt_sb_decrement(session, ikey->sb, ikey);
 
 	__wt_scr_free(&retb);
 

@@ -653,8 +653,12 @@ extern int __wt_sb_alloc( WT_SESSION_IMPL *session,
     size_t size,
     void *retp,
     WT_SESSION_BUFFER **sbp);
-extern void __wt_sb_free(WT_SESSION_IMPL *session, WT_SESSION_BUFFER *sb);
-extern void __wt_sb_decrement(WT_SESSION_IMPL *session, WT_SESSION_BUFFER *sb);
+extern void __wt_sb_free(WT_SESSION_IMPL *session,
+    WT_SESSION_BUFFER *sb,
+    void *p);
+extern void __wt_sb_decrement(WT_SESSION_IMPL *session,
+    WT_SESSION_BUFFER *sb,
+    void *p);
 extern void __wt_session_dump_all(WT_SESSION_IMPL *session);
 extern void __wt_session_dump(WT_SESSION_IMPL *session);
 extern int __wt_stat_alloc_btree_stats(WT_SESSION_IMPL *session,

@@ -182,7 +182,7 @@ __bulk_col_var(WT_CURSOR_BULK *cbulk)
 	return (0);
 
 err:	if (upd != NULL)
-		__wt_sb_decrement(session, upd->sb);
+		__wt_sb_decrement(session, upd->sb, upd);
 	return (ret);
 }
 
@@ -233,9 +233,9 @@ __bulk_row(WT_CURSOR_BULK *cbulk)
 	return (0);
 
 err:	if (ins != NULL)
-		__wt_sb_decrement(session, ins->sb);
+		__wt_sb_decrement(session, ins->sb, ins);
 	if (upd != NULL)
-		__wt_sb_decrement(session, upd->sb);
+		__wt_sb_decrement(session, upd->sb, ins);
 	return (ret);
 }
 

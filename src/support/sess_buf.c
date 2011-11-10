@@ -15,6 +15,10 @@ int
 __wt_sb_alloc(
     WT_SESSION_IMPL *session, size_t size, void *retp, WT_SESSION_BUFFER **sbp)
 {
+#ifndef HAVE_SESSION_BUFFERS
+	*sbp = NULL;
+	return (__wt_calloc(session, 1, size, retp));
+#else
 	WT_SESSION_BUFFER *sb;
 	size_t alloc_size;
 	uint32_t align_size;
@@ -140,6 +144,7 @@ no_allocation:
 	WT_ASSERT(session, sb->in != 0);
 
 	return (0);
+#endif
 }
 
 /*
@@ -147,12 +152,18 @@ no_allocation:
  *	Free a chunk of memory from a per-WT_SESSION_IMPL buffer.
  */
 void
-__wt_sb_free(WT_SESSION_IMPL *session, WT_SESSION_BUFFER *sb)
+__wt_sb_free(WT_SESSION_IMPL *session, WT_SESSION_BUFFER *sb, void *p)
 {
+#ifndef HAVE_SESSION_BUFFERS
+	WT_UNUSED(sb);
+
+	__wt_free(session, p);
+#else
 	WT_ASSERT(session, sb->out < sb->in);
 
 	if (++sb->out == sb->in)
 		__wt_free(session, sb);
+#endif
 }
 
 /*
@@ -160,8 +171,13 @@ __wt_sb_free(WT_SESSION_IMPL *session, WT_SESSION_BUFFER *sb)
  *	Decrement the "insert" value of a per-WT_SESSION_IMPL buffer.
  */
 void
-__wt_sb_decrement(WT_SESSION_IMPL *session, WT_SESSION_BUFFER *sb)
+__wt_sb_decrement(WT_SESSION_IMPL *session, WT_SESSION_BUFFER *sb, void *p)
 {
+#ifndef HAVE_SESSION_BUFFERS
+	WT_UNUSED(sb);
+
+	__wt_free(session, p);
+#else
 	WT_ASSERT(session, sb->out < sb->in);
 
 	/*
@@ -205,4 +221,5 @@ __wt_sb_decrement(WT_SESSION_IMPL *session, WT_SESSION_BUFFER *sb)
 	 */
 	if (sb->in == sb->out)
 		__wt_free(session, sb);
+#endif
 }

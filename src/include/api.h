@@ -62,7 +62,7 @@ typedef	enum {
 	WT_SERIAL_READ=3,		/* Function, then schedule read */
 } wq_state_t;
 
-/* Get the connection implementation for a session. */
+/* Get the connection implementation for a session */
 #define	S2C(session) ((WT_CONNECTION_IMPL *)(session)->iface.connection)
 
 /*
@@ -97,7 +97,7 @@ struct __wt_session_impl {
 
 					/* Serialized operation state */
 	wq_state_t volatile wq_state;	/* Request state */
-	void	*wq_args;		/* Operation arguments. */
+	void	*wq_args;		/* Operation arguments */
 	int	wq_sleeping;		/* Thread is blocked */
 	int	wq_ret;			/* Return value */
 
@@ -140,7 +140,7 @@ struct __wt_connection_impl {
 	WT_CONNECTION iface;
 
 	WT_SESSION_IMPL default_session;/* For operations without an
-					   application-supplied session. */
+					   application-supplied session */
 
 	WT_SPINLOCK spinlock;		/* Connection spinlock */
 					/* Connection queue */
@@ -230,7 +230,7 @@ struct __wt_connection_impl {
 	API_SESSION_INIT(s, h, n, cur, bt);				\
 	ret = 0
 
-/* Standard entry point to the API.  Sets ret to 0 on success. */
+/* Standard entry point to the API.  Sets ret to 0 on success */
 #define	API_CALL(s, h, n, cur, bt, cfg, cfgvar)	do {			\
 	const char *cfgvar[] = API_CONF_DEFAULTS(h, n, cfg);		\
 	API_SESSION_INIT(s, h, n, cur, bt);				\
