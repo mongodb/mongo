@@ -66,11 +66,11 @@ void workerThread() {
         }
         else {
             if( r ) {
-                lf->readAt((unsigned) rofs, a.addr(), PG);
+                lf->readAt(rofs, a.addr(), PG);
                 iops++;
             }
             if( w ) {
-                lf->writeAt((unsigned) wofs, a.addr(), PG);
+                lf->writeAt(wofs, a.addr(), PG);
                 iops++;
             }
         }
@@ -89,7 +89,7 @@ void go() {
     if( len == 0 ) len = 1;
     cout << len << "MB ..." << endl;
 
-    if( len > 2000 && !options["mmf"].trueValue() ) { 
+    if( 0 && len > 2000 && !options["mmf"].trueValue() ) { 
         // todo make tests use 64 bit offsets in their i/o -- i.e. adjust LogFile::writeAt and such
         cout << "\nsizes > 2GB not yet supported with mmf:false" << endl; 
         return;

@@ -37,9 +37,9 @@ namespace mongo {
         void synchronousAppend(const void *buf, size_t len);
 
         /** write at specified offset. must be aligned.  noreturn until physically written. thread safe */
-        void writeAt(unsigned offset, const void *_bug, size_t _len);
+        void writeAt(unsigned long long offset, const void *_bug, size_t _len);
 
-        void readAt(unsigned offset, void *_buf, size_t _len);
+        void readAt(unsigned long long offset, void *_buf, size_t _len);
 
         const string _name;
 
