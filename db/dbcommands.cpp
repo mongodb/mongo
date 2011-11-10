@@ -1853,18 +1853,20 @@ namespace mongo {
         bool retval = false;
         if ( c->locktype() == Command::NONE ) {
             // we also trust that this won't crash
+            retval = true;
 
             if ( c->requiresAuth() ) {
                 // test that the user at least as read permissions
                 if ( ! client.getAuthenticationInfo()->isAuthorizedReads( dbname ) ) {
                     result.append( "errmsg" , "need to login" );
-                    return false;
+                    retval = false;
                 }
             }
 
-            client.curop()->ensureStarted();
-
-            retval = _execCommand(c, dbname , cmdObj , queryOptions, result , fromRepl );
+            if (retval) {
+                client.curop()->ensureStarted();
+                retval = _execCommand(c, dbname , cmdObj , queryOptions, result , fromRepl );
+            }
         }
         else {
             bool needWriteLock = c->locktype() == Command::WRITE;
