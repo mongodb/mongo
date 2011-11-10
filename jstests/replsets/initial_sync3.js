@@ -33,6 +33,7 @@ replTest.start(1);
 
 print("make sure 1 does not become a secondary (because it cannot clone from 2)");
 sleep(10000);
+reconnect(nodes[1]);
 var result = nodes[1].getDB("admin").runCommand({isMaster : 1});
 assert(!result.ismaster, tojson(result));
 assert(!result.secondary, tojson(result));
