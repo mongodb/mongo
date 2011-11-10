@@ -274,14 +274,16 @@ extern void __wt_row_key_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_row_modify(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
     int is_remove);
-extern int __wt_row_insert_alloc( WT_SESSION_IMPL *session,
+extern int __wt_row_insert_alloc(WT_SESSION_IMPL *session,
     WT_BUF *key,
     u_int skipdepth,
-    WT_INSERT **insp);
+    WT_INSERT **insp,
+    size_t *ins_sizep);
 extern void __wt_insert_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_update_alloc(WT_SESSION_IMPL *session,
     WT_BUF *value,
-    WT_UPDATE **updp);
+    WT_UPDATE **updp,
+    size_t *sizep);
 extern void __wt_update_serial_func(WT_SESSION_IMPL *session);
 extern WT_INSERT *__wt_search_insert(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,

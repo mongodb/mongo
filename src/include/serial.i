@@ -10,6 +10,8 @@ typedef struct {
 	size_t new_inshead_size;
 	int new_inshead_taken;
 	WT_INSERT *new_ins;
+	size_t new_ins_size;
+	int new_ins_taken;
 	u_int skipdepth;
 } __wt_col_append_args;
 
@@ -18,7 +20,7 @@ __wt_col_append_serial(
 	WT_SESSION_IMPL *session, WT_INSERT_HEAD **inshead, WT_INSERT
 	***ins_stack, WT_INSERT_HEAD ***new_inslistp, size_t new_inslist_size,
 	WT_INSERT_HEAD **new_insheadp, size_t new_inshead_size, WT_INSERT
-	*new_ins, u_int skipdepth)
+	**new_insp, size_t new_ins_size, u_int skipdepth)
 {
 	__wt_col_append_args _args, *args = &_args;
 	int ret;
@@ -45,7 +47,14 @@ __wt_col_append_serial(
 	}
 	args->new_inshead_taken = 0;
 
-	args->new_ins = new_ins;
+	if (new_insp == NULL)
+		args->new_ins = NULL;
+	else {
+		args->new_ins = *new_insp;
+		*new_insp = NULL;
+		args->new_ins_size = new_ins_size;
+	}
+	args->new_ins_taken = 0;
 
 	args->skipdepth = skipdepth;
 
@@ -56,6 +65,8 @@ __wt_col_append_serial(
 		__wt_free(session, args->new_inslist);
 	if (!args->new_inshead_taken)
 		__wt_free(session, args->new_inshead);
+	if (!args->new_ins_taken)
+		__wt_sb_decrement(session, args->new_ins->sb, args->new_ins);
 	return (ret);
 }
 
@@ -98,6 +109,18 @@ __wt_col_append_new_inshead_taken(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	WT_ASSERT(session, args->new_inshead_size != 0);
 	__wt_cache_page_inmem_incr(session, page, args->new_inshead_size);
+}
+
+static inline void
+__wt_col_append_new_ins_taken(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	__wt_col_append_args *args =
+	    (__wt_col_append_args *)session->wq_args;
+
+	args->new_ins_taken = 1;
+
+	WT_ASSERT(session, args->new_ins_size != 0);
+	__wt_cache_page_inmem_incr(session, page, args->new_ins_size);
 }
 
 typedef struct {
@@ -180,6 +203,8 @@ typedef struct {
 	size_t new_inshead_size;
 	int new_inshead_taken;
 	WT_INSERT *new_ins;
+	size_t new_ins_size;
+	int new_ins_taken;
 	u_int skipdepth;
 } __wt_insert_args;
 
@@ -188,8 +213,8 @@ __wt_insert_serial(
 	WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t write_gen,
 	WT_INSERT_HEAD **inshead, WT_INSERT ***ins_stack, WT_INSERT_HEAD
 	***new_inslistp, size_t new_inslist_size, WT_INSERT_HEAD
-	**new_insheadp, size_t new_inshead_size, WT_INSERT *new_ins, u_int
-	skipdepth)
+	**new_insheadp, size_t new_inshead_size, WT_INSERT **new_insp, size_t
+	new_ins_size, u_int skipdepth)
 {
 	__wt_insert_args _args, *args = &_args;
 	int ret;
@@ -220,7 +245,14 @@ __wt_insert_serial(
 	}
 	args->new_inshead_taken = 0;
 
-	args->new_ins = new_ins;
+	if (new_insp == NULL)
+		args->new_ins = NULL;
+	else {
+		args->new_ins = *new_insp;
+		*new_insp = NULL;
+		args->new_ins_size = new_ins_size;
+	}
+	args->new_ins_taken = 0;
 
 	args->skipdepth = skipdepth;
 
@@ -231,6 +263,8 @@ __wt_insert_serial(
 		__wt_free(session, args->new_inslist);
 	if (!args->new_inshead_taken)
 		__wt_free(session, args->new_inshead);
+	if (!args->new_ins_taken)
+		__wt_sb_decrement(session, args->new_ins->sb, args->new_ins);
 	return (ret);
 }
 
@@ -276,6 +310,18 @@ __wt_insert_new_inshead_taken(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	WT_ASSERT(session, args->new_inshead_size != 0);
 	__wt_cache_page_inmem_incr(session, page, args->new_inshead_size);
+}
+
+static inline void
+__wt_insert_new_ins_taken(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	__wt_insert_args *args =
+	    (__wt_insert_args *)session->wq_args;
+
+	args->new_ins_taken = 1;
+
+	WT_ASSERT(session, args->new_ins_size != 0);
+	__wt_cache_page_inmem_incr(session, page, args->new_ins_size);
 }
 
 typedef struct {
@@ -325,13 +371,15 @@ typedef struct {
 	size_t new_upd_size;
 	int new_upd_taken;
 	WT_UPDATE *upd;
+	size_t upd_size;
+	int upd_taken;
 } __wt_update_args;
 
 static inline int
 __wt_update_serial(
 	WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t write_gen, WT_UPDATE
 	**srch_upd, WT_UPDATE ***new_updp, size_t new_upd_size, WT_UPDATE
-	*upd)
+	**updp, size_t upd_size)
 {
 	__wt_update_args _args, *args = &_args;
 	int ret;
@@ -351,13 +399,22 @@ __wt_update_serial(
 	}
 	args->new_upd_taken = 0;
 
-	args->upd = upd;
+	if (updp == NULL)
+		args->upd = NULL;
+	else {
+		args->upd = *updp;
+		*updp = NULL;
+		args->upd_size = upd_size;
+	}
+	args->upd_taken = 0;
 
 	ret = __wt_session_serialize_func(session,
 	    WT_SERIAL_FUNC, __wt_update_serial_func, args);
 
 	if (!args->new_upd_taken)
 		__wt_free(session, args->new_upd);
+	if (!args->upd_taken)
+		__wt_sb_decrement(session, args->upd->sb, args->upd);
 	return (ret);
 }
 
@@ -386,4 +443,16 @@ __wt_update_new_upd_taken(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	WT_ASSERT(session, args->new_upd_size != 0);
 	__wt_cache_page_inmem_incr(session, page, args->new_upd_size);
+}
+
+static inline void
+__wt_update_upd_taken(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	__wt_update_args *args =
+	    (__wt_update_args *)session->wq_args;
+
+	args->upd_taken = 1;
+
+	WT_ASSERT(session, args->upd_size != 0);
+	__wt_cache_page_inmem_incr(session, page, args->upd_size);
 }

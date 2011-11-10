@@ -4,10 +4,11 @@ import textwrap
 from dist import compare_srcfile
 
 class SerialArg:
-	def __init__(self, typestr, name, sized=0):
+	def __init__(self, typestr, name, sized=0, sb=0):
 		self.typestr = typestr
 		self.name = name
 		self.sized = sized
+		self.sb = sb
 
 class Serial:
 	def __init__(self, name, op, args):
@@ -21,7 +22,7 @@ Serial('col_append', 'WT_SERIAL_FUNC', [
 		SerialArg('WT_INSERT ***', 'ins_stack'),
 		SerialArg('WT_INSERT_HEAD **', 'new_inslist', 1),
 		SerialArg('WT_INSERT_HEAD *', 'new_inshead', 1),
-		SerialArg('WT_INSERT *', 'new_ins', 0),
+		SerialArg('WT_INSERT *', 'new_ins', 1, 1),
 		SerialArg('u_int', 'skipdepth'),
 	]),
 
@@ -42,7 +43,7 @@ Serial('insert', 'WT_SERIAL_FUNC', [
 		SerialArg('WT_INSERT ***', 'ins_stack'),
 		SerialArg('WT_INSERT_HEAD **', 'new_inslist', 1),
 		SerialArg('WT_INSERT_HEAD *', 'new_inshead', 1),
-		SerialArg('WT_INSERT *', 'new_ins', 0),
+		SerialArg('WT_INSERT *', 'new_ins', 1, 1),
 		SerialArg('u_int', 'skipdepth'),
 	]),
 
@@ -57,7 +58,7 @@ Serial('update', 'WT_SERIAL_FUNC', [
 		SerialArg('uint32_t', 'write_gen'),
 		SerialArg('WT_UPDATE **', 'srch_upd'),
 		SerialArg('WT_UPDATE **', 'new_upd', 1),
-		SerialArg('WT_UPDATE *', 'upd', 0),
+		SerialArg('WT_UPDATE *', 'upd', 1, 1),
 	]),
 ]
 
@@ -124,10 +125,14 @@ typedef struct {
 			f.write('\targs->' + l.name + ' = ' + l.name + ';\n\n')
 	f.write('\tret = __wt_session_serialize_func(session,\n')
 	f.write('\t    ' + entry.op +
-	    ', __wt_' + entry.name + '_serial_func, args);\n\n')
+		', __wt_' + entry.name + '_serial_func, args);\n\n')
 	for l in entry.args:
-		if l.sized:
-			f.write('\tif (!args->' + l.name + '_taken)\n')
+		if not l.sized:
+			continue
+		f.write('\tif (!args->' + l.name + '_taken)\n')
+		if l.sb:
+			f.write('\t\t__wt_sb_decrement(session, args->' + l.name + '->sb, args->' + l.name + ');\n')
+		else:
 			f.write('\t\t__wt_free(session, args->' + l.name + ');\n')
 	f.write('\treturn (ret);\n')
 	f.write('}\n\n')

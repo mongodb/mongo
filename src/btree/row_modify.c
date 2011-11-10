@@ -19,6 +19,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 	WT_INSERT_HEAD **inshead, *new_inshead, **new_inslist;
 	WT_PAGE *page;
 	WT_UPDATE **new_upd, *upd, **upd_entry;
+	size_t ins_size, upd_size;
 	size_t new_inshead_size, new_inslist_size, new_upd_size;
 	uint32_t ins_slot;
 	u_int skipdepth;
@@ -65,11 +66,11 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 			upd_entry = &cbt->ins->upd;
 
 		/* Allocate room for the new value from per-thread memory. */
-		WT_ERR(__wt_update_alloc(session, value, &upd));
+		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
 
 		/* Insert the WT_UPDATE structure. */
-		ret = __wt_update_serial(session, page,
-		    cbt->write_gen, upd_entry, &new_upd, new_upd_size, upd);
+		ret = __wt_update_serial(session, page, cbt->write_gen,
+		    upd_entry, &new_upd, new_upd_size, &upd, upd_size);
 	} else {
 		/*
 		 * Allocate insert array if necessary, and set the WT_INSERT
@@ -118,16 +119,19 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		 * Allocate a WT_INSERT/WT_UPDATE pair, and update the cursor
 		 * to reference it.
 		 */
-		WT_ERR(__wt_row_insert_alloc(session, key, skipdepth, &ins));
-		WT_ERR(__wt_update_alloc(session, value, &upd));
+		WT_ERR(__wt_row_insert_alloc(
+		    session, key, skipdepth, &ins, &ins_size));
+		WT_ERR(__wt_update_alloc(session, value, &upd, &upd_size));
 		ins->upd = upd;
+		ins_size += upd_size;
 		cbt->ins = ins;
 
 		/* Insert the WT_INSERT structure. */
 		ret = __wt_insert_serial(session, page, cbt->write_gen,
 		    inshead, cbt->ins_stack,
 		    &new_inslist, new_inslist_size,
-		    &new_inshead, new_inshead_size, ins, skipdepth);
+		    &new_inshead, new_inshead_size,
+		    &ins, ins_size, skipdepth);
 	}
 
 	if (ret != 0) {
@@ -151,8 +155,8 @@ err:		if (ins != NULL)
  *	buffer and fill it in.
  */
 int
-__wt_row_insert_alloc(
-    WT_SESSION_IMPL *session, WT_BUF *key, u_int skipdepth, WT_INSERT **insp)
+__wt_row_insert_alloc(WT_SESSION_IMPL *session,
+    WT_BUF *key, u_int skipdepth, WT_INSERT **insp, size_t *ins_sizep)
 {
 	WT_SESSION_BUFFER *sb;
 	WT_INSERT *ins;
@@ -172,6 +176,8 @@ __wt_row_insert_alloc(
 	memcpy(WT_INSERT_KEY(ins), key->data, key->size);
 
 	*insp = ins;
+	if (ins_sizep != NULL)
+		*ins_sizep = ins_size;
 	return (0);
 }
 
@@ -237,6 +243,8 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session)
 		*ins_stack[i] = new_ins;
 	}
 
+	__wt_insert_new_ins_taken(session, page);
+
 err:	__wt_session_serialize_wrapup(session, page, ret);
 }
 
@@ -246,7 +254,8 @@ err:	__wt_session_serialize_wrapup(session, page, ret);
  *	buffer and fill it in.
  */
 int
-__wt_update_alloc(WT_SESSION_IMPL *session, WT_BUF *value, WT_UPDATE **updp)
+__wt_update_alloc(WT_SESSION_IMPL *session,
+    WT_BUF *value, WT_UPDATE **updp, size_t *sizep)
 {
 	WT_SESSION_BUFFER *sb;
 	WT_UPDATE *upd;
@@ -267,6 +276,8 @@ __wt_update_alloc(WT_SESSION_IMPL *session, WT_BUF *value, WT_UPDATE **updp)
 	}
 
 	*updp = upd;
+	if (sizep != NULL)
+		*sizep = sizeof(WT_UPDATE) + size;
 	return (0);
 }
 
@@ -307,6 +318,8 @@ __wt_update_serial_func(WT_SESSION_IMPL *session)
 	 * pointer is set before we update the linked list.
 	 */
 	WT_PUBLISH(*upd_entry, upd);
+
+	__wt_update_upd_taken(session, page);
 
 err:	__wt_session_serialize_wrapup(session, page, ret);
 }
