@@ -271,17 +271,10 @@ __rec_discard_add_ovfl(WT_SESSION_IMPL *session, WT_CELL_UNPACK *unpack)
 
 /*
  * __rec_incr --
- *	Update the memory tracking structure for one new entry.
- */
-#define	__rec_incr(session, r, size)	__rec_incrv(session, r, 1, size)
-
-/*
- * __rec_incrv --
  *	Update the memory tracking structure for a set of new entries.
  */
 static inline void
-__rec_incrv(
-    WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t v, uint32_t size)
+__rec_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t v, uint32_t size)
 {
 	/*
 	 * The buffer code is fragile and prone to off-by-one errors -- check
@@ -323,7 +316,7 @@ __rec_copy_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_KV *kv)
 		memcpy(p, kv->buf.data, kv->buf.size);
 
 	WT_ASSERT(session, kv->len == kv->cell_len + kv->buf.size);
-	__rec_incr(session, r, kv->len);
+	__rec_incr(session, r, 1, kv->len);
 }
 
 /*
@@ -1584,7 +1577,7 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		off.size = WT_COL_REF_SIZE(cref);
 		WT_RECNO(&off) = cref->recno;
 		memcpy(r->first_free, &off, sizeof(WT_OFF_RECORD));
-		__rec_incr(session, r, sizeof(WT_OFF_RECORD));
+		__rec_incr(session, r, 1, sizeof(WT_OFF_RECORD));
 	}
 
 	return (0);
@@ -1653,7 +1646,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 			 *
 			 * Boundary: split or write the page.
 			 */
-			__rec_incrv(session,
+			__rec_incr(session,
 			    r, entry, __bitstr_size(entry * btree->bitcnt));
 			WT_RET(__rec_split(session));
 
@@ -1663,7 +1656,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 		}
 
 	/* Update the counters. */
-	__rec_incrv(session, r, entry, __bitstr_size(entry * btree->bitcnt));
+	__rec_incr(session, r, entry, __bitstr_size(entry * btree->bitcnt));
 
 	/* Write the remnant page. */
 	return (__rec_split_finish(session));
@@ -1719,7 +1712,7 @@ __rec_col_fix_slvg(
 				(uint32_t)page_start, btree->bitcnt));
 
 		r->recno += entry;
-		__rec_incrv(
+		__rec_incr(
 		    session, r, entry, __bitstr_size(entry * btree->bitcnt));
 
 		/*
@@ -1758,7 +1751,7 @@ __rec_col_fix_bulk(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* Copy the bytes into place. */
 	len = __bitstr_size(page->entries * btree->bitcnt);
 	memcpy(r->first_free, page->u.bulk.bitf, len);
-	__rec_incrv(session, r, page->entries, len);
+	__rec_incr(session, r, page->entries, len);
 	r->recno += page->entries;
 
 	/* Write the page. */
