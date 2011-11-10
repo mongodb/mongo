@@ -1800,10 +1800,8 @@ namespace mongo {
 
         BSONObj info = loc.obj();
         bool background = info["background"].trueValue();
-        if( background && cc().isSyncThread() ) {
-            /* don't do background indexing on slaves.  there are nuances.  this could be added later
-                but requires more code.
-                */
+        // if this is not readable, let's move things along
+        if (background && ((!theReplSet && cc().isSyncThread()) || (theReplSet && !theReplSet->isSecondary()))) {
             log() << "info: indexing in foreground on this replica; was a background index build on the primary" << endl;
             background = false;
         }

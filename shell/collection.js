@@ -744,11 +744,11 @@ DBCollection.prototype.getShardDistribution = function(){
    
        var shardStats = stats.shards[ shard ]
        
-       var estDataPercent = Math.floor( shardStats.size / stats.size * 100 ) / 100
-       var estDocPercent = Math.floor( shardStats.count / stats.count * 100 ) / 100
+       var estDataPercent = Math.floor( shardStats.size / stats.size * 10000 ) / 100
+       var estDocPercent = Math.floor( shardStats.count / stats.count * 10000 ) / 100
        
-       print( " Shard " + shard + " data : " + estDataPercent + "%, docs : " + estDocPercent + "%" + 
-              ", avg obj size : " + sh._dataFormat( stats.shards[ shard ].avgObjSize ) )
+       print( " Shard " + shard + " contains " + estDataPercent + "% data, " + estDocPercent + "% docs in cluster, " +
+              "avg obj size on shard : " + sh._dataFormat( stats.shards[ shard ].avgObjSize ) )
    }
    
    print( "\n" )

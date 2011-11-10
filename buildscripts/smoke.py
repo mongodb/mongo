@@ -49,6 +49,7 @@ import sys
 import time
 
 from pymongo import Connection
+from pymongo.errors import OperationFailure
 
 import utils
 
@@ -85,6 +86,7 @@ class mongod(object):
     def __init__(self, **kwargs):
         self.kwargs = kwargs
         self.proc = None
+        self.auth = False
 
     def __enter__(self):
         self.start()
@@ -122,6 +124,15 @@ class mongod(object):
         print >> sys.stderr, "timeout starting mongod"
         return False
 
+    def setup_admin_user(self, port=mongod_port):
+        try:
+            Connection( "localhost" , int(port) ).admin.add_user("admin","password")
+        except OperationFailure, e:
+            if e.message == 'need to login':
+                pass # SERVER-4225
+            else:
+                raise e
+
     def start(self):
         global mongod_port
         global mongod
@@ -153,10 +164,16 @@ class mongod(object):
             argv += ['--nojournal']
         if self.kwargs.get('no_preallocj'):
             argv += ['--nopreallocj']
+        if self.kwargs.get('auth'):
+            argv += ['--auth']
+            self.auth = True
         print "running " + " ".join(argv)
         self.proc = Popen(argv)
         if not self.did_mongod_start(self.port):
             raise Exception("Failed to start mongod")
+
+        if self.auth:
+            self.setup_admin_user(self.port)
 
         if self.slave:
             local = Connection(port=self.port, slave_okay=True).local
@@ -278,26 +295,39 @@ def runTest(test):
                     "--port", mongod_port]
     else:
         raise Bug("fell off in extenstion case: %s" % path)
+
+    if keyFile:
+        f = open(keyFile, 'r')
+        keyFileData = re.sub(r'\s', '', f.read()) # Remove all whitespace
+        f.close()
+
     sys.stderr.write( "starting test : %s \n" % os.path.basename(path) )
     sys.stderr.flush()
     print " *******************************************"
     print "         Test : " + os.path.basename(path) + " ..."
-    t1 = time.time()
     # FIXME: we don't handle the case where the subprocess
     # hangs... that's bad.
     if argv[0].endswith( 'mongo' ) and not '--eval' in argv :
-        argv = argv + [ '--eval', 'TestData = new Object();' + 
-                                  'TestData.testPath = "' + path + '";' + 
-                                  'TestData.testFile = "' + os.path.basename( path ) + '";' +
-                                  'TestData.testName = "' + re.sub( ".js$", "", os.path.basename( path ) ) + '";' + 
-                                  'TestData.noJournal = ' + ( 'true' if no_journal else 'false' )  + ";" +
-                                  'TestData.noJournalPrealloc = ' + ( 'true' if no_preallocj else 'false' )  + ";" ]
+        evalString = 'TestData = new Object();' + \
+                     'TestData.testPath = "' + path + '";' + \
+                     'TestData.testFile = "' + os.path.basename( path ) + '";' + \
+                     'TestData.testName = "' + re.sub( ".js$", "", os.path.basename( path ) ) + '";' + \
+                     'TestData.noJournal = ' + ( 'true' if no_journal else 'false' )  + ";" + \
+                     'TestData.noJournalPrealloc = ' + ( 'true' if no_preallocj else 'false' )  + ";" + \
+                     'TestData.auth = ' + ( 'true' if auth else 'false' ) + ";" + \
+                     'TestData.keyFile = ' + ( '"' + keyFile + '"' if keyFile else 'null' ) + ";" + \
+                     'TestData.keyFileData = ' + ( '"' + keyFileData + '"' if keyFile else 'null' ) + ";"
+        if auth and usedb:
+            evalString += 'jsTest.authenticate(db.getMongo());'
+        argv = argv + [ '--eval', evalString]
+
     
     if argv[0].endswith( 'test' ) and no_preallocj :
         argv = argv + [ '--nopreallocj' ]
     
     
     print argv
+    t1 = time.time()
     r = call(argv, cwd=test_path)
     t2 = time.time()
     print "                " + str((t2 - t1) * 1000) + "ms"
@@ -319,7 +349,7 @@ def run_tests(tests):
     
     # The reason we use with is so that we get __exit__ semantics
 
-    with mongod(small_oplog=small_oplog,no_journal=no_journal,no_preallocj=no_preallocj) as master:
+    with mongod(small_oplog=small_oplog,no_journal=no_journal,no_preallocj=no_preallocj,auth=auth) as master:
         with mongod(slave=True) if small_oplog else Nothing() as slave:
             if small_oplog:
                 master.wait_for_repl()
@@ -442,7 +472,7 @@ def add_exe(e):
     return e
 
 def main():
-    global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog, no_journal, no_preallocj, smoke_db_prefix, test_path
+    global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog, no_journal, no_preallocj, auth, keyFile, smoke_db_prefix, test_path
     parser = OptionParser(usage="usage: smoke.py [OPTIONS] ARGS*")
     parser.add_option('--mode', dest='mode', default='suite',
                       help='If "files", ARGS are filenames; if "suite", ARGS are sets of tests (%default)')
@@ -474,6 +504,11 @@ def main():
     parser.add_option('--nopreallocj', dest='no_preallocj', default=False,
                       action="store_true",
                       help='Do not preallocate journal files in tests')
+    parser.add_option('--auth', dest='auth', default=False,
+                      action="store_true",
+                      help='Run standalone mongods in tests with authentication enabled')
+    parser.add_option('--keyFile', dest='keyFile', default=None,
+                      help='Path to keyFile to use to run replSet and sharding tests with authentication enabled')
     parser.add_option('--ignore', dest='ignore_files', default=None,
 		      help='Pattern of files to ignore in tests')    
 
@@ -499,6 +534,8 @@ def main():
     small_oplog = options.small_oplog
     no_journal = options.no_journal
     no_preallocj = options.no_preallocj
+    auth = options.auth
+    keyFile = options.keyFile
 
     if options.File:
         if options.File == '-':
