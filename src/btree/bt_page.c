@@ -12,8 +12,6 @@ static int  __inmem_col_int(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __inmem_col_var(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __inmem_row_int(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __inmem_row_leaf(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __inmem_row_leaf_keys(WT_SESSION_IMPL *, WT_PAGE *);
-static void __inmem_row_leaf_slots(uint8_t *, uint32_t, uint32_t, uint32_t);
 
 /*
  * __wt_page_in --
@@ -401,12 +399,14 @@ err:	__wt_scr_free(&current);
 static int
 __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_PAGE_DISK *dsk;
 	WT_ROW *rip;
 	uint32_t i, nindx;
 
+	btree = session->btree;
 	dsk = page->dsk;
 	unpack = &_unpack;
 
@@ -447,86 +447,12 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	page->entries = nindx;
 
-	return (__inmem_row_leaf_keys(session, page));
-}
-
-/*
- * __inmem_row_leaf_keys --
- *	Instantiate the interesting keys for random search of a page.
- */
-static int
-__inmem_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_BTREE *btree;
-	WT_BUF *tmp;
-	WT_ROW *rip;
-	uint32_t i;
-	int ret;
-
-	btree = session->btree;
-	ret = 0;
-
 	/*
-	 * Row-store leaf pages are written as one big prefix-compressed chunk,
-	 * that is, only the first key on the page is not prefix-compressed, and
-	 * to instantiate the last key on the page, you have to take the first
-	 * key on the page and roll it forward to the end of the page.  We don't
-	 * want to do that on every page access, of course, so we instantiate a
-	 * set of keys, essentially creating prefix chunks on the page, where we
-	 * can roll forward from the closest, previous, instantiated key.  The
-	 * complication is that not all keys on a page are equal: we're doing a
-	 * binary search on the  page, which means there are keys we look at a
-	 * lot (every time we search the page), and keys we never look at unless
-	 * they are actually being searched for.  This function figures out the
-	 * "interesting" keys on a page, and then we sequentially walk that list
-	 * instantiating those keys.
-	 *
-	 * Allocate a bit array and figure out the set of "interesting" keys,
-	 * marking up the array.
+	 * If the keys are Huffman encoded, instantiate some set of them.  It
+	 * doesn't matter if we are randomly searching the page or scanning a
+	 * cursor through it, there isn't a fast-path to getting keys off the
+	 * page.
 	 */
-	WT_RET(__wt_scr_alloc(session, __bitstr_size(page->entries), &tmp));
-
-	__inmem_row_leaf_slots(tmp->mem, 0, page->entries, btree->key_gap);
-
-	/* Instantiate the keys. */
-	for (rip = page->u.row_leaf.d, i = 0; i < page->entries; ++rip, ++i)
-		if (__bit_test(tmp->mem, i))
-			WT_ERR(__wt_row_key(session, page, rip, NULL));
-
-err:	__wt_scr_free(&tmp);
-	return (ret);
-}
-
-/*
- * __inmem_row_leaf_slots --
- *	Figure out the interesting slots of a page for random search, up to
- * the specified depth.
- */
-static void
-__inmem_row_leaf_slots(
-    uint8_t *list, uint32_t base, uint32_t entries, uint32_t gap)
-{
-	uint32_t indx, limit;
-
-	if (entries < gap)
-		return;
-
-	/*
-	 * !!!
-	 * Don't clean this code up -- it deliberately looks like the binary
-	 * search code.
-	 *
-	 * !!!
-	 * There's got to be a function that would give me this information, I
-	 * don't see any reason we can't just do this recursively.
-	 */
-	limit = entries;
-	indx = base + (limit >> 1);
-	__bit_set(list, indx);
-
-	__inmem_row_leaf_slots(list, base, limit >> 1, gap);
-
-	base = indx + 1;
-	--limit;
-	__inmem_row_leaf_slots(list, base, limit >> 1, gap);
+	return (btree->huffman_key == NULL ?
+	    0 : __wt_row_leaf_keys(session, page));
 }

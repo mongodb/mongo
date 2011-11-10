@@ -287,8 +287,10 @@ __cursor_row_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	WT_BUF *key, *val;
 	WT_INSERT *ins;
 	WT_ROW *rip;
+	WT_SESSION_IMPL *session;
 	WT_UPDATE *upd;
 
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
 	key = &cbt->iface.key;
 	val = &cbt->iface.value;
 
@@ -304,6 +306,13 @@ __cursor_row_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	 * New page configuration.
 	 */
 	if (newpage) {
+		/*
+		 * If we haven't instantiated keys on this page, do so, else it
+		 * is a very, very slow traversal.
+		 */
+		if (!F_ISSET(cbt->page, WT_PAGE_BUILD_KEYS))
+			WT_RET(__wt_row_leaf_keys(session, cbt->page));
+
 		if (cbt->page->entries == 0)
 			cbt->ins_head = WT_ROW_INSERT_SMALLEST(cbt->page);
 		else

@@ -13,7 +13,7 @@
  */
 WT_INSERT *
 __wt_search_insert(WT_SESSION_IMPL *session,
-    WT_CURSOR_BTREE *cbt, WT_INSERT_HEAD *inshead, WT_ITEM *key)
+    WT_CURSOR_BTREE *cbt, WT_INSERT_HEAD *inshead, WT_ITEM *srch_key)
 {
 	WT_BTREE *btree;
 	WT_INSERT **insp, *ret_ins;
@@ -29,7 +29,7 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 	/* Fast-path appends. */
 	insert_key.data = WT_INSERT_KEY(ret_ins);
 	insert_key.size = WT_INSERT_KEY_SIZE(ret_ins);
-	(void)WT_BTREE_CMP(session, btree, key, &insert_key, cmp);
+	(void)WT_BTREE_CMP(session, btree, srch_key, &insert_key, cmp);
 	if (cmp >= 0) {
 		for (i = WT_SKIP_MAXDEPTH - 1; i >= 0; i--)
 			cbt->ins_stack[i] = (inshead->tail[i] != NULL) ?
@@ -59,7 +59,7 @@ __wt_search_insert(WT_SESSION_IMPL *session,
 			insert_key.data = WT_INSERT_KEY(ret_ins);
 			insert_key.size = WT_INSERT_KEY_SIZE(ret_ins);
 			(void)WT_BTREE_CMP(session, btree,
-			    key, &insert_key, cmp);
+			    srch_key, &insert_key, cmp);
 		}
 
 		if (cmp > 0)		/* Keep going at this level */
@@ -87,19 +87,22 @@ int
 __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 {
 	WT_BTREE *btree;
+	WT_CELL_UNPACK *unpack, _unpack;
 	WT_IKEY *ikey;
-	WT_ITEM *key, *item, _item;
+	WT_ITEM *item, _item, *srch_key;
 	WT_PAGE *page;
 	WT_ROW *rip;
 	WT_ROW_REF *rref;
 	uint32_t base, indx, limit;
 	int cmp, ret;
+	void *key;
 
 	__cursor_search_clear(cbt);
 
-	key = (WT_ITEM *)&cbt->iface.key;
+	srch_key = (WT_ITEM *)&cbt->iface.key;
 
 	btree = session->btree;
+	unpack = &_unpack;
 	rip = NULL;
 
 	cmp = -1;				/* Assume we don't match. */
@@ -125,8 +128,8 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 				item->data = WT_IKEY_DATA(ikey);
 				item->size = ikey->size;
 
-				WT_RET(WT_BTREE_CMP(session, btree,
-				    key, item, cmp));
+				WT_RET(WT_BTREE_CMP(
+				    session, btree, srch_key, item, cmp));
 				if (cmp == 0)
 					break;
 				if (cmp < 0)
@@ -161,7 +164,6 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	 */
 	if (is_modify)
 		WT_ORDERED_READ(cbt->write_gen, page->write_gen);
-
 	cbt->page = page;
 
 	/* Do a binary search of the leaf page. */
@@ -169,18 +171,50 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 		indx = base + (limit >> 1);
 		rip = page->u.row_leaf.d + indx;
 
-		/* The key may not have been instantiated yet. */
-		if (__wt_off_page(page, rip->key)) {
-			ikey = rip->key;
+retry:		/*
+		 * Multiple threads of control may be searching this page, which
+		 * means the key may change underfoot, and here's where it gets
+		 * tricky: first, copy the key.  We don't need any barriers, the
+		 * key is updated atomically, and we just need a valid copy.
+		 */
+		key = rip->key;
+
+		/*
+		 * Key copied.
+		 *
+		 * If another thread instantiated the key, we don't have any
+		 * work to do.  Figure this out using the key's value:
+		 *
+		 * If the key points off-page, the key has been instantiated,
+		 * just use it.
+		 *
+		 * If the key points on-page, we have a copy of a WT_CELL value
+		 * that can be processed, regardless of what any other thread is
+		 * doing.
+		 */
+		if (__wt_off_page(page, key)) {
+			ikey = key;
 			_item.data = WT_IKEY_DATA(ikey);
 			_item.size = ikey->size;
 			item = &_item;
 		} else {
-			WT_ERR(__wt_row_key(session, page, rip, &cbt->tmp));
-			item = (WT_ITEM *)&cbt->tmp;
+			if (btree->huffman_key != NULL) {
+				WT_ERR(__wt_row_key(session, page, rip, NULL));
+				goto retry;
+			}
+			__wt_cell_unpack(key, unpack);
+			if (unpack->type == WT_CELL_KEY &&
+			    unpack->prefix == 0) {
+				_item.data = unpack->data;
+				_item.size = unpack->size;
+				item = &_item;
+			} else {
+				WT_ERR(__wt_row_key(session, page, rip, NULL));
+				goto retry;
+			}
 		}
 
-		WT_RET(WT_BTREE_CMP(session, btree, key, item, cmp));
+		WT_RET(WT_BTREE_CMP(session, btree, srch_key, item, cmp));
 		if (cmp == 0)
 			break;
 		if (cmp < 0)
@@ -241,7 +275,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	 * Search the insert list for a match; __wt_search_insert sets the
 	 * return insert information appropriately.
 	 */
-	cbt->ins = __wt_search_insert(session, cbt, cbt->ins_head, key);
+	cbt->ins = __wt_search_insert(session, cbt, cbt->ins_head, srch_key);
 	return (0);
 
 err:	__wt_page_release(session, page);

@@ -166,12 +166,13 @@ struct __wt_page {
 #define	WT_PAGE_FREELIST	7	/* Free-list page */
 	uint8_t type;			/* Page type */
 
-#define	WT_PAGE_BULK_LOAD	0x01	/* Page bulk loaded */
-#define	WT_PAGE_DELETED		0x02	/* Page was empty at reconciliation */
-#define	WT_PAGE_INITIAL_EMPTY	0x04	/* Empty page created during open */
-#define	WT_PAGE_MERGE		0x08	/* Page to merge in reconciliation */
-#define	WT_PAGE_MODIFIED	0x10	/* Page is modified */
-#define	WT_PAGE_PINNED		0x20	/* Page is pinned */
+#define	WT_PAGE_BUILD_KEYS	0x001	/* Page is pinned */
+#define	WT_PAGE_BULK_LOAD	0x002	/* Page bulk loaded */
+#define	WT_PAGE_DELETED		0x004	/* Page was empty at reconciliation */
+#define	WT_PAGE_INITIAL_EMPTY	0x008	/* Empty page created during open */
+#define	WT_PAGE_MERGE		0x010	/* Page to merge in reconciliation */
+#define	WT_PAGE_MODIFIED	0x020	/* Page is modified */
+#define	WT_PAGE_PINNED		0x040	/* Page is pinned */
 	uint8_t flags;			/* Page flags */
 };
 

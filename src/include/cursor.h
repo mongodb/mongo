@@ -23,7 +23,8 @@ struct __wt_cursor_btree {
 
 	WT_INSERT_HEAD   *ins_head;	/* Insert chain head */
 	WT_INSERT	 *ins;		/* Current insert node */
-	WT_INSERT	**ins_stack[WT_SKIP_MAXDEPTH];	/* Search stack. */
+					/* Search stack */
+	WT_INSERT	**ins_stack[WT_SKIP_MAXDEPTH];
 
 	uint64_t recno;			/* Record number */
 	uint32_t write_gen;		/* Saved leaf page's write generation */
@@ -54,12 +55,25 @@ struct __wt_cursor_btree {
 	WT_COL *cip_saved;		/* Last iteration reference */
 
 	/*
-	 * We also need a temporary buffer in the cursor during row-leaf page
-	 * searches, as a place to instantiate prefix-compressed keys.  This
-	 * use is orthogonal to our use in variable-length column-stores, use
-	 * the same buffer for both purposes.
-	 */				/* Row-store leaf-page search keys */
-	WT_BUF	 tmp;			/* Huffman or overflow return value */
+	 * We don't instantiate prefix-compressed keys on pages where there's no
+	 * Huffman encoding because we don't want to waste memory if only moving
+	 * a cursor through the page, and it's faster to build keys while moving
+	 * through the page than to roll-forward from a previously instantiated
+	 * key (we don't instantiate all of the keys, just the ones at binary
+	 * search points).  We can't use the application's WT_CURSOR key field
+	 * as a copy of the last-returned key because it may have been altered
+	 * by the API layer, for example, dump cursors.  Instead we store the
+	 * last-returned key in a temporary buffer.  The rip_saved field is used
+	 * to determine if the key in the temporary buffer has the prefix needed
+	 * for building the current key.
+	 */
+	WT_ROW *rip_saved;		/* Last-returned key reference */
+
+	/*
+	 * A temporary buffer with two uses: caching RLE values for column-store
+	 * files, and caching the last-returned keys for row-store files.
+	 */
+	WT_BUF tmp;
 
 	/*
 	 * Fixed-length column-store items are a single byte, and it's simpler
