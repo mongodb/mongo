@@ -282,9 +282,43 @@ __wt_btree_root_init(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_PAGE *page;
+	WT_REF *ref;
 
 	btree = session->btree;
 
+	/* Create the empty root page. */
+	WT_RET(__wt_calloc_def(session, 1, &page));
+	switch (btree->type) {
+	case BTREE_COL_FIX:
+	case BTREE_COL_VAR:
+		page->type = WT_PAGE_COL_INT;
+		WT_RET(__wt_calloc_def(session, 1, &page->u.col_int.t));
+		page->u.col_int.t->recno = 1;
+		ref = &page->u.col_int.t->ref;
+		page->u.col_int.recno = 1;
+		break;
+	case BTREE_ROW:
+		page->type = WT_PAGE_ROW_INT;
+		WT_RET(__wt_calloc_def(session, 1, &page->u.row_int.t));
+		ref = &page->u.row_int.t->ref;
+		WT_RET(__wt_row_ikey_alloc(session, 0, "", 1,
+		    (WT_IKEY **)&((WT_ROW_REF *)ref)->key));
+		break;
+	}
+	page->entries = 1;
+	page->parent = NULL;
+	page->parent_ref = &btree->root_page;
+	F_SET(page, WT_PAGE_INITIAL_EMPTY | WT_PAGE_PINNED);
+
+	btree->root_page.state = WT_REF_MEM;
+	btree->root_page.addr = WT_ADDR_INVALID;
+	btree->root_page.size = 0;
+	btree->root_page.page = page;
+
+	/*
+	 * Create a leaf page -- this can be reconciled while the root stays
+	 * pinned.
+	 */
 	WT_RET(__wt_calloc_def(session, 1, &page));
 	switch (btree->type) {
 	case BTREE_COL_FIX:
@@ -299,14 +333,13 @@ __wt_btree_root_init(WT_SESSION_IMPL *session)
 		page->type = WT_PAGE_ROW_LEAF;
 		break;
 	}
-	page->parent = NULL;
-	page->parent_ref = &btree->root_page;
-	F_SET(page, WT_PAGE_INITIAL_EMPTY | WT_PAGE_PINNED);
-
-	btree->root_page.state = WT_REF_MEM;
-	btree->root_page.addr = WT_ADDR_INVALID;
-	btree->root_page.size = 0;
-	btree->root_page.page = page;
+	page->parent = btree->root_page.page;
+	page->parent_ref = ref;
+	ref->state = WT_REF_MEM;
+	ref->addr = WT_ADDR_INVALID;
+	ref->size = 0;
+	ref->page = page;
+	F_SET(page, WT_PAGE_DELETED | WT_PAGE_INITIAL_EMPTY);
 	return (0);
 }
 

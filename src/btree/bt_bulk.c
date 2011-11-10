@@ -37,6 +37,7 @@ __wt_bulk_init(WT_CURSOR_BULK *cbulk)
 	if (F_ISSET(btree->root_page.page, WT_PAGE_INITIAL_EMPTY)) {
 		btree->root_page.state = WT_REF_DISK;
 		__wt_free(session, btree->root_page.page);
+		/* LEAK: the child page. */
 
 		btree->last_page = NULL;
 	} else {
