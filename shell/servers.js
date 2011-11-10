@@ -1631,11 +1631,11 @@ function startParallelShell( jsCode, port ){
         args.push("--password", TestData.keyFileData);
     }
 
-    if (db) {
+    args.push("--eval", jsCode);
+
+    if (typeof db == "object") {
         args.push(db.getMongo().host);
     }
-
-    args.push("--eval", jsCode);
 
     x = startMongoProgramNoConnect.apply(null, args);
     return function(){
