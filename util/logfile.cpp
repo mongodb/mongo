@@ -89,7 +89,7 @@ namespace mongo {
 // TODO 64 bit offsets
         OVERLAPPED o;
         memset(&o,0,sizeof(o));
-        o.Offset = offset;
+        (unsigned long long&) o.Offset = offset; 
         BOOL ok= WriteFile(_fd, _buf, _len, 0, &o);
         assert(ok);
     }
@@ -98,7 +98,7 @@ namespace mongo {
 // TODO 64 bit offsets
         OVERLAPPED o;
         memset(&o,0,sizeof(o));
-        o.Offset = offset;
+        (unsigned long long&) o.Offset = offset;
         DWORD nr;
         BOOL ok = ReadFile(_fd, _buf, _len, &nr, &o);
         if( !ok ) {
