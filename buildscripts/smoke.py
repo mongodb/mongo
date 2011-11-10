@@ -127,7 +127,7 @@ class mongod(object):
     def setup_admin_user(self, port=mongod_port):
         try:
             Connection( "localhost" , int(port) ).admin.add_user("admin","password")
-        except OperationFailure as e:
+        except OperationFailure, e:
             if e.message == 'need to login':
                 pass # SERVER-4225
             else:
