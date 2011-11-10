@@ -1620,11 +1620,16 @@ function startParallelShell( jsCode, port ){
     assert( jsCode.indexOf( '"' ) == -1,
            "double quotes should not be used in jsCode because the windows shell will stip them out" );
     var x;
-    if ( port ) {
-        x = startMongoProgramNoConnect( "mongo" , "--port" , port , "--eval" , jsCode );
-    } else {
-        x = startMongoProgramNoConnect( "mongo" , "--eval" , jsCode , db ? db.getMongo().host : null );        
+    if ( !port ) {
+        port = 27017;
     }
+
+    if (TestData.keyFile) {
+        x = startMongoProgramNoConnect( "mongo" , "--port" , port , "--eval" , jsCode, "--username", "__system", "--password", TestData.keyFileData);
+    } else {
+        x = startMongoProgramNoConnect( "mongo" , "mongo" , "--port" , port, "--eval" , jsCode );
+    }
+
     return function(){
         waitProgram( x );
     };
