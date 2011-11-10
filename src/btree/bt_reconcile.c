@@ -137,8 +137,8 @@ typedef struct {
 	 * We track current information about the current record number, the
 	 * number of entries copied into the temporary buffer, where we are
 	 * in the temporary buffer, and how much memory remains.  Those items
-	 * are packaged here rather than passing pointer to stack locations
-	 * through the code.
+	 * are packaged here rather than passing pointers to stack locations
+	 * around the code.
 	 */
 	uint64_t recno;			/* Current record number */
 	uint32_t entries;		/* Current number of entries */
