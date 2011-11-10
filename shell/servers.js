@@ -455,6 +455,7 @@ startMongodTest = function (port, dirname, restart, extraOptions ) {
     if( jsTestOptions().noJournal ) options["nojournal"] = ""
     if( jsTestOptions().noJournalPrealloc ) options["nopreallocj"] = ""
     if( jsTestOptions().auth ) options["auth"] = ""
+    if( jsTestOptions().keyFile && (!extraOptions || !extraOptions['keyFile']) ) options['keyFile'] = jsTestOptions().keyFile
 
     if ( extraOptions )
         Object.extend( options , extraOptions );
@@ -463,7 +464,7 @@ startMongodTest = function (port, dirname, restart, extraOptions ) {
 
     conn.name = (useHostname ? getHostName() : "localhost") + ":" + port;
 
-    if (jsTestOptions().auth) {
+    if (options['auth'] || options['keyFile']) {
         if (!this.shardsvr) {
             jsTest.addAuth(conn);
         }
