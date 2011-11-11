@@ -275,14 +275,14 @@ namespace mongo {
     V8ScriptEngine::V8ScriptEngine() {
         v8::V8::Initialize();
         v8::Locker l;
-        v8::Locker::StartPreemption( 10 );
+//        v8::Locker::StartPreemption( 10 );
 
         int K = 1024;
         v8::ResourceConstraints rc;
         rc.set_max_young_space_size(4 * K * K);
         rc.set_max_old_space_size(64 * K * K);
         v8::SetResourceConstraints(&rc);
-        v8::V8::IgnoreOutOfMemoryException();
+//        v8::V8::IgnoreOutOfMemoryException();
 //        v8::V8::SetFatalErrorHandler(fatalHandler);
     }
 
