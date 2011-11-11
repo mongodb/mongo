@@ -261,6 +261,17 @@ assert( ! result.ok , tojson( result ) )
 print( "   testing read command (should succeed)" );
 assert.commandWorked(readOnlyDB.runCommand({count : "foo"}));
 
+print("make sure currentOp/killOp fail");
+assert.throws(function() {
+    printjson(readOnlyDB.currentOp());
+});
+assert.throws(function() {
+    printjson(readOnlyDB.killOp(123));
+});
+assert.throws(function() {
+    printjson(readOnlyDB.fsyncUnlock());
+});
+
 /*
 broken because of SERVER-4156
 print( "   testing write command (should fail)" );
@@ -273,5 +284,16 @@ assert.commandFailed(readOnlyDB.runCommand(
 */
 print( "   testing logout (should succeed)" );
 assert.commandWorked(readOnlyDB.runCommand({logout : 1}));
+
+print("make sure currentOp/killOp fail again");
+assert.throws(function() {
+    printjson(readOnlyDB.currentOp());
+});
+assert.throws(function() {
+    printjson(readOnlyDB.killOp(123));
+});
+assert.throws(function() {
+    printjson(readOnlyDB.fsyncUnlock());
+});
 
 s.stop();

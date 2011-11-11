@@ -178,6 +178,8 @@ namespace mongo {
                 return false;
             ns += 10;
 
+            r.checkAuth( Auth::WRITE );
+
             BSONObjBuilder b;
             vector<Shard> shards;
 
