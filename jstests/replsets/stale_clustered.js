@@ -10,7 +10,7 @@ var shardTest = new ShardingTest( name = "clusteredstale" ,
                                   numShards = 2 ,
                                   verboseLevel = 0 ,
                                   numMongos = 2 ,
-                                  otherParams = { rs : true } )//, 
+                                  otherParams = { rs : true, rsOptions : {oplogSize : 1} } )//, 
                                                   //rs0 : { logpath : "$path/mongod.log" }, 
                                                   //rs1 : { logpath : "$path/mongod.log" } } );
 
