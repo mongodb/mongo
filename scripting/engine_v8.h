@@ -248,6 +248,5 @@ namespace mongo {
     };
 
     extern ScriptEngine * globalScriptEngine;
-    extern map< unsigned, int > __interruptSpecToThreadId;
 
 }
