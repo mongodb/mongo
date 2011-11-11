@@ -222,7 +222,7 @@ namespace mongo {
             }
             else if ( strcmp( ns , "killop" ) == 0 ) {
                 BSONElement e = q.query["op"];
-                if ( strstr( r.getns() , "admin." ) != 0 ) {
+                if ( strstr( r.getns() , "admin." ) == 0 ) {
                     b.append( "err" , "unauthorized" );
                 }
                 else if ( e.type() != String ) {
