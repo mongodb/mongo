@@ -624,6 +624,40 @@ namespace mongo {
         }
     }
 
+    bool shouldRetry(const BSONObj& o, const string& hn) {
+        OplogReader missingObjReader;
+
+        // we don't have the object yet, which is possible on initial sync.  get it.
+        log() << "replication info adding missing object" << endl; // rare enough we can log
+        uassert(15916, str::stream() << "Can no longer connect to initial sync source: " << hn, missingObjReader.connect(hn));
+
+        const char *ns = o.getStringField("ns");
+        // might be more than just _id in the update criteria
+        BSONObj query = BSONObjBuilder().append(o.getObjectField("o2")["_id"]).obj();
+        BSONObj missingObj;
+        try {
+            missingObj = missingObjReader.findOne(ns, query);
+        } catch(DBException& e) {
+            log() << "replication assertion fetching missing object: " << e.what() << endl;
+            throw;
+        }
+
+        if( missingObj.isEmpty() ) {
+            log() << "replication missing object not found on source. presumably deleted later in oplog" << endl;
+            log() << "replication o2: " << o.getObjectField("o2").toString() << endl;
+            log() << "replication o firstfield: " << o.getObjectField("o").firstElementFieldName() << endl;
+
+            return false;
+        }
+        else {
+            Client::Context ctx(ns);
+            DiskLoc d = theDataFileMgr.insert(ns, (void*) missingObj.objdata(), missingObj.objsize());
+            uassert(15917, "Got bad disk location when attempting to insert", !d.isNull());
+
+            return true;
+        }
+    }
+
     /** @param fromRepl false if from ApplyOpsCmd
         @return true if was and update should have happened and the document DNE.  see replset initial sync code.
      */

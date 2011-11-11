@@ -129,6 +129,12 @@ namespace mongo {
      * take an op and apply locally
      * used for applying from an oplog
      * @param fromRepl really from replication or for testing/internal/command/etc...
+     * Returns if the op was an update that could not be applied (true on failure)
      */
     bool applyOperation_inlock(const BSONObj& op , bool fromRepl = true );
+
+    /**
+     * If applyOperation_inlock should be called again after an update fails.
+     */
+    bool shouldRetry(const BSONObj& op , const string& hn);
 }
