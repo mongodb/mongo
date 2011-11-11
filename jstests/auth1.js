@@ -28,30 +28,30 @@ a.addUser( "super", pass );
 assert( a.auth( "super" , pass ) , "auth failed" );
 assert( !a.auth( "super" , pass + "a" ) , "auth should have failed" );
 
-db2 = new Mongo( db.getMongo().host ).getDB( db.getName() );
-
-users = db2.getCollection( "system.users" );
+users = db.getCollection( "system.users" );
 users.remove( {} );
-
 pass = "a" + Math.random();
 
-db2.addUser( "eliot" , pass );
+db.addUser( "eliot" , pass );
 
-assert.commandFailed( db2.runCommand( { authenticate: 1, user: "eliot", nonce: "foo", key: "bar" } ) );
+assert.commandFailed( db.runCommand( { authenticate: 1, user: "eliot", nonce: "foo", key: "bar" } ) );
 
 // check sanity check SERVER-3003
 
-before = db2.system.users.count()
+before = db.system.users.count()
 
 assert.throws( function(){
-    db2.addUser( "" , "abc" )
+    db.addUser( "" , "abc" )
 } , null , "C1" )
-
 assert.throws( function(){
-    db2.addUser( "abc" , "" )
+    db.addUser( "abc" , "" )
 } , null , "C2" )
 
 
-after = db2.system.users.count()
+after = db.system.users.count()
 assert( before > 0 , "C3" )
 assert.eq( before , after , "C4" )
+
+// Clean up after ourselves so other tests using authentication don't get messed up.
+db.system.users.remove({})
+db.getSiblingDB('admin').system.users.remove({})
