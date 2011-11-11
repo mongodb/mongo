@@ -2259,11 +2259,19 @@ ReplSetTest.prototype.restart = function( n , options, signal, wait ){
     }
     
     this.stop( n, signal, wait && wait.toFixed ? wait : true )
-    node = this.start( n , options , true, wait );
+    started = this.start( n , options , true, wait );
+
     if (jsTestOptions().keyFile && !this.keyFile) {
-        jsTest.authenticate(node);
+        if (started.length) {
+             // if n was an array of conns, start will return an array of connections
+            for (var i = 0; i < started.length; i++) {
+                jsTest.authenticate(started[i]);
+            }
+        } else {
+            jsTest.authenticate(started);
+        }
     }
-    return node;
+    return started;
 }
 
 ReplSetTest.prototype.stopMaster = function( signal , wait ) {
