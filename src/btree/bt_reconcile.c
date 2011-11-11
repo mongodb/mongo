@@ -196,7 +196,7 @@ typedef struct {
 
 static int  __hazard_bsearch_cmp(const void *, const void *);
 static void __hazard_copy(WT_SESSION_IMPL *);
-static int  __hazard_exclusive(WT_SESSION_IMPL *, WT_REF *);
+static int  __hazard_exclusive(WT_SESSION_IMPL *, WT_REF *, uint32_t);
 static int  __hazard_qsort_cmp(const void *, const void *);
 static int  __rec_cell_build_key(
 		WT_SESSION_IMPL *, const void *, uint32_t, int, int *);
@@ -240,10 +240,10 @@ static int  __rec_split_fixup(WT_SESSION_IMPL *);
 static int  __rec_split_init(WT_SESSION_IMPL *, WT_PAGE *, uint64_t, uint32_t);
 static int  __rec_split_row_promote(WT_SESSION_IMPL *, uint8_t);
 static int  __rec_split_write(WT_SESSION_IMPL *, WT_BOUNDARY *, WT_BUF *);
-static int  __rec_subtree(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __rec_subtree_col(WT_SESSION_IMPL *, WT_PAGE *);
+static int  __rec_subtree(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
+static int  __rec_subtree_col(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
 static void __rec_subtree_col_clear(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __rec_subtree_row(WT_SESSION_IMPL *, WT_PAGE *);
+static int  __rec_subtree_row(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
 static void __rec_subtree_row_clear(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_wrapup(WT_SESSION_IMPL *, WT_PAGE *);
 
@@ -442,7 +442,7 @@ __wt_page_reconcile_int(WT_SESSION_IMPL *session,
 	 * If the check fails (for example, we find an in-memory page and it's
 	 * an eviction attempt), we're done.
 	 */
-	WT_RET(__rec_subtree(session, page));
+	WT_RET(__rec_subtree(session, page, flags));
 
 	/*
 	 * Clean pages are simple: update the page parent's state and discard
@@ -637,7 +637,7 @@ __wt_rec_destroy(WT_SESSION_IMPL *session)
  *	Get exclusive access to a subtree for reconciliation.
  */
 static int
-__rec_subtree(WT_SESSION_IMPL *session, WT_PAGE *page)
+__rec_subtree(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 {
 	WT_RECONCILE *r;
 	int ret;
@@ -650,7 +650,7 @@ __rec_subtree(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * tree locked down.
 	 */
 	if (!r->locked)
-		WT_RET(__hazard_exclusive(session, page->parent_ref));
+		WT_RET(__hazard_exclusive(session, page->parent_ref, flags));
 
 	/*
 	 * Walk the page's subtree, and make sure we can reconcile this page.
@@ -689,12 +689,12 @@ __rec_subtree(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
-		if ((ret = __rec_subtree_col(session, page)) != 0)
+		if ((ret = __rec_subtree_col(session, page, flags)) != 0)
 			if (!r->locked)
 				__rec_subtree_col_clear(session, page);
 		break;
 	case WT_PAGE_ROW_INT:
-		if ((ret = __rec_subtree_row(session, page)) != 0)
+		if ((ret = __rec_subtree_row(session, page, flags)) != 0)
 			if (!r->locked)
 				__rec_subtree_row_clear(session, page);
 		break;
@@ -718,7 +718,7 @@ __rec_subtree(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	pages.
  */
 static int
-__rec_subtree_col(WT_SESSION_IMPL *session, WT_PAGE *parent)
+__rec_subtree_col(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t flags)
 {
 	WT_COL_REF *cref;
 	WT_PAGE *page;
@@ -760,7 +760,7 @@ __rec_subtree_col(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		 * have the tree locked down.
 		 */
 		if (!r->locked)
-			WT_RET(__hazard_exclusive(session, &cref->ref));
+			WT_RET(__hazard_exclusive(session, &cref->ref, flags));
 
 		/*
 		 * Split pages are always merged into the parent regardless of
@@ -808,7 +808,7 @@ __rec_subtree_col(WT_SESSION_IMPL *session, WT_PAGE *parent)
 
 		/* Recurse down the tree. */
 		if (page->type == WT_PAGE_COL_INT)
-			WT_RET(__rec_subtree_col(session, page));
+			WT_RET(__rec_subtree_col(session, page, flags));
 	}
 	return (0);
 }
@@ -843,7 +843,7 @@ __rec_subtree_col_clear(WT_SESSION_IMPL *session, WT_PAGE *parent)
  *	pages.
  */
 static int
-__rec_subtree_row(WT_SESSION_IMPL *session, WT_PAGE *parent)
+__rec_subtree_row(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t flags)
 {
 	WT_PAGE *page;
 	WT_RECONCILE *r;
@@ -885,7 +885,7 @@ __rec_subtree_row(WT_SESSION_IMPL *session, WT_PAGE *parent)
 		 * have the tree locked down.
 		 */
 		if (!r->locked)
-			WT_RET(__hazard_exclusive(session, &rref->ref));
+			WT_RET(__hazard_exclusive(session, &rref->ref, flags));
 
 		/*
 		 * Split pages are always merged into the parent regardless of
@@ -931,7 +931,7 @@ __rec_subtree_row(WT_SESSION_IMPL *session, WT_PAGE *parent)
 
 		/* Recurse down the tree. */
 		if (page->type == WT_PAGE_ROW_INT)
-			WT_RET(__rec_subtree_row(session, page));
+			WT_RET(__rec_subtree_row(session, page, flags));
 	}
 	return (0);
 }
@@ -2689,6 +2689,9 @@ __rec_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	r = session->btree->reconcile;
 
+	if (F_ISSET(page, WT_PAGE_FORCE_EVICT))
+		__wt_evict_force_clear(session, page);
+
 	/*
 	 * If the page was empty, we want to eventually discard it from the
 	 * tree by merging it into its parent, not just evict it from memory.
@@ -3521,7 +3524,7 @@ __hazard_bsearch_cmp(const void *search, const void *b)
  *	Request exclusive access to a page.
  */
 static int
-__hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
+__hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 {
 	WT_RECONCILE *r;
 
@@ -3541,7 +3544,7 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
 	WT_WRITE_BARRIER();
 
 	/* Get a fresh copy of the hazard reference array. */
-	__hazard_copy(session);
+retry:	__hazard_copy(session);
 
 	/* If we find a matching hazard reference, the page is still in use. */
 	if (bsearch(ref->page, r->hazard, r->hazard_elem,
@@ -3549,6 +3552,11 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
 		return (0);
 
 	WT_BSTAT_INCR(session, rec_hazard);
+	if (LF_ISSET(WT_REC_WAIT)) {
+		__wt_yield();
+		goto retry;
+	}
+
 	WT_VERBOSE(session, RECONCILE,
 	    "reconcile: addr %" PRIu32 " hazard request failed", ref->addr);
 

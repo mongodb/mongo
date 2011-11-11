@@ -308,7 +308,7 @@ __wt_btree_root_init(WT_SESSION_IMPL *session)
 	page->entries = 1;
 	page->parent = NULL;
 	page->parent_ref = &btree->root_page;
-	F_SET(page, WT_PAGE_INITIAL_EMPTY | WT_PAGE_PINNED);
+	F_SET(page, WT_PAGE_EMPTY_TREE | WT_PAGE_PINNED);
 
 	btree->root_page.state = WT_REF_MEM;
 	btree->root_page.addr = WT_ADDR_INVALID;
@@ -339,7 +339,7 @@ __wt_btree_root_init(WT_SESSION_IMPL *session)
 	ref->addr = WT_ADDR_INVALID;
 	ref->size = 0;
 	ref->page = page;
-	F_SET(page, WT_PAGE_DELETED | WT_PAGE_INITIAL_EMPTY);
+	F_SET(page, WT_PAGE_DELETED | WT_PAGE_EMPTY_TREE);
 	return (0);
 }
 

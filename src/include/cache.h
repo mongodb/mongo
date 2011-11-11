@@ -29,7 +29,9 @@ struct __wt_evict_req {
 	size_t    retry_allocated;		/* Bytes allocated */
 	int	  retry_cnt;			/* We only try a few times. */
 
-	int	  close_method;			/* Discard pages */
+#define	WT_EVICT_REQ_CLOSE      0x1		/* Discard pages. */
+#define	WT_EVICT_REQ_PAGE       0x2		/* Force out a page. */
+	uint32_t  flags;
 };
 
 /*

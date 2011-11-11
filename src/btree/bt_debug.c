@@ -407,8 +407,10 @@ __debug_page_work(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 		__dmsg(ds, ", bulk-loaded");
 	if (F_ISSET(page, WT_PAGE_DELETED))
 		__dmsg(ds, ", deleted");
-	if (F_ISSET(page, WT_PAGE_INITIAL_EMPTY))
-		__dmsg(ds, ", initial-empty");
+	if (F_ISSET(page, WT_PAGE_EMPTY_TREE))
+		__dmsg(ds, ", empty-tree");
+	if (F_ISSET(page, WT_PAGE_FORCE_EVICT))
+		__dmsg(ds, ", force-evict");
 	if (F_ISSET(page, WT_PAGE_MERGE))
 		__dmsg(ds, ", merge");
 	if (F_ISSET(page, WT_PAGE_PINNED))

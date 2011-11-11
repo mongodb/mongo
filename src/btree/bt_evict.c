@@ -59,13 +59,16 @@ __evict_clr(WT_EVICT_LIST *e)
  *	Set an entry in the eviction request list.
  */
 static inline void
-__evict_req_set(WT_SESSION_IMPL *session, WT_EVICT_REQ *r, int close_method)
+__evict_req_set(
+    WT_SESSION_IMPL *session, WT_EVICT_REQ *r, WT_PAGE *page, uint32_t flags)
 {
 					/* Should be empty */
 	WT_ASSERT(session, r->session == NULL);
 
 	WT_CLEAR(*r);
-	r->close_method = close_method;
+	r->btree = session->btree;
+	r->page = page;
+	r->flags = flags;
 
 	/*
 	 * Publish: there must be a barrier to ensure the structure fields are
@@ -109,7 +112,7 @@ __wt_evict_server_wake(WT_CONNECTION_IMPL *conn, int force)
 	 * issue (when closing the environment), run the eviction server.
 	 */
 	bytes_inuse = __wt_cache_bytes_inuse(cache);
-	bytes_max = WT_STAT(conn->stats, cache_bytes_max);
+	bytes_max = conn->cache_size;
 	if (!force && !cache->read_lockout && bytes_inuse < bytes_max)
 		return;
 
@@ -144,12 +147,68 @@ __wt_evict_file_serial_func(WT_SESSION_IMPL *session)
 	/* Find an empty slot and enter the eviction request. */
 	WT_EVICT_REQ_FOREACH(er, er_end, cache)
 		if (er->session == NULL) {
-			__evict_req_set(session, er, close_method);
+			__evict_req_set(session, er, NULL, close_method ?
+			    WT_EVICT_REQ_CLOSE : 0);
 			return;
 		}
 
 	__wt_errx(session, "eviction server request table full");
 	__wt_session_serialize_wrapup(session, NULL, WT_ERROR);
+}
+
+/*
+ * __evict_page_serial_func --
+ *	Eviction serialization function called when a page needs to be forced
+ *	out due to the volume of inserts.
+ */
+void
+__wt_evict_page_serial_func(WT_SESSION_IMPL *session)
+{
+	WT_CACHE *cache;
+	WT_EVICT_REQ *er, *er_end;
+	WT_PAGE *page;
+
+	__wt_evict_page_unpack(session, &page);
+
+	cache = S2C(session)->cache;
+
+	/* Find an empty slot and enter the eviction request. */
+	WT_EVICT_REQ_FOREACH(er, er_end, cache)
+		if (er->session == NULL) {
+			__evict_req_set(session, er, page, WT_EVICT_REQ_PAGE);
+			return;
+		}
+
+	__wt_errx(session, "eviction server request table full");
+	__wt_session_serialize_wrapup(session, NULL, WT_ERROR);
+}
+
+/*
+ * __wt_evict_force_clear
+ *	Clear the force flag from a page and clear any pending requests to
+ *	evict the page.
+ */
+void
+__wt_evict_force_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_CACHE *cache;
+	WT_EVICT_REQ *er, *er_end;
+
+	cache = S2C(session)->cache;
+
+	WT_ASSERT(session, F_ISSET(page, WT_PAGE_FORCE_EVICT));
+
+	/*
+	 * If we evict a page marked for forced eviction, clear any reference
+	 * to it from the request queue.
+	 */
+	WT_EVICT_REQ_FOREACH(er, er_end, cache)
+		if (er->session != NULL &&
+		    F_ISSET(er, WT_EVICT_REQ_PAGE) &&
+		    er->page == page)
+			__evict_req_clr(session, er);
+
+	F_CLR(page, WT_PAGE_FORCE_EVICT);
 }
 
 /*
@@ -256,7 +315,7 @@ __evict_worker(WT_SESSION_IMPL *session)
 		 * soon as we get under the maximum cache.
 		 */
 		bytes_inuse = __wt_cache_bytes_inuse(cache);
-		bytes_max = WT_STAT(conn->stats, cache_bytes_max);
+		bytes_max = conn->cache_size;
 		if (cache->read_lockout) {
 			if (bytes_inuse <= bytes_max - (bytes_max / 20)) {
 				/*
@@ -319,9 +378,16 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 		memset(cache->evict, 0, cache->evict_allocated);
 
 		/* Reference the correct WT_BTREE handle. */
-		WT_SET_BTREE_IN_SESSION(session, request_session->btree);
+		WT_SET_BTREE_IN_SESSION(session, er->btree);
 
-		ret = __evict_file(session, er);
+		if (F_ISSET(er, WT_EVICT_REQ_PAGE))
+			ret = __wt_page_reconcile(session,
+			    er->page, WT_REC_WAIT);
+		else
+			ret = __evict_file(session, er);
+
+		/* Clear the reference to the btree handle. */
+		WT_CLEAR_BTREE_IN_SESSION(session);
 
 		/*
 		 * If we don't have any pages to retry, we're done, resolve the
@@ -329,14 +395,16 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 		 * main eviction loop to finish the work.
 		 */
 		if (er->retry == NULL) {
-			__wt_session_serialize_wrapup(
-			    request_session, NULL, ret);
+			/*
+			 * XXX Page eviction is special: the requesting thread
+			 * is already inside wrapup.
+			 */
+			if (!F_ISSET(er, WT_EVICT_REQ_PAGE))
+				__wt_session_serialize_wrapup(
+				    request_session, NULL, ret);
 			__evict_req_clr(session, er);
 		} else
 			cache->pending_retry = 1;
-
-		/* Clear the reference to the btree handle. */
-		WT_CLEAR_BTREE_IN_SESSION(session);
 	}
 	return (0);
 }
@@ -353,11 +421,12 @@ __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 	uint32_t flags;
 
 	btree = session->btree;
-	flags = er->close_method ? WT_REC_EVICT | WT_REC_LOCKED : 0;
+	flags = F_ISSET(er, WT_EVICT_REQ_CLOSE) ?
+	    WT_REC_EVICT | WT_REC_LOCKED : 0;
 
 	WT_VERBOSE(session, EVICTSERVER,
 	    "eviction: %s file request: %s",
-	    btree->name, er->close_method ? "close" : "sync");
+	    btree->name, F_ISSET(er, WT_EVICT_REQ_CLOSE) ? "close" : "sync");
 
 	/*
 	 * Release any page we're holding: we're about to do a walk of the file
@@ -388,7 +457,7 @@ __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 		 * Close: discarding all of the file's pages from the cache,
 		 * and reconciliation is how we do that.
 		 */
-		if (!er->close_method &&
+		if (!F_ISSET(er, WT_EVICT_REQ_CLOSE) &&
 		    (!WT_PAGE_IS_MODIFIED(page) ||
 		    F_ISSET(page, WT_PAGE_PINNED)))
 			continue;
@@ -457,13 +526,14 @@ __evict_request_retry(WT_SESSION_IMPL *session)
 		WT_VERBOSE(session, EVICTSERVER,
 		    "eviction: %s file request retry: %s",
 		    request_session->btree->name,
-		    er->close_method ? "close" : "sync");
+		    F_ISSET(er, WT_EVICT_REQ_CLOSE) ? "close" : "sync");
 
 		/*
 		 * Set the reconcile flags: should never be close, but we
 		 * can do the work even if it is.
 		 */
-		flags = er->close_method ? WT_REC_EVICT | WT_REC_LOCKED : 0;
+		flags = F_ISSET(er, WT_EVICT_REQ_CLOSE) ?
+		    WT_REC_EVICT | WT_REC_LOCKED : 0;
 
 		/* Walk the list of retry requests. */
 		for (pending_retry = 0, i = 0; i < er->retry_entries; ++i) {

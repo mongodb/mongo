@@ -67,6 +67,8 @@ __wt_session_serialize_func(WT_SESSION_IMPL *session,
 void
 __wt_session_serialize_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int ret)
 {
+	WT_CONNECTION_IMPL *conn;
+
 	session->wq_ret = ret;			/* Set the return value. */
 
 	/* If passed a page and the return value is OK, we modified the page. */
@@ -80,6 +82,24 @@ __wt_session_serialize_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int ret)
 		 */
 		WT_WRITE_BARRIER();
 		WT_PAGE_SET_MODIFIED(page);
+
+		/* If the page is pathologically large, force eviction. */
+		conn = S2C(session);
+		if ((int64_t)page->memory_footprint > conn->cache_size / 2 &&
+		    !F_ISSET(page, WT_PAGE_FORCE_EVICT | WT_PAGE_PINNED)) {
+			/*
+			 * XXX We're already inside a serialized function, so
+			 * we can't use the usual machinery.
+			 */
+			__wt_evict_page_args _args, *args = &_args;
+			F_SET(page, WT_PAGE_FORCE_EVICT);
+			args->page = page;
+			session->wq_args = args;
+			__wt_evict_page_serial_func(session);
+			__wt_evict_server_wake(conn, 1);
+		} else if (__wt_cache_bytes_inuse(conn->cache) >
+		    (conn->cache_size * 11) / 10)
+			__wt_evict_server_wake(conn, 0);
 	}
 
 	/*

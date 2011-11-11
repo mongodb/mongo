@@ -68,7 +68,7 @@ __wt_read_server_wake(WT_CONNECTION_IMPL *conn, int force)
 	 * before opening up for more reads.
 	 */
 	bytes_inuse = __wt_cache_bytes_inuse(cache);
-	bytes_max = WT_STAT(conn->stats, cache_bytes_max);
+	bytes_max = conn->cache_size;
 	if (!cache->read_lockout &&
 	    bytes_inuse > bytes_max + (bytes_max / 10)) {
 		WT_VERBOSE(session, READSERVER,

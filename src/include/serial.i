@@ -193,6 +193,35 @@ __wt_evict_file_unpack(
 
 typedef struct {
 	WT_PAGE *page;
+} __wt_evict_page_args;
+
+static inline int
+__wt_evict_page_serial(
+	WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	__wt_evict_page_args _args, *args = &_args;
+	int ret;
+
+	args->page = page;
+
+	ret = __wt_session_serialize_func(session,
+	    WT_SERIAL_FUNC, __wt_evict_page_serial_func, args);
+
+	return (ret);
+}
+
+static inline void
+__wt_evict_page_unpack(
+	WT_SESSION_IMPL *session, WT_PAGE **pagep)
+{
+	__wt_evict_page_args *args =
+	    (__wt_evict_page_args *)session->wq_args;
+
+	*pagep = args->page;
+}
+
+typedef struct {
+	WT_PAGE *page;
 	uint32_t write_gen;
 	WT_INSERT_HEAD **inshead;
 	WT_INSERT ***ins_stack;

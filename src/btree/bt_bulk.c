@@ -34,7 +34,7 @@ __wt_bulk_init(WT_CURSOR_BULK *cbulk)
 	 * of the root page (we're doing a bulk load, on-disk is the eventual
 	 * state of this tree, after we write the internal page).
 	 */
-	if (F_ISSET(btree->root_page.page, WT_PAGE_INITIAL_EMPTY)) {
+	if (F_ISSET(btree->root_page.page, WT_PAGE_EMPTY_TREE)) {
 		btree->root_page.state = WT_REF_DISK;
 		__wt_free(session, btree->root_page.page);
 		/* LEAK: the child page. */

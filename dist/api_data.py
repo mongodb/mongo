@@ -350,7 +350,7 @@ flags = {
 ###################################################
 	'block_read' : [ 'VERIFY' ],
 	'page_free' : [ 'PAGE_FREE_IGNORE_DISK' ],
-	'page_reconcile' : [ 'REC_EVICT', 'REC_LOCKED', 'REC_SALVAGE' ],
+	'page_reconcile' : [ 'REC_EVICT', 'REC_LOCKED', 'REC_SALVAGE', 'REC_WAIT' ],
 	'verbose' : [
 		'VERB_ALLOCATE',
 		'VERB_EVICTSERVER',

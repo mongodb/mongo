@@ -42,7 +42,8 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 * is created dirty and can never be "clean".
 	 */
 	WT_ASSERT(session,
-	    F_ISSET(page, WT_PAGE_MERGE) || !WT_PAGE_IS_MODIFIED(page));
+	    F_ISSET(page, WT_PAGE_EMPTY_TREE | WT_PAGE_MERGE) ||
+	    !WT_PAGE_IS_MODIFIED(page));
 
 	/*
 	 * If this page has a memory footprint associated with it, update

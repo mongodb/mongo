@@ -196,7 +196,7 @@ struct __wt_connection_impl {
 	uint32_t   session_size;
 
 	WT_CACHE  *cache;		/* Page cache */
-	int64_t	   cache_size;
+	uint64_t   cache_size;
 
 	WT_CONNECTION_STATS *stats;	/* Connection statistics */
 
@@ -272,9 +272,10 @@ extern WT_PROCESS __wt_process;
  */
 #define	WT_BUF_INUSE					0x00000001
 #define	WT_PAGE_FREE_IGNORE_DISK			0x00000001
-#define	WT_REC_EVICT					0x00000004
-#define	WT_REC_LOCKED					0x00000002
-#define	WT_REC_SALVAGE					0x00000001
+#define	WT_REC_EVICT					0x00000008
+#define	WT_REC_LOCKED					0x00000004
+#define	WT_REC_SALVAGE					0x00000002
+#define	WT_REC_WAIT					0x00000001
 #define	WT_SERVER_RUN					0x00000001
 #define	WT_SESSION_INTERNAL				0x00000002
 #define	WT_SESSION_SALVAGE_QUIET_ERR			0x00000001
