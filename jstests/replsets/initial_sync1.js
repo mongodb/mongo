@@ -50,17 +50,14 @@ var ports = allocatePorts( 3 );
 var basePath = "/data/db/" + basename;
 var hostname = getHostName();
 
-var sargs = new MongodRunner( ports[ 2 ], basePath, false, false,
-                              ["--replSet", basename, "--oplogSize", 2],
-                              {no_bind : true} );
-var slave2 = sargs.start();
+var slave2 = startMongodTest (ports[2], basename, false, {replSet : basename, oplogSize : 2} )
+
 var local_s2 = slave2.getDB("local");
 var admin_s2 = slave2.getDB("admin");
 
 var config = replTest.getReplSetConfig();
 config.version = 2;
 config.members.push({_id:2, host:hostname+":"+ports[2]});
-
 try {
   admin.runCommand({replSetReconfig:config});
 }
