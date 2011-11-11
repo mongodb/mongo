@@ -635,14 +635,14 @@ DB.prototype.currentOp = function( arg ){
         else if ( arg )
             q["$all"] = true;
     }
-    return db.$cmd.sys.inprog.findOne( q );
+    return this.$cmd.sys.inprog.findOne( q );
 }
 DB.prototype.currentOP = DB.prototype.currentOp;
 
 DB.prototype.killOp = function(op) {
     if( !op ) 
         throw "no opNum to kill specified";
-    return db.$cmd.sys.killop.findOne({'op':op});
+    return this.$cmd.sys.killop.findOne({'op':op});
 }
 DB.prototype.killOP = DB.prototype.killOp;
 
