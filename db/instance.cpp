@@ -84,7 +84,6 @@ namespace mongo {
         BSONObjBuilder b;
 
         if( ! cc().isAdmin() ) {
-            BSONObjBuilder b;
             b.append("err", "unauthorized");
         }
         else {
