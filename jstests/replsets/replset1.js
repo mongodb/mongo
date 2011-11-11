@@ -1,3 +1,5 @@
+load("jstests/replsets/rslib.js")
+
 doTest = function( signal ) {
 
     // Test basic replica set functionality.
@@ -59,16 +61,7 @@ doTest = function( signal ) {
 
     assert( master_id != new_master_id, "Old master shouldn't be equal to new master." );
 
-    {
-        // this may fail since it has to reconnect
-        try {
-            cppconn.foo.findOne()
-        }
-        catch ( e ){
-        }
-        assert.eq( 1000 , cppconn.foo.findOne().a , "cppconn 2" );
-
-    }
+    reconnect(cppconn);
 
     // Now let's write some documents to the new master
     for(var i=0; i<1000; i++) {
