@@ -1044,46 +1044,17 @@ namespace mongo {
         return v8::Number::New( scope->v8ToMongo( args[ 0 ]->ToObject() ).objsize() );
     }
 
-    // to be called with v8 mutex
-    void enableV8Interrupt() {
-        if ( globalScriptEngine->haveGetInterruptSpecCallback() ) {
-            __interruptSpecToThreadId[ globalScriptEngine->getInterruptSpec() ] = v8::V8::GetCurrentThreadId();
-        }
-    }
-
-    // to be called with v8 mutex
-    void disableV8Interrupt() {
-        if ( globalScriptEngine->haveGetInterruptSpecCallback() ) {
-            __interruptSpecToThreadId.erase( globalScriptEngine->getInterruptSpec() );
-        }
-    }
-
-    // to be called with v8 mutex
-    bool pauseV8Interrupt() {
-        if ( globalScriptEngine->haveGetInterruptSpecCallback() ) {
-            int thread = __interruptSpecToThreadId[ globalScriptEngine->getInterruptSpec() ];
-            if ( thread == -2 || thread == -3) {
-                // already paused
-                return false;
-            }
-            __interruptSpecToThreadId[ globalScriptEngine->getInterruptSpec() ] = -2;
-        }
-        return true;
-    }
-
-    // to be called with v8 mutex
-    bool resumeV8Interrupt() {
-        if ( globalScriptEngine->haveGetInterruptSpecCallback() ) {
-            if (__interruptSpecToThreadId[ globalScriptEngine->getInterruptSpec() ] == -3) {
-                // was interrupted
-                return false;
-            }
-            __interruptSpecToThreadId[ globalScriptEngine->getInterruptSpec() ] = v8::V8::GetCurrentThreadId();
-        }
-        return true;
-    }
-
     namespace v8Locks {
+        boost::mutex& __interruptMutex = *( new boost::mutex );
+
+        InterruptLock::InterruptLock() {
+            __interruptMutex.lock();
+        }
+
+        InterruptLock::~InterruptLock() {
+            __interruptMutex.unlock();
+        }
+
         boost::mutex& __v8Mutex = *( new boost::mutex );
         ThreadLocalValue< bool > __locked;
 

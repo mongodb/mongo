@@ -90,10 +90,5 @@ namespace mongo {
 
     v8::Handle<v8::Value> bsonsize( V8Scope* scope, const v8::Arguments& args );
 
-    // call with v8 mutex:
-    void enableV8Interrupt();
-    void disableV8Interrupt();
-    bool pauseV8Interrupt();
-    bool resumeV8Interrupt();
 }
 

@@ -29,12 +29,13 @@ using namespace boost;
 #include "v8_utils.h"
 #include "v8_db.h"
 
-#define V8_SIMPLE_HEADER V8Lock l; HandleScope handle_scope; Context::Scope context_scope( _context );
+#define V8_SIMPLE_HEADER v8::Isolate::Scope iscope(_isolate); v8::Locker l(_isolate); HandleScope handle_scope; Context::Scope context_scope( _context );
 
 namespace mongo {
 
     // guarded by v8 mutex
     map< unsigned, int > __interruptSpecToThreadId;
+    map< unsigned, v8::Isolate* > __interruptSpecToIsolate;
 
     /**
      * Unwraps a BSONObj from the JS wrapper
@@ -272,6 +273,10 @@ namespace mongo {
 //    }
 
     V8ScriptEngine::V8ScriptEngine() {
+        v8::V8::Initialize();
+        v8::Locker l;
+        v8::Locker::StartPreemption( 10 );
+
         int K = 1024;
         v8::ResourceConstraints rc;
         rc.set_max_young_space_size(4 * K * K);
@@ -292,6 +297,7 @@ namespace mongo {
 
     void V8ScriptEngine::interrupt( unsigned opSpec ) {
         v8::Locker l;
+        v8Locks::InterruptLock il;
         if ( __interruptSpecToThreadId.count( opSpec ) ) {
             int thread = __interruptSpecToThreadId[ opSpec ];
             if ( thread == -2 || thread == -3) {
@@ -299,16 +305,20 @@ namespace mongo {
                 __interruptSpecToThreadId[ opSpec ] = -3;
                 return;
             }
-            V8::TerminateExecution( __interruptSpecToThreadId[ opSpec ] );
+
+            V8::TerminateExecution( __interruptSpecToIsolate[ opSpec ] );
         }
     }
+
     void V8ScriptEngine::interruptAll() {
         v8::Locker l;
-        vector< int > toKill; // v8 mutex could potentially be yielded during the termination call
-        for( map< unsigned, int >::const_iterator i = __interruptSpecToThreadId.begin(); i != __interruptSpecToThreadId.end(); ++i ) {
+        v8Locks::InterruptLock il;
+        vector< Isolate* > toKill; // v8 mutex could potentially be yielded during the termination call
+
+        for( map< unsigned, Isolate* >::const_iterator i = __interruptSpecToIsolate.begin(); i != __interruptSpecToIsolate.end(); ++i ) {
             toKill.push_back( i->second );
         }
-        for( vector< int >::const_iterator i = toKill.begin(); i != toKill.end(); ++i ) {
+        for( vector< Isolate* >::const_iterator i = toKill.begin(); i != toKill.end(); ++i ) {
             V8::TerminateExecution( *i );
         }
     }
@@ -319,7 +329,10 @@ namespace mongo {
         : _engine( engine ) ,
           _connectState( NOT ) {
 
-        V8Lock l;
+        _isolate = v8::Isolate::New();
+        v8::Isolate::Scope iscope(_isolate);
+        v8::Locker l(_isolate);
+
         HandleScope handleScope;
         _context = Context::New();
         Context::Scope context_scope( _context );
@@ -384,15 +397,17 @@ namespace mongo {
     }
 
     V8Scope::~V8Scope() {
-        V8Lock l;
-        Context::Scope context_scope( _context );
+        // make sure to disable interrupt, otherwise can get segfault on race condition
+        disableV8Interrupt();
+
+        {
+        V8_SIMPLE_HEADER
         _wrapper.Dispose();
         _emptyObj.Dispose();
         for( unsigned i = 0; i < _funcs.size(); ++i )
             _funcs[ i ].Dispose();
         _funcs.clear();
         _global.Dispose();
-        _context.Dispose();
         std::map <string, v8::Persistent <v8::String> >::iterator it = _strCache.begin();
         std::map <string, v8::Persistent <v8::String> >::iterator end = _strCache.end();
         while (it != end) {
@@ -403,6 +418,10 @@ namespace mongo {
         lzArrayTemplate.Dispose();
         roObjectTemplate.Dispose();
         internalFieldObjects.Dispose();
+        _context.Dispose();
+        }
+
+        _isolate->Dispose();
     }
 
     bool V8Scope::hasOutOfMemoryException() {
@@ -461,14 +480,14 @@ namespace mongo {
      * for an old one
      */
     v8::Handle< v8::Value > V8Scope::v8Callback( const v8::Arguments &args ) {
-        // originally v8 interrupt where disabled here cause: don't want to have to audit all v8 calls for termination exceptions
-        // but we do need to keep interrupt because much time may be spent here (e.g. sleep)
-        bool paused = pauseV8Interrupt();
-
         Local< External > f = External::Cast( *args.Callee()->Get( v8::String::New( "_v8_function" ) ) );
         v8Function function = (v8Function)(f->Value());
         Local< External > scp = External::Cast( *args.Data() );
         V8Scope* scope = (V8Scope*)(scp->Value());
+
+        // originally v8 interrupt where disabled here cause: don't want to have to audit all v8 calls for termination exceptions
+        // but we do need to keep interrupt because much time may be spent here (e.g. sleep)
+        bool paused = scope->pauseV8Interrupt();
 
         v8::Handle< v8::Value > ret;
         string exception;
@@ -482,9 +501,9 @@ namespace mongo {
             exception = "unknown exception";
         }
         if (paused) {
-            bool resume = resumeV8Interrupt();
+            bool resume = scope->resumeV8Interrupt();
             if ( !resume || globalScriptEngine->interrupted() ) {
-                v8::V8::TerminateExecution();
+                v8::V8::TerminateExecution(scope->_isolate);
                 return v8::ThrowException( v8::String::New( "Interruption in V8 native callback" ) );
             }
         }
@@ -871,9 +890,6 @@ namespace mongo {
                     return;
                 throw UserException( 12511, "localConnect called with a different name previously" );
             }
-
-            // needed for killop / interrupt support
-            v8::Locker::StartPreemption( 1 );
 
             //_global->Set( v8::String::New( "Mongo" ) , _engine->_externalTemplate->GetFunction() );
             _global->Set( getV8Str( "Mongo" ) , getMongoFunctionTemplate( this, true )->GetFunction() );
@@ -1568,6 +1584,55 @@ namespace mongo {
         }
 //      cout << "Returning str " + str << endl;
         return ptr;
+    }
+
+    // to be called with v8 mutex
+    void V8Scope::enableV8Interrupt() {
+        v8Locks::InterruptLock l;
+        if ( globalScriptEngine->haveGetInterruptSpecCallback() ) {
+            unsigned op = globalScriptEngine->getInterruptSpec();
+            __interruptSpecToThreadId[ op ] = v8::V8::GetCurrentThreadId();
+            __interruptSpecToIsolate[ op ] = _isolate;
+        }
+    }
+
+    // to be called with v8 mutex
+    void V8Scope::disableV8Interrupt() {
+        v8Locks::InterruptLock l;
+        if ( globalScriptEngine->haveGetInterruptSpecCallback() ) {
+            unsigned op = globalScriptEngine->getInterruptSpec();
+            __interruptSpecToIsolate.erase( op );
+            __interruptSpecToThreadId.erase( op );
+        }
+    }
+
+    // to be called with v8 mutex
+    bool V8Scope::pauseV8Interrupt() {
+        v8Locks::InterruptLock l;
+        if ( globalScriptEngine->haveGetInterruptSpecCallback() ) {
+            unsigned op = globalScriptEngine->getInterruptSpec();
+            int thread = __interruptSpecToThreadId[ op ];
+            if ( thread == -2 || thread == -3) {
+                // already paused
+                return false;
+            }
+            __interruptSpecToThreadId[ op ] = -2;
+        }
+        return true;
+    }
+
+    // to be called with v8 mutex
+    bool V8Scope::resumeV8Interrupt() {
+        v8Locks::InterruptLock l;
+        if ( globalScriptEngine->haveGetInterruptSpecCallback() ) {
+            unsigned op = globalScriptEngine->getInterruptSpec();
+            if (__interruptSpecToThreadId[ op ] == -3) {
+                // was interrupted
+                return false;
+            }
+            __interruptSpecToThreadId[ op ] = v8::V8::GetCurrentThreadId();
+        }
+        return true;
     }
 
 } // namespace mongo
