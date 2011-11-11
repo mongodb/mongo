@@ -847,11 +847,11 @@ DB.prototype.printShardingStatus = function( verbose ){
 }
 
 DB.prototype.fsyncLock = function() {
-    return db.adminCommand({fsync:1, lock:true});
+    return this.adminCommand({fsync:1, lock:true});
 }
 
 DB.prototype.fsyncUnlock = function() {
-    return db.getSiblingDB("admin").$cmd.sys.unlock.findOne()
+    return this.getSiblingDB("admin").$cmd.sys.unlock.findOne()
 }
 
 DB.autocomplete = function(obj){
