@@ -613,6 +613,7 @@ namespace mongo {
 
     void ReplSource::applyOperation(const BSONObj& op) {
         try {
+            // TODO SERVER-3367
             applyOperation_inlock( op );
         }
         catch ( UserException& e ) {
