@@ -8,11 +8,9 @@ var path = "jstests/libs/";
 
 
 print("try starting mongod with auth");
-var m = runMongoProgram( "mongod", "--auth", "--port", port[4], "--dbpath", "/data/db/wrong-auth");
+var m = MongoRunner.runMongod({auth : "", port : port[4], dbpath : "/data/db/wrong-auth"});
 
-assert.throws(function() {
-    m.getDB("local").auth("__system", "");
-});
+assert.eq(m.getDB("local").auth("__system", ""), 0);
 
 stopMongod(port[4]);
 
