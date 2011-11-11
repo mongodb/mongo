@@ -494,8 +494,8 @@ startMongodNoReset = function(){
     return startMongoProgram.apply( null, args );
 }
 
-startMongos = function(){
-    return startMongoProgram.apply( null, createMongoArgs( "mongos" , arguments ) );
+startMongos = function(args){
+    return MongoRunner.runMongos(args);
 }
 
 /* Start mongod or mongos and return a Mongo() object connected to there.
