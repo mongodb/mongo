@@ -797,6 +797,7 @@ namespace mongo {
             BSONObjIterator i( ops );
             while ( i.more() ) {
                 BSONElement e = i.next();
+                // todo SERVER-4259 ?
                 applyOperation_inlock( e.Obj() , false );
                 num++;
             }
