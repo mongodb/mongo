@@ -385,7 +385,9 @@ namespace mongo {
 
                 globalFlushCounters.flushed(time_flushing);
 
-                log(1) << "flushing mmap took " << time_flushing << "ms " << " for " << numFiles << " files" << endl;
+                if( logLevel >= 1 || time_flushing >= 10000 ) { 
+                    log() << "flushing mmaps took " << time_flushing << "ms " << " for " << numFiles << " files" << endl;
+                }
             }
         }
 
