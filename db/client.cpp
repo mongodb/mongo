@@ -626,7 +626,7 @@ namespace mongo {
         ns = "";
         query = BSONObj();
         updateobj = BSONObj();
-        
+
         cursorid = 0;
         ntoreturn = 0;
         ntoskip = 0;

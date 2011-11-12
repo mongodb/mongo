@@ -1335,12 +1335,13 @@ namespace mongo {
         if ( numModded )
             return UpdateResult( 1 , 1 , numModded );
 
+        // todo: no need for "if( profile )" here as that probably just makes things slower?
         if ( profile )
             debug.nscanned = (int) nscanned;
 
         if ( upsert ) {
             if ( updateobj.firstElementFieldName()[0] == '$' ) {
-                /* upsert of an $inc. build a default */
+                // upsert of an $operation. build a default object 
                 BSONObj newObj = mods->createNewFromQuery( patternOrig );
                 checkNoMods( newObj );
                 debug.fastmodinsert = true;
