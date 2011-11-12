@@ -410,10 +410,7 @@ namespace mongo {
 
         extern size_t privateMapBytes;
 
-        /** We need to remap the private views periodically. otherwise they would become very large.
-            Call within write lock.
-        */
-        void _REMAPPRIVATEVIEW() {
+        static void _REMAPPRIVATEVIEW() {
             // todo: Consider using ProcessInfo herein and watching for getResidentSize to drop.  that could be a way 
             //       to assure very good behavior here.
 
@@ -462,8 +459,10 @@ namespace mongo {
                 i++;
                 if( i == e ) i = b;
             }
+            unsigned startedAt = startAt;
             startAt = (startAt + ntodo) % sz; // mark where to start next time
 
+            Timer t;
             for( unsigned x = 0; x < ntodo; x++ ) {
                 dassert( i != e );
                 if( (*i)->isMongoMMF() ) {
@@ -477,7 +476,12 @@ namespace mongo {
                     if( i == e ) i = b;
                 }
             }
+            LOG(2) << "journal REMAPPRIVATEVIEW start:" << startedAt << " n:" << ntodo << ' ' << t.millis() << "ms" << endl;
         }
+
+        /** We need to remap the private views periodically. otherwise they would become very large.
+            Call within write lock.  See top of file for more commentary.
+        */
         void REMAPPRIVATEVIEW() {
             Timer t;
             _REMAPPRIVATEVIEW();
