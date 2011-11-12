@@ -1101,7 +1101,8 @@ namespace mongo {
     int Extent::followupSize(int len, int lastExtentLen) {
         assert( len < Extent::maxSize() );
         int x = initialSize(len);
-        int y = (int) (lastExtentLen < 4000000 ? lastExtentLen * 4.0 : lastExtentLen * 1.2);
+        // changed from 1.20 to 1.35 in v2.1.x to get to larger extent size faster
+        int y = (int) (lastExtentLen < 4000000 ? lastExtentLen * 4.0 : lastExtentLen * 1.35);
         int sz = y > x ? y : x;
 
         if ( sz < lastExtentLen ) {
