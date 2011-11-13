@@ -333,6 +333,21 @@ namespace mongo {
         }
     }
 
+    void checkIfReplMissingFromCommandLine() {
+        if( !cmdLine.usingReplSets() ) { 
+            Client::GodScope gs;
+            DBDirectClient c;
+            unsigned long long x = 
+                c.count("local.system.replset");
+            if( x ) { 
+                log() << endl;
+                log() << "** warning: mongod started without --replSet yet " << x << " documents are present in local.system.replset" << endl;
+                log() << "**          restart with --replSet unless you are doing maintenance and no other clients are connected" << endl;
+                log() << endl;
+            }
+        }
+    }
+
     void clearTmpCollections() {
         Client::GodScope gs;
         vector< string > toDelete;
@@ -461,6 +476,8 @@ namespace mongo {
 
         // comes after getDur().startup() because this reads from the database
         clearTmpCollections();
+
+        checkIfReplMissingFromCommandLine();
 
         Module::initAll();
 
