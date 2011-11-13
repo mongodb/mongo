@@ -1360,7 +1360,7 @@ namespace mongo {
 
             return true;
         }
-    } cmdCollectionStatis;
+    } cmdCollectionStats;
 
     class DBStats : public Command {
     public:
