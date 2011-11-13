@@ -39,12 +39,26 @@ namespace mongo {
     DiskLoc allocateSpaceForANewRecord(const char *ns, NamespaceDetails *d, int lenWHdr, bool god);
     void freeExtents(DiskLoc firstExt, DiskLoc lastExt);
 
+    /* this should be done in alloc record not here, but doing here for now. 
+       really dumb; it's a start.
+    */
+    unsigned quantizeMask(unsigned x) { 
+        if( x > 4096 * 20 ) 
+            return ~4095;
+        if( x >= 512 ) 
+            return ~63;
+        return ~0;
+    }
+
     /** @return number of skipped (invalid) documents */
     unsigned compactExtent(const char *ns, NamespaceDetails *d, const DiskLoc ext, int n,
                 const scoped_array<IndexSpec> &indexSpecs,
-                scoped_array<SortPhaseOne>& phase1, int nidx, bool validate)
+                scoped_array<SortPhaseOne>& phase1, int nidx, bool validate, 
+                double pf, int pb)
     {
         log() << "compact extent #" << n << endl;
+        unsigned oldObjSize = 0; // we'll report what the old padding was
+        unsigned oldObjSizeWithPadding = 0;
 
         Extent *e = ext.ext();
         e->assertOk();
@@ -80,10 +94,23 @@ namespace mongo {
 
                 if( !validate || objOld.valid() ) {
                     unsigned sz = objOld.objsize();
+
+                    oldObjSize += sz;
+                    oldObjSizeWithPadding += recOld->netLength();
+
                     unsigned lenWHdr = sz + Record::HeaderSize;
-                    totalSize += lenWHdr;
+                    unsigned lenWPadding = lenWHdr;
+                    {
+                        lenWPadding *= pf;
+                        lenWPadding += pb;
+                        lenWPadding = lenWPadding & quantizeMask(lenWPadding);
+                        if( lenWPadding < lenWHdr || lenWPadding > BSONObjMaxUserSize / 2 ) { 
+                            lenWPadding = lenWHdr;
+                        }
+                    }
+                    totalSize += lenWPadding;
                     DiskLoc extentLoc;
-                    DiskLoc loc = allocateSpaceForANewRecord(ns, d, lenWHdr, false);
+                    DiskLoc loc = allocateSpaceForANewRecord(ns, d, lenWPadding, false);
                     uassert(14024, "compact error out of space during compaction", !loc.isNull());
                     Record *recNew = loc.rec();
                     recNew = (Record *) getDur().writingPtr(recNew, lenWHdr);
@@ -129,7 +156,14 @@ namespace mongo {
             freeExtents(ext,ext);
             getDur().commitIfNeeded();
 
-            log() << "compact " << nrecs << " documents " << totalSize/1000000.0 << "MB" << endl;
+            { 
+                double op = 1.0;
+                if( oldObjSize ) 
+                    op = static_cast<double>(oldObjSizeWithPadding)/oldObjSize;
+                log() << "compact " << nrecs << " documents " << totalSize/1000000.0 << "MB"
+                    << " oldPadding: " << op << ' ' << static_cast<unsigned>(op*100.0)/100
+                    << endl;                    
+            }
         }
 
         return skipped;
@@ -137,7 +171,7 @@ namespace mongo {
 
     extern SortPhaseOne *precalced;
 
-    bool _compact(const char *ns, NamespaceDetails *d, string& errmsg, bool validate, BSONObjBuilder& result) { 
+    bool _compact(const char *ns, NamespaceDetails *d, string& errmsg, bool validate, BSONObjBuilder& result, double pf, int pb) { 
         //int les = d->lastExtentSize;
 
         // this is a big job, so might as well make things tidy before we start just to be nice.
@@ -198,7 +232,7 @@ namespace mongo {
         long long skipped = 0;
         int n = 0;
         for( list<DiskLoc>::iterator i = extents.begin(); i != extents.end(); i++ ) { 
-            skipped += compactExtent(ns, d, *i, n++, indexSpecs, phase1, nidx, validate);
+            skipped += compactExtent(ns, d, *i, n++, indexSpecs, phase1, nidx, validate, pf, pb);
             pm.hit();
         }
 
@@ -232,7 +266,7 @@ namespace mongo {
         return true;
     }
 
-    bool compact(const string& ns, string &errmsg, bool validate, BSONObjBuilder& result) {
+    bool compact(const string& ns, string &errmsg, bool validate, BSONObjBuilder& result, double pf, int pb) {
         massert( 14028, "bad ns", NamespaceString::normal(ns.c_str()) );
         massert( 14027, "can't compact a system namespace", !str::contains(ns, ".system.") ); // items in system.indexes cannot be moved there are pointers to those disklocs in NamespaceDetails
 
@@ -245,8 +279,11 @@ namespace mongo {
             massert( 13660, str::stream() << "namespace " << ns << " does not exist", d );
             massert( 13661, "cannot compact capped collection", !d->capped );
             log() << "compact " << ns << " begin" << endl;
+            if( pf != 0 || pb != 0 ) { 
+                log() << "paddingFactor:" << pf << " paddingBytes:" << pb << endl;
+            } 
             try { 
-                ok = _compact(ns.c_str(), d, errmsg, validate, result);
+                ok = _compact(ns.c_str(), d, errmsg, validate, result, pf, pb);
             }
             catch(...) { 
                 log() << "compact " << ns << " end (with error)" << endl;
@@ -315,8 +352,19 @@ namespace mongo {
                 }
             }
 
+            double pf = 1.0;
+            int pb = 0;
+            if( cmdObj.hasElement("paddingFactor") ) {
+                pf = cmdObj["paddingFactor"].Number();
+                assert( pf >= 1.0 && pf <= 4.0 );
+            }
+            if( cmdObj.hasElement("paddingBytes") ) {
+                pb = (int) cmdObj["paddingBytes"].Number();
+                assert( pb >= 0 && pb <= 1024 * 1024 );
+            }
+
             bool validate = !cmdObj.hasElement("validate") || cmdObj["validate"].trueValue(); // default is true at the moment
-            bool ok = compact(ns, errmsg, validate, result);
+            bool ok = compact(ns, errmsg, validate, result, pf, pb);
             return ok;
         }
     };
