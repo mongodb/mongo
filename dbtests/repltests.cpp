@@ -105,12 +105,6 @@ namespace ReplTests {
             return count;
         }
         static void applyAllOperations() {
-            class Applier : public ReplSource {
-            public:
-                static void apply( const BSONObj &op ) {
-                    ReplSource::applyOperation( op );
-                }
-            };
             dblock lk;
             vector< BSONObj > ops;
             {
@@ -120,8 +114,13 @@ namespace ReplTests {
             }
             {
                 Client::Context ctx( ns() );
-                for( vector< BSONObj >::iterator i = ops.begin(); i != ops.end(); ++i )
-                    Applier::apply( *i );
+                BSONObjBuilder b;
+                b.append("host", "localhost");
+                b.appendTimestamp("syncedTo", 0);
+                ReplSource a(b.obj());
+                for( vector< BSONObj >::iterator i = ops.begin(); i != ops.end(); ++i ) {
+                    a.applyOperation( *i );
+                }
             }
         }
         static void printAll( const char *ns ) {
