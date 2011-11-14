@@ -672,6 +672,7 @@ int main(int argc, char* argv[]) {
     ("noauth", "run without security")
     ("nohttpinterface", "disable http interface")
     ("noprealloc", "disable data file preallocation - will often hurt performance")
+    ("allocateFixedSizes", "allocate fixed size records - will help with frequent delete use cases")
     ("noscripting", "disable scripting engine")
     ("notablescan", "do not allow table scans")
 #if !defined(_WIN32)
@@ -884,6 +885,10 @@ int main(int argc, char* argv[]) {
         }
         if (params.count("smallfiles")) {
             cmdLine.smallfiles = true;
+        }
+        if (params.count("allocateFixedSizes"))
+        {
+        	cmdLine.allocateFixedSizes = true;
         }
         if (params.count("diaglog")) {
             int x = params["diaglog"].as<int>();

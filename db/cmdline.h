@@ -27,7 +27,7 @@ namespace mongo {
     struct CmdLine {
 
         CmdLine() :
-            port(DefaultDBPort), rest(false), jsonp(false), quiet(false), noTableScan(false), prealloc(true), smallfiles(sizeof(int*) == 4),
+            port(DefaultDBPort), rest(false), jsonp(false), quiet(false), noTableScan(false), prealloc(true), smallfiles(sizeof(int*) == 4), allocateFixedSizes(false),
             quota(false), quotaFiles(8), cpu(false), durOptions(0), oplogSize(0), defaultProfile(0), slowMS(100), pretouch(0), moveParanoia( true ),
             syncdelay(60), socket("/tmp") {
             // default may change for this later.
@@ -71,7 +71,7 @@ namespace mongo {
         bool noTableScan;      // --notablescan no table scans allowed
         bool prealloc;         // --noprealloc no preallocation of data files
         bool smallfiles;       // --smallfiles allocate smaller data files
-
+        bool allocateFixedSizes; // --allocateFixedSizes allocate records of fixed sizes
         bool quota;            // --quota
         int quotaFiles;        // --quotaFiles
         bool cpu;              // --cpu show cpu time periodically
