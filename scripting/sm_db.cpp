@@ -230,6 +230,31 @@ namespace mongo {
         JSCLASS_NO_OPTIONAL_MEMBERS
     };
 
+    JSBool mongo_auth(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
+        smuassert( cx , "mongo_auth needs 3 args" , argc == 3 );
+        shared_ptr< DBClientWithCommands > * connHolder = (shared_ptr< DBClientWithCommands >*)JS_GetPrivate( cx , obj );
+        smuassert( cx ,  "no connection!" , connHolder && connHolder->get() );
+        DBClientWithCommands *conn = connHolder->get();
+
+        Convertor c( cx );
+
+        string db = c.toString( argv[0] );
+        string username = c.toString( argv[1] );
+        string password = c.toString( argv[2] );
+        string errmsg = "";
+
+        try {
+            if (conn->auth(db, username, password, errmsg)) {
+                return JS_TRUE;
+            }
+            JS_ReportError( cx, errmsg.c_str() );
+        }
+        catch ( ... ) {
+            JS_ReportError( cx , "error doing query: unknown" );
+        }
+        return JS_FALSE;
+    }
+
     JSBool mongo_find(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
         smuassert( cx , "mongo_find needs 7 args" , argc == 7 );
         shared_ptr< DBClientWithCommands > * connHolder = (shared_ptr< DBClientWithCommands >*)JS_GetPrivate( cx , obj );
@@ -392,6 +417,7 @@ namespace mongo {
     }
 
     JSFunctionSpec mongo_functions[] = {
+        { "auth" , mongo_auth , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
         { "find" , mongo_find , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
         { "update" , mongo_update , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,
         { "insert" , mongo_insert , 0 , JSPROP_READONLY | JSPROP_PERMANENT, 0 } ,

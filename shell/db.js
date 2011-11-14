@@ -98,18 +98,15 @@ DB.prototype.__pwHash = function( nonce, username, pass ) {
 }
 
 DB.prototype.auth = function( username , pass ){
-    var n = this.runCommand( { getnonce : 1 } );
-
-    var a = this.runCommand( 
-        { 
-            authenticate : 1 , 
-            user : username , 
-            nonce : n.nonce , 
-            key : this.__pwHash( n.nonce, username, pass )
-        }
-    );
-
-    return a.ok;
+    var result = 0;
+    try {
+        result = this.getMongo().auth(this.getName(), username, pass);
+    }
+    catch (e) {
+        print(e);
+        return 0;
+    }
+    return 1;
 }
 
 /**
