@@ -32,6 +32,16 @@ def findSettingsSetup():
     sys.path.append( ".." )
     sys.path.append( "../../" )
 
+def getThirdPartyShortNames():
+    lst = []
+    for x in os.listdir( "third_party" ):
+        if not x.endswith( ".py" ) or x.find( "#" ) >= 0:
+            continue
+         
+        lst.append( x.rpartition( "." )[0] )
+    return lst
+
+
 # --- options ----
 
 options = {}
@@ -171,6 +181,11 @@ add_option( "gdbserver" , "build in gdb server support" , 0 , True )
 add_option( "heapcheck", "link to heap-checking malloc-lib and look for memory leaks during tests" , 0 , False )
 
 add_option("smokedbprefix", "prefix to dbpath et al. for smoke tests", 1 , False )
+
+for shortName in getThirdPartyShortNames():
+    add_option( "use-system-" + shortName , "use system version of library " + shortName , 0 , True )
+
+add_option( "use-system-all" , "use all system libraries " + shortName , 0 , True )
 
 # --- environment setup ---
 
@@ -763,21 +778,20 @@ if not windows:
         os.chmod( keyfile , stat.S_IWUSR|stat.S_IRUSR )
 
 moduleFiles = {}
-for x in os.listdir( "third_party" ):
-    if not x.endswith( ".py" ) or x.find( "#" ) >= 0:
-        continue
-         
-    shortName = x.rpartition( "." )[0]
-    path = "third_party/%s" % x
+for shortName in getThirdPartyShortNames():    
 
-
+    path = "third_party/%s.py" % shortName
     myModule = imp.load_module( "third_party_%s" % shortName , open( path , "r" ) , path , ( ".py" , "r" , imp.PY_SOURCE ) )
     fileLists = { "commonFiles" : commonFiles , "serverOnlyFiles" : serverOnlyFiles , "scriptingFiles" : scriptingFiles, "moduleFiles" : moduleFiles }
     
     options_topass["windows"] = windows
     options_topass["nix"] = nix
     
-    myModule.configure( env , fileLists , options_topass )
+    if has_option( "use-system-" + shortName ) or has_option( "use-system-all" ):
+        print( "using system version of: " + shortName )
+        myModule.configureSystem( env , fileLists , options_topass )
+    else:
+        myModule.configure( env , fileLists , options_topass )
 
 coreServerFiles += scriptingFiles
 
@@ -1174,7 +1188,12 @@ elif not onlyServer:
     shellEnv = doConfigure( shellEnv , shell=True )
 
     shellEnv.Prepend( LIBS=[ "mongoshellfiles"] )
-    mongo = shellEnv.Program( "mongo" , moduleFiles["pcre"] + coreShellFiles )
+    
+    shellFilesToUse = coreShellFiles
+    if "pcre" in moduleFiles:
+        shellFilesToUse += moduleFiles["pcre"]
+
+    mongo = shellEnv.Program( "mongo" , shellFilesToUse )
 
 
 #  ---- RUNNING TESTS ----

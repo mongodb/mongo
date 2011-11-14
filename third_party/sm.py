@@ -42,14 +42,19 @@ root = "third_party/js-1.7"
 def r(x):
     return "%s/%s" % ( root , x )
 
-def configure( env , fileLists , options ):
-    if not options["usesm"]:
-        return
-
+def configureBasics( env , fileLists , options ):
     if options["windows"]:
         env.Append( CPPDEFINES=[ "XP_WIN" ] )
     else:
         env.Append( CPPDEFINES=[ "XP_UNIX" ] )
+
+    
+
+def configure( env , fileLists , options ):
+    if not options["usesm"]:
+        return
+
+    configureBasics( env , fileLists , options )
 
     env.Prepend( CPPPATH=[root] )
 
@@ -98,3 +103,12 @@ def configure( env , fileLists , options ):
     myenv.Auto( r("jsautocfg.h") , [ jscpucfg ] )
     
     myenv.Depends( r("jsscan.c") , r("jsautokw.h") )
+
+
+def configureSystem( env , fileLists , options ):
+    if not options["usesm"]:
+        return
+    
+    configureBasics( env , fileLists , options )
+
+    env.Append( LIBS=[ "js" ] )
