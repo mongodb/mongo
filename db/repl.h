@@ -134,7 +134,7 @@ namespace mongo {
     public:
         OplogReader oplogReader;
 
-        static void applyOperation(const BSONObj& op);
+        void applyOperation(const BSONObj& op);
         bool replacing; // in "replace mode" -- see CmdReplacePeer
         bool paired; // --pair in use
         string hostName;    // ip addr or hostname plus optionally, ":<port>"

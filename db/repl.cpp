@@ -851,7 +851,10 @@ namespace mongo {
 
     void ReplSource::applyOperation(const BSONObj& op) {
         try {
-            applyOperation_inlock( op );
+            bool failedUpdate = applyOperation_inlock( op );
+            if (failedUpdate && shouldRetry(op, hostName)) {
+                uassert(15914, "Failure retrying initial sync update", applyOperation_inlock(op));
+            }
         }
         catch ( UserException& e ) {
             log() << "sync: caught user assertion " << e << " while applying op: " << op << endl;;
@@ -1351,6 +1354,7 @@ namespace mongo {
                             setLastSavedLocalTs( nextLastSaved );
                         }
                     }
+
                     if( oplogReader.awaitCapable() && tailing )
                         okResultCode = 0; // don't sleep
                     syncedTo = nextOpTime;

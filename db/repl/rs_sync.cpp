@@ -58,7 +58,6 @@ namespace mongo {
 
         const string hn = source->h().toString();
         OplogReader r;
-        OplogReader missingObjReader;
         try {
             if( !r.connect(hn) ) {
                 log() << "replSet initial sync error can't connect to " << hn << " to read " << rsoplog << rsLog;
@@ -137,44 +136,8 @@ namespace mongo {
 
                     if( ts >= applyGTE ) { // optimes before we started copying need not be applied.
                         bool failedUpdate = syncApply(o);
-                        if( failedUpdate ) {
-                            // we don't have the object yet, which is possible on initial sync.  get it.
-                            log() << "replSet info adding missing object" << endl; // rare enough we can log
-                            if( !missingObjReader.connect(hn) ) { // ok to call more than once
-                                log() << "replSet initial sync fails, couldn't connect to " << hn << endl;
-                                return false;
-                            }
-                            const char *ns = o.getStringField("ns");
-                            BSONObj query = BSONObjBuilder().append(o.getObjectField("o2")["_id"]).obj(); // might be more than just _id in the update criteria
-                            BSONObj missingObj;
-                            try {
-                                missingObj = missingObjReader.findOne(
-                                    ns,
-                                    query );
-                            } catch(...) {
-                                log() << "replSet assertion fetching missing object" << endl;
-                                throw;
-                            }
-                            if( missingObj.isEmpty() ) {
-                                log() << "replSet missing object not found on source. presumably deleted later in oplog" << endl;
-                                log() << "replSet op: " << o.toString() << endl;
-                            }
-                            else {
-                                Client::Context ctx(ns);
-                                try {
-                                    DiskLoc d = theDataFileMgr.insert(ns, (void*) missingObj.objdata(), missingObj.objsize());
-                                    assert( !d.isNull() );
-                                } catch(...) {
-                                    log() << "replSet assertion during insert of missing object" << endl;
-                                    throw;
-                                }
-                                // now reapply the update from above
-                                bool failed = syncApply(o);
-                                if( failed ) {
-                                    log() << "replSet update still fails after adding missing object " << ns << endl;
-                                    assert(false);
-                                }
-                            }
+                        if( failedUpdate && shouldRetry(o, hn)) {
+                            uassert(15915, "replSet update still fails after adding missing object", syncApply(o));
                         }
                     }
                     _logOpObjRS(o);   /* with repl sets we write the ops to our oplog too */
