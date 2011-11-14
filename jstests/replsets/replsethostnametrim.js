@@ -4,7 +4,7 @@ var replTest = new ReplSetTest({ name: 'testSet', nodes: 1 });
 var nodes = replTest.startSet();
 replTest.initiate();
 
-var master = replTest.nodes[0];
+var master = replTest.getMaster();
 var config = master.getDB("local").system.replset.findOne();
 config.version++;
 var origHost = config.members[0].host;
