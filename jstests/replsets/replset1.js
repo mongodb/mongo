@@ -62,6 +62,7 @@ doTest = function( signal ) {
     assert( master_id != new_master_id, "Old master shouldn't be equal to new master." );
 
     reconnect(cppconn);
+    assert.eq( 1000 , cppconn.foo.findOne().a , "cppconn 2" );
 
     // Now let's write some documents to the new master
     for(var i=0; i<1000; i++) {
