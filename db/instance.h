@@ -30,39 +30,50 @@ namespace mongo {
 
     extern string dbExecCommand;
 
-    struct DiagLog {
+    /** a high level recording of operations to the database - sometimes used for diagnostics 
+        and debugging.
+        */
+    class DiagLog {
         ofstream *f;
         /* 0 = off; 1 = writes, 2 = reads, 3 = both
            7 = log a few reads, and all writes.
         */
         int level;
         mongo::mutex mutex;
-
-        DiagLog() : f(0) , level(0), mutex("DiagLog") { }
-        void init() {
-            if ( ! f && level ) {
-                log() << "diagLogging = " << level << endl;
-                stringstream ss;
-                ss << dbpath << "/diaglog." << hex << time(0);
-                string name = ss.str();
-                f = new ofstream(name.c_str(), ios::out | ios::binary);
-                if ( ! f->good() ) {
-                    problem() << "couldn't open log stream" << endl;
-                    throw 1717;
-                }
+        void openFile() {
+            assert( f == 0 );
+            stringstream ss;
+            ss << dbpath << "/diaglog." << hex << time(0);
+            string name = ss.str();
+            f = new ofstream(name.c_str(), ios::out | ios::binary);
+            if ( ! f->good() ) {
+                problem() << "diagLogging couldn't open " << name << endl;
+                // todo what is this? :
+                throw 1717;
+            }
+            else {
+                log() << "diagLogging using file " << name << endl;
             }
         }
+    public:
+        DiagLog() : f(0) , level(0), mutex("DiagLog") { }
+        int getLevel() const { return level; }
         /**
          * @return old
          */
         int setLevel( int newLevel ) {
+            scoped_lock lk(mutex);
             int old = level;
-            level = newLevel;
-            init();
+            log() << "diagLogging level=" << newLevel << endl;
+            if( f == 0 ) { 
+                openFile();
+            }
+            level = newLevel; // must be done AFTER f is set
             return old;
         }
         void flush() {
             if ( level ) {
+                log() << "flushing diag log" << endl;
                 scoped_lock lk(mutex);
                 f->flush();
             }

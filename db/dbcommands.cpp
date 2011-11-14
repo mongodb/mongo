@@ -66,8 +66,6 @@ namespace mongo {
         return false;
     }
 
-    void flushDiagLog();
-
     /* reset any errors so that getlasterror comes back clean.
 
        useful before performing a long series of operations where we want to
@@ -665,9 +663,9 @@ namespace mongo {
         virtual LockType locktype() const { return WRITE; }
         bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             int was = _diaglog.setLevel( cmdObj.firstElement().numberInt() );
-            flushDiagLog();
+            _diaglog.flush();
             if ( !cmdLine.quiet )
-                tlog() << "CMD: diagLogging set to " << _diaglog.level << " from: " << was << endl;
+                tlog() << "CMD: diagLogging set to " << _diaglog.getLevel() << " from: " << was << endl;
             result.append( "was" , was );
             return true;
         }

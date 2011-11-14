@@ -363,8 +363,6 @@ namespace mongo {
         }
     }
 
-    void flushDiagLog();
-
     /**
      * does background async flushes of mmapped files
      */
@@ -380,7 +378,7 @@ namespace mongo {
                 log(1) << "--syncdelay " << cmdLine.syncdelay << endl;
             int time_flushing = 0;
             while ( ! inShutdown() ) {
-                flushDiagLog();
+                _diaglog.flush();
                 if ( cmdLine.syncdelay == 0 ) {
                     // in case at some point we add an option to change at runtime
                     sleepsecs(5);
@@ -466,8 +464,6 @@ namespace mongo {
         FileAllocator::get()->start();
 
         MONGO_BOOST_CHECK_EXCEPTION_WITH_MSG( clearTmpFiles(), "clear tmp files" );
-
-        _diaglog.init();
 
         dur::startup();
 
@@ -832,7 +828,7 @@ int main(int argc, char* argv[]) {
                 out() << "can't interpret --diaglog setting" << endl;
                 dbexit( EXIT_BADOPTIONS );
             }
-            _diaglog.level = x;
+            _diaglog.setLevel(x);
         }
         if (params.count("sysinfo")) {
             sysRuntimeInfo();
