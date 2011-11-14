@@ -508,12 +508,12 @@ namespace mongo {
 
         return;
     }
-    
+
     DatabaseIgnorer ___databaseIgnorer;
-    
+
     void DatabaseIgnorer::doIgnoreUntilAfter( const string &db, const OpTime &futureOplogTime ) {
         if ( futureOplogTime > _ignores[ db ] ) {
-            _ignores[ db ] = futureOplogTime;   
+            _ignores[ db ] = futureOplogTime;
         }
     }
 
@@ -533,28 +533,28 @@ namespace mongo {
     bool ReplSource::handleDuplicateDbName( const BSONObj &op, const char *ns, const char *db ) {
         if ( dbHolder.isLoaded( ns, dbpath ) ) {
             // Database is already present.
-            return true;   
+            return true;
         }
         BSONElement ts = op.getField( "ts" );
         if ( ( ts.type() == Date || ts.type() == Timestamp ) && ___databaseIgnorer.ignoreAt( db, ts.date() ) ) {
             // Database is ignored due to a previous indication that it is
             // missing from master after optime "ts".
-            return false;   
+            return false;
         }
         if ( Database::duplicateUncasedName( db, dbpath ).empty() ) {
             // No duplicate database names are present.
             return true;
         }
-        
+
         OpTime lastTime;
         bool dbOk = false;
         {
             dbtemprelease release;
-        
+
             // We always log an operation after executing it (never before), so
             // a database list will always be valid as of an oplog entry generated
             // before it was retrieved.
-            
+
             BSONObj last = oplogReader.findOne( this->ns().c_str(), Query().sort( BSON( "$natural" << -1 ) ) );
             if ( !last.isEmpty() ) {
 	            BSONElement ts = last.getField( "ts" );
@@ -568,34 +568,34 @@ namespace mongo {
             BSONObjIterator i( info.getField( "databases" ).embeddedObject() );
             while( i.more() ) {
                 BSONElement e = i.next();
-            
+
                 const char * name = e.embeddedObject().getField( "name" ).valuestr();
                 if ( strcasecmp( name, db ) != 0 )
                     continue;
-                
+
                 if ( strcmp( name, db ) == 0 ) {
                     // The db exists on master, still need to check that no conflicts exist there.
                     dbOk = true;
                     continue;
                 }
-                
+
                 // The master has a db name that conflicts with the requested name.
                 dbOk = false;
                 break;
             }
         }
-        
+
         if ( !dbOk ) {
             ___databaseIgnorer.doIgnoreUntilAfter( db, lastTime );
             incompleteCloneDbs.erase(db);
             addDbNextPass.erase(db);
-            return false;   
+            return false;
         }
-        
+
         // Check for duplicates again, since we released the lock above.
         set< string > duplicates;
         Database::duplicateUncasedName( db, dbpath, &duplicates );
-        
+
         // The database is present on the master and no conflicting databases
         // are present on the master.  Drop any local conflicts.
         for( set< string >::const_iterator i = duplicates.begin(); i != duplicates.end(); ++i ) {
@@ -605,7 +605,7 @@ namespace mongo {
             Client::Context ctx(*i);
             dropDatabase(*i);
         }
-        
+
         massert( 14034, "Duplicate database names present after attempting to delete duplicates",
                 Database::duplicateUncasedName( db, dbpath ).empty() );
         return true;
@@ -613,7 +613,10 @@ namespace mongo {
 
     void ReplSource::applyOperation(const BSONObj& op) {
         try {
-            applyOperation_inlock( op );
+            bool failedUpdate = applyOperation_inlock( op );
+            if (failedUpdate && shouldRetry(op, hostName)) {
+                uassert(15914, "Failure retrying initial sync update", applyOperation_inlock(op));
+            }
         }
         catch ( UserException& e ) {
             log() << "sync: caught user assertion " << e << " while applying op: " << op << endl;;
@@ -705,9 +708,9 @@ namespace mongo {
         }
 
         if ( !handleDuplicateDbName( op, ns, clientName ) ) {
-            return;   
+            return;
         }
-                
+
         Client::Context ctx( ns );
         ctx.getClient()->curop()->reset();
 
@@ -943,7 +946,7 @@ namespace mongo {
                         }
                         // otherwise, break out of loop so we can set to completed or clone more dbs
                     }
-                    
+
                     if( oplogReader.awaitCapable() && tailing )
                         okResultCode = 0; // don't sleep
                     syncedTo = nextOpTime;
@@ -1077,7 +1080,7 @@ namespace mongo {
 
         BSONObj me;
         {
-            
+
             dblock l;
             // local.me is an identifier for a server for getLastError w:2+
             if ( ! Helpers::getSingleton( "local.me" , me ) ||
@@ -1123,7 +1126,7 @@ namespace mongo {
         }
         return true;
     }
-    
+
     bool OplogReader::connect(string hostName) {
         if (conn() != 0) {
             return true;

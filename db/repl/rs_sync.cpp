@@ -32,7 +32,7 @@ namespace mongo {
         }
     }
 
-    /* apply the log op that is in param o 
+    /* apply the log op that is in param o
        @return bool failedUpdate
     */
     bool ReplSetImpl::syncApply(const BSONObj &o) {
@@ -59,7 +59,7 @@ namespace mongo {
 
         const string hn = source->h().toString();
         OplogReader r;
-        OplogReader missingObjReader;
+
         try {
             if( !r.connect(hn) ) {
                 log() << "replSet initial sync error can't connect to " << hn << " to read " << rsoplog << rsLog;
@@ -135,45 +135,8 @@ namespace mongo {
 
                     if( ts >= applyGTE ) { // optimes before we started copying need not be applied.
                         bool failedUpdate = syncApply(o);
-                        if( failedUpdate ) {
-                            // we don't have the object yet, which is possible on initial sync.  get it.
-                            log() << "replSet info adding missing object" << endl; // rare enough we can log
-                            if( !missingObjReader.connect(hn) ) { // ok to call more than once
-                                log() << "replSet initial sync fails, couldn't connect to " << hn << endl;
-                                return false;
-                            }
-                            const char *ns = o.getStringField("ns");
-                            BSONObj query = BSONObjBuilder().append(o.getObjectField("o2")["_id"]).obj(); // might be more than just _id in the update criteria
-                            BSONObj missingObj;
-                            try {
-                                missingObj = missingObjReader.findOne(
-                                    ns, 
-                                    query );
-                            } catch(...) { 
-                                log() << "replSet assertion fetching missing object" << endl;
-                                throw;
-                            }
-                            if( missingObj.isEmpty() ) { 
-                                log() << "replSet missing object not found on source. presumably deleted later in oplog" << endl;
-                                log() << "replSet o2: " << o.getObjectField("o2").toString() << endl;
-                                log() << "replSet o firstfield: " << o.getObjectField("o").firstElementFieldName() << endl;
-                            }
-                            else {
-                                Client::Context ctx(ns);
-                                try {
-                                    DiskLoc d = theDataFileMgr.insert(ns, (void*) missingObj.objdata(), missingObj.objsize());
-                                    assert( !d.isNull() );
-                                } catch(...) { 
-                                    log() << "replSet assertion during insert of missing object" << endl;
-                                    throw;
-                                }
-                                // now reapply the update from above
-                                bool failed = syncApply(o);
-                                if( failed ) {
-                                    log() << "replSet update still fails after adding missing object " << ns << endl;
-                                    assert(false);
-                                }
-                            }
+                        if( failedUpdate && shouldRetry(o, hn)) {
+                            uassert(15915, "replSet update still fails after adding missing object", syncApply(o));
                         }
                     }
                     _logOpObjRS(o);   /* with repl sets we write the ops to our oplog too */
@@ -200,7 +163,7 @@ namespace mongo {
                 if( e.getCode() == 11000 || e.getCode() == 11001 ) {
                     continue;
                 }
-                
+
                 // handle cursor not found (just requery)
                 if( e.getCode() == 13127 ) {
                     r.resetCursor();
@@ -333,7 +296,7 @@ namespace mongo {
                 target = 0;
             }
         }
-            
+
         // no server found
         if (target == 0) {
             // if there is no one to sync from
@@ -341,7 +304,7 @@ namespace mongo {
             tryToGoLiveAsASecondary(minvalid);
             return;
         }
-        
+
         r.tailingQueryGTE(rsoplog, lastOpTimeWritten);
         // if target cut connections between connecting and querying (for
         // example, because it stepped down) we might not have a cursor
@@ -451,7 +414,7 @@ namespace mongo {
                                     if( !target->hbinfo().hbstate.readable() ) {
                                         break;
                                     }
-                                    
+
                                     if( myConfig().slaveDelay != sd ) // reconf
                                         break;
                                 }
@@ -472,7 +435,7 @@ namespace mongo {
                         }
 
                         syncApply(o);
-                        _logOpObjRS(o);   // with repl sets we write the ops to our oplog too 
+                        _logOpObjRS(o);   // with repl sets we write the ops to our oplog too
                     }
                     catch (DBException& e) {
                         sethbmsg(str::stream() << "syncTail: " << e.toString() << ", syncing: " << o);
@@ -487,7 +450,7 @@ namespace mongo {
                 // TODO : reuse our connection to the primary.
                 return;
             }
-            
+
             if( !target->hbinfo().hbstate.readable() ) {
                 return;
             }
@@ -608,10 +571,10 @@ namespace mongo {
             OCCASIONALLY warning() << "couldn't update slave " << rid << " no entry" << rsLog;
             return;
         }
-        
+
         GhostSlave& slave = i->second;
         if (!slave.init) {
-            OCCASIONALLY log() << "couldn't update slave " << rid << " not init" << rsLog;            
+            OCCASIONALLY log() << "couldn't update slave " << rid << " not init" << rsLog;
             return;
         }
 
