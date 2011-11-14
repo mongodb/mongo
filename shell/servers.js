@@ -1626,9 +1626,8 @@ function startParallelShell( jsCode, port ){
         args.push("--port", port);
     }
 
-    if (TestData.keyFile) {
-        args.push("--username", "__system");
-        args.push("--password", TestData.keyFileData);
+    if (TestData) {
+        jsCode = "TestData = " + tojson(TestData) + ";jsTest.authenticate(db.getMongo());" + jsCode;
     }
 
     args.push("--eval", jsCode);
