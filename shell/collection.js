@@ -60,7 +60,7 @@ DBCollection.prototype.help = function () {
     print("\tdb." + shortName + ".storageSize() - includes free space allocated to this collection");
     print("\tdb." + shortName + ".totalIndexSize() - size in bytes of all the indexes");
     print("\tdb." + shortName + ".totalSize() - storage allocated for all data and indexes");
-    print("\tdb." + shortName + ".update(query, object[, upsert_bool, multi_bool])");
+    print("\tdb." + shortName + ".update(query, object[, upsert_bool, multi_bool]) - instead of two flags, you can pass an object with fields: upsert, multi");
     print("\tdb." + shortName + ".validate( <full> ) - SLOW");;
     print("\tdb." + shortName + ".getShardVersion() - only for use with sharding");
     print("\tdb." + shortName + ".getShardDistribution() - prints statistics about data distribution in the cluster");
