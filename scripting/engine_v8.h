@@ -125,8 +125,7 @@ namespace mongo {
         v8::Handle<v8::Object> mongoToLZV8( const mongo::BSONObj & m , bool array = 0 , bool readOnly = false );
         mongo::BSONObj v8ToMongo( v8::Handle<v8::Object> o , int depth = 0 );
 
-        void v8ToMongoElement( BSONObjBuilder & b , v8::Handle<v8::String> name ,
-                               const string sname , v8::Handle<v8::Value> value , int depth = 0, BSONObj* originalParent=0 );
+        void v8ToMongoElement( BSONObjBuilder & b , const string sname , v8::Handle<v8::Value> value , int depth = 0, BSONObj* originalParent=0 );
         v8::Handle<v8::Value> mongoToV8Element( const BSONElement &f, bool readOnly = false );
         virtual void append( BSONObjBuilder & builder , const char * fieldName , const char * scopeName );
 
@@ -140,6 +139,9 @@ namespace mongo {
         v8::Handle<v8::String> getV8Str(string str);
 //        inline v8::Handle<v8::String> getV8Str(string str) { return v8::String::New(str.c_str()); }
         inline v8::Handle<v8::String> getLocalV8Str(string str) { return v8::String::New(str.c_str()); }
+
+        v8::Isolate* getIsolate() { return _isolate; }
+        Persistent<Context> getContext() { return _context; }
 
         // call with v8 mutex:
         void enableV8Interrupt();

@@ -443,7 +443,7 @@ namespace mongo {
         for( int i = 0; i < args.Length(); ++i ) {
             stringstream ss;
             ss << i;
-            scope->v8ToMongoElement( b, scope->V8STR_EMPTY, ss.str(), args[ i ] );
+            scope->v8ToMongoElement( b, ss.str(), args[ i ] );
         }
         BSONObj nativeArgs = b.obj();
         BSONObj ret;
@@ -1349,10 +1349,10 @@ namespace mongo {
         V8_SIMPLE_HEADER
         Handle<v8::String> v8name = getV8Str(scopeName);
         Handle<Value> value = _global->Get( v8name );
-        v8ToMongoElement(builder, v8name, fieldName, value);
+        v8ToMongoElement(builder, fieldName, value);
     }
 
-    void V8Scope::v8ToMongoElement( BSONObjBuilder & b , v8::Handle<v8::String> name , const string sname , v8::Handle<v8::Value> value , int depth, BSONObj* originalParent ) {
+    void V8Scope::v8ToMongoElement( BSONObjBuilder & b , const string sname , v8::Handle<v8::Value> value , int depth, BSONObj* originalParent ) {
 
         if ( value->IsString() ) {
 //            Handle<v8::String> str = Handle<v8::String>::Cast(value);
@@ -1492,7 +1492,7 @@ namespace mongo {
             return;
         }
 
-        cout << "don't know how to convert to mongo field [" << name << "]\t" << value << endl;
+        cout << "don't know how to convert to mongo field [" << sname << "]\t" << value << endl;
     }
 
     BSONObj V8Scope::v8ToMongo( v8::Handle<v8::Object> o , int depth ) {
@@ -1511,7 +1511,7 @@ namespace mongo {
 
         if ( depth == 0 ) {
             if ( o->HasRealNamedProperty( V8STR_ID ) ) {
-                v8ToMongoElement( b , V8STR_ID , "_id" , o->Get( V8STR_ID ), 0, originalBSON );
+                v8ToMongoElement( b , "_id" , o->Get( V8STR_ID ), 0, originalBSON );
             }
         }
 
@@ -1529,7 +1529,7 @@ namespace mongo {
             if ( depth == 0 && sname == "_id" )
                 continue;
 
-            v8ToMongoElement( b , name , sname , value , depth + 1, originalBSON );
+            v8ToMongoElement( b , sname , value , depth + 1, originalBSON );
         }
         return b.obj();
     }
