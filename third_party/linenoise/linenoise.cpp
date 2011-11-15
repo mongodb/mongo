@@ -112,6 +112,8 @@ static DWORD oldMode;
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+#include <signal.h>
+#include <poll.h>
 
 static struct termios orig_termios; /* in order to restore at exit */
 #endif /* _WIN32 */
@@ -237,21 +239,39 @@ static void output(const char* str, size_t len, int x, int y)
     DWORD count = 0;
     WriteConsoleOutputCharacterA(console_out, str, len, pos, &count);
 }
+#else
+static int writeBlue(int fd, char c) {
+    if (write(fd, "\x1b[1;34m", 7) == -1) return -1; // bright blue (visible with both B&W bg)
+    if (write(fd, &c, 1) == -1) return -1;
+    if (write(fd, "\x1b[0m", 4) == -1) return -1; // resume normal coloring
+    return 0;
+}
+
+static int writeRed(int fd, char c) {
+    if (write(fd, "\x1b[1;31m", 7) == -1) return -1; // bright red (visible with both B&W bg)
+    if (write(fd, &c, 1) == -1) return -1;
+    if (write(fd, "\x1b[0m", 4) == -1) return -1; // resume normal coloring
+    return 0;
+}
 #endif
 
 static void refreshLine(int fd, const char *prompt, char *buf, size_t len, size_t pos, size_t cols) {
     size_t plen = strlen(prompt);
+    int offset = 0;
+    size_t lenDiff = 0;
+
+    /* offset is the portion of the line before what will be displayed */
+    if ( (plen + pos) >= cols )
+        offset = plen + pos - cols + 1;
     
-    while((plen+pos) >= cols) {
-        buf++;
-        len--;
-        pos--;
-    }
-    while (plen+len > cols) {
-        len--;
-    }
+    /* lenDiff is the change that must be made in len to keep the line to one line */
+    if ( (len + plen) > cols ) 
+        lenDiff = len + plen - cols;
 
 #ifdef _WIN32
+    buf += offset;
+    pos -= offset;
+    len -= lenDiff;
     CONSOLE_SCREEN_BUFFER_INFO inf = { 0 };
     GetConsoleScreenBufferInfo(console_out, &inf);
     output(prompt, plen, 0, inf.dwCursorPosition.Y);
@@ -268,7 +288,7 @@ static void refreshLine(int fd, const char *prompt, char *buf, size_t len, size_
 #else
     {
         char seq[64];
-        int highlight = -1;
+        int curmatchpos = -1;
 
         if (pos < len) {
             /* this scans for a brace matching buf[pos] to highlight */
@@ -289,12 +309,52 @@ static void refreshLine(int fd, const char *prompt, char *buf, size_t len, size_
                         unmatched++;
 
                     if (unmatched == 0) {
-                        highlight = i;
+                        curmatchpos = i;
                         break;
                     }
                 }
             }
         }
+
+        /* scans for unmatched {[( to be highlighted */
+        int mismatched = 0;
+        int mismatchpos[LINENOISE_MAX_LINE];
+        int unmatchedpos = -1;
+
+        for (size_t i = 0; i <= LINENOISE_MAX_LINE; i++) {
+            mismatchpos[i] = -1;
+        }
+
+        for (size_t i = 0; i < len; i++) {
+            if (strchr("{[(", buf[i])) {
+                mismatched++;
+                mismatchpos[mismatched] = i;
+            } else if (strchr("}])", buf[i])) {
+                mismatched--;
+                if ( mismatched < 0 && mismatchpos[LINENOISE_MAX_LINE + mismatched] == -1)
+                    mismatchpos[LINENOISE_MAX_LINE + mismatched] = i;
+            }
+        }
+
+        if ( mismatched < 0 )
+            unmatchedpos = mismatchpos[LINENOISE_MAX_LINE + mismatched];
+        else
+            unmatchedpos = mismatchpos[mismatched];
+
+        buf += offset;
+        pos -= offset;
+        len -= lenDiff;
+        int max = offset + len;
+
+        if ( unmatchedpos < offset || unmatchedpos >= max )
+            unmatchedpos = -1;
+        else 
+            unmatchedpos -= offset;
+
+        if ( curmatchpos < offset || curmatchpos >= max )
+            curmatchpos = -1;
+        else 
+            curmatchpos -= offset;
 
         /* Cursor to left edge */
         snprintf(seq,64,"\x1b[1G");
@@ -302,14 +362,28 @@ static void refreshLine(int fd, const char *prompt, char *buf, size_t len, size_
         /* Write the prompt and the current buffer content */
         if (write(fd,prompt,strlen(prompt)) == -1) return;
 
-        if (highlight == -1) {
+        if (curmatchpos == -1 && unmatchedpos == -1) {
             if (write(fd,buf,len) == -1) return;
+        } else if (curmatchpos != -1 && unmatchedpos == -1) {
+            if (write(fd,buf,curmatchpos) == -1) return;
+            if (writeBlue(fd, buf[curmatchpos]) == -1) return;
+            if (write(fd,buf+curmatchpos+1,len-curmatchpos-1) == -1) return;
+        } else if (curmatchpos == -1 && unmatchedpos != -1) {
+            if (write(fd,buf,unmatchedpos) == -1) return;
+            if (writeRed(fd, buf[unmatchedpos]) == -1) return;
+            if (write(fd,buf+unmatchedpos+1,len-unmatchedpos-1) == -1) return;
+        } else if (curmatchpos > unmatchedpos) {
+            if (write(fd,buf,unmatchedpos) == -1) return;
+            if (writeRed(fd, buf[unmatchedpos]) == -1) return;
+            if (write(fd,buf+unmatchedpos+1,curmatchpos-unmatchedpos-1) == -1) return;
+            if (writeBlue(fd, buf[curmatchpos]) == -1) return;
+            if (write(fd,buf+curmatchpos+1,len-curmatchpos-1) == -1) return;
         } else {
-            if (write(fd,buf,highlight) == -1) return;
-            if (write(fd,"\x1b[1;34m",7) == -1) return; /* bright blue (visible with both B&W bg) */
-            if (write(fd,&buf[highlight],1) == -1) return;
-            if (write(fd,"\x1b[0m",4) == -1) return; /* reset */
-            if (write(fd,buf+highlight+1,len-highlight-1) == -1) return;
+            if (write(fd,buf,curmatchpos) == -1) return;
+            if (writeBlue(fd, buf[curmatchpos]) == -1) return;
+            if (write(fd,buf+curmatchpos+1,unmatchedpos-curmatchpos-1) == -1) return;
+            if (writeRed(fd, buf[unmatchedpos]) == -1) return;
+            if (write(fd,buf+unmatchedpos+1,len-unmatchedpos-1) == -1) return;
         }
 
         /* Erase to right */
@@ -379,6 +453,13 @@ static char linenoiseReadChar(int fd){
 #endif
 
     if (c == 27) { /* escape */
+        /* wait 200ms to see if other keys come in. if not, assume escape key
+         * was hit rather than start of escape sequence */
+
+        struct pollfd pfd = {fd, POLLIN, 0};
+        if (poll(&pfd, 1, 200/*ms*/) == 0) // true on timeout
+            return 27;
+
         if (read(fd,seq,2) == -1) return 0;
         if (seq[0] == 91){
             if (seq[1] == 68) { /* left arrow */
@@ -508,6 +589,113 @@ static int completeLine(int fd, const char *prompt, char *buf, size_t buflen, si
     return c; /* Return last read character */
 }
 
+void historyResult(const char *search, char *buf){
+    int i;
+    int looped = history_index+1;
+    i = history_index;
+    for (; i!=looped; i--) {
+        if ( strstr(history[i], search) ) {
+            strcpy(buf, history[i]);
+            if (i == history_index+1) // same result from a repeat search
+                beep();
+            history_index = i;
+            return;
+        }
+        if ( i == 0) {
+            i = history_len;
+            looped--;
+        }
+    }
+    return;
+}
+
+int historySearch(int fd, const char *prompt, char *buf, size_t *len, size_t *pos, size_t cols) {
+    char c;
+    int searchlen = 0;
+    *pos = *len = 0;
+    char search[LINENOISE_MAX_LINE] = "";
+    char search_prompt[LINENOISE_MAX_LINE] = "search (): "; 
+    history_index = history_len-1;
+    refreshLine(fd,search_prompt,buf,*len,*pos,cols);
+
+    while (true){
+        c = linenoiseReadChar(fd);
+        strcpy(search_prompt, "search (");
+        if ( c <= 126 && c >= 32 ) { //all the useful ascii chars
+            search[searchlen] = c;
+            searchlen++;
+            historyResult(search, buf);
+            *len = strlen(buf);
+            if ( strstr(buf, search) != NULL)
+                *pos = strlen(buf) - strlen(strstr(buf, search)) + strlen(search);
+            else 
+                beep(); // TODO nomatching
+            refreshLine(fd, strcat(strcat(search_prompt,search),"): ") ,buf,*len,*pos,cols);
+        } else if (c == 8) { // backspace
+            if (searchlen > 0) {
+                searchlen--;
+                search[searchlen] = '\0';
+                history_index = history_len-1;
+                historyResult(search, buf);
+                *len = strlen(buf);
+                if ( strstr(buf, search) != NULL)
+                    *pos = strlen(buf) - strlen(strstr(buf, search)) + strlen(search);
+                refreshLine(fd, strcat(strcat(search_prompt,search),"): ") ,buf,*len,*pos,cols);
+            } else {
+                beep();
+            }
+        } else if (c == 127) {
+            beep();
+        } else if (c == 14) { // Ctrl+n next history item
+            if (history_index < history_len)
+                history_index++;
+            strcpy( buf, history[history_index] );
+            *len = *pos = strlen(buf);
+            refreshLine(fd,prompt,buf,*len,*pos,cols);
+            return 0;
+        } else if (c == 16) { // Ctrl+p previous history item
+            if (history_index > 0)
+                history_index--;
+            strcpy( buf, history[history_index] );
+            *len = *pos = strlen(buf);
+            refreshLine(fd,prompt,buf,*len,*pos,cols);
+            return 0;
+        } else if (c == 27 || c == 3 ) { // esc or Ctrl+C 
+            history_index = history_len;
+            buf[0]  = '\0';
+            *len = *pos = 0;
+            refreshLine(fd,prompt,buf,*len,*pos,cols);
+            return 0;
+        } else if (c == 2) { // Ctrl+b place cursor before query
+            *pos = strlen(buf) - strlen(strstr(buf, search));
+            refreshLine(fd,prompt,buf,*len,*pos,cols);
+            return 0;
+        } else if (c == 6) { // Ctrl+f place cursor after query 
+            refreshLine(fd,prompt,buf,*len,*pos,cols);
+            return 0;
+        } else if (c == 1) { // Ctrl+a place cursor at start of string
+            *pos = 0;
+            refreshLine(fd,prompt,buf,*len,*pos,cols);
+            return 0;
+        } else if (c == 5) { // Ctrl+e place cursor at end of string
+            *pos = strlen(buf);
+            refreshLine(fd,prompt,buf,*len,*pos,cols);
+            return 0;
+        } else if (c == 18) { // Ctrl+r earlier match
+            history_index--;
+            historyResult(search, buf);
+            *len = strlen(buf);
+            if ( strstr(buf, search) != NULL)
+                *pos = strlen(buf) - strlen(strstr(buf, search)) + strlen(search);
+            refreshLine(fd, strcat(strcat(search_prompt,search),"): ") ,buf,*len,*pos,cols);
+        } else if (c == 13) { // enter
+            *pos = strlen(buf);
+            refreshLine(fd,prompt,buf,*len,*pos,cols);
+            return 0;
+        }
+    }
+}
+
 void linenoiseClearScreen(void) {
 #ifdef _WIN32
     COORD coord = {0, 0};
@@ -533,6 +721,8 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
     size_t cols = getColumns();
     // cols is 0 in certain circumstances like inside debugger, which creates further issues
     cols = cols > 0 ? cols : 80;
+
+    char del[LINENOISE_MAX_LINE] = {'\0'};
 
     buf[0] = '\0';
     buflen--; /* Make sure there is always space for the nulterm */
@@ -574,6 +764,9 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
             return (int)len;
         case 3:     /* ctrl-c */
             errno = EAGAIN;
+#ifndef _WIN32
+                raise(SIGINT);
+#endif
             return -1;
         case 8:     /* backspace or ctrl-h */
             if (pos > 0 && len > 0) {
@@ -656,13 +849,7 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
                     pos++;
                     len++;
                     buf[len] = '\0';
-                    if (plen+len < cols) {
-                        /* Avoid a full update of the line in the
-                         * trivial case. */
-                        if (write(1,&c,1) == -1) return -1;
-                    } else {
-                        refreshLine(fd,prompt,buf,len,pos,cols);
-                    }
+                    refreshLine(fd,prompt,buf,len,pos,cols);
                 } else {
                     memmove(buf+pos+1,buf+pos,len-pos);
                     buf[pos] = c;
@@ -674,13 +861,24 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
             }
             break;
         case 21: /* Ctrl+u, delete the whole line. */
+            strncpy( del, buf, LINENOISE_MAX_LINE );
+            del[len] = '\0';
             buf[0] = '\0';
             pos = len = 0;
             refreshLine(fd,prompt,buf,len,pos,cols);
             break;
         case 11: /* Ctrl+k, delete from current to end of line. */
+            strncpy( del, buf+pos, pos+len );
+            del[len-pos] = '\0';
             buf[pos] = '\0';
             len = pos;
+            refreshLine(fd,prompt,buf,len,pos,cols);
+            break;
+        case 25: /* Ctrl+y, paste the most recently deleted portion. */
+            memmove( buf+pos+strlen(del), buf+pos, len-pos );
+            memcpy( buf+pos, del, strlen(del) );
+            len += strlen(del);
+            pos += strlen(del);
             refreshLine(fd,prompt,buf,len,pos,cols);
             break;
         case 1: /* Ctrl+a, go to the start of the line */
@@ -694,6 +892,10 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
         case 12: /* ctrl+l, clear screen */
             linenoiseClearScreen();
             refreshLine(fd,prompt,buf,len,pos,cols);
+            break;
+        case 18: /* Ctrl+r, history search */
+            historySearch(fd,prompt,buf,&len,&pos,cols);
+            break;
         }
     }
     return len;
