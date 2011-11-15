@@ -13,7 +13,7 @@ def checkOk():
     
     m = "v" + m[0]
     print( m )
-    print( "excpted version [" + m + "]" )
+    print( "expected version [" + m + "]" )
 
     from subprocess import Popen, PIPE
     diff = Popen( [ "git", "diff", "origin/v1.2" ], stdout=PIPE ).communicate()[ 0 ]
