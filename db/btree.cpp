@@ -1238,19 +1238,24 @@ namespace mongo {
                                             IndexDetails &id, const Ordering &order ) {
         // As a precondition, lchild + the old separator are <= half a body size,
         // and rchild is at most completely full.  Based on the value of split,
-        // lchild will get less than half of the total bytes which is at most 75%
-        // of a full body.  So lchild will have room for the following keys:
+        // in most cases, lchild will get less than half of the total bytes
+        // which is at most 75% of a full body.  So lchild should have room for
+        // the following keys.  However in cases where keys are de-duped in
+        // rchild, lchild will likely get more bytes than a full body, in such
+        // cases, we try our best to balance:
         int lN = l->n;
         {
             KeyNode kn = keyNode( leftIndex );
             l->pushBack( kn.recordLoc, kn.key, order, l->nextChild ); // left child's right child becomes old parent key's left child
         }
-        for( int i = 0; i < split - lN - 1; ++i ) {
+        int i;
+        for( i = 0; i < split - lN - 1; ++i ) {
             KeyNode kn = r->keyNode( i );
-            l->pushBack( kn.recordLoc, kn.key, order, kn.prevChildBucket );
+            if ( l->_pushBack( kn.recordLoc, kn.key, order, kn.prevChildBucket ) == false )
+                break;
         }
         {
-            KeyNode kn = r->keyNode( split - lN - 1 );
+            KeyNode kn = r->keyNode( i );
             l->nextChild = kn.prevChildBucket;
             // Child lN was lchild's old nextChild, and don't need to fix that one.
             l->fixParentPtrs( lchild, lN + 1, l->n );
@@ -1262,7 +1267,7 @@ namespace mongo {
         int zeropos = 0;
         // lchild and rchild cannot be merged, so there must be >0 (actually more)
         // keys to the right of split.
-        r->dropFront( split - lN, order, zeropos );
+        r->dropFront( i + 1 , order, zeropos );
     }
 
     template< class V >
