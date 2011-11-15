@@ -127,7 +127,7 @@
 } while (0)
 #else
 #define	WT_VERBOSE_ISSET(session, f)	0
-#define	WT_VERBOSE(session, f, msg)
+#define	WT_VERBOSE(session, f, ...)
 #endif
 
 /* Clear a structure. */
