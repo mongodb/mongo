@@ -32,6 +32,8 @@ DBCollection.prototype.help = function () {
     print("DBCollection help");
     print("\tdb." + shortName + ".find().help() - show DBCursor help");
     print("\tdb." + shortName + ".count()");
+    print("\tdb." + shortName + ".copyTo(newColl) - duplicates collection by copying all documents to newColl; no indexes are copied.");
+    print("\tdb." + shortName + ".convertToCapped(maxBytes) - calls {convertToCapped:'" + shortName + "', size:maxBytes}} command");
     print("\tdb." + shortName + ".dataSize()");
     print("\tdb." + shortName + ".distinct( key ) - eg. db." + shortName + ".distinct( 'x' )");
     print("\tdb." + shortName + ".drop() drop the collection");

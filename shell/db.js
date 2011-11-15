@@ -305,6 +305,7 @@ DB.prototype.repairDatabase = function() {
 DB.prototype.help = function() {
     print("DB methods:");
     print("\tdb.addUser(username, password[, readOnly=false])");
+    print("\tdb.adminCommand(nameOrDocument) - switches to 'admin' db, and runs command [ just calls db.runCommand(...) ]");
     print("\tdb.auth(username, password)");
     print("\tdb.cloneDatabase(fromhost)");
     print("\tdb.commandHelp(name) returns the help for the command");
