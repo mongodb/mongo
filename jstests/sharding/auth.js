@@ -218,6 +218,10 @@ assert.eq(count, 500);
 
 logout(adminUser);
 
+// add admin on shard itself, hack to prevent localhost auth bypass
+d1.getMaster().getDB(adminUser.db).addUser(adminUser.username, adminUser.password);
+d2.getMaster().getDB(adminUser.db).addUser(adminUser.username, adminUser.password);
+
 login(testUser);
 print( "testing map reduce" );
 /* sharded map reduce can be tricky since all components talk to each other.
