@@ -8,11 +8,11 @@ var path = "jstests/libs/";
 
 
 print("try starting mongod with auth");
-var m = runMongoProgram( "mongod", "--auth", "--port", port[4], "--dbpath", "/data/db/wrong-auth");
+var pargs = new MongodRunner( port[4], "/data/db/wrong-auth", false, false,
+                              ["--auth"], {no_bind : true} );
+var m = pargs.start();
 
-assert.throws(function() {
-    m.getDB("local").auth("__system", "");
-});
+assert.eq(m.getDB("local").auth("__system", ""), 0);
 
 stopMongod(port[4]);
 
@@ -24,7 +24,6 @@ run("chmod", "644", path+"key2");
 
 print("try starting mongod");
 m = runMongoProgram( "mongod", "--keyFile", path+"key1", "--port", port[0], "--dbpath", "/data/db/" + name);
-
 
 print("should fail with wrong permissions");
 assert.eq(m, 2, "mongod should exit w/ 2: permissions too open");
