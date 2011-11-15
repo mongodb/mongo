@@ -666,15 +666,18 @@ namespace mongo {
         _KeyNode &kn = k( i );
         kn.recordLoc = recordLoc;
         kn.prevChildBucket = prevChildBucket;
-        if ( i > 0 && key.binaryEqual( keyNode(i-1).key ) ) {
-            kn.setKeyDataOfs( k(i-1).keyDataOfs() );
-        }
-        else {
-            short ofs = (short) _alloc( key.dataSize() );
-            kn.setKeyDataOfs( ofs );
-            char *p = dataAt( ofs );
-            memcpy( p, key.data(), key.dataSize() );
-        }
+        short ofs = (short) _alloc( key.dataSize() );
+        kn.setKeyDataOfs( ofs );
+        char *p = dataAt( ofs );
+        memcpy( p, key.data(), key.dataSize() );
+    }
+
+    template< class V >
+    void BucketBasics<V>::setKey( int i, const DiskLoc recordLoc, const short dataOfs, const DiskLoc prevChildBucket ) {
+        _KeyNode &kn = k( i );
+        kn.recordLoc = recordLoc;
+        kn.prevChildBucket = prevChildBucket;
+        kn.setKeyDataOfs( dataOfs );
     }
 
     template< class V >
@@ -1208,9 +1211,18 @@ namespace mongo {
         // of a full body.  So rchild will have room for the following keys:
         int rAdd = l->n - split;
         r->reserveKeysFront( rAdd );
+        map< short, short > offsetMap;
         for( int i = split + 1, j = 0; i < l->n; ++i, ++j ) {
+            const _KeyNode &kk = l->k( i );
             KeyNode kn = l->keyNode( i );
-            r->setKey( j, kn.recordLoc, kn.key, kn.prevChildBucket );
+            map< short, short >::iterator it = offsetMap.find( kk.keyDataOfs() );
+            if ( it == offsetMap.end() ) {
+                r->setKey( j, kn.recordLoc, kn.key, kn.prevChildBucket );
+                offsetMap[ kk.keyDataOfs() ] = r->k( j ).keyDataOfs();
+            }
+            else {
+                r->setKey( j, kn.recordLoc, it->second, kn.prevChildBucket );
+            }
         }
         {
             KeyNode kn = keyNode( leftIndex );

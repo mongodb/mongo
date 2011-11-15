@@ -572,6 +572,7 @@ namespace mongo {
          *    _KeyNode data and without shifting any other _KeyNode objects.
          */
         void setKey( int i, const DiskLoc recordLoc, const Key& key, const DiskLoc prevChildBucket );
+        void setKey( int i, const DiskLoc recordLoc, const short dataOfs, const DiskLoc prevChildBucket );
     };
 
     template< class V>
