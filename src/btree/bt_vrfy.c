@@ -71,7 +71,7 @@ __wt_dumpfile(WT_SESSION_IMPL *session, const char *cfg[])
 #else
 	__wt_errx(session,
 	    "the WiredTiger library was not built in diagnostic mode");
-	return (EOPNOTSUPP);
+	return (ENOTSUP);
 #endif
 }
 
