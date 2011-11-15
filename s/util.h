@@ -121,8 +121,8 @@ namespace mongo {
      */
     class StaleConfigException : public AssertionException {
     public:
-        StaleConfigException( const string& ns , const string& raw , bool justConnection = false )
-            : AssertionException( (string)"ns: " + ns + " " + raw , 9996 ) ,
+        StaleConfigException( const string& ns , const string& raw , int code, bool justConnection = false )
+            : AssertionException( (string)"ns: " + ns + " " + raw , code ) ,
               _justConnection(justConnection) ,
               _ns(ns) {
         }
@@ -152,6 +152,21 @@ namespace mongo {
         string _ns;
     };
 
+    class SendStaleConfigException : public StaleConfigException {
+    public:
+        SendStaleConfigException( const string& ns , const string& raw , bool justConnection = false )
+            : StaleConfigException( ns, raw + "(send)", SendStaleConfigCode, justConnection ) {}
+    };
+
+    class RecvStaleConfigException : public StaleConfigException {
+    public:
+        RecvStaleConfigException( const string& ns , const string& raw , bool justConnection = false )
+            : StaleConfigException( ns, raw + "(recv)", RecvStaleConfigCode, justConnection ) {}
+    };
+
+    extern boost::function1<bool, DBClientBase* > isVersionableCB;
+    extern boost::function2<bool, DBClientBase&, BSONObj& > initShardVersionCB;
+    extern boost::function1<bool, const string& > forceRemoteCheckShardVersionCB;
     extern boost::function4<bool, DBClientBase&, const string&, bool, int> checkShardVersionCB;
     extern boost::function1<void, DBClientBase*> resetShardVersionCB;
 

@@ -68,7 +68,7 @@ namespace mongo {
         /** copy the entire database */
         bool go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk, bool useReplAuth, bool snapshot, bool mayYield, bool mayBeInterrupted, int *errCode = 0);
 
-        bool copyCollection( const string& from , const string& ns , const BSONObj& query , string& errmsg , bool mayYield, bool mayBeInterrupted, bool copyIndexes = true, bool logForRepl = true );
+        bool copyCollection( const string& ns , const BSONObj& query , string& errmsg , bool mayYield, bool mayBeInterrupted, bool copyIndexes = true, bool logForRepl = true );
     };
 
     /* for index info object:
@@ -244,18 +244,19 @@ namespace mongo {
         }
     }
 
-    bool copyCollectionFromRemote(const string& host, const string& ns, const BSONObj& query, string& errmsg, bool logForRepl, bool mayYield, bool mayBeInterrupted) {
+    bool copyCollectionFromRemote(const string& host, const string& ns, string& errmsg) {
         Cloner c;
-        return c.copyCollection(host, ns, query, errmsg, mayYield, mayBeInterrupted, /*copyIndexes*/ true, logForRepl);
+
+        DBClientConnection *conn = new DBClientConnection();
+        // cloner owns conn in auto_ptr
+        c.setConnection(conn);
+        uassert(15908, errmsg, conn->connect(host, errmsg) && replAuthenticate(conn));
+
+        return c.copyCollection(ns, BSONObj(), errmsg, true, false, /*copyIndexes*/ true, false);
     }
 
-    bool Cloner::copyCollection( const string& from , const string& ns , const BSONObj& query , string& errmsg , bool mayYield, bool mayBeInterrupted, bool copyIndexes, bool logForRepl ) {
-        auto_ptr<DBClientConnection> myconn;
-        myconn.reset( new DBClientConnection() );
-        if ( ! myconn->connect( from , errmsg ) )
-            return false;
-
-        conn.reset( myconn.release() );
+    bool Cloner::copyCollection( const string& ns, const BSONObj& query, string& errmsg,
+                                 bool mayYield, bool mayBeInterrupted, bool copyIndexes, bool logForRepl ) {
 
         writelock lk(ns); // TODO: make this lower down
         Client::Context ctx(ns);
@@ -527,7 +528,14 @@ namespace mongo {
                   << " query: " << query << " " << ( copyIndexes ? "" : ", not copying indexes" ) << endl;
 
             Cloner c;
-            return c.copyCollection( fromhost , collection , query, errmsg , true, false, copyIndexes );
+            auto_ptr<DBClientConnection> myconn;
+            myconn.reset( new DBClientConnection() );
+            if ( ! myconn->connect( fromhost , errmsg ) )
+                return false;
+
+            c.setConnection( myconn.release() );
+
+            return c.copyCollection( collection , query, errmsg , true, false, copyIndexes );
         }
     } cmdclonecollection;
 

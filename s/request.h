@@ -70,7 +70,7 @@ namespace mongo {
             return _clientInfo;
         }
 
-        void checkAuth() const;
+        void checkAuth( Auth::Level levelNeeded ) const;
 
         // ---- remote location info -----
 

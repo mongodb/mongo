@@ -98,18 +98,15 @@ DB.prototype.__pwHash = function( nonce, username, pass ) {
 }
 
 DB.prototype.auth = function( username , pass ){
-    var n = this.runCommand( { getnonce : 1 } );
-
-    var a = this.runCommand( 
-        { 
-            authenticate : 1 , 
-            user : username , 
-            nonce : n.nonce , 
-            key : this.__pwHash( n.nonce, username, pass )
-        }
-    );
-
-    return a.ok;
+    var result = 0;
+    try {
+        result = this.getMongo().auth(this.getName(), username, pass);
+    }
+    catch (e) {
+        print(e);
+        return 0;
+    }
+    return 1;
 }
 
 /**
@@ -635,14 +632,14 @@ DB.prototype.currentOp = function( arg ){
         else if ( arg )
             q["$all"] = true;
     }
-    return db.$cmd.sys.inprog.findOne( q );
+    return this.$cmd.sys.inprog.findOne( q );
 }
 DB.prototype.currentOP = DB.prototype.currentOp;
 
 DB.prototype.killOp = function(op) {
     if( !op ) 
         throw "no opNum to kill specified";
-    return db.$cmd.sys.killop.findOne({'op':op});
+    return this.$cmd.sys.killop.findOne({'op':op});
 }
 DB.prototype.killOP = DB.prototype.killOp;
 
@@ -847,11 +844,11 @@ DB.prototype.printShardingStatus = function( verbose ){
 }
 
 DB.prototype.fsyncLock = function() {
-    return db.adminCommand({fsync:1, lock:true});
+    return this.adminCommand({fsync:1, lock:true});
 }
 
 DB.prototype.fsyncUnlock = function() {
-    return db.getSiblingDB("admin").$cmd.sys.unlock.findOne()
+    return this.getSiblingDB("admin").$cmd.sys.unlock.findOne()
 }
 
 DB.autocomplete = function(obj){

@@ -102,7 +102,8 @@ namespace mongo {
     public:
         CmdBuildInfo() : Command( "buildInfo", true, "buildinfo" ) {}
         virtual bool slaveOk() const { return true; }
-        virtual bool adminOnly() const { return true; }
+        virtual bool adminOnly() const { return false; }
+        virtual bool requiresAuth() { return false; }
         virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream &help ) const {
             help << "get version #, etc.\n";

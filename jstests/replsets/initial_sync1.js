@@ -50,17 +50,14 @@ var ports = allocatePorts( 3 );
 var basePath = "/data/db/" + basename;
 var hostname = getHostName();
 
-var sargs = new MongodRunner( ports[ 2 ], basePath, false, false,
-                              ["--replSet", basename, "--oplogSize", 2],
-                              {no_bind : true} );
-var slave2 = sargs.start();
+var slave2 = startMongodTest (ports[2], basename, false, {replSet : basename, oplogSize : 2} )
+
 var local_s2 = slave2.getDB("local");
 var admin_s2 = slave2.getDB("admin");
 
 var config = replTest.getReplSetConfig();
 config.version = 2;
 config.members.push({_id:2, host:hostname+":"+ports[2]});
-
 try {
   admin.runCommand({replSetReconfig:config});
 }
@@ -116,10 +113,17 @@ wait(function() {
 print("10. Insert some stuff");
 master = replTest.getMaster();
 for (var i=0; i<10000; i++) {
-  foo.bar.insert({date : new Date(), x : i, str : "all the talk on the market"});
+    master.getDB("foo").bar.insert({date : new Date(), x : i, str : "all the talk on the market"});
 }
 
 
 print("11. Everyone happy eventually");
 replTest.awaitReplication(300000);
 
+
+print("12. Build index in background");
+master.getDB("foo").bar.ensureIndex({x : 1}, {background : true});
+
+assert.soon(function() {
+    return replTest.liveNodes.slaves[0].getDB("foo").runCommand({count: 1}).ok == 1;
+});

@@ -99,11 +99,12 @@ namespace mongo {
         }
 
         bool more() {
-            assert( cursor.get() );
+            uassert( 15910, "Doesn't have cursor for reading oplog", cursor.get() );
             return cursor->more();
         }
+
         bool moreInCurrentBatch() {
-            assert( cursor.get() );
+            uassert( 15911, "Doesn't have cursor for reading oplog", cursor.get() );
             return cursor->moreInCurrentBatch();
         }
 

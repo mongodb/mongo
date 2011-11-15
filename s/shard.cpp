@@ -243,7 +243,7 @@ namespace mongo {
 
     void Shard::_setAddr( const string& addr ) {
         _addr = addr;
-        if ( _addr.size() ) {
+        if ( !_addr.empty() ) {
             _cs = ConnectionString( addr , ConnectionString::SET );
             _rsInit();
         }
@@ -365,12 +365,26 @@ namespace mongo {
                     conn->auth("local", internalSecurity.user, internalSecurity.pwd, err, false));
         }
 
-        if ( _shardedConnections ) {
-            conn->simpleCommand( "admin" , 0 , "setShardVersion" );
+        if ( _shardedConnections && isVersionableCB( conn ) ) {
+
+            // We must initialize sharding on all connections, so that we get exceptions if sharding is enabled on
+            // the collection.
+            BSONObj result;
+            bool ok = initShardVersionCB( *conn, result );
+
+            // assert that we actually successfully setup sharding
+            uassert( 15907, str::stream() << "could not initialize sharding on connection " << (*conn).toString() <<
+                        ( result["errmsg"].type() == String ? causedBy( result["errmsg"].String() ) :
+                                                              causedBy( (string)"unknown failure : " + result.toString() ) ), ok );
+
         }
     }
 
-    void ShardingConnectionHook::onDestory( DBClientBase * conn ) {
-        resetShardVersionCB( conn );
+    void ShardingConnectionHook::onDestroy( DBClientBase * conn ) {
+
+        if( _shardedConnections && isVersionableCB( conn ) ){
+            resetShardVersionCB( conn );
+        }
+
     }
 }

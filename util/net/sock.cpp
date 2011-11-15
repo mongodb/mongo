@@ -19,6 +19,7 @@
 #include "sock.h"
 #include "../background.h"
 #include "../concurrency/value.h"
+#include "../mongoutils/str.h"
 
 #if !defined(_WIN32)
 # include <sys/socket.h>
@@ -40,7 +41,12 @@
 #include <openssl/ssl.h>
 #endif
 
+using namespace mongoutils;
+
 namespace mongo {
+
+    void dynHostResolve(string& name, int& port);
+    string dynHostMyName();
 
     static bool ipv6 = false;
     void enableIPv6(bool state) { ipv6 = state; }
@@ -133,17 +139,23 @@ namespace mongo {
         addressSize = sizeof(sockaddr_in);
     }
 
-    SockAddr::SockAddr(const char * iporhost , int port) {
-        if (!strcmp(iporhost, "localhost"))
-            iporhost = "127.0.0.1";
+    SockAddr::SockAddr(const char * _iporhost , int port) {
+        string target = _iporhost;
+        bool cloudName = *_iporhost == '#';
+        if( target == "localhost" ) {
+            target = "127.0.0.1";
+        }
+        else if( cloudName ) {
+            dynHostResolve(target, port);
+        }
 
-        if (strchr(iporhost, '/')) {
+        if( str::contains(target, '/') ) {
 #ifdef _WIN32
             uassert(13080, "no unix socket support on windows", false);
 #endif
-            uassert(13079, "path to unix socket too long", strlen(iporhost) < sizeof(as<sockaddr_un>().sun_path));
+            uassert(13079, "path to unix socket too long", target.size() < sizeof(as<sockaddr_un>().sun_path));
             as<sockaddr_un>().sun_family = AF_UNIX;
-            strcpy(as<sockaddr_un>().sun_path, iporhost);
+            strcpy(as<sockaddr_un>().sun_path, target.c_str());
             addressSize = sizeof(sockaddr_un);
         }
         else {
@@ -157,7 +169,7 @@ namespace mongo {
 
             StringBuilder ss;
             ss << port;
-            int ret = getaddrinfo(iporhost, ss.str().c_str(), &hints, &addrs);
+            int ret = getaddrinfo(target.c_str(), ss.str().c_str(), &hints, &addrs);
 
             // old C compilers on IPv6-capable hosts return EAI_NODATA error
 #ifdef EAI_NODATA
@@ -165,16 +177,16 @@ namespace mongo {
 #else
             int nodata = false;
 #endif
-            if (ret == EAI_NONAME || nodata) {
+            if ( (ret == EAI_NONAME || nodata) && !cloudName ) {
                 // iporhost isn't an IP address, allow DNS lookup
                 hints.ai_flags &= ~AI_NUMERICHOST;
-                ret = getaddrinfo(iporhost, ss.str().c_str(), &hints, &addrs);
+                ret = getaddrinfo(target.c_str(), ss.str().c_str(), &hints, &addrs);
             }
 
             if (ret) {
-                // don't log if this as it is a CRT construction and log() may not work yet.
-                if( strcmp("0.0.0.0", iporhost) ) {
-                    log() << "getaddrinfo(\"" << iporhost << "\") failed: " << gai_strerror(ret) << endl;
+                // we were unsuccessful
+                if( target != "0.0.0.0" ) { // don't log if this as it is a CRT construction and log() may not work yet.
+                    log() << "getaddrinfo(\"" << target << "\") failed: " << gai_strerror(ret) << endl;
                 }
                 *this = SockAddr(port);
             }
@@ -227,7 +239,7 @@ namespace mongo {
             const int buflen=128;
             char buffer[buflen];
             int ret = getnameinfo(raw(), addressSize, buffer, buflen, NULL, 0, NI_NUMERICHOST);
-            massert(13082, getAddrInfoStrError(ret), ret == 0);
+            massert(13082, str::stream() << "getnameinfo error " << getAddrInfoStrError(ret), ret == 0);
             return buffer;
         }
             
@@ -281,13 +293,13 @@ namespace mongo {
 
     SockAddr unknownAddress( "0.0.0.0", 0 );
 
-    mapsf<string,string> dynHostNames;
-
-    // ------ hostname -------------------
-
+    // If an ip address is passed in, just return that.  If a hostname is passed
+    // in, look up its ip and return that.  Returns "" on failure.
     string hostbyname(const char *hostname) {
         if( *hostname == '#' ) {
-            string s = dynHostNames.get(hostname);
+            string s = hostname;
+            int port;
+            dynHostResolve(s, port);
             return s;
         }
 
@@ -300,7 +312,15 @@ namespace mongo {
    
     //  --- my --
 
+    DiagStr _hostNameCached;
+
     string getHostName() {
+        {
+            string s = dynHostMyName();
+            if( !s.empty() ) 
+                return s;
+        }
+
         char buf[256];
         int ec = gethostname(buf, 127);
         if ( ec || *buf == 0 ) {
@@ -310,7 +330,6 @@ namespace mongo {
         return buf;
     }
 
-    DiagStr _hostNameCached;
     static void _hostNameCachedInit() {
         _hostNameCached = getHostName();
     }

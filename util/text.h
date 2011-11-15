@@ -45,7 +45,7 @@ namespace mongo {
 
         /** @return true if more to be taken via next() */
         bool more() {
-            return _big[0];
+            return _big[0] != 0;
         }
 
         /** get next split string fragment */

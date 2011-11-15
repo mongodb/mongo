@@ -240,7 +240,10 @@ namespace mongo {
 
     inline Client::GodScope::~GodScope() { cc()._god = _prev; }
 
-    /* this unlocks, does NOT upgrade. that works for our current usage */
+    /* this unreadlocks and then writelocks; i.e. it does NOT upgrade inside the
+       lock (and is thus wrong to use if you need that, which is usually).
+       that said we use it today for a specific case where the usage is correct.
+    */
     inline void mongolock::releaseAndWriteLock() {
         if( !_writelock ) {
 
@@ -256,6 +259,8 @@ namespace mongo {
             dbMutex.unlock_shared();
             dbMutex.lock();
 
+            // todo: unlocked() method says to call it before unlocking, not after.  so fix this here,
+            // or fix the doc there.
             if ( cc().getContext() )
                 cc().getContext()->unlocked();
         }

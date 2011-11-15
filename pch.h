@@ -113,8 +113,8 @@ namespace mongo {
 #endif
 
     // pdfile versions
-    const int VERSION = 4;
-    const int VERSION_MINOR = 5;
+    const int PDFILE_VERSION = 4;
+    const int PDFILE_VERSION_MINOR = 5;
 
     enum ExitCode {
         EXIT_CLEAN = 0 ,

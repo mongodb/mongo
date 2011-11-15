@@ -121,6 +121,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">_CRT_SECURE_NO_WARNINGS;XP_WIN;HAVE_CONFIG_H;OLDJS;MONGO_EXPOSE_MACROS;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">_CRT_SECURE_NO_WARNINGS;USE_READLINE;XP_WIN;HAVE_CONFIG_H;OLDJS;MONGO_EXPOSE_MACROS;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="..\..\util\background.cpp" />
     <ClCompile Include="..\..\util\concurrency\spin_lock.cpp" />
@@ -242,6 +243,7 @@
     <None Include="..\query.js" />
     <None Include="..\servers.js" />
     <None Include="..\utils.js" />
+    <None Include="..\utils_sh.js" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\..\js\js32d.lib">

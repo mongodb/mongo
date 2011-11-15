@@ -133,76 +133,80 @@ namespace mongo {
 
     class JSThreadConfig {
     public:
-        JSThreadConfig( const Arguments &args, bool newScope = false ) : started_(), done_(), newScope_( newScope ) {
+        JSThreadConfig( V8Scope* scope, const Arguments &args, bool newScope = false ) : started_(), done_(), newScope_( newScope ) {
             jsassert( args.Length() > 0, "need at least one argument" );
             jsassert( args[ 0 ]->IsFunction(), "first argument must be a function" );
-            Local< v8::Function > f = v8::Function::Cast( *args[ 0 ] );
-            f_ = Persistent< v8::Function >::New( f );
-            for( int i = 1; i < args.Length(); ++i )
-                args_.push_back( Persistent< Value >::New( args[ i ] ) );
+
+            // arguments need to be copied into the isolate, go through bson
+            BSONObjBuilder b;
+            for( int i = 0; i < args.Length(); ++i ) {
+                scope->v8ToMongoElement(b, "arg" + i, args[i]);
+            }
+            args_ = b.obj();
         }
+
         ~JSThreadConfig() {
-            f_.Dispose();
-            for( vector< Persistent< Value > >::iterator i = args_.begin(); i != args_.end(); ++i )
-                i->Dispose();
-            returnData_.Dispose();
         }
+
         void start() {
             jsassert( !started_, "Thread already started" );
+            // obtain own scope for execution
+            // do it here, not in constructor, otherwise it creates an infinite recursion from ScopedThread
+            _scope.reset( dynamic_cast< V8Scope * >( globalScriptEngine->newScope() ) );
+
             JSThread jt( *this );
             thread_.reset( new boost::thread( jt ) );
             started_ = true;
         }
         void join() {
             jsassert( started_ && !done_, "Thread not running" );
-            V8Unlock u;
             thread_->join();
             done_ = true;
         }
-        Local< Value > returnData() {
+
+        BSONObj returnData() {
             if ( !done_ )
                 join();
-            return Local< Value >::New( returnData_ );
+            return returnData_;
         }
+
     private:
         class JSThread {
         public:
             JSThread( JSThreadConfig &config ) : config_( config ) {}
+
             void operator()() {
-                V8Lock l;
+                V8Scope* scope = config_._scope.get();
+                v8::Isolate::Scope iscope(scope->getIsolate());
+                v8::Locker l(scope->getIsolate());
                 HandleScope handle_scope;
-                Handle< Context > context;
-                Handle< v8::Function > fun;
-                auto_ptr< V8Scope > scope;
-                if ( config_.newScope_ ) {
-                    scope.reset( dynamic_cast< V8Scope * >( globalScriptEngine->newScope() ) );
-                    context = scope->context();
-                    // A v8::Function tracks the context in which it was created, so we have to
-                    // create a new function in the new context.
-                    Context::Scope baseScope( baseContext_ );
-                    string fCode = toSTLString( config_.f_->ToString() );
-                    Context::Scope context_scope( context );
-                    fun = scope->__createFunction( fCode.c_str() );
+                Context::Scope context_scope( scope->getContext() );
+
+                BSONObj args = config_.args_;
+                Local< v8::Function > f = v8::Function::Cast( *(scope->mongoToV8Element(args.firstElement(), true)) );
+                int argc = args.nFields() - 1;
+
+                boost::scoped_array< Local< Value > > argv( new Local< Value >[ argc ] );
+                BSONObjIterator it(args);
+                it.next();
+                for( int i = 0; i < argc; ++i ) {
+                    argv[ i ] = Local< Value >::New( scope->mongoToV8Element(*it, true) );
+                    it.next();
                 }
-                else {
-                    context = baseContext_;
-                    Context::Scope context_scope( context );
-                    fun = config_.f_;
-                }
-                Context::Scope context_scope( context );
-                boost::scoped_array< Local< Value > > argv( new Local< Value >[ config_.args_.size() ] );
-                for( unsigned int i = 0; i < config_.args_.size(); ++i )
-                    argv[ i ] = Local< Value >::New( config_.args_[ i ] );
                 TryCatch try_catch;
-                Handle< Value > ret = fun->Call( context->Global(), config_.args_.size(), argv.get() );
+                Handle< Value > ret = f->Call( scope->getContext()->Global(), argc, argv.get() );
                 if ( ret.IsEmpty() ) {
                     string e = toSTLString( &try_catch );
                     log() << "js thread raised exception: " << e << endl;
                     // v8 probably does something sane if ret is empty, but not going to assume that for now
                     ret = v8::Undefined();
                 }
-                config_.returnData_ = Persistent< Value >::New( ret );
+                // ret is translated to BSON to switch isolate
+                BSONObjBuilder b;
+                scope->v8ToMongoElement(b, "ret", ret);
+                config_.returnData_ = b.obj();
             }
+
         private:
             JSThreadConfig &config_;
         };
@@ -210,10 +214,10 @@ namespace mongo {
         bool started_;
         bool done_;
         bool newScope_;
-        Persistent< v8::Function > f_;
-        vector< Persistent< Value > > args_;
-        auto_ptr< boost::thread > thread_;
-        Persistent< Value > returnData_;
+        BSONObj args_;
+        scoped_ptr< boost::thread > thread_;
+        scoped_ptr< V8Scope > _scope;
+        BSONObj returnData_;
     };
 
     Handle< Value > ThreadInit( V8Scope* scope, const Arguments &args ) {
@@ -221,7 +225,7 @@ namespace mongo {
         // NOTE I believe the passed JSThreadConfig will never be freed.  If this
         // policy is changed, JSThread may no longer be able to store JSThreadConfig
         // by reference.
-        it->SetHiddenValue( v8::String::New( "_JSThreadConfig" ), External::New( new JSThreadConfig( args ) ) );
+        it->SetHiddenValue( v8::String::New( "_JSThreadConfig" ), External::New( new JSThreadConfig( scope, args ) ) );
         return v8::Undefined();
     }
 
@@ -230,7 +234,7 @@ namespace mongo {
         // NOTE I believe the passed JSThreadConfig will never be freed.  If this
         // policy is changed, JSThread may no longer be able to store JSThreadConfig
         // by reference.
-        it->SetHiddenValue( v8::String::New( "_JSThreadConfig" ), External::New( new JSThreadConfig( args, true ) ) );
+        it->SetHiddenValue( v8::String::New( "_JSThreadConfig" ), External::New( new JSThreadConfig( scope, args, true ) ) );
         return v8::Undefined();
     }
 
@@ -251,8 +255,8 @@ namespace mongo {
     }
 
     Handle< Value > ThreadReturnData( V8Scope* scope, const Arguments &args ) {
-        HandleScope handle_scope;
-        return handle_scope.Close( thisConfig( scope, args )->returnData() );
+        BSONObj data = thisConfig( scope, args )->returnData();
+        return scope->mongoToV8Element(data.firstElement(), true);
     }
 
     Handle< Value > ThreadInject( V8Scope* scope, const Arguments &args ) {
@@ -261,11 +265,11 @@ namespace mongo {
 
         Local<v8::Object> o = args[0]->ToObject();
 
+        // install method on the Thread object
         scope->injectV8Function("init", ThreadInit, o);
         scope->injectV8Function("start", ThreadStart, o);
         scope->injectV8Function("join", ThreadJoin, o);
         scope->injectV8Function("returnData", ThreadReturnData, o);
-
         return v8::Undefined();
     }
 

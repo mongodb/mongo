@@ -237,8 +237,8 @@ namespace mongo {
         static DBDirectClient db;
 
         if ( h->version == 4 && h->versionMinor == 4 ) {
-            assert( VERSION == 4 );
-            assert( VERSION_MINOR == 5 );
+            assert( PDFILE_VERSION == 4 );
+            assert( PDFILE_VERSION_MINOR == 5 );
 
             list<string> colls = db.getCollectionNames( dbName );
             for ( list<string>::iterator i=colls.begin(); i!=colls.end(); i++) {
@@ -290,7 +290,7 @@ namespace mongo {
                 log() << "****" << endl;
                 log() << "****" << endl;
                 log() << "need to upgrade database " << dbName << " with pdfile version " << h->version << "." << h->versionMinor << ", "
-                      << "new version: " << VERSION << "." << VERSION_MINOR << endl;
+                      << "new version: " << PDFILE_VERSION << "." << PDFILE_VERSION_MINOR << endl;
                 if ( shouldRepairDatabases ) {
                     // QUESTION: Repair even if file format is higher version than code?
                     log() << "\t starting upgrade" << endl;
@@ -333,6 +333,21 @@ namespace mongo {
         }
     }
 
+    void checkIfReplMissingFromCommandLine() {
+        if( !cmdLine.usingReplSets() ) { 
+            Client::GodScope gs;
+            DBDirectClient c;
+            unsigned long long x = 
+                c.count("local.system.replset");
+            if( x ) { 
+                log() << endl;
+                log() << "** warning: mongod started without --replSet yet " << x << " documents are present in local.system.replset" << endl;
+                log() << "**          restart with --replSet unless you are doing maintenance and no other clients are connected" << endl;
+                log() << endl;
+            }
+        }
+    }
+
     void clearTmpCollections() {
         Client::GodScope gs;
         vector< string > toDelete;
@@ -347,8 +362,6 @@ namespace mongo {
             cli.dropCollection( *i );
         }
     }
-
-    void flushDiagLog();
 
     /**
      * does background async flushes of mmapped files
@@ -365,7 +378,7 @@ namespace mongo {
                 log(1) << "--syncdelay " << cmdLine.syncdelay << endl;
             int time_flushing = 0;
             while ( ! inShutdown() ) {
-                flushDiagLog();
+                _diaglog.flush();
                 if ( cmdLine.syncdelay == 0 ) {
                     // in case at some point we add an option to change at runtime
                     sleepsecs(5);
@@ -385,7 +398,9 @@ namespace mongo {
 
                 globalFlushCounters.flushed(time_flushing);
 
-                log(1) << "flushing mmap took " << time_flushing << "ms " << " for " << numFiles << " files" << endl;
+                if( logLevel >= 1 || time_flushing >= 10000 ) { 
+                    log() << "flushing mmaps took " << time_flushing << "ms " << " for " << numFiles << " files" << endl;
+                }
             }
         }
 
@@ -429,7 +444,12 @@ namespace mongo {
 
         {
             stringstream ss;
-            ss << "dbpath (" << dbpath << ") does not exist";
+            ss << endl;
+            ss << "*********************************************************************" << endl;
+            ss << " ERROR: dbpath (" << dbpath << ") does not exist." << endl;
+            ss << " Create this directory or give existing directory in --dbpath." << endl;
+            ss << " See http://www.mongodb.org/display/DOCS/Starting+and+Stopping+Mongo" << endl;
+            ss << "*********************************************************************" << endl;
             uassert( 10296 ,  ss.str().c_str(), boost::filesystem::exists( dbpath ) );
         }
         {
@@ -445,8 +465,6 @@ namespace mongo {
 
         MONGO_BOOST_CHECK_EXCEPTION_WITH_MSG( clearTmpFiles(), "clear tmp files" );
 
-        _diaglog.init();
-
         dur::startup();
 
         if( cmdLine.durOptions & CmdLine::DurRecoverOnly )
@@ -454,6 +472,8 @@ namespace mongo {
 
         // comes after getDur().startup() because this reads from the database
         clearTmpCollections();
+
+        checkIfReplMissingFromCommandLine();
 
         Module::initAll();
 
@@ -479,7 +499,10 @@ namespace mongo {
         snapshotThread.go();
         clientCursorMonitor.go();
         PeriodicTask::theRunner->go();
-
+        
+#ifndef _WIN32
+        CmdLine::launchOk();
+#endif
         listen(listenPort);
 
         // listen() will return when exit code closes its socket.
@@ -597,7 +620,6 @@ int main(int argc, char* argv[]) {
 #endif
 
     replication_options.add_options()
-    ("fastsync", "indicate that this instance is starting from a dbpath snapshot of the repl peer")
     ("oplogSize", po::value<int>(), "size limit (in MB) for op log")
     ;
 
@@ -621,7 +643,8 @@ int main(int argc, char* argv[]) {
     ;
 
     hidden_options.add_options()
-    ("pretouch", po::value<int>(), "n pretouch threads for applying replicationed operations")
+    ("fastsync", "indicate that this instance is starting from a dbpath snapshot of the repl peer")
+    ("pretouch", po::value<int>(), "n pretouch threads for applying replicationed operations") // experimental
     ("command", po::value< vector<string> >(), "command")
     ("cacheSize", po::value<long>(), "cache size (in MB) for rec store")
     ("nodur", "disable journaling (currently the default)")
@@ -629,8 +652,8 @@ int main(int argc, char* argv[]) {
     ("nocursors", "diagnostic/debugging option that turns off cursors DO NOT USE IN PRODUCTION")
     ("nohints", "ignore query hints")
     ("nopreallocj", "don't preallocate journal files")
-    ("dur", "enable journaling") // deprecated version
-    ("durOptions", po::value<int>(), "durability diagnostic options") // deprecated version
+    ("dur", "enable journaling") // old name for --journal
+    ("durOptions", po::value<int>(), "durability diagnostic options") // deprecated name
     // deprecated pairing command line options
     ("pairwith", "DEPRECATED")
     ("arbiter", "DEPRECATED")
@@ -805,7 +828,7 @@ int main(int argc, char* argv[]) {
                 out() << "can't interpret --diaglog setting" << endl;
                 dbexit( EXIT_BADOPTIONS );
             }
-            _diaglog.level = x;
+            _diaglog.setLevel(x);
         }
         if (params.count("sysinfo")) {
             sysRuntimeInfo();
@@ -936,7 +959,7 @@ int main(int argc, char* argv[]) {
         }
         if (params.count("pairwith") || params.count("arbiter") || params.count("opIdMem")) {
             out() << "****" << endl;
-            out() << "Replica Pairs have been deprecated." << endl;
+            out() << "Replica Pairs have been deprecated. Invalid options: --pairwith, --arbiter, and/or --opIdMem" << endl;
             out() << "<http://www.mongodb.org/display/DOCS/Replica+Pairs>" << endl;
             out() << "****" << endl;
             dbexit( EXIT_BADOPTIONS );

@@ -388,23 +388,17 @@ namespace mongo {
             for( set<string>::iterator i = h.collectionsToResync.begin(); i != h.collectionsToResync.end(); i++ ) {
                 string ns = *i;
                 sethbmsg(str::stream() << "rollback 4.1 coll resync " << ns);
-                Client::Context c(*i);
-                try {
+
+                Client::Context c(ns);
+                {
                     bob res;
                     string errmsg;
                     dropCollection(ns, errmsg, res);
                     {
                         dbtemprelease r;
-                        bool ok = copyCollectionFromRemote(them->getServerAddress(), ns, bo(), errmsg, false, true, false);
-                        if( !ok ) {
-                            log() << "replSet rollback error resyncing collection " << ns << ' ' << errmsg << rsLog;
-                            throw "rollback error resyncing rollection [1]";
-                        }
+                        bool ok = copyCollectionFromRemote(them->getServerAddress(), ns, errmsg);
+                        uassert(15909, str::stream() << "replSet rollback error resyncing collection " << ns << ' ' << errmsg, ok);
                     }
-                }
-                catch(...) {
-                    log() << "replset rollback error resyncing collection " << ns << rsLog;
-                    throw "rollback error resyncing rollection [2]";
                 }
             }
 
@@ -423,7 +417,7 @@ namespace mongo {
                         setMinValid(newMinValid);
                     }
                 }
-                catch(...) {
+                catch (DBException&) {
                     err = "can't get/set minvalid";
                 }
                 if( h.rbid != getRBID(r.conn()) ) {

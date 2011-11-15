@@ -66,8 +66,6 @@ namespace mongo {
         return false;
     }
 
-    void flushDiagLog();
-
     /* reset any errors so that getlasterror comes back clean.
 
        useful before performing a long series of operations where we want to
@@ -665,9 +663,9 @@ namespace mongo {
         virtual LockType locktype() const { return WRITE; }
         bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             int was = _diaglog.setLevel( cmdObj.firstElement().numberInt() );
-            flushDiagLog();
+            _diaglog.flush();
             if ( !cmdLine.quiet )
-                tlog() << "CMD: diagLogging set to " << _diaglog.level << " from: " << was << endl;
+                tlog() << "CMD: diagLogging set to " << _diaglog.getLevel() << " from: " << was << endl;
             result.append( "was" , was );
             return true;
         }
@@ -1360,7 +1358,7 @@ namespace mongo {
 
             return true;
         }
-    } cmdCollectionStatis;
+    } cmdCollectionStats;
 
     class DBStats : public Command {
     public:
@@ -1573,29 +1571,36 @@ namespace mongo {
     class GodInsert : public Command {
     public:
         GodInsert() : Command( "godinsert" ) { }
-        virtual bool logTheOp() {
-            return true;
-        }
-        virtual bool slaveOk() const {
-            return true;
-        }
-        virtual LockType locktype() const { return WRITE; }
-        virtual bool requiresAuth() {
-            return true;
-        }
+        virtual bool adminOnly() const { return false; }
+        virtual bool logTheOp() { return false; }
+        virtual bool slaveOk() const { return true; }
+        virtual LockType locktype() const { return NONE; }
+        virtual bool requiresAuth() { return true; }
         virtual void help( stringstream &help ) const {
             help << "internal. for testing only.";
         }
         virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+
+            AuthenticationInfo *ai = cc().getAuthenticationInfo();
+            if ( ! ai->isLocalHost ) {
+                errmsg = "godinsert only works locally";
+                return false;
+            }
+
             string coll = cmdObj[ "godinsert" ].valuestrsafe();
+            log() << "test only command godinsert invoked coll:" << coll << endl;
             uassert( 13049, "godinsert must specify a collection", !coll.empty() );
             string ns = dbname + "." + coll;
             BSONObj obj = cmdObj[ "obj" ].embeddedObjectUserCheck();
-            theDataFileMgr.insertWithObjMod( ns.c_str(), obj, true );
+            {
+                dblock lk;
+                Client::Context ctx( ns );
+                theDataFileMgr.insertWithObjMod( ns.c_str(), obj, true );
+            }
             return true;
         }
     } cmdGodInsert;
-
+    
     class DBHashCmd : public Command {
     public:
         DBHashCmd() : Command( "dbHash", false, "dbhash" ) {}
@@ -1695,6 +1700,7 @@ namespace mongo {
         }
         CmdSleep() : Command("sleep") { }
         bool run(const string& ns, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            log() << "test only command sleep invoked" << endl;
             int secs = 100;
             if ( cmdObj["secs"].isNumber() )
                 secs = cmdObj["secs"].numberInt();
@@ -1764,7 +1770,14 @@ namespace mongo {
                 return false;
             }
         }
+        catch ( SendStaleConfigException& e ){
+            log(1) << "command failed because of stale config, can retry" << causedBy( e ) << endl;
+            throw;
+        }
         catch ( DBException& e ) {
+
+            // TODO: Rethrown errors have issues here, should divorce SendStaleConfigException from the DBException tree
+
             stringstream ss;
             ss << "exception: " << e.what();
             result.append( "errmsg" , ss.str() );
@@ -1824,6 +1837,7 @@ namespace mongo {
 
         if ( ! canRunHere ) {
             result.append( "errmsg" , "not master" );
+            result.append( "note" , "from execCommand" );
             return false;
         }
 
@@ -1837,18 +1851,20 @@ namespace mongo {
         bool retval = false;
         if ( c->locktype() == Command::NONE ) {
             // we also trust that this won't crash
+            retval = true;
 
             if ( c->requiresAuth() ) {
                 // test that the user at least as read permissions
                 if ( ! client.getAuthenticationInfo()->isAuthorizedReads( dbname ) ) {
                     result.append( "errmsg" , "need to login" );
-                    return false;
+                    retval = false;
                 }
             }
 
-            client.curop()->ensureStarted();
-
-            retval = _execCommand(c, dbname , cmdObj , queryOptions, result , fromRepl );
+            if (retval) {
+                client.curop()->ensureStarted();
+                retval = _execCommand(c, dbname , cmdObj , queryOptions, result , fromRepl );
+            }
         }
         else {
             bool needWriteLock = c->locktype() == Command::WRITE;

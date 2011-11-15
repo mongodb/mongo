@@ -59,12 +59,12 @@ namespace mongo {
 
         // debugging/profile info
         int nscanned;
-        bool idhack;
-        bool scanAndOrder;
-        bool moved;
+        bool idhack;         // indicates short circuited code path on an update to make the update faster
+        bool scanAndOrder;   // scanandorder query plan aspect was used
+        bool moved;          // update resulted in a move (moves are expensive)
         bool fastmod;
-        bool fastmodinsert;
-        bool upsert;
+        bool fastmodinsert;  // upsert of an $operation. builds a default object
+        bool upsert;         // true if the update actually did an insert
         unsigned keyUpdates;
 
         // error handling

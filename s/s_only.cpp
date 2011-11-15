@@ -42,7 +42,12 @@ namespace mongo {
     Client::~Client() {}
     bool Client::shutdown() { return true; }
 
+    static unsigned long long nThreads = 0;
+    void assertStartingUp() { 
+        dassert( nThreads <= 1 );
+    }
     Client& Client::initThread(const char *desc, AbstractMessagingPort *mp) {
+        DEV nThreads++; // never decremented.  this is for casi class asserts
         setThreadName(desc);
         assert( currentClient.get() == 0 );
         Client *c = new Client(desc, mp);

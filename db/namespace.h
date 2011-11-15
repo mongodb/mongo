@@ -69,7 +69,7 @@ namespace mongo {
     };
 
 #pragma pack(1)
-    /* This helper class is used to make the HashMap below in NamespaceDetails e.g. see line:
+    /* This helper class is used to make the HashMap below in NamespaceIndex e.g. see line:
           HashTable<Namespace,NamespaceDetails> *ht;
     */
     class Namespace {

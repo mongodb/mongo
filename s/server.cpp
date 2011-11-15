@@ -179,11 +179,19 @@ namespace mongo {
         return 0;
     }
 
-    void printShardingVersionInfo() {
-        log() << mongosCommand << " " << mongodVersion() << " starting (--help for usage)" << endl;
-        printGitVersion();
-        printSysInfo();
+    void printShardingVersionInfo(bool out) {
+        if (out) {
+          cout << mongosCommand << " " << mongodVersion() << " starting (--help for usage)" << endl;
+          cout << "git version: " << gitVersion() << endl;
+          cout <<  "build sys info: " << sysInfo() << endl;
+        } else {
+          log() << mongosCommand << " " << mongodVersion() << " starting (--help for usage)" << endl;
+          printGitVersion();
+          printSysInfo();
+        }
     }
+
+    void cloudCmdLineParamIs(string cmd);
 
 } // namespace mongo
 
@@ -230,7 +238,7 @@ int _main(int argc, char* argv[]) {
     }
 
     if ( params.count( "version" ) ) {
-        printShardingVersionInfo();
+        printShardingVersionInfo(true);
         return 0;
     }
 
@@ -268,6 +276,11 @@ int _main(int argc, char* argv[]) {
     if ( ! params.count( "configdb" ) ) {
         out() << "error: no args for --configdb" << endl;
         return 4;
+    }
+
+    if( params.count("cloud") ) {
+        string s = params["cloud"].as<string>();
+        cloudCmdLineParamIs(s);
     }
 
     vector<string> configdbs;
@@ -324,7 +337,7 @@ int _main(int argc, char* argv[]) {
         return 1;
     }
 
-    printShardingVersionInfo();
+    printShardingVersionInfo(false);
 
     if ( ! configServer.init( configdbs ) ) {
         cout << "couldn't resolve config db address" << endl;
@@ -332,7 +345,7 @@ int _main(int argc, char* argv[]) {
     }
 
     if ( ! configServer.ok( true ) ) {
-        cout << "configServer startup check failed" << endl;
+        cout << "configServer connection startup check failed" << endl;
         return 8;
     }
 
@@ -357,8 +370,12 @@ int _main(int argc, char* argv[]) {
         return configError;
     }
     configServer.reloadSettings();
-
+    
     init();
+
+#ifndef _WIN32
+    CmdLine::launchOk();
+#endif
 
     boost::thread web( boost::bind(&webServerThread, new NoAdminAccess() /* takes ownership */) );
 

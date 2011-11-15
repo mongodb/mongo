@@ -35,8 +35,11 @@ namespace mongo {
      *     2 : write
      */
     struct Auth {
-        Auth() { level = 0; }
-        int level;
+        
+        enum Level { NONE = 0 , READ = 1 , WRITE = 2 };
+
+        Auth() { level = NONE; }
+        Level level;
         string user;
     };
 
@@ -55,27 +58,34 @@ namespace mongo {
         }
         void authorize(const string& dbname , const string& user ) {
             scoped_spinlock lk(_lock);
-            _dbs[dbname].level = 2;
+            _dbs[dbname].level = Auth::WRITE;
             _dbs[dbname].user = user;
         }
         void authorizeReadOnly(const string& dbname , const string& user ) {
             scoped_spinlock lk(_lock);
-            _dbs[dbname].level = 1;
+            _dbs[dbname].level = Auth::READ;
             _dbs[dbname].user = user;
         }
         
         // -- accessors ---
 
         bool isAuthorized(const string& dbname) const { 
-            return _isAuthorized( dbname, 2 ); 
+            return _isAuthorized( dbname, Auth::WRITE ); 
         }
         
         bool isAuthorizedReads(const string& dbname) const { 
-            return _isAuthorized( dbname, 1 ); 
+            return _isAuthorized( dbname, Auth::READ ); 
         }
         
+        /**
+         * @param lockType - this is from dbmutex 1 is write, 0 is read
+         */
         bool isAuthorizedForLock(const string& dbname, int lockType ) const { 
-            return _isAuthorized( dbname , lockType > 0 ? 2 : 1 ); 
+            return _isAuthorized( dbname , lockType > 0 ? Auth::WRITE : Auth::READ ); 
+        }
+
+        bool isAuthorizedForLevel( const string& dbname , Auth::Level level ) const {
+            return _isAuthorized( dbname , level );
         }
 
         string getUser( const string& dbname ) const;
@@ -84,9 +94,9 @@ namespace mongo {
 
     protected:
         /** takes a lock */
-        bool _isAuthorized(const string& dbname, int level) const;
+        bool _isAuthorized(const string& dbname, Auth::Level level) const;
 
-        bool _isAuthorizedSingle_inlock(const string& dbname, int level) const;
+        bool _isAuthorizedSingle_inlock(const string& dbname, Auth::Level level) const;
         
         /** cannot call this locked */
         bool _isAuthorizedSpecialChecks( const string& dbname ) const ;

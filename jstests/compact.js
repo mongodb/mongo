@@ -24,8 +24,18 @@ assert(v.ok);
 assert(v.extentCount == 1);
 assert(v.deletedCount == 1);
 assert(t.getIndexes().length == 2);
+var ssize = t.stats().storageSize;
 
 print("2");
+res = db.runCommand({ compact: 'compacttest', dev: true,paddingBytes:100 });
+assert(res.ok);
+assert(t.count() == 9);
+var v = t.validate(true);
+assert(v.ok);
+assert(t.stats().storageSize > ssize, "expected more storage given padding is higher. however it rounds off so if something changed this could be");
+//printjson(t.stats());
+
+print("3");
 
 // works on an empty collection?
 t.remove({});

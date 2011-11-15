@@ -250,16 +250,15 @@ namespace mongo {
             else {
                 c->advance();
             }
-            if ( c->eof() ) {
-                // advanced to end
-                // leave ClientCursor in place so next getMore doesn't fail
-                // still need to mark new location though
-                cc->updateLocation();
+            while (!c->eof() && c->refLoc() == dl) {
+                /* We don't delete at EOF because we want to return "no more results" rather than "no such cursor".
+                 * The loop is to handle MultiKey indexes where the deleted record is pointed to by multiple adjacent keys.
+                 * In that case we need to advance until we get to the next distinct record or EOF.
+                 * SERVER-4154
+                 */
+                c->advance();
             }
-            else {
-                wassert( c->refLoc() != dl );
-                cc->updateLocation();
-            }
+            cc->updateLocation();
         }
     }
     void aboutToDelete(const DiskLoc& dl) { ClientCursor::aboutToDelete(dl); }

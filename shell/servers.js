@@ -114,7 +114,9 @@ MongoRunner.logicalOptions = { runId : true,
                                useHostname : true,
                                noReplSet : true,
                                forgetPort : true,
-                               arbiter : true }
+                               arbiter : true,
+                               noJournalPrealloc : true,
+                               noJournal : true }
 
 MongoRunner.toRealPath = function( path, pathOpts ){
     
@@ -239,6 +241,13 @@ MongoRunner.mongoOptions = function( opts ){
         opts.runId = opts.remember
         opts.remember = true
     }
+    else if( opts.remember == undefined ){
+        // Remember by default if we're restarting
+        opts.remember = opts.restart
+    }
+    
+    // If we passed in restart : <conn> or runId : <conn>
+    if( isObject( opts.runId ) && opts.runId.runId ) opts.runId = opts.runId.runId
     
     if( opts.restart && opts.remember ) opts = Object.merge( MongoRunner.savedOptions[ opts.runId ], opts )
 
@@ -255,6 +264,8 @@ MongoRunner.mongoOptions = function( opts ){
     }
     
     opts.port = opts.port || MongoRunner.nextOpenPort()
+    MongoRunner.usedPortMap[ "" + parseInt( opts.port ) ] = true
+    
     opts.pathOpts = Object.merge( opts.pathOpts || {}, { port : "" + opts.port, runId : "" + opts.runId } )
     
     return opts
@@ -276,12 +287,16 @@ MongoRunner.mongodOptions = function( opts ){
         opts.logFile = MongoRunner.toRealFile( opts.logFile, opts.pathOpts )
     }
     
-    if( jsTestOptions().noJournalPrealloc )
+    if( jsTestOptions().noJournalPrealloc || opts.noJournalPrealloc )
         opts.nopreallocj = ""
             
-    if( jsTestOptions().noJournal )
+    if( jsTestOptions().noJournal || opts.noJournal )
         opts.nojournal = ""
-            
+
+    if( jsTestOptions().keyFile && !opts.keyFile) {
+        opts.keyFile = jsTestOptions().keyFile
+    }
+
     if( opts.noReplSet ) opts.replSet = null
     if( opts.arbiter ) opts.oplogSize = 1
             
@@ -302,7 +317,11 @@ MongoRunner.mongosOptions = function( opts ){
     else if( opts.logFile ){
         opts.logFile = MongoRunner.toRealFile( opts.logFile, opts.pathOpts )
     }
-    
+
+    if( jsTestOptions().keyFile && !opts.keyFile) {
+        opts.keyFile = jsTestOptions().keyFile
+    }
+
     return opts
 }
 
@@ -358,11 +377,16 @@ MongoRunner.runMongos = function( opts ){
     mongos.port = parseInt( mongos.commandLine.port ) 
     mongos.runId = runId || ObjectId()
     mongos.savedOptions = MongoRunner.savedOptions[ mongos.runId ]
-    
+        
     return mongos
 }
 
 MongoRunner.stopMongod = function( port, signal ){
+    
+    if( ! port ) {
+        print( "Cannot stop mongo process " + port )
+        return
+    }
     
     signal = signal || 15
     
@@ -373,11 +397,33 @@ MongoRunner.stopMongod = function( port, signal ){
         var opts = MongoRunner.savedOptions( port )
         if( opts ) port = parseInt( opts.port )
     }
-        
-    return stopMongod( parseInt( port ), parseInt( signal ) )
+    
+    var exitCode = stopMongod( parseInt( port ), parseInt( signal ) )
+    
+    delete MongoRunner.usedPortMap[ "" + parseInt( port ) ]
+
+    return exitCode
 }
 
 MongoRunner.stopMongos = MongoRunner.stopMongod
+
+MongoRunner.isStopped = function( port ){
+    
+    if( ! port ) {
+        print( "Cannot detect if process " + port + " is stopped." )
+        return
+    }
+    
+    if( port.port )
+        port = parseInt( port.port )
+    
+    if( port instanceof ObjectId ){
+        var opts = MongoRunner.savedOptions( port )
+        if( opts ) port = parseInt( opts.port )
+    }
+    
+    return MongoRunner.usedPortMap[ "" + parseInt( port ) ] ? false : true
+}
 
 __nextPort = 27000;
 startMongodTest = function (port, dirname, restart, extraOptions ) {
@@ -408,6 +454,8 @@ startMongodTest = function (port, dirname, restart, extraOptions ) {
     
     if( jsTestOptions().noJournal ) options["nojournal"] = ""
     if( jsTestOptions().noJournalPrealloc ) options["nopreallocj"] = ""
+    if( jsTestOptions().auth ) options["auth"] = ""
+    if( jsTestOptions().keyFile && (!extraOptions || !extraOptions['keyFile']) ) options['keyFile'] = jsTestOptions().keyFile
 
     if ( extraOptions )
         Object.extend( options , extraOptions );
@@ -415,6 +463,13 @@ startMongodTest = function (port, dirname, restart, extraOptions ) {
     var conn = f.apply(null, [ options ] );
 
     conn.name = (useHostname ? getHostName() : "localhost") + ":" + port;
+
+    if (options['auth'] || options['keyFile']) {
+        if (!this.shardsvr && !options.replSet) {
+            jsTest.addAuth(conn);
+        }
+        jsTest.authenticate(conn);
+    }
     return conn;
 }
 
@@ -439,8 +494,8 @@ startMongodNoReset = function(){
     return startMongoProgram.apply( null, args );
 }
 
-startMongos = function(){
-    return startMongoProgram.apply( null, createMongoArgs( "mongos" , arguments ) );
+startMongos = function(args){
+    return MongoRunner.runMongos(args);
 }
 
 /* Start mongod or mongos and return a Mongo() object connected to there.
@@ -507,6 +562,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         numMongos = params.mongos || 1
         
         keyFile = params.keyFile || otherParams.keyFile || otherParams.extraOptions.keyFile
+        otherParams.nopreallocj = params.nopreallocj || otherParams.nopreallocj
         otherParams.rs = params.rs || ( params.other ? params.other.rs : undefined )
         otherParams.chunksize = params.chunksize || ( params.other ? params.other.chunksize : undefined )
         
@@ -556,6 +612,14 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
             if( params.config.length == 3 ) otherParams.sync = true
             else otherParams.sync = false
         }
+        else if( params.config ) {
+            
+            if( params.config == 3 ){
+                otherParams.separateConfig = otherParams.separateConfig || true
+                otherParams.sync = true
+            }
+            
+        }
     }
     else {
         // Handle legacy stuff
@@ -563,6 +627,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
     }
 
     this._testName = testName
+    this._otherParams = otherParams
     
     var pathOpts = this.pathOpts = { testName : testName }
 
@@ -595,9 +660,10 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
             var setName = testName + "-rs" + i;
             
             rsDefaults = { useHostname : otherParams.useHostname,
+                           noJournalPrealloc : otherParams.nopreallocj, 
                            oplogSize : 40,
                            nodes : 3,
-                           pathOpts : Object.merge( pathOpts, { shard : i } ) }
+                           pathOpts : Object.merge( pathOpts, { shard : i } )}
             
             rsDefaults = Object.merge( rsDefaults, otherParams.rs )
             rsDefaults = Object.merge( rsDefaults, otherParams.rsOptions )
@@ -608,7 +674,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
             
             print( "Replica set test!" )
             
-            var rs = new ReplSetTest( { name : setName , nodes : numReplicas , startPort : 31100 + ( i * 100 ), useHostName : otherParams.useHostname, keyFile : keyFile } );
+            var rs = new ReplSetTest( { name : setName , nodes : numReplicas , startPort : 31100 + ( i * 100 ), useHostName : otherParams.useHostname, keyFile : keyFile, shardSvr : true } );
             this._rs[i] = { setName : setName , test : rs , nodes : rs.startSet( rsDefaults ) , url : rs.getURL() };
             rs.initiate();
             this["rs" + i] = rs
@@ -620,6 +686,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         }
         else {
             var options = { useHostname : otherParams.useHostname,
+                            noJournalPrealloc : otherParams.nopreallocj,
                             port : 30000 + i,
                             pathOpts : Object.merge( pathOpts, { shard : i } ),
                             dbpath : "$testName$shard",
@@ -656,8 +723,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         this["shard" + i] = rsConn
         rsConn.rs = rs
     }
-    
-    
+
     this._configServers = []
     this._configNames = []
     
@@ -671,6 +737,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         if( otherParams.separateConfig ){
             
             var options = { useHostname : otherParams.useHostname, 
+                            noJournalPrealloc : otherParams.nopreallocj, 
                             port : 40000 + i,
                             pathOpts : Object.merge( pathOpts, { config : i } ),
                             dbpath : "$testName-config$config",
@@ -694,7 +761,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
         this["config" + i] = conn
         this["c" + i] = conn
     }
-    
+
     printjson( this._configDB = this._configNames.join( "," ) )
     this._configConnection = new Mongo( this._configDB )
     if ( ! otherParams.noChunkSize ) {
@@ -744,8 +811,16 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
                 x = admin.runCommand( { addshard : n } );
                 printjson( x )
                 shardNames.push( x.shardAdded )
+                z.shardName = x.shardAdded
             }
         );
+    }
+
+    if (jsTestOptions().keyFile && !keyFile) {
+        jsTest.addAuth(this._mongos[0]);
+        jsTest.authenticateNodes(this._connections);
+        jsTest.authenticateNodes(this._configServers);
+        jsTest.authenticateNodes(this._mongos);
     }
 }
 
@@ -754,6 +829,18 @@ ShardingTest.prototype.getRSEntry = function( setName ){
         if ( this._rs[i].setName == setName )
             return this._rs[i];
     throw "can't find rs: " + setName;
+}
+
+ShardingTest.prototype.getConfigIndex = function( config ){
+    
+    // Assume config is a # if not a conn object
+    if( ! isObject( config ) ) config = getHostName() + ":" + config
+    
+    for( var i = 0; i < this._configServers.length; i++ ){
+        if( connectionURLTheSame( this._configServers[i], config ) ) return i
+    }
+    
+    return -1
 }
 
 ShardingTest.prototype.getDB = function( name ){
@@ -854,7 +941,7 @@ ShardingTest.prototype.getFirstOther = function( one ){
 
 ShardingTest.prototype.stop = function(){
     for ( var i=0; i<this._mongos.length; i++ ){
-        stopMongoProgram( 31000 - i );
+        stopMongoProgram( 31000 - i - 1 );
     }
     for ( var i=0; i<this._connections.length; i++){
         stopMongod( 30000 + i );
@@ -862,6 +949,11 @@ ShardingTest.prototype.stop = function(){
     if ( this._rs ){
         for ( var i=0; i<this._rs.length; i++ ){
             if( this._rs[i] ) this._rs[i].test.stopSet( 15 );
+        }
+    }
+    if( this._otherParams.separateConfig ){
+        for ( var i=0; i<this._configServers.length; i++ ){
+            MongoRunner.stopMongod( this._configServers[i] )
         }
     }
     if ( this._alldbpaths ){
@@ -981,7 +1073,7 @@ printShardingStatus = function( configDB , verbose ){
             output( "\t" + tojsononeline(db,"",true) );
         
             if (db.partitioned){
-                configDB.collections.find( { _id : new RegExp( "^" + db._id + "\." ) } ).sort( { _id : 1 } ).forEach(
+                configDB.collections.find( { _id : new RegExp( "^" + db._id + "\\." ) } ).sort( { _id : 1 } ).forEach(
                     function( coll ){
                         if ( coll.dropped == false ){
                             output("\t\t" + coll._id + " chunks:");
@@ -1422,6 +1514,10 @@ ReplTest.prototype.getOptions = function( master , extra , putBinaryFirst, norep
     
     if( jsTestOptions().noJournal ) a.push( "--nojournal" )
     if( jsTestOptions().noJournalPrealloc ) a.push( "--nopreallocj" )
+    if( jsTestOptions().keyFile ) {
+        a.push( "--keyFile" )
+        a.push( jsTestOptions().keyFile )
+    }
 
     if ( !norepl ) {
         if ( master ){
@@ -1524,11 +1620,23 @@ function startParallelShell( jsCode, port ){
     assert( jsCode.indexOf( '"' ) == -1,
            "double quotes should not be used in jsCode because the windows shell will stip them out" );
     var x;
-    if ( port ) {
-        x = startMongoProgramNoConnect( "mongo" , "--port" , port , "--eval" , jsCode );
-    } else {
-        x = startMongoProgramNoConnect( "mongo" , "--eval" , jsCode , db ? db.getMongo().host : null );        
+
+    var args = ["mongo"];
+    if (port) {
+        args.push("--port", port);
     }
+
+    if (TestData) {
+        jsCode = "TestData = " + tojson(TestData) + ";jsTest.authenticate(db.getMongo());" + jsCode;
+    }
+
+    args.push("--eval", jsCode);
+
+    if (typeof db == "object") {
+        args.push(db.getMongo().host);
+    }
+
+    x = startMongoProgramNoConnect.apply(null, args);
     return function(){
         waitProgram( x );
     };
@@ -1553,6 +1661,7 @@ ReplSetTest = function( opts ){
     this.bridged = opts.bridged || false;
     this.ports = [];
     this.keyFile = opts.keyFile
+    this.shardSvr = opts.shardSvr || false;
 
     this.startPort = opts.startPort || 31000;
 
@@ -1753,6 +1862,10 @@ ReplSetTest.prototype.getOptions = function( n , extra , putBinaryFirst ){
     
     if( jsTestOptions().noJournal ) a.push( "--nojournal" )
     if( jsTestOptions().noJournalPrealloc ) a.push( "--nopreallocj" )
+    if( jsTestOptions().keyFile && !this.keyFile) {
+        a.push( "--keyFile" )
+        a.push( jsTestOptions().keyFile )
+    }
     
     for ( var k in extra ){
         var v = extra[k];
@@ -1862,7 +1975,7 @@ ReplSetTest.prototype.awaitSecondaryNodes = function( timeout ) {
   var slaves = this.liveNodes.slaves;
   var len = slaves.length;
 
-  this.attempt({context: this, timeout: 60000, desc: "Awaiting secondaries"}, function() {
+  jsTest.attempt({context: this, timeout: 60000, desc: "Awaiting secondaries"}, function() {
      var ready = true;
      for(var i=0; i<len; i++) {
        ready = ready && slaves[i].getDB("admin").runCommand({ismaster: 1})['secondary'];
@@ -1878,7 +1991,7 @@ ReplSetTest.prototype.getMaster = function( timeout ) {
   var t = timeout || 000;
   var master = null;
 
-  master = this.attempt({context: this, timeout: 60000, desc: "Finding master"}, this.callIsMaster);
+  master = jsTest.attempt({context: this, timeout: 60000, desc: "Finding master"}, this.callIsMaster);
   return master;
 }
 
@@ -1931,27 +2044,6 @@ ReplSetTest.prototype.remove = function( nodeId ) {
     this.ports.splice( nodeId, 1 );
 }
 
-// Pass this method a function to call repeatedly until
-// that function returns true. Example:
-//   attempt({timeout: 20000, desc: "get master"}, function() { // return false until success })
-ReplSetTest.prototype.attempt = function( opts, func ) {
-    var timeout = opts.timeout || 1000;
-    var tries   = 0;
-    var sleepTime = 500;
-    var result = null;
-    var context = opts.context || this;
-
-    while((result = func.apply(context)) == false) {
-        tries += 1;
-        sleep(sleepTime);
-        if( tries * sleepTime > timeout) {
-            throw('[' + opts['desc'] + ']' + " timed out after " + timeout + "ms ( " + tries + " tries )");
-        }
-    }
-
-    return result;
-}
-
 ReplSetTest.prototype.initiate = function( cfg , initCmd , timeout ) {
     var master  = this.nodes[0].getDB("admin");
     var config  = cfg || this.getReplSetConfig();
@@ -1961,11 +2053,20 @@ ReplSetTest.prototype.initiate = function( cfg , initCmd , timeout ) {
     cmd[cmdKey] = config;
     printjson(cmd);
 
-    this.attempt({timeout: timeout, desc: "Initiate replica set"}, function() {
+    jsTest.attempt({context:this, timeout: timeout, desc: "Initiate replica set"}, function() {
         var result = master.runCommand(cmd);
         printjson(result);
         return result['ok'] == 1;
     });
+
+    // Setup authentication if running test with authentication
+    if (jsTestOptions().keyFile && !this.keyFile) {
+        if (!this.shardSvr) {
+            master = this.getMaster();
+            jsTest.addAuth(master);
+        }
+        jsTest.authenticateNodes(this.nodes);
+    }
 }
 
 ReplSetTest.prototype.reInitiate = function() {
@@ -1978,7 +2079,7 @@ ReplSetTest.prototype.reInitiate = function() {
 
 ReplSetTest.prototype.getLastOpTimeWritten = function() {
     this.getMaster();
-    this.attempt({context : this, desc : "awaiting oplog query"},
+    jsTest.attempt({context : this, desc : "awaiting oplog query"},
                  function() {
                      try {
                          this.latest = this.liveNodes.master.getDB("local")['oplog.rs'].find({}).sort({'$natural': -1}).limit(1).next()['ts'];
@@ -1998,7 +2099,7 @@ ReplSetTest.prototype.awaitReplication = function(timeout) {
 
     print("ReplSetTest " + this.latest);
 
-    this.attempt({context: this, timeout: timeout, desc: "awaiting replication"},
+    jsTest.attempt({context: this, timeout: timeout, desc: "awaiting replication"},
                  function() {
                      try {
                          var synced = true;
@@ -2157,7 +2258,19 @@ ReplSetTest.prototype.restart = function( n , options, signal, wait ){
     }
     
     this.stop( n, signal, wait && wait.toFixed ? wait : true )
-    return this.start( n , options , true, wait );
+    started = this.start( n , options , true, wait );
+
+    if (jsTestOptions().keyFile && !this.keyFile) {
+        if (started.length) {
+             // if n was an array of conns, start will return an array of connections
+            for (var i = 0; i < started.length; i++) {
+                jsTest.authenticate(started[i]);
+            }
+        } else {
+            jsTest.authenticate(started);
+        }
+    }
+    return started;
 }
 
 ReplSetTest.prototype.stopMaster = function( signal , wait ) {
@@ -2229,7 +2342,7 @@ ReplSetTest.prototype.waitForMaster = function( timeout ){
     
     var master = undefined
     
-    this.attempt({context: this, timeout: timeout, desc: "waiting for master"}, function() {
+    jsTest.attempt({context: this, timeout: timeout, desc: "waiting for master"}, function() {
         return ( master = this.getMaster() )
     });
     
@@ -2298,7 +2411,7 @@ ReplSetTest.prototype.waitForIndicator = function( node, states, ind, timeout ){
     var currTime = new Date().getTime()
     var status = undefined
         
-    this.attempt({context: this, timeout: timeout, desc: "waiting for state indicator " + ind + " for " + timeout + "ms" }, function() {
+    jsTest.attempt({context: this, timeout: timeout, desc: "waiting for state indicator " + ind + " for " + timeout + "ms" }, function() {
         
         status = this.status()
         

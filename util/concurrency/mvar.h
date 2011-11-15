@@ -18,7 +18,7 @@
 namespace mongo {
 
     /* This is based on haskell's MVar synchronization primitive:
-     * http://www.haskell.org/ghc/docs/latest/html/libraries/base-4.2.0.0/Control-Concurrent-MVar.html
+     * http://www.haskell.org/ghc/docs/latest/html/libraries/base/Control-Concurrent-MVar.html
      *
      * It is a thread-safe queue that can hold at most one object.
      * You can also think of it as a box that can be either full or empty.

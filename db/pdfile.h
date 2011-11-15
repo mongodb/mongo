@@ -366,7 +366,7 @@ namespace mongo {
 
         enum { HeaderSize = 8192 };
 
-        bool isCurrentVersion() const { return ( version == VERSION ) && ( versionMinor == VERSION_MINOR ); }
+        bool isCurrentVersion() const { return ( version == PDFILE_VERSION ) && ( versionMinor == PDFILE_VERSION_MINOR ); }
 
         bool uninitialized() const { return version == 0; }
 
@@ -379,8 +379,8 @@ namespace mongo {
                 assert( HeaderSize == 8192 );
                 DataFileHeader *h = getDur().writing(this);
                 h->fileLength = filelength;
-                h->version = VERSION;
-                h->versionMinor = VERSION_MINOR;
+                h->version = PDFILE_VERSION;
+                h->versionMinor = PDFILE_VERSION_MINOR;
                 h->unused.set( fileno, HeaderSize );
                 assert( (data-(char*)this) == HeaderSize );
                 h->unusedLength = fileLength - HeaderSize - 16;

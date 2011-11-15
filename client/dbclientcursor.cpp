@@ -21,6 +21,7 @@
 #include "../db/cmdline.h"
 #include "connpool.h"
 #include "../s/shard.h"
+#include "../s/util.h"
 
 namespace mongo {
 
@@ -171,6 +172,13 @@ namespace mongo {
         b.data = qr->data();
 
         _client->checkResponse( b.data, b.nReturned, &retry, &host ); // watches for "not master"
+
+        if( qr->resultFlags() & ResultFlag_ShardConfigStale ) {
+            BSONObj error;
+            assert( peekError( &error ) );
+            throw RecvStaleConfigException( error["ns"].String(),
+                                            (string)"stale config on lazy receive" + causedBy( getErrField( error ) ) );
+        }
 
         /* this assert would fire the way we currently work:
             assert( nReturned || cursorId == 0 );

@@ -9,3 +9,6 @@ def configure( env , fileLists , options ):
     files = ["third_party/snappy/snappy.cc", "third_party/snappy/snappy-sinksource.cc"]
 
     fileLists["serverOnlyFiles"] += [ myenv.Object(f) for f in files ]
+
+def configureSystem( env , fileLists , options ):
+    configure( env , fileLists , options )

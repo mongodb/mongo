@@ -67,7 +67,7 @@ namespace mongo {
             BufBuilder b( 32768 );
             b.skip( sizeof( QueryResult ) );
             {
-                BSONObj obj = BSON( "$err" << errmsg );
+                BSONObj obj = BSON( "$err" << errmsg << "ns" << ns );
                 b.appendBuf( obj.objdata() , obj.objsize() );
             }
 

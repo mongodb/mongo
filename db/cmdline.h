@@ -25,8 +25,6 @@ namespace mongo {
     class SSLManager;
 #endif
 
-
-
     /* command line options
     */
     /* concurrency: OK/READ */
@@ -105,9 +103,15 @@ namespace mongo {
         double syncdelay;      // seconds between fsyncs
 
         bool noUnixSocket;     // --nounixsocket
+        bool doFork;           // --fork
         string socket;         // UNIX domain socket directory
 
         bool keyFile;
+
+#ifndef _WIN32
+        pid_t parentProc;      // --fork pid of initial process
+        pid_t leaderProc;      // --fork pid of leader process
+#endif
 
 #ifdef MONGO_SSL
         bool sslOnNormalPorts;      // --sslOnNormalPorts
@@ -116,6 +120,8 @@ namespace mongo {
 
         SSLManager* sslServerManager; // currently leaks on close
 #endif
+        
+        static void launchOk();
 
         static void addGlobalOptions( boost::program_options::options_description& general ,
                                       boost::program_options::options_description& hidden );
@@ -142,7 +148,7 @@ namespace mongo {
         port(DefaultDBPort), rest(false), jsonp(false), quiet(false), noTableScan(false), prealloc(true), preallocj(true), smallfiles(sizeof(int*) == 4),
         configsvr(false),
         quota(false), quotaFiles(8), cpu(false), durOptions(0), objcheck(false), oplogSize(0), defaultProfile(0), slowMS(100), pretouch(0), moveParanoia( true ),
-        syncdelay(60), noUnixSocket(false), socket("/tmp") 
+        syncdelay(60), noUnixSocket(false), doFork(0), socket("/tmp") 
     {
         started = time(0);
 
@@ -165,6 +171,7 @@ namespace mongo {
             
     extern CmdLine cmdLine;
 
+    void setupLaunchSignals();
     void setupCoreSignals();
 
     string prettyHostName();
@@ -172,7 +179,7 @@ namespace mongo {
     void printCommandLineOpts();
 
     /**
-     * used for setParameter
+     * used for setParameter command
      * so you can write validation code that lives with code using it
      * rather than all in the command place
      * also lets you have mongos or mongod specific code
@@ -183,15 +190,13 @@ namespace mongo {
         ParameterValidator( const string& name );
         virtual ~ParameterValidator() {}
 
-        virtual bool isValid( BSONElement e , string& errmsg ) = 0;
+        virtual bool isValid( BSONElement e , string& errmsg ) const = 0;
 
         static ParameterValidator * get( const string& name );
 
     private:
-        string _name;
-
-        // don't need to lock since this is all done in static init
-        static map<string,ParameterValidator*> * _all;
+        const string _name;
     };
 
 }
+

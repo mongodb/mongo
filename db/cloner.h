@@ -34,6 +34,6 @@ namespace mongo {
                    bool slaveOk, bool useReplAuth, bool snapshot, bool mayYield,
                    bool mayBeInterrupted, int *errCode = 0);
 
-    bool copyCollectionFromRemote(const string& host, const string& ns, const BSONObj& query, string& errmsg, bool logForRepl, bool mayYield, bool mayBeInterrupted);
+    bool copyCollectionFromRemote(const string& host, const string& ns, string& errmsg);
 
 } // namespace mongo

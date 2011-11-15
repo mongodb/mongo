@@ -613,7 +613,10 @@ namespace mongo {
 
     void ReplSource::applyOperation(const BSONObj& op) {
         try {
-            applyOperation_inlock( op );
+            bool failedUpdate = applyOperation_inlock( op );
+            if (failedUpdate && shouldRetry(op, hostName)) {
+                uassert(15914, "Failure retrying initial sync update", applyOperation_inlock(op));
+            }
         }
         catch ( UserException& e ) {
             log() << "sync: caught user assertion " << e << " while applying op: " << op << endl;;
@@ -1117,7 +1120,7 @@ namespace mongo {
             if ( !_conn->connect(hostName.c_str(), errmsg) ||
                  (!noauth && !replAuthenticate(_conn.get())) ) {
                 resetConnection();
-                log() << "repl:  " << errmsg << endl;
+                log() << "repl: " << errmsg << endl;
                 return false;
             }
         }
@@ -1164,7 +1167,7 @@ namespace mongo {
         ReplInfo r("sync");
         if ( !cmdLine.quiet ) {
             Nullstream& l = log();
-            l << "repl: from ";
+            l << "repl: syncing from ";
             if( sourceName() != "main" ) {
                 l << "source:" << sourceName() << ' ';
             }
@@ -1487,7 +1490,7 @@ namespace mongo {
     public:
         ReplApplyBatchSizeValidator() : ParameterValidator( "replApplyBatchSize" ) {}
 
-        virtual bool isValid( BSONElement e , string& errmsg ) {
+        virtual bool isValid( BSONElement e , string& errmsg ) const {
             int b = e.numberInt();
             if( b < 1 || b > 1024 ) {
                 errmsg = "replApplyBatchSize has to be >= 1 and < 1024";

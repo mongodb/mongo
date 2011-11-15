@@ -370,6 +370,7 @@ namespace mongo {
         string md5() const;
 
         bool operator==( const BSONObj& other ) const { return equal( other ); }
+        bool operator!=(const BSONObj& other) const { return !operator==( other); }
 
         enum MatchType {
             Equality = 0,

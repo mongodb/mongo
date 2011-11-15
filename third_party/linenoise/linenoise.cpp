@@ -410,6 +410,10 @@ static char linenoiseReadChar(int fd){
                 } else {
                     return -1;
                 }
+            } else if (seq[1] == 72) { /* home (konsole) */
+                return 1; /* ctrl-a */
+            } else if (seq[1] == 70) { /* end (konsole) */
+                return 5; /* ctrl-e */
             } else {
                 return -1;
             }
@@ -571,14 +575,6 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
         case 3:     /* ctrl-c */
             errno = EAGAIN;
             return -1;
-        case 127:   /* delete */
-            if (len > 0 && pos < len) {
-                memmove(buf+pos,buf+pos+1,len-pos-1);
-                len--;
-                buf[len] = '\0';
-                refreshLine(fd,prompt,buf,len,pos,cols);
-            }
-            break;
         case 8:     /* backspace or ctrl-h */
             if (pos > 0 && len > 0) {
                 memmove(buf+pos-1,buf+pos,len-pos);
@@ -588,24 +584,26 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
                 refreshLine(fd,prompt,buf,len,pos,cols);
             }
             break;
-        case 4:     /* ctrl-d, remove char at right of cursor */
-            if (len > 1 && pos < (len-1)) {
+        case 127:  // DEL and ctrl-d both delete the character under the cursor
+        case 4:    // on an empty line, DEL does nothing while ctrl-d will exit the shell
+            if( len > 0 && pos < len ) {
                 memmove(buf+pos,buf+pos+1,len-pos);
                 len--;
-                buf[len] = '\0';
                 refreshLine(fd,prompt,buf,len,pos,cols);
-            } else if (len == 0) {
+            }
+            else if( c == 4 && len == 0 ) {
                 history_len--;
                 free(history[history_len]);
                 return -1;
             }
             break;
         case 20:    /* ctrl-t */
-            if (pos > 0 && pos < len) {
-                int aux = buf[pos-1];
-                buf[pos-1] = buf[pos];
-                buf[pos] = aux;
-                if (pos != len-1) pos++;
+            if (pos > 0 && len > 1) {
+                size_t leftCharPos = (pos == len) ? pos - 2 : pos - 1;
+                char aux = buf[leftCharPos];
+                buf[leftCharPos] = buf[leftCharPos+1];
+                buf[leftCharPos+1] = aux;
+                if (pos != len) pos++;
                 refreshLine(fd,prompt,buf,len,pos,cols);
             }
             break;
@@ -649,6 +647,10 @@ static int linenoisePrompt(int fd, char *buf, size_t buflen, const char *prompt)
             break; /* should be handled by linenoiseReadChar */
         default:
             if (len < buflen) {
+                if ((unsigned char)c < 32) { /* Unhandled control character */
+                    beep();
+                    break;
+                }
                 if (len == pos) {
                     buf[pos] = c;
                     pos++;

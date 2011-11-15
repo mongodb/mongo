@@ -82,6 +82,7 @@ namespace mongo {
     Member* ReplSetImpl::getMemberToSyncTo() {
         Member *closest = 0;
         time_t now = 0;
+        bool buildIndexes = true;
 
         // wait for 2N pings before choosing a sync target
         if (_cfg) {
@@ -91,11 +92,15 @@ namespace mongo {
                 OCCASIONALLY log() << "waiting for " << needMorePings << " pings from other members before syncing" << endl;
                 return NULL;
             }
+
+            buildIndexes = myConfig().buildIndexes;
         }
 
         // find the member with the lowest ping time that has more data than me
         for (Member *m = _members.head(); m; m = m->next()) {
             if (m->hbinfo().up() &&
+                // make sure members with buildIndexes sync from other members w/indexes
+                (!buildIndexes || (buildIndexes && m->config().buildIndexes)) &&
                 (m->state() == MemberState::RS_PRIMARY ||
                  (m->state() == MemberState::RS_SECONDARY && m->hbinfo().opTime > lastOpTimeWritten)) &&
                 (!closest || m->hbinfo().ping < closest->hbinfo().ping)) {

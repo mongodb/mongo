@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="..\bson\oid.cpp" />
@@ -176,6 +176,7 @@
     <ClCompile Include="..\third_party\pcre-7.4\pcre_version.c" />
     <ClCompile Include="..\third_party\pcre-7.4\pcre_xclass.c" />
     <ClCompile Include="..\third_party\pcre-7.4\pcreposix.c" />
+    <ClCompile Include="commands\cloud.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\dbclientcursor.h" />
@@ -290,7 +291,6 @@
     <ClInclude Include="..\scripting\v8_wrapper.h" />
     <ClInclude Include="btree.h" />
     <ClInclude Include="repl\health.h" />
-    <ClInclude Include="..\util\hostandport.h" />
     <ClInclude Include="repl\rs.h" />
     <ClInclude Include="repl\rs_config.h" />
     <ClInclude Include="..\bson\bsonelement.h" />
@@ -321,8 +321,6 @@
     <ClInclude Include="..\util\net\message.h" />
     <ClInclude Include="..\util\net\message_server.h" />
     <ClInclude Include="..\util\net\sock.h" />
-    <ClInclude Include="..\util\concurrency\rwlockimpl.h" />
-    <ClInclude Include="..\util\concurrency\mutexdebugger.h" />
     <ClInclude Include="..\third_party\snappy\config.h">
       <Filter>snappy</Filter>
     </ClInclude>
@@ -331,6 +329,11 @@
     </ClInclude>
     <ClInclude Include="..\third_party\pcre-7.4\config.h" />
     <ClInclude Include="..\third_party\pcre-7.4\pcre.h" />
+    <ClInclude Include="globals.h" />
+    <ClInclude Include="..\util\net\hostandport.h" />
+    <ClInclude Include="..\util\net\listen.h" />
+    <ClInclude Include="..\util\net\message_port.h" />
+    <ClInclude Include="..\util\net\miniwebserver.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="db.rc" />

@@ -60,7 +60,7 @@ DBCollection.prototype.help = function () {
     print("\tdb." + shortName + ".storageSize() - includes free space allocated to this collection");
     print("\tdb." + shortName + ".totalIndexSize() - size in bytes of all the indexes");
     print("\tdb." + shortName + ".totalSize() - storage allocated for all data and indexes");
-    print("\tdb." + shortName + ".update(query, object[, upsert_bool, multi_bool])");
+    print("\tdb." + shortName + ".update(query, object[, upsert_bool, multi_bool]) - instead of two flags, you can pass an object with fields: upsert, multi");
     print("\tdb." + shortName + ".validate( <full> ) - SLOW");;
     print("\tdb." + shortName + ".getShardVersion() - only for use with sharding");
     print("\tdb." + shortName + ".getShardDistribution() - prints statistics about data distribution in the cluster");
@@ -204,6 +204,16 @@ DBCollection.prototype.update = function( query , obj , upsert , multi ){
         // we're basically inserting a brand new object, do full validation
         this._validateForStorage( obj );
     }
+
+    // can pass options via object for improved readability    
+    if ( typeof(upsert) === 'object' ) {
+        assert( multi === undefined, "Fourth argument must be empty when specifying upsert and multi with an object." );
+
+        opts = upsert;
+        multi = opts.multi;
+        upsert = opts.upsert;
+    }
+
     this._db._initExtraInfo();
     this._mongo.update( this._fullName , query , obj , upsert ? true : false , multi ? true : false );
     this._db._getExtraInfo("Updated");
@@ -711,7 +721,7 @@ DBCollection.prototype.getShardDistribution = function(){
        
        var shardStats = stats.shards[ shard ]
                
-       var chunks = config.chunks.find({ _id : sh._collRE( coll ), shard : shard }).toArray()
+       var chunks = config.chunks.find({ _id : sh._collRE( this ), shard : shard }).toArray()
        
        numChunks += chunks.length
        
@@ -734,11 +744,11 @@ DBCollection.prototype.getShardDistribution = function(){
    
        var shardStats = stats.shards[ shard ]
        
-       var estDataPercent = Math.floor( shardStats.size / stats.size * 100 ) / 100
-       var estDocPercent = Math.floor( shardStats.count / stats.count * 100 ) / 100
+       var estDataPercent = Math.floor( shardStats.size / stats.size * 10000 ) / 100
+       var estDocPercent = Math.floor( shardStats.count / stats.count * 10000 ) / 100
        
-       print( " Shard " + shard + " data : " + estDataPercent + "%, docs : " + estDocPercent + "%" + 
-              ", avg obj size : " + sh._dataFormat( stats.shards[ shard ].avgObjSize ) )
+       print( " Shard " + shard + " contains " + estDataPercent + "% data, " + estDocPercent + "% docs in cluster, " +
+              "avg obj size on shard : " + sh._dataFormat( stats.shards[ shard ].avgObjSize ) )
    }
    
    print( "\n" )

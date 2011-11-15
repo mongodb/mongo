@@ -112,7 +112,7 @@ namespace mongo {
     template< class V >
     void BucketBasics<V>::_shape(int level, stringstream& ss) const {
         for ( int i = 0; i < level; i++ ) ss << ' ';
-        ss << "*\n";
+        ss << "*[" << this->n << "]\n";
         for ( int i = 0; i < this->n; i++ ) {
             if ( !k(i).prevChildBucket.isNull() ) {
                 DiskLoc ll = k(i).prevChildBucket;

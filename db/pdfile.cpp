@@ -1101,7 +1101,8 @@ namespace mongo {
     int Extent::followupSize(int len, int lastExtentLen) {
         assert( len < Extent::maxSize() );
         int x = initialSize(len);
-        int y = (int) (lastExtentLen < 4000000 ? lastExtentLen * 4.0 : lastExtentLen * 1.2);
+        // changed from 1.20 to 1.35 in v2.1.x to get to larger extent size faster
+        int y = (int) (lastExtentLen < 4000000 ? lastExtentLen * 4.0 : lastExtentLen * 1.35);
         int sz = y > x ? y : x;
 
         if ( sz < lastExtentLen ) {
@@ -1800,10 +1801,8 @@ namespace mongo {
 
         BSONObj info = loc.obj();
         bool background = info["background"].trueValue();
-        if( background && cc().isSyncThread() ) {
-            /* don't do background indexing on slaves.  there are nuances.  this could be added later
-                but requires more code.
-                */
+        // if this is not readable, let's move things along
+        if (background && ((!theReplSet && cc().isSyncThread()) || (theReplSet && !theReplSet->isSecondary()))) {
             log() << "info: indexing in foreground on this replica; was a background index build on the primary" << endl;
             background = false;
         }

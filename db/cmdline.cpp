@@ -23,10 +23,13 @@
 #include "../util/processinfo.h"
 #include "../util/net/listen.h"
 #include "security_common.h"
-
 #ifdef _WIN32
 #include <direct.h>
+#else
+#include <sys/types.h>
+#include <sys/wait.h>
 #endif
+#include "globals.h"
 
 #define MAX_LINE_LENGTH 256
 
@@ -65,10 +68,12 @@ namespace mongo {
         ("nounixsocket", "disable listening on unix sockets")
         ("unixSocketPrefix", po::value<string>(), "alternative directory for UNIX domain sockets (defaults to /tmp)")
         ("fork" , "fork server process" )
+        ("syslog" , "log to system's syslog facility instead of file or stdout" )
 #endif
         ;
         
         hidden.add_options()
+        ("cloud", po::value<string>(), "custom dynamic host naming")
 #ifdef MONGO_SSL
         ("sslOnNormalPorts" , "use ssl on configured ports" )
         ("sslPEMKeyFile" , po::value<string>(&cmdLine.sslPEMKeyFile), "PEM file for ssl" )
@@ -121,7 +126,31 @@ namespace mongo {
         return;
     }
 
+#ifndef _WIN32
+    // support for exit value propagation with fork
+    void launchSignal( int sig ) {
+        if ( sig == SIGUSR2 ) {
+            pid_t cur = getpid();
+            
+            if ( cur == cmdLine.parentProc || cur == cmdLine.leaderProc ) {
+                // signal indicates successful start allowing us to exit
+                _exit(0);
+            } 
+        }
+    }
 
+    void setupLaunchSignals() {
+        assert( signal(SIGUSR2 , launchSignal ) != SIG_ERR );
+    }
+
+
+    void CmdLine::launchOk() {
+        if ( cmdLine.doFork ) {
+            // killing leader will propagate to parent
+            assert( kill( cmdLine.leaderProc, SIGUSR2 ) == 0 );
+        }
+    }
+#endif
 
     bool CmdLine::store( int argc , char ** argv ,
                          boost::program_options::options_description& visible,
@@ -240,12 +269,13 @@ namespace mongo {
         }
 
         if (params.count("fork")) {
-            if ( ! params.count( "logpath" ) ) {
-                cout << "--fork has to be used with --logpath" << endl;
+            cmdLine.doFork = true;
+            if ( ! params.count( "logpath" ) && ! params.count( "syslog" ) ) {
+                cout << "--fork has to be used with --logpath or --syslog" << endl;
                 ::exit(-1);
             }
 
-            {
+            if ( params.count( "logpath" ) ) {
                 // test logpath
                 logpath = params["logpath"].as<string>();
                 assert( logpath.size() );
@@ -262,10 +292,26 @@ namespace mongo {
 
             cout.flush();
             cerr.flush();
+            
+            cmdLine.parentProc = getpid();
+            
+            // facilitate clean exit when child starts successfully
+            setupLaunchSignals();
 
             pid_t c = fork();
             if ( c ) {
-                _exit(0);
+                int pstat;
+                waitpid(c, &pstat, 0);
+
+                if ( WIFEXITED(pstat) ) {
+                    if ( ! WEXITSTATUS(pstat) ) {
+                        cout << "child process started successfully, parent exiting" << endl;
+                    }
+
+                    _exit( WEXITSTATUS(pstat) );
+                }
+
+                _exit(50);
             }
 
             if ( chdir("/") < 0 ) {
@@ -273,11 +319,20 @@ namespace mongo {
                 ::exit(-1);
             }
             setsid();
+            
+            cmdLine.leaderProc = getpid();
 
             pid_t c2 = fork();
             if ( c2 ) {
+                int pstat;
                 cout << "forked process: " << c2 << endl;
-                _exit(0);
+                waitpid(c2, &pstat, 0);
+
+                if ( WIFEXITED(pstat) ) {
+                    _exit( WEXITSTATUS(pstat) );
+                }
+
+                _exit(51);
             }
 
             // stdout handled in initLogging
@@ -302,9 +357,19 @@ namespace mongo {
             setupCoreSignals();
             setupSignals( true );
         }
-
+        
+        if (params.count("syslog")) {
+            StringBuilder sb(128);
+            sb << cmdLine.binaryName << "." << cmdLine.port;
+            Logstream::useSyslog( sb.str().c_str() );
+        }
 #endif
         if (params.count("logpath")) {
+            if ( params.count("syslog") ) {
+                cout << "Cant use both a logpath and syslog " << endl;
+                ::exit(-1);
+            }
+            
             if ( logpath.size() == 0 )
                 logpath = params["logpath"].as<string>();
             uassert( 10033 ,  "logpath has to be non-zero" , logpath.size() );
@@ -431,18 +496,19 @@ namespace mongo {
         return s.str();
     }
 
-    ParameterValidator::ParameterValidator( const string& name ) : _name( name ) {
-        if ( ! _all )
-            _all = new map<string,ParameterValidator*>();
-        (*_all)[_name] = this;
-    }
+    casi< map<string,ParameterValidator*> * > pv_all (NULL);
 
+    ParameterValidator::ParameterValidator( const string& name ) : _name( name ) {
+        if ( ! pv_all)
+            pv_all.ref() = new map<string,ParameterValidator*>();
+        (*pv_all.ref())[_name] = this;
+    }
+    
     ParameterValidator * ParameterValidator::get( const string& name ) {
-        map<string,ParameterValidator*>::iterator i = _all->find( name );
-        if ( i == _all->end() )
+        map<string,ParameterValidator*>::const_iterator i = pv_all.get()->find( name );
+        if ( i == pv_all.get()->end() )
             return NULL;
         return i->second;
     }
-    map<string,ParameterValidator*> * ParameterValidator::_all = 0;
 
 }

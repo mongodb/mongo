@@ -113,12 +113,16 @@ namespace mongo {
             SimpleMutex::scoped_lock lk(m);
             val.swap(rhs);
         }
+        bool empty() { 
+            SimpleMutex::scoped_lock lk(m);
+            return val.empty(); 
+        }
         // safe as we pass by value:
         V get(K k) { 
             SimpleMutex::scoped_lock lk(m);
             typename map<K,V>::iterator i = val.find(k);
             if( i == val.end() )
-                return K();
+                return V();
             return i->second;
         }
         // think about deadlocks when using ref.  the other methods

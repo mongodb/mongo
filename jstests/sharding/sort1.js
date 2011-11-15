@@ -22,11 +22,18 @@ s.adminCommand( { split : "test.data" , middle : { 'sub.num' : 66 } } )
 
 s.adminCommand( { movechunk : "test.data" , find : { 'sub.num' : 50 } , to : s.getOther( s.getServer( "test" ) ).name } );
 
-assert.eq( 3 , s.config.chunks.find().itcount() , "A1" );
+assert.lte( 3 , s.config.chunks.find().itcount() , "A1" );
 
 temp = s.config.chunks.find().sort( { min : 1 } ).toArray();
-assert.eq( temp[0].shard , temp[2].shard , "A2" );
-assert.neq( temp[0].shard , temp[1].shard , "A3" );
+temp.forEach( printjsononeline )
+
+z = 0;
+for ( ; z<temp.length; z++ ) 
+    if ( temp[z].min["sub.num"] <= 50 && temp[z].max["sub.num"] > 50 )
+        break;
+
+assert.eq( temp[z-1].shard , temp[z+1].shard , "A2" );
+assert.neq( temp[z-1].shard , temp[z].shard , "A3" );
 
 temp = db.data.find().sort( { 'sub.num' : 1 } ).toArray();
 assert.eq( N , temp.length , "B1" );

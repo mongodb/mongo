@@ -55,7 +55,12 @@ namespace mongo {
         try {
             return _runCommands(ns, jsobj, b, anObjBuilder, fromRepl, queryOptions);
         }
+        catch( SendStaleConfigException& ){
+            throw;
+        }
         catch ( AssertionException& e ) {
+            assert( e.getCode() != SendStaleConfigCode && e.getCode() != RecvStaleConfigCode );
+
             e.getInfo().append( anObjBuilder , "assertion" , "assertionCode" );
             curop.debug().exceptionInfo = e.getInfo();
         }
@@ -441,6 +446,9 @@ namespace mongo {
                 return b.obj();
             }
             else {
+            	stringstream host;
+            	host << getHostNameCached() << ":" << cmdLine.port;
+            	*_b << "server" << host.str();
                 _b->appendElements( suffix );
                 return _b->obj();
             }

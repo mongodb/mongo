@@ -35,7 +35,7 @@ namespace mongo {
         virtual void queryOp( Request& r ) {
             QueryMessage q( r.d() );
 
-            r.checkAuth();
+            r.checkAuth( Auth::READ );
 
             LOG(3) << "shard query: " << q.ns << "  " << q.query << endl;
 
