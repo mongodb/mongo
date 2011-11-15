@@ -101,7 +101,7 @@ namespace mongo {
                     unsigned lenWHdr = sz + Record::HeaderSize;
                     unsigned lenWPadding = lenWHdr;
                     {
-                        lenWPadding *= pf;
+                        lenWPadding = static_cast<unsigned>(pf*lenWPadding);
                         lenWPadding += pb;
                         lenWPadding = lenWPadding & quantizeMask(lenWPadding);
                         if( lenWPadding < lenWHdr || lenWPadding > BSONObjMaxUserSize / 2 ) { 
