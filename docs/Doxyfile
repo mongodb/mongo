@@ -203,8 +203,8 @@ TAB_SIZE               = 8
 # You can put \n's in the value part of an alias to insert newlines.
 
 ALIASES                = "notyet{1}=<b>Not yet supported in WiredTiger.</b>\n@todo fix when \1 supported\n\n" \
-			 "errors=\returns zero on success and a non-zero error code on failure" \
-                         "ex_ref{1}=\ref \1 \"\1\", available in the source tree as \c examples/c/\1" \
+			 "errors=@returns zero on success and a non-zero error code on failure.  See @ref error_returns \"Error Returns\" for details." \
+                         "ex_ref{1}=@ref \1 \"\1\", available in the source tree as \c examples/c/\1" \
                          "hrow{1}=<tr><th>\1</th></tr>" \
                          "hrow{2}=<tr><th>\1</th><th>\2</th></tr>" \
                          "hrow{3}=<tr><th>\1</th><th>\2</th><th>\3</th></tr>" \
@@ -215,10 +215,10 @@ ALIASES                = "notyet{1}=<b>Not yet supported in WiredTiger.</b>\n@to
                          "row{3}=<tr><td>\1</td><td>\2</td><td>\3</td></tr>" \
                          "row{4}=<tr><td>\1</td><td>\2</td><td>\3</td><td>\4</td></tr>" \
                          "row{5}=<tr><td>\1</td><td>\2</td><td>\3</td><td>\4</td><td>\5</td></tr>" \
-                         "configstart{2}=\param config\n  Configuration string, see \ref config_strings. Permitted values:\n  <table>@hrow{Name,Effect,Default}" \
-                         "config{3}=  \row{<tt>\1</tt>,\2,\3}" \
+                         "configstart{2}=@param config\n  Configuration string, see @ref config_strings. Permitted values:\n  <table>@hrow{Name,Effect,Default}" \
+                         "config{3}=  @row{<tt>\1</tt>,\2,\3}" \
                          "configend=  </table>" \
-                         "configempty{2}=\param config\n  Configuration string, see \ref config_strings.  No values currently permitted."
+                         "configempty{2}=@param config\n  Configuration string, see @ref config_strings.  No values currently permitted."
 
 # Set the OPTIMIZE_OUTPUT_FOR_C tag to YES if your project consists of C 
 # sources only. Doxygen will then generate output that is more tailored for C. 

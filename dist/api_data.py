@@ -1,16 +1,30 @@
 # This file is a python script that describes the WiredTiger API.
 
 class Error:
-	def __init__(self, name, desc, **flags):
+	def __init__(self, name, desc, long_desc=None, **flags):
 		self.name = name
 		self.desc = desc
+		self.long_desc = long_desc
 		self.flags = flags
 
 errors = [
-	Error('WT_DEADLOCK', 'conflict with concurrent operation'),
-	Error('WT_DUPLICATE_KEY', 'attempt to insert an existing key'),
-	Error('WT_ERROR', 'non-specific WiredTiger error'),
-	Error('WT_NOTFOUND', 'item not found'),
+	Error('WT_DEADLOCK', 'conflict between concurrent operations', '''
+		This error is generated when an operation cannot be completed due
+		to a conflict with concurrent operations.  The operation should be
+		retried.  If a transaction is in progress, it should be rolled back
+		and the operation retried in a new transaction.'''),
+	Error('WT_DUPLICATE_KEY', 'attempt to insert an existing key', '''
+		This error is generated when the application attempts to insert a
+		record with the same key as an existing record without the 'overwrite'
+		configuration to WT_SESSION::open_cursor.'''),
+	Error('WT_ERROR', 'non-specific WiredTiger error', '''
+		This error is generated for cases that are not covered by specific
+		error returns.'''),
+	Error('WT_NOTFOUND', 'item not found', '''
+		This return value indicates that a search operation did not find a
+		record matching the application's search key.  This includes implicit
+		search operations in WT_CURSOR::update or WT_CURSOR::remove
+		operations.'''),
 	Error('WT_RESTART', 'restart the operation (internal)', undoc=True),
 ]
 

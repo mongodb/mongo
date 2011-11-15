@@ -327,6 +327,8 @@ struct wt_cursor {
 	 *
 	 * @param cursor the cursor handle
 	 * @errors
+	 * In particular, if no record with the specified key exists,
+	 * ::WT_NOTFOUND is returned.
 	 */
 	int __F(update)(WT_CURSOR *cursor);
 
@@ -337,6 +339,8 @@ struct wt_cursor {
 	 *
 	 * @param cursor the cursor handle
 	 * @errors
+	 * In particular, if no record with the specified key exists,
+	 * ::WT_NOTFOUND is returned.
 	 */
 	int __F(remove)(WT_CURSOR *cursor);
 	/*! @} */
@@ -1159,27 +1163,55 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
 /*******************************************
  * Error returns
  *******************************************/
+/*!
+ * @anchor error_returns
+ * @name Error returns
+ * Most functions and methods in WiredTiger return an integer code indicating
+ * whether the operation succeeded or failed.  A return of zero indicates
+ * success, all non-zero return values indicate some kind of failure.  This
+ * list below includes all of the the WiredTiger-specific error returns.
+ *
+ * In addition, C99/POSIX error codes such as ENOMEM, EINVAL and ENOTSUP may
+ * also be returned, with the usual meanings.
+ * @{
+ */
 /*
  * DO NOT EDIT: automatically built by dist/api_err.py.
  * Error return section: BEGIN
  */
-/*! Conflict with concurrent operation. */
-#define	WT_DEADLOCK	-31800
-/*! Attempt to insert an existing key. */
-#define	WT_DUPLICATE_KEY	-31801
-/*! Non-specific WiredTiger error. */
-#define	WT_ERROR	-31802
-/*! Item not found. */
-#define	WT_NOTFOUND	-31803
-/*! @cond internal
- * Restart the operation (internal).
+/*! Conflict between concurrent operations.
+ * This error is generated when an operation cannot be completed due to a
+ * conflict with concurrent operations.  The operation should be retried.  If a
+ * transaction is in progress, it should be rolled back and the operation
+ * retried in a new transaction.
  */
+#define	WT_DEADLOCK	-31800
+/*! Attempt to insert an existing key.
+ * This error is generated when the application attempts to insert a record with
+ * the same key as an existing record without the 'overwrite' configuration to
+ * WT_SESSION::open_cursor.
+ */
+#define	WT_DUPLICATE_KEY	-31801
+/*! Non-specific WiredTiger error.
+ * This error is generated for cases that are not covered by specific error
+ * returns.
+ */
+#define	WT_ERROR	-31802
+/*! Item not found.
+ * This return value indicates that a search operation did not find a record
+ * matching the application's search key.  This includes implicit search
+ * operations in WT_CURSOR::update or WT_CURSOR::remove operations.
+ */
+#define	WT_NOTFOUND	-31803
+/*! @cond internal */
+/*! Restart the operation (internal). */
 #define	WT_RESTART	-31804
 /*! @endcond */
 /*
  * Error return section: END
  * DO NOT EDIT: automatically built by dist/api_err.py.
  */
+/*! @} */
 
 /*! @} */
 

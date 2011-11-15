@@ -1,7 +1,7 @@
 # Output C #defines for errors into wiredtiger.in and the associated error
 # message code in strerror.c.
 
-import re
+import re, textwrap
 
 import api_data
 from dist import compare_srcfile
@@ -25,13 +25,12 @@ for line in open('../src/include/wiredtiger.in', 'r'):
 		# -31,999.
 		v = -31800
 		for err in api_data.errors:
-			name, desc = err.name, err.desc
 			if 'undoc' in err.flags:
-				tfile.write('/*! @cond internal\n * %s.\n */\n' %
-				    (desc[0].upper() + desc[1:]))
-			else:
-				tfile.write('/*! %s. */\n' % (desc[0].upper() + desc[1:]))
-			tfile.write('#define\t%s\t%d\n' % (name, v))
+				tfile.write('/*! @cond internal */\n')
+			tfile.write('/*! %s.%s */\n' %
+			    (err.desc[0].upper() + err.desc[1:],
+			    ''.join('\n * ' + l for l in textwrap.wrap(textwrap.dedent(err.long_desc).strip(), 77)) + '\n' if err.long_desc else ''))
+			tfile.write('#define\t%s\t%d\n' % (err.name, v))
 			v -= 1
 			if 'undoc' in err.flags:
 				tfile.write('/*! @endcond */\n')
