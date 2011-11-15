@@ -1,4 +1,3 @@
-
 import re
 import socket
 import time
@@ -68,8 +67,7 @@ def execsys( args ):
         r = re.compile( "\s+" )
         args = r.split( args )
     p = subprocess.Popen( args , stdout=subprocess.PIPE , stderr=subprocess.PIPE )
-    r = p.communicate()
-    return r;
+    return p.communicate()
 
 def getprocesslist():
     raw = ""
