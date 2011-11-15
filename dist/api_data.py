@@ -312,11 +312,13 @@ methods = {
 		fail if the database already exists''',
 		type='boolean'),
 	Config('extensions', '', r'''
-		list of extensions to load.  Optional values override the name
-		of the default entry function \c wiredtiger_init''',
+		list of extensions to load.  Optional values are passed as the
+		\c config parameter to WT_CONNECTION::load_extension.  Complex paths
+		may need quoting, for example,
+		<code>extensions=("/path/to/ext.so"="entry=my_entry")</code>''',
 		type='list'),
 	Config('error_prefix', '', r'''
-		Prefix string for error messages'''),
+		prefix string for error messages'''),
 	Config('hazard_max', '30', r'''
 		number of simultaneous hazard references per session handle''',
 		min='15'),

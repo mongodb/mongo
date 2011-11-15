@@ -1017,13 +1017,14 @@ struct wt_connection {
  * must be an integer between 1MB and 10TB.,\c 20MB}
  * @config{create, create the database if it does not exist. The value must be a
  * boolean flag.,\c false}
- * @config{error_prefix, Prefix string for error messages. The value must be a
+ * @config{error_prefix, prefix string for error messages. The value must be a
  * string.,empty}
  * @config{exclusive, fail if the database already exists. The value must be a
  * boolean flag.,\c false}
- * @config{extensions, list of extensions to load.  Optional values override the
- * name of the default entry function \c wiredtiger_init. The value must be a
- * list of strings.,empty}
+ * @config{extensions, list of extensions to load.  Optional values are passed
+ * as the \c config parameter to WT_CONNECTION::load_extension.  For example\,
+ * <code>extensions=("/path/to/ext.so"="entry=my_entry")</code>. The value must
+ * be a list of strings.,empty}
  * @config{hazard_max, number of simultaneous hazard references per session
  * handle. The value must be an integer greater than or equal to 15.,\c 30}
  * @config{home_environment, use the WIREDTIGER_HOME environment variable for
@@ -1171,8 +1172,8 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  * success, all non-zero return values indicate some kind of failure.  This
  * list below includes all of the the WiredTiger-specific error returns.
  *
- * In addition, C99/POSIX error codes such as ENOMEM, EINVAL and ENOTSUP may
- * also be returned, with the usual meanings.
+ * In addition, C99/POSIX error codes such as \c ENOMEM, \c EINVAL and
+ * \c ENOTSUP may also be returned, with the usual meanings.
  * @{
  */
 /*
