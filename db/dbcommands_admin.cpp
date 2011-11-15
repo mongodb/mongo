@@ -27,6 +27,7 @@
 #include "pdfile.h"
 #include "namespace-inl.h"
 #include "commands.h"
+#include "dbcommands_admin.h"
 #include "cmdline.h"
 #include "btree.h"
 #include "curop-inl.h"
@@ -397,8 +398,8 @@ namespace mongo {
 
     bool lockedForWriting = false; // read from db/instance.cpp
     static bool unlockRequested = false;
-    static mongo::mutex fsyncLockMutex("fsyncLock");
-    static boost::condition fsyncLockCondition;
+    mongo::mutex fsyncLockMutex("fsyncLock");
+    boost::condition fsyncLockCondition;
     static OID fsyncLockID; // identifies the current lock job
 
     /*

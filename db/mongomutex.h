@@ -30,6 +30,7 @@
 #include "../util/concurrency/rwlock.h"
 #include "../util/mmap.h"
 #include "../util/time_support.h"
+#include "../../db/dbcommands_admin.h"
 
 namespace mongo {
 
@@ -95,6 +96,11 @@ namespace mongo {
 
         // write lock.  use the writelock scoped lock class, not this directly.
         void lock() {
+            scoped_lock lk(fsyncLockMutex);
+            while (lockedForWriting) { // DB has been fsync locked
+                fsyncLockCondition.wait(lk.boost());
+            }
+
             if ( _writeLockedAlready() )
                 return;
 
