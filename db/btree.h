@@ -411,6 +411,8 @@ namespace mongo {
             assert(ok);
         }
 
+        void pushBackKeyNode( const DiskLoc recordLoc, const DiskLoc prevChild, const short dataOfs );
+
         /**
          * This is a special purpose function used by BtreeBuilder.  The
          * interface is quite dangerous if you're not careful.  The bson key

@@ -342,6 +342,17 @@ namespace mongo {
             _unalloc(keysize);
     }
 
+    template< class V >
+    void BucketBasics<V>::pushBackKeyNode( const DiskLoc recordLoc, const DiskLoc prevChild, const short dataOfs ) {
+        this->emptySize -= sizeof(_KeyNode);
+        assert( this->emptySize >= 0 );
+        _KeyNode& kn = k(this->n);
+        kn.recordLoc = recordLoc;
+        kn.prevChildBucket = prevChild;
+        kn.setKeyDataOfs( dataOfs );
+        this->n++;
+    }
+
     /** add a key.  must be > all existing.  be careful to set next ptr right. */
     template< class V >
     bool BucketBasics<V>::_pushBack(const DiskLoc recordLoc, const Key& key, const Ordering &order, const DiskLoc prevChild) {
@@ -1124,12 +1135,17 @@ namespace mongo {
             KeyNode kn = keyNode( leftIndex );
             l->pushBack( kn.recordLoc, kn.key, order, l->nextChild ); // left child's right child becomes old parent key's left child
         }
+        int leftOldTop = l->topSize;
+        int leftTop = l->_alloc( r->topSize );
+        int rightTop = r->_alloc( 0 );
+        memcpy( l->data+leftTop, r->data+rightTop, r->topSize );
         for( int i = 0; i < r->n; ++i ) {
-            KeyNode kn = r->keyNode( i );
-            l->pushBack( kn.recordLoc, kn.key, order, kn.prevChildBucket );
+            const _KeyNode &kn = r->k( i );
+            l->pushBackKeyNode( kn.recordLoc, kn.prevChildBucket, kn.keyDataOfs()-leftOldTop );
         }
         l->nextChild = r->nextChild;
         l->fixParentPtrs( leftNodeLoc, oldLNum );
+        l->assertValid( order, true );
         r->delBucket( rightNodeLoc, id );
         this->childForPos( leftIndex + 1 ) = leftNodeLoc;
         this->childForPos( leftIndex ) = DiskLoc();
