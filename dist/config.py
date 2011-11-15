@@ -30,7 +30,7 @@ def typedesc(c):
 	cmax = str(checks.get('max', ''))
 	choices = checks.get('choices', [])
 	ctype = gettype(c)
-	desc = '. The value must be ' + {
+	desc = {
 		'boolean' : 'a boolean flag',
 		'format'  : 'a format string',
 		'int'     : 'an integer',
@@ -50,7 +50,7 @@ def typedesc(c):
 		desc += ', '.join('\\c "' + c + '"' for c in choices)
 	elif ctype == 'list':
 		desc += ' of strings'
-	return desc + '.'
+	return desc
 
 skip = False
 for line in open(f, 'r'):
@@ -93,12 +93,13 @@ for line in open(f, 'r'):
 		if name == lastname:
 			continue
 		lastname = name
-		desc = textwrap.dedent(c.desc)
-		desc += typedesc(c)
+		desc = textwrap.dedent(c.desc) + '.'
 		desc = desc.replace(',', '\\,')
 		default = '\\c ' + str(c.default) if c.default or gettype(c) == 'int' \
 				else 'empty'
-		output = '@config{' + name + ',' + desc + ',' + default + '}'
+		tdesc = typedesc(c) + '; default ' + default + '.'
+		tdesc = tdesc.replace(',', '\\,')
+		output = '@config{' + ','.join((name, desc, tdesc)) + '}'
 		for l in w.wrap(output):
 			tfile.write(prefix + l + '\n')
 
