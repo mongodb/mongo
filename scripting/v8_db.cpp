@@ -64,6 +64,7 @@ namespace mongo {
         scope->injectV8Function("insert", mongoInsert, proto);
         scope->injectV8Function("remove", mongoRemove, proto);
         scope->injectV8Function("update", mongoUpdate, proto);
+        scope->injectV8Function("auth", mongoAuth, proto);
 
         v8::Handle<FunctionTemplate> ic = scope->createV8Function(internalCursorCons);
         ic->InstanceTemplate()->SetInternalFieldCount( 1 );
@@ -463,7 +464,47 @@ namespace mongo {
         return v8::Undefined();
     }
 
+    v8::Handle<v8::Value> mongoAuth(V8Scope* scope, const v8::Arguments& args) {
+        jsassert( args.Length() >= 3 , "update needs at least 3 args" );
+        DBClientBase * conn = getConnection( args );
+        string db = toSTLString(args[0]);
+        string username = toSTLString(args[1]);
+        string password = toSTLString(args[2]);
+        string errmsg = "";
 
+        try {
+            if (conn->auth(db, username, password, errmsg)) {
+                return v8::Boolean::New(true);
+            }
+        } catch ( ... ) {
+        }
+        return v8::ThrowException( v8::String::New( errmsg.c_str() ) );
+    }
+
+//    +    JSBool mongo_auth(JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval) {
+//    +        smuassert( cx , "mongo_auth needs 3 args" , argc == 3 );
+//    +        shared_ptr< DBClientWithCommands > * connHolder = (shared_ptr< DBClientWithCommands >*)JS_GetPrivate( cx , obj );
+//    +        smuassert( cx ,  "no connection!" , connHolder && connHolder->get() );
+//    +        DBClientWithCommands *conn = connHolder->get();
+//    +
+//    +        Convertor c( cx );
+//    +
+//    +        string db = c.toString( argv[0] );
+//    +        string username = c.toString( argv[1] );
+//    +        string password = c.toString( argv[2] );
+//    +        string errmsg = "";
+//    +
+//    +        try {
+//    +            if (conn->auth(db, username, password, errmsg)) {
+//    +                return JS_TRUE;
+//    +            }
+//    +            JS_ReportError( cx, errmsg.c_str() );
+//    +        }
+//    +        catch ( ... ) {
+//    +            JS_ReportError( cx , "error doing query: unknown" );
+//    +        }
+//    +        return JS_FALSE;
+//    +    }
 
 
     // --- cursor ---
