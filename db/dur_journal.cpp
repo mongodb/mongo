@@ -90,7 +90,7 @@ namespace mongo {
                 (2) make an indicator in the journal dir that something bad happened.
                 (2b) refuse to do a recovery startup if that is there without manual override.
             */
-            log() << "journaling error " << msg << endl;
+            log() << "journaling failure/error: " << msg << endl;
             assert(false);
         }
 
