@@ -180,20 +180,20 @@ namespace mongo {
 
     void Matcher::addRegex(const char *fieldName, const char *regex, const char *flags, bool isNot) {
 
-	RegexMatcher rm;
-	rm._re.reset( new pcrecpp::RE(regex, flags2options(flags)) );
-	rm._fieldName = fieldName;
-	rm._regex = regex;
-	rm._flags = flags;
-	rm._isNot = isNot;
-	_regexs.push_back(rm);
+        RegexMatcher rm;
+        rm._re.reset( new pcrecpp::RE(regex, flags2options(flags)) );
+        rm._fieldName = fieldName;
+        rm._regex = regex;
+        rm._flags = flags;
+        rm._isNot = isNot;
+        _regexs.push_back(rm);
 
-	if (!isNot) { //TODO something smarter
-	    bool purePrefix;
-	    string prefix = simpleRegex(regex, flags, &purePrefix);
-	    if (purePrefix)
-		rm._prefix = prefix;
-	}
+        if (!isNot) { //TODO something smarter
+            bool purePrefix;
+            string prefix = simpleRegex(regex, flags, &purePrefix);
+            if (purePrefix)
+                rm._prefix = prefix;
+        }
     }
 
     bool Matcher::addOp( const BSONElement &e, const BSONElement &fe, bool isNot, const char *& regex, const char *&flags ) {

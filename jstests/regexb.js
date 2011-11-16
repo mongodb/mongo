@@ -5,8 +5,8 @@ t.drop();
 
 t.save( {a:'a',b:'b',c:'c',d:'d',e:'e'} );
 
-assert.eq( 1, t.count( {a:/a/,b:/b/,c:/c/,d:/d/,e:/e/} ) );    
-assert.eq( 0, t.count( {a:/a/,b:/b/,c:/c/,d:/d/,e:/barf/} ) ); // SERVER-969
+assert.eq( 1, t.count( {a:/a/,b:/b/,c:/c/,d:/d/,e:/e/} ) );
+assert.eq( 0, t.count( {a:/a/,b:/b/,c:/c/,d:/d/,e:/barf/} ) );
 
 
 
