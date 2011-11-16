@@ -103,11 +103,6 @@ namespace mongo {
             return ns[name.size()] == '.';
         }
 
-        // TODO: remove this method entirely
-        static bool validDBName( const string& ns ) {
-            return NamespaceString::validDBName( ns );
-        }
-        
         /**
          * @throws DatabaseDifferCaseCode if the name is a duplicate based on
          * case insensitive matching.

@@ -117,7 +117,7 @@ namespace mongo {
 
         string _todb( const string& ns ) const {
             string d = __todb( ns );
-            uassert( 13280 , (string)"invalid db name: " + ns , Database::validDBName( d ) );
+            uassert( 13280 , (string)"invalid db name: " + ns , NamespaceString::validDBName( d ) );
             return d;
         }
 

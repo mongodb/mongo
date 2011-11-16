@@ -433,9 +433,10 @@ namespace BasicTests {
     class DatabaseValidNames {
     public:
         void run() {
-            ASSERT( Database::validDBName( "foo" ) );
-            ASSERT( ! Database::validDBName( "foo/bar" ) );
-            ASSERT( ! Database::validDBName( "foo.bar" ) );
+            ASSERT( NamespaceString::validDBName( "foo" ) );
+            ASSERT( ! NamespaceString::validDBName( "foo/bar" ) );
+            ASSERT( ! NamespaceString::validDBName( "foo bar" ) );
+            ASSERT( ! NamespaceString::validDBName( "foo.bar" ) );
 
             ASSERT( NamespaceString::normal( "asdads" ) );
             ASSERT( ! NamespaceString::normal( "asda$ds" ) );
