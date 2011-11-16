@@ -180,25 +180,20 @@ namespace mongo {
 
     void Matcher::addRegex(const char *fieldName, const char *regex, const char *flags, bool isNot) {
 
-        if ( _nRegex >= 4 ) {
-            out() << "ERROR: too many regexes in query" << endl;
-        }
-        else {
-            RegexMatcher& rm = _regexs[_nRegex];
-            rm._re.reset( new pcrecpp::RE(regex, flags2options(flags)) );
-            rm._fieldName = fieldName;
-            rm._regex = regex;
-            rm._flags = flags;
-            rm._isNot = isNot;
-            _nRegex++;
+	RegexMatcher rm;
+	rm._re.reset( new pcrecpp::RE(regex, flags2options(flags)) );
+	rm._fieldName = fieldName;
+	rm._regex = regex;
+	rm._flags = flags;
+	rm._isNot = isNot;
+	_regexs.push_back(rm);
 
-            if (!isNot) { //TODO something smarter
-                bool purePrefix;
-                string prefix = simpleRegex(regex, flags, &purePrefix);
-                if (purePrefix)
-                    rm._prefix = prefix;
-            }
-        }
+	if (!isNot) { //TODO something smarter
+	    bool purePrefix;
+	    string prefix = simpleRegex(regex, flags, &purePrefix);
+	    if (purePrefix)
+		rm._prefix = prefix;
+	}
     }
 
     bool Matcher::addOp( const BSONElement &e, const BSONElement &fe, bool isNot, const char *& regex, const char *&flags ) {
@@ -456,7 +451,7 @@ namespace mongo {
     /* _jsobj          - the query pattern
     */
     Matcher::Matcher(const BSONObj &jsobj, bool nested) :
-        _where(0), _jsobj(jsobj), _haveSize(), _all(), _hasArray(0), _haveNeg(), _atomic(false), _nRegex(0) {
+        _where(0), _jsobj(jsobj), _haveSize(), _all(), _hasArray(0), _haveNeg(), _atomic(false) {
 
         BSONObjIterator i(_jsobj);
         while ( i.more() ) {
@@ -465,7 +460,7 @@ namespace mongo {
     }
 
     Matcher::Matcher( const Matcher &docMatcher, const BSONObj &key ) :
-        _where(0), _constrainIndexKey( key ), _haveSize(), _all(), _hasArray(0), _haveNeg(), _atomic(false), _nRegex(0) {
+        _where(0), _constrainIndexKey( key ), _haveSize(), _all(), _hasArray(0), _haveNeg(), _atomic(false) {
         // Filter out match components that will provide an incorrect result
         // given a key from a single key index.
         for( vector< ElementMatcher >::const_iterator i = docMatcher._basics.begin(); i != docMatcher._basics.end(); ++i ) {
@@ -501,10 +496,12 @@ namespace mongo {
                 }
             }
         }
-        for( int i = 0; i < docMatcher._nRegex; ++i ) {
-            if ( !docMatcher._regexs[ i ]._isNot && key.hasField( docMatcher._regexs[ i ]._fieldName ) ) {
-                _regexs[ _nRegex++ ] = docMatcher._regexs[ i ];
-            }
+        for( vector<RegexMatcher>::const_iterator it = docMatcher._regexs.begin();
+	     it != docMatcher._regexs.end();
+	     ++it) {
+	  if ( !it->_isNot && key.hasField( it->_fieldName ) ) {
+	      _regexs.push_back(*it);
+	  }
         }
         // Recursively filter match components for and and or matchers.
         for( list< shared_ptr< Matcher > >::const_iterator i = docMatcher._andMatchers.begin(); i != docMatcher._andMatchers.end(); ++i ) {
@@ -854,11 +851,12 @@ namespace mongo {
             }
         }
 
-        for ( int r = 0; r < _nRegex; r++ ) {
-            RegexMatcher& rm = _regexs[r];
+        for (vector<RegexMatcher>::const_iterator it = _regexs.begin();
+	     it != _regexs.end();
+	     ++it) {
             BSONElementSet s;
             if ( !_constrainIndexKey.isEmpty() ) {
-                BSONElement e = jsobj.getFieldUsingIndexNames(rm._fieldName, _constrainIndexKey);
+                BSONElement e = jsobj.getFieldUsingIndexNames(it->_fieldName, _constrainIndexKey);
 
                 // Should only have keys nested one deep here, for geo-indices
                 // TODO: future indices may nest deeper?
@@ -873,13 +871,13 @@ namespace mongo {
 
             }
             else {
-                jsobj.getFieldsDotted( rm._fieldName, s );
+                jsobj.getFieldsDotted( it->_fieldName, s );
             }
             bool match = false;
             for( BSONElementSet::const_iterator i = s.begin(); i != s.end(); ++i )
-                if ( regexMatches(rm, *i) )
+                if ( regexMatches(*it, *i) )
                     match = true;
-            if ( !match ^ rm._isNot )
+            if ( !match ^ it->_isNot )
                 return false;
         }
 
@@ -971,7 +969,7 @@ namespace mongo {
         }
         
         // Check that all match components are available in the index matcher.
-        if ( !( _basics.size() == docMatcher._basics.size() && _nRegex == docMatcher._nRegex && !docMatcher._where ) ) {
+        if ( !( _basics.size() == docMatcher._basics.size() && _regexs.size() == docMatcher._regexs.size() && !docMatcher._where ) ) {
             return false;
         }
         if ( _andMatchers.size() != docMatcher._andMatchers.size() ) {

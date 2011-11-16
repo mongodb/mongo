@@ -209,8 +209,7 @@ namespace mongo {
         */
         bool _atomic;
 
-        RegexMatcher _regexs[4];
-        int _nRegex;
+	vector<RegexMatcher> _regexs;
 
         // so we delete the mem when we're done:
         vector< shared_ptr< BSONObjBuilder > > _builders;
