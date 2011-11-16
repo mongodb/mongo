@@ -120,10 +120,28 @@ namespace mongo {
         OpTime ts;
         time_t start = time(0);
         unsigned long long n = 0;
-        while( 1 ) {
+        int fails = 0;
+        while( ts < minValid ) {
             try {
-                if( !r.more() )
-                    break;
+                // There are some special cases with initial sync (see the catch block), so we
+                // don't want to break out of this while until we've reached minvalid. Thus, we'll
+                // keep trying to requery.
+                if( !r.more() ) {
+                    OCCASIONALLY log() << "replSet initial sync oplog: no more records" << endl;
+                    sleepsecs(1);
+
+                    r.resetCursor();
+                    r.tailingQueryGTE(rsoplog, lastOpTimeWritten);
+                    if ( !r.haveCursor() ) {
+                        if (fails++ > 30) {
+                            log() << "replSet initial sync tried to query oplog 30 times, giving up" << endl;
+                            return false;
+                        }
+                    }
+
+                    continue;
+                }
+
                 BSONObj o = r.nextSafe(); /* note we might get "not master" at some point */
                 ts = o["ts"]._opTime();
 
@@ -161,10 +179,6 @@ namespace mongo {
                     }
                 }
 
-                if ( ts > minValid ) {
-                    break;
-                }
-
                 getDur().commitIfNeeded();
             }
             catch (DBException& e) {
@@ -191,8 +205,8 @@ namespace mongo {
                     return false;
                 }
 
-                // otherwise, whatever
-                break;
+                // otherwise, whatever, we'll break out of the loop and catch
+                // anything that's really wrong in syncTail
             }
         }
         return true;
