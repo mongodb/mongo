@@ -206,7 +206,8 @@ void shellHistoryInit() {
 }
 void shellHistoryDone() {
 #ifdef USE_LINENOISE
-    linenoiseHistorySave( (char*)historyFile.c_str() );
+    linenoiseHistorySave( historyFile.c_str() );
+    linenoiseHistoryFree();
 #endif
 }
 void shellHistoryAdd( const char * line ) {
@@ -286,6 +287,7 @@ void quitNicely( int sig ) {
     exit(0);
 }
 
+// the returned string is allocated with strdup() or malloc() and must be freed by calling free()
 char * shellReadline( const char * prompt , int handlesigint = 0 ) {
 
     atPrompt = true;
@@ -313,7 +315,7 @@ char * shellReadline( const char * prompt , int handlesigint = 0 ) {
     return ret;
 #else
     printf("%s", prompt); cout.flush();
-    char * buf = new char[1024];
+    char * buf = (char *)malloc(1024);
     char * l = fgets( buf , 1024 , stdin );
     int len = strlen( buf );
     if ( len )
@@ -508,8 +510,11 @@ string finishCode( string code ) {
         if ( code.find("\n\n\n") != string::npos )
             return ";";
         char * line = shellReadline("... " , 1 );
-        if ( gotInterrupted )
+        if ( gotInterrupted ) {
+            if (line)
+                free(line);
             return "";
+        }
         if ( ! line )
             return "";
 
@@ -517,6 +522,7 @@ string finishCode( string code ) {
             line += 4;
 
         code += line;
+        free(line);
     }
     return code;
 }
@@ -851,37 +857,43 @@ int _main(int argc, char* argv[]) {
 
             char * line = shellReadline( prompt.c_str() );
 
-            if ( line ) {
-                while (startsWith(line, "> "))
-                    line += 2;
+            char * linePtr = line;  // can't clobber 'line', we need to free() it later
+            if ( linePtr ) {
+                while (startsWith(linePtr, "> "))   // this makes no sense, the prompt isn't part of the buffer
+                    linePtr += 2;
 
-                while ( line[0] == ' ' )
-                    line++;
+                while ( linePtr[0] == ' ' )
+                    linePtr++;
             }
 
-            if ( ! line || ( strlen(line) == 4 && strstr( line , "exit" ) ) ) {
+            if ( ! linePtr || ( strlen(linePtr) == 4 && strstr( linePtr , "exit" ) ) ) {
                 cout << "bye" << endl;
+                if (line)
+                    free(line);
                 break;
             }
 
-            string code = line;
+            string code = linePtr;
             if ( code == "exit" || code == "exit;" ) {
+                free(line);
                 break;
             }
 
-            if ( code.size() == 0 )
+            if ( code.size() == 0 ) {
+                free(line);
                 continue;
+            }
 
 #ifndef _WIN32
-            if (startsWith(line, "edit ")){
-                shellHistoryAdd( line );
+            if (startsWith(linePtr, "edit ")){
+                shellHistoryAdd( linePtr );
 
-                const char* s = line + 5; // skip "edit "
+                const char* s = linePtr + 5; // skip "edit "
                 while(*s && isspace(*s))
                     s++;
 
-
                 edit(s);
+                free(line);
                 continue;
             }
 #endif
@@ -889,15 +901,18 @@ int _main(int argc, char* argv[]) {
             code = finishCode( code );
             if ( gotInterrupted ) {
                 cout << endl;
+                free(line);
                 continue;
             }
 
-            if ( code.size() == 0 )
+            if ( code.size() == 0 ) {
+                free(line);
                 break;
+            }
 
             bool wascmd = false;
             {
-                string cmd = line;
+                string cmd = linePtr;
                 if ( cmd.find( " " ) > 0 )
                     cmd = cmd.substr( 0 , cmd.find( " " ) );
 
@@ -928,6 +943,7 @@ int _main(int argc, char* argv[]) {
             }
 
             shellHistoryAdd( line );
+            free(line);
         }
 
         shellHistoryDone();
