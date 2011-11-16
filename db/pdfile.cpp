@@ -1078,7 +1078,7 @@ namespace mongo {
 
         /* have any index keys changed? */
         {
-            unsigned keyUpdates = 0;
+            int keyUpdates = 0;
             int z = d->nIndexesBeingBuilt();
             for ( int x = 0; x < z; x++ ) {
                 IndexDetails& idx = d->idx(x);

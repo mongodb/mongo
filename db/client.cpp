@@ -712,25 +712,25 @@ namespace mongo {
         query = BSONObj();
         updateobj = BSONObj();
 
-        cursorid = 0;
-        ntoreturn = 0;
-        ntoskip = 0;
+        cursorid = -1;
+        ntoreturn = -1;
+        ntoskip = -1;
         exhaust = false;
 
-        nscanned = 0;
+        nscanned = -1;
         idhack = false;
         scanAndOrder = false;
         moved = false;
         fastmod = false;
         fastmodinsert = false;
         upsert = false;
-        keyUpdates = 0;
+        keyUpdates = 0;  // unsigned, so -1 not possible
         
         exceptionInfo.reset();
         
         executionTime = 0;
-        nreturned = 0;
-        responseLength = 0;
+        nreturned = -1;
+        responseLength = -1;
     }
 
 
@@ -787,7 +787,7 @@ namespace mongo {
         return s.str();
     }
 
-#define OPDEBUG_APPEND_NUMBER(x) if( x ) b.append( #x , (x) )
+#define OPDEBUG_APPEND_NUMBER(x) if( x != -1 ) b.append( #x , (x) )
 #define OPDEBUG_APPEND_BOOL(x) if( x ) b.appendBool( #x , (x) )
     void OpDebug::append( const CurOp& curop, BSONObjBuilder& b ) const {
         b.append( "op" , iscommand ? "command" : opToString( op ) );

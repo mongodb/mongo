@@ -65,7 +65,7 @@ namespace mongo {
         bool fastmod;
         bool fastmodinsert;  // upsert of an $operation. builds a default object
         bool upsert;         // true if the update actually did an insert
-        unsigned keyUpdates;
+        int keyUpdates;
 
         // error handling
         ExceptionInfo exceptionInfo;
