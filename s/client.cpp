@@ -281,6 +281,7 @@ namespace mongo {
             catch( std::exception &e ){
                 warning() << "could not clear last error from a shard " << temp << causedBy( e ) << endl;
             }
+            conn.done();
         }
         clearSinceLastGetError();
 
