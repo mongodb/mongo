@@ -284,13 +284,6 @@ namespace mongo {
         return true;
     }
 
-    bool Database::validDBName( const string& ns ) {
-        if ( ns.size() == 0 || ns.size() > 64 )
-            return false;
-        size_t good = strcspn( ns.c_str() , "/\\. \"" );
-        return good == ns.size();
-    }
-
     void Database::flushFiles( bool sync ) const {
         dbMutex.assertAtLeastReadLocked();
         for ( unsigned i=0; i<files.size(); i++ ) {

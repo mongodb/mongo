@@ -60,6 +60,28 @@ namespace mongo {
         static bool special(const char *ns) { 
             return !normal(ns) || strstr(ns, ".system.");
         }
+        
+        /**
+         * samples:
+         *   good:  
+         *      foo  
+         *      bar
+         *      foo-bar
+         *   bad:
+         *      foo bar
+         *      foo.bar
+         *      foo"bar
+         *        
+         * @param db - a possible database name
+         * @return if db is an allowed database name
+         */
+        static bool validDBName( const string& db ) {
+            if ( db.size() == 0 || db.size() > 64 )
+                return false;
+            size_t good = strcspn( db.c_str() , "/\\. \"" );
+            return good == db.size();
+        }
+
     private:
         void init(const char *ns) {
             const char *p = strchr(ns, '.');
