@@ -161,7 +161,7 @@ static int isUnsupportedTerm(void) {
     return 0;
 }
 
-static void freeHistory(void) {
+void linenoiseHistoryFree(void) {
     if (history) {
         int j;
 
@@ -233,7 +233,6 @@ static void disableRawMode(int fd) {
 /* At exit we'll try to fix the terminal to the initial conditions. */
 static void linenoiseAtExit(void) {
     disableRawMode(STDIN_FILENO);
-    freeHistory();
 }
 
 static int getColumns(void) {
@@ -795,6 +794,7 @@ static int linenoiseRaw(char *buf, int buflen, PROMPTINFO & pi) {
     return count;
 }
 
+// the returned string is allocated with strdup() and must be freed by calling free()
 char *linenoise(const char *prompt) {
     char buf[LINENOISE_MAX_LINE];
     int count;
