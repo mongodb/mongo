@@ -11,7 +11,6 @@
 #include <map>
 #include <vector>
 #include <set>
-#include <strstream>
 
 #include "bson/inline_decls.h"
 
