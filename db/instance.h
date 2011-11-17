@@ -34,7 +34,7 @@ namespace mongo {
         and debugging.
         */
     class DiagLog {
-        ofstream *f;
+        ofstream *f; // note this is never freed
         /* 0 = off; 1 = writes, 2 = reads, 3 = both
            7 = log a few reads, and all writes.
         */
