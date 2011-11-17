@@ -83,7 +83,7 @@ namespace mongo {
             out << "   conn     \t- number of open connections\n";
             out << "   set      \t- replica set name\n";
             out << "   repl     \t- replication type \n";
-            out << "            \t    M   - master (primary)\n";
+            out << "            \t    PRI - primary (master)\n";
             out << "            \t    SEC - secondary\n";
             out << "            \t    REC - recovering\n";
             out << "            \t    UNK - unknown\n";
@@ -317,7 +317,7 @@ namespace mongo {
                 }
 
                 if ( x["ismaster"].trueValue() )
-                    ss << "M";
+                    ss << "PRI";
                 else if ( x["secondary"].trueValue() )
                     ss << "SEC";
                 else if ( x["isreplicaset"].trueValue() )
