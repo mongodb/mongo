@@ -209,6 +209,7 @@ linux64  = False
 darwin = False
 windows = False
 freebsd = False
+netbsd = False
 openbsd = False
 solaris = False
 force64 = has_option( "force64" )
@@ -540,6 +541,13 @@ elif os.sys.platform.startswith( "freebsd" ):
     env.Append( CPPPATH=[ "/usr/local/include" ] )
     env.Append( LIBPATH=[ "/usr/local/lib" ] )
     env.Append( CPPDEFINES=[ "__freebsd__" ] )
+
+elif os.sys.platform.startswith( "netbsd" ):
+    nix = True
+    netbsd = True
+    env.Append( CPPPATH=[ "/usr/pkg/include" ] )
+    env.Append( LIBPATH=[ "/usr/pkg/lib" ] )
+    env.Append( CPPDEFINES=[ "__netbsd__" ] )
 
 elif os.sys.platform.startswith( "openbsd" ):
     nix = True
