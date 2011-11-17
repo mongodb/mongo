@@ -19,9 +19,12 @@
 #pragma once
 
 #include "cmdline.h"
+#include "namespace.h"
 
 namespace mongo {
 
+    class Extent;
+    class MongoDataFile;
     class ClientCursor;
     struct ByLocKey;
     typedef map<ByLocKey, ClientCursor*> CCByLoc;
@@ -126,6 +129,8 @@ namespace mongo {
         const string profileName; // "alleyinsider.system.profile"
         CCByLoc ccByLoc;
         int magic; // used for making sure the object is still loaded in memory
+
+        RWLockBase dbLock; // d_concurrency.h
     };
 
 } // namespace mongo

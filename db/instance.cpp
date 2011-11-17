@@ -41,6 +41,7 @@
 #include "ops/update.h"
 #include "ops/delete.h"
 #include "ops/query.h"
+#include "d_concurrency.h"
 
 namespace mongo {
 
@@ -473,7 +474,8 @@ namespace mongo {
 
         writelock lk;
 
-        // writelock is used to synchronize stepdowns w/ writes
+        // void ReplSetImpl::relinquish() uses big write lock so 
+        // this is thus synchronized given our lock above.
         uassert( 10054 ,  "not master", isMasterNs( ns ) );
         
         // if this ever moves to outside of lock, need to adjust check Client::Context::_finishInit
@@ -666,7 +668,9 @@ namespace mongo {
         }
 
         writelock lk(ns);
+        //LockCollectionExclusively lk(ns);
 
+        // CONCURRENCY TODO: is being read locked in big log sufficient here?
         // writelock is used to synchronize stepdowns w/ writes
         uassert( 10058 , "not master", isMasterNs(ns) );
 
