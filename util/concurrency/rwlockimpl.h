@@ -11,6 +11,9 @@ namespace mongo {
         SRWLOCK _lock;
     protected:
         RWLockBase() { InitializeSRWLock(&_lock); }
+        ~RWLockBase() {
+            // no special action needed to destroy a SRWLOCK
+        }
         void lock()          { AcquireSRWLockExclusive(&_lock); }
         void unlock()        { ReleaseSRWLockExclusive(&_lock); }
         void lock_shared()   { AcquireSRWLockShared(&_lock); }

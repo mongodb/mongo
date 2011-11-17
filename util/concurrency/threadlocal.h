@@ -54,6 +54,12 @@ namespace mongo {
         const T _default;
     };
 
+    /* TSP
+       These macros use intrinsics which are faster than boost::thread_specific_ptr. 
+       However the intrinsics don't free up objects on thread closure. Thus we use 
+       a combination here, with the assumption that reset's are infrequent, so that 
+       get's are fast.
+    */
 #if defined(_WIN32) || (defined(__GNUC__) && defined(__linux__))
         
     template< class T >

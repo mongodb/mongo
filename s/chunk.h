@@ -373,6 +373,8 @@ namespace mongo {
 
         const unsigned long long _sequenceNumber;
 
+        mutable TicketHolder _splitTickets; // number of concurrent splitVector we can do from a splitIfShould per collection
+        
         friend class Chunk;
         friend class ChunkRangeManager; // only needed for CRM::assertValid()
         static AtomicUInt NextSequenceNumber;

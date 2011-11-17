@@ -19,6 +19,7 @@
 #pragma once
 
 #include "../pch.h"
+#include "namespace_common.h"
 #include "jsobj.h"
 #include "querypattern.h"
 #include "diskloc.h"
@@ -27,46 +28,6 @@
 
 namespace mongo {
 
-    /* in the mongo source code, "client" means "database". */
-
-    const int MaxDatabaseNameLen = 256; // max str len for the db name, including null char
-
-    /* e.g.
-       NamespaceString ns("acme.orders");
-       cout << ns.coll; // "orders"
-    */
-    class NamespaceString {
-    public:
-        string db;
-        string coll; // note collection names can have periods in them for organizing purposes (e.g. "system.indexes")
-
-        NamespaceString( const char * ns ) { init(ns); }
-        NamespaceString( const string& ns ) { init(ns.c_str()); }
-        string ns() const { return db + '.' + coll; }
-        bool isSystem() const { return strncmp(coll.c_str(), "system.", 7) == 0; }
-
-        /**
-         * @return true if ns is 'normal'.  $ used for collections holding index data, which do not contain BSON objects in their records.
-         * special case for the local.oplog.$main ns -- naming it as such was a mistake.
-         */
-        static bool normal(const char* ns) {
-            const char *p = strchr(ns, '$');
-            if( p == 0 )
-                return true;
-            return strcmp( ns, "local.oplog.$main" ) == 0;
-        }
-
-        static bool special(const char *ns) { 
-            return !normal(ns) || strstr(ns, ".system.");
-        }
-    private:
-        void init(const char *ns) {
-            const char *p = strchr(ns, '.');
-            if( p == 0 ) return;
-            db = string(ns, p - ns);
-            coll = p + 1;
-        }
-    };
 
 #pragma pack(1)
     /* This helper class is used to make the HashMap below in NamespaceIndex e.g. see line:
@@ -663,31 +624,5 @@ namespace mongo {
     // (Arguments should include db name)
     void renameNamespace( const char *from, const char *to );
 
-    // "database.a.b.c" -> "database"
-    inline void nsToDatabase(const char *ns, char *database) {
-        const char *p = ns;
-        char *q = database;
-        while ( *p != '.' ) {
-            if ( *p == 0 )
-                break;
-            *q++ = *p++;
-        }
-        *q = 0;
-        if (q-database>=MaxDatabaseNameLen) {
-            log() << "nsToDatabase: ns too long. terminating, buf overrun condition" << endl;
-            dbexit( EXIT_POSSIBLE_CORRUPTION );
-        }
-    }
-    inline string nsToDatabase(const char *ns) {
-        char buf[MaxDatabaseNameLen];
-        nsToDatabase(ns, buf);
-        return buf;
-    }
-    inline string nsToDatabase(const string& ns) {
-        size_t i = ns.find( '.' );
-        if ( i == string::npos )
-            return ns;
-        return ns.substr( 0 , i );
-    }
 
 } // namespace mongo

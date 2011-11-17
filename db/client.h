@@ -141,8 +141,6 @@ namespace mongo {
             */
         bool sometimes(unsigned howOften) { return ++_sometimes % howOften == 0; }
 
-    public:
-
         /* set _god=true temporarily, safely */
         class GodScope {
             bool _prev;
@@ -221,8 +219,13 @@ namespace mongo {
 
             string _ns;
             Database * _db;
-
         }; // class Client::Context
+
+        struct LockStatus { 
+            LockStatus() : db(), coll() { }
+            int db;
+            int coll;
+        } lockStatus;
 
     }; // class Client
 

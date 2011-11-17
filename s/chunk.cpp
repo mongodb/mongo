@@ -344,6 +344,12 @@ namespace mongo {
 
             if ( _dataWritten < splitThreshold / 5 )
                 return false;
+            
+            if ( ! getManager()->_splitTickets.tryAcquire() ) {
+                LOG(1) << "won't auto split becaue not enough tickets: " << getManager()->getns() << endl;
+                return false;
+            }
+            TicketHolderReleaser releaser( &getManager()->_splitTickets );
 
             // this is a bit ugly
             // we need it so that mongos blocks for the writes to actually be committed
@@ -542,7 +548,9 @@ namespace mongo {
         // The shard versioning mechanism hinges on keeping track of the number of times we reloaded ChunkManager's.
         // Increasing this number here will prompt checkShardVersion() to refresh the connection-level versions to
         // the most up to date value.
-        _sequenceNumber(++NextSequenceNumber)
+        _sequenceNumber(++NextSequenceNumber),
+
+        _splitTickets( 5 )
 
     {
         int tries = 3;
