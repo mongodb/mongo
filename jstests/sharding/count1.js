@@ -88,6 +88,12 @@ assert.eq( 5 , db.foo.find( { name : { $gt : "z" } } ).sort( { _id : 1 } ).skip(
 sleep( 5000 )
 assert.eq( 3 , db.foo.find( { name : { $gt : "z" } } ).sort( { _id : 1 } ).skip(5).limit(3).itcount() , "LSF4" )
 
+// SERVER-3567
+assert.eq( 2 , db.foo.find().limit(2).itcount() , "N1" );
+assert.eq( 2 , db.foo.find().limit(-2).itcount() , "N2" );
+assert.eq( 2 , db.foo.find().skip(4).limit(2).itcount() , "N3" );
+assert.eq( 2 , db.foo.find().skip(4).limit(-2).itcount() , "N4" );
+
 s.stop();
 
 
