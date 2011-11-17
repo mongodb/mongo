@@ -8,8 +8,15 @@
 
 #pragma once
 
+#include <map>
+#include <vector>
+#include <set>
+#include <strstream>
+
 #include "bson/inline_decls.h"
-using namespace bson;
+
+//using namespace std;
+//using namespace bson;
 
 /* Note: do not clutter code with these -- ONLY use in hot spots / significant loops. */
 
