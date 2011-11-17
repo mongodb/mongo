@@ -72,6 +72,18 @@ Install the following ports:
   * lang/spidermonkey
 
 
+NETBSD
+--------------
+
+Install the following packages:
+
+  * devel/scons
+  * devel/boost-headers
+  * devel/boost-libs
+  * devel/pcre
+  * lang/spidermonkey
+
+
 Special Build Notes
 --------------
   * [debian etch on ec2](building.debian.etch.ec2.html)
