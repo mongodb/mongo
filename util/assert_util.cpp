@@ -100,7 +100,7 @@ namespace mongo {
         breakpoint();
 #if defined(_DEBUG) || defined(_DURABLEDEFAULTON) || defined(_DURABLEDEFAULTOFF)
         // this is so we notice in buildbot
-        log() << "\n\n***aborting after assert() failure in a debug/test build\n\n" << endl;
+        log() << "\n\n***aborting after assert() failure as this is a debug/test build\n\n" << endl;
         abort();
 #endif
         throw e;

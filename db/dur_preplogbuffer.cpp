@@ -46,20 +46,20 @@ namespace mongo {
 
         RelativePath local = RelativePath::fromRelativePath("local");
 
-        MongoMMF* findMMF_inlock(void *ptr, size_t &ofs) {
+        static MongoMMF* findMMF_inlock(void *ptr, size_t &ofs) {
             MongoMMF *f = privateViews.find_inlock(ptr, ofs);
             if( f == 0 ) {
                 error() << "findMMF_inlock failed " << privateViews.numberOfViews_inlock() << endl;
-                printStackTrace(); // we want a stack trace and the assert below didn't print a trace once in the real world
+                printStackTrace(); // we want a stack trace and the assert below didn't print a trace once in the real world - not sure why
                 stringstream ss;
                 ss << "view pointer cannot be resolved " << hex << (size_t) ptr;
-                journalingFailure(ss.str().c_str()); // asserts
+                journalingFailure(ss.str().c_str()); // asserts, which then abends
             }
             return f;
         }
 
         /** put the basic write operation into the buffer (bb) to be journaled */
-        void prepBasicWrite_inlock(AlignedBuilder&bb, const WriteIntent *i, RelativePath& lastDbPath) {
+        static void prepBasicWrite_inlock(AlignedBuilder&bb, const WriteIntent *i, RelativePath& lastDbPath) {
             size_t ofs = 1;
             MongoMMF *mmf = findMMF_inlock(i->start(), /*out*/ofs);
 
@@ -117,7 +117,7 @@ namespace mongo {
             two writes to the same location during the group commit interval, it is likely
             (although not assured) that it is journaled here once.
         */
-        void prepBasicWrites(AlignedBuilder& bb) {
+        static void prepBasicWrites(AlignedBuilder& bb) {
             scoped_lock lk(privateViews._mutex());
 
             // each time events switch to a different database we journal a JDbContext
@@ -128,7 +128,7 @@ namespace mongo {
             }
         }
 
-        void resetLogBuffer(/*out*/JSectHeader& h, AlignedBuilder& bb) {
+        static void resetLogBuffer(/*out*/JSectHeader& h, AlignedBuilder& bb) {
             bb.reset();
 
             h.setSectionLen(0xffffffff);  // total length, will fill in later
@@ -141,7 +141,7 @@ namespace mongo {
             caller handles locking
             @return partially populated sectheader and _ab set
         */
-        void _PREPLOGBUFFER(JSectHeader& h) {
+        static void _PREPLOGBUFFER(JSectHeader& h) {
             assert( cmdLine.dur );
 
             {
