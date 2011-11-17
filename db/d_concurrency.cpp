@@ -9,9 +9,23 @@ using namespace std;
 
 namespace mongo {
 
+#if defined(CLC)
+   
+    static void dbLock(Client& c) {
+        Client::LockStatus& s = c.lockStatus;
+        if( s.db++ == 0 ) { // i.e. allow recursive
+        }
+    }
+
     LockCollectionForReading::LockCollectionForReading(const char *ns)
     {
+        Client& c = cc();
+        lockDb(c);
+
+
 //...
     }
+
+#endif
 
 }

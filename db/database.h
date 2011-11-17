@@ -130,7 +130,7 @@ namespace mongo {
         CCByLoc ccByLoc;
         int magic; // used for making sure the object is still loaded in memory
 
-        RWLockBase dbLock; // d_concurrency.h
+        RWLockBase dbLock; // see d_concurrency.h
     };
 
 } // namespace mongo
