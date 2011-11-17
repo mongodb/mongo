@@ -45,7 +45,7 @@ namespace NamespaceTests {
             }
         protected:
             void create( bool sparse = false ) {
-                NamespaceDetailsTransient::get_w( ns() ).deletedIndex();
+                NamespaceDetailsTransient::get( ns() ).deletedIndex();
                 BSONObjBuilder builder;
                 builder.append( "ns", ns() );
                 builder.append( "name", "testIndex" );

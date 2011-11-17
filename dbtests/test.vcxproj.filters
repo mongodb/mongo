@@ -325,6 +325,7 @@
     <ClInclude Include="..\third_party\pcre-7.4\pcrecpp.h" />
     <ClInclude Include="..\third_party\pcre-7.4\config.h" />
     <ClInclude Include="..\third_party\pcre-7.4\pcre.h" />
+    <ClInclude Include="..\db\collection.h" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\js\js64r.lib">

@@ -993,7 +993,7 @@ namespace mongo {
         unindexRecord(d, todelete, dl, noWarn);
 
         _deleteRecord(d, ns, todelete, dl);
-        NamespaceDetailsTransient::get_w( ns ).notifyOfWriteOp();
+        NamespaceDetailsTransient::get( ns ).notifyOfWriteOp();
 
         if ( ! toDelete.isEmpty() ) {
             logOp( "d" , ns , toDelete );
@@ -1508,7 +1508,7 @@ namespace mongo {
             bgJobsInProgress.insert(d);
         }
         void done(const char *ns, NamespaceDetails *d) {
-            NamespaceDetailsTransient::get_w(ns).addedIndex(); // clear query optimizer cache
+            NamespaceDetailsTransient::get(ns).addedIndex(); // clear query optimizer cache
             assertInWriteLock();
         }
 
@@ -1987,7 +1987,7 @@ namespace mongo {
 
         // we don't bother resetting query optimizer stats for the god tables - also god is true when adding a btree bucket
         if ( !god )
-            NamespaceDetailsTransient::get_w( ns ).notifyOfWriteOp();
+            NamespaceDetailsTransient::get( ns ).notifyOfWriteOp();
 
         if ( tableToIndex ) {
             insert_makeIndex(tableToIndex, tabletoidxns, loc);

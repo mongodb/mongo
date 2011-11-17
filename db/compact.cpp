@@ -185,7 +185,7 @@ namespace mongo {
         ProgressMeterHolder pm( cc().curop()->setMessage( "compact extent" , extents.size() ) );
 
         // same data, but might perform a little different after compact?
-        NamespaceDetailsTransient::get_w(ns).clearQueryCache();
+        NamespaceDetailsTransient::get(ns).clearQueryCache();
 
         int nidx = d->nIndexes;
         scoped_array<IndexSpec> indexSpecs( new IndexSpec[nidx] );

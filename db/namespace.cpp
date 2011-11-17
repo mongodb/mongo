@@ -519,7 +519,7 @@ namespace mongo {
 
         (*getDur().writing(&nIndexes))++;
         if ( resetTransient )
-            NamespaceDetailsTransient::get_w(thisns).addedIndex();
+            NamespaceDetailsTransient::get(thisns).addedIndex();
         return *id;
     }
 
@@ -594,7 +594,7 @@ namespace mongo {
 
     SimpleMutex NamespaceDetailsTransient::_qcMutex("qc");
     SimpleMutex NamespaceDetailsTransient::_isMutex("is");
-    map< string, shared_ptr< NamespaceDetailsTransient > > NamespaceDetailsTransient::_map;
+    map< string, shared_ptr< NamespaceDetailsTransient > > NamespaceDetailsTransient::_nsdMap;
     typedef map< string, shared_ptr< NamespaceDetailsTransient > >::iterator ouriter;
 
     void NamespaceDetailsTransient::reset() {
@@ -604,32 +604,25 @@ namespace mongo {
         _indexSpecs.clear();
     }
 
-    /*    NamespaceDetailsTransient& NamespaceDetailsTransient::get(const char *ns) {
-            shared_ptr< NamespaceDetailsTransient > &t = map_[ ns ];
-            if ( t.get() == 0 )
-                t.reset( new NamespaceDetailsTransient(ns) );
-            return *t;
-        }
-    */
     void NamespaceDetailsTransient::clearForPrefix(const char *prefix) {
         assertInWriteLock();
         vector< string > found;
-        for( ouriter i = _map.begin(); i != _map.end(); ++i )
+        for( ouriter i = _nsdMap.begin(); i != _nsdMap.end(); ++i )
             if ( strncmp( i->first.c_str(), prefix, strlen( prefix ) ) == 0 )
                 found.push_back( i->first );
         for( vector< string >::iterator i = found.begin(); i != found.end(); ++i ) {
-            _map[ *i ].reset();
+            _nsdMap[ *i ].reset();
         }
     }
 
     void NamespaceDetailsTransient::eraseForPrefix(const char *prefix) {
         assertInWriteLock();
         vector< string > found;
-        for( ouriter i = _map.begin(); i != _map.end(); ++i )
+        for( ouriter i = _nsdMap.begin(); i != _nsdMap.end(); ++i )
             if ( strncmp( i->first.c_str(), prefix, strlen( prefix ) ) == 0 )
                 found.push_back( i->first );
         for( vector< string >::iterator i = found.begin(); i != found.end(); ++i ) {
-            _map.erase(*i);
+            _nsdMap.erase(*i);
         }
     }
 

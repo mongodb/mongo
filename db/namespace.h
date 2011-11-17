@@ -423,21 +423,12 @@ namespace mongo {
     private:
         string _ns;
         void reset();
-        static std::map< string, shared_ptr< NamespaceDetailsTransient > > _map;
+        static std::map< string, shared_ptr< NamespaceDetailsTransient > > _nsdMap;
     public:
         NamespaceDetailsTransient(const char *ns) : _ns(ns), _keysComputed(false), _qcWriteCount() { }
-    private:
-        /* _get() is not threadsafe -- see get_inlock() comments */
-        static NamespaceDetailsTransient& _get(const char *ns);
     public:
-        /* use get_w() when doing write operations. this is safe as there is only 1 write op and it's exclusive to everything else.  
-           for reads you must lock and then use get_inlock() instead. */
-        static NamespaceDetailsTransient& get_w(const char *ns) {
-            DEV assertInWriteLock();
-            return _get(ns);
-        }
-        void addedIndex() { reset(); }
-        void deletedIndex() { reset(); }
+        void addedIndex() { assertInWriteLock(); reset(); }
+        void deletedIndex() { assertInWriteLock(); reset(); }
         /* Drop cached information on all namespaces beginning with the specified prefix.
            Can be useful as index namespaces share the same start as the regular collection.
            SLOW - sequential scan of all NamespaceDetailsTransient objects */
@@ -505,10 +496,20 @@ namespace mongo {
         map< QueryPattern, pair< BSONObj, long long > > _qcCache;
     public:
         static SimpleMutex _qcMutex;
-        /* you must be in the qcMutex when calling this (and using the returned val): */
-        static NamespaceDetailsTransient& get_inlock(const char *ns) {
-            return _get(ns);
+
+        /* you must be in the qcMutex when calling this.
+           A NamespaceDetailsTransient object will not go out of scope on you if you are
+           dbMutex.atLeastReadLocked(), so you do't have to stay locked.
+           Creates a NamespaceDetailsTransient before returning if one DNE. 
+           todo: avoid creating too many on erroneous ns queries.
+           */
+        static NamespaceDetailsTransient& get_inlock(const char *ns);
+
+        static NamespaceDetailsTransient& get(const char *ns) {
+            SimpleMutex::scoped_lock lk(_qcMutex);
+            return get_inlock(ns);
         }
+
         void clearQueryCache() { // public for unit tests
             _qcCache.clear();
             _qcWriteCount = 0;
@@ -532,8 +533,8 @@ namespace mongo {
 
     }; /* NamespaceDetailsTransient */
 
-    inline NamespaceDetailsTransient& NamespaceDetailsTransient::_get(const char *ns) {
-        shared_ptr< NamespaceDetailsTransient > &t = _map[ ns ];
+    inline NamespaceDetailsTransient& NamespaceDetailsTransient::get_inlock(const char *ns) {
+        shared_ptr< NamespaceDetailsTransient > &t = _nsdMap[ ns ];
         if ( t.get() == 0 )
             t.reset( new NamespaceDetailsTransient(ns) );
         return *t;
