@@ -1680,8 +1680,9 @@
             ArtificialTree *root = ArtificialTree::is( dl() );
             unsigned previousEmptySize = root->getEmptySize();
             BSONObj key = BSON( "" << 5LL );
+            BtreeBucket::KeyOwned k(key);
             ASSERT( root->insertAtPos( dl(), 1, key, recordLoc( 18 ) ) );
-            ASSERT_EQUALS( previousEmptySize, root->getEmptySize() + sizeof(_KeyNode) + key.objsize() );
+            ASSERT_EQUALS( previousEmptySize, root->getEmptySize() + sizeof(_KeyNode) + k.dataSize() );
             ASSERT_EQUALS( 4, bt()->fullValidate( dl(), order(), 0, true ) );
         }
     };
