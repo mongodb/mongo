@@ -1687,6 +1687,26 @@
         }
     };
 
+    class DupKeyTopSizeLessThanKeyNumber : public Base {
+    public:
+        void run() {
+            ArtificialTree::setTree( "", id() );
+            ArtificialTree *root = ArtificialTree::is( dl() );
+            BSONObj key = BSON( "" << "a" );
+            for (int i = 1; i <= 20; i++) {
+                root->push( key, DiskLoc(), recordLoc( 2*i ) );
+            }
+            Tester::checkTopSizeLessThanKeyNumber( root );
+        }
+        class Tester : public ArtificialTree {
+        public:
+            static void checkTopSizeLessThanKeyNumber( ArtificialTree *a ) {
+                Tester *t = static_cast< Tester * >( a );
+                ASSERT_LESS_THAN( t->topSize, t->n );
+            }
+        };
+    };
+
     class SignedZeroDuplication : public Base {
     public:
         void run() {
@@ -1789,5 +1809,6 @@
             add< DupKeyWithPreviousOne >();
             add< DupKeyWithNextOne >();
             add< NotDedupKey >();
+            add< DupKeyTopSizeLessThanKeyNumber >();
         }
     } myall;
