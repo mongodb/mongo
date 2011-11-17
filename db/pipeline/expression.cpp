@@ -190,6 +190,7 @@ namespace mongo {
         {"$add", ExpressionAdd::create},
         {"$and", ExpressionAnd::create},
         {"$cmp", ExpressionCompare::createCmp},
+	{"$cond", ExpressionCond::create},
 	{"$const", ExpressionNoOp::create},
         {"$dayOfMonth", ExpressionDayOfMonth::create},
         {"$dayOfWeek", ExpressionDayOfWeek::create},
@@ -817,6 +818,38 @@ namespace mongo {
 
     const char *ExpressionCompare::getOpName() const {
 	return cmpLookup[cmpOp].name;
+    }
+
+    /* ----------------------- ExpressionCond ------------------------------ */
+
+    ExpressionCond::~ExpressionCond() {
+    }
+
+    intrusive_ptr<ExpressionNary> ExpressionCond::create() {
+        intrusive_ptr<ExpressionCond> pExpression(new ExpressionCond());
+        return pExpression;
+    }
+
+    ExpressionCond::ExpressionCond():
+        ExpressionNary() {
+    }
+
+    void ExpressionCond::addOperand(
+	const intrusive_ptr<Expression> &pExpression) {
+        assert(vpOperand.size() < 3); // CW TODO user error
+        ExpressionNary::addOperand(pExpression);
+    }
+
+    intrusive_ptr<const Value> ExpressionCond::evaluate(
+        const intrusive_ptr<Document> &pDocument) const {
+        assert(vpOperand.size() == 3); // CW TODO user error
+        intrusive_ptr<const Value> pCond(vpOperand[0]->evaluate(pDocument));
+	int idx = pCond->coerceToBool() ? 1 : 2;
+	return vpOperand[idx]->evaluate(pDocument);
+    }
+
+    const char *ExpressionCond::getOpName() const {
+	return "$cond";
     }
 
     /* ---------------------- ExpressionConstant --------------------------- */

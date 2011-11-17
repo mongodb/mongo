@@ -396,6 +396,24 @@ namespace mongo {
         CmpOp cmpOp;
     };
 
+
+    class ExpressionCond :
+        public ExpressionNary {
+    public:
+        // virtuals from ExpressionNary
+        virtual ~ExpressionCond();
+        virtual intrusive_ptr<const Value> evaluate(
+            const intrusive_ptr<Document> &pDocument) const;
+	virtual const char *getOpName() const;
+        virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
+
+        static intrusive_ptr<ExpressionNary> create();
+
+    private:
+        ExpressionCond();
+    };
+
+
     class ExpressionConstant :
         public Expression,
         public boost::enable_shared_from_this<ExpressionConstant> {

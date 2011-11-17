@@ -1148,6 +1148,35 @@ var p20result = [
 
 assert(arrayEq(p20.result, p20result), 'p20 failed');
 
+// ternary conditional operator
+var p21 = db.runCommand(
+{ aggregate : "article", pipeline : [
+    { $project : {
+	_id : 0,
+	author : 1,
+	pageViews : { $cond : [ {$eq:["$author", "dave"]},
+				{$add:["$pageViews", 1000]}, "$pageViews" ]
+	}
+    }}
+]});
+
+var p21result = [
+    {
+        "author" : "bob",
+        "pageViews" : 5
+    },
+    {
+        "author" : "dave",
+        "pageViews" : 1007
+    },
+    {
+        "author" : "jane",
+        "pageViews" : 6
+    }
+];
+
+assert(arrayEq(p21.result, p21result), 'p21 failed');
+
 
 // simple matching
 var m1 = db.runCommand(
