@@ -138,7 +138,7 @@ for ( i=0; i<20; i++ ){
 
 print( "checkpoint G")
 
-assert.throws( function(){ s.getDB( "test" ).foo.find().sort( { s : 1 } ).forEach( printjsononeline ) } )
+assert.throws( function(){ s.getDB( "test" ).foo.find().sort( { s : 1 } ).forEach( function( x ){ printjsononeline( x.substring( 0, x.length > 30 ? 30 : x.length ) ) } ) } )
 
 print( "checkpoint H")
 
