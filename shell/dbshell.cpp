@@ -114,7 +114,7 @@ static void edit(const string& var){
     const string js = shellMainScope->getString("__jsout__");
 
     if (strstr(js.c_str(), "[native code]")) {
-        cout << "Can't edit native functions" << endl;
+        cout << "can't edit native functions" << endl;
         return;
     }
 
@@ -942,7 +942,7 @@ int _main(int argc, char* argv[]) {
                 }
             }
 
-            shellHistoryAdd( line );
+            shellHistoryAdd( code.c_str() );
             free(line);
         }
 
