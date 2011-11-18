@@ -2215,6 +2215,9 @@ ReplSetTest.prototype.start = function( n , options , restart , wait ){
     if( tojson(options) != tojson({}) )
         printjson(options)
 
+    // make sure to call getPath, otherwise folders wont be cleaned
+    this.getPath(n);
+
     print("ReplSetTest " + (restart ? "(Re)" : "") + "Starting....");
     
     var rval = this.nodes[n] = MongoRunner.runMongod( options )
