@@ -83,6 +83,8 @@ Install the following packages:
   * devel/pcre
   * lang/spidermonkey
 
+If there are problems building third_party directory, try "scons --use-system-all".
+
 
 Special Build Notes
 --------------
