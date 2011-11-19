@@ -1808,7 +1808,7 @@ const StringData _jscode_raw_utils =
 "print();\n" 
 "print(\"\\to = new ObjectId()                  create a new ObjectId\");\n" 
 "print(\"\\to.getTimestamp()                    return timestamp derived from first 32 bits of the OID\");\n" 
-"print(\"\\to.isObjectId()\");\n" 
+"print(\"\\to.isObjectId\");\n" 
 "print(\"\\to.toString()\");\n" 
 "print(\"\\to.equals(otherid)\");\n" 
 "print();\n" 
