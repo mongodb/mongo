@@ -95,11 +95,11 @@ namespace mongo {
                 p->shutdown();
             }
             catch ( std::exception &e ) {
-                error() << "Uncaught std::exception: " << e.what() << ", terminating" << endl;
-                dbexit( EXIT_UNCAUGHT );
+                error() << "Uncaught std::exception: " << e.what() << endl;
+                p->shutdown();
             }
             catch ( ... ) {
-                error() << "Uncaught exception, terminating" << endl;
+                error() << "MessageServer uncaught exception, terminating" << endl;
                 dbexit( EXIT_UNCAUGHT );
             }
 
