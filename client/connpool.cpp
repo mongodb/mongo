@@ -145,9 +145,15 @@ namespace mongo {
             PoolForHost& p = _pools[PoolKey(host,socketTimeout)];
             p.createdOne( conn );
         }
-
-        onCreate( conn );
-        onHandedOut( conn );
+        
+        try {
+            onCreate( conn );
+            onHandedOut( conn );
+        }
+        catch ( std::exception& e ) {
+            delete conn;
+            throw;
+        }
 
         return conn;
     }
@@ -155,7 +161,13 @@ namespace mongo {
     DBClientBase* DBConnectionPool::get(const ConnectionString& url, double socketTimeout) {
         DBClientBase * c = _get( url.toString() , socketTimeout );
         if ( c ) {
-            onHandedOut( c );
+            try {
+                onHandedOut( c );
+            }
+            catch ( std::exception& e ) {
+                delete c;
+                throw;
+            }
             return c;
         }
 
@@ -169,7 +181,13 @@ namespace mongo {
     DBClientBase* DBConnectionPool::get(const string& host, double socketTimeout) {
         DBClientBase * c = _get( host , socketTimeout );
         if ( c ) {
-            onHandedOut( c );
+            try {
+                onHandedOut( c );
+            }
+            catch ( std::exception& e ) {
+                delete c;
+                throw;
+            }
             return c;
         }
 
