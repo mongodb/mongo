@@ -118,6 +118,10 @@
       <TargetMachine>MachineX86</TargetMachine>
       <Profile>true</Profile>
     </Link>
+    <PreBuildEvent>
+      <Command>cscript //Nologo ..\shell\msvc\createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
+      <Message>Create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -142,6 +146,10 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
     </Link>
+    <PreBuildEvent>
+      <Command>cscript //Nologo ..\shell\msvc\createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
+      <Message>Create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -168,6 +176,10 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <TargetMachine>MachineX86</TargetMachine>
     </Link>
+    <PreBuildEvent>
+      <Command>cscript //Nologo ..\shell\msvc\createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
+      <Message>Create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -193,6 +205,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>cscript //Nologo ..\shell\msvc\createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
+      <Message>Create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\boostw\boost_1_34_1\boost\config\auto_link.hpp" />
@@ -662,7 +678,7 @@
     <ClCompile Include="..\s\d_logic.cpp" />
     <ClCompile Include="..\scripting\engine.cpp" />
     <ClCompile Include="..\scripting\engine_spidermonkey.cpp" />
-    <ClCompile Include="..\shell\mongo_vstudio.cpp">
+    <ClCompile Include="..\shell\mongo.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
       </PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>

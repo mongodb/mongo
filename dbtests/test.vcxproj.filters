@@ -492,7 +492,7 @@
     <ClCompile Include="..\scripting\engine_spidermonkey.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
-    <ClCompile Include="..\shell\mongo_vstudio.cpp">
+    <ClCompile Include="..\shell\mongo.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
     <ClCompile Include="..\scripting\utils.cpp">

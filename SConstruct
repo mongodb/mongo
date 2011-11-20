@@ -1046,12 +1046,6 @@ def jsToH(target, source, env):
     out.write( text )
     out.close()
 
-    # mongo_vstudio.cpp is in git as the .vcproj doesn't generate this file.
-    if outFile.find( "mongo.cpp" ) >= 0:
-        out = open( outFile.replace( "mongo" , "mongo_vstudio" ) , 'wb' )
-        out.write( text )
-        out.close()
-
     return None
 
 jshBuilder = Builder(action = jsToH,
@@ -1159,7 +1153,7 @@ if darwin or clientEnv["_HAVEPCAP"]:
 
 # --- shell ---
 
-# note, if you add a file here, need to add in engine.cpp currently
+# note, if you add a file here, you need to add it in scripting/engine.cpp and shell/msvc/createCPPfromJavaScriptFiles.js as well
 env.JSHeader( "shell/mongo.cpp"  , Glob( "shell/utils*.js" ) + [ "shell/db.js","shell/mongo.js","shell/mr.js","shell/query.js","shell/collection.js"] )
 
 env.JSHeader( "shell/mongo-server.cpp"  , [ "shell/servers.js"] )
@@ -1346,7 +1340,6 @@ def doStyling( env , target , source ):
 
     files = utils.getAllSourceFiles() 
     files = filter( lambda x: not x.endswith( ".c" ) , files )
-    files.remove( "./shell/mongo_vstudio.cpp" )
 
     cmd = "astyle --options=mongo_astyle " + " ".join( files )
     res = utils.execsys( cmd )
