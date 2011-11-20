@@ -105,7 +105,13 @@ namespace mongo {
             if ( s->avail ) {
                 DBClientBase* c = s->avail;
                 s->avail = 0;
-                shardConnectionPool.onHandedOut( c );
+                try {
+                    shardConnectionPool.onHandedOut( c );
+                }
+                catch ( std::exception& e ) {
+                    delete c;
+                    throw;
+                }
                 return c;
             }
 
