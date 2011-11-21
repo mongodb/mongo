@@ -687,6 +687,11 @@ namespace mongo {
         if ( ! shardingState.enabled() )
             return true;
 
+        if ( ! isMasterNs( ns.c_str() ) )  {
+            // right now connections to secondaries aren't versioned at all
+            return true;
+        }
+
         ShardedConnectionInfo* info = ShardedConnectionInfo::get( false );
 
         if ( ! info ) {
