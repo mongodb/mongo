@@ -80,12 +80,16 @@ __wt_read_server_wake(WT_CONNECTION_IMPL *conn, int force)
 
 	/* Wait for eviction to free some space. */
 	while (!force && cache->read_lockout) {
-		if (__wt_cache_bytes_inuse(cache) <=
-		    bytes_max - (bytes_max / 20))
+		if (bytes_inuse < bytes_max) {
+			WT_VERBOSE(session, READSERVER,
+			    "read server restores reads: "
+			    "bytes-inuse %" PRIu64 " of bytes-max %" PRIu64,
+			    bytes_inuse, bytes_max);
 			cache->read_lockout = 0;
-		else {
+		} else {
 			__wt_evict_server_wake(conn, 1);
 			__wt_yield();
+			bytes_inuse = __wt_cache_bytes_inuse(cache);
 		}
 	}
 

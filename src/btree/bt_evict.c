@@ -23,9 +23,9 @@ static int  __evict_worker(WT_SESSION_IMPL *);
  * Tuning constants: I hesitate to call this tuning, but we want to review some
  * number of pages from each file's in-memory tree for each page we evict.
  */
-#define	WT_EVICT_GROUP		10	/* Evict N pages at a time */
-#define	WT_EVICT_WALK_PER_TABLE	5	/* Pages to visit per file */
-#define	WT_EVICT_WALK_BASE	25	/* Pages tracked across file visits */
+#define	WT_EVICT_GROUP		100	/* Evict N pages at a time */
+#define	WT_EVICT_WALK_PER_TABLE	50	/* Pages to visit per file */
+#define	WT_EVICT_WALK_BASE	100	/* Pages tracked across file visits */
 
 /*
  * WT_EVICT_FOREACH --
@@ -108,12 +108,14 @@ __wt_evict_server_wake(WT_CONNECTION_IMPL *conn, int force)
 	session = &conn->default_session;
 
 	/*
-	 * If we're locking out reads, or over our cache limit, or forcing the
-	 * issue (when closing the environment), run the eviction server.
+	 * If we're locking out reads, or within 95% of our cache limit, or
+	 * forcing the issue (when closing the environment), run the eviction
+	 * server.
 	 */
 	bytes_inuse = __wt_cache_bytes_inuse(cache);
 	bytes_max = conn->cache_size;
-	if (!force && !cache->read_lockout && bytes_inuse < bytes_max)
+	if (!force && !cache->read_lockout &&
+	    bytes_inuse < bytes_max - bytes_max / 20)
 		return;
 
 	WT_VERBOSE(session, EVICTSERVER,
@@ -285,7 +287,7 @@ __evict_worker(WT_SESSION_IMPL *session)
 	cache = conn->cache;
 
 	/* Evict pages from the cache. */
-	for (loop = 0;;) {
+	for (loop = 0;; loop++) {
 		/* Walk the eviction-request queue. */
 		WT_RET(__evict_request_walk(session));
 
@@ -310,23 +312,16 @@ __evict_worker(WT_SESSION_IMPL *session)
 		}
 
 		/*
-		 * If we've locked out reads, keep evicting until we get to at
-		 * least 5% under the maximum cache.  Else, quit evicting as
-		 * soon as we get under the maximum cache.
+		 * Keep evicting until we to 90% of the maximum cache size.
 		 */
 		bytes_inuse = __wt_cache_bytes_inuse(cache);
 		bytes_max = conn->cache_size;
-		if (cache->read_lockout) {
-			if (bytes_inuse <= bytes_max - (bytes_max / 20)) {
-				/*
-				 * If we have freed enough space to unlock
-				 * reads, ping the read server.
-				 */
-				__wt_read_server_wake(conn, 0);
-				break;
-			}
-		} else if (bytes_inuse < bytes_max)
+		if (bytes_inuse < bytes_max - (bytes_max / 10)) {
+			/* If reads are locked out, ping the read server. */
+			if (cache->read_lockout)
+				__wt_read_server_wake(conn, 1);
 			break;
+		}
 
 		WT_RET(__evict_lru(session));
 
@@ -337,12 +332,16 @@ __evict_worker(WT_SESSION_IMPL *session)
 		 */
 		bytes_start = bytes_inuse;
 		bytes_inuse = __wt_cache_bytes_inuse(cache);
-		if (bytes_start == bytes_inuse && ++loop == 10) {
-			WT_STAT_INCR(conn->stats, cache_evict_slow);
-			WT_VERBOSE(session, EVICTSERVER,
-			    "eviction server: unable to reach eviction goal");
-			break;
-		}
+		if (bytes_start == bytes_inuse) {
+			if (loop == 10) {
+				WT_STAT_INCR(conn->stats, cache_evict_slow);
+				WT_VERBOSE(session, EVICTSERVER,
+				    "eviction server: "
+				    "unable to reach eviction goal");
+				break;
+			}
+		} else
+			loop = 0;
 	}
 	return (0);
 }
