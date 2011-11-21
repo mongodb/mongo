@@ -3552,7 +3552,7 @@ retry:	__hazard_copy(session);
 		return (0);
 
 	WT_BSTAT_INCR(session, rec_hazard);
-	if (LF_ISSET(WT_REC_WAIT)) {
+	if (LF_ISSET(WT_REC_WAIT) || F_ISSET(ref->page, WT_PAGE_FORCE_EVICT)) {
 		__wt_yield();
 		goto retry;
 	}
