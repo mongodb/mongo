@@ -44,8 +44,20 @@ printjson( coll.findOne() )
 
 end = new Date();
 
-print( "time to work: " + ( ( end.getTime() - start.getTime() ) / 1000 ) + " seconds" );
+print( "time to work for primary: " + ( ( end.getTime() - start.getTime() ) / 1000 ) + " seconds" );
 
 assert.gt( 3 , iteratioons );
+
+
+// now check secondary
+
+sadmin.runCommand({ replSetStepDown : 3000, force : true })
+other = new Mongo( mongosA.host );
+other.setSlaveOk( true );
+other = other.getCollection( jsTestName() + ".coll" );
+
+print( "eliot: " + tojson( other.findOne() ) );
+
+
 
 st.stop()
