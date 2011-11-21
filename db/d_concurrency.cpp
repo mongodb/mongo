@@ -1,4 +1,4 @@
-#include "../pch.h"
+#include "pch.h"
 #include "database.h"
 #include "d_concurrency.h"
 #include "../util/concurrency/threadlocal.h"
@@ -20,8 +20,6 @@ namespace mongo {
     LockCollectionForReading::LockCollectionForReading(const char *ns)
     {
         Client& c = cc();
-        lockDb(c);
-
 
 //...
     }

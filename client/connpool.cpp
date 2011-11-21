@@ -150,7 +150,7 @@ namespace mongo {
             onCreate( conn );
             onHandedOut( conn );
         }
-        catch ( std::exception& e ) {
+        catch ( std::exception & ) {
             delete conn;
             throw;
         }
@@ -164,7 +164,7 @@ namespace mongo {
             try {
                 onHandedOut( c );
             }
-            catch ( std::exception& e ) {
+            catch ( std::exception& ) {
                 delete c;
                 throw;
             }
@@ -184,7 +184,7 @@ namespace mongo {
             try {
                 onHandedOut( c );
             }
-            catch ( std::exception& e ) {
+            catch ( std::exception& ) {
                 delete c;
                 throw;
             }

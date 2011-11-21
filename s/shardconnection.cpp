@@ -108,7 +108,7 @@ namespace mongo {
                 try {
                     shardConnectionPool.onHandedOut( c );
                 }
-                catch ( std::exception& e ) {
+                catch ( std::exception& ) {
                     delete c;
                     throw;
                 }
