@@ -79,7 +79,7 @@ int main(void)
 	    "columns=(country,year)");
 
 	ret = session->open_cursor(session, "table:population",
-	    NULL, NULL, &cursor);
+	    NULL, "append", &cursor);
 
 	endp = pop_data + (sizeof (pop_data) / sizeof (pop_data[0]));
 	for (p = pop_data; p < endp; p++) {

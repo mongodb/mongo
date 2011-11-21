@@ -172,10 +172,6 @@ int main(void)
 	if (ret == 0)
 		ret = cursor->close(cursor, NULL);
 
-	ret = session->open_cursor(session, "table:", NULL, NULL, &cursor);
-	if (ret == 0)
-		ret = cursor->close(cursor, NULL);
-
 	ret = session->open_cursor(session, "statistics:", NULL, NULL, &cursor);
 	if (ret == 0)
 		ret = cursor->close(cursor, NULL);
