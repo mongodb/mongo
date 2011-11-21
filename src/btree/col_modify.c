@@ -19,7 +19,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 {
 	WT_BTREE *btree;
 	WT_BUF *value, _value;
-	WT_INSERT *ins;
+	WT_INSERT *ins, *ins_copy;
 	WT_INSERT_HEAD **inshead, *new_inshead, **new_inslist;
 	WT_PAGE *page;
 	WT_UPDATE *upd;
@@ -145,6 +145,12 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 		 * Insert or append the WT_INSERT structure.
 		 */
 		if (op == 1) {
+			/*
+			 * The serialized function clears ins: take a copy of
+			 * the pointer so we can look up the record number.
+			 */
+			ins_copy = ins;
+
 			WT_ERR(__wt_col_append_serial(session,
 			    inshead, cbt->ins_stack,
 			    &new_inslist, new_inslist_size,
@@ -153,7 +159,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 
 			/* Set up the cursor for the inserted page and value. */
 			cbt->page = btree->last_page;
-			cbt->recno = WT_INSERT_RECNO(ins);
+			cbt->recno = WT_INSERT_RECNO(ins_copy);
 		} else
 			WT_ERR(__wt_insert_serial(session,
 			    page, cbt->write_gen,
