@@ -312,16 +312,15 @@ __evict_worker(WT_SESSION_IMPL *session)
 		}
 
 		/*
-		 * Keep evicting until we to 90% of the maximum cache size.
+		 * Keep evicting until we hit 90% of the maximum cache size.
 		 */
 		bytes_inuse = __wt_cache_bytes_inuse(cache);
 		bytes_max = conn->cache_size;
-		if (bytes_inuse < bytes_max - (bytes_max / 10)) {
-			/* If reads are locked out, ping the read server. */
-			if (cache->read_lockout)
-				__wt_read_server_wake(conn, 1);
+		/* If reads are locked out, ping the read server. */
+		if (cache->read_lockout && bytes_inuse < bytes_max)
+			__wt_read_server_wake(conn, 1);
+		if (bytes_inuse < bytes_max - (bytes_max / 10))
 			break;
-		}
 
 		WT_RET(__evict_lru(session));
 
@@ -749,8 +748,12 @@ __evict_page(WT_SESSION_IMPL *session)
 	    sizeof(WT_EVICT_LIST), __evict_lru_cmp);
 
 	WT_EVICT_FOREACH(cache, evict, i) {
+		/*
+		 * NULL pages sort to the end of the list: once we hit one,
+		 * give up.
+		 */
 		if ((page = evict->page) == NULL)
-			continue;
+			break;
 
 		/* Reference the correct WT_BTREE handle. */
 		WT_SET_BTREE_IN_SESSION(session, evict->btree);

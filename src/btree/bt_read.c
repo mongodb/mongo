@@ -61,39 +61,34 @@ __wt_read_server_wake(WT_CONNECTION_IMPL *conn, int force)
 	session = &conn->default_session;
 
 	/*
-	 * If we're 10% over the maximum cache, shut out reads (which include
-	 * page allocations) until we evict to at least 5% under the maximum
-	 * cache.  The idea is that we don't want to run on the edge all the
-	 * time -- if we're seriously out of space, get things under control
-	 * before opening up for more reads.
+	 * If we're over the maximum cache, shut out reads (which include page
+	 * allocations) until we evict to back under the maximum cache.
+	 * Eviction will keep pushing out pages so we don't run on the edge all
+	 * the time.
 	 */
 	bytes_inuse = __wt_cache_bytes_inuse(cache);
 	bytes_max = conn->cache_size;
-	if (!cache->read_lockout &&
-	    bytes_inuse > bytes_max + (bytes_max / 10)) {
+	if (!cache->read_lockout && bytes_inuse > bytes_max) {
 		WT_VERBOSE(session, READSERVER,
 		    "read server locks out reads: "
 		    "bytes-inuse %" PRIu64 " of bytes-max %" PRIu64,
 		    bytes_inuse, bytes_max);
 		cache->read_lockout = 1;
+	} else if (cache->read_lockout && bytes_inuse < bytes_max) {
+		WT_VERBOSE(session, READSERVER,
+		    "read server restores reads: "
+		    "bytes-inuse %" PRIu64 " of bytes-max %" PRIu64,
+		    bytes_inuse, bytes_max);
+		cache->read_lockout = 0;
 	}
 
-	/* Wait for eviction to free some space. */
-	while (!force && cache->read_lockout) {
-		if (bytes_inuse < bytes_max) {
-			WT_VERBOSE(session, READSERVER,
-			    "read server restores reads: "
-			    "bytes-inuse %" PRIu64 " of bytes-max %" PRIu64,
-			    bytes_inuse, bytes_max);
-			cache->read_lockout = 0;
-		} else {
-			__wt_evict_server_wake(conn, 1);
-			__wt_yield();
-			bytes_inuse = __wt_cache_bytes_inuse(cache);
-		}
-	}
+	/* Trigger eviction when we're over 95% of the cache size. */
+	if (!force && bytes_inuse > bytes_max - (bytes_max / 20))
+		__wt_evict_server_wake(conn, 1);
 
-	__wt_cond_signal(session, cache->read_cond);
+	/* If reads are locked out, eviction will signal the read thread. */
+	if (!cache->read_lockout)
+		__wt_cond_signal(session, cache->read_cond);
 }
 
 /*
