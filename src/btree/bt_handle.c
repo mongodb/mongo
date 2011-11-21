@@ -355,14 +355,16 @@ __btree_last(WT_SESSION_IMPL *session)
 
 	btree = session->btree;
 
+	if (btree->type == BTREE_ROW)
+		return (0);
+
 	page = NULL;
 	WT_RET(__wt_tree_np(session, &page, 0, 0));
 	if (page == NULL)
 		return (WT_NOTFOUND);
 
 	btree->last_page = page;
-	if (page->type != WT_PAGE_ROW_LEAF)
-		btree->last_recno = __col_last_recno(page);
+	btree->last_recno = __col_last_recno(page);
 
 	/*
 	 * If the page is already pinned (that is, the last page is the root
