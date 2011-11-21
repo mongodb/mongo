@@ -9,22 +9,23 @@ class Error:
 
 errors = [
 	Error('WT_DEADLOCK', 'conflict between concurrent operations', '''
-		This error is generated when an operation cannot be completed due
-		to a conflict with concurrent operations.  The operation should be
-		retried.  If a transaction is in progress, it should be rolled back
-		and the operation retried in a new transaction.'''),
+		This error is generated when an operation cannot be completed
+		due to a conflict with concurrent operations.  The operation
+		should be retried.  If a transaction is in progress, it should
+		be rolled back and the operation retried in a new
+		transaction.'''),
 	Error('WT_DUPLICATE_KEY', 'attempt to insert an existing key', '''
-		This error is generated when the application attempts to insert a
-		record with the same key as an existing record without the 'overwrite'
-		configuration to WT_SESSION::open_cursor.'''),
+		This error is generated when the application attempts to insert
+		a record with the same key as an existing record without the
+		'overwrite' configuration to WT_SESSION::open_cursor.'''),
 	Error('WT_ERROR', 'non-specific WiredTiger error', '''
-		This error is generated for cases that are not covered by specific
-		error returns.'''),
+		This error is generated for cases that are not covered by
+		specific error returns.'''),
 	Error('WT_NOTFOUND', 'item not found', '''
-		This return value indicates that a search operation did not find a
-		record matching the application's search key.  This includes implicit
-		search operations in WT_CURSOR::update or WT_CURSOR::remove
-		operations.'''),
+		This return value indicates that a search operation did not
+		find a record matching the application's search key.  This
+		includes implicit search operations in WT_CURSOR::update or
+		WT_CURSOR::remove operations.'''),
 	Error('WT_RESTART', 'restart the operation (internal)', undoc=True),
 ]
 
@@ -62,80 +63,76 @@ filename_meta = [
 format_meta = column_meta + [
 	Config('key_format', 'u', r'''
 		the format of the data packed into key items.  See @ref
-		schema_format_types for details.  By default, the
-		key_format is \c 'u' and applications use WT_ITEM
-		structures to manipulate raw byte arrays. By default,
-		records are stored in row-store files: keys of type \c
-		'r' are record numbers and records referenced by record
-		number are stored in column-store files''',
+		schema_format_types for details.  By default, the key_format is
+		\c 'u' and applications use WT_ITEM structures to manipulate
+		raw byte arrays. By default, records are stored in row-store
+		files: keys of type \c 'r' are record numbers and records
+		referenced by record number are stored in column-store files''',
 		type='format'),
 	Config('value_format', 'u', r'''
 		the format of the data packed into value items.  See @ref
-		schema_format_types for details.
-		By default, the value_format is \c 'u' and applications use a
-		WT_ITEM structure to manipulate raw byte arrays. Value items
-		of type 't' are bitfields, and when configured with record
-		number type keys, will be stored using a fixed-length store''',
+		schema_format_types for details.  By default, the value_format
+		is \c 'u' and applications use a WT_ITEM structure to
+		manipulate raw byte arrays. Value items of type 't' are
+		bitfields, and when configured with record number type keys,
+		will be stored using a fixed-length store''',
 		type='format'),
 ]
 
 # Per-file configuration
 file_meta = format_meta + [
 	Config('allocation_size', '512B', r'''
-		configure the file unit allocation size, in bytes; the size
-		must a power-of-two''',
+		the file unit allocation size, in bytes; must a power-of-two''',
 		min='512B', max='128MB'),
 	Config('block_compressor', '', r'''
-		configure a compressor for file blocks.  Permitted values
-		are empty (off) or \c "<name>".  See @ref compressors for
-		more details'''),
+		a compressor for file blocks.  Permitted values are empty (off)
+		or \c "<name>".  See @ref compressors for more details'''),
 	Config('collator', '', r'''
-	    configure custom collation for keys.  Value must be a collator
+		custom collation for keys.  Value must be a collator name
 		created with WT_CONNECTION::add_collator'''),
 	Config('huffman_key', '', r'''
-		configure Huffman encoding for keys.  Permitted values are
-		empty (off), \c "english" or \c "<filename>".  See @ref huffman
-		for more details'''),
+		use Huffman encoding for keys.  Permitted values are empty
+		(off), \c "english" or \c "<filename>".  See @ref huffman for
+		more details'''),
 	Config('huffman_value', '', r'''
-		configure Huffman encoding for values.  Permitted values are
-		empty (off), \c "english" or \c "<filename>".  See @ref huffman
-		for more details'''),
+		use Huffman encoding for values.  Permitted values are empty
+		(off), \c "english" or \c "<filename>".  See @ref huffman for
+		more details'''),
 	Config('internal_key_truncate', 'true', r'''
-		configure the Btree for truncation of internal keys, discarding
+		the Btree for truncation of internal keys, discarding
 		unnecessary trailing bytes on internal keys''',
 		type='boolean'),
 	Config('internal_node_max', '2KB', r'''
-		configure the maximum page size for internal nodes, in bytes;
-		the size must be a multiple of the allocation size''',
+		the maximum page size for internal nodes, in bytes; the size
+		must be a multiple of the allocation size''',
 		min='512B', max='512MB'),
 	Config('internal_overflow_size', '64B', r'''
-		configure the internal node overflow key size, in bytes''',
+		the maximum key size stored on internal nodes, in bytes''',
 		min='40B'),
 	Config('key_gap', '10', r'''
-		configure the maximum gap between instantiated keys in a Btree
-		leaf page, constraining the number of keys processed to
-		instantiate a random Btree leaf page key''',
+		the maximum gap between instantiated keys in a Btree leaf page,
+		constraining the number of keys processed to instantiate a
+		random Btree leaf page key''',
 		min='0'),
 	Config('leaf_node_max', '1MB', r'''
-		configure the maximum page size for leaf nodes, in bytes;
-		the size must be a multiple of the allocation size''',
+		the maximum page size for leaf nodes, in bytes; the size must
+		be a multiple of the allocation size''',
 		min='512B', max='512MB'),
 	Config('leaf_overflow_size', '470B', r'''
-		configure the leaf node overflow key size, in bytes''',
+		the maximum key or value size stored on leaf nodes, in bytes''',
 		min='40B'),
 	Config('prefix_compression', 'true', r'''
-		configure the Btree for prefix compression, storing keys as a
-		count of bytes matching the previous key plus a unique
-		suffix''',
+		the Btree for prefix compression, storing keys as a count of
+		bytes matching the previous key plus a unique suffix''',
 		type='boolean'),
 	Config('split_pct', '75', r'''
-		configure the Btree page split size as a percentage of the
-		maximum Btree page size, that is, when a Btree page is split,
-		it will be split into smaller pages, where each page is the
-		specified percentage of the maximum Btree page size''',
+		the Btree page split size as a percentage of the maximum Btree
+		page size, that is, when a Btree page is split, it will be
+		split into smaller pages, where each page is the specified
+		percentage of the maximum Btree page size''',
 		min='25', max='100'),
 	Config('type', 'btree', r'''
-		configure the file type''',
+		the file type''',
 		choices=['btree']),
 ]
 
@@ -240,7 +237,7 @@ methods = {
 		name of the transaction for tracing and debugging'''),
 	Config('sync', 'full', r'''
 		how to sync log records when the transaction commits''',
-		choices=["full", "flush", "write", "none"]),
+		choices=['full', 'flush', 'write', 'none']),
 	Config('priority', 0, r'''
 		priority of the transaction for resolving conflicts.
 		Transactions with higher values are less likely to abort''',
@@ -299,8 +296,8 @@ methods = {
 		create the database if it does not exist''',
 		type='boolean'),
 	Config('home_environment', 'false', r'''
-		use the \c WIREDTIGER_HOME environment variable for naming unless
-		the process is running with special privileges.
+		use the \c WIREDTIGER_HOME environment variable for naming
+		unless the process is running with special privileges.
 		See @ref home for details''',
 		type='boolean'),
 	Config('home_environment_priv', 'false', r'''
@@ -313,8 +310,8 @@ methods = {
 		type='boolean'),
 	Config('extensions', '', r'''
 		list of extensions to load.  Optional values are passed as the
-		\c config parameter to WT_CONNECTION::load_extension.  Complex paths
-		may need quoting, for example,
+		\c config parameter to WT_CONNECTION::load_extension.  Complex
+		paths may need quoting, for example,
 		<code>extensions=("/path/to/ext.so"="entry=my_entry")</code>''',
 		type='list'),
 	Config('error_prefix', '', r'''
