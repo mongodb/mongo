@@ -31,9 +31,9 @@ fgrep -who "$search" $l
 # Second, we don't use the "WT_STAT_" prefix when we call a stat macro, the stat
 # macro handles that for us, so we have to remove that prefix before searching.
 #
-# The special cases listed below are because the INCR, INCRV, and SET #defines
-# are in stat.h, but shouldn't have the leading WT_STAT prefix stripped.  They
-# are heavily used, so just delete them from the search.
+# The special cases listed below are because the INCR, INCRV, SET and WT_STAT
+# #defines are in stat.h, but shouldn't have the leading WT_STAT prefix
+# stripped.  They are heavily used, so just delete them from the search.
 
 l=`echo $l | sed -e 's,\.\./support/stat.c,,'`
 
@@ -42,6 +42,7 @@ search=`cat ../src/include/stat.h | egrep '^#define' |
         -e '/^WT_STAT_INCR$/d' \
         -e '/^WT_STAT_INCRV$/d' \
         -e '/^WT_STAT_SET$/d' \
+        -e '/^WT_STAT$/d' \
         -e 's/WT_STAT_//' |
     sort -u`
 
