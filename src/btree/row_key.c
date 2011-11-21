@@ -436,8 +436,11 @@ __wt_row_key_serial_func(WT_SESSION_IMPL *session)
 	 * Passed both WT_ROW_REF and WT_ROW structures; the first field of each
 	 * is a void *.
 	 */
-	if (!__wt_off_page(page, rip->key))
+	if (!__wt_off_page(page, rip->key)) {
 		rip->key = ikey;
+		__wt_cache_page_inmem_incr(
+		    session, page, sizeof(WT_IKEY) + ikey->size);
+	}
 
 	__wt_session_serialize_wrapup(session, NULL, 0);
 }

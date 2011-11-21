@@ -33,12 +33,10 @@ __wt_cache_page_read(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 	cache = S2C(session)->cache;
 
 	WT_ASSERT(session, size != 0);
-	WT_ASSERT(session, page->memory_footprint == 0);
 
 	++cache->pages_read;
 	cache->bytes_read += size;
-
-	page->memory_footprint = WT_STORE_SIZE(size);
+	page->memory_footprint += WT_STORE_SIZE(size);
 }
 
 /*
