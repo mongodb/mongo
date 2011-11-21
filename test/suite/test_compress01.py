@@ -63,7 +63,7 @@ class test_compress01_base(wttest.WiredTigerTestCase):
             val = `idx` + self.bigvalue + `idx`
             inscursor = self.cursor_ss(self.table_name1, 'key' + `idx`, val)
             inscursor.insert()
-            inscursor.close
+            inscursor.close()
 
     def do_verify(self):
         self.pr('search')
