@@ -215,7 +215,6 @@ __verify_tree(
 	/*
 	 * Update the fragment list.
 	 */
-	WT_ASSERT(session, ref->addr != WT_ADDR_INVALID);
 	WT_RET(__verify_addfrag(session, ref->addr, ref->size, vs));
 
 #ifdef HAVE_DIAGNOSTIC
