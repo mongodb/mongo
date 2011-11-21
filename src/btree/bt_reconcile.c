@@ -2996,8 +2996,7 @@ __rec_cell_build_key(WT_SESSION_IMPL *session,
 		    key->buf.data, key->buf.size, &key->buf));
 
 	/* Create an overflow object if the data won't fit. */
-	if (key->buf.size >=
-	    (is_internal ? btree->intlovfl : btree->leafovfl)) {
+	if (key->buf.size > (is_internal ? btree->intlovfl : btree->leafovfl)) {
 		WT_BSTAT_INCR(session, rec_ovfl_key);
 
 		/*
