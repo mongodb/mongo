@@ -261,9 +261,13 @@ def check_db_hashes(master, slave):
 
 # Blech.
 def skipTest(path):
-    if small_oplog:
-        if os.path.basename(path) in ["cursor8.js", "indexh.js", "dropdb.js"]:
+    basename = os.path.basename(path)
+    parentDir = os.path.basename(os.path.dirname(path))
+    if small_oplog: # For tests running in parallel
+        if basename in ["cursor8.js", "indexh.js", "dropdb.js"]:
             return True
+    if auth or keyFile: # For tests running with auth
+        return os.path.join(parentDir,basename) in ["sharding/sync3.js", "sharding/sync6.js"]
     return False
 
 def runTest(test):
