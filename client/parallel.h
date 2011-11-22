@@ -233,6 +233,9 @@ namespace mongo {
         string versionedNS;
         BSONObj cmdFilter;
 
+        CommandInfo() {}
+        CommandInfo( const string& vns, const BSONObj& filter ) : versionedNS( vns ), cmdFilter( filter ) {}
+
         bool isEmpty(){
             return versionedNS.size() == 0;
         }
@@ -291,6 +294,8 @@ namespace mongo {
         bool finished;
         bool completed;
 
+        bool errored;
+
         BSONObj toBSON() const;
 
         string toString() const {
@@ -310,10 +315,15 @@ namespace mongo {
      */
     class ParallelSortClusteredCursor : public ClusteredCursor {
     public:
+
+        ParallelSortClusteredCursor( const QuerySpec& qSpec, const CommandInfo& cInfo = CommandInfo() );
+        ParallelSortClusteredCursor( const set<Shard>& servers, const QuerySpec& qSpec );
+
+        // LEGACY Constructors
         ParallelSortClusteredCursor( const set<ServerAndQuery>& servers , QueryMessage& q , const BSONObj& sortKey );
         ParallelSortClusteredCursor( const set<ServerAndQuery>& servers , const string& ns ,
                                      const Query& q , int options=0, const BSONObj& fields=BSONObj() );
-        ParallelSortClusteredCursor( const QuerySpec& qSpec, const CommandInfo& cInfo );
+
         virtual ~ParallelSortClusteredCursor();
         virtual bool more();
         virtual BSONObj next();
@@ -323,8 +333,12 @@ namespace mongo {
         void startInit();
         void finishInit();
 
+        bool isCommand(){ return NamespaceString( _qSpec.ns() ).isCommand(); }
+        bool isVersioned(){ return _qShards.size() == 0; }
+
         bool isSharded();
         ShardPtr getPrimary();
+        void getQueryShards( set<Shard>& shards );
         ChunkManagerPtr getChunkManager( const Shard& shard );
         DBClientCursorPtr getShardCursor( const Shard& shard );
 
@@ -338,10 +352,10 @@ namespace mongo {
 
         virtual void _explain( map< string,list<BSONObj> >& out );
 
-        bool _isCommand(){ return ! _cInfo.isEmpty(); }
         void _markStaleNS( const NamespaceString& staleNS, bool& forceReload, bool& fullReload );
         void _handleStaleNS( const NamespaceString& staleNS, bool forceReload, bool fullReload );
 
+        set<Shard> _qShards;
         QuerySpec _qSpec;
         CommandInfo _cInfo;
 

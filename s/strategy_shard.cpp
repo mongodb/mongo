@@ -99,6 +99,27 @@ namespace mongo {
             }
         }
 
+        virtual void commandOp( const string& db, const BSONObj& command, int options,
+                                const string& versionedNS, const BSONObj& filter,
+                                map<Shard,BSONObj>& results )
+        {
+
+            QuerySpec qSpec( db + ".$cmd", command, BSONObj(), 0, 1, options );
+
+            ParallelSortClusteredCursor cursor( qSpec, CommandInfo( versionedNS, filter ) );
+
+            // Initialize the cursor
+            cursor.init();
+
+            set<Shard> shards;
+            cursor.getQueryShards( shards );
+
+            for( set<Shard>::iterator i = shards.begin(), end = shards.end(); i != end; ++i ){
+                results[ *i ] = cursor.getShardCursor( *i )->peekFirst().getOwned();
+            }
+
+        }
+
         virtual void getMore( Request& r ) {
 
             // TODO:  Handle stale config exceptions here from coll being dropped or sharded during op
