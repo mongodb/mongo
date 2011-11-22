@@ -14,6 +14,7 @@ while ( true ) {
     t.insert( { _id : N++ , x : [] , s : s } );
     err = db.getLastError();
     if ( err ) {
+        assert.eq("Can't take a write lock while out of disk space", err);
         print( err );
         break;
     }
