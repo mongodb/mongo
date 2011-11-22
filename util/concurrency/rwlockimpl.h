@@ -73,15 +73,18 @@ namespace mongo {
             log() << "pthread rwlock failed: " << x << endl;
             assert( x == 0 );
         }        
-    protected:
-        RWLockBase() {
-            check( pthread_rwlock_init( &_lock , 0 ) );
-        }
+
         ~RWLockBase() {
             if ( ! StaticObserver::_destroyingStatics ) {
                 wassert( pthread_rwlock_destroy( &_lock ) == 0 ); // wassert as don't want to throw from a destructor
             }
         }
+
+    protected:
+        RWLockBase() {
+            check( pthread_rwlock_init( &_lock , 0 ) );
+        }
+
         void lock() { check( pthread_rwlock_wrlock( &_lock ) ); }
         void unlock() { check( pthread_rwlock_unlock( &_lock ) ); }
         void lock_shared() { check( pthread_rwlock_rdlock( &_lock ) ); }
