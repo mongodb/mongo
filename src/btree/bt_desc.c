@@ -102,7 +102,7 @@ err:		__wt_errx(session, "%s%s", msg,
 	return (0);
 
 verify:	__wt_errx(session,
-    	    "root or free addresses reference non-existent pages");
+	    "root or free addresses reference non-existent pages");
 	return (WT_ERROR);
 }
 
