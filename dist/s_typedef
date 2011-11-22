@@ -13,7 +13,7 @@ build() {
 
 	l=`echo ../src/include/*.[hi] ../src/include/*.in |
 	    sed -e 's/wiredtiger.in//' -e 's/queue.h//'`
-	egrep -h '^(struct|union)[	 ]*__.*[	 ]*{$' $l | \
+	egrep -h '^[ 	]*(struct|union)[	 ]*__.*[	 ]*{$' $l | \
 	    sed -e 's/[	 ]*{$//' | sort | \
 	while read t n; do
 		upper=`echo $n | sed -e 's/^__//' | tr a-z A-Z`
@@ -39,7 +39,9 @@ check() {
 	(
 	# Get the list of typedefs
 	search=`cat ../src/include/*.h ../src/include/*.in |
-	    sed -e 's/^struct.*typedef.* \(.*\);$/\1/p' -e d |
+	    sed -e 's/^struct.*typedef.* \(.*\);$/\1/p' \
+	        -e 's/^union.*typedef.* \(.*\);$/\1/p' \
+	        -e d |
 	    sort -u`
 	echo "$search"
 	fgrep -who "$search" $l
