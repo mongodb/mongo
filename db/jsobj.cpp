@@ -331,13 +331,6 @@ namespace mongo {
         size_t rstart = 0;
 
         for ( int i=0; i<maxLoops; i++ ) {
-            if ( lstart >= l.size() ) {
-                if ( rstart >= r.size() )
-                    return SAME;
-                return RIGHT_SUBFIELD;
-            }
-            if ( rstart >= r.size() )
-                return LEFT_SUBFIELD;
 
             size_t a = l.find( '.' , lstart );
             size_t b = r.find( '.' , rstart );
@@ -357,6 +350,14 @@ namespace mongo {
 
             lstart = lend + 1;
             rstart = rend + 1;
+
+            if ( lstart >= l.size() ) {
+                if ( rstart >= r.size() )
+                    return SAME;
+                return RIGHT_SUBFIELD;
+            }
+            if ( rstart >= r.size() )
+                return LEFT_SUBFIELD;
         }
 
         log() << "compareDottedFieldNames ERROR  l: " << l << " r: " << r << "  TOO MANY LOOPS" << endl;
