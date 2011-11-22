@@ -1,6 +1,6 @@
 x = 1
 
-t = db.foo;
+t = db.diskFullUpdates;
 t.drop();
 
 assert.eq( 0 , t.count() );
