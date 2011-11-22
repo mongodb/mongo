@@ -56,6 +56,16 @@ namespace mongo {
             : _mutex( "ConnectionShardStatus" ) {
         }
 
+        bool isInitialized( DBClientBase * conn ){
+            scoped_lock lk( _mutex );
+            return _init.find( conn ) != _init.end();
+        }
+
+        void setInitialized( DBClientBase * conn ){
+            scoped_lock lk( _mutex );
+            _init.insert( conn );
+        }
+
         S getSequence( DBClientBase * conn , const string& ns ) {
             scoped_lock lk( _mutex );
             return _map[conn][ns];
@@ -69,13 +79,15 @@ namespace mongo {
         void reset( DBClientBase * conn ) {
             scoped_lock lk( _mutex );
             _map.erase( conn );
+            _init.erase( conn );
         }
 
-        // protects _map
+        // protects _maps
         mongo::mutex _mutex;
 
         // a map from a connection into ChunkManager's sequence number for each namespace
         map<DBClientBase*, map<string,unsigned long long> > _map;
+        set<DBClientBase*> _init;
 
     } connectionShardStatus;
 
@@ -133,11 +145,15 @@ namespace mongo {
         LOG(2) << "initial sharding settings : " << cmd << endl;
 
         bool ok = conn->runCommand( "admin" , cmd , result );
+        connectionShardStatus.setInitialized( conn );
 
         // HACK for backwards compatibility with v1.8.x, v2.0.0 and v2.0.1
         // Result is false, but will still initialize serverID and configdb
+        // Not master does not initialize serverID and configdb, but we ignore since if the connection is not master,
+        // we are not setting the shard version at all
         if( ! ok && ! result["errmsg"].eoo() && ( result["errmsg"].String() == "need to specify namespace"/* 2.0.1/2 */ ||
-                                                  result["errmsg"].String() == "need to speciy namespace" /* 1.8 */ ))
+                                                  result["errmsg"].String() == "need to speciy namespace" /* 1.8 */ ||
+                                                  result["errmsg"].String() == "not master" /* both */ ) )
         {
             ok = true;
         }
@@ -162,6 +178,11 @@ namespace mongo {
 
         DBClientBase* conn = getVersionable( &conn_in );
         assert(conn); // errors thrown above
+
+        if( ! connectionShardStatus.isInitialized( conn ) ){
+            BSONObj result;
+            uassert( 15918, str::stream() << "cannot initialize version on shard " << conn->getServerAddress() << causedBy( result.toString() ), initShardVersion( *conn, result ) );
+        }
 
         unsigned long long officialSequenceNumber = 0;
 
