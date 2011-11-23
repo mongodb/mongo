@@ -200,8 +200,6 @@ __wt_evict_force_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	cache = S2C(session)->cache;
 
-	WT_ASSERT(session, F_ISSET(page, WT_PAGE_FORCE_EVICT));
-
 	/*
 	 * If we evict a page marked for forced eviction, clear any reference
 	 * to it from the request queue or the list of pages tracked for
