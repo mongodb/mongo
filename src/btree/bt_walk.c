@@ -63,10 +63,12 @@ __wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int cacheonly, int next)
 	 * to evict our parent, that fails because the parent has a child page
 	 * that can't be discarded.
 	 */
-	ret = WT_PAGE_IS_ROOT(t) ?
+	ret = (WT_PAGE_IS_ROOT(t) || cacheonly) ?
 	    0 : __wt_page_in(session, t, t->parent_ref, 0);
-	__wt_page_release(session, page);
-	WT_RET(ret);
+	if (!cacheonly) {
+		__wt_page_release(session, page);
+		WT_RET(ret);
+	}
 	page = t;
 
 	/*
@@ -96,16 +98,19 @@ descend:	for (;;) {
 			}
 
 			/* We may only care about in-memory pages. */
-			if (cacheonly && ref->state != WT_REF_MEM)
-				break;
-
-			/*
-			 * Swap hazard references at each level (but don't
-			 * leave a hazard reference dangling on error).
-			 */
-			ret = __wt_page_in(session, page, ref, 0);
-			__wt_page_release(session, page);
-			WT_RET(ret);
+			if (cacheonly) {
+				if (ref->state != WT_REF_MEM)
+					break;
+			} else {
+				/*
+				 * Swap hazard references at each level (but
+				 * don't leave a hazard reference dangling on
+				 * error).
+				 */
+				ret = __wt_page_in(session, page, ref, 0);
+				__wt_page_release(session, page);
+				WT_RET(ret);
+			}
 
 			page = ref->page;
 			slot = next ? 0 : page->entries - 1;

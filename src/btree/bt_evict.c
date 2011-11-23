@@ -427,14 +427,11 @@ __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 	    btree->name, F_ISSET(er, WT_EVICT_REQ_CLOSE) ? "close" : "sync");
 
 	/*
-	 * Release any page we're holding: we're about to do a walk of the file
+	 * Discard any page we're holding: we're about to do a walk of the file
 	 * tree, and if we're closing the file, there won't be pages to evict
 	 * in the future, that is, our location in the tree is no longer useful.
 	 */
-	if (btree->evict_page != NULL) {
-		__wt_page_release(session, btree->evict_page);
-		btree->evict_page = NULL;
-	}
+	btree->evict_page = NULL;
 
 	/*
 	 * We can't evict the page just returned to us, it marks our place in
