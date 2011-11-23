@@ -40,7 +40,7 @@ namespace mongo {
 
         Database(const char *nm, /*out*/ bool& newDb, const string& _path = dbpath);
     private:
-        ~Database();
+        ~Database(); // closes files and other cleanup see below.
     public:
         /* you must use this to close - there is essential code in this method that is not in the ~Database destructor.
            thus the destructor is private.  this could be cleaned up one day...
@@ -129,8 +129,7 @@ namespace mongo {
         const string profileName; // "alleyinsider.system.profile"
         CCByLoc ccByLoc;
         int magic; // used for making sure the object is still loaded in memory
-
-        RWLockBase dbLock; // see d_concurrency.h
+        SimpleRWLock dbLock; // see d_concurrency.h.  using "Base" version as there are a few nuance hassles to RWLock use here albeit it would work
     };
 
 } // namespace mongo

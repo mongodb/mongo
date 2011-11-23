@@ -10,29 +10,20 @@ namespace mongo {
        try to go from sharable to exclusive
     */
 
-    //void assertDbLocked();
-    //void assertCollectionLocked();
-
-    /*class LockDatabaseExclusively : boost::noncopyable { 
+    class LockDatabaseSharable : boost::noncopyable { 
+        bool already;
     public:
-        LockDatabaseExclusively(const char *db);
-    };*/
+        LockDatabaseSharable();
+        ~LockDatabaseSharable();
+    };
 
-    /*class LockCollectionUpgradably : boost::noncopyable { 
-    public:
-        LockCollectionUpgradably(const char *ns);
-    };*/
-
-    class LockCollectionForReading : boost::noncopyable { 
-        Database *db;
+    class LockCollectionForReading : boost::noncopyable {
+        atleastreadlock globalrl;
+        LockDatabaseSharable dbrl;
+        bool already;
     public:
         LockCollectionForReading(const char *ns);
         ~LockCollectionForReading();
-    };
-
-    class LockCollectionExclusively : boost::noncopyable { 
-    public:
-        LockCollectionExclusively(const char *ns);
     };
 
 }

@@ -32,6 +32,7 @@
 #include "../util/concurrency/threadlocal.h"
 #include "../db/client_common.h"
 #include "../util/net/message_port.h"
+#include "../util/concurrency/rwlock.h"
 
 namespace mongo {
 
@@ -155,12 +156,11 @@ namespace mongo {
         class Context : boost::noncopyable {
         public:
             /**
-             * this is the main constructor
-             * use this unless there is a good reason not to
+             * this is the main constructor use this unless there is a good reason not to
              */
             Context(const string& ns, string path=dbpath, mongolock * lock = 0 , bool doauth=true );
 
-            /* this version saves the context but doesn't yet set the new one: */
+            /* this version saves the context but doesn't yet set the new one */
             Context();
 
             /**
@@ -220,13 +220,18 @@ namespace mongo {
             string _ns;
             Database * _db;
         }; // class Client::Context
-
+#if defined(CLC)
+        void checkLocks() const;
         struct LockStatus { 
-            LockStatus() : db(), coll() { }
-            int db;
-            int coll;
+            LockStatus() : dbLockCount(0), whichDB(0), collLockCount(0) { }
+            SimpleRWLock collLock;
+            const Database *whichDB;
+            string whichCollection;
+            int dbLockCount;
+            int collLockCount;
+            bool collLocked();
         } lockStatus;
-
+#endif
     }; // class Client
 
     /** get the Client object for this thread. */

@@ -167,6 +167,23 @@ namespace mongo {
     BSONObj CachedBSONObj::_tooBig = fromjson("{\"$msg\":\"query not recording (too large)\"}");
     AtomicUInt CurOp::_nextOpNum;
 
+    /** true if this is "under" the parent collection. indexes are that way. i.e. for a db foo, 
+        foo.mycoll can be thought of as a parent of foo.mycoll.$someindex collection.
+        */
+    bool subcollectionOf(const string& parent, const char *child) { 
+        return parent == child || 
+            ( strlen(child) > parent.size() && child[parent.size()] == '.'  );
+    }
+
+    void Client::checkLocks() const {
+        if( lockStatus.collLockCount ) {
+            assert( ns() == 0 || subcollectionOf(lockStatus.whichCollection, ns()) );
+        }
+        else if( lockStatus.dbLockCount ) { 
+            assert( lockStatus.whichDB == database() || database() == 0 );
+        }
+    }
+
     Client::Context::Context( string ns , Database * db, bool doauth )
         : _client( currentClient.get() ) , _oldContext( _client->_context ) ,
           _path( dbpath ) , _lock(0) , _justCreated(false) {
@@ -176,6 +193,7 @@ namespace mongo {
         _client->_context = this;
         if ( doauth )
             _auth();
+        _client->checkLocks();
     }
 
     Client::Context::Context(const string& ns, string path , mongolock * lock , bool doauth )
@@ -183,6 +201,7 @@ namespace mongo {
           _path( path ) , _lock( lock ) ,
           _ns( ns ), _db(0) {
         _finishInit( doauth );
+        _client->checkLocks();        
     }
 
     /* this version saves the context but doesn't yet set the new one: */
@@ -192,6 +211,7 @@ namespace mongo {
           _path( dbpath ) , _lock(0) , _justCreated(false), _db(0) {
         _client->_context = this;
         clear();
+        _client->checkLocks();        
     }
 
     void Client::Context::_finishInit( bool doauth ) {
