@@ -208,6 +208,7 @@ extern int __wt_btree_open(WT_SESSION_IMPL *session,
     const char *cfg[],
     uint32_t flags);
 extern int __wt_btree_root_init(WT_SESSION_IMPL *session);
+extern int __wt_btree_root_free(WT_SESSION_IMPL *session);
 extern int __wt_btree_close(WT_SESSION_IMPL *session);
 extern int __wt_btree_reopen(WT_SESSION_IMPL *session,
     const char *cfg[],

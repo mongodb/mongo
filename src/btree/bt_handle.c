@@ -274,7 +274,7 @@ __btree_conf(WT_SESSION_IMPL *session, const char *config)
 
 /*
  * __wt_btree_root_init --
- *      Create an in-memory page but don't mark it dirty, if it's never
+ *      Create an empty in-memory tree.  Don't mark it dirty, if it's never
  *      written, that's OK.
  */
 int
@@ -340,6 +340,45 @@ __wt_btree_root_init(WT_SESSION_IMPL *session)
 	ref->size = 0;
 	ref->page = page;
 	F_SET(page, WT_PAGE_DELETED | WT_PAGE_EMPTY_TREE);
+	return (0);
+}
+
+/*
+ * __wt_btree_root_free --
+ *      Free an empty in-memory tree before.
+ */
+int
+__wt_btree_root_free(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *btree;
+	WT_PAGE *child, *root;
+	WT_REF *ref;
+
+	btree = session->btree;
+	root = btree->root_page.page;
+	
+	if (!F_ISSET(root, WT_PAGE_EMPTY_TREE) || root->entries != 1)
+		return (WT_ERROR);
+
+	/* Create the empty root page. */
+	switch (root->type) {
+	case WT_PAGE_COL_INT:
+		ref = &root->u.col_int.t->ref;
+		break;
+	case WT_PAGE_ROW_INT:
+		ref = &root->u.row_int.t->ref;
+		break;
+	WT_ILLEGAL_FORMAT(session);
+	}
+
+	child = ref->page;
+	if (child == NULL || !F_ISSET(child, WT_PAGE_DELETED))
+		return (WT_ERROR);
+
+	__wt_page_out(session, child, 0);
+	__wt_page_out(session, root, 0);
+	btree->root_page.page = NULL;
+	
 	return (0);
 }
 

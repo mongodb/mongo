@@ -24,27 +24,24 @@ __wt_bulk_init(WT_CURSOR_BULK *cbulk)
 	WT_BTREE *btree;
 	WT_SESSION_IMPL *session;
 	uint32_t nrecs;
+	int ret;
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	btree = session->btree;
 
 	/*
 	 * You can't bulk-load into existing trees; while checking, free the
-	 * empty page created when the btree was opened, and reset the state
+	 * empty page(s) created when the btree was opened, and reset the state
 	 * of the root page (we're doing a bulk load, on-disk is the eventual
 	 * state of this tree, after we write the internal page).
 	 */
-	if (F_ISSET(btree->root_page.page, WT_PAGE_EMPTY_TREE)) {
-		btree->root_page.state = WT_REF_DISK;
-		__wt_free(session, btree->root_page.page);
-		/* LEAK: the child page. */
-
-		btree->last_page = NULL;
-	} else {
+	if ((ret = __wt_btree_root_free(session)) != 0) {
 		__wt_errx(
 		    session, "bulk-load is only possible for empty trees");
-		return (WT_ERROR);
+		return (ret);
 	}
+	btree->root_page.state = WT_REF_DISK;
+	btree->last_page = NULL;
 
 #if 0
 	/*
