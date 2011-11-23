@@ -27,7 +27,7 @@ namespace mongo {
         }
         else {
             // recursed
-            massert( 0, "wrong database while locking", db == s.whichDB);
+            massert( 15919, "wrong database while locking", db == s.whichDB);
         }
         s.dbLockCount--; // < 0 means sharable
     }

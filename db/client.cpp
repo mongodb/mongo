@@ -175,6 +175,7 @@ namespace mongo {
             ( strlen(child) > parent.size() && child[parent.size()] == '.'  );
     }
 
+#if defined(CLC)
     void Client::checkLocks() const {
         if( lockStatus.collLockCount ) {
             assert( ns() == 0 || subcollectionOf(lockStatus.whichCollection, ns()) );
@@ -183,6 +184,7 @@ namespace mongo {
             assert( lockStatus.whichDB == database() || database() == 0 );
         }
     }
+#endif
 
     Client::Context::Context( string ns , Database * db, bool doauth )
         : _client( currentClient.get() ) , _oldContext( _client->_context ) ,

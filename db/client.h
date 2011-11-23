@@ -231,6 +231,8 @@ namespace mongo {
             int collLockCount;
             bool collLocked();
         } lockStatus;
+#else
+        void checkLocks() const {}
 #endif
     }; // class Client
 
