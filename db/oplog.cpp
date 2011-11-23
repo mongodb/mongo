@@ -740,7 +740,7 @@ namespace mongo {
                     // of the form
                     //   { _id:..., { x : {$size:...} }
                     // thus this is not ideal.
-                    else if( Helpers::findById(nsdetails(ns), updateCriteria).isNull() ) {
+                    else if( nsdetails(ns) == NULL || Helpers::findById(nsdetails(ns), updateCriteria).isNull() ) {
                         failedUpdate = true; 
                     }
                     else { 
