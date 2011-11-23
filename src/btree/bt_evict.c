@@ -216,6 +216,9 @@ __wt_evict_force_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 			if (evict->page == page)
 				__evict_clr(evict);
 
+	if (session->btree->evict_page == page)
+		session->btree->evict_page = NULL;
+
 	F_CLR(page, WT_PAGE_FORCE_EVICT);
 }
 
@@ -766,6 +769,13 @@ __evict_page(WT_SESSION_IMPL *session)
 		 * the same page on reconciliation error.
 		 */
 		__evict_clr(evict);
+
+		/*
+		 * If we're evicting our current eviction point in the file,
+		 * clear it and start again.
+		 */
+		if (page == session->btree->evict_page)
+			session->btree->evict_page = NULL;
 
 		/*
 		 * For now, we don't care why reconciliation failed -- we expect
