@@ -73,7 +73,7 @@ namespace mongo {
             MAdvise adv(e, e->length, MAdvise::Sequential);
             const char *p = (const char *) e;
             for( int i = 0; i < e->length; i += 4096 ) { 
-                faux += *p;
+                faux += p[i];
             }
             int ms = t.millis();
             if( ms > 1000 ) 
