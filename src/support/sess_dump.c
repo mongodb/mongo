@@ -80,12 +80,14 @@ __wt_session_print_state(WT_SESSION_IMPL *session)
 	switch (session->wq_state) {
 	case WT_SERIAL_EVICT:
 		return ("evict");
-	case WT_SERIAL_READ:
-		return ("read");
 	case WT_SERIAL_FUNC:
 		return ("function");
 	case WT_SERIAL_NONE:
 		return ("none");
+	case WT_SERIAL_READ:
+		return ("read");
+	case WT_SERIAL_REENTER:
+		return ("reenter");
 	}
 	return ("unknown");
 	/* NOTREACHED */

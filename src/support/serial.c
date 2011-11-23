@@ -31,12 +31,16 @@ __wt_session_serialize_func(WT_SESSION_IMPL *session,
 	 *	if necessary, block until an async action completes.
 	 */
 	session->wq_args = args;
-	session->wq_sleeping = (op != WT_SERIAL_FUNC);
+	session->wq_sleeping = (op == WT_SERIAL_EVICT || op == WT_SERIAL_READ);
 
 	/* Functions are serialized by holding a spinlock. */
-	__wt_spin_lock(session, &conn->serial_lock);
+	if (op != WT_SERIAL_REENTER)
+		__wt_spin_lock(session, &conn->serial_lock);
+
 	func(session);
-	__wt_spin_unlock(session, &conn->serial_lock);
+
+	if (op != WT_SERIAL_REENTER)
+		__wt_spin_unlock(session, &conn->serial_lock);
 
 	switch (op) {
 	case WT_SERIAL_EVICT:
@@ -45,10 +49,8 @@ __wt_session_serialize_func(WT_SESSION_IMPL *session,
 	case WT_SERIAL_READ:
 		__wt_read_server_wake(conn, 0);
 		break;
-	case WT_SERIAL_FUNC:
-	case WT_SERIAL_NONE:
 	default:
-		return (session->wq_ret);
+		break;
 	}
 
 	/*
@@ -56,7 +58,8 @@ __wt_session_serialize_func(WT_SESSION_IMPL *session,
 	 * variable: when the operation is complete, this will be notified and
 	 * we can continue.
 	 */
-	__wt_cond_wait(session, session->cond);
+	if (session->wq_sleeping)
+		__wt_cond_wait(session, session->cond);
 	return (session->wq_ret);
 }
 
@@ -70,7 +73,6 @@ __wt_session_serialize_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int ret)
 	WT_CONNECTION_IMPL *conn;
 
 	conn = S2C(session);
-	session->wq_ret = ret;			/* Set the return value. */
 
 	/* If passed a page and the return value is OK, we modified the page. */
 	if (page != NULL && ret == 0) {
@@ -91,11 +93,8 @@ __wt_session_serialize_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int ret)
 			 * XXX We're already inside a serialized function, so
 			 * we can't use the usual machinery.
 			 */
-			__wt_evict_page_args _args, *args = &_args;
 			F_SET(page, WT_PAGE_FORCE_EVICT);
-			args->page = page;
-			session->wq_args = args;
-			__wt_evict_page_serial_func(session);
+			__wt_evict_page_serial(session, page);
 			__wt_evict_server_wake(conn, 1);
 		}
 	}

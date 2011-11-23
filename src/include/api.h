@@ -60,6 +60,7 @@ typedef	enum {
 	WT_SERIAL_FUNC=1,		/* Function, then return */
 	WT_SERIAL_EVICT=2,		/* Function, then schedule evict */
 	WT_SERIAL_READ=3,		/* Function, then schedule read */
+	WT_SERIAL_REENTER=4,	/* Call function from inside a serialized op */
 } wq_state_t;
 
 /* Get the connection implementation for a session */

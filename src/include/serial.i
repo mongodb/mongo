@@ -205,7 +205,7 @@ __wt_evict_page_serial(
 	args->page = page;
 
 	ret = __wt_session_serialize_func(session,
-	    WT_SERIAL_FUNC, __wt_evict_page_serial_func, args);
+	    WT_SERIAL_REENTER, __wt_evict_page_serial_func, args);
 
 	return (ret);
 }
