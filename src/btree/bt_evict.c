@@ -426,6 +426,7 @@ __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 	WT_BTREE *btree;
 	WT_PAGE *next_page, *page;
 	uint32_t flags;
+	int force;
 
 	btree = session->btree;
 	flags = F_ISSET(er, WT_EVICT_REQ_CLOSE) ?
@@ -453,6 +454,8 @@ __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 			break;
 		WT_RET(__wt_tree_np(session, &next_page, 1, 1));
 
+		force = F_ISSET(page, WT_PAGE_FORCE_EVICT) ? 1 : 0;
+
 		/*
 		 * Sync: only dirty pages need reconciliation, and we ignore
 		 * pinned pages because we can't assure total access to them
@@ -461,11 +464,21 @@ __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 		 * Close: discarding all of the file's pages from the cache,
 		 * and reconciliation is how we do that.
 		 */
-		if (!F_ISSET(er, WT_EVICT_REQ_CLOSE) &&
+		if (!F_ISSET(er, WT_EVICT_REQ_CLOSE) && !force &&
 		    (!WT_PAGE_IS_MODIFIED(page) ||
 		    F_ISSET(page, WT_PAGE_PINNED)))
 			continue;
-		if (__wt_page_reconcile(session, page, flags) == 0)
+		
+		/*
+		 * Remove the page from any lists it might be in before we
+		 * reconcile it.  Do this unconditionally in sync and close,
+		 * otherwise the next LRU pass may try to evict stale
+		 * references to pages.
+		 */
+		__wt_evict_force_clear(session, page);
+
+		if (__wt_page_reconcile(
+		    session, page, flags | (force ? WT_REC_WAIT : 0)) == 0)
 			continue;
 
 		/*
@@ -746,6 +759,7 @@ __evict_page(WT_SESSION_IMPL *session)
 	WT_EVICT_LIST *evict;
 	WT_PAGE *page;
 	u_int i;
+	int force;
 
 	cache = S2C(session)->cache;
 
@@ -777,13 +791,16 @@ __evict_page(WT_SESSION_IMPL *session)
 		if (page == session->btree->evict_page)
 			session->btree->evict_page = NULL;
 
+		force = F_ISSET(page, WT_PAGE_FORCE_EVICT) ? 1 : 0;
+
 		/*
 		 * For now, we don't care why reconciliation failed -- we expect
 		 * the reason is we were unable to get exclusive access for the
 		 * page, but it might be we're out of disk space.   Regardless,
 		 * try not to pick the same page every time.
 		 */
-		if (__wt_page_reconcile(session, page, WT_REC_EVICT) != 0)
+		if (__wt_page_reconcile(session, page,
+		    WT_REC_EVICT | (force ? WT_REC_WAIT : 0)) != 0)
 			page->read_gen = __wt_cache_read_gen(session);
 
 		WT_CLEAR_BTREE_IN_SESSION(session);
