@@ -63,7 +63,7 @@ namespace mongo {
         void unlock_shared() { RWLockBase::unlock_shared(); }
     private:
         void lockAsUpgradable() { 
-            assert( x == NilState );
+//TODO FIX            assert( x == NilState );
             x = UpgradableState;
             RWLockBase::lockAsUpgradable(); 
         }
