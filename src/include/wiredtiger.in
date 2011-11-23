@@ -1012,7 +1012,7 @@ struct wt_connection {
  * handler is installed that writes error messages to stderr
  * @configstart{wiredtiger_open, see dist/api_data.py}
  * @config{cache_size, maximum heap memory to allocate for the cache.,an integer
- * between 1MB and 10TB; default \c 20MB.}
+ * between 1MB and 10TB; default \c 100MB.}
  * @config{create, create the database if it does not exist.,a boolean flag;
  * default \c false.}
  * @config{error_prefix, prefix string for error messages.,a string; default

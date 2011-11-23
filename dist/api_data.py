@@ -289,7 +289,7 @@ methods = {
 'connection.open_session' : Method([]),
 
 'wiredtiger_open' : Method([
-	Config('cache_size', '20MB', r'''
+	Config('cache_size', '100MB', r'''
 		maximum heap memory to allocate for the cache''',
 		min='1MB', max='10TB'),
 	Config('create', 'false', r'''
