@@ -128,7 +128,7 @@ __wt_sb_alloc(
 		 * still be used for future K/V inserts or modifications.
 		 */
 		if (session->sb != NULL)
-			__wt_sb_decrement(session, session->sb);
+			__wt_sb_decrement(session, session->sb, NULL);
 		session->sb = sb;
 
 		sb->in = 1;
@@ -159,6 +159,8 @@ __wt_sb_free(WT_SESSION_IMPL *session, WT_SESSION_BUFFER *sb, void *p)
 
 	__wt_free(session, p);
 #else
+	WT_UNUSED(p);
+
 	WT_ASSERT(session, sb->out < sb->in);
 
 	if (++sb->out == sb->in)
@@ -178,6 +180,8 @@ __wt_sb_decrement(WT_SESSION_IMPL *session, WT_SESSION_BUFFER *sb, void *p)
 
 	__wt_free(session, p);
 #else
+	WT_UNUSED(p);
+
 	WT_ASSERT(session, sb->out < sb->in);
 
 	/*
