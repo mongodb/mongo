@@ -106,7 +106,7 @@ namespace mongo {
                     _r.unlockFromUpgradable();
                 }
                 else {
-                    assert( _r.x == Exclusive ); // has been upgraded
+//TEMP                     assert( _r.x == Exclusive ); // has been upgraded
                     _r.x = NilState;
                     _r.unlock();
                 }
