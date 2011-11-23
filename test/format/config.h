@@ -68,9 +68,9 @@ static CONFIG c[] = {
 	  "percent operations that are inserts",
 	  0, 0, 0, 45, &g.c_insert_pct },
 
-	{ "intl_node_max",
+	{ "internal_page_max",
 	  "maximum size of Btree internal nodes",
-	  0, 0, 9, 17, &g.c_intl_node_max },
+	  0, 0, 9, 17, &g.c_intl_page_max },
 
 	{ "key_max",
 	  "maximum size of keys",
@@ -80,9 +80,9 @@ static CONFIG c[] = {
 	  "minimum size of keys",
 	  C_ROW, 0, 10, 32, &g.c_key_min },
 
-	{ "leaf_node_max",
+	{ "leaf_page_max",
 	  "maximum size of Btree leaf nodes",
-	  0, 0, 9, 24, &g.c_leaf_node_max },
+	  0, 0, 9, 24, &g.c_leaf_page_max },
 
 	{ "ops",
 	  "the number of modification operations done per run",

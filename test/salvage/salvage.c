@@ -449,24 +449,24 @@ build(int ikey, int ivalue, int cnt)
 		(void)snprintf(config, sizeof(config),
 		    "key_format=r,value_format=7t,"
 		    "allocation_size=%d,"
-		    "internal_node_max=%d,internal_overflow_size=%d,"
-		    "leaf_node_max=%d,leaf_overflow_size=%d",
+		    "internal_page_max=%d,internal_item_max=%d,"
+		    "leaf_page_max=%d,leaf_item_max=%d",
 		    PSIZE, PSIZE, OSIZE, PSIZE, OSIZE);
 		break;
 	case WT_PAGE_COL_VAR:
 		(void)snprintf(config, sizeof(config),
 		    "key_format=r,"
 		    "allocation_size=%d,"
-		    "internal_node_max=%d,internal_overflow_size=%d,"
-		    "leaf_node_max=%d,leaf_overflow_size=%d",
+		    "internal_page_max=%d,internal_item_max=%d,"
+		    "leaf_page_max=%d,leaf_item_max=%d",
 		    PSIZE, PSIZE, OSIZE, PSIZE, OSIZE);
 		break;
 	case WT_PAGE_ROW_LEAF:
 		(void)snprintf(config, sizeof(config),
 		    "key_format=u,"
 		    "allocation_size=%d,"
-		    "internal_node_max=%d,internal_overflow_size=%d,"
-		    "leaf_node_max=%d,leaf_overflow_size=%d",
+		    "internal_page_max=%d,internal_item_max=%d,"
+		    "leaf_page_max=%d,leaf_item_max=%d",
 		    PSIZE, PSIZE, OSIZE, PSIZE, OSIZE);
 		break;
 	default:

@@ -280,8 +280,6 @@ initn
 initsize
 inmem
 intl
-intlmax
-intlovfl
 intpack
 ints
 inuse
@@ -291,8 +289,6 @@ keycmp
 keyname
 keyv
 kv
-leafmax
-leafovfl
 len
 lex
 lexicographically
@@ -306,6 +302,10 @@ lsn
 lu
 majorp
 malloc
+maxintlitem
+maxintlpage
+maxleafitem
+maxleafpage
 mb
 mem
 memalloc

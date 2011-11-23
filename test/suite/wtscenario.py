@@ -105,11 +105,11 @@ class wtscenario:
         """
         res = ''
         if hasattr(self, 'ioverflow'):
-            res += ',internal_overflow_size=' + str(self.ioverflow)
+            res += ',internal_item_max=' + str(self.ioverflow)
         if hasattr(self, 'imax'):
-            res += ',internal_node_max=' + str(self.imax)
+            res += ',internal_page_max=' + str(self.imax)
         if hasattr(self, 'loverflow'):
-            res += ',leaf_overflow_size=' + str(self.loverflow)
+            res += ',leaf_item_max=' + str(self.loverflow)
         if hasattr(self, 'lmax'):
-            res += ',leaf_node_max=' + str(self.lmax)
+            res += ',leaf_page_max=' + str(self.lmax)
         return res

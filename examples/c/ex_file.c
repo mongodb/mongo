@@ -32,8 +32,8 @@ main(void)
 
 	ret = session->create(session, "file:example",
 	    "key_format=u,"
-	    "internal_node_max=32KB,internal_overflow_size=1KB,"
-	    "leaf_node_max=1MB,leaf_overflow_size=32KB");
+	    "internal_page_max=32KB,internal_item_max=1KB,"
+	    "leaf_page_max=1MB,leaf_item_max=32KB");
 
 	return (conn->close(conn, NULL) == 0 ? ret : EXIT_FAILURE);
 }

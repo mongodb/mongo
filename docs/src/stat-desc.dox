@@ -63,11 +63,11 @@ in this release:
 @row{file: pages written to the file}
 @row{file: size}
 @row{fixed-record size}
-@row{internal page overflow size}
-@row{leaf page overflow size}
 @row{magic number}
 @row{major version number}
+@row{maximum internal page item size}
 @row{maximum internal page size}
+@row{maximum leaf page item size}
 @row{maximum leaf page size}
 @row{minor version number}
 @row{number of bytes in the freelist}

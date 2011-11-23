@@ -562,16 +562,16 @@ __btree_page_sizes(WT_SESSION_IMPL *session, const char *config)
 	WT_RET(__wt_config_getones(session, config, "allocation_size", &cval));
 	btree->allocsize = (uint32_t)cval.val;
 	WT_RET(__wt_config_getones(
-	    session, config, "internal_node_max", &cval));
-	btree->intlmax = (uint32_t)cval.val;
+	    session, config, "internal_page_max", &cval));
+	btree->maxintlpage = (uint32_t)cval.val;
 	WT_RET(__wt_config_getones(
-	    session, config, "internal_overflow_size", &cval));
-	btree->intlovfl = (uint32_t)cval.val;
-	WT_RET(__wt_config_getones(session, config, "leaf_node_max", &cval));
-	btree->leafmax = (uint32_t)cval.val;
+	    session, config, "internal_item_max", &cval));
+	btree->maxintlitem = (uint32_t)cval.val;
+	WT_RET(__wt_config_getones(session, config, "leaf_page_max", &cval));
+	btree->maxleafpage = (uint32_t)cval.val;
 	WT_RET(__wt_config_getones(
-	    session, config, "leaf_overflow_size", &cval));
-	btree->leafovfl = (uint32_t)cval.val;
+	    session, config, "leaf_item_max", &cval));
+	btree->maxleafitem = (uint32_t)cval.val;
 
 	/*
 	 * Limit allocation units to 128MB, and page sizes to 512MB.  There's
@@ -582,8 +582,8 @@ __btree_page_sizes(WT_SESSION_IMPL *session, const char *config)
 	 */
 	WT_ASSERT(session, btree->allocsize >= WT_BTREE_ALLOCATION_SIZE_MIN);
 	WT_ASSERT(session, btree->allocsize <= WT_BTREE_ALLOCATION_SIZE_MAX);
-	WT_ASSERT(session, btree->intlmax <= WT_BTREE_PAGE_SIZE_MAX);
-	WT_ASSERT(session, btree->leafmax <= WT_BTREE_PAGE_SIZE_MAX);
+	WT_ASSERT(session, btree->maxintlpage <= WT_BTREE_PAGE_SIZE_MAX);
+	WT_ASSERT(session, btree->maxleafpage <= WT_BTREE_PAGE_SIZE_MAX);
 
 	/* Allocation sizes must be a power-of-two, nothing else makes sense. */
 	if (!__wt_ispo2(btree->allocsize)) {
@@ -593,10 +593,10 @@ __btree_page_sizes(WT_SESSION_IMPL *session, const char *config)
 	}
 
 	/* All page sizes must be in units of the allocation size. */
-	if (btree->intlmax < btree->allocsize ||
-	    btree->intlmax % btree->allocsize != 0 ||
-	    btree->leafmax < btree->allocsize ||
-	    btree->leafmax % btree->allocsize != 0) {
+	if (btree->maxintlpage < btree->allocsize ||
+	    btree->maxintlpage % btree->allocsize != 0 ||
+	    btree->maxleafpage < btree->allocsize ||
+	    btree->maxleafpage % btree->allocsize != 0) {
 		__wt_errx(session,
 		    "page sizes must be a multiple of the page allocation "
 		    "size (%" PRIu32 "B)", btree->allocsize);
@@ -607,20 +607,20 @@ __btree_page_sizes(WT_SESSION_IMPL *session, const char *config)
 	 * The API limits the minimum overflow size, but just in case: we'd fail
 	 * horribly if the overflow limit was smaller than an overflow chunk.
 	 */
-	WT_ASSERT(session, btree->intlovfl > sizeof(WT_OFF) + 10);
-	WT_ASSERT(session, btree->leafovfl > sizeof(WT_OFF) + 10);
+	WT_ASSERT(session, btree->maxintlitem > sizeof(WT_OFF) + 10);
+	WT_ASSERT(session, btree->maxleafitem > sizeof(WT_OFF) + 10);
 
 	/*
 	 * Check we can fit 10 items on a page; 2 is probably the true minimum,
 	 * but that doesn't make much sense, anything less than 20 is probably
 	 * an application error.
 	 */
-	if (btree->intlovfl > btree->intlmax / 10)
-		return (pse1(
-		    session, "internal", btree->intlmax, btree->intlovfl));
-	if (btree->leafovfl > btree->leafmax / 10)
-		return (pse1(
-		    session, "leaf", btree->leafmax, btree->leafovfl));
+	if (btree->maxintlitem > btree->maxintlpage / 10)
+		return (pse1(session, "internal",
+		    btree->maxintlpage, btree->maxintlitem));
+	if (btree->maxleafitem > btree->maxleafpage / 10)
+		return (pse1(session, "leaf",
+		    btree->maxleafpage, btree->maxleafitem));
 
 	/*
 	 * Take into account the size of a split page: reconciliation splits to
@@ -630,16 +630,16 @@ __btree_page_sizes(WT_SESSION_IMPL *session, const char *config)
 	 */
 	WT_RET(__wt_config_getones(session, config, "split_pct", &cval));
 	split_pct = (uint32_t)cval.val;
-	split_size =
-	    WT_SPLIT_PAGE_SIZE(btree->intlmax, btree->allocsize, split_pct);
-	if (btree->intlovfl > split_size / 10)
-		return (pse2(session,
-		    "internal", btree->intlmax, btree->intlovfl, split_pct));
-	split_size =
-	    WT_SPLIT_PAGE_SIZE(btree->leafmax, btree->allocsize, split_pct);
-	if (btree->leafovfl > split_size / 10)
-		return (pse2(session,
-		   "leaf", btree->leafmax, btree->leafovfl, split_pct));
+	split_size = WT_SPLIT_PAGE_SIZE(
+	    btree->maxintlpage, btree->allocsize, split_pct);
+	if (btree->maxintlitem > split_size / 10)
+		return (pse2(session, "internal",
+		    btree->maxintlpage, btree->maxintlitem, split_pct));
+	split_size = WT_SPLIT_PAGE_SIZE(
+	    btree->maxleafpage, btree->allocsize, split_pct);
+	if (btree->maxleafitem > split_size / 10)
+		return (pse2(session, "leaf",
+		    btree->maxleafpage, btree->maxleafitem, split_pct));
 
 	return (0);
 }
@@ -648,7 +648,7 @@ static int
 pse1(WT_SESSION_IMPL *session, const char *type, uint32_t max, uint32_t ovfl)
 {
 	__wt_errx(session,
-	    "%s page size (%" PRIu32 "B) too small for the overflow size "
+	    "%s page size (%" PRIu32 "B) too small for the maximum item size "
 	    "(%" PRIu32 "B); the page must be able to hold at least 10 items",
 	    type, max, ovfl);
 	return (WT_ERROR);
@@ -659,7 +659,7 @@ pse2(WT_SESSION_IMPL *session,
     const char *type, uint32_t max, uint32_t ovfl, uint32_t pct)
 {
 	__wt_errx(session,
-	    "%s page size (%" PRIu32 "B) too small for the overflow size "
+	    "%s page size (%" PRIu32 "B) too small for the maximum item size "
 	    "(%" PRIu32 "B), because of the split percentage (%" PRIu32
 	    "%%); a split page must be able to hold at least 10 items",
 	    type, max, ovfl, pct);

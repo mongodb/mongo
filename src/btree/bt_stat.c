@@ -28,10 +28,10 @@ __wt_btree_stat_init(WT_SESSION_IMPL *session)
 
 	WT_BSTAT_SET(session, file_allocsize, btree->allocsize);
 	WT_BSTAT_SET(session, file_fixed_len, btree->bitcnt);
-	WT_BSTAT_SET(session, file_intlmax, btree->intlmax);
-	WT_BSTAT_SET(session, file_intlovfl, btree->intlovfl);
-	WT_BSTAT_SET(session, file_leafmax, btree->leafmax);
-	WT_BSTAT_SET(session, file_leafovfl, btree->leafovfl);
+	WT_BSTAT_SET(session, file_maxintlpage, btree->maxintlpage);
+	WT_BSTAT_SET(session, file_maxintlitem, btree->maxintlitem);
+	WT_BSTAT_SET(session, file_maxleafpage, btree->maxleafpage);
+	WT_BSTAT_SET(session, file_maxleafitem, btree->maxleafitem);
 	WT_BSTAT_SET(session, file_magic, WT_BTREE_MAGIC);
 	WT_BSTAT_SET(session, file_major, WT_BTREE_MAJOR_VERSION);
 	WT_BSTAT_SET(session, file_minor, WT_BTREE_MINOR_VERSION);

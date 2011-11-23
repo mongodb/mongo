@@ -27,8 +27,8 @@ load(void)
 	end = config + sizeof(config);
 	p += snprintf(p, (size_t)(end - p),
 	    "key_format=%s,"
-	    "internal_node_max=%d,"
-	    "leaf_node_max=%d,",
+	    "internal_page_max=%d,"
+	    "leaf_page_max=%d,",
 	    ftype == ROW ? "u" : "r", 16 * 1024, 128 * 1024);
 	if (ftype == FIX)
 		(void)snprintf(p, (size_t)(end - p), ",value_format=3t");

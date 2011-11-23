@@ -590,7 +590,7 @@ struct __wt_insert_head {
  *	Return the number of bitfield records that fit on a fixed-length page.
  */
 #define	WT_FIX_NRECS(btree)						\
-	(((btree)->leafmax - WT_PAGE_DISK_SIZE) / (btree)->bitcnt)
+	(((btree)->maxleafpage - WT_PAGE_DISK_SIZE) / (btree)->bitcnt)
 
 /*
  * WT_OFF_FOREACH --

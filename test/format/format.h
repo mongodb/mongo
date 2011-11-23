@@ -70,10 +70,10 @@ typedef struct {
 	uint32_t c_huffman_key;
 	uint32_t c_huffman_value;
 	uint32_t c_insert_pct;
-	uint32_t c_intl_node_max;
+	uint32_t c_intl_page_max;
 	uint32_t c_key_max;
 	uint32_t c_key_min;
-	uint32_t c_leaf_node_max;
+	uint32_t c_leaf_page_max;
 	uint32_t c_ops;
 	uint32_t c_repeat_data_pct;
 	uint32_t c_reverse;

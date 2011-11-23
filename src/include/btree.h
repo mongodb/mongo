@@ -68,10 +68,10 @@ struct __wt_btree {
 	uint32_t key_gap;		/* Row-store prefix key gap */
 
 	uint32_t allocsize;		/* Allocation size */
-	uint32_t intlmax;		/* Internal page size max */
-	uint32_t intlovfl;		/* Internal page overflow size */
-	uint32_t leafmax;		/* Leaf page size max */
-	uint32_t leafovfl;		/* Leaf page overflow size */
+	uint32_t maxintlpage;		/* Internal page max size */
+	uint32_t maxintlitem;		/* Internal page max item size */
+	uint32_t maxleafpage;		/* Leaf page max size */
+	uint32_t maxleafitem;		/* Leaf page max item size */
 
 	void *huffman_key;		/* Key huffman encoding */
 	void *huffman_value;		/* Value huffman encoding */

@@ -102,11 +102,11 @@ file_meta = format_meta + [
 		the Btree for truncation of internal keys, discarding
 		unnecessary trailing bytes on internal keys''',
 		type='boolean'),
-	Config('internal_node_max', '2KB', r'''
+	Config('internal_page_max', '2KB', r'''
 		the maximum page size for internal nodes, in bytes; the size
 		must be a multiple of the allocation size''',
 		min='512B', max='512MB'),
-	Config('internal_overflow_size', '64B', r'''
+	Config('internal_item_max', '64B', r'''
 		the maximum key size stored on internal nodes, in bytes''',
 		min='40B'),
 	Config('key_gap', '10', r'''
@@ -114,11 +114,11 @@ file_meta = format_meta + [
 		constraining the number of keys processed to instantiate a
 		random Btree leaf page key''',
 		min='0'),
-	Config('leaf_node_max', '1MB', r'''
+	Config('leaf_page_max', '1MB', r'''
 		the maximum page size for leaf nodes, in bytes; the size must
 		be a multiple of the allocation size''',
 		min='512B', max='512MB'),
-	Config('leaf_overflow_size', '470B', r'''
+	Config('leaf_item_max', '470B', r'''
 		the maximum key or value size stored on leaf nodes, in bytes''',
 		min='40B'),
 	Config('prefix_compression', 'true', r'''

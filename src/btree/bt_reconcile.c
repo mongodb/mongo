@@ -1498,8 +1498,8 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, uint8_t type)
 static int
 __rec_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_RET(__rec_split_init(
-	    session, page, page->u.col_int.recno, session->btree->intlmax));
+	WT_RET(__rec_split_init(session,
+	    page, page->u.col_int.recno, session->btree->maxintlpage));
 
 	/*
 	 * Walking the row-store internal pages is complicated by the fact that
@@ -1606,8 +1606,8 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 		    ((uint8_t *)WT_UPDATE_DATA(ins->upd))[0]);
 
 	/* Allocate the memory. */
-	WT_RET(__rec_split_init(
-	    session, page, page->u.bulk.recno, btree->leafmax));
+	WT_RET(__rec_split_init(session,
+	    page, page->u.bulk.recno, btree->maxleafpage));
 
 	/* Copy the updated, disk-image bytes into place. */
 	memcpy(r->first_free, page->u.col_leaf.bitf,
@@ -1690,8 +1690,8 @@ __rec_col_fix_slvg(
 	 * for fixed-length format ranges to overlap during salvage, and I
 	 * don't want to have to retrofit the code later.
 	 */
-	WT_RET(__rec_split_init(
-	    session, page, page->u.col_leaf.recno, btree->leafmax));
+	WT_RET(__rec_split_init(session,
+	    page, page->u.col_leaf.recno, btree->maxleafpage));
 
 	/* We may not be taking all of the entries on the original page. */
 	page_take = salvage->take == 0 ? page->entries : salvage->take;
@@ -1745,8 +1745,8 @@ __rec_col_fix_bulk(WT_SESSION_IMPL *session, WT_PAGE *page)
 	btree = session->btree;
 
 	/* Allocate the memory -- we know the entire page will fit. */
-	WT_RET(__rec_split_init(
-	    session, page, page->u.bulk.recno, btree->leafmax));
+	WT_RET(__rec_split_init(session,
+	    page, page->u.bulk.recno, btree->maxleafpage));
 
 	/* Copy the bytes into place. */
 	len = __bitstr_size(page->entries * btree->bitcnt);
@@ -1860,8 +1860,8 @@ __rec_col_var(
 	data = NULL;
 	size = 0;
 
-	WT_RET(__rec_split_init(
-	    session, page, page->u.col_leaf.recno, session->btree->leafmax));
+	WT_RET(__rec_split_init(session,
+	    page, page->u.col_leaf.recno, session->btree->maxleafpage));
 
 	/*
 	 * The salvage code may be calling us to reconcile a page where there
@@ -2106,8 +2106,8 @@ __rec_col_var_bulk(WT_SESSION_IMPL *session, WT_PAGE *page)
 	r = session->btree->reconcile;
 	val = &r->v;
 
-	WT_RET(__rec_split_init(
-	    session, page, page->u.bulk.recno, session->btree->leafmax));
+	WT_RET(__rec_split_init(session,
+	    page, page->u.bulk.recno, session->btree->maxleafpage));
 
 	/* For each entry in the update list... */
 	rle = 1;
@@ -2164,7 +2164,8 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	key = &r->k;
 	val = &r->v;
 
-	WT_RET(__rec_split_init(session, page, 0ULL, session->btree->intlmax));
+	WT_RET(__rec_split_init(session,
+	    page, 0ULL, session->btree->maxintlpage));
 
 	/*
 	 * Ideally, we'd never store the 0th key on row-store internal pages
@@ -2445,7 +2446,8 @@ __rec_row_leaf(
 	key = &r->k;
 	val = &r->v;
 
-	WT_RET(__rec_split_init(session, page, 0ULL, session->btree->leafmax));
+	WT_RET(__rec_split_init(session,
+	    page, 0ULL, session->btree->maxleafpage));
 
 	/*
 	 * Bulk-loaded pages are just an insert list and nothing more.  As
@@ -2999,7 +3001,8 @@ __rec_cell_build_key(WT_SESSION_IMPL *session,
 		    key->buf.data, key->buf.size, &key->buf));
 
 	/* Create an overflow object if the data won't fit. */
-	if (key->buf.size > (is_internal ? btree->intlovfl : btree->leafovfl)) {
+	if (key->buf.size >
+	    (is_internal ? btree->maxintlitem : btree->maxleafitem)) {
 		WT_BSTAT_INCR(session, rec_ovfl_key);
 
 		/*
@@ -3054,7 +3057,7 @@ __rec_cell_build_val(
 			    val->buf.data, val->buf.size, &val->buf));
 
 		/* Create an overflow object if the data won't fit. */
-		if (val->buf.size > btree->leafovfl) {
+		if (val->buf.size > btree->maxleafitem) {
 			WT_BSTAT_INCR(session, rec_ovfl_value);
 
 			return (__rec_cell_build_ovfl(

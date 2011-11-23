@@ -118,33 +118,33 @@ wts_startup(int open_cursors)
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor, *cursor_insert;
 	WT_SESSION *session;
-	uint32_t intlmax, intlovfl, leafmax, leafovfl;
+	uint32_t maxintlpage, maxintlitem, maxleafpage, maxleafitem;
 	int ret;
 	char config[512], *end, *p;
 
 	if (wts_open(&conn, &session))
 		return (1);
 
-	intlmax = 1U << g.c_intl_node_max;
-	intlovfl = MMRAND(intlmax / 50, intlmax / 40);
-	if (intlovfl < 40)
-		intlovfl = 40;
-	leafmax = 1U << g.c_leaf_node_max;
+	maxintlpage = 1U << g.c_intl_page_max;
+	maxintlitem = MMRAND(maxintlpage / 50, maxintlpage / 40);
+	if (maxintlitem < 40)
+		maxintlitem = 40;
+	maxleafpage = 1U << g.c_leaf_page_max;
 	/* Make sure at least 3 leaf pages can fix in cache. */
-	while (3 * leafmax > g.c_cache << 20)
-		leafmax >>= 1;
-	leafovfl = MMRAND(leafmax / 50, leafmax / 40);
-	if (leafovfl < 40)
-		leafovfl = 40;
+	while (3 * maxleafpage > g.c_cache << 20)
+		maxleafpage >>= 1;
+	maxleafitem = MMRAND(maxleafpage / 50, maxleafpage / 40);
+	if (maxleafitem < 40)
+		maxleafitem = 40;
 
 	p = config;
 	end = config + sizeof(config);
 	p += snprintf(p, (size_t)(end - p),
 	    "key_format=%s,"
-	    "internal_node_max=%d,internal_overflow_size=%d,"
-	    "leaf_node_max=%d,leaf_overflow_size=%d",
+	    "internal_page_max=%d,internal_item_max=%d,"
+	    "leaf_page_max=%d,leaf_item_max=%d",
 	    (g.c_file_type == ROW) ? "u" : "r",
-	    intlmax, intlovfl, leafmax, leafovfl);
+	    maxintlpage, maxintlitem, maxleafpage, maxleafitem);
 
 	if (g.c_bzip)
 		p += snprintf(p, (size_t)(end - p),

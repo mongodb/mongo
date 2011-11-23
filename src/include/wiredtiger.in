@@ -541,15 +541,15 @@ struct wt_session {
 	 * @config{huffman_value, use Huffman encoding for values.  Permitted
 	 * values are empty (off)\, \c "english" or \c "<filename>".  See @ref
 	 * huffman for more details.,a string; default empty.}
+	 * @config{internal_item_max, the maximum key size stored on internal
+	 * nodes\, in bytes.,an integer greater than or equal to 40B; default \c
+	 * 64B.}
 	 * @config{internal_key_truncate, the Btree for truncation of internal
 	 * keys\, discarding unnecessary trailing bytes on internal keys.,a
 	 * boolean flag; default \c true.}
-	 * @config{internal_node_max, the maximum page size for internal nodes\,
+	 * @config{internal_page_max, the maximum page size for internal nodes\,
 	 * in bytes; the size must be a multiple of the allocation size.,an
 	 * integer between 512B and 512MB; default \c 2KB.}
-	 * @config{internal_overflow_size, the maximum key size stored on
-	 * internal nodes\, in bytes.,an integer greater than or equal to 40B;
-	 * default \c 64B.}
 	 * @config{key_format, the format of the data packed into key items.
 	 * See @ref schema_format_types for details.  By default\, the
 	 * key_format is \c 'u' and applications use WT_ITEM structures to
@@ -561,12 +561,12 @@ struct wt_session {
 	 * leaf page\, constraining the number of keys processed to instantiate
 	 * a random Btree leaf page key.,an integer greater than or equal to 0;
 	 * default \c 10.}
-	 * @config{leaf_node_max, the maximum page size for leaf nodes\, in
+	 * @config{leaf_item_max, the maximum key or value size stored on leaf
+	 * nodes\, in bytes.,an integer greater than or equal to 40B; default \c
+	 * 470B.}
+	 * @config{leaf_page_max, the maximum page size for leaf nodes\, in
 	 * bytes; the size must be a multiple of the allocation size.,an integer
 	 * between 512B and 512MB; default \c 1MB.}
-	 * @config{leaf_overflow_size, the maximum key or value size stored on
-	 * leaf nodes\, in bytes.,an integer greater than or equal to 40B;
-	 * default \c 470B.}
 	 * @config{prefix_compression, the Btree for prefix compression\,
 	 * storing keys as a count of bytes matching the previous key plus a
 	 * unique suffix.,a boolean flag; default \c true.}

@@ -45,7 +45,7 @@ class test_stat01(wttest.WiredTigerTestCase):
         self.assertTrue(found, 'in stats, did not see: ' + lookfor)
 
     def test_statistics(self):
-        extra_params = ',allocation_size=512,internal_node_max=16384,leaf_node_max=131072'
+        extra_params = ',allocation_size=512,internal_page_max=16384,leaf_page_max=131072'
         self.session.create('table:' + self.tablename, 'key_format=S,value_format=S' + extra_params)
         cursor = self.session.open_cursor('table:' + self.tablename, None, None)
         value = ""
