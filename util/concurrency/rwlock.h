@@ -28,11 +28,21 @@
 
 namespace mongo {
 
+    /** separated out as later the implementation of this may be different than RWLock, 
+        depending on OS, as there is no upgrade etc. facility herein.
+    */
+    class SimpleRWLock : public RWLockBase { 
+    public:
+        void lock() { RWLockBase::lock(); }
+        void unlock() { RWLockBase::unlock(); }
+        void lock_shared() { RWLockBase::lock_shared(); }
+        void unlock_shared() { RWLockBase::unlock_shared(); }
+    };
+
     class RWLock : public RWLockBase { 
-        enum { NilState, UpgradableState, Exclusive } x;
+        enum { NilState, UpgradableState, Exclusive } x; // only bother to set when doing upgradable related things
     public:
         const char * const _name;
-        //int lowPriorityWaitMS() const { return _lowPriorityWaitMS; }
         RWLock(const char *name) : _name(name) { 
             x = NilState;
         }
@@ -52,8 +62,14 @@ namespace mongo {
         void lock_shared() { RWLockBase::lock_shared(); }
         void unlock_shared() { RWLockBase::unlock_shared(); }
     private:
-        void lockAsUpgradable() { RWLockBase::lockAsUpgradable(); }
+        void lockAsUpgradable() { 
+            assert( x == NilState );
+            x = UpgradableState;
+            RWLockBase::lockAsUpgradable(); 
+        }
         void unlockFromUpgradable() { // upgradable -> unlocked
+            assert( x == UpgradableState );
+            x = NilState;
             RWLockBase::unlockFromUpgradable();
         }
     public:
@@ -84,12 +100,9 @@ namespace mongo {
         public:
             Upgradable(RWLock& r) : _r(r) { 
                 r.lockAsUpgradable();
-                assert( _r.x == NilState );
-                _r.x = RWLock::UpgradableState;
             }
             ~Upgradable() {
                 if( _r.x == RWLock::UpgradableState ) {
-                    _r.x = NilState;
                     _r.unlockFromUpgradable();
                 }
                 else {
