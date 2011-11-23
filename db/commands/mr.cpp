@@ -222,6 +222,9 @@ namespace mongo {
 
             verbose = cmdObj["verbose"].trueValue();
             jsMode = cmdObj["jsMode"].trueValue();
+            splitInfo = 0;
+            if (cmdObj.hasField("splitInfo"))
+                splitInfo = cmdObj["splitInfo"].Int();
 
             jsMaxKeys = 500000;
             reduceTriggerRatio = 2.0;
@@ -384,8 +387,32 @@ namespace mongo {
          * Makes sure (key, value) tuple is formatted as {_id: key, value: val}
          */
         void State::appendResults( BSONObjBuilder& final ) {
-            if ( _onDisk )
+            if ( _onDisk ) {
+                if (!_config.outDB.empty()) {
+                    BSONObjBuilder loc;
+                    if ( !_config.outDB.empty())
+                        loc.append( "db" , _config.outDB );
+                    if ( !_config.finalShort.empty() )
+                        loc.append( "collection" , _config.finalShort );
+                    final.append("result", loc.obj());
+                }
+                else {
+                    if ( !_config.finalShort.empty() )
+                        final.append( "result" , _config.finalShort );
+                }
+
+                if ( _config.splitInfo > 0 ) {
+                    // add split points, used for shard
+                    BSONObj res;
+                    BSONObj idKey = BSON( "_id" << 1 );
+                    if ( ! _db.runCommand( "admin" , BSON( "splitVector" << _config.finalLong << "keyPattern" << idKey << "maxChunkSizeBytes" << _config.splitInfo ) , res ) ) {
+                        uasserted( 15919 ,  str::stream() << "splitVector failed: " << res );
+                    }
+                    if ( res.hasField( "splitKeys" ) )
+                        final.append( res.getField( "splitKeys" ) );
+                }
                 return;
+            }
 
             if (_jsMode) {
                 ScriptingFunction getResult = _scope->createFunction("var map = _mrMap; var result = []; for (key in map) { result.push({_id: key, value: map[key]}) } return result;");
@@ -1097,19 +1124,6 @@ namespace mongo {
                     state.appendResults( result );
 
                     timingBuilder.append( "total" , t.millis() );
-
-                    if (!config.outDB.empty()) {
-                        BSONObjBuilder loc;
-                        if ( !config.outDB.empty())
-                            loc.append( "db" , config.outDB );
-                        if ( !config.finalShort.empty() )
-                            loc.append( "collection" , config.finalShort );
-                        result.append("result", loc.obj());
-                    }
-                    else {
-                        if ( !config.finalShort.empty() )
-                            result.append( "result" , config.finalShort );
-                    }
                     result.append( "timeMillis" , t.millis() );
                     countsBuilder.appendNumber( "output" , finalCount );
                     if ( config.verbose ) result.append( "timing" , timingBuilder.obj() );
@@ -1158,19 +1172,37 @@ namespace mongo {
             virtual LockType locktype() const { return NONE; }
             bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 ShardedConnectionInfo::addHook();
+                // legacy name
                 string shardedOutputCollection = cmdObj["shardedOutputCollection"].valuestrsafe();
-                string postProcessCollection = cmdObj["postProcessCollection"].valuestrsafe();
-                bool postProcessOnly = !(postProcessCollection.empty());
+                string inputNS = cmdObj["inputNS"].valuestrsafe();
+                if (inputNS.empty())
+                    inputNS = dbname + "." + shardedOutputCollection;
+
+                // build queries based on ranges this shard owns
+                vector<BSONObj> rangeQueries;
+                if (cmdObj.hasField("ranges")) {
+                    BSONArrayBuilder ors;
+                    vector<BSONElement> ranges = cmdObj.getField("ranges").Array();
+                    for (unsigned i = 0; i < ranges.size(); i += 2) {
+                        BSONElement min = ranges.at(i);
+                        BSONElement max = ranges.at(i+1);
+                        BSONObjBuilder b;
+                        b.appendAs(min, "$gte");
+                        b.appendAs(max, "$lt");
+                        rangeQueries.push_back(BSON("_id" << b.obj()));
+                    }
+                } else {
+                    // add empty
+                    rangeQueries.push_back(BSONObj());
+                }
+
                 Client& client = cc();
                 CurOp * op = client.curop();
 
                 Config config( dbname , cmdObj.firstElement().embeddedObjectUserCheck() );
                 State state(config);
                 state.init();
-                if (postProcessOnly) {
-                    // the temp collection has been decided by mongos
-                    config.tempLong = dbname + "." + postProcessCollection;
-                }
+
                 // no need for incremental collection because records are already sorted
                 config.incLong = config.tempLong;
 
@@ -1179,108 +1211,83 @@ namespace mongo {
                 BSONObj counts = cmdObj["counts"].embeddedObjectUserCheck();
 
                 ProgressMeterHolder pm( op->setMessage( "m/r: merge sort and reduce" ) );
-                if (postProcessOnly) {
-                    if (!state._db.exists(config.tempLong)) {
-                        // nothing to do
-                        return 1;
+                set<ServerAndQuery> servers;
+                vector< auto_ptr<DBClientCursor> > shardCursors;
+
+                {
+                    // parse per shard results
+                    BSONObjIterator i( shards );
+                    while ( i.more() ) {
+                        BSONElement e = i.next();
+                        string shard = e.fieldName();
+//                        BSONObj res = e.embeddedObjectUserCheck();
+                        servers.insert( shard );
                     }
+                }
+
+                state.prepTempCollection();
+
+                BSONList values;
+                if (!config.outDB.empty()) {
+                    BSONObjBuilder loc;
+                    if ( !config.outDB.empty())
+                        loc.append( "db" , config.outDB );
+                    if ( !config.finalShort.empty() )
+                        loc.append( "collection" , config.finalShort );
+                    result.append("result", loc.obj());
                 }
                 else {
-                    set<ServerAndQuery> servers;
-                    vector< auto_ptr<DBClientCursor> > shardCursors;
+                    if ( !config.finalShort.empty() )
+                        result.append( "result" , config.finalShort );
+                }
 
-                    {
-                        // parse per shard results
-                        BSONObjIterator i( shards );
-                        while ( i.more() ) {
-                            BSONElement e = i.next();
-                            string shard = e.fieldName();
+                // it would be better to do just one big $or query, but then the sorting would not be efficient
+                long long inputCount = 0;
+                for (vector<BSONObj>::iterator it = rangeQueries.begin(); it != rangeQueries.end(); ++it) {
+                    // reduce from each shard for a chunk
 
-                            BSONObj res = e.embeddedObjectUserCheck();
+                    BSONObj sortKey = BSON( "_id" << 1 );
 
-                            uassert( 10078 ,  "something bad happened" , shardedOutputCollection == res["result"].valuestrsafe() );
-                            servers.insert( shard );
+                    ParallelSortClusteredCursor cursor( servers , inputNS , Query( *it ).sort( sortKey ) );
+                    cursor.init();
 
-                        }
+                    while ( cursor.more() || !values.empty() ) {
+                        BSONObj t;
+                        if (cursor.more()) {
+                            t = cursor.next().getOwned();
+                            ++inputCount;
 
-                    }
-
-                    state.prepTempCollection();
-
-                    {
-                        // reduce from each stream
-
-                        BSONObj sortKey = BSON( "_id" << 1 );
-
-                        ParallelSortClusteredCursor cursor( servers , dbname + "." + shardedOutputCollection ,
-                                                            Query().sort( sortKey ) );
-                        cursor.init();
-
-                        BSONList values;
-                        if (!config.outDB.empty()) {
-                            BSONObjBuilder loc;
-                            if ( !config.outDB.empty())
-                                loc.append( "db" , config.outDB );
-                            if ( !config.finalShort.empty() )
-                                loc.append( "collection" , config.finalShort );
-                            result.append("result", loc.obj());
-                        }
-                        else {
-                            if ( !config.finalShort.empty() )
-                                result.append( "result" , config.finalShort );
-                        }
-
-                        while ( cursor.more() || !values.empty() ) {
-                            BSONObj t;
-                            if (cursor.more()) {
-                                t = cursor.next().getOwned();
-
-                                if ( values.size() == 0 ) {
-                                    values.push_back( t );
-                                    continue;
-                                }
-
-                                if ( t.woSortOrder( *(values.begin()) , sortKey ) == 0 ) {
-                                    values.push_back( t );
-                                    continue;
-                                }
+                            if ( values.size() == 0 ) {
+                                values.push_back( t );
+                                continue;
                             }
 
-                            BSONObj res = config.reducer->finalReduce( values , config.finalizer.get());
-                            if (state.isOnDisk())
-                                state.insertToInc(res);
-                            else
-                                state.emit(res);
-                            values.clear();
-                            if (!t.isEmpty())
+                            if ( t.woSortOrder( *(values.begin()) , sortKey ) == 0 ) {
                                 values.push_back( t );
+                                continue;
+                            }
                         }
-                    }
 
-                    for ( set<ServerAndQuery>::iterator i=servers.begin(); i!=servers.end(); i++ ) {
-                        ScopedDbConnection conn( i->_server );
-                        conn->dropCollection( dbname + "." + shardedOutputCollection );
-                        conn.done();
+                        BSONObj res = config.reducer->finalReduce( values , config.finalizer.get());
+                        if (state.isOnDisk())
+                            state.insertToInc(res);
+                        else
+                            state.emit(res);
+                        values.clear();
+                        if (!t.isEmpty())
+                            values.push_back( t );
                     }
-
-                    result.append( "shardCounts" , shardCounts );
                 }
 
-                long long finalCount = state.postProcessCollection(op, pm);
+                result.append( "shardCounts" , shardCounts );
+
+                long long outputCount = state.postProcessCollection(op, pm);
                 state.appendResults( result );
 
-                // fix the global counts
                 BSONObjBuilder countsB(32);
-                BSONObjIterator j(counts);
-                while (j.more()) {
-                    BSONElement elmt = j.next();
-                    if (!strcmp(elmt.fieldName(), "reduce"))
-                        countsB.append("reduce", elmt.numberLong() + state.numReduces());
-                    else if (!strcmp(elmt.fieldName(), "output"))
-                        countsB.append("output", finalCount);
-                    else
-                        countsB.append(elmt);
-                }
+                countsB.append("input", inputCount);
+                countsB.append("reduce", state.numReduces());
+                countsB.append("output", outputCount);
                 result.append( "counts" , countsB.obj() );
 
                 return 1;

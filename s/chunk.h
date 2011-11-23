@@ -317,6 +317,8 @@ namespace mongo {
         void getAllShards( set<Shard>& all ) const;
         void getShardsForRange(set<Shard>& shards, const BSONObj& min, const BSONObj& max, bool fullKeyReq = true) const; // [min, max)
 
+        ChunkMap getChunkMap() const { return _chunkMap; }
+
         /**
          * Returns true if, for this shard, the chunks are identical in both chunk managers
          */

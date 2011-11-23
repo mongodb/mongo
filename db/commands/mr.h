@@ -156,6 +156,7 @@ namespace mongo {
             // options
             bool verbose;
             bool jsMode;
+            int splitInfo;
 
             // query options
 
