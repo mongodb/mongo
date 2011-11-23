@@ -10,6 +10,7 @@
 #
 
 import testscenarios
+import suite_random
 
 def powerrange(start, stop, mult):
     """
@@ -45,6 +46,9 @@ def log2chr(val):
 megabyte = 1024 * 1024
 
 def multiply_scenarios(sep, *args):
+    """
+    Create the cross product of two lists of scenarios
+    """
     result = None
     for scenes in args:
         if result == None:
@@ -53,12 +57,59 @@ def multiply_scenarios(sep, *args):
             total = []
             for scena in scenes:
                 for scenb in result:
+                    # Create a merged scenario with a concatenated name
                     name = scena[0] + sep + scenb[0]
                     tdict = {}
                     tdict.update(scena[1])
                     tdict.update(scenb[1])
+
+                    # If there is a 'P' value, it represents the
+                    # probability that we want to use this scenario
+                    # If both scenarios list a probability, multiply them.
+                    if 'P' in scena[1] and 'P' in scenb[1]:
+                        P = scena[1]['P'] * scenb[1]['P']
+                        tdict['P'] = P
                     total.append((name, tdict))
             result = total
+    return result
+
+def prune_scenarios(scenes):
+    """
+    Use listed probabilities for pruning the list of scenarios
+    """
+    r = suite_random.suite_random()
+    result = []
+    for scene in scenes:
+        if 'P' in scene[1]:
+            p = scene[1]['P']
+            if p < r.rand_float():
+                continue
+        result.append(scene)
+    return result
+
+def quick_scenarios(fieldname, values, probabilities):
+    """
+    Quickly build common scenarios, like:
+       [('foo', dict(somefieldname='foo')),
+       ('bar', dict(somefieldname='bar')),
+       ('boo', dict(somefieldname='boo'))]
+    via a call to:
+       quick_scenario('somefieldname', ['foo', 'bar', 'boo'])
+    """
+    result = []
+    if probabilities == None:
+        plen = 0
+    else:
+        plen = len(probabilities)
+    ppos = 0
+    for value in values:
+        if ppos >= plen:
+            d = dict([[fieldname, value]])
+        else:
+            p = probabilities[ppos]
+            ppos += 1
+            d = dict([[fieldname, value],['P', p]])
+        result.append((str(value), d))
     return result
 
 class wtscenario:
