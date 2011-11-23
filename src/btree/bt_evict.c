@@ -194,7 +194,9 @@ void
 __wt_evict_force_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CACHE *cache;
+	WT_EVICT_LIST *evict;
 	WT_EVICT_REQ *er, *er_end;
+	u_int i;
 
 	cache = S2C(session)->cache;
 
@@ -202,13 +204,19 @@ __wt_evict_force_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/*
 	 * If we evict a page marked for forced eviction, clear any reference
-	 * to it from the request queue.
+	 * to it from the request queue or the list of pages tracked for
+	 * eviction.
 	 */
 	WT_EVICT_REQ_FOREACH(er, er_end, cache)
 		if (er->session != NULL &&
 		    F_ISSET(er, WT_EVICT_REQ_PAGE) &&
 		    er->page == page)
 			__evict_req_clr(session, er);
+
+	if (cache->evict != NULL)
+		WT_EVICT_FOREACH(cache, evict, i)
+			if (evict->page == page)
+				__evict_clr(evict);
 
 	F_CLR(page, WT_PAGE_FORCE_EVICT);
 }
