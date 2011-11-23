@@ -87,7 +87,7 @@ namespace mongo {
 
         bool atLeastReadLocked() const { return _state.get() != 0; }
         void assertAtLeastReadLocked() const { assert(atLeastReadLocked()); }
-        bool isWriteLocked() const { return getState() > 0; }
+        bool isWriteLocked/*by our thread*/() const { return getState() > 0; }
         void assertWriteLocked() const {
             assert( getState() > 0 );
             DEV assert( !_releasedEarly.get() );
@@ -113,7 +113,7 @@ namespace mongo {
 
         // try write lock
         bool lock_try( int millis ) {
-            if ( _writeLockedAlready() )
+            if ( _writeLockedAlready() ) // adjusts _state
                 return true;
 
             Client *c = curopWaitingForLock( 1 );
@@ -343,7 +343,7 @@ namespace mongo {
         if you have a write lock, that's ok too.
     */
     struct atleastreadlock {
-        atleastreadlock( const string& ns ) {
+        atleastreadlock( const string& ns = "" ) {
             _prev = dbMutex.getState();
             if ( _prev == 0 )
                 dbMutex.lock_shared();
