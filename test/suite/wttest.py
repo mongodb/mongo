@@ -116,6 +116,10 @@ class WiredTigerTestCase(unittest.TestCase):
             self.pr('preserving directory ' + self.testdir)
         self.prhead('TEST COMPLETED')
 
+    def KNOWN_FAILURE(self, name):
+        print '**** THIS TEST HAS A KNOWN FAILURE: ' + name + ' ****'
+        self.skipTest('KNOWN FAILURE: ' + name)
+
     def pr(self, s):
         """
         print a progress line for testing
