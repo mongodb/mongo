@@ -62,14 +62,8 @@ namespace mongo {
         void lock_shared() { RWLockBase::lock_shared(); }
         void unlock_shared() { RWLockBase::unlock_shared(); }
     private:
-        void lockAsUpgradable() { 
-//TODO FIX            assert( x == NilState );
-            x = UpgradableState;
-            RWLockBase::lockAsUpgradable(); 
-        }
+        void lockAsUpgradable() { RWLockBase::lockAsUpgradable(); }
         void unlockFromUpgradable() { // upgradable -> unlocked
-            assert( x == UpgradableState );
-            x = NilState;
             RWLockBase::unlockFromUpgradable();
         }
     public:
@@ -100,9 +94,12 @@ namespace mongo {
         public:
             Upgradable(RWLock& r) : _r(r) { 
                 r.lockAsUpgradable();
+                assert( _r.x == NilState );
+                _r.x = RWLock::UpgradableState;
             }
             ~Upgradable() {
                 if( _r.x == RWLock::UpgradableState ) {
+                    _r.x = NilState;
                     _r.unlockFromUpgradable();
                 }
                 else {
