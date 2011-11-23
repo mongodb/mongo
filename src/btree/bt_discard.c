@@ -96,7 +96,14 @@ __free_page_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* Free the in-memory index array. */
 	__wt_free(session, page->u.col_leaf.d);
 
-	/* Free the insert array. */
+	/* Free the append array. */
+	if (page->u.col_leaf.append != NULL) {
+		__free_insert_list(
+		    session, WT_SKIP_FIRST(*page->u.col_leaf.append));
+		__wt_free(session, *page->u.col_leaf.append);
+		__wt_free(session, page->u.col_leaf.append);
+	}
+	/* Free the update array. */
 	if (page->u.col_leaf.update != NULL)
 		__free_insert(session, page->u.col_leaf.update, 1);
 }
@@ -124,6 +131,14 @@ __free_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* Free the RLE lookup array. */
 	__wt_free(session, page->u.col_leaf.repeats);
+
+	/* Free the append array. */
+	if (page->u.col_leaf.append != NULL) {
+		__free_insert_list(
+		    session, WT_SKIP_FIRST(*page->u.col_leaf.append));
+		__wt_free(session, *page->u.col_leaf.append);
+		__wt_free(session, page->u.col_leaf.append);
+	}
 
 	/* Free the insert array. */
 	if (page->u.col_leaf.update != NULL)
