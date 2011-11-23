@@ -161,6 +161,9 @@ for (i=0; i<num; i++) {
 
 // Make sure all data gets sent through
 printjson( s.getDB("test").getLastError() )
+for (var i = 0; i < s._connections.length; i++) { // SERVER-4356
+    s._connections[i].getDB("test").getLastError();
+}
 
 var d1Chunks = s.getDB("config").chunks.count({shard : "d1"});
 var d2Chunks = s.getDB("config").chunks.count({shard : "d2"});
