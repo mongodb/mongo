@@ -195,7 +195,7 @@ extern int __wt_desc_update(WT_SESSION_IMPL *session);
 extern void __wt_page_out(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     uint32_t flags);
-extern void __wt_evict_server_wake(WT_CONNECTION_IMPL *conn, int force);
+extern void __wt_evict_server_wake(WT_SESSION_IMPL *session);
 extern void __wt_evict_file_serial_func(WT_SESSION_IMPL *session);
 extern void __wt_evict_page_serial_func(WT_SESSION_IMPL *session);
 extern void __wt_evict_force_clear(WT_SESSION_IMPL *session, WT_PAGE *page);
@@ -231,7 +231,7 @@ extern int __wt_page_inmem(WT_SESSION_IMPL *session,
     WT_REF *parent_ref,
     WT_PAGE_DISK *dsk,
     WT_PAGE **pagep);
-extern void __wt_read_server_wake(WT_CONNECTION_IMPL *conn, int force);
+extern void __wt_read_server_wake(WT_SESSION_IMPL *session, int force);
 extern void __wt_cache_read_serial_func(WT_SESSION_IMPL *session);
 extern void *__wt_cache_read_server(void *arg);
 extern int __wt_page_reconcile_int(WT_SESSION_IMPL *session,

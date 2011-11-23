@@ -44,10 +44,10 @@ __wt_session_serialize_func(WT_SESSION_IMPL *session,
 
 	switch (op) {
 	case WT_SERIAL_EVICT:
-		__wt_evict_server_wake(conn, 1);
+		__wt_evict_server_wake(session);
 		break;
 	case WT_SERIAL_READ:
-		__wt_read_server_wake(conn, 0);
+		__wt_read_server_wake(session, 0);
 		break;
 	default:
 		break;
@@ -70,10 +70,6 @@ __wt_session_serialize_func(WT_SESSION_IMPL *session,
 void
 __wt_session_serialize_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int ret)
 {
-	WT_CONNECTION_IMPL *conn;
-
-	conn = S2C(session);
-
 	/* If passed a page and the return value is OK, we modified the page. */
 	if (page != NULL && ret == 0) {
 		/*
@@ -85,23 +81,13 @@ __wt_session_serialize_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int ret)
 		 */
 		WT_WRITE_BARRIER();
 		WT_PAGE_SET_MODIFIED(page);
-
-		/* If the page is pathologically large, force eviction. */
-		if ((int64_t)page->memory_footprint > conn->cache_size / 2 &&
-		    !F_ISSET(page, WT_PAGE_FORCE_EVICT | WT_PAGE_PINNED)) {
-			/*
-			 * XXX We're already inside a serialized function, so
-			 * we can't use the usual machinery.
-			 */
-			F_SET(page, WT_PAGE_FORCE_EVICT);
-			__wt_evict_page_serial(session, page);
-			__wt_evict_server_wake(conn, 1);
-		}
 	}
 
-	/* If the cache is full, wake up the eviction thread. */
-	if (__wt_cache_bytes_inuse(conn->cache) > conn->cache_size)
-		__wt_evict_server_wake(conn, 0);
+	if (ret == 0)
+		ret = __wt_eviction_check(session, page);
+
+	/* Set the return value. */
+	session->wq_ret = ret;
 
 	/*
 	 * Publish: there must be a barrier to ensure the return value is set

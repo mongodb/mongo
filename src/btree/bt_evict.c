@@ -95,33 +95,24 @@ __evict_req_clr(WT_SESSION_IMPL *session, WT_EVICT_REQ *r)
 
 /*
  * __wt_evict_server_wake --
- *	See if the eviction server thread needs to be awakened.
+ *	Wake the eviction server thread.
  */
 void
-__wt_evict_server_wake(WT_CONNECTION_IMPL *conn, int force)
+__wt_evict_server_wake(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
-	WT_SESSION_IMPL *session;
+	WT_CONNECTION_IMPL *conn;
 	uint64_t bytes_inuse, bytes_max;
 
+	conn = S2C(session);
 	cache = conn->cache;
-	session = &conn->default_session;
-
-	/*
-	 * If we're locking out reads, or within 95% of our cache limit, or
-	 * forcing the issue (when closing the environment), run the eviction
-	 * server.
-	 */
 	bytes_inuse = __wt_cache_bytes_inuse(cache);
 	bytes_max = conn->cache_size;
-	if (!force && !cache->read_lockout &&
-	    bytes_inuse < bytes_max - bytes_max / 20)
-		return;
 
 	WT_VERBOSE(session, EVICTSERVER,
-	    "waking eviction server: force %sset, read lockout %sset, "
+	    "waking eviction server: read lockout %sset, "
 	    "bytes inuse %s max (%" PRIu64 "MB %s %" PRIu64 "MB), ",
-	    force ? "" : "not ", cache->read_lockout ? "" : "not ",
+	    cache->read_lockout ? "" : "not ",
 	    bytes_inuse <= bytes_max ? "<=" : ">",
 	    bytes_inuse / WT_MEGABYTE,
 	    bytes_inuse <= bytes_max ? "<=" : ">",
@@ -325,9 +316,14 @@ __evict_worker(WT_SESSION_IMPL *session)
 		 */
 		bytes_inuse = __wt_cache_bytes_inuse(cache);
 		bytes_max = conn->cache_size;
-		/* If reads are locked out, ping the read server. */
-		if (cache->read_lockout && bytes_inuse < bytes_max)
-			__wt_read_server_wake(conn, 1);
+		/*
+		 * If reads are locked out and we have freed enough space,
+		 * unlock reads and ping the read server.
+		 */
+		if (cache->read_lockout && bytes_inuse < bytes_max) {
+			cache->read_lockout = 0;
+			__wt_read_server_wake(session, 1);
+		}
 		if (bytes_inuse < bytes_max - (bytes_max / 10))
 			break;
 

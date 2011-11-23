@@ -51,43 +51,17 @@ __cache_read_req_clr(WT_READ_REQ *rr)
  *	See if the read server thread needs to be awakened.
  */
 void
-__wt_read_server_wake(WT_CONNECTION_IMPL *conn, int force)
+__wt_read_server_wake(WT_SESSION_IMPL *session, int force)
 {
 	WT_CACHE *cache;
-	WT_SESSION_IMPL *session;
-	uint64_t bytes_inuse, bytes_max;
 
-	cache = conn->cache;
-	session = &conn->default_session;
+	cache = S2C(session)->cache;
 
-	/*
-	 * If we're over the maximum cache, shut out reads (which include page
-	 * allocations) until we evict to back under the maximum cache.
-	 * Eviction will keep pushing out pages so we don't run on the edge all
-	 * the time.
-	 */
-	bytes_inuse = __wt_cache_bytes_inuse(cache);
-	bytes_max = conn->cache_size;
-	if (!cache->read_lockout && bytes_inuse > bytes_max) {
-		WT_VERBOSE(session, READSERVER,
-		    "read server locks out reads: "
-		    "bytes-inuse %" PRIu64 " of bytes-max %" PRIu64,
-		    bytes_inuse, bytes_max);
-		cache->read_lockout = 1;
-	} else if (cache->read_lockout && bytes_inuse < bytes_max) {
-		WT_VERBOSE(session, READSERVER,
-		    "read server restores reads: "
-		    "bytes-inuse %" PRIu64 " of bytes-max %" PRIu64,
-		    bytes_inuse, bytes_max);
-		cache->read_lockout = 0;
-	}
-
-	/* Trigger eviction when we're over 95% of the cache size. */
-	if (!force && bytes_inuse > bytes_max - (bytes_max / 20))
-		__wt_evict_server_wake(conn, 1);
+	if (!force)
+		__wt_eviction_check(session, NULL);
 
 	/* If reads are locked out, eviction will signal the read thread. */
-	if (!cache->read_lockout)
+	if (force || !cache->read_lockout)
 		__wt_cond_signal(session, cache->read_cond);
 }
 

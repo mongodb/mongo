@@ -171,6 +171,7 @@ struct __wt_update;
 #include "extern.h"
 #include "verify_build.h"
 
+/* Required by cell.i */
 #include "intpack.i"
 
 #include "bitstring.i"
@@ -183,6 +184,9 @@ struct __wt_update;
 #include "packing.i"
 #include "progress.i"
 #include "serial.i"
+
+/* Requires serial.i */
+#include "cache.i"
 
 #if defined(__cplusplus)
 }

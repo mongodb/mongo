@@ -98,9 +98,9 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 
 	/* Shut down the server threads. */
 	F_CLR(conn, WT_SERVER_RUN);
-	__wt_evict_server_wake(conn, 1);
+	__wt_evict_server_wake(session);
 	WT_TRET(__wt_thread_join(conn->cache_evict_tid));
-	__wt_read_server_wake(conn, 1);
+	__wt_read_server_wake(session, 1);
 	WT_TRET(__wt_thread_join(conn->cache_read_tid));
 
 	/* Discard the cache. */
