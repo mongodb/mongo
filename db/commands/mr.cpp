@@ -406,7 +406,7 @@ namespace mongo {
                     BSONObj res;
                     BSONObj idKey = BSON( "_id" << 1 );
                     if ( ! _db.runCommand( "admin" , BSON( "splitVector" << _config.finalLong << "keyPattern" << idKey << "maxChunkSizeBytes" << _config.splitInfo ) , res ) ) {
-                        uasserted( 15919 ,  str::stream() << "splitVector failed: " << res );
+                        uasserted( 15921 ,  str::stream() << "splitVector failed: " << res );
                     }
                     if ( res.hasField( "splitKeys" ) )
                         final.append( res.getField( "splitKeys" ) );
