@@ -84,7 +84,7 @@ __wt_session_serialize_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int ret)
 	}
 
 	if (ret == 0)
-		ret = __wt_eviction_check(session, page);
+		(void)__wt_eviction_check(session, page);
 
 	/* Set the return value. */
 	session->wq_ret = ret;
