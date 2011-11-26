@@ -219,7 +219,18 @@ namespace mongo {
         serviceDescription.lpDescription = (LPTSTR)serviceDesc.c_str();
         serviceInstalled = ::ChangeServiceConfig2( schService, SERVICE_CONFIG_DESCRIPTION, &serviceDescription );
 
-
+#if 1
+        if ( ! serviceInstalled ) {
+#else
+        // This code sets the mongod service to auto-restart, forever.
+        // This might be a fine thing to do except that when mongod or Windows has a crash, the mongo.lock
+        // file is still around, so any attempt at a restart will immediately fail.  With auto-restart, we
+        // go into a loop, crashing and restarting, crashing and restarting, until someone comes in and
+        // disables the service or deletes the mongod.lock file.
+        //
+        // I'm leaving the old code here for now in case we solve this and are able to turn SC_ACTION_RESTART
+        // back on.
+        //
         if ( serviceInstalled ) {
             SC_ACTION aActions[ 3 ] = { { SC_ACTION_RESTART, 0 }, { SC_ACTION_RESTART, 0 }, { SC_ACTION_RESTART, 0 } };
 
@@ -233,6 +244,7 @@ namespace mongo {
 
         }
         else {
+#endif
             cerr << "Could not set service description. Check the event log for more details." << endl;
         }
 
