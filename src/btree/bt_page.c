@@ -96,7 +96,6 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 	 * Set the write generation to 1 (which can't match a search where the
 	 * write generation wasn't set, that is, remained 0).
 	 */
-	page->write_gen = 1;
 	page->read_gen = __wt_cache_read_gen(session);
 
 	switch (page->type) {

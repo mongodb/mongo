@@ -105,13 +105,67 @@ __wt_cache_bytes_inuse(WT_CACHE *cache)
 }
 
 /*
+ * __wt_page_set_modified --
+ *	Mark the page dirty.
+ */
+static inline int
+__wt_page_set_modified(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	/*
+	 * If the page has not yet been modified, it won't have a modification
+	 * structure.  This won't be the case for most leaf pages because we
+	 * create their modification structures early so we can fill in write
+	 * generation values during the search.  However, when writing a leaf
+	 * page to disk we have to mark the parent dirty, and that's likely the
+	 * first time the parent has been dirtied, and also, we have to do this
+	 * when we create pages in memory, for example, during salvage.
+	 */
+	if (page->modify == NULL)
+		WT_RET(__wt_rec_modify_init(session, page));
+
+	/*
+	 * Publish: there must be a barrier to ensure all changes to the page
+	 * are flushed before we update the page's write generation, otherwise
+	 * a thread searching the page might see the page's write generation
+	 * update before the changes to the page, which breaks the protocol.
+	 */
+	WT_WRITE_BARRIER();
+
+	/* The page is dirty if the disk and write generations differ. */
+	++page->modify->write_gen;
+
+	/*
+	 * Clear the page-is-empty flag, this page may not be empty.  If we did
+	 * not clear this flag, we'd check when evicting the page's parent to
+	 * see if the page is "empty and also not dirty", instead of checking
+	 * only if the page is empty.  That's a cheap test, but this way we can
+	 * figure out if this page requires reconciliation earlier than when we
+	 * are trying to evict its parent.
+	 */
+	F_CLR(page, WT_PAGE_REC_EMPTY);
+
+	return (0);
+}
+
+/*
+ * __wt_page_is_modified --
+ *	Return if the page is dirty.
+ */
+static inline int
+__wt_page_is_modified(WT_PAGE *page)
+{
+	return (page->modify == NULL ||
+	    page->modify->write_gen == page->modify->disk_gen ? 0 : 1);
+}
+
+/*
  * __wt_page_write_gen_check --
  *	Confirm the page's write generation number is correct.
  */
 static inline int
 __wt_page_write_gen_check(WT_PAGE *page, uint32_t write_gen)
 {
-	return (page->write_gen == write_gen ? 0 : WT_RESTART);
+	return (page->modify->write_gen == write_gen ? 0 : WT_RESTART);
 }
 
 /*
@@ -133,20 +187,6 @@ __wt_off_page(WT_PAGE *page, const void *p)
 	return (page->dsk == NULL ||
 	    p < (void *)page->dsk ||
 	    p >= (void *)((uint8_t *)page->dsk + page->dsk->memsize));
-}
-
-/*
- * __wt_page_reconcile --
- *	Standard version of page reconciliation.
- */
-static inline int
-__wt_page_reconcile(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
-{
-	/*
-	 * There's an internal version of page reconciliation that salvage uses,
-	 * everybody else just calls with a value of NULL as the 3rd argument.
-	 */
-	return (__wt_page_reconcile_int(session, page, NULL, flags));
 }
 
 /*

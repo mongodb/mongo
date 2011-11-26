@@ -1101,7 +1101,7 @@ __slvg_col_build_internal(
 	page->u.col_int.recno = 1;
 	page->entries = leaf_cnt;
 	page->type = WT_PAGE_COL_INT;
-	WT_PAGE_SET_MODIFIED(page);
+	WT_RET(__wt_page_set_modified(session, page));
 
 	/* Reference this page from the root of the tree. */
 	root_page->state = WT_REF_MEM;
@@ -1135,8 +1135,7 @@ __slvg_col_build_internal(
 	}
 
 	/* Write the internal page to disk. */
-	return (__wt_page_reconcile(
-	    session, page, WT_REC_EVICT | WT_REC_LOCKED));
+	return (__wt_rec_write(session, page, NULL));
 
 err:	__wt_free(session, page->u.col_int.t);
 	__wt_free(session, page);
@@ -1217,10 +1216,8 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session,
 	WT_COL_REF_SIZE(cref) = 0;
 
 	/* Write the new version of the leaf page to disk. */
-	WT_PAGE_SET_MODIFIED(page);
-
-	ret = __wt_page_reconcile_int(session,
-	    page, cookie, WT_REC_EVICT | WT_REC_LOCKED | WT_REC_SALVAGE);
+	WT_ERR(__wt_page_set_modified(session, page));
+	ret = __wt_rec_write(session, page, cookie);
 
 err:	/* Reset the page. */
 	page->u.col_leaf.d = save_col_leaf;
@@ -1671,7 +1668,7 @@ __slvg_row_build_internal(
 	page->read_gen = 0;
 	page->entries = leaf_cnt;
 	page->type = WT_PAGE_ROW_INT;
-	WT_PAGE_SET_MODIFIED(page);
+	WT_ERR(__wt_page_set_modified(session, page));
 
 	/* Reference this page from the root of the tree. */
 	root_page->state = WT_REF_MEM;
@@ -1709,8 +1706,7 @@ __slvg_row_build_internal(
 	}
 
 	/* Write the internal page to disk. */
-	return (__wt_page_reconcile(
-	    session, page, WT_REC_EVICT | WT_REC_LOCKED));
+	return (__wt_rec_write(session, page, NULL));
 
 err:	__wt_free(session, page->u.row_int.t);
 	__wt_free(session, page);
@@ -1857,6 +1853,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 		 * value limits the number of page items.
 		 */
 		page->entries -= skip_stop;
+		cookie->skip = skip_start;
 
 		/*
 		 * We can't discard the original blocks associated with the page
@@ -1872,10 +1869,8 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 		WT_ROW_REF_SIZE(rref) = 0;
 
 		/* Write the new version of the leaf page to disk. */
-		WT_PAGE_SET_MODIFIED(page);
-		cookie->skip = skip_start;
-		ret = __wt_page_reconcile_int(session, page, cookie,
-		    WT_REC_EVICT | WT_REC_LOCKED | WT_REC_SALVAGE);
+		WT_ERR(__wt_page_set_modified(session, page));
+		ret = __wt_rec_write(session, page, cookie);
 
 		page->entries += skip_stop;
 		if (ret != 0)

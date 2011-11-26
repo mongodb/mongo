@@ -73,24 +73,16 @@ err:		__wt_errx(session, "%s%s", msg,
 	if (salvage)
 		return (0);
 
-	/*
-	 * If the root or free-list addresses point to non-existent pages, we
-	 * can't continue.   It's possible for the root or free-list addresses
-	 * to be non-existent, but they should both be non-existent, and there
-	 * should be no pages in the file.
-	 */
-	if (desc->root_addr == WT_ADDR_INVALID ||
-	    desc->free_addr == WT_ADDR_INVALID) {
-		if (desc->root_addr != WT_ADDR_INVALID ||
-		    desc->free_addr != WT_ADDR_INVALID ||
-		    btree->fh->file_size > WT_BTREE_DESC_SECTOR)
-			goto verify;
-	} else
-		if (WT_ADDR_TO_OFF(btree, desc->root_addr) +
-		    (off_t)desc->root_size > btree->fh->file_size ||
-		    WT_ADDR_TO_OFF(btree, desc->free_addr) +
-		    (off_t)desc->free_size > btree->fh->file_size)
-			goto verify;
+	if ((desc->root_addr != WT_ADDR_INVALID &&
+	    WT_ADDR_TO_OFF(btree, desc->root_addr) +
+	    (off_t)desc->root_size > btree->fh->file_size) ||
+	    (desc->free_addr != WT_ADDR_INVALID &&
+	    WT_ADDR_TO_OFF(btree, desc->free_addr) +
+	    (off_t)desc->free_size > btree->fh->file_size)) {
+		__wt_errx(session,
+		    "root or free addresses reference non-existent pages");
+		return (WT_ERROR);
+	}
 
 	btree->root_page.addr = desc->root_addr;
 	btree->root_page.size = desc->root_size;
@@ -100,10 +92,6 @@ err:		__wt_errx(session, "%s%s", msg,
 	btree->lsn = desc->lsn;
 
 	return (0);
-
-verify:	__wt_errx(session,
-	    "root or free addresses reference non-existent pages");
-	return (WT_ERROR);
 }
 
 /*

@@ -10,8 +10,8 @@
  *	Encapsulation of an eviction candidate.
  */
 struct __wt_evict_list {
+	WT_BTREE *btree;			/* File object */
 	WT_PAGE	 *page;				/* Page */
-	WT_BTREE *btree;			/* Underlying file object */
 };
 
 /*
@@ -23,15 +23,9 @@ struct __wt_evict_req {
 	WT_BTREE *btree;			/* Btree */
 	WT_PAGE *page;                          /* Single page to flush */
 
-	WT_PAGE **retry;			/* Pages to retry */
-	uint32_t  retry_next;			/* Next retry slot */
-	uint32_t  retry_entries;		/* Total retry slots */
-	size_t    retry_allocated;		/* Bytes allocated */
-	int	  retry_cnt;			/* We only try a few times. */
-
-#define	WT_EVICT_REQ_CLOSE      0x1		/* Discard pages. */
-#define	WT_EVICT_REQ_PAGE       0x2		/* Force out a page. */
-	uint32_t  flags;
+#define	WT_EVICT_REQ_CLOSE      0x1		/* Discard pages */
+#define	WT_EVICT_REQ_PAGE       0x2		/* Force out a page */
+	uint32_t flags;
 };
 
 /*
@@ -49,33 +43,6 @@ struct __wt_read_req {
  * WiredTiger cache structure.
  */
 struct __wt_cache {
-	WT_CONDVAR *evict_cond;		/* Cache eviction server mutex */
-
-	/*
-	 * File sync can temporarily fail when a tree is active, that is, we may
-	 * not be able to immediately reconcile all of the file's pages.  If the
-	 * pending_retry value is non-zero, it means there are pending requests
-	 * we need to handle.
-	 */
-	int pending_retry;		/* Eviction request needs completion */
-
-	WT_EVICT_LIST *evict;		/* Pages being tracked for eviction */
-	size_t   evict_allocated;	/* Bytes allocated */
-	uint32_t evict_entries;		/* Total evict slots */
-
-	WT_EVICT_REQ *evict_request;	/* Eviction requests:
-					   slot available if session is NULL */
-	uint32_t max_evict_request;	/* Size of the evict request array. */
-
-	WT_CONDVAR *read_cond;		/* Cache read server mutex */
-	u_int volatile read_lockout;	/* No reading until memory drains */
-
-	WT_READ_REQ *read_request;	/* Read requests:
-					   slot available if session is NULL */
-	uint32_t max_read_request;	/* Size of read request array. */
-
-	uint32_t read_gen;		/* Page read generation (LRU) */
-
 	/*
 	 * Different threads read/write pages to/from the cache and create pages
 	 * in the cache, so we cannot know precisely how much memory is in use
@@ -88,4 +55,32 @@ struct __wt_cache {
 	uint64_t bytes_inmem;		/* Bytes/pages created in memory */
 	uint64_t bytes_evict;		/* Bytes/pages discarded by eviction */
 	uint64_t pages_evict;
+
+	/*
+	 * Read thread information.
+	 */
+	WT_CONDVAR *read_cond;		/* Cache read server mutex */
+	u_int volatile read_lockout;	/* No reading until memory drains */
+
+	WT_READ_REQ *read_request;	/* Read requests:
+					   slot available if session is NULL */
+	uint32_t max_read_request;	/* Size of read request array */
+
+	uint32_t   read_gen;		/* Page read generation (LRU) */
+
+	/*
+	 * Eviction thread information.
+	 */
+	WT_CONDVAR *evict_cond;		/* Cache eviction server mutex */
+
+	WT_EVICT_LIST *evict;		/* Pages being tracked for eviction */
+	size_t   evict_allocated;	/* Bytes allocated */
+	uint32_t evict_entries;		/* Total evict slots */
+
+	WT_EVICT_REQ *evict_request;	/* Eviction requests:
+					   slot available if session is NULL */
+	uint32_t max_evict_request;	/* Size of the evict request array */
+
+	WT_HAZARD  *hazard;		/* Copy of the hazard references */
+	uint32_t    hazard_elem;	/* Number of entries in the list */
 };

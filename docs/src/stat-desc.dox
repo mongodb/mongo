@@ -80,6 +80,7 @@ in this release:
 @row{reconcile: overflow key}
 @row{reconcile: overflow value}
 @row{reconcile: pages deleted}
+@row{reconcile: pages written}
 @row{reconcile: unable to acquire hazard reference}
 @row{row-store internal pages}
 @row{row-store leaf pages}

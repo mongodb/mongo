@@ -273,7 +273,7 @@ __wt_bulk_end(WT_CURSOR_BULK *cbulk)
 	page->parent = NULL;				/* Root page */
 	page->parent_ref = root_page;
 	page->read_gen = 0;
-	WT_PAGE_SET_MODIFIED(page);
+	WT_RET(__wt_page_set_modified(session, page));
 
 	switch (cbulk->page_type) {
 	case WT_PAGE_COL_FIX:
@@ -297,8 +297,7 @@ __wt_bulk_end(WT_CURSOR_BULK *cbulk)
 	root_page->size = 0;
 	root_page->page = page;
 
-	return (__wt_page_reconcile(
-	    session, page, WT_REC_EVICT | WT_REC_LOCKED));
+	return (__wt_rec_write(session, page, NULL));
 }
 
 /*
@@ -349,16 +348,15 @@ __bulk_row_page(WT_CURSOR_BULK *cbulk)
 	page->dsk = NULL;
 	page->entries = cbulk->ins_cnt;
 	page->type = WT_PAGE_ROW_LEAF;
-	WT_PAGE_SET_MODIFIED(page);
 	F_SET(page, WT_PAGE_BULK_LOAD);
+	WT_RET(__wt_page_set_modified(session, page));
 
 	cbulk->insp = &cbulk->ins_base;	/* The page owns the insert list */
 	cbulk->ins_cnt = 0;
 
 	++cbulk->ref_next;		/* Move to the next parent slot */
 
-	return (__wt_page_reconcile(
-	    session, page, WT_REC_EVICT | WT_REC_LOCKED));
+	return (__wt_rec_write(session, page, NULL));
 }
 
 /*
@@ -412,8 +410,8 @@ __bulk_col_page(WT_CURSOR_BULK *cbulk)
 	page->dsk = NULL;
 	page->entries = cbulk->ins_cnt;
 	page->type = cbulk->page_type;
-	WT_PAGE_SET_MODIFIED(page);
 	F_SET(page, WT_PAGE_BULK_LOAD);
+	WT_RET(__wt_page_set_modified(session, page));
 
 	cbulk->recno += cbulk->ins_cnt;	/* Update the starting record number */
 
@@ -422,8 +420,7 @@ __bulk_col_page(WT_CURSOR_BULK *cbulk)
 
 	++cbulk->ref_next;		/* Move to the next parent slot */
 
-	return (__wt_page_reconcile(
-	    session, page, WT_REC_EVICT | WT_REC_LOCKED));
+	return (__wt_rec_write(session, page, NULL));
 }
 
 /*

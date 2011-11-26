@@ -234,11 +234,20 @@ extern int __wt_page_inmem(WT_SESSION_IMPL *session,
 extern void __wt_read_server_wake(WT_SESSION_IMPL *session, int force);
 extern void __wt_cache_read_serial_func(WT_SESSION_IMPL *session);
 extern void *__wt_cache_read_server(void *arg);
-extern int __wt_page_reconcile_int(WT_SESSION_IMPL *session,
+extern int __wt_rec_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page);
+extern int __wt_rec_write( WT_SESSION_IMPL *session,
     WT_PAGE *page,
-    WT_SALVAGE_COOKIE *salvage,
-    uint32_t flags);
+    WT_SALVAGE_COOKIE *salvage);
 extern void __wt_rec_destroy(WT_SESSION_IMPL *session);
+extern int __wt_rec_track(WT_SESSION_IMPL *session,
+    WT_PAGE *page,
+    __wt_pt_type_t type,
+    const void *ref,
+    uint32_t addr,
+    uint32_t size);
+extern int __wt_rec_evict(WT_SESSION_IMPL *session,
+    WT_PAGE *page,
+    uint32_t flags);
 extern int __wt_kv_return(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
     int key_ret);

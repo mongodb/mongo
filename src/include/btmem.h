@@ -6,6 +6,97 @@
  */
 
 /*
+ * WT_PAGE_MODIFY --
+ *	When a page is modified, there's additional information maintained as it
+ * is written to disk.
+ */
+typedef enum {
+	WT_PT_BLOCK,			/* Inactive block */
+	WT_PT_OVFL,			/* Active overflow block */
+	WT_PT_OVFL_DISCARD,		/* Inactive overflow block */
+} __wt_pt_type_t;
+
+struct __wt_page_modify {
+	/*
+	 * The write generation is incremented after a page is modified.  That
+	 * is, it tracks page versions.
+	 *
+	 * The write generation value is used to detect changes scheduled based
+	 * on out-of-date information.  Two threads of control updating the same
+	 * page could both search the page in state A.  When the updates are
+	 * performed serially, one of the changes will happen after the page is
+	 * modified, and the search state for the other thread might no longer
+	 * be applicable.  To avoid this race, page write generations are copied
+	 * into the search stack whenever a page is read, and check when a
+	 * modification is serialized.  The serialized function compares each
+	 * page's current write generation to the generation copied in the
+	 * read/search; if the two values match, the search occurred on a
+	 * current version of the page and the modification can proceed.  If the
+	 * two generations differ, the serialized call returns an error and the
+	 * operation must be restarted.
+	 *
+	 * The write-generation value could be stored on a per-entry basis if
+	 * there's sufficient contention for the page as a whole.
+	 *
+	 * The write-generation is not declared volatile: write-generation is
+	 * written by a serialized function when modifying a page, and must be
+	 * flushed in order as the serialized updates are flushed.
+	 *
+	 * XXX
+	 * 32-bit values are probably more than is needed: at some point we may
+	 * need to clean up pages once there have been sufficient modifications
+	 * to make our linked lists of inserted cells too slow to search, or as
+	 * soon as enough memory is allocated in service of page modifications
+	 * (although we should be able to release memory from the MVCC list as
+	 * soon as there's no running thread/txn which might want that version
+	 * of the data).   I've used 32-bit types instead of 16-bit types as I
+	 * am less confident a 16-bit write to memory will be atomic.
+	 */
+	uint32_t write_gen;
+
+	/*
+	 * The disk generation tracks page versions written to disk.  When a
+	 * page is reconciled and written to disk, the thread doing that work
+	 * is just another reader of the page, and other readers and writers
+	 * can access the page at the same time.  For this reason, the thread
+	 * reconciling the page logs the write generation of the page it read.
+	 */
+	uint32_t disk_gen;
+
+	union {
+		WT_PAGE *write_split;	/* Newly created internal pages */
+		WT_OFF	 write_off;	/* Newly written page */
+	} u;
+
+	/*
+	 * Track pages, blocks to discard: as pages are reconciled, overflow
+	 * K/V items are discarded along with their underlying blocks, and as
+	 * pages are evicted, split and emptied pages are merged into their
+	 * parents and discarded.  If an overflow item was discarded and page
+	 * reconciliation then failed, the in-memory tree would be corrupted.
+	 * To keep the tree correct until we're sure page reconciliation has
+	 * succeeded, we track the objects we'll discard when the reconciled
+	 * page is evicted.
+	 *
+	 * Track overflow objects: if pages are reconciled more than once, an
+	 * overflow item might be written repeatedly.  Instead, when overflow
+	 * items are written we note their data source and resulting location,
+	 * and make sure to only write them once.
+	 */
+	struct __wt_page_track {
+		__wt_pt_type_t type;	/* Type */
+
+		const void *ref;	/* Overflow data reference */
+
+		uint32_t addr;		/* Location */
+		uint32_t size;
+	} *track;			/* Array of tracked objects */
+	uint32_t track_next;		/* Next track slot */
+	uint32_t track_entries;		/* Total track slots */
+	size_t   track_allocated;	/* Bytes allocated */
+};
+
+/*
  * WT_PAGE --
  * The WT_PAGE structure describes the in-memory information about a disk page.
  */
@@ -86,6 +177,9 @@ struct __wt_page {
 	/* Page's on-disk representation: NULL for pages created in memory. */
 	WT_PAGE_DISK *dsk;
 
+	/* If/when the page is modified, we need lots more information. */
+	WT_PAGE_MODIFY *modify;
+
 	/*
 	 * The read generation is incremented each time the page is searched,
 	 * and acts as an LRU value for each page in the tree; it is read by
@@ -101,50 +195,7 @@ struct __wt_page {
 	 uint64_t read_gen;
 
 	/*
-	 * The write generation is incremented after a page is modified.  That
-	 * is, it tracks page versions.
-	 *
-	 * The write generation value is used to detect changes scheduled based
-	 * on out-of-date information.  Two threads of control updating the same
-	 * page could both search the page in state A.  When the updates are
-	 * performed serially, one of the changes will happen after the page is
-	 * modified, and the search state for the other thread might no longer
-	 * be applicable.  To avoid this race, page write generations are copied
-	 * into the search stack whenever a page is read, and check when a
-	 * modification is serialized.  The serialized function compares each
-	 * page's current write generation to the generation copied in the
-	 * read/search; if the two values match, the search occurred on a
-	 * current version of the page and the modification can proceed.  If the
-	 * two generations differ, the serialized call returns an error and the
-	 * operation must be restarted.
-	 *
-	 * The write-generation value could be stored on a per-entry basis if
-	 * there's sufficient contention for the page as a whole.
-	 *
-	 * The write-generation is not declared volatile: write-generation is
-	 * written by a serialized function when modifying a page, and must be
-	 * flushed in order as the serialized updates are flushed.
-	 *
-	 * XXX
-	 * 32-bit values are probably more than is needed: at some point we may
-	 * need to clean up pages once there have been sufficient modifications
-	 * to make our linked lists of inserted cells too slow to search, or as
-	 * soon as enough memory is allocated in service of page modifications
-	 * (although we should be able to release memory from the MVCC list as
-	 * soon as there's no running thread/txn which might want that version
-	 * of the data).   I've used 32-bit types instead of 16-bit types as I
-	 * am less confident a 16-bit write to memory will be atomic.
-	 */
-#define	WT_PAGE_SET_MODIFIED(p) do {					\
-	++(p)->write_gen;						\
-	F_CLR(p, WT_PAGE_DELETED);					\
-	F_SET(p, WT_PAGE_MODIFIED);					\
-} while (0)
-#define	WT_PAGE_IS_MODIFIED(p)	(F_ISSET(p, WT_PAGE_MODIFIED))
-	uint32_t write_gen;
-
-	/*
-	 * In-memory pages optionally reference a number of entries, originally
+	 * In-memory pages optionally reference a number of entries originally
 	 * read from disk.
 	 */
 	uint32_t entries;
@@ -166,16 +217,25 @@ struct __wt_page {
 #define	WT_PAGE_FREELIST	7	/* Free-list page */
 	uint8_t type;			/* Page type */
 
+	/*
+	 * The flags are divided into two sets: flags set initially, before more
+	 * than a single thread accesses the page and the reconciliation flags.
+	 * It has to be that way, otherwise testing and setting the flags could
+	 * race.
+	 */
 #define	WT_PAGE_BUILD_KEYS	0x001	/* Keys have been built in memory */
 #define	WT_PAGE_BULK_LOAD	0x002	/* Page bulk loaded */
-#define	WT_PAGE_DELETED		0x004	/* Page was empty at reconciliation */
-#define	WT_PAGE_EMPTY_TREE	0x008	/* Empty page created during open */
-#define	WT_PAGE_FORCE_EVICT	0x010	/* Waiting for forced eviction */
-#define	WT_PAGE_MERGE		0x020	/* Page to merge in reconciliation */
-#define	WT_PAGE_MODIFIED	0x040	/* Page is modified */
-#define	WT_PAGE_PINNED		0x080	/* Page is pinned */
+#define	WT_PAGE_EMPTY_TREE	0x004	/* Empty page created during open */
+#define	WT_PAGE_FORCE_EVICT	0x008	/* Waiting for forced eviction */
+#define	WT_PAGE_PINNED		0x010	/* Page is pinned */
+#define	WT_PAGE_REC_EMPTY	0x020	/* Reconciliation: page empty */
+#define	WT_PAGE_REC_REPLACE	0x040	/* Reconciliation: page replaced */
+#define	WT_PAGE_REC_SPLIT	0x080	/* Reconciliation: page split */
 	uint8_t flags;			/* Page flags */
 };
+
+#define	WT_PAGE_REC_MASK						\
+	(WT_PAGE_REC_EMPTY | WT_PAGE_REC_REPLACE | WT_PAGE_REC_SPLIT)
 
 /*
  * WT_PADDR, WT_PSIZE --

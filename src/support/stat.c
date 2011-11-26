@@ -99,6 +99,8 @@ __wt_stat_alloc_btree_stats(WT_SESSION_IMPL *session, WT_BTREE_STATS **statsp)
 	stats->rec_split_intl.desc = "reconcile: internal pages split";
 	stats->rec_split_leaf.name = "rec_split_leaf";
 	stats->rec_split_leaf.desc = "reconcile: leaf pages split";
+	stats->rec_written.name = "rec_written";
+	stats->rec_written.desc = "reconcile: pages written";
 
 	*statsp = stats;
 	return (0);
@@ -153,6 +155,7 @@ __wt_stat_clear_btree_stats(WT_STATS *stats_arg)
 	stats->rec_page_merge.v = 0;
 	stats->rec_split_intl.v = 0;
 	stats->rec_split_leaf.v = 0;
+	stats->rec_written.v = 0;
 }
 
 int

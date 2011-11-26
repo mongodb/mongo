@@ -70,21 +70,17 @@ __wt_session_serialize_func(WT_SESSION_IMPL *session,
 void
 __wt_session_serialize_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int ret)
 {
-	/* If passed a page and the return value is OK, we modified the page. */
-	if (page != NULL && ret == 0) {
+	if (ret == 0) {
 		/*
-		 * Publish: there must be a barrier to ensure that all changes
-		 * to the page are flushed before we update the page's write
-		 * generation, otherwise a thread searching the page might see
-		 * the page's write generation update before the changes to the
-		 * page, which breaks the protocol.
+		 * If passed a page and the return value is OK, we modified the
+		 * page.
 		 */
-		WT_WRITE_BARRIER();
-		WT_PAGE_SET_MODIFIED(page);
-	}
+		if (page != NULL)
+			ret = __wt_page_set_modified(session, page);
 
-	if (ret == 0)
+		/* Wake the eviction server as necessary. */
 		(void)__wt_eviction_check(session, page);
+	}
 
 	/* Set the return value. */
 	session->wq_ret = ret;

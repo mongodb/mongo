@@ -89,6 +89,7 @@ struct __wt_btree_stats {
 	WT_STATS rec_ovfl_key;
 	WT_STATS rec_ovfl_value;
 	WT_STATS rec_page_delete;
+	WT_STATS rec_written;
 	WT_STATS rec_hazard;
 	WT_STATS file_row_int_pages;
 	WT_STATS file_row_leaf_pages;

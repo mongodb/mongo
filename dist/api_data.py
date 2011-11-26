@@ -337,9 +337,17 @@ methods = {
 	Config('verbose', '', r'''
 		enable messages for various events.  Options are given as a
 		list, such as <code>"verbose=[evictserver,read]"</code>''',
-		type='list',
-		    choices=['allocate', 'evictserver', 'fileops', 'hazard',
-		    'mutex', 'read', 'readserver', 'reconcile', 'salvage',
+		type='list', choices=[
+		    'allocate',
+		    'evict',
+		    'evictserver',
+		    'fileops',
+		    'hazard',
+		    'mutex',
+		    'read',
+		    'readserver',
+		    'reconcile',
+		    'salvage',
 		    'write']),
 ]),
 }
@@ -350,9 +358,10 @@ flags = {
 ###################################################
 	'block_read' : [ 'VERIFY' ],
 	'page_free' : [ 'PAGE_FREE_IGNORE_DISK' ],
-	'page_reconcile' : [ 'REC_EVICT', 'REC_LOCKED', 'REC_SALVAGE', 'REC_WAIT' ],
+	'rec_evict' : [ 'REC_SINGLE', 'REC_WAIT' ],
 	'verbose' : [
 		'VERB_ALLOCATE',
+		'VERB_EVICT',
 		'VERB_EVICTSERVER',
 		'VERB_FILEOPS',
 		'VERB_HAZARD',

@@ -84,4 +84,5 @@ btree_stats = [
 	Stat('rec_page_merge', 'reconcile: deleted or temporary pages merged'),
 	Stat('rec_split_intl', 'reconcile: internal pages split'),
 	Stat('rec_split_leaf', 'reconcile: leaf pages split'),
+	Stat('rec_written', 'reconcile: pages written'),
 ]

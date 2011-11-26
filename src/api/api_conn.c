@@ -357,6 +357,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		uint32_t vflag;
 	} *vt, verbtypes[] = {
 		{ "allocate",	WT_VERB_ALLOCATE },
+		{ "evict",	WT_VERB_EVICT },
 		{ "evictserver",WT_VERB_EVICTSERVER },
 		{ "fileops",	WT_VERB_FILEOPS },
 		{ "hazard",	WT_VERB_HAZARD },

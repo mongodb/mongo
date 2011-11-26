@@ -401,20 +401,21 @@ __debug_page_work(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 	else
 		__dmsg(ds, ", parent %p", page->parent);
 
-	__dmsg(ds,
-	    " (%s", WT_PAGE_IS_MODIFIED(page) ? "dirty" : "clean");
+	__dmsg(ds, " (%s", __wt_page_is_modified(page) ? "dirty" : "clean");
 	if (F_ISSET(page, WT_PAGE_BULK_LOAD))
 		__dmsg(ds, ", bulk-loaded");
-	if (F_ISSET(page, WT_PAGE_DELETED))
-		__dmsg(ds, ", deleted");
 	if (F_ISSET(page, WT_PAGE_EMPTY_TREE))
 		__dmsg(ds, ", empty-tree");
 	if (F_ISSET(page, WT_PAGE_FORCE_EVICT))
 		__dmsg(ds, ", force-evict");
-	if (F_ISSET(page, WT_PAGE_MERGE))
-		__dmsg(ds, ", merge");
 	if (F_ISSET(page, WT_PAGE_PINNED))
 		__dmsg(ds, ", pinned");
+	if (F_ISSET(page, WT_PAGE_REC_EMPTY))
+		__dmsg(ds, ", empty");
+	if (F_ISSET(page, WT_PAGE_REC_REPLACE))
+		__dmsg(ds, ", replaced");
+	if (F_ISSET(page, WT_PAGE_REC_SPLIT))
+		__dmsg(ds, ", split");
 	__dmsg(ds, ")\n");
 
 	/* Skip bulk-loaded pages. */

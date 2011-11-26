@@ -269,5 +269,5 @@ __wt_confchk_wiredtiger_open =
     "home_environment_priv=(type=boolean),logging=(type=boolean),"
     "multiprocess=(type=boolean),session_max=(type=int,min=1),"
     "transactional=(type=boolean),verbose=(type=list,choices=[\"allocate\","
-    "\"evictserver\",\"fileops\",\"hazard\",\"mutex\",\"read\",\"readserver\""
-    ",\"reconcile\",\"salvage\",\"write\"])";
+    "\"evict\",\"evictserver\",\"fileops\",\"hazard\",\"mutex\",\"read\","
+    "\"readserver\",\"reconcile\",\"salvage\",\"write\"])";
