@@ -133,6 +133,7 @@ namespace mongo {
         }
     }
 
+    /* note called outside of locks (other than ccmutex) so care must be exercised */
     bool ClientCursor::shouldTimeout( unsigned millis ) {
         _idleAgeMillis += millis;
         return _idleAgeMillis > 600000 && _pinValue == 0;
@@ -140,24 +141,47 @@ namespace mongo {
 
     /* called every 4 seconds.  millis is amount of idle time passed since the last call -- could be zero */
     void ClientCursor::idleTimeReport(unsigned millis) {
-        readlock lk("");
-        recursive_scoped_lock lock(ccmutex);
-        for ( CCById::iterator i = clientCursorsById.begin(); i != clientCursorsById.end();  ) {
-            CCById::iterator j = i;
-            i++;
-            if( j->second->shouldTimeout( millis ) ) {
-                numberTimedOut++;
-                LOG(1) << "killing old cursor " << j->second->_cursorid << ' ' << j->second->_ns
-                       << " idle:" << j->second->idleTime() << "ms\n";
-                delete j->second;
+        bool foundSomeToTimeout = false;
+
+        // two passes so that we don't need to readlock unless we really do some timeouts
+        // we assume here that incrementing _idleAgeMillis outside readlock is ok.
+        {
+            recursive_scoped_lock lock(ccmutex);
+            {
+                unsigned sz = clientCursorsById.size();
+                static time_t last;
+                if( sz >= 100000 ) { 
+                    if( time(0) - last > 300 ) {
+                        last = time(0);
+                        log() << "warning number of open cursors is very large: " << sz << endl;
+                    }
+                }
+            }
+            for ( CCById::iterator i = clientCursorsById.begin(); i != clientCursorsById.end();  ) {
+                CCById::iterator j = i;
+                i++;
+                if( j->second->shouldTimeout( millis ) ) {
+                    foundSomeToTimeout = true;
+                    break;
+                }
             }
         }
-        unsigned sz = clientCursorsById.size();
-        static time_t last;
-        if( sz >= 100000 ) { 
-            if( time(0) - last > 300 ) {
-                last = time(0);
-                log() << "warning number of open cursors is very large: " << sz << endl;
+
+        if( foundSomeToTimeout ) {
+            // todo: ideally all readlocks automatically note what we are locking for so this 
+            // can be reported in currentop command. e.g. something like:
+            //   readlock lk("", "timeout cursors");
+            readlock lk("");
+            recursive_scoped_lock lock(ccmutex);
+            for ( CCById::iterator i = clientCursorsById.begin(); i != clientCursorsById.end();  ) {
+                CCById::iterator j = i;
+                i++;
+                if( j->second->shouldTimeout(0) ) {
+                    numberTimedOut++;
+                    LOG(1) << "killing old cursor " << j->second->_cursorid << ' ' << j->second->_ns
+                           << " idle:" << j->second->idleTime() << "ms\n";
+                    delete j->second;
+                }
             }
         }
     }
