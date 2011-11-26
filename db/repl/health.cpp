@@ -169,8 +169,10 @@ namespace mongo {
             ss << "Error : can't find a member with id: " << server_id << '\n';
             return;
         }
-
-        ss << p("Server : " + m->fullName() + "<br>ns : " + rsoplog );
+        
+        ss << h2("overview");
+        ss << labelValue( "server", m->fullName() );
+        ss << labelValue( "ns", rsoplog );
 
         //const bo fields = BSON( "o" << false << "o2" << false );
         const bo fields;
@@ -192,13 +194,9 @@ namespace mongo {
         }
         static const char *h[] = {"ts","optime", "h","op","ns","rest",0};
 
-        ss << "<style type=\"text/css\" media=\"screen\">"
-           "table { font-size:75% }\n"
-           // "th { background-color:#bbb; color:#000 }\n"
-           // "td,th { padding:.25em }\n"
-           "</style>\n";
-
-        ss << table(h, true);
+        ss << h2("log");
+        ss << "<div id=\"oplog\">";
+        ss << table(h);
         //ss << "<pre>\n";
         int n = 0;
         OpTime otFirst;
@@ -240,10 +238,12 @@ namespace mongo {
             }
         }
         ss << _table();
-        ss << p(time_t_to_String_short(time(0)) + " current time");
+        ss << "</div>";
+        ss << h2("log info");
+        ss << labelValue("current time", time_t_to_String_short(time(0)));
 
         if( !otEnd.isNull() ) {
-            ss << "<p>Log length in time: ";
+            ss << "<div class=\"info\"><label>log length in time</label><div>";
             unsigned d = otEnd.getSecs() - otFirst.getSecs();
             double h = d / 3600.0;
             ss.precision(3);
@@ -251,26 +251,27 @@ namespace mongo {
                 ss << h << " hours";
             else
                 ss << h / 24.0 << " days";
-            ss << "</p>\n";
+            ss << "</div></div>\n";
         }
     }
 
     void ReplSetImpl::_summarizeAsHtml(stringstream& s) const {
-        s << table(0, false);
-        s << tr("Set name:", _name);
-        s << tr("Majority up:", elect.aMajoritySeemsToBeUp()?"yes":"no" );
-        s << _table();
+        s << h2("overview");      
+        s << labelValue( "set name", _name );
+        s << labelValue( "majority up", elect.aMajoritySeemsToBeUp() ? "yes" : "no" );
 
-        const char *h[] = {"Member",
+        const char *h[] = {"member",
                            "<a title=\"member id in the replset config\">id</a>",
-                           "Up",
+                           "up",
                            "<a title=\"length of time we have been continuously connected to the other member with no reconnects (for self, shows uptime)\">cctime</a>",
-                           "<a title=\"when this server last received a heartbeat response - includes error code responses\">Last heartbeat</a>",
-                           "Votes", "Priority", "State", "Messages",
+                           "<a title=\"when this server last received a heartbeat response - includes error code responses\">last heartbeat</a>",
+                           "votes", "Priority", "State", "Messages",
                            "<a title=\"how up to date this server is.  this value polled every few seconds so actually lag is typically much lower than value shown here.\">optime</a>",
                            "<a title=\"Clock skew in seconds relative to this server. Informational; server clock variances will make the diagnostics hard to read, but otherwise are benign..\">skew</a>",
                            0
                           };
+
+        s << h2("members");
         s << table(h);
 
         /* this is to sort the member rows by their ordinal _id, so they show up in the same

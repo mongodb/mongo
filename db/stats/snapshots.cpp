@@ -91,6 +91,10 @@ namespace mongo {
     void Snapshots::outputLockInfoHTML( stringstream& ss ) {
         scoped_lock lk(_lock);
         ss << "\n<div>";
+        if (numDeltas() == 0) {
+          ss << "&nbsp;";
+          return;
+        }
         for ( int i=0; i<numDeltas(); i++ ) {
             SnapshotDelta d( getPrev(i+1) , getPrev(i) );
             unsigned e = (unsigned) d.elapsed() / 1000;
@@ -99,6 +103,7 @@ namespace mongo {
                 ss << '(' << e / 1000.0 << "s)";
             ss << ' ';
         }
+        
         ss << "</div>\n";
     }
 
@@ -137,28 +142,27 @@ namespace mongo {
 
     class WriteLockStatus : public WebStatusPlugin {
     public:
-        WriteLockStatus() : WebStatusPlugin( "write lock" , 51 , "% time in write lock, by 4 sec periods" ) {}
+        WriteLockStatus() : WebStatusPlugin( "write lock" , 51 , "% time in write lock, by 4 sec periods <a id=\"wlHelp\" href=\"http://www.mongodb.org/pages/viewpage.action?pageId=7209296\" title=\"snapshot: was the db in the write lock when this page was generated?\"><div class=\"help\"></div></a>" ) {}
         virtual void init() {}
 
         virtual void run( stringstream& ss ) {
+            ss << labelValue("current status", (dbMutex.info().isLocked() ? "locked" : "not locked"));
+            ss << "<div class=\"info\"><label>historical status</label>";
             statsSnapshots.outputLockInfoHTML( ss );
-
-            ss << "<a "
-               "href=\"http://www.mongodb.org/pages/viewpage.action?pageId=7209296\" "
-               "title=\"snapshot: was the db in the write lock when this page was generated?\">";
-            ss << "write locked now:</a> " << (dbMutex.info().isLocked() ? "true" : "false") << "\n";
+            ss << "</div>";
         }
 
     } writeLockStatus;
 
     class DBTopStatus : public WebStatusPlugin {
     public:
-        DBTopStatus() : WebStatusPlugin( "dbtop" , 50 , "(occurrences|percent of elapsed)" ) {}
+        DBTopStatus() : WebStatusPlugin( "dbtop" , 50 , "occurrences | percent of elapsed" ) {}
 
-        void display( stringstream& ss , double elapsed , const Top::UsageData& usage ) {
-            ss << "<td>";
+        void display( stringstream& ss , double elapsed , const Top::UsageData& usage, bool alt ) {
+            openTd( ss, alt );
             ss << usage.count;
-            ss << "</td><td>";
+            ss << "</td>";
+            openTd( ss, alt );
             double per = 100 * ((double)usage.time)/elapsed;
             if( per == (int) per )
                 ss << (int) per;
@@ -167,22 +171,30 @@ namespace mongo {
             ss << '%';
             ss << "</td>";
         }
+        
+        void openTd( stringstream& ss, bool alt ) {
+          if (alt) {
+              ss << "<td class=\"alt\">";  
+          } else {
+              ss << "<td>";  
+          }
+        }
 
         void display( stringstream& ss , double elapsed , const string& ns , const Top::CollectionData& data ) {
-            if ( ns != "TOTAL" && data.total.count == 0 )
+            if ( ns != "total" && data.total.count == 0 )
                 return;
             ss << "<tr><th>" << ns << "</th>";
 
-            display( ss , elapsed , data.total );
+            display( ss , elapsed , data.total, false );
 
-            display( ss , elapsed , data.readLock );
-            display( ss , elapsed , data.writeLock );
+            display( ss , elapsed , data.readLock, true );
+            display( ss , elapsed , data.writeLock, false );
 
-            display( ss , elapsed , data.queries );
-            display( ss , elapsed , data.getmore );
-            display( ss , elapsed , data.insert );
-            display( ss , elapsed , data.update );
-            display( ss , elapsed , data.remove );
+            display( ss , elapsed , data.queries, true );
+            display( ss , elapsed , data.getmore, false );
+            display( ss , elapsed , data.insert, true );
+            display( ss , elapsed , data.update, false );
+            display( ss , elapsed , data.remove, true );
 
             ss << "</tr>\n";
         }
@@ -192,21 +204,21 @@ namespace mongo {
             if ( ! delta.get() )
                 return;
 
-            ss << "<table border=1 cellpadding=2 cellspacing=0>";
-            ss << "<tr align='left'><th>";
+            ss << "<table id=\"dbtop\">";
+            ss << "<tr><th>";
             ss << a("http://www.mongodb.org/display/DOCS/Developer+FAQ#DeveloperFAQ-What%27sa%22namespace%22%3F", "namespace") <<
-               "NS</a></th>"
-               "<th colspan=2>total</th>"
-               "<th colspan=2>Reads</th>"
-               "<th colspan=2>Writes</th>"
-               "<th colspan=2>Queries</th>"
-               "<th colspan=2>GetMores</th>"
-               "<th colspan=2>Inserts</th>"
-               "<th colspan=2>Updates</th>"
-               "<th colspan=2>Removes</th>";
+               "ns</a></th>"
+               "<th colspan=2 class=c>total</th>"
+               "<th colspan=2 class=\"c alt\">reads</th>"
+               "<th colspan=2 class=c>writes</th>"
+               "<th colspan=2 class=\"c alt\">queries</th>"
+               "<th colspan=2 class=c>getmores</th>"
+               "<th colspan=2 class=\"c alt\">inserts</th>"
+               "<th colspan=2 class=c>updates</th>"
+               "<th colspan=2 class=\"c alt\">removes</th>";
             ss << "</tr>\n";
 
-            display( ss , (double) delta->elapsed() , "TOTAL" , delta->globalUsageDiff() );
+            display( ss , (double) delta->elapsed() , "total" , delta->globalUsageDiff() );
 
             Top::UsageMap usage = delta->collectionUsageDiff();
             for ( Top::UsageMap::iterator i=usage.begin(); i != usage.end(); i++ ) {
