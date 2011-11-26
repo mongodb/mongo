@@ -131,14 +131,9 @@ namespace mongo {
 
         stringstream commandLine;
 
-        if ( strchr(argv[0], ':') ) { // a crude test for fully qualified path
-            commandLine << '"' << argv[0] << "\" ";
-        }
-        else {
-            char buffer[256];
-            assert( _getcwd(buffer, 256) );
-            commandLine << '"' << buffer << '\\' << argv[0] << "\" ";
-        }
+        char exePath[1024];
+        GetModuleFileNameA( NULL, exePath, sizeof exePath );
+        commandLine << '"' << exePath << "\" ";
 
         for ( int i = 1; i < argc; i++ ) {
             std::string arg( argv[ i ] );
