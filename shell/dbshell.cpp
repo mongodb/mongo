@@ -19,10 +19,7 @@
 #include <stdio.h>
 #include <string.h>
 
-
-#define USE_LINENOISE
 #include "../third_party/linenoise/linenoise.h"
-
 #include "../scripting/engine.h"
 #include "../client/dbclient.h"
 #include "../util/unittest.h"
@@ -44,17 +41,11 @@ bool inMultiLine = 0;
 static volatile bool atPrompt = false; // can eval before getting to prompt
 bool autoKillOp = false;
 
-
-#if defined(USE_LINENOISE) && !defined(__freebsd__) && !defined(__openbsd__) && !defined(_WIN32)
+#if !defined(__freebsd__) && !defined(__openbsd__) && !defined(_WIN32)
 // this is for ctrl-c handling
 #include <setjmp.h>
 jmp_buf jbuf;
 #endif
-
-#if defined(USE_LINENOISE)
-#define USE_TABCOMPLETION
-#endif
-
 
 namespace mongo {
 
@@ -67,127 +58,29 @@ void generateCompletions( const string& prefix , vector<string>& all ) {
     if ( prefix.find( '"' ) != string::npos )
         return;
 
-    BSONObj args = BSON("0" << prefix);
-    shellMainScope->invokeSafe("function(x) {shellAutocomplete(x)}", &args, 0, 1000);
+    BSONObj args = BSON( "0" << prefix );
+    shellMainScope->invokeSafe( "function(x) {shellAutocomplete(x)}", &args, 0, 1000 );
     BSONObjBuilder b;
     shellMainScope->append( b , "" , "__autocomplete__" );
     BSONObj res = b.obj();
     BSONObj arr = res.firstElement().Obj();
 
-    BSONObjIterator i(arr);
+    BSONObjIterator i( arr );
     while ( i.more() ) {
         BSONElement e = i.next();
         all.push_back( e.String() );
     }
-
 }
 
-#ifdef USE_TABCOMPLETION
-void completionHook(const char* text , linenoiseCompletions* lc ) {
+void completionHook( const char* text , linenoiseCompletions* lc ) {
     vector<string> all;
     generateCompletions( text , all );
 
-    for ( unsigned i=0; i<all.size(); i++ )
+    for ( unsigned i = 0; i < all.size(); ++i )
         linenoiseAddCompletion( lc , (char*)all[i].c_str() );
-
 }
-#endif
-
-#ifndef _WIN32
-static void edit(const string& var){
-    static const char * editor = getenv("EDITOR");
-    if (!editor) {
-        cout << "please define the EDITOR environment variable" << endl;
-        return;
-    }
-
-    for (const char* p=var.c_str(); *p ; p++){
-        if (! (isalnum(*p) || *p == '_' || *p == '.')){
-            cout << "can only edit variable or property" << endl;
-            return;
-        }
-    }
-
-    if (!shellMainScope->exec("__jsout__ = tojson("+var+")", "tojs", false, false, false))
-        return; // Error already printed
-
-    const string js = shellMainScope->getString("__jsout__");
-
-    if (strstr(js.c_str(), "[native code]")) {
-        cout << "can't edit native functions" << endl;
-        return;
-    }
-
-    string filename;
-    int fd;
-    for (int i=0; i < 10; i++){
-        StringBuilder sb;
-        sb << "/tmp/mongo_edit" << time(0)+i << ".js";
-        filename = sb.str();
-        fd = open(filename.c_str(), O_RDWR|O_CREAT|O_EXCL, 0600);
-        if (fd > 0)
-            break;
-
-        if (errno != EEXIST) {
-            cout << "couldn't open temp file: " << errnoWithDescription() << endl;
-            return;
-        }
-    }
-
-    if (fd == -1){
-        cout << "couldn't create unique temp file after 10 attempts" << endl;
-        return;
-    }
-
-    // just to make sure this gets closed no matter what
-    File holder;
-    holder.fd = fd;
-
-    if (write(fd, js.data(), js.size()) != (int)js.size()){
-        cout << "failed to write to temp file: " << errnoWithDescription() << endl;
-        return;
-    }
-
-    StringBuilder sb;
-    sb << editor << " " << filename;
-    int ret = ::system(sb.str().c_str());
-    int systemErrno = errno;
-    remove(filename.c_str()); // file already open, deleted on close
-    if (ret){
-        if (ret == -1) {
-            cout << "failed to launch $EDITOR (" << editor << "): " << errnoWithDescription(systemErrno) << endl;
-            return;
-        }
-
-        cout << "editor exited with error, not applying changes" << endl;
-        return;
-
-    }
-
-    lseek(fd, 0, SEEK_SET);
-
-    sb.reset();
-    sb << var << " = ";
-    int bytes;
-    do {
-        char buf[1024];
-        bytes = read(fd, buf, sizeof(buf));
-        if (bytes < 0) {
-            cout << "failed to read temp file: " << errnoWithDescription() << endl;
-            return;
-        }
-        sb.append( StringData(buf, bytes) );
-    }while (bytes);
-
-    const string code = sb.str();
-    if (!shellMainScope->exec(code, "tojs", false, false, false))
-        return; // Error already printed
-
-}
-#endif
 
 void shellHistoryInit() {
-#ifdef USE_LINENOISE
     stringstream ss;
     const char * h = shellUtils::getUserDir();
     if ( h )
@@ -195,42 +88,33 @@ void shellHistoryInit() {
     ss << ".dbshell";
     historyFile = ss.str();
 
-    linenoiseHistoryLoad( (char*)historyFile.c_str() );
-#ifdef USE_TABCOMPLETION
+    linenoiseHistoryLoad( historyFile.c_str() );
     linenoiseSetCompletionCallback( completionHook );
-#endif
-
-#else
-    //cout << "type \"exit\" to exit" << endl;
-#endif
 }
+
 void shellHistoryDone() {
-#ifdef USE_LINENOISE
     linenoiseHistorySave( historyFile.c_str() );
     linenoiseHistoryFree();
-#endif
 }
 void shellHistoryAdd( const char * line ) {
-#ifdef USE_LINENOISE
     if ( line[0] == '\0' )
         return;
 
     // dont record duplicate lines
     static string lastLine;
-    if (lastLine == line)
+    if ( lastLine == line )
         return;
     lastLine = line;
 
-    if ((strstr(line, ".auth")) == NULL)
+    if ( strstr( line, ".auth") == NULL )
         linenoiseHistoryAdd( line );
-#endif
 }
 
-void intr( int sig ) {
 #ifdef CTRLC_HANDLE
+void intr( int sig ) {
     longjmp( jbuf , 1 );
-#endif
 }
+#endif
 
 void killOps() {
     if ( mongo::shellUtils::_nokillop || mongo::shellUtils::_allMyUris.size() == 0 )
@@ -243,16 +127,16 @@ void killOps() {
 
     for( map< string, set<string> >::const_iterator i = shellUtils::_allMyUris.begin(); i != shellUtils::_allMyUris.end(); ++i ) {
         string errmsg;
-        ConnectionString cs = ConnectionString::parse(i->first, errmsg);
+        ConnectionString cs = ConnectionString::parse( i->first, errmsg );
         if (!cs.isValid()) continue;
-        boost::scoped_ptr<DBClientWithCommands> conn (cs.connect(errmsg));
+        boost::scoped_ptr<DBClientWithCommands> conn( cs.connect( errmsg ) );
         if (!conn) continue;
 
         const set<string>& uris = i->second;
 
-        BSONObj inprog =  conn->findOne("admin.$cmd.sys.inprog", Query())["inprog"].embeddedObject().getOwned();
-        BSONForEach(op, inprog) {
-            if ( uris.count(op["client"].String()) ) {
+        BSONObj inprog =  conn->findOne( "admin.$cmd.sys.inprog", Query() )["inprog"].embeddedObject().getOwned();
+        BSONForEach( op, inprog ) {
+            if ( uris.count( op["client"].String() ) ) {
                 ONCE if ( !autoKillOp ) {
                     cout << endl << "do you want to kill the current op(s) on the server? (y/n): ";
                     cout.flush();
@@ -260,11 +144,11 @@ void killOps() {
                     char yn;
                     cin >> yn;
 
-                    if (yn != 'y' && yn != 'Y')
+                    if ( yn != 'y' && yn != 'Y' )
                         return;
                 }
 
-                conn->findOne("admin.$cmd.sys.killop", QUERY("op"<< op["opid"]));
+                conn->findOne( "admin.$cmd.sys.killop", QUERY( "op"<< op["opid"] ) );
             }
         }
     }
@@ -289,10 +173,7 @@ void quitNicely( int sig ) {
 
 // the returned string is allocated with strdup() or malloc() and must be freed by calling free()
 char * shellReadline( const char * prompt , int handlesigint = 0 ) {
-
     atPrompt = true;
-#ifdef USE_LINENOISE
-
 
 #ifdef CTRLC_HANDLE
     if ( ! handlesigint ) {
@@ -313,16 +194,6 @@ char * shellReadline( const char * prompt , int handlesigint = 0 ) {
     signal( SIGINT , quitNicely );
     atPrompt = false;
     return ret;
-#else
-    printf("%s", prompt); cout.flush();
-    char * buf = (char *)malloc(1024);
-    char * l = fgets( buf , 1024 , stdin );
-    int len = strlen( buf );
-    if ( len )
-        buf[len-1] = 0;
-    atPrompt = false;
-    return l;
-#endif
 }
 
 #ifdef _WIN32
@@ -348,7 +219,7 @@ void quitAbruptly( int sig ) {
     mongo::rawOut( ossBt.str() );
 
     mongo::shellUtils::KillMongoProgramInstances();
-    exit(14);
+    exit( 14 );
 }
 
 // this will be called in certain c++ error cases, for example if there are two active
@@ -356,7 +227,7 @@ void quitAbruptly( int sig ) {
 void myterminate() {
     mongo::rawOut( "terminate() called in shell, printing stack:" );
     mongo::printStackTrace();
-    exit(14);
+    exit( 14 );
 }
 
 void setupSignals() {
@@ -401,7 +272,7 @@ string fixHost( string url , string host , string port ) {
     string newurl = host;
     if ( port.size() > 0 )
         newurl += ":" + port;
-    else if (host.find(':') == string::npos) {
+    else if ( host.find(':') == string::npos ) {
         // need to add port with IPv6 addresses
         newurl += ":27017";
     }
@@ -436,8 +307,8 @@ bool isBalanced( string code ) {
     for ( size_t i=0; i<code.size(); i++ ) {
         switch( code[i] ) {
         case '/':
-            if ( i+1 < code.size() && code[i+1] == '/' ) {
-                while ( i<code.size() && code[i] != '\n' )
+            if ( i + 1 < code.size() && code[i+1] == '/' ) {
+                while ( i  <code.size() && code[i] != '\n' )
                     i++;
             }
             continue;
@@ -454,22 +325,22 @@ bool isBalanced( string code ) {
             while ( i < code.size() && code[i] != '\'' ) i++;
             break;
         case '\\':
-            if ( i+1 < code.size() && code[i+1] == '/') i++;
+            if ( i + 1 < code.size() && code[i+1] == '/' ) i++;
             break;
         case '+':
         case '-':
-            if ( i+1 < code.size() && code[i+1] == code[i]) {
+            if ( i + 1 < code.size() && code[i+1] == code[i] ) {
                 i++;
                 continue; // postfix op (++/--) can't be a dangling op
             }
             break;
         }
-        if (i>=code.size()) {
+        if ( i >= code.size() ) {
             danglingOp = false;
             break;
         }
-        if ( isOpSymbol( code[i] )) danglingOp = true;
-        else if (! std::isspace( code[i] )) danglingOp = false;
+        if ( isOpSymbol( code[i] ) ) danglingOp = true;
+        else if ( !std::isspace( code[i] ) ) danglingOp = false;
     }
 
     return brackets == 0 && parens == 0 && !danglingOp;
@@ -500,29 +371,29 @@ public:
         assert( !isBalanced( "a. ") );
         assert( isBalanced( "a.b") );
     }
-} balnaced_test;
+} balanced_test;
 
 string finishCode( string code ) {
     while ( ! isBalanced( code ) ) {
         inMultiLine = 1;
         code += "\n";
         // cancel multiline if two blank lines are entered
-        if ( code.find("\n\n\n") != string::npos )
+        if ( code.find( "\n\n\n ") != string::npos )
             return ";";
-        char * line = shellReadline("... " , 1 );
+        char * line = shellReadline( "... " , 1 );
         if ( gotInterrupted ) {
-            if (line)
-                free(line);
+            if ( line )
+                free( line );
             return "";
         }
         if ( ! line )
             return "";
 
-        while (startsWith(line, "... "))
+        while ( startsWith( line, "... " ) )
             line += 4;
 
         code += line;
-        free(line);
+        free( line );
     }
     return code;
 }
@@ -530,7 +401,7 @@ string finishCode( string code ) {
 #include <boost/program_options.hpp>
 namespace po = boost::program_options;
 
-void show_help_text(const char* name, po::options_description options) {
+void show_help_text( const char* name, po::options_description options ) {
     cout << "MongoDB shell version: " << mongo::versionString << endl;
     cout << "usage: " << name << " [options] [db address] [file names (ending in .js)]" << endl
          << "db address can be:" << endl
@@ -544,10 +415,10 @@ void show_help_text(const char* name, po::options_description options) {
 
 bool fileExists( string file ) {
     try {
-        path p(file);
+        path p( file );
         return boost::filesystem::exists( file );
     }
-    catch (...) {
+    catch ( ... ) {
         return false;
     }
 }
@@ -561,30 +432,151 @@ string sayReplSetMemberState() {
     try {
         if( latestConn ) {
             BSONObj info;
-            if( latestConn->runCommand("admin", BSON( "replSetGetStatus" << 1 << "forShell" << 1 ) , info ) ) {
+            if( latestConn->runCommand( "admin", BSON( "replSetGetStatus" << 1 << "forShell" << 1 ) , info ) ) {
                 stringstream ss;
                 ss << info["set"].String() << ':';
                 
                 int s = info["myState"].Int();
-                MemberState ms(s);
+                MemberState ms( s );
                 ss << ms.toString();
 
                 return ss.str();
             }
             else {
-                string s = info.getStringField("info");
+                string s = info.getStringField( "info" );
                 if( s.size() < 20 )
                     return s; // "mongos", "configsvr"
             }
         }
     }
     catch( std::exception& e ) {
-        log(1) << "error in sayReplSetMemberState:" << e.what() << endl;
+        log( 1 ) << "error in sayReplSetMemberState:" << e.what() << endl;
     }
     return "";
 }
 
-int _main(int argc, char* argv[]) {
+/**
+ * Edit a variable in an external editor -- EDITOR must be defined
+ *
+ * @param var Name of JavaScript variable to be edited
+ */
+static void edit( const string& var ) {
+
+    // EDITOR must be defined in the environment
+    static const char * editor = getenv( "EDITOR" );
+    if ( !editor ) {
+        cout << "please define the EDITOR environment variable" << endl;
+        return;
+    }
+
+    // "var" must look like a variable/property name
+    for ( const char* p=var.c_str(); *p; ++p ) {
+        if ( ! ( isalnum( *p ) || *p == '_' || *p == '.' ) ) {
+            cout << "can only edit variable or property" << endl;
+            return;
+        }
+    }
+
+    // Convert "var" to JavaScript (JSON) text
+    if ( !shellMainScope->exec( "__jsout__ = tojson(" + var + ")", "tojs", false, false, false ) )
+        return; // Error already printed
+
+    const string js = shellMainScope->getString( "__jsout__" );
+
+    if ( strstr( js.c_str(), "[native code]" ) ) {
+        cout << "can't edit native functions" << endl;
+        return;
+    }
+
+    // Pick a name to use for the temp file
+    string filename;
+    const int maxAttempts = 10;
+    int i;
+    for ( i = 0; i < maxAttempts; ++i ) {
+        StringBuilder sb;
+#ifdef _WIN32
+        char tempFolder[MAX_PATH];
+        GetTempPathA( sizeof tempFolder, tempFolder );
+        sb << tempFolder << "mongo_edit" << time( 0 ) + i << ".js";
+#else
+        sb << "/tmp/mongo_edit" << time( 0 ) + i << ".js";
+#endif
+        filename = sb.str();
+        if ( ! fileExists( filename ) )
+            break;
+    }
+    if ( i == maxAttempts ) {
+        cout << "couldn't create unique temp file after " << maxAttempts << " attempts" << endl;
+        return;
+    }
+
+    // Create the temp file
+    FILE * tempFileStream;
+    tempFileStream = fopen( filename.c_str(), "wt" );
+    if ( ! tempFileStream ) {
+        cout << "couldn't create temp file (" << filename << "): " << errnoWithDescription() << endl;
+        return;
+    }
+
+    // Write JSON into the temp file
+    size_t fileSize = js.size();
+    if ( fwrite( js.data(), sizeof( char ), fileSize, tempFileStream ) != fileSize ) {
+        int systemErrno = errno;
+        cout << "failed to write to temp file: " << errnoWithDescription( systemErrno ) << endl;
+        fclose( tempFileStream );
+        remove( filename.c_str() );
+        return;
+    }
+    fclose( tempFileStream );
+
+    // Pass file to editor
+    StringBuilder sb;
+    sb << editor << " " << filename;
+    int ret = ::system( sb.str().c_str() );
+    if ( ret ) {
+        if ( ret == -1 ) {
+            int systemErrno = errno;
+            cout << "failed to launch $EDITOR (" << editor << "): " << errnoWithDescription( systemErrno ) << endl;
+        }
+        else
+            cout << "editor exited with error (" << ret << "), not applying changes" << endl;
+        remove( filename.c_str() );
+        return;
+    }
+
+    // The editor gave return code zero, so read the file back in
+    tempFileStream = fopen( filename.c_str(), "rt" );
+    if ( ! tempFileStream ) {
+        cout << "couldn't open temp file on return from editor: " << errnoWithDescription() << endl;
+        remove( filename.c_str() );
+        return;
+    }
+    sb.reset();
+    sb << var << " = ";
+    int bytes;
+    do {
+        char buf[1024];
+        bytes = fread( buf, sizeof( char ), sizeof buf, tempFileStream );
+        if ( ferror( tempFileStream ) ) {
+            cout << "failed to read temp file: " << errnoWithDescription() << endl;
+            fclose( tempFileStream );
+            remove( filename.c_str() );
+            return;
+        }
+        sb.append( StringData( buf, bytes ) );
+    } while ( bytes );
+
+    // Done with temp file, close and delete it
+    fclose( tempFileStream );
+    remove( filename.c_str() );
+
+    // Try to execute assignment to copy edited value back into the variable
+    const string code = sb.str();
+    if ( !shellMainScope->exec( code, "tojs", false, false, false ) )
+        return; // Error already printed
+}
+
+int _main( int argc, char* argv[] ) {
     mongo::isShell = true;
     setupSignals();
 
@@ -604,42 +596,41 @@ int _main(int argc, char* argv[]) {
 
     string script;
 
-    po::options_description shell_options("options");
-    po::options_description hidden_options("Hidden options");
-    po::options_description cmdline_options("Command line options");
+    po::options_description shell_options( "options" );
+    po::options_description hidden_options( "Hidden options" );
+    po::options_description cmdline_options( "Command line options" );
     po::positional_options_description positional_options;
 
     shell_options.add_options()
-    ("shell", "run the shell after executing files")
-    ("nodb", "don't connect to mongod on startup - no 'db address' arg expected")
-    ("norc", "will not run the \".mongorc.js\" file on start up")
-    ("quiet", "be less chatty" )
-    ("port", po::value<string>(&port), "port to connect to")
-    ("host", po::value<string>(&dbhost), "server to connect to")
-    ("eval", po::value<string>(&script), "evaluate javascript")
-    ("username,u", po::value<string>(&username), "username for authentication")
-    ("password,p", new mongo::PasswordValue(&password),
-     "password for authentication")
-    ("help,h", "show this usage information")
-    ("version", "show version information")
-    ("verbose", "increase verbosity")
-    ("ipv6", "enable IPv6 support (disabled by default)")
+    ( "shell", "run the shell after executing files" )
+    ( "nodb", "don't connect to mongod on startup - no 'db address' arg expected" )
+    ( "norc", "will not run the \".mongorc.js\" file on start up" )
+    ( "quiet", "be less chatty" )
+    ( "port", po::value<string>( &port ), "port to connect to" )
+    ( "host", po::value<string>( &dbhost ), "server to connect to" )
+    ( "eval", po::value<string>( &script ), "evaluate javascript" )
+    ( "username,u", po::value<string>(&username), "username for authentication" )
+    ( "password,p", new mongo::PasswordValue( &password ), "password for authentication" )
+    ( "help,h", "show this usage information" )
+    ( "version", "show version information" )
+    ( "verbose", "increase verbosity" )
+    ( "ipv6", "enable IPv6 support (disabled by default)" )
 #ifdef MONGO_SSL
-    ("ssl", "use all for connections")
+    ( "ssl", "use all for connections" )
 #endif
     ;
 
     hidden_options.add_options()
-    ("dbaddress", po::value<string>(), "dbaddress")
-    ("files", po::value< vector<string> >(), "files")
-    ("nokillop", "nokillop") // for testing, kill op will also be disabled automatically if the tests starts a mongo program
-    ("autokillop", "autokillop") // for testing, will kill op without prompting
+    ( "dbaddress", po::value<string>(), "dbaddress" )
+    ( "files", po::value< vector<string> >(), "files" )
+    ( "nokillop", "nokillop" ) // for testing, kill op will also be disabled automatically if the tests starts a mongo program
+    ( "autokillop", "autokillop" ) // for testing, will kill op without prompting
     ;
 
-    positional_options.add("dbaddress", 1);
-    positional_options.add("files", -1);
+    positional_options.add( "dbaddress", 1 );
+    positional_options.add( "files", -1 );
 
-    cmdline_options.add(shell_options).add(hidden_options);
+    cmdline_options.add( shell_options ).add( hidden_options );
 
     po::variables_map params;
 
@@ -654,60 +645,58 @@ int _main(int argc, char* argv[]) {
         po::store(po::command_line_parser(argc, argv).options(cmdline_options).
                   positional(positional_options).
                   style(command_line_style).run(), params);
-        po::notify(params);
+        po::notify( params );
     }
-    catch (po::error &e) {
+    catch ( po::error &e ) {
         cout << "ERROR: " << e.what() << endl << endl;
-        show_help_text(argv[0], shell_options);
+        show_help_text( argv[0], shell_options );
         return mongo::EXIT_BADOPTIONS;
     }
 
     // hide password from ps output
-    for (int i=0; i < (argc-1); ++i) {
-        if (!strcmp(argv[i], "-p") || !strcmp(argv[i], "--password")) {
-            char* arg = argv[i+1];
-            while (*arg) {
+    for ( int i = 0; i < (argc-1); ++i ) {
+        if ( !strcmp(argv[i], "-p") || !strcmp( argv[i], "--password" ) ) {
+            char* arg = argv[i + 1];
+            while ( *arg ) {
                 *arg++ = 'x';
             }
         }
     }
 
-    if (params.count("shell")) {
+    if ( params.count( "shell" ) ) {
         runShell = true;
     }
-    if (params.count("nodb")) {
+    if ( params.count( "nodb" ) ) {
         nodb = true;
     }
-    if (params.count("norc")) {
+    if ( params.count( "norc" ) ) {
         norc = true;
     }
-    if (params.count("help")) {
-        show_help_text(argv[0], shell_options);
+    if ( params.count( "help" ) ) {
+        show_help_text( argv[0], shell_options );
         return mongo::EXIT_CLEAN;
     }
-    if (params.count("files")) {
+    if ( params.count( "files" ) ) {
         files = params["files"].as< vector<string> >();
     }
-    if (params.count("version")) {
+    if ( params.count( "version" ) ) {
         cout << "MongoDB shell version: " << mongo::versionString << endl;
         return mongo::EXIT_CLEAN;
     }
-    if (params.count("quiet")) {
+    if ( params.count( "quiet" ) ) {
         mongo::cmdLine.quiet = true;
     }
 #ifdef MONGO_SSL
-    if (params.count("ssl")) {
+    if ( params.count( "ssl" ) ) {
         mongo::cmdLine.sslOnNormalPorts = true;
     }
 #endif
-    if (params.count("nokillop")) {
+    if ( params.count( "nokillop" ) ) {
         mongo::shellUtils::_nokillop = true;
     }
-    if (params.count("autokillop")) {
+    if ( params.count( "autokillop" ) ) {
         autoKillOp = true;
     }
-
-    
 
     /* This is a bit confusing, here are the rules:
      *
@@ -716,32 +705,32 @@ int _main(int argc, char* argv[]) {
      * only if one of these conditions is met:
      *   - it contains no '.' after the last appearance of '\' or '/'
      *   - it doesn't end in '.js' and it doesn't specify a path to an existing file */
-    if (params.count("dbaddress")) {
+    if ( params.count( "dbaddress" ) ) {
         string dbaddress = params["dbaddress"].as<string>();
         if (nodb) {
-            files.insert(files.begin(), dbaddress);
+            files.insert( files.begin(), dbaddress );
         }
         else {
-            string basename = dbaddress.substr(dbaddress.find_last_of("/\\") + 1);
-            if (basename.find_first_of('.') == string::npos ||
-                    (basename.find(".js", basename.size() - 3) == string::npos && !fileExists(dbaddress))) {
+            string basename = dbaddress.substr( dbaddress.find_last_of( "/\\" ) + 1 );
+            if (basename.find_first_of( '.' ) == string::npos ||
+                    ( basename.find( ".js", basename.size() - 3 ) == string::npos && !fileExists( dbaddress ) ) ) {
                 url = dbaddress;
             }
             else {
-                files.insert(files.begin(), dbaddress);
+                files.insert( files.begin(), dbaddress );
             }
         }
     }
-    if (params.count("ipv6")) {
+    if ( params.count( "ipv6" ) ) {
         mongo::enableIPv6();
     }
-    if (params.count("verbose")) {
+    if ( params.count( "verbose" ) ) {
         logLevel = 1;
     }
 
     if ( url == "*" ) {
         cout << "ERROR: " << "\"*\" is an invalid db address" << endl << endl;
-        show_help_text(argv[0], shell_options);
+        show_help_text( argv[0], shell_options );
         return mongo::EXIT_BADOPTIONS;
     }
 
@@ -760,17 +749,14 @@ int _main(int argc, char* argv[]) {
 
         mongo::shellUtils::_dbConnect = ss.str();
 
-        if ( params.count( "password" )
-                && ( password.empty() ) ) {
+        if ( params.count( "password" ) && password.empty() )
             password = mongo::askPassword();
-        }
 
         if ( username.size() && password.size() ) {
             stringstream ss;
             ss << "if ( ! db.auth( \"" << username << "\" , \"" << password << "\" ) ){ throw 'login failed'; }";
             mongo::shellUtils::_dbAuth = ss.str();
         }
-
     }
 
     mongo::ScriptEngine::setConnectCallback( mongo::shellUtils::onConnect );
@@ -788,7 +774,7 @@ int _main(int argc, char* argv[]) {
             return -4;
     }
 
-    for (size_t i = 0; i < files.size(); i++) {
+    for (size_t i = 0; i < files.size(); ++i) {
         mongo::shellUtils::MongoProgramScope s;
 
         if ( files.size() > 1 )
@@ -800,22 +786,21 @@ int _main(int argc, char* argv[]) {
         }
     }
 
-    if ( files.size() == 0 && script.empty() ) {
+    if ( files.size() == 0 && script.empty() )
         runShell = true;
-    }
 
     if ( runShell ) {
 
         mongo::shellUtils::MongoProgramScope s;
 
-        if (!norc) {
+        if ( !norc ) {
             string rcLocation;
 #ifndef _WIN32
-            if ( getenv("HOME") != NULL )
-                rcLocation = str::stream() << getenv("HOME") << "/.mongorc.js" ;
+            if ( getenv( "HOME" ) != NULL )
+                rcLocation = str::stream() << getenv( "HOME" ) << "/.mongorc.js" ;
 #else
-            if ( getenv("HOMEDRIVE") != NULL && getenv("HOMEPATH") != NULL )
-                rcLocation = str::stream() << getenv("HOMEDRIVE") << getenv("HOMEPATH") << "\\.mongorc.js";
+            if ( getenv( "HOMEDRIVE" ) != NULL && getenv( "HOMEPATH" ) != NULL )
+                rcLocation = str::stream() << getenv( "HOMEDRIVE" ) << getenv( "HOMEPATH" ) << "\\.mongorc.js";
 #endif
             if ( !rcLocation.empty() && fileExists(rcLocation) ) {
                 if ( ! scope->execFile( rcLocation , false , true , false , 0 ) ) {
@@ -839,74 +824,69 @@ int _main(int argc, char* argv[]) {
             //DBClientWithCommands *c = getConnection( JSContext *cx, JSObject *obj );
 
             bool haveStringPrompt = false;
-            promptType = scope->type("prompt");
+            promptType = scope->type( "prompt" );
             if( promptType == String ) {
-                prompt = scope->getString("prompt");
+                prompt = scope->getString( "prompt" );
                 haveStringPrompt = true;
             }
             else if( promptType == Code ) {
-                scope->exec("delete __prompt__;", "", false, false, false, 0);
-                scope->exec("__prompt__ = prompt();", "", false, false, false, 0);
-                if( scope->type("__prompt__") == String ) {
-                    prompt = scope->getString("__prompt__");
+                scope->exec( "delete __prompt__;", "", false, false, false, 0 );
+                scope->exec( "__prompt__ = prompt();", "", false, false, false, 0 );
+                if( scope->type( "__prompt__" ) == String ) {
+                    prompt = scope->getString( "__prompt__" );
                     haveStringPrompt = true;
                 }
             }
             if( !haveStringPrompt )
-                prompt = sayReplSetMemberState()+"> ";
+                prompt = sayReplSetMemberState() + "> ";
 
             char * line = shellReadline( prompt.c_str() );
 
             char * linePtr = line;  // can't clobber 'line', we need to free() it later
             if ( linePtr ) {
-                while (startsWith(linePtr, "> "))   // this makes no sense, the prompt isn't part of the buffer
-                    linePtr += 2;
-
                 while ( linePtr[0] == ' ' )
-                    linePtr++;
+                    ++linePtr;
             }
 
-            if ( ! linePtr || ( strlen(linePtr) == 4 && strstr( linePtr , "exit" ) ) ) {
+            if ( ! linePtr || ( strlen( linePtr ) == 4 && strstr( linePtr , "exit" ) ) ) {
                 cout << "bye" << endl;
-                if (line)
-                    free(line);
+                if ( line )
+                    free( line );
                 break;
             }
 
             string code = linePtr;
             if ( code == "exit" || code == "exit;" ) {
-                free(line);
+                free( line );
                 break;
             }
 
             if ( code.size() == 0 ) {
-                free(line);
+                free( line );
                 continue;
             }
 
-#ifndef _WIN32
-            if (startsWith(linePtr, "edit ")){
+            if ( startsWith( linePtr, "edit " ) ) {
                 shellHistoryAdd( linePtr );
 
                 const char* s = linePtr + 5; // skip "edit "
-                while(*s && isspace(*s))
+                while( *s && isspace( *s ) )
                     s++;
 
-                edit(s);
-                free(line);
+                edit( s );
+                free( line );
                 continue;
             }
-#endif
 
             code = finishCode( code );
             if ( gotInterrupted ) {
                 cout << endl;
-                free(line);
+                free( line );
                 continue;
             }
 
             if ( code.size() == 0 ) {
-                free(line);
+                free( line );
                 break;
             }
 
@@ -929,7 +909,6 @@ int _main(int argc, char* argv[]) {
                         wascmd = true;
                     }
                 }
-
             }
 
             if ( ! wascmd ) {
@@ -943,7 +922,7 @@ int _main(int argc, char* argv[]) {
             }
 
             shellHistoryAdd( code.c_str() );
-            free(line);
+            free( line );
         }
 
         shellHistoryDone();
@@ -953,7 +932,7 @@ int _main(int argc, char* argv[]) {
     return 0;
 }
 
-int main(int argc, char* argv[]) {
+int main( int argc, char* argv[] ) {
     static mongo::StaticObserver staticObserver;
     try {
         return _main( argc , argv );
@@ -963,5 +942,3 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 }
-
-
