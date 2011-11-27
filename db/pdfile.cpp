@@ -367,7 +367,7 @@ namespace mongo {
         return size;
     }
 
-    static void check(void *p) { 
+    static void check(void *_mb) { 
         if( sizeof(char *) == 4 )
             uassert( 10084 , "can't map file memory - mongo requires 64 bit build for larger datasets", _mb != 0);
         else
