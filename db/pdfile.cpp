@@ -2344,7 +2344,7 @@ namespace mongo {
             dbs.insert( i->first );
         }
 
-        currentClient.get()->getContext()->clear();
+        currentClient.get()->getContext()->_clear();
 
         BSONObjBuilder bb( result.subarrayStart( "dbs" ) );
         int n = 0;

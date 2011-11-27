@@ -387,7 +387,7 @@ namespace mongo {
             }
             else {
                 writelock lk;
-                if ( dbHolder.isLoaded( nsToDatabase( currentOp.getNS() ) , dbpath ) ) {
+                if ( dbHolder._isLoaded( nsToDatabase( currentOp.getNS() ) , dbpath ) ) {
                     Client::Context cx( currentOp.getNS() );
                     profile(c , currentOp );
                 }
@@ -448,7 +448,7 @@ namespace mongo {
         NamespaceDetailsTransient::clearForPrefix( prefix.c_str() );
 
         dbHolder.erase( db, path );
-        ctx->clear();
+        ctx->_clear();
         delete database; // closes files
     }
 
@@ -710,6 +710,7 @@ namespace mongo {
 
     /* returns true if there is data on this server.  useful when starting replication.
        local database does NOT count except for rsoplog collection.
+       used to set the hasData field on replset heartbeat command response
     */
     bool replHasDatabases() {
         vector<string> names;

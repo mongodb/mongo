@@ -155,18 +155,13 @@ namespace mongo {
         */
         class Context : boost::noncopyable {
         public:
-            /**
-             * this is the main constructor use this unless there is a good reason not to
-             */
-            Context(const string& ns, string path=dbpath, mongolock * lock = 0 , bool doauth=true );
+            /** this is probably what you want */
+            Context(const string& ns, string path=dbpath, bool doauth=true );
 
-            /* this version saves the context but doesn't yet set the new one */
-            Context();
-
-            /**
-             * if you are doing this after allowing a write there could be a race condition
-             * if someone closes that db.  this checks that the DB is still valid
-             */
+            /** note: this does not call finishInit -- i.e., does not call 
+                      shardVersionOk() for example. 
+                see also: reset().
+            */
             Context( string ns , Database * db, bool doauth=true );
 
             ~Context();
@@ -185,10 +180,14 @@ namespace mongo {
              */
             bool inDB( const string& db , const string& path=dbpath ) const;
 
-            void clear() { _ns = ""; _db = 0; }
+            void _clear() { // this is sort of an "early destruct" indication, _ns can never be uncleared
+                const_cast<string&>(_ns).empty();
+                _db = 0;
+            }
 
             /**
              * call before unlocking, so clear any non-thread safe state
+             * _db gets restored on the relock
              */
             void unlocked() { _db = 0; }
 
@@ -210,14 +209,11 @@ namespace mongo {
 
             void _auth( int lockState = dbMutex.getState() );
 
-            Client * _client;
-            Context * _oldContext;
-
-            string _path;
-            mongolock * _lock;
+            Client * const _client;
+            Context * const _oldContext;
+            const string _path;
             bool _justCreated;
-
-            string _ns;
+            const string _ns;
             Database * _db;
         }; // class Client::Context
 #if defined(CLC)
@@ -254,6 +250,7 @@ namespace mongo {
        lock (and is thus wrong to use if you need that, which is usually).
        that said we use it today for a specific case where the usage is correct.
     */
+#if 0
     inline void mongolock::releaseAndWriteLock() {
         if( !_writelock ) {
 
@@ -275,8 +272,9 @@ namespace mongo {
                 cc().getContext()->unlocked();
         }
     }
-
+#endif
     string sayClientState();
 
     inline bool haveClient() { return currentClient.get() > 0; }
+
 };

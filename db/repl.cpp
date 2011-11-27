@@ -176,7 +176,7 @@ namespace mongo {
             BSONObjBuilder sources( result.subarrayStart( "sources" ) );
 
             readlock lk( "local.sources" );
-            Client::Context ctx( "local.sources", dbpath, 0, authed );
+            Client::Context ctx( "local.sources", dbpath, authed );
             shared_ptr<Cursor> c = findTableScan("local.sources", BSONObj());
             int n = 0;
             while ( c->ok() ) {
@@ -531,7 +531,7 @@ namespace mongo {
     }
 
     bool ReplSource::handleDuplicateDbName( const BSONObj &op, const char *ns, const char *db ) {
-        if ( dbHolder.isLoaded( ns, dbpath ) ) {
+        if ( dbHolder._isLoaded( ns, dbpath ) ) {
             // Database is already present.
             return true;   
         }

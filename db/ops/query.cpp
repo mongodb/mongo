@@ -37,6 +37,7 @@
 #include "../../s/d_logic.h"
 #include "../repl_block.h"
 #include "../../server.h"
+#include "../d_concurrency.h"
 
 namespace mongo {
 
@@ -868,9 +869,10 @@ namespace mongo {
 
         /* --- read lock --- */
 
+        //LockCollectionForReading lk(ns);
         mongolock lk(false);
 
-        Client::Context ctx( ns , dbpath , &lk );
+        Client::Context ctx( ns , dbpath );
 
         replVerifyReadsOk(pq);
 

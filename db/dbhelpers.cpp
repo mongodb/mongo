@@ -166,7 +166,7 @@ namespace mongo {
     }
 
     bool Helpers::isEmpty(const char *ns, bool doAuth) {
-        Client::Context context(ns, dbpath, NULL, doAuth);
+        Client::Context context(ns, dbpath, doAuth);
         shared_ptr<Cursor> c = DataFileMgr::findAll(ns);
         return !c->ok();
     }

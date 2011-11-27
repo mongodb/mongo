@@ -237,7 +237,7 @@ namespace mongo {
 
     bool RestAdminAccess::haveAdminUsers() const {
         readlocktryassert rl("admin.system.users", 10000);
-        Client::Context cx( "admin.system.users", dbpath, NULL, false );
+        Client::Context cx( "admin.system.users", dbpath, false );
         return ! Helpers::isEmpty("admin.system.users", false);
     }
 
@@ -260,7 +260,7 @@ namespace mongo {
         void _gotLock( int millis , stringstream& ss ) {
             ss << "<pre>\n";
             ss << "time to get readlock: " << millis << "ms\n";
-            ss << "# databases: " << dbHolder.size() << '\n';
+            ss << "# databases: " << dbHolder.sizeInfo() << '\n';
             ss << "# Cursors: " << ClientCursor::numCursors() << '\n';
             ss << "replication: ";
             if( *replInfo )

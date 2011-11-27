@@ -186,36 +186,50 @@ namespace mongo {
     }
 #endif
 
-    Client::Context::Context( string ns , Database * db, bool doauth )
-        : _client( currentClient.get() ) , _oldContext( _client->_context ) ,
-          _path( dbpath ) , _lock(0) , _justCreated(false) {
-        assert( db && db->isOk() );
-        _ns = ns;
-        _db = db;
+    Client::Context::Context( string ns , Database * db, bool doauth ) :
+        _client( currentClient.get() ), 
+        _oldContext( _client->_context ),
+        _path( mongo::dbpath ), 
+        _justCreated(false),
+        _ns( ns ), 
+        _db(db)
+    {
+        assert( db == 0 || db->isOk() );
         _client->_context = this;
         if ( doauth )
             _auth();
         _client->checkLocks();
     }
 
-    Client::Context::Context(const string& ns, string path , mongolock * lock , bool doauth )
-        : _client( currentClient.get() ) , _oldContext( _client->_context ) ,
-          _path( path ) , _lock( lock ) ,
-          _ns( ns ), _db(0) {
+    Client::Context::Context(const string& ns, string path , bool doauth ) :
+        _client( currentClient.get() ), 
+        _oldContext( _client->_context ),
+        _path( path ), 
+        _justCreated(false), // set for real in finishInit
+        _ns( ns ), 
+        _db(0) 
+    {
         _finishInit( doauth );
         _client->checkLocks();        
     }
 
     /* this version saves the context but doesn't yet set the new one: */
 
-    Client::Context::Context()
-        : _client( currentClient.get() ) , _oldContext( _client->_context ),
-          _path( dbpath ) , _lock(0) , _justCreated(false), _db(0) {
+//        Client::Context::Context() : Client::Context("",0,false) { }
+#if 0
+
+    Client::Context::Context() :
+        _client( currentClient.get() ), 
+        _oldContext( _client->_context ),
+        _path( mongo::dbpath ) , 
+        _justCreated(false), 
+        _ns(""),
+        _db(0) 
+    {
         _client->_context = this;
-        clear();
         _client->checkLocks();        
     }
-
+#endif
     void Client::Context::_finishInit( bool doauth ) {
         int lockState = dbMutex.getState();
         assert( lockState );
@@ -224,6 +238,9 @@ namespace mongo {
             uassert(14031, "Can't take a write lock while out of disk space", false);
         }
 
+        _db = dbHolder.getOrCreate( _ns , _path , _justCreated );        
+        assert(_db);
+        /*
         _db = dbHolder.get( _ns , _path );
         if ( _db ) {
             _justCreated = false;
@@ -263,6 +280,7 @@ namespace mongo {
 
             uassert( 13005 , "can't create db, keeps getting closed" , _db );
         }
+        */
 
         switch ( _client->_curOp->getOp() ) {
         case dbGetMore: // getMore's are special and should be handled else where
@@ -323,7 +341,6 @@ namespace mongo {
             b.appendTimestamp( "lastOp" , _lastOp.asDate() );
         }
     }
-
 
     string Client::clientAddress(bool includePort) const {
         if( _curOp )

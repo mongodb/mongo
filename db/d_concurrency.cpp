@@ -37,7 +37,14 @@ namespace mongo {
             return;
         Client& c = cc();
         Client::LockStatus& s = c.lockStatus;
-        wassert( c.database() == s.whichDB );
+        if( c.database() == 0 ) { 
+            wassert(false);
+            return;
+        }
+        if( c.database() != s.whichDB ) { 
+            DEV error() << "~LockDatabaseSharable wrong db context " << c.database() << ' ' << s.whichDB << endl;
+            wassert(false);
+        }
         wassert( s.dbLockCount < 0 );
         if( ++s.dbLockCount == 0 ) { 
             c.database()->dbLock.unlock_shared();
@@ -54,6 +61,7 @@ namespace mongo {
     {
         Client& c = cc();
         Client::LockStatus& s = c.lockStatus;
+        assert( c.ns() && ns && str::equals(c.ns(),ns) );
         already = false;
         if( dbMutex.isWriteLocked() || s.dbLockCount > 0 ) { 
             // already locked exclusively at a higher level in the hierarchy
@@ -62,7 +70,6 @@ namespace mongo {
             return;
         }
 
-        assert( c.ns() && ns && str::equals(c.ns(),ns) );
         if( s.collLockCount == 0 ) {
             s.whichCollection = ns;
             s.collLock.lock_shared();

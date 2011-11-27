@@ -380,7 +380,7 @@ namespace mongo {
             );
         }
         /* this unlocks, does NOT upgrade. that works for our current usage */
-        void releaseAndWriteLock();
+        //void releaseAndWriteLock();
     };
 
     /* deprecated - use writelock and readlock instead */

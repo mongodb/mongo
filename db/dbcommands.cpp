@@ -1875,7 +1875,7 @@ namespace mongo {
 
             mongolock lk( needWriteLock );
             client.curop()->ensureStarted();
-            Client::Context ctx( dbname , dbpath , &lk , c->requiresAuth() );
+            Client::Context ctx( dbname , dbpath , c->requiresAuth() );
 
             retval = _execCommand(c, dbname , cmdObj , queryOptions, result , fromRepl );
 

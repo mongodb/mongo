@@ -124,14 +124,13 @@ namespace mongo {
 #endif
 
     void NamespaceDetails::onLoad(const Namespace& k) {
-        //dump(k);
 
         if( k.isExtra() ) {
             /* overflow storage for indexes - so don't treat as a NamespaceDetails object. */
             return;
         }
 
-        DEV assertInWriteLock();
+        // we should be in dbHolderMutex here
 
         if( indexBuildInProgress || capped2.cc2_ptr ) {
             assertInWriteLock();

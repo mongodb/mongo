@@ -45,10 +45,10 @@ namespace mongo {
             // check db name is valid
             size_t L = strlen(nm);
             uassert( 10028 ,  "db name is empty", L > 0 );
+            uassert( 10032 ,  "db name too long", L < 64 );
             uassert( 10029 ,  "bad db name [1]", *nm != '.' );
             uassert( 10030 ,  "bad db name [2]", nm[L-1] != '.' );
             uassert( 10031 ,  "bad char(s) in db name", strchr(nm, ' ') == 0 );
-            uassert( 10032 ,  "db name too long", L < 64 );
         }
 
         newDb = namespaceIndex.exists();
@@ -299,7 +299,11 @@ namespace mongo {
     }
 
     Database* DatabaseHolder::getOrCreate( const string& ns , const string& path , bool& justCreated ) {
-        dbMutex.assertWriteLocked();
+        dbMutex.assertAtLeastReadLocked();
+
+        // note the full db opening, not just the map lookup, needs to be done in this lock
+        recursive_scoped_lock lk(dbHolderMutex);
+
         DBs& m = _paths[path];
 
         string dbname = _todb( ns );
@@ -321,5 +325,7 @@ namespace mongo {
         _size++;
         return db;
     }
+
+    boost::recursive_mutex& DatabaseHolder::dbHolderMutex( *(new boost::recursive_mutex()) );
 
 } // namespace mongo

@@ -63,7 +63,7 @@ namespace mongo {
         {
             const char *logns = rsoplog;
             if ( rsOplogDetails == 0 ) {
-                Client::Context ctx( logns , dbpath, 0, false);
+                Client::Context ctx( logns , dbpath, false);
                 localDB = ctx.db();
                 assert( localDB );
                 rsOplogDetails = nsdetails(logns);
@@ -167,7 +167,7 @@ namespace mongo {
         {
             const char *logns = rsoplog;
             if ( rsOplogDetails == 0 ) {
-                Client::Context ctx( logns , dbpath, 0, false);
+                Client::Context ctx( logns , dbpath, false);
                 localDB = ctx.db();
                 assert( localDB );
                 rsOplogDetails = nsdetails(logns);
@@ -229,7 +229,7 @@ namespace mongo {
         }
 
         const OpTime ts = OpTime::now();
-        Client::Context context;
+        Client::Context context("",0,false);
 
         /* we jump through a bunch of hoops here to avoid copying the obj buffer twice --
            instead we do a single copy to the destination position in the memory mapped file.
@@ -253,7 +253,7 @@ namespace mongo {
         if( logNS == 0 ) {
             logNS = "local.oplog.$main";
             if ( localOplogMainDetails == 0 ) {
-                Client::Context ctx( logNS , dbpath, 0, false);
+                Client::Context ctx( logNS , dbpath, false);
                 localDB = ctx.db();
                 assert( localDB );
                 localOplogMainDetails = nsdetails(logNS);
@@ -263,7 +263,7 @@ namespace mongo {
             r = theDataFileMgr.fast_oplog_insert(localOplogMainDetails, logNS, len);
         }
         else {
-            Client::Context ctx( logNS, dbpath, 0, false );
+            Client::Context ctx( logNS, dbpath, false );
             assert( nsdetails( logNS ) );
             // first we allocate the space, then we fill it below.
             r = theDataFileMgr.fast_oplog_insert( nsdetails( logNS ), logNS, len);

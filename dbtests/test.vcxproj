@@ -226,6 +226,7 @@
     <ClInclude Include="..\bson\ordering.h" />
     <ClInclude Include="..\bson\stringdata.h" />
     <ClInclude Include="..\db\collection.h" />
+    <ClInclude Include="..\db\databaseholder.h" />
     <ClInclude Include="..\db\dur.h" />
     <ClInclude Include="..\db\durop.h" />
     <ClInclude Include="..\db\dur_journal.h" />
