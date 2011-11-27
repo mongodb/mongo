@@ -377,11 +377,16 @@ namespace mongo {
                     massert(13640, str::stream() << "DataFileHeader looks corrupt at file open filelength:" << filelength << " fileno:" << fileno, false);
                 }
 
-                DEV { 
+                { 
                     if( !dbMutex.isWriteLocked() ) { 
+                        log() << "*** TEMP NOT INITIALIZING FILE " << filename << ", not in a write lock." << endl;
+                        log() << "temp bypass until more elaborate change - case that is manifesting is benign anyway" << endl;
+                        return;
+/**
                         log() << "ERROR can't create outside a write lock" << endl;
                         printStackTrace();
                         ::abort();
+**/
                     }
                 }
 
