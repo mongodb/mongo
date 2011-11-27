@@ -36,7 +36,7 @@ namespace mongo {
         virtual void close();
 
         /** @return true if opened ok. */
-        bool open(string fname, bool sequentialHint);
+        bool open(string fname, bool sequentialHint /*typically we open with this false*/);
 
         /** @return file length */
         unsigned long long length() const { return MemoryMappedFile::length(); }
