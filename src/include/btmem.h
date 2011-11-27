@@ -219,9 +219,11 @@ struct __wt_page {
 
 	/*
 	 * The flags are divided into two sets: flags set initially, before more
-	 * than a single thread accesses the page and the reconciliation flags.
-	 * It has to be that way, otherwise testing and setting the flags could
-	 * race.
+	 * than a single thread accesses the page, and the reconciliation flags.
+	 * The alternative would be to move the WT_PAGE_REC_XXX flags into the
+	 * WT_PAGE_MODIFY structure, but that costs more memory.  Obviously, it
+	 * is important not to add more flags that can be set at run-time, else
+	 * the threads could race.
 	 */
 #define	WT_PAGE_BUILD_KEYS	0x001	/* Keys have been built in memory */
 #define	WT_PAGE_BULK_LOAD	0x002	/* Page bulk loaded */
