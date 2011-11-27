@@ -367,8 +367,7 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 		WT_SET_BTREE_IN_SESSION(session, er->btree);
 
 		if (F_ISSET(er, WT_EVICT_REQ_PAGE))
-			ret = __wt_page_reconcile(session,
-			    er->page, WT_REC_WAIT);
+			ret = __wt_rec_evict(session, er->page, WT_REC_WAIT);
 		else
 			ret = __evict_file(session, er);
 
@@ -402,11 +401,8 @@ __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 {
 	WT_BTREE *btree;
 	WT_PAGE *next_page, *page;
-	uint32_t flags;
 
 	btree = session->btree;
-	flags = F_ISSET(er, WT_EVICT_REQ_CLOSE) ?
-	    WT_REC_EVICT | WT_REC_LOCKED : 0;
 
 	WT_VERBOSE(session, EVICTSERVER,
 	    "eviction: %s file request: %s",
@@ -444,10 +440,10 @@ __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 		 */
 		if (F_ISSET(er, WT_EVICT_REQ_CLOSE))
 			WT_RET(__wt_rec_evict(session, page, WT_REC_SINGLE));
+		else if (F_ISSET(page, WT_PAGE_FORCE_EVICT))
+			WT_RET(__wt_rec_evict(session, page, WT_REC_WAIT));
 		else if (__wt_page_is_modified(page))
-			WT_RET(__wt_rec_write(session,
-			    page, NULL, flags | F_ISSET(page,
-			    WT_PAGE_FORCE_EVICT) ? WT_REC_WAIT : 0));
+			WT_RET(__wt_rec_write(session, page, NULL));
 	}
 
 	return (0);

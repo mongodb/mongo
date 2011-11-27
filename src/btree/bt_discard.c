@@ -189,12 +189,8 @@ __free_page_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		if (WT_ROW_REF_STATE(rref) != WT_REF_DISK)
 			__wt_page_out(session, WT_ROW_REF_PAGE(rref), 0);
 		if ((ikey = rref->key) != NULL)
-<<<<<<< local
 			__wt_sb_free(session, ikey->sb, ikey);
-=======
-			__wt_sb_free(session, ikey->sb);
 	}
->>>>>>> other
 
 	/* Free the subtree-reference array. */
 	__wt_free(session, page->u.row_int.t);

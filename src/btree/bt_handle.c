@@ -304,6 +304,7 @@ __wt_btree_root_init(WT_SESSION_IMPL *session)
 		WT_RET(__wt_row_ikey_alloc(session, 0, "", 1,
 		    (WT_IKEY **)&((WT_ROW_REF *)ref)->key));
 		break;
+	WT_ILLEGAL_FORMAT(session);
 	}
 	page->entries = 1;
 	page->parent = NULL;
@@ -339,7 +340,7 @@ __wt_btree_root_init(WT_SESSION_IMPL *session)
 	ref->addr = WT_ADDR_INVALID;
 	ref->size = 0;
 	ref->page = page;
-	F_SET(page, WT_PAGE_DELETED | WT_PAGE_EMPTY_TREE);
+	F_SET(page, WT_PAGE_REC_EMPTY | WT_PAGE_EMPTY_TREE);
 	return (0);
 }
 
@@ -372,7 +373,7 @@ __wt_btree_root_free(WT_SESSION_IMPL *session)
 	}
 
 	child = ref->page;
-	if (child == NULL || !F_ISSET(child, WT_PAGE_DELETED))
+	if (child == NULL || !F_ISSET(child, WT_PAGE_REC_EMPTY))
 		return (WT_ERROR);
 
 	__wt_page_out(session, child, 0);

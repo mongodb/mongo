@@ -596,7 +596,7 @@ __rec_subtree(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 		if ((ret = __rec_subtree_row(session, page, flags)) != 0)
 			if (!LF_ISSET(WT_REC_SINGLE))
 		break;
-	default:
+	WT_ILLEGAL_FORMAT(session);
 		break;
 	}
 
@@ -604,7 +604,7 @@ __rec_subtree(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 * If we're not going to reconcile this page, release our exclusive
 	 * reference.
 	 */
-	if (ret != 0 && !single)
+	if (ret != 0 && !LF_ISSET(WT_REC_SINGLE))
 		page->parent_ref->state = WT_REF_MEM;
 
 	return (ret);
