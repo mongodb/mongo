@@ -80,6 +80,7 @@ mongobridge
 mongostat
 mongotop
 mongooplog
+mongoperf
 bsondump
 
 *.tgz
