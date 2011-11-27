@@ -134,16 +134,6 @@ __wt_page_set_modified(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* The page is dirty if the disk and write generations differ. */
 	++page->modify->write_gen;
 
-	/*
-	 * Clear the page-is-empty flag, this page may not be empty.  If we did
-	 * not clear this flag, we'd check when evicting the page's parent to
-	 * see if the page is "empty and also not dirty", instead of checking
-	 * only if the page is empty.  That's a cheap test, but this way we can
-	 * figure out if this page requires reconciliation earlier than when we
-	 * are trying to evict its parent.
-	 */
-	F_CLR(page, WT_PAGE_REC_EMPTY);
-
 	return (0);
 }
 

@@ -17,6 +17,8 @@ static int  __rec_parent_dirty_update(WT_SESSION_IMPL *, WT_PAGE *, int);
 static int  __rec_subtree(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
 static int  __rec_subtree_col(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
 static void __rec_subtree_col_clear(WT_SESSION_IMPL *, WT_PAGE *);
+static int  __rec_subtree_page(
+		WT_SESSION_IMPL *, WT_REF *, WT_PAGE *, uint32_t);
 static int  __rec_subtree_row(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
 static void __rec_subtree_row_clear(WT_SESSION_IMPL *, WT_PAGE *);
 
@@ -36,20 +38,12 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	    __wt_page_type_string(page->type));
 
 	/*
-	 * We're only interested in normal pages, except the root has to be
-	 * evicted regardless.
-	 */
-	WT_ASSERT(session,
-	    WT_PAGE_IS_ROOT(page) ||
-	    !F_ISSET(page, WT_PAGE_REC_EMPTY | WT_PAGE_REC_SPLIT));
-
-	/*
 	 * Get exclusive access to the page and review the page's subtree for
 	 * in-memory pages that would block our eviction of the page.  If the
-	 * check fails (for example, we find child page that can't be merged),
+	 * check fails (for example, we find a child page that can't be merged),
 	 * we're done.
 	 */
-	WT_RET(__rec_subtree(session, page, LF_ISSET(WT_REC_SINGLE) ? 1 : 0));
+	WT_RET(__rec_subtree(session, page, flags));
 
 	if (page->modify == NULL) {
 		/*
@@ -260,8 +254,9 @@ __rec_subtree(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	case WT_PAGE_ROW_INT:
 		if ((ret = __rec_subtree_row(session, page, flags)) != 0)
 			if (!LF_ISSET(WT_REC_SINGLE))
+				__rec_subtree_row_clear(session, page);
 		break;
-	WT_ILLEGAL_FORMAT(session);
+	default:
 		break;
 	}
 
@@ -301,52 +296,7 @@ __rec_subtree_col(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t flags)
 		}
 		page = WT_COL_REF_PAGE(cref);
 
-		/*
-		 * We found an in-memory page: if the page won't be merged into
-		 * its parent, then we can't evict the top-level page.  This is
-		 * not a problem, it just means we chose badly when selecting a
-		 * page for eviction.
-		 */
-		if (!F_ISSET(page, WT_PAGE_REC_EMPTY | WT_PAGE_REC_SPLIT))
-			return (1);
-
-		/*
-		 * Another thread of control could be running in this page: get
-		 * exclusive access to the page if our caller doesn't have the
-		 * tree locked down.
-		 */
-		if (!LF_ISSET(WT_REC_SINGLE))
-			WT_RET(__hazard_exclusive(session, &cref->ref, flags));
-
-		/*
-		 * Split pages are always merged into the parent regardless of
-		 * their contents, but a deleted page might have changed state
-		 * while we waited for exclusive access.   In other words, we
-		 * had exclusive access to the parent, but another thread had
-		 * a hazard reference to the deleted page in the parent's tree:
-		 * while we waited, that thread inserted new material, and the
-		 * deleted page became an in-memory page we can't merge, it has
-		 * to be reconciled on its own.
-		 *
-		 * We fail if this happens, we can't evict the original page.
-		 */
-		if (!F_ISSET(page, WT_PAGE_REC_EMPTY | WT_PAGE_REC_SPLIT))
-			return (1);
-
-		/*
-		 * Overflow items on deleted pages are also discarded when
-		 * reconciliation completes.
-		 */
-		if (F_ISSET(page, WT_PAGE_REC_EMPTY))
-			switch (page->type) {
-			case WT_PAGE_COL_FIX:
-			case WT_PAGE_COL_INT:
-				break;
-			case WT_PAGE_COL_VAR:
-				WT_RET(__rec_ovfl_delete(session, page));
-				break;
-			WT_ILLEGAL_FORMAT(session);
-			}
+		WT_RET(__rec_subtree_page(session, &cref->ref, page, flags));
 
 		/* Recurse down the tree. */
 		if (page->type == WT_PAGE_COL_INT)
@@ -381,8 +331,8 @@ __rec_subtree_col_clear(WT_SESSION_IMPL *session, WT_PAGE *parent)
 
 /*
  * __rec_subtree_row --
- *	Walk a row-store internal page's subtree, handle deleted and split
- *	pages.
+ *	Walk a row-store internal page's subtree, and acquiring exclusive access
+ * as necessary and checking if the subtree can be evicted.
  */
 static int
 __rec_subtree_row(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t flags)
@@ -405,50 +355,7 @@ __rec_subtree_row(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t flags)
 		}
 		page = WT_ROW_REF_PAGE(rref);
 
-		/*
-		 * We found an in-memory page: if the page won't be merged into
-		 * its parent, then we can't evict the top-level page.  This is
-		 * not a problem, it just means we chose badly when selecting a
-		 * page for eviction.
-		 */
-		if (!F_ISSET(page, WT_PAGE_REC_EMPTY | WT_PAGE_REC_SPLIT))
-			return (1);
-
-		/*
-		 * Another thread of control could be running in this page: get
-		 * exclusive access to the page if our caller doesn't have the
-		 * tree locked down.
-		 */
-		if (!LF_ISSET(WT_REC_SINGLE))
-			WT_RET(__hazard_exclusive(session, &rref->ref, flags));
-
-		/*
-		 * Split pages are always merged into the parent regardless of
-		 * their contents, but a deleted page might have changed state
-		 * while we waited for exclusive access.   In other words, we
-		 * had exclusive access to the parent, but another thread had
-		 * a hazard reference to the deleted page in the parent's tree:
-		 * while we waited, that thread inserted new material, and the
-		 * deleted page became an in-memory page we can't merge, it has
-		 * to be reconciled on its own.
-		 *
-		 * We fail if this happens, we can't evict the original page.
-		 */
-		if (!F_ISSET(page, WT_PAGE_REC_EMPTY | WT_PAGE_REC_SPLIT))
-			return (1);
-
-		/*
-		 * Overflow items on deleted pages are also discarded when
-		 * reconciliation completes.
-		 */
-		if (F_ISSET(page, WT_PAGE_REC_EMPTY))
-			switch (page->type) {
-			case WT_PAGE_ROW_INT:
-			case WT_PAGE_ROW_LEAF:
-				WT_RET(__rec_ovfl_delete(session, page));
-				break;
-			WT_ILLEGAL_FORMAT(session);
-			}
+		WT_RET(__rec_subtree_page(session, &rref->ref, page, flags));
 
 		/* Recurse down the tree. */
 		if (page->type == WT_PAGE_ROW_INT)
@@ -479,6 +386,56 @@ __rec_subtree_row_clear(WT_SESSION_IMPL *session, WT_PAGE *parent)
 			if (page->type == WT_PAGE_ROW_INT)
 				__rec_subtree_row_clear(session, page);
 		}
+}
+
+/*
+ * __rec_subtree_page --
+ *	Acquire exclusive access to a page as necessary, and check if the page
+ * can be evicted.
+ */
+static int
+__rec_subtree_page(
+    WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *page, uint32_t flags)
+{
+	/*
+	 * An in-memory page: if the page can't be merged into its parent, then
+	 * we can't evict the subtree.  This is not a problem, it just means we
+	 * chose badly when selecting a page for eviction.
+	 *
+	 * The test is for dirty pages (which must be written before we can know
+	 * what they will look like during their parent eviction), and for empty
+	 * or split pages.
+	 */
+	if (__wt_page_is_modified(page) ||
+	    !F_ISSET(page, WT_PAGE_REC_EMPTY | WT_PAGE_REC_SPLIT))
+		return (1);
+
+	/*
+	 * Another thread of control could be using this page: get exclusive
+	 * access to the page if our caller doesn't have the tree locked down,
+	 * and test again.
+	 */
+	if (!LF_ISSET(WT_REC_SINGLE)) {
+		WT_RET(__hazard_exclusive(session, ref, flags));
+
+		if (__wt_page_is_modified(page) ||
+		    !F_ISSET(page, WT_PAGE_REC_EMPTY | WT_PAGE_REC_SPLIT))
+			return (1);
+	}
+
+	/*
+	 * Overflow items on deleted pages are discarded when reconciliation
+	 * completes.
+	 */
+	if (F_ISSET(page, WT_PAGE_REC_EMPTY))
+		switch (page->type) {
+		case WT_PAGE_ROW_INT:
+		case WT_PAGE_ROW_LEAF:
+			WT_RET(__rec_ovfl_delete(session, page));
+			break;
+		WT_ILLEGAL_FORMAT(session);
+		}
+	return (0);
 }
 
 /*

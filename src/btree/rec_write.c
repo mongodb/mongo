@@ -214,13 +214,7 @@ __wt_rec_write(
 
 	WT_BSTAT_INCR(session, rec_written);
 
-	/*
-	 * We're only interested in normal, dirty pages, except the root has to
-	 * be written regardless.
-	 */
-	WT_ASSERT(session,
-	    WT_PAGE_IS_ROOT(page) ||
-	    !F_ISSET(page, WT_PAGE_REC_EMPTY | WT_PAGE_REC_SPLIT));
+	/* We're only interested in dirty pages. */
 	WT_ASSERT(session, __wt_page_is_modified(page));
 
 	/* Update the disk generation before we read anything from the page. */
@@ -2600,7 +2594,6 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 	page->read_gen = __wt_cache_read_gen(session);
 	page->entries = r->bnd_next;
 	page->type = WT_PAGE_ROW_INT;
-	WT_ERR(__wt_page_set_modified(session, page));
 
 	/*
 	 * Newly created internal pages are not persistent as we don't want the
@@ -2662,7 +2655,6 @@ __rec_split_col(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 	page->u.col_int.recno = r->bnd[0].recno;
 	page->entries = r->bnd_next;
 	page->type = WT_PAGE_COL_INT;
-	WT_ERR(__wt_page_set_modified(session, page));
 
 	/*
 	 * Newly created internal pages are not persistent as we don't want the
