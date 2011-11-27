@@ -201,163 +201,6 @@ __wt_rec_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __rec_split_root --
- *	Split the root page.
- */
-static int
-__rec_split_root(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_BOUNDARY *bnd;
-	WT_BTREE *btree;
-	WT_RECONCILE *r;
-
-	r = session->btree->reconcile;
-	btree = session->btree;
-
-	/*
-	 * Do the minimum work necessary to make the page look real enough to
-	 * write, and write it.
-	 */
-	WT_RET(__rec_write_init(session, page, NULL));
-	WT_RET(__rec_row_int(session, page));
-
-	bnd = &r->bnd[0];
-	WT_VERBOSE(session, RECONCILE,
-	    "reconcile: split root %" PRIu32 " to %" PRIu32
-	    ", (%" PRIu32 " %s %" PRIu32 ")",
-	    btree->root_page.addr, bnd->off.addr,
-	    btree->root_page.size,
-	    btree->root_page.size == bnd->off.size ? "==" :
-	    (btree->root_page.size < bnd->off.size ? ">>" : "<<"),
-	    bnd->off.size);
-
-	btree->root_page.addr = bnd->off.addr;
-	btree->root_page.size = bnd->off.size;
-	return (0);
-}
-
-/*
- * __rec_incr --
- *	Update the memory tracking structure for a set of new entries.
- */
-static inline void
-__rec_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t v, uint32_t size)
-{
-	/*
-	 * The buffer code is fragile and prone to off-by-one errors -- check
-	 * for overflow in diagnostic mode.
-	 */
-	WT_ASSERT(session, r->space_avail >= size);
-	WT_ASSERT(session,
-	    WT_BLOCK_FITS(r->first_free, size, r->dsk.mem, r->page_size));
-
-	r->entries += v;
-	r->space_avail -= size;
-	r->first_free += size;
-}
-
-/*
- * __rec_copy_incr --
- *	Copy a key/value cell and buffer pair into the new image.
- */
-static inline void
-__rec_copy_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_KV *kv)
-{
-	uint32_t len;
-	uint8_t *p, *t;
-
-	/*
-	 * If there's only one chunk of data to copy (because the cell and data
-	 * are being copied from the original disk page), the cell length won't
-	 * be set, the WT_BUF data/length will reference the data to be copied.
-	 *
-	 * WT_CELLs are typically small, 1 or 2 bytes -- don't call memcpy, do
-	 * the copy in-line.
-	 */
-	for (p = (uint8_t *)r->first_free,
-	    t = (uint8_t *)&kv->cell, len = kv->cell_len; len > 0; --len)
-		*p++ = *t++;
-
-	/* The data can be quite large -- call memcpy. */
-	if (kv->buf.size != 0)
-		memcpy(p, kv->buf.data, kv->buf.size);
-
-	WT_ASSERT(session, kv->len == kv->cell_len + kv->buf.size);
-	__rec_incr(session, r, 1, kv->len);
-}
-
-/*
- * __rec_key_state_update --
- *	Update prefix and suffix compression based on the last key.
- */
-static inline void
-__rec_key_state_update(WT_RECONCILE *r, int ovfl_key)
-{
-	WT_BUF *a;
-
-	/*
-	 * If writing an overflow key onto the page, don't update the "last key"
-	 * value, and leave the state of prefix compression alone.  (If we are
-	 * currently doing prefix compression, we have a key state which will
-	 * continue to work, we're just skipping the key just created because
-	 * it's an overflow key and doesn't participate in prefix compression.
-	 * If we are not currently doing prefix compression, we can't start, an
-	 * overflow key doesn't give us any state.)
-	 *
-	 * Additionally, if we wrote an overflow key onto the page, turn off the
-	 * suffix compression of row-store internal node keys.  (When we split,
-	 * "last key" is the largest key on the previous page, and "cur key" is
-	 * the first key on the next page, which is being promoted.  In some
-	 * cases we can discard bytes from the "cur key" that are not needed to
-	 * distinguish between the "last key" and "cur key", compressing the
-	 * size of keys on internal nodes.  If we just built an overflow key,
-	 * we're not going to update the "last key", making suffix compression
-	 * impossible for the next key.   Alternatively, we could remember where
-	 * the last key was on the page, detect it's an overflow key, read it
-	 * from disk and do suffix compression, but that's too much work for an
-	 * unlikely event.)
-	 *
-	 * If we're not writing an overflow key on the page, update the last-key
-	 * value and turn on both prefix and suffix compression.
-	 */
-	if (ovfl_key)
-		r->key_sfx_compress = 0;
-	else {
-		a = r->cur;
-		r->cur = r->last;
-		r->last = a;
-
-		r->key_pfx_compress = r->key_pfx_compress_conf;
-		r->key_sfx_compress = r->key_sfx_compress_conf;
-	}
-}
-
-/*
- * __rec_split_bnd_grow --
- *	Grow the boundary array as necessary.
- */
-static inline int
-__rec_split_bnd_grow(WT_SESSION_IMPL *session)
-{
-	WT_RECONCILE *r;
-
-	r = session->btree->reconcile;
-
-	/*
-	 * Make sure there's enough room in which to save another boundary.
-	 *
-	 * The calculation is actually +1, because we save the start point one
-	 * past the current entry -- make it +20 so we don't grow slot-by-slot.
-	 */
-	if (r->bnd_next + 1 >= r->bnd_entries) {
-		WT_RET(__wt_realloc(session, &r->bnd_allocated,
-		    (r->bnd_entries + 20) * sizeof(*r->bnd), &r->bnd));
-		r->bnd_entries += 20;
-	}
-	return (0);
-}
-
-/*
  * __wt_rec_write --
  *	Reconcile an in-memory page into its on-disk format, and write it.
  */
@@ -518,6 +361,163 @@ __wt_rec_destroy(WT_SESSION_IMPL *session)
 	__wt_buf_free(session, &r->_last);
 
 	__wt_free(session, session->btree->reconcile);
+}
+
+/*
+ * __rec_split_root --
+ *	Split the root page.
+ */
+static int
+__rec_split_root(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_BOUNDARY *bnd;
+	WT_BTREE *btree;
+	WT_RECONCILE *r;
+
+	r = session->btree->reconcile;
+	btree = session->btree;
+
+	/*
+	 * Do the minimum work necessary to make the page look real enough to
+	 * write, and write it.
+	 */
+	WT_RET(__rec_write_init(session, page, NULL));
+	WT_RET(__rec_row_int(session, page));
+
+	bnd = &r->bnd[0];
+	WT_VERBOSE(session, RECONCILE,
+	    "reconcile: split root %" PRIu32 " to %" PRIu32
+	    ", (%" PRIu32 " %s %" PRIu32 ")",
+	    btree->root_page.addr, bnd->off.addr,
+	    btree->root_page.size,
+	    btree->root_page.size == bnd->off.size ? "==" :
+	    (btree->root_page.size < bnd->off.size ? ">>" : "<<"),
+	    bnd->off.size);
+
+	btree->root_page.addr = bnd->off.addr;
+	btree->root_page.size = bnd->off.size;
+	return (0);
+}
+
+/*
+ * __rec_incr --
+ *	Update the memory tracking structure for a set of new entries.
+ */
+static inline void
+__rec_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, uint32_t v, uint32_t size)
+{
+	/*
+	 * The buffer code is fragile and prone to off-by-one errors -- check
+	 * for overflow in diagnostic mode.
+	 */
+	WT_ASSERT(session, r->space_avail >= size);
+	WT_ASSERT(session,
+	    WT_BLOCK_FITS(r->first_free, size, r->dsk.mem, r->page_size));
+
+	r->entries += v;
+	r->space_avail -= size;
+	r->first_free += size;
+}
+
+/*
+ * __rec_copy_incr --
+ *	Copy a key/value cell and buffer pair into the new image.
+ */
+static inline void
+__rec_copy_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_KV *kv)
+{
+	uint32_t len;
+	uint8_t *p, *t;
+
+	/*
+	 * If there's only one chunk of data to copy (because the cell and data
+	 * are being copied from the original disk page), the cell length won't
+	 * be set, the WT_BUF data/length will reference the data to be copied.
+	 *
+	 * WT_CELLs are typically small, 1 or 2 bytes -- don't call memcpy, do
+	 * the copy in-line.
+	 */
+	for (p = (uint8_t *)r->first_free,
+	    t = (uint8_t *)&kv->cell, len = kv->cell_len; len > 0; --len)
+		*p++ = *t++;
+
+	/* The data can be quite large -- call memcpy. */
+	if (kv->buf.size != 0)
+		memcpy(p, kv->buf.data, kv->buf.size);
+
+	WT_ASSERT(session, kv->len == kv->cell_len + kv->buf.size);
+	__rec_incr(session, r, 1, kv->len);
+}
+
+/*
+ * __rec_key_state_update --
+ *	Update prefix and suffix compression based on the last key.
+ */
+static inline void
+__rec_key_state_update(WT_RECONCILE *r, int ovfl_key)
+{
+	WT_BUF *a;
+
+	/*
+	 * If writing an overflow key onto the page, don't update the "last key"
+	 * value, and leave the state of prefix compression alone.  (If we are
+	 * currently doing prefix compression, we have a key state which will
+	 * continue to work, we're just skipping the key just created because
+	 * it's an overflow key and doesn't participate in prefix compression.
+	 * If we are not currently doing prefix compression, we can't start, an
+	 * overflow key doesn't give us any state.)
+	 *
+	 * Additionally, if we wrote an overflow key onto the page, turn off the
+	 * suffix compression of row-store internal node keys.  (When we split,
+	 * "last key" is the largest key on the previous page, and "cur key" is
+	 * the first key on the next page, which is being promoted.  In some
+	 * cases we can discard bytes from the "cur key" that are not needed to
+	 * distinguish between the "last key" and "cur key", compressing the
+	 * size of keys on internal nodes.  If we just built an overflow key,
+	 * we're not going to update the "last key", making suffix compression
+	 * impossible for the next key.   Alternatively, we could remember where
+	 * the last key was on the page, detect it's an overflow key, read it
+	 * from disk and do suffix compression, but that's too much work for an
+	 * unlikely event.)
+	 *
+	 * If we're not writing an overflow key on the page, update the last-key
+	 * value and turn on both prefix and suffix compression.
+	 */
+	if (ovfl_key)
+		r->key_sfx_compress = 0;
+	else {
+		a = r->cur;
+		r->cur = r->last;
+		r->last = a;
+
+		r->key_pfx_compress = r->key_pfx_compress_conf;
+		r->key_sfx_compress = r->key_sfx_compress_conf;
+	}
+}
+
+/*
+ * __rec_split_bnd_grow --
+ *	Grow the boundary array as necessary.
+ */
+static inline int
+__rec_split_bnd_grow(WT_SESSION_IMPL *session)
+{
+	WT_RECONCILE *r;
+
+	r = session->btree->reconcile;
+
+	/*
+	 * Make sure there's enough room in which to save another boundary.
+	 *
+	 * The calculation is actually +1, because we save the start point one
+	 * past the current entry -- make it +20 so we don't grow slot-by-slot.
+	 */
+	if (r->bnd_next + 1 >= r->bnd_entries) {
+		WT_RET(__wt_realloc(session, &r->bnd_allocated,
+		    (r->bnd_entries + 20) * sizeof(*r->bnd), &r->bnd));
+		r->bnd_entries += 20;
+	}
+	return (0);
 }
 
 /*
