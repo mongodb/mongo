@@ -1087,7 +1087,7 @@ mongod = env.Program( "mongod" , commonFiles + coreDbFiles + coreServerFiles + s
 Default( mongod )
 
 # tools
-allToolFiles = commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + [ "client/gridfs.cpp", "tools/tool.cpp" ]
+allToolFiles = commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + [ "client/gridfs.cpp", "tools/tool.cpp" , "tools/stat_util.cpp" ]
 normalTools = [ "dump" , "restore" , "export" , "import" , "files" , "stat" , "top" , "oplog" ]
 env.Alias( "tools" , [ add_exe( "mongo" + x ) for x in normalTools ] )
 for x in normalTools:
