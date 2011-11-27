@@ -22,11 +22,8 @@
 #insert_pct
 #	percent operations that are inserts
 
-#intl_node_max
+#internal_page_max
 #	maximum size of Btree internal nodes
-
-#intl_node_min
-#	minimum size of Btree internal nodes
 
 #key_max
 #	maximum size of keys
@@ -34,17 +31,17 @@
 #key_min
 #	minimum size of keys
 
-#leaf_node_max
+#leaf_page_max
 #	maximum size of Btree leaf nodes
-
-#leaf_node_min
-#	minimum size of Btree leaf nodes
 
 #ops
 #	the number of modification operations done per run
 
 #repeat_data_pct
-#	percent duplicate values in variable-length column-store files
+#	percent duplicate values in variable-len column-store files
+
+#reverse
+#	collate in reverse order
 
 #rows
 #	the number of rows to create
