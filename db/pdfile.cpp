@@ -367,6 +367,33 @@ namespace mongo {
         return size;
     }
 
+    static void check(void *p) { 
+        if( sizeof(char *) == 4 )
+            uassert( 10084 , "can't map file memory - mongo requires 64 bit build for larger datasets", _mb != 0);
+        else
+            uassert( 10085 , "can't map file memory", _mb != 0);
+    }
+
+    /** @return true if found and opened. if uninitialized (prealloc only) does not open. */
+    bool MongoDataFile::openExisting( const char *filename ) {
+        assert( _mb == 0 );
+        if( !exists(filename) )
+            return false;
+        if( !mmf.open(filename,false) ) {
+            dlog(2) << "info couldn't open " << filename << " probably end of datafile list" << endl;
+            return false;
+        }
+        _mb = mmf.getView(); assert(_mb);
+        unsigned long long sz = mmf.length();
+        assert( sz <= 0x7fffffff );
+        assert( sz % 4096 == 0 );
+        assert( sz >= 64*1024*1024 || cmdLine.smallfiles );
+        check(_mb);
+        if( header()->uninitialized() )
+            return false;
+        return true;
+    }
+
     void MongoDataFile::open( const char *filename, int minSize, bool preallocateOnly ) {
         long size = defaultSize( filename );
         while ( size < minSize ) {
@@ -398,11 +425,7 @@ namespace mongo {
             assert( sz <= 0x7fffffff );
             size = (int) sz;
         }
-        //header = (DataFileHeader *) _p;
-        if( sizeof(char *) == 4 )
-            uassert( 10084 , "can't map file memory - mongo requires 64 bit build for larger datasets", _mb != 0);
-        else
-            uassert( 10085 , "can't map file memory", _mb != 0);
+        check(_mb);
         header()->init(fileNo, size, filename);
     }
 

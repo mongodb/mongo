@@ -62,15 +62,18 @@ namespace mongo {
          */
         long long fileSize() const;
 
-        int numFiles() const { return (int)files.size(); }
+        int numFiles() const;
 
         /**
          * returns file valid for file number n
          */
         boost::filesystem::path fileName( int n ) const;
 
-        bool exists(int n) const { return boost::filesystem::exists( fileName( n ) ); }
+    private:
+        bool exists(int n) const;
+        bool openExistingFile( int n );
 
+    public:
         /**
          * return file n.  if it doesn't exist, create it
          */
@@ -95,7 +98,7 @@ namespace mongo {
          */
         bool setProfilingLevel( int newLevel , string& errmsg );
 
-        void flushFiles( bool sync ) const;
+        void flushFiles( bool sync );
 
         /**
          * @return true if ns is part of the database
@@ -120,11 +123,18 @@ namespace mongo {
          */
         static string duplicateUncasedName( const string &name, const string &path, set< string > *duplicates = 0 );
         
-    public: // this should be private later
-
-        vector<MongoDataFile*> files;
         const string name; // "alleyinsider"
         const string path;
+
+    private:
+
+        // must be in the dbLock when touching this (and write locked when writing to of course)
+        // however during Database object construction we aren't, which is ok as it isn't yet visible
+        //   to others and we are in the dbholder lock then.
+        vector<MongoDataFile*> _files;
+
+    public: // this should be private later
+
         NamespaceIndex namespaceIndex;
         int profile; // 0=off.
         const string profileName; // "alleyinsider.system.profile"

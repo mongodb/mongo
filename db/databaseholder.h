@@ -13,11 +13,7 @@ namespace mongo {
     public:
         DatabaseHolder() : _size(0) { }
 
-        // must be write locked as otherwise isLoaded could go false->true on you 
-        // in the background and you might not expect that.  underscore prefix
-        // on 'isLoaded' to indicate that slight voodoo
-        bool _isLoaded( const string& ns , const string& path ) const {
-            dbMutex.assertWriteLocked();
+        bool __isLoaded( const string& ns , const string& path ) const {
             Paths::const_iterator x = _paths.find( path );
             if ( x == _paths.end() )
                 return false;
@@ -28,6 +24,12 @@ namespace mongo {
             DBs::const_iterator it = m.find(db);
             return it != m.end();
         }
+        // must be write locked as otherwise isLoaded could go false->true on you 
+        // in the background and you might not expect that.
+        bool _isLoaded( const string& ns , const string& path ) const {
+            dbMutex.assertWriteLocked();
+            return __isLoaded(ns,path);
+        }
 
         Database * get( const string& ns , const string& path ) const {
             dbMutex.assertAtLeastReadLocked();
@@ -36,16 +38,14 @@ namespace mongo {
             if ( x == _paths.end() )
                 return 0;
             const DBs& m = x->second;
-
             string db = _todb( ns );
-
             DBs::const_iterator it = m.find(db);
             if ( it != m.end() )
                 return it->second;
             return 0;
         }
 
-        void put( const string& ns , const string& path , Database * db ) {
+        void _put( const string& ns , const string& path , Database * db ) {
             dbMutex.assertAtLeastReadLocked();
             recursive_scoped_lock lk(dbHolderMutex);
             DBs& m = _paths[path];
@@ -105,13 +105,11 @@ namespace mongo {
         static boost::recursive_mutex& dbHolderMutex;
 
     private:
-
         static string _todb( const string& ns ) {
             string d = __todb( ns );
             uassert( 13280 , (string)"invalid db name: " + ns , NamespaceString::validDBName( d ) );
             return d;
         }
-
         static string __todb( const string& ns ) {
             size_t i = ns.find( '.' );
             if ( i == string::npos ) {
@@ -121,10 +119,8 @@ namespace mongo {
             uassert( 13075 , "db name can't be empty" , i > 0 );
             return ns.substr( 0 , i );
         }
-
         Paths _paths;
         int _size;
-
     };
 
     extern DatabaseHolder dbHolder;
