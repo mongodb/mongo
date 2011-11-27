@@ -63,7 +63,7 @@ namespace mongo {
         MongoDataFile(int fn) : _mb(0), fileNo(fn) { }
 
         /** @return true if found and opened. if uninitialized (prealloc only) does not open. */
-        bool MongoDataFile::openExisting( const char *filename );
+        bool openExisting( const char *filename );
 
         /** creates if DNE */
         void open(const char *filename, int requestedDataSize = 0, bool preallocateOnly = false);

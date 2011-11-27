@@ -155,7 +155,7 @@ namespace mongo {
         }
 
         {
-            if( n < _files.size() && _files[n] ) {
+            if( n < (int) _files.size() && _files[n] ) {
                 dlog(2) << "openExistingFile " << n << " is already open" << endl;
                 return true;
             }
