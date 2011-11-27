@@ -31,7 +31,6 @@ src/btree/bt_misc.c
 src/btree/bt_ovfl.c
 src/btree/bt_page.c
 src/btree/bt_read.c
-src/btree/bt_reconcile.c
 src/btree/bt_ret.c
 src/btree/bt_salvage.c
 src/btree/bt_stat.c
@@ -41,6 +40,8 @@ src/btree/bt_vrfy_dsk.c
 src/btree/bt_walk.c
 src/btree/col_modify.c
 src/btree/col_srch.c
+src/btree/rec_evict.c
+src/btree/rec_write.c
 src/btree/row_key.c
 src/btree/row_modify.c
 src/btree/row_srch.c
