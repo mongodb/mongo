@@ -551,13 +551,15 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 	i = restarted_once = 0;
 	do {
 		/*
-		 * Pinned pages can't be evicted, and it's not useful to try
-		 * and evict deleted or temporary pages.
+		 * Root and pinned pages can't be evicted.
+		 *
+		 * !!!
+		 * It's still in flux if root pages are pinned or not, test for
+		 * both cases for now.
 		 */
 		page = btree->evict_page;
 		if (page != NULL &&
-		    (WT_PAGE_IS_ROOT(page) || !F_ISSET(page,
-		    WT_PAGE_PINNED | WT_PAGE_REC_EMPTY | WT_PAGE_REC_SPLIT))) {
+		    !WT_PAGE_IS_ROOT(page) && !F_ISSET(page, WT_PAGE_PINNED)) {
 			WT_VERBOSE(session, EVICTSERVER,
 			    "eviction: %s walk: %" PRIu32,
 			    btree->name, WT_PADDR(page));
