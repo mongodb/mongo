@@ -331,7 +331,7 @@ int teardown(void){
 int dowrite(char *name, int rnum, int bulk, int rnd){
   WT_CURSOR *c;
   WT_ITEM key, value;
-  int i, err, len;
+  int i, err;
   char buf[RECBUFSIZ];
   if(showprgr)
     printf("<Write Test of Row Store>\n  name=%s  rnum=%d\n\n", name, rnum);
@@ -347,7 +347,7 @@ int dowrite(char *name, int rnum, int bulk, int rnd){
   /* loop for each record */
   for(i = 1; i <= rnum; i++){
     /* store a record */
-    len = sprintf(buf, "%08d", rnd ? myrand() % rnum + 1 : i);
+    sprintf(buf, "%08d", rnd ? myrand() % rnum + 1 : i);
     c->set_key(c, &key);
     c->set_value(c, &value);
     if((err = c->insert(c)) != 0 && err != WT_DUPLICATE_KEY) {
@@ -379,7 +379,7 @@ int dowrite(char *name, int rnum, int bulk, int rnd){
 int doread(char *name, int rnum, int rnd){
   WT_CURSOR *c;
   WT_ITEM key, value;
-  int i, err, len;
+  int i, err;
   char buf[RECBUFSIZ];
   if(showprgr)
     printf("<Read Test of Row Store>\n  name=%s  rnum=%d\n\n", name, rnum);
@@ -394,7 +394,7 @@ int doread(char *name, int rnum, int rnd){
   /* loop for each record */
   for(i = 1; i <= rnum; i++){
     /* store a record */
-    len = sprintf(buf, "%08d", rnd ? myrand() % rnum + 1 : i);
+    sprintf(buf, "%08d", rnd ? myrand() % rnum + 1 : i);
     c->set_key(c, &key);
     if(c->search(c) != 0){
       fprintf(stderr, "search failed\n");
@@ -427,7 +427,7 @@ int doread(char *name, int rnum, int rnd){
 int dovlcswrite(char *name, int rnum, int bulk, int rnd){
   WT_CURSOR *c;
   WT_ITEM value;
-  int i, err, len;
+  int i, err;
   char buf[RECBUFSIZ];
   if(showprgr)
     printf("<Write Test of var-length Column Store>\n  name=%s  rnum=%d\n\n", name, rnum);
@@ -443,7 +443,7 @@ int dovlcswrite(char *name, int rnum, int bulk, int rnd){
   /* loop for each record */
   for(i = 1; i <= rnum; i++){
     /* store a record */
-    len = sprintf(buf, "%08d", i);
+    sprintf(buf, "%08d", i);
     c->set_key(c, (uint64_t)(rnd ? myrand() % rnum + 1 : i));
     c->set_value(c, &value);
     if((err = c->insert(c)) != 0 && err != WT_DUPLICATE_KEY) {
@@ -519,7 +519,7 @@ int dovlcsread(char *name, int rnum, int rnd){
 int doflcswrite(char *name, int rnum, int bulk, int rnd){
   WT_CURSOR *c;
   uint8_t value;
-  int i, err, len;
+  int i, err;
   char buf[RECBUFSIZ];
   if(showprgr)
     printf("<Write Test of var-length Column Store>\n  name=%s  rnum=%d\n\n", name, rnum);
@@ -534,7 +534,7 @@ int doflcswrite(char *name, int rnum, int bulk, int rnd){
   /* loop for each record */
   for(i = 1; i <= rnum; i++){
     /* store a record */
-    len = sprintf(buf, "%08d", i);
+    sprintf(buf, "%08d", i);
     c->set_key(c, (uint64_t)(rnd ? myrand() % rnum + 1 : i));
     c->set_value(c, value);
     if((err = c->insert(c)) != 0 && err != WT_DUPLICATE_KEY) {

@@ -63,10 +63,8 @@ static inline void
 __cursor_func_resolve(WT_CURSOR_BTREE *cbt, int ret)
 {
 	WT_CURSOR *cursor;
-	WT_SESSION_IMPL *session;
 
 	cursor = &cbt->iface;
-	session = (WT_SESSION_IMPL *)cursor->session;
 
 	/*
 	 * On success, we're returning a key/value pair, and can iterate.

@@ -19,16 +19,16 @@
 
 #include <wiredtiger.h>
 
-void add_collator(WT_CONNECTION *conn);
-void add_compressor(WT_CONNECTION *conn);
-void add_cursor_type(WT_CONNECTION *conn);
-void add_extractor(WT_CONNECTION *conn);
-void connection_ops(WT_CONNECTION *conn);
-void cursor_ops(WT_SESSION *session);
-void cursor_search_near(WT_CURSOR *cursor);
-void session_ops(WT_SESSION *session);
+int add_collator(WT_CONNECTION *conn);
+int add_compressor(WT_CONNECTION *conn);
+int add_cursor_type(WT_CONNECTION *conn);
+int add_extractor(WT_CONNECTION *conn);
+int connection_ops(WT_CONNECTION *conn);
+int cursor_ops(WT_SESSION *session);
+int cursor_search_near(WT_CURSOR *cursor);
+int session_ops(WT_SESSION *session);
 
-void
+int
 cursor_ops(WT_SESSION *session)
 {
 	WT_CURSOR *cursor;
@@ -183,9 +183,11 @@ cursor_ops(WT_SESSION *session)
 	/*! [Close the cursor] */
 	ret = cursor->close(cursor, NULL);
 	/*! [Close the cursor] */
+
+	return (ret);
 }
 
-void
+int
 cursor_search_near(WT_CURSOR *cursor)
 {
 	int exact, ret;
@@ -237,9 +239,11 @@ cursor_search_near(WT_CURSOR *cursor)
 		/* the rest of the scan */
 	}
 	/*! [Backward scan less than] */
+
+	return (ret);
 }
 
-void
+int
 session_ops(WT_SESSION *session)
 {
 	int ret;
@@ -270,6 +274,8 @@ session_ops(WT_SESSION *session)
 	ret = session->checkpoint(session, NULL);
 
 	ret = session->close(session, NULL);
+
+	return (ret);
 }
 
 /*! [Implement WT_CURSOR_TYPE] */
@@ -300,7 +306,7 @@ my_init_cursor(WT_CURSOR_TYPE *ctype, WT_SESSION *session,
 }
 /*! [Implement WT_CURSOR_TYPE] */
 
-void
+int
 add_cursor_type(WT_CONNECTION *conn)
 {
 	int ret;
@@ -309,6 +315,8 @@ add_cursor_type(WT_CONNECTION *conn)
 	static WT_CURSOR_TYPE my_ctype = { my_cursor_size, my_init_cursor };
 	ret = conn->add_cursor_type(conn, NULL, &my_ctype, NULL);
 	/*! [Register a new cursor type] */
+
+	return (ret);
 }
 
 /*! [Implement WT_COLLATOR] */
@@ -332,7 +340,7 @@ my_compare(WT_COLLATOR *collator, WT_SESSION *session,
 }
 /*! [Implement WT_COLLATOR] */
 
-void
+int
 add_collator(WT_CONNECTION *conn)
 {
 	int ret;
@@ -341,6 +349,8 @@ add_collator(WT_CONNECTION *conn)
 	static WT_COLLATOR my_collator = { my_compare };
 	ret = conn->add_collator(conn, "my_collator", &my_collator, NULL);
 	/*! [Register a new collator] */
+
+	return (ret);
 }
 
 /*! [Implement WT_COMPRESSOR] */
@@ -379,7 +389,7 @@ my_decompress(WT_COMPRESSOR *compressor,
 }
 /*! [Implement WT_COMPRESSOR] */
 
-void
+int
 add_compressor(WT_CONNECTION *conn)
 {
 	int ret;
@@ -388,6 +398,8 @@ add_compressor(WT_CONNECTION *conn)
 	static WT_COMPRESSOR my_compressor = { my_compress, my_decompress };
 	ret = conn->add_compressor(conn, "my_compress", &my_compressor, NULL);
 	/*! [Register a new compressor] */
+
+	return (ret);
 }
 
 /*! [Implement WT_EXTRACTOR] */
@@ -406,7 +418,7 @@ my_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
 }
 /*! [Implement WT_EXTRACTOR] */
 
-void
+int
 add_extractor(WT_CONNECTION *conn)
 {
 	int ret;
@@ -416,9 +428,11 @@ add_extractor(WT_CONNECTION *conn)
 	my_extractor.extract = my_extract;
 	ret = conn->add_extractor(conn, "my_extractor", &my_extractor, NULL);
 	/*! [Register a new extractor] */
+
+	return (ret);
 }
 
-void
+int
 connection_ops(WT_CONNECTION *conn)
 {
 	int ret;
@@ -447,6 +461,8 @@ connection_ops(WT_CONNECTION *conn)
 
 	session_ops(session);
 	}
+
+	return (ret);
 }
 
 int main(void)
@@ -493,5 +509,5 @@ int main(void)
 	/*! [Get the WiredTiger library version] */
 	}
 
-	return (0);
+	return (ret);
 }

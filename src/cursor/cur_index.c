@@ -54,6 +54,7 @@ __curindex_set_value(WT_CURSOR *cursor, ...)
 	int ret;
 
 	CURSOR_API_CALL(cursor, session, set_value, NULL);
+	WT_UNUSED(ret);
 	cursor->saved_err = ENOTSUP;
 	F_CLR(cursor, WT_CURSTD_VALUE_SET);
 	API_END(session);

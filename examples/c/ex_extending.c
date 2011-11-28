@@ -24,8 +24,8 @@ __compare_nocase(WT_COLLATOR *collator, WT_SESSION *session,
 	const char *s1 = (const char *)v1->data;
 	const char *s2 = (const char *)v2->data;
 
-	session = NULL; /* unused */
-	collator = NULL; /* unused */
+	(void)session; /* unused */
+	(void)collator; /* unused */
 
 	*cmp = strcasecmp(s1, s2);
 	return (0);
@@ -50,7 +50,7 @@ __compare_prefixes(WT_COLLATOR *collator, WT_SESSION *session,
 	const char *s1 = (const char *)v1->data;
 	const char *s2 = (const char *)v2->data;
 
-	session = NULL; /* unused */
+	(void)session; /* unused */
 
 	*cmp = strncmp(s1, s2, pcoll->maxlen);
 	return (0);
