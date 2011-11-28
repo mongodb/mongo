@@ -464,7 +464,7 @@ __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 		    (!WT_PAGE_IS_MODIFIED(page) ||
 		    F_ISSET(page, WT_PAGE_PINNED)))
 			continue;
-		
+
 		/*
 		 * Remove the page from any lists it might be in before we
 		 * reconcile it.  Do this unconditionally in sync and close,
