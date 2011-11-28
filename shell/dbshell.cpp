@@ -849,7 +849,8 @@ int _main( int argc, char* argv[] ) {
             }
 
             if ( ! linePtr || ( strlen( linePtr ) == 4 && strstr( linePtr , "exit" ) ) ) {
-                cout << "bye" << endl;
+                if ( ! mongo::cmdLine.quiet )
+                    cout << "bye" << endl;
                 if ( line )
                     free( line );
                 break;
