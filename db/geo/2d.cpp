@@ -2959,6 +2959,11 @@ namespace mongo {
                 }
                 bb.append( "obj" , p._o );
                 bb.done();
+
+                if ( arr.len() > BSONObjMaxUserSize ) {
+                    warning() << "Too many results to fit in single document. Truncating..." << endl;
+                    break;
+                }
             }
             arr.done();
 
