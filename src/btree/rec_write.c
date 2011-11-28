@@ -2723,23 +2723,25 @@ __wt_rec_track(WT_SESSION_IMPL *session, WT_PAGE *page,
 static void
 __rec_track_verbose(WT_SESSION_IMPL *session, WT_PAGE_TRACK *track)
 {
-	const char *t;
+	const char *onoff;
 
 	switch (track->type) {
 	case WT_PT_BLOCK:
-		t = "block";
-		break;
+		WT_VERBOSE(session, RECONCILE,
+		    "reconcile: tracking block (%" PRIu32 "/%" PRIu32 ")",
+		    track->ref, track->addr, track->size);
+		return;
 	case WT_PT_OVFL:
-		t = "overflow ON";
+		onoff = "ON";
 		break;
 	default:				/* Not possible. */
 	case WT_PT_OVFL_DISCARD:
-		t = "overflow OFF";
+		onoff = "OFF";
 		break;
 	}
 	WT_VERBOSE(session, RECONCILE,
-	    "reconcile: tracking %s (%p, %" PRIu32 "/%" PRIu32 ")",
-	    t, track->ref, track->addr, track->size);
+	    "reconcile: tracking overflow %s (%p, %" PRIu32 "/%" PRIu32 ")",
+	    onoff, track->ref, track->addr, track->size);
 }
 #endif
 
