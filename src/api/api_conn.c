@@ -366,6 +366,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		{ "readserver",	WT_VERB_READSERVER },
 		{ "reconcile",	WT_VERB_RECONCILE },
 		{ "salvage",	WT_VERB_SALVAGE },
+		{ "verify",	WT_VERB_VERIFY },
 		{ "write",	WT_VERB_WRITE },
 		{ NULL, 0 }
 	};

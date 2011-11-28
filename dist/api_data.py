@@ -348,6 +348,7 @@ methods = {
 		    'readserver',
 		    'reconcile',
 		    'salvage',
+		    'verify',
 		    'write']),
 ]),
 }
@@ -370,6 +371,7 @@ flags = {
 		'VERB_READSERVER',
 		'VERB_RECONCILE',
 		'VERB_SALVAGE',
+		'VERB_VERIFY',
 		'VERB_WRITE'
 	],
 

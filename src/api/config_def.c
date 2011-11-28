@@ -270,4 +270,4 @@ __wt_confchk_wiredtiger_open =
     "multiprocess=(type=boolean),session_max=(type=int,min=1),"
     "transactional=(type=boolean),verbose=(type=list,choices=[\"allocate\","
     "\"evict\",\"evictserver\",\"fileops\",\"hazard\",\"mutex\",\"read\","
-    "\"readserver\",\"reconcile\",\"salvage\",\"write\"])";
+    "\"readserver\",\"reconcile\",\"salvage\",\"verify\",\"write\"])";
