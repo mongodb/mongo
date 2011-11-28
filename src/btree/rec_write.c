@@ -2239,8 +2239,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		break;
 	case WT_PAGE_REC_SPLIT:				/* Page split */
 		WT_RET(mod->u.write_split->type == WT_PAGE_ROW_INT ?
-		    __rec_track_restart_row(session, mod->u.write_split) :
-		    __rec_track_restart_col(session, mod->u.write_split));
+		    __rec_track_restart_row(session, page) :
+		    __rec_track_restart_col(session, page));
 		__wt_page_out(session, mod->u.write_split, 0);
 		break;
 	case WT_PAGE_REC_REPLACE:			/* 1-for-1 page swap */
@@ -2835,7 +2835,7 @@ __rec_track_restart_row(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_ROW_REF *rref;
 	uint32_t i;
 
-	WT_ROW_REF_FOREACH(page, rref, i)
+	WT_ROW_REF_FOREACH(page->modify->u.write_split, rref, i)
 		WT_RET(__wt_rec_track(
 		    session, page, WT_PT_BLOCK, NULL,
 		    WT_ROW_REF_ADDR(rref), WT_ROW_REF_SIZE(rref)));
@@ -2852,7 +2852,7 @@ __rec_track_restart_col(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_COL_REF *cref;
 	uint32_t i;
 
-	WT_COL_REF_FOREACH(page, cref, i)
+	WT_COL_REF_FOREACH(page->modify->u.write_split, cref, i)
 		WT_RET(__wt_rec_track(
 		    session, page, WT_PT_BLOCK, NULL,
 		    WT_COL_REF_ADDR(cref), WT_COL_REF_SIZE(cref)));
