@@ -35,7 +35,7 @@ __wt_bulk_init(WT_CURSOR_BULK *cbulk)
 	 * of the root page (we're doing a bulk load, on-disk is the eventual
 	 * state of this tree, after we write the internal page).
 	 */
-	if ((ret = __wt_btree_root_free(session)) != 0) {
+	if ((ret = __wt_btree_root_empty_free(session)) != 0) {
 		__wt_errx(
 		    session, "bulk-load is only possible for empty trees");
 		return (ret);

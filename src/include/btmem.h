@@ -227,12 +227,11 @@ struct __wt_page {
 	 */
 #define	WT_PAGE_BUILD_KEYS	0x001	/* Keys have been built in memory */
 #define	WT_PAGE_BULK_LOAD	0x002	/* Page bulk loaded */
-#define	WT_PAGE_EMPTY_TREE	0x004	/* Empty page created during open */
-#define	WT_PAGE_FORCE_EVICT	0x008	/* Waiting for forced eviction */
-#define	WT_PAGE_PINNED		0x010	/* Page is pinned */
-#define	WT_PAGE_REC_EMPTY	0x020	/* Reconciliation: page empty */
-#define	WT_PAGE_REC_REPLACE	0x040	/* Reconciliation: page replaced */
-#define	WT_PAGE_REC_SPLIT	0x080	/* Reconciliation: page split */
+#define	WT_PAGE_FORCE_EVICT	0x004	/* Waiting for forced eviction */
+#define	WT_PAGE_PINNED		0x008	/* Page is pinned */
+#define	WT_PAGE_REC_EMPTY	0x010	/* Reconciliation: page empty */
+#define	WT_PAGE_REC_REPLACE	0x020	/* Reconciliation: page replaced */
+#define	WT_PAGE_REC_SPLIT	0x040	/* Reconciliation: page split */
 	uint8_t flags;			/* Page flags */
 };
 

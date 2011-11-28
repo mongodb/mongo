@@ -135,8 +135,14 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 	vs->frags = WT_OFF_TO_ADDR(btree, btree->fh->file_size);
 	WT_ERR(__bit_alloc(session, vs->frags, &vs->fragbits));
 
-	/* Verify the tree, starting at the root. */
-	WT_ERR(__verify_tree(session, &btree->root_page, (uint64_t)1, vs));
+	/*
+	 * Verify the tree, starting at the root: if there is no root, that's
+	 * still possibly a legal file, but all of the pages must be on the
+	 * free-list.
+	 */
+	if (btree->root_page.addr != WT_ADDR_INVALID)
+		WT_ERR(
+		    __verify_tree(session, &btree->root_page, (uint64_t)1, vs));
 
 	/* Verify the free-list. */
 	WT_ERR(__verify_freelist(session, vs));
@@ -185,6 +191,10 @@ __verify_tree(
 	ret = 0;
 	page = ref->page;
 	unpack = &_unpack;
+
+	WT_VERBOSE(session, VERIFY,
+	    "verify: addr %" PRIu32 " (%s)",
+	    ref->addr, __wt_page_type_string(page->type));
 
 	/*
 	 * The page's physical structure was verified when it was read into
@@ -553,6 +563,9 @@ __verify_freelist(WT_SESSION_IMPL *session, WT_VSTUFF *vs)
 			    fe->addr);
 			return (WT_ERROR);
 		}
+		WT_VERBOSE(session, VERIFY,
+		    "verify: free-list addr/frags %" PRIu32 "/%" PRIu32,
+		    fe->addr, fe->size / btree->allocsize);
 		WT_TRET(__verify_addfrag(session, fe->addr, fe->size, vs));
 	}
 

@@ -25,10 +25,6 @@ static void __free_update_list(WT_SESSION_IMPL *, WT_UPDATE *);
 void
 __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 {
-#ifdef HAVE_DIAGNOSTIC
-	__wt_hazard_validate(session, page);
-#endif
-
 	/*
 	 * When a page is discarded, it's been disconnected from its parent
 	 * (both page and WT_REF structure), and the parent's WT_REF structure
@@ -38,12 +34,12 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	page->parent = NULL;
 	page->parent_ref = NULL;
 
-	/*
-	 * The page must either be clean, or an internal split page, which
-	 * is created dirty and can never be "clean".
-	 */
-	WT_ASSERT(session,
-	    F_ISSET(page, WT_PAGE_EMPTY_TREE) || !__wt_page_is_modified(page));
+	/* The page must be clean. */
+	WT_ASSERT(session, !__wt_page_is_modified(page));
+
+#ifdef HAVE_DIAGNOSTIC
+	__wt_hazard_validate(session, page);
+#endif
 
 	/*
 	 * If this page has a memory footprint associated with it, update

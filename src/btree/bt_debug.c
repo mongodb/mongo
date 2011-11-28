@@ -404,8 +404,6 @@ __debug_page_work(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 	__dmsg(ds, " (%s", __wt_page_is_modified(page) ? "dirty" : "clean");
 	if (F_ISSET(page, WT_PAGE_BULK_LOAD))
 		__dmsg(ds, ", bulk-loaded");
-	if (F_ISSET(page, WT_PAGE_EMPTY_TREE))
-		__dmsg(ds, ", empty-tree");
 	if (F_ISSET(page, WT_PAGE_FORCE_EVICT))
 		__dmsg(ds, ", force-evict");
 	if (F_ISSET(page, WT_PAGE_PINNED))

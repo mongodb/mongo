@@ -273,12 +273,11 @@ __btree_conf(WT_SESSION_IMPL *session, const char *config)
 }
 
 /*
- * __wt_btree_root_init --
- *      Create an empty in-memory tree.  Don't mark it dirty, if it's never
- *      written, that's OK.
+ * __wt_btree_root_empty_init --
+ *      Create an empty in-memory tree.
  */
 int
-__wt_btree_root_init(WT_SESSION_IMPL *session)
+__wt_btree_root_empty_init(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_PAGE *page;
@@ -286,7 +285,13 @@ __wt_btree_root_init(WT_SESSION_IMPL *session)
 
 	btree = session->btree;
 
-	/* Create the empty root page. */
+	/*
+	 * A note about empty trees: the initial tree is a root page and a leaf
+	 * page, neither of which are marked dirty.   If evicted without being
+	 * modified, that's OK, nothing will ever be written.
+	 *
+	 * Create the empty root page.
+	 */
 	WT_RET(__wt_calloc_def(session, 1, &page));
 	switch (btree->type) {
 	case BTREE_COL_FIX:
@@ -309,7 +314,7 @@ __wt_btree_root_init(WT_SESSION_IMPL *session)
 	page->entries = 1;
 	page->parent = NULL;
 	page->parent_ref = &btree->root_page;
-	F_SET(page, WT_PAGE_EMPTY_TREE | WT_PAGE_PINNED);
+	F_SET(page, WT_PAGE_PINNED);
 
 	btree->root_page.state = WT_REF_MEM;
 	btree->root_page.addr = WT_ADDR_INVALID;
@@ -334,30 +339,43 @@ __wt_btree_root_init(WT_SESSION_IMPL *session)
 		page->type = WT_PAGE_ROW_LEAF;
 		break;
 	}
+	page->entries = 0;
 	page->parent = btree->root_page.page;
 	page->parent_ref = ref;
+
 	ref->state = WT_REF_MEM;
 	ref->addr = WT_ADDR_INVALID;
 	ref->size = 0;
 	ref->page = page;
-	F_SET(page, WT_PAGE_REC_EMPTY | WT_PAGE_EMPTY_TREE);
 	return (0);
 }
 
 /*
- * __wt_btree_root_free --
- *      Free an empty in-memory tree before doing a bulk load.
+ * __wt_btree_root_empty_free --
+ *	Bulk loads only work on empty trees: check and free the tree before
+ * doing a bulk load.
  */
 int
-__wt_btree_root_free(WT_SESSION_IMPL *session)
+__wt_btree_root_empty_free(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
-	WT_PAGE *root;
+	WT_PAGE *root, *child;
 
 	btree = session->btree;
 	root = btree->root_page.page;
 
-	if (!F_ISSET(root, WT_PAGE_EMPTY_TREE) || root->entries != 1)
+	if (root->entries != 1)
+		return (WT_ERROR);
+	switch (root->type) {
+	case WT_PAGE_COL_INT:
+		child = root->u.col_int.t->ref.page;
+		break;
+	case WT_PAGE_ROW_INT:
+		child = root->u.row_int.t->ref.page;
+		break;
+	WT_ILLEGAL_FORMAT(session);
+	}
+	if (child->entries != 0)
 		return (WT_ERROR);
 
 	__wt_page_out(session, root, 0);
@@ -475,7 +493,7 @@ __btree_read_meta(WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
 	 * pin it.  If there's no root page, create an empty in-memory page.
 	 */
 	if (btree->root_page.addr == WT_ADDR_INVALID)
-		WT_RET(__wt_btree_root_init(session));
+		WT_RET(__wt_btree_root_empty_init(session));
 	else  {
 		/* If an open for a verify operation, check the disk image. */
 		WT_RET(__wt_page_in(session, NULL,

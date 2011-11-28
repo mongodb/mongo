@@ -12,8 +12,8 @@ static void __hazard_copy(WT_SESSION_IMPL *);
 static int  __hazard_exclusive(WT_SESSION_IMPL *, WT_REF *, uint32_t);
 static int  __hazard_qsort_cmp(const void *, const void *);
 static int  __rec_ovfl_delete(WT_SESSION_IMPL *, WT_PAGE *);
-static void __rec_parent_clean_update(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __rec_parent_dirty_update(WT_SESSION_IMPL *, WT_PAGE *, int);
+static void __rec_parent_clean_update(WT_PAGE *);
+static int  __rec_parent_dirty_update(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
 static int  __rec_subtree(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
 static int  __rec_subtree_col(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
 static void __rec_subtree_col_clear(WT_SESSION_IMPL *, WT_PAGE *);
@@ -33,7 +33,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 
 	conn = S2C(session);
 
-	WT_VERBOSE(session, RECONCILE,
+	WT_VERBOSE(session, EVICT,
 	    "evict: addr %" PRIu32 " (%s)", WT_PADDR(page),
 	    __wt_page_type_string(page->type));
 
@@ -52,7 +52,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 		 */
 		WT_STAT_INCR(conn->stats, cache_evict_unmodified);
 
-		__rec_parent_clean_update(session, page);
+		__rec_parent_clean_update(page);
 	} else {
 		/*
 		 * If the page was ever modified:
@@ -64,8 +64,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 		if (__wt_page_is_modified(page))
 			WT_RET(__wt_rec_write(session, page, NULL));
 
-		WT_RET(__rec_parent_dirty_update(
-		    session, page, LF_ISSET(WT_REC_SINGLE) ? 1 : 0));
+		WT_RET(__rec_parent_dirty_update(session, page, flags));
 	}
 
 	__wt_page_out(session, page, 0);
@@ -78,26 +77,14 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
  *	Update a parent page's reference for an evicted, clean page.
  */
 static void
-__rec_parent_clean_update(WT_SESSION_IMPL *session, WT_PAGE *page)
+__rec_parent_clean_update(WT_PAGE *page)
 {
-	WT_REF *parent_ref;
-
-	parent_ref = page->parent_ref;
-
-	/*
-	 * If a page is on disk, it must have a valid disk address -- with
-	 * one exception: if you create a root page and never use it, then
-	 * it won't have a disk address.
-	 */
-	WT_ASSERT(session,
-	    WT_PAGE_IS_ROOT(page) || parent_ref->addr != WT_ADDR_INVALID);
-
 	/*
 	 * Update the relevant WT_REF structure; no memory flush is needed,
 	 * the state field is declared volatile.
 	 */
-	parent_ref->page = NULL;
-	parent_ref->state = WT_REF_DISK;
+	page->parent_ref->page = NULL;
+	page->parent_ref->state = WT_REF_DISK;
 }
 
 /*
@@ -105,7 +92,8 @@ __rec_parent_clean_update(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Update a parent page's reference for an evicted, dirty page.
  */
 static int
-__rec_parent_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
+__rec_parent_dirty_update(
+    WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 {
 	WT_PAGE_MODIFY *mod;
 	WT_REF *parent_ref;
@@ -137,7 +125,7 @@ __rec_parent_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 		 * our exclusive reference to it, as well as any pages below it
 		 * we locked down, and return it into use.
 		 */
-		if (!single) {
+		if (!LF_ISSET(WT_REC_SINGLE)) {
 			switch (page->type) {
 			case WT_PAGE_COL_INT:
 				__rec_subtree_col_clear(session, page);
