@@ -18,7 +18,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	const char *path;
 	WT_CONNECTION_IMPL *conn;
 	WT_FH *fh;
-	int f, fd, matched, ret;
+	int f, fd, matched, ret, retry;
 
 	conn = S2C(session);
 	fh = NULL;
@@ -52,7 +52,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	if (ok_create)
 		f |= O_CREAT;
 
-	for (;;) {
+	for (retry = 0;;) {
 		if ((fd = open(path, f, mode)) != -1)
 			break;
 
@@ -63,8 +63,11 @@ __wt_open(WT_SESSION_IMPL *session,
 		case EMFILE:
 		case ENFILE:
 		case ENOSPC:
-			__wt_sleep(1L, 0L);
-			break;
+			if (++retry < 10) {
+				__wt_sleep(1L, 0L);
+				break;
+			}
+			/* FALLTHROUGH */
 		default:
 			__wt_err(session, errno, "%s", name);
 			WT_ERR(errno);
