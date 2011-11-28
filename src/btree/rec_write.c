@@ -2729,7 +2729,7 @@ __rec_track_verbose(WT_SESSION_IMPL *session, WT_PAGE_TRACK *track)
 	case WT_PT_BLOCK:
 		WT_VERBOSE(session, RECONCILE,
 		    "reconcile: tracking block (%" PRIu32 "/%" PRIu32 ")",
-		    track->ref, track->addr, track->size);
+		    track->addr, track->size);
 		return;
 	case WT_PT_OVFL:
 		onoff = "ON";
