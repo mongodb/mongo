@@ -1248,6 +1248,7 @@ shellAutocomplete = function (/*prefix*/){ // outer scope function called on ini
         }
 
         var lastPrefix = parts[parts.length-1] || '';
+        var lastPrefixLowercase = lastPrefix.toLowerCase()
         var begining = parts.slice(0, parts.length-1).join('.');
         if (begining.length)
             begining += '.';
@@ -1269,7 +1270,7 @@ shellAutocomplete = function (/*prefix*/){ // outer scope function called on ini
             if (p.length == 0 || p.length < lastPrefix.length) continue;
             if (lastPrefix[0] != '_' && isPrivate(p)) continue;
             if (p.match(/^[0-9]+$/)) continue; // don't array number indexes
-            if (p.substr(0, lastPrefix.length) != lastPrefix) continue;
+            if (p.substr(0, lastPrefix.length).toLowerCase() != lastPrefixLowercase) continue;
 
             var completion = begining + p;
             if(curObj[p] && curObj[p].constructor == Function && p != 'constructor')
