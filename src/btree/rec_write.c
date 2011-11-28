@@ -2768,6 +2768,13 @@ __rec_track_ovfl_active(WT_SESSION_IMPL *session,
 
 	WT_PAGE_MODIFY *mod;
 
+	/*
+	 * XXX
+	 * We don't currently track overflow keys.
+	 */
+	if (orig_data == NULL)
+		return (0);
+
 	mod = page->modify;
 	for (track = mod->track, i = 0; i < mod->track_next; ++track, ++i)
 		if ((track->type == WT_PT_OVFL ||
