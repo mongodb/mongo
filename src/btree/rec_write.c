@@ -2734,8 +2734,8 @@ __rec_track_verbose(WT_SESSION_IMPL *session, WT_PAGE_TRACK *track)
 	case WT_PT_OVFL:
 		onoff = "ON";
 		break;
-	default:				/* Not possible. */
 	case WT_PT_OVFL_DISCARD:
+	default:				/* Not possible. */
 		onoff = "OFF";
 		break;
 	}

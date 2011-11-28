@@ -13,7 +13,7 @@
 typedef enum {
 	WT_PT_BLOCK,			/* Inactive block */
 	WT_PT_OVFL,			/* Active overflow block */
-	WT_PT_OVFL_DISCARD,		/* Inactive overflow block */
+	WT_PT_OVFL_DISCARD		/* Inactive overflow block */
 } __wt_pt_type_t;
 
 struct __wt_page_modify {

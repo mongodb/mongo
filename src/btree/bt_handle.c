@@ -378,7 +378,8 @@ __wt_btree_root_empty_free(WT_SESSION_IMPL *session)
 	if (child->entries != 0)
 		return (WT_ERROR);
 
-	__wt_page_out(session, root, 0);
+	__wt_free(session, root);
+	__wt_free(session, child);
 	btree->root_page.page = NULL;
 
 	return (0);
@@ -447,7 +448,6 @@ __btree_close_cache(WT_SESSION_IMPL *session)
 	/*
 	 * Write out the free list.
 	 * Update the file's description.
-	 * Close the underlying file handle.
 	 */
 	WT_TRET(__wt_block_freelist_write(session));
 	WT_TRET(__wt_desc_update(session));

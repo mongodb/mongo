@@ -14,7 +14,6 @@ static void __free_page_col_int(WT_SESSION_IMPL *, WT_PAGE *);
 static void __free_page_col_var(WT_SESSION_IMPL *, WT_PAGE *);
 static void __free_page_row_int(WT_SESSION_IMPL *, WT_PAGE *);
 static void __free_page_row_leaf(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __free_track(WT_SESSION_IMPL *, WT_PAGE *);
 static void __free_update(WT_SESSION_IMPL *, WT_UPDATE **, uint32_t);
 static void __free_update_list(WT_SESSION_IMPL *, WT_UPDATE *);
 
@@ -77,14 +76,6 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 			break;
 		}
 
-	/*
-	 * XXX:
-	 * __free_track puts blocks on the free-list, and so it can fail, we're
-	 * losing an error return here.
-	 */
-	if (page->modify != NULL)
-		(void)__free_track(session, page);
-
 	if (!LF_ISSET(WT_PAGE_FREE_IGNORE_DISK))
 		__wt_free(session, page->dsk);
 	__wt_free(session, page);
@@ -119,18 +110,6 @@ __free_page_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 static void
 __free_page_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_COL_REF *cref;
-	uint32_t i;
-
-	/*
-	 * The internal page may reference a split or deleted page which was
-	 * merged into this page, and that split or deleted page may have a
-	 * modification list which needs to be resolved.
-	 */
-	WT_COL_REF_FOREACH(page, cref, i)
-		if (WT_COL_REF_STATE(cref) != WT_REF_DISK)
-			__wt_page_out(session, WT_COL_REF_PAGE(cref), 0);
-
 	/* Free the subtree-reference array. */
 	__wt_free(session, page->u.col_int.t);
 }
@@ -173,19 +152,12 @@ __free_page_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	uint32_t i;
 
 	/*
-	 * The internal page may reference a split or deleted page which was
-	 * merged into this page, and that split or deleted page may have a
-	 * modification list which needs to be resolved.
-	 *
 	 * For each referenced key, see if the key was an allocation (that is,
 	 * if it points somewhere other than the original page), and free it.
 	 */
-	WT_ROW_REF_FOREACH(page, rref, i) {
-		if (WT_ROW_REF_STATE(rref) != WT_REF_DISK)
-			__wt_page_out(session, WT_ROW_REF_PAGE(rref), 0);
+	WT_ROW_REF_FOREACH(page, rref, i)
 		if ((ikey = rref->key) != NULL)
 			__wt_sb_free(session, ikey->sb, ikey);
-	}
 
 	/* Free the subtree-reference array. */
 	__wt_free(session, page->u.row_int.t);
@@ -309,32 +281,4 @@ __free_update_list(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 		next = upd->next;
 		__wt_sb_free(session, upd->sb, upd);
 	} while ((upd = next) != NULL);
-}
-
-/*
- * __free_track --
- *	Process the list of tracked objects.
- */
-static int
-__free_track(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_PAGE_TRACK *track;
-	uint32_t i;
-
-	for (track = page->modify->track,
-	    i = 0; i < page->modify->track_next; ++track, ++i)
-		switch (track->type) {
-		case WT_PT_BLOCK:
-		case WT_PT_OVFL_DISCARD:
-			WT_VERBOSE(session, EVICT,
-			    "evict: discarding%s block %" PRIu32 "/%" PRIu32,
-			    track->type == WT_PT_OVFL ? " overflow" : "",
-			    track->addr, track->size);
-			WT_RET(
-			    __wt_block_free(session, track->addr, track->size));
-			break;
-		case WT_PT_OVFL:
-			break;
-		}
-	return (0);
 }
