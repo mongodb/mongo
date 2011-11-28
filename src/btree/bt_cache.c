@@ -30,6 +30,16 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn)
 	    "cache read server", 1, &cache->read_cond));
 
 	/*
+	 * Allocate request arrays.  We size the arrays to allow one eviction
+	 * request and one read request per session.
+	 */
+	cache->max_evict_request = cache->max_read_request = conn->session_size;
+	WT_ERR(__wt_calloc_def(
+	    session, cache->max_evict_request, &cache->evict_request));
+	WT_ERR(__wt_calloc_def(
+	    session, cache->max_read_request, &cache->read_request));
+
+	/*
 	 * We pull some values from the cache statistics (rather than have two
 	 * copies).   Set them.
 	 */
@@ -80,5 +90,7 @@ __wt_cache_destroy(WT_CONNECTION_IMPL *conn)
 	if (cache->read_cond != NULL)
 		(void)__wt_cond_destroy(session, cache->read_cond);
 
+	__wt_free(session, cache->evict_request);
+	__wt_free(session, cache->read_request);
 	__wt_free(session, conn->cache);
 }

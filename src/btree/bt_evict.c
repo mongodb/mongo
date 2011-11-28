@@ -40,7 +40,7 @@ static int  __evict_worker(WT_SESSION_IMPL *);
  */
 #define	WT_EVICT_REQ_FOREACH(er, er_end, cache)				\
 	for ((er) = (cache)->evict_request,				\
-	    (er_end) = (er) + WT_ELEMENTS((cache)->evict_request);	\
+	    (er_end) = (er) + (cache)->max_evict_request;		\
 	    (er) < (er_end); ++(er))
 
 /*

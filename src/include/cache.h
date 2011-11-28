@@ -63,16 +63,18 @@ struct __wt_cache {
 	size_t   evict_allocated;	/* Bytes allocated */
 	uint32_t evict_entries;		/* Total evict slots */
 
-	WT_EVICT_REQ evict_request[20];	/* Eviction requests:
+	WT_EVICT_REQ *evict_request;	/* Eviction requests:
 					   slot available if session is NULL */
+	uint32_t max_evict_request;	/* Size of the evict request array. */
 
 	WT_CONDVAR *read_cond;		/* Cache read server mutex */
 	u_int volatile read_lockout;	/* No reading until memory drains */
 
-	WT_READ_REQ read_request[40];	/* Read requests:
+	WT_READ_REQ *read_request;	/* Read requests:
 					   slot available if session is NULL */
+	uint32_t max_read_request;	/* Size of read request array. */
 
-	uint32_t   read_gen;		/* Page read generation (LRU) */
+	uint32_t read_gen;		/* Page read generation (LRU) */
 
 	/*
 	 * Different threads read/write pages to/from the cache and create pages

@@ -11,7 +11,7 @@ static int  __cache_read(WT_SESSION_IMPL *, WT_PAGE *, WT_REF *, int);
 
 #define	WT_READ_REQ_FOREACH(rr, rr_end, cache)				\
 	for ((rr) = (cache)->read_request,				\
-	    (rr_end) = (rr) + WT_ELEMENTS((cache)->read_request);	\
+	    (rr_end) = (rr) + (cache)->max_read_request;		\
 	    (rr) < (rr_end); ++(rr))
 
 /*
