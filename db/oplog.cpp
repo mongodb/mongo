@@ -624,11 +624,9 @@ namespace mongo {
         }
     }
 
-    bool shouldRetry(const BSONObj& o, const string& hn) {
+    BSONObj Sync::getMissingDoc(const BSONObj& o) {
         OplogReader missingObjReader;
 
-        // we don't have the object yet, which is possible on initial sync.  get it.
-        log() << "replication info adding missing object" << endl; // rare enough we can log
         uassert(15916, str::stream() << "Can no longer connect to initial sync source: " << hn, missingObjReader.connect(hn));
 
         const char *ns = o.getStringField("ns");
@@ -642,6 +640,15 @@ namespace mongo {
             throw;
         }
 
+        return missingObj;
+    }
+
+    bool Sync::shouldRetry(const BSONObj& o) {
+        // we don't have the object yet, which is possible on initial sync.  get it.
+        log() << "replication info adding missing object" << endl; // rare enough we can log
+
+        BSONObj missingObj = getMissingDoc(o);
+
         if( missingObj.isEmpty() ) {
             log() << "replication missing object not found on source. presumably deleted later in oplog" << endl;
             log() << "replication o2: " << o.getObjectField("o2").toString() << endl;
@@ -650,6 +657,7 @@ namespace mongo {
             return false;
         }
         else {
+            const char *ns = o.getStringField("ns");
             Client::Context ctx(ns);
             DiskLoc d = theDataFileMgr.insert(ns, (void*) missingObj.objdata(), missingObj.objsize());
             uassert(15917, "Got bad disk location when attempting to insert", !d.isNull());

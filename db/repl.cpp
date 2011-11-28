@@ -614,8 +614,11 @@ namespace mongo {
     void ReplSource::applyOperation(const BSONObj& op) {
         try {
             bool failedUpdate = applyOperation_inlock( op );
-            if (failedUpdate && shouldRetry(op, hostName)) {
-                uassert(15914, "Failure retrying initial sync update", applyOperation_inlock(op));
+            if (failedUpdate) {
+                Sync sync(hostName);
+                if (sync.shouldRetry(op)) {
+                    uassert(15914, "Failure retrying initial sync update", applyOperation_inlock(op));
+                }
             }
         }
         catch ( UserException& e ) {

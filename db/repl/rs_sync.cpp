@@ -162,8 +162,11 @@ namespace mongo {
 
                     if( ts >= applyGTE ) { // optimes before we started copying need not be applied.
                         bool failedUpdate = syncApply(o);
-                        if( failedUpdate && shouldRetry(o, hn)) {
-                            uassert(15915, "replSet update still fails after adding missing object", syncApply(o));
+                        if (failedUpdate) {
+                            Sync sync(hn);
+                            if (sync.shouldRetry(o)) {
+                                uassert(15915, "replSet update still fails after adding missing object", syncApply(o));
+                            }
                         }
                     }
                     _logOpObjRS(o);   /* with repl sets we write the ops to our oplog too */

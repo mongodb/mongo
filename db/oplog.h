@@ -122,6 +122,20 @@ namespace mongo {
         bool firstDocMatchesOrEmpty() const;
     };
 
+    class Sync {
+    protected:
+        string hn;
+    public:
+        Sync(const string& hostname) : hn(hostname) {}
+        virtual ~Sync() {}
+        virtual BSONObj getMissingDoc(const BSONObj& o);
+
+        /**
+         * If applyOperation_inlock should be called again after an update fails.
+         */
+        bool shouldRetry(const BSONObj& o);
+    };
+
     void pretouchOperation(const BSONObj& op);
     void pretouchN(vector<BSONObj>&, unsigned a, unsigned b);
 
@@ -132,9 +146,4 @@ namespace mongo {
      * Returns if the op was an update that could not be applied (true on failure)
      */
     bool applyOperation_inlock(const BSONObj& op , bool fromRepl = true );
-
-    /**
-     * If applyOperation_inlock should be called again after an update fails.
-     */
-    bool shouldRetry(const BSONObj& op , const string& hn);
 }

@@ -1122,6 +1122,47 @@ namespace ReplTests {
         }
     };
 
+    class SyncTest : public Sync {
+    public:
+        bool returnEmpty;
+        SyncTest() : Sync(""), returnEmpty(false) {}
+        virtual ~SyncTest() {}
+        virtual BSONObj getMissingDoc(const BSONObj& o) {
+            if (returnEmpty) {
+                BSONObj o;
+                return o;
+            }
+            return BSON("_id" << "on remote" << "foo" << "baz");
+        }
+    };
+
+    class ShouldRetry : public Base {
+    public:
+        void run() {
+            bool threw = false;
+            BSONObj o = BSON("ns" << ns() << "o" << BSON("foo" << "bar") << "o2" << BSON("_id" << "in oplog" << "foo" << "bar"));
+
+            // this should fail because we can't connect
+            try {
+                Sync badSource("localhost:123");
+                badSource.getMissingDoc(o);
+            }
+            catch (DBException& e) {
+                threw = true;
+            }
+            assert(threw);
+
+            // now this should succeed
+            SyncTest t;
+            assert(t.shouldRetry(o));
+            assert(!client()->findOne(ns(), BSON("_id" << "on remote")).isEmpty());
+
+            // force it not to find an obj
+            t.returnEmpty = true;
+            assert(!t.shouldRetry(o));
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "repl" ) {
@@ -1179,6 +1220,7 @@ namespace ReplTests {
             add< FindingStartCursorStale >();
             add< FindingStartCursorYield >();
             add< ReplSetMemberCfgEquality >();
+            add< ShouldRetry >();
         }
     } myall;
 
