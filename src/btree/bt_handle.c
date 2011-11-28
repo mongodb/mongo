@@ -346,14 +346,13 @@ __wt_btree_root_init(WT_SESSION_IMPL *session)
 
 /*
  * __wt_btree_root_free --
- *      Free an empty in-memory tree before.
+ *      Free an empty in-memory tree before doing a bulk load.
  */
 int
 __wt_btree_root_free(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
-	WT_PAGE *child, *root;
-	WT_REF *ref;
+	WT_PAGE *root;
 
 	btree = session->btree;
 	root = btree->root_page.page;
@@ -361,22 +360,6 @@ __wt_btree_root_free(WT_SESSION_IMPL *session)
 	if (!F_ISSET(root, WT_PAGE_EMPTY_TREE) || root->entries != 1)
 		return (WT_ERROR);
 
-	/* Create the empty root page. */
-	switch (root->type) {
-	case WT_PAGE_COL_INT:
-		ref = &root->u.col_int.t->ref;
-		break;
-	case WT_PAGE_ROW_INT:
-		ref = &root->u.row_int.t->ref;
-		break;
-	WT_ILLEGAL_FORMAT(session);
-	}
-
-	child = ref->page;
-	if (child == NULL || !F_ISSET(child, WT_PAGE_REC_EMPTY))
-		return (WT_ERROR);
-
-	__wt_page_out(session, child, 0);
 	__wt_page_out(session, root, 0);
 	btree->root_page.page = NULL;
 
