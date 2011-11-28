@@ -308,11 +308,18 @@ namespace mongo {
             f.fsync();
         }
 
+        const int NUM_PREALLOC_FILES = 3;
+        inline filesystem::path preallocPath(int n) {
+            assert(n >= 0);
+            assert(n < NUM_PREALLOC_FILES);
+            string fn = str::stream() << "prealloc." << n;
+            return getJournalDir() / fn;
+        }
+
         // throws
         void _preallocateFiles() {
-            for( int i = 0; i <= 2; i++ ) {
-                string fn = str::stream() << "prealloc." << i;
-                filesystem::path filepath = getJournalDir() / fn;
+            for( int i = 0; i < NUM_PREALLOC_FILES; i++ ) {
+                filesystem::path filepath = preallocPath(i);
 
                 unsigned long long limit = DataLimitPerJournalFile;
                 if( debug && i == 1 ) { 
@@ -327,8 +334,8 @@ namespace mongo {
         }
 
         void preallocateFiles() {
-            if( exists(getJournalDir()/"prealloc.0") || // if enabled previously, keep using
-                exists(getJournalDir()/"prealloc.1") ||
+            if( exists(preallocPath(0)) || // if enabled previously, keep using
+                exists(preallocPath(1)) ||
                 ( cmdLine.preallocj && preallocateIsFaster() ) ) {
                     usingPreallocate = true;
                     try {
@@ -344,12 +351,11 @@ namespace mongo {
         void removeOldJournalFile(path p) { 
             if( usingPreallocate ) {
                 try {
-                    for( int i = 0; i <= 2; i++ ) {
-                        string fn = str::stream() << "prealloc." << i;
-                        filesystem::path filepath = getJournalDir() / fn;
+                    for( int i = 0; i < NUM_PREALLOC_FILES; i++ ) {
+                        filesystem::path filepath = preallocPath(i);
                         if( !filesystem::exists(filepath) ) {
                             // we can recycle this file into this prealloc file location
-                            filesystem::path temppath = getJournalDir() / (fn+".temp");
+                            filesystem::path temppath = filepath.string() + ".temp";
                             boost::filesystem::rename(p, temppath);
                             {
                                 // zero the header
@@ -383,9 +389,8 @@ namespace mongo {
         // find a prealloc.<n> file, presumably to take and use
         path findPrealloced() { 
             try {
-                for( int i = 0; i <= 2; i++ ) {
-                    string fn = str::stream() << "prealloc." << i;
-                    filesystem::path filepath = getJournalDir() / fn;
+                for( int i = 0; i < NUM_PREALLOC_FILES; i++ ) {
+                    filesystem::path filepath = preallocPath(i);
                     if( filesystem::exists(filepath) )
                         return filepath;
                 }
