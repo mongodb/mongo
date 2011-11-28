@@ -51,7 +51,18 @@ namespace mongo {
 
     void ScanAndOrder::add(BSONObj o, DiskLoc* loc) {
         assert( o.isValid() );
-        BSONObj k = _order.getKeyFromObject(o);
+        BSONObj k;
+        try {
+            k = _order.getKeyFromObject(o);
+        }
+        catch (UserException &e) {
+            if ( e.getCode() == 10088 ) { // cannot get keys for parallel arrays
+                // fix lasterror text to be more accurate.
+                uasserted( 15925, "cannot sort with keys that are parallel arrays" );
+            } else
+                throw;
+        }
+
         if ( k.isEmpty() ) {
             return;   
         }
