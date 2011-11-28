@@ -109,7 +109,6 @@ namespace mongo {
                             }
                         }
                         totalSize += lenWPadding;
-                        DiskLoc extentLoc;
                         DiskLoc loc = allocateSpaceForANewRecord(ns, d, lenWPadding, false);
                         uassert(14024, "compact error out of space during compaction", !loc.isNull());
                         Record *recNew = loc.rec();
