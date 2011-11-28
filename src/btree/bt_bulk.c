@@ -297,7 +297,7 @@ __wt_bulk_end(WT_CURSOR_BULK *cbulk)
 	root_page->size = 0;
 	root_page->page = page;
 
-	return (__wt_rec_write(session, page, NULL));
+	return (__wt_rec_evict(session, page, WT_REC_SINGLE));
 }
 
 /*
@@ -356,7 +356,7 @@ __bulk_row_page(WT_CURSOR_BULK *cbulk)
 
 	++cbulk->ref_next;		/* Move to the next parent slot */
 
-	return (__wt_rec_write(session, page, NULL));
+	return (__wt_rec_evict(session, page, WT_REC_SINGLE));
 }
 
 /*
@@ -420,7 +420,7 @@ __bulk_col_page(WT_CURSOR_BULK *cbulk)
 
 	++cbulk->ref_next;		/* Move to the next parent slot */
 
-	return (__wt_rec_write(session, page, NULL));
+	return (__wt_rec_evict(session, page, WT_REC_SINGLE));
 }
 
 /*
