@@ -85,67 +85,68 @@ namespace mongo {
             unsigned totalSize = 0;
             int nrecs = 0;
             DiskLoc L = e->firstRecord;
-            if( !L.isNull() )
-            while( 1 ) {
-                Record *recOld = L.rec();
-                L = recOld->nextInExtent(L);
-                nrecs++;
-                BSONObj objOld(recOld);
+            if( !L.isNull() ) {
+                while( 1 ) {
+                    Record *recOld = L.rec();
+                    L = recOld->nextInExtent(L);
+                    nrecs++;
+                    BSONObj objOld(recOld);
 
-                if( !validate || objOld.valid() ) {
-                    unsigned sz = objOld.objsize();
+                    if( !validate || objOld.valid() ) {
+                        unsigned sz = objOld.objsize();
 
-                    oldObjSize += sz;
-                    oldObjSizeWithPadding += recOld->netLength();
+                        oldObjSize += sz;
+                        oldObjSizeWithPadding += recOld->netLength();
 
-                    unsigned lenWHdr = sz + Record::HeaderSize;
-                    unsigned lenWPadding = lenWHdr;
-                    {
-                        lenWPadding = static_cast<unsigned>(pf*lenWPadding);
-                        lenWPadding += pb;
-                        lenWPadding = lenWPadding & quantizeMask(lenWPadding);
-                        if( lenWPadding < lenWHdr || lenWPadding > BSONObjMaxUserSize / 2 ) { 
-                            lenWPadding = lenWHdr;
+                        unsigned lenWHdr = sz + Record::HeaderSize;
+                        unsigned lenWPadding = lenWHdr;
+                        {
+                            lenWPadding = static_cast<unsigned>(pf*lenWPadding);
+                            lenWPadding += pb;
+                            lenWPadding = lenWPadding & quantizeMask(lenWPadding);
+                            if( lenWPadding < lenWHdr || lenWPadding > BSONObjMaxUserSize / 2 ) { 
+                                lenWPadding = lenWHdr;
+                            }
+                        }
+                        totalSize += lenWPadding;
+                        DiskLoc extentLoc;
+                        DiskLoc loc = allocateSpaceForANewRecord(ns, d, lenWPadding, false);
+                        uassert(14024, "compact error out of space during compaction", !loc.isNull());
+                        Record *recNew = loc.rec();
+                        recNew = (Record *) getDur().writingPtr(recNew, lenWHdr);
+                        addRecordToRecListInExtent(recNew, loc);
+                        memcpy(recNew->data, objOld.objdata(), sz);
+
+                        {
+                            // extract keys for all indexes we will be rebuilding
+                            for( int x = 0; x < nidx; x++ ) { 
+                                phase1[x].addKeys(indexSpecs[x], objOld, loc);
+                            }
                         }
                     }
-                    totalSize += lenWPadding;
-                    DiskLoc extentLoc;
-                    DiskLoc loc = allocateSpaceForANewRecord(ns, d, lenWPadding, false);
-                    uassert(14024, "compact error out of space during compaction", !loc.isNull());
-                    Record *recNew = loc.rec();
-                    recNew = (Record *) getDur().writingPtr(recNew, lenWHdr);
-                    addRecordToRecListInExtent(recNew, loc);
-                    memcpy(recNew->data, objOld.objdata(), sz);
+                    else { 
+                        if( ++skipped <= 10 )
+                            log() << "compact skipping invalid object" << endl;
+                    }
 
-                    {
-                        // extract keys for all indexes we will be rebuilding
-                        for( int x = 0; x < nidx; x++ ) { 
-                            phase1[x].addKeys(indexSpecs[x], objOld, loc);
-                        }
+                    if( L.isNull() ) { 
+                        // we just did the very last record from the old extent.  it's still pointed to 
+                        // by the old extent ext, but that will be fixed below after this loop
+                        break;
+                    }
+
+                    // remove the old records (orphan them) periodically so our commit block doesn't get too large
+                    bool stopping = false;
+                    RARELY stopping = *killCurrentOp.checkForInterruptNoAssert() != 0;
+                    if( stopping || getDur().aCommitIsNeeded() ) {
+                        e->firstRecord.writing() = L;
+                        Record *r = L.rec();
+                        getDur().writingInt(r->prevOfs) = DiskLoc::NullOfs;
+                        getDur().commitIfNeeded();
+                        killCurrentOp.checkForInterrupt(false);
                     }
                 }
-                else { 
-                    if( ++skipped <= 10 )
-                        log() << "compact skipping invalid object" << endl;
-                }
-
-                if( L.isNull() ) { 
-                    // we just did the very last record from the old extent.  it's still pointed to 
-                    // by the old extent ext, but that will be fixed below after this loop
-                    break;
-                }
-
-                // remove the old records (orphan them) periodically so our commit block doesn't get too large
-                bool stopping = false;
-                RARELY stopping = *killCurrentOp.checkForInterruptNoAssert() != 0;
-                if( stopping || getDur().aCommitIsNeeded() ) {
-                    e->firstRecord.writing() = L;
-                    Record *r = L.rec();
-                    getDur().writingInt(r->prevOfs) = DiskLoc::NullOfs;
-                    getDur().commitIfNeeded();
-                    killCurrentOp.checkForInterrupt(false);
-                }
-            }
+            } // if !L.isNull()
 
             assert( d->firstExtent == ext );
             assert( d->lastExtent != ext );
