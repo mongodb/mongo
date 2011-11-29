@@ -212,7 +212,7 @@ __cache_read(
 	WT_ERR(__wt_block_read(
 	    session, tmp, addr, size, dsk_verify ? WT_VERIFY : 0));
 
-	dsk = __wt_buf_steal(session, tmp, &size);
+	dsk = __wt_buf_steal(session, tmp, NULL);
 	__wt_scr_free(&tmp);
 
 	/*
