@@ -1333,7 +1333,11 @@ namespace mongo {
                 }
 
                 // copy some elements from a single result
-                result.append(singleResult.getField("result"));
+                // annoying that we have to copy all results for inline, but no way around it
+                if (singleResult.hasField("result"))
+                    result.append(singleResult.getField("result"));
+                else if (singleResult.hasField("results"))
+                    result.append(singleResult.getField("results"));
 
                 BSONObjBuilder countsB(32);
                 // input stat is determined by aggregate MR job
