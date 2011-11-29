@@ -23,7 +23,7 @@
 namespace mongo {
 
     class ExpressionContext :
-        public IntrusiveCounter {
+        public IntrusiveCounterUnsigned {
     public:
 	virtual ~ExpressionContext();
 

@@ -23,14 +23,15 @@
 #include "db/pipeline/document.h"
 
 namespace mongo {
+
     const intrusive_ptr<const Value> Value::pFieldUndefined(
-	new Value(Undefined));
-    const intrusive_ptr<const Value> Value::pFieldNull(new Value());
-    const intrusive_ptr<const Value> Value::pFieldTrue(new Value(true));
-    const intrusive_ptr<const Value> Value::pFieldFalse(new Value(false));
-    const intrusive_ptr<const Value> Value::pFieldMinusOne(new Value(-1));
-    const intrusive_ptr<const Value> Value::pFieldZero(new Value(0));
-    const intrusive_ptr<const Value> Value::pFieldOne(new Value(1));
+	new ValueStatic(Undefined));
+    const intrusive_ptr<const Value> Value::pFieldNull(new ValueStatic());
+    const intrusive_ptr<const Value> Value::pFieldTrue(new ValueStatic(true));
+    const intrusive_ptr<const Value> Value::pFieldFalse(new ValueStatic(false));
+    const intrusive_ptr<const Value> Value::pFieldMinusOne(new ValueStatic(-1));
+    const intrusive_ptr<const Value> Value::pFieldZero(new ValueStatic(0));
+    const intrusive_ptr<const Value> Value::pFieldOne(new ValueStatic(1));
 
     Value::~Value() {
     }
@@ -1015,4 +1016,12 @@ namespace mongo {
 	assert(false);
 	return sizeof(Value);
     }
+
+
+    void ValueStatic::addRef() const {
+    }
+
+    void ValueStatic::release() const {
+    }
+
 }

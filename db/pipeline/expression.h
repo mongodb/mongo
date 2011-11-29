@@ -32,7 +32,7 @@ namespace mongo {
     class Value;
 
     class Expression :
-        public IntrusiveCounter {
+        public IntrusiveCounterUnsigned {
     public:
         virtual ~Expression() {};
 

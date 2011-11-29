@@ -27,7 +27,7 @@ namespace mongo {
     class Value;
 
     class ValueIterator :
-        public IntrusiveCounter {
+        public IntrusiveCounterUnsigned {
     public:
         virtual ~ValueIterator();
 
@@ -52,7 +52,7 @@ namespace mongo {
       intrusive_ptr<const Value>.
      */
     class Value :
-        public IntrusiveCounter {
+        public IntrusiveCounterUnsigned {
     public:
         ~Value();
 
@@ -291,15 +291,17 @@ namespace mongo {
 	    unary_function<intrusive_ptr<const Value>, size_t> {
 	    size_t operator()(const intrusive_ptr<const Value> &rV) const;
 	};
-	
-    private:
+
+    protected:
         Value(); // creates null value
 	Value(BSONType type); // creates an empty (unitialized value) of type
 	                                        // mostly useful for Undefined
-        Value(BSONElement *pBsonElement);
-
         Value(bool boolValue);
         Value(int intValue);
+
+    private:
+        Value(BSONElement *pBsonElement);
+
         Value(long long longValue);
         Value(double doubleValue);
         Value(const Date_t &dateValue);
@@ -371,6 +373,32 @@ namespace mongo {
 		    const intrusive_ptr<const Value> &v2) {
 	return (Value::compare(v1, v2) == 0);
     }
+
+    /*
+      For performance reasons, there are various sharable static values
+      defined in class Value, obtainable by methods such as getUndefined(),
+      getTrue(), getOne(), etc.  We don't want these to go away as they are
+      used by a multitude of threads evaluating pipelines.  In order to avoid
+      having to use atomic integers in the intrusive reference counter, this
+      class overrides the reference counting methods to do nothing, making it
+      safe to use for static Values.
+
+      At this point, only the constructors necessary for the static Values in
+      common use have been defined.  The remainder can be defined if necessary.
+     */
+    class ValueStatic :
+        public Value {
+    public:
+	// virtuals from IntrusiveCounterUnsigned
+	virtual void addRef() const;
+	virtual void release() const;
+
+	// constructors
+	ValueStatic();
+	ValueStatic(BSONType type);
+	ValueStatic(bool boolValue);
+	ValueStatic(int intValue);
+    };
 }
 
 /* ======================= INLINED IMPLEMENTATIONS ========================== */
@@ -419,6 +447,22 @@ namespace mongo {
 	size_t seed = 0xf0afbeef;
 	rV->hash_combine(seed);
 	return seed;
+    }
+
+    inline ValueStatic::ValueStatic():
+	Value() {
+    }
+
+    inline ValueStatic::ValueStatic(BSONType type):
+	Value(type) {
+    }
+
+    inline ValueStatic::ValueStatic(bool boolValue):
+	Value(boolValue) {
+    }
+
+    inline ValueStatic::ValueStatic(int intValue):
+	Value(intValue) {
     }
 
 };

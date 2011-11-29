@@ -38,7 +38,7 @@ namespace mongo {
     class Matcher;
 
     class DocumentSource :
-        public IntrusiveCounter,
+        public IntrusiveCounterUnsigned,
 	public StringWriter {
     public:
 	virtual ~DocumentSource();

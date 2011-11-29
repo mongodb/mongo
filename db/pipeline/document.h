@@ -26,7 +26,7 @@ namespace mongo {
     class Value;
 
     class Document :
-        public IntrusiveCounter {
+        public IntrusiveCounterUnsigned {
     public:
         ~Document();
 
