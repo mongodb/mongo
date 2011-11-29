@@ -39,8 +39,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	conn = S2C(session);
 
 	WT_VERBOSE(session, EVICT,
-	    "evict: addr %" PRIu32 " (%s)", WT_PADDR(page),
-	    __wt_page_type_string(page->type));
+	    "evict: page %p (%s)", page, __wt_page_type_string(page->type));
 
 	/*
 	 * Get exclusive access to the page and review the page's subtree for
@@ -582,8 +581,9 @@ __rec_discard_track(WT_SESSION_IMPL *session, WT_PAGE *page)
 		case WT_PT_BLOCK:
 		case WT_PT_OVFL_DISCARD:
 			WT_VERBOSE(session, EVICT,
-			    "evict: discarding%s block %" PRIu32 "/%" PRIu32,
-			    track->type == WT_PT_OVFL ? " overflow" : "",
+			    "evict: page %p discarding%s block %" PRIu32 "/%"
+			    PRIu32,
+			    page, track->type == WT_PT_OVFL ? " overflow" : "",
 			    track->addr, track->size);
 			WT_RET(
 			    __wt_block_free(session, track->addr, track->size));
@@ -632,8 +632,8 @@ retry:	__hazard_copy(session);
 		goto retry;
 	}
 
-	WT_VERBOSE(session, EVICT,
-	    "evict: addr %" PRIu32 " hazard request failed", ref->addr);
+	WT_VERBOSE(session,
+	    EVICT, "evict: page %p hazard request failed", ref->page);
 
 	/* Return the page to in-use. */
 	ref->state = WT_REF_MEM;
