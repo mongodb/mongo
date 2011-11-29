@@ -2693,9 +2693,11 @@ __rec_track_verbose(
 		onoff = "ON";
 		break;
 	case WT_PT_OVFL_DISCARD:
-	default:				/* Not possible. */
 		onoff = "OFF";
 		break;
+	case WT_PT_EMPTY:			/* Odd, but possible. */
+	default:				/* Not possible. */
+		return;
 	}
 	WT_VERBOSE(session, reconcile,
 	    "page %p tracking overflow %s (%p, %" PRIu32 "/%" PRIu32 ")",
