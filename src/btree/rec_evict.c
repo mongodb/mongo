@@ -205,23 +205,32 @@ __rec_parent_dirty_update(
 	 * triggered the split won't see our new root page during its traversal.
 	 *
 	 * We left the old root page locked and we've discarded the old root
-	 * page.  Make the new root page look like it's not the result of a
-	 * split, write it out, and then discard it.
+	 * page.  Now, make the new root page look like a normal page that has
+	 * been modified, write it out, update the tree's root information,
+	 * and discard it.
 	 */
 	if (root_split != NULL) {
 		WT_VERBOSE(session, evict, "split root page %p", page);
 
-		F_CLR(root_split, WT_PAGE_REC_MASK);
 		WT_RET(__wt_page_set_modified(session, root_split));
+		mod = root_split->modify;
+		F_CLR(root_split, WT_PAGE_REC_MASK);
+
 		WT_RET(__wt_rec_write(session, root_split, NULL));
-		WT_RET(__rec_discard_page(session, root_split));
+
+		WT_ASSERT(session, F_ISSET(root_split,
+		    WT_PAGE_REC_MASK) == WT_PAGE_REC_REPLACE);
+		btree->root_page.addr = mod->u.write_off.addr;
+		btree->root_page.size = mod->u.write_off.size;
+		btree->root_page.page = NULL;
 
 		/*
 		 * Publish: a barrier to ensure the structure fields are set
 		 * before the state change makes the page available to readers.
 		 */
-		btree->root_page.page = NULL;
 		WT_PUBLISH(parent_ref->state, WT_REF_DISK);
+
+		WT_RET(__rec_discard_page(session, root_split));
 	}
 
 	return (0);
