@@ -1135,7 +1135,7 @@ __slvg_col_build_internal(
 	}
 
 	/* Write the internal page to disk. */
-	return (__wt_rec_write(session, page, NULL));
+	return (__wt_rec_evict(session, page, WT_REC_SINGLE));
 
 err:	__wt_free(session, page->u.col_int.t);
 	__wt_free(session, page);
@@ -1159,6 +1159,7 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session,
 
 	cookie = &_cookie;
 	WT_CLEAR(*cookie);
+	ret = 0;
 
 	/* Get the original page, including the full in-memory setup. */
 	WT_RET(__wt_page_in(session, parent, &cref->ref, 0));
@@ -1217,15 +1218,18 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session,
 
 	/* Write the new version of the leaf page to disk. */
 	WT_ERR(__wt_page_set_modified(session, page));
-	ret = __wt_rec_write(session, page, cookie);
+	WT_ERR(__wt_rec_write(session, page, cookie));
 
-err:	/* Reset the page. */
+	/* Reset the page. */
 	page->u.col_leaf.d = save_col_leaf;
 	page->entries = save_entries;
 
-	/* Discard our hazard reference and the page. */
 	__wt_page_release(session, page);
-	__wt_page_out(session, page, 0);
+	ret = __wt_rec_evict(session, page, WT_REC_SINGLE);
+
+	if (0) {
+err:		__wt_page_release(session, page);
+	}
 
 	return (ret);
 }
@@ -1706,7 +1710,7 @@ __slvg_row_build_internal(
 	}
 
 	/* Write the internal page to disk. */
-	return (__wt_rec_write(session, page, NULL));
+	return (__wt_rec_evict(session, page, WT_REC_SINGLE));
 
 err:	__wt_free(session, page->u.row_int.t);
 	__wt_free(session, page);
@@ -1736,6 +1740,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 
 	cookie = &_cookie;
 	WT_CLEAR(*cookie);
+	ret = 0;
 
 	/* Allocate temporary space in which to instantiate the keys. */
 	WT_RET(__wt_scr_alloc(session, 0, &key));
@@ -1830,6 +1835,22 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	WT_ASSERT_RET(session, skip_start + skip_stop < page->entries);
 
 	/*
+	 * Take a copy of this page's first key to define the start of
+	 * its range.  The key may require processing, otherwise, it's
+	 * a copy from the page.
+	 */
+	rip = page->u.row_leaf.d + skip_start;
+	if (__wt_off_page(page, rip->key)) {
+		ikey = rip->key;
+		WT_ERR(__wt_row_ikey_alloc(session, 0,
+		    WT_IKEY_DATA(ikey), ikey->size, (WT_IKEY **)&rref->key));
+	} else {
+		WT_ERR(__wt_row_key(session, page, rip, key));
+		WT_ERR(__wt_row_ikey_alloc(session, 0,
+		    key->data, key->size, (WT_IKEY **)&rref->key));
+	}
+
+	/*
 	 * Discard backing overflow pages for any items being discarded that
 	 * reference overflow pages.
 	 */
@@ -1870,34 +1891,22 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 
 		/* Write the new version of the leaf page to disk. */
 		WT_ERR(__wt_page_set_modified(session, page));
-		ret = __wt_rec_write(session, page, cookie);
+		WT_ERR(__wt_rec_write(session, page, cookie));
 
+		/* Reset the page. */
 		page->entries += skip_stop;
-		if (ret != 0)
-			goto err;
 	}
 
 	/*
-	 * Take a copy of this page's first key to define the start of
-	 * its range.  The key may require processing, otherwise, it's
-	 * a copy from the page.
+	 * Discard our hazard reference and evict the page, updating the
+	 * parent's reference.
 	 */
-	rip = page->u.row_leaf.d + skip_start;
-	if (__wt_off_page(page, rip->key)) {
-		ikey = rip->key;
-		WT_ERR(__wt_row_ikey_alloc(session, 0,
-		    WT_IKEY_DATA(ikey), ikey->size,
-		    (WT_IKEY **)&rref->key));
-	} else {
-		WT_ERR(__wt_row_key(session, page, rip, key));
-		WT_ERR(__wt_row_ikey_alloc(session, 0,
-		    key->data, key->size, (WT_IKEY **)&rref->key));
+	__wt_page_release(session, page);
+	ret = __wt_rec_evict(session, page, WT_REC_SINGLE);
+
+	if (0) {
+err:		__wt_page_release(session, page);
 	}
-
-	/* Discard our hazard reference and the page. */
-err:	__wt_page_release(session, page);
-	__wt_page_out(session, page, 0);
-
 	__wt_scr_free(&key);
 
 	return (ret);
