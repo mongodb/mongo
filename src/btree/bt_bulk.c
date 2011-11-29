@@ -28,6 +28,7 @@ __wt_bulk_init(WT_CURSOR_BULK *cbulk)
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 	btree = session->btree;
+	ret = 0;
 
 	/*
 	 * You can't bulk-load into existing trees; while checking, free the
@@ -75,10 +76,21 @@ __wt_bulk_init(WT_CURSOR_BULK *cbulk)
 		break;
 	}
 
+	/*
+	 * Allocate an internal page so the leaf pages have something to
+	 * reference.
+	 */
+	WT_ERR(__wt_calloc_def(session, 1, &cbulk->parent));
+	cbulk->parent->parent = NULL;			/* Root page */
+	cbulk->parent->parent_ref = &session->btree->root_page;
+
 	/* Tell the eviction thread to ignore us, we'll handle our own pages. */
 	F_SET(btree, WT_BTREE_NO_EVICTION);
 
 	return (0);
+
+err:	__wt_free(session, cbulk->bitf);
+	return (ret);
 }
 
 /*
@@ -245,9 +257,9 @@ err:	if (ins != NULL)
 int
 __wt_bulk_end(WT_CURSOR_BULK *cbulk)
 {
-	WT_SESSION_IMPL *session;
 	WT_PAGE *page;
 	WT_REF *root_page;
+	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 
@@ -266,15 +278,8 @@ __wt_bulk_end(WT_CURSOR_BULK *cbulk)
 	/* Discard any fixed-length column-store bulk buffer. */
 	__wt_free(session, cbulk->bitf);
 
-	root_page = &session->btree->root_page;
-
-	/* Allocate an internal page and initialize it. */
-	WT_RET(__wt_calloc_def(session, 1, &page));
-	page->parent = NULL;				/* Root page */
-	page->parent_ref = root_page;
-	page->read_gen = 0;
-	WT_RET(__wt_page_set_modified(session, page));
-
+	/* Finish initializing the internal page. */
+	page = cbulk->parent;
 	switch (cbulk->page_type) {
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_VAR:
@@ -292,11 +297,14 @@ __wt_bulk_end(WT_CURSOR_BULK *cbulk)
 	}
 
 	/* Reference this page from the root of the tree. */
+	root_page = &session->btree->root_page;
 	root_page->state = WT_REF_MEM;
 	root_page->addr = WT_ADDR_INVALID;
 	root_page->size = 0;
 	root_page->page = page;
+	WT_RET(__wt_page_set_modified(session, page));
 
+	/* Evict the internal page. */
 	return (__wt_rec_evict(session, page, WT_REC_SINGLE));
 }
 
@@ -340,7 +348,7 @@ __bulk_row_page(WT_CURSOR_BULK *cbulk)
 	 * a WT_INSERT/WT_UPDATE pair, held in a single, forward-linked list.
 	 */
 	WT_RET(__wt_calloc_def(session, 1, &page));
-	page->parent = NULL;
+	page->parent = cbulk->parent;
 	page->parent_ref = parent_ref;
 	page->read_gen = __wt_cache_read_gen(session);
 	page->u.bulk.recno = 0;
@@ -395,7 +403,7 @@ __bulk_col_page(WT_CURSOR_BULK *cbulk)
 	 * a WT_UPDATE item, held in a single, forward-linked list.
 	 */
 	WT_RET(__wt_calloc_def(session, 1, &page));
-	page->parent = NULL;
+	page->parent = cbulk->parent;
 	page->parent_ref = parent_ref;
 	page->read_gen = __wt_cache_read_gen(session);
 	page->u.bulk.recno = cbulk->recno;

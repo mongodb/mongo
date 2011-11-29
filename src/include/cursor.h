@@ -113,8 +113,11 @@ struct __wt_cursor_bulk {
 	 * when the bulk load finishes, we build an internal page for those
 	 * references.
 	 */
+	WT_PAGE	*parent;			/* The internal page */
+
 	WT_ROW_REF *rref;			/* List of row leaf pages */
 	WT_COL_REF *cref;			/* List of column leaf pages */
+
 	uint32_t ref_next;			/* Next leaf page slot */
 	uint32_t ref_entries;			/* Total leaf page slots */
 	size_t   ref_allocated;			/* Bytes allocated */
