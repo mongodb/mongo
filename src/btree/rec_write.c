@@ -2845,7 +2845,9 @@ __wt_rec_discard_track(WT_SESSION_IMPL *session, WT_PAGE *page)
 			    page, track->addr, track->size);
 			break;
 		case WT_PT_OVFL:
-			__rec_track_verbose(session, page, track);
+			WT_VERBOSE(session, reconcile,
+			    "page %p keeping overflow %" PRIu32 "/%" PRIu32,
+			    page, track->addr, track->size);
 			continue;
 		}
 		WT_RET(__wt_block_free(session, track->addr, track->size));
