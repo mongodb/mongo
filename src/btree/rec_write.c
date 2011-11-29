@@ -171,7 +171,6 @@ static int  __rec_split_col(WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE **);
 static int  __rec_split_finish(WT_SESSION_IMPL *);
 static int  __rec_split_fixup(WT_SESSION_IMPL *);
 static int  __rec_split_init(WT_SESSION_IMPL *, WT_PAGE *, uint64_t, uint32_t);
-static int  __rec_split_root(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_split_row(WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE **);
 static int  __rec_split_row_promote(WT_SESSION_IMPL *, uint8_t);
 static int  __rec_split_write(WT_SESSION_IMPL *, WT_BOUNDARY *, WT_BUF *);
@@ -270,17 +269,6 @@ __wt_rec_write(
 	if (!WT_PAGE_IS_ROOT(page))
 		WT_RET(__wt_page_set_modified(session, page->parent));
 
-	/*
-	 * Newly created internal pages are normally merged into their parents
-	 * when said parent is reconciled.  Newly split root pages can't be
-	 * merged (as they have no parent), the new root page must be written.
-	 *
-	 * We detect root splits when the root page is written and the page's
-	 * WT_MODIFY structure references a split page.
-	 */
-	if (WT_PAGE_IS_ROOT(page) && F_ISSET(page, WT_PAGE_REC_SPLIT))
-		WT_RET(__rec_split_root(session, page->modify->u.write_split));
-
 	return (0);
 }
 
@@ -354,43 +342,6 @@ __wt_rec_destroy(WT_SESSION_IMPL *session)
 	__wt_buf_free(session, &r->_last);
 
 	__wt_free(session, session->btree->reconcile);
-}
-
-/*
- * __rec_split_root --
- *	Split the root page.
- */
-static int
-__rec_split_root(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_BOUNDARY *bnd;
-	WT_BTREE *btree;
-	WT_RECONCILE *r;
-
-	r = session->btree->reconcile;
-	btree = session->btree;
-
-	/*
-	 * Do the minimum work necessary to make the page look real enough to
-	 * write, and write it.
-	 */
-	WT_RET(__rec_write_init(session, page, NULL));
-	WT_RET(__rec_row_int(session, page));
-
-	bnd = &r->bnd[0];
-	WT_VERBOSE(session, reconcile,
-	    "split root page %p: %" PRIu32 " to %" PRIu32
-	    ", (%" PRIu32 " %s %" PRIu32 ")",
-	    page,
-	    btree->root_page.addr, bnd->off.addr,
-	    btree->root_page.size,
-	    btree->root_page.size == bnd->off.size ? "==" :
-	    (btree->root_page.size < bnd->off.size ? ">>" : "<<"),
-	    bnd->off.size);
-
-	btree->root_page.addr = bnd->off.addr;
-	btree->root_page.size = bnd->off.size;
-	return (0);
 }
 
 /*

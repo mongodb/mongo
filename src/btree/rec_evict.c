@@ -101,17 +101,21 @@ static int
 __rec_parent_dirty_update(
     WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 {
+	WT_BTREE *btree;
+	WT_PAGE *root_split;
 	WT_PAGE_MODIFY *mod;
 	WT_REF *parent_ref;
 
+	btree = session->btree;
 	mod = page->modify;
 	parent_ref = page->parent_ref;
+	root_split = NULL;
 
 	switch (F_ISSET(page, WT_PAGE_REC_MASK)) {
 	case WT_PAGE_REC_EMPTY:				/* Page is empty */
 		/*
-		 * If the tree is empty, we will end up here with an empty root
-		 * page: discard it.
+		 * Special case the root page: if the root page is empty, we
+		 * reset the root address and discard the tree.
 		 */
 		if (WT_PAGE_IS_ROOT(page)) {
 			parent_ref->addr = WT_ADDR_INVALID;
@@ -150,9 +154,16 @@ __rec_parent_dirty_update(
 		WT_PUBLISH(parent_ref->state, WT_REF_MEM);
 		return (0);
 	case WT_PAGE_REC_REPLACE: 			/* 1-for-1 page swap */
+		/*
+		 * Special case the root page: none, we just wrote a new root
+		 * page, updating the parent is all that's necessary.
+		 *
+		 * Update the parent to reference the replacement page.
+		 */
 		parent_ref->addr = mod->u.write_off.addr;
 		parent_ref->size = mod->u.write_off.size;
 		parent_ref->page = NULL;
+
 		/*
 		 * Publish: a barrier to ensure the structure fields are set
 		 * before the state change makes the page available to readers.
@@ -161,24 +172,20 @@ __rec_parent_dirty_update(
 		break;
 	case WT_PAGE_REC_SPLIT:				/* Page split */
 	default:					/* Not possible */
+		/* Special case the root page: see below. */
+		if (WT_PAGE_IS_ROOT(page)) {
+			root_split = mod->u.write_split;
+			break;
+		}
+
 		/*
-		 * Update the parent to reference the created internal page(s).
-		 * If we're evicting the root page and there was a split of the
-		 * root page, we end up here: when we wrote the internal root
-		 * page, we also wrote out the created internal pages as well,
-		 * and updated the root page information, which means there's
-		 * no internal page, we're done.
+		 * Update the parent to reference new internal page(s).
 		 *
 		 * Publish: a barrier to ensure the structure fields are set
 		 * before the state change makes the page available to readers.
 		 */
-		if (WT_PAGE_IS_ROOT(page)) {
-			parent_ref->page = NULL;
-			WT_PUBLISH(parent_ref->state, WT_REF_DISK);
-		} else {
-			parent_ref->page = mod->u.write_split;
-			WT_PUBLISH(parent_ref->state, WT_REF_MEM);
-		}
+		parent_ref->page = mod->u.write_split;
+		WT_PUBLISH(parent_ref->state, WT_REF_MEM);
 		break;
 	}
 
@@ -190,6 +197,33 @@ __rec_parent_dirty_update(
 	 */
 	WT_RET(__rec_sub_discard(session, page));
 	WT_RET(__rec_discard_page(session, page));
+
+	/*
+	 * Newly created internal pages are normally merged into their parent
+	 * when the parent is evicted.  Newly split root pages can't be merged,
+	 * they have no parent and the new root page must be written.  We also
+	 * have to write the root page immediately, as the sync or close that
+	 * triggered the split won't see our new root page during its traversal.
+	 *
+	 * We left the old root page locked and we've discarded the old root
+	 * page.  Make the new root page look like it's not the result of a
+	 * split, write it out, and then discard it.
+	 */
+	if (root_split != NULL) {
+		WT_VERBOSE(session, evict, "split root page %p", page);
+
+		F_CLR(root_split, WT_PAGE_REC_MASK);
+		WT_RET(__wt_page_set_modified(session, root_split));
+		WT_RET(__wt_rec_write(session, root_split, NULL));
+		WT_RET(__rec_discard_page(session, root_split));
+
+		/*
+		 * Publish: a barrier to ensure the structure fields are set
+		 * before the state change makes the page available to readers.
+		 */
+		btree->root_page.page = NULL;
+		WT_PUBLISH(parent_ref->state, WT_REF_DISK);
+	}
 
 	return (0);
 }
