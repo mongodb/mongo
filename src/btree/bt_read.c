@@ -203,11 +203,9 @@ __cache_read(
 	 * The page isn't in the cache, and since we're the only path for the
 	 * page to get into the cache, we don't have to worry further, and we
 	 * might as well get to it.
+	 *
+	 * Allocate memory for the page's disk image.
 	 */
-	WT_VERBOSE(
-	    session, READSERVER, "read %" PRIu32 "/%" PRIu32, addr, size);
-
-	/* Allocate memory for the page's disk image. */
 	WT_RET(__wt_scr_alloc(session, size, &tmp));
 
 	/* Read the page and steal the resulting buffer. */
@@ -232,6 +230,10 @@ __cache_read(
 
 	/* No memory flush required, the state variable is volatile. */
 	ref->state = WT_REF_MEM;
+
+	WT_VERBOSE(session, READ,
+	    "read page %p (%" PRIu32 "/%" PRIu32 ", %s)",
+	    ref->page, addr, size, __wt_page_type_string(ref->page->type));
 
 	return (0);
 
