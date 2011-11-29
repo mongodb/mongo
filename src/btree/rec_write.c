@@ -2254,7 +2254,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	switch (r->bnd_next) {
 	case 0:						/* Page delete */
-		WT_VERBOSE(session, reconcile, "delete page %p", page);
+		WT_VERBOSE(session, reconcile, "page %p empty", page);
 
 		WT_BSTAT_INCR(session, rec_page_delete);
 
@@ -2275,7 +2275,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 */
 		bnd = &r->bnd[0];
 		WT_VERBOSE(session, reconcile,
-		    "replace page %p to %" PRIu32 ", (%" PRIu32
+		    "page %p replace to %" PRIu32 ", (%" PRIu32
 		    " %s %" PRIu32 ")",
 		    page, bnd->off.addr, WT_PSIZE(page),
 		    WT_PSIZE(page) == bnd->off.size ? "==" :
@@ -2287,7 +2287,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		break;
 	default:					/* Page split */
 		WT_VERBOSE(session, reconcile,
-		    "split page %p into %" PRIu32 " pages",
+		    "page %p split into %" PRIu32 " pages",
 		    page, r->bnd_next);
 
 		switch (page->type) {
