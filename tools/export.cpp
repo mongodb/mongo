@@ -45,6 +45,15 @@ public:
         _usesstdout = false;
     }
 
+    virtual void preSetup() {
+        string out = getParam("out");
+        if ( out == "-" ) {
+                // write output to standard error to avoid mangling output
+                // must happen early to avoid sending junk to stdout
+                useStandardOutput(false);
+        }
+    }
+
     virtual void printExtraHelp( ostream & out ) {
         out << "Export MongoDB data to CSV, TSV or JSON files.\n" << endl;
     }
