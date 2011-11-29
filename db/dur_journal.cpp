@@ -333,7 +333,28 @@ namespace mongo {
             }
         }
 
+        void checkFreeSpace() {
+            unsigned long long spaceNeeded = 3 * DataLimitPerJournalFile * 1.1; // add 10% for headroom
+            unsigned long long freeSpace = File::freeSpace(getJournalDir().string());
+            unsigned long long prealloced = 0;
+            for( int i = 0; i < NUM_PREALLOC_FILES; i++ ) {
+                filesystem::path filepath = preallocPath(i);
+                if (exists(filepath))
+                    prealloced += file_size(filepath);
+            }
+
+            if (freeSpace + prealloced < spaceNeeded) {
+                log() << endl;
+                error() << "Insufficient free space for journals." << endl;
+                log() << "Please make at least " << spaceNeeded/(1024*1024) << "MB available in " << getJournalDir().string() << endl;
+                log() << endl;
+                throw UserException(15926, "Insufficient free space for journals");
+            }
+        }
+
         void preallocateFiles() {
+            checkFreeSpace();
+
             if( exists(preallocPath(0)) || // if enabled previously, keep using
                 exists(preallocPath(1)) ||
                 ( cmdLine.preallocj && preallocateIsFaster() ) ) {
