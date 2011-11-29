@@ -356,18 +356,18 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		const char *vname;
 		uint32_t vflag;
 	} *vt, verbtypes[] = {
-		{ "allocate",	WT_VERB_ALLOCATE },
-		{ "evict",	WT_VERB_EVICT },
-		{ "evictserver",WT_VERB_EVICTSERVER },
-		{ "fileops",	WT_VERB_FILEOPS },
-		{ "hazard",	WT_VERB_HAZARD },
-		{ "mutex",	WT_VERB_MUTEX },
-		{ "read",	WT_VERB_READ },
-		{ "readserver",	WT_VERB_READSERVER },
-		{ "reconcile",	WT_VERB_RECONCILE },
-		{ "salvage",	WT_VERB_SALVAGE },
-		{ "verify",	WT_VERB_VERIFY },
-		{ "write",	WT_VERB_WRITE },
+		{ "allocate",	WT_VERB_allocate },
+		{ "evict",	WT_VERB_evict },
+		{ "evictserver",WT_VERB_evictserver },
+		{ "fileops",	WT_VERB_fileops },
+		{ "hazard",	WT_VERB_hazard },
+		{ "mutex",	WT_VERB_mutex },
+		{ "read",	WT_VERB_read },
+		{ "readserver",	WT_VERB_readserver },
+		{ "reconcile",	WT_VERB_reconcile },
+		{ "salvage",	WT_VERB_salvage },
+		{ "verify",	WT_VERB_verify },
+		{ "write",	WT_VERB_write },
 		{ NULL, 0 }
 	};
 	WT_BUF *cbuf, expath, exconfig;

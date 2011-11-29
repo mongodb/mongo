@@ -192,8 +192,8 @@ __verify_tree(
 	page = ref->page;
 	unpack = &_unpack;
 
-	WT_VERBOSE(session, VERIFY,
-	    "verify: addr %" PRIu32 " (%s)",
+	WT_VERBOSE(session, verify,
+	    "addr %" PRIu32 " (%s)",
 	    ref->addr, __wt_page_type_string(page->type));
 
 	/*
@@ -563,8 +563,8 @@ __verify_freelist(WT_SESSION_IMPL *session, WT_VSTUFF *vs)
 			    fe->addr);
 			return (WT_ERROR);
 		}
-		WT_VERBOSE(session, VERIFY,
-		    "verify: free-list addr/frags %" PRIu32 "/%" PRIu32,
+		WT_VERBOSE(session, verify,
+		    "free-list addr/frags %" PRIu32 "/%" PRIu32,
 		    fe->addr, fe->size / btree->allocsize);
 		WT_TRET(__verify_addfrag(session, fe->addr, fe->size, vs));
 	}

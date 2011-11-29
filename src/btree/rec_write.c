@@ -208,8 +208,8 @@ int
 __wt_rec_write(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_SALVAGE_COOKIE *salvage)
 {
-	WT_VERBOSE(session, RECONCILE,
-	    "reconcile: page %p (%s)", page, __wt_page_type_string(page->type));
+	WT_VERBOSE(session, reconcile,
+	    "page %p (%s)", page, __wt_page_type_string(page->type));
 
 	WT_BSTAT_INCR(session, rec_written);
 
@@ -378,8 +378,8 @@ __rec_split_root(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_RET(__rec_row_int(session, page));
 
 	bnd = &r->bnd[0];
-	WT_VERBOSE(session, RECONCILE,
-	    "reconcile: split root page %p: %" PRIu32 " to %" PRIu32
+	WT_VERBOSE(session, reconcile,
+	    "split root page %p: %" PRIu32 " to %" PRIu32
 	    ", (%" PRIu32 " %s %" PRIu32 ")",
 	    page,
 	    btree->root_page.addr, bnd->off.addr,
@@ -2254,8 +2254,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	switch (r->bnd_next) {
 	case 0:						/* Page delete */
-		WT_VERBOSE(session,
-		    RECONCILE, "reconcile: delete page %p", page);
+		WT_VERBOSE(session, reconcile, "delete page %p", page);
 
 		WT_BSTAT_INCR(session, rec_page_delete);
 
@@ -2275,8 +2274,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * the time.
 		 */
 		bnd = &r->bnd[0];
-		WT_VERBOSE(session, RECONCILE,
-		    "reconcile: replace page %p to %" PRIu32 ", (%" PRIu32
+		WT_VERBOSE(session, reconcile,
+		    "replace page %p to %" PRIu32 ", (%" PRIu32
 		    " %s %" PRIu32 ")",
 		    page, bnd->off.addr, WT_PSIZE(page),
 		    WT_PSIZE(page) == bnd->off.size ? "==" :
@@ -2287,8 +2286,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		F_SET(page, WT_PAGE_REC_REPLACE);
 		break;
 	default:					/* Page split */
-		WT_VERBOSE(session, RECONCILE,
-		    "reconcile split page %p into %" PRIu32 " pages",
+		WT_VERBOSE(session, reconcile,
+		    "split page %p into %" PRIu32 " pages",
 		    page, r->bnd_next);
 
 		switch (page->type) {
@@ -2305,7 +2304,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		}
 
 #ifdef HAVE_VERBOSE
-		if (WT_VERBOSE_ISSET(session, RECONCILE)) {
+		if (WT_VERBOSE_ISSET(session, reconcile)) {
 			WT_BUF *tkey;
 			if (page->type == WT_PAGE_ROW_INT ||
 			    page->type == WT_PAGE_ROW_LEAF)
@@ -2317,8 +2316,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 					WT_ERR(__wt_buf_set_printable(
 					    session, tkey,
 					    bnd->key.data, bnd->key.size));
-					WT_VERBOSE(session, RECONCILE,
-					    "reconcile split: starting key "
+					WT_VERBOSE(session, reconcile,
+					    "split: starting key "
 					    "%.*s",
 					    (int)tkey->size,
 					    (char *)tkey->data);
@@ -2326,9 +2325,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 				case WT_PAGE_COL_FIX:
 				case WT_PAGE_COL_INT:
 				case WT_PAGE_COL_VAR:
-					WT_VERBOSE(session, RECONCILE,
-					    "reconcile split: starting recno %"
-					    PRIu64,
+					WT_VERBOSE(session, reconcile,
+					    "split: starting recno %" PRIu64,
 					    bnd->recno);
 					break;
 				WT_ILLEGAL_FORMAT(session);
@@ -2725,9 +2723,8 @@ __rec_track_verbose(
 
 	switch (track->type) {
 	case WT_PT_BLOCK:
-		WT_VERBOSE(session, RECONCILE,
-		    "reconcile: page %p tracking block (%" PRIu32 "/%" PRIu32
-		    ")",
+		WT_VERBOSE(session, reconcile,
+		    "page %p tracking block (%" PRIu32 "/%" PRIu32 ")",
 		    page, track->addr, track->size);
 		return;
 	case WT_PT_OVFL:
@@ -2738,9 +2735,8 @@ __rec_track_verbose(
 		onoff = "OFF";
 		break;
 	}
-	WT_VERBOSE(session, RECONCILE,
-	    "reconcile: page %p tracking overflow %s (%p, %" PRIu32 "/%"
-	    PRIu32 ")",
+	WT_VERBOSE(session, reconcile,
+	    "page %p tracking overflow %s (%p, %" PRIu32 "/%" PRIu32 ")",
 	    page, onoff, track->ref, track->addr, track->size);
 }
 #endif

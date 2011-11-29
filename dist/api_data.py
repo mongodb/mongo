@@ -361,18 +361,18 @@ flags = {
 	'page_free' : [ 'PAGE_FREE_IGNORE_DISK' ],
 	'rec_evict' : [ 'REC_SINGLE', 'REC_WAIT' ],
 	'verbose' : [
-		'VERB_ALLOCATE',
-		'VERB_EVICT',
-		'VERB_EVICTSERVER',
-		'VERB_FILEOPS',
-		'VERB_HAZARD',
-		'VERB_MUTEX',
-		'VERB_READ',
-		'VERB_READSERVER',
-		'VERB_RECONCILE',
-		'VERB_SALVAGE',
-		'VERB_VERIFY',
-		'VERB_WRITE'
+		'VERB_allocate',
+		'VERB_evict',
+		'VERB_evictserver',
+		'VERB_fileops',
+		'VERB_hazard',
+		'VERB_mutex',
+		'VERB_read',
+		'VERB_readserver',
+		'VERB_reconcile',
+		'VERB_salvage',
+		'VERB_verify',
+		'VERB_write'
 	],
 
 ###################################################

@@ -108,8 +108,8 @@ __wt_evict_server_wake(WT_SESSION_IMPL *session)
 	bytes_inuse = __wt_cache_bytes_inuse(cache);
 	bytes_max = conn->cache_size;
 
-	WT_VERBOSE(session, EVICTSERVER,
-	    "waking eviction server: read lockout %sset, "
+	WT_VERBOSE(session, evictserver,
+	    "waking, read lockout %sset, "
 	    "bytes inuse %s max (%" PRIu64 "MB %s %" PRIu64 "MB), ",
 	    cache->read_lockout ? "" : "not ",
 	    bytes_inuse <= bytes_max ? "<=" : ">",
@@ -243,11 +243,11 @@ __wt_cache_evict_server(void *arg)
 	    conn->session_size * conn->hazard_size, &cache->hazard));
 
 	while (F_ISSET(conn, WT_SERVER_RUN)) {
-		WT_VERBOSE(session, EVICTSERVER, "eviction server sleeping");
+		WT_VERBOSE(session, evictserver, "sleeping");
 		__wt_cond_wait(session, cache->evict_cond);
 		if (!F_ISSET(conn, WT_SERVER_RUN))
 			break;
-		WT_VERBOSE(session, EVICTSERVER, "eviction server waking");
+		WT_VERBOSE(session, evictserver, "waking");
 
 		/* Evict pages from the cache as needed. */
 		WT_ERR(__evict_worker(session));
@@ -264,7 +264,7 @@ __wt_cache_evict_server(void *arg)
 	} else
 err:		__wt_err(session, ret, "cache eviction server error");
 
-	WT_VERBOSE(session, EVICTSERVER, "cache eviction server exiting");
+	WT_VERBOSE(session, evictserver, "exiting");
 
 	__wt_free(session, cache->evict);
 	__wt_free(session, cache->hazard);
@@ -322,8 +322,7 @@ __evict_worker(WT_SESSION_IMPL *session)
 		if (bytes_start == bytes_inuse) {
 			if (loop == 10) {
 				WT_STAT_INCR(conn->stats, cache_evict_slow);
-				WT_VERBOSE(session, EVICTSERVER,
-				    "eviction server: "
+				WT_VERBOSE(session, evictserver,
 				    "unable to reach eviction goal");
 				break;
 			}
@@ -404,9 +403,9 @@ __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 
 	btree = session->btree;
 
-	WT_VERBOSE(session, EVICTSERVER,
-	    "eviction: %s file request: %s",
-	    btree->name, F_ISSET(er, WT_EVICT_REQ_CLOSE) ? "close" : "sync");
+	WT_VERBOSE(session, evictserver,
+	    "%s file request: %s",
+	    btree->name, (F_ISSET(er, WT_EVICT_REQ_CLOSE) ? "close" : "sync"));
 
 	/*
 	 * Discard any page we're holding: we're about to do a walk of the file
@@ -560,8 +559,8 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		page = btree->evict_page;
 		if (page != NULL &&
 		    !WT_PAGE_IS_ROOT(page) && !F_ISSET(page, WT_PAGE_PINNED)) {
-			WT_VERBOSE(session, EVICTSERVER,
-			    "eviction: %s walk: %" PRIu32,
+			WT_VERBOSE(session, evictserver,
+			    "%s walk: %" PRIu32,
 			    btree->name, WT_PADDR(page));
 
 			++i;

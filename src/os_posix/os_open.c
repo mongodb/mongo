@@ -25,7 +25,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	fd = -1;
 	ret = 0;
 
-	WT_VERBOSE(session, FILEOPS, "fileops: %s: open", name);
+	WT_VERBOSE(session, fileops, "%s: open", name);
 
 	/* Increment the reference count if we already have the file open. */
 	matched = 0;

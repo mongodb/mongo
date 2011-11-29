@@ -119,11 +119,11 @@ __wt_cache_read_server(void *arg)
 	}
 
 	while (F_ISSET(conn, WT_SERVER_RUN)) {
-		WT_VERBOSE(session, READSERVER, "read server sleeping");
+		WT_VERBOSE(session, readserver, "sleeping");
 		__wt_cond_wait(session, cache->read_cond);
 		if (!F_ISSET(conn, WT_SERVER_RUN))
 			break;
-		WT_VERBOSE(session, READSERVER, "read server waking");
+		WT_VERBOSE(session, readserver, "waking");
 
 		/*
 		 * Walk the read-request queue, looking for reads (defined by
@@ -161,7 +161,7 @@ __wt_cache_read_server(void *arg)
 		} while (didwork);
 	}
 
-	WT_VERBOSE(session, READSERVER, "read server exiting");
+	WT_VERBOSE(session, readserver, "exiting");
 	(void)session->iface.close(&session->iface, NULL);
 
 	return (NULL);
@@ -231,8 +231,8 @@ __cache_read(
 	/* No memory flush required, the state variable is volatile. */
 	ref->state = WT_REF_MEM;
 
-	WT_VERBOSE(session, READ,
-	    "read page %p (%" PRIu32 "/%" PRIu32 ", %s)",
+	WT_VERBOSE(session, read,
+	    "page %p (%" PRIu32 "/%" PRIu32 ", %s)",
 	    ref->page, addr, size, __wt_page_type_string(ref->page->type));
 
 	return (0);

@@ -44,13 +44,13 @@ __wt_eviction_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 		bytes_inuse = __wt_cache_bytes_inuse(cache);
 		bytes_max = conn->cache_size;
 		if (!cache->read_lockout && bytes_inuse > bytes_max) {
-			WT_VERBOSE(session, READSERVER,
+			WT_VERBOSE(session, readserver,
 			    "lock out reads: bytes-inuse %" PRIu64
 			    " of bytes-max %" PRIu64,
 			    bytes_inuse, bytes_max);
 			cache->read_lockout = 1;
 		} else if (cache->read_lockout && bytes_inuse < bytes_max) {
-			WT_VERBOSE(session, READSERVER,
+			WT_VERBOSE(session, readserver,
 			    "restore reads: bytes-inuse %" PRIu64
 			    " of bytes-max %" PRIu64,
 			    bytes_inuse, bytes_max);

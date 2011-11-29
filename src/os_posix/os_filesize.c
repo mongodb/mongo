@@ -17,7 +17,7 @@ __wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, off_t *sizep)
 	struct stat sb;
 	int ret;
 
-	WT_VERBOSE(session, FILEOPS, "fileops: %s: fstat", fh->name);
+	WT_VERBOSE(session, fileops, "%s: fstat", fh->name);
 
 	SYSCALL_RETRY(fstat(fh->fd, &sb), ret);
 	if (ret == 0) {

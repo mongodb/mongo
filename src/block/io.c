@@ -244,8 +244,8 @@ not_compressed:	/*
 	WT_BSTAT_INCR(session, page_write);
 	WT_CSTAT_INCR(session, block_write);
 
-	WT_VERBOSE(session, WRITE,
-	    "write %" PRIu32 " at addr/size %" PRIu32 "/%" PRIu32 ", %s%s",
+	WT_VERBOSE(session, write,
+	    "%" PRIu32 " at addr/size %" PRIu32 "/%" PRIu32 ", %s%s",
 	    dsk->memsize, addr, dsk->size,
 	    dsk->size < dsk->memsize ? "compressed, " : "",
 	    __wt_page_type_string(orig_type));
