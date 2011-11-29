@@ -227,8 +227,8 @@ namespace mongo {
                 splitInfo = cmdObj["splitInfo"].Int();
 
             jsMaxKeys = 500000;
-            reduceTriggerRatio = 2.0;
-            maxInMemSize = 5 * 1024 * 1024;
+            reduceTriggerRatio = 10.0;
+            maxInMemSize = 500 * 1024;
 
             uassert( 13602 , "outType is no longer a valid option" , cmdObj["outType"].eoo() );
 
@@ -905,7 +905,9 @@ namespace mongo {
                 }
                 else if (dupCt > (keyCt * _config.reduceTriggerRatio)) {
                     // reduce now to lower mem usage
+    				Timer t;
                     _scope->invoke(_reduceAll, 0, 0, 0, true);
+    				log(1) << "  MR - did reduceAll: keys=" << keyCt << " dups=" << dupCt << " newKeys=" << _scope->getNumberInt("_keyCt") << " time=" << t.millis() << "ms" << endl;
                     return;
                 }
             }
@@ -913,18 +915,18 @@ namespace mongo {
             if (_jsMode)
                 return;
 
-            bool dump = _onDisk && _size > _config.maxInMemSize;
-            // attempt to reduce in memory map, if we've seen duplicates
-            if ( dump || _dupCount > (_temp->size() * _config.reduceTriggerRatio)) {
-				long before = _size;
+            if (_size > _config.maxInMemSize || _dupCount > (_temp->size() * _config.reduceTriggerRatio)) {
+                // attempt to reduce in memory map, if memory is too high or we have many duplicates
+    			long oldSize = _size;
+				Timer t;
 				reduceInMemory();
-				log(1) << "  mr: did reduceInMemory  " << before << " -->> " << _size << endl;
-            }
+				log(1) << "  MR - did reduceInMemory: size=" << oldSize << " dups=" << _dupCount << " newSize=" << _size << " time=" << t.millis() << "ms" << endl;
 
-            // reevaluate size and potentially dump
-            if ( dump &&  _size > _config.maxInMemSize) {
-                dumpToInc();
-                log(1) << "  mr: dumping to db" << endl;
+	            // if size is still high, or values are not reducing well, dump
+	            if ( _onDisk && (_size > _config.maxInMemSize || _size > oldSize / 2) ) {
+	                dumpToInc();
+	                log(1) << "  MR - dumping to db" << endl;
+	            }
             }
         }
 
