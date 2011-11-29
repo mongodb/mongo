@@ -334,7 +334,7 @@ namespace mongo {
         }
 
         void checkFreeSpace() {
-            unsigned long long spaceNeeded = 3 * DataLimitPerJournalFile * 1.1; // add 10% for headroom
+            unsigned long long spaceNeeded = static_cast<unsigned long long>(3 * DataLimitPerJournalFile * 1.1); // add 10% for headroom
             unsigned long long freeSpace = File::freeSpace(getJournalDir().string());
             unsigned long long prealloced = 0;
             for( int i = 0; i < NUM_PREALLOC_FILES; i++ ) {
