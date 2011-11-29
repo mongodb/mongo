@@ -56,10 +56,11 @@ namespace mongo {
             k = _order.getKeyFromObject(o);
         }
         catch (UserException &e) {
-            if ( e.getCode() == 10088 ) { // cannot get keys for parallel arrays
+            if ( e.getCode() == ParallelArraysCode ) { // cannot get keys for parallel arrays
                 // fix lasterror text to be more accurate.
                 uasserted( 15925, "cannot sort with keys that are parallel arrays" );
-            } else
+            }
+            else
                 throw;
         }
 
