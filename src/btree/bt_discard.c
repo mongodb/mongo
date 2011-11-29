@@ -76,8 +76,14 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 			break;
 		}
 
-	if (!LF_ISSET(WT_PAGE_FREE_IGNORE_DISK))
+	if (!LF_ISSET(WT_PAGE_FREE_IGNORE_DISK))	/* Disk image */
 		__wt_free(session, page->dsk);
+
+	if (page->modify != NULL) {			/* WT_PAGE_MODIFY */
+		__wt_free(session, page->modify->track);
+		__wt_free(session, page->modify);
+	}
+
 	__wt_free(session, page);
 }
 
