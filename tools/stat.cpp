@@ -146,7 +146,7 @@ namespace mongo {
         }
 
         int run() {
-            _statUtil.setSeconds( getParam( "sleep" , _statUtil.getSeconds() ) );
+            _statUtil.setSeconds( getParam( "sleep" , 1 ) );
             _statUtil.setAll( hasParam( "all" ) );
             if ( _many )
                 return runMany();
@@ -206,7 +206,7 @@ namespace mongo {
                 return -1;
 
             while ( rowCount == 0 || rowNum < rowCount ) {
-                sleepsecs(_statUtil.getSeconds());
+                sleepsecs((int)ceil(_statUtil.getSeconds()));
                 BSONObj now;
                 try {
                     now = stats();
@@ -414,7 +414,7 @@ namespace mongo {
             bool discover = hasParam( "discover" );
 
             while ( 1 ) {
-                sleepsecs( _statUtil.getSeconds() );
+                sleepsecs( (int)ceil(_statUtil.getSeconds()) );
 
                 // collect data
                 vector<Row> rows;
