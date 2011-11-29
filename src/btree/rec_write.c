@@ -181,7 +181,7 @@ static int  __rec_track_ovfl_active(WT_SESSION_IMPL *,
 static int  __rec_track_restart_col(WT_SESSION_IMPL *, WT_PAGE *);
 static void __rec_track_restart_ovfl(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_track_restart_row(WT_SESSION_IMPL *, WT_PAGE *);
-static void __rec_track_verbose(WT_SESSION_IMPL *, WT_PAGE_TRACK *);
+static void __rec_track_verbose(WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE_TRACK *);
 static int  __rec_write_init(WT_SESSION_IMPL *, WT_PAGE *, WT_SALVAGE_COOKIE *);
 static int  __rec_write_wrapup(WT_SESSION_IMPL *, WT_PAGE *);
 
@@ -209,8 +209,7 @@ __wt_rec_write(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_SALVAGE_COOKIE *salvage)
 {
 	WT_VERBOSE(session, RECONCILE,
-	    "reconcile: addr %" PRIu32 " (%s)", WT_PADDR(page),
-	    __wt_page_type_string(page->type));
+	    "reconcile: page %p (%s)", page, __wt_page_type_string(page->type));
 
 	WT_BSTAT_INCR(session, rec_written);
 
@@ -380,8 +379,9 @@ __rec_split_root(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	bnd = &r->bnd[0];
 	WT_VERBOSE(session, RECONCILE,
-	    "reconcile: split root %" PRIu32 " to %" PRIu32
+	    "reconcile: split root page %p: %" PRIu32 " to %" PRIu32
 	    ", (%" PRIu32 " %s %" PRIu32 ")",
+	    page,
 	    btree->root_page.addr, bnd->off.addr,
 	    btree->root_page.size,
 	    btree->root_page.size == bnd->off.size ? "==" :
@@ -2254,9 +2254,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	switch (r->bnd_next) {
 	case 0:						/* Page delete */
-		WT_VERBOSE(session, RECONCILE,
-		    "reconcile: delete page: addr %" PRIu32 " (%" PRIu32 "B)",
-		    WT_PADDR(page), WT_PSIZE(page));
+		WT_VERBOSE(session,
+		    RECONCILE, "reconcile: delete page %p", page);
 
 		WT_BSTAT_INCR(session, rec_page_delete);
 
@@ -2277,10 +2276,9 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 */
 		bnd = &r->bnd[0];
 		WT_VERBOSE(session, RECONCILE,
-		    "reconcile: replace page: addr %" PRIu32 " to %" PRIu32
-		    ", (%" PRIu32 " %s %" PRIu32 ")",
-		    WT_PADDR(page), bnd->off.addr,
-		    WT_PSIZE(page),
+		    "reconcile: replace page %p to %" PRIu32 ", (%" PRIu32
+		    " %s %" PRIu32 ")",
+		    page, bnd->off.addr, WT_PSIZE(page),
 		    WT_PSIZE(page) == bnd->off.size ? "==" :
 		    (WT_PSIZE(page) < bnd->off.size ? ">>" : "<<"),
 		    bnd->off.size);
@@ -2290,9 +2288,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		break;
 	default:					/* Page split */
 		WT_VERBOSE(session, RECONCILE,
-		    "reconcile split page: %" PRIu32 " (%" PRIu32 "B) into %"
-		    PRIu32 " pages",
-		    WT_PADDR(page), WT_PSIZE(page), r->bnd_next);
+		    "reconcile split page %p into %" PRIu32 " pages",
+		    page, r->bnd_next);
 
 		switch (page->type) {
 		case WT_PAGE_COL_INT:
@@ -2709,7 +2706,7 @@ __wt_rec_track(WT_SESSION_IMPL *session, WT_PAGE *page,
 	mod->track[mod->track_next].addr = addr;
 	mod->track[mod->track_next].size = size;
 #ifdef HAVE_VERBOSE
-	__rec_track_verbose(session, &mod->track[mod->track_next]);
+	__rec_track_verbose(session, page, &mod->track[mod->track_next]);
 #endif
 	++mod->track_next;
 	return (0);
@@ -2721,15 +2718,17 @@ __wt_rec_track(WT_SESSION_IMPL *session, WT_PAGE *page,
  *	Display an entry being tracked.
  */
 static void
-__rec_track_verbose(WT_SESSION_IMPL *session, WT_PAGE_TRACK *track)
+__rec_track_verbose(
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_PAGE_TRACK *track)
 {
 	const char *onoff;
 
 	switch (track->type) {
 	case WT_PT_BLOCK:
 		WT_VERBOSE(session, RECONCILE,
-		    "reconcile: tracking block (%" PRIu32 "/%" PRIu32 ")",
-		    track->addr, track->size);
+		    "reconcile: page %p tracking block (%" PRIu32 "/%" PRIu32
+		    ")",
+		    page, track->addr, track->size);
 		return;
 	case WT_PT_OVFL:
 		onoff = "ON";
@@ -2740,8 +2739,9 @@ __rec_track_verbose(WT_SESSION_IMPL *session, WT_PAGE_TRACK *track)
 		break;
 	}
 	WT_VERBOSE(session, RECONCILE,
-	    "reconcile: tracking overflow %s (%p, %" PRIu32 "/%" PRIu32 ")",
-	    onoff, track->ref, track->addr, track->size);
+	    "reconcile: page %p tracking overflow %s (%p, %" PRIu32 "/%"
+	    PRIu32 ")",
+	    page, onoff, track->ref, track->addr, track->size);
 }
 #endif
 
@@ -2792,7 +2792,7 @@ __rec_track_ovfl_active(WT_SESSION_IMPL *session,
 			*sizep = track->size;
 			track->type = WT_PT_OVFL;
 #ifdef HAVE_VERBOSE
-			__rec_track_verbose(session, track);
+			__rec_track_verbose(session, page, track);
 #endif
 			return (1);
 		}
@@ -2820,7 +2820,7 @@ __rec_track_restart_ovfl(WT_SESSION_IMPL *session, WT_PAGE *page)
 		if (track->type == WT_PT_OVFL)
 			track->type = WT_PT_OVFL_DISCARD;
 #ifdef HAVE_VERBOSE
-		__rec_track_verbose(session, track);
+		__rec_track_verbose(session, page, track);
 #endif
 	}
 }
