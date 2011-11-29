@@ -2641,11 +2641,22 @@ __wt_rec_track(WT_SESSION_IMPL *session, WT_PAGE *page,
     __wt_pt_type_t type, const void *ref, uint32_t addr, uint32_t size)
 {
 	WT_PAGE_MODIFY *mod;
+	size_t bytes_allocated;
 
 	mod = page->modify;
 
 	if (mod->track_next == mod->track_entries) {
-		WT_RET(__wt_realloc(session, NULL,
+		/*
+		 * The __wt_realloc() function uses the "bytes allocated" value
+		 * to figure out how much of the memory it needs to clear (see
+		 * the function for an explanation of why the memory is cleared,
+		 * it's a security thing).  We can calculate the bytes allocated
+		 * so far, which saves a size_t in the WT_PAGE_MODIFY structure.
+		 * That's worth a little dance, we have one of them per modified
+		 * page.
+		 */
+		bytes_allocated = mod->track_entries * sizeof(*mod->track);
+		WT_RET(__wt_realloc(session, &bytes_allocated,
 		    (mod->track_entries + 20) * sizeof(*mod->track),
 		    &mod->track));
 		mod->track_entries += 20;
@@ -2822,12 +2833,12 @@ __wt_rec_discard_track(WT_SESSION_IMPL *session, WT_PAGE *page)
 		case WT_PT_EMPTY:
 			continue;
 		case WT_PT_BLOCK:
-			WT_VERBOSE(session, evict,
+			WT_VERBOSE(session, reconcile,
 			    "page %p discard block %" PRIu32 "/%" PRIu32,
 			    page, track->addr, track->size);
 			break;
 		case WT_PT_OVFL_DISCARD:
-			WT_VERBOSE(session, evict,
+			WT_VERBOSE(session, reconcile,
 			    "page %p discard overflow %" PRIu32 "/%" PRIu32,
 			    page, track->addr, track->size);
 			break;
