@@ -886,7 +886,7 @@ namespace mongo {
             all.push_back( a );
             size += a.objsize() + 16;
             if (all.size() > 1)
-            	++_dupCount;
+                ++_dupCount;
         }
 
         /**
@@ -905,9 +905,9 @@ namespace mongo {
                 }
                 else if (dupCt > (keyCt * _config.reduceTriggerRatio)) {
                     // reduce now to lower mem usage
-    				Timer t;
+                    Timer t;
                     _scope->invoke(_reduceAll, 0, 0, 0, true);
-    				log(1) << "  MR - did reduceAll: keys=" << keyCt << " dups=" << dupCt << " newKeys=" << _scope->getNumberInt("_keyCt") << " time=" << t.millis() << "ms" << endl;
+                    log(1) << "  MR - did reduceAll: keys=" << keyCt << " dups=" << dupCt << " newKeys=" << _scope->getNumberInt("_keyCt") << " time=" << t.millis() << "ms" << endl;
                     return;
                 }
             }
@@ -917,16 +917,16 @@ namespace mongo {
 
             if (_size > _config.maxInMemSize || _dupCount > (_temp->size() * _config.reduceTriggerRatio)) {
                 // attempt to reduce in memory map, if memory is too high or we have many duplicates
-    			long oldSize = _size;
-				Timer t;
-				reduceInMemory();
-				log(1) << "  MR - did reduceInMemory: size=" << oldSize << " dups=" << _dupCount << " newSize=" << _size << " time=" << t.millis() << "ms" << endl;
+                long oldSize = _size;
+                Timer t;
+                reduceInMemory();
+                log(1) << "  MR - did reduceInMemory: size=" << oldSize << " dups=" << _dupCount << " newSize=" << _size << " time=" << t.millis() << "ms" << endl;
 
-	            // if size is still high, or values are not reducing well, dump
-	            if ( _onDisk && (_size > _config.maxInMemSize || _size > oldSize / 2) ) {
-	                dumpToInc();
-	                log(1) << "  MR - dumping to db" << endl;
-	            }
+                // if size is still high, or values are not reducing well, dump
+                if ( _onDisk && (_size > _config.maxInMemSize || _size > oldSize / 2) ) {
+                    dumpToInc();
+                    log(1) << "  MR - dumping to db" << endl;
+                }
             }
         }
 
@@ -1020,8 +1020,8 @@ namespace mongo {
                 }
 
                 if (state.isOnDisk() && !client.getAuthenticationInfo()->isAuthorized(dbname)) {
-                	errmsg = "read-only user cannot output mapReduce to collection, use inline instead";
-                	return false;
+                    errmsg = "read-only user cannot output mapReduce to collection, use inline instead";
+                    return false;
                 }
 
                 try {
