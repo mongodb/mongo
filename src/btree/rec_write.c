@@ -2805,3 +2805,42 @@ __rec_track_restart_col(WT_SESSION_IMPL *session, WT_PAGE *page)
 		    WT_COL_REF_ADDR(cref), WT_COL_REF_SIZE(cref)));
 	return (0);
 }
+
+/*
+ * __wt_rec_discard_track --
+ *	Process the page's list of tracked objects.
+ */
+int
+__wt_rec_discard_track(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_PAGE_TRACK *track;
+	uint32_t i;
+
+	for (track = page->modify->track,
+	    i = 0; i < page->modify->track_next; ++track, ++i) {
+		switch (track->type) {
+		case WT_PT_EMPTY:
+			continue;
+		case WT_PT_BLOCK:
+			WT_VERBOSE(session, evict,
+			    "page %p discard block %" PRIu32 "/%" PRIu32,
+			    page, track->addr, track->size);
+			break;
+		case WT_PT_OVFL_DISCARD:
+			WT_VERBOSE(session, evict,
+			    "page %p discard overflow %" PRIu32 "/%" PRIu32,
+			    page, track->addr, track->size);
+			break;
+		case WT_PT_OVFL:
+			__rec_track_verbose(session, page, track);
+			continue;
+		}
+		WT_RET(__wt_block_free(session, track->addr, track->size));
+
+		track->type = WT_PT_EMPTY;
+		track->ref = NULL;
+		track->addr = WT_ADDR_INVALID;
+		track->size = 0;
+	}
+	return (0);
+}

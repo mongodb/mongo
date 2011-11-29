@@ -11,6 +11,7 @@
  * is written to disk.
  */
 typedef enum {
+	WT_PT_EMPTY=0,			/* Unused slot */
 	WT_PT_BLOCK,			/* Inactive block */
 	WT_PT_OVFL,			/* Active overflow block */
 	WT_PT_OVFL_DISCARD		/* Inactive overflow block */

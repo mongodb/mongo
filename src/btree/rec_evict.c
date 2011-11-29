@@ -12,7 +12,6 @@ static void __hazard_copy(WT_SESSION_IMPL *);
 static int  __hazard_exclusive(WT_SESSION_IMPL *, WT_REF *, uint32_t);
 static int  __hazard_qsort_cmp(const void *, const void *);
 static int  __rec_discard_page(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __rec_discard_track(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_ovfl_delete(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_parent_clean_update(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_parent_dirty_update(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
@@ -591,40 +590,11 @@ __rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	/* If the page has tracked objects, resolve them. */
 	if (page->modify != NULL)
-		WT_RET(__rec_discard_track(session, page));
+		WT_RET(__wt_rec_discard_track(session, page));
 
 	/* Discard the page itself. */
 	__wt_page_out(session, page, 0);
 
-	return (0);
-}
-
-/*
- * __rec_discard_track --
- *	Process the page's list of tracked objects.
- */
-static int
-__rec_discard_track(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_PAGE_TRACK *track;
-	uint32_t i;
-
-	for (track = page->modify->track,
-	    i = 0; i < page->modify->track_next; ++track, ++i)
-		switch (track->type) {
-		case WT_PT_BLOCK:
-		case WT_PT_OVFL_DISCARD:
-			WT_VERBOSE(session, evict,
-			    "page %p discarding%s block %" PRIu32 "/%"
-			    PRIu32,
-			    page, track->type == WT_PT_OVFL ? " overflow" : "",
-			    track->addr, track->size);
-			WT_RET(
-			    __wt_block_free(session, track->addr, track->size));
-			break;
-		case WT_PT_OVFL:
-			break;
-		}
 	return (0);
 }
 

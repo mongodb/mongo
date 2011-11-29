@@ -271,6 +271,7 @@ extern int __wt_rec_track(WT_SESSION_IMPL *session,
     const void *ref,
     uint32_t addr,
     uint32_t size);
+extern int __wt_rec_discard_track(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_row_key( WT_SESSION_IMPL *session,
     WT_PAGE *page,
