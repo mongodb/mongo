@@ -2645,7 +2645,7 @@ __wt_rec_track(WT_SESSION_IMPL *session, WT_PAGE *page,
 	mod = page->modify;
 
 	if (mod->track_next == mod->track_entries) {
-		WT_RET(__wt_realloc(session, &mod->track_allocated,
+		WT_RET(__wt_realloc(session, NULL,
 		    (mod->track_entries + 20) * sizeof(*mod->track),
 		    &mod->track));
 		mod->track_entries += 20;

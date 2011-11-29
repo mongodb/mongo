@@ -93,7 +93,6 @@ struct __wt_page_modify {
 	} *track;			/* Array of tracked objects */
 	uint32_t track_next;		/* Next track slot */
 	uint32_t track_entries;		/* Total track slots */
-	size_t   track_allocated;	/* Bytes allocated */
 };
 
 /*
