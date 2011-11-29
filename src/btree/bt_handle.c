@@ -378,8 +378,7 @@ __wt_btree_root_empty_free(WT_SESSION_IMPL *session)
 	if (child->entries != 0)
 		return (WT_ERROR);
 
-	__wt_free(session, root);
-	__wt_free(session, child);
+	__wt_page_out(session, root, 0);
 	btree->root_page.page = NULL;
 
 	return (0);
