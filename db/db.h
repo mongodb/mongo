@@ -111,11 +111,10 @@ namespace mongo {
         }
 
         bool unlocked() {
-            return real > 0;
+            return real != 0;
         }
     };
 
 } // namespace mongo
 
-//#include "dbinfo.h"
 #include "concurrency.h"

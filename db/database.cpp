@@ -25,7 +25,7 @@
 
 namespace mongo {
 
-    bool Database::_openAllFiles = false;
+    bool Database::_openAllFiles = true;
 
     void assertDbAtLeastReadLocked(const Database *) { 
         // temp impl
@@ -188,6 +188,7 @@ namespace mongo {
     //        if one datafile were missing we should keep going for 
     //        repair purposes yet we do not.
     void Database::openAllFiles() {
+        //log() << "TEMP openallfiles " << path << ' ' << name << endl;
         assert(this);
         int n = 0;
         while( openExistingFile(n) ) {
@@ -208,6 +209,7 @@ namespace mongo {
         }*/
     }
 
+    // todo: this is called a lot. streamline the common case
     MongoDataFile* Database::getFile( int n, int sizeNeeded , bool preallocateOnly) {
         assert(this);
         DEV assertDbAtLeastReadLocked(this);
@@ -218,19 +220,24 @@ namespace mongo {
             massert( 10295 , "getFile(): bad file number value (corrupt db?): run repair", false);
         }
         DEV {
-            if ( n > 100 )
+            if ( n > 100 ) {
                 out() << "getFile(): n=" << n << endl;
+            }
         }
         MongoDataFile* p = 0;
         if ( !preallocateOnly ) {
             while ( n >= (int) _files.size() ) {
-                DEV assertDbWriteLocked(this);
+                DEV if( !dbMutex.isWriteLocked() ) { 
+                    log() << "error: getFile() called in a read lock, yet file to return is not yet open" << endl;
+                    log() << "       getFile(" << n << ") " <<_files.size() << ' ' << fileName(n).string() << endl; 
+                }
+                assertDbWriteLocked(this);
                 _files.push_back(0);
             }
             p = _files[n];
         }
         if ( p == 0 ) {
-            DEV assertDbWriteLocked(this);
+            assertDbWriteLocked(this);
             boost::filesystem::path fullName = fileName( n );
             string fullNameString = fullName.string();
             p = new MongoDataFile(n);

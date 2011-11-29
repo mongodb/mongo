@@ -419,6 +419,8 @@ namespace mongo {
 
         Client::initThread("initandlisten");
 
+        Database::_openAllFiles = false;
+
         Logstream::get().addGlobalTee( new RamLog("global") );
 
         bool is32bit = sizeof(int*) == 4;
