@@ -125,6 +125,7 @@ namespace mongo {
     /* ----------------------------------------- */
 
     string dbpath = "/data/db/";
+    const char FREELIST_NS[] = ".$freelist";
     bool directoryperdb = false;
     string repairpath;
     string pidfilepath;
@@ -136,7 +137,7 @@ namespace mongo {
     void addNewNamespaceToCatalog(const char *ns, const BSONObj *options = 0);
     void ensureIdIndexForNewNs(const char *ns) {
         if ( ( strstr( ns, ".system." ) == 0 || legalClientSystemNS( ns , false ) ) &&
-                strstr( ns, ".$freelist" ) == 0 ) {
+                strstr( ns, FREELIST_NS ) == 0 ) {
             log( 1 ) << "adding _id index for collection " << ns << endl;
             ensureHaveIdIndex( ns );
         }
@@ -210,7 +211,7 @@ namespace mongo {
         /* todo: do this only when we have allocated space successfully? or we could insert with a { ok: 0 } field
            and then go back and set to ok : 1 after we are done.
         */
-        bool isFreeList = strstr(ns, ".$freelist") != 0;
+        bool isFreeList = strstr(ns, FREELIST_NS) != 0;
         if( !isFreeList )
             addNewNamespaceToCatalog(ns, options.isEmpty() ? 0 : &options);
 
@@ -496,7 +497,7 @@ namespace mongo {
     }
 
     Extent* DataFileMgr::allocFromFreeList(const char *ns, int approxSize, bool capped) {
-        string s = cc().database()->name + ".$freelist";
+        string s = cc().database()->name + FREELIST_NS;
         NamespaceDetails *f = nsdetails(s.c_str());
         if( f ) {
             int low, high;
@@ -645,6 +646,7 @@ namespace mongo {
         DeletedRecord *empty = getDur().writing( DataFileMgr::makeDeletedRecord(emptyLoc, delRecLength) );
         empty->lengthWithHeaders = delRecLength;
         empty->extentOfs = myLoc.getOfs();
+
         return emptyLoc;
     }
 
@@ -780,7 +782,7 @@ namespace mongo {
     }
 
     void printFreeList() {
-        string s = cc().database()->name + ".$freelist";
+        string s = cc().database()->name + FREELIST_NS;
         log() << "dump freelist " << s << endl;
         NamespaceDetails *freeExtents = nsdetails(s.c_str());
         if( freeExtents == 0 ) {
@@ -811,7 +813,7 @@ namespace mongo {
             assert( f==l || !l->xprev.isNull() );
         }
 
-        string s = cc().database()->name + ".$freelist";
+        string s = cc().database()->name + FREELIST_NS;
         NamespaceDetails *freeExtents = nsdetails(s.c_str());
         if( freeExtents == 0 ) {
             string err;
