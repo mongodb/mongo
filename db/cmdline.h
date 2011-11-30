@@ -88,7 +88,8 @@ namespace mongo {
             DurRecoverOnly = 4,   // terminate after recovery step
             DurParanoid = 8,      // paranoid mode enables extra checks
             DurAlwaysCommit = 16, // do a group commit every time the writelock is released
-            DurAlwaysRemap = 32   // remap the private view after every group commit (may lag to the next write lock acquisition, but will do all files then)
+            DurAlwaysRemap = 32,  // remap the private view after every group commit (may lag to the next write lock acquisition, but will do all files then)
+            DurNoCheckSpace = 64  // don't check that there is enough room for journal files before startup (for diskfull tests)
         };
         int durOptions;          // --durOptions <n> for debugging
 
