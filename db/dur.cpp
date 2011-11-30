@@ -417,6 +417,8 @@ namespace mongo {
             static unsigned startAt;
             static unsigned long long lastRemap;
 
+            LOG(3) << "journal REMAPPRIVATEVIEW" << endl;
+
             dbMutex.assertWriteLocked();
             dbMutex._remapPrivateViewRequested = false;
             assert( !commitJob.hasWritten() );
@@ -476,7 +478,7 @@ namespace mongo {
                     if( i == e ) i = b;
                 }
             }
-            LOG(2) << "journal REMAPPRIVATEVIEW start:" << startedAt << " n:" << ntodo << ' ' << t.millis() << "ms" << endl;
+            LOG(2) << "journal REMAPPRIVATEVIEW done startedAt: " << startedAt << " n:" << ntodo << ' ' << t.millis() << "ms" << endl;
         }
 
         /** We need to remap the private views periodically. otherwise they would become very large.

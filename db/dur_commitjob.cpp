@@ -116,7 +116,7 @@ namespace mongo {
 
         /** note an operation other than a "basic write" */
         void CommitJob::noteOp(shared_ptr<DurOp> p) {
-            DEV dbMutex.assertWriteLocked();
+            dbMutex.assertWriteLocked();
             dassert( cmdLine.dur );
             if( !_hasWritten ) {
                 assert( !dbMutex._remapPrivateViewRequested );
