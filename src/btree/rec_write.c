@@ -1719,7 +1719,10 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 			rp = WT_ROW_REF_PAGE(rref);
 			switch (F_ISSET(rp, WT_PAGE_REC_MASK)) {
 			case WT_PAGE_REC_EMPTY:
-				/* Check overflow keys for deleted pages. */
+				/*
+				 * Overflow keys referencing discarded pages are
+				 * no longer useful.
+				 */
 				if (cell != NULL)
 					WT_RET(__rec_track_cell(
 					    session, page, unpack));
@@ -1730,6 +1733,15 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 				break;
 			case WT_PAGE_REC_SPLIT:
 				r->merge_ref = rref;
+
+				/*
+				 * Overflow keys referencing split pages are no
+				 * no longer useful (the interesting key is the
+				 * key for the split page).
+				 */
+				if (cell != NULL)
+					WT_RET(__rec_track_cell(
+					    session, page, unpack));
 
 				WT_RET(__rec_row_merge(session,
 				    rp->modify == NULL ?
