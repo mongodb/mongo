@@ -353,7 +353,8 @@ namespace mongo {
         }
 
         void preallocateFiles() {
-            checkFreeSpace();
+            if (! (cmdLine.durOptions & CmdLine::DurNoCheckSpace))
+                checkFreeSpace();
 
             if( exists(preallocPath(0)) || // if enabled previously, keep using
                 exists(preallocPath(1)) ||
