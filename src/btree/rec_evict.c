@@ -50,25 +50,16 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 */
 	WT_RET(__rec_sub_excl(session, page, flags));
 
-	if (page->modify == NULL) {
-		/*
-		 * If the page was never modified:
-		 *	update the parent and discard the page
-		 */
-		WT_STAT_INCR(conn->stats, cache_evict_unmodified);
+	/* If the page is dirty, write it. */
+	if (__wt_page_is_modified(page))
+		WT_RET(__wt_rec_write(session, page, NULL));
 
+	/* Update the parent and discard the page. */
+	if (F_ISSET(page, WT_PAGE_REC_MASK) == 0) {
+		WT_STAT_INCR(conn->stats, cache_evict_unmodified);
 		WT_RET(__rec_parent_clean_update(session, page));
 	} else {
-		/*
-		 * If the page was ever modified:
-		 *	write the page if it's currently dirty,
-		 *	update the parent and discard the page
-		 */
 		WT_STAT_INCR(conn->stats, cache_evict_modified);
-
-		if (__wt_page_is_modified(page))
-			WT_RET(__wt_rec_write(session, page, NULL));
-
 		WT_RET(__rec_parent_dirty_update(session, page, flags));
 	}
 	return (0);
@@ -170,7 +161,6 @@ __rec_parent_dirty_update(
 		WT_PUBLISH(parent_ref->state, WT_REF_DISK);
 		break;
 	case WT_PAGE_REC_SPLIT:				/* Page split */
-	default:					/* Not possible */
 		/* Special case the root page: see below. */
 		if (WT_PAGE_IS_ROOT(page)) {
 			root_split = mod->u.write_split;
@@ -186,6 +176,7 @@ __rec_parent_dirty_update(
 		parent_ref->page = mod->u.write_split;
 		WT_PUBLISH(parent_ref->state, WT_REF_MEM);
 		break;
+	WT_ILLEGAL_FORMAT(session);
 	}
 
 	/*
