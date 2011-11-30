@@ -2653,10 +2653,26 @@ __wt_rec_track(WT_SESSION_IMPL *session, WT_PAGE *page,
     __wt_pt_type_t type, const void *ref, uint32_t addr, uint32_t size)
 {
 	WT_PAGE_MODIFY *mod;
+	WT_PAGE_TRACK *track;
 	size_t bytes_allocated;
+	uint32_t i;
 
 	mod = page->modify;
 
+	/*
+	 * There may be multiple requests to track a single block. For example,
+	 * an internal page with an overflow key that references a page that's
+	 * split: every time the page is written, we'll figure out the key's
+	 * overflow pages are no longer useful because the underlying page has
+	 * split, but we have no way to know that we've figured that same thing
+	 * out several times already.   Check for duplicates.
+	 */
+	for (track = mod->track, i = 0; i < mod->track_next; ++track, ++i)
+		if (track->type == type && track->ref == ref &&
+		    track->addr == addr && track->size == size)
+			return (0);
+
+	/* Reallocate space as necessary and track the new item. */
 	if (mod->track_next == mod->track_entries) {
 		/*
 		 * The __wt_realloc() function uses the "bytes allocated" value
@@ -2673,14 +2689,14 @@ __wt_rec_track(WT_SESSION_IMPL *session, WT_PAGE *page,
 		    &mod->track));
 		mod->track_entries += 20;
 	}
-	mod->track[mod->track_next].type = type;
-	mod->track[mod->track_next].ref = ref;
-	mod->track[mod->track_next].addr = addr;
-	mod->track[mod->track_next].size = size;
+	track = &mod->track[mod->track_next++];
+	track->type = type;
+	track->ref = ref;
+	track->addr = addr;
+	track->size = size;
 #ifdef HAVE_VERBOSE
-	__rec_track_verbose(session, page, &mod->track[mod->track_next]);
+	__rec_track_verbose(session, page, track);
 #endif
-	++mod->track_next;
 	return (0);
 }
 
