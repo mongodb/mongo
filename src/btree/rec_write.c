@@ -2468,7 +2468,7 @@ __rec_cell_build_val(
 
 /*
  * __rec_cell_build_ovfl --
- *	Store bulk-loaded overflow items in the file, returning the WT_OFF.
+ *	Store overflow items in the file, returning the WT_OFF.
  */
 static int
 __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
