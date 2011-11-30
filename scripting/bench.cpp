@@ -241,7 +241,7 @@ namespace mongo {
                     }
                     else if( op == "find" || op == "query" ) {
 
-                        int limit = e["limit"].eoo() ? 0 : e["limit"].Int();
+                        int limit = e["limit"].eoo() ? 0 : e["limit"].numberInt();
                         int skip = e["skip"].eoo() ? 0 : e["skip"].Int();
                         int options = e["options"].eoo() ? 0 : e["options"].Int();
                         int batchSize = e["batchSize"].eoo() ? 0 : e["batchSize"].Int();
