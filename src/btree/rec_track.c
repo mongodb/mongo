@@ -141,24 +141,25 @@ __wt_rec_track_ovfl_active(WT_SESSION_IMPL *session,
 		return (0);
 
 	mod = page->modify;
-	for (track = mod->track, i = 0; i < mod->track_next; ++track, ++i)
-		if ((track->type == WT_PT_OVFL ||
-		    track->type == WT_PT_OVFL_DISCARD) &&
-		    track->ref == orig_data) {
-			/*
-			 * We better not see more than a single request for any
-			 * specific overflow item, that would be a coding error.
-			 */
-			WT_ASSERT(session, track->type != WT_PT_OVFL);
+	for (track = mod->track, i = 0; i < mod->track_next; ++track, ++i) {
+		if (track->ref != orig_data)
+			continue;
+		/*
+		 * We better not see more than a single request for any address,
+		 * that implies a coding error in reconciliation where we might
+		 * confuse two overflow items.
+		 */
+		WT_ASSERT(session, track->type == WT_PT_OVFL_DISCARD);
+		track->type = WT_PT_OVFL;
 
-			*addrp = track->addr;
-			*sizep = track->size;
-			track->type = WT_PT_OVFL;
-#ifdef HAVE_VERBOSE
-			__wt_rec_track_verbose(session, page, track);
-#endif
-			return (1);
-		}
+		/* Return the addr/size pair to our caller for reuse. */
+		*addrp = track->addr;
+		*sizep = track->size;
+		WT_VERBOSE(session, reconcile,
+		    "page %p reactivate overflow %" PRIu32 "/%" PRIu32,
+		    page, track->addr, track->size);
+		return (1);
+	}
 	return (0);
 }
 
@@ -179,13 +180,13 @@ __wt_rec_track_restart_ovfl(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Mark all overflow references "discarded" at the start of a write,
 	 * we'll reactivate ones we are using again as we process the page.
 	 */
-	for (track = mod->track, i = 0; i < mod->track_next; ++track, ++i) {
-		if (track->type == WT_PT_OVFL)
+	for (track = mod->track, i = 0; i < mod->track_next; ++track, ++i)
+		if (track->type == WT_PT_OVFL) {
 			track->type = WT_PT_OVFL_DISCARD;
-#ifdef HAVE_VERBOSE
-		__wt_rec_track_verbose(session, page, track);
-#endif
-	}
+			WT_VERBOSE(session, reconcile,
+			    "page %p restart overflow %" PRIu32 "/%" PRIu32,
+			    page, track->addr, track->size);
+		}
 }
 
 /*
