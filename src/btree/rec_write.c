@@ -206,11 +206,8 @@ __wt_rec_write(
 	/* Update the disk generation before we read anything from the page. */
 	WT_ORDERED_READ(page->modify->disk_gen, page->modify->write_gen);
 
-	/* Initialize the reconciliation structure for each new run. */
+	/* Initialize the reconciliation information for each new run. */
 	WT_RET(__rec_write_init(session, page, salvage));
-
-	/* Reset overflow tracking information for this page. */
-	__wt_rec_track_restart_ovfl(session, page);
 
 	/* Reconcile the page. */
 	switch (page->type) {
@@ -298,6 +295,9 @@ __rec_write_init(
 
 	r->page = page;
 	r->salvage = salvage == NULL ? 0 : 1;
+
+	/* Reset overflow tracking information for this page. */
+	__wt_rec_track_ovfl_reset(session, page);
 
 	return (0);
 }

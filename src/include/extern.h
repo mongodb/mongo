@@ -274,8 +274,7 @@ extern int __wt_rec_track_ovfl_active(WT_SESSION_IMPL *session,
     const void *orig_data,
     uint32_t *addrp,
     uint32_t *sizep);
-extern void __wt_rec_track_restart_ovfl(WT_SESSION_IMPL *session,
-    WT_PAGE *page);
+extern void __wt_rec_track_ovfl_reset(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_rec_track_restart_row(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_rec_track_restart_col(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_rec_discard_track(WT_SESSION_IMPL *session, WT_PAGE *page);

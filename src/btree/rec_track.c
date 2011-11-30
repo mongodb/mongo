@@ -164,11 +164,11 @@ __wt_rec_track_ovfl_active(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_rec_track_restart_ovfl --
+ * __wt_rec_track_ovfl_reset --
  *	Cleanup the tracking information each time we write a page.
  */
 void
-__wt_rec_track_restart_ovfl(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_rec_track_ovfl_reset(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_PAGE_MODIFY *mod;
 	WT_PAGE_TRACK *track;
@@ -177,14 +177,15 @@ __wt_rec_track_restart_ovfl(WT_SESSION_IMPL *session, WT_PAGE *page)
 	mod = page->modify;
 
 	/*
-	 * Mark all overflow references "discarded" at the start of a write,
-	 * we'll reactivate ones we are using again as we process the page.
+	 * Mark all overflow references "discarded" at the start of a page
+	 * reconciliation: we'll reactivate ones we are using again as we
+	 * process the page.
 	 */
 	for (track = mod->track, i = 0; i < mod->track_next; ++track, ++i)
 		if (track->type == WT_PT_OVFL) {
 			track->type = WT_PT_OVFL_DISCARD;
 			WT_VERBOSE(session, reconcile,
-			    "page %p restart overflow %" PRIu32 "/%" PRIu32,
+			    "page %p reset overflow %" PRIu32 "/%" PRIu32,
 			    page, track->addr, track->size);
 		}
 }
