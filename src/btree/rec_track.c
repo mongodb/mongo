@@ -179,40 +179,6 @@ __wt_rec_track_ovfl_reset(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __wt_rec_track_restart_row --
- *	Cleanup the tracking information from a row-store split page.
- */
-int
-__wt_rec_track_restart_row(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_ROW_REF *rref;
-	uint32_t i;
-
-	WT_ROW_REF_FOREACH(page->modify->u.write_split, rref, i)
-		WT_RET(__wt_rec_track(
-		    session, page, WT_PT_BLOCK, NULL,
-		    WT_ROW_REF_ADDR(rref), WT_ROW_REF_SIZE(rref)));
-	return (0);
-}
-
-/*
- * __wt_rec_track_restart_col --
- *	Cleanup the tracking information from a column-store split page.
- */
-int
-__wt_rec_track_restart_col(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_COL_REF *cref;
-	uint32_t i;
-
-	WT_COL_REF_FOREACH(page->modify->u.write_split, cref, i)
-		WT_RET(__wt_rec_track(
-		    session, page, WT_PT_BLOCK, NULL,
-		    WT_COL_REF_ADDR(cref), WT_COL_REF_SIZE(cref)));
-	return (0);
-}
-
-/*
  * __wt_rec_discard_track --
  *	Resolve the page's list of tracked objects.
  */

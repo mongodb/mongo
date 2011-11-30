@@ -2188,8 +2188,10 @@ static int
 __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BOUNDARY *bnd;
+	WT_COL_REF *cref;
 	WT_PAGE_MODIFY *mod;
 	WT_RECONCILE *r;
+	WT_ROW_REF *rref;
 	uint32_t i;
 	int ret;
 
@@ -2210,12 +2212,28 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	case WT_PAGE_REC_EMPTY:				/* Page deleted */
 		break;
 	case WT_PAGE_REC_SPLIT:				/* Page split */
-		WT_RET(mod->u.write_split->type == WT_PAGE_ROW_INT ?
-		    __wt_rec_track_restart_row(session, page) :
-		    __wt_rec_track_restart_col(session, page));
+		/* The split page's blocks need to be discarded. */
+		switch (mod->u.write_split->type) {
+		case WT_PAGE_ROW_INT:
+			WT_ROW_REF_FOREACH(page->modify->u.write_split, rref, i)
+				WT_RET(__wt_rec_track(session, page,
+				    WT_PT_BLOCK, NULL, WT_ROW_REF_ADDR(rref),
+				    WT_ROW_REF_SIZE(rref)));
+			break;
+		case WT_PAGE_COL_INT:
+			WT_COL_REF_FOREACH(page->modify->u.write_split, cref, i)
+				WT_RET(__wt_rec_track(session, page,
+				    WT_PT_BLOCK, NULL, WT_COL_REF_ADDR(cref),
+				    WT_COL_REF_SIZE(cref)));
+			break;
+		WT_ILLEGAL_FORMAT(session);
+		}
+
+		/* Discard the split page itself. */
 		__wt_page_out(session, mod->u.write_split, 0);
 		break;
 	case WT_PAGE_REC_REPLACE:			/* 1-for-1 page swap */
+		/* Discard the replacement page. */
 		WT_RET(__wt_rec_track(session, page, WT_PT_BLOCK,
 		    NULL, mod->u.write_off.addr, mod->u.write_off.size));
 		break;
