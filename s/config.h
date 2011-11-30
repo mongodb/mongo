@@ -115,7 +115,8 @@ namespace mongo {
             : _name( name ) ,
               _primary("config","") ,
               _shardingEnabled(false),
-              _lock("DBConfig") {
+              _lock("DBConfig") ,
+              _hitConfigServerLock( "DBConfig::_hitConfigServerLock" ) {
             assert( name.size() );
         }
         virtual ~DBConfig() {}
@@ -195,6 +196,7 @@ namespace mongo {
         Collections _collections;
 
         mutable mongo::mutex _lock; // TODO: change to r/w lock ??
+        mutable mongo::mutex _hitConfigServerLock;
     };
 
     class ConfigServer : public DBConfig {
