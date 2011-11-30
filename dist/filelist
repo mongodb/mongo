@@ -41,6 +41,7 @@ src/btree/bt_walk.c
 src/btree/col_modify.c
 src/btree/col_srch.c
 src/btree/rec_evict.c
+src/btree/rec_track.c
 src/btree/rec_write.c
 src/btree/row_key.c
 src/btree/row_modify.c
