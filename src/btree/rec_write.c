@@ -178,6 +178,18 @@ static int  __rec_write_init(WT_SESSION_IMPL *, WT_PAGE *, WT_SALVAGE_COOKIE *);
 static int  __rec_write_wrapup(WT_SESSION_IMPL *, WT_PAGE *);
 
 /*
+ * __rec_track_cell --
+ *	If the cell references an overflow chunk, add it to the page's list.
+ */
+static inline int
+__rec_track_cell(
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack)
+{
+	return (unpack->ovfl ? __wt_rec_track(session, page,
+	    WT_PT_BLOCK, NULL, unpack->off.addr, unpack->off.size) : 0);
+}
+
+/*
  * __wt_rec_modify_init --
  *	A page is about to be modified, get ready for reconciliation.
  */
@@ -1413,7 +1425,7 @@ __rec_col_var(
 			 * that work because I don't want the complexity, and
 			 * overflow records should be rare.
 			 */
-			WT_RET(__wt_rec_track_cell(session, page, unpack));
+			WT_RET(__rec_track_cell(session, page, unpack));
 		}
 
 		/*
@@ -1721,7 +1733,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 				 * no longer useful.
 				 */
 				if (cell != NULL)
-					WT_RET(__wt_rec_track_cell(
+					WT_RET(__rec_track_cell(
 					    session, page, unpack));
 				continue;
 			case WT_PAGE_REC_REPLACE:
@@ -1737,7 +1749,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 				 * key for the split page).
 				 */
 				if (cell != NULL)
-					WT_RET(__wt_rec_track_cell(
+					WT_RET(__rec_track_cell(
 					    session, page, unpack));
 
 				WT_RET(__rec_row_merge(session,
@@ -2014,8 +2026,7 @@ __rec_row_leaf(
 			 * file space.
 			 */
 			if (val_cell != NULL)
-				WT_ERR(
-				    __wt_rec_track_cell(session, page, unpack));
+				WT_ERR(__rec_track_cell(session, page, unpack));
 
 			/*
 			 * If this key/value pair was deleted, we're done.  If
@@ -2024,8 +2035,7 @@ __rec_row_leaf(
 			 */
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
 				__wt_cell_unpack(cell, unpack);
-				WT_ERR(
-				    __wt_rec_track_cell(session, page, unpack));
+				WT_ERR(__rec_track_cell(session, page, unpack));
 				goto leaf_insert;
 			}
 

@@ -266,9 +266,6 @@ extern int __wt_rec_track(WT_SESSION_IMPL *session,
     const void *ref,
     uint32_t addr,
     uint32_t size);
-extern int __wt_rec_track_cell( WT_SESSION_IMPL *session,
-    WT_PAGE *page,
-    WT_CELL_UNPACK *unpack);
 extern int __wt_rec_track_ovfl_active(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const void *orig_data,

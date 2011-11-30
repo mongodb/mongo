@@ -109,18 +109,6 @@ __wt_rec_track_verbose(
 #endif
 
 /*
- * __wt_rec_track_cell --
- *	If the cell references an overflow chunk, add it to the page's list.
- */
-int
-__wt_rec_track_cell(
-    WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack)
-{
-	return (unpack->ovfl ? __wt_rec_track(session, page,
-	    WT_PT_BLOCK, NULL, unpack->off.addr, unpack->off.size) : 0);
-}
-
-/*
  * __wt_rec_track_ovfl_active --
  *	Search for an overflow record and reactivate it.
  */
