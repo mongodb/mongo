@@ -184,12 +184,7 @@ static int  __rec_write_wrapup(WT_SESSION_IMPL *, WT_PAGE *);
 int
 __wt_rec_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_RET(__wt_calloc_def(session, 1, &page->modify));
-
-	if (WT_PADDR(page) != WT_ADDR_INVALID)
-		WT_RET(__wt_rec_track(session, page, WT_PT_BLOCK,
-		    NULL, WT_PADDR(page), WT_PSIZE(page)));
-	return (0);
+	return (__wt_calloc_def(session, 1, &page->modify));
 }
 
 /*
@@ -2206,6 +2201,20 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		    NULL, mod->u.write_off.addr, mod->u.write_off.size));
 		break;
 	default:
+		/*
+		 * The page has never been reconciled before, track the original
+		 * address blocks (if any).  Clear the addr/size pair as well:
+		 * if this page splits, we insert a new, in-memory page into the
+		 * tree with the same parent WT_REF structure, and if that page
+		 * is subsequently modified and written, we don't want to free
+		 * the same block again.
+		 */
+		if (WT_PADDR(page) != WT_ADDR_INVALID) {
+			WT_RET(__wt_rec_track(session, page,
+			    WT_PT_BLOCK, NULL, WT_PADDR(page), WT_PSIZE(page)));
+			WT_PADDR(page) = WT_ADDR_INVALID;
+			WT_PSIZE(page) = WT_ADDR_INVALID;
+		}
 		break;
 	}
 	F_CLR(page, WT_PAGE_REC_MASK);
