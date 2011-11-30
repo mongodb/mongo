@@ -505,8 +505,9 @@ namespace mongo {
                 commitJob.notifyCommitted();
                 return true;
             }
+
             JSectHeader h;
-            PREPLOGBUFFER(h);
+            PREPLOGBUFFER(h); // need to be in readlock (writes excluded) for this
 
             RWLockRecursive::Shared lk3(MongoFile::mmmutex);
 
