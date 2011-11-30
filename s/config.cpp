@@ -214,10 +214,11 @@ namespace mongo {
         
         assert( ! key.isEmpty() );
         
+        BSONObj newest;
         if ( oldVersion > 0 && ! forceReload ) {
             ScopedDbConnection conn( configServer.modelServer() , 30.0 );
-            BSONObj newest = conn->findOne( ShardNS::chunk , 
-                                            Query( BSON( "ns" << ns ) ).sort( "lastmod" , -1 ) );
+            newest = conn->findOne( ShardNS::chunk , 
+                                    Query( BSON( "ns" << ns ) ).sort( "lastmod" , -1 ) );
             conn.done();
             
             if ( ! newest.isEmpty() ) {
@@ -238,11 +239,32 @@ namespace mongo {
 
         // we are not locked now, and want to load a new ChunkManager
         
-        auto_ptr<ChunkManager> temp( new ChunkManager( ns , key , unique ) );
-        if ( temp->numChunks() == 0 ) {
-            // maybe we're not sharded any more
-            reload(); // this is a full reload
-            return getChunkManager( ns , false );
+        auto_ptr<ChunkManager> temp;
+
+        {
+            scoped_lock lll ( _hitConfigServerLock );
+            
+            if ( ! newest.isEmpty() && ! forceReload ) {
+                // if we have a target we're going for
+                // see if we've hit already
+                
+                scoped_lock lk( _lock );
+                CollectionInfo& ci = _collections[ns];
+                if ( ci.isSharded() && ci.getCM() ) {
+                    ShardChunkVersion currentVersion = newest["lastmod"];
+                    if ( currentVersion == ci.getCM()->getVersion() ) {
+                        return ci.getCM();
+                    }
+                }
+                
+            }
+            
+            temp.reset( new ChunkManager( ns , key , unique ) );
+            if ( temp->numChunks() == 0 ) {
+                // maybe we're not sharded any more
+                reload(); // this is a full reload
+                return getChunkManager( ns , false );
+            }
         }
 
         scoped_lock lk( _lock );
