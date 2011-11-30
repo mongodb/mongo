@@ -157,11 +157,31 @@ assert.soon = function( f, msg, timeout /*ms*/, interval ) {
             if ( f() )
                 return;
         }
-        
-        if ( ( new Date() ).getTime() - start.getTime() > timeout )
+       
+        diff = ( new Date() ).getTime() - start.getTime();
+        if ( diff > timeout )
             doassert( "assert.soon failed: " + f + ", msg:" + msg );
         sleep( interval );
     }
+}
+
+assert.time = function( f, msg, timeout /*ms*/ ) {
+    if ( assert._debug && msg ) print( "in assert for: " + msg );
+
+    var start = new Date();
+    timeout = timeout || 30000;
+        
+        if ( typeof( f ) == "string" ){
+            res = eval( f );
+        }
+        else {
+            res = f();
+        }
+       
+        diff = ( new Date() ).getTime() - start.getTime();
+        if ( diff > timeout )
+            doassert( "assert.time failed: " + f + ", msg:" + msg );
+        return res;
 }
 
 assert.throws = function( func , params , msg ){
