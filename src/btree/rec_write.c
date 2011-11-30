@@ -1481,7 +1481,11 @@ __rec_col_var(
 				    salvage, last, last_deleted, 0, rle));
 			}
 
-			/* Swap the current/last state. */
+			/*
+			 * Swap the current/last state.  We can't simply assign
+			 * the data values to the buffer because they may have
+			 * come from a copy built from an encoded cell.
+			 */
 			if (!deleted)
 				WT_RET(__wt_buf_set(session, last, data, size));
 			last_deleted = deleted;
@@ -1527,9 +1531,15 @@ __rec_col_var(
 				    salvage, last, last_deleted, 0, rle));
 			}
 
-			/* Swap the current/last state. */
-			if (!deleted)
-				WT_RET(__wt_buf_set(session, last, data, size));
+			/*
+			 * Swap the current/last state.  We simply assign the
+			 * data values to the buffer because they can only be
+			 * the data from a WT_UPDATE structure.
+			 */
+			if (!deleted) {
+				last->data = data;
+				last->size = size;
+			}
 			last_deleted = deleted;
 
 			/* Reset RLE counter and turn on comparisons. */
