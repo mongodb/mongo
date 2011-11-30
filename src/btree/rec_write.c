@@ -1011,18 +1011,17 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 				break;
 			}
 		}
+		WT_RECNO(&off) = cref->recno;
 
 		/* Boundary: split or write the page. */
 		while (sizeof(WT_OFF_RECORD) > r->space_avail)
 			WT_RET(__rec_split(session));
 
 		/*
-		 * Copy a new WT_OFF_RECORD structure onto the page; any
-		 * off-page reference must be a valid disk address.
+		 * Copy the off-page reference onto the page; any off-page
+		 * reference must be a valid disk address.
 		 */
-		WT_ASSERT_RET(
-		    session, WT_COL_REF_ADDR(cref) != WT_ADDR_INVALID);
-		WT_RECNO(&off) = cref->recno;
+		WT_ASSERT_RET(session, off.addr != WT_ADDR_INVALID);
 		memcpy(r->first_free, &off, sizeof(WT_OFF_RECORD));
 		__rec_incr(session, r, 1, sizeof(WT_OFF_RECORD));
 	}
