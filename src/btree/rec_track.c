@@ -258,7 +258,7 @@ __wt_rec_track_discard(WT_SESSION_IMPL *session, WT_PAGE *page, int final)
 	 *	reconciliation, because we need to track it for re-use in future
 	 *	reconciliations.   When the page is evicted, discard its memory,
 	 *	leaving the underlying blocks alone.
-	 * WT_PT_OVLF_DISCARD:
+	 * WT_PT_OVFL_DISCARD:
 	 *	An overflow record that's no longer in-use.  Discard the memory
 	 *	and free the underlying blocks after reconciliation completes.
 	 */
