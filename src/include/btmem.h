@@ -81,8 +81,8 @@ struct __wt_page_modify {
 	 *
 	 * Track overflow objects: if pages are reconciled more than once, an
 	 * overflow item might be written repeatedly.  Instead, when overflow
-	 * items are written we note their data source and resulting location,
-	 * and make sure to only write them once.
+	 * items are written we save a copy and resulting location so we only
+	 * write them once.
 	 */
 	struct __wt_page_track {
 		__wt_pt_type_t type;	/* Type */
