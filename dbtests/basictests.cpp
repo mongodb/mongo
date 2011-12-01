@@ -451,13 +451,16 @@ namespace BasicTests {
             bool isNew = false;
             // this leaks as ~Database is private
             // if that changes, should put this on the stack
-            Database * db = new Database( "dbtests_basictests_ownsns" , isNew );
-            assert( isNew );
+            {
+                SimpleMutex::scoped_lock lk(DatabaseHolder::dbHolderMutex);
+                Database * db = new Database( "dbtests_basictests_ownsns" , isNew );
+                assert( isNew );
 
-            ASSERT( db->ownsNS( "dbtests_basictests_ownsns.x" ) );
-            ASSERT( db->ownsNS( "dbtests_basictests_ownsns.x.y" ) );
-            ASSERT( ! db->ownsNS( "dbtests_basictests_ownsn.x.y" ) );
-            ASSERT( ! db->ownsNS( "dbtests_basictests_ownsnsa.x.y" ) );
+                ASSERT( db->ownsNS( "dbtests_basictests_ownsns.x" ) );
+                ASSERT( db->ownsNS( "dbtests_basictests_ownsns.x.y" ) );
+                ASSERT( ! db->ownsNS( "dbtests_basictests_ownsn.x.y" ) );
+                ASSERT( ! db->ownsNS( "dbtests_basictests_ownsnsa.x.y" ) );
+            }
         }
     };
 

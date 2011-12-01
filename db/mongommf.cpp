@@ -316,9 +316,16 @@ namespace mongo {
     /*virtual*/ void MongoMMF::close() {
         LOG(3) << "mmf close " << filename() << endl;
 
-        if( cmdLine.dur && _view_write/*actually was opened*/ ) {
-            dbMutex.assertWriteLocked();
-            dur::closingFileNotification();
+        if( view_write() /*actually was opened*/ ) {
+            if( cmdLine.dur ) {
+                dur::closingFileNotification();
+            }
+            if( !dbMutex.isWriteLocked() ) { 
+                assert( inShutdown() );
+                DEV { 
+                    log() << "is it really ok to close a mongommf outside a write lock? dbmutex status:" << dbMutex.getState() << " file:" << filename() << endl;
+                }
+            }
         }
 
         RWLockRecursive::Exclusive lk(mmmutex);
