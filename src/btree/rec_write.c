@@ -2225,14 +2225,14 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		/* The split page's blocks need to be discarded. */
 		switch (mod->u.write_split->type) {
 		case WT_PAGE_ROW_INT:
-			WT_ROW_REF_FOREACH(page->modify->u.write_split, rref, i)
+			WT_ROW_REF_FOREACH(mod->u.write_split, rref, i)
 				WT_RET(__wt_rec_track_block(
 				    session, WT_PT_BLOCK, page,
 				    WT_ROW_REF_ADDR(rref),
 				    WT_ROW_REF_SIZE(rref)));
 			break;
 		case WT_PAGE_COL_INT:
-			WT_COL_REF_FOREACH(page->modify->u.write_split, cref, i)
+			WT_COL_REF_FOREACH(mod->u.write_split, cref, i)
 				WT_RET(__wt_rec_track_block(
 				    session, WT_PT_BLOCK, page,
 				    WT_COL_REF_ADDR(cref),
