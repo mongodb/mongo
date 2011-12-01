@@ -260,19 +260,26 @@ extern int __wt_col_search(WT_SESSION_IMPL *session,
 extern int __wt_rec_evict(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     uint32_t flags);
-extern int __wt_rec_track(WT_SESSION_IMPL *session,
+extern int __wt_rec_track_block( WT_SESSION_IMPL *session,
     WT_PAGE *page,
-    __wt_pt_type_t type,
-    const void *ref,
     uint32_t addr,
     uint32_t size);
-extern int __wt_rec_track_ovfl_active(WT_SESSION_IMPL *session,
+extern int __wt_rec_track_ovfl(WT_SESSION_IMPL *session,
     WT_PAGE *page,
-    const void *orig_data,
+    const void *data,
+    uint32_t len,
+    uint32_t addr,
+    uint32_t size);
+extern int __wt_rec_track_ovfl_reuse(WT_SESSION_IMPL *session,
+    WT_PAGE *page,
+    const void *data,
+    uint32_t len,
     uint32_t *addrp,
     uint32_t *sizep);
 extern void __wt_rec_track_ovfl_reset(WT_SESSION_IMPL *session, WT_PAGE *page);
-extern int __wt_rec_discard_track(WT_SESSION_IMPL *session, WT_PAGE *page);
+extern int __wt_rec_track_discard(WT_SESSION_IMPL *session,
+    WT_PAGE *page,
+    int final);
 extern int __wt_rec_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_rec_write( WT_SESSION_IMPL *session,
     WT_PAGE *page,

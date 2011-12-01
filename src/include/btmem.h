@@ -87,10 +87,10 @@ struct __wt_page_modify {
 	struct __wt_page_track {
 		__wt_pt_type_t type;	/* Type */
 
-		const void *ref;	/* Overflow data reference */
-
-		uint32_t addr;		/* Location */
-		uint32_t size;
+		uint8_t *data;		/* Overflow data reference */
+		uint32_t len;		/* Overflow data length */
+		uint32_t addr;		/* Block location */
+		uint32_t size;		/* Block length */
 	} *track;			/* Array of tracked objects */
 	uint32_t track_next;		/* Next track slot */
 	uint32_t track_entries;		/* Total track slots */

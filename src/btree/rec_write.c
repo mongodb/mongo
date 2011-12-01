@@ -149,7 +149,7 @@ typedef struct {
 static int  __rec_cell_build_key(
 		WT_SESSION_IMPL *, const void *, uint32_t, int, int *);
 static int  __rec_cell_build_ovfl(
-		WT_SESSION_IMPL *, const void *, WT_KV *, uint8_t, uint64_t);
+		WT_SESSION_IMPL *, WT_KV *, uint8_t, uint64_t);
 static int  __rec_cell_build_val(
 		WT_SESSION_IMPL *, const void *, uint32_t, uint64_t);
 static int  __rec_col_fix(WT_SESSION_IMPL *, WT_PAGE *);
@@ -185,8 +185,8 @@ static inline int
 __rec_track_cell(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack)
 {
-	return (unpack->ovfl ? __wt_rec_track(session, page,
-	    WT_PT_BLOCK, NULL, unpack->off.addr, unpack->off.size) : 0);
+	return (unpack->ovfl ? __wt_rec_track_block(
+	    session, page, unpack->off.addr, unpack->off.size) : 0);
 }
 
 /*
@@ -2216,14 +2216,14 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		switch (mod->u.write_split->type) {
 		case WT_PAGE_ROW_INT:
 			WT_ROW_REF_FOREACH(page->modify->u.write_split, rref, i)
-				WT_RET(__wt_rec_track(session, page,
-				    WT_PT_BLOCK, NULL, WT_ROW_REF_ADDR(rref),
+				WT_RET(__wt_rec_track_block(session, page,
+				    WT_ROW_REF_ADDR(rref),
 				    WT_ROW_REF_SIZE(rref)));
 			break;
 		case WT_PAGE_COL_INT:
 			WT_COL_REF_FOREACH(page->modify->u.write_split, cref, i)
-				WT_RET(__wt_rec_track(session, page,
-				    WT_PT_BLOCK, NULL, WT_COL_REF_ADDR(cref),
+				WT_RET(__wt_rec_track_block(session, page,
+				    WT_COL_REF_ADDR(cref),
 				    WT_COL_REF_SIZE(cref)));
 			break;
 		WT_ILLEGAL_FORMAT(session);
@@ -2233,9 +2233,9 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		__wt_page_out(session, mod->u.write_split, 0);
 		break;
 	case WT_PAGE_REC_REPLACE:			/* 1-for-1 page swap */
-		/* Discard the replacement page. */
-		WT_RET(__wt_rec_track(session, page, WT_PT_BLOCK,
-		    NULL, mod->u.write_off.addr, mod->u.write_off.size));
+		/* Discard the replacement page's blocks. */
+		WT_RET(__wt_rec_track_block(session,
+		    page, mod->u.write_off.addr, mod->u.write_off.size));
 		break;
 	default:
 		/*
@@ -2247,8 +2247,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * the same block again.
 		 */
 		if (WT_PADDR(page) != WT_ADDR_INVALID) {
-			WT_RET(__wt_rec_track(session, page,
-			    WT_PT_BLOCK, NULL, WT_PADDR(page), WT_PSIZE(page)));
+			WT_RET(__wt_rec_track_block(
+			    session, page, WT_PADDR(page), WT_PSIZE(page)));
 			WT_PADDR(page) = WT_ADDR_INVALID;
 			WT_PSIZE(page) = WT_ADDR_INVALID;
 		}
@@ -2359,6 +2359,9 @@ err:			if (page->type == WT_PAGE_ROW_INT ||
 		break;
 	}
 
+	/* Reset overflow tracking information for this page. */
+	__wt_rec_track_discard(session, page, 0);
+
 	return (ret);
 }
 
@@ -2436,16 +2439,11 @@ __rec_cell_build_key(WT_SESSION_IMPL *session,
 		/*
 		 * Overflow objects aren't prefix compressed -- rebuild any
 		 * object that was prefix compressed.
-		 *
-		 * !!!
-		 * Currently, we rewrite the key overflow values every damned
-		 * time -- change NULL to "data" if you want to take another
-		 * behavior out for a spin.
 		 */
 		if (pfx == 0) {
 			*is_ovflp = 1;
-			return (__rec_cell_build_ovfl(session,
-			    NULL, key, WT_CELL_KEY_OVFL, (uint64_t)0));
+			return (__rec_cell_build_ovfl(
+			    session, key, WT_CELL_KEY_OVFL, (uint64_t)0));
 		}
 		return (__rec_cell_build_key(
 		    session, NULL, 0, is_internal, is_ovflp));
@@ -2493,8 +2491,8 @@ __rec_cell_build_val(
 		if (val->buf.size > btree->maxleafitem) {
 			WT_BSTAT_INCR(session, rec_ovfl_value);
 
-			return (__rec_cell_build_ovfl(session,
-			    data, val, WT_CELL_VALUE_OVFL, rle));
+			return (__rec_cell_build_ovfl(
+			    session, val, WT_CELL_VALUE_OVFL, rle));
 		}
 	}
 	val->cell_len = __wt_cell_pack_data(&val->cell, rle, val->buf.size);
@@ -2508,8 +2506,8 @@ __rec_cell_build_val(
  *	Store overflow items in the file, returning the WT_OFF.
  */
 static int
-__rec_cell_build_ovfl(WT_SESSION_IMPL *session,
-    const void *orig_data, WT_KV *kv, uint8_t type, uint64_t rle)
+__rec_cell_build_ovfl(
+    WT_SESSION_IMPL *session, WT_KV *kv, uint8_t type, uint64_t rle)
 {
 	WT_BUF *tmp;
 	WT_PAGE *page;
@@ -2526,13 +2524,9 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
 	/*
 	 * Check to see if this overflow record has already been written and
 	 * reuse it if possible.
-	 *
-	 * !!!
-	 * The error that scares me a non-unique value for "orig_data", that's
-	 * going to fail badly.  Assert that's not the case.
 	 */
-	if (__wt_rec_track_ovfl_active(session,
-	    page, orig_data, &kv->off.addr, &kv->off.size))
+	if (__wt_rec_track_ovfl_reuse(session,
+	    page, kv->buf.data, kv->buf.size, &kv->off.addr, &kv->off.size))
 		goto reuse;
 
 	/*
@@ -2552,8 +2546,8 @@ __rec_cell_build_ovfl(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_block_write(session, tmp, &kv->off.addr, &kv->off.size));
 
 	/* Track the new overflow item. */
-	WT_RET(__wt_rec_track(session, page,
-	    WT_PT_OVFL, orig_data, kv->off.addr, kv->off.size));
+	WT_RET(__wt_rec_track_ovfl(session, page,
+	    kv->buf.data, kv->buf.size, kv->off.addr, kv->off.size));
 
 reuse:	/* Set the callers K/V to reference the WT_OFF structure. */
 	kv->buf.data = &kv->off;

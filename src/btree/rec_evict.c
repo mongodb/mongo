@@ -504,8 +504,8 @@ __rec_ovfl_delete(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_CELL_FOREACH(dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
 		if (unpack->ovfl)
-			WT_RET(__wt_rec_track(session, page, WT_PT_BLOCK,
-			    NULL, unpack->off.addr, unpack->off.size));
+			WT_RET(__wt_rec_track_block(
+			    session, page, unpack->off.addr, unpack->off.size));
 	}
 
 	return (0);
@@ -590,7 +590,7 @@ __rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	/* If the page has tracked objects, resolve them. */
 	if (page->modify != NULL)
-		WT_RET(__wt_rec_discard_track(session, page));
+		WT_RET(__wt_rec_track_discard(session, page, 1));
 
 	/* Discard the page itself. */
 	__wt_page_out(session, page, 0);
