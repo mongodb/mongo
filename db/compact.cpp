@@ -215,6 +215,11 @@ namespace mongo {
             d->deletedList[i].writing().Null();
         }
 
+
+
+        // Start over from scratch with our extent sizing and growth
+        d->lastExtentSize=0;
+
         // before dropping indexes, at least make sure we can allocate one extent!
         uassert(14025, "compact error no space available to allocate", !allocateSpaceForANewRecord(ns, d, Record::HeaderSize+1, false).isNull());
 

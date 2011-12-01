@@ -50,12 +50,8 @@ if (1) {
 
         assert(v.ok);
         assert(t.getIndexes().length == 4);
-
-        if (b < a) {
-            // consider making this fail/assert
-            print("\n\n\nwarning WARNING compact command was slower than it should be");
-            print("a:" + a + " b:" + b);
-            print("\n\n\n");
-        }
+        print("inserting records and adding indexes took " + a);
+        print("compact took " + b);
+        assert(b < a, "compact was slower than it should be");
     }
 }

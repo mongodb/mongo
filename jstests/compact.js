@@ -27,7 +27,7 @@ assert(t.getIndexes().length == 2);
 var ssize = t.stats().storageSize;
 
 print("2");
-res = db.runCommand({ compact: 'compacttest', dev: true,paddingBytes:100 });
+res = db.runCommand({ compact: 'compacttest', dev: true,paddingBytes:1000 });
 assert(res.ok);
 assert(t.count() == 9);
 var v = t.validate(true);
