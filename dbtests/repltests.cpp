@@ -1147,7 +1147,7 @@ namespace ReplTests {
                 Sync badSource("localhost:123");
                 badSource.getMissingDoc(o);
             }
-            catch (DBException& e) {
+            catch (DBException&) {
                 threw = true;
             }
             assert(threw);
