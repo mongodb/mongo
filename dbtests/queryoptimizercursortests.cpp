@@ -986,6 +986,33 @@ namespace QueryOptimizerCursorTests {
         }
     };
     
+    /** Yield and remove document with $or query. */
+    class YieldRemoveOr : public Base {
+    public:
+        void run() {
+            _cli.insert( ns(), BSON( "_id" << 1 ) );
+            _cli.insert( ns(), BSON( "_id" << 2 ) );
+
+            {
+                dblock lk;
+                Client::Context ctx( ns() );
+                setQueryOptimizerCursor( BSON( "$or" << BSON_ARRAY( BSON( "_id" << 1 ) << BSON( "_id" << 2 ) ) ) );
+                ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
+                ASSERT( prepareToYield() );
+            }
+
+            _cli.remove( ns(), BSON( "_id" << 1 ) );
+
+            {
+                dblock lk;
+                Client::Context ctx( ns() );
+                recoverFromYield();
+                ASSERT( ok() );
+                ASSERT_EQUALS( 2, current().getIntField( "_id" ) );
+            }
+        }
+    };
+
     /** Yield and overwrite current in capped collection. */
     class YieldCappedOverwrite : public Base {
     public:
@@ -1138,7 +1165,69 @@ namespace QueryOptimizerCursorTests {
             }                
         }
     };
+
+    /** Yielding with delete, multiple plans active, and $or clause. */
+    class YieldMultiplePlansDeleteOr : public Base {
+    public:
+        void run() {
+            _cli.insert( ns(), BSON( "_id" << 1 << "a" << 2 ) );
+            _cli.insert( ns(), BSON( "_id" << 2 << "a" << 1 ) );
+            _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+
+            {
+                dblock lk;
+                Client::Context ctx( ns() );
+                setQueryOptimizerCursor( BSON( "$or" << BSON_ARRAY( BSON( "_id" << 1 << "a" << 2 ) << BSON( "_id" << 2 << "a" << 1 ) ) ) );
+                ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
+                ASSERT( prepareToYield() );
+            }
+
+            _cli.remove( ns(), BSON( "_id" << 1 ) );
+
+            {
+                dblock lk;
+                Client::Context ctx( ns() );
+                c()->recoverFromYield();
+                ASSERT( ok() );
+                ASSERT_EQUALS( 2, current().getIntField( "_id" ) );
+                ASSERT( !advance() );
+                ASSERT( !ok() );
+            }
+        }
+    };
     
+    /** Yielding with delete, multiple plans active with advancement to the second, and $or clause. */
+    class YieldMultiplePlansDeleteOrAdvance : public Base {
+    public:
+        void run() {
+            _cli.insert( ns(), BSON( "_id" << 1 << "a" << 2 ) );
+            _cli.insert( ns(), BSON( "_id" << 2 << "a" << 1 ) );
+            _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+
+            {
+                dblock lk;
+                Client::Context ctx( ns() );
+                setQueryOptimizerCursor( BSON( "$or" << BSON_ARRAY( BSON( "_id" << 1 << "a" << 2 ) << BSON( "_id" << 2 << "a" << 1 ) ) ) );
+                ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
+                ASSERT( prepareToYield() );
+                c()->advance();
+                ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
+            }
+
+            _cli.remove( ns(), BSON( "_id" << 1 ) );
+
+            {
+                dblock lk;
+                Client::Context ctx( ns() );
+                c()->recoverFromYield();
+                ASSERT( ok() );
+                ASSERT_EQUALS( 2, current().getIntField( "_id" ) );
+                ASSERT( !advance() );
+                ASSERT( !ok() );
+            }
+        }
+    };
+
     /** Yielding with multiple plans and capped overwrite. */
     class YieldMultiplePlansCappedOverwrite : public Base {
     public:
@@ -1728,11 +1817,14 @@ namespace QueryOptimizerCursorTests {
             add<QueryOptimizerCursorTests::YieldUpdate>();
             add<QueryOptimizerCursorTests::YieldDrop>();
             add<QueryOptimizerCursorTests::YieldDropOr>();
+            add<QueryOptimizerCursorTests::YieldRemoveOr>();
             add<QueryOptimizerCursorTests::YieldCappedOverwrite>();
             add<QueryOptimizerCursorTests::YieldDropIndex>();
             add<QueryOptimizerCursorTests::YieldMultiplePlansNoOp>();
             add<QueryOptimizerCursorTests::YieldMultiplePlansAdvanceNoOp>();
             add<QueryOptimizerCursorTests::YieldMultiplePlansDelete>();
+            add<QueryOptimizerCursorTests::YieldMultiplePlansDeleteOr>();
+            add<QueryOptimizerCursorTests::YieldMultiplePlansDeleteOrAdvance>();
             add<QueryOptimizerCursorTests::YieldMultiplePlansCappedOverwrite>();
             add<QueryOptimizerCursorTests::YieldMultiplePlansCappedOverwriteManual>();
             add<QueryOptimizerCursorTests::YieldMultiplePlansCappedOverwriteManual2>();
