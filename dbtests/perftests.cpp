@@ -180,12 +180,14 @@ namespace PerfTests {
                     if( c->connect("perfdb.10gen.cc", err) ) { 
                         if( !c->auth("perf", "perf", pwd, err) ) { 
                             cout << "info: authentication with stats db failed: " << err << endl;
+                            delete c;
                             assert(false);
                         }
                         conn = c;
                     }
                     else { 
                         cout << err << " (to log perfstats)" << endl;
+                        delete c;
                     }
                 }
             }
