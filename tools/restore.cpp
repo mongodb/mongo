@@ -44,11 +44,12 @@ public:
     string _curns;
     string _curdb;
     set<string> _users; // For restoring users with --drop
-
+    auto_ptr<Matcher> _opmatcher; // For oplog replay
     Restore() : BSONTool( "restore" ) , _drop(false) {
         add_options()
         ("drop" , "drop each collection before import" )
-        ("oplogReplay" , "replay oplog for point-in-time restore")
+        ("oplogReplay", "replay oplog for point-in-time restore")
+        ("oplogLimit", po::value<string>(), "exclude oplog entries newer than provided timestamp (epoch[:ordinal])")
         ("keepIndexVersion" , "don't upgrade indexes to newest version")
         ("w" , po::value<int>()->default_value(1) , "minimum number of replicas per write" )
         ;
@@ -76,8 +77,9 @@ public:
         _drop = hasParam( "drop" );
         _keepIndexVersion = hasParam("keepIndexVersion");
         _w = getParam( "w" , 1 );
-
+        
         bool doOplog = hasParam( "oplogReplay" );
+
         if (doOplog) {
             // fail early if errors
 
@@ -102,6 +104,24 @@ public:
             if (versionCmp(version, "1.7.4-pre-") < 0) {
                 cout << "Can only replay oplog to server version >= 1.7.4" << endl;
                 return -1;
+            }
+
+            string oplogLimit = getParam( "oplogLimit", "" );
+            string oplogInc = "0";
+
+            if(!oplogLimit.empty()) {
+                size_t i = oplogLimit.find_first_of(':');
+                if ( i != string::npos ) {
+                    if ( i + 1 < oplogLimit.length() ) {
+                        oplogInc = oplogLimit.substr(i + 1);
+                    }
+
+                    oplogLimit = oplogLimit.substr(0, i);
+                }
+                
+                if ( ! oplogLimit.empty() ) {
+                    _opmatcher.reset( new Matcher( fromjson( string("{ \"ts\": { \"$lt\": { \"$timestamp\": { \"t\": ") + oplogLimit + string(", \"i\": ") + oplogInc + string(" } } } }") ) ) );
+                }
             }
         }
 
@@ -250,6 +270,11 @@ public:
         if (_curns == OPLOG_SENTINEL) { // intentional ptr compare
             if (obj["op"].valuestr()[0] == 'n') // skip no-ops
                 return;
+            
+            // exclude operations that don't meet (timestamp) criteria
+            if ( _opmatcher.get() && ! _opmatcher->matches ( obj ) ) {
+                return;
+            }
 
             string db = obj["ns"].valuestr();
             db = db.substr(0, db.find('.'));
