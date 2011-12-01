@@ -1213,10 +1213,13 @@ namespace mongo {
                         }
 
                         // create initial chunks
+                        // the 1st chunk from MinKey will belong to primary for shard
+                        bool skipPrimary = true;
                         vector<Shard> allShards;
                         Shard::getAllShards(allShards);
                         if ( !splitPts.empty() ) {
-                            vector<Shard>::iterator itShard = allShards.begin();
+                            int sidx = 0;
+                            int numShards = allShards.size();
                             for (set<BSONObj>::iterator it = splitPts.begin(); it != splitPts.end(); ++it) {
                                 BSONObj splitCmd = BSON("split" << finalColLong << "middle" << *it);
                                 BSONObjBuilder splitResult(32);
@@ -1227,7 +1230,13 @@ namespace mongo {
                                 }
 
                                 // move to a shard
-                                BSONObj mvCmd = BSON("moveChunk" << finalColLong << "find" << *it << "to" << itShard->getName());
+                                Shard s = allShards[sidx];
+                                if (skipPrimary && s == confOut->getPrimary()) {
+                                    skipPrimary = false;
+                                    sidx = (sidx + 1) % numShards;
+                                    s = allShards[sidx];
+                                }
+                                BSONObj mvCmd = BSON("moveChunk" << finalColLong << "find" << *it << "to" << s.getName());
                                 BSONObjBuilder mvResult(32);
                                 res = Command::runAgainstRegistered("admin.$cmd", mvCmd, mvResult);
                                 if (!res) {
@@ -1235,14 +1244,12 @@ namespace mongo {
                                     return false;
                                 }
 
-                                ++itShard;
-                                if (itShard == allShards.end())
-                                    itShard = allShards.begin();
+                                sidx = (sidx + 1) % numShards;
                             }
                         }
                     }
 
-                    // obtain chunk information
+                    // group chunks per shard
                     ChunkManagerPtr cm = confOut->getChunkManager( finalColLong );
                     map<Shard, vector<ChunkPtr> > rangesList;
                     const ChunkMap& chunkMap = cm->getChunkMap();
@@ -1273,8 +1280,9 @@ namespace mongo {
                     }
 
                     // now wait for the result of all shards
-                    failed = false;
-                    for ( list< shared_ptr<Future::CommandResult> >::iterator i=futures.begin(); i!=futures.end(); i++ ) {
+                    ok = true;
+                    map<Shard, vector<ChunkPtr> >::iterator rangeIt=rangesList.begin();
+                    for ( list< shared_ptr<Future::CommandResult> >::iterator i=futures.begin(); i!=futures.end(); ++i, ++rangeIt ) {
                         string server;
                         try {
                             shared_ptr<Future::CommandResult> res = *i;
@@ -1283,7 +1291,7 @@ namespace mongo {
                                 result.append( "cause" , res->result() );
                                 errmsg = "final reduce failed: ";
                                 errmsg += res->result().toString();
-                                failed = true;
+                                ok = false;
                                 continue;
                             }
                             singleResult = res->result();
@@ -1292,23 +1300,23 @@ namespace mongo {
                             outputCount += counts.getIntField("output");
                             server = res->getServer();
                             postCountsB.append(server, counts);
+
+                            // check on splitting, now that results are in the final collection
+                            if (singleResult.hasField("chunkSizes")) {
+                                vector<BSONElement> chunkSizes = singleResult.getField("chunkSizes").Array();
+                                vector<ChunkPtr> chunks = rangeIt->second;
+                                for (unsigned int i = 0; i < chunkSizes.size(); ++i) {
+                                    long long size = chunkSizes[i].numberLong();
+                                    ChunkPtr c = chunks[i];
+                                    c->splitIfShould(size);
+                                }
+                            }
                         }
                         catch( RecvStaleConfigException& e ){
                             log() << "final reduce error due to stale config on a shard" << causedBy( e ) << endl;
-                            failed = true;
+                            ok = false;
                             continue;
                         }
-                    }
-
-                    if ( !failed ) {
-                        // check on splitting, now that results are in the final collection
-                        for ( ChunkMap::const_iterator it = chunkMap.begin(); it != chunkMap.end(); ++it ) {
-//                            ChunkPtr c = it->second;
-//                            cout << "Splitting for chunk " << c << endl;
-//                            c->splitIfShould();
-                        }
-
-                        ok = true;
                     }
                 }
 

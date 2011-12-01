@@ -1180,24 +1180,6 @@ namespace mongo {
                 if (inputNS.empty())
                     inputNS = dbname + "." + shardedOutputCollection;
 
-                // build queries based on ranges this shard owns
-                vector<BSONObj> rangeQueries;
-                if (cmdObj.hasField("ranges")) {
-                    BSONArrayBuilder ors;
-                    vector<BSONElement> ranges = cmdObj.getField("ranges").Array();
-                    for (unsigned i = 0; i < ranges.size(); i += 2) {
-                        BSONElement min = ranges.at(i);
-                        BSONElement max = ranges.at(i+1);
-                        BSONObjBuilder b;
-                        b.appendAs(min, "$gte");
-                        b.appendAs(max, "$lt");
-                        rangeQueries.push_back(BSON("_id" << b.obj()));
-                    }
-                } else {
-                    // add empty
-                    rangeQueries.push_back(BSONObj());
-                }
-
                 Client& client = cc();
                 CurOp * op = client.curop();
 
@@ -1243,15 +1225,33 @@ namespace mongo {
                         result.append( "result" , config.finalShort );
                 }
 
+                // fetch result from other shards 1 chunk at a time
                 // it would be better to do just one big $or query, but then the sorting would not be efficient
+                vector<BSONElement> ranges;
+                if (cmdObj.hasField("ranges")) {
+                    ranges = cmdObj.getField("ranges").Array();
+                }
+
                 long long inputCount = 0;
-                for (vector<BSONObj>::iterator it = rangeQueries.begin(); it != rangeQueries.end(); ++it) {
+                unsigned int index = 0;
+                BSONObj query;
+                BSONArrayBuilder chunkSizes;
+                while (true) {
+                    if (ranges.size() > 0) {
+                        BSONElement min = ranges[index];
+                        BSONElement max = ranges[index+1];
+                        BSONObjBuilder b;
+                        b.appendAs(min, "$gte");
+                        b.appendAs(max, "$lt");
+                        query = BSON("_id" << b.obj());
+//                        chunkSizes.append(min);
+                    }
+
                     // reduce from each shard for a chunk
-
                     BSONObj sortKey = BSON( "_id" << 1 );
-
-                    ParallelSortClusteredCursor cursor( servers , inputNS , Query( *it ).sort( sortKey ) );
+                    ParallelSortClusteredCursor cursor( servers , inputNS , Query( query ).sort( sortKey ) );
                     cursor.init();
+                    long long chunkSize = 0;
 
                     while ( cursor.more() || !values.empty() ) {
                         BSONObj t;
@@ -1271,6 +1271,7 @@ namespace mongo {
                         }
 
                         BSONObj res = config.reducer->finalReduce( values , config.finalizer.get());
+                        chunkSize += res.objsize();
                         if (state.isOnDisk())
                             state.insertToInc(res);
                         else
@@ -1279,9 +1280,14 @@ namespace mongo {
                         if (!t.isEmpty())
                             values.push_back( t );
                     }
+
+                    chunkSizes.append(chunkSize);
+                    index += 2;
+                    if (index >= ranges.size())
+                        break;
                 }
 
-                result.append( "shardCounts" , shardCounts );
+                result.append( "chunkSizes" , chunkSizes.arr() );
 
                 long long outputCount = state.postProcessCollection(op, pm);
                 state.appendResults( result );
