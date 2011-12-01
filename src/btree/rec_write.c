@@ -2360,7 +2360,7 @@ err:			if (page->type == WT_PAGE_ROW_INT ||
 	}
 
 	/* Reset overflow tracking information for this page. */
-	__wt_rec_track_discard(session, page, 0);
+	WT_RET(__wt_rec_track_discard(session, page, 0));
 
 	return (ret);
 }
