@@ -23,8 +23,6 @@ typedef struct {
 
 	WT_BUF	 dsk;			/* Temporary disk-image buffer */
 
-	int	 salvage;		/* Called from salvage */
-
 	/*
 	 * Reconciliation gets tricky if we have to split a page, that is, if
 	 * the disk image we create exceeds the maximum size of disk images for
@@ -174,7 +172,7 @@ static int  __rec_split_init(WT_SESSION_IMPL *, WT_PAGE *, uint64_t, uint32_t);
 static int  __rec_split_row(WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE **);
 static int  __rec_split_row_promote(WT_SESSION_IMPL *, uint8_t);
 static int  __rec_split_write(WT_SESSION_IMPL *, WT_BOUNDARY *, WT_BUF *);
-static int  __rec_write_init(WT_SESSION_IMPL *, WT_PAGE *, WT_SALVAGE_COOKIE *);
+static int  __rec_write_init(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_write_wrapup(WT_SESSION_IMPL *, WT_PAGE *);
 
 /*
@@ -219,7 +217,7 @@ __wt_rec_write(
 	WT_ORDERED_READ(page->modify->disk_gen, page->modify->write_gen);
 
 	/* Initialize the reconciliation information for each new run. */
-	WT_RET(__rec_write_init(session, page, salvage));
+	WT_RET(__rec_write_init(session, page));
 
 	/* Reconcile the page. */
 	switch (page->type) {
@@ -274,8 +272,7 @@ __wt_rec_write(
  *	Initialize the reconciliation structure.
  */
 static int
-__rec_write_init(
-    WT_SESSION_IMPL *session, WT_PAGE *page, WT_SALVAGE_COOKIE *salvage)
+__rec_write_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CONFIG_ITEM cval;
 	WT_RECONCILE *r;
@@ -306,7 +303,6 @@ __rec_write_init(
 	}
 
 	r->page = page;
-	r->salvage = salvage == NULL ? 0 : 1;
 
 	/* Reset overflow tracking information for this page. */
 	__wt_rec_track_ovfl_reset(session, page);
