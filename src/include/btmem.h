@@ -92,7 +92,6 @@ struct __wt_page_modify {
 		uint32_t addr;		/* Block location */
 		uint32_t size;		/* Block length */
 	} *track;			/* Array of tracked objects */
-	uint32_t track_next;		/* Next track slot */
 	uint32_t track_entries;		/* Total track slots */
 };
 
