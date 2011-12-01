@@ -246,7 +246,7 @@ namespace mongo {
             }
             else { 
                 assert( x < -1 );
-                uasserted(0, str::stream() << "can't open a database from a nested read lock " << ns);
+                uasserted(15928, str::stream() << "can't open a database from a nested read lock " << ns);
             }
         }
 
