@@ -75,7 +75,8 @@ namespace mongo {
         int sizeInfo() const { return _size; }
 
         void forEach(boost::function<void(Database *)> f) const {
-            dbMutex.assertAtLeastReadLocked();
+//            dbMutex.assertAtLeastReadLocked();
+            dbMutex.assertWriteLocked();
             recursive_scoped_lock lk(dbHolderMutex);
             for ( Paths::const_iterator i=_paths.begin(); i!=_paths.end(); i++ ) {
                 DBs m = i->second;
