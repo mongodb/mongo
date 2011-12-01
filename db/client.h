@@ -150,10 +150,24 @@ namespace mongo {
             ~GodScope();
         };
 
+        static void assureDatabaseIsOpen(const string& ns, string path=dbpath);
+
+        /** "read lock, and set my context, all in one operation" 
+         *  This handles (if not recursively locked) opening an unopened database.
+         */
+        class ReadContext : boost::noncopyable { 
+        public:
+            ReadContext(const string& ns, string path=dbpath, bool doauth=true );
+        private:
+            scoped_ptr<readlock> lk;
+            scoped_ptr<Context> c;
+        };
+
         /* Set database we want to use, then, restores when we finish (are out of scope)
            Note this is also helpful if an exception happens as the state if fixed up.
         */
         class Context : boost::noncopyable {
+            void checkNotStale() const;
         public:
             /** this is probably what you want */
             Context(const string& ns, string path=dbpath, bool doauth=true );
@@ -163,6 +177,9 @@ namespace mongo {
                 see also: reset().
             */
             Context( string ns , Database * db, bool doauth=true );
+
+            // used by ReadContext
+            Context(const string& path, const string& ns, Database *db, bool doauth);
 
             ~Context();
 

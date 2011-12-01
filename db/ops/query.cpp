@@ -874,12 +874,7 @@ namespace mongo {
             uassert( 10110 , "bad query object", false);
         }
 
-        /* --- read lock --- */
-
-        //LockCollectionForReading lk(ns);
-        mongolock lk(false);
-
-        Client::Context ctx( ns , dbpath );
+        Client::ReadContext ctx( ns , dbpath ); // read locks
 
         replVerifyReadsOk(pq);
 

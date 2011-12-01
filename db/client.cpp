@@ -189,7 +189,7 @@ namespace mongo {
     Client::Context::Context( string ns , Database * db, bool doauth ) :
         _client( currentClient.get() ), 
         _oldContext( _client->_context ),
-        _path( mongo::dbpath ), 
+        _path( mongo::dbpath ), // is this right? could be a different db? may need a dassert for this
         _justCreated(false),
         _ns( ns ), 
         _db(db)
@@ -212,24 +212,84 @@ namespace mongo {
         _finishInit( doauth );
         _client->checkLocks();        
     }
+       
+    /** "read lock, and set my context, all in one operation" 
+     *  This handles (if not recursively locked) opening an unopened database.
+     */
+    Client::ReadContext::ReadContext(const string& ns, string path, bool doauth ) {
+        {
+            lk.reset( new readlock() );
+            Database *db = dbHolder.get(ns, path);
+            if( db ) {
+                c.reset( new Context(path, ns, db, doauth) );
+                return;
+            }
+        }
 
-    /* this version saves the context but doesn't yet set the new one: */
+        // we usually don't get here, so doesn't matter how fast this part is
+        {
+            int x = dbMutex.getState();
+            if( x > 0 ) { 
+                // write locked already
+                DEV RARELY log() << "write locked on ReadContext construction " << ns << endl;
+                c.reset( new Context(ns, path, doauth) );
+            }
+            else if( x == -1 ) { 
+                lk.reset(0);
+                {
+                    writelock w;
+                    Context c(ns, path, doauth);
+                }
+                // db could be closed at this interim point -- that is ok, we will throw, and don't mind throwing.
+                lk.reset( new readlock() );
+                c.reset( new Context(ns, path, doauth) );
+            }
+            else { 
+                assert( x < -1 );
+                uasserted(0, str::stream() << "can't open a database from a nested read lock " << ns);
+            }
+        }
 
-//        Client::Context::Context() : Client::Context("",0,false) { }
-#if 0
+        // todo: are receipts of thousands of queries for a nonexisting database a potential 
+        //       cause of bad performance due to the write lock acquisition above?  let's fix that.
+        //       it would be easy to first check that there is at least a .ns file, or something similar.
+    }
 
-    Client::Context::Context() :
+    void Client::Context::checkNotStale() const { 
+        switch ( _client->_curOp->getOp() ) {
+        case dbGetMore: // getMore's are special and should be handled else where
+        case dbUpdate: // update & delete check shard version in instance.cpp, so don't check here as well
+        case dbDelete:
+            break;
+        default: {
+            string errmsg;
+            if ( ! shardVersionOk( _ns , errmsg ) ) {
+                ostringstream os;
+                os << "[" << _ns << "] shard version not ok in Client::Context: " << errmsg;
+                throw SendStaleConfigException( _ns, os.str() );
+            }
+        }
+        }
+    }
+
+    // invoked from ReadContext
+    Client::Context::Context(const string& path, const string& ns, Database *db , bool doauth) :
         _client( currentClient.get() ), 
         _oldContext( _client->_context ),
-        _path( mongo::dbpath ) , 
-        _justCreated(false), 
-        _ns(""),
-        _db(0) 
+        _path( path ), 
+        _justCreated(false),
+        _ns( ns ), 
+        _db(db)
     {
+        assert(_db);
+        checkNotStale();
         _client->_context = this;
+        _client->_curOp->enter( this );
+        if ( doauth )
+            _auth( dbMutex.getState() );
         _client->checkLocks();        
     }
-#endif
+       
     void Client::Context::_finishInit( bool doauth ) {
         int lockState = dbMutex.getState();
         assert( lockState );
@@ -282,21 +342,7 @@ namespace mongo {
         }
         */
 
-        switch ( _client->_curOp->getOp() ) {
-        case dbGetMore: // getMore's are special and should be handled else where
-        case dbUpdate: // update & delete check shard version in instance.cpp, so don't check here as well
-        case dbDelete:
-            break;
-        default: {
-            string errmsg;
-            if ( ! shardVersionOk( _ns , errmsg ) ) {
-                ostringstream os;
-                os << "[" << _ns << "] shard version not ok in Client::Context: " << errmsg;
-                throw SendStaleConfigException( _ns, os.str() );
-            }
-        }
-        }
-
+        checkNotStale();
         _client->_context = this;
         _client->_curOp->enter( this );
         if ( doauth )

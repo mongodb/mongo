@@ -142,7 +142,7 @@ namespace mongo {
 
     bool Database::openExistingFile( int n ) { 
         assert(this);
-        assertDbAtLeastReadLocked(this);
+        dbMutex.assertWriteLocked();
         {
             // must not yet be visible to others as we aren't in the db's write lock and 
             // we will write to _files vector - thus this assert.
@@ -415,6 +415,10 @@ namespace mongo {
         //       that would make the DBs map very large.  not clear what to do to handle though, 
         //       perhaps just log it, which is what we do here with the "> 40" : 
         log(m.size() > 40 ? 1 : 0) << "Accessing: " << dbname << " for the first time" << endl;
+        
+        if( !dbMutex.isWriteLocked() ) { 
+            uasserted(0, "can't open database in a read lock. consider retrying the query");
+        }
 
         Database *db = new Database( dbname.c_str() , justCreated , path );
         m[dbname] = db;
