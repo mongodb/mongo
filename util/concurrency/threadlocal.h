@@ -49,6 +49,16 @@ namespace mongo {
             _val.reset( v );
         }
 
+        T& getRef() {
+            T *v = _val.get();
+            if( v ) {
+                return *v; 
+            }
+            v = new T(_default);
+            _val.reset( v );
+            return *v;
+        }
+
     private:
         boost::thread_specific_ptr<T> _val;
         const T _default;
