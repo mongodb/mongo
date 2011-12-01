@@ -180,7 +180,7 @@ assert.time = function( f, msg, timeout /*ms*/ ) {
        
         diff = ( new Date() ).getTime() - start.getTime();
         if ( diff > timeout )
-            doassert( "assert.time failed: " + f + ", msg:" + msg );
+            doassert( "assert.time failed timeout " + timeout + "ms took " + diff + "ms : " + f + ", msg:" + msg );
         return res;
 }
 
