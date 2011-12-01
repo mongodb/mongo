@@ -200,4 +200,31 @@ namespace mongo {
     
 #endif
 
+    /** This can be used instead of boost recursive mutex. The advantage is the _DEBUG checks
+     *  and ability to assertLocked(). This has not yet been tested for speed vs. the boost one.
+     */
+    class RecursiveMutex : boost::noncopyable {
+    public:
+        RecursiveMutex(const char* name) : m(name) { }
+        bool isLocked() const { return n.get() > 0; }
+        class scoped_lock : boost::noncopyable {
+            RecursiveMutex& rm;
+            int& nLocksByMe;
+        public:
+            scoped_lock( RecursiveMutex &m ) : rm(m), nLocksByMe(rm.n.getRef()) { 
+                if( nLocksByMe++ == 0 ) 
+                    rm.m.lock(); 
+            }
+            ~scoped_lock() { 
+                assert( nLocksByMe > 0 );
+                if( --nLocksByMe == 0 ) {
+                    rm.m.unlock(); 
+                }
+            }
+        };
+    private:
+        SimpleMutex m;
+        ThreadLocalValue<int> n;
+    };
+
 }
