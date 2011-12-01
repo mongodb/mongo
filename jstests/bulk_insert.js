@@ -1,6 +1,7 @@
 // Tests bulk insert of docs from the shell
 
 var coll = db.bulkInsertTest
+coll.drop()
 
 Random.srand( new Date().getTime() )
 
