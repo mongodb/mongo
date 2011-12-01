@@ -35,7 +35,9 @@ namespace mongo {
          * @param aggregateNscanned - shared int counting total nscanned for
          * query ops for all cursors.
          */
-        QueryOptimizerCursorOp( long long &aggregateNscanned ) : _matchCount(), _mustAdvance(), _nscanned(), _aggregateNscanned( aggregateNscanned ) {}
+        QueryOptimizerCursorOp( long long &aggregateNscanned ) :
+        _matchCount(), _mustAdvance(), _nscanned(), _capped(),
+        _aggregateNscanned( aggregateNscanned ), _yieldRecoveryFailed() {}
         
         virtual void _init() {
             if ( qp().scanAndOrderRequired() ) {
@@ -64,6 +66,7 @@ namespace mongo {
         
         virtual void recoverFromYield() {
             if ( _cc && !ClientCursor::recoverFromYield( _yieldData ) ) {
+                _yieldRecoveryFailed = true;
                 _c.reset();
                 _cc.reset();
                 
@@ -134,6 +137,7 @@ namespace mongo {
         DiskLoc _posBeforeYield;
         ClientCursor::YieldData _yieldData;
         long long &_aggregateNscanned;
+        bool _yieldRecoveryFailed;
     };
     
     /**
