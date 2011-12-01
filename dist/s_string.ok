@@ -285,6 +285,7 @@ ints
 inuse
 io
 ispo
+kcell
 keycmp
 keyname
 keyv
@@ -457,6 +458,7 @@ uri
 utf
 va
 vanishingly
+vcell
 versa
 vpack
 vsize
