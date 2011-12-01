@@ -33,7 +33,7 @@ namespace mongo {
 
         Database * get( const string& ns , const string& path ) const {
             dbMutex.assertAtLeastReadLocked();
-            recursive_scoped_lock lk(dbHolderMutex);
+            SimpleMutex::scoped_lock lk(dbHolderMutex);
             Paths::const_iterator x = _paths.find( path );
             if ( x == _paths.end() )
                 return 0;
@@ -47,7 +47,7 @@ namespace mongo {
 
         void _put( const string& ns , const string& path , Database * db ) {
             dbMutex.assertAtLeastReadLocked();
-            recursive_scoped_lock lk(dbHolderMutex);
+            SimpleMutex::scoped_lock lk(dbHolderMutex);
             DBs& m = _paths[path];
             Database*& d = m[_todb(ns)];
             if( d ) {
@@ -63,7 +63,7 @@ namespace mongo {
 
         void erase( const string& ns , const string& path ) {
             dbMutex.assertWriteLocked(); // write lock req'd as a Database obj can be in use dbHolderMutex is mainly just to control the holder itself
-            recursive_scoped_lock lk(dbHolderMutex);
+            SimpleMutex::scoped_lock lk(dbHolderMutex);
             DBs& m = _paths[path];
             _size -= (int)m.erase( _todb( ns ) );
         }
@@ -75,9 +75,8 @@ namespace mongo {
         int sizeInfo() const { return _size; }
 
         void forEach(boost::function<void(Database *)> f) const {
-//            dbMutex.assertAtLeastReadLocked();
             dbMutex.assertWriteLocked();
-            recursive_scoped_lock lk(dbHolderMutex);
+            SimpleMutex::scoped_lock lk(dbHolderMutex);
             for ( Paths::const_iterator i=_paths.begin(); i!=_paths.end(); i++ ) {
                 DBs m = i->second;
                 for( DBs::const_iterator j=m.begin(); j!=m.end(); j++ ) {
@@ -89,9 +88,10 @@ namespace mongo {
         /**
          * gets all unique db names, ignoring paths
          */
-        void getAllShortNames( set<string>& all ) const {
+        void getAllShortNames( bool locked, set<string>& all ) const {
             dbMutex.assertAtLeastReadLocked();
-            recursive_scoped_lock lk(dbHolderMutex);
+            scoped_ptr<SimpleMutex::scoped_lock> lk( locked ? 0 : new SimpleMutex::scoped_lock(dbHolderMutex) );
+            dbHolderMutex.dassertLocked();
             for ( Paths::const_iterator i=_paths.begin(); i!=_paths.end(); i++ ) {
                 DBs m = i->second;
                 for( DBs::const_iterator j=m.begin(); j!=m.end(); j++ ) {
@@ -103,7 +103,7 @@ namespace mongo {
         /** this is public as we overload it and use it also to make opening the datafiles 
             of a database exclusive.
          */
-        static boost::recursive_mutex& dbHolderMutex;
+        static SimpleMutex& dbHolderMutex;
 
     private:
         static string _todb( const string& ns ) {

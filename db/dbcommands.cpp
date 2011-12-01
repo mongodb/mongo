@@ -1014,7 +1014,7 @@ namespace mongo {
             set<string> allShortNames;
             {
                 readlock lk;
-                dbHolder.getAllShortNames( allShortNames );
+                dbHolder.getAllShortNames( false, allShortNames );
             }
             
             for ( set<string>::iterator i = allShortNames.begin(); i != allShortNames.end(); i++ ) {

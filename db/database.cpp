@@ -64,7 +64,7 @@ namespace mongo {
             }
             newDb = namespaceIndex.exists();
             profile = cmdLine.defaultProfile;
-            checkDuplicateUncasedNames();
+            checkDuplicateUncasedNames(true);
             // If already exists, open.  Otherwise behave as if empty until
             // there's a write, then open.
             if ( ! newDb || cmdLine.defaultProfile ) {
@@ -83,8 +83,8 @@ namespace mongo {
         }
     }
     
-    void Database::checkDuplicateUncasedNames() const {
-        string duplicate = duplicateUncasedName( name, path );
+    void Database::checkDuplicateUncasedNames(bool inholderlock) const {
+        string duplicate = duplicateUncasedName(inholderlock, name, path );
         if ( !duplicate.empty() ) {
             stringstream ss;
             ss << "db already exists with different case other: [" << duplicate << "] me [" << name << "]";
@@ -92,7 +92,11 @@ namespace mongo {
         }
     }
 
-    string Database::duplicateUncasedName( const string &name, const string &path, set< string > *duplicates ) {
+    /*static*/
+    string Database::duplicateUncasedName( bool inholderlock, const string &name, const string &path, set< string > *duplicates ) {
+        dbMutex.assertAtLeastReadLocked();
+        DatabaseHolder::dbHolderMutex.dassertLocked();
+
         if ( duplicates ) {
             duplicates->clear();   
         }
@@ -101,7 +105,7 @@ namespace mongo {
         getDatabaseNames( others , path );
         
         set<string> allShortNames;
-        dbHolder.getAllShortNames( allShortNames );
+        dbHolder.getAllShortNames( inholderlock, allShortNames );
         
         others.insert( others.end(), allShortNames.begin(), allShortNames.end() );
         
@@ -389,8 +393,11 @@ namespace mongo {
     Database* DatabaseHolder::getOrCreate( const string& ns , const string& path , bool& justCreated ) {
         dbMutex.assertAtLeastReadLocked();
 
-        // note the full db opening, not just the map lookup, needs to be done in this lock
-        recursive_scoped_lock lk(dbHolderMutex);
+        // note the full db opening, not just the map lookup, needs to be done in this lock,
+        //  so that two threads don't try to do the open at the same time.
+        // note that dbHolderMutex protects _paths and _todb but not the contents of each Database 
+        //  object themselves.
+        SimpleMutex::scoped_lock lk(dbHolderMutex);
 
         DBs& m = _paths[path];
 
@@ -404,13 +411,17 @@ namespace mongo {
             }
         }
 
-        log(1) << "Accessing: " << dbname << " for the first time" << endl;
+        // todo: protect against getting sprayed with requests for different db names that DNE - 
+        //       that would make the DBs map very large.  not clear what to do to handle though, 
+        //       perhaps just log it, which is what we do here with the "> 40" : 
+        log(m.size() > 40 ? 1 : 0) << "Accessing: " << dbname << " for the first time" << endl;
+
         Database *db = new Database( dbname.c_str() , justCreated , path );
         m[dbname] = db;
         _size++;
         return db;
     }
 
-    boost::recursive_mutex& DatabaseHolder::dbHolderMutex( *(new boost::recursive_mutex()) );
+    SimpleMutex& DatabaseHolder::dbHolderMutex( *(new SimpleMutex("dbholder")) );
 
 } // namespace mongo

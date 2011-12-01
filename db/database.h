@@ -109,20 +109,20 @@ namespace mongo {
                 return false;
             return ns[name.size()] == '.';
         }
-
+    private:
         /**
          * @throws DatabaseDifferCaseCode if the name is a duplicate based on
          * case insensitive matching.
          */
-        void checkDuplicateUncasedNames() const;
-
+        void checkDuplicateUncasedNames(bool inholderlockalready) const;
+    public:
         /**
          * @return name of an existing database with same text name but different
          * casing, if one exists.  Otherwise the empty string is returned.  If
          * 'duplicates' is specified, it is filled with all duplicate names.
          */
-        static string duplicateUncasedName( const string &name, const string &path, set< string > *duplicates = 0 );
-        
+        static string duplicateUncasedName( bool inholderlockalready, const string &name, const string &path, set< string > *duplicates = 0 );
+    public:
         const string name; // "alleyinsider"
         const string path;
 

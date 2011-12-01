@@ -541,7 +541,7 @@ namespace mongo {
             // missing from master after optime "ts".
             return false;   
         }
-        if ( Database::duplicateUncasedName( db, dbpath ).empty() ) {
+        if ( Database::duplicateUncasedName( false, db, dbpath ).empty() ) {
             // No duplicate database names are present.
             return true;
         }
@@ -594,7 +594,7 @@ namespace mongo {
         
         // Check for duplicates again, since we released the lock above.
         set< string > duplicates;
-        Database::duplicateUncasedName( db, dbpath, &duplicates );
+        Database::duplicateUncasedName( false, db, dbpath, &duplicates );
         
         // The database is present on the master and no conflicting databases
         // are present on the master.  Drop any local conflicts.
@@ -607,7 +607,7 @@ namespace mongo {
         }
         
         massert( 14034, "Duplicate database names present after attempting to delete duplicates",
-                Database::duplicateUncasedName( db, dbpath ).empty() );
+                Database::duplicateUncasedName( false, db, dbpath ).empty() );
         return true;
     }
 
