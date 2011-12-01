@@ -12,9 +12,10 @@
  */
 typedef enum {
 	WT_PT_EMPTY=0,			/* Unused slot */
-	WT_PT_BLOCK,			/* Inactive block */
-	WT_PT_OVFL,			/* Active overflow block */
-	WT_PT_OVFL_DISCARD		/* Inactive overflow block */
+	WT_PT_BLOCK,			/* Block: inactive */
+	WT_PT_BLOCK_EVICT,		/* Block: inactive on eviction */
+	WT_PT_OVFL,			/* Overflow: active */
+	WT_PT_OVFL_DISCARD		/* Overflow: inactive */
 } __wt_pt_type_t;
 
 struct __wt_page_modify {

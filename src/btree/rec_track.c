@@ -7,8 +7,7 @@
 
 #include "wt_internal.h"
 
-static void __wt_rec_track_verbose(
-		WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE_TRACK *);
+static void __wt_rec_track_print(WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE_TRACK *);
 
 /*
  * A page in memory has a list of associated blocks and overflow items.  For
@@ -18,6 +17,20 @@ static void __wt_rec_track_verbose(
  * generally called from the routines in rec_write.c, which update the objects
  * each time a page is reconciled.
  */
+
+/*
+ * __rec_track_clear --
+ *	Clear a track entry.
+ */
+static inline void
+__rec_track_clear(WT_PAGE_TRACK *track)
+{
+	track->type = WT_PT_EMPTY;
+	track->data = NULL;
+	track->len = 0;
+	track->addr = WT_ADDR_INVALID;
+	track->size = 0;
+}
 
 /*
  * __rec_track_extend --
@@ -52,8 +65,8 @@ __rec_track_extend(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Add an addr/size pair to the page's list of tracked objects.
  */
 int
-__wt_rec_track_block(
-    WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t addr, uint32_t size)
+__wt_rec_track_block(WT_SESSION_IMPL *session,
+    __wt_pt_type_t type, WT_PAGE *page, uint32_t addr, uint32_t size)
 {
 	WT_PAGE_MODIFY *mod;
 	WT_PAGE_TRACK *next, *track;
@@ -75,7 +88,7 @@ __wt_rec_track_block(
 			next = track;
 			continue;
 		}
-		if (track->type == WT_PT_BLOCK &&
+		if (track->type == type &&
 		    track->addr == addr && track->size == size)
 			return (0);
 	}
@@ -87,14 +100,14 @@ __wt_rec_track_block(
 	}
 
 	track = next;
-	track->type = WT_PT_BLOCK;
+	track->type = type;
 	track->data = NULL;
 	track->len = 0;
 	track->addr = addr;
 	track->size = size;
 
 #ifdef HAVE_VERBOSE
-	__wt_rec_track_verbose(session, page, track);
+	__wt_rec_track_print(session, page, track);
 #endif
 	return (0);
 }
@@ -138,7 +151,7 @@ __wt_rec_track_ovfl(WT_SESSION_IMPL *session, WT_PAGE *page,
 	track->size = size;
 
 #ifdef HAVE_VERBOSE
-	__wt_rec_track_verbose(session, page, track);
+	__wt_rec_track_print(session, page, track);
 #endif
 	return (0);
 }
@@ -179,11 +192,11 @@ __wt_rec_track_ovfl_reuse(WT_SESSION_IMPL *session, WT_PAGE *page,
 }
 
 /*
- * __wt_rec_track_ovfl_reset --
- *	Reset the overflow tracking information when first writing a page.
+ * __wt_rec_track_reset --
+ *	Reset the tracking information when first writing a page.
  */
 void
-__wt_rec_track_ovfl_reset(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_rec_track_reset(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_PAGE_MODIFY *mod;
 	WT_PAGE_TRACK *track;
@@ -195,13 +208,27 @@ __wt_rec_track_ovfl_reset(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Mark all overflow references "discarded" at the start of a page
 	 * reconciliation: we'll reactivate ones we are using again as we
 	 * process the page.
+	 *
+	 * Discard any blocks intended to be discarded on eviction, we are
+	 * not evicting based on the last reconciliation, they're no longer
+	 * interesting.
 	 */
 	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i)
-		if (track->type == WT_PT_OVFL) {
+		switch (track->type) {
+		case WT_PT_BLOCK_EVICT:
+			__rec_track_clear(track);
+			break;
+		case WT_PT_OVFL:
 			track->type = WT_PT_OVFL_DISCARD;
 			WT_VERBOSE(session, reconcile,
 			    "page %p set overflow OFF %" PRIu32 "/%" PRIu32,
 			    page, track->addr, track->size);
+			break;
+		case WT_PT_BLOCK:
+		case WT_PT_EMPTY:
+		case WT_PT_OVFL_DISCARD:
+		default:
+			break;
 		}
 }
 
@@ -217,18 +244,33 @@ __wt_rec_track_discard(WT_SESSION_IMPL *session, WT_PAGE *page, int final)
 
 	/*
 	 * After a sync of a page, some of the objects we're tracking are no
-	 * longer needed: discarded overflow items and tracked blocks can be
-	 * discarded.
+	 * longer needed -- free what we can free.
 	 *
-	 * When final is set (the page itself is being evicted), we no longer
-	 * need to track the overflow items we're holding, but the underlying
-	 * blocks are still inuse.
+	 * WT_PT_EMPTY:
+	 *	Empty slot.
+	 * WT_PT_BLOCK:
+	 *	A discarded block, free when this reconciliation completes.
+	 * WT_PT_BLOCK_EVICT:
+	 *	A discarded block based on this reconciliation; if the block is
+	 *	evicted based on this reconciliation, free it.
+	 * WT_PT_OVFL:
+	 *	An overflow record that's in-use.  Ignored after any particular
+	 *	reconciliation, because we need to track it for re-use in future
+	 *	reconciliations.   When the page is evicted, discard its memory,
+	 *	leaving the underlying blocks alone.
+	 * WT_PT_OVLF_DISCARD:
+	 *	An overflow record that's no longer in-use.  Discard the memory
+	 *	and free the underlying blocks after reconciliation completes.
 	 */
 	for (track = page->modify->track,
 	    i = 0; i < page->modify->track_entries; ++track, ++i) {
 		switch (track->type) {
 		case WT_PT_EMPTY:
 			continue;
+		case WT_PT_BLOCK_EVICT:
+			if (!final)
+				continue;
+			/* FALLTHROUGH */
 		case WT_PT_BLOCK:
 			WT_VERBOSE(session, reconcile,
 			    "page %p discard block %" PRIu32 "/%" PRIu32,
@@ -237,6 +279,9 @@ __wt_rec_track_discard(WT_SESSION_IMPL *session, WT_PAGE *page, int final)
 			    __wt_block_free(session, track->addr, track->size));
 			break;
 		case WT_PT_OVFL:
+			WT_VERBOSE(session, reconcile,
+			    "page %p retain overflow %" PRIu32 "/%" PRIu32,
+			    page, track->addr, track->size);
 			if (!final)
 				continue;
 			__wt_free(session, track->data);
@@ -251,28 +296,25 @@ __wt_rec_track_discard(WT_SESSION_IMPL *session, WT_PAGE *page, int final)
 			break;
 		}
 
-		track->type = WT_PT_EMPTY;
-		track->data = NULL;
-		track->len = 0;
-		track->addr = WT_ADDR_INVALID;
-		track->size = 0;
+		__rec_track_clear(track);
 	}
 	return (0);
 }
 
 #ifdef HAVE_VERBOSE
 /*
- * __wt_rec_track_verbose --
+ * __wt_rec_track_print --
  *	Display an entry being tracked.
  */
 static void
-__wt_rec_track_verbose(
+__wt_rec_track_print(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_PAGE_TRACK *track)
 {
 	const char *onoff;
 
 	switch (track->type) {
 	case WT_PT_BLOCK:
+	case WT_PT_BLOCK_EVICT:
 		WT_VERBOSE(session, reconcile,
 		    "page %p tracking block (%" PRIu32 "/%" PRIu32 ")",
 		    page, track->addr, track->size);

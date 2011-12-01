@@ -12,7 +12,6 @@ static void __hazard_copy(WT_SESSION_IMPL *);
 static int  __hazard_exclusive(WT_SESSION_IMPL *, WT_REF *, uint32_t);
 static int  __hazard_qsort_cmp(const void *, const void *);
 static int  __rec_discard_page(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __rec_ovfl_delete(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_parent_clean_update(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_parent_dirty_update(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
 static int  __rec_sub_discard(WT_SESSION_IMPL *, WT_PAGE *);
@@ -458,56 +457,6 @@ __rec_sub_excl_page(
 		    !F_ISSET(page, WT_PAGE_REC_EMPTY | WT_PAGE_REC_SPLIT))
 			return (1);
 	}
-
-	/*
-	 * Overflow items on deleted pages are discarded when reconciliation
-	 * completes.
-	 */
-	if (F_ISSET(page, WT_PAGE_REC_EMPTY))
-		switch (page->type) {
-		case WT_PAGE_ROW_INT:
-		case WT_PAGE_ROW_LEAF:
-			WT_RET(__rec_ovfl_delete(session, page));
-			break;
-		WT_ILLEGAL_FORMAT(session);
-		}
-	return (0);
-}
-
-/*
- * __rec_ovfl_delete --
- *	Walk the cells of a deleted disk page and schedule any overflow items
- * for eventual discard.
- */
-static int
-__rec_ovfl_delete(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_CELL *cell;
-	WT_CELL_UNPACK *unpack, _unpack;
-	WT_PAGE_DISK *dsk;
-	uint32_t i;
-
-	dsk = page->dsk;
-	unpack = &_unpack;
-
-	/*
-	 * For row-internal pages, the disk image was discarded because there
-	 * were no overflow items.
-	 */
-	if (dsk == NULL)
-		return (0);
-
-	/*
-	 * We're deleting the page, which means any overflow item we ever had
-	 * is deleted as well.
-	 */
-	WT_CELL_FOREACH(dsk, cell, unpack, i) {
-		__wt_cell_unpack(cell, unpack);
-		if (unpack->ovfl)
-			WT_RET(__wt_rec_track_block(
-			    session, page, unpack->off.addr, unpack->off.size));
-	}
-
 	return (0);
 }
 

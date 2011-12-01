@@ -176,15 +176,27 @@ static int  __rec_write_init(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_write_wrapup(WT_SESSION_IMPL *, WT_PAGE *);
 
 /*
- * __rec_track_cell --
- *	If the cell references an overflow chunk, add it to the page's list.
+ * __rec_track_kcell --
+ *	If a key cell references an overflow chunk, add it to the page's list.
  */
 static inline int
-__rec_track_cell(
+__rec_track_kcell(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack)
 {
-	return (unpack->ovfl ? __wt_rec_track_block(
-	    session, page, unpack->off.addr, unpack->off.size) : 0);
+	return (unpack->ovfl ? __wt_rec_track_block(session,
+	    WT_PT_BLOCK_EVICT, page, unpack->off.addr, unpack->off.size) : 0);
+}
+
+/*
+ * __rec_track_vcell --
+ *	If a value cell references an overflow chunk, add it to the page's list.
+ */
+static inline int
+__rec_track_vcell(
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack)
+{
+	return (unpack->ovfl ? __wt_rec_track_block(session,
+	    WT_PT_BLOCK, page, unpack->off.addr, unpack->off.size) : 0);
 }
 
 /*
@@ -305,7 +317,7 @@ __rec_write_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 	r->page = page;
 
 	/* Reset overflow tracking information for this page. */
-	__wt_rec_track_ovfl_reset(session, page);
+	__wt_rec_track_reset(session, page);
 
 	return (0);
 }
@@ -1421,7 +1433,7 @@ __rec_col_var(
 			 * that work because I don't want the complexity, and
 			 * overflow records should be rare.
 			 */
-			WT_RET(__rec_track_cell(session, page, unpack));
+			WT_RET(__rec_track_vcell(session, page, unpack));
 		}
 
 		/*
@@ -1729,7 +1741,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 				 * no longer useful.
 				 */
 				if (cell != NULL)
-					WT_RET(__rec_track_cell(
+					WT_RET(__rec_track_vcell(
 					    session, page, unpack));
 				continue;
 			case WT_PAGE_REC_REPLACE:
@@ -1745,7 +1757,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 				 * key for the split page).
 				 */
 				if (cell != NULL)
-					WT_RET(__rec_track_cell(
+					WT_RET(__rec_track_kcell(
 					    session, page, unpack));
 
 				WT_RET(__rec_row_merge(session,
@@ -2022,7 +2034,8 @@ __rec_row_leaf(
 			 * file space.
 			 */
 			if (val_cell != NULL)
-				WT_ERR(__rec_track_cell(session, page, unpack));
+				WT_ERR(
+				    __rec_track_vcell(session, page, unpack));
 
 			/*
 			 * If this key/value pair was deleted, we're done.  If
@@ -2031,7 +2044,8 @@ __rec_row_leaf(
 			 */
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
 				__wt_cell_unpack(cell, unpack);
-				WT_ERR(__rec_track_cell(session, page, unpack));
+				WT_ERR(
+				    __rec_track_kcell(session, page, unpack));
 				goto leaf_insert;
 			}
 
@@ -2212,13 +2226,15 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		switch (mod->u.write_split->type) {
 		case WT_PAGE_ROW_INT:
 			WT_ROW_REF_FOREACH(page->modify->u.write_split, rref, i)
-				WT_RET(__wt_rec_track_block(session, page,
+				WT_RET(__wt_rec_track_block(
+				    session, WT_PT_BLOCK, page,
 				    WT_ROW_REF_ADDR(rref),
 				    WT_ROW_REF_SIZE(rref)));
 			break;
 		case WT_PAGE_COL_INT:
 			WT_COL_REF_FOREACH(page->modify->u.write_split, cref, i)
-				WT_RET(__wt_rec_track_block(session, page,
+				WT_RET(__wt_rec_track_block(
+				    session, WT_PT_BLOCK, page,
 				    WT_COL_REF_ADDR(cref),
 				    WT_COL_REF_SIZE(cref)));
 			break;
@@ -2230,7 +2246,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		break;
 	case WT_PAGE_REC_REPLACE:			/* 1-for-1 page swap */
 		/* Discard the replacement page's blocks. */
-		WT_RET(__wt_rec_track_block(session,
+		WT_RET(__wt_rec_track_block(session, WT_PT_BLOCK,
 		    page, mod->u.write_off.addr, mod->u.write_off.size));
 		break;
 	default:
@@ -2243,8 +2259,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * the same block again.
 		 */
 		if (WT_PADDR(page) != WT_ADDR_INVALID) {
-			WT_RET(__wt_rec_track_block(
-			    session, page, WT_PADDR(page), WT_PSIZE(page)));
+			WT_RET(__wt_rec_track_block(session,
+			    WT_PT_BLOCK, page, WT_PADDR(page), WT_PSIZE(page)));
 			WT_PADDR(page) = WT_ADDR_INVALID;
 			WT_PSIZE(page) = WT_ADDR_INVALID;
 		}
