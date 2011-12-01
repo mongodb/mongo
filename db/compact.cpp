@@ -2,8 +2,6 @@
    compaction of deleted space in pdfiles (datafiles)
 */
 
-/* NOTE 6Oct2010 : this file PRELIMINARY, EXPERIMENTAL, NOT DONE, NOT USED YET (not in SConstruct) */
-
 /**
 *    Copyright (C) 2010 10gen Inc.
 *
