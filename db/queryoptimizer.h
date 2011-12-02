@@ -295,7 +295,7 @@ namespace mongo {
         /** @return metadata about cursors and index bounds for all plans, suitable for explain output. */
         BSONObj explain() const;
         /** @return true iff a plan is selected based on previous success of this plan. */
-        bool usingPrerecordedPlan() const { return _usingPrerecordedPlan; }
+        bool usingCachedPlan() const { return _usingCachedPlan; }
         /** @return a single plan that may work well for the specified query. */
         QueryPlanPtr getBestGuess() const;
 
@@ -365,7 +365,7 @@ namespace mongo {
         auto_ptr<FieldRangeSetPair> _originalFrsp;
         PlanSet _plans;
         bool _mayRecordPlan;
-        bool _usingPrerecordedPlan;
+        bool _usingCachedPlan;
         BSONObj _hint;
         BSONObj _order;
         long long _oldNScanned;
@@ -436,7 +436,7 @@ namespace mongo {
         /** @return non-$or version of explain output. */
         BSONObj oldExplain() const { assertNotOr(); return _currentQps->explain(); }
         /** @return true iff this is not a $or query and a plan is selected based on previous success of this plan. */
-        bool usingPrerecordedPlan() const { return !_or && _currentQps->usingPrerecordedPlan(); }
+        bool usingCachedPlan() const { return !_or && _currentQps->usingCachedPlan(); }
         /** Don't attempt to scan multiple plans, just use the best guess. */
         void setBestGuessOnly() { _bestGuessOnly = true; }
         /** Yielding is allowed while running each QueryPlan. */

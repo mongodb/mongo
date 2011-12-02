@@ -950,7 +950,7 @@ namespace mongo {
         BSONObj oldPlan;
         if ( explain && ! pq.hasIndexSpecifier() ) {
             MultiPlanScanner mps( ns, query, order );
-            if ( mps.usingPrerecordedPlan() )
+            if ( mps.usingCachedPlan() )
                 oldPlan = mps.oldExplain();
         }
         auto_ptr< MultiPlanScanner > mps( new MultiPlanScanner( ns, query, order, &hint, !explain, pq.getMin(), pq.getMax(), false, true ) );

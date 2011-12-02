@@ -315,7 +315,7 @@ doneCheckOrder:
         _frsp( frsp ),
         _originalFrsp( originalFrsp ),
         _mayRecordPlan( true ),
-        _usingPrerecordedPlan( false ),
+        _usingCachedPlan( false ),
         _hint( BSONObj() ),
         _order( order.getOwned() ),
         _oldNScanned( 0 ),
@@ -395,7 +395,7 @@ doneCheckOrder:
         _runner.reset();
         _plans.clear();
         _mayRecordPlan = true;
-        _usingPrerecordedPlan = false;
+        _usingCachedPlan = false;
 
         const char *ns = _frsp->ns();
         NamespaceDetails *d = nsdetails( ns );
@@ -432,7 +432,7 @@ doneCheckOrder:
         if ( isSimpleIdQuery( _originalQuery ) ) {
             int idx = d->findIdIndex();
             if ( idx >= 0 ) {
-                _usingPrerecordedPlan = true;
+                _usingCachedPlan = false;
                 _mayRecordPlan = false;
                 _plans.push_back( QueryPlanPtr( new QueryPlan( d , idx , *_frsp , _originalFrsp.get() , _originalQuery, _order, _mustAssertOnYieldFailure ) ) );
                 return;
@@ -453,7 +453,7 @@ doneCheckOrder:
                 IndexDetails& ii = i.next();
                 const IndexSpec& spec = ii.getSpec();
                 if ( spec.getTypeName() == _special && spec.suitability( _originalQuery , _order ) ) {
-                    _usingPrerecordedPlan = true;
+                    _usingCachedPlan = false;
                     _mayRecordPlan = false;
                     _plans.push_back( QueryPlanPtr( new QueryPlan( d , j , *_frsp , _originalFrsp.get() , _originalQuery, _order ,
                                                     _mustAssertOnYieldFailure , BSONObj() , BSONObj() , _special ) ) );
@@ -486,7 +486,7 @@ doneCheckOrder:
 
                 massert( 10368 ,  "Unable to locate previously recorded index", p.get() );
                 if ( !( _bestGuessOnly && p->scanAndOrderRequired() ) ) {
-                    _usingPrerecordedPlan = true;
+                    _usingCachedPlan = true;
                     _mayRecordPlan = false;
                     _plans.push_back( p );
                     return;
@@ -552,7 +552,7 @@ doneCheckOrder:
     }
 
     shared_ptr<QueryOp> QueryPlanSet::runOp( QueryOp &op ) {
-        if ( _usingPrerecordedPlan ) {
+        if ( _usingCachedPlan ) {
             Runner r( *this, op );
             shared_ptr<QueryOp> res = r.runUntilFirstCompletes();
             // _plans.size() > 1 if addOtherPlans was called in Runner::runUntilFirstCompletes().
@@ -578,14 +578,14 @@ doneCheckOrder:
         if ( !op->error() ) {
             return op;   
         }
-        if ( !_usingPrerecordedPlan || _bestGuessOnly || _plans.size() > 1 ) {
+        if ( !_usingCachedPlan || _bestGuessOnly || _plans.size() > 1 ) {
             return op;
         }
 
-        // Avoid an infinite loop here
-        uassert( 15878, str::stream() << "query plans not successful even with no constraints, potentially due to additional sort", ! retried );
+        // Avoid an infinite loop here - this should never occur.
+        verify( 15878, !retried );
 
-        // Retry with all candidate plans.
+        // A cached plan was used, so clear the plan cache and retry the query without a cached plan.
         QueryUtilIndexed::clearIndexesForPatterns( *_frsp, _order );
         init();
         return nextOp( originalOp, true );
@@ -739,7 +739,7 @@ doneCheckOrder:
             return holder._op;
         }
         _queue.push( holder );
-        if ( !_plans._bestGuessOnly && _plans._usingPrerecordedPlan && op.nscanned() > _plans._oldNScanned * 10 && _plans._special.empty() ) {
+        if ( !_plans._bestGuessOnly && _plans._usingCachedPlan && op.nscanned() > _plans._oldNScanned * 10 && _plans._special.empty() ) {
             holder._offset = -op.nscanned();
             _plans.addOtherPlans( /* avoid duplicating the initial plan */ true );
             PlanSet::iterator i = _plans._plans.begin();
@@ -754,7 +754,7 @@ doneCheckOrder:
                 _queue.push( op );
             }
             _plans._mayRecordPlan = true;
-            _plans._usingPrerecordedPlan = false;
+            _plans._usingCachedPlan = false;
         }
         return holder._op;
     }
