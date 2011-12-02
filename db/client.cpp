@@ -296,6 +296,9 @@ namespace mongo {
         if ( lockState > 0 && FileAllocator::get()->hasFailed() ) {
             uassert(14031, "Can't take a write lock while out of disk space", false);
         }
+      
+        uassert( 15918, "client access to index backing namespace prohibited", NamespaceString::normal( _ns.c_str() ) )
+
         _db = dbHolderUnchecked().getOrCreate( _ns , _path , _justCreated );
         assert(_db);
         checkNotStale();
@@ -316,7 +319,7 @@ namespace mongo {
         ss << "unauthorized db:" << _db->name << " lock type:" << lockState << " client:" << _client->clientAddress();
         uasserted( 10057 , ss.str() );
     }
-
+    
     Client::Context::~Context() {
         DEV assert( _client == currentClient.get() );
         _client->_curOp->leave( this );
