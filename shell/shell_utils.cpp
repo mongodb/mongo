@@ -503,8 +503,15 @@ namespace mongo {
                     if (i) ss << ' ';
                     if (argv_[i].find(' ') == string::npos)
                         ss << argv_[i];
-                    else
-                        ss << '"' << argv_[i] << '"';
+                    else {
+                        ss << '"';
+                        // escape all embedded quotes
+                        for (size_t j=0; j<argv_[i].size(); ++j) {
+                            if (argv_[i][j]=='"') ss << '"';
+                            ss << argv_[i][j];
+                        }
+                        ss << '"';
+                    }
                 }
 
                 string args = ss.str();
