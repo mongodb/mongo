@@ -18,6 +18,7 @@ static int  __rec_sub_discard(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_sub_discard_col(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_sub_discard_row(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_sub_excl(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
+static void __rec_sub_excl_clear(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
 static int  __rec_sub_excl_col(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
 static void __rec_sub_excl_col_clear(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_sub_excl_page(
@@ -117,7 +118,18 @@ __rec_parent_dirty_update(
 			WT_PUBLISH(parent_ref->state, WT_REF_DISK);
 			break;
 		}
-		goto noevict;
+		/* FALLTHROUGH */
+	case WT_PAGE_REC_SPLIT_MERGE:			/* Page split */
+		/*
+		 * Empty pages or pages which split and were then evicted, that
+		 * is, pages now waiting to be merged into their parents. We're
+		 * not going to evict this page after all, instead we'll merge
+		 * it into its parent when that page is evicted.  Release our
+		 * exclusive reference to it, as well as any pages below it we
+		 * locked down, and return it into use.
+		 */
+		__rec_sub_excl_clear(session, page, flags);
+		return (0);
 	case WT_PAGE_REC_REPLACE: 			/* 1-for-1 page swap */
 		/*
 		 * Special case the root page: none, we just wrote a new root
@@ -135,31 +147,6 @@ __rec_parent_dirty_update(
 		 */
 		WT_PUBLISH(parent_ref->state, WT_REF_DISK);
 		break;
-	case WT_PAGE_REC_SPLIT_MERGE:			/* Page split */
-noevict:	/*
-		 * We're not going to evict this page after all, instead we'll
-		 * merge it into its parent when that page is evicted.  Release
-		 * our exclusive reference to it, as well as any pages below it
-		 * we locked down, and return it into use.
-		 */
-		if (!LF_ISSET(WT_REC_SINGLE)) {
-			switch (page->type) {
-			case WT_PAGE_COL_INT:
-				__rec_sub_excl_col_clear(session, page);
-				break;
-			case WT_PAGE_ROW_INT:
-				__rec_sub_excl_row_clear(session, page);
-				break;
-			default:
-				break;
-			}
-		}
-		/*
-		 * Publish: a barrier to ensure the structure fields are set
-		 * before the state change makes the page available to readers.
-		 */
-		WT_PUBLISH(parent_ref->state, WT_REF_MEM);
-		return (0);
 	case WT_PAGE_REC_SPLIT:				/* Page split */
 		/* Special case the root page: see below. */
 		if (WT_PAGE_IS_ROOT(page)) {
@@ -246,10 +233,10 @@ __rec_sub_excl(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 		WT_RET(__hazard_exclusive(session, page->parent_ref, flags));
 
 	/*
-	 * Walk the page's subtree, and make sure we can reconcile this page.
+	 * Walk the page's subtree and make sure we can evict this page.
 	 *
-	 * When reconciling a page, it may reference deleted or split pages
-	 * which will be merged into the reconciled page.
+	 * When evicting a page, it may reference deleted or split pages which
+	 * will be merged into the evicted page.
 	 *
 	 * If we find an in-memory page, we're done: you can't evict a page that
 	 * references other in-memory pages, those pages must be evicted first.
@@ -272,38 +259,46 @@ __rec_sub_excl(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 * rather than keeping track of the locked pages on purpose -- the
 	 * only time this should ever fail is if eviction's LRU-based choice
 	 * is very unlucky.)
-	 *
-	 * We could skip in-memory page checks when called as part of closing
-	 * a file, but we have to do the rest anyway, it's not worth doing.
-	 *
-	 * Finally, we do some additional cleanup work during this pass: first,
-	 * add any deleted or split pages to our list of pages to discard when
-	 * we discard the page being reconciled; second, review deleted pages
-	 * for overflow items and schedule them for deletion as well.
 	 */
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
-		if ((ret = __rec_sub_excl_col(session, page, flags)) != 0)
-			if (!LF_ISSET(WT_REC_SINGLE))
-				__rec_sub_excl_col_clear(session, page);
+		ret = __rec_sub_excl_col(session, page, flags);
 		break;
 	case WT_PAGE_ROW_INT:
-		if ((ret = __rec_sub_excl_row(session, page, flags)) != 0)
-			if (!LF_ISSET(WT_REC_SINGLE))
-				__rec_sub_excl_row_clear(session, page);
+		ret = __rec_sub_excl_row(session, page, flags);
 		break;
 	default:
 		break;
 	}
 
-	/*
-	 * If we're not going to reconcile this page, release our exclusive
-	 * reference.
-	 */
-	if (ret != 0 && !LF_ISSET(WT_REC_SINGLE))
-		page->parent_ref->state = WT_REF_MEM;
+	/* If can't evict this page, release our exclusive reference. */
+	if (ret != 0)
+		__rec_sub_excl_clear(session, page, flags);
 
 	return (ret);
+}
+
+/*
+ * __rec_sub_excl_clear --
+ *     Discard exclusive access and return a page to availability.
+ */
+static void
+__rec_sub_excl_clear(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
+{
+	if (LF_ISSET(WT_REC_SINGLE))
+		return;
+
+	switch (page->type) {
+	case WT_PAGE_COL_INT:
+		__rec_sub_excl_col_clear(session, page);
+		break;
+	case WT_PAGE_ROW_INT:
+		__rec_sub_excl_row_clear(session, page);
+		break;
+	default:
+		break;
+	}
+	page->parent_ref->state = WT_REF_MEM;
 }
 
 /*
