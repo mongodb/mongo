@@ -152,6 +152,31 @@ namespace mongo {
                 i++;
                 continue;
             }
+            else if ( arg == "-f" && i + 1 < argc ) {
+                commandLine << arg << "  \"" << argv[i+1] << "\"  ";
+                i++;
+                continue;
+            }
+            else if ( arg == "--config" && i + 1 < argc ) {
+                commandLine << arg << "  \"" << argv[i+1] << "\"  ";
+                i++;
+                continue;
+            }
+            else if ( arg == "--pidfilepath" && i + 1 < argc ) {
+                commandLine << arg << "  \"" << argv[i+1] << "\"  ";
+                i++;
+                continue;
+            }
+            else if ( arg == "--repairpath" && i + 1 < argc ) {
+                commandLine << arg << "  \"" << argv[i+1] << "\"  ";
+                i++;
+                continue;
+            }
+            else if ( arg == "--keyfile" && i + 1 < argc ) {
+                commandLine << arg << "  \"" << argv[i+1] << "\"  ";
+                i++;
+                continue;
+            }
             else if ( arg.length() > 9 && arg.substr(0, 9) == "--service" ) {
                 // Strip off --service(Name|User|Password) arguments
                 i++;
