@@ -296,8 +296,8 @@ namespace mongo {
         if ( lockState > 0 && FileAllocator::get()->hasFailed() ) {
             uassert(14031, "Can't take a write lock while out of disk space", false);
         }
-      
-        uassert( 15918, "client access to index backing namespace prohibited", NamespaceString::normal( _ns.c_str() ) )
+        
+        uassert( 15929, "client access to index backing namespace prohibited", NamespaceString::normal( _ns.c_str() ) );
 
         _db = dbHolderUnchecked().getOrCreate( _ns , _path , _justCreated );
         assert(_db);
