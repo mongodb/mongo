@@ -25,6 +25,7 @@
 #include "../util/base64.h"
 #include "../util/md5.hpp"
 #include <limits>
+#include <cmath>
 #include "../util/unittest.h"
 #include "../util/embedded_builder.h"
 #include "../util/stringutils.h"
@@ -77,6 +78,9 @@ namespace mongo {
                     number() <= numeric_limits< double >::max() ) {
                 s.precision( 16 );
                 s << number();
+            }
+            else if ( std::isnan(number()) ) {
+                s << "NaN";
             }
             else {
                 StringBuilder ss;

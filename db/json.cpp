@@ -541,7 +541,7 @@ namespace mongo {
 
                 // real_p accepts numbers with nonsignificant zero prefixes, which
                 // aren't allowed in JSON.  Oh well.
-                number = strict_real_p;
+                number = strict_real_p | str_p( "NaN" );
 
                 static int_parser<long long, 10,  1, numeric_limits<long long>::digits10 + 1> long_long_p;
                 integer = long_long_p[ intValue(self.b) ];
