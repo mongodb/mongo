@@ -6,10 +6,24 @@ var st = new ShardingTest( { shards : 1, mongos : 2, other : { rs : true } } )
 
 var mongosA = st.s0
 var mongosB = st.s1
+var rs = st._rs[0].test
 var shard = st.shard0
 
 var sadmin = shard.getDB( "admin" )
-sadmin.runCommand({ replSetStepDown : 3000, force : true })
+
+jsTestLog( "Stepping down replica set member..." )
+
+try{
+    sadmin.runCommand({ replSetStepDown : 3000, force : true })
+}
+catch( e ){
+    // stepdown errors out our conn to the shard
+    printjson( e )
+}
+
+jsTestLog( "Reconnecting..." )
+
+sadmin = new Mongo( st.shard0.host ).getDB("admin")
 
 assert.soon( 
     function(){
@@ -22,36 +36,42 @@ assert.soon(
     }
 );
 
+jsTestLog( "New primary elected..." )
+
 coll = mongosA.getCollection( jsTestName() + ".coll" );
 
 start = new Date();
 
-iteratioons = 0;
+ReplSetTest.awaitRSClientHosts( coll.getMongo(), rs.getPrimary(), { ismaster : true }, rs )
 
-assert.soon( 
-    function(z){
-        iteratioons++;
-        try {
-            coll.findOne();
-            return true;
-        }
-        catch ( e ){
-            return false;
-        }
-    } );
-
-printjson( coll.findOne() )
+try{
+    coll.findOne()
+}
+catch( e ){
+    printjson( e )
+    assert( false )
+}
 
 end = new Date();
 
 print( "time to work for primary: " + ( ( end.getTime() - start.getTime() ) / 1000 ) + " seconds" );
 
-assert.gt( 3 , iteratioons );
-
+jsTestLog( "Found data from collection..." )
 
 // now check secondary
 
-sadmin.runCommand({ replSetStepDown : 3000, force : true })
+try{
+    sadmin.runCommand({ replSetStepDown : 3000, force : true })
+}
+catch( e ){
+    // expected, since all conns closed
+    printjson( e )
+}
+
+sadmin = new Mongo( st.shard0.host ).getDB("admin")
+
+jsTestLog( "Stepped down secondary..." )
+
 other = new Mongo( mongosA.host );
 other.setSlaveOk( true );
 other = other.getCollection( jsTestName() + ".coll" );
