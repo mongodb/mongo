@@ -155,6 +155,7 @@ namespace mongo {
         class ReadContext : boost::noncopyable { 
         public:
             ReadContext(const string& ns, string path=dbpath, bool doauth=true );
+            Context& ctx() { return *c.get(); }
         private:
             scoped_ptr<readlock> lk;
             scoped_ptr<Context> c;

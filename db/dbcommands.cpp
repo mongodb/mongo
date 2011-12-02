@@ -1000,9 +1000,8 @@ namespace mongo {
                 totalSize += size;
                 
                 {
-                    readlock lk( *i );
-                    Client::Context ctx( *i );
-                    b.appendBool( "empty", ctx.db()->isEmpty() );
+                    Client::ReadContext rc( *i );
+                    b.appendBool( "empty", rc.ctx().db()->isEmpty() );
                 }
                 
                 dbInfos.push_back( b.obj() );
@@ -1866,19 +1865,19 @@ namespace mongo {
                 retval = _execCommand(c, dbname , cmdObj , queryOptions, result , fromRepl );
             }
         }
+        else if( c->locktype() != Command::WRITE ) { 
+            // read lock
+            assert( ! c->logTheOp() );
+            Client::ReadContext ctx( dbname , dbpath, c->requiresAuth() ); // read locks
+            client.curop()->ensureStarted();
+            retval = _execCommand(c, dbname , cmdObj , queryOptions, result , fromRepl );
+        }
         else {
-            bool needWriteLock = c->locktype() == Command::WRITE;
-
-            if ( ! needWriteLock ) {
-                assert( ! c->logTheOp() );
-            }
-
-            mongolock lk( needWriteLock );
+            dassert( c->locktype() == Command::WRITE );
+            writelock lk;
             client.curop()->ensureStarted();
             Client::Context ctx( dbname , dbpath , c->requiresAuth() );
-
             retval = _execCommand(c, dbname , cmdObj , queryOptions, result , fromRepl );
-
             if ( retval && c->logTheOp() && ! fromRepl ) {
                 logOp("c", cmdns, cmdObj);
             }

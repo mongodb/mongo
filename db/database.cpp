@@ -414,12 +414,14 @@ namespace mongo {
         // todo: protect against getting sprayed with requests for different db names that DNE - 
         //       that would make the DBs map very large.  not clear what to do to handle though, 
         //       perhaps just log it, which is what we do here with the "> 40" : 
-        log(m.size() > 40 ? 1 : 0) << "Accessing: " << dbname << " for the first time" << endl;
-        
-        if( !dbMutex.isWriteLocked() ) { 
+        bool cant = !dbMutex.isWriteLocked();
+        if( logLevel >= 1 || m.size() > 40 || cant || DEBUG_BUILD ) {
+            log() << "opening db: " << (path==dbpath?"":path) << ' ' << dbname << endl;
+        }
+        if( cant ) { 
             uasserted(15927, "can't open database in a read lock. consider retrying the query");
         }
-
+        
         Database *db = new Database( dbname.c_str() , justCreated , path );
         m[dbname] = db;
         _size++;
