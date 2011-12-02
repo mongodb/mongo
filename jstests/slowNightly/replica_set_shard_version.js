@@ -9,18 +9,10 @@ var mongosB = st.s1
 var shard = st.shard0
 
 var sadmin = shard.getDB( "admin" )
-sadmin.runCommand({ replSetStepDown : 3000, force : true })
+assert.throws(function() { sadmin.runCommand({ replSetStepDown : 3000, force : true }); });
+try { sadmin.getLastError(); } catch (e) { print("reconnecting: "+e); }
 
-assert.soon( 
-    function(){
-        var res = sadmin.runCommand( "replSetGetStatus" );
-        for ( var i=0; i<res.members.length; i++ ) {
-            if ( res.members[i].state == 1 )
-                return true;
-        }
-        return false;
-    }
-);
+st.rs0.getMaster();
 
 coll = mongosA.getCollection( jsTestName() + ".coll" );
 
@@ -28,7 +20,7 @@ start = new Date();
 
 iteratioons = 0;
 
-assert.soon( 
+assert.soon(
     function(z){
         iteratioons++;
         try {
@@ -51,7 +43,9 @@ assert.gt( 3 , iteratioons );
 
 // now check secondary
 
-sadmin.runCommand({ replSetStepDown : 3000, force : true })
+assert.throws(function() { sadmin.runCommand({ replSetStepDown : 3000, force : true }); });
+try { sadmin.getLastError(); } catch (e) { print("reconnecting: "+e); }
+
 other = new Mongo( mongosA.host );
 other.setSlaveOk( true );
 other = other.getCollection( jsTestName() + ".coll" );
