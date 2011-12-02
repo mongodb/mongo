@@ -17,6 +17,7 @@
 
 #include "pch.h"
 #include "ntservice.h"
+#include "../db/client.h"
 #include "winutil.h"
 #include "text.h"
 #include <direct.h>
@@ -355,14 +356,25 @@ namespace mongo {
         reportStatus( SERVICE_STOPPED );
     }
 
+    static void serviceShutdown( const char* controlCodeName ) {
+        Client::initThread( "serviceShutdown" );
+        log() << "got " << controlCodeName << " request from Windows Service Controller, " <<
+            ( inShutdown() ? "already in shutdown" : "will terminate after current cmd ends" ) << endl;
+        ServiceController::reportStatus( SERVICE_STOP_PENDING );
+        if ( ! inShutdown() ) {
+            exitCleanly( EXIT_WINDOWS_SERVICE_STOP );
+            ServiceController::reportStatus( SERVICE_STOPPED );
+        }
+    }
+
     void WINAPI ServiceController::serviceCtrl( DWORD ctrlCode ) {
         switch ( ctrlCode ) {
         case SERVICE_CONTROL_STOP:
+            serviceShutdown( "SERVICE_CONTROL_STOP" );
+            break;
         case SERVICE_CONTROL_SHUTDOWN:
-            reportStatus( SERVICE_STOP_PENDING );
-            shutdownServer();
-            reportStatus( SERVICE_STOPPED );
-            return;
+            serviceShutdown( "SERVICE_CONTROL_SHUTDOWN" );
+            break;
         }
     }
 

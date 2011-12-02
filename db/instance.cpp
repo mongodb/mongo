@@ -927,6 +927,15 @@ namespace mongo {
         catch (...) { }
 #endif
 
+#ifdef _WIN32
+        // Windows Service Controller wants to be told when we are down,
+        //  so don't call ::exit() yet, or say "really exiting now"
+        //
+        if ( rc == EXIT_WINDOWS_SERVICE_STOP ) {
+            if ( c ) c->shutdown();
+            return;
+        }
+#endif
         tryToOutputFatal( "dbexit: really exiting now" );
         if ( c ) c->shutdown();
         ::exit(rc);
