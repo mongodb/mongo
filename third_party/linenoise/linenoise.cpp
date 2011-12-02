@@ -800,10 +800,13 @@ static int linenoisePrompt(int fd, char *buf, int buflen, PROMPTINFO & pi) {
                 }
             }
             break;
-        case 21: /* Ctrl+u, delete the whole line. */
-            buf[0] = '\0';
-            pos = len = 0;
-            refreshLine(fd, pi, buf, len, pos, cols);
+        case 21: /* Ctrl+u, delete all characters to the left of the cursor. */
+            if( pos > 0 ) {
+                len -= pos;
+                memmove( buf, buf + pos, len + 1 );
+                pos = 0;
+                refreshLine( fd, pi, buf, len, pos, cols );
+            }
             break;
         case 11: /* Ctrl+k, delete from current to end of line. */
             buf[pos] = '\0';
