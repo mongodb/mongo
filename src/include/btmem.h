@@ -232,11 +232,13 @@ struct __wt_page {
 #define	WT_PAGE_REC_EMPTY	0x010	/* Reconciliation: page empty */
 #define	WT_PAGE_REC_REPLACE	0x020	/* Reconciliation: page replaced */
 #define	WT_PAGE_REC_SPLIT	0x040	/* Reconciliation: page split */
+#define	WT_PAGE_REC_SPLIT_MERGE	0x080	/* Reconciliation: page split merge */
 	uint8_t flags;			/* Page flags */
 };
 
 #define	WT_PAGE_REC_MASK						\
-	(WT_PAGE_REC_EMPTY | WT_PAGE_REC_REPLACE | WT_PAGE_REC_SPLIT)
+	(WT_PAGE_REC_EMPTY |						\
+	    WT_PAGE_REC_REPLACE | WT_PAGE_REC_SPLIT | WT_PAGE_REC_SPLIT_MERGE)
 
 /*
  * WT_PADDR, WT_PSIZE --

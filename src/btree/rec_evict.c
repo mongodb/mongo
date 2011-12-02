@@ -117,8 +117,26 @@ __rec_parent_dirty_update(
 			WT_PUBLISH(parent_ref->state, WT_REF_DISK);
 			break;
 		}
+		goto noevict;
+	case WT_PAGE_REC_REPLACE: 			/* 1-for-1 page swap */
+		/*
+		 * Special case the root page: none, we just wrote a new root
+		 * page, updating the parent is all that's necessary.
+		 *
+		 * Update the parent to reference the replacement page.
+		 */
+		parent_ref->addr = mod->u.write_off.addr;
+		parent_ref->size = mod->u.write_off.size;
+		parent_ref->page = NULL;
 
 		/*
+		 * Publish: a barrier to ensure the structure fields are set
+		 * before the state change makes the page available to readers.
+		 */
+		WT_PUBLISH(parent_ref->state, WT_REF_DISK);
+		break;
+	case WT_PAGE_REC_SPLIT_MERGE:			/* Page split */
+noevict:	/*
 		 * We're not going to evict this page after all, instead we'll
 		 * merge it into its parent when that page is evicted.  Release
 		 * our exclusive reference to it, as well as any pages below it
@@ -142,23 +160,6 @@ __rec_parent_dirty_update(
 		 */
 		WT_PUBLISH(parent_ref->state, WT_REF_MEM);
 		return (0);
-	case WT_PAGE_REC_REPLACE: 			/* 1-for-1 page swap */
-		/*
-		 * Special case the root page: none, we just wrote a new root
-		 * page, updating the parent is all that's necessary.
-		 *
-		 * Update the parent to reference the replacement page.
-		 */
-		parent_ref->addr = mod->u.write_off.addr;
-		parent_ref->size = mod->u.write_off.size;
-		parent_ref->page = NULL;
-
-		/*
-		 * Publish: a barrier to ensure the structure fields are set
-		 * before the state change makes the page available to readers.
-		 */
-		WT_PUBLISH(parent_ref->state, WT_REF_DISK);
-		break;
 	case WT_PAGE_REC_SPLIT:				/* Page split */
 		/* Special case the root page: see below. */
 		if (WT_PAGE_IS_ROOT(page)) {
@@ -440,23 +441,26 @@ __rec_sub_excl_page(
 	 * The test is for dirty pages (which must be written before we can know
 	 * what they will look like during their parent eviction), and for empty
 	 * or split pages.
+	 *
+	 * The test is cheap, do it first.  If it passes, get exclusive access
+	 * to the page if our caller doesn't have the tree locked down, and test
+	 * again.
 	 */
 	if (__wt_page_is_modified(page) ||
-	    !F_ISSET(page, WT_PAGE_REC_EMPTY | WT_PAGE_REC_SPLIT))
+	    !F_ISSET(page,
+	    WT_PAGE_REC_EMPTY | WT_PAGE_REC_SPLIT | WT_PAGE_REC_SPLIT_MERGE))
 		return (1);
 
-	/*
-	 * Another thread of control could be using this page: get exclusive
-	 * access to the page if our caller doesn't have the tree locked down,
-	 * and test again.
-	 */
-	if (!LF_ISSET(WT_REC_SINGLE)) {
-		WT_RET(__hazard_exclusive(session, ref, flags));
+	if (LF_ISSET(WT_REC_SINGLE))
+		return (0);
 
-		if (__wt_page_is_modified(page) ||
-		    !F_ISSET(page, WT_PAGE_REC_EMPTY | WT_PAGE_REC_SPLIT))
-			return (1);
-	}
+	WT_RET(__hazard_exclusive(session, ref, flags));
+
+	if (__wt_page_is_modified(page) ||
+	    !F_ISSET(page,
+	    WT_PAGE_REC_EMPTY | WT_PAGE_REC_SPLIT | WT_PAGE_REC_SPLIT_MERGE))
+		return (1);
+
 	return (0);
 }
 

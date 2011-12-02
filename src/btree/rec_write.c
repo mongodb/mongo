@@ -1021,9 +1021,11 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 				off.size = rp->modify->u.write_off.size;
 				break;
 			case WT_PAGE_REC_SPLIT:
-				WT_RET(__rec_col_merge(session,
-				    rp->modify == NULL ?
-				    rp : rp->modify->u.write_split));
+				WT_RET(__rec_col_merge(
+				    session, rp->modify->u.write_split));
+				continue;
+			case WT_PAGE_REC_SPLIT_MERGE:
+				WT_RET(__rec_col_merge(session, rp));
 				continue;
 			default:
 				off.addr = WT_COL_REF_ADDR(cref);
@@ -1749,6 +1751,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 				val->off.size = rp->modify->u.write_off.size;
 				break;
 			case WT_PAGE_REC_SPLIT:
+			case WT_PAGE_REC_SPLIT_MERGE:
 				r->merge_ref = rref;
 
 				/*
@@ -1761,7 +1764,8 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 					    session, page, unpack));
 
 				WT_RET(__rec_row_merge(session,
-				    rp->modify == NULL ?
+				    F_ISSET(rp, WT_PAGE_REC_MASK) ==
+				    WT_PAGE_REC_SPLIT_MERGE ?
 				    rp : rp->modify->u.write_split));
 				continue;
 			default:
@@ -1870,9 +1874,11 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 				val->off.size = rp->modify->u.write_off.size;
 				break;
 			case WT_PAGE_REC_SPLIT:
-				WT_RET(__rec_row_merge(session,
-				    rp->modify == NULL ?
-				    rp : rp->modify->u.write_split));
+				WT_RET(__rec_row_merge(
+				    session, rp->modify->u.write_split));
+				continue;
+			case WT_PAGE_REC_SPLIT_MERGE:
+				WT_RET(__rec_row_merge(session, rp));
 				continue;
 			default:
 				val->off.addr = WT_ROW_REF_ADDR(rref);
@@ -2220,6 +2226,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	switch (F_ISSET(page, WT_PAGE_REC_MASK)) {
 	case WT_PAGE_REC_EMPTY:				/* Page deleted */
+	case WT_PAGE_REC_SPLIT_MERGE:			/* Page split */
 		break;
 	case WT_PAGE_REC_SPLIT:				/* Page split */
 		/* The split page's blocks need to be discarded. */
@@ -2610,7 +2617,7 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 	 * its parents see and merge the split pages).  As they say, if it's not
 	 * confusing, you don't understand it.
 	 */
-	F_SET(page, WT_PAGE_REC_SPLIT);
+	F_SET(page, WT_PAGE_REC_SPLIT_MERGE);
 
 	/* Enter each split page into the new, internal page. */
 	for (rref = page->u.row_int.t,
@@ -2671,7 +2678,7 @@ __rec_split_col(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 	 * its parents see and merge the split pages).  As they say, if it's not
 	 * confusing, you don't understand it.
 	 */
-	F_SET(page, WT_PAGE_REC_SPLIT);
+	F_SET(page, WT_PAGE_REC_SPLIT_MERGE);
 
 	/* Enter each split page into the new, internal page. */
 	for (cref = page->u.col_int.t,

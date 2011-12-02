@@ -414,6 +414,8 @@ __debug_page_work(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 		__dmsg(ds, ", replaced");
 	if (F_ISSET(page, WT_PAGE_REC_SPLIT))
 		__dmsg(ds, ", split");
+	if (F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE))
+		__dmsg(ds, ", split-merge");
 	__dmsg(ds, ")\n");
 
 	/* Skip bulk-loaded pages. */
