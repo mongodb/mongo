@@ -165,8 +165,6 @@ namespace mongo {
            Note this is also helpful if an exception happens as the state if fixed up.
         */
         class Context : boost::noncopyable {
-            friend class CurOp;
-            void checkNotStale() const;
         public:
             /** this is probably what you want */
             Context(const string& ns, string path=dbpath, bool doauth=true );
@@ -181,7 +179,6 @@ namespace mongo {
             Context(const string& path, const string& ns, Database *db, bool doauth);
 
             ~Context();
-
             Client* getClient() const { return _client; }
             Database* db() const { return _db; }
             const char * ns() const { return _ns.c_str(); }
@@ -207,14 +204,10 @@ namespace mongo {
             void relocked() { _finishInit(); }
 
         private:
-            /**
-             * at this point _client, _oldContext and _ns have to be set
-             * _db should not have been touched
-             * this will set _db and create if needed
-             * will also set _client->_context to this
-             */
+            friend class CurOp;
             void _finishInit( bool doauth=true);
             void _auth( int lockState = dbMutex.getState() );
+            void checkNotStale() const;
             Client * const _client;
             Context * const _oldContext;
             const string _path;
@@ -281,7 +274,6 @@ namespace mongo {
         }
     }
 #endif
-    string sayClientState();
 
     inline bool haveClient() { return currentClient.get() > 0; }
 
