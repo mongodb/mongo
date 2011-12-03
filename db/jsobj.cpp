@@ -79,7 +79,7 @@ namespace mongo {
                 s.precision( 16 );
                 s << number();
             }
-            else if ( std::isnan(number()) ) {
+            else if ( mongo::isNaN(number()) ) {
                 s << "NaN";
             }
             else {
