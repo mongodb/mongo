@@ -388,7 +388,15 @@ namespace mongo {
         unsigned long long sz = mmf.length();
         assert( sz <= 0x7fffffff );
         assert( sz % 4096 == 0 );
-        assert( sz >= 64*1024*1024 || cmdLine.smallfiles );
+        if( sz < 64*1024*1024 && !cmdLine.smallfiles ) { 
+            if( sz >= 16*1024*1024 && sz % (1024*1024) == 0 ) { 
+                log() << "info openExisting file size " << sz << " but cmdLine.smallfiles=false" << endl;
+            }
+            else {
+                log() << "openExisting size " << sz << " less then minimum file size expectation " << filename << endl;
+                assert(false);
+            }
+        }
         check(_mb);
         if( header()->uninitialized() )
             return false;
