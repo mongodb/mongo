@@ -461,7 +461,7 @@ namespace ThreadedTests {
             }
             
             // must assert as the item is missing
-            ASSERT_EXCEPTION( l.orphan( new M( -3 ) ) , UserException );
+            ASSERT_THROWS( l.orphan( new M( -3 ) ) , UserException );
         }
     };
 

@@ -23,7 +23,7 @@
 
 #include "../pch.h"
 
-#define ASSERT_EXCEPTION(a,b)                                       \
+#define ASSERT_THROWS(a,b)                                       \
     try {                                                           \
         a;                                                          \
         mongo::regression::assert_fail( #a , __FILE__ , __LINE__ ); \

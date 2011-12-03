@@ -1284,8 +1284,8 @@ namespace JsobjTests {
         class Unallowed {
         public:
             void run() {
-                ASSERT_EXCEPTION( BSON( GT << 4 ), MsgAssertionException );
-                ASSERT_EXCEPTION( BSON( "a" << 1 << GT << 4 ), MsgAssertionException );
+                ASSERT_THROWS( BSON( GT << 4 ), MsgAssertionException );
+                ASSERT_THROWS( BSON( "a" << 1 << GT << 4 ), MsgAssertionException );
             }
         };
 

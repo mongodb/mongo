@@ -1099,7 +1099,7 @@ namespace ReplTests {
             ASSERT( !fsc.done() );
             ASSERT( fsc.prepareToYield() );
             ClientCursor::invalidate( "local.oplog.$main" );
-            ASSERT_EXCEPTION( fsc.recoverFromYield(), MsgAssertionException );
+            ASSERT_THROWS( fsc.recoverFromYield(), MsgAssertionException );
         }
     };
 

@@ -303,6 +303,7 @@
     <ClInclude Include="..\util\mongoutils\hash.h" />
     <ClInclude Include="..\util\sock.h" />
     <ClInclude Include="..\util\unittest.h" />
+    <ClInclude Include="framework.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\bson\oid.cpp" />

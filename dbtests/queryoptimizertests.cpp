@@ -470,7 +470,7 @@ namespace QueryOptimizerTests {
                 BSONElement e = b.firstElement();
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 1 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                ASSERT_EXCEPTION( QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 1 ), BSON( "b" << 1 ), true, &e ),
+                ASSERT_THROWS( QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 1 ), BSON( "b" << 1 ), true, &e ),
                                   AssertionException );
             }
         };
@@ -750,7 +750,7 @@ namespace QueryOptimizerTests {
                 theDataFileMgr.insertWithObjMod( ns(), one );
                 BSONObj result;
                 ASSERT( Helpers::findOne( ns(), BSON( "a" << 1 ), result ) );
-                ASSERT_EXCEPTION( Helpers::findOne( ns(), BSON( "a" << 1 ), result, true ), AssertionException );
+                ASSERT_THROWS( Helpers::findOne( ns(), BSON( "a" << 1 ), result, true ), AssertionException );
                 Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "a_1" );
                 ASSERT( Helpers::findOne( ns(), BSON( "a" << 1 ), result, true ) );
             }
@@ -970,7 +970,7 @@ namespace QueryOptimizerTests {
     class BestGuessOrSortAssertion : public Base {
     public:
         void run() {
-            ASSERT_EXCEPTION( bestGuessCursor( ns(), BSON( "$or" << BSON_ARRAY( BSON( "b" << 1 ) ) ), BSON( "a" << 1 ) ), MsgAssertionException );
+            ASSERT_THROWS( bestGuessCursor( ns(), BSON( "$or" << BSON_ARRAY( BSON( "b" << 1 ) ) ), BSON( "a" << 1 ) ), MsgAssertionException );
         }
     };
     

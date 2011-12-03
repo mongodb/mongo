@@ -329,6 +329,7 @@
     <ClInclude Include="..\db\databaseholder.h">
       <Filter>db\h</Filter>
     </ClInclude>
+    <ClInclude Include="framework.h" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\js\js64r.lib">

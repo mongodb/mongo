@@ -262,7 +262,7 @@ namespace NamespaceTests {
                 b.append( "b", shortArray() );
 
                 BSONObjSet keys;
-                ASSERT_EXCEPTION( id().getKeysFromObject( b.done(), keys ),
+                ASSERT_THROWS( id().getKeysFromObject( b.done(), keys ),
                                   UserException );
             }
         private:
@@ -463,7 +463,7 @@ namespace NamespaceTests {
             void run() {
                 create();
                 BSONObjSet keys;
-                ASSERT_EXCEPTION( id().getKeysFromObject( fromjson( "{a:[{b:[1],c:[2]}]}" ), keys ),
+                ASSERT_THROWS( id().getKeysFromObject( fromjson( "{a:[{b:[1],c:[2]}]}" ), keys ),
                                   UserException );
             }
         private:
@@ -818,9 +818,9 @@ namespace NamespaceTests {
                 ASSERT_EQUALS( BSON( "" << 1 ), *keys.begin() );
                 keys.clear();
 
-                ASSERT_EXCEPTION( id().getKeysFromObject( fromjson( "{a:[{'0':1}]}" ), keys ), UserException );
+                ASSERT_THROWS( id().getKeysFromObject( fromjson( "{a:[{'0':1}]}" ), keys ), UserException );
 
-                ASSERT_EXCEPTION( id().getKeysFromObject( fromjson( "{a:[1,{'0':2}]}" ), keys ), UserException );
+                ASSERT_THROWS( id().getKeysFromObject( fromjson( "{a:[1,{'0':2}]}" ), keys ), UserException );
             }
         protected:
             BSONObj key() const { return BSON( "a.0" << 1 ); }
