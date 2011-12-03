@@ -717,6 +717,7 @@
     <ClInclude Include="..\util\ramlog.h" />
     <ClInclude Include="..\util\text.h" />
     <ClInclude Include="..\util\time_support.h" />
+    <ClInclude Include="databaseholder.h" />
     <ClInclude Include="durop.h" />
     <ClInclude Include="dur_commitjob.h" />
     <ClInclude Include="dur_journal.h" />

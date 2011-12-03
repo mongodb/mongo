@@ -334,6 +334,7 @@
     <ClInclude Include="..\util\net\listen.h" />
     <ClInclude Include="..\util\net\message_port.h" />
     <ClInclude Include="..\util\net\miniwebserver.h" />
+    <ClInclude Include="databaseholder.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="db.rc" />
