@@ -163,15 +163,6 @@ struct __wt_page {
 			WT_COL_RLE *repeats;	/* RLE array for lookups */
 			uint32_t    nrepeats;	/* Number of repeat slots. */
 		} col_leaf;
-
-		/* Bulk-loaded linked list. */
-		struct {
-			uint64_t   recno;	/* Starting recno */
-			WT_INSERT *ins;		/* Bulk-loaded K/V pairs */
-			WT_UPDATE *upd;		/* Bulk-loaded V items */
-			uint8_t	  *bitf;	/* Bulk-loaded bit fields */
-
-		} bulk;
 	} u;
 
 	/* Page's on-disk representation: NULL for pages created in memory. */
@@ -226,13 +217,12 @@ struct __wt_page {
 	 * the threads could race.
 	 */
 #define	WT_PAGE_BUILD_KEYS	0x001	/* Keys have been built in memory */
-#define	WT_PAGE_BULK_LOAD	0x002	/* Page bulk loaded */
-#define	WT_PAGE_FORCE_EVICT	0x004	/* Waiting for forced eviction */
-#define	WT_PAGE_PINNED		0x008	/* Page is pinned */
-#define	WT_PAGE_REC_EMPTY	0x010	/* Reconciliation: page empty */
-#define	WT_PAGE_REC_REPLACE	0x020	/* Reconciliation: page replaced */
-#define	WT_PAGE_REC_SPLIT	0x040	/* Reconciliation: page split */
-#define	WT_PAGE_REC_SPLIT_MERGE	0x080	/* Reconciliation: page split merge */
+#define	WT_PAGE_FORCE_EVICT	0x002	/* Waiting for forced eviction */
+#define	WT_PAGE_PINNED		0x004	/* Page is pinned */
+#define	WT_PAGE_REC_EMPTY	0x008	/* Reconciliation: page empty */
+#define	WT_PAGE_REC_REPLACE	0x010	/* Reconciliation: page replaced */
+#define	WT_PAGE_REC_SPLIT	0x020	/* Reconciliation: page split */
+#define	WT_PAGE_REC_SPLIT_MERGE	0x040	/* Reconciliation: page split merge */
 	uint8_t flags;			/* Page flags */
 };
 
@@ -647,13 +637,6 @@ struct __wt_insert_head {
 	    __bit_getv(WT_PAGE_DISK_BYTE(dsk), 0, (btree)->bitcnt) : 0;	\
 	    (i) < (dsk)->u.entries; ++(i),				\
 	    (v) = __bit_getv(WT_PAGE_DISK_BYTE(dsk), i, (btree)->bitcnt))
-
-/*
- * WT_FIX_NRECS --
- *	Return the number of bitfield records that fit on a fixed-length page.
- */
-#define	WT_FIX_NRECS(btree)						\
-	(((btree)->maxleafpage - WT_PAGE_DISK_SIZE) / (btree)->bitcnt)
 
 /*
  * WT_OFF_FOREACH --

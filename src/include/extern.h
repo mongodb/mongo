@@ -208,7 +208,7 @@ extern int __wt_btree_open(WT_SESSION_IMPL *session,
     const char *cfg[],
     uint32_t flags);
 extern int __wt_btree_root_empty_init(WT_SESSION_IMPL *session);
-extern int __wt_btree_root_empty_free(WT_SESSION_IMPL *session);
+extern int __wt_btree_root_empty(WT_SESSION_IMPL *session, WT_PAGE **leafp);
 extern int __wt_btree_close(WT_SESSION_IMPL *session);
 extern int __wt_btree_reopen(WT_SESSION_IMPL *session,
     const char *cfg[],
@@ -286,6 +286,11 @@ extern int __wt_rec_write( WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_SALVAGE_COOKIE *salvage);
 extern void __wt_rec_destroy(WT_SESSION_IMPL *session);
+extern int __wt_rec_bulk_init(WT_CURSOR_BULK *cbulk);
+extern int __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk);
+extern int __wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk);
+extern int __wt_rec_col_fix_bulk_insert(WT_CURSOR_BULK *cbulk);
+extern int __wt_rec_col_var_bulk_insert(WT_CURSOR_BULK *cbulk);
 extern int __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_row_key( WT_SESSION_IMPL *session,
     WT_PAGE *page,

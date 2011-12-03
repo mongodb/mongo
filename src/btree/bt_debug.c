@@ -402,8 +402,6 @@ __debug_page_work(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 		__dmsg(ds, ", parent %p", page->parent);
 
 	__dmsg(ds, " (%s", __wt_page_is_modified(page) ? "dirty" : "clean");
-	if (F_ISSET(page, WT_PAGE_BULK_LOAD))
-		__dmsg(ds, ", bulk-loaded");
 	if (F_ISSET(page, WT_PAGE_FORCE_EVICT))
 		__dmsg(ds, ", force-evict");
 	if (F_ISSET(page, WT_PAGE_PINNED))
@@ -417,12 +415,6 @@ __debug_page_work(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 	if (F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE))
 		__dmsg(ds, ", split-merge");
 	__dmsg(ds, ")\n");
-
-	/* Skip bulk-loaded pages. */
-	if (F_ISSET(page, WT_PAGE_BULK_LOAD)) {
-		__dmsg(ds, "bulk-loaded page -- skipped\n");
-		return (0);
-	}
 
 	/* Dump the page. */
 	switch (page->type) {

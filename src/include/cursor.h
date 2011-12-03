@@ -92,37 +92,27 @@ struct __wt_cursor_btree {
 struct __wt_cursor_bulk {
 	WT_CURSOR_BTREE cbt;
 
-	uint64_t recno;				/* Total record number */
-	uint32_t ipp;				/* Items per page */
-	uint32_t ins_cnt;			/* Inserts on the list */
-	uint8_t	 page_type;			/* Page type */
+	WT_PAGE *leaf;				/* The leaf page */
 
 	/*
-	 * K/V pairs for row-store leaf pages, and V objects for column-store
-	 * leaf pages, are stored in singly-linked lists (the lists are never
-	 * searched, only walked at reconciliation, so it's not so bad).
+	 * Variable-length column store compares values during bulk load as
+	 * part of RLE compression, row-store compares keys during bulk load
+	 * to avoid corruption.
 	 */
-	WT_INSERT  *ins_base;			/* Base insert link */
-	WT_INSERT **insp;			/* Next insert link */
-	WT_UPDATE  *upd_base;			/* Base update link */
-	WT_UPDATE **updp;			/* Next update link */
-	uint8_t	   *bitf;			/* Bit field */
+	WT_BUF cmp;				/* Comparison buffer */
 
 	/*
-	 * Bulk load dynamically allocates an array of leaf-page references;
-	 * when the bulk load finishes, we build an internal page for those
-	 * references.
+	 * Variable-length column-store RLE counter (also overloaded to mean
+	 * the first time through the bulk-load insert routine, when set to 0).
 	 */
-	WT_PAGE	*parent;			/* The internal page */
+	uint64_t rle;
 
-	WT_ROW_REF *rref;			/* List of row leaf pages */
-	WT_COL_REF *cref;			/* List of column leaf pages */
-
-	uint32_t ref_next;			/* Next leaf page slot */
-	uint32_t ref_entries;			/* Total leaf page slots */
-	size_t   ref_allocated;			/* Bytes allocated */
-
-	WT_BUF keycmp;				/* Key comparisons. */
+	/*
+	 * Fixed-length column-store current entry in memory chunk count, and
+	 * the maximum number of records per chunk.
+	 */
+	uint32_t entry;				/* Entry count */
+	uint32_t nrecs;				/* Max records per chunk */
 };
 
 struct __wt_cursor_config {

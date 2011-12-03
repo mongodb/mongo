@@ -351,12 +351,11 @@ __wt_btree_root_empty_init(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_btree_root_empty_free --
- *	Bulk loads only work on empty trees: check and free the tree before
- * doing a bulk load.
+ * __wt_btree_root_empty --
+ *	Bulk loads only work on empty trees: check before doing a bulk load.
  */
 int
-__wt_btree_root_empty_free(WT_SESSION_IMPL *session)
+__wt_btree_root_empty(WT_SESSION_IMPL *session, WT_PAGE **leafp)
 {
 	WT_BTREE *btree;
 	WT_PAGE *root, *child;
@@ -378,9 +377,7 @@ __wt_btree_root_empty_free(WT_SESSION_IMPL *session)
 	if (child->entries != 0)
 		return (WT_ERROR);
 
-	__wt_page_out(session, root, 0);
-	btree->root_page.page = NULL;
-
+	*leafp = child;
 	return (0);
 }
 

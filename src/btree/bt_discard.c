@@ -47,34 +47,23 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	if (page->memory_footprint != 0)
 		__wt_cache_page_evict(session, page);
 
-	/* Bulk-loaded pages are skeleton pages, we don't need to do much. */
-	if (F_ISSET(page, WT_PAGE_BULK_LOAD))
-		switch (page->type) {
-		case WT_PAGE_COL_VAR:
-			__free_update_list(session, page->u.bulk.upd);
-			break;
-		case WT_PAGE_ROW_LEAF:
-			__free_insert_list(session, page->u.bulk.ins);
-			break;
-		}
-	else
-		switch (page->type) {
-		case WT_PAGE_COL_FIX:
-			__free_page_col_fix(session, page);
-			break;
-		case WT_PAGE_COL_INT:
-			__free_page_col_int(session, page);
-			break;
-		case WT_PAGE_COL_VAR:
-			__free_page_col_var(session, page);
-			break;
-		case WT_PAGE_ROW_INT:
-			__free_page_row_int(session, page);
-			break;
-		case WT_PAGE_ROW_LEAF:
-			__free_page_row_leaf(session, page);
-			break;
-		}
+	switch (page->type) {
+	case WT_PAGE_COL_FIX:
+		__free_page_col_fix(session, page);
+		break;
+	case WT_PAGE_COL_INT:
+		__free_page_col_int(session, page);
+		break;
+	case WT_PAGE_COL_VAR:
+		__free_page_col_var(session, page);
+		break;
+	case WT_PAGE_ROW_INT:
+		__free_page_row_int(session, page);
+		break;
+	case WT_PAGE_ROW_LEAF:
+		__free_page_row_leaf(session, page);
+		break;
+	}
 
 	if (!LF_ISSET(WT_PAGE_FREE_IGNORE_DISK))	/* Disk image */
 		__wt_free(session, page->dsk);

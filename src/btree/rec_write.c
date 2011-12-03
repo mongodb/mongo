@@ -151,13 +151,11 @@ static int  __rec_cell_build_ovfl(
 static int  __rec_cell_build_val(
 		WT_SESSION_IMPL *, const void *, uint32_t, uint64_t);
 static int  __rec_col_fix(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __rec_col_fix_bulk(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_col_fix_slvg(
 		WT_SESSION_IMPL *, WT_PAGE *, WT_SALVAGE_COOKIE *);
 static int  __rec_col_int(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_col_merge(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_col_var(WT_SESSION_IMPL *, WT_PAGE *, WT_SALVAGE_COOKIE *);
-static int  __rec_col_var_bulk(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_col_var_helper(WT_SESSION_IMPL *,
 		WT_SALVAGE_COOKIE *, WT_BUF *, int, int, uint64_t);
 static int  __rec_row_int(WT_SESSION_IMPL *, WT_PAGE *);
@@ -234,9 +232,7 @@ __wt_rec_write(
 	/* Reconcile the page. */
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
-		if (F_ISSET(page, WT_PAGE_BULK_LOAD))
-			WT_RET(__rec_col_fix_bulk(session, page));
-		else if (salvage != NULL)
+		if (salvage != NULL)
 			WT_RET(__rec_col_fix_slvg(session, page, salvage));
 		else
 			WT_RET(__rec_col_fix(session, page));
@@ -245,10 +241,7 @@ __wt_rec_write(
 		WT_RET(__rec_col_int(session, page));
 		break;
 	case WT_PAGE_COL_VAR:
-		if (F_ISSET(page, WT_PAGE_BULK_LOAD))
-			WT_RET(__rec_col_var_bulk(session, page));
-		else
-			WT_RET(__rec_col_var(session, page, salvage));
+		WT_RET(__rec_col_var(session, page, salvage));
 		break;
 	case WT_PAGE_ROW_INT:
 		WT_RET(__rec_row_int(session, page));
@@ -950,6 +943,206 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, uint8_t type)
 }
 
 /*
+ * __wt_rec_bulk_init --
+ *	Bulk insert reconciliation initialization.
+ */
+int
+__wt_rec_bulk_init(WT_CURSOR_BULK *cbulk)
+{
+	WT_BTREE *btree;
+	WT_PAGE *page;
+	WT_SESSION_IMPL *session;
+	uint64_t recno;
+
+	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
+	btree = session->btree;
+	page = cbulk->leaf;
+
+	WT_RET(__wt_rec_modify_init(session, page));
+	WT_RET(__rec_write_init(session, page));
+
+	switch (btree->type) {
+	case BTREE_COL_FIX:
+	case BTREE_COL_VAR:
+		recno = 1;
+		break;
+	case BTREE_ROW:
+		recno = 0;
+		break;
+	WT_ILLEGAL_FORMAT(session);
+	}
+
+	WT_RET(__rec_split_init(
+	    session, page, recno, session->btree->maxleafpage));
+
+	return (0);
+}
+
+/*
+ * __wt_rec_bulk_wrapup --
+ *	Bulk insert reconciliation cleanup.
+ */
+int
+__wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk)
+{
+	WT_BTREE *btree;
+	WT_PAGE *page;
+	WT_RECONCILE *r;
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
+	r = session->btree->reconcile;
+	btree = session->btree;
+
+	switch (btree->type) {
+	case BTREE_COL_FIX:
+		if (cbulk->entry != 0)
+			__rec_incr(session, r, cbulk->entry,
+			    __bitstr_size(cbulk->entry * btree->bitcnt));
+		break;
+	case BTREE_COL_VAR:
+		if (cbulk->rle != 0)
+			WT_RET(__wt_rec_col_var_bulk_insert(cbulk));
+		break;
+	case BTREE_ROW:
+		break;
+	WT_ILLEGAL_FORMAT(session);
+	}
+
+	page = cbulk->leaf;
+
+	WT_RET(__rec_split_finish(session));
+	WT_RET(__rec_write_wrapup(session, page));
+	WT_RET(__wt_page_set_modified(session, page->parent));
+	return (0);
+}
+
+/*
+ * __wt_rec_row_bulk_insert --
+ *	Row-store bulk insert.
+ */
+int
+__wt_rec_row_bulk_insert(WT_CURSOR_BULK *cbulk)
+{
+	WT_CURSOR *cursor;
+	WT_KV *key, *val;
+	WT_RECONCILE *r;
+	WT_SESSION_IMPL *session;
+	int ovfl_key;
+
+	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
+	r = session->btree->reconcile;
+
+	cursor = &cbulk->cbt.iface;
+	key = &r->k;
+	val = &r->v;
+	WT_RET(__rec_cell_build_key(session,	/* Build key cell */
+	    cursor->key.data, cursor->key.size, 0, &ovfl_key));
+	WT_RET(__rec_cell_build_val(session,	/* Build value cell */
+	    cursor->value.data, cursor->value.size, (uint64_t)0));
+
+	/*
+	 * Boundary, split or write the page.  If the K/V pair doesn't
+	 * fit: split the page, switch to the non-prefix-compressed key
+	 * and turn off compression until a full key is written to the
+	 * new page.
+	 *
+	 * We write a trailing key cell on the page after the K/V pairs
+	 * (see WT_TRAILING_KEY_CELL for more information).
+	 */
+	while (key->len + val->len + WT_TRAILING_KEY_CELL > r->space_avail) {
+		WT_RET(__rec_split(session));
+
+		r->key_pfx_compress = 0;
+		if (!ovfl_key)
+			WT_RET(__rec_cell_build_key(
+			    session, NULL, 0, 0, &ovfl_key));
+	}
+
+	/* Copy the key/value pair onto the page. */
+	__rec_copy_incr(session, r, key);
+	if (val->len != 0)
+		__rec_copy_incr(session, r, val);
+
+	/* Update compression state. */
+	__rec_key_state_update(r, ovfl_key);
+
+	return (0);
+}
+
+/*
+ * __wt_rec_col_fix_bulk_insert --
+ *	Fixed-length column-store bulk insert.
+ */
+int
+__wt_rec_col_fix_bulk_insert(WT_CURSOR_BULK *cbulk)
+{
+	WT_BTREE *btree;
+	WT_CURSOR *cursor;
+	WT_RECONCILE *r;
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
+	r = session->btree->reconcile;
+	btree = session->btree;
+	cursor = &cbulk->cbt.iface;
+
+	if (cbulk->entry == cbulk->nrecs) {
+		if (cbulk->entry != 0) {
+			/*
+			 * If everything didn't fit, update the counters and
+			 * split.
+			 *
+			 * Boundary: split or write the page.
+			 */
+			__rec_incr(session, r, cbulk->entry,
+			    __bitstr_size(cbulk->entry * btree->bitcnt));
+			WT_RET(__rec_split(session));
+		}
+		cbulk->entry = 0;
+		cbulk->nrecs = r->space_avail / btree->bitcnt;
+	}
+
+	__bit_setv(r->first_free,
+	    cbulk->entry, btree->bitcnt, ((uint8_t *)cursor->value.data)[0]);
+	++cbulk->entry;
+	++r->recno;
+
+	return (0);
+}
+
+/*
+ * __wt_rec_col_var_bulk_insert --
+ *	Variable-length column-store bulk insert.
+ */
+int
+__wt_rec_col_var_bulk_insert(WT_CURSOR_BULK *cbulk)
+{
+	WT_SESSION_IMPL *session;
+	WT_KV *val;
+	WT_RECONCILE *r;
+
+	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
+	r = session->btree->reconcile;
+
+	val = &r->v;
+	WT_RET(__rec_cell_build_val(
+	    session, cbulk->cmp.data, cbulk->cmp.size, cbulk->rle));
+
+	/* Boundary: split or write the page. */
+	while (val->len > r->space_avail)
+		WT_RET(__rec_split(session));
+
+	/* Copy the value onto the page. */
+	__rec_copy_incr(session, r, val);
+
+	/* Update the starting record number in case we split. */
+	r->recno += cbulk->rle;
+
+	return (0);
+}
+
+/*
  * __rec_col_int --
  *	Reconcile a column-store internal page.
  */
@@ -1075,7 +1268,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* Allocate the memory. */
 	WT_RET(__rec_split_init(session,
-	    page, page->u.bulk.recno, btree->maxleafpage));
+	    page, page->u.col_leaf.recno, btree->maxleafpage));
 
 	/* Copy the updated, disk-image bytes into place. */
 	memcpy(r->first_free, page->u.col_leaf.bitf,
@@ -1195,34 +1388,6 @@ __rec_col_fix_slvg(
 	}
 
 	/* Write the remnant page. */
-	return (__rec_split_finish(session));
-}
-
-/*
- * __rec_col_fix_bulk --
- *	Reconcile a bulk-loaded, fixed-width column-store leaf page.
- */
-static int
-__rec_col_fix_bulk(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_BTREE *btree;
-	WT_RECONCILE *r;
-	uint32_t len;
-
-	r = session->btree->reconcile;
-	btree = session->btree;
-
-	/* Allocate the memory -- we know the entire page will fit. */
-	WT_RET(__rec_split_init(session,
-	    page, page->u.bulk.recno, btree->maxleafpage));
-
-	/* Copy the bytes into place. */
-	len = __bitstr_size(page->entries * btree->bitcnt);
-	memcpy(r->first_free, page->u.bulk.bitf, len);
-	__rec_incr(session, r, page->entries, len);
-	r->recno += page->entries;
-
-	/* Write the page. */
 	return (__rec_split_finish(session));
 }
 
@@ -1579,57 +1744,6 @@ __rec_col_var(
 }
 
 /*
- * __rec_col_var_bulk --
- *	Reconcile a bulk-loaded, variable-width column-store leaf page.
- */
-static int
-__rec_col_var_bulk(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_KV *val;
-	WT_RECONCILE *r;
-	WT_UPDATE *upd, *next;
-	uint64_t rle;
-
-	r = session->btree->reconcile;
-	val = &r->v;
-
-	WT_RET(__rec_split_init(session,
-	    page, page->u.bulk.recno, session->btree->maxleafpage));
-
-	/* For each entry in the update list... */
-	rle = 1;
-	for (upd = page->u.bulk.upd; upd != NULL; upd = next) {
-		next = upd->next;
-		if (next != NULL && upd->size == next->size &&
-		    memcmp(WT_UPDATE_DATA(upd),
-		    WT_UPDATE_DATA(next), upd->size) == 0) {
-			++rle;
-			continue;
-		}
-
-		WT_RET(__rec_cell_build_val(
-		    session, WT_UPDATE_DATA(upd), upd->size, rle));
-
-		/* Boundary: split or write the page. */
-		while (val->len > r->space_avail)
-			WT_RET(__rec_split(session));
-
-		/* Copy the value onto the page. */
-		__rec_copy_incr(session, r, val);
-
-		/*
-		 * Update the starting record number in case we split.
-		 * Reset the RLE counter.
-		 */
-		r->recno += rle;
-		rle = 1;
-	}
-
-	/* Write the remnant page. */
-	return (__rec_split_finish(session));
-}
-
-/*
  * __rec_row_int --
  *	Reconcile a row-store internal page.
  */
@@ -1964,16 +2078,6 @@ __rec_row_leaf(
 
 	WT_RET(__rec_split_init(session,
 	    page, 0ULL, session->btree->maxleafpage));
-
-	/*
-	 * Bulk-loaded pages are just an insert list and nothing more.  As
-	 * row-store leaf pages already have to deal with insert lists, it's
-	 * pretty easy to hack into that path.
-	 */
-	if (F_ISSET(page, WT_PAGE_BULK_LOAD)) {
-		WT_RET(__rec_row_leaf_insert(session, page->u.bulk.ins));
-		return (__rec_split_finish(session));
-	}
 
 	/*
 	 * Write any K/V pairs inserted into the page before the first from-disk
