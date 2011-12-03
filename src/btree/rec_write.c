@@ -2489,6 +2489,126 @@ err:			if (page->type == WT_PAGE_ROW_INT ||
 }
 
 /*
+ * __rec_split_row --
+ *	Update a row-store parent page's reference when a page is split.
+ */
+static int
+__rec_split_row(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
+{
+	WT_BOUNDARY *bnd;
+	WT_PAGE *page;
+	WT_RECONCILE *r;
+	WT_ROW_REF *rref;
+	uint32_t i;
+	int ret;
+
+	r = session->btree->reconcile;
+	ret = 0;
+
+	/* Allocate a row-store internal page. */
+	WT_RET(__wt_calloc_def(session, 1, &page));
+	WT_ERR(__wt_calloc_def(
+	    session, (size_t)r->bnd_next, &page->u.row_int.t));
+
+	/* Fill it in. */
+	page->parent = orig->parent;
+	page->parent_ref = orig->parent_ref;
+	page->read_gen = __wt_cache_read_gen(session);
+	page->entries = r->bnd_next;
+	page->type = WT_PAGE_ROW_INT;
+
+	/*
+	 * Newly created internal pages are not persistent as we don't want the
+	 * tree to deepen whenever a leaf page splits.  Flag the page for merge
+	 * into its parent when the parent is reconciled.   We set the flag on
+	 * the original page (so that future reconciliations of its parent see
+	 * and merge the split pages), and on the newly created split page (so
+	 * that after eviction, when the split page replaces the original page,
+	 * its parents see and merge the split pages).  As they say, if it's not
+	 * confusing, you don't understand it.
+	 */
+	F_SET(page, WT_PAGE_REC_SPLIT_MERGE);
+
+	/* Enter each split page into the new, internal page. */
+	for (rref = page->u.row_int.t,
+	    bnd = r->bnd, i = 0; i < r->bnd_next; ++rref, ++bnd, ++i) {
+		WT_ERR(__wt_row_ikey_alloc(session, 0,
+		    bnd->key.data, bnd->key.size, (WT_IKEY **)&rref->key));
+		WT_ROW_REF_ADDR(rref) = bnd->off.addr;
+		WT_ROW_REF_SIZE(rref) = bnd->off.size;
+
+		WT_ROW_REF_PAGE(rref) = NULL;
+		WT_ROW_REF_STATE(rref) = WT_REF_DISK;
+	}
+
+	*splitp = page;
+	return (0);
+
+err:	__wt_free(session, page);
+	return (ret);
+}
+
+/*
+ * __rec_split_col --
+ *	Update a column-store parent page's reference when a page is split.
+ */
+static int
+__rec_split_col(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
+{
+	WT_BOUNDARY *bnd;
+	WT_COL_REF *cref;
+	WT_PAGE *page;
+	WT_RECONCILE *r;
+	uint32_t i;
+	int ret;
+
+	r = session->btree->reconcile;
+	ret = 0;
+
+	/* Allocate a column-store internal page. */
+	WT_RET(__wt_calloc_def(session, 1, &page));
+	WT_ERR(__wt_calloc_def(
+	    session, (size_t)r->bnd_next, &page->u.col_int.t));
+
+	/* Fill it in. */
+	page->parent = orig->parent;
+	page->parent_ref = orig->parent_ref;
+	page->read_gen = __wt_cache_read_gen(session);
+	page->u.col_int.recno = r->bnd[0].recno;
+	page->entries = r->bnd_next;
+	page->type = WT_PAGE_COL_INT;
+
+	/*
+	 * Newly created internal pages are not persistent as we don't want the
+	 * tree to deepen whenever a leaf page splits.  Flag the page for merge
+	 * into its parent when the parent is reconciled.   We set the flag on
+	 * the original page (so that future reconciliations of its parent see
+	 * and merge the split pages), and on the newly created split page (so
+	 * that after eviction, when the split page replaces the original page,
+	 * its parents see and merge the split pages).  As they say, if it's not
+	 * confusing, you don't understand it.
+	 */
+	F_SET(page, WT_PAGE_REC_SPLIT_MERGE);
+
+	/* Enter each split page into the new, internal page. */
+	for (cref = page->u.col_int.t,
+	    bnd = r->bnd, i = 0; i < r->bnd_next; ++cref, ++bnd, ++i) {
+		cref->recno = bnd->recno;
+		WT_COL_REF_ADDR(cref) = bnd->off.addr;
+		WT_COL_REF_SIZE(cref) = bnd->off.size;
+
+		WT_COL_REF_PAGE(cref) = NULL;
+		WT_COL_REF_STATE(cref) = WT_REF_DISK;
+	}
+
+	*splitp = page;
+	return (0);
+
+err:	__wt_free(session, page);
+	return (ret);
+}
+
+/*
  * __rec_cell_build_key --
  *	Process a key and return a WT_CELL structure and byte string to be
  * stored on the page.
@@ -2679,125 +2799,5 @@ reuse:	/* Set the callers K/V to reference the WT_OFF structure. */
 	kv->len = kv->cell_len + kv->buf.size;
 
 err:	__wt_scr_free(&tmp);
-	return (ret);
-}
-
-/*
- * __rec_split_row --
- *	Update a row-store parent page's reference when a page is split.
- */
-static int
-__rec_split_row(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
-{
-	WT_BOUNDARY *bnd;
-	WT_PAGE *page;
-	WT_RECONCILE *r;
-	WT_ROW_REF *rref;
-	uint32_t i;
-	int ret;
-
-	r = session->btree->reconcile;
-	ret = 0;
-
-	/* Allocate a row-store internal page. */
-	WT_RET(__wt_calloc_def(session, 1, &page));
-	WT_ERR(__wt_calloc_def(
-	    session, (size_t)r->bnd_next, &page->u.row_int.t));
-
-	/* Fill it in. */
-	page->parent = orig->parent;
-	page->parent_ref = orig->parent_ref;
-	page->read_gen = __wt_cache_read_gen(session);
-	page->entries = r->bnd_next;
-	page->type = WT_PAGE_ROW_INT;
-
-	/*
-	 * Newly created internal pages are not persistent as we don't want the
-	 * tree to deepen whenever a leaf page splits.  Flag the page for merge
-	 * into its parent when the parent is reconciled.   We set the flag on
-	 * the original page (so that future reconciliations of its parent see
-	 * and merge the split pages), and on the newly created split page (so
-	 * that after eviction, when the split page replaces the original page,
-	 * its parents see and merge the split pages).  As they say, if it's not
-	 * confusing, you don't understand it.
-	 */
-	F_SET(page, WT_PAGE_REC_SPLIT_MERGE);
-
-	/* Enter each split page into the new, internal page. */
-	for (rref = page->u.row_int.t,
-	    bnd = r->bnd, i = 0; i < r->bnd_next; ++rref, ++bnd, ++i) {
-		WT_ERR(__wt_row_ikey_alloc(session, 0,
-		    bnd->key.data, bnd->key.size, (WT_IKEY **)&rref->key));
-		WT_ROW_REF_ADDR(rref) = bnd->off.addr;
-		WT_ROW_REF_SIZE(rref) = bnd->off.size;
-
-		WT_ROW_REF_PAGE(rref) = NULL;
-		WT_ROW_REF_STATE(rref) = WT_REF_DISK;
-	}
-
-	*splitp = page;
-	return (0);
-
-err:	__wt_free(session, page);
-	return (ret);
-}
-
-/*
- * __rec_split_col --
- *	Update a column-store parent page's reference when a page is split.
- */
-static int
-__rec_split_col(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
-{
-	WT_BOUNDARY *bnd;
-	WT_COL_REF *cref;
-	WT_PAGE *page;
-	WT_RECONCILE *r;
-	uint32_t i;
-	int ret;
-
-	r = session->btree->reconcile;
-	ret = 0;
-
-	/* Allocate a column-store internal page. */
-	WT_RET(__wt_calloc_def(session, 1, &page));
-	WT_ERR(__wt_calloc_def(
-	    session, (size_t)r->bnd_next, &page->u.col_int.t));
-
-	/* Fill it in. */
-	page->parent = orig->parent;
-	page->parent_ref = orig->parent_ref;
-	page->read_gen = __wt_cache_read_gen(session);
-	page->u.col_int.recno = r->bnd[0].recno;
-	page->entries = r->bnd_next;
-	page->type = WT_PAGE_COL_INT;
-
-	/*
-	 * Newly created internal pages are not persistent as we don't want the
-	 * tree to deepen whenever a leaf page splits.  Flag the page for merge
-	 * into its parent when the parent is reconciled.   We set the flag on
-	 * the original page (so that future reconciliations of its parent see
-	 * and merge the split pages), and on the newly created split page (so
-	 * that after eviction, when the split page replaces the original page,
-	 * its parents see and merge the split pages).  As they say, if it's not
-	 * confusing, you don't understand it.
-	 */
-	F_SET(page, WT_PAGE_REC_SPLIT_MERGE);
-
-	/* Enter each split page into the new, internal page. */
-	for (cref = page->u.col_int.t,
-	    bnd = r->bnd, i = 0; i < r->bnd_next; ++cref, ++bnd, ++i) {
-		cref->recno = bnd->recno;
-		WT_COL_REF_ADDR(cref) = bnd->off.addr;
-		WT_COL_REF_SIZE(cref) = bnd->off.size;
-
-		WT_COL_REF_PAGE(cref) = NULL;
-		WT_COL_REF_STATE(cref) = WT_REF_DISK;
-	}
-
-	*splitp = page;
-	return (0);
-
-err:	__wt_free(session, page);
 	return (ret);
 }
