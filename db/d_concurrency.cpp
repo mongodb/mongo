@@ -10,6 +10,82 @@
    
 namespace mongo {
 
+    SimpleRWLock writeExcluder;
+
+    HLock::readlock::readlock(HLock& _h) : h(_h) { 
+
+        already = cc().readLocked || cc().writeLocked;
+        if( !already ) { 
+            h.hlockShared();
+        }
+    }
+    HLock::readlock::~readlock() { 
+        if( !already ) {
+            cc().readLocked=false;
+            h.hunlockShared();
+        }
+    }
+
+    HLock::readlocktry::readlocktry(int ms) {
+        already = cc().readLocked || cc().writeLocked;
+        if( !already ) { 
+            ok = h.hlockSharedTry();
+        }
+    }
+
+    HLock::writelock::writelock(HLock& _h) : h(_h) { 
+        assert( !cc().readLocked );
+        already = cc().writeLocked;
+        if( !already ) {
+            h.lock();
+            cc().writeLocked=true;
+        }
+    }
+    HLock::writelock::~writelock() { 
+        if( !already ) {
+            cc().writeLocked=false;
+            h.hunlock();
+        }
+    }
+
+    void HLock::hlockShared() {
+        if( parent ) 
+            parent->hlockShared();
+        r.lock_shared();
+    }
+    void HLock::hunlockShared() {
+        r.unlock_shared();
+        if( parent )
+            parent->hunlockShared();
+    }
+
+    /*
+    bool HLock::hlockSharedTry(int ms) {
+        if( parent && !parent->hlockSharedTry(ms) ) {
+            return false;
+        }
+        bool ok = r.lock_shared_try(ms);
+        if( !ok ) {
+            parent->hunlockShared();
+        }
+        return ok;
+    }
+    */
+
+    void HLock::hlock() {
+        writeExcluder.lock_shared();
+        if( parent )
+            parent->hlockShared();
+        r.lock();
+    }
+    void HLock::hunlock() { 
+        r.unlock();
+        if( parent ) 
+            parent->hunlockShared();
+        writeExcluder.unlock_shared();
+    }
+
+    /**
     LockDatabaseSharable::LockDatabaseSharable() {
         Client& c = cc();
         Client::LockStatus& s = c.lockStatus;
@@ -95,7 +171,7 @@ namespace mongo {
             s.collLock.unlock_shared();
         }
     }
-
+**/
 }
 
 #endif

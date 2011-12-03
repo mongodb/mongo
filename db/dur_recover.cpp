@@ -243,6 +243,7 @@ namespace mongo {
             }
 
             if ((entry.e->ofs + entry.e->len) <= mmf->length()) {
+                log() << "mmf=" << (void*) mmf << endl;
                 assert(mmf->view_write());
                 assert(entry.e->srcData());
 

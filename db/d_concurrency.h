@@ -2,28 +2,39 @@
 
 #pragma once
 
-//#include "mongomutex.h"
+#include "../util/concurrency/rwlock.h"
+
+#if defined(CLC)
+
+#error asdf
 
 namespace mongo {
 
-    /* these may be used recursively as long as you do not
-       try to go from sharable to exclusive
-    */
-
-    class LockDatabaseSharable : boost::noncopyable { 
-        bool already;
+    class HLock { 
     public:
-        LockDatabaseSharable();
-        ~LockDatabaseSharable();
-    };
-
-    class LockCollectionForReading : boost::noncopyable {
-        atleastreadlock globalrl;
-        LockDatabaseSharable dbrl;
-        bool already;
-    public:
-        LockCollectionForReading(const char *ns);
-        ~LockCollectionForReading();
+        HLock(HLock *parent, RWLock& r);
+        struct writelock { 
+            writelock(HLock&);
+            ~writelock();
+        private: 
+            HLock& h;
+            bool already;
+        };
+        struct readlock { 
+            readlock(HLock&);
+        private:
+            HLock& h;
+            bool already;
+        };
+    private:
+        void hlock();
+        void hunlock();
+        void hlockShared();
+        void hunlockShared();
+        HLock *parent;
+        RWLock& r;
     };
 
 }
+
+#endif
