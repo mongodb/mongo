@@ -121,6 +121,9 @@ __wt_bulk_end(WT_CURSOR_BULK *cbulk)
 
 	WT_RET(__wt_rec_bulk_wrapup(cbulk));
 	WT_RET(__wt_rec_evict(session, cbulk->leaf, WT_REC_SINGLE));
+
+	__wt_buf_free(session, &cbulk->cmp);
+
 	return (0);
 }
 
