@@ -87,7 +87,7 @@ namespace mongo {
         writeExcluder.unlock_shared();
     }
 
-    /**
+#if 0
     LockDatabaseSharable::LockDatabaseSharable() {
         Client& c = cc();
         Client::LockStatus& s = c.lockStatus;
@@ -173,7 +173,7 @@ namespace mongo {
             s.collLock.unlock_shared();
         }
     }
-**/
+#endif
 }
 
 #endif
