@@ -649,7 +649,7 @@ int main(int argc, char* argv[]) {
     ("pretouch", po::value<int>(), "n pretouch threads for applying replicationed operations") // experimental
     ("command", po::value< vector<string> >(), "command")
     ("cacheSize", po::value<long>(), "cache size (in MB) for rec store")
-    ("nodur", "disable journaling (currently the default)")
+    ("nodur", "disable journaling")
     // things we don't want people to use
     ("nocursors", "diagnostic/debugging option that turns off cursors DO NOT USE IN PRODUCTION")
     ("nohints", "ignore query hints")
