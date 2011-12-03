@@ -901,6 +901,12 @@
     <ClCompile Include="..\db\d_concurrency.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
+    <ClCompile Include="d_chunk_manager_tests.cpp">
+      <Filter>shard</Filter>
+    </ClCompile>
+    <ClCompile Include="queryoptimizercursortests.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">

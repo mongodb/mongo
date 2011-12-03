@@ -98,14 +98,14 @@ namespace QueryOptimizerCursorTests {
             Client::Context ctx( ns() );
             shared_ptr<Cursor> c = newQueryOptimizerCursor( ns(), BSONObj() );
             ASSERT( !c->ok() );
-            ASSERT_EXCEPTION( c->_current(), AssertionException );
-            ASSERT_EXCEPTION( c->current(), AssertionException );
+            ASSERT_THROWS( c->_current(), AssertionException );
+            ASSERT_THROWS( c->current(), AssertionException );
             ASSERT( c->currLoc().isNull() );
             ASSERT( !c->advance() );
-            ASSERT_EXCEPTION( c->currKey(), AssertionException );
-            ASSERT_EXCEPTION( c->getsetdup( DiskLoc() ), AssertionException );
-            ASSERT_EXCEPTION( c->isMultiKey(), AssertionException );
-            ASSERT_EXCEPTION( c->matcher(), AssertionException );
+            ASSERT_THROWS( c->currKey(), AssertionException );
+            ASSERT_THROWS( c->getsetdup( DiskLoc() ), AssertionException );
+            ASSERT_THROWS( c->isMultiKey(), AssertionException );
+            ASSERT_THROWS( c->matcher(), AssertionException );
         }
     };
     
@@ -980,7 +980,7 @@ namespace QueryOptimizerCursorTests {
             {
                 dblock lk;
                 Client::Context ctx( ns() );
-                ASSERT_EXCEPTION( recoverFromYield(), MsgAssertionException );
+                ASSERT_THROWS( recoverFromYield(), MsgAssertionException );
                 ASSERT( !ok() );
             }                
         }
@@ -1036,7 +1036,7 @@ namespace QueryOptimizerCursorTests {
             {
                 dblock lk;
                 Client::Context ctx( ns() );
-                ASSERT_EXCEPTION( recoverFromYield(), MsgAssertionException );
+                ASSERT_THROWS( recoverFromYield(), MsgAssertionException );
                 ASSERT( !ok() );
             }                
         }
@@ -1606,7 +1606,7 @@ namespace QueryOptimizerCursorTests {
             ASSERT( ok() );
             cc().curop()->kill();
             // First advance() call throws, subsequent calls just fail.
-            ASSERT_EXCEPTION( advance(), MsgAssertionException );
+            ASSERT_THROWS( advance(), MsgAssertionException );
             ASSERT( !advance() );
         }
     };
@@ -1624,7 +1624,7 @@ namespace QueryOptimizerCursorTests {
             ASSERT( c->ok() );
             cc().curop()->kill();
             // First advance() call throws, subsequent calls just fail.
-            ASSERT_EXCEPTION( c->advance(), MsgAssertionException );
+            ASSERT_THROWS( c->advance(), MsgAssertionException );
             ASSERT( !c->advance() );
         }
     };

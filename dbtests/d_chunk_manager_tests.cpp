@@ -185,7 +185,7 @@ namespace {
 
             BSONArray chunks = BSONArray();
 
-            ASSERT_EXCEPTION( ShardChunkManager s ( collection , chunks ) , UserException );
+            ASSERT_THROWS( ShardChunkManager s ( collection , chunks ) , UserException );
         }
     };
 
@@ -240,7 +240,7 @@ namespace {
             // [15,0-25,0) overlaps [10,0-20,0)
             BSONObj min = BSON( "a" << 15 << "b" << 0 );
             BSONObj max = BSON( "a" << 25 << "b" << 0 );
-            ASSERT_EXCEPTION( s.clonePlus ( min , max , 1 /* TODO test version */ ) , UserException );
+            ASSERT_THROWS( s.clonePlus ( min , max , 1 /* TODO test version */ ) , UserException );
         }
     };
 
@@ -307,13 +307,13 @@ namespace {
             // deleting non-existing chunk [25,0-28,0)
             BSONObj min1 = BSON( "a" << 25 << "b" << 0 );
             BSONObj max1 = BSON( "a" << 28 << "b" << 0 );
-            ASSERT_EXCEPTION( s.cloneMinus( min1 , max1 , 1 /* TODO test version */ ) , UserException );
+            ASSERT_THROWS( s.cloneMinus( min1 , max1 , 1 /* TODO test version */ ) , UserException );
 
 
             // deletin an overlapping range (not exactly a chunk) [15,0-25,0)
             BSONObj min2 = BSON( "a" << 15 << "b" << 0 );
             BSONObj max2 = BSON( "a" << 25 << "b" << 0 );
-            ASSERT_EXCEPTION( s.cloneMinus( min2 , max2 , 1 /* TODO test version */ ) , UserException );
+            ASSERT_THROWS( s.cloneMinus( min2 , max2 , 1 /* TODO test version */ ) , UserException );
         }
     };
 
@@ -376,13 +376,13 @@ namespace {
             BSONObj badSplit = BSON( "a" << 5 << "b" << 0 );
             vector<BSONObj> splitKeys;
             splitKeys.push_back( badSplit );
-            ASSERT_EXCEPTION( s.cloneSplit( min , max , splitKeys , ShardChunkVersion( 1 ) ) , UserException );
+            ASSERT_THROWS( s.cloneSplit( min , max , splitKeys , ShardChunkVersion( 1 ) ) , UserException );
 
             BSONObj badMax = BSON( "a" << 25 << "b" << 0 );
             BSONObj split = BSON( "a" << 15 << "b" << 0 );
             splitKeys.clear();
             splitKeys.push_back( split );
-            ASSERT_EXCEPTION( s.cloneSplit( min , badMax, splitKeys , ShardChunkVersion( 1 ) ) , UserException );
+            ASSERT_THROWS( s.cloneSplit( min , badMax, splitKeys , ShardChunkVersion( 1 ) ) , UserException );
         }
     };
 
@@ -426,7 +426,7 @@ namespace {
 
             // if we remove the only chunk, the only version accepted is 0
             ShardChunkVersion nonZero = 99;
-            ASSERT_EXCEPTION( s.cloneMinus( min , max , nonZero ) , UserException );
+            ASSERT_THROWS( s.cloneMinus( min , max , nonZero ) , UserException );
             ShardChunkManagerPtr empty( s.cloneMinus( min , max , 0 ) );
             ASSERT_EQUALS( empty->getVersion() , ShardChunkVersion( 0 ) );
             ASSERT_EQUALS( empty->getNumChunks() , 0u );
@@ -435,7 +435,7 @@ namespace {
 
             // we can add a chunk to an empty manager
             // version should be provided
-            ASSERT_EXCEPTION( empty->clonePlus( min , max , 0 ) , UserException );
+            ASSERT_THROWS( empty->clonePlus( min , max , 0 ) , UserException );
             ShardChunkManagerPtr cloned( empty->clonePlus( min , max , nonZero ) );
             ASSERT_EQUALS( cloned->getVersion(), nonZero );
             ASSERT_EQUALS( cloned->getNumChunks() , 1u );
