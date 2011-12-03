@@ -1052,7 +1052,8 @@ namespace mongo {
 
                 // modify command to run on shards with output to tmp collection
                 string badShardedField;
-                BSONObj shardedCommand = fixForShards( cmdObj , shardResultCollection , badShardedField, maxChunkSizeBytes );
+                assert( maxChunkSizeBytes < 0x7fffffff );
+                BSONObj shardedCommand = fixForShards( cmdObj , shardResultCollection , badShardedField, static_cast<int>(maxChunkSizeBytes) );
 
                 if ( ! shardedInput && ! shardedOutput && ! customOutDB ) {
                     LOG(1) << "simple MR, just passthrough" << endl;
@@ -1308,7 +1309,8 @@ namespace mongo {
                                 for (unsigned int i = 0; i < chunkSizes.size(); ++i) {
                                     long long size = chunkSizes[i].numberLong();
                                     ChunkPtr c = chunks[i];
-                                    c->splitIfShould(size);
+                                    assert( size < 0x7fffffff );
+                                    c->splitIfShould(static_cast<int>(size));
                                 }
                             }
                         }
