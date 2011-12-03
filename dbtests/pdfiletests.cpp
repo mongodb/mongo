@@ -347,7 +347,7 @@ namespace PdfileTests {
             Client::Context cx( dbname );
 
             bool isnew;
-            Database * d = dbHolder.getOrCreate( dbname , dbpath , isnew );
+            Database * d = dbHolderW().getOrCreate( dbname , dbpath , isnew );
             assert( d );
 
             int big = 10 * 1024;

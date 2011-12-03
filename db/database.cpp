@@ -95,7 +95,6 @@ namespace mongo {
     /*static*/
     string Database::duplicateUncasedName( bool inholderlock, const string &name, const string &path, set< string > *duplicates ) {
         dbMutex.assertAtLeastReadLocked();
-        DatabaseHolder::dbHolderMutex.dassertLocked();
 
         if ( duplicates ) {
             duplicates->clear();   
@@ -105,7 +104,7 @@ namespace mongo {
         getDatabaseNames( others , path );
         
         set<string> allShortNames;
-        dbHolder.getAllShortNames( inholderlock, allShortNames );
+        dbHolder().getAllShortNames( inholderlock, allShortNames );
         
         others.insert( others.end(), allShortNames.begin(), allShortNames.end() );
         
@@ -146,7 +145,7 @@ namespace mongo {
         {
             // must not yet be visible to others as we aren't in the db's write lock and 
             // we will write to _files vector - thus this assert.
-            bool loaded = dbHolder.__isLoaded(name, path);
+            bool loaded = dbHolder().__isLoaded(name, path);
             assert( !loaded );
         }
         // additionally must be in the dbholder mutex (no assert for that yet)
@@ -393,12 +392,6 @@ namespace mongo {
     Database* DatabaseHolder::getOrCreate( const string& ns , const string& path , bool& justCreated ) {
         dbMutex.assertAtLeastReadLocked();
 
-        // note the full db opening, not just the map lookup, needs to be done in this lock,
-        //  so that two threads don't try to do the open at the same time.
-        // note that dbHolderMutex protects _paths and _todb but not the contents of each Database 
-        //  object themselves.
-        SimpleMutex::scoped_lock lk(dbHolderMutex);
-
         DBs& m = _paths[path];
 
         string dbname = _todb( ns );
@@ -427,7 +420,5 @@ namespace mongo {
         _size++;
         return db;
     }
-
-    SimpleMutex& DatabaseHolder::dbHolderMutex( *(new SimpleMutex("dbholder")) );
 
 } // namespace mongo

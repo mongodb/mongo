@@ -260,7 +260,7 @@ namespace mongo {
         void _gotLock( int millis , stringstream& ss ) {
             ss << "<pre>\n";
             ss << "time to get readlock: " << millis << "ms\n";
-            ss << "# databases: " << dbHolder.sizeInfo() << '\n';
+            ss << "# databases: " << dbHolder().sizeInfo() << '\n';
             ss << "# Cursors: " << ClientCursor::numCursors() << '\n';
             ss << "replication: ";
             if( *replInfo )

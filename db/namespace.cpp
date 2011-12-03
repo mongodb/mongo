@@ -130,8 +130,6 @@ namespace mongo {
             return;
         }
 
-        // we should be in dbHolderMutex here
-
         if( indexBuildInProgress || capped2.cc2_ptr ) {
             assertInWriteLock();
             if( indexBuildInProgress ) {

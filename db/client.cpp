@@ -219,7 +219,7 @@ namespace mongo {
     Client::ReadContext::ReadContext(const string& ns, string path, bool doauth ) {
         {
             lk.reset( new readlock() );
-            Database *db = dbHolder.get(ns, path);
+            Database *db = dbHolder().get(ns, path);
             if( db ) {
                 c.reset( new Context(path, ns, db, doauth) );
                 return;
@@ -296,7 +296,7 @@ namespace mongo {
         if ( lockState > 0 && FileAllocator::get()->hasFailed() ) {
             uassert(14031, "Can't take a write lock while out of disk space", false);
         }
-        _db = dbHolder.getOrCreate( _ns , _path , _justCreated );        
+        _db = dbHolderUnchecked().getOrCreate( _ns , _path , _justCreated );
         assert(_db);
         checkNotStale();
         _client->_context = this;

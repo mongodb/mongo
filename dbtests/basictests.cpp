@@ -452,7 +452,6 @@ namespace BasicTests {
             // this leaks as ~Database is private
             // if that changes, should put this on the stack
             {
-                SimpleMutex::scoped_lock lk(DatabaseHolder::dbHolderMutex);
                 Database * db = new Database( "dbtests_basictests_ownsns" , isNew );
                 assert( isNew );
 

@@ -387,7 +387,7 @@ namespace mongo {
             }
             else {
                 writelock lk;
-                if ( dbHolder._isLoaded( nsToDatabase( currentOp.getNS() ) , dbpath ) ) {
+                if ( dbHolder()._isLoaded( nsToDatabase( currentOp.getNS() ) , dbpath ) ) {
                     Client::Context cx( currentOp.getNS() );
                     profile(c , currentOp );
                 }
@@ -447,7 +447,7 @@ namespace mongo {
 
         NamespaceDetailsTransient::clearForPrefix( prefix.c_str() );
 
-        dbHolder.erase( db, path );
+        dbHolderW().erase( db, path );
         ctx->_clear();
         delete database; // closes files
     }

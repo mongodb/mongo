@@ -33,7 +33,6 @@ namespace mongo {
 
         Database * get( const string& ns , const string& path ) const {
             dbMutex.assertAtLeastReadLocked();
-            SimpleMutex::scoped_lock lk(dbHolderMutex);
             Paths::const_iterator x = _paths.find( path );
             if ( x == _paths.end() )
                 return 0;
@@ -47,7 +46,6 @@ namespace mongo {
 
         void _put( const string& ns , const string& path , Database * db ) {
             dbMutex.assertAtLeastReadLocked();
-            SimpleMutex::scoped_lock lk(dbHolderMutex);
             DBs& m = _paths[path];
             Database*& d = m[_todb(ns)];
             if( d ) {
@@ -63,7 +61,6 @@ namespace mongo {
 
         void erase( const string& ns , const string& path ) {
             dbMutex.assertWriteLocked(); // write lock req'd as a Database obj can be in use dbHolderMutex is mainly just to control the holder itself
-            SimpleMutex::scoped_lock lk(dbHolderMutex);
             DBs& m = _paths[path];
             _size -= (int)m.erase( _todb( ns ) );
         }
@@ -76,7 +73,6 @@ namespace mongo {
 
         void forEach(boost::function<void(Database *)> f) const {
             dbMutex.assertWriteLocked();
-            SimpleMutex::scoped_lock lk(dbHolderMutex);
             for ( Paths::const_iterator i=_paths.begin(); i!=_paths.end(); i++ ) {
                 DBs m = i->second;
                 for( DBs::const_iterator j=m.begin(); j!=m.end(); j++ ) {
@@ -90,8 +86,6 @@ namespace mongo {
          */
         void getAllShortNames( bool locked, set<string>& all ) const {
             dbMutex.assertAtLeastReadLocked();
-            scoped_ptr<SimpleMutex::scoped_lock> lk( locked ? 0 : new SimpleMutex::scoped_lock(dbHolderMutex) );
-            dbHolderMutex.dassertLocked();
             for ( Paths::const_iterator i=_paths.begin(); i!=_paths.end(); i++ ) {
                 DBs m = i->second;
                 for( DBs::const_iterator j=m.begin(); j!=m.end(); j++ ) {
@@ -99,11 +93,6 @@ namespace mongo {
                 }
             }
         }
-
-        /** this is public as we overload it and use it also to make opening the datafiles 
-            of a database exclusive.
-         */
-        static SimpleMutex& dbHolderMutex;
 
     private:
         static string _todb( const string& ns ) {
@@ -124,6 +113,14 @@ namespace mongo {
         int _size;
     };
 
-    extern DatabaseHolder dbHolder;
+    DatabaseHolder& dbHolderUnchecked();
+    inline const DatabaseHolder& dbHolder() { 
+        dassert( dbMutex.atLeastReadLocked() );
+        return dbHolderUnchecked();
+    }
+    inline DatabaseHolder& dbHolderW() { 
+        dassert( dbMutex.isWriteLocked() );
+        return dbHolderUnchecked();
+    }
 
 }

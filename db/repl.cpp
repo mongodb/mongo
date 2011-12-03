@@ -531,7 +531,7 @@ namespace mongo {
     }
 
     bool ReplSource::handleDuplicateDbName( const BSONObj &op, const char *ns, const char *db ) {
-        if ( dbHolder._isLoaded( ns, dbpath ) ) {
+        if ( dbHolder()._isLoaded( ns, dbpath ) ) {
             // Database is already present.
             return true;   
         }

@@ -131,8 +131,12 @@ namespace mongo {
     string pidfilepath;
 
     DataFileMgr theDataFileMgr;
-    DatabaseHolder dbHolder;
+    DatabaseHolder _dbHolder;
     int MAGIC = 0x1000;
+
+    DatabaseHolder& dbHolderUnchecked() {
+        return _dbHolder;
+    }
 
     void addNewNamespaceToCatalog(const char *ns, const BSONObj *options = 0);
     void ensureIdIndexForNewNs(const char *ns) {

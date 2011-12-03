@@ -1013,7 +1013,7 @@ namespace mongo {
             set<string> allShortNames;
             {
                 readlock lk;
-                dbHolder.getAllShortNames( false, allShortNames );
+                dbHolder().getAllShortNames( false, allShortNames );
             }
             
             for ( set<string>::iterator i = allShortNames.begin(); i != allShortNames.end(); i++ ) {
@@ -1055,7 +1055,7 @@ namespace mongo {
         bool run(const string& dbname , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
             bool ok;
             try {
-                ok = dbHolder.closeAll( dbpath , result, false );
+                ok = dbHolderW().closeAll( dbpath , result, false );
             }
             catch(DBException&) { 
                 throw;
