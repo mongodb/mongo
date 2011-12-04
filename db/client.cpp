@@ -196,8 +196,7 @@ namespace mongo {
     {
         assert( db == 0 || db->isOk() );
         _client->_context = this;
-        if ( doauth )
-            _auth();
+        checkNsAccess( doauth );
         _client->checkLocks();
     }
 
@@ -285,9 +284,8 @@ namespace mongo {
         checkNotStale();
         _client->_context = this;
         _client->_curOp->enter( this );
-        if ( doauth )
-            _auth( dbMutex.getState() );
-        _client->checkLocks();        
+        checkNsAccess( doauth, dbMutex.getState() );
+        _client->checkLocks();
     }
        
     void Client::Context::_finishInit( bool doauth ) {
@@ -297,15 +295,12 @@ namespace mongo {
             uassert(14031, "Can't take a write lock while out of disk space", false);
         }
         
-        uassert( 15929, "client access to index backing namespace prohibited", NamespaceString::normal( _ns.c_str() ) );
-
         _db = dbHolderUnchecked().getOrCreate( _ns , _path , _justCreated );
         assert(_db);
         checkNotStale();
         _client->_context = this;
         _client->_curOp->enter( this );
-        if ( doauth )
-            _auth( lockState );
+        checkNsAccess( doauth, lockState );
     }
 
     void Client::Context::_auth( int lockState ) {
@@ -338,6 +333,13 @@ namespace mongo {
             return false;
 
         return  _ns[db.size()] == '.';
+    }
+    
+    void Client::Context::checkNsAccess( bool doauth, int lockState ) {
+        uassert( 15929, "client access to index backing namespace prohibited", NamespaceString::normal( _ns.c_str() ) );
+        if ( doauth ) {
+            _auth( lockState );
+        }
     }
 
     void Client::appendLastOp( BSONObjBuilder& b ) const {

@@ -28,7 +28,7 @@ function checkFailingOperations() {
     shouldFail( function() { idx.update({},{}); } );
     assert.commandFailed( idx.runCommand( 'compact' ) );
     
-    // No validation here.
+    // No validation here (yet).
     //shouldFail( function() { idx.ensureIndex({x:1}) } );    
 }
 

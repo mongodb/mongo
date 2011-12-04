@@ -206,8 +206,9 @@ namespace mongo {
         private:
             friend class CurOp;
             void _finishInit( bool doauth=true);
-            void _auth( int lockState = dbMutex.getState() );
+            void _auth( int lockState );
             void checkNotStale() const;
+            void checkNsAccess( bool doauth, int lockState = dbMutex.getState() );
             Client * const _client;
             Context * const _oldContext;
             const string _path;
