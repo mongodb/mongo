@@ -432,7 +432,6 @@ doneCheckOrder:
         if ( isSimpleIdQuery( _originalQuery ) ) {
             int idx = d->findIdIndex();
             if ( idx >= 0 ) {
-                _usingCachedPlan = false;
                 _mayRecordPlan = false;
                 _plans.push_back( QueryPlanPtr( new QueryPlan( d , idx , *_frsp , _originalFrsp.get() , _originalQuery, _order, _mustAssertOnYieldFailure ) ) );
                 return;
@@ -453,7 +452,6 @@ doneCheckOrder:
                 IndexDetails& ii = i.next();
                 const IndexSpec& spec = ii.getSpec();
                 if ( spec.getTypeName() == _special && spec.suitability( _originalQuery , _order ) ) {
-                    _usingCachedPlan = false;
                     _mayRecordPlan = false;
                     _plans.push_back( QueryPlanPtr( new QueryPlan( d , j , *_frsp , _originalFrsp.get() , _originalQuery, _order ,
                                                     _mustAssertOnYieldFailure , BSONObj() , BSONObj() , _special ) ) );
@@ -558,7 +556,7 @@ doneCheckOrder:
             // _plans.size() > 1 if addOtherPlans was called in Runner::runUntilFirstCompletes().
             if ( _bestGuessOnly || res->complete() || _plans.size() > 1 )
                 return res;
-            // Retry with all candidate plans.
+            // A cached plan was used, so clear the plan for this query pattern and retry the query without a cached plan.
             QueryUtilIndexed::clearIndexesForPatterns( *_frsp, _order );
             init();
         }
@@ -585,7 +583,7 @@ doneCheckOrder:
         // Avoid an infinite loop here - this should never occur.
         verify( 15878, !retried );
 
-        // A cached plan was used, so clear the plan cache and retry the query without a cached plan.
+        // A cached plan was used, so clear the plan for this query pattern and retry the query without a cached plan.
         QueryUtilIndexed::clearIndexesForPatterns( *_frsp, _order );
         init();
         return nextOp( originalOp, true );
