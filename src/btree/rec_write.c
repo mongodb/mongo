@@ -1482,7 +1482,7 @@ __rec_col_var(
 	WT_UPDATE *upd;
 	uint64_t n, nrepeat, repeat_count, rle, slvg_missing, src_recno;
 	uint32_t i, size;
-	int can_compare, deleted, last_deleted, orig_deleted;
+	int can_compare, deleted, last_deleted, orig_deleted, ret;
 	const void *data;
 
 	r = session->btree->reconcile;
@@ -1508,7 +1508,7 @@ __rec_col_var(
 	 */
 	slvg_missing = salvage == NULL ? 0 : salvage->missing;
 	if (slvg_missing)
-		WT_RET(__rec_col_var_helper(
+		WT_ERR(__rec_col_var_helper(
 		    session, NULL, NULL, 1, 0, slvg_missing));
 
 	/*
@@ -1562,7 +1562,7 @@ __rec_col_var(
 				 * off comparisons for the next item.
 				 */
 				if (can_compare) {
-					WT_RET(__rec_col_var_helper(
+					WT_ERR(__rec_col_var_helper(
 					    session, salvage,
 					    last, last_deleted, 0, rle));
 					can_compare = 0;
@@ -1571,7 +1571,7 @@ __rec_col_var(
 				/* Write out the overflow cell as a raw cell. */
 				last->data = cell;
 				last->size = unpack->len;
-				WT_RET(__rec_col_var_helper(
+				WT_ERR(__rec_col_var_helper(
 				    session, salvage, last, 0, 1, unpack->rle));
 				src_recno += unpack->rle;
 				continue;
@@ -1582,7 +1582,7 @@ __rec_col_var(
 
 			/* Get a copy of the cell. */
 			if (!orig_deleted)
-				WT_RET(__wt_cell_unpack_copy(
+				WT_ERR(__wt_cell_unpack_copy(
 				    session, unpack, &orig));
 
 			/*
@@ -1600,7 +1600,7 @@ __rec_col_var(
 			 * that work because I don't want the complexity, and
 			 * overflow records should be rare.
 			 */
-			WT_RET(__rec_track_vcell(session, page, unpack));
+			WT_ERR(__rec_track_vcell(session, page, unpack));
 		}
 
 		/*
@@ -1664,7 +1664,7 @@ __rec_col_var(
 					continue;
 				}
 
-				WT_RET(__rec_col_var_helper(session,
+				WT_ERR(__rec_col_var_helper(session,
 				    salvage, last, last_deleted, 0, rle));
 			}
 
@@ -1674,7 +1674,7 @@ __rec_col_var(
 			 * come from a copy built from an encoded cell.
 			 */
 			if (!deleted)
-				WT_RET(__wt_buf_set(session, last, data, size));
+				WT_ERR(__wt_buf_set(session, last, data, size));
 			last_deleted = deleted;
 
 			/* Reset RLE counter and turn on comparisons. */
@@ -1714,7 +1714,7 @@ __rec_col_var(
 					continue;
 				}
 
-				WT_RET(__rec_col_var_helper(session,
+				WT_ERR(__rec_col_var_helper(session,
 				    salvage, last, last_deleted, 0, rle));
 			}
 
@@ -1736,11 +1736,14 @@ __rec_col_var(
 
 	/* If we were tracking a record, write it. */
 	if (can_compare)
-		WT_RET(__rec_col_var_helper(
+		WT_ERR(__rec_col_var_helper(
 		    session, salvage, last, last_deleted, 0, rle));
 
 	/* Write the remnant page. */
 	return (__rec_split_finish(session));
+
+err:	__wt_buf_free(session, &orig);
+	return (ret);
 }
 
 /*
