@@ -216,8 +216,8 @@ doneCheckOrder:
                 checkTableScanAllowed( _frs.ns() );
                 
                 // if we are doing a table scan on _id
-                // and its a capped collection
-                // we disallow as its a common user error
+                // and it's a capped collection
+                // we warn /*disallow*/ as it's a common user error
                 // .system. and local collections are exempt
                 if ( _d && _d->capped && _frs.range( "_id" ).nontrivial() ) {
                     if ( cc().isSyncThread() ||
