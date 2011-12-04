@@ -203,7 +203,6 @@ __rec_root_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 	WT_PAGE *next;
-	int done;
 
 	btree = session->btree;
 
@@ -216,7 +215,7 @@ __rec_root_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * something huge, and now we're evicting the index page that references
 	 * all of those leaf pages.
 	 */
-	for (done = 0; !done; page = next) {
+	for (; page != NULL; page = next) {
 		WT_RET(__wt_page_set_modified(session, page));
 		F_CLR(page, WT_PAGE_REC_MASK);
 
@@ -227,7 +226,7 @@ __rec_root_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 			btree->root_page.addr = page->modify->u.write_off.addr;
 			btree->root_page.size = page->modify->u.write_off.size;
 			btree->root_page.page = NULL;
-			done = 1;
+			next = NULL;			/* terminate loop */
 			break;
 		case WT_PAGE_REC_SPLIT:			/* Page split */
 			next = page->modify->u.write_split;
