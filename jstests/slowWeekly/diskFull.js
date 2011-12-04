@@ -1,3 +1,4 @@
+/*
 x = 1
 
 t = db.diskFullUpdates;
@@ -40,3 +41,5 @@ while ( numAttempts < 20 ) {
     assert.eq( N , t.count() );
     numAttempts++
 }
+
+*/
