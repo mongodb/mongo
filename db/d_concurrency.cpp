@@ -8,25 +8,53 @@
 #include "../util/assert_util.h"
 #include "client.h"
 
-#if defined(CLC)
-   
 namespace mongo {
 
     SimpleRWLock writeExcluder;
 
-    HLock::readlock::readlock(HLock& _h) : h(_h) { 
+    // kept in cc()...
+    HLock::TLS::TLS() { 
+        x = 0;
+    }
+    HLock::TLS::~TLS() { 
+        wassert( x == 0 );
+    }
 
-        already = cc().readLocked || cc().writeLocked;
-        if( !already ) { 
-            h.hlockShared();
+    HLock::HLock(int l, HLock *p, RWLock& _r) : 
+        level(l), parent(p), r(_r) 
+    {
+        dassert(level>0);
+    }
+    void HLock::hlockShared(int n) {
+        if( --n > 0 ) {
+            assert(parent);
+            parent->hlockShared(n);
         }
+        r.lock_shared();
+    }
+    void HLock::hunlockShared(int n) {
+        r.unlock_shared();
+        if( --n > 0 ) {
+            assert(parent);
+            parent->hunlockShared(n);
+        }
+    }
+
+    HLock::readlock::readlock(HLock& _h) : h(_h) { 
+        int& x = cc().hlockInfo.x;
+        nToLock = h.level - x;
+        if( nToLock <= 0 ) 
+            return;
+        x += nToLock;
+        dassert( x == h.level );
+        h.hlockShared(nToLock);
     }
     HLock::readlock::~readlock() { 
-        if( !already ) {
-            cc().readLocked=false;
-            h.hunlockShared();
-        }
+        if( nToLock > 0 )
+            h.hunlockShared(nToLock);
     }
+
+#if defined(CLC)   
 
     HLock::readlocktry::readlocktry(int ms) {
         already = cc().readLocked || cc().writeLocked;
@@ -173,8 +201,9 @@ namespace mongo {
             s.collLock.unlock_shared();
         }
     }
+
 #endif
+
+#endif
+
 }
-
-#endif
-

@@ -30,10 +30,11 @@
 #include "namespace-inl.h"
 #include "lasterror.h"
 #include "stats/top.h"
-#include "../util/concurrency/threadlocal.h"
 #include "../db/client_common.h"
+#include "../util/concurrency/threadlocal.h"
 #include "../util/net/message_port.h"
 #include "../util/concurrency/rwlock.h"
+#include "d_concurrency.h"
 
 namespace mongo {
 
@@ -217,8 +218,9 @@ namespace mongo {
             Database * _db;
         }; // class Client::Context
 
+        HLock::TLS hlockInfo;
+
 #if defined(CLC)
-        void checkLocks() const;
         struct LockStatus { 
             LockStatus() : dbLockCount(0), whichDB(0), collLockCount(0) { }
             SimpleRWLock collLock;
@@ -228,9 +230,8 @@ namespace mongo {
             int collLockCount;
             bool collLocked();
         } lockStatus;
-#else
-        void checkLocks() const {}
 #endif
+        void checkLocks() const {}
 
     }; // class Client
 

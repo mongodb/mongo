@@ -4,15 +4,11 @@
 
 #include "../util/concurrency/rwlock.h"
 
-#if defined(CLC)
-
-#error asdf
-
 namespace mongo {
 
     class HLock { 
     public:
-        HLock(HLock *parent, RWLock& r);
+        HLock(int level, HLock *parent, RWLock& r);
         struct writelock { 
             writelock(HLock&);
             ~writelock();
@@ -21,20 +17,28 @@ namespace mongo {
             bool already;
         };
         struct readlock { 
-            readlock(HLock&);
+            readlock(HLock&); 
+            ~readlock();
         private:
-            HLock& h;
-            bool already;
+            HLock& h; int nToLock;
+        };
+        struct TLS { 
+            TLS(); ~TLS(); int x;
         };
     private:
         void hlock();
         void hunlock();
-        void hlockShared();
-        void hunlockShared();
-        HLock *parent;
+        void hlockShared(int n);
+        void hunlockShared(int n);
+        HLock * const parent;
         RWLock& r;
+        const int level; // 1=global, 2=db, 3=collection
     };
 
-}
-
+    // CLC turns on the "collection level concurrency" code which is under development
+    // and not finished.
+#if defined(CLC)
+    ...
 #endif
+
+}
