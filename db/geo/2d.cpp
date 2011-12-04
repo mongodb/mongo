@@ -1219,12 +1219,12 @@ namespace mongo {
 
             min._cursor.reset(
                             BtreeCursor::make( nsdetails( spec->getDetails()->parentNS().c_str() ), *( spec->getDetails() ),
-                                               frvMin, -1, true )
+                                               frvMin, -1 )
                     );
 
             max._cursor.reset(
                            BtreeCursor::make( nsdetails( spec->getDetails()->parentNS().c_str() ), *( spec->getDetails() ),
-                                              frvMax, 1, true )
+                                              frvMax, 1 )
                    );
 
             // if( hopper ) min.checkCur( found, hopper );
