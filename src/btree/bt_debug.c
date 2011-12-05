@@ -870,12 +870,9 @@ __debug_cell_data(WT_DBG *ds, const char *tag, WT_CELL_UNPACK *unpack)
 {
 	WT_BUF *tmp;
 	WT_SESSION_IMPL *session;
-	size_t size;
-	const uint8_t *p;
 	int ret;
 
 	session = ds->session;
-	tmp = NULL;
 	ret = 0;
 
 	/*
@@ -890,25 +887,20 @@ __debug_cell_data(WT_DBG *ds, const char *tag, WT_CELL_UNPACK *unpack)
 	case WT_CELL_KEY_OVFL:
 	case WT_CELL_VALUE:
 	case WT_CELL_VALUE_OVFL:
-		WT_ERR(__wt_scr_alloc(session, 0, &tmp));
+		WT_RET(__wt_scr_alloc(session, 0, &tmp));
 		WT_ERR(__wt_cell_unpack_copy(session, unpack, tmp));
-		p = tmp->data;
-		size = tmp->size;
+		__debug_item(ds, tag, tmp->data, tmp->size);
+err:		__wt_scr_free(&tmp);
 		break;
 	case WT_CELL_DEL:
-deleted:	p = (uint8_t *)"deleted";
-		size = strlen("deleted");
+deleted:	__debug_item(ds, tag, "deleted", strlen("deleted"));
 		break;
 	case WT_CELL_OFF:
-		p = (uint8_t *)"offpage";
-		size = strlen("offpage");
+		__debug_item(ds, tag, "offpage", strlen("offpage"));
 		break;
-	WT_ILLEGAL_FORMAT_ERR(session);
+	WT_ILLEGAL_FORMAT(session);
 	}
 
-	__debug_item(ds, tag, p, size);
-
-err:	__wt_scr_free(&tmp);
 	return (ret);
 }
 
