@@ -2,6 +2,7 @@ personal_ws-1.1 en 200
 APIs
 Atomicity
 BLOBs
+CFLAGS
 DB's
 DBTs
 DbCursor
@@ -9,6 +10,11 @@ DbEnv
 DbMultiple
 EB
 EmpId
+FreeBSD
+GCC
+LDFLAGS
+LIBS
+LSB
 MVCC's
 RepMgr
 Rrx
@@ -22,9 +28,12 @@ ack'ed
 ao
 api
 apiflags
+ar
 arg
+autoconf
 bdb
 bdbmap
+bindir
 bool
 boolean
 br
@@ -33,6 +42,7 @@ builtin
 bzip
 cachesize
 callbk
+cd
 cdb
 cds
 checksums
@@ -88,6 +98,7 @@ fillfactor
 firstname
 fput
 freelist
+gcc
 gdbm
 getter
 gid
@@ -111,9 +122,14 @@ keyvalue
 lastname
 len
 li
+libdir
+libtool
+libwiredtiger
+lmin
 loadtext
 logc
 lookup
+lrtf
 lsn
 lt
 malloc'd
@@ -135,6 +151,7 @@ mutex
 mutexes
 mutexing
 mvcc
+mygcc
 ndary
 ndbm
 newsite
@@ -166,10 +183,13 @@ printf
 printlog
 printvalue
 priv
+pthread
+pthreads
 qnx
 rdbms
 readlock
 readonly
+realclean
 realloc
 realloc'd
 recno
@@ -189,6 +209,8 @@ selectable
 seqname
 serializable
 skipline
+spinlock
+spinlocks
 sql
 startsync
 strerror
@@ -204,6 +226,7 @@ thang
 timestamp
 timestamps
 todo
+toolchain
 tpc
 tpcb
 transactional
@@ -219,6 +242,7 @@ unescaped
 untyped
 uri
 useconds
+usr
 utf
 valign
 valuefmt

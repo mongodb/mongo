@@ -1,4 +1,4 @@
-/*! @page file_formats Table File Formats
+/*! @page file_formats WiredTiger File Formats
 
 WiredTiger supports two underlying file formats: row-store and
 column-store.  WiredTiger row- and column-stores are both key/value

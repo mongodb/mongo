@@ -1,4 +1,4 @@
-/*! @page command_line Command Line Utility
+/*! @page command_line WiredTiger command line utility
 
 WiredTiger includes a command line utility, \c wt.
 

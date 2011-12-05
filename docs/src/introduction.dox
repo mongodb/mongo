@@ -15,25 +15,19 @@ of a row are stored together, WiredTiger supports column-oriented
 storage, where one or more columns can be stored individually, allowing
 more efficient access and storage.
 
-For full details about using WiredTiger, see:
+For more information about using WiredTiger, see:
 
 - @subpage install\n
-  how to get, build and install WiredTiger.
 
 - @subpage using\n
-  how to write WiredTiger applications.
 
-- @ref wt\n
-  the reference manual for the WiredTiger API.
+- @ref wt "WiredTiger API reference manual"
 
 - @subpage command_line\n
-  the reference for the WiredTiger command-line utility.
 
 - @subpage extending\n
-  how to extend WiredTiger.
 
-- @ref wt_ext\n
-  the reference manual for WiredTiger extensions.
+- @ref wt_ext "WiredTiger extensions API reference manual"
 
 - @subpage file_formats
 */

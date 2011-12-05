@@ -1,4 +1,4 @@
-/*! @page using Using WiredTiger
+/*! @page using Writing WiredTiger applications
 
 This section explains how to use WiredTiger by developing a sequence of
 example programs:
