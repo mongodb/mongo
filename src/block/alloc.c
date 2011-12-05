@@ -20,6 +20,7 @@ __wt_block_alloc(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
 {
 	WT_BTREE *btree;
 	WT_FREE_ENTRY *fe, *new;
+	int n;
 
 	btree = session->btree;
 
@@ -33,9 +34,16 @@ __wt_block_alloc(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
 
 	WT_BSTAT_INCR(session, alloc);
 
+	n = 0;
 	TAILQ_FOREACH(fe, &btree->freeqa, qa) {
-		if (fe->size < size)
+		if (fe->size < size) {
+#ifndef HAVE_BLOCK_SMARTS
+			/* Limit how many blocks we will examine */
+			if (++n > 100)
+				break;
+#endif
 			continue;
+		}
 
 		/* Nothing fancy: first fit on the queue. */
 		*addrp = fe->addr;
@@ -71,6 +79,7 @@ __wt_block_alloc(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
 		TAILQ_REMOVE(&btree->freeqs, fe, qs);
 
 		new = fe;
+#ifdef HAVE_BLOCK_SMARTS
 		TAILQ_FOREACH(fe, &btree->freeqs, qs) {
 			if (new->size > fe->size)
 				continue;
@@ -81,6 +90,9 @@ __wt_block_alloc(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
 			TAILQ_INSERT_TAIL(&btree->freeqs, new, qs);
 		else
 			TAILQ_INSERT_BEFORE(fe, new, qs);
+#else
+		TAILQ_INSERT_TAIL(&btree->freeqs, new, qs);
+#endif
 
 		return (0);
 	}
@@ -178,6 +190,7 @@ __wt_block_free(WT_SESSION_IMPL *session, uint32_t addr, uint32_t size)
 	new->addr = addr;
 	new->size = size;
 
+#ifdef HAVE_BLOCK_SMARTS
 combine:/*
 	 * Insert the entry at the appropriate place in the address list after
 	 * checking to see if it adjoins adjacent entries.
@@ -260,6 +273,14 @@ combine:/*
 	}
 #endif
 
+#else
+	WT_UNUSED(fe);
+
+	/* No smarts: just insert at the head of the list. */
+	TAILQ_INSERT_HEAD(&btree->freeqa, new, qa);
+#endif
+
+#ifdef HAVE_BLOCK_SMARTS
 	/*
 	 * The variable new now references a WT_FREE_ENTRY structure not linked
 	 * into the size list at all (if it was linked in, we unlinked it while
@@ -278,6 +299,9 @@ combine:/*
 		TAILQ_INSERT_TAIL(&btree->freeqs, new, qs);
 	else
 		TAILQ_INSERT_BEFORE(fe, new, qs);
+#else
+	TAILQ_INSERT_HEAD(&btree->freeqs, new, qs);
+#endif
 
 	return (0);
 }
