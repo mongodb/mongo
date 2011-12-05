@@ -73,7 +73,7 @@ namespace mongo {
             assert( cursor );
 
             try {
-                long long start_millis;
+                long long start_millis = 0;
                 if ( query.isExplain() ) start_millis = curTimeMillis64();
                 cursor->init();
 
