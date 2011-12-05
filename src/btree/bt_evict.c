@@ -365,9 +365,12 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 		/* Reference the correct WT_BTREE handle. */
 		WT_SET_BTREE_IN_SESSION(session, er->btree);
 
-		if (F_ISSET(er, WT_EVICT_REQ_PAGE))
+		if (F_ISSET(er, WT_EVICT_REQ_PAGE)) {
+			WT_VERBOSE(session, evictserver,
+			    "eviction server: "
+			    "forcing eviction of page %p", er->page);
 			ret = __wt_rec_evict(session, er->page, WT_REC_WAIT);
-		else
+		} else
 			ret = __evict_file(session, er);
 
 		/* Clear the reference to the btree handle. */
