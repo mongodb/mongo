@@ -384,7 +384,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 			case WT_PAGE_ROW_LEAF:
 				ret = __cursor_row_next(cbt, newpage);
 				break;
-			WT_ILLEGAL_FORMAT_ERR(session);
+			WT_ILLEGAL_VALUE(session);
 			}
 			if (ret != WT_NOTFOUND)
 				break;

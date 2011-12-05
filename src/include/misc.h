@@ -135,12 +135,12 @@
 	memset(&(s), 0, sizeof(s))
 
 /* Standard error cases for switch statements. */
-#define	WT_ILLEGAL_FORMAT(session)					\
+#define	WT_ILLEGAL_VALUE(session)					\
 	default:							\
-		return (__wt_file_format(session))
-#define	WT_ILLEGAL_FORMAT_ERR(session)					\
+		return (__wt_illegal_value(session))
+#define	WT_ILLEGAL_VALUE_ERR(session)					\
 	default:							\
-		ret = __wt_file_format(session);			\
+		ret = __wt_illegal_value(session);			\
 		goto err
 
 /*

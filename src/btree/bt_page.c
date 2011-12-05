@@ -117,7 +117,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 	case WT_PAGE_ROW_LEAF:
 		WT_ERR(__inmem_row_leaf(session, page));
 		break;
-	WT_ILLEGAL_FORMAT(session);
+	WT_ILLEGAL_VALUE(session);
 	}
 
 	*pagep = page;
@@ -311,7 +311,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 			WT_ROW_REF_SIZE(rref) = unpack->off.size;
 			++rref;
 			continue;
-		WT_ILLEGAL_FORMAT(session);
+		WT_ILLEGAL_VALUE(session);
 		}
 
 		/*
@@ -440,7 +440,7 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 		case WT_CELL_VALUE:
 		case WT_CELL_VALUE_OVFL:
 			break;
-		WT_ILLEGAL_FORMAT(session);
+		WT_ILLEGAL_VALUE(session);
 		}
 	}
 

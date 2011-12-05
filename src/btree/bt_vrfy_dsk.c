@@ -110,7 +110,7 @@ __wt_verify_dsk(WT_SESSION_IMPL *session,
 	case WT_PAGE_OVFL:
 		return (__verify_dsk_chunk(
 		    session, dsk, addr, dsk->u.datalen, size));
-	WT_ILLEGAL_FORMAT(session);
+	WT_ILLEGAL_VALUE(session);
 	}
 	/* NOTREACHED */
 }

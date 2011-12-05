@@ -309,7 +309,7 @@ __wt_btree_root_empty_init(WT_SESSION_IMPL *session)
 		WT_RET(__wt_row_ikey_alloc(session, 0, "", 1,
 		    (WT_IKEY **)&((WT_ROW_REF *)ref)->key));
 		break;
-	WT_ILLEGAL_FORMAT(session);
+	WT_ILLEGAL_VALUE(session);
 	}
 	page->entries = 1;
 	page->parent = NULL;
@@ -372,7 +372,7 @@ __wt_btree_root_empty(WT_SESSION_IMPL *session, WT_PAGE **leafp)
 	case WT_PAGE_ROW_INT:
 		child = root->u.row_int.t->ref.page;
 		break;
-	WT_ILLEGAL_FORMAT(session);
+	WT_ILLEGAL_VALUE(session);
 	}
 	if (child->entries != 0)
 		return (WT_ERROR);

@@ -439,7 +439,7 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt)
 			case WT_PAGE_ROW_LEAF:
 				ret = __cursor_row_prev(cbt, newpage);
 				break;
-			WT_ILLEGAL_FORMAT_ERR(session);
+			WT_ILLEGAL_VALUE_ERR(session);
 			}
 			if (ret != WT_NOTFOUND)
 				break;

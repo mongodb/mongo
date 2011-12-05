@@ -179,7 +179,7 @@ __rec_parent_dirty_update(
 			WT_PUBLISH(parent_ref->state, WT_REF_MEM);
 		}
 		break;
-	WT_ILLEGAL_FORMAT(session);
+	WT_ILLEGAL_VALUE(session);
 	}
 
 	/*
@@ -231,7 +231,7 @@ __rec_root_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 		case WT_PAGE_REC_SPLIT:			/* Page split */
 			next = page->modify->u.write_split;
 			break;
-		WT_ILLEGAL_FORMAT(session);
+		WT_ILLEGAL_VALUE(session);
 		}
 
 		WT_RET(__rec_discard_page(session, page));

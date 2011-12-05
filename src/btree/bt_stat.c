@@ -76,7 +76,7 @@ __stat_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	case WT_PAGE_ROW_LEAF:
 		WT_RET(__stat_page_row_leaf(session, page));
 		break;
-	WT_ILLEGAL_FORMAT(session);
+	WT_ILLEGAL_VALUE(session);
 	}
 	return (0);
 }

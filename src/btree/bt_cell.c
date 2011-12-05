@@ -45,7 +45,7 @@ __wt_cell_unpack_copy(
 	case WT_CELL_VALUE_OVFL:
 		WT_RET(__wt_ovfl_in(session, &unpack->off, retb));
 		break;
-	WT_ILLEGAL_FORMAT(session);
+	WT_ILLEGAL_VALUE(session);
 	}
 
 	/* Select a Huffman encoding function. */

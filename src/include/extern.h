@@ -600,7 +600,7 @@ extern int __wt_assert(WT_SESSION_IMPL *session,
     ...) WT_GCC_ATTRIBUTE((format (printf,
     5,
     6)));
-extern int __wt_file_format(WT_SESSION_IMPL *session);
+extern int __wt_illegal_value(WT_SESSION_IMPL *session);
 extern int __wt_file_item_too_big(WT_SESSION_IMPL *session);
 extern int __wt_unknown_object_type(WT_SESSION_IMPL *session, const char *uri);
 extern int __wt_filename(WT_SESSION_IMPL *session,

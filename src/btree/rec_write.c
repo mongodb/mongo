@@ -249,7 +249,7 @@ __wt_rec_write(
 	case WT_PAGE_ROW_LEAF:
 		WT_RET(__rec_row_leaf(session, page, salvage));
 		break;
-	WT_ILLEGAL_FORMAT(session);
+	WT_ILLEGAL_VALUE(session);
 	}
 
 	/* Wrap it up. */
@@ -969,7 +969,7 @@ __wt_rec_bulk_init(WT_CURSOR_BULK *cbulk)
 	case BTREE_ROW:
 		recno = 0;
 		break;
-	WT_ILLEGAL_FORMAT(session);
+	WT_ILLEGAL_VALUE(session);
 	}
 
 	WT_RET(__rec_split_init(
@@ -1006,7 +1006,7 @@ __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk)
 		break;
 	case BTREE_ROW:
 		break;
-	WT_ILLEGAL_FORMAT(session);
+	WT_ILLEGAL_VALUE(session);
 	}
 
 	page = cbulk->leaf;
@@ -2361,7 +2361,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 				    WT_COL_REF_ADDR(cref),
 				    WT_COL_REF_SIZE(cref)));
 			break;
-		WT_ILLEGAL_FORMAT(session);
+		WT_ILLEGAL_VALUE(session);
 		}
 
 		/* Discard the split page itself. */
@@ -2439,7 +2439,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		case WT_PAGE_ROW_LEAF:
 			WT_BSTAT_INCR(session, rec_split_leaf);
 			break;
-		WT_ILLEGAL_FORMAT(session);
+		WT_ILLEGAL_VALUE(session);
 		}
 
 #ifdef HAVE_VERBOSE
@@ -2468,7 +2468,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 					    "split: starting recno %" PRIu64,
 					    bnd->recno);
 					break;
-				WT_ILLEGAL_FORMAT(session);
+				WT_ILLEGAL_VALUE(session);
 				}
 err:			if (page->type == WT_PAGE_ROW_INT ||
 			    page->type == WT_PAGE_ROW_LEAF)
@@ -2487,7 +2487,7 @@ err:			if (page->type == WT_PAGE_ROW_INT ||
 			WT_RET(__rec_split_col(
 			    session, page, &mod->u.write_split));
 			break;
-		WT_ILLEGAL_FORMAT(session);
+		WT_ILLEGAL_VALUE(session);
 		}
 
 		F_SET(page, WT_PAGE_REC_SPLIT);

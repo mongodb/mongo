@@ -143,15 +143,17 @@ __wt_assert(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_file_format --
- *	Print a standard error message when a file format error is suddenly
- *	discovered.
+ * __wt_illegal_value --
+ *	Print a standard error message when we detect an illegal value.
  */
 int
-__wt_file_format(WT_SESSION_IMPL *session)
+__wt_illegal_value(WT_SESSION_IMPL *session)
 {
-	__wt_errx(session, "the file is corrupted; use the Db.salvage"
-	    " method or the db_salvage utility to repair the file");
+	__wt_errx(session,
+	    "encountered an illegal file format or structure value; restart "
+	    "the system and verify the underlying files, if corruption is "
+	    "detected use the WT_SESSION salvage method or the wt utility's "
+	    "salvage command to repair the file");
 	return (WT_ERROR);
 }
 

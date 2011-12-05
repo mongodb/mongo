@@ -102,7 +102,7 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int key_ret)
 			return (0);
 		}
 		break;
-	WT_ILLEGAL_FORMAT(session);
+	WT_ILLEGAL_VALUE(session);
 	}
 
 	/* It's a cell, unpack and expand it as necessary. */

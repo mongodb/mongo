@@ -229,7 +229,7 @@ __wt_debug_disk(WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, const char *ofile)
 		    __wt_page_type_string(dsk->type), dsk->u.datalen,
 		    WT_LSN_FILE(dsk->lsn), WT_LSN_OFFSET(dsk->lsn));
 		break;
-	WT_ILLEGAL_FORMAT(session);
+	WT_ILLEGAL_VALUE(session);
 	}
 
 	switch (dsk->type) {
@@ -399,7 +399,7 @@ __debug_page(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 		if (LF_ISSET(WT_DEBUG_TREE_LEAF))
 			WT_RET(__debug_page_row_leaf(ds, page));
 		break;
-	WT_ILLEGAL_FORMAT(session);
+	WT_ILLEGAL_VALUE(session);
 	}
 
 	return (0);
@@ -438,7 +438,7 @@ __debug_page_hdr(WT_DBG *ds, WT_PAGE *page)
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
 		break;
-	WT_ILLEGAL_FORMAT(session);
+	WT_ILLEGAL_VALUE(session);
 	}
 
 	if (WT_PAGE_IS_ROOT(page))
@@ -518,7 +518,7 @@ __debug_page_modify(WT_DBG *ds, WT_PAGE *page)
 			break;
 		case WT_PT_EMPTY:
 			break;
-		WT_ILLEGAL_FORMAT(session);
+		WT_ILLEGAL_VALUE(session);
 		}
 	}
 
@@ -818,7 +818,7 @@ __debug_cell(WT_DBG *ds, WT_CELL_UNPACK *unpack)
 		__dmsg(ds, ", offpage: addr %" PRIu32 ", size %" PRIu32,
 		    unpack->off.addr, unpack->off.size);
 		break;
-	WT_ILLEGAL_FORMAT(session);
+	WT_ILLEGAL_VALUE(session);
 	}
 	__dmsg(ds, "\n");
 
@@ -898,7 +898,7 @@ deleted:	__debug_item(ds, tag, "deleted", strlen("deleted"));
 	case WT_CELL_OFF:
 		__debug_item(ds, tag, "offpage", strlen("offpage"));
 		break;
-	WT_ILLEGAL_FORMAT(session);
+	WT_ILLEGAL_VALUE(session);
 	}
 
 	return (ret);
