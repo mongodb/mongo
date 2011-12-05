@@ -299,13 +299,10 @@ __evict_worker(WT_SESSION_IMPL *session)
 		bytes_max = conn->cache_size;
 
 		/*
-		 * If reads are locked out and we have freed enough space,
-		 * unlock reads and ping the read server.
+		 * Keep evicting until we hit the target cache usage.
 		 */
-		if (cache->read_lockout && bytes_inuse < bytes_max) {
-			cache->read_lockout = 0;
-			__wt_read_server_wake(session, 1);
-		}
+		bytes_inuse = __wt_cache_bytes_inuse(cache);
+		bytes_max = conn->cache_size;
 		if (bytes_inuse < cache->eviction_target * (bytes_max / 100))
 			break;
 

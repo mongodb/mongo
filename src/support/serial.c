@@ -79,7 +79,7 @@ __wt_session_serialize_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int ret)
 			ret = __wt_page_set_modified(session, page);
 
 		/* Wake the eviction server as necessary. */
-		(void)__wt_eviction_check(session, page);
+		(void)__wt_eviction_check(session, page, NULL);
 	}
 
 	/* Set the return value. */

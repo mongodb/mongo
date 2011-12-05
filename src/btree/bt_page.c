@@ -26,10 +26,7 @@ __wt_page_in_func(
 #endif
     )
 {
-	WT_CACHE *cache;
-	int ret;
-
-	cache = S2C(session)->cache;
+	int read_lockout, ret;
 
 	for (;;)
 		switch (ref->state) {
@@ -39,7 +36,8 @@ __wt_page_in_func(
 			 * state to WT_REF_READING.  If successful, read it.
 			 */
 			ret = WT_RESTART;
-			if (cache->read_lockout ||
+			__wt_eviction_check(session, NULL, &read_lockout);
+			if (read_lockout ||
 			    (ret = __wt_read_begin_serial(session, ref)) != 0) {
 				if (ret != WT_RESTART)
 					return (ret);

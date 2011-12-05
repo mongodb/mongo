@@ -56,10 +56,10 @@ __wt_read_server_wake(WT_SESSION_IMPL *session, int force)
 	cache = S2C(session)->cache;
 
 	if (!force)
-		__wt_eviction_check(session, NULL);
+		__wt_eviction_check(session, NULL, NULL);
 
 	/* If reads are locked out, eviction will signal the read thread. */
-	if (force || !cache->read_lockout)
+	if (force)
 		__wt_cond_signal(session, cache->read_cond);
 }
 
@@ -72,16 +72,13 @@ __wt_read_server_wake(WT_SESSION_IMPL *session, int force)
 void
 __wt_read_begin_serial_func(WT_SESSION_IMPL *session)
 {
-	WT_CACHE *cache;
 	WT_REF *ref;
-
-	cache = S2C(session)->cache;
 
 	__wt_read_begin_unpack(session, &ref);
 
-	__wt_eviction_check(session, NULL);
+	__wt_eviction_check(session, NULL, NULL);
 
-	if (cache->read_lockout || ref->state != WT_REF_DISK)
+	if (ref->state != WT_REF_DISK)
 		__wt_session_serialize_wrapup(session, NULL, WT_RESTART);
 	else {
 		ref->state = WT_REF_READING;

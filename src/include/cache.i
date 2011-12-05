@@ -10,7 +10,7 @@
  *	Wake the eviction server if necessary.
  */
 static inline int
-__wt_eviction_check(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_eviction_check(WT_SESSION_IMPL *session, WT_PAGE *page, int *read_lockoutp)
 {
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
@@ -43,6 +43,10 @@ __wt_eviction_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 */
 		bytes_inuse = __wt_cache_bytes_inuse(cache);
 		bytes_max = conn->cache_size;
+#if 1
+		if (read_lockoutp != NULL)
+			*read_lockoutp = (bytes_inuse > bytes_max);
+#else
 		if (!cache->read_lockout && bytes_inuse > bytes_max) {
 			WT_VERBOSE(session, readserver,
 			    "lock out reads: bytes-inuse %" PRIu64
@@ -56,6 +60,7 @@ __wt_eviction_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 			    bytes_inuse, bytes_max);
 			cache->read_lockout = 0;
 		}
+#endif
 
 		/* Wake eviction when we're over the trigger cache size. */
 		if (bytes_inuse > cache->eviction_trigger * (bytes_max / 100))
