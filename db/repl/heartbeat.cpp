@@ -102,8 +102,8 @@ namespace mongo {
                 if( !from.empty() ) {
                     replSettings.discoveredSeeds.insert(from);
                 }
-                errmsg = "still initializing";
-                return false;
+                result.append("hbmsg", "still initializing");
+                return true;
             }
 
             if( theReplSet->name() != cmdObj.getStringField("replSetHeartbeat") ) {
