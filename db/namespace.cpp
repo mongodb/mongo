@@ -30,7 +30,6 @@
 #include "ops/delete.h"
 #include "ops/query.h"
 
-
 namespace mongo {
 
     BOOST_STATIC_ASSERT( sizeof(Namespace) == 128 );
@@ -603,6 +602,34 @@ namespace mongo {
         _indexSpecs.clear();
     }
 
+    /*static*/ NOINLINE_DECL NamespaceDetailsTransient& NamespaceDetailsTransient::make_inlock(const char *ns) {
+        shared_ptr< NamespaceDetailsTransient > &t = _nsdMap[ ns ];
+        assert( t.get() == 0 );
+        Database *database = cc().database();
+        assert( database );
+        if( _nsdMap.size() % 20000 == 10000 ) { 
+            // so we notice if insanely large #s
+            log() << "opening namespace " << ns << endl;
+            log() << _nsdMap.size() << " namespaces in nsdMap" << endl;
+        }
+        t.reset( new NamespaceDetailsTransient(database, ns) );
+        return *t;
+    }
+
+    // note with repair there could be two databases with the same ns name.
+    // that is NOT handled here yet!  TODO
+    // repair may not use nsdt though not sure.  anyway, requires work.
+    NamespaceDetailsTransient::NamespaceDetailsTransient(Database *db, const char *ns) : 
+        database(db), 
+        h(3,&db->h), _ns(ns), _keysComputed(false), _qcWriteCount() 
+    {
+        dassert(db);
+    }
+
+    NamespaceDetailsTransient::~NamespaceDetailsTransient() { 
+        DEV wassert( database->isOk() );
+    }
+    
     void NamespaceDetailsTransient::clearForPrefix(const char *prefix) {
         assertInWriteLock();
         vector< string > found;

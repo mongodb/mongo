@@ -8,7 +8,7 @@ namespace mongo {
 
     class HLock { 
     public:
-        HLock(int level, HLock *parent, RWLock& r);
+        HLock(int level, HLock *parent);
         struct writelock { 
             writelock(HLock&);
             ~writelock();
@@ -31,7 +31,7 @@ namespace mongo {
         void hlockShared(int n);
         void hunlockShared(int n);
         HLock * const parent;
-        RWLock& r;
+        RWLock r;
         const int level; // 1=global, 2=db, 3=collection
     };
 

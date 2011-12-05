@@ -48,9 +48,12 @@ namespace mongo {
         }
     }
 
+    HLock theGlobalLock(1,0);
+
     Database::Database(const char *nm, bool& newDb, const string& _path )
         : name(nm), path(_path), namespaceIndex( path, name ),
-          profileName(name + ".system.profile") 
+          profileName(name + ".system.profile"),
+          h(2, &theGlobalLock)
     {
         try {
             {

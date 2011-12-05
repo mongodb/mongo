@@ -1,7 +1,6 @@
 // @file d_concurrency.cpp 
 
 #include "pch.h"
-#include "database.h"
 #include "d_concurrency.h"
 #include "../util/concurrency/threadlocal.h"
 #include "../util/concurrency/rwlock.h"
@@ -20,8 +19,8 @@ namespace mongo {
         wassert( x == 0 );
     }
 
-    HLock::HLock(int l, HLock *p, RWLock& _r) : 
-        level(l), parent(p), r(_r) 
+    HLock::HLock(int l, HLock *p) : 
+        level(l), parent(p), r(0)
     {
         dassert(level>0);
     }

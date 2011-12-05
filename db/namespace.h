@@ -25,9 +25,11 @@
 #include "diskloc.h"
 #include "../util/hashtab.h"
 #include "mongommf.h"
+#include "d_concurrency.h"
 
 namespace mongo {
 
+    class Database;
 
 #pragma pack(1)
     /* This helper class is used to make the HashMap below in NamespaceIndex e.g. see line:
@@ -419,14 +421,15 @@ namespace mongo {
     class NamespaceDetailsTransient : boost::noncopyable {
         BOOST_STATIC_ASSERT( sizeof(NamespaceDetails) == 496 );
 
-        /* general ------------------------------------------------------------- */
-    private:
-        string _ns;
+        Database *database;
+        HLock h;
+        const string _ns;
         void reset();
         static std::map< string, shared_ptr< NamespaceDetailsTransient > > _nsdMap;
+
+        NamespaceDetailsTransient(Database*,const char *ns);
     public:
-        NamespaceDetailsTransient(const char *ns) : _ns(ns), _keysComputed(false), _qcWriteCount() { }
-    public:
+        ~NamespaceDetailsTransient();
         void addedIndex() { assertInWriteLock(); reset(); }
         void deletedIndex() { assertInWriteLock(); reset(); }
         /* Drop cached information on all namespaces beginning with the specified prefix.
@@ -494,6 +497,7 @@ namespace mongo {
     private:
         int _qcWriteCount;
         map< QueryPattern, pair< BSONObj, long long > > _qcCache;
+        static NamespaceDetailsTransient& make_inlock(const char *ns);
     public:
         static SimpleMutex _qcMutex;
 
@@ -534,10 +538,10 @@ namespace mongo {
     }; /* NamespaceDetailsTransient */
 
     inline NamespaceDetailsTransient& NamespaceDetailsTransient::get_inlock(const char *ns) {
-        shared_ptr< NamespaceDetailsTransient > &t = _nsdMap[ ns ];
-        if ( t.get() == 0 )
-            t.reset( new NamespaceDetailsTransient(ns) );
-        return *t;
+        std::map< string, shared_ptr< NamespaceDetailsTransient > >::iterator i = _nsdMap.find(ns);
+        if( i != _nsdMap.end() ) 
+            return *i->second;
+        return make_inlock(ns);
     }
 
     /* NamespaceIndex is the ".ns" file you see in the data directory.  It is the "system catalog"
