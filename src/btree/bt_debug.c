@@ -376,7 +376,7 @@ __debug_page(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 	/* Dump the page header. */
 	WT_RET(__debug_page_hdr(ds, page));
 
-	/* Dump the page modifcation structure. */
+	/* Dump the page modification structure. */
 	WT_RET(__debug_page_modify(ds, page));
 
 	/* Dump the page. */
