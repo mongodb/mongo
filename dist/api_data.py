@@ -106,9 +106,10 @@ file_meta = format_meta + [
 		the maximum page size for internal nodes, in bytes; the size
 		must be a multiple of the allocation size''',
 		min='512B', max='512MB'),
-	Config('internal_item_max', '64B', r'''
-		the maximum key size stored on internal nodes, in bytes''',
-		min='40B'),
+	Config('internal_item_max', '0', r'''
+		the maximum key size stored on internal nodes, in bytes.  If zero, a
+		maximum is calculated to permit at least 10 keys per internal page''',
+		min=0),
 	Config('key_gap', '10', r'''
 		the maximum gap between instantiated keys in a Btree leaf page,
 		constraining the number of keys processed to instantiate a
@@ -118,9 +119,10 @@ file_meta = format_meta + [
 		the maximum page size for leaf nodes, in bytes; the size must
 		be a multiple of the allocation size''',
 		min='512B', max='512MB'),
-	Config('leaf_item_max', '470B', r'''
-		the maximum key or value size stored on leaf nodes, in bytes''',
-		min='40B'),
+	Config('leaf_item_max', '0', r'''
+		the maximum key or value size stored on leaf nodes, in bytes.  If zero,
+		a size is calculated to permit at least 5 records per leaf page.''',
+		min=0),
 	Config('prefix_compression', 'true', r'''
 		the Btree for prefix compression, storing keys as a count of
 		bytes matching the previous key plus a unique suffix''',

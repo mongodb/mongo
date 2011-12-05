@@ -585,7 +585,7 @@ __btree_page_sizes(WT_SESSION_IMPL *session, const char *config)
 {
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
-	uint32_t split_pct, split_size;
+	uint32_t intl_split_size, leaf_split_size, split_pct;
 
 	btree = session->btree;
 
@@ -634,40 +634,50 @@ __btree_page_sizes(WT_SESSION_IMPL *session, const char *config)
 	}
 
 	/*
+	 * Set the split percentage: reconciliation splits to a
+	 * smaller-than-maximum page size so we don't split every time a new
+	 * entry is added.
+	 */
+	WT_RET(__wt_config_getones(session, config, "split_pct", &cval));
+	split_pct = (uint32_t)cval.val;
+	intl_split_size = WT_SPLIT_PAGE_SIZE(
+	    btree->maxintlpage, btree->allocsize, split_pct);
+	leaf_split_size = WT_SPLIT_PAGE_SIZE(
+	    btree->maxleafpage, btree->allocsize, split_pct);
+
+	/*
+	 * Default values for internal and leaf page items: make sure at least
+	 * 8 items fit on split pages.
+	 */
+	if (btree->maxintlitem == 0)
+		    btree->maxintlitem = intl_split_size / 8;
+	if (btree->maxleafitem == 0)
+		    btree->maxleafitem = leaf_split_size / 8;
+
+	/*
 	 * The API limits the minimum overflow size, but just in case: we'd fail
 	 * horribly if the overflow limit was smaller than an overflow chunk.
 	 */
 	WT_ASSERT(session, btree->maxintlitem > sizeof(WT_OFF) + 10);
 	WT_ASSERT(session, btree->maxleafitem > sizeof(WT_OFF) + 10);
 
-	/*
-	 * Check we can fit 10 items on a page; 2 is probably the true minimum,
-	 * but that doesn't make much sense, anything less than 20 is probably
-	 * an application error.
-	 */
-	if (btree->maxintlitem > btree->maxintlpage / 10)
+	/* Check we can fit at least 2 items on a page. */
+	if (btree->maxintlitem > btree->maxintlpage / 2)
 		return (pse1(session, "internal",
 		    btree->maxintlpage, btree->maxintlitem));
-	if (btree->maxleafitem > btree->maxleafpage / 10)
+	if (btree->maxleafitem > btree->maxleafpage / 2)
 		return (pse1(session, "leaf",
 		    btree->maxleafpage, btree->maxleafitem));
 
 	/*
-	 * Take into account the size of a split page: reconciliation splits to
-	 * a smaller-than-maximum page size so we don't split every time a new
-	 * entry is added.  Make it a separate error message so it's clear what
-	 * went wrong.
+	 * Take into account the size of a split page:
+	 *
+	 * Make it a separate error message so it's clear what went wrong.
 	 */
-	WT_RET(__wt_config_getones(session, config, "split_pct", &cval));
-	split_pct = (uint32_t)cval.val;
-	split_size = WT_SPLIT_PAGE_SIZE(
-	    btree->maxintlpage, btree->allocsize, split_pct);
-	if (btree->maxintlitem > split_size / 10)
+	if (btree->maxintlitem > intl_split_size / 2)
 		return (pse2(session, "internal",
 		    btree->maxintlpage, btree->maxintlitem, split_pct));
-	split_size = WT_SPLIT_PAGE_SIZE(
-	    btree->maxleafpage, btree->allocsize, split_pct);
-	if (btree->maxleafitem > split_size / 10)
+	if (btree->maxleafitem > leaf_split_size / 2)
 		return (pse2(session, "leaf",
 		    btree->maxleafpage, btree->maxleafitem, split_pct));
 
@@ -679,7 +689,7 @@ pse1(WT_SESSION_IMPL *session, const char *type, uint32_t max, uint32_t ovfl)
 {
 	__wt_errx(session,
 	    "%s page size (%" PRIu32 "B) too small for the maximum item size "
-	    "(%" PRIu32 "B); the page must be able to hold at least 10 items",
+	    "(%" PRIu32 "B); the page must be able to hold at least 2 items",
 	    type, max, ovfl);
 	return (WT_ERROR);
 }
@@ -691,7 +701,7 @@ pse2(WT_SESSION_IMPL *session,
 	__wt_errx(session,
 	    "%s page size (%" PRIu32 "B) too small for the maximum item size "
 	    "(%" PRIu32 "B), because of the split percentage (%" PRIu32
-	    "%%); a split page must be able to hold at least 10 items",
+	    "%%); a split page must be able to hold at least 2 items",
 	    type, max, ovfl, pct);
 	return (WT_ERROR);
 }
