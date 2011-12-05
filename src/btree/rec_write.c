@@ -2177,6 +2177,13 @@ __rec_row_leaf(
 				__wt_cell_unpack(cell, unpack);
 				WT_ERR(
 				    __rec_track_kcell(session, page, unpack));
+
+				/*
+				 * We skip creating the key, don't try to use
+				 * the last valid key in prefix calculations.
+				 */
+				tmp->size = 0;
+
 				goto leaf_insert;
 			}
 
@@ -2206,11 +2213,48 @@ __rec_row_leaf(
 			key->cell_len = 0;
 			key->len = key->buf.size;
 			ovfl_key = 1;
-		} else if (ikey != NULL)
-			WT_ERR(__rec_cell_build_key(session,
-			    WT_IKEY_DATA(ikey), ikey->size, 0, &ovfl_key));
-		else {
-			WT_ERR(__wt_row_key(session, page, rip, tmp));
+
+			/* Don't try to use a prefix across an overflow key. */
+			tmp->size = 0;
+		} else {
+			if (ikey != NULL) {
+				tmp->data = WT_IKEY_DATA(ikey);
+				tmp->size = ikey->size;
+			} else if (session->btree->huffman_key == NULL &&
+			    unpack->type == WT_CELL_KEY &&
+			    unpack->prefix == 0) {
+				tmp->data = unpack->data;
+				tmp->size = unpack->size;
+			} else if (session->btree->huffman_key == NULL &&
+			    unpack->type == WT_CELL_KEY &&
+			    tmp->size >= unpack->prefix) {
+				/*
+				 * If we previously built a prefix-compressed
+				 * key in the temporary buffer, the
+				 * WT_BUF->data field will be the same as the
+				 * WT_BUF->mem field: grow the buffer if
+				 * necessary and copy the suffix into place.
+				 * If we previously pointed the temporary
+				 * buffer at an on-page key, the WT_BUF->data
+				 * field will not be the same as the
+				 * WT_BUF->mem field: grow the buffer if
+				 * necessary, copy the prefix into place, and
+				 * then re-point the WT_BUF->data field to the
+				 * newly constructed memory.
+				 */
+				WT_RET(__wt_buf_grow(session,
+				    tmp, unpack->prefix + unpack->size));
+				if (tmp->data != tmp->mem) {
+					memcpy(tmp->mem, tmp->data,
+					    unpack->prefix);
+					tmp->data = tmp->mem;
+				}
+				memcpy((uint8_t *)tmp->data + unpack->prefix,
+				    unpack->data, unpack->size);
+				tmp->size = unpack->prefix + unpack->size;
+			} else
+				WT_ERR(__wt_row_key(session, page, rip, tmp));
+
 			WT_ERR(__rec_cell_build_key(
 			    session, tmp->data, tmp->size, 0, &ovfl_key));
 		}
