@@ -232,7 +232,8 @@ namespace mongo {
             while ( n >= (int) _files.size() ) {
                 DEV if( !dbMutex.isWriteLocked() ) { 
                     log() << "error: getFile() called in a read lock, yet file to return is not yet open" << endl;
-                    log() << "       getFile(" << n << ") " <<_files.size() << ' ' << fileName(n).string() << endl; 
+                    log() << "       getFile(" << n << ") _files.size:" <<_files.size() << ' ' << fileName(n).string() << endl;
+                    log() << "       context ns: " << cc().ns() << " openallfiles:" << _openAllFiles << endl;
                 }
                 assertDbWriteLocked(this);
                 _files.push_back(0);

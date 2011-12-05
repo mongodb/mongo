@@ -349,6 +349,7 @@ namespace mongo {
     }
 
     void clearTmpCollections() {
+        writelock lk; // _openAllFiles is false at this point, so this is helpful for the query below to work as you can't open files when readlocked
         Client::GodScope gs;
         vector< string > toDelete;
         DBDirectClient cli;
