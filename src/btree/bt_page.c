@@ -26,17 +26,42 @@ __wt_page_in_func(
 #endif
     )
 {
+	WT_CACHE *cache;
+	int ret;
+
+	cache = S2C(session)->cache;
+
 	for (;;)
 		switch (ref->state) {
 		case WT_REF_DISK:
-			/* The page isn't in memory, request it be read. */
-			WT_RET(__wt_cache_read_serial(
+			/*
+			 * The page isn't in memory, attempt to set the
+			 * state to WT_REF_READING.  If successful, read it.
+			 */
+			ret = WT_RESTART;
+			if (cache->read_lockout ||
+			    (ret = __wt_read_begin_serial(session, ref)) != 0) {
+				if (ret != WT_RESTART)
+					return (ret);
+				__wt_yield();
+				break;
+			}
+
+			WT_ASSERT(session, ref->state == WT_REF_READING);
+
+			WT_RET(__wt_cache_read(
 			    session, parent, ref, dsk_verify));
+
+			WT_RET(__wt_read_end_serial(session, ref));
+
+			WT_ASSERT(session, ref->state == WT_REF_MEM &&
+			    ref->page != NULL);
 			break;
 		case WT_REF_LOCKED:
+		case WT_REF_READING:
 			/*
-			 * The page is being considered for eviction -- wait
-			 * for that to be resolved.
+			 * The page is being read or considered for eviction --
+			 * wait for that to be resolved.
 			 */
 			__wt_yield();
 			break;

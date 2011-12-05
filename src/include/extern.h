@@ -232,8 +232,13 @@ extern int __wt_page_inmem(WT_SESSION_IMPL *session,
     WT_PAGE_DISK *dsk,
     WT_PAGE **pagep);
 extern void __wt_read_server_wake(WT_SESSION_IMPL *session, int force);
-extern void __wt_cache_read_serial_func(WT_SESSION_IMPL *session);
+extern void __wt_read_begin_serial_func(WT_SESSION_IMPL *session);
+extern void __wt_read_end_serial_func(WT_SESSION_IMPL *session);
 extern void *__wt_cache_read_server(void *arg);
+extern int __wt_cache_read( WT_SESSION_IMPL *session,
+    WT_PAGE *parent,
+    WT_REF *ref,
+    int dsk_verify);
 extern int __wt_kv_return(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
     int key_ret);

@@ -124,42 +124,61 @@ __wt_col_append_new_ins_taken(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 typedef struct {
-	WT_PAGE *parent;
-	WT_REF *parent_ref;
-	int dsk_verify;
-} __wt_cache_read_args;
+	WT_REF *ref;
+} __wt_read_begin_args;
 
 static inline int
-__wt_cache_read_serial(
-	WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *parent_ref, int
-	dsk_verify)
+__wt_read_begin_serial(
+	WT_SESSION_IMPL *session, WT_REF *ref)
 {
-	__wt_cache_read_args _args, *args = &_args;
+	__wt_read_begin_args _args, *args = &_args;
 	int ret;
 
-	args->parent = parent;
-
-	args->parent_ref = parent_ref;
-
-	args->dsk_verify = dsk_verify;
+	args->ref = ref;
 
 	ret = __wt_session_serialize_func(session,
-	    WT_SERIAL_READ, __wt_cache_read_serial_func, args);
+	    WT_SERIAL_FUNC, __wt_read_begin_serial_func, args);
 
 	return (ret);
 }
 
 static inline void
-__wt_cache_read_unpack(
-	WT_SESSION_IMPL *session, WT_PAGE **parentp, WT_REF **parent_refp, int
-	*dsk_verifyp)
+__wt_read_begin_unpack(
+	WT_SESSION_IMPL *session, WT_REF **refp)
 {
-	__wt_cache_read_args *args =
-	    (__wt_cache_read_args *)session->wq_args;
+	__wt_read_begin_args *args =
+	    (__wt_read_begin_args *)session->wq_args;
 
-	*parentp = args->parent;
-	*parent_refp = args->parent_ref;
-	*dsk_verifyp = args->dsk_verify;
+	*refp = args->ref;
+}
+
+typedef struct {
+	WT_REF *ref;
+} __wt_read_end_args;
+
+static inline int
+__wt_read_end_serial(
+	WT_SESSION_IMPL *session, WT_REF *ref)
+{
+	__wt_read_end_args _args, *args = &_args;
+	int ret;
+
+	args->ref = ref;
+
+	ret = __wt_session_serialize_func(session,
+	    WT_SERIAL_FUNC, __wt_read_end_serial_func, args);
+
+	return (ret);
+}
+
+static inline void
+__wt_read_end_unpack(
+	WT_SESSION_IMPL *session, WT_REF **refp)
+{
+	__wt_read_end_args *args =
+	    (__wt_read_end_args *)session->wq_args;
+
+	*refp = args->ref;
 }
 
 typedef struct {

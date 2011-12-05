@@ -289,6 +289,7 @@ struct __wt_ref {
 #define	WT_REF_DISK		0	/* Page is on disk */
 #define	WT_REF_LOCKED		1	/* Page being evaluated for eviction */
 #define	WT_REF_MEM		2	/* Page is in cache and valid */
+#define	WT_REF_READING		3	/* Page being read */
 	uint32_t volatile state;
 
 	uint32_t addr;			/* Backing disk address */

@@ -7,8 +7,6 @@
 
 #include "wt_internal.h"
 
-static int  __cache_read(WT_SESSION_IMPL *, WT_PAGE *, WT_REF *, int);
-
 #define	WT_READ_REQ_FOREACH(rr, rr_end, cache)				\
 	for ((rr) = (cache)->read_request,				\
 	    (rr_end) = (rr) + (cache)->max_read_request;		\
@@ -66,33 +64,51 @@ __wt_read_server_wake(WT_SESSION_IMPL *session, int force)
 }
 
 /*
- * __wt_cache_read_serial_func --
- *	Read/allocation serialization function called when a page-in requires
- *	allocation or a read.
+ * __wt_read_begin_serial_func --
+ *	Serialization function called when a page-in requires a read.
+ *	The return value indicates whether the read should proceed in
+ *	the worker thread.
  */
 void
-__wt_cache_read_serial_func(WT_SESSION_IMPL *session)
+__wt_read_begin_serial_func(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
-	WT_PAGE *parent;
-	WT_READ_REQ *rr, *rr_end;
 	WT_REF *ref;
-	int dsk_verify;
-
-	__wt_cache_read_unpack(session, &parent, &ref, &dsk_verify);
 
 	cache = S2C(session)->cache;
 
-	/* Find an empty slot and enter the read request. */
-	WT_READ_REQ_FOREACH(rr, rr_end, cache)
-		if (rr->session == NULL) {
-			__cache_read_req_set(
-			    session, rr, parent, ref, dsk_verify);
-			return;
-		}
+	__wt_read_begin_unpack(session, &ref);
 
-	__wt_errx(session, "read server request table full");
-	__wt_session_serialize_wrapup(session, NULL, WT_ERROR);
+	__wt_eviction_check(session, NULL);
+
+	if (cache->read_lockout || ref->state != WT_REF_DISK)
+		__wt_session_serialize_wrapup(session, NULL, WT_RESTART);
+	else {
+		ref->state = WT_REF_READING;
+		__wt_session_serialize_wrapup(session, NULL, 0);
+	}
+}
+
+/*
+ * __wt_read_end_serial_func --
+ *	Serialization function called when a page-in is complete.
+ */
+void
+__wt_read_end_serial_func(WT_SESSION_IMPL *session)
+{
+	WT_PAGE_DISK *dsk;
+	WT_REF *ref;
+
+	__wt_read_end_unpack(session, &ref);
+
+	/* Add the page to our cache statistics. */
+	dsk = ref->page->dsk;
+	__wt_cache_page_read(session, ref->page,
+	    sizeof(WT_PAGE) + ((dsk == NULL) ? 0 : dsk->memsize));
+
+	ref->state = WT_REF_MEM;
+
+	__wt_session_serialize_wrapup(session, NULL, 0);
 }
 
 /*
@@ -144,7 +160,7 @@ __wt_cache_read_server(void *arg)
 				WT_SET_BTREE_IN_SESSION(
 				    session, request_session->btree);
 
-				ret = __cache_read(session,
+				ret = __wt_cache_read(session,
 				    rr->parent, rr->ref, rr->dsk_verify);
 
 				/*
@@ -168,11 +184,11 @@ __wt_cache_read_server(void *arg)
 }
 
 /*
- * __cache_read --
+ * __wt_cache_read --
  *	Read a page from the file.
  */
-static int
-__cache_read(
+int
+__wt_cache_read(
     WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify)
 {
 	WT_BUF *tmp;
@@ -189,6 +205,7 @@ __cache_read(
 	/* Review the possible page states. */
 	switch (ref->state) {
 	case WT_REF_DISK:
+	case WT_REF_READING:
 		/* Page is on disk, and that's our problem.  Read it. */
 		break;
 	case WT_REF_MEM:
@@ -221,15 +238,6 @@ __cache_read(
 	 * the page has, or NULL if it doesn't have one.
 	 */
 	WT_ERR(__wt_page_inmem(session, parent, ref, dsk, &ref->page));
-	/* The disk image may have been discarded, use the one in the page. */
-	dsk = ref->page->dsk;
-
-	/* Add the page to our cache statistics. */
-	__wt_cache_page_read(session, ref->page,
-	    sizeof(WT_PAGE) + ((dsk == NULL) ? 0 : dsk->memsize));
-
-	/* No memory flush required, the state variable is volatile. */
-	ref->state = WT_REF_MEM;
 
 	WT_VERBOSE(session, read,
 	    "page %p (%" PRIu32 "/%" PRIu32 ", %s)",
