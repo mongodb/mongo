@@ -165,7 +165,8 @@ namespace mongo {
                         if (failedUpdate) {
                             Sync sync(hn);
                             if (sync.shouldRetry(o)) {
-                                uassert(15915, "replSet update still fails after adding missing object", syncApply(o));
+                                failedUpdate = syncApply(o);
+                                uassert(15915, "replSet update still fails after adding missing object", !failedUpdate);
                             }
                         }
                     }

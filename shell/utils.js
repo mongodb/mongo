@@ -180,7 +180,7 @@ assert.time = function( f, msg, timeout /*ms*/ ) {
        
         diff = ( new Date() ).getTime() - start.getTime();
         if ( diff > timeout )
-            doassert( "assert.time failed: " + f + ", msg:" + msg );
+            doassert( "assert.time failed timeout " + timeout + "ms took " + diff + "ms : " + f + ", msg:" + msg );
         return res;
 }
 
@@ -1076,7 +1076,9 @@ jsTestOptions = function(){
                             auth : TestData.auth,
                             keyFile : TestData.keyFile,
                             authUser : "__system",
-                            authPassword : TestData.keyFileData }
+                            authPassword : TestData.keyFileData,
+                            adminUser : "admin",
+                            adminPassword : "password" }
     return {}
 }
 
@@ -1108,7 +1110,7 @@ jsTest.randomize = function( seed ) {
 */
 jsTest.addAuth = function(conn) {
     print ("Adding admin user on connection: " + conn);
-    return conn.getDB('admin').addUser("admin", "password");
+    return conn.getDB('admin').addUser(jsTestOptions().adminUser, jsTestOptions().adminPassword);
 }
 
 jsTest.authenticate = function(conn) {
@@ -1117,7 +1119,7 @@ jsTest.authenticate = function(conn) {
     result2 = null;
     if (jsTest.options().auth) {
         print ("Authenticating to admin user on connection: " + conn);
-        result1 = conn.getDB('admin').auth("admin", "password");
+        result1 = conn.getDB('admin').auth(jsTestOptions().adminUser, jsTestOptions().adminPassword);
     }
     if (jsTest.options().keyFile && !jsTest.isMongos(conn)) {
         print ("Authenticating to system user on connection: " + conn);
