@@ -187,6 +187,11 @@ for shortName in getThirdPartyShortNames():
 
 add_option( "use-system-all" , "use all system libraries " + shortName , 0 , True )
 
+
+# don't run configure if user calls --help
+if GetOption('help'):
+    Return()
+
 # --- environment setup ---
 
 def removeIfInList( lst , thing ):
