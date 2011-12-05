@@ -1,7 +1,8 @@
 /* 
    How to build and run:
 
-   (out of date) : g++ -o mongoperf -I .. mongoperf.cpp mongo_client_lib.cpp -lboost_thread-mt -lboost_filesystem
+   scons mongoperf
+   ./mongoperf -h
 */
 
 #include <iostream>
@@ -9,6 +10,7 @@
 #include "../../util/mmap.h"
 #include <assert.h>
 #include "../../util/logfile.h"
+#include "../../util/timer.h"
 #include "../../util/time_support.h"
 #include "../../bson/util/atomic_int.h"
 
@@ -30,6 +32,17 @@ AtomicUInt iops;
 
 SimpleMutex m("mperf");
 
+int syncDelaySecs = 0;
+
+void syncThread() {
+    while( 1 ) {
+        mongo::Timer t;
+        mmfFile->flush(true);
+        cout << "                                                     mmf sync took " << t.millis() << "ms" << endl;
+        sleepsecs(syncDelaySecs);
+    }
+}
+
 char* round(char* x) {
     size_t f = (size_t) x;
     char *p = (char *) ((f+PG-1)/PG*PG);
@@ -49,6 +62,7 @@ unsigned long long rrand() {
 void workerThread() {
     bool r = options["r"].trueValue();
     bool w = options["w"].trueValue();
+    //cout << "read:" << r << " write:" << w << endl;
     long long su = options["sleepMicros"].numberLong();
     Aligned a;
     while( 1 ) { 
@@ -121,6 +135,11 @@ void go() {
         mmfFile = new MemoryMappedFile();
         mmf = (char *) mmfFile->map(fname);
         assert( mmf );
+
+        syncDelaySecs = options["syncDelay"].numberInt();
+        if( syncDelaySecs ) {
+            boost::thread t(syncThread);
+        }
     }
 
     cout << "testing..."<< endl;
@@ -134,7 +153,7 @@ void go() {
     unsigned d = 1;
     unsigned &nthr = nThreadsRunning;
     while( 1 ) {
-        if( i++ % 4 == 0 ) {
+        if( i++ % 8 == 0 ) {
             if( nthr < wthr ) {
                 while( nthr < wthr && nthr < d ) {
                     nthr++;
@@ -144,10 +163,10 @@ void go() {
                 d *= 2;
             }
         }
-        sleepsecs(4);
+        sleepsecs(1);
         unsigned long long w = iops.get();
         iops.zero();
-        w /= 4; // 4 secs
+        w /= 1; // 1 secs
         cout << w << " ops/sec ";
         if( mmf == 0 ) 
             // only writing 4 bytes with mmf so we don't say this
@@ -175,7 +194,8 @@ cout <<
 "    sleepMicros:<n>,  // pause for sleepMicros/nThreads between each operation (default 0)\n"
 "    mmf:<bool>,       // if true do i/o's via memory mapped files (default false)\n"
 "    r:<bool>,         // do reads (default false)\n"
-"    w:<bool>          // do writes (default false)\n"
+"    w:<bool>,         // do writes (default false)\n"
+"    syncDelay:<n>     // secs between fsyncs, like --syncdelay in mongod. (default 0/never)\n"
 "  }\n"
 "\n"
 "mongoperf is a performance testing tool. the initial tests are of disk subsystem performance; \n"
