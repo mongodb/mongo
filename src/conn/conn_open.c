@@ -12,7 +12,7 @@
  *	Open a connection.
  */
 int
-__wt_connection_open(WT_CONNECTION_IMPL *conn)
+__wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 {
 	WT_SESSION_IMPL *session;
 	int ret;
@@ -34,7 +34,7 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn)
 	   &conn->hazard));
 
 	/* Create the cache. */
-	WT_RET(__wt_cache_create(conn));
+	WT_RET(__wt_cache_create(conn, cfg));
 
 	/*
 	 * Publish: there must be a barrier to ensure the connection structure

@@ -318,6 +318,13 @@ methods = {
 		type='list'),
 	Config('error_prefix', '', r'''
 		prefix string for error messages'''),
+	Config('eviction_target', '80', r'''
+		continue evicting until the cache becomes less full than this (as a
+		percentage).  Must be less than \c eviction_trigger.''',
+		min=10, max=99),
+	Config('eviction_trigger', '95', r'''
+		trigger eviction when the cache becomes this full (as a percentage)''',
+		min=10, max=99),
 	Config('hazard_max', '30', r'''
 		number of simultaneous hazard references per session handle''',
 		min='15'),

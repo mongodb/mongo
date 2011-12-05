@@ -1024,6 +1024,11 @@ struct wt_connection {
  * default \c false.}
  * @config{error_prefix, prefix string for error messages.,a string; default
  * empty.}
+ * @config{eviction_target, continue evicting until the cache becomes less full
+ * than this (as a percentage).  Must be less than \c eviction_trigger..,an
+ * integer between 10 and 99; default \c 80.}
+ * @config{eviction_trigger, trigger eviction when the cache becomes this full
+ * (as a percentage).,an integer between 10 and 99; default \c 95.}
  * @config{exclusive, fail if the database already exists.,a boolean flag;
  * default \c false.}
  * @config{extensions, list of extensions to load.  Optional values are passed

@@ -12,9 +12,10 @@
  *	Create the underlying cache.
  */
 int
-__wt_cache_create(WT_CONNECTION_IMPL *conn)
+__wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 {
 	WT_CACHE *cache;
+	WT_CONFIG_ITEM cval;
 	WT_SESSION_IMPL *session;
 	int ret;
 
@@ -23,6 +24,19 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn)
 
 	WT_RET(__wt_calloc_def(session, 1, &conn->cache));
 	cache = conn->cache;
+
+	/* Configure the cache. */
+	WT_ERR(__wt_config_gets(session, cfg, "eviction_target", &cval));
+	cache->eviction_target = (u_int)cval.val;
+	WT_ERR(__wt_config_gets(session, cfg, "eviction_trigger", &cval));
+	cache->eviction_trigger = (u_int)cval.val;
+
+	/*
+	 * Sanity: the target size must be lower than the trigger size or we
+	 * will never get any work done.
+	 */
+	if (cache->eviction_target >= cache->eviction_trigger)
+		cache->eviction_target = cache->eviction_trigger - 1;
 
 	WT_ERR(__wt_cond_alloc(session,
 	    "cache eviction server", 1, &cache->evict_cond));

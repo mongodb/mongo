@@ -306,7 +306,7 @@ __evict_worker(WT_SESSION_IMPL *session)
 			cache->read_lockout = 0;
 			__wt_read_server_wake(session, 1);
 		}
-		if (bytes_inuse < bytes_max - (bytes_max / 10))
+		if (bytes_inuse < cache->eviction_target * (bytes_max / 100))
 			break;
 
 		WT_RET(__evict_lru(session));

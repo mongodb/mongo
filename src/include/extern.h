@@ -152,7 +152,7 @@ extern int __wt_block_write( WT_SESSION_IMPL *session,
 extern int __wt_bulk_init(WT_CURSOR_BULK *cbulk);
 extern int __wt_bulk_insert(WT_CURSOR_BULK *cbulk);
 extern int __wt_bulk_end(WT_CURSOR_BULK *cbulk);
-extern int __wt_cache_create(WT_CONNECTION_IMPL *conn);
+extern int __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern void __wt_cache_stats_update(WT_CONNECTION_IMPL *conn);
 extern void __wt_cache_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_cell_copy(WT_SESSION_IMPL *session,
@@ -331,7 +331,7 @@ extern int __wt_row_search(WT_SESSION_IMPL *session,
     int is_modify);
 extern int __wt_connection_init(WT_CONNECTION_IMPL *conn);
 extern void __wt_connection_destroy(WT_CONNECTION_IMPL *conn);
-extern int __wt_connection_open(WT_CONNECTION_IMPL *conn);
+extern int __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[]);
 extern int __wt_connection_close(WT_CONNECTION_IMPL *conn);
 extern void __wt_conn_stat_init(WT_SESSION_IMPL *session);
 extern int __wt_curbulk_init(WT_CURSOR_BULK *cbulk);

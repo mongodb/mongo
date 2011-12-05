@@ -77,6 +77,9 @@ struct __wt_cache {
 	size_t   evict_allocated;	/* Bytes allocated */
 	uint32_t evict_entries;		/* Total evict slots */
 
+	u_int eviction_trigger;		/* Percent to trigger eviction. */
+	u_int eviction_target;		/* Percent to end eviction. */
+
 	WT_EVICT_REQ *evict_request;	/* Eviction requests:
 					   slot available if session is NULL */
 	uint32_t max_evict_request;	/* Size of the evict request array */

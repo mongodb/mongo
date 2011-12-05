@@ -487,7 +487,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 * Open the connection; if that fails, the connection handle has been
 	 * destroyed by the time the open function returns.
 	 */
-	if ((ret = __wt_connection_open(conn)) != 0) {
+	if ((ret = __wt_connection_open(conn, cfg)) != 0) {
 		conn = NULL;
 		WT_ERR(ret);
 	}
