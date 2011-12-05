@@ -73,14 +73,22 @@ namespace mongo {
             assert( cursor );
 
             try {
+                long long start_millis;
+                if ( query.isExplain() ) start_millis = curTimeMillis64();
                 cursor->init();
 
                 LOG(5) << "   cursor type: " << cursor->type() << endl;
                 shardedCursorTypes.hit( cursor->type() );
 
                 if ( query.isExplain() ) {
-                    BSONObj explain = cursor->explain();
-                    replyToQuery( 0 , r.p() , r.m() , explain );
+                    // fetch elapsed time for the query
+                    long long elapsed_millis = curTimeMillis64() - start_millis;
+                    BSONObjBuilder explain_builder;
+                    cursor->explain( explain_builder );
+                    explain_builder.appendNumber( "millis", elapsed_millis );
+                    BSONObj b = explain_builder.obj();
+
+                    replyToQuery( 0 , r.p() , r.m() , b );
                     delete( cursor );
                     return;
                 }
