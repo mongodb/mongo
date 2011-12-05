@@ -1039,6 +1039,9 @@ struct __wt_connection {
  * between 1MB and 10TB; default \c 100MB.}
  * @config{create, create the database if it does not exist.,a boolean flag;
  * default \c false.}
+ * @config{direct_io, Use \c O_DIRECT to access files.  Options are given as a
+ * list\, such as <code>"direct_io=[data]"</code>.,a list\, with values chosen
+ * from the following options: \c "data"\, \c "log"; default empty.}
  * @config{error_prefix, prefix string for error messages.,a string; default
  * empty.}
  * @config{eviction_target, continue evicting until the cache becomes less full

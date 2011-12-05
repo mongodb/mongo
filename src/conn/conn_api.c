@@ -346,9 +346,9 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		__conn_open_session
 	};
 	static struct {
-		const char *vname;
-		uint32_t vflag;
-	} *vt, verbtypes[] = {
+		const char *name;
+		uint32_t flag;
+	} *ft, verbtypes[] = {
 		{ "block",	WT_VERB_block },
 		{ "evict",	WT_VERB_evict },
 		{ "evictserver",WT_VERB_evictserver },
@@ -361,6 +361,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		{ "salvage",	WT_VERB_salvage },
 		{ "verify",	WT_VERB_verify },
 		{ "write",	WT_VERB_write },
+		{ NULL, 0 }
+	}, directio_types[] = {
+		{ "data",	WT_DIRECTIO_DATA },
+		{ "log",	WT_DIRECTIO_LOG },
 		{ NULL, 0 }
 	};
 	WT_CONFIG subconfig;
@@ -444,21 +448,30 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	conn->verbose = 0;
 #ifdef HAVE_VERBOSE
 	WT_ERR(__wt_config_gets(session, cfg, "verbose", &cval));
-	for (vt = verbtypes; vt->vname != NULL; vt++) {
-		WT_ERR(__wt_config_subinit(session, &subconfig, &cval));
-		skey.str = vt->vname;
-		skey.len = strlen(vt->vname);
-		ret = __wt_config_getraw(&subconfig, &skey, &sval);
-		if (ret == 0 && sval.val)
-			FLD_SET(conn->verbose, vt->vflag);
-		else if (ret != WT_NOTFOUND)
+	for (ft = verbtypes; ft->name != NULL; ft++) {
+		ret = __wt_config_subgets(session, &cval, ft->name, &sval);
+		if (ret == 0) {
+			if (sval.val)
+				FLD_SET(conn->verbose, ft->flag);
+		} else if (ret != WT_NOTFOUND)
 			goto err;
 	}
 #endif
 
 	WT_ERR(__wt_config_gets(session, cfg, "logging", &cval));
 	if (cval.val != 0)
-		WT_ERR(__wt_open(session, WT_LOG_FILENAME, 1, &conn->log_fh));
+		WT_ERR(__wt_open(session, WT_LOG_FILENAME, 1, 0, &conn->log_fh));
+
+	/* Configure direct I/O flags. */
+	WT_ERR(__wt_config_gets(session, cfg, "direct_io", &cval));
+	for (ft = directio_types; ft->name != NULL; ft++) {
+		ret = __wt_config_subgets(session, &cval, ft->name, &sval);
+		if (ret == 0) {
+			if (sval.val)
+				FLD_SET(conn->direct_io, ft->flag);
+		} else if (ret != WT_NOTFOUND)
+			goto err;
+	}
 
 	/* Load any extensions referenced in the config. */
 	WT_ERR(__wt_config_gets(session, cfg, "extensions", &cval));
@@ -578,7 +591,7 @@ __conn_single(WT_CONNECTION_IMPL *conn, const char **cfg)
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "create", &cval));
 	WT_RET(__wt_open(session,
-	    WT_FLAGFILE, cval.val == 0 ? 0 : 1, &conn->lock_fh));
+	    WT_FLAGFILE, cval.val == 0 ? 0 : 1, 0, &conn->lock_fh));
 
 	/*
 	 * Lock a byte of the file: if we don't get the lock, some other process
@@ -670,7 +683,7 @@ __conn_config(WT_CONNECTION_IMPL *conn, const char **cfg, WT_ITEM **cbufp)
 		return (0);
 
 	/* Open the configuration file. */
-	WT_RET(__wt_open(session, WT_CONFIGFILE, 0, &fh));
+	WT_RET(__wt_open(session, WT_CONFIGFILE, 0, 0, &fh));
 	WT_ERR(__wt_filesize(session, fh, &size));
 	if (size == 0)
 		goto err;

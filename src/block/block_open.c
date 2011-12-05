@@ -21,7 +21,7 @@ __wt_block_truncate(WT_SESSION_IMPL *session, const char *filename)
 	int ret;
 
 	/* Open the underlying file handle. */
-	WT_RET(__wt_open(session, filename, 0, &fh));
+	WT_RET(__wt_open(session, filename, 0, 1, &fh));
 
 	/* Truncate the file. */
 	WT_ERR(__wt_ftruncate(session, fh, (off_t)0));
@@ -54,7 +54,7 @@ __wt_block_create(WT_SESSION_IMPL *session, const char *filename)
 		    filename);
 
 	/* Open the underlying file handle. */
-	WT_RET(__wt_open(session, filename, 1, &fh));
+	WT_RET(__wt_open(session, filename, 1, 1, &fh));
 
 	/* Write out the file's meta-data. */
 	ret = __wt_desc_init(session, fh);
@@ -96,7 +96,7 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
 	__wt_block_freelist_open(session, block);
 
 	/* Open the underlying file handle. */
-	WT_ERR(__wt_open(session, filename, 1, &block->fh));
+	WT_ERR(__wt_open(session, filename, 1, 1, &block->fh));
 
 	/* Get the allocation size. */
 	WT_ERR(__wt_config_getones(session, config, "allocation_size", &cval));

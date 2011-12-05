@@ -202,6 +202,7 @@ struct __wt_connection_impl {
 	FILE *msgfile;
 	void (*msgcall)(const WT_CONNECTION_IMPL *, const char *);
 
+	uint32_t direct_io;
 	uint32_t verbose;
 
 	uint32_t flags;
@@ -266,6 +267,8 @@ extern WT_PROCESS __wt_process;
  * DO NOT EDIT: automatically built by dist/api_flags.py.
  * API flags section: BEGIN
  */
+#define	WT_DIRECTIO_DATA				0x00000002
+#define	WT_DIRECTIO_LOG					0x00000001
 #define	WT_PAGE_FREE_IGNORE_DISK			0x00000001
 #define	WT_REC_SINGLE					0x00000001
 #define	WT_SERVER_RUN					0x00000001

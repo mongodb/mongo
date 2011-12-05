@@ -328,6 +328,10 @@ methods = {
 	Config('create', 'false', r'''
 		create the database if it does not exist''',
 		type='boolean'),
+	Config('direct_io', '', r'''
+		Use \c O_DIRECT to access files.  Options are given as a
+		list, such as <code>"direct_io=[data]"</code>''',
+		type='list', choices=['data', 'log']),
 	Config('home_environment', 'false', r'''
 		use the \c WIREDTIGER_HOME environment variable for naming
 		unless the process is running with special privileges.
@@ -394,6 +398,7 @@ flags = {
 ###################################################
 # Internal routine flag declarations
 ###################################################
+	'direct_io' : [ 'DIRECTIO_DATA', 'DIRECTIO_LOG' ],
 	'page_free' : [ 'PAGE_FREE_IGNORE_DISK' ],
 	'rec_evict' : [ 'REC_SINGLE' ],
 	'verbose' : [

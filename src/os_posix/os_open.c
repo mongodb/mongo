@@ -12,7 +12,8 @@
  *	Open a file handle.
  */
 int
-__wt_open(WT_SESSION_IMPL *session, const char *name, int create, WT_FH **fhp)
+__wt_open(WT_SESSION_IMPL *session,
+    const char *name, int ok_create, int is_tree, WT_FH **fhp)
 {
 	const char *path;
 	WT_CONNECTION_IMPL *conn;
@@ -49,11 +50,18 @@ __wt_open(WT_SESSION_IMPL *session, const char *name, int create, WT_FH **fhp)
 	/* Windows clones: we always want to treat the file as a binary. */
 	f |= O_BINARY;
 #endif
-	if (create) {
+	if (ok_create) {
 		f |= O_CREAT;
 		mode = 0666;
 	} else
 		mode = 0;
+
+#ifdef O_DIRECT
+	if (is_tree && FLD_ISSET(conn->direct_io, WT_DIRECTIO_DATA))
+		f |= O_DIRECT;
+#else
+	WT_UNUSED(is_tree);
+#endif
 
 	WT_SYSCALL_RETRY(((fd = open(path, f, mode)) == -1 ? 1 : 0), ret);
 	if (ret != 0)

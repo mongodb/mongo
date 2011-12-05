@@ -551,7 +551,8 @@ extern void __wt_rwunlock(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
 extern int __wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
 extern int __wt_open(WT_SESSION_IMPL *session,
     const char *name,
-    int create,
+    int ok_create,
+    int is_tree,
     WT_FH **fhp);
 extern int __wt_close(WT_SESSION_IMPL *session, WT_FH *fh);
 extern int __wt_has_priv(void);
