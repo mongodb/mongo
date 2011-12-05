@@ -19,7 +19,7 @@ AC_MSG_RESULT($wt_cv_enable_attach)
 AC_MSG_CHECKING(if --enable-bzip2 option specified)
 AC_ARG_ENABLE(bzip2,
 	[AC_HELP_STRING([--enable-bzip2],
-	    [Build the bzip2 compressor extention.])], r=$enableval, r=no)
+	    [Build the bzip2 compressor extension.])], r=$enableval, r=no)
 case "$r" in
 no)	wt_cv_enable_bzip2=no;;
 *)	wt_cv_enable_bzip2=yes;;
@@ -71,16 +71,6 @@ no)	wt_cv_enable_verbose=no;;
 	wt_cv_enable_verbose=yes;;
 esac
 AC_MSG_RESULT($wt_cv_enable_verbose)
-
-AH_TEMPLATE(HAVE_WORKQ, [Define to 1 to enable the workQ thread.])
-AC_MSG_CHECKING(if --enable-workq option specified)
-AC_ARG_ENABLE(workq,
-	[AC_HELP_STRING([--enable-workq],
-	    [Configure the workQ thread.])], r=$enableval, r=no)
-case "$r" in
-yes)	AC_DEFINE(HAVE_WORKQ);;
-esac
-AC_MSG_RESULT($r)
 
 AC_MSG_CHECKING(if --with-spinlock option specified)
 AH_TEMPLATE(SPINLOCK_TYPE, [Spinlock type from mutex.h.])
