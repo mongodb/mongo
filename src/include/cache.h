@@ -55,7 +55,10 @@ struct __wt_cache {
 	 */
 	WT_CONDVAR *evict_cond;		/* Cache eviction server mutex */
 
+	WT_SPINLOCK lru_lock;		/* Manage the eviction list. */
+
 	WT_EVICT_LIST *evict;		/* Pages being tracked for eviction */
+	WT_EVICT_LIST *evict_current;	/* Current page to be evicted */
 	size_t   evict_allocated;	/* Bytes allocated */
 	uint32_t evict_entries;		/* Total evict slots */
 

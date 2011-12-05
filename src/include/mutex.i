@@ -33,6 +33,14 @@ __wt_spin_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 			WT_PAUSE();
 }
 
+static inline int
+__wt_spin_trylock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
+{
+	WT_UNUSED(session);
+
+	return (!__sync_lock_test_and_set(t, 1));
+}
+
 static inline void
 __wt_spin_unlock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
@@ -48,7 +56,7 @@ __wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
 	WT_UNUSED(session);
 
-	(void)pthread_mutex_init(t, NULL);				\
+	(void)pthread_mutex_init(t, NULL);
 }
 
 static inline void
@@ -56,6 +64,13 @@ __wt_spin_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
 	WT_UNUSED(session);
 	pthread_mutex_lock(t);
+}
+
+static inline int
+__wt_spin_trylock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
+{
+	WT_UNUSED(session);
+	return (pthread_mutex_trylock(t));
 }
 
 static inline void

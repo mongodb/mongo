@@ -41,7 +41,15 @@ __wt_page_in_func(
 			    (ret = __wt_read_begin_serial(session, ref)) != 0) {
 				if (ret != WT_RESTART)
 					return (ret);
-				__wt_yield();
+
+				/*
+				 * Find a page to evict -- if that succeeds,
+				 * try again immediately.  If it fails, we
+				 * don't care why, but give up our slice befor
+				 * retrying.
+				 */
+				if (__wt_evict_lru_page(session) != 0)
+					__wt_yield();
 				break;
 			}
 

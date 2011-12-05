@@ -20,9 +20,10 @@ __wt_block_alloc(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
 {
 	WT_BTREE *btree;
 	WT_FREE_ENTRY *fe, *new;
-	int n;
+	int n, ret;
 
 	btree = session->btree;
+	ret = 0;
 
 	if (size % btree->allocsize != 0) {
 		__wt_errx(session,
@@ -33,6 +34,8 @@ __wt_block_alloc(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
 	}
 
 	WT_BSTAT_INCR(session, alloc);
+
+	__wt_spin_lock(session, &btree->freelist_lock);
 
 	n = 0;
 	TAILQ_FOREACH(fe, &btree->freeqa, qa) {
@@ -59,8 +62,10 @@ __wt_block_alloc(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
 			__wt_free(session, fe);
 
 			WT_VERBOSE(session, allocate,
-			    "block %" PRIu32 "/%" PRIu32, *addrp, size);
-			return (0);
+			    "allocate: block %" PRIu32 "/%" PRIu32,
+			    *addrp, size);
+
+			goto done;
 		}
 
 		WT_VERBOSE(session, allocate,
@@ -94,11 +99,14 @@ __wt_block_alloc(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
 		TAILQ_INSERT_TAIL(&btree->freeqs, new, qs);
 #endif
 
-		return (0);
+		goto done;
 	}
 
 	/* No segments large enough found, extend the file. */
-	return (__block_extend(session, addrp, size));
+	ret = __block_extend(session, addrp, size);
+
+done:	__wt_spin_unlock(session, &btree->freelist_lock);
+	return (ret);
 }
 
 /*
@@ -179,6 +187,7 @@ __wt_block_free(WT_SESSION_IMPL *session, uint32_t addr, uint32_t size)
 	WT_VERBOSE(session, allocate,
 	    "free %" PRIu32 "/%" PRIu32, addr, size);
 
+	__wt_spin_lock(session, &btree->freelist_lock);
 	btree->freelist_dirty = 1;
 
 	WT_BSTAT_INCR(session, free);
@@ -262,6 +271,7 @@ combine:/*
 	    ((fe = TAILQ_NEXT(new, qa)) != NULL &&
 	    new->addr + (new->size / btree->allocsize) > fe->addr)) {
 		TAILQ_REMOVE(&btree->freeqa, new, qa);
+		__wt_spin_unlock(session, &btree->freelist_lock);
 
 		__wt_errx(session,
 		    "block free at addr range %" PRIu32 "-%" PRIu32
@@ -303,6 +313,7 @@ combine:/*
 	TAILQ_INSERT_HEAD(&btree->freeqs, new, qs);
 #endif
 
+	__wt_spin_unlock(session, &btree->freelist_lock);
 	return (0);
 }
 

@@ -45,6 +45,8 @@ extern "C" {
  * DO NOT EDIT: automatically built by dist/s_typedef.
  * Forward structure declarations for internal structures: BEGIN
  */
+struct __wt_page_track;
+    typedef struct __wt_page_track WT_PAGE_TRACK;
 struct __wt_btree;
     typedef struct __wt_btree WT_BTREE;
 struct __wt_btree_desc;
@@ -119,8 +121,6 @@ struct __wt_page_disk;
     typedef struct __wt_page_disk WT_PAGE_DISK;
 struct __wt_page_modify;
     typedef struct __wt_page_modify WT_PAGE_MODIFY;
-struct __wt_page_track;
-    typedef struct __wt_page_track WT_PAGE_TRACK;
 struct __wt_process;
     typedef struct __wt_process WT_PROCESS;
 struct __wt_ref;
@@ -153,6 +153,7 @@ struct __wt_update;
  *******************************************/
 #include "posix.h"
 #include "misc.h"
+#include "mutex.h"
 
 #include "btdsk.h"
 #include "btmem.h"
@@ -162,7 +163,6 @@ struct __wt_update;
 #include "debug.h"
 #include "dlh.h"
 #include "log.h"
-#include "mutex.h"
 #include "os.h"
 #include "stat.h"
 

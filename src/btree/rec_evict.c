@@ -599,6 +599,10 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 
 	cache = S2C(session)->cache;
 
+        /* If another thread already has this page, give up. */
+        if (ref->state != WT_REF_MEM)
+                return (1);
+
 	/*
 	 * Hazard references are acquired down the tree, which means we can't
 	 * deadlock.

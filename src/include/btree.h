@@ -82,6 +82,7 @@ struct __wt_btree {
 	WT_FH	*fh;			/* Backing file handle */
 	uint64_t lsn;			/* LSN file/offset pair */
 
+	WT_SPINLOCK freelist_lock;	/* Spinlock to protect the freelist. */
 	uint64_t freelist_bytes;	/* Free-list byte count */
 	uint32_t freelist_entries;	/* Free-list entry count */
 					/* Free-list queues */

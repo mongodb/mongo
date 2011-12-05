@@ -40,6 +40,7 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 
 	WT_ERR(__wt_cond_alloc(session,
 	    "cache eviction server", 1, &cache->evict_cond));
+	__wt_spin_init(session, &cache->lru_lock);
 
 	/*
 	 * Allocate the eviction request array.  We size it to allow one

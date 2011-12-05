@@ -11,7 +11,7 @@ static void __evict_dup_remove(WT_SESSION_IMPL *);
 static int  __evict_file(WT_SESSION_IMPL *, WT_EVICT_REQ *);
 static int  __evict_lru(WT_SESSION_IMPL *);
 static int  __evict_lru_cmp(const void *, const void *);
-static void __evict_page(WT_SESSION_IMPL *);
+static void __evict_pages(WT_SESSION_IMPL *);
 static int  __evict_page_cmp(const void *, const void *);
 static int  __evict_request_walk(WT_SESSION_IMPL *);
 static int  __evict_walk(WT_SESSION_IMPL *);
@@ -354,6 +354,7 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 		 * The eviction candidate list might reference pages we are
 		 * about to discard; clear it.
 		 */
+		__wt_spin_lock(session, &cache->lru_lock);
 		memset(cache->evict, 0, cache->evict_allocated);
 
 		/* Reference the correct WT_BTREE handle. */
@@ -369,6 +370,8 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 
 		/* Clear the reference to the btree handle. */
 		WT_CLEAR_BTREE_IN_SESSION(session);
+
+		__wt_spin_unlock(session, &cache->lru_lock);
 
 		/*
 		 * Resolve the request and clear the slot.
@@ -457,16 +460,26 @@ __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 static int
 __evict_lru(WT_SESSION_IMPL *session)
 {
+	WT_CACHE *cache;
+	int ret;
+
+	cache = S2C(session)->cache;
+
+	__wt_spin_lock(session, &cache->lru_lock);
+
 	/* Get some more pages to consider for eviction. */
-	WT_RET(__evict_walk(session));
+	WT_ERR(__evict_walk(session));
 
 	/* Remove duplicates from the list. */
 	__evict_dup_remove(session);
 
-	/* Reconcile and discard the pages. */
-	__evict_page(session);
+err:	__wt_spin_unlock(session, &cache->lru_lock);
 
-	return (0);
+	/* Reconcile and discard some pages. */
+	if (ret == 0)
+		__evict_pages(session);
+
+	return (ret);
 }
 
 /*
@@ -501,6 +514,7 @@ __evict_walk(WT_SESSION_IMPL *session)
 		    elem * sizeof(WT_EVICT_LIST), &cache->evict));
 		cache->evict_entries = elem;
 	}
+	cache->evict_current = cache->evict;
 
 	i = WT_EVICT_WALK_BASE;
 	TAILQ_FOREACH(btree, &conn->btqh, q) {
@@ -621,36 +635,36 @@ __evict_dup_remove(WT_SESSION_IMPL *session)
 			else
 				break;
 		}
+ 
+ 	/* Sort the array by LRU, then evict the most promising candidates. */
+ 	qsort(cache->evict, (size_t)cache->evict_entries,
+ 	    sizeof(WT_EVICT_LIST), __evict_lru_cmp);
 }
-
+ 
 /*
- * __evict_page --
- *	Discard cache pages.
+ * __evict_get_page --
+ *	Get a page for eviction.
  */
 static void
-__evict_page(WT_SESSION_IMPL *session)
+__evict_get_page(WT_SESSION_IMPL *session, WT_BTREE **btreep, WT_PAGE **pagep)
 {
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
-	WT_PAGE *page;
-	u_int i;
 
 	cache = S2C(session)->cache;
+	*pagep = NULL;
 
-	/* Sort the array by LRU, then evict the most promising candidates. */
-	qsort(cache->evict, (size_t)cache->evict_entries,
-	    sizeof(WT_EVICT_LIST), __evict_lru_cmp);
+	if (__wt_spin_trylock(session, &cache->lru_lock) != 0)
+		return;
 
-	WT_EVICT_FOREACH(cache, evict, i) {
-		/*
-		 * NULL pages sort to the end of the list: once we hit one,
-		 * give up.
-		 */
-		if ((page = evict->page) == NULL)
-			break;
+	evict = cache->evict_current;
+	if (evict >= cache->evict &&
+	    evict < cache->evict + cache->evict_entries &&
+	    evict->page != NULL) {
+		WT_ASSERT(session, evict->btree != NULL);
 
-		/* Reference the correct WT_BTREE handle. */
-		WT_SET_BTREE_IN_SESSION(session, evict->btree);
+		*pagep = evict->page;
+		*btreep = evict->btree;
 
 		/*
 		 * Paranoia: remove the entry so we never try and reconcile
@@ -658,24 +672,60 @@ __evict_page(WT_SESSION_IMPL *session)
 		 */
 		__evict_clr(evict);
 
-		/*
-		 * If we're evicting our current eviction point in the file,
-		 * clear it and start again.
-		 */
-		if (page == session->btree->evict_page)
-			session->btree->evict_page = NULL;
-
-		/*
-		 * We don't care why reconciliation failed: maybe the page was
-		 * dirty and we're out of disk space?  Regardless, don't pick
-		 * the same page every time.
-		 */
-		if (__wt_rec_evict(session, page,
-		    F_ISSET(page, WT_PAGE_FORCE_EVICT) ? WT_REC_WAIT : 0) != 0)
-			page->read_gen = __wt_cache_read_gen(session);
-
-		WT_CLEAR_BTREE_IN_SESSION(session);
+		++cache->evict_current;
 	}
+
+	__wt_spin_unlock(session, &cache->lru_lock);
+}
+
+int
+__wt_evict_lru_page(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *btree, *saved_btree;
+	WT_PAGE *page;
+
+	__evict_get_page(session, &btree, &page);
+	if (page == NULL)
+		return (WT_NOTFOUND);
+
+	/* Reference the correct WT_BTREE handle. */
+	saved_btree = session->btree;
+	WT_SET_BTREE_IN_SESSION(session, btree);
+
+	/*
+	 * If we're evicting our current eviction point in the file,
+	 * clear it and start again.
+	 */
+	if (page == session->btree->evict_page)
+		session->btree->evict_page = NULL;
+
+	/*
+	 * We don't care why reconciliation failed: maybe the page was
+	 * dirty and we're out of disk space?  Regardless, don't pick
+	 * the same page every time.
+	 */
+	if (__wt_rec_evict(session, page,
+	    F_ISSET(page, WT_PAGE_FORCE_EVICT) ? WT_REC_WAIT : 0) != 0)
+		page->read_gen = __wt_cache_read_gen(session);
+
+	WT_CLEAR_BTREE_IN_SESSION(session);
+	session->btree = saved_btree;
+
+	return (0);
+}
+
+/*
+ * __evict_page --
+ *	Reconcile and discard cache pages.
+ */
+static void
+__evict_pages(WT_SESSION_IMPL *session)
+{
+	u_int i;
+
+	for (i = 0; i < WT_EVICT_GROUP; i++)
+		if (__wt_evict_lru_page(session) != 0)
+			break;
 }
 
 /*
