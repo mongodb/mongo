@@ -321,9 +321,9 @@ __wt_cursor_kv_not_set(WT_CURSOR *cursor, int key)
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)cursor->session;
-	if (cursor->saved_err != 0)
-		return (cursor->saved_err);
 
 	__wt_errx(session, "requires %s be set", key ? "key" : "value");
+	if (cursor->saved_err != 0)
+		return (cursor->saved_err);
 	return (EINVAL);
 }
