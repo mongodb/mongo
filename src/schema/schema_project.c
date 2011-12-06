@@ -22,8 +22,9 @@ __wt_schema_project_in(WT_SESSION_IMPL *session,
 	WT_PACK_VALUE pv;
 	char *proj;
 	uint8_t *p, *end;
-	size_t len;
-	uint32_t arg, offset;
+	const uint8_t *next;
+	size_t len, offset, old_len;
+	uint32_t arg;
 
 	/* Reset any of the buffers we will be setting. */
 	for (proj = (char *)proj_arg; *proj != '\0'; proj++) {
@@ -75,27 +76,52 @@ __wt_schema_project_in(WT_SESSION_IMPL *session,
 					 * to append in that case, and we're
 					 * positioned to do that.
 					 */
-					if (p < end)
+					if (p == end) {
+						/* Set up an empty value. */
+						WT_CLEAR(pv.u);
+						if (pv.type == 'S' ||
+						    pv.type == 's')
+							pv.u.s = "";
+
+						len = __pack_size(session, &pv);
+						WT_RET(__wt_buf_grow(session,
+						    buf, buf->size + len));
+						p = (uint8_t *)buf->data +
+						    buf->size;
+						WT_RET(__pack_write(
+						    session, &pv, &p, len));
+						buf->size += WT_STORE_SIZE(len);
+						end = (uint8_t *)buf->data +
+						    buf->size;
+					} else if (*proj == WT_PROJ_SKIP)
 						WT_RET(__unpack_read(session,
 						    &pv, (const uint8_t **)&p,
 						    (size_t)(end - p)));
+
 					break;
 				}
 				WT_PACK_GET(session, pv, ap);
 				/* FALLTHROUGH */
 
 			case WT_PROJ_REUSE:
+				/* Read the item we're about to overwrite. */
+				next = p;
+				if (p < end)
+					WT_RET(__unpack_read(session, &pv,
+					    &next, (size_t)(end - p)));
+				old_len = (size_t)(next - p);
+
 				len = __pack_size(session, &pv);
-				offset = (uint32_t)(p - (uint8_t *)buf->data);
+				offset = WT_PTRDIFF(p, buf->data);
 				WT_RET(__wt_buf_grow(session,
 				    buf, buf->size + len));
 				p = (uint8_t *)buf->data + offset;
 				end = (uint8_t *)buf->data + buf->size + len;
 				/* Make room if we're inserting out-of-order. */
-				if (offset < buf->size)
-					memmove(p + len, p, buf->size - offset);
-				WT_RET(__pack_write(session,
-				    &pv, &p, (size_t)(end - p)));
+				if (offset + old_len < buf->size)
+					memmove(p + len, p + old_len,
+					    buf->size - (offset + old_len));
+				WT_RET(__pack_write(session, &pv, &p, len));
 				buf->size += WT_STORE_SIZE(len);
 				break;
 
@@ -186,10 +212,10 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 	WT_PACK pack, vpack;
 	WT_PACK_VALUE pv, vpv;
 	char *proj;
-	uint8_t *p, *end;
-	const uint8_t *vp, *vend;
-	size_t len;
-	uint32_t arg, offset;
+	uint8_t *end, *p;
+	const uint8_t *next, *vp, *vend;
+	size_t len, offset, old_len;
+	uint32_t arg;
 	int is_recno, skip;
 
 	WT_RET(__pack_init(session, &vpack, vformat));
@@ -246,21 +272,35 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 			case WT_PROJ_SKIP:
 				if (!skip) {
 					WT_RET(__pack_next(&pack, &pv));
+
 					/*
 					 * A nasty case: if we are inserting
-					 * out-of-order, we may reach the end
-					 * of the data.  That's okay: we want
-					 * to append in that case, and we're
-					 * positioned to do that.
+					 * out-of-order, append a zero value
+					 * to keep the buffer in the correct
+					 * format.
 					 */
-					if (*proj == WT_PROJ_SKIP) {
-						if (p < end)
-							WT_RET(__unpack_read(
-							    session, &pv,
-							    (const uint8_t **)
-							    &p,
-							    (size_t)(end - p)));
-					}
+					if (*proj == WT_PROJ_SKIP &&
+					    p == end) {
+						/* Set up an empty value. */
+						WT_CLEAR(pv.u);
+						if (pv.type == 'S' ||
+						    pv.type == 's')
+							pv.u.s = "";
+
+						len = __pack_size(session, &pv);
+						WT_RET(__wt_buf_grow(session,
+						    buf, buf->size + len));
+						p = (uint8_t *)buf->data +
+						    buf->size;
+						WT_RET(__pack_write(
+						    session, &pv, &p, len));
+						buf->size += WT_STORE_SIZE(len);
+						end = (uint8_t *)buf->data +
+						    buf->size;
+					} else if (*proj == WT_PROJ_SKIP)
+						WT_RET(__unpack_read(session,
+						    &pv, (const uint8_t **)&p,
+						    (size_t)(end - p)));
 				}
 				if (*proj == WT_PROJ_SKIP)
 					break;
@@ -277,6 +317,13 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 					break;
 				}
 
+				/* Read the item we're about to overwrite. */
+				next = p;
+				if (p < end)
+					WT_RET(__unpack_read(session, &pv,
+					    &next, (size_t)(end - p)));
+				old_len = (size_t)(next - p);
+
 				/*
 				 * There is subtlety here: the value format
 				 * may not exactly match the cursor's format.
@@ -287,16 +334,16 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 				pv.u = vpv.u;
 
 				len = __pack_size(session, &pv);
-				offset = WT_PTRDIFF32(p, buf->data);
+				offset = WT_PTRDIFF(p, buf->data);
 				WT_RET(__wt_buf_grow(session,
-				    buf, buf->size + len));
+				    buf, buf->size + len - old_len));
 				p = (uint8_t *)buf->data + offset;
 				end = (uint8_t *)buf->data + buf->size + len;
 				/* Make room if we're inserting out-of-order. */
-				if (offset < buf->size)
-					memmove(p + len, p, buf->size - offset);
-				WT_RET(__pack_write(session,
-				    &pv, &p, (size_t)(end - p)));
+				if (offset + old_len < buf->size)
+					memmove(p + len, p + old_len,
+					    buf->size - (offset + old_len));
+				WT_RET(__pack_write(session, &pv, &p, len));
 				buf->size += WT_STORE_SIZE(len);
 				break;
 			default:
