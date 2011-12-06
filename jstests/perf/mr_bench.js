@@ -67,7 +67,7 @@ assert.eq( count , res.counts.input , "A" );
 x = db[res.result];
 assert.eq( count , x.find().count() , "B" );
 return 1;
-}, "unique key mr", 20000);
+}, "unique key mr", 15000);
 
 // 2nd MR emits the same key, and a unique value is added as key to same object
 // if object is kept in ram and being reduced, this can be really slow
@@ -79,5 +79,5 @@ assert.eq( count , res.counts.input , "A" );
 x = db[res.result];
 assert.eq( 1 , x.find().count() , "B" );
 return 1;
-}, "single key mr", 30000);
+}, "single key mr", 20000);
 
