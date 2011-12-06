@@ -64,6 +64,8 @@ namespace mongo {
             result.append( name , BSON( "width" << (int)width << "data" << t ) );
         }
 
+        bool _in( const BSONElement& me , const BSONElement& arr );
+
         
         // -------
 

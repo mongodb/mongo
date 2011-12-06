@@ -31,6 +31,18 @@ namespace mongo {
 
     }
 
+    bool StatUtil::_in( const BSONElement& me , const BSONElement& arr ) {
+        if ( me.type() != String || arr.type() != Array )
+            return false;
+
+        string s = me.String();
+        BSONForEach(e, arr.Obj()) {
+            if ( e.type() == String && s == e.String() )
+                return true;
+        }
+        return false;
+    }
+
     BSONObj StatUtil::doRow( const BSONObj& a , const BSONObj& b ) {
         BSONObjBuilder result;
 
@@ -155,7 +167,11 @@ namespace mongo {
                 ss << "SEC";
             else if ( x["isreplicaset"].trueValue() )
                 ss << "REC";
-            else if ( isReplSet )
+            else if ( x["arbiterOnly"].trueValue() )
+                ss << "ARB";
+            else if ( _in( x["me"] , x["passives"] ) )
+                ss << "PSV";
+            else if ( isReplSet ) 
                 ss << "UNK";
             else
                 ss << "SLV";
