@@ -115,6 +115,7 @@ __wt_curtable_set_key(WT_CURSOR *cursor, ...)
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	CURSOR_API_CALL(cursor, session, set_key, NULL);
+	cp = ctable->cg_cursors;
 
 	va_start(ap, cursor);
 	fmt = F_ISSET(cursor,
@@ -141,17 +142,15 @@ __wt_curtable_set_key(WT_CURSOR *cursor, ...)
 		if ((ret = __wt_buf_initsize(session, buf, sz)) != 0 ||
 		    (ret = __wt_struct_packv(session, buf->mem, sz,
 		    cursor->key_format, ap)) != 0) {
-			cursor->saved_err = ret;
-			F_CLR(ctable->cg_cursors[0], WT_CURSTD_KEY_SET);
+			(*cp)->saved_err = ret;
+			F_CLR(*cp, WT_CURSTD_KEY_SET);
 			goto err;
 		}
 	}
 	cursor->key.size = WT_STORE_SIZE(sz);
 	va_end(ap);
 
-	for (i = 0, cp = ctable->cg_cursors;
-	     i < WT_COLGROUPS(ctable->table);
-	     i++, cp++) {
+	for (i = 0; i < WT_COLGROUPS(ctable->table); i++, cp++) {
 		(*cp)->recno = cursor->recno;
 		(*cp)->key.data = cursor->key.data;
 		(*cp)->key.size = cursor->key.size;
@@ -197,10 +196,11 @@ __wt_curtable_set_value(WT_CURSOR *cursor, ...)
 	     i++, cp++)
 		if (ret == 0)
 			F_SET(*cp, WT_CURSTD_VALUE_SET);
-		else
+		else {
+			(*cp)->saved_err = ret;
 			F_CLR(*cp, WT_CURSTD_VALUE_SET);
+		}
 
-	cursor->saved_err = ret;
 	API_END(session);
 }
 
