@@ -116,12 +116,6 @@ public:
     void writeCollectionFile( const string coll , path outputFile ) {
         cout << "\t" << coll << " to " << outputFile.string() << endl;
 
-        size_t hasSlashOrNull = coll.find_first_of("/\0");
-        if (hasSlashOrNull != string::npos){
-          error() << "Cannot dump "  << coll << ". Collection has '/' or null in the collection name." << endl;
-          return;
-        }
-
         FilePtr f (fopen(outputFile.string().c_str(), "wb"));
         uassert(10262, errnoWithPrefix("couldn't open file"), f);
 
@@ -204,10 +198,18 @@ public:
                 continue;
             }
 
-            // Don't dump indexes
+            // raise error before writing collection with non-permitted filename chars in the name
+            size_t hasBadChars = name.find_first_of("/\0");
+            if (hasBadChars != string::npos){
+              error() << "Cannot dump "  << name << ". Collection has '/' or null in the collection name." << endl;
+              continue;
+            }
+
+			 // Don't dump indexes
             if ( endsWith(name.c_str(), ".system.indexes") ) {
                 continue;
             }
+
 
             if ( _coll != "" && db + "." + _coll != name && _coll != name )
                 continue;
