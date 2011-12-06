@@ -40,9 +40,12 @@ public:
 
     bool _drop;
     bool _keepIndexVersion;
+    bool _restoreOptions;
+    bool _restoreIndexes;
     int _w;
     string _curns;
     string _curdb;
+    string _curcoll;
     set<string> _users; // For restoring users with --drop
     auto_ptr<Matcher> _opmatcher; // For oplog replay
     Restore() : BSONTool( "restore" ) , _drop(false) {
@@ -51,6 +54,8 @@ public:
         ("oplogReplay", "replay oplog for point-in-time restore")
         ("oplogLimit", po::value<string>(), "exclude oplog entries newer than provided timestamp (epoch[:ordinal])")
         ("keepIndexVersion" , "don't upgrade indexes to newest version")
+        ("noOptionsRestore" , "don't restore collection options")
+        ("noIndexRestore" , "don't restore indexes")
         ("w" , po::value<int>()->default_value(1) , "minimum number of replicas per write" )
         ;
         add_hidden_options()
@@ -76,6 +81,8 @@ public:
 
         _drop = hasParam( "drop" );
         _keepIndexVersion = hasParam("keepIndexVersion");
+        _restoreOptions = !hasParam("noOptionRestore");
+        _restoreIndexes = !hasParam("noIndexRestore");
         _w = getParam( "w" , 1 );
         
         bool doOplog = hasParam( "oplogReplay" );
@@ -197,6 +204,11 @@ public:
             return;
         }
 
+        if ( endsWith( root.string().c_str() , ".metadata.json" ) ) {
+            // Metadata files are handled when the corresponding .bson file is handled
+            return;
+        }
+
         if ( ! ( endsWith( root.string().c_str() , ".bson" ) ||
                  endsWith( root.string().c_str() , ".bin" ) ) ) {
             cerr << "don't know what to do with file [" << root.string() << "]" << endl;
@@ -227,16 +239,16 @@ public:
 
         assert( ns.size() );
 
+        string oldCollName = root.leaf(); // Name of the collection that was dumped from
+        oldCollName = oldCollName.substr( 0 , oldCollName.find_last_of( "." ) );
         if (use_coll) {
             ns += "." + _coll;
         }
         else {
-            string l = root.leaf();
-            l = l.substr( 0 , l.find_last_of( "." ) );
-            ns += "." + l;
+            ns += "." + oldCollName;
         }
 
-        out() << "\t going into namespace [" << ns << "]" << endl;
+        out() << "\tgoing into namespace [" << ns << "]" << endl;
 
         if ( _drop ) {
             if (root.leaf() != "system.users.bson" ) {
@@ -253,8 +265,29 @@ public:
             }
         }
 
+        BSONObj metadataObject;
+        if (_restoreOptions || _restoreIndexes) {
+            path metadataFile = (root.branch_path() / (oldCollName + ".metadata.json"));
+            if (!exists(metadataFile.string())) {
+                // This is fine because dumps from before 2.1 won't have a metadata file, just print a warning.
+                // System collections shouldn't have metadata so don't warn if that file is missing.
+                if (!startsWith(metadataFile.leaf(), "system.")) {
+                    out() << metadataFile.string() << " not found. Skipping." << endl;
+                }
+            } else {
+                metadataObject = parseMetadataFile(metadataFile.string());
+            }
+        }
+
         _curns = ns.c_str();
         _curdb = NamespaceString(_curns).db;
+        _curcoll = NamespaceString(_curns).coll;
+
+        if (_restoreOptions && metadataObject.hasField("options")) {
+            // Try to create collection with given options
+            createCollectionWithOptions(metadataObject["options"].Obj());
+        }
+
         processFile( root );
         if (_drop && root.leaf() == "system.users.bson") {
             // Delete any users that used to exist but weren't in the dump file
@@ -263,6 +296,13 @@ public:
                 conn().remove(ns, Query(userMatch));
             }
             _users.clear();
+        }
+
+        if (_restoreIndexes && metadataObject.hasField("indexes")) {
+            vector<BSONElement> indexes = metadataObject["indexes"].Array();
+            for (vector<BSONElement>::iterator it = indexes.begin(); it != indexes.end(); ++it) {
+                createIndex((*it).Obj(), false);
+            }
         }
     }
 
@@ -289,42 +329,7 @@ public:
             }
         }
         else if ( endsWith( _curns.c_str() , ".system.indexes" )) {
-            /* Index construction is slightly special: when restoring
-               indexes, we must ensure that the ns attribute is
-               <dbname>.<indexname>, where <dbname> might be different
-               at restore time than what was dumped.  Also, we're
-               stricter about errors for indexes than for regular
-               data. */
-            BSONObjBuilder bo;
-            BSONObjIterator i(obj);
-            while ( i.more() ) {
-                BSONElement e = i.next();
-                if (strcmp(e.fieldName(), "ns") == 0) {
-                    NamespaceString n(e.String());
-                    string s = _curdb + "." + n.coll;
-                    bo.append("ns", s);
-                }
-                else if (strcmp(e.fieldName(), "v") != 0 || _keepIndexVersion) { // Remove index version number
-                    bo.append(e);
-                }
-            }
-            BSONObj o = bo.obj();
-            log(0) << o << endl;
-            conn().insert( _curns ,  o );
-            BSONObj err = conn().getLastErrorDetailed(false, false, _w);
-
-            if ( ! ( err["err"].isNull() ) ) {
-                if (err["err"].String() == "norepl" && _w > 1) {
-                    cerr << "Cannot specify write concern for non-replicas" << endl;
-                }
-                else {
-                        cerr << "Error creating index " << o["ns"].String();
-                        cerr << ": " << err["code"].Int() << " " << err["err"].String() << endl;
-                        cerr << "To resume index restoration, run " << _name << " on file" << _fileName << " manually." << endl;
-                }
-
-                ::abort();
-            }
+            createIndex(obj, true);
         }
         else if (_drop && endsWith(_curns.c_str(), ".system.users") && _users.count(obj["user"].String())) {
             // Since system collections can't be dropped, we have to manually
@@ -342,7 +347,90 @@ public:
         }
     }
 
+private:
 
+    BSONObj parseMetadataFile(string filePath) {
+        long long fileSize = file_size(filePath);
+        ifstream file(filePath.c_str(), ios_base::in);
+
+        char buf[fileSize];
+        file.read(buf, fileSize);
+        int objSize;
+        BSONObj obj;
+        obj = fromjson (buf, &objSize);
+        uassert(15934, "JSON object size didn't match file size", objSize == fileSize);
+        return obj;
+    }
+
+    void createCollectionWithOptions(BSONObj cmdObj) {
+        if (!cmdObj.hasField("create") || cmdObj["create"].String() != _curcoll) {
+            BSONObjBuilder bo;
+            if (!cmdObj.hasField("create")) {
+                bo.append("create", _curcoll);
+            }
+
+            BSONObjIterator i(cmdObj);
+            while ( i.more() ) {
+                BSONElement e = i.next();
+                if (strcmp(e.fieldName(), "create") == 0) {
+                    bo.append("create", _curcoll);
+                }
+                else {
+                    bo.append(e);
+                }
+            }
+            cmdObj = bo.obj();
+        }
+
+        BSONObj info;
+        if (!conn().runCommand(_curdb, cmdObj, info)) {
+            if (info["errmsg"].String() == "collection already exists") {
+                out() << "Couldn't create collection " << _curns << " because it already exists. Collection options will not be added" << endl;
+            } else {
+                uasserted(15936, "Creating collection " + _curns + " failed. Errmsg: " + info["errmsg"].String());
+            }
+        } else {
+            out() << "\tCreated collection " << _curns << " with options: " << cmdObj.jsonString() << endl;
+        }
+    }
+
+    /* We must handle if the dbname or collection name is different at restore time than what was dumped.
+       If keepCollName is true, however, we keep the same collection name that's in the index object.
+     */
+    void createIndex(BSONObj indexObj, bool keepCollName) {
+        BSONObjBuilder bo;
+        BSONObjIterator i(indexObj);
+        while ( i.more() ) {
+            BSONElement e = i.next();
+            if (strcmp(e.fieldName(), "ns") == 0) {
+                NamespaceString n(e.String());
+                string s = _curdb + "." + (keepCollName ? n.coll : _curcoll);
+                bo.append("ns", s);
+            }
+            else if (strcmp(e.fieldName(), "v") != 0 || _keepIndexVersion) { // Remove index version number
+                bo.append(e);
+            }
+        }
+        BSONObj o = bo.obj();
+        log(0) << "\tCreating index: " << o << endl;
+        conn().insert( _curdb + ".system.indexes" ,  o );
+
+        // We're stricter about errors for indexes than for regular data
+        BSONObj err = conn().getLastErrorDetailed(false, false, _w);
+
+        if ( ! ( err["err"].isNull() ) ) {
+            if (err["err"].String() == "norepl" && _w > 1) {
+                cerr << "Cannot specify write concern for non-replicas" << endl;
+            }
+            else {
+                cerr << "Error creating index " << o["ns"].String();
+                cerr << ": " << err["code"].Int() << " " << err["err"].String() << endl;
+                cerr << "To resume index restoration, run " << _name << " on file" << _fileName << " manually." << endl;
+            }
+
+            ::abort();
+        }
+    }
 };
 
 int main( int argc , char ** argv ) {
