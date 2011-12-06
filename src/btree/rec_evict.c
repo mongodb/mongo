@@ -14,11 +14,11 @@ static int  __hazard_qsort_cmp(const void *, const void *);
 static int  __rec_discard_page(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_parent_clean_update(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_parent_dirty_update(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
+static int  __rec_review(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
 static int  __rec_root_split(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_sub_discard(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_sub_discard_col(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_sub_discard_row(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __rec_sub_excl(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
 static void __rec_sub_excl_clear(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
 static int  __rec_sub_excl_col(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
 static void __rec_sub_excl_col_clear(WT_SESSION_IMPL *, WT_PAGE *);
@@ -42,28 +42,14 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	    "page %p (%s)", page, __wt_page_type_string(page->type));
 
 	/*
-	 * You cannot evict pages merge-split pages (that is, internal pages
-	 * that are a result of a split of another page).  They can only be
-	 * evicted as a result of evicting their parents, else we would lose
-	 * the merge flag and they would be written separately, permanently
-	 * deepening the tree.  Should the eviction server request eviction
-	 * of a merge-split page, ignore it (but do what we can to ensure the
-	 * page isn't selected again).
-	 */
-	if (F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE)) {
-		page->read_gen = __wt_cache_read_gen(session);
-		return (0);
-	}
-
-	/*
-	 * Get exclusive access to the page and review the page's subtree for
-	 * in-memory pages that would block our eviction of the page.  If the
+	 * Get exclusive access to the page and review the page and its subtree
+	 * for conditions that would block our eviction of the page.  If the
 	 * check fails (for example, we find a child page that can't be merged),
 	 * we're done.  We have to make this check for clean pages, too: while
 	 * unlikely eviction would choose an internal page with children, it's
-	 * possible.
+	 * not disallowed anywhere.
 	 */
-	WT_RET(__rec_sub_excl(session, page, flags));
+	WT_RET(__rec_review(session, page, flags));
 
 	/* If the page is dirty, write it. */
 	if (__wt_page_is_modified(page))
@@ -251,15 +237,28 @@ __rec_root_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __rec_sub_excl --
- *	Get exclusive access to a subtree for reconciliation.
+ * __rec_review --
+ *	Get exclusive access to the page and review the page and its subtree
+ * for conditions that would block our eviction of the page.
  */
 static int
-__rec_sub_excl(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
+__rec_review(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 {
 	int ret;
 
 	ret = 0;
+
+	/*
+	 * You cannot evict pages merge-split pages (that is, internal pages
+	 * that are a result of a split of another page).  They can only be
+	 * evicted as a result of evicting their parents, else we would lose
+	 * the merge flag and they would be written separately, permanently
+	 * deepening the tree.  Should the eviction server request eviction
+	 * of a merge-split page, ignore it (but do what we can to ensure the
+	 * page isn't selected again).
+	 */
+	if (F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE))
+		return (1);
 
 	/*
 	 * Attempt exclusive access to the page if our caller doesn't have the
@@ -492,10 +491,9 @@ __rec_sub_excl_page(
 	 */
 	if (F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE))
 		return (0);
-	if (!__wt_page_is_modified(page) ||
-	    F_ISSET(page, WT_PAGE_REC_SPLIT | WT_PAGE_REC_EMPTY))
-		return (0);
-
+	if (F_ISSET(page, WT_PAGE_REC_SPLIT | WT_PAGE_REC_EMPTY))
+		if (!__wt_page_is_modified(page))
+			return (0);
 	return (1);
 }
 
