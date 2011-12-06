@@ -101,10 +101,6 @@ namespace JsonTests {
         class InvalidNumbers {
         public:
             void run() {
-                BSONObjBuilder b;
-                b.append( "a", numeric_limits< double >::infinity() );
-                ASSERT_THROWS( b.done().jsonString( Strict ), AssertionException );
-
                 BSONObjBuilder c;
                 c.append( "a", numeric_limits< double >::quiet_NaN() );
                 string s = c.done().jsonString( Strict );
