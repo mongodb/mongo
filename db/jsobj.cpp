@@ -58,6 +58,7 @@ namespace mongo {
     // need to move to bson/, but has dependency on base64 so move that to bson/util/ first.
     inline string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames, int pretty ) const {
         BSONType t = type();
+        int sign;
         if ( t == Undefined )
             return "undefined";
 
@@ -81,6 +82,9 @@ namespace mongo {
             }
             else if ( mongo::isNaN(number()) ) {
                 s << "NaN";
+            }
+            else if ( mongo::isInf(number(), &sign) ) {
+                s << ( sign == 1 ? "Infinity" : "-Infinity");
             }
             else {
                 StringBuilder ss;
