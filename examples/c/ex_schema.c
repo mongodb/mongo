@@ -41,6 +41,7 @@ int main(void)
 	POP_RECORD *p, *endp;
 	const char *country;
 	uint64_t recno;
+	uint16_t year;
 
 	ret = wiredtiger_open(home, NULL, "create", &conn);
 	if (ret != 0)
@@ -90,11 +91,11 @@ int main(void)
 
 	/* Now just read through the countries we know about */
 	ret = session->open_cursor(session,
-	    "index:population:country_year(country,id)",
+	    "index:population:country_year(id)",
 	    NULL, NULL, &cursor);
 
 	while ((ret = cursor->next(cursor)) == 0) {
-		cursor->get_key(cursor, &country);
+		cursor->get_key(cursor, &country, &year);
 		cursor->get_value(cursor, &recno);
 
 		printf("Got country %s : row ID %d\n", country, (int)recno);
