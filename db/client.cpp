@@ -336,7 +336,9 @@ namespace mongo {
     }
     
     void Client::Context::checkNsAccess( bool doauth, int lockState ) {
-        uassert( 15929, "client access to index backing namespace prohibited", NamespaceString::normal( _ns.c_str() ) );
+        if ( 0 ) { // SERVER-4276
+            uassert( 15929, "client access to index backing namespace prohibited", NamespaceString::normal( _ns.c_str() ) );
+        }
         if ( doauth ) {
             _auth( lockState );
         }

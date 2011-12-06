@@ -1,5 +1,7 @@
 // Test that client cannot access index namespaces SERVER-4276.
 
+if ( 0 ) { // SERVER-4276
+
 t = db.jstests_indexx;
 t.drop();
 
@@ -37,3 +39,5 @@ checkFailingOperations();
 t.save({});
 // Check with base collection present.
 checkFailingOperations();
+
+}
