@@ -54,6 +54,9 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	/* Confirm we're not holding any hazard references. */
 	__wt_hazard_empty(session);
 
+	/* Free any reconciliation state. */
+	__wt_rec_destroy(session);
+
 	/* Destroy the thread's mutex. */
 	if (session->cond != NULL)
 		(void)__wt_cond_destroy(session, session->cond);

@@ -103,6 +103,8 @@ struct __wt_session_impl {
 
 	WT_HAZARD *hazard;		/* Hazard reference array */
 
+	void	*reconcile;		/* Reconciliation structure */
+
 	WT_SESSION_BUFFER *sb;		/* Per-thread update buffer */
 	uint32_t update_alloc_size;	/* Allocation size */
 

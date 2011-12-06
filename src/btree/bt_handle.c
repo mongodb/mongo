@@ -158,7 +158,7 @@ __btree_alloc(WT_SESSION_IMPL *session, const char *name, const char *filename)
 	session->btree = btree;
 
 	WT_RET(__wt_rwlock_alloc(session, "btree handle", &btree->rwlock));
-        __wt_spin_init(session, &btree->freelist_lock);
+	__wt_spin_init(session, &btree->freelist_lock);
 
 	/* Take copies of names for the new handle. */
 	WT_RET(__wt_strdup(session, name, &btree->name));
@@ -554,7 +554,6 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	__wt_free(session, btree->value_format);
 	__wt_free(session, btree->value_plan);
 	__wt_btree_huffman_close(session);
-	__wt_rec_destroy(session);
 	__wt_free(session, btree->stats);
 
 	WT_TRET(__wt_rwlock_destroy(session, btree->rwlock));

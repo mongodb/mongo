@@ -97,8 +97,6 @@ struct __wt_btree {
 	WT_PAGE *last_page;		/* Col-store append, last page */
 	uint64_t last_recno;		/* Col-store append, last recno */
 
-	void	*reconcile;		/* Reconciliation structure */
-
 	WT_BTREE_STATS *stats;		/* Btree statistics */
 
 #define	WT_BTREE_BULK		0x01	/* Handle is for bulk load. */
