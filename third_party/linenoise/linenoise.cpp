@@ -97,7 +97,7 @@
 #define STDIN_FILENO 0
 
 #else /* _WIN32 */
-
+#include <signal.h>
 #include <termios.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -695,9 +695,9 @@ static void linenoiseClearScreen( int fd, PromptInfo& pi, char *buf, int len, in
     DWORD count;
     FillConsoleOutputCharacterA( console_out, ' ', inf.dwSize.X * inf.dwSize.Y, coord, &count );
 #else
-    if ( write(1,"\x1b[H\x1b[2J",7) <= 0 ) return;
+    if ( write( fd, "\x1b[H\x1b[2J", 7 ) <= 0 ) return;
 #endif
-    if ( write(1, pi.promptText, pi.promptChars) == -1 ) return;
+    if ( write( fd, pi.promptText, pi.promptChars ) == -1 ) return;
     pi.promptCursorRowOffset = pi.promptExtraLines;
     refreshLine( fd, pi, buf, len, pos );
 }
@@ -863,6 +863,16 @@ static int linenoisePrompt( int fd, char *buf, int buflen, PromptInfo& pi ) {
                 refreshLine( fd, pi, buf, len, pos );
             }
             break;
+
+#ifndef _WIN32
+        case ctrlChar( 'Z' ):   // ctrl-Z, job control
+            disableRawMode( fd );                   // Returning to Linux (whatever) shell, leave raw mode
+            raise( SIGSTOP );                       // Break out in mid-line
+            enableRawMode( fd );                    // Back from Linux shell, re-enter raw mode
+            if ( write( fd, pi.promptText, pi.promptChars ) == -1 ) break; // Redraw prompt
+            refreshLine( fd, pi, buf, len, pos );   // Refresh the line
+            break;
+#endif
 
         case 27:    /* escape sequence */
             break; /* should be handled by linenoiseReadChar */
