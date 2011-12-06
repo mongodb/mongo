@@ -186,7 +186,6 @@ __wt_evict_force_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
 	WT_EVICT_REQ *er, *er_end;
-	u_int i;
 
 	cache = S2C(session)->cache;
 
@@ -201,8 +200,8 @@ __wt_evict_force_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
 		    er->page == page)
 			__evict_req_clr(session, er);
 
-	if (cache->evict != NULL)
-		WT_EVICT_FOREACH(cache, evict, i)
+	if ((evict = cache->evict) != NULL)
+		for (; evict < cache->evict + cache->evict_entries; ++evict)
 			if (evict->page == page)
 				__evict_clr(evict);
 
