@@ -82,8 +82,6 @@
  * 
  */
 
-#include <boost/scoped_array.hpp>
-
 #ifdef _WIN32
 
 #include <conio.h>
@@ -122,7 +120,7 @@
 #define ctrlChar( upperCaseASCII ) ( upperCaseASCII - 0x40 )
 
 struct PromptInfo {                 // a convenience struct for grouping prompt info
-    char*   promptText;                 // pointer to prompt text (owned elsewhere)
+    char*   promptText;                 // our copy of the prompt text, edited
     int     promptChars;                // bytes or chars (until UTF-8) in promptText
     int     promptExtraLines;           // extra lines (beyond 1) occupied by prompt
     int     promptIndentation;          // column offset to end of prompt
@@ -131,7 +129,10 @@ struct PromptInfo {                 // a convenience struct for grouping prompt 
     int     promptCursorRowOffset;      // where the cursor is relative to the start of the prompt
     int     promptScreenColumns;        // width of screen in columns
 
-    PromptInfo( char* textPtr, int columns ) : promptText( textPtr ), promptScreenColumns( columns ) {
+    PromptInfo( const char* textPtr, int columns ) : promptScreenColumns( columns ) {
+
+        promptText = new char[strlen( textPtr ) + 1];
+        strcpy( promptText, textPtr );
 
         // strip evil characters from the prompt -- we do allow newline
         unsigned char* pIn = reinterpret_cast<unsigned char *>( promptText );
@@ -150,7 +151,7 @@ struct PromptInfo {                 // a convenience struct for grouping prompt 
         promptLastLinePosition = 0;
         promptPreviousInputLen = 0;
         int x = 0;
-        for( int i = 0; i < promptChars; ++i ) {
+        for ( int i = 0; i < promptChars; ++i ) {
             char c = promptText[i];
             if ( '\n' == c ) {
                 x = 0;
@@ -167,10 +168,11 @@ struct PromptInfo {                 // a convenience struct for grouping prompt 
             }
         }
         promptIndentation = promptChars - promptLastLinePosition;
+        promptCursorRowOffset = promptExtraLines;
     }
-
-private:
-    PromptInfo( const PromptInfo& );    // disallow copy
+    ~PromptInfo() {
+        delete [] promptText;
+    }
 };
 
 static const char* unsupported_term[] = { "dumb", "cons25", NULL };
@@ -194,16 +196,18 @@ static void linenoiseAtExit( void );
 
 static bool isUnsupportedTerm( void ) {
     char* term = getenv( "TERM" );
-
-    if ( term == NULL ) return false;
-    for ( int j = 0; unsupported_term[j]; j++ )
-        if ( ! strcasecmp( term, unsupported_term[j] ) ) return true;
+    if ( term == NULL )
+        return false;
+    for ( int j = 0; unsupported_term[j]; ++j )
+        if ( ! strcasecmp( term, unsupported_term[j] ) ) {
+            return true;
+        }
     return false;
 }
 
 void linenoiseHistoryFree( void ) {
     if ( history ) {
-        for ( int j = 0; j < history_len; j++ )
+        for ( int j = 0; j < history_len; ++j )
             free( history[j] );
         history_len = 0;
         free( history );
@@ -264,7 +268,6 @@ static void disableRawMode( int fd ) {
     console_in = 0;
     console_out = 0;
 #else
-    /* Don't even check the return value as it's too late. */
     if ( rawmode && tcsetattr (fd, TCSADRAIN, &orig_termios ) != -1 )
         rawmode = 0;
 #endif
@@ -278,17 +281,15 @@ static void linenoiseAtExit( void ) {
 static int getColumns( void ) {
     int cols;
 #ifdef _WIN32
-    CONSOLE_SCREEN_BUFFER_INFO inf = { 0 };
+    CONSOLE_SCREEN_BUFFER_INFO inf;
     GetConsoleScreenBufferInfo( console_out, &inf );
     cols = inf.dwSize.X;
 #else
     struct winsize ws;
     cols = ( ioctl( 1, TIOCGWINSZ, &ws ) == -1 ) ? 80 : ws.ws_col;
 #endif
-
     // cols is 0 in certain circumstances like inside debugger, which creates further issues
-    cols = cols > 0 ? cols : 80;
-    return cols;
+    return (cols > 0) ? cols : 80;
 }
 
 /**
@@ -310,11 +311,11 @@ static void calculateScreenPosition(int x, int y, int screenColumns, int charCou
         yOut = y;
         charsRemaining -= charsThisRow;
         x = 0;
-        y++;
+        ++y;
     }
     if ( xOut == screenColumns ) {  // we have to special-case line wrap
         xOut = 0;
-        yOut++;
+        ++yOut;
     }
 }
 
@@ -345,7 +346,7 @@ static void refreshLine( int fd, PromptInfo& pi, char *buf, int len, int pos ) {
                 if ( strchr( "}])", buf[i] ) )
                     unmatched--;
                 else if ( strchr( "{[(", buf[i] ) )
-                    unmatched++;
+                    ++unmatched;
 
                 if ( unmatched == 0 ) {
                     highlight = i;
@@ -561,7 +562,7 @@ static void beep() {
 }
 
 static void freeCompletions( linenoiseCompletions* lc ) {
-    for ( size_t i = 0; i < lc->len; i++ )
+    for ( size_t i = 0; i < lc->len; ++i )
         free( lc->cvec[i] );
     if ( lc->cvec )
         free( lc->cvec );
@@ -837,7 +838,7 @@ static int linenoisePrompt( int fd, char *buf, int buflen, PromptInfo& pi ) {
                 }
                 strncpy( buf, history[history_index], buflen );
                 buf[buflen] = '\0';
-                len = pos = strlen( buf );  // place cusror at end of line
+                len = pos = strlen( buf );  // place cursor at end of line
                 refreshLine( fd, pi, buf, len, pos );
             }
             break;
@@ -913,7 +914,7 @@ static int linenoiseRaw( char* buf, int buflen, PromptInfo& pi ) {
     }
 
     if ( isatty( STDIN_FILENO ) ) {     // input is from a terminal
-        if ( enableRawMode(fd) == -1 )
+        if ( enableRawMode( fd ) == -1 )
             return -1;
         count = linenoisePrompt( fd, buf, buflen, pi );
         disableRawMode( fd );
@@ -935,20 +936,15 @@ static int linenoiseRaw( char* buf, int buflen, PromptInfo& pi ) {
 
 // the returned string is allocated with strdup() and must be freed by calling free()
 char *linenoise( const char* prompt ) {
-    char buf[LINENOISE_MAX_LINE];
-    int count;
-    int cols = getColumns();
-
-    // promptCopy owns the memory, PromptInfo pi just holds a ptr to it
-    boost::scoped_array<char> promptCopy( new char[strlen( prompt )+1] );
-    strcpy( &promptCopy[0], prompt );
-    PromptInfo pi( &promptCopy[0], cols );
+    char buf[LINENOISE_MAX_LINE];               // buffer for user's input
+    PromptInfo pi( prompt, getColumns() );      // struct to hold edited copy of prompt & misc prompt info
 
     if ( isUnsupportedTerm() ) {
         printf( "%s", pi.promptText );
         fflush( stdout );
-        if ( fgets( buf,LINENOISE_MAX_LINE, stdin ) == NULL )
+        if ( fgets( buf,LINENOISE_MAX_LINE, stdin ) == NULL ) {
             return NULL;
+        }
         size_t len = strlen( buf );
         while ( len && ( buf[len - 1] == '\n' || buf[len - 1] == '\r' ) ) {
             --len;
@@ -956,9 +952,10 @@ char *linenoise( const char* prompt ) {
         }
     }
     else {
-        count = linenoiseRaw( buf, LINENOISE_MAX_LINE, pi );
-        if ( count == -1 )
+        int count = linenoiseRaw( buf, LINENOISE_MAX_LINE, pi );
+        if ( count == -1 ) {
             return NULL;
+        }
     }
     return strdup( buf );
 }
@@ -976,20 +973,16 @@ void linenoiseAddCompletion( linenoiseCompletions* lc, const char* str ) {
     lc->cvec[lc->len++] = copy;
 }
 
-/* Using a circular buffer is smarter, but a bit more complex to handle. */
 int linenoiseHistoryAdd( const char* line ) {
-    char* linecopy;
-
     if ( history_max_len == 0 )
         return 0;
-
     if ( history == NULL ) {
         history = reinterpret_cast<char**>( malloc( sizeof( char* ) * history_max_len ) );
         if (history == NULL)
             return 0;
         memset( history, 0, (sizeof(char*) * history_max_len ) );
     }
-    linecopy = strdup( line );
+    char* linecopy = strdup( line );
     if ( ! linecopy )
         return 0;
     if ( history_len == history_max_len ) {
@@ -1011,12 +1004,10 @@ int linenoiseHistoryAdd( const char* line ) {
 }
 
 int linenoiseHistorySetMaxLen( int len ) {
-
     if ( len < 1 )
         return 0;
     if ( history ) {
         int tocopy = history_len;
-
         char** newHistory = reinterpret_cast<char**>( malloc( sizeof(char*) * len ) );
         if ( newHistory == NULL )
             return 0;
