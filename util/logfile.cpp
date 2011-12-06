@@ -191,6 +191,8 @@ namespace mongo {
         if (ftruncate(_fd, pos) != 0){
             msgasserted(15873, "Couldn't truncate file: " + errnoWithDescription());
         }
+
+        fsync(_fd);
     }
 
     void LogFile::writeAt(unsigned long long offset, const void *buf, size_t len) { 
