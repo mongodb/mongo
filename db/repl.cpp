@@ -615,7 +615,8 @@ namespace mongo {
         try {
             bool failedUpdate = applyOperation_inlock( op );
             if (failedUpdate && shouldRetry(op, hostName)) {
-                uassert(15914, "Failure retrying initial sync update", applyOperation_inlock(op));
+                failedUpdate = applyOperation_inlock( op );
+                uassert(15914, "Failure retrying initial sync update", ! failedUpdate );
             }
         }
         catch ( UserException& e ) {
