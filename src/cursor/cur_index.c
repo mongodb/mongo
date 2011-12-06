@@ -329,6 +329,8 @@ __curindex_close(WT_CURSOR *cursor, const char *config)
 		__wt_free(session, cindex->key_plan);
 	if (cindex->value_plan != btree->value_plan)
 		__wt_free(session, cindex->value_plan);
+	if (cursor->value_format != cindex->table->value_format)
+		__wt_free(session, cindex->value_plan);
 
 	WT_TRET(__wt_btcur_close(&cindex->cbt, cfg));
 	WT_TRET(__wt_session_release_btree(session));
@@ -372,6 +374,7 @@ int
 __wt_curindex_open(WT_SESSION_IMPL *session,
     const char *uri, const char *cfg[], WT_CURSOR **cursorp)
 {
+	WT_BUF fmt, plan;
 	static WT_CURSOR iface = {
 		NULL,
 		NULL,
@@ -436,22 +439,35 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	WT_RET(__wt_schema_open_index(session, table, idxname, namesize));
 	WT_RET(__wt_calloc_def(session, 1, &cindex));
 
-	cindex->table = table;
 	cbt = &cindex->cbt;
+	cursor = &cbt->iface;
+	*cursor = iface;
+	cursor->session = &session->iface;
 	cbt->btree = session->btree;
+
+	cindex->table = table;
 	WT_RET(__wt_session_lock_btree(session, NULL, 0));
 	cindex->key_plan = session->btree->key_plan;
 	cindex->value_plan = session->btree->value_plan;
 
-	/* Open the column groups needed for this index cursor. */
-	WT_RET(__curindex_open_colgroups(session, cindex, cfg));
-
-	cursor = &cbt->iface;
-	*cursor = iface;
-	cursor->session = &session->iface;
-
 	cursor->key_format = cbt->btree->idxkey_format;
 	cursor->value_format = table->value_format;
+
+	/* Handle projections. */
+	if (columns != NULL) {
+		WT_CLEAR(fmt);
+		WT_RET(__wt_struct_reformat(session, table,
+		    columns, strlen(columns), NULL, 0, &fmt));
+		cursor->value_format = __wt_buf_steal(session, &fmt, NULL);
+
+		WT_CLEAR(plan);
+		WT_RET(__wt_struct_plan(session, table,
+		    columns, strlen(columns), 0, &plan));
+		cindex->value_plan = __wt_buf_steal(session, &plan, NULL);
+	}
+
+	/* Open the column groups needed for this index cursor. */
+	WT_RET(__curindex_open_colgroups(session, cindex, cfg));
 
 	__wt_cursor_init(cursor, 1, 1, cfg);
 	*cursorp = cursor;

@@ -273,7 +273,7 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 					break;
 
 				if (is_recno) {
-					c->recno = pv.u.u;
+					c->recno = vpv.u.u;
 					break;
 				}
 
