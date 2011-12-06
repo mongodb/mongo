@@ -42,6 +42,20 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	    "page %p (%s)", page, __wt_page_type_string(page->type));
 
 	/*
+	 * You cannot evict pages merge-split pages (that is, internal pages
+	 * that are a result of a split of another page).  They can only be
+	 * evicted as a result of evicting their parents, else we would lose
+	 * the merge flag and they would be written separately, permanently
+	 * deepening the tree.  Should the eviction server request eviction
+	 * of a merge-split page, ignore it (but do what we can to ensure the
+	 * page isn't selected again).
+	 */
+	if (F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE)) {
+		page->read_gen = __wt_cache_read_gen(session);
+		return (0);
+	}
+
+	/*
 	 * Get exclusive access to the page and review the page and its subtree
 	 * for conditions that would block our eviction of the page.  If the
 	 * check fails (for example, we find a child page that can't be merged),
@@ -247,18 +261,6 @@ __rec_review(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	int ret;
 
 	ret = 0;
-
-	/*
-	 * You cannot evict pages merge-split pages (that is, internal pages
-	 * that are a result of a split of another page).  They can only be
-	 * evicted as a result of evicting their parents, else we would lose
-	 * the merge flag and they would be written separately, permanently
-	 * deepening the tree.  Should the eviction server request eviction
-	 * of a merge-split page, ignore it (but do what we can to ensure the
-	 * page isn't selected again).
-	 */
-	if (F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE))
-		return (1);
 
 	/*
 	 * Attempt exclusive access to the page if our caller doesn't have the
