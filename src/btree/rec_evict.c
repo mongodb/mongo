@@ -42,6 +42,20 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	    "page %p (%s)", page, __wt_page_type_string(page->type));
 
 	/*
+	 * You cannot evict pages merge-split pages (that is, internal pages
+	 * that are a result of a split of another page).  They can only be
+	 * evicted as a result of evicting their parents, else we would lose
+	 * the merge flag and they would be written separately, permanently
+	 * deepening the tree.  Should the eviction server request eviction
+	 * of a merge-split page, ignore it (but do what we can to ensure the
+	 * page isn't selected again).
+	 */
+	if (F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE)) {
+		page->read_gen = __wt_cache_read_gen(session);
+		return (0);
+	}
+
+	/*
 	 * Get exclusive access to the page and review the page's subtree for
 	 * in-memory pages that would block our eviction of the page.  If the
 	 * check fails (for example, we find a child page that can't be merged),
@@ -115,15 +129,11 @@ __rec_parent_dirty_update(
 			WT_PUBLISH(parent_ref->state, WT_REF_DISK);
 			break;
 		}
-		/* FALLTHROUGH */
-	case WT_PAGE_REC_SPLIT_MERGE:			/* Page split */
 		/*
-		 * Empty pages or pages which split and were then evicted, that
-		 * is, pages now waiting to be merged into their parents. We're
-		 * not going to evict this page after all, instead we'll merge
-		 * it into its parent when that page is evicted.  Release our
-		 * exclusive reference to it, as well as any pages below it we
-		 * locked down, and return it into use.
+		 * We're not going to evict this page after all, instead we'll
+		 * merge it into its parent when that page is evicted.  Release
+		 * our exclusive reference to it, as well as any pages below it
+		 * we locked down, and return it into use.
 		 */
 		__rec_sub_excl_clear(session, page, flags);
 		return (0);
@@ -459,30 +469,34 @@ __rec_sub_excl_page(
 	 * we can't evict the subtree.  This is not a problem, it just means we
 	 * chose badly when selecting a page for eviction.
 	 *
-	 * The test is for dirty pages (which must be written before we can know
-	 * what they will look like during their parent eviction), and for empty
-	 * or split pages.
-	 *
-	 * The test is cheap, do it first.  If it passes, get exclusive access
-	 * to the page if our caller doesn't have the tree locked down, and test
-	 * again.
+	 * First, a cheap test: if the child page doesn't at least have a chance
+	 * of a merge, we can't evict the candidate page.
 	 */
-	if (__wt_page_is_modified(page) ||
-	    !F_ISSET(page,
+	if (!F_ISSET(page,
 	    WT_PAGE_REC_EMPTY | WT_PAGE_REC_SPLIT | WT_PAGE_REC_SPLIT_MERGE))
 		return (1);
 
-	if (LF_ISSET(WT_REC_SINGLE))
+	/*
+	 * Next, if our caller doesn't have the tree locked down, get exclusive
+	 * access to the page and test again.
+	 */
+	if (!LF_ISSET(WT_REC_SINGLE))
+		WT_RET(__hazard_exclusive(session, ref, flags));
+
+	/*
+	 * Second, a more careful test: merge-split pages are OK, no matter if
+	 * they're clean or dirty, we can always merge them into the parent.
+	 * Clean split or empty pages are OK too.  Dirty split or empty pages
+	 * are not OK, they must be written first so we know what they're going
+	 * to look like to the parent.
+	 */
+	if (F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE))
+		return (0);
+	if (!__wt_page_is_modified(page) ||
+	    F_ISSET(page, WT_PAGE_REC_SPLIT | WT_PAGE_REC_EMPTY))
 		return (0);
 
-	WT_RET(__hazard_exclusive(session, ref, flags));
-
-	if (__wt_page_is_modified(page) ||
-	    !F_ISSET(page,
-	    WT_PAGE_REC_EMPTY | WT_PAGE_REC_SPLIT | WT_PAGE_REC_SPLIT_MERGE))
-		return (1);
-
-	return (0);
+	return (1);
 }
 
 /*

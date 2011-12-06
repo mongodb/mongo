@@ -220,8 +220,15 @@ __wt_rec_write(
 
 	WT_BSTAT_INCR(session, rec_written);
 
-	/* We're only interested in dirty pages. */
+	/* We're shouldn't get called with a clean page, that's an error. */
 	WT_ASSERT(session, __wt_page_is_modified(page));
+
+	/*
+	 * We can't do anything with a previously split page, that has to
+	 * be merged into its parent.
+	 */
+	if (F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE))
+		return (0);
 
 	/* Update the disk generation before we read anything from the page. */
 	WT_ORDERED_READ(page->modify->disk_gen, page->modify->write_gen);
@@ -1193,11 +1200,6 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		/*
 		 * The page may be deleted or internally created during a split.
 		 * Deleted/split pages are merged into the parent and discarded.
-		 *
-		 * !!!
-		 * Column-store formats don't support deleted pages; they can
-		 * shrink, but deleting a page would remove part of the record
-		 * count name space.
 		 */
 		if (WT_COL_REF_STATE(cref) == WT_REF_DISK) {
 			off.addr = WT_COL_REF_ADDR(cref);
@@ -1206,6 +1208,13 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 			rp = WT_COL_REF_PAGE(cref);
 			switch (F_ISSET(rp, WT_PAGE_REC_MASK)) {
 			case WT_PAGE_REC_EMPTY:
+				/*
+				 * !!!
+				 * Column-store formats don't support deleted
+				 * pages; they can shrink, but deleting a page
+				 * would remove part of the record count name
+				 * space.
+				 */
 				WT_ASSERT(session,
 				    !F_ISSET(rp, WT_PAGE_REC_EMPTY));
 				continue;
@@ -2341,8 +2350,25 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * new reality.
 	 */
 	switch (F_ISSET(page, WT_PAGE_REC_MASK)) {
+	case 0:	/*
+		 * The page has never been reconciled before, track the original
+		 * address blocks (if any).  Clear the addr/size pair as well,
+		 * it shouldn't be required, but it guarantees we dno't free the
+		 * same block again.
+		 */
+		if (WT_PADDR(page) != WT_ADDR_INVALID) {
+			WT_RET(__wt_rec_track_block(session,
+			    WT_PT_BLOCK, page, WT_PADDR(page), WT_PSIZE(page)));
+			WT_PADDR(page) = WT_ADDR_INVALID;
+			WT_PSIZE(page) = WT_ADDR_INVALID;
+		}
+		break;
 	case WT_PAGE_REC_EMPTY:				/* Page deleted */
-	case WT_PAGE_REC_SPLIT_MERGE:			/* Page split */
+		break;
+	case WT_PAGE_REC_REPLACE:			/* 1-for-1 page swap */
+		/* Discard the replacement page's blocks. */
+		WT_RET(__wt_rec_track_block(session, WT_PT_BLOCK,
+		    page, mod->u.write_off.addr, mod->u.write_off.size));
 		break;
 	case WT_PAGE_REC_SPLIT:				/* Page split */
 		/* The split page's blocks need to be discarded. */
@@ -2367,27 +2393,14 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		/* Discard the split page itself. */
 		__wt_page_out(session, mod->u.write_split, 0);
 		break;
-	case WT_PAGE_REC_REPLACE:			/* 1-for-1 page swap */
-		/* Discard the replacement page's blocks. */
-		WT_RET(__wt_rec_track_block(session, WT_PT_BLOCK,
-		    page, mod->u.write_off.addr, mod->u.write_off.size));
-		break;
-	default:
+	case WT_PAGE_REC_SPLIT_MERGE:			/* Page split */
 		/*
-		 * The page has never been reconciled before, track the original
-		 * address blocks (if any).  Clear the addr/size pair as well:
-		 * if this page splits, we insert a new, in-memory page into the
-		 * tree with the same parent WT_REF structure, and if that page
-		 * is subsequently modified and written, we don't want to free
-		 * the same block again.
+		 * We should never be here with a split-merge page: you cannot
+		 * reconcile split-merge pages, they can only be merged into a
+		 * parent.
 		 */
-		if (WT_PADDR(page) != WT_ADDR_INVALID) {
-			WT_RET(__wt_rec_track_block(session,
-			    WT_PT_BLOCK, page, WT_PADDR(page), WT_PSIZE(page)));
-			WT_PADDR(page) = WT_ADDR_INVALID;
-			WT_PSIZE(page) = WT_ADDR_INVALID;
-		}
-		break;
+		/* FALLTHROUGH */
+	WT_ILLEGAL_VALUE(session);
 	}
 	F_CLR(page, WT_PAGE_REC_MASK);
 
@@ -2530,14 +2543,23 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 	page->type = WT_PAGE_ROW_INT;
 
 	/*
-	 * Newly created internal pages are not persistent as we don't want the
-	 * tree to deepen whenever a leaf page splits.  Flag the page for merge
-	 * into its parent when the parent is reconciled.   We set the flag on
-	 * the original page (so that future reconciliations of its parent see
-	 * and merge the split pages), and on the newly created split page (so
-	 * that after eviction, when the split page replaces the original page,
-	 * its parents see and merge the split pages).  As they say, if it's not
-	 * confusing, you don't understand it.
+	 * we don't re-write parent pages when child pages split, which means
+	 * we have only one slot to work with in the parent.  When a leaf page
+	 * splits, we create a new internal page referencing the split pages, 
+	 * and when the leaf page is evicted, we update the leaf's slot in the
+	 * parent to reference the new internal page in the tree (deepening the
+	 * tree by a level).  We don't want the tree to deepen permanently, so
+	 * we never write that new internal page to disk, we only merge it into
+	 * the parent when the parent page is evicted.
+	 *
+	 * We set one flag (WT_PAGE_REC_SPLIT) on the original page so future
+	 * reconciliations of its parent merge in the newly created split page.
+	 * We set a different flag (WT_PAGE_REC_SPLIT_MERGE) on the created
+	 * split page so after we evict the original page and replace it with
+	 * the split page, the parent continues to merge in the split page.
+	 * The flags are different because the original page can be evicted and
+	 * its memory discarded, but the newly created split page cannot be
+	 * evicted, it can only be merged into its parent.
 	 */
 	F_SET(page, WT_PAGE_REC_SPLIT_MERGE);
 
@@ -2591,14 +2613,7 @@ __rec_split_col(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 	page->type = WT_PAGE_COL_INT;
 
 	/*
-	 * Newly created internal pages are not persistent as we don't want the
-	 * tree to deepen whenever a leaf page splits.  Flag the page for merge
-	 * into its parent when the parent is reconciled.   We set the flag on
-	 * the original page (so that future reconciliations of its parent see
-	 * and merge the split pages), and on the newly created split page (so
-	 * that after eviction, when the split page replaces the original page,
-	 * its parents see and merge the split pages).  As they say, if it's not
-	 * confusing, you don't understand it.
+	 * See the comment above in __rec_split_row().
 	 */
 	F_SET(page, WT_PAGE_REC_SPLIT_MERGE);
 
