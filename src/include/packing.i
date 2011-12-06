@@ -104,6 +104,7 @@ next:	if (pack->cur == pack->end)
 	case 'q':
 	case 'Q':
 	case 'r':
+	case 'R':
 		/* Integral types repeat <size> times. */
 		if (pv->size == 0)
 			goto next;
@@ -152,6 +153,7 @@ next:	if (pack->cur == pack->end)
 		break;							\
 	case 'Q':							\
 	case 'r':							\
+	case 'R':							\
 		pv.u.u = va_arg(ap, uint64_t);				\
 		break;							\
 	default:							\
@@ -213,6 +215,8 @@ __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv)
 	case 'Q':
 	case 'r':
 		return (__wt_vsize_uint(pv->u.u));
+	case 'R':
+		return (sizeof (uint64_t));
 	}
 
 	__wt_errx(session, "unknown pack-value type: %c", (int)pv->type);
@@ -302,6 +306,11 @@ __pack_write(
 	case 'r':
 		WT_RET(__wt_vpack_uint(pp, maxlen, pv->u.u));
 		break;
+	case 'R':
+		WT_SIZE_CHECK(sizeof (uint64_t), maxlen);
+		*(uint64_t *)*pp = pv->u.u;
+		*pp += sizeof(uint64_t);
+		break;
 	default:
 		__wt_errx(
 		    session, "unknown pack-value type: %c", (int)pv->type);
@@ -370,6 +379,11 @@ __unpack_read(WT_SESSION_IMPL *session,
 	case 'r':
 		WT_RET(__wt_vunpack_uint(pp, maxlen, &pv->u.u));
 		break;
+	case 'R':
+		WT_SIZE_CHECK(sizeof (uint64_t), maxlen);
+		pv->u.u = *(uint64_t *)*pp;
+		*pp += sizeof(uint64_t);
+		break;
 	default:
 		__wt_errx(
 		    session, "unknown pack-value type: %c", (int)pv->type);
@@ -421,6 +435,7 @@ __unpack_read(WT_SESSION_IMPL *session,
 		break;							\
 	case 'Q':							\
 	case 'r':							\
+	case 'R':							\
 		*va_arg(ap, uint64_t *) = pv.u.u;			\
 		break;							\
 	default:							\
