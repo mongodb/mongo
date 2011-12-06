@@ -36,14 +36,14 @@ sh.status(true)
 
 sh.setBalancerState( true )
 
-function diff(){
+function diff1(){
     var x = s.chunkCounts( "foo" );
     printjson( x )
     return Math.max( x.shard0000 , x.shard0001 ) - Math.min( x.shard0000 , x.shard0001 );
 }
 
 assert.soon( function(){
-    var d = diff();
+    var d = diff1();
     print( "diff: " + d );
     sh.status(true)
     return d < 5;
