@@ -128,7 +128,6 @@ struct __wt_page {
 		struct {
 			uint64_t    recno;	/* Starting recno */
 			WT_COL_REF *t;		/* Subtrees */
-			uint32_t    ext_entries;/* Extension entries */
 		} col_int;
 
 		/* Column-store leaf page. */
