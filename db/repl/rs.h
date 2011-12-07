@@ -23,6 +23,7 @@
 #include "../../util/concurrency/msg.h"
 #include "../../util/net/hostandport.h"
 #include "../commands.h"
+#include "../oplog.h"
 #include "../oplogreader.h"
 #include "rs_exception.h"
 #include "rs_optime.h"
@@ -79,6 +80,33 @@ namespace mongo {
         const HostAndPort _h;
         HeartbeatInfo _hbinfo;
     };
+
+    namespace replset {
+        /**
+         * "Normal" replica set syncing
+         */
+        class SyncTail : public Sync {
+        public:
+            virtual ~SyncTail() {}
+            SyncTail(const string& host) : Sync(host) {}
+            virtual bool syncApply(const BSONObj &o);
+        };
+
+        /**
+         * Initial clone and sync
+         */
+        class InitialSync : public SyncTail {
+        public:
+            InitialSync(const string& host) : SyncTail(host) {}
+            virtual ~InitialSync() {}
+            bool oplogApplication(OplogReader& r, const Member* source, const OpTime& applyGTE, const OpTime& minValid);
+            virtual void applyOp(const BSONObj& o, const OpTime& minvalid);
+        };
+
+        // TODO: move hbmsg into an error-keeping class (SERVER-4444)
+        void sethbmsg(const string& s, const int logLevel=0);
+
+    } // namespace replset
 
     class Manager : public task::Server {
         ReplSetImpl *rs;
@@ -490,13 +518,11 @@ namespace mongo {
 
     private:
         bool initialSyncOplogApplication(const OpTime& applyGTE, const OpTime& minValid);
-        bool _initialSyncOplogApplication(OplogReader& r, const Member *source, const OpTime& applyGTE, const OpTime& minValid);
         void _syncDoInitialSync();
         void syncDoInitialSync();
         void _syncThread();
         bool tryToGoLiveAsASecondary(OpTime&); // readlocks
         void syncTail();
-        bool syncApply(const BSONObj &o);
         unsigned _syncRollback(OplogReader& r);
         void syncRollback(OplogReader& r);
         void syncFixUp(HowToFixUp& h, OplogReader& r);

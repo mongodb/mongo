@@ -617,8 +617,7 @@ namespace mongo {
             if (failedUpdate) {
                 Sync sync(hostName);
                 if (sync.shouldRetry(op)) {
-                    failedUpdate = applyOperation_inlock(op);
-                    uassert(15914, "Failure retrying initial sync update", !failedUpdate);
+                    uassert(15914, "Failure retrying initial sync update", !applyOperation_inlock(op));
                 }
             }
         }

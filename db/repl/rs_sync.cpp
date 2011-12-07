@@ -32,19 +32,19 @@ namespace mongo {
         }
     }
 
-    /* apply the log op that is in param o 
-       @return bool failedUpdate
+    /* apply the log op that is in param o
+       @return bool success (true) or failure (false)
     */
-    bool ReplSetImpl::syncApply(const BSONObj &o) {
+    bool replset::SyncTail::syncApply(const BSONObj &o) {
         const char *ns = o.getStringField("ns");
         if ( *ns == '.' || *ns == 0 ) {
             blank(o);
-            return false;
+            return true;
         }
 
         Client::Context ctx(ns);
         ctx.getClient()->curop()->reset();
-        return applyOperation_inlock(o);
+        return !applyOperation_inlock(o);
     }
 
     /* initial oplog application, during initial sync, after cloning.
@@ -56,8 +56,9 @@ namespace mongo {
         OplogReader r;
 
         // keep trying to initial sync from oplog until we run out of targets
-        while ((source = _getOplogReader(r, applyGTE.isNull())) != 0) {
-            if (_initialSyncOplogApplication(r, source, applyGTE, minValid)) {
+        while ((source = _getOplogReader(r, applyGTE)) != 0) {
+            replset::InitialSync init(source->fullName());
+            if (init.oplogApplication(r, source, applyGTE, minValid)) {
                 return true;
             }
 
@@ -70,7 +71,7 @@ namespace mongo {
         return false;
     }
 
-    bool ReplSetImpl::_initialSyncOplogApplication(OplogReader& r, const Member *source,
+    bool replset::InitialSync::oplogApplication(OplogReader& r, const Member* source,
         const OpTime& applyGTE, const OpTime& minValid) {
 
         const string hn = source->fullName();
@@ -131,7 +132,7 @@ namespace mongo {
                     sleepsecs(1);
 
                     r.resetCursor();
-                    r.tailingQueryGTE(rsoplog, lastOpTimeWritten);
+                    r.tailingQueryGTE(rsoplog, theReplSet->lastOpTimeWritten);
                     if ( !r.haveCursor() ) {
                         if (fails++ > 30) {
                             log() << "replSet initial sync tried to query oplog 30 times, giving up" << endl;
@@ -160,17 +161,7 @@ namespace mongo {
                         throw DBException("primary changed",0);
                     }
 
-                    if( ts >= applyGTE ) { // optimes before we started copying need not be applied.
-                        bool failedUpdate = syncApply(o);
-                        if (failedUpdate) {
-                            Sync sync(hn);
-                            if (sync.shouldRetry(o)) {
-                                failedUpdate = syncApply(o);
-                                uassert(15915, "replSet update still fails after adding missing object", !failedUpdate);
-                            }
-                        }
-                    }
-                    _logOpObjRS(o);   /* with repl sets we write the ops to our oplog too */
+                    applyOp(o, applyGTE);
                 }
 
                 if ( ++n % 1000 == 0 ) {
@@ -214,6 +205,22 @@ namespace mongo {
             }
         }
         return true;
+    }
+
+    void replset::InitialSync::applyOp(const BSONObj& o, const OpTime& applyGTE) {
+        OpTime ts = o["ts"]._opTime();
+
+        // optimes before we started copying need not be applied.
+        if( ts >= applyGTE ) {
+            if (!syncApply(o)) {
+                if (shouldRetry(o)) {
+                    uassert(15915, "replSet update still fails after adding missing object", syncApply(o));
+                }
+            }
+        }
+
+        // with repl sets we write the ops to our oplog, too
+        _logOpObjRS(o);
     }
 
     /* should be in RECOVERING state on arrival here.
@@ -468,8 +475,10 @@ namespace mongo {
                                 return;
                             }
 
-                            syncApply(o);
-                            _logOpObjRS(o);   // with repl sets we write the ops to our oplog too 
+                            // TODO: make this whole method a member of SyncTail (SERVER-4444)
+                            replset::SyncTail tail("");
+                            tail.syncApply(o);
+                            _logOpObjRS(o);   // with repl sets we write the ops to our oplog too
                         }
                         catch (DBException& e) {
                             sethbmsg(str::stream() << "syncTail: " << e.toString() << ", syncing: " << o);

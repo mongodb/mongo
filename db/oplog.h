@@ -133,7 +133,7 @@ namespace mongo {
         /**
          * If applyOperation_inlock should be called again after an update fails.
          */
-        bool shouldRetry(const BSONObj& o);
+        virtual bool shouldRetry(const BSONObj& o);
     };
 
     void pretouchOperation(const BSONObj& op);
