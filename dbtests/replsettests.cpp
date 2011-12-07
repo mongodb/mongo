@@ -93,6 +93,8 @@ namespace ReplSetTests {
     class TestInitApplyOp : public Base {
     public:
         void run() {
+            writelock lk("");
+
             OpTime o1 = OpTime::now();
             OpTime o2 = OpTime::now();
 
@@ -103,25 +105,19 @@ namespace ReplSetTests {
             MockInitialSync mock;
 
             // all three should succeed
-            {
-                writelock lk("");
-                mock.applyOp(obj, o1);
+            mock.applyOp(obj, o1);
 
-                mock.failOnStep = MockInitialSync::FAIL_FIRST_APPLY;
-                mock.applyOp(obj, o1);
+            mock.failOnStep = MockInitialSync::FAIL_FIRST_APPLY;
+            mock.applyOp(obj, o1);
 
-                mock.retry = false;
-                mock.applyOp(obj, o1);
-            }
+            mock.retry = false;
+            mock.applyOp(obj, o1);
 
             // force failure
             MockInitialSync mock2;
             mock2.failOnStep = MockInitialSync::FAIL_BOTH_APPLY;
 
-            {
-                writelock lk("");
-                ASSERT_THROWS(mock2.applyOp(obj, o2), UserException);
-            }
+            ASSERT_THROWS(mock2.applyOp(obj, o2), UserException);
         }
     };
 
@@ -143,6 +139,8 @@ namespace ReplSetTests {
     class TestInitApplyOp2 : public Base {
     public:
         void run() {
+            writelock lk("");
+
             OpTime o1 = OpTime::now();
             OpTime o2 = OpTime::now();
 
@@ -155,17 +153,11 @@ namespace ReplSetTests {
             BSONObj obj = b.obj();
 
             SyncTest2 sync;
-            {
-                writelock lk("");
-                ASSERT_THROWS(sync.applyOp(obj, o1), UserException);
-            }
+            ASSERT_THROWS(sync.applyOp(obj, o1), UserException);
 
             sync.insertOnRetry = true;
             // succeeds
-            {
-                writelock lk("");
-                sync.applyOp(obj, o1);
-            }
+            sync.applyOp(obj, o1);
 
             BSONObj fin = findOne();
             assert(fin["x"].Number() == 456);
