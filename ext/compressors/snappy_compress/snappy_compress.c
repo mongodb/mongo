@@ -134,7 +134,9 @@ wt_snappy_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	/* retrieve the saved length */
 	snaplen = *((size_t *)src->data);
 	if (snaplen + sizeof(size_t) > src->size) {
-		fprintf(stderr, "wt_snap_decompress: stored size exceeds buf size\n");
+		wiredtiger_err_printf(
+		    session,
+		    "wt_snappy_decompress: stored size exceeds buf size");
 		return (WT_ERROR);
 	}
 	dstlen = dst->size;
