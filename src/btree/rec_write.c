@@ -2353,7 +2353,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	case 0:	/*
 		 * The page has never been reconciled before, track the original
 		 * address blocks (if any).  Clear the addr/size pair as well,
-		 * it shouldn't be required, but it guarantees we dno't free the
+		 * it shouldn't be required, but it guarantees we don't free the
 		 * same block again.
 		 */
 		if (WT_PADDR(page) != WT_ADDR_INVALID) {
