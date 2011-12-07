@@ -1431,6 +1431,7 @@ ToolTest = function( name ){
     this.ext = this.root + "_external/";
     this.extFile = this.root + "_external/a";
     resetDbpath( this.dbpath );
+    resetDbpath( this.ext );
 }
 
 ToolTest.prototype.startDB = function( coll ){
