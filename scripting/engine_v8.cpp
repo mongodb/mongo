@@ -1074,7 +1074,7 @@ namespace mongo {
             }
 
             case mongo::BinData: {
-                Local<v8::Object> b = readOnly ? readOnlyObjects->NewInstance() : internalFieldObjects->NewInstance();
+                /*Local<v8::Object> b =*/ readOnly ? readOnlyObjects->NewInstance() : internalFieldObjects->NewInstance();
 
                 int len;
                 const char *data = f.binData( len );
@@ -1100,7 +1100,7 @@ namespace mongo {
             }
 
             case mongo::NumberLong: {
-                Local<v8::Object> sub = readOnly ? readOnlyObjects->NewInstance() : internalFieldObjects->NewInstance();
+                /*Local<v8::Object> sub = */readOnly ? readOnlyObjects->NewInstance() : internalFieldObjects->NewInstance();
                 unsigned long long val = f.numberLong();
                 v8::Function* numberLong = getNamedCons( "NumberLong" );
                 double floatApprox = (double)(long long)val;
@@ -1285,7 +1285,7 @@ namespace mongo {
         }
 
         case mongo::NumberLong: {
-            Local<v8::Object> sub = internalFieldObjects->NewInstance();
+            /*Local<v8::Object> sub = */internalFieldObjects->NewInstance();
             unsigned long long val = f.numberLong();
             v8::Function* numberLong = getNamedCons( "NumberLong" );
             // values above 2^53 are not accurately represented in JS
