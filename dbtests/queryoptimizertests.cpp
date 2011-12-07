@@ -766,9 +766,10 @@ namespace QueryOptimizerTests {
                 }
                 BSONObj one = BSON( "a" << 1 );
                 theDataFileMgr.insertWithObjMod( ns(), one );
-                deleteObjects( ns(), BSON( "a" << 1 ), false );
-                ASSERT( BSON( "a" << 1 ).woCompare( NamespaceDetailsTransient::get_inlock( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "a" << 1 ), true ).pattern() ) ) == 0 );
-                ASSERT_EQUALS( 1, NamespaceDetailsTransient::get_inlock( ns() ).nScannedForPattern( FieldRangeSet( ns(), BSON( "a" << 1 ), true ).pattern() ) );
+                BSONObj delSpec = BSON( "a" << 1 << "_id" << NE << 0 );
+                deleteObjects( ns(), delSpec, false );
+                ASSERT( BSON( "a" << 1 ).woCompare( NamespaceDetailsTransient::get_inlock( ns() ).indexForPattern( FieldRangeSet( ns(), delSpec, true ).pattern() ) ) == 0 );
+                ASSERT_EQUALS( 1, NamespaceDetailsTransient::get_inlock( ns() ).nScannedForPattern( FieldRangeSet( ns(), delSpec, true ).pattern() ) );
             }
         };
 

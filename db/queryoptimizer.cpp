@@ -314,7 +314,7 @@ doneCheckOrder:
         _originalQuery( originalQuery ),
         _frsp( frsp ),
         _originalFrsp( originalFrsp ),
-        _mayRecordPlan( true ),
+        _mayRecordPlan( false ),
         _usingCachedPlan( false ),
         _hint( BSONObj() ),
         _order( order.getOwned() ),
@@ -394,7 +394,6 @@ doneCheckOrder:
         DEBUGQO( "QueryPlanSet::init " << ns << "\t" << _originalQuery );
         _runner.reset();
         _plans.clear();
-        _mayRecordPlan = true;
         _usingCachedPlan = false;
 
         const char *ns = _frsp->ns();
@@ -407,7 +406,6 @@ doneCheckOrder:
 
         BSONElement hint = _hint.firstElement();
         if ( !hint.eoo() ) {
-            _mayRecordPlan = false;
             IndexDetails *id = parseHint( hint, d );
             if ( id ) {
                 addHint( *id );
@@ -432,7 +430,6 @@ doneCheckOrder:
         if ( isSimpleIdQuery( _originalQuery ) ) {
             int idx = d->findIdIndex();
             if ( idx >= 0 ) {
-                _mayRecordPlan = false;
                 _plans.push_back( QueryPlanPtr( new QueryPlan( d , idx , *_frsp , _originalFrsp.get() , _originalQuery, _order, _mustAssertOnYieldFailure ) ) );
                 return;
             }
@@ -452,7 +449,6 @@ doneCheckOrder:
                 IndexDetails& ii = i.next();
                 const IndexSpec& spec = ii.getSpec();
                 if ( spec.getTypeName() == _special && spec.suitability( _originalQuery , _order ) ) {
-                    _mayRecordPlan = false;
                     _plans.push_back( QueryPlanPtr( new QueryPlan( d , j , *_frsp , _originalFrsp.get() , _originalQuery, _order ,
                                                     _mustAssertOnYieldFailure , BSONObj() , BSONObj() , _special ) ) );
                     return;
@@ -485,7 +481,6 @@ doneCheckOrder:
                 massert( 10368 ,  "Unable to locate previously recorded index", p.get() );
                 if ( !( _bestGuessOnly && p->scanAndOrderRequired() ) ) {
                     _usingCachedPlan = true;
-                    _mayRecordPlan = false;
                     _plans.push_back( p );
                     return;
                 }
@@ -547,6 +542,7 @@ doneCheckOrder:
 
         // Table scan plan
         addPlan( QueryPlanPtr( new QueryPlan( d, -1, *_frsp, _originalFrsp.get(), _originalQuery, _order, _mustAssertOnYieldFailure ) ), checkFirst );
+        _mayRecordPlan = true;
     }
 
     shared_ptr<QueryOp> QueryPlanSet::runOp( QueryOp &op ) {
@@ -751,7 +747,6 @@ doneCheckOrder:
                     return op;
                 _queue.push( op );
             }
-            _plans._mayRecordPlan = true;
             _plans._usingCachedPlan = false;
         }
         return holder._op;
@@ -985,7 +980,7 @@ doneCheckOrder:
     }
 
     const QueryPlan *MultiPlanScanner::singlePlan() const {
-        if ( _or || _currentQps->nPlans() != 1 || _currentQps->firstPlan()->scanAndOrderRequired() ) {
+        if ( _or || _currentQps->nPlans() != 1 || _currentQps->firstPlan()->scanAndOrderRequired() || _currentQps->usingCachedPlan() ) {
             return 0;
         }
         return _currentQps->firstPlan().get();

@@ -1988,6 +1988,46 @@ namespace QueryOptimizerCursorTests {
                 ASSERT_EQUALS( 5, c->current().getIntField( "_id" ) );
             }
         };
+
+        /**
+         * If an optimal plan is a candidate, return a cursor for it rather than a QueryOptimizerCursor.  Avoid
+         * caching optimal plans since simple cursors will not save a plan anyway (so in the most common case optimal
+         * plans won't be cached) and because this simplifies the implementation for selecting a simple cursor.
+         */
+        class BestSavedOptimal : public QueryOptimizerCursorTests::Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "_id" << 1 ) );
+                _cli.ensureIndex( ns(), BSON( "_id" << 1 << "q" << 1 ) );
+                // {_id:1} index not recorded for these queries since it is an optimal index.
+                ASSERT( _cli.query( ns(), QUERY( "_id" << GT << 0 ) )->more() );
+                ASSERT( _cli.query( ns(), QUERY( "$or" << BSON_ARRAY( BSON( "_id" << GT << 0 ) ) ) )->more() );
+                dblock lk;
+                Client::Context ctx( ns() );
+                // Check that no plan was recorded for this query.
+                ASSERT( BSONObj().woCompare( NamespaceDetailsTransient::get_inlock( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "_id" << GT << 0 ), true ).pattern() ) ) == 0 );
+                shared_ptr<Cursor> c = NamespaceDetailsTransient::getCursor( ns(), BSON( "_id" << GT << 0 ) );
+                // No need for query optimizer cursor since the plan is optimal.
+                ASSERT_EQUALS( "BtreeCursor _id_", c->toString() );
+            }
+        };
+        
+        /** If a no optimal plan is a candidate a QueryOptimizerCursor should be returned, even if plan has been recorded. */
+        class BestSavedNotOptimal : public QueryOptimizerCursorTests::Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "_id" << 1 << "q" << 1 ) );
+                _cli.ensureIndex( ns(), BSON( "q" << 1 ) );
+                // Record {_id:1} index for this query
+                ASSERT( _cli.query( ns(), QUERY( "q" << 1 << "_id" << 1 ) )->more() );
+                dblock lk;
+                Client::Context ctx( ns() );
+                ASSERT( BSON( "_id" << 1 ).woCompare( NamespaceDetailsTransient::get_inlock( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "q" << 1 << "_id" << 1 ), true ).pattern() ) ) == 0 );
+                shared_ptr<Cursor> c = NamespaceDetailsTransient::getCursor( ns(), BSON( "q" << 1 << "_id" << 1 ) );
+                // Need query optimizer cursor since the cached plan is not optimal.
+                ASSERT_EQUALS( "QueryOptimizerCursor", c->toString() );
+            }
+        };
         
         class MultiIndex : public Base {
         public:
@@ -2164,6 +2204,8 @@ namespace QueryOptimizerCursorTests {
             add<QueryOptimizerCursorTests::GetCursor::Geo>();
             add<QueryOptimizerCursorTests::GetCursor::OutOfOrder>();
             add<QueryOptimizerCursorTests::GetCursor::BestSavedOutOfOrder>();
+            add<QueryOptimizerCursorTests::GetCursor::BestSavedOptimal>();
+            add<QueryOptimizerCursorTests::GetCursor::BestSavedNotOptimal>();
             add<QueryOptimizerCursorTests::GetCursor::MultiIndex>();
             add<QueryOptimizerCursorTests::GetCursor::RequireIndexNoConstraints>();
             add<QueryOptimizerCursorTests::GetCursor::RequireIndexSimpleId>();
