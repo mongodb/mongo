@@ -45,7 +45,7 @@ namespace mongo {
                 throw MsgAssertionException( 9011, "Not an index cursor" );                
             }
             _c = qp().newCursor();
-            verify( 15911, _c->supportYields() ); // The QueryOptimizerCursor::noteLocation() implementation requires _c->prepareToYield() to work.
+            verify( 15933, _c->supportYields() ); // The QueryOptimizerCursor::noteLocation() implementation requires _c->prepareToYield() to work.
             _capped = _c->capped();
             mayAdvance();
         }
@@ -232,7 +232,7 @@ namespace mongo {
                 _takeover->noteLocation();
             }
             else if ( _currOp ) {
-                verify( 15910, _mps->prepareToYield() );
+                verify( 15934, _mps->prepareToYield() );
             }
         }
 
