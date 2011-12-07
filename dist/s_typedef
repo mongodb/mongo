@@ -14,7 +14,7 @@ build() {
 	l=`echo ../src/include/*.[hi] ../src/include/*.in |
 	    sed -e 's/wiredtiger.in//' -e 's/queue.h//'`
 	egrep -h '^[ 	]*(struct|union)[	 ]*__.*[	 ]*{$' $l | \
-	    sed -e 's/[	 ]*{$//' | sort | \
+	    sed -e 's/^[	 ]*//' -e 's/[	 ]*{$//' | sort | \
 	while read t n; do
 		upper=`echo $n | sed -e 's/^__//' | tr a-z A-Z`
 		echo "$t $n;"
