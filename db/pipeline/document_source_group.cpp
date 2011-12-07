@@ -276,6 +276,8 @@ namespace mongo {
 
             /* get the _id document */
             intrusive_ptr<const Value> pId(pIdExpression->evaluate(pDocument));
+	    assert(pId->getType() != Undefined);
+	        // CW TODO error grouping key must not be undefined
 
             /*
               Look for the _id value in the map; if it's not there, add a
