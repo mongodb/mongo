@@ -23,7 +23,7 @@ db.getLastError();
 s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } );
 assert.lt( 20 , s.config.chunks.count()  , "setup2" );
 
-function diff(){
+function diff1(){
     var x = s.chunkCounts( "foo" );
     var total = 0;
     var min = 1000000000;
@@ -40,8 +40,8 @@ function diff(){
     return max - min;
 }
 
-assert.lt( 20 , diff() , "big differential here" );
-print( diff() )
+assert.lt( 20 , diff1() , "big differential here" );
+print( diff1() )
 
 {
     // quick test for SERVER-2686
@@ -53,7 +53,7 @@ print( diff() )
 
 
 assert.soon( function(){
-    var d = diff();
+    var d = diff1();
     return d < 5;
 } , "balance didn't happen" , 1000 * 60 * 6 , 5000 );
 
