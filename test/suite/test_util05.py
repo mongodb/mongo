@@ -63,18 +63,12 @@ class test_util05(wttest.WiredTigerTestCase, suite_subprocess):
             self.conn = None
         filename = tablename + ".wt"
 
-        # It doesn't really matter what the OS page size is,
-        # since we're just going to clobber a chunk of data
-        pagesize = 4096
         filesize = os.path.getsize(filename)
-        npages = filesize / pagesize
-        self.assertTrue(npages > 0)
+        position = (filesize * pct) / 100
 
-        # 
-        positionpage = (npages * pct) / 100
-        self.pr('damaging page at: ' + str(positionpage))
+        self.pr('damaging file at: ' + str(position))
         fp = open(filename, "r+b")
-        fp.seek(pagesize * positionpage)
+        fp.seek(position)
         return fp
 
     def test_verify_process_empty(self):
