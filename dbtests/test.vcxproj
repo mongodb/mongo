@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -118,6 +118,10 @@
       <TargetMachine>MachineX86</TargetMachine>
       <Profile>true</Profile>
     </Link>
+    <PreBuildEvent>
+      <Command>cscript //Nologo ..\shell\msvc\createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
+      <Message>Create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -142,6 +146,10 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <SubSystem>Console</SubSystem>
     </Link>
+    <PreBuildEvent>
+      <Command>cscript //Nologo ..\shell\msvc\createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
+      <Message>Create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <ClCompile>
@@ -168,6 +176,10 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <TargetMachine>MachineX86</TargetMachine>
     </Link>
+    <PreBuildEvent>
+      <Command>cscript //Nologo ..\shell\msvc\createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
+      <Message>Create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -193,6 +205,10 @@
       <OptimizeReferences>true</OptimizeReferences>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
+    <PreBuildEvent>
+      <Command>cscript //Nologo ..\shell\msvc\createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
+      <Message>Create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\boostw\boost_1_34_1\boost\config\auto_link.hpp" />
@@ -209,6 +225,8 @@
     <ClInclude Include="..\bson\oid.h" />
     <ClInclude Include="..\bson\ordering.h" />
     <ClInclude Include="..\bson\stringdata.h" />
+    <ClInclude Include="..\db\collection.h" />
+    <ClInclude Include="..\db\databaseholder.h" />
     <ClInclude Include="..\db\dur.h" />
     <ClInclude Include="..\db\durop.h" />
     <ClInclude Include="..\db\dur_journal.h" />
@@ -285,6 +303,7 @@
     <ClInclude Include="..\util\mongoutils\hash.h" />
     <ClInclude Include="..\util\sock.h" />
     <ClInclude Include="..\util\unittest.h" />
+    <ClInclude Include="framework.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\bson\oid.cpp" />
@@ -307,6 +326,12 @@
     <ClCompile Include="..\db\dur_preplogbuffer.cpp" />
     <ClCompile Include="..\db\dur_recover.cpp" />
     <ClCompile Include="..\db\dur_writetodatafiles.cpp" />
+    <ClCompile Include="..\db\d_concurrency.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\db\geo\2d.cpp" />
     <ClCompile Include="..\db\geo\haystack.cpp" />
     <ClCompile Include="..\db\key.cpp" />
@@ -655,7 +680,7 @@
     <ClCompile Include="..\s\d_logic.cpp" />
     <ClCompile Include="..\scripting\engine.cpp" />
     <ClCompile Include="..\scripting\engine_spidermonkey.cpp" />
-    <ClCompile Include="..\shell\mongo_vstudio.cpp">
+    <ClCompile Include="..\shell\mongo.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
       </PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
@@ -672,6 +697,7 @@
     <ClCompile Include="cursortests.cpp" />
     <ClCompile Include="dbtests.cpp" />
     <ClCompile Include="directclienttests.cpp" />
+    <ClCompile Include="d_chunk_manager_tests.cpp" />
     <ClCompile Include="framework.cpp" />
     <ClCompile Include="jsobjtests.cpp" />
     <ClCompile Include="jsontests.cpp" />
@@ -681,6 +707,7 @@
     <ClCompile Include="namespacetests.cpp" />
     <ClCompile Include="pdfiletests.cpp" />
     <ClCompile Include="perftests.cpp" />
+    <ClCompile Include="queryoptimizercursortests.cpp" />
     <ClCompile Include="queryoptimizertests.cpp" />
     <ClCompile Include="querytests.cpp" />
     <ClCompile Include="repltests.cpp" />

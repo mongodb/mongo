@@ -433,9 +433,10 @@ namespace BasicTests {
     class DatabaseValidNames {
     public:
         void run() {
-            ASSERT( Database::validDBName( "foo" ) );
-            ASSERT( ! Database::validDBName( "foo/bar" ) );
-            ASSERT( ! Database::validDBName( "foo.bar" ) );
+            ASSERT( NamespaceString::validDBName( "foo" ) );
+            ASSERT( ! NamespaceString::validDBName( "foo/bar" ) );
+            ASSERT( ! NamespaceString::validDBName( "foo bar" ) );
+            ASSERT( ! NamespaceString::validDBName( "foo.bar" ) );
 
             ASSERT( NamespaceString::normal( "asdads" ) );
             ASSERT( ! NamespaceString::normal( "asda$ds" ) );
@@ -450,13 +451,15 @@ namespace BasicTests {
             bool isNew = false;
             // this leaks as ~Database is private
             // if that changes, should put this on the stack
-            Database * db = new Database( "dbtests_basictests_ownsns" , isNew );
-            assert( isNew );
+            {
+                Database * db = new Database( "dbtests_basictests_ownsns" , isNew );
+                assert( isNew );
 
-            ASSERT( db->ownsNS( "dbtests_basictests_ownsns.x" ) );
-            ASSERT( db->ownsNS( "dbtests_basictests_ownsns.x.y" ) );
-            ASSERT( ! db->ownsNS( "dbtests_basictests_ownsn.x.y" ) );
-            ASSERT( ! db->ownsNS( "dbtests_basictests_ownsnsa.x.y" ) );
+                ASSERT( db->ownsNS( "dbtests_basictests_ownsns.x" ) );
+                ASSERT( db->ownsNS( "dbtests_basictests_ownsns.x.y" ) );
+                ASSERT( ! db->ownsNS( "dbtests_basictests_ownsn.x.y" ) );
+                ASSERT( ! db->ownsNS( "dbtests_basictests_ownsnsa.x.y" ) );
+            }
         }
     };
 

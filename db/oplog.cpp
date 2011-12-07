@@ -63,7 +63,7 @@ namespace mongo {
         {
             const char *logns = rsoplog;
             if ( rsOplogDetails == 0 ) {
-                Client::Context ctx( logns , dbpath, 0, false);
+                Client::Context ctx( logns , dbpath, false);
                 localDB = ctx.db();
                 assert( localDB );
                 rsOplogDetails = nsdetails(logns);
@@ -167,7 +167,7 @@ namespace mongo {
         {
             const char *logns = rsoplog;
             if ( rsOplogDetails == 0 ) {
-                Client::Context ctx( logns , dbpath, 0, false);
+                Client::Context ctx( logns , dbpath, false);
                 localDB = ctx.db();
                 assert( localDB );
                 rsOplogDetails = nsdetails(logns);
@@ -229,7 +229,7 @@ namespace mongo {
         }
 
         const OpTime ts = OpTime::now();
-        Client::Context context;
+        Client::Context context("",0,false);
 
         /* we jump through a bunch of hoops here to avoid copying the obj buffer twice --
            instead we do a single copy to the destination position in the memory mapped file.
@@ -253,7 +253,7 @@ namespace mongo {
         if( logNS == 0 ) {
             logNS = "local.oplog.$main";
             if ( localOplogMainDetails == 0 ) {
-                Client::Context ctx( logNS , dbpath, 0, false);
+                Client::Context ctx( logNS , dbpath, false);
                 localDB = ctx.db();
                 assert( localDB );
                 localOplogMainDetails = nsdetails(logNS);
@@ -263,7 +263,7 @@ namespace mongo {
             r = theDataFileMgr.fast_oplog_insert(localOplogMainDetails, logNS, len);
         }
         else {
-            Client::Context ctx( logNS, dbpath, 0, false );
+            Client::Context ctx( logNS, dbpath, false );
             assert( nsdetails( logNS ) );
             // first we allocate the space, then we fill it below.
             r = theDataFileMgr.fast_oplog_insert( nsdetails( logNS ), logNS, len);
@@ -624,6 +624,48 @@ namespace mongo {
         }
     }
 
+    BSONObj Sync::getMissingDoc(const BSONObj& o) {
+        OplogReader missingObjReader;
+
+        uassert(15916, str::stream() << "Can no longer connect to initial sync source: " << hn, missingObjReader.connect(hn));
+
+        const char *ns = o.getStringField("ns");
+        // might be more than just _id in the update criteria
+        BSONObj query = BSONObjBuilder().append(o.getObjectField("o2")["_id"]).obj();
+        BSONObj missingObj;
+        try {
+            missingObj = missingObjReader.findOne(ns, query);
+        } catch(DBException& e) {
+            log() << "replication assertion fetching missing object: " << e.what() << endl;
+            throw;
+        }
+
+        return missingObj;
+    }
+
+    bool Sync::shouldRetry(const BSONObj& o) {
+        // we don't have the object yet, which is possible on initial sync.  get it.
+        log() << "replication info adding missing object" << endl; // rare enough we can log
+
+        BSONObj missingObj = getMissingDoc(o);
+
+        if( missingObj.isEmpty() ) {
+            log() << "replication missing object not found on source. presumably deleted later in oplog" << endl;
+            log() << "replication o2: " << o.getObjectField("o2").toString() << endl;
+            log() << "replication o firstfield: " << o.getObjectField("o").firstElementFieldName() << endl;
+
+            return false;
+        }
+        else {
+            const char *ns = o.getStringField("ns");
+            Client::Context ctx(ns);
+            DiskLoc d = theDataFileMgr.insert(ns, (void*) missingObj.objdata(), missingObj.objsize());
+            uassert(15917, "Got bad disk location when attempting to insert", !d.isNull());
+
+            return true;
+        }
+    }
+
     /** @param fromRepl false if from ApplyOpsCmd
         @return true if was and update should have happened and the document DNE.  see replset initial sync code.
      */
@@ -706,7 +748,7 @@ namespace mongo {
                     // of the form
                     //   { _id:..., { x : {$size:...} }
                     // thus this is not ideal.
-                    else if( Helpers::findById(nsdetails(ns), updateCriteria).isNull() ) {
+                    else if( nsdetails(ns) == NULL || Helpers::findById(nsdetails(ns), updateCriteria).isNull() ) {
                         failedUpdate = true; 
                     }
                     else { 
@@ -797,6 +839,7 @@ namespace mongo {
             BSONObjIterator i( ops );
             while ( i.more() ) {
                 BSONElement e = i.next();
+                // todo SERVER-4259 ?
                 applyOperation_inlock( e.Obj() , false );
                 num++;
             }

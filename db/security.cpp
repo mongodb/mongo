@@ -56,9 +56,8 @@ namespace mongo {
             return true;
 
         if ( isLocalHost ) {
-            atleastreadlock l("");
             Client::GodScope gs;
-            Client::Context c("admin.system.users");
+            Client::ReadContext ctx("admin.system.users");
             BSONObj result;
             if( ! Helpers::getSingleton("admin.system.users", result) ) {
                 if( ! _warned ) {

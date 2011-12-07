@@ -1,4 +1,11 @@
-// client.h
+/* @file client.h
+
+   "Client" represents a connection to the database (the server-side) and corresponds
+   to an open socket (or logical connection if pooling on sockets) from a client.
+
+   todo: switch to asio...this will fit nicely with that.
+*/
+
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -16,12 +23,6 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-/* Client represents a connection to the database (the server-side) and corresponds
-   to an open socket (or logical connection if pooling on sockets) from a client.
-
-   todo: switch to asio...this will fit nicely with that.
-*/
-
 #pragma once
 
 #include "../pch.h"
@@ -32,6 +33,7 @@
 #include "../util/concurrency/threadlocal.h"
 #include "../db/client_common.h"
 #include "../util/net/message_port.h"
+#include "../util/concurrency/rwlock.h"
 
 namespace mongo {
 
@@ -49,17 +51,19 @@ namespace mongo {
 
     /** the database's concept of an outside "client" */
     class Client : public ClientBasic {
-    public:
-        class Context;
-
-        static mongo::mutex clientsMutex;
-        static set<Client*> clients; // always be in clientsMutex when manipulating this
-        static int recommendedYieldMicros( int * writers = 0 , int * readers = 0 );
-        static int getActiveClientCount( int& writers , int& readers );
         static Client *syncThread;
+    public:
+        // always be in clientsMutex when manipulating this. killop stuff uses these.
+        static set<Client*> clients;      
+        static mongo::mutex clientsMutex; 
 
-        /* each thread which does db operations has a Client object in TLS.
-           call this when your thread starts.
+        static int getActiveClientCount( int& writers , int& readers );
+        class Context;
+        ~Client();
+        static int recommendedYieldMicros( int * writers = 0 , int * readers = 0 );
+
+        /** each thread which does db operations has a Client object in TLS.
+         *  call this when your thread starts.
         */
         static Client& initThread(const char *desc, AbstractMessagingPort *mp = 0);
 
@@ -69,15 +73,12 @@ namespace mongo {
             initThread(desc);
         }
 
-        ~Client();
-
-        /*
-           this has to be called as the client goes away, but before thread termination
-           @return true if anything was done
+        /** this has to be called as the client goes away, but before thread termination
+         *  @return true if anything was done
          */
         bool shutdown();
 
-        /**  set so isSyncThread() works */
+        /** set so isSyncThread() works */
         void iAmSyncThread() {
             wassert( syncThread == 0 );
             syncThread = this;
@@ -114,6 +115,8 @@ namespace mongo {
         ConnectionId getConnectionId() const { return _connectionId; }
 
     private:
+        Client(const char *desc, AbstractMessagingPort *p = 0);
+        friend class CurOp;
         ConnectionId _connectionId; // > 0 for things "conn", 0 otherwise
         string _threadId; // "" on non support systems
         CurOp * _curOp;
@@ -126,11 +129,6 @@ namespace mongo {
         BSONObj _handshake;
         BSONObj _remoteId;
         AbstractMessagingPort * const _mp;
-
-        Client(const char *desc, AbstractMessagingPort *p = 0);
-
-        friend class CurOp;
-
         unsigned _sometimes;
 
     public:
@@ -141,8 +139,6 @@ namespace mongo {
             */
         bool sometimes(unsigned howOften) { return ++_sometimes % howOften == 0; }
 
-    public:
-
         /* set _god=true temporarily, safely */
         class GodScope {
             bool _prev;
@@ -151,78 +147,90 @@ namespace mongo {
             ~GodScope();
         };
 
+        //static void assureDatabaseIsOpen(const string& ns, string path=dbpath);
+
+        /** "read lock, and set my context, all in one operation" 
+         *  This handles (if not recursively locked) opening an unopened database.
+         */
+        class ReadContext : boost::noncopyable { 
+        public:
+            ReadContext(const string& ns, string path=dbpath, bool doauth=true );
+            Context& ctx() { return *c.get(); }
+        private:
+            scoped_ptr<readlock> lk;
+            scoped_ptr<Context> c;
+        };
+
         /* Set database we want to use, then, restores when we finish (are out of scope)
            Note this is also helpful if an exception happens as the state if fixed up.
         */
         class Context : boost::noncopyable {
         public:
-            /**
-             * this is the main constructor
-             * use this unless there is a good reason not to
-             */
-            Context(const string& ns, string path=dbpath, mongolock * lock = 0 , bool doauth=true );
+            /** this is probably what you want */
+            Context(const string& ns, string path=dbpath, bool doauth=true );
 
-            /* this version saves the context but doesn't yet set the new one: */
-            Context();
-
-            /**
-             * if you are doing this after allowing a write there could be a race condition
-             * if someone closes that db.  this checks that the DB is still valid
-             */
+            /** note: this does not call finishInit -- i.e., does not call 
+                      shardVersionOk() for example. 
+                see also: reset().
+            */
             Context( string ns , Database * db, bool doauth=true );
 
-            ~Context();
+            // used by ReadContext
+            Context(const string& path, const string& ns, Database *db, bool doauth);
 
+            ~Context();
             Client* getClient() const { return _client; }
             Database* db() const { return _db; }
             const char * ns() const { return _ns.c_str(); }
+            bool equals( const string& ns , const string& path=dbpath ) const { return _ns == ns && _path == path; }
 
             /** @return if the db was created by this Context */
             bool justCreated() const { return _justCreated; }
 
-            bool equals( const string& ns , const string& path=dbpath ) const { return _ns == ns && _path == path; }
-
-            /**
-             * @return true iff the current Context is using db/path
-             */
+            /** @return true iff the current Context is using db/path */
             bool inDB( const string& db , const string& path=dbpath ) const;
 
-            void clear() { _ns = ""; _db = 0; }
+            void _clear() { // this is sort of an "early destruct" indication, _ns can never be uncleared
+                const_cast<string&>(_ns).empty();
+                _db = 0;
+            }
 
-            /**
-             * call before unlocking, so clear any non-thread safe state
+            /** call before unlocking, so clear any non-thread safe state
+             *  _db gets restored on the relock
              */
             void unlocked() { _db = 0; }
 
-            /**
-             * call after going back into the lock, will re-establish non-thread safe stuff
-             */
+            /** call after going back into the lock, will re-establish non-thread safe stuff */
             void relocked() { _finishInit(); }
 
-            friend class CurOp;
-
         private:
-            /**
-             * at this point _client, _oldContext and _ns have to be set
-             * _db should not have been touched
-             * this will set _db and create if needed
-             * will also set _client->_context to this
-             */
+            friend class CurOp;
             void _finishInit( bool doauth=true);
-
-            void _auth( int lockState = dbMutex.getState() );
-
-            Client * _client;
-            Context * _oldContext;
-
-            string _path;
-            mongolock * _lock;
+            void _auth( int lockState );
+            void checkNotStale() const;
+            void checkNsAccess( bool doauth, int lockState = dbMutex.getState() );
+            Client * const _client;
+            Context * const _oldContext;
+            const string _path;
             bool _justCreated;
-
-            string _ns;
+            const string _ns;
             Database * _db;
-
         }; // class Client::Context
+
+#if defined(CLC)
+        void checkLocks() const;
+        struct LockStatus { 
+            LockStatus() : dbLockCount(0), whichDB(0), collLockCount(0) { }
+            SimpleRWLock collLock;
+            const Database *whichDB;
+            string whichCollection;
+            int dbLockCount;
+            int collLockCount;
+            bool collLocked();
+        } lockStatus;
+#else
+        void checkLocks() const {}
+#endif
 
     }; // class Client
 
@@ -244,6 +252,7 @@ namespace mongo {
        lock (and is thus wrong to use if you need that, which is usually).
        that said we use it today for a specific case where the usage is correct.
     */
+#if 0
     inline void mongolock::releaseAndWriteLock() {
         if( !_writelock ) {
 
@@ -265,8 +274,8 @@ namespace mongo {
                 cc().getContext()->unlocked();
         }
     }
-
-    string sayClientState();
+#endif
 
     inline bool haveClient() { return currentClient.get() > 0; }
+
 };

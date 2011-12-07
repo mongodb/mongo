@@ -167,81 +167,94 @@ namespace mongo {
     BSONObj CachedBSONObj::_tooBig = fromjson("{\"$msg\":\"query not recording (too large)\"}");
     AtomicUInt CurOp::_nextOpNum;
 
-    Client::Context::Context( string ns , Database * db, bool doauth )
-        : _client( currentClient.get() ) , _oldContext( _client->_context ) ,
-          _path( dbpath ) , _lock(0) , _justCreated(false) {
-        assert( db && db->isOk() );
-        _ns = ns;
-        _db = db;
-        _client->_context = this;
-        if ( doauth )
-            _auth();
+    /** true if this is "under" the parent collection. indexes are that way. i.e. for a db foo, 
+        foo.mycoll can be thought of as a parent of foo.mycoll.$someindex collection.
+        */
+    bool subcollectionOf(const string& parent, const char *child) { 
+        return parent == child || 
+            ( strlen(child) > parent.size() && child[parent.size()] == '.'  );
     }
 
-    Client::Context::Context(const string& ns, string path , mongolock * lock , bool doauth )
-        : _client( currentClient.get() ) , _oldContext( _client->_context ) ,
-          _path( path ) , _lock( lock ) ,
-          _ns( ns ), _db(0) {
+#if defined(CLC)
+    void Client::checkLocks() const {
+        if( lockStatus.collLockCount ) {
+            assert( ns() == 0 || subcollectionOf(lockStatus.whichCollection, ns()) );
+        }
+        else if( lockStatus.dbLockCount ) { 
+            assert( lockStatus.whichDB == database() || database() == 0 );
+        }
+    }
+#endif
+
+    Client::Context::Context( string ns , Database * db, bool doauth ) :
+        _client( currentClient.get() ), 
+        _oldContext( _client->_context ),
+        _path( mongo::dbpath ), // is this right? could be a different db? may need a dassert for this
+        _justCreated(false),
+        _ns( ns ), 
+        _db(db)
+    {
+        assert( db == 0 || db->isOk() );
+        _client->_context = this;
+        checkNsAccess( doauth );
+        _client->checkLocks();
+    }
+
+    Client::Context::Context(const string& ns, string path , bool doauth ) :
+        _client( currentClient.get() ), 
+        _oldContext( _client->_context ),
+        _path( path ), 
+        _justCreated(false), // set for real in finishInit
+        _ns( ns ), 
+        _db(0) 
+    {
         _finishInit( doauth );
+        _client->checkLocks();        
     }
-
-    /* this version saves the context but doesn't yet set the new one: */
-
-    Client::Context::Context()
-        : _client( currentClient.get() ) , _oldContext( _client->_context ),
-          _path( dbpath ) , _lock(0) , _justCreated(false), _db(0) {
-        _client->_context = this;
-        clear();
-    }
-
-    void Client::Context::_finishInit( bool doauth ) {
-        int lockState = dbMutex.getState();
-        assert( lockState );
-        
-        if ( lockState > 0 && FileAllocator::get()->hasFailed() ) {
-            uassert(14031, "Can't take a write lock while out of disk space", false);
-        }
-
-        _db = dbHolder.get( _ns , _path );
-        if ( _db ) {
-            _justCreated = false;
-        }
-        else if ( lockState > 0 ) {
-            // already in a write lock
-            _db = dbHolder.getOrCreate( _ns , _path , _justCreated );
-            assert( _db );
-        }
-        else if ( lockState < -1 ) {
-            // nested read lock :(
-            assert( _lock );
-            _lock->releaseAndWriteLock();
-            _db = dbHolder.getOrCreate( _ns , _path , _justCreated );
-            assert( _db );
-        }
-        else {
-            // we have a read lock, but need to get a write lock for a bit
-            // we need to be in a write lock since we're going to create the DB object
-            // to do that, we're going to unlock, then get a write lock
-            // this is so that if this is the first query and its long doesn't block db
-            // we just have to check that the db wasn't closed in the interim where we unlock
-            for ( int x=0; x<2; x++ ) {
-                {
-                    dbtemprelease unlock;
-                    writelock lk( _ns );
-                    dbHolder.getOrCreate( _ns , _path , _justCreated );
-                }
-
-                _db = dbHolder.get( _ns , _path );
-
-                if ( _db )
-                    break;
-
-                log() << "db was closed on us right after we opened it: " << _ns << endl;
+       
+    /** "read lock, and set my context, all in one operation" 
+     *  This handles (if not recursively locked) opening an unopened database.
+     */
+    Client::ReadContext::ReadContext(const string& ns, string path, bool doauth ) {
+        {
+            lk.reset( new readlock() );
+            Database *db = dbHolder().get(ns, path);
+            if( db ) {
+                c.reset( new Context(path, ns, db, doauth) );
+                return;
             }
-
-            uassert( 13005 , "can't create db, keeps getting closed" , _db );
         }
 
+        // we usually don't get here, so doesn't matter how fast this part is
+        {
+            int x = dbMutex.getState();
+            if( x > 0 ) { 
+                // write locked already
+                DEV RARELY log() << "write locked on ReadContext construction " << ns << endl;
+                c.reset( new Context(ns, path, doauth) );
+            }
+            else if( x == -1 ) { 
+                lk.reset(0);
+                {
+                    writelock w;
+                    Context c(ns, path, doauth);
+                }
+                // db could be closed at this interim point -- that is ok, we will throw, and don't mind throwing.
+                lk.reset( new readlock() );
+                c.reset( new Context(ns, path, doauth) );
+            }
+            else { 
+                assert( x < -1 );
+                uasserted(15928, str::stream() << "can't open a database from a nested read lock " << ns);
+            }
+        }
+
+        // todo: are receipts of thousands of queries for a nonexisting database a potential 
+        //       cause of bad performance due to the write lock acquisition above?  let's fix that.
+        //       it would be easy to first check that there is at least a .ns file, or something similar.
+    }
+
+    void Client::Context::checkNotStale() const { 
         switch ( _client->_curOp->getOp() ) {
         case dbGetMore: // getMore's are special and should be handled else where
         case dbUpdate: // update & delete check shard version in instance.cpp, so don't check here as well
@@ -256,11 +269,38 @@ namespace mongo {
             }
         }
         }
+    }
 
+    // invoked from ReadContext
+    Client::Context::Context(const string& path, const string& ns, Database *db , bool doauth) :
+        _client( currentClient.get() ), 
+        _oldContext( _client->_context ),
+        _path( path ), 
+        _justCreated(false),
+        _ns( ns ), 
+        _db(db)
+    {
+        assert(_db);
+        checkNotStale();
         _client->_context = this;
         _client->_curOp->enter( this );
-        if ( doauth )
-            _auth( lockState );
+        checkNsAccess( doauth, dbMutex.getState() );
+        _client->checkLocks();
+    }
+       
+    void Client::Context::_finishInit( bool doauth ) {
+        int lockState = dbMutex.getState();
+        assert( lockState );        
+        if ( lockState > 0 && FileAllocator::get()->hasFailed() ) {
+            uassert(14031, "Can't take a write lock while out of disk space", false);
+        }
+        
+        _db = dbHolderUnchecked().getOrCreate( _ns , _path , _justCreated );
+        assert(_db);
+        checkNotStale();
+        _client->_context = this;
+        _client->_curOp->enter( this );
+        checkNsAccess( doauth, lockState );
     }
 
     void Client::Context::_auth( int lockState ) {
@@ -274,7 +314,7 @@ namespace mongo {
         ss << "unauthorized db:" << _db->name << " lock type:" << lockState << " client:" << _client->clientAddress();
         uasserted( 10057 , ss.str() );
     }
-
+    
     Client::Context::~Context() {
         DEV assert( _client == currentClient.get() );
         _client->_curOp->leave( this );
@@ -294,6 +334,15 @@ namespace mongo {
 
         return  _ns[db.size()] == '.';
     }
+    
+    void Client::Context::checkNsAccess( bool doauth, int lockState ) {
+        if ( 0 ) { // SERVER-4276
+            uassert( 15929, "client access to index backing namespace prohibited", NamespaceString::normal( _ns.c_str() ) );
+        }
+        if ( doauth ) {
+            _auth( lockState );
+        }
+    }
 
     void Client::appendLastOp( BSONObjBuilder& b ) const {
         // _lastOp is never set if replication is off
@@ -301,7 +350,6 @@ namespace mongo {
             b.appendTimestamp( "lastOp" , _lastOp.asDate() );
         }
     }
-
 
     string Client::clientAddress(bool includePort) const {
         if( _curOp )
@@ -626,26 +674,26 @@ namespace mongo {
         ns = "";
         query = BSONObj();
         updateobj = BSONObj();
-        
-        cursorid = 0;
-        ntoreturn = 0;
-        ntoskip = 0;
+
+        cursorid = -1;
+        ntoreturn = -1;
+        ntoskip = -1;
         exhaust = false;
 
-        nscanned = 0;
+        nscanned = -1;
         idhack = false;
         scanAndOrder = false;
         moved = false;
         fastmod = false;
         fastmodinsert = false;
         upsert = false;
-        keyUpdates = 0;
+        keyUpdates = 0;  // unsigned, so -1 not possible
         
         exceptionInfo.reset();
         
         executionTime = 0;
-        nreturned = 0;
-        responseLength = 0;
+        nreturned = -1;
+        responseLength = -1;
     }
 
 
@@ -702,7 +750,7 @@ namespace mongo {
         return s.str();
     }
 
-#define OPDEBUG_APPEND_NUMBER(x) if( x ) b.append( #x , (x) )
+#define OPDEBUG_APPEND_NUMBER(x) if( x != -1 ) b.append( #x , (x) )
 #define OPDEBUG_APPEND_BOOL(x) if( x ) b.appendBool( #x , (x) )
     void OpDebug::append( const CurOp& curop, BSONObjBuilder& b ) const {
         b.append( "op" , iscommand ? "command" : opToString( op ) );

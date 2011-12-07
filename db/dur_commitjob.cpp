@@ -116,7 +116,7 @@ namespace mongo {
 
         /** note an operation other than a "basic write" */
         void CommitJob::noteOp(shared_ptr<DurOp> p) {
-            DEV dbMutex.assertWriteLocked();
+            dbMutex.assertWriteLocked();
             dassert( cmdLine.dur );
             if( !_hasWritten ) {
                 assert( !dbMutex._remapPrivateViewRequested );
@@ -209,8 +209,10 @@ namespace mongo {
                         if( _nSinceCommitIfNeededCall >= 80 ) {
                             if( _nSinceCommitIfNeededCall % 40 == 0 ) {
                                 log() << "debug nsincecommitifneeded:" << _nSinceCommitIfNeededCall << " bytes:" << _bytes << endl;
-                                if( _nSinceCommitIfNeededCall == 120 || _nSinceCommitIfNeededCall == 1200 )
+                                if( _nSinceCommitIfNeededCall == 120 || _nSinceCommitIfNeededCall == 1200 ) {
+                                    log() << "_DEBUG printing stack given high nsinccommitifneeded number" << endl;
                                     printStackTrace();
+                                }
                             }
                         }
 #endif

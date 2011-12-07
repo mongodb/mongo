@@ -61,15 +61,23 @@ namespace mongo {
 
         return false;
     }
-    inline bool isMaster(const char *client = 0) {
+    inline bool isMaster(const char * dbname = 0) {
         if( _isMaster() )
             return true;
-        if ( !client ) {
+        if ( ! dbname ) {
             Database *database = cc().database();
             assert( database );
-            client = database->name.c_str();
+            dbname = database->name.c_str();
         }
-        return strcmp( client, "local" ) == 0;
+        return strcmp( dbname , "local" ) == 0;
+    }
+    inline bool isMasterNs( const char *ns ) {
+        if ( _isMaster() )
+            return true;
+        assert( ns );
+        if ( ! str::startsWith( ns , "local" ) )
+            return false;
+        return ns[5] == 0 || ns[5] == '.';
     }
 
     inline void notMasterUnless(bool expr) {
@@ -89,10 +97,6 @@ namespace mongo {
         }
     }
 
-    inline bool isMasterNs( const char *ns ) {
-        char cl[ 256 ];
-        nsToDatabase( ns, cl );
-        return isMaster( cl );
-    }
+
 
 } // namespace mongo

@@ -157,11 +157,31 @@ assert.soon = function( f, msg, timeout /*ms*/, interval ) {
             if ( f() )
                 return;
         }
-        
-        if ( ( new Date() ).getTime() - start.getTime() > timeout )
+       
+        diff = ( new Date() ).getTime() - start.getTime();
+        if ( diff > timeout )
             doassert( "assert.soon failed: " + f + ", msg:" + msg );
         sleep( interval );
     }
+}
+
+assert.time = function( f, msg, timeout /*ms*/ ) {
+    if ( assert._debug && msg ) print( "in assert for: " + msg );
+
+    var start = new Date();
+    timeout = timeout || 30000;
+        
+        if ( typeof( f ) == "string" ){
+            res = eval( f );
+        }
+        else {
+            res = f();
+        }
+       
+        diff = ( new Date() ).getTime() - start.getTime();
+        if ( diff > timeout )
+            doassert( "assert.time failed timeout " + timeout + "ms took " + diff + "ms : " + f + ", msg:" + msg );
+        return res;
 }
 
 assert.throws = function( func , params , msg ){
@@ -1014,10 +1034,10 @@ shellPrint = function( x ){
     if ( db ){
         var e = db.getPrevError();
         if ( e.err ) {
-	    if( e.nPrev <= 1 )
-		print( "error on last call: " + tojson( e.err ) );
-	    else
-		print( "an error " + tojson(e.err) + " occurred " + e.nPrev + " operations back in the command invocation" );
+            if ( e.nPrev <= 1 )
+                print( "error on last call: " + tojson( e.err ) );
+            else
+                print( "an error " + tojson( e.err ) + " occurred " + e.nPrev + " operations back in the command invocation" );
         }
         db.resetError();
     }
@@ -1052,7 +1072,13 @@ jsTestPath = function(){
 
 jsTestOptions = function(){
     if( TestData ) return { noJournal : TestData.noJournal,
-                            noJournalPrealloc : TestData.noJournalPrealloc }
+                            noJournalPrealloc : TestData.noJournalPrealloc,
+                            auth : TestData.auth,
+                            keyFile : TestData.keyFile,
+                            authUser : "__system",
+                            authPassword : TestData.keyFileData,
+                            adminUser : "admin",
+                            adminPassword : "password" }
     return {}
 }
 
@@ -1077,6 +1103,77 @@ jsTest.randomize = function( seed ) {
     Random.srand( seed )
     print( "Random seed for test : " + seed ) 
 }
+
+/**
+* Adds a user to the admin DB on the given connection. This is only used for running the test suite
+* with authentication enabled.
+*/
+jsTest.addAuth = function(conn) {
+    print ("Adding admin user on connection: " + conn);
+    return conn.getDB('admin').addUser(jsTestOptions().adminUser, jsTestOptions().adminPassword);
+}
+
+jsTest.authenticate = function(conn) {
+    conn.authenticated = true;
+    result1 = null;
+    result2 = null;
+    if (jsTest.options().auth) {
+        print ("Authenticating to admin user on connection: " + conn);
+        result1 = conn.getDB('admin').auth(jsTestOptions().adminUser, jsTestOptions().adminPassword);
+    }
+    if (jsTest.options().keyFile && !jsTest.isMongos(conn)) {
+        print ("Authenticating to system user on connection: " + conn);
+        result2 = conn.getDB('local').auth(jsTestOptions().authUser, jsTestOptions().authPassword);
+    }
+
+    if (result1 == 1 || result2 == 1) {
+        return 1;
+    }
+
+    return result2 != null ? result2 : result1;
+}
+
+jsTest.authenticateNodes = function(nodes) {
+    jsTest.attempt({timeout:30000, desc: "Authenticate to nodes: " + nodes}, function() {
+        for (var i = 0; i < nodes.length; i++) {
+            // Don't try to authenticate to arbiters
+            res = nodes[i].getDB("admin").runCommand({replSetGetStatus: 1});
+            if(res.myState == 7) {
+                continue;
+            }
+            if(jsTest.authenticate(nodes[i]) != 1) {
+                return false;
+            }
+        }
+        return true;
+    });
+}
+
+jsTest.isMongos = function(conn) {
+    return conn.getDB('admin').isMaster().msg=='isdbgrid';
+}
+
+// Pass this method a function to call repeatedly until
+// that function returns true. Example:
+//   attempt({timeout: 20000, desc: "get master"}, function() { // return false until success })
+jsTest.attempt = function( opts, func ) {
+    var timeout = opts.timeout || 1000;
+    var tries   = 0;
+    var sleepTime = 500;
+    var result = null;
+    var context = opts.context || this;
+
+    while((result = func.apply(context)) == false) {
+        tries += 1;
+        sleep(sleepTime);
+        if( tries * sleepTime > timeout) {
+            throw('[' + opts['desc'] + ']' + " timed out after " + timeout + "ms ( " + tries + " tries )");
+        }
+    }
+
+    return result;
+}
+
 
 shellPrintHelper = function (x) {
     if (typeof (x) == "undefined") {
@@ -1115,107 +1212,112 @@ shellPrintHelper = function (x) {
         print(tojson(x));
 }
 
-shellAutocomplete = function (/*prefix*/){ // outer scope function called on init. Actual function at end
+shellAutocomplete = function ( /*prefix*/ ) { // outer scope function called on init. Actual function at end
 
-    var universalMethods = "constructor prototype toString valueOf toLocaleString hasOwnProperty propertyIsEnumerable".split(' ');
+    var universalMethods = "constructor prototype toString valueOf toLocaleString hasOwnProperty propertyIsEnumerable".split( ' ' );
 
     var builtinMethods = {}; // uses constructor objects as keys
-    builtinMethods[Array] = "length concat join pop push reverse shift slice sort splice unshift indexOf lastIndexOf every filter forEach map some".split(' ');
-    builtinMethods[Boolean] = "".split(' '); // nothing more than universal methods
-    builtinMethods[Date] = "getDate getDay getFullYear getHours getMilliseconds getMinutes getMonth getSeconds getTime getTimezoneOffset getUTCDate getUTCDay getUTCFullYear getUTCHours getUTCMilliseconds getUTCMinutes getUTCMonth getUTCSeconds getYear parse setDate setFullYear setHours setMilliseconds setMinutes setMonth setSeconds setTime setUTCDate setUTCFullYear setUTCHours setUTCMilliseconds setUTCMinutes setUTCMonth setUTCSeconds setYear toDateString toGMTString toLocaleDateString toLocaleTimeString toTimeString toUTCString UTC".split(' ');
-    builtinMethods[Math] = "E LN2 LN10 LOG2E LOG10E PI SQRT1_2 SQRT2 abs acos asin atan atan2 ceil cos exp floor log max min pow random round sin sqrt tan".split(' ');
-    builtinMethods[Number] = "MAX_VALUE MIN_VALUE NEGATIVE_INFINITY POSITIVE_INFINITY toExponential toFixed toPrecision".split(' ');
-    builtinMethods[RegExp] = "global ignoreCase lastIndex multiline source compile exec test".split(' ');
-    builtinMethods[String] = "length charAt charCodeAt concat fromCharCode indexOf lastIndexOf match replace search slice split substr substring toLowerCase toUpperCase".split(' ');
-    builtinMethods[Function] = "call apply".split(' ');
-    builtinMethods[Object] = "bsonsize".split(' ');
+    builtinMethods[Array] = "length concat join pop push reverse shift slice sort splice unshift indexOf lastIndexOf every filter forEach map some".split( ' ' );
+    builtinMethods[Boolean] = "".split( ' ' ); // nothing more than universal methods
+    builtinMethods[Date] = "getDate getDay getFullYear getHours getMilliseconds getMinutes getMonth getSeconds getTime getTimezoneOffset getUTCDate getUTCDay getUTCFullYear getUTCHours getUTCMilliseconds getUTCMinutes getUTCMonth getUTCSeconds getYear parse setDate setFullYear setHours setMilliseconds setMinutes setMonth setSeconds setTime setUTCDate setUTCFullYear setUTCHours setUTCMilliseconds setUTCMinutes setUTCMonth setUTCSeconds setYear toDateString toGMTString toLocaleDateString toLocaleTimeString toTimeString toUTCString UTC".split( ' ' );
+    builtinMethods[Math] = "E LN2 LN10 LOG2E LOG10E PI SQRT1_2 SQRT2 abs acos asin atan atan2 ceil cos exp floor log max min pow random round sin sqrt tan".split( ' ' );
+    builtinMethods[Number] = "MAX_VALUE MIN_VALUE NEGATIVE_INFINITY POSITIVE_INFINITY toExponential toFixed toPrecision".split( ' ' );
+    builtinMethods[RegExp] = "global ignoreCase lastIndex multiline source compile exec test".split( ' ' );
+    builtinMethods[String] = "length charAt charCodeAt concat fromCharCode indexOf lastIndexOf match replace search slice split substr substring toLowerCase toUpperCase".split( ' ' );
+    builtinMethods[Function] = "call apply".split( ' ' );
+    builtinMethods[Object] = "bsonsize".split( ' ' );
 
-    builtinMethods[Mongo] = "find update insert remove".split(' ');
-    builtinMethods[BinData] = "hex base64 length subtype".split(' ');
+    builtinMethods[Mongo] = "find update insert remove".split( ' ' );
+    builtinMethods[BinData] = "hex base64 length subtype".split( ' ' );
 
-    var extraGlobals = "Infinity NaN undefined null true false decodeURI decodeURIComponent encodeURI encodeURIComponent escape eval isFinite isNaN parseFloat parseInt unescape Array Boolean Date Math Number RegExp String print load gc MinKey MaxKey Mongo NumberLong ObjectId DBPointer UUID BinData Map".split(' ');
+    var extraGlobals = "Infinity NaN undefined null true false decodeURI decodeURIComponent encodeURI encodeURIComponent escape eval isFinite isNaN parseFloat parseInt unescape Array Boolean Date Math Number RegExp String print load gc MinKey MaxKey Mongo NumberLong ObjectId DBPointer UUID BinData Map".split( ' ' );
 
-    var isPrivate = function(name){
-        if (shellAutocomplete.showPrivate) return false;
-        if (name == '_id') return false;
-        if (name[0] == '_') return true;
-        if (name[name.length-1] == '_') return true; // some native functions have an extra name_ method
+    var isPrivate = function( name ) {
+        if ( shellAutocomplete.showPrivate ) return false;
+        if ( name == '_id' ) return false;
+        if ( name[0] == '_' ) return true;
+        if ( name[name.length - 1] == '_' ) return true; // some native functions have an extra name_ method
         return false;
     }
 
-    var customComplete = function(obj){
+    var customComplete = function( obj ) {
         try {
-            if(obj.__proto__.constructor.autocomplete){
-                var ret = obj.constructor.autocomplete(obj);
-                if (ret.constructor != Array){
-                    print("\nautocompleters must return real Arrays");
+            if ( obj.__proto__.constructor.autocomplete ) {
+                var ret = obj.constructor.autocomplete( obj );
+                if ( ret.constructor != Array ) {
+                    print( "\nautocompleters must return real Arrays" );
                     return [];
                 }
                 return ret;
             } else {
                 return [];
             }
-        } catch (e) {
-            // print(e); // uncomment if debugging custom completers
+        } catch ( e ) {
+            // print( e ); // uncomment if debugging custom completers
             return [];
         }
     }
 
-    var worker = function( prefix ){
-        var global = (function(){return this;}).call(); // trick to get global object
+    var worker = function( prefix ) {
+        var global = ( function() { return this; } ).call(); // trick to get global object
 
         var curObj = global;
-        var parts = prefix.split('.');
-        for (var p=0; p < parts.length - 1; p++){ // doesn't include last part
+        var parts = prefix.split( '.' );
+        for ( var p = 0; p < parts.length - 1; p++ ) { // doesn't include last part
             curObj = curObj[parts[p]];
-            if (curObj == null)
+            if ( curObj == null )
                 return [];
         }
 
-        var lastPrefix = parts[parts.length-1] || '';
-        var begining = parts.slice(0, parts.length-1).join('.');
-        if (begining.length)
-            begining += '.';
+        var lastPrefix = parts[parts.length - 1] || '';
+        var lastPrefixLowercase = lastPrefix.toLowerCase()
+        var beginning = parts.slice( 0, parts.length - 1 ).join( '.' );
+        if ( beginning.length )
+            beginning += '.';
 
         var possibilities = new Array().concat(
             universalMethods,
-            Object.keySet(curObj),
-            Object.keySet(curObj.__proto__),
+            Object.keySet( curObj ),
+            Object.keySet( curObj.__proto__ ),
             builtinMethods[curObj] || [], // curObj is a builtin constructor
             builtinMethods[curObj.__proto__.constructor] || [], // curObj is made from a builtin constructor
             curObj == global ? extraGlobals : [],
-            customComplete(curObj)
+            customComplete( curObj )
         );
 
-        var ret = [];
-        for (var i=0; i < possibilities.length; i++){
+        var noDuplicates = {}; // see http://dreaminginjavascript.wordpress.com/2008/08/22/eliminating-duplicates/
+        for ( var i = 0; i < possibilities.length; i++ ) {
             var p = possibilities[i];
-            if (typeof(curObj[p]) == "undefined" && curObj != global) continue; // extraGlobals aren't in the global object
-            if (p.length == 0 || p.length < lastPrefix.length) continue;
-            if (lastPrefix[0] != '_' && isPrivate(p)) continue;
-            if (p.match(/^[0-9]+$/)) continue; // don't array number indexes
-            if (p.substr(0, lastPrefix.length) != lastPrefix) continue;
+            if ( typeof ( curObj[p] ) == "undefined" && curObj != global ) continue; // extraGlobals aren't in the global object
+            if ( p.length == 0 || p.length < lastPrefix.length ) continue;
+            if ( lastPrefix[0] != '_' && isPrivate( p ) ) continue;
+            if ( p.match( /^[0-9]+$/ ) ) continue; // don't array number indexes
+            if ( p.substr( 0, lastPrefix.length ).toLowerCase() != lastPrefixLowercase ) continue;
 
-            var completion = begining + p;
-            if(curObj[p] && curObj[p].constructor == Function && p != 'constructor')
+            var completion = beginning + p;
+            if ( curObj[p] && curObj[p].constructor == Function && p != 'constructor' )
                 completion += '(';
 
-            ret.push(completion);
+            noDuplicates[completion] = 0;
         }
+
+        var ret = [];
+        for ( i in noDuplicates )
+            ret.push( i );
 
         return ret;
     }
 
     // this is the actual function that gets assigned to shellAutocomplete
-    return function( prefix ){
+    return function( prefix ) {
         try {
-            __autocomplete__ = worker(prefix).sort();
-        }catch (e){
-            print("exception during autocomplete: " + tojson(e.message));
+            __autocomplete__ = worker( prefix ).sort();
+        } catch ( e ) {
+            print( "exception during autocomplete: " + tojson( e.message ) );
             __autocomplete__ = [];
         }
     }
-}();
+} ();
 
 shellAutocomplete.showPrivate = false; // toggle to show (useful when working on internals)
 

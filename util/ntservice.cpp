@@ -17,6 +17,7 @@
 
 #include "pch.h"
 #include "ntservice.h"
+#include "../db/client.h"
 #include "winutil.h"
 #include "text.h"
 #include <direct.h>
@@ -131,14 +132,9 @@ namespace mongo {
 
         stringstream commandLine;
 
-        if ( strchr(argv[0], ':') ) { // a crude test for fully qualified path
-            commandLine << '"' << argv[0] << "\" ";
-        }
-        else {
-            char buffer[256];
-            assert( _getcwd(buffer, 256) );
-            commandLine << '"' << buffer << '\\' << argv[0] << "\" ";
-        }
+        char exePath[1024];
+        GetModuleFileNameA( NULL, exePath, sizeof exePath );
+        commandLine << '"' << exePath << "\" ";
 
         for ( int i = 1; i < argc; i++ ) {
             std::string arg( argv[ i ] );
@@ -152,6 +148,31 @@ namespace mongo {
                 continue;
             }
             else if ( arg == "--logpath" && i + 1 < argc ) {
+                commandLine << arg << "  \"" << argv[i+1] << "\"  ";
+                i++;
+                continue;
+            }
+            else if ( arg == "-f" && i + 1 < argc ) {
+                commandLine << arg << "  \"" << argv[i+1] << "\"  ";
+                i++;
+                continue;
+            }
+            else if ( arg == "--config" && i + 1 < argc ) {
+                commandLine << arg << "  \"" << argv[i+1] << "\"  ";
+                i++;
+                continue;
+            }
+            else if ( arg == "--pidfilepath" && i + 1 < argc ) {
+                commandLine << arg << "  \"" << argv[i+1] << "\"  ";
+                i++;
+                continue;
+            }
+            else if ( arg == "--repairpath" && i + 1 < argc ) {
+                commandLine << arg << "  \"" << argv[i+1] << "\"  ";
+                i++;
+                continue;
+            }
+            else if ( arg == "--keyfile" && i + 1 < argc ) {
                 commandLine << arg << "  \"" << argv[i+1] << "\"  ";
                 i++;
                 continue;
@@ -224,7 +245,18 @@ namespace mongo {
         serviceDescription.lpDescription = (LPTSTR)serviceDesc.c_str();
         serviceInstalled = ::ChangeServiceConfig2( schService, SERVICE_CONFIG_DESCRIPTION, &serviceDescription );
 
-
+#if 1
+        if ( ! serviceInstalled ) {
+#else
+        // This code sets the mongod service to auto-restart, forever.
+        // This might be a fine thing to do except that when mongod or Windows has a crash, the mongo.lock
+        // file is still around, so any attempt at a restart will immediately fail.  With auto-restart, we
+        // go into a loop, crashing and restarting, crashing and restarting, until someone comes in and
+        // disables the service or deletes the mongod.lock file.
+        //
+        // I'm leaving the old code here for now in case we solve this and are able to turn SC_ACTION_RESTART
+        // back on.
+        //
         if ( serviceInstalled ) {
             SC_ACTION aActions[ 3 ] = { { SC_ACTION_RESTART, 0 }, { SC_ACTION_RESTART, 0 }, { SC_ACTION_RESTART, 0 } };
 
@@ -238,6 +270,7 @@ namespace mongo {
 
         }
         else {
+#endif
             cerr << "Could not set service description. Check the event log for more details." << endl;
         }
 
@@ -348,14 +381,25 @@ namespace mongo {
         reportStatus( SERVICE_STOPPED );
     }
 
+    static void serviceShutdown( const char* controlCodeName ) {
+        Client::initThread( "serviceShutdown" );
+        log() << "got " << controlCodeName << " request from Windows Service Controller, " <<
+            ( inShutdown() ? "already in shutdown" : "will terminate after current cmd ends" ) << endl;
+        ServiceController::reportStatus( SERVICE_STOP_PENDING );
+        if ( ! inShutdown() ) {
+            exitCleanly( EXIT_WINDOWS_SERVICE_STOP );
+            ServiceController::reportStatus( SERVICE_STOPPED );
+        }
+    }
+
     void WINAPI ServiceController::serviceCtrl( DWORD ctrlCode ) {
         switch ( ctrlCode ) {
         case SERVICE_CONTROL_STOP:
+            serviceShutdown( "SERVICE_CONTROL_STOP" );
+            break;
         case SERVICE_CONTROL_SHUTDOWN:
-            reportStatus( SERVICE_STOP_PENDING );
-            shutdownServer();
-            reportStatus( SERVICE_STOPPED );
-            return;
+            serviceShutdown( "SERVICE_CONTROL_SHUTDOWN" );
+            break;
         }
     }
 

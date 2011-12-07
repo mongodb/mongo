@@ -176,7 +176,7 @@ namespace mongo {
             BSONObjBuilder sources( result.subarrayStart( "sources" ) );
 
             readlock lk( "local.sources" );
-            Client::Context ctx( "local.sources", dbpath, 0, authed );
+            Client::Context ctx( "local.sources", dbpath, authed );
             shared_ptr<Cursor> c = findTableScan("local.sources", BSONObj());
             int n = 0;
             while ( c->ok() ) {
@@ -531,7 +531,7 @@ namespace mongo {
     }
 
     bool ReplSource::handleDuplicateDbName( const BSONObj &op, const char *ns, const char *db ) {
-        if ( dbHolder.isLoaded( ns, dbpath ) ) {
+        if ( dbHolder()._isLoaded( ns, dbpath ) ) {
             // Database is already present.
             return true;   
         }
@@ -541,7 +541,7 @@ namespace mongo {
             // missing from master after optime "ts".
             return false;   
         }
-        if ( Database::duplicateUncasedName( db, dbpath ).empty() ) {
+        if ( Database::duplicateUncasedName( false, db, dbpath ).empty() ) {
             // No duplicate database names are present.
             return true;
         }
@@ -594,7 +594,7 @@ namespace mongo {
         
         // Check for duplicates again, since we released the lock above.
         set< string > duplicates;
-        Database::duplicateUncasedName( db, dbpath, &duplicates );
+        Database::duplicateUncasedName( false, db, dbpath, &duplicates );
         
         // The database is present on the master and no conflicting databases
         // are present on the master.  Drop any local conflicts.
@@ -607,13 +607,20 @@ namespace mongo {
         }
         
         massert( 14034, "Duplicate database names present after attempting to delete duplicates",
-                Database::duplicateUncasedName( db, dbpath ).empty() );
+                Database::duplicateUncasedName( false, db, dbpath ).empty() );
         return true;
     }
 
     void ReplSource::applyOperation(const BSONObj& op) {
         try {
-            applyOperation_inlock( op );
+            bool failedUpdate = applyOperation_inlock( op );
+            if (failedUpdate) {
+                Sync sync(hostName);
+                if (sync.shouldRetry(op)) {
+                    failedUpdate = applyOperation_inlock(op);
+                    uassert(15914, "Failure retrying initial sync update", !failedUpdate);
+                }
+            }
         }
         catch ( UserException& e ) {
             log() << "sync: caught user assertion " << e << " while applying op: " << op << endl;;

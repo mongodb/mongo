@@ -266,7 +266,7 @@ namespace mongo {
             string temp = ctx.db()->name + ".system.namespaces";
             BSONObj config = conn->findOne( temp , BSON( "name" << ns ) );
             if ( config["options"].isABSONObj() )
-                if ( ! userCreateNS( ns.c_str() , config["options"].Obj() , errmsg, true , 0 ) )
+                if ( ! userCreateNS( ns.c_str() , config["options"].Obj() , errmsg, logForRepl , 0 ) )
                     return false;
         }
 

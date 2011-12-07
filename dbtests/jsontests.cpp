@@ -101,17 +101,20 @@ namespace JsonTests {
         class InvalidNumbers {
         public:
             void run() {
-                BSONObjBuilder b;
-                b.append( "a", numeric_limits< double >::infinity() );
-                ASSERT_EXCEPTION( b.done().jsonString( Strict ), AssertionException );
-
                 BSONObjBuilder c;
                 c.append( "a", numeric_limits< double >::quiet_NaN() );
-                ASSERT_EXCEPTION( c.done().jsonString( Strict ), AssertionException );
+                string s = c.done().jsonString( Strict );
+                // Note there is no NaN in the JSON RFC but what would be the alternative?
+                ASSERT( str::contains(s, "NaN") );
+
+                // commented out assertion as it doesn't throw anymore:
+                //ASSERT_THROWS( c.done().jsonString( Strict ), AssertionException );
 
                 BSONObjBuilder d;
                 d.append( "a", numeric_limits< double >::signaling_NaN() );
-                ASSERT_EXCEPTION( d.done().jsonString( Strict ), AssertionException );
+                //ASSERT_THROWS( d.done().jsonString( Strict ), AssertionException );
+                s = d.done().jsonString( Strict );
+                ASSERT( str::contains(s, "NaN") );
             }
         };
 
@@ -424,7 +427,7 @@ namespace JsonTests {
         public:
             virtual ~Bad() {}
             void run() {
-                ASSERT_EXCEPTION( fromjson( json() ), MsgAssertionException );
+                ASSERT_THROWS( fromjson( json() ), MsgAssertionException );
             }
         protected:
             virtual string json() const = 0;

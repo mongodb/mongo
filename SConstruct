@@ -32,6 +32,16 @@ def findSettingsSetup():
     sys.path.append( ".." )
     sys.path.append( "../../" )
 
+def getThirdPartyShortNames():
+    lst = []
+    for x in os.listdir( "third_party" ):
+        if not x.endswith( ".py" ) or x.find( "#" ) >= 0:
+            continue
+         
+        lst.append( x.rpartition( "." )[0] )
+    return lst
+
+
 # --- options ----
 
 options = {}
@@ -171,6 +181,16 @@ add_option( "gdbserver" , "build in gdb server support" , 0 , True )
 add_option( "heapcheck", "link to heap-checking malloc-lib and look for memory leaks during tests" , 0 , False )
 
 add_option("smokedbprefix", "prefix to dbpath et al. for smoke tests", 1 , False )
+
+for shortName in getThirdPartyShortNames():
+    add_option( "use-system-" + shortName , "use system version of library " + shortName , 0 , True )
+
+add_option( "use-system-all" , "use all system libraries " + shortName , 0 , True )
+
+
+# don't run configure if user calls --help
+if GetOption('help'):
+    Return()
 
 # --- environment setup ---
 
@@ -387,7 +407,7 @@ if has_option( "asio" ):
     coreServerFiles += [ "util/net/message_server_asio.cpp" ]
 
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client libs.
-serverOnlyFiles = Split( "util/compress.cpp db/key.cpp db/btreebuilder.cpp util/logfile.cpp util/alignedbuilder.cpp db/mongommf.cpp db/dur.cpp db/durop.cpp db/dur_writetodatafiles.cpp db/dur_preplogbuffer.cpp db/dur_commitjob.cpp db/dur_recover.cpp db/dur_journal.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/tests.cpp db/repl.cpp db/repl/rs.cpp db/repl/consensus.cpp db/repl/rs_initiate.cpp db/repl/replset_commands.cpp db/repl/manager.cpp db/repl/health.cpp db/repl/heartbeat.cpp db/repl/rs_config.cpp db/repl/rs_rollback.cpp db/repl/rs_sync.cpp db/repl/rs_initialsync.cpp db/oplog.cpp db/repl_block.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/cap.cpp db/matcher_covered.cpp db/dbeval.cpp db/restapi.cpp db/dbhelpers.cpp db/instance.cpp db/client.cpp db/database.cpp db/pdfile.cpp db/record.cpp db/cursor.cpp db/security.cpp db/queryoptimizer.cpp db/queryoptimizercursor.cpp db/extsort.cpp db/cmdline.cpp" )
+serverOnlyFiles = Split( "util/compress.cpp db/d_concurrency.cpp db/key.cpp db/btreebuilder.cpp util/logfile.cpp util/alignedbuilder.cpp db/mongommf.cpp db/dur.cpp db/durop.cpp db/dur_writetodatafiles.cpp db/dur_preplogbuffer.cpp db/dur_commitjob.cpp db/dur_recover.cpp db/dur_journal.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/tests.cpp db/repl.cpp db/repl/rs.cpp db/repl/consensus.cpp db/repl/rs_initiate.cpp db/repl/replset_commands.cpp db/repl/manager.cpp db/repl/health.cpp db/repl/heartbeat.cpp db/repl/rs_config.cpp db/repl/rs_rollback.cpp db/repl/rs_sync.cpp db/repl/rs_initialsync.cpp db/oplog.cpp db/repl_block.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/cap.cpp db/matcher_covered.cpp db/dbeval.cpp db/restapi.cpp db/dbhelpers.cpp db/instance.cpp db/client.cpp db/database.cpp db/pdfile.cpp db/record.cpp db/cursor.cpp db/security.cpp db/queryoptimizer.cpp db/queryoptimizercursor.cpp db/extsort.cpp db/cmdline.cpp" )
 
 serverOnlyFiles += [ "db/index.cpp" , "db/scanandorder.cpp" ] + Glob( "db/geo/*.cpp" ) + Glob( "db/ops/*.cpp" )
 
@@ -792,21 +812,20 @@ if not windows:
         os.chmod( keyfile , stat.S_IWUSR|stat.S_IRUSR )
 
 moduleFiles = {}
-for x in os.listdir( "third_party" ):
-    if not x.endswith( ".py" ) or x.find( "#" ) >= 0:
-        continue
-         
-    shortName = x.rpartition( "." )[0]
-    path = "third_party/%s" % x
+for shortName in getThirdPartyShortNames():    
 
-
+    path = "third_party/%s.py" % shortName
     myModule = imp.load_module( "third_party_%s" % shortName , open( path , "r" ) , path , ( ".py" , "r" , imp.PY_SOURCE ) )
     fileLists = { "commonFiles" : commonFiles , "serverOnlyFiles" : serverOnlyFiles , "scriptingFiles" : scriptingFiles, "moduleFiles" : moduleFiles }
     
     options_topass["windows"] = windows
     options_topass["nix"] = nix
     
-    myModule.configure( env , fileLists , options_topass )
+    if has_option( "use-system-" + shortName ) or has_option( "use-system-all" ):
+        print( "using system version of: " + shortName )
+        myModule.configureSystem( env , fileLists , options_topass )
+    else:
+        myModule.configure( env , fileLists , options_topass )
 
 coreServerFiles += scriptingFiles
 
@@ -1061,12 +1080,6 @@ def jsToH(target, source, env):
     out.write( text )
     out.close()
 
-    # mongo_vstudio.cpp is in git as the .vcproj doesn't generate this file.
-    if outFile.find( "mongo.cpp" ) >= 0:
-        out = open( outFile.replace( "mongo" , "mongo_vstudio" ) , 'wb' )
-        out.write( text )
-        out.close()
-
     return None
 
 jshBuilder = Builder(action = jsToH,
@@ -1108,7 +1121,7 @@ mongod = env.Program( "mongod" , commonFiles + coreDbFiles + coreServerFiles + s
 Default( mongod )
 
 # tools
-allToolFiles = commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + [ "client/gridfs.cpp", "tools/tool.cpp" ]
+allToolFiles = commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + [ "client/gridfs.cpp", "tools/tool.cpp" , "tools/stat_util.cpp" ]
 normalTools = [ "dump" , "restore" , "export" , "import" , "files" , "stat" , "top" , "oplog" ]
 env.Alias( "tools" , [ add_exe( "mongo" + x ) for x in normalTools ] )
 for x in normalTools:
@@ -1174,7 +1187,7 @@ if darwin or clientEnv["_HAVEPCAP"]:
 
 # --- shell ---
 
-# note, if you add a file here, need to add in engine.cpp currently
+# note, if you add a file here, you need to add it in scripting/engine.cpp and shell/msvc/createCPPfromJavaScriptFiles.js as well
 env.JSHeader( "shell/mongo.cpp"  , Glob( "shell/utils*.js" ) + [ "shell/db.js","shell/mongo.js","shell/mr.js","shell/query.js","shell/collection.js"] )
 
 env.JSHeader( "shell/mongo-server.cpp"  , [ "shell/servers.js"] )
@@ -1203,7 +1216,12 @@ elif not onlyServer:
     shellEnv = doConfigure( shellEnv , shell=True )
 
     shellEnv.Prepend( LIBS=[ "mongoshellfiles"] )
-    mongo = shellEnv.Program( "mongo" , moduleFiles["pcre"] + coreShellFiles )
+    
+    shellFilesToUse = coreShellFiles
+    if "pcre" in moduleFiles:
+        shellFilesToUse += moduleFiles["pcre"]
+
+    mongo = shellEnv.Program( "mongo" , shellFilesToUse )
 
 
 #  ---- RUNNING TESTS ----
@@ -1356,7 +1374,6 @@ def doStyling( env , target , source ):
 
     files = utils.getAllSourceFiles() 
     files = filter( lambda x: not x.endswith( ".c" ) , files )
-    files.remove( "./shell/mongo_vstudio.cpp" )
 
     cmd = "astyle --options=mongo_astyle " + " ".join( files )
     res = utils.execsys( cmd )

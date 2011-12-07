@@ -52,6 +52,8 @@ namespace mongo {
         BenchRunConfig() : _mutex( "BenchRunConfig" ) {
             host = "localhost";
             db = "test";
+            username = "";
+            password = "";
 
             parallel = 1;
             seconds = 1;
@@ -69,6 +71,8 @@ namespace mongo {
 
         string host;
         string db;
+        string username;
+        string password;
 
         unsigned parallel;
         double seconds;
@@ -183,6 +187,13 @@ namespace mongo {
                 ScriptingFunction scopeFunc = 0;
                 BSONObj scopeObj;
 
+                if (config->username != "") {
+                    string errmsg;
+                    if (!conn.get()->auth(config->db, config->username, config->password, errmsg)) {
+                        uasserted(15931, "Authenticating to connection for _benchThread failed: " + errmsg);
+                    }
+                }
+
                 bool check = ! e["check"].eoo();
                 if( check ){
                     if ( e["check"].type() == CodeWScope || e["check"].type() == Code || e["check"].type() == String ) {
@@ -241,7 +252,7 @@ namespace mongo {
                     }
                     else if( op == "find" || op == "query" ) {
 
-                        int limit = e["limit"].eoo() ? 0 : e["limit"].Int();
+                        int limit = e["limit"].eoo() ? 0 : e["limit"].numberInt();
                         int skip = e["skip"].eoo() ? 0 : e["skip"].Int();
                         int options = e["options"].eoo() ? 0 : e["options"].Int();
                         int batchSize = e["batchSize"].eoo() ? 0 : e["batchSize"].Int();
@@ -407,6 +418,13 @@ namespace mongo {
         config->threadsActive++;
 
         try {
+            if (config->username != "") {
+                string errmsg;
+                if (!conn.get()->auth(config->db, config->username, config->password, errmsg)) {
+                    uasserted(15932, "Authenticating to connection for benchThread failed: " + errmsg);
+                }
+            }
+
             _benchThread( config, conn );
         }
         catch( DBException& e ){
@@ -443,6 +461,10 @@ namespace mongo {
                 config.host = args["host"].String();
             if ( args["db"].type() == String )
                 config.db = args["db"].String();
+            if ( args["username"].type() == String )
+                config.username = args["username"].String();
+            if ( args["password"].type() == String )
+                config.db = args["password"].String();
 
             if ( args["parallel"].isNumber() )
                 config.parallel = args["parallel"].numberInt();
@@ -601,6 +623,10 @@ namespace mongo {
             config.host = args["host"].String();
         if ( args["db"].type() == String )
             config.db = args["db"].String();
+        if ( args["username"].type() == String )
+            config.username = args["username"].String();
+        if ( args["password"].type() == String )
+            config.password = args["password"].String();
 
         if ( args["parallel"].isNumber() )
             config.parallel = args["parallel"].numberInt();
@@ -613,6 +639,14 @@ namespace mongo {
         // execute
 
         ScopedDbConnection conn( config.host );
+
+        if (config.username != "") {
+            string errmsg;
+            if (!conn.get()->auth(config.db, config.username, config.password, errmsg)) {
+                uasserted(15930, "Authenticating to connection for bench run failed: " + errmsg);
+            }
+        }
+
 
         //    start threads
         vector<boost::thread*> all;

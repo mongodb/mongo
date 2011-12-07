@@ -125,18 +125,23 @@ namespace mongo {
     /* ----------------------------------------- */
 
     string dbpath = "/data/db/";
+    const char FREELIST_NS[] = ".$freelist";
     bool directoryperdb = false;
     string repairpath;
     string pidfilepath;
 
     DataFileMgr theDataFileMgr;
-    DatabaseHolder dbHolder;
+    DatabaseHolder _dbHolder;
     int MAGIC = 0x1000;
+
+    DatabaseHolder& dbHolderUnchecked() {
+        return _dbHolder;
+    }
 
     void addNewNamespaceToCatalog(const char *ns, const BSONObj *options = 0);
     void ensureIdIndexForNewNs(const char *ns) {
         if ( ( strstr( ns, ".system." ) == 0 || legalClientSystemNS( ns , false ) ) &&
-                strstr( ns, ".$freelist" ) == 0 ) {
+                strstr( ns, FREELIST_NS ) == 0 ) {
             log( 1 ) << "adding _id index for collection " << ns << endl;
             ensureHaveIdIndex( ns );
         }
@@ -210,7 +215,7 @@ namespace mongo {
         /* todo: do this only when we have allocated space successfully? or we could insert with a { ok: 0 } field
            and then go back and set to ok : 1 after we are done.
         */
-        bool isFreeList = strstr(ns, ".$freelist") != 0;
+        bool isFreeList = strstr(ns, FREELIST_NS) != 0;
         if( !isFreeList )
             addNewNamespaceToCatalog(ns, options.isEmpty() ? 0 : &options);
 
@@ -367,6 +372,41 @@ namespace mongo {
         return size;
     }
 
+    static void check(void *_mb) { 
+        if( sizeof(char *) == 4 )
+            uassert( 10084 , "can't map file memory - mongo requires 64 bit build for larger datasets", _mb != 0);
+        else
+            uassert( 10085 , "can't map file memory", _mb != 0);
+    }
+
+    /** @return true if found and opened. if uninitialized (prealloc only) does not open. */
+    bool MongoDataFile::openExisting( const char *filename ) {
+        assert( _mb == 0 );
+        if( !exists(filename) )
+            return false;
+        if( !mmf.open(filename,false) ) {
+            dlog(2) << "info couldn't open " << filename << " probably end of datafile list" << endl;
+            return false;
+        }
+        _mb = mmf.getView(); assert(_mb);
+        unsigned long long sz = mmf.length();
+        assert( sz <= 0x7fffffff );
+        assert( sz % 4096 == 0 );
+        if( sz < 64*1024*1024 && !cmdLine.smallfiles ) { 
+            if( sz >= 16*1024*1024 && sz % (1024*1024) == 0 ) { 
+                log() << "info openExisting file size " << sz << " but cmdLine.smallfiles=false" << endl;
+            }
+            else {
+                log() << "openExisting size " << sz << " less then minimum file size expectation " << filename << endl;
+                assert(false);
+            }
+        }
+        check(_mb);
+        if( header()->uninitialized() )
+            return false;
+        return true;
+    }
+
     void MongoDataFile::open( const char *filename, int minSize, bool preallocateOnly ) {
         long size = defaultSize( filename );
         while ( size < minSize ) {
@@ -398,11 +438,7 @@ namespace mongo {
             assert( sz <= 0x7fffffff );
             size = (int) sz;
         }
-        //header = (DataFileHeader *) _p;
-        if( sizeof(char *) == 4 )
-            uassert( 10084 , "can't map file memory - mongo requires 64 bit build for larger datasets", _mb != 0);
-        else
-            uassert( 10085 , "can't map file memory", _mb != 0);
+        check(_mb);
         header()->init(fileNo, size, filename);
     }
 
@@ -473,7 +509,7 @@ namespace mongo {
     }
 
     Extent* DataFileMgr::allocFromFreeList(const char *ns, int approxSize, bool capped) {
-        string s = cc().database()->name + ".$freelist";
+        string s = cc().database()->name + FREELIST_NS;
         NamespaceDetails *f = nsdetails(s.c_str());
         if( f ) {
             int low, high;
@@ -622,6 +658,7 @@ namespace mongo {
         DeletedRecord *empty = getDur().writing( DataFileMgr::makeDeletedRecord(emptyLoc, delRecLength) );
         empty->lengthWithHeaders = delRecLength;
         empty->extentOfs = myLoc.getOfs();
+
         return emptyLoc;
     }
 
@@ -757,7 +794,7 @@ namespace mongo {
     }
 
     void printFreeList() {
-        string s = cc().database()->name + ".$freelist";
+        string s = cc().database()->name + FREELIST_NS;
         log() << "dump freelist " << s << endl;
         NamespaceDetails *freeExtents = nsdetails(s.c_str());
         if( freeExtents == 0 ) {
@@ -788,7 +825,7 @@ namespace mongo {
             assert( f==l || !l->xprev.isNull() );
         }
 
-        string s = cc().database()->name + ".$freelist";
+        string s = cc().database()->name + FREELIST_NS;
         NamespaceDetails *freeExtents = nsdetails(s.c_str());
         if( freeExtents == 0 ) {
             string err;
@@ -993,7 +1030,7 @@ namespace mongo {
         unindexRecord(d, todelete, dl, noWarn);
 
         _deleteRecord(d, ns, todelete, dl);
-        NamespaceDetailsTransient::get_w( ns ).notifyOfWriteOp();
+        NamespaceDetailsTransient::get( ns ).notifyOfWriteOp();
 
         if ( ! toDelete.isEmpty() ) {
             logOp( "d" , ns , toDelete );
@@ -1053,7 +1090,7 @@ namespace mongo {
 
         /* have any index keys changed? */
         {
-            unsigned keyUpdates = 0;
+            int keyUpdates = 0;
             int z = d->nIndexesBeingBuilt();
             for ( int x = 0; x < z; x++ ) {
                 IndexDetails& idx = d->idx(x);
@@ -1101,7 +1138,8 @@ namespace mongo {
     int Extent::followupSize(int len, int lastExtentLen) {
         assert( len < Extent::maxSize() );
         int x = initialSize(len);
-        int y = (int) (lastExtentLen < 4000000 ? lastExtentLen * 4.0 : lastExtentLen * 1.2);
+        // changed from 1.20 to 1.35 in v2.1.x to get to larger extent size faster
+        int y = (int) (lastExtentLen < 4000000 ? lastExtentLen * 4.0 : lastExtentLen * 1.35);
         int sz = y > x ? y : x;
 
         if ( sz < lastExtentLen ) {
@@ -1507,7 +1545,7 @@ namespace mongo {
             bgJobsInProgress.insert(d);
         }
         void done(const char *ns, NamespaceDetails *d) {
-            NamespaceDetailsTransient::get_w(ns).addedIndex(); // clear query optimizer cache
+            NamespaceDetailsTransient::get(ns).addedIndex(); // clear query optimizer cache
             assertInWriteLock();
         }
 
@@ -1800,10 +1838,8 @@ namespace mongo {
 
         BSONObj info = loc.obj();
         bool background = info["background"].trueValue();
-        if( background && cc().isSyncThread() ) {
-            /* don't do background indexing on slaves.  there are nuances.  this could be added later
-                but requires more code.
-                */
+        // if this is not readable, let's move things along
+        if (background && ((!theReplSet && cc().isSyncThread()) || (theReplSet && !theReplSet->isSecondary()))) {
             log() << "info: indexing in foreground on this replica; was a background index build on the primary" << endl;
             background = false;
         }
@@ -1988,7 +2024,7 @@ namespace mongo {
 
         // we don't bother resetting query optimizer stats for the god tables - also god is true when adding a btree bucket
         if ( !god )
-            NamespaceDetailsTransient::get_w( ns ).notifyOfWriteOp();
+            NamespaceDetailsTransient::get( ns ).notifyOfWriteOp();
 
         if ( tableToIndex ) {
             insert_makeIndex(tableToIndex, tabletoidxns, loc);
@@ -2345,7 +2381,7 @@ namespace mongo {
             dbs.insert( i->first );
         }
 
-        currentClient.get()->getContext()->clear();
+        currentClient.get()->getContext()->_clear();
 
         BSONObjBuilder bb( result.subarrayStart( "dbs" ) );
         int n = 0;

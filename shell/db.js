@@ -98,18 +98,15 @@ DB.prototype.__pwHash = function( nonce, username, pass ) {
 }
 
 DB.prototype.auth = function( username , pass ){
-    var n = this.runCommand( { getnonce : 1 } );
-
-    var a = this.runCommand( 
-        { 
-            authenticate : 1 , 
-            user : username , 
-            nonce : n.nonce , 
-            key : this.__pwHash( n.nonce, username, pass )
-        }
-    );
-
-    return a.ok;
+    var result = 0;
+    try {
+        result = this.getMongo().auth(this.getName(), username, pass);
+    }
+    catch (e) {
+        print(e);
+        return 0;
+    }
+    return 1;
 }
 
 /**
@@ -141,7 +138,9 @@ DB.prototype.auth = function( username , pass ){
 */
 DB.prototype.createCollection = function(name, opt) {
     var options = opt || {};
-    var cmd = { create: name, capped: options.capped, size: options.size, max: options.max };
+    var cmd = { create: name, capped: options.capped, size: options.size };
+    if (options.max != undefined)
+        cmd.max = options.max;
     if (options.autoIndexId != undefined)
         cmd.autoIndexId = options.autoIndexId;
     var res = this._dbCommand(cmd);
@@ -308,6 +307,7 @@ DB.prototype.repairDatabase = function() {
 DB.prototype.help = function() {
     print("DB methods:");
     print("\tdb.addUser(username, password[, readOnly=false])");
+    print("\tdb.adminCommand(nameOrDocument) - switches to 'admin' db, and runs command [ just calls db.runCommand(...) ]");
     print("\tdb.auth(username, password)");
     print("\tdb.cloneDatabase(fromhost)");
     print("\tdb.commandHelp(name) returns the help for the command");
@@ -316,16 +316,18 @@ DB.prototype.help = function() {
     print("\tdb.currentOp() displays currently executing operations in the db");
     print("\tdb.dropDatabase()");
     print("\tdb.eval(func, args) run code server-side");
+    print("\tdb.fsyncLock() flush data to disk and lock server for backups");
+    print("\tdb.fsyncUnlock() unlocks server following a db.fsyncLock()");
     print("\tdb.getCollection(cname) same as db['cname'] or db.cname");
     print("\tdb.getCollectionNames()");
     print("\tdb.getLastError() - just returns the err msg string");
     print("\tdb.getLastErrorObj() - return full status object");
     print("\tdb.getMongo() get the server connection object");
-    print("\tdb.getMongo().setSlaveOk() allow this connection to read from the nonmaster member of a replica pair");
+    print("\tdb.getMongo().setSlaveOk() allow queries on a replication slave server");
     print("\tdb.getName()");
     print("\tdb.getPrevError()");
     print("\tdb.getProfilingLevel() - deprecated");
-    print("\tdb.getProfilingStatus() - returns if profiling is on and slow threshold ");
+    print("\tdb.getProfilingStatus() - returns if profiling is on and slow threshold");
     print("\tdb.getReplicationInfo()");
     print("\tdb.getSiblingDB(name) get the db at the same server as this one");
     print("\tdb.isMaster() check replica primary status");
@@ -334,8 +336,8 @@ DB.prototype.help = function() {
     print("\tdb.logout()");
     print("\tdb.printCollectionStats()");
     print("\tdb.printReplicationInfo()");
-    print("\tdb.printSlaveReplicationInfo()");
     print("\tdb.printShardingStatus()");
+    print("\tdb.printSlaveReplicationInfo()");
     print("\tdb.removeUser(username)");
     print("\tdb.repairDatabase()");
     print("\tdb.resetError()");
@@ -346,9 +348,6 @@ DB.prototype.help = function() {
     print("\tdb.shutdownServer()");
     print("\tdb.stats()");
     print("\tdb.version() current version of the server");
-    print("\tdb.getMongo().setSlaveOk() allow queries on a replication slave server");
-    print("\tdb.fsyncLock() flush data to disk and lock server for backups");
-    print("\tdb.fsyncUnlock() unlocks server following a db.fsyncLock()");
 
     return __magicNoPrint;
 }
@@ -635,14 +634,14 @@ DB.prototype.currentOp = function( arg ){
         else if ( arg )
             q["$all"] = true;
     }
-    return db.$cmd.sys.inprog.findOne( q );
+    return this.$cmd.sys.inprog.findOne( q );
 }
 DB.prototype.currentOP = DB.prototype.currentOp;
 
 DB.prototype.killOp = function(op) {
     if( !op ) 
         throw "no opNum to kill specified";
-    return db.$cmd.sys.killop.findOne({'op':op});
+    return this.$cmd.sys.killop.findOne({'op':op});
 }
 DB.prototype.killOP = DB.prototype.killOp;
 
@@ -847,11 +846,11 @@ DB.prototype.printShardingStatus = function( verbose ){
 }
 
 DB.prototype.fsyncLock = function() {
-    return db.adminCommand({fsync:1, lock:true});
+    return this.adminCommand({fsync:1, lock:true});
 }
 
 DB.prototype.fsyncUnlock = function() {
-    return db.getSiblingDB("admin").$cmd.sys.unlock.findOne()
+    return this.getSiblingDB("admin").$cmd.sys.unlock.findOne()
 }
 
 DB.autocomplete = function(obj){

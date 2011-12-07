@@ -55,12 +55,18 @@ try {
 
     db.eval("sleep(1)") // pre-load system.js
 
-    db.setProfilingLevel(2);
-    before = db.system.profile.count();
+    function resetProfile( level , slowms ) {
+        db.setProfilingLevel(0);
+        db.system.profile.drop();
+        db.setProfilingLevel(level,slowms);
+    }
+
+    resetProfile(2);
+
     db.eval( "sleep(25)" )
     db.eval( "sleep(120)" )
-    after = db.system.profile.count()
-    assert.eq( before + 3 , after , "X1" )
+    
+    assert.eq( 2 , db.system.profile.find( { "command.$eval" : /^sleep/ } ).count() );
 
     assert.lte( 120 , db.system.profile.findOne( { "command.$eval" : "sleep(120)" } ).millis );
     assert.lte( 25 , db.system.profile.findOne( { "command.$eval" : "sleep(25)" } ).millis );
@@ -93,24 +99,20 @@ try {
         return actual >= max ? 1 : 0;
     }
 
-    db.setProfilingLevel(1,100);
-    before = db.system.profile.count();
+    resetProfile(1,100);
     var delta = 0;
     delta += evalSleepMoreThan( 15 , 100 );
     delta += evalSleepMoreThan( 120 , 100 );
-    after = db.system.profile.count()
-    assert.eq( before + delta , after , "X2 : " + getProfileAString() )
+    assert.eq( delta , db.system.profile.find( { "command.$eval" : /^sleep/ } ).count() , "X2 : " + getProfileAString() )
 
-    db.setProfilingLevel(1,20);
-    before = db.system.profile.count();
+    resetProfile(1,20);
     delta = 0;
     delta += evalSleepMoreThan( 5 , 20 );
     delta += evalSleepMoreThan( 120 , 20 );
-    after = db.system.profile.count()
-    assert.eq( before + delta , after , "X3 : " + getProfileAString() )
+    assert.eq( delta , db.system.profile.find( { "command.$eval" : /^sleep/ } ).count() , "X3 : " + getProfileAString() )
         
-    db.profile.drop();
-    db.setProfilingLevel(2)
+    resetProfile(2);
+    db.profile1.drop();
     var q = { _id : 5 };
     var u = { $inc : { x : 1 } };
     db.profile1.update( q , u );

@@ -267,18 +267,21 @@ namespace mongo {
     }
 
     bool MongoMMF::open(string fname, bool sequentialHint) {
+        LOG(3) << "mmf open " << fname << endl;
         setPath(fname);
         _view_write = mapWithOptions(fname.c_str(), sequentialHint ? SEQUENTIAL : 0);
         return finishOpening();
     }
 
     bool MongoMMF::create(string fname, unsigned long long& len, bool sequentialHint) {
+        LOG(3) << "mmf create " << fname << endl;
         setPath(fname);
         _view_write = map(fname.c_str(), len, sequentialHint ? SEQUENTIAL : 0);
         return finishOpening();
     }
 
     bool MongoMMF::finishOpening() {
+        LOG(3) << "mmf finishOpening " << (void*) _view_write << ' ' << filename() << " len:" << length() << endl;
         if( _view_write ) {
             if( cmdLine.dur ) {
                 _view_private = createPrivateMap();
@@ -300,7 +303,10 @@ namespace mongo {
     }
 
     MongoMMF::~MongoMMF() {
-        close();
+        try { 
+            close();
+        }
+        catch(...) { error() << "exception in ~MongoMMF" << endl; }
     }
 
     namespace dur {
@@ -308,8 +314,18 @@ namespace mongo {
     }
 
     /*virtual*/ void MongoMMF::close() {
-        if( cmdLine.dur && _view_write/*actually was opened*/ ) {
-            dur::closingFileNotification();
+        LOG(3) << "mmf close " << filename() << endl;
+
+        if( view_write() /*actually was opened*/ ) {
+            if( cmdLine.dur ) {
+                dur::closingFileNotification();
+            }
+            if( !dbMutex.isWriteLocked() ) { 
+                assert( inShutdown() );
+                DEV { 
+                    log() << "is it really ok to close a mongommf outside a write lock? dbmutex status:" << dbMutex.getState() << " file:" << filename() << endl;
+                }
+            }
         }
 
         RWLockRecursive::Exclusive lk(mmmutex);

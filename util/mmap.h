@@ -167,7 +167,8 @@ namespace mongo {
         // Throws exception if file doesn't exist. (dm may2010: not sure if this is always true?)
         void* map(const char *filename);
 
-        /** @param options see MongoFile::Options */
+        /** @param options see MongoFile::Options 
+        */
         void* mapWithOptions(const char *filename, int options);
 
         /* Creates with length if DNE, otherwise uses existing file length,

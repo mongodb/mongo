@@ -25,6 +25,7 @@
 #include "../util/base64.h"
 #include "../util/md5.hpp"
 #include <limits>
+#include <cmath>
 #include "../util/unittest.h"
 #include "../util/embedded_builder.h"
 #include "../util/stringutils.h"
@@ -57,6 +58,7 @@ namespace mongo {
     // need to move to bson/, but has dependency on base64 so move that to bson/util/ first.
     inline string BSONElement::jsonString( JsonStringFormat format, bool includeFieldNames, int pretty ) const {
         BSONType t = type();
+        int sign;
         if ( t == Undefined )
             return "undefined";
 
@@ -77,6 +79,12 @@ namespace mongo {
                     number() <= numeric_limits< double >::max() ) {
                 s.precision( 16 );
                 s << number();
+            }
+            else if ( mongo::isNaN(number()) ) {
+                s << "NaN";
+            }
+            else if ( mongo::isInf(number(), &sign) ) {
+                s << ( sign == 1 ? "Infinity" : "-Infinity");
             }
             else {
                 StringBuilder ss;
@@ -331,13 +339,6 @@ namespace mongo {
         size_t rstart = 0;
 
         for ( int i=0; i<maxLoops; i++ ) {
-            if ( lstart >= l.size() ) {
-                if ( rstart >= r.size() )
-                    return SAME;
-                return RIGHT_SUBFIELD;
-            }
-            if ( rstart >= r.size() )
-                return LEFT_SUBFIELD;
 
             size_t a = l.find( '.' , lstart );
             size_t b = r.find( '.' , rstart );
@@ -357,6 +358,14 @@ namespace mongo {
 
             lstart = lend + 1;
             rstart = rend + 1;
+
+            if ( lstart >= l.size() ) {
+                if ( rstart >= r.size() )
+                    return SAME;
+                return RIGHT_SUBFIELD;
+            }
+            if ( rstart >= r.size() )
+                return LEFT_SUBFIELD;
         }
 
         log() << "compareDottedFieldNames ERROR  l: " << l << " r: " << r << "  TOO MANY LOOPS" << endl;

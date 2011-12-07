@@ -758,6 +758,11 @@ namespace mongo {
         int arrSize() const { return _i; }
 
     private:
+        // These two are undefined privates to prevent their accidental
+        // use as we don't support unsigned ints in BSON
+        BSONObjBuilder& append(const StringData& fieldName, unsigned int val);
+        BSONObjBuilder& append(const StringData& fieldName, unsigned long long val);
+
         void fill( const StringData& name ) {
             char *r;
             long int n = strtol( name.data(), &r, 10 );

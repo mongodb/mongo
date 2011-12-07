@@ -317,6 +317,8 @@ namespace mongo {
         void getAllShards( set<Shard>& all ) const;
         void getShardsForRange(set<Shard>& shards, const BSONObj& min, const BSONObj& max, bool fullKeyReq = true) const; // [min, max)
 
+        ChunkMap getChunkMap() const { return _chunkMap; }
+
         /**
          * Returns true if, for this shard, the chunks are identical in both chunk managers
          */
@@ -373,6 +375,8 @@ namespace mongo {
 
         const unsigned long long _sequenceNumber;
 
+        mutable TicketHolder _splitTickets; // number of concurrent splitVector we can do from a splitIfShould per collection
+        
         friend class Chunk;
         friend class ChunkRangeManager; // only needed for CRM::assertValid()
         static AtomicUInt NextSequenceNumber;

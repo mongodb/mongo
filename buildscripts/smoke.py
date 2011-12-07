@@ -49,11 +49,18 @@ import sys
 import time
 
 from pymongo import Connection
+from pymongo.errors import OperationFailure
 
 import utils
 
+try:
+    import cPickle as pickle
+except ImportError:
+    import pickle
+
 # TODO clean this up so we don't need globals...
 mongo_repo = os.getcwd() #'./'
+failfile = os.path.join(mongo_repo, 'failfile.smoke')
 test_path = None
 mongod_executable = None
 mongod_port = None
@@ -63,6 +70,7 @@ continue_on_failure = None
 tests = []
 winners = []
 losers = {}
+fails = [] # like losers but in format of tests
 
 # For replication hash checking
 replicated_collections = []
@@ -85,6 +93,7 @@ class mongod(object):
     def __init__(self, **kwargs):
         self.kwargs = kwargs
         self.proc = None
+        self.auth = False
 
     def __enter__(self):
         self.start()
@@ -122,6 +131,15 @@ class mongod(object):
         print >> sys.stderr, "timeout starting mongod"
         return False
 
+    def setup_admin_user(self, port=mongod_port):
+        try:
+            Connection( "localhost" , int(port) ).admin.add_user("admin","password")
+        except OperationFailure, e:
+            if e.message == 'need to login':
+                pass # SERVER-4225
+            else:
+                raise e
+
     def start(self):
         global mongod_port
         global mongod
@@ -153,10 +171,16 @@ class mongod(object):
             argv += ['--nojournal']
         if self.kwargs.get('no_preallocj'):
             argv += ['--nopreallocj']
+        if self.kwargs.get('auth'):
+            argv += ['--auth']
+            self.auth = True
         print "running " + " ".join(argv)
         self.proc = Popen(argv)
         if not self.did_mongod_start(self.port):
             raise Exception("Failed to start mongod")
+
+        if self.auth:
+            self.setup_admin_user(self.port)
 
         if self.slave:
             local = Connection(port=self.port, slave_okay=True).local
@@ -244,9 +268,13 @@ def check_db_hashes(master, slave):
 
 # Blech.
 def skipTest(path):
-    if small_oplog:
-        if os.path.basename(path) in ["cursor8.js", "indexh.js", "dropdb.js"]:
+    basename = os.path.basename(path)
+    parentDir = os.path.basename(os.path.dirname(path))
+    if small_oplog: # For tests running in parallel
+        if basename in ["cursor8.js", "indexh.js", "dropdb.js"]:
             return True
+    if auth or keyFile: # For tests running with auth
+        return os.path.join(parentDir,basename) in ["sharding/sync3.js", "sharding/sync6.js"]
     return False
 
 def runTest(test):
@@ -278,26 +306,40 @@ def runTest(test):
                     "--port", mongod_port]
     else:
         raise Bug("fell off in extenstion case: %s" % path)
+
+    if keyFile:
+        f = open(keyFile, 'r')
+        keyFileData = re.sub(r'\s', '', f.read()) # Remove all whitespace
+        f.close()
+
     sys.stderr.write( "starting test : %s \n" % os.path.basename(path) )
     sys.stderr.flush()
     print " *******************************************"
     print "         Test : " + os.path.basename(path) + " ..."
-    t1 = time.time()
     # FIXME: we don't handle the case where the subprocess
     # hangs... that's bad.
     if argv[0].endswith( 'mongo' ) and not '--eval' in argv :
-        argv = argv + [ '--eval', 'TestData = new Object();' + 
-                                  'TestData.testPath = "' + path + '";' + 
-                                  'TestData.testFile = "' + os.path.basename( path ) + '";' +
-                                  'TestData.testName = "' + re.sub( ".js$", "", os.path.basename( path ) ) + '";' + 
-                                  'TestData.noJournal = ' + ( 'true' if no_journal else 'false' )  + ";" +
-                                  'TestData.noJournalPrealloc = ' + ( 'true' if no_preallocj else 'false' )  + ";" ]
+        evalString = 'TestData = new Object();' + \
+                     'TestData.testPath = "' + path + '";' + \
+                     'TestData.testFile = "' + os.path.basename( path ) + '";' + \
+                     'TestData.testName = "' + re.sub( ".js$", "", os.path.basename( path ) ) + '";' + \
+                     'TestData.noJournal = ' + ( 'true' if no_journal else 'false' )  + ";" + \
+                     'TestData.noJournalPrealloc = ' + ( 'true' if no_preallocj else 'false' )  + ";" + \
+                     'TestData.auth = ' + ( 'true' if auth else 'false' ) + ";" + \
+                     'TestData.keyFile = ' + ( '"' + keyFile + '"' if keyFile else 'null' ) + ";" + \
+                     'TestData.keyFileData = ' + ( '"' + keyFileData + '"' if keyFile else 'null' ) + ";"
+        if auth and usedb:
+            evalString += 'db.getSiblingDB("admin").addUser("admin","password");'
+            evalString += 'jsTest.authenticate(db.getMongo());'
+        argv = argv + [ '--eval', evalString]
+
     
     if argv[0].endswith( 'test' ) and no_preallocj :
         argv = argv + [ '--nopreallocj' ]
     
     
     print argv
+    t1 = time.time()
     r = call(argv, cwd=test_path)
     t2 = time.time()
     print "                " + str((t2 - t1) * 1000) + "ms"
@@ -319,14 +361,16 @@ def run_tests(tests):
     
     # The reason we use with is so that we get __exit__ semantics
 
-    with mongod(small_oplog=small_oplog,no_journal=no_journal,no_preallocj=no_preallocj) as master:
+    with mongod(small_oplog=small_oplog,no_journal=no_journal,no_preallocj=no_preallocj,auth=auth) as master:
         with mongod(slave=True) if small_oplog else Nothing() as slave:
             if small_oplog:
                 master.wait_for_repl()
 
             for test in tests:
                 try:
+                    fails.append(test)
                     runTest(test)
+                    fails.pop()
                     winners.append(test)
 
                     if small_oplog:
@@ -441,8 +485,82 @@ def add_exe(e):
         e += ".exe"
     return e
 
+def set_globals(options):
+    global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog, no_journal, no_preallocj, auth, keyFile, smoke_db_prefix, test_path
+    #Careful, this can be called multiple times
+    test_path = options.test_path
+
+    mongod_executable = add_exe(options.mongod_executable)
+    if not os.path.exists(mongod_executable):
+        raise Exception("no mongod found in this directory.")
+
+    mongod_port = options.mongod_port
+
+    shell_executable = add_exe( options.shell_executable )
+    if not os.path.exists(shell_executable):
+        raise Exception("no mongo shell found in this directory.")
+
+    continue_on_failure = options.continue_on_failure
+    smoke_db_prefix = options.smoke_db_prefix
+    small_oplog = options.small_oplog
+    no_journal = options.no_journal
+    no_preallocj = options.no_preallocj
+    auth = options.auth
+    keyFile = options.keyFile
+
+def clear_failfile():
+    if os.path.exists(failfile):
+        os.remove(failfile)
+
+def run_old_fails():
+    global tests
+
+    try:
+        with open(failfile, 'r') as f:
+            testsAndOptions = pickle.load(f)
+    except Exception:
+        clear_failfile()
+        return # This counts as passing so we will run all tests
+
+    tests = [x[0] for x in testsAndOptions]
+    passed = []
+    try:
+        for (i, (test, options)) in enumerate(testsAndOptions):
+            set_globals(options)
+            oldWinners = len(winners)
+            run_tests([test])
+            if len(winners) != oldWinners: # can't use return value due to continue_on_failure
+                passed.append(i)
+    finally:
+        for offset, i in enumerate(passed):
+            testsAndOptions.pop(i - offset)
+
+        if testsAndOptions:
+            with open(failfile, 'w') as f:
+                pickle.dump(testsAndOptions, f)
+        else:
+            clear_failfile()
+
+        report() # exits with failure code if there is an error
+
+def add_to_failfile(tests, options):
+    try:
+        with open(failfile, 'r') as f:
+            testsAndOptions = pickle.load(f)
+    except Exception:
+        testsAndOptions = []
+
+    for test in tests:
+        if (test, options) not in testsAndOptions:
+            testsAndOptions.append( (test, options) )
+
+    with open(failfile, 'w') as f:
+        pickle.dump(testsAndOptions, f)
+
+
+
 def main():
-    global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog, no_journal, no_preallocj, smoke_db_prefix, test_path
+    global mongod_executable, mongod_port, shell_executable, continue_on_failure, small_oplog, no_journal, no_preallocj, auth, keyFile, smoke_db_prefix, test_path
     parser = OptionParser(usage="usage: smoke.py [OPTIONS] ARGS*")
     parser.add_option('--mode', dest='mode', default='suite',
                       help='If "files", ARGS are filenames; if "suite", ARGS are sets of tests (%default)')
@@ -474,31 +592,26 @@ def main():
     parser.add_option('--nopreallocj', dest='no_preallocj', default=False,
                       action="store_true",
                       help='Do not preallocate journal files in tests')
+    parser.add_option('--auth', dest='auth', default=False,
+                      action="store_true",
+                      help='Run standalone mongods in tests with authentication enabled')
+    parser.add_option('--keyFile', dest='keyFile', default=None,
+                      help='Path to keyFile to use to run replSet and sharding tests with authentication enabled')
     parser.add_option('--ignore', dest='ignore_files', default=None,
-		      help='Pattern of files to ignore in tests')    
+                      help='Pattern of files to ignore in tests')
+    parser.add_option('--only-old-fails', dest='only_old_fails', default=False,
+                      action="store_true",
+                      help='Check the failfile and only run all tests that failed last time')
+    parser.add_option('--reset-old-fails', dest='reset_old_fails', default=False,
+                      action="store_true",
+                      help='Clear the failfile. Do this if all tests pass')
 
     global tests
     (options, tests) = parser.parse_args()
 
     print tests
 
-    test_path = options.test_path
-
-    mongod_executable = add_exe(options.mongod_executable)
-    if not os.path.exists(mongod_executable):
-        raise Exception("no mongod found in this directory.")
-
-    mongod_port = options.mongod_port
-
-    shell_executable = add_exe( options.shell_executable )
-    if not os.path.exists(shell_executable):
-        raise Exception("no mongo shell found in this directory.")
-
-    continue_on_failure = options.continue_on_failure
-    smoke_db_prefix = options.smoke_db_prefix
-    small_oplog = options.small_oplog
-    no_journal = options.no_journal
-    no_preallocj = options.no_preallocj
+    set_globals(options)
 
     if options.File:
         if options.File == '-':
@@ -507,6 +620,13 @@ def main():
             with open(options.File) as f:
                 tests = f.readlines()
     tests = [t.rstrip('\n') for t in tests]
+
+    if options.only_old_fails:
+        run_old_fails()
+        return
+    elif options.reset_old_fails:
+        clear_failfile()
+        return
 
     # If we're in suite mode, tests is a list of names of sets of tests.
     if options.mode == 'suite':
@@ -524,6 +644,7 @@ def main():
     try:
         run_tests(tests)
     finally:
+        add_to_failfile(fails, options)
         report()
 
 

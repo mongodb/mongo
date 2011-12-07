@@ -32,12 +32,22 @@ DBQuery.prototype.help = function () {
     print("\t.size() - total # of objects cursor would return, honors skip,limit")
     print("\t.explain([verbose])")
     print("\t.hint(...)")
+    print("\t.addOption(n) - adds op_query options -- see wire protocol")
+    print("\t._addSpecial(name, value) - http://www.mongodb.org/display/DOCS/Advanced%20Queries#AdvancedQueries-Metaqueryoperators")
+    print("\t.batchSize(n) - sets the number of docs to return per getMore")
     print("\t.showDiskLoc() - adds a $diskLoc field to each returned object")
+    print("\t.min(idxDoc)")
+    print("\t.max(idxDoc)")
+    
     print("\nCursor methods");
+    print("\t.toArray() - iterates through docs and returns an array of the results")
     print("\t.forEach( func )")
     print("\t.map( func )")
     print("\t.hasNext()")
     print("\t.next()")
+    print("\t.objsLeftInBatch() - returns count of docs left in current batch (when exhausted, a new getMore will be issued)")
+    print("\t.count(applySkipLimit) - runs command at server")    
+    print("\t.itcount() - iterates through documents and counts them")
 }
 
 DBQuery.prototype.clone = function(){
@@ -242,6 +252,12 @@ DBQuery.prototype.map = function( func ){
 
 DBQuery.prototype.arrayAccess = function( idx ){
     return this.toArray()[idx];
+}
+DBQuery.prototype.comment = function (comment) {
+    var n = this.clone();
+    n._ensureSpecial();
+    n._addSpecial("$comment", comment);
+    return this.next();
 }
 
 DBQuery.prototype.explain = function (verbose) {

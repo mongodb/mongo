@@ -109,12 +109,6 @@ namespace ReplTests {
             return count;
         }
         static void applyAllOperations() {
-            class Applier : public ReplSource {
-            public:
-                static void apply( const BSONObj &op ) {
-                    ReplSource::applyOperation( op );
-                }
-            };
             dblock lk;
             vector< BSONObj > ops;
             {
@@ -124,8 +118,13 @@ namespace ReplTests {
             }
             {
                 Client::Context ctx( ns() );
-                for( vector< BSONObj >::iterator i = ops.begin(); i != ops.end(); ++i )
-                    Applier::apply( *i );
+                BSONObjBuilder b;
+                b.append("host", "localhost");
+                b.appendTimestamp("syncedTo", 0);
+                ReplSource a(b.obj());
+                for( vector< BSONObj >::iterator i = ops.begin(); i != ops.end(); ++i ) {
+                    a.applyOperation( *i );
+                }
             }
         }
         static void printAll( const char *ns ) {
@@ -1016,7 +1015,7 @@ namespace ReplTests {
             ASSERT( !one( BSON( "_id" << 2 ) ).isEmpty() );
         }
     };
-    
+
     class DatabaseIgnorerBasic {
     public:
         void run() {
@@ -1049,10 +1048,10 @@ namespace ReplTests {
             d.doIgnoreUntilAfter( "a", OpTime( 5, 0 ) );
             ASSERT( d.ignoreAt( "a", OpTime( 5, 5 ) ) );
             ASSERT( d.ignoreAt( "a", OpTime( 6, 0 ) ) );
-            ASSERT( !d.ignoreAt( "a", OpTime( 6, 1 ) ) );            
+            ASSERT( !d.ignoreAt( "a", OpTime( 6, 1 ) ) );
         }
     };
-    
+
     /**
      * Check against oldest document in the oplog before scanning backward
      * from the newest document.
@@ -1077,7 +1076,7 @@ namespace ReplTests {
             ASSERT_EQUALS( 0, fsc.cursor()->current()[ "o" ].Obj()[ "_id" ].Int() );
         }
     };
-    
+
     /** Check unsuccessful yield recovery with FindingStartCursor */
     class FindingStartCursorYield : public Base {
     public:
@@ -1100,7 +1099,7 @@ namespace ReplTests {
             ASSERT( !fsc.done() );
             ASSERT( fsc.prepareToYield() );
             ClientCursor::invalidate( "local.oplog.$main" );
-            ASSERT_EXCEPTION( fsc.recoverFromYield(), MsgAssertionException );
+            ASSERT_THROWS( fsc.recoverFromYield(), MsgAssertionException );
         }
     };
 
@@ -1120,6 +1119,47 @@ namespace ReplTests {
             assert(m1 == m2);
             m1.tags.clear();
             assert(m1 != m2);
+        }
+    };
+
+    class SyncTest : public Sync {
+    public:
+        bool returnEmpty;
+        SyncTest() : Sync(""), returnEmpty(false) {}
+        virtual ~SyncTest() {}
+        virtual BSONObj getMissingDoc(const BSONObj& o) {
+            if (returnEmpty) {
+                BSONObj o;
+                return o;
+            }
+            return BSON("_id" << "on remote" << "foo" << "baz");
+        }
+    };
+
+    class ShouldRetry : public Base {
+    public:
+        void run() {
+            bool threw = false;
+            BSONObj o = BSON("ns" << ns() << "o" << BSON("foo" << "bar") << "o2" << BSON("_id" << "in oplog" << "foo" << "bar"));
+
+            // this should fail because we can't connect
+            try {
+                Sync badSource("localhost:123");
+                badSource.getMissingDoc(o);
+            }
+            catch (DBException&) {
+                threw = true;
+            }
+            assert(threw);
+
+            // now this should succeed
+            SyncTest t;
+            assert(t.shouldRetry(o));
+            assert(!client()->findOne(ns(), BSON("_id" << "on remote")).isEmpty());
+
+            // force it not to find an obj
+            t.returnEmpty = true;
+            assert(!t.shouldRetry(o));
         }
     };
 
@@ -1180,6 +1220,7 @@ namespace ReplTests {
             add< FindingStartCursorStale >();
             add< FindingStartCursorYield >();
             add< ReplSetMemberCfgEquality >();
+            add< ShouldRetry >();
         }
     } myall;
 

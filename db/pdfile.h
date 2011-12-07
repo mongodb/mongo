@@ -61,6 +61,11 @@ namespace mongo {
         friend class BasicCursor;
     public:
         MongoDataFile(int fn) : _mb(0), fileNo(fn) { }
+
+        /** @return true if found and opened. if uninitialized (prealloc only) does not open. */
+        bool openExisting( const char *filename );
+
+        /** creates if DNE */
         void open(const char *filename, int requestedDataSize = 0, bool preallocateOnly = false);
 
         /* allocate a new extent from this datafile.
@@ -372,9 +377,24 @@ namespace mongo {
 
         void init(int fileno, int filelength, const char* filename) {
             if ( uninitialized() ) {
+                DEV log() << "datafileheader::init initializing " << filename << " n:" << fileno << endl;
                 if( !(filelength > 32768 ) ) { 
                     massert(13640, str::stream() << "DataFileHeader looks corrupt at file open filelength:" << filelength << " fileno:" << fileno, false);
                 }
+
+                { 
+                    if( !dbMutex.isWriteLocked() ) { 
+                        log() << "*** TEMP NOT INITIALIZING FILE " << filename << ", not in a write lock." << endl;
+                        log() << "temp bypass until more elaborate change - case that is manifesting is benign anyway" << endl;
+                        return;
+/**
+                        log() << "ERROR can't create outside a write lock" << endl;
+                        printStackTrace();
+                        ::abort();
+**/
+                    }
+                }
+
                 getDur().createdFile(filename, filelength);
                 assert( HeaderSize == 8192 );
                 DataFileHeader *h = getDur().writing(this);

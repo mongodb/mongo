@@ -27,29 +27,11 @@ namespace mongo {
 
         void debugValidateAllMapsMatch();
 
-        /** apply the writes back to the non-private MMF after they are for certain in redo log
-
-            (1) todo we don't need to write back everything every group commit.  we MUST write back
-            that which is going to be a remapped on its private view - but that might not be all
-            views.
-
-            (2) todo should we do this using N threads?  would be quite easy
-                see Hackenberg paper table 5 and 6.  2 threads might be a good balance.
-
-            (3) with enough work, we could do this outside the read lock.  it's a bit tricky though.
-                - we couldn't do it from the private views then as they may be changing.  would have to then
-                  be from the journal alignedbuffer.
-                - we need to be careful the file isn't unmapped on us -- perhaps a mutex or something
-                  with MongoMMF on closes or something to coordinate that.
-
-            locking: in read lock when called
-
-            @see https://docs.google.com/drawings/edit?id=1TklsmZzm7ohIZkwgeK6rMvsdaR13KjtJYMsfLr175Zc&hl=en
-        */
-
-        void WRITETODATAFILES_Impl1(const JSectHeader& h, AlignedBuilder& uncompressed) {
+        static void WRITETODATAFILES_Impl1(const JSectHeader& h, AlignedBuilder& uncompressed) {
             RWLockRecursive::Shared lk(MongoFile::mmmutex);
+            LOG(3) << "journal WRITETODATAFILES 1" << endl;
             RecoveryJob::get().processSection(&h, uncompressed.buf(), uncompressed.len(), 0);
+            LOG(3) << "journal WRITETODATAFILES 2" << endl;
         }
 
 #if 0
@@ -80,15 +62,32 @@ namespace mongo {
         }
 #endif
 
-        // concurrency: in mmmutex, not necessarily in dbMutex
+        /** apply the writes back to the non-private MMF after they are for certain in redo log
+
+            (1) todo we don't need to write back everything every group commit.  we MUST write back
+            that which is going to be a remapped on its private view - but that might not be all
+            views.
+
+            (2) todo should we do this using N threads?  would be quite easy
+                see Hackenberg paper table 5 and 6.  2 threads might be a good balance.
+
+            (3) with enough work, we could do this outside the read lock.  it's a bit tricky though.
+                - we couldn't do it from the private views then as they may be changing.  would have to then
+                  be from the journal alignedbuffer.
+                - we need to be careful the file isn't unmapped on us -- perhaps a mutex or something
+                  with MongoMMF on closes or something to coordinate that.
+
+            concurrency: in mmmutex, not necessarily in dbMutex
+
+            @see https://docs.google.com/drawings/edit?id=1TklsmZzm7ohIZkwgeK6rMvsdaR13KjtJYMsfLr175Zc&hl=en
+        */
+
         void WRITETODATAFILES(const JSectHeader& h, AlignedBuilder& uncompressed) {
             Timer t;
-#if defined(_EXPERIMENTAL)
-            WRITETODATAFILES_Impl3();
-#else
             WRITETODATAFILES_Impl1(h, uncompressed);
-#endif
-            stats.curr->_writeToDataFilesMicros += t.micros();
+            unsigned long long m = t.micros();
+            stats.curr->_writeToDataFilesMicros += m;
+            LOG(2) << "journal WRITETODATAFILES " << m / 1000.0 << "ms" << endl;
         }
 
     }

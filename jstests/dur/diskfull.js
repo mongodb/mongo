@@ -85,7 +85,7 @@ function runFirstMongodAndFillDisk() {
     log();
     
     clear();
-    conn = startMongodNoReset("--port", 30001, "--dbpath", startPath, "--dur", "--smallfiles", "--durOptions", 8, "--noprealloc");
+    conn = startMongodNoReset("--port", 30001, "--dbpath", startPath, "--dur", "--smallfiles", "--durOptions", 8+64, "--noprealloc");
     
     assert.throws( work, null, "no exception thrown when exceeding disk capacity" );
     stopMongod( 30001 );
@@ -96,7 +96,7 @@ function runFirstMongodAndFillDisk() {
 function runSecondMongdAndRecover() {
     // restart and recover
     log();
-    conn = startMongodNoReset("--port", 30003, "--dbpath", startPath, "--dur", "--smallfiles", "--durOptions", 8, "--noprealloc");
+    conn = startMongodNoReset("--port", 30003, "--dbpath", startPath, "--dur", "--smallfiles", "--durOptions", 8+64, "--noprealloc");
     verify();
     
     log("stop");

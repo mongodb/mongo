@@ -66,8 +66,6 @@ namespace mongo {
         return false;
     }
 
-    void flushDiagLog();
-
     /* reset any errors so that getlasterror comes back clean.
 
        useful before performing a long series of operations where we want to
@@ -665,9 +663,9 @@ namespace mongo {
         virtual LockType locktype() const { return WRITE; }
         bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
             int was = _diaglog.setLevel( cmdObj.firstElement().numberInt() );
-            flushDiagLog();
+            _diaglog.flush();
             if ( !cmdLine.quiet )
-                tlog() << "CMD: diagLogging set to " << _diaglog.level << " from: " << was << endl;
+                tlog() << "CMD: diagLogging set to " << _diaglog.getLevel() << " from: " << was << endl;
             result.append( "was" , was );
             return true;
         }
@@ -1002,9 +1000,8 @@ namespace mongo {
                 totalSize += size;
                 
                 {
-                    readlock lk( *i );
-                    Client::Context ctx( *i );
-                    b.appendBool( "empty", ctx.db()->isEmpty() );
+                    Client::ReadContext rc( *i );
+                    b.appendBool( "empty", rc.ctx().db()->isEmpty() );
                 }
                 
                 dbInfos.push_back( b.obj() );
@@ -1016,7 +1013,7 @@ namespace mongo {
             set<string> allShortNames;
             {
                 readlock lk;
-                dbHolder.getAllShortNames( allShortNames );
+                dbHolder().getAllShortNames( false, allShortNames );
             }
             
             for ( set<string>::iterator i = allShortNames.begin(); i != allShortNames.end(); i++ ) {
@@ -1058,7 +1055,7 @@ namespace mongo {
         bool run(const string& dbname , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
             bool ok;
             try {
-                ok = dbHolder.closeAll( dbpath , result, false );
+                ok = dbHolderW().closeAll( dbpath , result, false );
             }
             catch(DBException&) { 
                 throw;
@@ -1360,7 +1357,7 @@ namespace mongo {
 
             return true;
         }
-    } cmdCollectionStatis;
+    } cmdCollectionStats;
 
     class DBStats : public Command {
     public:
@@ -1853,32 +1850,34 @@ namespace mongo {
         bool retval = false;
         if ( c->locktype() == Command::NONE ) {
             // we also trust that this won't crash
+            retval = true;
 
             if ( c->requiresAuth() ) {
                 // test that the user at least as read permissions
                 if ( ! client.getAuthenticationInfo()->isAuthorizedReads( dbname ) ) {
                     result.append( "errmsg" , "need to login" );
-                    return false;
+                    retval = false;
                 }
             }
 
+            if (retval) {
+                client.curop()->ensureStarted();
+                retval = _execCommand(c, dbname , cmdObj , queryOptions, result , fromRepl );
+            }
+        }
+        else if( c->locktype() != Command::WRITE ) { 
+            // read lock
+            assert( ! c->logTheOp() );
+            Client::ReadContext ctx( dbname , dbpath, c->requiresAuth() ); // read locks
             client.curop()->ensureStarted();
-
             retval = _execCommand(c, dbname , cmdObj , queryOptions, result , fromRepl );
         }
         else {
-            bool needWriteLock = c->locktype() == Command::WRITE;
-
-            if ( ! needWriteLock ) {
-                assert( ! c->logTheOp() );
-            }
-
-            mongolock lk( needWriteLock );
+            dassert( c->locktype() == Command::WRITE );
+            writelock lk;
             client.curop()->ensureStarted();
-            Client::Context ctx( dbname , dbpath , &lk , c->requiresAuth() );
-
+            Client::Context ctx( dbname , dbpath , c->requiresAuth() );
             retval = _execCommand(c, dbname , cmdObj , queryOptions, result , fromRepl );
-
             if ( retval && c->logTheOp() && ! fromRepl ) {
                 logOp("c", cmdns, cmdObj);
             }

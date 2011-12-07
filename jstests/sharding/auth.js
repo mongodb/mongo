@@ -161,6 +161,9 @@ for (i=0; i<num; i++) {
 
 // Make sure all data gets sent through
 printjson( s.getDB("test").getLastError() )
+for (var i = 0; i < s._connections.length; i++) { // SERVER-4356
+    s._connections[i].getDB("test").getLastError();
+}
 
 var d1Chunks = s.getDB("config").chunks.count({shard : "d1"});
 var d2Chunks = s.getDB("config").chunks.count({shard : "d2"});
@@ -218,6 +221,10 @@ assert.eq(count, 500);
 
 logout(adminUser);
 
+// add admin on shard itself, hack to prevent localhost auth bypass
+d1.getMaster().getDB(adminUser.db).addUser(adminUser.username, adminUser.password);
+d2.getMaster().getDB(adminUser.db).addUser(adminUser.username, adminUser.password);
+
 login(testUser);
 print( "testing map reduce" );
 /* sharded map reduce can be tricky since all components talk to each other.
@@ -261,6 +268,17 @@ assert( ! result.ok , tojson( result ) )
 print( "   testing read command (should succeed)" );
 assert.commandWorked(readOnlyDB.runCommand({count : "foo"}));
 
+print("make sure currentOp/killOp fail");
+assert.throws(function() {
+    printjson(readOnlyDB.currentOp());
+});
+assert.throws(function() {
+    printjson(readOnlyDB.killOp(123));
+});
+assert.throws(function() {
+    printjson(readOnlyDB.fsyncUnlock());
+});
+
 /*
 broken because of SERVER-4156
 print( "   testing write command (should fail)" );
@@ -273,5 +291,16 @@ assert.commandFailed(readOnlyDB.runCommand(
 */
 print( "   testing logout (should succeed)" );
 assert.commandWorked(readOnlyDB.runCommand({logout : 1}));
+
+print("make sure currentOp/killOp fail again");
+assert.throws(function() {
+    printjson(readOnlyDB.currentOp());
+});
+assert.throws(function() {
+    printjson(readOnlyDB.killOp(123));
+});
+assert.throws(function() {
+    printjson(readOnlyDB.fsyncUnlock());
+});
 
 s.stop();

@@ -125,6 +125,11 @@ namespace mongo {
         ss << _root.string() << "/file." << _files.size();
         string file = ss.str();
 
+        // todo: it may make sense to fadvise that this not be cached so that building the index doesn't 
+        //       eject other things the db is using from the file system cache.  while we will soon be reading 
+        //       this back, if it fit in ram, there wouldn't have been a need for an external sort in the first 
+        //       place.
+
         ofstream out;
         out.open( file.c_str() , ios_base::out | ios_base::binary );
         assertStreamGood( 10051 ,  (string)"couldn't open file: " + file , out );

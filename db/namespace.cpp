@@ -124,14 +124,11 @@ namespace mongo {
 #endif
 
     void NamespaceDetails::onLoad(const Namespace& k) {
-        //dump(k);
 
         if( k.isExtra() ) {
             /* overflow storage for indexes - so don't treat as a NamespaceDetails object. */
             return;
         }
-
-        DEV assertInWriteLock();
 
         if( indexBuildInProgress || capped2.cc2_ptr ) {
             assertInWriteLock();
@@ -152,6 +149,8 @@ namespace mongo {
 
     NOINLINE_DECL void NamespaceIndex::_init() {
         assert( !ht );
+
+        dbMutex.assertWriteLocked();
 
         /* if someone manually deleted the datafiles for a database,
            we need to be sure to clear any cached info for the database in
@@ -272,7 +271,15 @@ namespace mongo {
         @return null diskloc if no room - allocate a new extent then
     */
     DiskLoc NamespaceDetails::alloc(const char *ns, int lenToAlloc, DiskLoc& extentLoc) {
-        lenToAlloc = (lenToAlloc + 3) & 0xfffffffc;
+        {
+            // align very slightly.  
+            // note that if doing more coarse-grained quantization (really just if it isn't always
+            //   a constant amount but if it varied by record size) then that quantization should 
+            //   NOT be done here but rather in __stdAlloc so that we can grab a deletedrecord that 
+            //   is just big enough if we happen to run into one.
+            lenToAlloc = (lenToAlloc + 3) & 0xfffffffc;
+        }
+
         DiskLoc loc = _alloc(ns, lenToAlloc);
         if ( loc.isNull() )
             return loc;
@@ -292,14 +299,12 @@ namespace mongo {
         if ( capped == 0 ) {
             if ( left < 24 || left < (lenToAlloc >> 3) ) {
                 // you get the whole thing.
-                //DataFileMgr::grow(loc, regionlen);
                 return loc;
             }
         }
 
         /* split off some for further use. */
         getDur().writingInt(r->lengthWithHeaders) = lenToAlloc;
-        //DataFileMgr::grow(loc, lenToAlloc);
         DiskLoc newDelLoc = loc;
         newDelLoc.inc(lenToAlloc);
         DeletedRecord *newDel = DataFileMgr::makeDeletedRecord(newDelLoc, left);
@@ -314,7 +319,7 @@ namespace mongo {
     }
 
     /* for non-capped collections.
-       @param willBeAt just look up where and don't reserve
+       @param peekOnly just look up where and don't reserve
        returned item is out of the deleted list upon return
     */
     DiskLoc NamespaceDetails::__stdAlloc(int len, bool peekOnly) {
@@ -513,7 +518,7 @@ namespace mongo {
 
         (*getDur().writing(&nIndexes))++;
         if ( resetTransient )
-            NamespaceDetailsTransient::get_w(thisns).addedIndex();
+            NamespaceDetailsTransient::get(thisns).addedIndex();
         return *id;
     }
 
@@ -588,7 +593,7 @@ namespace mongo {
 
     SimpleMutex NamespaceDetailsTransient::_qcMutex("qc");
     SimpleMutex NamespaceDetailsTransient::_isMutex("is");
-    map< string, shared_ptr< NamespaceDetailsTransient > > NamespaceDetailsTransient::_map;
+    map< string, shared_ptr< NamespaceDetailsTransient > > NamespaceDetailsTransient::_nsdMap;
     typedef map< string, shared_ptr< NamespaceDetailsTransient > >::iterator ouriter;
 
     void NamespaceDetailsTransient::reset() {
@@ -598,32 +603,25 @@ namespace mongo {
         _indexSpecs.clear();
     }
 
-    /*    NamespaceDetailsTransient& NamespaceDetailsTransient::get(const char *ns) {
-            shared_ptr< NamespaceDetailsTransient > &t = map_[ ns ];
-            if ( t.get() == 0 )
-                t.reset( new NamespaceDetailsTransient(ns) );
-            return *t;
-        }
-    */
     void NamespaceDetailsTransient::clearForPrefix(const char *prefix) {
         assertInWriteLock();
         vector< string > found;
-        for( ouriter i = _map.begin(); i != _map.end(); ++i )
+        for( ouriter i = _nsdMap.begin(); i != _nsdMap.end(); ++i )
             if ( strncmp( i->first.c_str(), prefix, strlen( prefix ) ) == 0 )
                 found.push_back( i->first );
         for( vector< string >::iterator i = found.begin(); i != found.end(); ++i ) {
-            _map[ *i ].reset();
+            _nsdMap[ *i ].reset();
         }
     }
 
     void NamespaceDetailsTransient::eraseForPrefix(const char *prefix) {
         assertInWriteLock();
         vector< string > found;
-        for( ouriter i = _map.begin(); i != _map.end(); ++i )
+        for( ouriter i = _nsdMap.begin(); i != _nsdMap.end(); ++i )
             if ( strncmp( i->first.c_str(), prefix, strlen( prefix ) ) == 0 )
                 found.push_back( i->first );
         for( vector< string >::iterator i = found.begin(); i != found.end(); ++i ) {
-            _map.erase(*i);
+            _nsdMap.erase(*i);
         }
     }
 

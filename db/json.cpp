@@ -261,11 +261,31 @@ namespace mongo {
     struct numberValue {
         numberValue( ObjectBuilder &_b ) : b( _b ) {}
         void operator() ( const char *start, const char *end ) const {
-            // We re-parse the numeric string here because spirit parsing of strings
-            // to doubles produces different results from strtod in some cases and
-            // we want to use strtod to ensure consistency with other string to
-            // double conversions in our code.
-            b.back()->append( b.fieldName(), strtod( start, 0 ) );
+            string raw(start);
+            double val;
+
+            // strtod isn't able to deal with NaN and inf in a portable way.
+            // Correspondingly, we perform the conversions explicitly.
+
+            if ( ! raw.compare(0, 3, "NaN" ) ) {
+                val = std::numeric_limits<double>::quiet_NaN();
+            } 
+            else if ( ! raw.compare(0, 8, "Infinity" ) ) {
+                val = std::numeric_limits<double>::infinity();
+            } 
+            else if ( ! raw.compare(0, 9, "-Infinity" ) ) {
+                val = -std::numeric_limits<double>::infinity();
+            }
+            else {
+                // We re-parse the numeric string here because spirit parsing of strings
+                // to doubles produces different results from strtod in some cases and
+                // we want to use strtod to ensure consistency with other string to
+                // double conversions in our code.
+
+                val = strtod( start, 0 );
+            }
+
+            b.back()->append( b.fieldName(), val );
         }
         ObjectBuilder &b;
     };
@@ -541,7 +561,7 @@ namespace mongo {
 
                 // real_p accepts numbers with nonsignificant zero prefixes, which
                 // aren't allowed in JSON.  Oh well.
-                number = strict_real_p;
+                number = strict_real_p | str_p( "NaN" ) | str_p( "Infinity" ) | str_p( "-Infinity" );
 
                 static int_parser<long long, 10,  1, numeric_limits<long long>::digits10 + 1> long_long_p;
                 integer = long_long_p[ intValue(self.b) ];

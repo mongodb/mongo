@@ -410,15 +410,14 @@ namespace mongo {
 
         extern size_t privateMapBytes;
 
-        /** We need to remap the private views periodically. otherwise they would become very large.
-            Call within write lock.
-        */
-        void _REMAPPRIVATEVIEW() {
+        static void _REMAPPRIVATEVIEW() {
             // todo: Consider using ProcessInfo herein and watching for getResidentSize to drop.  that could be a way 
             //       to assure very good behavior here.
 
             static unsigned startAt;
             static unsigned long long lastRemap;
+
+            LOG(3) << "journal REMAPPRIVATEVIEW" << endl;
 
             dbMutex.assertWriteLocked();
             dbMutex._remapPrivateViewRequested = false;
@@ -462,8 +461,10 @@ namespace mongo {
                 i++;
                 if( i == e ) i = b;
             }
+            unsigned startedAt = startAt;
             startAt = (startAt + ntodo) % sz; // mark where to start next time
 
+            Timer t;
             for( unsigned x = 0; x < ntodo; x++ ) {
                 dassert( i != e );
                 if( (*i)->isMongoMMF() ) {
@@ -477,7 +478,12 @@ namespace mongo {
                     if( i == e ) i = b;
                 }
             }
+            LOG(2) << "journal REMAPPRIVATEVIEW done startedAt: " << startedAt << " n:" << ntodo << ' ' << t.millis() << "ms" << endl;
         }
+
+        /** We need to remap the private views periodically. otherwise they would become very large.
+            Call within write lock.  See top of file for more commentary.
+        */
         void REMAPPRIVATEVIEW() {
             Timer t;
             _REMAPPRIVATEVIEW();
@@ -488,11 +494,19 @@ namespace mongo {
         mutex groupCommitMutex("groupCommit");
 
         bool _groupCommitWithLimitedLocks() {
+
+            int p = 0;
+            LOG(3) << "groupcommitll " << p++ << endl;
+
             scoped_ptr<readlocktry> lk1( new readlocktry("", 500) );
             if( !lk1->got() )
                 return false;
 
+            LOG(3) << "groupcommitll " << p++ << endl;
+
             scoped_lock lk2(groupCommitMutex);
+
+            LOG(3) << "groupcommitll " << p++ << endl;
 
             commitJob.beginCommit();
 
@@ -501,61 +515,84 @@ namespace mongo {
                 commitJob.notifyCommitted();
                 return true;
             }
+
+            LOG(3) << "groupcommitll " << p++ << endl;
+
             JSectHeader h;
-            PREPLOGBUFFER(h);
+            PREPLOGBUFFER(h); // need to be in readlock (writes excluded) for this
+
+            LOG(3) << "groupcommitll " << p++ << endl;
 
             RWLockRecursive::Shared lk3(MongoFile::mmmutex);
+
+            LOG(3) << "groupcommitll " << p++ << endl;
 
             unsigned abLen = commitJob._ab.len();
             commitJob.reset(); // must be reset before allowing anyone to write
             DEV assert( !commitJob.hasWritten() );
 
+            LOG(3) << "groupcommitll " << p++ << endl;
+
             // release the readlock -- allowing others to now write while we are writing to the journal (etc.)
             lk1.reset();
+
+            LOG(3) << "groupcommitll " << p++ << endl;
 
             // ****** now other threads can do writes ******
             WRITETOJOURNAL(h, commitJob._ab);
             assert( abLen == commitJob._ab.len() ); // a check that no one touched the builder while we were doing work. if so, our locking is wrong.
 
+            LOG(3) << "groupcommitll " << p++ << endl;
+
             // data is now in the journal, which is sufficient for acknowledging getLastError.
             // (ok to crash after that)
             commitJob.notifyCommitted();
 
+            LOG(3) << "groupcommitll " << p++ << " WRITETODATAFILES()" << endl;
+
             WRITETODATAFILES(h, commitJob._ab);
             assert( abLen == commitJob._ab.len() ); // check again wasn't modded
             commitJob._ab.reset();
+
+            LOG(3) << "groupcommitll " << p++ << endl;
 
             // can't : dbMutex._remapPrivateViewRequested = true;
 
             return true;
         }
 
-       /** @return true if committed; false if lock acquisition timed out (we only try for a read lock herein and only wait for a certain duration). */
-       bool groupCommitWithLimitedLocks() {
-           try {
-               return _groupCommitWithLimitedLocks();
-           }
-           catch(DBException& e ) {
-               log() << "dbexception in groupCommitLL causing immediate shutdown: " << e.toString() << endl;
-               mongoAbort("dur1");
-           }
-           catch(std::ios_base::failure& e) {
-               log() << "ios_base exception in groupCommitLL causing immediate shutdown: " << e.what() << endl;
-               mongoAbort("dur2");
-           }
-           catch(std::bad_alloc& e) {
-               log() << "bad_alloc exception in groupCommitLL causing immediate shutdown: " << e.what() << endl;
-               mongoAbort("dur3");
-           }
-           catch(std::exception& e) {
-               log() << "exception in dur::groupCommitLL causing immediate shutdown: " << e.what() << endl;
-               mongoAbort("dur4");
-           }
-           return false;
-       }
+        /** @return true if committed; false if lock acquisition timed out (we only try for a read lock herein and only wait for a certain duration). */
+        bool groupCommitWithLimitedLocks() {
+            try {
+                return _groupCommitWithLimitedLocks();
+            }
+            catch(DBException& e ) {
+                log() << "dbexception in groupCommitLL causing immediate shutdown: " << e.toString() << endl;
+                mongoAbort("dur1");
+            }
+            catch(std::ios_base::failure& e) {
+                log() << "ios_base exception in groupCommitLL causing immediate shutdown: " << e.what() << endl;
+                mongoAbort("dur2");
+            }
+            catch(std::bad_alloc& e) {
+                log() << "bad_alloc exception in groupCommitLL causing immediate shutdown: " << e.what() << endl;
+                mongoAbort("dur3");
+            }
+            catch(std::exception& e) {
+                log() << "exception in dur::groupCommitLL causing immediate shutdown: " << e.what() << endl;
+                mongoAbort("dur4");
+            }
+            return false;
+        }
 
-       /** locking: in read lock when called. */
         static void _groupCommit() {
+
+            LOG(3) << "_groupCommit " << endl;
+
+            // we need to be at least read locked on the dbMutex so that we know the write intent data 
+            // structures are not changing while we work
+            dbMutex.assertAtLeastReadLocked();
+
             commitJob.beginCommit();
 
             if( !commitJob.hasWritten() ) {
@@ -616,10 +653,6 @@ namespace mongo {
             @see MongoMMF::close()
         */
         static void groupCommit() {
-            // we need to be at least read locked on the dbMutex so that we know the write intent data 
-            // structures are not changing while we work
-            dbMutex.assertAtLeastReadLocked();
-
             try {
                 _groupCommit();
             }
@@ -639,6 +672,7 @@ namespace mongo {
                 log() << "exception in dur::groupCommit causing immediate shutdown: " << e.what() << endl;
                 mongoAbort("gc4");
             }
+            LOG(3) << "groupCommit end" << endl;
         }
 
         static void go() {

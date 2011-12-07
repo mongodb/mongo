@@ -26,6 +26,8 @@
 namespace mongo {
 
     extern const int DefaultIndexVersionNumber;
+
+    const int ParallelArraysCode = 10088;
     
     class Cursor;
     class IndexSpec;

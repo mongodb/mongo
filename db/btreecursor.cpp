@@ -34,8 +34,8 @@ namespace mongo {
 
         BtreeCursorImpl(NamespaceDetails *a, int b, const IndexDetails& c, const BSONObj &d, const BSONObj &e, bool f, int g) : 
           BtreeCursor(a,b,c,d,e,f,g) { }
-        BtreeCursorImpl(NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction, bool useFRVSpec = false) :
-          BtreeCursor(_d,_idxNo,_id,_bounds,_direction, useFRVSpec )
+        BtreeCursorImpl(NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction ) :
+          BtreeCursor(_d,_idxNo,_id,_bounds,_direction )
         { 
             pair< DiskLoc, int > noBestParent;
             indexDetails.head.btree<V>()->customLocate( bucket, keyOfs, startKey, 0, false, _boundsIterator->cmp(), _boundsIterator->inc(), _ordering, _direction, noBestParent );
@@ -235,9 +235,9 @@ namespace mongo {
 
     BtreeCursor* BtreeCursor::make(
         NamespaceDetails *_d, const IndexDetails& _id,
-        const shared_ptr< FieldRangeVector > &_bounds, int _direction, bool useFRVSpec )
+        const shared_ptr< FieldRangeVector > &_bounds, int _direction )
     {
-        return make( _d, _d->idxNo( (IndexDetails&) _id), _id, _bounds, _direction, useFRVSpec );
+        return make( _d, _d->idxNo( (IndexDetails&) _id), _id, _bounds, _direction );
     }
 
     BtreeCursor* BtreeCursor::make(
@@ -263,20 +263,20 @@ namespace mongo {
         else {
             uasserted(14800, str::stream() << "unsupported index version " << v);
         }
-        c->init();
+        c->initWithoutIndependentFieldRanges();
         dassert( c->_dups.size() == 0 );
         return c;
     }
 
     BtreeCursor* BtreeCursor::make(
         NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, 
-        const shared_ptr< FieldRangeVector > &_bounds, int _direction, bool useFRVSpec )
+        const shared_ptr< FieldRangeVector > &_bounds, int _direction )
     {
         int v = _id.version();
         if( v == 1 )
-            return new BtreeCursorImpl<V1>(_d,_idxNo,_id,_bounds,_direction, useFRVSpec);
+            return new BtreeCursorImpl<V1>(_d,_idxNo,_id,_bounds,_direction);
         if( v == 0 )
-            return new BtreeCursorImpl<V0>(_d,_idxNo,_id,_bounds,_direction, useFRVSpec);
+            return new BtreeCursorImpl<V0>(_d,_idxNo,_id,_bounds,_direction);
         uasserted(14801, str::stream() << "unsupported index version " << v);
 
         // just check we are in sync with this method
@@ -296,13 +296,12 @@ namespace mongo {
         _order( _id.keyPattern() ),
         _ordering( Ordering::make( _order ) ),
         _direction( _direction ),
-        _spec( _id.getSpec() ),
         _independentFieldRanges( false ),
         _nscanned( 0 ) {
         audit();
     }
 
-    BtreeCursor::BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction, bool useFRVSpec )
+    BtreeCursor::BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction )
         :
         d(_d), idxNo(_idxNo),
         _endKeyInclusive( true ),
@@ -313,10 +312,8 @@ namespace mongo {
         _direction( _direction ),
         _bounds( ( assert( _bounds.get() ), _bounds ) ),
         _boundsIterator( new FieldRangeVectorIterator( *_bounds  ) ),
-        _spec( useFRVSpec ? _bounds->getSpec() : _id.getSpec() ),
         _independentFieldRanges( true ),
         _nscanned( 0 ) {
-        massert( 13384, "BtreeCursor FieldRangeVector constructor doesn't accept special indexes", !_spec.getType() );
         audit();
         startKey = _bounds->startKey();
         _boundsIterator->advance( startKey ); // handles initialization
@@ -332,10 +329,10 @@ namespace mongo {
         dassert( d->idxNo((IndexDetails&) indexDetails) == idxNo );
     }
 
-    void BtreeCursor::init() {
-        if ( _spec.getType() ) {
-            startKey = _spec.getType()->fixKey( startKey );
-            endKey = _spec.getType()->fixKey( endKey );
+    void BtreeCursor::initWithoutIndependentFieldRanges() {
+        if ( indexDetails.getSpec().getType() ) {
+            startKey = indexDetails.getSpec().getType()->fixKey( startKey );
+            endKey = indexDetails.getSpec().getType()->fixKey( endKey );
         }
         bucket = _locate(startKey, _direction > 0 ? minDiskLoc : maxDiskLoc);
         if ( ok() ) {

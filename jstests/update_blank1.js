@@ -2,11 +2,9 @@
 t = db.update_blank1
 t.drop();
 
-orig = { _id : 1 , "" : 1 , "a" : 2 , "b" : 3 };
+orig = { "" : 1 , _id : 2 , "a" : 3 , "b" : 4 };
 t.insert( orig );
-assert.eq( orig , t.findOne() , "A1" );
-
-t.update( {} , { $set : { "c" :  1 } } );
+t.update( {} , { $set : { "c" :  5 } } );
 print( db.getLastError() );
-orig["c"] = 1;
-//assert.eq( orig , t.findOne() , "A2" ); // SERVER-2651
+orig["c"] = 5;
+assert.eq( orig , t.findOne() , "after $set" ); // SERVER-2651

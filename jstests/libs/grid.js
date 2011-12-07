@@ -11,33 +11,32 @@ var nextPort = 31000
  To start a server call 'begin' ***/
 // new Server :: String -> FreshPorts Server
 function Server (name) {
-    this.dbpath = '/data/db/' + name + nextPort
-    this.port = nextPort++
-    this.noprealloc = ''
-    this.smallfiles = ''
-    this.rest = ''
-    this.oplogSize = 8
+    this.addr = '127.0.0.1';
+    this.dirname = name + nextPort;
+    this.args = { port : nextPort++,
+                  noprealloc : '',
+                  smallfiles : '',
+                  rest : '',
+                  oplogSize : 8 }
 }
-
-Server.prototype.addr = '127.0.0.1'
 
 // Server -> String <addr:port>
 Server.prototype.host = function() {
-    return this.addr + ':' + this.port
+    return this.addr + ':' + this.args.port
 }
 
 // Start a new server with this spec and return connection to it
 // Server -> IO Connection
 Server.prototype.begin = function() {
-    return startMongodEmpty(this)
+    return startMongodTest(this.args.port, this.dirname, false, this.args);
 }
 
 // Stop server and remove db directory
 // Server -> IO ()
 Server.prototype.end = function() {
-    print('Stopping mongod on port ' + this.port)
-    stopMongod (this.port)
-    resetDbpath (this.dbpath)
+    print('Stopping mongod on port ' + this.args.port)
+    stopMongod (this.args.port)
+    resetDbpath ('/data/db/' + this.dirname)
 }
 
 // Cut server from network so it is unreachable (but still alive)
@@ -126,22 +125,22 @@ ConfigSet.prototype.end = function() {
  To start a router (mongos) call 'begin' ***/
 // new Router :: ConfigSet -> FreshPorts Router
 function Router (configSet) {
-    this.port = nextPort++
-    this.v = 0
-    this.configdb = map (function(s) {return s.host()}, configSet.configSvrs) .join(',')
-    this.chunkSize = 1
+    this.args = { port : nextPort++,
+                  v : 0,
+                  configdb : map (function(s) {return s.host()}, configSet.configSvrs) .join(','),
+                  chunkSize : 1}
 }
 
-// Start router (mongos) with this spec and return connection to it
+// Start router (mongos) with this spec and return connection to it.
 // Router -> IO Connection
 Router.prototype.begin = function() {
-    return startMongos (this)
+    return startMongos (this.args);
 }
 
 // Stop router
 // Router -> IO ()
 Router.prototype.end = function() {
-    return stopMongoProgram (this.port)
+    return stopMongoProgram (this.args.port)
 }
 
 // Add shard to config via router (mongos) connection. Shard is either a replSet name (replSet.getURL()) or single server (server.host)

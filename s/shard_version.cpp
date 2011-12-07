@@ -136,6 +136,14 @@ namespace mongo {
 
         bool ok = conn->runCommand( "admin" , cmd , result );
 
+        // HACK for backwards compatibility with v1.8.x, v2.0.0 and v2.0.1
+        // Result is false, but will still initialize serverID and configdb
+        if( ! ok && ! result["errmsg"].eoo() && ( result["errmsg"].String() == "need to specify namespace"/* 2.0.1/2 */ ||
+                                                  result["errmsg"].String() == "need to speciy namespace" /* 1.8 */ ))
+        {
+            ok = true;
+        }
+
         LOG(3) << "initial sharding result : " << result << endl;
 
         return ok;

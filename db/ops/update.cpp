@@ -1008,7 +1008,7 @@ namespace mongo {
                     // dropped 
                     return UpdateResult(0, 0, 0);
                 }
-                nsdt = &NamespaceDetailsTransient::get_w(ns);
+                nsdt = &NamespaceDetailsTransient::get(ns);
                 IndexDetails& i = d->idx(idIdxNo);
                 BSONObj key = i.getKeyFromQuery( patternOrig );            
                 loc = i.idxInterface().findSingle(i, i.head, key);
@@ -1081,7 +1081,7 @@ namespace mongo {
         // idea with these here it to make them loop invariant for multi updates, and thus be a bit faster for that case
         // The pointers may be left invalid on a failed or terminal yield recovery.
         NamespaceDetails *d = nsdetails(ns); // can be null if an upsert...
-        NamespaceDetailsTransient *nsdt = &NamespaceDetailsTransient::get_w(ns);
+        NamespaceDetailsTransient *nsdt = &NamespaceDetailsTransient::get(ns);
 
         auto_ptr<ModSet> mods;
         bool isOperatorUpdate = updateobj.firstElementFieldName()[0] == '$';
@@ -1123,7 +1123,7 @@ namespace mongo {
         shared_ptr< MultiCursor > c( new MultiCursor( ns, patternOrig, BSONObj(), opPtr, true ) );
 
         d = nsdetails(ns);
-        nsdt = &NamespaceDetailsTransient::get_w(ns);
+        nsdt = &NamespaceDetailsTransient::get(ns);
         bool autoDedup = c->autoDedup();
 
         if( c->ok() ) {
@@ -1153,7 +1153,7 @@ namespace mongo {
                 
                     if ( didYield ) {
                         d = nsdetails(ns);
-                        nsdt = &NamespaceDetailsTransient::get_w(ns);
+                        nsdt = &NamespaceDetailsTransient::get(ns);
                     }
                     // *****************
                 }
@@ -1176,7 +1176,7 @@ namespace mongo {
                             break;
                         }
                         d = nsdetails(ns);
-                        nsdt = &NamespaceDetailsTransient::get_w(ns);
+                        nsdt = &NamespaceDetailsTransient::get(ns);
                     }
                     continue;
                 }
@@ -1311,7 +1311,7 @@ namespace mongo {
                             break;
                         }
                         d = nsdetails(ns);
-                        nsdt = &NamespaceDetailsTransient::get_w(ns);
+                        nsdt = &NamespaceDetailsTransient::get(ns);
                     }
 
                     getDur().commitIfNeeded();
@@ -1335,12 +1335,13 @@ namespace mongo {
         if ( numModded )
             return UpdateResult( 1 , 1 , numModded );
 
+        // todo: no need for "if( profile )" here as that probably just makes things slower?
         if ( profile )
             debug.nscanned = (int) nscanned;
 
         if ( upsert ) {
             if ( updateobj.firstElementFieldName()[0] == '$' ) {
-                /* upsert of an $inc. build a default */
+                // upsert of an $operation. build a default object 
                 BSONObj newObj = mods->createNewFromQuery( patternOrig );
                 checkNoMods( newObj );
                 debug.fastmodinsert = true;

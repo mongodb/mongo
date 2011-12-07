@@ -1000,14 +1000,14 @@ namespace mongo {
     class BtreeCursor : public Cursor {
     protected:
         BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction );
-        BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction, bool useFRVSpec = false);
+        BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction );
     public:
         virtual ~BtreeCursor();
         /** makes an appropriate subclass depending on the index version */
         static BtreeCursor* make( NamespaceDetails *_d, const IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction );
-        static BtreeCursor* make( NamespaceDetails *_d, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction, bool useFRVSpec = false );
+        static BtreeCursor* make( NamespaceDetails *_d, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction );
         static BtreeCursor* make( NamespaceDetails *_d, int _idxNo, const IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction );
-        static BtreeCursor* make( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction, bool useFRVSpec = false );
+        static BtreeCursor* make( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction );
 
         virtual bool ok() { return !bucket.isNull(); }
         virtual bool advance();
@@ -1100,7 +1100,7 @@ namespace mongo {
         virtual void _advanceTo(DiskLoc &thisLoc, int &keyOfs, const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive, const Ordering &order, int direction ) = 0;
 
         /** set initial bucket */
-        void init();
+        void initWithoutIndependentFieldRanges();
 
         /** if afterKey is true, we want the first key with values of the keyBegin fields greater than keyBegin */
         void advanceTo( const BSONObj &keyBegin, int keyBeginLen, bool afterKey, const vector< const BSONElement * > &keyEnd, const vector< bool > &keyEndInclusive );
@@ -1122,7 +1122,6 @@ namespace mongo {
         DiskLoc locAtKeyOfs;
         const shared_ptr< FieldRangeVector > _bounds;
         auto_ptr< FieldRangeVectorIterator > _boundsIterator;
-        const IndexSpec& _spec;
         shared_ptr< CoveredIndexMatcher > _matcher;
         bool _independentFieldRanges;
         long long _nscanned;

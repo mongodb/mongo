@@ -50,11 +50,23 @@ namespace mongo {
     }
 
     void* MemoryMappedFile::map(const char *filename) {
-        unsigned long long l = boost::filesystem::file_size( filename );
+        unsigned long long l;
+        try {
+            l = boost::filesystem::file_size( filename );
+        } 
+        catch(boost::filesystem::filesystem_error& e) { 
+            uasserted(15922, str::stream() << "couldn't get file length when opening mapping " << filename << ' ' << e.what() );
+        }
         return map( filename , l );
     }
     void* MemoryMappedFile::mapWithOptions(const char *filename, int options) {
-        unsigned long long l = boost::filesystem::file_size( filename );
+        unsigned long long l;
+        try {
+            l = boost::filesystem::file_size( filename );
+        } 
+        catch(boost::filesystem::filesystem_error& e) { 
+            uasserted(15923, str::stream() << "couldn't get file length when opening mapping " << filename << ' ' << e.what() );
+        }
         return map( filename , l, options );
     }
 

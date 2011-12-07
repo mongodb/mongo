@@ -90,7 +90,7 @@ namespace mongo {
                 (2) make an indicator in the journal dir that something bad happened.
                 (2b) refuse to do a recovery startup if that is there without manual override.
             */
-            log() << "journaling error " << msg << endl;
+            log() << "journaling failure/error: " << msg << endl;
             assert(false);
         }
 
@@ -308,11 +308,18 @@ namespace mongo {
             f.fsync();
         }
 
+        const int NUM_PREALLOC_FILES = 3;
+        inline filesystem::path preallocPath(int n) {
+            assert(n >= 0);
+            assert(n < NUM_PREALLOC_FILES);
+            string fn = str::stream() << "prealloc." << n;
+            return getJournalDir() / fn;
+        }
+
         // throws
         void _preallocateFiles() {
-            for( int i = 0; i <= 2; i++ ) {
-                string fn = str::stream() << "prealloc." << i;
-                filesystem::path filepath = getJournalDir() / fn;
+            for( int i = 0; i < NUM_PREALLOC_FILES; i++ ) {
+                filesystem::path filepath = preallocPath(i);
 
                 unsigned long long limit = DataLimitPerJournalFile;
                 if( debug && i == 1 ) { 
@@ -326,9 +333,31 @@ namespace mongo {
             }
         }
 
+        void checkFreeSpace() {
+            unsigned long long spaceNeeded = static_cast<unsigned long long>(3 * DataLimitPerJournalFile * 1.1); // add 10% for headroom
+            unsigned long long freeSpace = File::freeSpace(getJournalDir().string());
+            unsigned long long prealloced = 0;
+            for( int i = 0; i < NUM_PREALLOC_FILES; i++ ) {
+                filesystem::path filepath = preallocPath(i);
+                if (exists(filepath))
+                    prealloced += file_size(filepath);
+            }
+
+            if (freeSpace + prealloced < spaceNeeded) {
+                log() << endl;
+                error() << "Insufficient free space for journals." << endl;
+                log() << "Please make at least " << spaceNeeded/(1024*1024) << "MB available in " << getJournalDir().string() << endl;
+                log() << endl;
+                throw UserException(15926, "Insufficient free space for journals");
+            }
+        }
+
         void preallocateFiles() {
-            if( exists(getJournalDir()/"prealloc.0") || // if enabled previously, keep using
-                exists(getJournalDir()/"prealloc.1") ||
+            if (! (cmdLine.durOptions & CmdLine::DurNoCheckSpace))
+                checkFreeSpace();
+
+            if( exists(preallocPath(0)) || // if enabled previously, keep using
+                exists(preallocPath(1)) ||
                 ( cmdLine.preallocj && preallocateIsFaster() ) ) {
                     usingPreallocate = true;
                     try {
@@ -344,12 +373,11 @@ namespace mongo {
         void removeOldJournalFile(path p) { 
             if( usingPreallocate ) {
                 try {
-                    for( int i = 0; i <= 2; i++ ) {
-                        string fn = str::stream() << "prealloc." << i;
-                        filesystem::path filepath = getJournalDir() / fn;
+                    for( int i = 0; i < NUM_PREALLOC_FILES; i++ ) {
+                        filesystem::path filepath = preallocPath(i);
                         if( !filesystem::exists(filepath) ) {
                             // we can recycle this file into this prealloc file location
-                            filesystem::path temppath = getJournalDir() / (fn+".temp");
+                            filesystem::path temppath = filepath.string() + ".temp";
                             boost::filesystem::rename(p, temppath);
                             {
                                 // zero the header
@@ -383,9 +411,8 @@ namespace mongo {
         // find a prealloc.<n> file, presumably to take and use
         path findPrealloced() { 
             try {
-                for( int i = 0; i <= 2; i++ ) {
-                    string fn = str::stream() << "prealloc." << i;
-                    filesystem::path filepath = getJournalDir() / fn;
+                for( int i = 0; i < NUM_PREALLOC_FILES; i++ ) {
+                    filesystem::path filepath = preallocPath(i);
                     if( filesystem::exists(filepath) )
                         return filepath;
                 }
