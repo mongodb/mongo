@@ -60,6 +60,17 @@ esac
 AC_MSG_RESULT($wt_cv_enable_python)
 AM_CONDITIONAL(PYTHON, test x$wt_cv_enable_python = xyes)
 
+AC_MSG_CHECKING(if --enable-snappy option specified)
+AC_ARG_ENABLE(snappy,
+	[AC_HELP_STRING([--enable-snappy],
+	    [Build the snappy compressor extension.])], r=$enableval, r=no)
+case "$r" in
+no)	wt_cv_enable_snappy=no;;
+*)	wt_cv_enable_snappy=yes;;
+esac
+AC_MSG_RESULT($wt_cv_enable_snappy)
+AM_CONDITIONAL([SNAPPY], [test x$wt_cv_enable_snappy = xyes])
+
 AH_TEMPLATE(HAVE_VERBOSE, [Define to 1 to support the Env.verbose_set method.])
 AC_MSG_CHECKING(if --enable-verbose option specified)
 AC_ARG_ENABLE(verbose,

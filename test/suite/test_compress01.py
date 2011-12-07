@@ -120,6 +120,10 @@ class test_compress01_2_bz(test_compress01_base):
     def __init__(self, testname):
         test_compress01_base.__init__(self, testname, 'bzip2_compress', 'bz')
 
+class test_compress01_3_sn(test_compress01_base):
+    def __init__(self, testname):
+        test_compress01_base.__init__(self, testname, 'snappy_compress', 'sn')
+
 
 if __name__ == '__main__':
     wttest.run(test_compress01_base)

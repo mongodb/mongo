@@ -119,6 +119,10 @@ Configure WiredTiger to perform various run-time diagnostic tests.
 @par \c --enable-python
 Build the WiredTiger <a href="http://www.python.org">Python</a> API.
 
+@par \c --enable-snappy
+Configure WiredTiger for <a href="http://code.google.com/p/snappy/">snappy</a>
+compression.
+
 @par \c --enable-verbose
 Configure WiredTiger to support the \c verbose configuration string to
 ::wiredtiger_open.
