@@ -241,11 +241,7 @@ namespace mongo {
                 _takeover->checkLocation();
             }
             else if ( _currOp ) {
-                _mps->recoverFromYield();
-                if ( _currOp->error() ) {
-                    // See if we can advance to a non error op.
-                    advance();
-                }
+                recoverFromYield();
             }
         }
 
