@@ -29,6 +29,7 @@
 #include "../replutil.h"
 #include "../../s/d_chunk_manager.h"
 #include "../../s/d_logic.h"
+#include "../../s/grid.h"
 
 #include "mr.h"
 
@@ -1227,9 +1228,16 @@ namespace mongo {
 
                 // fetch result from other shards 1 chunk at a time
                 // it would be better to do just one big $or query, but then the sorting would not be efficient
-                vector<BSONElement> ranges;
-                if (cmdObj.hasField("ranges")) {
-                    ranges = cmdObj.getField("ranges").Array();
+                string shardName = shardingState.getShardName();
+                DBConfigPtr confOut = grid.getDBConfig( dbname , false );
+                vector<ChunkPtr> chunks;
+                if ( confOut->isSharded(config.finalLong) ) {
+                    ChunkManagerPtr cm = confOut->getChunkManager( config.finalLong );
+                    const ChunkMap& chunkMap = cm->getChunkMap();
+                    for ( ChunkMap::const_iterator it = chunkMap.begin(); it != chunkMap.end(); ++it ) {
+                        ChunkPtr chunk = it->second;
+                        if (chunk->getShard().getName() == shardName) chunks.push_back(chunk);
+                    }
                 }
 
                 long long inputCount = 0;
@@ -1237,12 +1245,12 @@ namespace mongo {
                 BSONObj query;
                 BSONArrayBuilder chunkSizes;
                 while (true) {
-                    if (ranges.size() > 0) {
-                        BSONElement min = ranges[index];
-                        BSONElement max = ranges[index+1];
+                    ChunkPtr chunk;
+                    if (chunks.size() > 0) {
+                        chunk = chunks[index];
                         BSONObjBuilder b;
-                        b.appendAs(min, "$gte");
-                        b.appendAs(max, "$lt");
+                        b.appendAs(chunk->getMin().firstElement(), "$gte");
+                        b.appendAs(chunk->getMax().firstElement(), "$lt");
                         query = BSON("_id" << b.obj());
 //                        chunkSizes.append(min);
                     }
@@ -1281,9 +1289,11 @@ namespace mongo {
                             values.push_back( t );
                     }
 
-                    chunkSizes.append(chunkSize);
-                    index += 2;
-                    if (index >= ranges.size())
+                    if (chunk) {
+                        chunkSizes.append(chunk->getMin());
+                        chunkSizes.append(chunkSize);
+                    }
+                    if (++index >= chunks.size())
                         break;
                 }
 

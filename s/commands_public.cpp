@@ -1252,38 +1252,25 @@ namespace mongo {
 
                     // group chunks per shard
                     ChunkManagerPtr cm = confOut->getChunkManager( finalColLong );
-                    map<Shard, vector<ChunkPtr> > rangesList;
-                    const ChunkMap& chunkMap = cm->getChunkMap();
-                    for ( ChunkMap::const_iterator it = chunkMap.begin(); it != chunkMap.end(); ++it ) {
-                        ChunkPtr chunk = it->second;
-                        rangesList[chunk->getShard()].push_back(chunk);
-                    }
+                    set<Shard> outShards;
+                    cm->getShardsForQuery(outShards, BSONObj());
 
                     // spawn sharded finish jobs on each shard
                     // command will fetch appropriate results from other shards, do final reduce and post processing
                     futures.clear();
                     BSONObj finalCmdObj = finalCmd.obj();
 
-                    for ( map<Shard, vector<ChunkPtr> >::iterator i=rangesList.begin(), end=rangesList.end() ; i != end ; i++ ) {
-                        Shard shard = i->first;
-                        BSONObjBuilder b;
-                        b.appendElements(finalCmdObj);
-                        BSONArrayBuilder ranges;
-                        for (vector<ChunkPtr>::iterator it = i->second.begin(); it != i->second.end(); ++it) {
-                            ranges.append((*it)->getMin().firstElement());
-                            ranges.append((*it)->getMax().firstElement());
-                        }
-                        b.append("ranges", ranges.arr());
+                    for ( set<Shard>::iterator i=outShards.begin(), end=outShards.end() ; i != end ; i++ ) {
+                        Shard shard = *i;
                         shared_ptr<ShardConnection> temp( new ShardConnection( shard.getConnString() , finalColLong ) );
                         assert( temp->get() );
-                        futures.push_back( Future::spawnCommand( shard.getConnString() , outDB , b.obj() , 0 , temp->get() ) );
+                        futures.push_back( Future::spawnCommand( shard.getConnString() , outDB , finalCmdObj , 0 , temp->get() ) );
                         shardConns.push_back(temp);
                     }
 
                     // now wait for the result of all shards
                     ok = true;
-                    map<Shard, vector<ChunkPtr> >::iterator rangeIt=rangesList.begin();
-                    for ( list< shared_ptr<Future::CommandResult> >::iterator i=futures.begin(); i!=futures.end(); ++i, ++rangeIt ) {
+                    for ( list< shared_ptr<Future::CommandResult> >::iterator i=futures.begin(); i!=futures.end(); ++i ) {
                         string server;
                         try {
                             shared_ptr<Future::CommandResult> res = *i;
@@ -1304,13 +1291,19 @@ namespace mongo {
 
                             // check on splitting, now that results are in the final collection
                             if (singleResult.hasField("chunkSizes")) {
+                                const ChunkMap& chunkMap = cm->getChunkMap();
                                 vector<BSONElement> chunkSizes = singleResult.getField("chunkSizes").Array();
-                                vector<ChunkPtr> chunks = rangeIt->second;
-                                for (unsigned int i = 0; i < chunkSizes.size(); ++i) {
-                                    long long size = chunkSizes[i].numberLong();
-                                    ChunkPtr c = chunks[i];
+                                for (unsigned int i = 0; i < chunkSizes.size(); i += 2) {
+                                    BSONObj key = chunkSizes[i].Obj();
+                                    long long size = chunkSizes[i+1].numberLong();
                                     assert( size < 0x7fffffff );
-                                    c->splitIfShould(static_cast<int>(size));
+
+                                    if (chunkMap.count(key) <= 0) {
+                                        warning() << "Mongod reported " << size << " bytes inserted for key " << key << " but can't find chunk" << endl;
+                                    } else {
+                                        ChunkPtr c = chunkMap.at(key);
+                                        c->splitIfShould(static_cast<int>(size));
+                                    }
                                 }
                             }
                         }

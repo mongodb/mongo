@@ -47,6 +47,9 @@ namespace mongo {
         void gotShardName( const string& name );
         void gotShardHost( string host );
 
+        string getShardName() { return _shardName; }
+        string getShardHost() { return _shardHost; }
+
         /** Reverts back to a state where this mongod is not sharded. */
         void resetShardingState(); 
 
