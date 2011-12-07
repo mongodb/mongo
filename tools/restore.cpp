@@ -353,11 +353,11 @@ private:
         long long fileSize = file_size(filePath);
         ifstream file(filePath.c_str(), ios_base::in);
 
-        char buf[fileSize];
-        file.read(buf, fileSize);
+        scoped_ptr<char> buf(new char[fileSize]);
+        file.read(buf.get(), fileSize);
         int objSize;
         BSONObj obj;
-        obj = fromjson (buf, &objSize);
+        obj = fromjson (buf.get(), &objSize);
         uassert(15934, "JSON object size didn't match file size", objSize == fileSize);
         return obj;
     }
