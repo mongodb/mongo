@@ -239,6 +239,11 @@ namespace mongo {
                 replApplyBatchSize = e.numberInt();
                 s++;
             }
+            if( cmdObj.hasElement( "traceExceptions" ) ) {
+                if( s == 0 ) result.append( "was", DBException::traceExceptions );
+                DBException::traceExceptions = cmdObj["traceExceptions"].Bool();
+                s++;
+            }
 
             if( s == 0 && !found ) {
                 errmsg = "no option found to set, use help:true to see options ";
