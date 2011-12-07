@@ -290,6 +290,9 @@ namespace mongo {
         bool prepareToYield();
         void recoverFromYield();
         
+        /** Clear the runner member. */
+        void clearRunner();
+        
         QueryPlanPtr firstPlan() const { return _plans[ 0 ]; }
         
         /** @return metadata about cursors and index bounds for all plans, suitable for explain output. */
@@ -424,6 +427,9 @@ namespace mongo {
         
         bool prepareToYield();
         void recoverFromYield();
+        
+        /** Clear the runner member. */
+        void clearRunner();
         
         /**
          * @return a single simple cursor if the scanner would run a single cursor

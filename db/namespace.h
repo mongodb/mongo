@@ -468,7 +468,7 @@ namespace mongo {
          */
         static shared_ptr<Cursor> getCursor( const char *ns, const BSONObj &query,
                                             const BSONObj &order = BSONObj(), bool requireIndex = false,
-                                            bool *simpleEqualityMatch = 0, bool doingDeletes = false );
+                                            bool *simpleEqualityMatch = 0 );
                                      
         /* indexKeys() cache ---------------------------------------------------- */
         /* assumed to be in write lock for this */

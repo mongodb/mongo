@@ -35,7 +35,7 @@ namespace mongo {
          * @param aggregateNscanned - shared int counting total nscanned for
          * query ops for all cursors.
          */
-        QueryOptimizerCursorOp( long long &aggregateNscanned, bool requireIndex, bool doingDeletes ) : _matchCount(), _myMatchCount(), _mustAdvance(), _nscanned(), _capped(), _aggregateNscanned( aggregateNscanned ), _yieldRecoveryFailed(), _requireIndex( requireIndex ), _doingDeletes( doingDeletes ) {}
+        QueryOptimizerCursorOp( long long &aggregateNscanned, bool requireIndex ) : _matchCount(), _myMatchCount(), _mustAdvance(), _nscanned(), _capped(), _aggregateNscanned( aggregateNscanned ), _yieldRecoveryFailed(), _requireIndex( requireIndex ) {}
         
         virtual void _init() {
             if ( qp().scanAndOrderRequired() ) {
@@ -57,7 +57,6 @@ namespace mongo {
         virtual bool prepareToYield() {
             if ( _c && !_cc ) {
                 _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , _c , qp().ns() ) );
-                _cc->setDoingDeletes( _doingDeletes );
             }
             if ( _cc ) {
                 _posBeforeYield = currLoc();
@@ -113,7 +112,7 @@ namespace mongo {
             _mustAdvance = true;
         }
         virtual QueryOp *_createChild() const {
-            QueryOptimizerCursorOp *ret = new QueryOptimizerCursorOp( _aggregateNscanned, _requireIndex, _doingDeletes );
+            QueryOptimizerCursorOp *ret = new QueryOptimizerCursorOp( _aggregateNscanned, _requireIndex );
             ret->_matchCount = _matchCount;
             return ret;
         }
@@ -148,7 +147,6 @@ namespace mongo {
         long long &_aggregateNscanned;
         bool _yieldRecoveryFailed;
         bool _requireIndex;
-        bool _doingDeletes;
     };
     
     /**
@@ -159,9 +157,9 @@ namespace mongo {
      */
     class QueryOptimizerCursor : public Cursor {
     public:
-        QueryOptimizerCursor( auto_ptr<MultiPlanScanner> &mps, bool requireIndex, bool doingDeletes ) :
+        QueryOptimizerCursor( auto_ptr<MultiPlanScanner> &mps, bool requireIndex ) :
         _mps( mps ),
-        _originalOp( new QueryOptimizerCursorOp( _nscanned, requireIndex, doingDeletes ) ),
+        _originalOp( new QueryOptimizerCursorOp( _nscanned, requireIndex ) ),
         _currOp(),
         _nscanned() {
             _mps->initialOp( _originalOp );
@@ -336,6 +334,7 @@ namespace mongo {
             }
             else if ( op->stopRequested() ) {
                 if ( qocop->cursor() ) {
+                    _mps->clearRunner();
                     _takeover.reset( new MultiCursor( _mps,
                                                      qocop->cursor(),
                                                      op->matcher( qocop->cursor() ),
@@ -376,9 +375,9 @@ namespace mongo {
         long long _nscanned;
     };
     
-    shared_ptr<Cursor> newQueryOptimizerCursor( auto_ptr<MultiPlanScanner> mps, bool requireIndex, bool doingDeletes ) {
+    shared_ptr<Cursor> newQueryOptimizerCursor( auto_ptr<MultiPlanScanner> mps, bool requireIndex ) {
         try {
-            return shared_ptr<Cursor>( new QueryOptimizerCursor( mps, requireIndex, doingDeletes ) );
+            return shared_ptr<Cursor>( new QueryOptimizerCursor( mps, requireIndex ) );
         } catch( const AssertionException &e ) {
             if ( e.getCode() == OutOfOrderDocumentsAssertionCode ) {
                 // If no indexes follow the requested sort order, return an
@@ -392,7 +391,7 @@ namespace mongo {
     
     shared_ptr<Cursor> NamespaceDetailsTransient::getCursor( const char *ns, const BSONObj &query,
                                                             const BSONObj &order, bool requireIndex,
-                                                            bool *simpleEqualityMatch, bool doingDeletes ) {
+                                                            bool *simpleEqualityMatch ) {
         if ( simpleEqualityMatch ) {
             *simpleEqualityMatch = false;
         }
@@ -430,13 +429,13 @@ namespace mongo {
                 return single;
             }
         }
-        return newQueryOptimizerCursor( mps, requireIndex, doingDeletes );
+        return newQueryOptimizerCursor( mps, requireIndex );
     }
 
     /** This interface just available for testing. */
-    shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query, const BSONObj &order, bool requireIndex, bool doingDeletes ) {
+    shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query, const BSONObj &order, bool requireIndex ) {
         auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order ) ); // mayYield == false
-        return newQueryOptimizerCursor( mps, requireIndex, false );
+        return newQueryOptimizerCursor( mps, requireIndex );
     }
         
 } // namespace mongo;

@@ -25,7 +25,7 @@
 
 namespace mongo {
     void __forceLinkGeoPlugin();
-    shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query, const BSONObj &order = BSONObj(), bool requireIndex = false, bool doingDeletes = false );
+    shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query, const BSONObj &order = BSONObj(), bool requireIndex = false );
 } // namespace mongo
 
 namespace QueryOptimizerCursorTests {
@@ -53,8 +53,8 @@ namespace QueryOptimizerCursorTests {
     protected:
         DBDirectClient _cli;
         static const char *ns() { return "unittests.QueryOptimizerTests"; }
-        void setQueryOptimizerCursor( const BSONObj &query, const BSONObj &order = BSONObj(), bool doingDeletes = false ) {
-            _c = newQueryOptimizerCursor( ns(), query, order, false, doingDeletes );
+        void setQueryOptimizerCursor( const BSONObj &query, const BSONObj &order = BSONObj() ) {
+            _c = newQueryOptimizerCursor( ns(), query, order, false );
             if ( ok() && !mayReturnCurrent() ) {
                 advance();
             }

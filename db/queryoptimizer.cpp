@@ -595,6 +595,12 @@ doneCheckOrder:
         }
     }
     
+    void QueryPlanSet::clearRunner() {
+        if ( _runner ) {
+            _runner.reset();
+        }
+    }
+    
     BSONObj QueryPlanSet::explain() const {
         vector<BSONObj> arr;
         for( PlanSet::const_iterator i = _plans.begin(); i != _plans.end(); ++i ) {
@@ -968,6 +974,12 @@ doneCheckOrder:
         }
     }
 
+    void MultiPlanScanner::clearRunner() {
+        if ( _currentQps.get() ) {
+            _currentQps->clearRunner();
+        }    
+    }
+    
     shared_ptr<Cursor> MultiPlanScanner::singleCursor() const {
         const QueryPlan *qp = singlePlan();
         if ( !qp ) {
