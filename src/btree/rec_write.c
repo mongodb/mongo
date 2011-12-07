@@ -2545,7 +2545,7 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 	/*
 	 * we don't re-write parent pages when child pages split, which means
 	 * we have only one slot to work with in the parent.  When a leaf page
-	 * splits, we create a new internal page referencing the split pages, 
+	 * splits, we create a new internal page referencing the split pages,
 	 * and when the leaf page is evicted, we update the leaf's slot in the
 	 * parent to reference the new internal page in the tree (deepening the
 	 * tree by a level).  We don't want the tree to deepen permanently, so
