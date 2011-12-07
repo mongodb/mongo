@@ -29,17 +29,6 @@ struct __wt_evict_req {
 };
 
 /*
- * WT_READ_REQ --
- *	Encapsulation of a read request.
- */
-struct __wt_read_req {
-	WT_SESSION_IMPL *session;		/* Requesting thread */
-	WT_PAGE *parent;			/* Parent */
-	WT_REF  *ref;				/* Reference/Address */
-	int	 dsk_verify;			/* Verify the disk image */
-};
-
-/*
  * WiredTiger cache structure.
  */
 struct __wt_cache {
@@ -57,15 +46,8 @@ struct __wt_cache {
 	uint64_t pages_evict;
 
 	/*
-	 * Read thread information.
+	 * Read information.
 	 */
-	WT_CONDVAR *read_cond;		/* Cache read server mutex */
-	u_int volatile read_lockout;	/* No reading until memory drains */
-
-	WT_READ_REQ *read_request;	/* Read requests:
-					   slot available if session is NULL */
-	uint32_t max_read_request;	/* Size of read request array */
-
 	uint32_t   read_gen;		/* Page read generation (LRU) */
 
 	/*

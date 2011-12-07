@@ -40,18 +40,14 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 
 	WT_ERR(__wt_cond_alloc(session,
 	    "cache eviction server", 1, &cache->evict_cond));
-	WT_ERR(__wt_cond_alloc(session,
-	    "cache read server", 1, &cache->read_cond));
 
 	/*
-	 * Allocate request arrays.  We size the arrays to allow one eviction
-	 * request and one read request per session.
+	 * Allocate the eviction request array.  We size it to allow one
+	 * eviction request request per session.
 	 */
-	cache->max_evict_request = cache->max_read_request = conn->session_size;
+	cache->max_evict_request = conn->session_size;
 	WT_ERR(__wt_calloc_def(
 	    session, cache->max_evict_request, &cache->evict_request));
-	WT_ERR(__wt_calloc_def(
-	    session, cache->max_read_request, &cache->read_request));
 
 	/*
 	 * We pull some values from the cache statistics (rather than have two
@@ -101,10 +97,7 @@ __wt_cache_destroy(WT_CONNECTION_IMPL *conn)
 
 	if (cache->evict_cond != NULL)
 		(void)__wt_cond_destroy(session, cache->evict_cond);
-	if (cache->read_cond != NULL)
-		(void)__wt_cond_destroy(session, cache->read_cond);
 
 	__wt_free(session, cache->evict_request);
-	__wt_free(session, cache->read_request);
 	__wt_free(session, conn->cache);
 }

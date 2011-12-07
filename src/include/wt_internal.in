@@ -123,8 +123,6 @@ struct __wt_page_track;
     typedef struct __wt_page_track WT_PAGE_TRACK;
 struct __wt_process;
     typedef struct __wt_process WT_PROCESS;
-struct __wt_read_req;
-    typedef struct __wt_read_req WT_READ_REQ;
 struct __wt_ref;
     typedef struct __wt_ref WT_REF;
 struct __wt_row;

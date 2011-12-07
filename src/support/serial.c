@@ -31,7 +31,7 @@ __wt_session_serialize_func(WT_SESSION_IMPL *session,
 	 *	if necessary, block until an async action completes.
 	 */
 	session->wq_args = args;
-	session->wq_sleeping = (op == WT_SERIAL_EVICT || op == WT_SERIAL_READ);
+	session->wq_sleeping = (op == WT_SERIAL_EVICT);
 
 	/* Functions are serialized by holding a spinlock. */
 	if (op != WT_SERIAL_REENTER)
@@ -45,9 +45,6 @@ __wt_session_serialize_func(WT_SESSION_IMPL *session,
 	switch (op) {
 	case WT_SERIAL_EVICT:
 		__wt_evict_server_wake(session);
-		break;
-	case WT_SERIAL_READ:
-		__wt_read_server_wake(session, 0);
 		break;
 	default:
 		break;

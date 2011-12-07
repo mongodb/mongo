@@ -109,9 +109,7 @@ __wt_evict_server_wake(WT_SESSION_IMPL *session)
 	bytes_max = conn->cache_size;
 
 	WT_VERBOSE(session, evictserver,
-	    "waking, read lockout %sset, "
-	    "bytes inuse %s max (%" PRIu64 "MB %s %" PRIu64 "MB), ",
-	    cache->read_lockout ? "" : "not ",
+	    "waking, bytes inuse %s max (%" PRIu64 "MB %s %" PRIu64 "MB), ",
 	    bytes_inuse <= bytes_max ? "<=" : ">",
 	    bytes_inuse / WT_MEGABYTE,
 	    bytes_inuse <= bytes_max ? "<=" : ">",

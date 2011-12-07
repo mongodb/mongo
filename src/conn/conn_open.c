@@ -47,8 +47,6 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 
 	WT_ERR(__wt_thread_create(
 	    &conn->cache_evict_tid, __wt_cache_evict_server, conn));
-	WT_ERR(__wt_thread_create(
-	    &conn->cache_read_tid, __wt_cache_read_server, conn));
 
 	return (0);
 
@@ -100,8 +98,6 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 	F_CLR(conn, WT_SERVER_RUN);
 	__wt_evict_server_wake(session);
 	WT_TRET(__wt_thread_join(conn->cache_evict_tid));
-	__wt_read_server_wake(session, 1);
-	WT_TRET(__wt_thread_join(conn->cache_read_tid));
 
 	/* Discard the cache. */
 	__wt_cache_destroy(conn);
