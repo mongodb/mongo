@@ -291,6 +291,7 @@ namespace mongo {
         } catch ( ... ) {
             exceptionInfo = "unknown exception";
         }
+        // Historically we have returned zero in many count assertion cases - see SERVER-2291.
         log() << "Count with ns: " << ns << " and query: " << query
             << " failed with exception: " << exceptionInfo
             << endl;

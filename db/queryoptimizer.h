@@ -153,7 +153,7 @@ namespace mongo {
         virtual bool prepareToYield() { massert( 13335, "yield not supported", false ); return false; }
         /** Recover once the db mutex is regained. */
         virtual void recoverFromYield() { massert( 13336, "yield not supported", false ); }
-                
+        
         /**
          * @return true iff the QueryPlan for this QueryOp may be registered
          * as a winning plan.

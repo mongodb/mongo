@@ -900,72 +900,6 @@ namespace mongo {
         }
     }
 
-    class UpdateOp : public MultiCursor::CursorOp {
-    public:
-        UpdateOp( bool hasPositionalField, int orClauseIndex = -1 ) :
-        _nscanned(),
-        _hasPositionalField( hasPositionalField ),
-        _orClauseIndex( orClauseIndex ) {}
-        virtual void _init() {
-            _c = qp().newCursor();
-            if ( ! _c->ok() ) {
-                setComplete();
-            }
-        }
-        virtual bool prepareToYield() {
-            if ( _orClauseIndex > 0 ) {
-                return false;
-            }
-            if ( ! _cc ) {
-                _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , _c , qp().ns() ) );
-            }
-            return _cc->prepareToYield( _yieldData );
-        }
-        virtual void recoverFromYield() {
-            if ( !ClientCursor::recoverFromYield( _yieldData ) ) {
-                _c.reset();
-                _cc.reset();
-                massert( 13339, "cursor dropped during update", false );
-            }
-        }
-        virtual long long nscanned() {
-            return _c.get() ? _c->nscanned() : _nscanned;
-        }
-        virtual void next() {
-            if ( ! _c->ok() ) {
-                setComplete();
-                return;
-            }
-            _nscanned = _c->nscanned();
-            if ( _orClauseIndex > 0 && _nscanned >= 100 ) {
-                setComplete();
-                return;
-            }
-            if ( matcher( _c )->matchesCurrent(_c.get(), &_details ) ) {
-                setComplete();
-                return;
-            }
-            _c->advance();
-        }
-
-        virtual bool mayRecordPlan() const { return false; }
-        virtual QueryOp *_createChild() const {
-            return new UpdateOp( _hasPositionalField, _orClauseIndex + 1 );
-        }
-        // already scanned to the first match, so return _c
-        virtual shared_ptr< Cursor > newCursor() const { return _c; }
-        virtual bool alwaysUseRecord() const { return _hasPositionalField; }
-    private:
-        shared_ptr< Cursor > _c;
-        long long _nscanned;
-        bool _hasPositionalField;
-        MatchDetails _details;
-        ClientCursor::CleanupPointer _cc;
-        ClientCursor::YieldData _yieldData;
-        // Avoid yielding in the MultiPlanScanner when not the first $or clause - just a temporary implementaiton for now.  SERVER-3555
-        int _orClauseIndex;
-    };
-
     static void checkTooLarge(const BSONObj& newObj) {
         uassert( 12522 , "$ operator made object too large" , newObj.objsize() <= BSONObjMaxUserSize );
     }
@@ -1119,8 +1053,7 @@ namespace mongo {
 
         int numModded = 0;
         long long nscanned = 0;
-        shared_ptr< MultiCursor::CursorOp > opPtr( new UpdateOp( mods.get() && mods->hasDynamicArray() ) );
-        shared_ptr< MultiCursor > c( new MultiCursor( ns, patternOrig, BSONObj(), opPtr, true ) );
+        shared_ptr< Cursor > c = NamespaceDetailsTransient::getCursor( ns, patternOrig );
 
         d = nsdetails(ns);
         nsdt = &NamespaceDetailsTransient::get(ns);
@@ -1133,7 +1066,7 @@ namespace mongo {
             do {
                 nscanned++;
 
-                bool atomic = c->matcher()->docMatcher().atomic();
+                bool atomic = c->matcher() && c->matcher()->docMatcher().atomic();
                 
                 if ( !atomic ) {
                     // *****************
@@ -1158,8 +1091,7 @@ namespace mongo {
                     // *****************
                 }
 
-                // May have already matched in UpdateOp, but do again to get details set correctly
-                if ( ! c->matcher()->matchesCurrent( c.get(), &details ) ) {
+                if ( c->matcher() && !c->matcher()->matchesCurrent( c.get(), &details ) ) {
                     c->advance();
 
                     if ( nscanned % 256 == 0 && ! atomic ) {
@@ -1210,7 +1142,7 @@ namespace mongo {
                     }
                 }
 
-                if ( profile  && !multi ) 
+                if ( profile && !multi )
                     debug.nscanned = (int) nscanned;
 
                 /* look for $inc etc.  note as listed here, all fields to inc must be this type, you can't set some

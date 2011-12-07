@@ -35,7 +35,7 @@ namespace mongo {
          * @param aggregateNscanned - shared int counting total nscanned for
          * query ops for all cursors.
          */
-        QueryOptimizerCursorOp( long long &aggregateNscanned, bool requireIndex ) : _matchCount(), _myMatchCount(), _mustAdvance(), _nscanned(), _capped(), _aggregateNscanned( aggregateNscanned ), _yieldRecoveryFailed(), _requireIndex( requireIndex ) {}
+        QueryOptimizerCursorOp( long long &aggregateNscanned, bool requireIndex, bool doingDeletes ) : _matchCount(), _myMatchCount(), _mustAdvance(), _nscanned(), _capped(), _aggregateNscanned( aggregateNscanned ), _yieldRecoveryFailed(), _requireIndex( requireIndex ), _doingDeletes( doingDeletes ) {}
         
         virtual void _init() {
             if ( qp().scanAndOrderRequired() ) {
@@ -45,6 +45,7 @@ namespace mongo {
                 throw MsgAssertionException( 9011, "Not an index cursor" );                
             }
             _c = qp().newCursor();
+            verify( 15911, _c->supportYields() ); // The QueryOptimizerCursor::noteLocation() implementation requires _c->prepareToYield() to work.
             _capped = _c->capped();
             mayAdvance();
         }
@@ -56,6 +57,7 @@ namespace mongo {
         virtual bool prepareToYield() {
             if ( _c && !_cc ) {
                 _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , _c , qp().ns() ) );
+                _cc->setDoingDeletes( _doingDeletes );
             }
             if ( _cc ) {
                 _posBeforeYield = currLoc();
@@ -111,7 +113,7 @@ namespace mongo {
             _mustAdvance = true;
         }
         virtual QueryOp *_createChild() const {
-            QueryOptimizerCursorOp *ret = new QueryOptimizerCursorOp( _aggregateNscanned, _requireIndex );
+            QueryOptimizerCursorOp *ret = new QueryOptimizerCursorOp( _aggregateNscanned, _requireIndex, _doingDeletes );
             ret->_matchCount = _matchCount;
             return ret;
         }
@@ -146,6 +148,7 @@ namespace mongo {
         long long &_aggregateNscanned;
         bool _yieldRecoveryFailed;
         bool _requireIndex;
+        bool _doingDeletes;
     };
     
     /**
@@ -156,9 +159,9 @@ namespace mongo {
      */
     class QueryOptimizerCursor : public Cursor {
     public:
-        QueryOptimizerCursor( auto_ptr<MultiPlanScanner> &mps, bool requireIndex ) :
+        QueryOptimizerCursor( auto_ptr<MultiPlanScanner> &mps, bool requireIndex, bool doingDeletes ) :
         _mps( mps ),
-        _originalOp( new QueryOptimizerCursorOp( _nscanned, requireIndex ) ),
+        _originalOp( new QueryOptimizerCursorOp( _nscanned, requireIndex, doingDeletes ) ),
         _currOp(),
         _nscanned() {
             _mps->initialOp( _originalOp );
@@ -170,6 +173,7 @@ namespace mongo {
         }
         
         virtual bool ok() { return _takeover ? _takeover->ok() : !currLoc().isNull(); }
+        
         virtual Record* _current() {
             if ( _takeover ) {
                 return _takeover->_current();
@@ -177,6 +181,7 @@ namespace mongo {
             assertOk();
             return currLoc().rec();
         }
+        
         virtual BSONObj current() {
             if ( _takeover ) {
                 return _takeover->current();
@@ -184,7 +189,9 @@ namespace mongo {
             assertOk();
             return currLoc().obj();
         }
+        
         virtual DiskLoc currLoc() { return _takeover ? _takeover->currLoc() : _currLoc(); }
+        
         DiskLoc _currLoc() const {
             verify( 14826, !_takeover );
             if ( _currOp ) {
@@ -192,9 +199,11 @@ namespace mongo {
             }
             return DiskLoc();
         }
+        
         virtual bool advance() {
             return _advance( false );
         }
+        
         virtual BSONObj currKey() const {
             if ( _takeover ) {
              	return _takeover->currKey();   
@@ -203,7 +212,7 @@ namespace mongo {
             return _currOp->currKey();
         }
         
-        /** This cursor will be ignored for yielding by the client cursor implementation. */
+        /** If !_takeover, our cursor will be ignored for yielding by the client cursor implementation. */
         virtual DiskLoc refLoc() { return _takeover ? _takeover->refLoc() : DiskLoc(); }
         
         virtual BSONObj indexKeyPattern() {
@@ -217,6 +226,29 @@ namespace mongo {
         virtual bool supportGetMore() { return false; }
 
         virtual bool supportYields() { return _takeover ? _takeover->supportYields() : true; }
+        
+        virtual void noteLocation() {
+            if ( _takeover ) {
+                _takeover->noteLocation();
+            }
+            else if ( _currOp ) {
+                verify( 15910, _mps->prepareToYield() );
+            }
+        }
+
+        virtual void checkLocation() {
+            if ( _takeover ) {
+                _takeover->checkLocation();
+            }
+            else if ( _currOp ) {
+                _mps->recoverFromYield();
+                if ( _currOp->error() ) {
+                    // See if we can advance to a non error op.
+                    advance();
+                }
+            }
+        }
+
         virtual bool prepareToYield() {
             if ( _takeover ) {
                 return _takeover->prepareToYield();
@@ -228,6 +260,7 @@ namespace mongo {
                 return true;
             }
         }
+        
         virtual void recoverFromYield() {
             if ( _takeover ) {
                 _takeover->recoverFromYield();
@@ -347,9 +380,9 @@ namespace mongo {
         long long _nscanned;
     };
     
-    shared_ptr<Cursor> newQueryOptimizerCursor( auto_ptr<MultiPlanScanner> mps, bool requireIndex ) {
+    shared_ptr<Cursor> newQueryOptimizerCursor( auto_ptr<MultiPlanScanner> mps, bool requireIndex, bool doingDeletes ) {
         try {
-            return shared_ptr<Cursor>( new QueryOptimizerCursor( mps, requireIndex ) );
+            return shared_ptr<Cursor>( new QueryOptimizerCursor( mps, requireIndex, doingDeletes ) );
         } catch( const AssertionException &e ) {
             if ( e.getCode() == OutOfOrderDocumentsAssertionCode ) {
                 // If no indexes follow the requested sort order, return an
@@ -363,7 +396,7 @@ namespace mongo {
     
     shared_ptr<Cursor> NamespaceDetailsTransient::getCursor( const char *ns, const BSONObj &query,
                                                             const BSONObj &order, bool requireIndex,
-                                                            bool *simpleEqualityMatch ) {
+                                                            bool *simpleEqualityMatch, bool doingDeletes ) {
         if ( simpleEqualityMatch ) {
             *simpleEqualityMatch = false;
         }
@@ -401,13 +434,13 @@ namespace mongo {
                 return single;
             }
         }
-        return newQueryOptimizerCursor( mps, requireIndex );
+        return newQueryOptimizerCursor( mps, requireIndex, doingDeletes );
     }
 
     /** This interface just available for testing. */
-    shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query, const BSONObj &order, bool requireIndex ) {
+    shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query, const BSONObj &order, bool requireIndex, bool doingDeletes ) {
         auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order ) ); // mayYield == false
-        return newQueryOptimizerCursor( mps, requireIndex );
+        return newQueryOptimizerCursor( mps, requireIndex, false );
     }
         
 } // namespace mongo;

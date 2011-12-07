@@ -654,7 +654,7 @@ doneCheckOrder:
             recoverFromYieldOp( **i );
         }        
     }
-    
+
     void QueryPlanSet::Runner::mayYield() {
         if ( ! _plans._mayYield ) 
             return;
@@ -969,10 +969,10 @@ doneCheckOrder:
     
     void MultiPlanScanner::recoverFromYield() {
         if ( _currentQps.get() ) {
-            _currentQps->recoverFromYield();   
+            _currentQps->recoverFromYield();
         }
     }
-    
+
     shared_ptr<Cursor> MultiPlanScanner::singleCursor() const {
         const QueryPlan *qp = singlePlan();
         if ( !qp ) {

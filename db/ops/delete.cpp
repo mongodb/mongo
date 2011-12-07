@@ -23,87 +23,6 @@
 
 namespace mongo {
     
-    // Just try to identify best plan.
-    class DeleteOp : public MultiCursor::CursorOp {
-    public:
-        DeleteOp( bool justOne, int& bestCount, int orClauseIndex = -1 ) :
-            justOne_( justOne ),
-            count_(),
-            bestCount_( bestCount ),
-            _nscanned(),
-            _orClauseIndex( orClauseIndex ) {
-        }
-        virtual void _init() {
-            c_ = qp().newCursor();
-        }
-        virtual bool prepareToYield() {
-            if ( _orClauseIndex > 0 ) {
-                return false;
-            }
-            if ( ! _cc ) {
-                _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , c_ , qp().ns() ) );
-            }
-            return _cc->prepareToYield( _yieldData );
-        }
-        virtual void recoverFromYield() {
-            if ( !ClientCursor::recoverFromYield( _yieldData ) ) {
-                _cc.reset();
-                c_.reset();
-                massert( 13340, "cursor dropped during delete", false );
-            }
-        }
-        virtual long long nscanned() {
-            return c_.get() ? c_->nscanned() : _nscanned;
-        }
-        virtual void next() {
-            if ( !c_->ok() ) {
-                setComplete();
-                return;
-            }
-
-            DiskLoc rloc = c_->currLoc();
-
-            if ( matcher( c_ )->matchesCurrent(c_.get()) ) {
-                if ( !c_->getsetdup(rloc) )
-                    ++count_;
-            }
-
-            c_->advance();
-            _nscanned = c_->nscanned();
-            
-            if ( _orClauseIndex > 0 && _nscanned >= 100 ) {
-                setComplete();
-                return;
-            }
-            
-            if ( count_ > bestCount_ )
-                bestCount_ = count_;
-
-            if ( count_ > 0 ) {
-                if ( justOne_ )
-                    setComplete();
-                else if ( _nscanned >= 100 && count_ == bestCount_ )
-                    setComplete();
-            }
-        }
-        virtual bool mayRecordPlan() const { return !justOne_; }
-        virtual QueryOp *_createChild() const {
-            bestCount_ = 0; // should be safe to reset this in contexts where createChild() is called
-            return new DeleteOp( justOne_, bestCount_, _orClauseIndex + 1 );
-        }
-        virtual shared_ptr<Cursor> newCursor() const { return qp().newCursor(); }
-    private:
-        bool justOne_;
-        int count_;
-        int &bestCount_;
-        long long _nscanned;
-        shared_ptr<Cursor> c_;
-        ClientCursor::CleanupPointer _cc;
-        ClientCursor::YieldData _yieldData;
-        // Avoid yielding in the MultiPlanScanner when not the first $or clause - just a temporary implementaiton for now.  SERVER-3555
-        int _orClauseIndex;
-    };
-
     /* ns:      namespace, e.g. <database>.<collection>
        pattern: the "where" clause / criteria
        justOne: stop after 1 match
@@ -133,9 +52,7 @@ namespace mongo {
 
         long long nDeleted = 0;
 
-        int best = 0;
-        shared_ptr< MultiCursor::CursorOp > opPtr( new DeleteOp( justOneOrig, best ) );
-        shared_ptr< MultiCursor > creal( new MultiCursor( ns, pattern, BSONObj(), opPtr, !god ) );
+        shared_ptr< Cursor > creal = NamespaceDetailsTransient::getCursor( ns, pattern, BSONObj(), false, 0, true );
 
         if( !creal->ok() )
             return nDeleted;
@@ -147,12 +64,12 @@ namespace mongo {
         CursorId id = cc->cursorid();
 
         bool justOne = justOneOrig;
-        bool canYield = !god && !creal->matcher()->docMatcher().atomic();
+        bool canYield = !god && !(creal->matcher() && creal->matcher()->docMatcher().atomic());
 
         do {
             // TODO: we can generalize this I believe
             //       
-            bool willNeedRecord = creal->matcher()->needRecord() || pattern.isEmpty() || isSimpleIdQuery( pattern );
+            bool willNeedRecord = (creal->matcher() && creal->matcher()->needRecord()) || pattern.isEmpty() || isSimpleIdQuery( pattern );
             if ( ! willNeedRecord ) {
                 // TODO: this is a total hack right now
                 // check if the index full encompasses query
@@ -180,7 +97,8 @@ namespace mongo {
 
             // NOTE Calling advance() may change the matcher, so it's important
             // to try to match first.
-            bool match = creal->matcher()->matchesCurrent(creal.get());
+            bool match = !creal->matcher() || creal->matcher()->matchesCurrent(creal.get());
+            bool dup = cc->c()->getsetdup(rloc);
 
             if ( ! cc->advance() )
                 justOne = true;
@@ -188,7 +106,7 @@ namespace mongo {
             if ( ! match )
                 continue;
 
-            assert( !cc->c()->getsetdup(rloc) ); // can't be a dup, we deleted it!
+            assert( !dup ); // can't be a dup, we deleted it!
 
             if ( !justOne ) {
                 /* NOTE: this is SLOW.  this is not good, noteLocation() was designed to be called across getMore

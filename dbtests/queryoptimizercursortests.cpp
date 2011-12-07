@@ -25,7 +25,7 @@
 
 namespace mongo {
     void __forceLinkGeoPlugin();
-    shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query, const BSONObj &order = BSONObj(), bool requireIndex = false );
+    shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query, const BSONObj &order = BSONObj(), bool requireIndex = false, bool doingDeletes = false );
 } // namespace mongo
 
 namespace QueryOptimizerCursorTests {
@@ -53,8 +53,8 @@ namespace QueryOptimizerCursorTests {
     protected:
         DBDirectClient _cli;
         static const char *ns() { return "unittests.QueryOptimizerTests"; }
-        void setQueryOptimizerCursor( const BSONObj &query, const BSONObj &order = BSONObj() ) {
-            _c = newQueryOptimizerCursor( ns(), query, order );
+        void setQueryOptimizerCursor( const BSONObj &query, const BSONObj &order = BSONObj(), bool doingDeletes = false ) {
+            _c = newQueryOptimizerCursor( ns(), query, order, false, doingDeletes );
             if ( ok() && !mayReturnCurrent() ) {
                 advance();
             }
@@ -74,6 +74,9 @@ namespace QueryOptimizerCursorTests {
             return ret;
         }
         BSONObj current() const { return _c->current(); }
+        DiskLoc currLoc() const { return _c->currLoc(); }
+        void noteLocation() { _c->noteLocation(); }
+        void checkLocation() { _c->checkLocation(); }
         bool mayReturnCurrent() {
             return _c->matcher()->matchesCurrent( _c.get() ) && !_c->getsetdup( _c->currLoc() );
         }
@@ -768,26 +771,6 @@ namespace QueryOptimizerCursorTests {
         }
     };
     
-    /** Simple geo query. */
-    class Geo : public Base {
-    public:
-        void run() {
-            _cli.insert( ns(), BSON( "_id" << 0 << "loc" << BSON( "lon" << 30 << "lat" << 30 ) ) );
-            _cli.insert( ns(), BSON( "_id" << 1 << "loc" << BSON( "lon" << 31 << "lat" << 31 ) ) );
-            _cli.ensureIndex( ns(), BSON( "loc" << "2d" ) );
-            
-            dblock lk;
-            Client::Context ctx( ns() );
-            setQueryOptimizerCursor( BSON( "loc" << BSON( "$near" << BSON_ARRAY( 30 << 30 ) ) ) );
-            ASSERT( ok() );
-            ASSERT_EQUALS( 0, current().getIntField( "_id" ) );
-            ASSERT( advance() );
-            ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
-            ASSERT( !advance() );
-            ASSERT( !ok() );
-        }
-    };
-    
     /** Yield cursor and delete current entry, then continue iteration. */
     class YieldNoOp : public Base {
     public:
@@ -1349,26 +1332,6 @@ namespace QueryOptimizerCursorTests {
         }
     };
     
-    /** Try and fail to yield a geo query. */
-    class TryYieldGeo : public Base {
-    public:
-        void run() {
-            _cli.insert( ns(), BSON( "_id" << 0 << "loc" << BSON( "lon" << 30 << "lat" << 30 ) ) );
-            _cli.ensureIndex( ns(), BSON( "loc" << "2d" ) );
-            
-            dblock lk;
-            Client::Context ctx( ns() );
-            setQueryOptimizerCursor( BSON( "loc" << BSON( "$near" << BSON_ARRAY( 50 << 50 ) ) ) );
-            ASSERT( ok() );
-            ASSERT_EQUALS( 0, current().getIntField( "_id" ) );
-            ASSERT( !prepareToYield() );
-            ASSERT( ok() );
-            ASSERT_EQUALS( 0, current().getIntField( "_id" ) );
-            ASSERT( !advance() );
-            ASSERT( !ok() );
-        }
-    };
-    
     /** Yield with takeover cursor. */
     class YieldTakeover : public Base {
     public:
@@ -1652,6 +1615,245 @@ namespace QueryOptimizerCursorTests {
             ASSERT( !c->ok() );
         }
     };
+
+    /* Test noteLocation / checkLocation without doc modifications. */
+    class NoteCheckLocation : public Base {
+    public:
+        void run() {            
+            _cli.insert( ns(), BSON( "_id" << 1 << "b" << 1 ) );
+            _cli.insert( ns(), BSON( "_id" << 2 << "b" << 2 ) );
+            _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
+
+            mongolock lk( false );
+            Client::Context ctx( ns() );
+            shared_ptr<Cursor> c = newQueryOptimizerCursor( ns(), BSON( "_id" << GT << 0 << "b" << GT << 0 ) );
+            
+            ASSERT( c->ok() );
+            while( c->ok() ) {
+                DiskLoc loc = c->currLoc();
+                BSONObj obj = c->current();
+                c->noteLocation();
+                c->checkLocation();
+                ASSERT( loc == c->currLoc() );
+                ASSERT_EQUALS( obj, c->current() );
+                c->advance();
+            }
+        }
+    };
+
+    /* Test noteLocation / checkLocation with doc modifications. */
+    class NoteCheckLocationDelete : public Base {
+    public:
+        void run() {            
+            _cli.insert( ns(), BSON( "_id" << 1 << "b" << 1 ) );
+            _cli.insert( ns(), BSON( "_id" << 2 << "b" << 2 ) );
+            _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
+            
+            DiskLoc firstLoc;
+            dblock lk;
+            Client::Context ctx( ns() );
+            setQueryOptimizerCursor( BSON( "_id" << GT << 0 << "b" << GT << 0 ) );
+            ASSERT( ok() );
+            firstLoc = currLoc();
+            ASSERT( c()->advance() );
+            noteLocation();
+            
+            _cli.remove( ns(), BSON( "_id" << 1 ), true );
+
+            checkLocation();
+            ASSERT( ok() );
+            while( ok() ) {
+                ASSERT( firstLoc != currLoc() );
+                c()->advance();
+            }
+        }
+    };
+
+    /* Test noteLocation / checkLocation with several doc modifications. */
+    class NoteCheckLocationDeleteMultiple : public Base {
+    public:
+        void run() {
+            for( int i = 1; i < 10; ++i ) {
+                _cli.insert( ns(), BSON( "_id" << i << "b" << i ) );
+            }
+            _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
+            
+            set<DiskLoc> deleted;
+            int id = 0;
+            dblock lk;
+            Client::Context ctx( ns() );
+            setQueryOptimizerCursor( BSON( "_id" << GT << 0 << "b" << GT << 0 ) );
+            while( 1 ) {
+                if ( !ok() ) {
+                    break;
+                }
+                ASSERT( deleted.count( currLoc() ) == 0 );
+                id = current()["_id"].Int();
+                deleted.insert( currLoc() );
+                c()->advance();
+                noteLocation();
+                
+                _cli.remove( ns(), BSON( "_id" << id ), true );
+
+                checkLocation();
+            }
+            ASSERT_EQUALS( 9U, deleted.size() );
+        }
+    };
+
+    /* Test noteLocation / checkLocation with takeover. */
+    class NoteCheckLocationTakeover : public Base {
+    public:
+        void run() {
+            for( int i = 1; i < 300; ++i ) {
+                _cli.insert( ns(), BSON( "_id" << i << "b" << i ) );
+            }
+            _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
+            
+            mongolock lk( false );
+            Client::Context ctx( ns() );
+            setQueryOptimizerCursor( BSON( "_id" << GT << 0 << "b" << GT << 0 ) );
+            
+            ASSERT( ok() );
+            int count = 1;
+            while( ok() ) {
+                DiskLoc loc = currLoc();
+                BSONObj obj = current();
+                noteLocation();
+                checkLocation();
+                ASSERT( loc == currLoc() );
+                ASSERT_EQUALS( obj, current() );
+                count += mayReturnCurrent();
+                c()->advance();
+            }
+            ASSERT_EQUALS( 299, count );
+        }
+    };
+
+    /* Test noteLocation / checkLocation with takeover and deletes. */
+    class NoteCheckLocationTakeoverDeleteMultiple : public Base {
+    public:
+        void run() {
+            for( int i = 1; i < 300; ++i ) {
+                _cli.insert( ns(), BSON( "_id" << i << "b" << i ) );
+            }
+            _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
+            
+            set<DiskLoc> deleted;
+            int id = 0;
+
+            dblock lk;
+            Client::Context ctx( ns() );
+            setQueryOptimizerCursor( BSON( "_id" << GT << 0 << "b" << GT << 0 ) );
+            while( 1 ) {
+                if ( !ok() ) {
+                    break;
+                }
+                ASSERT( deleted.count( currLoc() ) == 0 );
+                id = current()["_id"].Int();
+                deleted.insert( currLoc() );
+                c()->advance();
+                noteLocation();
+
+                _cli.remove( ns(), BSON( "_id" << id ), true );
+
+                checkLocation();
+            }
+            ASSERT_EQUALS( 299U, deleted.size() );
+        }
+    };
+
+    /* Test noteLocation / checkLocation with takeover and deletes, with multiple advances in a row. */
+    class NoteCheckLocationTakeoverDeleteMultipleMultiAdvance : public Base {
+    public:
+        void run() {
+            for( int i = 1; i < 300; ++i ) {
+                _cli.insert( ns(), BSON( "_id" << i << "b" << i ) );
+            }
+            _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
+            
+            set<DiskLoc> deleted;
+            int id = 0;
+
+            dblock lk;
+            Client::Context ctx( ns() );
+            setQueryOptimizerCursor( BSON( "_id" << GT << 0 << "b" << GT << 0 ) );
+            while( 1 ) {
+                if ( !ok() ) {
+                    break;
+                }
+                ASSERT( deleted.count( currLoc() ) == 0 );
+                id = current()["_id"].Int();
+                deleted.insert( currLoc() );
+                advance();
+                noteLocation();
+
+                _cli.remove( ns(), BSON( "_id" << id ), true );
+                
+                checkLocation();
+            }
+            ASSERT_EQUALS( 299U, deleted.size() );
+        }
+    };
+
+    /* Test ClientCursor recovery failure in checkLocation. */
+    class NoteCheckLocationFailedRecovery : public Base {
+    public:
+        void run() {
+            _cli.createCollection( ns(), 1000, true );
+            _cli.insert( ns(), BSON( "_id" << 1 << "x" << 1 ) );
+            
+            dblock lk;
+            Client::Context ctx( ns() );
+            setQueryOptimizerCursor( BSON( "x" << GT << 0 ) );
+            ASSERT_EQUALS( 1, current().getIntField( "x" ) );
+            noteLocation();
+            
+            int x = 2;
+            while( _cli.count( ns(), BSON( "x" << 1 ) ) > 0 ) {
+                _cli.insert( ns(), BSON( "_id" << x << "x" << x ) );
+                ++x;
+            }
+            
+            ASSERT_EXCEPTION( checkLocation(), MsgAssertionException );
+            ASSERT( !ok() );
+        }
+    };
+
+    /* Test ClientCursor recovery failure in checkLocation with a failover plan. */
+    class NoteCheckLocationFailedRecoveryMultiplePlans : public Base {
+    public:
+        void run() {
+            _cli.createCollection( ns(), 1000, true );
+            _cli.ensureIndex( ns(), BSON( "x" << 1 ) );
+            _cli.insert( ns(), BSON( "_id" << 1 << "x" << 1 ) );
+            
+            dblock lk;
+            Client::Context ctx( ns() );
+            setQueryOptimizerCursor( BSON( "x" << GT << 0 << "_id" << GT << 0 ) );
+            ASSERT_EQUALS( 1, current().getIntField( "x" ) );
+            while ( 1 ) {
+                ASSERT( ok() );
+                // Ensure the capped cursor is the query optimizer cursor's active sub cursor when we noteLocation().
+                if ( c()->indexKeyPattern().isEmpty() ) {
+                    break;
+                }
+                c()->advance();
+            }
+            noteLocation();
+            
+            int x = 2;
+            while( _cli.count( ns(), BSON( "x" << 1 ) ) > 0 ) {
+                _cli.insert( ns(), BSON( "_id" << x << "x" << x ) );
+                ++x;
+            }
+            
+            checkLocation();
+            // We should have recovered from the failed capped cursor.
+            ASSERT( ok() );
+            ASSERT( advance() );
+        }
+    };
     
     namespace GetCursor {
         
@@ -1917,7 +2119,6 @@ namespace QueryOptimizerCursorTests {
             add<QueryOptimizerCursorTests::EarlyDups>();
             add<QueryOptimizerCursorTests::OrPopInTakeover>();
             add<QueryOptimizerCursorTests::OrCollectionScanAbort>();
-            add<QueryOptimizerCursorTests::Geo>();
             add<QueryOptimizerCursorTests::YieldNoOp>();
             add<QueryOptimizerCursorTests::YieldDelete>();
             add<QueryOptimizerCursorTests::YieldDeleteContinue>();
@@ -1936,7 +2137,6 @@ namespace QueryOptimizerCursorTests {
             add<QueryOptimizerCursorTests::YieldMultiplePlansCappedOverwrite>();
             add<QueryOptimizerCursorTests::YieldMultiplePlansCappedOverwriteManual>();
             add<QueryOptimizerCursorTests::YieldMultiplePlansCappedOverwriteManual2>();
-            add<QueryOptimizerCursorTests::TryYieldGeo>();
             add<QueryOptimizerCursorTests::YieldTakeover>();
             add<QueryOptimizerCursorTests::YieldTakeoverBasic>();
             add<QueryOptimizerCursorTests::YieldInactiveCursorAdvance>();
@@ -1949,6 +2149,14 @@ namespace QueryOptimizerCursorTests {
             add<QueryOptimizerCursorTests::KillOp>();
             add<QueryOptimizerCursorTests::KillOpFirstClause>();
             add<QueryOptimizerCursorTests::Nscanned>();
+            add<QueryOptimizerCursorTests::NoteCheckLocation>();
+            add<QueryOptimizerCursorTests::NoteCheckLocationDelete>();
+            add<QueryOptimizerCursorTests::NoteCheckLocationDeleteMultiple>();
+            add<QueryOptimizerCursorTests::NoteCheckLocationTakeover>();
+            add<QueryOptimizerCursorTests::NoteCheckLocationTakeoverDeleteMultiple>();
+            add<QueryOptimizerCursorTests::NoteCheckLocationTakeoverDeleteMultipleMultiAdvance>();
+            add<QueryOptimizerCursorTests::NoteCheckLocationFailedRecovery>();
+            add<QueryOptimizerCursorTests::NoteCheckLocationFailedRecoveryMultiplePlans>();
             add<QueryOptimizerCursorTests::GetCursor::NoConstraints>();
             add<QueryOptimizerCursorTests::GetCursor::SimpleId>();
             add<QueryOptimizerCursorTests::GetCursor::OptimalIndex>();
