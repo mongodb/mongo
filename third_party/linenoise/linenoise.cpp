@@ -181,6 +181,7 @@ static linenoiseCompletionCallback* completionCallback = NULL;
 #ifdef _WIN32
 static HANDLE console_in, console_out;
 static DWORD oldMode;
+static WORD oldDisplayAttribute;
 #else
 static struct termios orig_termios; /* in order to restore at exit */
 #endif
@@ -319,6 +320,43 @@ static void calculateScreenPosition(int x, int y, int screenColumns, int charCou
     }
 }
 
+static void setDisplayAttribute( int fd, bool enhancedDisplay ) {
+#ifdef _WIN32
+    if ( enhancedDisplay ) {
+        CONSOLE_SCREEN_BUFFER_INFO inf;
+        GetConsoleScreenBufferInfo( console_out, &inf );
+        oldDisplayAttribute = inf.wAttributes;
+        BYTE oldLowByte = oldDisplayAttribute & 0xFF;
+        BYTE newLowByte;
+        switch ( oldLowByte ) {
+        case 0x07:
+            //newLowByte = FOREGROUND_BLUE | FOREGROUND_INTENSITY;  // too dim
+            //newLowByte = FOREGROUND_BLUE;                         // even dimmer
+            newLowByte = FOREGROUND_BLUE | FOREGROUND_GREEN;        // most similar to xterm appearance
+            break;
+        case 0x70:
+            newLowByte = BACKGROUND_BLUE | BACKGROUND_INTENSITY;
+            break;
+        default:
+            newLowByte = oldLowByte ^ 0xFF;     // default to inverse video
+            break;
+        }
+        inf.wAttributes = ( inf.wAttributes & 0xFF00 ) | newLowByte;
+        SetConsoleTextAttribute( console_out, inf.wAttributes );
+    }
+    else {
+        SetConsoleTextAttribute( console_out, oldDisplayAttribute );
+    }
+#else
+    if ( enhancedDisplay ) {
+        if ( write( fd, "\x1b[1;34m", 7 ) == -1 ) return; /* bright blue (visible with both B&W bg) */
+    }
+    else {
+        if ( write( fd, "\x1b[0m", 4 ) == -1 ) return; /* reset */
+    }
+#endif
+}
+
 /**
  * Refresh the user's input line: the prompt is already onscreen and is not redrawn here
  * @param fd   file handle to use for output to the screen
@@ -377,7 +415,16 @@ static void refreshLine( int fd, PromptInfo& pi, char *buf, int len, int pos ) {
     pi.promptPreviousInputLen = len;
 
     // display the input line
-    if ( write( 1, buf, len ) == -1 ) return;
+    if (highlight == -1) {
+        if ( write( 1, buf, len ) == -1 ) return;
+    }
+    else {
+        if  (write( 1, buf, highlight ) == -1 ) return;
+        setDisplayAttribute( 1, true ); /* bright blue (visible with both B&W bg) */
+        if ( write( 1, &buf[highlight], 1 ) == -1 ) return;
+        setDisplayAttribute( 1, false );
+        if ( write( 1, buf + highlight + 1, len - highlight - 1 ) == -1 ) return;
+    }
 
     // position the cursor
     GetConsoleScreenBufferInfo( console_out, &inf );
@@ -400,9 +447,9 @@ static void refreshLine( int fd, PromptInfo& pi, char *buf, int len, int pos ) {
     }
     else {  // highlight the matching brace/bracket/parenthesis
         if ( write( fd, buf, highlight ) == -1 ) return;
-        if ( write( fd, "\x1b[1;34m", 7 ) == -1 ) return; /* bright blue (visible with both B&W bg) */
+        setDisplayAttribute( fd, true );
         if ( write( fd, &buf[highlight], 1 ) == -1 ) return;
-        if ( write( fd, "\x1b[0m", 4 ) == -1 ) return; /* reset */
+        setDisplayAttribute( fd, false );
         if ( write( fd, buf + highlight + 1, len - highlight - 1 ) == -1 ) return;
     }
 
