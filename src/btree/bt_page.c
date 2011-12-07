@@ -49,13 +49,11 @@ __wt_page_in_func(
 
 			WT_ASSERT(session, ref->state == WT_REF_READING);
 
-			WT_RET(__wt_cache_read(
-			    session, parent, ref, dsk_verify));
+			ret = __wt_cache_read(
+			    session, parent, ref, dsk_verify);
 
-			WT_RET(__wt_read_end_serial(session, ref));
-
-			WT_ASSERT(session, ref->state == WT_REF_MEM &&
-			    ref->page != NULL);
+			WT_TRET(__wt_read_end_serial(session, ref));
+			WT_RET(ret);
 			break;
 		case WT_REF_LOCKED:
 		case WT_REF_READING:
@@ -88,7 +86,8 @@ __wt_page_in_func(
 			WT_ASSERT_RET(session,
 			    ref->state == WT_REF_DISK ||
 			    ref->state == WT_REF_LOCKED ||
-			    ref->state == WT_REF_MEM);
+			    ref->state == WT_REF_MEM ||
+			    ref->state == WT_REF_READING);
 		}
 	/* NOTREACHED */
 }

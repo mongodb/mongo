@@ -356,6 +356,7 @@ __rec_sub_excl_col(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t flags)
 		case WT_REF_DISK:			/* On-disk */
 			continue;
 		case WT_REF_LOCKED:			/* Eviction candidate */
+		case WT_REF_READING:			/* Being read */
 			__wt_errx(session,
 			    "subtree page locked during eviction");
 			return (WT_ERROR);
@@ -415,6 +416,7 @@ __rec_sub_excl_row(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t flags)
 		case WT_REF_DISK:			/* On-disk */
 			continue;
 		case WT_REF_LOCKED:			/* Eviction candidate */
+		case WT_REF_READING:			/* Being read */
 			__wt_errx(session,
 			    "subtree page locked during eviction");
 			return (WT_ERROR);

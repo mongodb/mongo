@@ -102,11 +102,14 @@ __wt_read_end_serial_func(WT_SESSION_IMPL *session)
 	__wt_read_end_unpack(session, &ref);
 
 	/* Add the page to our cache statistics. */
-	dsk = ref->page->dsk;
-	__wt_cache_page_read(session, ref->page,
-	    sizeof(WT_PAGE) + ((dsk == NULL) ? 0 : dsk->memsize));
+	if (ref->page != NULL) {
+		dsk = ref->page->dsk;
+		__wt_cache_page_read(session, ref->page,
+		    sizeof(WT_PAGE) + ((dsk == NULL) ? 0 : dsk->memsize));
 
-	ref->state = WT_REF_MEM;
+		ref->state = WT_REF_MEM;
+	} else
+		ref->state = WT_REF_DISK;
 
 	__wt_session_serialize_wrapup(session, NULL, 0);
 }
