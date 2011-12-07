@@ -560,8 +560,9 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		if (page != NULL &&
 		    !WT_PAGE_IS_ROOT(page) && !F_ISSET(page, WT_PAGE_PINNED)) {
 			WT_VERBOSE(session, evictserver,
-			    "%s walk: %" PRIu32,
-			    btree->name, WT_PADDR(page));
+			    "%s walk: %" PRIu32 ", size %" PRIu32,
+			    btree->name, WT_PADDR(page),
+			    page->memory_footprint);
 
 			++i;
 			cache->evict[*slotp].page = page;
