@@ -1815,7 +1815,7 @@ namespace QueryOptimizerCursorTests {
                 ++x;
             }
             
-            ASSERT_EXCEPTION( checkLocation(), MsgAssertionException );
+            ASSERT_THROWS( checkLocation(), MsgAssertionException );
             ASSERT( !ok() );
         }
     };
@@ -1869,7 +1869,7 @@ namespace QueryOptimizerCursorTests {
                 Client::Context ctx( ns() );
                 bool simpleEqualityMatch;
                 if ( expectException() ) {
-                    ASSERT_EXCEPTION( NamespaceDetailsTransient::getCursor( ns(), query(), order(), requireIndex(), &simpleEqualityMatch ), MsgAssertionException );
+                    ASSERT_THROWS( NamespaceDetailsTransient::getCursor( ns(), query(), order(), requireIndex(), &simpleEqualityMatch ), MsgAssertionException );
                     return;
                 }
                 shared_ptr<Cursor> c = NamespaceDetailsTransient::getCursor( ns(), query(), order(), requireIndex(), &simpleEqualityMatch );
@@ -2078,7 +2078,7 @@ namespace QueryOptimizerCursorTests {
                 ASSERT( c->ok() );
                 ASSERT( c->matcher() );
                 // An unindexed cursor is required for the second clause, but is not allowed.
-                ASSERT_EXCEPTION( c->advance(), MsgAssertionException );
+                ASSERT_THROWS( c->advance(), MsgAssertionException );
             }
         };
         

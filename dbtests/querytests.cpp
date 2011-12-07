@@ -166,9 +166,9 @@ namespace QueryTests {
             ASSERT_EQUALS( ret, Helpers::findOne( ns(), query, false ).obj() );
             
             // Check findOne() returning object, requiring indexed scan without index.
-            ASSERT_EXCEPTION( Helpers::findOne( ns(), query, ret, true ), MsgAssertionException );
+            ASSERT_THROWS( Helpers::findOne( ns(), query, ret, true ), MsgAssertionException );
             // Check findOne() returning location, requiring indexed scan without index.
-            ASSERT_EXCEPTION( Helpers::findOne( ns(), query, true ), MsgAssertionException );
+            ASSERT_THROWS( Helpers::findOne( ns(), query, true ), MsgAssertionException );
 
             addIndex( BSON( "b" << 1 ) );
             // Check findOne() returning object, requiring indexed scan with index.
