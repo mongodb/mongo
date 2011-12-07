@@ -35,18 +35,18 @@ db.getLastError();
 s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } );
 assert.lt( 20 , s.config.chunks.count()  , "setup2" );
 
-function diff(){
+function diff1(){
     var x = s.chunkCounts( "foo" );
     printjson( x )
     return Math.max( x.shard0000 , x.shard0001 ) - Math.min( x.shard0000 , x.shard0001 );
 }
 
-assert.lt( 10 , diff() );
-print( diff() )
+assert.lt( 10 , diff1() );
+print( diff1() )
 
-var currDiff = diff();
+var currDiff = diff1();
 assert.repeat( function(){
-    var d = diff();
+    var d = diff1();
     return d != currDiff;
 } , "balance with maxSize should not have happened" , 1000 * 30 , 5000 );
     

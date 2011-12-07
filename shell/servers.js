@@ -1431,6 +1431,7 @@ ToolTest = function( name ){
     this.ext = this.root + "_external/";
     this.extFile = this.root + "_external/a";
     resetDbpath( this.dbpath );
+    resetDbpath( this.ext );
 }
 
 ToolTest.prototype.startDB = function( coll ){
@@ -1617,8 +1618,6 @@ SyncCCTest.prototype.tempStart = function( num ){
 
 
 function startParallelShell( jsCode, port ){
-    assert( jsCode.indexOf( '"' ) == -1,
-           "double quotes should not be used in jsCode because the windows shell will stip them out" );
     var x;
 
     var args = ["mongo"];

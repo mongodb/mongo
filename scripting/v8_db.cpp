@@ -125,7 +125,7 @@ namespace mongo {
 
     v8::Handle<v8::FunctionTemplate> getTimestampFunctionTemplate(V8Scope* scope) {
         v8::Handle<v8::FunctionTemplate> ts = scope->createV8Function(dbTimestampInit);
-        v8::Local<v8::Template> proto = ts->PrototypeTemplate();
+        /*v8::Local<v8::Template> proto =*/ ts->PrototypeTemplate();
         ts->InstanceTemplate()->SetInternalFieldCount( 1 );
 
         return ts;

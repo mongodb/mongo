@@ -83,11 +83,14 @@ namespace mongo {
         char buf[256];
     };
 
+    class DBException;
+    string causedBy( const DBException& e );
+
     class DBException : public std::exception {
     public:
-        DBException( const ExceptionInfo& ei ) : _ei(ei) {}
-        DBException( const char * msg , int code ) : _ei(msg,code) {}
-        DBException( const string& msg , int code ) : _ei(msg,code) {}
+        DBException( const ExceptionInfo& ei ) : _ei(ei) { traceIfNeeded(*this); }
+        DBException( const char * msg , int code ) : _ei(msg,code) { traceIfNeeded(*this); }
+        DBException( const string& msg , int code ) : _ei(msg,code) { traceIfNeeded(*this); }
         virtual ~DBException() throw() { }
 
         virtual const char* what() const throw() { return _ei.msg.c_str(); }
@@ -101,6 +104,15 @@ namespace mongo {
         }
 
         const ExceptionInfo& getInfo() const { return _ei; }
+
+        static void traceIfNeeded( const DBException& e ) {
+            if( traceExceptions && ! inShutdown() ){
+                warning() << "DBException thrown" << causedBy( e ) << endl;
+                printStackTrace();
+            }
+        }
+
+        static bool traceExceptions;
 
     protected:
         ExceptionInfo _ei;

@@ -52,6 +52,8 @@ namespace mongo {
             rollover();
     }
 
+    bool DBException::traceExceptions = false;
+
     void ExceptionInfo::append( BSONObjBuilder& b , const char * m , const char * c ) const {
         if ( msg.empty() )
             b.append( m , "unknown assertion" );
