@@ -850,6 +850,8 @@ DBCollection.prototype.getSplitKeysForChunks = function( chunkSize ){
        sleep( 1 )
    }
    
+   splitFunction.getSplitPoints = function(){ return allSplitPoints; }
+   
    print( "\nGenerated " + numSplits + " split keys, run output function to perform splits.\n" +
           " ex : \n" + 
           "  > var splitter = <collection>.getSplitKeysForChunks()\n" +
