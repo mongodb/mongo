@@ -24,6 +24,7 @@ namespace mongo {
 
     class ReplicaSetMonitor;
     typedef shared_ptr<ReplicaSetMonitor> ReplicaSetMonitorPtr;
+    typedef pair<set<string>,set<int> > NodeDiff;
 
     /**
      * manages state about a replica set for client
@@ -92,7 +93,7 @@ namespace mongo {
         string getName() const { return _name; }
 
         string getServerAddress() const;
-        
+
         bool contains( const string& server ) const;
         
         void appendInfo( BSONObjBuilder& b ) const;
@@ -132,6 +133,12 @@ namespace mongo {
          */
         bool _checkConnection( DBClientConnection * c , string& maybePrimary , bool verbose , int nodesOffset );
 
+        string _getServerAddress_inlock() const;
+
+        NodeDiff _getHostDiff_inlock( const BSONObj& hostList );
+        bool _shouldChangeHosts( const BSONObj& hostList, bool inlock );
+
+
         int _find( const string& server ) const ;
         int _find_inlock( const string& server ) const ;
         int _find( const HostAndPort& server ) const ;
@@ -144,6 +151,7 @@ namespace mongo {
             Node( const HostAndPort& a , DBClientConnection* c ) 
                 : addr( a ) , conn(c) , ok(true) , 
                   ismaster(false), secondary( false ) , hidden( false ) , pingTimeMillis(0) {
+                ok = conn.get() == NULL;
             }
 
             bool okForSecondaryQueries() const {
