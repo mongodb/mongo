@@ -27,13 +27,6 @@ static int  __evict_worker(WT_SESSION_IMPL *);
 #define	WT_EVICT_WALK_BASE	100	/* Pages tracked across file visits */
 
 /*
- * WT_EVICT_FOREACH --
- *	Walk a list of eviction candidates.
- */
-#define	WT_EVICT_FOREACH(cache, p, i)					\
-	for ((i) = 0, (p) = (cache)->evict; (i) < WT_EVICT_GROUP; ++(i), ++(p))
-
-/*
  * WT_EVICT_REQ_FOREACH --
  *	Walk a list of eviction requests.
  */
