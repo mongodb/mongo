@@ -103,7 +103,7 @@ wt_snappy_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 			*(size_t *)destp = snaplen;
 			destp += sizeof(size_t);
 			memcpy(destp, snapbuf, snaplen);
-			dst->size = snaplen + sizeof(size_t);
+			dst->size = (uint32_t)(snaplen + sizeof(size_t));
 			*compression_failed  = 0;
 		}
 		else
@@ -144,7 +144,7 @@ wt_snappy_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	    (char *)dst->data, &dstlen);
 
 	if (snret == SNAPPY_OK) {
-		dst->size = dstlen;
+		dst->size = (uint32_t)dstlen;
 		ret = 0;
 	}
 	else
