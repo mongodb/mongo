@@ -2142,7 +2142,8 @@ __rec_row_leaf(
 			ikey = NULL;
 			cell = rip->key;
 		}
-							/* Build value cell. */
+
+		/* Build value cell. */
 		if ((val_cell = __wt_row_value(page, rip)) != NULL)
 			__wt_cell_unpack(val_cell, unpack);
 		if ((upd = WT_ROW_UPDATE(page, rip)) == NULL) {
@@ -2202,12 +2203,13 @@ __rec_row_leaf(
 
 		/*
 		 * Build key cell.
-		 *
-		 * If the key is an overflow item, assume prefix compression
-		 * won't make things better, and simply copy it.
 		 */
 		__wt_cell_unpack(cell, unpack);
 		if (unpack->type == WT_CELL_KEY_OVFL) {
+			/*
+			 * If the key is an overflow item, assume prefix
+			 * compression won't make things better, and copy it.
+			 */
 			key->buf.data = cell;
 			key->buf.size = unpack->len;
 			key->cell_len = 0;
@@ -2217,6 +2219,13 @@ __rec_row_leaf(
 			/* Don't try to use a prefix across an overflow key. */
 			tmp->size = 0;
 		} else {
+			/*
+			 * If the key is already instantiated, use it.
+			 * Else, if the key is available from the page, use it.
+			 * Else, if we can construct the key from a previous
+			 *	key, do so.
+			 * Else, instantiate the key.
+			 */
 			if (ikey != NULL) {
 				tmp->data = WT_IKEY_DATA(ikey);
 				tmp->size = ikey->size;
@@ -2230,19 +2239,20 @@ __rec_row_leaf(
 			    tmp->size >= unpack->prefix) {
 				/*
 				 * If we previously built a prefix-compressed
-				 * key in the temporary buffer, the
-				 * WT_BUF->data field will be the same as the
-				 * WT_BUF->mem field: grow the buffer if
-				 * necessary and copy the suffix into place.
-				 * If we previously pointed the temporary
-				 * buffer at an on-page key, the WT_BUF->data
-				 * field will not be the same as the
-				 * WT_BUF->mem field: grow the buffer if
-				 * necessary, copy the prefix into place, and
-				 * then re-point the WT_BUF->data field to the
-				 * newly constructed memory.
+				 * key in the temporary buffer, WT_BUF->data
+				 * will be the same as WT_BUF->mem: grow the
+				 * buffer if necessary and copy the suffix into
+				 * place.
+				 *
+				 * If we previously pointed the temporary buffer
+				 * at an on-page key, WT_BUF->data will not be
+				 * the same as WT_BUF->mem: grow the buffer if
+				 * necessary, copy the prefix into place, then
+				 * re-point the WT_BUF->data field to the newly
+				 * constructed memory, and then copy the suffix
+				 * into place.
 				 */
-				WT_RET(__wt_buf_grow(session,
+				WT_ERR(__wt_buf_grow(session,
 				    tmp, unpack->prefix + unpack->size));
 				if (tmp->data != tmp->mem) {
 					memcpy(tmp->mem, tmp->data,
