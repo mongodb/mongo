@@ -1,20 +1,24 @@
 //dumpfilename1.js
 
-//Test designed to make sure proper error is thrown when trying to dump collection with a "/" in the name
+//Test designed to make sure error that dumping a collection with "/" in the name doesn't crash the system.
+//An error is logged and given to the user, but the other collections should dump and restore OK.  
 
 t = new ToolTest( "dumpfilename1" );
 
 t.startDB( "foo" );
+c = t.db;
+c.getCollection("df/").insert({a:3});
+c.getCollection("df").insert({a:2});
 
-db = t.db;
-db.getCollection("df1/").insert({a:3});
-db.getCollection("df1").insert({a:2});
 t.runTool( "dump" , "--out" , t.ext );
 
-catch(e){
-    print(e.message);
-    assert(false,"fail here");
-    t.stop();
-}
-assert(false,"fail at end");
+assert(c.getCollection("df/").drop(),"cannot drop 1");
+assert(c.getCollection("df").drop(), "cannot drop 2");
+
+t.runTool( "restore" , "--dir" , t.ext );
+
+assert.eq( 0 , c.getCollection("df/").count() , "collection 1 does not restore properly" );
+assert.eq( 1 , c.getCollection("df").count() , "collection 2 does not restore properly" );
+
 t.stop();
+
