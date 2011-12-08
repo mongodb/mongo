@@ -223,7 +223,7 @@ static int enableRawMode( int fd ) {
         console_out = GetStdHandle( STD_OUTPUT_HANDLE );
 
         GetConsoleMode( console_in, &oldMode );
-        SetConsoleMode( console_in, oldMode & ~( ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT ) );
+        SetConsoleMode( console_in, oldMode & ~( ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT | ENABLE_PROCESSED_INPUT ) );
     }
     return 0;
 #else
@@ -813,6 +813,12 @@ static int linenoisePrompt( int fd, char *buf, int buflen, PromptInfo& pi ) {
 
         case ctrlChar( 'C' ):   // ctrl-C, abort this line
             errno = EAGAIN;
+            --history_len;
+            free( history[history_len] );
+            // we need one last refresh with the cursor at the end of the line
+            // so we don't display the next prompt over the previous input line
+            refreshLine( fd, pi, buf, len, len );  // pass len as pos for EOL
+            if ( write( 1, "^C", 2 ) == -1 ) return -1;    // Display the ^C we got
             return -1;
 
         case 127:               // DEL and ctrl-d both delete the character under the cursor
