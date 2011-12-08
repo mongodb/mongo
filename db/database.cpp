@@ -21,16 +21,28 @@
 #include "database.h"
 #include "instance.h"
 #include "clientcursor.h"
+#include "databaseholder.h"
 
 namespace mongo {
 
-    bool Database::_openAllFiles = false;
+    bool Database::_openAllFiles = true;
+
+    void assertDbAtLeastReadLocked(const Database *) { 
+        // temp impl
+        dbMutex.assertAtLeastReadLocked(); 
+    }
+
+    void assertDbWriteLocked(const Database *) { 
+        // temp impl
+        dbMutex.assertWriteLocked();
+    }
 
     Database::~Database() {
+        dbMutex.assertWriteLocked();
         magic = 0;
-        size_t n = files.size();
+        size_t n = _files.size();
         for ( size_t i = 0; i < n; i++ )
-            delete files[i];
+            delete _files[i];
         if( ccByLoc.size() ) {
             log() << "\n\n\nWARNING: ccByLoc not empty on database close! " << ccByLoc.size() << ' ' << name << endl;
         }
@@ -38,45 +50,41 @@ namespace mongo {
 
     Database::Database(const char *nm, bool& newDb, const string& _path )
         : name(nm), path(_path), namespaceIndex( path, name ),
-          profileName(name + ".system.profile") {
+          profileName(name + ".system.profile") 
+    {
         try {
-
-        {
-            // check db name is valid
-            size_t L = strlen(nm);
-            uassert( 10028 ,  "db name is empty", L > 0 );
-            uassert( 10029 ,  "bad db name [1]", *nm != '.' );
-            uassert( 10030 ,  "bad db name [2]", nm[L-1] != '.' );
-            uassert( 10031 ,  "bad char(s) in db name", strchr(nm, ' ') == 0 );
-            uassert( 10032 ,  "db name too long", L < 64 );
-        }
-
-        newDb = namespaceIndex.exists();
-        profile = cmdLine.defaultProfile;
-
-        checkDuplicateUncasedNames();
-
-        // If already exists, open.  Otherwise behave as if empty until
-        // there's a write, then open.
-        if ( ! newDb || cmdLine.defaultProfile ) {
-            namespaceIndex.init();
-            if( _openAllFiles )
-                openAllFiles();
-
-        }
-
-
-        magic = 781231;
-        } catch(...) { 
+            {
+                // check db name is valid
+                size_t L = strlen(nm);
+                uassert( 10028 ,  "db name is empty", L > 0 );
+                uassert( 10032 ,  "db name too long", L < 64 );
+                uassert( 10029 ,  "bad db name [1]", *nm != '.' );
+                uassert( 10030 ,  "bad db name [2]", nm[L-1] != '.' );
+                uassert( 10031 ,  "bad char(s) in db name", strchr(nm, ' ') == 0 );
+            }
+            newDb = namespaceIndex.exists();
+            profile = cmdLine.defaultProfile;
+            checkDuplicateUncasedNames(true);
+            // If already exists, open.  Otherwise behave as if empty until
+            // there's a write, then open.
+            if ( ! newDb || cmdLine.defaultProfile ) {
+                namespaceIndex.init();
+                if( _openAllFiles )
+                    openAllFiles();
+            }
+            magic = 781231;
+        } catch(std::exception& e) {
+            log() << "warning database " << path << ' ' << nm << " could not be opened" << endl;
+            log() << e.what() << endl;
             // since destructor won't be called:
-            for ( size_t i = 0; i < files.size(); i++ )
-                delete files[i];
+            for ( size_t i = 0; i < _files.size(); i++ )
+                delete _files[i];
             throw;
         }
     }
     
-    void Database::checkDuplicateUncasedNames() const {
-        string duplicate = duplicateUncasedName( name, path );
+    void Database::checkDuplicateUncasedNames(bool inholderlock) const {
+        string duplicate = duplicateUncasedName(inholderlock, name, path );
         if ( !duplicate.empty() ) {
             stringstream ss;
             ss << "db already exists with different case other: [" << duplicate << "] me [" << name << "]";
@@ -84,7 +92,10 @@ namespace mongo {
         }
     }
 
-    string Database::duplicateUncasedName( const string &name, const string &path, set< string > *duplicates ) {
+    /*static*/
+    string Database::duplicateUncasedName( bool inholderlock, const string &name, const string &path, set< string > *duplicates ) {
+        dbMutex.assertAtLeastReadLocked();
+
         if ( duplicates ) {
             duplicates->clear();   
         }
@@ -93,7 +104,7 @@ namespace mongo {
         getDatabaseNames( others , path );
         
         set<string> allShortNames;
-        dbHolder.getAllShortNames( allShortNames );
+        dbHolder().getAllShortNames( inholderlock, allShortNames );
         
         others.insert( others.end(), allShortNames.begin(), allShortNames.end() );
         
@@ -128,7 +139,66 @@ namespace mongo {
         return fullName;
     }
 
+    bool Database::openExistingFile( int n ) { 
+        assert(this);
+        dbMutex.assertWriteLocked();
+        {
+            // must not yet be visible to others as we aren't in the db's write lock and 
+            // we will write to _files vector - thus this assert.
+            bool loaded = dbHolder().__isLoaded(name, path);
+            assert( !loaded );
+        }
+        // additionally must be in the dbholder mutex (no assert for that yet)
+
+        // todo: why here? that could be bad as we may be read locked only here
+        namespaceIndex.init();
+
+        if ( n < 0 || n >= DiskLoc::MaxFiles ) {
+            massert( 15924 , str::stream() << "getFile(): bad file number value " << n << " (corrupt db?): run repair", false);
+        }
+
+        {
+            if( n < (int) _files.size() && _files[n] ) {
+                dlog(2) << "openExistingFile " << n << " is already open" << endl;
+                return true;
+            }
+        }
+
+        {
+            boost::filesystem::path fullName = fileName( n );
+            string fullNameString = fullName.string();
+            MongoDataFile *df = new MongoDataFile(n);
+            try {
+                if( !df->openExisting( fullNameString.c_str() ) ) { 
+                    delete df;
+                    return false;
+                }
+            }
+            catch ( AssertionException& ) {
+                delete df;
+                throw;
+            }
+            while ( n >= (int) _files.size() ) {
+                _files.push_back(0);
+            }
+            _files[n] = df;
+        }
+
+        return true;
+    }
+
+    // todo : we stop once a datafile dne.
+    //        if one datafile were missing we should keep going for 
+    //        repair purposes yet we do not.
     void Database::openAllFiles() {
+        //log() << "TEMP openallfiles " << path << ' ' << name << endl;
+        assert(this);
+        int n = 0;
+        while( openExistingFile(n) ) {
+            n++;
+        }
+
+        /*
         int n = 0;
         while( exists(n) ) {
             getFile(n);
@@ -137,13 +207,15 @@ namespace mongo {
         // If last file is empty, consider it preallocated and make sure it's not mapped
         // until a write is requested
         if ( n > 1 && getFile( n - 1 )->getHeader()->isEmpty() ) {
-            delete files[ n - 1 ];
-            files.pop_back();
-        }
+            delete _files[ n - 1 ];
+            _files.pop_back();
+        }*/
     }
 
+    // todo: this is called a lot. streamline the common case
     MongoDataFile* Database::getFile( int n, int sizeNeeded , bool preallocateOnly) {
         assert(this);
+        DEV assertDbAtLeastReadLocked(this);
 
         namespaceIndex.init();
         if ( n < 0 || n >= DiskLoc::MaxFiles ) {
@@ -151,22 +223,31 @@ namespace mongo {
             massert( 10295 , "getFile(): bad file number value (corrupt db?): run repair", false);
         }
         DEV {
-            if ( n > 100 )
-                out() << "getFile(): n=" << n << "?" << endl;
+            if ( n > 100 ) {
+                out() << "getFile(): n=" << n << endl;
+            }
         }
         MongoDataFile* p = 0;
         if ( !preallocateOnly ) {
-            while ( n >= (int) files.size() )
-                files.push_back(0);
-            p = files[n];
+            while ( n >= (int) _files.size() ) {
+                DEV if( !dbMutex.isWriteLocked() ) { 
+                    log() << "error: getFile() called in a read lock, yet file to return is not yet open" << endl;
+                    log() << "       getFile(" << n << ") _files.size:" <<_files.size() << ' ' << fileName(n).string() << endl;
+                    log() << "       context ns: " << cc().ns() << " openallfiles:" << _openAllFiles << endl;
+                }
+                assertDbWriteLocked(this);
+                _files.push_back(0);
+            }
+            p = _files[n];
         }
         if ( p == 0 ) {
+            assertDbWriteLocked(this);
             boost::filesystem::path fullName = fileName( n );
             string fullNameString = fullName.string();
             p = new MongoDataFile(n);
             int minSize = 0;
-            if ( n != 0 && files[ n - 1 ] )
-                minSize = files[ n - 1 ]->getHeader()->fileLength;
+            if ( n != 0 && _files[ n - 1 ] )
+                minSize = _files[ n - 1 ]->getHeader()->fileLength;
             if ( sizeNeeded + DataFileHeader::HeaderSize > minSize )
                 minSize = sizeNeeded + DataFileHeader::HeaderSize;
             try {
@@ -179,13 +260,14 @@ namespace mongo {
             if ( preallocateOnly )
                 delete p;
             else
-                files[n] = p;
+                _files[n] = p;
         }
         return preallocateOnly ? 0 : p;
     }
 
     MongoDataFile* Database::addAFile( int sizeNeeded, bool preallocateNextFile ) {
-        int n = (int) files.size();
+        assertDbWriteLocked(this);
+        int n = (int) _files.size();
         MongoDataFile *ret = getFile( n, sizeNeeded );
         if ( preallocateNextFile )
             preallocateAFile();
@@ -243,10 +325,15 @@ namespace mongo {
 
 
     Extent* Database::allocExtent( const char *ns, int size, bool capped, bool enforceQuota ) {
+        // todo: when profiling, these may be worth logging into profile collection
+        bool fromFreeList = true;
         Extent *e = DataFileMgr::allocFromFreeList( ns, size, capped );
-        if( e )
-            return e;
-        return suitableFile( ns, size, !capped, enforceQuota )->createExtent( ns, size, capped );
+        if( e == 0 ) {
+            fromFreeList = false;
+            e = suitableFile( ns, size, !capped, enforceQuota )->createExtent( ns, size, capped );
+        }
+        LOG(1) << "allocExtent " << ns << " size " << size << ' ' << fromFreeList << endl; 
+        return e;
     }
 
 
@@ -279,17 +366,20 @@ namespace mongo {
         return true;
     }
 
-    bool Database::validDBName( const string& ns ) {
-        if ( ns.size() == 0 || ns.size() > 64 )
-            return false;
-        size_t good = strcspn( ns.c_str() , "/\\. \"" );
-        return good == ns.size();
+    bool Database::exists(int n) const { 
+        return boost::filesystem::exists( fileName( n ) ); 
     }
 
-    void Database::flushFiles( bool sync ) const {
-        dbMutex.assertAtLeastReadLocked();
-        for ( unsigned i=0; i<files.size(); i++ ) {
-            files[i]->flush( sync );
+    int Database::numFiles() const { 
+        DEV assertDbAtLeastReadLocked(this);
+        return (int) _files.size(); 
+    }
+
+    void Database::flushFiles( bool sync ) {
+        assertDbAtLeastReadLocked(this);
+        for( vector<MongoDataFile*>::iterator i = _files.begin(); i != _files.end(); i++ ) { 
+            MongoDataFile *f = *i;
+            f->flush(sync);
         }
     }
 
@@ -301,25 +391,31 @@ namespace mongo {
     }
 
     Database* DatabaseHolder::getOrCreate( const string& ns , const string& path , bool& justCreated ) {
-        dbMutex.assertWriteLocked();
+        dbMutex.assertAtLeastReadLocked();
+
         DBs& m = _paths[path];
 
         string dbname = _todb( ns );
 
-        Database* & db = m[dbname];
-        if ( db ) {
-            justCreated = false;
-            return db;
+        {
+            DBs::iterator i = m.find(dbname); 
+            if( i != m.end() ) {
+                justCreated = false;
+                return i->second;
+            }
         }
 
-        log(1) << "Accessing: " << dbname << " for the first time" << endl;
-        try {
-            db = new Database( dbname.c_str() , justCreated , path );
+        // todo: protect against getting sprayed with requests for different db names that DNE - 
+        //       that would make the DBs map very large.  not clear what to do to handle though, 
+        //       perhaps just log it, which is what we do here with the "> 40" : 
+        bool cant = !dbMutex.isWriteLocked();
+        if( logLevel >= 1 || m.size() > 40 || cant || DEBUG_BUILD ) {
+            log() << "opening db: " << (path==dbpath?"":path) << ' ' << dbname << endl;
         }
-        catch ( ... ) {
-            m.erase( dbname );
-            throw;
-        }
+        massert(15927, "can't open database in a read lock. if db was just closed, consider retrying the query. might otherwise indicate an internal error", !cant);
+        
+        Database *db = new Database( dbname.c_str() , justCreated , path );
+        m[dbname] = db;
         _size++;
         return db;
     }

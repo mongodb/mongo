@@ -37,6 +37,7 @@
 #include "../../s/d_logic.h"
 #include "../repl_block.h"
 #include "../../server.h"
+#include "../d_concurrency.h"
 
 namespace mongo {
 
@@ -226,7 +227,8 @@ namespace mongo {
             _skip( spec["skip"].numberLong() ),
             _limit( spec["limit"].numberLong() ),
             _nscanned(),
-            _bc() {
+            _bc(),
+            _yieldRecoveryFailed() {
         }
 
         virtual void _init() {
@@ -256,6 +258,7 @@ namespace mongo {
 
         virtual void recoverFromYield() {
             if ( _cc && !ClientCursor::recoverFromYield( _yieldData ) ) {
+                _yieldRecoveryFailed = true;
                 _c.reset();
                 _cc.reset();
 
@@ -314,7 +317,7 @@ namespace mongo {
         }
         long long count() const { return _count; }
         virtual bool mayRecordPlan() const {
-            return ( _myCount > _limit / 2 ) || ( complete() && !stopRequested() );
+            return !_yieldRecoveryFailed && ( ( _myCount > _limit / 2 ) || ( complete() && !stopRequested() ) );
         }
     private:
 
@@ -348,6 +351,7 @@ namespace mongo {
 
         ClientCursor::CleanupPointer _cc;
         ClientCursor::YieldData _yieldData;
+        bool _yieldRecoveryFailed;
     };
 
     /* { count: "collectionname"[, query: <query>] }
@@ -482,7 +486,8 @@ namespace mongo {
             _oplogReplay( pq.hasOption( QueryOption_OplogReplay) ),
             _response( response ),
             _eb( eb ),
-            _curop( curop )
+            _curop( curop ),
+            _yieldRecoveryFailed()
         {}
 
         virtual void _init() {
@@ -539,6 +544,7 @@ namespace mongo {
                 _findingStartCursor->recoverFromYield();
             }
             else if ( _cc && !ClientCursor::recoverFromYield( _yieldData ) ) {
+                _yieldRecoveryFailed = true;
                 _c.reset();
                 _cc.reset();
                 _so.reset();
@@ -731,7 +737,7 @@ namespace mongo {
         }
 
         virtual bool mayRecordPlan() const {
-            return ( _pq.getNumToReturn() != 1 ) && ( ( _n > _pq.getNumToReturn() / 2 ) || ( complete() && !stopRequested() ) );
+            return !_yieldRecoveryFailed && ( _pq.getNumToReturn() != 1 ) && ( ( _n > _pq.getNumToReturn() / 2 ) || ( complete() && !stopRequested() ) );
         }
 
         virtual QueryOp *_createChild() const {
@@ -799,6 +805,8 @@ namespace mongo {
         ExplainBuilder &_eb;
         CurOp &_curop;
         OpTime _slaveReadTill;
+
+        bool _yieldRecoveryFailed;
     };
 
     /* run a query -- includes checking for and running a Command \
@@ -866,11 +874,7 @@ namespace mongo {
             uassert( 10110 , "bad query object", false);
         }
 
-        /* --- read lock --- */
-
-        mongolock lk(false);
-
-        Client::Context ctx( ns , dbpath , &lk );
+        Client::ReadContext ctx( ns , dbpath ); // read locks
 
         replVerifyReadsOk(pq);
 
@@ -946,7 +950,7 @@ namespace mongo {
         BSONObj oldPlan;
         if ( explain && ! pq.hasIndexSpecifier() ) {
             MultiPlanScanner mps( ns, query, order );
-            if ( mps.usingPrerecordedPlan() )
+            if ( mps.usingCachedPlan() )
                 oldPlan = mps.oldExplain();
         }
         auto_ptr< MultiPlanScanner > mps( new MultiPlanScanner( ns, query, order, &hint, !explain, pq.getMin(), pq.getMax(), false, true ) );

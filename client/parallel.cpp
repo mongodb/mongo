@@ -164,12 +164,11 @@ namespace mongo {
         // TODO: should do some simplification here if possibl ideally
     }
 
-    BSONObj ClusteredCursor::explain() {
+    void ClusteredCursor::explain(BSONObjBuilder& b) {
         // Note: by default we filter out allPlans and oldPlan in the shell's
         // explain() function. If you add any recursive structures, make sure to
         // edit the JS to make sure everything gets filtered.
 
-        BSONObjBuilder b;
         b.append( "clusteredType" , type() );
 
         long long millis = 0;
@@ -210,12 +209,10 @@ namespace mongo {
         for ( map<string,long long>::iterator i=counters.begin(); i!=counters.end(); ++i )
             b.appendNumber( i->first , i->second );
 
-        b.appendNumber( "millisTotal" , millis );
-        b.append( "millisAvg" , (int)((double)millis / numExplains ) );
+        b.appendNumber( "millisShardTotal" , millis );
+        b.append( "millisShardAvg" , (int)((double)millis / numExplains ) );
         b.append( "numQueries" , (int)numExplains );
         b.append( "numShards" , (int)out.size() );
-
-        return b.obj();
     }
 
     // --------  FilteringClientCursor -----------

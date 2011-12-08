@@ -35,6 +35,11 @@ namespace mongo {
     // will not be preempted.  The V8Lock should be used in place of v8::Locker
     // except in certain special cases involving interrupts.
     namespace v8Locks {
+        struct InterruptLock {
+            InterruptLock();
+            ~InterruptLock();
+        };
+
         // the implementations are quite simple - objects must be destroyed in
         // reverse of the order created, and should not be shared between threads
         struct RecursiveLock {
@@ -49,10 +54,18 @@ namespace mongo {
         };
     } // namespace v8Locks
     class V8Lock {
+        public:
+        V8Lock() : _preemptionLock(Isolate::GetCurrent()){}
+
+        private:
         v8Locks::RecursiveLock _noPreemptionLock;
         v8::Locker _preemptionLock;
     };
     struct V8Unlock {
+        public:
+        V8Unlock() : _preemptionUnlock(Isolate::GetCurrent()){}
+
+        private:
         v8::Unlocker _preemptionUnlock;
         v8Locks::RecursiveUnlock _noPreemptionUnlock;
     };
@@ -112,8 +125,7 @@ namespace mongo {
         v8::Handle<v8::Object> mongoToLZV8( const mongo::BSONObj & m , bool array = 0 , bool readOnly = false );
         mongo::BSONObj v8ToMongo( v8::Handle<v8::Object> o , int depth = 0 );
 
-        void v8ToMongoElement( BSONObjBuilder & b , v8::Handle<v8::String> name ,
-                               const string sname , v8::Handle<v8::Value> value , int depth = 0, BSONObj* originalParent=0 );
+        void v8ToMongoElement( BSONObjBuilder & b , const string sname , v8::Handle<v8::Value> value , int depth = 0, BSONObj* originalParent=0 );
         v8::Handle<v8::Value> mongoToV8Element( const BSONElement &f, bool readOnly = false );
         virtual void append( BSONObjBuilder & builder , const char * fieldName , const char * scopeName );
 
@@ -127,6 +139,15 @@ namespace mongo {
         v8::Handle<v8::String> getV8Str(string str);
 //        inline v8::Handle<v8::String> getV8Str(string str) { return v8::String::New(str.c_str()); }
         inline v8::Handle<v8::String> getLocalV8Str(string str) { return v8::String::New(str.c_str()); }
+
+        v8::Isolate* getIsolate() { return _isolate; }
+        Persistent<Context> getContext() { return _context; }
+
+        // call with v8 mutex:
+        void enableV8Interrupt();
+        void disableV8Interrupt();
+        bool pauseV8Interrupt();
+        bool resumeV8Interrupt();
 
         Handle<v8::String> V8STR_CONN;
         Handle<v8::String> V8STR_ID;
@@ -184,6 +205,7 @@ namespace mongo {
         Persistent<v8::ObjectTemplate> roObjectTemplate;
         Persistent<v8::ObjectTemplate> lzArrayTemplate;
         Persistent<v8::ObjectTemplate> internalFieldObjects;
+        v8::Isolate* _isolate;
     };
 
     class V8ScriptEngine : public ScriptEngine {
@@ -228,6 +250,5 @@ namespace mongo {
     };
 
     extern ScriptEngine * globalScriptEngine;
-    extern map< unsigned, int > __interruptSpecToThreadId;
 
 }

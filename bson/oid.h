@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <boost/functional/hash.hpp>
 #include "../util/hex.h"
 
 namespace mongo {
@@ -73,6 +74,11 @@ namespace mongo {
         Date_t asDateT() { return asTimeT() * (long long)1000; }
 
         bool isSet() const { return a || b; }
+
+	void hash_combine(size_t &seed) const {
+	    boost::hash_combine(seed, a);
+	    boost::hash_combine(seed, b);
+	}
 
         /** call this after a fork to update the process id */
         static void justForked();

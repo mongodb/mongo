@@ -246,6 +246,11 @@ namespace mongo {
         return o["ok"].trueValue();
     }
 
+    bool DBClientWithCommands::isNotMasterErrorString( const BSONElement& e ) {
+        return e.type() == String && str::contains( e.valuestr() , "not master" );
+    }
+
+
     enum QueryOptions DBClientWithCommands::availableOptions() {
         if ( !_haveCachedAvailableOptions ) {
             BSONObj ret;
@@ -614,6 +619,19 @@ namespace mongo {
 
         return true;
     }
+
+
+    inline bool DBClientConnection::runCommand(const string &dbname, const BSONObj& cmd, BSONObj &info, int options) {
+        if ( DBClientWithCommands::runCommand( dbname , cmd , info , options ) )
+            return true;
+        
+        if ( clientSet && isNotMasterErrorString( info["errmsg"] ) ) {
+            clientSet->isntMaster();
+        }
+
+        return false;
+    }
+
 
     void DBClientConnection::_checkConnection() {
         if ( !_failed )
@@ -998,8 +1016,7 @@ namespace mongo {
         if ( clientSet && nReturned ) {
             assert(data);
             BSONObj o(data);
-            BSONElement e = getErrField(o);
-            if ( e.type() == String && str::contains( e.valuestr() , "not master" ) ) {
+            if ( isNotMasterErrorString( getErrField(o) ) ) {
                 clientSet->isntMaster();
             }
         }
@@ -1046,5 +1063,25 @@ namespace mongo {
             return false;
         return true;
     }
+
+
+    /** @return the database name portion of an ns string */
+    string nsGetDB( const string &ns ) {
+        string::size_type pos = ns.find( "." );
+        if ( pos == string::npos )
+            return ns;
+
+        return ns.substr( 0 , pos );
+    }
+
+    /** @return the collection name portion of an ns string */
+    string nsGetCollection( const string &ns ) {
+        string::size_type pos = ns.find( "." );
+        if ( pos == string::npos )
+            return "";
+
+        return ns.substr( pos + 1 );
+    }
+
 
 } // namespace mongo

@@ -139,9 +139,10 @@ namespace mongo {
         assert( !haveLimit );
         auto_ptr<Message> response(new Message());
         assert( _client );
-        _client->recv(*response);
-        b.m = response;
-        dataReceived();
+        if ( _client->recv(*response) ) {
+            b.m = response;
+            dataReceived();
+        }
     }
 
     void DBClientCursor::dataReceived( bool& retry, string& host ) {

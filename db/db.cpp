@@ -333,7 +333,23 @@ namespace mongo {
         }
     }
 
+    void checkIfReplMissingFromCommandLine() {
+        if( !cmdLine.usingReplSets() ) { 
+            Client::GodScope gs;
+            DBDirectClient c;
+            unsigned long long x = 
+                c.count("local.system.replset");
+            if( x ) { 
+                log() << endl;
+                log() << "** warning: mongod started without --replSet yet " << x << " documents are present in local.system.replset" << endl;
+                log() << "**          restart with --replSet unless you are doing maintenance and no other clients are connected" << endl;
+                log() << endl;
+            }
+        }
+    }
+
     void clearTmpCollections() {
+        writelock lk; // _openAllFiles is false at this point, so this is helpful for the query below to work as you can't open files when readlocked
         Client::GodScope gs;
         vector< string > toDelete;
         DBDirectClient cli;
@@ -347,8 +363,6 @@ namespace mongo {
             cli.dropCollection( *i );
         }
     }
-
-    void flushDiagLog();
 
     /**
      * does background async flushes of mmapped files
@@ -365,7 +379,7 @@ namespace mongo {
                 log(1) << "--syncdelay " << cmdLine.syncdelay << endl;
             int time_flushing = 0;
             while ( ! inShutdown() ) {
-                flushDiagLog();
+                _diaglog.flush();
                 if ( cmdLine.syncdelay == 0 ) {
                     // in case at some point we add an option to change at runtime
                     sleepsecs(5);
@@ -385,7 +399,9 @@ namespace mongo {
 
                 globalFlushCounters.flushed(time_flushing);
 
-                log(1) << "flushing mmap took " << time_flushing << "ms " << " for " << numFiles << " files" << endl;
+                if( logLevel >= 1 || time_flushing >= 10000 ) { 
+                    log() << "flushing mmaps took " << time_flushing << "ms " << " for " << numFiles << " files" << endl;
+                }
             }
         }
 
@@ -403,6 +419,8 @@ namespace mongo {
     void _initAndListen(int listenPort ) {
 
         Client::initThread("initandlisten");
+
+        Database::_openAllFiles = false;
 
         Logstream::get().addGlobalTee( new RamLog("global") );
 
@@ -450,8 +468,6 @@ namespace mongo {
 
         MONGO_BOOST_CHECK_EXCEPTION_WITH_MSG( clearTmpFiles(), "clear tmp files" );
 
-        _diaglog.init();
-
         dur::startup();
 
         if( cmdLine.durOptions & CmdLine::DurRecoverOnly )
@@ -459,6 +475,8 @@ namespace mongo {
 
         // comes after getDur().startup() because this reads from the database
         clearTmpCollections();
+
+        checkIfReplMissingFromCommandLine();
 
         Module::initAll();
 
@@ -632,7 +650,7 @@ int main(int argc, char* argv[]) {
     ("pretouch", po::value<int>(), "n pretouch threads for applying replicationed operations") // experimental
     ("command", po::value< vector<string> >(), "command")
     ("cacheSize", po::value<long>(), "cache size (in MB) for rec store")
-    ("nodur", "disable journaling (currently the default)")
+    ("nodur", "disable journaling")
     // things we don't want people to use
     ("nocursors", "diagnostic/debugging option that turns off cursors DO NOT USE IN PRODUCTION")
     ("nohints", "ignore query hints")
@@ -813,7 +831,7 @@ int main(int argc, char* argv[]) {
                 out() << "can't interpret --diaglog setting" << endl;
                 dbexit( EXIT_BADOPTIONS );
             }
-            _diaglog.level = x;
+            _diaglog.setLevel(x);
         }
         if (params.count("sysinfo")) {
             sysRuntimeInfo();
@@ -1188,31 +1206,41 @@ namespace mongo {
     }
 
 #else
-    void ctrlCTerminate() {
-        log() << "got kill or ctrl-c signal, will terminate after current cmd ends" << endl;
-        Client::initThread( "ctrlCTerminate" );
+    void consoleTerminate( const char* controlCodeName ) {
+        Client::initThread( "consoleTerminate" );
+        log() << "got " << controlCodeName << ", will terminate after current cmd ends" << endl;
         exitCleanly( EXIT_KILL );
     }
+
     BOOL CtrlHandler( DWORD fdwCtrlType ) {
+
         switch( fdwCtrlType ) {
+
         case CTRL_C_EVENT:
-            rawOut("Ctrl-C signal");
-            ctrlCTerminate();
-            return( TRUE );
+            rawOut( "Ctrl-C signal" );
+            consoleTerminate( "CTRL_C_EVENT" );
+            return TRUE ;
+
         case CTRL_CLOSE_EVENT:
-            rawOut("CTRL_CLOSE_EVENT signal");
-            ctrlCTerminate();
-            return( TRUE );
+            rawOut( "CTRL_CLOSE_EVENT signal" );
+            consoleTerminate( "CTRL_CLOSE_EVENT" );
+            return TRUE ;
+
         case CTRL_BREAK_EVENT:
-            rawOut("CTRL_BREAK_EVENT signal");
-            ctrlCTerminate();
+            rawOut( "CTRL_BREAK_EVENT signal" );
+            consoleTerminate( "CTRL_BREAK_EVENT" );
             return TRUE;
+
         case CTRL_LOGOFF_EVENT:
-            rawOut("CTRL_LOGOFF_EVENT signal (ignored)");
-            return FALSE;
+            rawOut( "CTRL_LOGOFF_EVENT signal" );
+            consoleTerminate( "CTRL_LOGOFF_EVENT" );
+            return TRUE;
+
         case CTRL_SHUTDOWN_EVENT:
-            rawOut("CTRL_SHUTDOWN_EVENT signal (ignored)");
-            return FALSE;
+            rawOut( "CTRL_SHUTDOWN_EVENT signal" );
+            consoleTerminate( "CTRL_SHUTDOWN_EVENT" );
+            return TRUE;
+
         default:
             return FALSE;
         }

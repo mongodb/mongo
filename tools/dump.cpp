@@ -22,6 +22,7 @@
 #include "tool.h"
 
 #include <fcntl.h>
+#include <map>
 
 using namespace mongo;
 
@@ -126,6 +127,40 @@ public:
         cout << "\t\t " << m.done() << " objects" << endl;
     }
 
+    void writeMetadataFile( const string coll, path outputFile, map<string, BSONObj> options, multimap<string, BSONObj> indexes ) {
+        cout << "\tMetadata for " << coll << " to " << outputFile.string() << endl;
+
+        ofstream file (outputFile.string().c_str());
+        uassert(15933, "Couldn't open file: " + outputFile.string(), file.is_open());
+
+        bool hasOptions = options.count(coll) > 0;
+        bool hasIndexes = indexes.count(coll) > 0;
+
+        if (hasOptions) {
+            file << "{options : " << options.find(coll)->second.jsonString();
+
+            if (hasIndexes) {
+                file << ", ";
+            }
+        } else {
+            file << "{";
+        }
+
+        if (hasIndexes) {
+            file << "indexes:[";
+            for (multimap<string, BSONObj>::iterator it=indexes.equal_range(coll).first; it!=indexes.equal_range(coll).second; ++it) {
+                if (it != indexes.equal_range(coll).first) {
+                    file << ", ";
+                }
+                file << (*it).second.jsonString();
+            }
+            file << "]";
+        }
+        file << "}";
+    }
+
+
+
     void writeCollectionStdout( const string coll ) {
         doCollection(coll, stdout, NULL);
     }
@@ -135,12 +170,27 @@ public:
 
         create_directories( outdir );
 
-        string sns = db + ".system.namespaces";
+        map <string, BSONObj> collectionOptions;
+        multimap <string, BSONObj> indexes;
+        vector <string> collections;
 
-        auto_ptr<DBClientCursor> cursor = conn( true ).query( sns.c_str() , Query() , 0 , 0 , 0 , QueryOption_SlaveOk | QueryOption_NoCursorTimeout );
+        // Save indexes for database
+        string ins = db + ".system.indexes";
+        auto_ptr<DBClientCursor> cursor = conn( true ).query( ins.c_str() , Query() , 0 , 0 , 0 , QueryOption_SlaveOk | QueryOption_NoCursorTimeout );
+        while ( cursor->more() ) {
+            BSONObj obj = cursor->nextSafe();
+            const string name = obj.getField( "ns" ).valuestr();
+            indexes.insert( pair<string, BSONObj> (name, obj.getOwned()) );
+        }
+
+        string sns = db + ".system.namespaces";
+        cursor = conn( true ).query( sns.c_str() , Query() , 0 , 0 , 0 , QueryOption_SlaveOk | QueryOption_NoCursorTimeout );
         while ( cursor->more() ) {
             BSONObj obj = cursor->nextSafe();
             const string name = obj.getField( "name" ).valuestr();
+            if (obj.hasField("options")) {
+                collectionOptions.insert( pair<string,BSONObj> (name, obj.getField("options").embeddedObject()) );
+            }
 
             // skip namespaces with $ in them only if we don't specify a collection to dump
             if ( _coll == "" && name.find( ".$" ) != string::npos ) {
@@ -148,13 +198,22 @@ public:
                 continue;
             }
 
-            const string filename = name.substr( db.size() + 1 );
+            // Don't dump indexes
+            if ( endsWith(name.c_str(), ".system.indexes") ) {
+                continue;
+            }
 
             if ( _coll != "" && db + "." + _coll != name && _coll != name )
                 continue;
 
-            writeCollectionFile( name.c_str() , outdir / ( filename + ".bson" ) );
+            collections.push_back(name);
+        }
 
+        for (vector<string>::iterator it = collections.begin(); it != collections.end(); ++it) {
+            string name = *it;
+            const string filename = name.substr( db.size() + 1 );
+            writeCollectionFile( name , outdir / ( filename + ".bson" ) );
+            writeMetadataFile( name, outdir / (filename + ".metadata.json"), collectionOptions, indexes);
         }
 
     }

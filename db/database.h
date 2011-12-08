@@ -19,9 +19,12 @@
 #pragma once
 
 #include "cmdline.h"
+#include "namespace.h"
 
 namespace mongo {
 
+    class Extent;
+    class MongoDataFile;
     class ClientCursor;
     struct ByLocKey;
     typedef map<ByLocKey, ClientCursor*> CCByLoc;
@@ -35,9 +38,10 @@ namespace mongo {
     public:
         static bool _openAllFiles;
 
+        // you probably need to be in dbHolderMutex when constructing this
         Database(const char *nm, /*out*/ bool& newDb, const string& _path = dbpath);
     private:
-        ~Database();
+        ~Database(); // closes files and other cleanup see below.
     public:
         /* you must use this to close - there is essential code in this method that is not in the ~Database destructor.
            thus the destructor is private.  this could be cleaned up one day...
@@ -58,15 +62,18 @@ namespace mongo {
          */
         long long fileSize() const;
 
-        int numFiles() const { return (int)files.size(); }
+        int numFiles() const;
 
         /**
          * returns file valid for file number n
          */
         boost::filesystem::path fileName( int n ) const;
 
-        bool exists(int n) const { return boost::filesystem::exists( fileName( n ) ); }
+    private:
+        bool exists(int n) const;
+        bool openExistingFile( int n );
 
+    public:
         /**
          * return file n.  if it doesn't exist, create it
          */
@@ -91,7 +98,7 @@ namespace mongo {
          */
         bool setProfilingLevel( int newLevel , string& errmsg );
 
-        void flushFiles( bool sync ) const;
+        void flushFiles( bool sync );
 
         /**
          * @return true if ns is part of the database
@@ -102,32 +109,38 @@ namespace mongo {
                 return false;
             return ns[name.size()] == '.';
         }
-
-        static bool validDBName( const string& ns );
-        
+    private:
         /**
          * @throws DatabaseDifferCaseCode if the name is a duplicate based on
          * case insensitive matching.
          */
-        void checkDuplicateUncasedNames() const;
-
+        void checkDuplicateUncasedNames(bool inholderlockalready) const;
+    public:
         /**
          * @return name of an existing database with same text name but different
          * casing, if one exists.  Otherwise the empty string is returned.  If
          * 'duplicates' is specified, it is filled with all duplicate names.
          */
-        static string duplicateUncasedName( const string &name, const string &path, set< string > *duplicates = 0 );
-        
-    public: // this should be private later
-
-        vector<MongoDataFile*> files;
+        static string duplicateUncasedName( bool inholderlockalready, const string &name, const string &path, set< string > *duplicates = 0 );
+    public:
         const string name; // "alleyinsider"
         const string path;
+
+    private:
+
+        // must be in the dbLock when touching this (and write locked when writing to of course)
+        // however during Database object construction we aren't, which is ok as it isn't yet visible
+        //   to others and we are in the dbholder lock then.
+        vector<MongoDataFile*> _files;
+
+    public: // this should be private later
+
         NamespaceIndex namespaceIndex;
         int profile; // 0=off.
         const string profileName; // "alleyinsider.system.profile"
         CCByLoc ccByLoc;
         int magic; // used for making sure the object is still loaded in memory
+        SimpleRWLock dbLock; // see d_concurrency.h.  using "Base" version as there are a few nuance hassles to RWLock use here albeit it would work
     };
 
 } // namespace mongo

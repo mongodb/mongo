@@ -74,3 +74,5 @@ t.mapReduce( map, red, {out: { reduce: out }} )
 t.mapReduce( map, red, {out: { merge: out }} )
 
 stopMongod( port );
+
+print("\n\n\nmr_auth.js SUCCESS\n\n\n");

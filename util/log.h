@@ -374,6 +374,13 @@ namespace mongo {
         return Logstream::get().prolog();
     }
 
+    // log if debug build or if at a certain level
+    inline Nullstream& dlog( int level ) {
+        if ( level <= logLevel || DEBUG_BUILD )
+            return Logstream::get().prolog();
+        return nullstream;
+    }
+
     inline Nullstream& log( int level ) {
         if ( level > logLevel )
             return nullstream;

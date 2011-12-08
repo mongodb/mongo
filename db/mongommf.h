@@ -36,7 +36,7 @@ namespace mongo {
         virtual void close();
 
         /** @return true if opened ok. */
-        bool open(string fname, bool sequentialHint);
+        bool open(string fname, bool sequentialHint /*typically we open with this false*/);
 
         /** @return file length */
         unsigned long long length() const { return MemoryMappedFile::length(); }
@@ -110,7 +110,7 @@ namespace mongo {
     public:
         PointerToMMF();
 
-        /** register view. \
+        /** register view.
             threadsafe
             */
         void add(void *view, MongoMMF *f);
@@ -132,6 +132,8 @@ namespace mongo {
         MongoMMF* find_inlock(void *p, /*out*/ size_t& ofs);
 
         map<void*,MongoMMF*>::iterator finditer_inlock(void *p) { return _views.upper_bound(p); }
+
+        unsigned numberOfViews_inlock() const { return _views.size(); }
 
     private:
         mutex _m;

@@ -38,8 +38,13 @@ var checkNoAuth = function() {
 var checkInvalidAuthStates = function() {
     print("check that 0 is in recovering");
     assert.soon(function() {
-        var result = m.getDB("admin").runCommand({isMaster: 1});
-        return !result.ismaster && !result.secondary;
+        try {
+            var result = m.getDB("admin").runCommand({isMaster: 1});
+            return !result.ismaster && !result.secondary;
+        }
+        catch ( e ) {
+            print( e );
+        }
     });
 
     print("shut down 1, 0 still in recovering.");

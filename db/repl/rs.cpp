@@ -39,6 +39,12 @@ namespace mongo {
         return theReplSet && theReplSet->isPrimary();
     }
 
+    void replset::sethbmsg(const string& s, const int level) {
+        if (theReplSet) {
+            theReplSet->sethbmsg(s, logLevel);
+        }
+    }
+
     void ReplSetImpl::sethbmsg(string s, int logLevel) {
         static time_t lastLogged;
         _hbmsgTime = time(0);

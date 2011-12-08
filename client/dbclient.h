@@ -337,6 +337,13 @@ namespace mongo {
     */
 #define QUERY(x) mongo::Query( BSON(x) )
 
+    // Useful utilities for namespaces
+    /** @return the database name portion of an ns string */
+    string nsGetDB( const string &ns );
+
+    /** @return the collection name portion of an ns string */
+    string nsGetCollection( const string &ns );
+
     /**
        interface that handles communication with the db
      */
@@ -705,26 +712,12 @@ namespace mongo {
 
         virtual string toString() = 0;
 
-        /** @return the database name portion of an ns string */
-        string nsGetDB( const string &ns ) {
-            string::size_type pos = ns.find( "." );
-            if ( pos == string::npos )
-                return ns;
-
-            return ns.substr( 0 , pos );
-        }
-
-        /** @return the collection name portion of an ns string */
-        string nsGetCollection( const string &ns ) {
-            string::size_type pos = ns.find( "." );
-            if ( pos == string::npos )
-                return "";
-
-            return ns.substr( pos + 1 );
-        }
-
     protected:
+        /** if the result of a command is ok*/
         bool isOk(const BSONObj&);
+
+        /** if the element contains a not master error */
+        bool isNotMasterErrorString( const BSONElement& e );
 
         BSONObj _countCmd(const string &ns, const BSONObj& query, int options, int limit, int skip );
 
@@ -894,6 +887,8 @@ namespace mongo {
          */
         unsigned long long query( boost::function<void(const BSONObj&)> f, const string& ns, Query query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
         unsigned long long query( boost::function<void(DBClientCursorBatchIterator&)> f, const string& ns, Query query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
+
+        virtual bool runCommand(const string &dbname, const BSONObj& cmd, BSONObj &info, int options=0);
 
         /**
            @return true if this connection is currently in a failed state.  When autoreconnect is on,

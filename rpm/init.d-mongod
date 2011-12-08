@@ -42,7 +42,7 @@ start()
 stop()
 {
   echo -n $"Stopping mongod: "
-  killproc -p "$DBPATH"/mongod.lock -t30 -TERM /usr/bin/mongod
+  killproc -p "$DBPATH"/mongod.lock -d 300 /usr/bin/mongod
   RETVAL=$?
   echo
   [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/mongod

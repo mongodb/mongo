@@ -31,7 +31,6 @@ namespace mongo {
     class DiskLoc;
 
     typedef ShardChunkVersion ConfigVersion;
-    typedef map<string,ConfigVersion> NSVersionMap;
 
     // --------------
     // --- global state ---
@@ -47,6 +46,9 @@ namespace mongo {
 
         void gotShardName( const string& name );
         void gotShardHost( string host );
+
+        string getShardName() { return _shardName; }
+        string getShardHost() { return _shardHost; }
 
         /** Reverts back to a state where this mongod is not sharded. */
         void resetShardingState(); 
@@ -185,8 +187,10 @@ namespace mongo {
     private:
 
         OID _id;
-        NSVersionMap _versions;
         bool _forceVersionOk; // if this is true, then chunk version #s aren't check, and all ops are allowed
+
+        typedef map<string,ConfigVersion> NSVersionMap;
+        NSVersionMap _versions;
 
         static boost::thread_specific_ptr<ShardedConnectionInfo> _tl;
     };

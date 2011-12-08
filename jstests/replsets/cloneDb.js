@@ -50,5 +50,9 @@ doTest = function( signal ) {
     repset.stopSet( signal )
 }
 
-doTest( 15 );
-print("replsets/cloneDb.js SUCCESS");
+if (jsTest.options().keyFile) {
+    print("Skipping test because clone command doesn't work with authentication enabled: SERVER-4245")
+} else {
+    doTest( 15 );
+    print("replsets/cloneDb.js SUCCESS");
+}

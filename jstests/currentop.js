@@ -18,8 +18,8 @@ o = [];
 assert.soon( function() {
     o = ops({});
 
-    var writes = ops({ "lockType": "write" }).length;
-    var reads = ops({ "lockType": "read" }).length;
+    var writes = ops({ "lockType": "write", "ns": "test.jstests_currentop" }).length;
+    var reads = ops({ "lockType": "read", "ns": "test.jstests_currentop" }).length;
 
     return o.length > writes && o.length > reads;
 } );

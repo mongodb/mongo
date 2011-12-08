@@ -41,11 +41,12 @@
 #include "ops/update.h"
 #include "ops/delete.h"
 #include "ops/query.h"
+#include "d_concurrency.h"
 
 namespace mongo {
 
-    inline void opread(Message& m) { if( _diaglog.level & 2 ) _diaglog.readop((char *) m.singleData(), m.header()->len); }
-    inline void opwrite(Message& m) { if( _diaglog.level & 1 ) _diaglog.write((char *) m.singleData(), m.header()->len); }
+    inline void opread(Message& m) { if( _diaglog.getLevel() & 2 ) _diaglog.readop((char *) m.singleData(), m.header()->len); }
+    inline void opwrite(Message& m) { if( _diaglog.getLevel() & 1 ) _diaglog.write((char *) m.singleData(), m.header()->len); }
 
     void receivedKillCursors(Message& m);
     void receivedUpdate(Message& m, CurOp& op);
@@ -63,13 +64,6 @@ namespace mongo {
     bool useCursors = true;
     bool useHints = true;
 
-    void flushDiagLog() {
-        if( _diaglog.f && _diaglog.f->is_open() ) {
-            log() << "flushing diag log" << endl;
-            _diaglog.flush();
-        }
-    }
-
     KillCurrentOp killCurrentOp;
 
     int lockFile = 0;
@@ -84,7 +78,6 @@ namespace mongo {
         BSONObjBuilder b;
 
         if( ! cc().isAdmin() ) {
-            BSONObjBuilder b;
             b.append("err", "unauthorized");
         }
         else {
@@ -394,7 +387,7 @@ namespace mongo {
             }
             else {
                 writelock lk;
-                if ( dbHolder.isLoaded( nsToDatabase( currentOp.getNS() ) , dbpath ) ) {
+                if ( dbHolder()._isLoaded( nsToDatabase( currentOp.getNS() ) , dbpath ) ) {
                     Client::Context cx( currentOp.getNS() );
                     profile(c , currentOp );
                 }
@@ -454,8 +447,8 @@ namespace mongo {
 
         NamespaceDetailsTransient::clearForPrefix( prefix.c_str() );
 
-        dbHolder.erase( db, path );
-        ctx->clear();
+        dbHolderW().erase( db, path );
+        ctx->_clear();
         delete database; // closes files
     }
 
@@ -481,7 +474,8 @@ namespace mongo {
 
         writelock lk;
 
-        // writelock is used to synchronize stepdowns w/ writes
+        // void ReplSetImpl::relinquish() uses big write lock so 
+        // this is thus synchronized given our lock above.
         uassert( 10054 ,  "not master", isMasterNs( ns ) );
         
         // if this ever moves to outside of lock, need to adjust check Client::Context::_finishInit
@@ -674,7 +668,9 @@ namespace mongo {
         }
 
         writelock lk(ns);
+        //LockCollectionExclusively lk(ns);
 
+        // CONCURRENCY TODO: is being read locked in big log sufficient here?
         // writelock is used to synchronize stepdowns w/ writes
         uassert( 10058 , "not master", isMasterNs(ns) );
 
@@ -714,6 +710,7 @@ namespace mongo {
 
     /* returns true if there is data on this server.  useful when starting replication.
        local database does NOT count except for rsoplog collection.
+       used to set the hasData field on replset heartbeat command response
     */
     bool replHasDatabases() {
         vector<string> names;
@@ -813,7 +810,7 @@ namespace mongo {
         ListeningSockets::get()->closeAll();
 
         log() << "shutdown: going to flush diaglog..." << endl;
-        flushDiagLog();
+        _diaglog.flush();
 
         /* must do this before unmapping mem or you may get a seg fault */
         log() << "shutdown: going to close sockets..." << endl;
@@ -930,6 +927,15 @@ namespace mongo {
         catch (...) { }
 #endif
 
+#ifdef _WIN32
+        // Windows Service Controller wants to be told when we are down,
+        //  so don't call ::exit() yet, or say "really exiting now"
+        //
+        if ( rc == EXIT_WINDOWS_SERVICE_STOP ) {
+            if ( c ) c->shutdown();
+            return;
+        }
+#endif
         tryToOutputFatal( "dbexit: really exiting now" );
         if ( c ) c->shutdown();
         ::exit(rc);
@@ -1040,7 +1046,7 @@ namespace mongo {
         // Not related to lock file, but this is where we handle unclean shutdown
         if( !cmdLine.dur && dur::haveJournalFiles() ) {
             cout << "**************" << endl;
-            cout << "Error: journal files are present in journal directory, yet starting without --journal enabled." << endl;
+            cout << "Error: journal files are present in journal directory, yet starting without journaling enabled." << endl;
             cout << "It is recommended that you start with journaling enabled so that recovery may occur." << endl;
             cout << "**************" << endl;
             uasserted(13597, "can't start without --journal enabled when journal/ files are present");

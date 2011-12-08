@@ -180,24 +180,19 @@ namespace mongo {
 
     void Matcher::addRegex(const char *fieldName, const char *regex, const char *flags, bool isNot) {
 
-        if ( _nRegex >= 4 ) {
-            out() << "ERROR: too many regexes in query" << endl;
-        }
-        else {
-            RegexMatcher& rm = _regexs[_nRegex];
-            rm._re.reset( new pcrecpp::RE(regex, flags2options(flags)) );
-            rm._fieldName = fieldName;
-            rm._regex = regex;
-            rm._flags = flags;
-            rm._isNot = isNot;
-            _nRegex++;
+        RegexMatcher rm;
+        rm._re.reset( new pcrecpp::RE(regex, flags2options(flags)) );
+        rm._fieldName = fieldName;
+        rm._regex = regex;
+        rm._flags = flags;
+        rm._isNot = isNot;
+        _regexs.push_back(rm);
 
-            if (!isNot) { //TODO something smarter
-                bool purePrefix;
-                string prefix = simpleRegex(regex, flags, &purePrefix);
-                if (purePrefix)
-                    rm._prefix = prefix;
-            }
+        if (!isNot) { //TODO something smarter
+            bool purePrefix;
+            string prefix = simpleRegex(regex, flags, &purePrefix);
+            if (purePrefix)
+                rm._prefix = prefix;
         }
     }
 
@@ -456,7 +451,7 @@ namespace mongo {
     /* _jsobj          - the query pattern
     */
     Matcher::Matcher(const BSONObj &jsobj, bool nested) :
-        _where(0), _jsobj(jsobj), _haveSize(), _all(), _hasArray(0), _haveNeg(), _atomic(false), _nRegex(0) {
+        _where(0), _jsobj(jsobj), _haveSize(), _all(), _hasArray(0), _haveNeg(), _atomic(false) {
 
         BSONObjIterator i(_jsobj);
         while ( i.more() ) {
@@ -465,7 +460,7 @@ namespace mongo {
     }
 
     Matcher::Matcher( const Matcher &docMatcher, const BSONObj &key ) :
-        _where(0), _constrainIndexKey( key ), _haveSize(), _all(), _hasArray(0), _haveNeg(), _atomic(false), _nRegex(0) {
+        _where(0), _constrainIndexKey( key ), _haveSize(), _all(), _hasArray(0), _haveNeg(), _atomic(false) {
         // Filter out match components that will provide an incorrect result
         // given a key from a single key index.
         for( vector< ElementMatcher >::const_iterator i = docMatcher._basics.begin(); i != docMatcher._basics.end(); ++i ) {
@@ -501,10 +496,12 @@ namespace mongo {
                 }
             }
         }
-        for( int i = 0; i < docMatcher._nRegex; ++i ) {
-            if ( !docMatcher._regexs[ i ]._isNot && key.hasField( docMatcher._regexs[ i ]._fieldName ) ) {
-                _regexs[ _nRegex++ ] = docMatcher._regexs[ i ];
-            }
+        for( vector<RegexMatcher>::const_iterator it = docMatcher._regexs.begin();
+	     it != docMatcher._regexs.end();
+	     ++it) {
+	  if ( !it->_isNot && key.hasField( it->_fieldName ) ) {
+	      _regexs.push_back(*it);
+	  }
         }
         // Recursively filter match components for and and or matchers.
         for( list< shared_ptr< Matcher > >::const_iterator i = docMatcher._andMatchers.begin(); i != docMatcher._andMatchers.end(); ++i ) {
@@ -530,7 +527,7 @@ namespace mongo {
         }
     }
 
-    inline int Matcher::valuesMatch(const BSONElement& l, const BSONElement& r, int op, const ElementMatcher& bm) {
+    inline int Matcher::valuesMatch(const BSONElement& l, const BSONElement& r, int op, const ElementMatcher& bm) const {
         assert( op != BSONObj::NE && op != BSONObj::NIN );
 
         if ( op == BSONObj::Equality ) {
@@ -586,7 +583,7 @@ namespace mongo {
         return (op & z);
     }
 
-    int Matcher::inverseMatch(const char *fieldName, const BSONElement &toMatch, const BSONObj &obj, const ElementMatcher& bm , MatchDetails * details ) {
+    int Matcher::inverseMatch(const char *fieldName, const BSONElement &toMatch, const BSONObj &obj, const ElementMatcher& bm , MatchDetails * details ) const {
         int inverseRet = matchesDotted( fieldName, toMatch, obj, bm.inverseOfNegativeCompareOp(), bm , false , details );
         if ( bm.negativeCompareOpContainsNull() ) {
             return ( inverseRet <= 0 ) ? 1 : 0;
@@ -617,7 +614,7 @@ namespace mongo {
         0 missing element
         1 match
     */
-    int Matcher::matchesDotted(const char *fieldName, const BSONElement& toMatch, const BSONObj& obj, int compareOp, const ElementMatcher& em , bool isArr, MatchDetails * details ) {
+    int Matcher::matchesDotted(const char *fieldName, const BSONElement& toMatch, const BSONObj& obj, int compareOp, const ElementMatcher& em , bool isArr, MatchDetails * details ) const {
         DEBUGMATCHER( "\t matchesDotted : " << fieldName << " hasDetails: " << ( details ? "yes" : "no" ) );
         if ( compareOp == BSONObj::opALL ) {
 
@@ -817,8 +814,7 @@ namespace mongo {
 
     /* See if an object matches the query.
     */
-    bool Matcher::matches(const BSONObj& jsobj , MatchDetails * details ) {
-
+    bool Matcher::matches(const BSONObj& jsobj , MatchDetails * details ) const {
         LOG(5) << "Matcher::matches() " << jsobj.toString() << endl;
 
         /* assuming there is usually only one thing to match.  if more this
@@ -826,8 +822,8 @@ namespace mongo {
 
         // check normal non-regex cases:
         for ( unsigned i = 0; i < _basics.size(); i++ ) {
-            ElementMatcher& bm = _basics[i];
-            BSONElement& m = bm._toMatch;
+            const ElementMatcher& bm = _basics[i];
+            const BSONElement& m = bm._toMatch;
             // -1=mismatch. 0=missing element. 1=match
             int cmp = matchesDotted(m.fieldName(), m, jsobj, bm._compareOp, bm , false , details );
             if ( cmp == 0 && bm._compareOp == BSONObj::opEXISTS ) {
@@ -854,11 +850,12 @@ namespace mongo {
             }
         }
 
-        for ( int r = 0; r < _nRegex; r++ ) {
-            RegexMatcher& rm = _regexs[r];
+        for (vector<RegexMatcher>::const_iterator it = _regexs.begin();
+	     it != _regexs.end();
+	     ++it) {
             BSONElementSet s;
             if ( !_constrainIndexKey.isEmpty() ) {
-                BSONElement e = jsobj.getFieldUsingIndexNames(rm._fieldName, _constrainIndexKey);
+                BSONElement e = jsobj.getFieldUsingIndexNames(it->_fieldName, _constrainIndexKey);
 
                 // Should only have keys nested one deep here, for geo-indices
                 // TODO: future indices may nest deeper?
@@ -873,13 +870,13 @@ namespace mongo {
 
             }
             else {
-                jsobj.getFieldsDotted( rm._fieldName, s );
+                jsobj.getFieldsDotted( it->_fieldName, s );
             }
             bool match = false;
             for( BSONElementSet::const_iterator i = s.begin(); i != s.end(); ++i )
-                if ( regexMatches(rm, *i) )
+                if ( regexMatches(*it, *i) )
                     match = true;
-            if ( !match ^ rm._isNot )
+            if ( !match ^ it->_isNot )
                 return false;
         }
 
@@ -971,7 +968,7 @@ namespace mongo {
         }
         
         // Check that all match components are available in the index matcher.
-        if ( !( _basics.size() == docMatcher._basics.size() && _nRegex == docMatcher._nRegex && !docMatcher._where ) ) {
+        if ( !( _basics.size() == docMatcher._basics.size() && _regexs.size() == docMatcher._regexs.size() && !docMatcher._where ) ) {
             return false;
         }
         if ( _andMatchers.size() != docMatcher._andMatchers.size() ) {

@@ -22,6 +22,7 @@
 #include "../client/connpool.h"
 #include "../util/stringutils.h"
 #include "../util/unittest.h"
+#include "../db/namespace_common.h"
 
 #include "grid.h"
 #include "shard.h"
@@ -37,6 +38,8 @@ namespace mongo {
 
         if ( database == "config" )
             return configServerPtr;
+
+        uassert( 15918 , str::stream() << "invalid database name: " << database , NamespaceString::validDBName( database ) );
 
         scoped_lock l( _lock );
 

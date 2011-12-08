@@ -57,7 +57,7 @@ doTest = function( signal ) {
    * initializing. Make sure it syncs all of these writes before going into
    * syncDelay.
    */
-  var conn = startMongodTest(31008, name + "-sd", 0, { useHostname: true, replSet: name });
+  var conn = MongoRunner.runMongod({port : 31008, dbpath : name + "-sd", useHostname: true, replSet: name });
   conn.setSlaveOk();
   
   config = master.getSisterDB("local").system.replset.findOne();

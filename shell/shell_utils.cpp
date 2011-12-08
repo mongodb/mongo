@@ -503,8 +503,15 @@ namespace mongo {
                     if (i) ss << ' ';
                     if (argv_[i].find(' ') == string::npos)
                         ss << argv_[i];
-                    else
-                        ss << '"' << argv_[i] << '"';
+                    else {
+                        ss << '"';
+                        // escape all embedded quotes
+                        for (size_t j=0; j<argv_[i].size(); ++j) {
+                            if (argv_[i][j]=='"') ss << '"';
+                            ss << argv_[i][j];
+                        }
+                        ss << '"';
+                    }
                 }
 
                 string args = ss.str();
@@ -530,10 +537,22 @@ namespace mongo {
                 ZeroMemory(&pi, sizeof(pi));
 
                 bool success = CreateProcess( NULL, args_tchar.get(), NULL, NULL, true, 0, NULL, NULL, &si, &pi) != 0;
-                {
+                if (!success) {
+                    LPSTR lpMsgBuf=0;
+                    DWORD dw = GetLastError();
+                    FormatMessageA(
+                        FORMAT_MESSAGE_ALLOCATE_BUFFER |
+                        FORMAT_MESSAGE_FROM_SYSTEM |
+                        FORMAT_MESSAGE_IGNORE_INSERTS,
+                        NULL,
+                        dw,
+                        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                        (LPSTR)&lpMsgBuf,
+                        0, NULL );
                     stringstream ss;
-                    ss << "couldn't start process " << argv_[0];
+                    ss << "couldn't start process " << argv_[0] << "; " << lpMsgBuf;
                     uassert(14042, ss.str(), success);
+                    LocalFree(lpMsgBuf);
                 }
 
                 CloseHandle(pi.hThread);

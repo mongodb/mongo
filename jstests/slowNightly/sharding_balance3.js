@@ -25,18 +25,18 @@ db.getLastError();
 s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } );
 assert.lt( 20 , s.config.chunks.count()  , "setup2" );
 
-function diff(){
+function diff1(){
     var x = s.chunkCounts( "foo" );
     printjson( x )
     return Math.max( x.shard0000 , x.shard0001 ) - Math.min( x.shard0000 , x.shard0001 );
 }
 
-assert.lt( 10 , diff() );
+assert.lt( 10 , diff1() );
 
 // Wait for balancer to kick in.
-var initialDiff = diff();
+var initialDiff = diff1();
 var maxRetries = 3;
-while ( diff() == initialDiff ){
+while ( diff1() == initialDiff ){
     sleep( 5000 );
     assert.lt( 0, maxRetries--, "Balancer did not kick in.");
 }
@@ -48,11 +48,11 @@ s.config.settings.find().forEach( printjson );
 print("* B");
 
 
-print( diff() )
+print( diff1() )
 
-var currDiff = diff();
+var currDiff = diff1();
 assert.repeat( function(){
-    var d = diff();
+    var d = diff1();
     return d != currDiff;
 } , "balance with stopped flag should not have happened" , 1000 * 60 , 5000 );
 

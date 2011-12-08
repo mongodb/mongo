@@ -131,6 +131,7 @@ namespace mongo {
         EXIT_FS = 45 ,
         EXIT_CLOCK_SKEW = 47 ,
         EXIT_NET_ERROR = 48 ,
+        EXIT_WINDOWS_SERVICE_STOP = 49 ,
         EXIT_POSSIBLE_CORRUPTION = 60 , // this means we detected a possible corruption situation, like a buf overflow
         EXIT_UNCAUGHT = 100 , // top level exception that wasn't caught
         EXIT_TEST = 101 ,

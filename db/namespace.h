@@ -19,6 +19,7 @@
 #pragma once
 
 #include "../pch.h"
+#include "namespace_common.h"
 #include "jsobj.h"
 #include "querypattern.h"
 #include "diskloc.h"
@@ -27,46 +28,6 @@
 
 namespace mongo {
 
-    /* in the mongo source code, "client" means "database". */
-
-    const int MaxDatabaseNameLen = 256; // max str len for the db name, including null char
-
-    /* e.g.
-       NamespaceString ns("acme.orders");
-       cout << ns.coll; // "orders"
-    */
-    class NamespaceString {
-    public:
-        string db;
-        string coll; // note collection names can have periods in them for organizing purposes (e.g. "system.indexes")
-
-        NamespaceString( const char * ns ) { init(ns); }
-        NamespaceString( const string& ns ) { init(ns.c_str()); }
-        string ns() const { return db + '.' + coll; }
-        bool isSystem() const { return strncmp(coll.c_str(), "system.", 7) == 0; }
-
-        /**
-         * @return true if ns is 'normal'.  $ used for collections holding index data, which do not contain BSON objects in their records.
-         * special case for the local.oplog.$main ns -- naming it as such was a mistake.
-         */
-        static bool normal(const char* ns) {
-            const char *p = strchr(ns, '$');
-            if( p == 0 )
-                return true;
-            return strcmp( ns, "local.oplog.$main" ) == 0;
-        }
-
-        static bool special(const char *ns) { 
-            return !normal(ns) || strstr(ns, ".system.");
-        }
-    private:
-        void init(const char *ns) {
-            const char *p = strchr(ns, '.');
-            if( p == 0 ) return;
-            db = string(ns, p - ns);
-            coll = p + 1;
-        }
-    };
 
 #pragma pack(1)
     /* This helper class is used to make the HashMap below in NamespaceIndex e.g. see line:
@@ -462,21 +423,12 @@ namespace mongo {
     private:
         string _ns;
         void reset();
-        static std::map< string, shared_ptr< NamespaceDetailsTransient > > _map;
+        static std::map< string, shared_ptr< NamespaceDetailsTransient > > _nsdMap;
     public:
         NamespaceDetailsTransient(const char *ns) : _ns(ns), _keysComputed(false), _qcWriteCount() { }
-    private:
-        /* _get() is not threadsafe -- see get_inlock() comments */
-        static NamespaceDetailsTransient& _get(const char *ns);
     public:
-        /* use get_w() when doing write operations. this is safe as there is only 1 write op and it's exclusive to everything else.  
-           for reads you must lock and then use get_inlock() instead. */
-        static NamespaceDetailsTransient& get_w(const char *ns) {
-            DEV assertInWriteLock();
-            return _get(ns);
-        }
-        void addedIndex() { reset(); }
-        void deletedIndex() { reset(); }
+        void addedIndex() { assertInWriteLock(); reset(); }
+        void deletedIndex() { assertInWriteLock(); reset(); }
         /* Drop cached information on all namespaces beginning with the specified prefix.
            Can be useful as index namespaces share the same start as the regular collection.
            SLOW - sequential scan of all NamespaceDetailsTransient objects */
@@ -544,10 +496,20 @@ namespace mongo {
         map< QueryPattern, pair< BSONObj, long long > > _qcCache;
     public:
         static SimpleMutex _qcMutex;
-        /* you must be in the qcMutex when calling this (and using the returned val): */
-        static NamespaceDetailsTransient& get_inlock(const char *ns) {
-            return _get(ns);
+
+        /* you must be in the qcMutex when calling this.
+           A NamespaceDetailsTransient object will not go out of scope on you if you are
+           dbMutex.atLeastReadLocked(), so you do't have to stay locked.
+           Creates a NamespaceDetailsTransient before returning if one DNE. 
+           todo: avoid creating too many on erroneous ns queries.
+           */
+        static NamespaceDetailsTransient& get_inlock(const char *ns);
+
+        static NamespaceDetailsTransient& get(const char *ns) {
+            SimpleMutex::scoped_lock lk(_qcMutex);
+            return get_inlock(ns);
         }
+
         void clearQueryCache() { // public for unit tests
             _qcCache.clear();
             _qcWriteCount = 0;
@@ -556,7 +518,7 @@ namespace mongo {
         void notifyOfWriteOp() {
             if ( _qcCache.empty() )
                 return;
-            if ( ++_qcWriteCount >= 1000 )
+            if ( ++_qcWriteCount >= 100 )
                 clearQueryCache();
         }
         BSONObj indexForPattern( const QueryPattern &pattern ) {
@@ -571,8 +533,8 @@ namespace mongo {
 
     }; /* NamespaceDetailsTransient */
 
-    inline NamespaceDetailsTransient& NamespaceDetailsTransient::_get(const char *ns) {
-        shared_ptr< NamespaceDetailsTransient > &t = _map[ ns ];
+    inline NamespaceDetailsTransient& NamespaceDetailsTransient::get_inlock(const char *ns) {
+        shared_ptr< NamespaceDetailsTransient > &t = _nsdMap[ ns ];
         if ( t.get() == 0 )
             t.reset( new NamespaceDetailsTransient(ns) );
         return *t;
@@ -663,31 +625,5 @@ namespace mongo {
     // (Arguments should include db name)
     void renameNamespace( const char *from, const char *to );
 
-    // "database.a.b.c" -> "database"
-    inline void nsToDatabase(const char *ns, char *database) {
-        const char *p = ns;
-        char *q = database;
-        while ( *p != '.' ) {
-            if ( *p == 0 )
-                break;
-            *q++ = *p++;
-        }
-        *q = 0;
-        if (q-database>=MaxDatabaseNameLen) {
-            log() << "nsToDatabase: ns too long. terminating, buf overrun condition" << endl;
-            dbexit( EXIT_POSSIBLE_CORRUPTION );
-        }
-    }
-    inline string nsToDatabase(const char *ns) {
-        char buf[MaxDatabaseNameLen];
-        nsToDatabase(ns, buf);
-        return buf;
-    }
-    inline string nsToDatabase(const string& ns) {
-        size_t i = ns.find( '.' );
-        if ( i == string::npos )
-            return ns;
-        return ns.substr( 0 , i );
-    }
 
 } // namespace mongo

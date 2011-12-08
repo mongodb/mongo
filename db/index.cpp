@@ -207,7 +207,7 @@ namespace mongo {
             string pns = parentNS(); // note we need a copy, as parentNS() won't work after the drop() below
 
             // clean up parent namespace index cache
-            NamespaceDetailsTransient::get_w( pns.c_str() ).deletedIndex();
+            NamespaceDetailsTransient::get( pns.c_str() ).deletedIndex();
 
             string name = indexName();
 

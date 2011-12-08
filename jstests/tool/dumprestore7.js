@@ -1,6 +1,3 @@
-
-var dr7 = function() {
-
 var name = "dumprestore7";
 
 function step(msg) {
@@ -63,9 +60,3 @@ replTest.stopSet();
 
 step("SUCCESS");
 
-};
-
-// SERVER-3985
-if (!_isWindows()) {
-    dr7();
-}

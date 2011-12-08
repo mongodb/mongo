@@ -51,6 +51,7 @@ settings.py
 buildinfo.cpp
 tags
 TAGS
+failfile.smoke
 
 #temp dirs
 dump
@@ -80,6 +81,7 @@ mongobridge
 mongostat
 mongotop
 mongooplog
+mongoperf
 bsondump
 
 *.tgz

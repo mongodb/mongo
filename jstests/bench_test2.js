@@ -6,14 +6,22 @@ for ( i=0; i<100; i++ )
     t.insert( { _id : i , x : 0 } );
 db.getLastError();
 
-res = benchRun( { ops : [ { ns : t.getFullName() , 
-                            op : "update" , 
-                            query : { _id : { "#RAND_INT" : [ 0 , 100 ] } } ,
-                            update : { $inc : { x : 1 } } } ] , 
-                  parallel : 2 , 
-                  seconds : 1 ,
-                  totals : true ,
-                  host : db.getMongo().host } )
+benchArgs = { ops : [ { ns : t.getFullName() ,
+                        op : "update" ,
+                        query : { _id : { "#RAND_INT" : [ 0 , 100 ] } } ,
+                        update : { $inc : { x : 1 } } } ] ,
+              parallel : 2 ,
+              seconds : 1 ,
+              totals : true ,
+              host : db.getMongo().host }
+
+if (jsTest.options().auth) {
+    benchArgs['db'] = 'admin';
+    benchArgs['username'] = jsTest.options().adminUser;
+    benchArgs['password'] = jsTest.options().adminPassword;
+}
+
+res = benchRun( benchArgs )
 printjson( res );
 
 sumsq = 0

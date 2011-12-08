@@ -19,6 +19,8 @@
    tools for working in parallel/sharded/clustered environment
  */
 
+#pragma once
+
 #include "../pch.h"
 #include "dbclient.h"
 #include "redef_macros.h"
@@ -83,7 +85,7 @@ namespace mongo {
 
         virtual string type() const = 0;
 
-        virtual BSONObj explain();
+        virtual void explain(BSONObjBuilder& b);
 
     protected:
 

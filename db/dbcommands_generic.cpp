@@ -102,7 +102,8 @@ namespace mongo {
     public:
         CmdBuildInfo() : Command( "buildInfo", true, "buildinfo" ) {}
         virtual bool slaveOk() const { return true; }
-        virtual bool adminOnly() const { return true; }
+        virtual bool adminOnly() const { return false; }
+        virtual bool requiresAuth() { return false; }
         virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream &help ) const {
             help << "get version #, etc.\n";
@@ -236,6 +237,11 @@ namespace mongo {
                 if ( ! v->isValid( e , errmsg ) )
                     return false;
                 replApplyBatchSize = e.numberInt();
+                s++;
+            }
+            if( cmdObj.hasElement( "traceExceptions" ) ) {
+                if( s == 0 ) result.append( "was", DBException::traceExceptions );
+                DBException::traceExceptions = cmdObj["traceExceptions"].Bool();
                 s++;
             }
 

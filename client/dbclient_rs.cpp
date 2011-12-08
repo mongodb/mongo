@@ -820,10 +820,14 @@ namespace mongo {
 
 
     bool DBClientReplicaSet::call( Message &toSend, Message &response, bool assertOk , string * actualServer ) {
+        const char * ns = 0;
+
         if ( toSend.operation() == dbQuery ) {
             // TODO: might be possible to do this faster by changing api
             DbMessage dm( toSend );
             QueryMessage qm( dm );
+            ns = qm.ns;
+
             if ( qm.queryOptions & QueryOption_SlaveOk ) {
                 for ( int i=0; i<3; i++ ) {
                     try {
@@ -844,7 +848,26 @@ namespace mongo {
         DBClientConnection* m = checkMaster();
         if ( actualServer )
             *actualServer = m->getServerAddress();
-        return m->call( toSend , response , assertOk );
+        
+        if ( ! m->call( toSend , response , assertOk ) )
+            return false;
+
+        if ( ns ) {
+            QueryResult * res = (QueryResult*)response.singleData();
+            if ( res->nReturned == 1 ) {
+                BSONObj x(res->data() );
+                if ( str::contains( ns , "$cmd" ) ) {
+                    if ( isNotMasterErrorString( x["errmsg"] ) )
+                        isntMaster();
+                }
+                else {
+                    if ( isNotMasterErrorString( getErrField( x ) ) )
+                        isntMaster();
+                }
+            }
+        }
+
+        return true;
     }
 
 }

@@ -45,7 +45,7 @@ namespace mongo {
     v8::Handle<v8::Value> mongoInsert(V8Scope* scope, const v8::Arguments& args);
     v8::Handle<v8::Value> mongoRemove(V8Scope* scope, const v8::Arguments& args);
     v8::Handle<v8::Value> mongoUpdate(V8Scope* scope, const v8::Arguments& args);
-
+    v8::Handle<v8::Value> mongoAuth(V8Scope* scope, const v8::Arguments& args);
 
     v8::Handle<v8::Value> internalCursorCons(V8Scope* scope, const v8::Arguments& args);
     v8::Handle<v8::Value> internalCursorNext(V8Scope* scope, const v8::Arguments& args);
@@ -90,10 +90,5 @@ namespace mongo {
 
     v8::Handle<v8::Value> bsonsize( V8Scope* scope, const v8::Arguments& args );
 
-    // call with v8 mutex:
-    void enableV8Interrupt();
-    void disableV8Interrupt();
-    bool pauseV8Interrupt();
-    bool resumeV8Interrupt();
 }
 

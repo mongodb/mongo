@@ -22,6 +22,7 @@
 #include "../util/net/httpclient.h"
 #include "../util/text.h"
 #include "tool.h"
+#include "stat_util.h"
 #include <fstream>
 #include <iostream>
 #include <boost/program_options.hpp>
@@ -34,7 +35,6 @@ namespace mongo {
     public:
 
         Stat() : Tool( "stat" , REMOTE_SERVER , "admin" ) {
-            _sleep = 1;
             _http = false;
             _many = false;
 
@@ -83,7 +83,7 @@ namespace mongo {
             out << "   conn     \t- number of open connections\n";
             out << "   set      \t- replica set name\n";
             out << "   repl     \t- replication type \n";
-            out << "            \t    M   - master (primary)\n";
+            out << "            \t    PRI - primary (master)\n";
             out << "            \t    SEC - secondary\n";
             out << "            \t    REC - recovering\n";
             out << "            \t    UNK - unknown\n";
@@ -127,226 +127,6 @@ namespace mongo {
             return out.getOwned();
         }
 
-        double diff( const string& name , const BSONObj& a , const BSONObj& b ) {
-            BSONElement x = a.getFieldDotted( name.c_str() );
-            BSONElement y = b.getFieldDotted( name.c_str() );
-            if ( ! x.isNumber() || ! y.isNumber() )
-                return -1;
-            return ( y.number() - x.number() ) / _sleep;
-        }
-
-        double percent( const char * outof , const char * val , const BSONObj& a , const BSONObj& b ) {
-            double x = ( b.getFieldDotted( val ).number() - a.getFieldDotted( val ).number() );
-            double y = ( b.getFieldDotted( outof ).number() - a.getFieldDotted( outof ).number() );
-            if ( y == 0 )
-                return 0;
-            double p = x / y;
-            p = (double)((int)(p * 1000)) / 10;
-            return p;
-        }
-
-        template<typename T>
-        void _append( BSONObjBuilder& result , const string& name , unsigned width , const T& t ) {
-            if ( name.size() > width )
-                width = name.size();
-            result.append( name , BSON( "width" << (int)width << "data" << t ) );
-        }
-
-        void _appendMem( BSONObjBuilder& result , const string& name , unsigned width , double sz ) {
-            string unit = "m";
-            if ( sz > 1024 ) {
-                unit = "g";
-                sz /= 1024;
-            }
-
-            if ( sz >= 1000 ) {
-                string s = str::stream() << (int)sz << unit;
-                _append( result , name , width , s );
-                return;
-            }
-
-            stringstream ss;
-            ss << setprecision(3) << sz << unit;
-            _append( result , name , width , ss.str() );
-        }
-
-        void _appendNet( BSONObjBuilder& result , const string& name , double diff ) {
-            // I think 1000 is correct for megabit, but I've seen conflicting things (ERH 11/2010)
-            const double div = 1000;
-
-            string unit = "b";
-
-            if ( diff >= div ) {
-                unit = "k";
-                diff /= div;
-            }
-
-            if ( diff >= div ) {
-                unit = "m";
-                diff /= div;
-            }
-
-            if ( diff >= div ) {
-                unit = "g";
-                diff /= div;
-            }
-
-            string out = str::stream() << (int)diff << unit;
-            _append( result , name , 6 , out );
-        }
-
-        /**
-         * BSON( <field> -> BSON( width : ### , data : XXX ) )
-         */
-        BSONObj doRow( const BSONObj& a , const BSONObj& b ) {
-            BSONObjBuilder result;
-
-            bool isMongos =  b["shardCursorType"].type() == Object; // TODO: should have a better check
-
-            if ( a["opcounters"].isABSONObj() && b["opcounters"].isABSONObj() ) {
-                BSONObj ax = a["opcounters"].embeddedObject();
-                BSONObj bx = b["opcounters"].embeddedObject();
-
-                BSONObj ar = a["opcountersRepl"].isABSONObj() ? a["opcountersRepl"].embeddedObject() : BSONObj();
-                BSONObj br = b["opcountersRepl"].isABSONObj() ? b["opcountersRepl"].embeddedObject() : BSONObj();
-
-                BSONObjIterator i( bx );
-                while ( i.more() ) {
-                    BSONElement e = i.next();
-                    if ( ar.isEmpty() || br.isEmpty() ) {
-                        _append( result , e.fieldName() , 6 , (int)diff( e.fieldName() , ax , bx ) );
-                    }
-                    else {
-                        string f = e.fieldName();
-
-                        int m = (int)diff( f , ax , bx );
-                        int r = (int)diff( f , ar , br );
-
-                        string myout;
-
-                        if ( f == "command" ) {
-                            myout = str::stream() << m << "|" << r;
-                        }
-                        else if ( f == "getmore" ) {
-                            myout = str::stream() << m;
-                        }
-                        else if ( m && r ) {
-                            // this is weird...
-                            myout = str::stream() << m << "|" << r;
-                        }
-                        else if ( m ) {
-                            myout = str::stream() << m;
-                        }
-                        else if ( r ) {
-                            myout = str::stream() << "*" << r;
-                        }
-                        else {
-                            myout = "*0";
-                        }
-
-                        _append( result , f , 6 , myout );
-                    }
-                }
-            }
-
-            if ( b["backgroundFlushing"].type() == Object ) {
-                BSONObj ax = a["backgroundFlushing"].embeddedObject();
-                BSONObj bx = b["backgroundFlushing"].embeddedObject();
-                _append( result , "flushes" , 6 , (int)diff( "flushes" , ax , bx ) );
-            }
-
-            if ( b.getFieldDotted("mem.supported").trueValue() ) {
-                BSONObj bx = b["mem"].embeddedObject();
-                BSONObjIterator i( bx );
-                if (!isMongos)
-                    _appendMem( result , "mapped" , 6 , bx["mapped"].numberInt() );
-                _appendMem( result , "vsize" , 6 , bx["virtual"].numberInt() );
-                _appendMem( result , "res" , 6 , bx["resident"].numberInt() );
-
-                if ( !isMongos && _all )
-                    _appendMem( result , "non-mapped" , 6 , bx["virtual"].numberInt() - bx["mapped"].numberInt() );
-            }
-
-            if ( b["extra_info"].type() == Object ) {
-                BSONObj ax = a["extra_info"].embeddedObject();
-                BSONObj bx = b["extra_info"].embeddedObject();
-                if ( ax["page_faults"].type() || ax["page_faults"].type() )
-                    _append( result , "faults" , 6 , (int)diff( "page_faults" , ax , bx ) );
-            }
-
-            if (!isMongos) {
-                _append( result , "locked %" , 8 , percent( "globalLock.totalTime" , "globalLock.lockTime" , a , b ) );
-                _append( result , "idx miss %" , 8 , percent( "indexCounters.btree.accesses" , "indexCounters.btree.misses" , a , b ) );
-            }
-
-            if ( b.getFieldDotted( "globalLock.currentQueue" ).type() == Object ) {
-                int r = b.getFieldDotted( "globalLock.currentQueue.readers" ).numberInt();
-                int w = b.getFieldDotted( "globalLock.currentQueue.writers" ).numberInt();
-                stringstream temp;
-                temp << r << "|" << w;
-                _append( result , "qr|qw" , 9 , temp.str() );
-            }
-
-            if ( b.getFieldDotted( "globalLock.activeClients" ).type() == Object ) {
-                int r = b.getFieldDotted( "globalLock.activeClients.readers" ).numberInt();
-                int w = b.getFieldDotted( "globalLock.activeClients.writers" ).numberInt();
-                stringstream temp;
-                temp << r << "|" << w;
-                _append( result , "ar|aw" , 7 , temp.str() );
-            }
-
-            if ( a["network"].isABSONObj() && b["network"].isABSONObj() ) {
-                BSONObj ax = a["network"].embeddedObject();
-                BSONObj bx = b["network"].embeddedObject();
-                _appendNet( result , "netIn" , diff( "bytesIn" , ax , bx ) );
-                _appendNet( result , "netOut" , diff( "bytesOut" , ax , bx ) );
-            }
-
-            _append( result , "conn" , 5 , b.getFieldDotted( "connections.current" ).numberInt() );
-
-            if ( b["repl"].type() == Object ) {
-
-                BSONObj x = b["repl"].embeddedObject();
-                bool isReplSet = x["setName"].type() == String;
-
-                stringstream ss;
-
-                if ( isReplSet ) {
-                    string setName = x["setName"].String();
-                    _append( result , "set" , setName.size() , setName );
-                }
-
-                if ( x["ismaster"].trueValue() )
-                    ss << "M";
-                else if ( x["secondary"].trueValue() )
-                    ss << "SEC";
-                else if ( x["isreplicaset"].trueValue() )
-                    ss << "REC";
-                else if ( isReplSet )
-                    ss << "UNK";
-                else
-                    ss << "SLV";
-
-                _append( result , "repl" , 4 , ss.str() );
-
-            }
-            else if ( isMongos ) {
-                _append( result , "repl" , 4 , "RTR" );
-            }
-
-            {
-                struct tm t;
-                time_t_to_Struct( time(0), &t , true );
-                stringstream temp;
-                temp << setfill('0') << setw(2) << t.tm_hour
-                     << ":"
-                     << setfill('0') << setw(2) << t.tm_min
-                     << ":"
-                     << setfill('0') << setw(2) << t.tm_sec;
-                _append( result , "time" , 10 , temp.str() );
-            }
-            return result.obj();
-        }
 
         virtual void preSetup() {
             if ( hasParam( "http" ) ) {
@@ -366,8 +146,8 @@ namespace mongo {
         }
 
         int run() {
-            _sleep = getParam( "sleep" , _sleep );
-            _all = hasParam( "all" );
+            _statUtil.setSeconds( getParam( "sleep" , 1 ) );
+            _statUtil.setAll( hasParam( "all" ) );
             if ( _many )
                 return runMany();
             return runNormal();
@@ -426,7 +206,7 @@ namespace mongo {
                 return -1;
 
             while ( rowCount == 0 || rowNum < rowCount ) {
-                sleepsecs(_sleep);
+                sleepsecs((int)ceil(_statUtil.getSeconds()));
                 BSONObj now;
                 try {
                     now = stats();
@@ -441,7 +221,7 @@ namespace mongo {
 
                 try {
 
-                    BSONObj out = doRow( prev , now );
+                    BSONObj out = _statUtil.doRow( prev , now );
 
                     if ( showHeaders && rowNum % 10 == 0 ) {
                         printHeaders( out );
@@ -634,7 +414,7 @@ namespace mongo {
             bool discover = hasParam( "discover" );
 
             while ( 1 ) {
-                sleepsecs( _sleep );
+                sleepsecs( (int)ceil(_statUtil.getSeconds()) );
 
                 // collect data
                 vector<Row> rows;
@@ -648,7 +428,7 @@ namespace mongo {
                         rows.push_back( Row( i->first ) );
                     }
                     else {
-                        BSONObj out = doRow( i->second->prev , i->second->now );
+                        BSONObj out = _statUtil.doRow( i->second->prev , i->second->now );
                         rows.push_back( Row( i->first , out ) );
                     }
 
@@ -731,10 +511,9 @@ namespace mongo {
             return 0;
         }
 
-        int _sleep;
+        StatUtil _statUtil;
         bool _http;
         bool _many;
-        bool _all;
 
         struct Row {
             Row( string h , string e ) {

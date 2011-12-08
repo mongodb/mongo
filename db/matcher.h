@@ -126,7 +126,7 @@ namespace mongo {
         int matchesDotted(
             const char *fieldName,
             const BSONElement& toMatch, const BSONObj& obj,
-            int compareOp, const ElementMatcher& bm, bool isArr , MatchDetails * details );
+            int compareOp, const ElementMatcher& bm, bool isArr , MatchDetails * details ) const;
 
         /**
          * Perform a NE or NIN match by returning the inverse of the opposite matching operation.
@@ -135,7 +135,7 @@ namespace mongo {
         int inverseMatch(
             const char *fieldName,
             const BSONElement &toMatch, const BSONObj &obj,
-            const ElementMatcher&bm, MatchDetails * details );
+            const ElementMatcher&bm, MatchDetails * details ) const;
 
     public:
         static int opDirection(int op) {
@@ -146,7 +146,7 @@ namespace mongo {
 
         ~Matcher();
 
-        bool matches(const BSONObj& j, MatchDetails * details = 0 );
+        bool matches(const BSONObj& j, MatchDetails * details = 0 ) const;
 
         bool atomic() const { return _atomic; }
 
@@ -168,6 +168,16 @@ namespace mongo {
          */
         bool keyMatch( const Matcher &docMatcher ) const;
         
+        bool singleSimpleCriterion() const {
+            return false; // TODO SERVER-958
+//            // TODO Really check, especially if all basics are ok.
+//            // $all, etc
+//            // _orConstraints?
+//            return ( ( basics.size() + nRegex ) < 2 ) && !where && !_orMatchers.size() && !_norMatchers.size();
+        }
+
+	const BSONObj *getQuery() const { return &_jsobj; };
+
     private:
         /**
          * Generate a matcher for the provided index key format using the
@@ -185,7 +195,7 @@ namespace mongo {
         void addRegex(const char *fieldName, const char *regex, const char *flags, bool isNot = false);
         bool addOp( const BSONElement &e, const BSONElement &fe, bool isNot, const char *& regex, const char *&flags );
 
-        int valuesMatch(const BSONElement& l, const BSONElement& r, int op, const ElementMatcher& bm);
+        int valuesMatch(const BSONElement& l, const BSONElement& r, int op, const ElementMatcher& bm) const;
 
         bool parseClause( const BSONElement &e );
         void parseExtractedClause( const BSONElement &e, list< shared_ptr< Matcher > > &matchers );
@@ -209,8 +219,7 @@ namespace mongo {
         */
         bool _atomic;
 
-        RegexMatcher _regexs[4];
-        int _nRegex;
+        vector<RegexMatcher> _regexs;
 
         // so we delete the mem when we're done:
         vector< shared_ptr< BSONObjBuilder > > _builders;

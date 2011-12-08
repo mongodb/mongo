@@ -126,29 +126,29 @@ namespace PerfTests {
         virtual string name() = 0;
 
         // how long to run test.  0 is a sentinel which means just run the timed() method once and time it.
-        virtual int howLongMillis() { return profiling ? 60000 : 5000; } 
+        virtual int howLongMillis() { return profiling ? 60000 : 5000; }
 
         /* override if your test output doesn't need that */
         virtual bool showDurStats() { return true; }
 
-        static DBClientConnection *conn;
+        static  boost::shared_ptr<DBClientConnection> conn;
         static unsigned once;
 
     public:
-        /* if you want recording of the timings, place the password for the perf database 
+        /* if you want recording of the timings, place the password for the perf database
             in ./../settings.py:
                 pstatspassword="<pwd>"
         */
-        void connect() { 
+        void connect() {
             if( once )
                 return;
             ++once;
 
             // no writing to perf db if _DEBUG
             DEV return;
-            
+
             const char *fn = "../../settings.py";
-            if( !exists(fn) ) { 
+            if( !exists(fn) ) {
                 if( exists("settings.py") )
                     fn = "settings.py";
                 else {
@@ -175,16 +175,16 @@ namespace PerfTests {
                         }
                     }
 
-                    DBClientConnection *c = new DBClientConnection(false, 0, 60);
+                    boost::shared_ptr<DBClientConnection> c(new DBClientConnection(false, 0, 60));
                     string err;
-                    if( c->connect("perfdb.10gen.cc", err) ) { 
-                        if( !c->auth("perf", "perf", pwd, err) ) { 
+                    if( c->connect("perfdb.10gen.cc", err) ) {
+                        if( !c->auth("perf", "perf", pwd, err) ) {
                             cout << "info: authentication with stats db failed: " << err << endl;
                             assert(false);
                         }
                         conn = c;
                     }
-                    else { 
+                    else {
                         cout << err << " (to log perfstats)" << endl;
                     }
                 }
@@ -203,7 +203,7 @@ namespace PerfTests {
 
             connect();
 
-            if( conn && !conn->isFailed() ) { 
+            if( conn && !conn->isFailed() ) {
                 const char *ns = "perf.pstats";
                 if( perfHist ) {
                     static bool needver = true;
@@ -215,9 +215,9 @@ namespace PerfTests {
                             b.append("host",getHostName()).append("test",s).append("dur",cmdLine.dur);
                             DEV { b.append("info.DEBUG",true); }
                             else b.appendNull("info.DEBUG");
-                            if( sizeof(int*) == 4 ) 
+                            if( sizeof(int*) == 4 )
                                 b.append("info.bits", 32);
-                            else 
+                            else
                                 b.appendNull("info.bits");
                             q = Query(b.obj()).sort("when",-1);
                         }
@@ -248,7 +248,7 @@ namespace PerfTests {
                     b.append("rps", (int) rps);
                     b.append("millis", ms);
                     b.appendBool("dur", cmdLine.dur);
-                    if( showDurStats() && cmdLine.dur ) 
+                    if( showDurStats() && cmdLine.dur )
                         b.append("durStats", dur::stats.curr->_asObj());
                     {
                         bob inf;
@@ -285,7 +285,7 @@ namespace PerfTests {
             prep();
 
             int hlm = howLongMillis();
-            DEV { 
+            DEV {
                 // don't run very long with _DEBUG - not very meaningful anyway on that build
                 hlm = min(hlm, 500);
             }
@@ -296,7 +296,7 @@ namespace PerfTests {
             n = 0;
             const unsigned Batch = batchSize();
 
-            if( hlm == 0 ) { 
+            if( hlm == 0 ) {
                 // means just do once
                 timed();
             }
@@ -346,17 +346,17 @@ namespace PerfTests {
             }
         }
 
-        void thread() { 
+        void thread() {
             DBClientType c;
             Client::initThreadIfNotAlready("perftestthr");
-            for( unsigned long long i = 0; i < n/8; i++ ) { 
+            for( unsigned long long i = 0; i < n/8; i++ ) {
                 timed2(c);
             }
             cc().shutdown();
         }
 
         void launchThreads(int remaining) {
-            if (!remaining) 
+            if (!remaining)
                 return;
             boost::thread athread(boost::bind(&B::thread, this));
             launchThreads(remaining - 1);
@@ -364,28 +364,28 @@ namespace PerfTests {
         }
     };
 
-    DBClientConnection *B::conn;
+    boost::shared_ptr<DBClientConnection> B::conn;
     unsigned B::once;
 
     unsigned dontOptimizeOutHopefully;
 
-    class NonDurTest : public B { 
+    class NonDurTest : public B {
     public:
-        virtual int howLongMillis() { return 3000; } 
+        virtual int howLongMillis() { return 3000; }
         virtual bool showDurStats() { return false; }
     };
 
-    class BSONIter : public NonDurTest { 
+    class BSONIter : public NonDurTest {
     public:
         int n;
         bo b, sub;
         string name() { return "BSONIter"; }
-        BSONIter() { 
+        BSONIter() {
             n = 0;
             bo sub = bob().appendTimeT("t", time(0)).appendBool("abool", true).appendBinData("somebin", 3, BinDataGeneral, "abc").appendNull("anullone").obj();
             b = BSON( "_id" << OID() << "x" << 3 << "yaaaaaa" << 3.00009 << "zz" << 1 << "q" << false << "obj" << sub << "zzzzzzz" << "a string a string" );
         }
-        void timed() { 
+        void timed() {
             for( bo::iterator i = b.begin(); i.more(); )
                 if( i.next().fieldName() )
                     n++;
@@ -395,12 +395,12 @@ namespace PerfTests {
         }
     };
 
-    class BSONGetFields1 : public NonDurTest { 
+    class BSONGetFields1 : public NonDurTest {
     public:
         int n;
         bo b, sub;
         string name() { return "BSONGetFields1By1"; }
-        BSONGetFields1() { 
+        BSONGetFields1() {
             n = 0;
             bo sub = bob().appendTimeT("t", time(0)).appendBool("abool", true).appendBinData("somebin", 3, BinDataGeneral, "abc").appendNull("anullone").obj();
             b = BSON( "_id" << OID() << "x" << 3 << "yaaaaaa" << 3.00009 << "zz" << 1 << "q" << false << "obj" << sub << "zzzzzzz" << "a string a string" );
@@ -415,7 +415,7 @@ namespace PerfTests {
         }
     };
 
-    class BSONGetFields2 : public BSONGetFields1 { 
+    class BSONGetFields2 : public BSONGetFields1 {
     public:
         string name() { return "BSONGetFields"; }
         void timed() {
@@ -431,18 +431,18 @@ namespace PerfTests {
         }
     };
 
-    class KeyTest : public B { 
+    class KeyTest : public B {
     public:
         KeyV1Owned a,b,c;
         string name() { return "Key-woequal"; }
-        virtual int howLongMillis() { return 3000; } 
-        KeyTest() : 
-          a(BSON("a"<<1<<"b"<<3.0<<"c"<<"qqq")), 
-          b(BSON("a"<<1<<"b"<<3.0<<"c"<<"qqq")), 
+        virtual int howLongMillis() { return 3000; }
+        KeyTest() :
+          a(BSON("a"<<1<<"b"<<3.0<<"c"<<"qqq")),
+          b(BSON("a"<<1<<"b"<<3.0<<"c"<<"qqq")),
           c(BSON("a"<<1<<"b"<<3.0<<"c"<<"qqqb"))
           {}
         virtual bool showDurStats() { return false; }
-        void timed() { 
+        void timed() {
             assert( a.woEqual(b) );
             assert( !a.woEqual(c) );
         }
@@ -450,10 +450,10 @@ namespace PerfTests {
 
     unsigned long long aaa;
 
-    class Timer : public B { 
+    class Timer : public B {
     public:
         string name() { return "Timer"; }
-        virtual int howLongMillis() { return 1000; } 
+        virtual int howLongMillis() { return 1000; }
         virtual bool showDurStats() { return false; }
         void timed() {
             mongo::Timer t;
@@ -461,10 +461,10 @@ namespace PerfTests {
         }
     };
 
-    class Sleep0Ms : public B { 
+    class Sleep0Ms : public B {
     public:
         string name() { return "Sleep0Ms"; }
-        virtual int howLongMillis() { return 400; } 
+        virtual int howLongMillis() { return 400; }
         virtual bool showDurStats() { return false; }
         void timed() {
             sleepmillis(0);
@@ -478,38 +478,38 @@ namespace PerfTests {
     mongo::mutex mtest("mtest");
     SpinLock s;
 
-    class mutexspeed : public B { 
+    class mutexspeed : public B {
     public:
         string name() { return "mutex"; }
-        virtual int howLongMillis() { return 500; } 
+        virtual int howLongMillis() { return 500; }
         virtual bool showDurStats() { return false; }
         void timed() {
             mongo::mutex::scoped_lock lk(mtest);
         }
-    };    
-    class simplemutexspeed : public B { 
+    };
+    class simplemutexspeed : public B {
     public:
         string name() { return "simplemutex"; }
-        virtual int howLongMillis() { return 500; } 
+        virtual int howLongMillis() { return 500; }
         virtual bool showDurStats() { return false; }
         void timed() {
             SimpleMutex::scoped_lock lk(m);
         }
-    };    
-    class spinlockspeed : public B { 
+    };
+    class spinlockspeed : public B {
     public:
         string name() { return "spinlock"; }
-        virtual int howLongMillis() { return 500; } 
+        virtual int howLongMillis() { return 500; }
         virtual bool showDurStats() { return false; }
         void timed() {
             mongo::scoped_spinlock lk(s);
         }
-    };    
+    };
     int cas;
-    class casspeed : public B { 
+    class casspeed : public B {
     public:
         string name() { return "compareandswap"; }
-        virtual int howLongMillis() { return 500; } 
+        virtual int howLongMillis() { return 500; }
         virtual bool showDurStats() { return false; }
         void timed() {
 #ifdef __GCC_HAVE_SYNC_COMPARE_AND_SWAP_4
@@ -517,33 +517,33 @@ namespace PerfTests {
             __sync_bool_compare_and_swap(&cas, 0, 0);
 #endif
         }
-    };    
-    class rlock : public B { 
+    };
+    class rlock : public B {
     public:
         string name() { return "rlock"; }
-        virtual int howLongMillis() { return 500; } 
+        virtual int howLongMillis() { return 500; }
         virtual bool showDurStats() { return false; }
         void timed() {
             lk.lock_shared();
             lk.unlock_shared();
         }
     };
-    class wlock : public B { 
+    class wlock : public B {
     public:
         string name() { return "wlock"; }
-        virtual int howLongMillis() { return 500; } 
+        virtual int howLongMillis() { return 500; }
         virtual bool showDurStats() { return false; }
         void timed() {
             lk.lock();
             lk.unlock();
         }
     };
-    
+
 #if 0
-    class ulock : public B { 
+    class ulock : public B {
     public:
         string name() { return "ulock"; }
-        virtual int howLongMillis() { return 500; } 
+        virtual int howLongMillis() { return 500; }
         virtual bool showDurStats() { return false; }
         void timed() {
             lk.lockAsUpgradable();
@@ -552,11 +552,11 @@ namespace PerfTests {
     };
 #endif
 
-    class CTM : public B { 
+    class CTM : public B {
     public:
         CTM() : last(0), delts(0), n(0) { }
         string name() { return "curTimeMillis64"; }
-        virtual int howLongMillis() { return 500; } 
+        virtual int howLongMillis() { return 500; }
         virtual bool showDurStats() { return false; }
         unsigned long long last;
         unsigned long long delts;
@@ -564,7 +564,7 @@ namespace PerfTests {
         void timed() {
             unsigned long long x = curTimeMillis64();
             aaa += x;
-            if( last ) { 
+            if( last ) {
                 unsigned long long delt = x-last;
                 if( delt ) {
                     delts += delt;
@@ -580,13 +580,13 @@ namespace PerfTests {
         }
     };
 
-    class Bldr : public B { 
+    class Bldr : public B {
     public:
         int n;
         string name() { return "BufBuilder"; }
-        Bldr() { 
+        Bldr() {
         }
-        virtual int howLongMillis() { return 3000; } 
+        virtual int howLongMillis() { return 3000; }
         virtual bool showDurStats() { return false; }
         void timed() {
             BufBuilder b;
@@ -597,9 +597,9 @@ namespace PerfTests {
         }
     };
 
-    class StkBldr : public B { 
+    class StkBldr : public B {
     public:
-        virtual int howLongMillis() { return 3000; } 
+        virtual int howLongMillis() { return 3000; }
         int n;
         string name() { return "StackBufBuilder"; }
         virtual bool showDurStats() { return false; }
@@ -616,7 +616,7 @@ namespace PerfTests {
     class Dummy : public B {
     public:
         Dummy() { }
-        virtual int howLongMillis() { return 3000; } 
+        virtual int howLongMillis() { return 3000; }
         string name() { return "dummy"; }
         void timed() {
             dontOptimizeOutHopefully++;
@@ -629,7 +629,7 @@ namespace PerfTests {
     __declspec( thread ) int x;
     class TLS2 : public B {
     public:
-        virtual int howLongMillis() { return 3000; } 
+        virtual int howLongMillis() { return 3000; }
         string name() { return "thread-local-storage2"; }
         void timed() {
             if( x )
@@ -642,7 +642,7 @@ namespace PerfTests {
     // test thread local speed
     class TLS : public B {
     public:
-        virtual int howLongMillis() { return 3000; } 
+        virtual int howLongMillis() { return 3000; }
         string name() { return "thread-local-storage"; }
         void timed() {
             if( &cc() )
@@ -653,7 +653,7 @@ namespace PerfTests {
 
     class New128 : public B {
     public:
-        virtual int howLongMillis() { return 2000; } 
+        virtual int howLongMillis() { return 2000; }
         string name() { return "new128"; }
         void timed() {
             char *p = new char[128];
@@ -665,7 +665,7 @@ namespace PerfTests {
 
     class New8 : public B {
     public:
-        virtual int howLongMillis() { return 2000; } 
+        virtual int howLongMillis() { return 2000; }
         string name() { return "new8"; }
         void timed() {
             char *p = new char[8];
@@ -683,8 +683,8 @@ namespace PerfTests {
         virtual unsigned batchSize() { return 1; }
         string name() { return "compress"; }
         virtual bool showDurStats() { return false; }
-        virtual int howLongMillis() { return 4000; } 
-        void prep() { 
+        virtual int howLongMillis() { return 4000; }
+        void prep() {
             p = malloc(sz);
             // this isn't a fair test as it is mostly rands but we just want a rough perf check
             static int last;
@@ -722,13 +722,13 @@ namespace PerfTests {
         const unsigned sz;
         ChecksumTest() : sz(1024*1024*100+3) { }
         string name() { return "checksum"; }
-        virtual int howLongMillis() { return 2000; } 
+        virtual int howLongMillis() { return 2000; }
         virtual bool showDurStats() { return false; }
         virtual unsigned batchSize() { return 1; }
 
         void *p;
 
-        void prep() { 
+        void prep() {
             {
                 // the checksum code assumes 'standard' rollover on addition overflows. let's check that:
                 unsigned long long x = 0xffffffffffffffffULL;
@@ -749,7 +749,7 @@ namespace PerfTests {
             if( i == 0 )
                 last = c;
             else if( i == 1 ) {
-                ASSERT( c == last ); 
+                ASSERT( c == last );
             }
         }
         void post() {
@@ -793,8 +793,8 @@ namespace PerfTests {
         OID oid;
         BSONObj query;
     public:
-        virtual int howLongMillis() { return 30000; } 
-        Insert1() : x( BSON("x" << 99) ) { 
+        virtual int howLongMillis() { return 30000; }
+        Insert1() : x( BSON("x" << 99) ) {
             oid.init();
             query = BSON("_id" << oid);
             i = 0;
@@ -843,7 +843,7 @@ namespace PerfTests {
 
     class InsertRandom : public B {
     public:
-        virtual int howLongMillis() { return profiling ? 30000 : 5000; } 
+        virtual int howLongMillis() { return profiling ? 30000 : 5000; }
         string name() { return "random-inserts"; }
         void prep() {
             client().insert( ns(), BSONObj() );
@@ -926,9 +926,9 @@ namespace PerfTests {
     public:
         All() : Suite( "perf" ) { }
 
-        Result * run( const string& filter ) { 
+        Result * run( const string& filter ) {
             boost::thread a(t);
-            Result * res = Suite::run(filter); 
+            Result * res = Suite::run(filter);
             a.join();
             return res;
         }
@@ -937,7 +937,7 @@ namespace PerfTests {
             cout
                 << "stats test                              rps------  time-- "
                 << dur::stats.curr->_CSVHeader() << endl;
-            if( profiling ) { 
+            if( profiling ) {
                 add< New8 >();
                 add< New128 >();
             }

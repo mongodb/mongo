@@ -94,8 +94,6 @@ namespace mongo {
                         todo.push_back( pair<BSONObj,BSONObj>( i->first.obj.getOwned() ,
                                                                BSON( "$set" << temp.obj() ).getOwned() ) );
                     }
-
-                    _slaves.clear();
                 }
 
                 for ( list< pair<BSONObj,BSONObj> >::iterator i=todo.begin(); i!=todo.end(); i++ ) {

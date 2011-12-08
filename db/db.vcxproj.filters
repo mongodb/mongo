@@ -7,7 +7,7 @@
     <ClCompile Include="..\client\distlock.cpp" />
     <ClCompile Include="..\client\model.cpp" />
     <ClCompile Include="..\scripting\bench.cpp" />
-    <ClCompile Include="..\shell\mongo_vstudio.cpp" />
+    <ClCompile Include="..\shell\mongo.cpp" />
     <ClCompile Include="..\s\chunk.cpp" />
     <ClCompile Include="..\s\config.cpp" />
     <ClCompile Include="..\s\d_chunk_manager.cpp" />
@@ -334,6 +334,7 @@
     <ClInclude Include="..\util\net\listen.h" />
     <ClInclude Include="..\util\net\message_port.h" />
     <ClInclude Include="..\util\net\miniwebserver.h" />
+    <ClInclude Include="databaseholder.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="db.rc" />

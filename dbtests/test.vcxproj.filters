@@ -325,6 +325,11 @@
     <ClInclude Include="..\third_party\pcre-7.4\pcrecpp.h" />
     <ClInclude Include="..\third_party\pcre-7.4\config.h" />
     <ClInclude Include="..\third_party\pcre-7.4\pcre.h" />
+    <ClInclude Include="..\db\collection.h" />
+    <ClInclude Include="..\db\databaseholder.h">
+      <Filter>db\h</Filter>
+    </ClInclude>
+    <ClInclude Include="framework.h" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\js\js64r.lib">
@@ -491,7 +496,7 @@
     <ClCompile Include="..\scripting\engine_spidermonkey.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
-    <ClCompile Include="..\shell\mongo_vstudio.cpp">
+    <ClCompile Include="..\shell\mongo.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
     <ClCompile Include="..\scripting\utils.cpp">
@@ -892,6 +897,15 @@
     </ClCompile>
     <ClCompile Include="..\db\commands\cloud.cpp">
       <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\d_concurrency.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="d_chunk_manager_tests.cpp">
+      <Filter>shard</Filter>
+    </ClCompile>
+    <ClCompile Include="queryoptimizercursortests.cpp">
+      <Filter>dbtests</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
