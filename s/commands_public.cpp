@@ -1301,10 +1301,11 @@ namespace mongo {
                                     long long size = chunkSizes[i+1].numberLong();
                                     assert( size < 0x7fffffff );
 
-                                    if (chunkMap.count(key) <= 0) {
+                                    ChunkMap::const_iterator cit = chunkMap.find(key);
+                                    if (cit == chunkMap.end()) {
                                         warning() << "Mongod reported " << size << " bytes inserted for key " << key << " but can't find chunk" << endl;
                                     } else {
-                                        ChunkPtr c = chunkMap.at(key);
+                                        ChunkPtr c = cit->second;
                                         c->splitIfShould(static_cast<int>(size));
                                     }
                                 }
