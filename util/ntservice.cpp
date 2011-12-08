@@ -37,7 +37,7 @@ namespace mongo {
     bool initService();
 
     // returns true if the service is started.
-    bool serviceParamsCheck( program_options::variables_map& params, const std::string dbpath, int argc, char* argv[] ) {
+    bool serviceParamsCheck( boost::program_options::variables_map& params, const std::string dbpath, int argc, char* argv[] ) {
         bool installService = false;
         bool removeService = false;
         bool reinstallService = false;
