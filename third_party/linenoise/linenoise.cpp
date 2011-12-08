@@ -698,12 +698,15 @@ static int completeLine( int fd, PromptInfo& pi, char *buf, int buflen, int *len
                         beep();         // beep after completing cycle
                     break;
 
+#if 0 // SERVER-4011 -- Escape only works to end command completion in Windows
+      // leaving code here for now in case this is where we will add Ctrl-R (revert-line) later
                 case 27: /* escape */
                     /* Re-show original buffer */
                     if ( i < lc.len )
                         refreshLine( fd, pi, buf, *len, *pos );
                     stop = true;
                     break;
+#endif // SERVER-4011 -- Escape only works to end command completion in Windows
 
                 default:
                     /* Update buffer and return */
