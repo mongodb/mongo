@@ -412,7 +412,7 @@ namespace mongo {
                 if (pValue->getType() == Date) 
                     dateTotal += pValue->coerceToDate();
                 else 
-                    dateTotal += pValue->coerceToDouble()*24*60*60*1000;
+                    dateTotal += static_cast<long long>(pValue->coerceToDouble()*24*60*60*1000);
             }
 
             return Value::createDate(Date_t(dateTotal));
@@ -2582,7 +2582,7 @@ namespace mongo {
             if (pRight->getType() == Date)
                 right = pRight->coerceToDate();
             else 
-                right = pRight->coerceToDouble()*24*60*60*1000;
+                right = static_cast<long long>(pRight->coerceToDouble()*24*60*60*1000);
             return Value::createDate(Date_t(left-right));
         }
             
