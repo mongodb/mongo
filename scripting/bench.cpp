@@ -145,25 +145,29 @@ namespace mongo {
         while ( i.more() ) {
             BSONElement e = i.next();
             
-            if ( e.type() != Object ) {
+            if ( ! e.isABSONObj() ) {
                 b.append( e );
                 continue;
             }
 
             BSONObj sub = e.Obj();
-            if ( sub.firstElement().fieldName()[0] != '#' ) {
-                b.append( e );
-                continue;
+            if ( sub.firstElement().fieldName()[0] == '#' ) {
+                _fixField( b , e );
             }
-            
-            _fixField( b , e );
+            else {
+                BSONObjBuilder xx( e.type() == Object ? b.subobjStart( e.fieldName() ) : b.subarrayStart( e.fieldName() ) );
+                fixQuery( xx , sub );
+                xx.done();
+            }
+
         }
     }
 
     static BSONObj fixQuery( const BSONObj& obj ) {
+
         if ( ! _hasSpecial( obj ) ) 
             return obj;
-        
+
         BSONObjBuilder b( obj.objsize() + 128 );
         fixQuery( b , obj );
         return b.obj();
