@@ -646,12 +646,14 @@ __evict_dup_remove(WT_SESSION_IMPL *session)
  *	Get a page for eviction.
  */
 static void
-__evict_get_page(WT_SESSION_IMPL *session, WT_BTREE **btreep, WT_PAGE **pagep)
+__evict_get_page(
+    WT_SESSION_IMPL *session, int is_app, WT_BTREE **btreep, WT_PAGE **pagep)
 {
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
 
 	cache = S2C(session)->cache;
+	*btreep = NULL;
 	*pagep = NULL;
 
 	if (__wt_spin_trylock(session, &cache->lru_lock) != 0)
@@ -662,6 +664,16 @@ __evict_get_page(WT_SESSION_IMPL *session, WT_BTREE **btreep, WT_PAGE **pagep)
 	    evict < cache->evict + cache->evict_entries &&
 	    evict->page != NULL) {
 		WT_ASSERT(session, evict->btree != NULL);
+
+		/*
+		 * For now, application sessions can only evict pages from
+		 * trees they have open.  Otherwise, closing a different
+		 * session handle could cause the tree we are evicting from
+		 * to be closed underneath us.
+		 */
+		if (is_app &&
+		    __wt_session_has_btree(session, evict->btree) != 0)
+			goto done;
 
 		*pagep = evict->page;
 		*btreep = evict->btree;
@@ -675,16 +687,20 @@ __evict_get_page(WT_SESSION_IMPL *session, WT_BTREE **btreep, WT_PAGE **pagep)
 		++cache->evict_current;
 	}
 
-	__wt_spin_unlock(session, &cache->lru_lock);
+done:	__wt_spin_unlock(session, &cache->lru_lock);
 }
 
+/*
+ * __wt_evict_lru_page --
+ *	Called by both eviction and application threads to evict a page.
+ */
 int
-__wt_evict_lru_page(WT_SESSION_IMPL *session)
+__wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 {
 	WT_BTREE *btree, *saved_btree;
 	WT_PAGE *page;
 
-	__evict_get_page(session, &btree, &page);
+	__evict_get_page(session, is_app, &btree, &page);
 	if (page == NULL)
 		return (WT_NOTFOUND);
 
@@ -724,7 +740,7 @@ __evict_pages(WT_SESSION_IMPL *session)
 	u_int i;
 
 	for (i = 0; i < WT_EVICT_GROUP; i++)
-		if (__wt_evict_lru_page(session) != 0)
+		if (__wt_evict_lru_page(session, 0) != 0)
 			break;
 }
 

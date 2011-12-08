@@ -48,7 +48,7 @@ __wt_page_in_func(
 				 * don't care why, but give up our slice befor
 				 * retrying.
 				 */
-				if (__wt_evict_lru_page(session) != 0)
+				if (__wt_evict_lru_page(session, 1) != 0)
 					__wt_yield();
 				break;
 			}
