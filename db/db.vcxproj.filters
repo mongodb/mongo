@@ -177,6 +177,40 @@
     <ClCompile Include="..\third_party\pcre-7.4\pcre_xclass.c" />
     <ClCompile Include="..\third_party\pcre-7.4\pcreposix.c" />
     <ClCompile Include="commands\cloud.cpp" />
+    <ClCompile Include="commands\pipeline_command.cpp" />
+    <ClCompile Include="commands\pipeline.cpp" />
+    <ClCompile Include="pipeline\accumulator.cpp" />
+    <ClCompile Include="pipeline\accumulator_add_to_set.cpp" />
+    <ClCompile Include="pipeline\accumulator_avg.cpp" />
+    <ClCompile Include="pipeline\accumulator_first.cpp" />
+    <ClCompile Include="pipeline\accumulator_last.cpp" />
+    <ClCompile Include="pipeline\accumulator_min_max.cpp" />
+    <ClCompile Include="pipeline\accumulator_push.cpp" />
+    <ClCompile Include="pipeline\accumulator_single_value.cpp" />
+    <ClCompile Include="pipeline\accumulator_sum.cpp" />
+    <ClCompile Include="pipeline\builder.cpp" />
+    <ClCompile Include="pipeline\doc_mem_monitor.cpp" />
+    <ClCompile Include="pipeline\document.cpp" />
+    <ClCompile Include="pipeline\document_source.cpp" />
+    <ClCompile Include="pipeline\document_source_bson_array.cpp" />
+    <ClCompile Include="pipeline\document_source_command_futures.cpp" />
+    <ClCompile Include="pipeline\document_source_filter.cpp" />
+    <ClCompile Include="pipeline\document_source_filter_base.cpp" />
+    <ClCompile Include="pipeline\document_source_group.cpp" />
+    <ClCompile Include="pipeline\document_source_limit.cpp" />
+    <ClCompile Include="pipeline\document_source_match.cpp" />
+    <ClCompile Include="pipeline\document_source_out.cpp" />
+    <ClCompile Include="pipeline\document_source_project.cpp" />
+    <ClCompile Include="pipeline\document_source_skip.cpp" />
+    <ClCompile Include="pipeline\document_source_sort.cpp" />
+    <ClCompile Include="pipeline\document_source_unwind.cpp" />
+    <ClCompile Include="pipeline\expression.cpp" />
+    <ClCompile Include="pipeline\expression_context.cpp" />
+    <ClCompile Include="pipeline\field_path.cpp" />
+    <ClCompile Include="pipeline\value.cpp" />
+    <ClCompile Include="..\util\intrusive_counter.cpp" />
+    <ClCompile Include="..\util\systeminfo_win32.cpp" />
+    <ClCompile Include="commands\document_source_cursor.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\dbclientcursor.h" />
@@ -335,6 +369,17 @@
     <ClInclude Include="..\util\net\message_port.h" />
     <ClInclude Include="..\util\net\miniwebserver.h" />
     <ClInclude Include="databaseholder.h" />
+    <ClInclude Include="pipeline\accumulator.h" />
+    <ClInclude Include="pipeline\builder.h" />
+    <ClInclude Include="pipeline\doc_mem_monitor.h" />
+    <ClInclude Include="pipeline\document.h" />
+    <ClInclude Include="pipeline\document_source.h" />
+    <ClInclude Include="pipeline\expression.h" />
+    <ClInclude Include="pipeline\expression_context.h" />
+    <ClInclude Include="pipeline\field_path.h" />
+    <ClInclude Include="pipeline\value.h" />
+    <ClInclude Include="..\util\intrusive_counter.h" />
+    <ClInclude Include="..\util\systeminfo.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="db.rc" />
