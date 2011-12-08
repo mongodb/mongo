@@ -395,7 +395,7 @@ namespace mongo {
             BSONObj max = _max.copy();
             IndexDetails *idx = indexDetailsForRange( _ns.c_str() , errmsg , min , max , keyPattern );
             if ( idx == NULL ) {
-                errmsg = "can't find index in storeCurrentLocs";
+                errmsg = (string)"can't find index in storeCurrentLocs" + causedBy( errmsg );
                 return false;
             }
 
