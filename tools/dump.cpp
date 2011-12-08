@@ -198,25 +198,30 @@ public:
                 continue;
             }
 
+            const string filename = name.substr( db.size() + 1 );
+
+            //if a particular collections is specified, and it's not this one, skip it
+            if ( _coll != "" && db + "." + _coll != name && _coll != name )
+                continue;
+
             // raise error before writing collection with non-permitted filename chars in the name
             size_t hasBadChars = name.find_first_of("/\0");
             if (hasBadChars != string::npos){
               error() << "Cannot dump "  << name << ". Collection has '/' or null in the collection name." << endl;
               continue;
             }
-
-			 // Don't dump indexes
+            
+            // Don't dump indexes
             if ( endsWith(name.c_str(), ".system.indexes") ) {
-                continue;
+              continue;
             }
-
-
+            
             if ( _coll != "" && db + "." + _coll != name && _coll != name )
-                continue;
-
+              continue;
+            
             collections.push_back(name);
         }
-
+        
         for (vector<string>::iterator it = collections.begin(); it != collections.end(); ++it) {
             string name = *it;
             const string filename = name.substr( db.size() + 1 );
