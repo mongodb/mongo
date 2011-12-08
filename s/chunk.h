@@ -34,7 +34,6 @@ namespace mongo {
     class Chunk;
     class ChunkRange;
     class ChunkManager;
-    class ChunkRangeMangager;
     class ChunkObjUnitTest;
 
     typedef shared_ptr<const Chunk> ChunkPtr;
