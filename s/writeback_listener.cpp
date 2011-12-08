@@ -162,14 +162,16 @@ namespace mongo {
                     DBConfigPtr db = grid.getDBConfig( ns );
                     ShardChunkVersion needVersion( data["version"] );
 
+                    ChunkManagerPtr manager = db->getChunkManagerIfExists( ns );
+
                     LOG(1) << "connectionId: " << cid << " writebackId: " << wid << " needVersion : " << needVersion.toString()
-                           << " mine : " << db->getChunkManager( ns )->getVersion().toString() << endl;// TODO change to log(3)
+                           << " mine : " << ( manager ? manager->getVersion().toString() : "(none)" ) << endl;// TODO change to log(3)
 
                     if ( logLevel ) log(1) << debugString( m ) << endl;
 
-                    ShardChunkVersion start = db->getChunkManager( ns )->getVersion();
+                    ShardChunkVersion start = ( manager ? manager->getVersion() : (ShardChunkVersion)0 );
 
-                    if ( needVersion.isSet() && needVersion <= start ) {
+                    if ( manager && needVersion.isSet() && needVersion <= start ) {
                         // this means when the write went originally, the version was old
                         // if we're here, it means we've already updated the config, so don't need to do again
                         //db->getChunkManager( ns , true ); // SERVER-1349
@@ -180,11 +182,16 @@ namespace mongo {
                         // we need to reload the chunk manager and get the new shard versions
                         bool good = false;
                         for ( int i=0; i<100; i++ ) {
-                            if ( db->getChunkManager( ns , true )->getVersion() >= needVersion ) {
+                            manager = db->getChunkManagerIfExists( ns , true );
+                            if( ! manager && needVersion == 0 ){
                                 good = true;
                                 break;
                             }
-                            log() << "writeback getChunkManager didn't update?" << endl;
+                            else if ( manager->getVersion() >= needVersion ) {
+                                good = true;
+                                break;
+                            }
+                            log() << "chunk manager didn't update in writeback listener, wanted version : " << needVersion << ", found : " << ( manager ? manager->getVersion().toString() : "(none)" ) << endl;
                             sleepmillis(10);
                         }
                         assert( good );

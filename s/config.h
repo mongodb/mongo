@@ -132,6 +132,7 @@ namespace mongo {
          */
         bool isSharded( const string& ns );
 
+        ChunkManagerPtr getChunkManagerIfExists( const string& ns , bool reload = false );
         ChunkManagerPtr getChunkManager( const string& ns , bool reload = false );
 
         /**

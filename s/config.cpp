@@ -211,6 +211,16 @@ namespace mongo {
         return true;
     }
 
+    ChunkManagerPtr DBConfig::getChunkManagerIfExists( const string& ns, bool shouldReload ){
+        try{
+            return getChunkManager( ns, shouldReload );
+        }
+        catch( AssertionException& e ){
+            warning() << "chunk manager not found for " << ns << " :: caused by :: " << e.toString() << endl;
+            return ChunkManagerPtr();
+        }
+    }
+
     ChunkManagerPtr DBConfig::getChunkManager( const string& ns , bool shouldReload ) {
         scoped_lock lk( _lock );
 
