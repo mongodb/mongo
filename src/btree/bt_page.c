@@ -45,7 +45,7 @@ __wt_page_in_func(
 				/*
 				 * Find a page to evict -- if that succeeds,
 				 * try again immediately.  If it fails, we
-				 * don't care why, but give up our slice befor
+				 * don't care why, but give up our slice before
 				 * retrying.
 				 */
 				if (__wt_evict_lru_page(session, 1) != 0)

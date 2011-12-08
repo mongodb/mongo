@@ -635,12 +635,12 @@ __evict_dup_remove(WT_SESSION_IMPL *session)
 			else
 				break;
 		}
- 
- 	/* Sort the array by LRU, then evict the most promising candidates. */
- 	qsort(cache->evict, (size_t)cache->evict_entries,
- 	    sizeof(WT_EVICT_LIST), __evict_lru_cmp);
+
+	/* Sort the array by LRU, then evict the most promising candidates. */
+	qsort(cache->evict, (size_t)cache->evict_entries,
+	    sizeof(WT_EVICT_LIST), __evict_lru_cmp);
 }
- 
+
 /*
  * __evict_get_page --
  *	Get a page for eviction.
