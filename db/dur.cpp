@@ -720,7 +720,7 @@ namespace mongo {
         }
 
         extern int groupCommitIntervalMs;
-        filesystem::path getJournalDir();
+        boost::filesystem::path getJournalDir();
 
         void durThread() {
             Client::initThread("journal");

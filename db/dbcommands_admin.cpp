@@ -71,7 +71,7 @@ namespace mongo {
     } cleanCmd;
 
     namespace dur {
-        filesystem::path getJournalDir();
+        boost::filesystem::path getJournalDir();
     }
  
     class JournalLatencyTestCmd : public Command {
@@ -84,7 +84,7 @@ namespace mongo {
         virtual void help(stringstream& h) const { h << "test how long to write and fsync to a test file in the journal/ directory"; }
 
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
-            filesystem::path p = dur::getJournalDir();
+            boost::filesystem::path p = dur::getJournalDir();
             p /= "journalLatencyTest";
         
             // remove file if already present

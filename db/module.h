@@ -42,7 +42,7 @@ namespace mongo {
         /**
          * read config from command line
          */
-        virtual void config( program_options::variables_map& params ) = 0;
+        virtual void config( boost::program_options::variables_map& params ) = 0;
 
         /**
          * called after configuration when the server is ready start
@@ -58,13 +58,13 @@ namespace mongo {
 
         // --- static things
 
-        static void addOptions( program_options::options_description& options );
-        static void configAll( program_options::variables_map& params );
+        static void addOptions( boost::program_options::options_description& options );
+        static void configAll( boost::program_options::variables_map& params );
         static void initAll();
 
     private:
         static std::list<Module*> * _all;
         string _name;
-        program_options::options_description _options;
+        boost::program_options::options_description _options;
     };
 }

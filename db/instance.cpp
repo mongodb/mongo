@@ -524,7 +524,7 @@ namespace mongo {
         if (*this != last) return; // check early
 
         boost::xtime timeout;
-        boost::xtime_get(&timeout, TIME_UTC);
+        boost::xtime_get(&timeout, boost::TIME_UTC);
 
         timeout.nsec += millis * 1000*1000;
         if (timeout.nsec >= 1000*1000*1000){
