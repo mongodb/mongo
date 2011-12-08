@@ -20,8 +20,7 @@
 
 namespace mongo {
 
-    class FieldPath :
-        boost::noncopyable {
+    class FieldPath {
     public:
 	virtual ~FieldPath();
 
