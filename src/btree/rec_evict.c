@@ -362,7 +362,7 @@ __rec_sub_excl_col(WT_SESSION_IMPL *session,
 			continue;
 		case WT_REF_LOCKED:			/* Eviction candidate */
 		case WT_REF_READING:			/* Being read */
-			__wt_errx(session,
+			WT_VERBOSE(session, evict,
 			    "subtree of %p locked during eviction, state %d",
 			    parent, WT_COL_REF_STATE(cref));
 			return (WT_ERROR);
@@ -434,7 +434,7 @@ __rec_sub_excl_row(WT_SESSION_IMPL *session,
 			continue;
 		case WT_REF_LOCKED:			/* Eviction candidate */
 		case WT_REF_READING:			/* Being read */
-			__wt_errx(session,
+			WT_VERBOSE(session, evict,
 			    "subtree of %p locked during eviction, state %d",
 			    parent, WT_ROW_REF_STATE(rref));
 			return (WT_ERROR);
