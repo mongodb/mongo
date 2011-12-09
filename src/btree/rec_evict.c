@@ -19,13 +19,16 @@ static int  __rec_root_split(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_sub_discard(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_sub_discard_col(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_sub_discard_row(WT_SESSION_IMPL *, WT_PAGE *);
-static void __rec_sub_excl_clear(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
-static int  __rec_sub_excl_col(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
-static void __rec_sub_excl_col_clear(WT_SESSION_IMPL *, WT_PAGE *);
+static void __rec_sub_excl_clear(
+    WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE *, uint32_t);
+static int  __rec_sub_excl_col(
+    WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE **, uint32_t);
+static int __rec_sub_excl_col_clear(WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE *);
 static int  __rec_sub_excl_page(
-		WT_SESSION_IMPL *, WT_REF *, WT_PAGE *, uint32_t);
-static int  __rec_sub_excl_row(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
-static void __rec_sub_excl_row_clear(WT_SESSION_IMPL *, WT_PAGE *);
+    WT_SESSION_IMPL *, WT_REF *, WT_PAGE *, uint32_t);
+static int  __rec_sub_excl_row(
+    WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE **, uint32_t);
+static int __rec_sub_excl_row_clear(WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE *);
 
 /*
  * __wt_rec_evict --
@@ -135,7 +138,7 @@ __rec_parent_dirty_update(
 		 * our exclusive reference to it, as well as any pages below it
 		 * we locked down, and return it into use.
 		 */
-		__rec_sub_excl_clear(session, page, flags);
+		__rec_sub_excl_clear(session, page, NULL, flags);
 		return (0);
 	case WT_PAGE_REC_REPLACE: 			/* 1-for-1 page swap */
 		/*
@@ -258,6 +261,7 @@ __rec_root_split(WT_SESSION_IMPL *session, WT_PAGE *page)
 static int
 __rec_review(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 {
+	WT_PAGE *last_page;
 	int ret;
 
 	ret = 0;
@@ -292,25 +296,24 @@ __rec_review(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 * means the reconciliation fails.
 	 *
 	 * If reconciliation isn't going to be possible, we have to clear any
-	 * pages we locked while we were looking.  (I'm re-walking the tree
-	 * rather than keeping track of the locked pages on purpose -- the
-	 * only time this should ever fail is if eviction's LRU-based choice
-	 * is very unlucky.)
+	 * pages we locked while we were looking.  We keep track of the last
+	 * page we successfully locked, and traverse the tree in the same order
+	 * to clear locks, stopping when we reach the last locked page.
 	 */
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
-		ret = __rec_sub_excl_col(session, page, flags);
+		ret = __rec_sub_excl_col(session, page, &last_page, flags);
 		break;
 	case WT_PAGE_ROW_INT:
-		ret = __rec_sub_excl_row(session, page, flags);
+		ret = __rec_sub_excl_row(session, page, &last_page, flags);
 		break;
 	default:
 		break;
 	}
 
-	/* If can't evict this page, release our exclusive reference. */
+	/* If can't evict this page, release our exclusive reference(s). */
 	if (ret != 0)
-		__rec_sub_excl_clear(session, page, flags);
+		__rec_sub_excl_clear(session, page, last_page, flags);
 
 	return (ret);
 }
@@ -320,17 +323,18 @@ __rec_review(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
  *     Discard exclusive access and return a page to availability.
  */
 static void
-__rec_sub_excl_clear(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
+__rec_sub_excl_clear(WT_SESSION_IMPL *session,
+    WT_PAGE *page, WT_PAGE *last_page, uint32_t flags)
 {
 	if (LF_ISSET(WT_REC_SINGLE))
 		return;
 
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
-		__rec_sub_excl_col_clear(session, page);
+		__rec_sub_excl_col_clear(session, page, last_page);
 		break;
 	case WT_PAGE_ROW_INT:
-		__rec_sub_excl_row_clear(session, page);
+		__rec_sub_excl_row_clear(session, page, last_page);
 		break;
 	default:
 		break;
@@ -344,7 +348,8 @@ __rec_sub_excl_clear(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
  *	pages.
  */
 static int
-__rec_sub_excl_col(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t flags)
+__rec_sub_excl_col(WT_SESSION_IMPL *session,
+    WT_PAGE *parent, WT_PAGE **last_pagep, uint32_t flags)
 {
 	WT_COL_REF *cref;
 	WT_PAGE *page;
@@ -358,7 +363,8 @@ __rec_sub_excl_col(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t flags)
 		case WT_REF_LOCKED:			/* Eviction candidate */
 		case WT_REF_READING:			/* Being read */
 			__wt_errx(session,
-			    "subtree page locked during eviction");
+			    "subtree of %p locked during eviction, state %d",
+			    parent, WT_COL_REF_STATE(cref));
 			return (WT_ERROR);
 		case WT_REF_MEM:			/* In-memory */
 			break;
@@ -367,9 +373,12 @@ __rec_sub_excl_col(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t flags)
 
 		WT_RET(__rec_sub_excl_page(session, &cref->ref, page, flags));
 
+		*last_pagep = page;
+
 		/* Recurse down the tree. */
 		if (page->type == WT_PAGE_COL_INT)
-			WT_RET(__rec_sub_excl_col(session, page, flags));
+			WT_RET(__rec_sub_excl_col(
+			    session, page, last_pagep, flags));
 	}
 	return (0);
 }
@@ -379,8 +388,9 @@ __rec_sub_excl_col(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t flags)
  *	Clear any pages for which we have exclusive access -- eviction isn't
  *	possible.
  */
-static void
-__rec_sub_excl_col_clear(WT_SESSION_IMPL *session, WT_PAGE *parent)
+static int
+__rec_sub_excl_col_clear(
+    WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *last_page)
 {
 	WT_COL_REF *cref;
 	WT_PAGE *page;
@@ -393,9 +403,15 @@ __rec_sub_excl_col_clear(WT_SESSION_IMPL *session, WT_PAGE *parent)
 
 			/* Recurse down the tree. */
 			page = WT_COL_REF_PAGE(cref);
+			if (page == last_page)
+				return (1);
 			if (page->type == WT_PAGE_COL_INT)
-				__rec_sub_excl_col_clear(session, page);
+				if (__rec_sub_excl_col_clear(
+				    session, page, last_page))
+					return (1);
 		}
+
+	return (0);
 }
 
 /*
@@ -404,7 +420,8 @@ __rec_sub_excl_col_clear(WT_SESSION_IMPL *session, WT_PAGE *parent)
  * as necessary and checking if the subtree can be evicted.
  */
 static int
-__rec_sub_excl_row(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t flags)
+__rec_sub_excl_row(WT_SESSION_IMPL *session,
+    WT_PAGE *parent, WT_PAGE **last_pagep, uint32_t flags)
 {
 	WT_PAGE *page;
 	WT_ROW_REF *rref;
@@ -418,7 +435,8 @@ __rec_sub_excl_row(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t flags)
 		case WT_REF_LOCKED:			/* Eviction candidate */
 		case WT_REF_READING:			/* Being read */
 			__wt_errx(session,
-			    "subtree page locked during eviction");
+			    "subtree of %p locked during eviction, state %d",
+			    parent, WT_ROW_REF_STATE(rref));
 			return (WT_ERROR);
 		case WT_REF_MEM:			/* In-memory */
 			break;
@@ -427,9 +445,12 @@ __rec_sub_excl_row(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t flags)
 
 		WT_RET(__rec_sub_excl_page(session, &rref->ref, page, flags));
 
+		*last_pagep = page;
+
 		/* Recurse down the tree. */
 		if (page->type == WT_PAGE_ROW_INT)
-			WT_RET(__rec_sub_excl_row(session, page, flags));
+			WT_RET(__rec_sub_excl_row(
+			    session, page, last_pagep, flags));
 	}
 	return (0);
 }
@@ -439,8 +460,9 @@ __rec_sub_excl_row(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t flags)
  *	Clear any pages for which we have exclusive access -- eviction isn't
  *	possible.
  */
-static void
-__rec_sub_excl_row_clear(WT_SESSION_IMPL *session, WT_PAGE *parent)
+static int
+__rec_sub_excl_row_clear(
+    WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *last_page)
 {
 	WT_PAGE *page;
 	WT_ROW_REF *rref;
@@ -453,9 +475,15 @@ __rec_sub_excl_row_clear(WT_SESSION_IMPL *session, WT_PAGE *parent)
 
 			/* Recurse down the tree. */
 			page = WT_ROW_REF_PAGE(rref);
+			if (page == last_page)
+				return (1);
 			if (page->type == WT_PAGE_ROW_INT)
-				__rec_sub_excl_row_clear(session, page);
+				if (__rec_sub_excl_row_clear(
+				    session, page, last_page))
+					return (1);
 		}
+
+	return (0);
 }
 
 /*
@@ -596,11 +624,17 @@ static int
 __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 {
 	WT_CACHE *cache;
+	int can_lock;
 
 	cache = S2C(session)->cache;
 
-	/* If another thread already has this page, give up. */
-	if (ref->state != WT_REF_MEM)
+	/*
+	 * If another thread already has this page, give up.
+	 *
+	 * Acquire a latch briefly to check and switch the page state in case
+	 * multiple threads attempt to evict overlapping subtrees.
+	 */
+	if (__wt_spin_trylock(session, &cache->lru_lock) != 0)
 		return (1);
 
 	/*
@@ -610,11 +644,15 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	 * Request exclusive access to the page; no memory flush needed, the
 	 * state field is declared volatile.
 	 */
-	ref->state = WT_REF_LOCKED;
+	can_lock = (ref->state == WT_REF_MEM);
+	if (can_lock)
+		ref->state = WT_REF_LOCKED;
 
-	/* Publish the page's state before reading the hazard references. */
-	WT_READ_BARRIER();
-	WT_WRITE_BARRIER();
+	/* Releasing the spinlock is an implicit full barrier. */
+	__wt_spin_unlock(session, &cache->lru_lock);
+
+	if (!can_lock)
+		return (1);
 
 	/* Get a fresh copy of the hazard reference array. */
 retry:	__hazard_copy(session);
