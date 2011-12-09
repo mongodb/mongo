@@ -234,7 +234,7 @@ namespace mongo {
             : _manager(begin->second->getManager())
             , _shard(begin->second->getShard())
             , _min(begin->second->getMin())
-            , _max(prior(end)->second->getMax()) {
+            , _max(boost::prior(end)->second->getMax()) {
             assert( begin != end );
 
             DEV while (begin != end) {

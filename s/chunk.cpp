@@ -635,11 +635,11 @@ namespace mongo {
 
         // Check endpoints
         ENSURE(allOfType(MinKey, chunkMap.begin()->second->getMin()));
-        ENSURE(allOfType(MaxKey, prior(chunkMap.end())->second->getMax()));
+        ENSURE(allOfType(MaxKey, boost::prior(chunkMap.end())->second->getMax()));
 
         // Make sure there are no gaps or overlaps
         for (ChunkMap::const_iterator it=boost::next(chunkMap.begin()), end=chunkMap.end(); it != end; ++it) {
-            ChunkMap::const_iterator last = prior(it);
+            ChunkMap::const_iterator last = boost::prior(it);
 
             if (!(it->second->getMin() == last->second->getMax())) {
                 PRINT(it->second->toString());
@@ -942,11 +942,11 @@ namespace mongo {
 
             // Check endpoints
             assert(allOfType(MinKey, _ranges.begin()->second->getMin()));
-            assert(allOfType(MaxKey, prior(_ranges.end())->second->getMax()));
+            assert(allOfType(MaxKey, boost::prior(_ranges.end())->second->getMax()));
 
             // Make sure there are no gaps or overlaps
             for (ChunkRangeMap::const_iterator it=boost::next(_ranges.begin()), end=_ranges.end(); it != end; ++it) {
-                ChunkRangeMap::const_iterator last = prior(it);
+                ChunkRangeMap::const_iterator last = boost::prior(it);
                 assert(it->second->getMin() == last->second->getMax());
             }
 
