@@ -577,6 +577,21 @@ DBCollection.prototype.distinct = function( keyString , query ){
 }
 
 
+DBCollection.prototype.aggregate = function( ops ) {
+    
+    var arr = ops;
+    
+    if ( ! ops.length ) {
+        arr = [];
+        for ( var i=0; i<arguments.length; i++ ) {
+            arr.push( arguments[i] )
+            printjson( arguments[0] )
+        }
+    }
+    
+    return this.runCommand( "aggregate" , { pipeline : arr } );
+}
+
 DBCollection.prototype.group = function( params ){
     params.ns = this._shortName;
     return this._db.group( params );
