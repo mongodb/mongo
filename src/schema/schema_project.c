@@ -309,9 +309,8 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 						    buf->size;
 						WT_RET(__pack_write(
 						    session, &pv, &p, len));
+						end = p;
 						buf->size += WT_STORE_SIZE(len);
-						end = (uint8_t *)buf->data +
-						    buf->size;
 					} else if (*proj == WT_PROJ_SKIP)
 						WT_RET(__unpack_read(session,
 						    &pv, (const uint8_t **)&p,
@@ -348,13 +347,13 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 				WT_RET(__wt_buf_grow(session,
 				    buf, buf->size + len - old_len));
 				p = (uint8_t *)buf->data + offset;
-				end = (uint8_t *)buf->data + buf->size + len;
 				/* Make room if we're inserting out-of-order. */
 				if (offset + old_len < buf->size)
 					memmove(p + len, p + old_len,
 					    buf->size - (offset + old_len));
 				WT_RET(__pack_write(session, &pv, &p, len));
-				buf->size += WT_STORE_SIZE(len);
+				buf->size += WT_STORE_SIZE(len - old_len);
+				end = (uint8_t *)buf->data + buf->size;
 				break;
 			default:
 				__wt_errx(session,
