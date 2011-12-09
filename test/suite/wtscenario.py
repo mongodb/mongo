@@ -87,6 +87,17 @@ def prune_scenarios(scenes):
         result.append(scene)
     return result
 
+def number_scenarios(scenes):
+    """
+    Add a 'scenario_number' variable to each scenario.
+    The hash table for each scenario is altered!
+    """
+    count = 0
+    for scene in scenes:
+        scene[1]['scenario_number'] = count
+        count += 1
+    return scenes
+
 def quick_scenarios(fieldname, values, probabilities):
     """
     Quickly build common scenarios, like:

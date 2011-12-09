@@ -120,6 +120,9 @@ class WiredTigerTestCase(unittest.TestCase):
         print '**** THIS TEST HAS A KNOWN FAILURE: ' + name + ' ****'
         self.skipTest('KNOWN FAILURE: ' + name)
 
+    def KNOWN_LIMITATION(self, name):
+        print '**** THIS TEST HAS A KNOWN LIMITATION: ' + name + ' ****'
+
     def pr(self, s):
         """
         print a progress line for testing
