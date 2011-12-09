@@ -613,25 +613,25 @@ __evict_dup_remove(WT_SESSION_IMPL *session)
 	elem = cache->evict_entries;
 	qsort(evict,
 	    (size_t)elem, sizeof(WT_EVICT_LIST), __evict_page_cmp);
-	for (i = 0; i < elem; i = j)
-		for (j = i + 1; j < elem; ++j) {
-			/*
-			 * If the leading pointer hits a NULL, we're done, the
-			 * NULLs all sorted to the top of the array.
-			 */
-			if (evict[j].page == NULL)
-				return;
+	for (i = 0; i < elem; i = j) {
+		/*
+		 * Once we hit a NULL, we're done, the NULLs all sorted to the
+		 * end of the array.
+		 */
+		if (evict[i].page == NULL)
+			break;
 
+		for (j = i + 1; j < elem; ++j) {
 			/* Delete the second and any subsequent duplicates. */
 			if (evict[i].page == evict[j].page)
 				__evict_clr(&evict[j]);
 			else
 				break;
 		}
+	}
 
 	/* Sort the array by LRU, then evict the most promising candidates. */
-	qsort(cache->evict, (size_t)cache->evict_entries,
-	    sizeof(WT_EVICT_LIST), __evict_lru_cmp);
+	qsort(cache->evict, elem, sizeof(WT_EVICT_LIST), __evict_lru_cmp);
 }
 
 /*
