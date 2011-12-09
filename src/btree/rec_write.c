@@ -2075,7 +2075,7 @@ static int
 __rec_row_leaf(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_SALVAGE_COOKIE *salvage)
 {
-	WT_BUF *tmp;
+	WT_BUF *tmpkey;
 	WT_CELL *cell, *val_cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_IKEY *ikey;
@@ -2089,7 +2089,7 @@ __rec_row_leaf(
 	int ovfl_key, ret;
 
 	r = session->reconcile;
-	tmp = NULL;
+	tmpkey = NULL;
 	unpack = &_unpack;
 	slvg_skip = salvage == NULL ? 0 : salvage->skip;
 	ret = 0;
@@ -2112,7 +2112,7 @@ __rec_row_leaf(
 	 * From this point on, we need to jump to the err label on error so the
 	 * buffer is discarded.
 	 */
-	WT_RET(__wt_scr_alloc(session, 0, &tmp));
+	WT_RET(__wt_scr_alloc(session, 0, &tmpkey));
 
 	/* For each entry in the page... */
 	WT_ROW_FOREACH(page, rip, i) {
@@ -2183,7 +2183,7 @@ __rec_row_leaf(
 				 * We skip creating the key, don't try to use
 				 * the last valid key in prefix calculations.
 				 */
-				tmp->size = 0;
+				tmpkey->size = 0;
 
 				goto leaf_insert;
 			}
@@ -2217,7 +2217,7 @@ __rec_row_leaf(
 			ovfl_key = 1;
 
 			/* Don't try to use a prefix across an overflow key. */
-			tmp->size = 0;
+			tmpkey->size = 0;
 		} else {
 			/*
 			 * If the key is already instantiated, use it.
@@ -2227,16 +2227,16 @@ __rec_row_leaf(
 			 * Else, instantiate the key.
 			 */
 			if (ikey != NULL) {
-				tmp->data = WT_IKEY_DATA(ikey);
-				tmp->size = ikey->size;
+				tmpkey->data = WT_IKEY_DATA(ikey);
+				tmpkey->size = ikey->size;
 			} else if (session->btree->huffman_key == NULL &&
 			    unpack->type == WT_CELL_KEY &&
 			    unpack->prefix == 0) {
-				tmp->data = unpack->data;
-				tmp->size = unpack->size;
+				tmpkey->data = unpack->data;
+				tmpkey->size = unpack->size;
 			} else if (session->btree->huffman_key == NULL &&
 			    unpack->type == WT_CELL_KEY &&
-			    tmp->size >= unpack->prefix) {
+			    tmpkey->size >= unpack->prefix) {
 				/*
 				 * If we previously built a prefix-compressed
 				 * key in the temporary buffer, WT_BUF->data
@@ -2253,20 +2253,21 @@ __rec_row_leaf(
 				 * into place.
 				 */
 				WT_ERR(__wt_buf_grow(session,
-				    tmp, unpack->prefix + unpack->size));
-				if (tmp->data != tmp->mem) {
-					memcpy(tmp->mem, tmp->data,
+				    tmpkey, unpack->prefix + unpack->size));
+				if (tmpkey->data != tmpkey->mem) {
+					memcpy(tmpkey->mem, tmpkey->data,
 					    unpack->prefix);
-					tmp->data = tmp->mem;
+					tmpkey->data = tmpkey->mem;
 				}
-				memcpy((uint8_t *)tmp->data + unpack->prefix,
+				memcpy((uint8_t *)tmpkey->data + unpack->prefix,
 				    unpack->data, unpack->size);
-				tmp->size = unpack->prefix + unpack->size;
+				tmpkey->size = unpack->prefix + unpack->size;
 			} else
-				WT_ERR(__wt_row_key(session, page, rip, tmp));
+				WT_ERR(
+				    __wt_row_key(session, page, rip, tmpkey));
 
 			WT_ERR(__rec_cell_build_key(
-			    session, tmp->data, tmp->size, 0, &ovfl_key));
+			    session, tmpkey->data, tmpkey->size, 0, &ovfl_key));
 		}
 
 		/*
@@ -2311,7 +2312,7 @@ leaf_insert:	/* Write any K/V pairs inserted into the page after this key. */
 	/* Write the remnant page. */
 	ret = __rec_split_finish(session);
 
-err:	__wt_scr_free(&tmp);
+err:	__wt_scr_free(&tmpkey);
 	return (ret);
 }
 
