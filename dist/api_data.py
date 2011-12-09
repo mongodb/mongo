@@ -108,7 +108,7 @@ file_meta = format_meta + [
 		min='512B', max='512MB'),
 	Config('internal_item_max', '0', r'''
 		the maximum key size stored on internal nodes, in bytes.  If zero, a
-		maximum is calculated to permit at least 10 keys per internal page''',
+		maximum is calculated to permit at least 8 keys per internal page''',
 		min=0),
 	Config('key_gap', '10', r'''
 		the maximum gap between instantiated keys in a Btree leaf page,
@@ -121,7 +121,8 @@ file_meta = format_meta + [
 		min='512B', max='512MB'),
 	Config('leaf_item_max', '0', r'''
 		the maximum key or value size stored on leaf nodes, in bytes.  If zero,
-		a size is calculated to permit at least 5 records per leaf page.''',
+		a size is calculated to permit at least 8 items (values or row store
+		keys) per leaf page''',
 		min=0),
 	Config('prefix_compression', 'true', r'''
 		the Btree for prefix compression, storing keys as a count of
@@ -320,7 +321,7 @@ methods = {
 		prefix string for error messages'''),
 	Config('eviction_target', '80', r'''
 		continue evicting until the cache becomes less full than this (as a
-		percentage).  Must be less than \c eviction_trigger.''',
+		percentage).  Must be less than \c eviction_trigger''',
 		min=10, max=99),
 	Config('eviction_trigger', '95', r'''
 		trigger eviction when the cache becomes this full (as a percentage)''',

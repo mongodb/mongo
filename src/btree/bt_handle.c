@@ -603,18 +603,6 @@ __btree_page_sizes(WT_SESSION_IMPL *session, const char *config)
 	    session, config, "leaf_item_max", &cval));
 	btree->maxleafitem = (uint32_t)cval.val;
 
-	/*
-	 * Limit allocation units to 128MB, and page sizes to 512MB.  There's
-	 * no reason we couldn't support larger sizes (any sizes up to the
-	 * smaller of an off_t and a size_t should work), but an application
-	 * specifying larger allocation or page sizes would likely be making
-	 * as mistake.  The API checked this, but we assert it anyway.
-	 */
-	WT_ASSERT(session, btree->allocsize >= WT_BTREE_ALLOCATION_SIZE_MIN);
-	WT_ASSERT(session, btree->allocsize <= WT_BTREE_ALLOCATION_SIZE_MAX);
-	WT_ASSERT(session, btree->maxintlpage <= WT_BTREE_PAGE_SIZE_MAX);
-	WT_ASSERT(session, btree->maxleafpage <= WT_BTREE_PAGE_SIZE_MAX);
-
 	/* Allocation sizes must be a power-of-two, nothing else makes sense. */
 	if (!__wt_ispo2(btree->allocsize)) {
 		__wt_errx(
@@ -653,14 +641,6 @@ __btree_page_sizes(WT_SESSION_IMPL *session, const char *config)
 		    btree->maxintlitem = intl_split_size / 8;
 	if (btree->maxleafitem == 0)
 		    btree->maxleafitem = leaf_split_size / 8;
-
-	/*
-	 * The API limits the minimum overflow size, but just in case: we'd fail
-	 * horribly if the overflow limit was smaller than an overflow chunk.
-	 */
-	WT_ASSERT(session, btree->maxintlitem > sizeof(WT_OFF) + 10);
-	WT_ASSERT(session, btree->maxleafitem > sizeof(WT_OFF) + 10);
-
 	/* Check we can fit at least 2 items on a page. */
 	if (btree->maxintlitem > btree->maxintlpage / 2)
 		return (pse1(session, "internal",
@@ -680,6 +660,25 @@ __btree_page_sizes(WT_SESSION_IMPL *session, const char *config)
 	if (btree->maxleafitem > leaf_split_size / 2)
 		return (pse2(session, "leaf",
 		    btree->maxleafpage, btree->maxleafitem, split_pct));
+
+	/*
+	 * Limit allocation units to 128MB, and page sizes to 512MB.  There's
+	 * no reason we couldn't support larger sizes (any sizes up to the
+	 * smaller of an off_t and a size_t should work), but an application
+	 * specifying larger allocation or page sizes would likely be making
+	 * as mistake.  The API checked this, but we assert it anyway.
+	 */
+	WT_ASSERT(session, btree->allocsize >= WT_BTREE_ALLOCATION_SIZE_MIN);
+	WT_ASSERT(session, btree->allocsize <= WT_BTREE_ALLOCATION_SIZE_MAX);
+	WT_ASSERT(session, btree->maxintlpage <= WT_BTREE_PAGE_SIZE_MAX);
+	WT_ASSERT(session, btree->maxleafpage <= WT_BTREE_PAGE_SIZE_MAX);
+
+	/*
+	 * The API limits the minimum overflow size, but just in case: we'd fail
+	 * horribly if the overflow limit was smaller than an overflow chunk.
+	 */
+	WT_ASSERT(session, btree->maxintlitem > sizeof(WT_OFF) + 10);
+	WT_ASSERT(session, btree->maxleafitem > sizeof(WT_OFF) + 10);
 
 	return (0);
 }
