@@ -64,6 +64,11 @@ AC_C_BIGENDIAN
 # Is there a link to a BDB tree that we can use for test/format?
 AM_CONDITIONAL([HAVE_BDB], [test -d ../test/format && test -e db])
 
+# Warn that diagnostic builds should not be used in production
+if test "$wt_cv_enable_diagnostic" = "yes"; then
+	AC_MSG_WARN([DIAGNOSTIC BUILDS ARE NOT RECOMMENDED FOR PRODUCTION DEPLOYMENT.])
+fi
+
 # Output files
 AC_CONFIG_HEADERS([wiredtiger_config.h:build_posix/config.hin])
 
