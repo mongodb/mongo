@@ -1688,8 +1688,7 @@ rs._runCmd = function (c) {
     return res;
 }
 rs.reconfig = function (cfg, options) {
-    if( cfg.version == undefined )
-        cfg.version = rs.conf().version + 1;
+    cfg.version = rs.conf().version + 1;
     cmd = { replSetReconfig: cfg };
     for (var i in options) {
         cmd[i] = options[i];
