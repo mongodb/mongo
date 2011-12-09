@@ -67,6 +67,9 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	TAILQ_REMOVE(&__wt_process.connqh, conn, q);
 	__wt_spin_unlock(session, &__wt_process.spinlock);
 
+	__wt_spin_destroy(session, &conn->serial_lock);
+	__wt_spin_destroy(session, &conn->spinlock);
+
 	/* Free allocated memory. */
 	__wt_free(session, conn->home);
 	__wt_free(session, conn->sessions);

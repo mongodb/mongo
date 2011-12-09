@@ -24,6 +24,13 @@ __wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 }
 
 static inline void
+__wt_spin_destroy(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
+{
+	WT_UNUSED(session);
+	WT_UNUSED(t);
+}
+
+static inline void
 __wt_spin_lock(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 {
 	WT_UNUSED(session);
@@ -57,6 +64,14 @@ __wt_spin_init(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
 	WT_UNUSED(session);
 
 	(void)pthread_mutex_init(t, NULL);
+}
+
+static inline void
+__wt_spin_destroy(WT_SESSION_IMPL *session, WT_SPINLOCK *t)
+{
+	WT_UNUSED(session);
+
+	(void)pthread_mutex_destroy(t);
 }
 
 static inline void

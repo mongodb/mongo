@@ -98,6 +98,7 @@ __wt_cache_destroy(WT_CONNECTION_IMPL *conn)
 
 	if (cache->evict_cond != NULL)
 		(void)__wt_cond_destroy(session, cache->evict_cond);
+	__wt_spin_destroy(session, &cache->lru_lock);
 
 	__wt_free(session, cache->evict_request);
 	__wt_free(session, conn->cache);

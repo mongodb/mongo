@@ -556,6 +556,7 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	__wt_btree_huffman_close(session);
 	__wt_free(session, btree->stats);
 
+	__wt_spin_destroy(session, &btree->freelist_lock);
 	WT_TRET(__wt_rwlock_destroy(session, btree->rwlock));
 	__wt_free(session, session->btree);
 
