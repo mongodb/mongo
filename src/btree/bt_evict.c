@@ -786,5 +786,15 @@ __evict_lru_cmp(const void *a, const void *b)
 	/* Sort the LRU in ascending order. */
 	a_lru = a_page->read_gen;
 	b_lru = b_page->read_gen;
+
+	/*
+	 * Bias in favor of leaf pages.  Otherwise, we can waste time
+	 * considering parent pages for eviction while their child pages are
+	 * still in memory.
+	 */
+	if (a_page->type == WT_PAGE_ROW_INT || a_page->type == WT_PAGE_COL_INT)
+		a_lru += WT_EVICT_WALK_BASE;
+	if (b_page->type == WT_PAGE_ROW_INT || b_page->type == WT_PAGE_COL_INT)
+		b_lru += WT_EVICT_WALK_BASE;
 	return (a_lru > b_lru ? 1 : (a_lru < b_lru ? -1 : 0));
 }
