@@ -456,13 +456,16 @@ namespace mongo {
 
                     for (set<Shard>::iterator it=shards.begin(), end=shards.end(); it != end; ++it) {
                         ShardConnection conn(*it, fullns);
-                        if ( conn.setVersion() ) {
-                            total = 0;
-                            shardCounts.clear();
-                            cm = conf->getChunkManagerIfExists( fullns );
-                            conn.done();
-                            hadToBreak = true;
-                            break;
+                        if ( conn.setVersion() ){
+                            ChunkManagerPtr newCM = conf->getChunkManagerIfExists( fullns );
+                            if( newCM->getVersion() != cm->getVersion() ){
+                                cm = newCM;
+                                total = 0;
+                                shardCounts.clear();
+                                conn.done();
+                                hadToBreak = true;
+                                break;
+                            }
                         }
 
                         BSONObj temp;
