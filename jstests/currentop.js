@@ -16,7 +16,7 @@ s2 = startParallelShell( "db.jstests_currentop.update( { '$where': function() { 
 
 o = [];
 assert.soon( function() {
-    o = ops({});
+    o = ops({ "ns": "test.jstests_currentop" });
 
     var writes = ops({ "lockType": "write", "ns": "test.jstests_currentop" }).length;
     var reads = ops({ "lockType": "read", "ns": "test.jstests_currentop" }).length;
