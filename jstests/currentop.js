@@ -5,6 +5,8 @@ t.drop();
 for(i=0;i<100;i++) {
     t.save({ "num": i });
 }
+// Make sure data is written before we start reading it in parallel shells.
+db.getLastError();
 
 function ops(q) {
     return db.currentOp(q).inprog;
