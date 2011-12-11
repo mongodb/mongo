@@ -75,7 +75,7 @@ namespace mongo {
         case dbUpdate:
         case dbInsert:
         case dbDelete:
-            return false;
+            return true;
 
         default:
             PRINT(op);
