@@ -79,12 +79,11 @@ namespace mongo {
 	      come out of this pipeline operator.
 	     */
 	    intrusive_ptr<Document> pCurrent(pInDocument);
-	    const size_t nField = pCurrent->getFieldCount();
 	    const size_t pathLength = unwindPath.getPathLength();
 	    for(size_t i = 0; i < pathLength; ++i) {
 		size_t idx = pCurrent->getFieldIndex(
 		    unwindPath.getFieldName(i));
-		if (idx == nField) {
+		if (idx == pCurrent->getFieldCount() ) {
 		    /* this document doesn't contain the target field */
 		    resetArray();
 		    return pInDocument;
