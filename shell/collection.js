@@ -585,7 +585,6 @@ DBCollection.prototype.aggregate = function( ops ) {
         arr = [];
         for ( var i=0; i<arguments.length; i++ ) {
             arr.push( arguments[i] )
-            printjson( arguments[0] )
         }
     }
     
