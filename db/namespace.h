@@ -540,8 +540,10 @@ namespace mongo {
 
     inline NamespaceDetailsTransient& NamespaceDetailsTransient::get_inlock(const char *ns) {
         std::map< string, shared_ptr< NamespaceDetailsTransient > >::iterator i = _nsdMap.find(ns);
-        if( i != _nsdMap.end() ) 
+        if( i != _nsdMap.end() && 
+            i->second.get() ) { // could be null ptr from clearForPrefix
             return *i->second;
+        }
         return make_inlock(ns);
     }
 
