@@ -204,7 +204,7 @@ namespace mongo {
         void unlock_shared() {
             int s = _state.get();
             if( s > 0 ) {
-                assert( s > 1 ); /* we must have done a lock write first to have s > 1 */
+                wassert( s > 1 ); /* we must have done a lock write first to have s > 1 */
                 _state.set(s-1);
                 return;
             }
@@ -212,7 +212,7 @@ namespace mongo {
                 _state.set(s+1);
                 return;
             }
-            assert( s == -1 );
+            wassert( s == -1 );
             _state.set(0);
             _m.unlock_shared();
         }
@@ -303,6 +303,8 @@ namespace mongo {
             );
         }
     };
+    // eventually rename fully
+    typedef readlock GlobalSharedLock;
 
     struct readlocktry {
         readlocktry( const string&ns , int tryms ) {

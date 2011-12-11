@@ -211,6 +211,7 @@
     <ClCompile Include="..\util\intrusive_counter.cpp" />
     <ClCompile Include="..\util\systeminfo_win32.cpp" />
     <ClCompile Include="commands\document_source_cursor.cpp" />
+    <ClCompile Include="d_concurrency.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\dbclientcursor.h" />

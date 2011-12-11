@@ -37,6 +37,18 @@ namespace mongo {
         void unlock() { RWLockBase::unlock(); }
         void lock_shared() { RWLockBase::lock_shared(); }
         void unlock_shared() { RWLockBase::unlock_shared(); }
+        class Shared : boost::noncopyable {
+            SimpleRWLock& _r;
+        public:
+            Shared(SimpleRWLock& rwlock) : _r(rwlock) {_r.lock_shared(); }
+            ~Shared() { _r.unlock_shared(); }
+        };
+        class Exclusive : boost::noncopyable {
+            SimpleRWLock& _r;
+        public:
+            Exclusive(SimpleRWLock& rwlock) : _r(rwlock) {_r.lock(); }
+            ~Exclusive() { _r.unlock(); }
+        };
     };
 
     class RWLock : public RWLockBase { 
@@ -103,7 +115,7 @@ namespace mongo {
                     _r.unlockFromUpgradable();
                 }
                 else {
-//TEMP                     assert( _r.x == Exclusive ); // has been upgraded
+                    //TEMP                     assert( _r.x == Exclusive ); // has been upgraded
                     _r.x = NilState;
                     _r.unlock();
                 }

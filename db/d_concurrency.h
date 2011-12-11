@@ -3,36 +3,33 @@
 #pragma once
 
 #include "../util/concurrency/rwlock.h"
+#include "db/mongomutex.h"
 
 namespace mongo {
 
-    class HLock { 
+    class LockCollectionForReading { 
+        struct Locks { 
+            Locks(string ns);
+            GlobalSharedLock gslk;
+            rwlock_shared clk;
+        };
+        scoped_ptr<Locks> locks;
     public:
-        HLock(int level, HLock *parent);
-        struct writelock { 
-            writelock(HLock&);
-            ~writelock();
-        private: 
-            HLock& h;
-            bool already;
+        LockCollectionForReading(string coll);
+        ~LockCollectionForReading();
+    };
+
+    class LockCollectionForWriting {
+        struct Locks { 
+            Locks(string ns);
+            SimpleRWLock::Shared excluder;
+            GlobalSharedLock gslk;
+            rwlock clk;
         };
-        struct readlock { 
-            readlock(HLock&); 
-            ~readlock();
-        private:
-            HLock& h; int nToLock;
-        };
-        struct TLS { 
-            TLS(); ~TLS(); int x;
-        };
-    private:
-        void hlock();
-        void hunlock();
-        void hlockShared(int n);
-        void hunlockShared(int n);
-        HLock * const parent;
-        RWLock r;
-        const int level; // 1=global, 2=db, 3=collection
+        scoped_ptr<Locks> locks;
+    public:
+        LockCollectionForWriting(string db);
+        ~LockCollectionForWriting();
     };
 
     // CLC turns on the "collection level concurrency" code which is under development

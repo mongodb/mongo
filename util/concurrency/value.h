@@ -130,7 +130,7 @@ namespace mongo {
         struct ref {
             SimpleMutex::scoped_lock lk;
         public:
-            map<K,V> const &r;
+            map<K,V> &r;
             ref(mapsf<K,V> &m) : lk(m.m), r(m.val) { }
             V& operator[](const K& k) { return r[k]; }
         };

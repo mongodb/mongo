@@ -167,25 +167,6 @@ namespace mongo {
     BSONObj CachedBSONObj::_tooBig = fromjson("{\"$msg\":\"query not recording (too large)\"}");
     AtomicUInt CurOp::_nextOpNum;
 
-    /** true if this is "under" the parent collection. indexes are that way. i.e. for a db foo, 
-        foo.mycoll can be thought of as a parent of foo.mycoll.$someindex collection.
-        */
-    bool subcollectionOf(const string& parent, const char *child) { 
-        return parent == child || 
-            ( strlen(child) > parent.size() && child[parent.size()] == '.'  );
-    }
-
-#if defined(CLC)
-    void Client::checkLocks() const {
-        if( lockStatus.collLockCount ) {
-            assert( ns() == 0 || subcollectionOf(lockStatus.whichCollection, ns()) );
-        }
-        else if( lockStatus.dbLockCount ) { 
-            assert( lockStatus.whichDB == database() || database() == 0 );
-        }
-    }
-#endif
-
     Client::Context::Context( string ns , Database * db, bool doauth ) :
         _client( currentClient.get() ), 
         _oldContext( _client->_context ),
@@ -217,7 +198,7 @@ namespace mongo {
      */
     Client::ReadContext::ReadContext(const string& ns, string path, bool doauth ) {
         {
-            lk.reset( new readlock() );
+            lk.reset( new _LockCollectionForReading(ns) );
             Database *db = dbHolder().get(ns, path);
             if( db ) {
                 c.reset( new Context(path, ns, db, doauth) );
@@ -240,7 +221,7 @@ namespace mongo {
                     Context c(ns, path, doauth);
                 }
                 // db could be closed at this interim point -- that is ok, we will throw, and don't mind throwing.
-                lk.reset( new readlock() );
+                lk.reset( new _LockCollectionForReading(ns) );
                 c.reset( new Context(ns, path, doauth) );
             }
             else { 

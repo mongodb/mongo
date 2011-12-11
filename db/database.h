@@ -139,7 +139,6 @@ namespace mongo {
         int profile; // 0=off.
         const string profileName; // "alleyinsider.system.profile"
         CCByLoc ccByLoc;
-        HLock h;
         int magic; // used for making sure the object is still loaded in memory
     };
 

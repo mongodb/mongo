@@ -620,14 +620,12 @@ namespace mongo {
     // that is NOT handled here yet!  TODO
     // repair may not use nsdt though not sure.  anyway, requires work.
     NamespaceDetailsTransient::NamespaceDetailsTransient(Database *db, const char *ns) : 
-        database(db), 
-        h(3,&db->h), _ns(ns), _keysComputed(false), _qcWriteCount() 
+        _ns(ns), _keysComputed(false), _qcWriteCount() 
     {
         dassert(db);
     }
 
     NamespaceDetailsTransient::~NamespaceDetailsTransient() { 
-        DEV wassert( database->isOk() );
     }
     
     void NamespaceDetailsTransient::clearForPrefix(const char *prefix) {

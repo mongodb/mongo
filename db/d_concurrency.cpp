@@ -4,205 +4,123 @@
 #include "d_concurrency.h"
 #include "../util/concurrency/threadlocal.h"
 #include "../util/concurrency/rwlock.h"
+#include "../util/concurrency/value.h"
 #include "../util/assert_util.h"
 #include "client.h"
 
+// we will use the global write lock for writing to system.* collections for simplicity 
+// for now; this has some advantages in speed as we don't need to latch just for that then; 
+// also there are cases to be handled carefully otherwise such as namespacedetails methods
+// reaching into system.indexes implicitly
+// 
+// exception : system.profile
+
+// oplog locking
+// ...
+
 namespace mongo {
 
+    /** we want to be able to block any attempted write while allowing reads; additionally 
+        force non-greedy acquisition so that reads can continue -- 
+        that is, disallow greediness of write lock acquisitions.  This is for that purpose.  The 
+        #1 need is by groupCommitWithLimitedLocks() but useful elsewhere such as for lock and fsync.
+    */
     SimpleRWLock writeExcluder;
 
-    // kept in cc()...
-    HLock::TLS::TLS() { 
-        x = 0;
-    }
-    HLock::TLS::~TLS() { 
-        wassert( x == 0 );
+    Client::LockStatus::LockStatus() { 
+        coll = 0;
     }
 
-    HLock::HLock(int l, HLock *p) : 
-        level(l), parent(p), r(0)
-    {
-        dassert(level>0);
-    }
-    void HLock::hlockShared(int n) {
-        if( --n > 0 ) {
-            assert(parent);
-            parent->hlockShared(n);
-        }
-        r.lock_shared();
-    }
-    void HLock::hunlockShared(int n) {
-        r.unlock_shared();
-        if( --n > 0 ) {
-            assert(parent);
-            parent->hunlockShared(n);
-        }
-    }
-
-    HLock::readlock::readlock(HLock& _h) : h(_h) { 
-        int& x = cc().hlockInfo.x;
-        nToLock = h.level - x;
-        if( nToLock <= 0 ) 
-            return;
-        x += nToLock;
-        dassert( x == h.level );
-        h.hlockShared(nToLock);
-    }
-    HLock::readlock::~readlock() { 
-        if( nToLock > 0 )
-            h.hunlockShared(nToLock);
-    }
-
-#if defined(CLC)   
-
-    HLock::readlocktry::readlocktry(int ms) {
-        already = cc().readLocked || cc().writeLocked;
-        if( !already ) { 
-            ok = h.hlockSharedTry();
-        }
-    }
-
-    HLock::writelock::writelock(HLock& _h) : h(_h) { 
-        assert( !cc().readLocked );
-        already = cc().writeLocked;
-        if( !already ) {
-            h.lock();
-            cc().writeLocked=true;
-        }
-    }
-    HLock::writelock::~writelock() { 
-        if( !already ) {
-            cc().writeLocked=false;
-            h.hunlock();
-        }
-    }
-
-    void HLock::hlockShared() {
-        if( parent ) 
-            parent->hlockShared();
-        r.lock_shared();
-    }
-    void HLock::hunlockShared() {
-        r.unlock_shared();
-        if( parent )
-            parent->hunlockShared();
-    }
-
-    /*
-    bool HLock::hlockSharedTry(int ms) {
-        if( parent && !parent->hlockSharedTry(ms) ) {
+    bool subcollectionOf(const string& parent, const char *child) {
+        if( parent == child ) 
+            return true;
+        if( !str::startsWith(child, parent) )
             return false;
-        }
-        bool ok = r.lock_shared_try(ms);
-        if( !ok ) {
-            parent->hunlockShared();
-        }
-        return ok;
-    }
-    */
-
-    void HLock::hlock() {
-        writeExcluder.lock_shared();
-        if( parent )
-            parent->hlockShared();
-        r.lock();
-    }
-    void HLock::hunlock() { 
-        r.unlock();
-        if( parent ) 
-            parent->hunlockShared();
-        writeExcluder.unlock_shared();
+        const char *p = child + parent.size();
+        return *p == '.' && p[1] == '$';
     }
 
-#if 0
-    LockDatabaseSharable::LockDatabaseSharable() {
-        Client& c = cc();
-        Client::LockStatus& s = c.lockStatus;
-        already = false;
-        if( dbMutex.isWriteLocked() ) {
-            already = true;
-            assert( s.dbLockCount == 0 );
-            return;
-        }
-        Database *db = c.database();
-        assert( db );
-        if( s.dbLockCount == 0 ) {
-            s.whichDB = db;
-            db->dbLock.lock_shared();
-        }
-        else {
-            // recursed
-            massert( 15919, "wrong database while locking", db == s.whichDB);
-        }
-        s.dbLockCount--; // < 0 means sharable
-    }
-
-    LockDatabaseSharable::~LockDatabaseSharable() { 
-        if( already ) 
-            return;
-        Client& c = cc();
-        Client::LockStatus& s = c.lockStatus;
-        if( c.database() == 0 ) { 
-            wassert(false);
-            return;
-        }
-        if( c.database() != s.whichDB ) { 
-            DEV error() << "~LockDatabaseSharable wrong db context " << c.database() << ' ' << s.whichDB << endl;
-            wassert(false);
-        }
-        wassert( s.dbLockCount < 0 );
-        if( ++s.dbLockCount == 0 ) { 
-            c.database()->dbLock.unlock_shared();
-        }
-    }
-
-    bool subcollectionOf(const string& parent, const char *child);
-
-    /** notes
-        note if we r and w lock arbitarily with nested rwlocks we can deadlock. so we avoid this.
-        also have to be careful about any throws in things like this
-    */
-    LockCollectionForReading::LockCollectionForReading(const char *ns)
-    {
-        Client& c = cc();
-        Client::LockStatus& s = c.lockStatus;
-        assert( c.ns() && ns && str::equals(c.ns(),ns) );
-        already = false;
-        if( dbMutex.isWriteLocked() || s.dbLockCount > 0 ) { 
-            // already locked exclusively at a higher level in the hierarchy
-            already = true;
-            assert( s.collLockCount == 0 );
-            return;
-        }
-
-        if( s.collLockCount == 0 ) {
-            s.whichCollection = ns;
-            s.collLock.lock_shared();
-        }
-        else {
-            // must be the same ns or a child ns
-            assert( subcollectionOf(s.whichCollection, ns) );
-            if( s.whichCollection != ns ) {
-                DEV log() << "info lock on nested ns: " << ns << endl;
+    // we don't keep these locks in the namespacedetailstransient and Database 
+    // objects -- that makes things safer as we need not prove to ourselves that they 
+    // are always in scope when we need them.
+    // todo: we don't clean these locks up yet.
+    // todo: avoiding the mutex here might be nice.
+    class TheLocks {
+        //mapsf<string,RWLock*> dblocks;
+        mapsf<string,RWLock*> nslocks;
+    public:
+        /*RWLock& fordb(string db) { 
+            mapsf<string,RWLock*>::ref r(dblocks);
+            RWLock*& rw = r[db];
+            if( rw == 0 )
+                rw = new RWLock(0);
+            return *rw;
+        }*/
+        RWLock& forns(string ns) { 
+            mapsf<string,RWLock*>::ref r(nslocks);
+            RWLock*& rw = r[ns];
+            if( rw == 0 ) { 
+                rw = new RWLock(0);
             }
+            return *rw;
         }
-        s.collLockCount--; // < 0 means sharable state
-    }
+    } theLocks;
 
-    LockCollectionForReading::~LockCollectionForReading() { 
-        if( already ) 
+    LockCollectionForWriting::Locks::Locks(string ns) : 
+        excluder(writeExcluder),
+        gslk(),
+        clk(theLocks.forns(ns),true)
+    { }
+    LockCollectionForWriting::~LockCollectionForWriting() { 
+        if( locks.get() ) {
+            Client::LockStatus& s = cc().lockStatus;
+            s.whichCollection.clear();
+            s.coll--;
+        }
+    }
+    LockCollectionForWriting::LockCollectionForWriting(string coll)
+    {
+        Client::LockStatus& s = cc().lockStatus;
+        if( !s.whichCollection.empty() ) {
+            if( !subcollectionOf(s.whichCollection, coll.c_str()) ) { 
+                massert(0, str::stream() << "can't nest lock of " << coll << " beneath " << s.whichCollection, false);
+            }
+            massert(0, "want collection write lock but it is already read locked", s.coll > 0);
             return;
-        Client& c = cc();
-        Client::LockStatus& s = c.lockStatus;
-        wassert( c.ns() && s.whichCollection == c.ns() );
-        wassert( s.collLockCount < 0 );
-        if( ++s.collLockCount == 0 ) { 
-            s.collLock.unlock_shared();
+        }
+        s.whichCollection = coll;
+        dassert( s.coll == 0 );
+        s.coll++;
+        locks.reset( new Locks(coll) );
+    }    
+
+    LockCollectionForReading::Locks::Locks(string ns) : 
+      gslk(),
+      clk( theLocks.forns(ns) ) 
+    { }
+    LockCollectionForReading::~LockCollectionForReading() {
+        Client::LockStatus& s = cc().lockStatus;
+        dassert( !s.whichCollection.empty() );
+        if( locks.get() ) {
+            s.whichCollection.clear();
+            s.coll++;
+            wassert( s.coll == 0 );
         }
     }
-
-#endif
-
-#endif
+    LockCollectionForReading::LockCollectionForReading(string coll)
+    {
+        Client::LockStatus& s = cc().lockStatus;
+        if( !s.whichCollection.empty() ) {
+            if( !subcollectionOf(s.whichCollection, coll.c_str()) ) { 
+                massert(0, str::stream() << "can't nest lock of " << coll << " beneath " << s.whichCollection, false);
+            }
+            // already locked, so done; might have been a write lock.
+            return;
+        }
+        s.whichCollection = coll; 
+        dassert( s.coll == 0 );
+        s.coll--;
+        locks.reset( new Locks(coll) );
+    }
 
 }
