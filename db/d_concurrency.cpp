@@ -83,9 +83,9 @@ namespace mongo {
         Client::LockStatus& s = cc().lockStatus;
         if( !s.whichCollection.empty() ) {
             if( !subcollectionOf(s.whichCollection, coll.c_str()) ) { 
-                massert(0, str::stream() << "can't nest lock of " << coll << " beneath " << s.whichCollection, false);
+                massert(15937, str::stream() << "can't nest lock of " << coll << " beneath " << s.whichCollection, false);
             }
-            massert(0, "want collection write lock but it is already read locked", s.coll > 0);
+            massert(15938, "want collection write lock but it is already read locked", s.coll > 0);
             return;
         }
         s.whichCollection = coll;
@@ -112,7 +112,7 @@ namespace mongo {
         Client::LockStatus& s = cc().lockStatus;
         if( !s.whichCollection.empty() ) {
             if( !subcollectionOf(s.whichCollection, coll.c_str()) ) { 
-                massert(0, str::stream() << "can't nest lock of " << coll << " beneath " << s.whichCollection, false);
+                massert(15939, str::stream() << "can't nest lock of " << coll << " beneath " << s.whichCollection, false);
             }
             // already locked, so done; might have been a write lock.
             return;
