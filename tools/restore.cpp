@@ -362,6 +362,28 @@ private:
         return obj;
     }
 
+    // Compares 2 BSONObj representing collection options. Returns true if the objects
+    // represent different options. Ignores the "create" field.
+    bool optionsSame(BSONObj obj1, BSONObj obj2) {
+        int nfields = 0;
+        BSONObjIterator i(obj1);
+        while ( i.more() ) {
+            BSONElement e = i.next();
+            if (!obj2.hasField(e.fieldName())) {
+                if (strcmp(e.fieldName(), "create") == 0) {
+                    continue;
+                } else {
+                    return false;
+                }
+            }
+            nfields++;
+            if (e != obj2[e.fieldName()]) {
+                return false;
+            }
+        }
+        return nfields == obj2.nFields();
+    }
+
     void createCollectionWithOptions(BSONObj cmdObj) {
         if (!cmdObj.hasField("create") || cmdObj["create"].String() != _curcoll) {
             BSONObjBuilder bo;
@@ -382,13 +404,25 @@ private:
             cmdObj = bo.obj();
         }
 
+        BSONObj fields = BSON("options" << 1);
+        scoped_ptr<DBClientCursor> cursor(conn().query(_curdb + ".system.namespaces", Query(BSON("name" << _curns)), 0, 0, &fields));
+
+        bool createColl = true;
+        if (cursor->more()) {
+            createColl = false;
+            BSONObj obj = cursor->next();
+            if (!obj.hasField("options") || !optionsSame(cmdObj, obj["options"].Obj())) {
+                    out() << "WARNING: collection " << _curns << " exists with different options than are in the metadata.json file and not using --drop. Options in the metadata file will be ignored." << endl;
+            }
+        }
+
+        if (!createColl) {
+            return;
+        }
+
         BSONObj info;
         if (!conn().runCommand(_curdb, cmdObj, info)) {
-            if (info["errmsg"].String() == "collection already exists") {
-                out() << "Couldn't create collection " << _curns << " because it already exists. Collection options will not be added" << endl;
-            } else {
-                uasserted(15936, "Creating collection " + _curns + " failed. Errmsg: " + info["errmsg"].String());
-            }
+            uasserted(15936, "Creating collection " + _curns + " failed. Errmsg: " + info["errmsg"].String());
         } else {
             out() << "\tCreated collection " << _curns << " with options: " << cmdObj.jsonString() << endl;
         }
