@@ -7,6 +7,9 @@ secondary = s.getOther( primary ).getDB( "test" );
 
 numObjs = 20;
 
+// Turn balancer off - with small numbers of chunks the balancer tries to correct all imbalances, not just < 8
+s.s.getDB( "config" ).settings.update({ _id : "balancer" }, { $set : { stopped : true } }, true )
+
 s.adminCommand( { shardcollection : "test.stuff"  , key : {_id:1} } );
 
 // pre-split the collection so to avoid interference from balancer
