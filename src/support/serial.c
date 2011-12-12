@@ -10,7 +10,7 @@
 /*
  * Serialization: serialization support allows scheduling operations requiring
  * serialized access to a piece of memory, normally by a different thread of
- * control.  This updating and evicting pages from trees.
+ * control.  This includes updating and evicting pages from trees.
  *
  * __wt_session_serialize_func --
  *	Schedule a serialization request, and block or spin until it completes.
