@@ -33,8 +33,8 @@ namespace mongo {
         string s = cmdObj.firstElement().valuestr();
         NamespaceString nss(s);
         // these are for security, do not remove:
-        verify(15940, dbname == nss.db || dbname == "admin" );
-        verify(15941, !nss.db.empty() );
+        verify(15966, dbname == nss.db || dbname == "admin" );
+        verify(15962, !nss.db.empty() );
         return s;
     }
 

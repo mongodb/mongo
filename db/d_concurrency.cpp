@@ -23,7 +23,7 @@ namespace mongo {
         if( !str::startsWith(child, parent) )
             return false;
         const char *p = child + parent.size();
-        uassert(15942, str::stream() << "bad collection name: " << child, !str::endsWith(p, '.'));
+        uassert(15963, str::stream() << "bad collection name: " << child, !str::endsWith(p, '.'));
         return *p == '.' && p[1] == '$';
     }
 
@@ -96,7 +96,7 @@ namespace mongo {
         RWLock& forns(string ns) { 
             mapsf<string,RWLock*>::ref r(nslocks);
 #if defined(CLC)
-            massert(15943, str::stream() << "bad collection name to lock: " << ns, str::contains(ns, '.'));
+            massert(15964, str::stream() << "bad collection name to lock: " << ns, str::contains(ns, '.'));
 #endif
             RWLock*& rw = r[ns];
             if( rw == 0 ) { 
@@ -128,7 +128,7 @@ namespace mongo {
             massert(15938, "want collection write lock but it is already read locked", s.coll > 0);
             return;
         }
-        verify(15944, !lkspecial(coll)); // you must global write lock for writes to special's
+        verify(15965, !lkspecial(coll)); // you must global write lock for writes to special's
         s.whichCollection = coll;
         dassert( s.coll == 0 );
         s.coll++;
