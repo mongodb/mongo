@@ -26,19 +26,7 @@ __wt_cache_read(
 	size = ref->size;
 	ret = 0;
 
-	/* Review the possible page states. */
-	switch (ref->state) {
-	case WT_REF_DISK:
-	case WT_REF_READING:
-		/* Page is on disk, and that's our problem.  Read it. */
-		break;
-	case WT_REF_MEM:
-		/* Page is in memory, must have already been read. */
-		return (0);
-	case WT_REF_LOCKED:
-		/* Page being considered for eviction: not our problem. */
-		return (0);
-	}
+	WT_ASSERT(session, ref->state = WT_REF_READING);
 
 	/*
 	 * The page isn't in the cache, and since we're the only path for the
