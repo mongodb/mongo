@@ -244,30 +244,29 @@ struct __wt_page {
  * A single in-memory page and the state information used to determine if it's
  * OK to dereference the pointer to the page.
  *
- * Synchronization is based on the WT_REF->state field, which has 3 states:
+ * Synchronization is based on the WT_REF->state field, which has 4 states:
  *
  * WT_REF_DISK:
- *      The default setting before any pages are brought into memory, and set
- *	by the eviction server after page reconciliation (when the page has
- *	been discarded or written to disk, and remains backed by the disk);
- *	the page is on disk, and needs to be read into memory before use.
+ *      The initial setting before a page is brought into memory, and set as
+ *	a result of page eviction; the page is on disk, and must be read into
+ *	into memory before use.
  * WT_REF_LOCKED:
- *	Set by eviction; an eviction thread has selected this page
- *	for eviction and is checking hazard references.
+ *	Set by eviction; an eviction thread has selected this page for eviction;
+ *	once hazard references are checked, the page will be evicted.
  * WT_REF_MEM:
- *	Set by a reading thread when the page is read from disk; the page is
- *	in the cache and the page reference is OK.
+ *	Set by a reading thread once the page has been read from disk; the page
+ *	is in the cache and the page reference is OK.
  * WT_REF_READING:
  *	Set by a reading thread before reading a page from disk; other readers
  *	of the page wait until the read completes.
  *
  * The life cycle of a typical page goes like this: pages are read into memory
- * from disk and their state set to WT_REF_MEM.  When the the page is selected
- * for eviction, the page state is set to WT_REF_LOCKED.  In all cases, an
- * evicting thread resets the page's state when it's finished with the page: if
- * eviction was successful (a clean page was simply discarded, and a dirty page
- * was written to disk), the page state is set to WT_REF_DISK; if eviction
- * failed because the page was busy, the page state is reset to WT_REF_MEM.
+ * from disk and their state set to WT_REF_MEM.  When the page is selected for
+ * eviction, the page state is set to WT_REF_LOCKED.  In all cases, evicting
+ * threads reset the page's state when finished with the page: if eviction was
+ * successful (a clean page was simply discarded, and a dirty page was written
+ * to disk and then discarded), the page state is set to WT_REF_DISK; if
+ * eviction failed because the page was busy, page state is reset to WT_REF_MEM.
  *
  * Readers check the state field and if it's WT_REF_MEM, they set a hazard
  * reference to the page, flush memory and re-confirm the page state.  If the
