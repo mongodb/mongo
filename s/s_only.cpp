@@ -32,7 +32,10 @@ namespace mongo {
     TSP_DEFINE(Client,currentClient)
 
     Client::LockStatus::LockStatus() { 
-        dassert(false);
+        // why is mongo::Client used in mongos?  that is very weird.  
+        // commenting this out until that is cleaned up or until someone puts a comment here
+        // explaining why it does make sense. 
+        ////dassert(false);
     } 
 
     Client::Client(const char *desc , AbstractMessagingPort *p) :
