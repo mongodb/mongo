@@ -80,6 +80,21 @@ namespace mongo {
             return good == db.size();
         }
 
+        /**
+         * samples:
+         *   good:
+         *      foo.bar
+         *   bad:
+         *      foo.
+         *
+         * @param dbcoll - a possible collection name of the form db.coll
+         * @return if db.coll is an allowed collection name
+         */
+        static bool validCollectionName(const char* dbcoll){
+          const char *c = strchr( dbcoll, '.' ) + 1;
+          return normal(dbcoll) && c && *c;
+        }
+
     private:
         void init(const char *ns) {
             const char *p = strchr(ns, '.');
