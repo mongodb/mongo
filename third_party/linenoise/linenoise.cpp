@@ -113,6 +113,11 @@
 #endif /* _WIN32 */
 
 #include "linenoise.h"
+#include <string>
+#include <vector>
+
+using std::string;
+using std::vector;
 
 #define LINENOISE_DEFAULT_HISTORY_MAX_LEN 100
 #define LINENOISE_MAX_LINE 4096
@@ -176,6 +181,47 @@ struct PromptInfo {                 // a convenience struct for grouping prompt 
     }
 };
 
+class KillRing {
+    vector < string >   theRing;
+    int                 index;
+
+public:
+    bool lastActionWasKill;
+
+    KillRing() : index( 0 ), lastActionWasKill( false ) {
+        theRing.reserve( 1 );
+    }
+
+    void kill( const char* text, int textLen, bool forward ) {
+        if ( textLen == 0 ) {
+            return;
+        }
+        char* textCopy = new char[ textLen + 1 ];
+        memcpy( textCopy, text, textLen );
+        textCopy[ textLen ] = 0;
+        string textCopyString( textCopy );
+        if ( lastActionWasKill ) {
+            theRing[index] = forward ?
+                theRing[index] + textCopyString :
+                textCopyString + theRing[index];
+        }
+        else {
+            theRing.clear();
+            theRing.push_back( textCopyString );
+        }
+        delete[] textCopy;
+    }
+
+    string* yank() {
+        if ( theRing.size() > 0 && theRing[0].length() > 0 ) {
+            return &theRing[0];
+        } else {
+            return 0;
+        }
+    }
+
+};
+
 // Special codes for keyboard input:
 //
 // Between Windows and the various Linux "terminal" programs, there is some
@@ -218,6 +264,8 @@ static WORD oldDisplayAttribute;
 #else
 static struct termios orig_termios; /* in order to restore at exit */
 #endif
+
+static KillRing killRing;
 
 static int rawmode = 0; /* for atexit() function to check if restore is needed*/
 static int atexit_registered = 0; /* register atexit just 1 time */
@@ -1038,6 +1086,9 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
     // the cursor starts out at the end of the prompt
     pi.promptCursorRowOffset = pi.promptExtraLines;
 
+    // new prompt resets 'lastActionWasKill' state
+    killRing.lastActionWasKill = false;
+
     // loop collecting characters, responding to ctrl characters
     while ( true ) {
         int c = linenoiseReadChar();
@@ -1053,6 +1104,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
 
         // ctrl-I/tab, command completion, needs to be before switch statement
         if ( c == ctrlChar( 'I' ) && completionCallback ) {
+            killRing.lastActionWasKill = false;
 
             // completeLine does the actual completion and replacement
             c = completeLine( pi, buf, buflen, &len, &pos );
@@ -1070,12 +1122,14 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
 
         case ctrlChar( 'A' ):   // ctrl-A, move cursor to start of line
         case HOME_KEY:
+            killRing.lastActionWasKill = false;
             pos = 0;
             refreshLine( pi ,buf, len, pos );
             break;
 
         case ctrlChar( 'B' ):   // ctrl-B, move cursor left by one character
         case LEFT_ARROW_KEY:
+            killRing.lastActionWasKill = false;
             if ( pos > 0 ) {
                 --pos;
                 refreshLine( pi, buf, len, pos );
@@ -1086,6 +1140,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
         case META + 'B':
         case CTRL + LEFT_ARROW_KEY:
         case META + LEFT_ARROW_KEY: // Emacs allows Meta, bash & readline don't
+            killRing.lastActionWasKill = false;
             if( pos > 0 ) {
                 while ( pos > 0 && !isalnum( buf[pos - 1] ) ) {
                     --pos;
@@ -1098,6 +1153,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
             break;
 
         case ctrlChar( 'C' ):   // ctrl-C, abort this line
+            killRing.lastActionWasKill = false;
             errno = EAGAIN;
             --history_len;
             free( history[history_len] );
@@ -1110,6 +1166,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
         // ctrl-D, delete the character under the cursor
         // on an empty line, exit the shell
         case ctrlChar( 'D' ):
+            killRing.lastActionWasKill = false;
             if( len > 0 && pos < len ) {
                 memmove( buf + pos, buf + pos + 1, len - pos );
                 --len;
@@ -1122,7 +1179,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
             }
             break;
 
-        case META + 'd':        // meta-D, delete word to right of cursor
+        case META + 'd':        // meta-D, kill word to right of cursor
         case META + 'D':
             if( pos < len ) {
                 int endingPos = pos;
@@ -1132,20 +1189,24 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
                 while ( endingPos < len && isalnum( buf[endingPos] ) ) {
                     ++endingPos;
                 }
+                killRing.kill( &buf[pos], endingPos - pos, true );
                 memmove( buf + pos, buf + endingPos, len - endingPos + 1 );
                 len -= endingPos - pos;
                 refreshLine( pi, buf, len, pos );
             }
+            killRing.lastActionWasKill = true;
             break;
 
         case ctrlChar( 'E' ):   // ctrl-E, move cursor to end of line
         case END_KEY:
+            killRing.lastActionWasKill = false;
             pos = len;
             refreshLine( pi, buf, len, pos );
             break;
 
         case ctrlChar( 'F' ):   // ctrl-F, move cursor right by one character
         case RIGHT_ARROW_KEY:
+            killRing.lastActionWasKill = false;
             if ( pos < len ) {
                 ++pos;
                 refreshLine( pi ,buf, len, pos );
@@ -1156,6 +1217,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
         case META + 'F':
         case CTRL + RIGHT_ARROW_KEY:
         case META + RIGHT_ARROW_KEY: // Emacs allows Meta, bash & readline don't
+            killRing.lastActionWasKill = false;
             if( pos < len ) {
                 while ( pos < len && !isalnum( buf[pos] ) ) {
                     ++pos;
@@ -1168,6 +1230,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
             break;
 
         case ctrlChar( 'H' ):   // backspace/ctrl-H, delete char to left of cursor
+            killRing.lastActionWasKill = false;
             if ( pos > 0 ) {
                 memmove( buf + pos - 1, buf + pos, 1 + len - pos );
                 --pos;
@@ -1176,7 +1239,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
             }
             break;
 
-        // meta-Backspace, delete word to left of cursor
+        // meta-Backspace, kill word to left of cursor
         case META + ctrlChar( 'H' ):
             if( pos > 0 ) {
                 int startingPos = pos;
@@ -1186,14 +1249,17 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
                 while ( pos > 0 && isalnum( buf[pos - 1] ) ) {
                     --pos;
                 }
+                killRing.kill( &buf[pos], startingPos - pos, false );
                 memmove( buf + pos, buf + startingPos, len - startingPos + 1 );
                 len -= startingPos - pos;
                 refreshLine( pi, buf, len, pos );
             }
+            killRing.lastActionWasKill = true;
             break;
 
         case ctrlChar( 'J' ):   // ctrl-J/linefeed/newline, accept line
         case ctrlChar( 'M' ):   // ctrl-M/return/enter
+            killRing.lastActionWasKill = false;
             // we need one last refresh with the cursor at the end of the line
             // so we don't display the next prompt over the previous input line
             refreshLine( pi, buf, len, len );  // pass len as pos for EOL
@@ -1201,10 +1267,12 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
             free( history[history_len] );
             return len;
 
-        case ctrlChar( 'K' ):   // ctrl-K, delete from cursor to end of line
+        case ctrlChar( 'K' ):   // ctrl-K, kill from cursor to end of line
+            killRing.kill( &buf[pos], len - pos, true );
             buf[pos] = '\0';
             len = pos;
             refreshLine( pi, buf, len, pos );
+            killRing.lastActionWasKill = true;
             break;
 
         case ctrlChar( 'L' ):   // ctrl-L, clear screen and redisplay line
@@ -1215,6 +1283,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
         case ctrlChar( 'P' ):   // ctrl-P, recall previous line in history
         case DOWN_ARROW_KEY:
         case UP_ARROW_KEY:
+            killRing.lastActionWasKill = false;
             if ( history_len > 1 ) {
                 /* Update the current history entry before we
                  * overwrite it with the next one. */
@@ -1241,6 +1310,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
             break;
 
         case ctrlChar( 'T' ):   // ctrl-T, transpose characters
+            killRing.lastActionWasKill = false;
             if ( pos > 0 && len > 1 ) {
                 size_t leftCharPos = ( pos == len ) ? pos - 2 : pos - 1;
                 char aux = buf[leftCharPos];
@@ -1252,16 +1322,18 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
             }
             break;
 
-        case ctrlChar( 'U' ):   // ctrl-U, delete all characters to the left of the cursor
+        case ctrlChar( 'U' ):   // ctrl-U, kill all characters to the left of the cursor
             if( pos > 0 ) {
+                killRing.kill( &buf[0], pos, false );
                 len -= pos;
                 memmove( buf, buf + pos, len + 1 );
                 pos = 0;
                 refreshLine( pi, buf, len, pos );
             }
+            killRing.lastActionWasKill = true;
             break;
 
-        // ctrl-W, delete to whitespace (not word) to left of cursor
+        // ctrl-W, kill to whitespace (not word) to left of cursor
         case ctrlChar( 'W' ):
             if( pos > 0 ) {
                 int startingPos = pos;
@@ -1271,11 +1343,47 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
                 while ( pos > 0 && buf[pos - 1] != ' ' ) {
                     --pos;
                 }
+                killRing.kill( &buf[pos], startingPos - pos, false );
                 memmove( buf + pos, buf + startingPos, len - startingPos + 1 );
                 len -= startingPos - pos;
                 refreshLine( pi, buf, len, pos );
             }
+            killRing.lastActionWasKill = true;
             break;
+
+        case ctrlChar( 'Y' ):   // ctrl-Y, yank killed text
+            killRing.lastActionWasKill = false;
+            {
+                string* restoredText = killRing.yank();
+                if ( restoredText ) {
+                    int restoredTextLen = restoredText->length();
+                    memmove( buf + pos + restoredTextLen, buf + pos, len - pos + 1 );
+                    memmove( buf + pos, restoredText->c_str(), restoredTextLen );
+                    pos += restoredTextLen;
+                    len += restoredTextLen;
+                    refreshLine( pi, buf, len, pos );
+                }
+                else {
+                    beep();
+                }
+            }
+            break;
+
+#if 0 // beep until implemented properly
+        case META + 'y':        // meta-Y, "yank-pop", rotate popped text
+        case META + 'Y':
+            killRing.lastActionWasKill = false;
+            {
+                string restoredText = killRing.yankPop();
+                int restoredTextLen = restoredText.length();
+                memmove( buf + pos + restoredTextLen, buf + pos, len - pos + 1 );
+                memmove( buf + pos, restoredText.c_str(), restoredTextLen );
+                pos += restoredTextLen;
+                len += restoredTextLen;
+                refreshLine( pi, buf, len, pos );
+            }
+            break;
+#endif
 
 #ifndef _WIN32
         case ctrlChar( 'Z' ):   // ctrl-Z, job control
@@ -1290,6 +1398,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
         // DEL, delete the character under the cursor
         case 127:
         case DELETE_KEY:
+            killRing.lastActionWasKill = false;
             if( len > 0 && pos < len ) {
                 memmove( buf + pos, buf + pos + 1, len - pos );
                 --len;
@@ -1299,6 +1408,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
 
         // not one of our special characters, maybe insert it in the buffer
         default:
+            killRing.lastActionWasKill = false;
             if ( c > 0xFF ) {   // beep on unknown Ctrl and/or Meta keys
                 beep();
                 break;
