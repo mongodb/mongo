@@ -20,6 +20,7 @@
 #include "db/jsobj.h"
 
 namespace mongo {
+
     void Accumulator::addOperand(
         const intrusive_ptr<Expression> &pExpression) {
         assert(vpOperand.size() < 1); // CW TODO error: no more than one arg
@@ -47,5 +48,28 @@ namespace mongo {
     void Accumulator::addToBsonArray(
 	BSONArrayBuilder *pBuilder, unsigned depth) const {
 	assert(false); // these can't appear in arrays
+    }
+
+    static void reservedErrors()
+    {
+	uassert(15943, "reserved error", false);
+	uassert(15944, "reserved error", false);
+	uassert(15945, "reserved error", false);
+	uassert(15946, "reserved error", false);
+	uassert(15947, "reserved error", false);
+	uassert(15948, "reserved error", false);
+	uassert(15949, "reserved error", false);
+	uassert(15950, "reserved error", false);
+	uassert(15951, "reserved error", false);
+	uassert(15952, "reserved error", false);
+	uassert(15953, "reserved error", false);
+	uassert(15954, "reserved error", false);
+	uassert(15955, "reserved error", false);
+	uassert(15956, "reserved error", false);
+	uassert(15957, "reserved error", false);
+	uassert(15958, "reserved error", false);
+	uassert(15959, "reserved error", false);
+	uassert(15960, "reserved error", false);
+	uassert(15961, "reserved error", false);
     }
 }

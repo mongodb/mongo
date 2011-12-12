@@ -315,6 +315,11 @@ db/commands/mr.cpp
 * 9014 [code](http://github.com/mongodb/mongo/blob/master/db/commands/mr.cpp#L74) map invoke failed: 
 
 
+db/commands/pipeline.cpp
+----
+* 15942 [code](http://github.com/mongodb/mongo/blob/master/db/commands/pipeline.cpp#L143) pipeline element 
+
+
 db/common.cpp
 ----
 * 10332 [code](http://github.com/mongodb/mongo/blob/master/db/common.cpp#L45) Expected CurrentTime type
