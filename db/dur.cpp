@@ -498,9 +498,7 @@ namespace mongo {
             int p = 0;
             LOG(3) << "groupcommitll " << p++ << endl;
 
-            scoped_ptr<readlocktry> lk1( new readlocktry("", 500) );
-            if( !lk1->got() )
-                return false;
+            scoped_ptr<ExcludeAllWrites> lk1( new ExcludeAllWrites() );
 
             LOG(3) << "groupcommitll " << p++ << endl;
 
@@ -539,6 +537,7 @@ namespace mongo {
             LOG(3) << "groupcommitll " << p++ << endl;
 
             // ****** now other threads can do writes ******
+
             WRITETOJOURNAL(h, commitJob._ab);
             assert( abLen == commitJob._ab.len() ); // a check that no one touched the builder while we were doing work. if so, our locking is wrong.
 

@@ -229,9 +229,14 @@ namespace mongo {
             LockStatus();
             string whichCollection;
             int coll;
+            bool isWriteLocked() const;
         } lockStatus;
 
-        void checkLocks() const {}
+#if defined(CLC)
+        void checkLocks() const;
+#else
+        void checkLocks() const { }
+#endif
 
     }; // class Client
 

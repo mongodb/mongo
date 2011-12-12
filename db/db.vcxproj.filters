@@ -381,6 +381,7 @@
     <ClInclude Include="pipeline\value.h" />
     <ClInclude Include="..\util\intrusive_counter.h" />
     <ClInclude Include="..\util\systeminfo.h" />
+    <ClInclude Include="namespacestring.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="db.rc" />

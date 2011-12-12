@@ -79,6 +79,10 @@ namespace mongoutils {
             if( x < l ) return false;
             return strncmp(s.c_str()+x-l, p.c_str(), l) == 0;
         }
+        inline bool endsWith(const char *s, char p) {
+            size_t len = strlen(s);
+            return len && s[len-1] == p;
+        }
 
         inline bool equals( const char * a , const char * b ) { return strcmp( a , b ) == 0; }
 

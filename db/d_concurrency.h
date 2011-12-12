@@ -32,10 +32,11 @@ namespace mongo {
         ~LockCollectionForWriting();
     };
 
-    // CLC turns on the "collection level concurrency" code which is under development
-    // and not finished.
-#if defined(CLC)
-    ...
-#endif
+    class ExcludeAllWrites {
+        SimpleRWLock::Exclusive lk;
+        GlobalSharedLock gslk;
+    public:
+        ExcludeAllWrites();
+    };
 
 }

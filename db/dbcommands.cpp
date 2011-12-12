@@ -804,22 +804,16 @@ namespace mongo {
     public:
         virtual LockType locktype() const { return READ; }
         CmdCount() : Command("count") { }
-        virtual bool logTheOp() {
-            return false;
-        }
+        virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const {
             // ok on --slave setups
             return replSettings.slave == SimpleSlave;
         }
-        virtual bool slaveOverrideOk() {
-            return true;
-        }
-        virtual bool adminOnly() const {
-            return false;
-        }
+        virtual bool slaveOverrideOk() { return true; }
+        virtual bool adminOnly() const { return false; }
         virtual void help( stringstream& help ) const { help << "count objects in collection"; }
         virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
-            string ns = dbname + '.' + cmdObj.firstElement().valuestr();
+            string ns = parseNs(dbname, cmdObj);
             string err;
             long long n = runCount(ns.c_str(), cmdObj, err);
             long long nn = n;
@@ -1000,7 +994,7 @@ namespace mongo {
                 totalSize += size;
                 
                 {
-                    Client::ReadContext rc( *i );
+                    Client::ReadContext rc( *i + ".system.namespaces" );
                     b.appendBool( "empty", rc.ctx().db()->isEmpty() );
                 }
                 
@@ -1171,6 +1165,9 @@ namespace mongo {
     }
 
     class CmdDatasize : public Command {
+        virtual string parseNs(const string& dbname, const BSONObj& cmdObj) const { 
+            return parseNsFullyQualified(dbname, cmdObj);
+        }
     public:
         CmdDatasize() : Command( "dataSize", false, "datasize" ) {}
         virtual bool slaveOk() const { return true; }
@@ -1868,7 +1865,8 @@ namespace mongo {
         else if( c->locktype() != Command::WRITE ) { 
             // read lock
             assert( ! c->logTheOp() );
-            Client::ReadContext ctx( dbname , dbpath, c->requiresAuth() ); // read locks
+            string ns = c->parseNs(dbname, cmdObj);
+            Client::ReadContext ctx( ns , dbpath, c->requiresAuth() ); // read locks
             client.curop()->ensureStarted();
             retval = _execCommand(c, dbname , cmdObj , queryOptions, result , fromRepl );
         }

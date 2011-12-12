@@ -1,4 +1,4 @@
-// namespace_common.h
+// @file namespacestring.h
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -20,10 +20,6 @@
 
 #include <string>
 
-
-/**
- * this file contains basics utilities for handling namespaces
- */
 namespace mongo {
 
     using std::string;
@@ -43,7 +39,9 @@ namespace mongo {
 
         NamespaceString( const char * ns ) { init(ns); }
         NamespaceString( const string& ns ) { init(ns.c_str()); }
+
         string ns() const { return db + '.' + coll; }
+
         bool isSystem() const { return strncmp(coll.c_str(), "system.", 7) == 0; }
 
         /**

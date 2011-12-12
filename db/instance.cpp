@@ -560,16 +560,13 @@ namespace mongo {
         OpTime last;
         while( 1 ) {
             try {
-                readlock lk;
-
+                Client::ReadContext ctx(ns);
                 if (str::startsWith(ns, "local.oplog.")){
                     if (pass == 0)
                         last = OpTime::last_inlock();
                     else
                         last.waitForDifferent(1000/*ms*/);
                 }
-
-                Client::Context ctx(ns);
                 msgdata = processGetMore(ns, ntoreturn, cursorid, curop, pass, exhaust);
             }
             catch ( AssertionException& e ) {

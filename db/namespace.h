@@ -19,7 +19,7 @@
 #pragma once
 
 #include "../pch.h"
-#include "namespace_common.h"
+#include "namespacestring.h"
 #include "jsobj.h"
 #include "querypattern.h"
 #include "diskloc.h"

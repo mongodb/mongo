@@ -29,6 +29,29 @@ namespace mongo {
     map<string,Command*> * Command::_webCommands;
     map<string,Command*> * Command::_commands;
 
+    string Command::parseNsFullyQualified(const string& dbname, const BSONObj& cmdObj) const { 
+        string s = cmdObj.firstElement().valuestr();
+        NamespaceString nss(s);
+        // these are for security, do not remove:
+        verify(15940, dbname == nss.db || dbname == "admin" );
+        verify(15941, !nss.db.empty() );
+        return s;
+    }
+
+    /*virtual*/ string Command::parseNs(const string& dbname, const BSONObj& cmdObj) const {
+        string coll = cmdObj.firstElement().valuestr();
+#if defined(CLC)
+        DEV if( mongoutils::str::startsWith(coll, dbname+'.') ) { 
+            log() << "DEBUG parseNs Command's collection name looks like it includes the db name\n"
+                << dbname << '\n' 
+                << coll << '\n'
+                << cmdObj.toString() << endl;
+            dassert(false);
+        }
+#endif
+        return dbname + '.' + coll;
+    }
+
     void Command::htmlHelp(stringstream& ss) const {
         string helpStr;
         {

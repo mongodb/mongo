@@ -224,7 +224,7 @@ namespace mongo {
        returns -1 on ns does not exist error.
     */
     long long runCount( const char *ns, const BSONObj &cmd, string &err ) {
-        Client::Context cx(ns);
+        Client::ReadContext cx(ns);
         NamespaceDetails *d = nsdetails( ns );
         if ( !d ) {
             err = "ns missing";

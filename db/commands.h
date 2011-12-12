@@ -17,10 +17,8 @@
 
 #pragma once
 
-//#include "../pch.h"
 #include "jsobj.h"
-//#include "../util/timer.h"
-//#include "../client/dbclient.h"
+#include "../util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -33,7 +31,11 @@ namespace mongo {
         subclass to make a command.  define a singleton object for it.
         */
     class Command {
+    protected:
+        string parseNsFullyQualified(const string& dbname, const BSONObj& cmdObj) const;
     public:
+        // only makes sense for commands where 1st parm is the collection.
+        virtual string parseNs(const string& dbname, const BSONObj& cmdObj) const;
 
         enum LockType { READ = -1 , NONE = 0 , WRITE = 1 };
 
