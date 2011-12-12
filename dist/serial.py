@@ -26,14 +26,6 @@ Serial('col_append', 'WT_SERIAL_FUNC', [
 		SerialArg('u_int', 'skipdepth'),
 	]),
 
-Serial('read_begin', 'WT_SERIAL_FUNC', [
-		SerialArg('WT_REF *', 'ref'),
-	 ]),
-
-Serial('read_end', 'WT_SERIAL_FUNC', [
-		SerialArg('WT_REF *', 'ref'),
-	 ]),
-
 Serial('evict_file', 'WT_SERIAL_EVICT', [
 		SerialArg('int', 'close_method'),
 	]),

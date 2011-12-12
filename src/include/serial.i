@@ -124,64 +124,6 @@ __wt_col_append_new_ins_taken(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 typedef struct {
-	WT_REF *ref;
-} __wt_read_begin_args;
-
-static inline int
-__wt_read_begin_serial(
-	WT_SESSION_IMPL *session, WT_REF *ref)
-{
-	__wt_read_begin_args _args, *args = &_args;
-	int ret;
-
-	args->ref = ref;
-
-	ret = __wt_session_serialize_func(session,
-	    WT_SERIAL_FUNC, __wt_read_begin_serial_func, args);
-
-	return (ret);
-}
-
-static inline void
-__wt_read_begin_unpack(
-	WT_SESSION_IMPL *session, WT_REF **refp)
-{
-	__wt_read_begin_args *args =
-	    (__wt_read_begin_args *)session->wq_args;
-
-	*refp = args->ref;
-}
-
-typedef struct {
-	WT_REF *ref;
-} __wt_read_end_args;
-
-static inline int
-__wt_read_end_serial(
-	WT_SESSION_IMPL *session, WT_REF *ref)
-{
-	__wt_read_end_args _args, *args = &_args;
-	int ret;
-
-	args->ref = ref;
-
-	ret = __wt_session_serialize_func(session,
-	    WT_SERIAL_FUNC, __wt_read_end_serial_func, args);
-
-	return (ret);
-}
-
-static inline void
-__wt_read_end_unpack(
-	WT_SESSION_IMPL *session, WT_REF **refp)
-{
-	__wt_read_end_args *args =
-	    (__wt_read_end_args *)session->wq_args;
-
-	*refp = args->ref;
-}
-
-typedef struct {
 	int close_method;
 } __wt_evict_file_args;
 

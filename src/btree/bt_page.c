@@ -26,48 +26,29 @@ __wt_page_in_func(
 #endif
     )
 {
-	int read_lockout, ret;
+	int read_lockout;
 
-	for (;;)
+	for (;;) {
 		switch (ref->state) {
 		case WT_REF_DISK:
 			/*
 			 * The page isn't in memory, attempt to set the
 			 * state to WT_REF_READING.  If successful, read it.
 			 */
-			ret = WT_RESTART;
-			__wt_eviction_check(session, NULL, &read_lockout);
-			if (read_lockout ||
-			    (ret = __wt_read_begin_serial(session, ref)) != 0) {
-				if (ret != WT_RESTART)
-					return (ret);
-
-				/*
-				 * Find a page to evict -- if that succeeds,
-				 * try again immediately.  If it fails, we
-				 * don't care why, but give up our slice before
-				 * retrying.
-				 */
-				if (__wt_evict_lru_page(session, 1) != 0)
-					__wt_yield();
+			__wt_eviction_check(session, &read_lockout);
+			if (read_lockout || !WT_ATOMIC_CAS(
+			    ref->state, WT_REF_DISK, WT_REF_READING))
 				break;
-			}
 
-			WT_ASSERT(session, ref->state == WT_REF_READING);
-
-			ret = __wt_cache_read(
-			    session, parent, ref, dsk_verify);
-
-			WT_TRET(__wt_read_end_serial(session, ref));
-			WT_RET(ret);
-			break;
+			WT_RET(__wt_cache_read(
+			    session, parent, ref, dsk_verify));
+			continue;
 		case WT_REF_LOCKED:
 		case WT_REF_READING:
 			/*
 			 * The page is being read or considered for eviction --
 			 * wait for that to be resolved.
 			 */
-			__wt_yield();
 			break;
 		case WT_REF_MEM:
 			/*
@@ -86,7 +67,6 @@ __wt_page_in_func(
 				    __wt_cache_read_gen(session);
 				return (0);
 			}
-			__wt_yield();
 			break;
 		default:
 			WT_ASSERT_RET(session,
@@ -95,7 +75,16 @@ __wt_page_in_func(
 			    ref->state == WT_REF_MEM ||
 			    ref->state == WT_REF_READING);
 		}
-	/* NOTREACHED */
+
+		/*
+		 * Find a page to evict -- if that succeeds,
+		 * try again immediately.  If it fails, we
+		 * don't care why, but give up our slice before
+		 * retrying.
+		 */
+		if (__wt_evict_lru_page(session, 1) != 0)
+			__wt_yield();
+	}
 }
 
 /*

@@ -159,6 +159,7 @@ __wt_evict_page_serial_func(WT_SESSION_IMPL *session)
 	WT_EVICT_REQ_FOREACH(er, er_end, cache)
 		if (er->session == NULL) {
 			__evict_req_set(session, er, page, WT_EVICT_REQ_PAGE);
+			__wt_evict_server_wake(session);
 			return;
 		}
 
@@ -544,15 +545,17 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 	i = restarted_once = 0;
 	do {
 		/*
-		 * Root and pinned pages can't be evicted.
+		 * Root and pinned pages can't be evicted, nor can pages that
+		 * were created as the result of reconciliation.
 		 *
 		 * !!!
 		 * It's still in flux if root pages are pinned or not, test for
 		 * both cases for now.
 		 */
 		page = btree->evict_page;
-		if (page != NULL &&
-		    !WT_PAGE_IS_ROOT(page) && !F_ISSET(page, WT_PAGE_PINNED)) {
+		if (page != NULL && !WT_PAGE_IS_ROOT(page) &&
+		    !F_ISSET(page, WT_PAGE_PINNED | WT_PAGE_REC_EMPTY |
+		    WT_PAGE_REC_SPLIT | WT_PAGE_REC_SPLIT_MERGE)) {
 			WT_VERBOSE(session, evictserver,
 			    "%s walk: %" PRIu32 ", size %" PRIu32,
 			    btree->name, WT_PADDR(page),
@@ -634,6 +637,7 @@ __evict_get_page(
 {
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
+	WT_REF *ref;
 
 	cache = S2C(session)->cache;
 	*btreep = NULL;
@@ -643,8 +647,8 @@ __evict_get_page(
 		return;
 
 	evict = cache->evict_current;
-	if (evict >= cache->evict &&
-	    evict < cache->evict + cache->evict_entries &&
+	if (evict != NULL &&
+	    evict >= cache->evict && evict < cache->evict + WT_EVICT_GROUP &&
 	    evict->page != NULL) {
 		WT_ASSERT(session, evict->btree != NULL);
 
@@ -656,6 +660,14 @@ __evict_get_page(
 		 */
 		if (is_app &&
 		    __wt_session_has_btree(session, evict->btree) != 0)
+			goto done;
+
+		/*
+		 * Set the page locked here while holding the eviction mutex to
+		 * prevent multiple attempts to evict it.
+		 */
+		ref = evict->page->parent_ref;
+		if (!WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED))
 			goto done;
 
 		*pagep = evict->page;

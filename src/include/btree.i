@@ -17,8 +17,8 @@ __wt_cache_page_inmem_incr(
 
 	cache = S2C(session)->cache;
 
-	cache->bytes_inmem += size;
-	page->memory_footprint += WT_STORE_SIZE(size);
+	WT_ATOMIC_ADD(cache->bytes_inmem, size);
+	WT_ATOMIC_ADD(page->memory_footprint, WT_STORE_SIZE(size));
 }
 
 /*
@@ -34,9 +34,9 @@ __wt_cache_page_read(WT_SESSION_IMPL *session, WT_PAGE *page, size_t size)
 
 	WT_ASSERT(session, size != 0);
 
-	++cache->pages_read;
-	cache->bytes_read += size;
-	page->memory_footprint += WT_STORE_SIZE(size);
+	WT_ATOMIC_ADD(cache->pages_read, 1);
+	WT_ATOMIC_ADD(cache->bytes_read, size);
+	WT_ATOMIC_ADD(page->memory_footprint, WT_STORE_SIZE(size));
 }
 
 /*
@@ -52,8 +52,8 @@ __wt_cache_page_evict(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	WT_ASSERT(session, page->memory_footprint != 0);
 
-	++cache->pages_evict;
-	cache->bytes_evict += page->memory_footprint;
+	WT_ATOMIC_ADD(cache->pages_evict, 1);
+	WT_ATOMIC_ADD(cache->bytes_evict, page->memory_footprint);
 
 	page->memory_footprint = 0;
 }

@@ -10,8 +10,7 @@
 /*
  * Serialization: serialization support allows scheduling operations requiring
  * serialized access to a piece of memory, normally by a different thread of
- * control.  This includes reading pages into memory (a request of the read
- * thread), and updating Btree pages.
+ * control.  This updating and evicting pages from trees.
  *
  * __wt_session_serialize_func --
  *	Schedule a serialization request, and block or spin until it completes.
@@ -67,16 +66,14 @@ __wt_session_serialize_func(WT_SESSION_IMPL *session,
 void
 __wt_session_serialize_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int ret)
 {
-	if (ret == 0) {
+	if (ret == 0 && page != NULL) {
 		/*
 		 * If passed a page and the return value is OK, we modified the
-		 * page.
+		 * page.  Wake the eviction server as necessary if the page
+		 * has become too large.
 		 */
-		if (page != NULL)
-			ret = __wt_page_set_modified(session, page);
-
-		/* Wake the eviction server as necessary. */
-		(void)__wt_eviction_check(session, page, NULL);
+		ret = __wt_page_set_modified(session, page);
+		(void)__wt_eviction_page_check(session, page);
 	}
 
 	/* Set the return value. */

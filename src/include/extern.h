@@ -233,8 +233,6 @@ extern int __wt_page_inmem(WT_SESSION_IMPL *session,
     WT_REF *parent_ref,
     WT_PAGE_DISK *dsk,
     WT_PAGE **pagep);
-extern void __wt_read_begin_serial_func(WT_SESSION_IMPL *session);
-extern void __wt_read_end_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_cache_read( WT_SESSION_IMPL *session,
     WT_PAGE *parent,
     WT_REF *ref,

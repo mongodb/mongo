@@ -58,14 +58,14 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 		return (0);
 	}
 
-        /*
-         * If eviction of a page needs to be forced, wait for the page to
-         * become available.
-         */
-        if (F_ISSET(page, WT_PAGE_FORCE_EVICT)) {
-                LF_SET(REC_WAIT);
+	/*
+	 * If eviction of a page needs to be forced, wait for the page to
+	 * become available.
+	 */
+	if (F_ISSET(page, WT_PAGE_FORCE_EVICT)) {
+		LF_SET(WT_REC_WAIT);
 		__wt_evict_force_clear(session, page);
-        }
+	}
 
 	/*
 	 * Get exclusive access to the page and review the page and its subtree
@@ -282,7 +282,7 @@ __rec_review(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 */
 	if (!LF_ISSET(WT_REC_SINGLE))
 		WT_RET(__hazard_exclusive(
-                    session, page->parent_ref, LF_ISSET(WT_REC_WAIT) ? 1 : 0));
+		    session, page->parent_ref, LF_ISSET(WT_REC_WAIT) ? 1 : 0));
 
 	/*
 	 * Walk the page's subtree and make sure we can evict this page.
@@ -518,7 +518,7 @@ __rec_sub_excl_page(
 	 */
 	if (!LF_ISSET(WT_REC_SINGLE))
 		WT_RET(__hazard_exclusive(
-                    session, ref, LF_ISSET(WT_REC_WAIT) ? 1 : 0));
+		    session, ref, LF_ISSET(WT_REC_WAIT) ? 1 : 0));
 
 	/*
 	 * Second, a more careful test: merge-split pages are OK, no matter if
@@ -630,37 +630,22 @@ static int
 __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref, int force)
 {
 	WT_CACHE *cache;
-	int can_lock;
 
 	cache = S2C(session)->cache;
 
-	/*
-	 * If another thread already has this page, give up.
-	 *
-         * Acquire a latch briefly to check and switch the page state in case
-         * multiple threads attempt to evict overlapping subtrees.
-	 */
-	if (force)
-	        __wt_spin_lock(session, &cache->lru_lock);
-        else if (__wt_spin_trylock(session, &cache->lru_lock) != 0)
-		return (1);
+	/* The page must be in memory, and we may already have it locked. */
+	WT_ASSERT(session,
+	    ref->state == WT_REF_MEM || ref->state == WT_REF_LOCKED);
 
 	/*
 	 * Hazard references are acquired down the tree, which means we can't
 	 * deadlock.
 	 *
 	 * Request exclusive access to the page; no memory flush needed, the
-	 * state field is declared volatile.
+	 * state field is declared volatile.  If another thread already has
+	 * this page and we are not forcing the issue, give up.
 	 */
-	can_lock = (ref->state == WT_REF_MEM);
-	if (can_lock)
-		ref->state = WT_REF_LOCKED;
-
-	/* Releasing the spinlock is an implicit full barrier. */
-	__wt_spin_unlock(session, &cache->lru_lock);
-
-	if (!can_lock)
-		return (1);
+	ref->state = WT_REF_LOCKED;
 
 	/* Get a fresh copy of the hazard reference array. */
 retry:	__hazard_copy(session);
@@ -672,10 +657,10 @@ retry:	__hazard_copy(session);
 
 	WT_BSTAT_INCR(session, rec_hazard);
 
-        /*
-         * If we have to get this hazard reference, spin and wait for it to
-         * become available.
-         */
+	/*
+	 * If we have to get this hazard reference, spin and wait for it to
+	 * become available.
+	 */
 	if (force) {
 		__wt_yield();
 		goto retry;

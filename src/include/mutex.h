@@ -64,12 +64,25 @@
  * guarantees and may have no effect on systems with weaker cache guarantees.
  *
  * In summary, locking > barriers > volatile.
+ *
+ * To avoid locking shared data structures such as statistics and to permit
+ * atomic state changes, we rely on the WT_ATOMIC_ADD and WT_ATOMIC_CAS
+ * (compare and swap) operations.
  */
 #if defined(_lint)
+#define	WT_ATOMIC_ADD(v, val)
+#define	WT_ATOMIC_CAS(v, oldv, newv)
 #define	WT_FULL_BARRIER()
 #define	WT_READ_BARRIER()
 #define	WT_WRITE_BARRIER()
-#elif (defined(x86_64) || defined(__x86_64__)) && defined(__GNUC__)
+#define	HAVE_ATOMICS 1
+#elif defined(__GNUC__)
+#define	WT_ATOMIC_ADD(v, val)                                           \
+	__sync_add_and_fetch(&(v), val)
+#define	WT_ATOMIC_CAS(v, oldv, newv)                                    \
+	__sync_bool_compare_and_swap(&(v), oldv, newv)
+
+#if defined(x86_64) || defined(__x86_64__)
 #define	WT_FULL_BARRIER() do {						\
 	asm volatile ("mfence" ::: "memory");				\
 } while (0)
@@ -79,13 +92,18 @@
 #define	WT_WRITE_BARRIER() do {						\
 	asm volatile ("sfence" ::: "memory");				\
 } while (0)
-#elif (defined(i386) || defined(__i386__)) && defined(__GNUC__)
+#define	HAVE_ATOMICS 1
+#elif defined(i386) || defined(__i386__)
 #define	WT_FULL_BARRIER() do {						\
 	asm volatile ("lock; addl $0, 0(%%esp)" ::: "memory");		\
 } while (0);
 #define	WT_READ_BARRIER() WT_FULL_BARRIER()
 #define	WT_WRITE_BARRIER() WT_FULL_BARRIER()
-#else
+#define	HAVE_ATOMICS 1
+#endif
+#endif
+
+#ifndef HAVE_ATOMICS
 #error "No write barrier implementation for this platform"
 #endif
 

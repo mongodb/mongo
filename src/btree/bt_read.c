@@ -8,54 +8,6 @@
 #include "wt_internal.h"
 
 /*
- * __wt_read_begin_serial_func --
- *	Serialization function called when a page-in requires a read.
- *	The return value indicates whether the read should proceed in
- *	the worker thread.
- */
-void
-__wt_read_begin_serial_func(WT_SESSION_IMPL *session)
-{
-	WT_REF *ref;
-
-	__wt_read_begin_unpack(session, &ref);
-
-	__wt_eviction_check(session, NULL, NULL);
-
-	if (ref->state != WT_REF_DISK)
-		__wt_session_serialize_wrapup(session, NULL, WT_RESTART);
-	else {
-		ref->state = WT_REF_READING;
-		__wt_session_serialize_wrapup(session, NULL, 0);
-	}
-}
-
-/*
- * __wt_read_end_serial_func --
- *	Serialization function called when a page-in is complete.
- */
-void
-__wt_read_end_serial_func(WT_SESSION_IMPL *session)
-{
-	WT_PAGE_DISK *dsk;
-	WT_REF *ref;
-
-	__wt_read_end_unpack(session, &ref);
-
-	/* Add the page to our cache statistics. */
-	if (ref->page != NULL) {
-		dsk = ref->page->dsk;
-		__wt_cache_page_read(session, ref->page,
-		    sizeof(WT_PAGE) + ((dsk == NULL) ? 0 : dsk->memsize));
-
-		ref->state = WT_REF_MEM;
-	} else
-		ref->state = WT_REF_DISK;
-
-	__wt_session_serialize_wrapup(session, NULL, 0);
-}
-
-/*
  * __wt_cache_read --
  *	Read a page from the file.
  */
@@ -111,13 +63,19 @@ __wt_cache_read(
 	 */
 	WT_ERR(__wt_page_inmem(session, parent, ref, dsk, &ref->page));
 
+	dsk = ref->page->dsk;
+	__wt_cache_page_read(session, ref->page,
+	    sizeof(WT_PAGE) + ((dsk == NULL) ? 0 : dsk->memsize));
+	ref->state = WT_REF_MEM;
+
 	WT_VERBOSE(session, read,
 	    "page %p (%" PRIu32 "/%" PRIu32 ", %s)",
 	    ref->page, addr, size, __wt_page_type_string(ref->page->type));
-
 	return (0);
 
 err:	__wt_scr_free(&tmp);
 	__wt_free(session, dsk);
+	ref->state = WT_REF_DISK;
+
 	return (ret);
 }

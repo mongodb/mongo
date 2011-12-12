@@ -252,30 +252,32 @@ struct __wt_page {
  *	been discarded or written to disk, and remains backed by the disk);
  *	the page is on disk, and needs to be read into memory before use.
  * WT_REF_LOCKED:
- *	Set by the eviction server; the eviction server has selected this page
+ *	Set by eviction; an eviction thread has selected this page
  *	for eviction and is checking hazard references.
  * WT_REF_MEM:
- *	Set by the read server when the page is read from disk; the page is
+ *	Set by a reading thread when the page is read from disk; the page is
  *	in the cache and the page reference is OK.
+ * WT_REF_READING:
+ *	Set by a reading thread before reading a page from disk; other readers
+ *	of the page wait until the read completes.
  *
  * The life cycle of a typical page goes like this: pages are read into memory
- * from disk and the read server sets their state to WT_REF_MEM.  When the
- * eviction server selects the page for eviction, it sets the page state to
- * WT_REF_LOCKED.  In all cases, the eviction server resets the page's state
- * when it's finished with the page: if eviction was successful (a clean page
- * was simply discarded, and a dirty page was written to disk), the server sets
- * the page state to WT_REF_DISK; if eviction failed because the page was busy,
- * the page state is reset to WT_REF_MEM.
+ * from disk and their state set to WT_REF_MEM.  When the the page is selected
+ * for eviction, the page state is set to WT_REF_LOCKED.  In all cases, an
+ * evicting thread resets the page's state when it's finished with the page: if
+ * eviction was successful (a clean page was simply discarded, and a dirty page
+ * was written to disk), the page state is set to WT_REF_DISK; if eviction
+ * failed because the page was busy, the page state is reset to WT_REF_MEM.
  *
  * Readers check the state field and if it's WT_REF_MEM, they set a hazard
  * reference to the page, flush memory and re-confirm the page state.  If the
  * page state is unchanged, the reader has a valid reference and can proceed.
  *
- * When the eviction server wants to discard a page from the tree, it sets the
- * WT_REF_LOCKED flag, flushes memory, then checks hazard references.  If the
- * eviction server finds a hazard reference, it resets the state to WT_REF_MEM,
- * restoring the page to the readers.  If the eviction server does not find a
- * hazard reference, the page is evicted.
+ * When an evicting thread wants to discard a page from the tree, it sets the
+ * WT_REF_LOCKED state, flushes memory, then checks hazard references.  If a
+ * hazard reference is found, state is reset to WT_REF_MEM, restoring the page
+ * to the readers.  If the evicting thread does not find a hazard reference,
+ * the page is evicted.
  */
 struct __wt_ref {
 	WT_PAGE *page;			/* In-memory page */
