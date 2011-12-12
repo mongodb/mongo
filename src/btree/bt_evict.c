@@ -541,7 +541,8 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 	do {
 		/*
 		 * Root and pinned pages can't be evicted, nor can pages that
-		 * were created as the result of reconciliation.
+		 * are already locked, or were created as the result of
+		 * reconciliation.
 		 *
 		 * !!!
 		 * It's still in flux if root pages are pinned or not, test for
@@ -549,6 +550,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		 */
 		page = btree->evict_page;
 		if (page != NULL && !WT_PAGE_IS_ROOT(page) &&
+		    page->parent_ref->state == WT_REF_MEM &&
 		    !F_ISSET(page, WT_PAGE_PINNED | WT_PAGE_REC_EMPTY |
 		    WT_PAGE_REC_SPLIT | WT_PAGE_REC_SPLIT_MERGE)) {
 			WT_VERBOSE(session, evictserver,

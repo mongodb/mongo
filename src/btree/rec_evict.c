@@ -280,9 +280,12 @@ __rec_review(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 * Attempt exclusive access to the page if our caller doesn't have the
 	 * tree locked down.
 	 */
-	if (!LF_ISSET(WT_REC_SINGLE))
+	if (!LF_ISSET(WT_REC_SINGLE)) {
 		WT_RET(__hazard_exclusive(
 		    session, page->parent_ref, LF_ISSET(WT_REC_WAIT) ? 1 : 0));
+
+		last_page = page;
+	}
 
 	/*
 	 * Walk the page's subtree and make sure we can evict this page.
@@ -340,6 +343,16 @@ __rec_sub_excl_clear(WT_SESSION_IMPL *session,
 	if (LF_ISSET(WT_REC_SINGLE))
 		return;
 
+	WT_ASSERT(session, page->parent_ref->state == WT_REF_LOCKED);
+
+	/*
+	 * Take care to unlock pages in the same order we locked them.
+	 * Otherwise, tracking the last successfully locked page is meaningless.
+	 */
+	page->parent_ref->state = WT_REF_MEM;
+	if (page == last_page)
+		return;
+
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		__rec_sub_excl_col_clear(session, page, last_page);
@@ -350,7 +363,6 @@ __rec_sub_excl_clear(WT_SESSION_IMPL *session,
 	default:
 		break;
 	}
-	page->parent_ref->state = WT_REF_MEM;
 }
 
 /*
@@ -405,19 +417,19 @@ __rec_sub_excl_col_clear(
 	uint32_t i;
 
 	/* For each entry in the page... */
-	WT_COL_REF_FOREACH(parent, cref, i)
-		if (WT_COL_REF_STATE(cref) == WT_REF_LOCKED) {
-			WT_COL_REF_STATE(cref) = WT_REF_MEM;
+	WT_COL_REF_FOREACH(parent, cref, i) {
+		WT_ASSERT(session, WT_COL_REF_STATE(cref) == WT_REF_LOCKED);
+		WT_COL_REF_STATE(cref) = WT_REF_MEM;
 
-			/* Recurse down the tree. */
-			page = WT_COL_REF_PAGE(cref);
-			if (page == last_page)
+		/* Recurse down the tree. */
+		page = WT_COL_REF_PAGE(cref);
+		if (page == last_page)
+			return (1);
+		if (page->type == WT_PAGE_COL_INT)
+			if (__rec_sub_excl_col_clear(
+			    session, page, last_page))
 				return (1);
-			if (page->type == WT_PAGE_COL_INT)
-				if (__rec_sub_excl_col_clear(
-				    session, page, last_page))
-					return (1);
-		}
+	}
 
 	return (0);
 }
@@ -474,19 +486,19 @@ __rec_sub_excl_row_clear(
 	uint32_t i;
 
 	/* For each entry in the page... */
-	WT_ROW_REF_FOREACH(parent, rref, i)
-		if (WT_ROW_REF_STATE(rref) == WT_REF_LOCKED) {
-			WT_ROW_REF_STATE(rref) = WT_REF_MEM;
+	WT_ROW_REF_FOREACH(parent, rref, i) {
+		WT_ASSERT(session, WT_ROW_REF_STATE(rref) == WT_REF_LOCKED);
+		WT_ROW_REF_STATE(rref) = WT_REF_MEM;
 
-			/* Recurse down the tree. */
-			page = WT_ROW_REF_PAGE(rref);
-			if (page == last_page)
+		/* Recurse down the tree. */
+		page = WT_ROW_REF_PAGE(rref);
+		if (page == last_page)
+			return (1);
+		if (page->type == WT_PAGE_ROW_INT)
+			if (__rec_sub_excl_row_clear(
+			    session, page, last_page))
 				return (1);
-			if (page->type == WT_PAGE_ROW_INT)
-				if (__rec_sub_excl_row_clear(
-				    session, page, last_page))
-					return (1);
-		}
+	}
 
 	return (0);
 }
