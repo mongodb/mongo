@@ -899,12 +899,6 @@ namespace mongo {
     protected:
 
         /**
-         * Allocate a temporary btree bucket in ram rather than in memory mapped
-         * storage.  The caller must release this bucket with free().
-         */
-        static BtreeBucket<V> * allocTemp();
-
-        /**
          * Preconditions:
          *  - This bucket is packed.
          *  - Cannot add a key of size KeyMax to this bucket.

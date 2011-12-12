@@ -1244,13 +1244,6 @@ namespace mongo {
     }
 
     template< class V >
-    BtreeBucket<V> * BtreeBucket<V>::allocTemp() {
-      BtreeBucket *b = (BtreeBucket*) malloc(V::BucketSize);
-        b->init();
-        return b;
-    }
-
-    template< class V >
     inline void BtreeBucket<V>::fix(const DiskLoc thisLoc, const DiskLoc child) {
         if ( !child.isNull() ) {
             if ( insert_debug )
