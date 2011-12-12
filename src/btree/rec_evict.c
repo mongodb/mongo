@@ -9,7 +9,7 @@
 
 static int  __hazard_bsearch_cmp(const void *, const void *);
 static void __hazard_copy(WT_SESSION_IMPL *);
-static int  __hazard_exclusive(WT_SESSION_IMPL *, WT_REF *, uint32_t);
+static int  __hazard_exclusive(WT_SESSION_IMPL *, WT_REF *, int);
 static int  __hazard_qsort_cmp(const void *, const void *);
 static int  __rec_discard_page(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_parent_clean_update(WT_SESSION_IMPL *, WT_PAGE *);
@@ -58,6 +58,15 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 		return (0);
 	}
 
+        /*
+         * If eviction of a page needs to be forced, wait for the page to
+         * become available.
+         */
+        if (F_ISSET(page, WT_PAGE_FORCE_EVICT)) {
+                LF_SET(REC_WAIT);
+		__wt_evict_force_clear(session, page);
+        }
+
 	/*
 	 * Get exclusive access to the page and review the page and its subtree
 	 * for conditions that would block our eviction of the page.  If the
@@ -80,6 +89,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 		WT_STAT_INCR(conn->stats, cache_evict_modified);
 		WT_RET(__rec_parent_dirty_update(session, page, flags));
 	}
+
 	return (0);
 }
 
@@ -271,7 +281,8 @@ __rec_review(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 * tree locked down.
 	 */
 	if (!LF_ISSET(WT_REC_SINGLE))
-		WT_RET(__hazard_exclusive(session, page->parent_ref, flags));
+		WT_RET(__hazard_exclusive(
+                    session, page->parent_ref, LF_ISSET(WT_REC_WAIT) ? 1 : 0));
 
 	/*
 	 * Walk the page's subtree and make sure we can evict this page.
@@ -506,7 +517,8 @@ __rec_sub_excl_page(
 	 * access to the page and test again.
 	 */
 	if (!LF_ISSET(WT_REC_SINGLE))
-		WT_RET(__hazard_exclusive(session, ref, flags));
+		WT_RET(__hazard_exclusive(
+                    session, ref, LF_ISSET(WT_REC_WAIT) ? 1 : 0));
 
 	/*
 	 * Second, a more careful test: merge-split pages are OK, no matter if
@@ -615,7 +627,7 @@ __rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Request exclusive access to a page.
  */
 static int
-__hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
+__hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref, int force)
 {
 	WT_CACHE *cache;
 	int can_lock;
@@ -625,10 +637,12 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	/*
 	 * If another thread already has this page, give up.
 	 *
-	 * Acquire a latch briefly to check and switch the page state in case
-	 * multiple threads attempt to evict overlapping subtrees.
+         * Acquire a latch briefly to check and switch the page state in case
+         * multiple threads attempt to evict overlapping subtrees.
 	 */
-	if (__wt_spin_trylock(session, &cache->lru_lock) != 0)
+	if (force)
+	        __wt_spin_lock(session, &cache->lru_lock);
+        else if (__wt_spin_trylock(session, &cache->lru_lock) != 0)
 		return (1);
 
 	/*
@@ -657,7 +671,12 @@ retry:	__hazard_copy(session);
 		return (0);
 
 	WT_BSTAT_INCR(session, rec_hazard);
-	if (LF_ISSET(WT_REC_WAIT)) {
+
+        /*
+         * If we have to get this hazard reference, spin and wait for it to
+         * become available.
+         */
+	if (force) {
 		__wt_yield();
 		goto retry;
 	}

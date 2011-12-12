@@ -419,14 +419,6 @@ __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 		WT_RET(__wt_tree_np(session, &next_page, 1, 1));
 
 		/*
-		 * Remove the page from any lists it might be in before we
-		 * reconcile it.  Do this unconditionally in sync and close,
-		 * otherwise the next LRU pass may try to evict stale
-		 * references to pages.
-		 */
-		__wt_evict_force_clear(session, page);
-
-		/*
 		 * Close: discarding all of the file's pages from the cache.
 		 * Force: evict a single page from the cache.
 		 *  Sync: only dirty pages need to be written.
@@ -437,8 +429,6 @@ __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 		 */
 		if (F_ISSET(er, WT_EVICT_REQ_CLOSE))
 			WT_RET(__wt_rec_evict(session, page, WT_REC_SINGLE));
-		else if (F_ISSET(page, WT_PAGE_FORCE_EVICT))
-			WT_RET(__wt_rec_evict(session, page, WT_REC_WAIT));
 		else if (__wt_page_is_modified(page))
 			WT_RET(__wt_rec_write(session, page, NULL));
 	}
@@ -713,8 +703,7 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 	 * dirty and we're out of disk space?  Regardless, don't pick
 	 * the same page every time.
 	 */
-	if (__wt_rec_evict(session, page,
-	    F_ISSET(page, WT_PAGE_FORCE_EVICT) ? WT_REC_WAIT : 0) != 0)
+	if (__wt_rec_evict(session, page, 0) != 0)
 		page->read_gen = __wt_cache_read_gen(session);
 
 	WT_CLEAR_BTREE_IN_SESSION(session);

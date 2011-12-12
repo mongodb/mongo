@@ -2395,9 +2395,6 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	mod = page->modify;
 	ret = 0;
 
-	if (F_ISSET(page, WT_PAGE_FORCE_EVICT))
-		__wt_evict_force_clear(session, page);
-
 	/*
 	 * This page may have previously been reconciled, and that information
 	 * is now about to be replaced.  Make sure it's discarded at some point,
