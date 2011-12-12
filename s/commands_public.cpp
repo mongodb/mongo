@@ -443,6 +443,10 @@ namespace mongo {
                 while ( numTries < 5 ) {
                     numTries++;
 
+                    // This all should eventually be replaced by new pcursor framework, but for now match query
+                    // retry behavior manually
+                    if( numTries >= 2 ) sleepsecs( numTries - 1 );
+
                     if ( ! cm ) {
                         // probably unsharded now
                         return run( dbName , cmdObj , options , errmsg , result, false );
