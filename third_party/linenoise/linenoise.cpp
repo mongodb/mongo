@@ -766,6 +766,9 @@ static unsigned int hibitCRoutine( unsigned int c ) {
     // xterm sends a bizarre sequence for Alt combos: 'C'+0x80 then '!'+0x80 for Alt-a for example
     if ( read( 0, &c, 1 ) <= 0 ) return 0;
     if ( c >= ( ' ' | 0x80 ) && c <= ( '?' | 0x80 ) ) {
+        if ( c == ( '?' | 0x80 ) ) {        // have to special case this, normal code would send
+            return META | ctrlChar( 'H' );  // Meta-_ (thank you xterm)
+        }
         return META | ( c - 0x40 );
     }
     return escFailureRoutine( c );
