@@ -260,14 +260,13 @@ namespace mongo {
 
                 // With simple equality matching there is no need to use the matcher because the bounds
                 // are enforced by the FieldRangeVectorIterator and only key fields have constraints.  There
-                // is no need do key deduping because an exact value is specified in the query for all key
+                // is no need to do key deduping because an exact value is specified in the query for all key
                 // fields and duplicate keys are not allowed per document.
                 // NOTE In the distant past we used a min/max bounded BtreeCursor with a shallow
                 // equality comparison to check for matches in the simple match case.  That may be
                 // more performant, but I don't think we've measured the performance.
                 if ( simpleEqualityMatch ||
-                    ( ( !cursor->matcher() || cursor->matcher()->matchesCurrent( cursor.get() ) ) &&
-                        !cursor->getsetdup( cursor->currLoc() ) ) ) {
+                    ( cursor->currentMatches() && !cursor->getsetdup( cursor->currLoc() ) ) ) {
                         
                     if ( skip > 0 ) {
                         --skip;

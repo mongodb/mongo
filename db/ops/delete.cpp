@@ -95,9 +95,7 @@ namespace mongo {
             DiskLoc rloc = cc->currLoc();
             BSONObj key = cc->currKey();
 
-            // NOTE Calling advance() may change the matcher, so it's important
-            // to try to match first.
-            bool match = !creal->matcher() || creal->matcher()->matchesCurrent(creal.get());
+            bool match = creal->currentMatches();
             bool dup = cc->c()->getsetdup(rloc);
 
             if ( ! cc->advance() )
@@ -112,7 +110,7 @@ namespace mongo {
                 /* NOTE: this is SLOW.  this is not good, noteLocation() was designed to be called across getMore
                     blocks.  here we might call millions of times which would be bad.
                     */
-                cc->c()->noteLocation();
+                cc->c()->prepareToTouchEarlierIterate();
             }
 
             if ( logop ) {
@@ -136,7 +134,7 @@ namespace mongo {
             if ( justOne ) {
                 break;
             }
-            cc->c()->checkLocation();
+            cc->c()->recoverFromTouchingEarlierIterate();
          
             if( !god ) 
                 getDur().commitIfNeeded();

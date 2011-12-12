@@ -1091,7 +1091,7 @@ namespace mongo {
                     // *****************
                 }
 
-                if ( c->matcher() && !c->matcher()->matchesCurrent( c.get(), &details ) ) {
+                if ( !c->currentMatches( &details ) ) {
                     c->advance();
 
                     if ( nscanned % 256 == 0 && ! atomic ) {
@@ -1172,10 +1172,10 @@ namespace mongo {
                     bool indexHack = multi && ( modsIsIndexed || ! mss->canApplyInPlace() );
 
                     if ( indexHack ) {
-                        if ( cc.get() )
-                            cc->updateLocation();
-                        else
-                            c->noteLocation();
+                        if ( cc.get() ) {
+                            cc->setDoingDeletes( true );
+                        }
+                        c->prepareToTouchEarlierIterate();
                     }
 
                     if ( modsIsIndexed <= 0 && mss->canApplyInPlace() ) {
@@ -1228,7 +1228,7 @@ namespace mongo {
                     if ( ! multi )
                         return UpdateResult( 1 , 1 , numModded );
                     if ( indexHack )
-                        c->checkLocation();
+                        c->recoverFromTouchingEarlierIterate();
 
                     if ( nscanned % 64 == 0 && ! atomic ) {
                         if ( cc.get() == 0 ) {
