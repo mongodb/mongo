@@ -421,12 +421,7 @@ __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 
 		/*
 		 * Close: discarding all of the file's pages from the cache.
-		 * Force: evict a single page from the cache.
 		 *  Sync: only dirty pages need to be written.
-		 *
-		 * Note that this isn't the primary path where we find a page
-		 * being forced from the cache, we just happened to stumble on
-		 * it during a sync.
 		 */
 		if (F_ISSET(er, WT_EVICT_REQ_CLOSE))
 			WT_RET(__wt_rec_evict(session, page, WT_REC_SINGLE));
