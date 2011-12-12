@@ -30,10 +30,6 @@ Serial('evict_file', 'WT_SERIAL_EVICT', [
 		SerialArg('int', 'close_method'),
 	]),
 
-Serial('evict_page', 'WT_SERIAL_REENTER', [
-		SerialArg('WT_PAGE *', 'page'),
-	]),
-
 Serial('insert', 'WT_SERIAL_FUNC', [
 		SerialArg('WT_PAGE *', 'page'),
 		SerialArg('uint32_t', 'write_gen'),

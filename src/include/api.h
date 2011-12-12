@@ -59,7 +59,6 @@ typedef	enum {
 	WT_SERIAL_NONE=0,		/* No request */
 	WT_SERIAL_FUNC=1,		/* Function, then return */
 	WT_SERIAL_EVICT=2,		/* Function, then schedule evict */
-	WT_SERIAL_REENTER=3,	/* Call function from inside a serialized op */
 } wq_state_t;
 
 /* Get the connection implementation for a session */
@@ -96,7 +95,6 @@ struct __wt_session_impl {
 	u_int	scratch_alloc;		/* Currently allocated */
 
 					/* Serialized operation state */
-	wq_state_t volatile wq_state;	/* Request state */
 	void	*wq_args;		/* Operation arguments */
 	int	wq_sleeping;		/* Thread is blocked */
 	int	wq_ret;			/* Return value */

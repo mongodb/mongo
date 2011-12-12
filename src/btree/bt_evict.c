@@ -140,18 +140,18 @@ __wt_evict_file_serial_func(WT_SESSION_IMPL *session)
 }
 
 /*
- * __evict_page_serial_func --
- *	Eviction serialization function called when a page needs to be forced
- *	out due to the volume of inserts.
+ * __wt_evict_page_request --
+ *	Schedule a page for forced eviction due to a high volume of inserts or
+ *	updates.
+ *
+ *	NOTE: this function is called from inside serialized functions, so it
+ *	is holding the serial lock.
  */
-void
-__wt_evict_page_serial_func(WT_SESSION_IMPL *session)
+int
+__wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CACHE *cache;
 	WT_EVICT_REQ *er, *er_end;
-	WT_PAGE *page;
-
-	__wt_evict_page_unpack(session, &page);
 
 	cache = S2C(session)->cache;
 
@@ -160,11 +160,11 @@ __wt_evict_page_serial_func(WT_SESSION_IMPL *session)
 		if (er->session == NULL) {
 			__evict_req_set(session, er, page, WT_EVICT_REQ_PAGE);
 			__wt_evict_server_wake(session);
-			return;
+			return (0);
 		}
 
 	__wt_errx(session, "eviction server request table full");
-	__wt_session_serialize_wrapup(session, NULL, WT_ERROR);
+	return (WT_ERROR);
 }
 
 /*

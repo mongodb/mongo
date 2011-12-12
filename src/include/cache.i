@@ -59,7 +59,7 @@ __wt_eviction_page_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * We're already inside a serialized function, so we need to
 		 * take some care.
 		 */
-		WT_RET(__wt_evict_page_serial(session, page));
+		WT_RET(__wt_evict_page_request(session, page));
 	} else
 		__wt_eviction_check(session, NULL);
 

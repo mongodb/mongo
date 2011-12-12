@@ -33,13 +33,11 @@ __wt_session_serialize_func(WT_SESSION_IMPL *session,
 	session->wq_sleeping = (op == WT_SERIAL_EVICT);
 
 	/* Functions are serialized by holding a spinlock. */
-	if (op != WT_SERIAL_REENTER)
-		__wt_spin_lock(session, &conn->serial_lock);
+	__wt_spin_lock(session, &conn->serial_lock);
 
 	func(session);
 
-	if (op != WT_SERIAL_REENTER)
-		__wt_spin_unlock(session, &conn->serial_lock);
+	__wt_spin_unlock(session, &conn->serial_lock);
 
 	switch (op) {
 	case WT_SERIAL_EVICT:
@@ -76,9 +74,6 @@ __wt_session_serialize_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int ret)
 		(void)__wt_eviction_page_check(session, page);
 	}
 
-	/* Set the return value. */
-	session->wq_ret = ret;
-
 	/*
 	 * Publish: there must be a barrier to ensure the return value is set
 	 * before the calling thread can see its results, and the page's new
@@ -88,7 +83,7 @@ __wt_session_serialize_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int ret)
 	 * they will have to retry their update for reading an old version of
 	 * the page.
 	 */
-	WT_PUBLISH(session->wq_state, WT_SERIAL_NONE);
+       WT_PUBLISH(session->wq_ret, ret);
 
 	/* If the calling thread is sleeping, wake it up. */
 	if (session->wq_sleeping)

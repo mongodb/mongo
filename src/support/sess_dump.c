@@ -8,8 +8,6 @@
 #include "wt_internal.h"
 
 #ifdef HAVE_DIAGNOSTIC
-static const char *__wt_session_print_state(WT_SESSION_IMPL *);
-
 /*
  * __wt_session_dump_all --
  *	Dump information about all open sessions.
@@ -44,8 +42,6 @@ __wt_session_dump(WT_SESSION_IMPL *session)
 	    session->name == NULL ? "" : session->name,
 	    session->name == NULL ? "" : " ", session);
 
-	__wt_msg(session, "\tstate: %s", __wt_session_print_state(session));
-
 	first = 0;
 	TAILQ_FOREACH(cursor, &session->file_cursors, q) {
 		if (++first == 1)
@@ -68,26 +64,5 @@ __wt_session_dump(WT_SESSION_IMPL *session)
 		__wt_msg(session, "\t\t%[" PRIu32 "]", WT_PADDR(hp->page));
 #endif
 	}
-}
-
-/*
- * __wt_session_print_state --
- *	Return the WT_SESSION_IMPL state as a string.
- */
-static const char *
-__wt_session_print_state(WT_SESSION_IMPL *session)
-{
-	switch (session->wq_state) {
-	case WT_SERIAL_EVICT:
-		return ("evict");
-	case WT_SERIAL_FUNC:
-		return ("function");
-	case WT_SERIAL_NONE:
-		return ("read");
-	case WT_SERIAL_REENTER:
-		return ("reenter");
-	}
-	return ("unknown");
-	/* NOTREACHED */
 }
 #endif

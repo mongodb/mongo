@@ -198,7 +198,7 @@ extern void __wt_page_out(WT_SESSION_IMPL *session,
     uint32_t flags);
 extern void __wt_evict_server_wake(WT_SESSION_IMPL *session);
 extern void __wt_evict_file_serial_func(WT_SESSION_IMPL *session);
-extern void __wt_evict_page_serial_func(WT_SESSION_IMPL *session);
+extern int __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern void __wt_evict_force_clear(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern void *__wt_cache_evict_server(void *arg);
 extern int __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app);
