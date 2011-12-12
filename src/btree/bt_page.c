@@ -68,12 +68,7 @@ __wt_page_in_func(
 				return (0);
 			}
 			break;
-		default:
-			WT_ASSERT_RET(session,
-			    ref->state == WT_REF_DISK ||
-			    ref->state == WT_REF_LOCKED ||
-			    ref->state == WT_REF_MEM ||
-			    ref->state == WT_REF_READING);
+		WT_ILLEGAL_VALUE(session);
 		}
 
 		/*

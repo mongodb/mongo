@@ -150,7 +150,7 @@ int
 __wt_illegal_value(WT_SESSION_IMPL *session)
 {
 	__wt_errx(session,
-	    "encountered an illegal file format or structure value; restart "
+	    "encountered an illegal file format or internal value; restart "
 	    "the system and verify the underlying files, if corruption is "
 	    "detected use the WT_SESSION salvage method or the wt utility's "
 	    "salvage command to repair the file");
