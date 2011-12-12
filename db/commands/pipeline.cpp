@@ -140,7 +140,9 @@ namespace mongo {
         for(size_t iStep = 0; iStep < nSteps; ++iStep) {
             /* pull out the pipeline element as an object */
             BSONElement pipeElement(pipeline[iStep]);
-            assert(pipeElement.type() == Object); // CW TODO user error
+	    if (pipeElement.type() != Object) {
+		assert(pipeElement.type() == Object); // CW TODO user error
+	    }
             BSONObj bsonObj(pipeElement.Obj());
 
 	    intrusive_ptr<DocumentSource> pSource;
