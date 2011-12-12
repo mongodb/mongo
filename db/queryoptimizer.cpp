@@ -980,6 +980,10 @@ doneCheckOrder:
         }    
     }
     
+    int MultiPlanScanner::currentNPlans() const {
+        return _currentQps.get() ? _currentQps->nPlans() : 0;
+    }
+
     shared_ptr<Cursor> MultiPlanScanner::singleCursor() const {
         const QueryPlan *qp = singlePlan();
         if ( !qp ) {

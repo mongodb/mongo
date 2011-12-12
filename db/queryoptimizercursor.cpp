@@ -21,6 +21,7 @@
 #include "pdfile.h"
 #include "clientcursor.h"
 #include "btree.h"
+#include "queryoptimizercursor.h"
 
 namespace mongo {
     
@@ -32,10 +33,10 @@ namespace mongo {
     class QueryOptimizerCursorOp : public QueryOp {
     public:
         /**
-         * @param aggregateNscanned - shared int counting total nscanned for
+         * @param aggregateNscanned - shared long long counting total nscanned for
          * query ops for all cursors.
          */
-        QueryOptimizerCursorOp( long long &aggregateNscanned, bool requireIndex ) : _matchCount(), _myMatchCount(), _mustAdvance(), _nscanned(), _capped(), _aggregateNscanned( aggregateNscanned ), _yieldRecoveryFailed(), _requireIndex( requireIndex ) {}
+        QueryOptimizerCursorOp( long long &aggregateNscanned, bool requireIndex, int cumulativeCount = 0 ) : _matchCounter( aggregateNscanned, cumulativeCount ), _countingMatches(), _mustAdvance(), _capped(), _yieldRecoveryFailed(), _requireIndex( requireIndex ) {}
         
         virtual void _init() {
             if ( qp().scanAndOrderRequired() ) {
@@ -45,13 +46,20 @@ namespace mongo {
                 throw MsgAssertionException( 9011, "Not an index cursor" );                
             }
             _c = qp().newCursor();
-            verify( 15937, _c->supportYields() ); // The QueryOptimizerCursor::noteLocation() implementation requires _c->prepareToYield() to work.
+
+            // The QueryOptimizerCursor::prepareToTouchEarlierIterate() implementation requires _c->prepareToYield() to work.
+            verify( 15937, _c->supportYields() );
             _capped = _c->capped();
-            mayAdvance();
+
+            // TODO This violates the current Cursor interface abstraction, but for now it's simpler to keep our own set of
+            // dups rather than avoid poisoning the cursor's dup set with unreturned documents.
+            _matchCounter.setCheckDups( _c->isMultiKey() );
+
+            _matchCounter.updateNscanned( _c->nscanned() );
         }
         
         virtual long long nscanned() {
-            return _c ? _c->nscanned() : _nscanned;
+            return _c ? _c->nscanned() : _matchCounter.nscanned();
         }
         
         virtual bool prepareToYield() {
@@ -59,7 +67,7 @@ namespace mongo {
                 _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , _c , qp().ns() ) );
             }
             if ( _cc ) {
-                _posBeforeYield = currLoc();
+                recordCursorLocation();
                 return _cc->prepareToYield( _yieldData );
             }
             // no active cursor - ok to yield
@@ -84,19 +92,28 @@ namespace mongo {
                 }
             }
             else {
-                if ( _posBeforeYield != currLoc() ) {
-                    // If the yield advanced our position, the next next() will be a no op.
-                    _mustAdvance = false;
-                }
+                checkCursorAdvanced();
             }
+        }
+
+        void prepareToTouchEarlierIterate() {
+            recordCursorLocation();
+            if ( _c ) {
+                _c->prepareToTouchEarlierIterate();
+            }
+        }
+
+        void recoverFromTouchingEarlierIterate() {
+            if ( _c ) {
+                _c->recoverFromTouchingEarlierIterate();
+            }
+            checkCursorAdvanced();
         }
         
         virtual void next() {
             mayAdvance();
             
-            if ( _matchCount >= 101 ) {
-                // This is equivalent to the default condition for switching from
-                // a query to a getMore.
+            if ( _matchCounter.enoughCumulativeMatchesToChooseAPlan() ) {
                 setStop();
                 return;
             }
@@ -105,22 +122,20 @@ namespace mongo {
                 return;
             }
             
-            if ( matcher( _c )->matchesCurrent( _c.get() ) && !_c->getsetdup( _c->currLoc() ) ) {
-                ++_myMatchCount;
-                ++_matchCount;
-            }
             _mustAdvance = true;
         }
         virtual QueryOp *_createChild() const {
-            QueryOptimizerCursorOp *ret = new QueryOptimizerCursorOp( _aggregateNscanned, _requireIndex );
-            ret->_matchCount = _matchCount;
-            return ret;
+            return new QueryOptimizerCursorOp( _matchCounter.aggregateNscanned(), _requireIndex, _matchCounter.cumulativeCount() );
         }
         DiskLoc currLoc() const { return _c ? _c->currLoc() : DiskLoc(); }
         BSONObj currKey() const { return _c ? _c->currKey() : BSONObj(); }
+        bool currentMatches( MatchDetails *details ) {
+            bool ret = ( _c && _c->ok() ) ? matcher( _c.get() )->matchesCurrent( _c.get(), details ) : false;
+            _matchCounter.setMatch( ret );
+            return ret;
+        }
         virtual bool mayRecordPlan() const {
-            // Recording after 50 matches is a historical default (101 default limit / 2).
-            return !_yieldRecoveryFailed && complete() && ( !stopRequested() || _myMatchCount > 50 );
+            return !_yieldRecoveryFailed && complete() && ( !stopRequested() || _matchCounter.enoughMatchesToRecordPlan() );
         }
         shared_ptr<Cursor> cursor() const { return _c; }
     private:
@@ -128,23 +143,52 @@ namespace mongo {
             if ( !_c ) {
                 return;
             }
+            if ( countingMatches() ) {
+                if ( !_matchCounter.knowMatch() ) {
+                    currentMatches( 0 );
+                }
+                _matchCounter.countMatch( currLoc() );
+            }
             if ( _mustAdvance ) {
                 _c->advance();
-                _mustAdvance = false;
+                handleCursorAdvanced();
             }
-            _aggregateNscanned += ( _c->nscanned() - _nscanned );
-            _nscanned = _c->nscanned();
+            _matchCounter.updateNscanned( _c->nscanned() );
         }
-        int _matchCount; // cumulative count
-        int _myMatchCount; // count for this QueryOptimizerCursorOp object
+        // Don't count matches on the first call to next(), which occurs before the first result is returned.
+        bool countingMatches() {
+            if ( _countingMatches ) {
+                return true;
+            }
+            _countingMatches = true;
+            return false;
+        }
+
+        void recordCursorLocation() {
+            _posBeforeYield = currLoc();
+        }
+        void checkCursorAdvanced() {
+            // This check will not correctly determine if we are looking at a different document in
+            // all cases, but it is adequate for updating the query plan's match count (just used to pick
+            // plans, not returned to the client) and adjust iteration via _mustAdvance.
+            if ( _posBeforeYield != currLoc() ) {
+                // If the yield advanced our position, the next next() will be a no op.
+                handleCursorAdvanced();
+            }
+        }
+        void handleCursorAdvanced() {
+            _mustAdvance = false;
+            _matchCounter.resetMatch();
+        }
+
+        CachedMatchCounter _matchCounter;
+        bool _countingMatches;
         bool _mustAdvance;
-        long long _nscanned;
         bool _capped;
         shared_ptr<Cursor> _c;
         ClientCursor::CleanupPointer _cc;
         DiskLoc _posBeforeYield;
         ClientCursor::YieldData _yieldData;
-        long long &_aggregateNscanned;
         bool _yieldRecoveryFailed;
         bool _requireIndex;
     };
@@ -191,11 +235,8 @@ namespace mongo {
         virtual DiskLoc currLoc() { return _takeover ? _takeover->currLoc() : _currLoc(); }
         
         DiskLoc _currLoc() const {
-            verify( 14826, !_takeover );
-            if ( _currOp ) {
-                return _currOp->currLoc();
-            }
-            return DiskLoc();
+            dassert( !_takeover );
+            return _currOp ? _currOp->currLoc() : DiskLoc();
         }
         
         virtual bool advance() {
@@ -210,7 +251,10 @@ namespace mongo {
             return _currOp->currKey();
         }
         
-        /** If !_takeover, our cursor will be ignored for yielding by the client cursor implementation. */
+        /**
+         * When return value isNull(), our cursor will be ignored for yielding by the client cursor implementation.
+         * In such cases, an internal ClientCursor will update the position of component cursors when necessary.
+         */
         virtual DiskLoc refLoc() { return _takeover ? _takeover->refLoc() : DiskLoc(); }
         
         virtual BSONObj indexKeyPattern() {
@@ -225,21 +269,32 @@ namespace mongo {
 
         virtual bool supportYields() { return _takeover ? _takeover->supportYields() : true; }
         
-        virtual void noteLocation() {
+        virtual void prepareToTouchEarlierIterate() {
             if ( _takeover ) {
-                _takeover->noteLocation();
+                _takeover->prepareToTouchEarlierIterate();
             }
             else if ( _currOp ) {
-                verify( 15938, _mps->prepareToYield() );
+                if ( _mps->currentNPlans() == 1 ) {
+                    // This single plan version is a bit more performant, so we use it when possible.
+                    _currOp->prepareToTouchEarlierIterate();
+                }
+                else {
+                    verify( 15938, _mps->prepareToYield() );
+                }
             }
         }
 
-        virtual void checkLocation() {
+        virtual void recoverFromTouchingEarlierIterate() {
             if ( _takeover ) {
-                _takeover->checkLocation();
+                _takeover->recoverFromTouchingEarlierIterate();
             }
             else if ( _currOp ) {
-                recoverFromYield();
+                if ( _mps->currentNPlans() == 1 ) {
+                    _currOp->recoverFromTouchingEarlierIterate();
+                }
+                else {
+                    recoverFromYield();
+                }
             }
         }
 
@@ -292,7 +347,10 @@ namespace mongo {
         }
         
         virtual bool modifiedKeys() const { return true; }
-        
+
+        /** Initial capped wrapping cases (before takeover) are handled internally by a component ClientCursor. */
+        virtual bool capped() const { return _takeover ? _takeover->capped() : false; }
+
         virtual long long nscanned() { return _takeover ? _takeover->nscanned() : _nscanned; }
 
         /** @return the matcher for the takeover cursor or current active op. */
@@ -313,6 +371,14 @@ namespace mongo {
             return _currOp->matcher( _currOp->cursor() ).get();
         }
 
+        virtual bool currentMatches( MatchDetails *details = 0 ) {
+            if ( _takeover ) {
+                return _takeover->currentMatches( details );
+            }
+            assertOk();
+            return _currOp->currentMatches( details );
+        }
+
     private:
         bool _advance( bool force ) {
             if ( _takeover ) {
@@ -323,17 +389,27 @@ namespace mongo {
                 return false;
             }
 
+            DiskLoc prevLoc = _currLoc();
+
             _currOp = 0;
             shared_ptr<QueryOp> op = _mps->nextOp();
             rethrowOnError( op );
 
-            QueryOptimizerCursorOp *qocop = dynamic_cast<QueryOptimizerCursorOp*>( op.get() );
+            // Avoiding dynamic_cast here for performance.  Soon we won't need to
+            // do a cast at all.
+            QueryOptimizerCursorOp *qocop = (QueryOptimizerCursorOp*)( op.get() );
+
             if ( !op->complete() ) {
                 // 'qocop' will be valid until we call _mps->nextOp() again.
                 _currOp = qocop;
             }
             else if ( op->stopRequested() ) {
                 if ( qocop->cursor() ) {
+                    // This ensures that prepareToTouchEarlierIterate() may be called safely when a BasicCursor takes over.
+                    if ( !prevLoc.isNull() && prevLoc == qocop->currLoc() ) {
+                        qocop->cursor()->advance();
+                    }
+                    // Clears the Runner and any unnecessary QueryOps and their ClientCursors.
                     _mps->clearRunner();
                     _takeover.reset( new MultiCursor( _mps,
                                                      qocop->cursor(),
@@ -358,21 +434,22 @@ namespace mongo {
 
         /** Insert and check for dups before takeover occurs */
         bool getsetdupInternal(const DiskLoc &loc) {
-            pair<set<DiskLoc>::iterator, bool> p = _dups.insert(loc);
-            return !p.second;
+            return _dups.getsetdup( loc );
         }
 
         /** Just check for dups - after takeover occurs */
         bool getdupInternal(const DiskLoc &loc) {
-            return _dups.count( loc ) > 0;
+            dassert( _takeover );
+            return _dups.getdup( loc );
         }
         
         auto_ptr<MultiPlanScanner> _mps;
         shared_ptr<QueryOptimizerCursorOp> _originalOp;
         QueryOptimizerCursorOp *_currOp;
-        set<DiskLoc> _dups;
         shared_ptr<Cursor> _takeover;
         long long _nscanned;
+        // Using a SmallDupSet seems a bit hokey, but I've measured a 5% performance improvement with ~100 document non multi key scans.
+        SmallDupSet _dups;
     };
     
     shared_ptr<Cursor> newQueryOptimizerCursor( auto_ptr<MultiPlanScanner> mps, bool requireIndex ) {

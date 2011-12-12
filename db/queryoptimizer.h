@@ -431,6 +431,8 @@ namespace mongo {
         /** Clear the runner member. */
         void clearRunner();
         
+        int currentNPlans() const;
+
         /**
          * @return a single simple cursor if the scanner would run a single cursor
          * for this query, otherwise return an empty shared_ptr.
@@ -535,6 +537,8 @@ namespace mongo {
 
         virtual shared_ptr< CoveredIndexMatcher > matcherPtr() const { return _matcher; }
         virtual CoveredIndexMatcher* matcher() const { return _matcher.get(); }
+
+        virtual bool capped() const { return _c->capped(); }
 
         /** return -1 if we're a getmore handoff */
         virtual long long nscanned() { return _nscanned >= 0 ? _nscanned + _c->nscanned() : _nscanned; }
