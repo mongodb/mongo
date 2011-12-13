@@ -26,8 +26,8 @@ function checkYield( dropCollection, fastCount, query ) {
 
         printjson( query );
         count = t.count( query );
-        // Changing documents or dropping collection changes the return value of count,
-        // indicating that a yield occurred.    
+        // We test that count yields by requesting a concurrent operation modifying the collection
+        // and checking that the count result is modified.
         print( 'count: ' + count + ', nDocs: ' + nDocs );
         if ( count < nDocs ) {
             passed = true;
