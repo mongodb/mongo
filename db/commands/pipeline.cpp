@@ -24,6 +24,7 @@
 #include "db/pipeline/expression.h"
 #include "db/pipeline/expression_context.h"
 #include "db/pdfile.h"
+#include "util/mongoutils/str.h"
 
 namespace mongo {
 

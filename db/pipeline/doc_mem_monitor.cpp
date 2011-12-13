@@ -51,8 +51,8 @@ namespace mongo {
 	    }
 	}
 	
-	if (errorLimit && (totalUsed > errorLimit)) {
-	    assert(false); // CW TODO error document memory exceeds limit...
+	if (errorLimit) {
+	    uassert(15944, "terminating request:  request heap use exceeded 10% of physical RAM", (totalUsed <= errorLimit));
 	}
     }
 

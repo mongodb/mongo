@@ -83,14 +83,19 @@ namespace mongo {
 
     void DocumentSourceProject::addField(
         const string &fieldName, const intrusive_ptr<Expression> &pExpression) {
-        assert(pExpression); // CW TODO must be a non-null expression
+	uassert(15960,
+		"projection fields must be defined by non-empty expressions",
+		pExpression);
 
 	pEO->addField(fieldName, pExpression);
     }
 
     void DocumentSourceProject::includePath(const string &fieldPath) {
 	if (Document::idName.compare(fieldPath) == 0) {
-	    assert(!excludeId); // included by default, don't allow switching
+	    uassert(15961, str::stream() << projectName <<
+		    ":  _id cannot be included once it has been excluded",
+		    !excludeId);
+
 	    return;
 	}
 

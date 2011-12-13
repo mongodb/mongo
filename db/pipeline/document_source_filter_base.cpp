@@ -73,7 +73,7 @@ namespace mongo {
         if (unstarted)
             findNext();
 
-        assert(pCurrent.get() != NULL); // CW TODO error
+        assert(pCurrent.get() != NULL);
         return pCurrent;
     }
 

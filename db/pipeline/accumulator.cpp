@@ -18,12 +18,17 @@
 #include "db/pipeline/accumulator.h"
 
 #include "db/jsobj.h"
+#include "util/mongoutils/str.h"
 
 namespace mongo {
+    using namespace mongoutils;
 
     void Accumulator::addOperand(
         const intrusive_ptr<Expression> &pExpression) {
-        assert(vpOperand.size() < 1); // CW TODO error: no more than one arg
+	uassert(15943, str::stream() << "group accumulator " <<
+		getOpName() << " only accepts one operand",
+		vpOperand.size() < 1);
+	
         ExpressionNary::addOperand(pExpression);
     }
 
@@ -52,24 +57,5 @@ namespace mongo {
 
     void agg_framework_reservedErrors()
     {
-	uassert(15943, "reserved error", false);
-	uassert(15944, "reserved error", false);
-	uassert(15945, "reserved error", false);
-	uassert(15946, "reserved error", false);
-	uassert(15947, "reserved error", false);
-	uassert(15948, "reserved error", false);
-	uassert(15949, "reserved error", false);
-	uassert(15950, "reserved error", false);
-	uassert(15951, "reserved error", false);
-	uassert(15952, "reserved error", false);
-	uassert(15953, "reserved error", false);
-	uassert(15954, "reserved error", false);
-	uassert(15955, "reserved error", false);
-	uassert(15956, "reserved error", false);
-	uassert(15957, "reserved error", false);
-	uassert(15958, "reserved error", false);
-	uassert(15959, "reserved error", false);
-	uassert(15960, "reserved error", false);
-	uassert(15961, "reserved error", false);
     }
 }

@@ -68,13 +68,15 @@ namespace mongo {
     intrusive_ptr<DocumentSource> DocumentSourceLimit::createFromBson(
 	BSONElement *pBsonElement,
 	const intrusive_ptr<ExpressionContext> &pCtx) {
-        assert(pBsonElement->isNumber()); // CW TODO must be a number
+	uassert(15957, "the limit must be specified as a number",
+		pBsonElement->isNumber());
 
         intrusive_ptr<DocumentSourceLimit> pLimit(
 	    DocumentSourceLimit::create(pCtx));
 
         pLimit->limit = (int)pBsonElement->numberLong();
-        assert(pLimit->limit > 0); // CW TODO error code
+	uassert(15958, "the limit must be positive",
+		pLimit->limit > 0);
 
         return pLimit;
     }

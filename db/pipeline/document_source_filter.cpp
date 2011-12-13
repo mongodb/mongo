@@ -67,8 +67,8 @@ namespace mongo {
     intrusive_ptr<DocumentSource> DocumentSourceFilter::createFromBson(
 	BSONElement *pBsonElement,
 	const intrusive_ptr<ExpressionContext> &pCtx) {
-        assert(pBsonElement->type() == Object);
-        // CW TODO error: expression object must be an object
+	uassert(15946, "a document filter expression must be an object",
+		pBsonElement->type() == Object);
 
 	Expression::ObjectCtx oCtx(0);
         intrusive_ptr<Expression> pExpression(
