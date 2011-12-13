@@ -1,419 +1,89 @@
-/* DO NOT EDIT: automatically built by dist/serial.py. */
+/*-
+ * See the file LICENSE for redistribution information.
+ *
+ * Copyright (c) 2008-2011 WiredTiger, Inc.
+ *	All rights reserved.
+ */
 
-typedef struct {
-	WT_INSERT_HEAD **inshead;
-	WT_INSERT ***ins_stack;
-	WT_INSERT_HEAD **new_inslist;
-	size_t new_inslist_size;
-	int new_inslist_taken;
-	WT_INSERT_HEAD *new_inshead;
-	size_t new_inshead_size;
-	int new_inshead_taken;
-	WT_INSERT *new_ins;
-	size_t new_ins_size;
-	int new_ins_taken;
-	u_int skipdepth;
-} __wt_col_append_args;
-
+/*
+ * Serialization: serialization support allows scheduling operations requiring
+ * serialized access to a piece of memory, normally by a different thread of
+ * control.  This includes updating and evicting pages from trees.
+ *
+ * __wt_session_serialize_func --
+ *	Schedule a serialization request, and block or spin until it completes.
+ */
 static inline int
-__wt_col_append_serial(
-	WT_SESSION_IMPL *session, WT_INSERT_HEAD **inshead, WT_INSERT
-	***ins_stack, WT_INSERT_HEAD ***new_inslistp, size_t new_inslist_size,
-	WT_INSERT_HEAD **new_insheadp, size_t new_inshead_size, WT_INSERT
-	**new_insp, size_t new_ins_size, u_int skipdepth)
+__wt_session_serialize_func(WT_SESSION_IMPL *session,
+    wq_state_t op, void (*func)(WT_SESSION_IMPL *), void *args)
 {
-	__wt_col_append_args _args, *args = &_args;
-	int ret;
+	WT_CONNECTION_IMPL *conn;
 
-	args->inshead = inshead;
+	conn = S2C(session);
 
-	args->ins_stack = ins_stack;
+	/*
+	 * Threads serializing access to data using a function:
+	 *	call the function while holding a spinlock
+	 *	update the session sleeping state, and
+	 *	if necessary, block until an async action completes.
+	 */
+	session->wq_args = args;
+	session->wq_sleeping = (op == WT_SERIAL_EVICT);
 
-	if (new_inslistp == NULL)
-		args->new_inslist = NULL;
-	else {
-		args->new_inslist = *new_inslistp;
-		*new_inslistp = NULL;
-		args->new_inslist_size = new_inslist_size;
+	/* Functions are serialized by holding a spinlock. */
+	__wt_spin_lock(session, &conn->serial_lock);
+
+	func(session);
+
+	__wt_spin_unlock(session, &conn->serial_lock);
+
+	switch (op) {
+	case WT_SERIAL_EVICT:
+		__wt_evict_server_wake(session);
+		break;
+	default:
+		break;
 	}
-	args->new_inslist_taken = 0;
 
-	if (new_insheadp == NULL)
-		args->new_inshead = NULL;
-	else {
-		args->new_inshead = *new_insheadp;
-		*new_insheadp = NULL;
-		args->new_inshead_size = new_inshead_size;
+	/*
+	 * If we are waiting on a server thread, block on the session condition
+	 * variable: when the operation is complete, this will be notified and
+	 * we can continue.
+	 */
+	if (session->wq_sleeping)
+		__wt_cond_wait(session, session->cond);
+	return (session->wq_ret);
+}
+
+/*
+ * __wt_session_serialize_wrapup --
+ *	Server function cleanup.
+ */
+static inline void
+__wt_session_serialize_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int ret)
+{
+	if (ret == 0 && page != NULL) {
+		/*
+		 * If passed a page and the return value is OK, we modified the
+		 * page.  Wake the eviction server as necessary if the page
+		 * has become too large.
+		 */
+		ret = __wt_page_set_modified(session, page);
+		(void)__wt_eviction_page_check(session, page);
 	}
-	args->new_inshead_taken = 0;
 
-	if (new_insp == NULL)
-		args->new_ins = NULL;
-	else {
-		args->new_ins = *new_insp;
-		*new_insp = NULL;
-		args->new_ins_size = new_ins_size;
-	}
-	args->new_ins_taken = 0;
-
-	args->skipdepth = skipdepth;
-
-	ret = __wt_session_serialize_func(session,
-	    WT_SERIAL_FUNC, __wt_col_append_serial_func, args);
-
-	if (!args->new_inslist_taken)
-		__wt_free(session, args->new_inslist);
-	if (!args->new_inshead_taken)
-		__wt_free(session, args->new_inshead);
-	if (!args->new_ins_taken)
-		__wt_sb_decrement(session, args->new_ins->sb, args->new_ins);
-	return (ret);
-}
-
-static inline void
-__wt_col_append_unpack(
-	WT_SESSION_IMPL *session, WT_INSERT_HEAD ***insheadp, WT_INSERT
-	****ins_stackp, WT_INSERT_HEAD ***new_inslistp, WT_INSERT_HEAD
-	**new_insheadp, WT_INSERT **new_insp, u_int *skipdepthp)
-{
-	__wt_col_append_args *args =
-	    (__wt_col_append_args *)session->wq_args;
-
-	*insheadp = args->inshead;
-	*ins_stackp = args->ins_stack;
-	*new_inslistp = args->new_inslist;
-	*new_insheadp = args->new_inshead;
-	*new_insp = args->new_ins;
-	*skipdepthp = args->skipdepth;
-}
-
-static inline void
-__wt_col_append_new_inslist_taken(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	__wt_col_append_args *args =
-	    (__wt_col_append_args *)session->wq_args;
-
-	args->new_inslist_taken = 1;
-
-	WT_ASSERT(session, args->new_inslist_size != 0);
-	__wt_cache_page_inmem_incr(session, page, args->new_inslist_size);
-}
-
-static inline void
-__wt_col_append_new_inshead_taken(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	__wt_col_append_args *args =
-	    (__wt_col_append_args *)session->wq_args;
-
-	args->new_inshead_taken = 1;
-
-	WT_ASSERT(session, args->new_inshead_size != 0);
-	__wt_cache_page_inmem_incr(session, page, args->new_inshead_size);
-}
-
-static inline void
-__wt_col_append_new_ins_taken(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	__wt_col_append_args *args =
-	    (__wt_col_append_args *)session->wq_args;
-
-	args->new_ins_taken = 1;
-
-	WT_ASSERT(session, args->new_ins_size != 0);
-	__wt_cache_page_inmem_incr(session, page, args->new_ins_size);
-}
-
-typedef struct {
-	int close_method;
-} __wt_evict_file_args;
-
-static inline int
-__wt_evict_file_serial(
-	WT_SESSION_IMPL *session, int close_method)
-{
-	__wt_evict_file_args _args, *args = &_args;
-	int ret;
-
-	args->close_method = close_method;
-
-	ret = __wt_session_serialize_func(session,
-	    WT_SERIAL_EVICT, __wt_evict_file_serial_func, args);
-
-	return (ret);
-}
-
-static inline void
-__wt_evict_file_unpack(
-	WT_SESSION_IMPL *session, int *close_methodp)
-{
-	__wt_evict_file_args *args =
-	    (__wt_evict_file_args *)session->wq_args;
-
-	*close_methodp = args->close_method;
-}
-
-typedef struct {
-	WT_PAGE *page;
-	uint32_t write_gen;
-	WT_INSERT_HEAD **inshead;
-	WT_INSERT ***ins_stack;
-	WT_INSERT_HEAD **new_inslist;
-	size_t new_inslist_size;
-	int new_inslist_taken;
-	WT_INSERT_HEAD *new_inshead;
-	size_t new_inshead_size;
-	int new_inshead_taken;
-	WT_INSERT *new_ins;
-	size_t new_ins_size;
-	int new_ins_taken;
-	u_int skipdepth;
-} __wt_insert_args;
-
-static inline int
-__wt_insert_serial(
-	WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t write_gen,
-	WT_INSERT_HEAD **inshead, WT_INSERT ***ins_stack, WT_INSERT_HEAD
-	***new_inslistp, size_t new_inslist_size, WT_INSERT_HEAD
-	**new_insheadp, size_t new_inshead_size, WT_INSERT **new_insp, size_t
-	new_ins_size, u_int skipdepth)
-{
-	__wt_insert_args _args, *args = &_args;
-	int ret;
-
-	args->page = page;
-
-	args->write_gen = write_gen;
-
-	args->inshead = inshead;
-
-	args->ins_stack = ins_stack;
-
-	if (new_inslistp == NULL)
-		args->new_inslist = NULL;
-	else {
-		args->new_inslist = *new_inslistp;
-		*new_inslistp = NULL;
-		args->new_inslist_size = new_inslist_size;
-	}
-	args->new_inslist_taken = 0;
-
-	if (new_insheadp == NULL)
-		args->new_inshead = NULL;
-	else {
-		args->new_inshead = *new_insheadp;
-		*new_insheadp = NULL;
-		args->new_inshead_size = new_inshead_size;
-	}
-	args->new_inshead_taken = 0;
-
-	if (new_insp == NULL)
-		args->new_ins = NULL;
-	else {
-		args->new_ins = *new_insp;
-		*new_insp = NULL;
-		args->new_ins_size = new_ins_size;
-	}
-	args->new_ins_taken = 0;
-
-	args->skipdepth = skipdepth;
-
-	ret = __wt_session_serialize_func(session,
-	    WT_SERIAL_FUNC, __wt_insert_serial_func, args);
-
-	if (!args->new_inslist_taken)
-		__wt_free(session, args->new_inslist);
-	if (!args->new_inshead_taken)
-		__wt_free(session, args->new_inshead);
-	if (!args->new_ins_taken)
-		__wt_sb_decrement(session, args->new_ins->sb, args->new_ins);
-	return (ret);
-}
-
-static inline void
-__wt_insert_unpack(
-	WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t *write_genp,
-	WT_INSERT_HEAD ***insheadp, WT_INSERT ****ins_stackp, WT_INSERT_HEAD
-	***new_inslistp, WT_INSERT_HEAD **new_insheadp, WT_INSERT **new_insp,
-	u_int *skipdepthp)
-{
-	__wt_insert_args *args =
-	    (__wt_insert_args *)session->wq_args;
-
-	*pagep = args->page;
-	*write_genp = args->write_gen;
-	*insheadp = args->inshead;
-	*ins_stackp = args->ins_stack;
-	*new_inslistp = args->new_inslist;
-	*new_insheadp = args->new_inshead;
-	*new_insp = args->new_ins;
-	*skipdepthp = args->skipdepth;
-}
-
-static inline void
-__wt_insert_new_inslist_taken(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	__wt_insert_args *args =
-	    (__wt_insert_args *)session->wq_args;
-
-	args->new_inslist_taken = 1;
-
-	WT_ASSERT(session, args->new_inslist_size != 0);
-	__wt_cache_page_inmem_incr(session, page, args->new_inslist_size);
-}
-
-static inline void
-__wt_insert_new_inshead_taken(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	__wt_insert_args *args =
-	    (__wt_insert_args *)session->wq_args;
-
-	args->new_inshead_taken = 1;
-
-	WT_ASSERT(session, args->new_inshead_size != 0);
-	__wt_cache_page_inmem_incr(session, page, args->new_inshead_size);
-}
-
-static inline void
-__wt_insert_new_ins_taken(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	__wt_insert_args *args =
-	    (__wt_insert_args *)session->wq_args;
-
-	args->new_ins_taken = 1;
-
-	WT_ASSERT(session, args->new_ins_size != 0);
-	__wt_cache_page_inmem_incr(session, page, args->new_ins_size);
-}
-
-typedef struct {
-	WT_PAGE *page;
-	WT_ROW *row_arg;
-	WT_IKEY *ikey;
-} __wt_row_key_args;
-
-static inline int
-__wt_row_key_serial(
-	WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *row_arg, WT_IKEY
-	*ikey)
-{
-	__wt_row_key_args _args, *args = &_args;
-	int ret;
-
-	args->page = page;
-
-	args->row_arg = row_arg;
-
-	args->ikey = ikey;
-
-	ret = __wt_session_serialize_func(session,
-	    WT_SERIAL_FUNC, __wt_row_key_serial_func, args);
-
-	return (ret);
-}
-
-static inline void
-__wt_row_key_unpack(
-	WT_SESSION_IMPL *session, WT_PAGE **pagep, WT_ROW **row_argp, WT_IKEY
-	**ikeyp)
-{
-	__wt_row_key_args *args =
-	    (__wt_row_key_args *)session->wq_args;
-
-	*pagep = args->page;
-	*row_argp = args->row_arg;
-	*ikeyp = args->ikey;
-}
-
-typedef struct {
-	WT_PAGE *page;
-	uint32_t write_gen;
-	WT_UPDATE **srch_upd;
-	WT_UPDATE **new_upd;
-	size_t new_upd_size;
-	int new_upd_taken;
-	WT_UPDATE *upd;
-	size_t upd_size;
-	int upd_taken;
-} __wt_update_args;
-
-static inline int
-__wt_update_serial(
-	WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t write_gen, WT_UPDATE
-	**srch_upd, WT_UPDATE ***new_updp, size_t new_upd_size, WT_UPDATE
-	**updp, size_t upd_size)
-{
-	__wt_update_args _args, *args = &_args;
-	int ret;
-
-	args->page = page;
-
-	args->write_gen = write_gen;
-
-	args->srch_upd = srch_upd;
-
-	if (new_updp == NULL)
-		args->new_upd = NULL;
-	else {
-		args->new_upd = *new_updp;
-		*new_updp = NULL;
-		args->new_upd_size = new_upd_size;
-	}
-	args->new_upd_taken = 0;
-
-	if (updp == NULL)
-		args->upd = NULL;
-	else {
-		args->upd = *updp;
-		*updp = NULL;
-		args->upd_size = upd_size;
-	}
-	args->upd_taken = 0;
-
-	ret = __wt_session_serialize_func(session,
-	    WT_SERIAL_FUNC, __wt_update_serial_func, args);
-
-	if (!args->new_upd_taken)
-		__wt_free(session, args->new_upd);
-	if (!args->upd_taken)
-		__wt_sb_decrement(session, args->upd->sb, args->upd);
-	return (ret);
-}
-
-static inline void
-__wt_update_unpack(
-	WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t *write_genp,
-	WT_UPDATE ***srch_updp, WT_UPDATE ***new_updp, WT_UPDATE **updp)
-{
-	__wt_update_args *args =
-	    (__wt_update_args *)session->wq_args;
-
-	*pagep = args->page;
-	*write_genp = args->write_gen;
-	*srch_updp = args->srch_upd;
-	*new_updp = args->new_upd;
-	*updp = args->upd;
-}
-
-static inline void
-__wt_update_new_upd_taken(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	__wt_update_args *args =
-	    (__wt_update_args *)session->wq_args;
-
-	args->new_upd_taken = 1;
-
-	WT_ASSERT(session, args->new_upd_size != 0);
-	__wt_cache_page_inmem_incr(session, page, args->new_upd_size);
-}
-
-static inline void
-__wt_update_upd_taken(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	__wt_update_args *args =
-	    (__wt_update_args *)session->wq_args;
-
-	args->upd_taken = 1;
-
-	WT_ASSERT(session, args->upd_size != 0);
-	__wt_cache_page_inmem_incr(session, page, args->upd_size);
+	/*
+	 * Publish: there must be a barrier to ensure the return value is set
+	 * before the calling thread can see its results, and the page's new
+	 * write generation makes it to memory.  The latter isn't a correctness
+	 * issue, the write generation just needs to be updated so that readers
+	 * get credit for reading the right version of the page, otherwise,
+	 * they will have to retry their update for reading an old version of
+	 * the page.
+	 */
+       WT_PUBLISH(session->wq_ret, ret);
+
+	/* If the calling thread is sleeping, wake it up. */
+	if (session->wq_sleeping)
+		__wt_cond_signal(session, session->cond);
 }

@@ -178,6 +178,7 @@ struct __wt_update;
 
 #include "bitstring.i"
 #include "btree.i"
+#include "cache.i"
 #include "cell.i"
 #include "column.i"
 #include "cursor.i"
@@ -186,9 +187,7 @@ struct __wt_update;
 #include "packing.i"
 #include "progress.i"
 #include "serial.i"
-
-/* Requires serial.i */
-#include "cache.i"
+#include "serial_funcs.i"
 
 #if defined(__cplusplus)
 }

@@ -679,13 +679,6 @@ extern void __wt_scr_free(WT_BUF **bufp);
 extern void __wt_scr_discard(WT_SESSION_IMPL *session);
 extern void *__wt_scr_alloc_ext(WT_SESSION *wt_session, size_t size);
 extern void __wt_scr_free_ext(WT_SESSION *wt_session, void *p);
-extern int __wt_session_serialize_func(WT_SESSION_IMPL *session,
-    wq_state_t op,
-    void (*func)(WT_SESSION_IMPL *),
-    void *args);
-extern void __wt_session_serialize_wrapup(WT_SESSION_IMPL *session,
-    WT_PAGE *page,
-    int ret);
 extern int __wt_sb_alloc( WT_SESSION_IMPL *session,
     size_t size,
     void *retp,

@@ -165,7 +165,7 @@ static inline void\n__wt_''' + entry.name + '_' + l.name + '''_taken(WT_SESSION_
 ''')
 
 #####################################################################
-# Update serial.i.
+# Update serial_funcs.i.
 #####################################################################
 tmp_file = '__tmp'
 tfile = open(tmp_file, 'w')
@@ -176,4 +176,4 @@ for entry in msgtypes:
 
 tfile.close()
 
-compare_srcfile(tmp_file, '../src/include/serial.i')
+compare_srcfile(tmp_file, '../src/include/serial_funcs.i')

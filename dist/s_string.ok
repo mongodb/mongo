@@ -251,6 +251,7 @@ fsync
 fsyncs
 ftruncate
 func
+funcs
 gcc
 gdb
 getone
