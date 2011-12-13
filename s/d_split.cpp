@@ -136,14 +136,10 @@ namespace mongo {
         virtual void help( stringstream &help ) const {
             help << "Internal command.\n";
         }
-        virtual string parseNs(const string& dbname, const BSONObj& cmdObj) const { 
-            return parseNsFullyQualified(dbname, cmdObj);
-        }
+
         bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
 
             const char* ns = jsobj.getStringField( "checkShardingIndex" );
-            NamespaceString str(ns);
-            assert( str.db == dbname );
             BSONObj keyPattern = jsobj.getObjectField( "keyPattern" );
 
             if ( keyPattern.nFields() == 1 && str::equals( "_id" , keyPattern.firstElementFieldName() ) ) {
