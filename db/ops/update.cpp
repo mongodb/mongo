@@ -1169,7 +1169,7 @@ namespace mongo {
 
                     auto_ptr<ModSetState> mss = useMods->prepare( onDisk );
 
-                    bool indexHack = multi && ( modsIsIndexed || ! mss->canApplyInPlace() );
+                    bool indexHack = multi && c->ok() && ( modsIsIndexed || ! mss->canApplyInPlace() );
 
                     if ( indexHack ) {
                         if ( cc.get() ) {
