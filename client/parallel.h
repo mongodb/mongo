@@ -134,6 +134,9 @@ namespace mongo {
 
         DBClientCursor* raw() { return _cursor.get(); }
 
+        // Required for new PCursor
+        void release(){ _cursor.release(); }
+
     private:
         void _advance();
 
@@ -233,10 +236,69 @@ namespace mongo {
         bool isEmpty(){
             return versionedNS.size() == 0;
         }
+
+        string toString() const {
+            return str::stream() << "CInfo " << BSON( "v_ns" << versionedNS << "filter" << cmdFilter );
+        }
     };
+
+    class ShardConnection;
+    typedef shared_ptr<ShardConnection> ShardConnectionPtr;
+
+    class DBClientCursor;
+    typedef shared_ptr<DBClientCursor> DBClientCursorPtr;
+
+    class Shard;
+    typedef shared_ptr<Shard> ShardPtr;
 
     class ChunkManager;
     typedef shared_ptr<const ChunkManager> ChunkManagerPtr;
+
+    class ParallelConnectionState {
+    public:
+
+        ShardConnectionPtr conn;
+        DBClientCursorPtr cursor;
+
+        // Version information
+        ChunkManagerPtr manager;
+        ShardPtr primary;
+
+        BSONObj toBSON() const;
+
+        string toString() const {
+            return str::stream() << "PCState : " << toBSON();
+        }
+    };
+
+    typedef ParallelConnectionState PCState;
+    typedef shared_ptr<PCState> PCStatePtr;
+
+    class ParallelConnectionMetadata {
+    public:
+
+        ~ParallelConnectionMetadata(){
+            cleanup( true );
+        }
+
+        void cleanup( bool full = true );
+
+        PCStatePtr pcState;
+
+        bool retryNext;
+
+        bool initialized;
+        bool finished;
+
+        BSONObj toBSON() const;
+
+        string toString() const {
+            return str::stream() << "PCMData : " << toBSON();
+        }
+    };
+
+    typedef ParallelConnectionMetadata PCMData;
+    typedef shared_ptr<PCMData> PCMDataPtr;
 
     /**
      * runs a query in parellel across N servers
@@ -247,20 +309,40 @@ namespace mongo {
         ParallelSortClusteredCursor( const set<ServerAndQuery>& servers , QueryMessage& q , const BSONObj& sortKey );
         ParallelSortClusteredCursor( const set<ServerAndQuery>& servers , const string& ns ,
                                      const Query& q , int options=0, const BSONObj& fields=BSONObj() );
-        ParallelSortClusteredCursor( const QuerySpec& qSpec, const CommandInfo& cInfo, ChunkManagerPtr info );
+        ParallelSortClusteredCursor( const QuerySpec& qSpec, const CommandInfo& cInfo );
         virtual ~ParallelSortClusteredCursor();
         virtual bool more();
         virtual BSONObj next();
         virtual string type() const { return "ParallelSort"; }
+
+        void fullInit();
+        void startInit();
+        void finishInit();
+
+        BSONObj toBSON() const;
+        string toString() const;
+
     protected:
         void _finishCons();
         void _init();
+        void _oldInit();
 
         virtual void _explain( map< string,list<BSONObj> >& out );
+
+        bool _isCommand(){ return ! _cInfo.isEmpty(); }
+        void _markStaleNS( const string& staleNS, bool& forceReload, bool& fullReload );
+        void _handleStaleNS( const string& staleNS, bool forceReload, bool fullReload );
 
         QuerySpec _qSpec;
         CommandInfo _cInfo;
 
+        // Count round-trips req'd for namespaces and total
+        map<string,int> _staleNSMap;
+        int _totalTries;
+
+        map<Shard,PCMData> _cursorMap;
+
+        // LEGACY BELOW
         int _numServers;
         set<ServerAndQuery> _servers;
         BSONObj _sortKey;

@@ -177,13 +177,13 @@ namespace mongo {
 
             Shard shard = Shard::make( conn->getServerAddress() );
             if( refManager && ! refManager->compatibleWith( manager, shard ) ){
-                throw new SendStaleConfigException( ns, str::stream() << "manager (" << manager->getVersion( shard )  << " : " << manager->getSequenceNumber() << ") "
+                throw SendStaleConfigException( ns, str::stream() << "manager (" << manager->getVersion( shard )  << " : " << manager->getSequenceNumber() << ") "
                                                                       << "not compatible with reference manager (" << refManager->getVersion( shard )  << " : " << refManager->getSequenceNumber() << ") "
                                                                       << "on shard " << shard.getName() << " (" << shard.getAddress().toString() << ")" );
             }
         }
         else if( refManager ){
-            throw new SendStaleConfigException( ns, str::stream() << "not sharded (" << ( (manager.get() == 0) ? ( str::stream() << manager->getSequenceNumber() << ") " ) : (string)"<none>) " ) <<
+            throw SendStaleConfigException( ns, str::stream() << "not sharded (" << ( (manager.get() == 0) ? ( str::stream() << manager->getSequenceNumber() << ") " ) : (string)"<none>) " ) <<
                                                                      "but has reference manager (" << refManager->getSequenceNumber() << ") "
                                                                   << "on conn " << conn->getServerAddress() << " (" << conn_in->getServerAddress() << ")" );
         }

@@ -380,6 +380,10 @@ namespace mongo {
             return _queryObj.getSort();
         }
 
+        BSONObj query(){
+            return _query;
+        }
+
         BSONObj fields() const { return _fields; }
 
         string ns() const { return _ns; }
@@ -389,6 +393,11 @@ namespace mongo {
         int ntoreturn() const { return _ntoreturn; }
 
         int options() const { return _options; }
+
+        string toString() const {
+            return str::stream() << "QSpec " << BSON( "ns" << _ns << "n2skip" << _ntoskip << "n2return" << _ntoreturn << "options" << _options
+                                                           << "query" << _query << "fields" << _fields );
+        }
 
     };
 

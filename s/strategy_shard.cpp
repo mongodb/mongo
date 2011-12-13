@@ -44,7 +44,7 @@ namespace mongo {
 
             QuerySpec qSpec( (string)q.ns, q.query, q.fields, q.ntoskip, q.ntoreturn, q.queryOptions );
 
-            ClusteredCursor * cursor = new ParallelSortClusteredCursor( qSpec, CommandInfo(), r.getChunkManager() );
+            ClusteredCursor * cursor = new ParallelSortClusteredCursor( qSpec, CommandInfo() );
             assert( cursor );
 
             try {

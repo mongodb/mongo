@@ -110,6 +110,17 @@ namespace mongo {
         return i->second.isSharded();
     }
 
+    ShardPtr DBConfig::getShardIfExists( const string& ns ){
+        try{
+            // TODO: this function assumes the _primary will not change under-the-covers, but so does
+            // getShard() in general
+            return ShardPtr( new Shard( getShard( ns ) ) );
+        }
+        catch( AssertionException& e ){
+            warning() << "primary not found for " << ns << causedBy( e ) << endl;
+            return ShardPtr();
+        }
+    }
 
     const Shard& DBConfig::getShard( const string& ns ) {
         if ( isSharded( ns ) )
