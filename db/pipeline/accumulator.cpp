@@ -55,7 +55,7 @@ namespace mongo {
 	assert(false); // these can't appear in arrays
     }
 
-    static void agg_framework_reservedErrors()
+    void agg_framework_reservedErrors()
     {
 	uassert(15968, "reserved error", false);
 	uassert(15969, "reserved error", false);
