@@ -71,6 +71,7 @@ namespace mongo {
      */
     class ClusteredCursor {
     public:
+        ClusteredCursor( const QuerySpec& q );
         ClusteredCursor( QueryMessage& q );
         ClusteredCursor( const string& ns , const BSONObj& q , int options=0 , const BSONObj& fields=BSONObj() );
         virtual ~ClusteredCursor();
@@ -223,6 +224,20 @@ namespace mongo {
     };
 
 
+
+    class CommandInfo {
+    public:
+        string versionedNS;
+        BSONObj cmdFilter;
+
+        bool isEmpty(){
+            return versionedNS.size() == 0;
+        }
+    };
+
+    class ChunkManager;
+    typedef shared_ptr<const ChunkManager> ChunkManagerPtr;
+
     /**
      * runs a query in parellel across N servers
      * sots
@@ -232,6 +247,7 @@ namespace mongo {
         ParallelSortClusteredCursor( const set<ServerAndQuery>& servers , QueryMessage& q , const BSONObj& sortKey );
         ParallelSortClusteredCursor( const set<ServerAndQuery>& servers , const string& ns ,
                                      const Query& q , int options=0, const BSONObj& fields=BSONObj() );
+        ParallelSortClusteredCursor( const QuerySpec& qSpec, const CommandInfo& cInfo, ChunkManagerPtr info );
         virtual ~ParallelSortClusteredCursor();
         virtual bool more();
         virtual BSONObj next();
@@ -241,6 +257,9 @@ namespace mongo {
         void _init();
 
         virtual void _explain( map< string,list<BSONObj> >& out );
+
+        QuerySpec _qSpec;
+        CommandInfo _cInfo;
 
         int _numServers;
         set<ServerAndQuery> _servers;

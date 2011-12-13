@@ -42,45 +42,20 @@ namespace mongo {
             if ( q.ntoreturn == 1 && strstr(q.ns, ".$cmd") )
                 throw UserException( 8010 , "something is wrong, shouldn't see a command here" );
 
-            ChunkManagerPtr info = r.getChunkManager();
-            assert( info );
+            QuerySpec qSpec( (string)q.ns, q.query, q.fields, q.ntoskip, q.ntoreturn, q.queryOptions );
 
-            Query query( q.query );
-
-            set<Shard> shards;
-            info->getShardsForQuery( shards , query.getFilter()  );
-
-            set<ServerAndQuery> servers;
-            for ( set<Shard>::iterator i = shards.begin(); i != shards.end(); i++ ) {
-                servers.insert( ServerAndQuery( i->getConnString() , BSONObj() ) );
-            }
-
-            if ( logLevel > 4 ) {
-                StringBuilder ss;
-                ss << " shard query servers: " << servers.size() << '\n';
-                for ( set<ServerAndQuery>::iterator i = servers.begin(); i!=servers.end(); i++ ) {
-                    const ServerAndQuery& s = *i;
-                    ss << "       " << s.toString() << '\n';
-                }
-                log() << ss.str() << endl;
-            }
-
-            ClusteredCursor * cursor = 0;
-
-            BSONObj sort = query.getSort();
-            cursor = new ParallelSortClusteredCursor( servers , q , sort );
-
+            ClusteredCursor * cursor = new ParallelSortClusteredCursor( qSpec, CommandInfo(), r.getChunkManager() );
             assert( cursor );
 
             try {
                 long long start_millis = 0;
-                if ( query.isExplain() ) start_millis = curTimeMillis64();
+                if ( qSpec.isExplain() ) start_millis = curTimeMillis64();
                 cursor->init();
 
                 LOG(5) << "   cursor type: " << cursor->type() << endl;
                 shardedCursorTypes.hit( cursor->type() );
 
-                if ( query.isExplain() ) {
+                if ( qSpec.isExplain() ) {
                     // fetch elapsed time for the query
                     long long elapsed_millis = curTimeMillis64() - start_millis;
                     BSONObjBuilder explain_builder;

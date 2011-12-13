@@ -332,6 +332,67 @@ namespace mongo {
         }
     };
 
+    /**
+     * Represents a full query description, including all options required for the query to be passed on
+     * to other hosts
+     */
+    class QuerySpec {
+    public:
+
+        string _ns;
+        int _ntoskip;
+        int _ntoreturn;
+        int _options;
+        BSONObj _query;
+        BSONObj _fields;
+        Query _queryObj;
+
+        QuerySpec( const string& ns,
+                   const BSONObj& query, const BSONObj& fields,
+                   int ntoskip, int ntoreturn, int options )
+            : _ns( ns ), _ntoskip( ntoskip ), _ntoreturn( ntoreturn ), _options( options ),
+              _query( query ), _fields( fields )
+        {
+            _query = _query.getOwned();
+            _fields = _fields.getOwned();
+            _queryObj = Query( _query );
+        }
+
+        QuerySpec() {}
+
+        bool isEmpty() const {
+            return _ns.size() == 0;
+        }
+
+        bool isExplain() const {
+            return _queryObj.isExplain();
+        }
+
+        BSONObj filter() const {
+            return _queryObj.getFilter();
+        }
+
+        BSONObj hint() const {
+            return _queryObj.getHint();
+        }
+
+        BSONObj sort() const {
+            return _queryObj.getSort();
+        }
+
+        BSONObj fields() const { return _fields; }
+
+        string ns() const { return _ns; }
+
+        int ntoskip() const { return _ntoskip; }
+
+        int ntoreturn() const { return _ntoreturn; }
+
+        int options() const { return _options; }
+
+    };
+
+
     /** Typically one uses the QUERY(...) macro to construct a Query object.
         Example: QUERY( "age" << 33 << "school" << "UCLA" )
     */

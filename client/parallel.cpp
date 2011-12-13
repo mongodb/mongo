@@ -23,10 +23,24 @@
 #include "../db/dbmessage.h"
 #include "../s/util.h"
 #include "../s/shard.h"
+#include "../s/chunk.h"
 
 namespace mongo {
 
     // --------  ClusteredCursor -----------
+
+    ClusteredCursor::ClusteredCursor( const QuerySpec& q ) {
+        _ns = q.ns();
+        _query = q.filter().copy();
+        _options = q.options();
+        _fields = q.fields().copy();
+        _batchSize = q.ntoreturn();
+        if ( _batchSize == 1 )
+            _batchSize = 2;
+
+        _done = false;
+        _didInit = false;
+    }
 
     ClusteredCursor::ClusteredCursor( QueryMessage& q ) {
         _ns = q.ns;
@@ -358,6 +372,37 @@ namespace mongo {
         _sortKey = q.getSort().copy();
         _needToSkip = 0;
         _finishCons();
+    }
+
+    ParallelSortClusteredCursor::ParallelSortClusteredCursor( const QuerySpec& qSpec, const CommandInfo& cInfo, ChunkManagerPtr info )
+        : ClusteredCursor( qSpec ),
+          _qSpec( qSpec ), _cInfo( cInfo )
+    {
+        // Handle legacy stuff
+        set<Shard> shards;
+        assert( info );
+        info->getShardsForQuery( shards , _qSpec.filter() );
+
+        for ( set<Shard>::iterator i = shards.begin(); i != shards.end(); i++ ) {
+            _servers.insert( ServerAndQuery( i->getConnString() , BSONObj() ) );
+        }
+
+        if ( logLevel > 4 ) {
+            StringBuilder ss;
+            ss << " shard query servers: " << _servers.size() << '\n';
+            for ( set<ServerAndQuery>::iterator i = _servers.begin(); i!=_servers.end(); i++ ) {
+                const ServerAndQuery& s = *i;
+                ss << "       " << s.toString() << '\n';
+            }
+            log() << ss.str() << endl;
+        }
+
+        _needToSkip = _qSpec.ntoskip();
+        _cursors = 0;
+        _sortKey = _qSpec.sort();
+        _fields = _qSpec.fields();
+        _finishCons();
+        _qSpec._fields = _fields;
     }
 
     void ParallelSortClusteredCursor::_finishCons() {
