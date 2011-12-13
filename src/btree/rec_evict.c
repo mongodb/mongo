@@ -38,6 +38,7 @@ int
 __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 {
 	WT_CONNECTION_IMPL *conn;
+	int ret;
 
 	conn = S2C(session);
 
@@ -50,11 +51,12 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 * evicted as a result of evicting their parents, else we would lose
 	 * the merge flag and they would be written separately, permanently
 	 * deepening the tree.  Should the eviction server request eviction
-	 * of a merge-split page, ignore it (but do what we can to ensure the
-	 * page isn't selected again).
+	 * of a merge-split page, ignore the request (but unlock the page and
+	 * bump the read generation to ensure it isn't selected again).
 	 */
 	if (F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE)) {
 		page->read_gen = __wt_cache_read_gen(session);
+		page->parent_ref->state = WT_REF_MEM;
 		return (0);
 	}
 
@@ -79,7 +81,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 
 	/* If the page is dirty, write it. */
 	if (__wt_page_is_modified(page))
-		WT_RET(__wt_rec_write(session, page, NULL));
+		WT_ERR(__wt_rec_write(session, page, NULL));
 
 	/* Update the parent and discard the page. */
 	if (F_ISSET(page, WT_PAGE_REC_MASK) == 0) {
@@ -91,6 +93,9 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	}
 
 	return (0);
+
+err:	__rec_sub_excl_clear(session, page, NULL, flags);
+	return (ret);
 }
 
 /*

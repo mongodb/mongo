@@ -541,18 +541,17 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 	do {
 		/*
 		 * Root and pinned pages can't be evicted, nor can pages that
-		 * are already locked, or were created as the result of
-		 * reconciliation.
+		 * are already locked.  We would skip locked pages later, but
+		 * they just fill up the eviction list for no benefit.
 		 *
 		 * !!!
 		 * It's still in flux if root pages are pinned or not, test for
 		 * both cases for now.
 		 */
 		page = btree->evict_page;
-		if (page != NULL && !WT_PAGE_IS_ROOT(page) &&
-		    page->parent_ref->state == WT_REF_MEM &&
-		    !F_ISSET(page, WT_PAGE_PINNED | WT_PAGE_REC_EMPTY |
-		    WT_PAGE_REC_SPLIT | WT_PAGE_REC_SPLIT_MERGE)) {
+		if (page != NULL &&
+		    !WT_PAGE_IS_ROOT(page) && !F_ISSET(page, WT_PAGE_PINNED) &&
+		    page->parent_ref->state == WT_REF_MEM) {
 			WT_VERBOSE(session, evictserver,
 			    "%s walk: %" PRIu32 ", size %" PRIu32,
 			    btree->name, WT_PADDR(page),
@@ -659,6 +658,9 @@ __evict_get_page(
 		    __wt_session_has_btree(session, evict->btree) != 0)
 			goto done;
 
+		/* Move to the next page queued for eviction. */
+		++cache->evict_current;
+
 		/*
 		 * Set the page locked here while holding the eviction mutex to
 		 * prevent multiple attempts to evict it.
@@ -675,8 +677,6 @@ __evict_get_page(
 		 * the same page on reconciliation error.
 		 */
 		__evict_clr(evict);
-
-		++cache->evict_current;
 	}
 
 done:	__wt_spin_unlock(session, &cache->lru_lock);
@@ -708,9 +708,9 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 		session->btree->evict_page = NULL;
 
 	/*
-	 * We don't care why reconciliation failed: maybe the page was
-	 * dirty and we're out of disk space?  Regardless, don't pick
-	 * the same page every time.
+	 * We don't care why reconciliation failed: maybe the page was dirty
+	 * and we're out of disk space, or maybe a subtree was already being
+	 * evicted.  Regardless, don't pick the same page every time.
 	 */
 	if (__wt_rec_evict(session, page, 0) != 0)
 		page->read_gen = __wt_cache_read_gen(session);
