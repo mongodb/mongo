@@ -9,7 +9,7 @@ function checkYield( dropCollection, fastCount, query ) {
     query = query || obj;
     
     passed = false;
-    for( nDocs = 20000; nDocs < 100000000; nDocs *= 2 ) {
+    for( nDocs = 20000; nDocs < 1000000; nDocs *= 2 ) {
 
         t.drop();
         t.ensureIndex( {a:1} );
