@@ -225,8 +225,14 @@ __curindex_search(WT_CURSOR *cursor)
 
 	WT_ERR(cursor->search_near(cursor, &exact));
 
-	/* We expect partial matches. */
-	if (exact < 1)
+	/*
+	 * We expect partial matches, and want the smallest record with a key
+	 * greater than or equal to the search key.  The only way for the key
+	 * to be equal is if there is an index on the primary key, because
+	 * otherwise the primary key columns will be appended to the index key,
+	 * but we don't disallow that (odd) case.
+	 */
+	if (exact < 0)
 		WT_ERR(cursor->next(cursor));
 
 	if (cursor->key.size < oldkeyp->size ||
