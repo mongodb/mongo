@@ -339,19 +339,24 @@ namespace mongo {
         }
 
         int available() const {
+            scoped_lock lock( _mutex );
             return _num;
         }
 
         int used() const {
+            scoped_lock lock( _mutex );
             return _outof - _num;
         }
 
-        int outof() const { return _outof; }
+        int outof() const { 
+            scoped_lock lock( _mutex );
+            return _outof; 
+        }
 
     private:
         int _outof;
         int _num;
-        mongo::mutex _mutex;
+        mutable mongo::mutex _mutex;
     };
 
     class TicketHolderReleaser {
