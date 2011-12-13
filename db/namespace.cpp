@@ -457,6 +457,7 @@ namespace mongo {
     }
 
     void NamespaceIndex::kill_ns(const char *ns) {
+        dbMutex.assertWriteLocked();
         if ( !ht )
             return;
         Namespace n(ns);
@@ -467,12 +468,26 @@ namespace mongo {
                 Namespace extra(n.extraName(i).c_str());
                 ht->kill(extra);
             }
-            catch(DBException&) { }
+            catch(DBException&) { 
+                dlog(3) << "caught exception in kill_ns" << endl;
+            }
         }
+    }
+
+    void NamespaceIndex::add_ns(const char *ns, DiskLoc& loc, bool capped) {
+        NamespaceDetails details( loc, capped );
+        add_ns( ns, details );
+    }
+    void NamespaceIndex::add_ns( const char *ns, const NamespaceDetails &details ) {
+        dbMutex.assertWriteLocked();
+        init();
+        Namespace n(ns);
+        uassert( 10081 , "too many namespaces/collections", ht->put(n, details));
     }
 
     /* extra space for indexes when more than 10 */
     NamespaceDetails::Extra* NamespaceIndex::newExtra(const char *ns, int i, NamespaceDetails *d) {
+        dbMutex.assertWriteLocked();
         assert( i >= 0 && i <= 1 );
         Namespace n(ns);
         Namespace extra(n.extraName(i).c_str()); // throws userexception if ns name too long

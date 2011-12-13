@@ -568,30 +568,13 @@ namespace mongo {
         /* returns true if new db will be created if we init lazily */
         bool exists() const;
 
-    private:
-        void _init();
-    public:
         void init() {
             if( !ht ) 
                 _init();
         }
 
-        void add_ns(const char *ns, DiskLoc& loc, bool capped) {
-            NamespaceDetails details( loc, capped );
-            add_ns( ns, details );
-        }
-        void add_ns( const char *ns, const NamespaceDetails &details ) {
-            init();
-            Namespace n(ns);
-            uassert( 10081 , "too many namespaces/collections", ht->put(n, details));
-        }
-
-        /* just for diagnostics */
-        /*size_t detailsOffset(NamespaceDetails *d) {
-            if ( !ht )
-                return -1;
-            return ((char *) d) -  (char *) ht->nodes;
-        }*/
+        void add_ns(const char *ns, DiskLoc& loc, bool capped);
+        void add_ns( const char *ns, const NamespaceDetails &details );
 
         NamespaceDetails* details(const char *ns) {
             if ( !ht )
@@ -614,9 +597,7 @@ namespace mongo {
             return false;
         }
 
-        bool allocated() const {
-            return ht != 0;
-        }
+        bool allocated() const { return ht != 0; }
 
         void getNamespaces( list<string>& tofill , bool onlyCollections = true ) const;
 
@@ -627,6 +608,7 @@ namespace mongo {
         unsigned long long fileLength() const { return f.length(); }
 
     private:
+        void _init();
         void maybeMkdir() const;
 
         MongoMMF f;

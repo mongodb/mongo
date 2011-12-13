@@ -510,7 +510,7 @@ namespace mongo {
             char buf[256];
             nsToDatabase(ns, buf);
             if ( database->name != buf ) {
-                out() << "ERROR: attempt to write to wrong database database\n";
+                out() << "ERROR: attempt to write to wrong database\n";
                 out() << " ns:" << ns << '\n';
                 out() << " database->name:" << database->name << endl;
                 assert( database->name == buf );

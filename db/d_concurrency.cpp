@@ -14,6 +14,7 @@
 // system.profile writing
 // oplog now
 // yielding
+// commitIfNeeded
 
 namespace mongo {
 
