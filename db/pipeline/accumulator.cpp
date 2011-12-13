@@ -55,7 +55,23 @@ namespace mongo {
 	assert(false); // these can't appear in arrays
     }
 
-    void agg_framework_reservedErrors()
+    static void agg_framework_reservedErrors()
     {
+	uassert(15968, "reserved error", false);
+	uassert(15969, "reserved error", false);
+	uassert(15970, "reserved error", false);
+	uassert(15971, "reserved error", false);
+	uassert(15972, "reserved error", false);
+	uassert(15973, "reserved error", false);
+	uassert(15974, "reserved error", false);
+	uassert(15975, "reserved error", false);
+	uassert(15976, "reserved error", false);
+	uassert(15978, "reserved error", false);
+	uassert(15979, "reserved error", false);
+	uassert(15980, "reserved error", false);
+	uassert(15981, "reserved error", false);
+	uassert(15982, "reserved error", false);
+	uassert(15983, "reserved error", false);
+	uassert(15984, "reserved error", false);
     }
 }
