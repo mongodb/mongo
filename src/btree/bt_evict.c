@@ -769,10 +769,14 @@ __evict_lru_cmp(const void *a, const void *b)
 	 * Bias in favor of leaf pages.  Otherwise, we can waste time
 	 * considering parent pages for eviction while their child pages are
 	 * still in memory.
+	 *
+	 * Bump the LRU generation by a small fixed amount: the idea being that
+	 * if we have enough good leaf page candidates, we should evict them
+	 * first, but not completely ignore an old internal page.
 	 */
 	if (a_page->type == WT_PAGE_ROW_INT || a_page->type == WT_PAGE_COL_INT)
-		a_lru += WT_EVICT_WALK_BASE;
+		a_lru += WT_EVICT_GROUP;
 	if (b_page->type == WT_PAGE_ROW_INT || b_page->type == WT_PAGE_COL_INT)
-		b_lru += WT_EVICT_WALK_BASE;
+		b_lru += WT_EVICT_GROUP;
 	return (a_lru > b_lru ? 1 : (a_lru < b_lru ? -1 : 0));
 }
