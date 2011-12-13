@@ -61,15 +61,6 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	}
 
 	/*
-	 * If eviction of a page needs to be forced, wait for the page to
-	 * become available.
-	 */
-	if (F_ISSET(page, WT_PAGE_FORCE_EVICT)) {
-		LF_SET(WT_REC_WAIT);
-		__wt_evict_force_clear(session, page);
-	}
-
-	/*
 	 * Get exclusive access to the page and review the page and its subtree
 	 * for conditions that would block our eviction of the page.  If the
 	 * check fails (for example, we find a child page that can't be merged),

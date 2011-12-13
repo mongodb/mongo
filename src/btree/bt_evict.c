@@ -168,42 +168,6 @@ __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __wt_evict_force_clear
- *	Clear the force flag from a page and clear any pending requests to
- *	evict the page.
- */
-void
-__wt_evict_force_clear(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_CACHE *cache;
-	WT_EVICT_LIST *evict;
-	WT_EVICT_REQ *er, *er_end;
-
-	cache = S2C(session)->cache;
-
-	/*
-	 * If we evict a page marked for forced eviction, clear any reference
-	 * to it from the request queue or the list of pages tracked for
-	 * eviction.
-	 */
-	WT_EVICT_REQ_FOREACH(er, er_end, cache)
-		if (er->session != NULL &&
-		    F_ISSET(er, WT_EVICT_REQ_PAGE) &&
-		    er->page == page)
-			__evict_req_clr(session, er);
-
-	if ((evict = cache->evict) != NULL)
-		for (; evict < cache->evict + cache->evict_entries; ++evict)
-			if (evict->page == page)
-				__evict_clr(evict);
-
-	if (session->btree->evict_page == page)
-		session->btree->evict_page = NULL;
-
-	F_CLR(page, WT_PAGE_FORCE_EVICT);
-}
-
-/*
  * __wt_cache_evict_server --
  *	Thread to evict pages from the cache.
  */
@@ -344,15 +308,28 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 		if ((request_session = er->session) == NULL)
 			continue;
 
+		/* Reference the correct WT_BTREE handle. */
+		WT_SET_BTREE_IN_SESSION(session, er->btree);
+
+		/*
+		 * Block out concurrent eviction while we are handling this
+		 * request.
+		 */
+		__wt_spin_lock(session, &cache->lru_lock);
+
 		/*
 		 * The eviction candidate list might reference pages we are
 		 * about to discard; clear it.
 		 */
-		__wt_spin_lock(session, &cache->lru_lock);
 		memset(cache->evict, 0, cache->evict_allocated);
 
-		/* Reference the correct WT_BTREE handle. */
-		WT_SET_BTREE_IN_SESSION(session, er->btree);
+		/*
+		 * Discard any page we're holding: we're about to do a walk of
+		 * the file tree, and if we're closing the file, there won't be
+		 * pages to evict in the future, that is, our location in the
+		 * tree is no longer useful.
+		 */
+		session->btree->evict_page = NULL;
 
 		if (F_ISSET(er, WT_EVICT_REQ_PAGE)) {
 			WT_VERBOSE(session, evictserver,
@@ -377,6 +354,7 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 		if (!F_ISSET(er, WT_EVICT_REQ_PAGE))
 			__wt_session_serialize_wrapup(
 			    request_session, NULL, ret);
+
 		__evict_req_clr(session, er);
 
 		/* Clear the reference to the btree handle. */
@@ -400,13 +378,6 @@ __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 	WT_VERBOSE(session, evictserver,
 	    "%s file request: %s",
 	    btree->name, (F_ISSET(er, WT_EVICT_REQ_CLOSE) ? "close" : "sync"));
-
-	/*
-	 * Discard any page we're holding: we're about to do a walk of the file
-	 * tree, and if we're closing the file, there won't be pages to evict
-	 * in the future, that is, our location in the tree is no longer useful.
-	 */
-	btree->evict_page = NULL;
 
 	/*
 	 * We can't evict the page just returned to us, it marks our place in
@@ -660,6 +631,15 @@ __evict_get_page(
 
 		/* Move to the next page queued for eviction. */
 		++cache->evict_current;
+
+		/*
+		 * If the page happens to be marked for forced eviction, ignore
+		 * it: it will be sitting in the request queue.  This is
+		 * unlikely, and it is simpler to leave it for the eviction
+		 * thread than trying to find it and clear the request.
+		 */
+		if (F_ISSET(evict->page, WT_PAGE_FORCE_EVICT))
+			goto done;
 
 		/*
 		 * Set the page locked here while holding the eviction mutex to
