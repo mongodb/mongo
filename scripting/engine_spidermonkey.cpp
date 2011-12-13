@@ -459,7 +459,13 @@ namespace mongo {
             size_t start = code.find( '(' );
             assert( start != string::npos );
 
-            string fbase = ( start > 9 ) ? trim( code.substr( 9 , start - 9 ) ) : "anonymous_function";
+            string fbase;
+            if ( start > 9 ) {
+                fbase = trim( code.substr( 9 , start - 9 ) );
+            }
+            if ( fbase.length() == 0 ) {
+                fbase = "anonymous_function";
+            }
             fname << "f__" << fbase;
 
             code = code.substr( start + 1 );
