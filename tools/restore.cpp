@@ -177,7 +177,6 @@ public:
 
             cout << "Finished restoring config database." << endl
                  << "Calling flushRouterConfig on this connection" << endl;
-            BSONObj info;
             conn().runCommand( "config" , BSON( "flushRouterConfig" << 1 ) , info );
         }
 
