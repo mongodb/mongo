@@ -114,7 +114,7 @@ public:
     }
 
     void writeCollectionFile( const string coll , path outputFile ) {
-        cout << "\t" << coll << " to " << outputFile.string() << endl;
+        log() << "\t" << coll << " to " << outputFile.string() << endl;
 
         FilePtr f (fopen(outputFile.string().c_str(), "wb"));
         uassert(10262, errnoWithPrefix("couldn't open file"), f);
@@ -124,11 +124,11 @@ public:
 
         doCollection(coll, f, &m);
 
-        cout << "\t\t " << m.done() << " objects" << endl;
+        log() << "\t\t " << m.done() << " objects" << endl;
     }
 
     void writeMetadataFile( const string coll, path outputFile, map<string, BSONObj> options, multimap<string, BSONObj> indexes ) {
-        cout << "\tMetadata for " << coll << " to " << outputFile.string() << endl;
+        log() << "\tMetadata for " << coll << " to " << outputFile.string() << endl;
 
         ofstream file (outputFile.string().c_str());
         uassert(15933, "Couldn't open file: " + outputFile.string(), file.is_open());
@@ -166,7 +166,7 @@ public:
     }
 
     void go( const string db , const path outdir ) {
-        cout << "DATABASE: " << db << "\t to \t" << outdir.string() << endl;
+        log() << "DATABASE: " << db << "\t to \t" << outdir.string() << endl;
 
         create_directories( outdir );
 
@@ -233,12 +233,12 @@ public:
 
     int repair() {
         if ( ! hasParam( "dbpath" ) ){
-            cout << "repair mode only works with --dbpath" << endl;
+            log() << "repair mode only works with --dbpath" << endl;
             return -1;
         }
         
         if ( ! hasParam( "db" ) ){
-            cout << "repair mode only works on 1 db right at a time right now" << endl;
+            log() << "repair mode only works on 1 db right at a time right now" << endl;
             return -1;
         }
 
@@ -422,7 +422,7 @@ public:
         unsigned long long opLogStart = 0;
         if (hasParam("oplog")) {
             if (hasParam("query") || hasParam("db") || hasParam("collection")) {
-                cout << "oplog mode is only supported on full dumps" << endl;
+                log() << "oplog mode is only supported on full dumps" << endl;
                 return -1;
             }
 
@@ -436,7 +436,7 @@ public:
             else {
                 opLogName = "local.oplog.$main";
                 if ( ! isMaster["ismaster"].trueValue() ) {
-                    cout << "oplog mode is only supported on master or replica set member" << endl;
+                    log() << "oplog mode is only supported on master or replica set member" << endl;
                     return -1;
                 }
             }
@@ -445,7 +445,7 @@ public:
 
             BSONObj op = conn(true).findOne(opLogName, Query().sort("$natural", -1), 0, QueryOption_SlaveOk);
             if (op.isEmpty()) {
-                cout << "No operations in oplog. Please ensure you are connecting to a master." << endl;
+                log() << "No operations in oplog. Please ensure you are connecting to a master." << endl;
                 return -1;
             }
 
@@ -461,7 +461,7 @@ public:
                 return 0;
             }
             else {
-                cout << "You must specify database and collection to print to stdout" << endl;
+                log() << "You must specify database and collection to print to stdout" << endl;
                 return -1;
             }
         }
@@ -472,7 +472,7 @@ public:
         string db = _db;
 
         if ( db == "" ) {
-            cout << "all dbs" << endl;
+            log() << "all dbs" << endl;
             auth( "admin" );
 
             BSONObj res = conn( true ).findOne( "admin.$cmd" , BSON( "listDatabases" << 1 ) );

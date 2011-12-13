@@ -96,25 +96,25 @@ public:
             // fail early if errors
 
             if (_db != "") {
-                cout << "Can only replay oplog on full restore" << endl;
+                log() << "Can only replay oplog on full restore" << endl;
                 return -1;
             }
 
             if ( ! exists(root / "oplog.bson") ) {
-                cout << "No oplog file to replay. Make sure you run mongodump with --oplog." << endl;
+                log() << "No oplog file to replay. Make sure you run mongodump with --oplog." << endl;
                 return -1;
             }
 
 
             BSONObj out;
             if (! conn().simpleCommand("admin", &out, "buildinfo")) {
-                cout << "buildinfo command failed: " << out["errmsg"].String() << endl;
+                log() << "buildinfo command failed: " << out["errmsg"].String() << endl;
                 return -1;
             }
 
             StringData version = out["version"].valuestr();
             if (versionCmp(version, "1.7.4-pre-") < 0) {
-                cout << "Can only replay oplog to server version >= 1.7.4" << endl;
+                log() << "Can only replay oplog to server version >= 1.7.4" << endl;
                 return -1;
             }
 
@@ -139,29 +139,29 @@ public:
 
         if (_restoreShardingConfig) {
             if (_db != "" && _db != "config") {
-                cout << "Can only setup sharding configuration on full restore or on restoring config database" << endl;
+                log() << "Can only setup sharding configuration on full restore or on restoring config database" << endl;
                 return -1;
             }
 
             // make sure we're talking to a mongos
             if (!isMongos()) {
-                cout << "Can only use --restoreShardingConfig on a mongos" << endl;
+                log() << "Can only use --restoreShardingConfig on a mongos" << endl;
                 return -1;
             }
 
             if ( ! exists(root / "config") ) {
-                cout << "No config directory to restore sharding setup from." << endl;
+                log() << "No config directory to restore sharding setup from." << endl;
                 return -1;
             }
 
             // Make sure this isn't an active cluster.
-            cout << "WARNING: this will drop the config database, overriding any sharding configuration you currently have." << endl
+            log() << "WARNING: this will drop the config database, overriding any sharding configuration you currently have." << endl
                  << "DO NOT RUN THIS COMMAND WHILE YOUR CLUSTER IS ACTIVE" << endl;
             if (forceConfigRestore) {
-                cout << "Running with --forceConfigRestore. Continuing." << endl;
+                log() << "Running with --forceConfigRestore. Continuing." << endl;
             } else {
                 if (!confirmAction()) {
-                    cout << "aborting" << endl;
+                    log() << "aborting" << endl;
                     return -1;
                 }
             }
@@ -170,12 +170,12 @@ public:
             BSONObj info;
             bool ok = conn().runCommand( "config" , BSON( "dropDatabase" << 1 ) , info );
             if (!ok) {
-                cout << "Error dumping config database. Aborting" << endl;
+                log() << "Error dumping config database. Aborting" << endl;
                 return -1;
             }
             drillDown(root / "config", false, false);
 
-            cout << "Finished restoring config database." << endl
+            log() << "Finished restoring config database." << endl
                  << "Calling flushRouterConfig on this connection" << endl;
             conn().runCommand( "config" , BSON( "flushRouterConfig" << 1 ) , info );
         }
@@ -202,7 +202,7 @@ public:
         conn().getLastError();
 
         if (doOplog) {
-            out() << "\t Replaying oplog" << endl;
+            log() << "\t Replaying oplog" << endl;
             _curns = OPLOG_SENTINEL;
             processFile( root / "oplog.bson" );
         }
@@ -227,8 +227,8 @@ public:
 
                 if (use_db) {
                     if (is_directory(p)) {
-                        cerr << "ERROR: root directory must be a dump of a single database" << endl;
-                        cerr << "       when specifying a db name with --db" << endl;
+                        error() << "ERROR: root directory must be a dump of a single database" << endl;
+                        error() << "       when specifying a db name with --db" << endl;
                         printHelp(cout);
                         return;
                     }
@@ -236,8 +236,8 @@ public:
 
                 if (use_coll) {
                     if (is_directory(p) || i != end) {
-                        cerr << "ERROR: root directory must be a dump of a single collection" << endl;
-                        cerr << "       when specifying a collection name with --collection" << endl;
+                        error() << "ERROR: root directory must be a dump of a single collection" << endl;
+                        error() << "       when specifying a collection name with --collection" << endl;
                         printHelp(cout);
                         return;
                     }
@@ -272,7 +272,7 @@ public:
 
         if ( ! ( endsWith( root.string().c_str() , ".bson" ) ||
                  endsWith( root.string().c_str() , ".bin" ) ) ) {
-            cerr << "don't know what to do with file [" << root.string() << "]" << endl;
+            error() << "don't know what to do with file [" << root.string() << "]" << endl;
             return;
         }
 
@@ -309,11 +309,11 @@ public:
             ns += "." + oldCollName;
         }
 
-        out() << "\tgoing into namespace [" << ns << "]" << endl;
+        log() << "\tgoing into namespace [" << ns << "]" << endl;
 
         if ( _drop ) {
             if (root.leaf() != "system.users.bson" ) {
-                out() << "\t dropping" << endl;
+                log() << "\t dropping" << endl;
                 conn().dropCollection( ns );
             } else {
                 // Create map of the users currently in the DB
@@ -333,7 +333,7 @@ public:
                 // This is fine because dumps from before 2.1 won't have a metadata file, just print a warning.
                 // System collections shouldn't have metadata so don't warn if that file is missing.
                 if (!startsWith(metadataFile.leaf(), "system.")) {
-                    out() << metadataFile.string() << " not found. Skipping." << endl;
+                    log() << metadataFile.string() << " not found. Skipping." << endl;
                 }
             } else {
                 metadataObject = parseMetadataFile(metadataFile.string());
@@ -473,7 +473,7 @@ private:
             createColl = false;
             BSONObj obj = cursor->next();
             if (!obj.hasField("options") || !optionsSame(cmdObj, obj["options"].Obj())) {
-                    out() << "WARNING: collection " << _curns << " exists with different options than are in the metadata.json file and not using --drop. Options in the metadata file will be ignored." << endl;
+                    log() << "WARNING: collection " << _curns << " exists with different options than are in the metadata.json file and not using --drop. Options in the metadata file will be ignored." << endl;
             }
         }
 
@@ -485,7 +485,7 @@ private:
         if (!conn().runCommand(_curdb, cmdObj, info)) {
             uasserted(15936, "Creating collection " + _curns + " failed. Errmsg: " + info["errmsg"].String());
         } else {
-            out() << "\tCreated collection " << _curns << " with options: " << cmdObj.jsonString() << endl;
+            log() << "\tCreated collection " << _curns << " with options: " << cmdObj.jsonString() << endl;
         }
     }
 
@@ -515,12 +515,12 @@ private:
 
         if ( ! ( err["err"].isNull() ) ) {
             if (err["err"].String() == "norepl" && _w > 1) {
-                cerr << "Cannot specify write concern for non-replicas" << endl;
+                error() << "Cannot specify write concern for non-replicas" << endl;
             }
             else {
-                cerr << "Error creating index " << o["ns"].String();
-                cerr << ": " << err["code"].Int() << " " << err["err"].String() << endl;
-                cerr << "To resume index restoration, run " << _name << " on file" << _fileName << " manually." << endl;
+                error() << "Error creating index " << o["ns"].String();
+                error() << ": " << err["code"].Int() << " " << err["err"].String() << endl;
+                error() << "To resume index restoration, run " << _name << " on file" << _fileName << " manually." << endl;
             }
 
             ::abort();
@@ -540,13 +540,13 @@ private:
             ConnectionString cs = ConnectionString::parse( mongos , errmsg );
 
             if ( ! cs.isValid() ) {
-                cerr << "invalid mongos hostname [" << mongos << "] " << errmsg << endl;
+                error() << "invalid mongos hostname [" << mongos << "] " << errmsg << endl;
                 continue;
             }
 
             DBClientBase* mongosConn = cs.connect( errmsg );
             if ( ! mongosConn ) {
-                cerr << "Error connecting to mongos [" << mongos << "]: " << errmsg << endl;
+                error() << "Error connecting to mongos [" << mongos << "]: " << errmsg << endl;
                 continue;
             }
 
@@ -559,7 +559,7 @@ private:
         string userInput;
         int attemptCount = 0;
         while (attemptCount < 3) {
-            cout << "Are you sure you want to continue? [y/n]: ";
+            log() << "Are you sure you want to continue? [y/n]: ";
             cin >> userInput;
             if (userInput == "Y" || userInput == "y" || userInput == "yes" || userInput == "Yes" || userInput == "YES") {
                 return true;
@@ -568,11 +568,11 @@ private:
                 return false;
             }
             else {
-                cout << "Invalid input." << endl;
+                log() << "Invalid input." << endl;
                 attemptCount++;
             }
         }
-        cout << "Entered invalid input 3 times in a row." << endl;
+        log() << "Entered invalid input 3 times in a row." << endl;
         return false;
     }
 };
