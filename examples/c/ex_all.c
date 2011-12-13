@@ -4,7 +4,7 @@
  * Copyright (c) 2008-2011 WiredTiger, Inc.
  *	All rights reserved.
  *
- * ex_hello.c
+ * ex_all.c
  *	Containing a call to every method in the WiredTiger API.
  *
  *	It doesn't do anything very useful, just demonstrates how to call each
