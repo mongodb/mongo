@@ -19,6 +19,7 @@
 
 #include "pch.h"
 #include "db.h"
+#include "../bson/util/atomic_int.h"
 #include "introspect.h"
 #include "repl.h"
 #include "dbmessage.h"
@@ -778,7 +779,7 @@ namespace mongo {
     }
 
     mongo::mutex exitMutex("exit");
-    int numExitCalls = 0;
+    AtomicUInt numExitCalls = 0;
 
     bool inShutdown() {
         return numExitCalls > 0;
