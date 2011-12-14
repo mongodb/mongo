@@ -1310,8 +1310,8 @@ struct wt_compressor {
 
 	/*! Callback to size an output buffer for compression
 	 *
-         * If not null, this callback is called before each call
-         * to WT_COMPRESS::compress to determine the size of the
+         * If not null, this callback is called before each call to
+         * WT_COMPRESS::compress to determine the size of the
          * destination buffer.  If the callback is NULL, a default
          * size of \c source->size is used to size the buffer.
          *
