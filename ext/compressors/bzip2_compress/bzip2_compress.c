@@ -14,7 +14,8 @@ bzip2_compress(
 static int
 bzip2_decompress(WT_COMPRESSOR *, WT_SESSION *, const WT_ITEM *, WT_ITEM *);
 
-static WT_COMPRESSOR bzip2_compressor = { bzip2_compress, bzip2_decompress };
+static WT_COMPRESSOR bzip2_compressor = {
+    bzip2_compress, bzip2_decompress, NULL };
 
 #define	__UNUSED(v)	((void)(v))
 

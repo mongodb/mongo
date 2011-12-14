@@ -387,6 +387,14 @@ my_decompress(WT_COMPRESSOR *compressor,
 	dest->size = source->size;
 	return (0);
 }
+
+static int
+my_pre_size(WT_COMPRESSOR *compressor,
+    WT_SESSION *session, const WT_ITEM *source, WT_ITEM *dest)
+{
+	dest->size = source->size;
+	return (0);
+}
 /*! [Implement WT_COMPRESSOR] */
 
 int
@@ -395,7 +403,8 @@ add_compressor(WT_CONNECTION *conn)
 	int ret;
 	
 	/*! [Register a new compressor] */
-	static WT_COMPRESSOR my_compressor = { my_compress, my_decompress };
+	static WT_COMPRESSOR my_compressor = {
+	    my_compress, my_decompress, my_pre_size };
 	ret = conn->add_compressor(conn, "my_compress", &my_compressor, NULL);
 	/*! [Register a new compressor] */
 

@@ -11,7 +11,7 @@ nop_compress(WT_COMPRESSOR *, WT_SESSION *, const WT_ITEM *, WT_ITEM *, int *);
 static int
 nop_decompress(WT_COMPRESSOR *, WT_SESSION *, const WT_ITEM *, WT_ITEM *);
 
-static WT_COMPRESSOR nop_compressor = { nop_compress, nop_decompress };
+static WT_COMPRESSOR nop_compressor = { nop_compress, nop_decompress, NULL };
 
 #define	__UNUSED(v)	((void)(v))
 

@@ -9,15 +9,15 @@
 WT_EXTENSION_API *wt_api;
 
 static int
-wt_snappy_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
-    const WT_ITEM *source, WT_ITEM *dest, int *);
-	
+wt_snappy_compress(
+    WT_COMPRESSOR *, WT_SESSION *, const WT_ITEM *, WT_ITEM *, int *);
 static int
-wt_snappy_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
-    const WT_ITEM *source, WT_ITEM *dest);
-
+wt_snappy_decompress(WT_COMPRESSOR *, WT_SESSION *, const WT_ITEM *, WT_ITEM *);
+static int
+wt_snappy_pre_size(WT_COMPRESSOR *, WT_SESSION *, const WT_ITEM *, WT_ITEM *);
+	
 static WT_COMPRESSOR wt_snappy_compressor = {
-    wt_snappy_compress, wt_snappy_decompress };
+    wt_snappy_compress, wt_snappy_decompress, wt_snappy_pre_size };
 
 #define	__UNUSED(v)	((void)(v))
 
@@ -76,16 +76,12 @@ wt_snappy_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 
         __UNUSED(compressor);
 
-	/* Snappy requires that the dest buffer be somewhat larger
-	 * than the source, but WT hands us a a dest buffer the same
-	 * size.  This leads to an unfortunate extra copy, but it
-	 * can't be helped with the current WT interface and snappy
-	 * API.  We use a scratch buffer for temp storage, it should
-	 * be much faster than malloc.
+	/* dst->size was computed in wt_snappy_pre_size, so we know
+	 * it's big enough.  Skip past the space we'll use to store
+	 * the compressed buf size.
 	 */
-	snaplen = snappy_max_compressed_length(src->size);
-	buf = wiredtiger_scr_alloc(session, snaplen);
-	snapbuf = (char *)buf;
+	snaplen = dst->size - sizeof(size_t);
+	snapbuf = (char *)dst->data + sizeof(size_t);
 
 	/* snaplen is an input and an output arg. */
 	snret = snappy_compress((char *)src->data, src->size,
@@ -95,14 +91,12 @@ wt_snappy_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 		/* On decompression, snappy requires the exact
 		 * compressed buffer size (the current value of
 		 * snaplen).  WT does not preserve that, it rounds
-		 * the length up.  So we save the snaplen at the
+		 * the length up.  So save snaplen at the
 		 * beginning of the destination buffer.
 		 */
 		if (snaplen + sizeof(size_t) < dst->size) {
 			destp = (unsigned char *)dst->data;
 			*(size_t *)destp = snaplen;
-			destp += sizeof(size_t);
-			memcpy(destp, snapbuf, snaplen);
 			dst->size = (uint32_t)(snaplen + sizeof(size_t));
 			*compression_failed  = 0;
 		}
@@ -114,8 +108,6 @@ wt_snappy_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	}
 	else
 		ret = wt_snappy_error(session, "snappy_compress", snret);
-
-	wiredtiger_scr_free(session, buf);
 
         return (ret);
 }
@@ -152,4 +144,26 @@ wt_snappy_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 
         return (ret);
 }
+
+static int
+wt_snappy_pre_size(WT_COMPRESSOR *compressor, WT_SESSION *session,
+    const WT_ITEM *src, WT_ITEM *dst)
+{
+	size_t snaplen;
+
+        __UNUSED(compressor);
+        __UNUSED(session);
+
+	/* Snappy requires that the dest buffer be somewhat larger
+	 * than the source.  Fortunately, this is fast to compute, and
+	 * will give us a dest buffer in wt_snappy_compress that we
+	 * can compress to directly.  We add space in the dest buffer
+	 * to store the accurate compressed size.
+	 */
+	snaplen = snappy_max_compressed_length(src->size);
+	dst->size = (uint32_t)(snaplen + sizeof(size_t));
+	return (0);
+}
+	
+
 /* End implementation of WT_COMPRESSOR. */

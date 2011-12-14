@@ -98,7 +98,7 @@ __wt_block_write(
 	WT_BTREE *btree;
 	WT_BUF *tmp;
 	WT_PAGE_DISK *dsk;
-	uint32_t addr, align_size, size;
+	uint32_t addr, align_size, size, tmp_size;
 	uint8_t orig_type;
 	int compression_failed, ret;
 
@@ -163,18 +163,30 @@ not_compressed:	/*
 		dsk = buf->mem;
 		dsk->size = align_size;
 	} else {
-		/*
-		 * Allocate a buffer for disk compression; only allocate enough
-		 * memory for a copy of the original, if any compressed version
-		 * is bigger than the original, we won't use it.
-		 */
-		WT_RET(__wt_scr_alloc(session, buf->size, &tmp));
-
-		/* Skip the first 32B of the data. */
+		/* Skip the first 32B of the source data. */
 		src.data = (uint8_t *)buf->mem + COMPRESS_SKIP;
 		src.size = buf->size - COMPRESS_SKIP;
+
+		/*
+		 * Compute the size needed for the destination buffer.
+		 * By default, we only allocate enough memory for a
+		 * copy of the original, if any compressed version
+		 * is bigger than the original, we won't use it.
+		 * But some compressors may need more memory allocated
+		 * even though they may not need all of it.
+		 */
+		if (btree->compressor->pre_size != NULL) {
+			WT_ERR(btree->compressor->pre_size(btree->compressor,
+				&session->iface, &src, &dst));
+			tmp_size = dst.size;
+		}
+		else
+			tmp_size = src.size;
+		WT_RET(__wt_scr_alloc(session, tmp_size + COMPRESS_SKIP, &tmp));
+
+		/* Skip the first 32B of the dest data. */
 		dst.data = (uint8_t *)tmp->mem + COMPRESS_SKIP;
-		dst.size = src.size;
+		dst.size = tmp_size;
 
 		/*
 		 * If compression fails, fallback to the original version.  This
