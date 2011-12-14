@@ -548,7 +548,7 @@ namespace mongo {
         finishInit();
     }
 
-    void ParallelSortClusteredCursor::_markStaleNS( const string& staleNS, bool& forceReload, bool& fullReload ){
+    void ParallelSortClusteredCursor::_markStaleNS( const NamespaceString& staleNS, bool& forceReload, bool& fullReload ){
         if( _staleNSMap.find( staleNS ) == _staleNSMap.end() ){
             forceReload = false;
             fullReload = false;
@@ -564,9 +564,9 @@ namespace mongo {
         }
     }
 
-    void ParallelSortClusteredCursor::_handleStaleNS( const string& staleNS, bool forceReload, bool fullReload ){
+    void ParallelSortClusteredCursor::_handleStaleNS( const NamespaceString& staleNS, bool forceReload, bool fullReload ){
 
-        DBConfigPtr config = grid.getDBConfig( nsGetDB( staleNS ) );
+        DBConfigPtr config = grid.getDBConfig( staleNS.db );
 
         // Reload db if needed, make sure it works
         if( config && fullReload && ! config->reload() ){
@@ -592,11 +592,11 @@ namespace mongo {
         ChunkManagerPtr manager;
         ShardPtr primary;
 
-        string ns = _isCommand() ? _cInfo.versionedNS : _qSpec.ns();
+        NamespaceString ns = _isCommand() ? _cInfo.versionedNS : _qSpec.ns();
 
         log( pc ) << "creating " << ( _isCommand() ? "(command) " : "" ) << "pcursor over " << _qSpec << " and " << _cInfo << endl;
 
-        DBConfigPtr config = grid.getDBConfig( nsGetDB( ns ) ); // Gets or loads the config
+        DBConfigPtr config = grid.getDBConfig( ns.db ); // Gets or loads the config
         uassert( 15985, "database not found for parallel cursor request", config );
 
         // Try to get either the chunk manager or the primary shard
@@ -735,7 +735,7 @@ namespace mongo {
             catch( SendStaleConfigException& e ){
 
                 // Our version isn't compatible with the current version anymore on at least one shard, need to retry immediately
-                string staleNS = e.getns();
+                NamespaceString staleNS = e.getns();
 
                 // Probably need to retry fully
                 bool forceReload, fullReload;

@@ -339,8 +339,8 @@ namespace mongo {
         virtual void _explain( map< string,list<BSONObj> >& out );
 
         bool _isCommand(){ return ! _cInfo.isEmpty(); }
-        void _markStaleNS( const string& staleNS, bool& forceReload, bool& fullReload );
-        void _handleStaleNS( const string& staleNS, bool forceReload, bool fullReload );
+        void _markStaleNS( const NamespaceString& staleNS, bool& forceReload, bool& fullReload );
+        void _handleStaleNS( const NamespaceString& staleNS, bool forceReload, bool fullReload );
 
         QuerySpec _qSpec;
         CommandInfo _cInfo;

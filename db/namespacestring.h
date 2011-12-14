@@ -43,6 +43,19 @@ namespace mongo {
         string ns() const { return db + '.' + coll; }
 
         bool isSystem() const { return strncmp(coll.c_str(), "system.", 7) == 0; }
+        bool isCommand() const { return coll == "$cmd"; }
+
+        operator string() const { return ns(); }
+
+        bool operator==( const string& nsIn ) const { return nsIn == ns(); }
+        bool operator==( const char* nsIn ) const { return (string)nsIn == ns(); }
+        bool operator==( const NamespaceString& nsIn ) const { return nsIn.db == db && nsIn.coll == coll; }
+
+        bool operator!=( const string& nsIn ) const { return nsIn != ns(); }
+        bool operator!=( const char* nsIn ) const { return (string)nsIn != ns(); }
+        bool operator!=( const NamespaceString& nsIn ) const { return nsIn.db != db || nsIn.coll != coll; }
+
+        string toString() const { return ns(); }
 
         /**
          * @return true if ns is 'normal'.  $ used for collections holding index data, which do not contain BSON objects in their records.
@@ -58,7 +71,7 @@ namespace mongo {
         static bool special(const char *ns) { 
             return !normal(ns) || strstr(ns, ".system.");
         }
-        
+
         /**
          * samples:
          *   good:  
