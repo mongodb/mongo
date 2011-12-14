@@ -58,5 +58,35 @@ namespace mongo {
     void agg_framework_reservedErrors()
     {
 	uassert(15984, "reserved error", false);
+	uassert(15990, "reserved error", false);
+	uassert(15991, "reserved error", false);
+	uassert(15992, "reserved error", false);
+	uassert(15993, "reserved error", false);
+	uassert(15994, "reserved error", false);
+	uassert(15995, "reserved error", false);
+	uassert(15996, "reserved error", false);
+	uassert(15997, "reserved error", false);
+	uassert(15998, "reserved error", false);
+	uassert(15999, "reserved error", false);
+	uassert(16000, "reserved error", false);
+	uassert(16001, "reserved error", false);
+	uassert(16002, "reserved error", false);
+	uassert(16003, "reserved error", false);
+	uassert(16004, "reserved error", false);
+	uassert(16005, "reserved error", false);
+	uassert(16006, "reserved error", false);
+	uassert(16007, "reserved error", false);
+	uassert(16008, "reserved error", false);
+	uassert(16009, "reserved error", false);
+	uassert(16010, "reserved error", false);
+	uassert(16011, "reserved error", false);
+	uassert(16012, "reserved error", false);
+	uassert(16013, "reserved error", false);
+	uassert(16014, "reserved error", false);
+	uassert(16015, "reserved error", false);
+	uassert(16016, "reserved error", false);
+	uassert(16017, "reserved error", false);
+	uassert(16018, "reserved error", false);
+	uassert(16019, "reserved error", false);
     }
 }
