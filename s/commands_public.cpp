@@ -411,7 +411,14 @@ namespace mongo {
                     ShardConnection conn( conf->getPrimary() , fullns );
 
                     BSONObj temp;
-                    bool ok = conn->runCommand( dbName , cmdObj , temp, options );
+                    bool ok = false;
+                    try{
+                        ok = conn->runCommand( dbName , cmdObj , temp, options );
+                    }
+                    catch( RecvStaleConfigException& e ){
+                        conn.done();
+                        throw e;
+                    }
                     conn.done();
 
                     if ( ok ) {
@@ -473,7 +480,14 @@ namespace mongo {
                         }
 
                         BSONObj temp;
-                        bool ok = conn->runCommand( dbName , BSON( "count" << collection << "query" << filter ) , temp, options );
+                        bool ok = false;
+                        try{
+                            ok = conn->runCommand( dbName , BSON( "count" << collection << "query" << filter ) , temp, options );
+                        }
+                        catch( RecvStaleConfigException& e ){
+                            conn.done();
+                            throw e;
+                        }
                         conn.done();
 
                         if ( ok ) {
@@ -481,6 +495,7 @@ namespace mongo {
                             total += mine;
                             shardCounts[it->getName()] = mine;
                             continue;
+
                         }
 
                         if ( SendStaleConfigCode == temp["code"].numberInt() ) {
