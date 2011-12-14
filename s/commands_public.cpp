@@ -1241,70 +1241,48 @@ namespace mongo {
                         }
                     }
 
-                    // group chunks per shard
-                    ChunkManagerPtr cm = confOut->getChunkManager( finalColLong );
-                    set<Shard> outShards;
-                    cm->getShardsForQuery(outShards, BSONObj());
-
-                    // spawn sharded finish jobs on each shard
-                    // command will fetch appropriate results from other shards, do final reduce and post processing
-                    list<shared_ptr<Future::CommandResult> > futures;
-                    futures.clear();
                     BSONObj finalCmdObj = finalCmd.obj();
+                    results.clear();
 
-                    for ( set<Shard>::iterator i=outShards.begin(), end=outShards.end() ; i != end ; i++ ) {
-                        Shard shard = *i;
-                        shared_ptr<ShardConnection> temp( new ShardConnection( shard.getConnString() , finalColLong ) );
-                        assert( temp->get() );
-                        futures.push_back( Future::spawnCommand( shard.getConnString() , outDB , finalCmdObj , 0 , temp->get() ) );
-                        shardConns.push_back(temp);
+                    try {
+                        SHARDED->commandOp( outDB, finalCmdObj, 0, finalColLong, BSONObj(), results );
+                        ok = true;
+                    }
+                    catch( DBException& e ){
+                        e.addContext( str::stream() << "could not run final reduce command on all shards for ns " << fullns << ", output " << finalColLong );
+                        throw;
                     }
 
-                    // now wait for the result of all shards
-                    ok = true;
-                    for ( list< shared_ptr<Future::CommandResult> >::iterator i=futures.begin(); i!=futures.end(); ++i ) {
-                        string server;
-                        try {
-                            shared_ptr<Future::CommandResult> res = *i;
-                            if ( ! res->join() ) {
-                                error() << "final reduce failed on shard: " << res->getServer() << " error: " << res->result() << endl;
-                                result.append( "cause" , res->result() );
-                                errmsg = "final reduce failed: ";
-                                errmsg += res->result().toString();
-                                ok = false;
-                                continue;
-                            }
-                            singleResult = res->result();
-                            BSONObj counts = singleResult.getObjectField("counts");
-                            reduceCount += counts.getIntField("reduce");
-                            outputCount += counts.getIntField("output");
-                            server = res->getServer();
-                            postCountsB.append(server, counts);
+                    for ( map<Shard,BSONObj>::iterator i = results.begin(); i != results.end(); ++i ){
 
-                            // check on splitting, now that results are in the final collection
-                            if (singleResult.hasField("chunkSizes")) {
-                                const ChunkMap& chunkMap = cm->getChunkMap();
-                                vector<BSONElement> chunkSizes = singleResult.getField("chunkSizes").Array();
-                                for (unsigned int i = 0; i < chunkSizes.size(); i += 2) {
-                                    BSONObj key = chunkSizes[i].Obj();
-                                    long long size = chunkSizes[i+1].numberLong();
-                                    assert( size < 0x7fffffff );
+                        string server = i->first.getConnString();
+                        BSONObj singleResult = i->second;
 
-                                    ChunkMap::const_iterator cit = chunkMap.find(key);
-                                    if (cit == chunkMap.end()) {
-                                        warning() << "Mongod reported " << size << " bytes inserted for key " << key << " but can't find chunk" << endl;
-                                    } else {
-                                        ChunkPtr c = cit->second;
-                                        c->splitIfShould(static_cast<int>(size));
-                                    }
+                        BSONObj counts = singleResult.getObjectField("counts");
+                        reduceCount += counts.getIntField("reduce");
+                        outputCount += counts.getIntField("output");
+                        postCountsB.append(server, counts);
+
+                        // check on splitting, now that results are in the final collection
+                        ChunkManagerPtr cm = confOut->getChunkManagerIfExists( finalColLong );
+                        if (singleResult.hasField("chunkSizes") && cm) {
+                            const ChunkMap& chunkMap = cm->getChunkMap();
+                            vector<BSONElement> chunkSizes = singleResult.getField("chunkSizes").Array();
+                            for (unsigned int i = 0; i < chunkSizes.size(); i += 2) {
+                                BSONObj key = chunkSizes[i].Obj();
+                                long long size = chunkSizes[i+1].numberLong();
+                                assert( size < 0x7fffffff );
+
+                                ChunkMap::const_iterator cit = chunkMap.find(key);
+                                if (cit == chunkMap.end()) {
+                                    warning() << "Mongod reported " << size << " bytes inserted for key " << key << " but can't find chunk" << endl;
+                                } else {
+                                    ChunkPtr c = cit->second;
+                                    c->splitIfShould(static_cast<int>(size));
                                 }
                             }
                         }
-                        catch( RecvStaleConfigException& e ){
-                            log() << "final reduce error due to stale config on a shard" << causedBy( e ) << endl;
-                            ok = false;
-                            continue;
-                        }
+
                     }
                 }
 
