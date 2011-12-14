@@ -414,7 +414,7 @@ namespace mongo {
         }
 
         if ( cmdLine.sslPEMKeyFile.size() || cmdLine.sslPEMKeyPassword.size() ) {
-            log() << "Please ensure that \"sslOnNormalPorts\" is enabled before continuing" << endl;
+            log() << "need to enable sslOnNormalPorts" << endl;
             dbexit(EXIT_BADOPTIONS);
         }
 #endif
