@@ -70,7 +70,6 @@ wt_snappy_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	snappy_status snret;
 	int ret;
 	size_t snaplen;
-	void *buf;
 	char *snapbuf;
 	unsigned char *destp;
 

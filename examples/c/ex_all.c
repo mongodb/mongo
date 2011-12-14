@@ -392,6 +392,10 @@ static int
 my_pre_size(WT_COMPRESSOR *compressor,
     WT_SESSION *session, const WT_ITEM *source, WT_ITEM *dest)
 {
+	/* Unused parameters */
+	(void)compressor;
+	(void)session;
+
 	dest->size = source->size;
 	return (0);
 }
