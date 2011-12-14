@@ -115,7 +115,9 @@ namespace mongo {
 	BSONElement *pBsonElement,
 	const intrusive_ptr<ExpressionContext> &pCtx) {
         /* validate */
-        assert(pBsonElement->type() == Object); // CW TODO user error
+	uassert(15969, str::stream() << projectName <<
+		" specification must be an object",
+		pBsonElement->type() == Object);
 
         /* chain the projection onto the original source */
         intrusive_ptr<DocumentSourceProject> pProject(
@@ -140,22 +142,21 @@ namespace mongo {
             switch(specType) {
             case NumberDouble: {
                 double inclusion = outFieldElement.numberDouble();
-                if ((inclusion == 0) || (inclusion == 1))
-                    fieldInclusion = (int)inclusion;
-                else {
-                    assert(false); // CW TODO unimplemented constant expression
-                }
-
+		fieldInclusion = static_cast<int>(inclusion);
                 goto IncludeExclude;
             }
 
             case NumberInt:
                 /* just a plain integer include/exclude specification */
                 fieldInclusion = outFieldElement.numberInt();
-                assert((fieldInclusion >= 0) && (fieldInclusion <= 1));
-                // CW TODO invalid field projection specification
 
 IncludeExclude:
+		uassert(15970, str::stream() <<
+			"field inclusion or exclusion specification for \"" <<
+			outFieldPath <<
+			"\" must be true, 1, false, or zero",
+			((fieldInclusion == 0) || (fieldInclusion == 1)));
+
                 if (fieldInclusion == 0)
 		    pProject->excludePath(outFieldPath);
                 else 
@@ -164,7 +165,7 @@ IncludeExclude:
 
             case Bool:
                 /* just a plain boolean include/exclude specification */
-                fieldInclusion = outFieldElement.Bool() ? 1 : 0;
+                fieldInclusion = (outFieldElement.Bool() ? 1 : 0);
                 goto IncludeExclude;
 
             case String:
@@ -187,7 +188,10 @@ IncludeExclude:
             }
 
             default:
-                assert(false); // CW TODO invalid field projection specification
+		uassert(15971, str::stream() <<
+			"invalid BSON type (" << specType <<
+			") for " << projectName <<
+			" field " << outFieldPath, false);
             }
 
         }

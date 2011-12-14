@@ -121,12 +121,8 @@ namespace mongo {
 	}
 
 	/* make sure we have a valid value */
-/*
-	foo(15945, str::stream() << "cannot add undefined field " <<
+	uassert(15968, str::stream() << "cannot set undefined field " <<
 		fieldName << " to document", pValue->getType() != Undefined);
-*/
-	// CW TODO error
-	assert(pValue->getType() != Undefined);
 
 	/* set the indicated field */
         vFieldName[index] = fieldName;

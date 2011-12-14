@@ -23,8 +23,10 @@
 #include "db/pipeline/document.h"
 #include "db/pipeline/expression_context.h"
 #include "db/pipeline/value.h"
+#include "util/mongoutils/str.h"
 
 namespace mongo {
+    using namespace mongoutils;
 
     /* --------------------------- Expression ------------------------------ */
 
@@ -53,8 +55,10 @@ namespace mongo {
 
     string Expression::removeFieldPrefix(const string &prefixedField) {
 	const char *pPrefixedField = prefixedField.c_str();
-	assert(pPrefixedField[0] == '$');
-	// CW TODO field name must begin with a $
+	uassert(15982, str::stream() <<
+		"field path references must be prefixed with a '$' (\"" <<
+		prefixedField << "\"", pPrefixedField[0] == '$');
+
 	return string(pPrefixedField + 1);
     }
 
@@ -84,8 +88,10 @@ namespace mongo {
             const char *pFieldName = fieldElement.fieldName();
 
             if (pFieldName[0] == '$') {
-                assert(fieldCount == 0);
-                // CW TODO error:  operator must be only field
+		uassert(15983, str::stream() <<
+			"the operator must be the only field in a pipeline object (at \""
+			<< pFieldName << "\"",
+			fieldCount == 0);
 
                 /* we've determined this "object" is an operator expression */
                 isOp = 1;
