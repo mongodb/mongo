@@ -1,6 +1,6 @@
 add	LICENSE
-skip	src/api/config_def.c
-skip	src/api/strerror.c
+skip	src/api/api_strerror.c
+skip	src/config/config_def.c
 skip	src/include/bitstring.i
 skip	src/include/extern.h
 skip	src/include/log.i

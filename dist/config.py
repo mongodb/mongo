@@ -111,7 +111,7 @@ compare_srcfile(tmp_file, f)
 #####################################################################
 # Create config_def.c with defaults for each config string
 #####################################################################
-f='../src/api/config_def.c'
+f='../src/config/config_def.c'
 tfile = open(tmp_file, 'w')
 
 tfile.write('''/* DO NOT EDIT: automatically built by dist/config.py. */

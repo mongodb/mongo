@@ -81,4 +81,4 @@ tfile.write('''\
 }
 ''')
 tfile.close()
-compare_srcfile(tmp_file, '../src/api/strerror.c')
+compare_srcfile(tmp_file, '../src/api/api_strerror.c')

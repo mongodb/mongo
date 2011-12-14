@@ -19,7 +19,7 @@ ENDOFTEXT
 check()
 {
 	# Skip auto-generated files and files we didn't author.
-	if `egrep "skip	$1" s_copyright.lst > /dev/null`; then
+	if `egrep "skip	$1" s_copyright.list > /dev/null`; then
 		return;
 	fi
 
@@ -33,7 +33,7 @@ check()
 
 l="`cd .. && echo examples/c/*.c \
     src/include/*.[hi] src/include/*.in src/utilities/*.c`"
-l="$l `sed -e 's/^add	\(.*\)/\1/p' -e d s_copyright.lst`"
+l="$l `sed -e 's/^add	\(.*\)/\1/p' -e d s_copyright.list`"
 for i in $l `sed -e '/^[a-z]/! d' filelist`; do
 	check $i
 done
