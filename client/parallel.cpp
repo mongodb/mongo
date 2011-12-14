@@ -536,7 +536,8 @@ namespace mongo {
         return BSON( "state" << ( pcState ? pcState->toBSON() : BSONObj() ) <<
                      "retryNext" << retryNext <<
                      "init" << initialized <<
-                     "finish" << finished );
+                     "finish" << finished <<
+                     "errored" << errored );
     }
 
     BSONObj ParallelSortClusteredCursor::toBSON() const {
