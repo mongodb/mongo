@@ -301,8 +301,11 @@ namespace mongo {
     typedef shared_ptr<PCMData> PCMDataPtr;
 
     /**
-     * runs a query in parellel across N servers
-     * sots
+     * Runs a query in parallel across N servers.  New logic has several modes -
+     * 1) Standard query, enforces compatible chunk versions for queries across all results
+     * 2) Standard query, sent to particular servers with no compatible chunk version enforced, but handling
+     *    stale configuration exceptions
+     * 3) Command query, either enforcing compatible chunk versions or sent to particular shards.
      */
     class ParallelSortClusteredCursor : public ClusteredCursor {
     public:
@@ -318,6 +321,11 @@ namespace mongo {
         void fullInit();
         void startInit();
         void finishInit();
+
+        bool isSharded();
+        ShardPtr getPrimary();
+        ChunkManagerPtr getChunkManager( const Shard& shard );
+        DBClientCursorPtr getShardCursor( const Shard& shard );
 
         BSONObj toBSON() const;
         string toString() const;

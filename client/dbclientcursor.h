@@ -159,6 +159,8 @@ namespace mongo {
 
         void attach( AScopedConnection * conn );
 
+        Message* getMessage(){ return b.m.get(); }
+
         /**
          * actually does the query
          */
