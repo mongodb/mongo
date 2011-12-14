@@ -756,15 +756,20 @@ namespace QueryOptimizerCursorTests {
             
             c = newQueryOptimizerCursor( ns(), BSON( "a" << 100 << "b" << 149 ) );
             // Try {a:1}, which was successful previously.
-            for( int i = 0; i < 11; ++i ) {
+            for( int i = 0; i < 12; ++i ) {
                 ASSERT( 149 != c->current().getIntField( "b" ) );
                 ASSERT( c->advance() );
             }
-            // Now try {b:1} plan.
-            ASSERT_EQUALS( 149, c->current().getIntField( "b" ) );
-            ASSERT( c->advance() );
-            // {b:1} plan finished.
-            ASSERT( !c->advance() );
+            bool sawB1Index = false;
+            do {
+                if ( c->indexKeyPattern() == BSON( "b" << 1 ) ) {
+                    ASSERT_EQUALS( 149, c->current().getIntField( "b" ) );
+                    // We should try the {b:1} index and only see one result from it.
+                    ASSERT( !sawB1Index );
+                    sawB1Index = true;
+                }
+            } while ( c->advance() );
+            ASSERT( sawB1Index );
         }
     };
 
@@ -802,7 +807,7 @@ namespace QueryOptimizerCursorTests {
             
             c = newQueryOptimizerCursor( ns(), BSON( "a" << 100 << "b" << 150 ) );
             // Try {a:1}, which was successful previously.
-            for( int i = 0; i < 11; ++i ) {
+            for( int i = 0; i < 12; ++i ) {
                 ASSERT( 150 != c->current().getIntField( "b" ) );
                 ASSERT_EQUALS( BSON( "a" << 1 ), c->indexKeyPattern() );
                 ASSERT( c->advance() );

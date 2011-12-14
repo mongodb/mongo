@@ -738,7 +738,6 @@ doneCheckOrder:
         if ( op.error() ) {
             return holder._op;
         }
-        _queue.push( holder );
         if ( !_plans._bestGuessOnly && _plans._usingCachedPlan && op.nscanned() > _plans._oldNScanned * 10 && _plans._special.empty() ) {
             holder._offset = -op.nscanned();
             _plans.addOtherPlans( /* avoid duplicating the initial plan */ true );
@@ -755,6 +754,7 @@ doneCheckOrder:
             }
             _plans._usingCachedPlan = false;
         }
+        _queue.push( holder );
         return holder._op;
     }
     
