@@ -66,6 +66,18 @@ namespace QueryOptimizerCursorTests {
             c.countMatch( DiskLoc() );
             ASSERT_EQUALS( 1, c.count() );
             ASSERT_EQUALS( 1, c.cumulativeCount() );
+
+            // Don't count the same match twice, without checking the document location.
+            c.countMatch( DiskLoc( 1, 1 ) );
+            ASSERT_EQUALS( 1, c.count() );
+            ASSERT_EQUALS( 1, c.cumulativeCount() );
+
+            // Reset and count another match.
+            c.resetMatch();
+            c.setMatch( true );
+            c.countMatch( DiskLoc( 1, 1 ) );
+            ASSERT_EQUALS( 2, c.count() );
+            ASSERT_EQUALS( 2, c.cumulativeCount() );
         }
     };
     
@@ -858,11 +870,13 @@ namespace QueryOptimizerCursorTests {
             Client::Context ctx( ns() );
             shared_ptr<Cursor> c = newQueryOptimizerCursor( ns(), BSON( "a" << GTE << -1 << LTE << 0 << "b" << GTE << -1 << LTE << 0 ) );
             while( c->advance() );
+            // {a:1} plan should be recorded now.
           
             c = newQueryOptimizerCursor( ns(), BSON( "a" << GTE << 100 << LTE << 400 << "b" << GTE << 100 << LTE << 400 ) );
             int count = 0;
             while( c->ok() ) {
-                if ( c->currentMatches() && !c->getsetdup( c->currLoc() ) ) {
+                if ( c->currentMatches() ) {
+                    ASSERT( !c->getsetdup( c->currLoc() ) );
                     ++count;
                     int id = c->current().getIntField( "_id" );
                     c->advance();

@@ -21,15 +21,19 @@ namespace mongo {
     /** Helper class for caching and counting matches during execution of a QueryPlan. */
     class CachedMatchCounter {
     public:
-        CachedMatchCounter( long long &aggregateNscanned, int cumulativeCount ) : _aggregateNscanned( aggregateNscanned ), _nscanned(), _cumulativeCount( cumulativeCount ), _count(), _checkDups(), _match( Unknown ) {}
+        CachedMatchCounter( long long &aggregateNscanned, int cumulativeCount ) : _aggregateNscanned( aggregateNscanned ), _nscanned(), _cumulativeCount( cumulativeCount ), _count(), _checkDups(), _match( Unknown ), _counted() {}
         void setCheckDups( bool checkDups ) { _checkDups = checkDups; }
-        void resetMatch() { _match = Unknown; }
+        void resetMatch() {
+            _match = Unknown;
+            _counted = false;
+        }
         void setMatch( bool match ) { _match = match ? True : False; }
         bool knowMatch() const { return _match != Unknown; }
         void countMatch( const DiskLoc &loc ) {
-            if ( _match == True && !getsetdup( loc ) ) {
+            if ( !_counted && _match == True && !getsetdup( loc ) ) {
                 ++_cumulativeCount;
                 ++_count;
+                _counted = true;
             }
         }
         bool enoughCumulativeMatchesToChooseAPlan() const {
@@ -65,6 +69,7 @@ namespace mongo {
         bool _checkDups;
         enum MatchState { Unknown, False, True };
         MatchState _match;
+        bool _counted;
         set<DiskLoc> _dups;
     };
     
