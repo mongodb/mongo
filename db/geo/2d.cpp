@@ -2573,20 +2573,30 @@ namespace mongo {
                 return false;
             }
 
-            vector<int> idxs;
-            d->findIndexByType( GEO2DNAME , idxs );
+            int geoIdx = -1;
+            if ( cmdObj.hasField("field") ) {
+              geoIdx = d->findIndexByName( (cmdObj["field"].str() + "_").c_str() );
 
-            if ( idxs.size() > 1 ) {
-                errmsg = "more than 1 geo indexes :(";
+              if ( geoIdx == -1 ) {
+                errmsg = "couldn't find geo index by name :(";
                 return false;
-            }
+              }
+            } else {
+              vector<int> idxs;
+              d->findIndexByType( GEO2DNAME , idxs );
 
-            if ( idxs.size() == 0 ) {
-                errmsg = "no geo index :(";
-                return false;
-            }
+              if ( idxs.size() > 1 ) {
+                  errmsg = "more than 1 geo index, and field name is not specified :(";
+                  return false;
+              }
 
-            int geoIdx = idxs[0];
+              if ( idxs.size() == 0 ) {
+                  errmsg = "no geo index :(";
+                  return false;
+              }
+
+              geoIdx = idxs[0];
+            }
 
             result.append( "ns" , ns );
 
