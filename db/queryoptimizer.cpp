@@ -553,6 +553,7 @@ doneCheckOrder:
             if ( _bestGuessOnly || res->complete() || _plans.size() > 1 )
                 return res;
             // A cached plan was used, so clear the plan for this query pattern and retry the query without a cached plan.
+            // Carefull here, as the namespace may have been dropped.
             QueryUtilIndexed::clearIndexesForPatterns( *_frsp, _order );
             init();
         }
@@ -667,7 +668,7 @@ doneCheckOrder:
         int micros = ClientCursor::suggestYieldMicros();
         if ( micros <= 0 ) 
             return;
-        
+
         if ( !prepareToYield() ) 
             return;   
         
