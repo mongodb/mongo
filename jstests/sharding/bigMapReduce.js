@@ -45,15 +45,7 @@ for (iter = 0; iter < 5; iter++) {
 
     obj = outColl.convertToSingleObject("value");
     
-    // Because of SERVER-4215
-    try{ 
-        assert.eq( 51200 , obj.count , "Received wrong result " + obj.count );
-    }
-    catch( e ){
-        printjson( e );
-        print( "Result of " + obj.count + " may be due to simultaneous migrate." )
-        assert( obj.count >= 50000 && obj.count <= 54000 )
-    }
+    assert.eq( 51200 , obj.count , "Received wrong result " + obj.count );
 
     print("checking result field");
     assert.eq(res.result.collection, outCollStr, "Wrong collection " + res.result.collection);

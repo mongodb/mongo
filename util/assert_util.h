@@ -85,6 +85,7 @@ namespace mongo {
 
     class DBException;
     string causedBy( const DBException& e );
+    string causedBy( const string& e );
 
     class DBException : public std::exception {
     public:
@@ -97,6 +98,9 @@ namespace mongo {
         virtual int getCode() const { return _ei.code; }
 
         virtual void appendPrefix( stringstream& ss ) const { }
+        virtual void addContext( const string& str ) {
+            _ei.msg = str + causedBy( _ei.msg );
+        }
 
         virtual string toString() const {
             stringstream ss; ss << getCode() << " " << what(); return ss.str();
