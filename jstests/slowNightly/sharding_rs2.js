@@ -71,6 +71,11 @@ for ( i=0; i<10; i++ )
     assert.eq( 17 , ts.findOne().x , "B1" )
 
 m.setSlaveOk()
+
+// Confusingly, v2.0 mongos does not actually update the secondary status of any members until after the first 
+// ReplicaSetMonitorWatcher round.  Wait for that here.
+ReplSetTest.awaitRSClientHosts( m, rs.test.getSecondaries()[0], { secondary : true } )
+
 for ( i=0; i<10; i++ )
     assert.eq( 17 , ts.findOne().x , "B2" )
 
