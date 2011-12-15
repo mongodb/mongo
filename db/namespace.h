@@ -446,6 +446,8 @@ namespace mongo {
          * currKey() documents, the matcher(), and the isMultiKey() nature of the
          * cursor may change over the course of iteration.
          *
+         * @param query - Query used to select indexes and populate matchers.
+         *
          * @param order - Required ordering spec for documents produced by this cursor,
          * empty object default indicates no order requirement.  If no index exists that
          * satisfies the required sort order, an empty shared_ptr is returned.
@@ -462,7 +464,6 @@ namespace mongo {
          * This indicates that the cursor was unable to perform a complete scan.
          *
          * This is a work in progress.  Partial list of features not yet implemented:
-         * - modification of scanned documents
          * - covered indexes
          * - in memory sorting
          */
