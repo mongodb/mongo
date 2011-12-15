@@ -123,9 +123,6 @@
     <ClCompile Include="..\..\util\text.cpp">
       <Filter>shell</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\s\shardconnection.cpp">
-      <Filter>shared source files</Filter>
-    </ClCompile>
     <ClCompile Include="..\shell_utils.cpp">
       <Filter>shell</Filter>
     </ClCompile>
