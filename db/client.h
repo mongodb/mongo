@@ -228,8 +228,7 @@ namespace mongo {
         struct LockStatus {
             LockStatus();
             string whichCollection;
-            int coll;
-            bool isWriteLocked() const;
+            unsigned state;
         } lockStatus;
 
 #if defined(CLC)
