@@ -100,7 +100,7 @@ namespace mongo {
 
             _state.set(1);
 
-            Client *c = curopWaitingForLock( 1 ); // stats
+            curopWaitingForLock( 1 ); // stats
             _m.lock();
             MongoFile::markAllWritable(); // for _DEBUG validation -- a no op for release build
             _acquiredWriteLock();
@@ -111,7 +111,7 @@ namespace mongo {
             if ( _writeLockedAlready() ) // adjusts _state
                 return true;
 
-            Client *c = curopWaitingForLock( 1 );
+            curopWaitingForLock( 1 );
             bool got = _m.lock_try( millis );
 
             if ( got ) {
