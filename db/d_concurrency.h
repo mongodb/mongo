@@ -37,6 +37,7 @@ namespace mongo {
         GlobalSharedLock gslk;
     public:
         ExcludeAllWrites();
+        ~ExcludeAllWrites();
     };
 
 }

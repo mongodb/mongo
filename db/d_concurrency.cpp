@@ -18,6 +18,54 @@
 
 namespace mongo {
 
+    class LockBits {
+    public:
+        unsigned& x;
+        enum Level { 
+            LockExcluder = 0,
+            Global = 1,
+            Collection = 2,
+            OplogCollection = 3
+        };
+        enum State { 
+            NotLocked = 0,
+            //AwaitShared = 1, // todo...
+            Shared = 2,
+            // todo: upgradable...
+            //AwaitExclusive = 4,
+            Exclusive = 8
+        };
+        enum { B = 8, MASK = 0xff } ;
+        LockBits(unsigned &_x) : x(_x) { }
+        bool anythingExclusive() const { 
+            return (0x88888888 & x) != 0;
+        }
+        State get(Level l) const { 
+            unsigned msk = MASK << (l*B);
+            return static_cast<State>((x&msk) >> (l*B));
+        }
+        void set(Level l, State old, State _new) {
+            unsigned msk = MASK << (l*B);
+            verify(0, get(l)==old);
+            x = (x&~msk) | (_new << (l*B));
+        }
+    };
+
+    void MongoMutex::lockedExclusively() {
+        Client& c = cc();
+        curopGotLock(&c); // hopefully lockStatus replaces one day
+        LockBits b = c.lockStatus.state;
+        b.set(LockBits::Global, LockBits::NotLocked, LockBits::Exclusive);
+        _minfo.entered(); // hopefully eliminate one day 
+    }
+
+    void MongoMutex::unlockingExclusively() {
+        Client& c = cc();
+        _minfo.leaving();
+        LockBits b = c.lockStatus.state;
+        b.set(LockBits::Global, LockBits::Exclusive, LockBits::NotLocked);
+    }
+
     bool subcollectionOf(const string& parent, const char *child) {
         if( parent == child ) 
             return true;
@@ -49,8 +97,13 @@ namespace mongo {
     {
         LOG(3) << "ExcludeAllWrites" << endl;
         wassert( !dbMutex.isWriteLocked() );
-        wassert( !cc().lockStatus.isWriteLocked() );
+        LockBits b(cc().lockStatus.state);
+        wassert( b.x == 0 );
+        b.set(LockBits::LockExcluder, LockBits::NotLocked, LockBits::Exclusive);
     };
+    ExcludeAllWrites::~ExcludeAllWrites() {
+        LockBits(cc().lockStatus.state).set(LockBits::LockExcluder, LockBits::Exclusive, LockBits::NotLocked);
+    }
 
     // CLC turns on the "collection level concurrency" code 
     // (which is under development and not finished)
@@ -61,7 +114,7 @@ namespace mongo {
             if( !dbMutex.isWriteLocked() ) { 
                 const char *n = ns();
                 if( lockStatus.whichCollection.empty() ) { 
-                    log() << "DEBUG checkLocks error expected to already be locked " << n << endl;
+                    log() << "DEBUG checkLocks error expected to already be locked: " << n << endl;
                     dassert(false);
                 }
                 dassert( subcollectionOf(lockStatus.whichCollection, n) || lkspecial(n) );
@@ -71,11 +124,7 @@ namespace mongo {
 #endif
 
     Client::LockStatus::LockStatus() { 
-        coll = 0;
-    }
-
-    bool Client::LockStatus::isWriteLocked() const { 
-        return coll > 0;
+        state = 0;
     }
 
     // we don't keep these locks in the namespacedetailstransient and Database 
@@ -116,23 +165,27 @@ namespace mongo {
         if( locks.get() ) {
             Client::LockStatus& s = cc().lockStatus;
             s.whichCollection.clear();
-            s.coll--;
+            LockBits b( s.state );
+            wassert( b.get(LockBits::OplogCollection) == LockBits::NotLocked ); // todo ...
+            b.set(LockBits::Collection, LockBits::Exclusive, LockBits::NotLocked);
         }
     }
     LockCollectionForWriting::LockCollectionForWriting(string coll)
     {
         Client::LockStatus& s = cc().lockStatus;
+        LockBits b(s.state);
         if( !s.whichCollection.empty() ) {
             if( !subcollectionOf(s.whichCollection, coll.c_str()) ) { 
                 massert(15937, str::stream() << "can't nest lock of " << coll << " beneath " << s.whichCollection, false);
             }
-            massert(15938, "want collection write lock but it is already read locked", s.coll > 0);
+            if( b.get(LockBits::Collection) != LockBits::Exclusive ) {
+                massert(15938, str::stream() << "want collection write lock but it is already read locked " << s.state, false);
+            }
             return;
         }
         verify(15965, !lkspecial(coll)); // you must global write lock for writes to special's
         s.whichCollection = coll;
-        dassert( s.coll == 0 );
-        s.coll++;
+        b.set(LockBits::Collection, LockBits::NotLocked, LockBits::Exclusive);
         locks.reset( new Locks(coll) );
     }    
 
@@ -142,11 +195,11 @@ namespace mongo {
     { }
     LockCollectionForReading::~LockCollectionForReading() {
         Client::LockStatus& s = cc().lockStatus;
-        dassert( !s.whichCollection.empty() );
+        wassert( !s.whichCollection.empty() );
         if( locks.get() ) {
             s.whichCollection.clear();
-            s.coll++;
-            wassert( s.coll == 0 );
+            LockBits b(s.state);
+            b.set(LockBits::Collection, LockBits::Shared, LockBits::NotLocked);
         }
     }
     LockCollectionForReading::LockCollectionForReading(string coll)
@@ -163,9 +216,9 @@ namespace mongo {
             // already locked, so done; might have been a write lock.
             return;
         }
+        LockBits b(s.state);
         s.whichCollection = coll; 
-        dassert( s.coll == 0 );
-        s.coll--;
+        b.set(LockBits::Collection, LockBits::NotLocked, LockBits::Shared);
         locks.reset( new Locks(coll) );
     }
 
