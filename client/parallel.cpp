@@ -478,7 +478,7 @@ namespace mongo {
                         bool retry = false;
                         pcState->cursor->initLazyFinish( retry );
                     }
-                    catch( std::exception& e ){
+                    catch( std::exception& ){
                         warning() << "exception closing cursor" << endl;
                     }
                     catch( ... ){
