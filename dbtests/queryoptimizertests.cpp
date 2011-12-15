@@ -20,6 +20,7 @@
 #include "pch.h"
 #include "../db/queryoptimizer.h"
 #include "../db/instance.h"
+#include "../db/ops/count.h"
 #include "../db/ops/query.h"
 #include "../db/ops/delete.h"
 #include "dbtests.h"

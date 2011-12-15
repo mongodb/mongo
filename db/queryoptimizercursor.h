@@ -98,12 +98,12 @@ namespace mongo {
         SmallDupSet() : _accesses() {
             _vec.reserve( 250 );
         }
-        /** @return true if already added to the set, false if adding to the set in this call. */
+        /** @return true if @param 'loc' already added to the set, false if adding to the set in this call. */
         bool getsetdup( const DiskLoc &loc ) {
             access();
             return vec() ? getsetdupVec( loc ) : getsetdupSet( loc );
         }
-        /** @return true when in the set. */
+        /** @return true when @param loc in the set. */
         bool getdup( const DiskLoc &loc ) {
             access();
             return vec() ? getdupVec( loc ) : getdupSet( loc );

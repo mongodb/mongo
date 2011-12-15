@@ -1,5 +1,4 @@
 // querytests.cpp : query.{h,cpp} unit tests.
-//
 
 /**
  *    Copyright (C) 2008 10gen Inc.
@@ -77,62 +76,6 @@ namespace QueryTests {
         }
         static void insert( const BSONObj &o ) {
             theDataFileMgr.insert( ns(), o.objdata(), o.objsize() );
-        }
-    };
-
-    class CountBasic : public Base {
-    public:
-        void run() {
-            insert( "{\"a\":\"b\"}" );
-            BSONObj cmd = fromjson( "{\"query\":{}}" );
-            string err;
-            ASSERT_EQUALS( 1, runCount( ns(), cmd, err ) );
-        }
-    };
-
-    class CountQuery : public Base {
-    public:
-        void run() {
-            insert( "{\"a\":\"b\"}" );
-            insert( "{\"a\":\"b\",\"x\":\"y\"}" );
-            insert( "{\"a\":\"c\"}" );
-            BSONObj cmd = fromjson( "{\"query\":{\"a\":\"b\"}}" );
-            string err;
-            ASSERT_EQUALS( 2, runCount( ns(), cmd, err ) );
-        }
-    };
-
-    class CountFields : public Base {
-    public:
-        void run() {
-            insert( "{\"a\":\"b\"}" );
-            insert( "{\"c\":\"d\"}" );
-            BSONObj cmd = fromjson( "{\"query\":{},\"fields\":{\"a\":1}}" );
-            string err;
-            ASSERT_EQUALS( 2, runCount( ns(), cmd, err ) );
-        }
-    };
-
-    class CountQueryFields : public Base {
-    public:
-        void run() {
-            insert( "{\"a\":\"b\"}" );
-            insert( "{\"a\":\"c\"}" );
-            insert( "{\"d\":\"e\"}" );
-            BSONObj cmd = fromjson( "{\"query\":{\"a\":\"b\"},\"fields\":{\"a\":1}}" );
-            string err;
-            ASSERT_EQUALS( 1, runCount( ns(), cmd, err ) );
-        }
-    };
-
-    class CountIndexedRegex : public Base {
-    public:
-        void run() {
-            insert( "{\"a\":\"b\"}" );
-            insert( "{\"a\":\"c\"}" );
-            BSONObj cmd = fromjson( "{\"query\":{\"a\":/^b/}}" );
-            string err;
-            ASSERT_EQUALS( 1, runCount( ns(), cmd, err ) );
         }
     };
 
@@ -1404,11 +1347,6 @@ namespace QueryTests {
 
         void setupTests() {
             add< FindingStart >();
-            add< CountBasic >();
-            add< CountQuery >();
-            add< CountFields >();
-            add< CountQueryFields >();
-            add< CountIndexedRegex >();
             add< FindOne >();
             add< FindOneRequireIndex >();
             add< FindOneEmptyObj >();

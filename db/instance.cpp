@@ -39,10 +39,12 @@
 #include "background.h"
 #include "dur_journal.h"
 #include "dur_recover.h"
-#include "ops/update.h"
+#include "d_concurrency.h"
+
+#include "ops/count.h"
 #include "ops/delete.h"
 #include "ops/query.h"
-#include "d_concurrency.h"
+#include "ops/update.h"
 
 namespace mongo {
 

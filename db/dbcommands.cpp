@@ -21,6 +21,7 @@
 */
 
 #include "pch.h"
+#include "ops/count.h"
 #include "ops/query.h"
 #include "pdfile.h"
 #include "jsobj.h"
