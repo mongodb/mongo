@@ -280,9 +280,8 @@ namespace mongo {
     class ParallelConnectionMetadata {
     public:
 
-        ParallelConnectionMetadata() {
-            cleanup( true );
-        }
+        ParallelConnectionMetadata() :
+            retryNext( false ), initialized( false ), finished( false ), completed( false ), errored( false ) { }
 
         ~ParallelConnectionMetadata(){
             cleanup( true );

@@ -647,7 +647,7 @@ namespace mongo {
             assert( ! manager || ! primary );
 
             if( manager ) vinfo = ( str::stream() << "[" << manager->getns() << " @ " << manager->getVersion().toString() << "]" );
-            else vinfo = (str::stream() << "[unsharded @" << primary->toString() << "]" );
+            else vinfo = (str::stream() << "[unsharded @ " << primary->toString() << "]" );
 
             if( manager ) manager->getShardsForQuery( todo, specialFilter ? _cInfo.cmdFilter : _qSpec.filter() );
             else if( primary ) todo.insert( *primary );
