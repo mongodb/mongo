@@ -35,6 +35,7 @@ namespace mongo {
         /**
          * @param aggregateNscanned - shared long long counting total nscanned for
          * query ops for all cursors.
+         * @param requireIndex - if unindexed scans should be prohibited.
          */
         QueryOptimizerCursorOp( long long &aggregateNscanned, bool requireIndex, int cumulativeCount = 0 ) : _matchCounter( aggregateNscanned, cumulativeCount ), _countingMatches(), _mustAdvance(), _capped(), _yieldRecoveryFailed(), _requireIndex( requireIndex ) {}
         
@@ -54,7 +55,8 @@ namespace mongo {
             _capped = _c->capped();
 
             // TODO This violates the current Cursor interface abstraction, but for now it's simpler to keep our own set of
-            // dups rather than avoid poisoning the cursor's dup set with unreturned documents.
+            // dups rather than avoid poisoning the cursor's dup set with unreturned documents.  Deduping documents
+            // matched in this QueryOptimizerCursorOp will run against the takeover cursor.
             _matchCounter.setCheckDups( _c->isMultiKey() );
 
             _matchCounter.updateNscanned( _c->nscanned() );
@@ -133,6 +135,7 @@ namespace mongo {
         BSONObj currKey() const { return _c ? _c->currKey() : BSONObj(); }
         bool currentMatches( MatchDetails *details ) {
             bool ret = ( _c && _c->ok() ) ? matcher( _c.get() )->matchesCurrent( _c.get(), details ) : false;
+            // Cache the match, so we can count it in mayAdvance().
             _matchCounter.setMatch( ret );
             return ret;
         }
@@ -146,6 +149,7 @@ namespace mongo {
                 return;
             }
             if ( countingMatches() ) {
+                // Check match if not yet known.
                 if ( !_matchCounter.knowMatch() ) {
                     currentMatches( 0 );
                 }
@@ -281,6 +285,8 @@ namespace mongo {
                     _currOp->prepareToTouchEarlierIterate();
                 }
                 else {
+                    // With multiple plans, the 'earlier iterate' could be the current iterate of one of
+                    // the component plans.  We do a full yield of all plans, using ClientCursors.
                     verify( 15941, _mps->prepareToYield() );
                 }
             }
@@ -308,6 +314,7 @@ namespace mongo {
                 return _mps->prepareToYield();
             }
             else {
+                // No state needs to be protected, so yielding is fine.
                 return true;
             }
         }
@@ -320,7 +327,8 @@ namespace mongo {
             if ( _currOp ) {
                 _mps->recoverFromYield();
                 if ( _currOp->error() || !ok() ) {
-                    // Advance to a non error op or a following $or clause if possible.
+                    // Advance to a non error op if on of the ops errored out.
+                    // Advance to a following $or clause if the $or clause returned all results.
                     _advance( true );
                 }
             }
@@ -355,7 +363,6 @@ namespace mongo {
 
         virtual long long nscanned() { return _takeover ? _takeover->nscanned() : _nscanned; }
 
-        /** @return the matcher for the takeover cursor or current active op. */
         virtual shared_ptr<CoveredIndexMatcher> matcherPtr() const {
             if ( _takeover ) {
                 return _takeover->matcherPtr();
@@ -364,7 +371,6 @@ namespace mongo {
             return _currOp->matcher( _currOp->cursor() );
         }
 
-        /** @return the matcher for the takeover cursor or current active op. */
         virtual CoveredIndexMatcher* matcher() const {
             if ( _takeover ) {
                 return _takeover->matcher();
@@ -382,6 +388,11 @@ namespace mongo {
         }
 
     private:
+        /**
+         * Advances the QueryPlanSet::Runner.
+         * @param force - advance even if the current query op is not valid.  The 'force' param should only be specified
+         * when there are plans left in the runner.
+         */
         bool _advance( bool force ) {
             if ( _takeover ) {
                 return _takeover->advance();
@@ -402,16 +413,16 @@ namespace mongo {
             QueryOptimizerCursorOp *qocop = (QueryOptimizerCursorOp*)( op.get() );
 
             if ( !op->complete() ) {
-                // 'qocop' will be valid until we call _mps->nextOp() again.
+                // The 'qocop' will be valid until we call _mps->nextOp() again.  We return 'current' values from this op.
                 _currOp = qocop;
             }
             else if ( op->stopRequested() ) {
                 if ( qocop->cursor() ) {
-                    // This ensures that prepareToTouchEarlierIterate() may be called safely when a BasicCursor takes over.
+                    // Ensure that prepareToTouchEarlierIterate() may be called safely when a BasicCursor takes over.
                     if ( !prevLoc.isNull() && prevLoc == qocop->currLoc() ) {
                         qocop->cursor()->advance();
                     }
-                    // Clears the Runner and any unnecessary QueryOps and their ClientCursors.
+                    // Clear the Runner and any unnecessary QueryOps and their ClientCursors.
                     _mps->clearRunner();
                     _takeover.reset( new MultiCursor( _mps,
                                                      qocop->cursor(),
@@ -423,8 +434,8 @@ namespace mongo {
 
             return ok();
         }
+        /** Forward an exception when the runner errs out. */
         void rethrowOnError( const shared_ptr< QueryOp > &op ) {
-            // If all plans have erred out, assert.
             if ( op->error() ) {
                 throw MsgAssertionException( op->exception() );   
             }
@@ -460,7 +471,7 @@ namespace mongo {
         } catch( const AssertionException &e ) {
             if ( e.getCode() == OutOfOrderDocumentsAssertionCode ) {
                 // If no indexes follow the requested sort order, return an
-                // empty pointer.
+                // empty pointer.  This is legacy behavior based on bestGuessCursor().
                 return shared_ptr<Cursor>();
             }
             throw;
@@ -480,7 +491,7 @@ namespace mongo {
         }
         if ( isSimpleIdQuery( query ) ) {
             Database *database = cc().database();
-            assert( database );
+            verify( 15985, database );
             NamespaceDetails *d = database->namespaceIndex.details(ns);
             if ( d ) {
                 int idxNo = d->findIdIndex();
@@ -494,7 +505,8 @@ namespace mongo {
         auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order ) ); // mayYield == false
         shared_ptr<Cursor> single = mps->singleCursor();
         if ( single ) {
-            if ( !( requireIndex && dynamic_cast<BasicCursor*>( single.get() ) ) ) {
+            if ( !( requireIndex &&
+                   dynamic_cast<BasicCursor*>( single.get() ) /* May not use an unindexed cursor */ ) ) {
                 if ( !query.isEmpty() && !single->matcher() ) {
                     shared_ptr<CoveredIndexMatcher> matcher( new CoveredIndexMatcher( query, single->indexKeyPattern() ) );
                     single->setMatcher( matcher );

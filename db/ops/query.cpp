@@ -220,9 +220,10 @@ namespace mongo {
         return qr;
     }
 
-    /* { count: "collectionname"[, query: <query>] }
-       returns -1 on ns does not exist error.
-    */
+    /**
+     * { count: "collectionname"[, query: <query>] }
+     * @return -1 on ns does not exist error and other errors, 0 on other errors, otherwise the match count.
+     */
     long long runCount( const char *ns, const BSONObj &cmd, string &err ) {
         Client::Context cx(ns);
         NamespaceDetails *d = nsdetails( ns );
