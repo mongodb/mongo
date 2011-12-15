@@ -1812,8 +1812,7 @@ namespace QueryOptimizerCursorTests {
             _cli.insert( ns(), BSON( "_id" << 2 << "b" << 2 ) );
             _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
             
-            mongolock lk( false );
-            Client::Context ctx( ns() );
+            Client::ReadContext ctx( ns() );
             setQueryOptimizerCursor( BSON( "_id" << GT << 0 << "b" << GT << 0 ) );
             ASSERT( ok() );
             cc().curop()->kill();
@@ -1830,8 +1829,7 @@ namespace QueryOptimizerCursorTests {
             _cli.insert( ns(), BSON( "_id" << 2 << "b" << 2 ) );
             _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
             
-            mongolock lk( false );
-            Client::Context ctx( ns() );
+            Client::ReadContext ctx( ns() );
             shared_ptr<Cursor> c = newQueryOptimizerCursor( ns(), BSON( "$or" << BSON_ARRAY( BSON( "_id" << GT << 0 ) << BSON( "b" << GT << 0 ) ) ) );
             ASSERT( c->ok() );
             cc().curop()->kill();
@@ -1873,8 +1871,7 @@ namespace QueryOptimizerCursorTests {
             _cli.insert( ns(), BSON( "_id" << 2 << "b" << 2 ) );
             _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
 
-            mongolock lk( false );
-            Client::Context ctx( ns() );
+            Client::ReadContext ctx( ns() );
             shared_ptr<Cursor> c = newQueryOptimizerCursor( ns(), BSON( "_id" << GT << 0 << "b" << GT << 0 ) );
             
             ASSERT( c->ok() );
@@ -1959,8 +1956,7 @@ namespace QueryOptimizerCursorTests {
             }
             _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
             
-            mongolock lk( false );
-            Client::Context ctx( ns() );
+            Client::ReadContext ctx( ns() );
             setQueryOptimizerCursor( BSON( "_id" << GT << 0 << "b" << GT << 0 ) );
             
             ASSERT( ok() );
