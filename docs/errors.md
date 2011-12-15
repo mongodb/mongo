@@ -160,16 +160,16 @@ client/parallel.cpp
 ----
 * 10017 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L98) cursor already done
 * 10018 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L350) no more items
-* 10019 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L1401) no more elements
+* 10019 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L1402) no more elements
 * 13431 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L437) have to have sort key in projection and removing it
 * 13633 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L127) error querying server: 
-* 14812 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L1465) Error running command on server: 
-* 14813 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L1466) Command returned nothing
-* 15919 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L644) too many retries for chunk manager or primary
-* 15986 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L677) too many retries in total
-* 15987 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L769) could not fully initialize cursor on shard " << shard.toString() << ", current connection state is 
-* 15988 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L901) error querying server
-* 15989 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L632) database not found for parallel cursor request
+* 14812 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L1466) Error running command on server: 
+* 14813 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L1467) Command returned nothing
+* 15919 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L645) too many retries for chunk manager or primary
+* 15986 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L678) too many retries in total
+* 15987 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L770) could not fully initialize cursor on shard " << shard.toString() << ", current connection state is 
+* 15988 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L902) error querying server
+* 15989 [code](http://github.com/mongodb/mongo/blob/master/client/parallel.cpp#L633) database not found for parallel cursor request
 
 
 client/syncclusterconnection.cpp
@@ -614,12 +614,12 @@ db/instance.cpp
 
 db/jsobj.cpp
 ----
-* 10060 [code](http://github.com/mongodb/mongo/blob/master/db/jsobj.cpp#L534) woSortOrder needs a non-empty sortKey
-* 10061 [code](http://github.com/mongodb/mongo/blob/master/db/jsobj.cpp#L1131) type not supported for appendMinElementForType
-* 10311 [code](http://github.com/mongodb/mongo/blob/master/db/jsobj.cpp#L93) 
-* 10312 [code](http://github.com/mongodb/mongo/blob/master/db/jsobj.cpp#L251) 
-* 12579 [code](http://github.com/mongodb/mongo/blob/master/db/jsobj.cpp#L853) unhandled cases in BSONObj okForStorage
-* 14853 [code](http://github.com/mongodb/mongo/blob/master/db/jsobj.cpp#L1184) type not supported for appendMaxElementForType
+* 10060 [code](http://github.com/mongodb/mongo/blob/master/db/jsobj.cpp#L535) woSortOrder needs a non-empty sortKey
+* 10061 [code](http://github.com/mongodb/mongo/blob/master/db/jsobj.cpp#L1132) type not supported for appendMinElementForType
+* 10311 [code](http://github.com/mongodb/mongo/blob/master/db/jsobj.cpp#L94) 
+* 10312 [code](http://github.com/mongodb/mongo/blob/master/db/jsobj.cpp#L252) 
+* 12579 [code](http://github.com/mongodb/mongo/blob/master/db/jsobj.cpp#L854) unhandled cases in BSONObj okForStorage
+* 14853 [code](http://github.com/mongodb/mongo/blob/master/db/jsobj.cpp#L1185) type not supported for appendMaxElementForType
 
 
 db/json.cpp
@@ -873,7 +873,6 @@ db/pdfile.h
 db/pipeline/accumulator.cpp
 ----
 * 15943 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/accumulator.cpp#L28) group accumulator 
-* 15984 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/accumulator.cpp#L60) reserved error
 
 
 db/pipeline/doc_mem_monitor.cpp
@@ -952,6 +951,37 @@ db/pipeline/expression.cpp
 ----
 * 15982 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L58) 
 * 15983 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L91) 
+* 15984 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L119) this object is already an operator expression, and can't be used as a document expression (at \"
+* 15990 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L122) this object is already an operator expression, and can't be used as a document expression (at \"
+* 15991 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L165) 
+* 15992 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L178) 
+* 15993 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L688) 
+* 15994 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L775) 
+* 15995 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L813) 
+* 15996 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L859) 
+* 15997 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L866) 
+* 15998 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L971) 
+* 15999 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L247) invalid operator \"
+* 16000 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L393) can't add two dates together
+* 16001 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L979) 
+* 16002 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L1008) 
+* 16003 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L1016) 
+* 16004 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L1045) 
+* 16005 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L1053) 
+* 16006 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L1083) 
+* 16007 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L1091) 
+* 16008 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L1312) 
+* 16009 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L1318) 
+* 16010 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L1325) 
+* 16011 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L1340) 
+* 16012 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L1353) 
+* 16013 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L1365) 
+* 16014 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L1585) 
+* 16015 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L1599) 
+* 16016 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L1949) 
+* 16017 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L1957) 
+* 16018 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L1987) 
+* 16019 [code](http://github.com/mongodb/mongo/blob/master/db/pipeline/expression.cpp#L1996) 
 
 
 db/projection.cpp
