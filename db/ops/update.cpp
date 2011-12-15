@@ -1169,9 +1169,9 @@ namespace mongo {
 
                     auto_ptr<ModSetState> mss = useMods->prepare( onDisk );
 
-                    bool indexHack = multi && c->ok() && ( modsIsIndexed || ! mss->canApplyInPlace() );
+                    bool willAdvanceCursor = multi && c->ok() && ( modsIsIndexed || ! mss->canApplyInPlace() );
 
-                    if ( indexHack ) {
+                    if ( willAdvanceCursor ) {
                         if ( cc.get() ) {
                             cc->setDoingDeletes( true );
                         }
@@ -1227,7 +1227,7 @@ namespace mongo {
                     numModded++;
                     if ( ! multi )
                         return UpdateResult( 1 , 1 , numModded );
-                    if ( indexHack )
+                    if ( willAdvanceCursor )
                         c->recoverFromTouchingEarlierIterate();
 
                     if ( nscanned % 64 == 0 && ! atomic ) {
