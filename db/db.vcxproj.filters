@@ -212,6 +212,8 @@
     <ClCompile Include="..\util\systeminfo_win32.cpp" />
     <ClCompile Include="commands\document_source_cursor.cpp" />
     <ClCompile Include="d_concurrency.cpp" />
+    <ClCompile Include="..\s\default_version.cpp" />
+    <ClCompile Include="ops\count.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\dbclientcursor.h" />
@@ -382,6 +384,7 @@
     <ClInclude Include="..\util\intrusive_counter.h" />
     <ClInclude Include="..\util\systeminfo.h" />
     <ClInclude Include="namespacestring.h" />
+    <ClInclude Include="ops\count.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="db.rc" />
