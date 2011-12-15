@@ -116,9 +116,12 @@ namespace mongo {
                 }
             }
             else {
-                assert(isOp != 1);
-                assert(kind != OPERATOR);
-                // CW TODO error: can't accompany an operator expression
+		uassert(15984, str::stream() << "this object is already an operator expression, and can't be used as a document expression (at \"" <<
+			pFieldName << "\")",
+			isOp != 1);
+		uassert(15990, str::stream() << "this object is already an operator expression, and can't be used as a document expression (at \"" <<
+			pFieldName << "\")",
+			kind != OPERATOR);
 
                 /* if it's our first time, create the document expression */
                 if (!pExpression.get()) {
@@ -153,14 +156,16 @@ namespace mongo {
                 }
                 else if (fieldType == NumberDouble) {
                     /* it's an inclusion specification */
-                    double inclusion = fieldElement.Double();
+                    int inclusion = static_cast<int>(fieldElement.Double());
 		    if (inclusion == 0)
 			pExpressionObject->excludePath(fieldName);
 		    else if (inclusion == 1)
 			pExpressionObject->includePath(fieldName);
 		    else
-			assert(false);
-                    // CW TODO error: only 0 or 1 allowed here
+			uassert(15991, str::stream() <<
+				"\"" << fieldName <<
+				"\" numeric inclusion or exclusion must be 1 or 0 (or boolean)",
+				false);
                 }
                 else if (fieldType == Bool) {
 		    bool inclusion = fieldElement.Bool();
@@ -170,7 +175,10 @@ namespace mongo {
 			pExpressionObject->includePath(fieldName);
 		}
 		else { /* nothing else is allowed */
-                    assert(false); // CW TODO error
+		    uassert(15992, str::stream() <<
+			    "disallowed field type " << fieldType <<
+			    " in object expression (at \"" <<
+			    fieldName << "\")", false);
                 }
             }
         }
@@ -236,7 +244,8 @@ namespace mongo {
         const OpDesc *pOp = (const OpDesc *)bsearch(
                                 &key, OpTable, NOp, sizeof(OpDesc), OpDescCmp);
 
-        assert(pOp); // CW TODO error: invalid operator
+	uassert(15999, str::stream() << "invalid operator \"" <<
+		pOpName << "\"", pOp);
 
         /* make the expression node */
         intrusive_ptr<ExpressionNary> pExpression((*pOp->pFactory)());
@@ -381,7 +390,7 @@ namespace mongo {
 	   having many would not be not a problem.
         */
         if ((dateCount > 1) && !stringCount) {
-            assert(false); // CW TODO user error: can't add two dates
+	    uassert(16000, "can't add two dates together", false);
             return Value::getNull();
         }
 
@@ -676,7 +685,8 @@ namespace mongo {
 
     void ExpressionCompare::addOperand(
 	const intrusive_ptr<Expression> &pExpression) {
-        assert(vpOperand.size() < 2); // CW TODO user error
+	uassert(15993, str::stream() << getOpName() <<
+		" only takes two operands", vpOperand.size() < 2);
         ExpressionNary::addOperand(pExpression);
     }
 
@@ -762,7 +772,10 @@ namespace mongo {
 
         BSONType leftType = pLeft->getType();
         BSONType rightType = pRight->getType();
-        assert(leftType == rightType);
+	uassert(15994, str::stream() << getOpName() <<
+		":  no automatic conversion for types " <<
+		leftType << " and " << rightType,
+		leftType == rightType);
         // CW TODO at least for now.  later, handle automatic conversions
 
         int cmp = 0;
@@ -797,7 +810,8 @@ namespace mongo {
         }
 
         default:
-            assert(false); // CW TODO unimplemented for now
+	    uassert(15995, str::stream() <<
+		    "can't compare values of type " << leftType, false);
             break;
         }
 
@@ -842,13 +856,16 @@ namespace mongo {
 
     void ExpressionCond::addOperand(
 	const intrusive_ptr<Expression> &pExpression) {
-        assert(vpOperand.size() < 3); // CW TODO user error
+	uassert(15996, str::stream() << getOpName() <<
+		":  takes exactly 3 operands", vpOperand.size() < 3);
         ExpressionNary::addOperand(pExpression);
     }
 
     intrusive_ptr<const Value> ExpressionCond::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-        assert(vpOperand.size() == 3); // CW TODO user error
+	uassert(15997, str::stream() << getOpName() <<
+		":  insufficient operands; 3 required, only got " <<
+		vpOperand.size(), vpOperand.size() == 3);
         intrusive_ptr<const Value> pCond(vpOperand[0]->evaluate(pDocument));
 	int idx = pCond->coerceToBool() ? 1 : 2;
 	return vpOperand[idx]->evaluate(pDocument);
@@ -951,13 +968,18 @@ namespace mongo {
     }
 
     void ExpressionDayOfMonth::addOperand(const intrusive_ptr<Expression> &pExpression) {
-        assert(vpOperand.size() < 1); // CW TODO user error
+	uassert(15998, str::stream() << getOpName() <<
+		":  only accepts one operand", vpOperand.size() < 1);
+
         ExpressionNary::addOperand(pExpression);
     }
 
     intrusive_ptr<const Value> ExpressionDayOfMonth::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-        assert(vpOperand.size() == 1); // CW TODO user error
+	uassert(16001, str::stream() << getOpName() <<
+		":  insufficient operands; 1 required, only got " <<
+		vpOperand.size(), vpOperand.size() == 1);
+
         intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;
         (pDate->coerceToDate()).toTm(&date);
@@ -983,13 +1005,18 @@ namespace mongo {
     }
 
     void ExpressionDayOfWeek::addOperand(const intrusive_ptr<Expression> &pExpression) {
-        assert(vpOperand.size() < 1); // CW TODO user error
+	uassert(16002, str::stream() << getOpName() <<
+		":  only accepts one operand", vpOperand.size() < 1);
+
         ExpressionNary::addOperand(pExpression);
     }
 
     intrusive_ptr<const Value> ExpressionDayOfWeek::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-        assert(vpOperand.size() == 1); // CW TODO user error
+	uassert(16003, str::stream() << getOpName() <<
+		":  insufficient operands; 1 required, only got " <<
+		vpOperand.size(), vpOperand.size() == 1);
+
         intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;
         (pDate->coerceToDate()).toTm(&date);
@@ -1015,13 +1042,18 @@ namespace mongo {
     }
 
     void ExpressionDayOfYear::addOperand(const intrusive_ptr<Expression> &pExpression) {
-        assert(vpOperand.size() < 1); // CW TODO user error
+	uassert(16004, str::stream() << getOpName() <<
+		":  only accepts one operand", vpOperand.size() < 1);
+
         ExpressionNary::addOperand(pExpression);
     }
 
     intrusive_ptr<const Value> ExpressionDayOfYear::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-        assert(vpOperand.size() == 1); // CW TODO user error
+	uassert(16005, str::stream() << getOpName() <<
+		":  insufficient operands; 1 required, only got " <<
+		vpOperand.size(), vpOperand.size() == 1);
+
         intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;
         (pDate->coerceToDate()).toTm(&date);
@@ -1048,13 +1080,18 @@ namespace mongo {
 
     void ExpressionDivide::addOperand(
 	const intrusive_ptr<Expression> &pExpression) {
-        assert(vpOperand.size() < 2); // CW TODO user error
+	uassert(16006, str::stream() << getOpName() <<
+		":  only accepts two operands", vpOperand.size() < 2);
+
         ExpressionNary::addOperand(pExpression);
     }
 
     intrusive_ptr<const Value> ExpressionDivide::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-        assert(vpOperand.size() == 2); // CW TODO user error
+	uassert(16007, str::stream() << getOpName() <<
+		":  insufficient operands; 2 required, only got " <<
+		vpOperand.size(), vpOperand.size() == 2);
+
         intrusive_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
         intrusive_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
 
@@ -1272,16 +1309,23 @@ namespace mongo {
 
 	/* parse the field path */
 	FieldPath fieldPath(fieldName);
-	assert(fieldPath.getPathLength() == 1); // CW TODO ERROR
+	uassert(16008, str::stream() <<
+		"an expression object's field names cannot be field paths (at \"" <<
+		fieldName << "\")", fieldPath.getPathLength() == 1);
 
 	/* make sure it isn't a name we've included or excluded */
 	set<string>::iterator ex(path.find(fieldName));
-	assert(ex == path.end()); // CW TODO ERROR
+	uassert(16009, str::stream() <<
+		"can't add a field to an object expression that has already been excluded (at \"" <<
+		fieldName << "\")", ex == path.end());
 
 	/* make sure it isn't a name we've already got */
 	const size_t n = vFieldName.size();
 	for(size_t i = 0; i < n; ++i) {
-	    assert(fieldName.compare(vFieldName[i]) != 0); // CW TODO ERROR
+	    uassert(16010, str::stream() <<
+		    "can't add the same field to an object expression more than once (at \"" <<
+		    fieldName << "\")",
+		    fieldName.compare(vFieldName[i]) != 0);
 	}
 
 	vFieldName.push_back(fieldName);
@@ -1293,7 +1337,9 @@ namespace mongo {
 
 	/* get the current path field name */
 	string fieldName(pPath->getFieldName(pathi));
-	assert(fieldName.length()); // must be non-zero length
+	uassert(16011,
+		"an object expression can't include an empty field-name",
+		fieldName.length());
 
 	const size_t pathCount = path.size();
 
@@ -1304,8 +1350,11 @@ namespace mongo {
 	      the requested result.  Or, that this is the first (determining)
 	      specification.
 	    */
-	    assert((excludePaths == excludeLast) || !pathCount);
-                                                             // CW TODO ERROR
+	    uassert(16012, str::stream() <<
+		    "incompatible exclusion for \"" <<
+		    pPath->getPath(false) <<
+		    "\" because of a prior inclusion that includes a common sub-path",
+		    ((excludePaths == excludeLast) || !pathCount));
 
 	    excludePaths = excludeLast; // if (!pathCount), set this
 	    path.insert(fieldName);
@@ -1313,7 +1362,10 @@ namespace mongo {
 	}
 
 	/* this level had better be about inclusions */
-	assert(!excludePaths); // CW TODO ERROR
+	uassert(16013, str::stream() <<
+		"incompatible inclusion for \"" << pPath->getPath(false) <<
+		"\" because of a prior exclusion that includes a common sub-path",
+		!excludePaths);
 
 	/* see if we already know about this field */
 	const size_t n = vFieldName.size();
@@ -1530,7 +1582,12 @@ namespace mongo {
 		    continue;
 		}
 
-		assert(iType == Object); // CW TODO error, can't navigate this
+		uassert(16014, str::stream() << 
+			"the element \"" << fieldPath.getFieldName(index) <<
+			"\" along the dotted path \"" <<
+			fieldPath.getPath(false) <<
+			"\" is not an object, and cannot be navigated",
+			iType == Object);
 		intrusive_ptr<const Value> itemResult(
 		    evaluatePath(index, pathLength, pItem->getDocument()));
 		result.push_back(itemResult);
@@ -1539,7 +1596,11 @@ namespace mongo {
 	    return Value::createArray(result);
 	}
 
-	assert(false); // CW TODO user error:  must be a document
+	uassert(16015, str::stream() <<
+		"can't navigate into value of type " << type <<
+		"at \"" << fieldPath.getFieldName(index) <<
+		"\" in dotted path \"" << fieldPath.getPath(false),
+		false);
 	return intrusive_ptr<const Value>();
     }
 
@@ -1885,13 +1946,18 @@ namespace mongo {
     }
 
     void ExpressionMinute::addOperand(const intrusive_ptr<Expression> &pExpression) {
-        assert(vpOperand.size() < 1); // CW TODO user error
+	uassert(16016, str::stream() << getOpName() <<
+		":  only accepts one operand", vpOperand.size() < 1);
+
         ExpressionNary::addOperand(pExpression);
     }
 
     intrusive_ptr<const Value> ExpressionMinute::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-        assert(vpOperand.size() == 1); // CW TODO user error
+	uassert(16017, str::stream() << getOpName() <<
+		":  insufficient operands; 1 required, only got " <<
+		vpOperand.size(), vpOperand.size() == 1);
+
         intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;
         (pDate->coerceToDate()).toTm(&date);
@@ -1918,14 +1984,19 @@ namespace mongo {
 
     void ExpressionMod::addOperand(
 	const intrusive_ptr<Expression> &pExpression) {
-        assert(vpOperand.size() < 2); // CW TODO user error
+	uassert(16018, str::stream() << getOpName() <<
+		":  only accepts two operands", vpOperand.size() < 2);
+
         ExpressionNary::addOperand(pExpression);
     }
 
     intrusive_ptr<const Value> ExpressionMod::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         BSONType productType;
-        assert(vpOperand.size() == 2); // CW TODO user error
+	uassert(16019, str::stream() << getOpName() <<
+		":  insufficient operands; 2 required, only got " <<
+		vpOperand.size(), vpOperand.size() == 2);
+
         intrusive_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
         intrusive_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
 
