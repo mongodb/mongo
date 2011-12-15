@@ -64,7 +64,7 @@ for ( iter=0; iter<5; iter++ ){
 
     outColl = db["mrShardedOut"];
     // SERVER-3645 -can't use count()
-    assert.eq( 51200 , outColl.find().itcount() , "Received wrong result " );
+    assert.eq( 51200 , outColl.find().itcount() , "Received wrong result, this may happen intermittently until resolution of SERVER-3627" );
     // make sure it's sharded and split
     print("Number of chunks: " + config.chunks.count({ns: db.mrShardedOut._fullName}));
     assert.gt( config.chunks.count({ns: db.mrShardedOut._fullName}), 1, "didnt split");
