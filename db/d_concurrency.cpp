@@ -21,13 +21,13 @@ namespace mongo {
     class LockBits {
     public:
         unsigned& x;
-        enum Level { 
+        enum Level {
             LockExcluder = 0,
             Global = 1,
             Collection = 2,
             OplogCollection = 3
         };
-        enum State { 
+        enum State {
             NotLocked = 0,
             //AwaitShared = 1, // todo...
             Shared = 2,
@@ -37,10 +37,10 @@ namespace mongo {
         };
         enum { B = 8, MASK = 0xff } ;
         LockBits(unsigned &_x) : x(_x) { }
-        bool anythingExclusive() const { 
+        bool anythingExclusive() const {
             return (0x88888888 & x) != 0;
         }
-        State get(Level l) const { 
+        State get(Level l) const {
             unsigned msk = MASK << (l*B);
             return static_cast<State>((x&msk) >> (l*B));
         }
