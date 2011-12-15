@@ -46,7 +46,7 @@ namespace mongo {
         }
         void set(Level l, State old, State _new) {
             unsigned msk = MASK << (l*B);
-            verify(0, get(l)==old);
+            verify(16050, get(l)==old);
             x = (x&~msk) | (_new << (l*B));
         }
     };
