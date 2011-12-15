@@ -25,10 +25,6 @@
 
 namespace mongo {
     
-    /**
-     * { count: "collectionname"[, query: <query>] }
-     * @return -1 on ns does not exist error and other errors, 0 on other errors, otherwise the match count.
-     */
     long long runCount( const char *ns, const BSONObj &cmd, string &err ) {
         Client::Context cx(ns);
         NamespaceDetails *d = nsdetails( ns );
