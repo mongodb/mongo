@@ -2,5 +2,54 @@
 
 This section explains how to use compression engines with WiredTiger, including the builtin support for bzip2 and snappy.
 
-@todo describe how to use compression
+@section bzip2 Using bzip2 compression
+
+To use the builtin <a href="http://www.bzip.org/">bzip2</a> compression, first verify that bzip2 is installed on your system.  On most UNIX and Linux variants, there will be a <code>bzlib.h</code> header file in the include directory for the compiler, as well as a library file available, often named <code>libbz2.so</code>, in <code>/usr/lib</code>.  If these are available, you can simply enable bzip2 by using the \c --enable-bzip2 option when running configure.
+
+If you have installed your own version of bzip2 in a non-standard location, you'll need to modify the \c CPPFLAGS and \c LDFLAGS to indicate these locations.  For example, with bzip2 includes and libraries installed in <code>/usr/local/include</code> and <code>/usr/local/lib</code>, run configure as:
+
+@code
+cd build_posix
+../dist/configure --enable-bzip2 CPPFLAGS="-I/usr/local/include" LDFLAGS="-L/usr/local/include"
+@endcode
+
+After building, check that this compressor is built and working by running the compression part of the test suite:
+
+@code
+cd build_posix
+python ../test/suite/run.py compress
+@endcode
+
+Verify that the bzip2 part of the test passes and was not skipped.
+
+@section snappy Using snappy compression
+
+Google's <a href="http://code.google.com/p/snappy/">snappy</a> compressor is generally not installed by default on UNIX and Linux distributions, so you will need to download, build and install it first.  To configure WiredTiger to include snappy, use the \c --enable-snappy option along with \c CPPFLAGS and \c LDFLAGS.  For example, with snappy includes and libraries installed in <code>/usr/local/include</code> and <code>/usr/local/lib</code>, run configure as:
+
+@code
+cd build_posix
+../dist/configure --enable-snappy CPPFLAGS="-I/usr/local/include" LDFLAGS="-L/usr/local/include"
+@endcode
+
+After building, check that this compressor is built and working by running the compression part of the test suite:
+
+@code
+cd build_posix
+python ../test/suite/run.py compress
+@endcode
+
+Verify that the snappy part of the test passes and was not skipped.
+
+@section custom Custom compression engines
+
+To build your own compressor, use one of the compressors in <code>ext/compressors</code> as a template.  <code>nop_compress</code> is a simple compressor that passes through data unchanged, and is a reasonable starting point.
+
+Compressors must implement the WT_COMPRESSOR interface, and will use WT_CONNECTION::add_compressor to register their interface; see @ex_ref{ex_all.c} as an example.  In WT_COMPRESSOR, the WT_COMPRESSOR::compress and WT_COMPRESSOR::decompress callbacks must be specified, and WT_COMPRESSOR::pre_size is optional.
+
+WT_COMPRESSOR::compress is given a source buffer and a destination buffer, by default of the same size.  If the callback can compress the buffer to a smaller size in the destination, it does so, sets the <code>compression_failed</code> return to 0 and returns 0.  If the compression does not produce a smaller result, the callback sets the <code>compression_failed</code> return to 1 and returns 0. If another error occurs, it returns an errno or WiredTiger error code.
+
+WT_COMPRESSOR::decompress is given a source buffer and a destination buffer.  The contents are switched from <code>compress</code>: the source buffer is the compressed value, and the destination buffer is sized to be the original size.  If the callback successfully decompresses the source buffer to the destination buffer, it returns 0.  If an error occurs, it returns an errno or WiredTiger error code.  The source buffer that WT_COMPRESSOR::decompress is given may have a size that is rounded up from the size originally produced by WT_COMPRESSOR::compress, with the remainder of the buffer set to zeroes. Most compressors do not care about this difference if the size to be decompressed can be implicitly discovered from the compressed data.  If your compressor cares, you may need to allocate space for, and store, the actual size in the compressed buffer.  See the source code for the snappy compressor as an example of this. 
+
+WT_COMPRESSOR::pre_size is an optional callback that, given the source buffer and size, produces the size of the destination buffer to be given to WT_COMPRESSOR::compress.  This is useful for compressors that assume that the output buffer is sized for the worst case and thus no overrun checks are made.  If your compressor works like this, WT_COMPRESSOR::pre_size will need to be defined.  See the source code for the snappy compressor as an example.  However, if your compressor detects and avoids overruns against its target buffer, you will not need to define WT_COMPRESSOR::pre_size.  When WT_COMPRESSOR::pre_size is set to null, the destination buffer is sized the same as the source buffer.  This is always sufficient, since a compression result that is larger than the source buffer is discarded by WiredTiger.
+
  */
