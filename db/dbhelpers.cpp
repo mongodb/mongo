@@ -76,7 +76,7 @@ namespace mongo {
     DiskLoc Helpers::findOne(const char *ns, const BSONObj &query, bool requireIndex) {
         shared_ptr<Cursor> c = NamespaceDetailsTransient::getCursor( ns, query, BSONObj(), requireIndex );
         while( c->ok() ) {
-            if ( ( !c->matcher() || c->matcher()->matchesCurrent( c.get() ) ) && !c->getsetdup( c->currLoc() ) ) {
+            if ( c->currentMatches() && !c->getsetdup( c->currLoc() ) ) {
                 return c->currLoc();
             }
             c->advance();
