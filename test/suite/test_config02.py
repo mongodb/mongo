@@ -51,7 +51,6 @@ class test_config02(wttest.WiredTigerTestCase):
         self.assertTrue(os.path.exists(dirname + os.sep + self.table_name1 + ".wt"))
 
     def checknofiles(self, dirname):
-        print 'FILES=' + str(os.listdir(dirname))
         self.assertEqual(len(os.listdir(dirname)), 0)
 
     def common_test(self, homearg, homeenv, configextra):
