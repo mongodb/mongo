@@ -170,7 +170,7 @@ public:
             BSONObj info;
             bool ok = conn().runCommand( "config" , BSON( "dropDatabase" << 1 ) , info );
             if (!ok) {
-                log() << "Error dumping config database. Aborting" << endl;
+                log() << "Error dropping config database. Aborting" << endl;
                 return -1;
             }
             drillDown(root / "config", false, false);
