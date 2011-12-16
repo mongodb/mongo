@@ -368,7 +368,7 @@ __wt_scr_alloc(WT_SESSION_IMPL *session, uint32_t size, WT_BUF **scratchp)
 	return (__wt_scr_alloc(session, size, scratchp));
 
 err:	__wt_errx(session,
-	    "WT_SESSION_IMPL unable to allocate more scratch buffers");
+	    "session unable to allocate more scratch buffers");
 	return (ret);
 }
 
@@ -444,4 +444,5 @@ __wt_scr_free_ext(WT_SESSION *wt_session, void *p)
 			F_CLR(*bufp, WT_BUF_INUSE);
 			return;
 		}
+	__wt_errx(session, "extension free'd non-existent scratch buffer");
 }
