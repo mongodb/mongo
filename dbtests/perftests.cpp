@@ -651,6 +651,37 @@ namespace PerfTests {
         virtual bool showDurStats() { return false; }
     };
 
+    bool dummy1 = false;
+
+    class TestException : public DBException { 
+    public:
+        TestException() : DBException("testexception",3) { }
+    };
+
+    void foo_throws() { 
+        if( dontOptimizeOutHopefully ) { 
+            throw TestException();
+        }
+        log() << "hmmm" << endl;
+    }
+
+    class Throw : public B {
+    public:
+        virtual int howLongMillis() { return 2000; }
+        string name() { return "throw"; }
+        void timed() {
+            try { 
+                foo_throws();
+                dontOptimizeOutHopefully += 2;
+            }
+            catch(DBException& e) {
+                e.getCode();
+                dontOptimizeOutHopefully++;
+            }
+        }
+        virtual bool showDurStats() { return false; }
+    };
+
     class New128 : public B {
     public:
         virtual int howLongMillis() { return 2000; }
@@ -951,6 +982,7 @@ namespace PerfTests {
 #endif
                 add< New8 >();
                 add< New128 >();
+                add< Throw >();
                 add< Timer >();
                 add< Sleep0Ms >();
                 add< rlock >();
