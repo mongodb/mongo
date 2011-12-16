@@ -594,7 +594,12 @@ namespace mongo {
     void GhostSync::associateSlave(const BSONObj& id, const int memberId) {
         const OID rid = id["_id"].OID();
         rwlock lk( _lock , true );
-        GhostSlave &slave = _ghostCache[rid];
+        shared_ptr<GhostSlave> &g = _ghostCache[rid];
+        if( g.get() == 0 ) {
+            g.reset( new GhostSlave() );
+            wassert( _ghostCache.size() < 10000 );
+        }
+        GhostSlave &slave = *g;
         if (slave.init) {
             LOG(1) << "tracking " << slave.slave->h().toString() << " as " << rid << rsLog;
             return;
@@ -618,7 +623,7 @@ namespace mongo {
             return;
         }
         
-        GhostSlave& slave = i->second;
+        GhostSlave& slave = *(i->second);
         if (!slave.init) {
             OCCASIONALLY log() << "couldn't update slave " << rid << " not init" << rsLog;            
             return;
@@ -639,7 +644,7 @@ namespace mongo {
                 return;
             }
 
-            slave = &(i->second);
+            slave = i->second.get();
             if (!slave->init) {
                 OCCASIONALLY log() << "couldn't percolate slave " << rid << " not init" << rsLog;
                 return;

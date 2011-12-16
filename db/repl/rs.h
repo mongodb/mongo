@@ -131,8 +131,8 @@ namespace mongo {
     };
 
     class GhostSync : public task::Server {
-        struct GhostSlave {
-            GhostSlave() : last(0), slave(0), init(false) {}
+        struct GhostSlave : boost::noncopyable {
+            GhostSlave() : last(0), slave(0), init(false) { }
             OplogReader reader;
             OpTime last;
             Member* slave;
@@ -141,7 +141,7 @@ namespace mongo {
         /**
          * This is a cache of ghost slaves
          */
-        typedef map<mongo::OID,GhostSlave> MAP;
+        typedef map<mongo::OID,shared_ptr<GhostSlave>> MAP;
         MAP _ghostCache;
         RWLock _lock; // protects _ghostCache
         ReplSetImpl *rs;
