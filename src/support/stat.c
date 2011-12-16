@@ -177,6 +177,8 @@ __wt_stat_alloc_connection_stats(WT_SESSION_IMPL *session, WT_CONNECTION_STATS *
 	stats->cache_evict_hazard.name = "cache_evict_hazard";
 	stats->cache_evict_hazard.desc =
 	    "cache: pages selected for eviction not evicted because of a hazard reference";
+	stats->cache_evict_internal.name = "cache_evict_internal";
+	stats->cache_evict_internal.desc = "cache: internal pages evicted";
 	stats->cache_evict_modified.name = "cache_evict_modified";
 	stats->cache_evict_modified.desc = "cache: modified pages evicted";
 	stats->cache_evict_slow.name = "cache_evict_slow";
@@ -217,6 +219,7 @@ __wt_stat_clear_connection_stats(WT_STATS *stats_arg)
 	stats->block_read.v = 0;
 	stats->block_write.v = 0;
 	stats->cache_evict_hazard.v = 0;
+	stats->cache_evict_internal.v = 0;
 	stats->cache_evict_modified.v = 0;
 	stats->cache_evict_slow.v = 0;
 	stats->cache_evict_unmodified.v = 0;

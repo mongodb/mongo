@@ -105,6 +105,7 @@ struct __wt_connection_stats {
 	WT_STATS block_write;
 	WT_STATS cache_bytes_inuse;
 	WT_STATS cache_evict_slow;
+	WT_STATS cache_evict_internal;
 	WT_STATS cache_bytes_max;
 	WT_STATS cache_evict_modified;
 	WT_STATS cache_pages_inuse;

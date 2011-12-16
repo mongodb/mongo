@@ -17,6 +17,7 @@ The following statistics are available for the database in this release:
 @row{blocks written to a file}
 @row{cache: bytes currently held in the cache}
 @row{cache: eviction server unable to reach eviction goal}
+@row{cache: internal pages evicted}
 @row{cache: maximum bytes configured}
 @row{cache: modified pages evicted}
 @row{cache: pages currently held in the cache}

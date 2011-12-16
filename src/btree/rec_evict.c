@@ -74,6 +74,11 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	if (__wt_page_is_modified(page))
 		WT_ERR(__wt_rec_write(session, page, NULL));
 
+	/* Count evictions of internal pages during normal operation. */
+	if (!LF_ISSET(WT_REC_SINGLE) &&
+	    (page->type == WT_PAGE_COL_INT || page->type == WT_PAGE_ROW_INT))
+		WT_STAT_INCR(conn->stats, cache_evict_internal);
+
 	/* Update the parent and discard the page. */
 	if (F_ISSET(page, WT_PAGE_REC_MASK) == 0) {
 		WT_STAT_INCR(conn->stats, cache_evict_unmodified);

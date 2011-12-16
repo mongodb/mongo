@@ -23,6 +23,7 @@ connection_stats = [
 	Stat('cache_bytes_inuse', 'cache: bytes currently held in the cache', 'perm'),
 	Stat('cache_bytes_max', 'cache: maximum bytes configured', 'perm'),
 	Stat('cache_evict_hazard', 'cache: pages selected for eviction not evicted because of a hazard reference'),
+	Stat('cache_evict_internal', 'cache: internal pages evicted'),
 	Stat('cache_evict_modified', 'cache: modified pages evicted'),
 	Stat('cache_evict_slow', 'cache: eviction server unable to reach eviction goal'),
 	Stat('cache_evict_unmodified', 'cache: unmodified pages evicted'),
