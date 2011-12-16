@@ -1478,6 +1478,8 @@ namespace mongo {
             BSONObjBuilder spec;
             spec.appendBool( "capped", true );
             spec.append( "size", double( size ) );
+            if (jsobj.hasField("temp"))
+                spec.append(jsobj["temp"]);
             if ( !userCreateNS( toNs.c_str(), spec.done(), errmsg, true ) )
                 return false;
 
@@ -1516,7 +1518,7 @@ namespace mongo {
                 return false;
             }
 
-            string shortTmpName = str::stream() << ".tmp.convertToCapped." << from;
+            string shortTmpName = str::stream() << "tmp.convertToCapped." << from;
             string longTmpName = str::stream() << dbname << "." << shortTmpName;
 
             DBDirectClient client;
@@ -1524,7 +1526,7 @@ namespace mongo {
 
             BSONObj info;
             if ( !client.runCommand( dbname ,
-                                     BSON( "cloneCollectionAsCapped" << from << "toCollection" << shortTmpName << "size" << double( size ) ),
+                                     BSON( "cloneCollectionAsCapped" << from << "toCollection" << shortTmpName << "size" << double( size ) << "temp" << true ),
                                      info ) ) {
                 errmsg = "cloneCollectionAsCapped failed: " + info.toString();
                 return false;
@@ -1537,7 +1539,9 @@ namespace mongo {
 
             if ( !client.runCommand( "admin",
                                      BSON( "renameCollection" << longTmpName <<
-                                           "to" << ( dbname + "." + from ) ),
+                                           "to" << ( dbname + "." + from ) <<
+                                           "stayTemp" << false // explicit
+                                           ),
                                      info ) ) {
                 errmsg = "renameCollection failed: " + info.toString();
                 return false;

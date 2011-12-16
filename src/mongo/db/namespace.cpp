@@ -701,7 +701,7 @@ namespace mongo {
         theDataFileMgr.insert(s.c_str(), j.objdata(), j.objsize(), true);
     }
 
-    void renameNamespace( const char *from, const char *to ) {
+    void renameNamespace( const char *from, const char *to, bool stayTemp) {
         NamespaceIndex *ni = nsindex( from );
         assert( ni );
         assert( ni->details( from ) );
@@ -739,10 +739,13 @@ namespace mongo {
         BSONObjIterator i( oldSpec.getObjectField( "options" ) );
         while( i.more() ) {
             BSONElement e = i.next();
-            if ( strcmp( e.fieldName(), "create" ) != 0 )
-                newSpecB.append( e );
-            else
+            if ( strcmp( e.fieldName(), "create" ) != 0 ) {
+                if (stayTemp || (strcmp(e.fieldName(), "temp") != 0))
+                    newSpecB.append( e );
+            }
+            else {
                 newSpecB << "create" << to;
+            }
         }
         BSONObj newSpec = newSpecB.done();
         addNewNamespaceToCatalog( to, newSpec.isEmpty() ? 0 : &newSpec );

@@ -1442,7 +1442,7 @@ namespace mongo {
     }
 
     void renameIndexNamespace(const char *oldNs, const char *newNs) {
-        renameNamespace( oldNs, newNs );
+        renameNamespace( oldNs, newNs, false );
     }
 
     template< class V >

@@ -276,6 +276,12 @@ namespace mongo {
                 uasserted( 13606 , "'out' has to be a string or an object" );
             }
 
+            shardedFirstPass = false;
+            if (cmdObj.hasField("shardedFirstPass") && cmdObj["shardedFirstPass"].trueValue()){
+                massert(16054, "shardedFirstPass should only use replace outType", outType == REPLACE);
+                shardedFirstPass = true;
+            }
+
             if ( outType != INMEMORY ) { // setup names
                 tempLong = str::stream() << (outDB.empty() ? dbname : outDB) << ".tmp.mr." << cmdObj.firstElement().String() << "_" << JOB_NUMBER++;
 
@@ -337,7 +343,7 @@ namespace mongo {
                     writelock l( _config.incLong );
                     Client::Context ctx( _config.incLong );
                     string err;
-                    if ( ! userCreateNS( _config.incLong.c_str() , BSON( "autoIndexId" << 0 ) , err , false ) ) {
+                    if ( ! userCreateNS( _config.incLong.c_str() , BSON( "autoIndexId" << 0 << "temp" << true ) , err , false ) ) {
                         uasserted( 13631 , str::stream() << "userCreateNS failed for mr incLong ns: " << _config.incLong << " err: " << err );
                     }
                 }
@@ -352,7 +358,7 @@ namespace mongo {
                 writelock lock( _config.tempLong.c_str() );
                 Client::Context ctx( _config.tempLong.c_str() );
                 string errmsg;
-                if ( ! userCreateNS( _config.tempLong.c_str() , BSONObj() , errmsg , true ) ) {
+                if ( ! userCreateNS( _config.tempLong.c_str() , BSON("temp" << true) , errmsg , true ) ) {
                     uasserted( 13630 , str::stream() << "userCreateNS failed for mr tempLong ns: " << _config.tempLong << " err: " << errmsg );
                 }
             }
@@ -470,7 +476,12 @@ namespace mongo {
                 // replace: just rename from temp to final collection name, dropping previous collection
                 _db.dropCollection( _config.finalLong );
                 BSONObj info;
-                if ( ! _db.runCommand( "admin" , BSON( "renameCollection" << _config.tempLong << "to" << _config.finalLong ) , info ) ) {
+
+                if ( ! _db.runCommand( "admin"
+                                      , BSON( "renameCollection" << _config.tempLong <<
+                                              "to" << _config.finalLong <<
+                                              "stayTemp" << _config.shardedFirstPass )
+                                      , info ) ) {
                     uasserted( 10076 ,  str::stream() << "rename failed: " << info );
                 }
                          

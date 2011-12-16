@@ -198,6 +198,9 @@ namespace mongo {
             // if true, no lock during output operation
             bool outNonAtomic;
 
+            // true when called from mongos to do phase-1 of M/R
+            bool shardedFirstPass;
+
             static AtomicUInt JOB_NUMBER;
         }; // end MRsetup
 
