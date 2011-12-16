@@ -22,7 +22,7 @@
 #include "../client/connpool.h"
 #include "../util/stringutils.h"
 #include "../util/unittest.h"
-#include "../db/namespace_common.h"
+#include "../db/namespacestring.h"
 
 #include "grid.h"
 #include "shard.h"

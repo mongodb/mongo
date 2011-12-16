@@ -31,6 +31,7 @@
 #include "repl_block.h"
 #include "../util/processinfo.h"
 #include "../util/timer.h"
+#include "../server.h"
 
 namespace mongo {
 
@@ -519,7 +520,7 @@ namespace mongo {
                 CurOp * c = cc().curop();
                 while ( c->parent() )
                     c = c->parent();
-                warning() << "ClientCursor::yield can't unlock b/c of recursive lock"
+                LOGSOME << "warning ClientCursor::yield can't unlock b/c of recursive lock"
                           << " ns: " << ns 
                           << " top: " << c->info()
                           << endl;

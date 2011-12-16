@@ -18,8 +18,10 @@
 #include "db/jsobj.h"
 #include "db/pipeline/document.h"
 #include "db/pipeline/value.h"
+#include "util/mongoutils/str.h"
 
 namespace mongo {
+    using namespace mongoutils;
 
     string Document::idName("_id");
 
@@ -101,7 +103,8 @@ namespace mongo {
 
     void Document::addField(const string &fieldName,
 			    const intrusive_ptr<const Value> &pValue) {
-	assert(pValue->getType() != Undefined);
+	uassert(15945, str::stream() << "cannot add undefined field " <<
+		fieldName << " to document", pValue->getType() != Undefined);
 
         vFieldName.push_back(fieldName);
         vpValue.push_back(pValue);
@@ -118,7 +121,8 @@ namespace mongo {
 	}
 
 	/* make sure we have a valid value */
-	assert(pValue->getType() != Undefined);
+	uassert(15968, str::stream() << "cannot set undefined field " <<
+		fieldName << " to document", pValue->getType() != Undefined);
 
 	/* set the indicated field */
         vFieldName[index] = fieldName;
@@ -174,7 +178,7 @@ namespace mongo {
                 if (i >= rSize)
                     return 0; // documents are the same length
 
-                return-1; // left document is shorter
+                return -1; // left document is shorter
             }
 
             if (i >= rSize)
@@ -190,7 +194,7 @@ namespace mongo {
         }
 
         /* NOTREACHED */
-        assert(false); // CW TODO
+        assert(false);
         return 0;
     }
 

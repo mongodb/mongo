@@ -208,11 +208,14 @@ namespace mongo {
         double _writeLock;
     };
 
+    class ChunkManager;
+    typedef shared_ptr<const ChunkManager> ChunkManagerPtr;
+
     class ShardConnection : public AScopedConnection {
     public:
-        ShardConnection( const Shard * s , const string& ns );
-        ShardConnection( const Shard& s , const string& ns );
-        ShardConnection( const string& addr , const string& ns );
+        ShardConnection( const Shard * s , const string& ns, ChunkManagerPtr manager = ChunkManagerPtr() );
+        ShardConnection( const Shard& s , const string& ns, ChunkManagerPtr manager = ChunkManagerPtr() );
+        ShardConnection( const string& addr , const string& ns, ChunkManagerPtr manager = ChunkManagerPtr() );
 
         ~ShardConnection();
 
@@ -239,6 +242,14 @@ namespace mongo {
 
         string getHost() const {
             return _addr;
+        }
+
+        string getNS() const {
+            return _ns;
+        }
+
+        ChunkManagerPtr getManager() const {
+            return _manager;
         }
 
         bool setVersion() {
@@ -271,6 +282,8 @@ namespace mongo {
 
         string _addr;
         string _ns;
+        ChunkManagerPtr _manager;
+
         DBClientBase* _conn;
         bool _setVersion;
     };

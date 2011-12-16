@@ -85,7 +85,8 @@ namespace mongo {
     intrusive_ptr<DocumentSource> DocumentSourceSkip::createFromBson(
 	BSONElement *pBsonElement,
 	const intrusive_ptr<ExpressionContext> &pCtx) {
-        assert(pBsonElement->isNumber()); // CW TODO must be a number
+	uassert(15972, str::stream() << "the value to " <<
+		skipName << " must be a number", pBsonElement->isNumber());
 
         intrusive_ptr<DocumentSourceSkip> pSkip(
 	    DocumentSourceSkip::create(pCtx));

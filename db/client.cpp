@@ -190,7 +190,7 @@ namespace mongo {
         _db(0) 
     {
         _finishInit( doauth );
-        _client->checkLocks();        
+        _client->checkLocks();
     }
        
     /** "read lock, and set my context, all in one operation" 

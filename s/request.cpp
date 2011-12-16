@@ -60,28 +60,22 @@ namespace mongo {
         reset();
     }
 
-    void Request::reset( bool reload, bool forceReload ) {
+    // Deprecated, will move to the strategy itself
+    void Request::reset() {
         if ( _m.operation() == dbKillCursors ) {
             return;
         }
 
         uassert( 13644 , "can't use 'local' database through mongos" , ! str::startsWith( getns() , "local." ) );
 
+        // TODO: Deprecated, keeping to preserve codepath for now
         const string nsStr (getns()); // use in functions taking string rather than char*
 
         _config = grid.getDBConfig( nsStr );
-        if ( reload ) {
-            if ( _config->isSharded( nsStr ) )
-                _config->getChunkManager( nsStr , true, forceReload );
-            else
-                _config->reload();
-        }
 
+        // TODO:  In general, throwing an exception when the cm doesn't exist is really annoying
         if ( _config->isSharded( nsStr ) ) {
-            _chunkManager = _config->getChunkManager( nsStr , reload );
-            // TODO:  All of these uasserts are no longer necessary, getChunkManager() throws when
-            // not returning the right value.
-            uassert( 10193 ,  (string)"no shard info for: " + nsStr , _chunkManager );
+            _chunkManager = _config->getChunkManagerIfExists( nsStr );
         }
         else {
             _chunkManager.reset();
@@ -91,6 +85,7 @@ namespace mongo {
         _clientInfo->clearCurrentShards();
     }
 
+    // Deprecated, will move to the strategy itself
     Shard Request::primaryShard() const {
         assert( _didInit );
 
@@ -117,33 +112,15 @@ namespace mongo {
 
         LOG(3) << "Request::process ns: " << getns() << " msg id:" << (int)(_m.header()->id) << " attempt: " << attempt << endl;
 
-        Strategy * s = SINGLE;
+        Strategy * s = SHARDED;
         _counter = &opsNonSharded;
 
         _d.markSet();
 
-        if ( _chunkManager ) {
-            s = SHARDED;
-            _counter = &opsSharded;
-        }
-
         bool iscmd = false;
         if ( op == dbQuery ) {
             iscmd = isCommand();
-            try {
-                s->queryOp( *this );
-            }
-            catch ( StaleConfigException& staleConfig ) {
-                log() << staleConfig.what() << " attempt: " << attempt << endl;
-                uassert( 10195 ,  "too many attempts to update config, failing" , attempt < 5 );
-                ShardConnection::checkMyConnectionVersions( getns() );
-                if (!staleConfig.justConnection() )
-                    sleepsecs( attempt );
-                reset( ! staleConfig.justConnection(), attempt >= 2 );
-                _d.markReset();
-                process( attempt + 1 );
-                return;
-            }
+            s->queryOp( *this );
         }
         else if ( op == dbGetMore ) {
             checkAuth( Auth::READ ); // this is important so someone can't steal a cursor

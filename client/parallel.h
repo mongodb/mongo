@@ -71,6 +71,7 @@ namespace mongo {
      */
     class ClusteredCursor {
     public:
+        ClusteredCursor( const QuerySpec& q );
         ClusteredCursor( QueryMessage& q );
         ClusteredCursor( const string& ns , const BSONObj& q , int options=0 , const BSONObj& fields=BSONObj() );
         virtual ~ClusteredCursor();
@@ -132,6 +133,9 @@ namespace mongo {
         BSONObj peek();
 
         DBClientCursor* raw() { return _cursor.get(); }
+
+        // Required for new PCursor
+        void release(){ _cursor.release(); }
 
     private:
         void _advance();
@@ -223,25 +227,148 @@ namespace mongo {
     };
 
 
+
+    class CommandInfo {
+    public:
+        string versionedNS;
+        BSONObj cmdFilter;
+
+        CommandInfo() {}
+        CommandInfo( const string& vns, const BSONObj& filter ) : versionedNS( vns ), cmdFilter( filter ) {}
+
+        bool isEmpty(){
+            return versionedNS.size() == 0;
+        }
+
+        string toString() const {
+            return str::stream() << "CInfo " << BSON( "v_ns" << versionedNS << "filter" << cmdFilter );
+        }
+    };
+
+    class ShardConnection;
+    typedef shared_ptr<ShardConnection> ShardConnectionPtr;
+
+    class DBClientCursor;
+    typedef shared_ptr<DBClientCursor> DBClientCursorPtr;
+
+    class Shard;
+    typedef shared_ptr<Shard> ShardPtr;
+
+    class ChunkManager;
+    typedef shared_ptr<const ChunkManager> ChunkManagerPtr;
+
+    class ParallelConnectionState {
+    public:
+
+        ShardConnectionPtr conn;
+        DBClientCursorPtr cursor;
+
+        // Version information
+        ChunkManagerPtr manager;
+        ShardPtr primary;
+
+        BSONObj toBSON() const;
+
+        string toString() const {
+            return str::stream() << "PCState : " << toBSON();
+        }
+    };
+
+    typedef ParallelConnectionState PCState;
+    typedef shared_ptr<PCState> PCStatePtr;
+
+    class ParallelConnectionMetadata {
+    public:
+
+        ParallelConnectionMetadata() :
+            retryNext( false ), initialized( false ), finished( false ), completed( false ), errored( false ) { }
+
+        ~ParallelConnectionMetadata(){
+            cleanup( true );
+        }
+
+        void cleanup( bool full = true );
+
+        PCStatePtr pcState;
+
+        bool retryNext;
+
+        bool initialized;
+        bool finished;
+        bool completed;
+
+        bool errored;
+
+        BSONObj toBSON() const;
+
+        string toString() const {
+            return str::stream() << "PCMData : " << toBSON();
+        }
+    };
+
+    typedef ParallelConnectionMetadata PCMData;
+    typedef shared_ptr<PCMData> PCMDataPtr;
+
     /**
-     * runs a query in parellel across N servers
-     * sots
+     * Runs a query in parallel across N servers.  New logic has several modes -
+     * 1) Standard query, enforces compatible chunk versions for queries across all results
+     * 2) Standard query, sent to particular servers with no compatible chunk version enforced, but handling
+     *    stale configuration exceptions
+     * 3) Command query, either enforcing compatible chunk versions or sent to particular shards.
      */
     class ParallelSortClusteredCursor : public ClusteredCursor {
     public:
+
+        ParallelSortClusteredCursor( const QuerySpec& qSpec, const CommandInfo& cInfo = CommandInfo() );
+        ParallelSortClusteredCursor( const set<Shard>& servers, const QuerySpec& qSpec );
+
+        // LEGACY Constructors
         ParallelSortClusteredCursor( const set<ServerAndQuery>& servers , QueryMessage& q , const BSONObj& sortKey );
         ParallelSortClusteredCursor( const set<ServerAndQuery>& servers , const string& ns ,
                                      const Query& q , int options=0, const BSONObj& fields=BSONObj() );
+
         virtual ~ParallelSortClusteredCursor();
         virtual bool more();
         virtual BSONObj next();
         virtual string type() const { return "ParallelSort"; }
+
+        void fullInit();
+        void startInit();
+        void finishInit();
+
+        bool isCommand(){ return NamespaceString( _qSpec.ns() ).isCommand(); }
+        bool isVersioned(){ return _qShards.size() == 0; }
+
+        bool isSharded();
+        ShardPtr getPrimary();
+        void getQueryShards( set<Shard>& shards );
+        ChunkManagerPtr getChunkManager( const Shard& shard );
+        DBClientCursorPtr getShardCursor( const Shard& shard );
+
+        BSONObj toBSON() const;
+        string toString() const;
+
     protected:
         void _finishCons();
         void _init();
+        void _oldInit();
 
         virtual void _explain( map< string,list<BSONObj> >& out );
 
+        void _markStaleNS( const NamespaceString& staleNS, bool& forceReload, bool& fullReload );
+        void _handleStaleNS( const NamespaceString& staleNS, bool forceReload, bool fullReload );
+
+        set<Shard> _qShards;
+        QuerySpec _qSpec;
+        CommandInfo _cInfo;
+
+        // Count round-trips req'd for namespaces and total
+        map<string,int> _staleNSMap;
+        int _totalTries;
+
+        map<Shard,PCMData> _cursorMap;
+
+        // LEGACY BELOW
         int _numServers;
         set<ServerAndQuery> _servers;
         BSONObj _sortKey;

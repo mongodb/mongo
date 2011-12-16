@@ -45,15 +45,7 @@ for (iter = 0; iter < 5; iter++) {
 
     obj = outColl.convertToSingleObject("value");
     
-    // Because of SERVER-4215
-    try{ 
-        assert.eq( 51200 , obj.count , "Received wrong result " + obj.count );
-    }
-    catch( e ){
-        printjson( e );
-        print( "Result of " + obj.count + " may be due to simultaneous migrate." )
-        assert( obj.count >= 50000 && obj.count <= 54000 )
-    }
+    assert.eq( 51200 , obj.count , "Received wrong result " + obj.count );
 
     print("checking result field");
     assert.eq(res.result.collection, outCollStr, "Wrong collection " + res.result.collection);
@@ -72,7 +64,7 @@ for ( iter=0; iter<5; iter++ ){
 
     outColl = db["mrShardedOut"];
     // SERVER-3645 -can't use count()
-    assert.eq( 51200 , outColl.find().itcount() , "Received wrong result " );
+    assert.eq( 51200 , outColl.find().itcount() , "Received wrong result, this may happen intermittently until resolution of SERVER-3627" );
     // make sure it's sharded and split
     print("Number of chunks: " + config.chunks.count({ns: db.mrShardedOut._fullName}));
     assert.gt( config.chunks.count({ns: db.mrShardedOut._fullName}), 1, "didnt split");

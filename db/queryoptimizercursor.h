@@ -21,17 +21,37 @@ namespace mongo {
     /** Helper class for caching and counting matches during execution of a QueryPlan. */
     class CachedMatchCounter {
     public:
-        CachedMatchCounter( long long &aggregateNscanned, int cumulativeCount ) : _aggregateNscanned( aggregateNscanned ), _nscanned(), _cumulativeCount( cumulativeCount ), _count(), _checkDups(), _match( Unknown ) {}
+        /**
+         * @param aggregateNscanned - shared count of nscanned for this and othe plans.
+         * @param cumulativeCount - starting point for accumulated count over a series of plans.
+         */
+        CachedMatchCounter( long long &aggregateNscanned, int cumulativeCount ) : _aggregateNscanned( aggregateNscanned ), _nscanned(), _cumulativeCount( cumulativeCount ), _count(), _checkDups(), _match( Unknown ), _counted() {}
+        
+        /** Set whether dup checking is enabled when counting. */
         void setCheckDups( bool checkDups ) { _checkDups = checkDups; }
-        void resetMatch() { _match = Unknown; }
+        
+        /**
+         * Usual sequence of events:
+         * 1) resetMatch() - reset stored match value to Unkonwn.
+         * 2) setMatch() - set match value to a definite true/false value.
+         * 3) knowMatch() - check if setMatch() has been called.
+         * 4) countMatch() - increment count if match is true.
+         */
+        
+        void resetMatch() {
+            _match = Unknown;
+            _counted = false;
+        }
         void setMatch( bool match ) { _match = match ? True : False; }
         bool knowMatch() const { return _match != Unknown; }
         void countMatch( const DiskLoc &loc ) {
-            if ( _match == True && !getsetdup( loc ) ) {
+            if ( !_counted && _match == True && !getsetdup( loc ) ) {
                 ++_cumulativeCount;
                 ++_count;
+                _counted = true;
             }
         }
+
         bool enoughCumulativeMatchesToChooseAPlan() const {
             // This is equivalent to the default condition for switching from
             // a query to a getMore, which was the historical default match count for
@@ -42,8 +62,11 @@ namespace mongo {
             // Recording after 50 matches is a historical default (101 default limit / 2).
             return _count > 50;
         }
+
         int cumulativeCount() const { return _cumulativeCount; }
         int count() const { return _count; }
+        
+        /** Update local and aggregate nscanned counts. */
         void updateNscanned( long long nscanned ) {
             _aggregateNscanned += ( nscanned - _nscanned );
             _nscanned = nscanned;
@@ -65,6 +88,7 @@ namespace mongo {
         bool _checkDups;
         enum MatchState { Unknown, False, True };
         MatchState _match;
+        bool _counted;
         set<DiskLoc> _dups;
     };
     
@@ -74,10 +98,12 @@ namespace mongo {
         SmallDupSet() : _accesses() {
             _vec.reserve( 250 );
         }
+        /** @return true if @param 'loc' already added to the set, false if adding to the set in this call. */
         bool getsetdup( const DiskLoc &loc ) {
             access();
             return vec() ? getsetdupVec( loc ) : getsetdupSet( loc );
         }
+        /** @return true when @param loc in the set. */
         bool getdup( const DiskLoc &loc ) {
             access();
             return vec() ? getdupVec( loc ) : getdupSet( loc );

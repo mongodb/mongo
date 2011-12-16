@@ -163,7 +163,7 @@ namespace mongo {
 
     void start( const MessageServer::Options& opts ) {
         setThreadName( "mongosMain" );
-        installChunkShardVersioning();
+
         balancer.go();
         cursorCache.startTimeoutThread();
         PeriodicTask::theRunner->go();

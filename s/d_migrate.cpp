@@ -807,10 +807,19 @@ namespace mongo {
             {
                 ScopedDbConnection conn( shardingState.getConfigServer() );
 
-                BSONObj x = conn->findOne( ShardNS::chunk , Query( BSON( "ns" << ns ) ).sort( BSON( "lastmod" << -1 ) ) );
-                maxVersion = x["lastmod"];
+                BSONObj x;
+                BSONObj currChunk;
+                try{
+                    x = conn->findOne( ShardNS::chunk , Query( BSON( "ns" << ns ) ).sort( BSON( "lastmod" << -1 ) ) );
+                    currChunk = conn->findOne( ShardNS::chunk , shardId.wrap( "_id" ) );
+                }
+                catch( DBException& e ){
+                    errmsg = str::stream() << "aborted moveChunk because could not get chunk data from config server " << shardingState.getConfigServer() << causedBy( e );
+                    warning() << errmsg << endl;
+                    return false;
+                }
 
-                BSONObj currChunk = conn->findOne( ShardNS::chunk , shardId.wrap( "_id" ) );
+                maxVersion = x["lastmod"];
                 assert( currChunk["shard"].type() );
                 assert( currChunk["min"].type() );
                 assert( currChunk["max"].type() );
@@ -870,7 +879,9 @@ namespace mongo {
 
                 ScopedDbConnection connTo( to );
                 BSONObj res;
-                bool ok = connTo->runCommand( "admin" ,
+                bool ok;
+                try{
+                    ok = connTo->runCommand( "admin" ,
                                               BSON( "_recvChunkStart" << ns <<
                                                     "from" << from <<
                                                     "min" << min <<
@@ -878,6 +889,13 @@ namespace mongo {
                                                     "configServer" << configServer.modelServer()
                                                   ) ,
                                               res );
+                }
+                catch( DBException& e ){
+                    errmsg = str::stream() << "moveChunk could not contact to: shard " << to << " to start transfer" << causedBy( e );
+                    warning() << errmsg << endl;
+                    return false;
+                }
+
                 connTo.done();
 
                 if ( ! ok ) {
@@ -897,8 +915,17 @@ namespace mongo {
                 sleepsecs( 1 );
                 ScopedDbConnection conn( to );
                 BSONObj res;
-                bool ok = conn->runCommand( "admin" , BSON( "_recvChunkStatus" << 1 ) , res );
-                res = res.getOwned();
+                bool ok;
+                try {
+                    ok = conn->runCommand( "admin" , BSON( "_recvChunkStatus" << 1 ) , res );
+                    res = res.getOwned();
+                }
+                catch( DBException& e ){
+                    errmsg = str::stream() << "moveChunk could not contact to: shard " << to << " to monitor transfer" << causedBy( e );
+                    warning() << errmsg << endl;
+                    return false;
+                }
+
                 conn.done();
 
                 log(0) << "moveChunk data transfer progress: " << res << " my mem used: " << migrateFromStatus.mbUsed() << migrateLog;
@@ -957,9 +984,19 @@ namespace mongo {
                 {
                     BSONObj res;
                     ScopedDbConnection connTo( to );
-                    bool ok = connTo->runCommand( "admin" ,
+                    bool ok;
+
+                    try{
+                        ok = connTo->runCommand( "admin" ,
                                                   BSON( "_recvChunkCommit" << 1 ) ,
                                                   res );
+                    }
+                    catch( DBException& e ){
+                        errmsg = str::stream() << "moveChunk could not contact to: shard " << to << " to commit transfer" << causedBy( e );
+                        warning() << errmsg << endl;
+                        return false;
+                    }
+
                     connTo.done();
 
                     if ( ! ok ) {

@@ -59,8 +59,8 @@ namespace mongo {
     intrusive_ptr<DocumentSource> DocumentSourceMatch::createFromBson(
 	BSONElement *pBsonElement,
 	const intrusive_ptr<ExpressionContext> &pCtx) {
-        assert(pBsonElement->type() == Object);
-        // CW TODO error: expression object must be an object
+	uassert(15959, "the match filter must be an expression in an object",
+		pBsonElement->type() == Object);
 
         intrusive_ptr<DocumentSourceMatch> pMatcher(
 	    new DocumentSourceMatch(pBsonElement->Obj()));

@@ -91,7 +91,7 @@ namespace mongo {
 
         void init();
 
-        void reset( bool reload=false, bool forceReload = false );
+        void reset();
 
     private:
         Message& _m;

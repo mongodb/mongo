@@ -19,6 +19,7 @@
 
 #include "pch.h"
 #include "db.h"
+#include "../bson/util/atomic_int.h"
 #include "introspect.h"
 #include "repl.h"
 #include "dbmessage.h"
@@ -38,10 +39,12 @@
 #include "background.h"
 #include "dur_journal.h"
 #include "dur_recover.h"
-#include "ops/update.h"
+#include "d_concurrency.h"
+
+#include "ops/count.h"
 #include "ops/delete.h"
 #include "ops/query.h"
-#include "d_concurrency.h"
+#include "ops/update.h"
 
 namespace mongo {
 
@@ -560,16 +563,13 @@ namespace mongo {
         OpTime last;
         while( 1 ) {
             try {
-                readlock lk;
-
+                Client::ReadContext ctx(ns);
                 if (str::startsWith(ns, "local.oplog.")){
                     if (pass == 0)
                         last = OpTime::last_inlock();
                     else
                         last.waitForDifferent(1000/*ms*/);
                 }
-
-                Client::Context ctx(ns);
                 msgdata = processGetMore(ns, ntoreturn, cursorid, curop, pass, exhaust);
             }
             catch ( AssertionException& e ) {
@@ -767,7 +767,7 @@ namespace mongo {
     HostAndPort DBDirectClient::_clientHost = HostAndPort( "0.0.0.0" , 0 );
 
     unsigned long long DBDirectClient::count(const string &ns, const BSONObj& query, int options, int limit, int skip ) {
-        readlock lk( ns );
+        LockCollectionForReading lk( ns );
         string errmsg;
         long long res = runCount( ns.c_str() , _countCmd( ns , query , options , limit , skip ) , errmsg );
         if ( res == -1 )
@@ -781,7 +781,7 @@ namespace mongo {
     }
 
     mongo::mutex exitMutex("exit");
-    int numExitCalls = 0;
+    AtomicUInt numExitCalls = 0;
 
     bool inShutdown() {
         return numExitCalls > 0;

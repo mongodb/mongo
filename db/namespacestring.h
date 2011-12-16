@@ -1,4 +1,4 @@
-// namespace_common.h
+// @file namespacestring.h
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -20,10 +20,6 @@
 
 #include <string>
 
-
-/**
- * this file contains basics utilities for handling namespaces
- */
 namespace mongo {
 
     using std::string;
@@ -43,8 +39,23 @@ namespace mongo {
 
         NamespaceString( const char * ns ) { init(ns); }
         NamespaceString( const string& ns ) { init(ns.c_str()); }
+
         string ns() const { return db + '.' + coll; }
+
         bool isSystem() const { return strncmp(coll.c_str(), "system.", 7) == 0; }
+        bool isCommand() const { return coll == "$cmd"; }
+
+        operator string() const { return ns(); }
+
+        bool operator==( const string& nsIn ) const { return nsIn == ns(); }
+        bool operator==( const char* nsIn ) const { return (string)nsIn == ns(); }
+        bool operator==( const NamespaceString& nsIn ) const { return nsIn.db == db && nsIn.coll == coll; }
+
+        bool operator!=( const string& nsIn ) const { return nsIn != ns(); }
+        bool operator!=( const char* nsIn ) const { return (string)nsIn != ns(); }
+        bool operator!=( const NamespaceString& nsIn ) const { return nsIn.db != db || nsIn.coll != coll; }
+
+        string toString() const { return ns(); }
 
         /**
          * @return true if ns is 'normal'.  $ used for collections holding index data, which do not contain BSON objects in their records.
@@ -60,7 +71,7 @@ namespace mongo {
         static bool special(const char *ns) { 
             return !normal(ns) || strstr(ns, ".system.");
         }
-        
+
         /**
          * samples:
          *   good:  
@@ -80,6 +91,21 @@ namespace mongo {
                 return false;
             size_t good = strcspn( db.c_str() , "/\\. \"" );
             return good == db.size();
+        }
+
+        /**
+         * samples:
+         *   good:
+         *      foo.bar
+         *   bad:
+         *      foo.
+         *
+         * @param dbcoll - a possible collection name of the form db.coll
+         * @return if db.coll is an allowed collection name
+         */
+        static bool validCollectionName(const char* dbcoll){
+          const char *c = strchr( dbcoll, '.' ) + 1;
+          return normal(dbcoll) && c && *c;
         }
 
     private:

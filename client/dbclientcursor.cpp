@@ -247,6 +247,14 @@ namespace mongo {
         }
     }
     
+    BSONObj DBClientCursor::peekFirst(){
+        vector<BSONObj> v;
+        peek( v, 1 );
+
+        if( v.size() > 0 ) return v[0];
+        else return BSONObj();
+    }
+
     bool DBClientCursor::peekError(BSONObj* error){
         if( ! wasError ) return false;
 

@@ -97,8 +97,9 @@ namespace mongo {
 		    if (pPathValue->getType() != Object) {
 			/* can't walk down the field path */
 			resetArray();
-			assert(false);
-   			    // CW TODO error
+			uassert(15977, str::stream() << unwindName <<
+				":  cannot traverse field path past scalar value for \"" <<
+				fp.first << "\"", false);
 			break;
 		    }
 
@@ -109,8 +110,9 @@ namespace mongo {
 		    if (pPathValue->getType() != Array) {
 			/* last item on path must be an array to unwind */
 			resetArray();
-			assert(false);
-			    // CW TODO error
+			uassert(15978, str::stream() << unwindName <<
+				":  value at end of field path must be an array",
+				false);
 			break;
 		    }
 
@@ -200,11 +202,12 @@ namespace mongo {
 
     void DocumentSourceUnwind::unwindField(const FieldPath &rFieldPath) {
 	/* can't set more than one unwind field */
-	assert(!unwindPath.getPathLength());
-	    // CW TODO ERROR can't set more than one unwind field
+	uassert(15979, str::stream() << unwindName <<
+		"can't unwind more than one path at once",
+		!unwindPath.getPathLength());
 
-	assert(rFieldPath.getPathLength());
-   	    // CW TODO ERROR field path to be unwound can't be empty
+	uassert(15980, "the path of the field to unwind cannot be empty",
+		false);
 
 	/* record the field path */
 	unwindPath = rFieldPath;
@@ -216,8 +219,9 @@ namespace mongo {
         /*
 	  The value of $unwind should just be a field path.
          */
-        assert(pBsonElement->type() == String); // CW TODO user error
-	    // CW TODO ERROR must just be a field path
+	uassert(15981, str::stream() << "the " << unwindName <<
+		" field path must be specified as a string",
+		pBsonElement->type() == String);
 
 	string prefixedPathString(pBsonElement->String());
 	string pathString(Expression::removeFieldPrefix(prefixedPathString));

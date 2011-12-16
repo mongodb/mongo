@@ -42,7 +42,7 @@ namespace mongo {
         if (!populated)
             populate();
 
-        assert(groupsIterator != groups.end()); // CW TODO error
+        assert(groupsIterator != groups.end());
 
         ++groupsIterator;
         if (groupsIterator == groups.end()) {
@@ -138,7 +138,8 @@ namespace mongo {
     intrusive_ptr<DocumentSource> DocumentSourceGroup::createFromBson(
 	BSONElement *pBsonElement,
 	const intrusive_ptr<ExpressionContext> &pCtx) {
-        assert(pBsonElement->type() == Object); // CW TODO must be an object
+	uassert(15947, "a group's fields must be specified in an object",
+		pBsonElement->type() == Object);
 
         intrusive_ptr<DocumentSourceGroup> pGroup(
 	    DocumentSourceGroup::create(pCtx));
@@ -151,7 +152,8 @@ namespace mongo {
             const char *pFieldName = groupField.fieldName();
 
             if (strcmp(pFieldName, Document::idName.c_str()) == 0) {
-                assert(!idSet); // CW TODO _id specified multiple times
+		uassert(15948, "a group's _id may only be specified once",
+			!idSet);
 
 		BSONType groupType = groupField.type();
 
@@ -208,8 +210,9 @@ namespace mongo {
 		    }
 
 		    default:
-			assert(false);
-			// CW TODO disallowed constant group key
+			uassert(15949, str::stream() <<
+				"a group's _id may not include fields of BSON type " << groupType,
+				false);
 		    }
 		}
             }
@@ -218,10 +221,15 @@ namespace mongo {
                   Treat as a projection field with the additional ability to
                   add aggregation operators.
                 */
-                assert(*pFieldName != '$');
-                // CW TODO error: field name can't be an operator
-                assert(groupField.type() == Object);
-                // CW TODO error: must be an operator expression
+		uassert(15950, str::stream() <<
+			"the group aggregate field name " <<
+			*pFieldName << " cannot be an operator name",
+			*pFieldName != '$');
+
+		uassert(15951, str::stream() << 
+			"the group aggregate field " << *pFieldName <<
+			"must be defined as an expression inside an object",
+			groupField.type() == Object);
 
                 BSONObj subField(groupField.Obj());
                 BSONObjIterator subIterator(subField);
@@ -237,7 +245,10 @@ namespace mongo {
                               &key, GroupOpTable, NGroupOp, sizeof(GroupOpDesc),
                                       GroupOpDescCmp);
 
-                    assert(pOp); // CW TODO error: operator not found
+		    uassert(15952, str::stream() <<
+			    "unknown group operator \"" <<
+			    key.pName << "\"",
+			    pOp);
 
                     intrusive_ptr<Expression> pGroupExpr;
 
@@ -249,7 +260,9 @@ namespace mongo {
 			    &subElement, &oCtx);
 		    }
                     else if (elementType == Array) {
-                        assert(false); // CW TODO group operators are unary
+			uassert(15953, str::stream() <<
+				"aggregating group operators are unary (" <<
+				key.pName << ")", false);
                     }
                     else { /* assume its an atomic single operand */
                         pGroupExpr = Expression::parseOperand(&subElement);
@@ -259,12 +272,14 @@ namespace mongo {
                         pFieldName, pOp->pFactory, pGroupExpr);
                 }
 
-                assert(subCount == 1);
-                // CW TODO error: only one operator allowed
+		uassert(15954, str::stream() <<
+			"the computed aggregate \"" <<
+			pFieldName << "\" must specify exactly one operator",
+			subCount == 1);
             }
         }
 
-        assert(idSet); // CW TODO error: missing _id specification
+	uassert(15955, "a group specification must include an _id", idSet);
 
         return pGroup;
     }
@@ -276,8 +291,8 @@ namespace mongo {
 
             /* get the _id document */
             intrusive_ptr<const Value> pId(pIdExpression->evaluate(pDocument));
-	    assert(pId->getType() != Undefined);
-	        // CW TODO error grouping key must not be undefined
+	    uassert(15956, "the _id field for a group must not be undefined",
+		    pId->getType() != Undefined);
 
             /*
               Look for the _id value in the map; if it's not there, add a

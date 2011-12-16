@@ -29,27 +29,10 @@
 
 namespace mongo {
 
+    // Global version manager
+    VersionManager versionManager;
+
     // when running in sharded mode, use chunk shard version control
-
-    static bool isVersionable( DBClientBase * conn );
-    static bool initShardVersion( DBClientBase & conn, BSONObj& result );
-    static bool forceRemoteCheckShardVersion( const string& ns );
-    static bool checkShardVersion( DBClientBase & conn , const string& ns , bool authoritative = false , int tryNumber = 1 );
-    static void resetShardVersion( DBClientBase * conn );
-
-    void installChunkShardVersioning() {
-        //
-        // Overriding no-op behavior in shardconnection.cpp
-        //
-        // TODO: Better encapsulate this mechanism.
-        //
-        isVersionableCB = isVersionable;
-        initShardVersionCB = initShardVersion;
-        forceRemoteCheckShardVersionCB = forceRemoteCheckShardVersion;
-        checkShardVersionCB = checkShardVersion;
-        resetShardVersionCB = resetShardVersion;
-    }
-
     struct ConnectionShardStatus {
 
         typedef unsigned long long S;
@@ -81,11 +64,11 @@ namespace mongo {
 
     } connectionShardStatus;
 
-    void resetShardVersion( DBClientBase * conn ) {
+    void VersionManager::resetShardVersionCB( DBClientBase * conn ) {
         connectionShardStatus.reset( conn );
     }
 
-    bool isVersionable( DBClientBase* conn ){
+    bool VersionManager::isVersionableCB( DBClientBase* conn ){
         return conn->type() == ConnectionString::MASTER || conn->type() == ConnectionString::SET;
     }
 
@@ -114,11 +97,11 @@ namespace mongo {
 
     extern OID serverID;
 
-    bool initShardVersion( DBClientBase& conn_in, BSONObj& result ){
+    bool VersionManager::initShardVersionCB( DBClientBase * conn_in, BSONObj& result ){
 
-        WriteBackListener::init( conn_in );
+        WriteBackListener::init( *conn_in );
 
-        DBClientBase* conn = getVersionable( &conn_in );
+        DBClientBase* conn = getVersionable( conn_in );
         assert( conn ); // errors thrown above
 
         BSONObjBuilder cmdBuilder;
@@ -150,7 +133,7 @@ namespace mongo {
 
     }
 
-    bool forceRemoteCheckShardVersion( const string& ns ){
+    bool VersionManager::forceRemoteCheckShardVersionCB( const string& ns ){
 
         DBConfigPtr conf = grid.getDBConfig( ns );
         if ( ! conf ) return false;
@@ -166,16 +149,16 @@ namespace mongo {
     /**
      * @return true if had to do something
      */
-    bool checkShardVersion( DBClientBase& conn_in , const string& ns , bool authoritative , int tryNumber ) {
+    bool checkShardVersion( DBClientBase * conn_in , const string& ns , ChunkManagerPtr refManager, bool authoritative , int tryNumber ) {
         // TODO: cache, optimize, etc...
 
-        WriteBackListener::init( conn_in );
+        WriteBackListener::init( *conn_in );
 
         DBConfigPtr conf = grid.getDBConfig( ns );
         if ( ! conf )
             return false;
 
-        DBClientBase* conn = getVersionable( &conn_in );
+        DBClientBase* conn = getVersionable( conn_in );
         assert(conn); // errors thrown above
 
         unsigned long long officialSequenceNumber = 0;
@@ -187,6 +170,22 @@ namespace mongo {
             // It's possible the chunk manager was reset since we checked whether sharded was true,
             // so must check this here.
             if( manager ) officialSequenceNumber = manager->getSequenceNumber();
+        }
+
+        // Check this manager against the reference manager
+        if( isSharded && manager ){
+
+            Shard shard = Shard::make( conn->getServerAddress() );
+            if( refManager && ! refManager->compatibleWith( manager, shard ) ){
+                throw SendStaleConfigException( ns, str::stream() << "manager (" << manager->getVersion( shard )  << " : " << manager->getSequenceNumber() << ") "
+                                                                      << "not compatible with reference manager (" << refManager->getVersion( shard )  << " : " << refManager->getSequenceNumber() << ") "
+                                                                      << "on shard " << shard.getName() << " (" << shard.getAddress().toString() << ")" );
+            }
+        }
+        else if( refManager ){
+            throw SendStaleConfigException( ns, str::stream() << "not sharded (" << ( (manager.get() == 0) ? ( str::stream() << manager->getSequenceNumber() << ") " ) : (string)"<none>) " ) <<
+                                                                     "but has reference manager (" << refManager->getSequenceNumber() << ") "
+                                                                  << "on conn " << conn->getServerAddress() << " (" << conn_in->getServerAddress() << ")" );
         }
 
         // has the ChunkManager been reloaded since the last time we updated the connection-level version?
@@ -229,7 +228,7 @@ namespace mongo {
             massert( 10428 ,  "need_authoritative set but in authoritative mode already" , ! authoritative );
 
         if ( ! authoritative ) {
-            checkShardVersion( *conn , ns , 1 , tryNumber + 1 );
+            checkShardVersion( conn , ns , refManager, 1 , tryNumber + 1 );
             return true;
         }
         
@@ -249,7 +248,7 @@ namespace mongo {
             LOG( tryNumber < ( maxNumTries / 2 ) ? 1 : 0 ) 
                 << "going to retry checkShardVersion host: " << conn->getServerAddress() << " " << result << endl;
             sleepmillis( 10 * tryNumber );
-            checkShardVersion( *conn , ns , true , tryNumber + 1 );
+            checkShardVersion( conn , ns , refManager, true , tryNumber + 1 );
             return true;
         }
         
@@ -257,6 +256,14 @@ namespace mongo {
         log() << "     " << errmsg << endl;
         massert( 10429 , errmsg , 0 );
         return true;
+    }
+
+    bool VersionManager::checkShardVersionCB( DBClientBase* conn_in , const string& ns , bool authoritative , int tryNumber ) {
+        return checkShardVersion( conn_in, ns, ChunkManagerPtr(), authoritative, tryNumber );
+    }
+
+    bool VersionManager::checkShardVersionCB( ShardConnection* conn_in , bool authoritative , int tryNumber ) {
+        return checkShardVersion( conn_in->get(), conn_in->getNS(), conn_in->getManager(), authoritative, tryNumber );
     }
 
 }  // namespace mongo

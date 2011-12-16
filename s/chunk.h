@@ -321,8 +321,8 @@ namespace mongo {
         /**
          * Returns true if, for this shard, the chunks are identical in both chunk managers
          */
-        bool compatibleWith( const ChunkManager& other, const Shard& shard );
-        bool compatibleWith( ChunkManagerPtr other, const Shard& shard ){ return compatibleWith( *other, shard ); }
+        bool compatibleWith( const ChunkManager& other, const Shard& shard ) const;
+        bool compatibleWith( ChunkManagerPtr other, const Shard& shard ) const { if( ! other ) return false; return compatibleWith( *other, shard ); }
 
         string toString() const;
 

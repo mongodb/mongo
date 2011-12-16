@@ -228,10 +228,14 @@ namespace mongo {
         struct LockStatus {
             LockStatus();
             string whichCollection;
-            int coll;
+            unsigned state;
         } lockStatus;
 
-        void checkLocks() const {}
+#if defined(CLC)
+        void checkLocks() const;
+#else
+        void checkLocks() const { }
+#endif
 
     }; // class Client
 

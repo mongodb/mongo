@@ -58,17 +58,21 @@ void generateCompletions( const string& prefix , vector<string>& all ) {
     if ( prefix.find( '"' ) != string::npos )
         return;
 
-    BSONObj args = BSON( "0" << prefix );
-    shellMainScope->invokeSafe( "function(x) {shellAutocomplete(x)}", &args, 0, 1000 );
-    BSONObjBuilder b;
-    shellMainScope->append( b , "" , "__autocomplete__" );
-    BSONObj res = b.obj();
-    BSONObj arr = res.firstElement().Obj();
+    try {
+        BSONObj args = BSON( "0" << prefix );
+        shellMainScope->invokeSafe( "function callShellAutocomplete(x) {shellAutocomplete(x)}", &args, 0, 1000 );
+        BSONObjBuilder b;
+        shellMainScope->append( b , "" , "__autocomplete__" );
+        BSONObj res = b.obj();
+        BSONObj arr = res.firstElement().Obj();
 
-    BSONObjIterator i( arr );
-    while ( i.more() ) {
-        BSONElement e = i.next();
-        all.push_back( e.String() );
+        BSONObjIterator i( arr );
+        while ( i.more() ) {
+            BSONElement e = i.next();
+            all.push_back( e.String() );
+        }
+    }
+    catch ( ... ) {
     }
 }
 

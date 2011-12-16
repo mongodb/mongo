@@ -412,6 +412,11 @@ namespace mongo {
             cmdLine.sslServerManager = new SSLManager( false );
             cmdLine.sslServerManager->setupPEM( cmdLine.sslPEMKeyFile , cmdLine.sslPEMKeyPassword );
         }
+
+        if ( cmdLine.sslPEMKeyFile.size() || cmdLine.sslPEMKeyPassword.size() ) {
+            log() << "need to enable sslOnNormalPorts" << endl;
+            dbexit(EXIT_BADOPTIONS);
+        }
 #endif
         
         {

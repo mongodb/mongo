@@ -70,6 +70,7 @@ namespace mongo {
                         loops--;
                         log() << "retrying command: " << q.query << endl;
                         ShardConnection::checkMyConnectionVersions( e.getns() );
+                        if( loops < 4 ) versionManager.forceRemoteCheckShardVersionCB( e.getns() );
                     }
                     catch ( AssertionException& e ) {
                         e.getInfo().append( builder , "assertion" , "assertionCode" );

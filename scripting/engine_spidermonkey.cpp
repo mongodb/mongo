@@ -440,11 +440,10 @@ namespace mongo {
 
             //cout << "RAW\n---\n" << raw << "\n---" << endl;
 
-            stringstream fname;
-            fname << "cf_";
             static int fnum = 1;
-            fname << "_" << fnum++ << "_";
-            
+            stringstream fname;
+            fname << "__cf__" << fnum++ << "__";
+
             if ( ! hasFunctionIdentifier( raw ) ) {
                 string s = raw;
                 if ( isSimpleStatement( s ) ) {
@@ -460,9 +459,14 @@ namespace mongo {
             size_t start = code.find( '(' );
             assert( start != string::npos );
 
-            string fbase = trim( code.substr( 9 , start - 9 ) );
-
-            fname << "_f_" << fbase;
+            string fbase;
+            if ( start > 9 ) {
+                fbase = trim( code.substr( 9 , start - 9 ) );
+            }
+            if ( fbase.length() == 0 ) {
+                fbase = "anonymous_function";
+            }
+            fname << "f__" << fbase;
 
             code = code.substr( start + 1 );
             size_t end = code.find( ')' );
@@ -488,7 +492,7 @@ namespace mongo {
                 paramArray[i] = params[i].c_str();
             
             // avoid munging previously munged name (kludge; switching to v8 fixes underlying issue)
-            if ( fbase.find("cf__") != 0 && fbase.find("_f_") == string::npos ) {
+            if ( fbase.find("__cf__") != 0 && fbase.find("__f__") == string::npos ) {
                 fbase = fname.str();
             }
 

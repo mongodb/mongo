@@ -553,6 +553,7 @@ doneCheckOrder:
             if ( _bestGuessOnly || res->complete() || _plans.size() > 1 )
                 return res;
             // A cached plan was used, so clear the plan for this query pattern and retry the query without a cached plan.
+            // Carefull here, as the namespace may have been dropped.
             QueryUtilIndexed::clearIndexesForPatterns( *_frsp, _order );
             init();
         }
@@ -667,7 +668,7 @@ doneCheckOrder:
         int micros = ClientCursor::suggestYieldMicros();
         if ( micros <= 0 ) 
             return;
-        
+
         if ( !prepareToYield() ) 
             return;   
         
@@ -738,7 +739,6 @@ doneCheckOrder:
         if ( op.error() ) {
             return holder._op;
         }
-        _queue.push( holder );
         if ( !_plans._bestGuessOnly && _plans._usingCachedPlan && op.nscanned() > _plans._oldNScanned * 10 && _plans._special.empty() ) {
             holder._offset = -op.nscanned();
             _plans.addOtherPlans( /* avoid duplicating the initial plan */ true );
@@ -755,6 +755,7 @@ doneCheckOrder:
             }
             _plans._usingCachedPlan = false;
         }
+        _queue.push( holder );
         return holder._op;
     }
     

@@ -127,7 +127,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>..\..\js\src;..\third_party\pcre-7.4;c:\boost;\boost</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>CLC;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <PrecompiledHeader>Use</PrecompiledHeader>
@@ -217,6 +217,7 @@
     <ClCompile Include="..\client\dbclient_rs.cpp" />
     <ClCompile Include="..\client\distlock.cpp" />
     <ClCompile Include="..\client\model.cpp" />
+    <ClCompile Include="..\s\default_version.cpp" />
     <ClCompile Include="..\third_party\pcre-7.4\pcrecpp.cc">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
       </PrecompiledHeader>
@@ -552,6 +553,12 @@
     <ClCompile Include="key.cpp" />
     <ClCompile Include="mongommf.cpp" />
     <ClCompile Include="oplog.cpp" />
+    <ClCompile Include="ops\count.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="ops\delete.cpp" />
     <ClCompile Include="ops\query.cpp" />
     <ClCompile Include="ops\update.cpp" />
@@ -773,7 +780,9 @@
     <ClInclude Include="mongommf.h" />
     <ClInclude Include="mongomutex.h" />
     <ClInclude Include="namespace-inl.h" />
+    <ClInclude Include="namespacestring.h" />
     <ClInclude Include="oplogreader.h" />
+    <ClInclude Include="ops\count.h" />
     <ClInclude Include="ops\delete.h" />
     <ClInclude Include="ops\update.h" />
     <ClInclude Include="pipeline\accumulator.h" />

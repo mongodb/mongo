@@ -43,7 +43,7 @@ namespace mongo {
         if (!populated)
             populate();
 
-        assert(listIterator != documents.end()); // CW TODO error
+        assert(listIterator != documents.end());
 
         ++listIterator;
         if (listIterator == documents.end()) {
@@ -106,7 +106,9 @@ namespace mongo {
     intrusive_ptr<DocumentSource> DocumentSourceSort::createFromBson(
 	BSONElement *pBsonElement,
 	const intrusive_ptr<ExpressionContext> &pCtx) {
-        assert(pBsonElement->type() == Object); // CW TODO must be an object
+	uassert(15973, str::stream() << " the " <<
+		sortName << " key specification must be an object",
+		pBsonElement->type() == Object);
 
         intrusive_ptr<DocumentSourceSort> pSort(
 	    DocumentSourceSort::create(pCtx));
@@ -119,28 +121,28 @@ namespace mongo {
 	    const char *pKeyFieldName = keyField.fieldName();
 	    int sortOrder = 0;
 		
-	    if (keyField.isNumber()) {
-		sortOrder = (int)keyField.numberInt();
-	    }
-	    else {
-		assert(false);
-		// CW TODO illegal sort order specification
-	    }
+	    uassert(15974, str::stream() << sortName <<
+		    " key ordering must be specified using a number",
+		    keyField.isNumber());
+	    sortOrder = (int)keyField.numberInt();
 
-	    assert(sortOrder != 0); // CW TODO illegal sort order value
+	    uassert(15975,  str::stream() << sortName <<
+		    " key ordering must be 1 (for ascending) or -1 (for descending",
+		    ((sortOrder == 1) || (sortOrder == -1)));
+
 	    pSort->addKey(pKeyFieldName, (sortOrder > 0));
 	    ++sortKeys;
 	}
 
-	assert(sortKeys > 0);
-	// CW TODO error must be at least one sort key
+	uassert(15976, str::stream() << sortName <<
+		" must have at least one sort key", (sortKeys > 0));
 
         return pSort;
     }
 
     void DocumentSourceSort::populate() {
 	/* make sure we've got a sort key */
-	assert(vSortKey.size()); // CW TODO error
+	assert(vSortKey.size());
 
 	/* track and warn about how much physical memory has been used */
 	DocMemMonitor dmm(this);

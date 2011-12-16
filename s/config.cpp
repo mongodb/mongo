@@ -110,6 +110,17 @@ namespace mongo {
         return i->second.isSharded();
     }
 
+    ShardPtr DBConfig::getShardIfExists( const string& ns ){
+        try{
+            // TODO: this function assumes the _primary will not change under-the-covers, but so does
+            // getShard() in general
+            return ShardPtr( new Shard( getShard( ns ) ) );
+        }
+        catch( AssertionException& e ){
+            warning() << "primary not found for " << ns << causedBy( e ) << endl;
+            return ShardPtr();
+        }
+    }
 
     const Shard& DBConfig::getShard( const string& ns ) {
         if ( isSharded( ns ) )
@@ -150,7 +161,30 @@ namespace mongo {
             _save();
         }
 
-        return getChunkManager(ns,true,true);
+        ChunkManagerPtr manager = getChunkManager(ns,true,true);
+
+        // Tell the primary mongod to refresh it's data
+        // TODO:  Think the real fix here is for mongos to just assume all collections sharded, when we get there
+        for( int i = 0; i < 4; i++ ){
+            if( i == 3 ){
+                warning() << "too many tries updating initial version of " << ns << " on shard primary " << getPrimary() <<
+                             ", other mongoses may not see the collection as sharded immediately" << endl;
+                break;
+            }
+            try {
+                ShardConnection conn( getPrimary(), ns );
+                conn.setVersion();
+                conn.done();
+                break;
+            }
+            catch( DBException& e ){
+                warning() << "could not update initial version of " << ns << " on shard primary " << getPrimary() <<
+                             causedBy( e ) << endl;
+            }
+            sleepsecs( i );
+        }
+
+        return manager;
     }
 
     bool DBConfig::removeSharding( const string& ns ) {

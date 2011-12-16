@@ -34,6 +34,15 @@ namespace mongo {
 
         void insert( const Shard& shard , const char * ns , const BSONObj& obj , int flags=0 , bool safe=false );
 
+        virtual void commandOp( const string& db, const BSONObj& command, int options,
+                                const string& versionedNS, const BSONObj& filter,
+                                map<Shard,BSONObj>& results )
+        {
+            // Only call this from sharded, for now.
+            // TODO:  Refactor all this.
+            assert( false );
+        }
+
     protected:
         void doWrite( int op , Request& r , const Shard& shard , bool checkVersion = true );
         void doQuery( Request& r , const Shard& shard );

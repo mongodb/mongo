@@ -9,7 +9,7 @@ function checkYield( dropCollection, fastCount, query ) {
     query = query || obj;
     
     passed = false;
-    for( nDocs = 20000; nDocs < 100000000; nDocs *= 2 ) {
+    for( nDocs = 20000; nDocs < 1000000; nDocs *= 2 ) {
 
         t.drop();
         t.ensureIndex( {a:1} );
@@ -26,8 +26,8 @@ function checkYield( dropCollection, fastCount, query ) {
 
         printjson( query );
         count = t.count( query );
-        // Changing documents or dropping collection changes the return value of count,
-        // indicating that a yield occurred.    
+        // We test that count yields by requesting a concurrent operation modifying the collection
+        // and checking that the count result is modified.
         print( 'count: ' + count + ', nDocs: ' + nDocs );
         if ( count < nDocs ) {
             passed = true;

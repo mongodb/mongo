@@ -19,7 +19,7 @@
 #pragma once
 
 #include "../pch.h"
-#include "namespace_common.h"
+#include "namespacestring.h"
 #include "jsobj.h"
 #include "querypattern.h"
 #include "diskloc.h"
@@ -446,6 +446,8 @@ namespace mongo {
          * currKey() documents, the matcher(), and the isMultiKey() nature of the
          * cursor may change over the course of iteration.
          *
+         * @param query - Query used to select indexes and populate matchers.
+         *
          * @param order - Required ordering spec for documents produced by this cursor,
          * empty object default indicates no order requirement.  If no index exists that
          * satisfies the required sort order, an empty shared_ptr is returned.
@@ -462,7 +464,6 @@ namespace mongo {
          * This indicates that the cursor was unable to perform a complete scan.
          *
          * This is a work in progress.  Partial list of features not yet implemented:
-         * - modification of scanned documents
          * - covered indexes
          * - in memory sorting
          */
@@ -568,30 +569,13 @@ namespace mongo {
         /* returns true if new db will be created if we init lazily */
         bool exists() const;
 
-    private:
-        void _init();
-    public:
         void init() {
             if( !ht ) 
                 _init();
         }
 
-        void add_ns(const char *ns, DiskLoc& loc, bool capped) {
-            NamespaceDetails details( loc, capped );
-            add_ns( ns, details );
-        }
-        void add_ns( const char *ns, const NamespaceDetails &details ) {
-            init();
-            Namespace n(ns);
-            uassert( 10081 , "too many namespaces/collections", ht->put(n, details));
-        }
-
-        /* just for diagnostics */
-        /*size_t detailsOffset(NamespaceDetails *d) {
-            if ( !ht )
-                return -1;
-            return ((char *) d) -  (char *) ht->nodes;
-        }*/
+        void add_ns(const char *ns, DiskLoc& loc, bool capped);
+        void add_ns( const char *ns, const NamespaceDetails &details );
 
         NamespaceDetails* details(const char *ns) {
             if ( !ht )
@@ -614,9 +598,7 @@ namespace mongo {
             return false;
         }
 
-        bool allocated() const {
-            return ht != 0;
-        }
+        bool allocated() const { return ht != 0; }
 
         void getNamespaces( list<string>& tofill , bool onlyCollections = true ) const;
 
@@ -627,6 +609,7 @@ namespace mongo {
         unsigned long long fileLength() const { return f.length(); }
 
     private:
+        void _init();
         void maybeMkdir() const;
 
         MongoMMF f;

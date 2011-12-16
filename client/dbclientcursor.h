@@ -87,6 +87,9 @@ namespace mongo {
         */
         void peek(vector<BSONObj>&, int atMost);
 
+        // Peeks at first element, if exists
+        BSONObj peekFirst();
+
         /**
          * peek ahead and see if an error occurred, and get the error if so.
          */
@@ -158,6 +161,8 @@ namespace mongo {
         void decouple() { _ownCursor = false; }
 
         void attach( AScopedConnection * conn );
+
+        Message* getMessage(){ return b.m.get(); }
 
         /**
          * actually does the query

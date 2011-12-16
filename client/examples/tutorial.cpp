@@ -19,6 +19,8 @@
 #include "../../client/dbclient.h"
 
 // g++ tutorial.cpp -lmongoclient -lboost_thread -lboost_filesystem -o tutorial
+// Might need a variant of the above compile line.  This worked for me:
+//g++ tutorial.cpp -L[mongo directory] -L/opt/local/lib -lmongoclient -lboost_thread-mt -lboost_filesystem -lboost_system -I/opt/local/include  -o tutorial
 
 using namespace mongo;
 
@@ -39,6 +41,8 @@ void run() {
     p = BSON( "name" << "Jane" << "age" << 40 );
     c.insert("tutorial.persons", p);
     p = BSON( "name" << "Abe" << "age" << 33 );
+    c.insert("tutorial.persons", p);
+    p = BSON( "name" << "Methuselah" << "age" << BSONNULL);
     c.insert("tutorial.persons", p);
     p = BSON( "name" << "Samantha" << "age" << 21 << "city" << "Los Angeles" << "state" << "CA" );
     c.insert("tutorial.persons", p);
