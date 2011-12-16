@@ -54,6 +54,12 @@ class test_config02(wttest.WiredTigerTestCase):
         self.assertEqual(len(os.listdir(dirname)), 0)
 
     def common_test(self, homearg, homeenv, configextra):
+        """
+        Call wiredtiger_open and run a simple test.
+        homearg is the first arg to wiredtiger_open, it may be null.
+        WIREDTIGER_HOME is set to homeenv, if it is not null.
+        configextra are any extra configuration strings needed on the open.
+        """
         configarg = 'create'
         if configextra != None:
             configarg += ',' + configextra
@@ -99,12 +105,26 @@ class test_config02(wttest.WiredTigerTestCase):
         self.checkfiles(hdir)
         self.checknofiles(edir)
 
+    def test_home_and_missing_env(self):
+        # If homedir is set, it is used no matter what
+        self.KNOWN_FAILURE('wiredtiger.open with home_environment=true does not work')
+        hdir = 'homedir'
+        os.mkdir(hdir)
+        self.common_test(hdir, None, 'home_environnment=true')
+        self.checkfiles(hdir)
+
     def test_env_conf(self):
         self.KNOWN_FAILURE('wiredtiger.open with home_environment=true does not work')
         edir = 'envdir'
         os.mkdir(edir)
         self.common_test(None, edir, 'home_environnment=true')
         self.checkfiles(edir)
+
+    def test_env_conf_without_env_var(self):
+        # no env var set, so should use current directory
+        self.KNOWN_FAILURE('with no homedir, wiredtiger_open should use "."')
+        self.common_test(None, None, 'home_environnment=true')
+        self.checkfiles(".")
 
     def test_env_no_conf(self):
         self.KNOWN_FAILURE('with no homedir, wiredtiger_open should use "."')
