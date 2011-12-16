@@ -147,6 +147,8 @@ namespace mongo {
         mutable mongo::mutex  _checkConnectionLock;
 
         string _name;
+
+        // note these get copied around in the nodes vector so be sure to maintain copyable semantics here
         struct Node {
             Node( const HostAndPort& a , DBClientConnection* c ) 
                 : addr( a ) , conn(c) , ok(true) , 
