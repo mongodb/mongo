@@ -1191,7 +1191,6 @@ namespace mongo {
                 // no need for incremental collection because records are already sorted
                 config.incLong = config.tempLong;
 
-                BSONObj shards = cmdObj["shards"].embeddedObjectUserCheck();
                 BSONObj shardCounts = cmdObj["shardCounts"].embeddedObjectUserCheck();
                 BSONObj counts = cmdObj["counts"].embeddedObjectUserCheck();
 
@@ -1201,7 +1200,7 @@ namespace mongo {
 
                 {
                     // parse per shard results
-                    BSONObjIterator i( shards );
+                    BSONObjIterator i( shardCounts );
                     while ( i.more() ) {
                         BSONElement e = i.next();
                         string shard = e.fieldName();

@@ -1108,7 +1108,6 @@ namespace mongo {
                     throw;
                 }
 
-                BSONObjBuilder shardResultsB;
                 BSONObjBuilder shardCountsB;
                 BSONObjBuilder aggCountsB;
                 map<string,long long> countsMap;
@@ -1119,7 +1118,6 @@ namespace mongo {
                     BSONObj mrResult = i->second;
                     string server = i->first.getConnString();
 
-                    shardResultsB.append( server , mrResult );
                     BSONObj counts = mrResult["counts"].embeddedObjectUserCheck();
                     shardCountsB.append( server , counts );
                     servers.insert( server );
@@ -1146,7 +1144,6 @@ namespace mongo {
                 finalCmd.append( "mapreduce.shardedfinish" , cmdObj );
                 finalCmd.append( "inputNS" , dbName + "." + shardResultCollection );
 
-                finalCmd.append( "shards" , shardResultsB.obj() );
                 BSONObj shardCounts = shardCountsB.obj();
                 finalCmd.append( "shardCounts" , shardCounts );
                 timingBuilder.append( "shardProcessing" , t.millis() );
