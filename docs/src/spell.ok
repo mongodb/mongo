@@ -3,6 +3,7 @@ APIs
 Atomicity
 BLOBs
 CFLAGS
+CPPFLAGS
 DB's
 DBTs
 DbCursor
@@ -87,6 +88,7 @@ english
 env
 eof
 erlang
+errno
 failchk
 fd's
 fieldname
@@ -160,6 +162,7 @@ nodup
 noflush
 nolocking
 nommap
+nop
 nosync
 notgranted
 notyet

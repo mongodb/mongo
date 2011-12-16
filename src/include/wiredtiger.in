@@ -1310,24 +1310,24 @@ struct wt_compressor {
 
 	/*! Callback to size an output buffer for compression
 	 *
-         * If not null, this callback is called before each call to
-         * WT_COMPRESS::compress to determine the size of the
-         * destination buffer.  If the callback is NULL, a default
-         * size of \c source->size is used to size the buffer.
-         *
-	 * The callback should set \c dest->size to a suitable buffer size
-         * for compression, typically the maximum size required by
-         * WT_COMPRESSOR::compress.
+	 * If not null, this callback is called before each call to
+	 * WT_COMPRESS::compress to determine the size of the
+	 * destination buffer.  If the callback is NULL, a default
+	 * size of \c source->size is used to size the buffer.
 	 *
-         * This callback function can be used by compressors that, in
-         * the worst case, require an output buffer larger than than
-         * \c dest->size, and do not check for buffer overflow.  Such a
-         * compressor would otherwise need to allocate a temporary
-         * staging buffer.  If the cost of computing a worst case
-         * \c dest->size is less than the cost of allocating a temporary
-         * buffer, then declaring a WT_COMPRESSOR::pre_size callback
-         * is appropriate.
-         *
+	 * The callback should set \c dest->size to a suitable buffer size
+	 * for compression, typically the maximum size required by
+	 * WT_COMPRESSOR::compress.
+	 *
+	 * This callback function can be used by compressors that, in
+	 * the worst case, require an output buffer larger than than
+	 * \c dest->size, and do not check for buffer overflow.  Such a
+	 * compressor would otherwise need to allocate a temporary
+	 * staging buffer.  If the cost of computing a worst case
+	 * \c dest->size is less than the cost of allocating a temporary
+	 * buffer, then declaring a WT_COMPRESSOR::pre_size callback
+	 * is appropriate.
+	 *
 	 * @param[in] source the data to compress \c data field points to
 	 *	memory; \c size field set to the number of bytes
 	 * @param[out] dest \c size the size needed for compressing the data
