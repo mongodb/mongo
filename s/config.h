@@ -132,7 +132,7 @@ namespace mongo {
         }
 
         void enableSharding();
-        ChunkManagerPtr shardCollection( const string& ns , ShardKeyPattern fieldsAndOrder , bool unique );
+        ChunkManagerPtr shardCollection( const string& ns , ShardKeyPattern fieldsAndOrder , bool unique , const vector<BSONObj>& splitPoints );
 
         /**
            @return true if there was sharding info to remove

@@ -529,7 +529,23 @@ namespace mongo {
 
                 tlog() << "CMD: shardcollection: " << cmdObj << endl;
 
-                config->shardCollection( ns , key , careAboutUnique );
+                vector<BSONObj> pts;
+                if (cmdObj.hasField("splitPoints")) {
+                    if ( cmdObj.getField("splitPoints").type() != Array ) {
+                        errmsg = "Value of splitPoints must be an array of objects";
+                        return false;
+                    }
+
+                    vector<BSONElement> elmts = cmdObj.getField("splitPoints").Array();
+                    for ( unsigned i = 0 ; i < elmts.size() ; ++i) {
+                        if ( elmts[i].type() != Object ) {
+                            errmsg = "Elements in the splitPoints array must be objects";
+                            return false;
+                        }
+                        pts.push_back( elmts[i].Obj() );
+                    }
+                }
+                config->shardCollection( ns , key , careAboutUnique, pts );
 
                 result << "collectionsharded" << ns;
                 return true;

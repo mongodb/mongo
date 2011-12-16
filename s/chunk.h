@@ -305,7 +305,7 @@ namespace mongo {
         int numChunks() const { return _chunkMap.size(); }
         bool hasShardKey( const BSONObj& obj ) const;
 
-        void createFirstChunks( const Shard& shard ) const; // only call from DBConfig::shardCollection
+        void createFirstChunks( const Shard& shard , const vector<BSONObj>& chunkSplitPoints , const vector<Shard>& chunkShards ) const; // only call from DBConfig::shardCollection
         ChunkPtr findChunk( const BSONObj& obj ) const;
         ChunkPtr findChunkOnServer( const Shard& shard ) const;
 
