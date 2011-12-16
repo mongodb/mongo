@@ -16,8 +16,10 @@
 
 #include "pch.h"
 #include "db/pipeline/field_path.h"
+#include "util/mongoutils/str.h"
 
 namespace mongo {
+    using namespace mongoutils;
 
     FieldPath::~FieldPath() {
     }
@@ -45,7 +47,11 @@ namespace mongo {
 
             /* use the string up to the dot */
             const size_t length = dotpos - startpos;
-            assert(length); // CW TODO user error: no zero-length field names
+	    uassert(15998, str::stream() <<
+		    "field names cannot be zero length (in path \"" <<
+		    fieldPath << "\")",
+		    length > 0);
+
             vFieldName.push_back(fieldPath.substr(startpos, length));
 
             /* next time, search starting one spot after that */
