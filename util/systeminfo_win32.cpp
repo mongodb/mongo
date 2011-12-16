@@ -38,7 +38,7 @@ namespace mongo {
 	    MEMORYSTATUSEX status;
 	    status.dwLength = sizeof(status);
 	    GlobalMemoryStatusEx(&status);
-	    ramSize = status.ullTotalPhys;
+	    ramSize = static_cast<size_t>(status.ullTotalPhys);
 	    unknown = false;
 	}
 

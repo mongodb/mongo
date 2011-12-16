@@ -85,7 +85,7 @@ namespace mongo {
 	    double avg = 0;
 	    if (count) {
 		if (totalType != NumberDouble)
-		    avg = longTotal / count;
+		    avg = static_cast<double>(longTotal / count);
 		else
 		    avg = doubleTotal / count;
 	    }
