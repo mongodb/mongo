@@ -5,8 +5,8 @@
 # Copyright (c) 2008-2011 WiredTiger, Inc.
 #	All rights reserved.
 #
-# test_base03.py
-# 	Cursor operations
+# test_config01.py
+# 	Configuration strings for wiredtiger_open
 #
 
 import unittest
