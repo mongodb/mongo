@@ -264,6 +264,31 @@ namespace mongo {
 	 */
 	virtual void toBson(BSONObjBuilder *pBuilder,
 			    const char *pOpName, unsigned depth) const;
+
+	/*
+	  Checks the current size of vpOperand; if the size equal to or
+	  greater than maxArgs, fires a user assertion indicating that this
+	  operator cannot have this many arguments.
+
+	  The equal is there because this is intended to be used in
+	  addOperand() to check for the limit *before* adding the requested
+	  argument.
+
+	  @param maxArgs the maximum number of arguments the operator accepts
+	*/
+	void checkArgLimit(unsigned maxArgs) const;
+
+	/*
+	  Checks the current size of vpOperand; if the size is not equal to
+	  reqArgs, fires a user assertion indicating that this must have
+	  exactly reqArgs arguments.
+
+	  This is meant to be used in evaluate(), *before* the evaluation
+	  takes place.
+
+	  @param reqArgs the number of arguments this operator requires
+	*/
+	void checkArgCount(unsigned reqArgs) const;
     };
 
 

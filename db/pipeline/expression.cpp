@@ -685,8 +685,7 @@ namespace mongo {
 
     void ExpressionCompare::addOperand(
 	const intrusive_ptr<Expression> &pExpression) {
-	uassert(15993, str::stream() << getOpName() <<
-		" only takes two operands", vpOperand.size() < 2);
+	checkArgLimit(2);
         ExpressionNary::addOperand(pExpression);
     }
 
@@ -766,7 +765,7 @@ namespace mongo {
 
     intrusive_ptr<const Value> ExpressionCompare::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-        assert(vpOperand.size() == 2); // CW TODO user error
+	checkArgCount(2);
         intrusive_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
         intrusive_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
 
@@ -856,16 +855,13 @@ namespace mongo {
 
     void ExpressionCond::addOperand(
 	const intrusive_ptr<Expression> &pExpression) {
-	uassert(15996, str::stream() << getOpName() <<
-		":  takes exactly 3 operands", vpOperand.size() < 3);
+	checkArgLimit(3);
         ExpressionNary::addOperand(pExpression);
     }
 
     intrusive_ptr<const Value> ExpressionCond::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-	uassert(15997, str::stream() << getOpName() <<
-		":  insufficient operands; 3 required, only got " <<
-		vpOperand.size(), vpOperand.size() == 3);
+	checkArgCount(3);
         intrusive_ptr<const Value> pCond(vpOperand[0]->evaluate(pDocument));
 	int idx = pCond->coerceToBool() ? 1 : 2;
 	return vpOperand[idx]->evaluate(pDocument);
@@ -968,18 +964,14 @@ namespace mongo {
     }
 
     void ExpressionDayOfMonth::addOperand(const intrusive_ptr<Expression> &pExpression) {
-	uassert(15998, str::stream() << getOpName() <<
-		":  only accepts one operand", vpOperand.size() < 1);
+	checkArgLimit(1);
 
         ExpressionNary::addOperand(pExpression);
     }
 
     intrusive_ptr<const Value> ExpressionDayOfMonth::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-	uassert(16001, str::stream() << getOpName() <<
-		":  insufficient operands; 1 required, only got " <<
-		vpOperand.size(), vpOperand.size() == 1);
-
+	checkArgCount(1);
         intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;
         (pDate->coerceToDate()).toTm(&date);
@@ -1005,18 +997,13 @@ namespace mongo {
     }
 
     void ExpressionDayOfWeek::addOperand(const intrusive_ptr<Expression> &pExpression) {
-	uassert(16002, str::stream() << getOpName() <<
-		":  only accepts one operand", vpOperand.size() < 1);
-
+	checkArgLimit(1);
         ExpressionNary::addOperand(pExpression);
     }
 
     intrusive_ptr<const Value> ExpressionDayOfWeek::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-	uassert(16003, str::stream() << getOpName() <<
-		":  insufficient operands; 1 required, only got " <<
-		vpOperand.size(), vpOperand.size() == 1);
-
+	checkArgCount(1);
         intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;
         (pDate->coerceToDate()).toTm(&date);
@@ -1042,18 +1029,13 @@ namespace mongo {
     }
 
     void ExpressionDayOfYear::addOperand(const intrusive_ptr<Expression> &pExpression) {
-	uassert(16004, str::stream() << getOpName() <<
-		":  only accepts one operand", vpOperand.size() < 1);
-
+	checkArgLimit(1);
         ExpressionNary::addOperand(pExpression);
     }
 
     intrusive_ptr<const Value> ExpressionDayOfYear::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-	uassert(16005, str::stream() << getOpName() <<
-		":  insufficient operands; 1 required, only got " <<
-		vpOperand.size(), vpOperand.size() == 1);
-
+	checkArgCount(1);
         intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;
         (pDate->coerceToDate()).toTm(&date);
@@ -1080,18 +1062,13 @@ namespace mongo {
 
     void ExpressionDivide::addOperand(
 	const intrusive_ptr<Expression> &pExpression) {
-	uassert(16006, str::stream() << getOpName() <<
-		":  only accepts two operands", vpOperand.size() < 2);
-
+	checkArgLimit(2);
         ExpressionNary::addOperand(pExpression);
     }
 
     intrusive_ptr<const Value> ExpressionDivide::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-	uassert(16007, str::stream() << getOpName() <<
-		":  insufficient operands; 2 required, only got " <<
-		vpOperand.size(), vpOperand.size() == 2);
-
+	checkArgCount(2);
         intrusive_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
         intrusive_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
 
@@ -1946,18 +1923,13 @@ namespace mongo {
     }
 
     void ExpressionMinute::addOperand(const intrusive_ptr<Expression> &pExpression) {
-	uassert(16016, str::stream() << getOpName() <<
-		":  only accepts one operand", vpOperand.size() < 1);
-
+	checkArgLimit(1);
         ExpressionNary::addOperand(pExpression);
     }
 
     intrusive_ptr<const Value> ExpressionMinute::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-	uassert(16017, str::stream() << getOpName() <<
-		":  insufficient operands; 1 required, only got " <<
-		vpOperand.size(), vpOperand.size() == 1);
-
+	checkArgCount(1);
         intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;
         (pDate->coerceToDate()).toTm(&date);
@@ -1984,19 +1956,14 @@ namespace mongo {
 
     void ExpressionMod::addOperand(
 	const intrusive_ptr<Expression> &pExpression) {
-	uassert(16018, str::stream() << getOpName() <<
-		":  only accepts two operands", vpOperand.size() < 2);
-
+	checkArgLimit(2);
         ExpressionNary::addOperand(pExpression);
     }
 
     intrusive_ptr<const Value> ExpressionMod::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         BSONType productType;
-	uassert(16019, str::stream() << getOpName() <<
-		":  insufficient operands; 2 required, only got " <<
-		vpOperand.size(), vpOperand.size() == 2);
-
+	checkArgCount(2);
         intrusive_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
         intrusive_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
 
@@ -2031,13 +1998,13 @@ namespace mongo {
     }
 
     void ExpressionMonth::addOperand(const intrusive_ptr<Expression> &pExpression) {
-        assert(vpOperand.size() < 1); // CW TODO user error
+	checkArgLimit(1);
         ExpressionNary::addOperand(pExpression);
     }
 
     intrusive_ptr<const Value> ExpressionMonth::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-        assert(vpOperand.size() == 1); // CW TODO user error
+	checkArgCount(1);
         intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;
         (pDate->coerceToDate()).toTm(&date);
@@ -2113,13 +2080,13 @@ namespace mongo {
     }
 
     void ExpressionHour::addOperand(const intrusive_ptr<Expression> &pExpression) {
-        assert(vpOperand.size() < 1); // CW TODO user error
+	checkArgLimit(1);
         ExpressionNary::addOperand(pExpression);
     }
 
     intrusive_ptr<const Value> ExpressionHour::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-        assert(vpOperand.size() == 1); // CW TODO user error
+	checkArgCount(1);
         intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;
         (pDate->coerceToDate()).toTm(&date);
@@ -2146,13 +2113,13 @@ namespace mongo {
 
     void ExpressionIfNull::addOperand(
 	const intrusive_ptr<Expression> &pExpression) {
-        assert(vpOperand.size() < 2); // CW TODO user error
+	checkArgLimit(2);
         ExpressionNary::addOperand(pExpression);
     }
 
     intrusive_ptr<const Value> ExpressionIfNull::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-        assert(vpOperand.size() == 2); // CW TODO user error
+	checkArgCount(2);
         intrusive_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
 	BSONType leftType = pLeft->getType();
 
@@ -2345,6 +2312,20 @@ namespace mongo {
 	pBuilder->append(exprBuilder.done());
     }
 
+    void ExpressionNary::checkArgLimit(unsigned maxArgs) const {
+	uassert(15993, str::stream() << getOpName() <<
+		" only takes " << maxArgs <<
+		" operand" << (maxArgs == 1 ? "" : "s"),
+		vpOperand.size() < maxArgs);
+    }
+
+    void ExpressionNary::checkArgCount(unsigned reqArgs) const {
+	uassert(15997, str::stream() << getOpName() <<
+		":  insufficient operands; " << reqArgs <<
+		" required, only got " << vpOperand.size(),
+		vpOperand.size() == reqArgs);
+    }
+
     /* ----------------------- ExpressionNoOp ------------------------------ */
 
     ExpressionNoOp::~ExpressionNoOp() {
@@ -2356,7 +2337,7 @@ namespace mongo {
     }
 
     intrusive_ptr<Expression> ExpressionNoOp::optimize() {
-        assert(vpOperand.size() == 1); // CW TODO user error
+	checkArgCount(1);
 	intrusive_ptr<Expression> pR(vpOperand[0]->optimize());
 	return pR;
     }
@@ -2366,13 +2347,13 @@ namespace mongo {
     }
 
     void ExpressionNoOp::addOperand(const intrusive_ptr<Expression> &pExpression) {
-        assert(vpOperand.size() < 1); // CW TODO user error
+	checkArgLimit(1);
         ExpressionNary::addOperand(pExpression);
     }
 
     intrusive_ptr<const Value> ExpressionNoOp::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-        assert(vpOperand.size() == 1); // CW TODO user error
+	checkArgCount(1);
         intrusive_ptr<const Value> pValue(vpOperand[0]->evaluate(pDocument));
 	return pValue;
     }
@@ -2396,13 +2377,13 @@ namespace mongo {
     }
 
     void ExpressionNot::addOperand(const intrusive_ptr<Expression> &pExpression) {
-        assert(vpOperand.size() < 1); // CW TODO user error
+	checkArgLimit(1);
         ExpressionNary::addOperand(pExpression);
     }
 
     intrusive_ptr<const Value> ExpressionNot::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-        assert(vpOperand.size() == 1); // CW TODO user error
+	checkArgCount(1);
         intrusive_ptr<const Value> pOp(vpOperand[0]->evaluate(pDocument));
 
         bool b = pOp->coerceToBool();
@@ -2525,13 +2506,13 @@ namespace mongo {
     }
 
     void ExpressionSecond::addOperand(const intrusive_ptr<Expression> &pExpression) {
-        assert(vpOperand.size() < 1); // CW TODO user error
+	checkArgLimit(1);
         ExpressionNary::addOperand(pExpression);
     }
 
     intrusive_ptr<const Value> ExpressionSecond::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-        assert(vpOperand.size() == 1); // CW TODO user error
+	checkArgCount(1);
         intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;
         (pDate->coerceToDate()).toTm(&date);
@@ -2558,13 +2539,13 @@ namespace mongo {
 
     void ExpressionStrcasecmp::addOperand(
 	const intrusive_ptr<Expression> &pExpression) {
-        assert(vpOperand.size() < 2); // CW TODO user error
+	checkArgLimit(2);
         ExpressionNary::addOperand(pExpression);
     }
 
     intrusive_ptr<const Value> ExpressionStrcasecmp::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-        assert(vpOperand.size() == 2); // CW TODO user error
+	checkArgCount(2);
         intrusive_ptr<const Value> pString1(vpOperand[0]->evaluate(pDocument));
         intrusive_ptr<const Value> pString2(vpOperand[1]->evaluate(pDocument));
 
@@ -2600,24 +2581,30 @@ namespace mongo {
 
     void ExpressionSubstr::addOperand(
 	const intrusive_ptr<Expression> &pExpression) {
-        assert(vpOperand.size() < 3); // CW TODO user error
+	checkArgLimit(3);
         ExpressionNary::addOperand(pExpression);
     }
 
     intrusive_ptr<const Value> ExpressionSubstr::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-        assert(vpOperand.size() == 3); // CW TODO user error
+	checkArgCount(3);
         intrusive_ptr<const Value> pString(vpOperand[0]->evaluate(pDocument));
         intrusive_ptr<const Value> pLower(vpOperand[1]->evaluate(pDocument));
         intrusive_ptr<const Value> pLength(vpOperand[2]->evaluate(pDocument));
 
         string str = pString->coerceToString();
-        assert(pLower->getType() == NumberInt 
-            || pLower->getType() == NumberLong 
-            || pLower->getType() == NumberDouble); // CW TODO user error lower must be numeric
-        assert(pLength->getType() == NumberInt 
-            || pLength->getType() == NumberLong 
-            || pLength->getType() == NumberDouble); // CW TODO user error length must be numeric
+	uassert(16034, str::stream() << getOpName() <<
+		":  starting index must be a numeric type (is BSON type " <<
+		pLower->getType() << ")",
+		(pLower->getType() == NumberInt 
+		 || pLower->getType() == NumberLong 
+		 || pLower->getType() == NumberDouble));
+	uassert(16035, str::stream() << getOpName() <<
+		":  length must be a numeric type (is BSON type " <<
+		pLength->getType() << ")",
+		(pLength->getType() == NumberInt 
+		 || pLength->getType() == NumberLong 
+		 || pLength->getType() == NumberDouble));
         long long lower = pLower->coerceToLong();
         long long length = pLength->coerceToLong();
         return Value::createString( str.substr(lower, length) );
@@ -2643,14 +2630,14 @@ namespace mongo {
 
     void ExpressionSubtract::addOperand(
 	const intrusive_ptr<Expression> &pExpression) {
-        assert(vpOperand.size() < 2); // CW TODO user error
+	checkArgLimit(2);
         ExpressionNary::addOperand(pExpression);
     }
 
     intrusive_ptr<const Value> ExpressionSubtract::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         BSONType productType;
-        assert(vpOperand.size() == 2); // CW TODO user error
+	checkArgCount(2);
         intrusive_ptr<const Value> pLeft(vpOperand[0]->evaluate(pDocument));
         intrusive_ptr<const Value> pRight(vpOperand[1]->evaluate(pDocument));
         if (pLeft->getType() == Date) {
@@ -2663,12 +2650,11 @@ namespace mongo {
             return Value::createDate(Date_t(left-right));
         }
             
-        if (pRight->getType() == Date){
-            assert(false); //CW TODO user error
-            return Value::getNull();
-        }
+	uassert(15996, "cannot subtract one date from another",
+		pRight->getType() != Date);
 
-        productType = Value::getWidestNumeric(pRight->getType(), pLeft->getType());
+        productType = Value::getWidestNumeric(
+	    pRight->getType(), pLeft->getType());
         
 
         if (productType == NumberDouble) {
@@ -2703,13 +2689,13 @@ namespace mongo {
     }
 
     void ExpressionToLower::addOperand(const intrusive_ptr<Expression> &pExpression) {
-        assert(vpOperand.size() < 1); // CW TODO user error
+	checkArgLimit(1);
         ExpressionNary::addOperand(pExpression);
     }
 
     intrusive_ptr<const Value> ExpressionToLower::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-        assert(vpOperand.size() == 1); // CW TODO user error
+	checkArgCount(1);
         intrusive_ptr<const Value> pString(vpOperand[0]->evaluate(pDocument));
         string str = pString->coerceToString();
         boost::to_lower(str);
@@ -2736,13 +2722,13 @@ namespace mongo {
 
     void ExpressionToUpper::addOperand(
 	const intrusive_ptr<Expression> &pExpression) {
-        assert(vpOperand.size() < 1); // CW TODO user error
+	checkArgLimit(1);
         ExpressionNary::addOperand(pExpression);
     }
 
     intrusive_ptr<const Value> ExpressionToUpper::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-        assert(vpOperand.size() == 1); // CW TODO user error
+	checkArgCount(1);
         intrusive_ptr<const Value> pString(vpOperand[0]->evaluate(pDocument));
         string str(pString->coerceToString());
         boost::to_upper(str);
@@ -2768,13 +2754,13 @@ namespace mongo {
     }
 
     void ExpressionWeek::addOperand(const intrusive_ptr<Expression> &pExpression) {
-        assert(vpOperand.size() < 1); // CW TODO user error
+	checkArgLimit(1);
         ExpressionNary::addOperand(pExpression);
     }
 
     intrusive_ptr<const Value> ExpressionWeek::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-        assert(vpOperand.size() == 1); // CW TODO user error
+	checkArgCount(1);
         intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;
         (pDate->coerceToDate()).toTm(&date);
@@ -2810,13 +2796,13 @@ namespace mongo {
 
     void ExpressionYear::addOperand(
 	const intrusive_ptr<Expression> &pExpression) {
-        assert(vpOperand.size() < 1); // CW TODO user error
+	checkArgLimit(1);
         ExpressionNary::addOperand(pExpression);
     }
 
     intrusive_ptr<const Value> ExpressionYear::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-        assert(vpOperand.size() == 1); // CW TODO user error
+	checkArgCount(1);
         intrusive_ptr<const Value> pDate(vpOperand[0]->evaluate(pDocument));
         tm date;
         (pDate->coerceToDate()).toTm(&date);
