@@ -46,5 +46,9 @@ assert.eq( orig , t.findOne() , "C2" );
 t.update( {} , { $inc: { "a.10" : 1 } } );
 orig.a[10]++;
 
+// SERVER-3218
+t.drop()
+t.insert({"a":{"c00":1}, 'c':2})
+t.update({"c":2}, {'$inc':{'a.c000':1}})
 
-
+assert.eq( { "c00" : 1 , "c000" : 1 } , t.findOne().a , "D1" )
