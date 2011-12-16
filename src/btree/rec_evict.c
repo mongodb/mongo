@@ -679,6 +679,8 @@ retry:	__hazard_copy(session);
 		goto retry;
 	}
 
+	WT_CSTAT_INCR(session, cache_evict_hazard);
+
 	WT_VERBOSE(session, evict,
 	    "page %p hazard request failed", ref->page);
 
