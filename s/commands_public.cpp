@@ -1193,48 +1193,81 @@ namespace mongo {
                         confOut->shardCollection( finalColLong, sortKey, true, sortedSplitPts );
                     }
 
-                    BSONObj finalCmdObj = finalCmd.obj();
-                    results.clear();
+                    map<BSONObj, int> chunkSizes;
+                    {
+                        // take distributed lock to prevent split / migration during post processing
+                        ConnectionString config = configServer.getConnectionString();
+                        DistributedLock lockSetup( config , finalColLong );
+                        dist_lock_try dlk;
 
-                    try {
-                        SHARDED->commandOp( outDB, finalCmdObj, 0, finalColLong, BSONObj(), results );
-                        ok = true;
-                    }
-                    catch( DBException& e ){
-                        e.addContext( str::stream() << "could not run final reduce command on all shards for ns " << fullns << ", output " << finalColLong );
-                        throw;
-                    }
-
-                    for ( map<Shard,BSONObj>::iterator i = results.begin(); i != results.end(); ++i ){
-
-                        string server = i->first.getConnString();
-                        BSONObj singleResult = i->second;
-
-                        BSONObj counts = singleResult.getObjectField("counts");
-                        reduceCount += counts.getIntField("reduce");
-                        outputCount += counts.getIntField("output");
-                        postCountsB.append(server, counts);
-
-                        // check on splitting, now that results are in the final collection
-                        ChunkManagerPtr cm = confOut->getChunkManagerIfExists( finalColLong );
-                        if (singleResult.hasField("chunkSizes") && cm) {
-                            const ChunkMap& chunkMap = cm->getChunkMap();
-                            vector<BSONElement> chunkSizes = singleResult.getField("chunkSizes").Array();
-                            for (unsigned int i = 0; i < chunkSizes.size(); i += 2) {
-                                BSONObj key = chunkSizes[i].Obj();
-                                long long size = chunkSizes[i+1].numberLong();
-                                assert( size < 0x7fffffff );
-
-                                ChunkMap::const_iterator cit = chunkMap.find(key);
-                                if (cit == chunkMap.end()) {
-                                    warning() << "Mongod reported " << size << " bytes inserted for key " << key << " but can't find chunk" << endl;
-                                } else {
-                                    ChunkPtr c = cit->second;
-                                    c->splitIfShould(static_cast<int>(size));
+                        try{
+                            int tryc = 0;
+                            while ( !dlk.got() ) {
+                                dlk = dist_lock_try( &lockSetup , (string)"mapreduce" );
+                                if ( ! dlk.got() ) {
+                                    if ( ++tryc % 100 == 0 )
+                                        warning() << "the collection metadata could not be locked for mapreduce, already locked by " << dlk.other();
+                                    sleepmillis(10);
                                 }
                             }
                         }
+                        catch( LockException& e ){
+                            errmsg = str::stream() << "error locking distributed lock for mapreduce " << causedBy( e );
+                            return false;
+                        }
 
+                        BSONObj finalCmdObj = finalCmd.obj();
+                        results.clear();
+
+                        try {
+                            SHARDED->commandOp( outDB, finalCmdObj, 0, finalColLong, BSONObj(), results );
+                            ok = true;
+                        }
+                        catch( DBException& e ){
+                            e.addContext( str::stream() << "could not run final reduce command on all shards for ns " << fullns << ", output " << finalColLong );
+                            throw;
+                        }
+
+                        for ( map<Shard,BSONObj>::iterator i = results.begin(); i != results.end(); ++i ){
+
+                            string server = i->first.getConnString();
+                            BSONObj singleResult = i->second;
+
+                            BSONObj counts = singleResult.getObjectField("counts");
+                            reduceCount += counts.getIntField("reduce");
+                            outputCount += counts.getIntField("output");
+                            postCountsB.append(server, counts);
+
+                            // get the size inserted for each chunk
+                            // split cannot be called here since we already have the distributed lock
+                            if (singleResult.hasField("chunkSizes")) {
+                                vector<BSONElement> sizes = singleResult.getField("chunkSizes").Array();
+                                for (unsigned int i = 0; i < sizes.size(); i += 2) {
+                                    BSONObj key = sizes[i].Obj().getOwned();
+                                    int size = sizes[i+1].numberLong();
+                                    assert( size < 0x7fffffff );
+
+                                    chunkSizes[key] = size;
+                                }
+                            }
+                        }
+                    }
+
+                    // do the splitting round
+                    ChunkManagerPtr cm = confOut->getChunkManagerIfExists( finalColLong );
+                    const ChunkMap& chunkMap = cm->getChunkMap();
+                    for ( map<BSONObj, int>::iterator it = chunkSizes.begin() ; it != chunkSizes.end() ; ++it ) {
+                        BSONObj key = it->first;
+                        int size = it->second;
+                        assert( size < 0x7fffffff );
+
+                        ChunkMap::const_iterator cit = chunkMap.find(key);
+                        if (cit == chunkMap.end()) {
+                            warning() << "Mongod reported " << size << " bytes inserted for key " << key << " but can't find chunk" << endl;
+                        } else {
+                            ChunkPtr c = cit->second;
+                            c->splitIfShould( size );
+                        }
                     }
                 }
 

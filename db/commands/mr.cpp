@@ -1258,7 +1258,7 @@ namespace mongo {
                     BSONObj sortKey = BSON( "_id" << 1 );
                     ParallelSortClusteredCursor cursor( servers , inputNS , Query( query ).sort( sortKey ) );
                     cursor.init();
-                    long long chunkSize = 0;
+                    int chunkSize = 0;
 
                     while ( cursor.more() || !values.empty() ) {
                         BSONObj t;
