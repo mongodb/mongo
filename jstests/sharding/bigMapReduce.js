@@ -22,13 +22,13 @@ function map() { emit('count', 1); }
 function reduce(key, values) { return Array.sum(values) } 
 
 // Test basic mapReduce
-for ( iter=0; iter<5; iter++ ){
+for ( iter=0; iter<1; iter++ ){
     out = db.foo.mapReduce(map, reduce,"big_out") 
 }
 
 // test output to a different DB
 // do it multiple times so that primary shard changes
-for (iter = 0; iter < 5; iter++) {
+for (iter = 0; iter < 1; iter++) {
     
     assert.eq( 51200, db.foo.find().itcount(), "Not all data was found!" )
     
@@ -52,14 +52,14 @@ for (iter = 0; iter < 5; iter++) {
     assert.eq(res.result.db, outDbStr, "Wrong db " + res.result.db);
 }
 
-
 // sharded output
+function map2() { emit(this._id, {count: 1, y: this.y}); }
+function reduce2(key, values) { return values[0]; }
 
-function map2() { emit(this._id, 1); }
-
-for ( iter=0; iter<5; iter++ ){
+for ( iter=0; iter<1; iter++ ){
 
     res = db.foo.mapReduce(map2, reduce, { out : { replace: "mrShardedOut", sharded: true }});
+    assert.eq( 51200 , res.counts.output , "Output is wrong " );
     printjson(res);
 
     outColl = db["mrShardedOut"];
@@ -69,8 +69,27 @@ for ( iter=0; iter<5; iter++ ){
     print("Number of chunks: " + config.chunks.count({ns: db.mrShardedOut._fullName}));
     assert.gt( config.chunks.count({ns: db.mrShardedOut._fullName}), 1, "didnt split");
     
+    // check that chunks are well distributed
+    cur = config.chunks.find({ns: db.mrShardedOut._fullName});
+    shardChunks = {};
+    while (cur.hasNext()) {
+        chunk = cur.next();
+        printjson(chunk);
+        sname = chunk.shard;
+        if (shardChunks[sname] == undefined) shardChunks[sname] = 0;
+        shardChunks[chunk.shard] += 1;
+    }
+    
+    var count = 0;
+    for (var prop in shardChunks) {
+        print ("NUMBER OF CHUNKS FOR SHARD " + prop + ": " + shardChunks[prop]);
+        if (!count)
+            count = shardChunks[prop];
+        // should be about 200 chunks each shard
+        if (Math.abs(count - shardChunks[prop]) > 8)
+            assert(false, "Chunks are not well balanced: " + count + " vs " + shardChunks[prop]);
+    }
 }
-
 
 s.stop()
 

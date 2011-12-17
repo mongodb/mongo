@@ -1134,7 +1134,7 @@ namespace mongo {
                         BSONElement splitKeys = mrResult.getField("splitKeys");
                         vector<BSONElement> pts = splitKeys.Array();
                         for (vector<BSONElement>::iterator it = pts.begin(); it != pts.end(); ++it) {
-                            splitPts.insert(it->Obj());
+                            splitPts.insert(it->Obj().getOwned());
                         }
                     }
                 }
@@ -1144,14 +1144,14 @@ namespace mongo {
                 finalCmd.append( "mapreduce.shardedfinish" , cmdObj );
                 finalCmd.append( "inputNS" , dbName + "." + shardResultCollection );
 
-                BSONObj shardCounts = shardCountsB.obj();
+                BSONObj shardCounts = shardCountsB.done();
                 finalCmd.append( "shardCounts" , shardCounts );
                 timingBuilder.append( "shardProcessing" , t.millis() );
 
                 for ( map<string,long long>::iterator i=countsMap.begin(); i!=countsMap.end(); i++ ) {
                     aggCountsB.append( i->first , i->second );
                 }
-                BSONObj aggCounts = aggCountsB.obj();
+                BSONObj aggCounts = aggCountsB.done();
                 finalCmd.append( "counts" , aggCounts );
 
                 Timer t2;
@@ -1180,62 +1180,17 @@ namespace mongo {
                     LOG(1) << "MR with sharded output, NS=" << finalColLong << endl;
 
                     // create the sharded collection if needed
-                    BSONObj sortKey = BSON( "_id" << 1 );
                     if (!confOut->isSharded(finalColLong)) {
-                        // make sure db is sharded
-                        if (!confOut->isShardingEnabled()) {
-                            BSONObj shardDBCmd = BSON("enableSharding" << outDB);
-                            BSONObjBuilder shardDBResult(32);
-                            bool res = Command::runAgainstRegistered("admin.$cmd", shardDBCmd, shardDBResult);
-                            if (!res) {
-                                errmsg = str::stream() << "Could not enable sharding on db " << outDB << ": " << shardDBResult.obj().toString();
-                                return false;
-                            }
-                        }
+                        // enable sharding on db
+                        confOut->enableSharding();
 
-                        BSONObj shardColCmd = BSON("shardCollection" << finalColLong << "key" << sortKey);
-                        BSONObjBuilder shardColResult(32);
-                        bool res = Command::runAgainstRegistered("admin.$cmd", shardColCmd, shardColResult);
-                        if (!res) {
-                            errmsg = str::stream() << "Could not create sharded output collection " << finalColLong << ": " << shardColResult.obj().toString();
-                            return false;
-                        }
-
-                        // create initial chunks
-                        // the 1st chunk from MinKey will belong to primary for shard
-                        bool skipPrimary = true;
-                        vector<Shard> allShards;
-                        Shard::getAllShards(allShards);
-                        if ( !splitPts.empty() ) {
-                            int sidx = 0;
-                            int numShards = allShards.size();
-                            for (set<BSONObj>::iterator it = splitPts.begin(); it != splitPts.end(); ++it) {
-                                BSONObj splitCmd = BSON("split" << finalColLong << "middle" << *it);
-                                BSONObjBuilder splitResult(32);
-                                bool res = Command::runAgainstRegistered("admin.$cmd", splitCmd, splitResult);
-                                if (!res) {
-                                    errmsg = str::stream() << "Could not split sharded output collection " << finalColLong << ": " << splitResult.obj().toString();
-                                    return false;
-                                }
-
-                                // move to a shard
-                                Shard s = allShards[sidx];
-                                if (skipPrimary && s == confOut->getPrimary()) {
-                                    skipPrimary = false;
-                                    sidx = (sidx + 1) % numShards;
-                                    s = allShards[sidx];
-                                }
-                                BSONObj mvCmd = BSON("moveChunk" << finalColLong << "find" << *it << "to" << s.getName());
-                                BSONObjBuilder mvResult(32);
-                                res = Command::runAgainstRegistered("admin.$cmd", mvCmd, mvResult);
-                                if (!res) {
-                                    errmsg = str::stream() << "Could not move chunk for sharded output collection " << finalColLong << ": " << mvResult.obj().toString();
-                                    return false;
-                                }
-
-                                sidx = (sidx + 1) % numShards;
-                            }
-                        }
+                        // shard collection according to split points
+                        BSONObj sortKey = BSON( "_id" << 1 );
+                        vector<BSONObj> sortedSplitPts;
+                        // points will be properly sorted using the set
+                        for ( set<BSONObj>::iterator it = splitPts.begin() ; it != splitPts.end() ; ++it )
+                            sortedSplitPts.push_back( *it );
+                        confOut->shardCollection( finalColLong, sortKey, true, sortedSplitPts );
                     }
 
                     BSONObj finalCmdObj = finalCmd.obj();
