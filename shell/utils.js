@@ -593,11 +593,11 @@ ObjectId.prototype.equals = function( other){
 }
 
 if ( typeof( DBPointer ) != "undefined" ){
-    DBPointer.prototype.fetch = function(){
+    DBPointer.prototype.fetch = function(fields){
         assert( this.ns , "need a ns" );
         assert( this.id , "need an id" );
         
-        return db[ this.ns ].findOne( { _id : this.id } );
+        return db[ this.ns ].findOne( { _id : this.id }, fields );
     }
     
     DBPointer.prototype.tojson = function(indent){
@@ -621,11 +621,11 @@ else {
 }
 
 if ( typeof( DBRef ) != "undefined" ){
-    DBRef.prototype.fetch = function(){
+    DBRef.prototype.fetch = function(fields){
         assert( this.$ref , "need a ns" );
         assert( this.$id , "need an id" );
         
-        return db[ this.$ref ].findOne( { _id : this.$id } );
+        return db[ this.$ref ].findOne( { _id : this.$id }, fields );
     }
     
     DBRef.prototype.tojson = function(indent){
