@@ -27,16 +27,15 @@ namespace mongo {
 
     class AScopedConnection;
 
-    /** for mock purposes only -- do not create variants of DBClientCursor, nor hang code here */
-    class DBClientCursorInterface {
+    /** for mock purposes only -- do not create variants of DBClientCursor, nor hang code here 
+        @see DBClientMockCursor
+     */
+    class DBClientCursorInterface : boost::noncopyable {
     public:
         virtual ~DBClientCursorInterface() {}
-
         virtual bool more() = 0;
         virtual BSONObj next() = 0;
-
         // TODO bring more of the DBClientCursor interface to here
-
     protected:
         DBClientCursorInterface() {}
     };
@@ -52,7 +51,7 @@ namespace mongo {
             if you want to exhaust whatever data has been fetched to the client already but
             then perhaps stop.
         */
-        int objsLeftInBatch() const { _assertIfNull(); return _putBack.size() + b.nReturned - b.pos; }
+        int objsLeftInBatch() const { _assertIfNull(); return _putBack.size() + batch.nReturned - batch.pos; }
         bool moreInCurrentBatch() { return objsLeftInBatch() > 0; }
 
         /** next
@@ -162,7 +161,7 @@ namespace mongo {
 
         void attach( AScopedConnection * conn );
 
-        Message* getMessage(){ return b.m.get(); }
+        Message* getMessage(){ return batch.m.get(); }
 
         /**
          * actually does the query
@@ -188,7 +187,7 @@ namespace mongo {
 
         int nextBatchSize();
         
-        Batch b;
+        Batch batch;
         DBClientBase* _client;
         string ns;
         BSONObj query;
