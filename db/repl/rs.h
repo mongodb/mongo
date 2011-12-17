@@ -141,7 +141,7 @@ namespace mongo {
         /**
          * This is a cache of ghost slaves
          */
-        typedef map<mongo::OID,shared_ptr<GhostSlave>> MAP;
+        typedef map< mongo::OID,shared_ptr<GhostSlave> > MAP;
         MAP _ghostCache;
         RWLock _lock; // protects _ghostCache
         ReplSetImpl *rs;
