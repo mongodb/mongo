@@ -214,8 +214,13 @@ namespace mongo {
         if ( ps::rolling.access( region , offset , false ) )
             return true;
 
-        if ( ! blockSupported )
+        if ( ! blockSupported ) {
+            // this means we don't fallback to system call 
+            // and assume things aren't in memory
+            // possible we yield too much - but better than not yielding through a fault
             return false;
+        }
+
         return ProcessInfo::blockInMemory( data );
     }
 
