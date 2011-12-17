@@ -78,7 +78,10 @@ struct __wt_btree {
 
 	WT_COMPRESSOR *compressor;	/* Page compressor */
 
-	WT_REF	 root_page;		/* Root page reference */
+	WT_PAGE *root_page;		/* Root page */
+	void	*root_addr;		/* Root address cookie */
+	uint32_t root_size;
+
 	WT_FH	*fh;			/* Backing file handle */
 	uint64_t lsn;			/* LSN file/offset pair */
 

@@ -32,7 +32,7 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	cref = NULL;
 
 	/* Search the internal pages of the tree. */
-	for (page = btree->root_page.page; page->type == WT_PAGE_COL_INT;) {
+	for (page = btree->root_page; page->type == WT_PAGE_COL_INT;) {
 		WT_ASSERT(session, cref == NULL ||
 		    cref->recno == page->u.col_int.recno);
 

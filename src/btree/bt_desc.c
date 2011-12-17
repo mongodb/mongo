@@ -17,8 +17,9 @@ __wt_desc_read(WT_SESSION_IMPL *session, int salvage)
 	WT_BTREE *btree;
 	WT_BTREE_DESC *desc;
 	WT_CONFIG_ITEM cval;
-	uint32_t checksum;
-	uint8_t buf[WT_BTREE_DESC_SECTOR];
+	uint32_t addrbuf_len, cksum;
+	uint8_t *endp;
+	uint8_t addrbuf[WT_BM_MAX_ADDR_COOKIE], buf[WT_BTREE_DESC_SECTOR];
 	const char *msg;
 
 	/*
@@ -36,9 +37,9 @@ __wt_desc_read(WT_SESSION_IMPL *session, int salvage)
 	WT_RET(__wt_read(session, btree->fh, (off_t)0, sizeof(buf), buf));
 	desc = (WT_BTREE_DESC *)buf;
 
-	checksum = desc->checksum;
-	desc->checksum = 0;
-	if (checksum != __wt_cksum(buf, sizeof(buf))) {
+	cksum = desc->cksum;
+	desc->cksum = 0;
+	if (cksum != __wt_cksum(buf, sizeof(buf))) {
 		msg = "checksum mismatch: file does not appear to be a "
 		    "WiredTiger Btree file";
 		goto err;
@@ -84,12 +85,27 @@ err:		__wt_errx(session, "%s%s", msg,
 		return (WT_ERROR);
 	}
 
-	btree->root_page.addr = desc->root_addr;
-	btree->root_page.size = desc->root_size;
+	if (btree->root_addr != NULL) {
+		__wt_free(session, btree->root_addr);
+		btree->root_size = 0;
+	}
+	if (desc->root_addr == WT_ADDR_INVALID) {
+		btree->root_addr = NULL;
+		btree->root_size = 0;
+	} else {
+		endp = addrbuf;
+		WT_RET(__wt_fsm_addr_to_buffer(
+		    &endp, desc->root_addr, desc->root_size, 0));
+		addrbuf_len = WT_PTRDIFF32(endp, addrbuf);
+		WT_RET(__wt_strndup(
+		    session, (char *)addrbuf, addrbuf_len, &btree->root_addr));
+		btree->root_size = addrbuf_len;
+	}
+
 	btree->free_addr = desc->free_addr;
 	btree->free_size = desc->free_size;
 
-	btree->lsn = desc->lsn;
+	btree->lsn = desc->lsn;			/* XXX */
 
 	return (0);
 }
@@ -115,8 +131,8 @@ __wt_desc_write(WT_SESSION_IMPL *session, WT_FH *fh)
 	desc->free_addr = WT_ADDR_INVALID;
 
 	/* Update the checksum. */
-	desc->checksum = 0;
-	desc->checksum = __wt_cksum(buf, sizeof(buf));
+	desc->cksum = 0;
+	desc->cksum = __wt_cksum(buf, sizeof(buf));
 
 	return (__wt_write(session, fh, (off_t)0, sizeof(buf), buf));
 }
@@ -130,7 +146,9 @@ __wt_desc_update(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_BTREE_DESC *desc;
+	uint32_t addr, size, cksum;
 	uint8_t buf[WT_BTREE_DESC_SECTOR];
+	int update;
 
 	btree = session->btree;
 
@@ -138,22 +156,34 @@ __wt_desc_update(WT_SESSION_IMPL *session)
 	WT_RET(__wt_read(session, btree->fh, (off_t)0, sizeof(buf), buf));
 	desc = (WT_BTREE_DESC *)buf;
 
-	/* Update the possibly changed fields. */
-	if (desc->root_addr == btree->root_page.addr &&
-	    desc->root_size == btree->root_page.size &&
-	    desc->free_addr == btree->free_addr &&
-	    desc->free_size == btree->free_size)
+	/* See if anything has changed. */
+	update = 0;
+	if (btree->root_addr == NULL) {
+		addr = WT_ADDR_INVALID;
+		size = 0;
+	} else
+		WT_RET(__wt_fsm_buffer_to_addr(
+		    btree->root_addr, &addr, &size, &cksum));
+	if (desc->root_addr != addr || desc->root_size != size) {
+		desc->root_addr = addr;
+		desc->root_size = size;
+		update = 1;
+	}
+
+	if (desc->free_addr != btree->free_addr ||
+	    desc->free_size != btree->free_size) {
+		desc->free_addr = btree->free_addr;
+		desc->free_size = btree->free_size;
+		update = 1;
+	}
+	if (!update)
 		return (0);
 
-	desc->root_addr = btree->root_page.addr;
-	desc->root_size = btree->root_page.size;
-	desc->free_addr = btree->free_addr;
-	desc->free_size = btree->free_size;
-	desc->lsn = btree->lsn;
+	desc->lsn = btree->lsn;				/* XXX */
 
 	/* Update the checksum. */
-	desc->checksum = 0;
-	desc->checksum = __wt_cksum(buf, sizeof(buf));
+	desc->cksum = 0;
+	desc->cksum = __wt_cksum(buf, sizeof(buf));
 
 	/* Write the first sector. */
 	return (__wt_write(session, btree->fh, (off_t)0, sizeof(buf), buf));

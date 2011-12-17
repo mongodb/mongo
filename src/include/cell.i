@@ -15,24 +15,26 @@
  * There are 4 basic cell types: keys and data (each of which has an overflow
  * form), deleted cells and off-page references.  The cell is usually followed
  * by additional data, varying by type: a key or data cell is followed by a set
- * of bytes, a WT_OFF structure with addr/size pair follows overflow or off-page
- * cells.
+ * of bytes, an address cookie follows overflow or off-page cells.
  *
  * Deleted cells are place-holders for column-store files, where entries cannot
  * be removed in order to preserve the record count.
  *
  * Here's cell use by page type:
  *
- * WT_PAGE_ROW_INT (row-store internal pages):
- *	Keys with offpage-reference pairs (a WT_CELL_KEY or WT_CELL_KEY_OVFL
- * cell followed by a WT_CELL_OFF cell).
+ * WT_PAGE_ROW_INT (row-store internal page):
+ *	Keys and offpage-reference pairs (a WT_CELL_KEY or WT_CELL_KEY_OVFL
+ * cell followed by a WT_CELL_ADDR cell).
  *
- * WT_PAGE_ROW_LEAF (row-store leaf pages):
+ * WT_PAGE_ROW_LEAF (row-store leaf page):
  *	Keys with optional data cells (a WT_CELL_KEY or WT_CELL_KEY_OVFL cell,
  *	optionally followed by a WT_CELL_VALUE or WT_CELL_VALUE_OVFL cell).
  *
  * Both WT_PAGE_ROW_INT and WT_PAGE_ROW_LEAF pages prefix compress keys, using
  * a single byte immediately following the cell.
+ *
+ * WT_PAGE_COL_INT (Column-store internal page):
+ *	Off-page references (a WT_CELL_ADDR cell).
  *
  * WT_PAGE_COL_VAR (Column-store leaf page storing variable-length cells):
  *	Data cells (a WT_CELL_VALUE or WT_CELL_VALUE_OVFL cell), and deleted
@@ -47,26 +49,26 @@
  * 0x03 bit combination (setting both 0x01 and 0x02) is unused, but will require
  * code changes.
  *
- * Bit 3 marks run-length encoded variable-length column store data: immediately
- * after the cell description byte, there's a uint32_t repeat count.
+ * Bit 3 marks variable-length column store data with an associated run-length
+ * counter or a record number: there is a uint64_t value immediately after the
+ * cell description byte.
  */
 #define	WT_CELL_VALUE_SHORT	0x001		/* Short data */
 #define	WT_CELL_KEY_SHORT	0x002		/* Short key */
-#define	WT_CELL_RLE		0x004		/* Run-length encoding */
+#define	WT_CELL_64V		0x004		/* RLE or recno */
 #define	WT_CELL_UNUSED_BIT4	0x008		/* Unused */
 #define	WT_CELL_UNUSED_BIT5	0x010		/* Unused */
 
 /*
  * Bits 6-8 are for other cell types (there are currently 6 cell types).
  */
-#define	WT_CELL_DEL		(0 << 5)	/* Deleted */
-#define	WT_CELL_KEY		(1 << 5)	/* Key */
-#define	WT_CELL_KEY_OVFL	(2 << 5)	/* Key overflow */
-#define	WT_CELL_OFF		(3 << 5)	/* Off-page ref */
+#define	WT_CELL_ADDR		(0 << 5)	/* Location reference */
+#define	WT_CELL_DEL		(1 << 5)	/* Deleted */
+#define	WT_CELL_KEY		(2 << 5)	/* Key */
+#define	WT_CELL_KEY_OVFL	(3 << 5)	/* Key overflow */
 #define	WT_CELL_VALUE		(4 << 5)	/* Value */
 #define	WT_CELL_VALUE_OVFL	(5 << 5)	/* Value overflow */
 #define	WT_CELL_UNUSED_TYPE6	(6 << 5)	/* Unused */
-#define	WT_CELL_UNUSED_TYPE7	(7 << 5)	/* Unused */
 #define	WT_CELL_TYPE_MASK	(7 << 5)
 
 /*
@@ -75,13 +77,16 @@
  */
 struct __wt_cell {
 	/*
-	 * Maximum of 12 bytes:
-	 *	   0: type, RLE flag
-	 *	   1: prefix compression count
-	 *	 2-6: optional RLE count	(uint32_t encoding, max 5 bytes)
-	 *	7-11: optional data length	(uint32_t encoding, max 5 bytes)
+	 * Maximum of 16 bytes:
+	 * 1: type + 64V flag (recno/rle)
+	 * 1: prefix compression count
+	 * 9: optional RLE or recno	(uint64_t encoding, max 9 bytes)
+	 * 5: optional data length	(uint32_t encoding, max 5 bytes)
+	 *
+	 * The prefix compression count and 64V value overlap, this calculation
+	 * is pessimistic, but it isn't worth optimizing.
 	 */
-	uint8_t __chunk[12];
+	uint8_t __chunk[16];
 };
 
 /*
@@ -89,12 +94,10 @@ struct __wt_cell {
  *	Unpacked cell.
  */
 struct __wt_cell_unpack {
-	WT_OFF	 off;			/* WT_OFF structure */
-
-	uint64_t rle;			/* RLE count */
+	uint64_t v;			/* RLE count or recno */
 
 	const void *data;		/* Data */
-	uint32_t size;			/* Data size */
+	uint32_t    size;		/* Data size */
 
 	uint32_t len;			/* Cell + data total length */
 
@@ -112,6 +115,78 @@ struct __wt_cell_unpack {
 	for ((cell) = WT_PAGE_DISK_BYTE(dsk), (i) = (dsk)->u.entries;	\
 	    (i) > 0;							\
 	    (cell) = (WT_CELL *)((uint8_t *)(cell) + (unpack)->len), --(i))
+
+/*
+ * __wt_cell_pack_addr --
+ *	Pack an address cell.
+ */
+static inline uint32_t
+__wt_cell_pack_addr(WT_CELL *cell, uint64_t recno, uint32_t size)
+{
+	uint8_t *p;
+
+	p = cell->__chunk + 1;			/* Type + recno */
+	cell->__chunk[0] = WT_CELL_ADDR | WT_CELL_64V;
+	(void)__wt_vpack_uint(&p, 0, recno);
+						/* Length */
+	(void)__wt_vpack_uint(&p, 0, (uint64_t)size);
+	return (WT_PTRDIFF32(p, cell));
+}
+
+/*
+ * __wt_cell_pack_data --
+ *	Set a data item's WT_CELL contents.
+ */
+static inline uint32_t
+__wt_cell_pack_data(WT_CELL *cell, uint64_t rle, uint32_t size)
+{
+	uint8_t byte, *p;
+
+	/*
+	 * Short data cells have 7-bits of length in the descriptor byte and no
+	 * length bytes.
+	 *
+	 * Bit 0 is the WT_CELL_VALUE_SHORT flag; the other 7 bits are the size.
+	 */
+	if (rle == 0 && size <= 0x7f) {
+		byte = (uint8_t)size;
+		cell->__chunk[0] = (byte << 1) | WT_CELL_VALUE_SHORT;
+		return (1);
+	}
+
+	p = cell->__chunk + 1;
+	if (rle < 2)				/* Type + RLE */
+		cell->__chunk[0] = WT_CELL_VALUE;
+	else {
+		cell->__chunk[0] = WT_CELL_VALUE | WT_CELL_64V;
+		(void)__wt_vpack_uint(&p, 0, rle);
+	}
+						/* Length */
+	(void)__wt_vpack_uint(&p, 0, (uint64_t)size);
+
+	return (WT_PTRDIFF32(p, cell));
+}
+
+/*
+ * __wt_cell_pack_del --
+ *	Write a deleted value cell.
+ */
+static inline uint32_t
+__wt_cell_pack_del(WT_CELL *cell, uint64_t rle)
+{
+	uint8_t *p;
+
+	p = cell->__chunk + 1;
+	if (rle < 2) {				/* Type + RLE */
+		cell->__chunk[0] = WT_CELL_DEL;
+		return (1);
+	}
+
+	cell->__chunk[0] = WT_CELL_DEL | WT_CELL_64V;
+	(void)__wt_vpack_uint(&p, 0, rle);
+
+	return (WT_PTRDIFF32(p, cell));
+}
 
 /*
  * __wt_cell_pack_key --
@@ -146,31 +221,34 @@ __wt_cell_pack_key(WT_CELL *cell, uint8_t prefix, uint32_t size)
 }
 
 /*
- * __wt_cell_pack_data --
- *	Set a data item's WT_CELL contents.
+ * __wt_cell_pack_key_empty --
+ *	Write an empty key cell.
+ */
+static inline void
+__wt_cell_pack_key_empty(WT_CELL *cell)
+{
+	/*
+	 * At the end of a row-store leaf page we have to write an empty key to
+	 * act as a marker in case the last value on the page is zero-length.
+	 * See the caller of this function for details.
+	 */
+	cell->__chunk[0] = WT_CELL_KEY;
+}
+
+/*
+ * __wt_cell_pack_ovfl --
+ *	Pack an overflow cell.
  */
 static inline uint32_t
-__wt_cell_pack_data(WT_CELL *cell, uint64_t rle, uint32_t size)
+__wt_cell_pack_ovfl(WT_CELL *cell, uint8_t type, uint64_t rle, uint32_t size)
 {
-	uint8_t byte, *p;
-
-	/*
-	 * Short data cells have 7-bits of length in the descriptor byte and no
-	 * length bytes.
-	 *
-	 * Bit 0 is the WT_CELL_VALUE_SHORT flag; the other 7 bits are the size.
-	 */
-	if (rle < 2 && size <= 0x7f) {
-		byte = (uint8_t)size;
-		cell->__chunk[0] = (byte << 1) | WT_CELL_VALUE_SHORT;
-		return (1);
-	}
+	uint8_t *p;
 
 	p = cell->__chunk + 1;
 	if (rle < 2)				/* Type + RLE */
-		cell->__chunk[0] = WT_CELL_VALUE;
+		cell->__chunk[0] = type;
 	else {
-		cell->__chunk[0] = WT_CELL_VALUE | WT_CELL_RLE;
+		cell->__chunk[0] = type | WT_CELL_64V;
 		(void)__wt_vpack_uint(&p, 0, rle);
 	}
 						/* Length */
@@ -180,26 +258,18 @@ __wt_cell_pack_data(WT_CELL *cell, uint64_t rle, uint32_t size)
 }
 
 /*
- * __wt_cell_pack_type --
- *	Write a WT_CELL's contents based on a type with optional RLE count but
- * fixed-size data (that is, no need for data length bytes).
+ * __wt_cell_rle --
+ *	Return the cell's RLE value.
  */
-static inline uint32_t
-__wt_cell_pack_type(WT_CELL *cell, uint8_t type, uint64_t rle)
+static inline uint64_t
+__wt_cell_rle(WT_CELL_UNPACK *unpack)
 {
-	uint8_t *p;
-
-	if (rle < 2) {				/* Type + RLE */
-		cell->__chunk[0] = type;
-		return (1);
-	}
-
-	cell->__chunk[0] = type | WT_CELL_RLE;
-
-	p = cell->__chunk + 1;
-	(void)__wt_vpack_uint(&p, 0, rle);
-
-	return (WT_PTRDIFF32(p, cell));
+	/*
+	 * Any item with only 1 occurrence is stored with an RLE of 0, that is,
+	 * without any RLE at all.  This code is a single place to handle that
+	 * correction, for simplicity.
+	 */
+	return (unpack->v < 2 ? 1 : unpack->v);
 }
 
 /*
@@ -243,7 +313,6 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 } while (0)
 
 	memset(unpack, 0, sizeof(*unpack));
-	unpack->rle = 1;
 
 	/*
 	 * Check the cell description byte, then get the cell type.
@@ -279,14 +348,6 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 		unpack->size = cell->__chunk[0] >> 2;
 		unpack->len = 2 + unpack->size;
 		goto done;
-	case WT_CELL_OFF:
-		/*
-		 * Check the WT_OFF that follows the cell descriptor byte.
-		 */
-		CHK(cell, 1 + sizeof(WT_OFF));		/* check WT_OFF */
-		memcpy(&unpack->off, cell->__chunk + 1, sizeof(WT_OFF));
-		unpack->len = 1 + sizeof(WT_OFF);
-		goto done;
 	case WT_CELL_VALUE_SHORT:
 		/*
 		 * Not reading any more memory, no further checks until the
@@ -313,25 +374,23 @@ __wt_cell_unpack_safe(WT_CELL *cell, WT_CELL_UNPACK *unpack, uint8_t *end)
 		unpack->prefix = cell->__chunk[1];
 	}
 
-	if (cell->__chunk[0] & WT_CELL_RLE)		/* skip RLE */
+	if (cell->__chunk[0] & WT_CELL_64V)		/* skip RLE/recno */
 		WT_RET(__wt_vunpack_uint(
-		    &p, end == NULL ? 0 : (size_t)(end - p), &unpack->rle));
+		    &p, end == NULL ? 0 : (size_t)(end - p), &unpack->v));
 
 	/*
-	 * Overflow and deleted cells have known sizes, and no length bytes.
-	 * Key/data cells have data length bytes.
+	 * Deleted cells have known sizes, and no length bytes.
+	 * Key/data and overflow cells have data length bytes.
 	 */
 	switch (unpack->raw) {
-	case WT_CELL_KEY_OVFL:
-	case WT_CELL_VALUE_OVFL:
-		CHK(p, sizeof(WT_OFF));			/* check WT_OFF */
-		unpack->ovfl = 1;
-		memcpy(&unpack->off, p, sizeof(WT_OFF));
-		unpack->len = WT_PTRDIFF32(p + sizeof(WT_OFF), cell);
-		break;
 	case WT_CELL_DEL:
 		unpack->len = WT_PTRDIFF32(p, cell);
 		break;
+	case WT_CELL_KEY_OVFL:
+	case WT_CELL_VALUE_OVFL:
+		unpack->ovfl = 1;
+		/* FALLTHROUGH */
+	case WT_CELL_ADDR:
 	case WT_CELL_KEY:
 	case WT_CELL_VALUE:
 		WT_RET(__wt_vunpack_uint(

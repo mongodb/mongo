@@ -241,11 +241,13 @@ fh
 filename
 fileops
 filesize
+filesystem
 fixup
 fmt
 fp
 free'd
 freelist
+fsm
 fstat
 fsync
 fsyncs
@@ -412,6 +414,7 @@ str
 strdup
 strerror
 stringin
+strncpy
 strndup
 strtouq
 struct
@@ -428,11 +431,13 @@ tV
 tablename
 tblock
 tcursors
+tempty
 th
 thazard
 tinsert
 toffpage
 toverflow
+tparent
 transactional
 trecno
 treeconfig
@@ -440,6 +445,7 @@ trepeat
 treplacement
 trk
 trk's
+troot
 tsplit
 tstate
 tt

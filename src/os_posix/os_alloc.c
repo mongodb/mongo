@@ -120,6 +120,11 @@ __wt_strndup(WT_SESSION_IMPL *session, const char *str, size_t len, void *retp)
 		WT_CSTAT_INCR(session, memalloc);
 
 	WT_RET(__wt_calloc(session, len + 1, 1, &p));
+
+	/*
+	 * Don't change this to strncpy, we rely on this function to duplicate
+	 * "strings" that contain nul bytes.
+	 */
 	memcpy(p, str, len);
 
 	*(void **)retp = p;

@@ -552,8 +552,8 @@ copy(u_int lsn, u_int recno)
 	dsk->lsn = lsn;
 	if (page_type != WT_PAGE_ROW_LEAF)
 		dsk->recno = recno;
-	dsk->checksum = 0;
-	dsk->checksum = __wt_cksum(dsk, PSIZE);
+	dsk->cksum = 0;
+	dsk->cksum = __wt_cksum(dsk, PSIZE);
 	assert(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
 
 	/*

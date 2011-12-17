@@ -31,7 +31,7 @@ __wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int cacheonly, int next)
 
 	/* If no page is active, begin a walk from the start of the tree. */
 	if (page == NULL) {
-		if ((page = btree->root_page.page) == NULL)
+		if ((page = btree->root_page) == NULL)
 			return (0);
 		slot = next ? 0 : page->entries - 1;
 		goto descend;
@@ -45,8 +45,8 @@ __wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int cacheonly, int next)
 	t = page->parent;
 	slot =
 	    page->type == WT_PAGE_ROW_INT || page->type == WT_PAGE_ROW_LEAF ?
-	    WT_ROW_REF_SLOT(t, page->parent_ref) :
-	    WT_COL_REF_SLOT(t, page->parent_ref);
+	    WT_ROW_REF_SLOT(t, page->parent_ref.rref) :
+	    WT_COL_REF_SLOT(t, page->parent_ref.cref);
 
 	/*
 	 * Swap our hazard reference for the hazard reference of our parent,
@@ -64,7 +64,7 @@ __wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int cacheonly, int next)
 	 * that can't be discarded.
 	 */
 	ret = (WT_PAGE_IS_ROOT(t) || cacheonly) ?
-	    0 : __wt_page_in(session, t, t->parent_ref, 0);
+	    0 : __wt_page_in(session, t, t->parent_ref.ref, 0);
 	if (!cacheonly) {
 		__wt_page_release(session, page);
 		WT_RET(ret);

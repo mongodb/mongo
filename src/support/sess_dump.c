@@ -58,10 +58,9 @@ __wt_session_dump(WT_SESSION_IMPL *session)
 			__wt_msg(session, "\thazard references:");
 #ifdef HAVE_DIAGNOSTIC
 		__wt_msg(session,
-		    "\t\t[%" PRIu32 "] (%s, line %d)",
-		    WT_PADDR(hp->page), hp->file, hp->line);
+		    "\t\t%p (%s, line %d)", hp->page, hp->file, hp->line);
 #else
-		__wt_msg(session, "\t\t%[" PRIu32 "]", WT_PADDR(hp->page));
+		__wt_msg(session, "\t\t%p", hp->page);
 #endif
 	}
 }

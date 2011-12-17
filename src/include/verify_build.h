@@ -48,8 +48,6 @@ __wt_verify_build(void)
 	 * the page header structure is exactly what we expect.
 	 */
 	SIZE_CHECK(WT_BTREE_DESC, WT_BTREE_DESC_SIZE);
-	SIZE_CHECK(WT_OFF, WT_OFF_SIZE);
-	SIZE_CHECK(WT_OFF_RECORD, WT_OFF_RECORD_SIZE);
 
 	/*
 	 * The page header is special: the compiler will pad it to a multiple
@@ -60,7 +58,6 @@ __wt_verify_build(void)
 	SIZE_CHECK(WT_PAGE_DISK, WT_ALIGN(WT_PAGE_DISK_SIZE, sizeof(void *)));
 
 	/* There are also structures that must be aligned correctly. */
-	ALIGN_CHECK(WT_OFF, sizeof(uint32_t));
 	ALIGN_CHECK(WT_PAGE_DISK, sizeof(uint32_t));
 	ALIGN_CHECK(WT_SESSION_BUFFER, sizeof(uint32_t));
 

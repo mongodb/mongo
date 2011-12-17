@@ -109,7 +109,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 
 	/* Search the internal pages of the tree. */
 	item = &_item;
-	for (page = btree->root_page.page; page->type == WT_PAGE_ROW_INT;) {
+	for (page = btree->root_page; page->type == WT_PAGE_ROW_INT;) {
 		/* Binary search of internal pages. */
 		for (base = 0, rref = NULL,
 		    limit = page->entries; limit != 0; limit >>= 1) {

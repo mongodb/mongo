@@ -45,6 +45,8 @@ extern "C" {
  * DO NOT EDIT: automatically built by dist/s_typedef.
  * Forward structure declarations for internal structures: BEGIN
  */
+struct __wt_addr;
+    typedef struct __wt_addr WT_ADDR;
 struct __wt_btree;
     typedef struct __wt_btree WT_BTREE;
 struct __wt_btree_desc;
@@ -109,10 +111,6 @@ struct __wt_named_collator;
     typedef struct __wt_named_collator WT_NAMED_COLLATOR;
 struct __wt_named_compressor;
     typedef struct __wt_named_compressor WT_NAMED_COMPRESSOR;
-struct __wt_off;
-    typedef struct __wt_off WT_OFF;
-struct __wt_off_record;
-    typedef struct __wt_off_record WT_OFF_RECORD;
 struct __wt_page;
     typedef struct __wt_page WT_PAGE;
 struct __wt_page_disk;
@@ -175,11 +173,11 @@ struct __wt_update;
 
 /* Required by cell.i */
 #include "intpack.i"
+#include "cell.i"
 
 #include "bitstring.i"
 #include "btree.i"
 #include "cache.i"
-#include "cell.i"
 #include "column.i"
 #include "cursor.i"
 #include "log.i"

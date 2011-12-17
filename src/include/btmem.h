@@ -6,6 +6,20 @@
  */
 
 /*
+ * WiredTiger's block manager interface.
+ */
+#define	WT_BM_MAX_ADDR_COOKIE	255	/* Maximum address cookie size */
+
+/*
+ * WT_ADDR --
+ *	A block location.
+ */
+struct __wt_addr {
+	uint8_t *addr;			/* Cookie */
+	uint32_t size;			/* Cookie length */
+};
+
+/*
  * WT_PAGE_MODIFY --
  *	When a page is modified, there's additional information maintained as it
  * is written to disk.
@@ -66,8 +80,8 @@ struct __wt_page_modify {
 	uint32_t disk_gen;
 
 	union {
-		WT_PAGE *write_split;	/* Newly created internal pages */
-		WT_OFF	 write_off;	/* Newly written page */
+		WT_PAGE *split;		/* Resulting split */
+		WT_ADDR	 replace;	/* Resulting replacement */
 	} u;
 
 	/*
@@ -88,10 +102,10 @@ struct __wt_page_modify {
 	struct __wt_page_track {
 		__wt_pt_type_t type;	/* Type */
 
+		WT_ADDR  addr;		/* Overflow or block location */
+
 		uint8_t *data;		/* Overflow data reference */
-		uint32_t len;		/* Overflow data length */
-		uint32_t addr;		/* Block location */
-		uint32_t size;		/* Block length */
+		uint32_t size;		/* Overflow data length */
 	} *track;			/* Array of tracked objects */
 	uint32_t track_entries;		/* Total track slots */
 };
@@ -102,19 +116,25 @@ struct __wt_page_modify {
  */
 struct __wt_page {
 	/*
-	 * Two links to the parent's WT_PAGE structure -- the physical parent
-	 * page, and the WT_REF structure used to find this page.
+	 * Two links to the parent: the physical parent page, and the internal
+	 * page's reference structure used to find this page.  Note the WT_REF
+	 * structure appears first in the WT_COL_REF and WT_ROW_REF structures,
+	 * and so we can access all 3 information types with a single reference.
 	 */
 #define	WT_PAGE_IS_ROOT(page)						\
 	((page)->parent == NULL)
-	WT_PAGE	*parent;		/* Page's parent */
-	WT_REF	*parent_ref;		/* Page's parent reference */
+	WT_PAGE	*parent;			/* Page's parent */
+	union {
+		WT_COL_REF *cref;		/* Col-store parent reference */
+		WT_ROW_REF *rref;		/* Row-store parent reference */
+		WT_REF	   *ref;		/* Common WT_REF structure */
+	} parent_ref;
 
 	/* But the entries are wildly different, based on the page type. */
 	union {
 		/* Row-store internal page. */
 		struct {
-			WT_ROW_REF *t;		/* Subtrees */
+			WT_ROW_REF *t;		/* K/V object pairs */
 		} row_int;
 
 		/* Row-store leaf page. */
@@ -230,16 +250,6 @@ struct __wt_page {
 	    WT_PAGE_REC_REPLACE | WT_PAGE_REC_SPLIT | WT_PAGE_REC_SPLIT_MERGE)
 
 /*
- * WT_PADDR, WT_PSIZE --
- *	A page's address and size.  We don't maintain the page's address/size in
- * the page: a page's address/size is found in the page parent's WT_REF struct,
- * and like a person with two watches can never be sure what time it is, having
- * two places to find a piece of information leads to confusion.
- */
-#define	WT_PADDR(p)	((p)->parent_ref->addr)
-#define	WT_PSIZE(p)	((p)->parent_ref->size)
-
-/*
  * WT_REF --
  * A single in-memory page and the state information used to determine if it's
  * OK to dereference the pointer to the page.
@@ -281,6 +291,8 @@ struct __wt_page {
 struct __wt_ref {
 	WT_PAGE *page;			/* In-memory page */
 
+	void	*addr;			/* On-page cell or off_page WT_ADDR */
+
 	/*
 	 * Page state.
 	 *
@@ -292,37 +304,6 @@ struct __wt_ref {
 #define	WT_REF_MEM		2	/* Page is in cache and valid */
 #define	WT_REF_READING		3	/* Page being read */
 	uint32_t volatile state;
-
-	uint32_t addr;			/* Backing disk address */
-	uint32_t size;			/* Backing disk size */
-};
-
-/*
- * WT_IKEY --
- * Instantiated key: row-store keys are usually prefix compressed and sometimes
- * Huffman encoded or overflow objects.  Normally, a row-store page in-memory
- * key points to the on-page WT_CELL, but in some cases, we instantiate the key
- * in memory, in which case the row-store page in-memory key points to a WT_IKEY
- * structure.
- */
-struct __wt_ikey {
-	WT_SESSION_BUFFER *sb;		/* Session buffer holding the WT_IKEY */
-
-	uint32_t size;			/* Key length */
-
-	/*
-	 * If we no longer point to the key's on-page WT_CELL, we can't find its
-	 * related value.  Save the offset of the key cell in the page.
-	 *
-	 * Row-store cell references are page offsets, not pointers (we boldly
-	 * re-invent short pointers).  The trade-off is 4B per K/V pair on a
-	 * 64-bit machine vs. a single cycle for the addition of a base pointer.
-	 */
-	uint32_t  cell_offset;
-
-	/* The key bytes immediately follow the WT_IKEY structure. */
-#define	WT_IKEY_DATA(ikey)						\
-	((void *)((uint8_t *)(ikey) + sizeof(WT_IKEY)))
 };
 
 /*
@@ -331,9 +312,7 @@ struct __wt_ikey {
  */
 struct __wt_row_ref {
 	WT_REF	 ref;			/* Subtree page */
-#define	WT_ROW_REF_ADDR(rref)	((rref)->ref.addr)
 #define	WT_ROW_REF_PAGE(rref)	((rref)->ref.page)
-#define	WT_ROW_REF_SIZE(rref)	((rref)->ref.size)
 #define	WT_ROW_REF_STATE(rref)	((rref)->ref.state)
 
 	void	*key;			/* On-page cell or off-page WT_IKEY */
@@ -352,7 +331,7 @@ struct __wt_row_ref {
  *	Return the 0-based array offset based on a WT_ROW_REF reference.
  */
 #define	WT_ROW_REF_SLOT(page, rref)					\
-	((uint32_t)(((WT_ROW_REF *)rref) - (page)->u.row_int.t))
+	((uint32_t)((rref) - (page)->u.row_int.t))
 
 /*
  * WT_COL_REF --
@@ -360,9 +339,7 @@ struct __wt_row_ref {
  */
 struct __wt_col_ref {
 	WT_REF	 ref;			/* Subtree page */
-#define	WT_COL_REF_ADDR(cref)	((cref)->ref.addr)
 #define	WT_COL_REF_PAGE(cref)	((cref)->ref.page)
-#define	WT_COL_REF_SIZE(cref)	((cref)->ref.size)
 #define	WT_COL_REF_STATE(cref)	((cref)->ref.state)
 
 	uint64_t recno;			/* Starting record number */
@@ -381,7 +358,7 @@ struct __wt_col_ref {
  *	Return the 0-based array offset based on a WT_COL_REF reference.
  */
 #define	WT_COL_REF_SLOT(page, cref)					\
-	((uint32_t)(((WT_COL_REF *)cref) - (page)->u.col_int.t))
+	((uint32_t)((cref) - (page)->u.col_int.t))
 
 /*
  * WT_ROW --
@@ -426,11 +403,7 @@ struct __wt_col {
 	 * of a base pointer.  The on-page data is a WT_CELL (same as row-store
 	 * pages).
 	 *
-	 * If the value is 0, it's a single, deleted record.   While this might
-	 * be marginally faster than looking at the page, the real reason for
-	 * this is to simplify extending column-store files: a newly allocated
-	 * WT_COL array translates to a set of deleted records, which is exactly
-	 * what we want.
+	 * If the value is 0, it's a single, deleted record.
 	 *
 	 * Obscure the field name, code shouldn't use WT_COL->value, the public
 	 * interface is WT_COL_PTR.
@@ -472,6 +445,34 @@ struct __wt_col_rle {
  */
 #define	WT_COL_SLOT(page, cip)						\
 	((uint32_t)(((WT_COL *)cip) - (page)->u.col_leaf.d))
+
+/*
+ * WT_IKEY --
+ * Instantiated key: row-store keys are usually prefix compressed and sometimes
+ * Huffman encoded or overflow objects.  Normally, a row-store page in-memory
+ * key points to the on-page WT_CELL, but in some cases, we instantiate the key
+ * in memory, in which case the row-store page in-memory key points to a WT_IKEY
+ * structure.
+ */
+struct __wt_ikey {
+	WT_SESSION_BUFFER *sb;		/* Session buffer holding the WT_IKEY */
+
+	uint32_t size;			/* Key length */
+
+	/*
+	 * If we no longer point to the key's on-page WT_CELL, we can't find its
+	 * related value.  Save the offset of the key cell in the page.
+	 *
+	 * Row-store cell references are page offsets, not pointers (we boldly
+	 * re-invent short pointers).  The trade-off is 4B per K/V pair on a
+	 * 64-bit machine vs. a single cycle for the addition of a base pointer.
+	 */
+	uint32_t  cell_offset;
+
+	/* The key bytes immediately follow the WT_IKEY structure. */
+#define	WT_IKEY_DATA(ikey)						\
+	((void *)((uint8_t *)(ikey) + sizeof(WT_IKEY)))
+};
 
 /*
  * WT_UPDATE --
@@ -638,12 +639,3 @@ struct __wt_insert_head {
 	    __bit_getv(WT_PAGE_DISK_BYTE(dsk), 0, (btree)->bitcnt) : 0;	\
 	    (i) < (dsk)->u.entries; ++(i),				\
 	    (v) = __bit_getv(WT_PAGE_DISK_BYTE(dsk), i, (btree)->bitcnt))
-
-/*
- * WT_OFF_FOREACH --
- *	Walks WT_OFF/WT_OFF_RECORD references on a page, incrementing a pointer
- *	based on its declared type.
- */
-#define	WT_OFF_FOREACH(dsk, offp, i)					\
-	for ((offp) = WT_PAGE_DISK_BYTE(dsk),				\
-	    (i) = (dsk)->u.entries; (i) > 0; ++(offp), --(i))

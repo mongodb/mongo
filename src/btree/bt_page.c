@@ -104,7 +104,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 	WT_RET(__wt_calloc_def(session, 1, &page));
 	page->type = dsk->type;
 	page->parent = parent;
-	page->parent_ref = parent_ref;
+	page->parent_ref.ref = parent_ref;
 	page->dsk = dsk;
 	/*
 	 * Set the write generation to 1 (which can't match a search where the
@@ -164,12 +164,14 @@ __inmem_col_fix(WT_PAGE *page)
 static int
 __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_CELL *cell;
+	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL_REF *cref;
-	WT_OFF_RECORD *off_record;
 	WT_PAGE_DISK *dsk;
 	uint32_t i;
 
 	dsk = page->dsk;
+	unpack = &_unpack;
 
 	/*
 	 * Column-store page entries map one-to-one to the number of physical
@@ -179,22 +181,18 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	    session, (size_t)dsk->u.entries, &page->u.col_int.t));
 
 	/*
-	 * Walk the page, building references: the page contains WT_OFF_RECORD
-	 * structures.
+	 * Walk the page, building references: the page contains value items.
+	 * The value items are on-page items (WT_CELL_VALUE).
 	 */
 	cref = page->u.col_int.t;
-	WT_OFF_FOREACH(dsk, off_record, i) {
-		WT_COL_REF_ADDR(cref) = off_record->addr;
-		WT_COL_REF_SIZE(cref) = off_record->size;
-		cref->recno = WT_RECNO(off_record);
+	WT_CELL_FOREACH(dsk, cell, unpack, i) {
+		__wt_cell_unpack(cell, unpack);
+		cref->recno = unpack->v;
+		cref->ref.addr = cell;
 		++cref;
 	}
 
 	page->entries = dsk->u.entries;
-
-	/* Column-store internal pages do not require a disk image. */
-	__wt_free(session, page->dsk);
-
 	return (0);
 }
 
@@ -211,7 +209,7 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_PAGE_DISK *dsk;
-	uint64_t recno;
+	uint64_t recno, rle;
 	size_t bytes_allocated;
 	uint32_t i, indx, max_repeats, nrepeats;
 
@@ -243,7 +241,8 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * Add records with repeat counts greater than 1 to an array we
 		 * use for fast lookups.
 		 */
-		if (unpack->rle > 1) {
+		rle = __wt_cell_rle(unpack);
+		if (rle > 1) {
 			if (nrepeats == max_repeats) {
 				max_repeats = (max_repeats == 0) ?
 				    10 : 2 * max_repeats;
@@ -253,10 +252,10 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 			}
 			repeats[nrepeats].indx = indx;
 			repeats[nrepeats].recno = recno;
-			repeats[nrepeats++].rle = unpack->rle;
+			repeats[nrepeats++].rle = rle;
 		}
 		indx++;
-		recno += unpack->rle;
+		recno += rle;
 	}
 
 	page->u.col_leaf.repeats = repeats;
@@ -279,14 +278,14 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_PAGE_DISK *dsk;
 	WT_ROW_REF *rref;
 	uint32_t i, nindx, prefix;
-	int found_ovfl, ret;
+	int ret;
 	void *huffman;
 
 	btree = session->btree;
 	current = last = NULL;
 	unpack = &_unpack;
 	dsk = page->dsk;
-	found_ovfl = ret = 0;
+	ret = 0;
 	huffman = btree->huffman_key;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &current));
@@ -317,23 +316,15 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_CELL_FOREACH(dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {
-		case WT_CELL_KEY_OVFL:
 		case WT_CELL_KEY:
+		case WT_CELL_KEY_OVFL:
 			break;
-		case WT_CELL_OFF:
-			WT_ROW_REF_ADDR(rref) = unpack->off.addr;
-			WT_ROW_REF_SIZE(rref) = unpack->off.size;
+		case WT_CELL_ADDR:
+			rref->ref.addr = cell;
 			++rref;
 			continue;
 		WT_ILLEGAL_VALUE(session);
 		}
-
-		/*
-		 * We can discard the underlying disk page if we don't have any
-		 * overflow keys.
-		 */
-		if (unpack->ovfl)
-			found_ovfl = 1;
 
 		/*
 		 * If Huffman decoding is required or it's an overflow record,
@@ -397,9 +388,6 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		}
 	}
 
-	if (!found_ovfl)
-		__wt_free(session, page->dsk);
-
 err:	__wt_scr_free(&current);
 	__wt_scr_free(&last);
 	return (ret);
@@ -444,8 +432,8 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_CELL_FOREACH(dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {
-		case WT_CELL_KEY_OVFL:
 		case WT_CELL_KEY:
+		case WT_CELL_KEY_OVFL:
 			++nindx;
 			if (rip->key != NULL)
 				++rip;

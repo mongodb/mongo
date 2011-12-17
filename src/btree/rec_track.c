@@ -7,8 +7,6 @@
 
 #include "wt_internal.h"
 
-static void __wt_rec_track_print(WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE_TRACK *);
-
 /*
  * A page in memory has a list of associated blocks and overflow items.  For
  * example, when an overflow item is modified, the original overflow blocks
@@ -17,6 +15,11 @@ static void __wt_rec_track_print(WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE_TRACK *);
  * generally called from the routines in rec_write.c, which update the objects
  * each time a page is reconciled.
  */
+
+#ifdef HAVE_VERBOSE
+static void __track_msg(WT_SESSION_IMPL *, WT_PAGE *, const char *, WT_ADDR *);
+static void __track_print(WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE_TRACK *);
+#endif
 
 /*
  * __rec_track_clear --
@@ -27,9 +30,9 @@ __rec_track_clear(WT_PAGE_TRACK *track)
 {
 	track->type = WT_PT_EMPTY;
 	track->data = NULL;
-	track->len = 0;
-	track->addr = WT_ADDR_INVALID;
 	track->size = 0;
+	track->addr.addr = NULL;
+	track->addr.size = 0;
 }
 
 /*
@@ -66,14 +69,13 @@ __rec_track_extend(WT_SESSION_IMPL *session, WT_PAGE *page)
  */
 int
 __wt_rec_track_block(WT_SESSION_IMPL *session,
-    __wt_pt_type_t type, WT_PAGE *page, uint32_t addr, uint32_t size)
+    __wt_pt_type_t type, WT_PAGE *page, const uint8_t *addr, uint32_t size)
 {
 	WT_PAGE_MODIFY *mod;
 	WT_PAGE_TRACK *next, *track;
 	uint32_t i;
 
 	mod = page->modify;
-	next = NULL;
 
 	/*
 	 * There may be multiple requests to track a single block. For example,
@@ -83,13 +85,15 @@ __wt_rec_track_block(WT_SESSION_IMPL *session,
 	 * split, but we have no way to know that we've figured that same thing
 	 * out several times already.   Check for duplicates.
 	 */
+	next = NULL;
 	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i) {
 		if (track->type == WT_PT_EMPTY) {
 			next = track;
 			continue;
 		}
 		if (track->type == type &&
-		    track->addr == addr && track->size == size)
+		    track->addr.size == size &&
+		    memcmp(addr, track->addr.addr, size) == 0)
 			return (0);
 	}
 
@@ -102,12 +106,12 @@ __wt_rec_track_block(WT_SESSION_IMPL *session,
 	track = next;
 	track->type = type;
 	track->data = NULL;
-	track->len = 0;
-	track->addr = addr;
-	track->size = size;
+	track->size = 0;
+	WT_RET(__wt_strndup(session, (char *)addr, size, &track->addr.addr));
+	track->addr.size = size;
 
 #ifdef HAVE_VERBOSE
-	__wt_rec_track_print(session, page, track);
+	__track_print(session, page, track);
 #endif
 	return (0);
 }
@@ -118,16 +122,18 @@ __wt_rec_track_block(WT_SESSION_IMPL *session,
  */
 int
 __wt_rec_track_ovfl(WT_SESSION_IMPL *session, WT_PAGE *page,
-    const void *data, uint32_t len, uint32_t addr, uint32_t size)
+    uint8_t *addr, uint32_t addr_size, const void *data, uint32_t data_size)
 {
 	WT_PAGE_MODIFY *mod;
 	WT_PAGE_TRACK *next, *track;
 	uint8_t *p;
 	uint32_t i;
 
-	mod = page->modify;
-	next = NULL;
+	WT_ASSERT(session, addr != NULL);
 
+	mod = page->modify;
+
+	next = NULL;
 	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i)
 		if (track->type == WT_PT_EMPTY) {
 			next = track;
@@ -140,18 +146,25 @@ __wt_rec_track_ovfl(WT_SESSION_IMPL *session, WT_PAGE *page,
 		next = &mod->track[mod->track_entries - 1];
 	}
 
-	WT_RET(__wt_calloc_def(session, len, &p));
-	memcpy(p, data, len);
+	/*
+	 * Minor optimization: allocate a single chunk of space instead of two
+	 * separate ones: be careful when it's freed.
+	 */
+	WT_RET(__wt_calloc_def(session, addr_size + data_size, &p));
 
 	track = next;
 	track->type = WT_PT_OVFL;
+	track->addr.addr = p;
+	track->addr.size = addr_size;
+	memcpy(track->addr.addr, addr, addr_size);
+
+	p += addr_size;
 	track->data = p;
-	track->len = len;
-	track->addr = addr;
-	track->size = size;
+	track->size = data_size;
+	memcpy(track->data, data, data_size);
 
 #ifdef HAVE_VERBOSE
-	__wt_rec_track_print(session, page, track);
+	__track_print(session, page, track);
 #endif
 	return (0);
 }
@@ -162,7 +175,7 @@ __wt_rec_track_ovfl(WT_SESSION_IMPL *session, WT_PAGE *page,
  */
 int
 __wt_rec_track_ovfl_reuse(WT_SESSION_IMPL *session, WT_PAGE *page,
-    const void *data, uint32_t len, uint32_t *addrp, uint32_t *sizep)
+    const void *data, uint32_t size, uint8_t **addrp, uint32_t *sizep)
 {
 	WT_PAGE_TRACK *track;
 	uint32_t i;
@@ -173,30 +186,28 @@ __wt_rec_track_ovfl_reuse(WT_SESSION_IMPL *session, WT_PAGE *page,
 	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i) {
 		/* Check for a match. */
 		if (track->type != WT_PT_OVFL_DISCARD ||
-		    len != track->len || memcmp(data, track->data, len) != 0)
+		    size != track->size || memcmp(data, track->data, size) != 0)
 			continue;
 
 		/* Found a match, return the record to use. */
 		track->type = WT_PT_OVFL;
 
 		/* Return the block addr/size pair to our caller. */
-		*addrp = track->addr;
-		*sizep = track->size;
+		*addrp = track->addr.addr;
+		*sizep = track->addr.size;
 
-		WT_VERBOSE(session, reconcile,
-		    "page %p reactivate overflow %" PRIu32 "/%" PRIu32,
-		    page, track->addr, track->size);
+		__track_msg(session, page, "reactivate overflow", &track->addr);
 		return (1);
 	}
 	return (0);
 }
 
 /*
- * __wt_rec_track_reset --
- *	Reset the tracking information when first writing a page.
+ * __wt_rec_track_init --
+ *	Initialize/Reset the tracking information when writing a page.
  */
 void
-__wt_rec_track_reset(WT_SESSION_IMPL *session, WT_PAGE *page)
+__wt_rec_track_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_PAGE_MODIFY *mod;
 	WT_PAGE_TRACK *track;
@@ -215,29 +226,36 @@ __wt_rec_track_reset(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i)
 		switch (track->type) {
+		case WT_PT_BLOCK:
+			WT_ASSERT(session, track->type != WT_PT_BLOCK);
+			break;
 		case WT_PT_BLOCK_EVICT:
+			/*
+			 * We had a block we would have discarded, had the last
+			 * reconciliation been the final one used to evict the
+			 * page -- it wasn't, and we didn't.  Clear the slot.
+			 */
 			__rec_track_clear(track);
 			break;
 		case WT_PT_OVFL:
+			__track_msg(
+			    session, page, "set overflow OFF", &track->addr);
 			track->type = WT_PT_OVFL_DISCARD;
-			WT_VERBOSE(session, reconcile,
-			    "page %p set overflow OFF %" PRIu32 "/%" PRIu32,
-			    page, track->addr, track->size);
 			break;
-		case WT_PT_BLOCK:
-		case WT_PT_EMPTY:
 		case WT_PT_OVFL_DISCARD:
-		default:
+			WT_ASSERT(session, track->type != WT_PT_BLOCK);
+			break;
+		case WT_PT_EMPTY:
 			break;
 		}
 }
 
 /*
- * __wt_rec_track_discard --
- *	Resolve the page's list of tracked objects.
+ * __wt_rec_track_wrapup --
+ *	Temporarily/Permanently resolve the page's list of tracked objects.
  */
 int
-__wt_rec_track_discard(WT_SESSION_IMPL *session, WT_PAGE *page, int final)
+__wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int final)
 {
 	WT_PAGE_TRACK *track;
 	uint32_t i;
@@ -251,8 +269,11 @@ __wt_rec_track_discard(WT_SESSION_IMPL *session, WT_PAGE *page, int final)
 	 * WT_PT_BLOCK:
 	 *	A discarded block, free when this reconciliation completes.
 	 * WT_PT_BLOCK_EVICT:
-	 *	A discarded block based on this reconciliation; if the block is
-	 *	evicted based on this reconciliation, free it.
+	 *	A discarded block based on this reconciliation; if the page is
+	 *	evicted based on this reconciliation, discard the block.  (For
+	 *	example, an overflow key that references a deleted item will be
+	 *	discarded, but a subsequent reconciliation might find the key
+	 *	is once more in use because the item is no longer deleted.)
 	 * WT_PT_OVFL:
 	 *	An overflow record that's in-use.  Ignored after any particular
 	 *	reconciliation, because we need to track it for re-use in future
@@ -272,27 +293,29 @@ __wt_rec_track_discard(WT_SESSION_IMPL *session, WT_PAGE *page, int final)
 				continue;
 			/* FALLTHROUGH */
 		case WT_PT_BLOCK:
-			WT_VERBOSE(session, reconcile,
-			    "page %p discard block %" PRIu32 "/%" PRIu32,
-			    page, track->addr, track->size);
-			WT_RET(
-			    __wt_block_free(session, track->addr, track->size));
+			__track_msg(
+			    session, page, "discard block", &track->addr);
+			WT_RET(__wt_block_free(
+			    session, track->addr.addr, track->addr.size));
+			__wt_free(session, track->addr.addr);
 			break;
 		case WT_PT_OVFL:
-			WT_VERBOSE(session, reconcile,
-			    "page %p retain overflow %" PRIu32 "/%" PRIu32,
-			    page, track->addr, track->size);
+			__track_msg(
+			    session, page, "retain overflow", &track->addr);
 			if (!final)
 				continue;
-			__wt_free(session, track->data);
+
+			/* Freeing WT_PAGE_TRACK->addr frees ->data, too. */
+			__wt_free(session, track->addr.addr);
 			break;
 		case WT_PT_OVFL_DISCARD:
-			__wt_free(session, track->data);
-			WT_RET(
-			    __wt_block_free(session, track->addr, track->size));
-			WT_VERBOSE(session, reconcile,
-			    "page %p discard overflow %" PRIu32 "/%" PRIu32,
-			    page, track->addr, track->size);
+			__track_msg(
+			    session, page, "discard overflow", &track->addr);
+			WT_RET(__wt_block_free(
+			    session, track->addr.addr, track->addr.size));
+
+			/* Freeing WT_PAGE_TRACK->addr frees ->data, too. */
+			__wt_free(session, track->addr.addr);
 			break;
 		}
 
@@ -303,34 +326,48 @@ __wt_rec_track_discard(WT_SESSION_IMPL *session, WT_PAGE *page, int final)
 
 #ifdef HAVE_VERBOSE
 /*
- * __wt_rec_track_print --
- *	Display an entry being tracked.
+ * __track_msg --
+ *	Output a verbose message and associated page and address pair.
  */
 static void
-__wt_rec_track_print(
+__track_msg(
+    WT_SESSION_IMPL *session, WT_PAGE *page, const char *msg, WT_ADDR *addr)
+{
+	WT_BUF *buf;
+
+	if (!WT_VERBOSE_ISSET(session, reconcile))
+		return;
+	if (__wt_scr_alloc(session, 64, &buf))
+		return;
+	WT_VERBOSE(session, reconcile, "page %p %s %s", page, msg,
+	    __wt_addr_string(session, buf, addr->addr, addr->size));
+	__wt_scr_free(&buf);
+}
+
+/*
+ * __track_print --
+ *	Display a tracked entry.
+ */
+static void
+__track_print(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_PAGE_TRACK *track)
 {
-	const char *onoff;
-
 	switch (track->type) {
 	case WT_PT_BLOCK:
 	case WT_PT_BLOCK_EVICT:
-		WT_VERBOSE(session, reconcile,
-		    "page %p tracking block (%" PRIu32 "/%" PRIu32 ")",
-		    page, track->addr, track->size);
+		__track_msg(session, page, "tracking block", &track->addr);
 		return;
 	case WT_PT_OVFL:
-		onoff = "ON";
+		__track_msg(
+		    session, page, "tracking overflow ON", &track->addr);
 		break;
 	case WT_PT_OVFL_DISCARD:
-		onoff = "OFF";
+		__track_msg(
+		    session, page, "tracking overflow OFF", &track->addr);
 		break;
 	case WT_PT_EMPTY:
 	default:				/* Not possible. */
-		return;
+		break;
 	}
-	WT_VERBOSE(session, reconcile,
-	    "page %p tracking overflow %s (%p, %" PRIu32 "/%" PRIu32 ")",
-	    page, onoff, track->data, track->addr, track->size);
 }
 #endif

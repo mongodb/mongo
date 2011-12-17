@@ -9,9 +9,11 @@
 
 static int __btree_alloc(WT_SESSION_IMPL *, const char *, const char *);
 static int __btree_conf(WT_SESSION_IMPL *, const char *);
-static int __btree_read_meta(WT_SESSION_IMPL *, const char *[], uint32_t);
 static int __btree_last(WT_SESSION_IMPL *);
 static int __btree_page_sizes(WT_SESSION_IMPL *, const char *);
+static int __btree_read_meta(WT_SESSION_IMPL *, const char *[], uint32_t);
+static int __btree_root_init(WT_SESSION_IMPL *, uint32_t);
+static int __btree_root_init_empty(WT_SESSION_IMPL *);
 
 static int pse1(WT_SESSION_IMPL *, const char *, uint32_t, uint32_t);
 static int pse2(WT_SESSION_IMPL *, const char *, uint32_t, uint32_t, uint32_t);
@@ -259,11 +261,12 @@ __btree_conf(WT_SESSION_IMPL *session, const char *config)
 		}
 	}
 
-	btree->root_page.addr = WT_ADDR_INVALID;
+	btree->root_addr = NULL;
 
 	TAILQ_INIT(&btree->freeqa);
 	TAILQ_INIT(&btree->freeqs);
 	btree->free_addr = WT_ADDR_INVALID;
+	btree->free_size = 0;
 
 	WT_RET(__wt_stat_alloc_btree_stats(session, &btree->stats));
 
@@ -274,17 +277,73 @@ __btree_conf(WT_SESSION_IMPL *session, const char *config)
 }
 
 /*
- * __wt_btree_root_empty_init --
- *      Create an empty in-memory tree.
+ * __btree_root_init --
+ *      Read in a tree from disk.
  */
-int
-__wt_btree_root_empty_init(WT_SESSION_IMPL *session)
+static int
+__btree_root_init(WT_SESSION_IMPL *session, uint32_t flags)
 {
 	WT_BTREE *btree;
+	WT_BUF tmp;
 	WT_PAGE *page;
-	WT_REF *ref;
+	int ret;
 
 	btree = session->btree;
+
+	/* Read the root into memory, and verify it. */
+	WT_CLEAR(tmp);
+	WT_RET(__wt_block_read(
+	    session, &tmp, btree->root_addr, btree->root_size, flags));
+
+	/* Build the in-memory version of the page. */
+	WT_ERR(__wt_page_inmem(session, NULL, NULL, tmp.mem, &page));
+
+	/* This page can never leave memory. */
+	F_SET(page, WT_PAGE_PINNED);
+
+	btree->root_page = page;
+	return (0);
+
+err:	__wt_buf_free(session, &tmp);
+	return (ret);
+}
+
+/*
+ * __btree_root_init_empty --
+ *      Create an empty in-memory tree.
+ */
+static int
+__btree_root_init_empty(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *btree;
+	WT_PAGE *root, *leaf;
+	WT_ROW_REF *rref;
+	WT_COL_REF *cref;
+	int ret;
+
+	btree = session->btree;
+	root = leaf = NULL;
+	ret = 0;
+
+	/*
+	 * Create a leaf page -- this can be reconciled while the root stays
+	 * pinned.
+	 */
+	WT_ERR(__wt_calloc_def(session, 1, &leaf));
+	switch (btree->type) {
+	case BTREE_COL_FIX:
+		leaf->u.col_leaf.recno = 1;
+		leaf->type = WT_PAGE_COL_FIX;
+		break;
+	case BTREE_COL_VAR:
+		leaf->u.col_leaf.recno = 1;
+		leaf->type = WT_PAGE_COL_VAR;
+		break;
+	case BTREE_ROW:
+		leaf->type = WT_PAGE_ROW_LEAF;
+		break;
+	}
+	leaf->entries = 0;
 
 	/*
 	 * A note about empty trees: the initial tree is a root page and a leaf
@@ -293,62 +352,51 @@ __wt_btree_root_empty_init(WT_SESSION_IMPL *session)
 	 *
 	 * Create the empty root page.
 	 */
-	WT_RET(__wt_calloc_def(session, 1, &page));
+	WT_ERR(__wt_calloc_def(session, 1, &root));
 	switch (btree->type) {
 	case BTREE_COL_FIX:
 	case BTREE_COL_VAR:
-		page->type = WT_PAGE_COL_INT;
-		WT_RET(__wt_calloc_def(session, 1, &page->u.col_int.t));
-		page->u.col_int.t->recno = 1;
-		ref = &page->u.col_int.t->ref;
-		page->u.col_int.recno = 1;
+		root->type = WT_PAGE_COL_INT;
+		root->u.col_int.recno = 1;
+		WT_ERR(__wt_calloc_def(session, 1, &root->u.col_int.t));
+		cref = root->u.col_int.t;
+		WT_COL_REF_PAGE(cref) = leaf;
+		WT_COL_REF_STATE(cref) = WT_REF_MEM;
+		cref->recno = 1;
+		cref->ref.addr = NULL;
+
+		leaf->parent_ref.cref = cref;
+		leaf->parent = root;
 		break;
 	case BTREE_ROW:
-		page->type = WT_PAGE_ROW_INT;
-		WT_RET(__wt_calloc_def(session, 1, &page->u.row_int.t));
-		ref = &page->u.row_int.t->ref;
-		WT_RET(__wt_row_ikey_alloc(session, 0, "", 1,
-		    (WT_IKEY **)&((WT_ROW_REF *)ref)->key));
+		root->type = WT_PAGE_ROW_INT;
+		WT_ERR(__wt_calloc_def(session, 1, &root->u.row_int.t));
+		rref = root->u.row_int.t;
+		WT_ROW_REF_PAGE(rref) = leaf;
+		WT_ROW_REF_STATE(rref) = WT_REF_MEM;
+		WT_ERR(__wt_row_ikey_alloc(
+		    session, 0, "", 1, (WT_IKEY **)&(rref->key)));
+		rref->ref.addr = NULL;
+
+		leaf->parent_ref.rref = rref;
+		leaf->parent = root;
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
-	page->entries = 1;
-	page->parent = NULL;
-	page->parent_ref = &btree->root_page;
-	F_SET(page, WT_PAGE_PINNED);
+	root->entries = 1;
+	root->parent = NULL;
+	root->parent_ref.ref = NULL;
+	F_SET(root, WT_PAGE_PINNED);
 
-	btree->root_page.state = WT_REF_MEM;
-	btree->root_page.addr = WT_ADDR_INVALID;
-	btree->root_page.size = 0;
-	btree->root_page.page = page;
+	btree->root_page = root;
 
-	/*
-	 * Create a leaf page -- this can be reconciled while the root stays
-	 * pinned.
-	 */
-	WT_RET(__wt_calloc_def(session, 1, &page));
-	switch (btree->type) {
-	case BTREE_COL_FIX:
-		page->u.col_leaf.recno = 1;
-		page->type = WT_PAGE_COL_FIX;
-		break;
-	case BTREE_COL_VAR:
-		page->u.col_leaf.recno = 1;
-		page->type = WT_PAGE_COL_VAR;
-		break;
-	case BTREE_ROW:
-		page->type = WT_PAGE_ROW_LEAF;
-		break;
-	}
-	page->entries = 0;
-	page->parent = btree->root_page.page;
-	page->parent_ref = ref;
-
-	ref->state = WT_REF_MEM;
-	ref->addr = WT_ADDR_INVALID;
-	ref->size = 0;
-	ref->page = page;
 	return (0);
+
+err:	if (root != NULL)
+		__wt_free(session, root);
+	if (leaf != NULL)
+		__wt_free(session, leaf);
+	return (ret);
 }
 
 /*
@@ -362,7 +410,7 @@ __wt_btree_root_empty(WT_SESSION_IMPL *session, WT_PAGE **leafp)
 	WT_PAGE *root, *child;
 
 	btree = session->btree;
-	root = btree->root_page.page;
+	root = btree->root_page;
 
 	if (root->entries != 1)
 		return (WT_ERROR);
@@ -489,21 +537,10 @@ __btree_read_meta(WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
 	 * Get a root page.  If there's a root page in the file, read it in and
 	 * pin it.  If there's no root page, create an empty in-memory page.
 	 */
-	if (btree->root_page.addr == WT_ADDR_INVALID)
-		WT_RET(__wt_btree_root_empty_init(session));
-	else  {
-		/* If an open for a verify operation, check the disk image. */
-		WT_RET(__wt_page_in(session, NULL,
-		    &btree->root_page, LF_ISSET(WT_BTREE_VERIFY) ? 1 : 0));
-		F_SET(btree->root_page.page, WT_PAGE_PINNED);
-
-		/*
-		 * Publish: there must be a barrier to ensure the pinned flag
-		 * is set before we discard our hazard reference.
-		 */
-		WT_WRITE_BARRIER();
-		__wt_hazard_clear(session, btree->root_page.page);
-	}
+	if (btree->root_addr == NULL)
+		WT_RET(__btree_root_init_empty(session));
+	else
+		WT_RET(__btree_root_init(session, LF_ISSET(WT_BTREE_VERIFY)));
 
 	/* Get the last page of the file. */
 	WT_RET(__btree_last(session));
@@ -554,6 +591,7 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	__wt_free(session, btree->value_format);
 	__wt_free(session, btree->value_plan);
 	__wt_btree_huffman_close(session);
+	__wt_free(session, btree->root_addr);
 	__wt_free(session, btree->stats);
 
 	__wt_spin_destroy(session, &btree->freelist_lock);
@@ -673,13 +711,6 @@ __btree_page_sizes(WT_SESSION_IMPL *session, const char *config)
 	WT_ASSERT(session, btree->allocsize <= WT_BTREE_ALLOCATION_SIZE_MAX);
 	WT_ASSERT(session, btree->maxintlpage <= WT_BTREE_PAGE_SIZE_MAX);
 	WT_ASSERT(session, btree->maxleafpage <= WT_BTREE_PAGE_SIZE_MAX);
-
-	/*
-	 * The API limits the minimum overflow size, but just in case: we'd fail
-	 * horribly if the overflow limit was smaller than an overflow chunk.
-	 */
-	WT_ASSERT(session, btree->maxintlitem > sizeof(WT_OFF) + 10);
-	WT_ASSERT(session, btree->maxleafitem > sizeof(WT_OFF) + 10);
 
 	return (0);
 }

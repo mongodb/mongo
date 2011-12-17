@@ -524,9 +524,8 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		    !WT_PAGE_IS_ROOT(page) && !F_ISSET(page, WT_PAGE_PINNED) &&
 		    page->parent_ref->state == WT_REF_MEM) {
 			WT_VERBOSE(session, evictserver,
-			    "%s walk: %" PRIu32 ", size %" PRIu32,
-			    btree->name, WT_PADDR(page),
-			    page->memory_footprint);
+			    "%s walk: %p, size %" PRIu32,
+			    btree->name, page, page->memory_footprint);
 
 			++i;
 			cache->evict[*slotp].page = page;

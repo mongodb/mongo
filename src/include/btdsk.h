@@ -81,7 +81,7 @@ struct __wt_btree_desc {
 #define	WT_BTREE_MINOR_VERSION	1
 	uint16_t minorv;		/* 06-07: Minor version */
 
-	uint32_t checksum;		/* 08-11: Checksum */
+	uint32_t cksum;			/* 08-11: Checksum */
 
 	/*
 	 * We store two page addr/size pairs: the root page for the tree and
@@ -149,7 +149,7 @@ struct __wt_page_disk {
 	(++(lsn))
 	uint64_t lsn;			/* 08-15: LSN file/offset pair */
 
-	uint32_t checksum;		/* 16-19: checksum */
+	uint32_t cksum;			/* 16-19: checksum */
 
 	/*
 	 * We write the page size in the on-disk page header because it makes
@@ -199,40 +199,3 @@ struct __wt_page_disk {
 	WT_PTRDIFF32(p, dsk)
 #define	WT_REF_OFFSET(page, o)						\
 	((void *)((uint8_t *)((page)->dsk) + (o)))
-
-/*
- * WT_OFF --
- *	Row-store internal pages reference subtrees with no record count, and
- * row- and column-store overflow key and data items.
- *
- * WT_OFF_RECORD --
- *      Column-store internal pages reference subtrees including total record
- * counts for the subtree.
- *
- * !!!
- * Note the initial two fields of the WT_OFF and WT_OFF_RECORD fields are the
- * same -- this is deliberate, and we use it to pass references to places that
- * only care about the addr/size pair.
- */
-struct __wt_off {
-	uint32_t addr;			/* Subtree root page address */
-	uint32_t size;			/* Subtree root page length */
-};
-/*
- * WT_OFF_SIZE is the expected structure size -- we verify the build to
- * ensure the compiler hasn't inserted padding (which would break the world).
- */
-#define	WT_OFF_SIZE	8
-
-struct __wt_off_record {
-	uint32_t addr;			/* Subtree root page address */
-	uint32_t size;			/* Subtree root page length */
-
-#define	WT_RECNO(offp)		((offp)->recno)
-	uint64_t recno;
-};
-/*
- * WT_OFF_RECORD_SIZE is the expected structure size -- we verify the build to
- * ensure the compiler hasn't inserted padding (which would break the world).
- */
-#define	WT_OFF_RECORD_SIZE	16

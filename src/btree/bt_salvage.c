@@ -7,6 +7,7 @@
 
 #include "wt_internal.h"
 
+#ifdef HAVE_SALVAGE
 struct __wt_stuff; 		typedef struct __wt_stuff WT_STUFF;
 struct __wt_track; 		typedef struct __wt_track WT_TRACK;
 
@@ -140,11 +141,11 @@ __slvg_empty(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_salvage --
+ * __salvage --
  *	Salvage a Btree.
  */
-int
-__wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
+static int
+__salvage(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_BTREE *btree;
 	WT_STUFF *ss, stuff;
@@ -2240,4 +2241,22 @@ __slvg_trk_free(WT_SESSION_IMPL *session, WT_TRACK **trkp, uint32_t flags)
 	__wt_free(session, trk);
 
 	return (0);
+}
+#endif
+
+/*
+ * __wt_salvage --
+ *	Salvage a Btree.
+ */
+int
+__wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
+{
+#ifdef	HAVE_SALVAGE
+	return (__salvage(session, cfg));
+#else
+	WT_UNUSED(cfg);
+	__wt_errx(session,
+	    "the WiredTiger library was not built with salvage support");
+	return (ENOTSUP);
+#endif
 }

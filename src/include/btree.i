@@ -180,6 +180,36 @@ __wt_off_page(WT_PAGE *page, const void *p)
 }
 
 /*
+ * __wt_get_addr --
+ *	Return the addr/size pair for a reference.
+ */
+static inline void
+__wt_get_addr(
+    WT_PAGE *page, WT_REF *ref, const uint8_t **addrp, uint32_t *sizep)
+{
+	WT_CELL_UNPACK *unpack, _unpack;
+
+	unpack = &_unpack;
+
+	/*
+	 * If NULL, there is no location.
+	 * If off-page, the pointer references a WT_ADDR structure.
+	 * If on-page, the pointer references a cell.
+	 */
+	if (ref->addr == NULL) {
+		*addrp = NULL;
+		*sizep = 0;
+	} else if (__wt_off_page(page, ref->addr)) {
+		*addrp = ((WT_ADDR *)(ref->addr))->addr;
+		*sizep = ((WT_ADDR *)(ref->addr))->size;
+	} else {
+		__wt_cell_unpack(ref->addr, unpack);
+		*addrp = unpack->data;
+		*sizep = unpack->size;
+	}
+}
+
+/*
  * __wt_page_release --
  *	Release a reference to a page, unless it's pinned into memory, in which
  * case we never acquired a hazard reference.

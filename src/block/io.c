@@ -8,6 +8,134 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_fsm_buffer_to_addr --
+ *	Convert a filesystem address cookie into its components.
+ */
+int
+__wt_fsm_buffer_to_addr(
+    const uint8_t *p, uint32_t *addr, uint32_t *size, uint32_t *cksum)
+{
+	uint64_t a;
+
+	WT_RET(__wt_vunpack_uint(&p, 0, &a));
+	if (addr != NULL)
+		*addr = (uint32_t)a;
+
+	WT_RET(__wt_vunpack_uint(&p, 0, &a));
+	if (size != NULL)
+		*size = (uint32_t)a;
+
+	/* Minor optimization: we often don't want the checksum. */
+	if (cksum != NULL) {
+		WT_RET(__wt_vunpack_uint(&p, 0, &a));
+		*cksum = (uint32_t)a;
+	}
+
+	return (0);
+}
+
+/*
+ * __wt_fsm_addr_to_buffer --
+ *	Convert the filesystem components into its address cookie.
+ */
+int
+__wt_fsm_addr_to_buffer(
+    uint8_t **p, uint32_t addr, uint32_t size, uint32_t cksum)
+{
+	uint64_t a;
+
+	a = addr;
+	WT_RET(__wt_vpack_uint(p, 0, a));
+	a = size;
+	WT_RET(__wt_vpack_uint(p, 0, a));
+	a = cksum;
+	WT_RET(__wt_vpack_uint(p, 0, a));
+	return (0);
+}
+
+/*
+ * __wt_fsm_valid --
+ *	Return if a filesystem address cookie is valid for the file.
+ */
+int
+__wt_fsm_valid(
+    WT_SESSION_IMPL *session, const uint8_t *addrbuf, uint32_t addrbuf_size)
+{
+	WT_BTREE *btree;
+	uint32_t addr, size;
+
+	btree = session->btree;
+
+	/* Crack the cookie. */
+	WT_UNUSED(addrbuf_size);
+	WT_RET(__wt_fsm_buffer_to_addr(addrbuf, &addr, &size, NULL));
+
+	/* All we care about is if it's past the end of the file. */
+	return ((WT_ADDR_TO_OFF(btree, addr) +
+	    (off_t)size > btree->fh->file_size) ? 0 : 1);
+}
+
+/*
+ * __wt_fsm_addr_string
+ *	Return a printable string representation of a filesystem address cookie.
+ */
+int
+__wt_fsm_addr_string(WT_SESSION_IMPL *session,
+    WT_BUF *buf, const uint8_t *addrbuf, uint32_t addrbuf_size)
+{
+	uint32_t addr, size;
+
+	/* Crack the cookie. */
+	WT_UNUSED(addrbuf_size);
+	WT_RET(__wt_fsm_buffer_to_addr(addrbuf, &addr, &size, NULL));
+
+	/* Printable representation. */
+	WT_RET(__wt_buf_fmt(session, buf,
+	    "[%" PRIu32 "-%" PRIu32 ", %" PRIu32 "]",
+	    addr, addr + (size / 512 - 1), size));
+
+	return (0);
+}
+
+/*
+ * __wt_block_read --
+ *	Read a address cookie-referenced block into a buffer.
+ */
+int
+__wt_block_read(WT_SESSION_IMPL *session,
+    WT_BUF *buf, const uint8_t *addrbuf, uint32_t addrbuf_size, uint32_t flags)
+{
+	WT_BUF *tmp;
+	uint32_t addr, size, cksum;
+	int ret;
+
+	ret = 0;
+
+	/* Crack the cookie. */
+	WT_UNUSED(addrbuf_size);
+	WT_RET(__wt_fsm_buffer_to_addr(addrbuf, &addr, &size, &cksum));
+
+	/* Re-size the buffer as necessary. */
+	WT_RET(__wt_buf_initsize(session, buf, size));
+
+	/* Read the block. */
+	WT_RET(__wt_fsm_read(session, buf, addr, size, cksum));
+
+	/* Optionally verify the page: used by salvage and verify. */
+	if (!LF_ISSET(WT_VERIFY))
+		return (0);
+
+	WT_RET(__wt_scr_alloc(session, 0, &tmp));
+	WT_ERR(__wt_fsm_addr_string(session, tmp, addrbuf, addrbuf_size));
+	WT_ERR(__wt_verify_dsk(
+	    session, (char *)tmp->data, buf->mem, buf->size));
+
+err:	__wt_scr_free(&tmp);
+
+	return (ret);
+}
+
+/*
  * Don't compress the first 32B of the block (almost all of the WT_PAGE_DISK
  * structure) because we need the block's checksum and on-disk and in-memory
  * sizes to be immediately available without decompression (the checksum and
@@ -20,19 +148,18 @@
 #define	COMPRESS_SKIP    32
 
 /*
- * __wt_block_read --
+ * __wt_fsm_read --
  *	Read a block into a buffer.
  */
 int
-__wt_block_read(WT_SESSION_IMPL *session,
-    WT_BUF *buf, uint32_t addr, uint32_t size, uint32_t flags)
+__wt_fsm_read(WT_SESSION_IMPL *session,
+    WT_BUF *buf, uint32_t addr, uint32_t size, uint32_t cksum)
 {
 	WT_BTREE *btree;
 	WT_BUF *tmp;
 	WT_FH *fh;
 	WT_ITEM src, dst;
 	WT_PAGE_DISK *dsk;
-	uint32_t checksum;
 	int ret;
 
 	btree = session->btree;
@@ -40,14 +167,16 @@ __wt_block_read(WT_SESSION_IMPL *session,
 	fh = btree->fh;
 	ret = 0;
 
+	WT_VERBOSE(
+	    session, read, "addr/size %" PRIu32 "/%" PRIu32, addr, size);
 	WT_RET(__wt_read(
 	    session, fh, WT_ADDR_TO_OFF(btree, addr), size, buf->mem));
 	buf->size = size;
 
 	dsk = buf->mem;
-	checksum = dsk->checksum;
-	dsk->checksum = 0;
-	if (checksum != __wt_cksum(dsk, size)) {
+	cksum = dsk->cksum;
+	dsk->cksum = 0;
+	if (cksum != __wt_cksum(dsk, size)) {
 		if (!F_ISSET(session, WT_SESSION_SALVAGE_QUIET_ERR))
 			__wt_errx(session,
 			    "read checksum error: %" PRIu32 "/%" PRIu32,
@@ -78,56 +207,63 @@ __wt_block_read(WT_SESSION_IMPL *session,
 	WT_BSTAT_INCR(session, page_read);
 	WT_CSTAT_INCR(session, block_read);
 
-	/* Optionally verify the page: used by salvage and verify. */
-	if (LF_ISSET(WT_VERIFY))
-		WT_ERR(__wt_verify_dsk(session, buf->mem, addr, buf->size));
-
 err:	__wt_scr_free(&tmp);
 	return (ret);
 }
 
 /*
  * __wt_block_write --
- *	Write a buffer to disk, returning the addr/size pair for the block.
+ *	Write a buffer into a block, returning the block's address cookie.
  */
 int
-__wt_block_write(
-    WT_SESSION_IMPL *session, WT_BUF *buf, uint32_t *addrp, uint32_t *sizep)
+__wt_block_write(WT_SESSION_IMPL *session,
+    WT_BUF *buf, uint8_t *addrbuf, uint32_t *addrbuf_size)
+{
+	uint32_t addr, size, cksum;
+
+	uint8_t *endp;
+
+	/*
+	 * We're passed a table's page image: WT_BUF->{data,size} are the image
+	 * and byte count.
+	 *
+	 * Diagnostics: verify the disk page: this violates layering, but it's
+	 * the place we can ensure we never write a corrupted page.
+	 */
+	WT_ASSERT(session, __wt_verify_dsk(
+	    session, "[NoAddr]", (WT_PAGE_DISK *)buf->data, buf->size) == 0);
+
+	WT_RET(__wt_fsm_write(session, buf, &addr, &size, &cksum));
+
+	endp = addrbuf;
+	WT_RET(__wt_fsm_addr_to_buffer(&endp, addr, size, cksum));
+	*addrbuf_size = WT_PTRDIFF32(endp, addrbuf);
+
+	return (0);
+}
+
+/*
+ * __wt_fsm_write --
+ *	Write a buffer into a block, returning the block's addr, size and
+ * checksum.
+ */
+int
+__wt_fsm_write(WT_SESSION_IMPL *session,
+    WT_BUF *buf, uint32_t *addrp, uint32_t *sizep, uint32_t *cksump)
 {
 	WT_ITEM src, dst;
 	WT_BTREE *btree;
 	WT_BUF *tmp;
 	WT_PAGE_DISK *dsk;
-	uint32_t addr, align_size, size, tmp_size;
-	uint8_t orig_type;
+	uint32_t addr, align_size, size;
 	int compression_failed, ret;
 
 	btree = session->btree;
 	tmp = NULL;
 	ret = 0;
 
-	/*
-	 * We're passed in a WT_BUF that references some chunk of memory that's
-	 * a table's page image.  WT_BUF->size is the byte count of the image,
-	 * and WT_BUF->data is the image itself.
-	 *
-	 * Diagnostics: verify the disk page.  We have no disk address to use
-	 * for error messages, use 0 (WT_ADDR_INVALID is a big, big number).
-	 * This violates layering, but it's the place we can ensure we never
-	 * write a corrupted page.
-	 */
-	WT_ASSERT(session,
-	    __wt_verify_dsk(session, buf->mem, 0, buf->size) == 0);
-
-	/*
-	 * The WT_PAGE_DISK->type field is after the 32B we leave uncompressed
-	 * in the block, so we have to save a copy for our eventual verbose
-	 * message.
-	 */
-	dsk = buf->mem;
-	orig_type = dsk->type;
-
 	/* Set the in-memory size, then align it to an allocation unit. */
+	dsk = buf->mem;
 	dsk->memsize = buf->size;
 	align_size = WT_ALIGN(buf->size, btree->allocsize);
 
@@ -248,8 +384,8 @@ not_compressed:	/*
 	 * Update the block's checksum: checksum the compressed contents, not
 	 * the uncompressed contents.
 	 */
-	dsk->checksum = 0;
-	dsk->checksum = __wt_cksum(dsk, align_size);
+	dsk->cksum = 0;
+	dsk->cksum = __wt_cksum(dsk, align_size);
 	WT_ERR(__wt_write(
 	    session, btree->fh, WT_ADDR_TO_OFF(btree, addr), align_size, dsk));
 
@@ -257,13 +393,13 @@ not_compressed:	/*
 	WT_CSTAT_INCR(session, block_write);
 
 	WT_VERBOSE(session, write,
-	    "%" PRIu32 " at addr/size %" PRIu32 "/%" PRIu32 ", %s%s",
+	    "%" PRIu32 " at addr/size %" PRIu32 "/%" PRIu32 ", %s",
 	    dsk->memsize, addr, dsk->size,
-	    dsk->size < dsk->memsize ? "compressed, " : "",
-	    __wt_page_type_string(orig_type));
+	    dsk->size < dsk->memsize ? "compressed, " : "");
 
 	*addrp = addr;
 	*sizep = align_size;
+	*cksump = dsk->cksum;
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
