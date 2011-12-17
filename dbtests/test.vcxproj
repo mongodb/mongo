@@ -225,6 +225,7 @@
     <ClInclude Include="..\bson\oid.h" />
     <ClInclude Include="..\bson\ordering.h" />
     <ClInclude Include="..\bson\stringdata.h" />
+    <ClInclude Include="..\client\dbclientmockcursor.h" />
     <ClInclude Include="..\db\collection.h" />
     <ClInclude Include="..\db\databaseholder.h" />
     <ClInclude Include="..\db\dur.h" />
