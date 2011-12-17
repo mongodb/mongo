@@ -99,8 +99,7 @@ namespace mongo {
                 nscanned++;
                 bool loadedObject = false;
 
-                if ( ( !cursor->matcher() || cursor->matcher()->matchesCurrent( cursor.get() , &md ) ) &&
-                    !cursor->getsetdup( cursor->currLoc() ) ) {
+                if ( cursor->currentMatches( &md ) && !cursor->getsetdup( cursor->currLoc() ) ) {
                     n++;
 
                     BSONObj holder;

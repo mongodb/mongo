@@ -100,14 +100,9 @@ namespace mongo {
 
             _state.set(1);
 
-            Client *c = curopWaitingForLock( 1 ); // stats
+            curopWaitingForLock( 1 ); // stats
             _m.lock();
-            curopGotLock(c);
-
-            _minfo.entered();
-
             MongoFile::markAllWritable(); // for _DEBUG validation -- a no op for release build
-
             _acquiredWriteLock();
         }
 
@@ -116,12 +111,10 @@ namespace mongo {
             if ( _writeLockedAlready() ) // adjusts _state
                 return true;
 
-            Client *c = curopWaitingForLock( 1 );
+            curopWaitingForLock( 1 );
             bool got = _m.lock_try( millis );
 
             if ( got ) {
-                curopGotLock(c);
-                _minfo.entered();
                 _state.set(1);
                 MongoFile::markAllWritable(); // for _DEBUG validation -- a no op for release build
                 _acquiredWriteLock();
@@ -147,7 +140,6 @@ namespace mongo {
             _releasingWriteLock();
             MongoFile::unmarkAllWritable(); // _DEBUG validation
             _state.set(0);
-            _minfo.leaving();
             _m.unlock();
         }
 
@@ -204,7 +196,7 @@ namespace mongo {
         void unlock_shared() {
             int s = _state.get();
             if( s > 0 ) {
-                assert( s > 1 ); /* we must have done a lock write first to have s > 1 */
+                wassert( s > 1 ); /* we must have done a lock write first to have s > 1 */
                 _state.set(s-1);
                 return;
             }
@@ -212,7 +204,7 @@ namespace mongo {
                 _state.set(s+1);
                 return;
             }
-            assert( s == -1 );
+            wassert( s == -1 );
             _state.set(0);
             _m.unlock_shared();
         }
@@ -220,6 +212,8 @@ namespace mongo {
         MutexInfo& info() { return _minfo; }
 
     private:
+        void lockedExclusively();
+        void unlockingExclusively();
         void _acquiredWriteLock();
         void _releasingWriteLock();
 
@@ -260,9 +254,11 @@ namespace mongo {
 
     inline void MongoMutex::_releasingWriteLock() {
         dur::releasingWriteLock();
+        unlockingExclusively();
     }
 
     inline void MongoMutex::_acquiredWriteLock() {
+        lockedExclusively();
         if( _remapPrivateViewRequested ) {
             dur::REMAPPRIVATEVIEW();
             dassert( !_remapPrivateViewRequested );
@@ -303,6 +299,8 @@ namespace mongo {
             );
         }
     };
+    // eventually rename fully
+    typedef readlock GlobalSharedLock;
 
     struct readlocktry {
         readlocktry( const string&ns , int tryms ) {

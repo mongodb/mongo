@@ -42,6 +42,7 @@ public:
     bool _keepIndexVersion;
     bool _restoreOptions;
     bool _restoreIndexes;
+    bool _restoreShardingConfig;
     int _w;
     string _curns;
     string _curdb;
@@ -56,11 +57,13 @@ public:
         ("keepIndexVersion" , "don't upgrade indexes to newest version")
         ("noOptionsRestore" , "don't restore collection options")
         ("noIndexRestore" , "don't restore indexes")
+        ("restoreShardingConfig", "restore sharding configuration before doing the full import")
         ("w" , po::value<int>()->default_value(1) , "minimum number of replicas per write" )
         ;
         add_hidden_options()
         ("dir", po::value<string>()->default_value("dump"), "directory to restore from")
         ("indexesLast" , "wait to add indexes (now default)") // left in for backwards compatibility
+        ("forceConfigRestore", "don't use confirmation prompt when doing --restoreShardingConfig") // For testing
         ;
         addPositionArg("dir", 1);
     }
@@ -84,32 +87,34 @@ public:
         _restoreOptions = !hasParam("noOptionRestore");
         _restoreIndexes = !hasParam("noIndexRestore");
         _w = getParam( "w" , 1 );
-        
+        _restoreShardingConfig = hasParam("restoreShardingConfig");
+        bool forceConfigRestore = hasParam("forceConfigRestore");
+
         bool doOplog = hasParam( "oplogReplay" );
 
         if (doOplog) {
             // fail early if errors
 
             if (_db != "") {
-                cout << "Can only replay oplog on full restore" << endl;
+                log() << "Can only replay oplog on full restore" << endl;
                 return -1;
             }
 
             if ( ! exists(root / "oplog.bson") ) {
-                cout << "No oplog file to replay. Make sure you run mongodump with --oplog." << endl;
+                log() << "No oplog file to replay. Make sure you run mongodump with --oplog." << endl;
                 return -1;
             }
 
 
             BSONObj out;
             if (! conn().simpleCommand("admin", &out, "buildinfo")) {
-                cout << "buildinfo command failed: " << out["errmsg"].String() << endl;
+                log() << "buildinfo command failed: " << out["errmsg"].String() << endl;
                 return -1;
             }
 
             StringData version = out["version"].valuestr();
             if (versionCmp(version, "1.7.4-pre-") < 0) {
-                cout << "Can only replay oplog to server version >= 1.7.4" << endl;
+                log() << "Can only replay oplog to server version >= 1.7.4" << endl;
                 return -1;
             }
 
@@ -132,6 +137,49 @@ public:
             }
         }
 
+        if (_restoreShardingConfig) {
+            if (_db != "" && _db != "config") {
+                log() << "Can only setup sharding configuration on full restore or on restoring config database" << endl;
+                return -1;
+            }
+
+            // make sure we're talking to a mongos
+            if (!isMongos()) {
+                log() << "Can only use --restoreShardingConfig on a mongos" << endl;
+                return -1;
+            }
+
+            if ( ! exists(root / "config") ) {
+                log() << "No config directory to restore sharding setup from." << endl;
+                return -1;
+            }
+
+            // Make sure this isn't an active cluster.
+            log() << "WARNING: this will drop the config database, overriding any sharding configuration you currently have." << endl
+                 << "DO NOT RUN THIS COMMAND WHILE YOUR CLUSTER IS ACTIVE" << endl;
+            if (forceConfigRestore) {
+                log() << "Running with --forceConfigRestore. Continuing." << endl;
+            } else {
+                if (!confirmAction()) {
+                    log() << "aborting" << endl;
+                    return -1;
+                }
+            }
+
+            // Restore config database
+            BSONObj info;
+            bool ok = conn().runCommand( "config" , BSON( "dropDatabase" << 1 ) , info );
+            if (!ok) {
+                log() << "Error dropping config database. Aborting" << endl;
+                return -1;
+            }
+            drillDown(root / "config", false, false);
+
+            log() << "Finished restoring config database." << endl
+                 << "Calling flushRouterConfig on this connection" << endl;
+            conn().runCommand( "config" , BSON( "flushRouterConfig" << 1 ) , info );
+        }
+
         /* If _db is not "" then the user specified a db name to restore as.
          *
          * In that case we better be given either a root directory that
@@ -143,11 +191,18 @@ public:
          */
         drillDown(root, _db != "", _coll != "", true);
 
+        if (_restoreShardingConfig) {
+            log() << "Flushing routing configuration from all mongos that we're aware of" << endl;
+            flushAllMongos();
+            log(1) << "Finished flushing the sharding configuration on all mongos' that the dumped config data knew of." << endl
+                 << "If there are new mongos' that weren't just flushed, make sure to call flushRouterConfig on them." << endl;
+        }
+
         // should this happen for oplog replay as well?
         conn().getLastError();
 
         if (doOplog) {
-            out() << "\t Replaying oplog" << endl;
+            log() << "\t Replaying oplog" << endl;
             _curns = OPLOG_SENTINEL;
             processFile( root / "oplog.bson" );
         }
@@ -172,8 +227,8 @@ public:
 
                 if (use_db) {
                     if (is_directory(p)) {
-                        cerr << "ERROR: root directory must be a dump of a single database" << endl;
-                        cerr << "       when specifying a db name with --db" << endl;
+                        error() << "ERROR: root directory must be a dump of a single database" << endl;
+                        error() << "       when specifying a db name with --db" << endl;
                         printHelp(cout);
                         return;
                     }
@@ -181,8 +236,8 @@ public:
 
                 if (use_coll) {
                     if (is_directory(p) || i != end) {
-                        cerr << "ERROR: root directory must be a dump of a single collection" << endl;
-                        cerr << "       when specifying a collection name with --collection" << endl;
+                        error() << "ERROR: root directory must be a dump of a single collection" << endl;
+                        error() << "       when specifying a collection name with --collection" << endl;
                         printHelp(cout);
                         return;
                     }
@@ -192,10 +247,16 @@ public:
                 if (top_level && !use_db && p.leaf() == "oplog.bson")
                     continue;
 
-                if ( p.leaf() == "system.indexes.bson" )
+                if ( p.leaf() == "system.indexes.bson" ) {
                     indexes = p;
-                else
+                }
+                else if (_restoreShardingConfig && is_directory(p) && p.leaf() == "config") {
+                    // Config directory should have already been restored. Skip it here.
+                    continue;
+                }
+                else {
                     drillDown(p, use_db, use_coll);
+                }
             }
 
             if (!indexes.empty())
@@ -211,7 +272,7 @@ public:
 
         if ( ! ( endsWith( root.string().c_str() , ".bson" ) ||
                  endsWith( root.string().c_str() , ".bin" ) ) ) {
-            cerr << "don't know what to do with file [" << root.string() << "]" << endl;
+            error() << "don't know what to do with file [" << root.string() << "]" << endl;
             return;
         }
 
@@ -248,11 +309,11 @@ public:
             ns += "." + oldCollName;
         }
 
-        out() << "\tgoing into namespace [" << ns << "]" << endl;
+        log() << "\tgoing into namespace [" << ns << "]" << endl;
 
         if ( _drop ) {
             if (root.leaf() != "system.users.bson" ) {
-                out() << "\t dropping" << endl;
+                log() << "\t dropping" << endl;
                 conn().dropCollection( ns );
             } else {
                 // Create map of the users currently in the DB
@@ -272,7 +333,7 @@ public:
                 // This is fine because dumps from before 2.1 won't have a metadata file, just print a warning.
                 // System collections shouldn't have metadata so don't warn if that file is missing.
                 if (!startsWith(metadataFile.leaf(), "system.")) {
-                    out() << metadataFile.string() << " not found. Skipping." << endl;
+                    log() << metadataFile.string() << " not found. Skipping." << endl;
                 }
             } else {
                 metadataObject = parseMetadataFile(metadataFile.string());
@@ -362,6 +423,28 @@ private:
         return obj;
     }
 
+    // Compares 2 BSONObj representing collection options. Returns true if the objects
+    // represent different options. Ignores the "create" field.
+    bool optionsSame(BSONObj obj1, BSONObj obj2) {
+        int nfields = 0;
+        BSONObjIterator i(obj1);
+        while ( i.more() ) {
+            BSONElement e = i.next();
+            if (!obj2.hasField(e.fieldName())) {
+                if (strcmp(e.fieldName(), "create") == 0) {
+                    continue;
+                } else {
+                    return false;
+                }
+            }
+            nfields++;
+            if (e != obj2[e.fieldName()]) {
+                return false;
+            }
+        }
+        return nfields == obj2.nFields();
+    }
+
     void createCollectionWithOptions(BSONObj cmdObj) {
         if (!cmdObj.hasField("create") || cmdObj["create"].String() != _curcoll) {
             BSONObjBuilder bo;
@@ -382,15 +465,27 @@ private:
             cmdObj = bo.obj();
         }
 
+        BSONObj fields = BSON("options" << 1);
+        scoped_ptr<DBClientCursor> cursor(conn().query(_curdb + ".system.namespaces", Query(BSON("name" << _curns)), 0, 0, &fields));
+
+        bool createColl = true;
+        if (cursor->more()) {
+            createColl = false;
+            BSONObj obj = cursor->next();
+            if (!obj.hasField("options") || !optionsSame(cmdObj, obj["options"].Obj())) {
+                    log() << "WARNING: collection " << _curns << " exists with different options than are in the metadata.json file and not using --drop. Options in the metadata file will be ignored." << endl;
+            }
+        }
+
+        if (!createColl) {
+            return;
+        }
+
         BSONObj info;
         if (!conn().runCommand(_curdb, cmdObj, info)) {
-            if (info["errmsg"].String() == "collection already exists") {
-                out() << "Couldn't create collection " << _curns << " because it already exists. Collection options will not be added" << endl;
-            } else {
-                uasserted(15936, "Creating collection " + _curns + " failed. Errmsg: " + info["errmsg"].String());
-            }
+            uasserted(15936, "Creating collection " + _curns + " failed. Errmsg: " + info["errmsg"].String());
         } else {
-            out() << "\tCreated collection " << _curns << " with options: " << cmdObj.jsonString() << endl;
+            log() << "\tCreated collection " << _curns << " with options: " << cmdObj.jsonString() << endl;
         }
     }
 
@@ -420,16 +515,65 @@ private:
 
         if ( ! ( err["err"].isNull() ) ) {
             if (err["err"].String() == "norepl" && _w > 1) {
-                cerr << "Cannot specify write concern for non-replicas" << endl;
+                error() << "Cannot specify write concern for non-replicas" << endl;
             }
             else {
-                cerr << "Error creating index " << o["ns"].String();
-                cerr << ": " << err["code"].Int() << " " << err["err"].String() << endl;
-                cerr << "To resume index restoration, run " << _name << " on file" << _fileName << " manually." << endl;
+                error() << "Error creating index " << o["ns"].String();
+                error() << ": " << err["code"].Int() << " " << err["err"].String() << endl;
+                error() << "To resume index restoration, run " << _name << " on file" << _fileName << " manually." << endl;
             }
 
             ::abort();
         }
+    }
+
+    // Calls flushRouterConfig on all mongos' in the config db's mongos collection, as well as on the one
+    // we're currently connected to.
+    void flushAllMongos() {
+        BSONObj info;
+
+        auto_ptr<DBClientCursor> cursor = conn().query ("config.mongos", Query());
+        while (cursor->more()) {
+            BSONObj obj = cursor->nextSafe();
+            string mongos = obj.getField("_id").valuestr();
+            string errmsg;
+            ConnectionString cs = ConnectionString::parse( mongos , errmsg );
+
+            if ( ! cs.isValid() ) {
+                error() << "invalid mongos hostname [" << mongos << "] " << errmsg << endl;
+                continue;
+            }
+
+            DBClientBase* mongosConn = cs.connect( errmsg );
+            if ( ! mongosConn ) {
+                error() << "Error connecting to mongos [" << mongos << "]: " << errmsg << endl;
+                continue;
+            }
+
+            log(1) << "Calling flushRouterConfig on mongos: " << mongos << endl;
+            mongosConn->runCommand( "config" , BSON( "flushRouterConfig" << 1 ) , info );
+        }
+    }
+
+    bool confirmAction() {
+        string userInput;
+        int attemptCount = 0;
+        while (attemptCount < 3) {
+            log() << "Are you sure you want to continue? [y/n]: ";
+            cin >> userInput;
+            if (userInput == "Y" || userInput == "y" || userInput == "yes" || userInput == "Yes" || userInput == "YES") {
+                return true;
+            }
+            else if (userInput == "N" || userInput == "n" || userInput == "no" || userInput == "No" || userInput == "NO") {
+                return false;
+            }
+            else {
+                log() << "Invalid input." << endl;
+                attemptCount++;
+            }
+        }
+        log() << "Entered invalid input 3 times in a row." << endl;
+        return false;
     }
 };
 

@@ -27,6 +27,7 @@
 #include "../util/alignedbuilder.h"
 #include "../util/net/listen.h" // getelapsedtimemillis
 #include <boost/static_assert.hpp>
+#include <boost/filesystem.hpp>
 #undef assert
 #define assert MONGO_assert
 #include "../util/mongoutils/str.h"
@@ -72,8 +73,8 @@ namespace mongo {
 
         void removeOldJournalFile(path p);
 
-        filesystem::path getJournalDir() {
-            filesystem::path p(dbpath);
+        boost::filesystem::path getJournalDir() {
+            boost::filesystem::path p(dbpath);
             p /= "journal";
             return p;
         }
@@ -157,7 +158,7 @@ namespace mongo {
         }
 
         path Journal::getFilePathFor(int filenumber) const {
-            filesystem::path p(dir);
+            boost::filesystem::path p(dir);
             p /= string(str::stream() << "j._" << filenumber);
             return p;
         }
@@ -238,7 +239,7 @@ namespace mongo {
 
         bool _preallocateIsFaster() {
             bool faster = false;
-            filesystem::path p = getJournalDir() / "tempLatencyTest";
+            boost::filesystem::path p = getJournalDir() / "tempLatencyTest";
             try { remove(p); } catch(...) { }
             try {
                 AlignedBuilder b(8192);
@@ -281,7 +282,7 @@ namespace mongo {
         }
 
         // throws
-        void preallocateFile(filesystem::path p, unsigned long long len) {
+        void preallocateFile(boost::filesystem::path p, unsigned long long len) {
             if( exists(p) ) 
                 return;
             
@@ -309,7 +310,7 @@ namespace mongo {
         }
 
         const int NUM_PREALLOC_FILES = 3;
-        inline filesystem::path preallocPath(int n) {
+        inline boost::filesystem::path preallocPath(int n) {
             assert(n >= 0);
             assert(n < NUM_PREALLOC_FILES);
             string fn = str::stream() << "prealloc." << n;
@@ -319,7 +320,7 @@ namespace mongo {
         // throws
         void _preallocateFiles() {
             for( int i = 0; i < NUM_PREALLOC_FILES; i++ ) {
-                filesystem::path filepath = preallocPath(i);
+                boost::filesystem::path filepath = preallocPath(i);
 
                 unsigned long long limit = DataLimitPerJournalFile;
                 if( debug && i == 1 ) { 
@@ -338,7 +339,7 @@ namespace mongo {
             unsigned long long freeSpace = File::freeSpace(getJournalDir().string());
             unsigned long long prealloced = 0;
             for( int i = 0; i < NUM_PREALLOC_FILES; i++ ) {
-                filesystem::path filepath = preallocPath(i);
+                boost::filesystem::path filepath = preallocPath(i);
                 if (exists(filepath))
                     prealloced += file_size(filepath);
             }
@@ -374,10 +375,10 @@ namespace mongo {
             if( usingPreallocate ) {
                 try {
                     for( int i = 0; i < NUM_PREALLOC_FILES; i++ ) {
-                        filesystem::path filepath = preallocPath(i);
-                        if( !filesystem::exists(filepath) ) {
+                        boost::filesystem::path filepath = preallocPath(i);
+                        if( !boost::filesystem::exists(filepath) ) {
                             // we can recycle this file into this prealloc file location
-                            filesystem::path temppath = filepath.string() + ".temp";
+                            boost::filesystem::path temppath = filepath.string() + ".temp";
                             boost::filesystem::rename(p, temppath);
                             {
                                 // zero the header
@@ -412,8 +413,8 @@ namespace mongo {
         path findPrealloced() { 
             try {
                 for( int i = 0; i < NUM_PREALLOC_FILES; i++ ) {
-                    filesystem::path filepath = preallocPath(i);
-                    if( filesystem::exists(filepath) )
+                    boost::filesystem::path filepath = preallocPath(i);
+                    if( boost::filesystem::exists(filepath) )
                         return filepath;
                 }
             } catch(...) { 
@@ -426,7 +427,7 @@ namespace mongo {
         void journalMakeDir() {
             j.init();
 
-            filesystem::path p = getJournalDir();
+            boost::filesystem::path p = getJournalDir();
             j.dir = p.string();
             log() << "journal dir=" << j.dir << endl;
             if( !exists(j.dir) ) {

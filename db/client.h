@@ -1,4 +1,4 @@
-/* @file client.h
+/* @file db/client.h
 
    "Client" represents a connection to the database (the server-side) and corresponds
    to an open socket (or logical connection if pooling on sockets) from a client.
@@ -30,10 +30,11 @@
 #include "namespace-inl.h"
 #include "lasterror.h"
 #include "stats/top.h"
-#include "../util/concurrency/threadlocal.h"
 #include "../db/client_common.h"
+#include "../util/concurrency/threadlocal.h"
 #include "../util/net/message_port.h"
 #include "../util/concurrency/rwlock.h"
+#include "d_concurrency.h"
 
 namespace mongo {
 
@@ -44,6 +45,13 @@ namespace mongo {
     class Command;
     class Client;
     class AbstractMessagingPort;
+    class LockCollectionForReading;
+
+#if defined(CLC)
+    typedef LockCollectionForReading _LockCollectionForReading;
+#else
+    typedef readlock _LockCollectionForReading;
+#endif
 
     TSP_DECLARE(Client, currentClient)
 
@@ -157,7 +165,7 @@ namespace mongo {
             ReadContext(const string& ns, string path=dbpath, bool doauth=true );
             Context& ctx() { return *c.get(); }
         private:
-            scoped_ptr<readlock> lk;
+            scoped_ptr<_LockCollectionForReading> lk;
             scoped_ptr<Context> c;
         };
 
@@ -217,19 +225,16 @@ namespace mongo {
             Database * _db;
         }; // class Client::Context
 
+        struct LockStatus {
+            LockStatus();
+            string whichCollection;
+            unsigned state;
+        } lockStatus;
+
 #if defined(CLC)
         void checkLocks() const;
-        struct LockStatus { 
-            LockStatus() : dbLockCount(0), whichDB(0), collLockCount(0) { }
-            SimpleRWLock collLock;
-            const Database *whichDB;
-            string whichCollection;
-            int dbLockCount;
-            int collLockCount;
-            bool collLocked();
-        } lockStatus;
 #else
-        void checkLocks() const {}
+        void checkLocks() const { }
 #endif
 
     }; // class Client
@@ -245,7 +250,6 @@ namespace mongo {
         _prev = cc()._god;
         cc()._god = true;
     }
-
     inline Client::GodScope::~GodScope() { cc()._god = _prev; }
 
     /* this unreadlocks and then writelocks; i.e. it does NOT upgrade inside the

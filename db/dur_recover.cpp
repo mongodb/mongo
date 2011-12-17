@@ -67,11 +67,11 @@ namespace mongo {
         /** get journal filenames, in order. throws if unexpected content found */
         static void getFiles(path dir, vector<path>& files) {
             map<unsigned,path> m;
-            for ( filesystem::directory_iterator i( dir );
-                    i != filesystem::directory_iterator();
+            for ( boost::filesystem::directory_iterator i( dir );
+                    i != boost::filesystem::directory_iterator();
                     ++i ) {
-                filesystem::path filepath = *i;
-                string fileName = filesystem::path(*i).leaf();
+                boost::filesystem::path filepath = *i;
+                string fileName = boost::filesystem::path(*i).leaf();
                 if( str::startsWith(fileName, "j._") ) {
                     unsigned u = str::toUnsigned( str::after(fileName, '_') );
                     if( m.count(u) ) {
@@ -84,7 +84,7 @@ namespace mongo {
                 if( i != m.begin() && m.count(i->first - 1) == 0 ) {
                     uasserted(13532,
                     str::stream() << "unexpected file in journal directory " << dir.string()
-                      << " : " << filesystem::path(i->second).leaf() << " : can't find its preceeding file");
+                      << " : " << boost::filesystem::path(i->second).leaf() << " : can't find its preceeding file");
                 }
                 files.push_back(i->second);
             }
@@ -483,7 +483,7 @@ namespace mongo {
         void _recover() {
             assert( cmdLine.dur );
 
-            filesystem::path p = getJournalDir();
+            boost::filesystem::path p = getJournalDir();
             if( !exists(p) ) {
                 log() << "directory " << p.string() << " does not exist, there will be no recovery startup step" << endl;
                 okToCleanUp = true;

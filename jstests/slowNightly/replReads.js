@@ -77,9 +77,14 @@ function testReadLoadBalancing(numReplicas) {
             var x = rsStats();
             printjson(x);
             var numOk = 0;
+            // Now wait until the host disappears, since now we actually update our
+            // replica sets via isMaster in mongos
+            if( x.hosts.length == rs.conf()["members"].length - 1 ) return true
+            /*
             for ( var i=0; i<x.hosts.length; i++ ) 
                 if ( x.hosts[i].hidden )
                     return true;
+            */
             return false;
         } , "one slave not ok" , 180000 , 5000
     );

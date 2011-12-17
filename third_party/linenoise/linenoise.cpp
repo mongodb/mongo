@@ -108,10 +108,16 @@
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <unistd.h>
+#include <cctype>
 
 #endif /* _WIN32 */
 
 #include "linenoise.h"
+#include <string>
+#include <vector>
+
+using std::string;
+using std::vector;
 
 #define LINENOISE_DEFAULT_HISTORY_MAX_LEN 100
 #define LINENOISE_MAX_LINE 4096
@@ -175,7 +181,106 @@ struct PromptInfo {                 // a convenience struct for grouping prompt 
     }
 };
 
-static const char* unsupported_term[] = { "dumb", "cons25", NULL };
+class KillRing {
+    static const int    capacity = 10;
+    int                 size;
+    int                 index;
+    char                indexToSlot[10];
+    vector < string >   theRing;
+
+public:
+    enum                action { actionOther, actionKill, actionYank };
+    action              lastAction;
+    int                 lastYankSize;
+
+    KillRing() : size( 0 ), index( 0 ), lastAction( actionOther ) {
+        theRing.reserve( capacity );
+    }
+
+    void kill( const char* text, int textLen, bool forward ) {
+        if ( textLen == 0 ) {
+            return;
+        }
+        char* textCopy = new char[ textLen + 1 ];
+        memcpy( textCopy, text, textLen );
+        textCopy[ textLen ] = 0;
+        string textCopyString( textCopy );
+        if ( lastAction == actionKill ) {
+            int slot = indexToSlot[0];
+            theRing[slot] = forward ?
+                theRing[slot] + textCopyString :
+                textCopyString + theRing[slot];
+        }
+        else {
+            if ( size < capacity ) {
+                if ( size > 0 ) {
+                    memmove( &indexToSlot[1], &indexToSlot[0], size );
+                }
+                indexToSlot[0] = size;
+                size++;
+                theRing.push_back( textCopyString );
+            }
+            else {
+                int slot = indexToSlot[capacity - 1];
+                theRing[slot] = textCopyString;
+                memmove( &indexToSlot[1], &indexToSlot[0], capacity - 1 );
+                indexToSlot[0] = slot;
+            }
+            index = 0;
+        }
+        delete[] textCopy;
+    }
+
+    string* yank() {
+        return ( size > 0 ) ? &theRing[indexToSlot[index]] : 0;
+    }
+
+    string* yankPop() {
+        if ( size == 0 ) {
+            return 0;
+        }
+        ++index;
+        if ( index == size ) {
+            index = 0;
+        }
+        return &theRing[indexToSlot[index]];
+    }
+
+};
+
+// Special codes for keyboard input:
+//
+// Between Windows and the various Linux "terminal" programs, there is some
+// pretty diverse behavior in the "scan codes" and escape sequences we are
+// presented with.  So ... we'll translate them all into our own pidgin
+// pseudocode, trying to stay out of the way of UTF-8 and international
+// characters.  Here's the general plan.
+//
+// "User input keystrokes" (key chords, whatever) will be encoded as a single
+// value.  The low 8 bits are reserved for ASCII and UTF-8 characters.
+// Popular function-type keys get their own codes in the range 0x101 to (if
+// needed) 0x1FF, currently just arrow keys, Home, End and Delete.
+// Keypresses with Ctrl get or-ed with 0x200, with Alt get or-ed with 0x400.
+// So, Ctrl+Alt+Home is encoded as 0x200 + 0x400 + 0x105 == 0x705.  To keep
+// things complicated, the Alt key is equivalent to prefixing the keystroke
+// with ESC, so ESC followed by D is treated the same as Alt + D ... we'll
+// just use Emacs terminology and call this "Meta".  So, we will encode both
+// ESC followed by D and Alt held down while D is pressed the same, as Meta-D,
+// encoded as 0x464.
+//
+// Here are the definitions of our component constants:
+//
+static const int UP_ARROW_KEY       = 0x101;
+static const int DOWN_ARROW_KEY     = 0x102;
+static const int RIGHT_ARROW_KEY    = 0x103;
+static const int LEFT_ARROW_KEY     = 0x104;
+static const int HOME_KEY           = 0x105;
+static const int END_KEY            = 0x106;
+static const int DELETE_KEY         = 0x107;
+
+static const int CTRL               = 0x200;
+static const int META               = 0x400;
+
 static linenoiseCompletionCallback* completionCallback = NULL;
 
 #ifdef _WIN32
@@ -186,6 +291,8 @@ static WORD oldDisplayAttribute;
 static struct termios orig_termios; /* in order to restore at exit */
 #endif
 
+static KillRing killRing;
+
 static int rawmode = 0; /* for atexit() function to check if restore is needed*/
 static int atexit_registered = 0; /* register atexit just 1 time */
 static int history_max_len = LINENOISE_DEFAULT_HISTORY_MAX_LEN;
@@ -195,15 +302,9 @@ char** history = NULL;
 
 static void linenoiseAtExit( void );
 
-static bool isUnsupportedTerm( void ) {
-    char* term = getenv( "TERM" );
-    if ( term == NULL )
-        return false;
-    for ( int j = 0; unsupported_term[j]; ++j )
-        if ( ! strcasecmp( term, unsupported_term[j] ) ) {
-            return true;
-        }
-    return false;
+static void beep() {
+    fprintf( stderr, "\x7" );   // ctrl-G == bell/beep
+    fflush( stderr );
 }
 
 void linenoiseHistoryFree( void ) {
@@ -216,25 +317,25 @@ void linenoiseHistoryFree( void ) {
     }
 }
 
-static int enableRawMode( int fd ) {
+static int enableRawMode( void ) {
 #ifdef _WIN32
     if ( ! console_in ) {
         console_in = GetStdHandle( STD_INPUT_HANDLE );
         console_out = GetStdHandle( STD_OUTPUT_HANDLE );
 
         GetConsoleMode( console_in, &oldMode );
-        SetConsoleMode( console_in, oldMode & ~( ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT ) );
+        SetConsoleMode( console_in, oldMode & ~( ENABLE_LINE_INPUT | ENABLE_ECHO_INPUT | ENABLE_PROCESSED_INPUT ) );
     }
     return 0;
 #else
     struct termios raw;
 
-    if ( ! isatty( STDIN_FILENO ) ) goto fatal;
+    if ( ! isatty( 0 ) ) goto fatal;
     if ( ! atexit_registered ) {
         atexit( linenoiseAtExit );
         atexit_registered = 1;
     }
-    if ( tcgetattr( fd, &orig_termios ) == -1 ) goto fatal;
+    if ( tcgetattr( 0, &orig_termios ) == -1 ) goto fatal;
 
     raw = orig_termios;  /* modify the original mode */
     /* input modes: no break, no CR to NL, no parity check, no strip char,
@@ -253,7 +354,7 @@ static int enableRawMode( int fd ) {
     raw.c_cc[VMIN] = 1; raw.c_cc[VTIME] = 0; /* 1 byte, no timer */
 
     /* put terminal in raw mode after flushing */
-    if ( tcsetattr( fd,TCSADRAIN, &raw ) < 0 ) goto fatal;
+    if ( tcsetattr( 0, TCSADRAIN, &raw ) < 0 ) goto fatal;
     rawmode = 1;
     return 0;
 
@@ -263,20 +364,20 @@ fatal:
 #endif
 }
 
-static void disableRawMode( int fd ) {
+static void disableRawMode( void ) {
 #ifdef _WIN32
     SetConsoleMode( console_in, oldMode );
     console_in = 0;
     console_out = 0;
 #else
-    if ( rawmode && tcsetattr (fd, TCSADRAIN, &orig_termios ) != -1 )
+    if ( rawmode && tcsetattr ( 0, TCSADRAIN, &orig_termios ) != -1 )
         rawmode = 0;
 #endif
 }
 
 // At exit we'll try to fix the terminal to the initial conditions
 static void linenoiseAtExit( void ) {
-    disableRawMode( STDIN_FILENO );
+    disableRawMode();
 }
 
 static int getColumns( void ) {
@@ -320,7 +421,7 @@ static void calculateScreenPosition(int x, int y, int screenColumns, int charCou
     }
 }
 
-static void setDisplayAttribute( int fd, bool enhancedDisplay ) {
+static void setDisplayAttribute( bool enhancedDisplay ) {
 #ifdef _WIN32
     if ( enhancedDisplay ) {
         CONSOLE_SCREEN_BUFFER_INFO inf;
@@ -349,23 +450,22 @@ static void setDisplayAttribute( int fd, bool enhancedDisplay ) {
     }
 #else
     if ( enhancedDisplay ) {
-        if ( write( fd, "\x1b[1;34m", 7 ) == -1 ) return; /* bright blue (visible with both B&W bg) */
+        if ( write( 1, "\x1b[1;34m", 7 ) == -1 ) return; /* bright blue (visible with both B&W bg) */
     }
     else {
-        if ( write( fd, "\x1b[0m", 4 ) == -1 ) return; /* reset */
+        if ( write( 1, "\x1b[0m", 4 ) == -1 ) return; /* reset */
     }
 #endif
 }
 
 /**
  * Refresh the user's input line: the prompt is already onscreen and is not redrawn here
- * @param fd   file handle to use for output to the screen
  * @param pi   PromptInfo struct holding information about the prompt and our screen position
  * @param buf  input buffer to be displayed
  * @param len  count of characters in the buffer
  * @param pos  current cursor position within the buffer (0 <= pos <= len)
  */
-static void refreshLine( int fd, PromptInfo& pi, char *buf, int len, int pos ) {
+static void refreshLine( PromptInfo& pi, char *buf, int len, int pos ) {
 
     // check for a matching brace/bracket/paren, remember its position if found
     int highlight = -1;
@@ -420,9 +520,9 @@ static void refreshLine( int fd, PromptInfo& pi, char *buf, int len, int pos ) {
     }
     else {
         if  (write( 1, buf, highlight ) == -1 ) return;
-        setDisplayAttribute( 1, true ); /* bright blue (visible with both B&W bg) */
+        setDisplayAttribute( true ); /* bright blue (visible with both B&W bg) */
         if ( write( 1, &buf[highlight], 1 ) == -1 ) return;
-        setDisplayAttribute( 1, false );
+        setDisplayAttribute( false );
         if ( write( 1, buf + highlight + 1, len - highlight - 1 ) == -1 ) return;
     }
 
@@ -436,176 +536,408 @@ static void refreshLine( int fd, PromptInfo& pi, char *buf, int len, int pos ) {
     int cursorRowMovement = pi.promptCursorRowOffset - pi.promptExtraLines;
     if ( cursorRowMovement > 0 ) {  // move the cursor up as required
         snprintf( seq, sizeof seq, "\x1b[%dA", cursorRowMovement );
-        if ( write( fd, seq, strlen( seq ) ) == -1 ) return;
+        if ( write( 1, seq, strlen( seq ) ) == -1 ) return;
     }
     // position at the end of the prompt, clear to end of screen
     snprintf( seq, sizeof seq, "\x1b[%dG\x1b[J", pi.promptIndentation + 1 );  // 1-based on VT100
-    if ( write( fd, seq, strlen( seq ) ) == -1 ) return;
+    if ( write( 1, seq, strlen( seq ) ) == -1 ) return;
 
     if ( highlight == -1 ) {  // write unhighlighted text
-        if ( write( fd, buf, len ) == -1 ) return;
+        if ( write( 1, buf, len ) == -1 ) return;
     }
     else {  // highlight the matching brace/bracket/parenthesis
-        if ( write( fd, buf, highlight ) == -1 ) return;
-        setDisplayAttribute( fd, true );
-        if ( write( fd, &buf[highlight], 1 ) == -1 ) return;
-        setDisplayAttribute( fd, false );
-        if ( write( fd, buf + highlight + 1, len - highlight - 1 ) == -1 ) return;
+        if ( write( 1, buf, highlight ) == -1 ) return;
+        setDisplayAttribute( true );
+        if ( write( 1, &buf[highlight], 1 ) == -1 ) return;
+        setDisplayAttribute( false );
+        if ( write( 1, buf + highlight + 1, len - highlight - 1 ) == -1 ) return;
     }
 
     // we have to generate our own newline on line wrap
     if ( xEndOfInput == 0 && yEndOfInput > 0 )
-        if ( write( fd, "\n", 1 ) == -1 ) return;
+        if ( write( 1, "\n", 1 ) == -1 ) return;
 
     // position the cursor
     cursorRowMovement = yEndOfInput - yCursorPos;
     if ( cursorRowMovement > 0 ) {  // move the cursor up as required
         snprintf( seq, sizeof seq, "\x1b[%dA", cursorRowMovement );
-        if ( write( fd, seq, strlen( seq ) ) == -1 ) return;
+        if ( write( 1, seq, strlen( seq ) ) == -1 ) return;
     }
     // position the cursor within the line
     snprintf( seq, sizeof seq, "\x1b[%dG", xCursorPos + 1 );  // 1-based on VT100
-    if ( write( fd, seq, strlen( seq ) ) == -1 ) return;
+    if ( write( 1, seq, strlen( seq ) ) == -1 ) return;
 #endif
 
     pi.promptCursorRowOffset = pi.promptExtraLines + yCursorPos;  // remember row for next pass
 }
 
-/* Note that this should parse some special keys into their emacs ctrl-key combos
- * Return of -1 signifies unrecognized code
- */
-static char linenoiseReadChar( int fd ){
+#ifndef _WIN32
+
+namespace EscapeSequenceProcessing { // move these out of global namespace
+
+// This chunk of code does parsing of the escape sequences sent by various Linux terminals.
+//
+// It handles arrow keys, Home, End and Delete keys by interpreting the sequences sent by
+// gnome terminal, xterm, rxvt, konsole, aterm and yakuake including the Alt and Ctrl key
+// combinations that are understood by linenoise.
+//
+// The parsing uses tables, a bunch of intermediate dispatch routines and a doDispatch
+// loop that reads the tables and sends control to "deeper" routines to continue the
+// parsing.  The starting call to doDispatch( c, initialDispatch ) will eventually return
+// either a character (with optional CTRL and META bits set), or -1 if parsing fails, or
+// zero if an attempt to read from the keyboard fails.
+//
+// This is rather sloppy escape sequence processing, since we're not paying attention to what the
+// actual TERM is set to and are processing all key sequences for all terminals, but it works with
+// the most common keystrokes on the most common terminals.  It's intricate, but the nested 'if'
+// statements required to do it directly would be worse.  This way has the advantage of allowing
+// changes and extensions without having to touch a lot of code.
+//
+
+// This is a typedef for the routine called by doDispatch().  It takes the current character
+// as input, does any required processing including reading more characters and calling other
+// dispatch routines, then eventually returns the final (possibly extended or special) character.
+//
+typedef unsigned int ( *CharacterDispatchRoutine )( unsigned int );
+
+// This structure is used by doDispatch() to hold a list of characters to test for and
+// a list of routines to call if the character matches.  The dispatch routine list is one
+// longer than the character list; the final entry is used if no character matches.
+//
+struct CharacterDispatch {
+    unsigned int                len;        // length of the chars list
+    const char*                 chars;      // chars to test
+    CharacterDispatchRoutine*   dispatch;   // array of routines to call
+};
+
+// This dispatch routine is given a dispatch table and then farms work out to routines
+// listed in the table based on the character it is called with.  The dispatch routines can
+// read more input characters to decide what should eventually be returned.  Eventually,
+// a called routine returns either a character or -1 to indicate parsing failure.
+//
+static unsigned int doDispatch( unsigned int c, CharacterDispatch& dispatchTable ) {
+    for ( unsigned int i = 0; i < dispatchTable.len ; ++i ) {
+        if ( static_cast<unsigned char>( dispatchTable.chars[i] ) == c ) {
+            return dispatchTable.dispatch[i]( c );
+        }
+    }
+    return dispatchTable.dispatch[dispatchTable.len]( c );
+}
+
+static unsigned int thisKeyMetaCtrl = 0;     // holds pre-set Meta and/or Ctrl modifiers
+
+// Final dispatch routines -- return something
+//
+static unsigned int normalKeyRoutine( unsigned int c )            { return thisKeyMetaCtrl | c; }
+static unsigned int upArrowKeyRoutine( unsigned int c )           { return thisKeyMetaCtrl | UP_ARROW_KEY; }
+static unsigned int downArrowKeyRoutine( unsigned int c )         { return thisKeyMetaCtrl | DOWN_ARROW_KEY; }
+static unsigned int rightArrowKeyRoutine( unsigned int c )        { return thisKeyMetaCtrl | RIGHT_ARROW_KEY; }
+static unsigned int leftArrowKeyRoutine( unsigned int c )         { return thisKeyMetaCtrl | LEFT_ARROW_KEY; }
+static unsigned int homeKeyRoutine( unsigned int c )              { return thisKeyMetaCtrl | HOME_KEY; }
+static unsigned int endKeyRoutine( unsigned int c )               { return thisKeyMetaCtrl | END_KEY; }
+static unsigned int deleteCharRoutine( unsigned int c )           { return thisKeyMetaCtrl | ctrlChar( 'H' ); } // key labeled Backspace
+static unsigned int deleteKeyRoutine( unsigned int c )            { return thisKeyMetaCtrl | DELETE_KEY; }      // key labeled Delete
+static unsigned int ctrlUpArrowKeyRoutine( unsigned int c )       { return thisKeyMetaCtrl | CTRL | UP_ARROW_KEY; }
+static unsigned int ctrlDownArrowKeyRoutine( unsigned int c )     { return thisKeyMetaCtrl | CTRL | DOWN_ARROW_KEY; }
+static unsigned int ctrlRightArrowKeyRoutine( unsigned int c )    { return thisKeyMetaCtrl | CTRL | RIGHT_ARROW_KEY; }
+static unsigned int ctrlLeftArrowKeyRoutine( unsigned int c )     { return thisKeyMetaCtrl | CTRL | LEFT_ARROW_KEY; }
+static unsigned int escFailureRoutine( unsigned int c )           { beep(); return -1; }
+
+// Handle ESC [ 1 ; 3 (or 5) <more stuff> escape sequences
+//
+static CharacterDispatchRoutine escLeftBracket1Semicolon3or5Routines[] = { upArrowKeyRoutine, downArrowKeyRoutine, rightArrowKeyRoutine, leftArrowKeyRoutine, escFailureRoutine };
+static CharacterDispatch escLeftBracket1Semicolon3or5Dispatch = { 4, "ABCD", escLeftBracket1Semicolon3or5Routines };
+
+// Handle ESC [ 1 ; <more stuff> escape sequences
+//
+static unsigned int escLeftBracket1Semicolon3Routine( unsigned int c ) {
+    if ( read( 0, &c, 1 ) <= 0 ) return 0;
+    thisKeyMetaCtrl |= META;
+    return doDispatch( c, escLeftBracket1Semicolon3or5Dispatch );
+}
+static unsigned int escLeftBracket1Semicolon5Routine( unsigned int c ) {
+    if ( read( 0, &c, 1 ) <= 0 ) return 0;
+    thisKeyMetaCtrl |= CTRL;
+    return doDispatch( c, escLeftBracket1Semicolon3or5Dispatch );
+}
+static CharacterDispatchRoutine escLeftBracket1SemicolonRoutines[] = { escLeftBracket1Semicolon3Routine, escLeftBracket1Semicolon5Routine, escFailureRoutine };
+static CharacterDispatch escLeftBracket1SemicolonDispatch = { 2, "35", escLeftBracket1SemicolonRoutines };
+
+// Handle ESC [ 1 <more stuff> escape sequences
+//
+static unsigned int escLeftBracket1SemicolonRoutine( unsigned int c ) {
+    if ( read( 0, &c, 1 ) <= 0 ) return 0;
+    return doDispatch( c, escLeftBracket1SemicolonDispatch );
+}
+static CharacterDispatchRoutine escLeftBracket1Routines[] = { homeKeyRoutine, escLeftBracket1SemicolonRoutine, escFailureRoutine };
+static CharacterDispatch escLeftBracket1Dispatch = { 2, "~;", escLeftBracket1Routines };
+
+// Handle ESC [ 3 <more stuff> escape sequences
+//
+static CharacterDispatchRoutine escLeftBracket3Routines[] = { deleteKeyRoutine, escFailureRoutine };
+static CharacterDispatch escLeftBracket3Dispatch = { 1, "~", escLeftBracket3Routines };
+
+// Handle ESC [ 4 <more stuff> escape sequences
+//
+static CharacterDispatchRoutine escLeftBracket4Routines[] = { endKeyRoutine, escFailureRoutine };
+static CharacterDispatch escLeftBracket4Dispatch = { 1, "~", escLeftBracket4Routines };
+
+// Handle ESC [ 7 <more stuff> escape sequences
+//
+static CharacterDispatchRoutine escLeftBracket7Routines[] = { homeKeyRoutine, escFailureRoutine };
+static CharacterDispatch escLeftBracket7Dispatch = { 1, "~", escLeftBracket7Routines };
+
+// Handle ESC [ 8 <more stuff> escape sequences
+//
+static CharacterDispatchRoutine escLeftBracket8Routines[] = { endKeyRoutine, escFailureRoutine };
+static CharacterDispatch escLeftBracket8Dispatch = { 1, "~", escLeftBracket8Routines };
+
+// Handle ESC [ <digit> escape sequences
+//
+static unsigned int escLeftBracket0Routine( unsigned int c ) {
+    return escFailureRoutine( c );
+}
+static unsigned int escLeftBracket1Routine( unsigned int c ) {
+    if ( read( 0, &c, 1 ) <= 0 ) return 0;
+    return doDispatch( c, escLeftBracket1Dispatch );
+}
+static unsigned int escLeftBracket2Routine( unsigned int c ) {
+    return escFailureRoutine( c );
+}
+static unsigned int escLeftBracket3Routine( unsigned int c ) {
+    if ( read( 0, &c, 1 ) <= 0 ) return 0;
+    return doDispatch( c, escLeftBracket3Dispatch );
+}
+static unsigned int escLeftBracket4Routine( unsigned int c ) {
+    if ( read( 0, &c, 1 ) <= 0 ) return 0;
+    return doDispatch( c, escLeftBracket4Dispatch );
+}
+static unsigned int escLeftBracket5Routine( unsigned int c ) {
+    return escFailureRoutine( c );
+}
+static unsigned int escLeftBracket6Routine( unsigned int c ) {
+    return escFailureRoutine( c );
+}
+static unsigned int escLeftBracket7Routine( unsigned int c ) {
+    if ( read( 0, &c, 1 ) <= 0 ) return 0;
+    return doDispatch( c, escLeftBracket7Dispatch );
+}
+static unsigned int escLeftBracket8Routine( unsigned int c ) {
+    if ( read( 0, &c, 1 ) <= 0 ) return 0;
+    return doDispatch( c, escLeftBracket8Dispatch );
+}
+static unsigned int escLeftBracket9Routine( unsigned int c ) {
+    return escFailureRoutine( c );
+}
+
+// Handle ESC [ <more stuff> escape sequences
+//
+static CharacterDispatchRoutine escLeftBracketRoutines[] = {
+    upArrowKeyRoutine,
+    downArrowKeyRoutine,
+    rightArrowKeyRoutine,
+    leftArrowKeyRoutine,
+    homeKeyRoutine,
+    endKeyRoutine,
+    escLeftBracket0Routine,
+    escLeftBracket1Routine,
+    escLeftBracket2Routine,
+    escLeftBracket3Routine,
+    escLeftBracket4Routine,
+    escLeftBracket5Routine,
+    escLeftBracket6Routine,
+    escLeftBracket7Routine,
+    escLeftBracket8Routine,
+    escLeftBracket9Routine,
+    escFailureRoutine
+};
+static CharacterDispatch escLeftBracketDispatch = { 16, "ABCDHF0123456789", escLeftBracketRoutines };
+
+// Handle ESC O <char> escape sequences
+//
+static CharacterDispatchRoutine escORoutines[] = {
+    upArrowKeyRoutine,
+    downArrowKeyRoutine,
+    rightArrowKeyRoutine,
+    leftArrowKeyRoutine,
+    homeKeyRoutine,
+    endKeyRoutine,
+    ctrlUpArrowKeyRoutine,
+    ctrlDownArrowKeyRoutine,
+    ctrlRightArrowKeyRoutine,
+    ctrlLeftArrowKeyRoutine,
+    escFailureRoutine
+};
+static CharacterDispatch escODispatch = { 10, "ABCDHFabcd", escORoutines };
+
+// Initial ESC dispatch -- could be a Meta prefix or the start of an escape sequence
+//
+static unsigned int escLeftBracketRoutine( unsigned int c ) {
+    if ( read( 0, &c, 1 ) <= 0 ) return 0;
+    return doDispatch( c, escLeftBracketDispatch );
+}
+static unsigned int escORoutine( unsigned int c ) {
+    if ( read( 0, &c, 1 ) <= 0 ) return 0;
+    return doDispatch( c, escODispatch );
+}
+static unsigned int setMetaRoutine( unsigned int c ); // need forward reference
+static CharacterDispatchRoutine escRoutines[] = { escLeftBracketRoutine, escORoutine, setMetaRoutine };
+static CharacterDispatch escDispatch = { 2, "[O", escRoutines };
+
+// Initial dispatch -- we are not in the middle of anything yet
+//
+static unsigned int escRoutine( unsigned int c ) {
+    if ( read( 0, &c, 1 ) <= 0 ) return 0;
+    return doDispatch( c, escDispatch );
+}
+static unsigned int hibitCRoutine( unsigned int c ) {
+    // xterm sends a bizarre sequence for Alt combos: 'C'+0x80 then '!'+0x80 for Alt-a for example
+    if ( read( 0, &c, 1 ) <= 0 ) return 0;
+    if ( c >= ( ' ' | 0x80 ) && c <= ( '?' | 0x80 ) ) {
+        if ( c == ( '?' | 0x80 ) ) {        // have to special case this, normal code would send
+            return META | ctrlChar( 'H' );  // Meta-_ (thank you xterm)
+        }
+        return META | ( c - 0x40 );
+    }
+    return escFailureRoutine( c );
+}
+static CharacterDispatchRoutine initialRoutines[] = { escRoutine, deleteCharRoutine, hibitCRoutine, normalKeyRoutine };
+static CharacterDispatch initialDispatch = { 3, "\x1B\x7F\xC3", initialRoutines };
+
+// Special handling for the ESC key because it does double duty
+//
+static unsigned int setMetaRoutine( unsigned int c ) {
+    thisKeyMetaCtrl = META;
+    if ( c == 0x1B ) {  // another ESC, stay in ESC processing mode
+        if ( read( 0, &c, 1 ) <= 0 ) return 0;
+        return doDispatch( c, escDispatch );
+    }
+    return doDispatch( c, initialDispatch );
+}
+
+} // namespace EscapeSequenceProcessing // move these out of global namespace
+
+#endif // #ifndef _WIN32
+
+// linenoiseReadChar -- read a keystroke or keychord from the keyboard, and translate it
+// into an encoded "keystroke".  When convenient, extended keys are translated into their
+// simpler Emacs keystrokes, so an unmodified "left arrow" becomes Ctrl-B.
+//
+// A return value of zero means "no input available", and a return value of -1 means "invalid key".
+//
+static int linenoiseReadChar( void ){
 #ifdef _WIN32
     INPUT_RECORD rec;
     DWORD count;
-    do {
+    int modifierKeys = 0;
+    bool escSeen = false;
+    while ( true ) {
         ReadConsoleInputA( console_in, &rec, 1, &count );
         if ( rec.EventType != KEY_EVENT || !rec.Event.KeyEvent.bKeyDown ) {
             continue;
         }
+        modifierKeys = 0;
+        if ( rec.Event.KeyEvent.dwControlKeyState & ( RIGHT_CTRL_PRESSED | LEFT_CTRL_PRESSED ) ) {
+            modifierKeys |= CTRL;
+        }
+        if ( rec.Event.KeyEvent.dwControlKeyState & ( RIGHT_ALT_PRESSED | LEFT_ALT_PRESSED ) ) {
+            modifierKeys |= META;
+        }
+        if ( escSeen ) {
+            modifierKeys |= META;
+        }
         if ( rec.Event.KeyEvent.uChar.AsciiChar == 0 ) {
             switch ( rec.Event.KeyEvent.wVirtualKeyCode ) {
-                case VK_LEFT:   return ctrlChar( 'B' ); // EMACS character (B)ack
-                case VK_RIGHT:  return ctrlChar( 'F' ); // EMACS character (F)orward
-                case VK_UP:     return ctrlChar( 'P' ); // EMACS (P)revious line
-                case VK_DOWN:   return ctrlChar( 'N' ); // EMACS (N)ext line
-                case VK_DELETE: return 127;             // ASCII DEL byte
-                case VK_HOME:   return ctrlChar( 'A' ); // EMACS beginning-of-line
-                case VK_END:    return ctrlChar( 'E' ); // EMACS (E)nd-of-line
+                case VK_LEFT:   return modifierKeys | LEFT_ARROW_KEY;
+                case VK_RIGHT:  return modifierKeys | RIGHT_ARROW_KEY;
+                case VK_UP:     return modifierKeys | UP_ARROW_KEY;
+                case VK_DOWN:   return modifierKeys | DOWN_ARROW_KEY;
+                case VK_DELETE: return modifierKeys | DELETE_KEY;
+                case VK_HOME:   return modifierKeys | HOME_KEY;
+                case VK_END:    return modifierKeys | END_KEY;
                 default: continue;                      // in raw mode, ReadConsoleInput shows shift, ctrl ...
             }                                           //  ... ignore them
         }
-        else {
-            break;  // we got a real character, return it
+        else if ( rec.Event.KeyEvent.uChar.AsciiChar == ctrlChar( '[' ) ) { // ESC, set flag for later
+            escSeen = true;
+            continue;
         }
-    } while ( true );
-    return rec.Event.KeyEvent.uChar.AsciiChar;
+        else {
+            // we got a real character, return it
+            return modifierKeys | rec.Event.KeyEvent.uChar.AsciiChar;
+        }
+    }
 #else
-    char c;
+    unsigned int c;
+    unsigned char oneChar;
     int nread;
-    char seq[2], seq2[2];
 
-    nread = read( fd, &c, 1 );
+    nread = read( 0, &oneChar, 1 );
     if ( nread <= 0 )
         return 0;
+    c = static_cast<unsigned int>( oneChar );
 
-#if defined(_DEBUG)
+    // If _DEBUG_LINUX_KEYBOARD is set, then ctrl-\ puts us into a keyboard debugging mode
+    // where we print out decimal and decoded values for whatever the "terminal" program
+    // gives us on different keystrokes.  Hit ctrl-C to exit this mode.
+    //
+#define _DEBUG_LINUX_KEYBOARD
+#if defined(_DEBUG_LINUX_KEYBOARD)
     if ( c == 28 ) {    // ctrl-\, special debug mode, prints all keys hit, ctrl-C to get out.
         printf( "\x1b[1G\n" ); /* go to first column of new line */
         while ( true ) {
-            char keys[10];
-            int ret = read( fd, keys, 10 );
+            unsigned char keys[10];
+            int ret = read( 0, keys, 10 );
 
             if ( ret <= 0 ) {
                 printf( "\nret: %d\n", ret );
             }
-
             for ( int i = 0; i < ret; ++i ) {
-                printf( "%d ", static_cast<int>( keys[i] ) );
-            }
-            printf( "\x1b[1G\n" ); /* go to first column of new line */
-
-            if ( keys[0] == ctrlChar( 'C' ) ) /* ctrl-c. may cause signal instead */
-                return -1;
-        }
-    }
-#endif
-
-    // This is rather sloppy escape sequence processing, since we're not paying attention to what the
-    // actual TERM is set to and are processing all key sequences for all terminals, but it works with
-    // the most common keystrokes on the most common terminals ... VT100-like, xterm, rxvt and konsole.
-    //
-    if ( c == 27 ) {    // ESC character, start of ESC sequence
-        if ( read( fd, seq, 2 ) == -1 ) return 0;
-        if ( seq[0] == '[' ) {              // left square bracket
-            if ( seq[1] == 'A' ) {          // ESC [ A, VT100 up arrow key
-                return ctrlChar( 'P' );     // translate to ctrl-P
-            }
-            else if ( seq[1] == 'B' ) {     // ESC [ B, VT100 down arrow key
-                return ctrlChar( 'N' );     // translate to ctrl-N
-            }
-            else if ( seq[1] == 'C' ) {     // ESC [ C, VT100 right arrow key
-                return ctrlChar( 'F' );     // translate to ctrl-F
-            }
-            else if ( seq[1] == 'D' ) {     // ESC [ D, VT100 left arrow key
-                return ctrlChar( 'B' );     // translate to ctrl-B
-            }
-            else if ( seq[1] == 'F' ) {     // ESC [ F, konsole End key
-                return ctrlChar( 'E' );     // translate to ctrl-E
-            }
-            else if ( seq[1] == 'H' ) {     // ESC [ H, konsole Home key
-                return ctrlChar( 'A' );     // translate to ctrl-A
-            }
-            else if ( seq[1] > '0' && seq[1] < '9' ) {      // Linux console and rxvt, ESC [ 1 ~ through ESC [ 8 ~
-                if ( read( fd, seq2, 2 ) == -1 ) return 0;
-                if ( seq2[0] == '~' ) {                             // ESC [ <n> ~
-                    if ( seq[1] == '1' || seq[1] == '7' ) {         // ESC [ 1 ~ (Linux console) / ESC [ 7 ~ (rxvt) Home key
-                        return ctrlChar( 'A' );                     // translate to ctrl-A
-                    }
-                    else if ( seq[1] == '4' || seq[1] == '8' ) {    // ESC [ 4 ~ (Linux console) / ESC [ 8 ~ (rxvt) End key
-                        return ctrlChar( 'E' );                     // translate to ctrl-E
-                    }
-                    else if ( seq[1] == '3' ) {                     // ESC [ 3 ~ (either) Delete key
-                        return 127;                                 // translate to ASCII DEL
-                    }
-                    else {
-                        return -1;
-                    }
+                unsigned int key = static_cast<unsigned int>( keys[i] );
+                char * friendlyTextPtr;
+                char friendlyTextBuf[10];
+                const char * prefixText = (key < 0x80) ? "" : "highbit-";
+                unsigned int keyCopy = (key < 0x80) ? key : key - 0x80;
+                if ( keyCopy >= '!' && keyCopy <= '~' ) {   // printable
+                    friendlyTextBuf[0] = '\'';
+                    friendlyTextBuf[1] = keyCopy;
+                    friendlyTextBuf[2] = '\'';
+                    friendlyTextBuf[3] = 0;
+                    friendlyTextPtr = friendlyTextBuf;
+                }
+                else if ( keyCopy == ' ' ) {
+                    friendlyTextPtr = (char *)"space";
+                }
+                else if (keyCopy == 27 ) {
+                    friendlyTextPtr = (char *)"ESC";
+                }
+                else if (keyCopy == 0 ) {
+                    friendlyTextPtr = (char *)"NUL";
+                }
+                else if (keyCopy == 127 ) {
+                    friendlyTextPtr = (char *)"DEL";
                 }
                 else {
-                    return -1;
+                    friendlyTextBuf[0] = '^';
+                    friendlyTextBuf[1] = keyCopy + 0x40;
+                    friendlyTextBuf[2] = 0;
+                    friendlyTextPtr = friendlyTextBuf;
                 }
+                printf( "%d (%s%s)  ", key, prefixText, friendlyTextPtr );
             }
-            else {
+            printf( "\x1b[1G\n" );  // go to first column of new line
+
+            // drop out of this loop on ctrl-C
+            if ( keys[0] == ctrlChar( 'C' ) ) {
                 return -1;
             }
         }
-        else if ( seq[0] == 'O' ) {         // ESC O F and ESC O H (xterm Home and End)
-            if ( seq[1] == 'F' ) {          // ESC O F, xterm End key
-                return ctrlChar( 'E' );     // translate to ctrl-E
-            }
-            else if ( seq[1] == 'H' ) {     // ESC O H, xterm Home key
-                return ctrlChar( 'A' );     // translate to ctrl-A
-            }
-            else {
-                return -1;
-            }
-        }
-        else {
-            return -1;
-        }
     }
-    else if ( c == 127 ) {          // ASCII DEL
-        return ctrlChar( 'H' );     // translate to backspace/ctrl-H
-    }
+#endif  // _DEBUG_LINUX_KEYBOARD
 
-    return c; /* normalish character */
-#endif
-}
-
-static void beep() {
-    fprintf( stderr, "\x7" );   // ctrl-G == bell/beep
-    fflush( stderr );
+    EscapeSequenceProcessing::thisKeyMetaCtrl = 0;    // no modifiers yet at initialDispatch
+    return EscapeSequenceProcessing::doDispatch( c, EscapeSequenceProcessing::initialDispatch );
+#endif // #_WIN32
 }
 
 static void freeCompletions( linenoiseCompletions* lc ) {
@@ -622,14 +954,13 @@ static const char breakChars[] = " =+-/\\*?\"'`&<>;|@{([])}";
  * Handle command completion, using a completionCallback() routine to provide possible substitutions
  * This routine handles the mechanics of updating the user's input buffer with possible replacement of
  * text as the user selects a proposed completion string, or cancels the completion attempt.
- * @param fd     file handle to use for output to the screen
  * @param pi     PromptInfo struct holding information about the prompt and our screen position
  * @param buf    input buffer to be displayed
  * @param buflen size of input buffer in bytes
  * @param len    ptr to count of characters in the buffer (updated)
  * @param pos    ptr to current cursor position within the buffer (0 <= pos <= len) (updated)
  */
-static int completeLine( int fd, PromptInfo& pi, char *buf, int buflen, int *len, int *pos ) {
+static int completeLine( PromptInfo& pi, char *buf, int buflen, int *len, int *pos ) {
     linenoiseCompletions lc = { 0, NULL };
     char c = 0;
 
@@ -675,15 +1006,15 @@ static int completeLine( int fd, PromptInfo& pi, char *buf, int buflen, int *len
                 strcpy( &displayText[j], lc.cvec[i] );
                 strcpy( &displayText[j+clen], &buf[*pos] );
                 displayText[displayLength] = 0;
-                refreshLine( fd, pi, displayText, displayLength, startIndex + clen );
+                refreshLine( pi, displayText, displayLength, startIndex + clen );
                 free( displayText );
             }
             else {
-                refreshLine( fd, pi, buf, *len, *pos );
+                refreshLine( pi, buf, *len, *pos );
             }
 
             do {
-                c = linenoiseReadChar( fd );
+                c = linenoiseReadChar();
             } while ( c == static_cast<char>( -1 ) );
 
             switch ( c ) {
@@ -698,12 +1029,15 @@ static int completeLine( int fd, PromptInfo& pi, char *buf, int buflen, int *len
                         beep();         // beep after completing cycle
                     break;
 
+#if 0 // SERVER-4011 -- Escape only works to end command completion in Windows
+      // leaving code here for now in case this is where we will add Meta-R (revert-line) later
                 case 27: /* escape */
                     /* Re-show original buffer */
                     if ( i < lc.len )
-                        refreshLine( fd, pi, buf, *len, *pos );
+                        refreshLine( pi, buf, *len, *pos );
                     stop = true;
                     break;
+#endif // SERVER-4011 -- Escape only works to end command completion in Windows
 
                 default:
                     /* Update buffer and return */
@@ -732,7 +1066,7 @@ static int completeLine( int fd, PromptInfo& pi, char *buf, int buflen, int *len
     return c; /* Return last read character */
 }
 
-static void linenoiseClearScreen( int fd, PromptInfo& pi, char *buf, int len, int pos ) {
+static void linenoiseClearScreen( PromptInfo& pi, char *buf, int len, int pos ) {
 
 #ifdef _WIN32
     COORD coord = {0, 0};
@@ -742,14 +1076,33 @@ static void linenoiseClearScreen( int fd, PromptInfo& pi, char *buf, int len, in
     DWORD count;
     FillConsoleOutputCharacterA( console_out, ' ', inf.dwSize.X * inf.dwSize.Y, coord, &count );
 #else
-    if ( write( fd, "\x1b[H\x1b[2J", 7 ) <= 0 ) return;
+    if ( write( 1, "\x1b[H\x1b[2J", 7 ) <= 0 ) return;
 #endif
-    if ( write( fd, pi.promptText, pi.promptChars ) == -1 ) return;
+    if ( write( 1, pi.promptText, pi.promptChars ) == -1 ) return;
     pi.promptCursorRowOffset = pi.promptExtraLines;
-    refreshLine( fd, pi, buf, len, pos );
+    refreshLine( pi, buf, len, pos );
 }
 
-static int linenoisePrompt( int fd, char *buf, int buflen, PromptInfo& pi ) {
+// convert {CTRL + 'A'}, {CTRL + 'a'} and {CTRL + ctrlChar( 'A' )} into ctrlChar( 'A' )
+// leave META alone
+//
+static int cleanupCtrl( int c ) {
+    if ( c & CTRL ) {
+        int d = c & 0x1FF;
+        if ( d >= 'a' && d <= 'z' ) {
+            c = ( c + ( 'a' - ctrlChar( 'A' ) ) ) & ~CTRL;
+        }
+        if ( d >= 'A' && d <= 'Z' ) {
+            c = ( c + ( 'A' - ctrlChar( 'A' ) ) ) & ~CTRL;
+        }
+        if ( d >= ctrlChar( 'A' ) && d <= ctrlChar( 'Z' ) ) {
+            c = c & ~CTRL;
+        }
+    }
+    return c;
+}
+
+static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
     int pos = 0;
     int len = 0;
 
@@ -767,23 +1120,27 @@ static int linenoisePrompt( int fd, char *buf, int buflen, PromptInfo& pi ) {
     // the cursor starts out at the end of the prompt
     pi.promptCursorRowOffset = pi.promptExtraLines;
 
+    killRing.lastAction = KillRing::actionOther;
+
     // loop collecting characters, responding to ctrl characters
     while ( true ) {
-        char c = linenoiseReadChar( fd );
+        int c = linenoiseReadChar();
+        c = cleanupCtrl( c );
 
         if ( c == 0 )
             return len;
 
-        if ( c == static_cast<char>( -1 ) ) {
-            refreshLine( fd, pi, buf, len, pos );
+        if ( c == -1 ) {
+            refreshLine( pi, buf, len, pos );
             continue;
         }
 
         // ctrl-I/tab, command completion, needs to be before switch statement
         if ( c == ctrlChar( 'I' ) && completionCallback ) {
+            killRing.lastAction = KillRing::actionOther;
 
             // completeLine does the actual completion and replacement
-            c = completeLine( fd, pi, buf, buflen, &len, &pos );
+            c = completeLine( pi, buf, buflen, &len, &pos );
 
             if ( c < 0 )                // return on error
                 return len;
@@ -797,83 +1154,178 @@ static int linenoisePrompt( int fd, char *buf, int buflen, PromptInfo& pi ) {
         switch ( c ) {
 
         case ctrlChar( 'A' ):   // ctrl-A, move cursor to start of line
+        case HOME_KEY:
+            killRing.lastAction = KillRing::actionOther;
             pos = 0;
-            refreshLine( fd, pi ,buf, len, pos );
+            refreshLine( pi ,buf, len, pos );
             break;
 
         case ctrlChar( 'B' ):   // ctrl-B, move cursor left by one character
+        case LEFT_ARROW_KEY:
+            killRing.lastAction = KillRing::actionOther;
             if ( pos > 0 ) {
                 --pos;
-                refreshLine( fd, pi, buf, len, pos );
+                refreshLine( pi, buf, len, pos );
+            }
+            break;
+
+        case META + 'b':        // meta-B, move cursor left by one word
+        case META + 'B':
+        case CTRL + LEFT_ARROW_KEY:
+        case META + LEFT_ARROW_KEY: // Emacs allows Meta, bash & readline don't
+            killRing.lastAction = KillRing::actionOther;
+            if ( pos > 0 ) {
+                while ( pos > 0 && !isalnum( buf[pos - 1] ) ) {
+                    --pos;
+                }
+                while ( pos > 0 && isalnum( buf[pos - 1] ) ) {
+                    --pos;
+                }
+                refreshLine( pi, buf, len, pos );
             }
             break;
 
         case ctrlChar( 'C' ):   // ctrl-C, abort this line
+            killRing.lastAction = KillRing::actionOther;
             errno = EAGAIN;
+            --history_len;
+            free( history[history_len] );
+            // we need one last refresh with the cursor at the end of the line
+            // so we don't display the next prompt over the previous input line
+            refreshLine( pi, buf, len, len );  // pass len as pos for EOL
+            if ( write( 1, "^C", 2 ) == -1 ) return -1;    // Display the ^C we got
             return -1;
 
-        case 127:               // DEL and ctrl-d both delete the character under the cursor
-        case ctrlChar( 'D' ):   // on an empty line, DEL does nothing while ctrl-d will exit the shell
-            if( len > 0 && pos < len ) {
+        // ctrl-D, delete the character under the cursor
+        // on an empty line, exit the shell
+        case ctrlChar( 'D' ):
+            killRing.lastAction = KillRing::actionOther;
+            if ( len > 0 && pos < len ) {
                 memmove( buf + pos, buf + pos + 1, len - pos );
                 --len;
-                refreshLine( fd, pi, buf, len, pos );
+                refreshLine( pi, buf, len, pos );
             }
-            else if( c == ctrlChar( 'D' ) && len == 0 ) {
+            else if ( len == 0 ) {
                 history_len--;
                 free( history[history_len] );
                 return -1;
             }
             break;
 
+        case META + 'd':        // meta-D, kill word to right of cursor
+        case META + 'D':
+            if ( pos < len ) {
+                int endingPos = pos;
+                while ( endingPos < len && !isalnum( buf[endingPos] ) ) {
+                    ++endingPos;
+                }
+                while ( endingPos < len && isalnum( buf[endingPos] ) ) {
+                    ++endingPos;
+                }
+                killRing.kill( &buf[pos], endingPos - pos, true );
+                memmove( buf + pos, buf + endingPos, len - endingPos + 1 );
+                len -= endingPos - pos;
+                refreshLine( pi, buf, len, pos );
+            }
+            killRing.lastAction = KillRing::actionKill;
+            break;
+
         case ctrlChar( 'E' ):   // ctrl-E, move cursor to end of line
+        case END_KEY:
+            killRing.lastAction = KillRing::actionOther;
             pos = len;
-            refreshLine( fd, pi, buf, len, pos );
+            refreshLine( pi, buf, len, pos );
             break;
 
         case ctrlChar( 'F' ):   // ctrl-F, move cursor right by one character
+        case RIGHT_ARROW_KEY:
+            killRing.lastAction = KillRing::actionOther;
             if ( pos < len ) {
                 ++pos;
-                refreshLine( fd, pi ,buf, len, pos );
+                refreshLine( pi ,buf, len, pos );
+            }
+            break;
+
+        case META + 'f':        // meta-F, move cursor right by one word
+        case META + 'F':
+        case CTRL + RIGHT_ARROW_KEY:
+        case META + RIGHT_ARROW_KEY: // Emacs allows Meta, bash & readline don't
+            killRing.lastAction = KillRing::actionOther;
+            if ( pos < len ) {
+                while ( pos < len && !isalnum( buf[pos] ) ) {
+                    ++pos;
+                }
+                while ( pos < len && isalnum( buf[pos] ) ) {
+                    ++pos;
+                }
+                refreshLine( pi, buf, len, pos );
             }
             break;
 
         case ctrlChar( 'H' ):   // backspace/ctrl-H, delete char to left of cursor
+            killRing.lastAction = KillRing::actionOther;
             if ( pos > 0 ) {
                 memmove( buf + pos - 1, buf + pos, 1 + len - pos );
                 --pos;
                 --len;
-                refreshLine( fd, pi, buf, len, pos );
+                refreshLine( pi, buf, len, pos );
             }
+            break;
+
+        // meta-Backspace, kill word to left of cursor
+        case META + ctrlChar( 'H' ):
+            if ( pos > 0 ) {
+                int startingPos = pos;
+                while ( pos > 0 && !isalnum( buf[pos - 1] ) ) {
+                    --pos;
+                }
+                while ( pos > 0 && isalnum( buf[pos - 1] ) ) {
+                    --pos;
+                }
+                killRing.kill( &buf[pos], startingPos - pos, false );
+                memmove( buf + pos, buf + startingPos, len - startingPos + 1 );
+                len -= startingPos - pos;
+                refreshLine( pi, buf, len, pos );
+            }
+            killRing.lastAction = KillRing::actionKill;
             break;
 
         case ctrlChar( 'J' ):   // ctrl-J/linefeed/newline, accept line
         case ctrlChar( 'M' ):   // ctrl-M/return/enter
+            killRing.lastAction = KillRing::actionOther;
             // we need one last refresh with the cursor at the end of the line
             // so we don't display the next prompt over the previous input line
-            refreshLine( fd, pi, buf, len, len );  // pass len as pos for EOL
+            refreshLine( pi, buf, len, len );  // pass len as pos for EOL
             --history_len;
             free( history[history_len] );
             return len;
 
-        case ctrlChar( 'K' ):   // ctrl-K, delete from cursor to end of line
+        case ctrlChar( 'K' ):   // ctrl-K, kill from cursor to end of line
+            killRing.kill( &buf[pos], len - pos, true );
             buf[pos] = '\0';
             len = pos;
-            refreshLine( fd, pi, buf, len, pos );
+            refreshLine( pi, buf, len, pos );
+            killRing.lastAction = KillRing::actionKill;
             break;
 
         case ctrlChar( 'L' ):   // ctrl-L, clear screen and redisplay line
-            linenoiseClearScreen( fd, pi, buf, len, pos );
+            linenoiseClearScreen( pi, buf, len, pos );
             break;
 
         case ctrlChar( 'N' ):   // ctrl-N, recall next line in history
         case ctrlChar( 'P' ):   // ctrl-P, recall previous line in history
+        case DOWN_ARROW_KEY:
+        case UP_ARROW_KEY:
+            killRing.lastAction = KillRing::actionOther;
             if ( history_len > 1 ) {
                 /* Update the current history entry before we
                  * overwrite it with the next one. */
                 free( history[history_index] );
                 history[history_index] = strdup (buf );
                 /* Show the new entry */
+                if ( c == UP_ARROW_KEY ) {
+                    c = ctrlChar( 'P' );
+                }
                 history_index += ( c == ctrlChar( 'P' ) ) ? -1 : 1;
                 if ( history_index < 0 ) {
                     history_index = 0;
@@ -886,11 +1338,12 @@ static int linenoisePrompt( int fd, char *buf, int buflen, PromptInfo& pi ) {
                 strncpy( buf, history[history_index], buflen );
                 buf[buflen] = '\0';
                 len = pos = strlen( buf );  // place cursor at end of line
-                refreshLine( fd, pi, buf, len, pos );
+                refreshLine( pi, buf, len, pos );
             }
             break;
 
         case ctrlChar( 'T' ):   // ctrl-T, transpose characters
+            killRing.lastAction = KillRing::actionOther;
             if ( pos > 0 && len > 1 ) {
                 size_t leftCharPos = ( pos == len ) ? pos - 2 : pos - 1;
                 char aux = buf[leftCharPos];
@@ -898,33 +1351,110 @@ static int linenoisePrompt( int fd, char *buf, int buflen, PromptInfo& pi ) {
                 buf[leftCharPos+1] = aux;
                 if ( pos != len )
                     ++pos;
-                refreshLine( fd, pi ,buf, len, pos );
+                refreshLine( pi ,buf, len, pos );
             }
             break;
 
-        case ctrlChar( 'U' ):   // ctrl-U, delete all characters to the left of the cursor
-            if( pos > 0 ) {
+        case ctrlChar( 'U' ):   // ctrl-U, kill all characters to the left of the cursor
+            if ( pos > 0 ) {
+                killRing.kill( &buf[0], pos, false );
                 len -= pos;
                 memmove( buf, buf + pos, len + 1 );
                 pos = 0;
-                refreshLine( fd, pi, buf, len, pos );
+                refreshLine( pi, buf, len, pos );
             }
+            killRing.lastAction = KillRing::actionKill;
+            break;
+
+        // ctrl-W, kill to whitespace (not word) to left of cursor
+        case ctrlChar( 'W' ):
+            if ( pos > 0 ) {
+                int startingPos = pos;
+                while ( pos > 0 && buf[pos - 1] == ' ' ) {
+                    --pos;
+                }
+                while ( pos > 0 && buf[pos - 1] != ' ' ) {
+                    --pos;
+                }
+                killRing.kill( &buf[pos], startingPos - pos, false );
+                memmove( buf + pos, buf + startingPos, len - startingPos + 1 );
+                len -= startingPos - pos;
+                refreshLine( pi, buf, len, pos );
+            }
+            killRing.lastAction = KillRing::actionKill;
+            break;
+
+        case ctrlChar( 'Y' ):   // ctrl-Y, yank killed text
+            {
+                string* restoredText = killRing.yank();
+                if ( restoredText ) {
+                    int restoredTextLen = restoredText->length();
+                    memmove( buf + pos + restoredTextLen, buf + pos, len - pos + 1 );
+                    memmove( buf + pos, restoredText->c_str(), restoredTextLen );
+                    pos += restoredTextLen;
+                    len += restoredTextLen;
+                    refreshLine( pi, buf, len, pos );
+                    killRing.lastAction = KillRing::actionYank;
+                    killRing.lastYankSize = restoredTextLen;
+                }
+                else {
+                    beep();
+                }
+            }
+            break;
+
+        case META + 'y':        // meta-Y, "yank-pop", rotate popped text
+        case META + 'Y':
+            if ( killRing.lastAction == KillRing::actionYank ) {
+                string* restoredText = killRing.yankPop();
+                if ( restoredText ) {
+                    int restoredTextLen = restoredText->length();
+                    if ( restoredTextLen > killRing.lastYankSize ) {
+                        memmove( buf + pos + restoredTextLen - killRing.lastYankSize, buf + pos, len - pos + 1 );
+                        memmove( buf + pos - killRing.lastYankSize, restoredText->c_str(), restoredTextLen );
+                    }
+                    else {
+                        memmove( buf + pos - killRing.lastYankSize, restoredText->c_str(), restoredTextLen );
+                        memmove( buf + pos + restoredTextLen - killRing.lastYankSize, buf + pos, len - pos + 1 );
+                    }
+                    pos += restoredTextLen - killRing.lastYankSize;
+                    len += restoredTextLen - killRing.lastYankSize;
+                    killRing.lastYankSize = restoredTextLen;
+                    refreshLine( pi, buf, len, pos );
+                    break;
+                }
+            }
+            beep();
             break;
 
 #ifndef _WIN32
         case ctrlChar( 'Z' ):   // ctrl-Z, job control
-            disableRawMode( fd );                   // Returning to Linux (whatever) shell, leave raw mode
+            disableRawMode();                       // Returning to Linux (whatever) shell, leave raw mode
             raise( SIGSTOP );                       // Break out in mid-line
-            enableRawMode( fd );                    // Back from Linux shell, re-enter raw mode
-            if ( write( fd, pi.promptText, pi.promptChars ) == -1 ) break; // Redraw prompt
-            refreshLine( fd, pi, buf, len, pos );   // Refresh the line
+            enableRawMode();                        // Back from Linux shell, re-enter raw mode
+            if ( write( 1, pi.promptText, pi.promptChars ) == -1 ) break; // Redraw prompt
+            refreshLine( pi, buf, len, pos );   // Refresh the line
             break;
 #endif
 
-        case 27:    /* escape sequence */
-            break; /* should be handled by linenoiseReadChar */
+        // DEL, delete the character under the cursor
+        case 127:
+        case DELETE_KEY:
+            killRing.lastAction = KillRing::actionOther;
+            if ( len > 0 && pos < len ) {
+                memmove( buf + pos, buf + pos + 1, len - pos );
+                --len;
+                refreshLine( pi, buf, len, pos );
+            }
+            break;
 
-        default:    // not one of our special characters, maybe insert it in the buffer
+        // not one of our special characters, maybe insert it in the buffer
+        default:
+            killRing.lastAction = KillRing::actionOther;
+            if ( c > 0xFF ) {   // beep on unknown Ctrl and/or Meta keys
+                beep();
+                break;
+            }
             if ( len < buflen ) {
                 if ( static_cast<unsigned char>( c ) < 32 ) {   // don't insert control characters
                     beep();
@@ -943,7 +1473,7 @@ static int linenoisePrompt( int fd, char *buf, int buflen, PromptInfo& pi ) {
                         if ( write( 1, &c, 1) == -1 ) return -1;
                     }
                     else {
-                        refreshLine( fd, pi, buf, len, pos );
+                        refreshLine( pi, buf, len, pos );
                     }
                 }
                 else {  // not at end of buffer, have to move characters to our right
@@ -952,7 +1482,7 @@ static int linenoisePrompt( int fd, char *buf, int buflen, PromptInfo& pi ) {
                     ++len;
                     ++pos;
                     buf[len] = '\0';
-                    refreshLine( fd, pi, buf, len, pos );
+                    refreshLine( pi, buf, len, pos );
                 }
             }
             break;
@@ -962,7 +1492,6 @@ static int linenoisePrompt( int fd, char *buf, int buflen, PromptInfo& pi ) {
 }
 
 static int linenoiseRaw( char* buf, int buflen, PromptInfo& pi ) {
-    int fd = STDIN_FILENO;
     int count;
 
     if ( buflen == 0 ) {
@@ -971,10 +1500,10 @@ static int linenoiseRaw( char* buf, int buflen, PromptInfo& pi ) {
     }
 
     if ( isatty( STDIN_FILENO ) ) {     // input is from a terminal
-        if ( enableRawMode( fd ) == -1 )
+        if ( enableRawMode() == -1 )
             return -1;
-        count = linenoisePrompt( fd, buf, buflen, pi );
-        disableRawMode( fd );
+        count = linenoisePrompt( buf, buflen, pi );
+        disableRawMode();
         printf( "\n" );
     }
     else {  // input not from a terminal, we should work with piped input, i.e. redirected stdin
@@ -991,30 +1520,21 @@ static int linenoiseRaw( char* buf, int buflen, PromptInfo& pi ) {
     return count;
 }
 
-// the returned string is allocated with strdup() and must be freed by calling free()
-char *linenoise( const char* prompt ) {
+/**
+ * linenoise is a readline replacement.
+ *
+ * call it with a prompt to display and it will return a line of input from the user
+ *
+ * @param prompt text of prompt to display to the user
+ * @return       the returned string belongs to the caller on return and must be freed to prevent memory leaks
+ */
+char* linenoise( const char* prompt ) {
     char buf[LINENOISE_MAX_LINE];               // buffer for user's input
     PromptInfo pi( prompt, getColumns() );      // struct to hold edited copy of prompt & misc prompt info
-
-    if ( isUnsupportedTerm() ) {
-        printf( "%s", pi.promptText );
-        fflush( stdout );
-        if ( fgets( buf,LINENOISE_MAX_LINE, stdin ) == NULL ) {
-            return NULL;
-        }
-        size_t len = strlen( buf );
-        while ( len && ( buf[len - 1] == '\n' || buf[len - 1] == '\r' ) ) {
-            --len;
-            buf[len] = '\0';
-        }
+    if ( linenoiseRaw( buf, LINENOISE_MAX_LINE, pi ) == -1 ) {
+        return NULL;
     }
-    else {
-        int count = linenoiseRaw( buf, LINENOISE_MAX_LINE, pi );
-        if ( count == -1 ) {
-            return NULL;
-        }
-    }
-    return strdup( buf );
+    return strdup( buf );                       // caller must free buffer
 }
 
 /* Register a callback function to be called for tab-completion. */
@@ -1050,8 +1570,8 @@ int linenoiseHistoryAdd( const char* line ) {
 
     // convert newlines in multi-line code to spaces before storing
     char *p = linecopy;
-    while( *p ) {
-        if( *p == '\n' )
+    while ( *p ) {
+        if ( *p == '\n' )
             *p = ' ';
         ++p;
     }

@@ -122,7 +122,7 @@ namespace mongo {
          * 'duplicates' is specified, it is filled with all duplicate names.
          */
         static string duplicateUncasedName( bool inholderlockalready, const string &name, const string &path, set< string > *duplicates = 0 );
-    public:
+
         const string name; // "alleyinsider"
         const string path;
 
@@ -140,7 +140,6 @@ namespace mongo {
         const string profileName; // "alleyinsider.system.profile"
         CCByLoc ccByLoc;
         int magic; // used for making sure the object is still loaded in memory
-        SimpleRWLock dbLock; // see d_concurrency.h.  using "Base" version as there are a few nuance hassles to RWLock use here albeit it would work
     };
 
 } // namespace mongo

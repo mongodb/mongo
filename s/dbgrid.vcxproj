@@ -213,10 +213,40 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="..\db\commands\pipeline.cpp" />
     <ClCompile Include="..\db\common.cpp" />
     <ClCompile Include="..\db\dbmessage.cpp" />
     <ClCompile Include="..\db\dbcommands_generic.cpp" />
     <ClCompile Include="..\db\dbwebserver.cpp" />
+    <ClCompile Include="..\db\pipeline\accumulator.cpp" />
+    <ClCompile Include="..\db\pipeline\accumulator_add_to_set.cpp" />
+    <ClCompile Include="..\db\pipeline\accumulator_avg.cpp" />
+    <ClCompile Include="..\db\pipeline\accumulator_first.cpp" />
+    <ClCompile Include="..\db\pipeline\accumulator_last.cpp" />
+    <ClCompile Include="..\db\pipeline\accumulator_min_max.cpp" />
+    <ClCompile Include="..\db\pipeline\accumulator_push.cpp" />
+    <ClCompile Include="..\db\pipeline\accumulator_single_value.cpp" />
+    <ClCompile Include="..\db\pipeline\accumulator_sum.cpp" />
+    <ClCompile Include="..\db\pipeline\builder.cpp" />
+    <ClCompile Include="..\db\pipeline\document.cpp" />
+    <ClCompile Include="..\db\pipeline\document_source.cpp" />
+    <ClCompile Include="..\db\pipeline\document_source_bson_array.cpp" />
+    <ClCompile Include="..\db\pipeline\document_source_command_futures.cpp" />
+    <ClCompile Include="..\db\pipeline\document_source_filter.cpp" />
+    <ClCompile Include="..\db\pipeline\document_source_filter_base.cpp" />
+    <ClCompile Include="..\db\pipeline\document_source_group.cpp" />
+    <ClCompile Include="..\db\pipeline\document_source_limit.cpp" />
+    <ClCompile Include="..\db\pipeline\document_source_match.cpp" />
+    <ClCompile Include="..\db\pipeline\document_source_out.cpp" />
+    <ClCompile Include="..\db\pipeline\document_source_project.cpp" />
+    <ClCompile Include="..\db\pipeline\document_source_skip.cpp" />
+    <ClCompile Include="..\db\pipeline\document_source_sort.cpp" />
+    <ClCompile Include="..\db\pipeline\document_source_unwind.cpp" />
+    <ClCompile Include="..\db\pipeline\doc_mem_monitor.cpp" />
+    <ClCompile Include="..\db\pipeline\expression.cpp" />
+    <ClCompile Include="..\db\pipeline\expression_context.cpp" />
+    <ClCompile Include="..\db\pipeline\field_path.cpp" />
+    <ClCompile Include="..\db\pipeline\value.cpp" />
     <ClCompile Include="..\db\querypattern.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
@@ -233,6 +263,12 @@
     <ClCompile Include="..\util\concurrency\task.cpp" />
     <ClCompile Include="..\util\concurrency\thread_pool.cpp" />
     <ClCompile Include="..\util\concurrency\vars.cpp" />
+    <ClCompile Include="..\util\intrusive_counter.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\util\log.cpp" />
     <ClCompile Include="..\util\net\miniwebserver.cpp" />
     <ClCompile Include="..\util\net\listen.cpp" />
@@ -240,6 +276,7 @@
     <ClCompile Include="..\util\ramlog.cpp" />
     <ClCompile Include="..\util\signal_handlers.cpp" />
     <ClCompile Include="..\util\stringutils.cpp" />
+    <ClCompile Include="..\util\systeminfo_win32.cpp" />
     <ClCompile Include="..\util\text.cpp" />
     <ClCompile Include="..\util\version.cpp" />
     <ClCompile Include="balance.cpp" />
@@ -568,8 +605,20 @@
     <ClCompile Include="writeback_listener.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\db\commands\pipeline.h" />
+    <ClInclude Include="..\db\pipeline\accumulator.h" />
+    <ClInclude Include="..\db\pipeline\builder.h" />
+    <ClInclude Include="..\db\pipeline\document.h" />
+    <ClInclude Include="..\db\pipeline\document_source.h" />
+    <ClInclude Include="..\db\pipeline\doc_mem_monitor.h" />
+    <ClInclude Include="..\db\pipeline\expression.h" />
+    <ClInclude Include="..\db\pipeline\expression_context.h" />
+    <ClInclude Include="..\db\pipeline\field_path.h" />
+    <ClInclude Include="..\db\pipeline\value.h" />
+    <ClInclude Include="..\util\intrusive_counter.h" />
     <ClInclude Include="..\util\processinfo.h" />
     <ClInclude Include="..\util\signal_handlers.h" />
+    <ClInclude Include="..\util\systeminfo.h" />
     <ClInclude Include="..\util\version.h" />
     <ClInclude Include="balance.h" />
     <ClInclude Include="balancer_policy.h" />

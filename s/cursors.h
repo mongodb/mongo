@@ -99,7 +99,7 @@ namespace mongo {
 
         long long _shardedTotal;
 
-        static int _myLogLevel;
+        static const int _myLogLevel;
     };
 
     extern CursorCache cursorCache;

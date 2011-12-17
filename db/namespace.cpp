@@ -30,7 +30,6 @@
 #include "ops/delete.h"
 #include "ops/query.h"
 
-
 namespace mongo {
 
     BOOST_STATIC_ASSERT( sizeof(Namespace) == 128 );
@@ -458,6 +457,7 @@ namespace mongo {
     }
 
     void NamespaceIndex::kill_ns(const char *ns) {
+        dbMutex.assertWriteLocked();
         if ( !ht )
             return;
         Namespace n(ns);
@@ -468,12 +468,26 @@ namespace mongo {
                 Namespace extra(n.extraName(i).c_str());
                 ht->kill(extra);
             }
-            catch(DBException&) { }
+            catch(DBException&) { 
+                dlog(3) << "caught exception in kill_ns" << endl;
+            }
         }
+    }
+
+    void NamespaceIndex::add_ns(const char *ns, DiskLoc& loc, bool capped) {
+        NamespaceDetails details( loc, capped );
+        add_ns( ns, details );
+    }
+    void NamespaceIndex::add_ns( const char *ns, const NamespaceDetails &details ) {
+        dbMutex.assertWriteLocked();
+        init();
+        Namespace n(ns);
+        uassert( 10081 , "too many namespaces/collections", ht->put(n, details));
     }
 
     /* extra space for indexes when more than 10 */
     NamespaceDetails::Extra* NamespaceIndex::newExtra(const char *ns, int i, NamespaceDetails *d) {
+        dbMutex.assertWriteLocked();
         assert( i >= 0 && i <= 1 );
         Namespace n(ns);
         Namespace extra(n.extraName(i).c_str()); // throws userexception if ns name too long
@@ -603,6 +617,32 @@ namespace mongo {
         _indexSpecs.clear();
     }
 
+    /*static*/ NOINLINE_DECL NamespaceDetailsTransient& NamespaceDetailsTransient::make_inlock(const char *ns) {
+        shared_ptr< NamespaceDetailsTransient > &t = _nsdMap[ ns ];
+        assert( t.get() == 0 );
+        Database *database = cc().database();
+        assert( database );
+        if( _nsdMap.size() % 20000 == 10000 ) { 
+            // so we notice if insanely large #s
+            log() << "opening namespace " << ns << endl;
+            log() << _nsdMap.size() << " namespaces in nsdMap" << endl;
+        }
+        t.reset( new NamespaceDetailsTransient(database, ns) );
+        return *t;
+    }
+
+    // note with repair there could be two databases with the same ns name.
+    // that is NOT handled here yet!  TODO
+    // repair may not use nsdt though not sure.  anyway, requires work.
+    NamespaceDetailsTransient::NamespaceDetailsTransient(Database *db, const char *ns) : 
+        _ns(ns), _keysComputed(false), _qcWriteCount() 
+    {
+        dassert(db);
+    }
+
+    NamespaceDetailsTransient::~NamespaceDetailsTransient() { 
+    }
+    
     void NamespaceDetailsTransient::clearForPrefix(const char *prefix) {
         assertInWriteLock();
         vector< string > found;

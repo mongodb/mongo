@@ -51,6 +51,7 @@ namespace mongo {
     GENOIDLabeler GENOID;
 
     DateNowLabeler DATENOW;
+    NullLabeler BSONNULL;
 
     MinKeyLabeler MINKEY;
     MaxKeyLabeler MAXKEY;

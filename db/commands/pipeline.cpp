@@ -24,6 +24,7 @@
 #include "db/pipeline/expression.h"
 #include "db/pipeline/expression_context.h"
 #include "db/pdfile.h"
+#include "util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -140,7 +141,9 @@ namespace mongo {
         for(size_t iStep = 0; iStep < nSteps; ++iStep) {
             /* pull out the pipeline element as an object */
             BSONElement pipeElement(pipeline[iStep]);
-            assert(pipeElement.type() == Object); // CW TODO user error
+	    uassert(15942, str::stream() << "pipeline element " <<
+		    iStep << " is not an object",
+		    pipeElement.type() == Object);
             BSONObj bsonObj(pipeElement.Obj());
 
 	    intrusive_ptr<DocumentSource> pSource;

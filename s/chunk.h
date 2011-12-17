@@ -34,7 +34,6 @@ namespace mongo {
     class Chunk;
     class ChunkRange;
     class ChunkManager;
-    class ChunkRangeMangager;
     class ChunkObjUnitTest;
 
     typedef shared_ptr<const Chunk> ChunkPtr;
@@ -235,7 +234,7 @@ namespace mongo {
             : _manager(begin->second->getManager())
             , _shard(begin->second->getShard())
             , _min(begin->second->getMin())
-            , _max(prior(end)->second->getMax()) {
+            , _max(boost::prior(end)->second->getMax()) {
             assert( begin != end );
 
             DEV while (begin != end) {
@@ -306,7 +305,7 @@ namespace mongo {
         int numChunks() const { return _chunkMap.size(); }
         bool hasShardKey( const BSONObj& obj ) const;
 
-        void createFirstChunks( const Shard& shard ) const; // only call from DBConfig::shardCollection
+        void createFirstChunks( const Shard& shard , const vector<BSONObj>& chunkSplitPoints , const vector<Shard>& chunkShards ) const; // only call from DBConfig::shardCollection
         ChunkPtr findChunk( const BSONObj& obj ) const;
         ChunkPtr findChunkOnServer( const Shard& shard ) const;
 
@@ -322,8 +321,8 @@ namespace mongo {
         /**
          * Returns true if, for this shard, the chunks are identical in both chunk managers
          */
-        bool compatibleWith( const ChunkManager& other, const Shard& shard );
-        bool compatibleWith( ChunkManagerPtr other, const Shard& shard ){ return compatibleWith( *other, shard ); }
+        bool compatibleWith( const ChunkManager& other, const Shard& shard ) const;
+        bool compatibleWith( ChunkManagerPtr other, const Shard& shard ) const { if( ! other ) return false; return compatibleWith( *other, shard ); }
 
         string toString() const;
 

@@ -50,7 +50,7 @@ namespace mongo {
 
     Database::Database(const char *nm, bool& newDb, const string& _path )
         : name(nm), path(_path), namespaceIndex( path, name ),
-          profileName(name + ".system.profile") 
+          profileName(name + ".system.profile")
     {
         try {
             {

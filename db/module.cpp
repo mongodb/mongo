@@ -32,7 +32,7 @@ namespace mongo {
 
     Module::~Module() {}
 
-    void Module::addOptions( program_options::options_description& options ) {
+    void Module::addOptions( boost::program_options::options_description& options ) {
         if ( ! _all ) {
             return;
         }
@@ -42,7 +42,7 @@ namespace mongo {
         }
     }
 
-    void Module::configAll( program_options::variables_map& params ) {
+    void Module::configAll( boost::program_options::variables_map& params ) {
         if ( ! _all ) {
             return;
         }

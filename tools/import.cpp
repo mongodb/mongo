@@ -288,7 +288,7 @@ public:
 
         if ( filename.size() > 0 && filename != "-" ) {
             if ( ! exists( filename ) ) {
-                cerr << "file doesn't exist: " << filename << endl;
+                error() << "file doesn't exist: " << filename << endl;
                 return -1;
             }
             in = &file;
@@ -315,7 +315,7 @@ public:
         auth();
 
         if ( hasParam( "drop" ) ) {
-            cout << "dropping: " << ns << endl;
+            log() << "dropping: " << ns << endl;
             conn().dropCollection( ns.c_str() );
         }
 
@@ -352,7 +352,7 @@ public:
                 _sep = "\t";
             }
             else {
-                cerr << "don't know what type [" << type << "] is" << endl;
+                error() << "don't know what type [" << type << "] is" << endl;
                 return -1;
             }
         }
@@ -432,8 +432,8 @@ public:
                 num++;
             }
             catch ( std::exception& e ) {
-                cout << "exception:" << e.what() << endl;
-                cout << line << endl;
+                log() << "exception:" << e.what() << endl;
+                log() << line << endl;
                 errors++;
 
                 if (hasParam("stopOnError") || _jsonArray)
@@ -441,18 +441,18 @@ public:
             }
 
             if ( pm.hit( len + 1 ) ) {
-                cout << "\t\t\t" << num << "\t" << ( num / ( time(0) - start ) ) << "/second" << endl;
+                log() << "\t\t\t" << num << "\t" << ( num / ( time(0) - start ) ) << "/second" << endl;
             }
         }
 
-        cout << "imported " << ( num - headerRows ) << " objects" << endl;
+        log() << "imported " << ( num - headerRows ) << " objects" << endl;
 
         conn().getLastError();
 
         if ( errors == 0 )
             return 0;
 
-        cerr << "encountered " << errors << " error" << ( errors == 1 ? "" : "s" ) << endl;
+        error() << "encountered " << errors << " error" << ( errors == 1 ? "" : "s" ) << endl;
         return -1;
     }
 };

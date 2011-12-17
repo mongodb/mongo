@@ -48,7 +48,7 @@ namespace mongo {
 
         ~MMS() {}
 
-        void config( program_options::variables_map& params ) {
+        void config( boost::program_options::variables_map& params ) {
             _baseurl = params["mms-url"].as<string>();
             if ( params.count( "mms-token" ) ) {
                 _token = params["mms-token"].as<string>();

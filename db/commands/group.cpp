@@ -99,8 +99,7 @@ namespace mongo {
                     break;
                 }
                 
-                if ( ( cursor->matcher() && !cursor->matcher()->matchesCurrent( cursor.get() ) ) ||
-                    cursor->getsetdup( cursor->currLoc() ) ) {
+                if ( !cursor->currentMatches() || cursor->getsetdup( cursor->currLoc() ) ) {
                     cursor->advance();
                     continue;
                 }

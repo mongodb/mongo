@@ -237,9 +237,10 @@ namespace mongo {
     inline size_t Document::getFieldCount() const {
 	return vFieldName.size();
     }
-
+    
     inline Document::FieldPair Document::getField(size_t index) const {
-	return FieldPair(vFieldName[index], vpValue[index]);
+        assert( index < vFieldName.size() );
+        return FieldPair(vFieldName[index], vpValue[index]);
     }
 
 }

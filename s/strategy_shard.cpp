@@ -33,6 +33,13 @@ namespace mongo {
     class ShardStrategy : public Strategy {
 
         virtual void queryOp( Request& r ) {
+
+            // TODO: These probably should just be handled here.
+            if ( r.isCommand() ) {
+                SINGLE->queryOp( r );
+                return;
+            }
+
             QueryMessage q( r.d() );
 
             r.checkAuth( Auth::READ );
@@ -42,45 +49,21 @@ namespace mongo {
             if ( q.ntoreturn == 1 && strstr(q.ns, ".$cmd") )
                 throw UserException( 8010 , "something is wrong, shouldn't see a command here" );
 
-            ChunkManagerPtr info = r.getChunkManager();
-            assert( info );
+            QuerySpec qSpec( (string)q.ns, q.query, q.fields, q.ntoskip, q.ntoreturn, q.queryOptions );
 
-            Query query( q.query );
-
-            set<Shard> shards;
-            info->getShardsForQuery( shards , query.getFilter()  );
-
-            set<ServerAndQuery> servers;
-            for ( set<Shard>::iterator i = shards.begin(); i != shards.end(); i++ ) {
-                servers.insert( ServerAndQuery( i->getConnString() , BSONObj() ) );
-            }
-
-            if ( logLevel > 4 ) {
-                StringBuilder ss;
-                ss << " shard query servers: " << servers.size() << '\n';
-                for ( set<ServerAndQuery>::iterator i = servers.begin(); i!=servers.end(); i++ ) {
-                    const ServerAndQuery& s = *i;
-                    ss << "       " << s.toString() << '\n';
-                }
-                log() << ss.str() << endl;
-            }
-
-            ClusteredCursor * cursor = 0;
-
-            BSONObj sort = query.getSort();
-            cursor = new ParallelSortClusteredCursor( servers , q , sort );
-
+            ParallelSortClusteredCursor * cursor = new ParallelSortClusteredCursor( qSpec, CommandInfo() );
             assert( cursor );
 
+            // TODO:  Move out to Request itself, not strategy based
             try {
                 long long start_millis = 0;
-                if ( query.isExplain() ) start_millis = curTimeMillis64();
+                if ( qSpec.isExplain() ) start_millis = curTimeMillis64();
                 cursor->init();
 
                 LOG(5) << "   cursor type: " << cursor->type() << endl;
                 shardedCursorTypes.hit( cursor->type() );
 
-                if ( query.isExplain() ) {
+                if ( qSpec.isExplain() ) {
                     // fetch elapsed time for the query
                     long long elapsed_millis = curTimeMillis64() - start_millis;
                     BSONObjBuilder explain_builder;
@@ -98,35 +81,77 @@ namespace mongo {
                 throw;
             }
 
-            ShardedClientCursorPtr cc (new ShardedClientCursor( q , cursor ));
-            if ( ! cc->sendNextBatch( r ) ) {
-                return;
+            if( cursor->isSharded() ){
+                ShardedClientCursorPtr cc (new ShardedClientCursor( q , cursor ));
+
+                if ( ! cc->sendNextBatch( r ) ) {
+                    return;
+                }
+
+                LOG(6) << "storing cursor : " << cc->getId() << endl;
+                cursorCache.store( cc );
             }
-            LOG(6) << "storing cursor : " << cc->getId() << endl;
-            cursorCache.store( cc );
+            else{
+                // TODO:  Better merge this logic.  We potentially can now use the same cursor logic for everything.
+                ShardPtr primary = cursor->getPrimary();
+                DBClientCursorPtr shardCursor = cursor->getShardCursor( *primary );
+                r.reply( *(shardCursor->getMessage()) , primary->getConnString() );
+            }
+        }
+
+        virtual void commandOp( const string& db, const BSONObj& command, int options,
+                                const string& versionedNS, const BSONObj& filter,
+                                map<Shard,BSONObj>& results )
+        {
+
+            QuerySpec qSpec( db + ".$cmd", command, BSONObj(), 0, 1, options );
+
+            ParallelSortClusteredCursor cursor( qSpec, CommandInfo( versionedNS, filter ) );
+
+            // Initialize the cursor
+            cursor.init();
+
+            set<Shard> shards;
+            cursor.getQueryShards( shards );
+
+            for( set<Shard>::iterator i = shards.begin(), end = shards.end(); i != end; ++i ){
+                results[ *i ] = cursor.getShardCursor( *i )->peekFirst().getOwned();
+            }
+
         }
 
         virtual void getMore( Request& r ) {
-            int ntoreturn = r.d().pullInt();
-            long long id = r.d().pullInt64();
 
-            LOG(6) << "want cursor : " << id << endl;
+            // TODO:  Handle stale config exceptions here from coll being dropped or sharded during op
+            // for now has same semantics as legacy request
+            ChunkManagerPtr info = r.getChunkManager();
 
-            ShardedClientCursorPtr cursor = cursorCache.get( id );
-            if ( ! cursor ) {
-                LOG(6) << "\t invalid cursor :(" << endl;
-                replyToQuery( ResultFlag_CursorNotFound , r.p() , r.m() , 0 , 0 , 0 );
+            if( ! info ){
+                SINGLE->getMore( r );
                 return;
             }
+            else {
+                int ntoreturn = r.d().pullInt();
+                long long id = r.d().pullInt64();
 
-            if ( cursor->sendNextBatch( r , ntoreturn ) ) {
-                // still more data
-                cursor->accessed();
-                return;
+                LOG(6) << "want cursor : " << id << endl;
+
+                ShardedClientCursorPtr cursor = cursorCache.get( id );
+                if ( ! cursor ) {
+                    LOG(6) << "\t invalid cursor :(" << endl;
+                    replyToQuery( ResultFlag_CursorNotFound , r.p() , r.m() , 0 , 0 , 0 );
+                    return;
+                }
+
+                if ( cursor->sendNextBatch( r , ntoreturn ) ) {
+                    // still more data
+                    cursor->accessed();
+                    return;
+                }
+
+                // we've exhausted the cursor
+                cursorCache.remove( id );
             }
-
-            // we've exhausted the cursor
-            cursorCache.remove( id );
         }
 
         void _insert( Request& r , DbMessage& d, ChunkManagerPtr manager ) {
@@ -297,7 +322,7 @@ namespace mongo {
                         left--;
                         log() << "update will be retried b/c sharding config info is stale, "
                               << " left:" << left << " ns: " << r.getns() << " query: " << query << endl;
-                        r.reset( false );
+                        r.reset();
                         manager = r.getChunkManager();
                         uassert(14806, "collection no longer sharded", manager);
                     }
@@ -333,7 +358,7 @@ namespace mongo {
                     left--;
                     log() << "delete failed b/c of StaleConfigException, retrying "
                           << " left:" << left << " ns: " << r.getns() << " patt: " << pattern << endl;
-                    r.reset( false );
+                    r.reset();
                     shards.clear();
                     manager = r.getChunkManager();
                     uassert(14805, "collection no longer sharded", manager);
@@ -351,28 +376,38 @@ namespace mongo {
         }
 
         virtual void writeOp( int op , Request& r ) {
-            const char *ns = r.getns();
-            LOG(3) << "write: " << ns << endl;
 
-            DbMessage& d = r.d();
+            // TODO:  Handle stale config exceptions here from coll being dropped or sharded during op
+            // for now has same semantics as legacy request
             ChunkManagerPtr info = r.getChunkManager();
-            assert( info );
 
-            if ( op == dbInsert ) {
-                _insert( r , d , info );
+            if( ! info ){
+                SINGLE->writeOp( op, r );
+                return;
             }
-            else if ( op == dbUpdate ) {
-                _update( r , d , info );
-            }
-            else if ( op == dbDelete ) {
-                _delete( r , d , info );
-            }
-            else {
-                log() << "sharding can't do write op: " << op << endl;
-                throw UserException( 8016 , "can't do this write op on sharded collection" );
-            }
+            else{
+                const char *ns = r.getns();
+                LOG(3) << "write: " << ns << endl;
 
+                DbMessage& d = r.d();
+
+                if ( op == dbInsert ) {
+                    _insert( r , d , info );
+                }
+                else if ( op == dbUpdate ) {
+                    _update( r , d , info );
+                }
+                else if ( op == dbDelete ) {
+                    _delete( r , d , info );
+                }
+                else {
+                    log() << "sharding can't do write op: " << op << endl;
+                    throw UserException( 8016 , "can't do this write op on sharded collection" );
+                }
+                return;
+            }
         }
+
     };
 
     Strategy * SHARDED = new ShardStrategy();

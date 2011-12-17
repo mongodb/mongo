@@ -25,6 +25,7 @@
 #include "../util/timer.h"
 #include <boost/thread.hpp>
 #include <boost/bind.hpp>
+#include "../db/d_concurrency.h"
 
 #include "dbtests.h"
 
@@ -465,6 +466,37 @@ namespace ThreadedTests {
         }
     };
 
+    class Hierarchical1 {
+    public:
+        void run() {
+            {
+                LockCollectionForReading x("bar");
+            }
+            {
+                LockCollectionForReading x("foo");
+                LockCollectionForReading y("foo"); // recursion is ok
+            }
+            {
+                LockCollectionForReading x("foo");
+                LockCollectionForReading y("foo.$bar"); 
+            }
+            {
+                LockCollectionForWriting x("foo");
+                LockCollectionForWriting y("foo");
+            }
+            {
+                LockCollectionForReading x("foo");
+                ASSERT_THROWS( LockCollectionForWriting y("foo"), DBException )
+            }
+            {
+                LockCollectionForReading x("foo");
+                ASSERT_THROWS( LockCollectionForReading y("bar"), DBException )
+            }
+
+            cout << "temp ok" << endl;
+        }
+    };
+
 #if 1
     class UpgradableTest : public ThreadedTest<7> {
         RWLock m;
@@ -587,6 +619,8 @@ namespace ThreadedTests {
         All() : Suite( "threading" ) { }
 
         void setupTests() {
+            add< Hierarchical1 >();
+
             add< WriteLocksAreGreedy >();
             add< UpgradableTest >();
             add< List1Test >();
@@ -596,6 +630,7 @@ namespace ThreadedTests {
             add< MVarTest >();
             add< ThreadPoolTest >();
             add< LockTest >();
+
 
             add< RWLockTest1 >();
             //add< RWLockTest2 >(); // SERVER-2996

@@ -43,7 +43,7 @@ namespace mongo {
         }
 
         void entering(mid m) {
-            if( this == 0 ) return;
+            if( this == 0 || m == 0 ) return;
             assert( magic == 0x12345678 );
 
             Preceeding *_preceeding = us.get();
@@ -103,7 +103,7 @@ namespace mongo {
             }
         }
         void leaving(mid m) {
-            if( this == 0 ) return; // still in startup pre-main()
+            if( this == 0 || m == 0 ) return; // still in startup pre-main()
             Preceeding& preceeding = *us.get();
             preceeding[m]--;
             if( preceeding[m] < 0 ) {

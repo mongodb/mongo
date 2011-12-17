@@ -330,6 +330,9 @@
       <Filter>db\h</Filter>
     </ClInclude>
     <ClInclude Include="framework.h" />
+    <ClInclude Include="..\db\ops\count.h">
+      <Filter>db\h</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\js\js64r.lib">
@@ -906,6 +909,12 @@
     </ClCompile>
     <ClCompile Include="queryoptimizercursortests.cpp">
       <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\default_version.cpp">
+      <Filter>shard</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\ops\count.cpp">
+      <Filter>db\cpp</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

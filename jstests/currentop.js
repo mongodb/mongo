@@ -5,6 +5,8 @@ t.drop();
 for(i=0;i<100;i++) {
     t.save({ "num": i });
 }
+// Make sure data is written before we start reading it in parallel shells.
+db.getLastError();
 
 function ops(q) {
     return db.currentOp(q).inprog;
@@ -16,7 +18,7 @@ s2 = startParallelShell( "db.jstests_currentop.update( { '$where': function() { 
 
 o = [];
 assert.soon( function() {
-    o = ops({});
+    o = ops({ "ns": "test.jstests_currentop" });
 
     var writes = ops({ "lockType": "write", "ns": "test.jstests_currentop" }).length;
     var reads = ops({ "lockType": "read", "ns": "test.jstests_currentop" }).length;

@@ -1,5 +1,4 @@
 // querytests.cpp : query.{h,cpp} unit tests.
-//
 
 /**
  *    Copyright (C) 2008 10gen Inc.
@@ -51,9 +50,11 @@ namespace QueryTests {
                     toDelete.push_back( c->currLoc() );
                 for( vector< DiskLoc >::iterator i = toDelete.begin(); i != toDelete.end(); ++i )
                     theDataFileMgr.deleteRecord( ns(), i->rec(), *i, false );
+                DBDirectClient cl;
+                cl.dropIndexes( ns() );
             }
             catch ( ... ) {
-                FAIL( "Exception while cleaning up records" );
+                FAIL( "Exception while cleaning up collection" );
             }
         }
     protected:
@@ -78,62 +79,6 @@ namespace QueryTests {
         }
     };
 
-    class CountBasic : public Base {
-    public:
-        void run() {
-            insert( "{\"a\":\"b\"}" );
-            BSONObj cmd = fromjson( "{\"query\":{}}" );
-            string err;
-            ASSERT_EQUALS( 1, runCount( ns(), cmd, err ) );
-        }
-    };
-
-    class CountQuery : public Base {
-    public:
-        void run() {
-            insert( "{\"a\":\"b\"}" );
-            insert( "{\"a\":\"b\",\"x\":\"y\"}" );
-            insert( "{\"a\":\"c\"}" );
-            BSONObj cmd = fromjson( "{\"query\":{\"a\":\"b\"}}" );
-            string err;
-            ASSERT_EQUALS( 2, runCount( ns(), cmd, err ) );
-        }
-    };
-
-    class CountFields : public Base {
-    public:
-        void run() {
-            insert( "{\"a\":\"b\"}" );
-            insert( "{\"c\":\"d\"}" );
-            BSONObj cmd = fromjson( "{\"query\":{},\"fields\":{\"a\":1}}" );
-            string err;
-            ASSERT_EQUALS( 2, runCount( ns(), cmd, err ) );
-        }
-    };
-
-    class CountQueryFields : public Base {
-    public:
-        void run() {
-            insert( "{\"a\":\"b\"}" );
-            insert( "{\"a\":\"c\"}" );
-            insert( "{\"d\":\"e\"}" );
-            BSONObj cmd = fromjson( "{\"query\":{\"a\":\"b\"},\"fields\":{\"a\":1}}" );
-            string err;
-            ASSERT_EQUALS( 1, runCount( ns(), cmd, err ) );
-        }
-    };
-
-    class CountIndexedRegex : public Base {
-    public:
-        void run() {
-            insert( "{\"a\":\"b\"}" );
-            insert( "{\"a\":\"c\"}" );
-            BSONObj cmd = fromjson( "{\"query\":{\"a\":/^b/}}" );
-            string err;
-            ASSERT_EQUALS( 1, runCount( ns(), cmd, err ) );
-        }
-    };
-
     class FindOne : public Base {
     public:
         void run() {
@@ -141,12 +86,62 @@ namespace QueryTests {
             addIndex( BSON( "c" << 1 ) );
             insert( BSON( "b" << 2 << "_id" << 0 ) );
             insert( BSON( "c" << 3 << "_id" << 1 ) );
+            BSONObj query = fromjson( "{$or:[{b:2},{c:3}]}" );
             BSONObj ret;
-            ASSERT( Helpers::findOne( ns(), fromjson( "{$or:[{b:2},{c:3}]}" ), ret, true ) );
+            // Check findOne() returning object.
+            ASSERT( Helpers::findOne( ns(), query, ret, true ) );
             ASSERT_EQUALS( string( "b" ), ret.firstElement().fieldName() );
+            // Cross check with findOne() returning location.
+            ASSERT_EQUALS( ret, Helpers::findOne( ns(), query, true ).obj() );
         }
     };
+    
+    class FindOneRequireIndex : public Base {
+    public:
+        void run() {
+            insert( BSON( "b" << 2 << "_id" << 0 ) );
+            BSONObj query = fromjson( "{b:2}" );
+            BSONObj ret;
 
+            // Check findOne() returning object, allowing unindexed scan.
+            ASSERT( Helpers::findOne( ns(), query, ret, false ) );
+            // Check findOne() returning location, allowing unindexed scan.
+            ASSERT_EQUALS( ret, Helpers::findOne( ns(), query, false ).obj() );
+            
+            // Check findOne() returning object, requiring indexed scan without index.
+            ASSERT_THROWS( Helpers::findOne( ns(), query, ret, true ), MsgAssertionException );
+            // Check findOne() returning location, requiring indexed scan without index.
+            ASSERT_THROWS( Helpers::findOne( ns(), query, true ), MsgAssertionException );
+
+            addIndex( BSON( "b" << 1 ) );
+            // Check findOne() returning object, requiring indexed scan with index.
+            ASSERT( Helpers::findOne( ns(), query, ret, false ) );
+            // Check findOne() returning location, requiring indexed scan with index.
+            ASSERT_EQUALS( ret, Helpers::findOne( ns(), query, false ).obj() );
+        }
+    };
+    
+    class FindOneEmptyObj : public Base {
+    public:
+        void run() {
+            // We don't normally allow empty objects in the database, but test that we can find
+            // an empty object (one might be allowed inside a reserved namespace at some point).
+            dblock lk;
+            Client::Context ctx( "unittests.querytests" );
+            // Set up security so godinsert command can run.
+            cc().getAuthenticationInfo()->isLocalHost = true;
+            DBDirectClient cl;
+            BSONObj info;
+            ASSERT( cl.runCommand( "unittests", BSON( "godinsert" << "querytests" << "obj" << BSONObj() ), info ) );
+            insert( BSONObj() );
+            BSONObj query;
+            BSONObj ret;
+            ASSERT( Helpers::findOne( ns(), query, ret, false ) );
+            ASSERT( ret.isEmpty() );
+            ASSERT_EQUALS( ret, Helpers::findOne( ns(), query, false ).obj() );
+        }
+    };
+    
     class ClientBase {
     public:
         ClientBase() {
@@ -1352,12 +1347,9 @@ namespace QueryTests {
 
         void setupTests() {
             add< FindingStart >();
-            add< CountBasic >();
-            add< CountQuery >();
-            add< CountFields >();
-            add< CountQueryFields >();
-            add< CountIndexedRegex >();
             add< FindOne >();
+            add< FindOneRequireIndex >();
+            add< FindOneEmptyObj >();
             add< BoundedKey >();
             add< GetMore >();
             add< PositiveLimit >();

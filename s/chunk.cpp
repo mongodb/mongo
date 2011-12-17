@@ -635,11 +635,11 @@ namespace mongo {
 
         // Check endpoints
         ENSURE(allOfType(MinKey, chunkMap.begin()->second->getMin()));
-        ENSURE(allOfType(MaxKey, prior(chunkMap.end())->second->getMax()));
+        ENSURE(allOfType(MaxKey, boost::prior(chunkMap.end())->second->getMax()));
 
         // Make sure there are no gaps or overlaps
         for (ChunkMap::const_iterator it=boost::next(chunkMap.begin()), end=chunkMap.end(); it != end; ++it) {
-            ChunkMap::const_iterator last = prior(it);
+            ChunkMap::const_iterator last = boost::prior(it);
 
             if (!(it->second->getMin() == last->second->getMax())) {
                 PRINT(it->second->toString());
@@ -664,38 +664,50 @@ namespace mongo {
         return _key.hasShardKey( obj );
     }
 
-    void ChunkManager::createFirstChunks( const Shard& shard ) const {
+    void ChunkManager::createFirstChunks( const Shard& shard , const vector<BSONObj>& chunkSplitPoints , const vector<Shard>& chunkShards ) const {
         // TODO distlock?
         assert( _chunkMap.size() == 0 );
 
+        vector<BSONObj> splitPoints;
+        vector<Shard> shards;
         unsigned long long numObjects = 0;
-        {
-            // get stats to see if there is any data
-            ScopedDbConnection shardConn( shard.getConnString() );
-            numObjects = shardConn->count( getns() );
-            shardConn.done();
+        Chunk c(this, _key.globalMin(), _key.globalMax(), shard);
+
+        if ( chunkSplitPoints.size() == 0 ) {
+            // discover split points
+            {
+                // get stats to see if there is any data
+                ScopedDbConnection shardConn( shard.getConnString() );
+                numObjects = shardConn->count( getns() );
+                shardConn.done();
+            }
+
+            if ( numObjects > 0 )
+                c.pickSplitVector( splitPoints , Chunk::MaxChunkSize );
+        } else {
+            splitPoints = chunkSplitPoints;
+            shards = chunkShards;
         }
+
+        // make sure there is at least 1 shard, the primary
+        if ( !shards.size() )
+            shards.push_back( shard );
 
         // this is the first chunk; start the versioning from scratch
         ShardChunkVersion version;
         version.incMajor();
-
-        Chunk c(this, _key.globalMin(), _key.globalMax(), shard);
-
-        vector<BSONObj> splitPoints;
-        if ( numObjects > 0 )
-            c.pickSplitVector( splitPoints , Chunk::MaxChunkSize );
         
         log() << "going to create " << splitPoints.size() + 1 << " chunk(s) for: " << _ns << endl;
         
 
         ScopedDbConnection conn( configServer.modelServer() );        
 
+        unsigned si = 0;
         for ( unsigned i=0; i<=splitPoints.size(); i++ ) {
             BSONObj min = i == 0 ? _key.globalMin() : splitPoints[i-1];
             BSONObj max = i < splitPoints.size() ? splitPoints[i] : _key.globalMax();
             
-            Chunk temp( this , min , max , shard );
+            Chunk temp( this , min , max , shards[si] );
         
             BSONObjBuilder chunkBuilder;
             temp.serialize( chunkBuilder , version );
@@ -704,6 +716,8 @@ namespace mongo {
             conn->update( Chunk::chunkMetadataNS, QUERY( "_id" << temp.genID() ), chunkObj,  true, false );
 
             version.incMinor();
+            if ( ++si == shards.size() )
+                si = 0;
         }
 
         string errmsg = conn->getLastError();
@@ -842,7 +856,7 @@ namespace mongo {
         all.insert(_shards.begin(), _shards.end());
     }
 
-    bool ChunkManager::compatibleWith( const ChunkManager& other, const Shard& shard ){
+    bool ChunkManager::compatibleWith( const ChunkManager& other, const Shard& shard ) const {
         // TODO: Make this much smarter - currently returns true only if we're the same chunk manager
         return getns() == other.getns() && getSequenceNumber() == other.getSequenceNumber();
     }
@@ -942,11 +956,11 @@ namespace mongo {
 
             // Check endpoints
             assert(allOfType(MinKey, _ranges.begin()->second->getMin()));
-            assert(allOfType(MaxKey, prior(_ranges.end())->second->getMax()));
+            assert(allOfType(MaxKey, boost::prior(_ranges.end())->second->getMax()));
 
             // Make sure there are no gaps or overlaps
             for (ChunkRangeMap::const_iterator it=boost::next(_ranges.begin()), end=_ranges.end(); it != end; ++it) {
-                ChunkRangeMap::const_iterator last = prior(it);
+                ChunkRangeMap::const_iterator last = boost::prior(it);
                 assert(it->second->getMin() == last->second->getMax());
             }
 

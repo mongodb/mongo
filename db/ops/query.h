@@ -34,8 +34,6 @@ namespace mongo {
 
     QueryResult* processGetMore(const char *ns, int ntoreturn, long long cursorid , CurOp& op, int pass, bool& exhaust);
 
-    long long runCount(const char *ns, const BSONObj& cmd, string& err);
-
     const char * runQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result);
 
     /* This is for languages whose "objects" are not well ordered (JSON is well ordered).

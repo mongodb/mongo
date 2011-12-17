@@ -3,38 +3,41 @@
 #pragma once
 
 #include "../util/concurrency/rwlock.h"
-
-#if defined(CLC)
-
-#error asdf
+#include "db/mongomutex.h"
 
 namespace mongo {
 
-    class HLock { 
+    class LockCollectionForReading { 
+        struct Locks { 
+            Locks(string ns);
+            GlobalSharedLock gslk;
+            rwlock_shared clk;
+        };
+        scoped_ptr<Locks> locks;
     public:
-        HLock(HLock *parent, RWLock& r);
-        struct writelock { 
-            writelock(HLock&);
-            ~writelock();
-        private: 
-            HLock& h;
-            bool already;
+        LockCollectionForReading(string coll);
+        ~LockCollectionForReading();
+    };
+
+    class LockCollectionForWriting {
+        struct Locks { 
+            Locks(string ns);
+            SimpleRWLock::Shared excluder;
+            GlobalSharedLock gslk;
+            rwlock clk;
         };
-        struct readlock { 
-            readlock(HLock&);
-        private:
-            HLock& h;
-            bool already;
-        };
-    private:
-        void hlock();
-        void hunlock();
-        void hlockShared();
-        void hunlockShared();
-        HLock *parent;
-        RWLock& r;
+        scoped_ptr<Locks> locks;
+    public:
+        LockCollectionForWriting(string db);
+        ~LockCollectionForWriting();
+    };
+
+    class ExcludeAllWrites {
+        SimpleRWLock::Exclusive lk;
+        GlobalSharedLock gslk;
+    public:
+        ExcludeAllWrites();
+        ~ExcludeAllWrites();
     };
 
 }
-
-#endif

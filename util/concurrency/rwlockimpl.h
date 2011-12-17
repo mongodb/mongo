@@ -126,6 +126,7 @@ namespace mongo {
 namespace mongo { typedef boost::modified_shared_mutex shared_mutex; }
 # else
 #  include <boost/thread/shared_mutex.hpp>
+namespace mongo { using boost::shared_mutex; }
 # endif
 # undef assert
 # define assert MONGO_assert

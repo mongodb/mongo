@@ -42,7 +42,7 @@ namespace mongo {
     AccumulatorMinMax::AccumulatorMinMax(int theSense):
 	AccumulatorSingleValue(),
         sense(theSense) {
-        assert((sense == 1) || (sense == -1)); // CW TODO error
+        assert((sense == 1) || (sense == -1));
     }
 
     intrusive_ptr<Accumulator> AccumulatorMinMax::createMin(

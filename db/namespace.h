@@ -19,15 +19,17 @@
 #pragma once
 
 #include "../pch.h"
-#include "namespace_common.h"
+#include "namespacestring.h"
 #include "jsobj.h"
 #include "querypattern.h"
 #include "diskloc.h"
 #include "../util/hashtab.h"
 #include "mongommf.h"
+#include "d_concurrency.h"
 
 namespace mongo {
 
+    class Database;
 
 #pragma pack(1)
     /* This helper class is used to make the HashMap below in NamespaceIndex e.g. see line:
@@ -416,17 +418,19 @@ namespace mongo {
 
        todo: cleanup code, need abstractions and separation
     */
+    // todo: multiple db's with the same name (repairDatbase) is not handled herein.  that may be 
+    //       the way to go, if not used by repair, but need some sort of enforcement / asserts.
     class NamespaceDetailsTransient : boost::noncopyable {
         BOOST_STATIC_ASSERT( sizeof(NamespaceDetails) == 496 );
 
-        /* general ------------------------------------------------------------- */
-    private:
-        string _ns;
+        //Database *database;
+        const string _ns;
         void reset();
         static std::map< string, shared_ptr< NamespaceDetailsTransient > > _nsdMap;
+
+        NamespaceDetailsTransient(Database*,const char *ns);
     public:
-        NamespaceDetailsTransient(const char *ns) : _ns(ns), _keysComputed(false), _qcWriteCount() { }
-    public:
+        ~NamespaceDetailsTransient();
         void addedIndex() { assertInWriteLock(); reset(); }
         void deletedIndex() { assertInWriteLock(); reset(); }
         /* Drop cached information on all namespaces beginning with the specified prefix.
@@ -442,19 +446,30 @@ namespace mongo {
          * currKey() documents, the matcher(), and the isMultiKey() nature of the
          * cursor may change over the course of iteration.
          *
-         * @param order - If no index exists that satisfies this sort order, an
-         * empty shared_ptr will be returned.
+         * @param query - Query used to select indexes and populate matchers.
+         *
+         * @param order - Required ordering spec for documents produced by this cursor,
+         * empty object default indicates no order requirement.  If no index exists that
+         * satisfies the required sort order, an empty shared_ptr is returned.
+         *
+         * @param requireIndex - If true, no unindexed (ie collection scan) cursors are
+         * used to generate the returned cursor.  If an unindexed cursor is required, an
+         * assertion is raised by the cursor during iteration.
+         *
+         * @param simpleEqualityMatch - Set to true for certain simple queries -
+         * see queryoptimizer.cpp.
          *
          * The returned cursor may @throw inside of advance() or recoverFromYield() in
          * certain error cases, for example if a capped overrun occurred during a yield.
          * This indicates that the cursor was unable to perform a complete scan.
          *
          * This is a work in progress.  Partial list of features not yet implemented:
-         * - modification of scanned documents
          * - covered indexes
          * - in memory sorting
          */
-        static shared_ptr<Cursor> getCursor( const char *ns, const BSONObj &query, const BSONObj &order = BSONObj() );
+        static shared_ptr<Cursor> getCursor( const char *ns, const BSONObj &query,
+                                            const BSONObj &order = BSONObj(), bool requireIndex = false,
+                                            bool *simpleEqualityMatch = 0 );
                                      
         /* indexKeys() cache ---------------------------------------------------- */
         /* assumed to be in write lock for this */
@@ -494,6 +509,7 @@ namespace mongo {
     private:
         int _qcWriteCount;
         map< QueryPattern, pair< BSONObj, long long > > _qcCache;
+        static NamespaceDetailsTransient& make_inlock(const char *ns);
     public:
         static SimpleMutex _qcMutex;
 
@@ -534,10 +550,12 @@ namespace mongo {
     }; /* NamespaceDetailsTransient */
 
     inline NamespaceDetailsTransient& NamespaceDetailsTransient::get_inlock(const char *ns) {
-        shared_ptr< NamespaceDetailsTransient > &t = _nsdMap[ ns ];
-        if ( t.get() == 0 )
-            t.reset( new NamespaceDetailsTransient(ns) );
-        return *t;
+        std::map< string, shared_ptr< NamespaceDetailsTransient > >::iterator i = _nsdMap.find(ns);
+        if( i != _nsdMap.end() && 
+            i->second.get() ) { // could be null ptr from clearForPrefix
+            return *i->second;
+        }
+        return make_inlock(ns);
     }
 
     /* NamespaceIndex is the ".ns" file you see in the data directory.  It is the "system catalog"
@@ -551,30 +569,13 @@ namespace mongo {
         /* returns true if new db will be created if we init lazily */
         bool exists() const;
 
-    private:
-        void _init();
-    public:
         void init() {
             if( !ht ) 
                 _init();
         }
 
-        void add_ns(const char *ns, DiskLoc& loc, bool capped) {
-            NamespaceDetails details( loc, capped );
-            add_ns( ns, details );
-        }
-        void add_ns( const char *ns, const NamespaceDetails &details ) {
-            init();
-            Namespace n(ns);
-            uassert( 10081 , "too many namespaces/collections", ht->put(n, details));
-        }
-
-        /* just for diagnostics */
-        /*size_t detailsOffset(NamespaceDetails *d) {
-            if ( !ht )
-                return -1;
-            return ((char *) d) -  (char *) ht->nodes;
-        }*/
+        void add_ns(const char *ns, DiskLoc& loc, bool capped);
+        void add_ns( const char *ns, const NamespaceDetails &details );
 
         NamespaceDetails* details(const char *ns) {
             if ( !ht )
@@ -597,9 +598,7 @@ namespace mongo {
             return false;
         }
 
-        bool allocated() const {
-            return ht != 0;
-        }
+        bool allocated() const { return ht != 0; }
 
         void getNamespaces( list<string>& tofill , bool onlyCollections = true ) const;
 
@@ -610,6 +609,7 @@ namespace mongo {
         unsigned long long fileLength() const { return f.length(); }
 
     private:
+        void _init();
         void maybeMkdir() const;
 
         MongoMMF f;

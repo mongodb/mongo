@@ -80,12 +80,21 @@ namespace mongo {
         /* called before query getmore block is iterated */
         virtual void checkLocation() { }
 
+        /**
+         * Called before a document pointed at by an earlier iterate of this cursor is to be
+         * modified.  It is ok if the current iterate also points to the document to be modified.
+         */
+        virtual void prepareToTouchEarlierIterate() { noteLocation(); }
+
+        /** Recover from a previous call to prepareToTouchEarlierIterate(). */
+        virtual void recoverFromTouchingEarlierIterate() { checkLocation(); }
+
         virtual bool supportYields() = 0;
 
         /** Called before a ClientCursor yield. */
         virtual bool prepareToYield() { noteLocation(); return supportYields(); }
         
-        /** Called after a ClientCursor yield. */
+        /** Called after a ClientCursor yield.  Recovers from a previous call to prepareToYield(). */
         virtual void recoverFromYield() { checkLocation(); }
 
         virtual string toString() { return "abstract?"; }
@@ -127,6 +136,10 @@ namespace mongo {
         virtual CoveredIndexMatcher *matcher() const { return 0; }
         // Used when we need to share this matcher with someone else
         virtual shared_ptr< CoveredIndexMatcher > matcherPtr() const { return shared_ptr< CoveredIndexMatcher >(); }
+
+        virtual bool currentMatches( MatchDetails *details = 0 ) {
+            return !matcher() || matcher()->matchesCurrent( this, details );
+        }
 
         // A convenience function for setting the value of matcher() manually
         // so it may accessed later.  Implementations which must generate

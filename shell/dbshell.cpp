@@ -36,8 +36,8 @@ using namespace boost::filesystem;
 using namespace mongo;
 
 string historyFile;
-bool gotInterrupted = 0;
-bool inMultiLine = 0;
+bool gotInterrupted = false;
+bool inMultiLine = false;
 static volatile bool atPrompt = false; // can eval before getting to prompt
 bool autoKillOp = false;
 
@@ -58,17 +58,21 @@ void generateCompletions( const string& prefix , vector<string>& all ) {
     if ( prefix.find( '"' ) != string::npos )
         return;
 
-    BSONObj args = BSON( "0" << prefix );
-    shellMainScope->invokeSafe( "function(x) {shellAutocomplete(x)}", &args, 0, 1000 );
-    BSONObjBuilder b;
-    shellMainScope->append( b , "" , "__autocomplete__" );
-    BSONObj res = b.obj();
-    BSONObj arr = res.firstElement().Obj();
+    try {
+        BSONObj args = BSON( "0" << prefix );
+        shellMainScope->invokeSafe( "function callShellAutocomplete(x) {shellAutocomplete(x)}", &args, 0, 1000 );
+        BSONObjBuilder b;
+        shellMainScope->append( b , "" , "__autocomplete__" );
+        BSONObj res = b.obj();
+        BSONObj arr = res.firstElement().Obj();
 
-    BSONObjIterator i( arr );
-    while ( i.more() ) {
-        BSONElement e = i.next();
-        all.push_back( e.String() );
+        BSONObjIterator i( arr );
+        while ( i.more() ) {
+            BSONElement e = i.next();
+            all.push_back( e.String() );
+        }
+    }
+    catch ( ... ) {
     }
 }
 
@@ -191,6 +195,10 @@ char * shellReadline( const char * prompt , int handlesigint = 0 ) {
 #endif
 
     char * ret = linenoise( prompt );
+    if ( ! ret ) {
+        gotInterrupted = true;  // got ^C, break out of multiline
+    }
+
     signal( SIGINT , quitNicely );
     atPrompt = false;
     return ret;
@@ -375,10 +383,10 @@ public:
 
 string finishCode( string code ) {
     while ( ! isBalanced( code ) ) {
-        inMultiLine = 1;
+        inMultiLine = true;
         code += "\n";
         // cancel multiline if two blank lines are entered
-        if ( code.find( "\n\n\n ") != string::npos )
+        if ( code.find( "\n\n\n" ) != string::npos )
             return ";";
         char * line = shellReadline( "... " , 1 );
         if ( gotInterrupted ) {
@@ -818,8 +826,8 @@ int _main( int argc, char* argv[] ) {
         //v8::Handle<v8::Object> shellHelper = baseContext_->Global()->Get( v8::String::New( "shellHelper" ) )->ToObject();
 
         while ( 1 ) {
-            inMultiLine = 0;
-            gotInterrupted = 0;
+            inMultiLine = false;
+            gotInterrupted = false;
 //            shellMainScope->localConnect;
             //DBClientWithCommands *c = getConnection( JSContext *cx, JSObject *obj );
 
@@ -879,6 +887,7 @@ int _main( int argc, char* argv[] ) {
                 continue;
             }
 
+            gotInterrupted = false;
             code = finishCode( code );
             if ( gotInterrupted ) {
                 cout << endl;

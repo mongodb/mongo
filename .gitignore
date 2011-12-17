@@ -43,6 +43,8 @@ shell/mongo-server.cpp
 */*/Debug/
 */Release/
 */*/Release/
+*/ipch
+*/*/ipch
 db/.gdb*
 db/makefile.local
 db/_ReSharper.db

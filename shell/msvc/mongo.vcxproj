@@ -124,7 +124,6 @@
     <ClCompile Include="..\..\scripting\bench.cpp" />
     <ClCompile Include="..\..\scripting\engine_spidermonkey.cpp" />
     <ClCompile Include="..\..\scripting\utils.cpp" />
-    <ClCompile Include="..\..\s\shardconnection.cpp" />
     <ClCompile Include="..\..\third_party\linenoise\linenoise.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PreprocessorDefinitions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">_CRT_SECURE_NO_WARNINGS;XP_WIN;HAVE_CONFIG_H;OLDJS;MONGO_EXPOSE_MACROS;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>

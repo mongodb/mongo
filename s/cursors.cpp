@@ -283,7 +283,7 @@ namespace mongo {
 
     CursorCache cursorCache;
 
-    int CursorCache::_myLogLevel = 3;
+    const int CursorCache::_myLogLevel = 3;
 
     class CursorTimeoutTask : public task::Task {
     public:

@@ -67,6 +67,12 @@ namespace mongo {
         return *_builder;
     }
 
+    inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(NullLabeler& id) {
+        _builder->appendNull(_fieldName);
+        _fieldName = 0;
+        return *_builder;
+    }
+
     inline BSONObjBuilder& BSONObjBuilderValueStream::operator<<(MinKeyLabeler& id) {
         _builder->appendMinKey(_fieldName);
         _fieldName = 0;

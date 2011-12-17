@@ -84,6 +84,12 @@ namespace mongo {
     */
     extern struct DateNowLabeler { } DATENOW;
 
+    /* Utility class to assign a NULL value to a given attribute
+       Example:
+         cout << BSON( "a" << BSONNULL ); // { a : null }
+    */
+    extern struct NullLabeler { } BSONNULL;
+
     /* Utility class to add the minKey (minus infinity) to a given attribute
        Example:
          cout << BSON( "a" << MINKEY ); // { "a" : { "$minKey" : 1 } }
@@ -142,6 +148,8 @@ namespace mongo {
         BSONObjBuilder& operator<<( T value );
 
         BSONObjBuilder& operator<<(DateNowLabeler& id);
+
+        BSONObjBuilder& operator<<(NullLabeler& id);
 
         BSONObjBuilder& operator<<(MinKeyLabeler& id);
         BSONObjBuilder& operator<<(MaxKeyLabeler& id);

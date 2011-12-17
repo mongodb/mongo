@@ -15,15 +15,9 @@ namespace mongo {
         shared_ptr<DBClientConnection> _conn;
         shared_ptr<DBClientCursor> cursor;
     public:
-
-        OplogReader() {
-        }
-        ~OplogReader() {
-        }
-
-        void resetCursor() {
-            cursor.reset();
-        }
+        OplogReader() { }
+        ~OplogReader() { }
+        void resetCursor() { cursor.reset(); }
         void resetConnection() {
             cursor.reset();
             _conn.reset();
@@ -32,7 +26,6 @@ namespace mongo {
         BSONObj findOne(const char *ns, const Query& q) {
             return conn()->findOne(ns, q, 0, QueryOption_SlaveOk);
         }
-
         BSONObj getLastOp(const char *ns) {
             return findOne(ns, Query().sort(reverseNaturalObj));
         }
@@ -41,7 +34,6 @@ namespace mongo {
         bool connect(string hostname);
 
         bool connect(const BSONObj& rid, const int from, const string& to);
-
 
         void tailCheck() {
             if( cursor.get() && cursor->isDead() ) {
@@ -117,11 +109,8 @@ namespace mongo {
             if( cursor.get() )
                 cursor->peek(v,n);
         }
-
         BSONObj nextSafe() { return cursor->nextSafe(); }
-
         BSONObj next() { return cursor->next(); }
-
         void putBack(BSONObj op) { cursor->putBack(op); }
 
     private:

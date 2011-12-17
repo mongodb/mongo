@@ -153,7 +153,7 @@ namespace mongo {
         virtual bool prepareToYield() { massert( 13335, "yield not supported", false ); return false; }
         /** Recover once the db mutex is regained. */
         virtual void recoverFromYield() { massert( 13336, "yield not supported", false ); }
-                
+        
         /**
          * @return true iff the QueryPlan for this QueryOp may be registered
          * as a winning plan.
@@ -290,6 +290,9 @@ namespace mongo {
         bool prepareToYield();
         void recoverFromYield();
         
+        /** Clear the runner member. */
+        void clearRunner();
+        
         QueryPlanPtr firstPlan() const { return _plans[ 0 ]; }
         
         /** @return metadata about cursors and index bounds for all plans, suitable for explain output. */
@@ -425,12 +428,24 @@ namespace mongo {
         bool prepareToYield();
         void recoverFromYield();
         
+        /** Clear the runner member. */
+        void clearRunner();
+        
+        int currentNPlans() const;
+
         /**
          * @return a single simple cursor if the scanner would run a single cursor
          * for this query, otherwise return an empty shared_ptr.
          */
         shared_ptr<Cursor> singleCursor() const;
-        
+
+        /**
+         * @return the query plan that would be used if the scanner would run a single
+         * cursor for this query, otherwise 0.  The returned plan is invalid if this
+         * MultiPlanScanner is destroyed, hence we return a raw pointer.
+         */
+        const QueryPlan *singlePlan() const;
+
         /** @return true iff more $or clauses need to be scanned. */
         bool mayRunMore() const { return _or ? ( !_tableScanned && !_org->orFinished() ) : _i == 0; }
         /** @return non-$or version of explain output. */
@@ -522,6 +537,8 @@ namespace mongo {
 
         virtual shared_ptr< CoveredIndexMatcher > matcherPtr() const { return _matcher; }
         virtual CoveredIndexMatcher* matcher() const { return _matcher.get(); }
+
+        virtual bool capped() const { return _c->capped(); }
 
         /** return -1 if we're a getmore handoff */
         virtual long long nscanned() { return _nscanned >= 0 ? _nscanned + _c->nscanned() : _nscanned; }

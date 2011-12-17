@@ -93,7 +93,7 @@ namespace mongo {
 
                 unsigned long long ns = msTimeOut * 1000000ULL; // milli to nano
                 if ( xt.nsec + ns < 1000000000 ) {
-                    xt.nsec = (xtime::xtime_nsec_t) (xt.nsec + ns);
+                    xt.nsec = (boost::xtime::xtime_nsec_t) (xt.nsec + ns);
                 }
                 else {
                     xt.sec += 1 + ns / 1000000000;
