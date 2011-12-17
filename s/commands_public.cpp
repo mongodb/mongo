@@ -1244,10 +1244,9 @@ namespace mongo {
                                 vector<BSONElement> sizes = singleResult.getField("chunkSizes").Array();
                                 for (unsigned int i = 0; i < sizes.size(); i += 2) {
                                     BSONObj key = sizes[i].Obj().getOwned();
-                                    int size = sizes[i+1].numberLong();
+                                    long long size = sizes[i+1].numberLong();
                                     assert( size < 0x7fffffff );
-
-                                    chunkSizes[key] = size;
+                                    chunkSizes[key] = static_cast<int>(size);
                                 }
                             }
                         }
