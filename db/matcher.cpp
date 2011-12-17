@@ -620,7 +620,10 @@ namespace mongo {
 
             if ( em._allMatchers.size() ) {
                 BSONElement e = obj.getFieldDotted( fieldName );
-                uassert( 13021 , "$all/$elemMatch needs to be applied to array" , e.type() == Array );
+                // The $all/$elemMatch operator only matches arrays.
+                if ( e.type() != Array ) {
+                    return -1;
+                }
 
                 for ( unsigned i=0; i<em._allMatchers.size(); i++ ) {
                     bool found = false;
