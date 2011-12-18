@@ -255,7 +255,7 @@ __wt_fsm_write(WT_SESSION_IMPL *session,
 	WT_BTREE *btree;
 	WT_BUF *tmp;
 	WT_PAGE_DISK *dsk;
-	uint32_t addr, align_size, size;
+	uint32_t addr, align_size, size, tmp_size;
 	int compression_failed, ret;
 
 	btree = session->btree;

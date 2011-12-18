@@ -3,22 +3,47 @@
 extern int __wt_block_alloc(WT_SESSION_IMPL *session,
     uint32_t *addrp,
     uint32_t size);
-extern int __wt_block_free(WT_SESSION_IMPL *session,
-    uint32_t addr,
-    uint32_t size);
+extern int __wt_block_free( WT_SESSION_IMPL *session,
+    uint8_t *addrbuf,
+    uint32_t addrbuf_size);
 extern int __wt_block_freelist_read(WT_SESSION_IMPL *session);
 extern int __wt_block_freelist_write(WT_SESSION_IMPL *session);
 extern void __wt_block_stat(WT_SESSION_IMPL *session);
 extern void __wt_block_dump(WT_SESSION_IMPL *session);
+extern int __wt_fsm_buffer_to_addr( const uint8_t *p,
+    uint32_t *addr,
+    uint32_t *size,
+    uint32_t *cksum);
+extern int __wt_fsm_addr_to_buffer( uint8_t **p,
+    uint32_t addr,
+    uint32_t size,
+    uint32_t cksum);
+extern int __wt_fsm_valid( WT_SESSION_IMPL *session,
+    const uint8_t *addrbuf,
+    uint32_t addrbuf_size);
+extern int __wt_fsm_addr_string(WT_SESSION_IMPL *session,
+    WT_BUF *buf,
+    const uint8_t *addrbuf,
+    uint32_t addrbuf_size);
 extern int __wt_block_read(WT_SESSION_IMPL *session,
+    WT_BUF *buf,
+    const uint8_t *addrbuf,
+    uint32_t addrbuf_size,
+    uint32_t flags);
+extern int __wt_fsm_read(WT_SESSION_IMPL *session,
     WT_BUF *buf,
     uint32_t addr,
     uint32_t size,
-    uint32_t flags);
-extern int __wt_block_write( WT_SESSION_IMPL *session,
+    uint32_t cksum);
+extern int __wt_block_write(WT_SESSION_IMPL *session,
+    WT_BUF *buf,
+    uint8_t *addrbuf,
+    uint32_t *addrbuf_size);
+extern int __wt_fsm_write(WT_SESSION_IMPL *session,
     WT_BUF *buf,
     uint32_t *addrp,
-    uint32_t *sizep);
+    uint32_t *sizep,
+    uint32_t *cksump);
 extern int __wt_bulk_init(WT_CURSOR_BULK *cbulk);
 extern int __wt_bulk_insert(WT_CURSOR_BULK *cbulk);
 extern int __wt_bulk_end(WT_CURSOR_BULK *cbulk);
@@ -77,7 +102,6 @@ extern int __wt_btree_open(WT_SESSION_IMPL *session,
     const char *config,
     const char *cfg[],
     uint32_t flags);
-extern int __wt_btree_root_empty_init(WT_SESSION_IMPL *session);
 extern int __wt_btree_root_empty(WT_SESSION_IMPL *session, WT_PAGE **leafp);
 extern int __wt_btree_close(WT_SESSION_IMPL *session);
 extern int __wt_btree_reopen(WT_SESSION_IMPL *session,
@@ -88,7 +112,17 @@ extern int __wt_btree_huffman_open(WT_SESSION_IMPL *session,
 extern void __wt_btree_huffman_close(WT_SESSION_IMPL *session);
 extern const char *__wt_page_type_string(u_int type);
 extern const char *__wt_cell_type_string(uint8_t type);
-extern int __wt_ovfl_in(WT_SESSION_IMPL *session, WT_OFF *ovfl, WT_BUF *store);
+extern const char *__wt_page_addr_string(WT_SESSION_IMPL *session,
+    WT_BUF *buf,
+    WT_PAGE *page);
+extern const char *__wt_addr_string( WT_SESSION_IMPL *session,
+    WT_BUF *buf,
+    const uint8_t *addr,
+    uint32_t size);
+extern int __wt_ovfl_in( WT_SESSION_IMPL *session,
+    WT_BUF *store,
+    const uint8_t *addr,
+    uint32_t len);
 extern int
 __wt_page_in_func(
  WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify
@@ -114,8 +148,8 @@ extern int __wt_btree_sync(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_verify(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_dumpfile(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_verify_dsk(WT_SESSION_IMPL *session,
+    const char *addr,
     WT_PAGE_DISK *dsk,
-    uint32_t addr,
     uint32_t size);
 extern int __wt_tree_np(WT_SESSION_IMPL *session,
     WT_PAGE **pagep,
@@ -134,22 +168,22 @@ extern int __wt_rec_evict(WT_SESSION_IMPL *session,
 extern int __wt_rec_track_block(WT_SESSION_IMPL *session,
     __wt_pt_type_t type,
     WT_PAGE *page,
-    uint32_t addr,
+    const uint8_t *addr,
     uint32_t size);
 extern int __wt_rec_track_ovfl(WT_SESSION_IMPL *session,
     WT_PAGE *page,
+    uint8_t *addr,
+    uint32_t addr_size,
     const void *data,
-    uint32_t len,
-    uint32_t addr,
-    uint32_t size);
+    uint32_t data_size);
 extern int __wt_rec_track_ovfl_reuse(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const void *data,
-    uint32_t len,
-    uint32_t *addrp,
+    uint32_t size,
+    uint8_t **addrp,
     uint32_t *sizep);
-extern void __wt_rec_track_reset(WT_SESSION_IMPL *session, WT_PAGE *page);
-extern int __wt_rec_track_discard(WT_SESSION_IMPL *session,
+extern void __wt_rec_track_init(WT_SESSION_IMPL *session, WT_PAGE *page);
+extern int __wt_rec_track_wrapup(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     int final);
 extern int __wt_rec_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page);

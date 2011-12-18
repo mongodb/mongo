@@ -56,7 +56,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 */
 	if (F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE)) {
 		page->read_gen = __wt_cache_read_gen(session);
-		page->parent_ref->state = WT_REF_MEM;
+		page->parent_ref.ref->state = WT_REF_MEM;
 		return (0);
 	}
 
@@ -341,13 +341,13 @@ __rec_sub_excl_clear(WT_SESSION_IMPL *session,
 	if (LF_ISSET(WT_REC_SINGLE))
 		return;
 
-	WT_ASSERT(session, page->parent_ref->state == WT_REF_LOCKED);
+	WT_ASSERT(session, page->parent_ref.ref->state == WT_REF_LOCKED);
 
 	/*
 	 * Take care to unlock pages in the same order we locked them.
 	 * Otherwise, tracking the last successfully locked page is meaningless.
 	 */
-	page->parent_ref->state = WT_REF_MEM;
+	page->parent_ref.ref->state = WT_REF_MEM;
 	if (page == last_page)
 		return;
 
