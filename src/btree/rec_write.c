@@ -1308,10 +1308,10 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* Allocate the memory. */
 	WT_RET(__rec_split_init(session,
-	    page, page->u.col_leaf.recno, btree->maxleafpage));
+	    page, page->u.col_fix.recno, btree->maxleafpage));
 
 	/* Copy the updated, disk-image bytes into place. */
-	memcpy(r->first_free, page->u.col_leaf.bitf,
+	memcpy(r->first_free, page->u.col_fix.bitf,
 	    __bitstr_size(page->entries * btree->bitcnt));
 
 	/* Calculate the number of entries per page remainder. */
@@ -1392,7 +1392,7 @@ __rec_col_fix_slvg(
 	 * don't want to have to retrofit the code later.
 	 */
 	WT_RET(__rec_split_init(session,
-	    page, page->u.col_leaf.recno, btree->maxleafpage));
+	    page, page->u.col_fix.recno, btree->maxleafpage));
 
 	/* We may not be taking all of the entries on the original page. */
 	page_take = salvage->take == 0 ? page->entries : salvage->take;
@@ -1409,7 +1409,7 @@ __rec_col_fix_slvg(
 		for (; nrecs > 0 && page_take > 0;
 		    --nrecs, --page_take, ++page_start, ++entry)
 			__bit_setv(r->first_free, entry, btree->bitcnt,
-			    __bit_getv(page->u.col_leaf.bitf,
+			    __bit_getv(page->u.col_fix.bitf,
 				(uint32_t)page_start, btree->bitcnt));
 
 		r->recno += entry;
@@ -1533,7 +1533,7 @@ __rec_col_var(
 	size = 0;
 
 	WT_RET(__rec_split_init(session,
-	    page, page->u.col_leaf.recno, session->btree->maxleafpage));
+	    page, page->u.col_var.recno, session->btree->maxleafpage));
 
 	/*
 	 * The salvage code may be calling us to reconcile a page where there

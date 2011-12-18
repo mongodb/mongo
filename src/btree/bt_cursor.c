@@ -39,7 +39,7 @@ __cursor_invalid(WT_CURSOR_BTREE *cbt)
 	case BTREE_COL_FIX:
 		break;
 	case BTREE_COL_VAR:
-		cip = &page->u.col_leaf.d[cbt->slot];
+		cip = &page->u.col_var.d[cbt->slot];
 		if ((cell = WT_COL_PTR(page, cip)) == NULL)
 			return (WT_NOTFOUND);
 		__wt_cell_unpack(cell, &unpack);

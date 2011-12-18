@@ -395,11 +395,11 @@ __btree_root_init_empty(WT_SESSION_IMPL *session)
 	WT_ERR(__wt_calloc_def(session, 1, &leaf));
 	switch (btree->type) {
 	case BTREE_COL_FIX:
-		leaf->u.col_leaf.recno = 1;
+		leaf->u.col_fix.recno = 1;
 		leaf->type = WT_PAGE_COL_FIX;
 		break;
 	case BTREE_COL_VAR:
-		leaf->u.col_leaf.recno = 1;
+		leaf->u.col_var.recno = 1;
 		leaf->type = WT_PAGE_COL_VAR;
 		break;
 	case BTREE_ROW:

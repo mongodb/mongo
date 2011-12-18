@@ -74,9 +74,6 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 		page = WT_COL_REF_PAGE(cref);
 	}
 
-	WT_ASSERT(session, cref == NULL ||
-	    cref->recno == page->u.col_leaf.recno);
-
 	/*
 	 * Copy the leaf page's write generation value before reading the page.
 	 * Use a read memory barrier to ensure we read the value before we read
@@ -100,8 +97,8 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	 * we arrive here with a record that's impossibly large for the page.
 	 */
 	if (page->type == WT_PAGE_COL_FIX) {
-		if (recno >= page->u.col_leaf.recno + page->entries) {
-			cbt->recno = page->u.col_leaf.recno + page->entries;
+		if (recno >= page->u.col_fix.recno + page->entries) {
+			cbt->recno = page->u.col_fix.recno + page->entries;
 			goto past_end;
 		} else
 			ins_head = WT_COL_UPDATE_SINGLE(page);

@@ -114,7 +114,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
-		page->u.col_leaf.recno = dsk->recno;
+		page->u.col_fix.recno = dsk->recno;
 		WT_ERR(__inmem_col_fix(page));
 		break;
 	case WT_PAGE_COL_INT:
@@ -122,7 +122,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 		WT_ERR(__inmem_col_int(session, page));
 		break;
 	case WT_PAGE_COL_VAR:
-		page->u.col_leaf.recno = dsk->recno;
+		page->u.col_var.recno = dsk->recno;
 		WT_ERR(__inmem_col_var(session, page));
 		break;
 	case WT_PAGE_ROW_INT:
@@ -152,7 +152,7 @@ __inmem_col_fix(WT_PAGE *page)
 
 	dsk = page->dsk;
 
-	page->u.col_leaf.bitf = WT_PAGE_DISK_BYTE(dsk);
+	page->u.col_fix.bitf = WT_PAGE_DISK_BYTE(dsk);
 	page->entries = dsk->u.entries;
 	return (0);
 }
@@ -217,21 +217,21 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 	unpack = &_unpack;
 	repeats = NULL;
 	bytes_allocated = max_repeats = nrepeats = 0;
-	recno = page->u.col_leaf.recno;
+	recno = page->u.col_var.recno;
 
 	/*
 	 * Column-store page entries map one-to-one to the number of physical
 	 * entries on the page (each physical entry is a data item).
 	 */
 	WT_RET(__wt_calloc_def(
-	    session, (size_t)dsk->u.entries, &page->u.col_leaf.d));
+	    session, (size_t)dsk->u.entries, &page->u.col_var.d));
 
 	/*
 	 * Walk the page, building references: the page contains unsorted value
 	 * items.  The value items are on-page (WT_CELL_VALUE), overflow items
 	 * (WT_CELL_VALUE_OVFL) or deleted items (WT_CELL_DEL).
 	 */
-	cip = page->u.col_leaf.d;
+	cip = page->u.col_var.d;
 	indx = 0;
 	WT_CELL_FOREACH(dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
@@ -258,8 +258,8 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 		recno += rle;
 	}
 
-	page->u.col_leaf.repeats = repeats;
-	page->u.col_leaf.nrepeats = nrepeats;
+	page->u.col_var.repeats = repeats;
+	page->u.col_var.nrepeats = nrepeats;
 	page->entries = dsk->u.entries;
 	return (0);
 }

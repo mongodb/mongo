@@ -67,7 +67,7 @@ __cursor_fix_next(WT_CURSOR_BTREE *cbt, int newpage)
 		cbt->last_standard_recno = __col_last_recno(cbt->page);
 		if (cbt->last_standard_recno == 0)
 			return (WT_NOTFOUND);
-		cbt->recno = cbt->page->u.col_leaf.recno;
+		cbt->recno = cbt->page->u.col_fix.recno;
 		goto new_page;
 	}
 
@@ -118,7 +118,7 @@ __cursor_var_next(WT_CURSOR_BTREE *cbt, int newpage)
 		cbt->last_standard_recno = __col_last_recno(cbt->page);
 		if (cbt->last_standard_recno == 0)
 			return (WT_NOTFOUND);
-		cbt->recno = cbt->page->u.col_leaf.recno;
+		cbt->recno = cbt->page->u.col_var.recno;
 		goto new_page;
 	}
 

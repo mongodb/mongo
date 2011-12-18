@@ -258,12 +258,14 @@ __verify_tree(WT_SESSION_IMPL *session,
 	 * then update the total record count.
 	 */
 	switch (page->type) {
+	case WT_PAGE_COL_FIX:
+		recno = page->u.col_fix.recno;
+		goto recno_chk;
 	case WT_PAGE_COL_INT:
 		recno = page->u.col_int.recno;
 		goto recno_chk;
-	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_VAR:
-		recno = page->u.col_leaf.recno;
+		recno = page->u.col_var.recno;
 recno_chk:	if (parent_recno != recno) {
 			__wt_errx(session,
 			    "page at %s has a starting record of %" PRIu64

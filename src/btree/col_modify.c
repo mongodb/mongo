@@ -64,6 +64,10 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 		break;
 	}
 
+	/* If we don't yet have a modify structure, we'll need one. */
+	if (page->modify == NULL)
+		WT_RET(__wt_rec_modify_init(session, page));
+
 	ins = NULL;
 	new_inshead = NULL;
 	new_inslist = NULL;
@@ -91,31 +95,31 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 		/* There may be no WT_INSERT_HEAD, allocate as necessary. */
 		new_inshead_size = new_inslist_size = 0;
 		if (op == 1) {
-			if (page == NULL || page->u.col_leaf.append == NULL) {
+			if (page == NULL || page->modify->append == NULL) {
 				new_inslist_size = 1 * sizeof(WT_INSERT_HEAD *);
 				WT_ERR(
 				    __wt_calloc_def(session, 1, &new_inslist));
 				inshead = &new_inslist[0];
 			} else
-				inshead = &page->u.col_leaf.append[0];
+				inshead = &page->modify->append[0];
 			cbt->ins_head = *inshead;
 		} else if (page->type == WT_PAGE_COL_FIX) {
-			if (page->u.col_leaf.update == NULL) {
+			if (page->modify->update == NULL) {
 				new_inslist_size = 1 * sizeof(WT_INSERT_HEAD *);
 				WT_ERR(
 				    __wt_calloc_def(session, 1, &new_inslist));
 				inshead = &new_inslist[0];
 			} else
-				inshead = &page->u.col_leaf.update[0];
+				inshead = &page->modify->update[0];
 		} else {
-			if (page->u.col_leaf.update == NULL) {
+			if (page->modify->update == NULL) {
 				new_inslist_size =
 				    page->entries * sizeof(WT_INSERT_HEAD *);
 				WT_ERR(__wt_calloc_def(
 				    session, page->entries, &new_inslist));
 				inshead = &new_inslist[cbt->slot];
 			} else
-				inshead = &page->u.col_leaf.update[cbt->slot];
+				inshead = &page->modify->update[cbt->slot];
 		}
 
 		/* There may be no WT_INSERT list, allocate as necessary. */
@@ -236,8 +240,8 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 	 * If the page does not yet have an insert array, our caller passed
 	 * us one.
 	 */
-	if (page->u.col_leaf.append == NULL) {
-		page->u.col_leaf.append = new_inslist;
+	if (page->modify->append == NULL) {
+		page->modify->append = new_inslist;
 		__wt_col_append_new_inslist_taken(session, page);
 	}
 

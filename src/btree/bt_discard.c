@@ -84,19 +84,20 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 static void
 __free_page_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	/* Free the in-memory index array. */
-	__wt_free(session, page->u.col_leaf.d);
+	WT_PAGE_MODIFY *mod;
+
+	if ((mod = page->modify) == NULL)
+		return;
 
 	/* Free the append array. */
-	if (page->u.col_leaf.append != NULL) {
-		__free_insert_list(
-		    session, WT_SKIP_FIRST(*page->u.col_leaf.append));
-		__wt_free(session, *page->u.col_leaf.append);
-		__wt_free(session, page->u.col_leaf.append);
+	if (mod->append != NULL) {
+		__free_insert_list(session, WT_SKIP_FIRST(*mod->append));
+		__wt_free(session, *mod->append);
+		__wt_free(session, mod->append);
 	}
 	/* Free the update array. */
-	if (page->u.col_leaf.update != NULL)
-		__free_insert(session, page->u.col_leaf.update, 1);
+	if (mod->update != NULL)
+		__free_insert(session, mod->update, 1);
 }
 
 /*
@@ -131,23 +132,27 @@ __free_page_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 static void
 __free_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_PAGE_MODIFY *mod;
+
 	/* Free the in-memory index array. */
-	__wt_free(session, page->u.col_leaf.d);
+	__wt_free(session, page->u.col_var.d);
 
 	/* Free the RLE lookup array. */
-	__wt_free(session, page->u.col_leaf.repeats);
+	__wt_free(session, page->u.col_var.repeats);
+
+	if ((mod = page->modify) == NULL)
+		return;
 
 	/* Free the append array. */
-	if (page->u.col_leaf.append != NULL) {
-		__free_insert_list(
-		    session, WT_SKIP_FIRST(*page->u.col_leaf.append));
-		__wt_free(session, *page->u.col_leaf.append);
-		__wt_free(session, page->u.col_leaf.append);
+	if (mod->append != NULL) {
+		__free_insert_list(session, WT_SKIP_FIRST(*mod->append));
+		__wt_free(session, *mod->append);
+		__wt_free(session, mod->append);
 	}
 
 	/* Free the insert array. */
-	if (page->u.col_leaf.update != NULL)
-		__free_insert(session, page->u.col_leaf.update, page->entries);
+	if (mod->update != NULL)
+		__free_insert(session, mod->update, page->entries);
 }
 
 /*

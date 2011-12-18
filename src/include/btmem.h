@@ -85,6 +85,22 @@ struct __wt_page_modify {
 	} u;
 
 	/*
+	 * The last page of both fix- and variable-length column stores includes
+	 * a skiplist of appended entries.
+	 */
+	WT_INSERT_HEAD **append;	/* Appended items */
+
+	/*
+	 * Updated items in column-stores: variable-length RLE entries can
+	 * expand to multiple entries which requires some kind of list we can
+	 * expand on demand.  Updated items in fixed-length files could be done
+	 * based on an WT_UPDATE array as in row-stores, but there can be a
+	 * very large number of bits on a single page, and the cost of the
+	 * WT_UPDATE array would be huge.
+	 */
+	WT_INSERT_HEAD **update;	/* Updated items */
+
+	/*
 	 * Track pages, blocks to discard: as pages are reconciled, overflow
 	 * K/V items are discarded along with their underlying blocks, and as
 	 * pages are evicted, split and emptied pages are merged into their
@@ -140,8 +156,23 @@ struct __wt_page {
 		/* Row-store leaf page. */
 		struct {
 			WT_ROW	   *d;		/* K/V object pairs */
-			WT_INSERT_HEAD **ins;	/* Inserts */
-			WT_UPDATE **upd;	/* Updates */
+
+			/*
+			 * XXX
+			 * The row-store leaf page modification structures live
+			 * in the WT_PAGE structure, not in the WT_PAGE_MODIFY
+			 * structure as the column-store leaf page modification
+			 * do.  This is to keep the WT_PAGE structure as small
+			 * as possible for read-only pages.  For consistency,
+			 * we could move these structures into WT_PAGE_MODIFY
+			 * too, but it doesn't shrink WT_PAGE any further.  It
+			 * wouldn't grow WT_PAGE_MODIFY (we could create union
+			 * with the column-store modification structures), but
+			 * that's going to require ugly naming, the trade-off
+			 * consistency vs. ugly naming in the code.
+			 */
+			WT_INSERT_HEAD	**ins;	/* Inserts */
+			WT_UPDATE	**upd;	/* Updates */
 		} row_leaf;
 
 		/* Column-store internal page. */
@@ -150,29 +181,16 @@ struct __wt_page {
 			WT_COL_REF *t;		/* Subtrees */
 		} col_int;
 
-		/* Column-store leaf page. */
+		/* Fixed-length column-store leaf page. */
 		struct {
 			uint64_t    recno;	/* Starting recno */
-
 			uint8_t	   *bitf;	/* COL_FIX items */
+		} col_fix;
+
+		/* Variable-length column-store leaf page. */
+		struct {
+			uint64_t    recno;	/* Starting recno */
 			WT_COL	   *d;		/* COL_VAR items */
-
-			/*
-			 * The last page of both fix- and variable-length column
-			 * stores includes a skiplist of appended entries.
-			 */
-			WT_INSERT_HEAD **append;/* Appended items */
-
-			/*
-			 * Updated items in column-stores: variable-length RLE
-			 * entries can expand to multiple entries which requires
-			 * some kind of list we can expand on demand.  Updated
-			 * items in fixed-length files could be done based on an
-			 * WT_UPDATE array as in row-stores, but there can be a
-			 * very large number of bits on a single page, and the
-			 * cost of the WT_UPDATE array would be huge.
-			 */
-			WT_INSERT_HEAD **update;/* Updated items */
 
 			/*
 			 * Variable-length column-store files maintain a list of
@@ -181,7 +199,7 @@ struct __wt_page {
 			 */
 			WT_COL_RLE *repeats;	/* RLE array for lookups */
 			uint32_t    nrepeats;	/* Number of repeat slots. */
-		} col_leaf;
+		} col_var;
 	} u;
 
 	/* Page's on-disk representation: NULL for pages created in memory. */
@@ -420,7 +438,7 @@ struct __wt_col {
 struct __wt_col_rle {
 	uint64_t recno;			/* Record number of first repeat. */
 	uint64_t rle;			/* Repeat count. */
-	uint32_t indx;			/* Slot of entry in col_leaf.d */
+	uint32_t indx;			/* Slot of entry in col_var.d */
 } WT_GCC_ATTRIBUTE((packed));
 
 /*
@@ -433,18 +451,18 @@ struct __wt_col_rle {
 
 /*
  * WT_COL_FOREACH --
- *	Walk the entries of an in-memory column-store leaf page.
+ *	Walk the entries of variable-length column-store leaf page.
  */
 #define	WT_COL_FOREACH(page, cip, i)					\
 	for ((i) = (page)->entries,					\
-	    (cip) = (page)->u.col_leaf.d; (i) > 0; ++(cip), --(i))
+	    (cip) = (page)->u.col_var.d; (i) > 0; ++(cip), --(i))
 
 /*
  * WT_COL_SLOT --
  *	Return the 0-based array offset based on a WT_COL reference.
  */
 #define	WT_COL_SLOT(page, cip)						\
-	((uint32_t)(((WT_COL *)cip) - (page)->u.col_leaf.d))
+	((uint32_t)(((WT_COL *)cip) - (page)->u.col_var.d))
 
 /*
  * WT_IKEY --
@@ -612,8 +630,8 @@ struct __wt_insert_head {
  * of pointers and the specific structure exist, else NULL.
  */
 #define	WT_COL_UPDATE_SLOT(page, slot)					\
-	((page)->u.col_leaf.update == NULL ?				\
-	    NULL : (page)->u.col_leaf.update[slot])
+	((page)->modify == NULL || (page)->modify->update == NULL ?	\
+	    NULL : (page)->modify->update[slot])
 #define	WT_COL_UPDATE(page, ip)						\
 	WT_COL_UPDATE_SLOT(page, WT_COL_SLOT(page, ip))
 
@@ -629,8 +647,8 @@ struct __wt_insert_head {
  * appends.
  */
 #define	WT_COL_APPEND(page)						\
-	((page)->u.col_leaf.append == NULL ?				\
-	    NULL : (page)->u.col_leaf.append[0])
+	((page)->modify == NULL || (page)->modify->append == NULL ?	\
+	    NULL : (page)->modify->append[0])
 
 /* WT_FIX_FOREACH walks fixed-length bit-fields on a disk page. */
 #define	WT_FIX_FOREACH(btree, dsk, v, i)				\

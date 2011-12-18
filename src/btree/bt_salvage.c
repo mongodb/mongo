@@ -1151,7 +1151,7 @@ static int
 __slvg_col_build_leaf(WT_SESSION_IMPL *session,
     WT_TRACK *trk, WT_PAGE *parent, WT_COL_REF *cref)
 {
-	WT_COL *save_col_leaf;
+	WT_COL *save_col_var;
 	WT_PAGE *page;
 	WT_SALVAGE_COOKIE *cookie, _cookie;
 	uint64_t skip, take;
@@ -1165,14 +1165,14 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session,
 	/* Get the original page, including the full in-memory setup. */
 	WT_RET(__wt_page_in(session, parent, &cref->ref, 0));
 	page = WT_COL_REF_PAGE(cref);
-	save_col_leaf = page->u.col_leaf.d;
+	save_col_var = page->u.col_var.d;
 	save_entries = page->entries;
 
 	/*
 	 * Calculate the number of K/V entries we are going to skip, and
 	 * the total number of K/V entries we'll take from this page.
 	 */
-	cookie->skip = skip = trk->col_start - page->u.col_leaf.recno;
+	cookie->skip = skip = trk->col_start - page->u.col_var.recno;
 	cookie->take = take = (trk->col_stop - trk->col_start) + 1;
 
 	WT_VERBOSE(session, salvage,
@@ -1194,16 +1194,16 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session,
 	 * reference as well as the page itself.
 	 */
 	if (trk->col_missing == 0)
-		page->u.col_leaf.recno = trk->col_start;
+		page->u.col_var.recno = trk->col_start;
 	else {
-		page->u.col_leaf.recno = trk->col_missing;
+		page->u.col_var.recno = trk->col_missing;
 		cookie->missing = trk->col_start - trk->col_missing;
 
 		WT_VERBOSE(session, salvage,
 		    "[%" PRIu32 "] merge inserting %" PRIu64 " missing records",
 		    trk->addr, cookie->missing);
 	}
-	cref->recno = page->u.col_leaf.recno;
+	cref->recno = page->u.col_var.recno;
 
 	/*
 	 * We can't discard the original blocks associated with this page now.
@@ -1222,7 +1222,7 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_rec_write(session, page, cookie));
 
 	/* Reset the page. */
-	page->u.col_leaf.d = save_col_leaf;
+	page->u.col_var.d = save_col_var;
 	page->entries = save_entries;
 
 	__wt_page_release(session, page);
@@ -1251,7 +1251,7 @@ __slvg_col_merge_ovfl(WT_SESSION_IMPL *session,
 
 	unpack = &_unpack;
 
-	recno = page->u.col_leaf.recno;
+	recno = page->u.col_var.recno;
 	start = recno + skip;
 	stop = (recno + skip + take) - 1;
 

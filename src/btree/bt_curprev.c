@@ -174,7 +174,7 @@ __cursor_fix_prev(WT_CURSOR_BTREE *cbt, int newpage)
 
 	/* Move to the previous entry and return the item. */
 	for (;;) {
-		if (cbt->recno == cbt->page->u.col_leaf.recno)
+		if (cbt->recno == cbt->page->u.col_fix.recno)
 			return (WT_NOTFOUND);
 		--cbt->recno;
 new_page:	*recnop = cbt->recno;
@@ -227,7 +227,7 @@ __cursor_var_prev(WT_CURSOR_BTREE *cbt, int newpage)
 	for (;;) {
 		--cbt->recno;
 new_page:	*recnop = cbt->recno;
-		if (cbt->recno < cbt->page->u.col_leaf.recno)
+		if (cbt->recno < cbt->page->u.col_var.recno)
 			return (WT_NOTFOUND);
 
 		/* Find the matching WT_COL slot. */

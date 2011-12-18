@@ -61,7 +61,7 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int key_ret)
 			cursor->value.size = upd->size;
 			return (0);
 		}
-		cell = WT_COL_PTR(page, &page->u.col_leaf.d[cbt->slot]);
+		cell = WT_COL_PTR(page, &page->u.col_var.d[cbt->slot]);
 		break;
 	case WT_PAGE_ROW_LEAF:
 		rip = &page->u.row_leaf.d[cbt->slot];
