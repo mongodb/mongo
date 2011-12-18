@@ -616,9 +616,11 @@ namespace mongo {
     */
     int Matcher::matchesDotted(const char *fieldName, const BSONElement& toMatch, const BSONObj& obj, int compareOp, const ElementMatcher& em , bool isArr, MatchDetails * details ) const {
         DEBUGMATCHER( "\t matchesDotted : " << fieldName << " hasDetails: " << ( details ? "yes" : "no" ) );
+
         if ( compareOp == BSONObj::opALL ) {
 
             if ( em._allMatchers.size() ) {
+                // $all queries will not be matched against indexes, so the field is extracted from the full document.
                 BSONElement e = obj.getFieldDotted( fieldName );
                 // The $all/$elemMatch operator only matches arrays.
                 if ( e.type() != Array ) {
