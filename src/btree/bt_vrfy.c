@@ -494,15 +494,6 @@ __verify_overflow_cell(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 	unpack = &_unpack;
 	ret = 0;
 
-	/*
-	 * Row-store internal page disk images are discarded when there's no
-	 * overflow items on the page.   If there's no disk image, we're done.
-	 */
-	if ((dsk = page->dsk) == NULL) {
-		WT_ASSERT(session, page->type == WT_PAGE_ROW_INT);
-		return (0);
-	}
-
 	/* Walk the disk page, verifying pages referenced by overflow cells. */
 	cell_num = 0;
 	WT_CELL_FOREACH(dsk, cell, unpack, i) {
