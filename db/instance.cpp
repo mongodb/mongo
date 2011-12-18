@@ -897,6 +897,11 @@ namespace mongo {
         }
     }
 
+
+    namespace dur { 
+        extern mutex groupCommitMutex;
+    }
+
     /* not using log() herein in case we are already locked */
     NOINLINE_DECL void dbexit( ExitCode rc, const char *why, bool tryToGetLock ) {
 
@@ -941,6 +946,10 @@ namespace mongo {
         }
         catch (...) { }
 #endif
+
+        // stop the dur thread 
+        log(2) << "shutdown: groupCommitMutex" << endl;
+        scoped_lock lk(dur::groupCommitMutex);
 
 #ifdef _WIN32
         // Windows Service Controller wants to be told when we are down,
