@@ -815,11 +815,13 @@ if ( typeof _threadInject != "undefined" ){
                                    "jstests/notablescan.js",
                                    "jstests/drop2.js",
                                    "jstests/dropdb_race.js",
+                                   "jstests/fsync2.js", // May be placed in serialTestsArr once SERVER-4243 is fixed.
                                    "jstests/bench_test1.js"] );
         
         // some tests can't be run in parallel with each other
-        var serialTestsArr = [ "jstests/fsync.js",
-                              "jstests/fsync2.js" ];
+        var serialTestsArr = [ "jstests/fsync.js"
+//                              ,"jstests/fsync2.js" // SERVER-4243
+                              ];
         var serialTests = makeKeys( serialTestsArr );
         
         params[ 0 ] = serialTestsArr;
