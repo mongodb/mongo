@@ -46,6 +46,7 @@ namespace mongo {
     class Client;
     class AbstractMessagingPort;
     class LockCollectionForReading;
+    class PageFaultRetryableSection;
 
 #if defined(CLC)
     typedef LockCollectionForReading _LockCollectionForReading;
@@ -64,7 +65,6 @@ namespace mongo {
         // always be in clientsMutex when manipulating this. killop stuff uses these.
         static set<Client*> clients;      
         static mongo::mutex clientsMutex; 
-
         static int getActiveClientCount( int& writers , int& readers );
         class Context;
         ~Client();
@@ -121,7 +121,6 @@ namespace mongo {
         BSONObj getHandshake() const { return _handshake; }
         AbstractMessagingPort * port() const { return _mp; }
         ConnectionId getConnectionId() const { return _connectionId; }
-
     private:
         Client(const char *desc, AbstractMessagingPort *p = 0);
         friend class CurOp;
@@ -129,7 +128,7 @@ namespace mongo {
         string _threadId; // "" on non support systems
         CurOp * _curOp;
         Context * _context;
-        bool _shutdown;
+        bool _shutdown; // to track if Client::shutdown() gets called
         const char *_desc;
         bool _god;
         AuthenticationInfo _ai;
@@ -138,8 +137,10 @@ namespace mongo {
         BSONObj _remoteId;
         AbstractMessagingPort * const _mp;
         unsigned _sometimes;
-
     public:
+        bool _hasWrittenThisPass;
+        PageFaultRetryableSection *_pageFaultRetryableSection;
+
         /** the concept here is the same as MONGO_SOMETIMES.  however that 
             macro uses a static that will be shared by all threads, and each 
             time incremented it might eject that line from the other cpu caches (?),

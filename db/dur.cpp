@@ -433,7 +433,7 @@ namespace mongo {
                 fraction = 1;
             lastRemap = now;
 
-            RWLockRecursive::Shared lk(MongoFile::mmmutex);
+            LockMongoFilesShared lk;
             set<MongoFile*>& files = MongoFile::getAllFiles();
             unsigned sz = files.size();
             if( sz == 0 )
@@ -521,7 +521,7 @@ namespace mongo {
 
             LOG(4) << "groupcommitll " << p++ << endl;
 
-            RWLockRecursive::Shared lk3(MongoFile::mmmutex);
+            LockMongoFilesShared lk3;
 
             LOG(4) << "groupcommitll " << p++ << endl;
 

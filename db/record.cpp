@@ -4,6 +4,7 @@
 #include "pdfile.h"
 #include "../util/processinfo.h"
 #include "../util/net/listen.h"
+#include "pagefault.h"
 
 namespace mongo {
 
@@ -182,10 +183,8 @@ namespace mongo {
 
     bool Record::MemoryTrackingEnabled = true;
     
-
     volatile int __record_touch_dummy = 1; // this is used to make sure the compiler doesn't get too smart on us
     void Record::touch( bool entireRecrd ) {
-
         if ( lengthWithHeaders > HeaderSize ) { // this also makes sure lengthWithHeaders is in memory
             char * addr = data;
             char * end = data + netLength();
@@ -194,11 +193,15 @@ namespace mongo {
 
                 break; // TODO: remove this, pending SERVER-3711
                 
+                // note if this is a touch of a deletedrecord, we don't want to touch more than the first part. we may simply
+                // be updated the linked list and a deletedrecord could be gigantic.  similar circumstance just less extreme 
+                // exists for any record if we are just updating its header, say on a remove(); some sort of hints might be 
+                // useful.
+
                 if ( ! entireRecrd )
                     break;
             }
         }
-
     }
 
     const bool blockSupported = ProcessInfo::blockCheckSupported();
@@ -224,13 +227,41 @@ namespace mongo {
         return ProcessInfo::blockInMemory( data );
     }
 
+
     Record* Record::accessed() {
         const size_t page = (size_t)data >> 12;
         const size_t region = page >> 6;
-        const size_t offset = page & 0x3f;
-        
+        const size_t offset = page & 0x3f;        
         ps::rolling.access( region , offset , true );
         return this;
     }
     
+    Record* DiskLoc::rec() const {
+        Record *r = DataFileMgr::getRecord(*this);
+#if defined(_PAGEFAULTEXCEPTION)
+        DEV ONCE { 
+            log() << "_DEBUG info _PAGEFAULTEXCEPTION is ON -- experimental at this time" << endl;
+        }
+        bool fault = !r->likelyInPhysicalMemory();
+        DEV if( rand() % 100 == 0 ) 
+            fault = true;
+        if( fault &&
+            !cc()._hasWrittenThisPass &&
+            cc()._pageFaultRetryableSection ) 
+        {
+            if( cc()._pageFaultRetryableSection->_laps > 100 ) { 
+                log() << "info pagefaultexception _laps > 100" << endl;
+            }
+            else {
+                throw PageFaultException(r);
+            }
+        }
+#else 
+        DEV ONCE { 
+            log() << "_DEBUG info _PAGEFAULTEXCEPTION is off" << endl;
+        }
+#endif
+        return r;
+    }
+
 }

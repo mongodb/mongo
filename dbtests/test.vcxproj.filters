@@ -333,6 +333,8 @@
     <ClInclude Include="..\db\ops\count.h">
       <Filter>db\h</Filter>
     </ClInclude>
+    <ClInclude Include="..\client\dbclientmockcursor.h" />
+    <ClInclude Include="..\db\pagefault.h" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\js\js64r.lib">
@@ -914,6 +916,9 @@
       <Filter>shard</Filter>
     </ClCompile>
     <ClCompile Include="..\db\ops\count.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pagefault.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
   </ItemGroup>

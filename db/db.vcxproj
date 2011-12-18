@@ -562,6 +562,7 @@
     <ClCompile Include="ops\delete.cpp" />
     <ClCompile Include="ops\query.cpp" />
     <ClCompile Include="ops\update.cpp" />
+    <ClCompile Include="pagefault.cpp" />
     <ClCompile Include="pipeline\accumulator.cpp" />
     <ClCompile Include="pipeline\accumulator_add_to_set.cpp" />
     <ClCompile Include="pipeline\accumulator_avg.cpp" />
@@ -785,6 +786,7 @@
     <ClInclude Include="ops\count.h" />
     <ClInclude Include="ops\delete.h" />
     <ClInclude Include="ops\update.h" />
+    <ClInclude Include="pagefault.h" />
     <ClInclude Include="pipeline\accumulator.h" />
     <ClInclude Include="pipeline\builder.h" />
     <ClInclude Include="pipeline\document.h" />

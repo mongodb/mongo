@@ -28,7 +28,7 @@ namespace mongo {
         void debugValidateAllMapsMatch();
 
         static void WRITETODATAFILES_Impl1(const JSectHeader& h, AlignedBuilder& uncompressed) {
-            RWLockRecursive::Shared lk(MongoFile::mmmutex);
+            LockMongoFilesShared lk;
             LOG(3) << "journal WRITETODATAFILES 1" << endl;
             RecoveryJob::get().processSection(&h, uncompressed.buf(), uncompressed.len(), 0);
             LOG(3) << "journal WRITETODATAFILES 2" << endl;

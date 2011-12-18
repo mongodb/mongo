@@ -111,7 +111,10 @@ namespace mongo {
         _desc(desc),
         _god(0),
         _lastOp(0),
-        _mp(p) {
+        _mp(p) 
+    {
+        _hasWrittenThisPass = false;
+        _pageFaultRetryableSection = 0;
         _connectionId = setThreadName(desc);
         _curOp = new CurOp( this );
 #ifndef _WIN32

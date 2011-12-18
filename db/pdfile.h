@@ -201,13 +201,10 @@ namespace mongo {
         //void setNewLength(int netlen) { lengthWithHeaders = netlen + HeaderSize; }
 
         /* use this when a record is deleted. basically a union with next/prev fields */
-        DeletedRecord& asDeleted() {
-            return *((DeletedRecord*) this);
-        }
+        DeletedRecord& asDeleted() { return *((DeletedRecord*) this); }
 
-        Extent* myExtent(const DiskLoc& myLoc) {
-            return DataFileMgr::getExtent(DiskLoc(myLoc.a(), extentOfs));
-        }
+        Extent* myExtent(const DiskLoc& myLoc) { return DataFileMgr::getExtent(DiskLoc(myLoc.a(), extentOfs)); }
+
         /* get the next record in the namespace, traversing extents as necessary */
         DiskLoc getNext(const DiskLoc& myLoc);
         DiskLoc getPrev(const DiskLoc& myLoc);
@@ -474,9 +471,6 @@ namespace mongo {
         return e->xprev.ext()->lastRecord;
     }
 
-    inline Record* DiskLoc::rec() const {
-        return DataFileMgr::getRecord(*this);
-    }
     inline BSONObj DiskLoc::obj() const {
         return BSONObj(rec()->accessed());
     }

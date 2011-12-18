@@ -929,7 +929,7 @@ namespace mongo {
 
         if ( ! r->likelyInPhysicalMemory() ) {
             {
-                auto_ptr<RWLockRecursive::Shared> lk( new RWLockRecursive::Shared( MongoFile::mmmutex) );
+                scoped_ptr<LockMongoFilesShared> lk( new LockMongoFilesShared() );
                 dbtempreleasewritelock t;
                 r->touch();
                 lk.reset(0); // we have to release mmmutex before we can re-acquire dbmutex

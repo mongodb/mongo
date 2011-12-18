@@ -328,7 +328,7 @@ namespace mongo {
             }
         }
 
-        RWLockRecursive::Exclusive lk(mmmutex);
+        LockMongoFilesExclusive lk;
         privateViews.remove(_view_private);
         _view_write = _view_private = 0;
         MemoryMappedFile::close();

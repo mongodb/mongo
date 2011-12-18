@@ -74,7 +74,8 @@ namespace mongo {
        this is the administrative stuff
     */
 
-    RWLockRecursiveNongreedy MongoFile::mmmutex("mmmutex",10*60*1000 /* 10 minutes */);
+    RWLockRecursiveNongreedy LockMongoFilesShared::mmmutex("mmmutex",10*60*1000 /* 10 minutes */);
+    unsigned LockMongoFilesShared::era = 99; // note this rolls over
 
     /* subclass must call in destructor (or at close).
         removes this from pathToFile and other maps
@@ -82,7 +83,7 @@ namespace mongo {
         ideal to call close to the close, if the close is well before object destruction
     */
     void MongoFile::destroyed() {
-        mmmutex.assertExclusivelyLocked();
+        LockMongoFilesShared::assertExclusivelyLocked();
         mmfiles.erase(this);
         pathToFile.erase( filename() );
     }
@@ -96,7 +97,7 @@ namespace mongo {
         }
         ++closingAllFiles;
 
-        RWLockRecursive::Exclusive lk(mmmutex);
+        LockMongoFilesExclusive lk;
 
         ProgressMeter pm( mmfiles.size() , 2 , 1 );
         set<MongoFile*> temp = mmfiles;
@@ -111,7 +112,8 @@ namespace mongo {
     /*static*/ long long MongoFile::totalMappedLength() {
         unsigned long long total = 0;
 
-        RWLockRecursive::Shared lk(mmmutex);
+        LockMongoFilesShared lk;
+
         for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ )
             total += (*i)->length();
 
@@ -134,7 +136,7 @@ namespace mongo {
     /*static*/ int MongoFile::_flushAll( bool sync ) {
         if ( ! sync ) {
             int num = 0;
-            RWLockRecursive::Shared lk(mmmutex);
+            LockMongoFilesShared lk;
             for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ) {
                 num++;
                 MongoFile * mmf = *i;
@@ -151,7 +153,7 @@ namespace mongo {
         while ( true ) {
             auto_ptr<Flushable> f;
             {
-                RWLockRecursive::Shared lk(mmmutex);
+                LockMongoFilesShared lk;
                 for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ) {
                     MongoFile * mmf = *i;
                     if ( ! mmf )
@@ -172,12 +174,12 @@ namespace mongo {
     }
 
     void MongoFile::created() {
-        RWLockRecursive::Exclusive lk(mmmutex);
+        LockMongoFilesExclusive lk;
         mmfiles.insert(this);
     }
 
     void MongoFile::setFilename(string fn) {
-        RWLockRecursive::Exclusive lk(mmmutex);
+        LockMongoFilesExclusive lk;
         assert( _filename.empty() );
         _filename = fn;
         MongoFile *&ptf = pathToFile[fn];
@@ -189,7 +191,7 @@ namespace mongo {
     void MongoFile::markAllWritable() {
       if( cmdLine.dur )
           return;
-        RWLockRecursive::Shared lk(mmmutex);
+        LockMongoFilesShared lk;
         for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ) {
             MongoFile * mmf = *i;
             if (mmf) mmf->_lock();
@@ -199,7 +201,7 @@ namespace mongo {
     void MongoFile::unmarkAllWritable() {
         if( cmdLine.dur )
             return;
-        RWLockRecursive::Shared lk(mmmutex);
+        LockMongoFilesShared lk;
         for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ) {
             MongoFile * mmf = *i;
             if (mmf) mmf->_unlock();

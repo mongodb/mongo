@@ -40,14 +40,15 @@
 #include "dur_journal.h"
 #include "dur_recover.h"
 #include "d_concurrency.h"
-
 #include "ops/count.h"
 #include "ops/delete.h"
 #include "ops/query.h"
 #include "ops/update.h"
+#include "pagefault.h"
 
 namespace mongo {
 
+    // "diaglog"
     inline void opread(Message& m) { if( _diaglog.getLevel() & 2 ) _diaglog.readop((char *) m.singleData(), m.header()->len); }
     inline void opwrite(Message& m) { if( _diaglog.getLevel() & 1 ) _diaglog.write((char *) m.singleData(), m.header()->len); }
 
@@ -248,7 +249,7 @@ namespace mongo {
     }
 
     // Returns false when request includes 'end'
-    void assembleResponse( Message &m, DbResponse &dbresponse, const HostAndPort& remote ) {
+    void _assembleResponse( Message &m, DbResponse &dbresponse, const HostAndPort& remote ) {
 
         // before we lock...
         int op = m.operation();
@@ -401,7 +402,21 @@ namespace mongo {
         }
         
         debug.reset();
-    } /* assembleResponse() */
+    } /* _assembleResponse() */
+
+    void assembleResponse( Message &m, DbResponse &dbresponse, const HostAndPort& remote ) {
+        PageFaultRetryableSection s;
+        while( 1 ) {
+            try {
+                _assembleResponse( m, dbresponse, remote );
+                break;
+            }
+            catch( PageFaultException& e ) { 
+                DEV log() << "TEMP PageFaultException touch and retry" << endl;
+                e.touch();
+            } 
+        }
+    }
 
     void receivedKillCursors(Message& m) {
         int *x = (int *) m.singleData()->_data;

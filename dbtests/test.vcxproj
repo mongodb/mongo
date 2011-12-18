@@ -127,7 +127,7 @@
     <ClCompile>
       <Optimization>Disabled</Optimization>
       <AdditionalIncludeDirectories>..\..\js\src;..\third_party\pcre-7.4;C:\boost;\boost;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <PreprocessorDefinitions>CLC;_DURABLE;_UNICODE;UNICODE;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DURABLE;_UNICODE;UNICODE;MONGO_EXPOSE_MACROS;OLDJS;STATIC_JS_API;XP_WIN;_DEBUG;_CONSOLE;_CRT_SECURE_NO_WARNINGS;HAVE_CONFIG_H;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <PrecompiledHeader>Use</PrecompiledHeader>
@@ -238,6 +238,7 @@
     <ClInclude Include="..\db\ops\delete.h" />
     <ClInclude Include="..\db\ops\query.h" />
     <ClInclude Include="..\db\ops\update.h" />
+    <ClInclude Include="..\db\pagefault.h" />
     <ClInclude Include="..\third_party\pcre-7.4\pcrecpp.h" />
     <ClInclude Include="..\server.h" />
     <ClInclude Include="..\targetver.h" />
@@ -347,6 +348,7 @@
     <ClCompile Include="..\db\ops\delete.cpp" />
     <ClCompile Include="..\db\ops\query.cpp" />
     <ClCompile Include="..\db\ops\update.cpp" />
+    <ClCompile Include="..\db\pagefault.cpp" />
     <ClCompile Include="..\db\projection.cpp" />
     <ClCompile Include="..\db\queryoptimizercursor.cpp" />
     <ClCompile Include="..\db\querypattern.cpp">

@@ -20,6 +20,7 @@
 #include "dur_commitjob.h"
 #include "dur_stats.h"
 #include "taskqueue.h"
+#include "client.h"
 
 namespace mongo {
 
@@ -113,11 +114,11 @@ namespace mongo {
             }
         }
 
-
         /** note an operation other than a "basic write" */
         void CommitJob::noteOp(shared_ptr<DurOp> p) {
             dbMutex.assertWriteLocked();
             dassert( cmdLine.dur );
+            cc()._hasWrittenThisPass = true;
             if( !_hasWritten ) {
                 assert( !dbMutex._remapPrivateViewRequested );
                 _hasWritten = true;
@@ -155,6 +156,7 @@ namespace mongo {
             DEV notesThisLock++;
             DEV dbMutex.assertWriteLocked();
             dassert( cmdLine.dur );
+            cc()._hasWrittenThisPass = true;
             if( !_wi._alreadyNoted.checkAndSet(p, len) ) {
                 MemoryMappedFile::makeWritable(p, len);
 

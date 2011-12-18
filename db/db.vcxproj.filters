@@ -214,6 +214,7 @@
     <ClCompile Include="d_concurrency.cpp" />
     <ClCompile Include="..\s\default_version.cpp" />
     <ClCompile Include="ops\count.cpp" />
+    <ClCompile Include="pagefault.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\dbclientcursor.h" />
@@ -385,6 +386,7 @@
     <ClInclude Include="..\util\systeminfo.h" />
     <ClInclude Include="namespacestring.h" />
     <ClInclude Include="ops\count.h" />
+    <ClInclude Include="pagefault.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="db.rc" />

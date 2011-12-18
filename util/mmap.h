@@ -30,6 +30,33 @@ namespace mongo {
         ~MAdvise(); // destructor resets the range to MADV_NORMAL
     };
 
+    // lock order: lock dbMutex before this if you lock both
+    class LockMongoFilesShared { 
+        friend class LockMongoFilesExclusive;
+        static RWLockRecursiveNongreedy mmmutex;
+        static unsigned era;
+        RWLockRecursive::Shared lk;
+    public:
+        LockMongoFilesShared() : lk(mmmutex) { }
+
+        /** era changes anytime memory maps come and go.  thus you can use this as a cheap way to verify 
+            that things are still in the condition you expected. of course you must be shared locked 
+            otherwise someone could be in progress.  if you have unlocked this is a reasonable way to 
+            check your memory mapped pointer is still good.
+        */
+        static unsigned getEra() { return era; }
+
+        static void assertExclusivelyLocked() { mmmutex.assertExclusivelyLocked(); }
+    };
+
+    class LockMongoFilesExclusive { 
+        RWLockRecursive::Exclusive lk;
+    public:
+        LockMongoFilesExclusive() : lk(LockMongoFilesShared::mmmutex) { 
+            LockMongoFilesShared::era++;
+        }
+    };
+
     /* the administrative-ish stuff here */
     class MongoFile : boost::noncopyable {
     public:
@@ -110,9 +137,6 @@ namespace mongo {
         static set<MongoFile*> mmfiles;
     public:
         static map<string,MongoFile*> pathToFile;
-
-        // lock order: lock dbMutex before this if you lock both
-        static RWLockRecursiveNongreedy mmmutex;
     };
 
     /** look up a MMF by filename. scoped mutex locking convention.
@@ -123,7 +147,7 @@ namespace mongo {
     */
     class MongoFileFinder : boost::noncopyable {
     public:
-        MongoFileFinder() : _lk(MongoFile::mmmutex) { }
+        MongoFileFinder() { }
 
         /** @return The MongoFile object associated with the specified file name.  If no file is open
                     with the specified name, returns null.
@@ -134,7 +158,7 @@ namespace mongo {
         }
 
     private:
-        RWLockRecursive::Shared _lk;
+        LockMongoFilesShared _lk;
     };
 
     struct MongoFileAllowWrites {
@@ -158,7 +182,7 @@ namespace mongo {
         MemoryMappedFile();
 
         virtual ~MemoryMappedFile() {
-            RWLockRecursive::Exclusive lk(mmmutex);
+            LockMongoFilesExclusive lk;
             close();
         }
 
@@ -234,7 +258,7 @@ namespace mongo {
     /** p is called from within a mutex that MongoFile uses.  so be careful not to deadlock. */
     template < class F >
     inline void MongoFile::forEach( F p ) {
-        RWLockRecursive::Shared lklk(mmmutex);
+        LockMongoFilesShared lklk;
         for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ )
             p(*i);
     }
