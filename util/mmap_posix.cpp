@@ -38,7 +38,7 @@ namespace mongo {
     }
 
     void MemoryMappedFile::close() {
-        mmmutex.assertExclusivelyLocked();
+        LockMongoFilesShared::assertExclusivelyLocked();
         for( vector<void*>::iterator i = views.begin(); i != views.end(); i++ ) {
             munmap(*i,len);
         }
