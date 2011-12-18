@@ -2433,6 +2433,7 @@ static int
 __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BOUNDARY *bnd;
+	WT_BTREE *btree;
 	WT_COL_REF *cref;
 	WT_PAGE_MODIFY *mod;
 	WT_RECONCILE *r;
@@ -2442,6 +2443,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	const uint8_t *addr;
 
 	r = session->reconcile;
+	btree = session->btree;
 	mod = page->modify;
 	ret = 0;
 
@@ -2456,8 +2458,12 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * The page has never been reconciled before, track the original
 		 * address blocks (if any).
 		 */
-		if (!WT_PAGE_IS_ROOT(page) &&
-		    page->parent_ref.ref->addr != NULL) {
+		if (WT_PAGE_IS_ROOT(page)) {
+			if (btree->root_addr != NULL)
+				WT_RET(__wt_rec_track_block(
+				    session, WT_PT_BLOCK,
+				    page, btree->root_addr, btree->root_size));
+		} else if (page->parent_ref.ref->addr != NULL) {
 			__wt_get_addr(
 			    page->parent, page->parent_ref.ref, &addr, &size);
 			WT_RET(__wt_rec_track_block(

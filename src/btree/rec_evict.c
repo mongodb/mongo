@@ -200,11 +200,8 @@ __rec_root_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 		WT_VERBOSE(session, evict, "root page empty");
 
 		/* If the root page is empty, clear the root address. */
-		if (btree->root_addr != NULL) {
-			WT_RET(__wt_block_free(
-			    session, btree->root_addr, btree->root_size));
+		if (btree->root_addr != NULL)
 			__wt_free(session, btree->root_addr);
-		}
 		btree->root_addr = NULL;
 		btree->root_size = 0;
 		btree->root_page = NULL;
@@ -213,11 +210,8 @@ __rec_root_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 		WT_VERBOSE(session, evict, "root page replace");
 
 		/* Update the root reference to the new page. */
-		if (btree->root_addr != NULL) {
-			WT_RET(__wt_block_free(
-			    session, btree->root_addr, btree->root_size));
+		if (btree->root_addr != NULL)
 			__wt_free(session, btree->root_addr);
-		}
 		btree->root_addr = mod->u.replace.addr;
 		btree->root_size = mod->u.replace.size;
 		btree->root_page = NULL;
