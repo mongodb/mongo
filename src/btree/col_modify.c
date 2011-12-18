@@ -95,7 +95,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 		/* There may be no WT_INSERT_HEAD, allocate as necessary. */
 		new_inshead_size = new_inslist_size = 0;
 		if (op == 1) {
-			if (page == NULL || page->modify->append == NULL) {
+			if (page->modify->append == NULL) {
 				new_inslist_size = 1 * sizeof(WT_INSERT_HEAD *);
 				WT_ERR(
 				    __wt_calloc_def(session, 1, &new_inslist));
