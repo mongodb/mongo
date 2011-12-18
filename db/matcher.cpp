@@ -620,7 +620,8 @@ namespace mongo {
         if ( compareOp == BSONObj::opALL ) {
 
             if ( em._allMatchers.size() ) {
-                // $all queries will not be matched against indexes, so the field is extracted from the full document.
+                // $all query matching will not be performed against indexes, so the field
+                // to match is always extracted from the full document.
                 BSONElement e = obj.getFieldDotted( fieldName );
                 // The $all/$elemMatch operator only matches arrays.
                 if ( e.type() != Array ) {
