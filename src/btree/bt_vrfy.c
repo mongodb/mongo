@@ -487,7 +487,6 @@ __verify_overflow_cell(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 {
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
-	WT_PAGE_DISK *dsk;
 	uint32_t cell_num, i;
 	int ret;
 
@@ -496,7 +495,7 @@ __verify_overflow_cell(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 
 	/* Walk the disk page, verifying pages referenced by overflow cells. */
 	cell_num = 0;
-	WT_CELL_FOREACH(dsk, cell, unpack, i) {
+	WT_CELL_FOREACH(page->dsk, cell, unpack, i) {
 		++cell_num;
 		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {
