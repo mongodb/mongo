@@ -222,7 +222,7 @@ namespace mongo {
 
                 //
                 // Grammar for location lookup:
-                // locs ::= [loc,loc,...,loc]|{<k>:loc,<k>:loc}|loc
+                // locs ::= [loc,loc,...,loc]|{<k>:loc,<k>:loc,...,<k>:loc}|loc
                 // loc  ::= { <k1> : #, <k2> : # }|[#, #]|{}
                 //
                 // Empty locations are ignored, preserving single-location semantics
