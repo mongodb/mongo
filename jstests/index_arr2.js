@@ -1,7 +1,7 @@
 NUM = 20;
 M = 5;
 
-t = db.xxx;
+t = db.jstests_arr2;
 
 function test( withIndex ){
     t.drop();
