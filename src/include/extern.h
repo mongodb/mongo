@@ -102,11 +102,11 @@ extern int __wt_btree_open(WT_SESSION_IMPL *session,
     const char *config,
     const char *cfg[],
     uint32_t flags);
-extern int __wt_btree_root_empty(WT_SESSION_IMPL *session, WT_PAGE **leafp);
-extern int __wt_btree_close(WT_SESSION_IMPL *session);
 extern int __wt_btree_reopen(WT_SESSION_IMPL *session,
     const char *cfg[],
     uint32_t flags);
+extern int __wt_btree_root_empty(WT_SESSION_IMPL *session, WT_PAGE **leafp);
+extern int __wt_btree_close(WT_SESSION_IMPL *session);
 extern int __wt_btree_huffman_open(WT_SESSION_IMPL *session,
     const char *config);
 extern void __wt_btree_huffman_close(WT_SESSION_IMPL *session);

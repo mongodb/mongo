@@ -8,6 +8,7 @@
 #include "wt_internal.h"
 
 static int __btree_alloc(WT_SESSION_IMPL *, const char *, const char *);
+static int __btree_close_cache(WT_SESSION_IMPL *);
 static int __btree_conf(WT_SESSION_IMPL *, const char *);
 static int __btree_last(WT_SESSION_IMPL *);
 static int __btree_page_sizes(WT_SESSION_IMPL *, const char *);
@@ -148,6 +149,20 @@ err:		if (btree->fh != NULL) {
 }
 
 /*
+ * __wt_btree_reopen --
+ *	Reset an open btree handle back to its initial state.
+ */
+int
+__wt_btree_reopen(WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
+{
+	/* Close the existing cache and re-read the metadata. */
+	WT_RET(__btree_close_cache(session));
+	WT_RET(__btree_read_meta(session, cfg, flags));
+
+	return (0);
+}
+
+/*
  * __btree_alloc --
  *	Allocate a WT_BTREE structure.
  */
@@ -272,6 +287,54 @@ __btree_conf(WT_SESSION_IMPL *session, const char *config)
 
 	/* Take the config string: it will be freed with the btree handle. */
 	btree->config = config;
+
+	return (0);
+}
+
+/*
+ * __btree_read_meta --
+ *	Read the metadata for a tree.
+ */
+static int
+__btree_read_meta(WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
+{
+	WT_BTREE *btree;
+	WT_CONFIG_ITEM cval;
+
+	btree = session->btree;
+
+	btree->flags = flags;
+	F_SET(session->btree, WT_BTREE_OPEN);
+
+	/*
+	 * Read the file's metadata (unless it's a salvage operation and the
+	 * force flag is set, in which case we don't care what the file looks
+	 * like).
+	 */
+	if (LF_ISSET(WT_BTREE_SALVAGE))
+		WT_RET(__wt_config_gets(session, cfg, "force", &cval));
+	if (!LF_ISSET(WT_BTREE_SALVAGE) || cval.val == 0)
+		WT_RET(__wt_desc_read(
+		    session, LF_ISSET(WT_BTREE_SALVAGE) ? 1 : 0));
+
+	/* If this is an open for a salvage operation, that's all we do. */
+	if (LF_ISSET(WT_BTREE_SALVAGE))
+		return (0);
+
+	/* Read in the free list. */
+	WT_RET(__wt_block_freelist_read(session));
+
+	/*
+	 * Get a root page.  If there's a root page in the file, read it in and
+	 * pin it.  If there's no root page, create an empty in-memory page.
+	 */
+	if (btree->root_addr == NULL)
+		WT_RET(__btree_root_init_empty(session));
+	else
+		WT_RET(__btree_root_init(session, LF_ISSET(WT_BTREE_VERIFY)));
+
+	/* Get the last page of the file. */
+	WT_RET(__btree_last(session));
 
 	return (0);
 }
@@ -501,54 +564,6 @@ __btree_close_cache(WT_SESSION_IMPL *session)
 }
 
 /*
- * __btree_read_meta --
- *	Read the metadata for a tree.
- */
-static int
-__btree_read_meta(WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
-{
-	WT_BTREE *btree;
-	WT_CONFIG_ITEM cval;
-
-	btree = session->btree;
-
-	btree->flags = flags;
-	F_SET(session->btree, WT_BTREE_OPEN);
-
-	/*
-	 * Read the file's metadata (unless it's a salvage operation and the
-	 * force flag is set, in which case we don't care what the file looks
-	 * like).
-	 */
-	if (LF_ISSET(WT_BTREE_SALVAGE))
-		WT_RET(__wt_config_gets(session, cfg, "force", &cval));
-	if (!LF_ISSET(WT_BTREE_SALVAGE) || cval.val == 0)
-		WT_RET(__wt_desc_read(
-		    session, LF_ISSET(WT_BTREE_SALVAGE) ? 1 : 0));
-
-	/* If this is an open for a salvage operation, that's all we do. */
-	if (LF_ISSET(WT_BTREE_SALVAGE))
-		return (0);
-
-	/* Read in the free list. */
-	WT_RET(__wt_block_freelist_read(session));
-
-	/*
-	 * Get a root page.  If there's a root page in the file, read it in and
-	 * pin it.  If there's no root page, create an empty in-memory page.
-	 */
-	if (btree->root_addr == NULL)
-		WT_RET(__btree_root_init_empty(session));
-	else
-		WT_RET(__btree_root_init(session, LF_ISSET(WT_BTREE_VERIFY)));
-
-	/* Get the last page of the file. */
-	WT_RET(__btree_last(session));
-
-	return (0);
-}
-
-/*
  * __wt_btree_close --
  *	Close a Btree.
  */
@@ -599,20 +614,6 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	__wt_free(session, session->btree);
 
 	return (ret);
-}
-
-/*
- * __wt_btree_reopen --
- *	Reset an open btree handle back to its initial state.
- */
-int
-__wt_btree_reopen(WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
-{
-	/* Close the existing cache and re-read the metadata. */
-	WT_RET(__btree_close_cache(session));
-	WT_RET(__btree_read_meta(session, cfg, flags));
-
-	return (0);
 }
 
 /*
