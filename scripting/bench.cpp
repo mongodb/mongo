@@ -285,7 +285,7 @@ namespace mongo {
                         BSONObj query = e["query"].eoo() ? BSONObj() : e["query"].Obj();
                         BSONObj update = e["update"].Obj();
 
-                        conn->update( ns, fixQuery( query ), update, multi, upsert );
+                        conn->update( ns, fixQuery( query ), update, upsert , multi );
 
                         bool safe = e["safe"].trueValue();
                         if( safe ){
