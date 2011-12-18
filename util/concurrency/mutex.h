@@ -94,9 +94,7 @@ namespace mongo {
                         printStackTrace( cout );
                     }
                 }
-            };
-
-            PostStaticCheck _check;
+            } _check;
             mongo::mutex * const _mut;
 #endif
             scoped_lock( mongo::mutex &m ) : 
