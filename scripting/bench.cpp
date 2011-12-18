@@ -407,8 +407,11 @@ namespace mongo {
                         config->errCount++;
                     }
                 }
+                
+                if ( ++count % 100 == 0 ) {
+                    conn->getLastError();
+                }
 
-                count++;
                 sleepmillis( delay );
 
             }
