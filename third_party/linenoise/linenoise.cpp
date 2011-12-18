@@ -125,7 +125,34 @@ using std::vector;
 // make control-characters more readable
 #define ctrlChar( upperCaseASCII ) ( upperCaseASCII - 0x40 )
 
-struct PromptInfo {                 // a convenience struct for grouping prompt info
+/**
+ * Calculate a new screen position given a starting position, screen width and character count
+ * @param x             initial x position (zero-based)
+ * @param y             initial y position (zero-based)
+ * @param screenColumns screen column count
+ * @param charCount     character positions to advance
+ * @param xOut          returned x position (zero-based)
+ * @param yOut          returned y position (zero-based)
+ */
+static void calculateScreenPosition(int x, int y, int screenColumns, int charCount, int& xOut, int& yOut) {
+    xOut = x;
+    yOut = y;
+    int charsRemaining = charCount;
+    while ( charsRemaining > 0 ) {
+        int charsThisRow = (x + charsRemaining < screenColumns) ? charsRemaining : screenColumns - x;
+        xOut = x + charsThisRow;
+        yOut = y;
+        charsRemaining -= charsThisRow;
+        x = 0;
+        ++y;
+    }
+    if ( xOut == screenColumns ) {  // we have to special-case line wrap
+        xOut = 0;
+        ++yOut;
+    }
+}
+
+struct PromptBase {                 // a convenience struct for grouping prompt info
     char*   promptText;                 // our copy of the prompt text, edited
     int     promptChars;                // bytes or chars (until UTF-8) in promptText
     int     promptExtraLines;           // extra lines (beyond 1) occupied by prompt
@@ -134,8 +161,13 @@ struct PromptInfo {                 // a convenience struct for grouping prompt 
     int     promptPreviousInputLen;     // promptChars of previous input line, for clearing
     int     promptCursorRowOffset;      // where the cursor is relative to the start of the prompt
     int     promptScreenColumns;        // width of screen in columns
+    int     previousPromptLen;          // help erasing
+};
 
-    PromptInfo( const char* textPtr, int columns ) : promptScreenColumns( columns ) {
+struct PromptInfo : public PromptBase {
+
+    PromptInfo( const char* textPtr, int columns ) {
+        promptScreenColumns = columns;
 
         promptText = new char[strlen( textPtr ) + 1];
         strcpy( promptText, textPtr );
@@ -177,6 +209,68 @@ struct PromptInfo {                 // a convenience struct for grouping prompt 
         promptCursorRowOffset = promptExtraLines;
     }
     ~PromptInfo() {
+        delete [] promptText;
+    }
+};
+
+// Used with DynamicPrompt (history search)
+//
+static const char forwardSearchBasePrompt[] = "(i-search)`";
+static const char reverseSearchBasePrompt[] = "(reverse-i-search)`";
+static const char endSearchBasePrompt[] = "': ";
+static string previousSearchText;
+
+// changing prompt for "(reverse-i-search)`text':" etc.
+//
+struct DynamicPrompt : public PromptBase {
+    PromptInfo& realPrompt;                 // the prompt we are drawing over
+    char*       searchText;                 // text we are searching for
+    int         searchTextLen;              // chars in searchText
+    int         direction;                  // current search direction, 1=forward, -1=reverse
+    int         forwardSearchBasePromptLen; // prompt component lengths
+    int         reverseSearchBasePromptLen;
+    int         endSearchBasePromptLen;
+
+    DynamicPrompt( PromptInfo& pi, int initialDirection ) : realPrompt( pi ), direction( initialDirection ) {
+        forwardSearchBasePromptLen = strlen( forwardSearchBasePrompt ); // store constant text lengths
+        reverseSearchBasePromptLen = strlen( reverseSearchBasePrompt );
+        endSearchBasePromptLen = strlen( endSearchBasePrompt );
+        promptScreenColumns = pi.promptScreenColumns;
+        promptCursorRowOffset = 0;
+        searchTextLen = 0;
+        searchText = new char[1];                                       // start with empty search string
+        searchText[0] = 0;
+        promptChars = endSearchBasePromptLen +
+            ( ( direction > 0 ) ? forwardSearchBasePromptLen : reverseSearchBasePromptLen );
+        promptLastLinePosition = promptChars;   // TODO fix this, we are asssuming that the history prompt won't wrap (!)
+        promptPreviousInputLen = 0;
+        previousPromptLen = promptChars;
+        promptText = new char[promptChars + 1];
+        strcpy( promptText, ( direction > 0 ) ? forwardSearchBasePrompt : reverseSearchBasePrompt );
+        strcpy( &promptText[promptChars - endSearchBasePromptLen], endSearchBasePrompt );
+        calculateScreenPosition( 0, 0, pi.promptScreenColumns, promptChars, promptIndentation, promptExtraLines );
+    }
+
+    void updateSearchPrompt( void ) {
+        delete [] promptText;
+        promptChars = endSearchBasePromptLen + searchTextLen +
+            ( ( direction > 0 ) ? forwardSearchBasePromptLen : reverseSearchBasePromptLen );
+        promptText = new char[promptChars + 1];
+        strcpy( promptText, ( direction > 0 ) ? forwardSearchBasePrompt : reverseSearchBasePrompt );
+        strcat( promptText, searchText );
+        strcpy( &promptText[promptChars - endSearchBasePromptLen], endSearchBasePrompt );
+    }
+
+    void updateSearchText( const char* textPtr ) {
+        delete [] searchText;
+        searchTextLen = strlen( textPtr );
+        searchText = new char[searchTextLen + 1];
+        strcpy( searchText, textPtr );
+        updateSearchPrompt();
+    }
+
+    ~DynamicPrompt() {
+        delete [] searchText;
         delete [] promptText;
     }
 };
@@ -295,10 +389,11 @@ static KillRing killRing;
 
 static int rawmode = 0; /* for atexit() function to check if restore is needed*/
 static int atexit_registered = 0; /* register atexit just 1 time */
-static int history_max_len = LINENOISE_DEFAULT_HISTORY_MAX_LEN;
-static int history_len = 0;
-static int history_index = 0;
-char** history = NULL;
+static int historyMaxLen = LINENOISE_DEFAULT_HISTORY_MAX_LEN;
+static int historyLen = 0;
+static int historyIndex = 0;
+static char** history = NULL;
+static const char* emptyString = "";
 
 static void linenoiseAtExit( void );
 
@@ -309,9 +404,9 @@ static void beep() {
 
 void linenoiseHistoryFree( void ) {
     if ( history ) {
-        for ( int j = 0; j < history_len; ++j )
+        for ( int j = 0; j < historyLen; ++j )
             free( history[j] );
-        history_len = 0;
+        historyLen = 0;
         free( history );
         history = 0;
     }
@@ -394,33 +489,6 @@ static int getColumns( void ) {
     return (cols > 0) ? cols : 80;
 }
 
-/**
- * Calculate a new screen position given a starting position, screen width and character count
- * @param x             initial x position (zero-based)
- * @param y             initial y position (zero-based)
- * @param screenColumns screen column count
- * @param charCount     character positions to advance
- * @param xOut          returned x position (zero-based)
- * @param yOut          returned y position (zero-based)
- */
-static void calculateScreenPosition(int x, int y, int screenColumns, int charCount, int& xOut, int& yOut) {
-    xOut = x;
-    yOut = y;
-    int charsRemaining = charCount;
-    while ( charsRemaining > 0 ) {
-        int charsThisRow = (x + charsRemaining < screenColumns) ? charsRemaining : screenColumns - x;
-        xOut = x + charsThisRow;
-        yOut = y;
-        charsRemaining -= charsThisRow;
-        x = 0;
-        ++y;
-    }
-    if ( xOut == screenColumns ) {  // we have to special-case line wrap
-        xOut = 0;
-        ++yOut;
-    }
-}
-
 static void setDisplayAttribute( bool enhancedDisplay ) {
 #ifdef _WIN32
     if ( enhancedDisplay ) {
@@ -459,13 +527,94 @@ static void setDisplayAttribute( bool enhancedDisplay ) {
 }
 
 /**
+ * Display the dynamic incremental search prompt and the current user input line.
+ * @param pi   PromptInfo struct holding information about the prompt and our screen position
+ * @param buf  input buffer to be displayed
+ * @param len  count of characters in the buffer
+ * @param pos  current cursor position within the buffer (0 <= pos <= len)
+ */
+//static void dynamicRefresh( DynamicPrompt& pi, char *buf, int len, int pos ) {
+static void dynamicRefresh( PromptBase& pi, char *buf, int len, int pos ) {
+
+    // calculate the position of the end of the prompt
+    int xEndOfPrompt, yEndOfPrompt;
+    calculateScreenPosition( 0, 0, pi.promptScreenColumns, pi.promptChars, xEndOfPrompt, yEndOfPrompt );
+    pi.promptIndentation = xEndOfPrompt;
+
+    // calculate the position of the end of the input line
+    int xEndOfInput, yEndOfInput;
+    calculateScreenPosition( xEndOfPrompt, yEndOfPrompt, pi.promptScreenColumns, len, xEndOfInput, yEndOfInput );
+
+    // calculate the desired position of the cursor
+    int xCursorPos, yCursorPos;
+    calculateScreenPosition( xEndOfPrompt, yEndOfPrompt, pi.promptScreenColumns, pos, xCursorPos, yCursorPos );
+
+#ifdef _WIN32
+    // position at the start of the prompt, clear to end of previous input
+    CONSOLE_SCREEN_BUFFER_INFO inf;
+    GetConsoleScreenBufferInfo( console_out, &inf );
+    inf.dwCursorPosition.X = 0;
+    inf.dwCursorPosition.Y -= pi.promptCursorRowOffset /*- pi.promptExtraLines*/;
+    SetConsoleCursorPosition( console_out, inf.dwCursorPosition );
+    DWORD count;
+    FillConsoleOutputCharacterA( console_out, ' ', pi.previousPromptLen + pi.promptPreviousInputLen, inf.dwCursorPosition, &count );
+    pi.previousPromptLen = pi.promptIndentation;
+    pi.promptPreviousInputLen = len;
+
+    // display the prompt
+    if ( write( 1, pi.promptText, pi.promptChars ) == -1 ) return;
+
+    // display the input line
+    if ( write( 1, buf, len ) == -1 ) return;
+
+    // position the cursor
+    GetConsoleScreenBufferInfo( console_out, &inf );
+    inf.dwCursorPosition.X = xCursorPos;  // 0-based on Win32
+    inf.dwCursorPosition.Y -= yEndOfInput - yCursorPos;
+    SetConsoleCursorPosition( console_out, inf.dwCursorPosition );
+#else // _WIN32
+    char seq[64];
+    int cursorRowMovement = pi.promptCursorRowOffset - pi.promptExtraLines;
+    if ( cursorRowMovement > 0 ) {  // move the cursor up as required
+        snprintf( seq, sizeof seq, "\x1b[%dA", cursorRowMovement );
+        if ( write( 1, seq, strlen( seq ) ) == -1 ) return;
+    }
+    // position at the start of the prompt, clear to end of screen
+    snprintf( seq, sizeof seq, "\x1b[1G\x1b[J" );  // 1-based on VT100
+    if ( write( 1, seq, strlen( seq ) ) == -1 ) return;
+
+    // display the prompt
+    if ( write( 1, pi.promptText, pi.promptChars ) == -1 ) return;
+
+    // display the input line
+    if ( write( 1, buf, len ) == -1 ) return;
+
+    // we have to generate our own newline on line wrap
+    if ( xEndOfInput == 0 && yEndOfInput > 0 )
+        if ( write( 1, "\n", 1 ) == -1 ) return;
+
+    // position the cursor
+    cursorRowMovement = yEndOfInput - yCursorPos;
+    if ( cursorRowMovement > 0 ) {  // move the cursor up as required
+        snprintf( seq, sizeof seq, "\x1b[%dA", cursorRowMovement );
+        if ( write( 1, seq, strlen( seq ) ) == -1 ) return;
+    }
+    // position the cursor within the line
+    snprintf( seq, sizeof seq, "\x1b[%dG", xCursorPos + 1 );  // 1-based on VT100
+    if ( write( 1, seq, strlen( seq ) ) == -1 ) return;
+#endif
+
+    pi.promptCursorRowOffset = pi.promptExtraLines + yCursorPos;  // remember row for next pass
+}
+
+/**
  * Refresh the user's input line: the prompt is already onscreen and is not redrawn here
  * @param pi   PromptInfo struct holding information about the prompt and our screen position
  * @param buf  input buffer to be displayed
  * @param len  count of characters in the buffer
  * @param pos  current cursor position within the buffer (0 <= pos <= len)
  */
-static void refreshLine( PromptInfo& pi, char *buf, int len, int pos ) {
+static void refreshLine( PromptBase& pi, const char *buf, int len, int pos ) {
 
     // check for a matching brace/bracket/paren, remember its position if found
     int highlight = -1;
@@ -482,7 +631,7 @@ static void refreshLine( PromptInfo& pi, char *buf, int len, int pos ) {
             for ( int i = pos + scanDirection; i >= 0 && i < len; i += scanDirection ) {
                 /* TODO: the right thing when inside a string */
                 if ( strchr( "}])", buf[i] ) )
-                    unmatched--;
+                    --unmatched;
                 else if ( strchr( "{[(", buf[i] ) )
                     ++unmatched;
 
@@ -1102,6 +1251,215 @@ static int cleanupCtrl( int c ) {
     return c;
 }
 
+/**
+ * Incremental history search -- take over the prompt and keyboard as the user types a search string,
+ * deletes characters from it, changes direction, and either accepts the found line (for execution or
+ * editing) or cancels.
+ * @param pi        PromptInfo struct holding information about the (old, static) prompt and our screen position
+ * @param buf       input buffer to be displayed
+ * @param buflen    size of input buffer in bytes
+ * @param len       ptr to count of characters in the buffer (updated)
+ * @param pos       ptr to current cursor position within the buffer (0 <= pos <= len) (updated)
+ * @param startChar the character that began the search, used to set the initial direction
+ */
+int incrementalHistorySearch( PromptInfo& pi, char *buf, int buflen, int *len, int *pos, int startChar ) {
+
+    // add the current line to the history list so we don't have to special case it
+    history[historyLen - 1] = reinterpret_cast<char *>( realloc( history[historyLen - 1], *len + 1 ) );
+    strcpy( history[historyLen - 1], buf );
+    int historyLineLength = *len;
+    int historyLinePosition = *pos;
+    refreshLine( pi, emptyString, 0, 0 );                        // erase the old input first
+    DynamicPrompt dp( pi, ( startChar == ctrlChar( 'R' ) ) ? -1 : 1 );
+
+    dp.previousPromptLen = pi.previousPromptLen;
+    dp.promptPreviousInputLen = pi.promptPreviousInputLen;
+    dynamicRefresh( dp, history[historyLen - 1], historyLineLength, historyLinePosition ); // draw user's text with our prompt
+
+    // loop until we get an exit character
+    int c;
+    bool keepLooping = true;
+    bool useSearchedLine = true;
+    bool searchAgain = false;
+    while ( keepLooping ) {
+        c = linenoiseReadChar();
+        c = cleanupCtrl( c );           // convert CTRL + <char> into normal ctrl
+        switch ( c ) {
+
+        // these characters keep the selected text but do not execute it
+        case ctrlChar( 'A' ):   // ctrl-A, move cursor to start of line
+        case HOME_KEY:
+        case ctrlChar( 'B' ):   // ctrl-B, move cursor left by one character
+        case LEFT_ARROW_KEY:
+        case META + 'b':        // meta-B, move cursor left by one word
+        case META + 'B':
+        case CTRL + LEFT_ARROW_KEY:
+        case META + LEFT_ARROW_KEY: // Emacs allows Meta, bash & readline don't
+        case ctrlChar( 'D' ):
+        case META + 'd':        // meta-D, kill word to right of cursor
+        case META + 'D':
+        case ctrlChar( 'E' ):   // ctrl-E, move cursor to end of line
+        case END_KEY:
+        case ctrlChar( 'F' ):   // ctrl-F, move cursor right by one character
+        case RIGHT_ARROW_KEY:
+        case META + 'f':        // meta-F, move cursor right by one word
+        case META + 'F':
+        case CTRL + RIGHT_ARROW_KEY:
+        case META + RIGHT_ARROW_KEY: // Emacs allows Meta, bash & readline don't
+        case META + ctrlChar( 'H' ):
+        case ctrlChar( 'J' ):
+        case ctrlChar( 'K' ):   // ctrl-K, kill from cursor to end of line
+        case ctrlChar( 'M' ):
+        case ctrlChar( 'N' ):   // ctrl-N, recall next line in history
+        case ctrlChar( 'P' ):   // ctrl-P, recall previous line in history
+        case DOWN_ARROW_KEY:
+        case UP_ARROW_KEY:
+        case ctrlChar( 'T' ):   // ctrl-T, transpose characters
+        case ctrlChar( 'U' ):   // ctrl-U, kill all characters to the left of the cursor
+        case ctrlChar( 'W' ):
+        case META + 'y':        // meta-Y, "yank-pop", rotate popped text
+        case META + 'Y':
+        case 127:
+        case DELETE_KEY:
+            keepLooping = false;
+            break;
+
+        // these characters revert the input line to its previous state
+        case ctrlChar( 'C' ):   // ctrl-C, abort this line
+        case ctrlChar( 'G' ):
+        case ctrlChar( 'L' ):   // ctrl-L, clear screen and redisplay line
+            keepLooping = false;
+            useSearchedLine = false;
+            if ( c != ctrlChar( 'L' ) ) {
+                c = -1;         // ctrl-C and ctrl-G just abort the search and do nothing else
+            }
+            break;
+
+        // these characters stay in search mode and update the display
+        case ctrlChar( 'S' ):
+            if ( dp.direction == -1 ) {
+                dp.direction = 1;
+                dp.updateSearchPrompt();
+            }
+            else {
+                searchAgain = true;
+            }
+            break;
+
+        case ctrlChar( 'R' ):
+            if ( dp.searchTextLen == 0 ) {  // if no current search text, recall previous text
+                dp.updateSearchText( previousSearchText.c_str() );
+            }
+            if ( dp.direction == 1 ) {
+                dp.direction = -1;
+                dp.updateSearchPrompt();
+            }
+            else {
+                searchAgain = true;
+            }
+            break;
+
+            // job control is its own thing
+#ifndef _WIN32
+        case ctrlChar( 'Z' ):   // ctrl-Z, job control
+            disableRawMode();                       // Returning to Linux (whatever) shell, leave raw mode
+            raise( SIGSTOP );                       // Break out in mid-line
+            enableRawMode();                        // Back from Linux shell, re-enter raw mode
+            dynamicRefresh( dp, history[historyIndex], historyLineLength, historyLinePosition );
+            continue;
+            break;
+#endif
+
+        // these characters update the search string, and hence the selected input line
+        case ctrlChar( 'H' ):   // backspace/ctrl-H, delete char to left of cursor
+            if ( dp.searchTextLen > 0 ) {
+                --dp.searchTextLen;
+                dp.searchText[dp.searchTextLen] = 0;
+                string newSearchText( dp.searchText );
+                dp.updateSearchText( newSearchText.c_str() );
+            }
+            else {
+                beep();
+            }
+            break;
+
+        case ctrlChar( 'Y' ):   // ctrl-Y, yank killed text
+            break;
+
+        default:
+            if ( c >= ' ' && c < 256 ) {    // not an action character
+                string newSearchText = string( dp.searchText ) + static_cast<char>( c );
+                dp.updateSearchText( newSearchText.c_str() );
+            }
+            else {
+                beep();
+            }
+        } // switch
+
+        // if we are staying in search mode, search now
+        if ( keepLooping ) {
+            if ( dp.searchTextLen > 0 ) {
+                bool found = false;
+                int historySearchIndex = historyIndex;
+                int lineLength = historyLineLength;
+                int lineSearchPos = historyLinePosition;
+                if ( searchAgain ) {
+                    lineSearchPos += dp.direction;
+                }
+                searchAgain = false;
+                while ( true ) {
+                    while ( ( dp.direction > 0 ) ? ( lineSearchPos < lineLength ) : ( lineSearchPos >= 0 ) ) {
+                        if ( strncmp( dp.searchText, &history[historySearchIndex][lineSearchPos], dp.searchTextLen) == 0 ) {
+                            found = true;
+                            break;
+                        }
+                        lineSearchPos += dp.direction;
+                    }
+                    if ( found ) {
+                        historyIndex = historySearchIndex;
+                        historyLineLength = lineLength;
+                        historyLinePosition = lineSearchPos;
+                        break;
+                    }
+                    else if ( ( dp.direction > 0 ) ? ( historySearchIndex < historyLen - 1 ) : ( historySearchIndex > 0 ) ) {
+                        historySearchIndex += dp.direction;
+                        lineLength = strlen( history[historySearchIndex] );
+                        lineSearchPos = ( dp.direction > 0 ) ? 0 : ( lineLength - dp.searchTextLen );
+                    }
+                    else {
+                        beep();
+                        break;
+                    }
+                }; // while
+            }
+            dynamicRefresh( dp, history[historyIndex], historyLineLength, historyLinePosition ); // draw user's text with our prompt
+        }
+    } // while
+
+    // leaving history search, restore previous prompt, maybe make searched line current
+    PromptBase pb;
+    pb.promptText = &pi.promptText[pi.promptLastLinePosition];
+    pb.promptChars = pi.promptIndentation;
+    pb.promptExtraLines = 0;
+    pb.promptIndentation = pi.promptIndentation;
+    pb.promptLastLinePosition = 0;
+    pb.promptPreviousInputLen = historyLineLength;
+    pb.promptCursorRowOffset = dp.promptCursorRowOffset;
+    pb.promptScreenColumns = pi.promptScreenColumns;
+    pb.previousPromptLen = dp.promptChars;
+    if ( useSearchedLine ) {
+        strcpy( buf, history[historyIndex] );
+        *len = historyLineLength;
+        *pos = historyLinePosition;
+    }
+    dynamicRefresh( pb, buf, *len, *pos );              // redraw the original prompt with current input
+    pi.promptPreviousInputLen = *len;
+    pi.promptCursorRowOffset = pi.promptExtraLines + pb.promptCursorRowOffset;
+
+    previousSearchText = dp.searchText;     // save search text for possible reuse on ctrl-R ctrl-R
+    return c;                               // pass a character or -1 back to main loop
+}
+
 static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
     int pos = 0;
     int len = 0;
@@ -1112,20 +1470,37 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
     /* The latest history entry is always our current buffer, that
      * initially is just an empty string. */
     linenoiseHistoryAdd( "" );
-    history_index = history_len-1;
+    historyIndex = historyLen - 1;
 
     // display the prompt
     if ( write( 1, pi.promptText, pi.promptChars ) == -1 ) return -1;
 
+#ifndef _WIN32
+    // we have to generate our own newline on line wrap on Linux
+    if ( pi.promptIndentation == 0 && pi.promptExtraLines > 0 )
+        if ( write( 1, "\n", 1 ) == -1 ) return -1;
+#endif
+
     // the cursor starts out at the end of the prompt
     pi.promptCursorRowOffset = pi.promptExtraLines;
 
+    // kill and yank start in "other" mode
     killRing.lastAction = KillRing::actionOther;
+
+    // when history search returns control to us, we execute its terminating keystroke
+    int terminatingKeystroke = -1;
 
     // loop collecting characters, responding to ctrl characters
     while ( true ) {
-        int c = linenoiseReadChar();
-        c = cleanupCtrl( c );
+        int c;
+        if ( terminatingKeystroke == -1 ) {
+            c = linenoiseReadChar();    // get a new keystroke
+        }
+        else {
+            c = terminatingKeystroke;   // use the terminating keystroke from search
+            terminatingKeystroke = -1;  // clear it once we've used it
+        }
+        c = cleanupCtrl( c );           // convert CTRL + <char> into normal ctrl
 
         if ( c == 0 )
             return len;
@@ -1188,8 +1563,8 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
         case ctrlChar( 'C' ):   // ctrl-C, abort this line
             killRing.lastAction = KillRing::actionOther;
             errno = EAGAIN;
-            --history_len;
-            free( history[history_len] );
+            --historyLen;
+            free( history[historyLen] );
             // we need one last refresh with the cursor at the end of the line
             // so we don't display the next prompt over the previous input line
             refreshLine( pi, buf, len, len );  // pass len as pos for EOL
@@ -1206,8 +1581,8 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
                 refreshLine( pi, buf, len, pos );
             }
             else if ( len == 0 ) {
-                history_len--;
-                free( history[history_len] );
+                --historyLen;
+                free( history[historyLen] );
                 return -1;
             }
             break;
@@ -1296,8 +1671,8 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
             // we need one last refresh with the cursor at the end of the line
             // so we don't display the next prompt over the previous input line
             refreshLine( pi, buf, len, len );  // pass len as pos for EOL
-            --history_len;
-            free( history[history_len] );
+            --historyLen;
+            free( history[historyLen] );
             return len;
 
         case ctrlChar( 'K' ):   // ctrl-K, kill from cursor to end of line
@@ -1317,29 +1692,34 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
         case DOWN_ARROW_KEY:
         case UP_ARROW_KEY:
             killRing.lastAction = KillRing::actionOther;
-            if ( history_len > 1 ) {
+            if ( historyLen > 1 ) {
                 /* Update the current history entry before we
                  * overwrite it with the next one. */
-                free( history[history_index] );
-                history[history_index] = strdup (buf );
+                free( history[historyIndex] );
+                history[historyIndex] = strdup (buf );
                 /* Show the new entry */
                 if ( c == UP_ARROW_KEY ) {
                     c = ctrlChar( 'P' );
                 }
-                history_index += ( c == ctrlChar( 'P' ) ) ? -1 : 1;
-                if ( history_index < 0 ) {
-                    history_index = 0;
+                historyIndex += ( c == ctrlChar( 'P' ) ) ? -1 : 1;
+                if ( historyIndex < 0 ) {
+                    historyIndex = 0;
                     break;
                 }
-                else if ( history_index >= history_len ) {
-                    history_index = history_len - 1;
+                else if ( historyIndex >= historyLen ) {
+                    historyIndex = historyLen - 1;
                     break;
                 }
-                strncpy( buf, history[history_index], buflen );
+                strncpy( buf, history[historyIndex], buflen );
                 buf[buflen] = '\0';
                 len = pos = strlen( buf );  // place cursor at end of line
                 refreshLine( pi, buf, len, pos );
             }
+            break;
+
+        case ctrlChar( 'R' ):   // ctrl-R, reverse history search
+        case ctrlChar( 'S' ):   // ctrl-S, forward history search
+            terminatingKeystroke = incrementalHistorySearch( pi, buf, buflen, &len, &pos, c );
             break;
 
         case ctrlChar( 'T' ):   // ctrl-T, transpose characters
@@ -1551,21 +1931,21 @@ void linenoiseAddCompletion( linenoiseCompletions* lc, const char* str ) {
 }
 
 int linenoiseHistoryAdd( const char* line ) {
-    if ( history_max_len == 0 )
+    if ( historyMaxLen == 0 )
         return 0;
     if ( history == NULL ) {
-        history = reinterpret_cast<char**>( malloc( sizeof( char* ) * history_max_len ) );
+        history = reinterpret_cast<char**>( malloc( sizeof( char* ) * historyMaxLen ) );
         if (history == NULL)
             return 0;
-        memset( history, 0, (sizeof(char*) * history_max_len ) );
+        memset( history, 0, ( sizeof(char*) * historyMaxLen ) );
     }
     char* linecopy = strdup( line );
     if ( ! linecopy )
         return 0;
-    if ( history_len == history_max_len ) {
+    if ( historyLen == historyMaxLen ) {
         free( history[0] );
-        memmove( history, history + 1, sizeof(char*) * ( history_max_len - 1 ) );
-        --history_len;
+        memmove( history, history + 1, sizeof(char*) * ( historyMaxLen - 1 ) );
+        --historyLen;
     }
 
     // convert newlines in multi-line code to spaces before storing
@@ -1575,8 +1955,8 @@ int linenoiseHistoryAdd( const char* line ) {
             *p = ' ';
         ++p;
     }
-    history[history_len] = linecopy;
-    ++history_len;
+    history[historyLen] = linecopy;
+    ++historyLen;
     return 1;
 }
 
@@ -1584,19 +1964,19 @@ int linenoiseHistorySetMaxLen( int len ) {
     if ( len < 1 )
         return 0;
     if ( history ) {
-        int tocopy = history_len;
+        int tocopy = historyLen;
         char** newHistory = reinterpret_cast<char**>( malloc( sizeof(char*) * len ) );
         if ( newHistory == NULL )
             return 0;
         if ( len < tocopy )
             tocopy = len;
-        memcpy( newHistory, history + history_max_len - tocopy, sizeof(char*) * tocopy );
+        memcpy( newHistory, history + historyMaxLen - tocopy, sizeof(char*) * tocopy );
         free( history );
         history = newHistory;
     }
-    history_max_len = len;
-    if ( history_len > history_max_len )
-        history_len = history_max_len;
+    historyMaxLen = len;
+    if ( historyLen > historyMaxLen )
+        historyLen = historyMaxLen;
     return 1;
 }
 
@@ -1606,9 +1986,10 @@ int linenoiseHistorySave( const char* filename ) {
     FILE* fp = fopen( filename, "wt" );
     if ( fp == NULL )
         return -1;
-    for ( int j = 0; j < history_len; ++j ) {
+
+    for ( int j = 0; j < historyLen; ++j ) {
         if ( history[j][0] != '\0' )
-            fprintf (fp, "%s\n", history[j] );
+            fprintf ( fp, "%s\n", history[j] );
     }
     fclose( fp );
     return 0;
@@ -1621,11 +2002,10 @@ int linenoiseHistorySave( const char* filename ) {
  * on error -1 is returned. */
 int linenoiseHistoryLoad( const char* filename ) {
     FILE *fp = fopen( filename, "rt" );
-    char buf[LINENOISE_MAX_LINE];
-    
     if ( fp == NULL )
         return -1;
 
+    char buf[LINENOISE_MAX_LINE];
     while ( fgets( buf, LINENOISE_MAX_LINE, fp ) != NULL ) {
         char* p = strchr( buf, '\r' );
         if ( ! p )
