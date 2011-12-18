@@ -121,7 +121,7 @@ __wt_page_set_modified(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * when we create pages in memory, for example, during salvage.
 	 */
 	if (page->modify == NULL)
-		WT_RET(__wt_rec_modify_init(session, page));
+		WT_RET(__wt_page_modify_init(session, page));
 
 	/*
 	 * Publish: there must be a barrier to ensure all changes to the page

@@ -135,6 +135,7 @@ extern int __wt_page_inmem(WT_SESSION_IMPL *session,
     WT_REF *parent_ref,
     WT_PAGE_DISK *dsk,
     WT_PAGE **pagep);
+extern int __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_cache_read( WT_SESSION_IMPL *session,
     WT_PAGE *parent,
     WT_REF *ref,
@@ -186,7 +187,6 @@ extern void __wt_rec_track_init(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_rec_track_wrapup(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     int final);
-extern int __wt_rec_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_rec_write( WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_SALVAGE_COOKIE *salvage);

@@ -198,16 +198,6 @@ __rec_track_vcell(
 }
 
 /*
- * __wt_rec_modify_init --
- *	A page is about to be modified, get ready for reconciliation.
- */
-int
-__wt_rec_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	return (__wt_calloc_def(session, 1, &page->modify));
-}
-
-/*
  * __wt_rec_write --
  *	Reconcile an in-memory page into its on-disk format, and write it.
  */
@@ -977,7 +967,7 @@ __wt_rec_bulk_init(WT_CURSOR_BULK *cbulk)
 	btree = session->btree;
 	page = cbulk->leaf;
 
-	WT_RET(__wt_rec_modify_init(session, page));
+	WT_RET(__wt_page_modify_init(session, page));
 	WT_RET(__rec_write_init(session, page));
 
 	switch (btree->type) {

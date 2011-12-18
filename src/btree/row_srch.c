@@ -165,7 +165,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	if (is_modify) {
 		/* Initialize the page's modification information */
 		if (page->modify == NULL)
-			WT_RET(__wt_rec_modify_init(session, page));
+			WT_RET(__wt_page_modify_init(session, page));
 
 		WT_ORDERED_READ(cbt->write_gen, page->modify->write_gen);
 	}

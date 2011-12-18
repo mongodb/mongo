@@ -142,6 +142,16 @@ err:	__wt_free(session, page);
 }
 
 /*
+ * __wt_page_modify_init --
+ *	A page is about to be modified, allocate the modification structure.
+ */
+int
+__wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	return (__wt_calloc_def(session, 1, &page->modify));
+}
+
+/*
  * __inmem_col_fix --
  *	Build in-memory index for fixed-length column-store leaf pages.
  */
