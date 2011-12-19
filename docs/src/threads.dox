@@ -4,11 +4,19 @@ WT_CONNECTION handles can be shared between threads, and applications
 generally only open one connection to a given database per process. All
 methods on WT_CONNECTION are thread safe.
 
-WT_SESSION and WT_CURSOR handles cannot be shared between threads:
-applications should open one WT_SESSION for each thread that accesses a
-database.  Applications may open multiple WT_CURSOR handles in a thread.
+WT_SESSION and WT_CURSOR handles cannot be shared between threads concurrently:
+the usual approach is for applications to open one WT_SESSION for each thread
+that accesses a database.  Applications may open multiple WT_CURSOR handles
+within a session.
 
-@todo expand
+Multiple threads must not access a session handle concurrently (including
+accessing two or more cursor handles in the same session).  However,
+WT_SESSION handles may be accessed by different threads serially (for
+example, from a pool of threads managed by the application with a set of
+shared session handles).  There is no thread-local state in WiredTiger, but
+no built-in synchronization of session state either, so if multiple threads
+access a session handle or dependencies such as cursors, the access must be
+serialized by the application.
 
 @section threads_example Code Samples
 
