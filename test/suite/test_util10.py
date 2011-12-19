@@ -57,8 +57,8 @@ class test_util10(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.create('table:' + self.tablename, self.session_params)
         outfile = "dumpfileout.txt"
         self.runWt(["dumpfile", self.tablename + ".wt"], outfilename=outfile)
-        self.skipTest('TODO: dumpfile outputs a header even for empty trees')
-        # self.check_empty_file(outfile)
+        self.KNOWN_FAILURE('dumpfile outputs a header even for empty trees')
+        self.check_empty_file(outfile)
 
     def test_dumpfile_populated(self):
         """
@@ -67,7 +67,6 @@ class test_util10(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.create('table:' + self.tablename, self.session_params)
         self.populate(self.tablename)
         outfile = "dumpfileout.txt"
-        errfile = "dumpfileerr.txt"
         self.runWt(["dumpfile", self.tablename + ".wt"], outfilename=outfile)
 
         # Expected output is roughly K/V pairs in this format:
