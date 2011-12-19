@@ -62,6 +62,7 @@ namespace mongo {
         }
 
         void setInitialized( DBClientBase * conn ){
+            // At this point, conn may be deleted, *do not access*
             scoped_lock lk( _mutex );
             _init.insert( conn );
         }
@@ -145,7 +146,10 @@ namespace mongo {
         LOG(2) << "initial sharding settings : " << cmd << endl;
 
         bool ok = conn->runCommand( "admin" , cmd , result );
+
+        // Conn may be deleted here - *do not access again* - css is an exception, since just uses ptr address
         connectionShardStatus.setInitialized( conn );
+        conn = NULL;
 
         // HACK for backwards compatibility with v1.8.x, v2.0.0 and v2.0.1
         // Result is false, but will still initialize serverID and configdb
@@ -221,6 +225,8 @@ namespace mongo {
                << endl;
 
         BSONObj result;
+        // Save the server address, cannot access if fails
+        string serverAddress = conn->getServerAddress();
         if ( setShardVersion( *conn , ns , version , authoritative , result ) ) {
             // success!
             LOG(1) << "      setShardVersion success: " << result << endl;
@@ -228,13 +234,16 @@ namespace mongo {
             return true;
         }
 
+        // At this point, it is no longer safe to use the pointer to conn, we do not know its state
+        conn = NULL;
+
         LOG(1) << "       setShardVersion failed!\n" << result << endl;
 
         if ( result["need_authoritative"].trueValue() )
             massert( 10428 ,  "need_authoritative set but in authoritative mode already" , ! authoritative );
 
         if ( ! authoritative ) {
-            checkShardVersion( *conn , ns , 1 , tryNumber + 1 );
+            checkShardVersion( conn_in , ns , 1 , tryNumber + 1 );
             return true;
         }
         
@@ -252,13 +261,13 @@ namespace mongo {
         const int maxNumTries = 7;
         if ( tryNumber < maxNumTries ) {
             LOG( tryNumber < ( maxNumTries / 2 ) ? 1 : 0 ) 
-                << "going to retry checkShardVersion host: " << conn->getServerAddress() << " " << result << endl;
+                << "going to retry checkShardVersion host: " << serverAddress << " " << result << endl;
             sleepmillis( 10 * tryNumber );
-            checkShardVersion( *conn , ns , true , tryNumber + 1 );
+            checkShardVersion( conn_in , ns , true , tryNumber + 1 );
             return true;
         }
         
-        string errmsg = str::stream() << "setShardVersion failed host: " << conn->getServerAddress() << " " << result;
+        string errmsg = str::stream() << "setShardVersion failed host: " << serverAddress << " " << result;
         log() << "     " << errmsg << endl;
         massert( 10429 , errmsg , 0 );
         return true;

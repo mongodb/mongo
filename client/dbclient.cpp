@@ -611,6 +611,7 @@ namespace mongo {
         
         if ( clientSet && isNotMasterErrorString( info["errmsg"] ) ) {
             clientSet->isntMaster();
+            // At this point, we've probably deleted *this* object, do *not* use afterward
         }
 
         return false;
