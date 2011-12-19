@@ -480,6 +480,7 @@ namespace ThreadedTests {
                 LockCollectionForReading x("foo");
                 LockCollectionForReading y("foo.$bar"); 
             }
+#if defined(CLC)
             {
                 LockCollectionForWriting x("foo");
                 LockCollectionForWriting y("foo");
@@ -492,7 +493,7 @@ namespace ThreadedTests {
                 LockCollectionForReading x("foo");
                 ASSERT_THROWS( LockCollectionForReading y("bar"), DBException )
             }
-
+#endif
             cout << "temp ok" << endl;
         }
     };

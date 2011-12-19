@@ -18,52 +18,65 @@
 
 namespace mongo {
 
-    class LockBits {
-    public:
-        unsigned& x;
-        enum Level {
-            LockExcluder = 0,
-            Global = 1,
-            Collection = 2,
-            OplogCollection = 3
-        };
-        enum State {
-            NotLocked = 0,
-            //AwaitShared = 1, // todo...
-            Shared = 2,
-            // todo: upgradable...
-            //AwaitExclusive = 4,
-            Exclusive = 8
-        };
-        enum { B = 8, MASK = 0xff } ;
-        LockBits(unsigned &_x) : x(_x) { }
-        bool anythingExclusive() const {
-            return (0x88888888 & x) != 0;
-        }
-        State get(Level l) const {
-            unsigned msk = MASK << (l*B);
-            return static_cast<State>((x&msk) >> (l*B));
-        }
-        void set(Level l, State old, State _new) {
-            unsigned msk = MASK << (l*B);
-            verify(16050, get(l)==old);
-            x = (x&~msk) | (_new << (l*B));
-        }
-    };
+    using namespace clcimpl;
 
+    Client::LockStatus::LockStatus() { 
+        excluder=global=collection=0;
+    }
+
+    namespace clcimpl {
+        Shared::Shared(unsigned& _state, RWLock& lock) : state(_state) {
+            rw = 0;
+            if( state ) { 
+                // already locked
+                dassert( (state & (AcquireShared|AcquireExclusive)) == 0 );
+                return;
+            }
+            rw = &lock;
+            state = AcquireShared;
+            rw->lock_shared();
+            state = LockedShared;
+        }
+        Shared::~Shared() { 
+            if( rw ) {
+                state = Unlocked;
+                rw->unlock_shared();
+            }
+        }
+        Exclusive::Exclusive(unsigned& _state, RWLock& lock) : state(_state) { 
+            rw = 0;
+            if( state ) { 
+                // already locked
+                dassert( (state & (AcquireShared|AcquireExclusive)) == 0 );
+                assert( state == LockedExclusive ); // can't be in shared state
+                return;
+            }
+            rw = &lock;
+            state = AcquireExclusive;
+            rw->lock();
+            state = LockedExclusive;
+        }
+        Exclusive::~Exclusive() { 
+            if( rw ) {
+                state = Unlocked;
+                rw->unlock();
+            }
+        }
+    } // clcimpl namespace
+
+    // this tie-in temporary until MongoMutex is folded in more directly.
+    // called when the lock has been achieved
     void MongoMutex::lockedExclusively() {
         Client& c = cc();
         curopGotLock(&c); // hopefully lockStatus replaces one day
-        LockBits b = c.lockStatus.state;
-        b.set(LockBits::Global, LockBits::NotLocked, LockBits::Exclusive);
+        c.lockStatus.global = clcimpl::LockedExclusive;
         _minfo.entered(); // hopefully eliminate one day 
     }
 
     void MongoMutex::unlockingExclusively() {
         Client& c = cc();
         _minfo.leaving();
-        LockBits b = c.lockStatus.state;
-        b.set(LockBits::Global, LockBits::Exclusive, LockBits::NotLocked);
+        c.lockStatus.global = Unlocked;
     }
 
     bool subcollectionOf(const string& parent, const char *child) {
@@ -76,6 +89,7 @@ namespace mongo {
         return *p == '.' && p[1] == '$';
     }
 
+    // (maybe tbd) ...
     // we will use the global write lock for writing to system.* collections for simplicity 
     // for now; this has some advantages in speed as we don't need to latch just for that then; 
     // also there are cases to be handled carefully otherwise such as namespacedetails methods
@@ -91,18 +105,16 @@ namespace mongo {
         that is, disallow greediness of write lock acquisitions.  This is for that purpose.  The 
         #1 need is by groupCommitWithLimitedLocks() but useful elsewhere such as for lock and fsync.
     */
-    SimpleRWLock writeExcluder;
+    RWLock writeExcluder("writeexcluder");
+
     ExcludeAllWrites::ExcludeAllWrites() : 
-        lk(writeExcluder)
+        lk(cc().lockStatus.excluder, writeExcluder), 
+        gslk()
     {
         LOG(3) << "ExcludeAllWrites" << endl;
         wassert( !dbMutex.isWriteLocked() );
-        LockBits b(cc().lockStatus.state);
-        wassert( b.x == 0 );
-        b.set(LockBits::LockExcluder, LockBits::NotLocked, LockBits::Exclusive);
     };
     ExcludeAllWrites::~ExcludeAllWrites() {
-        LockBits(cc().lockStatus.state).set(LockBits::LockExcluder, LockBits::Exclusive, LockBits::NotLocked);
     }
 
     // CLC turns on the "collection level concurrency" code 
@@ -122,10 +134,6 @@ namespace mongo {
         }
     }
 #endif
-
-    Client::LockStatus::LockStatus() { 
-        state = 0;
-    }
 
     // we don't keep these locks in the namespacedetailstransient and Database 
     // objects -- that makes things safer as we need not prove to ourselves that they 
@@ -156,6 +164,7 @@ namespace mongo {
         }
     } theLocks;
 
+#if defined(CLC)
     LockCollectionForWriting::Locks::Locks(string ns) : 
         excluder(writeExcluder),
         gslk(),
@@ -165,9 +174,6 @@ namespace mongo {
         if( locks.get() ) {
             Client::LockStatus& s = cc().lockStatus;
             s.whichCollection.clear();
-            LockBits b( s.state );
-            wassert( b.get(LockBits::OplogCollection) == LockBits::NotLocked ); // todo ...
-            b.set(LockBits::Collection, LockBits::Exclusive, LockBits::NotLocked);
         }
     }
     LockCollectionForWriting::LockCollectionForWriting(string coll)
@@ -188,38 +194,31 @@ namespace mongo {
         b.set(LockBits::Collection, LockBits::NotLocked, LockBits::Exclusive);
         locks.reset( new Locks(coll) );
     }    
+#endif
 
-    LockCollectionForReading::Locks::Locks(string ns) : 
+    LockCollectionForReading::LockCollectionForReading(string ns) : 
       gslk(),
-      clk( theLocks.forns(ns) ) 
-    { }
-    LockCollectionForReading::~LockCollectionForReading() {
+      clk( cc().lockStatus.collection, theLocks.forns(ns) ) 
+    { 
         Client::LockStatus& s = cc().lockStatus;
-        wassert( !s.whichCollection.empty() );
-        if( locks.get() ) {
-            s.whichCollection.clear();
-            LockBits b(s.state);
-            b.set(LockBits::Collection, LockBits::Shared, LockBits::NotLocked);
+        if( s.whichCollection.empty() ) {
+            s.whichCollection = ns;
         }
-    }
-    LockCollectionForReading::LockCollectionForReading(string coll)
-    {
-        Client::LockStatus& s = cc().lockStatus;
-        if( !s.whichCollection.empty() ) {
-            if( !subcollectionOf(s.whichCollection, coll.c_str()) ) {
-                if( lkspecial(coll) )
+        else {
+            if( !subcollectionOf(s.whichCollection, ns.c_str()) ) {
+                if( lkspecial(ns) )
                     return;
                 massert(15939, 
-                    str::stream() << "can't nest lock of " << coll << " beneath " << s.whichCollection, 
+                    str::stream() << "can't nest lock of " << ns << " beneath " << s.whichCollection, 
                     false);
             }
-            // already locked, so done; might have been a write lock.
-            return;
         }
-        LockBits b(s.state);
-        s.whichCollection = coll; 
-        b.set(LockBits::Collection, LockBits::NotLocked, LockBits::Shared);
-        locks.reset( new Locks(coll) );
+    }
+    LockCollectionForReading::~LockCollectionForReading() {
+        if( !clk.recursed() ) {
+            Client::LockStatus& s = cc().lockStatus;
+            s.whichCollection.clear();
+        }
     }
 
 }

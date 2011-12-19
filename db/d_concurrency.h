@@ -7,19 +7,49 @@
 
 namespace mongo {
 
-    class LockCollectionForReading { 
-        struct Locks { 
-            Locks(string ns);
-            GlobalSharedLock gslk;
-            rwlock_shared clk;
+    namespace clcimpl {
+        enum LockStates { Unlocked, AcquireShared=1, LockedShared=2, AcquireExclusive=4, LockedExclusive=8 };
+        class Shared : boost::noncopyable { 
+            unsigned& state;
+            RWLock *rw;
+        public:
+            Shared(unsigned& state, RWLock& lock);
+            ~Shared();
+            bool recursed() const { return rw == 0; }
         };
-        scoped_ptr<Locks> locks;
+        class Exclusive : boost::noncopyable { 
+            unsigned& state;
+            RWLock *rw;
+        public:
+            Exclusive(unsigned& state, RWLock& lock);
+            ~Exclusive();
+        };
+    }
+
+    typedef readlock GlobalSharedLock;
+
+    class ExcludeAllWrites : boost::noncopyable {
+        clcimpl::Exclusive lk;
+        GlobalSharedLock gslk;
+    public:
+        ExcludeAllWrites();
+        ~ExcludeAllWrites();
+    };
+
+    class todoGlobalWriteLock : boost::noncopyable { 
+    public:
+    };
+
+    class LockCollectionForReading : boost::noncopyable { 
+        GlobalSharedLock gslk;
+        clcimpl::Shared clk;
     public:
         LockCollectionForReading(string coll);
         ~LockCollectionForReading();
     };
 
-    class LockCollectionForWriting {
+#if defined(CLC)
+    class LockCollectionForWriting : boost::noncopyable {
         struct Locks { 
             Locks(string ns);
             SimpleRWLock::Shared excluder;
@@ -31,13 +61,7 @@ namespace mongo {
         LockCollectionForWriting(string db);
         ~LockCollectionForWriting();
     };
-
-    class ExcludeAllWrites {
-        SimpleRWLock::Exclusive lk;
-        GlobalSharedLock gslk;
-    public:
-        ExcludeAllWrites();
-        ~ExcludeAllWrites();
-    };
+#else
+#endif
 
 }

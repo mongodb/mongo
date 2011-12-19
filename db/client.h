@@ -6,7 +6,6 @@
    todo: switch to asio...this will fit nicely with that.
 */
 
-
 /**
 *    Copyright (C) 2008 10gen Inc.
 *
@@ -229,7 +228,7 @@ namespace mongo {
         struct LockStatus {
             LockStatus();
             string whichCollection;
-            unsigned state;
+            unsigned excluder, global, collection;
         } lockStatus;
 
 #if defined(CLC)

@@ -299,9 +299,6 @@ namespace mongo {
             );
         }
     };
-    // eventually rename fully
-    typedef readlock GlobalSharedLock;
-
     struct readlocktry {
         readlocktry( const string&ns , int tryms ) {
             _got = dbMutex.lock_shared_try( tryms );
