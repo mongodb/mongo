@@ -72,7 +72,7 @@ __wt_vpack_posint(uint8_t **pp, size_t maxlen, uint64_t x)
 	int len, lz, shift;
 
 	WT_LEADING_ZEROS(x, lz);
-	len = 8 - lz;
+	len = (int)sizeof (x) - lz;
 	WT_SIZE_CHECK(len + 1, maxlen);
 	p = *pp;
 
@@ -97,7 +97,7 @@ __wt_vpack_negint(uint8_t **pp, size_t maxlen, uint64_t x)
 	int len, lz, shift;
 
 	WT_LEADING_ZEROS(~x, lz);
-	len = 8 - lz;
+	len = (int)sizeof (x) - lz;
 	WT_SIZE_CHECK(len + 1, maxlen);
 	p = *pp;
 
@@ -153,7 +153,7 @@ __wt_vunpack_negint(const uint8_t **pp, size_t maxlen, uint64_t *retp)
 
 	/* There are four length bits in the first byte. */
 	p = *pp;
-	len = 8 - (*p++ & 0xf);
+	len = (int)sizeof (x) - (*p++ & 0xf);
 	WT_SIZE_CHECK(len + 1, maxlen);
 
 	for (x = UINT64_MAX; len != 0; --len)
@@ -309,7 +309,7 @@ __wt_vsize_posint(uint64_t x)
 	int lz;
 
 	WT_LEADING_ZEROS(x, lz);
-	return (9 - lz);
+	return (WT_INTPACK64_MAXSIZE - lz);
 }
 
 /*
@@ -322,7 +322,7 @@ __wt_vsize_negint(uint64_t x)
 	int lz;
 
 	WT_LEADING_ZEROS(~x, lz);
-	return (size_t)(9 - lz);
+	return (size_t)(WT_INTPACK64_MAXSIZE - lz);
 }
 
 /*

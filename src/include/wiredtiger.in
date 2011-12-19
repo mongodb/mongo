@@ -101,10 +101,16 @@ struct wt_item {
 };
 
 /*!
- * The maximum size of a packed integer.  The ::wiredtiger_struct_pack function
- * will pack single integers into at most this many bytes.
+ * The maximum packed size of a 64-bit integer.  The ::wiredtiger_struct_pack
+ * function will pack single long integers into at most this many bytes.
  */
-#define	WT_INTPACK_MAXSIZE	9
+#define	WT_INTPACK64_MAXSIZE	((int)sizeof (int64_t) + 1)
+
+/*!
+ * The maximum packed size of a 32-bit integer.  The ::wiredtiger_struct_pack
+ * function will pack single integers into at most this many bytes.
+ */
+#define	WT_INTPACK32_MAXSIZE	((int)sizeof (int32_t) + 1)
 
 #ifndef DOXYGEN
 /* Forward structure declarations */
@@ -384,7 +390,7 @@ struct wt_cursor {
 	} q;                            /* Linked list of WT_CURSORs. */
 
 	uint64_t recno;
-	uint8_t raw_recno_buf[WT_INTPACK_MAXSIZE];
+	uint8_t raw_recno_buf[WT_INTPACK64_MAXSIZE];
 					/* Holds a recno in raw mode. */
 	WT_BUF key, value;
 	int saved_err;			/* Saved error in set_{key,value}. */
