@@ -377,7 +377,7 @@ elif os.sys.platform == "win32":
 else:
     mmapFiles += [ "util/mmap_posix.cpp" ]
 
-coreServerFiles += mmapFiles
+#coreServerFiles += mmapFiles
 
 # handle processinfo*
 processInfoFiles = [ "util/processinfo.cpp" ]
@@ -425,6 +425,8 @@ serverOnlyFiles += [
 #serverOnlyFiles += [ "db/commands/%s.cpp" % x for x in ["distinct","find_and_modify","group","mr"] ]
 
 serverOnlyFiles += [ "db/driverHelpers.cpp" ]
+
+serverOnlyFiles += mmapFiles
 
 # but the pipeline command works everywhere
 coreServerFiles += [ "db/commands/pipeline.cpp" ]
