@@ -872,3 +872,9 @@ DB.prototype.getSlaveOk = function() {
     if (this._slaveOk != undefined) return this._slaveOk;
     return this._mongo.getSlaveOk();
 }
+
+/* Loads any scripts contained in db.system.js into the client shell.
+*/
+DB.prototype.loadServerScripts = function(){
+    db.system.js.find().forEach(function(u){eval(u._id + " = " + u.value);});
+}
