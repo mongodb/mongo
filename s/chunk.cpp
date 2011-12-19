@@ -664,34 +664,51 @@ namespace mongo {
         return _key.hasShardKey( obj );
     }
 
-    void ChunkManager::createFirstChunks( const Shard& shard , const vector<BSONObj>& chunkSplitPoints , const vector<Shard>& chunkShards ) const {
+    void ChunkManager::createFirstChunks( const Shard& primary , vector<BSONObj>* initPoints , vector<Shard>* initShards ) const {
         // TODO distlock?
         assert( _chunkMap.size() == 0 );
 
         vector<BSONObj> splitPoints;
         vector<Shard> shards;
         unsigned long long numObjects = 0;
-        Chunk c(this, _key.globalMin(), _key.globalMax(), shard);
+        Chunk c(this, _key.globalMin(), _key.globalMax(), primary);
 
-        if ( chunkSplitPoints.size() == 0 ) {
+        if ( !initPoints || !initPoints->size() ) {
             // discover split points
             {
                 // get stats to see if there is any data
-                ScopedDbConnection shardConn( shard.getConnString() );
+                ScopedDbConnection shardConn( primary.getConnString() );
                 numObjects = shardConn->count( getns() );
                 shardConn.done();
             }
 
             if ( numObjects > 0 )
                 c.pickSplitVector( splitPoints , Chunk::MaxChunkSize );
-        } else {
-            splitPoints = chunkSplitPoints;
-            shards = chunkShards;
-        }
 
-        // make sure there is at least 1 shard, the primary
-        if ( !shards.size() )
-            shards.push_back( shard );
+            // since docs alread exists, must use primary shard
+            shards.push_back( primary );
+        } else {
+            // make sure points are unique and ordered
+            set<BSONObj> orderedPts;
+            for ( unsigned i = 0; i < initPoints->size(); ++i ) {
+                BSONObj pt = (*initPoints)[i];
+                orderedPts.insert( pt );
+            }
+            for ( set<BSONObj>::iterator it = orderedPts.begin(); it != orderedPts.end(); ++it ) {
+                splitPoints.push_back( *it );
+            }
+
+            if ( !initShards || !initShards->size() ) {
+                // use all shards, starting with primary
+                shards.push_back( primary );
+                vector<Shard> tmp;
+                primary.getAllShards( tmp );
+                for ( unsigned i = 0; i < tmp.size(); ++i ) {
+                    if ( tmp[i] != primary )
+                        shards.push_back( tmp[i] );
+                }
+            }
+        }
 
         // this is the first chunk; start the versioning from scratch
         ShardChunkVersion version;
@@ -699,15 +716,13 @@ namespace mongo {
         
         log() << "going to create " << splitPoints.size() + 1 << " chunk(s) for: " << _ns << endl;
         
-
         ScopedDbConnection conn( configServer.modelServer() );        
 
-        unsigned si = 0;
         for ( unsigned i=0; i<=splitPoints.size(); i++ ) {
             BSONObj min = i == 0 ? _key.globalMin() : splitPoints[i-1];
             BSONObj max = i < splitPoints.size() ? splitPoints[i] : _key.globalMax();
             
-            Chunk temp( this , min , max , shards[si] );
+            Chunk temp( this , min , max , shards[ i % shards.size() ] );
         
             BSONObjBuilder chunkBuilder;
             temp.serialize( chunkBuilder , version );
@@ -716,8 +731,6 @@ namespace mongo {
             conn->update( Chunk::chunkMetadataNS, QUERY( "_id" << temp.genID() ), chunkObj,  true, false );
 
             version.incMinor();
-            if ( ++si == shards.size() )
-                si = 0;
         }
 
         string errmsg = conn->getLastError();

@@ -141,7 +141,10 @@ namespace mongo {
         _save();
     }
 
-    ChunkManagerPtr DBConfig::shardCollection( const string& ns , ShardKeyPattern fieldsAndOrder , bool unique , const vector<BSONObj>& splitPoints ) {
+    /**
+     *
+     */
+    ChunkManagerPtr DBConfig::shardCollection( const string& ns , ShardKeyPattern fieldsAndOrder , bool unique , vector<BSONObj>* initPoints, vector<Shard>* initShards ) {
         uassert( 8042 , "db doesn't have sharding enabled" , _shardingEnabled );
         uassert( 13648 , str::stream() << "can't shard collection because not all config servers are up" , configServer.allUp() );
 
@@ -158,12 +161,7 @@ namespace mongo {
             ChunkManagerPtr cm = ci.getCM();
             uassert( 13449 , "collections already sharded" , (cm->numChunks() == 0) );
 
-            vector<Shard> shards;
-            if ( splitPoints.size() ) {
-                getPrimary().getAllShards( shards );
-            }
-
-            cm->createFirstChunks( getPrimary() , splitPoints , shards );
+            cm->createFirstChunks( getPrimary() , initPoints, initShards );
             _save();
         }
 
