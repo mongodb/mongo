@@ -12,9 +12,18 @@ static void __evict_init_candidate(
     WT_SESSION_IMPL *, WT_EVICT_ENTRY *, WT_PAGE *);
 static int  __evict_lru(WT_SESSION_IMPL *, uint32_t);
 static int  __evict_lru_cmp(const void *, const void *);
+static int __evict_lru_pages(WT_SESSION_IMPL *, int);
+static int  __evict_pass(WT_SESSION_IMPL *);
 static int  __evict_walk(WT_SESSION_IMPL *, uint32_t *, uint32_t);
 static int  __evict_walk_file(WT_SESSION_IMPL *, u_int *, uint32_t);
-static int  __evict_worker(WT_SESSION_IMPL *);
+static void *__evict_worker(void *);
+
+typedef struct {
+	WT_CONNECTION_IMPL *conn;
+	int id;
+
+	pthread_t tid;
+} WT_EVICTION_WORKER;
 
 /*
  * __evict_read_gen --
@@ -153,15 +162,26 @@ __wt_cache_evict_server(void *arg)
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
 	WT_DECL_RET;
+	WT_EVICTION_WORKER *workers;
 	WT_SESSION_IMPL *session;
+	u_int i;
 
 	session = arg;
 	conn = S2C(session);
 	cache = conn->cache;
+	workers = NULL;
+
+	WT_ERR(__wt_calloc_def(session, cache->eviction_workers, &workers));
+	for (i = 0; i < cache->eviction_workers; i++) {
+		workers[i].conn = conn;
+		workers[i].id = i;
+		WT_ERR(__wt_thread_create(session,
+		    &workers[i].tid, __evict_worker, &workers[i]));
+	}
 
 	while (F_ISSET(conn, WT_CONN_EVICTION_RUN)) {
 		/* Evict pages from the cache as needed. */
-		WT_ERR(__evict_worker(session));
+		WT_ERR(__evict_pass(session));
 
 		if (!F_ISSET(conn, WT_CONN_EVICTION_RUN))
 			break;
@@ -175,6 +195,13 @@ __wt_cache_evict_server(void *arg)
 	}
 
 	WT_VERBOSE_ERR(session, evictserver, "exiting");
+
+err:	WT_VERBOSE_TRET(session, evictserver, "waiting for helper threads");
+	for (i = 0; i < cache->eviction_workers; i++) {
+		__wt_cond_signal(session, cache->evict_waiter_cond);
+		WT_TRET(__wt_thread_join(session, workers[i].tid));
+	}
+	__wt_free(session, workers);
 
 	if (ret == 0) {
 		if (cache->pages_inmem != cache->pages_evict)
@@ -193,7 +220,7 @@ __wt_cache_evict_server(void *arg)
 			    " bytes dirty and %" PRIu64 " pages dirty",
 			    cache->bytes_dirty, cache->pages_dirty);
 	} else
-err:		WT_PANIC_ERR(session, ret, "eviction server error");
+		WT_PANIC_ERR(session, ret, "eviction server error");
 
 	/* Close the eviction session. */
 	(void)session->iface.close(&session->iface, NULL);
@@ -203,10 +230,57 @@ err:		WT_PANIC_ERR(session, ret, "eviction server error");
 
 /*
  * __evict_worker --
+ *	Thread to help evict pages from the cache.
+ */
+static void *
+__evict_worker(void *arg)
+{
+	WT_CACHE *cache;
+	WT_CONNECTION_IMPL *conn;
+	WT_DECL_RET;
+	WT_EVICTION_WORKER *worker;
+	WT_SESSION_IMPL *session;
+
+	worker = arg;
+	conn = worker->conn;
+	cache = conn->cache;
+	ret = 0;
+
+	/*
+	 * We need a session handle because we're reading/writing pages.
+	 * Start with the default session to keep error handling simple.
+	 */
+	session = conn->default_session;
+	WT_ERR(__wt_open_session(conn, 1, NULL, NULL, &session));
+
+	while (F_ISSET(conn, WT_CONN_EVICTION_RUN)) {
+		WT_VERBOSE_ERR(session, evictserver, "worker sleeping");
+		__wt_cond_wait(session, cache->evict_waiter_cond, 100000);
+		if (!F_ISSET(conn, WT_CONN_EVICTION_RUN))
+			break;
+		WT_VERBOSE_ERR(session, evictserver, "worker waking");
+
+		WT_ERR(__evict_lru_pages(session, 1));
+	}
+
+	if (0) {
+err:		__wt_err(session, ret, "cache eviction helper error");
+	}
+
+	WT_VERBOSE_TRET(session, evictserver, "helper exiting");
+
+	if (session != conn->default_session)
+		(void)session->iface.close(&session->iface, NULL);
+
+	return (NULL);
+}
+
+/*
+ * __evict_pass --
  *	Evict pages from memory.
  */
 static int
-__evict_worker(WT_SESSION_IMPL *session)
+__evict_pass(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
 	WT_CONNECTION_IMPL *conn;
@@ -683,6 +757,25 @@ err:	/* On error, clear any left-over tree walk. */
 }
 
 /*
+ * __evict_lru_pages --
+ *	Get pages from the LRU queue to evict.
+ */
+static int
+__evict_lru_pages(WT_SESSION_IMPL *session, int is_app)
+{
+	WT_DECL_RET;
+
+	/*
+	 * Reconcile and discard some pages: EBUSY is returned if a page fails
+	 * eviction because it's unavailable, continue in that case.
+	 */
+	while ((ret = __wt_evict_lru_page(session, is_app)) == 0 ||
+	    ret == EBUSY)
+		;
+	return (ret == WT_NOTFOUND ? 0 : ret);
+}
+
+/*
  * __evict_lru --
  *	Evict pages from the cache based on their read generation.
  */
@@ -690,7 +783,6 @@ static int
 __evict_lru(WT_SESSION_IMPL *session, uint32_t flags)
 {
 	WT_CACHE *cache;
-	WT_DECL_RET;
 	WT_EVICT_ENTRY *evict;
 	uint64_t cutoff;
 	uint32_t candidates, entries, i;
@@ -754,18 +846,12 @@ __evict_lru(WT_SESSION_IMPL *session, uint32_t flags)
 	__wt_spin_unlock(session, &cache->evict_lock);
 
 	/*
-	 * Signal any application threads waiting for the eviction queue to
-	 * have candidates.
+	 * Signal any application or worker threads waiting for the eviction
+	 * queue to have candidates.
 	 */
 	WT_RET(__wt_cond_signal(session, cache->evict_waiter_cond));
 
-	/*
-	 * Reconcile and discard some pages: EBUSY is returned if a page fails
-	 * eviction because it's unavailable, continue in that case.
-	 */
-	while ((ret = __wt_evict_lru_page(session, 0)) == 0 || ret == EBUSY)
-		;
-	return (ret == WT_NOTFOUND ? 0 : ret);
+	return (__evict_lru_pages(session, 0));
 }
 
 /*

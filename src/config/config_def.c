@@ -37,6 +37,7 @@ static const WT_CONFIG_CHECK confchk_connection_reconfigure[] = {
 	{ "eviction_dirty_target", "int", "min=10,max=99", NULL},
 	{ "eviction_target", "int", "min=10,max=99", NULL},
 	{ "eviction_trigger", "int", "min=10,max=99", NULL},
+	{ "eviction_workers", "int", "min=0,max=20", NULL},
 	{ "shared_cache", "category", NULL,
 	     confchk_shared_cache_subconfigs},
 	{ "statistics", "list",
@@ -256,6 +257,7 @@ static const WT_CONFIG_CHECK confchk_wiredtiger_open[] = {
 	{ "eviction_dirty_target", "int", "min=10,max=99", NULL},
 	{ "eviction_target", "int", "min=10,max=99", NULL},
 	{ "eviction_trigger", "int", "min=10,max=99", NULL},
+	{ "eviction_workers", "int", "min=0,max=20", NULL},
 	{ "extensions", "list", NULL, NULL},
 	{ "file_extend", "list", "choices=[\"data\",\"log\"]", NULL},
 	{ "hazard_max", "int", "min=15", NULL},
@@ -320,8 +322,9 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	},
 	{ "connection.reconfigure",
 	  "cache_size=100MB,error_prefix=,eviction_dirty_target=80,"
-	  "eviction_target=80,eviction_trigger=95,shared_cache=(chunk=10MB,"
-	  "name=,reserve=0,size=500MB),statistics=none,verbose=",
+	  "eviction_target=80,eviction_trigger=95,eviction_workers=0,"
+	  "shared_cache=(chunk=10MB,name=,reserve=0,size=500MB),"
+	  "statistics=none,verbose=",
 	  confchk_connection_reconfigure
 	},
 	{ "cursor.close",
@@ -428,10 +431,10 @@ static const WT_CONFIG_ENTRY config_entries[] = {
 	  "checkpoint=(name=\"WiredTigerCheckpoint\",wait=0),"
 	  "checkpoint_sync=,create=0,direct_io=,error_prefix=,"
 	  "eviction_dirty_target=80,eviction_target=80,eviction_trigger=95,"
-	  "extensions=,file_extend=,hazard_max=1000,log=(archive=,enabled=0"
-	  ",file_max=100MB,path=\"\"),lsm_merge=,mmap=,multiprocess=0,"
-	  "session_max=100,shared_cache=(chunk=10MB,name=,reserve=0,"
-	  "size=500MB),statistics=none,"
+	  "eviction_workers=0,extensions=,file_extend=,hazard_max=1000,"
+	  "log=(archive=,enabled=0,file_max=100MB,path=\"\"),lsm_merge=,"
+	  "mmap=,multiprocess=0,session_max=100,shared_cache=(chunk=10MB,"
+	  "name=,reserve=0,size=500MB),statistics=none,"
 	  "statistics_log=(path=\"WiredTigerStat.%d.%H\",sources=,"
 	  "timestamp=\"%b %d %H:%M:%S\",wait=0),transaction_sync=fsync,"
 	  "use_environment_priv=0,verbose=",

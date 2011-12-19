@@ -54,6 +54,11 @@ __wt_cache_config(WT_CONNECTION_IMPL *conn, const char *cfg[])
 		cache->eviction_dirty_target = (u_int)cval.val;
 	WT_RET_NOTFOUND_OK(ret);
 
+	if ((ret =
+	    __wt_config_gets(session, cfg, "eviction_workers", &cval)) == 0)
+		cache->eviction_workers = (u_int)cval.val;
+	WT_RET_NOTFOUND_OK(ret);
+
 	return (0);
 }
 
