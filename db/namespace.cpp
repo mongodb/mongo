@@ -149,7 +149,7 @@ namespace mongo {
     NOINLINE_DECL void NamespaceIndex::_init() {
         assert( !ht );
 
-        dbMutex.assertWriteLocked();
+        d.dbMutex.assertWriteLocked();
 
         /* if someone manually deleted the datafiles for a database,
            we need to be sure to clear any cached info for the database in
@@ -457,7 +457,7 @@ namespace mongo {
     }
 
     void NamespaceIndex::kill_ns(const char *ns) {
-        dbMutex.assertWriteLocked();
+        d.dbMutex.assertWriteLocked();
         if ( !ht )
             return;
         Namespace n(ns);
@@ -479,7 +479,7 @@ namespace mongo {
         add_ns( ns, details );
     }
     void NamespaceIndex::add_ns( const char *ns, const NamespaceDetails &details ) {
-        dbMutex.assertWriteLocked();
+        d.dbMutex.assertWriteLocked();
         init();
         Namespace n(ns);
         uassert( 10081 , "too many namespaces/collections", ht->put(n, details));
@@ -487,7 +487,7 @@ namespace mongo {
 
     /* extra space for indexes when more than 10 */
     NamespaceDetails::Extra* NamespaceIndex::newExtra(const char *ns, int i, NamespaceDetails *d) {
-        dbMutex.assertWriteLocked();
+        mongo::d.dbMutex.assertWriteLocked();
         assert( i >= 0 && i <= 1 );
         Namespace n(ns);
         Namespace extra(n.extraName(i).c_str()); // throws userexception if ns name too long

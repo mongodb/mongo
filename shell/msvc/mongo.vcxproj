@@ -219,7 +219,6 @@
     </ClCompile>
     <ClCompile Include="..\..\client\dbclient.cpp" />
     <ClCompile Include="..\..\client\dbclientcursor.cpp" />
-    <ClCompile Include="..\..\db\common.cpp" />
     <ClCompile Include="..\..\db\jsobj.cpp" />
     <ClCompile Include="..\..\db\json.cpp" />
     <ClCompile Include="..\..\pch.cpp">

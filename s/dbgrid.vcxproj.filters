@@ -563,6 +563,9 @@
     <ClCompile Include="..\util\systeminfo_win32.cpp">
       <Filter>Shared Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\stats\top.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\js\js32d.lib" />

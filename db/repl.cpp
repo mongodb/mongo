@@ -1407,7 +1407,7 @@ namespace mongo {
 
     void tempThread() {
         while ( 1 ) {
-            out() << dbMutex.info().isLocked() << endl;
+            out() << d.dbMutex.info().isLocked() << endl;
             sleepmillis(100);
         }
     }

@@ -62,7 +62,7 @@ namespace mongo {
         static Ordering extSortOrder;
         static int extSortComp( const void *lv, const void *rv ) {
             DEV RARELY {                 
-                dbMutex.assertWriteLocked(); // must be as we use a global var
+                d.dbMutex.assertWriteLocked(); // must be as we use a global var
             }
             Data * l = (Data*)lv;
             Data * r = (Data*)rv;

@@ -85,7 +85,7 @@ namespace ThreadedTests {
         }
     private:
         virtual void setup() {
-            mm = &dbMutex;
+            mm = &d.dbMutex;
         }
         virtual void subthread(int) {
             Client::initThread("mongomutextest");
@@ -233,7 +233,7 @@ namespace ThreadedTests {
 
             writelocktry lk( "" , 0 );
             ASSERT( lk.got() );
-            ASSERT( dbMutex.isWriteLocked() );
+            ASSERT( d.dbMutex.isWriteLocked() );
         }
     };
 

@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -548,6 +548,7 @@
     <ClCompile Include="dur_recover.cpp" />
     <ClCompile Include="dur_writetodatafiles.cpp" />
     <ClCompile Include="d_concurrency.cpp" />
+    <ClCompile Include="d_globals.cpp" />
     <ClCompile Include="geo\2d.cpp" />
     <ClCompile Include="geo\haystack.cpp" />
     <ClCompile Include="key.cpp" />
@@ -624,7 +625,9 @@
     <ClCompile Include="clientcursor.cpp" />
     <ClCompile Include="cloner.cpp" />
     <ClCompile Include="commands.cpp" />
-    <ClCompile Include="common.cpp" />
+    <ClCompile Include="common.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="cursor.cpp" />
     <ClCompile Include="database.cpp" />
     <ClCompile Include="db.cpp" />
@@ -774,6 +777,7 @@
     <ClInclude Include="dur_journalformat.h" />
     <ClInclude Include="dur_journalimpl.h" />
     <ClInclude Include="dur_stats.h" />
+    <ClInclude Include="d_globals.h" />
     <ClInclude Include="geo\core.h" />
     <ClInclude Include="globals.h" />
     <ClInclude Include="helpers\dblogger.h" />

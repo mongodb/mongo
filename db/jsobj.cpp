@@ -29,6 +29,7 @@
 #include "../util/unittest.h"
 #include "../util/embedded_builder.h"
 #include "../util/stringutils.h"
+#include "../util/mongoutils/str.h"
 #include "json.h"
 #include "jsobjmanipulator.h"
 #include "../util/optime.h"
@@ -771,7 +772,7 @@ namespace mongo {
             if( e.eoo() ) break;
 
             // TODO:  If actually important, may be able to do int->char* much faster
-            if( strcmp( e.fieldName(), ((string)( str::stream() << index )).c_str() ) != 0 )
+            if( strcmp( e.fieldName(), ((string)( mongoutils::str::stream() << index )).c_str() ) != 0 )
                 return false;
             index++;
         }

@@ -31,8 +31,8 @@
 #include "../pch.h"
 #include "../bson/util/builder.h"
 #include "../util/optime.h"
-#include "boost/utility.hpp"
-#include <set>
+//#include "boost/utility.hpp"
+//#include <set>
 #include "../bson/bsontypes.h"
 #include "../bson/oid.h"
 #include "../bson/bsonelement.h"
@@ -43,5 +43,5 @@
 #include "../bson/bson-inl.h"
 #include "../bson/ordering.h"
 #include "../bson/stringdata.h"
-
 #include "../bson/bson_db.h"
+

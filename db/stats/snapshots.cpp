@@ -27,10 +27,11 @@
    handles snapshotting performance metrics and other such things
  */
 namespace mongo {
+
     void SnapshotData::takeSnapshot() {
         _created = curTimeMicros64();
         _globalUsage = Top::global.getGlobalData();
-        _totalWriteLockedTime = dbMutex.info().getTimeLocked();
+//        _totalWriteLockedTime = d.dbMutex.info().getTimeLocked();
         Top::global.cloneMap(_usage);
     }
 
@@ -146,7 +147,7 @@ namespace mongo {
             ss << "<a "
                "href=\"http://www.mongodb.org/pages/viewpage.action?pageId=7209296\" "
                "title=\"snapshot: was the db in the write lock when this page was generated?\">";
-            ss << "write locked now:</a> " << (dbMutex.info().isLocked() ? "true" : "false") << "\n";
+            ss << "write locked now:</a> " << (d.dbMutex.info().isLocked() ? "true" : "false") << "\n";
         }
 
     } writeLockStatus;
@@ -222,4 +223,5 @@ namespace mongo {
 
     Snapshots statsSnapshots;
     SnapshotThread snapshotThread;
+
 }

@@ -214,7 +214,9 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="..\db\commands\pipeline.cpp" />
-    <ClCompile Include="..\db\common.cpp" />
+    <ClCompile Include="..\db\common.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\db\dbmessage.cpp" />
     <ClCompile Include="..\db\dbcommands_generic.cpp" />
     <ClCompile Include="..\db\dbwebserver.cpp" />
@@ -255,6 +257,7 @@
     </ClCompile>
     <ClCompile Include="..\db\security_commands.cpp" />
     <ClCompile Include="..\db\security_common.cpp" />
+    <ClCompile Include="..\db\stats\top.cpp" />
     <ClCompile Include="..\scripting\bench.cpp" />
     <ClCompile Include="..\util\alignedbuilder.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>

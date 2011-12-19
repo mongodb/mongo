@@ -350,7 +350,7 @@ namespace mongo {
 
         void checkForInterrupt( bool heedMutex = true ) {
             Client& c = cc();
-            if ( heedMutex && dbMutex.isWriteLocked() )
+            if ( heedMutex && d.dbMutex.isWriteLocked() )
                 return;
             if( _globalKill )
                 uasserted(11600,"interrupted at shutdown");
@@ -367,7 +367,7 @@ namespace mongo {
         const char *checkForInterruptNoAssert( /*bool heedMutex = true*/ ) {
             Client& c = cc();
             // always called withi false so commented out:
-            /*if ( heedMutex && dbMutex.isWriteLocked() )
+            /*if ( heedMutex && d.dbMutex.isWriteLocked() )
                 return "";*/
             if( _globalKill )
                 return "interrupted at shutdown";

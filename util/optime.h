@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include "../db/concurrency.h"
+//#include "../db/concurrency.h"
 
 namespace mongo {
     void exitCleanly( ExitCode code );
@@ -89,15 +89,8 @@ namespace mongo {
             last = OpTime(t, 1);
             return last;
         }
-        static OpTime now() {
-            DEV dbMutex.assertWriteLocked();
-            return now_inlock();
-        }
-
-        static OpTime last_inlock(){
-            DEV dbMutex.assertAtLeastReadLocked();
-            return last;
-        }
+        static OpTime now();
+        static OpTime last_inlock();
 
         // Waits for global OpTime to be different from *this
         // Must be atLeastReadLocked

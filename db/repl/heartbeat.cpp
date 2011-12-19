@@ -143,7 +143,7 @@ namespace mongo {
         // generally we don't want to be locked, at least not without
         // thinking acarefully about it first.
         uassert(15900, "can't heartbeat: too much lock",
-                !dbMutex.isWriteLocked() || theReplSet == 0 || !theReplSet->lockedByMe() );
+                !d.dbMutex.isWriteLocked() || theReplSet == 0 || !theReplSet->lockedByMe() );
 
         ScopedConn conn(memberFullName);
         return conn.runCommand("admin", cmd, result, 0);

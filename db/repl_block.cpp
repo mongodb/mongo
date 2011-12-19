@@ -133,7 +133,7 @@ namespace mongo {
                 return;
             }
 
-            dbMutex.assertAtLeastReadLocked();
+            d.dbMutex.assertAtLeastReadLocked();
 
             BSONObj res;
             if ( Helpers::findOne( NS , ident.obj , res ) ) {

@@ -216,7 +216,7 @@ namespace mongo {
             void _finishInit( bool doauth=true);
             void _auth( int lockState );
             void checkNotStale() const;
-            void checkNsAccess( bool doauth, int lockState = dbMutex.getState() );
+            void checkNsAccess( bool doauth, int lockState = d.dbMutex.getState() );
             Client * const _client;
             Context * const _oldContext;
             const string _path;
@@ -261,7 +261,7 @@ namespace mongo {
         if( !_writelock ) {
 
 #if BOOST_VERSION >= 103500
-            int s = dbMutex.getState();
+            int s = d.dbMutex.getState();
             if( s != -1 ) {
                 log() << "error: releaseAndWriteLock() s == " << s << endl;
                 msgasserted( 12600, "releaseAndWriteLock: unlock_shared failed, probably recursive" );
@@ -269,8 +269,8 @@ namespace mongo {
 #endif
 
             _writelock = true;
-            dbMutex.unlock_shared();
-            dbMutex.lock();
+            d.dbMutex.unlock_shared();
+            d.dbMutex.lock();
 
             // todo: unlocked() method says to call it before unlocking, not after.  so fix this here,
             // or fix the doc there.

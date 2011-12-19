@@ -503,7 +503,7 @@ namespace mongo {
                 bool ready = false;
                 LockDBJob *l = new LockDBJob(ready);
 
-                dbMutex.releaseEarly();
+                d.dbMutex.releaseEarly();
                 
                 // There is a narrow window for another lock request to come in
                 // here before the LockDBJob grabs the readlock. LockDBJob will

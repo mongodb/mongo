@@ -211,7 +211,7 @@ namespace mongo {
 
         // we usually don't get here, so doesn't matter how fast this part is
         {
-            int x = dbMutex.getState();
+            int x = d.dbMutex.getState();
             if( x > 0 ) { 
                 // write locked already
                 DEV RARELY log() << "write locked on ReadContext construction " << ns << endl;
@@ -268,12 +268,12 @@ namespace mongo {
         checkNotStale();
         _client->_context = this;
         _client->_curOp->enter( this );
-        checkNsAccess( doauth, dbMutex.getState() );
+        checkNsAccess( doauth, d.dbMutex.getState() );
         _client->checkLocks();
     }
        
     void Client::Context::_finishInit( bool doauth ) {
-        int lockState = dbMutex.getState();
+        int lockState = d.dbMutex.getState();
         assert( lockState );        
         if ( lockState > 0 && FileAllocator::get()->hasFailed() ) {
             uassert(14031, "Can't take a write lock while out of disk space", false);

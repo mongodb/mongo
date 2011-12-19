@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -335,6 +335,7 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Use</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Use</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="..\db\d_globals.cpp" />
     <ClCompile Include="..\db\geo\2d.cpp" />
     <ClCompile Include="..\db\geo\haystack.cpp" />
     <ClCompile Include="..\db\key.cpp" />
@@ -583,7 +584,9 @@
       <PrecompiledHeader />
     </ClCompile>
     <ClCompile Include="..\db\commands.cpp" />
-    <ClCompile Include="..\db\common.cpp" />
+    <ClCompile Include="..\db\common.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\db\cursor.cpp" />
     <ClCompile Include="..\db\database.cpp" />
     <ClCompile Include="..\db\dbcommands.cpp" />

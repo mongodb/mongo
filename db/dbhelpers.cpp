@@ -86,7 +86,7 @@ namespace mongo {
 
     bool Helpers::findById(Client& c, const char *ns, BSONObj query, BSONObj& result ,
                            bool * nsFound , bool * indexFound ) {
-        dbMutex.assertAtLeastReadLocked();
+        d.dbMutex.assertAtLeastReadLocked();
         Database *database = c.database();
         assert( database );
         NamespaceDetails *d = database->namespaceIndex.details(ns);

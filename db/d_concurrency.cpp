@@ -8,6 +8,7 @@
 #include "../util/assert_util.h"
 #include "client.h"
 #include "namespacestring.h"
+#include "d_globals.h"
 
 // oplog locking
 // no top level read locks
@@ -79,6 +80,12 @@ namespace mongo {
         c.lockStatus.global = Unlocked;
     }
 
+    MongoMutex::MongoMutex(const char *name) : _m(name) {
+        static int n = 0;
+        assert( ++n == 1 ); // below releasingWriteLock we assume MongoMutex is a singleton, and uses dbMutex ref above
+        _remapPrivateViewRequested = false;
+    }
+
     bool subcollectionOf(const string& parent, const char *child) {
         if( parent == child ) 
             return true;
@@ -100,19 +107,19 @@ namespace mongo {
         return s.isSystem() && s.coll != "system.profile";
     }
 
-    /** we want to be able to block any attempted write while allowing reads; additionally 
+    /** Notes on d.writeExcluder
+        we want to be able to block any attempted write while allowing reads; additionally 
         force non-greedy acquisition so that reads can continue -- 
         that is, disallow greediness of write lock acquisitions.  This is for that purpose.  The 
         #1 need is by groupCommitWithLimitedLocks() but useful elsewhere such as for lock and fsync.
     */
-    RWLock& writeExcluder = *(new RWLock("writeexcluder"));
 
     ExcludeAllWrites::ExcludeAllWrites() : 
-        lk(cc().lockStatus.excluder, writeExcluder), 
+        lk(cc().lockStatus.excluder, d.writeExcluder), 
         gslk()
     {
         LOG(3) << "ExcludeAllWrites" << endl;
-        wassert( !dbMutex.isWriteLocked() );
+        wassert( !d.dbMutex.isWriteLocked() );
     };
     ExcludeAllWrites::~ExcludeAllWrites() {
     }
@@ -123,7 +130,7 @@ namespace mongo {
     // called after a context is set. check that the correct collection is locked
     void Client::checkLocks() const { 
         DEV {
-            if( !dbMutex.isWriteLocked() ) { 
+            if( !d.dbMutex.isWriteLocked() ) { 
                 const char *n = ns();
                 if( lockStatus.whichCollection.empty() ) { 
                     log() << "DEBUG checkLocks error expected to already be locked: " << n << endl;
@@ -166,7 +173,7 @@ namespace mongo {
 
 #if defined(CLC)
     LockCollectionForWriting::Locks::Locks(string ns) : 
-        excluder(writeExcluder),
+        excluder(d.writeExcluder),
         gslk(),
         clk(theLocks.forns(ns),true)
     { }

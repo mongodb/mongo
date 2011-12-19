@@ -26,6 +26,8 @@
 #include "dur.h"
 #include "dur_journalformat.h"
 #include "../util/mongoutils/str.h"
+#include "mongomutex.h"
+#include "d_globals.h"
 
 using namespace mongoutils;
 
@@ -95,7 +97,7 @@ namespace mongo {
     }
 
     void* MemoryMappedFile::remapPrivateView(void *oldPrivateAddr) {
-        dbMutex.assertWriteLocked(); // short window where we are unmapped so must be exclusive
+        d.dbMutex.assertWriteLocked(); // short window where we are unmapped so must be exclusive
 
         // the mapViewMutex is to assure we get the same address on the remap
         scoped_lock lk(mapViewMutex);
@@ -320,10 +322,10 @@ namespace mongo {
             if( cmdLine.dur ) {
                 dur::closingFileNotification();
             }
-            if( !dbMutex.isWriteLocked() ) { 
+            if( !d.dbMutex.isWriteLocked() ) { 
                 assert( inShutdown() );
                 DEV { 
-                    log() << "is it really ok to close a mongommf outside a write lock? dbmutex status:" << dbMutex.getState() << " file:" << filename() << endl;
+                    log() << "is it really ok to close a mongommf outside a write lock? dbmutex status:" << d.dbMutex.getState() << " file:" << filename() << endl;
                 }
             }
         }

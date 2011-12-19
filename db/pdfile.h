@@ -380,7 +380,7 @@ namespace mongo {
                 }
 
                 { 
-                    if( !dbMutex.isWriteLocked() ) { 
+                    if( !d.dbMutex.isWriteLocked() ) { 
                         log() << "*** TEMP NOT INITIALIZING FILE " << filename << ", not in a write lock." << endl;
                         log() << "temp bypass until more elaborate change - case that is manifesting is benign anyway" << endl;
                         return;

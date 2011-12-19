@@ -6,12 +6,14 @@
 
 namespace mongo {
 
+    class Record;
+
     class PageFaultException /*: public DBException*/ { 
         unsigned era;
         Record *r;
     public:
         PageFaultException(const PageFaultException& rhs) : era(rhs.era), r(rhs.r) { }
-        PageFaultException(Record*);
+        explicit PageFaultException(Record*);
         void touch();
     };
 
@@ -22,7 +24,7 @@ namespace mongo {
         PageFaultRetryableSection();
         ~PageFaultRetryableSection();
     };
-
+#if 0
     inline void how_to_use_example() {
         // ...
         {
@@ -40,5 +42,5 @@ namespace mongo {
         }
         // ...
     }
-
+#endif
 }

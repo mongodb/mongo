@@ -419,8 +419,6 @@ namespace mongo {
         void run();
     };
 
-    extern ClientCursorMonitor clientCursorMonitor;
-
 } // namespace mongo
 
 // ClientCursor should only be used with auto_ptr because it needs to be

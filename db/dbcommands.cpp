@@ -441,7 +441,7 @@ namespace mongo {
                 BSONObjBuilder t;
 
                 unsigned long long last, start, timeLocked;
-                dbMutex.info().getTimingInfo(start, timeLocked);
+                d.dbMutex.info().getTimingInfo(start, timeLocked);
                 last = curTimeMicros64();
                 double tt = (double) last-start;
                 double tl = (double) timeLocked;
@@ -1264,7 +1264,7 @@ namespace mongo {
 
     namespace {
         long long getIndexSizeForCollection(string db, string ns, BSONObjBuilder* details=NULL, int scale = 1 ) {
-            dbMutex.assertAtLeastReadLocked();
+            d.dbMutex.assertAtLeastReadLocked();
 
             NamespaceDetails * nsd = nsdetails( ns.c_str() );
             if ( ! nsd )

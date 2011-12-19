@@ -5,6 +5,8 @@
    ./mongoperf -h
 */
 
+#define MONGO_EXPOSE_MACROS 1
+
 #include <iostream>
 #include "../dbclient.h" // the mongo c++ driver
 #include "../../util/mmap.h"

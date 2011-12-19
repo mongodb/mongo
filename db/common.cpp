@@ -1,4 +1,7 @@
-/** @file common.cpp Common code for server binaries (mongos, mongod, test).  Nothing used by driver should be here. */
+/** @file common.cpp 
+    Common code for server binaries (mongos, mongod, test).  
+    Nothing used by driver should be here. 
+ */
 
 /*
  *    Copyright (C) 2010 10gen Inc.
@@ -16,8 +19,8 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "pch.h"
-#include "concurrency.h"
+//#include "pch.h"
+//#include "concurrency.h"
 #include "jsobjmanipulator.h"
 
 /**
@@ -29,23 +32,6 @@ namespace mongo {
         invoked before about everything except global var construction.
      */
     void doPreServerStatupInits() { 
-    }
-
-    /* we use new here so we don't have to worry about destructor orders at program shutdown */
-    MongoMutex &dbMutex( *(new MongoMutex("dbMutex")) );
-
-    MongoMutex::MongoMutex(const char *name) : _m(name) {
-        static int n = 0;
-        assert( ++n == 1 ); // below releasingWriteLock we assume MongoMutex is a singleton, and uses dbMutex ref above
-        _remapPrivateViewRequested = false;
-    }
-
-    // OpTime::now() uses dbMutex, thus it is in this file not in the cpp files used by drivers and such
-    void BSONElementManipulator::initTimestamp() {
-        massert( 10332 ,  "Expected CurrentTime type", _element.type() == Timestamp );
-        unsigned long long &timestamp = *( reinterpret_cast< unsigned long long* >( value() ) );
-        if ( timestamp == 0 )
-            timestamp = OpTime::now().asDate();
     }
 
     NOINLINE_DECL OpTime OpTime::skewed() {

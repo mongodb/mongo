@@ -33,18 +33,18 @@ namespace mongo {
         dbtemprelease() {
             const Client& c = cc();
             _context = c.getContext();
-            _locktype = dbMutex.getState();
+            _locktype = d.dbMutex.getState();
             assert( _locktype );
 
             if ( _locktype > 0 ) {
                 massert( 10298 , "can't temprelease nested write lock", _locktype == 1);
                 if ( _context ) _context->unlocked();
-                dbMutex.unlock();
+                d.dbMutex.unlock();
             }
             else {
                 massert( 10299 , "can't temprelease nested read lock", _locktype == -1);
                 if ( _context ) _context->unlocked();
-                dbMutex.unlock_shared();
+                d.dbMutex.unlock_shared();
             }
             
             verify( 14814 , c.curop() );
@@ -53,9 +53,9 @@ namespace mongo {
         }
         ~dbtemprelease() {
             if ( _locktype > 0 )
-                dbMutex.lock();
+                d.dbMutex.lock();
             else
-                dbMutex.lock_shared();
+                d.dbMutex.lock_shared();
 
             if ( _context ) _context->relocked();
         }
@@ -71,19 +71,19 @@ namespace mongo {
         dbtempreleasewritelock() {
             const Client& c = cc();
             _context = c.getContext();
-            _locktype = dbMutex.getState();
+            _locktype = d.dbMutex.getState();
             assert( _locktype >= 1 );
             if( _locktype > 1 ) 
                 return; // nested
             if ( _context ) 
                 _context->unlocked();
-            dbMutex.unlock();
+            d.dbMutex.unlock();
             verify( 14845 , c.curop() );
             c.curop()->yielded();            
         }
         ~dbtempreleasewritelock() {
             if ( _locktype == 1 )
-                dbMutex.lock();
+                d.dbMutex.lock();
             if ( _context ) 
                 _context->relocked();
         }
@@ -98,7 +98,7 @@ namespace mongo {
 
         dbtempreleasecond() {
             real = 0;
-            locktype = dbMutex.getState();
+            locktype = d.dbMutex.getState();
             if ( locktype == 1 || locktype == -1 )
                 real = new dbtemprelease();
         }

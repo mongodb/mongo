@@ -172,7 +172,7 @@ namespace mongo {
 
         void DurableImpl::setNoJournal(void *dst, void *src, unsigned len) {
             // we are at least read locked, so we need not worry about REMAPPRIVATEVIEW herein.
-            DEV dbMutex.assertAtLeastReadLocked();
+            DEV d.dbMutex.assertAtLeastReadLocked();
 
             MemoryMappedFile::makeWritable(dst, len);
 
@@ -273,7 +273,7 @@ namespace mongo {
         }
 
         bool DurableImpl::commitIfNeeded() {
-            if ( !dbMutex.isWriteLocked() )
+            if ( !d.dbMutex.isWriteLocked() )
                 return false;
 
             DEV commitJob._nSinceCommitIfNeededCall = 0;
@@ -419,8 +419,8 @@ namespace mongo {
 
             LOG(4) << "journal REMAPPRIVATEVIEW" << endl;
 
-            dbMutex.assertWriteLocked();
-            dbMutex._remapPrivateViewRequested = false;
+            d.dbMutex.assertWriteLocked();
+            d.dbMutex._remapPrivateViewRequested = false;
             assert( !commitJob.hasWritten() );
 
             // we want to remap all private views about every 2 seconds.  there could be ~1000 views so
@@ -555,7 +555,7 @@ namespace mongo {
 
             LOG(4) << "groupcommitll " << p++ << endl;
 
-            // can't : dbMutex._remapPrivateViewRequested = true;
+            // can't : d.dbMutex._remapPrivateViewRequested = true;
 
             return true;
         }
@@ -590,7 +590,7 @@ namespace mongo {
 
             // we need to be at least read locked on the dbMutex so that we know the write intent data 
             // structures are not changing while we work
-            dbMutex.assertAtLeastReadLocked();
+            d.dbMutex.assertAtLeastReadLocked();
 
             commitJob.beginCommit();
 
@@ -628,14 +628,14 @@ namespace mongo {
             // we wouldn't see newly written data on reads.
             //
             DEV assert( !commitJob.hasWritten() );
-            if( !dbMutex.isWriteLocked() ) {
+            if( !d.dbMutex.isWriteLocked() ) {
                 // this needs done in a write lock (as there is a short window during remapping when each view 
                 // might not exist) thus we do it on the next acquisition of that instead of here (there is no 
                 // rush if you aren't writing anyway -- but it must happen, if it is done, before any uncommitted 
                 // writes occur).  If desired, perhaps this can be eliminated on posix as it may be that the remap 
                 // is race-free there.
                 //
-                dbMutex._remapPrivateViewRequested = true;
+                d.dbMutex._remapPrivateViewRequested = true;
             }
             else {
                 stats.curr->_commitsInWriteLock++;
@@ -707,7 +707,7 @@ namespace mongo {
             if (!cmdLine.dur)
                 return;
 
-            if( dbMutex.atLeastReadLocked() ) {
+            if( d.dbMutex.atLeastReadLocked() ) {
                 groupCommit();
             }
             else {
@@ -819,7 +819,7 @@ namespace mongo {
         }
 
         void DurableImpl::syncDataAndTruncateJournal() {
-            dbMutex.assertWriteLocked();
+            d.dbMutex.assertWriteLocked();
 
             // a commit from the commit thread won't begin while we are in the write lock,
             // but it may already be in progress and the end of that work is done outside 

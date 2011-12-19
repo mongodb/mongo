@@ -515,7 +515,7 @@ namespace mongo {
 
         /* you must be in the qcMutex when calling this.
            A NamespaceDetailsTransient object will not go out of scope on you if you are
-           dbMutex.atLeastReadLocked(), so you do't have to stay locked.
+           d.dbMutex.atLeastReadLocked(), so you do't have to stay locked.
            Creates a NamespaceDetailsTransient before returning if one DNE. 
            todo: avoid creating too many on erroneous ns queries.
            */

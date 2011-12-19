@@ -30,6 +30,7 @@
 #include "../util/concurrency/rwlock.h"
 #include "../util/mmap.h"
 #include "../util/time_support.h"
+#include "d_globals.h"
 
 namespace mongo {
 
@@ -67,7 +68,7 @@ namespace mongo {
     };
 
     /** the 'big lock'. a read/write lock.
-        there is one of these, dbMutex.
+        there is one of these, d.dbMutex.
 
         generally if you need to declare a mutex use the right primitive class, not this.
 
@@ -245,8 +246,6 @@ namespace mongo {
         //volatile bool _blockWrites;
     };
 
-    extern MongoMutex &dbMutex;
-
     namespace dur {
         void REMAPPRIVATEVIEW();
         void releasingWriteLock(); // because it's hard to include dur.h here
@@ -279,33 +278,33 @@ namespace mongo {
     }
 
     struct writelock {
-        writelock() { dbMutex.lock(); }
-        writelock(const string& ns) { dbMutex.lock(); }
+        writelock() { d.dbMutex.lock(); }
+        writelock(const string& ns) { d.dbMutex.lock(); }
         ~writelock() {
             DESTRUCTOR_GUARD(
-                dbMutex.unlock();
+                d.dbMutex.unlock();
             );
         }
     };
 
     struct readlock {
         readlock(const string& ns) {
-            dbMutex.lock_shared();
+            d.dbMutex.lock_shared();
         }
-        readlock() { dbMutex.lock_shared(); }
+        readlock() { d.dbMutex.lock_shared(); }
         ~readlock() {
             DESTRUCTOR_GUARD(
-                dbMutex.unlock_shared();
+                d.dbMutex.unlock_shared();
             );
         }
     };
     struct readlocktry {
         readlocktry( const string&ns , int tryms ) {
-            _got = dbMutex.lock_shared_try( tryms );
+            _got = d.dbMutex.lock_shared_try( tryms );
         }
         ~readlocktry() {
             if ( _got ) {
-                dbMutex.unlock_shared();
+                d.dbMutex.unlock_shared();
             }
         }
         bool got() const { return _got; }
@@ -315,11 +314,11 @@ namespace mongo {
 
     struct writelocktry {
         writelocktry( const string&ns , int tryms ) {
-            _got = dbMutex.lock_try( tryms );
+            _got = d.dbMutex.lock_try( tryms );
         }
         ~writelocktry() {
             if ( _got ) {
-                dbMutex.unlock();
+                d.dbMutex.unlock();
             }
         }
         bool got() const { return _got; }
@@ -339,13 +338,13 @@ namespace mongo {
     */
     struct atleastreadlock {
         atleastreadlock( const string& ns = "" ) {
-            _prev = dbMutex.getState();
+            _prev = d.dbMutex.getState();
             if ( _prev == 0 )
-                dbMutex.lock_shared();
+                d.dbMutex.lock_shared();
         }
         ~atleastreadlock() {
             if ( _prev == 0 )
-                dbMutex.unlock_shared();
+                d.dbMutex.unlock_shared();
         }
     private:
         int _prev;
@@ -359,18 +358,18 @@ namespace mongo {
     public:
         mongolock(bool write) : _writelock(write) {
             if( _writelock ) {
-                dbMutex.lock();
+                d.dbMutex.lock();
             }
             else
-                dbMutex.lock_shared();
+                d.dbMutex.lock_shared();
         }
         ~mongolock() {
             DESTRUCTOR_GUARD(
             if( _writelock ) {
-                dbMutex.unlock();
+                d.dbMutex.unlock();
             }
             else {
-                dbMutex.unlock_shared();
+                d.dbMutex.unlock_shared();
             }
             );
         }
@@ -383,7 +382,7 @@ namespace mongo {
         dblock() : writelock("") { }
     };
 
-    // eliminate this - we should just type "dbMutex.assertWriteLocked();" instead
-    inline void assertInWriteLock() { dbMutex.assertWriteLocked(); }
+    // eliminate this - we should just type "d.dbMutex.assertWriteLocked();" instead
+    inline void assertInWriteLock() { d.dbMutex.assertWriteLocked(); }
 
 }

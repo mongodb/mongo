@@ -132,9 +132,6 @@
     <ClCompile Include="..\..\util\password.cpp">
       <Filter>util</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\db\common.cpp">
-      <Filter>db</Filter>
-    </ClCompile>
     <ClCompile Include="..\mongo.cpp">
       <Filter>shell\generated_from_js</Filter>
     </ClCompile>

@@ -44,6 +44,7 @@
 #include "dur.h"
 #include "concurrency.h"
 #include "../s/d_writeback.h"
+#include "d_globals.h"
 
 #if defined(_WIN32)
 # include "../util/ntservice.h"
@@ -500,7 +501,7 @@ namespace mongo {
         srand((unsigned) (curTimeMicros() ^ startupSrandTimer.micros()));
 
         snapshotThread.go();
-        clientCursorMonitor.go();
+        d.clientCursorMonitor.go();
         PeriodicTask::theRunner->go();
         
 #ifndef _WIN32

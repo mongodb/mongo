@@ -631,7 +631,7 @@ namespace mongo {
         }
 
         void Journal::_rotate() {
-            if( dbMutex.atLeastReadLocked() ) { 
+            if( d.dbMutex.atLeastReadLocked() ) { 
                 LOGSOME << "info journal _rotate called insider dbMutex - ok but should be somewhat rare" << endl;
             }
 

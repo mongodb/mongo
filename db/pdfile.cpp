@@ -105,7 +105,7 @@ namespace mongo {
     }
 
     BackgroundOperation::~BackgroundOperation() {
-        wassert( dbMutex.isWriteLocked() );
+        wassert( d.dbMutex.isWriteLocked() );
         dbsInProg[_ns.db]--;
         nsInProg.erase(_ns.ns());
     }
@@ -1541,7 +1541,7 @@ namespace mongo {
 
         void prep(const char *ns, NamespaceDetails *d) {
             assertInWriteLock();
-            uassert( 13130 , "can't start bg index b/c in recursive lock (db.eval?)" , dbMutex.getState() == 1 );
+            uassert( 13130 , "can't start bg index b/c in recursive lock (db.eval?)" , mongo::d.dbMutex.getState() == 1 );
             bgJobsInProgress.insert(d);
         }
         void done(const char *ns, NamespaceDetails *d) {
@@ -2134,7 +2134,7 @@ namespace mongo {
 
         BackgroundOperation::assertNoBgOpInProgForDb(d->name.c_str());
 
-        dbMutex.assertWriteLocked();
+        mongo::d.dbMutex.assertWriteLocked();
 
         // Not sure we need this here, so removed.  If we do, we need to move it down 
         // within other calls both (1) as they could be called from elsewhere and 
@@ -2370,7 +2370,7 @@ namespace mongo {
 
     bool DatabaseHolder::closeAll( const string& path , BSONObjBuilder& result , bool force ) {
         log() << "DatabaseHolder::closeAll path:" << path << endl;
-        dbMutex.assertWriteLocked();
+        d.dbMutex.assertWriteLocked();
 
         map<string,Database*>& m = _paths[path];
         _size -= m.size();

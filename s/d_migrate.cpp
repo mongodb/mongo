@@ -515,7 +515,7 @@ namespace mongo {
         }
 
         void aboutToDelete( const Database* db , const DiskLoc& dl ) {
-            dbMutex.assertWriteLocked();
+            d.dbMutex.assertWriteLocked();
 
             if ( ! _getActive() )
                 return;
@@ -603,7 +603,7 @@ namespace mongo {
         int loops = 0;
         Timer t;
         while ( t.seconds() < 900 ) { // 15 minutes
-            assert( dbMutex.getState() == 0 );
+            assert( d.dbMutex.getState() == 0 );
             sleepmillis( 20 );
 
             set<CursorId> now;
@@ -911,7 +911,7 @@ namespace mongo {
 
             // 4.
             for ( int i=0; i<86400; i++ ) { // don't want a single chunk move to take more than a day
-                assert( dbMutex.getState() == 0 );
+                assert( d.dbMutex.getState() == 0 );
                 sleepsecs( 1 );
                 ScopedDbConnection conn( to );
                 BSONObj res;
