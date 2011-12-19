@@ -105,7 +105,7 @@ namespace mongo {
         that is, disallow greediness of write lock acquisitions.  This is for that purpose.  The 
         #1 need is by groupCommitWithLimitedLocks() but useful elsewhere such as for lock and fsync.
     */
-    RWLock writeExcluder("writeexcluder");
+    RWLock& writeExcluder = *(new RWLock("writeexcluder"));
 
     ExcludeAllWrites::ExcludeAllWrites() : 
         lk(cc().lockStatus.excluder, writeExcluder), 
