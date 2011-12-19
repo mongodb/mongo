@@ -89,13 +89,6 @@ namespace mongo {
             string mykey = ident;
 
             {
-                // if its a replica set, just use set name
-                size_t pos = mykey.find( '/' );
-                if ( pos != string::npos )
-                    mykey = mykey.substr(0,pos);
-            }
-
-            {
                 scoped_lock lk( _mutex );
                 ShardMap::iterator i = _lookup.find( mykey );
 
@@ -134,9 +127,6 @@ namespace mongo {
             
             const ConnectionString& cs = s->getAddress();
             if ( cs.type() == ConnectionString::SET ) {
-                if ( cs.getSetName().size() )
-                    _lookup[ cs.getSetName() ] = s;
-                
                 vector<HostAndPort> servers = cs.getServers();
                 for ( unsigned i=0; i<servers.size(); i++ ) {
                     _lookup[ servers[i].toString() ] = s;
