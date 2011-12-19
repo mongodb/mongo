@@ -1779,7 +1779,7 @@ __rec_col_var(
 		    session, salvage, last, last_deleted, 0, rle));
 
 	/* Write the remnant page. */
-	return (__rec_split_finish(session));
+	ret = __rec_split_finish(session);
 
 err:	__wt_buf_free(session, &orig);
 	return (ret);
