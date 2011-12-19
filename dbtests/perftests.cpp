@@ -23,6 +23,7 @@
  */
 
 #include "pch.h"
+#include <fstream>
 #include "../db/ops/query.h"
 #include "../db/db.h"
 #include "../db/instance.h"
@@ -132,6 +133,7 @@ namespace PerfTests {
         virtual bool showDurStats() { return true; }
 
         static  boost::shared_ptr<DBClientConnection> conn;
+        static string _perfhostname;
         static unsigned once;
 
     public:
@@ -183,6 +185,17 @@ namespace PerfTests {
                             assert(false);
                         }
                         conn = c;
+
+                        // override the hostname with the buildbot hostname, if present
+                        ifstream hostf( "../../info/host" );
+                        if ( hostf.good() ) {
+                            char buf[1024];
+                            hostf.getline(buf, sizeof(buf));
+                            _perfhostname = buf;
+                        }
+                        else {
+                            _perfhostname = getHostName();
+                        }
                     }
                     else {
                         cout << err << " (to log perfstats)" << endl;
@@ -212,7 +225,7 @@ namespace PerfTests {
                         Query q;
                         {
                             BSONObjBuilder b;
-                            b.append("host",getHostName()).append("test",s).append("dur",cmdLine.dur);
+                            b.append("host",_perfhostname).append("test",s).append("dur",cmdLine.dur);
                             DEV { b.append("info.DEBUG",true); }
                             else b.appendNull("info.DEBUG");
                             if( sizeof(int*) == 4 )
@@ -242,7 +255,7 @@ namespace PerfTests {
                 }
                 {
                     bob b;
-                    b.append("host", getHostName());
+                    b.append("host", _perfhostname);
                     b.appendTimeT("when", time(0));
                     b.append("test", s);
                     b.append("rps", (int) rps);
@@ -365,6 +378,7 @@ namespace PerfTests {
     };
 
     boost::shared_ptr<DBClientConnection> B::conn;
+    string B::_perfhostname;
     unsigned B::once;
 
     unsigned dontOptimizeOutHopefully;
