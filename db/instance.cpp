@@ -989,7 +989,7 @@ namespace mongo {
         catch (...) { }
 #endif
 
-        // stop the dur thread 
+        // block the dur thread from doing any work for the rest of the run
         log(2) << "shutdown: groupCommitMutex" << endl;
         scoped_lock lk(dur::groupCommitMutex);
 

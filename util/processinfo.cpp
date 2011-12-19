@@ -45,18 +45,4 @@ namespace mongo {
         pidFileWiper.write( path );
     }
 
-    void printMemInfo( const char * where ) {
-        cout << "mem info: ";
-        if ( where )
-            cout << where << " ";
-        ProcessInfo pi;
-        if ( ! pi.supported() ) {
-            cout << " not supported" << endl;
-            return;
-        }
-
-        cout << "vsize: " << pi.getVirtualMemorySize() << " resident: " << pi.getResidentSize() << " mapped: " << ( MemoryMappedFile::totalMappedLength() / ( 1024 * 1024 ) ) << endl;
-    }
-
-
 }
