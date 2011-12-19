@@ -86,7 +86,7 @@ struct __wt_cell {
 	 * The prefix compression count and 64V value overlap, this calculation
 	 * is pessimistic, but it isn't worth optimizing.
 	 */
-	uint8_t __chunk[16];
+	uint8_t __chunk[1 + 1 + WT_INTPACK64_MAXSIZE + WT_INTPACK32_MAXSIZE];
 };
 
 /*
