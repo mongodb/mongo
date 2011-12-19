@@ -68,6 +68,19 @@ class suite_subprocess:
             got = f.read(len(expect) + 100)
             self.assertEqual(got, expect, filename + ': does not contain expected:\n\'' + expect + '\', but contains:\n\'' + got + '\'.')
 
+    def check_file_contains(self, filename, expect):
+        """
+        Check that the file contains the expected string in the first 100K bytes
+        """
+        maxbytes = 1024*100
+        with open(filename, 'r') as f:
+            got = f.read(maxbytes)
+            if not (expect in got):
+                if len(got) >= maxbytes:
+                    self.fail(filename + ': does not contain expected \'' + expect + '\', or output is too large')
+                else:
+                    self.fail(filename + ': does not contain expected \'' + expect + '\'')
+
     def check_empty_file(self, filename):
         """
         Raise an error if the file is not empty

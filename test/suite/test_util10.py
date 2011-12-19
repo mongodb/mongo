@@ -40,16 +40,6 @@ class test_util10(wttest.WiredTigerTestCase, suite_subprocess):
         cursor.insert()
         cursor.close()
 
-    def check_file_contains(self, filename, expect):
-        maxbytes = 1024*100
-        with open(filename, 'r') as f:
-            got = f.read(maxbytes)
-            if not (expect in got):
-                if len(got) >= maxbytes:
-                    self.fail(filename + ': does not contain expected \'' + expect + '\', or output is too large')
-                else:
-                    self.fail(filename + ': does not contain expected \'' + expect + '\'')
-
     def test_dumpfile_empty(self):
         """
         Test read in a 'wt' process, using an empty table
