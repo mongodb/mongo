@@ -115,7 +115,7 @@ namespace mongo {
 
         views.push_back( view );
 
-        DEV if (! dbMutex.info().isLocked()) {
+        DEV if (! d.dbMutex.info().isLocked()) {
             _unlock();
         }
 

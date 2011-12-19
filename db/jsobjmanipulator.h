@@ -45,7 +45,7 @@ namespace mongo {
             else if ( _element.type() == NumberInt ) *reinterpret_cast< int * >( value() ) = (int) d;
             else assert(0);
         }
-        void BSONElementManipulator::SetNumber(double d);
+        void SetNumber(double d);
         void setLong(long long n) {
             assert( _element.type() == NumberLong );
             *reinterpret_cast< long long * >( value() ) = n;
