@@ -333,6 +333,7 @@ DB.prototype.help = function() {
     print("\tdb.isMaster() check replica primary status");
     print("\tdb.killOp(opid) kills the current operation in the db");
     print("\tdb.listCommands() lists all the db commands");
+    print("\tdb.loadServerScripts() loads all the scripts in db.system.js");
     print("\tdb.logout()");
     print("\tdb.printCollectionStats()");
     print("\tdb.printReplicationInfo()");
