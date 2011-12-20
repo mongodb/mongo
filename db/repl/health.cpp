@@ -383,9 +383,11 @@ namespace mongo {
                 bb.append("maintenanceMode", maintenance);
             }
 
-            string s = _self->lhb();
-            if( !s.empty() )
-                bb.append("errmsg", s);
+            if (theReplSet) {
+                string s = theReplSet->hbmsg();
+                if( !s.empty() )
+                    bb.append("errmsg", s);
+            }
             bb.append("self", true);
             v.push_back(bb.obj());
         }

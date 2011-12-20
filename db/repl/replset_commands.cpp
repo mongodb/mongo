@@ -65,6 +65,12 @@ namespace mongo {
                 replSetBlind = cmdObj.getBoolField("blind");
                 return true;
             }
+
+            if (cmdObj.hasElement("sethbmsg")) {
+                replset::sethbmsg(cmdObj["sethbmsg"].String());
+                return true;
+            }
+
             return false;
         }
     } cmdReplSetTest;
