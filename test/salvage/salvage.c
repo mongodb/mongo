@@ -100,22 +100,23 @@ t(int r, u_int ptype, int unique)
 	printf("%sunique values\n", unique ? "" : "non-");
 	value_unique = unique;
 
+#define	NTESTS	24
 	if (r == 0) {
 		if (ptype == 0) {
 			page_type = WT_PAGE_COL_FIX;
-			for (r = 1; r <= 23; ++r)
+			for (r = 1; r <= NTESTS; ++r)
 				run(r);
 
 			page_type = WT_PAGE_COL_VAR;
-			for (r = 1; r <= 23; ++r)
+			for (r = 1; r <= NTESTS; ++r)
 				run(r);
 
 			page_type = WT_PAGE_ROW_LEAF;
-			for (r = 1; r <= 23; ++r)
+			for (r = 1; r <= NTESTS; ++r)
 				run(r);
 		} else {
 			page_type = ptype;
-			for (r = 1; r <= 23; ++r)
+			for (r = 1; r <= NTESTS; ++r)
 				run(r);
 		}
 	} else if (ptype == 0) {
@@ -159,6 +160,12 @@ run(int r)
 	switch (r) {
 	case 1:
 		/*
+		 * Smoke test: empty files.
+		 */
+		build(0, 0, 0); copy(0, 0);
+		break;
+	case 2:
+		/*
 		 * Smoke test:
 		 * Sequential pages, all pages should be kept.
 		 */
@@ -169,7 +176,7 @@ run(int r)
 		print_res(200, 200, 20);
 		print_res(300, 300, 20);
 		break;
-	case 2:
+	case 3:
 		/*
 		 * Smoke test:
 		 * Sequential pages, all pages should be kept.
@@ -181,7 +188,7 @@ run(int r)
 		print_res(200, 200, 20);
 		print_res(300, 300, 20);
 		break;
-	case 3:
+	case 4:
 		/*
 		 * Case #1:
 		 * 3 pages, each with 20 records starting with the same record
@@ -193,7 +200,7 @@ run(int r)
 		build(100, 300, 20); copy(8, 1);
 		print_res(100, 300, 20);
 		break;
-	case 4:
+	case 5:
 		/*
 		 * Case #1:
 		 * 3 pages, each with 20 records starting with the same record
@@ -205,7 +212,7 @@ run(int r)
 		build(100, 300, 20); copy(7, 1);
 		print_res(100, 200, 20);
 		break;
-	case 5:
+	case 6:
 		/*
 		 * Case #1:
 		 * 3 pages, each with 20 records starting with the same record
@@ -217,7 +224,7 @@ run(int r)
 		build(100, 300, 20); copy(6, 1);
 		print_res(100, 100, 20);
 		break;
-	case 6:
+	case 7:
 		/*
 		 * Case #2:
 		 * The second page overlaps the beginning of the first page, and
@@ -228,7 +235,7 @@ run(int r)
 		print_res(100, 200, 10);
 		print_res(110, 100, 20);
 		break;
-	case 7:
+	case 8:
 		/*
 		 * Case #2:
 		 * The second page overlaps the beginning of the first page, and
@@ -239,7 +246,7 @@ run(int r)
 		print_res(100, 200, 20);
 		print_res(120, 110, 10);
 		break;
-	case 8:
+	case 9:
 		/*
 		 * Case #3:
 		 * The second page overlaps with the end of the first page, and
@@ -250,7 +257,7 @@ run(int r)
 		print_res(100, 100, 20);
 		print_res(120, 210, 10);
 		break;
-	case 9:
+	case 10:
 		/*
 		 * Case #3:
 		 * The second page overlaps with the end of the first page, and
@@ -261,7 +268,7 @@ run(int r)
 		print_res(100, 100, 10);
 		print_res(110, 200, 20);
 		break;
-	case 10:
+	case 11:
 		/*
 		 * Case #4:
 		 * The second page is a prefix of the first page, and the first
@@ -271,7 +278,7 @@ run(int r)
 		build(100, 200,  5); copy(6, 1);
 		print_res(100, 100, 20);
 		break;
-	case 11:
+	case 12:
 		/*
 		 * Case #4:
 		 * The second page is a prefix of the first page, and the second
@@ -282,7 +289,7 @@ run(int r)
 		print_res(100, 200, 5);
 		print_res(105, 105, 15);
 		break;
-	case 12:
+	case 13:
 		/*
 		 * Case #5:
 		 * The second page is in the middle of the first page, and the
@@ -292,7 +299,7 @@ run(int r)
 		build(110, 200, 10); copy(6, 11);
 		print_res(100, 100, 40);
 		break;
-	case 13:
+	case 14:
 		/*
 		 * Case #5:
 		 * The second page is in the middle of the first page, and the
@@ -304,7 +311,7 @@ run(int r)
 		print_res(110, 200, 10);
 		print_res(120, 120, 20);
 		break;
-	case 14:
+	case 15:
 		/*
 		 * Case #6:
 		 * The second page is a suffix of the first page, and the first
@@ -314,7 +321,7 @@ run(int r)
 		build(130, 200, 10); copy(6, 31);
 		print_res(100, 100, 40);
 		break;
-	case 15:
+	case 16:
 		/*
 		 * Case #6:
 		 * The second page is a suffix of the first page, and the second
@@ -325,7 +332,7 @@ run(int r)
 		print_res(100, 100, 30);
 		print_res(130, 200, 10);
 		break;
-	case 16:
+	case 17:
 		/*
 		 * Case #9:
 		 * The first page is a prefix of the second page, and the first
@@ -336,7 +343,7 @@ run(int r)
 		print_res(100, 100, 20);
 		print_res(120, 220, 20);
 		break;
-	case 17:
+	case 18:
 		/*
 		 * Case #9:
 		 * The first page is a prefix of the second page, and the second
@@ -346,7 +353,7 @@ run(int r)
 		build(100, 200, 40); copy(7, 1);
 		print_res(100, 200, 40);
 		break;
-	case 18:
+	case 19:
 		/*
 		 * Case #10:
 		 * The first page is a suffix of the second page, and the first
@@ -357,7 +364,7 @@ run(int r)
 		print_res(100, 200, 30);
 		print_res(130, 100, 10);
 		break;
-	case 19:
+	case 20:
 		/*
 		 * Case #10:
 		 * The first page is a suffix of the second page, and the second
@@ -367,7 +374,7 @@ run(int r)
 		build(100, 200, 40); copy(7, 1);
 		print_res(100, 200, 40);
 		break;
-	case 20:
+	case 21:
 		/*
 		 * Case #11:
 		 * The first page is in the middle of the second page, and the
@@ -379,7 +386,7 @@ run(int r)
 		print_res(110, 100, 10);
 		print_res(120, 220, 20);
 		break;
-	case 21:
+	case 22:
 		/*
 		 * Case #11:
 		 * The first page is in the middle of the second page, and the
@@ -389,7 +396,7 @@ run(int r)
 		build(100, 200, 40); copy(7, 1);
 		print_res(100, 200, 40);
 		break;
-	case 22:
+	case 23:
 		/*
 		 * Column-store only: missing an initial key range of 99
 		 * records.
@@ -398,7 +405,7 @@ run(int r)
 		empty(99);
 		print_res(100, 100, 10);
 		break;
-	case 23:
+	case 24:
 		/*
 		 * Column-store only: missing a middle key range of 37
 		 * records.
@@ -545,27 +552,31 @@ copy(u_int lsn, u_int recno)
 	} else
 		assert((ofp = fopen(SLVG, "a")) != NULL);
 
-	/* Copy/update the first formatted page. */
-	assert(fseek(ifp, (long)512, SEEK_SET) == 0);
-	assert(fread(buf, 1, PSIZE, ifp) == PSIZE);
-	dsk = (WT_PAGE_DISK *)buf;
-	dsk->lsn = lsn;
-	if (page_type != WT_PAGE_ROW_LEAF)
-		dsk->recno = recno;
-	dsk->cksum = 0;
-	dsk->cksum = __wt_cksum(dsk, PSIZE);
-	assert(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
-
 	/*
-	 * XXX
-	 * The open checks that the root page isn't past EOF, and for some of
-	 * these tests, it is.   We need a salvage force flag, but don't yet
-	 * have one.  For now, extend the file with random garbage that salvage
-	 * will ignore.
+	 * If there's data, copy/update the first formatted page.
 	 */
-	memset(buf, 'a', sizeof(buf));
-	assert(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
-	assert(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
+	if (lsn != 0) {
+		assert(fseek(ifp, (long)512, SEEK_SET) == 0);
+		assert(fread(buf, 1, PSIZE, ifp) == PSIZE);
+		dsk = (WT_PAGE_DISK *)buf;
+		dsk->lsn = lsn;
+		if (page_type != WT_PAGE_ROW_LEAF)
+			dsk->recno = recno;
+		dsk->cksum = 0;
+		dsk->cksum = __wt_cksum(dsk, PSIZE);
+		assert(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
+
+		/*
+		 * XXX
+		 * The open checks that the root page isn't past EOF, and for
+		 * some of these tests, it is.   We need a salvage force flag,
+		 * but don't yet have one.  For now, extend the file with
+		  *random garbage that salvage will ignore.
+		 */
+		memset(buf, 'a', sizeof(buf));
+		assert(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
+		assert(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
+	}
 
 	assert(fclose(ifp) == 0);
 	assert(fclose(ofp) == 0);
