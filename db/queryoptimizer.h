@@ -62,7 +62,7 @@ namespace mongo {
         bool exactKeyMatch() const { return _exactKeyMatch; }
         /** @return true iff this QueryPlan would perform an unindexed scan. */
         bool willScanTable() const { return _idxNo < 0 && !_impossible; }
-
+        
         /** @return a new cursor based on this QueryPlan's index and FieldRangeSet. */
         shared_ptr<Cursor> newCursor( const DiskLoc &startLoc = DiskLoc() , int numWanted=0 ) const;
         /** @return a new reverse cursor if this is an unindexed plan. */
@@ -85,10 +85,13 @@ namespace mongo {
         
         bool mustAssertOnYieldFailure() const { return _mustAssertOnYieldFailure; }
         
-        /** just for testing */
+        /** The following member functions are just for testing. */
         
         shared_ptr<FieldRangeVector> frv() const { return _frv; }
         bool isMultiKey() const;
+        
+        /** @return 'special' attribute of the plan, which was either set explicitly or generated from the index. */
+        const string &special() const { return _special; }
 
     private:
         NamespaceDetails * _d;

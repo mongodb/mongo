@@ -508,6 +508,7 @@ doneCheckOrder:
 
         PlanSet plans;
         QueryPlanPtr optimalPlan;
+        QueryPlanPtr specialPlan;
         for( int i = 0; i < d->nIndexes; ++i ) {
             if ( normalQuery ) {
                 BSONObj keyPattern = d->idx( i ).keyPattern();
@@ -530,15 +531,27 @@ doneCheckOrder:
                 }
             }
             else if ( !p->unhelpful() ) {
-                plans.push_back( p );
+                if ( p->special().empty() ) {
+                    plans.push_back( p );
+                }
+                else {
+                    specialPlan = p;
+                }
             }
         }
         if ( optimalPlan.get() ) {
             addPlan( optimalPlan, checkFirst );
             return;
         }
-        for( PlanSet::iterator i = plans.begin(); i != plans.end(); ++i )
+        for( PlanSet::const_iterator i = plans.begin(); i != plans.end(); ++i ) {
             addPlan( *i, checkFirst );
+        }
+
+        // Only add a special plan if no standard btree plans have been added. SERVER-4531
+        if ( plans.empty() && specialPlan ) {
+            addPlan( specialPlan, checkFirst );
+            return;
+        }
 
         // Table scan plan
         addPlan( QueryPlanPtr( new QueryPlan( d, -1, *_frsp, _originalFrsp.get(), _originalQuery, _order, _mustAssertOnYieldFailure ) ), checkFirst );
