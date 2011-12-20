@@ -243,8 +243,10 @@ __verify_tree(WT_SESSION_IMPL *session,
 	} else
 		__wt_get_addr(
 		    page->parent, page->parent_ref.ref, &addrbuf, &size);
-	WT_RET(__wt_block_buffer_to_addr(addrbuf, &addr, &size, NULL));
-	WT_RET(__verify_addfrag(session, addr, size, vs));
+	if (addrbuf != NULL) {
+		WT_RET(__wt_block_buffer_to_addr(addrbuf, &addr, &size, NULL));
+		WT_RET(__verify_addfrag(session, addr, size, vs));
+	}
 	}
 
 #ifdef HAVE_DIAGNOSTIC
