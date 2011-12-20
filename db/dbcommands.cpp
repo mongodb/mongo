@@ -811,6 +811,7 @@ namespace mongo {
             return replSettings.slave == SimpleSlave;
         }
         virtual bool slaveOverrideOk() { return true; }
+        virtual bool maintenanceOk() const { return false; }
         virtual bool adminOnly() const { return false; }
         virtual void help( stringstream& help ) const { help << "count objects in collection"; }
         virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
@@ -1834,6 +1835,12 @@ namespace mongo {
 
         if ( ! canRunHere ) {
             result.append( "errmsg" , "not master" );
+            result.append( "note" , "from execCommand" );
+            return false;
+        }
+
+        if ( ! c->maintenanceOk() && theReplSet && ! isMaster( dbname.c_str() ) && ! theReplSet->isSecondary() ) {
+            result.append( "errmsg" , "node is recovering" );
             result.append( "note" , "from execCommand" );
             return false;
         }
