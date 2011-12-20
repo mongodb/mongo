@@ -25,6 +25,8 @@
 
 namespace mongo {
     
+    extern bool useHints;
+    
     static const int OutOfOrderDocumentsAssertionCode = 14810;
         
     QueryPlanSelectionPolicy::Any QueryPlanSelectionPolicy::__any;
@@ -149,6 +151,7 @@ namespace mongo {
         }
         
         virtual void next() {
+
             mayAdvance();
             
             if ( _matchCounter.enoughCumulativeMatchesToChooseAPlan() ) {
@@ -307,7 +310,7 @@ namespace mongo {
             return _currOp->cursor()->indexKeyPattern();
         }
         
-        virtual bool supportGetMore() { return false; }
+        virtual bool supportGetMore() { return true; }
 
         virtual bool supportYields() { return _takeover ? _takeover->supportYields() : true; }
         
@@ -453,6 +456,7 @@ namespace mongo {
                 _currOp = qocop;
             }
             else if ( op->stopRequested() ) {
+                log() << "stop requested" << endl;
                 if ( qocop->cursor() ) {
                     // Ensure that prepareToTouchEarlierIterate() may be called safely when a BasicCursor takes over.
                     if ( !prevLoc.isNull() && prevLoc == qocop->currLoc() ) {
@@ -520,7 +524,8 @@ namespace mongo {
                                                             const BSONObj &order,
                                                             const QueryPlanSelectionPolicy
                                                             &planPolicy,
-                                                            bool *simpleEqualityMatch ) {
+                                                            bool *simpleEqualityMatch,
+                                                            const ParsedQuery *parsedQuery ) {
         if ( simpleEqualityMatch ) {
             *simpleEqualityMatch = false;
         }
@@ -528,22 +533,54 @@ namespace mongo {
             // TODO This will not use a covered index currently.
             return theDataFileMgr.findAll( ns );
         }
-        if ( planPolicy.permitOptimalIdPlan() && isSimpleIdQuery( query ) ) {
-            Database *database = cc().database();
-            verify( 15985, database );
-            NamespaceDetails *d = database->namespaceIndex.details(ns);
+
+        BSONElement hint = (useHints && parsedQuery) ? parsedQuery->getHint() : BSONElement();
+        bool snapshot = parsedQuery && parsedQuery->isSnapshot();
+
+        BSONObj snapshotHint; // put here to keep the data in scope
+        if( snapshot ) {
+            NamespaceDetails *d = nsdetails(ns);
             if ( d ) {
-                int idxNo = d->findIdIndex();
-                if ( idxNo >= 0 ) {
-                    IndexDetails& i = d->idx( idxNo );
-                    BSONObj key = i.getKeyFromQuery( query );
-                    return shared_ptr<Cursor>( BtreeCursor::make( d, idxNo, i, key, key, true, 1 ) );
+                int i = d->findIdIndex();
+                if( i < 0 ) {
+                    if ( strstr( ns , ".system." ) == 0 )
+                        log() << "warning: no _id index on $snapshot query, ns:" << ns << endl;
+                }
+                else {
+                    /* [dm] the name of an _id index tends to vary, so we build the hint the hard way here.
+                     probably need a better way to specify "use the _id index" as a hint.  if someone is
+                     in the query optimizer please fix this then!
+                     */
+                    BSONObjBuilder b;
+                    b.append("$hint", d->idx(i).indexName());
+                    snapshotHint = b.obj();
+                    hint = snapshotHint.firstElement();
                 }
             }
         }
-        auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order,
-                                                             planPolicy.planHint( ns ) ) ); // mayYield == false
-        const QueryPlan *singlePlan = mps->singlePlan();
+
+        bool mayShortcutQueryOptimizer = !parsedQuery || ( parsedQuery->getMin().isEmpty() && parsedQuery->getMax().isEmpty() );
+        if ( mayShortcutQueryOptimizer ) {
+            if ( query.isEmpty() && order.isEmpty() ) {
+                // TODO This will not use a covered index currently.
+                return theDataFileMgr.findAll( ns );
+            }
+            if ( planPolicy.permitOptimalIdPlan() && isSimpleIdQuery( query ) ) {
+                Database *database = cc().database();
+                verify( 15985, database );
+                NamespaceDetails *d = database->namespaceIndex.details(ns);
+                if ( d ) {
+                    int idxNo = d->findIdIndex();
+                    if ( idxNo >= 0 ) {
+                        IndexDetails& i = d->idx( idxNo );
+                        BSONObj key = i.getKeyFromQuery( query );
+                        return shared_ptr<Cursor>( BtreeCursor::make( d, idxNo, i, key, key, true, 1 ) );
+                    }
+                }
+            }
+        }
+        auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order, &hint, false, parsedQuery ? parsedQuery->getMin() : BSONObj(), parsedQuery ? parsedQuery->getMax() : BSONObj() ) ); // mayYield == false
+        const QueryPlan *singlePlan = mps->singleCursor();
         if ( singlePlan ) {
             if ( planPolicy.permitPlan( *singlePlan ) ) {
                 shared_ptr<Cursor> single = singlePlan->newCursor();

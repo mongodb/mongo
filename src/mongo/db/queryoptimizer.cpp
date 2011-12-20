@@ -579,6 +579,7 @@ doneCheckOrder:
 
         // Table scan plan
         addPlan( QueryPlanPtr( new QueryPlan( d, -1, *_frsp, _originalFrsp.get(), _originalQuery, _order, _mustAssertOnYieldFailure ) ), checkFirst );
+
         _mayRecordPlan = true;
     }
 
@@ -1039,7 +1040,10 @@ doneCheckOrder:
     }
 
     const QueryPlan *MultiPlanScanner::singlePlan() const {
-        if ( _or || _currentQps->nPlans() != 1 || _currentQps->firstPlan()->scanAndOrderRequired() || _currentQps->usingCachedPlan() ) {
+        if ( _or ||
+            _currentQps->nPlans() != 1 ||
+            _currentQps->firstPlan()->scanAndOrderRequired() ||
+            _currentQps->usingCachedPlan() ) {
             return 0;
         }
         return _currentQps->firstPlan().get();

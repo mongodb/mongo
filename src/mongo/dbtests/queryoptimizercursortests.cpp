@@ -2387,6 +2387,40 @@ namespace QueryOptimizerCursorTests {
             }
         };
         
+        class BestSavedOptimal : public QueryOptimizerCursorTests::Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "_id" << 1 ) );
+                _cli.ensureIndex( ns(), BSON( "_id" << 1 << "q" << 1 ) );
+                // {_id:1} index not recorded for these queries since it is an optimal index.
+                ASSERT( _cli.query( ns(), QUERY( "_id" << GT << 0 ) )->more() );
+                ASSERT( _cli.query( ns(), QUERY( "$or" << BSON_ARRAY( BSON( "_id" << GT << 0 ) ) ) )->more() );
+                dblock lk;
+                Client::Context ctx( ns() );
+                // Check that no plan was recorded for this query.
+                ASSERT( BSONObj().woCompare( NamespaceDetailsTransient::get_inlock( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "_id" << GT << 0 ), true ).pattern() ) ) == 0 );
+                shared_ptr<Cursor> c = NamespaceDetailsTransient::getCursor( ns(), BSON( "_id" << GT << 0 ) );
+                // No need for query optimizer cursor since the plan is optimal.
+                ASSERT_EQUALS( "BtreeCursor _id_", c->toString() );
+            }
+        };
+        
+        class BestSavedNotOptimal : public QueryOptimizerCursorTests::Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "_id" << 1 << "q" << 1 ) );
+                _cli.ensureIndex( ns(), BSON( "q" << 1 ) );
+                // Record {_id:1} index for this query
+                ASSERT( _cli.query( ns(), QUERY( "q" << 1 << "_id" << 1 ) )->more() );
+                dblock lk;
+                Client::Context ctx( ns() );
+                ASSERT( BSON( "_id" << 1 ).woCompare( NamespaceDetailsTransient::get_inlock( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "q" << 1 << "_id" << 1 ), true ).pattern() ) ) == 0 );
+                shared_ptr<Cursor> c = NamespaceDetailsTransient::getCursor( ns(), BSON( "q" << 1 << "_id" << 1 ) );
+                // Need query optimizer cursor since the cached plan is not optimal.
+                ASSERT_EQUALS( "QueryOptimizerCursor", c->toString() );
+            }
+        };
+        
         class MultiIndex : public Base {
         public:
             MultiIndex() {

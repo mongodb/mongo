@@ -23,14 +23,11 @@
 #include "../dbmessage.h"
 #include "../jsobj.h"
 #include "../diskloc.h"
-#include "../projection.h"
 
 // struct QueryOptions, QueryResult, QueryResultFlags in:
 #include "../../client/dbclient.h"
 
 namespace mongo {
-
-    extern const int MaxBytesToReturnToClientAtOnce;
 
     QueryResult* processGetMore(const char *ns, int ntoreturn, long long cursorid , CurOp& op, int pass, bool& exhaust);
 

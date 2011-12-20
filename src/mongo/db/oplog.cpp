@@ -536,6 +536,24 @@ namespace mongo {
         _findingStartMode = Initial;
     }
     
+    shared_ptr<Cursor> FindingStartCursor::getCursor( const char *ns, const BSONObj &query, const BSONObj &order ) {
+        NamespaceDetails *d = nsdetails(ns);
+        assert(d); // !!! what if ns not present
+        FieldRangeSetPair frsp = * new FieldRangeSetPair( ns, query );
+        QueryPlan &oplogPlan = * new QueryPlan( d, -1, frsp, 0, query, order, false ); // cursor isn't going to own this, make memory ownership ok/clearer
+        FindingStartCursor finder( oplogPlan );
+        while( !finder.done() ) {
+//            RARELY { // !!! want multiple to yield simultaneously
+//                if ( finder.prepareToYield() ) {
+//                    ClientCursor::staticYield( -1, ns, 0 );
+//                    finder.recoverFromYield();
+//                }
+//            }
+            finder.next();
+        }
+        return finder.cursor();
+    }
+    
     // -------------------------------------
 
     struct TestOpTime : public UnitTest {

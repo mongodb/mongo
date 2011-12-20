@@ -646,6 +646,32 @@ namespace mongo {
         bool _yieldRecoveryFailed;
     };
 
+    class QueryResponseBuilder {
+    public:
+        QueryResponseBuilder( const ParsedQuery &parsedQuery ) : _buf(32768), _parsedQuery( parsedQuery ), _n() {
+            _buf.skip( sizeof( QueryResult ) );
+        }
+        void addResult( const DiskLoc &loc ) {
+            fillQueryResultFromObj( _buf, _parsedQuery.getFields(), loc.obj(), ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
+        }
+        bool enoughTotalResults() {
+            return ( _parsedQuery.enough( _n ) || _buf.len() >= MaxBytesToReturnToClientAtOnce );
+        }
+        bool enoughForFirstBatch() {
+            return _parsedQuery.enoughForFirstBatch( _n, _buf.len() );
+        }
+        void handoff( Message &result ) {
+            if ( _buf.len() > 0 ) {
+                result.appendData( _buf.buf(), _buf.len() );
+                _buf.decouple();
+            }
+        }
+    private:
+        BufBuilder _buf;
+        const ParsedQuery &_parsedQuery;
+        long long _n;
+    };
+    
     /* run a query -- includes checking for and running a Command \
        @return points to ns if exhaust mode. 0=normal mode
     */
@@ -780,6 +806,98 @@ namespace mongo {
                 qr->nReturned = n;
                 result.setData( qr.release(), true );
                 return NULL;
+            }
+        }
+        
+        {
+            shared_ptr<Cursor> cursor;
+            if ( pq.hasOption( QueryOption_OplogReplay ) ) {
+//                cursor = FindingStartCursor::getCursor( ns, query, order );
+            } else if ( order.isEmpty() && !pq.getFields() && !pq.isExplain() && !pq.returnKey() ) {
+                cursor = NamespaceDetailsTransient::getCursor( ns, query, BSONObj(), &pq );
+            }
+            if ( cursor ) {
+                QueryResponseBuilder queryResponseBuilder( pq );
+//                long long nscanned = 0;
+                long long skip = pq.getSkip();
+                long long cursorid = 0;
+                OpTime slaveReadTill;
+                ClientCursor::CleanupPointer ccPointer;
+                ccPointer.reset( new ClientCursor( QueryOption_NoCursorTimeout, cursor, ns ) );
+                while( cursor->ok() ) {
+//                    if ( !ccPointer->yieldSometimes( ClientCursor::MaybeCovered ) || !cursor->ok() ) {
+//                        break;
+//                    }
+
+                    if ( pq.getMaxScan() && cursor->nscanned() > pq.getMaxScan() ) {
+                        break;
+                    }
+                    
+                    if ( cursor->matcher() && !cursor->matcher()->matchesCurrent( cursor.get() ) ) {
+                        cursor->advance();
+                        continue;
+                    }
+                    
+                    DiskLoc currLoc = cursor->currLoc();
+                    if ( cursor->getsetdup( currLoc ) ) {
+                        cursor->advance();
+                        continue;
+                    }
+                    
+                    if ( skip > 0 ) {
+                        --skip;
+                        cursor->advance();
+                        continue;
+                    }
+
+                    BSONObj js = cursor->current();
+                    assert( js.isValid() );
+                    
+                    if ( pq.hasOption( QueryOption_OplogReplay ) ) {
+                        BSONElement e = js["ts"];
+                        if ( e.type() == Date || e.type() == Timestamp ) {
+                            slaveReadTill = e._opTime();
+                        }
+                    }
+                    
+                    queryResponseBuilder.addResult( currLoc );
+                    if ( !cursor->supportGetMore() ) {
+                        if ( queryResponseBuilder.enoughTotalResults() ) {
+                            log() << "enough n:" << n << endl;
+                            break;
+                        }
+                    }
+                    else if ( queryResponseBuilder.enoughForFirstBatch() ) {
+                        log() << "enough for first" << endl;
+                        /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
+                        if ( pq.wantMore() && pq.getNumToReturn() != 1 && useCursors ) {
+                            log() << "setting cursorid" << endl;
+                            cursor->advance();
+                            cursorid = ccPointer->cursorid();
+                        }
+                        break;
+                    }
+                    
+                    cursor->advance();
+                }
+                if ( cursorid == 0 ) {
+//                    ccPointer.reset();
+                    ccPointer.release();
+                } else {
+                    log() << "updating location" << endl;
+                    ccPointer->updateLocation();
+                    ccPointer.release();
+                }
+                queryResponseBuilder.handoff( result );
+                QueryResult *qr = (QueryResult *) result.header();
+                qr->cursorId = cursorid;
+                qr->setResultFlagsToOk();
+                // qr->len is updated automatically by appendData()
+                curop.debug().responseLength = qr->len;
+                qr->setOperation(opReply);
+                qr->startingFrom = 0;
+                qr->nReturned = n;
+                return 0;
             }
         }
 

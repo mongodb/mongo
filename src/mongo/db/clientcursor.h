@@ -139,6 +139,10 @@ namespace mongo {
             }
             operator bool() { return _c; }
             ClientCursor * operator-> () { return _c; }
+            void release() {
+                _c = 0;
+                _id = -1;
+            }
         private:
             ClientCursor *_c;
             CursorId _id;

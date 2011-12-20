@@ -829,39 +829,6 @@ namespace QueryOptimizerTests {
             }
         };
 
-        class TryOtherPlansBeforeFinish : public Base {
-        public:
-            void run() {
-                Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "a_1" );
-                for( int i = 0; i < 100; ++i ) {
-                    for( int j = 0; j < 2; ++j ) {
-                        BSONObj temp = BSON( "a" << 100 - i - 1 << "b" << i );
-                        theDataFileMgr.insertWithObjMod( ns(), temp );
-                    }
-                }
-                Message m;
-                // Need to return at least 2 records to cause plan to be recorded.
-                assembleRequest( ns(), QUERY( "b" << 0 << "a" << GTE << 0 ).obj, 2, 0, 0, 0, m );
-                stringstream ss;
-                {
-                    DbMessage d(m);
-                    QueryMessage q(d);
-                    runQuery( m, q);
-                }
-                ASSERT( BSON( "$natural" << 1 ).woCompare( NamespaceDetailsTransient::get_inlock( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ), true ).pattern() ) ) == 0 );
-
-                Message m2;
-                assembleRequest( ns(), QUERY( "b" << 99 << "a" << GTE << 0 ).obj, 2, 0, 0, 0, m2 );
-                {
-                    DbMessage d(m2);
-                    QueryMessage q(d);
-                    runQuery( m2, q);
-                }
-                ASSERT( BSON( "a" << 1 ).woCompare( NamespaceDetailsTransient::get_inlock( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ), true ).pattern() ) ) == 0 );
-                ASSERT_EQUALS( 3, NamespaceDetailsTransient::get_inlock( ns() ).nScannedForPattern( FieldRangeSet( ns(), BSON( "b" << 0 << "a" << GTE << 0 ), true ).pattern() ) );
-            }
-        };
-
         class InQueryIntervals : public Base {
         public:
             void run() {
@@ -1085,7 +1052,6 @@ namespace QueryOptimizerTests {
             add<QueryPlanSetTests::Delete>();
             add<QueryPlanSetTests::DeleteOneScan>();
             add<QueryPlanSetTests::DeleteOneIndex>();
-            add<QueryPlanSetTests::TryOtherPlansBeforeFinish>();
             add<QueryPlanSetTests::InQueryIntervals>();
             add<QueryPlanSetTests::EqualityThenIn>();
             add<QueryPlanSetTests::NotEqualityThenIn>();

@@ -27,8 +27,15 @@
 #include "../util/mongoutils/str.h"
 
 namespace mongo {
+
     static const unsigned maxCombinations = 4000000;
 
+    ParsedQuery::ParsedQuery( QueryMessage& qm )
+    : _ns( qm.ns ) , _ntoskip( qm.ntoskip ) , _ntoreturn( qm.ntoreturn ) , _options( qm.queryOptions ) {
+        init( qm.query );
+        initFields( qm.fields );
+    }
+    
     extern BSONObj staticNull;
     extern BSONObj staticUndefined;
 

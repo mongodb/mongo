@@ -472,7 +472,8 @@ namespace mongo {
                                             const BSONObj &order = BSONObj(),
                                             const QueryPlanSelectionPolicy &planPolicy =
                                             QueryPlanSelectionPolicy::any(),
-                                            bool *simpleEqualityMatch = 0 );
+                                            bool *simpleEqualityMatch = 0,
+                                            const ParsedQuery *parsedQuery = 0 );
 
         /**
          * @return a single cursor that may work well for the given query.
@@ -481,7 +482,7 @@ namespace mongo {
          * no suitable indices exist.
          */
         static shared_ptr<Cursor> bestGuessCursor( const char *ns, const BSONObj &query, const BSONObj &sort );
-        
+
         /* indexKeys() cache ---------------------------------------------------- */
         /* assumed to be in write lock for this */
     private:
