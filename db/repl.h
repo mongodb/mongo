@@ -58,10 +58,18 @@ namespace mongo {
         int slavedelay;
 
         set<string> discoveredSeeds;
+        mutex discoveredSeeds_mx;
+
         BSONObj reconfig;
 
         ReplSettings()
-            : slave(NotSlave) , master(false) , fastsync() , autoresync(false), slavedelay(), discoveredSeeds() {
+            : slave(NotSlave),
+            master(false),
+            fastsync(),
+            autoresync(false),
+            slavedelay(),
+            discoveredSeeds(),
+            discoveredSeeds_mx("ReplSettings::discoveredSeeds") {
         }
 
     };

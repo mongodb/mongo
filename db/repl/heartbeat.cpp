@@ -100,6 +100,7 @@ namespace mongo {
             if( theReplSet == 0 ) {
                 string from( cmdObj.getStringField("from") );
                 if( !from.empty() ) {
+                    scoped_lock lck( replSettings.discoveredSeeds_mx );
                     replSettings.discoveredSeeds.insert(from);
                 }
                 result.append("hbmsg", "still initializing");
