@@ -2,9 +2,11 @@
 #	List of source files for WiredTiger library.
 
 src/api/api_event.c
-src/api/api_version.c
 src/api/api_strerror.c
+src/api/api_version.c
 src/block/alloc.c
+src/block/bm_addr.c
+src/block/bm_slvg.c
 src/block/io.c
 src/btree/bt_bulk.c
 src/btree/bt_cache.c

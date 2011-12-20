@@ -8,96 +8,6 @@
 #include "wt_internal.h"
 
 /*
- * __wt_fsm_buffer_to_addr --
- *	Convert a filesystem address cookie into its components.
- */
-int
-__wt_fsm_buffer_to_addr(
-    const uint8_t *p, uint32_t *addr, uint32_t *size, uint32_t *cksum)
-{
-	uint64_t a;
-
-	WT_RET(__wt_vunpack_uint(&p, 0, &a));
-	if (addr != NULL)
-		*addr = (uint32_t)a;
-
-	WT_RET(__wt_vunpack_uint(&p, 0, &a));
-	if (size != NULL)
-		*size = (uint32_t)a;
-
-	/* Minor optimization: we often don't want the checksum. */
-	if (cksum != NULL) {
-		WT_RET(__wt_vunpack_uint(&p, 0, &a));
-		*cksum = (uint32_t)a;
-	}
-
-	return (0);
-}
-
-/*
- * __wt_fsm_addr_to_buffer --
- *	Convert the filesystem components into its address cookie.
- */
-int
-__wt_fsm_addr_to_buffer(
-    uint8_t **p, uint32_t addr, uint32_t size, uint32_t cksum)
-{
-	uint64_t a;
-
-	a = addr;
-	WT_RET(__wt_vpack_uint(p, 0, a));
-	a = size;
-	WT_RET(__wt_vpack_uint(p, 0, a));
-	a = cksum;
-	WT_RET(__wt_vpack_uint(p, 0, a));
-	return (0);
-}
-
-/*
- * __wt_fsm_valid --
- *	Return if a filesystem address cookie is valid for the file.
- */
-int
-__wt_fsm_valid(
-    WT_SESSION_IMPL *session, const uint8_t *addrbuf, uint32_t addrbuf_size)
-{
-	WT_BTREE *btree;
-	uint32_t addr, size;
-
-	btree = session->btree;
-
-	/* Crack the cookie. */
-	WT_UNUSED(addrbuf_size);
-	WT_RET(__wt_fsm_buffer_to_addr(addrbuf, &addr, &size, NULL));
-
-	/* All we care about is if it's past the end of the file. */
-	return ((WT_ADDR_TO_OFF(btree, addr) +
-	    (off_t)size > btree->fh->file_size) ? 0 : 1);
-}
-
-/*
- * __wt_fsm_addr_string
- *	Return a printable string representation of a filesystem address cookie.
- */
-int
-__wt_fsm_addr_string(WT_SESSION_IMPL *session,
-    WT_BUF *buf, const uint8_t *addrbuf, uint32_t addrbuf_size)
-{
-	uint32_t addr, size;
-
-	/* Crack the cookie. */
-	WT_UNUSED(addrbuf_size);
-	WT_RET(__wt_fsm_buffer_to_addr(addrbuf, &addr, &size, NULL));
-
-	/* Printable representation. */
-	WT_RET(__wt_buf_fmt(session, buf,
-	    "[%" PRIu32 "-%" PRIu32 ", %" PRIu32 "]",
-	    addr, addr + (size / 512 - 1), size));
-
-	return (0);
-}
-
-/*
  * __wt_block_read --
  *	Read a address cookie-referenced block into a buffer.
  */
@@ -113,20 +23,20 @@ __wt_block_read(WT_SESSION_IMPL *session,
 
 	/* Crack the cookie. */
 	WT_UNUSED(addrbuf_size);
-	WT_RET(__wt_fsm_buffer_to_addr(addrbuf, &addr, &size, &cksum));
+	WT_RET(__wt_bm_buffer_to_addr(addrbuf, &addr, &size, &cksum));
 
 	/* Re-size the buffer as necessary. */
 	WT_RET(__wt_buf_initsize(session, buf, size));
 
 	/* Read the block. */
-	WT_RET(__wt_fsm_read(session, buf, addr, size, cksum));
+	WT_RET(__wt_bm_read(session, buf, addr, size, cksum));
 
-	/* Optionally verify the page: used by salvage and verify. */
+	/* Optionally verify the page: used by verify. */
 	if (!LF_ISSET(WT_VERIFY))
 		return (0);
 
 	WT_RET(__wt_scr_alloc(session, 0, &tmp));
-	WT_ERR(__wt_fsm_addr_string(session, tmp, addrbuf, addrbuf_size));
+	WT_ERR(__wt_bm_addr_string(session, tmp, addrbuf, addrbuf_size));
 	WT_ERR(__wt_verify_dsk(
 	    session, (char *)tmp->data, buf->mem, buf->size));
 
@@ -148,11 +58,11 @@ err:	__wt_scr_free(&tmp);
 #define	COMPRESS_SKIP    32
 
 /*
- * __wt_fsm_read --
+ * __wt_bm_read --
  *	Read a block into a buffer.
  */
 int
-__wt_fsm_read(WT_SESSION_IMPL *session,
+__wt_bm_read(WT_SESSION_IMPL *session,
     WT_BUF *buf, uint32_t addr, uint32_t size, uint32_t cksum)
 {
 	WT_BTREE *btree;
@@ -233,22 +143,22 @@ __wt_block_write(WT_SESSION_IMPL *session,
 	WT_ASSERT(session, __wt_verify_dsk(
 	    session, "[NoAddr]", (WT_PAGE_DISK *)buf->data, buf->size) == 0);
 
-	WT_RET(__wt_fsm_write(session, buf, &addr, &size, &cksum));
+	WT_RET(__wt_bm_write(session, buf, &addr, &size, &cksum));
 
 	endp = addrbuf;
-	WT_RET(__wt_fsm_addr_to_buffer(&endp, addr, size, cksum));
+	WT_RET(__wt_bm_addr_to_buffer(&endp, addr, size, cksum));
 	*addrbuf_size = WT_PTRDIFF32(endp, addrbuf);
 
 	return (0);
 }
 
 /*
- * __wt_fsm_write --
+ * __wt_bm_write --
  *	Write a buffer into a block, returning the block's addr, size and
  * checksum.
  */
 int
-__wt_fsm_write(WT_SESSION_IMPL *session,
+__wt_bm_write(WT_SESSION_IMPL *session,
     WT_BUF *buf, uint32_t *addrp, uint32_t *sizep, uint32_t *cksump)
 {
 	WT_ITEM src, dst;

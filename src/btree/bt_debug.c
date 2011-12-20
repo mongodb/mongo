@@ -190,7 +190,7 @@ __wt_debug_addr(
 	ret = 0;
 
 	WT_RET(__wt_scr_alloc(session, size, &buf));
-	WT_ERR(__wt_fsm_read(session, buf, addr, size, 0));
+	WT_ERR(__wt_bm_read(session, buf, addr, size, 0));
 	ret = __wt_debug_disk(session, buf->mem, ofile);
 err:	__wt_scr_free(&buf);
 
@@ -881,7 +881,7 @@ __debug_cell(WT_DBG *ds, WT_PAGE_DISK *dsk, WT_CELL_UNPACK *unpack)
 	case WT_CELL_KEY_OVFL:
 	case WT_CELL_VALUE_OVFL:
 		WT_RET(__wt_scr_alloc(session, 64, &buf));
-		if ((ret = __wt_fsm_addr_string(
+		if ((ret = __wt_bm_addr_string(
 		    session, buf, unpack->data, unpack->size)) == 0)
 			__dmsg(ds, ", %s %s",
 			    unpack->type == WT_CELL_ADDR ? "addr" : "ovfl",

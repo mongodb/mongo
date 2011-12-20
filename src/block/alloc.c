@@ -9,7 +9,6 @@
 
 static void __block_discard(WT_SESSION_IMPL *);
 static int  __block_extend(WT_SESSION_IMPL *, uint32_t *, uint32_t);
-static int  __block_free(WT_SESSION_IMPL *, uint32_t, uint32_t);
 static int  __block_truncate(WT_SESSION_IMPL *);
 
 /*
@@ -165,23 +164,23 @@ __block_extend(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
  */
 int
 __wt_block_free(
-    WT_SESSION_IMPL *session, uint8_t *addrbuf, uint32_t addrbuf_size)
+    WT_SESSION_IMPL *session, const uint8_t *addrbuf, uint32_t addrbuf_size)
 {
 	uint32_t addr, size;
 
 	/* Crack the cookie. */
 	WT_UNUSED(addrbuf_size);
-	WT_RET(__wt_fsm_buffer_to_addr(addrbuf, &addr, &size, NULL));
+	WT_RET(__wt_bm_buffer_to_addr(addrbuf, &addr, &size, NULL));
 
-	return (__block_free(session, addr, size));
+	return (__wt_bm_block_free(session, addr, size));
 }
 
 /*
- * __block_free --
+ * __wt_bm_block_free --
  *	Free a chunk of space to the underlying file.
  */
-static int
-__block_free(WT_SESSION_IMPL *session, uint32_t addr, uint32_t size)
+int
+__wt_bm_block_free(WT_SESSION_IMPL *session, uint32_t addr, uint32_t size)
 {
 	WT_BTREE *btree;
 	WT_FREE_ENTRY *fe, *new;
@@ -366,19 +365,19 @@ __wt_block_freelist_read(WT_SESSION_IMPL *session)
 		return (0);
 
 	WT_RET(__wt_scr_alloc(session, btree->free_size, &tmp));
-	WT_ERR(__wt_fsm_read(
+	WT_ERR(__wt_bm_read(
 	    session, tmp, btree->free_addr, btree->free_size, 0));
 
 	/* Insert the free-list items into the linked list. */
 	for (p = (uint32_t *)WT_PAGE_DISK_BYTE(tmp->mem);
 	    *p != WT_ADDR_INVALID; p += 2)
-		WT_ERR(__block_free(session, p[0], p[1]));
+		WT_ERR(__wt_bm_block_free(session, p[0], p[1]));
 
 	/*
 	 * Insert the free-list itself into the linked list, but don't clear
 	 * the values, if the free-list is never modified, we don't write it.
 	 */
-	WT_ERR(__block_free(session, btree->free_addr, btree->free_size));
+	WT_ERR(__wt_bm_block_free(session, btree->free_addr, btree->free_size));
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
@@ -465,7 +464,7 @@ __wt_block_freelist_write(WT_SESSION_IMPL *session)
 	__block_discard(session);
 
 	/* Write the free list to disk. */
-	WT_ERR(__wt_fsm_write(session, tmp, &addr, &size, &cksum));
+	WT_ERR(__wt_bm_write(session, tmp, &addr, &size, &cksum));
 
 	/* Update the file's meta-data. */
 	btree->free_addr = addr;

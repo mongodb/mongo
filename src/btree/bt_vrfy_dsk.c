@@ -217,7 +217,7 @@ __verify_dsk_row(WT_SESSION_IMPL *session,
 		case WT_CELL_ADDR:
 		case WT_CELL_KEY_OVFL:
 		case WT_CELL_VALUE_OVFL:
-			if (!__wt_fsm_valid(
+			if (!__wt_bm_addr_valid(
 			    session, unpack->data, unpack->size))
 				goto eof;
 			break;
@@ -389,7 +389,7 @@ __verify_dsk_col_int(WT_SESSION_IMPL *session,
 		    session, cell_num, addr, unpack->raw, dsk->type));
 
 		/* Check if any referenced item is entirely in the file. */
-		if (!__wt_fsm_valid(session, unpack->data, unpack->size))
+		if (!__wt_bm_addr_valid(session, unpack->data, unpack->size))
 			return (__err_eof(session, cell_num, addr));
 	}
 
@@ -455,7 +455,7 @@ __verify_dsk_col_var(WT_SESSION_IMPL *session,
 		/* Check if any referenced item is entirely in the file.
 		 */
 		if (cell_type == WT_CELL_VALUE_OVFL &&
-		    !__wt_fsm_valid(session, unpack->data, unpack->size))
+		    !__wt_bm_addr_valid(session, unpack->data, unpack->size))
 			return (__err_eof(session, cell_num, addr));
 
 		/*

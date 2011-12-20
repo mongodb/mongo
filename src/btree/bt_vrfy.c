@@ -243,7 +243,7 @@ __verify_tree(WT_SESSION_IMPL *session,
 	} else
 		__wt_get_addr(
 		    page->parent, page->parent_ref.ref, &addrbuf, &size);
-	WT_RET(__wt_fsm_buffer_to_addr(addrbuf, &addr, &size, NULL));
+	WT_RET(__wt_bm_buffer_to_addr(addrbuf, &addr, &size, NULL));
 	WT_RET(__verify_addfrag(session, addr, size, vs));
 	}
 
@@ -330,7 +330,7 @@ recno_chk:	if (parent_recno != recno) {
 			if (cref->recno != vs->record_total + 1) {
 				WT_RET(__wt_scr_alloc(session, 0, &tmp));
 				__wt_cell_unpack(cref->ref.addr, unpack);
-				ret = __wt_fsm_addr_string(
+				ret = __wt_bm_addr_string(
 				    session, tmp, unpack->data, unpack->size);
 				__wt_errx(session, "page at %s has a starting "
 				    "record of %" PRIu64 " when the expected "
@@ -550,7 +550,7 @@ __verify_overflow(WT_SESSION_IMPL *session,
 	/* XXX */
 	{
 	uint32_t addr, size, cksum;
-	WT_RET(__wt_fsm_buffer_to_addr(addrbuf, &addr, &size, &cksum));
+	WT_RET(__wt_bm_buffer_to_addr(addrbuf, &addr, &size, &cksum));
 	WT_RET(__verify_addfrag(session, addr, size, vs));
 	}
 

@@ -102,7 +102,7 @@ __wt_addr_string(
 	if (addr == NULL) {
 		buf->data = "[NoAddr]";
 		buf->size = WT_STORE_SIZE(strlen("[NoAddr]"));
-	} else if (__wt_fsm_addr_string(session, buf, addr, size) != 0) {
+	} else if (__wt_bm_addr_string(session, buf, addr, size) != 0) {
 		buf->data = "[Error]";
 		buf->size = WT_STORE_SIZE(strlen("[Error]"));
 	}
