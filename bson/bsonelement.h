@@ -184,9 +184,9 @@ namespace mongo {
 
         /** Return double value for this field. MUST be NumberDouble type. */
         double _numberDouble() const {return *reinterpret_cast< const double* >( value() ); }
-        /** Return double value for this field. MUST be NumberInt type. */
+        /** Return int value for this field. MUST be NumberInt type. */
         int _numberInt() const {return *reinterpret_cast< const int* >( value() ); }
-        /** Return double value for this field. MUST be NumberLong type. */
+        /** Return long long value for this field. MUST be NumberLong type. */
         long long _numberLong() const {return *reinterpret_cast< const long long* >( value() ); }
 
         /** Retrieve int value for the element safely.  Zero returned if not a number. */

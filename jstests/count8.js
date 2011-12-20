@@ -19,9 +19,9 @@ function checkYield( dropCollection, fastCount, query ) {
         db.getLastError();
 
         if ( dropCollection ) {
-            p = startParallelShell( 'sleep( 100 ); db.jstests_count8.drop(); db.getLastError();' );
+            p = startParallelShell( 'sleep( 30 ); db.jstests_count8.drop(); db.getLastError();' );
         } else {
-            p = startParallelShell( 'sleep( 100 ); db.jstests_count8.update( {$atomic:true}, {$set:{a:-1}}, false, true ); db.getLastError();' );
+            p = startParallelShell( 'sleep( 30 ); db.jstests_count8.update( {$atomic:true}, {$set:{a:-1}}, false, true ); db.getLastError();' );
         }
 
         printjson( query );
