@@ -102,7 +102,6 @@ static void __slvg_col_range_missing(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_col_range_overlap(
 		WT_SESSION_IMPL *, uint32_t, uint32_t, WT_STUFF *);
 static void __slvg_col_trk_update_start(uint32_t, WT_STUFF *);
-static int  __slvg_empty(WT_SESSION_IMPL *);
 static int  __slvg_merge_block_free(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_ovfl_compare(const void *, const void *);
 static int  __slvg_ovfl_discard(WT_SESSION_IMPL *, WT_STUFF *);
@@ -150,12 +149,12 @@ __salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_BTREE *btree;
 	WT_STUFF *ss, stuff;
 	uint32_t i, leaf_cnt;
-	int ret;
+	int ret, started;
 
 	WT_UNUSED(cfg);
 
 	btree = session->btree;
-	ret = 0;
+	ret = started = 0;
 
 				/* Set "silent on format error" flag. */
 	F_SET(session, WT_SESSION_SALVAGE_QUIET_ERR);
@@ -172,29 +171,33 @@ __salvage(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/*
 	 * Step 1:
+	 * Inform the underlying block manager that we're salvaging the file.
+	 */
+	WT_ERR(__wt_bm_slvg_start(session));
+	started = 1;
+
+	/*
+	 * Step 2:
 	 * Read the file and build in-memory structures that reference any leaf
 	 * or overflow page.  Any pages other than leaf or overflow pages are
 	 * added to the free list.
 	 */
 	WT_ERR(__slvg_read(session, ss));
-	if (ss->pages_next == 0)
-		WT_ERR(__slvg_empty(session));
-
-	/*
-	 * Step 2:
-	 * Review the relationships between the pages and the overflow items.
-	 */
-	if (ss->ovfl_next != 0)
-		WT_ERR(__slvg_ovfl_reconcile(session, ss));
 
 	/*
 	 * Step 3:
+	 * Review the relationships between the pages and the overflow items.
+	 *
+	 * Step 4:
 	 * Add unreferenced overflow page blocks to the free list.
 	 */
-	WT_ERR(__slvg_ovfl_discard(session, ss));
+	if (ss->ovfl_next != 0) {
+		WT_ERR(__slvg_ovfl_reconcile(session, ss));
+		WT_ERR(__slvg_ovfl_discard(session, ss));
+	}
 
 	/*
-	 * Step 4:
+	 * Step 5:
 	 * Walk the list of pages looking for overlapping ranges to resolve.
 	 * If we find a range that needs to be resolved, set a global flag
 	 * and a per WT_TRACK flag on the pages requiring modification.
@@ -220,7 +223,7 @@ __salvage(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(__slvg_col_range(session, ss));
 
 	/*
-	 * Step 5:
+	 * Step 6:
 	 * We may have lost key ranges in column-store databases, that is, some
 	 * part of the record number space is gone.   Look for missing ranges.
 	 */
@@ -234,32 +237,31 @@ __salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 
 	/*
+	 * Step 7:
+	 * Build an internal page that references all of the leaf pages,
+	 * and write it, as well as any merged pages, to the file.
+	 *
 	 * Count how many leaf pages we have (we could track this during the
 	 * array shuffling/splitting, but that's a lot harder).
 	 */
 	for (leaf_cnt = i = 0; i < ss->pages_next; ++i)
 		if (ss->pages[i] != NULL)
 			++leaf_cnt;
-	if (leaf_cnt == 0)
-		WT_ERR(__slvg_empty(session));
+	if (leaf_cnt != 0)
+		switch (ss->page_type) {
+		case WT_PAGE_COL_FIX:
+		case WT_PAGE_COL_VAR:
+			WT_ERR(
+			    __slvg_col_build_internal(session, leaf_cnt, ss));
+			break;
+		case WT_PAGE_ROW_LEAF:
+			WT_ERR(
+			    __slvg_row_build_internal(session, leaf_cnt, ss));
+			break;
+		}
 
 	/*
-	 * Step 6:
-	 * Build an internal page that references all of the leaf pages, and
-	 * write it, as well as any merged pages, to the file.
-	 */
-	switch (ss->page_type) {
-	case WT_PAGE_COL_FIX:
-	case WT_PAGE_COL_VAR:
-		WT_ERR(__slvg_col_build_internal(session, leaf_cnt, ss));
-		break;
-	case WT_PAGE_ROW_LEAF:
-		WT_ERR(__slvg_row_build_internal(session, leaf_cnt, ss));
-		break;
-	}
-
-	/*
-	 * Step 7:
+	 * Step 8:
 	 * If we had to merge key ranges, we have to do a final pass through
 	 * the leaf page array and discard file pages used during key merges.
 	 * We can't do it earlier: if we free'd the leaf pages we're merging as
@@ -273,13 +275,20 @@ __salvage(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(__slvg_merge_block_free(session, ss));
 
 	/*
-	 * Step 8:
+	 * Step 9:
 	 * Write out a file description block (closing the file will update it
 	 * with the correct values).
 	 */
 	WT_ERR(__wt_desc_write(session, btree->fh));
 
-err:	/* Discard the leaf and overflow page memory. */
+	/*
+	 * Step 10:
+	 * Inform the underlying block manager that we're done.
+	 */
+err:	if (started)
+		WT_TRET(__wt_bm_slvg_end(session, ret == 0 ? 0 : 1));
+
+	/* Discard the leaf and overflow page memory. */
 	WT_TRET(__slvg_cleanup(session, ss));
 
 	/* Discard temporary buffers. */
@@ -296,19 +305,6 @@ err:	/* Discard the leaf and overflow page memory. */
 }
 
 /*
- * __slvg_empty --
- *	Standard didn't find anything message.
- */
-static int
-__slvg_empty(WT_SESSION_IMPL *session)
-{
-	__wt_errx(session,
-	    "the file contains no recoverable leaf pages and cannot be "
-	    "salvaged");
-	return (WT_ERROR);
-}
-
-/*
  * __slvg_read --
  *	Read the file and build a table of the pages we can use.
  */
@@ -320,17 +316,15 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	WT_PAGE_DISK *dsk;
 	uint32_t addrbuf_size;
 	uint8_t addrbuf[WT_BM_MAX_ADDR_COOKIE];
-	int eof, ret, started;
+	int eof, ret;
 
 	btree = session->btree;
-	ret = started = 0;
+	ret = 0;
 
 	as = buf = NULL;
 	WT_ERR(__wt_scr_alloc(session, 0, &as));
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 
-	WT_ERR(__wt_bm_slvg_start(session));
-	started = 1;
 	for (;;) {
 		WT_ERR(__wt_bm_slvg_next(
 		    session, buf, addrbuf, &addrbuf_size, &eof));
@@ -430,9 +424,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		}
 	}
 
-err:	if (started)
-		WT_TRET(__wt_bm_slvg_end(session, ret == 0 ? 0 : 1));
-	__wt_scr_free(&as);
+err:	__wt_scr_free(&as);
 	__wt_scr_free(&buf);
 
 	return (ret);
