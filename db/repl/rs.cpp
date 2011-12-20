@@ -464,7 +464,13 @@ namespace mongo {
             }
             if( me == 0 ) {
                 _members.orphanAll();
-                // hbs must continue to pick up new config
+
+                // sending hbs must continue to pick up new config, so we leave
+                // hb threads alone
+
+                // close sockets to force clients to re-evaluate this member
+                MessagingPort::closeAllSockets(0);
+
                 // stop sync thread
                 box.set(MemberState::RS_STARTUP, 0);
 

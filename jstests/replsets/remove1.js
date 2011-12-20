@@ -33,19 +33,25 @@ var config = replTest.getReplSetConfig();
 
 config.members.pop();
 config.version = 2;
-assert.soon(function() {
-        try {
-            master.getDB("admin").runCommand({replSetReconfig:config});
-        }
-        catch(e) {
-            print(e);
-        }
 
-        reconnect(master);
-        reconnect(replTest.nodes[1]);
+assert.eq(replTest.nodes[1].getDB("admin").runCommand({ping:1}).ok, 1, "we are connected to node[1]");
+
+try {
+    master.getDB("admin").runCommand({replSetReconfig:config});
+}
+catch(e) {
+    print(e);
+}
+
+assert.throws(replTest.nodes[1].getDB("admin").runCommand({ping:1}).ok, 1, "we are not connected to node[1]");
+assert.eq(replTest.nodes[1].getDB("admin").runCommand({ping:1}).ok, 1, "we are connected to node[1]");
+
+reconnect(master);
+
+assert.soon(function() {
         var c = master.getDB("local").system.replset.findOne();
         return c.version == 2;
-    });
+});
 
 print("Add it back as a slave");
 config.members.push({_id:1, host : host+":"+replTest.getPort(1)});
