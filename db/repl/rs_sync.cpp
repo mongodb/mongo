@@ -177,7 +177,10 @@ namespace mongo {
                 getDur().commitIfNeeded();
             }
             catch (DBException& e) {
-                // skip duplicate key exceptions
+                // Skip duplicate key exceptions.
+                // These are relatively common on initial sync: if a document is inserted
+                // early in the clone step, the insert will be replayed but the document
+                // will probably already have been cloned over.
                 if( e.getCode() == 11000 || e.getCode() == 11001 || e.getCode() == 12582) {
                     continue;
                 }
