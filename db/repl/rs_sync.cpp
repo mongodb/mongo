@@ -178,7 +178,7 @@ namespace mongo {
             }
             catch (DBException& e) {
                 // skip duplicate key exceptions
-                if( e.getCode() == 11000 || e.getCode() == 11001 ) {
+                if( e.getCode() == 11000 || e.getCode() == 11001 || e.getCode() == 12582) {
                     continue;
                 }
                 
