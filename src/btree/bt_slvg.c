@@ -320,15 +320,17 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	WT_PAGE_DISK *dsk;
 	uint32_t addrbuf_size;
 	uint8_t addrbuf[WT_BM_MAX_ADDR_COOKIE];
-	int eof, ret;
+	int eof, ret, started;
 
 	btree = session->btree;
-	ret = 0;
+	ret = started = 0;
 
-	buf = ss->tmp1;			/* More useful names, that's all. */
-	as = ss->tmp2;
+	as = buf = NULL;
+	WT_ERR(__wt_scr_alloc(session, 0, &as));
+	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 
 	WT_ERR(__wt_bm_slvg_start(session));
+	started = 1;
 	for (;;) {
 		WT_ERR(__wt_bm_slvg_next(
 		    session, buf, addrbuf, &addrbuf_size, &eof));
@@ -341,9 +343,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 			__wt_progress(session, NULL, ss->fcnt);
 
 		/* Create a printable version of the address. */
-		if (WT_VERBOSE_ISSET(session, salvage))
-			WT_ERR(__wt_bm_addr_string(
-			    session, as, addrbuf, addrbuf_size));
+		WT_ERR(__wt_bm_addr_string(session, as, addrbuf, addrbuf_size));
 
 		/*
 		 * After reading the file, we write pages in order to resolve
@@ -430,7 +430,10 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		}
 	}
 
-err:	WT_TRET(__wt_bm_slvg_end(session, ret == 0 ? 0 : 1));
+err:	if (started)
+		WT_TRET(__wt_bm_slvg_end(session, ret == 0 ? 0 : 1));
+	__wt_scr_free(&as);
+	__wt_scr_free(&buf);
 
 	return (ret);
 }
