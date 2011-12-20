@@ -166,7 +166,7 @@ namespace mongo {
         could cause, such as duplicate key, disk full, etc.
     */
     void uasserted(int msgid, const char *msg) MONGO_NORETURN;
-    inline void uasserted(int msgid , string msg) { uasserted(msgid, msg.c_str()); }
+    void uasserted(int msgid , const string &msg);
 
     /** reported via lasterror, but don't throw exception */
     void uassert_nothrow(const char *msg);
@@ -177,7 +177,7 @@ namespace mongo {
     void msgassertedNoTrace(int msgid, const char *msg) MONGO_NORETURN;
     inline void msgassertedNoTrace(int msgid, const string& msg) { msgassertedNoTrace( msgid , msg.c_str() ); }
     void msgasserted(int msgid, const char *msg) MONGO_NORETURN;
-    inline void msgasserted(int msgid, string msg) { msgasserted(msgid, msg.c_str()); }
+    void msgasserted(int msgid, const string &msg);
 
     /* convert various types of exceptions to strings */
     inline string causedBy( const char* e ){ return (string)" :: caused by :: " + e; }

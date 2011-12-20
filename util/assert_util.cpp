@@ -129,11 +129,19 @@ namespace mongo {
         raiseError(0,msg);
     }
 
+    void uasserted(int msgid , const string &msg) {
+        uasserted(msgid, msg.c_str());
+    }
+
     NOINLINE_DECL void uasserted(int msgid, const char *msg) {
         assertionCount.condrollover( ++assertionCount.user );
         LOG(1) << "User Assertion: " << msgid << ":" << msg << endl;
         raiseError(msgid,msg);
         throw UserException(msgid, msg);
+    }
+
+    void msgasserted(int msgid, const string &msg) {
+        msgasserted(msgid, msg.c_str());
     }
 
     NOINLINE_DECL void msgasserted(int msgid, const char *msg) {
