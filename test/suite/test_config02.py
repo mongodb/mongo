@@ -63,14 +63,15 @@ class test_config02(wttest.WiredTigerTestCase):
         configarg = 'create'
         if configextra != None:
             configarg += ',' + configextra
-        if homeenv != None:
+        if homeenv == None:
+            os.unsetenv('WIREDTIGER_HOME')
+	else:
             os.putenv('WIREDTIGER_HOME', homeenv)
         self.conn = wiredtiger.wiredtiger_open(homearg, configarg)
         self.session = self.conn.open_session(None)
         self.populate_and_check()
 
     def test_home_nohome(self):
-        self.KNOWN_FAILURE('with no homedir, wiredtiger_open should use "."')
         self.common_test(None, None, None)
         self.checkfiles(".")
 
@@ -107,32 +108,28 @@ class test_config02(wttest.WiredTigerTestCase):
 
     def test_home_and_missing_env(self):
         # If homedir is set, it is used no matter what
-        self.KNOWN_FAILURE('wiredtiger.open with home_environment=true does not work')
         hdir = 'homedir'
         os.mkdir(hdir)
-        self.common_test(hdir, None, 'home_environnment=true')
+        self.common_test(hdir, None, 'home_environment=true')
         self.checkfiles(hdir)
 
     def test_env_conf(self):
-        self.KNOWN_FAILURE('wiredtiger.open with home_environment=true does not work')
         edir = 'envdir'
         os.mkdir(edir)
-        self.common_test(None, edir, 'home_environnment=true')
+        self.common_test(None, edir, 'home_environment=true')
         self.checkfiles(edir)
 
     def test_env_conf_without_env_var(self):
         # no env var set, so should use current directory
-        self.KNOWN_FAILURE('with no homedir, wiredtiger_open should use "."')
-        self.common_test(None, None, 'home_environnment=true')
+        self.common_test(None, None, 'home_environment=true')
         self.checkfiles(".")
 
     def test_env_no_conf(self):
-        self.KNOWN_FAILURE('with no homedir, wiredtiger_open should use "."')
+	# env var, but no open configuration string, should fail
         edir = 'envdir'
         os.mkdir(edir)
-        self.common_test(None, edir, None)
-        self.checkfiles(".")
-        self.checknofiles(edir)
+        self.assertRaises(WiredTigerError,
+                          lambda: self.common_test(None, edir, None))
 
     def test_home_does_not_exist(self):
         dir = 'nondir'
