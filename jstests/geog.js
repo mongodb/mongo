@@ -7,6 +7,16 @@ t.save({a:{x:0,y:0},z:1});
 
 query = {a:[0,0],z:1};
 
+function assertCount( count, hint ) {
+    if ( hint ) {
+        assert.eq( count, t.find(query).hint(hint).itcount() );
+    }
+    else {
+        assert.eq( count, t.find(query).itcount() );
+        assert.eq( count, t.count(query) );
+    }
+}
+
 function assertNotTryingGeoIndex() {
     plans = t.find(query).explain(true).allPlans;
     for( i in plans ) {
@@ -15,21 +25,21 @@ function assertNotTryingGeoIndex() {
 }
 
 function assertNonGeoResults() {
-    assert.eq( 0, t.find(query).itcount() );
+    assertCount( 0 );
     assertNotTryingGeoIndex();
 }
 
 function assertNonGeoResultsWithHint() {
-    assert.eq( 0, t.find(query).hint({a:1}).itcount() );
-    assert.eq( 0, t.find(query).hint({$natural:1}).itcount() );
+    assertCount( 0, {a:1} );
+    assertCount( 0, {$natural:1} );
 }
 
 function assertGeoResults() {
-    assert.eq( 1, t.find(query).itcount() );
+    assertCount( 1 );
 }
 
 function assertGeoResultsWithHint() {
-    assert.eq( 1, t.find(query).hint({a:'2d',z:1}).itcount() );
+    assertCount( 1, {a:'2d',z:1} );
 }
 
 assertNonGeoResults();
