@@ -25,7 +25,7 @@ src/btree/bt_ovfl.c
 src/btree/bt_page.c
 src/btree/bt_read.c
 src/btree/bt_ret.c
-src/btree/bt_salvage.c
+src/btree/bt_slvg.c
 src/btree/bt_stat.c
 src/btree/bt_sync.c
 src/btree/bt_vrfy.c

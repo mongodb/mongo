@@ -336,6 +336,10 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 			break;
 		dsk = buf->mem;
 
+		/* Report progress every 10 reads. */
+		if (++ss->fcnt % 10 == 0)
+			__wt_progress(session, NULL, ss->fcnt);
+
 		/* Create a printable version of the address. */
 		if (WT_VERBOSE_ISSET(session, salvage))
 			WT_ERR(__wt_bm_addr_string(
