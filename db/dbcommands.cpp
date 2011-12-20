@@ -811,7 +811,7 @@ namespace mongo {
             return replSettings.slave == SimpleSlave;
         }
         virtual bool slaveOverrideOk() { return true; }
-        virtual bool maintenanceOk() const { return false; }
+        virtual bool maintenanceOk() const { return true; }
         virtual bool adminOnly() const { return false; }
         virtual void help( stringstream& help ) const { help << "count objects in collection"; }
         virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
