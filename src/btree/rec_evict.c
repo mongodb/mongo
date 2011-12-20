@@ -347,10 +347,10 @@ __rec_sub_excl_clear(WT_SESSION_IMPL *session,
 
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
-		__rec_sub_excl_col_clear(session, page, last_page);
+		(void)__rec_sub_excl_col_clear(session, page, last_page);
 		break;
 	case WT_PAGE_ROW_INT:
-		__rec_sub_excl_row_clear(session, page, last_page);
+		(void)__rec_sub_excl_row_clear(session, page, last_page);
 		break;
 	default:
 		break;
