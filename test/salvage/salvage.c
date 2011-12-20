@@ -565,17 +565,6 @@ copy(u_int lsn, u_int recno)
 		dsk->cksum = 0;
 		dsk->cksum = __wt_cksum(dsk, PSIZE);
 		assert(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
-
-		/*
-		 * XXX
-		 * The open checks that the root page isn't past EOF, and for
-		 * some of these tests, it is.   We need a salvage force flag,
-		 * but don't yet have one.  For now, extend the file with
-		  *random garbage that salvage will ignore.
-		 */
-		memset(buf, 'a', sizeof(buf));
-		assert(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
-		assert(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
 	}
 
 	assert(fclose(ifp) == 0);
