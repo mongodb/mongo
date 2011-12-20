@@ -243,7 +243,7 @@ __verify_tree(WT_SESSION_IMPL *session,
 	} else
 		__wt_get_addr(
 		    page->parent, page->parent_ref.ref, &addrbuf, &size);
-	WT_RET(__wt_bm_buffer_to_addr(addrbuf, &addr, &size, NULL));
+	WT_RET(__wt_block_buffer_to_addr(addrbuf, &addr, &size, NULL));
 	WT_RET(__verify_addfrag(session, addr, size, vs));
 	}
 
@@ -530,7 +530,7 @@ __verify_overflow(WT_SESSION_IMPL *session,
 	WT_PAGE_DISK *dsk;
 
 	/* Read and verify the overflow item. */
-	WT_RET(__wt_block_read(
+	WT_RET(__wt_bm_read(
 	    session, vs->tmp1, addrbuf, addrbuf_len, WT_VERIFY));
 
 	/*
@@ -550,7 +550,7 @@ __verify_overflow(WT_SESSION_IMPL *session,
 	/* XXX */
 	{
 	uint32_t addr, size, cksum;
-	WT_RET(__wt_bm_buffer_to_addr(addrbuf, &addr, &size, &cksum));
+	WT_RET(__wt_block_buffer_to_addr(addrbuf, &addr, &size, &cksum));
 	WT_RET(__verify_addfrag(session, addr, size, vs));
 	}
 

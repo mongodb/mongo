@@ -368,7 +368,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		case WT_PAGE_COL_INT:
 		case WT_PAGE_FREELIST:
 		case WT_PAGE_ROW_INT:
-			WT_ERR(__wt_block_free(session, addrbuf, addrbuf_size));
+			WT_ERR(__wt_bm_free(session, addrbuf, addrbuf_size));
 
 			WT_VERBOSE(session, salvage,
 			    "%s page ignored %s",
@@ -386,7 +386,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		 */
 		if (__wt_verify_dsk(session,
 		    (char *)as->data, buf->mem, buf->size) != 0) {
-			WT_ERR(__wt_block_free(session, addrbuf, addrbuf_size));
+			WT_ERR(__wt_bm_free(session, addrbuf, addrbuf_size));
 
 			WT_VERBOSE(session, salvage,
 			    "%s page failed verify %s",
@@ -1249,7 +1249,7 @@ __slvg_col_merge_ovfl(WT_SESSION_IMPL *session,
 		    __wt_addr_string(session,
 			trk->ss->tmp2, unpack->data, unpack->size));
 
-		WT_RET(__wt_block_free(session, unpack->data, unpack->size));
+		WT_RET(__wt_bm_free(session, unpack->data, unpack->size));
 	}
 	return (0);
 }
@@ -1567,8 +1567,7 @@ __slvg_row_trk_update_start(
 	 * page successfully).
 	 */
 	WT_RET(__wt_scr_alloc(session, trk->size, &dsk));
-	WT_ERR(
-	    __wt_block_read(session, dsk, trk->addr.addr, trk->addr.size, 0));
+	WT_ERR(__wt_bm_read(session, dsk, trk->addr.addr, trk->addr.size, 0));
 	WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk->mem, &page));
 
 	/*
@@ -1929,7 +1928,7 @@ __slvg_row_merge_ovfl(WT_SESSION_IMPL *session,
 			    __wt_addr_string(session,
 			    trk->ss->tmp2, unpack->data, unpack->size));
 
-			WT_RET(__wt_block_free(
+			WT_RET(__wt_bm_free(
 			    session, unpack->data, unpack->size));
 		}
 
@@ -1944,7 +1943,7 @@ __slvg_row_merge_ovfl(WT_SESSION_IMPL *session,
 			    __wt_addr_string(session,
 			    trk->ss->tmp2, unpack->data, unpack->size));
 
-			WT_RET(__wt_block_free(
+			WT_RET(__wt_bm_free(
 			    session, unpack->data, unpack->size));
 		}
 	}
@@ -2270,8 +2269,7 @@ __slvg_trk_free(WT_SESSION_IMPL *session, WT_TRACK **trkp, uint32_t flags)
 		    __wt_addr_string(
 		    session, trk->ss->tmp1, trk->addr.addr, trk->addr.size),
 		    trk->size);
-		WT_RET(
-		    __wt_block_free(session, trk->addr.addr, trk->addr.size));
+		WT_RET(__wt_bm_free(session, trk->addr.addr, trk->addr.size));
 	}
 	if (LF_ISSET(WT_TRK_FREE_OVFL))
 		for (i = 0; i < trk->ovfl_cnt; ++i) {
@@ -2283,8 +2281,7 @@ __slvg_trk_free(WT_SESSION_IMPL *session, WT_TRACK **trkp, uint32_t flags)
 			    __wt_addr_string(session,
 			    trk->ss->tmp2, addr->addr, addr->size));
 
-			WT_RET(
-			    __wt_block_free(session, addr->addr, addr->size));
+			WT_RET(__wt_bm_free(session, addr->addr, addr->size));
 		}
 
 	if (trk->addr.addr != NULL)

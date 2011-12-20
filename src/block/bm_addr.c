@@ -8,11 +8,11 @@
 #include "wt_internal.h"
 
 /*
- * __wt_bm_buffer_to_addr --
+ * __wt_block_buffer_to_addr --
  *	Convert a filesystem address cookie into its components.
  */
 int
-__wt_bm_buffer_to_addr(
+__wt_block_buffer_to_addr(
     const uint8_t *p, uint32_t *addr, uint32_t *size, uint32_t *cksum)
 {
 	uint64_t a;
@@ -34,11 +34,11 @@ __wt_bm_buffer_to_addr(
 }
 
 /*
- * __wt_bm_addr_to_buffer --
+ * __wt_block_addr_to_buffer --
  *	Convert the filesystem components into its address cookie.
  */
 int
-__wt_bm_addr_to_buffer(
+__wt_block_addr_to_buffer(
     uint8_t **p, uint32_t addr, uint32_t size, uint32_t cksum)
 {
 	uint64_t a;
@@ -67,7 +67,7 @@ __wt_bm_addr_valid(
 
 	/* Crack the cookie. */
 	WT_UNUSED(addrbuf_size);
-	WT_RET(__wt_bm_buffer_to_addr(addrbuf, &addr, &size, NULL));
+	WT_RET(__wt_block_buffer_to_addr(addrbuf, &addr, &size, NULL));
 
 	/* All we care about is if it's past the end of the file. */
 	return ((WT_ADDR_TO_OFF(btree, addr) +
@@ -86,7 +86,7 @@ __wt_bm_addr_string(WT_SESSION_IMPL *session,
 
 	/* Crack the cookie. */
 	WT_UNUSED(addrbuf_size);
-	WT_RET(__wt_bm_buffer_to_addr(addrbuf, &addr, &size, NULL));
+	WT_RET(__wt_block_buffer_to_addr(addrbuf, &addr, &size, NULL));
 
 	/* Printable representation. */
 	WT_RET(__wt_buf_fmt(session, buf,

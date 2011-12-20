@@ -106,7 +106,7 @@ __wt_bm_slvg_next(WT_SESSION_IMPL *session,
 		 * we ignore this block.
 		 */
 		WT_RET(__wt_buf_initsize(session, buf, size));
-		if (__wt_bm_read(session, buf, addr, size, WT_VERIFY)) {
+		if (__wt_block_read(session, buf, addr, size, WT_VERIFY)) {
 skip:			WT_VERBOSE(session, salvage,
 			    "skipping %" PRIu32 "B at file offset %" PRIu64,
 			    allocsize, (uint64_t)off);
@@ -115,7 +115,7 @@ skip:			WT_VERBOSE(session, salvage,
 			 * Free the block and make sure we don't return it more
 			 * than once.
 			 */
-			WT_RET(__wt_bm_block_free(session, addr, allocsize));
+			WT_RET(__wt_block_free(session, addr, allocsize));
 			btree->slvg_off = off += allocsize;
 			continue;
 		}
@@ -126,7 +126,7 @@ skip:			WT_VERBOSE(session, salvage,
 
 	/* Create an address cookie that references this block. */
 	endp = addrbuf;
-	WT_RET(__wt_bm_addr_to_buffer(&endp, addr, size, 0));
+	WT_RET(__wt_block_addr_to_buffer(&endp, addr, size, 0));
 	*addrbuf_lenp = WT_PTRDIFF32(endp, addrbuf);
 
 	/* We're successfully returning the page, move past it. */

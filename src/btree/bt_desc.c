@@ -94,7 +94,7 @@ err:		__wt_errx(session, "%s%s", msg,
 		btree->root_size = 0;
 	} else {
 		endp = addrbuf;
-		WT_RET(__wt_bm_addr_to_buffer(
+		WT_RET(__wt_block_addr_to_buffer(
 		    &endp, desc->root_addr, desc->root_size, 0));
 		addrbuf_len = WT_PTRDIFF32(endp, addrbuf);
 		WT_RET(__wt_strndup(
@@ -162,7 +162,7 @@ __wt_desc_update(WT_SESSION_IMPL *session)
 		addr = WT_ADDR_INVALID;
 		size = 0;
 	} else
-		WT_RET(__wt_bm_buffer_to_addr(
+		WT_RET(__wt_block_buffer_to_addr(
 		    btree->root_addr, &addr, &size, &cksum));
 	if (desc->root_addr != addr || desc->root_size != size) {
 		desc->root_addr = addr;

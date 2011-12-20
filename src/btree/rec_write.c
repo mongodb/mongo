@@ -865,7 +865,7 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_BUF *buf)
 
 	/* Write the chunk and save the location information. */
 	WT_VERBOSE(session, write, "%s", __wt_page_type_string(dsk->type));
-	WT_RET(__wt_block_write(session, buf, addr, &size));
+	WT_RET(__wt_bm_write(session, buf, addr, &size));
 	WT_RET(__wt_strndup(session, (char *)addr, size, &bnd->addr.addr));
 	bnd->addr.size = size;
 
@@ -2936,7 +2936,7 @@ __rec_cell_build_ovfl(
 
 		/* Write the overflow chunk. */
 		addr = buf;
-		WT_ERR(__wt_block_write(session, tmp, addr, &size));
+		WT_ERR(__wt_bm_write(session, tmp, addr, &size));
 
 		/* Track the overflow chunk. */
 		WT_ERR(__wt_rec_track_ovfl(

@@ -120,6 +120,18 @@ struct __wt_btree_desc {
 	(WT_ALIGN((size) + WT_PAGE_DISK_SIZE, (session)->btree->allocsize))
 
 /*
+ * Don't compress the first 32B of the block (almost all of the WT_PAGE_DISK
+ * structure) because we need the block's checksum and on-disk and in-memory
+ * sizes to be immediately available without decompression (the checksum and
+ * the on-disk block sizes are used during salvage to figure out where the
+ * blocks are, and the in-memory page size tells us how large a buffer we need
+ * to decompress the file block.  We could take less than 32B, but a 32B
+ * boundary is probably better alignment for the underlying compression engine,
+ * and skipping 32B won't matter in terms of compression efficiency.
+ */
+#define	WT_COMPRESS_SKIP    32
+
+/*
  * WT_PAGE_DISK --
  *
  * All on-disk pages have a common header, defined by the WT_PAGE_DISK

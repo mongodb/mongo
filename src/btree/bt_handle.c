@@ -355,7 +355,7 @@ __btree_root_init(WT_SESSION_IMPL *session, uint32_t flags)
 
 	/* Read the root into memory, and verify it. */
 	WT_CLEAR(tmp);
-	WT_RET(__wt_block_read(
+	WT_RET(__wt_bm_read(
 	    session, &tmp, btree->root_addr, btree->root_size, flags));
 
 	/* Build the in-memory version of the page. */

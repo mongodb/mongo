@@ -1,23 +1,10 @@
 /* DO NOT EDIT: automatically built by dist/s_prototypes. */
 
-extern int __wt_block_alloc(WT_SESSION_IMPL *session,
-    uint32_t *addrp,
-    uint32_t size);
-extern int __wt_block_free( WT_SESSION_IMPL *session,
-    const uint8_t *addrbuf,
-    uint32_t addrbuf_size);
-extern int __wt_bm_block_free(WT_SESSION_IMPL *session,
-    uint32_t addr,
-    uint32_t size);
-extern int __wt_block_freelist_read(WT_SESSION_IMPL *session);
-extern int __wt_block_freelist_write(WT_SESSION_IMPL *session);
-extern void __wt_block_stat(WT_SESSION_IMPL *session);
-extern void __wt_block_dump(WT_SESSION_IMPL *session);
-extern int __wt_bm_buffer_to_addr( const uint8_t *p,
+extern int __wt_block_buffer_to_addr( const uint8_t *p,
     uint32_t *addr,
     uint32_t *size,
     uint32_t *cksum);
-extern int __wt_bm_addr_to_buffer( uint8_t **p,
+extern int __wt_block_addr_to_buffer( uint8_t **p,
     uint32_t addr,
     uint32_t size,
     uint32_t cksum);
@@ -28,6 +15,33 @@ extern int __wt_bm_addr_string(WT_SESSION_IMPL *session,
     WT_BUF *buf,
     const uint8_t *addrbuf,
     uint32_t addrbuf_size);
+extern int __wt_block_alloc(WT_SESSION_IMPL *session,
+    uint32_t *addrp,
+    uint32_t size);
+extern int __wt_block_free(WT_SESSION_IMPL *session,
+    uint32_t addr,
+    uint32_t size);
+extern int __wt_block_freelist_read(WT_SESSION_IMPL *session);
+extern int __wt_block_freelist_write(WT_SESSION_IMPL *session);
+extern void __wt_block_stat(WT_SESSION_IMPL *session);
+extern void __wt_block_dump(WT_SESSION_IMPL *session);
+extern int __wt_bm_free( WT_SESSION_IMPL *session,
+    const uint8_t *addrbuf,
+    uint32_t addrbuf_size);
+extern int __wt_bm_read(WT_SESSION_IMPL *session,
+    WT_BUF *buf,
+    const uint8_t *addrbuf,
+    uint32_t addrbuf_size,
+    uint32_t flags);
+extern int __wt_bm_write(WT_SESSION_IMPL *session,
+    WT_BUF *buf,
+    uint8_t *addrbuf,
+    uint32_t *addrbuf_size);
+extern int __wt_block_read(WT_SESSION_IMPL *session,
+    WT_BUF *buf,
+    uint32_t addr,
+    uint32_t size,
+    uint32_t cksum);
 extern int __wt_bm_slvg_start(WT_SESSION_IMPL *session);
 extern int __wt_bm_slvg_end(WT_SESSION_IMPL *session, int success);
 extern int __wt_bm_slvg_next(WT_SESSION_IMPL *session,
@@ -35,21 +49,7 @@ extern int __wt_bm_slvg_next(WT_SESSION_IMPL *session,
     uint8_t *addrbuf,
     uint32_t *addrbuf_lenp,
     int *eofp);
-extern int __wt_block_read(WT_SESSION_IMPL *session,
-    WT_BUF *buf,
-    const uint8_t *addrbuf,
-    uint32_t addrbuf_size,
-    uint32_t flags);
-extern int __wt_bm_read(WT_SESSION_IMPL *session,
-    WT_BUF *buf,
-    uint32_t addr,
-    uint32_t size,
-    uint32_t cksum);
 extern int __wt_block_write(WT_SESSION_IMPL *session,
-    WT_BUF *buf,
-    uint8_t *addrbuf,
-    uint32_t *addrbuf_size);
-extern int __wt_bm_write(WT_SESSION_IMPL *session,
     WT_BUF *buf,
     uint32_t *addrp,
     uint32_t *sizep,

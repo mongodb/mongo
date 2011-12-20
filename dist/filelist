@@ -4,9 +4,12 @@
 src/api/api_event.c
 src/api/api_strerror.c
 src/api/api_version.c
-src/block/alloc.c
 src/block/bm_addr.c
+src/block/bm_alloc.c
+src/block/bm_mgr.c
+src/block/bm_read.c
 src/block/bm_slvg.c
+src/block/bm_write.c
 src/block/io.c
 src/btree/bt_bulk.c
 src/btree/bt_cache.c

@@ -30,7 +30,7 @@ __wt_cache_read(
 
 	/* Force allocation of new memory. */
 	WT_CLEAR(tmp);
-	WT_RET(__wt_block_read(
+	WT_RET(__wt_bm_read(
 	    session, &tmp, addr, size, dsk_verify ? WT_VERIFY : 0));
 
 	/* Build the in-memory version of the page. */

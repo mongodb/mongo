@@ -8,157 +8,12 @@
 #include "wt_internal.h"
 
 /*
- * __wt_block_read --
- *	Read a address cookie-referenced block into a buffer.
- */
-int
-__wt_block_read(WT_SESSION_IMPL *session,
-    WT_BUF *buf, const uint8_t *addrbuf, uint32_t addrbuf_size, uint32_t flags)
-{
-	WT_BUF *tmp;
-	uint32_t addr, size, cksum;
-	int ret;
-
-	ret = 0;
-
-	/* Crack the cookie. */
-	WT_UNUSED(addrbuf_size);
-	WT_RET(__wt_bm_buffer_to_addr(addrbuf, &addr, &size, &cksum));
-
-	/* Re-size the buffer as necessary. */
-	WT_RET(__wt_buf_initsize(session, buf, size));
-
-	/* Read the block. */
-	WT_RET(__wt_bm_read(session, buf, addr, size, cksum));
-
-	/* Optionally verify the page: used by verify. */
-	if (!LF_ISSET(WT_VERIFY))
-		return (0);
-
-	WT_RET(__wt_scr_alloc(session, 0, &tmp));
-	WT_ERR(__wt_bm_addr_string(session, tmp, addrbuf, addrbuf_size));
-	WT_ERR(__wt_verify_dsk(
-	    session, (char *)tmp->data, buf->mem, buf->size));
-
-err:	__wt_scr_free(&tmp);
-
-	return (ret);
-}
-
-/*
- * Don't compress the first 32B of the block (almost all of the WT_PAGE_DISK
- * structure) because we need the block's checksum and on-disk and in-memory
- * sizes to be immediately available without decompression (the checksum and
- * the on-disk block sizes are used during salvage to figure out where the
- * blocks are, and the in-memory page size tells us how large a buffer we need
- * to decompress the file block.  We could take less than 32B, but a 32B
- * boundary is probably better alignment for the underlying compression engine,
- * and skipping 32B won't matter in terms of compression efficiency.
- */
-#define	COMPRESS_SKIP    32
-
-/*
- * __wt_bm_read --
- *	Read a block into a buffer.
- */
-int
-__wt_bm_read(WT_SESSION_IMPL *session,
-    WT_BUF *buf, uint32_t addr, uint32_t size, uint32_t cksum)
-{
-	WT_BTREE *btree;
-	WT_BUF *tmp;
-	WT_FH *fh;
-	WT_ITEM src, dst;
-	WT_PAGE_DISK *dsk;
-	int ret;
-
-	btree = session->btree;
-	tmp = NULL;
-	fh = btree->fh;
-	ret = 0;
-
-	WT_VERBOSE(
-	    session, read, "addr/size %" PRIu32 "/%" PRIu32, addr, size);
-	WT_RET(__wt_read(
-	    session, fh, WT_ADDR_TO_OFF(btree, addr), size, buf->mem));
-	buf->size = size;
-
-	dsk = buf->mem;
-	cksum = dsk->cksum;
-	dsk->cksum = 0;
-	if (cksum != __wt_cksum(dsk, size)) {
-		if (!F_ISSET(session, WT_SESSION_SALVAGE_QUIET_ERR))
-			__wt_errx(session,
-			    "read checksum error: %" PRIu32 "/%" PRIu32,
-			    addr, size);
-		return (WT_ERROR);
-	}
-
-	/*
-	 * If the in-memory page size is larger than the on-disk page size, the
-	 * buffer is compressed: allocate a temporary buffer, copy the skipped
-	 * bytes of the original image into place, then decompress.
-	 */
-	if (dsk->size < dsk->memsize) {
-		WT_RET(__wt_scr_alloc(session, dsk->memsize, &tmp));
-		memcpy(tmp->mem, buf->mem, COMPRESS_SKIP);
-		src.data = (uint8_t *)buf->mem + COMPRESS_SKIP;
-		src.size = buf->size - COMPRESS_SKIP;
-		dst.data = (uint8_t *)tmp->mem + COMPRESS_SKIP;
-		dst.size = dsk->memsize - COMPRESS_SKIP;
-		WT_ERR(btree->compressor->decompress(
-		    btree->compressor, &session->iface, &src, &dst));
-		tmp->size = dsk->memsize;
-
-		__wt_buf_swap(tmp, buf);
-		dsk = buf->mem;
-	}
-
-	WT_BSTAT_INCR(session, page_read);
-	WT_CSTAT_INCR(session, block_read);
-
-err:	__wt_scr_free(&tmp);
-	return (ret);
-}
-
-/*
  * __wt_block_write --
- *	Write a buffer into a block, returning the block's address cookie.
- */
-int
-__wt_block_write(WT_SESSION_IMPL *session,
-    WT_BUF *buf, uint8_t *addrbuf, uint32_t *addrbuf_size)
-{
-	uint32_t addr, size, cksum;
-
-	uint8_t *endp;
-
-	/*
-	 * We're passed a table's page image: WT_BUF->{data,size} are the image
-	 * and byte count.
-	 *
-	 * Diagnostics: verify the disk page: this violates layering, but it's
-	 * the place we can ensure we never write a corrupted page.
-	 */
-	WT_ASSERT(session, __wt_verify_dsk(
-	    session, "[NoAddr]", (WT_PAGE_DISK *)buf->data, buf->size) == 0);
-
-	WT_RET(__wt_bm_write(session, buf, &addr, &size, &cksum));
-
-	endp = addrbuf;
-	WT_RET(__wt_bm_addr_to_buffer(&endp, addr, size, cksum));
-	*addrbuf_size = WT_PTRDIFF32(endp, addrbuf);
-
-	return (0);
-}
-
-/*
- * __wt_bm_write --
  *	Write a buffer into a block, returning the block's addr, size and
  * checksum.
  */
 int
-__wt_bm_write(WT_SESSION_IMPL *session,
+__wt_block_write(WT_SESSION_IMPL *session,
     WT_BUF *buf, uint32_t *addrp, uint32_t *sizep, uint32_t *cksump)
 {
 	WT_ITEM src, dst;
@@ -210,8 +65,8 @@ not_compressed:	/*
 		dsk->size = align_size;
 	} else {
 		/* Skip the first 32B of the source data. */
-		src.data = (uint8_t *)buf->mem + COMPRESS_SKIP;
-		src.size = buf->size - COMPRESS_SKIP;
+		src.data = (uint8_t *)buf->mem + WT_COMPRESS_SKIP;
+		src.size = buf->size - WT_COMPRESS_SKIP;
 
 		/*
 		 * Compute the size needed for the destination buffer.
@@ -228,10 +83,11 @@ not_compressed:	/*
 		}
 		else
 			tmp_size = src.size;
-		WT_RET(__wt_scr_alloc(session, tmp_size + COMPRESS_SKIP, &tmp));
+		WT_RET(
+		    __wt_scr_alloc(session, tmp_size + WT_COMPRESS_SKIP, &tmp));
 
 		/* Skip the first 32B of the dest data. */
-		dst.data = (uint8_t *)tmp->mem + COMPRESS_SKIP;
+		dst.data = (uint8_t *)tmp->mem + WT_COMPRESS_SKIP;
 		dst.size = tmp_size;
 
 		/*
@@ -254,14 +110,14 @@ not_compressed:	/*
 		 * file allocation unit, use the uncompressed version because
 		 * it will be faster to read).
 		 */
-		tmp->size = dst.size + COMPRESS_SKIP;
+		tmp->size = dst.size + WT_COMPRESS_SKIP;
 		size = WT_ALIGN(tmp->size, btree->allocsize);
 		if (size >= align_size)
 			goto not_compressed;
 		align_size = size;
 
 		/* Copy in the skipped header bytes, zero out unused bytes. */
-		memcpy(tmp->mem, buf->mem, COMPRESS_SKIP);
+		memcpy(tmp->mem, buf->mem, WT_COMPRESS_SKIP);
 		memset(
 		    (uint8_t *)tmp->mem + tmp->size, 0, align_size - tmp->size);
 

@@ -295,7 +295,7 @@ __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int final)
 		case WT_PT_BLOCK:
 			__track_msg(
 			    session, page, "discard block", &track->addr);
-			WT_RET(__wt_block_free(
+			WT_RET(__wt_bm_free(
 			    session, track->addr.addr, track->addr.size));
 			__wt_free(session, track->addr.addr);
 			break;
@@ -311,7 +311,7 @@ __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int final)
 		case WT_PT_OVFL_DISCARD:
 			__track_msg(
 			    session, page, "discard overflow", &track->addr);
-			WT_RET(__wt_block_free(
+			WT_RET(__wt_bm_free(
 			    session, track->addr.addr, track->addr.size));
 
 			/* Freeing WT_PAGE_TRACK->addr frees ->data, too. */
