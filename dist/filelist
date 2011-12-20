@@ -7,6 +7,7 @@ src/api/api_version.c
 src/block/bm_addr.c
 src/block/bm_alloc.c
 src/block/bm_mgr.c
+src/block/bm_open.c
 src/block/bm_read.c
 src/block/bm_slvg.c
 src/block/bm_write.c
@@ -17,7 +18,6 @@ src/btree/bt_curnext.c
 src/btree/bt_curprev.c
 src/btree/bt_cursor.c
 src/btree/bt_debug.c
-src/btree/bt_desc.c
 src/btree/bt_discard.c
 src/btree/bt_evict.c
 src/btree/bt_handle.c
