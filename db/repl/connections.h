@@ -89,7 +89,7 @@ namespace mongo {
             log() << "couldn't connect to " << _hostport << ": " << err << rsLog;
             return false;
           }
-	  x->connected = true;
+          x->connected = true;
 
           // if we cannot authenticate against a member, then either its key file
           // or our key file has to change.  if our key file has to change, we'll
