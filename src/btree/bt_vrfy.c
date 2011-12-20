@@ -443,6 +443,13 @@ __verify_row_leaf_key_order(
 	btree = session->btree;
 
 	/*
+	 * If a tree is empty (just created), it won't have keys; if there
+	 * are no keys, we're done.
+	 */
+	if (page->entries == 0)
+		return (0);
+
+	/*
 	 * We visit our first leaf page before setting the maximum key (the 0th
 	 * keys on the internal pages leading to the smallest leaf in the tree
 	 * are all empty entries).
@@ -499,8 +506,8 @@ __verify_overflow_cell(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 	ret = 0;
 
 	/*
-	 * If a tree is empty (just created), it won't have a disk image --
-	 * rare, but it can happen.   If there's no disk image, we're done.
+	 * If a tree is empty (just created), it won't have a disk image;
+	 * if there is no disk image, we're done.
 	 */
 	if ((dsk = page->dsk) == NULL)
 		return (0);
