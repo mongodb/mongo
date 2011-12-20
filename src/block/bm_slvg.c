@@ -7,8 +7,6 @@
 
 #include "wt_internal.h"
 
-static off_t off;					/* XXX */
-
 /*
  * __wt_bm_slvg_start --
  *	Start a salvage of the file.
@@ -37,7 +35,7 @@ __wt_bm_slvg_start(WT_SESSION_IMPL *session)
 	}
 
 	/* The first sector of the file is the description record, skip it. */
-	off = WT_BTREE_DESC_SECTOR;
+	btree->slvg_off = WT_BTREE_DESC_SECTOR;
 
 	return (0);
 }
@@ -64,13 +62,14 @@ __wt_bm_slvg_next(WT_SESSION_IMPL *session,
 {
 	WT_BTREE *btree;
 	WT_FH *fh;
-	off_t max;
+	off_t max, off;
 	uint32_t addr, allocsize, size;
 	uint8_t *endp;
 
 	*eofp = 0;
 
 	btree = session->btree;
+	off = btree->slvg_off;
 	fh = btree->fh;
 	allocsize = btree->allocsize;
 	WT_RET(__wt_buf_initsize(session, buf, allocsize));
@@ -112,8 +111,12 @@ skip:			WT_VERBOSE(session, salvage,
 			    "skipping %" PRIu32 "B at file offset %" PRIu64,
 			    allocsize, (uint64_t)off);
 
+			/*
+			 * Free the block and make sure we don't return it more
+			 * than once.
+			 */
 			WT_RET(__wt_bm_block_free(session, addr, allocsize));
-			off += allocsize;
+			btree->slvg_off = off += allocsize;
 			continue;
 		}
 
@@ -126,8 +129,8 @@ skip:			WT_VERBOSE(session, salvage,
 	WT_RET(__wt_bm_addr_to_buffer(&endp, addr, size, 0));
 	*addrbuf_lenp = WT_PTRDIFF32(endp, addrbuf);
 
-	/* We're returning the page, move past it. */
-	off += size;
+	/* We're successfully returning the page, move past it. */
+	btree->slvg_off = off + size;
 
 	return (0);
 }

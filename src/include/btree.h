@@ -110,6 +110,12 @@ struct __wt_btree {
 #define	WT_BTREE_SALVAGE	0x40	/* Handle is for salvage */
 #define	WT_BTREE_VERIFY		0x80	/* Handle is for verify */
 	uint32_t flags;
+
+	/*
+	 * XXX
+	 * BLOCK MANAGER STUFF.
+	 */
+	off_t slvg_off;			/* Salvage file offset */
 };
 
 /*
