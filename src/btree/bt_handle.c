@@ -414,6 +414,11 @@ __btree_root_init_empty(WT_SESSION_IMPL *session)
 	 * modified, that's OK, nothing will ever be written.
 	 *
 	 * Create the empty root page.
+	 *
+	 * !!!
+	 * Be cautious about changing the order of updates in this code: to call
+	 * __wt_page_out on error, we require a correct page setup at each point
+	 * where we might fail.
 	 */
 	WT_ERR(__wt_calloc_def(session, 1, &root));
 	switch (btree->type) {
@@ -423,10 +428,15 @@ __btree_root_init_empty(WT_SESSION_IMPL *session)
 		root->u.col_int.recno = 1;
 		WT_ERR(__wt_calloc_def(session, 1, &root->u.col_int.t));
 		cref = root->u.col_int.t;
-		WT_COL_REF_PAGE(cref) = leaf;
-		WT_COL_REF_STATE(cref) = WT_REF_MEM;
 		cref->recno = 1;
+		WT_COL_REF_PAGE(cref) = leaf;
 		cref->ref.addr = NULL;
+		WT_COL_REF_STATE(cref) = WT_REF_MEM;
+
+		root->entries = 1;
+		root->parent = NULL;
+		root->parent_ref.ref = NULL;
+		F_SET(root, WT_PAGE_PINNED);
 
 		leaf->parent_ref.cref = cref;
 		leaf->parent = root;
@@ -436,29 +446,37 @@ __btree_root_init_empty(WT_SESSION_IMPL *session)
 		WT_ERR(__wt_calloc_def(session, 1, &root->u.row_int.t));
 		rref = root->u.row_int.t;
 		WT_ROW_REF_PAGE(rref) = leaf;
-		WT_ROW_REF_STATE(rref) = WT_REF_MEM;
-		WT_ERR(__wt_row_ikey_alloc(
-		    session, 0, "", 1, (WT_IKEY **)&(rref->key)));
 		rref->ref.addr = NULL;
+		WT_ROW_REF_STATE(rref) = WT_REF_MEM;
+
+		root->entries = 1;
+		root->parent = NULL;
+		root->parent_ref.ref = NULL;
+		F_SET(root, WT_PAGE_PINNED);
 
 		leaf->parent_ref.rref = rref;
 		leaf->parent = root;
+
+		WT_ERR(__wt_row_ikey_alloc(
+		    session, 0, "", 1, (WT_IKEY **)&(rref->key)));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
-	root->entries = 1;
-	root->parent = NULL;
-	root->parent_ref.ref = NULL;
-	F_SET(root, WT_PAGE_PINNED);
 
 	btree->root_page = root;
 
+	/*
+	 * Mark the child page dirty so that if it is evicted, the tree ends
+	 * up sane.
+	 */
+	WT_ERR(__wt_page_set_modified(session, leaf));
+
 	return (0);
 
-err:	if (root != NULL)
-		__wt_free(session, root);
-	if (leaf != NULL)
-		__wt_free(session, leaf);
+err:	if (leaf != NULL)
+		__wt_page_out(session, leaf, 0);
+	if (root != NULL)
+		__wt_page_out(session, root, 0);
 	return (ret);
 }
 

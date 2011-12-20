@@ -1213,14 +1213,11 @@ __rec_col_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 			switch (F_ISSET(rp, WT_PAGE_REC_MASK)) {
 			case WT_PAGE_REC_EMPTY:
 				/*
-				 * !!!
-				 * Column-store formats don't support deleted
-				 * pages; they can shrink, but deleting a page
-				 * would remove part of the record count name
-				 * space.
+				 * Column-store pages are almost never empty, as
+				 * discarding a page would remove a chunk of the
+				 * name space.  The exceptions are pages created
+				 * when the tree is created, and never filled.
 				 */
-				WT_ASSERT(session,
-				    !F_ISSET(rp, WT_PAGE_REC_EMPTY));
 				continue;
 			case WT_PAGE_REC_REPLACE:
 				__rec_cell_build_addr(session,
