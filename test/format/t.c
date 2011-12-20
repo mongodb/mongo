@@ -86,7 +86,7 @@ main(int argc, char *argv[])
 		if (wts_bulk_load())		/* Load initial records */
 			goto err;
 						/* Close, verify */
-		if (wts_teardown() || wts_verify("bulk"))
+		if (wts_teardown() || wts_verify("bulk-verify"))
 			goto err;
 						/* Loop reading & operations */
 		for (reps = 0; reps < 3; ++reps) {
@@ -105,7 +105,7 @@ main(int argc, char *argv[])
 				goto err;
 
 						/* Close, verify */
-			if (wts_teardown() || wts_verify("ops"))
+			if (wts_teardown() || wts_verify("ops-verify"))
 				goto err;
 
 			/*
@@ -132,7 +132,7 @@ main(int argc, char *argv[])
 		 */
 		if (g.c_delete_pct == 0 && (
 		    wts_salvage() ||
-		    wts_verify("salvage") ||
+		    wts_verify("salvage-verify") ||
 		    wts_dump("salvage", 0)))
 			goto err;
 
