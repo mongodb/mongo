@@ -1228,6 +1228,11 @@ static void linenoiseClearScreen( PromptInfo& pi, char *buf, int len, int pos ) 
     if ( write( 1, "\x1b[H\x1b[2J", 7 ) <= 0 ) return;
 #endif
     if ( write( 1, pi.promptText, pi.promptChars ) == -1 ) return;
+#ifndef _WIN32
+    // we have to generate our own newline on line wrap on Linux
+    if ( pi.promptIndentation == 0 && pi.promptExtraLines > 0 )
+        if ( write( 1, "\n", 1 ) == -1 ) return;
+#endif
     pi.promptCursorRowOffset = pi.promptExtraLines;
     refreshLine( pi, buf, len, pos );
 }
