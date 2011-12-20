@@ -92,10 +92,13 @@ class WiredTigerTestCase(unittest.TestCase):
         if os.path.exists(self.testdir):
             raise Exception(self.testdir + ": cannot remove directory");
         os.makedirs(self.testdir)
-        os.chdir(self.testdir)
-
-        self.conn = self.setUpConnectionOpen(".")
-        self.session = self.setUpSessionOpen(self.conn)
+        try:
+            os.chdir(self.testdir)
+            self.conn = self.setUpConnectionOpen(".")
+            self.session = self.setUpSessionOpen(self.conn)
+        except:
+            os.chdir(self.origcwd)
+            raise
 
     def tearDown(self):
         self.pr('finishing')
