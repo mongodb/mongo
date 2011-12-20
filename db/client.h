@@ -229,6 +229,7 @@ namespace mongo {
             LockStatus();
             string whichCollection;
             unsigned excluder, global, collection;
+            string toString() const;
         } lockStatus;
 
 #if defined(CLC)

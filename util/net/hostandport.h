@@ -82,6 +82,9 @@ namespace mongo {
 
         operator string() const { return toString(); }
 
+        bool empty() const { 
+            return _dynName.empty() && _host.empty() && _port < 0;
+        }
         string host() const { 
             if( !dyn() )
                 return _host; 

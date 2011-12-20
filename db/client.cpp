@@ -448,10 +448,9 @@ namespace mongo {
 
         _query.append( b , "query" );
 
-        // b.append("inLock",  ??
-        stringstream clientStr;
-        clientStr << _remote.toString();
-        b.append("client", clientStr.str());
+        if( !_remote.empty() ) {
+            b.append("client", _remote.toString());
+        }
 
         if ( _client ) {
             b.append( "desc" , _client->desc() );
