@@ -104,6 +104,11 @@ namespace mongo {
          */
         virtual bool maintenanceMode() const { return false; }
 
+        /* Return true if command should be permitted when a replica set secondary is in "recovering"
+           (unreadable) state.
+         */
+        virtual bool maintenanceOk() const { return true; /* assumed true prior to commit */ }
+
         /** @param webUI expose the command in the web ui as localhost:28017/<name>
             @param oldName an optional old, deprecated name for the command
         */
