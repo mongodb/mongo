@@ -203,8 +203,10 @@ namespace mongo {
             ~Exclusive() {
                 int s = _r._state.get();
                 DEV wassert( s < 0 ); // wassert: don't throw from destructors
-                _r._state.set(s+1);
-                _r.unlock();
+                ++s;
+                _r._state.set(s);
+                if ( s == 0 )
+                    _r.unlock();
             }
         };
 
