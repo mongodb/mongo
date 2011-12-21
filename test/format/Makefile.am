@@ -14,4 +14,4 @@ backup:
 	rm -rf BACKUP && mkdir BACKUP && cp WiredTiger __* BACKUP/
 
 clean-local:
-	rm -rf WiredTiger vgout.* __*
+	rm -rf WiredTiger WiredTiger.turtle vgout.* __*

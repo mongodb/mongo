@@ -7,19 +7,132 @@
 
 #include "wt_internal.h"
 
+static void __desc_dump(WT_SESSION_IMPL *, WT_BTREE_DESC *);
+static int  __desc_read(WT_SESSION_IMPL *, int);
+static int  __desc_update(WT_SESSION_IMPL *);
+
 /*
- * __wt_desc_read --
- *	Read and verify the file's metadata.
+ * __wt_bm_create --
+ *	Create a new block manager file.
  */
 int
-__wt_desc_read(WT_SESSION_IMPL *session, int salvage)
+__wt_bm_create(WT_SESSION_IMPL *session, const char *filename)
+{
+	WT_FH *fh;
+	int exist, ret;
+
+	/* Check to see if the file exists -- we don't want to overwrite it. */
+	WT_RET(__wt_exist(session, filename, &exist));
+	if (exist) {
+		__wt_errx(session,
+		    "the file %s already exists; to re-create it, remove it "
+		    "first, then create it",
+		    filename);
+		return (WT_ERROR);
+	}
+
+	/* Open the underlying file handle. */
+	WT_RET(__wt_open(session, filename, 0666, 1, &fh));
+
+	/* Write out the file's meta-data. */
+	ret = __wt_desc_write(session, fh);
+
+	/* Close the file handle. */
+	WT_TRET(__wt_close(session, fh));
+
+	return (ret);
+}
+
+/*
+ * __wt_bm_open --
+ *	Open a block manager file.
+ */
+int
+__wt_bm_open(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *btree;
+	WT_CONFIG_ITEM cval;
+	int ret;
+
+	btree = session->btree;
+
+	TAILQ_INIT(&btree->freeqa);
+	TAILQ_INIT(&btree->freeqs);
+	btree->free_addr = WT_ADDR_INVALID;
+	btree->free_size = 0;
+	__wt_spin_init(session, &btree->freelist_lock);
+
+	/* Open the underlying file handle. */
+	WT_RET(__wt_open(session, btree->filename, 0666, 1, &btree->fh));
+
+	/*
+	 * Read the file's metadata (unless it's a salvage operation and the
+	 * force flag is set, in which case we don't care what the file looks
+	 * like).
+	 */
+	cval.val = 0;
+	if (F_ISSET(btree, WT_BTREE_SALVAGE)) {
+		ret = __wt_config_getones(
+		    session, btree->config, "force", &cval);
+		if (ret != 0 && ret != WT_NOTFOUND)
+			WT_RET(ret);
+	}
+	if (!F_ISSET(btree, WT_BTREE_SALVAGE) || cval.val == 0)
+		WT_ERR(__desc_read(
+		    session, F_ISSET(btree, WT_BTREE_SALVAGE) ? 1 : 0));
+
+	/* If this is an open for a salvage operation, that's all we do. */
+	if (F_ISSET(btree, WT_BTREE_SALVAGE))
+		return (0);
+
+	/* Read in the free list. */
+	WT_ERR(__wt_block_freelist_read(session));
+
+	return (0);
+
+err:	(void)__wt_bm_close(session);
+	return (ret);
+}
+
+/*
+ * __wt_bm_close --
+ *	Close a block manager file.
+ */
+int
+__wt_bm_close(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *btree;
+	int ret;
+
+	btree = session->btree;
+	ret = 0;
+
+	/*
+	 * Write out the free list.
+	 * Update the file's description.
+	 */
+	WT_TRET(__wt_block_freelist_write(session));
+
+	if (btree->fh != NULL) {
+		WT_TRET(__desc_update(session));
+		WT_RET(__wt_close(session, btree->fh));
+		btree->fh = NULL;
+	}
+	return (ret);
+}
+
+/*
+ * __desc_read --
+ *	Read and verify the file's metadata.
+ */
+static int
+__desc_read(WT_SESSION_IMPL *session, int salvage)
 {
 	WT_BTREE *btree;
 	WT_BTREE_DESC *desc;
 	WT_CONFIG_ITEM cval;
-	uint32_t addrbuf_len, cksum;
-	uint8_t *endp;
-	uint8_t addrbuf[WT_BM_MAX_ADDR_COOKIE], buf[WT_BTREE_DESC_SECTOR];
+	uint32_t cksum;
+	uint8_t buf[WT_BTREE_DESC_SECTOR];
 	const char *msg;
 
 	/*
@@ -36,6 +149,9 @@ __wt_desc_read(WT_SESSION_IMPL *session, int salvage)
 	/* Read the first sector. */
 	WT_RET(__wt_read(session, btree->fh, (off_t)0, sizeof(buf), buf));
 	desc = (WT_BTREE_DESC *)buf;
+
+	if (WT_VERBOSE_ISSET(session, read))
+		__desc_dump(session, desc);
 
 	cksum = desc->cksum;
 	desc->cksum = 0;
@@ -74,40 +190,41 @@ err:		__wt_errx(session, "%s%s", msg,
 	if (salvage)
 		return (0);
 
-	if ((desc->root_addr != WT_ADDR_INVALID &&
-	    WT_ADDR_TO_OFF(btree, desc->root_addr) +
-	    (off_t)desc->root_size > btree->fh->file_size) ||
-	    (desc->free_addr != WT_ADDR_INVALID &&
+	if ((desc->free_addr != WT_ADDR_INVALID &&
 	    WT_ADDR_TO_OFF(btree, desc->free_addr) +
 	    (off_t)desc->free_size > btree->fh->file_size)) {
 		__wt_errx(session,
-		    "root or free addresses reference non-existent pages");
+		    "free address references non-existent pages");
 		return (WT_ERROR);
 	}
-
-	if (btree->root_addr != NULL) {
-		__wt_free(session, btree->root_addr);
-		btree->root_size = 0;
-	}
-	if (desc->root_addr == WT_ADDR_INVALID) {
-		btree->root_addr = NULL;
-		btree->root_size = 0;
-	} else {
-		endp = addrbuf;
-		WT_RET(__wt_block_addr_to_buffer(
-		    &endp, desc->root_addr, desc->root_size, 0));
-		addrbuf_len = WT_PTRDIFF32(endp, addrbuf);
-		WT_RET(__wt_strndup(
-		    session, (char *)addrbuf, addrbuf_len, &btree->root_addr));
-		btree->root_size = addrbuf_len;
-	}
-
 	btree->free_addr = desc->free_addr;
 	btree->free_size = desc->free_size;
 
 	btree->lsn = desc->lsn;			/* XXX */
 
 	return (0);
+}
+
+/*
+ * __desc_dump --
+ *	Dump the file's description sector.
+ */
+static void
+__desc_dump(WT_SESSION_IMPL *session, WT_BTREE_DESC *desc)
+{
+	WT_BTREE *btree;
+
+	btree = session->btree;
+
+	WT_VERBOSE(session, read, "%s description", btree->name);
+
+	WT_VERBOSE(session, read, "magic: %" PRIu32, desc->magic);
+	WT_VERBOSE(session, read, "major, minor: %" PRIu32 ", %" PRIu32,
+	    desc->majorv, desc->minorv);
+	WT_VERBOSE(session, read, "checksum: %#" PRIx32, desc->cksum);
+	WT_VERBOSE(session, read, "free addr, size: %" PRIu32 ", %" PRIu32,
+	    desc->free_addr, desc->free_size);
+	WT_VERBOSE(session, read, "lsn: %" PRIu64, desc->lsn);
 }
 
 /*
@@ -127,7 +244,6 @@ __wt_desc_write(WT_SESSION_IMPL *session, WT_FH *fh)
 	desc->majorv = WT_BTREE_MAJOR_VERSION;
 	desc->minorv = WT_BTREE_MINOR_VERSION;
 
-	desc->root_addr = WT_ADDR_INVALID;
 	desc->free_addr = WT_ADDR_INVALID;
 
 	/* Update the checksum. */
@@ -138,17 +254,15 @@ __wt_desc_write(WT_SESSION_IMPL *session, WT_FH *fh)
 }
 
 /*
- * __wt_desc_update --
+ * __desc_update --
  *	Update the file's descriptor structure.
  */
-int
-__wt_desc_update(WT_SESSION_IMPL *session)
+static int
+__desc_update(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_BTREE_DESC *desc;
-	uint32_t addr, size, cksum;
 	uint8_t buf[WT_BTREE_DESC_SECTOR];
-	int update;
 
 	btree = session->btree;
 
@@ -157,34 +271,18 @@ __wt_desc_update(WT_SESSION_IMPL *session)
 	desc = (WT_BTREE_DESC *)buf;
 
 	/* See if anything has changed. */
-	update = 0;
-	if (btree->root_addr == NULL) {
-		addr = WT_ADDR_INVALID;
-		size = 0;
-	} else
-		WT_RET(__wt_block_buffer_to_addr(
-		    btree->root_addr, &addr, &size, &cksum));
-	if (desc->root_addr != addr || desc->root_size != size) {
-		desc->root_addr = addr;
-		desc->root_size = size;
-		update = 1;
-	}
-
-	if (desc->free_addr != btree->free_addr ||
-	    desc->free_size != btree->free_size) {
-		desc->free_addr = btree->free_addr;
-		desc->free_size = btree->free_size;
-		update = 1;
-	}
-	if (!update)
+	if (desc->free_addr == btree->free_addr &&
+	    desc->free_size == btree->free_size &&
+	    desc->lsn == btree->lsn)
 		return (0);
 
+	desc->free_addr = btree->free_addr;
+	desc->free_size = btree->free_size;
 	desc->lsn = btree->lsn;				/* XXX */
 
 	/* Update the checksum. */
 	desc->cksum = 0;
 	desc->cksum = __wt_cksum(buf, sizeof(buf));
 
-	/* Write the first sector. */
 	return (__wt_write(session, btree->fh, (off_t)0, sizeof(buf), buf));
 }

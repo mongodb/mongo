@@ -100,8 +100,8 @@ __wt_addr_string(
     WT_SESSION_IMPL *session, WT_BUF *buf, const uint8_t *addr, uint32_t size)
 {
 	if (addr == NULL) {
-		buf->data = "[NoAddr]";
-		buf->size = WT_STORE_SIZE(strlen("[NoAddr]"));
+		buf->data = WT_NOADDR;
+		buf->size = WT_STORE_SIZE(strlen(WT_NOADDR));
 	} else if (__wt_bm_addr_string(session, buf, addr, size) != 0) {
 		buf->data = "[Error]";
 		buf->size = WT_STORE_SIZE(strlen("[Error]"));

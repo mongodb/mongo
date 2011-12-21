@@ -5,8 +5,8 @@
  *	All rights reserved.
  */
 
-/* The fixed name of the schema file. */
-#define	WT_SCHEMA_FILENAME	"__schema.wt"
+#define	WT_SCHEMA_FILENAME	"__schema.wt"		/* Schema file name */
+#define	WT_SCHEMA_URI		"file:__schema.wt"	/* Schema file URI */
 
 /* Character constants for projection plans. */
 #define	WT_PROJ_KEY	'k' /* Go to key in cursor <arg>. */

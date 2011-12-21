@@ -15,8 +15,6 @@
 
 #include <wt_internal.h>
 
-#define	UTIL_SCHEMA	"file:__schema.wt"	/* Schema file URI */
-
 #define	UTIL_FILE_OK	0x01			/* file: prefix OK */
 #define	UTIL_TABLE_OK	0x02			/* table: prefix OK */
 

@@ -47,9 +47,9 @@ __wt_bm_slvg_start(WT_SESSION_IMPL *session)
 int
 __wt_bm_slvg_end(WT_SESSION_IMPL *session, int success)
 {
-	WT_UNUSED(session);
 	WT_UNUSED(success);
-	return (0);
+
+	return (__wt_desc_write(session, session->btree->fh));
 }
 
 /*

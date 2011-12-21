@@ -45,9 +45,9 @@ list_print(WT_SESSION *session)
 
 	/* Open the schema file. */
 	if ((ret = session->open_cursor(
-	    session, UTIL_SCHEMA, NULL, NULL, &cursor)) != 0) {
+	    session, WT_SCHEMA_URI, NULL, NULL, &cursor)) != 0) {
 		fprintf(stderr, "%s: %s: session.open_cursor: %s\n",
-		    progname, UTIL_SCHEMA, wiredtiger_strerror(ret));
+		    progname, WT_SCHEMA_URI, wiredtiger_strerror(ret));
 		return (1);
 	}
 

@@ -37,9 +37,10 @@ extern int __wt_bm_write(WT_SESSION_IMPL *session,
     WT_BUF *buf,
     uint8_t *addrbuf,
     uint32_t *addrbuf_size);
-extern int __wt_desc_read(WT_SESSION_IMPL *session, int salvage);
+extern int __wt_bm_create(WT_SESSION_IMPL *session, const char *filename);
+extern int __wt_bm_open(WT_SESSION_IMPL *session);
+extern int __wt_bm_close(WT_SESSION_IMPL *session);
 extern int __wt_desc_write(WT_SESSION_IMPL *session, WT_FH *fh);
-extern int __wt_desc_update(WT_SESSION_IMPL *session);
 extern int __wt_block_read(WT_SESSION_IMPL *session,
     WT_BUF *buf,
     uint32_t addr,
@@ -96,7 +97,6 @@ extern int __wt_debug_tree(WT_SESSION_IMPL *session,
 extern int __wt_debug_page(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const char *ofile);
-extern int __wt_debug_desc(WT_SESSION_IMPL *session, const char *ofile);
 extern void __wt_page_out(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     uint32_t flags);
@@ -112,9 +112,7 @@ extern int __wt_btree_open(WT_SESSION_IMPL *session,
     const char *config,
     const char *cfg[],
     uint32_t flags);
-extern int __wt_btree_reopen(WT_SESSION_IMPL *session,
-    const char *cfg[],
-    uint32_t flags);
+extern int __wt_btree_reopen(WT_SESSION_IMPL *session, uint32_t flags);
 extern int __wt_btree_root_empty(WT_SESSION_IMPL *session, WT_PAGE **leafp);
 extern int __wt_btree_close(WT_SESSION_IMPL *session);
 extern int __wt_btree_huffman_open(WT_SESSION_IMPL *session,
@@ -153,6 +151,8 @@ extern int __wt_cache_read( WT_SESSION_IMPL *session,
 extern int __wt_kv_return(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
     int key_ret);
+extern int __wt_btree_get_root(WT_SESSION_IMPL *session);
+extern int __wt_btree_set_root(WT_SESSION_IMPL *session);
 extern int __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_btree_stat_init(WT_SESSION_IMPL *session);
 extern int __wt_btree_sync(WT_SESSION_IMPL *session, const char *cfg[]);
@@ -451,6 +451,9 @@ extern int __wt_open(WT_SESSION_IMPL *session,
 extern int __wt_close(WT_SESSION_IMPL *session, WT_FH *fh);
 extern int __wt_has_priv(void);
 extern int __wt_remove(WT_SESSION_IMPL *session, const char *name);
+extern int __wt_rename(WT_SESSION_IMPL *session,
+    const char *from,
+    const char *to);
 extern int __wt_read(WT_SESSION_IMPL *session,
     WT_FH *fh,
     off_t offset,
@@ -664,6 +667,16 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref
 extern void __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern void __wt_hazard_empty(WT_SESSION_IMPL *session);
 extern void __wt_hazard_validate(WT_SESSION_IMPL *session, WT_PAGE *page);
+extern void __wt_raw_to_hex(const void *from, void *to, uint32_t *sizep);
+extern void __wt_raw_to_esc_hex(const void *from, void *to, uint32_t *sizep);
+extern int __wt_hex_to_raw( WT_SESSION_IMPL *session,
+    void *from,
+    void *to,
+    uint32_t *sizep);
+extern int __wt_esc_hex_to_raw( WT_SESSION_IMPL *session,
+    void *from,
+    void *to,
+    uint32_t *sizep);
 extern int __wt_huffman_open(WT_SESSION_IMPL *session,
     void *symbol_frequency_array,
     u_int symcnt,

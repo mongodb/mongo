@@ -42,7 +42,7 @@ struct __wt_salvage_cookie {
  */
 struct __wt_btree {
 	WT_RWLOCK *rwlock;		/* Lock for shared/exclusive ops. */
-	uint32_t refcnt;		/* Sessions using this tree. */
+	uint32_t   refcnt;		/* Sessions using this tree. */
 	TAILQ_ENTRY(__wt_btree) q;	/* Linked list of handles */
 
 	const char *name;		/* Logical name */
@@ -82,18 +82,7 @@ struct __wt_btree {
 	void	*root_addr;		/* Root address cookie */
 	uint32_t root_size;
 
-	WT_FH	*fh;			/* Backing file handle */
 	uint64_t lsn;			/* LSN file/offset pair */
-
-	WT_SPINLOCK freelist_lock;	/* Lock to protect the freelist. */
-	uint64_t freelist_bytes;	/* Free-list byte count */
-	uint32_t freelist_entries;	/* Free-list entry count */
-					/* Free-list queues */
-	TAILQ_HEAD(__wt_free_qah, __wt_free_entry) freeqa;
-	TAILQ_HEAD(__wt_free_qsh, __wt_free_entry) freeqs;
-	int	 freelist_dirty;	/* Free-list has been modified */
-	uint32_t free_addr;		/* Free-list addr/size pair */
-	uint32_t free_size;
 
 	WT_PAGE *evict_page;		/* Eviction thread's location */
 
@@ -115,7 +104,18 @@ struct __wt_btree {
 	 * XXX
 	 * BLOCK MANAGER STUFF.
 	 */
-	off_t slvg_off;			/* Salvage file offset */
+	WT_FH	*fh;			/* Backing file handle */
+	off_t	 slvg_off;		/* Salvage file offset */
+
+	WT_SPINLOCK freelist_lock;	/* Lock to protect the freelist. */
+	uint64_t freelist_bytes;	/* Free-list byte count */
+	uint32_t freelist_entries;	/* Free-list entry count */
+					/* Free-list queues */
+	TAILQ_HEAD(__wt_free_qah, __wt_free_entry) freeqa;
+	TAILQ_HEAD(__wt_free_qsh, __wt_free_entry) freeqs;
+	int	 freelist_dirty;	/* Free-list has been modified */
+	uint32_t free_addr;		/* Free-list addr/size pair */
+	uint32_t free_size;
 };
 
 /*

@@ -27,6 +27,7 @@ src/btree/bt_ovfl.c
 src/btree/bt_page.c
 src/btree/bt_read.c
 src/btree/bt_ret.c
+src/btree/bt_root.c
 src/btree/bt_slvg.c
 src/btree/bt_stat.c
 src/btree/bt_sync.c
@@ -72,6 +73,7 @@ src/os_posix/os_mtx.c
 src/os_posix/os_open.c
 src/os_posix/os_priv.c
 src/os_posix/os_remove.c
+src/os_posix/os_rename.c
 src/os_posix/os_rw.c
 src/os_posix/os_sleep.c
 src/os_posix/os_thread.c
@@ -93,6 +95,7 @@ src/support/err.c
 src/support/filename.c
 src/support/global.c
 src/support/hazard.c
+src/support/hex.c
 src/support/huffman.c
 src/support/pow.c
 src/support/rand.c

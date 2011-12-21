@@ -275,13 +275,6 @@ __salvage(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(__slvg_merge_block_free(session, ss));
 
 	/*
-	 * Step 9:
-	 * Write out a file description block (closing the file will update it
-	 * with the correct values).
-	 */
-	WT_ERR(__wt_desc_write(session, btree->fh));
-
-	/*
 	 * Step 10:
 	 * Inform the underlying block manager that we're done.
 	 */
