@@ -139,7 +139,6 @@ namespace mongo {
         
     } 
     
-    // TODO:  Make recursively fixing
     static void fixQuery( BSONObjBuilder& b  , const BSONObj& obj ) {
         BSONObjIterator i( obj );
         while ( i.more() ) {
@@ -241,7 +240,7 @@ namespace mongo {
 
                         BSONObj result;
                         // TODO
-                        /* bool ok = */ conn->runCommand( ns , /* fixQuery( */ e["command"].Obj() /* ) */, result, e["options"].numberInt() );
+                        /* bool ok = */ conn->runCommand( ns , fixQuery( e["command"].Obj() ), result, e["options"].numberInt() );
 
                         if( check ){
                             int err = scope->invoke( scopeFunc , 0 , &result,  1000 * 60 , false );
