@@ -58,10 +58,18 @@ namespace mongo {
         tv.tv_usec = (int)((long long)(secs*1000*1000) % (1000*1000));
         bool report = logLevel > 3; // solaris doesn't provide these
         DEV report = true;
-        bool ok = setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(tv) ) == 0;
-        if( report && !ok ) log() << "unabled to set SO_RCVTIMEO" << endl;
-        ok = setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (char *) &tv, sizeof(tv) ) == 0;
-        DEV if( report && !ok ) log() << "unabled to set SO_RCVTIMEO" << endl;
+#if defined(_WIN32)
+        tv.tv_sec *= 1000; // Windows timeout is a DWORD, in milliseconds.
+        int status = setsockopt( sock, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv.tv_sec, sizeof(DWORD) ) == 0;
+        if( report && (status == SOCKET_ERROR) ) log() << "unable to set SO_RCVTIMEO" << endl;
+        status = setsockopt( sock, SOL_SOCKET, SO_SNDTIMEO, (char *) &tv.tv_sec, sizeof(DWORD) ) == 0;
+        DEV if( report && (status == SOCKET_ERROR) ) log() << "unable to set SO_SNDTIMEO" << endl;
+#else
+        bool ok = setsockopt( sock, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(tv) ) == 0;
+        if( report && !ok ) log() << "unable to set SO_RCVTIMEO" << endl;
+        ok = setsockopt( sock, SOL_SOCKET, SO_SNDTIMEO, (char *) &tv, sizeof(tv) ) == 0;
+        DEV if( report && !ok ) log() << "unable to set SO_SNDTIMEO" << endl;
+#endif
     }
 
 #if defined(_WIN32)
@@ -736,23 +744,7 @@ namespace mongo {
     }
 
     void Socket::setTimeout( double secs ) {
-        struct timeval tv;
-        tv.tv_sec = (int)secs;
-        tv.tv_usec = (int)((long long)(secs*1000*1000) % (1000*1000));
-        bool report = logLevel > 3; // solaris doesn't provide these
-        DEV report = true;
-#if defined(_WIN32)
-        tv.tv_sec *= 1000; // Windows timeout is a DWORD, in milliseconds.
-        int status = setsockopt(_fd, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv.tv_sec, sizeof(DWORD) ) == 0;
-        if( report && (status == SOCKET_ERROR) ) log() << "unable to set SO_RCVTIMEO" << endl;
-        status = setsockopt(_fd, SOL_SOCKET, SO_SNDTIMEO, (char *) &tv.tv_sec, sizeof(DWORD) ) == 0;
-        DEV if( report && (status == SOCKET_ERROR) ) log() << "unable to set SO_SNDTIMEO" << endl;
-#else
-        bool ok = setsockopt(_fd, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv, sizeof(tv) ) == 0;
-        if( report && !ok ) log() << "unable to set SO_RCVTIMEO" << endl;
-        ok = setsockopt(_fd, SOL_SOCKET, SO_SNDTIMEO, (char *) &tv, sizeof(tv) ) == 0;
-        DEV if( report && !ok ) log() << "unable to set SO_SNDTIMEO" << endl;
-#endif
+        setSockTimeouts( _fd, secs );
     }
 
 #if defined(_WIN32)
