@@ -1307,14 +1307,14 @@ namespace mongo {
 
                 // ouput is determined by post processing on each shard
                 countsB.append("output", outputCount);
-                result.append( "counts" , countsB.obj() );
+                result.append( "counts" , countsB.done() );
 
                 timingBuilder.append( "postProcessing" , t2.millis() );
 
                 result.append( "timeMillis" , t.millis() );
-                result.append( "timing" , timingBuilder.obj() );
+                result.append( "timing" , timingBuilder.done() );
                 result.append("shardCounts", shardCounts);
-                result.append("postProcessCounts", postCountsB.obj());
+                result.append("postProcessCounts", postCountsB.done());
                 return 1;
             }
         } mrCmd;
