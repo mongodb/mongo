@@ -82,8 +82,8 @@ namespace mongo {
         // this could be useful for targetting heavy pagefault locations in the code
         static BOOL bstat = InitializeProcessForWsWatch( GetCurrentProcess() );
         PSAPI_WS_WATCH_INFORMATION_EX wiex[30];
-        DWORD bufsize =  sizeof(wiex)*30;
-        bstat = GetWsChangesEx( GetCurrentProcess(), &wiex[0], (PDWORD)bufsize );
+        DWORD bufsize =  sizeof(wiex);
+        bstat = GetWsChangesEx( GetCurrentProcess(), &wiex[0], &bufsize );
         if (bstat) {
             for (int i=0; i<30; i++) {
                 if (wiex[i].BasicInfo.FaultingPc == 0) break;
