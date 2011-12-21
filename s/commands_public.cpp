@@ -1254,17 +1254,16 @@ namespace mongo {
 
                     // do the splitting round
                     ChunkManagerPtr cm = confOut->getChunkManagerIfExists( finalColLong );
-                    const ChunkMap& chunkMap = cm->getChunkMap();
                     for ( map<BSONObj, int>::iterator it = chunkSizes.begin() ; it != chunkSizes.end() ; ++it ) {
                         BSONObj key = it->first;
                         int size = it->second;
                         assert( size < 0x7fffffff );
 
-                        ChunkMap::const_iterator cit = chunkMap.find(key);
-                        if (cit == chunkMap.end()) {
+                        // key reported should be the chunk's minimum
+                        ChunkPtr c =  cm->findChunk(key);
+                        if ( !c ) {
                             warning() << "Mongod reported " << size << " bytes inserted for key " << key << " but can't find chunk" << endl;
                         } else {
-                            ChunkPtr c = cit->second;
                             c->splitIfShould( size );
                         }
                     }
