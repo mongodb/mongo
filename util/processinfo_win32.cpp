@@ -73,12 +73,30 @@ namespace mongo {
     }
 
     bool ProcessInfo::blockCheckSupported() {
-        return false;
-    }
-
-    bool ProcessInfo::blockInMemory( char * start ) {
-        assert(0);
         return true;
     }
 
+    bool ProcessInfo::blockInMemory( char * start ) {
+#if 0
+        // code for printing out page fault addresses and pc's --
+        // this could be useful for targetting heavy pagefault locations in the code
+        static BOOL bstat = InitializeProcessForWsWatch( GetCurrentProcess() );
+        PSAPI_WS_WATCH_INFORMATION_EX wiex[30];
+        DWORD bufsize =  sizeof(wiex)*30;
+        bstat = GetWsChangesEx( GetCurrentProcess(), &wiex[0], (PDWORD)bufsize );
+        if (bstat) {
+            for (int i=0; i<30; i++) {
+                if (wiex[i].BasicInfo.FaultingPc == 0) break;
+                cout << "faulting pc = " << wiex[i].BasicInfo.FaultingPc << " address = " << wiex[i].BasicInfo.FaultingVa << " thread id = " << wiex[i].FaultingThreadId << endl;
+            }
+        }
+#endif
+        PSAPI_WORKING_SET_EX_INFORMATION wsinfo;
+        wsinfo.VirtualAddress = start;
+        BOOL result = QueryWorkingSetEx( GetCurrentProcess(), &wsinfo, sizeof(wsinfo) );
+        if ( result )
+            if ( wsinfo.VirtualAttributes.Valid )
+                return true;
+        return false;
+    }
 }
