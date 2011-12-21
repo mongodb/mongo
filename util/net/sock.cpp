@@ -742,7 +742,7 @@ namespace mongo {
         bool report = logLevel > 3; // solaris doesn't provide these
         DEV report = true;
 #if defined(_WIN32)
-        tv.tv_sec *= 100; // Windows timeout is a DWORD, in milliseconds.
+        tv.tv_sec *= 1000; // Windows timeout is a DWORD, in milliseconds.
         int status = setsockopt(_fd, SOL_SOCKET, SO_RCVTIMEO, (char *) &tv.tv_sec, sizeof(DWORD) ) == 0;
         if( report && (status == SOCKET_ERROR) ) log() << "unable to set SO_RCVTIMEO" << endl;
         status = setsockopt(_fd, SOL_SOCKET, SO_SNDTIMEO, (char *) &tv.tv_sec, sizeof(DWORD) ) == 0;
