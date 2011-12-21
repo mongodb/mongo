@@ -23,7 +23,7 @@ __wt_cache_read(
 
 	ret = 0;
 
-	WT_ASSERT(session, ref->state = WT_REF_READING);
+	WT_ASSERT(session, ref->state == WT_REF_READING);
 
 	/* Get the address. */
 	__wt_get_addr(parent, ref, &addr, &size);
