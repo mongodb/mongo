@@ -30,7 +30,7 @@ namespace mongo {
     
     class StaticShardInfo {
     public:
-        StaticShardInfo() : _mutex("StaticShardInfo") { }
+        StaticShardInfo() : _mutex("StaticShardInfo"), _rsMutex("RSNameMap") { }
         void reload() {
 
             list<BSONObj> all;
@@ -105,6 +105,16 @@ namespace mongo {
             return i->second;
         }
 
+        // Lookup shard by replica set name. Returns Shard::EMTPY if the name can't be found.
+        // Note: this doesn't refresh the table if the name isn't found, so it's possible that
+        // a newly added shard/Replica Set may not be found.
+        Shard lookupRSName( const string& name) {
+            scoped_lock lk( _rsMutex );
+            ShardMap::iterator i = _rsLookup.find( name );
+
+            return (i == _rsLookup.end()) ? Shard::EMPTY : i->second.get();
+        }
+
         // Useful for ensuring our shard data will not be modified while we use it
         Shard findCopy( const string& ident ){
             ShardPtr found = find( ident );
@@ -127,6 +137,10 @@ namespace mongo {
             
             const ConnectionString& cs = s->getAddress();
             if ( cs.type() == ConnectionString::SET ) {
+                if ( cs.getSetName().size() ) {
+                    scoped_lock lk( _rsMutex);
+                    _rsLookup[ cs.getSetName() ] = s;
+                }
                 vector<HostAndPort> servers = cs.getServers();
                 for ( unsigned i=0; i<servers.size(); i++ ) {
                     _lookup[ servers[i].toString() ] = s;
@@ -213,7 +227,9 @@ namespace mongo {
     private:
         typedef map<string,ShardPtr> ShardMap;
         ShardMap _lookup;
+        ShardMap _rsLookup; // Map from ReplSet name to shard
         mutable mongo::mutex _mutex;
+        mutable mongo::mutex _rsMutex;
     } staticShardInfo;
 
     
@@ -277,6 +293,10 @@ namespace mongo {
 
     bool Shard::isAShardNode( const string& ident ) {
         return staticShardInfo.isAShardNode( ident );
+    }
+
+    Shard Shard::lookupRSName( const string& name) {
+        return staticShardInfo.lookupRSName(name);
     }
 
     void Shard::printShardInfo( ostream& out ) {

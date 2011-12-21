@@ -141,6 +141,7 @@ namespace mongo {
 
         static void getAllShards( vector<Shard>& all );
         static void printShardInfo( ostream& out );
+        static Shard lookupRSName( const string& name);
         
         /**
          * @parm current - shard where the chunk/database currently lives in

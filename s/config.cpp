@@ -859,8 +859,13 @@ namespace mongo {
 
     void ConfigServer::replicaSetChange( const ReplicaSetMonitor * monitor ) {
         try {
+            Shard s = Shard::lookupRSName(monitor->getName());
+            if (s == Shard::EMPTY) {
+                log(1) << "replicaSetChange: shard not found for set: " << monitor->getServerAddress() << endl;
+                return;
+            }
             ScopedDbConnection conn( configServer.getConnectionString(), 30.0 );
-            conn->update( ShardNS::shard , BSON( "_id" << monitor->getName() ) , BSON( "$set" << BSON( "host" << monitor->getServerAddress() ) ) );
+            conn->update( ShardNS::shard , BSON( "_id" << s.getName() ) , BSON( "$set" << BSON( "host" << monitor->getServerAddress() ) ) );
             conn.done();
         }
         catch ( DBException & ) {
