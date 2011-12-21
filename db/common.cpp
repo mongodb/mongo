@@ -38,6 +38,7 @@ namespace mongo {
       struct rlimit rlnproc;
       struct rlimit rlnofile;
 
+#if defined(RLIMIT_NPROC) && defined(RLIMIT_NOFILE)
       if(!getrlimit(RLIMIT_NPROC,&rlnproc) && !getrlimit(RLIMIT_NOFILE,&rlnofile)){
         if(rlnofile.rlim_cur < minNumFiles){
           log() << "Warning: soft rlimits too low. Number of files is " << rlnofile.rlim_cur << ", should be at least " << minNumFiles << endl;
@@ -49,6 +50,7 @@ namespace mongo {
       else{
         log() << "Warning: getrlimit failed" << endl;
       }
+#endif
     }
 
     NOINLINE_DECL OpTime OpTime::skewed() {
