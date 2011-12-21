@@ -29,7 +29,7 @@
 #include "../db/commands.h"
 #include "../db/jsobj.h"
 #include "../db/db.h"
-
+#include "../db/replutil.h"
 #include "../client/connpool.h"
 
 #include "../util/queue.h"
@@ -318,6 +318,7 @@ namespace mongo {
         if (!done) {
             LOG(1) << "adding sharding hook" << endl;
             pool.addHook(new ShardingConnectionHook(false));
+            shardConnectionPool.addHook(new ShardingConnectionHook(true));
             done = true;
         }
     }
@@ -395,6 +396,7 @@ namespace mongo {
             help << " example: { setShardVersion : 'alleyinsider.foo' , version : 1 , configdb : '' } ";
         }
 
+        virtual bool slaveOk() const { return true; }
         virtual LockType locktype() const { return NONE; }
         
         bool checkConfigOrInit( const string& configdb , bool authoritative , string& errmsg , BSONObjBuilder& result , bool locked=false ) const {
@@ -484,6 +486,20 @@ namespace mongo {
                 shardingState.gotShardHost( cmdObj["shardHost"].String() );
             }
             
+
+            // Handle initial shard connection
+            if( cmdObj["version"].eoo() && cmdObj["init"].trueValue() ){
+                result.append( "initialized", true );
+                return true;
+            }
+
+            // we can run on a slave up to here
+            if ( ! isMaster( "admin" ) ) {
+                result.append( "errmsg" , "not master" );
+                result.append( "note" , "from post init in setShardVersion" );
+                return false;
+            }
+
             // step 2
             
             string ns = cmdObj["setShardVersion"].valuestrsafe();
@@ -659,6 +675,11 @@ namespace mongo {
     bool shardVersionOk( const string& ns , string& errmsg ) {
         if ( ! shardingState.enabled() )
             return true;
+
+        if ( ! isMasterNs( ns.c_str() ) )  {
+            // right now connections to secondaries aren't versioned at all
+            return true;
+        }
 
         ShardedConnectionInfo* info = ShardedConnectionInfo::get( false );
 

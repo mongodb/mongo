@@ -157,6 +157,7 @@ namespace mongo {
     }
 
     DiskLoc Helpers::findById(NamespaceDetails *d, BSONObj idquery) {
+        assert(d);
         int idxNo = d->findIdIndex();
         uassert(13430, "no _id index", idxNo>=0);
         IndexDetails& i = d->idx( idxNo );

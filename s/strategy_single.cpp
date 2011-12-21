@@ -182,6 +182,9 @@ namespace mongo {
             vector<Shard> shards;
 
             if ( strcmp( ns , "inprog" ) == 0 ) {
+
+                r.checkAuth();
+
                 Shard::getAllShards( shards );
 
                 BSONArrayBuilder arr( b.subarrayStart( "inprog" ) );
@@ -219,6 +222,9 @@ namespace mongo {
                 arr.done();
             }
             else if ( strcmp( ns , "killop" ) == 0 ) {
+
+                r.checkAuth();
+
                 BSONElement e = q.query["op"];
                 if ( strstr( r.getns() , "admin." ) != 0 ) {
                     b.append( "err" , "unauthorized" );

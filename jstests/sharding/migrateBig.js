@@ -35,8 +35,16 @@ db.printShardingStatus()
 
 assert.throws( function(){  s.adminCommand( { movechunk : "test.foo" , find : { x : 50 } , to : s.getOther( s.getServer( "test" ) ).name } ); } , [] , "move should fail" )
 
-for ( i=0; i<20; i+= 2 )
-    s.adminCommand( { split : "test.foo" , middle : { x : i } } )
+for ( i=0; i<20; i+= 2 ) {
+    try {
+        s.adminCommand( { split : "test.foo" , middle : { x : i } } );
+    }
+    catch ( e ) {
+        // we may have auto split on some of these
+        // which is ok
+        print(e);
+    }
+}
 
 db.printShardingStatus()
 

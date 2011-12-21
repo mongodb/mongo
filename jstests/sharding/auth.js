@@ -146,13 +146,17 @@ for (i=0; i<num; i++) {
     s.getDB("test").foo.insert({x:i, abc : "defg", date : new Date(), str : "all the talk on the market"});
 }
 
-var d1Chunks = s.getDB("config").chunks.count({shard : "d1"});
-var d2Chunks = s.getDB("config").chunks.count({shard : "d2"});
-var totalChunks = s.getDB("config").chunks.count({ns : "test.foo"});
+assert.soon( function(){
 
-print("chunks: " + d1Chunks+" "+d2Chunks+" "+totalChunks);
+        var d1Chunks = s.getDB("config").chunks.count({shard : "d1"});
+        var d2Chunks = s.getDB("config").chunks.count({shard : "d2"});
+        var totalChunks = s.getDB("config").chunks.count({ns : "test.foo"});
 
-assert(d1Chunks > 0 && d2Chunks > 0 && d1Chunks+d2Chunks == totalChunks);
+        print("chunks: " + d1Chunks+" "+d2Chunks+" "+totalChunks);
+
+        return d1Chunks > 0 && d2Chunks > 0 && d1Chunks+d2Chunks == totalChunks;
+    }
+    )
 
 assert.eq(s.getDB("test").foo.count(), num+1);
 

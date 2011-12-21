@@ -122,11 +122,11 @@ namespace mongo {
          * @return true iff an op with the specified ns may be applied.
          */
         bool handleDuplicateDbName( const BSONObj &op, const char *ns, const char *db );
-        
+
     public:
         OplogReader oplogReader;
 
-        static void applyOperation(const BSONObj& op);
+        void applyOperation(const BSONObj& op);
         string hostName;    // ip addr or hostname plus optionally, ":<port>"
         string _sourceName;  // a logical source name.
         string sourceName() const { return _sourceName.empty() ? "main" : _sourceName; }

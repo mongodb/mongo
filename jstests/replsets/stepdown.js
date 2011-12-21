@@ -36,12 +36,15 @@ printjson(result);
 assert.eq(result.ok, 0);
 
 print("\n do stepdown that should work");
+var threw = false;
 try {
     master.getDB("admin").runCommand({replSetStepDown: 50, force : true});
 }
 catch (e) {
     print(e);
+    threw = true;
 }
+assert(threw);
 
 var r2 = master.getDB("admin").runCommand({ismaster : 1});
 assert.eq(r2.ismaster, false);

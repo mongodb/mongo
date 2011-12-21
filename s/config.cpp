@@ -143,25 +143,14 @@ namespace mongo {
 
             log() << "enable sharding on: " << ns << " with shard key: " << fieldsAndOrder << endl;
 
-            // From this point on, 'ns' is going to be treated as a sharded collection. We assume this is the first
-            // time it is seen by the sharded system and thus create the first chunk for the collection. All the remaining
-            // chunks will be created as a by-product of splitting.
             ci.shard( ns , fieldsAndOrder , unique );
             ChunkManagerPtr cm = ci.getCM();
             uassert( 13449 , "collections already sharded" , (cm->numChunks() == 0) );
-            cm->createFirstChunk( getPrimary() );
+            cm->createFirstChunks( getPrimary() );
             _save();
         }
 
-        try {
-            getChunkManager(ns, true)->maybeChunkCollection();
-        }
-        catch ( UserException& e ) {
-            // failure to chunk is not critical enough to abort the command (and undo the _save()'d configDB state)
-            log() << "couldn't chunk recently created collection: " << ns << " " << e << endl;
-        }
-
-        return getChunkManager(ns);
+        return getChunkManager(ns,true,true);
     }
 
     bool DBConfig::removeSharding( const string& ns ) {
@@ -225,10 +214,11 @@ namespace mongo {
         
         assert( ! key.isEmpty() );
         
+        BSONObj newest;
         if ( oldVersion > 0 && ! forceReload ) {
             ScopedDbConnection conn( configServer.modelServer() , 30.0 );
-            BSONObj newest = conn->findOne( ShardNS::chunk , 
-                                            Query( BSON( "ns" << ns ) ).sort( "lastmod" , -1 ) );
+            newest = conn->findOne( ShardNS::chunk , 
+                                    Query( BSON( "ns" << ns ) ).sort( "lastmod" , -1 ) );
             conn.done();
             
             if ( ! newest.isEmpty() ) {
@@ -249,11 +239,32 @@ namespace mongo {
 
         // we are not locked now, and want to load a new ChunkManager
         
-        auto_ptr<ChunkManager> temp( new ChunkManager( ns , key , unique ) );
-        if ( temp->numChunks() == 0 ) {
-            // maybe we're not sharded any more
-            reload(); // this is a full reload
-            return getChunkManager( ns , false );
+        auto_ptr<ChunkManager> temp;
+
+        {
+            scoped_lock lll ( _hitConfigServerLock );
+            
+            if ( ! newest.isEmpty() && ! forceReload ) {
+                // if we have a target we're going for
+                // see if we've hit already
+                
+                scoped_lock lk( _lock );
+                CollectionInfo& ci = _collections[ns];
+                if ( ci.isSharded() && ci.getCM() ) {
+                    ShardChunkVersion currentVersion = newest["lastmod"];
+                    if ( currentVersion == ci.getCM()->getVersion() ) {
+                        return ci.getCM();
+                    }
+                }
+                
+            }
+            
+            temp.reset( new ChunkManager( ns , key , unique ) );
+            if ( temp->numChunks() == 0 ) {
+                // maybe we're not sharded any more
+                reload(); // this is a full reload
+                return getChunkManager( ns , false );
+            }
         }
 
         scoped_lock lk( _lock );

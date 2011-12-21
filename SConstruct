@@ -32,6 +32,16 @@ def findSettingsSetup():
     sys.path.append( ".." )
     sys.path.append( "../../" )
 
+def getThirdPartyShortNames():
+    lst = []
+    for x in os.listdir( "third_party" ):
+        if not x.endswith( ".py" ) or x.find( "#" ) >= 0:
+            continue
+         
+        lst.append( x.rpartition( "." )[0] )
+    return lst
+
+
 # --- options ----
 
 options = {}
@@ -135,6 +145,8 @@ add_option( "staticlibpath", "comma separated list of dirs to search for staticl
 add_option( "boost-compiler", "compiler used for boost (gcc41)" , 1 , True , "boostCompiler" )
 add_option( "boost-version", "boost version for linking(1_38)" , 1 , True , "boostVersion" )
 
+add_option( "no-glibc-check" , "don't check for new versions of glibc" , 0 , False )
+
 # experimental features
 add_option( "mm", "use main memory instead of memory mapped files" , 0 , True )
 add_option( "asio" , "Use Asynchronous IO (NOT READY YET)" , 0 , True )
@@ -169,6 +181,11 @@ add_option( "gdbserver" , "build in gdb server support" , 0 , True )
 add_option( "heapcheck", "link to heap-checking malloc-lib and look for memory leaks during tests" , 0 , False )
 
 add_option("smokedbprefix", "prefix to dbpath et al. for smoke tests", 1 , False )
+
+for shortName in getThirdPartyShortNames():
+    add_option( "use-system-" + shortName , "use system version of library " + shortName , 0 , True )
+
+add_option( "use-system-all" , "use all system libraries " + shortName , 0 , True )
 
 # --- environment setup ---
 
@@ -327,7 +344,7 @@ if has_option( "full" ):
 
 # ------    SOURCE FILE SETUP -----------
 
-commonFiles = Split( "pch.cpp buildinfo.cpp db/indexkey.cpp db/jsobj.cpp bson/oid.cpp db/json.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp db/querypattern.cpp db/projection.cpp shell/mongo.cpp db/security_common.cpp db/security_commands.cpp" )
+commonFiles = Split( "pch.cpp buildinfo.cpp db/indexkey.cpp db/jsobj.cpp bson/oid.cpp db/json.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp db/querypattern.cpp db/projection.cpp shell/mongo.cpp" )
 commonFiles += [ "util/background.cpp" , "util/util.cpp" , "util/file_allocator.cpp" ,
                  "util/assert_util.cpp" , "util/log.cpp" , "util/ramlog.cpp" , "util/md5main.cpp" , "util/base64.cpp", "util/concurrency/vars.cpp", "util/concurrency/task.cpp", "util/debug_util.cpp",
                  "util/concurrency/thread_pool.cpp", "util/password.cpp", "util/version.cpp", "util/signal_handlers.cpp",  
@@ -343,8 +360,9 @@ coreDbFiles = [ "db/commands.cpp" ]
 coreServerFiles = [ "util/net/message_server_port.cpp" , 
                     "client/parallel.cpp" , "db/common.cpp", 
                     "util/net/miniwebserver.cpp" , "db/dbwebserver.cpp" , 
-                    "db/matcher.cpp" , "db/dbcommands_generic.cpp" , "db/dbmessage.cpp" ]
-
+                    "db/matcher.cpp" , "db/dbcommands_generic.cpp" , "db/dbmessage.cpp",
+                    "db/security_common.cpp", "db/security_commands.cpp",
+                  ]
 mmapFiles = [ "util/mmap.cpp" ]
 
 if has_option( "mm" ):
@@ -757,21 +775,20 @@ if not windows:
         keyfile = "jstests/libs/key%s" % keysuffix
         os.chmod( keyfile , stat.S_IWUSR|stat.S_IRUSR )
 
-for x in os.listdir( "third_party" ):
-    if not x.endswith( ".py" ) or x.find( "#" ) >= 0:
-        continue
-         
-    shortName = x.rpartition( "." )[0]
-    path = "third_party/%s" % x
-
-
+moduleFiles = {}
+for shortName in getThirdPartyShortNames():    
+    path = "third_party/%s.py" % shortName
     myModule = imp.load_module( "third_party_%s" % shortName , open( path , "r" ) , path , ( ".py" , "r" , imp.PY_SOURCE ) )
     fileLists = { "commonFiles" : commonFiles , "serverOnlyFiles" : serverOnlyFiles , "scriptingFiles" : scriptingFiles }
     
     options_topass["windows"] = windows
     options_topass["nix"] = nix
     
-    myModule.configure( env , fileLists , options_topass )
+    if has_option( "use-system-" + shortName ) or has_option( "use-system-all" ):
+        print( "using system version of: " + shortName )
+        myModule.configureSystem( env , fileLists , options_topass )
+    else:
+        myModule.configure( env , fileLists , options_topass )
 
 coreServerFiles += scriptingFiles
 
@@ -1131,7 +1148,7 @@ if darwin or clientEnv["_HAVEPCAP"]:
         sniffEnv.Append( LIBS=[ "wpcap" ] )
 
     sniffEnv.Prepend( LIBPATH=["."] )
-    sniffEnv.Append( LIBS=[ "mongotestfiles" ] )
+    sniffEnv.Prepend( LIBS=[ "mongotestfiles" ] )
 
     sniffEnv.Program( "mongosniff" , "tools/sniffer.cpp" )
 
@@ -1166,6 +1183,7 @@ elif not onlyServer:
     shellEnv = doConfigure( shellEnv , shell=True )
 
     shellEnv.Prepend( LIBS=[ "mongoshellfiles"] )
+
     mongo = shellEnv.Program( "mongo" , coreShellFiles )
 
 
@@ -1431,7 +1449,7 @@ def installBinary( e , name ):
     if (solaris or linux) and (not has_option("nostrip")):
         e.AddPostAction( inst, e.Action( 'strip ' + fullInstallName ) )
 
-    if linux and len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) == "s3dist":
+    if not has_option( "no-glibc-check" ) and linux and len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) == "s3dist":
         e.AddPostAction( inst , checkGlibc )
 
     if nix:

@@ -546,7 +546,7 @@ printShardingStatus = function( configDB , verbose ){
             output( "\t" + tojsononeline(db,"",true) );
         
             if (db.partitioned){
-                configDB.collections.find( { _id : new RegExp( "^" + db._id + "\." ) } ).sort( { _id : 1 } ).forEach(
+                configDB.collections.find( { _id : new RegExp( "^" + db._id + "\\." ) } ).sort( { _id : 1 } ).forEach(
                     function( coll ){
                         if ( coll.dropped == false ){
                             output("\t\t" + coll._id + " chunks:");
@@ -1860,7 +1860,11 @@ ReplSetTest.prototype.waitForIndicator = function( node, states, ind, timeout ){
             printjson( status )
             lastTime = new Date().getTime()
         }
-        
+
+        if (typeof status.members == 'undefined') {
+            return false;
+        }
+
         for( var i = 0; i < status.members.length; i++ ){
             if( status.members[i].name == node.host ){
                 for( var j = 0; j < states.length; j++ ){

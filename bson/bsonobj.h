@@ -254,6 +254,11 @@ namespace mongo {
 
         BSONElement getFieldUsingIndexNames(const char *fieldName, const BSONObj &indexKey) const;
 
+        /** arrays are bson objects with numeric and increasing field names
+            @return true if field names are numeric and increasing
+         */
+        bool couldBeArray() const;
+
         /** @return the raw data of the object */
         const char *objdata() const {
             return _objdata;
@@ -360,6 +365,7 @@ namespace mongo {
         string md5() const;
 
         bool operator==( const BSONObj& other ) const { return equal( other ); }
+        bool operator!=(const BSONObj& other) const { return !operator==( other); }
 
         enum MatchType {
             Equality = 0,

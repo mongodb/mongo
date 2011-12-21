@@ -29,6 +29,14 @@ namespace mongo {
     //
     // TODO: better encapsulate this mechanism.
 
+    bool defaultIsVersionable( DBClientBase * conn ){
+        return false;
+    }
+
+    bool defaultInitShardVersion( DBClientBase & conn, BSONObj& result ){
+        return false;
+    }
+
     bool defaultCheckShardVersion( DBClientBase & conn , const string& ns , bool authoritative , int tryNumber ) {
         // no-op in mongod
         return false;
@@ -38,13 +46,12 @@ namespace mongo {
         // no-op in mongod
     }
 
+    boost::function1<bool, DBClientBase* > isVersionableCB = defaultIsVersionable;
+    boost::function2<bool, DBClientBase&, BSONObj& > initShardVersionCB = defaultInitShardVersion;
     boost::function4<bool, DBClientBase&, const string&, bool, int> checkShardVersionCB = defaultCheckShardVersion;
     boost::function1<void, DBClientBase*> resetShardVersionCB = defaultResetShardVersion;
 
     DBConnectionPool shardConnectionPool;
-
-    // Only print the non-top-level-shard-conn warning once if not verbose
-    volatile bool printedShardConnWarning = false;
 
     /**
      * holds all the actual db connections for a client to various servers
@@ -71,7 +78,7 @@ namespace mongo {
                     /* if we're shutting down, don't want to initiate release mechanism as it is slow,
                        and isn't needed since all connections will be closed anyway */
                     if ( inShutdown() ) {
-                        resetShardVersionCB( ss->avail );
+                        if( isVersionableCB( ss->avail ) ) resetShardVersionCB( ss->avail );
                         delete ss->avail;
                     }
                     else
@@ -83,34 +90,8 @@ namespace mongo {
             _hosts.clear();
         }
 
-        DBClientBase * get( const string& addr , const string& ns, bool ignoreDirect = false ) {
+        DBClientBase * get( const string& addr , const string& ns ) {
             _check( ns );
-
-            // Determine if non-shard conn is RS member for warning
-            // All shards added to _hosts if not present in _check()
-            if( ( logLevel >= 1 || ! printedShardConnWarning ) && ! ignoreDirect && _hosts.find( addr ) == _hosts.end() ){
-
-                vector<Shard> all;
-                Shard::getAllShards( all );
-
-                bool isRSMember = false;
-                string parentShard;
-                for ( unsigned i = 0; i < all.size(); i++ ) {
-                    string connString = all[i].getConnString();
-                    if( connString.find( addr ) != string::npos && connString.find( '/' ) != string::npos ){
-                        isRSMember = true;
-                        parentShard = connString;
-                        break;
-                    }
-                }
-
-                if( isRSMember ){
-                    printedShardConnWarning = true;
-                    warning() << "adding shard sub-connection " << addr << " (parent " << parentShard << ") as sharded, this is safe but unexpected" << endl;
-                    printStackTrace();
-                }
-            }
-
 
             Status* &s = _hosts[addr];
             if ( ! s )
@@ -119,7 +100,13 @@ namespace mongo {
             if ( s->avail ) {
                 DBClientBase* c = s->avail;
                 s->avail = 0;
-                shardConnectionPool.onHandedOut( c );
+                try {
+                    shardConnectionPool.onHandedOut( c );
+                }
+                catch ( std::exception& e ) {
+                    delete c;
+                    throw;
+                }
                 return c;
             }
 
@@ -200,24 +187,24 @@ namespace mongo {
 
     thread_specific_ptr<ClientConnections> ClientConnections::_perThread;
 
-    ShardConnection::ShardConnection( const Shard * s , const string& ns, bool ignoreDirect )
+    ShardConnection::ShardConnection( const Shard * s , const string& ns )
         : _addr( s->getConnString() ) , _ns( ns ) {
-        _init( ignoreDirect );
+        _init();
     }
 
-    ShardConnection::ShardConnection( const Shard& s , const string& ns, bool ignoreDirect )
+    ShardConnection::ShardConnection( const Shard& s , const string& ns )
         : _addr( s.getConnString() ) , _ns( ns ) {
-        _init( ignoreDirect );
+        _init();
     }
 
-    ShardConnection::ShardConnection( const string& addr , const string& ns, bool ignoreDirect )
+    ShardConnection::ShardConnection( const string& addr , const string& ns )
         : _addr( addr ) , _ns( ns ) {
-        _init( ignoreDirect );
+        _init();
     }
 
-    void ShardConnection::_init( bool ignoreDirect ) {
+    void ShardConnection::_init() {
         assert( _addr.size() );
-        _conn = ClientConnections::threadInstance()->get( _addr , _ns, ignoreDirect );
+        _conn = ClientConnections::threadInstance()->get( _addr , _ns );
         _finishedInit = false;
     }
 
@@ -226,7 +213,7 @@ namespace mongo {
             return;
         _finishedInit = true;
 
-        if ( _ns.size() ) {
+        if ( _ns.size() && isVersionableCB( _conn ) ) {
             _setVersion = checkShardVersionCB( *_conn , _ns , false , 1 );
         }
         else {
@@ -245,7 +232,7 @@ namespace mongo {
 
     void ShardConnection::kill() {
         if ( _conn ) {
-            resetShardVersionCB( _conn );
+            if( isVersionableCB( _conn ) ) resetShardVersionCB( _conn );
             delete _conn;
             _conn = 0;
             _finishedInit = true;

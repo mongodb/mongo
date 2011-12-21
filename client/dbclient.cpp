@@ -247,6 +247,11 @@ namespace mongo {
         return o["ok"].trueValue();
     }
 
+    bool DBClientWithCommands::isNotMasterErrorString( const BSONElement& e ) {
+        return e.type() == String && str::contains( e.valuestr() , "not master" );
+    }
+
+
     enum QueryOptions DBClientWithCommands::availableOptions() {
         if ( !_haveCachedAvailableOptions ) {
             BSONObj ret;
@@ -598,6 +603,19 @@ namespace mongo {
 
         return true;
     }
+
+
+    inline bool DBClientConnection::runCommand(const string &dbname, const BSONObj& cmd, BSONObj &info, int options) {
+        if ( DBClientWithCommands::runCommand( dbname , cmd , info , options ) )
+            return true;
+        
+        if ( clientSet && isNotMasterErrorString( info["errmsg"] ) ) {
+            clientSet->isntMaster();
+        }
+
+        return false;
+    }
+
 
     void DBClientConnection::_checkConnection() {
         if ( !_failed )
@@ -982,8 +1000,7 @@ namespace mongo {
         if ( clientSet && nReturned ) {
             assert(data);
             BSONObj o(data);
-            BSONElement e = getErrField(o);
-            if ( e.type() == String && str::contains( e.valuestr() , "not master" ) ) {
+            if ( isNotMasterErrorString( getErrField(o) ) ) {
                 clientSet->isntMaster();
             }
         }

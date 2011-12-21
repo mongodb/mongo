@@ -139,6 +139,7 @@ namespace mongo {
 
     MessagingPort::MessagingPort( Socket& sock )
         : Socket( sock ) , piggyBackData( 0 ) {
+        ports.insert(this);
     }
 
     void MessagingPort::shutdown() {

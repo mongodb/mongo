@@ -35,7 +35,7 @@ namespace mongo {
                 return _entireResponse;
             }
 
-            const Headers getHeaders() const {
+            Headers getHeaders() const {
                 return _headers;
             }
 
@@ -76,4 +76,3 @@ namespace mongo {
 #endif
     };
 }
-

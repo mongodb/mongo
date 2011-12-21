@@ -31,6 +31,9 @@ def configure( env , fileLists , options ):
     myenv.Append( CPPDEFINES=["HAVE_CONFIG_H"] )
     fileLists["commonFiles"] += [ myenv.Object(f) for f in getFiles() ]
 
+def configureSystem( env , fileLists , options ):
+
+    env.Append( LIBS=[ "pcrecpp" ] )
 
 
 if __name__ == "__main__":

@@ -308,6 +308,8 @@ namespace mongo {
         bool operator==(const BSONElement& r) const {
             return woCompare( r , true ) == 0;
         }
+        /** Returns true if elements are unequal. */
+        bool operator!=(const BSONElement& r) const { return !operator==(r); }
 
         /** Well ordered comparison.
             @return <0: l<r. 0:l==r. >0:l>r
