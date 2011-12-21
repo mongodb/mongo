@@ -223,7 +223,6 @@ static string previousSearchText;
 // changing prompt for "(reverse-i-search)`text':" etc.
 //
 struct DynamicPrompt : public PromptBase {
-    PromptInfo& realPrompt;                 // the prompt we are drawing over
     char*       searchText;                 // text we are searching for
     int         searchTextLen;              // chars in searchText
     int         direction;                  // current search direction, 1=forward, -1=reverse
@@ -231,7 +230,7 @@ struct DynamicPrompt : public PromptBase {
     int         reverseSearchBasePromptLen;
     int         endSearchBasePromptLen;
 
-    DynamicPrompt( PromptInfo& pi, int initialDirection ) : realPrompt( pi ), direction( initialDirection ) {
+    DynamicPrompt( PromptInfo& pi, int initialDirection ) : direction( initialDirection ) {
         forwardSearchBasePromptLen = strlen( forwardSearchBasePrompt ); // store constant text lengths
         reverseSearchBasePromptLen = strlen( reverseSearchBasePrompt );
         endSearchBasePromptLen = strlen( endSearchBasePrompt );
@@ -342,6 +341,24 @@ public:
 
 };
 
+struct InputBuffer {
+    char*       buf;
+    int         buflen;
+    int         len;
+    int         pos;
+
+    InputBuffer( char* buffer, int bufferLen ) : buf( buffer ), buflen( bufferLen - 1 ), len( 0 ), pos( 0 ) {
+        buf[0] = 0;
+    }
+
+    int getInputLine( PromptInfo& pi );
+    void refreshLine( PromptBase& pi );
+    int completeLine( PromptInfo& pi );
+    void clearScreen( PromptInfo& pi );
+    int incrementalHistorySearch( PromptInfo& pi, int startChar );
+
+};
+
 // Special codes for keyboard input:
 //
 // Between Windows and the various Linux "terminal" programs, there is some
@@ -393,7 +410,6 @@ static int historyMaxLen = LINENOISE_DEFAULT_HISTORY_MAX_LEN;
 static int historyLen = 0;
 static int historyIndex = 0;
 static char** history = NULL;
-static const char* emptyString = "";
 
 static void linenoiseAtExit( void );
 
@@ -610,11 +626,8 @@ static void dynamicRefresh( PromptBase& pi, char *buf, int len, int pos ) {
 /**
  * Refresh the user's input line: the prompt is already onscreen and is not redrawn here
  * @param pi   PromptInfo struct holding information about the prompt and our screen position
- * @param buf  input buffer to be displayed
- * @param len  count of characters in the buffer
- * @param pos  current cursor position within the buffer (0 <= pos <= len)
  */
-static void refreshLine( PromptBase& pi, const char *buf, int len, int pos ) {
+void InputBuffer::refreshLine( PromptBase& pi ) {
 
     // check for a matching brace/bracket/paren, remember its position if found
     int highlight = -1;
@@ -1104,25 +1117,21 @@ static const char breakChars[] = " =+-/\\*?\"'`&<>;|@{([])}";
  * This routine handles the mechanics of updating the user's input buffer with possible replacement of
  * text as the user selects a proposed completion string, or cancels the completion attempt.
  * @param pi     PromptInfo struct holding information about the prompt and our screen position
- * @param buf    input buffer to be displayed
- * @param buflen size of input buffer in bytes
- * @param len    ptr to count of characters in the buffer (updated)
- * @param pos    ptr to current cursor position within the buffer (0 <= pos <= len) (updated)
  */
-static int completeLine( PromptInfo& pi, char *buf, int buflen, int *len, int *pos ) {
+int InputBuffer::completeLine( PromptInfo& pi ) {
     linenoiseCompletions lc = { 0, NULL };
     char c = 0;
 
     // completionCallback() expects a parsable entity, so find the previous break character and extract
     // a copy to parse.  we also handle the case where tab is hit while not at end-of-line.
-    int startIndex = *pos;
+    int startIndex = pos;
     while ( --startIndex >= 0 ) {
         if ( strchr( breakChars, buf[startIndex] ) ) {
             break;
         }
     }
     ++startIndex;
-    int itemLength = *pos - startIndex;
+    int itemLength = pos - startIndex;
     char* parseItem = reinterpret_cast<char *>( malloc( itemLength + 1 ) );
     int i = 0;
     for ( ; i < itemLength; ++i ) {
@@ -1147,19 +1156,22 @@ static int completeLine( PromptInfo& pi, char *buf, int buflen, int *len, int *p
             /* Show completion or original buffer */
             if ( i < lc.len ) {
                 clen = strlen( lc.cvec[i] );
-                displayLength = *len + clen - itemLength;
+                displayLength = len + clen - itemLength;
                 displayText = reinterpret_cast<char *>( malloc( displayLength + 1 ) );
+                InputBuffer temp( displayText, displayLength + 1 );
+                temp.len = displayLength;
+                temp.pos = startIndex + clen;
                 int j = 0;
                 for ( ; j < startIndex; ++j )
                     displayText[j] = buf[j];
                 strcpy( &displayText[j], lc.cvec[i] );
-                strcpy( &displayText[j+clen], &buf[*pos] );
+                strcpy( &displayText[j+clen], &buf[pos] );
                 displayText[displayLength] = 0;
-                refreshLine( pi, displayText, displayLength, startIndex + clen );
+                temp.refreshLine( pi );
                 free( displayText );
             }
             else {
-                refreshLine( pi, buf, *len, *pos );
+                refreshLine( pi );
             }
 
             do {
@@ -1192,18 +1204,18 @@ static int completeLine( PromptInfo& pi, char *buf, int buflen, int *len, int *p
                     /* Update buffer and return */
                     if ( i < lc.len ) {
                         clen = strlen( lc.cvec[i] );
-                        displayLength = *len + clen - itemLength;
+                        displayLength = len + clen - itemLength;
                         displayText = (char *)malloc( displayLength + 1 );
                         int j = 0;
                         for ( ; j < startIndex; ++j )
                             displayText[j] = buf[j];
                         strcpy( &displayText[j], lc.cvec[i] );
-                        strcpy( &displayText[j+clen], &buf[*pos] );
+                        strcpy( &displayText[j+clen], &buf[pos] );
                         displayText[displayLength] = 0;
                         strcpy( buf, displayText );
                         free( displayText );
-                        *pos = startIndex + clen;
-                        *len = displayLength;
+                        pos = startIndex + clen;
+                        len = displayLength;
                     }
                     stop = true;
                     break;
@@ -1215,7 +1227,7 @@ static int completeLine( PromptInfo& pi, char *buf, int buflen, int *len, int *p
     return c; /* Return last read character */
 }
 
-static void linenoiseClearScreen( PromptInfo& pi, char *buf, int len, int pos ) {
+void InputBuffer::clearScreen( PromptInfo& pi ) {
 
 #ifdef _WIN32
     COORD coord = {0, 0};
@@ -1234,7 +1246,7 @@ static void linenoiseClearScreen( PromptInfo& pi, char *buf, int len, int pos ) 
         if ( write( 1, "\n", 1 ) == -1 ) return;
 #endif
     pi.promptCursorRowOffset = pi.promptExtraLines;
-    refreshLine( pi, buf, len, pos );
+    refreshLine( pi );
 }
 
 // convert {CTRL + 'A'}, {CTRL + 'a'} and {CTRL + ctrlChar( 'A' )} into ctrlChar( 'A' )
@@ -1261,20 +1273,18 @@ static int cleanupCtrl( int c ) {
  * deletes characters from it, changes direction, and either accepts the found line (for execution or
  * editing) or cancels.
  * @param pi        PromptInfo struct holding information about the (old, static) prompt and our screen position
- * @param buf       input buffer to be displayed
- * @param buflen    size of input buffer in bytes
- * @param len       ptr to count of characters in the buffer (updated)
- * @param pos       ptr to current cursor position within the buffer (0 <= pos <= len) (updated)
  * @param startChar the character that began the search, used to set the initial direction
  */
-int incrementalHistorySearch( PromptInfo& pi, char *buf, int buflen, int *len, int *pos, int startChar ) {
+int InputBuffer::incrementalHistorySearch( PromptInfo& pi, int startChar ) {
 
     // add the current line to the history list so we don't have to special case it
-    history[historyLen - 1] = reinterpret_cast<char *>( realloc( history[historyLen - 1], *len + 1 ) );
+    history[historyLen - 1] = reinterpret_cast<char *>( realloc( history[historyLen - 1], len + 1 ) );
     strcpy( history[historyLen - 1], buf );
-    int historyLineLength = *len;
-    int historyLinePosition = *pos;
-    refreshLine( pi, emptyString, 0, 0 );                        // erase the old input first
+    int historyLineLength = len;
+    int historyLinePosition = pos;
+    char emptyBuffer[1];
+    InputBuffer empty( emptyBuffer, 1 );
+    empty.refreshLine( pi );                        // erase the old input first
     DynamicPrompt dp( pi, ( startChar == ctrlChar( 'R' ) ) ? -1 : 1 );
 
     dp.previousPromptLen = pi.previousPromptLen;
@@ -1454,26 +1464,19 @@ int incrementalHistorySearch( PromptInfo& pi, char *buf, int buflen, int *len, i
     pb.previousPromptLen = dp.promptChars;
     if ( useSearchedLine ) {
         strcpy( buf, history[historyIndex] );
-        *len = historyLineLength;
-        *pos = historyLinePosition;
+        len = historyLineLength;
+        pos = historyLinePosition;
     }
-    dynamicRefresh( pb, buf, *len, *pos );              // redraw the original prompt with current input
-    pi.promptPreviousInputLen = *len;
+    dynamicRefresh( pb, buf, len, pos );              // redraw the original prompt with current input
+    pi.promptPreviousInputLen = len;
     pi.promptCursorRowOffset = pi.promptExtraLines + pb.promptCursorRowOffset;
 
     previousSearchText = dp.searchText;     // save search text for possible reuse on ctrl-R ctrl-R
     return c;                               // pass a character or -1 back to main loop
 }
 
-static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
-    int pos = 0;
-    int len = 0;
-
-    buf[0] = '\0';
-    buflen--; /* Make sure there is always space for the nulterm */
-
-    /* The latest history entry is always our current buffer, that
-     * initially is just an empty string. */
+int InputBuffer::getInputLine( PromptInfo& pi ) {
+    // The latest history entry is always our current buffer
     linenoiseHistoryAdd( "" );
     historyIndex = historyLen - 1;
 
@@ -1511,7 +1514,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
             return len;
 
         if ( c == -1 ) {
-            refreshLine( pi, buf, len, pos );
+            refreshLine( pi );
             continue;
         }
 
@@ -1520,7 +1523,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
             killRing.lastAction = KillRing::actionOther;
 
             // completeLine does the actual completion and replacement
-            c = completeLine( pi, buf, buflen, &len, &pos );
+            c = completeLine( pi );
 
             if ( c < 0 )                // return on error
                 return len;
@@ -1537,7 +1540,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
         case HOME_KEY:
             killRing.lastAction = KillRing::actionOther;
             pos = 0;
-            refreshLine( pi ,buf, len, pos );
+            refreshLine( pi );
             break;
 
         case ctrlChar( 'B' ):   // ctrl-B, move cursor left by one character
@@ -1545,7 +1548,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
             killRing.lastAction = KillRing::actionOther;
             if ( pos > 0 ) {
                 --pos;
-                refreshLine( pi, buf, len, pos );
+                refreshLine( pi );
             }
             break;
 
@@ -1561,7 +1564,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
                 while ( pos > 0 && isalnum( buf[pos - 1] ) ) {
                     --pos;
                 }
-                refreshLine( pi, buf, len, pos );
+                refreshLine( pi );
             }
             break;
 
@@ -1572,7 +1575,8 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
             free( history[historyLen] );
             // we need one last refresh with the cursor at the end of the line
             // so we don't display the next prompt over the previous input line
-            refreshLine( pi, buf, len, len );  // pass len as pos for EOL
+            pos = len;  // pass len as pos for EOL
+            refreshLine( pi );
             if ( write( 1, "^C", 2 ) == -1 ) return -1;    // Display the ^C we got
             return -1;
 
@@ -1583,7 +1587,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
             if ( len > 0 && pos < len ) {
                 memmove( buf + pos, buf + pos + 1, len - pos );
                 --len;
-                refreshLine( pi, buf, len, pos );
+                refreshLine( pi );
             }
             else if ( len == 0 ) {
                 --historyLen;
@@ -1605,7 +1609,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
                 killRing.kill( &buf[pos], endingPos - pos, true );
                 memmove( buf + pos, buf + endingPos, len - endingPos + 1 );
                 len -= endingPos - pos;
-                refreshLine( pi, buf, len, pos );
+                refreshLine( pi );
             }
             killRing.lastAction = KillRing::actionKill;
             break;
@@ -1614,7 +1618,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
         case END_KEY:
             killRing.lastAction = KillRing::actionOther;
             pos = len;
-            refreshLine( pi, buf, len, pos );
+            refreshLine( pi );
             break;
 
         case ctrlChar( 'F' ):   // ctrl-F, move cursor right by one character
@@ -1622,7 +1626,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
             killRing.lastAction = KillRing::actionOther;
             if ( pos < len ) {
                 ++pos;
-                refreshLine( pi ,buf, len, pos );
+                refreshLine( pi );
             }
             break;
 
@@ -1638,7 +1642,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
                 while ( pos < len && isalnum( buf[pos] ) ) {
                     ++pos;
                 }
-                refreshLine( pi, buf, len, pos );
+                refreshLine( pi );
             }
             break;
 
@@ -1648,7 +1652,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
                 memmove( buf + pos - 1, buf + pos, 1 + len - pos );
                 --pos;
                 --len;
-                refreshLine( pi, buf, len, pos );
+                refreshLine( pi );
             }
             break;
 
@@ -1665,7 +1669,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
                 killRing.kill( &buf[pos], startingPos - pos, false );
                 memmove( buf + pos, buf + startingPos, len - startingPos + 1 );
                 len -= startingPos - pos;
-                refreshLine( pi, buf, len, pos );
+                refreshLine( pi );
             }
             killRing.lastAction = KillRing::actionKill;
             break;
@@ -1675,7 +1679,8 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
             killRing.lastAction = KillRing::actionOther;
             // we need one last refresh with the cursor at the end of the line
             // so we don't display the next prompt over the previous input line
-            refreshLine( pi, buf, len, len );  // pass len as pos for EOL
+            pos = len;    // pass len as pos for EOL
+            refreshLine( pi );
             --historyLen;
             free( history[historyLen] );
             return len;
@@ -1684,12 +1689,12 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
             killRing.kill( &buf[pos], len - pos, true );
             buf[pos] = '\0';
             len = pos;
-            refreshLine( pi, buf, len, pos );
+            refreshLine( pi );
             killRing.lastAction = KillRing::actionKill;
             break;
 
         case ctrlChar( 'L' ):   // ctrl-L, clear screen and redisplay line
-            linenoiseClearScreen( pi, buf, len, pos );
+            clearScreen( pi );
             break;
 
         case ctrlChar( 'N' ):   // ctrl-N, recall next line in history
@@ -1718,13 +1723,13 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
                 strncpy( buf, history[historyIndex], buflen );
                 buf[buflen] = '\0';
                 len = pos = strlen( buf );  // place cursor at end of line
-                refreshLine( pi, buf, len, pos );
+                refreshLine( pi );
             }
             break;
 
         case ctrlChar( 'R' ):   // ctrl-R, reverse history search
         case ctrlChar( 'S' ):   // ctrl-S, forward history search
-            terminatingKeystroke = incrementalHistorySearch( pi, buf, buflen, &len, &pos, c );
+            terminatingKeystroke = incrementalHistorySearch( pi, c );
             break;
 
         case ctrlChar( 'T' ):   // ctrl-T, transpose characters
@@ -1736,7 +1741,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
                 buf[leftCharPos+1] = aux;
                 if ( pos != len )
                     ++pos;
-                refreshLine( pi ,buf, len, pos );
+                refreshLine( pi );
             }
             break;
 
@@ -1746,7 +1751,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
                 len -= pos;
                 memmove( buf, buf + pos, len + 1 );
                 pos = 0;
-                refreshLine( pi, buf, len, pos );
+                refreshLine( pi );
             }
             killRing.lastAction = KillRing::actionKill;
             break;
@@ -1764,7 +1769,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
                 killRing.kill( &buf[pos], startingPos - pos, false );
                 memmove( buf + pos, buf + startingPos, len - startingPos + 1 );
                 len -= startingPos - pos;
-                refreshLine( pi, buf, len, pos );
+                refreshLine( pi );
             }
             killRing.lastAction = KillRing::actionKill;
             break;
@@ -1778,7 +1783,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
                     memmove( buf + pos, restoredText->c_str(), restoredTextLen );
                     pos += restoredTextLen;
                     len += restoredTextLen;
-                    refreshLine( pi, buf, len, pos );
+                    refreshLine( pi );
                     killRing.lastAction = KillRing::actionYank;
                     killRing.lastYankSize = restoredTextLen;
                 }
@@ -1805,7 +1810,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
                     pos += restoredTextLen - killRing.lastYankSize;
                     len += restoredTextLen - killRing.lastYankSize;
                     killRing.lastYankSize = restoredTextLen;
-                    refreshLine( pi, buf, len, pos );
+                    refreshLine( pi );
                     break;
                 }
             }
@@ -1818,7 +1823,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
             raise( SIGSTOP );                       // Break out in mid-line
             enableRawMode();                        // Back from Linux shell, re-enter raw mode
             if ( write( 1, pi.promptText, pi.promptChars ) == -1 ) break; // Redraw prompt
-            refreshLine( pi, buf, len, pos );   // Refresh the line
+            refreshLine( pi );                      // Refresh the line
             break;
 #endif
 
@@ -1829,7 +1834,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
             if ( len > 0 && pos < len ) {
                 memmove( buf + pos, buf + pos + 1, len - pos );
                 --len;
-                refreshLine( pi, buf, len, pos );
+                refreshLine( pi );
             }
             break;
 
@@ -1858,7 +1863,7 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
                         if ( write( 1, &c, 1) == -1 ) return -1;
                     }
                     else {
-                        refreshLine( pi, buf, len, pos );
+                        refreshLine( pi );
                     }
                 }
                 else {  // not at end of buffer, have to move characters to our right
@@ -1867,42 +1872,13 @@ static int linenoisePrompt( char *buf, int buflen, PromptInfo& pi ) {
                     ++len;
                     ++pos;
                     buf[len] = '\0';
-                    refreshLine( pi, buf, len, pos );
+                    refreshLine( pi );
                 }
             }
             break;
         }
     }
     return len;
-}
-
-static int linenoiseRaw( char* buf, int buflen, PromptInfo& pi ) {
-    int count;
-
-    if ( buflen == 0 ) {
-        errno = EINVAL;
-        return -1;
-    }
-
-    if ( isatty( STDIN_FILENO ) ) {     // input is from a terminal
-        if ( enableRawMode() == -1 )
-            return -1;
-        count = linenoisePrompt( buf, buflen, pi );
-        disableRawMode();
-        printf( "\n" );
-    }
-    else {  // input not from a terminal, we should work with piped input, i.e. redirected stdin
-        if ( fgets( buf, buflen, stdin ) == NULL )
-            return -1;
-        count = strlen( buf );
-
-        // if fgets() gave us the newline, remove it
-        if ( count && buf[count-1] == '\n' ) {
-            --count;
-            buf[count] = '\0';
-        }
-    }
-    return count;
 }
 
 /**
@@ -1915,9 +1891,28 @@ static int linenoiseRaw( char* buf, int buflen, PromptInfo& pi ) {
  */
 char* linenoise( const char* prompt ) {
     char buf[LINENOISE_MAX_LINE];               // buffer for user's input
-    PromptInfo pi( prompt, getColumns() );      // struct to hold edited copy of prompt & misc prompt info
-    if ( linenoiseRaw( buf, LINENOISE_MAX_LINE, pi ) == -1 ) {
-        return NULL;
+    int count;
+    if ( isatty( STDIN_FILENO ) ) {             // input is from a terminal
+        if ( enableRawMode() == -1 )
+            return NULL;
+        PromptInfo pi( prompt, getColumns() );  // struct to hold edited copy of prompt & misc prompt info
+        InputBuffer ib( buf, LINENOISE_MAX_LINE );
+        count = ib.getInputLine( pi );
+        disableRawMode();
+        printf( "\n" );
+        if ( count == -1 )
+            return NULL;
+    }
+    else {  // input not from a terminal, we should work with piped input, i.e. redirected stdin
+        if ( fgets( buf, sizeof buf, stdin ) == NULL )
+            return NULL;
+
+        // if fgets() gave us the newline, remove it
+        int count = strlen( buf );
+        if ( count && buf[count-1] == '\n' ) {
+            --count;
+            buf[count] = '\0';
+        }
     }
     return strdup( buf );                       // caller must free buffer
 }
