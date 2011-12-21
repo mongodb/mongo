@@ -32,13 +32,13 @@ namespace mongo {
         invoked before about everything except global var construction.
      */
     void doPreServerStartupInits() { 
+#if defined(RLIMIT_NPROC) && defined(RLIMIT_NOFILE)
       //Check that # of files rlmit > 1000 , and # of processes > # of files/2
       const unsigned int minNumFiles = 1000;
       const double filesToProcsRatio = 2.0;
       struct rlimit rlnproc;
       struct rlimit rlnofile;
 
-#if defined(RLIMIT_NPROC) && defined(RLIMIT_NOFILE)
       if(!getrlimit(RLIMIT_NPROC,&rlnproc) && !getrlimit(RLIMIT_NOFILE,&rlnofile)){
         if(rlnofile.rlim_cur < minNumFiles){
           log() << "Warning: soft rlimits too low. Number of files is " << rlnofile.rlim_cur << ", should be at least " << minNumFiles << endl;
