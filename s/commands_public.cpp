@@ -1206,7 +1206,7 @@ namespace mongo {
                                 dlk = dist_lock_try( &lockSetup , (string)"mapreduce" );
                                 if ( ! dlk.got() ) {
                                     if ( ++tryc % 100 == 0 )
-                                        warning() << "the collection metadata could not be locked for mapreduce, already locked by " << dlk.other();
+                                        warning() << "the collection metadata could not be locked for mapreduce, already locked by " << dlk.other() << endl;
                                     sleepmillis(10);
                                 }
                             }
