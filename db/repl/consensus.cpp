@@ -59,7 +59,7 @@ namespace mongo {
                 return false;
             }
 
-            if (!hopeful || !theReplSet->isElectable(id) ||
+            if ( !theReplSet->isElectable(id) ||
                 (highestPriority && highestPriority->config().priority > hopeful->config().priority)) {
                 return true;
             }
