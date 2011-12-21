@@ -20,6 +20,8 @@ print( "Sharding collection..." )
 
 var admin = mongos.getDB("admin")
 
+assert.eq( coll.getShardVersion().ok, 0 )
+
 admin.runCommand({ enableSharding : "test" })
 admin.runCommand({ shardCollection : "test.foo", key : { _id : 1 } })
 
@@ -34,6 +36,7 @@ coll.getDB().getLastError()
 
 config.printShardingStatus( true )
 
-assert.gt( config.chunks.find({ _id : /test.foo/ }).itcount(), 1 )
+assert.eq( coll.getShardVersion().ok, 1 )
+assert.eq( 101, coll.find().itcount() )
 
 st.stop()
