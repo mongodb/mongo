@@ -1231,7 +1231,7 @@ namespace mongo {
                         for ( map<Shard,BSONObj>::iterator i = results.begin(); i != results.end(); ++i ){
 
                             string server = i->first.getConnString();
-                            BSONObj singleResult = i->second;
+                            singleResult = i->second;
 
                             BSONObj counts = singleResult.getObjectField("counts");
                             reduceCount += counts.getIntField("reduce");
