@@ -395,7 +395,7 @@ int _main(int argc, char* argv[]) {
 }
 int main(int argc, char* argv[]) {
     try {
-        doPreServerStatupInits();
+        doPreServerStartupInits();
         return _main(argc, argv);
     }
     catch(DBException& e) { 

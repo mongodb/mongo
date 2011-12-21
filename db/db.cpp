@@ -567,7 +567,7 @@ string arg_error_check(int argc, char* argv[]) {
 
 int main(int argc, char* argv[]) {
     static StaticObserver staticObserver;
-    doPreServerStatupInits();
+    doPreServerStartupInits();
     getcurns = ourgetns;
 
     po::options_description general_options("General options");

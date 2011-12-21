@@ -23,7 +23,7 @@
 
 int main( int argc, char** argv ) {
     static StaticObserver StaticObserver;
-    doPreServerStatupInits();
+    doPreServerStartupInits();
     UnitTest::runTests();
     return Suite::run(argc, argv, "/tmp/unittest");
 }

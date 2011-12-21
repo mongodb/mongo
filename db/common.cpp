@@ -31,7 +31,24 @@ namespace mongo {
     /** called by mongos, mongod, test. do not call from clients and such. 
         invoked before about everything except global var construction.
      */
-    void doPreServerStatupInits() { 
+    void doPreServerStartupInits() { 
+      //Check that # of files rlmit > 1000 , and # of processes > # of files/2
+      const unsigned int minNumFiles = 1000;
+      const double filesToProcsRatio = 2.0;
+      struct rlimit rlnproc;
+      struct rlimit rlnofile;
+
+      if(!getrlimit(RLIMIT_NPROC,&rlnproc) && !getrlimit(RLIMIT_NOFILE,&rlnofile)){
+        if(rlnofile.rlim_cur < minNumFiles){
+          log() << "Warning: soft rlimits too low. Number of files is " << rlnofile.rlim_cur << ", should be at least " << minNumFiles << endl;
+        }
+        if(rlnproc.rlim_cur < rlnofile.rlim_cur/filesToProcsRatio){
+          log() << "Warning: soft rlimits too low. " << rlnproc.rlim_cur << " processes, " << rlnofile.rlim_cur << " files. Number of processes should be at least "<< 1/filesToProcsRatio << " times number of files." << endl;
+        }
+      }
+      else{
+        log() << "Warning: getrlimit failed" << endl;
+      }
     }
 
     NOINLINE_DECL OpTime OpTime::skewed() {

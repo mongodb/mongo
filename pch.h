@@ -177,7 +177,7 @@ namespace mongo {
     /** called by mongos, mongod, test. do not call from clients and such. 
         invoked before about everything except global var construction.
      */
-    void doPreServerStatupInits();
+    void doPreServerStartupInits();
 
 } // namespace mongo
 
