@@ -54,25 +54,35 @@ namespace mongo {
             _append = append;
 
             bool exists = boost::filesystem::exists(lp);
-            
-            if (!append && exists) {
-                stringstream ss;
-                ss << lp << "." << terseCurrentTime( false );
-                string s = ss.str();
-                rename( lp.c_str() , s.c_str() );
+            bool isdir = boost::filesystem::is_directory(lp);
+ 
+            if ( exists ) {
+                if ( isdir ) {
+                    cout << "logpath [" << lp << "] should be a file name not a directory" << endl;
+                    
+                    dbexit( EXIT_BADOPTIONS );
+                    assert( 0 );
+                }
 
-                cout << "log file [" << lp << "] exists; copied to temporary file [" << s << "]" << endl;
+                if ( ! append ) {
+                    stringstream ss;
+                    ss << lp << "." << terseCurrentTime( false );
+                    string s = ss.str();
+
+                    if ( ! rename( lp.c_str() , s.c_str() ) ) {
+                        cout << "log file [" << lp << "] exists; copied to temporary file [" << s << "]" << endl;
+                    } else {
+                        cout << "log file [" << lp << "] exists and couldn't make backup; run with --logappend or manually remove file" << endl;
+                        
+                        dbexit( EXIT_BADOPTIONS );
+                        assert( 0 );
+                    }
+                }
             }
-
             // test path
             FILE * test = fopen( lp.c_str() , _append ? "a" : "w" );
             if ( ! test ) {
-                if (boost::filesystem::is_directory(lp)) {
-                    cout << "logpath [" << lp << "] should be a file name not a directory" << endl;
-                }
-                else {
-                    cout << "can't open [" << lp << "] for log file: " << errnoWithDescription() << endl;
-                }
+                cout << "can't open [" << lp << "] for log file: " << errnoWithDescription() << endl;
                 dbexit( EXIT_BADOPTIONS );
                 assert( 0 );
             }
