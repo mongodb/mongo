@@ -45,6 +45,12 @@ else
 		AM_CFLAGS="$AM_CFLAGS -mt"
 	fi
 fi
+
+# Linux requires _GNU_SOURCE to be defined for O_DIRECT
+if test "`uname -s`" = "Linux"; then
+	AM_CFLAGS="$AM_CFLAGS -D_GNU_SOURCE"
+fi
+
 AC_SUBST(AM_CFLAGS)
 
 AM_CONDITIONAL([DEBUG], [test "$wt_cv_enable_debug" = "yes"])
