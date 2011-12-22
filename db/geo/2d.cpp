@@ -2575,10 +2575,11 @@ namespace mongo {
 
             int geoIdx = -1;
             if ( cmdObj.hasField("field") ) {
-              geoIdx = d->findIndexByName( (cmdObj["field"].str() + "_").c_str() );
+              BSONObj fieldKeyPattern = BSON( cmdObj["field"].str() << GEO2DNAME );
+              geoIdx = d->findIndexByKeyPattern( fieldKeyPattern );
 
               if ( geoIdx == -1 ) {
-                errmsg = "couldn't find geo index by name :(";
+                errmsg = "couldn't find geo index by key '" + cmdObj["field"].str() + "' :(";
                 return false;
               }
             } else {
