@@ -349,8 +349,7 @@ __track_msg(
  *	Display a tracked entry.
  */
 static void
-__track_print(
-    WT_SESSION_IMPL *session, WT_PAGE *page, WT_PAGE_TRACK *track)
+__track_print(WT_SESSION_IMPL *session, WT_PAGE *page, WT_PAGE_TRACK *track)
 {
 	switch (track->type) {
 	case WT_PT_BLOCK:
