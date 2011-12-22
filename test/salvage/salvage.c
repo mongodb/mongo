@@ -22,7 +22,7 @@
 #define	DUMP	"__slvg.dump"			/* Dump file */
 #define	LOAD	"__slvg.load"			/* Build file */
 #define	RSLT	"__slvg.result"			/* Result file */
-#define	SLVG	"__slvg.build"			/* Salvage file */
+#define	SLVG	"__slvg.slvg"			/* Salvage file */
 
 #define	PSIZE	(2 * 1024)
 #define	OSIZE	(PSIZE / 20)
@@ -147,8 +147,7 @@ run(int r)
 
 	printf("\t%s: run %d\n", __wt_page_type_string(page_type), r);
 
-	(void)remove(SLVG);
-
+	system("rm -f WiredTiger WiredTiger.* __slvg.* __schema.*");
 	assert((res_fp = fopen(RSLT, "w")) != NULL);
 
 	/*
@@ -510,7 +509,10 @@ build(int ikey, int ivalue, int cnt)
 		assert(cursor->insert(cursor) == 0);
 	}
 
-	/* Put a matching entry in the schema table for the salvage file. */
+	/*
+	 * The first time through this routine we put a matching configuration
+	 * in for the salvage file.
+	 */
 	new_slvg = (access(SLVG, F_OK) != 0);
 	if (new_slvg) {
 		assert(session->drop(session, "file:" SLVG, "force") == 0);
@@ -520,8 +522,8 @@ build(int ikey, int ivalue, int cnt)
 	assert(conn->close(conn, 0) == 0);
 
 	/*
-	 * We created the salvage file above, but all we want is the schema
-	 * table entry.
+	 * We created the salvage file above, but all we want is the schema,
+	 * we're creating the salvage file by hand.
 	 */
 	if (new_slvg)
 		(void)remove(SLVG);
