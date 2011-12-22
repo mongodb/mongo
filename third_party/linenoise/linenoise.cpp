@@ -1587,10 +1587,16 @@ int InputBuffer::getInputLine( PromptInfo& pi ) {
                 while ( pos < len && !isalnum( buf[pos] ) ) {
                     ++pos;
                 }
-                if ( pos < len && buf[pos] >= 'a' && buf[pos] <= 'z' ) {
-                    buf[pos] += 'A' - 'a';
+                if ( pos < len && isalnum( buf[pos] ) ) {
+                    if ( buf[pos] >= 'a' && buf[pos] <= 'z' ) {
+                        buf[pos] += 'A' - 'a';
+                    }
+                    ++pos;
                 }
                 while ( pos < len && isalnum( buf[pos] ) ) {
+                    if ( buf[pos] >= 'A' && buf[pos] <= 'Z' ) {
+                        buf[pos] += 'a' - 'A';
+                    }
                     ++pos;
                 }
                 refreshLine( pi );
