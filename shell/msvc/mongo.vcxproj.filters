@@ -273,6 +273,9 @@
     <ClInclude Include="..\..\db\lasterror.h">
       <Filter>db</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\third_party\linenoise\linenoise.h">
+      <Filter>thirdparty</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\db\db.rc">

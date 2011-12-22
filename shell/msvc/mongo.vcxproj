@@ -261,6 +261,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\db\lasterror.h" />
+    <ClInclude Include="..\..\third_party\linenoise\linenoise.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\db\db.rc" />

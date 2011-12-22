@@ -1227,18 +1227,25 @@ int InputBuffer::completeLine( PromptInfo& pi ) {
     return c; /* Return last read character */
 }
 
-void InputBuffer::clearScreen( PromptInfo& pi ) {
-
+/**
+ * Clear the screen ONLY (no redisplay of anything)
+ */
+void linenoiseClearScreen( void ) {
 #ifdef _WIN32
     COORD coord = {0, 0};
     CONSOLE_SCREEN_BUFFER_INFO inf;
-    GetConsoleScreenBufferInfo( console_out, &inf );
-    SetConsoleCursorPosition( console_out, coord );
+    HANDLE screenHandle = GetStdHandle( STD_OUTPUT_HANDLE );
+    GetConsoleScreenBufferInfo( screenHandle, &inf );
+    SetConsoleCursorPosition( screenHandle, coord );
     DWORD count;
-    FillConsoleOutputCharacterA( console_out, ' ', inf.dwSize.X * inf.dwSize.Y, coord, &count );
+    FillConsoleOutputCharacterA( screenHandle, ' ', inf.dwSize.X * inf.dwSize.Y, coord, &count );
 #else
     if ( write( 1, "\x1b[H\x1b[2J", 7 ) <= 0 ) return;
 #endif
+}
+
+void InputBuffer::clearScreen( PromptInfo& pi ) {
+    linenoiseClearScreen();
     if ( write( 1, pi.promptText, pi.promptChars ) == -1 ) return;
 #ifndef _WIN32
     // we have to generate our own newline on line wrap on Linux
