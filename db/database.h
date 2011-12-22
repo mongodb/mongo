@@ -37,6 +37,7 @@ namespace mongo {
     class Database {
     public:
         static bool _openAllFiles;
+        static const int DATABASE_MAGIC = 781231;
 
         // you probably need to be in dbHolderMutex when constructing this
         Database(const char *nm, /*out*/ bool& newDb, const string& _path = dbpath);
@@ -53,7 +54,7 @@ namespace mongo {
         /**
          * tries to make sure that this hasn't been deleted
          */
-        bool isOk() const { return magic == 781231; }
+        bool isOk() const { return magic == DATABASE_MAGIC; }
 
         bool isEmpty() { return ! namespaceIndex.allocated(); }
 
