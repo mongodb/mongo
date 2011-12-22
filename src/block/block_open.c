@@ -190,7 +190,10 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block, int salvage)
 {
 	WT_BLOCK_DESC *desc;
 	uint32_t cksum;
-	uint8_t buf[WT_BLOCK_DESC_SECTOR];
+	uint8_t *buf;
+	int ret;
+
+	WT_RET(__wt_calloc_def(session, WT_BLOCK_DESC_SECTOR, &buf));
 
 	/*
 	 * We currently always do the verification step, because it's cheap
@@ -198,7 +201,8 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block, int salvage)
 	 *
 	 * Read the first sector.
 	 */
-	WT_RET(__wt_read(session, block->fh, (off_t)0, sizeof(buf), buf));
+	WT_ERR(__wt_read(
+	    session, block->fh, (off_t)0, WT_BLOCK_DESC_SECTOR, buf));
 
 	desc = (WT_BLOCK_DESC *)buf;
 	WT_VERBOSE(session, block,
@@ -225,7 +229,7 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block, int salvage)
 	cksum = desc->cksum;
 	desc->cksum = 0;
 	if (desc->magic != WT_BLOCK_MAGIC ||
-	    cksum != __wt_cksum(buf, sizeof(buf)))
+	    cksum != __wt_cksum(buf, WT_BLOCK_DESC_SECTOR))
 		WT_RET_MSG(session, WT_ERROR, "%s %s%s",
 		    "does not appear to be a WiredTiger file",
 		    block->name,
@@ -242,33 +246,35 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block, int salvage)
 	block->write_gen = desc->write_gen;
 
 	/* That's all we check for salvage. */
-	if (salvage)
-		return (0);
+	if (!salvage) {
+		if ((desc->free_offset != WT_BLOCK_INVALID_OFFSET &&
+		    desc->free_offset + desc->free_size >
+		    (uint64_t)block->fh->file_size))
+			WT_RET_MSG(session, WT_ERROR,
+			    "free list offset references "
+			    "non-existent file space");
 
-	if ((desc->free_offset != WT_BLOCK_INVALID_OFFSET &&
-	    desc->free_offset + desc->free_size >
-	    (uint64_t)block->fh->file_size))
-		WT_RET_MSG(session, WT_ERROR,
-		    "free list offset references non-existent file space");
+		block->free_offset = (off_t)desc->free_offset;
+		block->free_size = desc->free_size;
+		block->free_cksum = desc->free_cksum;
+	}
 
-	block->free_offset = (off_t)desc->free_offset;
-	block->free_size = desc->free_size;
-	block->free_cksum = desc->free_cksum;
-
-	return (0);
+err:	__wt_free(session, buf);
+	return (ret);
 }
 
 /*
  * __wt_desc_init --
- *	Write an initial file's descriptor structure.
+ *	Write a file's initial descriptor structure.
  */
 int
 __wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh)
 {
 	WT_BLOCK_DESC *desc;
-	uint8_t buf[WT_BLOCK_DESC_SECTOR];
+	uint8_t *buf;
+	int ret;
 
-	memset(buf, 0, sizeof(buf));
+	WT_RET(__wt_calloc_def(session, WT_BLOCK_DESC_SECTOR, &buf));
 	desc = (WT_BLOCK_DESC *)buf;
 
 	desc->magic = WT_BLOCK_MAGIC;
@@ -280,9 +286,12 @@ __wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh)
 
 	/* Update the checksum. */
 	desc->cksum = 0;
-	desc->cksum = __wt_cksum(buf, sizeof(buf));
+	desc->cksum = __wt_cksum(buf, WT_BLOCK_DESC_SECTOR);
 
-	return (__wt_write(session, fh, (off_t)0, sizeof(buf), buf));
+	ret = __wt_write(session, fh, (off_t)0, WT_BLOCK_DESC_SECTOR, buf);
+
+	__wt_free(session, buf);
+	return (ret);
 }
 
 /*
@@ -293,10 +302,14 @@ static int
 __desc_update(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
 	WT_BLOCK_DESC *desc;
-	uint8_t buf[WT_BLOCK_DESC_SECTOR];
+	uint8_t *buf;
+	int ret;
+
+	WT_RET(__wt_calloc_def(session, WT_BLOCK_DESC_SECTOR, &buf));
 
 	/* Read the first sector. */
-	WT_RET(__wt_read(session, block->fh, (off_t)0, sizeof(buf), buf));
+	WT_ERR(__wt_read(
+	    session, block->fh, (off_t)0, WT_BLOCK_DESC_SECTOR, buf));
 	desc = (WT_BLOCK_DESC *)buf;
 
 	/* See if anything has changed. */
@@ -317,7 +330,12 @@ __desc_update(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
 	/* Update the checksum. */
 	desc->cksum = 0;
-	desc->cksum = __wt_cksum(buf, sizeof(buf));
+	desc->cksum = __wt_cksum(buf, WT_BLOCK_DESC_SECTOR);
 
-	return (__wt_write(session, block->fh, (off_t)0, sizeof(buf), buf));
+	/* Write the first sector. */
+	ret = __wt_write(session,
+	    block->fh, (off_t)0, WT_BLOCK_DESC_SECTOR, buf);
+
+err:	__wt_free(session, buf);
+	return (ret);
 }
