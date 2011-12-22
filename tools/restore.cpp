@@ -73,6 +73,11 @@ public:
         _drop = hasParam( "drop" );
         _keepIndexVersion = hasParam("keepIndexVersion");
 
+        if (isMongos() && _db == "" && exists(root / "config")) {
+            cout << "Cannot do a full restore on a sharded system" << endl;
+            return -1;
+        }
+
         bool doOplog = hasParam( "oplogReplay" );
         if (doOplog) {
             // fail early if errors
