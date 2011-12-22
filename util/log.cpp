@@ -54,6 +54,15 @@ namespace mongo {
             _append = append;
 
             bool exists = boost::filesystem::exists(lp);
+            
+            if (!append && exists) {
+                stringstream ss;
+                ss << lp << "." << terseCurrentTime( false );
+                string s = ss.str();
+                rename( lp.c_str() , s.c_str() );
+
+                cout << "log file [" << lp << "] exists; copied to temporary file [" << s << "]" << endl;
+            }
 
             // test path
             FILE * test = fopen( lp.c_str() , _append ? "a" : "w" );
