@@ -35,9 +35,23 @@ __wt_calloc(WT_SESSION_IMPL *session, size_t number, size_t size, void *retp)
 	if (session != NULL && S2C(session)->stats != NULL)
 		WT_CSTAT_INCR(session, memalloc);
 
+#ifdef HAVE_POSIX_MEMALIGN
+#define	ALIGN_SIZE	512
+	if (size * number >= ALIGN_SIZE) {
+		int ret;
+		if ((ret = posix_memalign(&p, ALIGN_SIZE, number * size)) != 0)
+			WT_RET_MSG(session, ret, "memory allocation");
+		memset(p, 0, number * size);
+		goto done;
+	}
+#endif
+
 	if ((p = calloc(number, size)) == NULL)
 		WT_RET_MSG(session, __wt_errno(), "memory allocation");
 
+#ifdef HAVE_POSIX_MEMALIGN
+done:
+#endif
 	*(void **)retp = p;
 	return (0);
 }
@@ -50,7 +64,7 @@ int
 __wt_realloc(WT_SESSION_IMPL *session,
     size_t *bytes_allocated_ret, size_t bytes_to_allocate, void *retp)
 {
-	void *p;
+	void *p, *newp;
 	size_t bytes_allocated;
 
 	/*
@@ -59,11 +73,6 @@ __wt_realloc(WT_SESSION_IMPL *session,
 	 */
 	WT_ASSERT(session, bytes_to_allocate != 0);
 
-	if (session != NULL && S2C(session)->stats != NULL)
-		WT_CSTAT_INCR(session, memalloc);
-
-	p = *(void **)retp;
-
 	/*
 	 * Sometimes we're allocating memory and we don't care about the
 	 * final length -- bytes_allocated_ret may be NULL.
@@ -71,6 +80,23 @@ __wt_realloc(WT_SESSION_IMPL *session,
 	bytes_allocated =
 	    bytes_allocated_ret == NULL ? 0 : *bytes_allocated_ret;
 	WT_ASSERT(session, bytes_allocated < bytes_to_allocate);
+
+	p = *(void **)retp;
+
+#ifdef HAVE_POSIX_MEMALIGN
+	if (bytes_allocated >= ALIGN_SIZE || bytes_to_allocate >= ALIGN_SIZE) {
+		WT_RET(__wt_calloc(session, bytes_to_allocate, 1, &newp));
+		memcpy(newp, p, bytes_allocated);
+		__wt_free(session, p);
+		p = newp;
+		goto done;
+	}
+#else
+	WT_UNUSED(newp);
+#endif
+
+	if (p == NULL && session != NULL && S2C(session)->stats != NULL)
+		WT_CSTAT_INCR(session, memalloc);
 
 	if ((p = realloc(p, bytes_to_allocate)) == NULL)
 		WT_RET_MSG(session, __wt_errno(), "memory allocation");
@@ -86,6 +112,9 @@ __wt_realloc(WT_SESSION_IMPL *session,
 	memset((uint8_t *)
 	    p + bytes_allocated, 0, bytes_to_allocate - bytes_allocated);
 
+#ifdef HAVE_POSIX_MEMALIGN
+done:
+#endif
 	/* Update caller's bytes allocated value. */
 	if (bytes_allocated_ret != NULL)
 		*bytes_allocated_ret = bytes_to_allocate;
@@ -107,13 +136,6 @@ __wt_strndup(WT_SESSION_IMPL *session, const char *str, size_t len, void *retp)
 		*(void **)retp = NULL;
 		return (0);
 	}
-
-	/*
-	 * !!!
-	 * This function MUST handle a NULL WT_SESSION_IMPL handle.
-	 */
-	if (session != NULL && S2C(session)->stats != NULL)
-		WT_CSTAT_INCR(session, memalloc);
 
 	WT_RET(__wt_calloc(session, len + 1, 1, &p));
 
