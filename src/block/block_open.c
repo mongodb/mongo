@@ -165,10 +165,14 @@ int
 __wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh)
 {
 	WT_BLOCK_DESC *desc;
-	uint8_t buf[WT_BLOCK_DESC_SECTOR];
+	WT_DECL_RET;
+	WT_ITEM *buf;
 
-	memset(buf, 0, sizeof(buf));
-	desc = (void *)buf;
+	/* Use a scratch buffer to get correct alignment for direct I/O. */
+	WT_RET(__wt_scr_alloc(session, WT_BLOCK_DESC_SECTOR, &buf));
+	memset(buf->mem, 0, WT_BLOCK_DESC_SECTOR);
+
+	desc = buf->mem;
 	desc->magic = WT_BLOCK_MAGIC;
 	desc->majorv = WT_BLOCK_MAJOR_VERSION;
 	desc->minorv = WT_BLOCK_MINOR_VERSION;
@@ -177,7 +181,10 @@ __wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh)
 	desc->cksum = 0;
 	desc->cksum = __wt_cksum(desc, WT_BLOCK_DESC_SECTOR);
 
-	return (__wt_write(session, fh, (off_t)0, WT_BLOCK_DESC_SECTOR, desc));
+	ret = __wt_write(session, fh, (off_t)0, WT_BLOCK_DESC_SECTOR, desc);
+
+	__wt_scr_free(&buf);
+	return (ret);
 }
 
 /*
@@ -188,16 +195,19 @@ static int
 __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
 	WT_BLOCK_DESC *desc;
+	WT_DECL_RET;
+	WT_ITEM *buf;
 	uint32_t cksum;
-	uint8_t buf[WT_BLOCK_DESC_SECTOR];
+
+	/* Use a scratch buffer to get correct alignment for direct I/O. */
+	WT_RET(__wt_scr_alloc(session, WT_BLOCK_DESC_SECTOR, &buf));
 
 	/* Read the first sector and verify the file's format. */
-	memset(buf, 0, sizeof(buf));
-	WT_RET(__wt_read(
-	    session, block->fh, (off_t)0, WT_BLOCK_DESC_SECTOR, buf));
+	WT_ERR(__wt_read(
+	    session, block->fh, (off_t)0, WT_BLOCK_DESC_SECTOR, buf->mem));
 
-	desc = (void *)buf;
-	WT_VERBOSE_RET(session, block,
+	desc = buf->mem;
+	WT_VERBOSE_ERR(session, block,
 	    "open: magic %" PRIu32
 	    ", major/minor: %" PRIu32 "/%" PRIu32
 	    ", checksum %#" PRIx32,
@@ -218,16 +228,17 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	desc->cksum = 0;
 	if (desc->magic != WT_BLOCK_MAGIC ||
 	    cksum != __wt_cksum(desc, WT_BLOCK_DESC_SECTOR))
-		WT_RET_MSG(session, WT_ERROR,
+		WT_ERR_MSG(session, WT_ERROR,
 		    "%s does not appear to be a WiredTiger file", block->name);
 
 	if (desc->majorv > WT_BLOCK_MAJOR_VERSION ||
 	    (desc->majorv == WT_BLOCK_MAJOR_VERSION &&
 	    desc->minorv > WT_BLOCK_MINOR_VERSION))
-		WT_RET_MSG(session, WT_ERROR,
+		WT_ERR_MSG(session, WT_ERROR,
 		    "%s is an unsupported version of a WiredTiger file",
 		    block->name);
 
+err:	__wt_scr_free(&buf);
 	return (0);
 }
 
