@@ -194,7 +194,10 @@ namespace mongo {
 
         void reset( const HostAndPort& remote, int op ) {
             reset();
-            _remote = remote;
+            if( _remote != remote ) {
+                // todo : _remote is not thread safe yet is used as such!
+                _remote = remote;
+            }
             _op = op;
         }
 
