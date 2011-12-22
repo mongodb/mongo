@@ -1098,43 +1098,68 @@ namespace mongo {
 
                 set<Shard> shards;
                 set<ServerAndQuery> servers;
-
                 map<Shard,BSONObj> results;
-                try {
-                    SHARDED->commandOp( dbName, shardedCommand, 0, fullns, q, results );
-                }
-                catch( DBException& e ){
-                    e.addContext( str::stream() << "could not run map command on all shards for ns " << fullns << " and query " << q );
-                    throw;
-                }
 
                 BSONObjBuilder shardCountsB;
                 BSONObjBuilder aggCountsB;
                 map<string,long long> countsMap;
                 set< BSONObj > splitPts;
 
-                for ( map<Shard,BSONObj>::iterator i = results.begin(); i != results.end(); ++i ){
+                {
+                    // take distributed lock to prevent split / migration
+                    ConnectionString config = configServer.getConnectionString();
+                    DistributedLock lockSetup( config , fullns );
+                    dist_lock_try dlk;
 
-                    BSONObj mrResult = i->second;
-                    string server = i->first.getConnString();
-
-                    BSONObj counts = mrResult["counts"].embeddedObjectUserCheck();
-                    shardCountsB.append( server , counts );
-                    servers.insert( server );
-
-                    // add up the counts for each shard
-                    // some of them will be fixed later like output and reduce
-                    BSONObjIterator j( counts );
-                    while ( j.more() ) {
-                        BSONElement temp = j.next();
-                        countsMap[temp.fieldName()] += temp.numberLong();
+                    if (shardedInput) {
+                        try{
+                            int tryc = 0;
+                            while ( !dlk.got() ) {
+                                dlk = dist_lock_try( &lockSetup , (string)"mr-parallel" );
+                                if ( ! dlk.got() ) {
+                                    if ( ++tryc % 100 == 0 )
+                                        warning() << "the collection metadata could not be locked for mapreduce, already locked by " << dlk.other() << endl;
+                                    sleepmillis(100);
+                                }
+                            }
+                        }
+                        catch( LockException& e ){
+                            errmsg = str::stream() << "error locking distributed lock for mapreduce " << causedBy( e );
+                            return false;
+                        }
                     }
 
-                    if (mrResult.hasField("splitKeys")) {
-                        BSONElement splitKeys = mrResult.getField("splitKeys");
-                        vector<BSONElement> pts = splitKeys.Array();
-                        for (vector<BSONElement>::iterator it = pts.begin(); it != pts.end(); ++it) {
-                            splitPts.insert(it->Obj().getOwned());
+                    try {
+                        SHARDED->commandOp( dbName, shardedCommand, 0, fullns, q, results );
+                    }
+                    catch( DBException& e ){
+                        e.addContext( str::stream() << "could not run map command on all shards for ns " << fullns << " and query " << q );
+                        throw;
+                    }
+
+                    for ( map<Shard,BSONObj>::iterator i = results.begin(); i != results.end(); ++i ){
+
+                        BSONObj mrResult = i->second;
+                        string server = i->first.getConnString();
+
+                        BSONObj counts = mrResult["counts"].embeddedObjectUserCheck();
+                        shardCountsB.append( server , counts );
+                        servers.insert( server );
+
+                        // add up the counts for each shard
+                        // some of them will be fixed later like output and reduce
+                        BSONObjIterator j( counts );
+                        while ( j.more() ) {
+                            BSONElement temp = j.next();
+                            countsMap[temp.fieldName()] += temp.numberLong();
+                        }
+
+                        if (mrResult.hasField("splitKeys")) {
+                            BSONElement splitKeys = mrResult.getField("splitKeys");
+                            vector<BSONElement> pts = splitKeys.Array();
+                            for (vector<BSONElement>::iterator it = pts.begin(); it != pts.end(); ++it) {
+                                splitPts.insert(it->Obj().getOwned());
+                            }
                         }
                     }
                 }
@@ -1160,9 +1185,6 @@ namespace mongo {
                 long long reduceCount = 0;
                 long long outputCount = 0;
                 BSONObjBuilder postCountsB;
-
-                // Still need for legacy reasons
-                vector<shared_ptr<ShardConnection> > shardConns;
 
                 if (!shardedOutput) {
                     LOG(1) << "MR with single shard output, NS=" << finalColLong << " primary=" << confOut->getPrimary() << endl;
@@ -1195,7 +1217,7 @@ namespace mongo {
 
                     map<BSONObj, int> chunkSizes;
                     {
-                        // take distributed lock to prevent split / migration during post processing
+                        // take distributed lock to prevent split / migration
                         ConnectionString config = configServer.getConnectionString();
                         DistributedLock lockSetup( config , finalColLong );
                         dist_lock_try dlk;
@@ -1203,11 +1225,11 @@ namespace mongo {
                         try{
                             int tryc = 0;
                             while ( !dlk.got() ) {
-                                dlk = dist_lock_try( &lockSetup , (string)"mapreduce" );
+                                dlk = dist_lock_try( &lockSetup , (string)"mr-post-process" );
                                 if ( ! dlk.got() ) {
                                     if ( ++tryc % 100 == 0 )
                                         warning() << "the collection metadata could not be locked for mapreduce, already locked by " << dlk.other() << endl;
-                                    sleepmillis(10);
+                                    sleepmillis(100);
                                 }
                             }
                         }
@@ -1279,9 +1301,6 @@ namespace mongo {
                 } catch ( std::exception e ) {
                     log() << "Cannot cleanup shard results" << causedBy( e ) << endl;
                 }
-
-                for ( unsigned i=0; i<shardConns.size(); i++ )
-                    shardConns[i]->done();
 
                 if ( ! ok ) {
                     errmsg = "final reduce failed: ";
