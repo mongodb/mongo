@@ -125,9 +125,13 @@ __wt_cell_pack_addr(WT_CELL *cell, uint64_t recno, uint32_t size)
 {
 	uint8_t *p;
 
-	p = cell->__chunk + 1;			/* Type + recno */
-	cell->__chunk[0] = WT_CELL_ADDR | WT_CELL_64V;
-	(void)__wt_vpack_uint(&p, 0, recno);
+	p = cell->__chunk + 1;
+	if (recno == 0)				/* Type + recno */
+		cell->__chunk[0] = WT_CELL_ADDR;
+	else {
+		cell->__chunk[0] = WT_CELL_ADDR | WT_CELL_64V;
+		(void)__wt_vpack_uint(&p, 0, recno);
+	}
 						/* Length */
 	(void)__wt_vpack_uint(&p, 0, (uint64_t)size);
 	return (WT_PTRDIFF32(p, cell));
