@@ -216,6 +216,7 @@
     <ClCompile Include="ops\count.cpp" />
     <ClCompile Include="pagefault.cpp" />
     <ClCompile Include="d_globals.cpp" />
+    <ClCompile Include="curop.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\dbclientcursor.h" />

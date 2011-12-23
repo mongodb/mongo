@@ -924,6 +924,9 @@
     <ClCompile Include="..\db\d_globals.cpp">
       <Filter>db</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\curop.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">
