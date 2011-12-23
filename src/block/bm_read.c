@@ -17,31 +17,37 @@ __wt_block_read(WT_SESSION_IMPL *session,
 {
 	WT_BTREE *btree;
 	WT_BUF *tmp;
-	WT_FH *fh;
 	WT_ITEM src, dst;
 	WT_PAGE_DISK *dsk;
+	uint32_t page_cksum;
 	int ret;
 
 	btree = session->btree;
 	tmp = NULL;
-	fh = btree->fh;
 	ret = 0;
 
 	WT_VERBOSE(
 	    session, read, "addr/size %" PRIu32 "/%" PRIu32, addr, size);
+
+	/* Do the read, validate the checksum. */
 	WT_RET(__wt_read(
-	    session, fh, WT_ADDR_TO_OFF(btree, addr), size, buf->mem));
+	    session, btree->fh, WT_ADDR_TO_OFF(btree, addr), size, buf->mem));
 	buf->size = size;
 
 	dsk = buf->mem;
-	cksum = dsk->cksum;
-	dsk->cksum = 0;
-	if (cksum != __wt_cksum(dsk, size)) {
-		if (!F_ISSET(session, WT_SESSION_SALVAGE_QUIET_ERR))
-			__wt_errx(session,
-			    "read checksum error: %" PRIu32 "/%" PRIu32,
-			    addr, size);
-		return (WT_ERROR);
+	if (cksum != 0) {
+		dsk->cksum = 0;
+		page_cksum = __wt_cksum(dsk, size);
+		if (cksum != page_cksum) {
+			if (!F_ISSET(session, WT_SESSION_SALVAGE_QUIET_ERR))
+				__wt_errx(session,
+				    "read checksum error %" PRIu32 " [%"
+				    PRIu32 "-%" PRIu32 ", %" PRIu32 ", %"
+				    PRIu32 "]",
+				    cksum, addr,
+				    addr + (size / 512 - 1), size, page_cksum);
+			return (WT_ERROR);
+		}
 	}
 
 	/*
