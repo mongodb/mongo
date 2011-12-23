@@ -60,6 +60,8 @@ struct __wt_btree {
 	uint32_t   refcnt;		/* Sessions using this tree. */
 	TAILQ_ENTRY(__wt_btree) q;	/* Linked list of handles */
 
+	volatile uint32_t lru_count;	/* Count of threads in LRU eviction. */
+
 	const char *name;		/* Logical name */
 	const char *filename;		/* File name */
 	const char *config;		/* Configuration string */

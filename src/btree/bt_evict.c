@@ -152,8 +152,10 @@ __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CACHE *cache;
 	WT_EVICT_REQ *er, *er_end;
+	int first;
 
 	cache = S2C(session)->cache;
+	first = 1;
 
 	/*
 	 * Application threads request forced eviction of pages when they
@@ -181,13 +183,22 @@ __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* Find an empty slot and enter the eviction request. */
 	WT_EVICT_REQ_FOREACH(er, er_end, cache)
 		if (er->session == NULL) {
+			/* Always leave one empty slot */
+			if (first) {
+				first = 0;
+				continue;
+			}
 			__evict_req_set(session, er, page, WT_EVICT_REQ_PAGE);
 			__wt_evict_server_wake(session);
 			return (0);
 		}
 
-	__wt_errx(session, "eviction server request table full");
-	return (WT_ERROR);
+	/*
+	 * The request table is full, that's okay for page requests: another
+	 * thread will see this later.
+	 */
+	WT_VERBOSE(session, evictserver, "eviction server request table full");
+	return (WT_RESTART);
 }
 
 /*
@@ -403,6 +414,10 @@ __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 	WT_VERBOSE(session, evictserver,
 	    "file request: %s",
 	   (F_ISSET(er, WT_EVICT_REQ_CLOSE) ? "close" : "sync"));
+
+	/* If this is a close, wait for LRU eviction activity to drain. */
+	while (F_ISSET(er, WT_EVICT_REQ_CLOSE) && er->btree->lru_count > 0)
+		__wt_yield();
 
 	/*
 	 * We can't evict the page just returned to us, it marks our place in
@@ -653,7 +668,7 @@ __evict_dup_remove(WT_SESSION_IMPL *session)
  */
 static void
 __evict_get_page(
-    WT_SESSION_IMPL *session, int is_app, WT_BTREE **btreep, WT_PAGE **pagep)
+    WT_SESSION_IMPL *session, WT_BTREE **btreep, WT_PAGE **pagep)
 {
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
@@ -676,16 +691,6 @@ __evict_get_page(
 		++cache->evict_current;
 
 		/*
-		 * For now, application sessions can only evict pages from
-		 * trees they have open.  Otherwise, closing a different
-		 * session handle could cause the tree we are evicting from
-		 * to be closed underneath us.
-		 */
-		if (is_app &&
-		    __wt_session_has_btree(session, evict->btree) != 0)
-			break;
-
-		/*
 		 * Switch the page state to evicting while holding the eviction
 		 * mutex to prevent multiple attempts to evict it.  For pages
 		 * that are already being evicted, including pages on the
@@ -695,6 +700,12 @@ __evict_get_page(
 		ref = evict->page->ref;
 		if (!WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_EVICTING))
 			continue;
+
+		/*
+		 * Increment the LRU count in the btree handle to prevent it
+		 * from being closed under us.
+		 */
+		WT_ATOMIC_ADD(evict->btree->lru_count, 1);
 
 		*pagep = evict->page;
 		*btreep = evict->btree;
@@ -724,12 +735,15 @@ __evict_get_page(
  *	Called by both eviction and application threads to evict a page.
  */
 int
-__wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
+__wt_evict_lru_page(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree, *saved_btree;
+	WT_CACHE *cache;
 	WT_PAGE *page;
 
-	__evict_get_page(session, is_app, &btree, &page);
+	cache = S2C(session)->cache;
+
+	__evict_get_page(session, &btree, &page);
 	if (page == NULL)
 		return (WT_NOTFOUND);
 
@@ -753,6 +767,8 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 			page->ref->state = WT_REF_MEM;
 	}
 
+	WT_ATOMIC_ADD(btree->lru_count, -1);
+
 	WT_CLEAR_BTREE_IN_SESSION(session);
 	session->btree = saved_btree;
 
@@ -769,7 +785,7 @@ __evict_pages(WT_SESSION_IMPL *session)
 	u_int i;
 
 	for (i = 0; i < WT_EVICT_GROUP; i++)
-		if (__wt_evict_lru_page(session, 0) != 0)
+		if (__wt_evict_lru_page(session) != 0)
 			break;
 }
 

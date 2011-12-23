@@ -14,6 +14,8 @@
 int
 __wt_btree_sync(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	int ret;
+
 	WT_UNUSED(cfg);
 
 	/*
@@ -37,5 +39,9 @@ __wt_btree_sync(WT_SESSION_IMPL *session, const char *cfg[])
 	 * already works that way.   None of these problems can't be fixed, but
 	 * I don't see a reason to change at this time, either.
 	 */
-	return (__wt_evict_file_serial(session, 0));
+	do {
+		ret = __wt_evict_file_serial(session, 0);
+	} while (ret == WT_RESTART);
+
+	return (ret);
 }

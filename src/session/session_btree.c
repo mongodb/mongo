@@ -29,22 +29,6 @@ __wt_session_add_btree(
 }
 
 /*
- * __wt_session_has_btree --
- *	Check whether a tree is already open in a session's cache.
- */
-int
-__wt_session_has_btree(WT_SESSION_IMPL *session, WT_BTREE *btree)
-{
-	WT_BTREE_SESSION *btree_session;
-
-	TAILQ_FOREACH(btree_session, &session->btrees, q)
-		if (btree_session->btree == btree)
-			return (0);
-
-	return (WT_NOTFOUND);
-}
-
-/*
  * __wt_session_lock_btree --
  *	Lock a btree handle.
  */
