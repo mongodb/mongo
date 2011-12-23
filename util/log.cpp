@@ -55,27 +55,31 @@ namespace mongo {
 
             bool exists = boost::filesystem::exists(lp);
             bool isdir = boost::filesystem::is_directory(lp);
- 
+            bool isreg = boost::filesystem::is_regular_file(lp);
+
             if ( exists ) {
                 if ( isdir ) {
-                    cout << "logpath [" << lp << "] should be a file name not a directory" << endl;
+                    cout << "logpath [" << lp << "] should be a filename, not a directory" << endl;
                     
                     dbexit( EXIT_BADOPTIONS );
                     assert( 0 );
                 }
 
                 if ( ! append ) {
-                    stringstream ss;
-                    ss << lp << "." << terseCurrentTime( false );
-                    string s = ss.str();
+                    // only attempt rename if log is regular file
+                    if ( isreg ) {
+                        stringstream ss;
+                        ss << lp << "." << terseCurrentTime( false );
+                        string s = ss.str();
 
-                    if ( ! rename( lp.c_str() , s.c_str() ) ) {
-                        cout << "log file [" << lp << "] exists; copied to temporary file [" << s << "]" << endl;
-                    } else {
-                        cout << "log file [" << lp << "] exists and couldn't make backup; run with --logappend or manually remove file" << endl;
-                        
-                        dbexit( EXIT_BADOPTIONS );
-                        assert( 0 );
+                        if ( ! rename( lp.c_str() , s.c_str() ) ) {
+                            cout << "log file [" << lp << "] exists; copied to temporary file [" << s << "]" << endl;
+                        } else {
+                            cout << "log file [" << lp << "] exists and couldn't make backup; run with --logappend or manually remove file (" << strerror(errno) << ")" << endl;
+                            
+                            dbexit( EXIT_BADOPTIONS );
+                            assert( 0 );
+                        }
                     }
                 }
             }
