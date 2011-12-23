@@ -6,6 +6,8 @@
 #include "../../client/dbclient.h"
 #include "../security.h"
 
+#include <boost/algorithm/string.hpp>
+
 #ifndef _WIN32
 # ifndef __sunos__
 #  include <ifaddrs.h>
@@ -34,12 +36,16 @@ namespace mongo {
 #if !defined(_WIN32) && !defined(__sunos__)
 
     vector<string> getMyAddrs() {
+        vector<string> out;
         ifaddrs * addrs;
+        
+        if ( ! cmdLine.bind_ip.empty() ) {
+            boost::split( out, cmdLine.bind_ip, boost::is_any_of( ", " ) );
+            return out;
+        }
 
         int status = getifaddrs(&addrs);
         massert(13469, "getifaddrs failure: " + errnoWithDescription(errno), status == 0);
-
-        vector<string> out;
 
         // based on example code from linux getifaddrs manpage
         for (ifaddrs * addr = addrs; addr != NULL; addr = addr->ifa_next) {
