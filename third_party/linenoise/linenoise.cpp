@@ -341,21 +341,22 @@ public:
 
 };
 
-struct InputBuffer {
+class InputBuffer {
     char*       buf;
     int         buflen;
     int         len;
     int         pos;
 
+    void clearScreen( PromptInfo& pi );
+    int incrementalHistorySearch( PromptInfo& pi, int startChar );
+    int completeLine( PromptInfo& pi );
+    void refreshLine( PromptBase& pi );
+
+public:
     InputBuffer( char* buffer, int bufferLen ) : buf( buffer ), buflen( bufferLen - 1 ), len( 0 ), pos( 0 ) {
         buf[0] = 0;
     }
-
     int getInputLine( PromptInfo& pi );
-    void refreshLine( PromptBase& pi );
-    int completeLine( PromptInfo& pi );
-    void clearScreen( PromptInfo& pi );
-    int incrementalHistorySearch( PromptInfo& pi, int startChar );
 
 };
 
@@ -1227,18 +1228,25 @@ int InputBuffer::completeLine( PromptInfo& pi ) {
     return c; /* Return last read character */
 }
 
-void InputBuffer::clearScreen( PromptInfo& pi ) {
-
+/**
+ * Clear the screen ONLY (no redisplay of anything)
+ */
+void linenoiseClearScreen( void ) {
 #ifdef _WIN32
     COORD coord = {0, 0};
     CONSOLE_SCREEN_BUFFER_INFO inf;
-    GetConsoleScreenBufferInfo( console_out, &inf );
-    SetConsoleCursorPosition( console_out, coord );
+    HANDLE screenHandle = GetStdHandle( STD_OUTPUT_HANDLE );
+    GetConsoleScreenBufferInfo( screenHandle, &inf );
+    SetConsoleCursorPosition( screenHandle, coord );
     DWORD count;
-    FillConsoleOutputCharacterA( console_out, ' ', inf.dwSize.X * inf.dwSize.Y, coord, &count );
+    FillConsoleOutputCharacterA( screenHandle, ' ', inf.dwSize.X * inf.dwSize.Y, coord, &count );
 #else
     if ( write( 1, "\x1b[H\x1b[2J", 7 ) <= 0 ) return;
 #endif
+}
+
+void InputBuffer::clearScreen( PromptInfo& pi ) {
+    linenoiseClearScreen();
     if ( write( 1, pi.promptText, pi.promptChars ) == -1 ) return;
 #ifndef _WIN32
     // we have to generate our own newline on line wrap on Linux
@@ -1352,25 +1360,17 @@ int InputBuffer::incrementalHistorySearch( PromptInfo& pi, int startChar ) {
 
         // these characters stay in search mode and update the display
         case ctrlChar( 'S' ):
-            if ( dp.direction == -1 ) {
-                dp.direction = 1;
-                dp.updateSearchPrompt();
-            }
-            else {
-                searchAgain = true;
-            }
-            break;
-
         case ctrlChar( 'R' ):
             if ( dp.searchTextLen == 0 ) {  // if no current search text, recall previous text
                 dp.updateSearchText( previousSearchText.c_str() );
             }
-            if ( dp.direction == 1 ) {
-                dp.direction = -1;
-                dp.updateSearchPrompt();
+            if ( ( dp.direction ==  1 && c == ctrlChar( 'R' ) ) ||
+                 ( dp.direction == -1 && c == ctrlChar( 'S' ) ) ) {
+                dp.direction = 0 - dp.direction;    // reverse direction
+                dp.updateSearchPrompt();            // change the prompt
             }
             else {
-                searchAgain = true;
+                searchAgain = true;                 // same direction, search again
             }
             break;
 
@@ -1580,6 +1580,29 @@ int InputBuffer::getInputLine( PromptInfo& pi ) {
             if ( write( 1, "^C", 2 ) == -1 ) return -1;    // Display the ^C we got
             return -1;
 
+        case META + 'c':        // meta-C, give word initial Cap
+        case META + 'C':
+            killRing.lastAction = KillRing::actionOther;
+            if ( pos < len ) {
+                while ( pos < len && !isalnum( buf[pos] ) ) {
+                    ++pos;
+                }
+                if ( pos < len && isalnum( buf[pos] ) ) {
+                    if ( buf[pos] >= 'a' && buf[pos] <= 'z' ) {
+                        buf[pos] += 'A' - 'a';
+                    }
+                    ++pos;
+                }
+                while ( pos < len && isalnum( buf[pos] ) ) {
+                    if ( buf[pos] >= 'A' && buf[pos] <= 'Z' ) {
+                        buf[pos] += 'a' - 'A';
+                    }
+                    ++pos;
+                }
+                refreshLine( pi );
+            }
+            break;
+
         // ctrl-D, delete the character under the cursor
         // on an empty line, exit the shell
         case ctrlChar( 'D' ):
@@ -1697,6 +1720,23 @@ int InputBuffer::getInputLine( PromptInfo& pi ) {
             clearScreen( pi );
             break;
 
+        case META + 'l':        // meta-L, lowercase word
+        case META + 'L':
+            killRing.lastAction = KillRing::actionOther;
+            if ( pos < len ) {
+                while ( pos < len && !isalnum( buf[pos] ) ) {
+                    ++pos;
+                }
+                while ( pos < len && isalnum( buf[pos] ) ) {
+                    if ( buf[pos] >= 'A' && buf[pos] <= 'Z' ) {
+                        buf[pos] += 'a' - 'A';
+                    }
+                    ++pos;
+                }
+                refreshLine( pi );
+            }
+            break;
+
         case ctrlChar( 'N' ):   // ctrl-N, recall next line in history
         case ctrlChar( 'P' ):   // ctrl-P, recall previous line in history
         case DOWN_ARROW_KEY:
@@ -1754,6 +1794,23 @@ int InputBuffer::getInputLine( PromptInfo& pi ) {
                 refreshLine( pi );
             }
             killRing.lastAction = KillRing::actionKill;
+            break;
+
+        case META + 'u':        // meta-U, uppercase word
+        case META + 'U':
+            killRing.lastAction = KillRing::actionOther;
+            if ( pos < len ) {
+                while ( pos < len && !isalnum( buf[pos] ) ) {
+                    ++pos;
+                }
+                while ( pos < len && isalnum( buf[pos] ) ) {
+                    if ( buf[pos] >= 'a' && buf[pos] <= 'z' ) {
+                        buf[pos] += 'A' - 'a';
+                    }
+                    ++pos;
+                }
+                refreshLine( pi );
+            }
             break;
 
         // ctrl-W, kill to whitespace (not word) to left of cursor

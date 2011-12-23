@@ -60,6 +60,7 @@ namespace mongo {
             else {
                 _lookup.clear();
             }
+            _rsLookup.clear();
 
             for ( list<BSONObj>::iterator i=all.begin(); i!=all.end(); ++i ) {
                 BSONObj o = *i;
@@ -154,6 +155,15 @@ namespace mongo {
                 ShardPtr s = i->second;
                 if ( s->getName() == name ) {
                     _lookup.erase(i++);
+                }
+                else {
+                    ++i;
+                }
+            }
+            for ( ShardMap::iterator i = _rsLookup.begin(); i!=_rsLookup.end(); ) {
+                ShardPtr s = i->second;
+                if ( s->getName() == name ) {
+                    _rsLookup.erase(i++);
                 }
                 else {
                     ++i;

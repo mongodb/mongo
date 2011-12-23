@@ -73,6 +73,9 @@ t.mapReduce( map, red, {out: { replace: out }} )
 t.mapReduce( map, red, {out: { reduce: out }} )
 t.mapReduce( map, red, {out: { merge: out }} )
 
+// make sure it fails if output to a diff db
+assert.throws(function() { t.mapReduce( map, red, {out: { replace: out, db: "admin" }} ) })
+
 stopMongod( port );
 
 print("\n\n\nmr_auth.js SUCCESS\n\n\n");

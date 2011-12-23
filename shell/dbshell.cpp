@@ -854,6 +854,9 @@ int _main( int argc, char* argv[] ) {
             if ( linePtr ) {
                 while ( linePtr[0] == ' ' )
                     ++linePtr;
+                int lineLen = strlen( linePtr );
+                while ( lineLen > 0 && linePtr[lineLen - 1] == ' ' )
+                    linePtr[--lineLen] = 0;
             }
 
             if ( ! linePtr || ( strlen( linePtr ) == 4 && strstr( linePtr , "exit" ) ) ) {
@@ -868,6 +871,11 @@ int _main( int argc, char* argv[] ) {
             if ( code == "exit" || code == "exit;" ) {
                 free( line );
                 break;
+            }
+            if ( code == "cls" ) {
+                free( line );
+                linenoiseClearScreen();
+                continue;
             }
 
             if ( code.size() == 0 ) {
