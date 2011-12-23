@@ -116,12 +116,15 @@ namespace mongo {
         DiskLoc currLoc() const { return _c ? _c->currLoc() : DiskLoc(); }
         BSONObj currKey() const { return _c ? _c->currKey() : BSONObj(); }
         virtual bool mayRecordPlan() const {
-            return complete() && !stopRequested();
+            return !_yieldRecoveryFailed && complete() && !stopRequested();
         }
         shared_ptr<Cursor> cursor() const { return _c; }
     private:
         void mayAdvance() {
-            if ( _mustAdvance && _c ) {
+            if ( !_c ) {
+                return;
+            }
+            if ( _mustAdvance ) {
                 _c->advance();
                 _mustAdvance = false;
             }
@@ -185,36 +188,7 @@ namespace mongo {
             return DiskLoc();            
         }
         virtual bool advance() {
-            if ( _takeover ) {
-                return _takeover->advance();
-            }
-            
-            // Ok to advance if currOp in an error state due to failed yield recovery.
-            // This may be the case when advance() is called by recoverFromYield().
-            if ( !( _currOp && _currOp->error() ) && !ok() ) {
-                return false;
-            }
-            
-            _currOp = 0;
-            shared_ptr<QueryOp> op = _mps->nextOp();
-            rethrowOnError( op );            
-
-            QueryOptimizerCursorOp *qocop = dynamic_cast<QueryOptimizerCursorOp*>( op.get() );
-            if ( !op->complete() ) {
-                // 'qocop' will be valid until we call _mps->nextOp() again.
-                _currOp = qocop;
-            }
-            else if ( op->stopRequested() ) {
-                if ( qocop->cursor() ) {
-                    _takeover.reset( new MultiCursor( _mps,
-                                                     qocop->cursor(),
-                                                     op->matcher( qocop->cursor() ),
-                                                     *op,
-                                                     _nscanned - qocop->cursor()->nscanned() ) );
-                }
-            }
-            
-            return ok();
+            return _advance( false );
         }
         virtual BSONObj currKey() const {
             if ( _takeover ) {
@@ -256,9 +230,9 @@ namespace mongo {
             }
             if ( _currOp ) {
                 _mps->recoverFromYield();
-                if ( _currOp->error() ) {
-                    // See if we can advance to a non error op.
-                    advance();
+                if ( _currOp->error() || !ok() ) {
+                    // Advance to a non error op or a following $or clause if possible.
+                    _advance( true );
                 }
             }
         }
@@ -308,6 +282,36 @@ namespace mongo {
         }
 
     private:
+        bool _advance( bool force ) {
+            if ( _takeover ) {
+                return _takeover->advance();
+            }
+
+            if ( !force && !ok() ) {
+                return false;
+            }
+
+            _currOp = 0;
+            shared_ptr<QueryOp> op = _mps->nextOp();
+            rethrowOnError( op );
+
+            QueryOptimizerCursorOp *qocop = dynamic_cast<QueryOptimizerCursorOp*>( op.get() );
+            if ( !op->complete() ) {
+                // 'qocop' will be valid until we call _mps->nextOp() again.
+                _currOp = qocop;
+            }
+            else if ( op->stopRequested() ) {
+                if ( qocop->cursor() ) {
+                    _takeover.reset( new MultiCursor( _mps,
+                                                     qocop->cursor(),
+                                                     op->matcher( qocop->cursor() ),
+                                                     *op,
+                                                     _nscanned - qocop->cursor()->nscanned() ) );
+                }
+            }
+
+            return ok();
+        }
         void rethrowOnError( const shared_ptr< QueryOp > &op ) {
             // If all plans have erred out, assert.
             if ( op->error() ) {
