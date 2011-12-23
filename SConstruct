@@ -664,13 +664,16 @@ elif "win32" == os.sys.platform:
         # /LTCG link time code generation
         env.Append( CPPFLAGS= " /GL " ) 
         env.Append( LINKFLAGS=" /LTCG " )
+        # /DEBUG will tell the linker to create a .pdb file
+        # which WinDbg and Visual Studio will use to resolve
+        # symbols if you want to debug a release-mode image
+        env.Append( LINKFLAGS=" /DEBUG " )
     else:
         # /Od disable optimization
-        # /ZI debug info w/edit & continue 
+        # /Z7 debug info goes into each individual .obj file -- no .pdb created 
         # /TP it's a c++ file
         # RTC1 /GZ (Enable Stack Frame Run-Time Error Checking)
         env.Append( CPPFLAGS=" /RTC1 /MDd /Z7 /TP /errorReport:none " )
-        env.Append( CPPFLAGS=' /Fd"mongod.pdb" ' )
 
         if debugBuild:
             env.Append( LINKFLAGS=" /debug " )
