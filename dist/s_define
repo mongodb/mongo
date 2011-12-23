@@ -6,7 +6,7 @@ trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
 # List of files to search.
 l=`sed -e 's,#.*,,' -e '/^$/d' -e 's,^,../,' filelist`
-l="$l `echo ../src/include/*.i`"
+l="$l `echo ../src/include/*.i ../src/utilities/*.c `"
 
 # Special include files: ignore their macros by including them in the search
 l="$l ../src/include/verify_build.h ../src/include/wiredtiger_ext.h"
