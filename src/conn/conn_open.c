@@ -72,10 +72,11 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 
 	/* Complain if WT_BTREE handles weren't closed. */
 	while ((btree = TAILQ_FIRST(&conn->btqh)) != NULL) {
-		WT_SET_BTREE_IN_SESSION(session, btree);
-
 		if (F_ISSET(btree, WT_BTREE_OPEN))
-			__wt_errx(session, "Connection has open btree handle");
+			__wt_errx(session,
+			    "Connection has an open btree handle: %s",
+			    btree->name);
+		WT_SET_BTREE_IN_SESSION(session, btree);
 
 		WT_TRET(__wt_btree_close(session));
 	}
