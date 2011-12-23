@@ -164,6 +164,54 @@ namespace ReplSetTests {
         }
     };
 
+    class CappedInitialSync : public Base {
+        string _ns;
+        dblock lk;
+        Client::Context _context;
+
+        string spec() const {
+            return "{\"capped\":true,\"size\":512}";
+        }
+
+        void create() {
+            dblock lk;
+            string err;
+            ASSERT(userCreateNS( _ns.c_str(), fromjson( spec() ), err, false ));
+        }
+
+        void drop() {
+            string s( _ns );
+            string errmsg;
+            BSONObjBuilder result;
+            dropCollection( s, errmsg, result );
+        }
+    public:
+        CappedInitialSync() : _ns("unittests.foo.bar"), _context(_ns) {
+            if (nsdetails(_ns.c_str()) != NULL) {
+                drop();
+            }
+        }
+        ~CappedInitialSync() {
+            if ( nsdetails(_ns.c_str()) == NULL )
+                return;
+            drop();
+        }
+
+        void run() {
+            create();
+
+            BSONObjBuilder b;
+            b.appendTimestamp("ts", OpTime::now().asLL());
+            b.append("op", "u");
+            b.append("o", BSON("$set" << BSON("x" << 456)));
+            b.append("o2", BSON("_id" << 123 << "x" << 123));
+            b.append("ns", _ns);
+
+            // in an annoying twist of api, returns true on failure
+            assert(applyOperation_inlock(b.obj(), true));
+        }
+    };
+
 
     class All : public Suite {
     public:
@@ -173,6 +221,7 @@ namespace ReplSetTests {
         void setupTests() {
             add< TestInitApplyOp >();
             add< TestInitApplyOp2 >();
+            add< CappedInitialSync >();
         }
     } myall;
 }

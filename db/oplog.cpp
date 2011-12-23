@@ -748,11 +748,18 @@ namespace mongo {
                     // of the form
                     //   { _id:..., { x : {$size:...} }
                     // thus this is not ideal.
-                    else if( nsdetails(ns) == NULL || Helpers::findById(nsdetails(ns), updateCriteria).isNull() ) {
-                        failedUpdate = true; 
-                    }
-                    else { 
-                        // it's present; zero objects were updated because of additional specifiers in the query for idempotence
+                    else {
+                        NamespaceDetails *nsd = nsdetails(ns);
+
+                        if (nsd == NULL ||
+                            (nsd->findIdIndex() >= 0 && Helpers::findById(nsd, updateCriteria).isNull()) ||
+                            // capped collections won't have an _id index
+                            (nsd->findIdIndex() < 0 && Helpers::findOne(ns, updateCriteria, false).isNull())) {
+                            failedUpdate = true;
+                        }
+
+                        // Otherwise, it's present; zero objects were updated because of additional specifiers
+                        // in the query for idempotence
                     }
                 }
                 else { 
