@@ -106,7 +106,6 @@ namespace mongo {
             else {
                 memcpy(_buf, o.objdata(), sz );
             }
-            _lock.unlock();
         }
 
         int size() const { return *_size; }
