@@ -75,17 +75,16 @@ __wt_cell_type_string(uint8_t type)
 const char *
 __wt_page_addr_string(WT_SESSION_IMPL *session, WT_BUF *buf, WT_PAGE *page)
 {
-	WT_BTREE *btree;
 	uint32_t size;
 	const uint8_t *addr;
 
-	btree = session->btree;
-
 	if (WT_PAGE_IS_ROOT(page)) {
-		addr = btree->root_addr;
-		size = btree->root_size;
-	} else
-		__wt_get_addr(page->parent, page->parent_ref.ref, &addr, &size);
+		buf->data = "[Root]";
+		buf->size = WT_STORE_SIZE(strlen("[Root]"));
+		return (0);
+	}
+
+	__wt_get_addr(page->parent, page->parent_ref.ref, &addr, &size);
 
 	return (__wt_addr_string(session, buf, addr, size));
 }

@@ -34,8 +34,16 @@ __wt_bm_slvg_start(WT_SESSION_IMPL *session)
 			WT_RET(__wt_ftruncate(session, btree->fh, len));
 	}
 
+	/* Reset the description sector. */
+	WT_RET(__wt_desc_write(session, btree->fh));
+
 	/* The first sector of the file is the description record, skip it. */
 	btree->slvg_off = WT_BTREE_DESC_SECTOR;
+
+	/*
+	 * We don't currently need to do anything about the freelist because
+	 * we don't read it for salvage operations.
+	 */
 
 	return (0);
 }
@@ -47,9 +55,11 @@ __wt_bm_slvg_start(WT_SESSION_IMPL *session)
 int
 __wt_bm_slvg_end(WT_SESSION_IMPL *session, int success)
 {
-	WT_UNUSED(success);
+	if (!success)
+		return (0);
 
-	return (__wt_desc_write(session, session->btree->fh));
+	WT_RET(__wt_block_freelist_write(session));
+	return (0);
 }
 
 /*
@@ -61,9 +71,10 @@ __wt_bm_slvg_next(WT_SESSION_IMPL *session,
     WT_BUF *buf, uint8_t *addrbuf, uint32_t *addrbuf_lenp, int *eofp)
 {
 	WT_BTREE *btree;
+	WT_PAGE_DISK *dsk;
 	WT_FH *fh;
 	off_t max, off;
-	uint32_t addr, allocsize, size;
+	uint32_t addr, allocsize, cksum, size;
 	uint8_t *endp;
 
 	*eofp = 0;
@@ -86,13 +97,15 @@ __wt_bm_slvg_next(WT_SESSION_IMPL *session,
 		 * and get a page length from it.
 		 */
 		WT_RET(__wt_read(session, fh, off, allocsize, buf->mem));
+		dsk = buf->mem;
 
 		/*
 		 * The page can't be more than the min/max page size, or past
 		 * the end of the file.
 		 */
 		addr = WT_OFF_TO_ADDR(btree, off);
-		size = ((WT_PAGE_DISK *)buf->mem)->size;
+		size = dsk->size;
+		cksum = dsk->cksum;
 		if (size == 0 ||
 		    size % allocsize != 0 ||
 		    size > WT_BTREE_PAGE_SIZE_MAX ||
@@ -106,7 +119,7 @@ __wt_bm_slvg_next(WT_SESSION_IMPL *session,
 		 * we ignore this block.
 		 */
 		WT_RET(__wt_buf_initsize(session, buf, size));
-		if (__wt_block_read(session, buf, addr, size, WT_VERIFY)) {
+		if (__wt_block_read(session, buf, addr, size, cksum)) {
 skip:			WT_VERBOSE(session, salvage,
 			    "skipping %" PRIu32 "B at file offset %" PRIu64,
 			    allocsize, (uint64_t)off);
@@ -124,9 +137,9 @@ skip:			WT_VERBOSE(session, salvage,
 		break;
 	}
 
-	/* Create an address cookie that references this block. */
+	/* Re-create the address cookie that should reference this block. */
 	endp = addrbuf;
-	WT_RET(__wt_block_addr_to_buffer(&endp, addr, size, 0));
+	WT_RET(__wt_block_addr_to_buffer(&endp, addr, size, cksum));
 	*addrbuf_lenp = WT_PTRDIFF32(endp, addrbuf);
 
 	/* We're successfully returning the page, move past it. */

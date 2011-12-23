@@ -79,8 +79,10 @@ struct __wt_btree {
 	WT_COMPRESSOR *compressor;	/* Page compressor */
 
 	WT_PAGE *root_page;		/* Root page */
-	void	*root_addr;		/* Root address cookie */
-	uint32_t root_size;
+	WT_ADDR  root_addr;		/* Replacement root address */
+	int	 root_update;		/* 0: free original root blocks
+					   1: free saved root blocks and
+					      update on close */
 
 	uint64_t lsn;			/* LSN file/offset pair */
 
@@ -107,6 +109,9 @@ struct __wt_btree {
 	WT_FH	*fh;			/* Backing file handle */
 	off_t	 slvg_off;		/* Salvage file offset */
 
+	uint32_t frags;			/* Total frags */
+	uint8_t *fragbits;		/* Frag tracking bit list */
+
 	WT_SPINLOCK freelist_lock;	/* Lock to protect the freelist. */
 	uint64_t freelist_bytes;	/* Free-list byte count */
 	uint32_t freelist_entries;	/* Free-list entry count */
@@ -123,9 +128,9 @@ struct __wt_btree {
  * were acquired.
  */
 #ifdef HAVE_DIAGNOSTIC
-#define	__wt_page_in(a, b, c, d)					\
-	__wt_page_in_func(a, b, c, d, __FILE__, __LINE__)
+#define	__wt_page_in(a, b, c)						\
+	__wt_page_in_func(a, b, c, __FILE__, __LINE__)
 #else
-#define	__wt_page_in(a, b, c, d)					\
-	__wt_page_in_func(a, b, c, d)
+#define	__wt_page_in(a, b, c)						\
+	__wt_page_in_func(a, b, c)
 #endif

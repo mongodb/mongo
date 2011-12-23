@@ -2443,14 +2443,12 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	switch (F_ISSET(page, WT_PAGE_REC_MASK)) {
 	case 0:	/*
 		 * The page has never been reconciled before, track the original
-		 * address blocks (if any).
+		 * address blocks (if any).   If we're splitting the root page
+		 * we may schedule the same blocks to be freed repeatedly: that
+		 * is OK, the track function checks for duplicates.
 		 */
-		if (WT_PAGE_IS_ROOT(page)) {
-			if (btree->root_addr != NULL)
-				WT_RET(__wt_rec_track_block(
-				    session, WT_PT_BLOCK,
-				    page, btree->root_addr, btree->root_size));
-		} else if (page->parent_ref.ref->addr != NULL) {
+		if (!WT_PAGE_IS_ROOT(page) &&
+		    page->parent_ref.ref->addr != NULL) {
 			__wt_get_addr(
 			    page->parent, page->parent_ref.ref, &addr, &size);
 			WT_RET(__wt_rec_track_block(

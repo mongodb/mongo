@@ -69,7 +69,7 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 		}
 
 		/* Swap the parent page for the child page. */
-		WT_ERR(__wt_page_in(session, page, &cref->ref, 0));
+		WT_ERR(__wt_page_in(session, page, &cref->ref));
 		__wt_page_release(session, page);
 		page = WT_COL_REF_PAGE(cref);
 	}

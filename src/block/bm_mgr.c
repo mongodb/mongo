@@ -30,12 +30,14 @@ __wt_bm_free(
  */
 int
 __wt_bm_read(WT_SESSION_IMPL *session,
-    WT_BUF *buf, const uint8_t *addrbuf, uint32_t addrbuf_size, uint32_t flags)
+    WT_BUF *buf, const uint8_t *addrbuf, uint32_t addrbuf_size)
 {
+	WT_BTREE *btree;
 	WT_BUF *tmp;
 	uint32_t addr, size, cksum;
 	int ret;
 
+	btree = session->btree;
 	ret = 0;
 
 	/* Crack the cookie. */
@@ -48,8 +50,8 @@ __wt_bm_read(WT_SESSION_IMPL *session,
 	/* Read the block. */
 	WT_RET(__wt_block_read(session, buf, addr, size, cksum));
 
-	/* Optionally verify the page: used by verify. */
-	if (!LF_ISSET(WT_VERIFY))
+	/* Optionally verify the page. */
+	if (btree->fragbits == NULL)
 		return (0);
 
 	WT_RET(__wt_scr_alloc(session, 0, &tmp));
@@ -81,8 +83,14 @@ __wt_bm_write(WT_SESSION_IMPL *session,
 	 * Diagnostics: verify the disk page: this violates layering, but it's
 	 * the place we can ensure we never write a corrupted page.
 	 */
-	WT_ASSERT(session, __wt_verify_dsk(
-	    session, "[NoAddr]", (WT_PAGE_DISK *)buf->data, buf->size) == 0);
+#ifdef HAVE_DIAGNOSTIC
+	{
+	int ret;
+	if ((ret = __wt_verify_dsk(session,
+	    "[write-check]", (WT_PAGE_DISK *)buf->data, buf->size)) != 0)
+		return (ret);
+	}
+#endif
 
 	WT_RET(__wt_block_write(session, buf, &addr, &size, &cksum));
 

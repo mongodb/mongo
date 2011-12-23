@@ -154,6 +154,17 @@ struct __wt_page_disk {
 	(++(lsn))
 	uint64_t lsn;			/* 08-15: LSN file/offset pair */
 
+	/*
+	 * Page checksums are stored in two places.  First, a page's checksum is
+	 * stored in the tree page that references a page as part of the address
+	 * cookie.  This is done to ensure we detect corruption, as storing the
+	 * checksum in the on-disk page implies a 1 in 2^32 chance corruption of
+	 * the page will result in a valid checksum).  Second, a page's checksum
+	 * is stored in the disk header.  This is for salvage, so that salvage
+	 * knows when it's found a page that has some chance of being useful.
+	 * This isn't risky because the complete address cookie in the reference
+	 * page is compared before we connect the two pages back together.
+	 */
 	uint32_t cksum;			/* 16-19: checksum */
 
 	/*

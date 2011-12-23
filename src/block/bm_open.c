@@ -7,7 +7,6 @@
 
 #include "wt_internal.h"
 
-static void __desc_dump(WT_SESSION_IMPL *, WT_BTREE_DESC *);
 static int  __desc_read(WT_SESSION_IMPL *, int);
 static int  __desc_update(WT_SESSION_IMPL *);
 
@@ -56,19 +55,15 @@ __wt_bm_open(WT_SESSION_IMPL *session)
 
 	btree = session->btree;
 
-	TAILQ_INIT(&btree->freeqa);
-	TAILQ_INIT(&btree->freeqs);
-	btree->free_addr = WT_ADDR_INVALID;
-	btree->free_size = 0;
-	__wt_spin_init(session, &btree->freelist_lock);
+	__wt_block_freelist_init(session);
 
 	/* Open the underlying file handle. */
 	WT_RET(__wt_open(session, btree->filename, 0666, 1, &btree->fh));
 
 	/*
-	 * Read the file's metadata (unless it's a salvage operation and the
-	 * force flag is set, in which case we don't care what the file looks
-	 * like).
+	 * Normally we read the file's meta-data to see if this is a WiredTiger
+	 * file.  But, if it's a salvage operation and force is set, we ignore
+	 * the file's format entirely.
 	 */
 	cval.val = 0;
 	if (F_ISSET(btree, WT_BTREE_SALVAGE)) {
@@ -77,7 +72,7 @@ __wt_bm_open(WT_SESSION_IMPL *session)
 		if (ret != 0 && ret != WT_NOTFOUND)
 			WT_RET(ret);
 	}
-	if (!F_ISSET(btree, WT_BTREE_SALVAGE) || cval.val == 0)
+	if (cval.val == 0)
 		WT_ERR(__desc_read(
 		    session, F_ISSET(btree, WT_BTREE_SALVAGE) ? 1 : 0));
 
@@ -85,7 +80,7 @@ __wt_bm_open(WT_SESSION_IMPL *session)
 	if (F_ISSET(btree, WT_BTREE_SALVAGE))
 		return (0);
 
-	/* Read in the free list. */
+	/* Read the free list. */
 	WT_ERR(__wt_block_freelist_read(session));
 
 	return (0);
@@ -150,8 +145,17 @@ __desc_read(WT_SESSION_IMPL *session, int salvage)
 	WT_RET(__wt_read(session, btree->fh, (off_t)0, sizeof(buf), buf));
 	desc = (WT_BTREE_DESC *)buf;
 
-	if (WT_VERBOSE_ISSET(session, read))
-		__desc_dump(session, desc);
+	WT_VERBOSE(session, block,
+	    "%s description: magic %" PRIu32
+	    ", major/minor: %" PRIu32 "/%" PRIu32
+	    ", checksum %#" PRIx32
+	    ", free addr/size %" PRIu32 "/%" PRIu32
+	    ", lsn %" PRIu64,
+	    btree->name, desc->magic,
+	    desc->majorv, desc->minorv,
+	    desc->cksum,
+	    desc->free_addr, desc->free_size,
+	    desc->lsn);
 
 	cksum = desc->cksum;
 	desc->cksum = 0;
@@ -206,28 +210,6 @@ err:		__wt_errx(session, "%s%s", msg,
 }
 
 /*
- * __desc_dump --
- *	Dump the file's description sector.
- */
-static void
-__desc_dump(WT_SESSION_IMPL *session, WT_BTREE_DESC *desc)
-{
-	WT_BTREE *btree;
-
-	btree = session->btree;
-
-	WT_VERBOSE(session, read, "%s description", btree->name);
-
-	WT_VERBOSE(session, read, "magic: %" PRIu32, desc->magic);
-	WT_VERBOSE(session, read, "major, minor: %" PRIu32 ", %" PRIu32,
-	    desc->majorv, desc->minorv);
-	WT_VERBOSE(session, read, "checksum: %#" PRIx32, desc->cksum);
-	WT_VERBOSE(session, read, "free addr, size: %" PRIu32 ", %" PRIu32,
-	    desc->free_addr, desc->free_size);
-	WT_VERBOSE(session, read, "lsn: %" PRIu64, desc->lsn);
-}
-
-/*
  * __wt_desc_write --
  *	Write the file's descriptor structure.
  */
@@ -245,6 +227,7 @@ __wt_desc_write(WT_SESSION_IMPL *session, WT_FH *fh)
 	desc->minorv = WT_BTREE_MINOR_VERSION;
 
 	desc->free_addr = WT_ADDR_INVALID;
+	desc->free_size = 0;
 
 	/* Update the checksum. */
 	desc->cksum = 0;
@@ -275,6 +258,11 @@ __desc_update(WT_SESSION_IMPL *session)
 	    desc->free_size == btree->free_size &&
 	    desc->lsn == btree->lsn)
 		return (0);
+
+	WT_VERBOSE(session, block,
+	    "updating free list [%" PRIu32 "-%" PRIu32 ", %" PRIu32 "]",
+	    btree->free_addr,
+	    btree->free_addr + (btree->free_size / 512 - 1), btree->free_size);
 
 	desc->free_addr = btree->free_addr;
 	desc->free_size = btree->free_size;

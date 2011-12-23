@@ -20,7 +20,7 @@ static int  __inmem_row_leaf(WT_SESSION_IMPL *, WT_PAGE *);
  */
 int
 __wt_page_in_func(
-    WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify
+    WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref
 #ifdef HAVE_DIAGNOSTIC
     , const char *file, int line
 #endif
@@ -40,8 +40,7 @@ __wt_page_in_func(
 			    ref->state, WT_REF_DISK, WT_REF_READING))
 				break;
 
-			WT_RET(__wt_cache_read(
-			    session, parent, ref, dsk_verify));
+			WT_RET(__wt_cache_read(session, parent, ref));
 			continue;
 		case WT_REF_LOCKED:
 		case WT_REF_READING:

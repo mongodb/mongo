@@ -277,7 +277,7 @@ extern WT_PROCESS __wt_process;
 #define	WT_SERVER_RUN					0x00000001
 #define	WT_SESSION_INTERNAL				0x00000002
 #define	WT_SESSION_SALVAGE_QUIET_ERR			0x00000001
-#define	WT_VERB_allocate				0x00000800
+#define	WT_VERB_block					0x00000800
 #define	WT_VERB_evict					0x00000400
 #define	WT_VERB_evictserver				0x00000200
 #define	WT_VERB_fileops					0x00000100
@@ -289,7 +289,6 @@ extern WT_PROCESS __wt_process;
 #define	WT_VERB_salvage					0x00000004
 #define	WT_VERB_verify					0x00000002
 #define	WT_VERB_write					0x00000001
-#define	WT_VERIFY					0x00000001
 /*
  * API flags section: END
  * DO NOT EDIT: automatically built by dist/api_flags.py.

@@ -171,13 +171,25 @@ __salvage(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/*
 	 * Step 1:
+	 * Clear the salvaged file's root address, we're done with this file
+	 * until it's salvaged.  We do this first on because salvage writes
+	 * a root page when it wraps up, and the eviction of that page updates
+	 * the root's address: if the root address were still set, eviction
+	 * would also free the previous root page, which would collide with
+	 * salvage freeing the previous root page when it reads those blocks
+	 * from the file.
+	 */
+	WT_ERR(__wt_btree_set_root(session, NULL, 0));
+
+	/*
+	 * Step 2:
 	 * Inform the underlying block manager that we're salvaging the file.
 	 */
 	WT_ERR(__wt_bm_slvg_start(session));
 	started = 1;
 
 	/*
-	 * Step 2:
+	 * Step 3:
 	 * Read the file and build in-memory structures that reference any leaf
 	 * or overflow page.  Any pages other than leaf or overflow pages are
 	 * added to the free list.
@@ -185,10 +197,10 @@ __salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ERR(__slvg_read(session, ss));
 
 	/*
-	 * Step 3:
+	 * Step 4:
 	 * Review the relationships between the pages and the overflow items.
 	 *
-	 * Step 4:
+	 * Step 5:
 	 * Add unreferenced overflow page blocks to the free list.
 	 */
 	if (ss->ovfl_next != 0) {
@@ -197,7 +209,7 @@ __salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 
 	/*
-	 * Step 5:
+	 * Step 6:
 	 * Walk the list of pages looking for overlapping ranges to resolve.
 	 * If we find a range that needs to be resolved, set a global flag
 	 * and a per WT_TRACK flag on the pages requiring modification.
@@ -223,7 +235,7 @@ __salvage(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(__slvg_col_range(session, ss));
 
 	/*
-	 * Step 6:
+	 * Step 7:
 	 * We may have lost key ranges in column-store databases, that is, some
 	 * part of the record number space is gone.   Look for missing ranges.
 	 */
@@ -237,7 +249,7 @@ __salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 
 	/*
-	 * Step 7:
+	 * Step 8:
 	 * Build an internal page that references all of the leaf pages,
 	 * and write it, as well as any merged pages, to the file.
 	 *
@@ -261,7 +273,7 @@ __salvage(WT_SESSION_IMPL *session, const char *cfg[])
 		}
 
 	/*
-	 * Step 8:
+	 * Step 9:
 	 * If we had to merge key ranges, we have to do a final pass through
 	 * the leaf page array and discard file pages used during key merges.
 	 * We can't do it earlier: if we free'd the leaf pages we're merging as
@@ -275,7 +287,7 @@ __salvage(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(__slvg_merge_block_free(session, ss));
 
 	/*
-	 * Step 10:
+	 * Step 11:
 	 * Inform the underlying block manager that we're done.
 	 */
 err:	if (started)
@@ -361,11 +373,10 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		case WT_PAGE_COL_INT:
 		case WT_PAGE_FREELIST:
 		case WT_PAGE_ROW_INT:
-			WT_ERR(__wt_bm_free(session, addrbuf, addrbuf_size));
-
 			WT_VERBOSE(session, salvage,
 			    "%s page ignored %s",
 			    __wt_page_type_string(dsk->type), (char *)as->data);
+			WT_ERR(__wt_bm_free(session, addrbuf, addrbuf_size));
 			continue;
 		}
 
@@ -379,11 +390,10 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		 */
 		if (__wt_verify_dsk(session,
 		    (char *)as->data, buf->mem, buf->size) != 0) {
-			WT_ERR(__wt_bm_free(session, addrbuf, addrbuf_size));
-
 			WT_VERBOSE(session, salvage,
 			    "%s page failed verify %s",
 			    __wt_page_type_string(dsk->type), (char *)as->data);
+			WT_ERR(__wt_bm_free(session, addrbuf, addrbuf_size));
 			continue;
 		}
 
@@ -1047,14 +1057,11 @@ __slvg_col_build_internal(
     WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF *ss)
 {
 	WT_ADDR *addr;
-	WT_BTREE *btree;
 	WT_COL_REF *cref;
 	WT_PAGE *page;
 	WT_TRACK *trk;
 	uint32_t i;
 	int ret;
-
-	btree = session->btree;
 
 	/* Allocate a column-store internal page. */
 	WT_RET(__wt_calloc_def(session, 1, &page));
@@ -1068,9 +1075,6 @@ __slvg_col_build_internal(
 	page->entries = leaf_cnt;
 	page->type = WT_PAGE_COL_INT;
 	WT_RET(__wt_page_set_modified(session, page));
-
-	/* Reference this page from the root of the tree. */
-	btree->root_page = page;
 
 	for (cref = page->u.col_int.t, i = 0; i < ss->pages_next; ++i) {
 		if ((trk = ss->pages[i]) == NULL)
@@ -1129,7 +1133,7 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session,
 	ret = 0;
 
 	/* Get the original page, including the full in-memory setup. */
-	WT_RET(__wt_page_in(session, parent, &cref->ref, 0));
+	WT_RET(__wt_page_in(session, parent, &cref->ref));
 	page = WT_COL_REF_PAGE(cref);
 	save_col_var = page->u.col_var.d;
 	save_entries = page->entries;
@@ -1560,7 +1564,7 @@ __slvg_row_trk_update_start(
 	 * page successfully).
 	 */
 	WT_RET(__wt_scr_alloc(session, trk->size, &dsk));
-	WT_ERR(__wt_bm_read(session, dsk, trk->addr.addr, trk->addr.size, 0));
+	WT_ERR(__wt_bm_read(session, dsk, trk->addr.addr, trk->addr.size));
 	WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk->mem, &page));
 
 	/*
@@ -1650,9 +1654,6 @@ __slvg_row_build_internal(
 	page->type = WT_PAGE_ROW_INT;
 	WT_ERR(__wt_page_set_modified(session, page));
 
-	/* Reference this page from the root of the tree. */
-	session->btree->root_page = page;
-
 	for (rref = page->u.row_int.t, i = 0; i < ss->pages_next; ++i) {
 		if ((trk = ss->pages[i]) == NULL)
 			continue;
@@ -1723,7 +1724,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	WT_RET(__wt_scr_alloc(session, 0, &key));
 
 	/* Get the original page, including the full in-memory setup. */
-	WT_ERR(__wt_page_in(session, parent, &rref->ref, 0));
+	WT_ERR(__wt_page_in(session, parent, &rref->ref));
 	page = WT_ROW_REF_PAGE(rref);
 
 	/*
@@ -1985,9 +1986,9 @@ __slvg_ovfl_compare(const void *a, const void *b)
 	trk = *(WT_TRACK **)b;
 
 	len = WT_MIN(trk->addr.size, addr->size);
-	ret = memcmp(trk->addr.addr, addr->addr, len);
-	if (ret == 0)
-		ret = trk->addr.size > addr->size ? -1 : 1;
+	ret = memcmp(addr->addr, trk->addr.addr, len);
+	if (ret == 0 && addr->size != trk->addr.size)
+		ret = addr->size < trk->addr.size ? -1 : 1;
 	return (ret);
 }
 
@@ -2049,7 +2050,6 @@ __slvg_ovfl_reconcile(WT_SESSION_IMPL *session, WT_STUFF *ss)
 			 * overflow page, discard the leaf page.
 			 */
 			if (searchp != NULL &&
-			    (*searchp)->size == addr->size &&
 			    !F_ISSET(*searchp, WT_TRACK_OVFL_REFD)) {
 				F_SET(*searchp, WT_TRACK_OVFL_REFD);
 				continue;

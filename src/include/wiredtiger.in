@@ -1068,7 +1068,7 @@ struct wt_connection {
  * default \c false.}
  * @config{verbose, enable messages for various events.  Options are given as a
  * list\, such as <code>"verbose=[evictserver\,read]"</code>.,a list\, with
- * values chosen from the following options: \c "allocate"\, \c "evict"\, \c
+ * values chosen from the following options: \c "block"\, \c "evict"\, \c
  * "evictserver"\, \c "fileops"\, \c "hazard"\, \c "mutex"\, \c "read"\, \c
  * "readserver"\, \c "reconcile"\, \c "salvage"\, \c "verify"\, \c "write";
  * default empty.}

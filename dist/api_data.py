@@ -348,7 +348,7 @@ methods = {
 		enable messages for various events.  Options are given as a
 		list, such as <code>"verbose=[evictserver,read]"</code>''',
 		type='list', choices=[
-		    'allocate',
+		    'block',
 		    'evict',
 		    'evictserver',
 		    'fileops',
@@ -367,11 +367,10 @@ flags = {
 ###################################################
 # Internal routine flag declarations
 ###################################################
-	'block_read' : [ 'VERIFY' ],
 	'page_free' : [ 'PAGE_FREE_IGNORE_DISK' ],
 	'rec_evict' : [ 'REC_SINGLE', 'REC_WAIT' ],
 	'verbose' : [
-		'VERB_allocate',
+		'VERB_block',
 		'VERB_evict',
 		'VERB_evictserver',
 		'VERB_fileops',

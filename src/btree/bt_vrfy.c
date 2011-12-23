@@ -12,9 +12,6 @@
  * together to make the code prettier.
  */
 typedef struct {
-	uint32_t frags;				/* Total frags */
-	uint8_t *fragbits;			/* Frag tracking bit list */
-
 	uint64_t record_total;			/* Total record count */
 
 	WT_BUF *max_key;			/* Largest key */
@@ -28,9 +25,6 @@ typedef struct {
 	WT_BUF *tmp2;				/* Temporary buffer */
 } WT_VSTUFF;
 
-static int __verify_addfrag(WT_SESSION_IMPL *, uint32_t, uint32_t, WT_VSTUFF *);
-static int __verify_checkfrag(WT_SESSION_IMPL *, WT_VSTUFF *);
-static int __verify_freelist(WT_SESSION_IMPL *, WT_VSTUFF *);
 static int __verify_int(WT_SESSION_IMPL *, int);
 static int __verify_overflow(
 	WT_SESSION_IMPL *, const uint8_t *, uint32_t, WT_VSTUFF *);
@@ -114,6 +108,8 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 		    return (WT_ERROR);
 	}
 
+	WT_RET(__wt_bm_verify_start(session));
+
 	WT_CLEAR(_vstuff);
 	vs = &_vstuff;
 
@@ -124,34 +120,18 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 	WT_ERR(__wt_scr_alloc(session, 0, &vs->tmp2));
 
 	/*
-	 * Allocate a bit array, where each bit represents a single allocation
-	 * size piece of the file (this is how we track the parts of the file
-	 * we've verified, and check for multiply referenced or unreferenced
-	 * blocks).  Storing this on the heap seems reasonable; verifying a 1TB
-	 * file with an allocation size of 512B would require a 256MB bit array:
-	 *
-	 *	(((1 * 2^40) / 512) / 8) / 2^20 = 256
-	 *
-	 * To verify larger files than we can handle in this way, we'd have to
-	 * write parts of the bit array into a disk file.
-	 */
-	vs->frags = WT_OFF_TO_ADDR(btree, btree->fh->file_size);
-	WT_ERR(__bit_alloc(session, vs->frags, &vs->fragbits));
-
-	/*
 	 * Verify the tree, starting at the root: if there is no root, that's
 	 * still possibly a legal file, but all of the pages must be on the
 	 * free-list.
 	 */
-	if (btree->root_page != NULL)
+	WT_ERR(__wt_btree_get_root(session, vs->tmp1));
+	if (vs->tmp1->data != NULL) {
+		WT_ERR(__wt_bm_verify_addr(
+		    session, vs->tmp1->data, vs->tmp1->size));
+		WT_ERR(__wt_btree_root_init(session, vs->tmp1));
 		WT_ERR(
 		    __verify_tree(session, btree->root_page, (uint64_t)1, vs));
-
-	/* Verify the free-list. */
-	WT_ERR(__verify_freelist(session, vs));
-
-	/* Verify we read every file block. */
-	WT_ERR(__verify_checkfrag(session, vs));
+	}
 
 	if (0) {
 err:		if (ret == 0)
@@ -163,12 +143,13 @@ err:		if (ret == 0)
 		__wt_progress(session, NULL, vs->fcnt);
 
 		/* Free allocated memory. */
-		__wt_free(session, vs->fragbits);
 		__wt_scr_free(&vs->max_key);
 		__wt_scr_free(&vs->max_addr);
 		__wt_scr_free(&vs->tmp1);
 		__wt_scr_free(&vs->tmp2);
 	}
+
+	WT_TRET(__wt_bm_verify_end(session));
 
 	return (ret);
 }
@@ -192,7 +173,8 @@ __verify_tree(WT_SESSION_IMPL *session,
 	WT_REF *ref;
 	WT_ROW_REF *rref;
 	uint64_t recno;
-	uint32_t entry, i;
+	const uint8_t *addr;
+	uint32_t entry, i, size;
 	int ret;
 
 	ret = 0;
@@ -227,25 +209,6 @@ __verify_tree(WT_SESSION_IMPL *session,
 	 */
 	if (++vs->fcnt % 10 == 0)
 		__wt_progress(session, NULL, vs->fcnt);
-
-	/*
-	 * XXX
-	 * Update the fragment list.
-	 */
-	{
-	uint32_t addr, size;
-	const uint8_t *addrbuf;
-	if (WT_PAGE_IS_ROOT(page)) {
-		addrbuf = session->btree->root_addr;
-		size = session->btree->root_size;
-	} else
-		__wt_get_addr(
-		    page->parent, page->parent_ref.ref, &addrbuf, &size);
-	if (addrbuf != NULL) {
-		WT_RET(__wt_block_buffer_to_addr(addrbuf, &addr, &size, NULL));
-		WT_RET(__verify_addfrag(session, addr, size, vs));
-	}
-	}
 
 #ifdef HAVE_DIAGNOSTIC
 	/* Optionally dump the page in debugging mode. */
@@ -344,7 +307,9 @@ recno_chk:	if (parent_recno != recno) {
 
 			/* cref references the subtree containing the record */
 			ref = &cref->ref;
-			WT_RET(__wt_page_in(session, page, ref, 1));
+			__wt_get_addr(page, ref, &addr, &size);
+			WT_RET(__wt_bm_verify_addr(session, addr, size));
+			WT_RET(__wt_page_in(session, page, ref));
 			ret =
 			    __verify_tree(session, ref->page, cref->recno, vs);
 			__wt_page_release(session, ref->page);
@@ -370,7 +335,9 @@ recno_chk:	if (parent_recno != recno) {
 
 			/* rref references the subtree containing the record */
 			ref = &rref->ref;
-			WT_RET(__wt_page_in(session, page, ref, 1));
+			__wt_get_addr(page, ref, &addr, &size);
+			WT_RET(__wt_bm_verify_addr(session, addr, size));
+			WT_RET(__wt_page_in(session, page, ref));
 			ret =
 			    __verify_tree(session, ref->page, (uint64_t)0, vs);
 			__wt_page_release(session, ref->page);
@@ -545,8 +512,8 @@ __verify_overflow(WT_SESSION_IMPL *session,
 	WT_PAGE_DISK *dsk;
 
 	/* Read and verify the overflow item. */
-	WT_RET(__wt_bm_read(
-	    session, vs->tmp1, addrbuf, addrbuf_len, WT_VERIFY));
+	WT_RET(__wt_bm_verify_addr(session, addrbuf, addrbuf_len));
+	WT_RET(__wt_bm_read(session, vs->tmp1, addrbuf, addrbuf_len));
 
 	/*
 	 * The page has already been verified, but we haven't confirmed that
@@ -560,117 +527,5 @@ __verify_overflow(WT_SESSION_IMPL *session,
 		    __wt_addr_string(session, vs->tmp1, addrbuf, addrbuf_len));
 		return (WT_ERROR);
 	}
-
-	/* Add the fragments. */
-	/* XXX */
-	{
-	uint32_t addr, size, cksum;
-	WT_RET(__wt_block_buffer_to_addr(addrbuf, &addr, &size, &cksum));
-	WT_RET(__verify_addfrag(session, addr, size, vs));
-	}
-
 	return (0);
-}
-
-/*
- * __verify_freelist --
- *	Add the freelist fragments to the list of verified fragments.
- */
-static int
-__verify_freelist(WT_SESSION_IMPL *session, WT_VSTUFF *vs)
-{
-	WT_BTREE *btree;
-	WT_FREE_ENTRY *fe;
-	int ret;
-
-	btree = session->btree;
-	ret = 0;
-
-	TAILQ_FOREACH(fe, &btree->freeqa, qa) {
-		if (WT_ADDR_TO_OFF(btree, fe->addr) +
-		    (off_t)fe->size > btree->fh->file_size) {
-			__wt_errx(session,
-			    "free-list entry addr %" PRIu32 "references "
-			    "non-existent file pages",
-			    fe->addr);
-			return (WT_ERROR);
-		}
-		WT_VERBOSE(session, verify,
-		    "free-list addr/frags %" PRIu32 "/%" PRIu32,
-		    fe->addr, fe->size / btree->allocsize);
-		WT_TRET(__verify_addfrag(session, fe->addr, fe->size, vs));
-	}
-
-	return (ret);
-}
-
-/*
- * __verify_addfrag --
- *	Add the WT_PAGE's fragments to the list, and complain if we've already
- *	verified this chunk of the file.
- */
-static int
-__verify_addfrag(
-    WT_SESSION_IMPL *session, uint32_t addr, uint32_t size, WT_VSTUFF *vs)
-{
-	WT_BTREE *btree;
-	uint32_t frags, i;
-
-	btree = session->btree;
-
-	frags = size / btree->allocsize;
-	for (i = 0; i < frags; ++i)
-		if (__bit_test(vs->fragbits, addr + i)) {
-			__wt_errx(session,
-			    "file fragment at addr %" PRIu32
-			    " already verified", addr);
-			return (WT_ERROR);
-		}
-	if (frags > 0)
-		__bit_nset(vs->fragbits, addr, addr + (frags - 1));
-	return (0);
-}
-
-/*
- * __verify_checkfrag --
- *	Verify we've checked all the fragments in the file.
- */
-static int
-__verify_checkfrag(WT_SESSION_IMPL *session, WT_VSTUFF *vs)
-{
-	uint32_t first, last, frags;
-	uint8_t *fragbits;
-	int ret;
-
-	fragbits = vs->fragbits;
-	frags = vs->frags;
-	ret = 0;
-
-	/*
-	 * Check for file fragments we haven't verified -- every time we find
-	 * a bit that's clear, complain.  We re-start the search each time
-	 * after setting the clear bit(s) we found: it's simpler and this isn't
-	 * supposed to happen a lot.
-	 */
-	for (;;) {
-		if (__bit_ffc(fragbits, frags, &first) != 0)
-			break;
-		__bit_set(fragbits, first);
-		for (last = first + 1; last < frags; ++last) {
-			if (__bit_test(fragbits, last))
-				break;
-			__bit_set(fragbits, last);
-		}
-		if (first == last)
-			__wt_errx(session,
-			    "file fragment %" PRIu32 " was never verified",
-			    first);
-		else
-			__wt_errx(session,
-			    "file fragments %" PRIu32 "-%" PRIu32 " were "
-			    "never verified",
-			    first, last);
-		ret = WT_ERROR;
-	}
-	return (ret);
 }

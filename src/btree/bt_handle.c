@@ -11,7 +11,6 @@ static int __btree_conf(
 	WT_SESSION_IMPL *, const char *, const char *, const char *, uint32_t);
 static int __btree_last(WT_SESSION_IMPL *);
 static int __btree_page_sizes(WT_SESSION_IMPL *, const char *);
-static int __btree_root_init(WT_SESSION_IMPL *, uint32_t);
 static int __btree_root_init_empty(WT_SESSION_IMPL *);
 static int __btree_tree_init(WT_SESSION_IMPL *);
 
@@ -116,8 +115,9 @@ conf:	WT_ERR(__btree_conf(session, name, filename, config, flags));
 	/* Open the underlying block object. */
 	WT_ERR(__wt_bm_open(session));
 
-	/* Initialize the in-memory tree. */
-	WT_ERR(__btree_tree_init(session));
+	/* Initialize the tree if not salvage or verify. */
+	if (!F_ISSET(btree, WT_BTREE_SALVAGE | WT_BTREE_VERIFY))
+		WT_ERR(__btree_tree_init(session));
 
 	F_SET(btree, WT_BTREE_OPEN);
 	WT_STAT_INCR(conn->stats, file_open);
@@ -139,15 +139,40 @@ __wt_btree_reopen(WT_SESSION_IMPL *session, uint32_t flags)
 
 	btree = session->btree;
 
-	/* Clear any existing cache. */
+	/*
+	 * Clear any existing cache.
+	 *
+	 * XXX
+	 * The reason for this is because verify and salvage don't want to deal
+	 * with in-memory trees, that is, all reads must be satisfied from the
+	 * disk.
+	 */
 	if (F_ISSET(btree, WT_BTREE_OPEN) &&
 	    !F_ISSET(btree, WT_BTREE_NO_EVICTION))
 		WT_RET(__wt_evict_file_serial(session, 1));
 
+	WT_ASSERT(session, btree->root_page == NULL);
+
+	/* After all pages are evicted, update the root's address. */
+	if (btree->root_update) {
+		/*
+		 * Release the original blocks held by the root, that is,
+		 * the blocks listed in the schema file.
+		 */
+		WT_RET(__wt_btree_free_root(session));
+
+		WT_RET(__wt_btree_set_root(
+		    session, btree->root_addr.addr, btree->root_addr.size));
+		if (btree->root_addr.addr != NULL)
+			__wt_free(session, btree->root_addr.addr);
+		btree->root_update = 0;
+	}
+
 	btree->flags = flags;				/* XXX */
 
-	/* Initialize the in-memory tree. */
-	WT_RET(__btree_tree_init(session));
+	/* Initialize the tree if not salvage or verify. */
+	if (!F_ISSET(btree, WT_BTREE_SALVAGE | WT_BTREE_VERIFY))
+		WT_RET(__btree_tree_init(session));
 
 	F_SET(btree, WT_BTREE_OPEN);
 	return (0);
@@ -268,36 +293,37 @@ __btree_conf(WT_SESSION_IMPL *session,
 static int
 __btree_tree_init(WT_SESSION_IMPL *session)
 {
-	WT_BTREE *btree;
+	WT_BUF *addr;
+	int ret;
 
-	btree = session->btree;
+	ret = 0;
+
+	WT_RET(__wt_scr_alloc(session, 0, &addr));
+	WT_ERR(__wt_btree_get_root(session, addr));
 
 	/*
-	 * If we don't have the root page's address, try and read it.
-	 *
 	 * If there's a root page in the file, read it in and pin it.
 	 * If there's no root page, create an empty in-memory page.
 	 */
-	if (btree->root_addr == NULL)
-		WT_RET(__wt_btree_get_root(session));
-	if (btree->root_addr == NULL)
-		WT_RET(__btree_root_init_empty(session));
+	if (addr->data == NULL)
+		WT_ERR(__btree_root_init_empty(session));
 	else
-		WT_RET(__btree_root_init(
-		    session, F_ISSET(btree, WT_BTREE_VERIFY)));
+		WT_ERR(__wt_btree_root_init(session, addr));
 
 	/* Get the last page of the file. */
-	WT_RET(__btree_last(session));
+	WT_ERR(__btree_last(session));
 
-	return (0);
+err:	__wt_scr_free(&addr);
+
+	return (ret);
 }
 
 /*
- * __btree_root_init --
+ * __wt_btree_root_init --
  *      Read in a tree from disk.
  */
-static int
-__btree_root_init(WT_SESSION_IMPL *session, uint32_t flags)
+int
+__wt_btree_root_init(WT_SESSION_IMPL *session, WT_BUF *addr)
 {
 	WT_BTREE *btree;
 	WT_BUF tmp;
@@ -306,10 +332,9 @@ __btree_root_init(WT_SESSION_IMPL *session, uint32_t flags)
 
 	btree = session->btree;
 
-	/* Read the root into memory, and verify it. */
+	/* Read the root into memory. */
 	WT_CLEAR(tmp);
-	WT_RET(__wt_bm_read(
-	    session, &tmp, btree->root_addr, btree->root_size, flags));
+	WT_RET(__wt_bm_read(session, &tmp, addr->data, addr->size));
 
 	/* Build the in-memory version of the page. */
 	WT_ERR(__wt_page_inmem(session, NULL, NULL, tmp.mem, &page));
@@ -538,10 +563,23 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 		WT_STAT_DECR(conn->stats, file_open);
 	}
 
+	/* After all pages are evicted, update the root's address. */
+	if (btree->root_update) {
+		/*
+		 * Release the original blocks held by the root, that is,
+		 * the blocks listed in the schema file.
+		 */
+		WT_RET(__wt_btree_free_root(session));
+
+		WT_RET(__wt_btree_set_root(
+		    session, btree->root_addr.addr, btree->root_addr.size));
+		if (btree->root_addr.addr != NULL)
+			__wt_free(session, btree->root_addr.addr);
+		btree->root_update = 0;
+	}
+
 	/* Close the underlying block manager reference. */
 	WT_TRET(__wt_bm_close(session));
-
-	WT_TRET(__wt_btree_set_root(session));
 
 	/* Free allocated memory. */
 	__wt_free(session, btree->name);
@@ -553,7 +591,6 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	__wt_free(session, btree->value_format);
 	__wt_free(session, btree->value_plan);
 	__wt_btree_huffman_close(session);
-	__wt_free(session, btree->root_addr);
 	__wt_free(session, btree->stats);
 
 	__wt_spin_destroy(session, &btree->freelist_lock);

@@ -24,7 +24,7 @@ __wt_ovfl_in(
 	 * Overflow reads are synchronous. That may bite me at some point, but
 	 * WiredTiger supports large page sizes, overflow items should be rare.
 	 */
-	WT_RET(__wt_bm_read(session, store, addr, len, 0));
+	WT_RET(__wt_bm_read(session, store, addr, len));
 
 	/* Reference the start of the data and set the data's length. */
 	store->data = WT_PAGE_DISK_BYTE(store->mem);

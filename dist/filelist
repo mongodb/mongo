@@ -10,6 +10,7 @@ src/block/bm_mgr.c
 src/block/bm_open.c
 src/block/bm_read.c
 src/block/bm_slvg.c
+src/block/bm_vrfy.c
 src/block/bm_write.c
 src/btree/bt_bulk.c
 src/btree/bt_cache.c

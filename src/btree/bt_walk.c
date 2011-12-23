@@ -64,7 +64,7 @@ __wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int cacheonly, int next)
 	 * that can't be discarded.
 	 */
 	ret = (WT_PAGE_IS_ROOT(t) || cacheonly) ?
-	    0 : __wt_page_in(session, t, t->parent_ref.ref, 0);
+	    0 : __wt_page_in(session, t, t->parent_ref.ref);
 	if (!cacheonly) {
 		__wt_page_release(session, page);
 		WT_RET(ret);
@@ -107,7 +107,7 @@ descend:	for (;;) {
 				 * don't leave a hazard reference dangling on
 				 * error).
 				 */
-				ret = __wt_page_in(session, page, ref, 0);
+				ret = __wt_page_in(session, page, ref);
 				__wt_page_release(session, page);
 				WT_RET(ret);
 			}

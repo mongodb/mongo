@@ -12,8 +12,7 @@
  *	Read a page from the file.
  */
 int
-__wt_cache_read(
-    WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify)
+__wt_cache_read(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref)
 {
 	WT_BUF tmp;
 	WT_PAGE *page;
@@ -30,8 +29,7 @@ __wt_cache_read(
 
 	/* Force allocation of new memory. */
 	WT_CLEAR(tmp);
-	WT_ERR(__wt_bm_read(
-	    session, &tmp, addr, size, dsk_verify ? WT_VERIFY : 0));
+	WT_ERR(__wt_bm_read(session, &tmp, addr, size));
 
 	/* Build the in-memory version of the page. */
 	WT_ERR(__wt_page_inmem(session, parent, ref, tmp.mem, &page));

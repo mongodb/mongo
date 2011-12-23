@@ -12,6 +12,29 @@ static int  __block_extend(WT_SESSION_IMPL *, uint32_t *, uint32_t);
 static int  __block_truncate(WT_SESSION_IMPL *);
 
 /*
+ * __wt_block_freelist_init --
+ *	Initialize the freelist.
+ */
+void
+__wt_block_freelist_init(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *btree;
+
+	btree = session->btree;
+
+	__wt_spin_init(session, &btree->freelist_lock);
+	btree->freelist_bytes = 0;
+	btree->freelist_entries = 0;
+
+	TAILQ_INIT(&btree->freeqa);
+	TAILQ_INIT(&btree->freeqs);
+	btree->freelist_dirty = 0;
+
+	btree->free_addr = WT_ADDR_INVALID;
+	btree->free_size = 0;
+}
+
+/*
  * __wt_block_alloc --
  *	Alloc a chunk of space from the underlying file.
  */
@@ -61,14 +84,14 @@ __wt_block_alloc(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
 			--btree->freelist_entries;
 			__wt_free(session, fe);
 
-			WT_VERBOSE(session, allocate,
+			WT_VERBOSE(session, block,
 			    "allocate: block %" PRIu32 "/%" PRIu32,
 			    *addrp, size);
 
 			goto done;
 		}
 
-		WT_VERBOSE(session, allocate,
+		WT_VERBOSE(session, block,
 		    "partial block %" PRIu32 "/%" PRIu32
 		    " from %" PRIu32 "/%" PRIu32,
 		    *addrp, size, fe->addr, fe->size);
@@ -151,7 +174,7 @@ __block_extend(WT_SESSION_IMPL *session, uint32_t *addrp, uint32_t size)
 	*addrp = WT_OFF_TO_ADDR(btree, fh->file_size);
 	fh->file_size += size;
 
-	WT_VERBOSE(session, allocate,
+	WT_VERBOSE(session, block,
 	    "file extend %" PRIu32 "/%" PRIu32, *addrp, size);
 
 	WT_BSTAT_INCR(session, extend);
@@ -184,7 +207,7 @@ __wt_block_free(WT_SESSION_IMPL *session, uint32_t addr, uint32_t size)
 		return (WT_ERROR);
 	}
 
-	WT_VERBOSE(session, allocate,
+	WT_VERBOSE(session, block,
 	    "free %" PRIu32 "/%" PRIu32, addr, size);
 
 	__wt_spin_lock(session, &btree->freelist_lock);
@@ -397,7 +420,7 @@ __wt_block_freelist_write(WT_SESSION_IMPL *session)
 	}
 
 #ifdef HAVE_VERBOSE
-	if (WT_VERBOSE_ISSET(session, allocate))
+	if (WT_VERBOSE_ISSET(session, block))
 		__wt_block_dump(session);
 #endif
 
@@ -449,6 +472,9 @@ __wt_block_freelist_write(WT_SESSION_IMPL *session)
 	/* Write the free list to disk. */
 	WT_ERR(__wt_block_write(session, tmp, &addr, &size, &cksum));
 
+	WT_VERBOSE(session,
+	    block, "free-list written %" PRIu32 "/%" PRIu32, addr, size);
+
 	/* Update the file's meta-data. */
 	btree->free_addr = addr;
 	btree->free_size = size;
@@ -482,7 +508,7 @@ __block_truncate(WT_SESSION_IMPL *session)
 		    fh->file_size)
 			break;
 
-		WT_VERBOSE(session, allocate,
+		WT_VERBOSE(session, block,
 		    "truncate free-list %" PRIu32 "/%" PRIu32,
 		    fe->addr, fe->size);
 
@@ -547,14 +573,14 @@ __wt_block_dump(WT_SESSION_IMPL *session)
 
 	btree = session->btree;
 
-	WT_VERBOSE(session, allocate, "freelist by addr:");
+	WT_VERBOSE(session, block, "freelist by addr:");
 	TAILQ_FOREACH(fe, &btree->freeqa, qa)
-		WT_VERBOSE(session, allocate,
+		WT_VERBOSE(session, block,
 		    "\t{%" PRIu32 "/%" PRIu32 "}", fe->addr, fe->size);
 
-	WT_VERBOSE(session, allocate, "freelist by size:");
+	WT_VERBOSE(session, block, "freelist by size:");
 	TAILQ_FOREACH(fe, &btree->freeqs, qs)
-		WT_VERBOSE(session, allocate,
+		WT_VERBOSE(session, block,
 		    "\t{%" PRIu32 "/%" PRIu32 "}", fe->addr, fe->size);
 }
 #endif

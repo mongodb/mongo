@@ -152,7 +152,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 			rref = page->u.row_int.t + (base - 1);
 
 		/* Swap the parent page for the child page. */
-		WT_ERR(__wt_page_in(session, page, &rref->ref, 0));
+		WT_ERR(__wt_page_in(session, page, &rref->ref));
 		__wt_page_release(session, page);
 		page = WT_ROW_REF_PAGE(rref);
 	}

@@ -15,6 +15,7 @@ extern int __wt_bm_addr_string(WT_SESSION_IMPL *session,
     WT_BUF *buf,
     const uint8_t *addrbuf,
     uint32_t addrbuf_size);
+extern void __wt_block_freelist_init(WT_SESSION_IMPL *session);
 extern int __wt_block_alloc(WT_SESSION_IMPL *session,
     uint32_t *addrp,
     uint32_t size);
@@ -31,8 +32,7 @@ extern int __wt_bm_free( WT_SESSION_IMPL *session,
 extern int __wt_bm_read(WT_SESSION_IMPL *session,
     WT_BUF *buf,
     const uint8_t *addrbuf,
-    uint32_t addrbuf_size,
-    uint32_t flags);
+    uint32_t addrbuf_size);
 extern int __wt_bm_write(WT_SESSION_IMPL *session,
     WT_BUF *buf,
     uint8_t *addrbuf,
@@ -53,6 +53,14 @@ extern int __wt_bm_slvg_next(WT_SESSION_IMPL *session,
     uint8_t *addrbuf,
     uint32_t *addrbuf_lenp,
     int *eofp);
+extern int __wt_bm_verify_start(WT_SESSION_IMPL *session);
+extern int __wt_bm_verify_end(WT_SESSION_IMPL *session);
+extern int __wt_bm_verify_addr(WT_SESSION_IMPL *session,
+    const uint8_t *addrbuf,
+    uint32_t addrbuf_size);
+extern int __wt_block_verify_addfrag( WT_SESSION_IMPL *session,
+    uint32_t addr,
+    uint32_t size);
 extern int __wt_block_write(WT_SESSION_IMPL *session,
     WT_BUF *buf,
     uint32_t *addrp,
@@ -113,6 +121,7 @@ extern int __wt_btree_open(WT_SESSION_IMPL *session,
     const char *cfg[],
     uint32_t flags);
 extern int __wt_btree_reopen(WT_SESSION_IMPL *session, uint32_t flags);
+extern int __wt_btree_root_init(WT_SESSION_IMPL *session, WT_BUF *addr);
 extern int __wt_btree_root_empty(WT_SESSION_IMPL *session, WT_PAGE **leafp);
 extern int __wt_btree_close(WT_SESSION_IMPL *session);
 extern int __wt_btree_huffman_open(WT_SESSION_IMPL *session,
@@ -133,7 +142,7 @@ extern int __wt_ovfl_in( WT_SESSION_IMPL *session,
     uint32_t len);
 extern int
 __wt_page_in_func(
- WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref, int dsk_verify
+ WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref
 #ifdef HAVE_DIAGNOSTIC
  , const char *file, int line
 #endif
@@ -144,15 +153,17 @@ extern int __wt_page_inmem(WT_SESSION_IMPL *session,
     WT_PAGE_DISK *dsk,
     WT_PAGE **pagep);
 extern int __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page);
-extern int __wt_cache_read( WT_SESSION_IMPL *session,
+extern int __wt_cache_read(WT_SESSION_IMPL *session,
     WT_PAGE *parent,
-    WT_REF *ref,
-    int dsk_verify);
+    WT_REF *ref);
 extern int __wt_kv_return(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
     int key_ret);
-extern int __wt_btree_get_root(WT_SESSION_IMPL *session);
-extern int __wt_btree_set_root(WT_SESSION_IMPL *session);
+extern int __wt_btree_get_root(WT_SESSION_IMPL *session, WT_BUF *addr);
+extern int __wt_btree_free_root(WT_SESSION_IMPL *session);
+extern int __wt_btree_set_root(WT_SESSION_IMPL *session,
+    uint8_t *addr,
+    uint32_t size);
 extern int __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_btree_stat_init(WT_SESSION_IMPL *session);
 extern int __wt_btree_sync(WT_SESSION_IMPL *session, const char *cfg[]);
