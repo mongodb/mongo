@@ -98,41 +98,23 @@ namespace mongo {
         }
 
         void set( const BSONObj& o ) {
-            _lock.lock();
-            try {
-                int sz = o.objsize();
-
-                if ( sz > (int) sizeof(_buf) ) {
-                    _reset(TOO_BIG_SENTINEL);
-                }
-                else {
-                    memcpy(_buf, o.objdata(), sz );
-                }
-
-                _lock.unlock();
+            scoped_spinlock lk(_lock);
+            int sz = o.objsize();
+            if ( sz > (int) sizeof(_buf) ) {
+                _reset(TOO_BIG_SENTINEL);
             }
-            catch ( ... ) {
-                _lock.unlock();
-                throw;
+            else {
+                memcpy(_buf, o.objdata(), sz );
             }
-
+            _lock.unlock();
         }
 
         int size() const { return *_size; }
         bool have() const { return size() > 0; }
 
         BSONObj get() const {
-            _lock.lock();
-            BSONObj o;
-            try {
-                o = _get();
-                _lock.unlock();
-            }
-            catch ( ... ) {
-                _lock.unlock();
-                throw;
-            }
-            return o;
+            scoped_spinlock lk(_lock);
+            return _get();
         }
 
         void append( BSONObjBuilder& b , const StringData& name ) const {
@@ -177,30 +159,10 @@ namespace mongo {
                 _start = _checkpoint = curTimeMicros64();
         }
         bool isStarted() const { return _start > 0; }
-
         void enter( Client::Context * context );
-
         void leave( Client::Context * context );
-
-        void reset() {
-            _reset();
-            _start = _checkpoint = 0;
-            _opNum = _nextOpNum++;
-            _ns[0] = 0;
-            _debug.reset();
-            _query.reset();
-            _active = true; // this should be last for ui clarity
-        }
-
-        void reset( const HostAndPort& remote, int op ) {
-            reset();
-            if( _remote != remote ) {
-                // todo : _remote is not thread safe yet is used as such!
-                _remote = remote;
-            }
-            _op = op;
-        }
-
+        void reset();
+        void reset( const HostAndPort& remote, int op );
         void markCommand() { _command = true; }
 
         void waitingForLock( int type ) {
@@ -230,66 +192,30 @@ namespace mongo {
         int getLockType() const { return _lockType; }
         bool isWaitingForLock() const { return _waitingForLock; }
         int getOp() const { return _op; }
-
-        /** micros */
-        unsigned long long startTime() {
+        unsigned long long startTime() { // micros
             ensureStarted();
             return _start;
         }
-
         void done() {
             _active = false;
             _end = curTimeMicros64();
         }
-
         unsigned long long totalTimeMicros() {
             massert( 12601 , "CurOp not marked done yet" , ! _active );
             return _end - startTime();
         }
-
         int totalTimeMillis() { return (int) (totalTimeMicros() / 1000); }
-
         int elapsedMillis() {
             unsigned long long total = curTimeMicros64() - startTime();
             return (int) (total / 1000);
         }
-
         int elapsedSeconds() { return elapsedMillis() / 1000; }
-
         void setQuery(const BSONObj& query) { _query.set( query ); }
-
         Client * getClient() const { return _client; }
-
-        BSONObj info() {
-            if( ! cc().getAuthenticationInfo()->isAuthorized("admin") ) {
-                BSONObjBuilder b;
-                b.append("err", "unauthorized");
-                return b.obj();
-            }
-            return infoNoauth();
-        }
-
+        BSONObj info();
         BSONObj infoNoauth();
-
         string getRemoteString( bool includePort = true ) { return _remote.toString(includePort); }
-
-        ProgressMeter& setMessage( const char * msg , unsigned long long progressMeterTotal = 0 , int secondsBetween = 3 ) {
-            if ( progressMeterTotal ) {
-                if ( _progressMeter.isActive() ) {
-                    cout << "about to assert, old _message: " << _message << " new message:" << msg << endl;
-                    assert( ! _progressMeter.isActive() );
-                }
-                _progressMeter.reset( progressMeterTotal , secondsBetween );
-            }
-            else {
-                _progressMeter.finished();
-            }
-
-            _message = msg;
-
-            return _progressMeter;
-        }
-
+        ProgressMeter& setMessage( const char * msg , unsigned long long progressMeterTotal = 0 , int secondsBetween = 3 );
         string getMessage() const { return _message.toString(); }
         ProgressMeter& getProgressMeter() { return _progressMeter; }
         CurOp *parent() const { return _wrapped; }
@@ -300,42 +226,32 @@ namespace mongo {
             strncpy(_ns, ns, Namespace::MaxNsLen);
             _ns[Namespace::MaxNsLen] = 0;
         }
-        friend class Client;
 
     private:
+        friend class Client;
+        void _reset();
+
         static AtomicUInt _nextOpNum;
-        Client * _client;
-        CurOp * _wrapped;
+        Client * const _client;
+        CurOp * const _wrapped;
         unsigned long long _start;
         unsigned long long _checkpoint;
         unsigned long long _end;
         bool _active;
         int _op;
         bool _command;
-        int _lockType; // see concurrency.h for values
+        int _lockType;                   // see concurrency.h for values
         bool _waitingForLock;
-        int _dbprofile; // 0=off, 1=slow, 2=all
-        AtomicUInt _opNum;
+        int _dbprofile;                  // 0=off, 1=slow, 2=all
+        AtomicUInt _opNum;               // todo: simple being "unsigned" may make more sense here
         char _ns[Namespace::MaxNsLen+2];
-        HostAndPort _remote;
-        CachedBSONObj _query;
+        HostAndPort _remote;             // CAREFUL here with thread safety
+        CachedBSONObj _query;            // CachedBSONObj is thread safe
         OpDebug _debug;
         ThreadSafeString _message;
         ProgressMeter _progressMeter;
         volatile bool _killed;
         int _numYields;
-
-        void _reset() {
-            _command = false;
-            _lockType = 0;
-            _dbprofile = 0;
-            _end = 0;
-            _waitingForLock = false;
-            _message = "";
-            _progressMeter.finished();
-            _killed = false;
-            _numYields = 0;
-        }
     };
 
     /* _globalKill: we are shutting down
