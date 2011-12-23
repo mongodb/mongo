@@ -480,41 +480,44 @@ __debug_page_modify(WT_DBG *ds, WT_PAGE *page)
 		return (0);
 
 	__dmsg(ds,
-	    "\twrite/disk generations: %" PRIu32 "/%" PRIu32 "\n",
+	    "\t" "write/disk generations: %" PRIu32 "/%" PRIu32 "\n",
 	    mod->write_gen, mod->disk_gen);
 
 	switch (F_ISSET(page, WT_PAGE_REC_MASK)) {
 	case 0:
 		break;
 	case WT_PAGE_REC_EMPTY:
-		__dmsg(ds, "\tempty page\n");
+		__dmsg(ds, "\t" "empty page\n");
 		break;
 	case WT_PAGE_REC_REPLACE:
-		__dmsg(ds, "\treplacement %s\n",
+		__dmsg(ds, "\t" "replacement %s\n",
 		    __wt_addr_string(session, ds->tmp,
 		    mod->u.replace.addr, mod->u.replace.size));
 		break;
 	case WT_PAGE_REC_SPLIT:
-		__dmsg(ds, "\tsplit page %p\n", mod->u.split);
+		__dmsg(ds, "\t" "split page %p\n", mod->u.split);
+		break;
+	case WT_PAGE_REC_SPLIT_MERGE:
+		__dmsg(ds, "\t" "split-merge page %p\n", mod->u.split);
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
 
 	if (mod->track_entries != 0)
-		__dmsg(ds, "\ttracking list:\n");
+		__dmsg(ds, "\t" "tracking list:\n");
 	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i) {
 		switch (track->type) {
 		case WT_PT_BLOCK:
-			__dmsg(ds, "\t\tblock");
+			__dmsg(ds, "\t\t" "block");
 			break;
 		case WT_PT_BLOCK_EVICT:
-			__dmsg(ds, "\t\tblock-evict");
+			__dmsg(ds, "\t\t" "block-evict");
 			break;
 		case WT_PT_OVFL:
-			__dmsg(ds, "\t\toverflow (on)");
+			__dmsg(ds, "\t\t" "overflow (on)");
 			break;
 		case WT_PT_OVFL_DISCARD:
-			__dmsg(ds, "\t\toverflow (off)");
+			__dmsg(ds, "\t\t" "overflow (off)");
 			break;
 		case WT_PT_EMPTY:
 			continue;
