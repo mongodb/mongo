@@ -541,12 +541,17 @@ namespace ThreadedTests {
                     RWLock::Upgradable u(m);
                     log() << x << ' ' << ch << " got" << endl;
                     if( ch == 'U' ) {
+#ifdef MONGO_USE_SRW_ON_WINDOWS
+                        if( t.millis() > 200 ) {
+#else
                         if( t.millis() > 20 ) {
+#endif
                             DEV {
                                 // a _DEBUG buildbot might be slow, try to avoid false positives
                                 log() << "warning lock upgrade was slow " << t.millis() << endl;
                             }
                             else {
+                                log() << "assertion failure: lock upgrade was too slow: " << t.millis() << endl;
                                 ASSERT( false );
                             }
                         }
