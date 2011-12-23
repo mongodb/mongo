@@ -82,16 +82,16 @@ int
 __wt_bm_addr_string(WT_SESSION_IMPL *session,
     WT_BUF *buf, const uint8_t *addrbuf, uint32_t addrbuf_size)
 {
-	uint32_t addr, size;
+	uint32_t addr, cksum, size;
 
 	/* Crack the cookie. */
 	WT_UNUSED(addrbuf_size);
-	WT_RET(__wt_block_buffer_to_addr(addrbuf, &addr, &size, NULL));
+	WT_RET(__wt_block_buffer_to_addr(addrbuf, &addr, &size, &cksum));
 
 	/* Printable representation. */
 	WT_RET(__wt_buf_fmt(session, buf,
-	    "[%" PRIu32 "-%" PRIu32 ", %" PRIu32 "]",
-	    addr, addr + (size / 512 - 1), size));
+	    "[%" PRIu32 "-%" PRIu32 ", %" PRIu32 ", %" PRIu32 "]",
+	    addr, addr + (size / 512 - 1), size, cksum));
 
 	return (0);
 }
