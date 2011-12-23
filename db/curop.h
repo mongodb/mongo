@@ -232,8 +232,8 @@ namespace mongo {
         void _reset();
 
         static AtomicUInt _nextOpNum;
-        Client * const _client;
-        CurOp * const _wrapped;
+        Client * _client;
+        CurOp * _wrapped;
         unsigned long long _start;
         unsigned long long _checkpoint;
         unsigned long long _end;

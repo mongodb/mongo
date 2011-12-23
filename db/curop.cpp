@@ -99,7 +99,7 @@ namespace mongo {
             scoped_lock bl(Client::clientsMutex);
             _client->_curOp = _wrapped;
         }
-        const_cast<Client *>(_client) = 0;
+        _client = 0;
     }
 
     void CurOp::enter( Client::Context * context ) {
