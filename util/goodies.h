@@ -372,7 +372,7 @@ namespace mongo {
      * this is a thread safe string
      * you will never get a bad pointer, though data may be mungedd
      */
-    class ThreadSafeString {
+    class ThreadSafeString : boost::noncopyable {
     public:
         ThreadSafeString( size_t size=256 )
             : _size( size ) , _buf( new char[size] ) {
