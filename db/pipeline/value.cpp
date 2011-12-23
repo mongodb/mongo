@@ -21,8 +21,10 @@
 #include "db/jsobj.h"
 #include "db/pipeline/builder.h"
 #include "db/pipeline/document.h"
+#include "util/mongoutils/str.h"
 
 namespace mongo {
+    using namespace mongoutils;
 
     const intrusive_ptr<const Value> Value::pFieldUndefined(
 	new ValueStatic(Undefined));
@@ -81,7 +83,9 @@ namespace mongo {
 
 	default:
 	    // nothing else is allowed
-	    assert(false && type);
+	    uassert(16001, str::stream() <<
+		    "can't create empty Value of type " << type, false);
+	    break;
 	}
     }
 
@@ -130,11 +134,6 @@ namespace mongo {
             break;
         }
 
-        case BinData:
-            // pBuilder->appendBinData(fieldName, ...);
-            assert(false); // CW TODO unimplemented
-            break;
-
         case jstOID:
             oidValue = pBsonElement->OID();
             break;
@@ -152,14 +151,6 @@ namespace mongo {
             // TODO pBsonElement->regexFlags();
             break;
 
-        case Symbol:
-            assert(false); // CW TODO unimplemented
-            break;
-
-        case CodeWScope:
-            assert(false); // CW TODO unimplemented
-            break;
-
         case NumberInt:
             simple.intValue = pBsonElement->numberInt();
             break;
@@ -173,6 +164,13 @@ namespace mongo {
             break;
 
         case jstNULL:
+	    break;
+
+        case BinData:
+        case Symbol:
+        case CodeWScope:
+	    uassert(16002, str::stream() <<
+		    "can't create Value of type " << type, false);
 	    break;
 
             /* these shouldn't happen in this context */
@@ -538,16 +536,16 @@ namespace mongo {
         case NumberLong:
             return (int)simple.longValue;
 
-        case String:
-            assert(false); // CW TODO try to convert w/atod()
-            return (int)0;
-
 	case jstNULL:
 	case Undefined:
 	    break;
 
+        case String:
         default:
-            assert(false); // CW TODO no conversion available
+	    uassert(16003, str::stream() <<
+		    "can't convert from BSON type " << type <<
+		    " to int",
+		    false);
         } // switch(type)
 
         return (int)0;
@@ -564,16 +562,16 @@ namespace mongo {
         case NumberLong:
             return simple.longValue;
 
-        case String:
-            assert(false); // CW TODO try to convert w/atod()
-            return (long long)0;
-
 	case jstNULL:
 	case Undefined:
 	    break;
 
+        case String:
         default:
-            assert(false); // CW TODO no conversion available
+	    uassert(16004, str::stream() <<
+		    "can't convert from BSON type " << type <<
+		    " to long",
+		    false);
         } // switch(type)
 
         return (long long)0;
@@ -590,16 +588,16 @@ namespace mongo {
         case NumberLong:
             return (double)simple.longValue;
 
-        case String:
-            assert(false); // CW TODO try to convert w/atod()
-            return (double)0;
-
 	case jstNULL:
 	case Undefined:
 	    break;
 
+        case String:
         default:
-            assert(false); // CW TODO no conversion available
+	    uassert(16005, str::stream() <<
+		    "can't convert from BSON type " << type <<
+		    " to double",
+		    false);
         } // switch(type)
 
         return (double)0;
@@ -616,7 +614,10 @@ namespace mongo {
 	    break;
 
         default:
-            assert(false); // CW TODO no conversion available
+	    uassert(16006, str::stream() <<
+		    "can't convert from BSON type " << type <<
+		    " to double",
+		    false);
         } // switch(type)
 
             assert(false); // CW TODO no conversion available
@@ -649,7 +650,10 @@ namespace mongo {
 	    break;
 
         default:
-            assert(false); // CW TODO no conversion available
+	    uassert(16007, str::stream() <<
+		    "can't convert from BSON type " << type <<
+		    " to double",
+		    false);
         } // switch(type)
 
         return "";
@@ -694,7 +698,10 @@ namespace mongo {
 	}
 
         // CW TODO for now, only compare like values
-        assert(lType == rType);
+	uassert(16016, str::stream() <<
+		"can't compare values of BSON types " << lType <<
+		" and " << rType,
+		lType == rType);
 
         switch(lType) {
         case NumberDouble:
