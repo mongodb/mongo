@@ -179,6 +179,10 @@ namespace mongo {
         return oldCompare(_o, r._o, nullOrdering) == 0;
     }
 
+    bool KeyBson::binaryEqual(const KeyBson& r) const {
+        return _o.binaryEqual(r._o);
+    }
+
     // [ ][HASMORE][x][y][canontype_4bits]
     enum CanonicalsEtc { 
         cminkey=1,
@@ -661,6 +665,14 @@ namespace mongo {
                 break;
         }
         return true;
+    }
+
+    bool KeyV1::binaryEqual(const KeyV1& r) const {
+        int os = dataSize();
+        if ( os == r.dataSize() ) {
+            return (os == 0 || memcmp(data(), r.data(), os) == 0);
+        }
+        return false;
     }
 
     struct CmpUnitTest : public UnitTest {

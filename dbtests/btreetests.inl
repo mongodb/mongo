@@ -5,8 +5,8 @@
     }
 
     // dummy, valid record loc
-    const DiskLoc recordLoc() {
-        return DiskLoc( 0, 2 );
+    const DiskLoc recordLoc( int i = 2 ) {
+        return DiskLoc( 0, i );
     }
 
     class Ensure {
@@ -65,25 +65,25 @@
         void dump() {
             bt()->dumpTree( dl(), order() );
         }
-        void insert( BSONObj &key ) {
+        void insert( BSONObj &key, DiskLoc recLoc = recordLoc() ) {
             const BtreeBucket *b = bt();
 
 #if defined(TESTTWOSTEP)
             {
-                Continuation c(dl(), recordLoc(), key, Ordering::make(order()), id());
+                Continuation c(dl(), recLoc, key, Ordering::make(order()), id());
                 b->twoStepInsert(dl(), c, true);
                 c.stepTwo();
             }
 #else
             {
-                b->bt_insert( dl(), recordLoc(), key, Ordering::make(order()), true, id(), true );
+                b->bt_insert( dl(), recLoc, key, Ordering::make(order()), true, id(), true );
             }
 #endif
             getDur().commitIfNeeded();
         }
-        bool unindex( BSONObj &key ) {
+        bool unindex( BSONObj &key, DiskLoc recLoc = recordLoc() ) {
             getDur().commitIfNeeded();
-            return bt()->unindex( dl(), id(), key, recordLoc() );
+            return bt()->unindex( dl(), id(), key, recLoc );
         }
         static BSONObj simpleKey( char c, int n = 1 ) {
             BSONObjBuilder builder;
@@ -159,6 +159,31 @@
 
             checkValid( 0 );
             locate( key, 0, false, DiskLoc() );
+        }
+    };
+
+    class SimpleInsertDeleteDupKey : public Base {
+    public:
+        void run() {
+            for (int i = 1; i <= 20; ++i ) {
+                BSONObj key = simpleKey( simpleToken( i ), 1 );
+
+                insert( key, recordLoc( 4 * i ) );
+                insert( key, recordLoc( 4 * i + 2 ) );
+            }
+            checkValid( 40 );
+
+            BSONObj key = simpleKey( simpleToken( 20 ), 1 );
+            unindex( key, recordLoc( 4 * 20 + 2 ) );
+
+            BSONObj newKey = simpleKey( simpleToken( 10 ), 1 );
+            insert( newKey );
+
+            checkValid( 40 );
+        }
+    private:
+        static char simpleToken( int i ) {
+            return 'a' + i;
         }
     };
 
@@ -494,9 +519,13 @@
     // Tool to construct custom trees for tests.
     class ArtificialTree : public BtreeBucket {
     public:
-        void push( const BSONObj &key, const DiskLoc &child ) {
+        void push( const BSONObj &key, const DiskLoc &child, DiskLoc diskLoc = recordLoc() ) {
             KeyOwned k(key);
-            pushBack( dummyDiskLoc(), k, Ordering::make( BSON( "a" << 1 ) ), child );
+            pushBack( diskLoc, k, Ordering::make( BSON( "a" << 1 ) ), child );
+        }
+        bool insertAtPos( DiskLoc thisLoc, int keypos, const BSONObj &key, DiskLoc diskLoc = recordLoc() ) {
+            KeyOwned k(key);
+            return basicInsert( thisLoc, keypos, diskLoc, k, Ordering::make( BSON( "a" << 1 ) ) );
         }
         void setNext( const DiskLoc &child ) {
             nextChild = child;
@@ -517,9 +546,14 @@
             DiskLoc node = make( id );
             ArtificialTree *n = ArtificialTree::is( node );
             BSONObjIterator i( spec );
+            DiskLoc diskLoc = recordLoc();
             while( i.more() ) {
                 BSONElement e = i.next();
                 DiskLoc child;
+                if ( e.fieldName() == string( "_diskloc" ) ) {
+                    diskLoc = recordLoc( e.numberInt() );
+                    continue;
+                }
                 if ( e.type() == Object ) {
                     child = makeTree( e.embeddedObject(), id );
                 }
@@ -527,7 +561,7 @@
                     n->setNext( child );
                 }
                 else {
-                    n->push( BSON( "" << expectedKey( e.fieldName() ) ), child );
+                    n->push( BSON( "" << expectedKey( e.fieldName() ) ), child, diskLoc );
                 }
             }
             n->fixParentPtrs( node );
@@ -557,8 +591,11 @@
             ArtificialTree *n = ArtificialTree::is( node );
             BSONObjIterator j( spec );
             for( int i = 0; i < n->n; ++i ) {
-                ASSERT( j.more() );
-                BSONElement e = j.next();
+                BSONElement e;
+                do {
+                    ASSERT( j.more() );
+                    e = j.next();
+                } while ( e.fieldName() == string( "_diskloc" ) );
                 KeyNode kn = n->keyNode( i );
                 string expected = expectedKey( e.fieldName() );
                 ASSERT( present( id, BSON( "" << expected ), 1 ) );
@@ -593,6 +630,7 @@
             id.head.btree()->locate( id, id.head, key, Ordering::make(id.keyPattern()), pos, found, recordLoc(), direction );
             return found;
         }
+        int getEmptySize() const { return emptySize; }
         int headerSize() const { return BtreeBucket::headerSize(); }
         int packedDataSize( int pos ) const { return BtreeBucket::packedDataSize( pos ); }
         void fixParentPtrs( const DiskLoc &thisLoc ) { BtreeBucket::fixParentPtrs( thisLoc ); }
@@ -601,8 +639,6 @@
             emptySize = 0;
             setNotPacked();
         }
-    private:
-        DiskLoc dummyDiskLoc() const { return DiskLoc( 0, 2 ); }
     };
 
     /**
@@ -1611,6 +1647,66 @@
         }
     };
 
+    class DupKeyWithPreviousOne : public Base {
+    public:
+        void run() {
+            ArtificialTree::setTree( "{_diskloc:10,a:null,b:null,c:null}", id() );
+            ArtificialTree *root = ArtificialTree::is( dl() );
+            unsigned previousEmptySize = root->getEmptySize();
+            BSONObj key = BSON( "" << "a" );
+            ASSERT( root->insertAtPos( dl(), 1, key, recordLoc( 12 ) ) );
+            ASSERT_EQUALS( previousEmptySize, root->getEmptySize() + sizeof(_KeyNode) );
+            ASSERT_EQUALS( 4, bt()->fullValidate( dl(), order(), 0, true ) );
+        }
+    };
+
+    class DupKeyWithNextOne : public Base {
+    public:
+        void run() {
+            ArtificialTree::setTree( "{_diskloc:10,a:null,b:null,c:null}", id() );
+            ArtificialTree *root = ArtificialTree::is( dl() );
+            unsigned previousEmptySize = root->getEmptySize();
+            BSONObj key = BSON( "" << "a" );
+            ASSERT( root->insertAtPos( dl(), 0, key, recordLoc( 8 ) ) );
+            ASSERT_EQUALS( previousEmptySize, root->getEmptySize() + sizeof(_KeyNode) );
+            ASSERT_EQUALS( 4, bt()->fullValidate( dl(), order(), 0, true ) );
+        }
+    };
+
+    class NotDedupKey : public Base {
+    public:
+        void run() {
+            ArtificialTree::setTree( "{_diskloc:10,$5:null,_diskloc:20,$5:null,$6:null}", id() );
+            ArtificialTree *root = ArtificialTree::is( dl() );
+            unsigned previousEmptySize = root->getEmptySize();
+            BSONObj key = BSON( "" << 5LL );
+            BtreeBucket::KeyOwned k(key);
+            ASSERT( root->insertAtPos( dl(), 1, key, recordLoc( 18 ) ) );
+            ASSERT_EQUALS( previousEmptySize, root->getEmptySize() + sizeof(_KeyNode) + k.dataSize() );
+            ASSERT_EQUALS( 4, bt()->fullValidate( dl(), order(), 0, true ) );
+        }
+    };
+
+    class DupKeyTopSizeLessThanKeyNumber : public Base {
+    public:
+        void run() {
+            ArtificialTree::setTree( "", id() );
+            ArtificialTree *root = ArtificialTree::is( dl() );
+            BSONObj key = BSON( "" << "a" );
+            for (int i = 1; i <= 20; i++) {
+                root->push( key, DiskLoc(), recordLoc( 2*i ) );
+            }
+            Tester::checkTopSizeLessThanKeyNumber( root );
+        }
+        class Tester : public ArtificialTree {
+        public:
+            static void checkTopSizeLessThanKeyNumber( ArtificialTree *a ) {
+                Tester *t = static_cast< Tester * >( a );
+                ASSERT_LESS_THAN( t->topSize, t->n );
+            }
+        };
+    };
+
     class SignedZeroDuplication : public Base {
     public:
         void run() {
@@ -1632,6 +1728,7 @@
         void setupTests() {
             add< Create >();
             add< SimpleInsertDelete >();
+            add< SimpleInsertDeleteDupKey >();
             add< SplitRightHeavyBucket >();
             add< SplitLeftHeavyBucket >();
             add< MissingLocate >();
@@ -1709,5 +1806,9 @@
             add< DelInternalSplitPromoteLeft >();
             add< DelInternalSplitPromoteRight >();
             add< SignedZeroDuplication >();
+            add< DupKeyWithPreviousOne >();
+            add< DupKeyWithNextOne >();
+            add< NotDedupKey >();
+            add< DupKeyTopSizeLessThanKeyNumber >();
         }
     } myall;

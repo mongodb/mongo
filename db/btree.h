@@ -411,6 +411,8 @@ namespace mongo {
             assert(ok);
         }
 
+        void pushBackKeyNode( const DiskLoc recordLoc, const DiskLoc prevChild, const short dataOfs );
+
         /**
          * This is a special purpose function used by BtreeBuilder.  The
          * interface is quite dangerous if you're not careful.  The bson key
@@ -570,6 +572,7 @@ namespace mongo {
          *    _KeyNode data and without shifting any other _KeyNode objects.
          */
         void setKey( int i, const DiskLoc recordLoc, const Key& key, const DiskLoc prevChildBucket );
+        void setKey( int i, const DiskLoc recordLoc, const short dataOfs, const DiskLoc prevChildBucket );
     };
 
     template< class V>
