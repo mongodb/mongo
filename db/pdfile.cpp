@@ -1956,6 +1956,9 @@ namespace mongo {
 
         int lenWHdr = len + Record::HeaderSize;
         lenWHdr = (int) (lenWHdr * d->paddingFactor);
+		if ( lenWHdr > BSONObjMaxInternalSize ) {
+			lenWHdr = BSONObjMaxInternalSize;
+		}
         if ( lenWHdr == 0 ) {
             // old datafiles, backward compatible here.
             assert( d->paddingFactor == 0 );
