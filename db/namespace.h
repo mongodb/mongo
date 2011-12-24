@@ -600,7 +600,7 @@ namespace mongo {
 
         bool allocated() const { return ht != 0; }
 
-        void getNamespaces( list<string>& tofill , bool onlyCollections = true ) const;
+        void getNamespaces( list<string>& tofill ) const;
 
         NamespaceDetails::Extra* newExtra(const char *ns, int n, NamespaceDetails *d);
 
