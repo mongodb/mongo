@@ -30,7 +30,7 @@ sh._dataFormat = function( bytes ){
 }
 
 sh._collRE = function( coll ){
-   return RegExp( "^" + (coll + "").replace(/\./g, "\\.") + "-.*" )
+   return RegExp( "^" + RegExp.escape(coll + "") + "-.*" )
 }
 
 sh._pchunk = function( chunk ){

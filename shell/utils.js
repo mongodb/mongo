@@ -341,7 +341,7 @@ String.prototype.startsWith = function (str){
 }
 
 String.prototype.endsWith = function (str){
-    return new RegExp( str + "$" ).test( this )
+    return new RegExp( RegExp.escape(str) + "$" ).test( this )
 }
 
 Number.prototype.zeroPad = function(width) {
@@ -425,6 +425,10 @@ ISODate = function(isoDateStr){
     }
 
     return new Date(time);
+}
+
+RegExp.escape = function( text ){
+    return text.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, "\\$&");
 }
 
 RegExp.prototype.tojson = RegExp.prototype.toString;
