@@ -41,11 +41,11 @@ __wt_block_read(WT_SESSION_IMPL *session,
 		if (cksum != page_cksum) {
 			if (!F_ISSET(session, WT_SESSION_SALVAGE_QUIET_ERR))
 				__wt_errx(session,
-				    "read checksum error %" PRIu32 " [%"
+				    "read checksum error [%"
 				    PRIu32 "-%" PRIu32 ", %" PRIu32 ", %"
-				    PRIu32 "]",
-				    cksum, addr,
-				    addr + (size / 512 - 1), size, page_cksum);
+				    PRIu32 " != %" PRIu32 "]",
+				    addr, addr + (size / 512 - 1),
+				    size, cksum, page_cksum);
 			return (WT_ERROR);
 		}
 	}
