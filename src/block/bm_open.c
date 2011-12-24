@@ -203,6 +203,7 @@ err:		__wt_errx(session, "%s%s", msg,
 	}
 	btree->free_addr = desc->free_addr;
 	btree->free_size = desc->free_size;
+	btree->free_cksum = desc->free_cksum;
 
 	btree->lsn = desc->lsn;			/* XXX */
 

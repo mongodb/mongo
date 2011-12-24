@@ -371,8 +371,8 @@ __wt_block_freelist_read(WT_SESSION_IMPL *session)
 		return (0);
 
 	WT_RET(__wt_scr_alloc(session, btree->free_size, &tmp));
-	WT_ERR(__wt_block_read(
-	    session, tmp, btree->free_addr, btree->free_size, 0));
+	WT_ERR(__wt_block_read(session,
+	    tmp, btree->free_addr, btree->free_size, btree->free_cksum));
 
 	/* Insert the free-list items into the linked list. */
 	for (p = (uint32_t *)WT_PAGE_DISK_BYTE(tmp->mem);
@@ -478,6 +478,7 @@ __wt_block_freelist_write(WT_SESSION_IMPL *session)
 	/* Update the file's meta-data. */
 	btree->free_addr = addr;
 	btree->free_size = size;
+	btree->free_cksum = cksum;
 
 err:	__wt_scr_free(&tmp);
 	return (ret);

@@ -118,8 +118,9 @@ struct __wt_btree {
 	TAILQ_HEAD(__wt_free_qah, __wt_free_entry) freeqa;
 	TAILQ_HEAD(__wt_free_qsh, __wt_free_entry) freeqs;
 	int	 freelist_dirty;	/* Free-list has been modified */
-	uint32_t free_addr;		/* Free-list addr/size pair */
+	uint32_t free_addr;		/* Free-list addr/size/checksum  */
 	uint32_t free_size;
+	uint32_t free_cksum;
 };
 
 /*

@@ -85,8 +85,7 @@ struct __wt_btree_desc {
 
 	uint32_t free_addr;		/* 12-15: Free list page address */
 	uint32_t free_size;		/* 16-19: Free list page length */
-
-	uint32_t unused;		/* 20-23: Unused */
+	uint32_t free_cksum;		/* 20-23: Free list page checksum */
 
 	/*
 	 * We maintain page LSN's for the file in the non-transactional case
