@@ -147,6 +147,21 @@ namespace mongo {
             return;
 
         log() << "FileAllocator: posix_fallocate failed: " << errnoWithDescription( ret ) << " falling back" << endl;
+#elif defined(__APPLE__)
+        // Darwin specific preallocation/deallocation structure
+        fstore_t preallocStore;
+        
+        preallocStore.fst_flags = F_ALLOCATECONTIG;
+        preallocStore.fst_posmode = F_PEOFPOSMODE;
+        preallocStore.fst_offset = 0;
+        preallocStore.fst_length = size;
+        preallocStore.fst_bytesalloc = 0;
+        
+        int ret = fcntl(fd, F_PREALLOCATE, &preallocStore);
+        if ( ret == 0 )
+            return;
+        
+        log() << "FileAllocator: fcntl F_PREALLOCATE failed: " << errnoWithDescription( ret ) << " falling back" << endl;
 #endif
 
         off_t filelen = lseek(fd, 0, SEEK_END);
