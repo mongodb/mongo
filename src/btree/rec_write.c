@@ -174,27 +174,15 @@ static int  __rec_write_init(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_write_wrapup(WT_SESSION_IMPL *, WT_PAGE *);
 
 /*
- * __rec_track_kcell --
- *	If a key cell references an overflow chunk, add it to the page's list.
+ * __rec_track_cell --
+ *	If a cell references an overflow chunk, add it to the page's list.
  */
 static inline int
-__rec_track_kcell(
+__rec_track_cell(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack)
 {
 	return (unpack->ovfl ? __wt_rec_track_block(session,
 	    WT_PT_BLOCK_EVICT, page, unpack->data, unpack->size) : 0);
-}
-
-/*
- * __rec_track_vcell --
- *	If a value cell references an overflow chunk, add it to the page's list.
- */
-static inline int
-__rec_track_vcell(
-    WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack)
-{
-	return (unpack->ovfl ? __wt_rec_track_block(session,
-	    WT_PT_BLOCK, page, unpack->data, unpack->size) : 0);
 }
 
 /*
@@ -1626,7 +1614,7 @@ __rec_col_var(
 			 * that work because I don't want the complexity, and
 			 * overflow records should be rare.
 			 */
-			WT_ERR(__rec_track_vcell(session, page, unpack));
+			WT_ERR(__rec_track_cell(session, page, unpack));
 		}
 
 		/*
@@ -1883,7 +1871,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 				 * no longer useful.
 				 */
 				if (cell != NULL)
-					WT_RET(__rec_track_vcell(
+					WT_RET(__rec_track_cell(
 					    session, page, unpack));
 				continue;
 			case WT_PAGE_REC_REPLACE:
@@ -1902,7 +1890,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 				 * key for the split page).
 				 */
 				if (cell != NULL)
-					WT_RET(__rec_track_kcell(
+					WT_RET(__rec_track_cell(
 					    session, page, unpack));
 
 				WT_RET(__rec_row_merge(session,
@@ -2201,8 +2189,7 @@ __rec_row_leaf(
 			 * file space.
 			 */
 			if (val_cell != NULL)
-				WT_ERR(
-				    __rec_track_vcell(session, page, unpack));
+				WT_ERR(__rec_track_cell(session, page, unpack));
 
 			/*
 			 * If this key/value pair was deleted, we're done.  If
@@ -2211,8 +2198,7 @@ __rec_row_leaf(
 			 */
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
 				__wt_cell_unpack(cell, unpack);
-				WT_ERR(
-				    __rec_track_kcell(session, page, unpack));
+				WT_ERR(__rec_track_cell(session, page, unpack));
 
 				/*
 				 * We skip creating the key, don't try to use
@@ -2451,7 +2437,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 			__wt_get_addr(
 			    page->parent, page->parent_ref.ref, &addr, &size);
 			WT_RET(__wt_rec_track_block(
-			    session, WT_PT_BLOCK, page, addr, size));
+			    session, WT_PT_BLOCK_EVICT, page, addr, size));
 		}
 		break;
 	case WT_PAGE_REC_EMPTY:				/* Page deleted */
