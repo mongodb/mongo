@@ -230,6 +230,50 @@ namespace UpdateTests {
         }
     };
 
+    class ISetExists : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{ a: 'b' }" ) );
+            client().update( ns(), Query(), fromjson( "{ $iset: { a: 5 } }" ) );
+            ASSERT( client().findOne( ns(), fromjson( "{ a: 5 }" ) ).isEmpty() );
+            ASSERT( !client().findOne( ns(), fromjson( "{ a: 'b' }" ) ).isEmpty() );
+        }
+    };
+
+    class ISetNotExists : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{ a: 'b' }" ) );
+            client().update( ns(), Query(), fromjson( "{ $iset: { c: 5 } }" ) );
+            ASSERT( !client().findOne( ns(), fromjson( "{ a: 'b', c: 5 }" ) ).isEmpty() );
+        }
+    };
+
+    class ISetUpsert : public SetBase {
+    public:
+        void run() {
+            client().update( ns(), fromjson( "{ a: 'b' }" ), fromjson( "{ $iset: { c: 5 } }" ), true );
+            ASSERT( !client().findOne( ns(), fromjson( "{ a: 'b', c: 5 }" ) ).isEmpty() );
+        }
+    };
+
+    class ISetIdExistingUpsert : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), fromjson( "{ a: 'b' }" ) );
+            client().update( ns(), fromjson( "{ a: 'b' }" ), fromjson( "{ $iset: { _id: 5 } }" ), true );
+            ASSERT( client().findOne( ns(), fromjson( "{ _id: 5 }" ) ).isEmpty() );
+        }
+    };
+
+    class ISetIdNewUpsert : public SetBase {
+    public:
+        void run() {
+            client().update( ns(), fromjson( "{ a: 'b' }" ), fromjson( "{ $iset: { _id: 5 } }" ), true );
+            ASSERT( client().findOne( ns(), fromjson( "{ _id: 5 }" ) ).woCompare( fromjson( "{ _id:5, a: 'b' }" ) ) == 0 );
+        }
+    };
+
     class IncMissing : public SetBase {
     public:
         void run() {
@@ -825,6 +869,11 @@ namespace UpdateTests {
             add< SetRecreateDotted >();
             add< SetMissingDotted >();
             add< SetAdjacentDotted >();
+            add< ISetExists >();
+            add< ISetNotExists >();
+            add< ISetUpsert >();
+            add< ISetIdExistingUpsert >();
+            add< ISetIdNewUpsert >();
             add< IncMissing >();
             add< MultiInc >();
             add< UnorderedNewSet >();

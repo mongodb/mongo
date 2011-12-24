@@ -21,3 +21,23 @@ f.drop();
 f.save( {'_id':0} );
 f.update( {}, {$set:{'_id':5}} );
 assert.eq( 0, f.findOne()._id , "D" );
+
+f.drop();
+f.save( { a:1 } );
+f.update( {}, {$iset:{ a:2 }} );
+assert.eq( 1, f.findOne().a , "E" );
+f.update( {}, {$iset:{ b:2 }} );
+assert.eq( 2, f.findOne().b , "F" );
+
+f.drop();
+f.update( {a:1}, {$iset:{ b:2 }}, true );
+assert.eq( 1, f.findOne().a , "G" );
+assert.eq( 2, f.findOne().b , "H" );
+
+f.drop();
+f.update( {a:1}, {$iset:{ _id:0 }}, true );
+assert.eq( 0, f.findOne()._id , "I" );
+assert.eq( 1, f.findOne().a , "J" );
+f.update( {a:1}, {$iset:{ _id:9 }}, true );
+assert.eq( 0, f.findOne()._id , "K" );
+assert.eq( 1, f.findOne().a , "L" );
