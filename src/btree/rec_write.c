@@ -909,8 +909,7 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, uint8_t type)
 		 */
 		cell = WT_PAGE_DISK_BYTE(r->dsk.mem);
 		__wt_cell_unpack(cell, unpack);
-		WT_ASSERT_RET(session,
-		    unpack->prefix == 0 || unpack->type == WT_CELL_KEY_OVFL);
+		WT_ASSERT_RET(session, unpack->prefix == 0);
 		WT_RET(
 		    __wt_cell_unpack_copy(session, unpack, &r->bnd[0].key));
 	}
