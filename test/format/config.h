@@ -46,7 +46,7 @@ static CONFIG c[] = {
 
 	{ "cache",
 	  "size of the cache in MB",
-	  0, 0, 1, 30, &g.c_cache },
+	  0, 0, 1, 100, &g.c_cache },
 
 	{ "delete_pct",
 	  "percent operations that are deletes",
