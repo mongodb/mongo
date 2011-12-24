@@ -46,6 +46,7 @@ namespace mongo {
 
 #include <pthread.h>
 #include <execinfo.h>
+#include <cxxabi.h>
 
 namespace mongo {
 
@@ -65,8 +66,36 @@ namespace mongo {
         char **strings;
 
         strings = backtrace_symbols(b, size);
-        for (int i = 0; i < size; i++)
-            o << ' ' << strings[i] << '\n';
+        for (int i = 0; i < size; i++) {
+            bool shown = false;
+            char *start = NULL, *end = NULL;
+            for (char *j = strings[i]; *j; j++) {
+                if (*j == '(')
+                    start = j;
+                else if (*j == '+')
+                    end = j;
+            }
+            if (start && end) {
+                *start++ = '\0';
+                *end = '\0';
+
+                int status;
+                char *ret = abi::__cxa_demangle(start, NULL, NULL, &status);
+                if (ret) {
+                    o << ' ' << strings[i] << '(' << ret << '+' << end+1 << '\n';
+                    free(ret);
+                    shown = true;
+                }
+                else {
+                    *--start = '(';
+                    *end = '+';
+                }
+            }
+            if (!shown) {
+                o << ' ' << strings[i] << '\n';
+            }
+        }
+
         o.flush();
         free (strings);
     }
