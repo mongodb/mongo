@@ -1348,7 +1348,6 @@ namespace mongo {
                 if ( !rchild.isNull() )
                     rchild.btree<V>()->parent.writing() = thisLoc;
             }
-            return;
         }
     }
 
