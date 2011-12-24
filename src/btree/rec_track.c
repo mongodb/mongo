@@ -72,7 +72,7 @@ __wt_rec_track_block(WT_SESSION_IMPL *session,
     __wt_pt_type_t type, WT_PAGE *page, const uint8_t *addr, uint32_t size)
 {
 	WT_PAGE_MODIFY *mod;
-	WT_PAGE_TRACK *next, *track;
+	WT_PAGE_TRACK *empty, *track;
 	uint32_t i;
 
 	mod = page->modify;
@@ -85,10 +85,10 @@ __wt_rec_track_block(WT_SESSION_IMPL *session,
 	 * split, but we have no way to know that we've figured that same thing
 	 * out several times already.   Check for duplicates.
 	 */
-	next = NULL;
+	empty = NULL;
 	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i) {
 		if (track->type == WT_PT_EMPTY) {
-			next = track;
+			empty = track;
 			continue;
 		}
 		if (track->type == type &&
@@ -98,12 +98,12 @@ __wt_rec_track_block(WT_SESSION_IMPL *session,
 	}
 
 	/* Reallocate space as necessary. */
-	if (next == NULL) {
+	if (empty == NULL) {
 		WT_RET(__rec_track_extend(session, page));
-		next = &mod->track[mod->track_entries - 1];
+		empty = &mod->track[mod->track_entries - 1];
 	}
 
-	track = next;
+	track = empty;
 	track->type = type;
 	track->data = NULL;
 	track->size = 0;
@@ -125,7 +125,7 @@ __wt_rec_track_ovfl(WT_SESSION_IMPL *session, WT_PAGE *page,
     uint8_t *addr, uint32_t addr_size, const void *data, uint32_t data_size)
 {
 	WT_PAGE_MODIFY *mod;
-	WT_PAGE_TRACK *next, *track;
+	WT_PAGE_TRACK *empty, *track;
 	uint8_t *p;
 	uint32_t i;
 
@@ -133,17 +133,17 @@ __wt_rec_track_ovfl(WT_SESSION_IMPL *session, WT_PAGE *page,
 
 	mod = page->modify;
 
-	next = NULL;
+	empty = NULL;
 	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i)
 		if (track->type == WT_PT_EMPTY) {
-			next = track;
+			empty = track;
 			break;
 		}
 
 	/* Reallocate space as necessary. */
-	if (next == NULL) {
+	if (empty == NULL) {
 		WT_RET(__rec_track_extend(session, page));
-		next = &mod->track[mod->track_entries - 1];
+		empty = &mod->track[mod->track_entries - 1];
 	}
 
 	/*
@@ -152,7 +152,7 @@ __wt_rec_track_ovfl(WT_SESSION_IMPL *session, WT_PAGE *page,
 	 */
 	WT_RET(__wt_calloc_def(session, addr_size + data_size, &p));
 
-	track = next;
+	track = empty;
 	track->type = WT_PT_OVFL;
 	track->addr.addr = p;
 	track->addr.size = addr_size;
