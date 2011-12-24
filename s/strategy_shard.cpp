@@ -280,7 +280,7 @@ namespace mongo {
                         while(fields.more()) {
                             const string field = fields.next().fieldName();
                             uassert(13123,
-                                    str::stream() << "Can't modify shard key's value field" << field
+                                    str::stream() << "Can't modify shard key's value field: " << field
                                     << " for collection: " << manager->getns(),
                                     ! manager->getShardKey().partOfShardKey(field));
                         }
