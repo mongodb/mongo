@@ -24,6 +24,7 @@
 #include "../../db/ops/query.h"
 #include "../../db/queryoptimizer.h"
 #include "../../util/file_allocator.h"
+#include "../../db/btree.h"
 
 #include "../framework.h"
 #include <boost/date_time/posix_time/posix_time.hpp>
@@ -720,6 +721,59 @@ namespace Plan {
         }
     } all;
 } // namespace Plan
+
+namespace Memmove {
+
+    typedef BtreeBucket<V1>::_KeyNode _KeyNode;
+
+    template <int Loops, int Total, int Insert>
+    class CopyEachTime {
+    public:
+        void run() {
+            int iterations = L;
+            _KeyNode *data = (_KeyNode*)buf;
+            while (iterations--) {
+                int n = N;
+                while (n > M) {
+                    data[n] = data[n-1];
+                    n--;
+                }
+            }
+        }
+    private:
+        enum { L = Loops, N = Total, M = Insert };
+        char buf[ sizeof(_KeyNode) * (N + 1) ];
+    };
+
+    template <int Loops, int Total, int Insert>
+    class MemmoveTime {
+    public:
+        void run() {
+            int iterations = L;
+            _KeyNode *data = (_KeyNode*)buf;
+            while (iterations--) {
+                int n = N - M;
+                memmove(&data[M + 1], &data[M], sizeof(_KeyNode) * n);
+            }
+        }
+    private:
+        enum { L = Loops, N = Total, M = Insert };
+        char buf[ sizeof(_KeyNode) * (N + 1) ];
+    };
+
+    class All : public RunnerSuite {
+    public:
+        All() : RunnerSuite("memmove") {}
+        void setupTests() {
+            // insert into the middle node
+            add< CopyEachTime<1000*1000*50, 100, 50> >();
+            add< MemmoveTime<1000*1000*50, 100, 50> >();
+            // insert into the first node
+            add< CopyEachTime<1000*1000*50, 100, 0> >();
+            add< MemmoveTime<1000*1000*50, 100, 0> >();
+        }
+    } all;
+} // namespace Memmove
 
 namespace Misc {
     class TimeMicros64 {

@@ -310,8 +310,7 @@ namespace mongo {
         assert( ( mayEmpty && this->n > 0 ) || this->n > 1 || this->nextChild.isNull() );
         this->emptySize += sizeof(_KeyNode);
         this->n--;
-        for ( int j = keypos; j < this->n; j++ )
-            k(j) = k(j+1);
+        memmove(&k(keypos), &k(keypos+1), sizeof(_KeyNode)*(this->n-keypos));
         setNotPacked();
     }
 
@@ -402,8 +401,7 @@ namespace mongo {
             // 1 4 9
             // ->
             // 1 4 _ 9
-            for ( int j = this->n; j > keypos; j-- ) // make room
-                b->k(j) = b->k(j-1);
+            memmove(&b->k(keypos+1), &b->k(keypos), sizeof(_KeyNode)*(this->n-keypos));
         }
 
         getDur().declareWriteIntent(&b->emptySize, sizeof(this->emptySize)+sizeof(this->topSize)+sizeof(this->n));
@@ -574,9 +572,7 @@ namespace mongo {
     void BucketBasics<V>::reserveKeysFront( int nAdd ) {
         assert( this->emptySize >= int( sizeof( _KeyNode ) * nAdd ) );
         this->emptySize -= sizeof( _KeyNode ) * nAdd;
-        for( int i = this->n - 1; i > -1; --i ) {
-            k( i + nAdd ) = k( i );
-        }
+        memmove(&k(nAdd), &k(0), sizeof( _KeyNode ) * this->n);
         this->n += nAdd;
     }
 
@@ -593,10 +589,8 @@ namespace mongo {
 
     template< class V >
     void BucketBasics<V>::dropFront( int nDrop, const Ordering &order, int &refpos ) {
-        for( int i = nDrop; i < this->n; ++i ) {
-            k( i - nDrop ) = k( i );
-        }
         this->n -= nDrop;
+        memmove(&k(0), &k(nDrop), sizeof(_KeyNode) * this->n);
         setNotPacked();
         _packReadyForMod( order, refpos );
     }
