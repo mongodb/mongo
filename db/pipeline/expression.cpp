@@ -2605,8 +2605,8 @@ namespace mongo {
 		(pLength->getType() == NumberInt 
 		 || pLength->getType() == NumberLong 
 		 || pLength->getType() == NumberDouble));
-        long long lower = pLower->coerceToLong();
-        long long length = pLength->coerceToLong();
+        string::size_type lower = static_cast< string::size_type >( pLower->coerceToLong() );
+        string::size_type length = static_cast< string::size_type >( pLength->coerceToLong() );
         return Value::createString( str.substr(lower, length) );
     }
 
