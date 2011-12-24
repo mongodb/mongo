@@ -217,7 +217,7 @@ __wt_cache_evict_server(void *arg)
 			    __wt_cache_bytes_inuse(cache));
 		}
 	} else
-err:		__wt_err(session, ret, "cache eviction server error");
+err:		__wt_err(session, ret, "eviction server error");
 
 	WT_VERBOSE(session, evictserver, "exiting");
 
@@ -333,7 +333,6 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 
 		if (F_ISSET(er, WT_EVICT_REQ_PAGE)) {
 			WT_VERBOSE(session, evictserver,
-			    "eviction server: "
 			    "forcing eviction of page %p", er->page);
 			ret = __wt_rec_evict(session, er->page, WT_REC_WAIT);
 		} else
