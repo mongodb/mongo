@@ -83,7 +83,13 @@ __debug_config(WT_SESSION_IMPL *session, WT_DBG *ds, const char *ofile)
 	if (ofile == NULL)
 		return (__wt_scr_alloc(session, 512, &ds->msg));
 
-	return ((ds->fp = fopen(ofile, "w")) == NULL ? WT_ERROR : 0);
+	/* If we're using a file, flush on each line. */
+	if ((ds->fp = fopen(ofile, "w")) == NULL) {
+		__wt_err(session, errno, "%s", ofile);
+		return (errno);
+	}
+	(void)setvbuf(ds->fp, NULL, _IOLBF, 0);
+	return (0);
 }
 
 /*
