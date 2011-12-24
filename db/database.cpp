@@ -72,7 +72,7 @@ namespace mongo {
                 if( _openAllFiles )
                     openAllFiles();
             }
-            magic = 781231;
+            magic = DATABASE_MAGIC;
         } catch(std::exception& e) {
             log() << "warning database " << path << ' ' << nm << " could not be opened" << endl;
             log() << e.what() << endl;
