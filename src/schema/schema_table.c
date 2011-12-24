@@ -38,9 +38,11 @@ err:	__wt_free(session, schemaconf);
  *	Opens a cursor on the schema table.
  */
 int
-__wt_schema_table_cursor(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
+__wt_schema_table_cursor(
+    WT_SESSION_IMPL *session, const char *config, WT_CURSOR **cursorp)
 {
-	const char *cfg[] = API_CONF_DEFAULTS(session, open_cursor, NULL);
+	const char *cfg[] = API_CONF_DEFAULTS(session, open_cursor, config);
+
 	WT_RET(__open_schema_table(session));
 	session->btree = session->schematab;
 	return (__wt_curfile_create(session, cfg, cursorp));
@@ -48,7 +50,7 @@ __wt_schema_table_cursor(WT_SESSION_IMPL *session, WT_CURSOR **cursorp)
 
 /*
  * __wt_schema_table_insert --
- *	Inserts a row into the schema table.
+ *	Insert a row into the schema table.
  */
 int
 __wt_schema_table_insert(
@@ -59,7 +61,28 @@ __wt_schema_table_insert(
 
 	ret = 0;
 
-	WT_RET(__wt_schema_table_cursor(session, &cursor));
+	WT_RET(__wt_schema_table_cursor(session, NULL, &cursor));
+	cursor->set_key(cursor, key);
+	cursor->set_value(cursor, value);
+	WT_TRET(cursor->insert(cursor));
+	WT_TRET(cursor->close(cursor, NULL));
+	return (ret);
+}
+
+/*
+ * __wt_schema_table_update --
+ *	Update a row in the schema table.
+ */
+int
+__wt_schema_table_update(
+    WT_SESSION_IMPL *session, const char *key, const char *value)
+{
+	WT_CURSOR *cursor;
+	int ret;
+
+	ret = 0;
+
+	WT_RET(__wt_schema_table_cursor(session, "overwrite", &cursor));
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
 	WT_TRET(cursor->insert(cursor));
@@ -79,7 +102,7 @@ __wt_schema_table_remove(WT_SESSION_IMPL *session, const char *key)
 
 	ret = 0;
 
-	WT_RET(__wt_schema_table_cursor(session, &cursor));
+	WT_RET(__wt_schema_table_cursor(session, NULL, &cursor));
 	cursor->set_key(cursor, key);
 	WT_TRET(cursor->remove(cursor));
 	WT_TRET(cursor->close(cursor, NULL));
@@ -101,7 +124,7 @@ __wt_schema_table_read(
 
 	ret = 0;
 
-	WT_RET(__wt_schema_table_cursor(session, &cursor));
+	WT_RET(__wt_schema_table_cursor(session, NULL, &cursor));
 	cursor->set_key(cursor, key);
 	WT_ERR(cursor->search(cursor));
 	WT_ERR(cursor->get_value(cursor, &value));

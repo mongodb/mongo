@@ -247,16 +247,7 @@ __btree_set_root(WT_SESSION_IMPL *session, char *v)
 
 	WT_RET(__wt_scr_alloc(session, 0, &key));
 	WT_ERR(__wt_buf_fmt(session, key, "root:%s", btree->filename));
-
-	/*
-	 * Schema operations do not configure the cursor with overwrite,
-	 * remove the entry first.
-	 */
-	ret = __wt_schema_table_remove(session, key->data);
-	if (ret == WT_NOTFOUND)
-		ret = 0;
-	WT_ERR(ret);
-	WT_ERR(__wt_schema_table_insert(session, key->data, v));
+	WT_ERR(__wt_schema_table_update(session, key->data, v));
 
 err:	__wt_scr_free(&key);
 

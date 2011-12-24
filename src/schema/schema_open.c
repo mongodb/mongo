@@ -62,7 +62,7 @@ __wt_schema_get_btree(WT_SESSION_IMPL *session,
 	if (len != strlen(objname))
 		WT_ERR(__wt_strndup(session, objname, len, &name));
 
-	WT_ERR(__wt_schema_table_cursor(session, &cursor));
+	WT_ERR(__wt_schema_table_cursor(session, NULL, &cursor));
 	cursor->set_key(cursor, name);
 	WT_ERR(cursor->search(cursor));
 	WT_ERR(cursor->get_value(cursor, &objconf));
@@ -281,7 +281,7 @@ __wt_schema_open_index(
 	 * XXX Do a full scan through the schema table to find all matching
 	 * indices.  This scan be optimized when we have cursor search + next.
 	 */
-	WT_RET(__wt_schema_table_cursor(session, &cursor));
+	WT_RET(__wt_schema_table_cursor(session, NULL, &cursor));
 
 	/* Open each index. */
 	for (i = 0; (ret = cursor->next(cursor)) == 0;) {
@@ -356,7 +356,7 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 	snprintf(tablename, bufsize, "table:%.*s", (int)namelen, name);
 
 	cursor = NULL;
-	WT_ERR(__wt_schema_table_cursor(session, &cursor));
+	WT_ERR(__wt_schema_table_cursor(session, NULL, &cursor));
 	cursor->set_key(cursor, tablename);
 	WT_ERR(cursor->search(cursor));
 	WT_ERR(cursor->get_value(cursor, &tconfig));

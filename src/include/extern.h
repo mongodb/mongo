@@ -587,9 +587,13 @@ extern int __wt_schema_project_merge(WT_SESSION_IMPL *session,
     const char *proj_arg,
     const char *vformat,
     WT_BUF *value);
-extern int __wt_schema_table_cursor(WT_SESSION_IMPL *session,
+extern int __wt_schema_table_cursor( WT_SESSION_IMPL *session,
+    const char *config,
     WT_CURSOR **cursorp);
 extern int __wt_schema_table_insert( WT_SESSION_IMPL *session,
+    const char *key,
+    const char *value);
+extern int __wt_schema_table_update( WT_SESSION_IMPL *session,
     const char *key,
     const char *value);
 extern int __wt_schema_table_remove(WT_SESSION_IMPL *session, const char *key);
