@@ -274,7 +274,7 @@ namespace mongo {
         if (type == NumberInt)
             return simple.intValue;
         if (type == NumberLong)
-            return simple.longValue;
+            return static_cast< double >( simple.longValue );
 
         assert(type == NumberDouble);
         return simple.doubleValue;

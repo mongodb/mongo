@@ -605,6 +605,7 @@ namespace mongo {
 
 
 #define OPDEBUG_TOSTRING_HELP(x) if( x >= 0 ) s << " " #x ":" << (x)
+#define OPDEBUG_TOSTRING_HELP_BOOL(x) if( x ) s << " " #x ":" << (x)
     string OpDebug::toString() const {
         StringBuilder s( ns.size() + 64 );
         if ( iscommand )
@@ -629,15 +630,15 @@ namespace mongo {
         OPDEBUG_TOSTRING_HELP( cursorid );
         OPDEBUG_TOSTRING_HELP( ntoreturn );
         OPDEBUG_TOSTRING_HELP( ntoskip );
-        OPDEBUG_TOSTRING_HELP( exhaust );
+        OPDEBUG_TOSTRING_HELP_BOOL( exhaust );
 
         OPDEBUG_TOSTRING_HELP( nscanned );
-        OPDEBUG_TOSTRING_HELP( idhack );
-        OPDEBUG_TOSTRING_HELP( scanAndOrder );
-        OPDEBUG_TOSTRING_HELP( moved );
-        OPDEBUG_TOSTRING_HELP( fastmod );
-        OPDEBUG_TOSTRING_HELP( fastmodinsert );
-        OPDEBUG_TOSTRING_HELP( upsert );
+        OPDEBUG_TOSTRING_HELP_BOOL( idhack );
+        OPDEBUG_TOSTRING_HELP_BOOL( scanAndOrder );
+        OPDEBUG_TOSTRING_HELP_BOOL( moved );
+        OPDEBUG_TOSTRING_HELP_BOOL( fastmod );
+        OPDEBUG_TOSTRING_HELP_BOOL( fastmodinsert );
+        OPDEBUG_TOSTRING_HELP_BOOL( upsert );
         OPDEBUG_TOSTRING_HELP( keyUpdates );
         
         if ( extra.len() )
