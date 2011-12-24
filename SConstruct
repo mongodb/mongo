@@ -34,7 +34,7 @@ def findSettingsSetup():
 
 def getThirdPartyShortNames():
     lst = []
-    for x in os.listdir( "third_party" ):
+    for x in os.listdir( "src/third_party" ):
         if not x.endswith( ".py" ) or x.find( "#" ) >= 0:
             continue
          
@@ -261,7 +261,8 @@ if has_option( "cpppath" ):
     env["CPPPATH"] = [get_option( "cpppath" )]
 
 env.Append( CPPDEFINES=[ "_SCONS" , "MONGO_EXPOSE_MACROS" ] )
-env.Append( CPPPATH=[ "." ] )
+env.Append( CPPPATH=[ "./src/mongo" ] )
+env.Append( CPPPATH=[ "./src/" ] )
 
 if has_option( "safeshell" ):
     env.Append( CPPDEFINES=[ "MONGO_SAFE_SHELL" ] )
@@ -336,7 +337,7 @@ class InstallSetup:
         self.headers = True
         self.bannerDir = "distsrc/client/"
         self.headerRoot = ""
-        self.clientTestsDir = "client/examples/"
+        self.clientTestsDir = "src/mongo/client/examples/"
         
 installSetup = InstallSetup()
 if distBuild:
@@ -349,119 +350,119 @@ if has_option( "full" ):
 
 # ------    SOURCE FILE SETUP -----------
 
-commonFiles = Split( "pch.cpp buildinfo.cpp db/indexkey.cpp db/jsobj.cpp bson/oid.cpp db/json.cpp db/lasterror.cpp db/nonce.cpp db/queryutil.cpp db/querypattern.cpp db/projection.cpp shell/mongo.cpp" )
-commonFiles += [ "util/background.cpp" , "util/intrusive_counter.cpp",
-                 "util/util.cpp" , "util/file_allocator.cpp" ,
-                 "util/assert_util.cpp" , "util/log.cpp" , "util/ramlog.cpp" , "util/md5main.cpp" , "util/base64.cpp", "util/concurrency/vars.cpp", "util/concurrency/task.cpp", "util/debug_util.cpp",
-                 "util/concurrency/thread_pool.cpp", "util/password.cpp", "util/version.cpp", "util/signal_handlers.cpp",  
-                 "util/histogram.cpp", "util/concurrency/spin_lock.cpp", "util/text.cpp" , "util/stringutils.cpp" ,
-                 "util/concurrency/synchronization.cpp" ]
-commonFiles += [ "util/net/sock.cpp" , "util/net/httpclient.cpp" , "util/net/message.cpp" , "util/net/message_port.cpp" , "util/net/listen.cpp" ]
-commonFiles += Glob( "util/*.c" ) 
-commonFiles += Split( "client/connpool.cpp client/dbclient.cpp client/dbclient_rs.cpp client/dbclientcursor.cpp client/model.cpp client/syncclusterconnection.cpp client/distlock.cpp s/shardconnection.cpp" )
+commonFiles = [ "src/mongo/pch.cpp" , "src/mongo/buildinfo.cpp" , "src/mongo/db/indexkey.cpp" , "src/mongo/db/jsobj.cpp" , "src/mongo/bson/oid.cpp" , "src/mongo/db/json.cpp" , "src/mongo/db/lasterror.cpp" , "src/mongo/db/nonce.cpp" , "src/mongo/db/queryutil.cpp" , "src/mongo/db/querypattern.cpp" , "src/mongo/db/projection.cpp" , "src/mongo/shell/mongo.cpp" ]
+commonFiles += [ "src/mongo/util/background.cpp" , "src/mongo/util/intrusive_counter.cpp",
+                 "src/mongo/util/util.cpp" , "src/mongo/util/file_allocator.cpp" ,
+                 "src/mongo/util/assert_util.cpp" , "src/mongo/util/log.cpp" , "src/mongo/util/ramlog.cpp" , "src/mongo/util/md5main.cpp" , "src/mongo/util/base64.cpp", "src/mongo/util/concurrency/vars.cpp", "src/mongo/util/concurrency/task.cpp", "src/mongo/util/debug_util.cpp",
+                 "src/mongo/util/concurrency/thread_pool.cpp", "src/mongo/util/password.cpp", "src/mongo/util/version.cpp", "src/mongo/util/signal_handlers.cpp",  
+                 "src/mongo/util/histogram.cpp", "src/mongo/util/concurrency/spin_lock.cpp", "src/mongo/util/text.cpp" , "src/mongo/util/stringutils.cpp" ,
+                 "src/mongo/util/concurrency/synchronization.cpp" ]
+commonFiles += [ "src/mongo/util/net/sock.cpp" , "src/mongo/util/net/httpclient.cpp" , "src/mongo/util/net/message.cpp" , "src/mongo/util/net/message_port.cpp" , "src/mongo/util/net/listen.cpp" ]
+commonFiles += Glob( "src/mongo/util/*.c" ) 
+commonFiles += [ "src/mongo/client/connpool.cpp" , "src/mongo/client/dbclient.cpp" , "src/mongo/client/dbclient_rs.cpp" , "src/mongo/client/dbclientcursor.cpp" , "src/mongo/client/model.cpp" , "src/mongo/client/syncclusterconnection.cpp" , "src/mongo/client/distlock.cpp" , "src/mongo/s/shardconnection.cpp" ] 
 
 #mmap stuff
 
-coreDbFiles = [ "db/commands.cpp" ]
-coreServerFiles = [ "util/net/message_server_port.cpp" , 
-                    "client/parallel.cpp" , "db/common.cpp", 
-                    "util/net/miniwebserver.cpp" , "db/dbwebserver.cpp" , 
-                    "db/matcher.cpp" , "db/dbcommands_generic.cpp" , "db/commands/cloud.cpp", "db/dbmessage.cpp" ]
+coreDbFiles = [ "src/mongo/db/commands.cpp" ]
+coreServerFiles = [ "src/mongo/util/net/message_server_port.cpp" , 
+                    "src/mongo/client/parallel.cpp" , "src/mongo/db/common.cpp", 
+                    "src/mongo/util/net/miniwebserver.cpp" , "src/mongo/db/dbwebserver.cpp" , 
+                    "src/mongo/db/matcher.cpp" , "src/mongo/db/dbcommands_generic.cpp" , "src/mongo/db/commands/cloud.cpp", "src/mongo/db/dbmessage.cpp" ]
 
-mmapFiles = [ "util/mmap.cpp" ]
+mmapFiles = [ "src/mongo/util/mmap.cpp" ]
 
 if has_option( "mm" ):
-    mmapFiles += [ "util/mmap_mm.cpp" ]
+    mmapFiles += [ "src/mongo/util/mmap_mm.cpp" ]
 elif os.sys.platform == "win32":
-    mmapFiles += [ "util/mmap_win.cpp" ]
+    mmapFiles += [ "src/mongo/util/mmap_win.cpp" ]
 else:
-    mmapFiles += [ "util/mmap_posix.cpp" ]
+    mmapFiles += [ "src/mongo/util/mmap_posix.cpp" ]
 
 #coreServerFiles += mmapFiles
 
 # handle processinfo*
-processInfoFiles = [ "util/processinfo.cpp" ]
+processInfoFiles = [ "src/mongo/util/processinfo.cpp" ]
 
-if os.path.exists( "util/processinfo_" + os.sys.platform + ".cpp" ):
-    processInfoFiles += [ "util/processinfo_" + os.sys.platform + ".cpp" ]
+if os.path.exists( "src/mongo/util/processinfo_" + os.sys.platform + ".cpp" ):
+    processInfoFiles += [ "src/mongo/util/processinfo_" + os.sys.platform + ".cpp" ]
 elif os.sys.platform == "linux3":
-    processInfoFiles += [ "util/processinfo_linux2.cpp" ]
+    processInfoFiles += [ "src/mongo/util/processinfo_linux2.cpp" ]
 else:
-    processInfoFiles += [ "util/processinfo_none.cpp" ]
+    processInfoFiles += [ "src/mongo/util/processinfo_none.cpp" ]
 
 coreServerFiles += processInfoFiles
 
 # handle systeminfo*
 systemInfoFiles = [ ]
-if os.path.exists( "util/systeminfo_" + os.sys.platform + ".cpp" ):
-    systemInfoFiles += [ "util/systeminfo_" + os.sys.platform + ".cpp" ]
+if os.path.exists( "src/mongo/util/systeminfo_" + os.sys.platform + ".cpp" ):
+    systemInfoFiles += [ "src/mongo/util/systeminfo_" + os.sys.platform + ".cpp" ]
 elif os.sys.platform == "linux3":
-    systemInfoFiles += [ "util/systeminfo_linux2.cpp" ]
+    systemInfoFiles += [ "src/mongo/util/systeminfo_linux2.cpp" ]
 else:
-    systemInfoFiles += [ "util/systeminfo_none.cpp" ]
+    systemInfoFiles += [ "src/mongo/util/systeminfo_none.cpp" ]
 
 coreServerFiles += systemInfoFiles
 
 
 if has_option( "asio" ):
-    coreServerFiles += [ "util/net/message_server_asio.cpp" ]
+    coreServerFiles += [ "src/mongo/util/net/message_server_asio.cpp" ]
 
 # mongod files - also files used in tools. present in dbtests, but not in mongos and not in client libs.
-serverOnlyFiles = Split( "db/curop.cpp db/d_globals.cpp db/pagefault.cpp util/compress.cpp db/d_concurrency.cpp db/key.cpp db/btreebuilder.cpp util/logfile.cpp util/alignedbuilder.cpp db/mongommf.cpp db/dur.cpp db/durop.cpp db/dur_writetodatafiles.cpp db/dur_preplogbuffer.cpp db/dur_commitjob.cpp db/dur_recover.cpp db/dur_journal.cpp db/introspect.cpp db/btree.cpp db/clientcursor.cpp db/tests.cpp db/repl.cpp db/repl/rs.cpp db/repl/consensus.cpp db/repl/rs_initiate.cpp db/repl/replset_commands.cpp db/repl/manager.cpp db/repl/health.cpp db/repl/heartbeat.cpp db/repl/rs_config.cpp db/repl/rs_rollback.cpp db/repl/rs_sync.cpp db/repl/rs_initialsync.cpp db/oplog.cpp db/repl_block.cpp db/btreecursor.cpp db/cloner.cpp db/namespace.cpp db/cap.cpp db/matcher_covered.cpp db/dbeval.cpp db/restapi.cpp db/dbhelpers.cpp db/instance.cpp db/client.cpp db/database.cpp db/pdfile.cpp db/record.cpp db/cursor.cpp db/security.cpp db/queryoptimizer.cpp db/queryoptimizercursor.cpp db/extsort.cpp db/cmdline.cpp" )
+serverOnlyFiles = [ "src/mongo/db/curop.cpp" , "src/mongo/db/d_globals.cpp" , "src/mongo/db/pagefault.cpp" , "src/mongo/util/compress.cpp" , "src/mongo/db/d_concurrency.cpp" , "src/mongo/db/key.cpp" , "src/mongo/db/btreebuilder.cpp" , "src/mongo/util/logfile.cpp" , "src/mongo/util/alignedbuilder.cpp" , "src/mongo/db/mongommf.cpp" , "src/mongo/db/dur.cpp" , "src/mongo/db/durop.cpp" , "src/mongo/db/dur_writetodatafiles.cpp" , "src/mongo/db/dur_preplogbuffer.cpp" , "src/mongo/db/dur_commitjob.cpp" , "src/mongo/db/dur_recover.cpp" , "src/mongo/db/dur_journal.cpp" , "src/mongo/db/introspect.cpp" , "src/mongo/db/btree.cpp" , "src/mongo/db/clientcursor.cpp" , "src/mongo/db/tests.cpp" , "src/mongo/db/repl.cpp" , "src/mongo/db/repl/rs.cpp" , "src/mongo/db/repl/consensus.cpp" , "src/mongo/db/repl/rs_initiate.cpp" , "src/mongo/db/repl/replset_commands.cpp" , "src/mongo/db/repl/manager.cpp" , "src/mongo/db/repl/health.cpp" , "src/mongo/db/repl/heartbeat.cpp" , "src/mongo/db/repl/rs_config.cpp" , "src/mongo/db/repl/rs_rollback.cpp" , "src/mongo/db/repl/rs_sync.cpp" , "src/mongo/db/repl/rs_initialsync.cpp" , "src/mongo/db/oplog.cpp" , "src/mongo/db/repl_block.cpp" , "src/mongo/db/btreecursor.cpp" , "src/mongo/db/cloner.cpp" , "src/mongo/db/namespace.cpp" , "src/mongo/db/cap.cpp" , "src/mongo/db/matcher_covered.cpp" , "src/mongo/db/dbeval.cpp" , "src/mongo/db/restapi.cpp" , "src/mongo/db/dbhelpers.cpp" , "src/mongo/db/instance.cpp" , "src/mongo/db/client.cpp" , "src/mongo/db/database.cpp" , "src/mongo/db/pdfile.cpp" , "src/mongo/db/record.cpp" , "src/mongo/db/cursor.cpp" , "src/mongo/db/security.cpp" , "src/mongo/db/queryoptimizer.cpp" , "src/mongo/db/queryoptimizercursor.cpp" , "src/mongo/db/extsort.cpp" , "src/mongo/db/cmdline.cpp" ]
 
-serverOnlyFiles += [ "db/index.cpp" , "db/scanandorder.cpp" ] + Glob( "db/geo/*.cpp" ) + Glob( "db/ops/*.cpp" )
+serverOnlyFiles += [ "src/mongo/db/index.cpp" , "src/mongo/db/scanandorder.cpp" ] + Glob( "src/mongo/db/geo/*.cpp" ) + Glob( "src/mongo/db/ops/*.cpp" )
 
-serverOnlyFiles += [ "db/dbcommands.cpp" , "db/dbcommands_admin.cpp" ]
+serverOnlyFiles += [ "src/mongo/db/dbcommands.cpp" , "src/mongo/db/dbcommands_admin.cpp" ]
 
 # most commands are only for mongod
 serverOnlyFiles += [
-    "db/commands/distinct.cpp",
-    "db/commands/find_and_modify.cpp",
-    "db/commands/group.cpp",
-    "db/commands/mr.cpp",
-    "db/commands/pipeline_command.cpp",
-    "db/commands/document_source_cursor.cpp" ]
-#    "db/commands/isself.cpp",
-#serverOnlyFiles += [ "db/commands/%s.cpp" % x for x in ["distinct","find_and_modify","group","mr"] ]
+    "src/mongo/db/commands/distinct.cpp",
+    "src/mongo/db/commands/find_and_modify.cpp",
+    "src/mongo/db/commands/group.cpp",
+    "src/mongo/db/commands/mr.cpp",
+    "src/mongo/db/commands/pipeline_command.cpp",
+    "src/mongo/db/commands/document_source_cursor.cpp" ]
+#    "src/mongo/db/commands/isself.cpp",
+#serverOnlyFiles += [ "src/mongo/db/commands/%s.cpp" % x for x in ["distinct","find_and_modify","group","mr"] ]
 
-serverOnlyFiles += [ "db/driverHelpers.cpp" ]
+serverOnlyFiles += [ "src/mongo/db/driverHelpers.cpp" ]
 
 serverOnlyFiles += mmapFiles
 
 # but the pipeline command works everywhere
-coreServerFiles += [ "db/commands/pipeline.cpp" ]
-coreServerFiles += Glob("db/pipeline/*.cpp")
+coreServerFiles += [ "src/mongo/db/commands/pipeline.cpp" ]
+coreServerFiles += Glob("src/mongo/db/pipeline/*.cpp")
 
-serverOnlyFiles += [ "db/stats/snapshots.cpp" ]
-############coreServerFiles += "db/stats/snapshots.cpp"
-coreServerFiles += [ "db/stats/counters.cpp", "db/stats/service_stats.cpp", "db/stats/top.cpp" ]
-#coreServerFiles += Glob( "db/stats/*.cpp" )
-coreServerFiles += [ "db/commands/isself.cpp", "db/security_common.cpp", "db/security_commands.cpp" ]
+serverOnlyFiles += [ "src/mongo/db/stats/snapshots.cpp" ]
+############coreServerFiles += "src/mongo/db/stats/snapshots.cpp"
+coreServerFiles += [ "src/mongo/db/stats/counters.cpp", "src/mongo/db/stats/service_stats.cpp", "src/mongo/db/stats/top.cpp" ]
+#coreServerFiles += Glob( "src/mongo/db/stats/*.cpp" )
+coreServerFiles += [ "src/mongo/db/commands/isself.cpp", "src/mongo/db/security_common.cpp", "src/mongo/db/security_commands.cpp" ]
 
-scriptingFiles = [ "scripting/engine.cpp" , "scripting/utils.cpp" , "scripting/bench.cpp" ]
+scriptingFiles = [ "src/mongo/scripting/engine.cpp" , "src/mongo/scripting/utils.cpp" , "src/mongo/scripting/bench.cpp" ]
 
 if usesm:
-    scriptingFiles += [ "scripting/engine_spidermonkey.cpp" ]
+    scriptingFiles += [ "src/mongo/scripting/engine_spidermonkey.cpp" ]
 elif usev8:
-    scriptingFiles += [ Glob( "scripting/*v8*.cpp" ) ]
+    scriptingFiles += [ Glob( "src/mongo/scripting/*v8*.cpp" ) ]
 else:
-    scriptingFiles += [ "scripting/engine_none.cpp" ]
+    scriptingFiles += [ "src/mongo/scripting/engine_none.cpp" ]
 
-coreShardFiles = [ "s/config.cpp" , "s/grid.cpp" , "s/chunk.cpp" , "s/shard.cpp" , "s/shardkey.cpp" ]
-shardServerFiles = coreShardFiles + Glob( "s/strategy*.cpp" ) + [ "s/commands_admin.cpp" , "s/commands_public.cpp" , "s/request.cpp" , "s/client.cpp" , "s/cursors.cpp" ,  "s/server.cpp" , "s/config_migrate.cpp" , "s/s_only.cpp" , "s/stats.cpp" , "s/balance.cpp" , "s/balancer_policy.cpp" , "db/cmdline.cpp" , "s/writeback_listener.cpp" , "s/shard_version.cpp", "s/mr_shard.cpp", "s/security.cpp" ]
-serverOnlyFiles += coreShardFiles + [ "s/d_logic.cpp" , "s/d_writeback.cpp" , "s/d_migrate.cpp" , "s/d_state.cpp" , "s/d_split.cpp" , "client/distlock_test.cpp" , "s/d_chunk_manager.cpp", "s/default_version.cpp" ]
+coreShardFiles = [ "src/mongo/s/config.cpp" , "src/mongo/s/grid.cpp" , "src/mongo/s/chunk.cpp" , "src/mongo/s/shard.cpp" , "src/mongo/s/shardkey.cpp" ]
+shardServerFiles = coreShardFiles + Glob( "src/mongo/s/strategy*.cpp" ) + [ "src/mongo/s/commands_admin.cpp" , "src/mongo/s/commands_public.cpp" , "src/mongo/s/request.cpp" , "src/mongo/s/client.cpp" , "src/mongo/s/cursors.cpp" ,  "src/mongo/s/server.cpp" , "src/mongo/s/config_migrate.cpp" , "src/mongo/s/s_only.cpp" , "src/mongo/s/stats.cpp" , "src/mongo/s/balance.cpp" , "src/mongo/s/balancer_policy.cpp" , "src/mongo/db/cmdline.cpp" , "src/mongo/s/writeback_listener.cpp" , "src/mongo/s/shard_version.cpp", "src/mongo/s/mr_shard.cpp", "src/mongo/s/security.cpp" ]
+serverOnlyFiles += coreShardFiles + [ "src/mongo/s/d_logic.cpp" , "src/mongo/s/d_writeback.cpp" , "src/mongo/s/d_migrate.cpp" , "src/mongo/s/d_state.cpp" , "src/mongo/s/d_split.cpp" , "src/mongo/client/distlock_test.cpp" , "src/mongo/s/d_chunk_manager.cpp", "src/mongo/s/default_version.cpp" ]
 
-serverOnlyFiles += [ "db/module.cpp" ] + Glob( "db/modules/*.cpp" )
+serverOnlyFiles += [ "src/mongo/db/module.cpp" ] + Glob( "src/mongo/db/modules/*.cpp" )
 
 modules = []
 moduleNames = []
 
-for x in os.listdir( "db/modules/" ):
+for x in os.listdir( "src/mongo/db/modules/" ):
     if x.find( "." ) >= 0:
         continue
     print( "adding module: " + x )
     moduleNames.append( x )
-    modRoot = "db/modules/" + x + "/"
+    modRoot = "src/mongo/db/modules/" + x + "/"
 
     modBuildFile = modRoot + "build.py"
     myModule = None
@@ -475,7 +476,7 @@ for x in os.listdir( "db/modules/" ):
         serverOnlyFiles += Glob( modRoot + "src/*.cpp" )
 
 
-allClientFiles = commonFiles + coreDbFiles + [ "client/clientOnly.cpp" , "client/gridfs.cpp" ];
+allClientFiles = commonFiles + coreDbFiles + [ "src/mongo/client/clientOnly.cpp" , "src/mongo/client/gridfs.cpp" ];
 
 # ---- other build setup -----
 
@@ -790,9 +791,9 @@ if nix:
             Exit(1)
         env['Gch'] = env.Gch( [ "pch.h" ] )[0]
         env['GchSh'] = env.GchSh( [ "pch.h" ] )[0]
-    elif os.path.exists('pch.h.gch'):
+    elif os.path.exists( "src/mongo/pch.h.gch" ):
         print( "removing precompiled headers" )
-        os.unlink('pch.h.gch') # gcc uses the file if it exists
+        os.unlink( "src/mongo/pch.h.gch" ) # gcc uses the file if it exists
 
 if usev8:
     env.Prepend( CPPPATH=["../v8/include/"] )
@@ -822,8 +823,8 @@ if not windows:
 moduleFiles = {}
 for shortName in getThirdPartyShortNames():    
 
-    path = "third_party/%s.py" % shortName
-    myModule = imp.load_module( "third_party_%s" % shortName , open( path , "r" ) , path , ( ".py" , "r" , imp.PY_SOURCE ) )
+    path = "src/third_party/%s.py" % shortName
+    myModule = imp.load_module( "src/third_party_%s" % shortName , open( path , "r" ) , path , ( ".py" , "r" , imp.PY_SOURCE ) )
     fileLists = { "commonFiles" : commonFiles , "serverOnlyFiles" : serverOnlyFiles , "scriptingFiles" : scriptingFiles, "moduleFiles" : moduleFiles }
     
     options_topass["windows"] = windows
@@ -874,7 +875,7 @@ def setupBuildInfoFile( outFile ):
     out.write( contents )
     out.close()
 
-setupBuildInfoFile( "buildinfo.cpp" )
+setupBuildInfoFile( "src/mongo/buildinfo.cpp" )
 
 def bigLibString( myenv ):
     s = str( myenv["LIBS"] )
@@ -1122,23 +1123,23 @@ def checkErrorCodes():
 checkErrorCodes()
 
 # main db target
-mongodOnlyFiles = [ "db/db.cpp", "db/compact.cpp" ]
+mongodOnlyFiles = [ "src/mongo/db/db.cpp", "src/mongo/db/compact.cpp" ]
 if windows:
-    mongodOnlyFiles.append( "util/ntservice.cpp" ) 
+    mongodOnlyFiles.append( "src/mongo/util/ntservice.cpp" ) 
 mongod = env.Program( "mongod" , commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + mongodOnlyFiles )
 Default( mongod )
 
 # tools
-allToolFiles = commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + [ "client/gridfs.cpp", "tools/tool.cpp" , "tools/stat_util.cpp" ]
+allToolFiles = commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + [ "src/mongo/client/gridfs.cpp", "src/mongo/tools/tool.cpp" , "src/mongo/tools/stat_util.cpp" ]
 normalTools = [ "dump" , "restore" , "export" , "import" , "files" , "stat" , "top" , "oplog" ]
 env.Alias( "tools" , [ add_exe( "mongo" + x ) for x in normalTools ] )
 for x in normalTools:
-    env.Program( "mongo" + x , allToolFiles + [ "tools/" + x + ".cpp" ] )
+    env.Program( "mongo" + x , allToolFiles + [ "src/mongo/tools/" + x + ".cpp" ] )
 
 #some special tools
-env.Program( "bsondump" , allToolFiles + [ "tools/bsondump.cpp" ] )
-env.Program( "mongobridge" , allToolFiles + [ "tools/bridge.cpp" ] )
-env.Program( "mongoperf" , allToolFiles + [ "client/examples/mongoperf.cpp" ] )
+env.Program( "bsondump" , allToolFiles + [ "src/mongo/tools/bsondump.cpp" ] )
+env.Program( "mongobridge" , allToolFiles + [ "src/mongo/tools/bridge.cpp" ] )
+env.Program( "mongoperf" , allToolFiles + [ "src/mongo/client/examples/mongoperf.cpp" ] )
 
 # mongos
 mongos = env.Program( "mongos" , commonFiles + coreDbFiles + coreServerFiles + shardServerFiles )
@@ -1148,7 +1149,7 @@ clientLib = env.Library( "mongoclient" , allClientFiles )
 clientLibName = str( clientLib[0] )
 if has_option( "sharedclient" ):
     sharedClientLibName = str( env.SharedLibrary( "mongoclient" , allClientFiles )[0] )
-env.Library( "mongotestfiles" , commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + ["client/gridfs.cpp"])
+env.Library( "mongotestfiles" , commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + ["src/mongo/client/gridfs.cpp"])
 env.Library( "mongoshellfiles" , allClientFiles + coreServerFiles )
 
 clientEnv = env.Clone();
@@ -1161,20 +1162,20 @@ l = clientEnv[ "LIBS" ]
 clientTests = []
 
 # examples
-clientTests += [ clientEnv.Program( "firstExample" , [ "client/examples/first.cpp" ] ) ]
-clientTests += [ clientEnv.Program( "rsExample" , [ "client/examples/rs.cpp" ] ) ]
-clientTests += [ clientEnv.Program( "secondExample" , [ "client/examples/second.cpp" ] ) ]
-clientTests += [ clientEnv.Program( "whereExample" , [ "client/examples/whereExample.cpp" ] ) ]
-clientTests += [ clientEnv.Program( "authTest" , [ "client/examples/authTest.cpp" ] ) ]
-clientTests += [ clientEnv.Program( "httpClientTest" , [ "client/examples/httpClientTest.cpp" ] ) ]
-clientTests += [ clientEnv.Program( "bsondemo" , [ "bson/bsondemo/bsondemo.cpp" ] ) ]
+clientTests += [ clientEnv.Program( "firstExample" , [ "src/mongo/client/examples/first.cpp" ] ) ]
+clientTests += [ clientEnv.Program( "rsExample" , [ "src/mongo/client/examples/rs.cpp" ] ) ]
+clientTests += [ clientEnv.Program( "secondExample" , [ "src/mongo/client/examples/second.cpp" ] ) ]
+clientTests += [ clientEnv.Program( "whereExample" , [ "src/mongo/client/examples/whereExample.cpp" ] ) ]
+clientTests += [ clientEnv.Program( "authTest" , [ "src/mongo/client/examples/authTest.cpp" ] ) ]
+clientTests += [ clientEnv.Program( "httpClientTest" , [ "src/mongo/client/examples/httpClientTest.cpp" ] ) ]
+clientTests += [ clientEnv.Program( "bsondemo" , [ "src/mongo/bson/bsondemo/bsondemo.cpp" ] ) ]
 
 # dbtests test binary
-test = testEnv.Program( "test" , Glob( "dbtests/*.cpp" ) )
+test = testEnv.Program( "test" , Glob( "src/mongo/dbtests/*.cpp" ) )
 if windows:
     testEnv.Alias( "test" , "test.exe" )
-perftest = testEnv.Program( "perftest", [ "dbtests/framework.cpp" , "dbtests/perf/perftest.cpp" ] )
-clientTests += [ clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] ) ]
+perftest = testEnv.Program( "perftest", [ "src/mongo/dbtests/framework.cpp" , "src/mongo/dbtests/perf/perftest.cpp" ] )
+clientTests += [ clientEnv.Program( "clientTest" , [ "src/mongo/client/examples/clientTest.cpp" ] ) ]
 
 # --- sniffer ---
 mongosniff_built = False
@@ -1191,14 +1192,14 @@ if darwin or clientEnv["_HAVEPCAP"]:
     sniffEnv.Prepend( LIBPATH=["."] )
     sniffEnv.Prepend( LIBS=[ "mongotestfiles" ] )
 
-    sniffEnv.Program( "mongosniff" , "tools/sniffer.cpp" )
+    sniffEnv.Program( "mongosniff" , "src/mongo/tools/sniffer.cpp" )
 
 # --- shell ---
 
 # note, if you add a file here, you need to add it in scripting/engine.cpp and shell/msvc/createCPPfromJavaScriptFiles.js as well
-env.JSHeader( "shell/mongo.cpp"  , Glob( "shell/utils*.js" ) + [ "shell/db.js","shell/mongo.js","shell/mr.js","shell/query.js","shell/collection.js"] )
+env.JSHeader( "src/mongo/shell/mongo.cpp"  , Glob( "src/mongo/shell/utils*.js" ) + [ "src/mongo/shell/db.js","src/mongo/shell/mongo.js","src/mongo/shell/mr.js","src/mongo/shell/query.js","src/mongo/shell/collection.js"] )
 
-env.JSHeader( "shell/mongo-server.cpp"  , [ "shell/servers.js"] )
+env.JSHeader( "src/mongo/shell/mongo-server.cpp"  , [ "src/mongo/shell/servers.js"] )
 
 shellEnv = env.Clone();
 
@@ -1215,9 +1216,9 @@ elif not onlyServer:
     if windows:
         shellEnv.Append( LIBS=["winmm.lib"] )
 
-    coreShellFiles = [ "shell/dbshell.cpp" , "shell/shell_utils.cpp" , "shell/mongo-server.cpp" ]
+    coreShellFiles = [ "src/mongo/shell/dbshell.cpp" , "src/mongo/shell/shell_utils.cpp" , "src/mongo/shell/mongo-server.cpp" ]
 
-    coreShellFiles.append( "third_party/linenoise/linenoise.cpp" )
+    coreShellFiles.append( "src/third_party/linenoise/linenoise.cpp" )
 
     shellEnv.Prepend( LIBPATH=[ "." ] )
         
@@ -1424,7 +1425,7 @@ def getSystemInstallName():
     return n
 
 def getCodeVersion():
-    fullSource = open( "util/version.cpp" , "r" ).read()
+    fullSource = open( "src/mongo/util/version.cpp" , "r" ).read()
     allMatches = re.findall( r"versionString.. = \"(.*?)\"" , fullSource );
     if len(allMatches) != 1:
         print( "can't find version # in code" )
@@ -1518,7 +1519,7 @@ env.Alias( "core" , [ add_exe( "mongo" ) , add_exe( "mongod" ) , add_exe( "mongo
 
 #headers
 if installSetup.headers:
-    for id in [ "", "util/", "util/net/", "util/mongoutils/", "util/concurrency/", "db/" , "db/stats/" , "db/repl/" , "db/ops/" , "client/" , "bson/", "bson/util/" , "s/" , "scripting/" ]:
+    for id in [ "src/mongo/" , "src/mongo/util/", "src/mongo/util/net/", "src/mongo/util/mongoutils/", "src/mongo/util/concurrency/", "src/mongo/db/" , "src/mongo/db/stats/" , "src/mongo/db/repl/" , "src/mongo/db/ops/" , "src/mongo/client/" , "src/mongo/bson/", "src/mongo/bson/util/" , "src/mongo/s/" , "src/mongo/scripting/" ]:
         env.Install( installDir + "/" + installSetup.headerRoot + "/mongo/" + id , Glob( id + "*.h" ) )
         env.Install( installDir + "/" + installSetup.headerRoot + "/mongo/" + id , Glob( id + "*.hpp" ) )
 

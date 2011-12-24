@@ -1,9 +1,9 @@
 
 import os
 
-def getFiles():
+root = "src/third_party/pcre-7.4"
 
-    root = "third_party/pcre-7.4"
+def getFiles():
 
     def pcreFilter(x):
         if x.endswith( "dftables.c" ):
@@ -25,7 +25,7 @@ def getFiles():
 def configure( env , fileLists , options ):
     #fileLists = { "serverOnlyFiles" : [] }
 
-    env.Prepend( CPPPATH=["./third_party/pcre-7.4/"] )
+    env.Prepend( CPPPATH=["./" + root + "/"] )
 
     myenv = env.Clone()
     myenv.Append( CPPDEFINES=["HAVE_CONFIG_H"] )

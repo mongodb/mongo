@@ -123,10 +123,10 @@ debian/mongodb
 .DS_Store
 
 #third party
-third_party/js-1.7/jsautocfg.h
-third_party/js-1.7/jsautokw.h
-third_party/js-1.7/jskwgen
-third_party/js-1.7/jscpucfg
+src/third_party/js-1.7/jsautocfg.h
+src/third_party/js-1.7/jsautokw.h
+src/third_party/js-1.7/jskwgen
+src/third_party/js-1.7/jscpucfg
 
 # QtCreator
 *.config
