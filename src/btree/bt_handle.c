@@ -147,10 +147,8 @@ __wt_btree_reopen(WT_SESSION_IMPL *session, uint32_t flags)
 	 * with in-memory trees, that is, all reads must be satisfied from the
 	 * disk.
 	 */
-	if (F_ISSET(btree, WT_BTREE_OPEN) &&
-	    !F_ISSET(btree, WT_BTREE_NO_EVICTION))
+	if (btree->root_page != NULL)
 		WT_RET(__wt_evict_file_serial(session, 1));
-
 	WT_ASSERT(session, btree->root_page == NULL);
 
 	/* After all pages are evicted, update the root's address. */
@@ -174,7 +172,7 @@ __wt_btree_reopen(WT_SESSION_IMPL *session, uint32_t flags)
 	if (!F_ISSET(btree, WT_BTREE_SALVAGE | WT_BTREE_VERIFY))
 		WT_RET(__btree_tree_init(session));
 
-	F_SET(btree, WT_BTREE_OPEN);
+	F_SET(btree, WT_BTREE_OPEN);			/* XXX */
 	return (0);
 }
 
@@ -555,13 +553,13 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	if (inuse)
 		return (0);
 
-	/* Clear any cache. */
-	if (F_ISSET(btree, WT_BTREE_OPEN)) {
-		if (!F_ISSET(btree, WT_BTREE_NO_EVICTION))
-			WT_TRET(__wt_evict_file_serial(session, 1));
-
+	if (F_ISSET(btree, WT_BTREE_OPEN))
 		WT_STAT_DECR(conn->stats, file_open);
-	}
+
+	/* Clear any cache. */
+	if (btree->root_page != NULL)
+		WT_TRET(__wt_evict_file_serial(session, 1));
+	WT_ASSERT(session, btree->root_page == NULL);
 
 	/* After all pages are evicted, update the root's address. */
 	if (btree->root_update) {

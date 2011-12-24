@@ -220,8 +220,7 @@ __session_salvage(WT_SESSION *wt_session, const char *uri, const char *config)
 
 	SESSION_API_CALL(session, salvage, config, cfg);
 	ret = __wt_schema_worker(session, uri, cfg,
-	    __wt_salvage,
-	    WT_BTREE_EXCLUSIVE | WT_BTREE_NO_EVICTION | WT_BTREE_SALVAGE);
+	    __wt_salvage, WT_BTREE_EXCLUSIVE | WT_BTREE_SALVAGE);
 err:	API_END(session);
 	return (ret);
 }
