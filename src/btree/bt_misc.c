@@ -81,7 +81,7 @@ __wt_page_addr_string(WT_SESSION_IMPL *session, WT_BUF *buf, WT_PAGE *page)
 	if (WT_PAGE_IS_ROOT(page)) {
 		buf->data = "[Root]";
 		buf->size = WT_STORE_SIZE(strlen("[Root]"));
-		return (0);
+		return (buf->data);
 	}
 
 	__wt_get_addr(page->parent, page->parent_ref.ref, &addr, &size);
