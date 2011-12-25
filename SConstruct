@@ -1352,37 +1352,6 @@ smokeEnv.AlwaysBuild( "addMongodReqNoJsTargets" )
 smokeEnv.Alias( "smokeAllNoJs", [ "smoke", "mongosTest", "addMongodReqNoJsTargets" ] )
 smokeEnv.AlwaysBuild( "smokeAllNoJs" )
 
-def recordPerformance( env, target, source ):
-    from buildscripts import benchmark_tools
-    global perftest
-    import subprocess, re
-    p = subprocess.Popen( [ perftest[0].abspath ], stdout=subprocess.PIPE )
-    b = p.communicate()[ 0 ]
-    print( "perftest results:" );
-    print( b );
-    if p.returncode != 0:
-        return True
-    entries = re.findall( "{.*?}", b )
-    import sys
-    for e in entries:
-        matches = re.match( "{'(.*?)': (.*?)}", e )
-        name = matches.group( 1 )
-        val = float( matches.group( 2 ) )
-        sub = { "benchmark": { "project": "http://github.com/mongodb/mongo", "description": "" }, "trial": {} }
-        sub[ "benchmark" ][ "name" ] = name
-        sub[ "benchmark" ][ "tags" ] = [ "c++", re.match( "(.*)__", name ).group( 1 ) ]
-        sub[ "trial" ][ "server_hash" ] = utils.getGitVersion()
-        sub[ "trial" ][ "client_hash" ] = ""
-        sub[ "trial" ][ "result" ] = val
-        try:
-            print(benchmark_tools.post_data(sub))
-        except:
-            print( "exception posting perf results" )
-            print( sys.exc_info() )
-    return False
-
-addTest( "recordPerf", [ "perftest" ] , [ recordPerformance ] )
-
 def run_shell_tests(env, target, source):
     from buildscripts import test_shell
     test_shell.mongo_path = windows and "mongo.exe" or "mongo"
