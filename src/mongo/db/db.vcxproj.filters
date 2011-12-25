@@ -390,6 +390,7 @@
     <ClInclude Include="ops\count.h" />
     <ClInclude Include="pagefault.h" />
     <ClInclude Include="d_globals.h" />
+    <ClInclude Include="..\util\concurrency\mapsf.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="db.rc" />

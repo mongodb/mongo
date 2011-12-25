@@ -1,5 +1,6 @@
 #include "../commands.h"
 #include <map>
+#include "../../util/concurrency/mapsf.h"
 #include "../../util/concurrency/value.h"
 #include "../../util/mongoutils/str.h"
 #include "../../util/net/hostandport.h"

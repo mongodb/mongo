@@ -4,7 +4,7 @@
 #include "d_concurrency.h"
 #include "../util/concurrency/threadlocal.h"
 #include "../util/concurrency/rwlock.h"
-#include "../util/concurrency/value.h"
+#include "../util/concurrency/mapsf.h"
 #include "../util/assert_util.h"
 #include "client.h"
 #include "namespacestring.h"

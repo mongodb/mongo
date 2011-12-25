@@ -33,9 +33,7 @@ namespace mongo {
         }
 
         void invalidate(void *p, unsigned len) {
-            if( ranges.count(p) ) { 
-            }
-            ranges.erase(p);
+            invalidate(p);
         }
 
         void invalidate(void *p) {

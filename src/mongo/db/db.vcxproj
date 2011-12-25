@@ -750,6 +750,7 @@
     <ClInclude Include="..\..\third_party\snappy\config.h" />
     <ClInclude Include="..\..\third_party\snappy\snappy.h" />
     <ClInclude Include="..\util\alignedbuilder.h" />
+    <ClInclude Include="..\util\concurrency\mapsf.h" />
     <ClInclude Include="..\util\concurrency\race.h" />
     <ClInclude Include="..\util\concurrency\rwlock.h" />
     <ClInclude Include="..\util\concurrency\msg.h" />
