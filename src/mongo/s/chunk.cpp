@@ -795,7 +795,6 @@ namespace mongo {
     }
 
     void ChunkManager::getShardsForQuery( set<Shard>& shards , const BSONObj& query ) const {
-        //TODO look into FieldRangeSetOr
         OrRangeGenerator org(_ns.c_str(), query, false);
 
         const string special = org.getSpecial();
