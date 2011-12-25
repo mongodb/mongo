@@ -1547,9 +1547,9 @@ env.Alias( "core" , [ add_exe( "mongo" ) , add_exe( "mongod" ) , add_exe( "mongo
 
 #headers
 if installSetup.headers:
-    for id in [ "src/mongo/" , "src/mongo/util/", "src/mongo/util/net/", "src/mongo/util/mongoutils/", "src/mongo/util/concurrency/", "src/mongo/db/" , "src/mongo/db/stats/" , "src/mongo/db/repl/" , "src/mongo/db/ops/" , "src/mongo/client/" , "src/mongo/bson/", "src/mongo/bson/util/" , "src/mongo/s/" , "src/mongo/scripting/" ]:
-        env.Install( installDir + "/" + installSetup.headerRoot + "/mongo/" + id , Glob( id + "*.h" ) )
-        env.Install( installDir + "/" + installSetup.headerRoot + "/mongo/" + id , Glob( id + "*.hpp" ) )
+    for id in [ "mongo/" , "mongo/util/", "mongo/util/net/", "mongo/util/mongoutils/", "mongo/util/concurrency/", "mongo/db/" , "mongo/db/stats/" , "mongo/db/repl/" , "mongo/db/ops/" , "mongo/client/" , "mongo/bson/", "mongo/bson/util/" , "mongo/s/" , "mongo/scripting/" ]:
+        env.Install( installDir + "/" + installSetup.headerRoot + "/" + id , Glob( "src/" + id + "*.h" ) )
+        env.Install( installDir + "/" + installSetup.headerRoot + "/" + id , Glob( "src/" + id + "*.hpp" ) )
 
 if installSetup.clientSrc:
     for x in allClientFiles:
