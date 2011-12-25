@@ -2405,7 +2405,6 @@ static int
 __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BOUNDARY *bnd;
-	WT_BTREE *btree;
 	WT_COL_REF *cref;
 	WT_PAGE_MODIFY *mod;
 	WT_RECONCILE *r;
@@ -2415,7 +2414,6 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	const uint8_t *addr;
 
 	r = session->reconcile;
-	btree = session->btree;
 	mod = page->modify;
 	ret = 0;
 
