@@ -88,7 +88,7 @@ namespace mongo {
         bool equality() const;
         /** @return true if all the intervals for this range are equalities */
         bool inQuery() const;
-        /** @return true iff this range does not include every BSONElement */
+        /** @return true iff this range matches some but not all BSONElements. */
         bool nontrivial() const;
         /** @return true iff this range matches no BSONElements. */
         bool empty() const { return _intervals.empty(); }
