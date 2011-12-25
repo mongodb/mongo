@@ -145,37 +145,37 @@
     <ClCompile Include="..\util\compress.cpp">
       <Filter>snappy</Filter>
     </ClCompile>
-    <ClCompile Include="..\third_party\snappy\snappy-sinksource.cc">
+    <ClCompile Include="..\..\third_party\snappy\snappy-sinksource.cc">
       <Filter>snappy</Filter>
     </ClCompile>
-    <ClCompile Include="..\third_party\snappy\snappy.cc">
+    <ClCompile Include="..\..\third_party\snappy\snappy.cc">
       <Filter>snappy</Filter>
     </ClCompile>
     <ClCompile Include="scanandorder.cpp" />
-    <ClCompile Include="..\third_party\pcre-7.4\pcrecpp.cc" />
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_chartables.c" />
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_compile.c" />
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_config.c" />
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_dfa_exec.c" />
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_exec.c" />
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_fullinfo.c" />
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_get.c" />
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_globals.c" />
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_info.c" />
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_maketables.c" />
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_newline.c" />
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_ord2utf8.c" />
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_refcount.c" />
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_scanner.cc" />
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_stringpiece.cc" />
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_study.c" />
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_tables.c" />
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_try_flipped.c" />
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_ucp_searchfuncs.c" />
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_valid_utf8.c" />
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_version.c" />
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_xclass.c" />
-    <ClCompile Include="..\third_party\pcre-7.4\pcreposix.c" />
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcrecpp.cc" />
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_chartables.c" />
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_compile.c" />
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_config.c" />
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_dfa_exec.c" />
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_exec.c" />
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_fullinfo.c" />
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_get.c" />
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_globals.c" />
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_info.c" />
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_maketables.c" />
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_newline.c" />
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_ord2utf8.c" />
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_refcount.c" />
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_scanner.cc" />
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_stringpiece.cc" />
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_study.c" />
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_tables.c" />
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_try_flipped.c" />
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_ucp_searchfuncs.c" />
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_valid_utf8.c" />
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_version.c" />
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_xclass.c" />
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcreposix.c" />
     <ClCompile Include="commands\cloud.cpp" />
     <ClCompile Include="commands\pipeline_command.cpp" />
     <ClCompile Include="commands\pipeline.cpp" />
@@ -361,14 +361,14 @@
     <ClInclude Include="..\util\net\message.h" />
     <ClInclude Include="..\util\net\message_server.h" />
     <ClInclude Include="..\util\net\sock.h" />
-    <ClInclude Include="..\third_party\snappy\config.h">
+    <ClInclude Include="..\..\third_party\snappy\config.h">
       <Filter>snappy</Filter>
     </ClInclude>
-    <ClInclude Include="..\third_party\snappy\snappy.h">
+    <ClInclude Include="..\..\third_party\snappy\snappy.h">
       <Filter>snappy</Filter>
     </ClInclude>
-    <ClInclude Include="..\third_party\pcre-7.4\config.h" />
-    <ClInclude Include="..\third_party\pcre-7.4\pcre.h" />
+    <ClInclude Include="..\..\third_party\pcre-7.4\config.h" />
+    <ClInclude Include="..\..\third_party\pcre-7.4\pcre.h" />
     <ClInclude Include="globals.h" />
     <ClInclude Include="..\util\net\hostandport.h" />
     <ClInclude Include="..\util\net\listen.h" />
@@ -419,10 +419,10 @@
     <None Include="repl\notes.txt" />
   </ItemGroup>
   <ItemGroup>
-    <Library Include="..\..\js\js32d.lib" />
-    <Library Include="..\..\js\js32r.lib" />
-    <Library Include="..\..\js\js64d.lib" />
-    <Library Include="..\..\js\js64r.lib" />
+    <Library Include="..\..\..\..\js\js32d.lib" />
+    <Library Include="..\..\..\..\js\js32r.lib" />
+    <Library Include="..\..\..\..\js\js64d.lib" />
+    <Library Include="..\..\..\..\js\js64r.lib" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="snappy">

@@ -298,33 +298,33 @@
     <ClInclude Include="..\server.h">
       <Filter>db\h</Filter>
     </ClInclude>
-    <ClInclude Include="..\third_party\snappy\config.h">
+    <ClInclude Include="..\..\third_party\snappy\config.h">
       <Filter>misc and third party\snappy</Filter>
     </ClInclude>
-    <ClInclude Include="..\third_party\snappy\snappy.h">
+    <ClInclude Include="..\..\third_party\snappy\snappy.h">
       <Filter>misc and third party\snappy</Filter>
     </ClInclude>
-    <ClInclude Include="..\third_party\snappy\snappy-c.h">
+    <ClInclude Include="..\..\third_party\snappy\snappy-c.h">
       <Filter>misc and third party\snappy</Filter>
     </ClInclude>
-    <ClInclude Include="..\third_party\snappy\snappy-internal.h">
+    <ClInclude Include="..\..\third_party\snappy\snappy-internal.h">
       <Filter>misc and third party\snappy</Filter>
     </ClInclude>
-    <ClInclude Include="..\third_party\snappy\snappy-sinksource.h">
+    <ClInclude Include="..\..\third_party\snappy\snappy-sinksource.h">
       <Filter>misc and third party\snappy</Filter>
     </ClInclude>
-    <ClInclude Include="..\third_party\snappy\snappy-stubs-internal.h">
+    <ClInclude Include="..\..\third_party\snappy\snappy-stubs-internal.h">
       <Filter>misc and third party\snappy</Filter>
     </ClInclude>
-    <ClInclude Include="..\third_party\snappy\snappy-stubs-public.h">
+    <ClInclude Include="..\..\third_party\snappy\snappy-stubs-public.h">
       <Filter>misc and third party\snappy</Filter>
     </ClInclude>
     <ClInclude Include="..\util\compress.h">
       <Filter>misc and third party</Filter>
     </ClInclude>
-    <ClInclude Include="..\third_party\pcre-7.4\pcrecpp.h" />
-    <ClInclude Include="..\third_party\pcre-7.4\config.h" />
-    <ClInclude Include="..\third_party\pcre-7.4\pcre.h" />
+    <ClInclude Include="..\..\third_party\pcre-7.4\pcrecpp.h" />
+    <ClInclude Include="..\..\third_party\pcre-7.4\config.h" />
+    <ClInclude Include="..\..\third_party\pcre-7.4\pcre.h" />
     <ClInclude Include="..\db\collection.h" />
     <ClInclude Include="..\db\databaseholder.h">
       <Filter>db\h</Filter>
@@ -337,16 +337,16 @@
     <ClInclude Include="..\db\pagefault.h" />
   </ItemGroup>
   <ItemGroup>
-    <Library Include="..\..\js\js64r.lib">
+    <Library Include="..\..\..\..\js\js32d.lib">
       <Filter>misc and third party</Filter>
     </Library>
-    <Library Include="..\..\js\js32d.lib">
+    <Library Include="..\..\..\..\js\js32r.lib">
       <Filter>misc and third party</Filter>
     </Library>
-    <Library Include="..\..\js\js32r.lib">
+    <Library Include="..\..\..\..\js\js64d.lib">
       <Filter>misc and third party</Filter>
     </Library>
-    <Library Include="..\..\js\js64d.lib">
+    <Library Include="..\..\..\..\js\js64r.lib">
       <Filter>misc and third party</Filter>
     </Library>
   </ItemGroup>
@@ -816,88 +816,88 @@
     <ClCompile Include="..\util\concurrency\spin_lock.cpp">
       <Filter>util\concurrency</Filter>
     </ClCompile>
-    <ClCompile Include="..\third_party\snappy\snappy.cc">
+    <ClCompile Include="..\..\third_party\snappy\snappy.cc">
       <Filter>misc and third party\snappy</Filter>
     </ClCompile>
     <ClCompile Include="..\util\compress.cpp">
       <Filter>misc and third party</Filter>
     </ClCompile>
-    <ClCompile Include="..\third_party\snappy\snappy-sinksource.cc">
+    <ClCompile Include="..\..\third_party\snappy\snappy-sinksource.cc">
       <Filter>misc and third party\snappy</Filter>
     </ClCompile>
     <ClCompile Include="..\db\scanandorder.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\third_party\pcre-7.4\pcrecpp.cc">
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcrecpp.cc">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_chartables.c">
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_chartables.c">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_compile.c">
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_compile.c">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_config.c">
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_config.c">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_dfa_exec.c">
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_dfa_exec.c">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_exec.c">
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_exec.c">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_fullinfo.c">
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_fullinfo.c">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_get.c">
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_get.c">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_globals.c">
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_globals.c">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_info.c">
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_info.c">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_maketables.c">
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_maketables.c">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_newline.c">
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_newline.c">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_ord2utf8.c">
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_ord2utf8.c">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_refcount.c">
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_refcount.c">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_scanner.cc">
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_scanner.cc">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_stringpiece.cc">
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_stringpiece.cc">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_study.c">
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_study.c">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_tables.c">
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_tables.c">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_try_flipped.c">
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_try_flipped.c">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_ucp_searchfuncs.c">
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_ucp_searchfuncs.c">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_valid_utf8.c">
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_valid_utf8.c">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_version.c">
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_version.c">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\third_party\pcre-7.4\pcre_xclass.c">
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_xclass.c">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\third_party\pcre-7.4\pcreposix.c">
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcreposix.c">
       <Filter>db\cpp</Filter>
     </ClCompile>
     <ClCompile Include="..\db\commands\cloud.cpp">

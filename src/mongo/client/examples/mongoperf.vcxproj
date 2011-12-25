@@ -38,7 +38,7 @@
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup>
-    <IncludePath>..\..;..\..\third_party\pcre-7.4;$(IncludePath)</IncludePath>
+    <IncludePath>..\..;..\..\..\third_party\pcre-7.4;$(IncludePath)</IncludePath>
     <LibraryPath>\boost\lib\vs2010_32;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
