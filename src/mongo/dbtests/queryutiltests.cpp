@@ -64,7 +64,7 @@ namespace QueryUtilTests {
             BSONObj o;
         };
 
-        class Empty : public Base {
+        class EmptyQuery : public Base {
             virtual BSONObj query() { return BSONObj(); }
         };
 
@@ -206,6 +206,16 @@ namespace QueryUtilTests {
             BSONObj o1_, o2_;
         };
 
+        class Empty {
+        public:
+            void run() {
+                FieldRangeSet s( "ns", BSON( "a" << GT << 5 << LT << 5 ), true );
+                const FieldRange &r = s.range( "a" );
+                ASSERT( r.empty() );
+                ASSERT( !r.nontrivial() ); // SERVER-4556
+            }
+        };
+        
         class Equality {
         public:
             void run() {
@@ -884,7 +894,7 @@ namespace QueryUtilTests {
         All() : Suite( "queryutil" ) {}
 
         void setupTests() {
-            add< FieldRangeTests::Empty >();
+            add< FieldRangeTests::EmptyQuery >();
             add< FieldRangeTests::Eq >();
             add< FieldRangeTests::DupEq >();
             add< FieldRangeTests::Lt >();
@@ -899,6 +909,7 @@ namespace QueryUtilTests {
             add< FieldRangeTests::RegexObj >();
             add< FieldRangeTests::UnhelpfulRegex >();
             add< FieldRangeTests::In >();
+            add< FieldRangeTests::Empty >();
             add< FieldRangeTests::Equality >();
             add< FieldRangeTests::SimplifiedQuery >();
             add< FieldRangeTests::QueryPatternTest >();
