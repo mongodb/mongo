@@ -28,6 +28,7 @@
 #include "../util/mongoutils/str.h"
 #include "mongomutex.h"
 #include "d_globals.h"
+#include "lockconcept.h"
 
 using namespace mongoutils;
 
@@ -92,6 +93,7 @@ namespace mongo {
         else {
             clearWritableBits(p);
             views.push_back(p);
+            lockconcept::is(p, lockconcept::memorymappedfile, filename());
         }
         return p;
     }
@@ -140,10 +142,12 @@ namespace mongo {
         assert( cmdLine.dur );
 
         // todo 1.9 : it turns out we require that we always remap to the same address.
-        // so the remove / add isn't necessary and can be removed
-        privateViews.remove(_view_private);
+        // so the remove / add isn't necessary and can be removed?
+        void *old = _view_private;
+        //privateViews.remove(_view_private);        
         _view_private = remapPrivateView(_view_private);
-        privateViews.add(_view_private, this);
+        //privateViews.add(_view_private, this);
+        fassert( 0, _view_private == old );
     }
 
     /** register view. threadsafe */
@@ -332,6 +336,7 @@ namespace mongo {
 
         LockMongoFilesExclusive lk;
         privateViews.remove(_view_private);
+        lockconcept::invalidate(_view_private);
         _view_write = _view_private = 0;
         MemoryMappedFile::close();
     }

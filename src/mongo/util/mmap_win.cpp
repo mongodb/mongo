@@ -20,6 +20,7 @@
 #include "text.h"
 #include "../db/mongommf.h"
 #include "../db/concurrency.h"
+#include "../db/lockconcept.h"
 
 namespace mongo {
 
@@ -48,6 +49,7 @@ namespace mongo {
     void MemoryMappedFile::close() {
         LockMongoFilesShared::assertExclusivelyLocked();
         for( vector<void*>::iterator i = views.begin(); i != views.end(); i++ ) {
+            lockconcept::invalidate(*i);
             clearWritableBits(*i);
             UnmapViewOfFile(*i);
         }
@@ -72,6 +74,7 @@ namespace mongo {
             log() << "FILE_MAP_READ MapViewOfFile failed " << filename() << " " << errnoWithDescription(e) << endl;
         }
         else {
+            lockconcept::is(p, lockconcept::other, filename());
             views.push_back(p);
         }
         return p;
@@ -148,6 +151,7 @@ namespace mongo {
         }
         else {
             views.push_back(view);
+            lockconcept::is(view, lockconcept::memorymappedfile, this->filename());
         }
         len = length;
 
