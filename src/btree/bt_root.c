@@ -145,30 +145,28 @@ __btree_get_root_turtle(WT_SESSION_IMPL *session, const char **vp)
 {
 	FILE *fp;
 	int ret;
+	const char *path;
 	char *p, line[1024];
 
 	*vp = NULL;
 
+	fp = NULL;
+	path = NULL;
 	ret = 0;
 
-	if ((fp = fopen(WT_SCHEMA_TURTLE, "r")) == NULL)
-		return (0);
-	if (fgets(line, (int)sizeof(line), fp) == NULL)
-		goto err;
-	if (strcmp(line, WT_TURTLE_MSG) != 0)
-		goto err;
-	if (fgets(line, (int)sizeof(line), fp) == NULL)
-		goto err;
-	if ((p = strchr(line, '\n')) == NULL)
-		goto err;
+	WT_ERR(__wt_filename(session, WT_SCHEMA_TURTLE, &path));
+	WT_ERR_TEST((fp = fopen(path, "r")) == NULL, 0);
+	WT_ERR_TEST(fgets(line, (int)sizeof(line), fp) == NULL, WT_ERROR);
+	WT_ERR_TEST(strcmp(line, WT_TURTLE_MSG) != 0, WT_ERROR);
+	WT_ERR_TEST(fgets(line, (int)sizeof(line), fp) == NULL, WT_ERROR);
+	WT_ERR_TEST((p = strchr(line, '\n')) == NULL, WT_ERROR);
 	*p = '\0';
 	WT_ERR(__wt_strdup(session, line, vp));
 
-	if (0) {
-err:		if (ret == 0)
-			ret = WT_ERROR;
-	}
-	WT_TRET(fclose(fp));
+err:	if (fp != NULL)
+		WT_TRET(fclose(fp));
+	if (path != NULL)
+		__wt_free(session, path);
 
 	return (ret);
 }
@@ -183,11 +181,13 @@ __btree_set_root_turtle(WT_SESSION_IMPL *session, char *v)
 	FILE *fp;
 	size_t len;
 	int ret;
+	const char *path;
 
 	ret = 0;
+	path = NULL;
 
-	if ((fp = fopen(WT_SCHEMA_TURTLE_SET, "w")) == NULL)
-		return (WT_ERROR);
+	WT_ERR(__wt_filename(session, WT_SCHEMA_TURTLE_SET, &path));
+	WT_ERR_TEST((fp = fopen(path, "w")) == NULL, WT_ERROR);
 
 	len = (size_t)fprintf(fp, "%s%s\n", WT_TURTLE_MSG, v);
 	if (len != strlen(WT_TURTLE_MSG) + strlen(v) + 1)
@@ -196,12 +196,15 @@ __btree_set_root_turtle(WT_SESSION_IMPL *session, char *v)
 	WT_TRET(fflush(fp));
 	WT_TRET(fclose(fp));
 
-	if (ret != 0) {
+	if (ret == 0)
+		ret = __wt_rename(
+		    session, WT_SCHEMA_TURTLE_SET, WT_SCHEMA_TURTLE);
+	else
 		(void)__wt_remove(session, WT_SCHEMA_TURTLE_SET);
-		return (ret);
-	}
 
-	return (__wt_rename(session, WT_SCHEMA_TURTLE_SET, WT_SCHEMA_TURTLE));
+err:	if (path != NULL)
+		__wt_free(session, path);
+	return (ret);
 }
 
 /*
