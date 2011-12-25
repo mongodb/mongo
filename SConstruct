@@ -83,7 +83,11 @@ def _has_option( name ):
 
 def has_option( name ):
     x = _has_option(name)
-    options_topass[name] = x
+
+    if name not in options_topass:
+        # if someone already set this, don't overwrite
+        options_topass[name] = x
+
     return x
 
 
@@ -108,11 +112,10 @@ def get_variant_dir():
     if len(a) > 0:
         a.sort()
         s += "/".join( a ) + "/"
-        
+    else:
+        s += "normal/"
     return s
         
-
-
 # installation/packaging
 add_option( "prefix" , "installation prefix" , 1 , False )
 add_option( "distname" , "dist name (0.8.0)" , 1 , False )
@@ -348,6 +351,8 @@ if has_option( "full" ):
     installSetup.libraries = True
 
 
+env.VariantDir( get_variant_dir() , "src" , duplicate=0 )
+
 # ------    SOURCE FILE SETUP -----------
 
 commonFiles = [ "src/mongo/pch.cpp" , "src/mongo/buildinfo.cpp" , "src/mongo/db/indexkey.cpp" , "src/mongo/db/jsobj.cpp" , "src/mongo/bson/oid.cpp" , "src/mongo/db/json.cpp" , "src/mongo/db/lasterror.cpp" , "src/mongo/db/nonce.cpp" , "src/mongo/db/queryutil.cpp" , "src/mongo/db/querypattern.cpp" , "src/mongo/db/projection.cpp" , "src/mongo/shell/mongo.cpp" ]
@@ -475,8 +480,30 @@ for x in os.listdir( "src/mongo/db/modules/" ):
     else:
         serverOnlyFiles += Glob( modRoot + "src/*.cpp" )
 
+mongodOnlyFiles = [ "src/mongo/db/db.cpp", "src/mongo/db/compact.cpp" ]
+if "win32" == os.sys.platform:
+    mongodOnlyFiles.append( "src/mongo/util/ntservice.cpp" ) 
+
+def fixBuildDir( lst ):
+    for i in xrange(0,len(lst)):
+        x = str(lst[i])
+        if not x.startswith( "src/" ):
+            continue
+        x = get_variant_dir() + "/" + x.partition( "src/" )[2]
+        x = x.replace( "//" , "/" )
+        lst[i] = x
+
+
 
 allClientFiles = commonFiles + coreDbFiles + [ "src/mongo/client/clientOnly.cpp" , "src/mongo/client/gridfs.cpp" ];
+
+fixBuildDir( commonFiles )
+fixBuildDir( coreDbFiles )
+fixBuildDir( allClientFiles )
+fixBuildDir( coreServerFiles )
+fixBuildDir( serverOnlyFiles )
+fixBuildDir( mongodOnlyFiles )
+fixBuildDir( shardServerFiles )
 
 # ---- other build setup -----
 
@@ -822,7 +849,6 @@ if not windows:
 
 moduleFiles = {}
 for shortName in getThirdPartyShortNames():    
-
     path = "src/third_party/%s.py" % shortName
     myModule = imp.load_module( "src/third_party_%s" % shortName , open( path , "r" ) , path , ( ".py" , "r" , imp.PY_SOURCE ) )
     fileLists = { "commonFiles" : commonFiles , "serverOnlyFiles" : serverOnlyFiles , "scriptingFiles" : scriptingFiles, "moduleFiles" : moduleFiles }
@@ -836,7 +862,9 @@ for shortName in getThirdPartyShortNames():
     else:
         myModule.configure( env , fileLists , options_topass )
 
+fixBuildDir( scriptingFiles )
 coreServerFiles += scriptingFiles
+
 
 # --- check system ---
 
@@ -1123,9 +1151,6 @@ def checkErrorCodes():
 checkErrorCodes()
 
 # main db target
-mongodOnlyFiles = [ "src/mongo/db/db.cpp", "src/mongo/db/compact.cpp" ]
-if windows:
-    mongodOnlyFiles.append( "src/mongo/util/ntservice.cpp" ) 
 mongod = env.Program( "mongod" , commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + mongodOnlyFiles )
 Default( mongod )
 
