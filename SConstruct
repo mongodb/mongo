@@ -1119,9 +1119,9 @@ def jsToH(target, source, env):
 
     return None
 
-jshBuilder = Builder(action = jsToH,
-                    suffix = '.cpp',
-                    src_suffix = '.js')
+jshBuilder = Builder(action = jsToH )
+#                    suffix = '.cpp',
+#                    src_suffix = '.js')
 
 env.Append( BUILDERS={'JSHeader' : jshBuilder})
 
@@ -1222,7 +1222,10 @@ if darwin or clientEnv["_HAVEPCAP"]:
 # --- shell ---
 
 # note, if you add a file here, you need to add it in scripting/engine.cpp and shell/msvc/createCPPfromJavaScriptFiles.js as well
-env.JSHeader( "src/mongo/shell/mongo.cpp"  , Glob( "src/mongo/shell/utils*.js" ) + [ "src/mongo/shell/db.js","src/mongo/shell/mongo.js","src/mongo/shell/mr.js","src/mongo/shell/query.js","src/mongo/shell/collection.js"] )
+env.Depends( "src/mongo/shell/dbshell.cpp" ,
+             env.JSHeader( "src/mongo/shell/mongo.cpp"  , 
+                           Glob( "src/mongo/shell/utils*.js" ) + 
+                           [ "src/mongo/shell/db.js","src/mongo/shell/mongo.js","src/mongo/shell/mr.js","src/mongo/shell/query.js","src/mongo/shell/collection.js"] ) )
 
 env.JSHeader( "src/mongo/shell/mongo-server.cpp"  , [ "src/mongo/shell/servers.js"] )
 
