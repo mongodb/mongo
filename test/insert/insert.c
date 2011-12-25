@@ -46,8 +46,7 @@ main(int argc, char *argv[])
 {
 	int ch;
 
-	(void)remove(FILENAME);
-	(void)remove("__schema.wt");
+	system("rm -f WiredTiger WiredTiger.* xx");
 
 	if ((progname = strrchr(argv[0], '/')) == NULL)
 		progname = argv[0];

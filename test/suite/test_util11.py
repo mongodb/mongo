@@ -35,7 +35,7 @@ class test_util11(wttest.WiredTigerTestCase, suite_subprocess):
         """
 
         # Construct what we think we'll find
-        filelist = 'file:__schema.wt\n'
+        filelist = 'file:WiredTiger.wt\n'
         outfile = "listout.txt"
         self.KNOWN_FAILURE('"wt list" with empty schema returns WT_NOTFOUND')
         self.runWt(["list"], outfilename=outfile)
@@ -56,7 +56,7 @@ class test_util11(wttest.WiredTigerTestCase, suite_subprocess):
         self.populate(pfx + '3')
 
         # Construct what we think we'll find
-        filelist = 'file:__schema.wt\n'
+        filelist = 'file:WiredTiger.wt\n'
         tablelist = ''
         for i in range(1, 6):
             filelist += 'file:' + pfx + str(i) + '.wt\n'
@@ -84,7 +84,7 @@ class test_util11(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.drop('table:' + pfx + '4', None)
 
         # Construct what we think we'll find
-        filelist = 'file:__schema.wt\n'
+        filelist = 'file:WiredTiger.wt\n'
         tablelist = ''
         filelist += 'file:' + pfx + '1.wt\n'
         tablelist += 'table:' + pfx + '1\n'
@@ -118,7 +118,7 @@ class test_util11(wttest.WiredTigerTestCase, suite_subprocess):
         self.session.drop('table:' + pfx + '1', None)
 
         # Construct what we think we'll find
-        filelist = 'file:__schema.wt\n'
+        filelist = 'file:WiredTiger.wt\n'
         outfile = "listout.txt"
         self.runWt(["list"], outfilename=outfile)
         self.check_file_content(outfile, filelist)

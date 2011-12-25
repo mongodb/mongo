@@ -173,7 +173,7 @@ wt_shutdown(void)
 static void
 shutdown(void)
 {
-	(void)system("rm -f WildTiger __schema.wt __wt*");
+	(void)system("rm -f WildTiger WiredTiger.* __wt*");
 }
 
 static int
