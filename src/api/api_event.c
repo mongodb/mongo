@@ -14,12 +14,23 @@
 static void
 __handle_error_default(WT_EVENT_HANDLER *handler, int error, const char *errmsg)
 {
+	size_t len_err, len_errmsg;
+	const char *err;
+
 	WT_UNUSED(handler);
 
-	if (error != 0)
-		fprintf(stderr, "%s: %s\n", errmsg, wiredtiger_strerror(error));
-	else
-		fprintf(stderr, "%s\n", errmsg);
+	if (error != 0) {
+		err = wiredtiger_strerror(error);
+		len_err = strlen(err);
+		len_errmsg = strlen(errmsg);
+		if (len_err >= len_errmsg &&
+		    strcmp(errmsg + (len_errmsg - len_err), err) != 0) {
+			fprintf(stderr,
+			    "%s: %s\n", errmsg, wiredtiger_strerror(error));
+			return;
+		}
+	}
+	fprintf(stderr, "%s\n", errmsg);
 }
 
 /*
