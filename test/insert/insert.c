@@ -46,7 +46,7 @@ main(int argc, char *argv[])
 {
 	int ch;
 
-	system("rm -f WiredTiger WiredTiger.* xx");
+	(void)system("rm -f WiredTiger WiredTiger.* xx");
 
 	if ((progname = strrchr(argv[0], '/')) == NULL)
 		progname = argv[0];
