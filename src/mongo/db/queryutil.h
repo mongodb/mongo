@@ -190,8 +190,11 @@ namespace mongo {
          * @return an ordered list of bounds generated using an index key pattern
          * and traversal direction.
          *
+         * The value of matchPossible() should be true, otherwise this function
+         * may @throw.
+         *
          * NOTE This function is deprecated in the query optimizer and only
-         * currently used by the sharding code.
+         * currently used by sharding code.
          */
         BoundList indexBounds( const BSONObj &keyPattern, int direction ) const;
 
