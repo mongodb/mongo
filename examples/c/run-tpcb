@@ -1,4 +1,7 @@
 #!/bin/sh
 
+rm -rf WT_TEST
+test -d WT_TEST || mkdir WT_TEST
+
 ./ex_tpcb -i
 ./ex_tpcb -n 1000
