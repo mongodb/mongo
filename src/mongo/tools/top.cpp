@@ -1,4 +1,4 @@
-// stat.cpp
+// top.cpp
 
 /**
 *    Copyright (C) 2008 10gen Inc.
@@ -95,9 +95,9 @@ namespace mongo {
 
             cout << "\n"
                  << setw(longest) << "ns" 
-                 << "\ttotal   "  
-                 << "\tread    "    
-                 << "\twrite   "  
+                 << "\ttotal"  
+                 << "\tread"    
+                 << "\twrite"  
                  << "\t\t" << terseCurrentTime()
                  << endl;
             for ( int i=data.size()-1; i>=0 && data.size() - i < 10 ; i-- ) {
@@ -111,6 +111,8 @@ namespace mongo {
 
         int run() {
             _sleep = getParam( "sleep" , _sleep );
+
+            auth();
             
             BSONObj prev = getData();
 
