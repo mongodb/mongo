@@ -351,7 +351,7 @@ if has_option( "full" ):
     installSetup.libraries = True
 
 
-env.VariantDir( get_variant_dir() , "src" , duplicate=0 )
+#env.VariantDir( get_variant_dir() , "src" , duplicate=0 )
 
 # ------    SOURCE FILE SETUP -----------
 
@@ -489,9 +489,9 @@ def fixBuildDir( lst ):
         x = str(lst[i])
         if not x.startswith( "src/" ):
             continue
-        x = get_variant_dir() + "/" + x.partition( "src/" )[2]
-        x = x.replace( "//" , "/" )
-        lst[i] = x
+        #x = get_variant_dir() + "/" + x.partition( "src/" )[2]
+        #x = x.replace( "//" , "/" )
+        #lst[i] = x
 
 
 
