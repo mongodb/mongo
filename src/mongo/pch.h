@@ -134,8 +134,7 @@ namespace mongo {
         EXIT_WINDOWS_SERVICE_STOP = 49 ,
         EXIT_POSSIBLE_CORRUPTION = 60 , // this means we detected a possible corruption situation, like a buf overflow
         EXIT_UNCAUGHT = 100 , // top level exception that wasn't caught
-        EXIT_TEST = 101 ,
-
+        EXIT_TEST = 101
     };
 
     void dbexit( ExitCode returnCode, const char *whyMsg = "", bool tryToGetLock = false);

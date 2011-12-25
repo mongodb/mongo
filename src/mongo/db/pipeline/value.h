@@ -18,6 +18,7 @@
 
 #include "pch.h"
 #include "bson/bsontypes.h"
+#include "bson/oid.h"
 #include "util/intrusive_counter.h"
 
 namespace mongo {

@@ -15,10 +15,7 @@
  *    limitations under the License.
  */
 
-
 #pragma once
-
-#include "../db/lasterror.h"
 
 // MONGO_NORETURN undefed at end of file
 #ifdef __GNUC__
@@ -50,6 +47,8 @@ namespace mongo {
 
     extern AssertionCount assertionCount;
 
+    class BSONObjBuilder;
+
     struct ExceptionInfo {
         ExceptionInfo() : msg(""),code(-1) {}
         ExceptionInfo( const char * m , int c )
@@ -59,11 +58,9 @@ namespace mongo {
             : msg( m ) , code( c ) {
         }
         void append( BSONObjBuilder& b , const char * m = "$err" , const char * c = "code" ) const ;
-        string toString() const { stringstream ss; ss << "exception: " << code << " " << msg; return ss.str(); }
-        bool empty() const { return msg.empty(); }
-        
+        string toString() const;
+        bool empty() const { return msg.empty(); }        
         void reset(){ msg = ""; code=-1; }
-
         string msg;
         int code;
     };
@@ -86,7 +83,9 @@ namespace mongo {
     class DBException;
     string causedBy( const DBException& e );
     string causedBy( const string& e );
+    bool inShutdown();
 
+    /** Most mongo exceptions inherit from this; this is commonly caught in most threads */
     class DBException : public std::exception {
     public:
         DBException( const ExceptionInfo& ei ) : _ei(ei) { traceIfNeeded(*this); }
@@ -102,20 +101,12 @@ namespace mongo {
             _ei.msg = str + causedBy( _ei.msg );
         }
 
-        virtual string toString() const {
-            stringstream ss; ss << getCode() << " " << what(); return ss.str();
-            return ss.str();
-        }
+        virtual string toString() const;
 
         const ExceptionInfo& getInfo() const { return _ei; }
-
-        static void traceIfNeeded( const DBException& e ) {
-            if( traceExceptions && ! inShutdown() ){
-                warning() << "DBException thrown" << causedBy( e ) << endl;
-                printStackTrace();
-            }
-        }
-
+    private:
+        static void traceIfNeeded( const DBException& e );
+    public:
         static bool traceExceptions;
 
     protected:
@@ -144,10 +135,9 @@ namespace mongo {
     class UserException : public AssertionException {
     public:
         UserException(int c , const string& m) : AssertionException( m , c ) {}
-
         virtual bool severe() { return false; }
         virtual bool isUserAssertion() { return true; }
-        virtual void appendPrefix( stringstream& ss ) const { ss << "userassert:"; }
+        virtual void appendPrefix( stringstream& ss ) const;
     };
 
     class MsgAssertionException : public AssertionException {
@@ -155,12 +145,13 @@ namespace mongo {
         MsgAssertionException( const ExceptionInfo& ei ) : AssertionException( ei ) {}
         MsgAssertionException(int c, const string& m) : AssertionException( m , c ) {}
         virtual bool severe() { return false; }
-        virtual void appendPrefix( stringstream& ss ) const { ss << "massert:"; }
+        virtual void appendPrefix( stringstream& ss ) const;
     };
 
     void asserted(const char *msg, const char *file, unsigned line) MONGO_NORETURN;
     void wasserted(const char *msg, const char *file, unsigned line);
     void verifyFailed( int msgid );
+    void fassertFailed( int msgid );
     
     /** a "user assertion".  throws UserAssertion.  logs.  typically used for errors that a user
         could cause, such as duplicate key, disk full, etc.
@@ -187,6 +178,9 @@ namespace mongo {
 
     /** in the mongodb source, use verify() instead of assert().  verify is always evaluated even in release builds. */
     inline void verify( int msgid , bool testOK ) { if ( ! testOK ) verifyFailed( msgid ); }
+
+    /** abends on condition failure */
+    inline void fassert( int msgid , bool testOK ) { if ( ! testOK ) fassertFailed( msgid ); }
 
 #ifdef assert
 #undef assert

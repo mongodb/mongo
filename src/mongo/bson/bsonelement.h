@@ -21,6 +21,7 @@
 #include <string.h>
 #include "util/builder.h"
 #include "bsontypes.h"
+#include "oid.h"
 
 namespace mongo {
     class OpTime;

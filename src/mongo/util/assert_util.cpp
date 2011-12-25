@@ -54,6 +54,18 @@ namespace mongo {
 
     bool DBException::traceExceptions = false;
 
+    string DBException::toString() const {
+        stringstream ss; ss << getCode() << " " << what(); return ss.str();
+        return ss.str();
+    }
+
+    void DBException::traceIfNeeded( const DBException& e ) {
+        if( traceExceptions && ! inShutdown() ){
+            warning() << "DBException thrown" << causedBy( e ) << endl;
+            printStackTrace();
+        }
+    }
+
     void ExceptionInfo::append( BSONObjBuilder& b , const char * m , const char * c ) const {
         if ( msg.empty() )
             b.append( m , "unknown assertion" );
@@ -65,6 +77,7 @@ namespace mongo {
     }
 
     string getDbContext();
+    void raiseError(int code , const char *msg);
 
     /* "warning" assert -- safe to continue, so we don't throw exception. */
     NOINLINE_DECL void wasserted(const char *msg, const char *file, unsigned line) {
@@ -108,6 +121,14 @@ namespace mongo {
         throw e;
     }
 
+    NOINLINE_DECL void fassertFailed( int msgid ) {
+        problem() << "Fatal Assertion " << msgid << endl;
+        sayDbContext();
+        breakpoint();
+        log() << "\n\n***aborting after fassert() failure\n\n" << endl;
+        abort();
+    }
+
     NOINLINE_DECL void verifyFailed( int msgid ) {
         assertionCount.condrollover( ++assertionCount.regular );
         problem() << "Assertion failure " << msgid << endl;
@@ -132,6 +153,9 @@ namespace mongo {
     void uasserted(int msgid , const string &msg) {
         uasserted(msgid, msg.c_str());
     }
+
+    void UserException::appendPrefix( stringstream& ss ) const { ss << "userassert:"; }
+    void MsgAssertionException::appendPrefix( stringstream& ss ) const { ss << "massert:"; }
 
     NOINLINE_DECL void uasserted(int msgid, const char *msg) {
         assertionCount.condrollover( ++assertionCount.user );
@@ -190,6 +214,10 @@ namespace mongo {
         free(niceName);
         return s;
 #endif
+    }
+
+    string ExceptionInfo::toString() const {
+        stringstream ss; ss << "exception: " << code << " " << msg; return ss.str(); 
     }
 
     NOINLINE_DECL ErrorMsg::ErrorMsg(const char *msg, char ch) {

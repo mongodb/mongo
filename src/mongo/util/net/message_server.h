@@ -26,6 +26,8 @@
 
 namespace mongo {
 
+    struct LastError;
+
     class MessageHandler {
     public:
         virtual ~MessageHandler() {}
