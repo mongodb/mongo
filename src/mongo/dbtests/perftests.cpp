@@ -171,7 +171,9 @@ namespace PerfTests {
                 }
             }
         }
-        catch(...) { }
+        catch(...) { 
+            cout << "pstatsConnect() didn't work; ignoring" << endl;
+        }
     }
 
 

@@ -68,8 +68,8 @@ try {
     
     assert.eq( 2 , db.system.profile.find( { "command.$eval" : /^sleep/ } ).count() );
 
-    assert.lte( 120 , db.system.profile.findOne( { "command.$eval" : "sleep(120)" } ).millis );
-    assert.lte( 25 , db.system.profile.findOne( { "command.$eval" : "sleep(25)" } ).millis );
+    assert.lte( 119 , db.system.profile.findOne( { "command.$eval" : "sleep(120)" } ).millis );
+    assert.lte( 24 , db.system.profile.findOne( { "command.$eval" : "sleep(25)" } ).millis );
 
     /* sleep() could be inaccurate on certain platforms.  let's check */
     print("\nsleep 2 time actual:");
