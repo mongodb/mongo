@@ -32,6 +32,7 @@
 #include "namespace-inl.h"
 #include "client.h"
 #include "mongommf.h"
+#include "lockconcept.h"
 
 namespace mongo {
 
@@ -420,6 +421,7 @@ namespace mongo {
     inline Extent* MongoDataFile::getExtent(DiskLoc loc) const {
         Extent *e = _getExtent(loc);
         e->assertOk();
+        lockconcept::is(e, lockconcept::extent);
         return e;
     }
 
@@ -476,7 +478,9 @@ namespace mongo {
     }
     inline DeletedRecord* DiskLoc::drec() const {
         assert( _a != -1 );
-        return (DeletedRecord*) rec();
+        DeletedRecord* dr = (DeletedRecord*) rec();
+        lockconcept::is(dr, lockconcept::deletedrecord);
+        return dr;
     }
     inline Extent* DiskLoc::ext() const {
         return DataFileMgr::getExtent(*this);
@@ -492,6 +496,7 @@ namespace mongo {
 } // namespace mongo
 
 #include "database.h"
+#include "lockconcept.h"
 
 namespace mongo {
 
@@ -500,6 +505,7 @@ namespace mongo {
     inline NamespaceIndex* nsindex(const char *ns) {
         Database *database = cc().database();
         assert( database );
+        lockconcept::is(database, lockconcept::database, ns, sizeof(Database));
         DEV {
             char buf[256];
             nsToDatabase(ns, buf);
@@ -515,7 +521,11 @@ namespace mongo {
 
     inline NamespaceDetails* nsdetails(const char *ns) {
         // if this faults, did you set the current db first?  (Client::Context + dblock)
-        return nsindex(ns)->details(ns);
+        NamespaceDetails *d = nsindex(ns)->details(ns);
+        if( d ) {
+            lockconcept::is(d, lockconcept::nsdetails, ns, sizeof(NamespaceDetails));
+        }
+        return d;
     }
 
     inline Extent* DataFileMgr::getExtent(const DiskLoc& dl) {
@@ -525,7 +535,8 @@ namespace mongo {
 
     inline Record* DataFileMgr::getRecord(const DiskLoc& dl) {
         assert( dl.a() != -1 );
-        return cc().database()->getFile(dl.a())->recordAt(dl);
+        Record* r = cc().database()->getFile(dl.a())->recordAt(dl);
+        return r;
     }
 
     BOOST_STATIC_ASSERT( 16 == sizeof(DeletedRecord) );
