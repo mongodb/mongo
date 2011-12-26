@@ -229,8 +229,7 @@ __btree_conf(WT_SESSION_IMPL *session,
 				return (EINVAL);
 			}
 		}
-		WT_RET(__wt_config_getones(
-		    session, config, "key_gap", &cval));
+		WT_RET(__wt_config_getones(session, config, "key_gap", &cval));
 		btree->key_gap = (uint32_t)cval.val;
 	}
 	/* Check for fixed-size data. */
@@ -257,8 +256,7 @@ __btree_conf(WT_SESSION_IMPL *session,
 	WT_RET(__wt_btree_huffman_open(session, config));
 
 	/* Page compressor */
-	WT_RET(__wt_config_getones(
-	    session, config, "block_compressor", &cval));
+	WT_RET(__wt_config_getones(session, config, "block_compressor", &cval));
 	if (cval.len > 0) {
 		TAILQ_FOREACH(ncomp, &conn->compqh, q) {
 			if (strncmp(ncomp->name, cval.str, cval.len) == 0) {
