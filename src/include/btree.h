@@ -6,37 +6,6 @@
  */
 
 /*
- * WT_FREE_ENTRY  --
- *	Encapsulation of an entry on the Btree free list.
- */
-struct __wt_free_entry {
-	TAILQ_ENTRY(__wt_free_entry) qa;	/* Address queue */
-	TAILQ_ENTRY(__wt_free_entry) qs;	/* Size queue */
-
-	uint32_t addr;				/* Disk offset */
-	uint32_t size;				/* Size */
-};
-
-/*
- * WT_SALVAGE_COOKIE --
- *	Encapsulation of salvage information for reconciliation.
- */
-struct __wt_salvage_cookie {
-	uint64_t missing;			/* Initial items to create */
-	uint64_t skip;				/* Initial items to skip */
-	uint64_t take;				/* Items to take */
-
-	int	 done;				/* Ignore the rest */
-};
-
-/*
- * Split page size calculation -- we don't want to repeatedly split every time
- * a new entry is added, so we split to a smaller-than-maximum page size.
- */
-#define	WT_SPLIT_PAGE_SIZE(pagesize, allocsize, pct)			\
-	WT_ALIGN(((uintmax_t)(pagesize) * (pct)) / 100, allocsize)
-
-/*
  * WT_BTREE --
  *	A btree handle.
  */
@@ -54,13 +23,12 @@ struct __wt_btree {
 		BTREE_ROW=3		/* Row-store */
 	} type;				/* Type */
 
-	uint8_t bitcnt;			/* Fixed-length field size in bits */
-
 	const char *key_format;		/* Key format */
 	const char *key_plan;		/* Key projection plan */
 	const char *idxkey_format;	/* Index key format (hides primary) */
 	const char *value_format;	/* Value format */
 	const char *value_plan;		/* Value projection plan */
+	uint8_t bitcnt;			/* Fixed-length field size in bits */
 
 					/* Row-store comparison function */
 	WT_COLLATOR *collator;          /* Comparison function */
@@ -93,10 +61,10 @@ struct __wt_btree {
 
 	WT_BTREE_STATS *stats;		/* Btree statistics */
 
-#define	WT_BTREE_BULK		0x01	/* Handle is for bulk load. */
+#define	WT_BTREE_BULK		0x01	/* Bulk-load handle */
 #define	WT_BTREE_EXCLUSIVE	0x02	/* Need exclusive access to handle */
-#define	WT_BTREE_OPEN		0x04	/* Handle is open. */
-#define	WT_BTREE_NO_LOCK	0x08	/* Do not lock the handle. */
+#define	WT_BTREE_NO_LOCK	0x04	/* Do not lock the handle */
+#define	WT_BTREE_OPEN		0x08	/* Handle is open */
 #define	WT_BTREE_SALVAGE	0x10	/* Handle is for salvage */
 #define	WT_BTREE_VERIFY		0x20	/* Handle is for verify */
 	uint32_t flags;
@@ -134,3 +102,22 @@ struct __wt_btree {
 #define	__wt_page_in(a, b, c)						\
 	__wt_page_in_func(a, b, c)
 #endif
+
+/*
+ * WT_SALVAGE_COOKIE --
+ *	Encapsulation of salvage information for reconciliation.
+ */
+struct __wt_salvage_cookie {
+	uint64_t missing;			/* Initial items to create */
+	uint64_t skip;				/* Initial items to skip */
+	uint64_t take;				/* Items to take */
+
+	int	 done;				/* Ignore the rest */
+};
+
+/*
+ * Split page size calculation -- we don't want to repeatedly split every time
+ * a new entry is added, so we split to a smaller-than-maximum page size.
+ */
+#define	WT_SPLIT_PAGE_SIZE(pagesize, allocsize, pct)			\
+	WT_ALIGN(((uintmax_t)(pagesize) * (pct)) / 100, allocsize)

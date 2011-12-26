@@ -70,6 +70,18 @@
 	WT_ADDR_TO_OFF(btree, UINT32_MAX - 1)
 
 /*
+ * WT_FREE_ENTRY  --
+ *	Encapsulation of an entry on the Btree free list.
+ */
+struct __wt_free_entry {
+	TAILQ_ENTRY(__wt_free_entry) qa;	/* Address queue */
+	TAILQ_ENTRY(__wt_free_entry) qs;	/* Size queue */
+
+	uint32_t addr;				/* Disk offset */
+	uint32_t size;				/* Size */
+};
+
+/*
  * WT_BTREE_DESC --
  *	The file's description.
  */
