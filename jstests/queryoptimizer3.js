@@ -1,4 +1,4 @@
-// Check cases where index scans are aborted due to the collection being dropped.
+// Check cases where index scans are aborted due to the collection being dropped.  SERVER-4400
 
 t = db.jstests_queryoptimizer3;
 t.drop();
