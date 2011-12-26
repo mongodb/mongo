@@ -114,9 +114,7 @@ namespace mongo {
             }
         };
 
-        // This object assures safe and reliable cleanup of the ClientCursor.
-        // The implementation assumes that there will be no duplicate ids among cursors
-        // (which is assured if cursors must last longer than 1 second).
+        // This object assures safe and reliable cleanup of a ClientCursor.
         class CleanupPointer : boost::noncopyable {
         public:
             CleanupPointer() : _c( 0 ), _id( -1 ) {}
@@ -302,6 +300,10 @@ namespace mongo {
             return c;
         }
 
+        /**
+         * Deletes the cursor with the provided @param 'id' if one exists.
+         * @throw if the cursor with the provided id is pinned.
+         */
         static bool erase(CursorId id) {
             recursive_scoped_lock lock(ccmutex);
             ClientCursor *cc = find_inlock(id);
