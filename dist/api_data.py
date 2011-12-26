@@ -87,6 +87,13 @@ file_meta = format_meta + [
 	Config('block_compressor', '', r'''
 		a compressor for file blocks.  Permitted values are empty (off)
 		or \c "<name>".  See @ref compressors for more details'''),
+	Config('checksum', 'true', r'''
+		the configuration for file block checksums; if false, the block
+		manager is free to not write or check block checksums.  This
+		can increase performance in applications where compression
+		provides checksum functionality or read-only applications where
+		blocks require no verification''',
+		type='boolean'),
 	Config('collator', '', r'''
 		custom collation for keys.  Value must be a collator name
 		created with WT_CONNECTION::add_collator'''),
@@ -99,16 +106,17 @@ file_meta = format_meta + [
 		(off), \c "english" or \c "<filename>".  See @ref huffman for
 		more details'''),
 	Config('internal_key_truncate', 'true', r'''
-		the Btree for truncation of internal keys, discarding
-		unnecessary trailing bytes on internal keys''',
+		the Btree configuration for truncation of internal keys,
+		discarding unnecessary trailing bytes on internal keys''',
 		type='boolean'),
 	Config('internal_page_max', '2KB', r'''
 		the maximum page size for internal nodes, in bytes; the size
 		must be a multiple of the allocation size''',
 		min='512B', max='512MB'),
 	Config('internal_item_max', '0', r'''
-		the maximum key size stored on internal nodes, in bytes.  If zero, a
-		maximum is calculated to permit at least 8 keys per internal page''',
+		the maximum key size stored on internal nodes, in bytes.  If
+		zero, a maximum is calculated to permit at least 8 keys per
+		internal page''',
 		min=0),
 	Config('key_gap', '10', r'''
 		the maximum gap between instantiated keys in a Btree leaf page,
@@ -120,9 +128,9 @@ file_meta = format_meta + [
 		be a multiple of the allocation size''',
 		min='512B', max='512MB'),
 	Config('leaf_item_max', '0', r'''
-		the maximum key or value size stored on leaf nodes, in bytes.  If zero,
-		a size is calculated to permit at least 8 items (values or row store
-		keys) per leaf page''',
+		the maximum key or value size stored on leaf nodes, in bytes.
+		If zero, a size is calculated to permit at least 8 items
+		(values or row store keys) per leaf page''',
 		min=0),
 	Config('prefix_compression', 'true', r'''
 		the Btree for prefix compression, storing keys as a count of

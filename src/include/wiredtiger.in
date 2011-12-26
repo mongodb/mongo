@@ -532,6 +532,12 @@ struct wt_session {
 	 * @config{block_compressor, a compressor for file blocks.  Permitted
 	 * values are empty (off) or \c "<name>".  See @ref compressors for more
 	 * details.,a string; default empty.}
+	 * @config{checksum, the configuration for file block checksums; if
+	 * false\, the block manager is free to not write or check block
+	 * checksums.  This can increase performance in applications where
+	 * compression provides checksum functionality or read-only applications
+	 * where blocks require no verification.,a boolean flag; default \c
+	 * true.}
 	 * @config{colgroups, comma-separated list of names of column groups.
 	 * Each column group is stored separately\, keyed by the primary key of
 	 * the table.  If no column groups are specified\, all columns are
@@ -563,9 +569,9 @@ struct wt_session {
 	 * nodes\, in bytes.  If zero\, a maximum is calculated to permit at
 	 * least 8 keys per internal page.,an integer greater than or equal to
 	 * 0; default \c 0.}
-	 * @config{internal_key_truncate, the Btree for truncation of internal
-	 * keys\, discarding unnecessary trailing bytes on internal keys.,a
-	 * boolean flag; default \c true.}
+	 * @config{internal_key_truncate, the Btree configuration for truncation
+	 * of internal keys\, discarding unnecessary trailing bytes on internal
+	 * keys.,a boolean flag; default \c true.}
 	 * @config{internal_page_max, the maximum page size for internal nodes\,
 	 * in bytes; the size must be a multiple of the allocation size.,an
 	 * integer between 512B and 512MB; default \c 2KB.}
@@ -581,8 +587,8 @@ struct wt_session {
 	 * a random Btree leaf page key.,an integer greater than or equal to 0;
 	 * default \c 10.}
 	 * @config{leaf_item_max, the maximum key or value size stored on leaf
-	 * nodes\, in bytes.  If zero\, a size is calculated to permit at least
-	 * 8 items (values or row store keys) per leaf page.,an integer greater
+	 * nodes\, in bytes. If zero\, a size is calculated to permit at least 8
+	 * items (values or row store keys) per leaf page.,an integer greater
 	 * than or equal to 0; default \c 0.}
 	 * @config{leaf_page_max, the maximum page size for leaf nodes\, in
 	 * bytes; the size must be a multiple of the allocation size.,an integer

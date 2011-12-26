@@ -151,7 +151,8 @@ not_compressed:	/*
 	 * the uncompressed contents.
 	 */
 	dsk->cksum = 0;
-	dsk->cksum = __wt_cksum(dsk, align_size);
+	if (btree->checksum)
+		dsk->cksum = __wt_cksum(dsk, align_size);
 	WT_ERR(__wt_write(
 	    session, btree->fh, WT_ADDR_TO_OFF(btree, addr), align_size, dsk));
 

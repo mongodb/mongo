@@ -35,7 +35,7 @@ __wt_block_read(WT_SESSION_IMPL *session,
 	buf->size = size;
 
 	dsk = buf->mem;
-	if (cksum != 0) {
+	if (btree->checksum && cksum == 0) {
 		dsk->cksum = 0;
 		page_cksum = __wt_cksum(dsk, size);
 		if (cksum != page_cksum) {

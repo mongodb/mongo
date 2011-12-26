@@ -60,6 +60,10 @@ __wt_bm_open(WT_SESSION_IMPL *session)
 	/* Open the underlying file handle. */
 	WT_RET(__wt_open(session, btree->filename, 0666, 1, &btree->fh));
 
+	/* Check if configured for checksums. */
+	WT_ERR(__wt_config_getones(session, btree->config, "checksum", &cval));
+	btree->checksum = cval.val == 0 ? 0 : 1;
+
 	/*
 	 * Normally we read the file's meta-data to see if this is a WiredTiger
 	 * file.  But, if it's a salvage operation and force is set, we ignore

@@ -76,6 +76,8 @@ struct __wt_btree {
 	WT_FH	*fh;			/* Backing file handle */
 	off_t	 slvg_off;		/* Salvage file offset */
 
+	int	 checksum;		/* If checksums configured */
+
 	uint32_t frags;			/* Total frags */
 	uint8_t *fragbits;		/* Frag tracking bit list */
 
