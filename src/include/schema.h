@@ -8,6 +8,9 @@
 #define	WT_SCHEMA_FILENAME	"WiredTiger.wt"		/* Schema file name */
 #define	WT_SCHEMA_URI		"file:WiredTiger.wt"	/* Schema file URI */
 
+#define	WT_SCHEMA_VERSION	"WiredTiger version"	/* Version keys */
+#define	WT_SCHEMA_VERSION_STR	"WiredTiger version string"
+
 /* Character constants for projection plans. */
 #define	WT_PROJ_KEY	'k' /* Go to key in cursor <arg>. */
 #define	WT_PROJ_NEXT	'n' /* Process the next item (<arg> repeats). */

@@ -11,11 +11,16 @@ static int
 __create_file(WT_SESSION_IMPL *session,
     const char *name, const char *fileuri, const char *config)
 {
+	WT_BUF *buf;
 	const char *cfg[] = API_CONF_DEFAULTS(session, create, config);
 	const char *dropcfg[] = API_CONF_DEFAULTS(session, drop, "force");
 	const char *filecfg[] = API_CONF_DEFAULTS(file, meta, config);
 	const char *filename, *treeconf;
-	int is_schema, ret;
+	int is_schema, vmajor, vminor, vpatch, ret;
+
+	buf = NULL;
+	treeconf = NULL;
+	ret = 0;
 
 	filename = fileuri;
 	if (!WT_PREFIX_SKIP(filename, "file:")) {
@@ -36,9 +41,19 @@ __create_file(WT_SESSION_IMPL *session,
 
 	WT_RET(__wt_btree_create(session, filename));
 
-	if (is_schema)
+	if (is_schema) {
+		WT_ERR(__wt_schema_table_insert(
+		    session, WT_SCHEMA_VERSION_STR,
+		    wiredtiger_version(&vmajor, &vminor, &vpatch)));
+
+		WT_ERR(__wt_scr_alloc(session, 0, &buf));
+		WT_ERR(__wt_buf_fmt(session, buf,
+		    "major=%d,minor=%d,patch=%d", vmajor, vminor, vpatch));
+		WT_ERR(__wt_schema_table_insert(
+		    session, WT_SCHEMA_VERSION, buf->data));
+
 		WT_ERR(__wt_strdup(session, config, &treeconf));
-	else
+	} else
 		WT_ERR(__wt_config_collapse(session, filecfg, &treeconf));
 	WT_ERR(__wt_schema_table_insert(session, fileuri, treeconf));
 
@@ -52,6 +67,7 @@ __create_file(WT_SESSION_IMPL *session,
 err:		(void)__wt_drop_file(session, fileuri, dropcfg);
 	}
 
+	__wt_scr_free(&buf);
 	__wt_free(session, treeconf);
 	return (ret);
 }
