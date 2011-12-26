@@ -108,6 +108,73 @@ namespace PerfTests {
     };
     int TaskQueueTest::tot;
 
+    /* if you want recording of the timings, place the password for the perf database
+        in ./../settings.py:
+            pstatspassword="<pwd>"
+    */
+    static boost::shared_ptr<DBClientConnection> conn;
+    static string _perfhostname;
+    void pstatsConnect() {
+        // no writing to perf db if _DEBUG
+        DEV return;
+
+        const char *fn = "../../settings.py";
+        if( !exists(fn) ) {
+            if( exists("settings.py") )
+                fn = "settings.py";
+            else {
+                cout << "no ../../settings.py or ./settings.py file found. will not write perf stats to pstats db." << endl;
+                cout << "it is recommended this be enabled even on dev boxes" << endl;
+                return;
+            }
+        }
+
+        try {
+            if( conn == 0 ) {
+                MemoryMappedFile f;
+                const char *p = (const char *) f.mapWithOptions(fn, MongoFile::READONLY);
+                string pwd;
+
+                {
+                    const char *q = str::after(p, "pstatspassword=\"");
+                    if( *q == 0 ) {
+                        cout << "info perftests.cpp: no pstatspassword= in settings.py" << endl;
+                        return;
+                    }
+                    else {
+                        pwd = str::before(q, '\"');
+                    }
+                }
+
+                boost::shared_ptr<DBClientConnection> c(new DBClientConnection(false, 0, 60));
+                string err;
+                if( c->connect("perfdb.10gen.cc", err) ) {
+                    if( !c->auth("perf", "perf", pwd, err) ) {
+                        cout << "info: authentication with stats db failed: " << err << endl;
+                        assert(false);
+                    }
+                    conn = c;
+
+                    // override the hostname with the buildbot hostname, if present
+                    ifstream hostf( "../../info/host" );
+                    if ( hostf.good() ) {
+                        char buf[1024];
+                        hostf.getline(buf, sizeof(buf));
+                        _perfhostname = buf;
+                    }
+                    else {
+                        _perfhostname = getHostName();
+                    }
+                }
+                else {
+                    cout << err << " (to log perfstats)" << endl;
+                }
+            }
+        }
+        catch(...) { }
+    }
+
+
     class B : public ClientBase {
         string _ns;
     protected:
@@ -132,89 +199,15 @@ namespace PerfTests {
         /* override if your test output doesn't need that */
         virtual bool showDurStats() { return true; }
 
-        static  boost::shared_ptr<DBClientConnection> conn;
-        static string _perfhostname;
-        static unsigned once;
-
     public:
-        /* if you want recording of the timings, place the password for the perf database
-            in ./../settings.py:
-                pstatspassword="<pwd>"
-        */
-        void connect() {
-            if( once )
-                return;
-            ++once;
-
-            // no writing to perf db if _DEBUG
-            DEV return;
-
-            const char *fn = "../../settings.py";
-            if( !exists(fn) ) {
-                if( exists("settings.py") )
-                    fn = "settings.py";
-                else {
-                    cout << "no ../../settings.py or ./settings.py file found. will not write perf stats to pstats db." << endl;
-                    cout << "it is recommended this be enabled even on dev boxes" << endl;
-                    return;
-                }
-            }
-
-            try {
-                if( conn == 0 ) {
-                    MemoryMappedFile f;
-                    const char *p = (const char *) f.mapWithOptions(fn, MongoFile::READONLY);
-                    string pwd;
-
-                    {
-                        const char *q = str::after(p, "pstatspassword=\"");
-                        if( *q == 0 ) {
-                            cout << "info perftests.cpp: no pstatspassword= in settings.py" << endl;
-                            return;
-                        }
-                        else {
-                            pwd = str::before(q, '\"');
-                        }
-                    }
-
-                    boost::shared_ptr<DBClientConnection> c(new DBClientConnection(false, 0, 60));
-                    string err;
-                    if( c->connect("perfdb.10gen.cc", err) ) {
-                        if( !c->auth("perf", "perf", pwd, err) ) {
-                            cout << "info: authentication with stats db failed: " << err << endl;
-                            assert(false);
-                        }
-                        conn = c;
-
-                        // override the hostname with the buildbot hostname, if present
-                        ifstream hostf( "../../info/host" );
-                        if ( hostf.good() ) {
-                            char buf[1024];
-                            hostf.getline(buf, sizeof(buf));
-                            _perfhostname = buf;
-                        }
-                        else {
-                            _perfhostname = getHostName();
-                        }
-                    }
-                    else {
-                        cout << err << " (to log perfstats)" << endl;
-                    }
-                }
-            }
-            catch(...) { }
-        }
-
         virtual unsigned batchSize() { return 50; }
 
         void say(unsigned long long n, int ms, string s) {
             unsigned long long rps = n*1000/ms;
-            cout << "stats " << setw(33) << left << s << ' ' << right << setw(9) << rps << ' ' << right << setw(5) << ms << "ms ";
+            cout << "stats " << setw(42) << left << s << ' ' << right << setw(9) << rps << ' ' << right << setw(5) << ms << "ms ";
             if( showDurStats() )
                 cout << dur::stats.curr->_asCSV();
             cout << endl;
-
-            connect();
 
             if( conn && !conn->isFailed() ) {
                 const char *ns = "perf.pstats";
@@ -287,22 +280,27 @@ namespace PerfTests {
             }
         }
 
+        /** if true runs timed2() again with several threads (8 at time of this writing 
+            shouldn't be just timed2, that is legacy and can be cleaned up one day
+        */
         virtual bool testThreaded() { return false; }
 
         unsigned long long n;
 
-        void run() {
-            _ns = string("perftest.") + name();
-            client().dropCollection(ns());
-
-            prep();
-
+        int howLong() { 
             int hlm = howLongMillis();
             DEV {
                 // don't run very long with _DEBUG - not very meaningful anyway on that build
                 hlm = min(hlm, 500);
             }
+            return hlm;
+        }
 
+        void run() {
+            _ns = string("perftest.") + name();
+            client().dropCollection(ns());
+            prep();
+            int hlm = howLong();
             dur::stats._intervalMicros = 0; // no auto rotate
             dur::stats.curr->reset();
             mongo::Timer t;
@@ -349,37 +347,45 @@ namespace PerfTests {
             }
 
             if( testThreaded() ) {
-                cout << "testThreaded" << endl;
+                const int nThreads = 8;
+                //cout << "testThreaded nThreads:" << nThreads << endl;
                 mongo::Timer t;
-                launchThreads(8);
-                //cout << "threaded done " << t.millis() << "ms" << endl;
-                //cout << n * 1000 / t.millis() << " per second" << endl;
+                launchThreads(nThreads);
                 say(n, t.millis(), test2name+"-threaded");
-
             }
         }
 
+        bool stop;
+
         void thread() {
+#if defined(_WIN32)
+            static int z;
+            srand( ++z ^ time(0));
+#endif
             DBClientType c;
             Client::initThreadIfNotAlready("perftestthr");
-            for( unsigned long long i = 0; i < n/8; i++ ) {
-                timed2(c);
+            while( 1 ) {
+                for( int i = 0; i < 8; i++ )
+                    timed2(c);
+                if( stop ) 
+                    break;
             }
             cc().shutdown();
         }
 
         void launchThreads(int remaining) {
-            if (!remaining)
+            stop = false;
+            if (!remaining) {
+                int hlm = howLong();
+                sleepmillis(hlm);
+                stop = true;
                 return;
+            }
             boost::thread athread(boost::bind(&B::thread, this));
             launchThreads(remaining - 1);
             athread.join();
         }
     };
-
-    boost::shared_ptr<DBClientConnection> B::conn;
-    string B::_perfhostname;
-    unsigned B::once;
 
     unsigned dontOptimizeOutHopefully;
 
@@ -920,16 +926,13 @@ namespace PerfTests {
             BSONObj y = BSON("x" << x << "y" << rand() << "z" << 33);
             client().update(ns(), q, y, /*upsert*/true);
         }
-
+        virtual bool testThreaded() { return true; }
         virtual string timed2(DBClientBase& c) {
             static BSONObj I = BSON( "$inc" << BSON( "y" << 1 ) );
-
             // test some $inc's
-
             int x = rand();
             BSONObj q = BSON("x" << x);
             c.update(ns(), q, I);
-
             return name()+"-inc";
         }
     };
@@ -979,8 +982,9 @@ namespace PerfTests {
         }
 
         void setupTests() {
+            pstatsConnect();
             cout
-                << "stats test                              rps------  time-- "
+                << "stats test                                            rps------  time-- "
                 << dur::stats.curr->_CSVHeader() << endl;
             if( profiling ) {
                 add< New8 >();
