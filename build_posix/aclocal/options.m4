@@ -26,6 +26,9 @@ no)	wt_cv_enable_bzip2=no;;
 esac
 AC_MSG_RESULT($wt_cv_enable_bzip2)
 AM_CONDITIONAL([BZIP2], [test x$wt_cv_enable_bzip2 = xyes])
+if test "$enable_shared" = "no"; then
+	AC_MSG_ERROR([--enable-bzip2 requires shared libraries])
+fi
 
 AC_MSG_CHECKING(if --enable-debug option specified)
 AC_ARG_ENABLE(debug,
@@ -59,6 +62,9 @@ no)	wt_cv_enable_python=no;;
 esac
 AC_MSG_RESULT($wt_cv_enable_python)
 AM_CONDITIONAL(PYTHON, test x$wt_cv_enable_python = xyes)
+if test "$enable_shared" = "no"; then
+	AC_MSG_ERROR([--enable-python requires shared libraries])
+fi
 
 AC_MSG_CHECKING(if --enable-snappy option specified)
 AC_ARG_ENABLE(snappy,
@@ -70,6 +76,9 @@ no)	wt_cv_enable_snappy=no;;
 esac
 AC_MSG_RESULT($wt_cv_enable_snappy)
 AM_CONDITIONAL([SNAPPY], [test x$wt_cv_enable_snappy = xyes])
+if test "$enable_shared" = "no"; then
+	AC_MSG_ERROR([--enable-snappy requires shared libraries])
+fi
 
 AH_TEMPLATE(HAVE_VERBOSE, [Define to 1 to support the Env.verbose_set method.])
 AC_MSG_CHECKING(if --enable-verbose option specified)
