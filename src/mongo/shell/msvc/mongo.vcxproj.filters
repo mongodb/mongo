@@ -710,6 +710,9 @@
     <ClInclude Include="..\..\util\version.h">
       <Filter>util</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\util\assert_util.h">
+      <Filter>util</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\db\db.rc">

@@ -358,6 +358,7 @@
     <ClInclude Include="..\..\s\util.h" />
     <ClInclude Include="..\..\targetver.h" />
     <ClInclude Include="..\..\util\allocator.h" />
+    <ClInclude Include="..\..\util\assert_util.h" />
     <ClInclude Include="..\..\util\background.h" />
     <ClInclude Include="..\..\util\base64.h" />
     <ClInclude Include="..\..\util\concurrency\list.h" />
