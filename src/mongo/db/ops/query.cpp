@@ -124,7 +124,7 @@ namespace mongo {
 
             start = cc->pos();
             Cursor *c = cc->c();
-            c->checkLocation();
+            c->recoverFromYield();
             DiskLoc last;
 
             scoped_ptr<Projection::KeyOnly> keyFieldsOnly;
@@ -200,7 +200,8 @@ namespace mongo {
             }
             
             if ( cc ) {
-                cc->updateLocation();
+                ClientCursor::YieldData data;
+                cc->prepareToYield( data );
                 cc->mayUpgradeStorage();
                 cc->storeOpForSlave( last );
                 exhaust = cc->queryOptions() & QueryOption_Exhaust;
@@ -652,6 +653,7 @@ namespace mongo {
             _buf.skip( sizeof( QueryResult ) );
         }
         void addResult( const DiskLoc &loc ) {
+            ++_n;
             fillQueryResultFromObj( _buf, _parsedQuery.getFields(), loc.obj(), ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
         }
         bool enoughTotalResults() {
@@ -666,6 +668,7 @@ namespace mongo {
                 _buf.decouple();
             }
         }
+        long long n() const { return _n; }
     private:
         BufBuilder _buf;
         const ParsedQuery &_parsedQuery;
@@ -814,7 +817,7 @@ namespace mongo {
             if ( pq.hasOption( QueryOption_OplogReplay ) ) {
 //                cursor = FindingStartCursor::getCursor( ns, query, order );
             } else if ( order.isEmpty() && !pq.getFields() && !pq.isExplain() && !pq.returnKey() ) {
-                cursor = NamespaceDetailsTransient::getCursor( ns, query, BSONObj(), &pq );
+                cursor = NamespaceDetailsTransient::getCursor( ns, query, BSONObj(), false, 0, &pq );
             }
             if ( cursor ) {
                 QueryResponseBuilder queryResponseBuilder( pq );
@@ -833,7 +836,7 @@ namespace mongo {
                         break;
                     }
                     
-                    if ( cursor->matcher() && !cursor->matcher()->matchesCurrent( cursor.get() ) ) {
+                    if ( !cursor->currentMatches() ) {
                         cursor->advance();
                         continue;
                     }
@@ -863,15 +866,15 @@ namespace mongo {
                     queryResponseBuilder.addResult( currLoc );
                     if ( !cursor->supportGetMore() ) {
                         if ( queryResponseBuilder.enoughTotalResults() ) {
-                            log() << "enough n:" << n << endl;
+//                            log() << "enough n:" << n << endl;
                             break;
                         }
                     }
                     else if ( queryResponseBuilder.enoughForFirstBatch() ) {
-                        log() << "enough for first" << endl;
+//                        log() << "enough for first" << endl;
                         /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
                         if ( pq.wantMore() && pq.getNumToReturn() != 1 && useCursors ) {
-                            log() << "setting cursorid" << endl;
+//                            log() << "setting cursorid" << endl;
                             cursor->advance();
                             cursorid = ccPointer->cursorid();
                         }
@@ -881,11 +884,12 @@ namespace mongo {
                     cursor->advance();
                 }
                 if ( cursorid == 0 ) {
-//                    ccPointer.reset();
-                    ccPointer.release();
+                    ccPointer.reset();
+//                    ccPointer.release();
                 } else {
-                    log() << "updating location" << endl;
-                    ccPointer->updateLocation();
+//                    log() << "updating location" << endl;
+                    ClientCursor::YieldData data;
+                    ccPointer->prepareToYield( data );
                     ccPointer.release();
                 }
                 queryResponseBuilder.handoff( result );
@@ -896,7 +900,7 @@ namespace mongo {
                 curop.debug().responseLength = qr->len;
                 qr->setOperation(opReply);
                 qr->startingFrom = 0;
-                qr->nReturned = n;
+                qr->nReturned = queryResponseBuilder.n();
                 return 0;
             }
         }

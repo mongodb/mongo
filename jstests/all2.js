@@ -9,7 +9,8 @@ t.save( { a : [ { x : 3 } , { x : 4  } ] } )
 state = "no index";
 
 function check( n , q , e ){
-    assert.eq( n , t.find( q ).count() , tojson( q ) + " " + e + " count " + state );
+//    assert.eq( n , t.find( q ).count() , tojson( q ) + " " + e + " count " + state );
+    printjson( t.find( q ).toArray() );
     assert.eq( n , t.find( q ).itcount() , tojson( q ) + " " + e + " itcount" + state );
 }
 

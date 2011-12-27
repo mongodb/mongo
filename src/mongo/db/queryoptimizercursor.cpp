@@ -104,6 +104,7 @@ namespace mongo {
         
         virtual bool prepareToYield() {
             if ( _c && !_cc ) {
+                log() << "making cursor" << endl;
                 _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , _c , qp().ns() ) );
             }
             if ( _cc ) {
@@ -529,10 +530,6 @@ namespace mongo {
         if ( simpleEqualityMatch ) {
             *simpleEqualityMatch = false;
         }
-        if ( planPolicy.permitOptimalNaturalPlan() && query.isEmpty() && order.isEmpty() ) {
-            // TODO This will not use a covered index currently.
-            return theDataFileMgr.findAll( ns );
-        }
 
         BSONElement hint = (useHints && parsedQuery) ? parsedQuery->getHint() : BSONElement();
         bool snapshot = parsedQuery && parsedQuery->isSnapshot();
@@ -559,9 +556,11 @@ namespace mongo {
             }
         }
 
-        bool mayShortcutQueryOptimizer = !parsedQuery || ( parsedQuery->getMin().isEmpty() && parsedQuery->getMax().isEmpty() );
+        bool mayShortcutQueryOptimizer =
+        ( !parsedQuery || ( parsedQuery->getMin().isEmpty() && parsedQuery->getMax().isEmpty() ) ) &&
+        hint.eoo();
         if ( mayShortcutQueryOptimizer ) {
-            if ( query.isEmpty() && order.isEmpty() ) {
+            if ( planPolicy.permitOptimalNaturalPlan() && query.isEmpty() && order.isEmpty() && !requireIndex ) {
                 // TODO This will not use a covered index currently.
                 return theDataFileMgr.findAll( ns );
             }
