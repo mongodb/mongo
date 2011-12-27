@@ -346,8 +346,8 @@ namespace mongo {
 
             if (freeSpace + prealloced < spaceNeeded) {
                 log() << endl;
-                error() << "Insufficient free space for journals." << endl;
-                log() << "Please make at least " << spaceNeeded/(1024*1024) << "MB available in " << getJournalDir().string() << endl;
+                error() << "Insufficient free space for journal files" << endl;
+                log() << "Please make at least " << spaceNeeded/(1024*1024) << "MB available in " << getJournalDir().string() << " or use --smallfiles" << endl;
                 log() << endl;
                 throw UserException(15926, "Insufficient free space for journals");
             }
