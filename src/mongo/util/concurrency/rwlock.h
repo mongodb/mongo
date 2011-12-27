@@ -33,6 +33,8 @@ namespace mongo {
     */
     class SimpleRWLock : public RWLockBase { 
     public:
+        explicit SimpleRWLock(const char *) { }
+        SimpleRWLock() { }
         void lock() { RWLockBase::lock(); }
         void unlock() { RWLockBase::unlock(); }
         void lock_shared() { RWLockBase::lock_shared(); }
