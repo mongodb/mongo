@@ -367,7 +367,7 @@ namespace mongo {
             if ( _currOp ) {
                 _mps->recoverFromYield();
                 if ( _currOp->error() || !ok() ) {
-                    // Advance to a non error op if on of the ops errored out.
+                    // Advance to a non error op if one of the ops errored out.
                     // Advance to a following $or clause if the $or clause returned all results.
                     _advance( true );
                 }

@@ -201,7 +201,7 @@ namespace mongo {
             
             if ( cc ) {
                 ClientCursor::YieldData data;
-                cc->prepareToYield( data );
+                assert( cc->prepareToYield( data ) );
                 cc->mayUpgradeStorage();
                 cc->storeOpForSlave( last );
                 exhaust = cc->queryOptions() & QueryOption_Exhaust;
