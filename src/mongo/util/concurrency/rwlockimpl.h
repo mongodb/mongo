@@ -2,11 +2,13 @@
 
 #pragma once
 
+#include <boost/noncopyable.hpp>
+
 #if defined(MONGO_USE_SRW_ON_WINDOWS) && defined(_WIN32)
 
 // windows slimreaderwriter version.  newer windows versions only
 
-namespace mongo { 
+namespace mongo {
     class RWLockBase : boost::noncopyable {
         SRWLOCK _lock;
     protected:
