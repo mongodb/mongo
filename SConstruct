@@ -669,9 +669,22 @@ elif "win32" == os.sys.platform:
 
     # /EHsc exception handling style for visual studio
     # /W3 warning level
-    env.Append( CPPFLAGS=" /EHsc /W3 " )
+    # /WX abort build on compiler warnings
+    env.Append( CPPFLAGS=" /EHsc /W3 /WX " )
 
     # some warnings we don't like:
+    # c4355
+    # 'this' : used in base member initializer list
+    #    The this pointer is valid only within nonstatic member functions. It cannot be used in the initializer list for a base class.
+    # c4800
+    # 'type' : forcing value to bool 'true' or 'false' (performance warning)
+    #    This warning is generated when a value that is not bool is assigned or coerced into type bool. 
+    # c4267
+    # 'var' : conversion from 'size_t' to 'type', possible loss of data
+    # When compiling with /Wp64, or when compiling on a 64-bit operating system, type is 32 bits but size_t is 64 bits when compiling for 64-bit targets. To fix this warning, use size_t instead of a type.
+    # c4244
+    # 'conversion' conversion from 'type1' to 'type2', possible loss of data
+    #  An integer type is converted to a smaller integer type.
     env.Append( CPPFLAGS=" /wd4355 /wd4800 /wd4267 /wd4244 " )
     
     # PSAPI_VERSION relates to process api dll Psapi.dll.
@@ -700,7 +713,7 @@ elif "win32" == os.sys.platform:
         # /Od disable optimization
         # /Z7 debug info goes into each individual .obj file -- no .pdb created 
         # /TP it's a c++ file
-        # RTC1 /GZ (Enable Stack Frame Run-Time Error Checking)
+        # /RTC1: - Enable Stack Frame Run-Time Error Checking; Reports when a variable is used without having been initialized
         env.Append( CPPFLAGS=" /RTC1 /MDd /Z7 /TP /errorReport:none " )
 
         if debugBuild:
