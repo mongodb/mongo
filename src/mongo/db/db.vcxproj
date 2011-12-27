@@ -756,6 +756,7 @@
     <ClInclude Include="..\util\concurrency\msg.h" />
     <ClInclude Include="..\util\concurrency\mutex.h" />
     <ClInclude Include="..\util\concurrency\mvar.h" />
+    <ClInclude Include="..\util\concurrency\rwlockimpl.h" />
     <ClInclude Include="..\util\concurrency\task.h" />
     <ClInclude Include="..\util\concurrency\thread_pool.h" />
     <ClInclude Include="..\util\intrusive_counter.h" />

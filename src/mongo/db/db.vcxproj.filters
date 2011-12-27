@@ -391,6 +391,7 @@
     <ClInclude Include="pagefault.h" />
     <ClInclude Include="d_globals.h" />
     <ClInclude Include="..\util\concurrency\mapsf.h" />
+    <ClInclude Include="..\util\concurrency\rwlockimpl.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="db.rc" />
