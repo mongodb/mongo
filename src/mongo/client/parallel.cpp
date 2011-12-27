@@ -228,7 +228,9 @@ namespace mongo {
             b.appendNumber( i->first , i->second );
 
         b.appendNumber( "millisShardTotal" , millis );
-        b.append( "millisShardAvg" , (int)((double)millis / numExplains ) );
+        b.append( "millisShardAvg" , 
+                  numExplains ? static_cast<int>( static_cast<double>(millis) / numExplains )
+                  : 0 );
         b.append( "numQueries" , (int)numExplains );
         b.append( "numShards" , (int)out.size() );
     }
