@@ -121,6 +121,10 @@ namespace mongo {
 
         virtual BSONObj prettyIndexBounds() const { return BSONArray(); }
 
+        /**
+         * If true, this is an unindexed cursor over a capped collection.  Currently such cursors must
+         * not own a delegate ClientCursor, due to the implementation of ClientCursor::aboutToDelete(). - SERVER-4563
+         */
         virtual bool capped() const { return false; }
 
         virtual long long nscanned() = 0;

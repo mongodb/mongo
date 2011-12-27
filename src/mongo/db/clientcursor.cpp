@@ -87,28 +87,31 @@ namespace mongo {
 
         {
             //cout << "\nTEMP invalidate " << ns << endl;
-            recursive_scoped_lock lock(ccmutex);
-
             Database *db = cc().database();
             assert(db);
             assert( str::startsWith(ns, db->name) );
 
-            for( CCById::iterator i = clientCursorsById.begin(); i != clientCursorsById.end(); /*++i*/ ) {
-                ClientCursor *cc = i->second;
+            for( LockedIterator i; i.ok(); ) {
+                ClientCursor *cc = i.current();
 
-                ++i; // we may be removing this node
-
-                if( cc->_db != db )
-                    continue;
-
-                if (isDB) {
-                    // already checked that db matched above
-                    dassert( str::startsWith(cc->_ns.c_str(), ns) );
-                    delete cc; //removes self from ccByID
+                bool shouldDelete = false;
+                if ( cc->_db == db ) {
+                    if (isDB) {
+                        // already checked that db matched above
+                        dassert( str::startsWith(cc->_ns.c_str(), ns) );
+                        shouldDelete = true;
+                    }
+                    else {
+                        if ( str::equals(cc->_ns.c_str(), ns) )
+                            shouldDelete = true;
+                    }
+                }
+                
+                if ( shouldDelete ) {
+                    i.deleteAndAdvance();
                 }
                 else {
-                    if ( str::equals(cc->_ns.c_str(), ns) )
-                        delete cc; //removes self from ccByID
+                    i.advance();
                 }
             }
 
@@ -173,15 +176,16 @@ namespace mongo {
             // can be reported in currentop command. e.g. something like:
             //   readlock lk("", "timeout cursors");
             readlock lk("");
-            recursive_scoped_lock lock(ccmutex);
-            for ( CCById::iterator i = clientCursorsById.begin(); i != clientCursorsById.end();  ) {
-                CCById::iterator j = i;
-                i++;
-                if( j->second->shouldTimeout(0) ) {
+            for( LockedIterator i; i.ok(); ) {
+                ClientCursor *cc = i.current();
+                if( cc->shouldTimeout(0) ) {
                     numberTimedOut++;
-                    LOG(1) << "killing old cursor " << j->second->_cursorid << ' ' << j->second->_ns
-                           << " idle:" << j->second->idleTime() << "ms\n";
-                    delete j->second;
+                    LOG(1) << "killing old cursor " << cc->_cursorid << ' ' << cc->_ns
+                           << " idle:" << cc->idleTime() << "ms\n";
+                    i.deleteAndAdvance();
+                }
+                else {
+                    i.advance();
                 }
             }
         }
@@ -288,6 +292,13 @@ namespace mongo {
     }
     void aboutToDelete(const DiskLoc& dl) { ClientCursor::aboutToDelete(dl); }
 
+    void ClientCursor::LockedIterator::deleteAndAdvance() {
+        ClientCursor *cc = current();
+        CursorId id = cc->cursorid();
+        delete cc;
+        _i = clientCursorsById.upper_bound( id );
+    }
+    
     ClientCursor::ClientCursor(int queryOptions, const shared_ptr<Cursor>& c, const string& ns, BSONObj query ) :
         _ns(ns), _db( cc().database() ),
         _c(c), _pos(0),

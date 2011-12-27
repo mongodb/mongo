@@ -144,6 +144,26 @@ namespace mongo {
             CursorId _id;
         };
 
+        /**
+         * Iterates through all ClientCursors, under its own ccmutex lock.
+         * Also supports deletion on the fly.
+         */
+        class LockedIterator : boost::noncopyable {
+        public:
+            LockedIterator() : _lock( ccmutex ), _i( clientCursorsById.begin() ) {}
+            bool ok() const { return _i != clientCursorsById.end(); }
+            ClientCursor *current() const { return _i->second; }
+            void advance() { ++_i; }
+            /**
+             * Delete 'current' and advance. Properly handles cascading deletions that may occur
+             * when one ClientCursor is directly deleted.
+             */
+            void deleteAndAdvance();
+        private:
+            recursive_scoped_lock _lock;
+            CCById::const_iterator _i;
+        };
+        
         ClientCursor(int queryOptions, const shared_ptr<Cursor>& c, const string& ns, BSONObj query = BSONObj() );
 
         ~ClientCursor();
