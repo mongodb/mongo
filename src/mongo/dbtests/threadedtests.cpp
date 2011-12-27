@@ -586,6 +586,19 @@ namespace ThreadedTests {
     };
 #endif
 
+        void sleepalittle() { 
+            Timer t;
+            while( 1 ) { 
+                boost::this_thread::yield();
+                if( t.micros() > 8 )
+                    break;
+            }
+        }
+
+    /* This test is to see how long it takes to get a lock after there has been contention -- the OS 
+         will need to reschedule us. if a spinlock, it will be fast of course, but these aren't spin locks.
+       Experimenting with different # of threads would be a good idea.
+    */
     template <class whichmutex, class scoped>
     class Slack : public ThreadedTest<17> {
     public:
@@ -624,7 +637,8 @@ namespace ThreadedTests {
             while( 1 ) {
                 scoped lk(m);
                 k = 1;
-                sleepmicros(20); // 20 -> conceptually on the order of 50,000 per second
+                // not very long, we'd like to simulate about 100K locks per second
+                sleepalittle();
                 k = 0; 
                 locks++;
                 if( done ||  t.millis() > 1500 )
@@ -676,7 +690,6 @@ namespace ThreadedTests {
         void setupTests() {
             add< Slack<mutex,mutex::scoped_lock> >();
             add< Slack<SimpleMutex,SimpleMutex::scoped_lock> >();
-            add< Slack<SimpleRWLock,SimpleRWLock::Shared> >();
             add< Slack<SimpleRWLock,SimpleRWLock::Exclusive> >();
             add< Hierarchical1 >();
 
