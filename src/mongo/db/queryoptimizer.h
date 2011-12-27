@@ -471,7 +471,7 @@ namespace mongo {
         shared_ptr<QueryOp> nextOpBeginningClause();
         shared_ptr<QueryOp> nextOpHandleEndOfClause();
         bool uselessOr( const BSONElement &hint ) const;
-        const char * _ns;
+        const string _ns;
         bool _or;
         BSONObj _query;
         shared_ptr<OrRangeGenerator> _org; // May be null in certain non $or query cases.

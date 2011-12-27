@@ -422,6 +422,8 @@ namespace mongo {
     public:
         shared_ptr<ParsedQuery> pq;
         shared_ptr<Projection> fields; // which fields query wants returned
+        // TODO Maybe helper objects should manage their own memory rather than rely on the
+        // original message being valid.
         Message originalMessage; // this is effectively an auto ptr for data the matcher points to
 
 
