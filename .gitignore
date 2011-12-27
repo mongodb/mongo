@@ -36,8 +36,8 @@ massif.out.*
 *.psess
 *#
 .#*
-shell/mongo.cpp
-shell/mongo-server.cpp
+/src/mongo/shell/mongo.cpp
+/src/mongo/shell/mongo-server.cpp
 
 */Debug/
 */*/Debug/
@@ -66,7 +66,7 @@ docs/doxygen
 scratch
 
 # binaries
-mongo
+/mongo
 mongod
 mongogrid
 mongos
