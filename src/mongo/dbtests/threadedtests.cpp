@@ -542,7 +542,8 @@ namespace ThreadedTests {
                     log() << x << ' ' << ch << " got" << endl;
                     if( ch == 'U' ) {
 #ifdef MONGO_USE_SRW_ON_WINDOWS
-                        if( t.millis() > 200 ) {
+                        // SRW locks are neither fair nor FIFO, as per docs
+                        if( t.millis() > 2000 ) {
 #else
                         if( t.millis() > 20 ) {
 #endif
