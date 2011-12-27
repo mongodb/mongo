@@ -586,6 +586,54 @@ namespace ThreadedTests {
     };
 #endif
 
+    template <class whichmutex, class scoped>
+    class Slack : public ThreadedTest<17> {
+    public:
+        Slack() : m("slack") {
+            k = 0;
+            done = false;
+            a = b = 0;
+            locks = 0;
+        }
+    private:
+        whichmutex m;
+        unsigned a, b;
+        virtual void validate() { 
+            cout << "Slack useful work fraction: " << ((double)a)/b << " locks:" << locks << endl;
+        }
+        unsigned locks;
+        volatile int k;
+        void watch() {
+            while( 1 ) { 
+                b++;
+                if( k ) { 
+                    a++;
+                }
+                sleepmillis(0);
+                if( done ) 
+                    break;
+            }
+        }
+        bool done;
+        virtual void subthread(int x) {
+            if( x == 1 ) { 
+                watch();
+                return;
+            }
+            Timer t;
+            while( 1 ) {
+                scoped lk(m);
+                k = 1;
+                sleepmicros(20); // 20 -> conceptually on the order of 50,000 per second
+                k = 0; 
+                locks++;
+                if( done ||  t.millis() > 1500 )
+                    break;
+            }
+            done = true;
+        }
+    };
+
     class WriteLocksAreGreedy : public ThreadedTest<3> {
     public:
         WriteLocksAreGreedy() : m("gtest") {}
@@ -626,6 +674,10 @@ namespace ThreadedTests {
         All() : Suite( "threading" ) { }
 
         void setupTests() {
+            add< Slack<mutex,mutex::scoped_lock> >();
+            add< Slack<SimpleMutex,SimpleMutex::scoped_lock> >();
+            add< Slack<SimpleRWLock,SimpleRWLock::Shared> >();
+            add< Slack<SimpleRWLock,SimpleRWLock::Exclusive> >();
             add< Hierarchical1 >();
 
             add< WriteLocksAreGreedy >();
