@@ -614,7 +614,7 @@ namespace ThreadedTests {
                     break;
             }
         }
-        bool done;
+        volatile bool done;
         virtual void subthread(int x) {
             if( x == 1 ) { 
                 watch();
