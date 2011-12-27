@@ -1069,6 +1069,16 @@ namespace mongo {
     struct JSUnitTest : public UnitTest {
         void run() {
 
+            {
+                // a quick check that we are using our mongo assert macro
+                int x = 1;
+                assert( ++x );
+                if( x != 2 ) { 
+                    log() << "bad build - wrong assert macro" << endl;
+                    ::abort();    
+                }
+            }
+
             BSONObj j1((const char *) &js1);
             BSONObj j2((const char *) &js2);
             Matcher m(j2);
