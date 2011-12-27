@@ -152,3 +152,4 @@ result = master.getDB("foo").runCommand({getLastError:1,w:"on2",wtimeout:timeout
 printjson(result);
 assert.eq(result.err, "timeout");
 
+print("\n\ntags.js SUCCESS\n\n");

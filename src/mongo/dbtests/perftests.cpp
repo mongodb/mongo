@@ -490,10 +490,22 @@ namespace PerfTests {
         virtual bool showDurStats() { return false; }
         void timed() {
             sleepmillis(0);
-            mongo::Timer t;
             aaa++;
         }
     };
+
+#if defined(__USE_XOPEN2K)
+    class Yield : public B {
+    public:
+        string name() { return "Yield"; }
+        virtual int howLongMillis() { return 400; }
+        virtual bool showDurStats() { return false; }
+        void timed() {
+            pthread_yield();
+            aaa++;
+        }
+    };
+#endif
 
     RWLock lk("testrw");
     SimpleMutex m("simptst");
@@ -1005,6 +1017,9 @@ namespace PerfTests {
                 add< Throw >();
                 add< Timer >();
                 add< Sleep0Ms >();
+#if defined(__USE_XOPEN2K)
+                add< Yield >();
+#endif
                 add< rlock >();
                 add< wlock >();
                 //add< ulock >();
