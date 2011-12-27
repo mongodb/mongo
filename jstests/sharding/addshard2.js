@@ -50,3 +50,5 @@ assert(!s.admin.runCommand({"addshard" : "add_shard2_rs2/"+getHostName()+":31203
        "accepted bad hostname in step 6");
 
 s.stop();
+rs1.stopSet();
+rs2.stopSet();

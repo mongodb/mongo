@@ -78,6 +78,7 @@ def readErrorCodes( callback, replaceZero = False ):
             of = open( x + ".tmp", 'w' )
             of.write( "".join( lines ) )
             of.close()
+            os.remove(x)
             os.rename( x + ".tmp", x )
         
 

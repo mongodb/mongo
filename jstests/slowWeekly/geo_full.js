@@ -322,6 +322,7 @@ var numTests = 100
 // each individual test will be reproducible given
 // that seed and test number
 var seed = new Date().getTime()
+//seed = 175 + 288 + 12
 
 for ( var test = 0; test < numTests; test++ ) {
 	
@@ -336,7 +337,8 @@ for ( var test = 0; test < numTests; test++ ) {
 	//env.bits = 11
 	var query = randQuery( env )
 	var data = randDataType()
-	//data.numDocs = 100; data.maxLocs = 3;
+	//data.numDocs = 5; data.maxLocs = 1;
+	var paddingSize = Math.floor( Random.rand() * 10 + 1 )
 	var results = {}
 	var totalPoints = 0
 	print( "Calculating target results for " + data.numDocs + " docs with max " + data.maxLocs + " locs " )
@@ -381,15 +383,20 @@ for ( var test = 0; test < numTests; test++ ) {
 		t.insert( doc )
 		
 	}
-
+	
+	var padding = "x"
+	for( var i = 0; i < paddingSize; i++ ) padding = padding + padding
+	
+	print( padding )
+	
 	printjson( { seed : seed,
 				 test: test,
 				 env : env,
 				 query : query,
 				 data : data,
-				 results : results } )
-				 
-	
+				 results : results,
+				 paddingSize : paddingSize } )
+								 
 	// exact
 	print( "Exact query..." )
 	assert.eq( results.exact.docsIn, t.find( { "locs.loc" : randLocType( query.exact ), "exact.docIn" : randYesQuery() } ).count() )
@@ -399,11 +406,28 @@ for ( var test = 0; test < numTests; test++ ) {
 	print( "Min box : " + minBoxSize( env, query.radius ) )
 	assert.eq( results.center.docsIn, t.find( { "locs.loc" : { $within : { $center : [ query.center, query.radius ], $uniqueDocs : 1 } }, "center.docIn" : randYesQuery() } ).count() )
 	assert.eq( results.center.locsIn, t.find( { "locs.loc" : { $within : { $center : [ query.center, query.radius ], $uniqueDocs : false } }, "center.docIn" : randYesQuery() } ).count() )
+	
+	print( "Center query update..." )
+	// printjson( t.find( { "locs.loc" : { $within : { $center : [ query.center, query.radius ], $uniqueDocs : 1 } }, "center.docIn" : randYesQuery() } ).toArray() )
+	t.update( { "locs.loc" : { $within : { $center : [ query.center, query.radius ], $uniqueDocs : true } }, "center.docIn" : randYesQuery() }, { $set : { "centerPaddingA" : padding } }, false, true )
+	assert.eq( results.center.docsIn, t.getDB().getLastErrorObj().n )
+	t.update( { "locs.loc" : { $within : { $center : [ query.center, query.radius ], $uniqueDocs : false } }, "center.docIn" : randYesQuery() }, { $set : { "centerPaddingB" : padding } }, false, true )
+    assert.eq( results.center.locsIn, t.getDB().getLastErrorObj().n )
+	
 	if( query.sphereRadius >= 0 ){
+	    
 		print( "Center sphere query...")
 		// $centerSphere
 		assert.eq( results.sphere.docsIn, t.find( { "locs.loc" : { $within : { $centerSphere : [ query.sphereCenter, query.sphereRadius ] } }, "sphere.docIn" : randYesQuery() } ).count() )
 		assert.eq( results.sphere.locsIn, t.find( { "locs.loc" : { $within : { $centerSphere : [ query.sphereCenter, query.sphereRadius ], $uniqueDocs : 0.0 } }, "sphere.docIn" : randYesQuery() } ).count() )
+		
+		print( "Center sphere query update..." )
+		// printjson( t.find( { "locs.loc" : { $within : { $center : [ query.center, query.radius ], $uniqueDocs : 1 } }, "center.docIn" : randYesQuery() } ).toArray() )
+		t.update( { "locs.loc" : { $within : { $centerSphere : [ query.sphereCenter, query.sphereRadius ], $uniqueDocs : true } }, "sphere.docIn" : randYesQuery() }, { $set : { "spherePaddingA" : padding } }, false, true )
+		assert.eq( results.sphere.docsIn, t.getDB().getLastErrorObj().n )
+		t.update( { "locs.loc" : { $within : { $centerSphere : [ query.sphereCenter, query.sphereRadius ], $uniqueDocs : false } }, "sphere.docIn" : randYesQuery() }, { $set : { "spherePaddingB" : padding } }, false, true )
+		assert.eq( results.sphere.locsIn, t.getDB().getLastErrorObj().n )
+		
 	}
 	
 	// $box
@@ -425,7 +449,6 @@ for ( var test = 0; test < numTests; test++ ) {
 		// $centerSphere
 		assert.eq( results.sphere.locsIn > 100 ? 100 : results.sphere.locsIn, t.find( { "locs.loc" : { $nearSphere : query.sphereCenter, $maxDistance : query.sphereRadius } } ).count( true ) )
 	}
-	
 	
 	// geoNear
 	// results limited by size of objects
@@ -479,9 +502,11 @@ for ( var test = 0; test < numTests; test++ ) {
 		
 	}
 	
-	//break;
-	
-	
+	// $polygon
+    print( "Polygon remove..." )
+    t.remove( { "locs.loc" : { $within : { $polygon : query.boxPoly } }, "poly.docIn" : randYesQuery() } )
+    assert.eq( results.poly.docsIn, t.getDB().getLastErrorObj().n )
+    	
 }
 
 

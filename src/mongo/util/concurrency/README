@@ -1,0 +1,39 @@
+util/concurrency/ files
+
+msg.h - message passing between threads
+
+mutex.h - small enhancements that wrap boost::mutex
+ also SimpleMutex
+
+mvar.h
+ This is based on haskell's MVar synchronization primitive:
+ http://www.haskell.org/ghc/docs/latest/html/libraries/base/Control-Concurrent-MVar.html
+ It is a thread-safe queue that can hold at most one object.
+ You can also think of it as a box that can be either full or empty.
+
+race.h
+  RACECHECK
+
+rwlock.h - read/write locks (RWLock)
+  RWLock
+  RWLockRecursive
+  RWLockRecursiveNongreedy
+
+spin_lock.h
+
+synchronization.h 
+  Notification, NotifyAll
+
+threadlocal.h
+
+thread_pool.h 
+
+value.h
+  Guarded
+  DiagStr
+  mapsf
+
+goofy things that need reworking:
+  list.h
+  task.h
+

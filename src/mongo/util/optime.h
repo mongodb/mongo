@@ -1,0 +1,170 @@
+// optime.h - OpTime class
+
+/*    Copyright 2009 10gen Inc.
+ *
+ *    Licensed under the Apache License, Version 2.0 (the "License");
+ *    you may not use this file except in compliance with the License.
+ *    You may obtain a copy of the License at
+ *
+ *    http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *    Unless required by applicable law or agreed to in writing, software
+ *    distributed under the License is distributed on an "AS IS" BASIS,
+ *    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *    See the License for the specific language governing permissions and
+ *    limitations under the License.
+ */
+
+#pragma once
+
+//#include "../db/concurrency.h"
+
+namespace mongo {
+    void exitCleanly( ExitCode code );
+
+    struct ClockSkewException : public DBException {
+        ClockSkewException() : DBException( "clock skew exception" , 20001 ) {}
+    };
+
+    /* replsets used to use RSOpTime.
+       M/S uses OpTime.
+       But this is useable from both.
+       */
+    typedef unsigned long long ReplTime;
+
+    /* Operation sequence #.  A combination of current second plus an ordinal value.
+     */
+#pragma pack(4)
+    class OpTime {
+        unsigned i; // ordinal comes first so we can do a single 64 bit compare on little endian
+        unsigned secs;
+        static OpTime last;
+        static OpTime skewed();
+    public:
+        static void setLast(const Date_t &date) {
+            notifier().notify_all(); // won't really do anything until write-lock released
+
+            last = OpTime(date);
+        }
+        unsigned getSecs() const {
+            return secs;
+        }
+        unsigned getInc() const {
+            return i;
+        }
+        OpTime(Date_t date) {
+            reinterpret_cast<unsigned long long&>(*this) = date.millis;
+            dassert( (int)secs >= 0 );
+        }
+        OpTime(ReplTime x) {
+            reinterpret_cast<unsigned long long&>(*this) = x;
+            dassert( (int)secs >= 0 );
+        }
+        OpTime(unsigned a, unsigned b) {
+            secs = a;
+            i = b;
+            dassert( (int)secs >= 0 );
+        }
+        OpTime( const OpTime& other ) { 
+            secs = other.secs;
+            i = other.i;
+            dassert( (int)secs >= 0 );
+        }
+        OpTime() {
+            secs = 0;
+            i = 0;
+        }
+        // it isn't generally safe to not be locked for this. so use now(). some tests use this.
+        static OpTime now_inlock() {
+            notifier().notify_all(); // won't really do anything until write-lock released
+
+            unsigned t = (unsigned) time(0);
+            if ( last.secs == t ) {
+                last.i++;
+                return last;
+            }
+            if ( t < last.secs ) {
+                return skewed(); // separate function to keep out of the hot code path
+            }
+            last = OpTime(t, 1);
+            return last;
+        }
+        static OpTime now();
+        static OpTime last_inlock();
+
+        // Waits for global OpTime to be different from *this
+        // Must be atLeastReadLocked
+        // Defined in instance.cpp (only current user) as it needs dbtemprelease
+        void waitForDifferent(unsigned millis);
+
+        /* We store OpTime's in the database as BSON Date datatype -- we needed some sort of
+         64 bit "container" for these values.  While these are not really "Dates", that seems a
+         better choice for now than say, Number, which is floating point.  Note the BinData type
+         is perhaps the cleanest choice, lacking a true unsigned64 datatype, but BinData has 5
+         bytes of overhead.
+         */
+        unsigned long long asDate() const {
+            return reinterpret_cast<const unsigned long long*>(&i)[0];
+        }
+        long long asLL() const {
+            return reinterpret_cast<const long long*>(&i)[0];
+        }
+
+        bool isNull() const { return secs == 0; }
+
+        string toStringLong() const {
+            char buf[64];
+            time_t_to_String(secs, buf);
+            stringstream ss;
+            ss << time_t_to_String_short(secs) << ' ';
+            ss << hex << secs << ':' << i;
+            return ss.str();
+        }
+
+        string toStringPretty() const {
+            stringstream ss;
+            ss << time_t_to_String_short(secs) << ':' << hex << i;
+            return ss.str();
+        }
+
+        string toString() const {
+            stringstream ss;
+            ss << hex << secs << ':' << i;
+            return ss.str();
+        }
+
+        bool operator==(const OpTime& r) const {
+            return i == r.i && secs == r.secs;
+        }
+        bool operator!=(const OpTime& r) const {
+            return !(*this == r);
+        }
+        bool operator<(const OpTime& r) const {
+            if ( secs != r.secs )
+                return secs < r.secs;
+            return i < r.i;
+        }
+        bool operator<=(const OpTime& r) const {
+            return *this < r || *this == r;
+        }
+        bool operator>(const OpTime& r) const {
+            return !(*this <= r);
+        }
+        bool operator>=(const OpTime& r) const {
+            return !(*this < r);
+        }
+    private:
+
+        // The following functions are to get around the need to define class-level statics in a cpp
+        static boost::condition& notifier() {
+            static boost::condition* holder = new boost::condition();
+            return *holder;
+        };
+        static boost::mutex& notifyMutex() {
+            static boost::mutex* holder = new boost::mutex();
+            return *holder;
+        };
+    };
+#pragma pack()
+
+} // namespace mongo

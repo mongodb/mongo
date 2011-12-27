@@ -19,7 +19,7 @@ printjson( rs.status() );
 
 var config = startMongodEmpty("--configsvr", "--port", 29999, "--dbpath", "/data/db/" + name + "_config" );
 
-var mongos = startMongos("--port", 30000, "--configdb", getHostName() + ":29999")
+var mongos = startMongos({ port : 30000, configdb : getHostName() + ":29999" })
 var admin = mongos.getDB("admin")
 var url = name + "/";
 for ( i=0; i<port.length; i++ ) {

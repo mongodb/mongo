@@ -43,8 +43,11 @@ t.add( EventGenerator.dispatch, g.getEvents() );
 
 t.run( "one or more tests failed" );
 
-assert( m.getDB( "test" )[ baseName ].validate().valid );
-assert( s.getDB( "test" )[ baseName ].validate().valid );
+masterValidation = m.getDB( "test" )[ baseName ].validate();
+assert( masterValidation.valid, tojson( masterValidation ) );
+
+slaveValidation = s.getDB( "test" )[ baseName ].validate();
+assert( slaveValidation.valid, tojson( slaveValidation ) );
 
 assert.soon( function() { 
             mh = m.getDB( "test" ).runCommand( "dbhash" );

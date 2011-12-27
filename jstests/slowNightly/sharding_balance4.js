@@ -83,7 +83,7 @@ function check( msg , dontAssert ){
     return true;
 }
 
-function diff(){
+function diff1(){
     var myid = doUpdate( false )
     var le = db.getLastErrorCmd();
 
@@ -114,12 +114,12 @@ function sum(){
     return x.shard0000 + x.shard0001;
 }
 
-assert.lt( 20 , diff() ,"initial load" );
-print( diff() )
+assert.lt( 20 , diff1() ,"initial load" );
+print( diff1() )
 
 assert.soon( function(){
     
-    var d = diff();
+    var d = diff1();
     return d < 5;
 } , "balance didn't happen" , 1000 * 60 * 3 , 1 );
     

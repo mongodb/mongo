@@ -38,10 +38,14 @@ var reconnect = function(a) {
       try {
         // make this work with either dbs or connections
         if (typeof(a.getDB) == "function") {
-          a.getDB("foo").bar.stats();
+          db = a.getDB('foo');
         }
         else {
-          a.bar.stats();
+          db = a;
+        }
+        db.bar.stats();
+        if (jsTest.options().keyFile) { // SERVER-4241: Shell connections don't re-authenticate on reconnect
+          jsTest.authenticate(db.getMongo());
         }
         return true;
       } catch(e) {

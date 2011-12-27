@@ -7,6 +7,18 @@
 
 var debugging = 0;
 
+function ifReady(db, f) {
+    var stats = db.adminCommand({ replSetGetStatus: 1 });
+    
+
+    // only eval if state isn't recovery
+    if (stats && stats.myState != 3) {
+        return f();
+    }
+
+    return false;
+}
+
 function pause(s) {
     print(s);
     while (debugging) {
@@ -105,7 +117,7 @@ doTest = function (signal) {
     assert(a.bar.count() == 3, "t.count");
 
     // wait for secondary to get this data
-    wait(function () { return b.bar.count() == 3; });
+    wait(function () { return ifReady(b, function() { return b.bar.count() == 3 }); });
 
     A.runCommand({ replSetTest: 1, blind: true });
     reconnect(a,b);

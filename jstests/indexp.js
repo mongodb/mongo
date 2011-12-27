@@ -15,50 +15,54 @@ function expectNoRecordedPlan( query ) {
 t.drop();
 t.ensureIndex( {a:1} );
 t.save( {a:1} );
-t.find( {a:1} ).itcount();
-expectRecordedPlan( {a:1}, "a_1" );
+t.find( {a:1,x:1} ).itcount();
+expectRecordedPlan( {a:1,x:1}, "a_1" );
 
 // Index type changes
 t.drop();
 t.ensureIndex( {a:1} );
 t.save( {a:1} );
-t.find( {a:1} ).itcount();
+t.find( {a:1,x:1} ).itcount();
 t.save( {a:[1,2]} );
-expectRecordedPlan( {a:1}, "a_1" );
+expectRecordedPlan( {a:1,x:1}, "a_1" );
 
 // Multi key QueryPattern reuses index
 t.drop();
 t.ensureIndex( {a:1} );
-t.save( {a:[1,2]} );
-t.find( {a:{$gt:0}} ).itcount();
-expectRecordedPlan( {a:{$gt:0,$lt:5}}, "a_1" );
+t.ensureIndex( {x:1} );
+t.save( {a:[1,2],x:1} );
+for( i = 0; i < 5; ++i ) {
+    t.save( {a:-1,x:i} );
+}
+t.find( {a:{$gt:0},x:{$gt:0}} ).itcount();
+expectRecordedPlan( {a:{$gt:0,$lt:5},x:{$gt:0}}, "a_1" );
 
 // Single key QueryPattern can still be used to find best plan - at least for now.
 t.drop();
 t.ensureIndex( {a:1} );
 t.save( {a:1} );
-t.find( {a:{$gt:0,$lt:5}} ).itcount();
+t.find( {a:{$gt:0,$lt:5},x:1} ).itcount();
 t.save( {a:[1,2]} );
-expectRecordedPlan( {a:{$gt:0,$lt:5}}, "a_1" );
+expectRecordedPlan( {a:{$gt:0,$lt:5},x:1}, "a_1" );
 
 // Invalid query with only valid fields used 
 // SERVER-2864
 t.drop();
 t.ensureIndex( {a:1} );
 t.save( {a:1}  );
-t.find( {a:1,b:{$gt:5,$lt:0}} ).itcount();
-expectRecordedPlan( {a:1,b:{$gt:0,$lt:5}}, "a_1" );
+t.find( {a:1,b:{$gt:5,$lt:0},x:1} ).itcount();
+expectRecordedPlan( {a:1,b:{$gt:0,$lt:5},x:1}, "a_1" );
 
 // SERVER-2864
 t.drop();
 t.ensureIndex( {a:1} );
 t.save( {a:1} );
-t.find( {a:{$gt:5,$lt:0}} ).itcount();
-expectNoRecordedPlan( {a:{$gt:0,$lt:5}}, "a_1" );
+t.find( {a:{$gt:5,$lt:0},x:1} ).itcount();
+expectNoRecordedPlan( {a:{$gt:0,$lt:5},x:1}, "a_1" );
 
 // Dummy query plan not stored
 t.drop();
 t.ensureIndex( {a:1} );
 t.save( {a:1} );
-t.find( {a:{$gt:5,$lt:0}} ).itcount();
-expectNoRecordedPlan( {a:{$gt:5,$lt:0}} );
+t.find( {a:{$gt:5,$lt:0},x:1} ).itcount();
+expectNoRecordedPlan( {a:{$gt:5,$lt:0},x:1} );

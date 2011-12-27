@@ -1,5 +1,6 @@
 numShards = 3
 s = new ShardingTest( "parallel" , numShards , 2 , 2 , { sync : true } );
+s.setBalancer( false )
 
 s.adminCommand( { enablesharding : "test" } );
 s.adminCommand( { shardcollection : "test.foo" , key : { _id : 1 } } ); 
@@ -13,7 +14,7 @@ for ( i=0; i<N; i+=(N/12) ) {
     sh.moveChunk( "test.foo", { _id : i } , "shard000" + Math.floor( Math.random() * numShards ) )
 }
 
-
+s.setBalancer( true )
 for ( i=0; i<N; i++ )
     db.foo.insert( { _id : i } )
 db.getLastError();

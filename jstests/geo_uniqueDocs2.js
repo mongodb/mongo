@@ -62,14 +62,8 @@ arrLocs = [[20,30,['loc1','loca']],[40,50,['loc2','locb']]];
 t.save( {loc:arrLocs} );
 results = db.runCommand( { geoNear : collName , near : [50,50], num : 10, uniqueDocs : false, includeLocs : true } ).results;
 // The original loc arrays are returned as objects.
-expectedLocs = []
-arrLocs.forEach( function( x ) {
-             obj = {};
-             for( i = 0; i < x.length; ++i ) {
-             obj[ i ] = x[ i ];
-             }
-             expectedLocs.push( obj );
-             } );
+expectedLocs = arrLocs
+
 assert.contains( results[0].loc, expectedLocs );
 assert.contains( results[1].loc, expectedLocs );
 

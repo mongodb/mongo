@@ -58,7 +58,8 @@ counts.push( s.config.chunks.count() );
 
 assert( counts[counts.length-1] > counts[0] , "counts 1 : " + tojson( counts ) )
 sorted = counts.slice(0)
-sorted.sort();
+// Sort doesn't sort numbers correctly by default, resulting in fail
+sorted.sort( function(a, b){ return a - b } )
 assert.eq( counts , sorted , "counts 2 : " + tojson( counts ) )
 
 print( counts )

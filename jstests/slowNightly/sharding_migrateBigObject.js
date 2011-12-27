@@ -1,9 +1,9 @@
 
-var shardA = startMongodEmpty("--shardsvr", "--port", 30001, "--dbpath", "/data/migrateBigger0");
-var shardB = startMongodEmpty("--shardsvr", "--port", 30002, "--dbpath", "/data/migrateBigger1");
-var config = startMongodEmpty("--configsvr", "--port", 29999, "--dbpath", "/data/migrateBiggerC");
+var shardA = startMongodEmpty("--shardsvr", "--port", 30001, "--dbpath", "/data/migrateBigger0", "--nopreallocj");
+var shardB = startMongodEmpty("--shardsvr", "--port", 30002, "--dbpath", "/data/migrateBigger1", "--nopreallocj");
+var config = startMongodEmpty("--configsvr", "--port", 29999, "--dbpath", "/data/migrateBiggerC", "--nopreallocj");
 
-var mongos = startMongos("--port", 30000, "--configdb", "localhost:29999")
+var mongos = startMongos({ port : 30000, configdb : "localhost:29999" })
 
 var admin = mongos.getDB("admin")
 
