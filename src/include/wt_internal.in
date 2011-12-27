@@ -47,6 +47,8 @@ extern "C" {
  */
 struct __wt_addr;
     typedef struct __wt_addr WT_ADDR;
+struct __wt_block;
+    typedef struct __wt_block WT_BLOCK;
 struct __wt_btree;
     typedef struct __wt_btree WT_BTREE;
 struct __wt_btree_desc;

@@ -51,3 +51,48 @@ __wt_block_addr_to_buffer(
 	WT_RET(__wt_vpack_uint(p, 0, a));
 	return (0);
 }
+
+/*
+ * __wt_block_addr_valid --
+ *	Return if an address cookie is valid.
+ */
+int
+__wt_block_addr_valid(WT_SESSION_IMPL *session,
+    WT_BLOCK *block, const uint8_t *addrbuf, uint32_t addrbuf_size)
+{
+	uint32_t addr, size;
+
+	WT_UNUSED(session);
+	WT_UNUSED(addrbuf_size);
+
+	/* Crack the cookie. */
+	WT_RET(__wt_block_buffer_to_addr(addrbuf, &addr, &size, NULL));
+
+	/* All we care about is if it's past the end of the file. */
+	return ((WT_ADDR_TO_OFF(block, addr) +
+	    (off_t)size > block->fh->file_size) ? 0 : 1);
+}
+
+/*
+ * __wt_block_addr_string --
+ *	Return a printable string representation of an address cookie.
+ */
+int
+__wt_block_addr_string(WT_SESSION_IMPL *session,
+    WT_BLOCK *block, WT_BUF *buf, const uint8_t *addrbuf, uint32_t addrbuf_size)
+{
+	uint32_t addr, cksum, size;
+
+	WT_UNUSED(block);
+	WT_UNUSED(addrbuf_size);
+
+	/* Crack the cookie. */
+	WT_RET(__wt_block_buffer_to_addr(addrbuf, &addr, &size, &cksum));
+
+	/* Printable representation. */
+	WT_RET(__wt_buf_fmt(session, buf,
+	    "[%" PRIu32 "-%" PRIu32 ", %" PRIu32 ", %" PRIu32 "]",
+	    addr, addr + (size / 512 - 1), size, cksum));
+
+	return (0);
+}

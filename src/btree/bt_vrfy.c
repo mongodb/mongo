@@ -80,35 +80,14 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 {
 	WT_BTREE *btree;
 	WT_VSTUFF *vs, _vstuff;
-	int ret;
+	int empty, ret;
 
 	btree = session->btree;
 	ret = 0;
 
-	/*
-	 * We're done if the file has no data pages (this is what happens if
-	 * we verify a file immediately after creation).
-	 */
-	if (btree->fh->file_size <= WT_BTREE_DESC_SECTOR) {
-		if (btree->fh->file_size == WT_BTREE_DESC_SECTOR)
-			return (0);
-
-		__wt_errx(session, "the file is empty and cannot be verified");
-		return (WT_ERROR);
-	}
-
-	/*
-	 * The file size should be a multiple of the allocsize, offset by the
-	 * size of the descriptor sector, the first 512B of the file.
-	 */
-	if ((btree->fh->file_size -
-	    WT_BTREE_DESC_SECTOR) % btree->allocsize != 0) {
-		__wt_errx(session,
-		    "the file size is not valid for the allocation size");
-		    return (WT_ERROR);
-	}
-
-	WT_RET(__wt_bm_verify_start(session));
+	WT_RET(__wt_bm_verify_start(session, &empty));
+	if (empty)
+		return (0);
 
 	WT_CLEAR(_vstuff);
 	vs = &_vstuff;

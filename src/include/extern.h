@@ -8,17 +8,35 @@ extern int __wt_block_addr_to_buffer( uint8_t **p,
     uint32_t addr,
     uint32_t size,
     uint32_t cksum);
-extern void __wt_block_freelist_init(WT_SESSION_IMPL *session);
-extern int __wt_block_alloc(WT_SESSION_IMPL *session,
+extern int __wt_block_addr_valid(WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    const uint8_t *addrbuf,
+    uint32_t addrbuf_size);
+extern int __wt_block_addr_string(WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    WT_BUF *buf,
+    const uint8_t *addrbuf,
+    uint32_t addrbuf_size);
+extern int __wt_block_alloc( WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
     uint32_t *addrp,
     uint32_t size);
-extern int __wt_block_free(WT_SESSION_IMPL *session,
+extern int __wt_block_free_buf(WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    const uint8_t *addrbuf,
+    uint32_t addrbuf_size);
+extern int __wt_block_free( WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
     uint32_t addr,
     uint32_t size);
-extern int __wt_block_freelist_read(WT_SESSION_IMPL *session);
-extern int __wt_block_freelist_write(WT_SESSION_IMPL *session);
-extern void __wt_block_stat(WT_SESSION_IMPL *session);
-extern void __wt_block_dump(WT_SESSION_IMPL *session);
+extern void __wt_block_freelist_open(WT_SESSION_IMPL *session, WT_BLOCK *block);
+extern int __wt_block_freelist_read(WT_SESSION_IMPL *session, WT_BLOCK *block);
+extern void __wt_block_freelist_close(WT_SESSION_IMPL *session,
+    WT_BLOCK *block);
+extern int __wt_block_freelist_write(WT_SESSION_IMPL *session, WT_BLOCK *block);
+extern void __wt_block_discard(WT_SESSION_IMPL *session, WT_BLOCK *block);
+extern void __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block);
+extern void __wt_block_dump(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_bm_addr_valid( WT_SESSION_IMPL *session,
     const uint8_t *addrbuf,
     uint32_t addrbuf_size);
@@ -27,7 +45,10 @@ extern int __wt_bm_addr_string(WT_SESSION_IMPL *session,
     const uint8_t *addrbuf,
     uint32_t addrbuf_size);
 extern int __wt_bm_create(WT_SESSION_IMPL *session, const char *filename);
-extern int __wt_bm_open(WT_SESSION_IMPL *session);
+extern int __wt_bm_open(WT_SESSION_IMPL *session,
+    const char *filename,
+    const char *config,
+    int salvage);
 extern int __wt_bm_close(WT_SESSION_IMPL *session);
 extern int __wt_bm_free( WT_SESSION_IMPL *session,
     const uint8_t *addrbuf,
@@ -40,6 +61,7 @@ extern int __wt_bm_write(WT_SESSION_IMPL *session,
     WT_BUF *buf,
     uint8_t *addrbuf,
     uint32_t *addrbuf_size);
+extern int __wt_bm_stat(WT_SESSION_IMPL *session);
 extern int __wt_bm_salvage_start(WT_SESSION_IMPL *session);
 extern int __wt_bm_salvage_next(WT_SESSION_IMPL *session,
     WT_BUF *buf,
@@ -47,33 +69,55 @@ extern int __wt_bm_salvage_next(WT_SESSION_IMPL *session,
     uint32_t *addrbuf_lenp,
     int *eofp);
 extern int __wt_bm_salvage_end(WT_SESSION_IMPL *session, int success);
-extern int __wt_bm_verify_start(WT_SESSION_IMPL *session);
+extern int __wt_bm_verify_start(WT_SESSION_IMPL *session, int *emptyp);
 extern int __wt_bm_verify_end(WT_SESSION_IMPL *session);
 extern int __wt_bm_verify_addr(WT_SESSION_IMPL *session,
     const uint8_t *addrbuf,
     uint32_t addrbuf_size);
 extern int __wt_block_create(WT_SESSION_IMPL *session, const char *filename);
-extern int __wt_block_open(WT_SESSION_IMPL *session);
-extern int __wt_block_close(WT_SESSION_IMPL *session);
-extern int __wt_desc_write(WT_SESSION_IMPL *session, WT_FH *fh);
+extern int __wt_block_open(WT_SESSION_IMPL *session,
+    const char *filename,
+    const char *config,
+    int salvage,
+    void *retp);
+extern int __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block);
+extern int __wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh);
+extern int __wt_block_read_buf(WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    WT_BUF *buf,
+    const uint8_t *addrbuf,
+    uint32_t addrbuf_size);
 extern int __wt_block_read(WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
     WT_BUF *buf,
     uint32_t addr,
     uint32_t size,
     uint32_t cksum);
-extern int __wt_block_salvage_start(WT_SESSION_IMPL *session);
-extern int __wt_block_salvage_end(WT_SESSION_IMPL *session, int success);
+extern int __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block);
+extern int __wt_block_salvage_end(WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    int success);
 extern int __wt_block_salvage_next(WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
     WT_BUF *buf,
     uint8_t *addrbuf,
     uint32_t *addrbuf_lenp,
     int *eofp);
-extern int __wt_block_verify_start(WT_SESSION_IMPL *session);
-extern int __wt_block_verify_end(WT_SESSION_IMPL *session);
+extern int __wt_block_verify_start(WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    int *emptyp);
+extern int __wt_block_verify_end(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_block_verify_addr(WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
     const uint8_t *addrbuf,
     uint32_t addrbuf_size);
+extern int __wt_block_write_buf(WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    WT_BUF *buf,
+    uint8_t *addrbuf,
+    uint32_t *addrbuf_size);
 extern int __wt_block_write(WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
     WT_BUF *buf,
     uint32_t *addrp,
     uint32_t *sizep,

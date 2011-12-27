@@ -7,48 +7,44 @@
 
 #include "wt_internal.h"
 
+static int
+__bm_invalid(WT_SESSION_IMPL *session)
+{
+	__wt_errx(session, "invalid block manager handle");
+	return (WT_ERROR);
+}
+
 /*
  * __wt_bm_addr_valid --
- *	Return if a filesystem address cookie is valid for the file.
+ *	Return if an address cookie is valid.
  */
 int
 __wt_bm_addr_valid(
     WT_SESSION_IMPL *session, const uint8_t *addrbuf, uint32_t addrbuf_size)
 {
-	WT_BTREE *btree;
-	uint32_t addr, size;
+	WT_BLOCK *block;
 
-	btree = session->btree;
+	if ((block = session->btree->block) == NULL)
+		return (__bm_invalid(session));
 
-	/* Crack the cookie. */
-	WT_UNUSED(addrbuf_size);
-	WT_RET(__wt_block_buffer_to_addr(addrbuf, &addr, &size, NULL));
-
-	/* All we care about is if it's past the end of the file. */
-	return ((WT_ADDR_TO_OFF(btree, addr) +
-	    (off_t)size > btree->fh->file_size) ? 0 : 1);
+	return (__wt_block_addr_valid(session, block, addrbuf, addrbuf_size));
 }
 
 /*
  * __wt_bm_addr_string
- *	Return a printable string representation of a filesystem address cookie.
+ *	Return a printable string representation of an address cookie.
  */
 int
 __wt_bm_addr_string(WT_SESSION_IMPL *session,
     WT_BUF *buf, const uint8_t *addrbuf, uint32_t addrbuf_size)
 {
-	uint32_t addr, cksum, size;
+	WT_BLOCK *block;
 
-	/* Crack the cookie. */
-	WT_UNUSED(addrbuf_size);
-	WT_RET(__wt_block_buffer_to_addr(addrbuf, &addr, &size, &cksum));
+	if ((block = session->btree->block) == NULL)
+		return (__bm_invalid(session));
 
-	/* Printable representation. */
-	WT_RET(__wt_buf_fmt(session, buf,
-	    "[%" PRIu32 "-%" PRIu32 ", %" PRIu32 ", %" PRIu32 "]",
-	    addr, addr + (size / 512 - 1), size, cksum));
-
-	return (0);
+	return (
+	    __wt_block_addr_string(session, block, buf, addrbuf, addrbuf_size));
 }
 
 /*
@@ -66,9 +62,11 @@ __wt_bm_create(WT_SESSION_IMPL *session, const char *filename)
  *	Open a file.
  */
 int
-__wt_bm_open(WT_SESSION_IMPL *session)
+__wt_bm_open(WT_SESSION_IMPL *session,
+    const char *filename, const char *config, int salvage)
 {
-	return (__wt_block_open(session));
+	return (__wt_block_open(
+	    session, filename, config, salvage, &session->btree->block));
 }
 
 /*
@@ -78,7 +76,12 @@ __wt_bm_open(WT_SESSION_IMPL *session)
 int
 __wt_bm_close(WT_SESSION_IMPL *session)
 {
-	return (__wt_block_close(session));
+	WT_BLOCK *block;
+
+	if ((block = session->btree->block) == NULL)
+		return (__bm_invalid(session));
+
+	return (__wt_block_close(session, block));
 }
 
 /*
@@ -89,13 +92,12 @@ int
 __wt_bm_free(
     WT_SESSION_IMPL *session, const uint8_t *addrbuf, uint32_t addrbuf_size)
 {
-	uint32_t addr, size;
+	WT_BLOCK *block;
 
-	/* Crack the cookie. */
-	WT_UNUSED(addrbuf_size);
-	WT_RET(__wt_block_buffer_to_addr(addrbuf, &addr, &size, NULL));
+	if ((block = session->btree->block) == NULL)
+		return (__bm_invalid(session));
 
-	return (__wt_block_free(session, addr, size));
+	return (__wt_block_free_buf(session, block, addrbuf, addrbuf_size));
 }
 
 /*
@@ -106,36 +108,13 @@ int
 __wt_bm_read(WT_SESSION_IMPL *session,
     WT_BUF *buf, const uint8_t *addrbuf, uint32_t addrbuf_size)
 {
-	WT_BTREE *btree;
-	WT_BUF *tmp;
-	uint32_t addr, size, cksum;
-	int ret;
+	WT_BLOCK *block;
 
-	btree = session->btree;
-	ret = 0;
+	if ((block = session->btree->block) == NULL)
+		return (__bm_invalid(session));
 
-	/* Crack the cookie. */
-	WT_UNUSED(addrbuf_size);
-	WT_RET(__wt_block_buffer_to_addr(addrbuf, &addr, &size, &cksum));
-
-	/* Re-size the buffer as necessary. */
-	WT_RET(__wt_buf_initsize(session, buf, size));
-
-	/* Read the block. */
-	WT_RET(__wt_block_read(session, buf, addr, size, cksum));
-
-	/* Optionally verify the page. */
-	if (btree->fragbits == NULL)
-		return (0);
-
-	WT_RET(__wt_scr_alloc(session, 0, &tmp));
-	WT_ERR(__wt_bm_addr_string(session, tmp, addrbuf, addrbuf_size));
-	WT_ERR(__wt_verify_dsk(
-	    session, (char *)tmp->data, buf->mem, buf->size));
-
-err:	__wt_scr_free(&tmp);
-
-	return (ret);
+	return (
+	    __wt_block_read_buf(session, block, buf, addrbuf, addrbuf_size));
 }
 
 /*
@@ -146,32 +125,28 @@ int
 __wt_bm_write(WT_SESSION_IMPL *session,
     WT_BUF *buf, uint8_t *addrbuf, uint32_t *addrbuf_size)
 {
-	uint32_t addr, size, cksum;
+	WT_BLOCK *block;
 
-	uint8_t *endp;
+	if ((block = session->btree->block) == NULL)
+		return (__bm_invalid(session));
 
-	/*
-	 * We're passed a table's page image: WT_BUF->{data,size} are the image
-	 * and byte count.
-	 *
-	 * Diagnostics: verify the disk page: this violates layering, but it's
-	 * the place we can ensure we never write a corrupted page.
-	 */
-#ifdef HAVE_DIAGNOSTIC
-	{
-	int ret;
-	if ((ret = __wt_verify_dsk(session,
-	    "[write-check]", (WT_PAGE_DISK *)buf->data, buf->size)) != 0)
-		return (ret);
-	}
-#endif
+	return (
+	    __wt_block_write_buf(session, block, buf, addrbuf, addrbuf_size));
+}
 
-	WT_RET(__wt_block_write(session, buf, &addr, &size, &cksum));
+/*
+ * __wt_bm_stat --
+ *	Block-manager statistics.
+ */
+int
+__wt_bm_stat(WT_SESSION_IMPL *session)
+{
+	WT_BLOCK *block;
 
-	endp = addrbuf;
-	WT_RET(__wt_block_addr_to_buffer(&endp, addr, size, cksum));
-	*addrbuf_size = WT_PTRDIFF32(endp, addrbuf);
+	if ((block = session->btree->block) == NULL)
+		return (__bm_invalid(session));
 
+	__wt_block_stat(session, block);
 	return (0);
 }
 
@@ -182,7 +157,12 @@ __wt_bm_write(WT_SESSION_IMPL *session,
 int
 __wt_bm_salvage_start(WT_SESSION_IMPL *session)
 {
-	return (__wt_block_salvage_start(session));
+	WT_BLOCK *block;
+
+	if ((block = session->btree->block) == NULL)
+		return (__bm_invalid(session));
+
+	return (__wt_block_salvage_start(session, block));
 }
 
 /*
@@ -193,8 +173,13 @@ int
 __wt_bm_salvage_next(WT_SESSION_IMPL *session,
     WT_BUF *buf, uint8_t *addrbuf, uint32_t *addrbuf_lenp, int *eofp)
 {
-	return (
-	    __wt_block_salvage_next(session, buf, addrbuf, addrbuf_lenp, eofp));
+	WT_BLOCK *block;
+
+	if ((block = session->btree->block) == NULL)
+		return (__bm_invalid(session));
+
+	return (__wt_block_salvage_next(
+	    session, block, buf, addrbuf, addrbuf_lenp, eofp));
 }
 
 /*
@@ -204,7 +189,12 @@ __wt_bm_salvage_next(WT_SESSION_IMPL *session,
 int
 __wt_bm_salvage_end(WT_SESSION_IMPL *session, int success)
 {
-	return (__wt_block_salvage_end(session, success));
+	WT_BLOCK *block;
+
+	if ((block = session->btree->block) == NULL)
+		return (__bm_invalid(session));
+
+	return (__wt_block_salvage_end(session, block, success));
 }
 
 /*
@@ -212,9 +202,14 @@ __wt_bm_salvage_end(WT_SESSION_IMPL *session, int success)
  *	Start a block manager salvage.
  */
 int
-__wt_bm_verify_start(WT_SESSION_IMPL *session)
+__wt_bm_verify_start(WT_SESSION_IMPL *session, int *emptyp)
 {
-	return (__wt_block_verify_start(session));
+	WT_BLOCK *block;
+
+	if ((block = session->btree->block) == NULL)
+		return (__bm_invalid(session));
+
+	return (__wt_block_verify_start(session, block, emptyp));
 }
 
 /*
@@ -224,7 +219,12 @@ __wt_bm_verify_start(WT_SESSION_IMPL *session)
 int
 __wt_bm_verify_end(WT_SESSION_IMPL *session)
 {
-	return (__wt_block_verify_end(session));
+	WT_BLOCK *block;
+
+	if ((block = session->btree->block) == NULL)
+		return (__bm_invalid(session));
+
+	return (__wt_block_verify_end(session, block));
 }
 
 /*
@@ -235,5 +235,10 @@ int
 __wt_bm_verify_addr(WT_SESSION_IMPL *session,
      const uint8_t *addrbuf, uint32_t addrbuf_size)
 {
-	return (__wt_block_verify_addr(session, addrbuf, addrbuf_size));
+	WT_BLOCK *block;
+
+	if ((block = session->btree->block) == NULL)
+		return (__bm_invalid(session));
+
+	return (__wt_block_verify_addr(session, block, addrbuf, addrbuf_size));
 }

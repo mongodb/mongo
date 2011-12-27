@@ -2904,7 +2904,7 @@ __rec_cell_build_ovfl(
 	if (!__wt_rec_track_ovfl_reuse(
 	    session, page, kv->buf.data, kv->buf.size, &addr, &size)) {
 		/* Allocate a buffer big enough to hold the overflow chunk. */
-		size = WT_DISK_REQUIRED(session, kv->buf.size);
+		size = WT_DISK_REQUIRED(session->btree->block, kv->buf.size);
 		WT_RET(__wt_scr_alloc(session, size, &tmp));
 
 		/* Initialize the disk header and overflow chunk. */

@@ -113,7 +113,8 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 conf:	WT_ERR(__btree_conf(session, name, filename, config, flags));
 
 	/* Open the underlying block object. */
-	WT_ERR(__wt_bm_open(session));
+	WT_ERR(__wt_bm_open(session, btree->filename,
+	    btree->config, F_ISSET(btree, WT_BTREE_SALVAGE) ? 1 : 0));
 
 	/* Initialize the tree if not salvage or verify. */
 	if (!F_ISSET(btree, WT_BTREE_SALVAGE | WT_BTREE_VERIFY))
@@ -188,7 +189,6 @@ __btree_conf(WT_SESSION_IMPL *session,
 	WT_CONFIG_ITEM cval;
 	WT_CONNECTION_IMPL *conn;
 	WT_NAMED_COLLATOR *ncoll;
-	WT_NAMED_COMPRESSOR *ncomp;
 	uint32_t bitcnt;
 	int fixed;
 
@@ -254,22 +254,6 @@ __btree_conf(WT_SESSION_IMPL *session,
 
 	/* Huffman encoding */
 	WT_RET(__wt_btree_huffman_open(session, config));
-
-	/* Page compressor */
-	WT_RET(__wt_config_getones(session, config, "block_compressor", &cval));
-	if (cval.len > 0) {
-		TAILQ_FOREACH(ncomp, &conn->compqh, q) {
-			if (strncmp(ncomp->name, cval.str, cval.len) == 0) {
-				btree->compressor = ncomp->compressor;
-				break;
-			}
-		}
-		if (btree->compressor == NULL) {
-			__wt_errx(session, "unknown block_compressor '%.*s'",
-			    (int)cval.len, cval.str);
-			return (EINVAL);
-		}
-	}
 
 	WT_RET(__wt_stat_alloc_btree_stats(session, &btree->stats));
 
@@ -589,7 +573,6 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	__wt_btree_huffman_close(session);
 	__wt_free(session, btree->stats);
 
-	__wt_spin_destroy(session, &btree->freelist_lock);
 	WT_TRET(__wt_rwlock_destroy(session, btree->rwlock));
 	__wt_free(session, session->btree);
 

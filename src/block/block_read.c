@@ -8,21 +8,57 @@
 #include "wt_internal.h"
 
 /*
- * __wt_block_read --
- *	Read a block into a buffer.
+ * __wt_block_read_buf --
+ *	Read filesystem cookie referenced block into a buffer.
  */
 int
-__wt_block_read(WT_SESSION_IMPL *session,
+__wt_block_read_buf(WT_SESSION_IMPL *session, WT_BLOCK *block,
+    WT_BUF *buf, const uint8_t *addrbuf, uint32_t addrbuf_size)
+{
+	WT_BUF *tmp;
+	uint32_t addr, size, cksum;
+	int ret;
+
+	ret = 0;
+
+	/* Crack the cookie. */
+	WT_RET(__wt_block_buffer_to_addr(addrbuf, &addr, &size, &cksum));
+
+	/* Re-size the buffer as necessary. */
+	WT_RET(__wt_buf_initsize(session, buf, size));
+
+	/* Read the block. */
+	WT_RET(__wt_block_read(session, block, buf, addr, size, cksum));
+
+	/* Optionally verify the page. */
+	if (block->fragbits == NULL)
+		return (0);
+
+	WT_RET(__wt_scr_alloc(session, 0, &tmp));
+	WT_ERR(
+	    __wt_block_addr_string(session, block, tmp, addrbuf, addrbuf_size));
+	WT_ERR(__wt_verify_dsk(
+	    session, (char *)tmp->data, buf->mem, buf->size));
+
+err:	__wt_scr_free(&tmp);
+
+	return (ret);
+}
+
+/*
+ * __wt_block_read --
+ *	Read an addr/size pair referenced block into a buffer.
+ */
+int
+__wt_block_read(WT_SESSION_IMPL *session, WT_BLOCK *block,
     WT_BUF *buf, uint32_t addr, uint32_t size, uint32_t cksum)
 {
-	WT_BTREE *btree;
 	WT_BUF *tmp;
 	WT_ITEM src, dst;
 	WT_PAGE_DISK *dsk;
 	uint32_t page_cksum;
 	int ret;
 
-	btree = session->btree;
 	tmp = NULL;
 	ret = 0;
 
@@ -31,11 +67,11 @@ __wt_block_read(WT_SESSION_IMPL *session,
 
 	/* Do the read, validate the checksum. */
 	WT_RET(__wt_read(
-	    session, btree->fh, WT_ADDR_TO_OFF(btree, addr), size, buf->mem));
+	    session, block->fh, WT_ADDR_TO_OFF(block, addr), size, buf->mem));
 	buf->size = size;
 
 	dsk = buf->mem;
-	if (btree->checksum && cksum != 0 && dsk->cksum != 0) {
+	if (block->checksum && cksum != 0 && dsk->cksum != 0) {
 		dsk->cksum = 0;
 		page_cksum = __wt_cksum(dsk, size);
 		if (cksum != page_cksum) {
@@ -62,8 +98,8 @@ __wt_block_read(WT_SESSION_IMPL *session,
 		src.size = buf->size - WT_COMPRESS_SKIP;
 		dst.data = (uint8_t *)tmp->mem + WT_COMPRESS_SKIP;
 		dst.size = dsk->memsize - WT_COMPRESS_SKIP;
-		WT_ERR(btree->compressor->decompress(
-		    btree->compressor, &session->iface, &src, &dst));
+		WT_ERR(block->compressor->decompress(
+		    block->compressor, &session->iface, &src, &dst));
 		tmp->size = dsk->memsize;
 
 		__wt_buf_swap(tmp, buf);

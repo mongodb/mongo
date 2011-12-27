@@ -8,35 +8,71 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_block_write_buf --
+ *	Write a buffer into a block, returning the block's address cookie.
+ */
+int
+__wt_block_write_buf(WT_SESSION_IMPL *session,
+    WT_BLOCK *block, WT_BUF *buf, uint8_t *addrbuf, uint32_t *addrbuf_size)
+{
+	uint32_t addr, size, cksum;
+	uint8_t *endp;
+
+	WT_UNUSED(addrbuf_size);
+
+	/*
+	 * We're passed a table's page image: WT_BUF->{data,size} are the image
+	 * and byte count.
+	 *
+	 * Diagnostics: verify the disk page: this violates layering, but it's
+	 * the place we can ensure we never write a corrupted page.
+	 */
+#ifdef HAVE_DIAGNOSTIC
+	{
+	int ret;
+	if ((ret = __wt_verify_dsk(session,
+	    "[write-check]", (WT_PAGE_DISK *)buf->data, buf->size)) != 0)
+		return (ret);
+	}
+#endif
+
+	WT_RET(__wt_block_write(session, block, buf, &addr, &size, &cksum));
+
+	endp = addrbuf;
+	WT_RET(__wt_block_addr_to_buffer(&endp, addr, size, cksum));
+	*addrbuf_size = WT_PTRDIFF32(endp, addrbuf);
+
+	return (0);
+}
+
+/*
  * __wt_block_write --
- *	Write a buffer into a block, returning the block's addr, size and
+ *	Write a buffer into a block, returning the block's addr/size and
  * checksum.
  */
 int
-__wt_block_write(WT_SESSION_IMPL *session,
+__wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
     WT_BUF *buf, uint32_t *addrp, uint32_t *sizep, uint32_t *cksump)
 {
 	WT_ITEM src, dst;
-	WT_BTREE *btree;
 	WT_BUF *tmp;
 	WT_PAGE_DISK *dsk;
 	uint32_t addr, align_size, size, tmp_size;
 	int compression_failed, ret;
 
-	btree = session->btree;
 	tmp = NULL;
 	ret = 0;
 
 	/* Set the in-memory size, then align it to an allocation unit. */
 	dsk = buf->mem;
 	dsk->memsize = buf->size;
-	align_size = WT_ALIGN(buf->size, btree->allocsize);
+	align_size = WT_ALIGN(buf->size, block->allocsize);
 
 	/*
 	 * Optionally stream-compress the data, but don't compress blocks that
 	 * are already as small as they're going to get.
 	 */
-	if (btree->compressor == NULL || align_size == btree->allocsize) {
+	if (block->compressor == NULL || align_size == block->allocsize) {
 not_compressed:	/*
 		 * If not compressing the buffer, we need to zero out any unused
 		 * bytes at the end.
@@ -76,9 +112,9 @@ not_compressed:	/*
 		 * But some compressors may need more memory allocated
 		 * even though they may not need all of it.
 		 */
-		if (btree->compressor->pre_size != NULL) {
-			WT_ERR(btree->compressor->pre_size(btree->compressor,
-				&session->iface, &src, &dst));
+		if (block->compressor->pre_size != NULL) {
+			WT_ERR(block->compressor->pre_size(
+			    block->compressor, &session->iface, &src, &dst));
 			tmp_size = dst.size;
 		}
 		else
@@ -99,7 +135,7 @@ not_compressed:	/*
 		 * and that's what we use.
 		 */
 		compression_failed = 0;
-		WT_ERR(btree->compressor->compress(btree->compressor,
+		WT_ERR(block->compressor->compress(block->compressor,
 		    &session->iface, &src, &dst, &compression_failed));
 		if (compression_failed)
 			goto not_compressed;
@@ -111,7 +147,7 @@ not_compressed:	/*
 		 * it will be faster to read).
 		 */
 		tmp->size = dst.size + WT_COMPRESS_SKIP;
-		size = WT_ALIGN(tmp->size, btree->allocsize);
+		size = WT_ALIGN(tmp->size, block->allocsize);
 		if (size >= align_size)
 			goto not_compressed;
 		align_size = size;
@@ -126,7 +162,7 @@ not_compressed:	/*
 	}
 
 	/* Allocate blocks from the underlying file. */
-	WT_ERR(__wt_block_alloc(session, &addr, align_size));
+	WT_ERR(__wt_block_alloc(session, block, &addr, align_size));
 
 	/*
 	 * The disk write function sets things in the WT_PAGE_DISK header simply
@@ -143,18 +179,18 @@ not_compressed:	/*
 	 * internal page may not have been written to disk after the leaf page
 	 * was updated.
 	 */
-	WT_LSN_INCR(btree->lsn);
-	dsk->lsn = btree->lsn;
+	WT_LSN_INCR(block->lsn);
+	dsk->lsn = block->lsn;
 
 	/*
 	 * Update the block's checksum: checksum the compressed contents, not
 	 * the uncompressed contents.
 	 */
 	dsk->cksum = 0;
-	if (btree->checksum)
+	if (block->checksum)
 		dsk->cksum = __wt_cksum(dsk, align_size);
 	WT_ERR(__wt_write(
-	    session, btree->fh, WT_ADDR_TO_OFF(btree, addr), align_size, dsk));
+	    session, block->fh, WT_ADDR_TO_OFF(block, addr), align_size, dsk));
 
 	WT_BSTAT_INCR(session, page_write);
 	WT_CSTAT_INCR(session, block_write);

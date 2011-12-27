@@ -172,8 +172,8 @@ __salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	/*
 	 * Step 1:
 	 * Clear the salvaged file's root address, we're done with this file
-	 * until it's salvaged.  We do this first on because salvage writes
-	 * a root page when it wraps up, and the eviction of that page updates
+	 * until it's salvaged.  We do this first because salvage writes a
+	 * root page when it wraps up, and the eviction of that page updates
 	 * the root's address: if the root address were still set, eviction
 	 * would also free the previous root page, which would collide with
 	 * salvage freeing the previous root page when it reads those blocks
@@ -291,7 +291,7 @@ __salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	 * Inform the underlying block manager that we're done.
 	 */
 err:	if (started)
-		WT_TRET(__wt_bm_salvage_end(session, ret == 0 ? 0 : 1));
+		WT_TRET(__wt_bm_salvage_end(session, ret == 0 ? 1 : 0));
 
 	/* Discard the leaf and overflow page memory. */
 	WT_TRET(__slvg_cleanup(session, ss));
@@ -316,14 +316,12 @@ err:	if (started)
 static int
 __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 {
-	WT_BTREE *btree;
 	WT_BUF *as, *buf;
 	WT_PAGE_DISK *dsk;
 	uint32_t addrbuf_size;
 	uint8_t addrbuf[WT_BM_MAX_ADDR_COOKIE];
 	int eof, ret;
 
-	btree = session->btree;
 	ret = 0;
 
 	as = buf = NULL;
@@ -343,22 +341,6 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 
 		/* Create a printable version of the address. */
 		WT_ERR(__wt_bm_addr_string(session, as, addrbuf, addrbuf_size));
-
-		/*
-		 * After reading the file, we write pages in order to resolve
-		 * key range overlaps.   We give our newly written pages LSNs
-		 * larger than any LSN found in the file in case the salvage
-		 * run fails and is restarted later.  (Regardless of our LSNs,
-		 * it's possible our newly written pages will have to be merged
-		 * in a subsequent salvage run, at least if it's a row-store,
-		 * as the key ranges are not exact.  However, having larger LSNs
-		 * should make our newly written pages more likely to win over
-		 * previous pages, minimizing the work done in subsequent
-		 * salvage runs.)  Reset the tree's current LSN to the largest
-		 * LSN we read.
-		 */
-		if (btree->lsn < dsk->lsn)
-			btree->lsn = dsk->lsn;
 
 		/*
 		 * Make sure it's an expected page type for the file.

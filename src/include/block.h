@@ -62,12 +62,12 @@
  * by 512B.
  */
 /* Convert a data address to/from a byte offset. */
-#define	WT_ADDR_TO_OFF(btree, addr)					\
-	(WT_BTREE_DESC_SECTOR + (off_t)(addr) * (off_t)(btree)->allocsize)
-#define	WT_OFF_TO_ADDR(btree, off)					\
-	((uint32_t)((off - WT_BTREE_DESC_SECTOR) / (btree)->allocsize))
-#define	WT_FILE_OFF_MAX(btree)						\
-	WT_ADDR_TO_OFF(btree, UINT32_MAX - 1)
+#define	WT_ADDR_TO_OFF(block, addr)					\
+	(WT_BTREE_DESC_SECTOR + (off_t)(addr) * (off_t)(block)->allocsize)
+#define	WT_OFF_TO_ADDR(block, off)					\
+	((uint32_t)((off - WT_BTREE_DESC_SECTOR) / (block)->allocsize))
+#define	WT_FILE_OFF_MAX(block)						\
+	WT_ADDR_TO_OFF(block, UINT32_MAX - 1)
 
 /*
  * WT_FREE_ENTRY  --
@@ -77,8 +77,44 @@ struct __wt_free_entry {
 	TAILQ_ENTRY(__wt_free_entry) qa;	/* Address queue */
 	TAILQ_ENTRY(__wt_free_entry) qs;	/* Size queue */
 
-	uint32_t addr;				/* Disk offset */
-	uint32_t size;				/* Size */
+	uint32_t addr;                          /* Disk offset */
+	uint32_t size;                          /* Size */
+};
+
+/*
+ * WT_BLOCK --
+ *	Encapsulation of the standard WiredTiger block manager.
+ */
+struct __wt_block {
+	const char *name;		/* Name */
+
+	WT_FH	*fh;			/* Backing file handle */
+
+	uint64_t lsn;			/* LSN file/offset pair */
+
+	uint32_t allocsize;		/* Allocation size */
+	int	 checksum;		/* If checksums configured */
+
+	WT_COMPRESSOR *compressor;	/* Page compressor */
+
+					/* Freelist support */
+	WT_SPINLOCK freelist_lock;	/* Lock to protect the freelist. */
+	uint64_t freelist_bytes;	/* Free-list byte count */
+	uint32_t freelist_entries;	/* Free-list entry count */
+					/* Free-list queues */
+	TAILQ_HEAD(__wt_free_qah, __wt_free_entry) freeqa;
+	TAILQ_HEAD(__wt_free_qsh, __wt_free_entry) freeqs;
+	int	 freelist_dirty;	/* Free-list has been modified */
+	uint32_t free_addr;		/* Free-list addr/size/checksum  */
+	uint32_t free_size;
+	uint32_t free_cksum;
+
+					/* Salvage support */
+	off_t	 slvg_off;		/* Salvage file offset */
+
+					/* Verification support */
+	uint32_t frags;			/* Total frags */
+	uint8_t *fragbits;		/* Frag tracking bit list */
 };
 
 /*
@@ -120,8 +156,8 @@ struct __wt_btree_desc {
  * WT_DISK_REQUIRED--
  *	Return bytes needed for byte length, rounded to an allocation unit.
  */
-#define	WT_DISK_REQUIRED(session, size)					\
-	(WT_ALIGN((size) + WT_PAGE_DISK_SIZE, (session)->btree->allocsize))
+#define	WT_DISK_REQUIRED(block, size)					\
+	(WT_ALIGN((size) + WT_PAGE_DISK_SIZE, ((WT_BLOCK *)(block))->allocsize))
 
 /*
  * Don't compress the first 32B of the block (almost all of the WT_PAGE_DISK

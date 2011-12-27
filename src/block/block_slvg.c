@@ -12,33 +12,30 @@
  *	Start a file salvage.
  */
 int
-__wt_block_salvage_start(WT_SESSION_IMPL *session)
+__wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
-	WT_BTREE *btree;
 	off_t len;
 	uint32_t allocsize;
-
-	btree = session->btree;
 
 	/*
 	 * Truncate the file to an initial sector plus N allocation size
 	 * units (bytes trailing the last multiple of an allocation size
 	 * unit must be garbage, by definition).
 	 */
-	if (btree->fh->file_size > WT_BTREE_DESC_SECTOR) {
-		allocsize = btree->allocsize;
-		len = btree->fh->file_size - WT_BTREE_DESC_SECTOR;
+	if (block->fh->file_size > WT_BTREE_DESC_SECTOR) {
+		allocsize = block->allocsize;
+		len = block->fh->file_size - WT_BTREE_DESC_SECTOR;
 		len = (len / allocsize) * allocsize;
 		len += WT_BTREE_DESC_SECTOR;
-		if (len != btree->fh->file_size)
-			WT_RET(__wt_ftruncate(session, btree->fh, len));
+		if (len != block->fh->file_size)
+			WT_RET(__wt_ftruncate(session, block->fh, len));
 	}
 
 	/* Reset the description sector. */
-	WT_RET(__wt_desc_write(session, btree->fh));
+	WT_RET(__wt_desc_init(session, block->fh));
 
 	/* The first sector of the file is the description record, skip it. */
-	btree->slvg_off = WT_BTREE_DESC_SECTOR;
+	block->slvg_off = WT_BTREE_DESC_SECTOR;
 
 	/*
 	 * We don't currently need to do anything about the freelist because
@@ -53,12 +50,11 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session)
  *	End a file salvage.
  */
 int
-__wt_block_salvage_end(WT_SESSION_IMPL *session, int success)
+__wt_block_salvage_end(WT_SESSION_IMPL *session, WT_BLOCK *block, int success)
 {
+	/* If not successful, discard the free-list, it's not useful. */
 	if (!success)
-		return (0);
-
-	WT_RET(__wt_block_freelist_write(session));
+		__wt_block_discard(session, block);
 	return (0);
 }
 
@@ -67,10 +63,9 @@ __wt_block_salvage_end(WT_SESSION_IMPL *session, int success)
  *	Return the next block from the file.
  */
 int
-__wt_block_salvage_next(WT_SESSION_IMPL *session,
+__wt_block_salvage_next(WT_SESSION_IMPL *session, WT_BLOCK *block,
     WT_BUF *buf, uint8_t *addrbuf, uint32_t *addrbuf_lenp, int *eofp)
 {
-	WT_BTREE *btree;
 	WT_PAGE_DISK *dsk;
 	WT_FH *fh;
 	off_t max, off;
@@ -79,10 +74,9 @@ __wt_block_salvage_next(WT_SESSION_IMPL *session,
 
 	*eofp = 0;
 
-	btree = session->btree;
-	off = btree->slvg_off;
-	fh = btree->fh;
-	allocsize = btree->allocsize;
+	off = block->slvg_off;
+	fh = block->fh;
+	allocsize = block->allocsize;
 	WT_RET(__wt_buf_initsize(session, buf, allocsize));
 
 	/* Read through the file, looking for pages with valid checksums. */
@@ -103,7 +97,7 @@ __wt_block_salvage_next(WT_SESSION_IMPL *session,
 		 * The page can't be more than the min/max page size, or past
 		 * the end of the file.
 		 */
-		addr = WT_OFF_TO_ADDR(btree, off);
+		addr = WT_OFF_TO_ADDR(block, off);
 		size = dsk->size;
 		cksum = dsk->cksum;
 		if (size == 0 ||
@@ -113,13 +107,29 @@ __wt_block_salvage_next(WT_SESSION_IMPL *session,
 			goto skip;
 
 		/*
+		 * After reading the file, we write pages in order to resolve
+		 * key range overlaps.   We give our newly written pages LSNs
+		 * larger than any LSN found in the file in case the salvage
+		 * run fails and is restarted later.  (Regardless of our LSNs,
+		 * it's possible our newly written pages will have to be merged
+		 * in a subsequent salvage run, at least if it's a row-store,
+		 * as the key ranges are not exact.  However, having larger LSNs
+		 * should make our newly written pages more likely to win over
+		 * previous pages, minimizing the work done in subsequent
+		 * salvage runs.)  Reset the tree's current LSN to the largest
+		 * LSN we read.
+		 */
+		if (block->lsn < dsk->lsn)
+			block->lsn = dsk->lsn;
+
+		/*
 		 * The page size isn't insane, read the entire page: reading the
 		 * page validates the checksum and then decompresses the page as
 		 * needed.  If reading the page fails, it's probably corruption,
 		 * we ignore this block.
 		 */
 		WT_RET(__wt_buf_initsize(session, buf, size));
-		if (__wt_block_read(session, buf, addr, size, cksum)) {
+		if (__wt_block_read(session, block, buf, addr, size, cksum)) {
 skip:			WT_VERBOSE(session, salvage,
 			    "skipping %" PRIu32 "B at file offset %" PRIu64,
 			    allocsize, (uint64_t)off);
@@ -128,8 +138,9 @@ skip:			WT_VERBOSE(session, salvage,
 			 * Free the block and make sure we don't return it more
 			 * than once.
 			 */
-			WT_RET(__wt_block_free(session, addr, allocsize));
-			btree->slvg_off = off += allocsize;
+			WT_RET(
+			    __wt_block_free(session, block, addr, allocsize));
+			block->slvg_off = off += allocsize;
 			continue;
 		}
 
@@ -143,7 +154,7 @@ skip:			WT_VERBOSE(session, salvage,
 	*addrbuf_lenp = WT_PTRDIFF32(endp, addrbuf);
 
 	/* We're successfully returning the page, move past it. */
-	btree->slvg_off = off + size;
+	block->slvg_off = off + size;
 
 	return (0);
 }

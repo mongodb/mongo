@@ -44,15 +44,13 @@ struct __wt_btree {
 	void *huffman_key;		/* Key huffman encoding */
 	void *huffman_value;		/* Value huffman encoding */
 
-	WT_COMPRESSOR *compressor;	/* Page compressor */
+	void *block;			/* Block manager */
 
 	WT_PAGE *root_page;		/* Root page */
 	WT_ADDR  root_addr;		/* Replacement root address */
 	int	 root_update;		/* 0: free original root blocks
 					   1: free saved root blocks and
 					      update on close */
-
-	uint64_t lsn;			/* LSN file/offset pair */
 
 	WT_PAGE *evict_page;		/* Eviction thread's location */
 
@@ -68,29 +66,6 @@ struct __wt_btree {
 #define	WT_BTREE_SALVAGE	0x10	/* Handle is for salvage */
 #define	WT_BTREE_VERIFY		0x20	/* Handle is for verify */
 	uint32_t flags;
-
-	/*
-	 * XXX
-	 * BLOCK MANAGER STUFF.
-	 */
-	WT_FH	*fh;			/* Backing file handle */
-	off_t	 slvg_off;		/* Salvage file offset */
-
-	int	 checksum;		/* If checksums configured */
-
-	uint32_t frags;			/* Total frags */
-	uint8_t *fragbits;		/* Frag tracking bit list */
-
-	WT_SPINLOCK freelist_lock;	/* Lock to protect the freelist. */
-	uint64_t freelist_bytes;	/* Free-list byte count */
-	uint32_t freelist_entries;	/* Free-list entry count */
-					/* Free-list queues */
-	TAILQ_HEAD(__wt_free_qah, __wt_free_entry) freeqa;
-	TAILQ_HEAD(__wt_free_qsh, __wt_free_entry) freeqs;
-	int	 freelist_dirty;	/* Free-list has been modified */
-	uint32_t free_addr;		/* Free-list addr/size/checksum  */
-	uint32_t free_size;
-	uint32_t free_cksum;
 };
 
 /*
