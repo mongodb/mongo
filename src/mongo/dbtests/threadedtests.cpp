@@ -688,7 +688,7 @@ namespace ThreadedTests {
         All() : Suite( "threading" ) { }
 
         void setupTests() {
-            add< Slack<mutex,mutex::scoped_lock> >();
+            add< Slack<mongo::mutex,mongo::mutex::scoped_lock> >();
             add< Slack<SimpleMutex,SimpleMutex::scoped_lock> >();
             add< Slack<SimpleRWLock,SimpleRWLock::Exclusive> >();
             add< Hierarchical1 >();
