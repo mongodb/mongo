@@ -8,11 +8,11 @@
 #include "wt_internal.h"
 
 /*
- * __wt_bm_slvg_start --
- *	Start a salvage of the file.
+ * __wt_block_salvage_start --
+ *	Start a file salvage.
  */
 int
-__wt_bm_slvg_start(WT_SESSION_IMPL *session)
+__wt_block_salvage_start(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	off_t len;
@@ -49,11 +49,11 @@ __wt_bm_slvg_start(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_bm_slvg_end --
- *	End a salvage of the file.
+ * __wt_block_salvage_end --
+ *	End a file salvage.
  */
 int
-__wt_bm_slvg_end(WT_SESSION_IMPL *session, int success)
+__wt_block_salvage_end(WT_SESSION_IMPL *session, int success)
 {
 	if (!success)
 		return (0);
@@ -63,11 +63,11 @@ __wt_bm_slvg_end(WT_SESSION_IMPL *session, int success)
 }
 
 /*
- * __wt_bm_slvg_next --
+ * __wt_block_salvage_next --
  *	Return the next block from the file.
  */
 int
-__wt_bm_slvg_next(WT_SESSION_IMPL *session,
+__wt_block_salvage_next(WT_SESSION_IMPL *session,
     WT_BUF *buf, uint8_t *addrbuf, uint32_t *addrbuf_lenp, int *eofp)
 {
 	WT_BTREE *btree;

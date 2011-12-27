@@ -7,15 +7,16 @@
 
 #include "wt_internal.h"
 
+static int __verify_addfrag(WT_SESSION_IMPL *, uint32_t, uint32_t);
 static int __verify_checkfrag(WT_SESSION_IMPL *);
 static int __verify_freelist(WT_SESSION_IMPL *);
 
 /*
- * __wt_bm_verify_start --
- *	Start verification of the file.
+ * __wt_block_verify_start --
+ *	Start file verification.
  */
 int
-__wt_bm_verify_start(WT_SESSION_IMPL *session)
+__wt_block_verify_start(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 
@@ -43,11 +44,11 @@ __wt_bm_verify_start(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_bm_verify_end --
- *	End a verification of the file.
+ * __wt_block_verify_end --
+ *	End file verification.
  */
 int
-__wt_bm_verify_end(WT_SESSION_IMPL *session)
+__wt_block_verify_end(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	int ret;
@@ -64,11 +65,11 @@ __wt_bm_verify_end(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_bm_verify_addr --
- *	Check an address to make sure it's OK.
+ * __wt_block_verify_addr --
+ *	Verify an address.
  */
 int
-__wt_bm_verify_addr(WT_SESSION_IMPL *session,
+__wt_block_verify_addr(WT_SESSION_IMPL *session,
      const uint8_t *addrbuf, uint32_t addrbuf_size)
 {
 	uint32_t addr, size;
@@ -77,7 +78,7 @@ __wt_bm_verify_addr(WT_SESSION_IMPL *session,
 	WT_UNUSED(addrbuf_size);
 	WT_RET(__wt_block_buffer_to_addr(addrbuf, &addr, &size, NULL));
 
-	WT_RET(__wt_block_verify_addfrag(session, addr, size));
+	WT_RET(__verify_addfrag(session, addr, size));
 
 	return (0);
 }
@@ -108,20 +109,19 @@ __verify_freelist(WT_SESSION_IMPL *session)
 		WT_VERBOSE(session, verify,
 		    "free-list addr/frags %" PRIu32 "/%" PRIu32,
 		    fe->addr, fe->size / btree->allocsize);
-		WT_TRET(__wt_block_verify_addfrag(session, fe->addr, fe->size));
+		WT_TRET(__verify_addfrag(session, fe->addr, fe->size));
 	}
 
 	return (ret);
 }
 
 /*
- * __wt_block_verify_addfrag --
+ * __verify_addfrag --
  *	Add the fragments to the list, and complain if we've already verified
  *	this chunk of the file.
  */
-int
-__wt_block_verify_addfrag(
-    WT_SESSION_IMPL *session, uint32_t addr, uint32_t size)
+static int
+__verify_addfrag(WT_SESSION_IMPL *session, uint32_t addr, uint32_t size)
 {
 	WT_BTREE *btree;
 	uint32_t frags, i;

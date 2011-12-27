@@ -185,7 +185,7 @@ __salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	 * Step 2:
 	 * Inform the underlying block manager that we're salvaging the file.
 	 */
-	WT_ERR(__wt_bm_slvg_start(session));
+	WT_ERR(__wt_bm_salvage_start(session));
 	started = 1;
 
 	/*
@@ -291,7 +291,7 @@ __salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	 * Inform the underlying block manager that we're done.
 	 */
 err:	if (started)
-		WT_TRET(__wt_bm_slvg_end(session, ret == 0 ? 0 : 1));
+		WT_TRET(__wt_bm_salvage_end(session, ret == 0 ? 0 : 1));
 
 	/* Discard the leaf and overflow page memory. */
 	WT_TRET(__slvg_cleanup(session, ss));
@@ -331,7 +331,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 
 	for (;;) {
-		WT_ERR(__wt_bm_slvg_next(
+		WT_ERR(__wt_bm_salvage_next(
 		    session, buf, addrbuf, &addrbuf_size, &eof));
 		if (eof)
 			break;

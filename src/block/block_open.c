@@ -11,11 +11,11 @@ static int  __desc_read(WT_SESSION_IMPL *, int);
 static int  __desc_update(WT_SESSION_IMPL *);
 
 /*
- * __wt_bm_create --
- *	Create a new block manager file.
+ * __wt_block_create --
+ *	Create a file.
  */
 int
-__wt_bm_create(WT_SESSION_IMPL *session, const char *filename)
+__wt_block_create(WT_SESSION_IMPL *session, const char *filename)
 {
 	WT_FH *fh;
 	int exist, ret;
@@ -39,15 +39,20 @@ __wt_bm_create(WT_SESSION_IMPL *session, const char *filename)
 	/* Close the file handle. */
 	WT_TRET(__wt_close(session, fh));
 
+	/* Undo any create on error. */
+	if (ret != 0)
+		(void)__wt_remove(session, filename);
+
 	return (ret);
+
 }
 
 /*
- * __wt_bm_open --
- *	Open a block manager file.
+ * __wt_block_open --
+ *	Open a file.
  */
 int
-__wt_bm_open(WT_SESSION_IMPL *session)
+__wt_block_open(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
@@ -89,16 +94,16 @@ __wt_bm_open(WT_SESSION_IMPL *session)
 
 	return (0);
 
-err:	(void)__wt_bm_close(session);
+err:	(void)__wt_block_close(session);
 	return (ret);
 }
 
 /*
- * __wt_bm_close --
- *	Close a block manager file.
+ * __wt_block_close --
+ *	Close a file.
  */
 int
-__wt_bm_close(WT_SESSION_IMPL *session)
+__wt_block_close(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	int ret;
