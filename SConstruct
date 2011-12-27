@@ -670,7 +670,7 @@ elif "win32" == os.sys.platform:
     # /EHsc exception handling style for visual studio
     # /W3 warning level
     # /WX abort build on compiler warnings
-    env.Append( CPPFLAGS=" /EHsc /W3 /WX " )
+    env.Append( CPPFLAGS=" /EHsc /W3 " ) #  /WX " )
 
     # some warnings we don't like:
     # c4355
