@@ -57,6 +57,11 @@ namespace mongo {
 
 #elif( BOOST_VERSION < 103500 ) 
 
+#error old boost?
+
+# if !defined(BOOST_VERSION)
+#  error BOOST_VERSION is not defined 
+# endif
 # if defined(_WIN32)
 #  error need boost >= 1.35 for windows
 # endif

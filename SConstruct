@@ -360,7 +360,7 @@ commonFiles += [ "src/mongo/util/background.cpp" , "src/mongo/util/intrusive_cou
                  "src/mongo/util/util.cpp" , "src/mongo/util/file_allocator.cpp" ,
                  "src/mongo/util/assert_util.cpp" , "src/mongo/util/log.cpp" , "src/mongo/util/ramlog.cpp" , "src/mongo/util/md5main.cpp" , "src/mongo/util/base64.cpp", "src/mongo/util/concurrency/vars.cpp", "src/mongo/util/concurrency/task.cpp", "src/mongo/util/debug_util.cpp",
                  "src/mongo/util/concurrency/thread_pool.cpp", "src/mongo/util/password.cpp", "src/mongo/util/version.cpp", "src/mongo/util/signal_handlers.cpp",  
-                 "src/mongo/util/histogram.cpp", "src/mongo/util/concurrency/spin_lock.cpp", "src/mongo/util/text.cpp" , "src/mongo/util/stringutils.cpp" ,
+                 "src/mongo/util/concurrency/rwlockimpl.cpp", "src/mongo/util/histogram.cpp", "src/mongo/util/concurrency/spin_lock.cpp", "src/mongo/util/text.cpp" , "src/mongo/util/stringutils.cpp" ,
                  "src/mongo/util/concurrency/synchronization.cpp" ]
 commonFiles += [ "src/mongo/util/net/sock.cpp" , "src/mongo/util/net/httpclient.cpp" , "src/mongo/util/net/message.cpp" , "src/mongo/util/net/message_port.cpp" , "src/mongo/util/net/listen.cpp" ]
 commonFiles += Glob( "src/mongo/util/*.c" ) 
