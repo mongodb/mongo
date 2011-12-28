@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <boost/noncopyable.hpp>
 #include <boost/intrusive_ptr.hpp>
 #include <set>
 #include <list>
