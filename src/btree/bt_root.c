@@ -44,7 +44,8 @@ __wt_btree_get_root(WT_SESSION_IMPL *session, WT_BUF *addr)
 	if (v != NULL && strlen(v) != 0 && strcmp(v, WT_NOADDR) != 0) {
 		WT_ERR(__wt_hex_to_raw(session, (void *)v, (void *)v, &size));
 		WT_ERR(__wt_buf_set(session, addr, v, size));
-	}
+	} else if (v != NULL)
+		__wt_free(session, v);
 
 	if (0) {
 err:		__wt_err(session, ret,
