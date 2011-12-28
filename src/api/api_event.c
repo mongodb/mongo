@@ -35,7 +35,7 @@ __handle_error_default(WT_EVENT_HANDLER *handler, int error, const char *errmsg)
 
 /*
  * __handle_message_default --
- *	Default WT_EVENT_HANDLER->handle_message implementation: ignore.
+ *	Default WT_EVENT_HANDLER->handle_message implementation: send to stdout.
  */
 static int
 __handle_message_default(WT_EVENT_HANDLER *handler, const char *message)
