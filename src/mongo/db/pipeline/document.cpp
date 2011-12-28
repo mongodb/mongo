@@ -15,6 +15,7 @@
  */
 
 #include "pch.h"
+#include <boost/functional/hash.hpp>
 #include "db/jsobj.h"
 #include "db/pipeline/document.h"
 #include "db/pipeline/value.h"
