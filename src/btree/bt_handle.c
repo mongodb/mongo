@@ -40,8 +40,6 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	WT_CONNECTION_IMPL *conn;
 	int matched, ret;
 
-	WT_UNUSED(cfg);
-
 	conn = S2C(session);
 
 	/*
@@ -114,7 +112,7 @@ conf:	WT_ERR(__btree_conf(session, name, filename, config, flags));
 
 	/* Open the underlying block object. */
 	WT_ERR(__wt_bm_open(session, btree->filename,
-	    btree->config, F_ISSET(btree, WT_BTREE_SALVAGE) ? 1 : 0));
+	    btree->config, cfg, F_ISSET(btree, WT_BTREE_SALVAGE) ? 1 : 0));
 
 	/* Initialize the tree if not salvage or verify. */
 	if (!F_ISSET(btree, WT_BTREE_SALVAGE | WT_BTREE_VERIFY))

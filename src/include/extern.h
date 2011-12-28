@@ -53,6 +53,7 @@ extern int __wt_bm_create(WT_SESSION_IMPL *session, const char *filename);
 extern int __wt_bm_open(WT_SESSION_IMPL *session,
     const char *filename,
     const char *config,
+    const char *cfg[],
     int salvage);
 extern int __wt_bm_close(WT_SESSION_IMPL *session);
 extern int __wt_bm_free(WT_SESSION_IMPL *session,
@@ -83,6 +84,7 @@ extern int __wt_block_create(WT_SESSION_IMPL *session, const char *filename);
 extern int __wt_block_open(WT_SESSION_IMPL *session,
     const char *filename,
     const char *config,
+    const char *cfg[],
     int salvage,
     void *retp);
 extern int __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block);

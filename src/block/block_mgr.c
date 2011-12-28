@@ -88,10 +88,10 @@ __wt_bm_create(WT_SESSION_IMPL *session, const char *filename)
  */
 int
 __wt_bm_open(WT_SESSION_IMPL *session,
-    const char *filename, const char *config, int salvage)
+    const char *filename, const char *config, const char *cfg[], int salvage)
 {
 	return (__wt_block_open(
-	    session, filename, config, salvage, &session->btree->block));
+	    session, filename, config, cfg, salvage, &session->btree->block));
 }
 
 /*

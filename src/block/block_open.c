@@ -52,8 +52,8 @@ __wt_block_create(WT_SESSION_IMPL *session, const char *filename)
  *	Open a file.
  */
 int
-__wt_block_open(WT_SESSION_IMPL *session,
-    const char *filename, const char *config, int salvage, void *retp)
+__wt_block_open(WT_SESSION_IMPL *session, const char *filename,
+    const char *config, const char *cfg[], int salvage, void *retp)
 {
 	WT_BLOCK *block;
 	WT_CONFIG_ITEM cval;
@@ -107,7 +107,7 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	 */
 	cval.val = 0;
 	if (salvage) {
-		ret = __wt_config_getones(session, config, "force", &cval);
+		ret = __wt_config_gets(session, cfg, "force", &cval);
 		if (ret != 0 && ret != WT_NOTFOUND)
 			WT_RET(ret);
 	}
@@ -171,6 +171,10 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block, int salvage)
 	uint32_t cksum;
 	uint8_t buf[WT_BLOCK_DESC_SECTOR];
 	const char *msg;
+	int ret;
+
+	msg = "file does not appear to be a WiredTiger Btree file";
+	ret = 0;
 
 	/*
 	 * We currently always do the verification step, because it's cheap
@@ -178,9 +182,9 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block, int salvage)
 	 *
 	 * Read the first sector.
 	 */
-	WT_RET(__wt_read(session, block->fh, (off_t)0, sizeof(buf), buf));
-	desc = (WT_BLOCK_DESC *)buf;
+	WT_ERR(__wt_read(session, block->fh, (off_t)0, sizeof(buf), buf));
 
+	desc = (WT_BLOCK_DESC *)buf;
 	WT_VERBOSE(session, block,
 	    "open: magic %" PRIu32
 	    ", major/minor: %" PRIu32 "/%" PRIu32
@@ -196,8 +200,7 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block, int salvage)
 	cksum = desc->cksum;
 	desc->cksum = 0;
 	if (cksum != __wt_cksum(buf, sizeof(buf))) {
-		msg = "checksum mismatch: file does not appear to be a "
-		    "WiredTiger Btree file";
+		ret = WT_ERROR;
 		goto err;
 	}
 
@@ -210,20 +213,19 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block, int salvage)
 	 * may have entered the wrong file name, and is now frantically pounding
 	 * their interrupt key.
 	 */
-	if (desc->magic != WT_BTREE_MAGIC) {
-		msg = "magic number mismatch: file does not appear to be a "
-		    "WiredTiger Btree file";
-		goto err;
-	}
+	if (desc->magic != WT_BTREE_MAGIC)
+		WT_ERR(WT_ERROR);
 	if (desc->majorv > WT_BTREE_MAJOR_VERSION ||
 	    (desc->majorv == WT_BTREE_MAJOR_VERSION &&
 	    desc->minorv > WT_BTREE_MINOR_VERSION)) {
-		msg = "file is an unsupported version of a WiredTiger Btree "
-		    "file";
-err:		__wt_errx(session, "%s%s", msg,
+		msg =
+		    "file is an unsupported version of a WiredTiger Btree file";
+err:		if (ret == 0)
+			ret = WT_ERROR;
+		__wt_errx(session, "%s%s", msg,
 		    salvage ? "; to salvage this file, configure the salvage "
 		    "operation with the force flag" : "");
-		return (WT_ERROR);
+		return (ret);
 	}
 
 	block->lsn = desc->lsn;
