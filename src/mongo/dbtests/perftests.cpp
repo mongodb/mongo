@@ -362,7 +362,7 @@ namespace PerfTests {
         void thread() {
 #if defined(_WIN32)
             static int z;
-            srand( ++z ^ time(0));
+            srand( ++z ^ (unsigned) time(0));
 #endif
             DBClientType c;
             Client::initThreadIfNotAlready("perftestthr");
