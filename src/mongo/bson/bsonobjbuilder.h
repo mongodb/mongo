@@ -25,6 +25,11 @@
 #include <limits>
 #include <cmath>
 #include <boost/static_assert.hpp>
+#if defined(MONGO_EXPOSE_MACROS)
+// boost changed it
+#undef assert
+#define assert MONGO_assert
+#endif
 #include "bsonelement.h"
 #include "bsonobj.h"
 #include "bsonmisc.h"

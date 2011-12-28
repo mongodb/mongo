@@ -20,10 +20,18 @@
 #include "util/atomic_int.h"
 #include "../db/nonce.h"
 #include "bsonobjbuilder.h"
+#include <boost/functional/hash.hpp>
+#undef assert
+#define assert MONGO_assert
 
 BOOST_STATIC_ASSERT( sizeof(mongo::OID) == 12 );
 
 namespace mongo {
+
+	void OID::hash_combine(size_t &seed) const {
+	    boost::hash_combine(seed, a);
+	    boost::hash_combine(seed, b);
+	}
 
     // machine # before folding in the process id
     OID::MachineAndPid OID::ourMachine;
