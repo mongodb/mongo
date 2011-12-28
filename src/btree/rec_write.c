@@ -2884,7 +2884,7 @@ __rec_cell_build_val(
 
 /*
  * __rec_cell_build_ovfl --
- *	Store overflow items in the file, returning the WT_OFF.
+ *	Store overflow items in the file, returning the address cookie.
  */
 static int
 __rec_cell_build_ovfl(
