@@ -15,6 +15,7 @@
 using namespace std;
 
 #include "../assert_util.h"
+#include "../time_support.h"
 #include "rwlockimpl.h"
 
 namespace mongo { 
