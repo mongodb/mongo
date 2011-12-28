@@ -39,15 +39,15 @@ massif.out.*
 /src/mongo/shell/mongo.cpp
 /src/mongo/shell/mongo-server.cpp
 
-*/Debug/
-*/*/Debug/
-*/Release/
-*/*/Release/
-*/ipch
-*/*/ipch
-db/.gdb*
-db/makefile.local
-db/_ReSharper.db
+/src/mongo/*/Debug/
+/src/mongo/*/*/Debug/
+/src/mongo/*/Release/
+/src/mongo/*/*/Release/
+/src/mongo/*/ipch
+/src/mongo/*/*/ipch
+/src/mongo/db/.gdb*
+/src/mongo/db/makefile.local
+/src/mongo/db/_ReSharper.db
 config.log
 settings.py
 buildinfo.cpp
