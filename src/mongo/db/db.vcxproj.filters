@@ -217,6 +217,7 @@
     <ClCompile Include="pagefault.cpp" />
     <ClCompile Include="d_globals.cpp" />
     <ClCompile Include="curop.cpp" />
+    <ClCompile Include="..\util\concurrency\rwlockimpl.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\dbclientcursor.h" />
