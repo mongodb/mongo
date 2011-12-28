@@ -199,10 +199,8 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block, int salvage)
 
 	cksum = desc->cksum;
 	desc->cksum = 0;
-	if (cksum != __wt_cksum(buf, sizeof(buf))) {
-		ret = WT_ERROR;
+	if (cksum != __wt_cksum(buf, sizeof(buf)))
 		goto err;
-	}
 
 	/*
 	 * We fail the open if the checksum fails, or the magic number is wrong
@@ -214,7 +212,7 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block, int salvage)
 	 * their interrupt key.
 	 */
 	if (desc->magic != WT_BTREE_MAGIC)
-		WT_ERR(WT_ERROR);
+		goto err;
 	if (desc->majorv > WT_BTREE_MAJOR_VERSION ||
 	    (desc->majorv == WT_BTREE_MAJOR_VERSION &&
 	    desc->minorv > WT_BTREE_MINOR_VERSION)) {
