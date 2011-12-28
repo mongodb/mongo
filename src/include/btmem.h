@@ -638,7 +638,7 @@ struct __wt_insert_head {
  * appends.
  */
 #define	WT_COL_APPEND(btree, page)					\
-	(F_ISSET(page, WT_PAGE_LAST_PAGE) &&				\
+	(F_ISSET((page), WT_PAGE_LAST_PAGE) &&				\
 	(btree)->append != NULL ? (btree)->append[0] : NULL)
 
 /* WT_FIX_FOREACH walks fixed-length bit-fields on a disk page. */
