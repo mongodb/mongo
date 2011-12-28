@@ -14,6 +14,7 @@ namespace mongo {
         boost::mutex writer;
     public:
         RWLockBase1();
+        ~RWLockBase1();
         const char * implType() const { return "mongo"; }
         void lock();
         void unlock();
@@ -38,6 +39,8 @@ namespace mongo {
 // windows slimreaderwriter version.  newer windows versions only
 
 namespace mongo {
+    unsigned long long curTimeMicros64();
+
     class RWLockBase : boost::noncopyable {
         SRWLOCK _lock;
     protected:
