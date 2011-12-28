@@ -2,9 +2,37 @@
 
 #pragma once
 
-#include <boost/noncopyable.hpp>
+//#define RWLOCK_TEST 1
 
-#if defined(MONGO_USE_SRW_ON_WINDOWS) && defined(_WIN32)
+namespace mongo {
+    class RWLockBase1 : boost::noncopyable { 
+        unsigned reading;
+        unsigned writing;
+        unsigned wantToWrite;
+        boost::mutex m;
+        boost::condition m_cond;
+        boost::mutex writer;
+    public:
+        const char * implType() const { return "mongo"; }
+        void lock();
+        void unlock();
+        void lock_shared();
+        void unlock_shared();
+
+        bool lock_shared_try(int millis);
+        bool lock_try(int millis = 0);
+
+        void lockAsUpgradable();
+        void unlockFromUpgradable();
+        void upgrade();
+    };
+}
+
+#if defined(RWLOCK_TEST)
+namespace mongo { 
+    typedef RWLockBase1 RWLockBase;
+}
+#elif defined(MONGO_USE_SRW_ON_WINDOWS) && defined(_WIN32)
 
 // windows slimreaderwriter version.  newer windows versions only
 
