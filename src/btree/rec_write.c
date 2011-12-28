@@ -1267,6 +1267,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 	WT_INSERT *ins;
+	WT_INSERT_HEAD *ins_head;
 	WT_RECONCILE *r;
 	uint64_t recno;
 	uint32_t entry, nrecs;
@@ -1294,7 +1295,8 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 	r->recno += entry;
 
 	/* Walk any append list. */
-	WT_SKIP_FOREACH(ins, WT_COL_APPEND(page))
+	ins_head = WT_COL_APPEND(btree, page);
+	WT_SKIP_FOREACH(ins, ins_head)
 		for (;;) {
 			/*
 			 * The application may have inserted records which left
@@ -1486,11 +1488,13 @@ static int
 __rec_col_var(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_SALVAGE_COOKIE *salvage)
 {
+	WT_BTREE *btree;
 	WT_BUF *last, orig;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
 	WT_INSERT *ins;
+	WT_INSERT_HEAD *ins_head;
 	WT_RECONCILE *r;
 	WT_UPDATE *upd;
 	uint64_t n, nrepeat, repeat_count, rle, slvg_missing, src_recno;
@@ -1499,6 +1503,7 @@ __rec_col_var(
 	const void *data;
 
 	r = session->reconcile;
+	btree = session->btree;
 	last = r->last;
 	unpack = &_unpack;
 
@@ -1707,7 +1712,8 @@ __rec_col_var(
 	}
 
 	/* Walk any append list. */
-	WT_SKIP_FOREACH(ins, WT_COL_APPEND(page))
+	ins_head = WT_COL_APPEND(btree, page);
+	WT_SKIP_FOREACH(ins, ins_head)
 		for (n = WT_INSERT_RECNO(ins); src_recno <= n; ++src_recno) {
 			/*
 			 * The application may have inserted records which left

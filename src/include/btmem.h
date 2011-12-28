@@ -81,12 +81,6 @@ struct __wt_page_modify {
 	} u;
 
 	/*
-	 * The last page of both fix- and variable-length column stores includes
-	 * a skiplist of appended entries.
-	 */
-	WT_INSERT_HEAD **append;	/* Appended items */
-
-	/*
 	 * Updated items in column-stores: variable-length RLE entries can
 	 * expand to multiple entries which requires some kind of list we can
 	 * expand on demand.  Updated items in fixed-length files could be done
@@ -251,11 +245,12 @@ struct __wt_page {
 	 */
 #define	WT_PAGE_BUILD_KEYS	0x001	/* Keys have been built in memory */
 #define	WT_PAGE_FORCE_EVICT	0x002	/* Waiting for forced eviction */
-#define	WT_PAGE_PINNED		0x004	/* Page is pinned */
-#define	WT_PAGE_REC_EMPTY	0x008	/* Reconciliation: page empty */
-#define	WT_PAGE_REC_REPLACE	0x010	/* Reconciliation: page replaced */
-#define	WT_PAGE_REC_SPLIT	0x020	/* Reconciliation: page split */
-#define	WT_PAGE_REC_SPLIT_MERGE	0x040	/* Reconciliation: page split merge */
+#define	WT_PAGE_LAST_PAGE	0x004	/* Page is pinned */
+#define	WT_PAGE_PINNED		0x008	/* Page is pinned */
+#define	WT_PAGE_REC_EMPTY	0x010	/* Reconciliation: page empty */
+#define	WT_PAGE_REC_REPLACE	0x020	/* Reconciliation: page replaced */
+#define	WT_PAGE_REC_SPLIT	0x040	/* Reconciliation: page split */
+#define	WT_PAGE_REC_SPLIT_MERGE	0x080	/* Reconciliation: page split merge */
 	uint8_t flags;			/* Page flags */
 };
 
@@ -642,9 +637,9 @@ struct __wt_insert_head {
  * WT_COL_APPEND is a single WT_INSERT list, used for fixed- and variable-length
  * appends.
  */
-#define	WT_COL_APPEND(page)						\
-	((page)->modify == NULL || (page)->modify->append == NULL ?	\
-	    NULL : (page)->modify->append[0])
+#define	WT_COL_APPEND(btree, page)					\
+	(F_ISSET(page, WT_PAGE_LAST_PAGE) &&				\
+	(btree)->append != NULL ? (btree)->append[0] : NULL)
 
 /* WT_FIX_FOREACH walks fixed-length bit-fields on a disk page. */
 #define	WT_FIX_FOREACH(btree, dsk, v, i)				\

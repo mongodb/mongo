@@ -492,20 +492,15 @@ __btree_last(WT_SESSION_IMPL *session)
 	btree->last_page = page;
 	btree->last_recno = __col_last_recno(page);
 
-	/*
-	 * If the page is already pinned (that is, the last page is the root
-	 * page), we're done, otherwise, pin the last page into memory.
-	 */
-	if (!F_ISSET(page, WT_PAGE_PINNED)) {
-		F_SET(page, WT_PAGE_PINNED);
+	F_SET(page, WT_PAGE_LAST_PAGE | WT_PAGE_PINNED);
 
-		/*
-		 * Publish: there must be a barrier to ensure the pinned flag
-		 * is set before we discard our hazard reference.
-		 */
-		WT_WRITE_BARRIER();
-		__wt_hazard_clear(session, page);
-	}
+	/*
+	 * Publish: there must be a barrier to ensure the pinned flag is set
+	 * before we discard our hazard reference.
+	 */
+	WT_WRITE_BARRIER();
+	__wt_hazard_clear(session, page);
+
 	return (0);
 }
 

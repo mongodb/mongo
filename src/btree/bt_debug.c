@@ -580,9 +580,9 @@ __debug_page_col_fix(WT_DBG *ds, WT_PAGE *page)
 		__dmsg(ds, "%s", sep);
 		__debug_col_list(ds, WT_COL_UPDATE_SINGLE(page), "update", 1);
 	}
-	if (WT_COL_APPEND(page) != NULL) {
+	if (WT_COL_APPEND(btree, page) != NULL) {
 		__dmsg(ds, "%s", sep);
-		__debug_col_list(ds, WT_COL_APPEND(page), "append", 1);
+		__debug_col_list(ds, WT_COL_APPEND(btree, page), "append", 1);
 	}
 }
 
@@ -617,6 +617,7 @@ __debug_page_col_int(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 static int
 __debug_page_col_var(WT_DBG *ds, WT_PAGE *page)
 {
+	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
@@ -625,6 +626,7 @@ __debug_page_col_var(WT_DBG *ds, WT_PAGE *page)
 	uint32_t i;
 	char tag[64];
 
+	btree = ds->session->btree;
 	unpack = &_unpack;
 	recno = page->u.col_var.recno;
 
@@ -644,9 +646,9 @@ __debug_page_col_var(WT_DBG *ds, WT_PAGE *page)
 		recno += rle;
 	}
 
-	if (WT_COL_APPEND(page) != NULL) {
+	if (WT_COL_APPEND(btree, page) != NULL) {
 		__dmsg(ds, "%s", sep);
-		__debug_col_list(ds, WT_COL_APPEND(page), "append", 0);
+		__debug_col_list(ds, WT_COL_APPEND(btree, page), "append", 0);
 	}
 
 	return (0);

@@ -136,7 +136,7 @@ past_end:
 	 * column-store files are dense, but in this case the caller searched
 	 * past the end of the table.
 	 */
-	cbt->ins_head = WT_COL_APPEND(page);
+	cbt->ins_head = WT_COL_APPEND(btree, page);
 	if ((cbt->ins =
 	    __col_insert_search(cbt->ins_head, cbt->ins_stack, recno)) == NULL)
 		cbt->compare = -1;

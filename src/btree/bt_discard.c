@@ -84,20 +84,21 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 static void
 __free_page_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_PAGE_MODIFY *mod;
+	WT_BTREE *btree;
+	WT_INSERT_HEAD *ins_head;
 
-	if ((mod = page->modify) == NULL)
-		return;
+	btree = session->btree;
 
 	/* Free the append array. */
-	if (mod->append != NULL) {
-		__free_insert_list(session, WT_SKIP_FIRST(*mod->append));
-		__wt_free(session, *mod->append);
-		__wt_free(session, mod->append);
+	if ((ins_head = WT_COL_APPEND(btree, page)) != NULL) {
+		__free_insert_list(session, WT_SKIP_FIRST(ins_head));
+		__wt_free(session, ins_head);
+		__wt_free(session, btree->append);
 	}
+
 	/* Free the update array. */
-	if (mod->update != NULL)
-		__free_insert(session, mod->update, 1);
+	if (page->modify != NULL && page->modify->update != NULL)
+		__free_insert(session, page->modify->update, 1);
 }
 
 /*
@@ -132,7 +133,10 @@ __free_page_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 static void
 __free_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_PAGE_MODIFY *mod;
+	WT_BTREE *btree;
+	WT_INSERT_HEAD *ins_head;
+
+	btree = session->btree;
 
 	/* Free the in-memory index array. */
 	__wt_free(session, page->u.col_var.d);
@@ -140,19 +144,16 @@ __free_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* Free the RLE lookup array. */
 	__wt_free(session, page->u.col_var.repeats);
 
-	if ((mod = page->modify) == NULL)
-		return;
-
 	/* Free the append array. */
-	if (mod->append != NULL) {
-		__free_insert_list(session, WT_SKIP_FIRST(*mod->append));
-		__wt_free(session, *mod->append);
-		__wt_free(session, mod->append);
+	if ((ins_head = WT_COL_APPEND(btree, page)) != NULL) {
+		__free_insert_list(session, WT_SKIP_FIRST(ins_head));
+		__wt_free(session, ins_head);
+		__wt_free(session, btree->append);
 	}
 
 	/* Free the insert array. */
-	if (mod->update != NULL)
-		__free_insert(session, mod->update, page->entries);
+	if (page->modify != NULL && page->modify->update != NULL)
+		__free_insert(session, page->modify->update, page->entries);
 }
 
 /*
