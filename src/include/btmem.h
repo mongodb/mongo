@@ -148,18 +148,15 @@ struct __wt_page {
 			WT_ROW	   *d;		/* K/V object pairs */
 
 			/*
-			 * XXX
-			 * The row-store leaf page modification structures live
-			 * in the WT_PAGE structure, not in the WT_PAGE_MODIFY
-			 * structure as the column-store leaf page modification
-			 * do.  This is to keep the WT_PAGE structure as small
-			 * as possible for read-only pages.  For consistency,
-			 * we could move these structures into WT_PAGE_MODIFY
-			 * too, but it doesn't shrink WT_PAGE any further.  It
-			 * wouldn't grow WT_PAGE_MODIFY (we could create union
-			 * with the column-store modification structures), but
-			 * that's going to require ugly naming, the trade-off
-			 * consistency vs. ugly naming in the code.
+			 * The column-store leaf page modification structures
+			 * live in the WT_PAGE_MODIFY structure to keep the
+			 * WT_PAGE structure as small as possible for read-only
+			 * pages.  For consistency, we could move the row-store
+			 * modification structures into WT_PAGE_MODIFY too, but
+			 * it doesn't shrink WT_PAGE any further, and avoiding
+			 * ugly naming in WT_PAGE_MODIFY to avoid growing it
+			 * won't be pretty.  So far, avoiding ugly naming has
+			 * overridden consistency.
 			 */
 			WT_INSERT_HEAD	**ins;	/* Inserts */
 			WT_UPDATE	**upd;	/* Updates */
