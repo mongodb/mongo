@@ -927,9 +927,13 @@ namespace mongo {
 
     Local< v8::Value > newFunction( const char *code ) {
         stringstream codeSS;
-        codeSS << "____MontoToV8_newFunction_temp = " << code;
+        codeSS << "____MongoToV8_newFunction_temp = " << code;
         string codeStr = codeSS.str();
         Local< Script > compiled = Script::New( v8::String::New( codeStr.c_str() ) );
+        if ( compiled.IsEmpty() ) {
+            warning() << "Could not compile function: " << codeStr.c_str() << endl;
+            return Local< v8::Value >::New( v8::Null() );
+        }
         Local< Value > ret = compiled->Run();
         return ret;
     }
