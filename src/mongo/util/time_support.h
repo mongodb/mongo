@@ -19,6 +19,7 @@
 
 #include <cstdio> // sscanf
 #include <ctime>
+#include <boost/thread/thread.hpp>
 #include <boost/thread/tss.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/thread/xtime.hpp>
