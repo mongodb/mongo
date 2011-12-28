@@ -114,6 +114,7 @@ add_option( "64" , "whether to force 64 bit" , 0 , True , "force64" )
 add_option( "32" , "whether to force 32 bit" , 0 , True , "force32" )
 
 add_option( "cxx", "compiler to use" , 1 , True )
+add_option( "cc", "compiler to use for c" , 1 , True )
 
 add_option( "cpppath", "Include path if you have headers in a nonstandard directory" , 1 , True )
 add_option( "libpath", "Library path if you have libraries in a nonstandard directory" , 1 , True )
@@ -211,6 +212,10 @@ env = Environment( MSVS_ARCH=msarch , tools = ["default", "gch"], toolpath = '.'
 if has_option( "cxx" ):
     env["CC"] = get_option( "cxx" )
     env["CXX"] = get_option( "cxx" )
+
+if has_option( "cc" ):
+    env["CC"] = get_option( "cc" )
+
 env["LIBPATH"] = []
 
 if has_option( "libpath" ):
