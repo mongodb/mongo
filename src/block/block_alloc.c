@@ -365,20 +365,17 @@ __wt_block_freelist_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	if (block->free_offset == WT_BLOCK_INVALID_OFFSET)
 		return (0);
 
-	/*
-	 * The free-list is read before the file is verified, which means we
-	 * need to be a little paranoid.   We know the free-list chunk itself
-	 * is entirely in the file because we checked when we first read the
-	 * file's description structure.   Nothing here is unsafe, all we're
-	 * doing is entering offset/size pairs into the in-memory free-list.
-	 * The verify code will separately check every offset/size pair to make
-	 * sure they're in the file.
-	 */
 	WT_RET(__wt_scr_alloc(session, block->free_size, &tmp));
 	WT_ERR(__wt_block_read(session, block,
 	    tmp, block->free_offset, block->free_size, block->free_cksum));
 
-	/* Insert the free-list items into the linked list. */
+	/*
+	 * The free-list is read before the file is verified, which means we
+	 * need to be a little paranoid.   We know the free-list chunk itself
+	 * is entirely in the file because we checked when we first read the
+	 * file's description structure.  Confirm the offset/size pairs are
+	 * valid, then insert them into the linked list.
+	 */
 	for (p = WT_PAGE_DISK_BYTE(tmp->mem);;) {
 		offset = *(off_t *)p;
 		if (offset == 0)
@@ -386,6 +383,15 @@ __wt_block_freelist_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		p += sizeof(off_t);
 		size = *(uint32_t *)p;
 		p += sizeof(uint32_t);
+
+		if ((offset - WT_BLOCK_DESC_SECTOR) % block->allocsize != 0 ||
+		    size % block->allocsize != 0 ||
+		    offset + size > block->fh->file_size) {
+			__wt_errx(
+			    session, "file contains a corrupted free-list");
+			WT_ERR(WT_ERROR);
+		}
+
 		WT_ERR(__wt_block_free(session, block, offset, size));
 	}
 
