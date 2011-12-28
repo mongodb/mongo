@@ -25,8 +25,6 @@
 
 namespace mongo {
 
-    void printStackTrace( ostream &o );
-
     inline boost::xtime incxtimemillis( long long s ) {
         boost::xtime xt;
         boost::xtime_get(&xt, boost::TIME_UTC);
@@ -88,12 +86,7 @@ namespace mongo {
         public:
 #if defined(_DEBUG)
             struct PostStaticCheck {
-                PostStaticCheck() {
-                    if ( StaticObserver::_destroyingStatics ) {
-                        cout << "_DEBUG warning trying to lock a mongo::mutex during static shutdown" << endl;
-                        printStackTrace( cout );
-                    }
-                }
+                PostStaticCheck();
             } _check;
             mongo::mutex * const _mut;
 #endif

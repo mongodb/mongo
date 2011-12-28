@@ -28,6 +28,9 @@
 #include "bsonelement.h"
 #include "bsonobj.h"
 #include "bsonmisc.h"
+#if defined(_DEBUG) && defined(MONGO_EXPOSE_MACROS)
+#include "../util/log.h"
+#endif
 
 namespace mongo {
 

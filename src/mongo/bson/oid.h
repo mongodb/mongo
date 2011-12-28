@@ -130,9 +130,6 @@ namespace mongo {
         JS
     };
 
-    inline ostream& operator<<( ostream &s, const OID &o ) {
-        s << o.str();
-        return s;
-    }
+     ostream& operator<<( ostream &s, const OID &o );
 
 }

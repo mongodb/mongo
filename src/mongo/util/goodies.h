@@ -54,7 +54,8 @@ namespace mongo {
     }
 
     /* use "addr2line -CFe <exe>" to parse. */
-    inline void printStackTrace( ostream &o = cout ) {
+    inline void printStackTrace(ostream &o = cout) {
+        ostream &o = cout;
         void *b[20];
 
         int size = backtrace(b, 20);
@@ -71,7 +72,7 @@ namespace mongo {
         free (strings);
     }
 #else
-    inline void printStackTrace( ostream &o = cout ) { }
+    inline void printStackTrace(ostream &o = cout) { }
 #endif
 
     bool isPrime(int n);

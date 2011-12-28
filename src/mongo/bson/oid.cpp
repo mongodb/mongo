@@ -28,6 +28,11 @@ namespace mongo {
     // machine # before folding in the process id
     OID::MachineAndPid OID::ourMachine;
 
+    ostream& operator<<( ostream &s, const OID &o ) {
+        s << o.str();
+        return s;
+    }
+
     unsigned OID::ourPid() {
         unsigned pid;
 #if defined(_WIN32)

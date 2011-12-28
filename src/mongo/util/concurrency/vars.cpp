@@ -24,6 +24,13 @@ namespace mongo {
 
 #if defined(_DEBUG)
 
+    scoped_lock::PostStaticCheck::PostStaticCheck() {
+        if ( StaticObserver::_destroyingStatics ) {
+            cout << "_DEBUG warning trying to lock a mongo::mutex during static shutdown" << endl;
+            printStackTrace( cout );
+        }
+    }
+
     // intentional leak. otherwise destructor orders can be problematic at termination.
     MutexDebugger &mutexDebugger = *(new MutexDebugger());
 
