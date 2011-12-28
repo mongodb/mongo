@@ -107,15 +107,18 @@ namespace mongo {
     }
 
     bool RWLockBase1::lock_try(int millis) { 
-        if( !m.timed_lock( boost::posix_time::milliseconds(millis) ) )
+//        if( !m.timed_lock( boost::posix_time::milliseconds(millis) ) )
+        if( !m.try_lock() )
             return false;
+
         if( reading ) {
             // TEMP NOT REALLY DONE COULD WAIT SOME HERE:
             m.unlock();
             return false;
         }
         wantToWrite++;
-        bool ok = writer.timed_lock( boost::posix_time::milliseconds(millis) );
+        bool ok = writer.try_lock();
+//        bool ok = writer.timed_lock( boost::posix_time::milliseconds(millis) );
         wantToWrite--;
         if( ok ) {
             writing++;
