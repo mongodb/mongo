@@ -18,7 +18,7 @@
 
 #include "../pch.h"
 #include "../util/net/message.h"
-#include "concurrency.h"
+#include "mongomutex.h"
 #include "pdfile.h"
 #include "curop.h"
 #include "client.h"
@@ -116,5 +116,3 @@ namespace mongo {
     };
 
 } // namespace mongo
-
-#include "concurrency.h"
