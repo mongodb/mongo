@@ -77,7 +77,6 @@ struct __wt_block_desc {
 	uint32_t free_size;		/* 24-27: Free list page length */
 	uint32_t free_cksum;		/* 28-31: Free list page checksum */
 
-
 	/*
 	 * We maintain page LSN's for the file in the non-transactional case
 	 * (where, instead of a log reference, the LSN is simply a counter),

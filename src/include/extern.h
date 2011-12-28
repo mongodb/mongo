@@ -39,6 +39,7 @@ extern int __wt_block_freelist_write(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern void __wt_block_discard(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern void __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern void __wt_block_dump(WT_SESSION_IMPL *session, WT_BLOCK *block);
+extern uint32_t __wt_cksum(const void *chunk, size_t len);
 extern int __wt_bm_addr_valid( WT_SESSION_IMPL *session,
     const uint8_t *addr,
     uint32_t addr_size);
@@ -695,7 +696,6 @@ extern int __wt_session_get_btree(WT_SESSION_IMPL *session,
     uint32_t flags);
 extern int __wt_session_remove_btree( WT_SESSION_IMPL *session,
     WT_BTREE_SESSION *btree_session);
-extern uint32_t __wt_cksum(const void *chunk, size_t len);
 extern void __wt_eventv(WT_SESSION_IMPL *session,
     int msg_event,
     int error,

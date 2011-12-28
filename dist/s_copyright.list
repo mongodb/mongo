@@ -1,5 +1,6 @@
 add	LICENSE
 skip	src/api/api_strerror.c
+skip	src/block/block_cksum.c
 skip	src/config/config_def.c
 skip	src/include/bitstring.i
 skip	src/include/extern.h
@@ -7,7 +8,6 @@ skip	src/include/log.i
 skip	src/include/queue.h
 skip	src/include/serial_funcs.i
 skip	src/log/log_desc.c
-skip	src/support/cksum.c
 skip	src/support/rand.c
 skip	src/support/stat.c
 skip	src/utilities/util_getopt.c
