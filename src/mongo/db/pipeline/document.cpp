@@ -16,6 +16,8 @@
 
 #include "pch.h"
 #include <boost/functional/hash.hpp>
+#undef assert
+#define assert MONGO_assert
 #include "db/jsobj.h"
 #include "db/pipeline/document.h"
 #include "db/pipeline/value.h"
