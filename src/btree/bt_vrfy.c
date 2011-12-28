@@ -159,7 +159,7 @@ __verify_tree(WT_SESSION_IMPL *session,
 	ret = 0;
 	unpack = &_unpack;
 
-	WT_VERBOSE(session, verify, "%p: %s (%s)",
+	WT_VERBOSE(session, verify, "%p: %s %s",
 	    page, __wt_page_addr_string(session, vs->tmp1, page),
 	    __wt_page_type_string(page->type));
 
