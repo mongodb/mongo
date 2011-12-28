@@ -39,10 +39,10 @@ massif.out.*
 /src/mongo/shell/mongo.cpp
 /src/mongo/shell/mongo-server.cpp
 
-/src/mongo/*/Debug/
-/src/mongo/*/*/Debug/
-/src/mongo/*/Release/
-/src/mongo/*/*/Release/
+/src/mongo/*/*Debug/
+/src/mongo/*/*/*Debug/
+/src/mongo/*/*Release/
+/src/mongo/*/*/*Release/
 /src/mongo/*/ipch
 /src/mongo/*/*/ipch
 /src/mongo/db/.gdb*
