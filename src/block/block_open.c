@@ -211,7 +211,7 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block, int salvage)
 	 * may have entered the wrong file name, and is now frantically pounding
 	 * their interrupt key.
 	 */
-	if (desc->magic != WT_BTREE_MAGIC)
+	if (desc->magic != WT_BLOCK_MAGIC)
 		goto err;
 	if (desc->majorv > WT_BTREE_MAJOR_VERSION ||
 	    (desc->majorv == WT_BTREE_MAJOR_VERSION &&
@@ -259,7 +259,7 @@ __wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh)
 	memset(buf, 0, sizeof(buf));
 	desc = (WT_BLOCK_DESC *)buf;
 
-	desc->magic = WT_BTREE_MAGIC;
+	desc->magic = WT_BLOCK_MAGIC;
 	desc->majorv = WT_BTREE_MAJOR_VERSION;
 	desc->minorv = WT_BTREE_MINOR_VERSION;
 

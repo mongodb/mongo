@@ -11,15 +11,6 @@
 #define	WT_BM_MAX_ADDR_COOKIE		255	/* Maximum address cookie */
 
 /*
- * The minimum btree leaf and internal page sizes are 512B, the maximum 512MB.
- * (The maximum of 512MB is enforced by the software, it could be set as high
- * as 4GB.)
- */
-#define	WT_BTREE_ALLOCATION_SIZE_MIN	512
-#define	WT_BTREE_ALLOCATION_SIZE_MAX	(128 * WT_MEGABYTE)
-#define	WT_BTREE_PAGE_SIZE_MAX		(512 * WT_MEGABYTE)
-
-/*
  * The file's description is written into the first 512B of the file, which
  * means we can use an offset of 0 as an invalid offset.
  */
@@ -71,21 +62,21 @@ struct __wt_block {
  *	The file's description.
  */
 struct __wt_block_desc {
-#define	WT_BTREE_MAGIC		120897
+#define	WT_BLOCK_MAGIC		120897
 	uint32_t magic;			/* 00-03: Magic number */
 #define	WT_BTREE_MAJOR_VERSION	0
 	uint16_t majorv;		/* 04-05: Major version */
 #define	WT_BTREE_MINOR_VERSION	1
 	uint16_t minorv;		/* 06-07: Minor version */
 
-	uint32_t cksum;			/* 08-11: Checksum */
+	uint32_t cksum;			/* 08-11: Description block checksum */
 
+	uint32_t unused;		/* 12-15: Padding */
 #define	WT_BLOCK_FREELIST_MAGIC	071002
-	uint32_t free_size;		/* 12-15: Free list page length */
-	uint32_t free_cksum;		/* 16-19: Free list page checksum */
+	uint64_t free_offset;		/* 16-23: Free list page address */
+	uint32_t free_size;		/* 24-27: Free list page length */
+	uint32_t free_cksum;		/* 28-31: Free list page checksum */
 
-	uint32_t unused;		/* 20-23: Padding */
-	uint64_t free_offset;		/* 24-31: Free list page address */
 
 	/*
 	 * We maintain page LSN's for the file in the non-transactional case
