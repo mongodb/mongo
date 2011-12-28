@@ -20,15 +20,40 @@ __bm_invalid(WT_SESSION_IMPL *session)
  */
 int
 __wt_bm_addr_valid(
-    WT_SESSION_IMPL *session, const uint8_t *addrbuf, uint32_t addrbuf_size)
+    WT_SESSION_IMPL *session, const uint8_t *addr, uint32_t addr_size)
 {
 	WT_BLOCK *block;
 
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (__wt_block_addr_valid(session, block, addrbuf, addrbuf_size));
+	return (__wt_block_addr_valid(session, block, addr, addr_size));
 }
+
+#ifdef HAVE_DIAGNOSTIC
+/*
+ * __wt_bm_addr_stderr --
+ *	Print an address on stderr.
+ */
+int
+__wt_bm_addr_stderr(
+    WT_SESSION_IMPL *session, const uint8_t *addr, uint32_t addr_size)
+{
+	WT_BLOCK *block;
+	WT_BUF *buf;
+	int ret;
+
+	if ((block = session->btree->block) == NULL)
+		return (__bm_invalid(session));
+
+	WT_RET(__wt_scr_alloc(session, 0, &buf));
+	ret = __wt_block_addr_string(session, block, buf, addr, addr_size);
+	if (ret == 0)
+		fprintf(stderr, "%s\n", (char *)buf->data);
+	__wt_scr_free(&buf);
+	return (ret);
+}
+#endif
 
 /*
  * __wt_bm_addr_string
@@ -36,7 +61,7 @@ __wt_bm_addr_valid(
  */
 int
 __wt_bm_addr_string(WT_SESSION_IMPL *session,
-    WT_BUF *buf, const uint8_t *addrbuf, uint32_t addrbuf_size)
+    WT_BUF *buf, const uint8_t *addr, uint32_t addr_size)
 {
 	WT_BLOCK *block;
 
@@ -44,7 +69,7 @@ __wt_bm_addr_string(WT_SESSION_IMPL *session,
 		return (__bm_invalid(session));
 
 	return (
-	    __wt_block_addr_string(session, block, buf, addrbuf, addrbuf_size));
+	    __wt_block_addr_string(session, block, buf, addr, addr_size));
 }
 
 /*
@@ -77,11 +102,15 @@ int
 __wt_bm_close(WT_SESSION_IMPL *session)
 {
 	WT_BLOCK *block;
+	int ret;
 
 	if ((block = session->btree->block) == NULL)
-		return (__bm_invalid(session));
+		return (0);
 
-	return (__wt_block_close(session, block));
+	ret = __wt_block_close(session, block);
+	session->btree->block = NULL;
+
+	return (ret);
 }
 
 /*
@@ -89,15 +118,14 @@ __wt_bm_close(WT_SESSION_IMPL *session)
  *	Free a chunk of space to the underlying file.
  */
 int
-__wt_bm_free(
-    WT_SESSION_IMPL *session, const uint8_t *addrbuf, uint32_t addrbuf_size)
+__wt_bm_free(WT_SESSION_IMPL *session, const uint8_t *addr, uint32_t addr_size)
 {
 	WT_BLOCK *block;
 
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (__wt_block_free_buf(session, block, addrbuf, addrbuf_size));
+	return (__wt_block_free_buf(session, block, addr, addr_size));
 }
 
 /*
@@ -106,15 +134,14 @@ __wt_bm_free(
  */
 int
 __wt_bm_read(WT_SESSION_IMPL *session,
-    WT_BUF *buf, const uint8_t *addrbuf, uint32_t addrbuf_size)
+    WT_BUF *buf, const uint8_t *addr, uint32_t addr_size)
 {
 	WT_BLOCK *block;
 
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (
-	    __wt_block_read_buf(session, block, buf, addrbuf, addrbuf_size));
+	return (__wt_block_read_buf(session, block, buf, addr, addr_size));
 }
 
 /*
@@ -122,16 +149,15 @@ __wt_bm_read(WT_SESSION_IMPL *session,
  *	Write a buffer into a block, returning the block's address cookie.
  */
 int
-__wt_bm_write(WT_SESSION_IMPL *session,
-    WT_BUF *buf, uint8_t *addrbuf, uint32_t *addrbuf_size)
+__wt_bm_write(
+    WT_SESSION_IMPL *session, WT_BUF *buf, uint8_t *addr, uint32_t *addr_size)
 {
 	WT_BLOCK *block;
 
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (
-	    __wt_block_write_buf(session, block, buf, addrbuf, addrbuf_size));
+	return (__wt_block_write_buf(session, block, buf, addr, addr_size));
 }
 
 /*
@@ -171,7 +197,7 @@ __wt_bm_salvage_start(WT_SESSION_IMPL *session)
  */
 int
 __wt_bm_salvage_next(WT_SESSION_IMPL *session,
-    WT_BUF *buf, uint8_t *addrbuf, uint32_t *addrbuf_lenp, int *eofp)
+    WT_BUF *buf, uint8_t *addr, uint32_t *addr_sizep, int *eofp)
 {
 	WT_BLOCK *block;
 
@@ -179,7 +205,7 @@ __wt_bm_salvage_next(WT_SESSION_IMPL *session,
 		return (__bm_invalid(session));
 
 	return (__wt_block_salvage_next(
-	    session, block, buf, addrbuf, addrbuf_lenp, eofp));
+	    session, block, buf, addr, addr_sizep, eofp));
 }
 
 /*
@@ -233,12 +259,12 @@ __wt_bm_verify_end(WT_SESSION_IMPL *session)
  */
 int
 __wt_bm_verify_addr(WT_SESSION_IMPL *session,
-     const uint8_t *addrbuf, uint32_t addrbuf_size)
+     const uint8_t *addr, uint32_t addr_size)
 {
 	WT_BLOCK *block;
 
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (__wt_block_verify_addr(session, block, addrbuf, addrbuf_size));
+	return (__wt_block_verify_addr(session, block, addr, addr_size));
 }

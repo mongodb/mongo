@@ -7,7 +7,7 @@
 
 #include "wt_internal.h"
 
-static int __verify_addfrag(WT_SESSION_IMPL *, WT_BLOCK *, uint32_t, uint32_t);
+static int __verify_addfrag(WT_SESSION_IMPL *, WT_BLOCK *, off_t, uint32_t);
 static int __verify_checkfrag(WT_SESSION_IMPL *, WT_BLOCK *);
 static int __verify_freelist(WT_SESSION_IMPL *, WT_BLOCK *);
 
@@ -18,11 +18,15 @@ static int __verify_freelist(WT_SESSION_IMPL *, WT_BLOCK *);
 int
 __wt_block_verify_start(WT_SESSION_IMPL *session, WT_BLOCK *block, int *emptyp)
 {
+	off_t file_size;
+
+	file_size = block->fh->file_size;
+
 	/*
 	 * We're done if the file has no data pages (this is what happens if
 	 * we verify a file immediately after creation).
 	 */
-	if (block->fh->file_size == WT_BTREE_DESC_SECTOR) {
+	if (file_size == WT_BLOCK_DESC_SECTOR) {
 		*emptyp = 1;
 		return (0);
 	}
@@ -32,10 +36,11 @@ __wt_block_verify_start(WT_SESSION_IMPL *session, WT_BLOCK *block, int *emptyp)
 	 * The file size should be a multiple of the allocsize, offset by the
 	 * size of the descriptor sector, the first 512B of the file.
 	 */
-	if ((block->fh->file_size -
-	    WT_BTREE_DESC_SECTOR) % block->allocsize != 0) {
+	if (file_size > WT_BLOCK_DESC_SECTOR)
+		file_size -= WT_BLOCK_DESC_SECTOR;
+	if (file_size % block->allocsize != 0) {
 		__wt_errx(session,
-		    "the file size is not valid for the allocation size");
+		    "the file size is not a multiple of the allocation size");
 		    return (WT_ERROR);
 	}
 
@@ -43,15 +48,19 @@ __wt_block_verify_start(WT_SESSION_IMPL *session, WT_BLOCK *block, int *emptyp)
 	 * Allocate a bit array, where each bit represents a single allocation
 	 * size piece of the file (this is how we track the parts of the file
 	 * we've verified, and check for multiply referenced or unreferenced
-	 * blocks).  Storing this on the heap seems reasonable; verifying a 1TB
-	 * file with an allocation size of 512B would require a 256MB bit array:
+	 * blocks).  Storing this on the heap seems reasonable, verifying a 1TB
+	 * file with an 512B allocation size would require a 256MB bit array
 	 *
 	 *	(((1 * 2^40) / 512) / 8) / 2^20 = 256
 	 *
 	 * To verify larger files than we can handle in this way, we'd have to
 	 * write parts of the bit array into a disk file.
 	 */
-	block->frags = WT_OFF_TO_ADDR(block, block->fh->file_size);
+	if (file_size / block->allocsize > UINT32_MAX) {
+		__wt_errx(session, "the file is too large to verify");
+		return (WT_ERROR);
+	}
+	block->frags = (uint32_t)file_size / block->allocsize;
 	WT_RET(__bit_alloc(session, block->frags, &block->fragbits));
 
 	/* Verify the free-list. */
@@ -83,16 +92,17 @@ __wt_block_verify_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
  */
 int
 __wt_block_verify_addr(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, const uint8_t *addrbuf, uint32_t addrbuf_size)
+    WT_BLOCK *block, const uint8_t *addr, uint32_t addr_size)
 {
-	uint32_t addr, size;
+	off_t offset;
+	uint32_t size;
 
-	WT_UNUSED(addrbuf_size);
+	WT_UNUSED(addr_size);
 
 	/* Crack the cookie. */
-	WT_RET(__wt_block_buffer_to_addr(addrbuf, &addr, &size, NULL));
+	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, NULL));
 
-	WT_RET(__verify_addfrag(session, block, addr, size));
+	WT_RET(__verify_addfrag(session, block, offset, size));
 
 	return (0);
 }
@@ -110,18 +120,17 @@ __verify_freelist(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	ret = 0;
 
 	TAILQ_FOREACH(fe, &block->freeqa, qa) {
-		if (WT_ADDR_TO_OFF(block, fe->addr) +
-		    (off_t)fe->size > block->fh->file_size) {
+		if (fe->offset + (off_t)fe->size > block->fh->file_size) {
 			__wt_errx(session,
-			    "free-list entry addr %" PRIu32 "references "
+			    "free-list entry offset %" PRIuMAX "references "
 			    "non-existent file pages",
-			    fe->addr);
+			    (uintmax_t)fe->offset);
 			return (WT_ERROR);
 		}
 		WT_VERBOSE(session, verify,
-		    "free-list addr/frags %" PRIu32 "/%" PRIu32,
-		    fe->addr, fe->size / block->allocsize);
-		WT_TRET(__verify_addfrag(session, block, fe->addr, fe->size));
+		    "free-list offset/frags %" PRIuMAX "/%" PRIu32,
+		    (uintmax_t)fe->offset, fe->size / block->allocsize);
+		WT_TRET(__verify_addfrag(session, block, fe->offset, fe->size));
 	}
 
 	return (ret);
@@ -134,20 +143,23 @@ __verify_freelist(WT_SESSION_IMPL *session, WT_BLOCK *block)
  */
 static int
 __verify_addfrag(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, uint32_t addr, uint32_t size)
+    WT_SESSION_IMPL *session, WT_BLOCK *block, off_t offset, uint32_t size)
 {
 	uint32_t frags, i;
 
+	offset = (offset - WT_BLOCK_DESC_SECTOR) / block->allocsize;
 	frags = size / block->allocsize;
 	for (i = 0; i < frags; ++i)
-		if (__bit_test(block->fragbits, addr + i)) {
+		if (__bit_test(block->fragbits, (uint32_t)offset + i)) {
 			__wt_errx(session,
-			    "file fragment at addr %" PRIu32
-			    " already verified", addr);
+			    "file fragment at offset %" PRIuMAX
+			    " already verified",
+			    (uintmax_t)offset);
 			return (WT_ERROR);
 		}
 	if (frags > 0)
-		__bit_nset(block->fragbits, addr, addr + (frags - 1));
+		__bit_nset(block->fragbits,
+		    (uint32_t)offset, (uint32_t)offset + (frags - 1));
 	return (0);
 }
 

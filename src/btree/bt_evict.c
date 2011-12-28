@@ -369,14 +369,11 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 static int
 __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 {
-	WT_BTREE *btree;
 	WT_PAGE *next_page, *page;
 
-	btree = session->btree;
-
 	WT_VERBOSE(session, evictserver,
-	    "%s file request: %s",
-	    btree->name, (F_ISSET(er, WT_EVICT_REQ_CLOSE) ? "close" : "sync"));
+	    "file request: %s",
+	   (F_ISSET(er, WT_EVICT_REQ_CLOSE) ? "close" : "sync"));
 
 	/*
 	 * We can't evict the page just returned to us, it marks our place in
@@ -519,8 +516,8 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		    !WT_PAGE_IS_ROOT(page) && !F_ISSET(page, WT_PAGE_PINNED) &&
 		    page->parent_ref.ref->state == WT_REF_MEM) {
 			WT_VERBOSE(session, evictserver,
-			    "%s walk: %p, size %" PRIu32,
-			    btree->name, page, page->memory_footprint);
+			    "walk: %p, size %" PRIu32,
+			    page, page->memory_footprint);
 
 			++i;
 			cache->evict[*slotp].page = page;

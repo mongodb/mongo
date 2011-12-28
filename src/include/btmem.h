@@ -6,11 +6,6 @@
  */
 
 /*
- * WiredTiger's block manager interface.
- */
-#define	WT_BM_MAX_ADDR_COOKIE	255	/* Maximum address cookie size */
-
-/*
  * WT_ADDR --
  *	A block location.
  */
@@ -658,3 +653,12 @@ struct __wt_insert_head {
 	    __bit_getv(WT_PAGE_DISK_BYTE(dsk), 0, (btree)->bitcnt) : 0;	\
 	    (i) < (dsk)->u.entries; ++(i),				\
 	    (v) = __bit_getv(WT_PAGE_DISK_BYTE(dsk), i, (btree)->bitcnt))
+
+/*
+ * WT_DISK_OFFSET, WT_REF_OFFSET --
+ *	Return the offset/pointer of a pointer/offset in a page disk image.
+ */
+#define	WT_DISK_OFFSET(dsk, p)						\
+	WT_PTRDIFF32(p, dsk)
+#define	WT_REF_OFFSET(page, o)						\
+	((void *)((uint8_t *)((page)->dsk) + (o)))

@@ -118,6 +118,7 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	if (!salvage)
 		WT_ERR(__wt_block_freelist_read(session, block));
 
+	F_SET(block, WT_BLOCK_OPEN);
 	*(void **)retp = block;
 	return (0);
 
@@ -136,15 +137,20 @@ __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
 	ret = 0;
 
-	if (block->fh != NULL) {	/* write out the free-list */
+	/*
+	 * If the file was active, write out the free-list and update the
+	 * file's description.
+	 */
+	if (F_ISSET(block, WT_BLOCK_OPEN)) {
 		WT_TRET(__wt_block_freelist_write(session, block));
-					/* update the file's description */
 		WT_TRET(__desc_update(session, block));
-		WT_RET(__wt_close(session, block->fh));
 	}
 
 	if (block->name != NULL)
 		__wt_free(session, block->name);
+
+	if (block->fh != NULL)
+		WT_RET(__wt_close(session, block->fh));
 
 	__wt_block_freelist_close(session, block);
 
@@ -161,9 +167,9 @@ __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block)
 static int
 __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block, int salvage)
 {
-	WT_BTREE_DESC *desc;
+	WT_BLOCK_DESC *desc;
 	uint32_t cksum;
-	uint8_t buf[WT_BTREE_DESC_SECTOR];
+	uint8_t buf[WT_BLOCK_DESC_SECTOR];
 	const char *msg;
 
 	/*
@@ -173,18 +179,18 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block, int salvage)
 	 * Read the first sector.
 	 */
 	WT_RET(__wt_read(session, block->fh, (off_t)0, sizeof(buf), buf));
-	desc = (WT_BTREE_DESC *)buf;
+	desc = (WT_BLOCK_DESC *)buf;
 
 	WT_VERBOSE(session, block,
-	    "%s description: magic %" PRIu32
+	    "open: magic %" PRIu32
 	    ", major/minor: %" PRIu32 "/%" PRIu32
 	    ", checksum %#" PRIx32
-	    ", free addr/size %" PRIu32 "/%" PRIu32
+	    ", free offset/size %" PRIu64 "/%" PRIu32
 	    ", lsn %" PRIu64,
-	    block->name, desc->magic,
+	    desc->magic,
 	    desc->majorv, desc->minorv,
 	    desc->cksum,
-	    desc->free_addr, desc->free_size,
+	    desc->free_offset, desc->free_size,
 	    desc->lsn);
 
 	cksum = desc->cksum;
@@ -226,14 +232,14 @@ err:		__wt_errx(session, "%s%s", msg,
 	if (salvage)
 		return (0);
 
-	if ((desc->free_addr != WT_ADDR_INVALID &&
-	    WT_ADDR_TO_OFF(block, desc->free_addr) +
-	    (off_t)desc->free_size > block->fh->file_size)) {
+	if ((desc->free_offset != WT_BLOCK_INVALID_OFFSET &&
+	    desc->free_offset + desc->free_size >
+	    (uint64_t)block->fh->file_size)) {
 		__wt_errx(session,
-		    "free address references non-existent pages");
+		    "free list offset references non-existent file space");
 		return (WT_ERROR);
 	}
-	block->free_addr = desc->free_addr;
+	block->free_offset = (off_t)desc->free_offset;
 	block->free_size = desc->free_size;
 	block->free_cksum = desc->free_cksum;
 
@@ -247,18 +253,18 @@ err:		__wt_errx(session, "%s%s", msg,
 int
 __wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh)
 {
-	WT_BTREE_DESC *desc;
-	uint8_t buf[WT_BTREE_DESC_SECTOR];
+	WT_BLOCK_DESC *desc;
+	uint8_t buf[WT_BLOCK_DESC_SECTOR];
 
 	memset(buf, 0, sizeof(buf));
-	desc = (WT_BTREE_DESC *)buf;
+	desc = (WT_BLOCK_DESC *)buf;
 
 	desc->magic = WT_BTREE_MAGIC;
 	desc->majorv = WT_BTREE_MAJOR_VERSION;
 	desc->minorv = WT_BTREE_MINOR_VERSION;
 
-	desc->free_addr = WT_ADDR_INVALID;
-	desc->free_size = 0;
+	desc->free_offset = WT_BLOCK_INVALID_OFFSET;
+	desc->free_size = desc->free_cksum = 0;
 
 	/* Update the checksum. */
 	desc->cksum = 0;
@@ -274,27 +280,27 @@ __wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh)
 static int
 __desc_update(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
-	WT_BTREE_DESC *desc;
-	uint8_t buf[WT_BTREE_DESC_SECTOR];
+	WT_BLOCK_DESC *desc;
+	uint8_t buf[WT_BLOCK_DESC_SECTOR];
 
 	/* Read the first sector. */
 	WT_RET(__wt_read(session, block->fh, (off_t)0, sizeof(buf), buf));
-	desc = (WT_BTREE_DESC *)buf;
+	desc = (WT_BLOCK_DESC *)buf;
 
 	/* See if anything has changed. */
-	if (desc->free_addr == block->free_addr &&
+	if (desc->free_offset == (uint64_t)block->free_offset &&
 	    desc->free_size == block->free_size &&
 	    desc->lsn == block->lsn)
 		return (0);
 
 	WT_VERBOSE(session, block,
-	    "updating free list [%" PRIu32 "-%" PRIu32 ", %" PRIu32 "]",
-	    block->free_addr,
-	    block->free_addr + (block->free_size / 512 - 1), block->free_size);
+	    "resetting free list [offset %" PRIuMAX ", size %" PRIu32 "]",
+	    (uintmax_t)block->free_offset, block->free_size);
 
 	desc->lsn = block->lsn;
-	desc->free_addr = block->free_addr;
+	desc->free_offset = (uint64_t)block->free_offset;
 	desc->free_size = block->free_size;
+	desc->free_cksum = block->free_cksum;
 
 	/* Update the checksum. */
 	desc->cksum = 0;

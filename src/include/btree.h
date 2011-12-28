@@ -98,3 +98,16 @@ struct __wt_salvage_cookie {
  */
 #define	WT_SPLIT_PAGE_SIZE(pagesize, allocsize, pct)			\
 	WT_ALIGN(((uintmax_t)(pagesize) * (pct)) / 100, allocsize)
+
+/*
+ * Limit the maximum size of a single object to 4GB - 512B: in some places we
+ * allocate memory to store objects plus associated data structures.  512B is
+ * far more space than we ever need, but I'm not eager to debug any off-by-ones,
+ * and storing a 4GB object in the file is flatly insane, anyway.
+ *
+ * Key and data item lengths are stored in 32-bit unsigned integers, meaning
+ * the largest key or data item is 4GB (minus a few bytes).  Record numbers
+ * are stored in 64-bit unsigned integers, meaning the largest record number
+ * is "really, really big".
+ */
+#define	WT_BTREE_OBJECT_SIZE_MAX	(UINT32_MAX - 512)

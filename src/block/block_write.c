@@ -13,12 +13,13 @@
  */
 int
 __wt_block_write_buf(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, WT_BUF *buf, uint8_t *addrbuf, uint32_t *addrbuf_size)
+    WT_BLOCK *block, WT_BUF *buf, uint8_t *addr, uint32_t *addr_size)
 {
-	uint32_t addr, size, cksum;
+	off_t offset;
+	uint32_t size, cksum;
 	uint8_t *endp;
 
-	WT_UNUSED(addrbuf_size);
+	WT_UNUSED(addr_size);
 
 	/*
 	 * We're passed a table's page image: WT_BUF->{data,size} are the image
@@ -36,11 +37,11 @@ __wt_block_write_buf(WT_SESSION_IMPL *session,
 	}
 #endif
 
-	WT_RET(__wt_block_write(session, block, buf, &addr, &size, &cksum));
+	WT_RET(__wt_block_write(session, block, buf, &offset, &size, &cksum));
 
-	endp = addrbuf;
-	WT_RET(__wt_block_addr_to_buffer(&endp, addr, size, cksum));
-	*addrbuf_size = WT_PTRDIFF32(endp, addrbuf);
+	endp = addr;
+	WT_RET(__wt_block_addr_to_buffer(block, &endp, offset, size, cksum));
+	*addr_size = WT_PTRDIFF32(endp, addr);
 
 	return (0);
 }
@@ -52,12 +53,13 @@ __wt_block_write_buf(WT_SESSION_IMPL *session,
  */
 int
 __wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
-    WT_BUF *buf, uint32_t *addrp, uint32_t *sizep, uint32_t *cksump)
+    WT_BUF *buf, off_t *offsetp, uint32_t *sizep, uint32_t *cksump)
 {
 	WT_ITEM src, dst;
 	WT_BUF *tmp;
 	WT_PAGE_DISK *dsk;
-	uint32_t addr, align_size, size, tmp_size;
+	off_t offset;
+	uint32_t align_size, size, tmp_size;
 	int compression_failed, ret;
 
 	tmp = NULL;
@@ -162,7 +164,7 @@ not_compressed:	/*
 	}
 
 	/* Allocate blocks from the underlying file. */
-	WT_ERR(__wt_block_alloc(session, block, &addr, align_size));
+	WT_ERR(__wt_block_alloc(session, block, &offset, align_size));
 
 	/*
 	 * The disk write function sets things in the WT_PAGE_DISK header simply
@@ -189,18 +191,17 @@ not_compressed:	/*
 	dsk->cksum = 0;
 	if (block->checksum)
 		dsk->cksum = __wt_cksum(dsk, align_size);
-	WT_ERR(__wt_write(
-	    session, block->fh, WT_ADDR_TO_OFF(block, addr), align_size, dsk));
+	WT_ERR(__wt_write(session, block->fh, offset, align_size, dsk));
 
 	WT_BSTAT_INCR(session, page_write);
 	WT_CSTAT_INCR(session, block_write);
 
 	WT_VERBOSE(session, write,
-	    "%" PRIu32 " at addr/size %" PRIu32 "/%" PRIu32 ", %s",
-	    dsk->memsize, addr, dsk->size,
+	    "%" PRIu32 " at offset/size %" PRIuMAX "/%" PRIu32 ", %s",
+	    dsk->memsize, (uintmax_t)offset, dsk->size,
 	    dsk->size < dsk->memsize ? "compressed, " : "");
 
-	*addrp = addr;
+	*offsetp = offset;
 	*sizep = align_size;
 	*cksump = dsk->cksum;
 

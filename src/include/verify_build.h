@@ -47,7 +47,7 @@ __wt_verify_build(void)
 	 * The compiler had better not have padded our structures -- make sure
 	 * the page header structure is exactly what we expect.
 	 */
-	SIZE_CHECK(WT_BTREE_DESC, WT_BTREE_DESC_SIZE);
+	SIZE_CHECK(WT_BLOCK_DESC, WT_BLOCK_DESC_SIZE);
 
 	/*
 	 * The page header is special: the compiler will pad it to a multiple
@@ -68,6 +68,12 @@ __wt_verify_build(void)
 	 * check, just to be sure.
 	 */
 	STATIC_ASSERT(sizeof(size_t) >= sizeof(uint32_t));
+
+	/*
+	 * We require an off_t fit into an 8B chunk because 8B is the largest
+	 * integral value we can encode.
+	 */
+	STATIC_ASSERT(sizeof(off_t) <= sizeof(uint64_t));
 }
 
 #undef ALIGN_CHECK

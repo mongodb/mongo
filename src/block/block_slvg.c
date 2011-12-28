@@ -22,11 +22,11 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	 * units (bytes trailing the last multiple of an allocation size
 	 * unit must be garbage, by definition).
 	 */
-	if (block->fh->file_size > WT_BTREE_DESC_SECTOR) {
+	if (block->fh->file_size > WT_BLOCK_DESC_SECTOR) {
 		allocsize = block->allocsize;
-		len = block->fh->file_size - WT_BTREE_DESC_SECTOR;
+		len = block->fh->file_size - WT_BLOCK_DESC_SECTOR;
 		len = (len / allocsize) * allocsize;
-		len += WT_BTREE_DESC_SECTOR;
+		len += WT_BLOCK_DESC_SECTOR;
 		if (len != block->fh->file_size)
 			WT_RET(__wt_ftruncate(session, block->fh, len));
 	}
@@ -35,7 +35,7 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	WT_RET(__wt_desc_init(session, block->fh));
 
 	/* The first sector of the file is the description record, skip it. */
-	block->slvg_off = WT_BTREE_DESC_SECTOR;
+	block->slvg_off = WT_BLOCK_DESC_SECTOR;
 
 	/*
 	 * We don't currently need to do anything about the freelist because
@@ -64,24 +64,24 @@ __wt_block_salvage_end(WT_SESSION_IMPL *session, WT_BLOCK *block, int success)
  */
 int
 __wt_block_salvage_next(WT_SESSION_IMPL *session, WT_BLOCK *block,
-    WT_BUF *buf, uint8_t *addrbuf, uint32_t *addrbuf_lenp, int *eofp)
+    WT_BUF *buf, uint8_t *addr, uint32_t *addr_sizep, int *eofp)
 {
 	WT_PAGE_DISK *dsk;
 	WT_FH *fh;
-	off_t max, off;
-	uint32_t addr, allocsize, cksum, size;
+	off_t max, offset;
+	uint32_t allocsize, cksum, size;
 	uint8_t *endp;
 
 	*eofp = 0;
 
-	off = block->slvg_off;
+	offset = block->slvg_off;
 	fh = block->fh;
 	allocsize = block->allocsize;
 	WT_RET(__wt_buf_initsize(session, buf, allocsize));
 
 	/* Read through the file, looking for pages with valid checksums. */
 	for (max = fh->file_size;;) {
-		if (off >= max) {			/* Check eof. */
+		if (offset >= max) {			/* Check eof. */
 			*eofp = 1;
 			return (0);
 		}
@@ -90,20 +90,19 @@ __wt_block_salvage_next(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		 * Read the start of a possible page (an allocation-size block),
 		 * and get a page length from it.
 		 */
-		WT_RET(__wt_read(session, fh, off, allocsize, buf->mem));
+		WT_RET(__wt_read(session, fh, offset, allocsize, buf->mem));
 		dsk = buf->mem;
 
 		/*
 		 * The page can't be more than the min/max page size, or past
 		 * the end of the file.
 		 */
-		addr = WT_OFF_TO_ADDR(block, off);
 		size = dsk->size;
 		cksum = dsk->cksum;
 		if (size == 0 ||
 		    size % allocsize != 0 ||
 		    size > WT_BTREE_PAGE_SIZE_MAX ||
-		    off + (off_t)size > max)
+		    offset + (off_t)size > max)
 			goto skip;
 
 		/*
@@ -129,18 +128,18 @@ __wt_block_salvage_next(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		 * we ignore this block.
 		 */
 		WT_RET(__wt_buf_initsize(session, buf, size));
-		if (__wt_block_read(session, block, buf, addr, size, cksum)) {
+		if (__wt_block_read(session, block, buf, offset, size, cksum)) {
 skip:			WT_VERBOSE(session, salvage,
-			    "skipping %" PRIu32 "B at file offset %" PRIu64,
-			    allocsize, (uint64_t)off);
+			    "skipping %" PRIu32 "B at file offset %" PRIuMAX,
+			    allocsize, (uintmax_t)offset);
 
 			/*
 			 * Free the block and make sure we don't return it more
 			 * than once.
 			 */
 			WT_RET(
-			    __wt_block_free(session, block, addr, allocsize));
-			block->slvg_off = off += allocsize;
+			    __wt_block_free(session, block, offset, allocsize));
+			block->slvg_off = offset += allocsize;
 			continue;
 		}
 
@@ -149,12 +148,12 @@ skip:			WT_VERBOSE(session, salvage,
 	}
 
 	/* Re-create the address cookie that should reference this block. */
-	endp = addrbuf;
-	WT_RET(__wt_block_addr_to_buffer(&endp, addr, size, cksum));
-	*addrbuf_lenp = WT_PTRDIFF32(endp, addrbuf);
+	endp = addr;
+	WT_RET(__wt_block_addr_to_buffer(block, &endp, offset, size, cksum));
+	*addr_sizep = WT_PTRDIFF32(endp, addr);
 
 	/* We're successfully returning the page, move past it. */
-	block->slvg_off = off + size;
+	block->slvg_off = offset + size;
 
 	return (0);
 }

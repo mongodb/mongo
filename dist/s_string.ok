@@ -232,6 +232,7 @@ errno
 errv
 errx
 esc
+eventv
 evictserver
 exactp
 extern

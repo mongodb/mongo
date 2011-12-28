@@ -13,30 +13,30 @@
  */
 int
 __wt_block_read_buf(WT_SESSION_IMPL *session, WT_BLOCK *block,
-    WT_BUF *buf, const uint8_t *addrbuf, uint32_t addrbuf_size)
+    WT_BUF *buf, const uint8_t *addr, uint32_t addr_size)
 {
 	WT_BUF *tmp;
-	uint32_t addr, size, cksum;
+	off_t offset;
+	uint32_t size, cksum;
 	int ret;
 
 	ret = 0;
 
 	/* Crack the cookie. */
-	WT_RET(__wt_block_buffer_to_addr(addrbuf, &addr, &size, &cksum));
+	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
 
 	/* Re-size the buffer as necessary. */
 	WT_RET(__wt_buf_initsize(session, buf, size));
 
 	/* Read the block. */
-	WT_RET(__wt_block_read(session, block, buf, addr, size, cksum));
+	WT_RET(__wt_block_read(session, block, buf, offset, size, cksum));
 
 	/* Optionally verify the page. */
 	if (block->fragbits == NULL)
 		return (0);
 
 	WT_RET(__wt_scr_alloc(session, 0, &tmp));
-	WT_ERR(
-	    __wt_block_addr_string(session, block, tmp, addrbuf, addrbuf_size));
+	WT_ERR(__wt_block_addr_string(session, block, tmp, addr, addr_size));
 	WT_ERR(__wt_verify_dsk(
 	    session, (char *)tmp->data, buf->mem, buf->size));
 
@@ -51,7 +51,7 @@ err:	__wt_scr_free(&tmp);
  */
 int
 __wt_block_read(WT_SESSION_IMPL *session, WT_BLOCK *block,
-    WT_BUF *buf, uint32_t addr, uint32_t size, uint32_t cksum)
+    WT_BUF *buf, off_t offset, uint32_t size, uint32_t cksum)
 {
 	WT_BUF *tmp;
 	WT_ITEM src, dst;
@@ -62,12 +62,11 @@ __wt_block_read(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	tmp = NULL;
 	ret = 0;
 
-	WT_VERBOSE(
-	    session, read, "addr/size %" PRIu32 "/%" PRIu32, addr, size);
+	WT_VERBOSE(session, read,
+	    "offset/size %" PRIuMAX "/%" PRIu32, (uintmax_t)offset, size);
 
 	/* Do the read, validate the checksum. */
-	WT_RET(__wt_read(
-	    session, block->fh, WT_ADDR_TO_OFF(block, addr), size, buf->mem));
+	WT_RET(__wt_read(session, block->fh, offset, size, buf->mem));
 	buf->size = size;
 
 	dsk = buf->mem;
@@ -78,10 +77,9 @@ __wt_block_read(WT_SESSION_IMPL *session, WT_BLOCK *block,
 			if (!F_ISSET(session, WT_SESSION_SALVAGE_QUIET_ERR))
 				__wt_errx(session,
 				    "read checksum error [%"
-				    PRIu32 "-%" PRIu32 ", %" PRIu32 ", %"
+				    PRIu32 "B @ %" PRIuMAX ", %"
 				    PRIu32 " != %" PRIu32 "]",
-				    addr, addr + (size / 512 - 1),
-				    size, cksum, page_cksum);
+				    size, (uintmax_t)offset, cksum, page_cksum);
 			return (WT_ERROR);
 		}
 	}

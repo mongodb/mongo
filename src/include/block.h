@@ -6,80 +6,25 @@
  */
 
 /*
- * In WiredTiger there are "file allocation units", which is the smallest file
- * chunk that can be allocated.  The smallest file allocation unit is 512B; the
- * largest is 128MB.  (The maximum of 128MB is enforced by the software, it
- * could be set as high as 4GB.)  Btree leaf and internal pages, as well as
- * overflow chunks, are allocated in groups of 1 or more allocation units.
- *
- * We use 32-bit unsigned integers to store file locations on file pages, and
- * all such file locations are counts of file allocation units.  In the code
- * these are called "addrs".  To simplify bookkeeping, page sizes must also be
- * a multiple of the allocation unit size.
+ * WiredTiger's block manager interface.
  */
-#define	WT_ADDR_INVALID		(UINT32_MAX)		/* Invalid address */
+#define	WT_BM_MAX_ADDR_COOKIE		255	/* Maximum address cookie */
 
 /*
- * The minimum maximum file size is 2TB (512B x 2^32), and the maximum maximum
- * file size is 2EB (512MB x 2^32).
- *
- * In summary, small file allocation units limit the file size and minimize
- * wasted space when storing overflow items; as the allocation unit grows,
- * the maximum size of the file grows as well.
- *
  * The minimum btree leaf and internal page sizes are 512B, the maximum 512MB.
  * (The maximum of 512MB is enforced by the software, it could be set as high
  * as 4GB.)
- *
- * Key and data item lengths are stored in 32-bit unsigned integers, meaning
- * the largest key or data item is 4GB (minus a few bytes).  Record numbers
- * are stored in 64-bit unsigned integers, meaning the largest record number
- * is "really, really big".
  */
-#define	WT_BTREE_ALLOCATION_SIZE_MIN	(512)
+#define	WT_BTREE_ALLOCATION_SIZE_MIN	512
 #define	WT_BTREE_ALLOCATION_SIZE_MAX	(128 * WT_MEGABYTE)
 #define	WT_BTREE_PAGE_SIZE_MAX		(512 * WT_MEGABYTE)
 
-/* The file's description is written into the first 512B of the file. */
-#define	WT_BTREE_DESC_SECTOR		512
-
 /*
- * Limit the maximum size of a single object to 4GB - 512B: in some places we
- * allocate memory to store objects plus associated data structures, in other
- * places we need out-of-band values in object sizes.   512B is far more space
- * than we ever need, but I'm not eager to debug any off-by-ones, and storing
- * a 4GB object in the file is flatly insane, anyway.
+ * The file's description is written into the first 512B of the file, which
+ * means we can use an offset of 0 as an invalid offset.
  */
-#define	WT_BTREE_OBJECT_SIZE_MAX	(UINT32_MAX - 512)
-
-/*
- * Underneath the Btree code is the OS layer, where sizes are stored as numbers
- * of bytes.   In the OS layer, 32-bits is too small (a file might be larger
- * than 4GB), so we use a standard type known to hold the size of a file, off_t.
- *
- * The first 512B of the file hold the file's description.  Since I don't want
- * to give up a full allocation-size to the file's description, we offset addrs
- * by 512B.
- */
-/* Convert a data address to/from a byte offset. */
-#define	WT_ADDR_TO_OFF(block, addr)					\
-	(WT_BTREE_DESC_SECTOR + (off_t)(addr) * (off_t)(block)->allocsize)
-#define	WT_OFF_TO_ADDR(block, off)					\
-	((uint32_t)((off - WT_BTREE_DESC_SECTOR) / (block)->allocsize))
-#define	WT_FILE_OFF_MAX(block)						\
-	WT_ADDR_TO_OFF(block, UINT32_MAX - 1)
-
-/*
- * WT_FREE_ENTRY  --
- *	Encapsulation of an entry on the Btree free list.
- */
-struct __wt_free_entry {
-	TAILQ_ENTRY(__wt_free_entry) qa;	/* Address queue */
-	TAILQ_ENTRY(__wt_free_entry) qs;	/* Size queue */
-
-	uint32_t addr;                          /* Disk offset */
-	uint32_t size;                          /* Size */
-};
+#define	WT_BLOCK_DESC_SECTOR		512
+#define	WT_BLOCK_INVALID_OFFSET		0
 
 /*
  * WT_BLOCK --
@@ -105,7 +50,8 @@ struct __wt_block {
 	TAILQ_HEAD(__wt_free_qah, __wt_free_entry) freeqa;
 	TAILQ_HEAD(__wt_free_qsh, __wt_free_entry) freeqs;
 	int	 freelist_dirty;	/* Free-list has been modified */
-	uint32_t free_addr;		/* Free-list addr/size/checksum  */
+
+	off_t	 free_offset;		/* Free-list addr/size/checksum  */
 	uint32_t free_size;
 	uint32_t free_cksum;
 
@@ -115,13 +61,16 @@ struct __wt_block {
 					/* Verification support */
 	uint32_t frags;			/* Total frags */
 	uint8_t *fragbits;		/* Frag tracking bit list */
+
+#define	WT_BLOCK_OPEN	0x01		/* File successfully opened */
+	uint32_t flags;
 };
 
 /*
- * WT_BTREE_DESC --
+ * WT_BLOCK_DESC --
  *	The file's description.
  */
-struct __wt_btree_desc {
+struct __wt_block_desc {
 #define	WT_BTREE_MAGIC		120897
 	uint32_t magic;			/* 00-03: Magic number */
 #define	WT_BTREE_MAJOR_VERSION	0
@@ -131,9 +80,11 @@ struct __wt_btree_desc {
 
 	uint32_t cksum;			/* 08-11: Checksum */
 
-	uint32_t free_addr;		/* 12-15: Free list page address */
-	uint32_t free_size;		/* 16-19: Free list page length */
-	uint32_t free_cksum;		/* 20-23: Free list page checksum */
+	uint32_t free_size;		/* 12-15: Free list page length */
+	uint32_t free_cksum;		/* 16-19: Free list page checksum */
+
+	uint32_t unused;		/* 20-23: Padding */
+	uint64_t free_offset;		/* 24-31: Free list page address */
 
 	/*
 	 * We maintain page LSN's for the file in the non-transactional case
@@ -142,22 +93,15 @@ struct __wt_btree_desc {
 	 * pages overlapping the same key range.  This non-transactional LSN
 	 * has to be persistent, and so it's included in the file's metadata.
 	 */
-	uint64_t lsn;			/* 24-31: Non-transactional page LSN */
+	uint64_t lsn;			/* 32-39: Non-transactional page LSN */
 };
 /*
- * WT_BTREE_DESC_SIZE is the expected structure size -- we verify the build to
+ * WT_BLOCK_DESC_SIZE is the expected structure size -- we verify the build to
  * ensure the compiler hasn't inserted padding (padding won't cause failure,
  * since we reserve the first sector of the file for this information, but it
  * would be worth investigation, regardless).
  */
-#define	WT_BTREE_DESC_SIZE		32
-
-/*
- * WT_DISK_REQUIRED--
- *	Return bytes needed for byte length, rounded to an allocation unit.
- */
-#define	WT_DISK_REQUIRED(block, size)					\
-	(WT_ALIGN((size) + WT_PAGE_DISK_SIZE, ((WT_BLOCK *)(block))->allocsize))
+#define	WT_BLOCK_DESC_SIZE		40
 
 /*
  * Don't compress the first 32B of the block (almost all of the WT_PAGE_DISK
@@ -169,7 +113,7 @@ struct __wt_btree_desc {
  * boundary is probably better alignment for the underlying compression engine,
  * and skipping 32B won't matter in terms of compression efficiency.
  */
-#define	WT_COMPRESS_SKIP    32
+#define	WT_COMPRESS_SKIP	32
 
 /*
  * WT_PAGE_DISK --
@@ -248,6 +192,13 @@ struct __wt_page_disk {
 #define	WT_PAGE_DISK_SIZE		36
 
 /*
+ * WT_DISK_REQUIRED--
+ *	Return bytes needed for byte length, rounded to an allocation unit.
+ */
+#define	WT_DISK_REQUIRED(block, size)					\
+	(WT_ALIGN((size) + WT_PAGE_DISK_SIZE, ((WT_BLOCK *)(block))->allocsize))
+
+/*
  * WT_PAGE_DISK_BYTE --
  *	The first usable data byte on the page (past the header).
  */
@@ -255,10 +206,13 @@ struct __wt_page_disk {
 	((void *)((uint8_t *)(dsk) + WT_PAGE_DISK_SIZE))
 
 /*
- * WT_DISK_OFFSET, WT_REF_OFFSET --
- *	Return the offset/pointer of a pointer/offset in a page disk image.
+ * WT_FREE_ENTRY  --
+ *	Encapsulation of an entry on the Btree free list.
  */
-#define	WT_DISK_OFFSET(dsk, p)						\
-	WT_PTRDIFF32(p, dsk)
-#define	WT_REF_OFFSET(page, o)						\
-	((void *)((uint8_t *)((page)->dsk) + (o)))
+struct __wt_free_entry {
+	TAILQ_ENTRY(__wt_free_entry) qa;	/* Address queue */
+	TAILQ_ENTRY(__wt_free_entry) qs;	/* Size queue */
+
+	off_t	 offset;			/* Disk offset */
+	uint32_t size;				/* Size */
+};

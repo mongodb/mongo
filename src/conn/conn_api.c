@@ -21,7 +21,7 @@ __api_err_printf(WT_SESSION *wt_session, const char *fmt, ...)
 	va_list ap;
 
 	va_start(ap, fmt);
-	__wt_errv((WT_SESSION_IMPL *)wt_session, 0, NULL, 0, fmt, ap);
+	__wt_eventv((WT_SESSION_IMPL *)wt_session, 0, 0, NULL, 0, fmt, ap);
 	va_end(ap);
 }
 
