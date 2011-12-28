@@ -28,10 +28,9 @@ namespace mongo {
      *
      * This class is thread-safe.
      */
-    class Notification {
+    class Notification : boost::noncopyable {
     public:
         Notification();
-        ~Notification();
 
         /*
          * Blocks until the method 'notifyOne()' is called.
