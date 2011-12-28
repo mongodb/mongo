@@ -62,7 +62,7 @@ struct __wt_block {
 	uint32_t frags;			/* Total frags */
 	uint8_t *fragbits;		/* Frag tracking bit list */
 
-#define	WT_BLOCK_OPEN	0x01		/* File successfully opened */
+#define	WT_BLOCK_OK	0x01		/* File successfully opened */
 	uint32_t flags;
 };
 

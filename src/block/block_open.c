@@ -118,7 +118,7 @@ __wt_block_open(WT_SESSION_IMPL *session,
 	if (!salvage)
 		WT_ERR(__wt_block_freelist_read(session, block));
 
-	F_SET(block, WT_BLOCK_OPEN);
+	F_SET(block, WT_BLOCK_OK);
 	*(void **)retp = block;
 	return (0);
 
@@ -141,7 +141,7 @@ __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	 * If the file was active, write out the free-list and update the
 	 * file's description.
 	 */
-	if (F_ISSET(block, WT_BLOCK_OPEN)) {
+	if (F_ISSET(block, WT_BLOCK_OK)) {
 		WT_TRET(__wt_block_freelist_write(session, block));
 		WT_TRET(__desc_update(session, block));
 	}

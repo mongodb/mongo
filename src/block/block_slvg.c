@@ -52,9 +52,14 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 int
 __wt_block_salvage_end(WT_SESSION_IMPL *session, WT_BLOCK *block, int success)
 {
-	/* If not successful, discard the free-list, it's not useful. */
-	if (!success)
+	/*
+	 * If not successful, discard the free-list, it's not useful, and
+	 * don't write back an updated description block.
+	 */
+	if (!success) {
+		F_CLR(block, WT_BLOCK_OK);
 		__wt_block_discard(session, block);
+	}
 	return (0);
 }
 
