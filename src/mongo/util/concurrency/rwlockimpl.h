@@ -13,6 +13,7 @@ namespace mongo {
         boost::condition m_cond;
         boost::mutex writer;
     public:
+        RWLockBase1();
         const char * implType() const { return "mongo"; }
         void lock();
         void unlock();

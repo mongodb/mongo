@@ -17,6 +17,8 @@
 
 #pragma once
 
+#include "../bson/inline_decls.h"
+
 // MONGO_NORETURN undefed at end of file
 #ifdef __GNUC__
 # define MONGO_NORETURN __attribute__((__noreturn__))
