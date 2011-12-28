@@ -57,7 +57,7 @@ struct __wt_btree {
 	/*
 	 * Column-store: track the last record in the file, and keep the last
 	 * page pinned in memory for fast appends, to a skiplist of appended
-	 * entries.  
+	 * entries.
 	 */
 	WT_PAGE *last_page;		/* Col-store append, last page */
 	uint64_t last_recno;		/* Col-store append, last recno */
