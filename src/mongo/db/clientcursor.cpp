@@ -166,7 +166,6 @@ namespace mongo {
                 i++;
                 if( j->second->shouldTimeout( millis ) ) {
                     foundSomeToTimeout = true;
-                    break;
                 }
             }
         }
