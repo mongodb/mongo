@@ -1,16 +1,9 @@
 // @file rwlockimpl.cpp
 
-#include <boost/version.hpp>
-
-#if !defined(_WIN32) && BOOST_VERSION >= 103500
-
-#include "rwlockimpl.h"
-
-#endif
-
+#if defined(_WIN32)
 #define WIN32_LEAN_AND_MEAN
 #include <windows.h>
-
+#endif
 #include <map>
 #include <set>
 #include <boost/noncopyable.hpp>
@@ -19,6 +12,14 @@
 #include <boost/thread/condition.hpp>
 
 using namespace std;
+
+#include <boost/version.hpp>
+
+#if !defined(_WIN32) && BOOST_VERSION >= 103500
+
+#include "rwlockimpl.h"
+
+#endif
 
 namespace mongo { 
 
