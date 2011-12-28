@@ -18,6 +18,8 @@ using namespace std;
 #include "../time_support.h"
 #include "rwlockimpl.h"
 
+#if defined(RWLOCK_TEST)
+
 namespace mongo { 
 
 #if defined(_DEBUG) && defined(_WIN32)
@@ -42,7 +44,9 @@ namespace mongo {
     }
 
     RWLockBase1::~RWLockBase1() { 
-        fassert(0, reading == writing == wantToWrite == 0);
+        fassert(0, reading == 0 );
+        fassert(0, writing == 0 );
+        fassert(0, wantToWrite == 0);
     }
 
     void RWLockBase1::lockAsUpgradable() { lock(); }
@@ -129,3 +133,5 @@ namespace mongo {
     }
 
 }
+
+#endif
