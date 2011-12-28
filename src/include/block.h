@@ -80,6 +80,7 @@ struct __wt_block_desc {
 
 	uint32_t cksum;			/* 08-11: Checksum */
 
+#define	WT_BLOCK_FREELIST_MAGIC	071002
 	uint32_t free_size;		/* 12-15: Free list page length */
 	uint32_t free_cksum;		/* 16-19: Free list page checksum */
 

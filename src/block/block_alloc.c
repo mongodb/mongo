@@ -376,9 +376,16 @@ __wt_block_freelist_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	 * file's description structure.  Confirm the offset/size pairs are
 	 * valid, then insert them into the linked list.
 	 */
-	for (p = WT_PAGE_DISK_BYTE(tmp->mem);;) {
+	p = WT_PAGE_DISK_BYTE(tmp->mem);
+	offset = *(off_t *)p;
+	p += sizeof(off_t);
+	size = *(uint32_t *)p;
+	p += sizeof(uint32_t);
+	if (offset != WT_BLOCK_FREELIST_MAGIC || size != 0)
+		goto corrupted;
+	for (;;) {
 		offset = *(off_t *)p;
-		if (offset == 0)
+		if (offset == WT_BLOCK_INVALID_OFFSET)
 			break;
 		p += sizeof(off_t);
 		size = *(uint32_t *)p;
@@ -387,7 +394,7 @@ __wt_block_freelist_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		if ((offset - WT_BLOCK_DESC_SECTOR) % block->allocsize != 0 ||
 		    size % block->allocsize != 0 ||
 		    offset + size > block->fh->file_size) {
-			__wt_errx(
+corrupted:		__wt_errx(
 			    session, "file contains a corrupted free-list");
 			WT_ERR(WT_ERROR);
 		}
@@ -460,11 +467,12 @@ __wt_block_freelist_write(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	 * block write function can zero-out unused bytes and write it without
 	 * copying to something larger.
 	 *
-	 * We allocate room for the free-list entries, plus 1 additional (the
-	 * list-terminating WT_ADDR_INVALID/0 pair).
+	 * Allocate room for the free-list entries, plus 2 additional entries:
+	 * the initial WT_BLOCK_FREELIST_MAGIC/0 pair and the list-terminating
+	 * WT_BLOCK_INVALID_OFFSET/0 pair.
 	 */
 	bytes =
-	    (block->freelist_entries + 1) * (sizeof(off_t) + sizeof(uint32_t));
+	    (block->freelist_entries + 2) * (sizeof(off_t) + sizeof(uint32_t));
 	WT_RET(__wt_scr_alloc(session, WT_DISK_REQUIRED(block, bytes), &tmp));
 	dsk = tmp->mem;
 	memset(dsk, 0, WT_PAGE_DISK_SIZE);
@@ -478,13 +486,20 @@ __wt_block_freelist_write(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	 * back in.
 	 */
 	p = WT_PAGE_DISK_BYTE(dsk);
+	*(off_t *)p = WT_BLOCK_FREELIST_MAGIC;		/* Initial value */
+	p += sizeof(off_t);
+	*(uint32_t *)p = 0;
+	p += sizeof(uint32_t);
 	TAILQ_FOREACH_REVERSE(fe, &block->freeqa, __wt_free_qah, qa) {
 		*(off_t *)p = fe->offset;
 		p += sizeof(off_t);
 		*(uint32_t *)p = fe->size;
 		p += sizeof(uint32_t);
 	}
-	*(off_t *)p = 0;		/* The list terminating values. */
+	*(off_t *)p = WT_BLOCK_INVALID_OFFSET;		/* Ending value */
+	p += sizeof(off_t);
+	*(uint32_t *)p = 0;
+	p += sizeof(uint32_t);
 
 	/*
 	 * Discard the in-memory free-list: this has to happen before writing
