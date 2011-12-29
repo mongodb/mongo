@@ -20,6 +20,11 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref)
 	const uint8_t *addr;
 	int ret;
 
+	/*
+	 * We don't pass in an allocated buffer, force allocation of new memory
+	 * of the appropriate size.
+	 */
+	WT_CLEAR(tmp);
 	ret = 0;
 
 	WT_ASSERT(session, ref->state == WT_REF_READING);
@@ -28,7 +33,6 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref)
 	__wt_get_addr(parent, ref, &addr, &size);
 
 	/* Force allocation of new memory. */
-	WT_CLEAR(tmp);
 	WT_ERR(__wt_bm_read(session, &tmp, addr, size));
 
 	/* Build the in-memory version of the page. */
