@@ -108,6 +108,16 @@ __wt_block_read(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		WT_RET(__wt_buf_init(session, buf, dsk->memsize));
 		buf->size = dsk->memsize;
 
+		/*
+		 * Note the source length is NOT the number of compressed bytes,
+		 * it's the length of the block we just read (minus the skipped
+		 * bytes).  We don't store the number of compressed bytes: some
+		 * compression engines need that length stored externally, they
+		 * don't have markers in the stream to signal the end of the
+		 * compressed bytes.  Those engines must store the compressed
+		 * byte length somehow, see the snappy compression extension for
+		 * an example.
+		 */
 		memcpy(buf->mem, tmp->mem, WT_COMPRESS_SKIP);
 		src.data = (uint8_t *)tmp->mem + WT_COMPRESS_SKIP;
 		src.size = tmp->size - WT_COMPRESS_SKIP;
