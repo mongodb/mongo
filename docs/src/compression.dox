@@ -1,4 +1,4 @@
-/*! @page compression Compression Engines
+/*! @page compression Compressors
 
 This section explains how to use compression engines with WiredTiger, including the builtin support for bzip2 and snappy.
 
