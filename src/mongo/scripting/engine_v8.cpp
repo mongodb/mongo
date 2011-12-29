@@ -434,7 +434,7 @@ namespace mongo {
      * JS Callback that will call a c++ function with BSON arguments.
      */
     Handle< Value > V8Scope::nativeCallback( V8Scope* scope, const Arguments &args ) {
-        V8Lock l;
+//        V8Lock l;
         HandleScope handle_scope;
         Local< External > f = External::Cast( *args.Callee()->Get( scope->V8STR_NATIVE_FUNC ) );
         NativeFunction function = (NativeFunction)(f->Value());
@@ -516,7 +516,7 @@ namespace mongo {
     // ---- global stuff ----
 
     void V8Scope::init( const BSONObj * data ) {
-        V8Lock l;
+//        V8Lock l;
         if ( ! data )
             return;
 
