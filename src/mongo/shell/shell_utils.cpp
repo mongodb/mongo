@@ -48,6 +48,7 @@
 #include "../util/heapcheck.h"
 #include "../util/time_support.h"
 #include "../util/file.h"
+#include "../client/clientOnly-private.h"
 
 namespace mongo {
 
@@ -289,7 +290,6 @@ namespace mongo {
         map< pid_t, HANDLE > handles;
 #endif
 
-        mongo::mutex mongoProgramOutputMutex("mongoProgramOutputMutex");
         stringstream mongoProgramOutput_;
 
         void goingAwaySoon() {

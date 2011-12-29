@@ -190,6 +190,9 @@ for shortName in getThirdPartyShortNames():
 
 add_option( "use-system-all" , "use all system libraries " + shortName , 0 , True )
 
+add_option( "use-cpu-profiler",
+            "Link against the google-perftools profiler library",
+            0, True )
 
 # don't run configure if user calls --help
 if GetOption('help'):
@@ -1162,6 +1165,10 @@ def checkErrorCodes():
         Exit(-1)
 
 checkErrorCodes()
+
+if has_option( 'use-cpu-profiler' ):
+    coreServerFiles.append( 'src/mongo/db/commands/cpuprofile.cpp' )
+    env.Append( LIBS=['profiler'] )
 
 # main db target
 mongod = env.Program( "mongod" , commonFiles + coreDbFiles + coreServerFiles + serverOnlyFiles + mongodOnlyFiles )

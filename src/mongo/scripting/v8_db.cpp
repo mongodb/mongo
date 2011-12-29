@@ -218,7 +218,7 @@ namespace mongo {
 
         DBClientWithCommands * conn;
         {
-            V8Unlock ul;
+            //V8Unlock ul;
             conn = cs.connect( errmsg );
         }
         if ( ! conn )
@@ -228,7 +228,7 @@ namespace mongo {
         self.MakeWeak( conn , destroyConnection );
 
         {
-            V8Unlock ul;
+            //V8Unlock ul;
             ScriptEngine::runConnectCallback( *conn );
         }
 
@@ -246,7 +246,7 @@ namespace mongo {
 
         DBClientBase * conn;
         {
-            V8Unlock ul;
+            //V8Unlock ul;
             conn = createDirectClient();
         }
 
@@ -317,7 +317,7 @@ namespace mongo {
             int batchSize = (int)(args[5]->ToNumber()->Value());
             int options = (int)(args[6]->ToNumber()->Value());
             {
-                V8Unlock u;
+                //V8Unlock u;
                 cursor = conn->query( ns, q ,  nToReturn , nToSkip , haveFields ? &fields : 0, options , batchSize );
                 if ( ! cursor.get() ) 
                     return v8::ThrowException( v8::String::New( "error doing query: failed" ) );
@@ -371,7 +371,7 @@ namespace mongo {
 
             DDD( "want to save batch : " << bos.length );
             try {
-                V8Unlock u;
+                //V8Unlock u;
                 conn->insert( ns , bos );
             }
             catch ( ... ) {
@@ -390,7 +390,7 @@ namespace mongo {
 
             DDD( "want to save : " << o.jsonString() );
             try {
-                V8Unlock u;
+                //V8Unlock u;
                 conn->insert( ns , o );
             }
             catch ( ... ) {
@@ -422,7 +422,7 @@ namespace mongo {
 
         DDD( "want to remove : " << o.jsonString() );
         try {
-            V8Unlock u;
+            //V8Unlock u;
             conn->remove( ns , o , justOne );
         }
         catch ( ... ) {
@@ -452,7 +452,7 @@ namespace mongo {
         try {
             BSONObj q1 = scope->v8ToMongo( q );
             BSONObj o1 = scope->v8ToMongo( o );
-            V8Unlock u;
+            //V8Unlock u;
             conn->update( ns , q1 , o1 , upsert, multi );
         }
         catch ( ... ) {
@@ -524,7 +524,7 @@ namespace mongo {
             return v8::Undefined();
         BSONObj o;
         {
-            V8Unlock u;
+            //V8Unlock u;
             o = cursor->next();
         }
         bool ro = false;
@@ -539,7 +539,7 @@ namespace mongo {
             return Boolean::New( false );
         bool ret;
         {
-            V8Unlock u;
+            //V8Unlock u;
             ret = cursor->more();
         }
         return Boolean::New( ret );
@@ -551,7 +551,7 @@ namespace mongo {
             return v8::Number::New( (double) 0 );
         int ret;
         {
-            V8Unlock u;
+            //V8Unlock u;
             ret = cursor->objsLeftInBatch();
         }
         return v8::Number::New( (double) ret );

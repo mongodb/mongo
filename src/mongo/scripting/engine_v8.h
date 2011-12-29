@@ -220,7 +220,7 @@ namespace mongo {
         bool utf8Ok() const { return true; }
 
         class V8UnlockForClient : public Unlocker {
-            V8Unlock u_;
+//            V8Unlock u_;
         };
 
         virtual auto_ptr<Unlocker> newThreadUnlocker() { return auto_ptr< Unlocker >( new V8UnlockForClient ); }

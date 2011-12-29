@@ -27,7 +27,7 @@ sleep( 1000 );
  * 14 is sometimes returned instead due to SERVER-2184
  */
 exitCode = stopMongod( port );
-assert( exitCode == 12 || exitCode == 14, "got unexpected exitCode: " + exitCode );
+assert( exitCode == 12 || exitCode == 14 || (_isWindows() && (exitCode == 0)), "got unexpected exitCode: " + exitCode );
 
 s1();
 s2();

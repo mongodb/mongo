@@ -21,6 +21,7 @@
 #include "../db/client_common.h"
 #include "../s/shard.h"
 #include "../util/timer.h"
+#include "clientOnly-private.h"
 
 namespace mongo {
 
@@ -29,6 +30,12 @@ namespace mongo {
     const char * curNs = "in client mode";
 
     bool dbexitCalled = false;
+    // This mutex helps the shell serialize output on exit,
+    // to avoid deadlocks at shutdown.  So it also protects
+    // the global dbexitCalled.
+    namespace shellUtils {
+        mongo::mutex &mongoProgramOutputMutex(*(new mongo::mutex("mongoProgramOutputMutex")));
+    }
 
     string dynHostMyName() { return ""; }
 
@@ -41,7 +48,10 @@ namespace mongo {
     }
 
     void dbexit( ExitCode returnCode, const char *whyMsg , bool tryToGetLock ) {
-        dbexitCalled = true;
+        {
+            mongo::mutex::scoped_lock lk( shellUtils::mongoProgramOutputMutex );
+            dbexitCalled = true;
+        }
         out() << "dbexit called" << endl;
         if ( whyMsg )
             out() << " b/c " << whyMsg << endl;
