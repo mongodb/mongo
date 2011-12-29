@@ -62,14 +62,26 @@ __wt_block_read(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	WT_VERBOSE(session, read,
 	    "offset/size %" PRIuMAX "/%" PRIu32, (uintmax_t)offset, size);
 
-	/* Re-size the buffer as necessary. */
-	WT_RET(__wt_buf_initsize(session, buf, size));
+	/*
+	 * If we're compressing the file blocks, place the initial read into a
+	 * scratch buffer, we're going to have to re-allocate more memory for
+	 * decompression.  Else check the caller's buffer size and grow it as
+	 * necessary, there will only be one buffer.
+	 */
+	if (block->compressor == NULL) {
+		WT_RET(__wt_buf_init(session, buf, size));
+		buf->size = size;
+		dsk = buf->mem;
+	} else {
+		WT_RET(__wt_scr_alloc(session, size, &tmp));
+		tmp->size = size;
+		dsk = tmp->mem;
+	}
 
-	/* Do the read, validate the checksum. */
-	WT_RET(__wt_read(session, block->fh, offset, size, buf->mem));
-	buf->size = size;
+	/* Read. */
+	WT_ERR(__wt_read(session, block->fh, offset, size, dsk));
 
-	dsk = buf->mem;
+	/* Validate the checksum. */
 	if (block->checksum && cksum != 0 && dsk->cksum != 0) {
 		dsk->cksum = 0;
 		page_cksum = __wt_cksum(dsk, size);
@@ -80,29 +92,38 @@ __wt_block_read(WT_SESSION_IMPL *session, WT_BLOCK *block,
 				    PRIu32 "B @ %" PRIuMAX ", %"
 				    PRIu32 " != %" PRIu32 "]",
 				    size, (uintmax_t)offset, cksum, page_cksum);
-			return (WT_ERROR);
+			WT_ERR(WT_ERROR);
 		}
 	}
 
 	/*
 	 * If the in-memory page size is larger than the on-disk page size, the
-	 * buffer is compressed: allocate a temporary buffer, copy the skipped
-	 * bytes of the original image into place, then decompress.
+	 * buffer is compressed: size the user's buffer, copy the skipped bytes
+	 * of the original image into place, then decompress.
 	 */
 	if (dsk->size < dsk->memsize) {
-		WT_RET(__wt_scr_alloc(session, dsk->memsize, &tmp));
-		memcpy(tmp->mem, buf->mem, WT_COMPRESS_SKIP);
-		src.data = (uint8_t *)buf->mem + WT_COMPRESS_SKIP;
-		src.size = buf->size - WT_COMPRESS_SKIP;
-		dst.data = (uint8_t *)tmp->mem + WT_COMPRESS_SKIP;
+		if (block->compressor == NULL)
+			WT_ERR(__wt_illegal_value(session));
+
+		WT_RET(__wt_buf_init(session, buf, dsk->memsize));
+		buf->size = dsk->memsize;
+
+		memcpy(buf->mem, tmp->mem, WT_COMPRESS_SKIP);
+		src.data = (uint8_t *)tmp->mem + WT_COMPRESS_SKIP;
+		src.size = tmp->size - WT_COMPRESS_SKIP;
+		dst.data = (uint8_t *)buf->mem + WT_COMPRESS_SKIP;
 		dst.size = dsk->memsize - WT_COMPRESS_SKIP;
+
 		WT_ERR(block->compressor->decompress(
 		    block->compressor, &session->iface, &src, &dst));
-		tmp->size = dsk->memsize;
-
-		__wt_buf_swap(tmp, buf);
-		dsk = buf->mem;
-	}
+	} else if (block->compressor != NULL)
+		/*
+		 * We guessed wrong: there was a compressor, but this block was
+		 * not compressed, and now the page is in the wrong buffer, and
+		 * the buffer may be of the wrong size.  This should be rare,
+		 * why configure a compressor that doesn't work?
+		 */
+		WT_ERR(__wt_buf_set(session, buf, tmp->data, tmp->size));
 
 	WT_BSTAT_INCR(session, page_read);
 	WT_CSTAT_INCR(session, block_read);
