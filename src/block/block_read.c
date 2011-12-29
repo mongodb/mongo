@@ -51,8 +51,8 @@ __wt_block_read(WT_SESSION_IMPL *session, WT_BLOCK *block,
     WT_BUF *buf, off_t offset, uint32_t size, uint32_t cksum)
 {
 	WT_BUF *tmp;
-	WT_ITEM src, dst;
 	WT_PAGE_DISK *dsk;
+	size_t result_len;
 	uint32_t page_cksum;
 	int ret;
 
@@ -119,17 +119,19 @@ __wt_block_read(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		 * an example.
 		 */
 		memcpy(buf->mem, tmp->mem, WT_COMPRESS_SKIP);
-		src.data = (uint8_t *)tmp->mem + WT_COMPRESS_SKIP;
-		src.size = tmp->size - WT_COMPRESS_SKIP;
-		dst.data = (uint8_t *)buf->mem + WT_COMPRESS_SKIP;
-		dst.size = dsk->memsize - WT_COMPRESS_SKIP;
-
 		WT_ERR(block->compressor->decompress(
-		    block->compressor, &session->iface, &src, &dst));
+		    block->compressor, &session->iface,
+		    (uint8_t *)tmp->mem + WT_COMPRESS_SKIP,
+		    tmp->size - WT_COMPRESS_SKIP,
+		    (uint8_t *)buf->mem + WT_COMPRESS_SKIP,
+		    dsk->memsize - WT_COMPRESS_SKIP,
+		    &result_len));
+		if (result_len != dsk->memsize - WT_COMPRESS_SKIP)
+			WT_ERR(__wt_illegal_value(session));
 	} else if (block->compressor != NULL)
 		/*
 		 * We guessed wrong: there was a compressor, but this block was
-		 * not compressed, and now the page is in the wrong buffer, and
+		 * not compressed, and now the page is in the wrong buffer and
 		 * the buffer may be of the wrong size.  This should be rare,
 		 * why configure a compressor that doesn't work?
 		 */

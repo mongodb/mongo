@@ -7,9 +7,11 @@
 WT_EXTENSION_API *wt_api;
 
 static int
-nop_compress(WT_COMPRESSOR *, WT_SESSION *, const WT_ITEM *, WT_ITEM *, int *);
+nop_compress(WT_COMPRESSOR *, WT_SESSION *,
+    uint8_t *, size_t, uint8_t *, size_t, size_t *, int *);
 static int
-nop_decompress(WT_COMPRESSOR *, WT_SESSION *, const WT_ITEM *, WT_ITEM *);
+nop_decompress(WT_COMPRESSOR *, WT_SESSION *,
+    uint8_t *, size_t, uint8_t *, size_t, size_t *);
 
 static WT_COMPRESSOR nop_compressor = { nop_compress, nop_decompress, NULL };
 
@@ -33,35 +35,39 @@ wiredtiger_extension_init(
 /* Implementation of WT_COMPRESSOR for WT_CONNECTION::add_compressor. */
 static int
 nop_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
-    const WT_ITEM *source, WT_ITEM *dest, int *compression_failed)
+    uint8_t *src, size_t src_len,
+    uint8_t *dst, size_t dst_len,
+    size_t *result_lenp, int *compression_failed)
 {
 	__UNUSED(compressor);
 	__UNUSED(session);
 
 	*compression_failed = 0;
-	if (dest->size < source->size) {
+	if (dst_len < src_len) {
 		*compression_failed = 1;
 		return (0);
 	}
 
-	memcpy((void *)dest->data, source->data, source->size);
-	dest->size = source->size;
+	memcpy(dst, src, src_len);
+	*result_lenp = src_len;
 
 	return (0);
 }
 
 static int
-nop_decompress(WT_COMPRESSOR *compressor,
-    WT_SESSION *session, const WT_ITEM *source, WT_ITEM *dest)
+nop_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
+    uint8_t *src, size_t src_len,
+    uint8_t *dst, size_t dst_len,
+    size_t *result_lenp)
 {
 	__UNUSED(compressor);
 	__UNUSED(session);
 
-	if (dest->size < source->size)
+	if (dst_len < src_len)
 		return (ENOMEM);
 
-	memcpy((void *)dest->data, source->data, source->size);
-	dest->size = source->size;
+	memcpy(dst, src, src_len);
+	*result_lenp = src_len;
 	return (0);
 }
 /* End implementation of WT_COMPRESSOR. */

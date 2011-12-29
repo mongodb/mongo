@@ -356,47 +356,52 @@ add_collator(WT_CONNECTION *conn)
 /*! [Implement WT_COMPRESSOR] */
 static int
 my_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
-    const WT_ITEM *source, WT_ITEM *dest, int *compression_failed)
+    uint8_t *src, size_t src_len,
+    uint8_t *dst, size_t dst_len,
+    size_t *result_lenp, int *compression_failed)
 {
 	/* Unused parameters */
 	(void)compressor;
 	(void)session;
 
 	*compression_failed = 0;
-	if (dest->size < source->size) {
+	if (dst_len < src_len) {
 		*compression_failed = 1;
 		return (0);
 	}
-	memcpy((void *)dest->data, source->data, source->size);
-	dest->size = source->size;
+	memcpy(dst, src, src_len);
+	*result_lenp = src_len;
 	return (0);
 }
 
 static int
-my_decompress(WT_COMPRESSOR *compressor,
-    WT_SESSION *session, const WT_ITEM *source, WT_ITEM *dest)
+my_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
+    uint8_t *src, size_t src_len,
+    uint8_t *dst, size_t dst_len,
+    size_t *result_lenp)
 {
 	/* Unused parameters */
 	(void)compressor;
 	(void)session;
 
-	if (dest->size < source->size)
+	if (dst_len < src_len)
 		return (ENOMEM);
 
-	memcpy((void *)dest->data, source->data, source->size);
-	dest->size = source->size;
+	memcpy(dst, src, src_len);
+	*result_lenp = src_len;
 	return (0);
 }
 
 static int
-my_pre_size(WT_COMPRESSOR *compressor,
-    WT_SESSION *session, const WT_ITEM *source, WT_ITEM *dest)
+my_pre_size(WT_COMPRESSOR *compressor, WT_SESSION *session,
+    uint8_t *src, size_t src_len,
+    size_t *result_lenp)
 {
 	/* Unused parameters */
 	(void)compressor;
 	(void)session;
 
-	dest->size = source->size;
+	*result_lenp = src_len;
 	return (0);
 }
 /*! [Implement WT_COMPRESSOR] */

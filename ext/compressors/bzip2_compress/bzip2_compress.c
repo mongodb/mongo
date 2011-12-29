@@ -9,10 +9,11 @@
 WT_EXTENSION_API *wt_api;
 
 static int
-bzip2_compress(
-    WT_COMPRESSOR *, WT_SESSION *, const WT_ITEM *, WT_ITEM *, int *);
+bzip2_compress(WT_COMPRESSOR *,
+    WT_SESSION *, uint8_t *, size_t, uint8_t *, size_t, size_t *, int *);
 static int
-bzip2_decompress(WT_COMPRESSOR *, WT_SESSION *, const WT_ITEM *, WT_ITEM *);
+bzip2_decompress(WT_COMPRESSOR *,
+    WT_SESSION *, uint8_t *, size_t, uint8_t *, size_t, size_t *);
 
 static WT_COMPRESSOR bzip2_compressor = {
     bzip2_compress, bzip2_decompress, NULL };
@@ -111,7 +112,9 @@ bzfree(void *cookie, void *p)
 
 static int
 bzip2_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
-    const WT_ITEM *src, WT_ITEM *dst, int *compression_failed)
+    uint8_t *src, size_t src_len,
+    uint8_t *dst, size_t dst_len,
+    size_t *result_lenp, int *compression_failed)
 {
 	bz_stream bz;
 	int ret;
@@ -127,13 +130,13 @@ bzip2_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	    bz_blocksize100k, bz_verbosity, bz_workfactor)) != BZ_OK)
 		return (bzip2_error(session, "BZ2_bzCompressInit", ret));
 
-	bz.next_in = (char *)src->data;
-	bz.avail_in = src->size;
-	bz.next_out = (char *)dst->data;
-	bz.avail_out = dst->size;
+	bz.next_in = src;
+	bz.avail_in = src_len;
+	bz.next_out = dst;
+	bz.avail_out = dst_len;
 	if ((ret = BZ2_bzCompress(&bz, BZ_FINISH)) == BZ_STREAM_END) {
 		*compression_failed = 0;
-		dst->size -= bz.avail_out;
+		*result_lenp = dst_len - bz.avail_out;
 	} else
 		*compression_failed = 1;
 
@@ -144,8 +147,10 @@ bzip2_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 }
 
 static int
-bzip2_decompress(WT_COMPRESSOR *compressor,
-    WT_SESSION *session, const WT_ITEM *src, WT_ITEM *dst)
+bzip2_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
+    uint8_t *src, size_t src_len,
+    uint8_t *dst, size_t dst_len,
+    size_t *result_lenp)
 {
 	bz_stream bz;
 	int ret, tret;
@@ -160,12 +165,12 @@ bzip2_decompress(WT_COMPRESSOR *compressor,
 	if ((ret = BZ2_bzDecompressInit(&bz, bz_small, bz_verbosity)) != BZ_OK)
 		return (bzip2_error(session, "BZ2_bzDecompressInit", ret));
 
-	bz.next_in = (char *)src->data;
-	bz.avail_in = src->size;
-	bz.next_out = (char *)dst->data;
-	bz.avail_out = dst->size;
+	bz.next_in = src;
+	bz.avail_in = src_len;
+	bz.next_out = dst;
+	bz.avail_out = dst_len;
 	if ((ret = BZ2_bzDecompress(&bz)) == BZ_STREAM_END) {
-		dst->size -= bz.avail_out;
+		*result_lenp = dst_len - bz.avail_out;
 		ret = 0;
 	} else
 		bzip2_error(session, "BZ2_bzDecompress", ret);

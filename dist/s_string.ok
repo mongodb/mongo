@@ -217,6 +217,7 @@ dlopen
 dlsym
 dmsg
 dsk
+dst
 dumpable
 dumpfile
 dup
@@ -298,6 +299,7 @@ keyname
 keyv
 kv
 len
+lenp
 lex
 lexicographically
 lfence

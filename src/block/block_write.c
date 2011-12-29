@@ -55,12 +55,13 @@ int
 __wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
     WT_BUF *buf, off_t *offsetp, uint32_t *sizep, uint32_t *cksump)
 {
-	WT_ITEM src, dst;
 	WT_BUF *tmp;
 	WT_PAGE_DISK *dsk;
 	off_t offset;
-	uint32_t align_size, size, tmp_size;
+	uint32_t align_size, size;
 	int compression_failed, ret;
+	uint8_t *src, *dst;
+	size_t len, src_len, dst_len, result_len;
 
 	tmp = NULL;
 	ret = 0;
@@ -103,30 +104,28 @@ not_compressed:	/*
 		dsk->size = align_size;
 	} else {
 		/* Skip the first 32B of the source data. */
-		src.data = (uint8_t *)buf->mem + WT_COMPRESS_SKIP;
-		src.size = buf->size - WT_COMPRESS_SKIP;
+		src = (uint8_t *)buf->mem + WT_COMPRESS_SKIP;
+		src_len = buf->size - WT_COMPRESS_SKIP;
 
 		/*
-		 * Compute the size needed for the destination buffer.
-		 * By default, we only allocate enough memory for a
-		 * copy of the original, if any compressed version
-		 * is bigger than the original, we won't use it.
-		 * But some compressors may need more memory allocated
-		 * even though they may not need all of it.
+		 * Compute the size needed for the destination buffer.  We only
+		 * allocate enough memory for a copy of the original by default,
+		 * if any compressed version is bigger than the original, we
+		 * won't use it.  However, some compression engines (snappy is
+		 * one example), may need more memory because they don't stop
+		 * just because there's no more memory into which to compress.
 		 */
-		if (block->compressor->pre_size != NULL) {
-			WT_ERR(block->compressor->pre_size(
-			    block->compressor, &session->iface, &src, &dst));
-			tmp_size = dst.size;
-		}
+		if (block->compressor->pre_size == NULL)
+			len = src_len;
 		else
-			tmp_size = src.size;
-		WT_RET(
-		    __wt_scr_alloc(session, tmp_size + WT_COMPRESS_SKIP, &tmp));
+			WT_ERR(block->compressor->pre_size(block->compressor,
+			    &session->iface, src, src_len, &len));
+		WT_RET(__wt_scr_alloc(
+		    session, (uint32_t)len + WT_COMPRESS_SKIP, &tmp));
 
-		/* Skip the first 32B of the dest data. */
-		dst.data = (uint8_t *)tmp->mem + WT_COMPRESS_SKIP;
-		dst.size = tmp_size;
+		/* Skip the first 32B of the destination data. */
+		dst = (uint8_t *)tmp->mem + WT_COMPRESS_SKIP;
+		dst_len = len;
 
 		/*
 		 * If compression fails, fallback to the original version.  This
@@ -138,7 +137,10 @@ not_compressed:	/*
 		 */
 		compression_failed = 0;
 		WT_ERR(block->compressor->compress(block->compressor,
-		    &session->iface, &src, &dst, &compression_failed));
+		    &session->iface,
+		    src, src_len,
+		    dst, dst_len,
+		    &result_len, &compression_failed));
 		if (compression_failed)
 			goto not_compressed;
 
@@ -148,7 +150,7 @@ not_compressed:	/*
 		 * file allocation unit, use the uncompressed version because
 		 * it will be faster to read).
 		 */
-		tmp->size = dst.size + WT_COMPRESS_SKIP;
+		tmp->size = (uint32_t)result_len + WT_COMPRESS_SKIP;
 		size = WT_ALIGN(tmp->size, block->allocsize);
 		if (size >= align_size)
 			goto not_compressed;
