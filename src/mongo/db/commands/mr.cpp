@@ -998,6 +998,28 @@ namespace mongo {
 
                 log(1) << "mr ns: " << config.ns << endl;
 
+                auto_ptr<ClientCursor> holdCursor;
+                ShardChunkManagerPtr chunkManager;
+
+                {
+                    // Get chunk manager before we check our version, to make sure it doesn't increment
+                    // in the meantime
+                    if ( shardingState.needShardChunkManager( config.ns ) ) {
+                        chunkManager = shardingState.getShardChunkManager( config.ns );
+                    }
+
+                    // Check our version immediately, to avoid migrations happening in the meantime while we do prep
+                    readlock lock( config.ns );
+                    Client::Context ctx( config.ns );
+
+                    // Get a very basic cursor, prevents deletion of migrated data while we m/r
+                    shared_ptr<Cursor> temp = NamespaceDetailsTransient::getCursor( config.ns.c_str(), BSONObj(), BSONObj() );
+                    uassert( 15876, str::stream() << "could not create cursor over " << config.ns << " to hold data while prepping m/r", temp.get() );
+                    holdCursor = auto_ptr<ClientCursor>( new ClientCursor( QueryOption_NoCursorTimeout , temp , config.ns.c_str() ) );
+                    uassert( 15877, str::stream() << "could not create m/r holding client cursor over " << config.ns, holdCursor.get() );
+
+                }
+
                 bool shouldHaveData = false;
 
                 long long num = 0;
@@ -1033,19 +1055,22 @@ namespace mongo {
                     wassert( config.limit < 0x4000000 ); // see case on next line to 32 bit unsigned
                     long long mapTime = 0;
                     {
+                        // We've got a cursor preventing migrations off, now re-establish our useful cursor
+
+                        // Need lock and context to use it
                         readlock lock( config.ns );
-                        Client::Context ctx( config.ns );
+                        // This context does no version check, safe b/c we checked earlier and have an
+                        // open cursor
+                        Client::Context ctx( config.ns, dbpath, true, false );
 
-                        ShardChunkManagerPtr chunkManager;
-                        if ( shardingState.needShardChunkManager( config.ns ) ) {
-                            chunkManager = shardingState.getShardChunkManager( config.ns );
-                        }
-
-                        // obtain cursor on data to apply mr to, sorted
+                        // obtain full cursor on data to apply mr to
                         shared_ptr<Cursor> temp = NamespaceDetailsTransient::getCursor( config.ns.c_str(), config.filter, config.sort );
-                        uassert( 15876, str::stream() << "could not create cursor over " << config.ns << " for query : " << config.filter << " sort : " << config.sort, temp.get() );
+                        uassert( 16052, str::stream() << "could not create cursor over " << config.ns << " for query : " << config.filter << " sort : " << config.sort, temp.get() );
                         auto_ptr<ClientCursor> cursor( new ClientCursor( QueryOption_NoCursorTimeout , temp , config.ns.c_str() ) );
-                        uassert( 15877, str::stream() << "could not create client cursor over " << config.ns << " for query : " << config.filter << " sort : " << config.sort, cursor.get() );
+                        uassert( 16053, str::stream() << "could not create client cursor over " << config.ns << " for query : " << config.filter << " sort : " << config.sort, cursor.get() );
+
+                        // Cleanup our previous cursor
+                        holdCursor.reset();
 
                         Timer mt;
                         // go through each doc
@@ -1137,7 +1162,6 @@ namespace mongo {
                         errmsg = "there were emits but no data!";
                         return false;
                     }
-
                 }
                 catch( SendStaleConfigException& e ){
                     log() << "mr detected stale config, should retry" << causedBy(e) << endl;

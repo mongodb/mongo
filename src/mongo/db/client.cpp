@@ -174,6 +174,7 @@ namespace mongo {
         _oldContext( _client->_context ),
         _path( mongo::dbpath ), // is this right? could be a different db? may need a dassert for this
         _justCreated(false),
+        _doVersion( true ),
         _ns( ns ), 
         _db(db)
     {
@@ -183,11 +184,12 @@ namespace mongo {
         _client->checkLocks();
     }
 
-    Client::Context::Context(const string& ns, string path , bool doauth ) :
+    Client::Context::Context(const string& ns, string path , bool doauth, bool doVersion ) :
         _client( currentClient.get() ), 
         _oldContext( _client->_context ),
         _path( path ), 
         _justCreated(false), // set for real in finishInit
+        _doVersion(doVersion),
         _ns( ns ), 
         _db(0) 
     {
@@ -280,7 +282,7 @@ namespace mongo {
         
         _db = dbHolderUnchecked().getOrCreate( _ns , _path , _justCreated );
         assert(_db);
-        checkNotStale();
+        if( _doVersion ) checkNotStale();
         _client->_context = this;
         _client->_curOp->enter( this );
         checkNsAccess( doauth, lockState );

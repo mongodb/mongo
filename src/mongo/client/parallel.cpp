@@ -623,7 +623,10 @@ namespace mongo {
         ChunkManagerPtr manager;
         ShardPtr primary;
 
-        log( pc ) << "creating pcursor over " << _qSpec << " and " << _cInfo << endl;
+        string prefix;
+        if( _totalTries > 0 ) prefix = str::stream() << "retrying (" << _totalTries << " tries)";
+        else prefix = "creating";
+        log( pc ) << prefix << " pcursor over " << _qSpec << " and " << _cInfo << endl;
 
         set<Shard> todoStorage;
         set<Shard>& todo = todoStorage;
