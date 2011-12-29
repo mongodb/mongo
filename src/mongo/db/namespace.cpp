@@ -689,22 +689,16 @@ namespace mongo {
             // TODO: fix above should not be strstr!
             return;
         }
-
-        {
-            BSONObjBuilder b;
-            b.append("name", ns);
-            if ( options )
-                b.append("options", *options);
-            BSONObj j = b.done();
-            char database[256];
-            nsToDatabase(ns, database);
-            string s = database;
-            if( cmdLine.configsvr && (s != "config" && s != "admin") ) { 
-                uasserted(14037, "can't create user databases on a --configsvr instance");
-            }
-            s += ".system.namespaces";
-            theDataFileMgr.insert(s.c_str(), j.objdata(), j.objsize(), true);
-        }
+        
+        BSONObjBuilder b;
+        b.append("name", ns);
+        if ( options )
+            b.append("options", *options);
+        BSONObj j = b.done();
+        char database[256];
+        nsToDatabase(ns, database);
+        string s = string(database) + ".system.namespaces";
+        theDataFileMgr.insert(s.c_str(), j.objdata(), j.objsize(), true);
     }
 
     void renameNamespace( const char *from, const char *to ) {
