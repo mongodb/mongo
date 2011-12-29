@@ -25,9 +25,6 @@ __wt_block_read_buf(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	/* Crack the cookie. */
 	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
 
-	/* Re-size the buffer as necessary. */
-	WT_RET(__wt_buf_initsize(session, buf, size));
-
 	/* Read the block. */
 	WT_RET(__wt_block_read(session, block, buf, offset, size, cksum));
 
@@ -64,6 +61,9 @@ __wt_block_read(WT_SESSION_IMPL *session, WT_BLOCK *block,
 
 	WT_VERBOSE(session, read,
 	    "offset/size %" PRIuMAX "/%" PRIu32, (uintmax_t)offset, size);
+
+	/* Re-size the buffer as necessary. */
+	WT_RET(__wt_buf_initsize(session, buf, size));
 
 	/* Do the read, validate the checksum. */
 	WT_RET(__wt_read(session, block->fh, offset, size, buf->mem));

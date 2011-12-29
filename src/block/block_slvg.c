@@ -132,7 +132,6 @@ __wt_block_salvage_next(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		 * needed.  If reading the page fails, it's probably corruption,
 		 * we ignore this block.
 		 */
-		WT_RET(__wt_buf_initsize(session, buf, size));
 		if (__wt_block_read(session, block, buf, offset, size, cksum)) {
 skip:			WT_VERBOSE(session, salvage,
 			    "skipping %" PRIu32 "B at file offset %" PRIuMAX,
