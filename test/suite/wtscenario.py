@@ -73,19 +73,49 @@ def multiply_scenarios(sep, *args):
             result = total
     return result
 
-def prune_scenarios(scenes):
+def prune_sorter_key(scene):
     """
-    Use listed probabilities for pruning the list of scenarios
+    Used by prune_scenerios to extract key for sorting.
+    The key is the saved random value multiplied by
+    the probability of choosing.
+    """
+    p = 1.0
+    if 'P' in scene[1]:
+        p = scene[1]['P']
+    return p * scene[1]['_rand']
+
+def prune_scenarios(scenes, count = -1):
+    """
+    Use listed probabilities for pruning the list of scenarios.
+    That is, the highest probability (value of P in the scendario)
+    are chosen more often.  With a second argument, only the
+    given number of scenarios are returned.  With no second argument,
+    only scenarios with P > .5 are returned half the time, etc.
     """
     r = suite_random.suite_random()
     result = []
-    for scene in scenes:
-        if 'P' in scene[1]:
-            p = scene[1]['P']
-            if p < r.rand_float():
-                continue
-        result.append(scene)
-    return result
+    if count == -1:
+        # Missing second arg - return those with P == .3 at
+        # 30% probability, for example.
+        for scene in scenes:
+            if 'P' in scene[1]:
+                p = scene[1]['P']
+                if p < r.rand_float():
+                    continue
+            result.append(scene)
+        return result
+    else:
+        # With second arg, we want exactly 'count' items
+        # returned.  So we'll sort them all and choose
+        # the top number.  Not the most efficient solution,
+        # but it's easy.
+        for scene in scenes:
+            scene[1]['_rand'] = r.rand_float()
+        scenes = sorted(scenes, key=prune_sorter_key)
+        for scene in scenes:
+            del scene[1]['_rand']
+        l = len(scenes)
+        return scenes[l-count:l]
 
 def number_scenarios(scenes):
     """
