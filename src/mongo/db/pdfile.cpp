@@ -218,20 +218,22 @@ namespace mongo {
         return z;
     }
 
+    void checkConfigNS(const char *ns) {
+        if ( cmdLine.configsvr && 
+             !( str::startsWith( ns, "config." ) || str::startsWith( ns, "admin." ) ) ) { 
+            uasserted(14037, "can't create user databases on a --configsvr instance");
+        }
+    }
+
     bool _userCreateNS(const char *ns, const BSONObj& options, string& err, bool *deferIdIndex) {
+        log(1) << "create collection " << ns << ' ' << options << endl;
+
         if ( nsdetails(ns) ) {
             err = "collection already exists";
             return false;
         }
 
-        log(1) << "create collection " << ns << ' ' << options << endl;
-
-        /* todo: do this only when we have allocated space successfully? or we could insert with a { ok: 0 } field
-           and then go back and set to ok : 1 after we are done.
-        */
-        bool isFreeList = strstr(ns, FREELIST_NS) != 0;
-        if( !isFreeList )
-            addNewNamespaceToCatalog(ns, options.isEmpty() ? 0 : &options);
+        checkConfigNS(ns);
 
         long long size = Extent::initialSize(128);
         {
@@ -321,6 +323,10 @@ namespace mongo {
 
         if ( mx > 0 )
             getDur().writingInt( d->max ) = mx;
+
+        bool isFreeList = strstr(ns, FREELIST_NS) != 0;
+        if( !isFreeList )
+            addNewNamespaceToCatalog(ns, options.isEmpty() ? 0 : &options);
 
         return true;
     }
@@ -1829,10 +1835,7 @@ namespace mongo {
     }
 
     NOINLINE_DECL NamespaceDetails* insert_newNamespace(const char *ns, int len, bool god) { 
-        addNewNamespaceToCatalog(ns);
-        /* todo: shouldn't be in the namespace catalog until after the allocations here work.
-            also if this is an addIndex, those checks should happen before this!
-        */
+        checkConfigNS(ns);
         // This may create first file in the database.
         int ies = Extent::initialSize(len);
         if( str::contains(ns, '$') && len + Record::HeaderSize >= BtreeData_V1::BucketSize - 256 && len + Record::HeaderSize <= BtreeData_V1::BucketSize + 256 ) { 
@@ -1844,6 +1847,7 @@ namespace mongo {
         NamespaceDetails *d = nsdetails(ns);
         if ( !god )
             ensureIdIndexForNewNs(ns);
+        addNewNamespaceToCatalog(ns);
         return d;
     }
 

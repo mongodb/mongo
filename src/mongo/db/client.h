@@ -175,7 +175,7 @@ namespace mongo {
         class Context : boost::noncopyable {
         public:
             /** this is probably what you want */
-            Context(const string& ns, string path=dbpath, bool doauth=true );
+            Context(const string& ns, string path=dbpath, bool doauth=true, bool doVersion=true );
 
             /** note: this does not call finishInit -- i.e., does not call 
                       shardVersionOk() for example. 
@@ -221,6 +221,7 @@ namespace mongo {
             Context * const _oldContext;
             const string _path;
             bool _justCreated;
+            bool _doVersion;
             const string _ns;
             Database * _db;
         }; // class Client::Context
