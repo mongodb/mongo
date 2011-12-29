@@ -1107,9 +1107,11 @@ namespace mongo {
 
                 {
                     // take distributed lock to prevent split / migration
+                    /*
                     ConnectionString config = configServer.getConnectionString();
                     DistributedLock lockSetup( config , fullns );
                     dist_lock_try dlk;
+
 
                     if (shardedInput) {
                         try{
@@ -1128,6 +1130,7 @@ namespace mongo {
                             return false;
                         }
                     }
+                    */
 
                     try {
                         SHARDED->commandOp( dbName, shardedCommand, 0, fullns, q, results );
