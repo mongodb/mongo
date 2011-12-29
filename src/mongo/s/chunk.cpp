@@ -869,8 +869,9 @@ namespace mongo {
     }
 
     bool ChunkManager::compatibleWith( const ChunkManager& other, const Shard& shard ) const {
-        // TODO: Make this much smarter - currently returns true only if we're the same chunk manager
-        return getns() == other.getns() && getSequenceNumber() == other.getSequenceNumber();
+        // Return true if the shard version is the same in the two chunk managers
+        return other.getVersion( shard ).toLong() == getVersion( shard ).toLong();
+
     }
 
     void ChunkManager::drop( ChunkManagerPtr me ) const {
