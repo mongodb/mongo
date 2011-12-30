@@ -7,14 +7,16 @@ rt = new ReplTest( baseName );
 m = rt.start( true );
 s = rt.start( false );
 
+// tests need to run against master server
 db = m.getDB( "test" );
+host = db.getMongo().host;
 
 Random.setRandomSeed();
 
 t = new ParallelTester();
 
 for( id = 0; id < 10; ++id ) {
-    var g = new EventGenerator( id, baseName, Random.randInt( 20 ) );
+    var g = new EventGenerator( id, baseName, Random.randInt( 20 ), host );
     for( var j = 0; j < 1000; ++j ) {
         var op = Random.randInt( 3 );
         switch( op ) {
@@ -34,7 +36,7 @@ for( id = 0; id < 10; ++id ) {
     t.add( EventGenerator.dispatch, g.getEvents() );
 }
 
-var g = new EventGenerator( id, baseName, Random.randInt( 5 ) );
+var g = new EventGenerator( id, baseName, Random.randInt( 5 ), host );
 for( var j = 1000; j < 3000; ++j ) {
     g.addCheckCount( j - 1000, { _id: {$gte:1000} }, j % 100 == 0, j % 500 == 0 );
     g.addInsert( {_id:j} );
