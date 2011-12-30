@@ -990,7 +990,7 @@ namespace mongo {
             */
             virtual bool slaveOk() const { return !replSet; }
 
-            virtual bool slaveOverrideOk() { return true; }
+            virtual bool slaveOverrideOk() const { return true; }
 
             virtual void help( stringstream &help ) const {
                 help << "Run a map/reduce operation on the server.\n";
@@ -1205,7 +1205,7 @@ namespace mongo {
         public:
             MapReduceFinishCommand() : Command( "mapreduce.shardedfinish" ) {}
             virtual bool slaveOk() const { return !replSet; }
-            virtual bool slaveOverrideOk() { return true; }
+            virtual bool slaveOverrideOk() const { return true; }
 
             virtual LockType locktype() const { return NONE; }
             bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {

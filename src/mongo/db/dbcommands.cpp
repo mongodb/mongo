@@ -810,7 +810,7 @@ namespace mongo {
             // ok on --slave setups
             return replSettings.slave == SimpleSlave;
         }
-        virtual bool slaveOverrideOk() { return true; }
+        virtual bool slaveOverrideOk() const { return true; }
         virtual bool maintenanceOk() const { return false; }
         virtual bool adminOnly() const { return false; }
         virtual void help( stringstream& help ) const { help << "count objects in collection"; }
@@ -971,7 +971,7 @@ namespace mongo {
         virtual bool slaveOk() const {
             return true;
         }
-        virtual bool slaveOverrideOk() {
+        virtual bool slaveOverrideOk() const {
             return true;
         }
         virtual bool adminOnly() const {

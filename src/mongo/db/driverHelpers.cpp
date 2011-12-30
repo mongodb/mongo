@@ -40,7 +40,7 @@ namespace mongo {
 
         virtual LockType locktype() const { return NONE; }
         virtual bool slaveOk() const { return true; }
-        virtual bool slaveOverrideOk() { return true; }
+        virtual bool slaveOverrideOk() const { return true; }
     };
 
     class ObjectIdTest : public BasicDriverHelper {
