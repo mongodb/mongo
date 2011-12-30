@@ -1,6 +1,11 @@
 // features2.js
 
 s = new ShardingTest( "features2" , 2 , 1 , 1 );
+
+// The counts and the tests for "on-num-shards" only works for previous assumptions in balancer 
+// behavior and assumes migrations do not occur during count() commands.
+s.stopBalancer()
+
 s.adminCommand( { enablesharding : "test" } );
 
 a = s._connections[0].getDB( "test" );
