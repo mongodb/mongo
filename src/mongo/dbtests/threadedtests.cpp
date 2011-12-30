@@ -18,6 +18,7 @@
  */
 
 #include "pch.h"
+#include "../server.h"
 #include "../bson/util/atomic_int.h"
 #include "../util/concurrency/mvar.h"
 #include "../util/concurrency/thread_pool.h"
@@ -27,7 +28,6 @@
 #include <boost/bind.hpp>
 #include "../db/d_concurrency.h"
 #include "../util/concurrency/synchronization.h"
-
 #include "dbtests.h"
 
 namespace ThreadedTests {
@@ -587,14 +587,16 @@ namespace ThreadedTests {
     };
 #endif
 
-        void sleepalittle() { 
-            Timer t;
-            while( 1 ) { 
-                boost::this_thread::yield();
-                if( t.micros() > 8 )
-                    break;
-            }
+    void sleepalittle() { 
+        Timer t;
+        while( 1 ) { 
+            boost::this_thread::yield();
+            if( t.micros() > 8 )
+                break;
         }
+    }
+
+    int once;
 
     /* This test is to see how long it takes to get a lock after there has been contention -- the OS 
          will need to reschedule us. if a spinlock, it will be fast of course, but these aren't spin locks.
@@ -611,15 +613,24 @@ namespace ThreadedTests {
         }
     private:
         whichmutex m;
+        char pad1[128];
         unsigned a, b;
+        char pad2[128];
+        unsigned locks;
+        char pad3[128];
+        volatile int k;
+
         virtual void validate() { 
+            if( once++ == 0 ) {
+                // <= 1.35 we use a different rwmutex impl so worth noting
+                cout << "Boost version : " << BOOST_VERSION << endl;
+            }
             cout << "Slack useful work fraction: " << ((double)a)/b << " locks:" << locks << endl;
         }
-        unsigned locks;
-        volatile int k;
         void watch() {
             while( 1 ) { 
                 b++;
+                //__sync_synchronize();
                 if( k ) { 
                     a++;
                 }
@@ -635,15 +646,20 @@ namespace ThreadedTests {
                 return;
             }
             Timer t;
+            unsigned lks = 0;
             while( 1 ) {
                 scoped lk(m);
                 k = 1;
                 // not very long, we'd like to simulate about 100K locks per second
                 sleepalittle();
-                k = 0; 
-                locks++;
-                if( done ||  t.millis() > 1500 )
+                lks++;
+                if( done ||  t.millis() > 1500 ) {
+                    locks += lks;
+                    k = 0;
                     break;
+                }
+                k = 0;
+                //__sync_synchronize();
             }
             done = true;
         }
