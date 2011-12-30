@@ -657,7 +657,8 @@ namespace mongo {
         QueryResponseBuilder( const ParsedQuery &parsedQuery ) : _buf(32768), _parsedQuery( parsedQuery ), _n() {
             _buf.skip( sizeof( QueryResult ) );
         }
-        void addResult( const DiskLoc &loc ) {
+        void addResult( const shared_ptr<Cursor> &cursor ) {
+            DiskLoc loc = cursor->currLoc();
             ++_n;
             fillQueryResultFromObj( _buf, _parsedQuery.getFields(), loc.obj(), ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
         }
@@ -821,7 +822,8 @@ namespace mongo {
             shared_ptr<Cursor> cursor;
             if ( pq.hasOption( QueryOption_OplogReplay ) ) {
                 cursor = FindingStartCursor::getCursor( ns, query, order );
-            } else if ( order.isEmpty() && !pq.getFields() && !pq.isExplain() && !pq.returnKey() ) {
+            }
+            else if ( order.isEmpty() && !pq.getFields() && !pq.isExplain() && !pq.returnKey() ) {
                 cursor = NamespaceDetailsTransient::getCursor( ns, query, BSONObj(), false, 0, &pq );
             }
             if ( cursor ) {
@@ -831,7 +833,8 @@ namespace mongo {
                 OpTime slaveReadTill;
                 ClientCursor::CleanupPointer ccPointer;
                 ccPointer.reset( new ClientCursor( QueryOption_NoCursorTimeout, cursor, ns ) );
-                while( cursor->ok() ) {
+
+                for( ; cursor->ok(); cursor->advance() ) {
                     if ( !ccPointer->yieldSometimes( ClientCursor::MaybeCovered ) || !cursor->ok() ) {
                         break;
                     }
@@ -841,19 +844,16 @@ namespace mongo {
                     }
                     
                     if ( !cursor->currentMatches() ) {
-                        cursor->advance();
                         continue;
                     }
                     
                     DiskLoc currLoc = cursor->currLoc();
                     if ( cursor->getsetdup( currLoc ) ) {
-                        cursor->advance();
                         continue;
                     }
                     
                     if ( skip > 0 ) {
                         --skip;
-                        cursor->advance();
                         continue;
                     }
 
@@ -867,7 +867,7 @@ namespace mongo {
                         }
                     }
                     
-                    queryResponseBuilder.addResult( currLoc );
+                    queryResponseBuilder.addResult( cursor );
                     if ( !cursor->supportGetMore() ) {
                         if ( queryResponseBuilder.enoughTotalResults() ) {
                             break;
@@ -881,9 +881,8 @@ namespace mongo {
                         }
                         break;
                     }
-                    
-                    cursor->advance();
                 }
+
                 if ( cursorid == 0 ) {
                     ccPointer.reset();
                 } else {
@@ -897,6 +896,7 @@ namespace mongo {
                     ccPointer->originalMessage = m;
                     ccPointer.release();
                 }
+
                 queryResponseBuilder.handoff( result );
                 QueryResult *qr = (QueryResult *) result.header();
                 qr->cursorId = cursorid;
