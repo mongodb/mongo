@@ -711,9 +711,10 @@ if ( typeof _threadInject != "undefined" ){
     }    
 
     // Helper class to generate a list of events which may be executed by a ParallelTester
-    EventGenerator = function( me, collectionName, mean ) {
+    EventGenerator = function( me, collectionName, mean, host ) {
         this.mean = mean;
-        this.events = new Array( me, collectionName );
+        if (host == undefined) host = db.getMongo().host;
+        this.events = new Array( me, collectionName, host );
     }
     
     EventGenerator.prototype._add = function( action ) {
@@ -754,7 +755,8 @@ if ( typeof _threadInject != "undefined" ){
         var args = argumentsToArray( arguments );
         var me = args.shift();
         var collectionName = args.shift();
-        var m = new Mongo( db.getMongo().host );
+        var host = args.shift();
+        var m = new Mongo( host );
         var t = m.getDB( "test" )[ collectionName ];
         for( var i in args ) {
             sleep( args[ i ][ 0 ] );
