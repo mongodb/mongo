@@ -578,7 +578,7 @@ namespace mongo {
                 }
             }
         }
-        auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order, &hint, false, parsedQuery ? parsedQuery->getMin() : BSONObj(), parsedQuery ? parsedQuery->getMax() : BSONObj() ) ); // mayYield == false
+        auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order, &hint, true, parsedQuery ? parsedQuery->getMin() : BSONObj(), parsedQuery ? parsedQuery->getMax() : BSONObj() ) ); // mayYield == false
         const QueryPlan *singlePlan = mps->singleCursor();
         if ( singlePlan ) {
             if ( planPolicy.permitPlan( *singlePlan ) ) {
