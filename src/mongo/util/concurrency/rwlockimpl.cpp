@@ -73,6 +73,11 @@ namespace mongo {
                     break;
                 }
             }
+
+            // TODO: this is wrong, we race pendingwriters for writer
+            //       which won't crash but could starve it or fail 
+            //       greedy semantic.
+
             // wait for writer to finish, then try again
             boost::mutex::scoped_lock lk(writer);
         }
