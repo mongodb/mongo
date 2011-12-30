@@ -200,8 +200,13 @@ namespace mongo {
             }
             
             if ( cc ) {
-                ClientCursor::YieldData data;
-                assert( cc->prepareToYield( data ) );
+                if ( c->supportYields() ) {
+                    ClientCursor::YieldData data;
+                    assert( cc->prepareToYield( data ) );
+                }
+                else {
+                    cc->updateLocation();
+                }
                 cc->mayUpgradeStorage();
                 cc->storeOpForSlave( last );
                 exhaust = cc->queryOptions() & QueryOption_Exhaust;
@@ -888,8 +893,14 @@ namespace mongo {
 //                    ccPointer.release();
                 } else {
 //                    log() << "updating location" << endl;
-                    ClientCursor::YieldData data;
-                    ccPointer->prepareToYield( data );
+                    if ( cursor->supportYields() ) {
+                        ClientCursor::YieldData data;
+                        ccPointer->prepareToYield( data );
+                    }
+                    else {
+                        ccPointer->updateLocation();
+                    }
+                    ccPointer->originalMessage = m;
                     ccPointer.release();
                 }
                 queryResponseBuilder.handoff( result );
