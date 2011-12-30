@@ -72,6 +72,22 @@ __wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	align_size = WT_ALIGN(buf->size, block->allocsize);
 
 	/*
+	 * The buffer must be big enough for us to zero to the next allocsize
+	 * boundary: our callers must allocate enough memory for the buffer so
+	 * that we can do this operation.  Why don't our callers just zero out
+	 * the buffer themselves?  Because we have to zero out the end of the
+	 * buffer in the compression case: so, we can either test compression
+	 * in our callers and zero or not-zero based on that test, splitting
+	 * the code to zero out the buffer into two parts, or require callers
+	 * allocate enough memory for us to zero here without copying.  Both
+	 * choices suck.
+	 */
+	if (align_size > buf->memsize) {
+		__wt_errx(session, "write buffer was incorrectly allocated");
+		return (WT_ERROR);
+	}
+
+	/*
 	 * Optionally stream-compress the data, but don't compress blocks that
 	 * are already as small as they're going to get.
 	 */
@@ -79,17 +95,6 @@ __wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
 not_compressed:	/*
 		 * If not compressing the buffer, we need to zero out any unused
 		 * bytes at the end.
-		 *
-		 * We know the buffer is big enough for us to zero to the next
-		 * allocsize boundary: our callers must allocate enough memory
-		 * for the buffer so that we can do this operation.  Why don't
-		 * our callers just zero out the buffer themselves?  Because we
-		 * have to zero out the end of the buffer in the compression
-		 * case: so, we can either test compression in our callers and
-		 * zero or not-zero based on that test, splitting the code to
-		 * zero out the buffer into two parts, or require our callers
-		 * allocate enough memory for us to zero here without copying.
-		 * Both choices suck.
 		 */
 		memset(
 		    (uint8_t *)buf->mem + buf->size, 0, align_size - buf->size);
