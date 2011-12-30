@@ -162,7 +162,6 @@ namespace mongo {
 	  and have set up the vector of indices for that document in fieldIndex.
 	 */
 	assert(pNoUnwindDocument.get());
-	assert(pUnwinder.get());
 
 	intrusive_ptr<Document> pClone(pNoUnwindDocument->clone());
 	intrusive_ptr<Document> pCurrent(pClone);
