@@ -1161,7 +1161,11 @@ namespace QueryTests {
 
         void run() {
             unsigned startNumCursors = ClientCursor::numCursors();
-            
+
+            // Check OplogReplay mode with missing collection.
+            auto_ptr< DBClientCursor > c0 = client().query( ns(), QUERY( "ts" << GTE << 50 ), 0, 0, 0, QueryOption_OplogReplay );
+            ASSERT( !c0->more() );
+
             BSONObj info;
             ASSERT( client().runCommand( "unittests", BSON( "create" << "querytests.findingstart" << "capped" << true << "$nExtents" << 5 << "autoIndexId" << false ), info ) );
             

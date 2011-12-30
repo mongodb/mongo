@@ -820,22 +820,21 @@ namespace mongo {
         {
             shared_ptr<Cursor> cursor;
             if ( pq.hasOption( QueryOption_OplogReplay ) ) {
-//                cursor = FindingStartCursor::getCursor( ns, query, order );
+                cursor = FindingStartCursor::getCursor( ns, query, order );
             } else if ( order.isEmpty() && !pq.getFields() && !pq.isExplain() && !pq.returnKey() ) {
                 cursor = NamespaceDetailsTransient::getCursor( ns, query, BSONObj(), false, 0, &pq );
             }
             if ( cursor ) {
                 QueryResponseBuilder queryResponseBuilder( pq );
-//                long long nscanned = 0;
                 long long skip = pq.getSkip();
                 long long cursorid = 0;
                 OpTime slaveReadTill;
                 ClientCursor::CleanupPointer ccPointer;
                 ccPointer.reset( new ClientCursor( QueryOption_NoCursorTimeout, cursor, ns ) );
                 while( cursor->ok() ) {
-//                    if ( !ccPointer->yieldSometimes( ClientCursor::MaybeCovered ) || !cursor->ok() ) {
-//                        break;
-//                    }
+                    if ( !ccPointer->yieldSometimes( ClientCursor::MaybeCovered ) || !cursor->ok() ) {
+                        break;
+                    }
 
                     if ( pq.getMaxScan() && cursor->nscanned() > pq.getMaxScan() ) {
                         break;
@@ -871,15 +870,12 @@ namespace mongo {
                     queryResponseBuilder.addResult( currLoc );
                     if ( !cursor->supportGetMore() ) {
                         if ( queryResponseBuilder.enoughTotalResults() ) {
-//                            log() << "enough n:" << n << endl;
                             break;
                         }
                     }
                     else if ( queryResponseBuilder.enoughForFirstBatch() ) {
-//                        log() << "enough for first" << endl;
                         /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
                         if ( pq.wantMore() && pq.getNumToReturn() != 1 && useCursors ) {
-//                            log() << "setting cursorid" << endl;
                             cursor->advance();
                             cursorid = ccPointer->cursorid();
                         }
@@ -890,9 +886,7 @@ namespace mongo {
                 }
                 if ( cursorid == 0 ) {
                     ccPointer.reset();
-//                    ccPointer.release();
                 } else {
-//                    log() << "updating location" << endl;
                     if ( cursor->supportYields() ) {
                         ClientCursor::YieldData data;
                         ccPointer->prepareToYield( data );

@@ -538,20 +538,26 @@ namespace mongo {
     
     shared_ptr<Cursor> FindingStartCursor::getCursor( const char *ns, const BSONObj &query, const BSONObj &order ) {
         NamespaceDetails *d = nsdetails(ns);
-        assert(d); // !!! what if ns not present
-        FieldRangeSetPair frsp = * new FieldRangeSetPair( ns, query );
-        QueryPlan &oplogPlan = * new QueryPlan( d, -1, frsp, 0, query, order, false ); // cursor isn't going to own this, make memory ownership ok/clearer
+        if ( !d ) {
+            return shared_ptr<Cursor>( new BasicCursor( DiskLoc() ) );
+        }
+        FieldRangeSetPair frsp( ns, query );
+        QueryPlan oplogPlan( d, -1, frsp, 0, query, order, false );
         FindingStartCursor finder( oplogPlan );
+        ElapsedTracker yieldCondition( 256, 20 );
         while( !finder.done() ) {
-//            RARELY { // !!! want multiple to yield simultaneously
-//                if ( finder.prepareToYield() ) {
-//                    ClientCursor::staticYield( -1, ns, 0 );
-//                    finder.recoverFromYield();
-//                }
-//            }
+            if ( yieldCondition.intervalHasElapsed() ) {
+                if ( finder.prepareToYield() ) {
+                    ClientCursor::staticYield( -1, ns, 0 );
+                    finder.recoverFromYield();
+                }
+            }
             finder.next();
         }
-        return finder.cursor();
+        shared_ptr<Cursor> ret = finder.cursor();
+        shared_ptr<CoveredIndexMatcher> matcher( new CoveredIndexMatcher( query, BSONObj() ) );
+        ret->setMatcher( matcher );
+        return ret;
     }
     
     // -------------------------------------
