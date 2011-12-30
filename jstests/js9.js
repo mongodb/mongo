@@ -1,4 +1,4 @@
-c = db.jni9;
+c = db.jstests_js9;
 c.drop();
 
 c.save( { a : 1 } );
@@ -13,7 +13,7 @@ assert.eq( 2 ,
            db.eval( 
                function(){
                    num = 0;
-                   db.jni9.find().forEach(
+                   db.jstests_js9.find().forEach(
                        function(z){
                            num++;
                        }

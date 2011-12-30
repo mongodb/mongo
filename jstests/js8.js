@@ -1,4 +1,4 @@
-t = db.jni8;
+t = db.jstests_js8;
 t.drop();
 
 t.save( { a : 1 , b : [ 2 , 3 , 4 ] } );

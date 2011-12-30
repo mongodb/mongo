@@ -1,4 +1,4 @@
-t = db.jni4;
+t = db.jstests_js4;
 t.drop();
 
 real = { a : 1 , 

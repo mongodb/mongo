@@ -1,4 +1,4 @@
-t = db.jni7;
+t = db.jstests_js7;
 t.drop();
 
 assert.eq( 17 , db.eval( function(){ return args[0]; } , 17 ) );
