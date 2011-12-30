@@ -30,6 +30,14 @@ using namespace std;
 //#include "../bson/bson.h"
 #include "../db/jsobj.h"
 
+#if defined(_DEBUG)
+void boost::assertion_failed(char const * expr, char const * function, char const * file, long line) {
+    mongo::log() << "boost assertion failure " << expr << ' ' << function << ' ' << file << ' ' << line << endl;
+    // for _DEBUG, abort so we notice for sure
+    ::abort();
+}
+#endif
+
 namespace mongo {
 
     AssertionCount assertionCount;
