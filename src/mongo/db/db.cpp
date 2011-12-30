@@ -1139,7 +1139,7 @@ namespace mongo {
         } else {
             oss << " operation";   
         }
-        oss << " at address: " << siginfo->si_addr << endl;
+        oss << " at address: " << siginfo->si_addr << " from thread: " << getThreadName() << endl;
         rawOut( oss.str() );
         abruptQuit( signal );   
     }
