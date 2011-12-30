@@ -18,6 +18,18 @@
 #define	WT_BLOCK_INVALID_OFFSET		0
 
 /*
+ * WT_FREE_ENTRY  --
+ *	Encapsulation of an entry on the Btree free list.
+ */
+struct __wt_free_entry {
+	TAILQ_ENTRY(__wt_free_entry) qa;	/* Address queue */
+	TAILQ_ENTRY(__wt_free_entry) qs;	/* Size queue */
+
+	off_t	 offset;			/* Disk offset */
+	uint32_t size;				/* Size */
+};
+
+/*
  * WT_BLOCK --
  *	Encapsulation of the standard WiredTiger block manager.
  */
@@ -195,15 +207,3 @@ struct __wt_page_disk {
  */
 #define	WT_PAGE_DISK_BYTE(dsk)						\
 	((void *)((uint8_t *)(dsk) + WT_PAGE_DISK_SIZE))
-
-/*
- * WT_FREE_ENTRY  --
- *	Encapsulation of an entry on the Btree free list.
- */
-struct __wt_free_entry {
-	TAILQ_ENTRY(__wt_free_entry) qa;	/* Address queue */
-	TAILQ_ENTRY(__wt_free_entry) qs;	/* Size queue */
-
-	off_t	 offset;			/* Disk offset */
-	uint32_t size;				/* Size */
-};
