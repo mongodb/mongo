@@ -172,11 +172,11 @@
 		ret = __ret;						\
 } while (0)
 
-/* Macros to check whether a string matches a prefix. */
-
+/* Check if a string matches a prefix. */
 #define	WT_PREFIX_MATCH(str, pre)					\
 	(strncmp((str), (pre), strlen(pre)) == 0)
 
+/* Check if a string matches a prefix, and move past it. */
 #define	WT_PREFIX_SKIP(str, pre)					\
 	((strncmp((str), (pre), strlen(pre)) == 0) ?			\
 	    ((str) += strlen(pre), 1) : 0)
