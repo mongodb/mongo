@@ -85,7 +85,8 @@ namespace mongo {
         static time_t lastWhen;
         static unsigned lastLine;
         if( lastLine == line && time(0)-lastWhen < 5 ) { 
-            if( rateLimited++ == 0 ) { 
+            if( !rateLimited ) { 
+                rateLimited = true;
                 log() << "rate limiting wassert" << endl;
             }
             return;

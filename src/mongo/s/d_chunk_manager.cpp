@@ -210,7 +210,7 @@ namespace mongo {
             ostringstream os;
             os << "ranges differ, "
                << "requested: "  << min << " -> " << max << " "
-               << "existing: " << (it == _chunksMap.end()) ? "<empty>" : it->first.toString() + " -> " + it->second.toString();
+               << "existing: " << ((it == _chunksMap.end()) ? "<empty>" : it->first.toString() + " -> " + it->second.toString());
             uasserted( 13587 , os.str() );
         }
     }
