@@ -118,15 +118,15 @@ __wt_block_read(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		 * byte length somehow, see the snappy compression extension for
 		 * an example.
 		 */
-		memcpy(buf->mem, tmp->mem, WT_COMPRESS_SKIP);
+		memcpy(buf->mem, tmp->mem, WT_BLOCK_COMPRESS_SKIP);
 		WT_ERR(block->compressor->decompress(
 		    block->compressor, &session->iface,
-		    (uint8_t *)tmp->mem + WT_COMPRESS_SKIP,
-		    tmp->size - WT_COMPRESS_SKIP,
-		    (uint8_t *)buf->mem + WT_COMPRESS_SKIP,
-		    dsk->memsize - WT_COMPRESS_SKIP,
+		    (uint8_t *)tmp->mem + WT_BLOCK_COMPRESS_SKIP,
+		    tmp->size - WT_BLOCK_COMPRESS_SKIP,
+		    (uint8_t *)buf->mem + WT_BLOCK_COMPRESS_SKIP,
+		    dsk->memsize - WT_BLOCK_COMPRESS_SKIP,
 		    &result_len));
-		if (result_len != dsk->memsize - WT_COMPRESS_SKIP)
+		if (result_len != dsk->memsize - WT_BLOCK_COMPRESS_SKIP)
 			WT_ERR(__wt_illegal_value(session));
 	} else if (block->compressor != NULL)
 		/*

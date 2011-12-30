@@ -104,8 +104,8 @@ not_compressed:	/*
 		dsk->size = align_size;
 	} else {
 		/* Skip the first 32B of the source data. */
-		src = (uint8_t *)buf->mem + WT_COMPRESS_SKIP;
-		src_len = buf->size - WT_COMPRESS_SKIP;
+		src = (uint8_t *)buf->mem + WT_BLOCK_COMPRESS_SKIP;
+		src_len = buf->size - WT_BLOCK_COMPRESS_SKIP;
 
 		/*
 		 * Compute the size needed for the destination buffer.  We only
@@ -121,10 +121,10 @@ not_compressed:	/*
 			WT_ERR(block->compressor->pre_size(block->compressor,
 			    &session->iface, src, src_len, &len));
 		WT_RET(__wt_scr_alloc(
-		    session, (uint32_t)len + WT_COMPRESS_SKIP, &tmp));
+		    session, (uint32_t)len + WT_BLOCK_COMPRESS_SKIP, &tmp));
 
 		/* Skip the first 32B of the destination data. */
-		dst = (uint8_t *)tmp->mem + WT_COMPRESS_SKIP;
+		dst = (uint8_t *)tmp->mem + WT_BLOCK_COMPRESS_SKIP;
 		dst_len = len;
 
 		/*
@@ -150,14 +150,14 @@ not_compressed:	/*
 		 * file allocation unit, use the uncompressed version because
 		 * it will be faster to read).
 		 */
-		tmp->size = (uint32_t)result_len + WT_COMPRESS_SKIP;
+		tmp->size = (uint32_t)result_len + WT_BLOCK_COMPRESS_SKIP;
 		size = WT_ALIGN(tmp->size, block->allocsize);
 		if (size >= align_size)
 			goto not_compressed;
 		align_size = size;
 
 		/* Copy in the skipped header bytes, zero out unused bytes. */
-		memcpy(tmp->mem, buf->mem, WT_COMPRESS_SKIP);
+		memcpy(tmp->mem, buf->mem, WT_BLOCK_COMPRESS_SKIP);
 		memset(
 		    (uint8_t *)tmp->mem + tmp->size, 0, align_size - tmp->size);
 

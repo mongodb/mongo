@@ -104,7 +104,7 @@ struct __wt_block_desc {
  * boundary is probably better alignment for the underlying compression engine,
  * and skipping 32B won't matter in terms of compression efficiency.
  */
-#define	WT_COMPRESS_SKIP	32
+#define	WT_BLOCK_COMPRESS_SKIP	32
 
 /*
  * WT_PAGE_DISK --
