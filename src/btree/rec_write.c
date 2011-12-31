@@ -470,8 +470,6 @@ __rec_split_init(
 
 	r = session->reconcile;
 	btree = session->btree;
-						/* New page, compression off. */
-	r->key_pfx_compress = r->key_sfx_compress = 0;
 
 	/* Ensure the scratch buffer is large enough. */
 	WT_RET(__wt_buf_initsize(session, &r->dsk, (size_t)max));
@@ -544,6 +542,10 @@ __rec_split_init(
 	r->entries = 0;
 	r->first_free = WT_PAGE_DISK_BYTE(dsk);
 	r->space_avail = r->split_size - WT_PAGE_DISK_SIZE;
+
+	/* New page, compression off. */
+	r->key_pfx_compress = r->key_sfx_compress = 0;
+
 	return (0);
 }
 
