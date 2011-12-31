@@ -18,8 +18,14 @@
 #pragma once
 
 #include <string.h>
+#include <sstream>
 #include <errno.h>
+#include <vector>
+#include <boost/shared_ptr.hpp>
+#include <boost/scoped_ptr.hpp>
+#include <boost/thread/tss.hpp>
 #include "../bson/util/builder.h"
+#include "debug_util.h"
 
 #ifndef _WIN32
 #include <syslog.h>
@@ -217,6 +223,8 @@ namespace mongo {
     };
     extern Nullstream nullstream;
 
+    class mutex;
+
     class Logstream : public Nullstream {
         static mongo::mutex mutex;
         static int doneSetup;
@@ -228,12 +236,9 @@ namespace mongo {
         static vector<Tee*> * globalTees;
         static bool isSyslog;
     public:
-        inline static void logLockless( const StringData& s );
+        static void logLockless( const StringData& s );
 
-        static void setLogFile(FILE* f) {
-            scoped_lock lk(mutex);
-            logfile = f;
-        }
+        static void setLogFile(FILE* f);
 #ifndef _WIN32
         static void useSyslog(const char * name) {
             cout << "using syslog ident: " << name << endl;
@@ -248,9 +253,7 @@ namespace mongo {
         }
 #endif
         
-        static int magicNumber() {
-            return 1717;
-        }
+        static int magicNumber() { return 1717; }
 
         static int getLogDesc() {
             int fd = -1;
@@ -324,7 +327,7 @@ namespace mongo {
         int getIndent() const { return indent; }
 
     private:
-        static thread_specific_ptr<Logstream> tsp;
+        static boost::thread_specific_ptr<Logstream> tsp;
         Logstream() {
             indent = 0;
             _init();
@@ -334,15 +337,7 @@ namespace mongo {
             logLevel = LL_INFO;
         }
     public:
-        static Logstream& get() {
-            if ( StaticObserver::_destroyingStatics ) {
-                cout << "Logstream::get called in uninitialized state" << endl;
-            }
-            Logstream *p = tsp.get();
-            if( p == 0 )
-                tsp.reset( p = new Logstream() );
-            return *p;
-        }
+        static Logstream& get();
     };
 
     extern int logLevel;
@@ -435,139 +430,10 @@ namespace mongo {
 
     std::string toUtf8String(const std::wstring& wide);
 
-#if defined(_WIN32)
-    inline string errnoWithDescription(DWORD x = GetLastError()) {
-#else
-    inline string errnoWithDescription(int x = errno) {
-#endif
-        stringstream s;
-        s << "errno:" << x << ' ';
-
-#if defined(_WIN32)
-        LPTSTR errorText = NULL;
-        FormatMessage(
-            FORMAT_MESSAGE_FROM_SYSTEM
-            |FORMAT_MESSAGE_ALLOCATE_BUFFER
-            |FORMAT_MESSAGE_IGNORE_INSERTS,
-            NULL,
-            x, 0,
-            (LPTSTR) &errorText,  // output
-            0, // minimum size for output buffer
-            NULL);
-        if( errorText ) {
-            string x = toUtf8String(errorText);
-            for( string::iterator i = x.begin(); i != x.end(); i++ ) {
-                if( *i == '\n' || *i == '\r' )
-                    break;
-                s << *i;
-            }
-            LocalFree(errorText);
-        }
-        else
-            s << strerror(x);
-        /*
-        DWORD n = FormatMessage(
-            FORMAT_MESSAGE_ALLOCATE_BUFFER |
-            FORMAT_MESSAGE_FROM_SYSTEM |
-            FORMAT_MESSAGE_IGNORE_INSERTS,
-            NULL, x,
-            MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-            (LPTSTR) &lpMsgBuf, 0, NULL);
-        */
-#else
-        s << strerror(x);
-#endif
-        return s.str();
-    }
-
     /** output the error # and error message with prefix.
         handy for use as parm in uassert/massert.
         */
     string errnoWithPrefix( const char * prefix );
-
-    void Logstream::logLockless( const StringData& s ) {
-        if ( s.size() == 0 )
-            return;
-
-        if ( doneSetup == 1717 ) {
-#ifndef _WIN32
-            if ( isSyslog ) {
-                syslog( LOG_INFO , "%s" , s.data() );
-            } else
-#endif
-            if (fwrite(s.data(), s.size(), 1, logfile)) {
-                fflush(logfile);
-            }
-            else {
-                int x = errno;
-                cout << "Failed to write to logfile: " << errnoWithDescription(x) << endl;
-            }
-        }
-        else {
-            cout << s.data();
-            cout.flush();
-        }
-    }
-
-    void Logstream::flush(Tee *t) {
-        // this ensures things are sane
-        if ( doneSetup == 1717 ) {
-            string msg = ss.str();
-            string threadName = getThreadName();
-            const char * type = logLevelToString(logLevel);
-
-            int spaceNeeded = (int)(msg.size() + 64 + threadName.size());
-            int bufSize = 128;
-            while ( bufSize < spaceNeeded )
-                bufSize += 128;
-
-            BufBuilder b(bufSize);
-            time_t_to_String( time(0) , b.grow(20) );
-            if (!threadName.empty()) {
-                b.appendChar( '[' );
-                b.appendStr( threadName , false );
-                b.appendChar( ']' );
-                b.appendChar( ' ' );
-            }
-
-            for ( int i=0; i<indent; i++ )
-                b.appendChar( '\t' );
-
-            if ( type[0] ) {
-                b.appendStr( type , false );
-                b.appendStr( ": " , false );
-            }
-
-            b.appendStr( msg );
-
-            string out( b.buf() , b.len() - 1);
-
-            scoped_lock lk(mutex);
-
-            if( t ) t->write(logLevel,out);
-            if ( globalTees ) {
-                for ( unsigned i=0; i<globalTees->size(); i++ )
-                    (*globalTees)[i]->write(logLevel,out);
-            }
-#ifndef _WIN32
-            if ( isSyslog ) {
-                syslog( logLevelToSysLogLevel(logLevel) , "%s" , out.data() );
-            } else
-#endif
-            if(fwrite(out.data(), out.size(), 1, logfile)) {
-                fflush(logfile);
-            }
-            else {
-                int x = errno;
-                cout << "Failed to write to logfile: " << errnoWithDescription(x) << ": " << out << endl;
-            }
-#ifdef POSIX_FADV_DONTNEED
-            // This only applies to pages that have already been flushed
-            RARELY posix_fadvise(fileno(logfile), 0, 0, POSIX_FADV_DONTNEED);
-#endif
-        }
-        _init();
-    }
 
     struct LogIndentLevel {
         LogIndentLevel(){
@@ -579,5 +445,7 @@ namespace mongo {
     };
 
     extern Tee* const warnings; // Things put here go in serverStatus
+
+    string errnoWithDescription(int errorcode = -1);
 
 } // namespace mongo

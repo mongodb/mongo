@@ -192,4 +192,151 @@ namespace mongo {
     FILE* Logstream::logfile = stdout;
     bool Logstream::isSyslog = false;
 
+    string errnoWithDescription(int x) {
+#if defined(_WIN32)
+        if( x < 0 ) 
+            x = GetLastError();
+#else
+        if( x < 0 ) 
+            x = errno;
+#endif
+        stringstream s;
+        s << "errno:" << x << ' ';
+
+#if defined(_WIN32)
+        LPTSTR errorText = NULL;
+        FormatMessage(
+            FORMAT_MESSAGE_FROM_SYSTEM
+            |FORMAT_MESSAGE_ALLOCATE_BUFFER
+            |FORMAT_MESSAGE_IGNORE_INSERTS,
+            NULL,
+            x, 0,
+            (LPTSTR) &errorText,  // output
+            0, // minimum size for output buffer
+            NULL);
+        if( errorText ) {
+            string x = toUtf8String(errorText);
+            for( string::iterator i = x.begin(); i != x.end(); i++ ) {
+                if( *i == '\n' || *i == '\r' )
+                    break;
+                s << *i;
+            }
+            LocalFree(errorText);
+        }
+        else
+            s << strerror(x);
+        /*
+        DWORD n = FormatMessage(
+            FORMAT_MESSAGE_ALLOCATE_BUFFER |
+            FORMAT_MESSAGE_FROM_SYSTEM |
+            FORMAT_MESSAGE_IGNORE_INSERTS,
+            NULL, x,
+            MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+            (LPTSTR) &lpMsgBuf, 0, NULL);
+        */
+#else
+        s << strerror(x);
+#endif
+        return s.str();
+    }
+
+    void Logstream::logLockless( const StringData& s ) {
+        if ( s.size() == 0 )
+            return;
+
+        if ( doneSetup == 1717 ) {
+#ifndef _WIN32
+            if ( isSyslog ) {
+                syslog( LOG_INFO , "%s" , s.data() );
+            } else
+#endif
+            if (fwrite(s.data(), s.size(), 1, logfile)) {
+                fflush(logfile);
+            }
+            else {
+                int x = errno;
+                cout << "Failed to write to logfile: " << errnoWithDescription(x) << endl;
+            }
+        }
+        else {
+            cout << s.data();
+            cout.flush();
+        }
+    }
+
+    void Logstream::flush(Tee *t) {
+        // this ensures things are sane
+        if ( doneSetup == 1717 ) {
+            string msg = ss.str();
+            string threadName = getThreadName();
+            const char * type = logLevelToString(logLevel);
+
+            int spaceNeeded = (int)(msg.size() + 64 + threadName.size());
+            int bufSize = 128;
+            while ( bufSize < spaceNeeded )
+                bufSize += 128;
+
+            BufBuilder b(bufSize);
+            time_t_to_String( time(0) , b.grow(20) );
+            if (!threadName.empty()) {
+                b.appendChar( '[' );
+                b.appendStr( threadName , false );
+                b.appendChar( ']' );
+                b.appendChar( ' ' );
+            }
+
+            for ( int i=0; i<indent; i++ )
+                b.appendChar( '\t' );
+
+            if ( type[0] ) {
+                b.appendStr( type , false );
+                b.appendStr( ": " , false );
+            }
+
+            b.appendStr( msg );
+
+            string out( b.buf() , b.len() - 1);
+
+            scoped_lock lk(mutex);
+
+            if( t ) t->write(logLevel,out);
+            if ( globalTees ) {
+                for ( unsigned i=0; i<globalTees->size(); i++ )
+                    (*globalTees)[i]->write(logLevel,out);
+            }
+#ifndef _WIN32
+            if ( isSyslog ) {
+                syslog( logLevelToSysLogLevel(logLevel) , "%s" , out.data() );
+            } else
+#endif
+            if(fwrite(out.data(), out.size(), 1, logfile)) {
+                fflush(logfile);
+            }
+            else {
+                int x = errno;
+                cout << "Failed to write to logfile: " << errnoWithDescription(x) << ": " << out << endl;
+            }
+#ifdef POSIX_FADV_DONTNEED
+            // This only applies to pages that have already been flushed
+            RARELY posix_fadvise(fileno(logfile), 0, 0, POSIX_FADV_DONTNEED);
+#endif
+        }
+        _init();
+    }
+
+    void Logstream::setLogFile(FILE* f) {
+        scoped_lock lk(mutex);
+        logfile = f;
+    }
+        
+    Logstream& Logstream::get() {
+        if ( StaticObserver::_destroyingStatics ) {
+            cout << "Logstream::get called in uninitialized state" << endl;
+        }
+        Logstream *p = tsp.get();
+        if( p == 0 )
+            tsp.reset( p = new Logstream() );
+        return *p;
+    }
+
 }
