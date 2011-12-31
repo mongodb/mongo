@@ -17,9 +17,6 @@
 
 #include "pch.h"
 #include "assert_util.h"
-#include "assert.h"
-//#include "file.h"
-#include <cmath>
 using namespace std;
 
 #ifndef _WIN32
@@ -27,8 +24,7 @@ using namespace std;
 #include <sys/file.h>
 #endif
 
-//#include "../bson/bson.h"
-#include "../db/jsobj.h"
+#include "../bson/bsonobjbuilder.h"
 
 #if defined(_DEBUG)
 namespace boost {
