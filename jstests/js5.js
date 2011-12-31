@@ -1,5 +1,5 @@
 
-t = db.jni5
+t = db.jstests_js5
 t.drop();
 
 t.save( { a : 1 } )

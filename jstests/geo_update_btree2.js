@@ -4,7 +4,7 @@ var status = function( msg ){
     print( "\n\n###\n" + msg + "\n###\n\n" )
 }
 
-var coll = db.getCollection( "foo.bar" )
+var coll = db.getCollection( "jstests_geo_update_btree2" )
 coll.drop()
 
 coll.ensureIndex( { loc : '2d' } )

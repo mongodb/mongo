@@ -994,6 +994,7 @@ namespace mongo {
                     }
                 }
                 b.append( "out" , output );
+                b.append( "shardedFirstPass" , true );
 
                 if ( maxChunkSizeBytes > 0 ) {
                     // will need to figure out chunks, ask shards for points

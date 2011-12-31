@@ -335,6 +335,7 @@ namespace mongo {
     }
 
     void checkIfReplMissingFromCommandLine() {
+        writelock lk; // _openAllFiles is false at this point, so this is helpful for the query below to work as you can't open files when readlocked
         if( !cmdLine.usingReplSets() ) { 
             Client::GodScope gs;
             DBDirectClient c;
@@ -354,10 +355,15 @@ namespace mongo {
         Client::GodScope gs;
         vector< string > toDelete;
         DBDirectClient cli;
-        auto_ptr< DBClientCursor > c = cli.query( "local.system.namespaces", Query( fromjson( "{name:/^local.temp./}" ) ) );
-        while( c->more() ) {
-            BSONObj o = c->next();
-            toDelete.push_back( o.getStringField( "name" ) );
+        vector< string > dbNames;
+        getDatabaseNames( dbNames );
+        for (vector<string>::const_iterator it(dbNames.begin()), end(dbNames.end()); it != end; ++it){
+            const string coll = *it + ".system.namespaces";
+            scoped_ptr< DBClientCursor > c (cli.query(coll, Query( fromjson( "{'options.temp': {$in: [true, 1]}}" ) ) ));
+            while( c->more() ) {
+                BSONObj o = c->next();
+                toDelete.push_back( o.getStringField( "name" ) );
+            }
         }
         for( vector< string >::iterator i = toDelete.begin(); i != toDelete.end(); ++i ) {
             log() << "Dropping old temporary collection: " << *i << endl;
@@ -1139,7 +1145,7 @@ namespace mongo {
         } else {
             oss << " operation";   
         }
-        oss << " at address: " << siginfo->si_addr << endl;
+        oss << " at address: " << siginfo->si_addr << " from thread: " << getThreadName() << endl;
         rawOut( oss.str() );
         abruptQuit( signal );   
     }

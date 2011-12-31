@@ -808,10 +808,10 @@ namespace mongo {
     }
 
     auto_ptr<DBClientCursor> DBDirectClient::query(const string &ns, Query query, int nToReturn , int nToSkip ,
-            const BSONObj *fieldsToReturn , int queryOptions ) {
+            const BSONObj *fieldsToReturn , int queryOptions , int batchSize) {
 
         //if ( ! query.obj.isEmpty() || nToReturn != 0 || nToSkip != 0 || fieldsToReturn || queryOptions )
-        return DBClientBase::query( ns , query , nToReturn , nToSkip , fieldsToReturn , queryOptions );
+        return DBClientBase::query( ns , query , nToReturn , nToSkip , fieldsToReturn , queryOptions , batchSize );
         //
         //assert( query.obj.isEmpty() );
         //throw UserException( (string)"yay:" + ns );

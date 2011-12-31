@@ -81,7 +81,7 @@ namespace mongo {
         /* Return true if the client force a command to be run on a slave by
            turning on the 'slaveOk' option in the command query.
         */
-        virtual bool slaveOverrideOk() {
+        virtual bool slaveOverrideOk() const {
             return false;
         }
 

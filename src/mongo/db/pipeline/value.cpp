@@ -748,8 +748,12 @@ namespace mongo {
         }
 
         case BinData:
+        case Symbol:
+        case CodeWScope:
+	    uassert(16017, str::stream() <<
+		    "comparisons of values of BSON type " << lType <<
+		    " are not supported", false);
             // pBuilder->appendBinData(fieldName, ...);
-            assert(false); // CW TODO unimplemented
             break;
 
         case jstOID:
@@ -775,14 +779,6 @@ namespace mongo {
 
         case RegEx:
             return rL->stringValue.compare(rR->stringValue);
-
-        case Symbol:
-            assert(false); // CW TODO unimplemented
-            break;
-
-        case CodeWScope:
-            assert(false); // CW TODO unimplemented
-            break;
 
         case NumberInt:
             if (rL->simple.intValue < rR->simple.intValue)
@@ -815,7 +811,7 @@ namespace mongo {
         case DBRef:
         case Code:
         case MaxKey:
-            assert(false); // CW TODO better message
+            assert(false);
             break;
         } // switch(lType)
 
@@ -850,8 +846,11 @@ namespace mongo {
         }
 
         case BinData:
-            // pBuilder->appendBinData(fieldName, ...);
-            assert(false); // CW TODO unimplemented
+        case Symbol:
+        case CodeWScope:
+	    uassert(16018, str::stream() <<
+		    "hashes of values of BSON type " << type <<
+		    " are not supported", false);
             break;
 
         case jstOID:
@@ -869,14 +868,6 @@ namespace mongo {
         case RegEx:
 	    boost::hash_combine(seed, stringValue);
 	    break;
-
-        case Symbol:
-            assert(false); // CW TODO unimplemented
-            break;
-
-        case CodeWScope:
-            assert(false); // CW TODO unimplemented
-            break;
 
         case NumberInt:
 	    boost::hash_combine(seed, simple.intValue);

@@ -2869,7 +2869,7 @@ namespace mongo {
         virtual LockType locktype() const { return READ; }
         bool slaveOk() const { return true; }
         void help(stringstream& h) const { h << "http://www.mongodb.org/display/DOCS/Geospatial+Indexing#GeospatialIndexing-geoNearCommand"; }
-        bool slaveOverrideOk() { return true; }
+        bool slaveOverrideOk() const { return true; }
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string ns = dbname + "." + cmdObj.firstElement().valuestr();
 
@@ -2986,7 +2986,7 @@ namespace mongo {
         GeoWalkCmd() : Command( "geoWalk" ) {}
         virtual LockType locktype() const { return READ; }
         bool slaveOk() const { return true; }
-        bool slaveOverrideOk() { return true; }
+        bool slaveOverrideOk() const { return true; }
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string ns = dbname + "." + cmdObj.firstElement().valuestr();
 

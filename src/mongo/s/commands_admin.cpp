@@ -1097,7 +1097,7 @@ namespace mongo {
 
         virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const { return true; }
-        virtual bool slaveOverrideOk() { return true; }
+        virtual bool slaveOverrideOk() const { return true; }
         virtual bool adminOnly() const { return true; }
         virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream& help ) const { help << "list databases on cluster"; }
@@ -1194,7 +1194,7 @@ namespace mongo {
         CmdCloseAllDatabases() : Command("closeAllDatabases", false , "closeAllDatabases" ) {}
         virtual bool logTheOp() { return false; }
         virtual bool slaveOk() const { return true; }
-        virtual bool slaveOverrideOk() { return true; }
+        virtual bool slaveOverrideOk() const { return true; }
         virtual bool adminOnly() const { return true; }
         virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream& help ) const { help << "Not supported sharded"; }

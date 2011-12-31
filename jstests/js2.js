@@ -1,22 +1,23 @@
 
-t = db.jni2;
+t = db.jstests_js2;
 t.remove( {} );
 
-db.jni2t.remove( {} );
+t2 = db.jstests_js2_2;
+t2.remove( {} );
 
-assert.eq( 0 , db.jni2t.find().length() , "A" );
+assert.eq( 0 , t2.find().length() , "A" );
 
 t.save( { z : 1 } );
 t.save( { z : 2 } );
 assert.throws( function(){
     t.find( { $where : 
                        function(){ 
-                           db.jni2t.save( { y : 1 } );
+                           db.jstests_js2_2.save( { y : 1 } );
                            return 1; 
                        } 
             } ).forEach( printjson );
 } , null , "can't save from $where" );
 
-assert.eq( 0 , db.jni2t.find().length() , "B" )
+assert.eq( 0 , t2.find().length() , "B" )
 
 assert(t.validate().valid , "E");

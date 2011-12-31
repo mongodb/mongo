@@ -832,8 +832,8 @@ if nix:
             #env.Prepend( CXXFLAGS=' -include pch.h ' ) # clang++ only uses pch from command line
             print( "ERROR: clang pch is broken for now" )
             Exit(1)
-        env['Gch'] = env.Gch( [ "pch.h" ] )[0]
-        env['GchSh'] = env.GchSh( [ "pch.h" ] )[0]
+        env['Gch'] = env.Gch( [ "src/mongo/pch.h" ] )[0]
+        env['GchSh'] = env.GchSh( [ "src/mongo/pch.h" ] )[0]
     elif os.path.exists( "src/mongo/pch.h.gch" ):
         print( "removing precompiled headers" )
         os.unlink( "src/mongo/pch.h.gch" ) # gcc uses the file if it exists

@@ -1,5 +1,5 @@
 
-t = db.jni3;
+t = db.jstests_js3;
 
 debug = function( s ){
     //printjson( s );
@@ -20,9 +20,9 @@ for( z = 0; z < 2; z++ ) {
     
     assert( 33 == db.dbEval(function() { return 33; } ) );
     
-    db.dbEval( function() { db.jni3.save({i:-1, z:"server side"}) } );
+    db.dbEval( function() { db.jstests_js3.save({i:-1, z:"server side"}) } );
     
-    assert( db.jni3.findOne({i:-1}) );
+    assert( t.findOne({i:-1}) );
     
     assert( 2 == t.find( { $where : 
 			   function(){ 

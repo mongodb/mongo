@@ -1,6 +1,6 @@
 
 
-t = db.jni1;
+t = db.jstests_js1;
 t.remove( {} );
 
 t.save( { z : 1 } );

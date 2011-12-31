@@ -1,6 +1,6 @@
 // Tests whether the geospatial search is stable under btree updates
 
-var coll = db.getCollection( "foo.bar" )
+var coll = db.getCollection( "jstests_geo_update_btree" )
 coll.drop()
 
 coll.ensureIndex( { loc : '2d' } )
