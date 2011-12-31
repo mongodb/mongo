@@ -18,8 +18,6 @@
 
 #include "pch.h"
 #include "assert_util.h"
-#include "assert.h"
-#include <cmath>
 #include "time_support.h"
 using namespace std;
 

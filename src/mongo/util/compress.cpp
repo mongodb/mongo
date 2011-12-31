@@ -2,9 +2,6 @@
 
 #include "../third_party/snappy/snappy.h"
 #include "compress.h"
-#include <string>
-#include <string.h>
-#include <assert.h>
 
 namespace mongo {
 
