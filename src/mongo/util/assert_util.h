@@ -56,14 +56,14 @@ namespace mongo {
         ExceptionInfo( const char * m , int c )
             : msg( m ) , code( c ) {
         }
-        ExceptionInfo( const string& m , int c )
+        ExceptionInfo( const std::string& m , int c )
             : msg( m ) , code( c ) {
         }
         void append( BSONObjBuilder& b , const char * m = "$err" , const char * c = "code" ) const ;
-        string toString() const;
+        std::string toString() const;
         bool empty() const { return msg.empty(); }        
         void reset(){ msg = ""; code=-1; }
-        string msg;
+        std::string msg;
         int code;
     };
 
@@ -77,14 +77,14 @@ namespace mongo {
     public:
         ErrorMsg(const char *msg, char ch);
         ErrorMsg(const char *msg, unsigned val);
-        operator string() const { return buf; }
+        operator std::string() const { return buf; }
     private:
         char buf[256];
     };
 
     class DBException;
-    string causedBy( const DBException& e );
-    string causedBy( const string& e );
+    std::string causedBy( const DBException& e );
+    std::string causedBy( const std::string& e );
     bool inShutdown();
 
     /** Most mongo exceptions inherit from this; this is commonly caught in most threads */
@@ -92,18 +92,18 @@ namespace mongo {
     public:
         DBException( const ExceptionInfo& ei ) : _ei(ei) { traceIfNeeded(*this); }
         DBException( const char * msg , int code ) : _ei(msg,code) { traceIfNeeded(*this); }
-        DBException( const string& msg , int code ) : _ei(msg,code) { traceIfNeeded(*this); }
+        DBException( const std::string& msg , int code ) : _ei(msg,code) { traceIfNeeded(*this); }
         virtual ~DBException() throw() { }
 
         virtual const char* what() const throw() { return _ei.msg.c_str(); }
         virtual int getCode() const { return _ei.code; }
 
-        virtual void appendPrefix( stringstream& ss ) const { }
-        virtual void addContext( const string& str ) {
+        virtual void appendPrefix( std::stringstream& ss ) const { }
+        virtual void addContext( const std::string& str ) {
             _ei.msg = str + causedBy( _ei.msg );
         }
 
-        virtual string toString() const;
+        virtual std::string toString() const;
 
         const ExceptionInfo& getInfo() const { return _ei; }
     private:
@@ -120,7 +120,7 @@ namespace mongo {
 
         AssertionException( const ExceptionInfo& ei ) : DBException(ei) {}
         AssertionException( const char * msg , int code ) : DBException(msg,code) {}
-        AssertionException( const string& msg , int code ) : DBException(msg,code) {}
+        AssertionException( const std::string& msg , int code ) : DBException(msg,code) {}
 
         virtual ~AssertionException() throw() { }
 
@@ -136,18 +136,18 @@ namespace mongo {
     /* UserExceptions are valid errors that a user can cause, like out of disk space or duplicate key */
     class UserException : public AssertionException {
     public:
-        UserException(int c , const string& m) : AssertionException( m , c ) {}
+        UserException(int c , const std::string& m) : AssertionException( m , c ) {}
         virtual bool severe() { return false; }
         virtual bool isUserAssertion() { return true; }
-        virtual void appendPrefix( stringstream& ss ) const;
+        virtual void appendPrefix( std::stringstream& ss ) const;
     };
 
     class MsgAssertionException : public AssertionException {
     public:
         MsgAssertionException( const ExceptionInfo& ei ) : AssertionException( ei ) {}
-        MsgAssertionException(int c, const string& m) : AssertionException( m , c ) {}
+        MsgAssertionException(int c, const std::string& m) : AssertionException( m , c ) {}
         virtual bool severe() { return false; }
-        virtual void appendPrefix( stringstream& ss ) const;
+        virtual void appendPrefix( std::stringstream& ss ) const;
     };
 
     void asserted(const char *msg, const char *file, unsigned line) MONGO_NORETURN;
@@ -159,24 +159,24 @@ namespace mongo {
         could cause, such as duplicate key, disk full, etc.
     */
     void uasserted(int msgid, const char *msg) MONGO_NORETURN;
-    void uasserted(int msgid , const string &msg);
+    void uasserted(int msgid , const std::string &msg);
 
     /** reported via lasterror, but don't throw exception */
     void uassert_nothrow(const char *msg);
 
-    /** msgassert and massert are for errors that are internal but have a well defined error text string.
+    /** msgassert and massert are for errors that are internal but have a well defined error text std::string.
         a stack trace is logged.
     */
     void msgassertedNoTrace(int msgid, const char *msg) MONGO_NORETURN;
-    inline void msgassertedNoTrace(int msgid, const string& msg) { msgassertedNoTrace( msgid , msg.c_str() ); }
+    inline void msgassertedNoTrace(int msgid, const std::string& msg) { msgassertedNoTrace( msgid , msg.c_str() ); }
     void msgasserted(int msgid, const char *msg) MONGO_NORETURN;
-    void msgasserted(int msgid, const string &msg);
+    void msgasserted(int msgid, const std::string &msg);
 
     /* convert various types of exceptions to strings */
-    inline string causedBy( const char* e ){ return (string)" :: caused by :: " + e; }
-    inline string causedBy( const DBException& e ){ return causedBy( e.toString().c_str() ); }
-    inline string causedBy( const std::exception& e ){ return causedBy( e.what() ); }
-    inline string causedBy( const string& e ){ return causedBy( e.c_str() ); }
+    inline std::string causedBy( const char* e ){ return (std::string)" :: caused by :: " + e; }
+    inline std::string causedBy( const DBException& e ){ return causedBy( e.toString().c_str() ); }
+    inline std::string causedBy( const std::exception& e ){ return causedBy( e.what() ); }
+    inline std::string causedBy( const std::string& e ){ return causedBy( e.c_str() ); }
 
     /** in the mongodb source, use verify() instead of assert().  verify is always evaluated even in release builds. */
     inline void verify( int msgid , bool testOK ) { if ( ! testOK ) verifyFailed( msgid ); }
@@ -225,13 +225,13 @@ namespace mongo {
     enum { ASSERT_ID_DUPKEY = 11000 };
 
     /* throws a uassertion with an appropriate msg */
-    void streamNotGood( int code , string msg , std::ios& myios ) MONGO_NORETURN;
+    void streamNotGood( int code , std::string msg , std::ios& myios ) MONGO_NORETURN;
 
-    inline void assertStreamGood(unsigned msgid, string msg, std::ios& myios) {
+    inline void assertStreamGood(unsigned msgid, std::string msg, std::ios& myios) {
         if( !myios.good() ) streamNotGood(msgid, msg, myios);
     }
 
-    string demangleName( const type_info& typeinfo );
+    std::string demangleName( const type_info& typeinfo );
 
 } // namespace mongo
 
@@ -255,7 +255,7 @@ namespace mongo {
         ss << msg << " caught boost exception: " << e.what();   \
         msgasserted( 14043 , ss.str() );        \
     } catch ( ... ) { \
-        msgasserted( 14044 , string("unknown boost failed ") + msg );   \
+        msgasserted( 14044 , std::string("unknown boost failed ") + msg );   \
     }
 
 #define DESTRUCTOR_GUARD MONGO_DESTRUCTOR_GUARD
