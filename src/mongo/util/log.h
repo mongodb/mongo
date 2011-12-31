@@ -267,7 +267,7 @@ namespace mongo {
             return fd;
         }
 
-        inline void flush(Tee *t = 0);
+        void flush(Tee *t = 0);
 
         inline Nullstream& setLogLevel(LogLevel l) {
             logLevel = l;
