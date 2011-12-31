@@ -992,8 +992,6 @@
     <ClCompile Include="..\util\net\message.cpp" />
     <ClCompile Include="..\util\net\message_port.cpp" />
     <ClCompile Include="..\util\net\message_server_port.cpp" />
-    <ClCompile Include="..\util\mmap.cpp" />
-    <ClCompile Include="..\util\mmap_win.cpp" />
     <ClCompile Include="..\shell\mongo.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
       </PrecompiledHeader>

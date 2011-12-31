@@ -238,7 +238,7 @@ namespace mongo {
     
     Record* DiskLoc::rec() const {
         Record *r = DataFileMgr::getRecord(*this);
-        lockconcept::is(r, lockconcept::record);
+        memconcept::is(r, memconcept::record);
 #if defined(_PAGEFAULTEXCEPTION)
         DEV ONCE { 
             log() << "_DEBUG info _PAGEFAULTEXCEPTION is ON -- experimental at this time" << endl;

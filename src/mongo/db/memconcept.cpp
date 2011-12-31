@@ -1,16 +1,16 @@
-// @file lockconcepts.cpp
+//#if defined(_DEBUG)
+#if 0
 
 #include <string>
 #include <map>
-#include "lockconcept.h"
-//#include "../util/log.h"
+#include "memconcept.h"
 
 using namespace std;
 
 #include "../util/assert_util.h"
 
 namespace mongo {
-    namespace lockconcept { 
+    namespace memconcept { 
 
         struct C { 
             C() : c(err) { }
@@ -24,12 +24,8 @@ namespace mongo {
 
         M &ranges( * new M() );
 
-        void is(void *p, concept c, string description) {
+        void is(void *p, concept c, string description, unsigned len) {
             ranges[p] = C(c,description);
-        }
-
-        void is(void *p, concept c) {
-            ranges[p] = C(c);
         }
 
         void invalidate(void *p, unsigned len) {
@@ -44,3 +40,5 @@ namespace mongo {
 
     }
 }
+
+#endif

@@ -137,12 +137,6 @@
     <ClCompile Include="..\util\md5main.cpp">
       <Filter>Shared Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\util\mmap.cpp">
-      <Filter>Shared Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\util\mmap_win.cpp">
-      <Filter>Shared Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\shell\mongo.cpp">
       <Filter>Shared Source Files</Filter>
     </ClCompile>

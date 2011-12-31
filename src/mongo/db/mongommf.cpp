@@ -28,7 +28,7 @@
 #include "../util/mongoutils/str.h"
 #include "mongomutex.h"
 #include "d_globals.h"
-#include "lockconcept.h"
+#include "memconcept.h"
 
 using namespace mongoutils;
 
@@ -93,7 +93,7 @@ namespace mongo {
         else {
             clearWritableBits(p);
             views.push_back(p);
-            lockconcept::is(p, lockconcept::memorymappedfile, filename());
+            memconcept::is(p, memconcept::memorymappedfile, filename());
         }
         return p;
     }
@@ -336,7 +336,7 @@ namespace mongo {
 
         LockMongoFilesExclusive lk;
         privateViews.remove(_view_private);
-        lockconcept::invalidate(_view_private);
+        memconcept::invalidate(_view_private);
         _view_write = _view_private = 0;
         MemoryMappedFile::close();
     }

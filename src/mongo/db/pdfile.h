@@ -32,7 +32,7 @@
 #include "namespace-inl.h"
 #include "client.h"
 #include "mongommf.h"
-#include "lockconcept.h"
+#include "memconcept.h"
 
 namespace mongo {
 
@@ -421,7 +421,7 @@ namespace mongo {
     inline Extent* MongoDataFile::getExtent(DiskLoc loc) const {
         Extent *e = _getExtent(loc);
         e->assertOk();
-        lockconcept::is(e, lockconcept::extent);
+        memconcept::is(e, memconcept::extent);
         return e;
     }
 
@@ -479,7 +479,7 @@ namespace mongo {
     inline DeletedRecord* DiskLoc::drec() const {
         assert( _a != -1 );
         DeletedRecord* dr = (DeletedRecord*) rec();
-        lockconcept::is(dr, lockconcept::deletedrecord);
+        memconcept::is(dr, memconcept::deletedrecord);
         return dr;
     }
     inline Extent* DiskLoc::ext() const {
@@ -496,7 +496,7 @@ namespace mongo {
 } // namespace mongo
 
 #include "database.h"
-#include "lockconcept.h"
+#include "memconcept.h"
 
 namespace mongo {
 
@@ -505,7 +505,7 @@ namespace mongo {
     inline NamespaceIndex* nsindex(const char *ns) {
         Database *database = cc().database();
         assert( database );
-        lockconcept::is(database, lockconcept::database, ns, sizeof(Database));
+        memconcept::is(database, memconcept::database, ns, sizeof(Database));
         DEV {
             char buf[256];
             nsToDatabase(ns, buf);
@@ -523,7 +523,7 @@ namespace mongo {
         // if this faults, did you set the current db first?  (Client::Context + dblock)
         NamespaceDetails *d = nsindex(ns)->details(ns);
         if( d ) {
-            lockconcept::is(d, lockconcept::nsdetails, ns, sizeof(NamespaceDetails));
+            memconcept::is(d, memconcept::nsdetails, ns, sizeof(NamespaceDetails));
         }
         return d;
     }
