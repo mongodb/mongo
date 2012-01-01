@@ -39,7 +39,7 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref)
 	WT_ERR(__wt_page_inmem(session, parent, ref, tmp.mem, &page));
 
 	__wt_cache_page_read(
-	    session, page, sizeof(WT_PAGE) + page->dsk->memsize);
+	    session, page, sizeof(WT_PAGE) + page->dsk->size);
 
 	WT_VERBOSE(session, read,
 	    "page %p, %s", page, __wt_page_type_string(page->type));

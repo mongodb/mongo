@@ -18,8 +18,7 @@ struct __wt_page_header {
 	 */
 	uint64_t recno;			/* 00-07: column-store starting recno */
 
-	/* The in-memory size of the block. */
-	uint32_t memsize;		/* 08-11: in-memory page size */
+	uint32_t size;			/* 08-11: page size */
 
 	union {
 		uint32_t entries;	/* 12-15: number of cells on page */

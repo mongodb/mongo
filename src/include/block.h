@@ -133,7 +133,7 @@ struct __wt_block_header {
 	 * one that checksums, and that's going to be harsh given WiredTiger's
 	 * potentially large page sizes.)
 	 */
-	uint32_t size;			/* 08-11: on-disk page size */
+	uint32_t disk_size;		/* 08-11: on-disk page size */
 
 	/*
 	 * Page checksums are stored in two places.  First, a page's checksum is

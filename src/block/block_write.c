@@ -86,7 +86,7 @@ __wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * Should be set by our caller, it's part of the WT_PAGE_HEADER?
 	 */
 	dsk = buf->mem;
-	dsk->memsize = buf->size;
+	dsk->size = buf->size;
 
 	/*
 	 * We're passed a table's page image: WT_BUF->{mem,size} are the image
@@ -212,7 +212,7 @@ not_compressed:	/*
 	 */
 	blk->write_gen = ++block->write_gen;
 
-	blk->size = align_size;
+	blk->disk_size = align_size;
 
 	/*
 	 * Update the block's checksum: checksum the compressed contents, not
@@ -231,8 +231,8 @@ not_compressed:	/*
 
 	WT_VERBOSE(session, write,
 	    "%" PRIu32 " at offset/size %" PRIuMAX "/%" PRIu32 ", %s",
-	    dsk->memsize, (uintmax_t)offset, blk->size,
-	    blk->size < dsk->memsize ? "compressed, " : "");
+	    dsk->size, (uintmax_t)offset, blk->disk_size,
+	    blk->disk_size < dsk->size ? "compressed, " : "");
 
 	*offsetp = offset;
 	*sizep = align_size;

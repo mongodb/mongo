@@ -80,11 +80,11 @@ __wt_verify_dsk(WT_SESSION_IMPL *session,
 	}
 
 	/* Check the in-memory size. */
-	if (dsk->memsize != size) {
+	if (dsk->size != size) {
 		WT_VRFY_ERR(session,
 		    "%s page at %s has an incorrect size (%" PRIu32 " != %"
 		    PRIu32 ")",
-		    __wt_page_type_string(dsk->type), addr, dsk->memsize, size);
+		    __wt_page_type_string(dsk->type), addr, dsk->size, size);
 		return (WT_ERROR);
 	}
 
@@ -145,7 +145,7 @@ __verify_dsk_row(
 	WT_ERR(__wt_scr_alloc(session, 0, &last_ovfl));
 	last = last_ovfl;
 
-	end = (uint8_t *)dsk + dsk->memsize;
+	end = (uint8_t *)dsk + dsk->size;
 
 	last_cell_type = FIRST;
 	cell_num = 0;
@@ -379,7 +379,7 @@ __verify_dsk_col_int(
 
 	btree = session->btree;
 	unpack = &_unpack;
-	end = (uint8_t *)dsk + dsk->memsize;
+	end = (uint8_t *)dsk + dsk->size;
 
 	cell_num = 0;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
@@ -436,7 +436,7 @@ __verify_dsk_col_var(
 
 	btree = session->btree;
 	unpack = &_unpack;
-	end = (uint8_t *)dsk + dsk->memsize;
+	end = (uint8_t *)dsk + dsk->size;
 	ret = 0;
 
 	last_data = NULL;
@@ -519,7 +519,7 @@ __verify_dsk_chunk(WT_SESSION_IMPL *session,
 	uint8_t *p, *end;
 
 	btree = session->btree;
-	end = (uint8_t *)dsk + dsk->memsize;
+	end = (uint8_t *)dsk + dsk->size;
 
 	/*
 	 * Fixed-length column-store, overflow and freelist pages are simple

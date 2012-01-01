@@ -103,7 +103,7 @@ __wt_block_salvage_next(
 		 * The page can't be more than the min/max page size, or past
 		 * the end of the file.
 		 */
-		size = blk->size;
+		size = blk->disk_size;
 		cksum = blk->cksum;
 		if (size == 0 ||
 		    size % allocsize != 0 ||

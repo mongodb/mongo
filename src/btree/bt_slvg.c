@@ -475,8 +475,7 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session, WT_PAGE_HEADER *dsk,
 		   (ss->pages_next + 1000) * sizeof(WT_TRACK *), &ss->pages));
 
 	/* Allocate a WT_TRACK entry for this new page and fill it in. */
-	WT_RET(
-	    __slvg_trk_init(session, addr, size, dsk->memsize, gen, ss, &trk));
+	WT_RET(__slvg_trk_init(session, addr, size, dsk->size, gen, ss, &trk));
 
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
@@ -584,8 +583,7 @@ __slvg_trk_ovfl(WT_SESSION_IMPL *session, WT_PAGE_HEADER *dsk,
 		WT_RET(__wt_realloc(session, &ss->ovfl_allocated,
 		   (ss->ovfl_next + 1000) * sizeof(WT_TRACK *), &ss->ovfl));
 
-	WT_RET(
-	    __slvg_trk_init(session, addr, size, dsk->memsize, gen, ss, &trk));
+	WT_RET(__slvg_trk_init(session, addr, size, dsk->size, gen, ss, &trk));
 	ss->ovfl[ss->ovfl_next++] = trk;
 
 	return (0);
