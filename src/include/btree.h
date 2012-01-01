@@ -10,7 +10,7 @@
  *	A btree handle.
  */
 struct __wt_btree {
-	WT_RWLOCK *rwlock;		/* Lock for shared/exclusive ops. */
+	WT_RWLOCK *rwlock;		/* Lock for shared/exclusive ops */
 	uint32_t   refcnt;		/* Sessions using this tree. */
 	TAILQ_ENTRY(__wt_btree) q;	/* Linked list of handles */
 
