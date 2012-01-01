@@ -115,8 +115,9 @@ conf:	WT_ERR(__btree_conf(session, name, filename, config, flags));
 	    btree->config, cfg, F_ISSET(btree, WT_BTREE_SALVAGE) ? 1 : 0));
 	WT_ERR(__wt_bm_block_header(session, &btree->block_header));
 
-	/* Initialize the tree if not salvage or verify. */
-	if (!F_ISSET(btree, WT_BTREE_SALVAGE | WT_BTREE_VERIFY))
+	/* Initialize the tree if not a special command. */
+	if (!F_ISSET(btree,
+	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
 		WT_ERR(__btree_tree_init(session));
 
 	F_SET(btree, WT_BTREE_OPEN);
@@ -168,8 +169,9 @@ __wt_btree_reopen(WT_SESSION_IMPL *session, uint32_t flags)
 
 	btree->flags = flags;				/* XXX */
 
-	/* Initialize the tree if not salvage or verify. */
-	if (!F_ISSET(btree, WT_BTREE_SALVAGE | WT_BTREE_VERIFY))
+	/* Initialize the tree if not a special command. */
+	if (!F_ISSET(btree,
+	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
 		WT_RET(__btree_tree_init(session));
 
 	F_SET(btree, WT_BTREE_OPEN);			/* XXX */

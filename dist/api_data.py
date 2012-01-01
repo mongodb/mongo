@@ -236,6 +236,7 @@ methods = {
 ]),
 'session.sync' : Method([]),
 'session.truncate' : Method([]),
+'session.upgrade' : Method([]),
 'session.verify' : Method([]),
 'session.dumpfile' : Method([]),
 

@@ -712,6 +712,21 @@ struct wt_session {
 	    const char *name,
 	    WT_CURSOR *start, WT_CURSOR *end, const char *config);
 
+	/*! Upgrade a table.
+	 *
+	 * Upgrade upgrades a file, or the files of which a table is comprised.
+	 *
+	 * @dontinclude ex_all.c
+	 * @skipline ->upgrade
+	 *
+	 * @param session the session handle
+	 * @param name the URI of the file or table to upgrade
+	 * @configempty{session.upgrade, see dist/api_data.py}
+	 * @errors
+	 */
+	int __F(upgrade)(WT_SESSION *session,
+	    const char *name, const char *config);
+
 	/*! Verify a table.
 	 *
 	 * Verify reports if a file, or the files of which a table is

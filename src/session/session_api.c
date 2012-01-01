@@ -261,6 +261,25 @@ __session_truncate(WT_SESSION *wt_session,
 }
 
 /*
+ * __session_upgrade --
+ *	WT_SESSION->upgrade method.
+ */
+static int
+__session_upgrade(WT_SESSION *wt_session, const char *uri, const char *config)
+{
+	WT_SESSION_IMPL *session;
+	int ret;
+
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	SESSION_API_CALL(session, upgrade, config, cfg);
+	ret = __wt_schema_worker(session, uri, cfg,
+	    __wt_upgrade, WT_BTREE_EXCLUSIVE | WT_BTREE_UPGRADE);
+err:	API_END(session);
+	return (ret);
+}
+
+/*
  * __session_verify --
  *	WT_SESSION->verify method.
  */
@@ -370,6 +389,7 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 		__session_salvage,
 		__session_sync,
 		__session_truncate,
+		__session_upgrade,
 		__session_verify,
 		__session_begin_transaction,
 		__session_commit_transaction,

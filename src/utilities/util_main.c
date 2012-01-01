@@ -157,6 +157,12 @@ main(int argc, char *argv[])
 		else
 			ret = usage();
 		break;
+	case 'u':
+		if (strcmp(command, "upgrade") == 0)
+			ret = util_upgrade(session, argc, argv);
+		else
+			ret = usage();
+		break;
 	case 'w':
 		if (strcmp(command, "write") == 0)
 			ret = util_write(session, argc, argv);
@@ -199,6 +205,7 @@ usage(void)
 	    "\tread\t  read values from an object\n"
 	    "\tsalvage\t  salvage a file\n"
 	    "\tstat\t  display statistics for an object\n"
+	    "\tupgrade\t  upgrade an object\n"
 	    "\tverify\t  verify an object\n"
 	    "\twrite\t  write values to an object\n");
 

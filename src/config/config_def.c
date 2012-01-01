@@ -239,6 +239,14 @@ __wt_confchk_session_truncate =
     "";
 
 const char *
+__wt_confdfl_session_upgrade =
+    "";
+
+const char *
+__wt_confchk_session_upgrade =
+    "";
+
+const char *
 __wt_confdfl_session_verify =
     "";
 

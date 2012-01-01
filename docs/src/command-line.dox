@@ -275,6 +275,21 @@ argument \c prefix will be printed.
 
 
 <hr>
+@section utility_upgrade wt upgrade
+Upgrade a table or file.
+
+The \c upgrade command upgrades the specified table or file, exiting
+success if the object up-to-date, and failure if the object cannot be
+upgraded.
+
+@subsection utility_upgrade_synopsis Synopsis
+<code>wt [-Vv] [-C config] [-h directory] upgrade uri</code>
+
+@subsection utility_upgrade_options Options
+The \c upgrade command has no command-specific options.
+
+
+<hr>
 @section utility_verify wt verify
 Check the structural integrity of a table or file.
 

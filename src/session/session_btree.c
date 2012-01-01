@@ -75,8 +75,8 @@ __wt_session_lock_btree(
 		 * We do need to pick up the flags anyway, for example to set
 		 * WT_BTREE_BULK so the handle is closed correctly.
 		 */
-		if (cfg != NULL && LF_ISSET(
-		    WT_BTREE_BULK | WT_BTREE_SALVAGE | WT_BTREE_VERIFY))
+		if (cfg != NULL && LF_ISSET(WT_BTREE_BULK |
+		    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
 			return (__wt_btree_reopen(session, flags));
 		else
 			F_SET(btree, flags);
@@ -104,8 +104,8 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	 * If we had exclusive access, reopen the tree without special flags so
 	 * that other threads can use it.
 	 */
-	if (F_ISSET(btree,
-	    WT_BTREE_BULK | WT_BTREE_SALVAGE | WT_BTREE_VERIFY)) {
+	if (F_ISSET(btree, WT_BTREE_BULK |
+	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)) {
 		WT_ASSERT(session, F_ISSET(btree, WT_BTREE_EXCLUSIVE));
 		ret = __wt_btree_reopen(session, 0);
 	} else if (F_ISSET(btree, WT_BTREE_EXCLUSIVE))

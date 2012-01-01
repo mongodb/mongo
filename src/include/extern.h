@@ -241,6 +241,7 @@ extern int __wt_btree_set_root(WT_SESSION_IMPL *session,
 extern int __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_btree_stat_init(WT_SESSION_IMPL *session);
 extern int __wt_btree_sync(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_upgrade(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_verify(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_dumpfile(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_verify_dsk(WT_SESSION_IMPL *session,
@@ -423,6 +424,8 @@ extern const char *__wt_confdfl_session_sync;
 extern const char *__wt_confchk_session_sync;
 extern const char *__wt_confdfl_session_truncate;
 extern const char *__wt_confchk_session_truncate;
+extern const char *__wt_confdfl_session_upgrade;
+extern const char *__wt_confchk_session_upgrade;
 extern const char *__wt_confdfl_session_verify;
 extern const char *__wt_confchk_session_verify;
 extern const char *__wt_confdfl_table_meta;
