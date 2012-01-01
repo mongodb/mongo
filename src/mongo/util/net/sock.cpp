@@ -406,7 +406,7 @@ namespace mongo {
     int SSLManager::password_cb(char *buf,int num, int rwflag,void *userdata){
         SSLManager* sm = (SSLManager*)userdata;
         string pass = sm->_password;
-        strcpy(buf,pass.c_str());
+        strcpy_s(buf, num, pass.c_str());
         return(pass.size());
     }
 
