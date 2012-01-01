@@ -598,8 +598,8 @@ __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	WT_BSTAT_SET(session, file_freelist_entries, block->freelist_entries);
 	WT_BSTAT_SET(session, file_size, block->fh->file_size);
 	WT_BSTAT_SET(session, file_magic, WT_BLOCK_MAGIC);
-	WT_BSTAT_SET(session, file_major, WT_BTREE_MAJOR_VERSION);
-	WT_BSTAT_SET(session, file_minor, WT_BTREE_MINOR_VERSION);
+	WT_BSTAT_SET(session, file_major, WT_BLOCK_MAJOR_VERSION);
+	WT_BSTAT_SET(session, file_minor, WT_BLOCK_MINOR_VERSION);
 }
 
 #ifdef HAVE_VERBOSE

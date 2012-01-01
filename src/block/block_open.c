@@ -213,9 +213,9 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block, int salvage)
 	 */
 	if (desc->magic != WT_BLOCK_MAGIC)
 		goto err;
-	if (desc->majorv > WT_BTREE_MAJOR_VERSION ||
-	    (desc->majorv == WT_BTREE_MAJOR_VERSION &&
-	    desc->minorv > WT_BTREE_MINOR_VERSION)) {
+	if (desc->majorv > WT_BLOCK_MAJOR_VERSION ||
+	    (desc->majorv == WT_BLOCK_MAJOR_VERSION &&
+	    desc->minorv > WT_BLOCK_MINOR_VERSION)) {
 		msg =
 		    "file is an unsupported version of a WiredTiger Btree file";
 err:		if (ret == 0)
@@ -260,8 +260,8 @@ __wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh)
 	desc = (WT_BLOCK_DESC *)buf;
 
 	desc->magic = WT_BLOCK_MAGIC;
-	desc->majorv = WT_BTREE_MAJOR_VERSION;
-	desc->minorv = WT_BTREE_MINOR_VERSION;
+	desc->majorv = WT_BLOCK_MAJOR_VERSION;
+	desc->minorv = WT_BLOCK_MINOR_VERSION;
 
 	desc->free_offset = WT_BLOCK_INVALID_OFFSET;
 	desc->free_size = desc->free_cksum = 0;
