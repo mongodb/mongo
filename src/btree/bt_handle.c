@@ -113,6 +113,7 @@ conf:	WT_ERR(__btree_conf(session, name, filename, config, flags));
 	/* Open the underlying block object. */
 	WT_ERR(__wt_bm_open(session, btree->filename,
 	    btree->config, cfg, F_ISSET(btree, WT_BTREE_SALVAGE) ? 1 : 0));
+	WT_ERR(__wt_bm_block_header(session, &btree->block_header));
 
 	/* Initialize the tree if not salvage or verify. */
 	if (!F_ISSET(btree, WT_BTREE_SALVAGE | WT_BTREE_VERIFY))

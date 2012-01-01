@@ -190,12 +190,12 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block, int salvage)
 	    ", major/minor: %" PRIu32 "/%" PRIu32
 	    ", checksum %#" PRIx32
 	    ", free offset/size %" PRIu64 "/%" PRIu32
-	    ", lsn %" PRIu64,
+	    ", write-generation %" PRIu64,
 	    desc->magic,
 	    desc->majorv, desc->minorv,
 	    desc->cksum,
 	    desc->free_offset, desc->free_size,
-	    desc->lsn);
+	    desc->write_gen);
 
 	cksum = desc->cksum;
 	desc->cksum = 0;
@@ -226,7 +226,7 @@ err:		if (ret == 0)
 		return (ret);
 	}
 
-	block->lsn = desc->lsn;
+	block->write_gen = desc->write_gen;
 
 	/* That's all we check for salvage. */
 	if (salvage)
@@ -290,17 +290,18 @@ __desc_update(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	/* See if anything has changed. */
 	if (desc->free_offset == (uint64_t)block->free_offset &&
 	    desc->free_size == block->free_size &&
-	    desc->lsn == block->lsn)
+	    desc->write_gen == block->write_gen)
 		return (0);
 
 	WT_VERBOSE(session, block,
 	    "resetting free list [offset %" PRIuMAX ", size %" PRIu32 "]",
 	    (uintmax_t)block->free_offset, block->free_size);
 
-	desc->lsn = block->lsn;
 	desc->free_offset = (uint64_t)block->free_offset;
 	desc->free_size = block->free_size;
 	desc->free_cksum = block->free_cksum;
+
+	desc->write_gen = block->write_gen;
 
 	/* Update the checksum. */
 	desc->cksum = 0;

@@ -64,6 +64,8 @@ extern int __wt_bm_read(WT_SESSION_IMPL *session,
     WT_BUF *buf,
     const uint8_t *addr,
     uint32_t addr_size);
+extern int __wt_bm_block_header(WT_SESSION_IMPL *session, uint32_t *headerp);
+extern int __wt_bm_write_size(WT_SESSION_IMPL *session, uint32_t *sizep);
 extern int __wt_bm_write( WT_SESSION_IMPL *session,
     WT_BUF *buf,
     uint8_t *addr,
@@ -74,6 +76,7 @@ extern int __wt_bm_salvage_next(WT_SESSION_IMPL *session,
     WT_BUF *buf,
     uint8_t *addr,
     uint32_t *addr_sizep,
+    uint64_t *write_genp,
     int *eofp);
 extern int __wt_bm_salvage_end(WT_SESSION_IMPL *session, int success);
 extern int __wt_bm_verify_start(WT_SESSION_IMPL *session, int *emptyp);
@@ -105,11 +108,12 @@ extern int __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_block_salvage_end(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     int success);
-extern int __wt_block_salvage_next(WT_SESSION_IMPL *session,
+extern int __wt_block_salvage_next( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_BUF *buf,
     uint8_t *addr,
     uint32_t *addr_sizep,
+    uint64_t *write_genp,
     int *eofp);
 extern int __wt_block_verify_start(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
@@ -119,6 +123,12 @@ extern int __wt_block_verify_addr(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     const uint8_t *addr,
     uint32_t addr_size);
+extern int __wt_block_header(WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    uint32_t *headerp);
+extern int __wt_block_write_size( WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    uint32_t *sizep);
 extern int __wt_block_write_buf(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_BUF *buf,
@@ -157,8 +167,8 @@ extern int __wt_debug_addr( WT_SESSION_IMPL *session,
     uint32_t addr,
     uint32_t size,
     const char *ofile);
-extern int __wt_debug_disk(WT_SESSION_IMPL *session,
-    WT_PAGE_DISK *dsk,
+extern int __wt_debug_disk( WT_SESSION_IMPL *session,
+    WT_PAGE_HEADER *dsk,
     const char *ofile);
 extern int __wt_debug_tree_all(WT_SESSION_IMPL *session,
     WT_PAGE *page,
@@ -214,7 +224,7 @@ __wt_page_in_func(
 extern int __wt_page_inmem(WT_SESSION_IMPL *session,
     WT_PAGE *parent,
     WT_REF *parent_ref,
-    WT_PAGE_DISK *dsk,
+    WT_PAGE_HEADER *dsk,
     WT_PAGE **pagep);
 extern int __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_cache_read(WT_SESSION_IMPL *session,
@@ -235,7 +245,7 @@ extern int __wt_verify(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_dumpfile(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_verify_dsk(WT_SESSION_IMPL *session,
     const char *addr,
-    WT_PAGE_DISK *dsk,
+    WT_PAGE_HEADER *dsk,
     uint32_t size);
 extern int __wt_tree_np(WT_SESSION_IMPL *session,
     WT_PAGE **pagep,

@@ -47,7 +47,7 @@ class test_config03(test_base03.test_base03):
     transactional_scenarios = wtscenario.quick_scenarios('s_transactional',
         [True,False], [0.2,1.0])
     verbose_scenarios = wtscenario.quick_scenarios('s_verbose',
-        ['allocate', 'evict,evictserver', 'fileops,hazard,mutex',
+        ['block', 'evict,evictserver', 'fileops,hazard,mutex',
          'read,readserver,reconcile,salvage','verify,write',''], None)
 
     config_vars = [ 'cache_size', 'create', 'error_prefix', 'eviction_target',

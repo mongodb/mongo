@@ -10,8 +10,8 @@
 static int
 __bm_invalid(WT_SESSION_IMPL *session)
 {
-	__wt_errx(session, "invalid block manager handle");
-	return (WT_ERROR);
+	__wt_err(session, EINVAL, "invalid block manager handle");
+	return (EINVAL);
 }
 
 /*
@@ -115,7 +115,7 @@ __wt_bm_close(WT_SESSION_IMPL *session)
 
 /*
  * __wt_bm_free --
- *	Free a chunk of space to the underlying file.
+ *	Free a block of space to the underlying file.
  */
 int
 __wt_bm_free(WT_SESSION_IMPL *session, const uint8_t *addr, uint32_t addr_size)
@@ -142,6 +142,36 @@ __wt_bm_read(WT_SESSION_IMPL *session,
 		return (__bm_invalid(session));
 
 	return (__wt_block_read_buf(session, block, buf, addr, addr_size));
+}
+
+/*
+ * __wt_bm_block_header --
+ *	Return the size of the block manager's header.
+ */
+int
+__wt_bm_block_header(WT_SESSION_IMPL *session, uint32_t *headerp)
+{
+	WT_BLOCK *block;
+
+	if ((block = session->btree->block) == NULL)
+		return (__bm_invalid(session));
+
+	return (__wt_block_header(session, block, headerp));
+}
+
+/*
+ * __wt_bm_write_size --
+ *	Return the buffer size required to write a block.
+ */
+int
+__wt_bm_write_size(WT_SESSION_IMPL *session, uint32_t *sizep)
+{
+	WT_BLOCK *block;
+
+	if ((block = session->btree->block) == NULL)
+		return (__bm_invalid(session));
+
+	return (__wt_block_write_size(session, block, sizep));
 }
 
 /*
@@ -196,8 +226,8 @@ __wt_bm_salvage_start(WT_SESSION_IMPL *session)
  *	Return the next block from the file.
  */
 int
-__wt_bm_salvage_next(WT_SESSION_IMPL *session,
-    WT_BUF *buf, uint8_t *addr, uint32_t *addr_sizep, int *eofp)
+__wt_bm_salvage_next(WT_SESSION_IMPL *session, WT_BUF *buf,
+    uint8_t *addr, uint32_t *addr_sizep, uint64_t *write_genp, int *eofp)
 {
 	WT_BLOCK *block;
 
@@ -205,7 +235,7 @@ __wt_bm_salvage_next(WT_SESSION_IMPL *session,
 		return (__bm_invalid(session));
 
 	return (__wt_block_salvage_next(
-	    session, block, buf, addr, addr_sizep, eofp));
+	    session, block, buf, addr, addr_sizep, write_genp, eofp));
 }
 
 /*

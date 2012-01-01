@@ -38,7 +38,7 @@ struct __wt_block {
 
 	WT_FH	*fh;			/* Backing file handle */
 
-	uint64_t lsn;			/* LSN file/offset pair */
+	uint64_t write_gen;		/* Write generation */
 
 	uint32_t allocsize;		/* Allocation size */
 	int	 checksum;		/* If checksums configured */
@@ -90,13 +90,13 @@ struct __wt_block_desc {
 	uint32_t free_cksum;		/* 28-31: Free list page checksum */
 
 	/*
-	 * We maintain page LSN's for the file in the non-transactional case
-	 * (where, instead of a log reference, the LSN is simply a counter),
+	 * We maintain page write-generations in the non-transactional case
+	 * (where, instead of a transactional LSN, the value is a counter),
 	 * as that's how salvage can determine the most recent page between
-	 * pages overlapping the same key range.  This non-transactional LSN
-	 * has to be persistent, and so it's included in the file's metadata.
+	 * pages overlapping the same key range.  The value has to persist,
+	 * so it's included in the file's metadata.
 	 */
-	uint64_t lsn;			/* 32-39: Non-transactional page LSN */
+	uint64_t write_gen;		/* 32-39: Write generation */
 };
 /*
  * WT_BLOCK_DESC_SIZE is the expected structure size -- we verify the build to
@@ -107,103 +107,69 @@ struct __wt_block_desc {
 #define	WT_BLOCK_DESC_SIZE		40
 
 /*
- * Don't compress the first 32B of the block (almost all of the WT_PAGE_DISK
- * structure) because we need the block's checksum and on-disk and in-memory
- * sizes to be immediately available without decompression (the checksum and
- * the on-disk block sizes are used during salvage to figure out where the
- * blocks are, and the in-memory page size tells us how large a buffer we need
- * to decompress the file block.  We could take less than 32B, but a 32B
- * boundary is probably better alignment for the underlying compression engine,
- * and skipping 32B won't matter in terms of compression efficiency.
+ * WT_BLOCK_HEADER --
+ *	Blocks have a common header, a WT_PAGE_HEADER structure followed by a
+ * block-manager specific structure: WT_BLOCK_HEADER is WiredTiger's default.
  */
-#define	WT_BLOCK_COMPRESS_SKIP	32
-
-/*
- * WT_PAGE_DISK --
- *
- * All on-disk pages have a common header, defined by the WT_PAGE_DISK
- * structure.  The header has no version number or mode bits, and the page type
- * and/or flags value will have to be modified when changes are made to the page
- * layout.  (The page type appears early in the header to make this simpler.)
- * In other words, the page type declares the contents of the page and how to
- * read it.
- */
-struct __wt_page_disk {
+struct __wt_block_header {
 	/*
-	 * The record number of the first record of the page is stored on disk
-	 * so we can figure out where the column-store leaf page fits into the
-	 * key space during salvage.
+	 * We maintain page write-generations in the non-transactional case
+	 * (where, instead of a transactional LSN, the value is a counter),
+	 * as that's how salvage can determine the most recent page between
+	 * pages overlapping the same key range.
+	 *
+	 * !!!
+	 * The write-generation is "owned" by the btree layer, but it's easier
+	 * to set it (when physically writing blocks), to persist it (in the
+	 * WT_BLOCK_DESC structure, rather than the schema file), and restore
+	 * it during salvage, in the block-manager layer.
 	 */
-	uint64_t recno;			/* 00-07: column-store starting recno */
-
-	/*
-	 * The LSN is a 64-bit chunk to make assignment and comparisons easier,
-	 * but it's 2 32-bit values underneath: a file number and a file offset.
-	 */
-#define	WT_LSN_FILE(lsn)						\
-	((uint32_t)(((lsn) & 0xffffffff00000000ULL) >> 32))
-#define	WT_LSN_OFFSET(lsn)						\
-	((uint32_t)((lsn) & 0xffffffff))
-#define	WT_LSN_INCR(lsn)						\
-	(++(lsn))
-	uint64_t lsn;			/* 08-15: LSN file/offset pair */
-
-	/*
-	 * Page checksums are stored in two places.  First, a page's checksum is
-	 * stored in the tree page that references a page as part of the address
-	 * cookie.  This is done to ensure we detect corruption, as storing the
-	 * checksum in the on-disk page implies a 1 in 2^32 chance corruption of
-	 * the page will result in a valid checksum).  Second, a page's checksum
-	 * is stored in the disk header.  This is for salvage, so that salvage
-	 * knows when it's found a page that has some chance of being useful.
-	 * This isn't risky because the complete address cookie in the reference
-	 * page is compared before we connect the two pages back together.
-	 */
-	uint32_t cksum;			/* 16-19: checksum */
+	uint64_t write_gen;		/* 00-07: write generation */
 
 	/*
 	 * We write the page size in the on-disk page header because it makes
 	 * salvage easier.  (If we don't know the expected page length, we'd
 	 * have to read increasingly larger chunks from the file until we find
 	 * one that checksums, and that's going to be harsh given WiredTiger's
-	 * large page sizes.)
-	 *
-	 * We also store an in-memory size because otherwise we'd have no idea
-	 * how much memory to allocate in order to expand a compressed page.
+	 * potentially large page sizes.)
 	 */
-	uint32_t size;			/* 20-23: on-disk page size */
-	uint32_t memsize;		/* 24-27: in-memory page size */
-
-	union {
-		uint32_t entries;	/* 28-31: number of cells on page */
-		uint32_t datalen;	/* 28-31: overflow data length */
-	} u;
-
-	uint8_t type;			/* 32: page type */
+	uint32_t size;			/* 08-11: on-disk page size */
 
 	/*
-	 * End the the WT_PAGE_DISK structure with 3 bytes of padding: it wastes
-	 * space, but it leaves the WT_PAGE_DISK structure 32-bit aligned and
-	 * having a small amount of space to play with in the future can't hurt.
+	 * Page checksums are stored in two places.  First, a page's checksum is
+	 * in the internal page that references a page as part of the address
+	 * cookie.  This is done to ensure we detect corruption, as storing the
+	 * checksum in the on-disk page implies a 1 in 2^32 chance corruption of
+	 * the page will result in a valid checksum).  Second, a page's checksum
+	 * is stored in the disk header.  This is for salvage, so that salvage
+	 * knows when it's found a page that may be useful.
 	 */
-	uint8_t unused[3];		/* 33-35: unused padding */
+	uint32_t cksum;			/* 12-15: checksum */
 };
 /*
- * WT_PAGE_DISK_SIZE is the expected structure size -- we verify the build to
- * ensure the compiler hasn't inserted padding (which would break the world).
+ * WT_BLOCK_HEADER_SIZE is the number of bytes we allocate for the structure: if
+ * the compiler inserts padding it will break the world.
  */
-#define	WT_PAGE_DISK_SIZE		36
+#define	WT_BLOCK_HEADER_SIZE		16
 
 /*
- * WT_DISK_REQUIRED--
- *	Return bytes needed for byte length, rounded to an allocation unit.
+ * WT_BLOCK_HEADER_BYTE
+ * WT_BLOCK_HEADER_BYTE_SIZE --
+ *	The first usable data byte on the block (past the combined headers).
  */
-#define	WT_DISK_REQUIRED(block, size)					\
-	(WT_ALIGN((size) + WT_PAGE_DISK_SIZE, ((WT_BLOCK *)(block))->allocsize))
+#define	WT_BLOCK_HEADER_BYTE_SIZE					\
+	(WT_PAGE_HEADER_SIZE + WT_BLOCK_HEADER_SIZE)
+#define	WT_BLOCK_HEADER_BYTE(dsk)					\
+	((void *)((uint8_t *)(dsk) + WT_BLOCK_HEADER_BYTE_SIZE))
 
 /*
- * WT_PAGE_DISK_BYTE --
- *	The first usable data byte on the page (past the header).
+ * Don't compress the block's WT_PAGE_HEADER and WT_BLOCK_HEADER structures.
+ * We need the WT_PAGE_HEADER in-memory size, and the WT_BLOCK_HEADER checksum
+ * and on-disk size to be immediately available without decompression.  We use
+ * the on-disk size and checksum during salvage to figure out where the blocks
+ * are, and the in-memory size tells us how large a buffer we need to decompress
+ * the block.  We could skip less than 64B, but a 64B boundary may offer better
+ * alignment for the underlying compression engine, and skipping 64B won't make
+ * a difference in terms of compression efficiency.
  */
-#define	WT_PAGE_DISK_BYTE(dsk)						\
-	((void *)((uint8_t *)(dsk) + WT_PAGE_DISK_SIZE))
+#define	WT_BLOCK_COMPRESS_SKIP	64

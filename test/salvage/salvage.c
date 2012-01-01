@@ -534,10 +534,11 @@ build(int ikey, int ivalue, int cnt)
  *	Copy the created page to the end of the salvage file.
  */
 void
-copy(u_int lsn, u_int recno)
+copy(u_int gen, u_int recno)
 {
 	FILE *ifp, *ofp;
-	WT_PAGE_DISK *dsk;
+	WT_PAGE_HEADER *dsk;
+	WT_BLOCK_HEADER *blk;
 	char buf[PSIZE];
 
 	assert((ifp = fopen(LOAD, "r")) != NULL);
@@ -557,15 +558,16 @@ copy(u_int lsn, u_int recno)
 	/*
 	 * If there's data, copy/update the first formatted page.
 	 */
-	if (lsn != 0) {
+	if (gen != 0) {
 		assert(fseek(ifp, (long)512, SEEK_SET) == 0);
 		assert(fread(buf, 1, PSIZE, ifp) == PSIZE);
-		dsk = (WT_PAGE_DISK *)buf;
-		dsk->lsn = lsn;
+		dsk = (WT_PAGE_HEADER *)buf;
 		if (page_type != WT_PAGE_ROW_LEAF)
 			dsk->recno = recno;
-		dsk->cksum = 0;
-		dsk->cksum = __wt_cksum(dsk, PSIZE);
+		blk = WT_BLOCK_HEADER_REF(buf);
+		blk->write_gen = gen;
+		blk->cksum = 0;
+		blk->cksum = __wt_cksum(dsk, PSIZE);
 		assert(fwrite(buf, 1, PSIZE, ofp) == PSIZE);
 	}
 

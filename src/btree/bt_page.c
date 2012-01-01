@@ -7,7 +7,7 @@
 
 #include "wt_internal.h"
 
-static int  __inmem_col_fix(WT_PAGE *);
+static int  __inmem_col_fix(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __inmem_col_int(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __inmem_col_var(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __inmem_row_int(WT_SESSION_IMPL *, WT_PAGE *);
@@ -87,7 +87,7 @@ __wt_page_in_func(
  */
 int
 __wt_page_inmem(WT_SESSION_IMPL *session,
-    WT_PAGE *parent, WT_REF *parent_ref, WT_PAGE_DISK *dsk, WT_PAGE **pagep)
+    WT_PAGE *parent, WT_REF *parent_ref, WT_PAGE_HEADER *dsk, WT_PAGE **pagep)
 {
 	WT_PAGE *page;
 	int ret;
@@ -114,7 +114,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
 		page->u.col_fix.recno = dsk->recno;
-		WT_ERR(__inmem_col_fix(page));
+		WT_ERR(__inmem_col_fix(session, page));
 		break;
 	case WT_PAGE_COL_INT:
 		page->u.col_int.recno = dsk->recno;
@@ -155,13 +155,15 @@ __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Build in-memory index for fixed-length column-store leaf pages.
  */
 static int
-__inmem_col_fix(WT_PAGE *page)
+__inmem_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_PAGE_DISK *dsk;
+	WT_BTREE *btree;
+	WT_PAGE_HEADER *dsk;
 
+	btree = session->btree;
 	dsk = page->dsk;
 
-	page->u.col_fix.bitf = WT_PAGE_DISK_BYTE(dsk);
+	page->u.col_fix.bitf = WT_PAGE_HEADER_BYTE(btree, dsk);
 	page->entries = dsk->u.entries;
 	return (0);
 }
@@ -173,12 +175,14 @@ __inmem_col_fix(WT_PAGE *page)
 static int
 __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL_REF *cref;
-	WT_PAGE_DISK *dsk;
+	WT_PAGE_HEADER *dsk;
 	uint32_t i;
 
+	btree = session->btree;
 	dsk = page->dsk;
 	unpack = &_unpack;
 
@@ -194,7 +198,7 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * The value items are on-page items (WT_CELL_VALUE).
 	 */
 	cref = page->u.col_int.t;
-	WT_CELL_FOREACH(dsk, cell, unpack, i) {
+	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
 		cref->recno = unpack->v;
 		cref->ref.addr = cell;
@@ -213,15 +217,17 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 static int
 __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_BTREE *btree;
 	WT_COL *cip;
 	WT_COL_RLE *repeats;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
-	WT_PAGE_DISK *dsk;
+	WT_PAGE_HEADER *dsk;
 	uint64_t recno, rle;
 	size_t bytes_allocated;
 	uint32_t i, indx, max_repeats, nrepeats;
 
+	btree = session->btree;
 	dsk = page->dsk;
 	unpack = &_unpack;
 	repeats = NULL;
@@ -242,9 +248,9 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	cip = page->u.col_var.d;
 	indx = 0;
-	WT_CELL_FOREACH(dsk, cell, unpack, i) {
+	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
-		(cip++)->__value = WT_DISK_OFFSET(dsk, cell);
+		(cip++)->__value = WT_PAGE_DISK_OFFSET(page, cell);
 
 		/*
 		 * Add records with repeat counts greater than 1 to an array we
@@ -284,7 +290,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_BUF *current, *last, *tmp;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
-	WT_PAGE_DISK *dsk;
+	WT_PAGE_HEADER *dsk;
 	WT_ROW_REF *rref;
 	uint32_t i, nindx, prefix;
 	int ret;
@@ -322,7 +328,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * are WT_CELL_OFF items.
 	 */
 	rref = page->u.row_int.t;
-	WT_CELL_FOREACH(dsk, cell, unpack, i) {
+	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {
 		case WT_CELL_KEY:
@@ -383,7 +389,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * and will need a reference to it during reconciliation.
 		 */
 		WT_ERR(__wt_row_ikey_alloc(session,
-		    unpack->ovfl ? WT_DISK_OFFSET(dsk, cell) : 0,
+		    unpack->ovfl ? WT_PAGE_DISK_OFFSET(page, cell) : 0,
 		    current->data, current->size, (WT_IKEY **)&rref->key));
 
 		/*
@@ -412,7 +418,7 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
-	WT_PAGE_DISK *dsk;
+	WT_PAGE_HEADER *dsk;
 	WT_ROW *rip;
 	uint32_t i, nindx;
 
@@ -438,7 +444,7 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	nindx = 0;
 	rip = page->u.row_leaf.d;
-	WT_CELL_FOREACH(dsk, cell, unpack, i) {
+	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {
 		case WT_CELL_KEY:

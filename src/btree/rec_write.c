@@ -465,21 +465,22 @@ __rec_split_init(
     WT_SESSION_IMPL *session, WT_PAGE *page, uint64_t recno, uint32_t max)
 {
 	WT_BTREE *btree;
-	WT_PAGE_DISK *dsk;
+	WT_PAGE_HEADER *dsk;
 	WT_RECONCILE *r;
 
 	r = session->reconcile;
 	btree = session->btree;
 
 	/* Ensure the scratch buffer is large enough. */
+	WT_RET(__wt_bm_write_size(session, &max));
 	WT_RET(__wt_buf_initsize(session, &r->dsk, (size_t)max));
 
 	/*
-	 * Some fields of the disk image are fixed based on the original page,
-	 * set them.
+	 * Clear the header and set the page type (the type doesn't change, and
+	 * setting it later requires additional code in a few different places).
 	 */
 	dsk = r->dsk.mem;
-	WT_CLEAR(*dsk);
+	memset(dsk, 0, WT_PAGE_HEADER_SIZE);
 	dsk->type = page->type;
 
 	/*
@@ -529,7 +530,7 @@ __rec_split_init(
 	r->bnd_next = 0;
 	WT_RET(__rec_split_bnd_grow(session));
 	r->bnd[0].recno = recno;
-	r->bnd[0].start = WT_PAGE_DISK_BYTE(dsk);
+	r->bnd[0].start = WT_PAGE_HEADER_BYTE(btree, dsk);
 
 	/* Initialize the total entries. */
 	r->total_entries = 0;
@@ -540,8 +541,8 @@ __rec_split_init(
 	 */
 	r->recno = recno;
 	r->entries = 0;
-	r->first_free = WT_PAGE_DISK_BYTE(dsk);
-	r->space_avail = r->split_size - WT_PAGE_DISK_SIZE;
+	r->first_free = WT_PAGE_HEADER_BYTE(btree, dsk);
+	r->space_avail = r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree);
 
 	/* New page, compression off. */
 	r->key_pfx_compress = r->key_sfx_compress = 0;
@@ -557,8 +558,9 @@ __rec_split_init(
 static int
 __rec_split(WT_SESSION_IMPL *session)
 {
+	WT_BTREE *btree;
 	WT_BOUNDARY *bnd;
-	WT_PAGE_DISK *dsk;
+	WT_PAGE_HEADER *dsk;
 	WT_RECONCILE *r;
 	uint32_t current_len;
 
@@ -568,6 +570,7 @@ __rec_split(WT_SESSION_IMPL *session)
 	 * times.
 	 */
 	r = session->reconcile;
+	btree = session->btree;
 	dsk = r->dsk.mem;
 
 	/*
@@ -627,11 +630,12 @@ __rec_split(WT_SESSION_IMPL *session)
 		 */
 		current_len = WT_PTRDIFF32(r->first_free, dsk);
 		if (current_len + r->split_size <= r->page_size)
-			r->space_avail = r->split_size - WT_PAGE_DISK_SIZE;
+			r->space_avail =
+			    r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree);
 		else {
 			r->bnd_state = SPLIT_MAX;
-			r->space_avail =
-			    (r->page_size - WT_PAGE_DISK_SIZE) - current_len;
+			r->space_avail = (r->page_size -
+			    WT_PAGE_HEADER_BYTE_SIZE(btree)) - current_len;
 		}
 		break;
 	case SPLIT_MAX:					/* Case #2 */
@@ -680,8 +684,9 @@ __rec_split(WT_SESSION_IMPL *session)
 		 * already split, so it's split-size chunks from here on out.
 		 */
 		r->entries = 0;
-		r->first_free = WT_PAGE_DISK_BYTE(dsk);
-		r->space_avail = r->split_size - WT_PAGE_DISK_SIZE;
+		r->first_free = WT_PAGE_HEADER_BYTE(btree, dsk);
+		r->space_avail =
+		    r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree);
 		break;
 	}
 	return (0);
@@ -695,7 +700,7 @@ static int
 __rec_split_finish(WT_SESSION_IMPL *session)
 {
 	WT_BOUNDARY *bnd;
-	WT_PAGE_DISK *dsk;
+	WT_PAGE_HEADER *dsk;
 	WT_RECONCILE *r;
 
 	r = session->reconcile;
@@ -749,9 +754,10 @@ __rec_split_finish(WT_SESSION_IMPL *session)
 static int
 __rec_split_fixup(WT_SESSION_IMPL *session)
 {
+	WT_BTREE *btree;
 	WT_BOUNDARY *bnd;
 	WT_BUF *tmp;
-	WT_PAGE_DISK *dsk;
+	WT_PAGE_HEADER *dsk;
 	WT_RECONCILE *r;
 	uint32_t i, len;
 	uint8_t *dsk_start;
@@ -763,6 +769,7 @@ __rec_split_fixup(WT_SESSION_IMPL *session)
 	 * the caller's information.
 	 */
 	r = session->reconcile;
+	btree = session->btree;
 	tmp = NULL;
 	ret = 0;
 
@@ -771,18 +778,18 @@ __rec_split_fixup(WT_SESSION_IMPL *session)
 	 * a clean, aligned, padded buffer before writing it.
 	 *
 	 * Allocate a scratch buffer to hold the new disk image.  Copy the
-	 * WT_PAGE_DISK header onto the scratch buffer, most of the header
+	 * WT_PAGE_HEADER header onto the scratch buffer, most of the header
 	 * information remains unchanged between the pages.
 	 */
 	WT_RET(__wt_scr_alloc(session, r->split_size, &tmp));
 	dsk = tmp->mem;
-	dsk_start = WT_PAGE_DISK_BYTE(dsk);
-	memcpy(dsk, r->dsk.mem, WT_PAGE_DISK_SIZE);
+	memcpy(dsk, r->dsk.mem, WT_PAGE_HEADER_SIZE);
 
 	/*
 	 * For each split chunk we've created, update the disk image and copy
 	 * it into place.
 	 */
+	dsk_start = WT_PAGE_HEADER_BYTE(btree, dsk);
 	for (i = 0, bnd = r->bnd; i < r->bnd_next; ++i, ++bnd) {
 		/* Copy the page contents to the temporary buffer. */
 		len = WT_PTRDIFF32((bnd + 1)->start, bnd->start);
@@ -791,7 +798,7 @@ __rec_split_fixup(WT_SESSION_IMPL *session)
 		/* Write the page. */
 		dsk->recno = bnd->recno;
 		dsk->u.entries = bnd->entries;
-		tmp->size = WT_PAGE_DISK_SIZE + len;
+		tmp->size = WT_PAGE_HEADER_BYTE_SIZE(btree) + len;
 		WT_ERR(__rec_split_write(session, bnd, tmp));
 	}
 
@@ -805,15 +812,17 @@ __rec_split_fixup(WT_SESSION_IMPL *session)
 	 * Fix up our caller's information.
 	 */
 	len = WT_PTRDIFF32(r->first_free, bnd->start);
-	WT_ASSERT_RET(session, len < r->split_size - WT_PAGE_DISK_SIZE);
+	WT_ASSERT_RET(
+	    session, len < r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree));
 
 	dsk = r->dsk.mem;
-	dsk_start = WT_PAGE_DISK_BYTE(dsk);
+	dsk_start = WT_PAGE_HEADER_BYTE(btree, dsk);
 	(void)memmove(dsk_start, bnd->start, len);
 
 	r->entries -= r->total_entries;
 	r->first_free = dsk_start + len;
-	r->space_avail = (r->split_size - WT_PAGE_DISK_SIZE) - len;
+	r->space_avail =
+	    (r->split_size - WT_PAGE_HEADER_BYTE_SIZE(btree)) - len;
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
@@ -827,7 +836,7 @@ static int
 __rec_split_write(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_BUF *buf)
 {
 	WT_CELL *cell;
-	WT_PAGE_DISK *dsk;
+	WT_PAGE_HEADER *dsk;
 	uint32_t size;
 	uint8_t addr[WT_BM_MAX_ADDR_COOKIE];
 
@@ -869,6 +878,7 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_BUF *buf)
 static int
 __rec_split_row_promote(WT_SESSION_IMPL *session, uint8_t type)
 {
+	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_RECONCILE *r;
@@ -876,6 +886,7 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, uint8_t type)
 	const uint8_t *pa, *pb;
 
 	r = session->reconcile;
+	btree = session->btree;
 	unpack = &_unpack;
 
 	/*
@@ -897,7 +908,7 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, uint8_t type)
 		 * __wt_cell_update_copy() won't be sufficient any way, we'd
 		 * only copy the non-prefix-compressed portion of the key.)
 		 */
-		cell = WT_PAGE_DISK_BYTE(r->dsk.mem);
+		cell = WT_PAGE_HEADER_BYTE(btree, r->dsk.mem);
 		__wt_cell_unpack(cell, unpack);
 		WT_ASSERT_RET(session, unpack->prefix == 0);
 		WT_RET(
@@ -1832,7 +1843,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		if (ikey->cell_offset == 0)
 			cell = NULL;
 		else {
-			cell = WT_REF_OFFSET(page, ikey->cell_offset);
+			cell = WT_PAGE_REF_OFFSET(page, ikey->cell_offset);
 			__wt_cell_unpack(cell, unpack);
 		}
 
@@ -2168,7 +2179,7 @@ __rec_row_leaf(
 		 */
 		if (__wt_off_page(page, rip->key)) {
 			ikey = rip->key;
-			cell = WT_REF_OFFSET(page, ikey->cell_offset);
+			cell = WT_PAGE_REF_OFFSET(page, ikey->cell_offset);
 		} else {
 			ikey = NULL;
 			cell = rip->key;
@@ -2892,47 +2903,51 @@ static int
 __rec_cell_build_ovfl(
     WT_SESSION_IMPL *session, WT_KV *kv, uint8_t type, uint64_t rle)
 {
+	WT_BTREE *btree;
 	WT_BUF *tmp;
 	WT_PAGE *page;
-	WT_PAGE_DISK *dsk;
+	WT_PAGE_HEADER *dsk;
 	WT_RECONCILE *r;
 	uint32_t size;
 	int ret;
 	uint8_t *addr, buf[WT_BM_MAX_ADDR_COOKIE];
 
 	r = session->reconcile;
+	btree = session->btree;
 	page = r->page;
 	tmp = NULL;
 	ret = 0;
 
 	/*
-	 * Check to see if this overflow chunk has already been written and
-	 * reuse it if possible.  Otherwise, write a new overflow chunk.
+	 * See if this overflow record has already been written and reuse it if
+	 * possible.  Else, write a new overflow record.
 	 */
 	if (!__wt_rec_track_ovfl_reuse(
 	    session, page, kv->buf.data, kv->buf.size, &addr, &size)) {
-		/* Allocate a buffer big enough to hold the overflow chunk. */
-		size = WT_DISK_REQUIRED(session->btree->block, kv->buf.size);
+		/* Allocate a buffer big enough to write the overflow record. */
+		size = kv->buf.size;
+		WT_RET(__wt_bm_write_size(session, &size));
 		WT_RET(__wt_scr_alloc(session, size, &tmp));
 
-		/* Initialize the disk header and overflow chunk. */
+		/* Initialize the buffer: disk header and overflow record. */
 		dsk = tmp->mem;
-		memset(dsk, 0, WT_PAGE_DISK_SIZE);
+		memset(dsk, 0, WT_PAGE_HEADER_SIZE);
 		dsk->type = WT_PAGE_OVFL;
 		dsk->u.datalen = kv->buf.size;
-		memcpy(WT_PAGE_DISK_BYTE(dsk), kv->buf.data, kv->buf.size);
-		tmp->size = WT_PAGE_DISK_SIZE + kv->buf.size;
+		memcpy(WT_PAGE_HEADER_BYTE(btree, dsk),
+		    kv->buf.data, kv->buf.size);
+		tmp->size = WT_PAGE_HEADER_BYTE_SIZE(btree) + kv->buf.size;
 
-		/* Write the overflow chunk. */
+		/* Write the buffer. */
 		addr = buf;
 		WT_ERR(__wt_bm_write(session, tmp, addr, &size));
 
-		/* Track the overflow chunk. */
+		/* Track the overflow record. */
 		WT_ERR(__wt_rec_track_ovfl(
 		    session, page, addr, size, kv->buf.data, kv->buf.size));
 	}
 
-	/* Set the callers K/V to reference the overflow chunk's address. */
+	/* Set the callers K/V to reference the overflow record's address. */
 	WT_ERR(__wt_buf_set(session, &kv->buf, addr, size));
 
 	/* Build the cell and return. */

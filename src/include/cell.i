@@ -111,8 +111,9 @@ struct __wt_cell_unpack {
  * WT_CELL_FOREACH --
  *	Walk the cells on a page.
  */
-#define	WT_CELL_FOREACH(dsk, cell, unpack, i)				\
-	for ((cell) = WT_PAGE_DISK_BYTE(dsk), (i) = (dsk)->u.entries;	\
+#define	WT_CELL_FOREACH(btree, dsk, cell, unpack, i)			\
+	for ((cell) =							\
+	    WT_PAGE_HEADER_BYTE(btree, dsk), (i) = (dsk)->u.entries;	\
 	    (i) > 0;							\
 	    (cell) = (WT_CELL *)((uint8_t *)(cell) + (unpack)->len), --(i))
 

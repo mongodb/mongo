@@ -27,12 +27,12 @@ typedef struct {
 /* Diagnostic output separator. */
 static const char *sep = "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
 
-static int  __debug_cell(WT_DBG *, WT_PAGE_DISK *, WT_CELL_UNPACK *);
+static int  __debug_cell(WT_DBG *, WT_PAGE_HEADER *, WT_CELL_UNPACK *);
 static int  __debug_cell_data(WT_DBG *, const char *, WT_CELL_UNPACK *);
 static void __debug_col_list(WT_DBG *, WT_INSERT_HEAD *, const char *, int);
 static int  __debug_config(WT_SESSION_IMPL *, WT_DBG *, const char *);
-static int  __debug_dsk_cell(WT_DBG *, WT_PAGE_DISK *);
-static void __debug_dsk_col_fix(WT_DBG *, WT_PAGE_DISK *);
+static int  __debug_dsk_cell(WT_DBG *, WT_PAGE_HEADER *);
+static void __debug_dsk_col_fix(WT_DBG *, WT_PAGE_HEADER *);
 static void __debug_ikey(WT_DBG *, WT_IKEY *);
 static void __debug_item(WT_DBG *, const char *, const void *, size_t);
 static int  __debug_page(WT_DBG *, WT_PAGE *, uint32_t);
@@ -209,7 +209,8 @@ err:	__wt_scr_free(&buf);
  *	Dump a disk page in debugging mode.
  */
 int
-__wt_debug_disk(WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, const char *ofile)
+__wt_debug_disk(
+    WT_SESSION_IMPL *session, WT_PAGE_HEADER *dsk, const char *ofile)
 {
 	WT_DBG *ds, _ds;
 	int ret;
@@ -231,15 +232,10 @@ __wt_debug_disk(WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, const char *ofile)
 		__dmsg(ds, ", entries %" PRIu32, dsk->u.entries);
 		break;
 	case WT_PAGE_OVFL:
-		__dmsg(ds, ", data size %" PRIu32, dsk->u.datalen);
+		__dmsg(ds, ", datalen %" PRIu32, dsk->u.datalen);
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
-	__dmsg(ds,
-	    ", size %" PRIu32 ", memsize %" PRIu32 ", lsn %" PRIu32 "/%" PRIu32
-	    ", cksum %" PRIu32 "\n",
-	    dsk->size, dsk->memsize,
-	    WT_LSN_FILE(dsk->lsn), WT_LSN_OFFSET(dsk->lsn), dsk->cksum);
 
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
@@ -265,7 +261,7 @@ __wt_debug_disk(WT_SESSION_IMPL *session, WT_PAGE_DISK *dsk, const char *ofile)
  *	Dump a WT_PAGE_COL_FIX page.
  */
 static void
-__debug_dsk_col_fix(WT_DBG *ds, WT_PAGE_DISK *dsk)
+__debug_dsk_col_fix(WT_DBG *ds, WT_PAGE_HEADER *dsk)
 {
 	WT_BTREE *btree;
 	uint32_t i;
@@ -285,15 +281,17 @@ __debug_dsk_col_fix(WT_DBG *ds, WT_PAGE_DISK *dsk)
  *	Dump a page of WT_CELL's.
  */
 static int
-__debug_dsk_cell(WT_DBG *ds, WT_PAGE_DISK *dsk)
+__debug_dsk_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk)
 {
+	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	uint32_t i;
 
+	btree = ds->session->btree;
 	unpack = &_unpack;
 
-	WT_CELL_FOREACH(dsk, cell, unpack, i) {
+	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
 		WT_RET(__debug_cell(ds, dsk, unpack));
 	}
@@ -546,7 +544,7 @@ __debug_page_col_fix(WT_DBG *ds, WT_PAGE *page)
 {
 	WT_BTREE *btree;
 	WT_INSERT *ins;
-	WT_PAGE_DISK *dsk;
+	WT_PAGE_HEADER *dsk;
 	WT_SESSION_IMPL *session;
 	uint64_t recno;
 	uint32_t i;
@@ -824,7 +822,7 @@ __debug_ref(WT_DBG *ds, WT_REF *ref, WT_PAGE *page)
  *	Dump a single, optionally unpacked, WT_CELL.
  */
 static int
-__debug_cell(WT_DBG *ds, WT_PAGE_DISK *dsk, WT_CELL_UNPACK *unpack)
+__debug_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 {
 	WT_BUF *buf;
 	WT_SESSION_IMPL *session;

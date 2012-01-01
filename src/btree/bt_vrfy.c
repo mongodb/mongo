@@ -440,12 +440,14 @@ __verify_row_leaf_key_order(
 static int
 __verify_overflow_cell(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 {
+	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
-	WT_PAGE_DISK *dsk;
+	WT_PAGE_HEADER *dsk;
 	uint32_t cell_num, i;
 	int ret;
 
+	btree = session->btree;
 	unpack = &_unpack;
 	ret = 0;
 
@@ -458,7 +460,7 @@ __verify_overflow_cell(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 
 	/* Walk the disk page, verifying pages referenced by overflow cells. */
 	cell_num = 0;
-	WT_CELL_FOREACH(dsk, cell, unpack, i) {
+	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		++cell_num;
 		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {
@@ -488,7 +490,7 @@ static int
 __verify_overflow(WT_SESSION_IMPL *session,
     const uint8_t *addrbuf, uint32_t addrbuf_len, WT_VSTUFF *vs)
 {
-	WT_PAGE_DISK *dsk;
+	WT_PAGE_HEADER *dsk;
 
 	/* Read and verify the overflow item. */
 	WT_RET(__wt_bm_verify_addr(session, addrbuf, addrbuf_len));

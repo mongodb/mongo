@@ -68,10 +68,11 @@ __wt_block_salvage_end(WT_SESSION_IMPL *session, WT_BLOCK *block, int success)
  *	Return the next block from the file.
  */
 int
-__wt_block_salvage_next(WT_SESSION_IMPL *session, WT_BLOCK *block,
-    WT_BUF *buf, uint8_t *addr, uint32_t *addr_sizep, int *eofp)
+__wt_block_salvage_next(
+    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_BUF *buf,
+    uint8_t *addr, uint32_t *addr_sizep, uint64_t *write_genp, int *eofp)
 {
-	WT_PAGE_DISK *dsk;
+	WT_BLOCK_HEADER *blk;
 	WT_FH *fh;
 	off_t max, offset;
 	uint32_t allocsize, cksum, size;
@@ -96,35 +97,19 @@ __wt_block_salvage_next(WT_SESSION_IMPL *session, WT_BLOCK *block,
 		 * and get a page length from it.
 		 */
 		WT_RET(__wt_read(session, fh, offset, allocsize, buf->mem));
-		dsk = buf->mem;
+		blk = WT_BLOCK_HEADER_REF(buf->mem);
 
 		/*
 		 * The page can't be more than the min/max page size, or past
 		 * the end of the file.
 		 */
-		size = dsk->size;
-		cksum = dsk->cksum;
+		size = blk->size;
+		cksum = blk->cksum;
 		if (size == 0 ||
 		    size % allocsize != 0 ||
 		    size > WT_BTREE_PAGE_SIZE_MAX ||
 		    offset + (off_t)size > max)
 			goto skip;
-
-		/*
-		 * After reading the file, we write pages in order to resolve
-		 * key range overlaps.   We give our newly written pages LSNs
-		 * larger than any LSN found in the file in case the salvage
-		 * run fails and is restarted later.  (Regardless of our LSNs,
-		 * it's possible our newly written pages will have to be merged
-		 * in a subsequent salvage run, at least if it's a row-store,
-		 * as the key ranges are not exact.  However, having larger LSNs
-		 * should make our newly written pages more likely to win over
-		 * previous pages, minimizing the work done in subsequent
-		 * salvage runs.)  Reset the tree's current LSN to the largest
-		 * LSN we read.
-		 */
-		if (block->lsn < dsk->lsn)
-			block->lsn = dsk->lsn;
 
 		/*
 		 * The page size isn't insane, read the entire page: reading the
@@ -150,6 +135,14 @@ skip:			WT_VERBOSE(session, salvage,
 		/* Valid block, return to our caller. */
 		break;
 	}
+
+	/*
+	 * Track the largest write-generation we've seen in the file so future
+	 * writes, done after salvage completes, are preferred to these blocks.
+	 */
+	*write_genp = blk->write_gen;
+	if (block->write_gen < blk->write_gen)
+		block->write_gen = blk->write_gen;
 
 	/* Re-create the address cookie that should reference this block. */
 	endp = addr;

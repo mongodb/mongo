@@ -15,6 +15,10 @@ int
 __wt_ovfl_in(
     WT_SESSION_IMPL *session, WT_BUF *store, const uint8_t *addr, uint32_t len)
 {
+	WT_BTREE *btree;
+
+	btree = session->btree;
+
 	WT_BSTAT_INCR(session, overflow_read);
 
 	/*
@@ -27,8 +31,8 @@ __wt_ovfl_in(
 	WT_RET(__wt_bm_read(session, store, addr, len));
 
 	/* Reference the start of the data and set the data's length. */
-	store->data = WT_PAGE_DISK_BYTE(store->mem);
-	store->size = ((WT_PAGE_DISK *)store->mem)->u.datalen;
+	store->data = WT_PAGE_HEADER_BYTE(btree, store->mem);
+	store->size = ((WT_PAGE_HEADER *)store->mem)->u.datalen;
 
 	return (0);
 }

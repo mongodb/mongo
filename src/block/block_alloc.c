@@ -376,7 +376,7 @@ __wt_block_freelist_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	 * file's description structure.  Confirm the offset/size pairs are
 	 * valid, then insert them into the linked list.
 	 */
-	p = WT_PAGE_DISK_BYTE(tmp->mem);
+	p = WT_BLOCK_HEADER_BYTE(tmp->mem);
 	offset = *(off_t *)p;
 	p += sizeof(off_t);
 	size = *(uint32_t *)p;
@@ -432,11 +432,10 @@ __wt_block_freelist_write(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
 	WT_BUF *tmp;
 	WT_FREE_ENTRY *fe;
-	WT_PAGE_DISK *dsk;
+	WT_PAGE_HEADER *dsk;
 	off_t offset;
-	uint32_t cksum, size;
+	uint32_t cksum, datasize, size;
 	uint8_t *p;
-	size_t bytes;
 	int ret;
 
 	tmp = NULL;
@@ -471,21 +470,22 @@ __wt_block_freelist_write(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	 * the initial WT_BLOCK_FREELIST_MAGIC/0 pair and the list-terminating
 	 * WT_BLOCK_INVALID_OFFSET/0 pair.
 	 */
-	bytes =
-	    (block->freelist_entries + 2) * (sizeof(off_t) + sizeof(uint32_t));
-	WT_RET(__wt_scr_alloc(session, WT_DISK_REQUIRED(block, bytes), &tmp));
+	datasize = size = (block->freelist_entries + 2) *
+	    WT_STORE_SIZE(sizeof(off_t) + sizeof(uint32_t));
+	WT_RET(__wt_block_write_size(session, block, &size));
+	WT_RET(__wt_scr_alloc(session, size, &tmp));
 	dsk = tmp->mem;
-	memset(dsk, 0, WT_PAGE_DISK_SIZE);
-	dsk->u.datalen = WT_STORE_SIZE(bytes);
+	memset(dsk, 0, WT_BLOCK_HEADER_BYTE_SIZE);
+	dsk->u.datalen = WT_STORE_SIZE(datasize);
 	dsk->type = WT_PAGE_FREELIST;
-	tmp->size = WT_STORE_SIZE(WT_PAGE_DISK_SIZE + bytes);
+	tmp->size = WT_STORE_SIZE(WT_BLOCK_HEADER_BYTE_SIZE + datasize);
 
 	/*
 	 * Fill the page's data.  We output the data in reverse order so we
 	 * insert quickly, at least into the address queue, when we read it
 	 * back in.
 	 */
-	p = WT_PAGE_DISK_BYTE(dsk);
+	p = WT_BLOCK_HEADER_BYTE(dsk);
 	*(off_t *)p = WT_BLOCK_FREELIST_MAGIC;		/* Initial value */
 	p += sizeof(off_t);
 	*(uint32_t *)p = 0;

@@ -12,15 +12,15 @@ static int __err_cell_type(
 	WT_SESSION_IMPL *, uint32_t, const char *, uint8_t, uint8_t);
 static int __err_eof(WT_SESSION_IMPL *, uint32_t, const char *);
 static int __verify_dsk_chunk(
-	WT_SESSION_IMPL *, const char *, WT_PAGE_DISK *, uint32_t, uint32_t);
+	WT_SESSION_IMPL *, const char *, WT_PAGE_HEADER *, uint32_t);
 static int __verify_dsk_col_fix(
-	WT_SESSION_IMPL *, const char *, WT_PAGE_DISK *, uint32_t);
+	WT_SESSION_IMPL *, const char *, WT_PAGE_HEADER *);
 static int __verify_dsk_col_int(
-	WT_SESSION_IMPL *, const char *, WT_PAGE_DISK *, uint32_t);
+	WT_SESSION_IMPL *, const char *, WT_PAGE_HEADER *);
 static int __verify_dsk_col_var(
-	WT_SESSION_IMPL *, const char *, WT_PAGE_DISK *, uint32_t);
+	WT_SESSION_IMPL *, const char *, WT_PAGE_HEADER *);
 static int __verify_dsk_row(
-	WT_SESSION_IMPL *, const char *, WT_PAGE_DISK *, uint32_t);
+	WT_SESSION_IMPL *, const char *, WT_PAGE_HEADER *);
 
 #define	WT_VRFY_ERR(session, ...) do {					\
 	if (!(F_ISSET(session, WT_SESSION_SALVAGE_QUIET_ERR)))		\
@@ -33,8 +33,11 @@ static int __verify_dsk_row(
  */
 int
 __wt_verify_dsk(WT_SESSION_IMPL *session,
-    const char *addr, WT_PAGE_DISK *dsk, uint32_t size)
+    const char *addr, WT_PAGE_HEADER *dsk, uint32_t size)
 {
+	u_int i;
+	uint8_t *p;
+
 	/* Check the page type. */
 	switch (dsk->type) {
 	case WT_PAGE_COL_FIX:
@@ -76,38 +79,38 @@ __wt_verify_dsk(WT_SESSION_IMPL *session,
 		return (WT_ERROR);
 	}
 
-	/*
-	 * Ignore the LSN.
-	 *
-	 * Ignore the checksum -- it verified when we first read the page.
-	 *
-	 * Ignore the disk sizes.
-	 */
-
-	/* Unused bytes */
-	if (dsk->unused[0] != '\0' ||
-	    dsk->unused[1] != '\0' || dsk->unused[2] != '\0') {
+	/* Check the in-memory size. */
+	if (dsk->memsize != size) {
 		WT_VRFY_ERR(session,
-		    "page at %s has non-zero unused header fields",
-		    addr);
+		    "%s page at %s has an incorrect size (%" PRIu32 " != %"
+		    PRIu32 ")",
+		    __wt_page_type_string(dsk->type), addr, dsk->memsize, size);
 		return (WT_ERROR);
 	}
+
+	/* Unused bytes */
+	for (p = dsk->unused, i = sizeof(dsk->unused); i > 0; --i)
+		if (*p != '\0') {
+			WT_VRFY_ERR(session,
+			    "page at %s has non-zero unused page header bytes",
+			    addr);
+			return (WT_ERROR);
+		}
 
 	/* Verify the items on the page. */
 	switch (dsk->type) {
 	case WT_PAGE_COL_INT:
-		return (__verify_dsk_col_int(session, addr, dsk, size));
+		return (__verify_dsk_col_int(session, addr, dsk));
 	case WT_PAGE_COL_FIX:
-		return (__verify_dsk_col_fix(session, addr, dsk, size));
+		return (__verify_dsk_col_fix(session, addr, dsk));
 	case WT_PAGE_COL_VAR:
-		return (__verify_dsk_col_var(session, addr, dsk, size));
+		return (__verify_dsk_col_var(session, addr, dsk));
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		return (__verify_dsk_row(session, addr, dsk, size));
+		return (__verify_dsk_row(session, addr, dsk));
 	case WT_PAGE_FREELIST:
 	case WT_PAGE_OVFL:
-		return (__verify_dsk_chunk(
-		    session, addr, dsk, dsk->u.datalen, size));
+		return (__verify_dsk_chunk(session, addr, dsk, dsk->u.datalen));
 	WT_ILLEGAL_VALUE(session);
 	}
 	/* NOTREACHED */
@@ -118,8 +121,8 @@ __wt_verify_dsk(WT_SESSION_IMPL *session,
  *	Walk a WT_PAGE_ROW_INT or WT_PAGE_ROW_LEAF disk page and verify it.
  */
 static int
-__verify_dsk_row(WT_SESSION_IMPL *session,
-    const char *addr, WT_PAGE_DISK *dsk, uint32_t size)
+__verify_dsk_row(
+    WT_SESSION_IMPL *session, const char *addr, WT_PAGE_HEADER *dsk)
 {
 	WT_BTREE *btree;
 	WT_BUF *current, *last, *last_pfx, *last_ovfl;
@@ -142,11 +145,11 @@ __verify_dsk_row(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_scr_alloc(session, 0, &last_ovfl));
 	last = last_ovfl;
 
-	end = (uint8_t *)dsk + size;
+	end = (uint8_t *)dsk + dsk->memsize;
 
 	last_cell_type = FIRST;
 	cell_num = 0;
-	WT_CELL_FOREACH(dsk, cell, unpack, i) {
+	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		++cell_num;
 
 		/* Carefully unpack the cell. */
@@ -365,19 +368,21 @@ err:		if (ret == 0)
  *	Walk a WT_PAGE_COL_INT disk page and verify it.
  */
 static int
-__verify_dsk_col_int(WT_SESSION_IMPL *session,
-    const char *addr, WT_PAGE_DISK *dsk, uint32_t size)
+__verify_dsk_col_int(
+    WT_SESSION_IMPL *session, const char *addr, WT_PAGE_HEADER *dsk)
 {
+	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	uint32_t cell_num, i;
 	uint8_t *end;
 
+	btree = session->btree;
 	unpack = &_unpack;
-	end = (uint8_t *)dsk + size;
+	end = (uint8_t *)dsk + dsk->memsize;
 
 	cell_num = 0;
-	WT_CELL_FOREACH(dsk, cell, unpack, i) {
+	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		++cell_num;
 
 		/* Carefully unpack the cell. */
@@ -401,8 +406,8 @@ __verify_dsk_col_int(WT_SESSION_IMPL *session,
  *	Walk a WT_PAGE_COL_FIX disk page and verify it.
  */
 static int
-__verify_dsk_col_fix(WT_SESSION_IMPL *session,
-    const char *addr, WT_PAGE_DISK *dsk, uint32_t size)
+__verify_dsk_col_fix(
+    WT_SESSION_IMPL *session, const char *addr, WT_PAGE_HEADER *dsk)
 {
 	WT_BTREE *btree;
 	uint32_t datalen;
@@ -410,7 +415,7 @@ __verify_dsk_col_fix(WT_SESSION_IMPL *session,
 	btree = session->btree;
 
 	datalen = __bitstr_size(btree->bitcnt * dsk->u.entries);
-	return (__verify_dsk_chunk(session, addr, dsk, datalen, size));
+	return (__verify_dsk_chunk(session, addr, dsk, datalen));
 }
 
 /*
@@ -418,9 +423,10 @@ __verify_dsk_col_fix(WT_SESSION_IMPL *session,
  *	Walk a WT_PAGE_COL_VAR disk page and verify it.
  */
 static int
-__verify_dsk_col_var(WT_SESSION_IMPL *session,
-    const char *addr, WT_PAGE_DISK *dsk, uint32_t size)
+__verify_dsk_col_var(
+    WT_SESSION_IMPL *session, const char *addr, WT_PAGE_HEADER *dsk)
 {
+	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	uint32_t cell_num, cell_type, i, last_size;
@@ -428,8 +434,9 @@ __verify_dsk_col_var(WT_SESSION_IMPL *session,
 	const uint8_t *last_data;
 	uint8_t *end;
 
+	btree = session->btree;
 	unpack = &_unpack;
-	end = (uint8_t *)dsk + size;
+	end = (uint8_t *)dsk + dsk->memsize;
 	ret = 0;
 
 	last_data = NULL;
@@ -437,7 +444,7 @@ __verify_dsk_col_var(WT_SESSION_IMPL *session,
 	last_deleted = 0;
 
 	cell_num = 0;
-	WT_CELL_FOREACH(dsk, cell, unpack, i) {
+	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		++cell_num;
 
 		/* Carefully unpack the cell. */
@@ -506,11 +513,13 @@ match_err:			ret = WT_ERROR;
  */
 static int
 __verify_dsk_chunk(WT_SESSION_IMPL *session,
-    const char *addr, WT_PAGE_DISK *dsk, uint32_t datalen, uint32_t size)
+    const char *addr, WT_PAGE_HEADER *dsk, uint32_t datalen)
 {
+	WT_BTREE *btree;
 	uint8_t *p, *end;
 
-	end = (uint8_t *)dsk + size;
+	btree = session->btree;
+	end = (uint8_t *)dsk + dsk->memsize;
 
 	/*
 	 * Fixed-length column-store, overflow and freelist pages are simple
@@ -524,7 +533,7 @@ __verify_dsk_chunk(WT_SESSION_IMPL *session,
 	}
 
 	/* Verify the data doesn't overflow the end of the page. */
-	p = (uint8_t *)WT_PAGE_DISK_BYTE(dsk);
+	p = WT_PAGE_HEADER_BYTE(btree, dsk);
 	if (p + datalen > end) {
 		WT_VRFY_ERR(session,
 		    "data on page at %s extends past the end of the page",

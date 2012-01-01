@@ -44,16 +44,6 @@ struct __wt_btree {
 	void *huffman_key;		/* Key huffman encoding */
 	void *huffman_value;		/* Value huffman encoding */
 
-	void *block;			/* Block manager */
-
-	WT_PAGE *root_page;		/* Root page */
-	WT_ADDR  root_addr;		/* Replacement root address */
-	int	 root_update;		/* 0: free original root blocks
-					   1: free saved root blocks and
-					      update on close */
-
-	WT_PAGE *evict_page;		/* Eviction thread's location */
-
 	/*
 	 * Column-store: track the last record in the file, and keep the last
 	 * page pinned in memory for fast appends, to a skiplist of appended
@@ -62,6 +52,17 @@ struct __wt_btree {
 	WT_PAGE *last_page;		/* Col-store append, last page */
 	uint64_t last_recno;		/* Col-store append, last recno */
 	WT_INSERT_HEAD **append;	/* Appended items */
+
+	WT_PAGE *root_page;		/* Root page */
+	WT_ADDR  root_addr;		/* Replacement root address */
+	int	 root_update;		/* 0: free original root blocks
+					   1: free saved root blocks and
+					      update on close */
+
+	void *block;			/* Block manager */
+	u_int block_header;		/* Block manager header length */
+
+	WT_PAGE *evict_page;		/* Eviction thread's location */
 
 	WT_BTREE_STATS *stats;		/* Btree statistics */
 

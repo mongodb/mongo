@@ -6,6 +6,59 @@
  */
 
 /*
+ * WT_PAGE_HEADER --
+ *	Blocks have a common header, a WT_PAGE_HEADER structure followed by a
+ * block-manager specific structure.
+ */
+struct __wt_page_header {
+	/*
+	 * The record number of the first record of the page is stored on disk
+	 * so we can figure out where the column-store leaf page fits into the
+	 * key space during salvage.
+	 */
+	uint64_t recno;			/* 00-07: column-store starting recno */
+
+	/* The in-memory size of the block. */
+	uint32_t memsize;		/* 08-11: in-memory page size */
+
+	union {
+		uint32_t entries;	/* 12-15: number of cells on page */
+		uint32_t datalen;	/* 12-15: overflow data length */
+	} u;
+
+	uint8_t type;			/* 16: page type */
+
+	/*
+	 * End the WT_PAGE_HEADER structure with 3 bytes of padding: it wastes
+	 * space, but it leaves the WT_PAGE_HEADER structure 32-bit aligned and
+	 * having a small amount of space to play with in the future can't hurt.
+	 */
+	uint8_t unused[3];		/* 17-19: unused padding */
+};
+/*
+ * WT_PAGE_HEADER_SIZE is the number of bytes we allocate for the structure: if
+ * the compiler inserts padding it will break the world.
+ */
+#define	WT_PAGE_HEADER_SIZE            20
+
+/*
+ * The block-manager specific information immediately follows the WT_PAGE_DISK
+ * structure.
+ */
+#define	WT_BLOCK_HEADER_REF(dsk)					\
+	((void *)((uint8_t *)(dsk) + WT_PAGE_HEADER_SIZE))
+
+/*
+ * WT_PAGE_HEADER_BYTE --
+ * WT_PAGE_HEADER_BYTE_SIZE --
+ *	The first usable data byte on the block (past the combined headers).
+ */
+#define	WT_PAGE_HEADER_BYTE_SIZE(btree)					\
+	((u_int)(WT_PAGE_HEADER_SIZE + (btree)->block_header))
+#define	WT_PAGE_HEADER_BYTE(btree, dsk)					\
+	((void *)((uint8_t *)(dsk) + WT_PAGE_HEADER_BYTE_SIZE(btree)))
+
+/*
  * WT_ADDR --
  *	A block location.
  */
@@ -190,7 +243,7 @@ struct __wt_page {
 	} u;
 
 	/* Page's on-disk representation: NULL for pages created in memory. */
-	WT_PAGE_DISK *dsk;
+	WT_PAGE_HEADER *dsk;
 
 	/* If/when the page is modified, we need lots more information. */
 	WT_PAGE_MODIFY *modify;
@@ -254,6 +307,15 @@ struct __wt_page {
 #define	WT_PAGE_REC_MASK						\
 	(WT_PAGE_REC_EMPTY |						\
 	    WT_PAGE_REC_REPLACE | WT_PAGE_REC_SPLIT | WT_PAGE_REC_SPLIT_MERGE)
+
+/*
+ * WT_PAGE_DISK_OFFSET, WT_PAGE_REF_OFFSET --
+ *	Return the offset/pointer of a pointer/offset in a page disk image.
+ */
+#define	WT_PAGE_DISK_OFFSET(page, p)					\
+	WT_PTRDIFF32(p, (page)->dsk)
+#define	WT_PAGE_REF_OFFSET(page, o)					\
+	((void *)((uint8_t *)((page)->dsk) + (o)))
 
 /*
  * WT_REF --
@@ -435,7 +497,7 @@ struct __wt_col_rle {
  * exist on the page, return a NULL.
  */
 #define	WT_COL_PTR(page, cip)						\
-	((cip)->__value == 0 ? NULL : WT_REF_OFFSET(page, (cip)->__value))
+	((cip)->__value == 0 ? NULL : WT_PAGE_REF_OFFSET(page, (cip)->__value))
 
 /*
  * WT_COL_FOREACH --
@@ -642,15 +704,8 @@ struct __wt_insert_head {
 #define	WT_FIX_FOREACH(btree, dsk, v, i)				\
 	for ((i) = 0,							\
 	    (v) = (i) < (dsk)->u.entries ?				\
-	    __bit_getv(WT_PAGE_DISK_BYTE(dsk), 0, (btree)->bitcnt) : 0;	\
+	    __bit_getv(							\
+	    WT_PAGE_HEADER_BYTE(btree, dsk), 0, (btree)->bitcnt) : 0;	\
 	    (i) < (dsk)->u.entries; ++(i),				\
-	    (v) = __bit_getv(WT_PAGE_DISK_BYTE(dsk), i, (btree)->bitcnt))
-
-/*
- * WT_DISK_OFFSET, WT_REF_OFFSET --
- *	Return the offset/pointer of a pointer/offset in a page disk image.
- */
-#define	WT_DISK_OFFSET(dsk, p)						\
-	WT_PTRDIFF32(p, dsk)
-#define	WT_REF_OFFSET(page, o)						\
-	((void *)((uint8_t *)((page)->dsk) + (o)))
+	    (v) = __bit_getv(						\
+	    WT_PAGE_HEADER_BYTE(btree, dsk), i, (btree)->bitcnt))

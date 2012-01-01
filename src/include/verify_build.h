@@ -43,22 +43,10 @@
 static inline void
 __wt_verify_build(void)
 {
-	/*
-	 * The compiler had better not have padded our structures -- make sure
-	 * the page header structure is exactly what we expect.
-	 */
+	/* On-disk structures should not be padded. */
 	SIZE_CHECK(WT_BLOCK_DESC, WT_BLOCK_DESC_SIZE);
 
-	/*
-	 * The page header is special: the compiler will pad it to a multiple
-	 * of 8 bytes because it has 64-bit fields that need alignment.  We
-	 * use WT_PAGE_DISK_SIZE everywhere instead of sizeof to avoid writing
-	 * 4 extra bytes to the file.
-	 */
-	SIZE_CHECK(WT_PAGE_DISK, WT_ALIGN(WT_PAGE_DISK_SIZE, sizeof(void *)));
-
-	/* There are also structures that must be aligned correctly. */
-	ALIGN_CHECK(WT_PAGE_DISK, sizeof(uint32_t));
+	/* Some structures must be aligned correctly. */
 	ALIGN_CHECK(WT_SESSION_BUFFER, sizeof(uint32_t));
 
 	/*

@@ -8,6 +8,34 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_block_header --
+ *	Return the size of the block-specific header.
+ */
+int
+__wt_block_header(WT_SESSION_IMPL *session, WT_BLOCK *block, uint32_t *headerp)
+{
+	WT_UNUSED(session);
+	WT_UNUSED(block);
+
+	*headerp = WT_BLOCK_HEADER_SIZE;
+	return (0);
+}
+
+/*
+ * __wt_block_write_size --
+ *	Return the buffer size required to write a block.
+ */
+int
+__wt_block_write_size(
+    WT_SESSION_IMPL *session, WT_BLOCK *block, uint32_t *sizep)
+{
+	WT_UNUSED(session);
+
+	*sizep = WT_ALIGN(*sizep + WT_BLOCK_HEADER_BYTE_SIZE, block->allocsize);
+	return (0);
+}
+
+/*
  * __wt_block_write_buf --
  *	Write a buffer into a block, returning the block's address cookie.
  */
@@ -20,22 +48,6 @@ __wt_block_write_buf(WT_SESSION_IMPL *session,
 	uint8_t *endp;
 
 	WT_UNUSED(addr_size);
-
-	/*
-	 * We're passed a table's page image: WT_BUF->{data,size} are the image
-	 * and byte count.
-	 *
-	 * Diagnostics: verify the disk page: this violates layering, but it's
-	 * the place we can ensure we never write a corrupted page.
-	 */
-#ifdef HAVE_DIAGNOSTIC
-	{
-	int ret;
-	if ((ret = __wt_verify_dsk(session,
-	    "[write-check]", (WT_PAGE_DISK *)buf->data, buf->size)) != 0)
-		return (ret);
-	}
-#endif
 
 	WT_RET(__wt_block_write(session, block, buf, &offset, &size, &cksum));
 
@@ -55,8 +67,9 @@ int
 __wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
     WT_BUF *buf, off_t *offsetp, uint32_t *sizep, uint32_t *cksump)
 {
+	WT_BLOCK_HEADER *blk;
+	WT_PAGE_HEADER *dsk;
 	WT_BUF *tmp;
-	WT_PAGE_DISK *dsk;
 	off_t offset;
 	uint32_t align_size, size;
 	int compression_failed, ret;
@@ -66,25 +79,41 @@ __wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	tmp = NULL;
 	ret = 0;
 
-	/* Set the in-memory size, then align it to an allocation unit. */
+	/*
+	 * Set the block's in-memory size.
+	 *
+	 * XXX
+	 * Should be set by our caller, it's part of the WT_PAGE_HEADER?
+	 */
 	dsk = buf->mem;
 	dsk->memsize = buf->size;
-	align_size = WT_ALIGN(buf->size, block->allocsize);
 
 	/*
-	 * The buffer must be big enough for us to zero to the next allocsize
-	 * boundary: our callers must allocate enough memory for the buffer so
-	 * that we can do this operation.  Why don't our callers just zero out
-	 * the buffer themselves?  Because we have to zero out the end of the
-	 * buffer in the compression case: so, we can either test compression
-	 * in our callers and zero or not-zero based on that test, splitting
-	 * the code to zero out the buffer into two parts, or require callers
-	 * allocate enough memory for us to zero here without copying.  Both
-	 * choices suck.
+	 * We're passed a table's page image: WT_BUF->{mem,size} are the image
+	 * and byte count.
+	 *
+	 * Diagnostics: verify the disk page: this violates layering, but it's
+	 * the place we can ensure we never write a corrupted page.  Note that
+	 * we are verifying the free-list page, too.  (We created a "page" for
+	 * the free-list, it was simpler than creating another type of object
+	 * in the file.)
 	 */
+#ifdef HAVE_DIAGNOSTIC
+	WT_RET(__wt_verify_dsk(session, "[write-check]", buf->mem, buf->size));
+#endif
+
+	/*
+	 * Align the size to an allocation unit.
+	 *
+	 * The buffer must be big enough for us to zero to the next allocsize
+	 * boundary, this is one of the reasons the btree layer must find out
+	 * from the block-manager layer the maximum size of the eventual write.
+	 */
+	align_size = WT_ALIGN(buf->size, block->allocsize);
 	if (align_size > buf->memsize) {
-		__wt_errx(session, "write buffer was incorrectly allocated");
-		return (WT_ERROR);
+		__wt_err(session, EINVAL,
+		    "write buffer was incorrectly allocated");
+		return (EINVAL);
 	}
 
 	/*
@@ -106,7 +135,6 @@ not_compressed:	/*
 		 * block is NOT compressed).
 		 */
 		dsk = buf->mem;
-		dsk->size = align_size;
 	} else {
 		/* Skip the first 32B of the source data. */
 		src = (uint8_t *)buf->mem + WT_BLOCK_COMPRESS_SKIP;
@@ -167,37 +195,35 @@ not_compressed:	/*
 		    (uint8_t *)tmp->mem + tmp->size, 0, align_size - tmp->size);
 
 		dsk = tmp->mem;
-		dsk->size = align_size;
 	}
 
-	/* Allocate blocks from the underlying file. */
-	WT_ERR(__wt_block_alloc(session, block, &offset, align_size));
+	blk = WT_BLOCK_HEADER_REF(dsk);
 
 	/*
-	 * The disk write function sets things in the WT_PAGE_DISK header simply
-	 * because it's easy to do it here.  In a transactional store, things
-	 * may be a little harder.
-	 *
-	 * We increment the block's LSN in non-transactional stores so it's easy
-	 * to identify newer versions of blocks during salvage: both blocks are
-	 * likely to be internally consistent, and might have the same initial
-	 * and last keys, so we need a way to know the most recent state of the
-	 * block.  Alternatively, we could check to see which leaf is referenced
+	 * We increment the block's write generation so it's easy to identify
+	 * newer versions of blocks during salvage: it's common in WiredTiger
+	 * for multiple blocks to be internally consistent with identical
+	 * first and last keys, so we need a way to know the most recent state
+	 * of the block.  (We could check to see which leaf is referenced by
 	 * by the internal page, which implies salvaging internal pages (which
 	 * I don't want to do), and it's not quite as good anyway, because the
 	 * internal page may not have been written to disk after the leaf page
-	 * was updated.
+	 * was updated.  So, write generations it is.)
 	 */
-	WT_LSN_INCR(block->lsn);
-	dsk->lsn = block->lsn;
+	blk->write_gen = ++block->write_gen;
+
+	blk->size = align_size;
 
 	/*
 	 * Update the block's checksum: checksum the compressed contents, not
 	 * the uncompressed contents.
 	 */
-	dsk->cksum = 0;
+	blk->cksum = 0;
 	if (block->checksum)
-		dsk->cksum = __wt_cksum(dsk, align_size);
+		blk->cksum = __wt_cksum(dsk, align_size);
+
+	/* Allocate space from the underlying file and write the block. */
+	WT_ERR(__wt_block_alloc(session, block, &offset, align_size));
 	WT_ERR(__wt_write(session, block->fh, offset, align_size, dsk));
 
 	WT_BSTAT_INCR(session, page_write);
@@ -205,12 +231,12 @@ not_compressed:	/*
 
 	WT_VERBOSE(session, write,
 	    "%" PRIu32 " at offset/size %" PRIuMAX "/%" PRIu32 ", %s",
-	    dsk->memsize, (uintmax_t)offset, dsk->size,
-	    dsk->size < dsk->memsize ? "compressed, " : "");
+	    dsk->memsize, (uintmax_t)offset, blk->size,
+	    blk->size < dsk->memsize ? "compressed, " : "");
 
 	*offsetp = offset;
 	*sizep = align_size;
-	*cksump = dsk->cksum;
+	*cksump = blk->cksum;
 
 err:	__wt_scr_free(&tmp);
 	return (ret);

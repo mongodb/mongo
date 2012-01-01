@@ -179,8 +179,8 @@ __wt_row_key(
 				break;
 			}
 
-			__wt_cell_unpack(
-			    WT_REF_OFFSET(page, ikey->cell_offset), unpack);
+			__wt_cell_unpack(WT_PAGE_REF_OFFSET(
+			    page, ikey->cell_offset), unpack);
 
 			/*
 			 * If we wanted a different key and this key is an
@@ -319,7 +319,7 @@ next:		switch (direction) {
 	 * this key.
 	 */
 	WT_ERR(__wt_row_ikey_alloc(session,
-	    WT_DISK_OFFSET(page->dsk, rip_arg->key),
+	    WT_PAGE_DISK_OFFSET(page, rip_arg->key),
 	    retb->data, retb->size, &ikey));
 
 	/* Serialize the swap of the key into place. */
@@ -374,7 +374,7 @@ __wt_row_value(WT_PAGE *page, WT_ROW *rip)
 	 * what other threads are doing.
 	 */
 	if (__wt_off_page(page, cell))
-		cell = WT_REF_OFFSET(page, ((WT_IKEY *)cell)->cell_offset);
+		cell = WT_PAGE_REF_OFFSET(page, ((WT_IKEY *)cell)->cell_offset);
 
 	/*
 	 * Row-store leaf pages may have a single data cell between each key, or
