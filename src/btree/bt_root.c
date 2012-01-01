@@ -7,12 +7,12 @@
 
 #include "wt_internal.h"
 
-static int __btree_get_root(WT_SESSION_IMPL *, const char **);
-static int __btree_get_root_turtle(WT_SESSION_IMPL *, const char **);
+static int __btree_get_root(WT_SESSION_IMPL *, const char **, int *, int *);
+static int __btree_get_turtle(WT_SESSION_IMPL *, const char **, int *, int *);
 static int __btree_set_root(WT_SESSION_IMPL *, char *);
-static int __btree_set_root_turtle(WT_SESSION_IMPL *, char *);
+static int __btree_set_turtle(WT_SESSION_IMPL *, char *);
 
-#define	WT_TURTLE_MSG		"The turtle.\n"
+#define	WT_TURTLE_MSG		"The turtle."
 
 #define	WT_SCHEMA_TURTLE	"WiredTiger.turtle"	/* Schema root page */
 #define	WT_SCHEMA_TURTLE_SET	"WiredTiger.turtle.set"	/* Schema root prep */
@@ -26,7 +26,7 @@ __wt_btree_get_root(WT_SESSION_IMPL *session, WT_BUF *addr)
 {
 	WT_BTREE *btree;
 	uint32_t size;
-	int ret;
+	int majorv, minorv, ret;
 	const char *v;
 
 	btree = session->btree;
@@ -36,9 +36,26 @@ __wt_btree_get_root(WT_SESSION_IMPL *session, WT_BUF *addr)
 	addr->data = NULL;
 	addr->size = 0;
 
+	/*
+	 * If we don't find a file, we're creating a new one, at the current
+	 * version.
+	 */
+	majorv = WT_BTREE_MAJOR_VERSION;
+	minorv = WT_BTREE_MINOR_VERSION;
+
+	/* Get the root address and major/minor numbers. */
 	WT_ERR(strcmp(btree->filename, WT_SCHEMA_FILENAME) == 0 ?
-	    __btree_get_root_turtle(session, &v) :
-	    __btree_get_root(session, &v));
+	    __btree_get_turtle(session, &v, &majorv, &minorv) :
+	    __btree_get_root(session, &v, &majorv, &minorv));
+
+	if (majorv > WT_BTREE_MAJOR_VERSION ||
+	    (majorv == WT_BTREE_MAJOR_VERSION &&
+	    minorv > WT_BTREE_MINOR_VERSION)) {
+		__wt_errx(session,
+		    "%s is an unsupported version of a WiredTiger file",
+		    btree->filename);
+		return (WT_ERROR);
+	}
 
 	/* Nothing or "[NoAddr]" means no address. */
 	if (v != NULL && strlen(v) != 0 && strcmp(v, WT_NOADDR) != 0) {
@@ -125,7 +142,7 @@ __wt_btree_set_root(WT_SESSION_IMPL *session, uint8_t *addr, uint32_t size)
 	}
 
 	WT_ERR(strcmp(btree->filename, WT_SCHEMA_FILENAME) == 0 ?
-	    __btree_set_root_turtle(session, (char *)v->data) :
+	    __btree_set_turtle(session, (char *)v->data) :
 	    __btree_set_root(session, (char *)v->data));
 
 	if (0) {
@@ -139,31 +156,62 @@ err:		__wt_err(session, ret,
 }
 
 /*
- * __btree_get_root --
+ * __btree_get_turtle --
  *	Get the schema file's root address.
  */
 static int
-__btree_get_root_turtle(WT_SESSION_IMPL *session, const char **vp)
+__btree_get_turtle(
+    WT_SESSION_IMPL *session, const char **vp, int *majorp, int *minorp)
 {
 	FILE *fp;
-	int ret;
+	int found_root, found_version, ret;
 	const char *path;
 	char *p, line[1024];
 
 	*vp = NULL;
 
 	fp = NULL;
-	path = NULL;
 	ret = 0;
+	path = NULL;
+
+	found_root = found_version = 0;
 
 	WT_ERR(__wt_filename(session, WT_SCHEMA_TURTLE, &path));
 	WT_ERR_TEST((fp = fopen(path, "r")) == NULL, 0);
-	WT_ERR_TEST(fgets(line, (int)sizeof(line), fp) == NULL, WT_ERROR);
-	WT_ERR_TEST(strcmp(line, WT_TURTLE_MSG) != 0, WT_ERROR);
-	WT_ERR_TEST(fgets(line, (int)sizeof(line), fp) == NULL, WT_ERROR);
-	WT_ERR_TEST((p = strchr(line, '\n')) == NULL, WT_ERROR);
-	*p = '\0';
-	WT_ERR(__wt_strdup(session, line, vp));
+	for (;;) {
+		if (fgets(line, (int)sizeof(line), fp) == NULL) {
+			if (ferror(fp))  {
+				ret = errno;
+				goto format;
+			}
+			break;
+		}
+		if ((p = strchr(line, '\n')) == NULL)
+			goto format;
+		*p = '\0';
+
+		if (strcmp(line, WT_TURTLE_MSG) == 0)
+			continue;
+		if (strncmp(line, "root:", strlen("root:")) == 0) {
+			WT_ERR(__wt_strdup(
+			    session, line + strlen("root:"), vp));
+			found_root = 1;
+			continue;
+		}
+		if (strncmp(line, "version:", strlen("version:")) == 0) {
+			if (sscanf(line,
+			    "version:major=%d,minor=%d", majorp, minorp) != 2)
+				goto format;
+			found_version = 1;
+			continue;
+		}
+		goto format;
+	}
+
+	if (!found_root || !found_version) {
+format:		__wt_errx(session, "the %s file is corrupted", path);
+		WT_TRET(__wt_illegal_value(session));
+	}
 
 err:	if (fp != NULL)
 		WT_TRET(fclose(fp));
@@ -174,25 +222,33 @@ err:	if (fp != NULL)
 }
 
 /*
- * __btree_set_root --
+ * __btree_set_turtle --
  *	Set the schema file's root address.
  */
 static int
-__btree_set_root_turtle(WT_SESSION_IMPL *session, char *v)
+__btree_set_turtle(WT_SESSION_IMPL *session, char *v)
 {
+	WT_BUF *buf;
 	FILE *fp;
 	size_t len;
 	int ret;
 	const char *path;
 
+	buf = NULL;
 	ret = 0;
 	path = NULL;
 
 	WT_ERR(__wt_filename(session, WT_SCHEMA_TURTLE_SET, &path));
 	WT_ERR_TEST((fp = fopen(path, "w")) == NULL, WT_ERROR);
 
-	len = (size_t)fprintf(fp, "%s%s\n", WT_TURTLE_MSG, v);
-	if (len != strlen(WT_TURTLE_MSG) + strlen(v) + 1)
+	WT_RET(__wt_scr_alloc(session, 0, &buf));
+	WT_ERR(__wt_buf_fmt(session, buf,
+	    "%s\n"
+	    "root:%s\n"
+	    "version:major=%d,minor=%d\n",
+	    WT_TURTLE_MSG, v, WT_BTREE_MAJOR_VERSION, WT_BTREE_MINOR_VERSION));
+	len = (size_t)fprintf(fp, "%s", (char *)buf->data);
+	if (len != buf->size)
 		ret = WT_ERROR;
 
 	WT_TRET(fflush(fp));
@@ -206,6 +262,7 @@ __btree_set_root_turtle(WT_SESSION_IMPL *session, char *v)
 
 err:	if (path != NULL)
 		__wt_free(session, path);
+	__wt_scr_free(&buf);
 	return (ret);
 }
 
@@ -214,22 +271,34 @@ err:	if (path != NULL)
  *	Get a non-schema file's root address.
  */
 static int
-__btree_get_root(WT_SESSION_IMPL *session, const char **vp)
+__btree_get_root(
+    WT_SESSION_IMPL *session, const char **vp, int *majorp, int *minorp)
 {
 	WT_BTREE *btree;
 	WT_BUF *key;
 	int ret;
+	const char *version;
 
 	*vp = NULL;
 
 	btree = session->btree;
 	key = NULL;
 	ret = 0;
+	version = NULL;
 
 	WT_RET(__wt_scr_alloc(session, 0, &key));
 	WT_ERR(__wt_buf_fmt(session, key, "root:%s", btree->filename));
 	WT_ERR(__wt_schema_table_read(session, key->data, vp));
 
+	WT_ERR(__wt_buf_fmt(session, key, "version:%s", btree->filename));
+	WT_ERR(__wt_schema_table_read(session, key->data, &version));
+	if (sscanf(version, "major=%d,minor=%d", majorp, minorp) != 2) {
+		__wt_errx(session,
+		    "unable to find %s file's version number", btree->filename);
+		WT_ERR(WT_ERROR);
+	}
+
+	__wt_free(session, version);
 err:	__wt_scr_free(&key);
 
 	session->btree = btree;		/* XXX: schema-read overwrites */
