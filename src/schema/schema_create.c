@@ -41,6 +41,7 @@ __create_file(WT_SESSION_IMPL *session,
 
 	WT_RET(__wt_btree_create(session, filename));
 
+	/* Insert WiredTiger version numbers into the schema file. */
 	WT_ERR(__wt_scr_alloc(session, 0, &val));
 	if (is_schema) {
 		WT_ERR(__wt_schema_table_insert(
@@ -51,6 +52,12 @@ __create_file(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_schema_table_insert(
 		    session, WT_SCHEMA_VERSION, val->data));
 	}
+
+	/*
+	 * Insert Btree version numbers into the schema file (including for
+	 * the schema file itself, although the schema file version numbers
+	 * can never be trusted, we have to get them from the turtle file).
+	 */
 	WT_ERR(__wt_scr_alloc(session, 0, &key));
 	WT_ERR(__wt_buf_fmt(session, key, "version:%s", filename));
 	WT_ERR(__wt_buf_fmt(session, val, "major=%d,minor=%d",
