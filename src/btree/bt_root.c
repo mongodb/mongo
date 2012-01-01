@@ -248,6 +248,7 @@ __btree_set_root(WT_SESSION_IMPL *session, char *v)
 	int ret;
 
 	btree = session->btree;
+	key = NULL;
 	ret = 0;
 
 	WT_RET(__wt_scr_alloc(session, 0, &key));
