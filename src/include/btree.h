@@ -5,6 +5,9 @@
  *	All rights reserved.
  */
 
+#define	WT_BTREE_MAJOR_VERSION	1	/* Version */
+#define	WT_BTREE_MINOR_VERSION	0
+
 /*
  * WT_BTREE --
  *	A btree handle.

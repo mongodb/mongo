@@ -170,11 +170,6 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block, int salvage)
 	WT_BLOCK_DESC *desc;
 	uint32_t cksum;
 	uint8_t buf[WT_BLOCK_DESC_SECTOR];
-	const char *msg;
-	int ret;
-
-	msg = "file does not appear to be a WiredTiger Btree file";
-	ret = 0;
 
 	/*
 	 * We currently always do the verification step, because it's cheap
@@ -182,7 +177,7 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block, int salvage)
 	 *
 	 * Read the first sector.
 	 */
-	WT_ERR(__wt_read(session, block->fh, (off_t)0, sizeof(buf), buf));
+	WT_RET(__wt_read(session, block->fh, (off_t)0, sizeof(buf), buf));
 
 	desc = (WT_BLOCK_DESC *)buf;
 	WT_VERBOSE(session, block,
@@ -197,11 +192,6 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block, int salvage)
 	    desc->free_offset, desc->free_size,
 	    desc->write_gen);
 
-	cksum = desc->cksum;
-	desc->cksum = 0;
-	if (cksum != __wt_cksum(buf, sizeof(buf)))
-		goto err;
-
 	/*
 	 * We fail the open if the checksum fails, or the magic number is wrong
 	 * or the major/minor numbers are unsupported for this version.  This
@@ -211,19 +201,24 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block, int salvage)
 	 * may have entered the wrong file name, and is now frantically pounding
 	 * their interrupt key.
 	 */
-	if (desc->magic != WT_BLOCK_MAGIC)
-		goto err;
+	cksum = desc->cksum;
+	desc->cksum = 0;
+	if (desc->magic != WT_BLOCK_MAGIC ||
+	    cksum != __wt_cksum(buf, sizeof(buf))) {
+		__wt_errx(session, "%s %s%s",
+		    "does not appear to be a WiredTiger file",
+		    block->name,
+		    salvage ? "; to salvage this file, configure the salvage "
+		    "operation with the force flag" : "");
+		return (WT_ERROR);
+	}
 	if (desc->majorv > WT_BLOCK_MAJOR_VERSION ||
 	    (desc->majorv == WT_BLOCK_MAJOR_VERSION &&
 	    desc->minorv > WT_BLOCK_MINOR_VERSION)) {
-		msg =
-		    "file is an unsupported version of a WiredTiger Btree file";
-err:		if (ret == 0)
-			ret = WT_ERROR;
-		__wt_errx(session, "%s%s", msg,
-		    salvage ? "; to salvage this file, configure the salvage "
-		    "operation with the force flag" : "");
-		return (ret);
+		__wt_errx(session,
+		    "%s is an unsupported version of a WiredTiger file",
+		    block->name);
+		return (WT_ERROR);
 	}
 
 	block->write_gen = desc->write_gen;
