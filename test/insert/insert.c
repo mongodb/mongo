@@ -5,11 +5,10 @@
  *	All rights reserved.
  */
 
-#include <sys/types.h>
-
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -224,6 +223,7 @@ void
 print(WT_SESSION *session)
 {
 	WT_CURSOR *cursor;
+	uint64_t recno;
 	int ret;
 	const char *key, *value;
 	uint8_t bitf;
@@ -233,9 +233,11 @@ print(WT_SESSION *session)
 	while ((ret = cursor->next(cursor)) == 0) {
 		switch (file_type) {
 		case FIX:
+			if ((ret = cursor->get_key(cursor, &recno)) != 0)
+				break;
 			if ((ret = cursor->get_value(cursor, &bitf)) != 0)
 				break;
-			printf("0x%02x\n", bitf);
+			printf("%" PRIu64 "\t0x%02x\n", recno, bitf);
 			break;
 		case ROW:
 			if ((ret = cursor->get_key(cursor, &key)) != 0)
@@ -246,11 +248,11 @@ print(WT_SESSION *session)
 			}
 			/* FALLTHROUGH */
 		case VAR:
-			if ((ret =
-			    cursor->get_value(cursor, &value)) != 0)
+			if ((ret = cursor->get_key(cursor, &recno)) != 0)
 				break;
-			if (printf("%s\n", value) < 0)
-				ret = errno;
+			if ((ret = cursor->get_value(cursor, &value)) != 0)
+				break;
+			printf("%" PRIu64 "\t%s\n", recno, value);
 			break;
 		}
 	}
