@@ -37,7 +37,7 @@ __wt_remove(WT_SESSION_IMPL *session, const char *name)
 
 	WT_RET(__wt_filename(session, name, &path));
 
-	SYSCALL_RETRY(remove(path), ret);
+	WT_SYSCALL_RETRY(remove(path), ret);
 
 	__wt_free(session, path);
 

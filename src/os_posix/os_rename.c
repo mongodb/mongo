@@ -22,7 +22,7 @@ __wt_rename(WT_SESSION_IMPL *session, const char *from, const char *to)
 	WT_RET(__wt_filename(session, from, &from_path));
 	WT_RET(__wt_filename(session, to, &to_path));
 
-	SYSCALL_RETRY(rename(from_path, to_path), ret);
+	WT_SYSCALL_RETRY(rename(from_path, to_path), ret);
 
 	__wt_free(session, from_path);
 	__wt_free(session, to_path);

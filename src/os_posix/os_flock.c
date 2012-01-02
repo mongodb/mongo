@@ -31,7 +31,7 @@ __wt_bytelock(WT_FH *fhp, off_t byte, int lock)
 	fl.l_type = lock ? F_WRLCK : F_UNLCK;
 	fl.l_whence = SEEK_SET;
 
-	SYSCALL_RETRY(fcntl(fhp->fd, F_SETLK, &fl), ret);
+	WT_SYSCALL_RETRY(fcntl(fhp->fd, F_SETLK, &fl), ret);
 
 	return (ret);
 }

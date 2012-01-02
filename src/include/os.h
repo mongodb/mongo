@@ -5,10 +5,10 @@
  *	All rights reserved.
  */
 
-#define	SYSCALL_RETRY(call, ret) do {					\
+#define	WT_SYSCALL_RETRY(call, ret) do {				\
 	int __retry;							\
 	for (__retry = 0; __retry < 10; ++__retry) {			\
-		if ((call)) {						\
+		if ((call) == 0) {					\
 			(ret) = 0;					\
 			break;						\
 		}							\

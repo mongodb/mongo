@@ -19,7 +19,7 @@ __wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, off_t *sizep)
 
 	WT_VERBOSE(session, fileops, "%s: fstat", fh->name);
 
-	SYSCALL_RETRY(fstat(fh->fd, &sb), ret);
+	WT_SYSCALL_RETRY(fstat(fh->fd, &sb), ret);
 	if (ret == 0) {
 		*sizep = sb.st_size;
 		return (0);

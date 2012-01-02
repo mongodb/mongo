@@ -20,7 +20,7 @@ __wt_exist(WT_SESSION_IMPL *session, const char *name, int *existp)
 
 	WT_RET(__wt_filename(session, name, &path));
 
-	SYSCALL_RETRY(stat(path, &sb), ret);
+	WT_SYSCALL_RETRY(stat(path, &sb), ret);
 
 	__wt_free(session, path);
 
