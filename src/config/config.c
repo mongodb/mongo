@@ -357,8 +357,8 @@ __process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
 		errno = 0;
 		value->val = strtoll(value->str, &endptr, 10);
 		if (errno == ERANGE)
-			return __config_err(conf,
-			    "Number out of range", ERANGE);
+			return (
+			    __config_err(conf, "Number out of range", ERANGE));
 
 		/* Check any leftover characters. */
 		while (endptr < value->str + value->len)

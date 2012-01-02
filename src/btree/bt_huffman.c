@@ -267,12 +267,10 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 		    (int)ip->len, ip->str);
 	}
 
-	if ((fp = fopen(file, "r")) == NULL) {
-		ret = (errno == 0) ? EIO : errno;
-		WT_ERR_MSG(session, ret,
+	if ((fp = fopen(file, "r")) == NULL)
+		WT_ERR_MSG(session, __wt_errno(),
 		    "unable to read Huffman table file %.*s",
 		    (int)ip->len, ip->str);
-	}
 
 	for (tp = table, lineno = 1; (ret =
 	    fscanf(fp, "%" SCNu64 " %" SCNu64, &symbol, &frequency)) != EOF;

@@ -85,7 +85,7 @@ __debug_config(WT_SESSION_IMPL *session, WT_DBG *ds, const char *ofile)
 
 	/* If we're using a file, flush on each line. */
 	if ((ds->fp = fopen(ofile, "w")) == NULL)
-		WT_RET_MSG(session, errno, "%s", ofile);
+		WT_RET_MSG(session, __wt_errno(), "%s", ofile);
 
 	(void)setvbuf(ds->fp, NULL, _IOLBF, 0);
 	return (0);

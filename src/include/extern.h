@@ -511,6 +511,7 @@ extern int __wt_dlsym( WT_SESSION_IMPL *session,
     const char *name,
     void *sym_ret);
 extern int __wt_dlclose(WT_SESSION_IMPL *session, WT_DLH *dlh);
+extern int __wt_errno(void);
 extern int __wt_exist(WT_SESSION_IMPL *session, const char *name, int *existp);
 extern int __wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, off_t *sizep);
 extern int __wt_bytelock(WT_FH *fhp, off_t byte, int lock);

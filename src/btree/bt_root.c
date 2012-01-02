@@ -175,8 +175,8 @@ __btree_get_turtle(
 	WT_ERR_TEST((fp = fopen(path, "r")) == NULL, 0);
 	for (;;) {
 		if (fgets(line, (int)sizeof(line), fp) == NULL) {
-			if (ferror(fp))  {
-				ret = errno;
+			if (ferror(fp)) {
+				ret = __wt_errno();
 				goto format;
 			}
 			break;
@@ -204,8 +204,9 @@ __btree_get_turtle(
 	}
 
 	if (!found_root || !found_version) {
-format:		__wt_errx(session, "the %s file is corrupted", path);
-		ret = __wt_illegal_value(session);
+format:		if (ret == 0)
+			ret = WT_ERROR;
+		__wt_errx(session, "the %s file is corrupted", path);
 	}
 
 err:	if (fp != NULL)

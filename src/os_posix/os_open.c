@@ -52,27 +52,27 @@ __wt_open(WT_SESSION_IMPL *session,
 	if (ok_create)
 		f |= O_CREAT;
 
-	for (retry = 0;;) {
-		if ((fd = open(path, f, mode)) != -1)
+	for (retry = 0; retry < 5; ++retry) {
+		if ((fd = open(path, f, mode)) != -1) {
+			ret = 0;
 			break;
-
-		switch (errno) {
+		}
+		switch (ret = __wt_errno()) {
 		case EAGAIN:
 		case EBUSY:
 		case EINTR:
+		case EIO:
 		case EMFILE:
 		case ENFILE:
 		case ENOSPC:
-			if (++retry < 10) {
-				__wt_sleep(1L, 0L);
-				break;
-			}
-			/* FALLTHROUGH */
+			__wt_sleep(0L, 500000L);
+			continue;
 		default:
-			WT_ERR_MSG(session,
-			    errno == 0 ? WT_ERROR : errno, "%s", name);
+			break;
 		}
 	}
+	if (ret != 0)
+		WT_ERR_MSG(session, ret, "%s", name);
 
 	WT_ERR(__wt_calloc(session, 1, sizeof(WT_FH), &fh));
 	WT_ERR(__wt_strdup(session, name, &fh->name));
@@ -86,7 +86,7 @@ __wt_open(WT_SESSION_IMPL *session,
 	 */
 	if ((f = fcntl(fd, F_GETFD)) == -1 ||
 	    fcntl(fd, F_SETFD, f | FD_CLOEXEC) == -1)
-		WT_ERR_MSG(session, errno, "%s: fcntl", name);
+		WT_ERR_MSG(session, __wt_errno(), "%s: fcntl", name);
 #endif
 
 	fh->fd = fd;
@@ -137,7 +137,7 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH *fh)
 	__wt_spin_unlock(session, &conn->spinlock);
 
 	if (close(fh->fd) != 0) {
-		ret = errno;
+		ret = __wt_errno();
 		__wt_err(session, ret, "%s", fh->name);
 	}
 

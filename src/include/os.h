@@ -7,15 +7,25 @@
 
 #define	SYSCALL_RETRY(call, ret) do {					\
 	int __retry;							\
-	for (__retry = 0; __retry < 5; ++__retry) {			\
-		if (((ret) = (call)) == 0)				\
+	for (__retry = 0; __retry < 10; ++__retry) {			\
+		if ((call)) {						\
+			(ret) = 0;					\
 			break;						\
-		/* Return the errno, not the call's failure return. */	\
-		ret = errno;						\
-		if (errno != EAGAIN &&					\
-		    errno != EBUSY && errno != EINTR && errno != EIO)	\
+		}							\
+		switch ((ret) = __wt_errno()) {				\
+		case EAGAIN:						\
+		case EBUSY:						\
+		case EINTR:						\
+		case EIO:						\
+		case EMFILE:						\
+		case ENFILE:						\
+		case ENOSPC:						\
+			__wt_sleep(0L, 500000L);			\
+			continue;					\
+		default:						\
 			break;						\
-		__wt_sleep(1L, 0L);					\
+		}							\
+		break;							\
 	}								\
 } while (0)
 
