@@ -936,6 +936,17 @@ namespace mongo {
                 }
             }
         }
+        else if( _lazyState._lastOp == dbQuery ){
+            // slaveOk is not set, just mark the master as bad
+
+            if( nReturned == -1 ||
+               ( hasErrField( dataObj ) &&  ! dataObj["code"].eoo() && dataObj["code"].Int() == 13435 ) )
+            {
+                if( _lazyState._lastClient == _master.get() ){
+                    isntMaster();
+                }
+            }
+        }
     }
 
 
