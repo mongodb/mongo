@@ -83,7 +83,7 @@ namespace mongo {
                 bool ok = conn->runCommand( db , cmdObj , res , passOptions() ? options : 0 );
                 if ( ! ok && res["code"].numberInt() == StaleConfigInContextCode ) {
                     conn.done();
-                    throw StaleConfigException("foo","command failed because of stale config");
+                    throw StaleConfigException( res["ns"].toString(), "command failed because of stale config" );
                 }
                 result.appendElements( res );
                 conn.done();
