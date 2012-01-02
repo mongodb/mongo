@@ -8,21 +8,6 @@
 #include "wt_internal.h"
 
 /*
- * __cursor_past_eof --
- *	Return if the cursor key's record number is larger than the largest
- * record in the tree.
- */
-static inline int
-__cursor_past_eof(WT_BTREE *btree, WT_CURSOR_BTREE *cbt)
-{
-	/*
-	 * XXX
-	 * UNPROTECTED 64B READ
-	 */
-	return (cbt->iface.recno > btree->last_recno ? 1 : 0);
-}
-
-/*
  * __cursor_invalid --
  *	Return if the cursor references an invalid K/V pair (either the pair
  * doesn't exist at all because the tree is empty, or the pair was deleted).
@@ -101,7 +86,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 		 * column-store implicitly fills the gap with empty records.
 		 */
 		if (btree->type == BTREE_COL_FIX &&
-		    !__cursor_past_eof(btree, cbt)) {
+		    !F_ISSET(cbt, WT_CBT_MAX_RECORD)) {
 			cbt->v = 0;
 			val = &cbt->iface.value;
 			val->data = &cbt->v;
@@ -156,7 +141,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 	 * an earlier record.  If that fails, quit, there's no record to return.
 	 */
 	if (btree->type == BTREE_COL_FIX &&
-	    cbt->compare != 0 && !__cursor_past_eof(btree, cbt)) {
+	    cbt->compare != 0 && !F_ISSET(cbt, WT_CBT_MAX_RECORD)) {
 		cbt->v = 0;
 		val = &cbt->iface.value;
 		val->data = &cbt->v;
@@ -237,7 +222,7 @@ retry:	__cursor_func_init(cbt, 1);
 		if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE) &&
 		    ((cbt->compare == 0 && !__cursor_invalid(cbt)) ||
 		    (cbt->compare != 0 && btree->type == BTREE_COL_FIX &&
-		    !__cursor_past_eof(btree, cbt)))) {
+		    !F_ISSET(cbt, WT_CBT_MAX_RECORD)))) {
 			ret = WT_DUPLICATE_KEY;
 			break;
 		}
@@ -301,7 +286,7 @@ retry:	__cursor_func_init(cbt, 1);
 		 */
 		if (cbt->compare != 0 || __cursor_invalid(cbt))
 			ret = btree->type == BTREE_COL_FIX &&
-			    !__cursor_past_eof(btree, cbt) ? 0 : WT_NOTFOUND;
+			    F_ISSET(cbt, WT_CBT_MAX_RECORD) ? WT_NOTFOUND : 0;
 		else if ((ret = __wt_col_modify(session, cbt, 2)) == WT_RESTART)
 			goto retry;
 		break;
@@ -359,7 +344,7 @@ retry:	__cursor_func_init(cbt, 1);
 		 */
 		if ((cbt->compare != 0 || __cursor_invalid(cbt)) &&
 		    (btree->type != BTREE_COL_FIX ||
-		    __cursor_past_eof(btree, cbt)))
+		    F_ISSET(cbt, WT_CBT_MAX_RECORD)))
 			ret = WT_NOTFOUND;
 		else if ((ret = __wt_col_modify(session, cbt, 3)) == WT_RESTART)
 			goto retry;

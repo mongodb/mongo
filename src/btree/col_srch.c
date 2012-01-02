@@ -149,6 +149,15 @@ past_end:
 		else
 			cbt->compare = -1;
 	}
+
+	/*
+	 * Note if the record is past the maximum record in the tree, the cursor
+	 * search functions need to know for fixed-length column-stores because
+	 * appended records implicitly create any skipped records, and cursor
+	 * search functions have to handle that case.
+	 */
+	if (cbt->compare == -1)
+		F_SET(cbt, WT_CBT_MAX_RECORD);
 	return (0);
 
 err:	__wt_page_release(session, page);
