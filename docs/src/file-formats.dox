@@ -17,20 +17,22 @@ for queries where only a few of the columns are required for any lookup
 Row-stores support three types of compression: prefix compression (where
 any identical portion of each key byte string is only stored once),
 Huffman encoding of individual key/value items, (see @subpage huffman
-for more details), and stream compression of the blocks in the file.
+for details), and stream compression of the blocks in the file (see @ref
+compressors for details).
 
 Unlike some row-stores, WiredTiger does not support duplicate data
 items, that is, for any single key, there can be only a single value,
-and applications are responsible to creating unique key/value pairs.
+and applications are responsible for creating unique key/value pairs.
 
 Column-stores with variable-length byte string values support three
 types of compression: run-length encoding (where duplicate values are
 only stored a single time), Huffman encoding of individual value items,
-(see @ref huffman for more details), and stream compression of the
-blocks in the file.
+(see @ref huffman for details), and stream compression of the blocks in
+the file (see @ref compressors for details).
 
 Column-stores with fixed-length byte values support a single type of
-compression: stream compression of the blocks in the file.
+compression: stream compression of the blocks in the file (see @ref
+compressors for details).
 
 In row-stores, keys and values too large to fit on a normal page are
 stored as overflow items in the file.  In variable-length column-stores,
@@ -39,9 +41,8 @@ in the file.
 
 WiredTiger allocates space from the underlying files in block units.
 The minimum file allocation unit WiredTiger supports is 512B and the
-maximum file allocation unit is 512MB.  File block offsets are 32-bit,
-meaning the minimum maximum file size is 2TB and the maximum maximum
-file size is 2EB.
+maximum file allocation unit is 512MB.  File block offsets are 64-bit
+(meaning the maximum file size is very, very large).
 
 Variable-length byte strings can be up to (4GB - 512B) in length.
 Fixed-length values are limited to 8-bits (that is, only values
