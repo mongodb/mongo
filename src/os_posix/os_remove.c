@@ -44,6 +44,5 @@ __wt_remove(WT_SESSION_IMPL *session, const char *name)
 	if (ret == 0)
 		return (0);
 
-	__wt_err(session, ret, "%s: remove", name);
-	return (ret);
+	WT_RET_MSG(session, ret, "%s: remove", name);
 }

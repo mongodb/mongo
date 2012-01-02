@@ -134,14 +134,11 @@ str2recno(WT_SESSION_IMPL *session, const char *p, uint64_t *recnop)
 
 	errno = 0;
 	recno = strtouq(p, &endptr, 0);
-	if (recno == ULLONG_MAX && errno == ERANGE) {
-		__wt_err(session, ERANGE, "%s: invalid record number", p);
-		return (ERANGE);
-	}
-	if (endptr[0] != '\0') {
-format:		__wt_errx(session, "%s: invalid record number", p);
-		return (EINVAL);
-	}
+	if (recno == ULLONG_MAX && errno == ERANGE)
+		WT_RET_MSG(session, ERANGE, "%s: invalid record number", p);
+	if (endptr[0] != '\0')
+format:		WT_RET_MSG(session, EINVAL, "%s: invalid record number", p);
+
 	*recnop = recno;
 	return (0);
 }

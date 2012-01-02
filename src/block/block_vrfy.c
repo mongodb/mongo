@@ -38,11 +38,9 @@ __wt_block_verify_start(WT_SESSION_IMPL *session, WT_BLOCK *block, int *emptyp)
 	 */
 	if (file_size > WT_BLOCK_DESC_SECTOR)
 		file_size -= WT_BLOCK_DESC_SECTOR;
-	if (file_size % block->allocsize != 0) {
-		__wt_errx(session,
+	if (file_size % block->allocsize != 0)
+		WT_RET_MSG(session, WT_ERROR,
 		    "the file size is not a multiple of the allocation size");
-		    return (WT_ERROR);
-	}
 
 	/*
 	 * Allocate a bit array, where each bit represents a single allocation
@@ -56,10 +54,10 @@ __wt_block_verify_start(WT_SESSION_IMPL *session, WT_BLOCK *block, int *emptyp)
 	 * To verify larger files than we can handle in this way, we'd have to
 	 * write parts of the bit array into a disk file.
 	 */
-	if (file_size / block->allocsize > UINT32_MAX) {
-		__wt_errx(session, "the file is too large to verify");
-		return (WT_ERROR);
-	}
+	if (file_size / block->allocsize > UINT32_MAX)
+		WT_RET_MSG(
+		    session, WT_ERROR, "the file is too large to verify");
+
 	block->frags = (uint32_t)file_size / block->allocsize;
 	WT_RET(__bit_alloc(session, block->frags, &block->fragbits));
 
@@ -120,13 +118,12 @@ __verify_freelist(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	ret = 0;
 
 	TAILQ_FOREACH(fe, &block->freeqa, qa) {
-		if (fe->offset + (off_t)fe->size > block->fh->file_size) {
-			__wt_errx(session,
+		if (fe->offset + (off_t)fe->size > block->fh->file_size)
+			WT_RET_MSG(session, WT_ERROR,
 			    "free-list entry offset %" PRIuMAX "references "
 			    "non-existent file pages",
 			    (uintmax_t)fe->offset);
-			return (WT_ERROR);
-		}
+
 		WT_VERBOSE(session, verify,
 		    "free-list offset/frags %" PRIuMAX "/%" PRIu32,
 		    (uintmax_t)fe->offset, fe->size / block->allocsize);
@@ -150,13 +147,11 @@ __verify_addfrag(
 	offset = (offset - WT_BLOCK_DESC_SECTOR) / block->allocsize;
 	frags = size / block->allocsize;
 	for (i = 0; i < frags; ++i)
-		if (__bit_test(block->fragbits, (uint32_t)offset + i)) {
-			__wt_errx(session,
+		if (__bit_test(block->fragbits, (uint32_t)offset + i))
+			WT_RET_MSG(session, WT_ERROR,
 			    "file fragment at offset %" PRIuMAX
 			    " already verified",
 			    (uintmax_t)offset);
-			return (WT_ERROR);
-		}
 	if (frags > 0)
 		__bit_nset(block->fragbits,
 		    (uint32_t)offset, (uint32_t)offset + (frags - 1));

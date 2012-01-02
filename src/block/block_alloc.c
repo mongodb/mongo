@@ -23,13 +23,11 @@ __wt_block_alloc(
 
 	ret = 0;
 
-	if (size % block->allocsize != 0) {
-		__wt_errx(session,
+	if (size % block->allocsize != 0)
+		WT_RET_MSG(session, EINVAL,
 		    "cannot allocate a block size %" PRIu32 " that is not "
 		    "a multiple of the allocation size %" PRIu32,
 		    size, block->allocsize);
-		return (WT_ERROR);
-	}
 
 	WT_BSTAT_INCR(session, alloc);
 
@@ -120,12 +118,10 @@ __block_extend(
 	fh = block->fh;
 
 	/* We should never be allocating from an empty file. */
-	if (fh->file_size < WT_BLOCK_DESC_SECTOR) {
-		__wt_errx(session,
+	if (fh->file_size < WT_BLOCK_DESC_SECTOR)
+		WT_RET_MSG(session, EINVAL,
 		    "cannot allocate from a file with no description "
 		    "information");
-		return (WT_ERROR);
-	}
 
 	/*
 	 * Make sure we don't allocate past the maximum file size.
@@ -143,11 +139,9 @@ __block_extend(
 	 * free list, and the file has been fully populated, file close will
 	 * fail because we can't write the free list.
 	 */
-	if (fh->file_size > (off_t)(INT64_MAX - size)) {
-		__wt_errx(session,
+	if (fh->file_size > (off_t)(INT64_MAX - size))
+		WT_RET_MSG(session, WT_ERROR,
 		    "block allocation failed, file cannot grow further");
-		return (WT_ERROR);
-	}
 
 	*offsetp = fh->file_size;
 	fh->file_size += size;
@@ -281,13 +275,12 @@ combine:/*
 		TAILQ_REMOVE(&block->freeqa, new, qa);
 		__wt_spin_unlock(session, &block->freelist_lock);
 
-		__wt_errx(session,
+		WT_RET_MSG(session, WT_ERROR,
 		    "block free at offset range %" PRIuMAX "-%" PRIuMAX
 		    " overlaps already free block at offset range "
 		    "%" PRIuMAX "-%" PRIuMAX,
 		    (uintmax_t)new->offset, (uintmax_t)new->offset + new->size,
 		    (uintmax_t)fe->offset, (uintmax_t)fe->offset + fe->size);
-		return (WT_ERROR);
 	}
 #endif
 
@@ -393,11 +386,9 @@ __wt_block_freelist_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
 		if ((offset - WT_BLOCK_DESC_SECTOR) % block->allocsize != 0 ||
 		    size % block->allocsize != 0 ||
-		    offset + size > block->fh->file_size) {
-corrupted:		__wt_errx(
-			    session, "file contains a corrupted free-list");
-			WT_ERR(WT_ERROR);
-		}
+		    offset + size > block->fh->file_size)
+corrupted:		WT_ERR_MSG(session,
+			    WT_ERROR, "file contains a corrupted free-list");
 
 		WT_ERR(__wt_block_free(session, block, offset, size));
 	}

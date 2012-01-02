@@ -114,12 +114,9 @@ __wt_cursor_set_key(WT_CURSOR *cursor, ...)
 			    item->data, item->size, "q", &cursor->recno));
 		} else
 			cursor->recno = va_arg(ap, uint64_t);
-		if (cursor->recno == 0) {
-			__wt_errx(session,
+		if (cursor->recno == 0)
+			WT_ERR_MSG(session, EINVAL,
 			    "Record numbers must be greater than zero");
-			ret = EINVAL;
-			goto err;
-		}
 		cursor->key.data = &cursor->recno;
 		sz = sizeof(cursor->recno);
 	} else {
@@ -145,16 +142,11 @@ __wt_cursor_set_key(WT_CURSOR *cursor, ...)
 			    cursor->key_format, ap));
 		}
 	}
-	if (sz == 0) {
-		__wt_errx(session, "Empty keys not permitted");
-		ret = EINVAL;
-		goto err;
-	} else if ((uint32_t)sz != sz) {
-		__wt_errx(session, "Key size (%" PRIu64 ") out of range",
-		    (uint64_t)sz);
-		ret = EINVAL;
-		goto err;
-	}
+	if (sz == 0)
+		WT_ERR_MSG(session, EINVAL, "Empty keys not permitted");
+	else if ((uint32_t)sz != sz)
+		WT_ERR_MSG(session, EINVAL,
+		    "Key size (%" PRIu64 ") out of range", (uint64_t)sz);
 	cursor->saved_err = 0;
 	cursor->key.size = WT_STORE_SIZE(sz);
 	F_SET(cursor, WT_CURSTD_KEY_SET);
@@ -322,8 +314,7 @@ __wt_cursor_kv_not_set(WT_CURSOR *cursor, int key)
 
 	session = (WT_SESSION_IMPL *)cursor->session;
 
-	__wt_errx(session, "requires %s be set", key ? "key" : "value");
-	if (cursor->saved_err != 0)
-		return (cursor->saved_err);
-	return (EINVAL);
+	WT_RET_MSG(session,
+	    cursor->saved_err == 0 ? EINVAL : cursor->saved_err,
+	    "requires %s be set", key ? "key" : "value");
 }

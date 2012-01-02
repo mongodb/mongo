@@ -156,10 +156,9 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 	int exist, ret;
 
 	filename = fileuri;
-	if (!WT_PREFIX_SKIP(filename, "file:")) {
-		__wt_errx(session, "Expected a 'file:' URI: %s", fileuri);
-		return (EINVAL);
-	}
+	if (!WT_PREFIX_SKIP(filename, "file:"))
+		WT_RET_MSG(
+		    session, EINVAL, "Expected a 'file:' URI: %s", fileuri);
 
 	if ((ret = __wt_session_find_btree(session,
 	    filename, strlen(filename), cfg, flags, &btree_session)) == 0) {

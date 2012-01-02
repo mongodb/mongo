@@ -419,20 +419,16 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 
 	tablename = uri;
 	if (!WT_PREFIX_SKIP(tablename, "index:") ||
-	    (idxname = strchr(tablename, ':')) == NULL) {
-		__wt_errx(session, "Invalid cursor URI: '%s'", uri);
-		return (EINVAL);
-	}
+	    (idxname = strchr(tablename, ':')) == NULL)
+		WT_RET_MSG(session, EINVAL, "Invalid cursor URI: '%s'", uri);
 	namesize = (size_t)(idxname - tablename);
 	++idxname;
 
 	if ((ret = __wt_schema_get_table(session,
 	    tablename, namesize, &table)) != 0) {
-		if (ret == WT_NOTFOUND) {
-			__wt_errx(session,
+		if (ret == WT_NOTFOUND)
+			WT_RET_MSG(session, EINVAL,
 			    "Cannot open cursor '%s' on unknown table", uri);
-			ret = EINVAL;
-		}
 		return (ret);
 	}
 

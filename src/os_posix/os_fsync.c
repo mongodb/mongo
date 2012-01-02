@@ -22,6 +22,5 @@ __wt_fsync(WT_SESSION_IMPL *session, WT_FH *fh)
 	if (ret == 0)
 		return (0);
 
-	__wt_err(session, ret, "%s fsync error", fh->name);
-	return (ret);
+	WT_RET_MSG(session, ret, "%s fsync error", fh->name);
 }

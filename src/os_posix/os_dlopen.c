@@ -20,11 +20,10 @@ __wt_dlopen(WT_SESSION_IMPL *session, const char *path, WT_DLH **dlhp)
 	WT_RET(__wt_calloc_def(session, 1, &dlh));
 	WT_ERR(__wt_strdup(session, path, &dlh->name));
 
-	if ((dlh->handle = dlopen(path, RTLD_LAZY)) == NULL) {
-		__wt_errx(session, "dlopen(%s): %s", path, dlerror());
-		ret = WT_ERROR;
-		goto err;
-	}
+	if ((dlh->handle = dlopen(path, RTLD_LAZY)) == NULL)
+		WT_ERR_MSG(session,
+		    errno == 0 ? WT_ERROR : errno,
+		    "dlopen(%s): %s", path, dlerror());
 
 	*dlhp = dlh;
 	if (0) {
@@ -44,11 +43,9 @@ __wt_dlsym(
 {
 	void *sym;
 
-	if ((sym = dlsym(dlh->handle, name)) == NULL) {
-		__wt_err(session, errno, "dlsym(%s in %s): %s",
-		    name, dlh->name, dlerror());
-		return (WT_ERROR);
-	}
+	if ((sym = dlsym(dlh->handle, name)) == NULL)
+		WT_RET_MSG(session, errno == 0 ? WT_ERROR : errno,
+		    "dlsym(%s in %s): %s", name, dlh->name, dlerror());
 
 	*(void **)sym_ret = sym;
 	return (0);
@@ -74,8 +71,8 @@ __wt_dlclose(WT_SESSION_IMPL *session, WT_DLH *dlh)
 	 */
 #ifndef __FreeBSD__
 	if (dlclose(dlh->handle) != 0) {
-		__wt_err(session, errno, "dlclose: %s", dlerror());
-		ret = WT_ERROR;
+		ret = errno == 0 ? WT_ERROR : errno;
+		__wt_err(session, ret, "dlclose: %s", dlerror());
 	}
 #endif
 

@@ -224,11 +224,10 @@ __btree_conf(WT_SESSION_IMPL *session,
 					break;
 				}
 			}
-			if (btree->collator == NULL) {
-				__wt_errx(session, "unknown collator '%.*s'",
+			if (btree->collator == NULL)
+				WT_RET_MSG(session, EINVAL,
+				    "unknown collator '%.*s'",
 				    (int)cval.len, cval.str);
-				return (EINVAL);
-			}
 		}
 		WT_RET(__wt_config_getones(session, config, "key_gap", &cval));
 		btree->key_gap = (uint32_t)cval.val;
@@ -238,13 +237,10 @@ __btree_conf(WT_SESSION_IMPL *session,
 		WT_RET(__wt_struct_check(
 		    session, cval.str, cval.len, &fixed, &bitcnt));
 		if (fixed) {
-			if (bitcnt == 0 || bitcnt > 8) {
-				__wt_errx(session,
-				    "the fixed-width field size must be "
-				    "greater than 0 and less than or equal "
-				    "to 8");
-				return (WT_ERROR);
-			}
+			if (bitcnt == 0 || bitcnt > 8)
+				WT_RET_MSG(session, EINVAL,
+				    "fixed-width field sizes must be greater "
+				    "than 0 and less than or equal to 8");
 			btree->bitcnt = (uint8_t)bitcnt;
 			btree->type = BTREE_COL_FIX;
 		}
@@ -603,22 +599,18 @@ __btree_page_sizes(WT_SESSION_IMPL *session, const char *config)
 	btree->maxleafitem = (uint32_t)cval.val;
 
 	/* Allocation sizes must be a power-of-two, nothing else makes sense. */
-	if (!__wt_ispo2(btree->allocsize)) {
-		__wt_errx(
-		    session, "the allocation size must be a power of two");
-		return (WT_ERROR);
-	}
+	if (!__wt_ispo2(btree->allocsize))
+		WT_RET_MSG(session,
+		    EINVAL, "the allocation size must be a power of two");
 
 	/* All page sizes must be in units of the allocation size. */
 	if (btree->maxintlpage < btree->allocsize ||
 	    btree->maxintlpage % btree->allocsize != 0 ||
 	    btree->maxleafpage < btree->allocsize ||
-	    btree->maxleafpage % btree->allocsize != 0) {
-		__wt_errx(session,
+	    btree->maxleafpage % btree->allocsize != 0)
+		WT_RET_MSG(session, EINVAL,
 		    "page sizes must be a multiple of the page allocation "
 		    "size (%" PRIu32 "B)", btree->allocsize);
-		return (WT_ERROR);
-	}
 
 	/*
 	 * Set the split percentage: reconciliation splits to a
@@ -678,21 +670,19 @@ __btree_page_sizes(WT_SESSION_IMPL *session, const char *config)
 static int
 pse1(WT_SESSION_IMPL *session, const char *type, uint32_t max, uint32_t ovfl)
 {
-	__wt_errx(session,
+	WT_RET_MSG(session, EINVAL,
 	    "%s page size (%" PRIu32 "B) too small for the maximum item size "
 	    "(%" PRIu32 "B); the page must be able to hold at least 2 items",
 	    type, max, ovfl);
-	return (WT_ERROR);
 }
 
 static int
 pse2(WT_SESSION_IMPL *session,
     const char *type, uint32_t max, uint32_t ovfl, uint32_t pct)
 {
-	__wt_errx(session,
+	WT_RET_MSG(session, EINVAL,
 	    "%s page size (%" PRIu32 "B) too small for the maximum item size "
 	    "(%" PRIu32 "B), because of the split percentage (%" PRIu32
 	    "%%); a split page must be able to hold at least 2 items",
 	    type, max, ovfl, pct);
-	return (WT_ERROR);
 }

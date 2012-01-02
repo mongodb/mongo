@@ -150,16 +150,13 @@ __wt_btree_huffman_open(WT_SESSION_IMPL *session, const char *config)
 
 	switch (btree->type) {		/* Check file type compatibility. */
 	case BTREE_COL_FIX:
-		__wt_errx(session,
+		WT_RET_MSG(session, EINVAL,
 		    "fixed-size column-store files may not be Huffman encoded");
-		return (WT_ERROR);
 	case BTREE_COL_VAR:
-		if (key_conf.len != 0) {
-			__wt_errx(session,
+		if (key_conf.len != 0)
+			WT_RET_MSG(session, EINVAL,
 			    "the keys of variable-length column-store files "
 			    "may not be Huffman encoded");
-			return (WT_ERROR);
-		}
 		break;
 	case BTREE_ROW:
 		break;
@@ -235,6 +232,7 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 	char *file;
 
 	ret = 0;
+	file = NULL;
 	table = NULL;
 
 	/*
@@ -248,7 +246,8 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 		WT_RET(__wt_calloc_def(session, entries, &table));
 
 		if (ip->len == 4)
-			goto nofile;
+			WT_ERR_MSG(session, EINVAL,
+			    "no Huffman table file name specified");
 		WT_ERR(__wt_calloc_def(session, ip->len, &file));
 		memcpy(file, ip->str + 4, ip->len - 4);
 	} else if (strncasecmp(ip->str, "utf16", 5) == 0) {
@@ -258,58 +257,47 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 		WT_RET(__wt_calloc_def(session, entries, &table));
 
 		if (ip->len == 5)
-			goto nofile;
+			WT_ERR_MSG(session, EINVAL,
+			    "no Huffman table file name specified");
 		WT_ERR(__wt_calloc_def(session, ip->len, &file));
 		memcpy(file, ip->str + 5, ip->len - 5);
 	} else {
-		__wt_errx(session,
-		    "unknown huffman configuration value %.*s",
+		WT_ERR_MSG(session, EINVAL,
+		    "unknown Huffman configuration value %.*s",
 		    (int)ip->len, ip->str);
-		goto err;
 	}
 
-	fp = fopen(file, "r");
-	__wt_free(session, file);
-	if (fp == NULL) {
-nofile:		ret = (errno == 0) ? WT_ERROR : errno;
-		__wt_err(session, ret,
-		    "no Huffman table file specified or unable to read "
-		    "Huffman table file %.*s",
+	if ((fp = fopen(file, "r")) == NULL) {
+		ret = (errno == 0) ? EIO : errno;
+		WT_ERR_MSG(session, ret,
+		    "unable to read Huffman table file %.*s",
 		    (int)ip->len, ip->str);
-		goto err;
 	}
 
 	for (tp = table, lineno = 1; (ret =
 	    fscanf(fp, "%" SCNu64 " %" SCNu64, &symbol, &frequency)) != EOF;
 	    ++tp, ++lineno) {
-		if (lineno > entries) {
-			__wt_errx(session,
+		if (lineno > entries)
+			WT_ERR_MSG(session, EINVAL,
 			    "Huffman table file %.*s is corrupted, "
 			    "more than %" PRIu32 " entries",
 			    (int)ip->len, ip->str, entries);
-			goto err;
-		}
-		if (ret != 2) {
-			__wt_errx(session,
+		if (ret != 2)
+			WT_ERR_MSG(session, EINVAL,
 			    "line %u of Huffman table file %.*s is corrupted: "
 			    "expected two unsigned integral values",
 			    lineno, (int)ip->len, ip->str);
-			goto err;
-		}
-		if (symbol > max) {
-			__wt_errx(session,
+		if (symbol > max)
+			WT_ERR_MSG(session, EINVAL,
 			    "line %u of Huffman table file %.*s is corrupted: "
 			    "symbol larger than maximum value of %u",
 			    lineno, (int)ip->len, ip->str, max);
-			goto err;
-		}
-		if (frequency > UINT32_MAX) {
-			__wt_errx(session, "line %u of Huffman table"
-			    " file %.*s is corrupted: frequency larger than"
-			    " maximum value of %" PRIu32,
+		if (frequency > UINT32_MAX)
+			WT_ERR_MSG(session, EINVAL,
+			    "line %u of Huffman table file %.*s is corrupted: "
+			    "frequency larger than maximum value of %" PRIu32,
 			    lineno, (int)ip->len, ip->str, UINT32_MAX);
-			goto err;
-		}
+
 		tp->symbol = (uint32_t)symbol;
 		tp->frequency = (uint32_t)frequency;
 	}
@@ -318,8 +306,7 @@ nofile:		ret = (errno == 0) ? WT_ERROR : errno;
 	*tablep = table;
 	return (0);
 
-err:	if (ret == 0)
-		ret = WT_ERROR;
+err:	__wt_free(session, file);
 	__wt_free(session, table);
 	return (ret);
 }

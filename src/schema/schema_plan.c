@@ -98,13 +98,12 @@ __wt_table_check(WT_SESSION_IMPL *session, WT_TABLE *table)
 		WT_RET(__wt_config_next(&conf, &k, &v));
 	cg = col = 0;
 	while ((ret = __wt_config_next(&conf, &k, &v)) == 0) {
-		if (__find_next_col(session, table,
-		    &k, &cg, &col, &coltype) != 0) {
-			__wt_errx(session, "Column '%.*s' in table '%s' "
-			    "does not appear in a column group",
+		if (__find_next_col(
+		    session, table, &k, &cg, &col, &coltype) != 0)
+			WT_RET_MSG(session, EINVAL,
+			    "Column '%.*s' in table '%s' does not appear in a "
+			    "column group",
 			    (int)k.len, k.str, table->name);
-			return (EINVAL);
-		}
 		/*
 		 * Column groups can't store key columns in their value:
 		 * __wt_struct_reformat should have already detected this case.
@@ -272,13 +271,11 @@ __wt_struct_reformat(WT_SESSION_IMPL *session, WT_TABLE *table,
 		if ((ret = __find_column_format(session,
 		    table, &k, value_only, &pv)) != 0) {
 			if (value_only && ret == EINVAL)
-				__wt_errx(session,
+				WT_RET_MSG(session, EINVAL,
 				    "A column group cannot store key column "
 				    "'%.*s' in its value", (int)k.len, k.str);
-			else
-				__wt_errx(session, "Column '%.*s' not found",
-				    (int)k.len, k.str);
-			return (EINVAL);
+			WT_RET_MSG(session, EINVAL,
+			    "Column '%.*s' not found", (int)k.len, k.str);
 		}
 
 		/*

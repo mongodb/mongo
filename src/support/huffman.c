@@ -316,18 +316,15 @@ __wt_huffman_open(WT_SESSION_IMPL *session,
 	 * (a frequency of 0 means the value is never expected to appear in the
 	 * input).  Validate the symbols are within range.
 	 */
-	if (numbytes != 1 && numbytes != 2) {
-		__wt_errx(session,
+	if (numbytes != 1 && numbytes != 2)
+		WT_ERR_MSG(session, EINVAL,
 		    "illegal number of symbol bytes specified for a huffman "
 		    "table");
-		goto err;
-	}
 
-	if (symcnt == 0) {
-		__wt_errx(session,
+	if (symcnt == 0)
+		WT_ERR_MSG(session, EINVAL,
 		    "illegal number of symbols specified for a huffman table");
-		goto err;
-	}
+
 	huffman->numSymbols = numbytes == 2 ? UINT16_MAX : UINT8_MAX;
 
 	/*
@@ -338,20 +335,16 @@ __wt_huffman_open(WT_SESSION_IMPL *session,
 	    symcnt, sizeof(INDEXED_SYMBOL), indexed_symbol_compare);
 	for (i = 0; i < symcnt; ++i) {
 		if (i > 0 &&
-		    indexed_freqs[i].symbol == indexed_freqs[i - 1].symbol) {
-			__wt_errx(session,
+		    indexed_freqs[i].symbol == indexed_freqs[i - 1].symbol)
+			WT_ERR_MSG(session, EINVAL,
 			    "duplicate symbol %" PRIx16
 			    " specified in a huffman table",
 			    indexed_freqs[i].symbol);
-			goto err;
-		}
-		if (indexed_freqs[i].symbol > huffman->numSymbols) {
-			__wt_errx(session,
+		if (indexed_freqs[i].symbol > huffman->numSymbols)
+			WT_ERR_MSG(session, EINVAL,
 			    "illegal symbol %" PRIx16
 			    " specified in a huffman table",
 			    indexed_freqs[i].symbol);
-			goto err;
-		}
 	}
 
 	/*

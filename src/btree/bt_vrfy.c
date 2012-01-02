@@ -64,9 +64,8 @@ __wt_dumpfile(WT_SESSION_IMPL *session, const char *cfg[])
 	 */
 	return (__verify_int(session, 1));
 #else
-	__wt_errx(session,
+	WT_RET_MSG(session, ENOTSUP,
 	    "the WiredTiger library was not built in diagnostic mode");
-	return (ENOTSUP);
 #endif
 }
 
@@ -208,14 +207,12 @@ __verify_tree(WT_SESSION_IMPL *session,
 		goto recno_chk;
 	case WT_PAGE_COL_VAR:
 		recno = page->u.col_var.recno;
-recno_chk:	if (parent_recno != recno) {
-			__wt_errx(session,
+recno_chk:	if (parent_recno != recno)
+			WT_RET_MSG(session, WT_ERROR,
 			    "page at %s has a starting record of %" PRIu64
 			    " when the expected starting record is %" PRIu64,
 			    __wt_page_addr_string(session, vs->tmp1, page),
 			    recno, parent_recno);
-			return (WT_ERROR);
-		}
 		break;
 	}
 	switch (page->type) {
@@ -354,16 +351,14 @@ __verify_row_int_key_order(WT_SESSION_IMPL *session,
 	/* Compare the key against the largest key we've seen so far. */
 	WT_RET(
 	    WT_BTREE_CMP(session, btree, &item, (WT_ITEM *)vs->max_key, cmp));
-	if (cmp <= 0) {
-		__wt_errx(session,
+	if (cmp <= 0)
+		WT_RET_MSG(session, WT_ERROR,
 		    "the internal key in entry %" PRIu32 " on the page at %s "
 		    "sorts before the last key appearing on page %s, earlier "
 		    "in the tree",
 		    entry,
 		    __wt_page_addr_string(session, vs->tmp1, page),
 		    (char *)vs->max_addr->data);
-		return (WT_ERROR);
-	}
 
 	/* Update the largest key we've seen to the key just checked. */
 	WT_RET(__wt_buf_set(session, vs->max_key, item.data, item.size));
@@ -414,15 +409,13 @@ __verify_row_leaf_key_order(
 		 */
 		WT_RET(WT_BTREE_CMP(session,
 		    btree, (WT_ITEM *)vs->tmp1, (WT_ITEM *)vs->max_key, cmp));
-		if (cmp < 0) {
-			__wt_errx(session,
+		if (cmp < 0)
+			WT_RET_MSG(session, WT_ERROR,
 			    "the first key on the page at %s sorts equal to or "
 			    "less than a key appearing on the page at %s, "
 			    "earlier in the tree",
 			    __wt_page_addr_string(session, vs->tmp1, page),
 				(char *)vs->max_addr->data);
-			return (WT_ERROR);
-		}
 	}
 
 	/* Update the largest key we've seen to the last key on this page. */
@@ -473,13 +466,12 @@ __verify_overflow_cell(WT_SESSION_IMPL *session, WT_PAGE *page, WT_VSTUFF *vs)
 	}
 	return (0);
 
-err:	__wt_errx(session,
+err:	WT_RET_MSG(session, ret,
 	    "cell %" PRIu32 " on page at %s references an overflow item at %s "
 	    "that failed verification",
 	    cell_num - 1,
 	    __wt_page_addr_string(session, vs->tmp1, page),
 	    __wt_addr_string(session, vs->tmp2, unpack->data, unpack->size));
-	return (ret);
 }
 
 /*
@@ -502,11 +494,9 @@ __verify_overflow(WT_SESSION_IMPL *session,
 	 * it's the type of page we expected.
 	 */
 	dsk = vs->tmp1->mem;
-	if (dsk->type != WT_PAGE_OVFL) {
-		__wt_errx(session,
+	if (dsk->type != WT_PAGE_OVFL)
+		WT_RET_MSG(session, WT_ERROR,
 		    "overflow referenced page at %s is not an overflow page",
 		    __wt_addr_string(session, vs->tmp1, addrbuf, addrbuf_len));
-		return (WT_ERROR);
-	}
 	return (0);
 }

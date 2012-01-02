@@ -367,9 +367,8 @@ __wt_scr_alloc(WT_SESSION_IMPL *session, uint32_t size, WT_BUF **scratchp)
 	session->scratch_alloc += 10;
 	return (__wt_scr_alloc(session, size, scratchp));
 
-err:	__wt_errx(session,
+err:	WT_RET_MSG(session, ret,
 	    "session unable to allocate more scratch buffers");
-	return (ret);
 }
 
 /*

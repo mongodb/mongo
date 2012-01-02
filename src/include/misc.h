@@ -118,44 +118,6 @@
 #define	WT_CLEAR(s)							\
 	memset(&(s), 0, sizeof(s))
 
-/* Standard error cases for switch statements. */
-#define	WT_ILLEGAL_VALUE(session)					\
-	default:							\
-		return (__wt_illegal_value(session))
-#define	WT_ILLEGAL_VALUE_ERR(session)					\
-	default:							\
-		ret = __wt_illegal_value(session);			\
-		goto err
-
-/*
- * Macros to handle standard return values and optionally branch to an error
- * label.
- */
-#define	WT_ERR(a) do {							\
-	if ((ret = (a)) != 0)						\
-		goto err;						\
-} while (0)
-#define	WT_ERR_TEST(a, v) do {						\
-	if (a) {							\
-		ret = (v);						\
-		goto err;						\
-	}								\
-} while (0)
-#define	WT_RET(a) do {							\
-	int __ret;							\
-	if ((__ret = (a)) != 0)						\
-		return (__ret);						\
-} while (0)
-#define	WT_RET_TEST(a, v) do {						\
-	if (a)								\
-		return (v);						\
-} while (0)
-#define	WT_TRET(a) do {							\
-	int __ret;							\
-	if ((__ret = (a)) != 0 && ret == 0)				\
-		ret = __ret;						\
-} while (0)
-
 /* Check if a string matches a prefix. */
 #define	WT_PREFIX_MATCH(str, pre)					\
 	(strncmp((str), (pre), strlen(pre)) == 0)

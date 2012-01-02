@@ -499,12 +499,10 @@ __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg[])
 	cfg_no_overwrite[2] = "overwrite=false";
 	cfg_no_overwrite[3] = NULL;
 
-	if (!table->cg_complete) {
-		__wt_errx(session,
+	if (!table->cg_complete)
+		WT_RET_MSG(session, EINVAL,
 		    "Can't use table '%s' until all column groups are created",
 		    table->name);
-		return (EINVAL);
-	}
 
 	WT_RET(__wt_calloc_def(session,
 	    WT_COLGROUPS(table), &ctable->cg_cursors));
@@ -536,11 +534,9 @@ __curtable_open_indices(WT_CURSOR_TABLE *ctable)
 		return (0);
 	/* Check for bulk cursors. */
 	primary = *ctable->cg_cursors;
-	if (F_ISSET(((WT_CURSOR_BTREE *)primary)->btree, WT_BTREE_BULK)) {
-		__wt_errx(session,
+	if (F_ISSET(((WT_CURSOR_BTREE *)primary)->btree, WT_BTREE_BULK))
+		WT_RET_MSG(session, ENOTSUP,
 		    "Bulk load is not supported for tables with indices");
-		return (ENOTSUP);
-	}
 	WT_RET(__wt_calloc_def(session, table->nindices, &ctable->idx_cursors));
 	for (i = 0, cp = ctable->idx_cursors; i < table->nindices; i++, cp++) {
 		session->btree = table->index[i];
@@ -606,19 +602,16 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		size = columns - tablename;
 	if ((ret = __wt_schema_get_table(session,
 	    tablename, size, &table)) != 0) {
-		if (ret == WT_NOTFOUND) {
-			__wt_errx(session,
+		if (ret == WT_NOTFOUND)
+			WT_RET_MSG(session, EINVAL,
 			    "Cannot open cursor '%s' on unknown table", uri);
-			ret = EINVAL;
-		}
 		return (ret);
 	}
 
-	if (!table->cg_complete) {
-		__wt_errx(session,
+	if (!table->cg_complete)
+		WT_RET_MSG(session, EINVAL,
 		    "Cannot open cursor '%s' on incomplete table", uri);
-		return (EINVAL);
-	} else if (table->is_simple) {
+	if (table->is_simple) {
 		/*
 		 * The returned cursor should be public: it is not part of a
 		 * table cursor.

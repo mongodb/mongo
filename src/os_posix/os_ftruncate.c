@@ -22,6 +22,5 @@ __wt_ftruncate(WT_SESSION_IMPL *session, WT_FH *fh, off_t len)
 		return (0);
 	}
 
-	__wt_err(session, ret, "%s ftruncate error", fh->name);
-	return (ret);
+	WT_RET_MSG(session, ret, "%s ftruncate error", fh->name);
 }

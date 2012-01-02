@@ -22,13 +22,11 @@ __wt_block_create(WT_SESSION_IMPL *session, const char *filename)
 
 	/* Check to see if the file exists -- we don't want to overwrite it. */
 	WT_RET(__wt_exist(session, filename, &exist));
-	if (exist) {
-		__wt_errx(session,
+	if (exist)
+		WT_RET_MSG(session, WT_ERROR,
 		    "the file %s already exists; to re-create it, remove it "
 		    "first, then create it",
 		    filename);
-		return (WT_ERROR);
-	}
 
 	/* Open the underlying file handle. */
 	WT_RET(__wt_open(session, filename, 0666, 1, &fh));
@@ -93,11 +91,10 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
 				break;
 			}
 		}
-		if (block->compressor == NULL) {
-			__wt_errx(session, "unknown block_compressor '%.*s'",
+		if (block->compressor == NULL)
+			WT_ERR_MSG(session, EINVAL,
+			    "unknown block_compressor '%.*s'",
 			    (int)cval.len, cval.str);
-			WT_ERR(EINVAL);
-		}
 	}
 
 	/*
@@ -204,22 +201,19 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block, int salvage)
 	cksum = desc->cksum;
 	desc->cksum = 0;
 	if (desc->magic != WT_BLOCK_MAGIC ||
-	    cksum != __wt_cksum(buf, sizeof(buf))) {
-		__wt_errx(session, "%s %s%s",
+	    cksum != __wt_cksum(buf, sizeof(buf)))
+		WT_RET_MSG(session, WT_ERROR, "%s %s%s",
 		    "does not appear to be a WiredTiger file",
 		    block->name,
 		    salvage ? "; to salvage this file, configure the salvage "
 		    "operation with the force flag" : "");
-		return (WT_ERROR);
-	}
+
 	if (desc->majorv > WT_BLOCK_MAJOR_VERSION ||
 	    (desc->majorv == WT_BLOCK_MAJOR_VERSION &&
-	    desc->minorv > WT_BLOCK_MINOR_VERSION)) {
-		__wt_errx(session,
+	    desc->minorv > WT_BLOCK_MINOR_VERSION))
+		WT_RET_MSG(session, WT_ERROR,
 		    "%s is an unsupported version of a WiredTiger file",
 		    block->name);
-		return (WT_ERROR);
-	}
 
 	block->write_gen = desc->write_gen;
 
@@ -229,11 +223,10 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block, int salvage)
 
 	if ((desc->free_offset != WT_BLOCK_INVALID_OFFSET &&
 	    desc->free_offset + desc->free_size >
-	    (uint64_t)block->fh->file_size)) {
-		__wt_errx(session,
+	    (uint64_t)block->fh->file_size))
+		WT_RET_MSG(session, WT_ERROR,
 		    "free list offset references non-existent file space");
-		return (WT_ERROR);
-	}
+
 	block->free_offset = (off_t)desc->free_offset;
 	block->free_size = desc->free_size;
 	block->free_cksum = desc->free_cksum;

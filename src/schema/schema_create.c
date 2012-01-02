@@ -23,10 +23,9 @@ __create_file(WT_SESSION_IMPL *session,
 	ret = 0;
 
 	filename = fileuri;
-	if (!WT_PREFIX_SKIP(filename, "file:")) {
-		__wt_errx(session, "Expecting a 'file:' URI: %s", fileuri);
-		return (EINVAL);
-	}
+	if (!WT_PREFIX_SKIP(filename, "file:"))
+		WT_RET_MSG(
+		    session, EINVAL, "Expecting a 'file:' URI: %s", fileuri);
 
 	/*
 	 * Opening the schema table is a special case, use the config
@@ -115,22 +114,18 @@ __create_colgroup(
 	} else
 		tlen = strlen(tablename);
 
-	if ((ret = __wt_schema_get_table(session,
-	    tablename, tlen, &table)) != 0) {
-		__wt_errx(session,
+	if ((ret =
+	    __wt_schema_get_table(session, tablename, tlen, &table)) != 0)
+		WT_RET_MSG(session, ret,
 		    "Can't create '%s' for non-existent table %.*s",
 		    name, (int)tlen, tablename);
-		return (ret);
-	}
 
 	/* Make sure the column group is referenced from the table. */
-	if (cgname != NULL && (ret = __wt_config_subgets(session,
-	    &table->cgconf, cgname, &cval)) != 0) {
-		__wt_errx(session,
+	if (cgname != NULL && (ret =
+	    __wt_config_subgets(session, &table->cgconf, cgname, &cval)) != 0)
+		WT_RET_MSG(session, EINVAL,
 		    "Column group '%s' not found in table '%.*s'",
 		    cgname, (int)tlen, tablename);
-		return (EINVAL);
-	}
 
 	/* Find the first NULL entry in the cfg stack. */
 	for (cfgp = &cfg[1]; *cfgp; cfgp++)
@@ -161,12 +156,9 @@ __create_colgroup(
 		WT_ERR(__wt_buf_catfmt
 		    (session, &fmt, ",value_format=%s", table->value_format));
 	else {
-		if (__wt_config_getones(session,
-		    config, "columns", &cval) != 0) {
-			__wt_errx(session,
+		if (__wt_config_getones(session, config, "columns", &cval) != 0)
+			WT_ERR_MSG(session, EINVAL,
 			    "No 'columns' configuration for '%s'", name);
-			WT_ERR(EINVAL);
-		}
 		WT_ERR(__wt_buf_catfmt(session, &fmt, ",value_format="));
 		WT_ERR(__wt_struct_reformat(session,
 		    table, cval.str, cval.len, NULL, 1, &fmt));
@@ -214,20 +206,16 @@ __create_index(WT_SESSION_IMPL *session, const char *name, const char *config)
 	if (!WT_PREFIX_SKIP(tablename, "index:"))
 		return (EINVAL);
 	idxname = strchr(tablename, ':');
-	if (idxname == NULL) {
-		__wt_errx(session, "Invalid index name, "
+	if (idxname == NULL)
+		WT_RET_MSG(session, EINVAL, "Invalid index name, "
 		     "should be <table name>:<index name>: %s", name);
-		return (EINVAL);
-	}
 
 	tlen = (size_t)(idxname++ - tablename);
-	if ((ret = __wt_schema_get_table(session,
-	    tablename, tlen, &table)) != 0) {
-		__wt_errx(session,
+	if ((ret =
+	    __wt_schema_get_table(session, tablename, tlen, &table)) != 0)
+		WT_RET_MSG(session, ret,
 		    "Can't create an index for a non-existent table: %.*s",
 		    (int)tlen, tablename);
-		return (ret);
-	}
 
 	/* Add the filename to the index config before collapsing. */
 	if (__wt_config_getones(session, config, "filename", &cval) == 0) {
@@ -243,12 +231,9 @@ __create_index(WT_SESSION_IMPL *session, const char *name, const char *config)
 	WT_ERR(__wt_config_collapse(session, cfg, &idxconf));
 
 	/* Calculate the key/value formats -- these go into the file config. */
-	if (__wt_config_getones(session,
-	    config, "columns", &icols) != 0) {
-		__wt_errx(session,
+	if (__wt_config_getones(session, config, "columns", &icols) != 0)
+		WT_ERR_MSG(session, EINVAL,
 		    "No 'columns' configuration for '%s'", name);
-		WT_ERR(EINVAL);
-	}
 
 	/*
 	 * The key format for an index is somewhat subtle: the application
@@ -314,12 +299,12 @@ __create_table(WT_SESSION_IMPL *session, const char *name, const char *config)
 	if ((ret = __wt_schema_get_table(session,
 	    tablename, strlen(tablename), &table)) == 0) {
 		if (__wt_config_getones(session,
-		    config, "exclusive", &cval) == 0 && cval.val) {
-			__wt_errx(session, "Table exists: %s", tablename);
-			return (EEXIST);
-		} else
-			return (0);
-	} else if (ret != WT_NOTFOUND)
+		    config, "exclusive", &cval) == 0 && cval.val)
+			WT_RET_MSG(
+			    session, EEXIST, "Table exists: %s", tablename);
+		return (0);
+	}
+	if (ret != WT_NOTFOUND)
 		return (ret);
 
 	WT_RET(__wt_config_gets(session, cfg, "colgroups", &cval));

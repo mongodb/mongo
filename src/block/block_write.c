@@ -110,11 +110,9 @@ __wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * from the block-manager layer the maximum size of the eventual write.
 	 */
 	align_size = WT_ALIGN(buf->size, block->allocsize);
-	if (align_size > buf->memsize) {
-		__wt_err(session, EINVAL,
+	if (align_size > buf->memsize)
+		WT_RET_MSG(session, EINVAL,
 		    "write buffer was incorrectly allocated");
-		return (EINVAL);
-	}
 
 	/*
 	 * Optionally stream-compress the data, but don't compress blocks that

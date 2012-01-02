@@ -69,8 +69,8 @@ __wt_open(WT_SESSION_IMPL *session,
 			}
 			/* FALLTHROUGH */
 		default:
-			__wt_err(session, errno, "%s", name);
-			WT_ERR(errno);
+			WT_ERR_MSG(session,
+			    errno == 0 ? WT_ERROR : errno, "%s", name);
 		}
 	}
 
@@ -85,10 +85,8 @@ __wt_open(WT_SESSION_IMPL *session,
 	 * race here...
 	 */
 	if ((f = fcntl(fd, F_GETFD)) == -1 ||
-	    fcntl(fd, F_SETFD, f | FD_CLOEXEC) == -1) {
-		__wt_err(session, errno, "%s: fcntl", name);
-		WT_ERR(errno);
-	}
+	    fcntl(fd, F_SETFD, f | FD_CLOEXEC) == -1)
+		WT_ERR_MSG(session, errno, "%s: fcntl", name);
 #endif
 
 	fh->fd = fd;
@@ -139,8 +137,8 @@ __wt_close(WT_SESSION_IMPL *session, WT_FH *fh)
 	__wt_spin_unlock(session, &conn->spinlock);
 
 	if (close(fh->fd) != 0) {
-		__wt_err(session, errno, "%s", fh->name);
-		ret = WT_ERROR;
+		ret = errno;
+		__wt_err(session, ret, "%s", fh->name);
 	}
 
 	__wt_free(session, fh->name);

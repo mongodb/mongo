@@ -22,9 +22,16 @@ static int __verify_dsk_col_var(
 static int __verify_dsk_row(
 	WT_SESSION_IMPL *, const char *, WT_PAGE_HEADER *);
 
-#define	WT_VRFY_ERR(session, ...) do {					\
+#define	WT_ERR_VRFY(session, ...) do {					\
 	if (!(F_ISSET(session, WT_SESSION_SALVAGE_QUIET_ERR)))		\
 		__wt_errx(session, __VA_ARGS__);			\
+	goto err;							\
+} while (0)
+
+#define	WT_RET_VRFY(session, ...) do {					\
+	if (!(F_ISSET(session, WT_SESSION_SALVAGE_QUIET_ERR)))		\
+		__wt_errx(session, __VA_ARGS__);			\
+	return (WT_ERROR);						\
 } while (0)
 
 /*
@@ -50,10 +57,9 @@ __wt_verify_dsk(WT_SESSION_IMPL *session,
 		break;
 	case WT_PAGE_INVALID:
 	default:
-		WT_VRFY_ERR(session,
+		WT_RET_VRFY(session,
 		    "page at %s has an invalid type of %" PRIu32,
 		    addr, dsk->type);
-		return (WT_ERROR);
 	}
 
 	/* Check the page record number. */
@@ -63,39 +69,33 @@ __wt_verify_dsk(WT_SESSION_IMPL *session,
 	case WT_PAGE_COL_VAR:
 		if (dsk->recno != 0)
 			break;
-		WT_VRFY_ERR(session,
+		WT_RET_VRFY(session,
 		    "%s page at %s has a record number of zero",
 		    __wt_page_type_string(dsk->type), addr);
-		return (WT_ERROR);
 	case WT_PAGE_FREELIST:
 	case WT_PAGE_OVFL:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
 		if (dsk->recno == 0)
 			break;
-		WT_VRFY_ERR(session,
+		WT_RET_VRFY(session,
 		    "%s page at %s has a non-zero record number",
 		    __wt_page_type_string(dsk->type), addr);
-		return (WT_ERROR);
 	}
 
 	/* Check the in-memory size. */
-	if (dsk->size != size) {
-		WT_VRFY_ERR(session,
+	if (dsk->size != size)
+		WT_RET_VRFY(session,
 		    "%s page at %s has an incorrect size (%" PRIu32 " != %"
 		    PRIu32 ")",
 		    __wt_page_type_string(dsk->type), addr, dsk->size, size);
-		return (WT_ERROR);
-	}
 
 	/* Unused bytes */
 	for (p = dsk->unused, i = sizeof(dsk->unused); i > 0; --i)
-		if (*p != '\0') {
-			WT_VRFY_ERR(session,
+		if (*p != '\0')
+			WT_RET_VRFY(session,
 			    "page at %s has non-zero unused page header bytes",
 			    addr);
-			return (WT_ERROR);
-		}
 
 	/* Verify the items on the page. */
 	switch (dsk->type) {
@@ -186,11 +186,10 @@ __verify_dsk_row(
 			case WAS_KEY:
 				if (dsk->type == WT_PAGE_ROW_LEAF)
 					break;
-				WT_VRFY_ERR(session,
+				WT_ERR_VRFY(session,
 				    "cell %" PRIu32 " on page at %s is the "
 				    "first of two adjacent keys",
 				    cell_num - 1, addr);
-				goto err;
 			}
 			last_cell_type = WAS_KEY;
 			break;
@@ -199,17 +198,15 @@ __verify_dsk_row(
 		case WT_CELL_VALUE_OVFL:
 			switch (last_cell_type) {
 			case FIRST:
-				WT_VRFY_ERR(session,
+				WT_ERR_VRFY(session,
 				    "page at %s begins with a value", addr);
-				goto err;
 			case WAS_KEY:
 				break;
 			case WAS_VALUE:
-				WT_VRFY_ERR(session,
+				WT_ERR_VRFY(session,
 				    "cell %" PRIu32 " on page at %s is the "
 				    "first of two adjacent values",
 				    cell_num - 1, addr);
-				goto err;
 			}
 			last_cell_type = WAS_VALUE;
 			break;
@@ -251,25 +248,21 @@ __verify_dsk_row(
 		 * prefix compression count.
 		 */
 		prefix = unpack->prefix;
-		if (last_pfx->size == 0 && prefix != 0) {
-			WT_VRFY_ERR(session,
+		if (last_pfx->size == 0 && prefix != 0)
+			WT_ERR_VRFY(session,
 			    "the %" PRIu32 " key on page at %s is the first "
 			    "non-overflow key on the page and has a non-zero "
 			    "prefix compression value",
 			    cell_num, addr);
-			goto err;
-		}
 
 		/* Confirm the prefix compression count is possible. */
-		if (cell_num > 1 && prefix > last->size) {
-			WT_VRFY_ERR(session,
+		if (cell_num > 1 && prefix > last->size)
+			WT_ERR_VRFY(session,
 			    "key %" PRIu32 " on page at %s has a prefix "
 			    "compression count of %" PRIu32
 			    ", larger than the length of the previous key, %"
 			    PRIu32,
 			    cell_num, addr, prefix, last->size);
-			goto err;
-		}
 
 		/*
 		 * If Huffman decoding required, use the heavy-weight call to
@@ -322,13 +315,11 @@ key_compare:	/*
 		    (dsk->type != WT_PAGE_ROW_INT && cell_num > 1)) {
 			WT_ERR(WT_BTREE_CMP(session, btree,
 			    (WT_ITEM *)last, (WT_ITEM *)current, cmp));
-			if (cmp >= 0) {
-				WT_VRFY_ERR(session,
+			if (cmp >= 0)
+				WT_ERR_VRFY(session,
 				    "the %" PRIu32 " and %" PRIu32 " keys on "
 				    "page at %s are incorrectly sorted",
 				    cell_num - 2, cell_num, addr);
-				goto err;
-			}
 		}
 
 		/*
@@ -430,14 +421,13 @@ __verify_dsk_col_var(
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	uint32_t cell_num, cell_type, i, last_size;
-	int last_deleted, ret;
+	int last_deleted;
 	const uint8_t *last_data;
 	uint8_t *end;
 
 	btree = session->btree;
 	unpack = &_unpack;
 	end = (uint8_t *)dsk + dsk->size;
-	ret = 0;
 
 	last_data = NULL;
 	last_size = 0;
@@ -477,15 +467,12 @@ __verify_dsk_col_var(
 			if (cell_type == WT_CELL_VALUE &&
 			    last_data != NULL &&
 			    last_size == unpack->size &&
-			    memcmp(last_data, unpack->data, last_size) == 0) {
-match_err:			ret = WT_ERROR;
-				WT_VRFY_ERR(session,
+			    memcmp(last_data, unpack->data, last_size) == 0)
+match_err:			WT_RET_VRFY(session,
 				    "data entries %" PRIu32 " and %" PRIu32
 				    " on page at %s are identical and should "
 				    "have been run-length encoded",
 				    cell_num - 1, cell_num, addr);
-				break;
-			}
 
 		switch (cell_type) {
 		case WT_CELL_DEL:
@@ -504,7 +491,7 @@ match_err:			ret = WT_ERROR;
 		}
 	}
 
-	return (ret);
+	return (0);
 }
 
 /*
@@ -525,30 +512,24 @@ __verify_dsk_chunk(WT_SESSION_IMPL *session,
 	 * Fixed-length column-store, overflow and freelist pages are simple
 	 * chunks of data.
 	 */
-	if (datalen == 0) {
-		WT_VRFY_ERR(session,
+	if (datalen == 0)
+		WT_RET_VRFY(session,
 		    "%s page at %s has no data",
 		    __wt_page_type_string(dsk->type), addr);
-		return (WT_ERROR);
-	}
 
 	/* Verify the data doesn't overflow the end of the page. */
 	p = WT_PAGE_HEADER_BYTE(btree, dsk);
-	if (p + datalen > end) {
-		WT_VRFY_ERR(session,
+	if (p + datalen > end)
+		WT_RET_VRFY(session,
 		    "data on page at %s extends past the end of the page",
 		    addr);
-		return (WT_ERROR);
-	}
 
 	/* Any bytes after the data chunk should be nul bytes. */
 	for (p += datalen; p < end; ++p)
-		if (*p != '\0') {
-			WT_VRFY_ERR(session,
+		if (*p != '\0')
+			WT_RET_VRFY(session,
 			    "%s page at %s has non-zero trailing bytes",
 			    __wt_page_type_string(dsk->type), addr);
-			return (WT_ERROR);
-		}
 
 	return (0);
 }
@@ -561,10 +542,9 @@ static int
 __err_cell_corrupted(
     WT_SESSION_IMPL *session, uint32_t entry_num, const char *addr)
 {
-	WT_VRFY_ERR(session,
+	WT_RET_VRFY(session,
 	    "item %" PRIu32 " on page at %s is a corrupted cell",
 	    entry_num, addr);
-	return (WT_ERROR);
 }
 
 /*
@@ -603,12 +583,11 @@ __err_cell_type(WT_SESSION_IMPL *session,
 		break;
 	}
 
-	WT_VRFY_ERR(session,
+	WT_RET_VRFY(session,
 	    "illegal cell and page type combination: cell %" PRIu32
 	    " on page at %s is a %s cell on a %s page",
 	    entry_num, addr,
 	    __wt_cell_type_string(cell_type), __wt_page_type_string(dsk_type));
-	return (WT_ERROR);
 }
 
 /*
@@ -618,9 +597,8 @@ __err_cell_type(WT_SESSION_IMPL *session,
 static int
 __err_eof(WT_SESSION_IMPL *session, uint32_t entry_num, const char *addr)
 {
-	WT_VRFY_ERR(session,
+	WT_RET_VRFY(session,
 	    "off-page item %" PRIu32
 	    " on page at %s references non-existent file pages",
 	    entry_num, addr);
-	return (WT_ERROR);
 }

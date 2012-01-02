@@ -30,6 +30,7 @@ __wt_btree_get_root(WT_SESSION_IMPL *session, WT_BUF *addr)
 	const char *v;
 
 	btree = session->btree;
+	v = NULL;
 	ret = 0;
 
 	/* If there's no root address, return a NULL with a size of 0. */
@@ -50,26 +51,22 @@ __wt_btree_get_root(WT_SESSION_IMPL *session, WT_BUF *addr)
 
 	if (majorv > WT_BTREE_MAJOR_VERSION ||
 	    (majorv == WT_BTREE_MAJOR_VERSION &&
-	    minorv > WT_BTREE_MINOR_VERSION)) {
-		__wt_errx(session,
+	    minorv > WT_BTREE_MINOR_VERSION))
+		WT_ERR_MSG(session, EACCES,
 		    "%s is an unsupported version of a WiredTiger file",
 		    btree->filename);
-		return (WT_ERROR);
-	}
 
 	/* Nothing or "[NoAddr]" means no address. */
 	if (v != NULL && strlen(v) != 0 && strcmp(v, WT_NOADDR) != 0) {
 		WT_ERR(__wt_hex_to_raw(session, (void *)v, (void *)v, &size));
 		WT_ERR(__wt_buf_set(session, addr, v, size));
 	}
-	if (v != NULL)
-		__wt_free(session, v);
 
-	if (0) {
-err:		__wt_err(session, ret,
+err:	if (ret != 0)
+		__wt_errx(session,
 		    "unable to find %s file's root address", btree->filename);
-	}
 
+	__wt_free(session, v);
 	return (ret);
 }
 
@@ -145,13 +142,11 @@ __wt_btree_set_root(WT_SESSION_IMPL *session, uint8_t *addr, uint32_t size)
 	    __btree_set_turtle(session, (char *)v->data) :
 	    __btree_set_root(session, (char *)v->data));
 
-	if (0) {
-err:		__wt_err(session, ret,
+err:	if (ret != 0)
+		__wt_errx(session,
 		    "unable to update %s file's root address", btree->filename);
-	}
 
 	__wt_scr_free(&v);
-
 	return (ret);
 }
 
@@ -210,13 +205,12 @@ __btree_get_turtle(
 
 	if (!found_root || !found_version) {
 format:		__wt_errx(session, "the %s file is corrupted", path);
-		WT_TRET(__wt_illegal_value(session));
+		ret = __wt_illegal_value(session);
 	}
 
 err:	if (fp != NULL)
 		WT_TRET(fclose(fp));
-	if (path != NULL)
-		__wt_free(session, path);
+	__wt_free(session, path);
 
 	return (ret);
 }
@@ -292,11 +286,9 @@ __btree_get_root(
 
 	WT_ERR(__wt_buf_fmt(session, key, "version:%s", btree->filename));
 	WT_ERR(__wt_schema_table_read(session, key->data, &version));
-	if (sscanf(version, "major=%d,minor=%d", majorp, minorp) != 2) {
-		__wt_errx(session,
+	if (sscanf(version, "major=%d,minor=%d", majorp, minorp) != 2)
+		WT_ERR_MSG(session, EINVAL,
 		    "unable to find %s file's version number", btree->filename);
-		WT_ERR(WT_ERROR);
-	}
 
 	__wt_free(session, version);
 err:	__wt_scr_free(&key);

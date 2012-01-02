@@ -30,6 +30,5 @@ __wt_rename(WT_SESSION_IMPL *session, const char *from, const char *to)
 	if (ret == 0)
 		return (0);
 
-	__wt_err(session, ret, "rename %s to %s", from, to);
-	return (ret);
+	WT_RET_MSG(session, ret, "rename %s to %s", from, to);
 }

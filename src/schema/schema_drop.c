@@ -23,10 +23,9 @@ __wt_drop_file(WT_SESSION_IMPL *session, const char *fileuri, const char *cfg[])
 	uribuf = NULL;
 
 	filename = fileuri;
-	if (!WT_PREFIX_SKIP(filename, "file:")) {
-		__wt_errx(session, "Expected a 'file:' URI: %s", fileuri);
-		return (EINVAL);
-	}
+	if (!WT_PREFIX_SKIP(filename, "file:"))
+		WT_RET_MSG(
+		    session, EINVAL, "Expected a 'file:' URI: %s", fileuri);
 
 	/* If open, close the btree handle. */
 	switch ((ret = __wt_session_find_btree(session,
@@ -109,10 +108,9 @@ __drop_table(
 	ret = 0;
 
 	tablename = tableuri;
-	if (!WT_PREFIX_SKIP(tablename, "table:")) {
-		__wt_errx(session, "Expected a 'table:' URI: %s", tableuri);
-		return (EINVAL);
-	}
+	if (!WT_PREFIX_SKIP(tablename, "table:"))
+		WT_RET_MSG(
+		    session, EINVAL, "Expected a 'table:' URI: %s", tableuri);
 
 	WT_RET(__wt_schema_get_table(session,
 	    tablename, strlen(tablename), &table));

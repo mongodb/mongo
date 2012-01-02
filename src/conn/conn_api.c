@@ -547,19 +547,15 @@ __conn_home(WT_CONNECTION_IMPL *conn, const char *home, const char **cfg)
 	 * environment variable if the process has appropriate privileges.
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "home_environment_priv", &cval));
-	if (cval.val == 0) {
-		__wt_errx(session, "%s",
+	if (cval.val == 0)
+		WT_RET_MSG(session, WT_ERROR, "%s",
 		    "WIREDTIGER_HOME environment variable set but WiredTiger "
 		    "not configured to use that environment variable");
-		return (WT_ERROR);
-	}
 
-	if (!__wt_has_priv()) {
-		__wt_errx(session, "%s",
+	if (!__wt_has_priv())
+		WT_RET_MSG(session, WT_ERROR, "%s",
 		    "WIREDTIGER_HOME environment variable set but process "
 		    "lacks privileges to use that environment variable");
-		return (WT_ERROR);
-	}
 
 copy:	return (__wt_strdup(session, home, &conn->home));
 }
@@ -591,11 +587,9 @@ __conn_single(WT_CONNECTION_IMPL *conn, const char **cfg)
 	WT_RET(__wt_config_gets(session, cfg, "exclusive", &cval));
 	if (cval.val) {
 		WT_RET(__wt_exist(session, WT_FLAGFILE, &exist));
-		if (exist) {
-			__wt_errx(session,
+		if (exist)
+			WT_RET_MSG(session, EEXIST,
 			    "%s", "WiredTiger database already exists");
-			return (EEXIST);
-		}
 	}
 
 	/*
@@ -618,12 +612,10 @@ __conn_single(WT_CONNECTION_IMPL *conn, const char **cfg)
 	 * and that's OK, the underlying call supports acquisition of locks past
 	 * the end-of-file.
 	 */
-	if (__wt_bytelock(conn->lock_fh, (off_t)0, 1) != 0) {
-		__wt_errx(session, "%s",
+	if (__wt_bytelock(conn->lock_fh, (off_t)0, 1) != 0)
+		WT_ERR_MSG(session, EBUSY, "%s",
 		    "WiredTiger database is already being managed by another "
 		    "process");
-		WT_ERR(EBUSY);
-	}
 
 	/* Check to see if another thread of control has this database open. */
 	ret = 0;
@@ -635,12 +627,10 @@ __conn_single(WT_CONNECTION_IMPL *conn, const char **cfg)
 			break;
 		}
 	__wt_spin_unlock(session, &__wt_process.spinlock);
-	if (ret != 0) {
-		__wt_errx(session, "%s",
+	if (ret != 0)
+		WT_ERR_MSG(session, EBUSY, "%s",
 		    "WiredTiger database is already being managed by another "
 		    "thread in this process");
-		WT_ERR(EBUSY);
-	}
 
 	/*
 	 * If the size of the file is 0, we created it (or we're racing with
@@ -718,10 +708,8 @@ __conn_config(WT_CONNECTION_IMPL *conn, const char **cfg, WT_BUF **cbufp)
 	 * the off_t size is larger than a uint32_t, which is more complicated
 	 * and a waste of time.)
 	 */
-	if (size > 100 * 1024) {
-		__wt_err(session, EFBIG, WT_CONFIGFILE);
-		WT_ERR(EFBIG);
-	}
+	if (size > 100 * 1024)
+		WT_ERR_MSG(session, EFBIG, WT_CONFIGFILE);
 	len = (uint32_t)size;
 
 	/*

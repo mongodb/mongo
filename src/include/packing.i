@@ -80,13 +80,11 @@ next:	if (pack->cur == pack->end)
 	case 'x':
 		return (0);
 	case 't':
-		if (pv->size < 1 || pv->size > 8) {
-			__wt_errx(pack->session,
+		if (pv->size < 1 || pv->size > 8)
+			WT_RET_MSG(pack->session, EINVAL,
 			    "Bitfield sizes must be between 1 and 8 bits "
 			    "in format '%.*s'",
 			    (int)(pack->end - pack->orig), pack->orig);
-			return (EINVAL);
-		}
 		return (0);
 	case 'u':
 	case 'U':
@@ -111,10 +109,9 @@ next:	if (pack->cur == pack->end)
 		pack->repeats = pv->size - 1;
 		return (0);
 	default:
-		__wt_errx(pack->session,
+		WT_RET_MSG(pack->session, EINVAL,
 		   "Invalid type '%c' found in format '%.*s'",
 		    pv->type, (int)(pack->end - pack->orig), pack->orig);
-		return (EINVAL);
 	}
 
 }
@@ -219,8 +216,8 @@ __pack_size(WT_SESSION_IMPL *session, WT_PACK_VALUE *pv)
 		return (sizeof (uint64_t));
 	}
 
-	__wt_errx(session, "unknown pack-value type: %c", (int)pv->type);
-	return (EINVAL);
+	WT_RET_MSG(
+	    session, EINVAL, "unknown pack-value type: %c", (int)pv->type);
 }
 
 static inline int
@@ -312,9 +309,8 @@ __pack_write(
 		*pp += sizeof(uint64_t);
 		break;
 	default:
-		__wt_errx(
-		    session, "unknown pack-value type: %c", (int)pv->type);
-		return (EINVAL);
+		WT_RET_MSG(session, EINVAL,
+		    "unknown pack-value type: %c", (int)pv->type);
 	}
 
 	return (0);
@@ -385,9 +381,8 @@ __unpack_read(WT_SESSION_IMPL *session,
 		*pp += sizeof(uint64_t);
 		break;
 	default:
-		__wt_errx(
-		    session, "unknown pack-value type: %c", (int)pv->type);
-		return (EINVAL);
+		WT_RET_MSG(session, EINVAL,
+		    "unknown pack-value type: %c", (int)pv->type);
 	}
 
 	return (0);

@@ -25,6 +25,5 @@ __wt_filesize(WT_SESSION_IMPL *session, WT_FH *fh, off_t *sizep)
 		return (0);
 	}
 
-	__wt_err(session, ret, "%s: fstat", fh->name);
-	return (ret);
+	WT_RET_MSG(session, ret, "%s: fstat", fh->name);
 }

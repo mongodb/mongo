@@ -35,10 +35,9 @@ __wt_calloc(WT_SESSION_IMPL *session, size_t number, size_t size, void *retp)
 	if (session != NULL && S2C(session)->stats != NULL)
 		WT_CSTAT_INCR(session, memalloc);
 
-	if ((p = calloc(number, size)) == NULL) {
-		__wt_err(session, errno, "memory allocation");
-		return (WT_ERROR);
-	}
+	if ((p = calloc(number, size)) == NULL)
+		WT_RET_MSG(session,
+		    errno == 0 ? WT_ERROR : errno, "memory allocation");
 
 	*(void **)retp = p;
 	return (0);
@@ -74,10 +73,9 @@ __wt_realloc(WT_SESSION_IMPL *session,
 	    bytes_allocated_ret == NULL ? 0 : *bytes_allocated_ret;
 	WT_ASSERT(session, bytes_allocated < bytes_to_allocate);
 
-	if ((p = realloc(p, bytes_to_allocate)) == NULL) {
-		__wt_err(session, errno, "memory allocation");
-		return (WT_ERROR);
-	}
+	if ((p = realloc(p, bytes_to_allocate)) == NULL)
+		WT_RET_MSG(session,
+		    errno == 0 ? WT_ERROR : errno, "memory allocation");
 
 	/*
 	 * Clear the allocated memory -- an application might: allocate memory,

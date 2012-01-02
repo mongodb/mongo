@@ -181,8 +181,8 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table,
 	ret = __wt_session_get_btree(session, uri, fileuri,
 	    NULL, NULL, WT_BTREE_NO_LOCK);
 	if (ret == ENOENT)
-		__wt_errx(session, "Index '%s' created but '%s' is missing",
-		    uri, fileuri);
+		__wt_errx(session,
+		    "Index '%s' created but '%s' is missing", uri, fileuri);
 	/* Other errors will already have generated an error message. */
 	if (ret != 0)
 		goto err;

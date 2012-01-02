@@ -14,11 +14,10 @@
 static int
 __config_err(WT_CONFIG *conf, const char *msg, int err)
 {
-	__wt_err(conf->session, err,
+	WT_RET_MSG(conf->session, err == 0 ? EINVAL : err,
 	    "Error parsing '%.*s' at byte %u: %s",
 	    (int)(conf->end - conf->orig), conf->orig,
 	    (u_int)(conf->cur - conf->orig), msg);
-	return ((err != 0) ? err : EINVAL);
 }
 
 /*

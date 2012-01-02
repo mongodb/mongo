@@ -10,8 +10,7 @@
 static int
 __bm_invalid(WT_SESSION_IMPL *session)
 {
-	__wt_err(session, EINVAL, "invalid block manager handle");
-	return (EINVAL);
+	WT_RET_MSG(session, EINVAL, "invalid block manager handle");
 }
 
 /*

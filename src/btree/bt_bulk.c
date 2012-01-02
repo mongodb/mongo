@@ -25,11 +25,9 @@ __wt_bulk_init(WT_CURSOR_BULK *cbulk)
 	 * You can't bulk-load into existing trees.  Check, and retrieve the
 	 * leaf page we're going to use.
 	 */
-	if ((ret = __wt_btree_root_empty(session, &cbulk->leaf)) != 0) {
-		__wt_errx(
-		    session, "bulk-load is only possible for empty trees");
-		return (ret);
-	}
+	if ((ret = __wt_btree_root_empty(session, &cbulk->leaf)) != 0)
+		WT_RET_MSG(
+		    session, ret, "bulk-load is only possible for empty trees");
 
 	WT_RET(__wt_rec_bulk_init(cbulk));
 
@@ -149,9 +147,8 @@ __bulk_row_keycmp_err(WT_CURSOR_BULK *cbulk)
 	WT_RET(__wt_buf_set_printable(
 	    session, &b, cbulk->cmp.data, cbulk->cmp.size));
 
-	__wt_errx( session,
+	WT_RET_MSG(session, EINVAL,
 	    "bulk-load presented with out-of-order keys: %.*s compares smaller "
 	    "than previously inserted key %.*s",
 	    (int)a.size, (char *)a.data, (int)b.size, (char *)b.data);
-	return (WT_ERROR);
 }

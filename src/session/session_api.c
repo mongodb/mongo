@@ -117,7 +117,7 @@ __session_open_cursor(WT_SESSION *wt_session,
 	else if (WT_PREFIX_MATCH(uri, "table:"))
 		ret = __wt_curtable_open(session, uri, cfg, cursorp);
 	else {
-		__wt_errx(session, "Unknown cursor type '%s'", uri);
+		__wt_err(session, EINVAL, "Unknown cursor type '%s'", uri);
 		ret = EINVAL;
 	}
 
@@ -410,13 +410,10 @@ __wt_open_session(WT_CONNECTION_IMPL *conn, int internal,
 	__wt_spin_lock(session, &conn->spinlock);
 
 	/* Check to see if there's an available session slot. */
-	if (conn->session_cnt == conn->session_size - 1) {
-		__wt_errx(session,
+	if (conn->session_cnt == conn->session_size - 1)
+		WT_ERR_MSG(session, WT_ERROR,
 		    "WiredTiger only configured to support %d thread contexts",
 		    conn->session_size);
-		ret = WT_ERROR;
-		goto err;
-	}
 
 	/*
 	 * The session reference list is compact, the session array is not.

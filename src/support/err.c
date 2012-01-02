@@ -168,12 +168,11 @@ __wt_assert(WT_SESSION_IMPL *session,
 int
 __wt_illegal_value(WT_SESSION_IMPL *session)
 {
-	__wt_errx(session,
+	WT_RET_MSG(session, WT_ERROR,
 	    "encountered an illegal file format or internal value; restart "
 	    "the system and verify the underlying files, if corruption is "
 	    "detected use the WT_SESSION salvage method or the wt utility's "
 	    "salvage command to repair the file");
-	return (WT_ERROR);
 }
 
 /*
@@ -183,8 +182,8 @@ __wt_illegal_value(WT_SESSION_IMPL *session)
 int
 __wt_file_item_too_big(WT_SESSION_IMPL *session)
 {
-	__wt_errx(session, "the item is too large for the file to store");
-	return (WT_ERROR);
+	WT_RET_MSG(session, WT_ERROR,
+	    "the item is too large for the file to store");
 }
 
 /*
@@ -194,6 +193,6 @@ __wt_file_item_too_big(WT_SESSION_IMPL *session)
 int
 __wt_unknown_object_type(WT_SESSION_IMPL *session, const char *uri)
 {
-	__wt_errx(session, "unknown or unsupported object type: %s", uri);
-	return (EINVAL);
+	WT_RET_MSG(session, EINVAL,
+	    "unknown or unsupported object type: %s", uri);
 }

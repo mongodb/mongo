@@ -391,14 +391,12 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		case WT_PAGE_ROW_LEAF:
 			if (ss->page_type == WT_PAGE_INVALID)
 				ss->page_type = dsk->type;
-			if (ss->page_type != dsk->type) {
-				__wt_errx(session,
+			if (ss->page_type != dsk->type)
+				WT_RET_MSG(session, WT_ERROR,
 				    "file contains multiple file formats (both "
 				    "%s and %s), and cannot be salvaged",
 				    __wt_page_type_string(ss->page_type),
 				    __wt_page_type_string(dsk->type));
-				return (WT_ERROR);
-			}
 
 			WT_ERR(__slvg_trk_leaf(
 			    session, dsk, addrbuf, addrbuf_size, gen, ss));

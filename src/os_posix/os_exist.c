@@ -33,6 +33,5 @@ __wt_exist(WT_SESSION_IMPL *session, const char *name, int *existp)
 		return (0);
 	}
 
-	__wt_err(session, ret, "%s: fstat", name);
-	return (ret);
+	WT_RET_MSG(session, ret, "%s: fstat", name);
 }

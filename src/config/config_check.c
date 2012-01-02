@@ -29,21 +29,17 @@ __wt_config_check(WT_SESSION_IMPL *session,
 
 	WT_RET(__wt_config_init(session, &parser, config));
 	while ((ret = __wt_config_next(&parser, &k, &v)) == 0) {
-		if (k.type != ITEM_STRING && k.type != ITEM_ID) {
-			__wt_errx(session,
+		if (k.type != ITEM_STRING && k.type != ITEM_ID)
+			WT_RET_MSG(session, EINVAL,
 			    "Invalid configuration key found: '%.*s'",
 			    (int)k.len, k.str);
-			return (EINVAL);
-		}
 
 		if ((ret = __wt_config_getone(session,
 		    checks, &k, &chk)) != 0) {
-			if (ret == WT_NOTFOUND) {
-				__wt_errx(session,
+			if (ret == WT_NOTFOUND)
+				WT_RET_MSG(session, EINVAL,
 				    "Unknown configuration key found: '%.*s'",
 				    (int)k.len, k.str);
-				ret = EINVAL;
-			}
 			return (ret);
 		}
 
@@ -56,38 +52,31 @@ __wt_config_check(WT_SESSION_IMPL *session,
 				    (v.type != ITEM_NUM ||
 				    (v.val != 0 && v.val != 1))) ||
 				    (strncmp(cv.str, "list", cv.len) == 0 &&
-				    v.len > 0 && v.type != ITEM_STRUCT)) {
-					__wt_errx(session, "Invalid value type "
+				    v.len > 0 && v.type != ITEM_STRUCT))
+					WT_RET_MSG(session, EINVAL,
+					    "Invalid value type "
 					    "for key '%.*s': expected a %.*s",
 					    (int)k.len, k.str,
 					    (int)cv.len, cv.str);
-					return (EINVAL);
-				}
 			} else if (strncmp(ck.str, "min", ck.len) == 0) {
-				if (v.val < cv.val) {
-					__wt_errx(session, "Value too small "
-					    "for key '%.*s' "
+				if (v.val < cv.val)
+					WT_RET_MSG(session, EINVAL,
+					    "Value too small for key '%.*s' "
 					    "the minimum is %.*s",
 					    (int)k.len, k.str,
 					    (int)cv.len, cv.str);
-					return (EINVAL);
-				}
 			} else if (strncmp(ck.str, "max", ck.len) == 0) {
-				if (v.val > cv.val) {
-					__wt_errx(session, "Value too large "
-					    "for key '%.*s' "
+				if (v.val > cv.val)
+					WT_RET_MSG(session, EINVAL,
+					    "Value too large for key '%.*s' "
 					    "the maximum is %.*s",
 					    (int)k.len, k.str,
 					    (int)cv.len, cv.str);
-					return (EINVAL);
-				}
 			} else if (strncmp(ck.str, "choices", ck.len) == 0) {
-				if (v.len == 0) {
-					__wt_errx(session,
+				if (v.len == 0)
+					WT_RET_MSG(session, EINVAL,
 					    "Key '%.*s' requires a value",
 					    (int)k.len, k.str);
-					return (EINVAL);
-				}
 				if (v.type == ITEM_STRUCT) {
 					/*
 					 * Handle the 'verbose' case of a list
@@ -111,19 +100,16 @@ __wt_config_check(WT_SESSION_IMPL *session,
 
 				if (ret != 0 && ret != WT_NOTFOUND)
 					return (ret);
-				if (!found) {
-					__wt_errx(session, "Value '%.*s' not a "
+				if (!found)
+					WT_RET_MSG(session, EINVAL,
+					    "Value '%.*s' not a "
 					    "permitted choice for key '%.*s'",
 					    (int)v.len, v.str,
 					    (int)k.len, k.str);
-					return (EINVAL);
-				}
-			} else {
-				__wt_errx(session,
+			} else
+				WT_RET_MSG(session, EINVAL,
 				    "unexpected configuration description "
 				    "keyword %.*s", (int)ck.len, ck.str);
-				return (EINVAL);
-			}
 		}
 	}
 

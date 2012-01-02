@@ -111,8 +111,7 @@ hex2byte(uint8_t *from, uint8_t *to)
 static int
 __hex_fmterr(WT_SESSION_IMPL *session)
 {
-	__wt_errx(session, "Invalid format in hexadecimal string");
-	return (EINVAL);
+	WT_RET_MSG(session, EINVAL, "Invalid format in hexadecimal string");
 }
 
 /*

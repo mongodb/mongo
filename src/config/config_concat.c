@@ -33,12 +33,10 @@ __wt_config_concat(
 	for (cp = cfg; *cp != NULL; ++cp) {
 		WT_ERR(__wt_config_init(session, &cparser, *cp));
 		while ((ret = __wt_config_next(&cparser, &k, &v)) == 0) {
-			if (k.type != ITEM_STRING && k.type != ITEM_ID) {
-				__wt_errx(session,
+			if (k.type != ITEM_STRING && k.type != ITEM_ID)
+				WT_ERR_MSG(session, EINVAL,
 				    "Invalid configuration key found: '%s'\n",
 				    k.str);
-				WT_ERR(EINVAL);
-			}
 			/* Include the quotes around string keys/values. */
 			if (k.type == ITEM_STRING) {
 				--k.str;

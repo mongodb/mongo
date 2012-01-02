@@ -164,13 +164,11 @@ retry:	__cursor_func_init(cbt, 1);
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
-		if (cursor->value.size != 1) {
-			__wt_errx(session,
+		if (cursor->value.size != 1)
+			WT_RET_MSG(session, EINVAL,
 			    "item size of %" PRIu32 " does not match "
 			    "fixed-length file requirement of 1 byte",
 			    cursor->value.size);
-			return (WT_ERROR);
-		}
 		/* FALLTHROUGH */
 	case BTREE_COL_VAR:
 		/*
@@ -292,13 +290,11 @@ retry:	__cursor_func_init(cbt, 1);
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
-		if (cursor->value.size != 1) {
-			__wt_errx(session,
+		if (cursor->value.size != 1)
+			WT_RET_MSG(session, EINVAL,
 			    "item size of %" PRIu32 " does not match "
 			    "fixed-length file requirement of 1 byte",
 			    cursor->value.size);
-			return (WT_ERROR);
-		}
 		/* FALLTHROUGH */
 	case BTREE_COL_VAR:
 		/* Update the record. */

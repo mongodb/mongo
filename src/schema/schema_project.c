@@ -132,10 +132,9 @@ __wt_schema_project_in(WT_SESSION_IMPL *session,
 				break;
 
 			default:
-				__wt_errx(session,
+				WT_RET_MSG(session, EINVAL,
 				    "unexpected projection plan: %c",
 				    (int)*proj);
-				return (EINVAL);
 			}
 		}
 	}
@@ -356,10 +355,9 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 				end = (uint8_t *)buf->data + buf->size;
 				break;
 			default:
-				__wt_errx(session,
+				WT_RET_MSG(session, EINVAL,
 				    "unexpected projection plan: %c",
 				    (int)*proj);
-				return (EINVAL);
 			}
 		}
 	}
