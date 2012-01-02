@@ -273,6 +273,13 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 	}
 
 	/*
+	 * If we don't find the record, check to see if we extended the file,
+	 * and update the last record number.
+	 */
+	if (recno > btree->last_recno)
+		btree->last_recno = recno;
+
+	/*
 	 * Publish: First, point the new WT_INSERT item's skiplist references
 	 * to the next elements in the insert list, then flush memory.  Second,
 	 * update the skiplist elements that reference the new WT_INSERT item,

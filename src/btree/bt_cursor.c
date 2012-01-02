@@ -8,6 +8,21 @@
 #include "wt_internal.h"
 
 /*
+ * __cursor_past_eof --
+ *	Return if the cursor key's record number is larger than the largest
+ * record in the tree.
+ */
+static inline int
+__cursor_past_eof(WT_BTREE *btree, WT_CURSOR_BTREE *cbt)
+{
+	/*
+	 * XXX
+	 * UNPROTECTED 64B READ
+	 */
+	return (cbt->iface.recno > btree->last_recno ? 1 : 0);
+}
+
+/*
  * __cursor_invalid --
  *	Return if the cursor references an invalid K/V pair (either the pair
  * doesn't exist at all because the tree is empty, or the pair was deleted).
@@ -64,6 +79,7 @@ int
 __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
+	WT_BUF *val;
 	WT_CURSOR *cursor;
 	WT_SESSION_IMPL *session;
 	int ret;
@@ -79,9 +95,20 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 	WT_ERR(btree->type == BTREE_ROW ?
 	    __wt_row_search(session, cbt, 0) :
 	    __wt_col_search(session, cbt, 0));
-	if (cbt->compare != 0 || __cursor_invalid(cbt))
-		ret = WT_NOTFOUND;
-	else
+	if (cbt->compare != 0 || __cursor_invalid(cbt)) {
+		/*
+		 * Creating a record past the end of the tree in a fixed-length
+		 * column-store implicitly fills the gap with empty records.
+		 */
+		if (btree->type == BTREE_COL_FIX &&
+		    !__cursor_past_eof(btree, cbt)) {
+			cbt->v = 0;
+			val = &cbt->iface.value;
+			val->data = &cbt->v;
+			val->size = 1;
+		} else
+			ret = WT_NOTFOUND;
+	} else
 		ret = __wt_kv_return(session, cbt, 0);
 
 err:	__cursor_func_resolve(cbt, ret);
@@ -97,6 +124,7 @@ int
 __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 {
 	WT_BTREE *btree;
+	WT_BUF *val;
 	WT_CURSOR *cursor;
 	WT_SESSION_IMPL *session;
 	int ret;
@@ -109,20 +137,32 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 
 	__cursor_func_init(cbt, 1);
 
-	/*
-	 * If we find a record that is not deleted, return it.
-	 *
-	 * If we find a deleted key, first try to move to the next key in the
-	 * tree (bias for prefix searches).  Cursor next skips deleted records,
-	 * so we don't have to test for them here.
-	 *
-	 * If there's no larger tree key, redo the search and try and find an
-	 * earlier record.  If that fails, quit, there's no record to return.
-	 */
 	WT_ERR(btree->type == BTREE_ROW ?
 	    __wt_row_search(session, cbt, 0) :
 	    __wt_col_search(session, cbt, 0));
-	if (!__cursor_invalid(cbt)) {
+
+	/*
+	 * Creating a record past the end of the tree in a fixed-length column-
+	 * store implicitly fills the gap with empty records.  In this case, we
+	 * instantiate the empty record, it's an exact match.
+	 *
+	 * Else, if we find a valid key (one that wasn't deleted), return it.
+	 *
+	 * Else, if we found a deleted key, try to move to the next key in the
+	 * tree (bias for prefix searches).  Cursor next skips deleted records,
+	 * so we don't have to test for them again.
+	 *
+	 * Else if there's no larger tree key, redo the search and try and find
+	 * an earlier record.  If that fails, quit, there's no record to return.
+	 */
+	if (btree->type == BTREE_COL_FIX &&
+	    cbt->compare != 0 && !__cursor_past_eof(btree, cbt)) {
+		cbt->v = 0;
+		val = &cbt->iface.value;
+		val->data = &cbt->v;
+		val->size = 1;
+		*exact = 0;
+	} else if (!__cursor_invalid(cbt)) {
 		*exact = cbt->compare;
 		ret = __wt_kv_return(session, cbt, cbt->compare == 0 ? 0 : 1);
 	} else if ((ret = __wt_btcur_next(cbt)) != WT_NOTFOUND)
@@ -183,16 +223,21 @@ retry:	__cursor_func_init(cbt, 1);
 			break;
 		}
 
-		/*
-		 * If WT_CURSTD_OVERWRITE not set, fail if the key exists, else
-		 * insert the key/value pair.
-		 *
-		 * If WT_CURSTD_OVERWRITE set, insert/update the key/value pair.
-		 */
 		WT_ERR(__wt_col_search(session, cbt, 1));
-		if (cbt->compare == 0 &&
-		    !__cursor_invalid(cbt) &&
-		    !F_ISSET(cursor, WT_CURSTD_OVERWRITE)) {
+
+		/*
+		 * If WT_CURSTD_OVERWRITE set, insert/update the key/value pair.
+		 *
+		 * If WT_CURSTD_OVERWRITE not set, fail if the key exists, else
+		 * insert the key/value pair.  Creating a record past the end
+		 * of the tree in a fixed-length column-store implicitly fills
+		 * the gap with empty records.  Fail in that case, the record
+		 * exists.
+		 */
+		if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE) &&
+		    ((cbt->compare == 0 && !__cursor_invalid(cbt)) ||
+		    (cbt->compare != 0 && btree->type == BTREE_COL_FIX &&
+		    !__cursor_past_eof(btree, cbt)))) {
 			ret = WT_DUPLICATE_KEY;
 			break;
 		}
@@ -246,10 +291,17 @@ retry:	__cursor_func_init(cbt, 1);
 	switch (btree->type) {
 	case BTREE_COL_FIX:
 	case BTREE_COL_VAR:
-		/* Remove the record if it exists. */
 		WT_ERR(__wt_col_search(session, cbt, 1));
+
+		/*
+		 * Remove the record if it exists.  Creating a record past the
+		 * end of the tree in a fixed-length column-store implicitly
+		 * fills the gap with empty records.  Return success in that
+		 * case, the record was deleted successfully.
+		 */
 		if (cbt->compare != 0 || __cursor_invalid(cbt))
-			ret = WT_NOTFOUND;
+			ret = btree->type == BTREE_COL_FIX &&
+			    !__cursor_past_eof(btree, cbt) ? 0 : WT_NOTFOUND;
 		else if ((ret = __wt_col_modify(session, cbt, 2)) == WT_RESTART)
 			goto retry;
 		break;
@@ -297,11 +349,19 @@ retry:	__cursor_func_init(cbt, 1);
 			    cursor->value.size);
 		/* FALLTHROUGH */
 	case BTREE_COL_VAR:
-		/* Update the record. */
 		WT_ERR(__wt_col_search(session, cbt, 1));
-		if (cbt->compare != 0 || __cursor_invalid(cbt))
+
+		/*
+		 * Update the record if it exists.  Creating a record past the
+		 * end of the tree in a fixed-length column-store implicitly
+		 * fills the gap with empty records.  Update the record in that
+		 * case, the record exists.
+		 */
+		if ((cbt->compare != 0 || __cursor_invalid(cbt)) &&
+		    (btree->type != BTREE_COL_FIX ||
+		    __cursor_past_eof(btree, cbt)))
 			ret = WT_NOTFOUND;
-		if ((ret = __wt_col_modify(session, cbt, 3)) == WT_RESTART)
+		else if ((ret = __wt_col_modify(session, cbt, 3)) == WT_RESTART)
 			goto retry;
 		break;
 	case BTREE_ROW:

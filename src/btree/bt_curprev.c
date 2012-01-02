@@ -101,46 +101,43 @@ __cursor_skip_prev(WT_CURSOR_BTREE *cbt)
 	}
 
 	/* If we found a previous node, the next one must be current. */
-	WT_ASSERT(session, cbt->ins_stack[0] == NULL ||
-	    *cbt->ins_stack[0] == current);
+	WT_ASSERT(session,
+	    cbt->ins_stack[0] == NULL || *cbt->ins_stack[0] == current);
 
 	cbt->ins = PREV_INS(cbt, 0);
 }
 
 /*
- * __cursor_col_append_prev --
- *	Return the previous entry on the append list.
+ * __cursor_fix_append_prev --
+ *	Return the previous fixed-length entry on the append list.
  */
 static inline int
-__cursor_col_append_prev(WT_CURSOR_BTREE *cbt, int newpage)
+__cursor_fix_append_prev(WT_CURSOR_BTREE *cbt, int newpage)
 {
 	WT_BUF *val;
 
 	val = &cbt->iface.value;
 
 	if (newpage) {
-		cbt->ins = WT_SKIP_LAST(cbt->ins_head);
-		goto new_page;
-	}
-
-	for (;;) {
-		__cursor_skip_prev(cbt);
-new_page:	if (cbt->ins == NULL)
+		if ((cbt->ins = WT_SKIP_LAST(cbt->ins_head)) == NULL)
 			return (WT_NOTFOUND);
-
-		cbt->iface.recno = WT_INSERT_RECNO(cbt->ins);
-		if (cbt->btree->type == BTREE_COL_FIX) {
-			val->data = WT_UPDATE_DATA(cbt->ins->upd);
-			val->size = 1;
-			break;
-		} else {
-			if (WT_UPDATE_DELETED_ISSET(cbt->ins->upd))
-				continue;
-			val->data = WT_UPDATE_DATA(cbt->ins->upd);
-			val->size = cbt->ins->upd->size;
-			break;
+		cbt->recno = WT_INSERT_RECNO(cbt->ins);
+	} else {
+		if (cbt->recno == WT_INSERT_RECNO(cbt->ins)) {
+			__cursor_skip_prev(cbt);
+			if (cbt->ins == NULL)
+				return (WT_NOTFOUND);
 		}
+		--cbt->recno;
 	}
+
+	cbt->iface.recno = cbt->recno;
+	if (cbt->recno > WT_INSERT_RECNO(cbt->ins)) {
+		cbt->v = 0;
+		val->data = &cbt->v;
+	} else
+		val->data = WT_UPDATE_DATA(cbt->ins->upd);
+	val->size = 1;
 	return (0);
 }
 
@@ -193,6 +190,37 @@ new_page:	*recnop = cbt->recno;
 		return (0);
 	}
 	/* NOTREACHED */
+}
+
+/*
+ * __cursor_var_append_prev --
+ *	Return the previous variable-length entry on the append list.
+ */
+static inline int
+__cursor_var_append_prev(WT_CURSOR_BTREE *cbt, int newpage)
+{
+	WT_BUF *val;
+
+	val = &cbt->iface.value;
+
+	if (newpage) {
+		cbt->ins = WT_SKIP_LAST(cbt->ins_head);
+		goto new_page;
+	}
+
+	for (;;) {
+		__cursor_skip_prev(cbt);
+new_page:	if (cbt->ins == NULL)
+			return (WT_NOTFOUND);
+
+		cbt->iface.recno = WT_INSERT_RECNO(cbt->ins);
+		if (WT_UPDATE_DELETED_ISSET(cbt->ins->upd))
+			continue;
+		val->data = WT_UPDATE_DATA(cbt->ins->upd);
+		val->size = cbt->ins->upd->size;
+		break;
+	}
+	return (0);
 }
 
 /*
@@ -421,7 +449,16 @@ __wt_btcur_prev(WT_CURSOR_BTREE *cbt)
 	 */
 	for (newpage = 0;; newpage = 1) {
 		if (F_ISSET(cbt, WT_CBT_ITERATE_APPEND)) {
-			if ((ret = __cursor_col_append_prev(cbt, newpage)) == 0)
+			switch (cbt->page->type) {
+			case WT_PAGE_COL_FIX:
+				ret = __cursor_fix_append_prev(cbt, newpage);
+				break;
+			case WT_PAGE_COL_VAR:
+				ret = __cursor_var_append_prev(cbt, newpage);
+				break;
+			WT_ILLEGAL_VALUE_ERR(session);
+			}
+			if (ret == 0)
 				break;
 			F_CLR(cbt, WT_CBT_ITERATE_APPEND);
 			if (ret != WT_NOTFOUND)

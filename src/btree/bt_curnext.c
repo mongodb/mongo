@@ -8,38 +8,30 @@
 #include "wt_internal.h"
 
 /*
- * __cursor_col_append_next --
+ * __cursor_fix_append_next --
  *	Return the next entry on the append list.
  */
 static inline int
-__cursor_col_append_next(WT_CURSOR_BTREE *cbt, int newpage)
+__cursor_fix_append_next(WT_CURSOR_BTREE *cbt, int newpage)
 {
 	WT_BUF *val;
 
 	val = &cbt->iface.value;
 
-	if (newpage) {
+	if (newpage)
 		cbt->ins = WT_SKIP_FIRST(cbt->ins_head);
-		goto new_page;
-	}
-
-	for (;;) {
-		if ((cbt->ins = WT_SKIP_NEXT(cbt->ins)) == NULL)
+	else
+		if (cbt->recno == WT_INSERT_RECNO(cbt->ins) &&
+		    (cbt->ins = WT_SKIP_NEXT(cbt->ins)) == NULL)
 			return (WT_NOTFOUND);
 
-new_page:	cbt->iface.recno = WT_INSERT_RECNO(cbt->ins);
-		if (cbt->btree->type == BTREE_COL_FIX) {
-			val->data = WT_UPDATE_DATA(cbt->ins->upd);
-			val->size = 1;
-			break;
-		} else {
-			if (WT_UPDATE_DELETED_ISSET(cbt->ins->upd))
-				continue;
-			val->data = WT_UPDATE_DATA(cbt->ins->upd);
-			val->size = cbt->ins->upd->size;
-			break;
-		}
-	}
+	cbt->iface.recno = ++cbt->recno;
+	if (cbt->recno < WT_INSERT_RECNO(cbt->ins)) {
+		cbt->v = 0;
+		val->data = &cbt->v;
+	} else
+		val->data = WT_UPDATE_DATA(cbt->ins->upd);
+	val->size = 1;
 	return (0);
 }
 
@@ -92,6 +84,36 @@ new_page:	*recnop = cbt->recno;
 		return (0);
 	}
 	/* NOTREACHED */
+}
+
+/*
+ * __cursor_var_append_next --
+ *	Return the next variable-length entry on the append list.
+ */
+static inline int
+__cursor_var_append_next(WT_CURSOR_BTREE *cbt, int newpage)
+{
+	WT_BUF *val;
+
+	val = &cbt->iface.value;
+
+	if (newpage) {
+		cbt->ins = WT_SKIP_FIRST(cbt->ins_head);
+		goto new_page;
+	}
+
+	for (;;) {
+		if ((cbt->ins = WT_SKIP_NEXT(cbt->ins)) == NULL)
+			return (WT_NOTFOUND);
+
+new_page:	cbt->iface.recno = WT_INSERT_RECNO(cbt->ins);
+		if (WT_UPDATE_DELETED_ISSET(cbt->ins->upd))
+			continue;
+		val->data = WT_UPDATE_DATA(cbt->ins->upd);
+		val->size = cbt->ins->upd->size;
+		break;
+	}
+	return (0);
 }
 
 /*
@@ -368,7 +390,16 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 	 */
 	for (newpage = 0;; newpage = 1) {
 		if (F_ISSET(cbt, WT_CBT_ITERATE_APPEND)) {
-			if ((ret = __cursor_col_append_next(cbt, newpage)) == 0)
+			switch (cbt->page->type) {
+			case WT_PAGE_COL_FIX:
+				ret = __cursor_fix_append_next(cbt, newpage);
+				break;
+			case WT_PAGE_COL_VAR:
+				ret = __cursor_var_append_next(cbt, newpage);
+				break;
+			WT_ILLEGAL_VALUE(session);
+			}
+			if (ret == 0)
 				break;
 			F_CLR(cbt, WT_CBT_ITERATE_APPEND);
 			if (ret != WT_NOTFOUND)

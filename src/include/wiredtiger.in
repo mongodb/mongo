@@ -319,7 +319,11 @@ struct wt_cursor {
 	 *
 	 * In table or file with a record number key, if the cursor was
 	 * configured with "append", the value must be set; a new record will
-	 * be appended and its number returned as the key value.
+	 * be appended and the record number returned as the key value.
+	 *
+	 * Inserting a new record after the current maximum record in a
+	 * fixed-length column-store implicitly creates skipped records as
+	 * records with a value of 0.
 	 *
 	 * @snippet ex_all.c Insert a new record
 	 *
@@ -346,6 +350,9 @@ struct wt_cursor {
 
 	/*! Remove a record.  The key must be set, and the key's record will be
 	 * removed.
+	 *
+	 * Removing a record in a fixed-length column-store is identical to
+	 * setting the record's value to 0.
 	 *
 	 * @snippet ex_all.c Remove a record
 	 *
