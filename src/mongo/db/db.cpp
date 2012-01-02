@@ -571,6 +571,17 @@ string arg_error_check(int argc, char* argv[]) {
     return "";
 }
 
+static bool is_big_endian()
+{
+    unsigned x = 0x12345678;
+    unsigned char& b = (unsigned char&) x;
+    if ( b != 0x78 ) {
+        return true;
+    }
+
+    return false;
+}
+
 int main(int argc, char* argv[]) {
     static StaticObserver staticObserver;
     doPreServerStartupInits();
@@ -694,13 +705,10 @@ int main(int argc, char* argv[]) {
     boost::filesystem::path::default_name_check( boost::filesystem::no_check );
 #endif
 
+    if( is_big_endian() )
     {
-        unsigned x = 0x12345678;
-        unsigned char& b = (unsigned char&) x;
-        if ( b != 0x78 ) {
-            out() << "big endian cpus not yet supported" << endl;
-            return 33;
-        }
+        out() << "big endian cpus not yet supported" << endl;
+        return 33;
     }
 
     if( argc == 1 )
