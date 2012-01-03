@@ -37,8 +37,8 @@
 #define __LINENOISE_H
 
 struct linenoiseCompletions {
-  size_t len;
-  char** cvec;
+  int       completionCount;
+  char * *  completionStrings;
 };
 
 typedef void( linenoiseCompletionCallback )( const char *, linenoiseCompletions * );

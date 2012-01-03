@@ -1104,14 +1104,36 @@ static int linenoiseReadChar( void ){
 }
 
 static void freeCompletions( linenoiseCompletions* lc ) {
-    for ( size_t i = 0; i < lc->len; ++i )
-        free( lc->cvec[i] );
-    if ( lc->cvec )
-        free( lc->cvec );
+    for ( int i = 0; i < lc->completionCount; ++i )
+        free( lc->completionStrings[i] );
+    if ( lc->completionStrings )
+        free( lc->completionStrings );
+}
+
+// convert {CTRL + 'A'}, {CTRL + 'a'} and {CTRL + ctrlChar( 'A' )} into ctrlChar( 'A' )
+// leave META alone
+//
+static int cleanupCtrl( int c ) {
+    if ( c & CTRL ) {
+        int d = c & 0x1FF;
+        if ( d >= 'a' && d <= 'z' ) {
+            c = ( c + ( 'a' - ctrlChar( 'A' ) ) ) & ~CTRL;
+        }
+        if ( d >= 'A' && d <= 'Z' ) {
+            c = ( c + ( 'A' - ctrlChar( 'A' ) ) ) & ~CTRL;
+        }
+        if ( d >= ctrlChar( 'A' ) && d <= ctrlChar( 'Z' ) ) {
+            c = c & ~CTRL;
+        }
+    }
+    return c;
 }
 
 // break characters that may precede items to be completed
 static const char breakChars[] = " =+-/\\*?\"'`&<>;|@{([])}";
+
+// maximum number of completions to display without asking
+static const int completionCountCutoff = 100;
 
 /**
  * Handle command completion, using a completionCallback() routine to provide possible substitutions
@@ -1136,96 +1158,154 @@ int InputBuffer::completeLine( PromptInfo& pi ) {
     char* parseItem = reinterpret_cast<char *>( malloc( itemLength + 1 ) );
     int i = 0;
     for ( ; i < itemLength; ++i ) {
-        parseItem[i] = buf[startIndex+i];
+        parseItem[i] = buf[startIndex + i];
     }
     parseItem[i] = 0;
 
     // get a list of completions
     completionCallback( parseItem, &lc );
     free( parseItem );
+
+    // if no completions, we are done
+    if ( lc.completionCount == 0 ) {
+        beep();
+        freeCompletions( &lc );
+        return 0;
+    }
+
+    // at least one completion
+    int longest = 0;
     int displayLength = 0;
     char * displayText = 0;
-    if ( lc.len == 0 ) {
-        beep();
+    if ( lc.completionCount == 1 ) {
+        longest = strlen( lc.completionStrings[0] );
     }
     else {
-        size_t i = 0;
-        size_t clen;
-
-        bool stop = false;
-        while ( ! stop ) {
-            /* Show completion or original buffer */
-            if ( i < lc.len ) {
-                clen = strlen( lc.cvec[i] );
-                displayLength = len + clen - itemLength;
-                displayText = reinterpret_cast<char *>( malloc( displayLength + 1 ) );
-                InputBuffer temp( displayText, displayLength + 1 );
-                temp.len = displayLength;
-                temp.pos = startIndex + clen;
-                int j = 0;
-                for ( ; j < startIndex; ++j )
-                    displayText[j] = buf[j];
-                strcpy( &displayText[j], lc.cvec[i] );
-                strcpy( &displayText[j+clen], &buf[pos] );
-                displayText[displayLength] = 0;
-                temp.refreshLine( pi );
-                free( displayText );
+        bool keepGoing = true;
+        while ( keepGoing ) {
+            for ( int j = 0; j < lc.completionCount - 1; ++j ) {
+                char c1, c2;
+                if ( ( 0 == ( c1 = lc.completionStrings[j][longest] ) ) || ( 0 == ( c2 = lc.completionStrings[j + 1][longest] ) ) || ( c1 != c2 ) ) {
+                    keepGoing = false;
+                    break;
+                }
             }
-            else {
-                refreshLine( pi );
-            }
-
-            do {
-                c = linenoiseReadChar();
-            } while ( c == static_cast<char>( -1 ) );
-
-            switch ( c ) {
-
-                case 0:
-                    freeCompletions( &lc );
-                    return -1;
-
-                case ctrlChar( 'I' ):   // ctrl-I/tab
-                    i = ( i + 1 ) % ( lc.len + 1 );
-                    if ( i == lc.len )
-                        beep();         // beep after completing cycle
-                    break;
-
-#if 0 // SERVER-4011 -- Escape only works to end command completion in Windows
-      // leaving code here for now in case this is where we will add Meta-R (revert-line) later
-                case 27: /* escape */
-                    /* Re-show original buffer */
-                    if ( i < lc.len )
-                        refreshLine( pi, buf, *len, *pos );
-                    stop = true;
-                    break;
-#endif // SERVER-4011 -- Escape only works to end command completion in Windows
-
-                default:
-                    /* Update buffer and return */
-                    if ( i < lc.len ) {
-                        clen = strlen( lc.cvec[i] );
-                        displayLength = len + clen - itemLength;
-                        displayText = (char *)malloc( displayLength + 1 );
-                        int j = 0;
-                        for ( ; j < startIndex; ++j )
-                            displayText[j] = buf[j];
-                        strcpy( &displayText[j], lc.cvec[i] );
-                        strcpy( &displayText[j+clen], &buf[pos] );
-                        displayText[displayLength] = 0;
-                        strcpy( buf, displayText );
-                        free( displayText );
-                        pos = startIndex + clen;
-                        len = displayLength;
-                    }
-                    stop = true;
-                    break;
+            if ( keepGoing ) {
+                ++longest;
             }
         }
     }
+    if ( lc.completionCount != 1 ) {    // beep if ambiguous
+        beep();
+    }
 
-    freeCompletions( &lc );
-    return c; /* Return last read character */
+    // if we can extend the item, extend it and return to main loop
+    if ( longest > itemLength ) {
+        displayLength = len + longest - itemLength;
+        displayText = reinterpret_cast<char *>( malloc( displayLength + 1 ) );
+        int j = 0;
+        for ( ; j < startIndex; ++j ) {
+            displayText[j] = buf[j];
+        }
+        for ( int k = 0; k < longest; ++j, ++k ) {
+            displayText[j] = lc.completionStrings[0][k];
+        }
+        strcpy( &displayText[j], &buf[pos] );
+        strcpy( buf, displayText );
+        free( displayText );
+        pos = startIndex + longest;
+        len = displayLength;
+        refreshLine( pi );
+        return 0;
+    }
+
+    // we can't complete any further, wait for second tab
+    do {
+        c = linenoiseReadChar();
+        c = cleanupCtrl( c );
+    } while ( c == static_cast<char>( -1 ) );
+
+    // if any character other than tab, pass it to the main loop
+    if ( c != ctrlChar( 'I' ) ) {
+        freeCompletions( &lc );
+        return c;
+    }
+
+    // we got a second tab, maybe show list of possible completions
+    bool showCompletions = true;
+    if ( lc.completionCount > completionCountCutoff ) {
+        int savePos = pos;
+        pos = len;
+        refreshLine( pi );
+        pos = savePos;
+        printf( "\nDisplay all %d possibilities? (y or n)", lc.completionCount );
+        fflush( stdout );
+        while ( c != 'y' && c != 'Y' && c != 'n' && c != 'N' && c != ctrlChar( 'C' ) ) {
+            do {
+                c = linenoiseReadChar();
+                c = cleanupCtrl( c );
+            } while ( c == static_cast<char>( -1 ) );
+        }
+        switch ( c ) {
+        case 'n':
+        case 'N':
+            showCompletions = false;
+            freeCompletions( &lc );
+            break;
+        case ctrlChar( 'C' ):
+            showCompletions = false;
+            freeCompletions( &lc );
+            if ( write( 1, "^C", 2 ) == -1 ) return -1;    // Display the ^C we got
+            c = 0;
+            break;
+        }
+    }
+
+    // if showing the list, do it the way readline does it
+    if ( showCompletions ) {
+        longest = 0;
+        for ( int j = 0; j < lc.completionCount; ++j) {
+            itemLength = strlen( lc.completionStrings[j] );
+            if ( itemLength > longest ) {
+                longest = itemLength;
+            }
+        }
+        longest += 2;
+        int columnCount = pi.promptScreenColumns / longest;
+        if ( columnCount < 1) {
+            columnCount = 1;
+        }
+        int rowCount = ( lc.completionCount + columnCount - 1) / columnCount;
+        for ( int row = 0; row < rowCount; ++row ) {
+            printf( "\n" );
+            for ( int column = 0; column < columnCount; ++column ) {
+                int index = ( column * rowCount ) + row;
+                if ( index < lc.completionCount ) {
+                    itemLength = strlen( lc.completionStrings[index] );
+                    printf( "%s", lc.completionStrings[index] );
+                    if ( ( ( column + 1 ) * rowCount ) + row < lc.completionCount ) {
+                        for ( int k = itemLength; k < longest; ++k ) {
+                            printf( " " );
+                        }
+                    }
+                }
+            }
+        }
+        fflush( stdout );
+        freeCompletions( &lc );
+    }
+
+    // display the prompt on a new line, then redisplay the input buffer
+    if ( write( 1, "\n", 1 ) == -1 ) return 0;
+    if ( write( 1, pi.promptText, pi.promptChars ) == -1 ) return 0;
+#ifndef _WIN32
+    // we have to generate our own newline on line wrap on Linux
+    if ( pi.promptIndentation == 0 && pi.promptExtraLines > 0 )
+        if ( write( 1, "\n", 1 ) == -1 ) return 0;
+#endif
+    pi.promptCursorRowOffset = pi.promptExtraLines;
+    refreshLine( pi );
+    return 0;
 }
 
 /**
@@ -1255,25 +1335,6 @@ void InputBuffer::clearScreen( PromptInfo& pi ) {
 #endif
     pi.promptCursorRowOffset = pi.promptExtraLines;
     refreshLine( pi );
-}
-
-// convert {CTRL + 'A'}, {CTRL + 'a'} and {CTRL + ctrlChar( 'A' )} into ctrlChar( 'A' )
-// leave META alone
-//
-static int cleanupCtrl( int c ) {
-    if ( c & CTRL ) {
-        int d = c & 0x1FF;
-        if ( d >= 'a' && d <= 'z' ) {
-            c = ( c + ( 'a' - ctrlChar( 'A' ) ) ) & ~CTRL;
-        }
-        if ( d >= 'A' && d <= 'Z' ) {
-            c = ( c + ( 'A' - ctrlChar( 'A' ) ) ) & ~CTRL;
-        }
-        if ( d >= ctrlChar( 'A' ) && d <= ctrlChar( 'Z' ) ) {
-            c = c & ~CTRL;
-        }
-    }
-    return c;
 }
 
 /**
@@ -1983,8 +2044,8 @@ void linenoiseAddCompletion( linenoiseCompletions* lc, const char* str ) {
     size_t len = strlen( str );
     char* copy = reinterpret_cast<char *>( malloc( len + 1 ) );
     memcpy( copy, str, len + 1 );
-    lc->cvec = reinterpret_cast<char**>( realloc( lc->cvec, sizeof( char* ) * ( lc->len + 1 ) ) );
-    lc->cvec[lc->len++] = copy;
+    lc->completionStrings = reinterpret_cast<char**>( realloc( lc->completionStrings, sizeof( char* ) * ( lc->completionCount + 1 ) ) );
+    lc->completionStrings[lc->completionCount++] = copy;
 }
 
 int linenoiseHistoryAdd( const char* line ) {
