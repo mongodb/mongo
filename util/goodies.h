@@ -354,9 +354,12 @@ namespace mongo {
     
 #if !defined(_WIN32)
     typedef int HANDLE;
+#if !defined(strcpy_s)
     inline void strcpy_s(char *dst, unsigned len, const char *src) {
-        strcpy(dst, src);
+        strncpy(dst, src, len-1);
+        dst[len-1] = '\0';
     }
+#endif
 #else
     typedef void *HANDLE;
 #endif
