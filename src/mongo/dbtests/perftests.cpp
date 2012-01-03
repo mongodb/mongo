@@ -389,7 +389,7 @@ namespace PerfTests {
         }
     };
 
-    unsigned dontOptimizeOutHopefully;
+    unsigned dontOptimizeOutHopefully = 1;
 
     class NonDurTest : public B {
     public:
@@ -692,13 +692,28 @@ namespace PerfTests {
         TestException() : DBException("testexception",3) { }
     };
 
-    void foo_throws() { 
+#if 0
+    void foo_throws(int n = 5) { 
         if( dontOptimizeOutHopefully ) { 
             throw TestException();
         }
         log() << "hmmm" << endl;
     }
-
+#else
+    void foo_throws(int n = 5) { 
+        if( --n <= 0 ) {
+            if( dontOptimizeOutHopefully ) { 
+                throw TestException();
+            }
+            log() << "hmmm" << endl;
+        }
+        try { 
+            foo_throws(n-1);
+        }
+        catch(DBException&) { 
+        }
+    }
+#endif
     class Throw : public B {
     public:
         virtual int howLongMillis() { return 2000; }
