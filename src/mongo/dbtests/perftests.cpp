@@ -691,16 +691,31 @@ namespace PerfTests {
     public:
         TestException() : DBException("testexception",3) { }
     };
-
-#if 0
-    void foo_throws(int n = 5) { 
+    struct Z { 
+        Z() {  dontOptimizeOutHopefully--; }
+        ~Z() { dontOptimizeOutHopefully++; }
+    };
+    void thr1(int n) { 
         if( dontOptimizeOutHopefully ) { 
             throw TestException();
         }
         log() << "hmmm" << endl;
     }
-#else
-    void foo_throws(int n = 5) { 
+    void thr2(int n) { 
+        if( --n <= 0 ) {
+            if( dontOptimizeOutHopefully ) { 
+                throw TestException();
+            }
+            log() << "hmmm" << endl;
+        }
+        Z z;
+        try { 
+            thr2(n-1);
+        }
+        catch(DBException&) { 
+        }
+    }
+    void thr3(int n) { 
         if( --n <= 0 ) {
             if( dontOptimizeOutHopefully ) { 
                 throw TestException();
@@ -708,19 +723,30 @@ namespace PerfTests {
             log() << "hmmm" << endl;
         }
         try { 
-            foo_throws(n-1);
+            Z z;
+            thr3(n-1);
         }
         catch(DBException&) { 
         }
     }
-#endif
+    void thr4(int n) { 
+        if( --n <= 0 ) {
+            if( dontOptimizeOutHopefully ) { 
+                throw TestException();
+            }
+            log() << "hmmm" << endl;
+        }
+        Z z;
+        thr4(n-1);
+    }
+    template< void T (int) >
     class Throw : public B {
     public:
         virtual int howLongMillis() { return 2000; }
         string name() { return "throw"; }
         void timed() {
             try { 
-                foo_throws();
+                T(10);
                 dontOptimizeOutHopefully += 2;
             }
             catch(DBException& e) {
@@ -1029,7 +1055,11 @@ namespace PerfTests {
 #endif
                 add< New8 >();
                 add< New128 >();
-                add< Throw >();
+                add< Throw< thr1 > >();
+                add< Throw< thr2 > >();
+                add< Throw< thr3 > >();
+                add< Throw< thr4 > >();
+                add< Throw< thr5 > >();
                 add< Timer >();
                 add< Sleep0Ms >();
 #if defined(__USE_XOPEN2K)
