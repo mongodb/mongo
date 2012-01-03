@@ -1005,7 +1005,7 @@ wts_row_del(uint64_t keyno, int *notfoundp)
 	/* Log the operation */
 	if (g.logging)
 		(void)session->msg_printf(
-		    session, "%-10s%" PRIu64, "delete", keyno);
+		    session, "%-10s%" PRIu64, "remove", keyno);
 
 	if (bdb_del(keyno, &notfound))
 		return (1);
@@ -1042,7 +1042,7 @@ wts_col_del(uint64_t keyno, int *notfoundp)
 	/* Log the operation */
 	if (g.logging)
 		(void)session->msg_printf(
-		    session, "%-10s%" PRIu64, "delete", keyno);
+		    session, "%-10s%" PRIu64, "remove", keyno);
 
 	/*
 	 * Deleting a fixed-length item is the same as setting the bits to 0;
