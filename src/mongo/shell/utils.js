@@ -100,7 +100,7 @@ assert.contains = function( o, arr, msg ){
     var wasIn = false
     
     if( ! arr.length ){
-        for( i in arr ){
+        for( var i in arr ){
             wasIn = arr[i] == o || ( ( arr[i] != null && o != null ) && friendlyEqual( arr[i] , o ) )
                 return;
             if( wasIn ) break
@@ -543,7 +543,7 @@ compareOn = function(field){
 
 Object.keySet = function( o ) {
     var ret = new Array();
-    for( i in o ) {
+    for( var i in o ) {
         if ( !( i in o.__proto__ && o[ i ] === o.__proto__[ i ] ) ) {
             ret.push( i );
         }
@@ -1306,7 +1306,7 @@ shellAutocomplete = function ( /*prefix*/ ) { // outer scope function called on 
         }
 
         var ret = [];
-        for ( i in noDuplicates )
+        for ( var i in noDuplicates )
             ret.push( i );
 
         return ret;

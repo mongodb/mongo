@@ -1,0 +1,417 @@
+scons: Reading SConscript files ...
+scons version: 2.1.0
+python version: 2 7 0 'final' 0
+found visual studio at C:\Program Files (x86)\Microsoft Visual Studio 10.0\VC\BIN\amd64
+boost found at 'C:/boost'
+Windows SDK Root 'C:/Program Files/Microsoft SDKs/Windows/v7.1'
+Checking whether the C++ compiler worksyes
+Checking for C++ header file boost/filesystem/operations.hpp... yes
+Checking for C library boost_system-mt... no
+Checking for C library boost_system... no
+Checking for C++ header file execinfo.h... no
+Checking for C library pcap... no
+Checking for C library wpcap... no
+Checking whether the C++ compiler worksyes
+Checking for C++ header file boost/filesystem/operations.hpp... yes
+Checking for C library boost_system-mt... no
+Checking for C library boost_system... no
+Checking for C++ header file execinfo.h... no
+Checking for C library pcap... no
+Checking for C library wpcap... no
+scons: done reading SConscript files.
+scons: Building targets ...
+cl /Fosrc\mongo\pch.obj /c src\mongo\pch.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+pch.cpp
+cl /Fosrc\mongo\buildinfo.obj /c src\mongo\buildinfo.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+buildinfo.cpp
+cl /Fosrc\mongo\db\indexkey.obj /c src\mongo\db\indexkey.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+indexkey.cpp
+cl /Fosrc\mongo\db\jsobj.obj /c src\mongo\db\jsobj.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+jsobj.cpp
+cl /Fosrc\mongo\bson\oid.obj /c src\mongo\bson\oid.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+oid.cpp
+cl /Fosrc\mongo\db\json.obj /c src\mongo\db\json.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+json.cpp
+cl /Fosrc\mongo\db\lasterror.obj /c src\mongo\db\lasterror.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+lasterror.cpp
+cl /Fosrc\mongo\db\nonce.obj /c src\mongo\db\nonce.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+nonce.cpp
+cl /Fosrc\mongo\db\queryutil.obj /c src\mongo\db\queryutil.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+queryutil.cpp
+cl /Fosrc\mongo\db\querypattern.obj /c src\mongo\db\querypattern.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+querypattern.cpp
+cl /Fosrc\mongo\db\projection.obj /c src\mongo\db\projection.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+projection.cpp
+jsToH(["src\mongo\shell\mongo.cpp"], ["src\mongo\shell\utils.js", "src\mongo\shell\utils_sh.js", "src\mongo\shell\db.js", "src\mongo\shell\mongo.js", "src\mongo\shell\mr.js", "src\mongo\shell\query.js", "src\mongo\shell\collection.js"])
+cl /Fosrc\mongo\shell\mongo.obj /c src\mongo\shell\mongo.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+mongo.cpp
+cl /Fosrc\mongo\util\background.obj /c src\mongo\util\background.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+background.cpp
+cl /Fosrc\mongo\util\intrusive_counter.obj /c src\mongo\util\intrusive_counter.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+intrusive_counter.cpp
+cl /Fosrc\mongo\util\util.obj /c src\mongo\util\util.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+util.cpp
+cl /Fosrc\mongo\util\file_allocator.obj /c src\mongo\util\file_allocator.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+file_allocator.cpp
+cl /Fosrc\mongo\util\assert_util.obj /c src\mongo\util\assert_util.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+assert_util.cpp
+cl /Fosrc\mongo\util\log.obj /c src\mongo\util\log.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+log.cpp
+cl /Fosrc\mongo\util\ramlog.obj /c src\mongo\util\ramlog.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+ramlog.cpp
+cl /Fosrc\mongo\util\md5main.obj /c src\mongo\util\md5main.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+md5main.cpp
+cl /Fosrc\mongo\util\base64.obj /c src\mongo\util\base64.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+base64.cpp
+cl /Fosrc\mongo\util\concurrency\vars.obj /c src\mongo\util\concurrency\vars.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+vars.cpp
+cl /Fosrc\mongo\util\concurrency\task.obj /c src\mongo\util\concurrency\task.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+task.cpp
+cl /Fosrc\mongo\util\debug_util.obj /c src\mongo\util\debug_util.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+debug_util.cpp
+cl /Fosrc\mongo\util\concurrency\thread_pool.obj /c src\mongo\util\concurrency\thread_pool.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+thread_pool.cpp
+cl /Fosrc\mongo\util\password.obj /c src\mongo\util\password.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+password.cpp
+cl /Fosrc\mongo\util\version.obj /c src\mongo\util\version.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+version.cpp
+cl /Fosrc\mongo\util\signal_handlers.obj /c src\mongo\util\signal_handlers.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+signal_handlers.cpp
+cl /Fosrc\mongo\util\histogram.obj /c src\mongo\util\histogram.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+histogram.cpp
+cl /Fosrc\mongo\util\concurrency\spin_lock.obj /c src\mongo\util\concurrency\spin_lock.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+spin_lock.cpp
+cl /Fosrc\mongo\util\text.obj /c src\mongo\util\text.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+text.cpp
+cl /Fosrc\mongo\util\stringutils.obj /c src\mongo\util\stringutils.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+stringutils.cpp
+cl /Fosrc\mongo\util\concurrency\synchronization.obj /c src\mongo\util\concurrency\synchronization.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+synchronization.cpp
+cl /Fosrc\mongo\util\net\sock.obj /c src\mongo\util\net\sock.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+sock.cpp
+cl /Fosrc\mongo\util\net\httpclient.obj /c src\mongo\util\net\httpclient.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+httpclient.cpp
+cl /Fosrc\mongo\util\net\message.obj /c src\mongo\util\net\message.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+message.cpp
+cl /Fosrc\mongo\util\net\message_port.obj /c src\mongo\util\net\message_port.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+message_port.cpp
+cl /Fosrc\mongo\util\net\listen.obj /c src\mongo\util\net\listen.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+listen.cpp
+cl /Fosrc\mongo\util\md5.obj /c src\mongo\util\md5.c /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+md5.c
+cl /Fosrc\mongo\client\connpool.obj /c src\mongo\client\connpool.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+connpool.cpp
+cl /Fosrc\mongo\client\dbclient.obj /c src\mongo\client\dbclient.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+dbclient.cpp
+cl /Fosrc\mongo\client\dbclient_rs.obj /c src\mongo\client\dbclient_rs.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+dbclient_rs.cpp
+cl /Fosrc\mongo\client\dbclientcursor.obj /c src\mongo\client\dbclientcursor.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+dbclientcursor.cpp
+cl /Fosrc\mongo\client\model.obj /c src\mongo\client\model.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+model.cpp
+cl /Fosrc\mongo\client\syncclusterconnection.obj /c src\mongo\client\syncclusterconnection.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+syncclusterconnection.cpp
+cl /Fosrc\mongo\client\distlock.obj /c src\mongo\client\distlock.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+distlock.cpp
+cl /Fosrc\mongo\s\shardconnection.obj /c src\mongo\s\shardconnection.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+shardconnection.cpp
+cl /Fosrc\third_party\pcre-7.4\pcrecpp.obj /c src\third_party\pcre-7.4\pcrecpp.cc /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DHAVE_CONFIG_H /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+pcrecpp.cc
+cl /Fosrc\third_party\pcre-7.4\pcreposix.obj /c src\third_party\pcre-7.4\pcreposix.c /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DHAVE_CONFIG_H /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+pcreposix.c
+cl /Fosrc\third_party\pcre-7.4\pcre_chartables.obj /c src\third_party\pcre-7.4\pcre_chartables.c /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DHAVE_CONFIG_H /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+pcre_chartables.c
+cl /Fosrc\third_party\pcre-7.4\pcre_compile.obj /c src\third_party\pcre-7.4\pcre_compile.c /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DHAVE_CONFIG_H /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+pcre_compile.c
+src\third_party\pcre-7.4\pcre_compile.c(736) : warning C4065: switch statement contains 'default' but no 'case' labels
+cl /Fosrc\third_party\pcre-7.4\pcre_config.obj /c src\third_party\pcre-7.4\pcre_config.c /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DHAVE_CONFIG_H /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+pcre_config.c
+cl /Fosrc\third_party\pcre-7.4\pcre_dfa_exec.obj /c src\third_party\pcre-7.4\pcre_dfa_exec.c /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DHAVE_CONFIG_H /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+pcre_dfa_exec.c
+cl /Fosrc\third_party\pcre-7.4\pcre_exec.obj /c src\third_party\pcre-7.4\pcre_exec.c /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DHAVE_CONFIG_H /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+pcre_exec.c
+cl /Fosrc\third_party\pcre-7.4\pcre_fullinfo.obj /c src\third_party\pcre-7.4\pcre_fullinfo.c /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DHAVE_CONFIG_H /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+pcre_fullinfo.c
+cl /Fosrc\third_party\pcre-7.4\pcre_get.obj /c src\third_party\pcre-7.4\pcre_get.c /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DHAVE_CONFIG_H /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+pcre_get.c
+cl /Fosrc\third_party\pcre-7.4\pcre_globals.obj /c src\third_party\pcre-7.4\pcre_globals.c /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DHAVE_CONFIG_H /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+pcre_globals.c
+cl /Fosrc\third_party\pcre-7.4\pcre_info.obj /c src\third_party\pcre-7.4\pcre_info.c /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DHAVE_CONFIG_H /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+pcre_info.c
+cl /Fosrc\third_party\pcre-7.4\pcre_maketables.obj /c src\third_party\pcre-7.4\pcre_maketables.c /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DHAVE_CONFIG_H /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+pcre_maketables.c
+cl /Fosrc\third_party\pcre-7.4\pcre_newline.obj /c src\third_party\pcre-7.4\pcre_newline.c /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DHAVE_CONFIG_H /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+pcre_newline.c
+cl /Fosrc\third_party\pcre-7.4\pcre_ord2utf8.obj /c src\third_party\pcre-7.4\pcre_ord2utf8.c /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DHAVE_CONFIG_H /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+pcre_ord2utf8.c
+cl /Fosrc\third_party\pcre-7.4\pcre_refcount.obj /c src\third_party\pcre-7.4\pcre_refcount.c /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DHAVE_CONFIG_H /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+pcre_refcount.c
+cl /Fosrc\third_party\pcre-7.4\pcre_scanner.obj /c src\third_party\pcre-7.4\pcre_scanner.cc /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DHAVE_CONFIG_H /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+pcre_scanner.cc
+cl /Fosrc\third_party\pcre-7.4\pcre_stringpiece.obj /c src\third_party\pcre-7.4\pcre_stringpiece.cc /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DHAVE_CONFIG_H /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+pcre_stringpiece.cc
+cl /Fosrc\third_party\pcre-7.4\pcre_study.obj /c src\third_party\pcre-7.4\pcre_study.c /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DHAVE_CONFIG_H /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+pcre_study.c
+cl /Fosrc\third_party\pcre-7.4\pcre_tables.obj /c src\third_party\pcre-7.4\pcre_tables.c /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DHAVE_CONFIG_H /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+pcre_tables.c
+cl /Fosrc\third_party\pcre-7.4\pcre_try_flipped.obj /c src\third_party\pcre-7.4\pcre_try_flipped.c /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DHAVE_CONFIG_H /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+pcre_try_flipped.c
+cl /Fosrc\third_party\pcre-7.4\pcre_ucp_searchfuncs.obj /c src\third_party\pcre-7.4\pcre_ucp_searchfuncs.c /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DHAVE_CONFIG_H /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+pcre_ucp_searchfuncs.c
+cl /Fosrc\third_party\pcre-7.4\pcre_valid_utf8.obj /c src\third_party\pcre-7.4\pcre_valid_utf8.c /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DHAVE_CONFIG_H /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+pcre_valid_utf8.c
+cl /Fosrc\third_party\pcre-7.4\pcre_version.obj /c src\third_party\pcre-7.4\pcre_version.c /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DHAVE_CONFIG_H /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+pcre_version.c
+cl /Fosrc\third_party\pcre-7.4\pcre_xclass.obj /c src\third_party\pcre-7.4\pcre_xclass.c /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DHAVE_CONFIG_H /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+pcre_xclass.c
+cl /Fosrc\mongo\db\commands.obj /c src\mongo\db\commands.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+commands.cpp
+cl /Fosrc\mongo\util\net\message_server_port.obj /c src\mongo\util\net\message_server_port.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+message_server_port.cpp
+cl /Fosrc\mongo\client\parallel.obj /c src\mongo\client\parallel.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+parallel.cpp
+cl /Fosrc\mongo\db\common.obj /c src\mongo\db\common.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+common.cpp
+cl /Fosrc\mongo\util\net\miniwebserver.obj /c src\mongo\util\net\miniwebserver.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+miniwebserver.cpp
+cl /Fosrc\mongo\db\dbwebserver.obj /c src\mongo\db\dbwebserver.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+dbwebserver.cpp
+cl /Fosrc\mongo\db\matcher.obj /c src\mongo\db\matcher.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+matcher.cpp
+cl /Fosrc\mongo\db\dbcommands_generic.obj /c src\mongo\db\dbcommands_generic.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+dbcommands_generic.cpp
+cl /Fosrc\mongo\db\commands\cloud.obj /c src\mongo\db\commands\cloud.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+cloud.cpp
+cl /Fosrc\mongo\db\dbmessage.obj /c src\mongo\db\dbmessage.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+dbmessage.cpp
+cl /Fosrc\mongo\util\processinfo.obj /c src\mongo\util\processinfo.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+processinfo.cpp
+cl /Fosrc\mongo\util\processinfo_win32.obj /c src\mongo\util\processinfo_win32.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+processinfo_win32.cpp
+cl /Fosrc\mongo\util\systeminfo_win32.obj /c src\mongo\util\systeminfo_win32.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+systeminfo_win32.cpp
+cl /Fosrc\mongo\db\commands\pipeline.obj /c src\mongo\db\commands\pipeline.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+pipeline.cpp
+cl /Fosrc\mongo\db\pipeline\accumulator.obj /c src\mongo\db\pipeline\accumulator.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+accumulator.cpp
+cl /Fosrc\mongo\db\pipeline\accumulator_add_to_set.obj /c src\mongo\db\pipeline\accumulator_add_to_set.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+accumulator_add_to_set.cpp
+cl /Fosrc\mongo\db\pipeline\accumulator_avg.obj /c src\mongo\db\pipeline\accumulator_avg.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+accumulator_avg.cpp
+cl /Fosrc\mongo\db\pipeline\accumulator_first.obj /c src\mongo\db\pipeline\accumulator_first.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+accumulator_first.cpp
+cl /Fosrc\mongo\db\pipeline\accumulator_last.obj /c src\mongo\db\pipeline\accumulator_last.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+accumulator_last.cpp
+cl /Fosrc\mongo\db\pipeline\accumulator_min_max.obj /c src\mongo\db\pipeline\accumulator_min_max.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+accumulator_min_max.cpp
+cl /Fosrc\mongo\db\pipeline\accumulator_push.obj /c src\mongo\db\pipeline\accumulator_push.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+accumulator_push.cpp
+cl /Fosrc\mongo\db\pipeline\accumulator_single_value.obj /c src\mongo\db\pipeline\accumulator_single_value.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+accumulator_single_value.cpp
+cl /Fosrc\mongo\db\pipeline\accumulator_sum.obj /c src\mongo\db\pipeline\accumulator_sum.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+accumulator_sum.cpp
+cl /Fosrc\mongo\db\pipeline\builder.obj /c src\mongo\db\pipeline\builder.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+builder.cpp
+cl /Fosrc\mongo\db\pipeline\doc_mem_monitor.obj /c src\mongo\db\pipeline\doc_mem_monitor.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+doc_mem_monitor.cpp
+cl /Fosrc\mongo\db\pipeline\document.obj /c src\mongo\db\pipeline\document.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+document.cpp
+cl /Fosrc\mongo\db\pipeline\document_source.obj /c src\mongo\db\pipeline\document_source.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+document_source.cpp
+cl /Fosrc\mongo\db\pipeline\document_source_bson_array.obj /c src\mongo\db\pipeline\document_source_bson_array.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+document_source_bson_array.cpp
+cl /Fosrc\mongo\db\pipeline\document_source_command_futures.obj /c src\mongo\db\pipeline\document_source_command_futures.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+document_source_command_futures.cpp
+cl /Fosrc\mongo\db\pipeline\document_source_filter.obj /c src\mongo\db\pipeline\document_source_filter.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+document_source_filter.cpp
+cl /Fosrc\mongo\db\pipeline\document_source_filter_base.obj /c src\mongo\db\pipeline\document_source_filter_base.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+document_source_filter_base.cpp
+cl /Fosrc\mongo\db\pipeline\document_source_group.obj /c src\mongo\db\pipeline\document_source_group.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+document_source_group.cpp
+cl /Fosrc\mongo\db\pipeline\document_source_limit.obj /c src\mongo\db\pipeline\document_source_limit.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+document_source_limit.cpp
+cl /Fosrc\mongo\db\pipeline\document_source_match.obj /c src\mongo\db\pipeline\document_source_match.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+document_source_match.cpp
+cl /Fosrc\mongo\db\pipeline\document_source_out.obj /c src\mongo\db\pipeline\document_source_out.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+document_source_out.cpp
+cl /Fosrc\mongo\db\pipeline\document_source_project.obj /c src\mongo\db\pipeline\document_source_project.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+document_source_project.cpp
+cl /Fosrc\mongo\db\pipeline\document_source_skip.obj /c src\mongo\db\pipeline\document_source_skip.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+document_source_skip.cpp
+cl /Fosrc\mongo\db\pipeline\document_source_sort.obj /c src\mongo\db\pipeline\document_source_sort.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+document_source_sort.cpp
+cl /Fosrc\mongo\db\pipeline\document_source_unwind.obj /c src\mongo\db\pipeline\document_source_unwind.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+document_source_unwind.cpp
+cl /Fosrc\mongo\db\pipeline\expression.obj /c src\mongo\db\pipeline\expression.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+expression.cpp
+cl /Fosrc\mongo\db\pipeline\expression_context.obj /c src\mongo\db\pipeline\expression_context.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+expression_context.cpp
+cl /Fosrc\mongo\db\pipeline\field_path.obj /c src\mongo\db\pipeline\field_path.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+field_path.cpp
+cl /Fosrc\mongo\db\pipeline\value.obj /c src\mongo\db\pipeline\value.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+value.cpp
+cl /Fosrc\mongo\db\stats\counters.obj /c src\mongo\db\stats\counters.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+counters.cpp
+cl /Fosrc\mongo\db\stats\service_stats.obj /c src\mongo\db\stats\service_stats.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+service_stats.cpp
+cl /Fosrc\mongo\db\stats\top.obj /c src\mongo\db\stats\top.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+top.cpp
+cl /Fosrc\mongo\db\commands\isself.obj /c src\mongo\db\commands\isself.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+isself.cpp
+cl /Fosrc\mongo\db\security_common.obj /c src\mongo\db\security_common.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+security_common.cpp
+cl /Fosrc\mongo\db\security_commands.obj /c src\mongo\db\security_commands.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+security_commands.cpp
+cl /Fosrc\mongo\scripting\engine.obj /c src\mongo\scripting\engine.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+engine.cpp
+cl /Fosrc\mongo\scripting\utils.obj /c src\mongo\scripting\utils.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+utils.cpp
+cl /Fosrc\mongo\scripting\bench.obj /c src\mongo\scripting\bench.cpp /TP /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /O2 /Gy /MT /Zi /TP /errorReport:none /GL /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DNDEBUG /DXP_WIN /DNOEXECINFO /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+bench.cpp
+cl /Fosrc\third_party\js-1.7\jscpucfg.obj /c src\third_party\js-1.7\jscpucfg.c /nologo /EHsc /W3 /wd4355 /wd4800 /wd4267 /wd4244 /MT /Zi /errorReport:none /GL /wd4748 /D_SCONS /DMONGO_EXPOSE_MACROS /D_UNICODE /DUNICODE /D_CONSOLE /D_CRT_SECURE_NO_WARNINGS /DPSAPI_VERSION=1 /DXP_WIN /DJSFILE /DEXPORT_JS_API /DJS_C_STRINGS_ARE_UTF8 /Isrc\third_party\js-1.7 /Isrc\third_party\pcre-7.4 /Isrc\mongo /Isrc /IC:\boost "/IC:\Program Files\Microsoft SDKs\Windows\v7.1\Include" "/IC:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Include"
+jscpucfg.c
+link /nologo /LTCG /DEBUG /NODEFAULTLIB:MSVCPRT /OUT:src\third_party\js-1.7\jscpucfg.exe /LIBPATH:C:\boost\lib\vs2010_32 "/LIBPATH:C:\Program Files\Microsoft SDKs\Windows\v7.1\Lib" "/LIBPATH:C:\Users\Tad\Documents\Visual Studio 2010\Projects\winpcap\Lib" ws2_32.lib kernel32.lib advapi32.lib Psapi.lib user32.lib gdi32.lib winspool.lib comdlg32.lib shell32.lib ole32.lib oleaut32.lib odbc32.lib odbccp32.lib uuid.lib src\third_party\js-1.7\jscpucfg.obj
+LIBCMT.lib(_file.obj) : error LNK2001: unresolved external symbol __imp_EnterCriticalSection
+LIBCMT.lib(mlock.obj) : error LNK2001: unresolved external symbol __imp_EnterCriticalSection
+LIBCMT.lib(osfinfo.obj) : error LNK2001: unresolved external symbol __imp_EnterCriticalSection
+LIBCMT.lib(_file.obj) : error LNK2001: unresolved external symbol __imp_LeaveCriticalSection
+LIBCMT.lib(mlock.obj) : error LNK2001: unresolved external symbol __imp_LeaveCriticalSection
+LIBCMT.lib(osfinfo.obj) : error LNK2001: unresolved external symbol __imp_LeaveCriticalSection
+LIBCMT.lib(crt0.obj) : error LNK2001: unresolved external symbol __imp_GetCommandLineA
+LIBCMT.lib(gs_report.obj) : error LNK2001: unresolved external symbol __imp_TerminateProcess
+LIBCMT.lib(invarg.obj) : error LNK2001: unresolved external symbol __imp_TerminateProcess
+LIBCMT.lib(gs_report.obj) : error LNK2001: unresolved external symbol __imp_GetCurrentProcess
+LIBCMT.lib(invarg.obj) : error LNK2001: unresolved external symbol __imp_GetCurrentProcess
+LIBCMT.lib(gs_report.obj) : error LNK2001: unresolved external symbol __imp_UnhandledExceptionFilter
+LIBCMT.lib(invarg.obj) : error LNK2001: unresolved external symbol __imp_UnhandledExceptionFilter
+LIBCMT.lib(gs_report.obj) : error LNK2001: unresolved external symbol __imp_SetUnhandledExceptionFilter
+LIBCMT.lib(invarg.obj) : error LNK2001: unresolved external symbol __imp_SetUnhandledExceptionFilter
+LIBCMT.lib(unhandld.obj) : error LNK2001: unresolved external symbol __imp_SetUnhandledExceptionFilter
+LIBCMT.lib(gs_report.obj) : error LNK2001: unresolved external symbol __imp_IsDebuggerPresent
+LIBCMT.lib(invarg.obj) : error LNK2001: unresolved external symbol __imp_IsDebuggerPresent
+LIBCMT.lib(gs_report.obj) : error LNK2001: unresolved external symbol RtlVirtualUnwind
+LIBCMT.lib(invarg.obj) : error LNK2001: unresolved external symbol RtlVirtualUnwind
+LIBCMT.lib(gs_report.obj) : error LNK2001: unresolved external symbol RtlLookupFunctionEntry
+LIBCMT.lib(invarg.obj) : error LNK2001: unresolved external symbol RtlLookupFunctionEntry
+LIBCMT.lib(gs_report.obj) : error LNK2001: unresolved external symbol __imp_RtlCaptureContext
+LIBCMT.lib(invarg.obj) : error LNK2001: unresolved external symbol __imp_RtlCaptureContext
+LIBCMT.lib(ioinit.obj) : error LNK2001: unresolved external symbol __imp_SetHandleCount
+LIBCMT.lib(ioinit.obj) : error LNK2001: unresolved external symbol __imp_GetStdHandle
+LIBCMT.lib(crt0msg.obj) : error LNK2001: unresolved external symbol __imp_GetStdHandle
+LIBCMT.lib(ioinit.obj) : error LNK2001: unresolved external symbol __imp_InitializeCriticalSectionAndSpinCount
+LIBCMT.lib(mlock.obj) : error LNK2001: unresolved external symbol __imp_InitializeCriticalSectionAndSpinCount
+LIBCMT.lib(osfinfo.obj) : error LNK2001: unresolved external symbol __imp_InitializeCriticalSectionAndSpinCount
+LIBCMT.lib(ioinit.obj) : error LNK2001: unresolved external symbol __imp_GetFileType
+LIBCMT.lib(osfinfo.obj) : error LNK2001: unresolved external symbol __imp_GetFileType
+LIBCMT.lib(ioinit.obj) : error LNK2001: unresolved external symbol __imp_GetStartupInfoW
+LIBCMT.lib(ioinit.obj) : error LNK2001: unresolved external symbol __imp_DeleteCriticalSection
+LIBCMT.lib(closeall.obj) : error LNK2001: unresolved external symbol __imp_DeleteCriticalSection
+LIBCMT.lib(mlock.obj) : error LNK2001: unresolved external symbol __imp_DeleteCriticalSection
+LIBCMT.lib(crtheap.obj) : error LNK2001: unresolved external symbol __imp_Sleep
+LIBCMT.lib(wctomb.obj) : error LNK2001: unresolved external symbol __imp_GetLastError
+LIBCMT.lib(close.obj) : error LNK2001: unresolved external symbol __imp_GetLastError
+LIBCMT.lib(lseeki64.obj) : error LNK2001: unresolved external symbol __imp_GetLastError
+LIBCMT.lib(osfinfo.obj) : error LNK2001: unresolved external symbol __imp_GetLastError
+LIBCMT.lib(rand_s.obj) : error LNK2001: unresolved external symbol __imp_GetLastError
+LIBCMT.lib(inithelp.obj) : error LNK2001: unresolved external symbol __imp_GetLastError
+LIBCMT.lib(write.obj) : error LNK2001: unresolved external symbol __imp_GetLastError
+LIBCMT.lib(commit.obj) : error LNK2001: unresolved external symbol __imp_GetLastError
+LIBCMT.lib(free.obj) : error LNK2001: unresolved external symbol __imp_GetLastError
+LIBCMT.lib(tidtable.obj) : error LNK2001: unresolved external symbol __imp_GetLastError
+LIBCMT.lib(realloc.obj) : error LNK2001: unresolved external symbol __imp_GetLastError
+LIBCMT.lib(winsig.obj) : error LNK2001: unresolved external symbol __imp_GetLastError
+LIBCMT.lib(free.obj) : error LNK2001: unresolved external symbol __imp_HeapFree
+LIBCMT.lib(crt0dat.obj) : error LNK2001: unresolved external symbol __imp_GetProcAddress
+LIBCMT.lib(rand_s.obj) : error LNK2001: unresolved external symbol __imp_GetProcAddress
+LIBCMT.lib(crtmboxw.obj) : error LNK2001: unresolved external symbol __imp_GetProcAddress
+LIBCMT.lib(crt0dat.obj) : error LNK2001: unresolved external symbol __imp_GetModuleHandleW
+LIBCMT.lib(crt0dat.obj) : error LNK2001: unresolved external symbol __imp_ExitProcess
+LIBCMT.lib(outputs.obj) : error LNK2001: unresolved external symbol __imp_DecodePointer
+LIBCMT.lib(outputp.obj) : error LNK2001: unresolved external symbol __imp_DecodePointer
+LIBCMT.lib(crtmboxw.obj) : error LNK2001: unresolved external symbol __imp_DecodePointer
+LIBCMT.lib(winsig.obj) : error LNK2001: unresolved external symbol __imp_DecodePointer
+LIBCMT.lib(rand_s.obj) : error LNK2001: unresolved external symbol __imp_DecodePointer
+LIBCMT.lib(handler.obj) : error LNK2001: unresolved external symbol __imp_DecodePointer
+LIBCMT.lib(onexit.obj) : error LNK2001: unresolved external symbol __imp_DecodePointer
+LIBCMT.lib(crt0dat.obj) : error LNK2001: unresolved external symbol __imp_DecodePointer
+LIBCMT.lib(output.obj) : error LNK2001: unresolved external symbol __imp_DecodePointer
+LIBCMT.lib(invarg.obj) : error LNK2001: unresolved external symbol __imp_DecodePointer
+LIBCMT.lib(hooks.obj) : error LNK2001: unresolved external symbol __imp_DecodePointer
+LIBCMT.lib(mlock.obj) : error LNK2001: unresolved external symbol __imp_FatalAppExitA
+LIBCMT.lib(chandler.obj) : error LNK2001: unresolved external symbol __imp_RtlUnwindEx
+LIBCMT.lib(crtmboxw.obj) : error LNK2001: unresolved external symbol __imp_EncodePointer
+LIBCMT.lib(rand_s.obj) : error LNK2001: unresolved external symbol __imp_EncodePointer
+LIBCMT.lib(handler.obj) : error LNK2001: unresolved external symbol __imp_EncodePointer
+LIBCMT.lib(onexit.obj) : error LNK2001: unresolved external symbol __imp_EncodePointer
+LIBCMT.lib(cmiscdat.obj) : error LNK2001: unresolved external symbol __imp_EncodePointer
+LIBCMT.lib(invarg.obj) : error LNK2001: unresolved external symbol __imp_EncodePointer
+LIBCMT.lib(tidtable.obj) : error LNK2001: unresolved external symbol __imp_EncodePointer
+LIBCMT.lib(hooks.obj) : error LNK2001: unresolved external symbol __imp_EncodePointer
+LIBCMT.lib(winsig.obj) : error LNK2001: unresolved external symbol __imp_EncodePointer
+LIBCMT.lib(crt0msg.obj) : error LNK2001: unresolved external symbol __imp_WriteFile
+LIBCMT.lib(write.obj) : error LNK2001: unresolved external symbol __imp_WriteFile
+LIBCMT.lib(crt0msg.obj) : error LNK2001: unresolved external symbol __imp_GetModuleFileNameW
+LIBCMT.lib(stdargv.obj) : error LNK2001: unresolved external symbol __imp_GetModuleFileNameA
+LIBCMT.lib(a_env.obj) : error LNK2001: unresolved external symbol __imp_FreeEnvironmentStringsW
+LIBCMT.lib(a_map.obj) : error LNK2001: unresolved external symbol __imp_WideCharToMultiByte
+LIBCMT.lib(a_env.obj) : error LNK2001: unresolved external symbol __imp_WideCharToMultiByte
+LIBCMT.lib(write.obj) : error LNK2001: unresolved external symbol __imp_WideCharToMultiByte
+LIBCMT.lib(wctomb.obj) : error LNK2001: unresolved external symbol __imp_WideCharToMultiByte
+LIBCMT.lib(a_loc.obj) : error LNK2001: unresolved external symbol __imp_WideCharToMultiByte
+LIBCMT.lib(a_env.obj) : error LNK2001: unresolved external symbol __imp_GetEnvironmentStringsW
+LIBCMT.lib(tidtable.obj) : error LNK2001: unresolved external symbol __imp_FlsGetValue
+LIBCMT.lib(tidtable.obj) : error LNK2001: unresolved external symbol __imp_FlsSetValue
+LIBCMT.lib(tidtable.obj) : error LNK2001: unresolved external symbol __imp_FlsFree
+LIBCMT.lib(tidtable.obj) : error LNK2001: unresolved external symbol __imp_SetLastError
+LIBCMT.lib(tidtable.obj) : error LNK2001: unresolved external symbol __imp_GetCurrentThreadId
+LIBCMT.lib(gs_support.obj) : error LNK2001: unresolved external symbol __imp_GetCurrentThreadId
+LIBCMT.lib(tidtable.obj) : error LNK2001: unresolved external symbol __imp_GetCurrentThread
+LIBCMT.lib(tidtable.obj) : error LNK2001: unresolved external symbol __imp_FlsAlloc
+LIBCMT.lib(heapinit.obj) : error LNK2001: unresolved external symbol __imp_HeapSetInformation
+LIBCMT.lib(heapinit.obj) : error LNK2001: unresolved external symbol __imp_GetVersion
+LIBCMT.lib(heapinit.obj) : error LNK2001: unresolved external symbol __imp_HeapCreate
+LIBCMT.lib(heapinit.obj) : error LNK2001: unresolved external symbol __imp_HeapDestroy
+LIBCMT.lib(gs_support.obj) : error LNK2001: unresolved external symbol __imp_QueryPerformanceCounter
+LIBCMT.lib(gs_support.obj) : error LNK2001: unresolved external symbol __imp_GetTickCount
+LIBCMT.lib(gs_support.obj) : error LNK2001: unresolved external symbol __imp_GetCurrentProcessId
+LIBCMT.lib(gs_support.obj) : error LNK2001: unresolved external symbol __imp_GetSystemTimeAsFileTime
+LIBCMT.lib(malloc.obj) : error LNK2001: unresolved external symbol __imp_HeapAlloc
+LIBCMT.lib(calloc_impl.obj) : error LNK2001: unresolved external symbol __imp_HeapAlloc
+LIBCMT.lib(realloc.obj) : error LNK2001: unresolved external symbol __imp_HeapReAlloc
+LIBCMT.lib(winsig.obj) : error LNK2001: unresolved external symbol __imp_SetConsoleCtrlHandler
+LIBCMT.lib(rand_s.obj) : error LNK2001: unresolved external symbol __imp_FreeLibrary
+LIBCMT.lib(rand_s.obj) : error LNK2001: unresolved external symbol __imp_LoadLibraryW
+LIBCMT.lib(crtmboxw.obj) : error LNK2001: unresolved external symbol __imp_LoadLibraryW
+LIBCMT.lib(inithelp.obj) : error LNK2001: unresolved external symbol __imp_GetLocaleInfoW
+LIBCMT.lib(a_loc.obj) : error LNK2001: unresolved external symbol __imp_GetLocaleInfoW
+LIBCMT.lib(getqloc.obj) : error LNK2001: unresolved external symbol __imp_GetLocaleInfoW
+LIBCMT.lib(write.obj) : error LNK2001: unresolved external symbol __imp_GetConsoleCP
+LIBCMT.lib(write.obj) : error LNK2001: unresolved external symbol __imp_GetConsoleMode
+LIBCMT.lib(commit.obj) : error LNK2001: unresolved external symbol __imp_FlushFileBuffers
+LIBCMT.lib(jmpuwind.obj) : error LNK2001: unresolved external symbol RtlUnwindEx
+LIBCMT.lib(mbctype.obj) : error LNK2001: unresolved external symbol __imp_GetCPInfo
+LIBCMT.lib(initctyp.obj) : error LNK2001: unresolved external symbol __imp_GetCPInfo
+LIBCMT.lib(mbctype.obj) : error LNK2001: unresolved external symbol __imp_GetACP
+LIBCMT.lib(getqloc.obj) : error LNK2001: unresolved external symbol __imp_GetACP
+LIBCMT.lib(mbctype.obj) : error LNK2001: unresolved external symbol __imp_GetOEMCP
+LIBCMT.lib(mbctype.obj) : error LNK2001: unresolved external symbol __imp_IsValidCodePage
+LIBCMT.lib(getqloc.obj) : error LNK2001: unresolved external symbol __imp_IsValidCodePage
+LIBCMT.lib(msize.obj) : error LNK2001: unresolved external symbol __imp_HeapSize
+LIBCMT.lib(close.obj) : error LNK2001: unresolved external symbol __imp_CloseHandle
+LIBCMT.lib(initcon.obj) : error LNK2001: unresolved external symbol __imp_CloseHandle
+LIBCMT.lib(putwch.obj) : error LNK2001: unresolved external symbol __imp_WriteConsoleW
+LIBCMT.lib(mbtowc.obj) : error LNK2001: unresolved external symbol __imp_MultiByteToWideChar
+LIBCMT.lib(a_map.obj) : error LNK2001: unresolved external symbol __imp_MultiByteToWideChar
+LIBCMT.lib(a_str.obj) : error LNK2001: unresolved external symbol __imp_MultiByteToWideChar
+LIBCMT.lib(lseeki64.obj) : error LNK2001: unresolved external symbol __imp_SetFilePointer
+LIBCMT.lib(osfinfo.obj) : error LNK2001: unresolved external symbol __imp_SetStdHandle
+LIBCMT.lib(a_map.obj) : error LNK2001: unresolved external symbol __imp_LCMapStringW
+LIBCMT.lib(a_str.obj) : error LNK2001: unresolved external symbol __imp_GetStringTypeW
+LIBCMT.lib(iswctype.obj) : error LNK2001: unresolved external symbol __imp_GetStringTypeW
+LIBCMT.lib(initcon.obj) : error LNK2001: unresolved external symbol __imp_CreateFileW
+LIBCMT.lib(getqloc.obj) : error LNK2001: unresolved external symbol __imp_GetUserDefaultLCID
+LIBCMT.lib(getqloc.obj) : error LNK2001: unresolved external symbol __imp_GetLocaleInfoA
+LIBCMT.lib(getqloc.obj) : error LNK2001: unresolved external symbol __imp_EnumSystemLocalesA
+LIBCMT.lib(getqloc.obj) : error LNK2001: unresolved external symbol __imp_IsValidLocale
+src\third_party\js-1.7\jscpucfg.exe : fatal error LNK1120: 75 unresolved externals
+scons: building terminated because of errors.
