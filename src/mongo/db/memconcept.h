@@ -40,7 +40,6 @@ namespace mongo {
 
 #if !defined(_DEBUG)
         inline void invalidate(void *p, unsigned len) { }
-        inline void invalidate(void *p) { }
         inline void is(void *p, concept c, std::string, unsigned) { }
 #endif
 

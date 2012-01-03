@@ -1,5 +1,6 @@
 #if defined(_DEBUG)
 
+#include "pch.h"
 #include <string>
 #include <map>
 #include "memconcept.h"
@@ -50,7 +51,7 @@ namespace mongo {
             return ss.str();
         }
 
-        const unsigned N = 100003;
+        const int N = 100003;
 
         class map { 
             C nodes[N];
