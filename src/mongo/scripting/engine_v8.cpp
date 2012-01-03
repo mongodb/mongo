@@ -15,14 +15,6 @@
  *    limitations under the License.
  */
 
-#if defined(_WIN32)
-/** this is a hack - v8stdint.h defined uint16_t etc. on _WIN32 only, and that collides with 
-    our usage of boost */
-#include "boost/cstdint.hpp"
-using namespace boost;
-#define V8STDINT_H_
-#endif
-
 #include "engine_v8.h"
 
 #include "v8_wrapper.h"
@@ -160,7 +152,7 @@ namespace mongo {
 //      return v8::Integer::New(None);
 //    }
 
-    static Handle<v8::Value> indexedGet(uint32_t index, const v8::AccessorInfo &info) {
+    static Handle<v8::Value> indexedGet(::uint32_t index, const v8::AccessorInfo &info) {
         // all properties should be set, otherwise means builtin or deleted
         if (!(info.This()->HasRealIndexedProperty(index)))
             return v8::Handle<v8::Value>();
@@ -193,14 +185,14 @@ namespace mongo {
         return val;
     }
 
-    Handle<Boolean> indexedDelete( uint32_t index, const AccessorInfo& info ) {
+    Handle<Boolean> indexedDelete( ::uint32_t index, const AccessorInfo& info ) {
         Local< External > scp = External::Cast( *info.Data() );
         V8Scope* scope = (V8Scope*)(scp->Value());
         info.This()->SetHiddenValue(scope->V8STR_MODIFIED, v8::Boolean::New(true));
         return Handle<Boolean>();
     }
 
-    static Handle<v8::Value> indexedGetRO(uint32_t index, const v8::AccessorInfo &info) {
+    static Handle<v8::Value> indexedGetRO(::uint32_t index, const v8::AccessorInfo &info) {
         StringBuilder ss;
         ss << index;
         string key = ss.str();
@@ -223,7 +215,7 @@ namespace mongo {
         return val;
     }
 
-    static Handle<v8::Value> indexedSet(uint32_t index, Local<v8::Value> value_obj, const v8::AccessorInfo& info) {
+    static Handle<v8::Value> indexedSet(::uint32_t index, Local<v8::Value> value_obj, const v8::AccessorInfo& info) {
         Local< External > scp = External::Cast( *info.Data() );
         V8Scope* scope = (V8Scope*)(scp->Value());
         info.This()->SetHiddenValue(scope->V8STR_MODIFIED, v8::Boolean::New(true));
@@ -256,12 +248,12 @@ namespace mongo {
         return Boolean::New( false );
     }
 
-    Handle<Value> IndexedReadOnlySet( uint32_t index, Local<Value> value, const AccessorInfo& info ) {
+    Handle<Value> IndexedReadOnlySet( ::uint32_t index, Local<Value> value, const AccessorInfo& info ) {
         cout << "cannot write property " << index << " to read-only array" << endl;
         return value;
     }
 
-    Handle<Boolean> IndexedReadOnlyDelete( uint32_t index, const AccessorInfo& info ) {
+    Handle<Boolean> IndexedReadOnlyDelete( ::uint32_t index, const AccessorInfo& info ) {
         cout << "cannot delete property " << index << " from read-only array" << endl;
         return Boolean::New( false );
     }
