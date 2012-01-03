@@ -659,12 +659,12 @@ int main(int argc, char* argv[]) {
     ("cacheSize", po::value<long>(), "cache size (in MB) for rec store")
     ("nodur", "disable journaling")
     // things we don't want people to use
-    ("nocursors", "diagnostic/debugging option that turns off cursors DO NOT USE IN PRODUCTION")
     ("nohints", "ignore query hints")
     ("nopreallocj", "don't preallocate journal files")
     ("dur", "enable journaling") // old name for --journal
     ("durOptions", po::value<int>(), "durability diagnostic options") // deprecated name
     // deprecated pairing command line options
+    ("nocursors", "DEPRECATED diagnostic/debugging option that turns off cursors DO NOT USE IN PRODUCTION")
     ("pairwith", "DEPRECATED")
     ("arbiter", "DEPRECATED")
     ("opIdMem", "DEPRECATED")
