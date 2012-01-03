@@ -173,9 +173,9 @@ class test_base06(wttest.WiredTigerTestCase):
         self.session.drop('table:' + self.table_name1, None)
         self.checkDoesNotExist(self.table_name1)
         self.session.drop('table:' + self.table_name1, 'force')
-        self.KNOWN_FAILURE('session drop of nonexistent file should fail')
-        self.assertRaises(WiredTigerError, lambda:
-            self.session.drop('table:' + self.table_name1, None))
+        self.assertEqual(
+	    self.session.drop('table:' + self.table_name1, None),
+	    wiredtiger.WT_NOTFOUND)
 
     def test_truncate(self):
         self.populate(self.table_name1)
