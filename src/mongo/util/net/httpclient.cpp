@@ -115,7 +115,7 @@ namespace mongo {
             sock.send( out , toSend, "_go" );
         }
 
-        char buf[4096];
+        char buf[4097];
         int got = sock.unsafe_recv( buf , 4096 );
         buf[got] = 0;
 
@@ -129,6 +129,7 @@ namespace mongo {
             sb << buf;
 
         while ( ( got = sock.unsafe_recv( buf , 4096 ) ) > 0) {
+            buf[got] = 0;
             if ( result )
                 sb << buf;
         }
