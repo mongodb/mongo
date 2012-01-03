@@ -58,9 +58,6 @@ namespace mongo {
         extern unsigned long long DataLimitPerJournalFile;
     }
 
-    /* only off if --nocursors which is for debugging. */
-    extern bool useCursors;
-
     /* only off if --nohints */
     extern bool useHints;
 
@@ -664,7 +661,6 @@ int main(int argc, char* argv[]) {
     ("dur", "enable journaling") // old name for --journal
     ("durOptions", po::value<int>(), "durability diagnostic options") // deprecated name
     // deprecated pairing command line options
-    ("nocursors", "DEPRECATED diagnostic/debugging option that turns off cursors DO NOT USE IN PRODUCTION")
     ("pairwith", "DEPRECATED")
     ("arbiter", "DEPRECATED")
     ("opIdMem", "DEPRECATED")
@@ -801,9 +797,6 @@ int main(int argc, char* argv[]) {
                 out() << "repairpath is empty" << endl;
                 dbexit( EXIT_BADOPTIONS );
             }
-        }
-        if (params.count("nocursors")) {
-            useCursors = false;
         }
         if (params.count("nohints")) {
             useHints = false;

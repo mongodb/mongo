@@ -49,7 +49,6 @@ namespace mongo {
     //ns->query->DiskLoc
 //    LRUishMap<BSONObj,DiskLoc,5> lrutest(123);
 
-    extern bool useCursors;
     extern bool useHints;
 
     bool runCommands(const char *ns, BSONObj& jsobj, CurOp& curop, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl, int queryOptions) {
@@ -427,7 +426,7 @@ namespace mongo {
                 return;
             }
 
-            bool mayCreateCursor1 = _pq.wantMore() && ! _inMemSort && _pq.getNumToReturn() != 1 && useCursors;
+            bool mayCreateCursor1 = _pq.wantMore() && ! _inMemSort && _pq.getNumToReturn() != 1;
 
             if( 0 ) {
                 cout << "SCANNING this: " << this << " key: " << _c->currKey() << " obj: " << _c->current() << endl;
