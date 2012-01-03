@@ -1059,7 +1059,6 @@ namespace PerfTests {
                 add< Throw< thr2 > >();
                 add< Throw< thr3 > >();
                 add< Throw< thr4 > >();
-                add< Throw< thr5 > >();
                 add< Timer >();
                 add< Sleep0Ms >();
 #if defined(__USE_XOPEN2K)
