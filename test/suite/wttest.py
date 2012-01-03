@@ -30,7 +30,8 @@ class WiredTigerTestCase(unittest.TestCase):
     _globalSetup = False
 
     @staticmethod
-    def globalSetup(preserveFiles = False, useTimestamp = False, gdbSub = False):
+    def globalSetup(preserveFiles = False, useTimestamp = False,
+                    gdbSub = False, verbose = 1):
         WiredTigerTestCase._preserveFiles = preserveFiles
         if useTimestamp:
             d = 'WT_TEST.' + time.strftime('%Y%m%d-%H%M%S', time.localtime())
@@ -41,6 +42,7 @@ class WiredTigerTestCase(unittest.TestCase):
         WiredTigerTestCase._parentTestdir = d
         WiredTigerTestCase._resultfile = open(os.path.join(d, 'results.txt'), "w", 0)  # unbuffered
         WiredTigerTestCase._gdbSubprocess = gdbSub
+        WiredTigerTestCase._verbose = verbose
         WiredTigerTestCase._globalSetup = True
     
     def __init__(self, *args, **kwargs):
@@ -86,7 +88,8 @@ class WiredTigerTestCase(unittest.TestCase):
             self.__class__.wt_ntests = 0
         self.__class__.wt_ntests += 1
         self.testdir = os.path.join(WiredTigerTestCase._parentTestdir, self.className() + '.' + str(self.__class__.wt_ntests))
-        self.prhead('started in ' + self.testdir, True)
+        if WiredTigerTestCase._verbose > 2:
+            self.prhead('started in ' + self.testdir, True)
         self.origcwd = os.getcwd()
         removeAll(self.testdir)
         if os.path.exists(self.testdir):
@@ -117,7 +120,8 @@ class WiredTigerTestCase(unittest.TestCase):
             self.pr('FAIL')
             self.prexception(excinfo)
             self.pr('preserving directory ' + self.testdir)
-        self.prhead('TEST COMPLETED')
+        if WiredTigerTestCase._verbose > 2:
+            self.prhead('TEST COMPLETED')
 
     def KNOWN_FAILURE(self, name):
         print '**** THIS TEST HAS A KNOWN FAILURE: ' + name + ' ****'
@@ -158,7 +162,8 @@ class WiredTigerTestCase(unittest.TestCase):
 
 def runsuite(suite):
     try:
-        return unittest.TextTestRunner(verbosity=2).run(suite)
+        return unittest.TextTestRunner(
+            verbosity=WiredTigerTestCase._verbose).run(suite)
     except BaseException as e:
         # This should not happen for regular test errors, unittest should catch everything
         print('ERROR: running test: ', e)

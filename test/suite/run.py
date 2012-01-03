@@ -2,7 +2,7 @@
 #
 # See the file LICENSE for redistribution information.
 #
-# Copyright (c) 2008-2011 WiredTiger, Inc.
+# Copyright (c) 2008-2012 WiredTiger, Inc.
 #	All rights reserved.
 #
 # WiredTigerTestCase
@@ -33,10 +33,12 @@ def usage():
   $ python ../test/suite/run.py [ options ] [ tests ]\n\
 \n\
 Options:\n\
-  -p | -preserve       preserve output files in WT_TEST/<testname>\n\
-  -t | -timestamp      name WT_TEST according to timestamp\n\
-  -d | -debug          run with \'pdb\', the python debugger\n\
-  -g | -gdb            all subprocesses (like calls to wt) invoke gdb\n\
+  -d   | --debug          run with \'pdb\', the python debugger\n\
+  -g   | --gdb            all subprocesses (like calls to wt) invoke gdb\n\
+  -h   | --help           show this message\n\
+  -p   | --preserve       preserve output files in WT_TEST/<testname>\n\
+  -t   | --timestamp      name WT_TEST according to timestamp\n\
+  -v N | --verbose N      set verboseness to N (0<=N<=3, default=1)\n\
 \n\
 Tests:\n\
   may be a file name in test/suite: (e.g. test_base01.py)\n\
@@ -83,25 +85,38 @@ if __name__ == '__main__':
         
     # Otherwise, turn numbers and ranges into test module names
     preserve = timestamp = debug = gdbSub = False
-    for arg in sys.argv[1:]:
+    verbose = 1
+    args = sys.argv[1:]
+    while len(args) > 0:
+        arg = args.pop(0)
         from unittest import defaultTestLoader as loader
 
         # Command line options
         if arg[0] == '-':
             option = arg[1:]
-            if option == 'preserve' or option == 'p':
-                preserve = True
-                continue
-            if option == 'timestamp' or option == 't':
-                timestamp = True
-                continue
-            if option == 'debug' or option == 'd':
+            if option == '-debug' or option == 'd':
                 import pdb
                 debug = True
                 continue
-            if option == 'gdb' or option == 'g':
+            if option == '-preserve' or option == 'p':
+                preserve = True
+                continue
+            if option == '-timestamp' or option == 't':
+                timestamp = True
+                continue
+            if option == '-gdb' or option == 'g':
                 gdbSub = True
                 continue
+            if option == '-help' or option == 'h':
+                usage()
+                sys.exit(True)
+            if option == '-verbose' or option == 'v':
+                if len(args) == 0:
+                    usage()
+                    sys.exit(False)
+                verbose = int(args.pop(0))
+                continue
+            print 'unknown arg: ' + arg
             usage()
             sys.exit(False)
 
@@ -109,6 +124,6 @@ if __name__ == '__main__':
 
         if debug:
                 pdb.set_trace()
-    wttest.WiredTigerTestCase.globalSetup(preserve, timestamp, gdbSub)
+    wttest.WiredTigerTestCase.globalSetup(preserve, timestamp, gdbSub, verbose)
     result = wttest.runsuite(tests)
     sys.exit(not result.wasSuccessful())
