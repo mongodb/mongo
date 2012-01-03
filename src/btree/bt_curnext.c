@@ -21,7 +21,6 @@ __cursor_fix_append_next(WT_CURSOR_BTREE *cbt, int newpage)
 	if (newpage) {
 		if ((cbt->ins = WT_SKIP_FIRST(cbt->ins_head)) == NULL)
 			return (WT_NOTFOUND);
-		cbt->recno = 0;
 	} else
 		if (cbt->recno == WT_INSERT_RECNO(cbt->ins) &&
 		    (cbt->ins = WT_SKIP_NEXT(cbt->ins)) == NULL)
@@ -359,6 +358,7 @@ __wt_btcur_first(WT_CURSOR_BTREE *cbt)
 
 	__cursor_func_init(cbt, 1);
 
+	cbt->recno = 0;
 	cbt->flags = WT_CBT_ITERATE_NEXT;
 
 	return (__wt_btcur_next(cbt));
