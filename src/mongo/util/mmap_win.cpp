@@ -74,7 +74,7 @@ namespace mongo {
             log() << "FILE_MAP_READ MapViewOfFile failed " << filename() << " " << errnoWithDescription(e) << endl;
         }
         else {
-            memconcept::is(p, memconcept::other, filename());
+            memconcept::is(p, memconcept::concept::other, filename());
             views.push_back(p);
         }
         return p;
@@ -151,10 +151,9 @@ namespace mongo {
         }
         else {
             views.push_back(view);
-            memconcept::is(view, memconcept::memorymappedfile, this->filename());
+            memconcept::is(view, memconcept::concept::memorymappedfile, this->filename(), length);
         }
         len = length;
-
         return view;
     }
 

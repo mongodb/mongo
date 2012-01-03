@@ -93,7 +93,7 @@ namespace mongo {
         else {
             clearWritableBits(p);
             views.push_back(p);
-            memconcept::is(p, memconcept::memorymappedfile, filename());
+            memconcept::is(p, memconcept::concept::memorymappedfile, filename());
         }
         return p;
     }

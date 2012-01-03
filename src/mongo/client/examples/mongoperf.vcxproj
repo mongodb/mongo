@@ -139,6 +139,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\db\memconcept.cpp" />
     <ClCompile Include="..\..\util\logfile.cpp" />
     <ClCompile Include="..\..\util\mmap.cpp" />
     <ClCompile Include="..\..\util\mmap_win.cpp" />

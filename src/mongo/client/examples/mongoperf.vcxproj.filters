@@ -14,6 +14,7 @@
     <ClCompile Include="..\..\util\logfile.cpp">
       <Filter>shared files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\db\memconcept.cpp" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="shared files">

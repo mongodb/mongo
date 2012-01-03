@@ -261,6 +261,9 @@
     <ClCompile Include="..\..\scripting\sm_db.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\db\memconcept.cpp">
+      <Filter>shell</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\collection.js">
