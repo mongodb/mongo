@@ -415,7 +415,7 @@ __wt_btcur_last(WT_CURSOR_BTREE *cbt)
 	WT_BSTAT_INCR(session, cursor_last);
 
 	__cursor_func_init(cbt, 1);
-	F_SET(cbt, WT_CBT_ITERATE_PREV);
+	cbt->flags = WT_CBT_ITERATE_PREV;
 
 	return (__wt_btcur_prev(cbt));
 }

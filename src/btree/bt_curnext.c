@@ -18,9 +18,11 @@ __cursor_fix_append_next(WT_CURSOR_BTREE *cbt, int newpage)
 
 	val = &cbt->iface.value;
 
-	if (newpage)
-		cbt->ins = WT_SKIP_FIRST(cbt->ins_head);
-	else
+	if (newpage) {
+		if ((cbt->ins = WT_SKIP_FIRST(cbt->ins_head)) == NULL)
+			return (WT_NOTFOUND);
+		cbt->recno = 0;
+	} else
 		if (cbt->recno == WT_INSERT_RECNO(cbt->ins) &&
 		    (cbt->ins = WT_SKIP_NEXT(cbt->ins)) == NULL)
 			return (WT_NOTFOUND);
@@ -356,7 +358,8 @@ __wt_btcur_first(WT_CURSOR_BTREE *cbt)
 	WT_BSTAT_INCR(session, cursor_first);
 
 	__cursor_func_init(cbt, 1);
-	F_SET(cbt, WT_CBT_ITERATE_NEXT);
+
+	cbt->flags = WT_CBT_ITERATE_NEXT;
 
 	return (__wt_btcur_next(cbt));
 }
