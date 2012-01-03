@@ -14,10 +14,11 @@
 int
 __wt_drop_file(WT_SESSION_IMPL *session, const char *fileuri, const char *cfg[])
 {
+	static const char *list[] = { "root", "version", NULL };
 	WT_BTREE_SESSION *btree_session;
 	WT_BUF *uribuf;
-	const char *filename;
 	int exist, ret;
+	const char *filename, **lp;
 
 	WT_UNUSED(cfg);
 	uribuf = NULL;
@@ -47,13 +48,13 @@ __wt_drop_file(WT_SESSION_IMPL *session, const char *fileuri, const char *cfg[])
 		return (ret);
 	}
 
-	WT_ERR(__wt_schema_table_remove(session, fileuri));
-
 	WT_ERR(__wt_scr_alloc(session, 0, &uribuf));
-	WT_ERR(__wt_buf_fmt(session, uribuf, "root:%s", filename));
-	WT_ERR(__wt_schema_table_remove(session, uribuf->data));
-	WT_ERR(__wt_buf_fmt(session, uribuf, "version:%s", filename));
-	WT_ERR(__wt_schema_table_remove(session, uribuf->data));
+
+	WT_ERR(__wt_schema_table_remove(session, fileuri));
+	for (lp = list; *lp != NULL; ++lp) {
+		WT_ERR(__wt_buf_fmt(session, uribuf, "%s:%s", *lp, filename));
+		WT_ERR(__wt_schema_table_remove(session, uribuf->data));
+	}
 
 	/* Remove the file itself. */
 	WT_ERR(__wt_exist(session, filename, &exist));
