@@ -755,6 +755,10 @@ elif "win32" == os.sys.platform:
         winLibString += " user32.lib gdi32.lib winspool.lib comdlg32.lib  shell32.lib ole32.lib oleaut32.lib "
         winLibString += " odbc32.lib odbccp32.lib uuid.lib "
 
+    # v8 calls timeGetTime() 
+    if usev8:   
+        winLibString += " winmm.lib "
+
     env.Append( LIBS=Split(winLibString) )
 
     # dm these should automatically be defined by the compiler. commenting out to see if works. jun2010
