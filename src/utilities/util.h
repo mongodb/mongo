@@ -54,6 +54,7 @@ char	*util_name(const char *, const char *, u_int);
 int	 util_printlog(WT_SESSION *, int, char *[]);
 int	 util_read(WT_SESSION *, int, char *[]);
 int	 util_read_line(ULINE *, int, int *);
+int	 util_rename(WT_SESSION *, int, char *[]);
 int	 util_salvage(WT_SESSION *, int, char *[]);
 int	 util_stat(WT_SESSION *, int, char *[]);
 int	 util_str2recno(const char *p, uint64_t *recnop);

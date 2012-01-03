@@ -150,14 +150,16 @@ err:	API_END(session);
  */
 static int
 __session_rename(WT_SESSION *wt_session,
-    const char *oldname, const char *newname, const char *config)
+    const char *uri, const char *newname, const char *config)
 {
-	WT_UNUSED(wt_session);
-	WT_UNUSED(oldname);
-	WT_UNUSED(newname);
-	WT_UNUSED(config);
+	WT_SESSION_IMPL *session;
+	int ret;
 
-	return (ENOTSUP);
+	session = (WT_SESSION_IMPL *)wt_session;
+	SESSION_API_CALL(session, rename, config, cfg);
+	ret = __wt_schema_rename(session, uri, newname, cfg);
+err:	API_END(session);
+	return (ret);
 }
 
 /*

@@ -665,6 +665,10 @@ extern int __wt_schema_project_merge(WT_SESSION_IMPL *session,
     const char *proj_arg,
     const char *vformat,
     WT_BUF *value);
+extern int __wt_schema_rename(WT_SESSION_IMPL *session,
+    const char *uri,
+    const char *newname,
+    const char *cfg[]);
 extern int __wt_schema_table_cursor( WT_SESSION_IMPL *session,
     const char *config,
     WT_CURSOR **cursorp);

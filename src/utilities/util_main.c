@@ -140,6 +140,8 @@ main(int argc, char *argv[])
 	case 'r':
 		if (strcmp(command, "read") == 0)
 			ret = util_read(session, argc, argv);
+		else if (strcmp(command, "rename") == 0)
+			ret = util_rename(session, argc, argv);
 		else
 			ret = usage();
 		break;
@@ -203,6 +205,7 @@ usage(void)
 	    "\tload\t  load an object\n"
 	    "\tprintlog  display the database log\n"
 	    "\tread\t  read values from an object\n"
+	    "\trename\t  rename an object\n"
 	    "\tsalvage\t  salvage a file\n"
 	    "\tstat\t  display statistics for an object\n"
 	    "\tupgrade\t  upgrade an object\n"
