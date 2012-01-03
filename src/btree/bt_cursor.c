@@ -7,6 +7,14 @@
 
 #include "wt_internal.h"
 
+static inline int
+__cursor_fix_implicit(WT_BTREE *btree, WT_CURSOR_BTREE *cbt)
+{
+	return (
+	    btree->type == BTREE_COL_FIX &&
+	    !F_ISSET(cbt, WT_CBT_MAX_RECORD) ? 1 : 0);
+}
+
 /*
  * __cursor_invalid --
  *	Return if the cursor references an invalid K/V pair (either the pair
@@ -85,8 +93,7 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 		 * Creating a record past the end of the tree in a fixed-length
 		 * column-store implicitly fills the gap with empty records.
 		 */
-		if (btree->type == BTREE_COL_FIX &&
-		    !F_ISSET(cbt, WT_CBT_MAX_RECORD)) {
+		if (__cursor_fix_implicit(btree, cbt)) {
 			cbt->v = 0;
 			val = &cbt->iface.value;
 			val->data = &cbt->v;
@@ -140,8 +147,7 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 	 * Else if there's no larger tree key, redo the search and try and find
 	 * an earlier record.  If that fails, quit, there's no record to return.
 	 */
-	if (btree->type == BTREE_COL_FIX &&
-	    cbt->compare != 0 && !F_ISSET(cbt, WT_CBT_MAX_RECORD)) {
+	if (cbt->compare != 0 && __cursor_fix_implicit(btree, cbt)) {
 		cbt->v = 0;
 		val = &cbt->iface.value;
 		val->data = &cbt->v;
@@ -221,8 +227,7 @@ retry:	__cursor_func_init(cbt, 1);
 		 */
 		if (!F_ISSET(cursor, WT_CURSTD_OVERWRITE) &&
 		    ((cbt->compare == 0 && !__cursor_invalid(cbt)) ||
-		    (cbt->compare != 0 && btree->type == BTREE_COL_FIX &&
-		    !F_ISSET(cbt, WT_CBT_MAX_RECORD)))) {
+		    (cbt->compare != 0 && __cursor_fix_implicit(btree, cbt)))) {
 			ret = WT_DUPLICATE_KEY;
 			break;
 		}
@@ -285,8 +290,8 @@ retry:	__cursor_func_init(cbt, 1);
 		 * case, the record was deleted successfully.
 		 */
 		if (cbt->compare != 0 || __cursor_invalid(cbt))
-			ret = btree->type == BTREE_COL_FIX &&
-			    F_ISSET(cbt, WT_CBT_MAX_RECORD) ? WT_NOTFOUND : 0;
+			ret =
+			    __cursor_fix_implicit(btree, cbt) ? 0 : WT_NOTFOUND;
 		else if ((ret = __wt_col_modify(session, cbt, 2)) == WT_RESTART)
 			goto retry;
 		break;
@@ -343,8 +348,7 @@ retry:	__cursor_func_init(cbt, 1);
 		 * case, the record exists.
 		 */
 		if ((cbt->compare != 0 || __cursor_invalid(cbt)) &&
-		    (btree->type != BTREE_COL_FIX ||
-		    F_ISSET(cbt, WT_CBT_MAX_RECORD)))
+		    !__cursor_fix_implicit(btree, cbt))
 			ret = WT_NOTFOUND;
 		else if ((ret = __wt_col_modify(session, cbt, 3)) == WT_RESTART)
 			goto retry;
