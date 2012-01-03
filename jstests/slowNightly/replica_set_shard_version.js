@@ -14,6 +14,8 @@ try { sadmin.getLastError(); } catch (e) { print("reconnecting: "+e); }
 
 st.rs0.getMaster();
 
+mongosA.getDB("admin").runCommand({ setParameter : 1, traceExceptions : true })
+
 coll = mongosA.getCollection( jsTestName() + ".coll" );
 
 start = new Date();
@@ -35,6 +37,8 @@ assert.soon(
 printjson( coll.findOne() )
 
 end = new Date();
+
+mongosA.getDB("admin").runCommand({ setParameter : 1, traceExceptions : false })
 
 print( "time to work for primary: " + ( ( end.getTime() - start.getTime() ) / 1000 ) + " seconds" );
 

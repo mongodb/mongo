@@ -17,12 +17,17 @@ s1.getDB('test').existing.insert({_id:1})
 assert.eq(1, s1.getDB('test').existing.count({_id:1}));
 assert.eq(1, s2.getDB('test').existing.count({_id:1}));
 
+// We need to turn off the balancer before doing manual moves, otherwise they can interfere
+s1.stopBalancer()
+
 s2.adminCommand( { shardcollection : "test.existing" , key : { _id : 1 } } );
 s2.adminCommand( { split : "test.existing" , find : { _id : 5 } } )
 
 res = s2.getDB( "admin" ).runCommand( { moveChunk: "test.existing" , find : { _id : 1 } , to : s1.getOther( s1.getServer( "test" ) ).name } );
 
 assert.eq(1 , res.ok, tojson(res));
+
+s1.setBalancer( true )
 
 printjson( s2.adminCommand( {"getShardVersion" : "test.existing" } ) )
 printjson( new Mongo(s1.getServer( "test" ).name).getDB( "admin" ).adminCommand( {"getShardVersion" : "test.existing" } ) )
@@ -50,12 +55,14 @@ s1.getDB('test').existing3.insert({_id:1})
 assert.eq(1, s1.getDB('test').existing3.count({_id:1}));
 assert.eq(1, s2.getDB('test').existing3.count({_id:1}));
 
+s1.stopBalancer()
+
 s2.adminCommand( { shardcollection : "test.existing3" , key : { _id : 1 } } );
 s2.adminCommand( { split : "test.existing3" , find : { _id : 5 } } )
 
 res = s1.getDB( "admin" ).runCommand( { moveChunk: "test.existing3" , find : { _id : 1 } , to : s1.getOther( s1.getServer( "test" ) ).name } );
 assert.eq(1 , res.ok, tojson(res));
 
-
+s1.setBalancer( true )
 
 s1.stop();
