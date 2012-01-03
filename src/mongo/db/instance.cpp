@@ -64,7 +64,6 @@ namespace mongo {
 
     DiagLog _diaglog;
 
-    bool useCursors = true;
     bool useHints = true;
 
     KillCurrentOp killCurrentOp;
