@@ -812,7 +812,7 @@ wts_np(int next, int insert, int *notfoundp)
 		case FIX:
 			(void)session->msg_printf(
 			    session, "%-10s%" PRIu64 " {0x%02x}", which,
-			    keyno, (int)value.size, ((char *)value.data)[0]);
+			    keyno, ((char *)value.data)[0]);
 			break;
 		case ROW:
 			(void)session->msg_printf(session, "%-10s{%.*s/%.*s}",
