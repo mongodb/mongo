@@ -761,7 +761,8 @@ namespace mongo {
                         indUpdate = indDB->findOne( locksNS, _id );
 
                         // Our lock should now be set until forcing.
-                        assert( indUpdate["state"].numberInt() == 1 );
+                        // It's possible another lock has won entirely by now, so state could be 1 or 2 here
+                        assert( indUpdate["state"].numberInt() > 0 );
 
                     }
                     // else our lock is the same, in which case we're safe, or it's a bigger lock,
