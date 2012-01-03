@@ -807,17 +807,25 @@ wts_np(int next, int insert, int *notfoundp)
 		return (1);
 	}
 
-	if (g.logging) {
-		if (g.c_file_type == ROW)
+	if (g.logging)
+		switch (g.c_file_type) {
+		case FIX:
+			(void)session->msg_printf(
+			    session, "%-10s%" PRIu64 " {0x%02x}", which,
+			    keyno, (int)value.size, ((char *)value.data)[0]);
+			break;
+		case ROW:
 			(void)session->msg_printf(session, "%-10s{%.*s/%.*s}",
 			    which,
 			    (int)key.size, (char *)key.data,
 			    (int)value.size, (char *)value.data);
-		else
+			break;
+		case VAR:
 			(void)session->msg_printf(
-			    session, "%-10s{%" PRIu64 "/%.*s}",
+			    session, "%-10s%" PRIu64 " {%.*s}",
 			    which, keyno, (int)value.size, (char *)value.data);
-	}
+			break;
+		}
 
 	return (0);
 }
