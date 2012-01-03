@@ -865,8 +865,8 @@ wts_row_put(uint64_t keyno, int insert)
 	if (ret != 0 && ret != WT_NOTFOUND) {
 		fprintf(stderr,
                     "%s: wts_row_put: %s row %" PRIu64 " by key: %s\n",
-		    g.progname,
-		    insert ? "insert" : "put", keyno, wiredtiger_strerror(ret));
+		    g.progname, insert ? "insert" : "update",
+		    keyno, wiredtiger_strerror(ret));
 		return (1);
 	}
 
@@ -897,12 +897,12 @@ wts_col_put(uint64_t keyno)
 		if (g.c_file_type == FIX)
 			(void)session->msg_printf(session,
 			    "%-10s%" PRIu64 " {0x%02" PRIx8 "}",
-			    "put", keyno,
+			    "update", keyno,
 			    ((uint8_t *)value.data)[0]);
 		else
 			(void)session->msg_printf(session,
 			    "%-10s%" PRIu64 " {%.*s}",
-			    "put", keyno,
+			    "update", keyno,
 			    (int)value.size, (char *)value.data);
 	}
 
@@ -911,7 +911,7 @@ wts_col_put(uint64_t keyno)
 		cursor->set_value(cursor, *(uint8_t *)value.data);
 	else
 		cursor->set_value(cursor, &value);
-	ret = cursor->update(cursor);
+	ret = cursor->insert(cursor);
 	if (ret != 0 && ret != WT_NOTFOUND) {
 		fprintf(stderr,
                     "%s: wts_col_put: %" PRIu64 " : %s\n",
