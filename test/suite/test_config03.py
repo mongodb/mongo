@@ -2,7 +2,7 @@
 #
 # See the file LICENSE for redistribution information.
 #
-# Copyright (c) 2008-2011 WiredTiger, Inc.
+# Copyright (c) 2008-2012 WiredTiger, Inc.
 #	All rights reserved.
 #
 # test_config03.py
@@ -46,9 +46,14 @@ class test_config03(test_base03.test_base03):
         [3, 30, 300], None)
     transactional_scenarios = wtscenario.quick_scenarios('s_transactional',
         [True,False], [0.2,1.0])
-    verbose_scenarios = wtscenario.quick_scenarios('s_verbose',
-        ['block', 'evict,evictserver', 'fileops,hazard,mutex',
-         'read,readserver,reconcile,salvage','verify,write',''], None)
+
+    # Note: we are not using any truly verbose scenarios until we have
+    # a way to redirect verbose output to a file in Python.
+    #
+    #verbose_scenarios = wtscenario.quick_scenarios('s_verbose',
+    #    ['block', 'evict,evictserver', 'fileops,hazard,mutex',
+    #     'read,readserver,reconcile,salvage','verify,write',''], None)
+    verbose_scenarios = wtscenario.quick_scenarios('s_verbose', [None], None)
 
     config_vars = [ 'cache_size', 'create', 'error_prefix', 'eviction_target',
                     'eviction_trigger', 'exclusive', 'hazard_max', 'logging',
@@ -92,12 +97,12 @@ class test_config03(test_base03.test_base03):
             expect_fail = True
 
         if expect_fail:
-            print 'wiredtiger_open (expected to fail) with args: ' + args
+            #print 'wiredtiger_open (expected to fail) with args: ' + args
             self.assertRaises(WiredTigerError, lambda:
                                   wiredtiger.wiredtiger_open(dir, args))
             args = successargs
 
-        print 'wiredtiger_open with args: ' + args
+        #print 'wiredtiger_open with args: ' + args
         conn = wiredtiger.wiredtiger_open(dir, args)
         self.pr(`conn`)
         return conn
