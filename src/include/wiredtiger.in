@@ -537,7 +537,7 @@ struct wt_session {
 	 * must a power-of-two.,an integer between 512B and 128MB; default \c
 	 * 512B.}
 	 * @config{block_compressor, a compressor for file blocks.  Permitted
-	 * values are empty (off) or \c "<name>".  See @ref compressors for more
+	 * values are empty (off) or \c "<name>".  See @ref compression for more
 	 * details.,a string; default empty.}
 	 * @config{checksum, the configuration for file block checksums; if
 	 * false\, the block manager is free to not write or check block

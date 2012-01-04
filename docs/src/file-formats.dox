@@ -18,7 +18,7 @@ Row-stores support three types of compression: prefix compression (where
 any identical portion of each key byte string is only stored once),
 Huffman encoding of individual key/value items, (see @subpage huffman
 for details), and stream compression of the blocks in the file (see @ref
-compressors for details).
+compression for details).
 
 Unlike some row-stores, WiredTiger does not support duplicate data
 items, that is, for any single key, there can be only a single value,
@@ -28,11 +28,11 @@ Column-stores with variable-length byte string values support three
 types of compression: run-length encoding (where duplicate values are
 only stored a single time), Huffman encoding of individual value items,
 (see @ref huffman for details), and stream compression of the blocks in
-the file (see @ref compressors for details).
+the file (see @ref compression for details).
 
 Column-stores with fixed-length byte values support a single type of
 compression: stream compression of the blocks in the file (see @ref
-compressors for details).
+compression for details).
 
 In row-stores, keys and values too large to fit on a normal page are
 stored as overflow items in the file.  In variable-length column-stores,
