@@ -16,10 +16,10 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 {
 	WT_BTREE *btree;
 	WT_COL *cip;
-	WT_COL_REF *cref;
 	WT_INSERT *ins;
 	WT_INSERT_HEAD *ins_head;
 	WT_PAGE *page;
+	WT_REF *ref;
 	uint64_t recno;
 	uint32_t base, indx, limit;
 	int ret;
@@ -29,27 +29,27 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	recno = cbt->iface.recno;
 
 	btree = session->btree;
-	cref = NULL;
+	ref = NULL;
 
 	/* Search the internal pages of the tree. */
 	for (page = btree->root_page; page->type == WT_PAGE_COL_INT;) {
-		WT_ASSERT(session, cref == NULL ||
-		    cref->recno == page->u.col_int.recno);
+		WT_ASSERT(session, ref == NULL ||
+		    ref->u.recno == page->u.intl.recno);
 
 		/* Binary search of internal pages. */
 		for (base = 0,
 		    limit = page->entries; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
-			cref = page->u.col_int.t + indx;
+			ref = page->u.intl.t + indx;
 
-			if (recno == cref->recno)
+			if (recno == ref->u.recno)
 				break;
-			if (recno < cref->recno)
+			if (recno < ref->u.recno)
 				continue;
 			base = indx + 1;
 			--limit;
 		}
-		WT_ASSERT(session, cref != NULL);
+		WT_ASSERT(session, ref != NULL);
 
 		/*
 		 * Reference the slot used for next step down the tree.
@@ -58,20 +58,20 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 		 * (last + 1) index.  The slot for descent is the one before
 		 * base.
 		 */
-		if (recno != cref->recno) {
+		if (recno != ref->u.recno) {
 			/*
 			 * We don't have to correct for base == 0 because the
 			 * only way for base to be 0 is if recno is the page's
 			 * starting recno.
 			 */
 			WT_ASSERT(session, base > 0);
-			cref = page->u.col_int.t + (base - 1);
+			ref = page->u.intl.t + (base - 1);
 		}
 
 		/* Swap the parent page for the child page. */
-		WT_ERR(__wt_page_in(session, page, &cref->ref));
+		WT_ERR(__wt_page_in(session, page, ref));
 		__wt_page_release(session, page);
-		page = WT_COL_REF_PAGE(cref);
+		page = ref->page;
 	}
 
 	/*

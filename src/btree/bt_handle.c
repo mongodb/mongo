@@ -345,8 +345,7 @@ __btree_root_init_empty(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_PAGE *root, *leaf;
-	WT_ROW_REF *rref;
-	WT_COL_REF *cref;
+	WT_REF *ref;
 	int ret;
 
 	btree = session->btree;
@@ -390,43 +389,33 @@ __btree_root_init_empty(WT_SESSION_IMPL *session)
 	case BTREE_COL_FIX:
 	case BTREE_COL_VAR:
 		root->type = WT_PAGE_COL_INT;
-		root->u.col_int.recno = 1;
-		WT_ERR(__wt_calloc_def(session, 1, &root->u.col_int.t));
-		cref = root->u.col_int.t;
-		cref->recno = 1;
-		WT_COL_REF_PAGE(cref) = leaf;
-		cref->ref.addr = NULL;
-		WT_COL_REF_STATE(cref) = WT_REF_MEM;
-
-		root->entries = 1;
-		root->parent = NULL;
-		root->parent_ref.ref = NULL;
-		F_SET(root, WT_PAGE_PINNED);
-
-		leaf->parent_ref.cref = cref;
-		leaf->parent = root;
+		root->u.intl.recno = 1;
+		WT_ERR(__wt_calloc_def(session, 1, &root->u.intl.t));
+		ref = root->u.intl.t;
+		ref->page = leaf;
+		ref->addr = NULL;
+		ref->state = WT_REF_MEM;
+		ref->u.recno = 1;
 		break;
 	case BTREE_ROW:
 		root->type = WT_PAGE_ROW_INT;
-		WT_ERR(__wt_calloc_def(session, 1, &root->u.row_int.t));
-		rref = root->u.row_int.t;
-		WT_ROW_REF_PAGE(rref) = leaf;
-		rref->ref.addr = NULL;
-		WT_ROW_REF_STATE(rref) = WT_REF_MEM;
-
-		root->entries = 1;
-		root->parent = NULL;
-		root->parent_ref.ref = NULL;
-		F_SET(root, WT_PAGE_PINNED);
-
-		leaf->parent_ref.rref = rref;
-		leaf->parent = root;
-
+		WT_ERR(__wt_calloc_def(session, 1, &root->u.intl.t));
+		ref = root->u.intl.t;
+		ref->page = leaf;
+		ref->addr = NULL;
+		ref->state = WT_REF_MEM;
 		WT_ERR(__wt_row_ikey_alloc(
-		    session, 0, "", 1, (WT_IKEY **)&(rref->key)));
+		    session, 0, "", 1, (WT_IKEY **)&(ref->u.key)));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
+	root->entries = 1;
+	root->parent = NULL;
+	root->ref = NULL;
+	F_SET(root, WT_PAGE_PINNED);
+
+	leaf->ref = ref;
+	leaf->parent = root;
 
 	btree->root_page = root;
 
@@ -460,15 +449,8 @@ __wt_btree_root_empty(WT_SESSION_IMPL *session, WT_PAGE **leafp)
 
 	if (root->entries != 1)
 		return (WT_ERROR);
-	switch (root->type) {
-	case WT_PAGE_COL_INT:
-		child = root->u.col_int.t->ref.page;
-		break;
-	case WT_PAGE_ROW_INT:
-		child = root->u.row_int.t->ref.page;
-		break;
-	WT_ILLEGAL_VALUE(session);
-	}
+
+	child = root->u.intl.t->page;
 	if (child->entries != 0)
 		return (WT_ERROR);
 

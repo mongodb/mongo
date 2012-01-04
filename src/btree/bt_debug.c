@@ -425,7 +425,7 @@ __debug_page_hdr(WT_DBG *ds, WT_PAGE *page)
 
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
-		__dmsg(ds, " recno %" PRIu64, page->u.col_int.recno);
+		__dmsg(ds, " recno %" PRIu64, page->u.intl.recno);
 		break;
 	case WT_PAGE_COL_FIX:
 		__dmsg(ds, " recno %" PRIu64, page->u.col_fix.recno);
@@ -590,19 +590,18 @@ __debug_page_col_fix(WT_DBG *ds, WT_PAGE *page)
 static int
 __debug_page_col_int(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 {
-	WT_COL_REF *cref;
+	WT_REF *ref;
 	uint32_t i;
 
-	WT_COL_REF_FOREACH(page, cref, i) {
-		__dmsg(ds, "\trecno %" PRIu64 "\n", cref->recno);
-		WT_RET(__debug_ref(ds, &cref->ref, page));
+	WT_REF_FOREACH(page, ref, i) {
+		__dmsg(ds, "\trecno %" PRIu64 "\n", ref->u.recno);
+		WT_RET(__debug_ref(ds, ref, page));
 	}
 
 	if (LF_ISSET(WT_DEBUG_TREE_WALK))
-		WT_COL_REF_FOREACH(page, cref, i)
-			if (WT_COL_REF_STATE(cref) == WT_REF_MEM)
-				WT_RET(__debug_page(
-				    ds, WT_COL_REF_PAGE(cref), flags));
+		WT_REF_FOREACH(page, ref, i)
+			if (ref->state == WT_REF_MEM)
+				WT_RET(__debug_page(ds, ref->page, flags));
 
 	return (0);
 }
@@ -658,19 +657,18 @@ __debug_page_col_var(WT_DBG *ds, WT_PAGE *page)
 static int
 __debug_page_row_int(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 {
-	WT_ROW_REF *rref;
+	WT_REF *ref;
 	uint32_t i;
 
-	WT_ROW_REF_FOREACH(page, rref, i) {
-		__debug_ikey(ds, rref->key);
-		WT_RET(__debug_ref(ds, &rref->ref, page));
+	WT_REF_FOREACH(page, ref, i) {
+		__debug_ikey(ds, ref->u.key);
+		WT_RET(__debug_ref(ds, ref, page));
 	}
 
 	if (LF_ISSET(WT_DEBUG_TREE_WALK))
-		WT_ROW_REF_FOREACH(page, rref, i)
-			if (WT_ROW_REF_STATE(rref) == WT_REF_MEM)
-				WT_RET(__debug_page(
-				    ds, WT_ROW_REF_PAGE(rref), flags));
+		WT_REF_FOREACH(page, ref, i)
+			if (ref->state == WT_REF_MEM)
+				WT_RET(__debug_page(ds, ref->page, flags));
 	return (0);
 }
 

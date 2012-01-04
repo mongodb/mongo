@@ -94,7 +94,7 @@ static int  __salvage(WT_SESSION_IMPL *, const char **);
 static int  __slvg_cleanup(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_col_build_internal(WT_SESSION_IMPL *, uint32_t, WT_STUFF *);
 static int  __slvg_col_build_leaf(
-		WT_SESSION_IMPL *, WT_TRACK *, WT_PAGE *, WT_COL_REF *);
+		WT_SESSION_IMPL *, WT_TRACK *, WT_PAGE *, WT_REF *);
 static int  __slvg_col_merge_ovfl(
 		WT_SESSION_IMPL *, WT_TRACK *, WT_PAGE *, uint64_t, uint64_t);
 static int  __slvg_col_range(WT_SESSION_IMPL *, WT_STUFF *);
@@ -109,7 +109,7 @@ static int  __slvg_ovfl_reconcile(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_read(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_row_build_internal(WT_SESSION_IMPL *, uint32_t, WT_STUFF *);
 static int  __slvg_row_build_leaf(WT_SESSION_IMPL *,
-		WT_TRACK *, WT_PAGE *, WT_ROW_REF *, WT_STUFF *);
+		WT_TRACK *, WT_PAGE *, WT_REF *, WT_STUFF *);
 static int  __slvg_row_merge_ovfl(
 		WT_SESSION_IMPL *, WT_TRACK *, WT_PAGE *, uint32_t, uint32_t);
 static int  __slvg_row_range(WT_SESSION_IMPL *, WT_STUFF *);
@@ -1041,38 +1041,37 @@ __slvg_col_build_internal(
     WT_SESSION_IMPL *session, uint32_t leaf_cnt, WT_STUFF *ss)
 {
 	WT_ADDR *addr;
-	WT_COL_REF *cref;
 	WT_PAGE *page;
+	WT_REF *ref;
 	WT_TRACK *trk;
 	uint32_t i;
 	int ret;
 
 	/* Allocate a column-store internal page. */
 	WT_RET(__wt_calloc_def(session, 1, &page));
-	WT_ERR(__wt_calloc_def(session, (size_t)leaf_cnt, &page->u.col_int.t));
+	WT_ERR(__wt_calloc_def(session, (size_t)leaf_cnt, &page->u.intl.t));
 
 	/* Fill it in. */
 	page->parent = NULL;				/* Root page */
-	page->parent_ref.ref = NULL;
+	page->ref = NULL;
 	page->read_gen = 0;
-	page->u.col_int.recno = 1;
+	page->u.intl.recno = 1;
 	page->entries = leaf_cnt;
 	page->type = WT_PAGE_COL_INT;
 	WT_RET(__wt_page_set_modified(session, page));
 
-	for (cref = page->u.col_int.t, i = 0; i < ss->pages_next; ++i) {
+	for (ref = page->u.intl.t, i = 0; i < ss->pages_next; ++i) {
 		if ((trk = ss->pages[i]) == NULL)
 			continue;
 
-		cref->recno = trk->col_start;
 		WT_ERR(__wt_calloc(session, 1, sizeof(WT_ADDR), &addr));
 		WT_ERR(__wt_strndup(session,
 		    (char *)trk->addr.addr, trk->addr.size, &addr->addr));
 		addr->size = trk->addr.size;
-		cref->ref.addr = addr;
-
-		WT_COL_REF_PAGE(cref) = NULL;
-		WT_COL_REF_STATE(cref) = WT_REF_DISK;
+		ref->page = NULL;
+		ref->addr = addr;
+		ref->u.recno = trk->col_start;
+		ref->state = WT_REF_DISK;
 
 		/*
 		 * If the page's key range is unmodified from when we read it
@@ -1085,9 +1084,9 @@ __slvg_col_build_internal(
 		if (F_ISSET(trk, WT_TRACK_MERGE)) {
 			ss->merge_free = 1;
 
-			WT_ERR(__slvg_col_build_leaf(session, trk, page, cref));
+			WT_ERR(__slvg_col_build_leaf(session, trk, page, ref));
 		}
-		++cref;
+		++ref;
 	}
 
 	/* Write the internal page to disk. */
@@ -1102,8 +1101,8 @@ err:	__wt_page_out(session, page, 0);
  *	Build a column-store leaf page for a merged page.
  */
 static int
-__slvg_col_build_leaf(WT_SESSION_IMPL *session,
-    WT_TRACK *trk, WT_PAGE *parent, WT_COL_REF *cref)
+__slvg_col_build_leaf(
+    WT_SESSION_IMPL *session, WT_TRACK *trk, WT_PAGE *parent, WT_REF *ref)
 {
 	WT_COL *save_col_var;
 	WT_PAGE *page;
@@ -1117,8 +1116,8 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session,
 	ret = 0;
 
 	/* Get the original page, including the full in-memory setup. */
-	WT_RET(__wt_page_in(session, parent, &cref->ref));
-	page = WT_COL_REF_PAGE(cref);
+	WT_RET(__wt_page_in(session, parent, ref));
+	page = ref->page;
 	save_col_var = page->u.col_var.d;
 	save_entries = page->entries;
 
@@ -1160,7 +1159,7 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session,
 		    session, trk->ss->tmp1, trk->addr.addr, trk->addr.size),
 		    cookie->missing);
 	}
-	cref->recno = page->u.col_var.recno;
+	ref->u.recno = page->u.col_var.recno;
 
 	/*
 	 * We can't discard the original blocks associated with this page now.
@@ -1171,9 +1170,9 @@ __slvg_col_build_leaf(WT_SESSION_IMPL *session,
 	 * would have been lost.)  Clear the reference addr so eviction doesn't
 	 * free the underlying blocks.
 	 */
-	__wt_free(session, ((WT_ADDR *)cref->ref.addr)->addr);
-	__wt_free(session, cref->ref.addr);
-	cref->ref.addr = NULL;
+	__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
+	__wt_free(session, ref->addr);
+	ref->addr = NULL;
 
 	/* Write the new version of the leaf page to disk. */
 	WT_ERR(__wt_page_set_modified(session, page));
@@ -1621,24 +1620,24 @@ __slvg_row_build_internal(
 {
 	WT_ADDR *addr;
 	WT_PAGE *page;
-	WT_ROW_REF *rref;
+	WT_REF *ref;
 	WT_TRACK *trk;
 	uint32_t i;
 	int ret;
 
 	/* Allocate a row-store internal page. */
 	WT_RET(__wt_calloc_def(session, 1, &page));
-	WT_ERR(__wt_calloc_def(session, (size_t)leaf_cnt, &page->u.row_int.t));
+	WT_ERR(__wt_calloc_def(session, (size_t)leaf_cnt, &page->u.intl.t));
 
 	/* Fill it in. */
 	page->parent = NULL;				/* Root page */
-	page->parent_ref.ref = NULL;
+	page->ref = NULL;
 	page->read_gen = 0;
 	page->entries = leaf_cnt;
 	page->type = WT_PAGE_ROW_INT;
 	WT_ERR(__wt_page_set_modified(session, page));
 
-	for (rref = page->u.row_int.t, i = 0; i < ss->pages_next; ++i) {
+	for (ref = page->u.intl.t, i = 0; i < ss->pages_next; ++i) {
 		if ((trk = ss->pages[i]) == NULL)
 			continue;
 
@@ -1646,10 +1645,10 @@ __slvg_row_build_internal(
 		WT_ERR(__wt_strndup(session,
 		    (char *)trk->addr.addr, trk->addr.size, &addr->addr));
 		addr->size = trk->addr.size;
-		rref->ref.addr = addr;
 
-		WT_ROW_REF_PAGE(rref) = NULL;
-		WT_ROW_REF_STATE(rref) = WT_REF_DISK;
+		ref->page = NULL;
+		ref->addr = addr;
+		ref->state = WT_REF_DISK;
 
 		/*
 		 * If the page's key range is unmodified from when we read it
@@ -1663,13 +1662,13 @@ __slvg_row_build_internal(
 			ss->merge_free = 1;
 
 			WT_ERR(__slvg_row_build_leaf(
-			    session, trk, page, rref, ss));
+			    session, trk, page, ref, ss));
 		} else
 			WT_ERR(__wt_row_ikey_alloc(session, 0,
 			    trk->row_start.data,
 			    trk->row_start.size,
-			    (WT_IKEY **)&rref->key));
-		++rref;
+			    (WT_IKEY **)&ref->u.key));
+		++ref;
 	}
 
 	/* Write the internal page to disk. */
@@ -1685,7 +1684,7 @@ err:	__wt_page_out(session, page, 0);
  */
 static int
 __slvg_row_build_leaf(WT_SESSION_IMPL *session,
-    WT_TRACK *trk, WT_PAGE *parent, WT_ROW_REF *rref, WT_STUFF *ss)
+    WT_TRACK *trk, WT_PAGE *parent, WT_REF *ref, WT_STUFF *ss)
 {
 	WT_BTREE *btree;
 	WT_BUF *key;
@@ -1708,8 +1707,8 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	WT_RET(__wt_scr_alloc(session, 0, &key));
 
 	/* Get the original page, including the full in-memory setup. */
-	WT_ERR(__wt_page_in(session, parent, &rref->ref));
-	page = WT_ROW_REF_PAGE(rref);
+	WT_ERR(__wt_page_in(session, parent, ref));
+	page = ref->page;
 
 	/*
 	 * Figure out how many page keys we want to take and how many we want
@@ -1807,11 +1806,11 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	if (__wt_off_page(page, rip->key)) {
 		ikey = rip->key;
 		WT_ERR(__wt_row_ikey_alloc(session, 0,
-		    WT_IKEY_DATA(ikey), ikey->size, (WT_IKEY **)&rref->key));
+		    WT_IKEY_DATA(ikey), ikey->size, (WT_IKEY **)&ref->u.key));
 	} else {
 		WT_ERR(__wt_row_key(session, page, rip, key));
 		WT_ERR(__wt_row_ikey_alloc(session, 0,
-		    key->data, key->size, (WT_IKEY **)&rref->key));
+		    key->data, key->size, (WT_IKEY **)&ref->u.key));
 	}
 
 	/*
@@ -1850,9 +1849,9 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 		 * salvage runs.)  Clear the reference addr so eviction doesn't
 		 * free the underlying blocks.
 		 */
-		__wt_free(session, ((WT_ADDR *)rref->ref.addr)->addr);
-		__wt_free(session, rref->ref.addr);
-		rref->ref.addr = NULL;
+		__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
+		__wt_free(session, ref->addr);
+		ref->addr = NULL;
 
 		/* Write the new version of the leaf page to disk. */
 		WT_ERR(__wt_page_set_modified(session, page));

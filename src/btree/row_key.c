@@ -356,9 +356,6 @@ __wt_row_value(WT_PAGE *page, WT_ROW *rip)
 	unpack = &_unpack;
 
 	/*
-	 * Passed both WT_ROW_REF and WT_ROW structures; the first field of each
-	 * is a void *.
-	 *
 	 * Multiple threads of control may be searching this page, which means
 	 * the key may change underfoot, and here's where it gets tricky: first,
 	 * copy the key.
@@ -432,9 +429,6 @@ __wt_row_key_serial_func(WT_SESSION_IMPL *session)
 	 * We don't care about the page's write generation -- there's a simpler
 	 * test, if the key we're interested in still needs to be instantiated,
 	 * because it can only be in one of two states.
-	 *
-	 * Passed both WT_ROW_REF and WT_ROW structures; the first field of each
-	 * is a void *.
 	 */
 	if (!__wt_off_page(page, rip->key)) {
 		rip->key = ikey;

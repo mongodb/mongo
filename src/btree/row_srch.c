@@ -91,8 +91,8 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	WT_IKEY *ikey;
 	WT_ITEM *item, _item, *srch_key;
 	WT_PAGE *page;
+	WT_REF *ref;
 	WT_ROW *rip;
-	WT_ROW_REF *rref;
 	uint32_t base, indx, limit;
 	int cmp, ret;
 	void *key;
@@ -111,10 +111,10 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	item = &_item;
 	for (page = btree->root_page; page->type == WT_PAGE_ROW_INT;) {
 		/* Binary search of internal pages. */
-		for (base = 0, rref = NULL,
+		for (base = 0, ref = NULL,
 		    limit = page->entries; limit != 0; limit >>= 1) {
 			indx = base + (limit >> 1);
-			rref = page->u.row_int.t + indx;
+			ref = page->u.intl.t + indx;
 
 			/*
 			 * If we're about to compare an application key with the
@@ -124,7 +124,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 			 * application stores a new, "smallest" key in the tree.
 			 */
 			if (indx != 0) {
-				ikey = rref->key;
+				ikey = ref->u.key;
 				item->data = WT_IKEY_DATA(ikey);
 				item->size = ikey->size;
 
@@ -138,7 +138,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 			base = indx + 1;
 			--limit;
 		}
-		WT_ASSERT(session, rref != NULL);
+		WT_ASSERT(session, ref != NULL);
 
 		/*
 		 * Reference the slot used for next step down the tree.
@@ -149,12 +149,12 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 		 * for descent is the one before base.
 		 */
 		if (cmp != 0)
-			rref = page->u.row_int.t + (base - 1);
+			ref = page->u.intl.t + (base - 1);
 
 		/* Swap the parent page for the child page. */
-		WT_ERR(__wt_page_in(session, page, &rref->ref));
+		WT_ERR(__wt_page_in(session, page, ref));
 		__wt_page_release(session, page);
-		page = WT_ROW_REF_PAGE(rref);
+		page = ref->page;
 	}
 
 	/*

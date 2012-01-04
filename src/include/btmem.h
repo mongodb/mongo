@@ -170,30 +170,30 @@ struct __wt_page_modify {
 
 /*
  * WT_PAGE --
- * The WT_PAGE structure describes the in-memory information about a disk page.
+ * The WT_PAGE structure describes the in-memory page information.
  */
 struct __wt_page {
 	/*
 	 * Two links to the parent: the physical parent page, and the internal
-	 * page's reference structure used to find this page.  Note the WT_REF
-	 * structure appears first in the WT_COL_REF and WT_ROW_REF structures,
-	 * and so we can access all 3 information types with a single reference.
+	 * page's reference structure used to find this page.
 	 */
 #define	WT_PAGE_IS_ROOT(page)						\
 	((page)->parent == NULL)
 	WT_PAGE	*parent;			/* Page's parent */
-	union {
-		WT_COL_REF *cref;		/* Col-store parent reference */
-		WT_ROW_REF *rref;		/* Row-store parent reference */
-		WT_REF	   *ref;		/* Common WT_REF structure */
-	} parent_ref;
+	WT_REF	*ref;				/* Parent reference */
 
-	/* But the entries are wildly different, based on the page type. */
+	/* Per page-type information. */
 	union {
-		/* Row-store internal page. */
+		/*
+		 * Column- and row-store internal page.  The recno is only used
+		 * by column-store, but having the WT_REF array in the same page
+		 * location makes some things simpler, and it doesn't cost us
+		 * any memory, other structures in this union are still larger.
+		 */
 		struct {
-			WT_ROW_REF *t;		/* K/V object pairs */
-		} row_int;
+			uint64_t    recno;	/* Starting recno */
+			WT_REF *t;		/* Subtree */
+		} intl;
 
 		/* Row-store leaf page. */
 		struct {
@@ -213,12 +213,6 @@ struct __wt_page {
 			WT_INSERT_HEAD	**ins;	/* Inserts */
 			WT_UPDATE	**upd;	/* Updates */
 		} row_leaf;
-
-		/* Column-store internal page. */
-		struct {
-			uint64_t    recno;	/* Starting recno */
-			WT_COL_REF *t;		/* Subtrees */
-		} col_int;
 
 		/* Fixed-length column-store leaf page. */
 		struct {
@@ -263,14 +257,13 @@ struct __wt_page {
 
 	/*
 	 * In-memory pages optionally reference a number of entries originally
-	 * read from disk.
+	 * read from disk and sizes the allocated arrays that describe the page.
 	 */
 	uint32_t entries;
 
 	/*
-	 * In-memory pages may have an optional memory allocation; this field
-	 * is only so the appropriate calculations are done when the page is
-	 * discarded.
+	 * Memory attached to the page (although not exact or complete), used
+	 * to force eviction of a page tying too much memory down.
 	 */
 	uint32_t memory_footprint;
 
@@ -289,7 +282,7 @@ struct __wt_page {
 	 * than a single thread accesses the page, and the reconciliation flags.
 	 * The alternative would be to move the WT_PAGE_REC_XXX flags into the
 	 * WT_PAGE_MODIFY structure, but that costs more memory.  Obviously, it
-	 * is important not to add more flags that can be set at run-time, else
+	 * is important not to add other flags that can be set at run-time, else
 	 * the threads could race.
 	 */
 #define	WT_PAGE_BUILD_KEYS	0x001	/* Keys have been built in memory */
@@ -360,6 +353,11 @@ struct __wt_ref {
 
 	void	*addr;			/* On-page cell or off_page WT_ADDR */
 
+	union {
+		uint64_t recno;		/* Column-store: starting recno */
+		void	*key;		/* Row-store: on-page cell or WT_IKEY */
+	} u;
+
 	/*
 	 * Page state.
 	 *
@@ -374,58 +372,12 @@ struct __wt_ref {
 };
 
 /*
- * WT_ROW_REF --
- * Row-store internal page subtree entries.
+ * WT_REF_FOREACH --
+ * Walk the subtree array of an in-memory internal page.
  */
-struct __wt_row_ref {
-	WT_REF	 ref;			/* Subtree page */
-#define	WT_ROW_REF_PAGE(rref)	((rref)->ref.page)
-#define	WT_ROW_REF_STATE(rref)	((rref)->ref.state)
-
-	void	*key;			/* On-page cell or off-page WT_IKEY */
-};
-
-/*
- * WT_ROW_REF_FOREACH --
- * Macro to walk the off-page subtree array of an in-memory internal page.
- */
-#define	WT_ROW_REF_FOREACH(page, rref, i)				\
+#define	WT_REF_FOREACH(page, ref, i)					\
 	for ((i) = (page)->entries,					\
-	    (rref) = (page)->u.row_int.t; (i) > 0; ++(rref), --(i))
-
-/*
- * WT_ROW_REF_SLOT --
- *	Return the 0-based array offset based on a WT_ROW_REF reference.
- */
-#define	WT_ROW_REF_SLOT(page, rref)					\
-	((uint32_t)((rref) - (page)->u.row_int.t))
-
-/*
- * WT_COL_REF --
- * Column-store internal page subtree entries.
- */
-struct __wt_col_ref {
-	WT_REF	 ref;			/* Subtree page */
-#define	WT_COL_REF_PAGE(cref)	((cref)->ref.page)
-#define	WT_COL_REF_STATE(cref)	((cref)->ref.state)
-
-	uint64_t recno;			/* Starting record number */
-};
-
-/*
- * WT_COL_REF_FOREACH --
- * Macro to walk the off-page subtree array of an in-memory internal page.
- */
-#define	WT_COL_REF_FOREACH(page, cref, i)				\
-	for ((i) = (page)->entries,					\
-	    (cref) = (page)->u.col_int.t; (i) > 0; ++(cref), --(i))
-
-/*
- * WT_COL_REF_SLOT --
- *	Return the 0-based array offset based on a WT_COL_REF reference.
- */
-#define	WT_COL_REF_SLOT(page, cref)					\
-	((uint32_t)((cref) - (page)->u.col_int.t))
+	    (ref) = (page)->u.intl.t; (i) > 0; ++(ref), --(i))
 
 /*
  * WT_ROW --

@@ -84,7 +84,7 @@ __wt_page_addr_string(WT_SESSION_IMPL *session, WT_BUF *buf, WT_PAGE *page)
 		return (buf->data);
 	}
 
-	__wt_get_addr(page->parent, page->parent_ref.ref, &addr, &size);
+	__wt_get_addr(page->parent, page->ref, &addr, &size);
 
 	return (__wt_addr_string(session, buf, addr, size));
 }

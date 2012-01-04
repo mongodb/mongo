@@ -26,11 +26,11 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 {
 	/*
 	 * When a page is discarded, it's been disconnected from its parent and
-	 * parent's WT_COL_REF/WT_ROW_REF structure may now point to a different
-	 * page.   Make sure we don't use any of that information by accident.
+	 * parent's WT_REF structure may now point to a different page.   Make
+	 * sure we don't use any of that information by accident.
 	 */
 	page->parent = NULL;
-	page->parent_ref.ref = NULL;
+	page->ref = NULL;
 
 	/* If not a split merged into its parent, the page must be clean. */
 	WT_ASSERT(session,
@@ -108,22 +108,22 @@ __free_page_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 static void
 __free_page_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_COL_REF *cref;
+	WT_REF *ref;
 	uint32_t i;
 
 	/*
 	 * For each referenced addr, see if the addr was an allocation, and if
 	 * so, free it.
 	 */
-	WT_COL_REF_FOREACH(page, cref, i)
-		if (cref->ref.addr != NULL &&
-		    __wt_off_page(page, cref->ref.addr)) {
-			__wt_free(session, ((WT_ADDR *)cref->ref.addr)->addr);
-			__wt_free(session, cref->ref.addr);
+	WT_REF_FOREACH(page, ref, i)
+		if (ref->addr != NULL &&
+		    __wt_off_page(page, ref->addr)) {
+			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
+			__wt_free(session, ref->addr);
 		}
 
 	/* Free the subtree-reference array. */
-	__wt_free(session, page->u.col_int.t);
+	__wt_free(session, page->u.intl.t);
 }
 
 /*
@@ -164,7 +164,7 @@ static void
 __free_page_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_IKEY *ikey;
-	WT_ROW_REF *rref;
+	WT_REF *ref;
 	uint32_t i;
 
 	/*
@@ -173,18 +173,18 @@ __free_page_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * For each referenced addr, see if the addr was an allocation, and if
 	 * so, free it.
 	 */
-	WT_ROW_REF_FOREACH(page, rref, i) {
-		if ((ikey = rref->key) != NULL)
+	WT_REF_FOREACH(page, ref, i) {
+		if ((ikey = ref->u.key) != NULL)
 			__wt_sb_free(session, ikey->sb, ikey);
-		if (rref->ref.addr != NULL &&
-		    __wt_off_page(page, rref->ref.addr)) {
-			__wt_free(session, ((WT_ADDR *)rref->ref.addr)->addr);
-			__wt_free(session, rref->ref.addr);
+		if (ref->addr != NULL &&
+		    __wt_off_page(page, ref->addr)) {
+			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
+			__wt_free(session, ref->addr);
 		}
 	}
 
 	/* Free the subtree-reference array. */
-	__wt_free(session, page->u.row_int.t);
+	__wt_free(session, page->u.intl.t);
 }
 
 /*

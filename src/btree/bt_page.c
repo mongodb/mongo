@@ -103,7 +103,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 	WT_RET(__wt_calloc_def(session, 1, &page));
 	page->type = dsk->type;
 	page->parent = parent;
-	page->parent_ref.ref = parent_ref;
+	page->ref = parent_ref;
 	page->dsk = dsk;
 	/*
 	 * Set the write generation to 1 (which can't match a search where the
@@ -117,7 +117,7 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 		WT_ERR(__inmem_col_fix(session, page));
 		break;
 	case WT_PAGE_COL_INT:
-		page->u.col_int.recno = dsk->recno;
+		page->u.intl.recno = dsk->recno;
 		WT_ERR(__inmem_col_int(session, page));
 		break;
 	case WT_PAGE_COL_VAR:
@@ -178,8 +178,8 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
-	WT_COL_REF *cref;
 	WT_PAGE_HEADER *dsk;
+	WT_REF *ref;
 	uint32_t i;
 
 	btree = session->btree;
@@ -191,18 +191,18 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * entries on the page (each physical entry is a offset object).
 	 */
 	WT_RET(__wt_calloc_def(
-	    session, (size_t)dsk->u.entries, &page->u.col_int.t));
+	    session, (size_t)dsk->u.entries, &page->u.intl.t));
 
 	/*
 	 * Walk the page, building references: the page contains value items.
 	 * The value items are on-page items (WT_CELL_VALUE).
 	 */
-	cref = page->u.col_int.t;
+	ref = page->u.intl.t;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
-		cref->recno = unpack->v;
-		cref->ref.addr = cell;
-		++cref;
+		ref->addr = cell;
+		ref->u.recno = unpack->v;
+		++ref;
 	}
 
 	page->entries = dsk->u.entries;
@@ -291,7 +291,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_PAGE_HEADER *dsk;
-	WT_ROW_REF *rref;
+	WT_REF *ref;
 	uint32_t i, nindx, prefix;
 	int ret;
 	void *huffman;
@@ -312,7 +312,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * and offset object).
 	 */
 	nindx = dsk->u.entries / 2;
-	WT_RET((__wt_calloc_def(session, (size_t)nindx, &page->u.row_int.t)));
+	WT_RET((__wt_calloc_def(session, (size_t)nindx, &page->u.intl.t)));
 
 	/*
 	 * Set the number of elements now -- we're about to allocate memory,
@@ -327,7 +327,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * on-page/overflow (WT_CELL_KEY/KEY_OVFL) items, and offpage references
 	 * are WT_CELL_OFF items.
 	 */
-	rref = page->u.row_int.t;
+	ref = page->u.intl.t;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {
@@ -335,8 +335,8 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		case WT_CELL_KEY_OVFL:
 			break;
 		case WT_CELL_ADDR:
-			rref->ref.addr = cell;
-			++rref;
+			ref->addr = cell;
+			++ref;
 			continue;
 		WT_ILLEGAL_VALUE(session);
 		}
@@ -390,7 +390,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 */
 		WT_ERR(__wt_row_ikey_alloc(session,
 		    unpack->ovfl ? WT_PAGE_DISK_OFFSET(page, cell) : 0,
-		    current->data, current->size, (WT_IKEY **)&rref->key));
+		    current->data, current->size, (WT_IKEY **)&ref->u.key));
 
 		/*
 		 * Swap buffers if it's not an overflow key, we have a new

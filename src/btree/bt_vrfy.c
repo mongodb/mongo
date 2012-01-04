@@ -30,7 +30,7 @@ static int __verify_overflow(
 	WT_SESSION_IMPL *, const uint8_t *, uint32_t, WT_VSTUFF *);
 static int __verify_overflow_cell(WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
 static int __verify_row_int_key_order(
-	WT_SESSION_IMPL *, WT_PAGE *, WT_ROW_REF *, uint32_t, WT_VSTUFF *);
+	WT_SESSION_IMPL *, WT_PAGE *, WT_REF *, uint32_t, WT_VSTUFF *);
 static int __verify_row_leaf_key_order(
 	WT_SESSION_IMPL *, WT_PAGE *, WT_VSTUFF *);
 static int __verify_tree(WT_SESSION_IMPL *, WT_PAGE *, uint64_t, WT_VSTUFF *);
@@ -147,9 +147,7 @@ __verify_tree(WT_SESSION_IMPL *session,
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
-	WT_COL_REF *cref;
 	WT_REF *ref;
-	WT_ROW_REF *rref;
 	uint64_t recno;
 	const uint8_t *addr;
 	uint32_t entry, i, size;
@@ -203,7 +201,7 @@ __verify_tree(WT_SESSION_IMPL *session,
 		recno = page->u.col_fix.recno;
 		goto recno_chk;
 	case WT_PAGE_COL_INT:
-		recno = page->u.col_int.recno;
+		recno = page->u.intl.recno;
 		goto recno_chk;
 	case WT_PAGE_COL_VAR:
 		recno = page->u.col_var.recno;
@@ -260,15 +258,15 @@ recno_chk:	if (parent_recno != recno)
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 		/* For each entry in an internal page, verify the subtree. */
-		WT_COL_REF_FOREACH(page, cref, i) {
+		WT_REF_FOREACH(page, ref, i) {
 			/*
 			 * It's a depth-first traversal: this entry's starting
 			 * record number should be 1 more than the total records
 			 * reviewed to this point.
 			 */
-			if (cref->recno != vs->record_total + 1) {
+			if (ref->u.recno != vs->record_total + 1) {
 				WT_RET(__wt_scr_alloc(session, 0, &tmp));
-				__wt_cell_unpack(cref->ref.addr, unpack);
+				__wt_cell_unpack(ref->addr, unpack);
 				ret = __wt_bm_addr_string(
 				    session, tmp, unpack->data, unpack->size);
 				__wt_errx(session, "page at %s has a starting "
@@ -276,18 +274,17 @@ recno_chk:	if (parent_recno != recno)
 				    "starting record was %" PRIu64,
 				    ret == 0 ?
 				    (char *)tmp->data : "[Unknown address]",
-				    cref->recno, vs->record_total + 1);
+				    ref->u.recno, vs->record_total + 1);
 				__wt_scr_free(&tmp);
 				return (WT_ERROR);
 			}
 
-			/* cref references the subtree containing the record */
-			ref = &cref->ref;
+			/* ref references the subtree containing the record */
 			__wt_get_addr(page, ref, &addr, &size);
 			WT_RET(__wt_bm_verify_addr(session, addr, size));
 			WT_RET(__wt_page_in(session, page, ref));
 			ret =
-			    __verify_tree(session, ref->page, cref->recno, vs);
+			    __verify_tree(session, ref->page, ref->u.recno, vs);
 			__wt_page_release(session, ref->page);
 			WT_RET(ret);
 		}
@@ -295,7 +292,7 @@ recno_chk:	if (parent_recno != recno)
 	case WT_PAGE_ROW_INT:
 		/* For each entry in an internal page, verify the subtree. */
 		entry = 0;
-		WT_ROW_REF_FOREACH(page, rref, i) {
+		WT_REF_FOREACH(page, ref, i) {
 			/*
 			 * It's a depth-first traversal: this entry's starting
 			 * key should be larger than the largest key previously
@@ -306,11 +303,10 @@ recno_chk:	if (parent_recno != recno)
 			 */
 			if (entry != 0)
 				WT_RET(__verify_row_int_key_order(
-				    session, page, rref, entry, vs));
+				    session, page, ref, entry, vs));
 			++entry;
 
-			/* rref references the subtree containing the record */
-			ref = &rref->ref;
+			/* ref references the subtree containing the record */
 			__wt_get_addr(page, ref, &addr, &size);
 			WT_RET(__wt_bm_verify_addr(session, addr, size));
 			WT_RET(__wt_page_in(session, page, ref));
@@ -331,7 +327,7 @@ recno_chk:	if (parent_recno != recno)
  */
 static int
 __verify_row_int_key_order(WT_SESSION_IMPL *session,
-    WT_PAGE *page, WT_ROW_REF *rref, uint32_t entry, WT_VSTUFF *vs)
+    WT_PAGE *page, WT_REF *ref, uint32_t entry, WT_VSTUFF *vs)
 {
 	WT_BTREE *btree;
 	WT_IKEY *ikey;
@@ -344,7 +340,7 @@ __verify_row_int_key_order(WT_SESSION_IMPL *session,
 	WT_ASSERT(session, vs->max_addr->size != 0);
 
 	/* Set up the key structure. */
-	ikey = rref->key;
+	ikey = ref->u.key;
 	item.data = WT_IKEY_DATA(ikey);
 	item.size = ikey->size;
 

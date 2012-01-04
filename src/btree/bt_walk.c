@@ -41,12 +41,9 @@ __wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int cacheonly, int next)
 	if (WT_PAGE_IS_ROOT(page))
 		return (0);
 
-	/* Figure out the current slot in the parent page. */
+	/* Figure out the current slot in the parent page's WT_REF array. */
 	t = page->parent;
-	slot =
-	    page->type == WT_PAGE_ROW_INT || page->type == WT_PAGE_ROW_LEAF ?
-	    WT_ROW_REF_SLOT(t, page->parent_ref.rref) :
-	    WT_COL_REF_SLOT(t, page->parent_ref.cref);
+	slot = (uint32_t)(page->ref - t->u.intl.t);
 
 	/*
 	 * Swap our hazard reference for the hazard reference of our parent,
@@ -64,7 +61,7 @@ __wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int cacheonly, int next)
 	 * that can't be discarded.
 	 */
 	ret = (WT_PAGE_IS_ROOT(t) || cacheonly) ?
-	    0 : __wt_page_in(session, t, t->parent_ref.ref);
+	    0 : __wt_page_in(session, t, t->ref);
 	if (!cacheonly) {
 		__wt_page_release(session, page);
 		WT_RET(ret);
@@ -88,10 +85,9 @@ __wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int cacheonly, int next)
 			--slot;
 
 descend:	for (;;) {
-			if (page->type == WT_PAGE_ROW_INT)
-				ref = &page->u.row_int.t[slot].ref;
-			else if (page->type == WT_PAGE_COL_INT)
-				ref = &page->u.col_int.t[slot].ref;
+			if (page->type == WT_PAGE_ROW_INT ||
+			    page->type == WT_PAGE_COL_INT)
+				ref = &page->u.intl.t[slot];
 			else {
 				*pagep = page;
 				return (0);

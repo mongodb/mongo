@@ -514,7 +514,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		page = btree->evict_page;
 		if (page != NULL &&
 		    !WT_PAGE_IS_ROOT(page) && !F_ISSET(page, WT_PAGE_PINNED) &&
-		    page->parent_ref.ref->state == WT_REF_MEM) {
+		    page->ref->state == WT_REF_MEM) {
 			WT_VERBOSE(session, evictserver,
 			    "walk: %p, size %" PRIu32,
 			    page, page->memory_footprint);
@@ -636,7 +636,7 @@ __evict_get_page(
 		 * Set the page locked here while holding the eviction mutex to
 		 * prevent multiple attempts to evict it.
 		 */
-		ref = evict->page->parent_ref.ref;
+		ref = evict->page->ref;
 		if (!WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED))
 			goto done;
 

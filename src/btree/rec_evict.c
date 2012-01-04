@@ -58,7 +58,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 */
 	if (F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE)) {
 		page->read_gen = __wt_cache_read_gen(session);
-		page->parent_ref.ref->state = WT_REF_MEM;
+		page->ref->state = WT_REF_MEM;
 		return (0);
 	}
 
@@ -115,8 +115,8 @@ __rec_page_clean_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Update the relevant WT_REF structure; no memory flush is needed,
 	 * the state field is declared volatile.
 	 */
-	page->parent_ref.ref->page = NULL;
-	page->parent_ref.ref->state = WT_REF_DISK;
+	page->ref->page = NULL;
+	page->ref->state = WT_REF_DISK;
 
 	return (__rec_discard_page(session, page));
 }
@@ -148,7 +148,7 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	WT_REF *parent_ref;
 
 	mod = page->modify;
-	parent_ref = page->parent_ref.ref;
+	parent_ref = page->ref;
 
 	switch (F_ISSET(page, WT_PAGE_REC_MASK)) {
 	case WT_PAGE_REC_EMPTY:				/* Page is empty */
@@ -315,8 +315,8 @@ __rec_review(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 * tree locked down.
 	 */
 	if (!LF_ISSET(WT_REC_SINGLE)) {
-		WT_RET(__hazard_exclusive(session,
-		    page->parent_ref.ref, LF_ISSET(WT_REC_WAIT) ? 1 : 0));
+		WT_RET(__hazard_exclusive(
+		    session, page->ref, LF_ISSET(WT_REC_WAIT) ? 1 : 0));
 
 		last_page = page;
 	}
@@ -377,13 +377,13 @@ __rec_sub_excl_clear(WT_SESSION_IMPL *session,
 	if (LF_ISSET(WT_REC_SINGLE))
 		return;
 
-	WT_ASSERT(session, page->parent_ref.ref->state == WT_REF_LOCKED);
+	WT_ASSERT(session, page->ref->state == WT_REF_LOCKED);
 
 	/*
 	 * Take care to unlock pages in the same order we locked them.
 	 * Otherwise, tracking the last successfully locked page is meaningless.
 	 */
-	page->parent_ref.ref->state = WT_REF_MEM;
+	page->ref->state = WT_REF_MEM;
 	if (page == last_page)
 		return;
 
@@ -408,13 +408,13 @@ static int
 __rec_sub_excl_col(WT_SESSION_IMPL *session,
     WT_PAGE *parent, WT_PAGE **last_pagep, uint32_t flags)
 {
-	WT_COL_REF *cref;
 	WT_PAGE *page;
+	WT_REF *ref;
 	uint32_t i;
 
 	/* For each entry in the page... */
-	WT_COL_REF_FOREACH(parent, cref, i) {
-		switch (WT_COL_REF_STATE(cref)) {
+	WT_REF_FOREACH(parent, ref, i) {
+		switch (ref->state) {
 		case WT_REF_DISK:			/* On-disk */
 			continue;
 		case WT_REF_LOCKED:			/* Eviction candidate */
@@ -423,9 +423,9 @@ __rec_sub_excl_col(WT_SESSION_IMPL *session,
 		case WT_REF_MEM:			/* In-memory */
 			break;
 		}
-		page = WT_COL_REF_PAGE(cref);
+		page = ref->page;
 
-		WT_RET(__rec_sub_excl_page(session, &cref->ref, page, flags));
+		WT_RET(__rec_sub_excl_page(session, ref, page, flags));
 
 		*last_pagep = page;
 
@@ -446,22 +446,21 @@ static int
 __rec_sub_excl_col_clear(
     WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *last_page)
 {
-	WT_COL_REF *cref;
 	WT_PAGE *page;
+	WT_REF *ref;
 	uint32_t i;
 
 	/* For each entry in the page... */
-	WT_COL_REF_FOREACH(parent, cref, i) {
-		WT_ASSERT(session, WT_COL_REF_STATE(cref) == WT_REF_LOCKED);
-		WT_COL_REF_STATE(cref) = WT_REF_MEM;
+	WT_REF_FOREACH(parent, ref, i) {
+		WT_ASSERT(session, ref->state == WT_REF_LOCKED);
+		ref->state = WT_REF_MEM;
 
 		/* Recurse down the tree. */
-		page = WT_COL_REF_PAGE(cref);
+		page = ref->page;
 		if (page == last_page)
 			return (1);
 		if (page->type == WT_PAGE_COL_INT)
-			if (__rec_sub_excl_col_clear(
-			    session, page, last_page))
+			if (__rec_sub_excl_col_clear(session, page, last_page))
 				return (1);
 	}
 
@@ -478,12 +477,12 @@ __rec_sub_excl_row(WT_SESSION_IMPL *session,
     WT_PAGE *parent, WT_PAGE **last_pagep, uint32_t flags)
 {
 	WT_PAGE *page;
-	WT_ROW_REF *rref;
+	WT_REF *ref;
 	uint32_t i;
 
 	/* For each entry in the page... */
-	WT_ROW_REF_FOREACH(parent, rref, i) {
-		switch (WT_ROW_REF_STATE(rref)) {
+	WT_REF_FOREACH(parent, ref, i) {
+		switch (ref->state) {
 		case WT_REF_DISK:			/* On-disk */
 			continue;
 		case WT_REF_LOCKED:			/* Eviction candidate */
@@ -492,9 +491,9 @@ __rec_sub_excl_row(WT_SESSION_IMPL *session,
 		case WT_REF_MEM:			/* In-memory */
 			break;
 		}
-		page = WT_ROW_REF_PAGE(rref);
+		page = ref->page;
 
-		WT_RET(__rec_sub_excl_page(session, &rref->ref, page, flags));
+		WT_RET(__rec_sub_excl_page(session, ref, page, flags));
 
 		*last_pagep = page;
 
@@ -516,21 +515,20 @@ __rec_sub_excl_row_clear(
     WT_SESSION_IMPL *session, WT_PAGE *parent, WT_PAGE *last_page)
 {
 	WT_PAGE *page;
-	WT_ROW_REF *rref;
+	WT_REF *ref;
 	uint32_t i;
 
 	/* For each entry in the page... */
-	WT_ROW_REF_FOREACH(parent, rref, i) {
-		WT_ASSERT(session, WT_ROW_REF_STATE(rref) == WT_REF_LOCKED);
-		WT_ROW_REF_STATE(rref) = WT_REF_MEM;
+	WT_REF_FOREACH(parent, ref, i) {
+		WT_ASSERT(session, ref->state == WT_REF_LOCKED);
+		ref->state = WT_REF_MEM;
 
 		/* Recurse down the tree. */
-		page = WT_ROW_REF_PAGE(rref);
+		page = ref->page;
 		if (page == last_page)
 			return (1);
 		if (page->type == WT_PAGE_ROW_INT)
-			if (__rec_sub_excl_row_clear(
-			    session, page, last_page))
+			if (__rec_sub_excl_row_clear(session, page, last_page))
 				return (1);
 	}
 
@@ -608,14 +606,14 @@ __rec_sub_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 static int
 __rec_sub_discard_col(WT_SESSION_IMPL *session, WT_PAGE *parent)
 {
-	WT_COL_REF *cref;
 	WT_PAGE *page;
+	WT_REF *ref;
 	uint32_t i;
 
 	/* For each entry in the page... */
-	WT_COL_REF_FOREACH(parent, cref, i)
-		if (WT_COL_REF_STATE(cref) != WT_REF_DISK) {
-			page = WT_ROW_REF_PAGE(cref);
+	WT_REF_FOREACH(parent, ref, i)
+		if (ref->state != WT_REF_DISK) {
+			page = ref->page;
 
 			/* Recurse down the tree. */
 			if (page->type == WT_PAGE_COL_INT)
@@ -634,13 +632,13 @@ static int
 __rec_sub_discard_row(WT_SESSION_IMPL *session, WT_PAGE *parent)
 {
 	WT_PAGE *page;
-	WT_ROW_REF *rref;
+	WT_REF *ref;
 	uint32_t i;
 
 	/* For each entry in the page... */
-	WT_ROW_REF_FOREACH(parent, rref, i)
-		if (WT_ROW_REF_STATE(rref) != WT_REF_DISK) {
-			page = WT_ROW_REF_PAGE(rref);
+	WT_REF_FOREACH(parent, ref, i)
+		if (ref->state != WT_REF_DISK) {
+			page = ref->page;
 
 			/* Recurse down the tree. */
 			if (page->type == WT_PAGE_ROW_INT)
