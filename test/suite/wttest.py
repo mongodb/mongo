@@ -131,6 +131,14 @@ class WiredTigerTestCase(unittest.TestCase):
     def KNOWN_LIMITATION(self, name):
         print '**** THIS TEST HAS A KNOWN LIMITATION: ' + name + ' ****'
 
+    @staticmethod
+    def printVerbose(level, message):
+        if level <= WiredTigerTestCase._verbose:
+            print message
+
+    def verbose(self, level, message):
+        WiredTigerTestCase.printVerbose(level, message)
+
     def pr(self, s):
         """
         print a progress line for testing

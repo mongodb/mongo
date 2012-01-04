@@ -69,8 +69,9 @@ class test_config03(test_base03.test_base03):
     scenarios = wtscenario.prune_scenarios(all_scenarios, 1000)
     scenarios = wtscenario.number_scenarios(scenarios)
 
-    print 'test_config03: running ' + str(len(scenarios)) + ' of ' + \
-        str(len(all_scenarios)) + ' possible scenarios'
+    wttest.WiredTigerTestCase.printVerbose(2, 'test_config03: running ' + \
+                          str(len(scenarios)) + ' of ' + \
+                          str(len(all_scenarios)) + ' possible scenarios')
 
     def setUpConnectionOpen(self, dir):
         args = ''
@@ -97,12 +98,12 @@ class test_config03(test_base03.test_base03):
             expect_fail = True
 
         if expect_fail:
-            #print 'wiredtiger_open (expected to fail) with args: ' + args
+            self.verbose(3, 'wiredtiger_open (should fail) with args: ' + args)
             self.assertRaises(WiredTigerError, lambda:
                                   wiredtiger.wiredtiger_open(dir, args))
             args = successargs
 
-        #print 'wiredtiger_open with args: ' + args
+        self.verbose(3, 'wiredtiger_open with args: ' + args)
         conn = wiredtiger.wiredtiger_open(dir, args)
         self.pr(`conn`)
         return conn
