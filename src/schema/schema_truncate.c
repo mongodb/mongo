@@ -54,7 +54,7 @@ __truncate_file(
 	WT_ERR(__wt_buf_fmt(session, uribuf, "root:%s", filename));
 	WT_ERR(__wt_schema_table_remove(session, uribuf->data));
 
-	WT_ERR(__wt_block_truncate(session, filename));
+	WT_ERR(__wt_btree_truncate(session, filename));
 
 err:	__wt_scr_free(&uribuf);
 	return (ret);
