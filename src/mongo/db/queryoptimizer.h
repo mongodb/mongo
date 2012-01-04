@@ -310,8 +310,10 @@ namespace mongo {
         /** @return a single plan that may work well for the specified query. */
         QueryPlanPtr getBestGuess() const;
 
-        //for testing
         const FieldRangeSetPair &frsp() const { return *_frsp; }
+        BSONObj order() const { return _order; }
+
+        //for testing
         const FieldRangeSetPair *originalFrsp() const { return _originalFrsp.get(); }
         bool modifiedKeys() const;
         bool hasMultiKey() const;
@@ -468,6 +470,8 @@ namespace mongo {
         void mayYield( bool val ) { _mayYield = val; }
         bool modifiedKeys() const { return _currentQps->modifiedKeys(); }
         bool hasMultiKey() const { return _currentQps->hasMultiKey(); }
+        
+        void clearIndexesForPatterns() const;
 
     private:
         void assertNotOr() const {

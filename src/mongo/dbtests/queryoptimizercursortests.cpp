@@ -18,7 +18,8 @@
  */
 
 #include "pch.h"
-#include "../db/queryoptimizercursor.h"
+
+#include "../db/queryoptimizercursorimpl.h"
 #include "../db/queryoptimizer.h"
 #include "../db/instance.h"
 #include "../db/ops/delete.h"

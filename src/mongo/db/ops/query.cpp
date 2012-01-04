@@ -38,6 +38,7 @@
 #include "../repl_block.h"
 #include "../../server.h"
 #include "../d_concurrency.h"
+#include "../queryoptimizercursor.h"
 
 namespace mongo {
 
@@ -654,30 +655,103 @@ namespace mongo {
 
     class QueryResponseBuilder {
     public:
-        QueryResponseBuilder( const ParsedQuery &parsedQuery ) : _buf(32768), _parsedQuery( parsedQuery ), _n() {
+        QueryResponseBuilder( const ParsedQuery &parsedQuery, const shared_ptr<Cursor> &cursor ) :
+        _parsedQuery( parsedQuery ),
+        _cursor( cursor ),
+        _queryOptimizerCursor( dynamic_cast<QueryOptimizerCursor*>( cursor.get() ) ),
+        _buf( 32768 ),
+        _scanAndOrder( newScanAndOrder() ),
+        _skip( _parsedQuery.getSkip() ),
+        _n() {
             _buf.skip( sizeof( QueryResult ) );
         }
-        void addResult( const shared_ptr<Cursor> &cursor ) {
-            DiskLoc loc = cursor->currLoc();
-            ++_n;
-            fillQueryResultFromObj( _buf, _parsedQuery.getFields(), loc.obj(), ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
+        void mayAddMatch() {
+            DiskLoc loc = _cursor->currLoc();
+            if ( _scanAndOrder ) {
+                try {
+                    _scanAndOrder->add( _cursor->current(), _parsedQuery.showDiskLoc() ? &loc : 0 );
+                } catch ( const UserException &e ) {
+                    if ( e.getCode() == ScanAndOrderMemoryLimitExceededAssertionCode ) {
+                        _queryOptimizerCursor->multiPlanScanner()->clearIndexesForPatterns();
+                    }
+                    throw;
+                }
+            }
+            if ( !iterateNeedsSort() ) {
+                if ( _skip > 0 ) {
+                    --_skip;
+                }
+                else {
+                    ++_n;
+                    fillQueryResultFromObj( _buf, _parsedQuery.getFields(), loc.obj(), ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
+                }
+            }
         }
-        bool enoughTotalResults() {
-            return ( _parsedQuery.enough( _n ) || _buf.len() >= MaxBytesToReturnToClientAtOnce );
-        }
-        bool enoughForFirstBatch() {
+        bool enoughForFirstBatch() const {
             return _parsedQuery.enoughForFirstBatch( _n, _buf.len() );
         }
-        void handoff( Message &result ) {
+        bool enoughTotalResults() const {
+            return ( _parsedQuery.enough( _n ) || _buf.len() >= MaxBytesToReturnToClientAtOnce );
+        }
+        long long handoff( Message &result ) {
+            int ret = _n;
+            if ( resultsNeedSort() ) {
+                _buf.reset();
+                _buf.skip( sizeof( QueryResult ) );
+                // Handle exception here
+                _scanAndOrder->fill( _buf, _parsedQuery.getFields(), ret );
+            }
             if ( _buf.len() > 0 ) {
                 result.appendData( _buf.buf(), _buf.len() );
                 _buf.decouple();
             }
+            return ret;
         }
-        long long n() const { return _n; }
     private:
-        BufBuilder _buf;
+        ScanAndOrder *newScanAndOrder() const {
+            if ( _parsedQuery.getOrder().isEmpty() ) {
+                return 0;
+            }
+            if ( !_queryOptimizerCursor ) {
+                return 0;
+            }
+            return new ScanAndOrder( _parsedQuery.getSkip(),
+                                    _parsedQuery.getNumToReturn(),
+                                    _parsedQuery.getOrder(),
+                                    _queryOptimizerCursor->queryPlan()->multikeyFrs() );
+        }
+        bool iterateNeedsSort() const {
+            if ( !_scanAndOrder ) {
+                return false;
+            }
+            const QueryPlan *queryPlan = _queryOptimizerCursor->queryPlan();
+            if ( !queryPlan ) {
+                return false;
+            }
+            if ( !queryPlan->scanAndOrderRequired() ) {
+                return false;
+            }
+            return true;
+        }
+        bool resultsNeedSort() const {
+            if ( !_scanAndOrder ) {
+                return false;
+            }
+            const QueryPlan *queryPlan = _queryOptimizerCursor->completeQueryPlan();
+            if ( !queryPlan ) {
+                return false;
+            }
+            if ( !queryPlan->scanAndOrderRequired() ) {
+                return false;
+            }
+            return true;            
+        }
         const ParsedQuery &_parsedQuery;
+        shared_ptr<Cursor> _cursor;
+        QueryOptimizerCursor *_queryOptimizerCursor;
+        BufBuilder _buf;
+        shared_ptr<ScanAndOrder> _scanAndOrder;
+        long long _skip;
         long long _n;
     };
     
@@ -818,17 +892,20 @@ namespace mongo {
             }
         }
         
-        {
+        for( int retries = 0; retries < 2; ++retries ) {
+        try {
             shared_ptr<Cursor> cursor;
             if ( pq.hasOption( QueryOption_OplogReplay ) ) {
                 cursor = FindingStartCursor::getCursor( ns, query, order );
             }
-            else if ( order.isEmpty() && !pq.getFields() && !pq.isExplain() && !pq.returnKey() ) {
-                cursor = NamespaceDetailsTransient::getCursor( ns, query, BSONObj(), false, 0, &pq );
+            else if ( !pq.getFields() && !pq.isExplain() && !pq.returnKey() ) {
+                cursor = NamespaceDetailsTransient::getCursor( ns, query, order, false, 0, &pq );
             }
-            if ( cursor ) {
-                QueryResponseBuilder queryResponseBuilder( pq );
-                long long skip = pq.getSkip();
+            if ( !cursor ) {
+                break;
+            }
+            {
+                QueryResponseBuilder queryResponseBuilder( pq, cursor );
                 long long cursorid = 0;
                 OpTime slaveReadTill;
                 ClientCursor::CleanupPointer ccPointer;
@@ -852,11 +929,6 @@ namespace mongo {
                         continue;
                     }
                     
-                    if ( skip > 0 ) {
-                        --skip;
-                        continue;
-                    }
-
                     BSONObj js = cursor->current();
                     assert( js.isValid() );
                     
@@ -867,7 +939,7 @@ namespace mongo {
                         }
                     }
                     
-                    queryResponseBuilder.addResult( cursor );
+                    queryResponseBuilder.mayAddMatch();
                     if ( !cursor->supportGetMore() ) {
                         if ( queryResponseBuilder.enoughTotalResults() ) {
                             break;
@@ -885,7 +957,8 @@ namespace mongo {
 
                 if ( cursorid == 0 ) {
                     ccPointer.reset();
-                } else {
+                }
+                else {
                     if ( cursor->supportYields() ) {
                         ClientCursor::YieldData data;
                         ccPointer->prepareToYield( data );
@@ -897,7 +970,7 @@ namespace mongo {
                     ccPointer.release();
                 }
 
-                queryResponseBuilder.handoff( result );
+                long long nReturned = queryResponseBuilder.handoff( result );
                 QueryResult *qr = (QueryResult *) result.header();
                 qr->cursorId = cursorid;
                 qr->setResultFlagsToOk();
@@ -905,9 +978,14 @@ namespace mongo {
                 curop.debug().responseLength = qr->len;
                 qr->setOperation(opReply);
                 qr->startingFrom = 0;
-                qr->nReturned = queryResponseBuilder.n();
+                qr->nReturned = nReturned;
                 return 0;
             }
+        } catch ( const UserException &u ) {
+            if ( retries != 0 || u.getCode() != ScanAndOrderMemoryLimitExceededAssertionCode ) {
+                throw;
+            }
+        }
         }
 
         // regular, not QO bypass query

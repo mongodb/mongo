@@ -1,4 +1,4 @@
-// @file queryoptimizercursor.cpp
+// @file queryoptimizercursorimpl.cpp
 
 /**
  *    Copyright (C) 2011 10gen Inc.
@@ -16,9 +16,9 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "queryoptimizercursorimpl.h"
+
 #include "pch.h"
-#include "queryoptimizercursor.h"
-#include "queryoptimizer.h"
 #include "pdfile.h"
 #include "clientcursor.h"
 #include "btree.h"
@@ -62,19 +62,19 @@ namespace mongo {
          * @param aggregateNscanned - shared long long counting total nscanned for
          * query ops for all cursors.
          */
-        QueryOptimizerCursorOp( long long &aggregateNscanned,
-                               const QueryPlanSelectionPolicy &selectionPolicy,
-                               int cumulativeCount = 0 ) :
+        QueryOptimizerCursorOp( long long &aggregateNscanned, const QueryPlanSelectionPolicy &selectionPolicy,
+                               bool requireOrder, int cumulativeCount = 0 ) :
         _matchCounter( aggregateNscanned, cumulativeCount ),
         _countingMatches(),
         _mustAdvance(),
         _capped(),
         _yieldRecoveryFailed(),
-        _selectionPolicy( selectionPolicy ) {
+        _selectionPolicy( selectionPolicy ),
+        _requireOrder( requireOrder ) {
         }
         
         virtual void _init() {
-            if ( qp().scanAndOrderRequired() ) {
+            if ( _requireOrder && qp().scanAndOrderRequired() ) {
                 throw MsgAssertionException( OutOfOrderDocumentsAssertionCode, "order spec cannot be satisfied with index" );
             }
             if ( !_selectionPolicy.permitPlan( qp() ) ) {
@@ -87,7 +87,7 @@ namespace mongo {
             _c = qp().newCursor();
 
             // The QueryOptimizerCursor::prepareToTouchEarlierIterate() implementation requires _c->prepareToYield() to work.
-            verify( 15940, _c->supportYields() );
+//            verify( 15940, _c->supportYields() );
             _capped = _c->capped();
 
             // TODO This violates the current Cursor interface abstraction, but for now it's simpler to keep our own set of
@@ -167,8 +167,7 @@ namespace mongo {
             _mustAdvance = true;
         }
         virtual QueryOp *_createChild() const {
-            return new QueryOptimizerCursorOp( _matchCounter.aggregateNscanned(), _selectionPolicy,
-                                              _matchCounter.cumulativeCount() );
+            return new QueryOptimizerCursorOp( _matchCounter.aggregateNscanned(), _selectionPolicy, _requireOrder, _matchCounter.cumulativeCount() );
         }
         DiskLoc currLoc() const { return _c ? _c->currLoc() : DiskLoc(); }
         BSONObj currKey() const { return _c ? _c->currKey() : BSONObj(); }
@@ -236,6 +235,7 @@ namespace mongo {
         ClientCursor::YieldData _yieldData;
         bool _yieldRecoveryFailed;
         const QueryPlanSelectionPolicy &_selectionPolicy;
+        bool _requireOrder;
     };
     
     /**
@@ -244,13 +244,13 @@ namespace mongo {
      * a single plan, this cursor becomes a simple wrapper around that single
      * plan's cursor (called the 'takeover' cursor).
      */
-    class QueryOptimizerCursor : public Cursor {
+    class QueryOptimizerCursorImpl : public QueryOptimizerCursor {
     public:
-        QueryOptimizerCursor( auto_ptr<MultiPlanScanner> &mps,
-                             const QueryPlanSelectionPolicy &planPolicy ) :
+        QueryOptimizerCursorImpl( auto_ptr<MultiPlanScanner> &mps, const QueryPlanSelectionPolicy &planPolicy, bool requireOrder ) :
         _mps( mps ),
-        _originalOp( new QueryOptimizerCursorOp( _nscanned, planPolicy ) ),
+        _originalOp( new QueryOptimizerCursorOp( _nscanned, planPolicy, requireOrder ) ),
         _currOp(),
+        _completeOp(),
         _nscanned() {
             _mps->initialOp( _originalOp );
             shared_ptr<QueryOp> op = _mps->nextOp();
@@ -426,7 +426,20 @@ namespace mongo {
             assertOk();
             return _currOp->currentMatches( details );
         }
+        
+        virtual const QueryPlan *queryPlan() const {
+            assertOk();
+            return _currOp ? &_currOp->qp() : 0;
+        }
+        
+        virtual const QueryPlan *completeQueryPlan() const {
+            return _completeOp ? &_completeOp->qp() : 0;
+        }
 
+        virtual const MultiPlanScanner *multiPlanScanner() const {
+            return _mps.get();
+        }
+        
     private:
         /**
          * Advances the QueryPlanSet::Runner.
@@ -472,6 +485,9 @@ namespace mongo {
                                                      _nscanned - qocop->cursor()->nscanned() ) );
                 }
             }
+            else {
+                _completeOp = qocop;
+            }
 
             return ok();
         }
@@ -500,16 +516,16 @@ namespace mongo {
         auto_ptr<MultiPlanScanner> _mps;
         shared_ptr<QueryOptimizerCursorOp> _originalOp;
         QueryOptimizerCursorOp *_currOp;
+        QueryOptimizerCursorOp *_completeOp;
         shared_ptr<Cursor> _takeover;
         long long _nscanned;
         // Using a SmallDupSet seems a bit hokey, but I've measured a 5% performance improvement with ~100 document non multi key scans.
         SmallDupSet _dups;
     };
     
-    shared_ptr<Cursor> newQueryOptimizerCursor( auto_ptr<MultiPlanScanner> mps,
-                                               const QueryPlanSelectionPolicy &planPolicy ) {
+    shared_ptr<Cursor> newQueryOptimizerCursor( auto_ptr<MultiPlanScanner> mps, const QueryPlanSelectionPolicy &planPolicy, bool requireOrder ) {
         try {
-            return shared_ptr<Cursor>( new QueryOptimizerCursor( mps, planPolicy ) );
+            return shared_ptr<Cursor>( new QueryOptimizerCursorImpl( mps, planPolicy, requireOrder ) );
         } catch( const AssertionException &e ) {
             if ( e.getCode() == OutOfOrderDocumentsAssertionCode ) {
                 // If no indexes follow the requested sort order, return an
@@ -557,7 +573,9 @@ namespace mongo {
         }
 
         bool mayShortcutQueryOptimizer =
-        ( !parsedQuery || ( parsedQuery->getMin().isEmpty() && parsedQuery->getMax().isEmpty() ) ) &&
+        ( !parsedQuery ||
+         ( parsedQuery->getMin().isEmpty() &&
+          parsedQuery->getMax().isEmpty() ) ) &&
         hint.eoo();
         if ( mayShortcutQueryOptimizer ) {
             if ( planPolicy.permitOptimalNaturalPlan() && query.isEmpty() && order.isEmpty() && !requireIndex ) {
@@ -580,7 +598,8 @@ namespace mongo {
         }
         auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order, &hint, true, parsedQuery ? parsedQuery->getMin() : BSONObj(), parsedQuery ? parsedQuery->getMax() : BSONObj() ) ); // mayYield == false
         const QueryPlan *singlePlan = mps->singleCursor();
-        if ( singlePlan ) {
+        bool requireOrder = ( parsedQuery == 0 );
+        if ( singlePlan && ( requireOrder || !singlePlan->scanAndOrderRequired() ) ) {
             if ( planPolicy.permitPlan( *singlePlan ) ) {
                 shared_ptr<Cursor> single = singlePlan->newCursor();
                 if ( !query.isEmpty() && !single->matcher() ) {
@@ -595,7 +614,7 @@ namespace mongo {
                 return single;
             }
         }
-        return newQueryOptimizerCursor( mps, planPolicy );
+        return newQueryOptimizerCursor( mps, planPolicy, requireOrder );
     }
 
     /** This interface just available for testing. */
@@ -603,7 +622,7 @@ namespace mongo {
                                                const BSONObj &order,
                                                const QueryPlanSelectionPolicy &planPolicy ) {
         auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order ) ); // mayYield == false
-        return newQueryOptimizerCursor( mps, planPolicy );
+        return newQueryOptimizerCursor( mps, planPolicy, true );
     }
         
 } // namespace mongo;

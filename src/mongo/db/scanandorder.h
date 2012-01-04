@@ -40,7 +40,7 @@ namespace mongo {
 
         /**
          * @return first key of the object that would be encountered while
-         * scanning index with keySpec 'pattern' using constraints 'frs', or
+         * scanning an index with keySpec 'pattern' using constraints 'frs', or
          * BSONObj() if no such key.
          */
         BSONObj getKeyFromObject(const BSONObj &o) const {

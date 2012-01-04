@@ -591,7 +591,7 @@ doneCheckOrder:
             if ( _bestGuessOnly || res->complete() || _plans.size() > 1 )
                 return res;
             // A cached plan was used, so clear the plan for this query pattern and retry the query without a cached plan.
-            // Carefull here, as the namespace may have been dropped.
+            // Careful here, as the namespace may have been dropped.
             QueryUtilIndexed::clearIndexesForPatterns( *_frsp, _order );
             init();
         }
@@ -1042,7 +1042,6 @@ doneCheckOrder:
     const QueryPlan *MultiPlanScanner::singlePlan() const {
         if ( _or ||
             _currentQps->nPlans() != 1 ||
-            _currentQps->firstPlan()->scanAndOrderRequired() ||
             _currentQps->usingCachedPlan() ) {
             return 0;
         }
@@ -1065,11 +1064,12 @@ doneCheckOrder:
         return QueryUtilIndexed::uselessOr( *_org, nsd, -1 );
     }
     
-    MultiCursor::MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order,
-                             shared_ptr<CursorOp> op, bool mayYield ) :
-    _mps( new MultiPlanScanner( ns, pattern, order, BSONObj(), true, BSONObj(), BSONObj(),
-                               !op.get(), mayYield ) ),
-    _nscanned() {
+    void MultiPlanScanner::clearIndexesForPatterns() const {
+        QueryUtilIndexed::clearIndexesForPatterns( _currentQps->frsp(), _currentQps->order() );
+    }
+
+    MultiCursor::MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order, shared_ptr<CursorOp> op, bool mayYield )
+    : _mps( new MultiPlanScanner( ns, pattern, order, BSONObj(), true, BSONObj(), BSONObj(), !op.get(), mayYield ) ), _nscanned() {
         if ( op.get() ) {
             _op = op;
         }
