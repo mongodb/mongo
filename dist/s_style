@@ -23,7 +23,7 @@ for f in `sed -e '/^[a-z]/! d' filelist` $extra; do
 	       -e '/va_start/,/va_end/{=;p;}' $f | \
 		sed 'N;s/\n/:/' | \
 		egrep 'return|WT_RET' | \
-		sed -e "s,^,$f:," -e 's/$/ [Early exit]/'
+		sed -e "s,^,$f:," -e 's/$/ [return skips API_END call]/'
 
 	# Bad code we can't easily fix
 	grep -Hn 'bzero|exit[ ]*\(1\)|^[	 ]+[|&=+-]' $f
