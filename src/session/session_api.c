@@ -251,18 +251,50 @@ err:	API_END(session);
  */
 static int
 __session_truncate(WT_SESSION *wt_session,
-    const char *uri, WT_CURSOR *begin, WT_CURSOR *end, const char *config)
+    const char *uri, WT_CURSOR *start, WT_CURSOR *stop, const char *config)
 {
 	WT_SESSION_IMPL *session;
 	int ret;
 
-	WT_UNUSED(begin);
-	WT_UNUSED(end);
-
 	session = (WT_SESSION_IMPL *)wt_session;
 
 	SESSION_API_CALL(session, truncate, config, cfg);
-	ret = uri == NULL ? ENOTSUP : __wt_schema_truncate(session, uri, cfg);
+	/*
+	 * If the URI is specified, we don't need a start/stop, if start/stop
+	 * is specified, we don't need a URI.
+	 */
+	if ((uri == NULL && start == NULL && stop == NULL) ||
+	    (uri != NULL && (start != NULL || stop != NULL)))
+		WT_ERR_MSG(session, EINVAL,
+		    "the truncate method should be passed either a URI or "
+		    "start/stop cursors, but not both");
+	if (uri == NULL) {
+		/*
+		 * From a starting/stopping cursor to the begin/end of the
+		 * object is easy, walk the object.
+		 */
+		if (start == NULL)
+			for (;;) {
+				WT_ERR(stop->remove(stop));
+				if ((ret = stop->prev(stop)) != 0) {
+					if (ret == WT_NOTFOUND)
+						ret = 0;
+					break;
+				}
+			}
+		else if (stop == NULL)
+			for (;;) {
+				WT_ERR(start->remove(start));
+				if ((ret = start->next(start)) != 0) {
+					if (ret == WT_NOTFOUND)
+						ret = 0;
+					break;
+				}
+			}
+		else
+			WT_ERR(ENOTSUP);		/* XXX */
+	} else
+		ret = __wt_schema_truncate(session, uri, cfg);
 err:	API_END(session);
 	return (ret);
 }

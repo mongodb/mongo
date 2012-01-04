@@ -698,26 +698,27 @@ struct wt_session {
 	int __F(sync)(WT_SESSION *session,
 	    const char *name, const char *config);
 
-	/*! Truncate a table. @notyet{session->truncate}
+	/*! Truncate a table or a cursor range.
 	 *
 	 * @dontinclude ex_all.c
 	 * @skipline ->truncate
 	 *
+	 * @snippet ex_all.c Truncate cursor
+	 *
 	 * @param session the session handle
 	 * @param name the URI of the table to truncate
-	 * @param start optional cursor marking the start of the truncate
-	 * operation.  If <code>NULL</code>, the truncate starts from the
-	 * beginning of the table
-	 * @param end optional cursor marking the end of the truncate
-	 * operation.  If <code>NULL</code>, the truncate continues to the end
-	 * of the table
-	 * @param name the name of the table
+	 * @param start optional cursor marking the first record discarded;
+	 * if <code>NULL</code>, the truncate starts from the beginning of
+	 * the table
+	 * @param stop optional cursor marking the last record discarded;
+	 * if <code>NULL</code>, the truncate continues to the end of the
+	 * table
 	 * @configempty{session.truncate, see dist/api_data.py}
 	 * @errors
 	 */
 	int __F(truncate)(WT_SESSION *session,
 	    const char *name,
-	    WT_CURSOR *start, WT_CURSOR *end, const char *config);
+	    WT_CURSOR *start, WT_CURSOR *stop, const char *config);
 
 	/*! Upgrade a table.
 	 *

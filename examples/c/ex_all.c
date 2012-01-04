@@ -263,6 +263,14 @@ session_ops(WT_SESSION *session)
 
 	ret = session->truncate(session, "table:mytable", NULL, NULL, NULL);
 
+	{
+	/*! [Truncate cursor] */
+	WT_CURSOR *start, *stop;
+
+	ret = session->truncate(session, NULL, start, stop, NULL);
+	/*! [Truncate cursor] */
+	}
+
 	ret = session->verify(session, "table:mytable", NULL);
 
 	ret = session->begin_transaction(session, NULL);
