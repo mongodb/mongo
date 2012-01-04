@@ -26,6 +26,7 @@ namespace mongo {
             static concept extent;
             static concept record;
             static concept deletedrecord;
+            static concept btreebucket;
         private:
             const char * c;
             concept(const char *);

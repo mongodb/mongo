@@ -30,6 +30,7 @@ namespace mongo {
         concept concept::extent("extent");
         concept concept::record("record");
         concept concept::deletedrecord("deletedrecord");
+        concept concept::btreebucket("btreebucket");
 
         class X : public UnitTest { 
         public:

@@ -490,7 +490,9 @@ namespace mongo {
     inline 
     const BtreeBucket<V> * DiskLoc::btree() const {
         assert( _a != -1 );
-        return (const BtreeBucket<V> *) rec()->data;
+        Record *r = rec();
+        memconcept::is(r, memconcept::concept::btreebucket, "", 8192);
+        return (const BtreeBucket<V> *) r->data;
     }
 
 } // namespace mongo
