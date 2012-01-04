@@ -947,7 +947,7 @@ namespace mongo {
                     }
                     else if ( queryResponseBuilder.enoughForFirstBatch() ) {
                         /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
-                        if ( pq.wantMore() && pq.getNumToReturn() != 1 && useCursors ) {
+                        if ( pq.wantMore() && pq.getNumToReturn() != 1 ) {
                             cursor->advance();
                             cursorid = ccPointer->cursorid();
                         }
