@@ -9,6 +9,35 @@
 #define	WT_BTREE_MINOR_VERSION	0
 
 /*
+ * The minimum btree leaf and internal page sizes are 512B, the maximum 512MB.
+ * (The maximum of 512MB is enforced by the software, it could be set as high
+ * as 4GB.)
+ */
+#define	WT_BTREE_ALLOCATION_SIZE_MIN	512
+#define	WT_BTREE_ALLOCATION_SIZE_MAX	(128 * WT_MEGABYTE)
+#define	WT_BTREE_PAGE_SIZE_MAX		(512 * WT_MEGABYTE)
+
+/*
+ * Split page size calculation -- we don't want to repeatedly split every time
+ * a new entry is added, so we split to a smaller-than-maximum page size.
+ */
+#define	WT_SPLIT_PAGE_SIZE(pagesize, allocsize, pct)			\
+	WT_ALIGN(((uintmax_t)(pagesize) * (pct)) / 100, allocsize)
+
+/*
+ * Limit the maximum size of a single object to 4GB - 512B: in some places we
+ * allocate memory to store objects plus associated data structures.  512B is
+ * far more space than we ever need, but I'm not eager to debug any off-by-ones,
+ * and storing a 4GB object in the file is flatly insane, anyway.
+ *
+ * Key and data item lengths are stored in 32-bit unsigned integers, meaning
+ * the largest key or data item is 4GB (minus a few bytes).  Record numbers
+ * are stored in 64-bit unsigned integers, meaning the largest record number
+ * is "really, really big".
+ */
+#define	WT_BTREE_OBJECT_SIZE_MAX	(UINT32_MAX - 512)
+
+/*
  * XXX
  * The server threads use their own WT_SESSION_IMPL handles because they may
  * want to block (for example, the eviction server calls reconciliation, and
@@ -115,32 +144,3 @@ struct __wt_salvage_cookie {
 
 	int	 done;				/* Ignore the rest */
 };
-
-/*
- * The minimum btree leaf and internal page sizes are 512B, the maximum 512MB.
- * (The maximum of 512MB is enforced by the software, it could be set as high
- * as 4GB.)
- */
-#define	WT_BTREE_ALLOCATION_SIZE_MIN	512
-#define	WT_BTREE_ALLOCATION_SIZE_MAX	(128 * WT_MEGABYTE)
-#define	WT_BTREE_PAGE_SIZE_MAX		(512 * WT_MEGABYTE)
-
-/*
- * Split page size calculation -- we don't want to repeatedly split every time
- * a new entry is added, so we split to a smaller-than-maximum page size.
- */
-#define	WT_SPLIT_PAGE_SIZE(pagesize, allocsize, pct)			\
-	WT_ALIGN(((uintmax_t)(pagesize) * (pct)) / 100, allocsize)
-
-/*
- * Limit the maximum size of a single object to 4GB - 512B: in some places we
- * allocate memory to store objects plus associated data structures.  512B is
- * far more space than we ever need, but I'm not eager to debug any off-by-ones,
- * and storing a 4GB object in the file is flatly insane, anyway.
- *
- * Key and data item lengths are stored in 32-bit unsigned integers, meaning
- * the largest key or data item is 4GB (minus a few bytes).  Record numbers
- * are stored in 64-bit unsigned integers, meaning the largest record number
- * is "really, really big".
- */
-#define	WT_BTREE_OBJECT_SIZE_MAX	(UINT32_MAX - 512)
