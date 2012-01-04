@@ -1205,7 +1205,7 @@ namespace mongo {
         set_new_handler( my_new_handler );
     }
 
-#else
+#else   // WIN32
     void consoleTerminate( const char* controlCodeName ) {
         Client::initThread( "consoleTerminate" );
         log() << "got " << controlCodeName << ", will terminate after current cmd ends" << endl;
@@ -1303,6 +1303,6 @@ namespace mongo {
         _set_purecall_handler( myPurecallHandler );
     }
 
-#endif
+#endif  // if !defined(_WIN32)
 
 } // namespace mongo
