@@ -1,0 +1,14 @@
+# -*- mode: python -*-
+
+Import( "env has_option" )
+
+env.SConscript( [
+        "pcre-${PCRE_VERSION}/SConscript",
+        ] )
+
+if has_option( "use-system-pcre" ) or has_option( "use-system-all" ):
+    env.StaticLibrary( "pcrecpp", ['mongo_pcrecpp.cc'],
+                       SYSLIBDEPS=[ 'pcrecpp' ] )
+else:
+    env.StaticLibrary( "pcrecpp", ['mongo_pcrecpp.cc'],
+                       LIBDEPS=[ 'pcre-${PCRE_VERSION}/pcrecpp' ] )
