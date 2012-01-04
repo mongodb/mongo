@@ -242,11 +242,10 @@ print(WT_SESSION *session)
 		case ROW:
 			if ((ret = cursor->get_key(cursor, &key)) != 0)
 				break;
-			if (printf("%s\n", key) < 0) {
-				ret = errno;
+			if ((ret = cursor->get_value(cursor, &value)) != 0)
 				break;
-			}
-			/* FALLTHROUGH */
+			printf("%s\t%s\n", key, value);
+			break;
 		case VAR:
 			if ((ret = cursor->get_key(cursor, &recno)) != 0)
 				break;
