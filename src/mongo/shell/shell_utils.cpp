@@ -738,8 +738,8 @@ namespace mongo {
             }
             else {
                 DBClientConnection conn;
-                conn.connect("127.0.0.1:" + BSONObjBuilder::numStr(port));
                 try {
+                    conn.connect("127.0.0.1:" + BSONObjBuilder::numStr(port));
                     conn.simpleCommand("admin", NULL, "shutdown");
                 }
                 catch (...) {
