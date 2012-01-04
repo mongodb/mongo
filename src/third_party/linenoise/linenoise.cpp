@@ -1624,10 +1624,10 @@ int InputBuffer::getInputLine( PromptInfo& pi ) {
         case META + LEFT_ARROW_KEY: // Emacs allows Meta, bash & readline don't
             killRing.lastAction = KillRing::actionOther;
             if ( pos > 0 ) {
-                while ( pos > 0 && !isalnum( buf[pos - 1] ) ) {
+                while ( pos > 0 && !isalnum( static_cast<unsigned char>( buf[pos - 1] ) ) ) {
                     --pos;
                 }
-                while ( pos > 0 && isalnum( buf[pos - 1] ) ) {
+                while ( pos > 0 && isalnum( static_cast<unsigned char>( buf[pos - 1] ) ) ) {
                     --pos;
                 }
                 refreshLine( pi );
@@ -1650,16 +1650,16 @@ int InputBuffer::getInputLine( PromptInfo& pi ) {
         case META + 'C':
             killRing.lastAction = KillRing::actionOther;
             if ( pos < len ) {
-                while ( pos < len && !isalnum( buf[pos] ) ) {
+                while ( pos < len && !isalnum( static_cast<unsigned char>( buf[pos] ) ) ) {
                     ++pos;
                 }
-                if ( pos < len && isalnum( buf[pos] ) ) {
+                if ( pos < len && isalnum( static_cast<unsigned char>( buf[pos] ) ) ) {
                     if ( buf[pos] >= 'a' && buf[pos] <= 'z' ) {
                         buf[pos] += 'A' - 'a';
                     }
                     ++pos;
                 }
-                while ( pos < len && isalnum( buf[pos] ) ) {
+                while ( pos < len && isalnum( static_cast<unsigned char>( buf[pos] ) ) ) {
                     if ( buf[pos] >= 'A' && buf[pos] <= 'Z' ) {
                         buf[pos] += 'a' - 'A';
                     }
@@ -1689,10 +1689,10 @@ int InputBuffer::getInputLine( PromptInfo& pi ) {
         case META + 'D':
             if ( pos < len ) {
                 int endingPos = pos;
-                while ( endingPos < len && !isalnum( buf[endingPos] ) ) {
+                while ( endingPos < len && !isalnum( static_cast<unsigned char>( buf[endingPos] ) ) ) {
                     ++endingPos;
                 }
-                while ( endingPos < len && isalnum( buf[endingPos] ) ) {
+                while ( endingPos < len && isalnum( static_cast<unsigned char>( buf[endingPos] ) ) ) {
                     ++endingPos;
                 }
                 killRing.kill( &buf[pos], endingPos - pos, true );
@@ -1725,10 +1725,10 @@ int InputBuffer::getInputLine( PromptInfo& pi ) {
         case META + RIGHT_ARROW_KEY: // Emacs allows Meta, bash & readline don't
             killRing.lastAction = KillRing::actionOther;
             if ( pos < len ) {
-                while ( pos < len && !isalnum( buf[pos] ) ) {
+                while ( pos < len && !isalnum( static_cast<unsigned char>( buf[pos] ) ) ) {
                     ++pos;
                 }
-                while ( pos < len && isalnum( buf[pos] ) ) {
+                while ( pos < len && isalnum( static_cast<unsigned char>( buf[pos] ) ) ) {
                     ++pos;
                 }
                 refreshLine( pi );
@@ -1749,10 +1749,10 @@ int InputBuffer::getInputLine( PromptInfo& pi ) {
         case META + ctrlChar( 'H' ):
             if ( pos > 0 ) {
                 int startingPos = pos;
-                while ( pos > 0 && !isalnum( buf[pos - 1] ) ) {
+                while ( pos > 0 && !isalnum( static_cast<unsigned char>( buf[pos - 1] ) ) ) {
                     --pos;
                 }
-                while ( pos > 0 && isalnum( buf[pos - 1] ) ) {
+                while ( pos > 0 && isalnum( static_cast<unsigned char>( buf[pos - 1] ) ) ) {
                     --pos;
                 }
                 killRing.kill( &buf[pos], startingPos - pos, false );
@@ -1790,10 +1790,10 @@ int InputBuffer::getInputLine( PromptInfo& pi ) {
         case META + 'L':
             killRing.lastAction = KillRing::actionOther;
             if ( pos < len ) {
-                while ( pos < len && !isalnum( buf[pos] ) ) {
+                while ( pos < len && !isalnum( static_cast<unsigned char>( buf[pos] ) ) ) {
                     ++pos;
                 }
-                while ( pos < len && isalnum( buf[pos] ) ) {
+                while ( pos < len && isalnum( static_cast<unsigned char>( buf[pos] ) ) ) {
                     if ( buf[pos] >= 'A' && buf[pos] <= 'Z' ) {
                         buf[pos] += 'a' - 'A';
                     }
@@ -1866,10 +1866,10 @@ int InputBuffer::getInputLine( PromptInfo& pi ) {
         case META + 'U':
             killRing.lastAction = KillRing::actionOther;
             if ( pos < len ) {
-                while ( pos < len && !isalnum( buf[pos] ) ) {
+                while ( pos < len && !isalnum( static_cast<unsigned char>( buf[pos] ) ) ) {
                     ++pos;
                 }
-                while ( pos < len && isalnum( buf[pos] ) ) {
+                while ( pos < len && isalnum( static_cast<unsigned char>( buf[pos] ) ) ) {
                     if ( buf[pos] >= 'a' && buf[pos] <= 'z' ) {
                         buf[pos] += 'A' - 'a';
                     }

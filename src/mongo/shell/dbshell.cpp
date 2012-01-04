@@ -348,7 +348,7 @@ bool isBalanced( string code ) {
             break;
         }
         if ( isOpSymbol( code[i] ) ) danglingOp = true;
-        else if ( !std::isspace( code[i] ) ) danglingOp = false;
+        else if ( !std::isspace( static_cast<unsigned char>( code[i] ) ) ) danglingOp = false;
     }
 
     return brackets == 0 && parens == 0 && !danglingOp;
