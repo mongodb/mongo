@@ -76,17 +76,11 @@ def testsFromArg(tests, loader, arg):
 if __name__ == '__main__':
     tests = unittest.TestSuite()
 
-    # Without arguments, do discovery
-    if len(sys.argv) < 2:
-        from discover import defaultTestLoader as loader
-        suites = loader.discover(suitedir)
-        suites = sorted(suites, key=lambda c: str(list(c)[0]))
-        tests.addTests(generate_scenarios(suites))
-        
-    # Otherwise, turn numbers and ranges into test module names
+    # Turn numbers and ranges into test module names
     preserve = timestamp = debug = gdbSub = False
     verbose = 1
     args = sys.argv[1:]
+    testargs = []
     while len(args) > 0:
         arg = args.pop(0)
         from unittest import defaultTestLoader as loader
@@ -95,7 +89,6 @@ if __name__ == '__main__':
         if arg[0] == '-':
             option = arg[1:]
             if option == '-debug' or option == 'd':
-                import pdb
                 debug = True
                 continue
             if option == '-preserve' or option == 'p':
@@ -119,11 +112,23 @@ if __name__ == '__main__':
             print 'unknown arg: ' + arg
             usage()
             sys.exit(False)
+        testargs.append(arg)
 
-        testsFromArg(tests, loader, arg)
-
-        if debug:
-                pdb.set_trace()
+    # Without arguments, do discovery
+    if len(testargs) == 0:
+        from discover import defaultTestLoader as loader
+        suites = loader.discover(suitedir)
+        suites = sorted(suites, key=lambda c: str(list(c)[0]))
+        tests.addTests(generate_scenarios(suites))
+    else:
+        for arg in testargs:
+            testsFromArg(tests, loader, arg)
+        
     wttest.WiredTigerTestCase.globalSetup(preserve, timestamp, gdbSub, verbose)
+
+    if debug:
+        import pdb
+        pdb.set_trace()
+
     result = wttest.runsuite(tests)
     sys.exit(not result.wasSuccessful())
