@@ -2,7 +2,7 @@
 #
 # See the file LICENSE for redistribution information.
 #
-# Copyright (c) 2008-2011 WiredTiger, Inc.
+# Copyright (c) 2008-2012 WiredTiger, Inc.
 #   All rights reserved.
 #
 # WiredTigerTestCase
@@ -52,7 +52,8 @@ class WiredTigerTestCase(unittest.TestCase):
 
     # Can be overridden
     def setUpConnectionOpen(self, dir):
-        conn = wiredtiger.wiredtiger_open(dir, 'create')
+        conn = wiredtiger.wiredtiger_open(dir, 'create,error_prefix="' +
+                                          self.shortid() + ': ' + '"')
         self.pr(`conn`)
         return conn
         
