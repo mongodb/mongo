@@ -2,11 +2,11 @@
 #
 # See the file LICENSE for redistribution information.
 #
-# Copyright (c) 2008-2011 WiredTiger, Inc.
+# Copyright (c) 2008-2012 WiredTiger, Inc.
 #	All rights reserved.
 #
-# test001.py
-#	Basic operations
+# test_index01.py
+#	basic tests for indices
 #
 
 import unittest
@@ -15,7 +15,7 @@ from wiredtiger import WT_NOTFOUND
 import wttest
 
 class test_index01(wttest.WiredTigerTestCase):
-	'''Test various tree types becoming empty'''
+	'''Test basic operations for indices'''
 
 	basename = 'test_index01'
 	tablename = 'table:' + basename
@@ -112,10 +112,18 @@ class test_index01(wttest.WiredTigerTestCase):
 		self.create_table()
 		self.insert('smith', 1, 'HR', 'manager', 100000, 1970)
 		self.check_exists('smith', 1, 0)
+                result = ''
 		for i in xrange(self.NUM_INDICES):
-			print 'Index(%d) contents:' % i
-			print '\n'.join(repr(cols) for cols in self.index_iter(i))
-			print
+			result += '\n'.join(repr(cols)
+				for cols in self.index_iter(i))
+			result += '\n\n'
+		self.assertEqual(result, \
+			"['HR', 'HR', 'manager', 100000, 1970]\n\n" + \
+			"['smith', 1970, 'HR', 'manager', 100000, 1970]\n\n" + \
+			"[100000, 'HR', 'manager', 100000, 1970]\n\n" + \
+			"['HR', 'manager', 'smith', 'HR', 'manager', 100000, 1970]\n\n" + \
+			"['smith', 1, 'HR', 'manager', 100000, 1970]\n\n" + \
+			"[1, 'smith', 'HR', 'manager', 100000, 1970]\n\n")
 		self.drop_table()
 
 	def test_update(self):
@@ -124,10 +132,18 @@ class test_index01(wttest.WiredTigerTestCase):
 		self.insert('smith', 1, 'HR', 'manager', 100000, 1970)
 		self.update('smith', 1, 'HR', 'janitor', 10000, 1970)
 		self.check_exists('smith', 1, 0)
+                result = ''
 		for i in xrange(self.NUM_INDICES):
-			print 'Index(%d) contents:' % i
-			print '\n'.join(repr(cols) for cols in self.index_iter(i))
-			print
+			result += '\n'.join(repr(cols)
+				for cols in self.index_iter(i))
+			result += '\n\n'
+		self.assertEqual(result, \
+			"['HR', 'HR', 'janitor', 10000, 1970]\n\n" + \
+			"['smith', 1970, 'HR', 'janitor', 10000, 1970]\n\n" + \
+			"[10000, 'HR', 'janitor', 10000, 1970]\n\n" + \
+			"['HR', 'janitor', 'smith', 'HR', 'janitor', 10000, 1970]\n\n" + \
+			"['smith', 1, 'HR', 'janitor', 10000, 1970]\n\n" + \
+			"[1, 'smith', 'HR', 'janitor', 10000, 1970]\n\n")
 		self.drop_table()
 
 	def test_insert_overwrite(self):
@@ -139,10 +155,25 @@ class test_index01(wttest.WiredTigerTestCase):
 		self.insert_overwrite('jones', 2, 'IT', 'sysadmin', 50000, 1980)
 		self.check_exists('smith', 1, 0)
 		self.check_exists('jones', 2, 0)
+                result = ''
 		for i in xrange(self.NUM_INDICES):
-			print 'Index(%d) contents:' % i
-			print '\n'.join(repr(cols) for cols in self.index_iter(i))
-			print
+			result += '\n'.join(repr(cols)
+				for cols in self.index_iter(i))
+			result += '\n\n'
+		self.assertEqual(result, \
+			"['HR', 'HR', 'janitor', 10000, 1970]\n" + \
+			"['IT', 'IT', 'sysadmin', 50000, 1980]\n\n" + \
+			"['jones', 1980, 'IT', 'sysadmin', 50000, 1980]\n" + \
+			"['smith', 1970, 'HR', 'janitor', 10000, 1970]\n\n" + \
+			"[10000, 'HR', 'janitor', 10000, 1970]\n" + \
+			"[50000, 'IT', 'sysadmin', 50000, 1980]\n\n" + \
+			"['HR', 'janitor', 'smith', 'HR', 'janitor', 10000, 1970]\n" + \
+			"['IT', 'sysadmin', 'jones', 'IT', 'sysadmin', 50000, 1980]\n\n" + \
+			"['jones', 2, 'IT', 'sysadmin', 50000, 1980]\n" + \
+			"['smith', 1, 'HR', 'janitor', 10000, 1970]\n\n" + \
+			"[1, 'smith', 'HR', 'janitor', 10000, 1970]\n" + \
+			"[2, 'jones', 'IT', 'sysadmin', 50000, 1980]\n\n")
+
 		self.drop_table()
 
 	def test_insert_delete(self):
