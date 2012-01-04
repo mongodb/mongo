@@ -526,7 +526,7 @@ struct wt_session {
 	/*! @name Table operations
 	 * @{
 	 */
-	/*! Create a table, column group or index.
+	/*! Create a table, column group, index or file.
 	 *
 	 * @snippet ex_all.c Create a table
 	 *
@@ -622,13 +622,13 @@ struct wt_session {
 	int __F(create)(WT_SESSION *session,
 	    const char *name, const char *config);
 
-	/*! Drop (delete) a table.
+	/*! Drop (delete) an object.
 	 *
 	 * @dontinclude ex_all.c
 	 * @skipline ->drop
 	 *
 	 * @param session the session handle
-	 * @param name the URI of the table to drop, such as \c "table:stock"
+	 * @param name the URI of the object to drop, such as \c "table:stock"
 	 * @configstart{session.drop, see dist/api_data.py}
 	 * @config{force, return success if the object does not exist.,a boolean
 	 * flag; default \c false.}
@@ -638,21 +638,21 @@ struct wt_session {
 	int __F(drop)(WT_SESSION *session,
 	    const char *name, const char *config);
 
-	/*! Rename a table. @notyet{session->rename}
+	/*! Rename an object. @notyet{session->rename}
 	 *
 	 * @dontinclude ex_all.c
 	 * @skipline ->rename
 	 *
 	 * @param session the session handle
-	 * @param oldname the current URI of the table, such as \c "table:old"
-	 * @param newname the new name of the table, e.g., \c "table:new"
+	 * @param oldname the current URI of the object, such as \c "table:old"
+	 * @param newname the new name of the object, such as \c "table:new"
 	 * @configempty{session.rename, see dist/api_data.py}
 	 * @errors
 	 */
 	int __F(rename)(WT_SESSION *session,
 	    const char *oldname, const char *newname, const char *config);
 
-	/*! Salvage a table.
+	/*! Salvage a file or table
 	 *
 	 * Salvage rebuilds the file, or files of which a table is comprised,
 	 * discarding any corrupted file blocks.
@@ -680,7 +680,7 @@ struct wt_session {
 	int __F(salvage)(WT_SESSION *session,
 	    const char *name, const char *config);
 
-	/*! Sync a table.
+	/*! Sync a file or table.
 	 *
 	 * Flush dirty pages from a table to stable storage.  Note that not
 	 * all pages are necessarily flushed (pages pinned in memory, or in
@@ -691,14 +691,14 @@ struct wt_session {
 	 * @skipline ->sync
 	 *
 	 * @param session the session handle
-	 * @param name the URI of the table to sync
+	 * @param name the URI of the file or table to sync
 	 * @configempty{session.sync, see dist/api_data.py}
 	 * @errors
 	 */
 	int __F(sync)(WT_SESSION *session,
 	    const char *name, const char *config);
 
-	/*! Truncate a table or a cursor range.
+	/*! Truncate a file, table or a cursor range.
 	 *
 	 * @dontinclude ex_all.c
 	 * @skipline ->truncate
@@ -706,7 +706,7 @@ struct wt_session {
 	 * @snippet ex_all.c Truncate cursor
 	 *
 	 * @param session the session handle
-	 * @param name the URI of the table to truncate
+	 * @param name the URI of the file or table to truncate
 	 * @param start optional cursor marking the first record discarded;
 	 * if <code>NULL</code>, the truncate starts from the beginning of
 	 * the table
@@ -720,7 +720,7 @@ struct wt_session {
 	    const char *name,
 	    WT_CURSOR *start, WT_CURSOR *stop, const char *config);
 
-	/*! Upgrade a table.
+	/*! Upgrade a file or table.
 	 *
 	 * Upgrade upgrades a file, or the files of which a table is comprised.
 	 *
@@ -735,7 +735,7 @@ struct wt_session {
 	int __F(upgrade)(WT_SESSION *session,
 	    const char *name, const char *config);
 
-	/*! Verify a table.
+	/*! Verify a file or table.
 	 *
 	 * Verify reports if a file, or the files of which a table is
 	 * comprised, have been corrupted.  The WT_SESSION::salvage method
