@@ -17,6 +17,7 @@
 
 #pragma once
 
+#include <cfloat>
 #include <string>
 #include <string.h>
 #include <stdio.h>
@@ -36,7 +37,7 @@ namespace mongo {
     const int BSONObjMaxUserSize = 16 * 1024 * 1024;
 
     /*
-       Sometimeswe we need objects slightly larger - an object in the replication local.oplog
+       Sometimes we need objects slightly larger - an object in the replication local.oplog
        is slightly larger than a user object for example.
     */
     const int BSONObjMaxInternalSize = BSONObjMaxUserSize + ( 16 * 1024 );
@@ -230,42 +231,51 @@ namespace mongo {
         void decouple(); // not allowed. not implemented.
     };
 
+    namespace {
 #if defined(_WIN32)
-#pragma warning( push )
-// warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS.
-#pragma warning( disable : 4996 )
+        int (*mongo_snprintf)(char *str, size_t size, const char *format, ...) = &sprintf_s;
+#else
+        int (*mongo_snprintf)(char *str, size_t size, const char *format, ...) = &snprintf;
 #endif
+    }
 
     /** stringstream deals with locale so this is a lot faster than std::stringstream for UTF8 */
     class StringBuilder {
     public:
+        static const size_t MONGO_DBL_SIZE = 3 + DBL_MANT_DIG - DBL_MIN_EXP;
+        static const size_t MONGO_S32_SIZE = 12;
+        static const size_t MONGO_U32_SIZE = 11;
+        static const size_t MONGO_S64_SIZE = 23;
+        static const size_t MONGO_U64_SIZE = 22;
+        static const size_t MONGO_S16_SIZE = 7;
+
         StringBuilder( int initsize=256 )
             : _buf( initsize ) {
         }
 
         StringBuilder& operator<<( double x ) {
-            return SBNUM( x , 25 , "%g" );
+            return SBNUM( x , MONGO_DBL_SIZE , "%g" );
         }
         StringBuilder& operator<<( int x ) {
-            return SBNUM( x , 11 , "%d" );
+            return SBNUM( x , MONGO_S32_SIZE , "%d" );
         }
         StringBuilder& operator<<( unsigned x ) {
-            return SBNUM( x , 11 , "%u" );
+            return SBNUM( x , MONGO_U32_SIZE , "%u" );
         }
         StringBuilder& operator<<( long x ) {
-            return SBNUM( x , 22 , "%ld" );
+            return SBNUM( x , MONGO_S64_SIZE , "%ld" );
         }
         StringBuilder& operator<<( unsigned long x ) {
-            return SBNUM( x , 22 , "%lu" );
+            return SBNUM( x , MONGO_U64_SIZE , "%lu" );
         }
         StringBuilder& operator<<( long long x ) {
-            return SBNUM( x , 22 , "%lld" );
+            return SBNUM( x , MONGO_S64_SIZE , "%lld" );
         }
         StringBuilder& operator<<( unsigned long long x ) {
-            return SBNUM( x , 22 , "%llu" );
+            return SBNUM( x , MONGO_U64_SIZE , "%llu" );
         }
         StringBuilder& operator<<( short x ) {
-            return SBNUM( x , 8 , "%hd" );
+            return SBNUM( x , MONGO_S16_SIZE , "%hd" );
         }
         StringBuilder& operator<<( char c ) {
             _buf.grow( 1 )[0] = c;
@@ -273,10 +283,12 @@ namespace mongo {
         }
 
         void appendDoubleNice( double x ) {
-            int prev = _buf.l;
-            char * start = _buf.grow( 32 );
-            int z = sprintf( start , "%.16g" , x );
+            const int prev = _buf.l;
+            const int maxSize = 32; 
+            char * start = _buf.grow( maxSize );
+            int z = mongo_snprintf( start , maxSize , "%.16g" , x );
             assert( z >= 0 );
+            assert( z < maxSize );
             _buf.l = prev + z;
             if( strchr(start, '.') == 0 && strchr(start, 'E') == 0 && strchr(start, 'N') == 0 ) {
                 write( ".0" , 2 );
@@ -308,15 +320,12 @@ namespace mongo {
         template <typename T>
         StringBuilder& SBNUM(T val,int maxSize,const char *macro)  {
             int prev = _buf.l;
-            int z = sprintf( _buf.grow(maxSize) , macro , (val) );
+            int z = mongo_snprintf( _buf.grow(maxSize) , maxSize , macro , (val) );
             assert( z >= 0 );
+            assert( z < maxSize );
             _buf.l = prev + z;
             return *this;
         }
     };
-
-#if defined(_WIN32)
-#pragma warning( pop )
-#endif
 
 } // namespace mongo
