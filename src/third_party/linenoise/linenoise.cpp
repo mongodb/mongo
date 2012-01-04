@@ -1000,6 +1000,11 @@ static int linenoiseReadChar( void ){
             continue;
         }
         modifierKeys = 0;
+        // AltGr is encoded as ( LEFT_CTRL_PRESSED | RIGHT_ALT_PRESSED ), so don't treat this combination as either CTRL or META
+        // we just turn off those two bits, so it is still possible to combine CTRL and/or META with an AltGr key by using right-Ctrl and/or left-Alt
+        if ( ( rec.Event.KeyEvent.dwControlKeyState & ( LEFT_CTRL_PRESSED | RIGHT_ALT_PRESSED ) ) == ( LEFT_CTRL_PRESSED | RIGHT_ALT_PRESSED ) ) {
+            rec.Event.KeyEvent.dwControlKeyState &= ~( LEFT_CTRL_PRESSED | RIGHT_ALT_PRESSED );
+        }
         if ( rec.Event.KeyEvent.dwControlKeyState & ( RIGHT_CTRL_PRESSED | LEFT_CTRL_PRESSED ) ) {
             modifierKeys |= CTRL;
         }
