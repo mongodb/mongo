@@ -7,8 +7,35 @@
 
 #include "wt_internal.h"
 
-static int  __desc_read(WT_SESSION_IMPL *, WT_BLOCK *, int);
-static int  __desc_update(WT_SESSION_IMPL *, WT_BLOCK *);
+static int __desc_read(WT_SESSION_IMPL *, WT_BLOCK *, int);
+static int __desc_update(WT_SESSION_IMPL *, WT_BLOCK *);
+
+#define	WT_FILEMODE	0666
+
+/*
+ * __wt_block_truncate --
+ *	Truncate a file.
+ */
+int
+__wt_block_truncate(WT_SESSION_IMPL *session, const char *filename)
+{
+	WT_FH *fh;
+	int ret;
+
+	/* Open the underlying file handle. */
+	WT_RET(__wt_open(session, filename, WT_FILEMODE, 0, &fh));
+
+	/* Truncate the file. */
+	WT_ERR(__wt_ftruncate(session, fh, (off_t)0));
+
+	/* Write out the file's meta-data. */
+	ret = __wt_desc_init(session, fh);
+
+	/* Close the file handle. */
+err:	WT_TRET(__wt_close(session, fh));
+
+	return (ret);
+}
 
 /*
  * __wt_block_create --
@@ -29,7 +56,7 @@ __wt_block_create(WT_SESSION_IMPL *session, const char *filename)
 		    filename);
 
 	/* Open the underlying file handle. */
-	WT_RET(__wt_open(session, filename, 0666, 1, &fh));
+	WT_RET(__wt_open(session, filename, WT_FILEMODE, 1, &fh));
 
 	/* Write out the file's meta-data. */
 	ret = __wt_desc_init(session, fh);
@@ -42,7 +69,6 @@ __wt_block_create(WT_SESSION_IMPL *session, const char *filename)
 		(void)__wt_remove(session, filename);
 
 	return (ret);
-
 }
 
 /*

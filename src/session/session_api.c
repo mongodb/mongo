@@ -251,15 +251,20 @@ err:	API_END(session);
  */
 static int
 __session_truncate(WT_SESSION *wt_session,
-    const char *name, WT_CURSOR *start, WT_CURSOR *end, const char *config)
+    const char *uri, WT_CURSOR *begin, WT_CURSOR *end, const char *config)
 {
-	WT_UNUSED(wt_session);
-	WT_UNUSED(name);
-	WT_UNUSED(start);
-	WT_UNUSED(end);
-	WT_UNUSED(config);
+	WT_SESSION_IMPL *session;
+	int ret;
 
-	return (ENOTSUP);
+	WT_UNUSED(begin);
+	WT_UNUSED(end);
+
+	session = (WT_SESSION_IMPL *)wt_session;
+
+	SESSION_API_CALL(session, truncate, config, cfg);
+	ret = uri == NULL ? ENOTSUP : __wt_schema_truncate(session, uri, cfg);
+err:	API_END(session);
+	return (ret);
 }
 
 /*

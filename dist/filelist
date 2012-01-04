@@ -92,6 +92,7 @@ src/schema/schema_plan.c
 src/schema/schema_project.c
 src/schema/schema_rename.c
 src/schema/schema_table.c
+src/schema/schema_truncate.c
 src/schema/schema_worker.c
 src/session/session_api.c
 src/session/session_btree.c

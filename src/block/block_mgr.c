@@ -113,6 +113,16 @@ __wt_bm_close(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __wt_bm_truncate --
+ *	Truncate a file.
+ */
+int
+__wt_bm_truncate(WT_SESSION_IMPL *session, const char *filename)
+{
+	return (__wt_block_truncate(session, filename));
+}
+
+/*
  * __wt_bm_free --
  *	Free a block of space to the underlying file.
  */

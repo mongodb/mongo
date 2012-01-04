@@ -28,6 +28,16 @@ __wt_btree_create(WT_SESSION_IMPL *session, const char *filename)
 }
 
 /*
+ * __wt_btree_truncate --
+ *	Truncate a Btree.
+ */
+int
+__wt_btree_truncate(WT_SESSION_IMPL *session, const char *filename)
+{
+	return (__wt_bm_truncate(session, filename));
+}
+
+/*
  * __wt_btree_open --
  *	Open a Btree.
  */

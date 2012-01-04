@@ -57,6 +57,7 @@ extern int __wt_bm_open(WT_SESSION_IMPL *session,
     const char *cfg[],
     int salvage);
 extern int __wt_bm_close(WT_SESSION_IMPL *session);
+extern int __wt_bm_truncate(WT_SESSION_IMPL *session, const char *filename);
 extern int __wt_bm_free(WT_SESSION_IMPL *session,
     const uint8_t *addr,
     uint32_t addr_size);
@@ -84,6 +85,7 @@ extern int __wt_bm_verify_end(WT_SESSION_IMPL *session);
 extern int __wt_bm_verify_addr(WT_SESSION_IMPL *session,
     const uint8_t *addr,
     uint32_t addr_size);
+extern int __wt_block_truncate(WT_SESSION_IMPL *session, const char *filename);
 extern int __wt_block_create(WT_SESSION_IMPL *session, const char *filename);
 extern int __wt_block_open(WT_SESSION_IMPL *session,
     const char *filename,
@@ -188,6 +190,7 @@ extern int __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern void *__wt_cache_evict_server(void *arg);
 extern int __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app);
 extern int __wt_btree_create(WT_SESSION_IMPL *session, const char *filename);
+extern int __wt_btree_truncate(WT_SESSION_IMPL *session, const char *filename);
 extern int __wt_btree_open(WT_SESSION_IMPL *session,
     const char *name,
     const char *filename,
@@ -682,6 +685,9 @@ extern int __wt_schema_table_remove(WT_SESSION_IMPL *session, const char *key);
 extern int __wt_schema_table_read( WT_SESSION_IMPL *session,
     const char *key,
     const char **valuep);
+extern int __wt_schema_truncate( WT_SESSION_IMPL *session,
+    const char *uri,
+    const char *cfg[]);
 extern int __wt_schema_worker(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],
