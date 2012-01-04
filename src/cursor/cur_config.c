@@ -8,54 +8,6 @@
 #include "wt_internal.h"
 
 /*
- * __curconfig_first --
- *	WT_CURSOR->first method for the config cursor type.
- */
-static int
-__curconfig_first(WT_CURSOR *cursor)
-{
-	WT_UNUSED(cursor);
-
-	return (ENOTSUP);
-}
-
-/*
- * __curconfig_last --
- *	WT_CURSOR->last method for the config cursor type.
- */
-static int
-__curconfig_last(WT_CURSOR *cursor)
-{
-	WT_UNUSED(cursor);
-
-	return (ENOTSUP);
-}
-
-/*
- * __curconfig_next --
- *	WT_CURSOR->next method for the config cursor type.
- */
-static int
-__curconfig_next(WT_CURSOR *cursor)
-{
-	WT_UNUSED(cursor);
-
-	return (ENOTSUP);
-}
-
-/*
- * __curconfig_prev --
- *	WT_CURSOR->prev method for the config cursor type.
- */
-static int
-__curconfig_prev(WT_CURSOR *cursor)
-{
-	WT_UNUSED(cursor);
-
-	return (ENOTSUP);
-}
-
-/*
  * __curconfig_search_near --
  *	WT_CURSOR->search_near method for the config cursor type.
  */
@@ -64,42 +16,6 @@ __curconfig_search_near(WT_CURSOR *cursor, int *exact)
 {
 	WT_UNUSED(cursor);
 	WT_UNUSED(exact);
-
-	return (ENOTSUP);
-}
-
-/*
- * __curconfig_insert --
- *	WT_CURSOR->insert method for the config cursor type.
- */
-static int
-__curconfig_insert(WT_CURSOR *cursor)
-{
-	WT_UNUSED(cursor);
-
-	return (ENOTSUP);
-}
-
-/*
- * __curconfig_update --
- *	WT_CURSOR->update method for the config cursor type.
- */
-static int
-__curconfig_update(WT_CURSOR *cursor)
-{
-	WT_UNUSED(cursor);
-
-	return (ENOTSUP);
-}
-
-/*
- * __curconfig_remove --
- *	WT_CURSOR->remove method for the config cursor type.
- */
-static int
-__curconfig_remove(WT_CURSOR *cursor)
-{
-	WT_UNUSED(cursor);
 
 	return (ENOTSUP);
 }
@@ -130,15 +46,15 @@ __wt_curconfig_open(WT_SESSION_IMPL *session,
 		NULL,
 		NULL,
 		NULL,
-		__curconfig_first,
-		__curconfig_last,
-		__curconfig_next,
-		__curconfig_prev,
+		__wt_cursor_notsup,	/* first */
+		__wt_cursor_notsup,	/* last */
+		__wt_cursor_notsup,	/* next */
+		__wt_cursor_notsup,	/* prev */
 		NULL,
 		__curconfig_search_near,
-		__curconfig_insert,
-		__curconfig_update,
-		__curconfig_remove,
+		__wt_cursor_notsup,	/* insert */
+		__wt_cursor_notsup,	/* update */
+		__wt_cursor_notsup,	/* remove */
 		__curconfig_close,
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
 		0,			/* recno key */

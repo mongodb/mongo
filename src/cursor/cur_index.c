@@ -270,42 +270,6 @@ __curindex_search_near(WT_CURSOR *cursor, int *exact)
 }
 
 /*
- * __curindex_insert --
- *	WT_CURSOR->insert method for index cursors.
- */
-static int
-__curindex_insert(WT_CURSOR *cursor)
-{
-	WT_UNUSED(cursor);
-
-	return (ENOTSUP);
-}
-
-/*
- * __curindex_update --
- *	WT_CURSOR->update method for index cursors.
- */
-static int
-__curindex_update(WT_CURSOR *cursor)
-{
-	WT_UNUSED(cursor);
-
-	return (ENOTSUP);
-}
-
-/*
- * __curindex_remove --
- *	WT_CURSOR->remove method for index cursors.
- */
-static int
-__curindex_remove(WT_CURSOR *cursor)
-{
-	WT_UNUSED(cursor);
-
-	return (ENOTSUP);
-}
-
-/*
  * __curindex_close --
  *	WT_CURSOR->close method for index cursors.
  */
@@ -395,9 +359,9 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 		__curindex_prev,
 		__curindex_search,
 		__curindex_search_near,
-		__curindex_insert,
-		__curindex_update,
-		__curindex_remove,
+		__wt_cursor_notsup,	/* insert */
+		__wt_cursor_notsup,	/* update */
+		__wt_cursor_notsup,	/* remove */
 		__curindex_close,
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
 		0,			/* recno key */

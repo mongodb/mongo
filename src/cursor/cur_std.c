@@ -8,6 +8,17 @@
 #include "wt_internal.h"
 
 /*
+ * __wt_cursor_notsup --
+ *	WT_CURSOR->XXX method for unsupported cursor actions.
+ */
+int
+__wt_cursor_notsup(WT_CURSOR *cursor)
+{
+	WT_UNUSED(cursor);
+	return (ENOTSUP);
+}
+
+/*
  * __wt_cursor_get_key --
  *	WT_CURSOR->get_key default implementation.
  */
@@ -290,17 +301,6 @@ __wt_cursor_init(
 		F_SET(cursor, WT_CURSTD_PUBLIC);
 		TAILQ_INSERT_HEAD(&session->public_cursors, cursor, q);
 	}
-}
-
-/*
- * __wt_cursor_notsup --
- *	WT_CURSOR->XXX method for unsupported cursor actions.
- */
-int
-__wt_cursor_notsup(WT_CURSOR *cursor)
-{
-	WT_UNUSED(cursor);
-	return (ENOTSUP);
 }
 
 /*
