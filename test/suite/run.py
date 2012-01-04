@@ -114,7 +114,11 @@ if __name__ == '__main__':
             sys.exit(False)
         testargs.append(arg)
 
-    # Without arguments, do discovery
+    # All global variables should be set before any test classes are loaded.
+    # That way, verbose printing can be done at the class definition level.
+    wttest.WiredTigerTestCase.globalSetup(preserve, timestamp, gdbSub, verbose)
+
+    # Without any tests listed as arguments, do discovery
     if len(testargs) == 0:
         from discover import defaultTestLoader as loader
         suites = loader.discover(suitedir)
@@ -124,8 +128,6 @@ if __name__ == '__main__':
         for arg in testargs:
             testsFromArg(tests, loader, arg)
         
-    wttest.WiredTigerTestCase.globalSetup(preserve, timestamp, gdbSub, verbose)
-
     if debug:
         import pdb
         pdb.set_trace()
