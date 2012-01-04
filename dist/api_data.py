@@ -86,7 +86,7 @@ file_meta = format_meta + [
 		min='512B', max='128MB'),
 	Config('block_compressor', '', r'''
 		a compressor for file blocks.  Permitted values are empty (off)
-		or \c "<name>".  See @ref compressors for more details'''),
+		or \c "<name>".  See @ref compression for more details'''),
 	Config('checksum', 'true', r'''
 		the configuration for file block checksums; if false, the block
 		manager is free to not write or check block checksums.  This
