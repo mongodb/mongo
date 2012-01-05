@@ -86,9 +86,7 @@
 
 #include <conio.h>
 #include <windows.h>
-#include <stdio.h>
 #include <io.h>
-#include <errno.h>
 #define snprintf _snprintf  // Microsoft headers use underscores in some names
 #define strcasecmp _stricmp
 #define strdup _strdup
@@ -97,21 +95,20 @@
 #define STDIN_FILENO 0
 
 #else /* _WIN32 */
+
 #include <signal.h>
 #include <termios.h>
 #include <unistd.h>
 #include <stdlib.h>
-#include <stdio.h>
-#include <errno.h>
 #include <string.h>
-#include <stdlib.h>
 #include <sys/types.h>
 #include <sys/ioctl.h>
-#include <unistd.h>
 #include <cctype>
 
 #endif /* _WIN32 */
 
+#include <stdio.h>
+#include <errno.h>
 #include "linenoise.h"
 #include <string>
 #include <vector>
