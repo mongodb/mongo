@@ -2,6 +2,7 @@
 
 s1 = new ShardingTest( "count2" , 2 , 1 , 2 );
 s2 = s1._mongos[1];
+s1.stopBalancer();
 
 s1.adminCommand( { enablesharding: "test" } );
 s1.adminCommand( { shardcollection: "test.foo" , key : { name : 1 } } );
