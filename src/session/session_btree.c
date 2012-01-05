@@ -205,7 +205,7 @@ __wt_session_remove_btree(
 
 /*
  * __wt_session_close_any_open_btree --
- *	If open, close ethe btree handle.
+ *	If open, close the btree handle.
  */
 int
 __wt_session_close_any_open_btree(WT_SESSION_IMPL *session, const char *name)
