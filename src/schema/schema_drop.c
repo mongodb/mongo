@@ -15,7 +15,6 @@ int
 __wt_drop_file(WT_SESSION_IMPL *session, const char *fileuri, const char *cfg[])
 {
 	static const char *list[] = { "root", "version", NULL };
-	WT_BTREE_SESSION *btree_session;
 	WT_BUF *uribuf;
 	int exist, ret;
 	const char *filename, **lp;
@@ -29,28 +28,11 @@ __wt_drop_file(WT_SESSION_IMPL *session, const char *fileuri, const char *cfg[])
 		    session, EINVAL, "Expected a 'file:' URI: %s", fileuri);
 
 	/* If open, close the btree handle. */
-	switch ((ret = __wt_session_find_btree(session,
-	    filename, strlen(filename), NULL, WT_BTREE_EXCLUSIVE,
-	    &btree_session))) {
-	case 0:
-		/*
-		 * XXX We have an exclusive lock, which means there are no
-		 * cursors open but some other thread may have the handle
-		 * cached.
-		 */
-		WT_ASSERT(session, btree_session->btree->refcnt == 1);
-		WT_TRET(__wt_session_remove_btree(session, btree_session));
-		break;
-	case WT_NOTFOUND:
-		ret = 0;
-		break;
-	default:
-		return (ret);
-	}
-
-	WT_ERR(__wt_scr_alloc(session, 0, &uribuf));
+	WT_RET(__wt_session_close_any_open_btree(session, filename));
 
 	WT_TRET(__wt_schema_table_remove(session, fileuri));
+
+	WT_ERR(__wt_scr_alloc(session, 0, &uribuf));
 	for (lp = list; *lp != NULL; ++lp) {
 		WT_ERR(__wt_buf_fmt(session, uribuf, "%s:%s", *lp, filename));
 		WT_TRET(__wt_schema_table_remove(session, uribuf->data));

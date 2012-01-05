@@ -202,3 +202,31 @@ __wt_session_remove_btree(
 
 	return (__wt_btree_close(session));
 }
+
+/*
+ * __wt_session_close_any_open_btree --
+ *	If open, close ethe btree handle.
+ */
+int
+__wt_session_close_any_open_btree(WT_SESSION_IMPL *session, const char *name)
+{
+	WT_BTREE_SESSION *btree_session;
+	int ret;
+
+	switch (ret = __wt_session_find_btree(session,
+	    name, strlen(name), NULL, WT_BTREE_EXCLUSIVE, &btree_session)) {
+	case 0:
+		/*
+		 * XXX
+		 * We have an exclusive lock, which means there are no cursors
+		 * open but some other thread may have the handle cached.
+		 */
+		WT_ASSERT(session, btree_session->btree->refcnt == 1);
+		return (__wt_session_remove_btree(session, btree_session));
+	case WT_NOTFOUND:
+		return (0);
+	default:
+		return (ret);
+	}
+	/* NOTREACHED */
+}

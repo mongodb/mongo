@@ -720,6 +720,8 @@ extern int __wt_session_get_btree(WT_SESSION_IMPL *session,
     uint32_t flags);
 extern int __wt_session_remove_btree( WT_SESSION_IMPL *session,
     WT_BTREE_SESSION *btree_session);
+extern int __wt_session_close_any_open_btree(WT_SESSION_IMPL *session,
+    const char *name);
 extern void __wt_eventv(WT_SESSION_IMPL *session,
     int msg_event,
     int error,
