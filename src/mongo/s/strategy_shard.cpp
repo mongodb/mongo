@@ -272,7 +272,7 @@ namespace mongo {
                     _insert( r, d, manager, insertsRemaining, insertsForChunks, retries + 1 );
                     return;
                 }
-                catch( UserException& e ){
+                catch( UserException& ){
                     // Unexpected exception, so don't clean up the conn
                     dbcon.kill();
 
