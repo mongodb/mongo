@@ -50,16 +50,16 @@ __wt_drop_file(WT_SESSION_IMPL *session, const char *fileuri, const char *cfg[])
 
 	WT_ERR(__wt_scr_alloc(session, 0, &uribuf));
 
-	WT_ERR(__wt_schema_table_remove(session, fileuri));
+	WT_TRET(__wt_schema_table_remove(session, fileuri));
 	for (lp = list; *lp != NULL; ++lp) {
 		WT_ERR(__wt_buf_fmt(session, uribuf, "%s:%s", *lp, filename));
-		WT_ERR(__wt_schema_table_remove(session, uribuf->data));
+		WT_TRET(__wt_schema_table_remove(session, uribuf->data));
 	}
 
 	/* Remove the file itself. */
 	WT_ERR(__wt_exist(session, filename, &exist));
 	if (exist)
-		ret = __wt_remove(session, filename);
+		WT_TRET(__wt_remove(session, filename));
 
 err:	__wt_scr_free(&uribuf);
 	return (ret);
@@ -141,12 +141,17 @@ __drop_table(
 int
 __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 {
+	int ret;
+
 	WT_UNUSED(cfg);
 
 	if (WT_PREFIX_MATCH(uri, "file:"))
-		return (__wt_drop_file(session, uri, cfg));
+		ret = __wt_drop_file(session, uri, cfg);
 	if (WT_PREFIX_MATCH(uri, "table:"))
-		return (__drop_table(session, uri, cfg));
+		ret = __drop_table(session, uri, cfg);
+	else
+		return (__wt_unknown_object_type(session, uri));
 
-	return (__wt_unknown_object_type(session, uri));
+	/* If we didn't find a schema file entry, map that error to ENOENT. */
+	return (ret == WT_NOTFOUND ? ENOENT : ret);
 }

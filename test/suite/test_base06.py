@@ -173,9 +173,8 @@ class test_base06(wttest.WiredTigerTestCase):
         self.session.drop('table:' + self.table_name1, None)
         self.checkDoesNotExist(self.table_name1)
         self.session.drop('table:' + self.table_name1, 'force')
-        self.assertEqual(
-	    self.session.drop('table:' + self.table_name1, None),
-	    wiredtiger.WT_NOTFOUND)
+	self.assertRaises(WiredTigerError, lambda:
+	    self.session.drop('table:' + self.table_name1, None))
 
     def test_truncate(self):
         self.populate(self.table_name1)
