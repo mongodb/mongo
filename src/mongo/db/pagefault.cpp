@@ -11,9 +11,9 @@ namespace mongo {
 
     PageFaultException::PageFaultException(Record *_r)
     {
-        assert( cc()._pageFaultRetryableSection != 0 );
-        cc()._pageFaultRetryableSection->_laps++;
-        assert( cc()._pageFaultRetryableSection->_laps < 1000 );
+        assert( cc().inPageFaultRetryableSection() );
+        cc().getPageFaultRetryableSection()->didLap();
+        assert( cc().getPageFaultRetryableSection()->laps() < 1000 );
         r = _r;
         era = LockMongoFilesShared::getEra();
     }

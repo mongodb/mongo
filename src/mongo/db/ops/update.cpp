@@ -25,6 +25,7 @@
 #include "../btree.h"
 #include "../../util/stringutils.h"
 #include "update.h"
+#include "../pagefault.h"
 
 //#define DEBUGUPDATE(x) cout << x << endl;
 #define DEBUGUPDATE(x)
@@ -927,32 +928,8 @@ namespace mongo {
         }
         Record *r = loc.rec();
 
-        if ( ! r->likelyInPhysicalMemory() ) {
-            {
-                scoped_ptr<LockMongoFilesShared> lk( new LockMongoFilesShared() );
-                dbtempreleasewritelock t;
-                r->touch();
-                lk.reset(0); // we have to release mmmutex before we can re-acquire dbmutex
-            }
-            
-            {
-                // we need to re-find in case something changed
-                d = nsdetails( ns );
-                if ( ! d ) {
-                    // dropped 
-                    return UpdateResult(0, 0, 0);
-                }
-                nsdt = &NamespaceDetailsTransient::get(ns);
-                IndexDetails& i = d->idx(idIdxNo);
-                BSONObj key = i.getKeyFromQuery( patternOrig );            
-                loc = i.idxInterface().findSingle(i, i.head, key);
-                if( loc.isNull() ) {
-                    // no upsert support in _updateById yet, so we are done.
-                    return UpdateResult(0, 0, 0);
-                }
-                
-                r = loc.rec();
-            }
+        if ( cc().inPageFaultRetryableSection() && ! r->likelyInPhysicalMemory() ) {
+            throw PageFaultException( r );
         }
 
         /* look for $inc etc.  note as listed here, all fields to inc must be this type, you can't set some

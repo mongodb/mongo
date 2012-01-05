@@ -118,7 +118,7 @@ namespace mongo {
         void CommitJob::noteOp(shared_ptr<DurOp> p) {
             d.dbMutex.assertWriteLocked();
             dassert( cmdLine.dur );
-            cc()._hasWrittenThisPass = true;
+            cc().writeHappened();
             if( !_hasWritten ) {
                 assert( !d.dbMutex._remapPrivateViewRequested );
                 _hasWritten = true;
@@ -156,7 +156,7 @@ namespace mongo {
             DEV notesThisLock++;
             DEV d.dbMutex.assertWriteLocked();
             dassert( cmdLine.dur );
-            cc()._hasWrittenThisPass = true;
+            cc().writeHappened();
             if( !_wi._alreadyNoted.checkAndSet(p, len) ) {
                 MemoryMappedFile::makeWritable(p, len);
 

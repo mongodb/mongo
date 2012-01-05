@@ -290,7 +290,7 @@ namespace mongo {
     }
 
     // Returns false when request includes 'end'
-    void _assembleResponse( Message &m, DbResponse &dbresponse, const HostAndPort& remote ) {
+    void assembleResponse( Message &m, DbResponse &dbresponse, const HostAndPort& remote ) {
 
         // before we lock...
         int op = m.operation();
@@ -443,21 +443,7 @@ namespace mongo {
         }
         
         debug.reset();
-    } /* _assembleResponse() */
-
-    void assembleResponse( Message &m, DbResponse &dbresponse, const HostAndPort& remote ) {
-        PageFaultRetryableSection s;
-        while( 1 ) {
-            try {
-                _assembleResponse( m, dbresponse, remote );
-                break;
-            }
-            catch( PageFaultException& e ) { 
-                DEV log() << "TEMP PageFaultException touch and retry" << endl;
-                e.touch();
-            } 
-        }
-    }
+    } /* assembleResponse() */
 
     void receivedKillCursors(Message& m) {
         int *x = (int *) m.singleData()->_data;
@@ -531,20 +517,30 @@ namespace mongo {
         op.debug().query = query;
         op.setQuery(query);
 
-        writelock lk;
-
-        // void ReplSetImpl::relinquish() uses big write lock so 
-        // this is thus synchronized given our lock above.
-        uassert( 10054 ,  "not master", isMasterNs( ns ) );
         
-        // if this ever moves to outside of lock, need to adjust check Client::Context::_finishInit
-        if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
-            return;
-
-        Client::Context ctx( ns );
-
-        UpdateResult res = updateObjects(ns, toupdate, query, upsert, multi, true, op.debug() );
-        lastError.getSafe()->recordUpdate( res.existing , res.num , res.upserted ); // for getlasterror
+        PageFaultRetryableSection s;
+        while ( 1 ) {
+            try {
+                writelock lk;
+                
+                // void ReplSetImpl::relinquish() uses big write lock so 
+                // this is thus synchronized given our lock above.
+                uassert( 10054 ,  "not master", isMasterNs( ns ) );
+                
+                // if this ever moves to outside of lock, need to adjust check Client::Context::_finishInit
+                if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
+                    return;
+                
+                Client::Context ctx( ns );
+                
+                UpdateResult res = updateObjects(ns, toupdate, query, upsert, multi, true, op.debug() );
+                lastError.getSafe()->recordUpdate( res.existing , res.num , res.upserted ); // for getlasterror
+                break;
+            }
+            catch ( PageFaultException& e ) {
+                e.touch();
+            }
+        }
     }
 
     void receivedDelete(Message& m, CurOp& op) {

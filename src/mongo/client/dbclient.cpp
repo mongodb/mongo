@@ -360,10 +360,13 @@ namespace mongo {
         return digestToString( d );
     }
 
-    bool DBClientWithCommands::auth(const string &dbname, const string &username, const string &password_text, string& errmsg, bool digestPassword) {
+    bool DBClientWithCommands::auth(const string &dbname, const string &username, const string &password_text, string& errmsg, bool digestPassword, Auth::Level * level) {
         string password = password_text;
         if( digestPassword )
             password = createPasswordDigest( username , password_text );
+
+        if ( level != NULL )
+                *level = Auth::NONE;
 
         BSONObj info;
         string nonce;
@@ -395,8 +398,15 @@ namespace mongo {
             authCmd = b.done();
         }
 
-        if( runCommand(dbname, authCmd, info) )
+        if( runCommand(dbname, authCmd, info) ) {
+            if ( level != NULL ) {
+                if ( info.getField("readOnly").trueValue() )
+                    *level = Auth::READ;
+                else
+                    *level = Auth::WRITE;
+            }
             return true;
+        }
 
         errmsg = info.toString();
         return false;

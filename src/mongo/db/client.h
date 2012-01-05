@@ -120,6 +120,13 @@ namespace mongo {
         BSONObj getHandshake() const { return _handshake; }
         AbstractMessagingPort * port() const { return _mp; }
         ConnectionId getConnectionId() const { return _connectionId; }
+
+        bool inPageFaultRetryableSection() const { return _pageFaultRetryableSection != 0; }
+        PageFaultRetryableSection* getPageFaultRetryableSection() const { return _pageFaultRetryableSection; }
+        
+        bool hasWrittenThisPass() const { return _hasWrittenThisPass; }
+        void writeHappened() { _hasWrittenThisPass = true; }
+
     private:
         Client(const char *desc, AbstractMessagingPort *p = 0);
         friend class CurOp;
@@ -136,9 +143,12 @@ namespace mongo {
         BSONObj _remoteId;
         AbstractMessagingPort * const _mp;
         unsigned _sometimes;
-    public:
+
         bool _hasWrittenThisPass;
         PageFaultRetryableSection *_pageFaultRetryableSection;
+        
+        friend class PageFaultRetryableSection; // TEMP
+    public:
 
         /** the concept here is the same as MONGO_SOMETIMES.  however that 
             macro uses a static that will be shared by all threads, and each 

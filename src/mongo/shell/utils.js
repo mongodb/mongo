@@ -691,7 +691,7 @@ else {
 }
 
 if ( typeof _threadInject != "undefined" ){
-    print( "fork() available!" );
+    //print( "fork() available!" );
     
     Thread = function(){
         this.init.apply( this, arguments );

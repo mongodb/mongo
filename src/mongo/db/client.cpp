@@ -653,7 +653,7 @@ namespace mongo {
         }
         
         OPDEBUG_TOSTRING_HELP( nreturned );
-        if ( responseLength )
+        if ( responseLength > 0 )
             s << " reslen:" << responseLength;
         s << " " << executionTime << "ms";
 

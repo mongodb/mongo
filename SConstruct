@@ -1326,7 +1326,7 @@ addSmoketest( "mongosTest" , [ mongos[0].abspath ] )
 # These tests require the mongo shell
 if not onlyServer and not noshell:
     addSmoketest( "smokeJs", [add_exe("mongo")] )
-    addSmoketest( "smokeClone", [ "mongo", "mongod" ] )
+    addSmoketest( "smokeClone", [ add_exe( "mongo" ), add_exe( "mongod" ) ] )
     addSmoketest( "smokeRepl", [ add_exe( "mongo" ), add_exe( "mongod" ), add_exe( "mongobridge" ) ] )
     addSmoketest( "smokeReplSets", [ add_exe( "mongo" ), add_exe( "mongod" ), add_exe( "mongobridge" ) ] )
     addSmoketest( "smokeDur", [ add_exe( "mongo" ) , add_exe( "mongod" ) , add_exe( 'mongorestore' ) ] )

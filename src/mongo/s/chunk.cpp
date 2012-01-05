@@ -874,6 +874,15 @@ namespace mongo {
 
     }
 
+    bool ChunkManager::compatibleWith( const Chunk& other ) const {
+        ChunkPtr myChunk = this->findChunk( other.getMin() );
+
+        if( other.getMin() != myChunk->getMin() ) return false;
+        if( other.getMax() != myChunk->getMax() ) return false;
+        if( other.getShard() != myChunk->getShard() ) return false;
+        return true;
+    }
+
     void ChunkManager::drop( ChunkManagerPtr me ) const {
         scoped_lock lk( _mutex );
 
