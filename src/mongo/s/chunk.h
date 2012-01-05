@@ -324,6 +324,11 @@ namespace mongo {
         bool compatibleWith( const ChunkManager& other, const Shard& shard ) const;
         bool compatibleWith( ChunkManagerPtr other, const Shard& shard ) const { if( ! other ) return false; return compatibleWith( *other, shard ); }
 
+        bool compatibleWith( const Chunk& other ) const;
+        bool compatibleWith( ChunkPtr other ) const { if( ! other ) return false; return compatibleWith( *other ); }
+
+
+
         string toString() const;
 
         ShardChunkVersion getVersion( const Shard& shard ) const;
