@@ -19,6 +19,8 @@
 
 #include <cfloat>
 #include <string>
+#include <sstream>
+#include <iostream>
 #include <string.h>
 #include <stdio.h>
 #include "../inline_decls.h"
@@ -203,8 +205,11 @@ namespace mongo {
                 a = 512;
             if ( l > a )
                 a = l + 16 * 1024;
-            if ( a > BufferMaxSize )
-                msgasserted(13548, "BufBuilder grow() > 64MB");
+            if ( a > BufferMaxSize ) {
+                std::stringstream ss;
+                ss << "BufBuilder attempted to grow() to " << a << " bytes, past the 64MB limit.";
+                msgasserted(13548, ss.str().c_str());
+            }
             data = (char *) al.Realloc(data, a);
             size= a;
         }

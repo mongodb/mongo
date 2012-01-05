@@ -44,15 +44,17 @@ namespace mongo {
 
     struct ObjectBuilder : boost::noncopyable {
         ~ObjectBuilder() {
-            unsigned i = builders.size();
-            if ( i ) {
-                i--;
-                for ( ; i>=1; i-- ) {
-                    if ( builders[i] ) {
-                        builders[i]->done();
+            DESTRUCTOR_GUARD(
+                unsigned i = builders.size();
+                if ( i ) {
+                    i--;
+                    for ( ; i>=1; i-- ) {
+                        if ( builders[i] ) {
+                            builders[i]->done();
+                        }
                     }
                 }
-            }
+            );
         }
         BSONObjBuilder *back() {
             return builders.back().get();
