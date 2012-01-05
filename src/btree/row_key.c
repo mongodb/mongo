@@ -53,7 +53,7 @@ __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 	__inmem_row_leaf_slots(tmp->mem, 0, page->entries, btree->key_gap);
 
 	/* Instantiate the keys. */
-	for (rip = page->u.row_leaf.d, i = 0; i < page->entries; ++rip, ++i)
+	for (rip = page->u.row.d, i = 0; i < page->entries; ++rip, ++i)
 		if (__bit_test(tmp->mem, i))
 			WT_ERR(__wt_row_key(session, page, rip, NULL));
 

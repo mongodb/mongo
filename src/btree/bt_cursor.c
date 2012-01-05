@@ -55,9 +55,9 @@ __cursor_invalid(WT_CURSOR_BTREE *cbt)
 			return (1);
 		break;
 	case BTREE_ROW:
-		if (page->u.row_leaf.upd != NULL &&
-		    page->u.row_leaf.upd[cbt->slot] != NULL &&
-		    WT_UPDATE_DELETED_ISSET(page->u.row_leaf.upd[cbt->slot]))
+		if (page->u.row.upd != NULL &&
+		    page->u.row.upd[cbt->slot] != NULL &&
+		    WT_UPDATE_DELETED_ISSET(page->u.row.upd[cbt->slot]))
 			return (1);
 		break;
 	}

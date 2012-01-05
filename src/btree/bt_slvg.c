@@ -527,9 +527,9 @@ __slvg_trk_leaf(WT_SESSION_IMPL *session, WT_PAGE_HEADER *dsk,
 		 */
 		WT_ERR(__wt_page_inmem(session, NULL, NULL, dsk, &page));
 		WT_ERR(__wt_row_key(session,
-		    page, &page->u.row_leaf.d[0], &trk->row_start));
+		    page, &page->u.row.d[0], &trk->row_start));
 		WT_ERR(__wt_row_key(session,
-		    page, &page->u.row_leaf.d[page->entries - 1],
+		    page, &page->u.row.d[page->entries - 1],
 		    &trk->row_stop));
 
 		if (WT_VERBOSE_ISSET(session, salvage)) {
@@ -1802,7 +1802,7 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 	 * its range.  The key may require processing, otherwise, it's
 	 * a copy from the page.
 	 */
-	rip = page->u.row_leaf.d + skip_start;
+	rip = page->u.row.d + skip_start;
 	if (__wt_off_page(page, rip->key)) {
 		ikey = rip->key;
 		WT_ERR(__wt_row_ikey_alloc(session, 0,
@@ -1890,7 +1890,7 @@ __slvg_row_merge_ovfl(WT_SESSION_IMPL *session,
 
 	unpack = &_unpack;
 
-	for (rip = page->u.row_leaf.d + start; start < stop; ++start) {
+	for (rip = page->u.row.d + start; start < stop; ++start) {
 		if (__wt_off_page(page, rip->key))
 			cell = WT_PAGE_REF_OFFSET(
 			    page, ((WT_IKEY *)rip->key)->cell_offset);

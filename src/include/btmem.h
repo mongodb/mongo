@@ -212,7 +212,7 @@ struct __wt_page {
 			 */
 			WT_INSERT_HEAD	**ins;	/* Inserts */
 			WT_UPDATE	**upd;	/* Updates */
-		} row_leaf;
+		} row;
 
 		/* Fixed-length column-store leaf page. */
 		struct {
@@ -395,10 +395,10 @@ struct __wt_row {
  */
 #define	WT_ROW_FOREACH(page, rip, i)					\
 	for ((i) = (page)->entries,					\
-	    (rip) = (page)->u.row_leaf.d; (i) > 0; ++(rip), --(i))
+	    (rip) = (page)->u.row.d; (i) > 0; ++(rip), --(i))
 #define	WT_ROW_FOREACH_REVERSE(page, rip, i)				\
 	for ((i) = (page)->entries,					\
-	    (rip) = (page)->u.row_leaf.d + ((page)->entries - 1);	\
+	    (rip) = (page)->u.row.d + ((page)->entries - 1);		\
 	    (i) > 0; --(rip), --(i))
 
 /*
@@ -406,7 +406,7 @@ struct __wt_row {
  *	Return the 0-based array offset based on a WT_ROW reference.
  */
 #define	WT_ROW_SLOT(page, rip)						\
-	((uint32_t)(((WT_ROW *)rip) - (page)->u.row_leaf.d))
+	((uint32_t)(((WT_ROW *)rip) - (page)->u.row.d))
 
 /*
  * WT_COL --
@@ -608,13 +608,12 @@ struct __wt_insert_head {
  * of pointers and the specific structure exist, else NULL.
  */
 #define	WT_ROW_INSERT_SLOT(page, slot)					\
-	((page)->u.row_leaf.ins == NULL ?				\
-	    NULL : (page)->u.row_leaf.ins[slot])
+	((page)->u.row.ins == NULL ? NULL : (page)->u.row.ins[slot])
 #define	WT_ROW_INSERT(page, ip)						\
 	WT_ROW_INSERT_SLOT(page, WT_ROW_SLOT(page, ip))
 #define	WT_ROW_UPDATE(page, ip)						\
-	((page)->u.row_leaf.upd == NULL ?				\
-	    NULL : (page)->u.row_leaf.upd[WT_ROW_SLOT(page, ip)])
+	((page)->u.row.upd == NULL ?					\
+	    NULL : (page)->u.row.upd[WT_ROW_SLOT(page, ip)])
 /*
  * WT_ROW_INSERT_SMALLEST references an additional slot past the end of the
  * the "one per WT_ROW slot" insert array.  That's because the insert array
@@ -622,8 +621,7 @@ struct __wt_insert_head {
  * original page.
  */
 #define	WT_ROW_INSERT_SMALLEST(page)					\
-	((page)->u.row_leaf.ins == NULL ?				\
-	    NULL : (page)->u.row_leaf.ins[(page)->entries])
+	((page)->u.row.ins == NULL ? NULL : (page)->u.row.ins[(page)->entries])
 
 /*
  * The column-store leaf page update lists are arrays of pointers to structures,

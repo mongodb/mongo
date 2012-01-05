@@ -174,7 +174,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	/* Do a binary search of the leaf page. */
 	for (base = 0, limit = page->entries; limit != 0; limit >>= 1) {
 		indx = base + (limit >> 1);
-		rip = page->u.row_leaf.d + indx;
+		rip = page->u.row.d + indx;
 
 retry:		/*
 		 * Multiple threads of control may be searching this page, which
@@ -251,7 +251,7 @@ retry:		/*
 	 * it means the application is inserting a key before any key found on
 	 * the page).
 	 */
-	rip = page->u.row_leaf.d;
+	rip = page->u.row.d;
 	if (base == 0)
 		cbt->compare = 1;
 	else {

@@ -54,14 +54,14 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 			 *
 			 * Set the WT_UPDATE array reference.
 			 */
-			if (page->u.row_leaf.upd == NULL) {
+			if (page->u.row.upd == NULL) {
 				WT_ERR(__wt_calloc_def(
 				    session, page->entries, &new_upd));
 				new_upd_size =
 				    page->entries * sizeof(WT_UPDATE *);
 				upd_entry = &new_upd[cbt->slot];
 			} else
-				upd_entry = &page->u.row_leaf.upd[cbt->slot];
+				upd_entry = &page->u.row.upd[cbt->slot];
 		} else
 			upd_entry = &cbt->ins->upd;
 
@@ -88,14 +88,14 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		    cbt, WT_CBT_SEARCH_SMALLEST) ? page->entries : cbt->slot;
 
 		new_inshead_size = new_inslist_size = 0;
-		if (page->u.row_leaf.ins == NULL) {
+		if (page->u.row.ins == NULL) {
 			WT_ERR(__wt_calloc_def(
 			    session, page->entries + 1, &new_inslist));
 			new_inslist_size =
 			    (page->entries + 1) * sizeof(WT_INSERT_HEAD *);
 			inshead = &new_inslist[ins_slot];
 		} else
-			inshead = &page->u.row_leaf.ins[ins_slot];
+			inshead = &page->u.row.ins[ins_slot];
 
 		/*
 		 * Allocate a new insert list head as necessary.
@@ -208,8 +208,8 @@ __wt_insert_serial_func(WT_SESSION_IMPL *session)
 	 * us one.
 	 */
 	if (page->type == WT_PAGE_ROW_LEAF) {
-		if (page->u.row_leaf.ins == NULL) {
-			page->u.row_leaf.ins = new_inslist;
+		if (page->u.row.ins == NULL) {
+			page->u.row.ins = new_inslist;
 			__wt_insert_new_inslist_taken(session, page);
 		}
 	} else
@@ -307,8 +307,8 @@ __wt_update_serial_func(WT_SESSION_IMPL *session)
 	 * one of the correct size.   Check the page still needs one (the write
 	 * generation test should have caught that, though).
 	 */
-	if (new_upd != NULL && page->u.row_leaf.upd == NULL) {
-		page->u.row_leaf.upd = new_upd;
+	if (new_upd != NULL && page->u.row.upd == NULL) {
+		page->u.row.upd = new_upd;
 		__wt_update_new_upd_taken(session, page);
 	}
 

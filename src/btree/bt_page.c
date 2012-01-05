@@ -432,7 +432,7 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * be a key without any subsequent data item).
 	 */
 	WT_RET((__wt_calloc_def(
-	    session, (size_t)dsk->u.entries * 2, &page->u.row_leaf.d)));
+	    session, (size_t)dsk->u.entries * 2, &page->u.row.d)));
 
 	/*
 	 * Walk a row-store page of WT_CELLs, building indices and finding the
@@ -443,7 +443,7 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * (WT_CELL_VALUE) or overflow (WT_CELL_VALUE_OVFL) item.
 	 */
 	nindx = 0;
-	rip = page->u.row_leaf.d;
+	rip = page->u.row.d;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {

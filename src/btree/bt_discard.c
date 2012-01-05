@@ -208,7 +208,7 @@ __free_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_ROW_FOREACH(page, rip, i)
 		if ((ikey = rip->key) != NULL && __wt_off_page(page, ikey))
 			__wt_sb_free(session, ikey->sb, ikey);
-	__wt_free(session, page->u.row_leaf.d);
+	__wt_free(session, page->u.row.d);
 
 	/*
 	 * Free the insert array.
@@ -217,14 +217,12 @@ __free_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * insert array has an extra slot to hold keys that sort before keys
 	 * found on the original page).
 	 */
-	if (page->u.row_leaf.ins != NULL)
-		__free_insert(
-		    session, page->u.row_leaf.ins, page->entries + 1);
+	if (page->u.row.ins != NULL)
+		__free_insert(session, page->u.row.ins, page->entries + 1);
 
 	/* Free the update array. */
-	if (page->u.row_leaf.upd != NULL)
-		__free_update(
-		    session, page->u.row_leaf.upd, page->entries);
+	if (page->u.row.upd != NULL)
+		__free_update(session, page->u.row.upd, page->entries);
 }
 
 /*

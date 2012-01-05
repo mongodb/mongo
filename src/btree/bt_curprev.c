@@ -391,7 +391,7 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 		cbt->ins_head = NULL;
 		cbt->ins = NULL;
 
-		rip = &cbt->page->u.row_leaf.d[cbt->slot / 2 - 1];
+		rip = &cbt->page->u.row.d[cbt->slot / 2 - 1];
 		upd = WT_ROW_UPDATE(cbt->page, rip);
 		if (upd != NULL && WT_UPDATE_DELETED_ISSET(upd))
 			continue;

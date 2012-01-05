@@ -64,7 +64,7 @@ __wt_kv_return(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int key_ret)
 		cell = WT_COL_PTR(page, &page->u.col_var.d[cbt->slot]);
 		break;
 	case WT_PAGE_ROW_LEAF:
-		rip = &page->u.row_leaf.d[cbt->slot];
+		rip = &page->u.row.d[cbt->slot];
 
 		/*
 		 * If the cursor references a WT_INSERT item, take the key and
