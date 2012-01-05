@@ -1420,9 +1420,11 @@ void InputBuffer::clearScreen( PromptBase& pi ) {
  */
 int InputBuffer::incrementalHistorySearch( PromptBase& pi, int startChar ) {
 
-    // add the current line to the history list so we don't have to special case it
-    history[historyLen - 1] = reinterpret_cast<char *>( realloc( history[historyLen - 1], len + 1 ) );
-    strcpy( history[historyLen - 1], buf );
+    // if not already recalling, add the current line to the history list so we don't have to special case it
+    if ( historyIndex == historyLen - 1 ) {
+        history[historyLen - 1] = reinterpret_cast<char *>( realloc( history[historyLen - 1], len + 1 ) );
+        strcpy( history[historyLen - 1], buf );
+    }
     int historyLineLength = len;
     int historyLinePosition = pos;
     char emptyBuffer[1];
@@ -1432,7 +1434,7 @@ int InputBuffer::incrementalHistorySearch( PromptBase& pi, int startChar ) {
 
     dp.previousPromptLen = pi.previousPromptLen;
     dp.promptPreviousInputLen = pi.promptPreviousInputLen;
-    dynamicRefresh( dp, history[historyLen - 1], historyLineLength, historyLinePosition ); // draw user's text with our prompt
+    dynamicRefresh( dp, buf, historyLineLength, historyLinePosition ); // draw user's text with our prompt
 
     // loop until we get an exit character
     int c;
@@ -1442,6 +1444,7 @@ int InputBuffer::incrementalHistorySearch( PromptBase& pi, int startChar ) {
     while ( keepLooping ) {
         c = linenoiseReadChar();
         c = cleanupCtrl( c );           // convert CTRL + <char> into normal ctrl
+
         switch ( c ) {
 
         // these characters keep the selected text but do not execute it
@@ -1890,6 +1893,11 @@ int InputBuffer::getInputLine( PromptBase& pi ) {
         case DOWN_ARROW_KEY:
         case UP_ARROW_KEY:
             killRing.lastAction = KillRing::actionOther;
+            // if not already recalling, add the current line to the history list so we don't have to special case it
+            if ( historyIndex == historyLen - 1 ) {
+                history[historyLen - 1] = reinterpret_cast<char *>( realloc( history[historyLen - 1], len + 1 ) );
+                strcpy( history[historyLen - 1], buf );
+            }
             if ( historyLen > 1 ) {
                 if ( c == UP_ARROW_KEY ) {
                     c = ctrlChar( 'P' );
@@ -2048,6 +2056,25 @@ int InputBuffer::getInputLine( PromptBase& pi ) {
                 historyRecallMostRecent = false;
                 memmove( buf + pos, buf + pos + 1, len - pos );
                 --len;
+                refreshLine( pi );
+            }
+            break;
+
+        case META + '<':        // meta-<, beginning of history
+        case META + '>':        // meta->, end of history
+            killRing.lastAction = KillRing::actionOther;
+            // if not already recalling, add the current line to the history list so we don't have to special case it
+            if ( historyIndex == historyLen - 1 ) {
+                history[historyLen - 1] = reinterpret_cast<char *>( realloc( history[historyLen - 1], len + 1 ) );
+                strcpy( history[historyLen - 1], buf );
+            }
+            if ( historyLen > 1 ) {
+                historyIndex = ( c == META + '<' ) ? 0 : historyLen - 1;
+                historyPreviousIndex = -2;
+                historyRecallMostRecent = true;
+                strncpy( buf, history[historyIndex], buflen );
+                buf[buflen] = '\0';
+                len = pos = strlen( buf );  // place cursor at end of line
                 refreshLine( pi );
             }
             break;
