@@ -24,6 +24,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <fstream>
 
 #include <boost/filesystem/convenience.hpp>
 #include <boost/filesystem/operations.hpp>

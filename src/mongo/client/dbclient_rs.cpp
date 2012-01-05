@@ -25,6 +25,7 @@
 #include "dbclient_rs.h"
 #include "../util/background.h"
 #include "../util/timer.h"
+#include <fstream>
 
 namespace mongo {
 

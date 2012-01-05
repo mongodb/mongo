@@ -52,6 +52,7 @@
 # include <sys/file.h>
 #endif
 
+#include <fstream>
 #include <boost/filesystem/operations.hpp>
 
 namespace mongo {

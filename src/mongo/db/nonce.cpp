@@ -18,6 +18,7 @@
 #include "pch.h"
 #include "nonce.h"
 #include "../util/time_support.h"
+#include <fstream>
 
 extern int do_md5_test(void);
 

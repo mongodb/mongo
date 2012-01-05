@@ -18,6 +18,7 @@
 
 #include "tool.h"
 
+#include <fstream>
 #include <iostream>
 
 #include "pcrecpp.h"

@@ -27,6 +27,8 @@
 #include "ops/update.h"
 #include "ops/delete.h"
 
+#include <fstream>
+
 #include <boost/filesystem/convenience.hpp>
 #include <boost/filesystem/operations.hpp>
 

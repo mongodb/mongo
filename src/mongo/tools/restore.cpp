@@ -28,6 +28,7 @@
 
 #include <fcntl.h>
 #include <set>
+#include <fstream>
 
 using namespace mongo;
 

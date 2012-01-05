@@ -33,6 +33,7 @@
 
 #define MAX_LINE_LENGTH 256
 
+#include <fstream>
 #include <boost/filesystem/operations.hpp>
 
 namespace po = boost::program_options;

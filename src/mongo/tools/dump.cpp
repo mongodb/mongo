@@ -23,6 +23,7 @@
 
 #include <fcntl.h>
 #include <map>
+#include <fstream>
 
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/convenience.hpp>

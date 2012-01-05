@@ -18,6 +18,7 @@
 #include "pch.h"
 #include <fcntl.h>
 #include <utility>
+#include <fstream>
 
 #include "gridfs.h"
 #include <boost/smart_ptr.hpp>

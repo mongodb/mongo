@@ -21,6 +21,7 @@
 #include <iomanip>
 #include <sstream>
 #include <string>
+#include <fstream>
 #include "unittest.h"
 #include "version.h"
 #include "stringutils.h"
