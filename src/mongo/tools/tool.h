@@ -29,6 +29,7 @@
 #include "client/dbclient.h"
 #include "db/instance.h"
 #include "db/matcher.h"
+#include "db/security.h"
 
 using std::string;
 
@@ -103,7 +104,7 @@ namespace mongo {
     protected:
 
         mongo::DBClientBase &conn( bool slaveIfPaired = false );
-        void auth( string db = "" );
+        void auth( string db = "",  Auth::Level * level = NULL);
 
         string _name;
 

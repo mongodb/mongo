@@ -74,7 +74,12 @@ public:
     }
 
     virtual int doRun() {
-        auth();
+
+        // authenticate
+        enum Auth::Level authLevel = Auth::NONE;
+        auth("", &authLevel);
+        uassert(15935, "user does not have write access", authLevel == Auth::WRITE);
+
         path root = getParam("dir");
 
         // check if we're actually talking to a machine that can write
