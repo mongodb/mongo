@@ -40,61 +40,18 @@ namespace mongo {
         */
         int level;
         mongo::mutex mutex;
-        void openFile() {
-            assert( f == 0 );
-            stringstream ss;
-            ss << dbpath << "/diaglog." << hex << time(0);
-            string name = ss.str();
-            f = new ofstream(name.c_str(), ios::out | ios::binary);
-            if ( ! f->good() ) {
-                problem() << "diagLogging couldn't open " << name << endl;
-                // todo what is this? :
-                throw 1717;
-            }
-            else {
-                log() << "diagLogging using file " << name << endl;
-            }
-        }
+        void openFile();
+
     public:
-        DiagLog() : f(0) , level(0), mutex("DiagLog") { }
+        DiagLog();
         int getLevel() const { return level; }
         /**
          * @return old
          */
-        int setLevel( int newLevel ) {
-            scoped_lock lk(mutex);
-            int old = level;
-            log() << "diagLogging level=" << newLevel << endl;
-            if( f == 0 ) { 
-                openFile();
-            }
-            level = newLevel; // must be done AFTER f is set
-            return old;
-        }
-        void flush() {
-            if ( level ) {
-                log() << "flushing diag log" << endl;
-                scoped_lock lk(mutex);
-                f->flush();
-            }
-        }
-        void write(char *data,int len) {
-            if ( level & 1 ) {
-                scoped_lock lk(mutex);
-                f->write(data,len);
-            }
-        }
-        void readop(char *data, int len) {
-            if ( level & 2 ) {
-                bool log = (level & 4) == 0;
-                OCCASIONALLY log = true;
-                if ( log ) {
-                    scoped_lock lk(mutex);
-                    assert( f );
-                    f->write(data,len);
-                }
-            }
-        }
+        int setLevel( int newLevel );
+        void flush();
+        void writeop(char *data,int len);
+        void readop(char *data, int len);
     };
 
     extern DiagLog _diaglog;
