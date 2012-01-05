@@ -23,6 +23,8 @@
 #include "tool.h"
 
 #include <boost/program_options.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/convenience.hpp>
 
 #include <fcntl.h>
 #include <set>
@@ -80,7 +82,7 @@ public:
         auth("", &authLevel);
         uassert(15935, "user does not have write access", authLevel == Auth::WRITE);
 
-        path root = getParam("dir");
+        boost::filesystem::path root = getParam("dir");
 
         // check if we're actually talking to a machine that can write
         if (!isMaster()) {
@@ -215,7 +217,7 @@ public:
         return EXIT_CLEAN;
     }
 
-    void drillDown( path root, bool use_db, bool use_coll, bool top_level=false ) {
+    void drillDown( boost::filesystem::path root, bool use_db, bool use_coll, bool top_level=false ) {
         log(2) << "drillDown: " << root.string() << endl;
 
         // skip hidden files and directories
@@ -223,15 +225,15 @@ public:
             return;
 
         if ( is_directory( root ) ) {
-            directory_iterator end;
-            directory_iterator i(root);
-            path indexes;
+            boost::filesystem::directory_iterator end;
+            boost::filesystem::directory_iterator i(root);
+            boost::filesystem::path indexes;
             while ( i != end ) {
-                path p = *i;
+                boost::filesystem::path p = *i;
                 i++;
 
                 if (use_db) {
-                    if (is_directory(p)) {
+                    if (boost::filesystem::is_directory(p)) {
                         error() << "ERROR: root directory must be a dump of a single database" << endl;
                         error() << "       when specifying a db name with --db" << endl;
                         printHelp(cout);
@@ -240,7 +242,7 @@ public:
                 }
 
                 if (use_coll) {
-                    if (is_directory(p) || i != end) {
+                    if (boost::filesystem::is_directory(p) || i != end) {
                         error() << "ERROR: root directory must be a dump of a single collection" << endl;
                         error() << "       when specifying a collection name with --collection" << endl;
                         printHelp(cout);
@@ -333,8 +335,8 @@ public:
 
         BSONObj metadataObject;
         if (_restoreOptions || _restoreIndexes) {
-            path metadataFile = (root.branch_path() / (oldCollName + ".metadata.json"));
-            if (!exists(metadataFile.string())) {
+            boost::filesystem::path metadataFile = (root.branch_path() / (oldCollName + ".metadata.json"));
+            if (!boost::filesystem::exists(metadataFile.string())) {
                 // This is fine because dumps from before 2.1 won't have a metadata file, just print a warning.
                 // System collections shouldn't have metadata so don't warn if that file is missing.
                 if (!startsWith(metadataFile.leaf(), "system.")) {
@@ -416,7 +418,7 @@ public:
 private:
 
     BSONObj parseMetadataFile(string filePath) {
-        long long fileSize = file_size(filePath);
+        long long fileSize = boost::filesystem::file_size(filePath);
         ifstream file(filePath.c_str(), ios_base::in);
 
         scoped_ptr<char> buf(new char[fileSize]);

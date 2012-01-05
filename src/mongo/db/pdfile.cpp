@@ -48,6 +48,8 @@ _ disallow system* manipulations from the database.
 #include "replutil.h"
 #include "memconcept.h"
 
+#include <boost/filesystem/operations.hpp>
+
 namespace mongo {
 
     BOOST_STATIC_ASSERT( sizeof(Extent)-4 == 48+128 );
@@ -402,7 +404,7 @@ namespace mongo {
     /** @return true if found and opened. if uninitialized (prealloc only) does not open. */
     bool MongoDataFile::openExisting( const char *filename ) {
         assert( _mb == 0 );
-        if( !exists(filename) )
+        if( !boost::filesystem::exists(filename) )
             return false;
         if( !mmf.open(filename,false) ) {
             dlog(2) << "info couldn't open " << filename << " probably end of datafile list" << endl;

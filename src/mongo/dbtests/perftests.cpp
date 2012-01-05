@@ -39,6 +39,8 @@
 #include "../db/key.h"
 #include "../util/compress.h"
 
+#include <boost/filesystem/operations.hpp>
+
 using namespace bson;
 
 namespace mongo {
@@ -119,8 +121,8 @@ namespace PerfTests {
         DEV return;
 
         const char *fn = "../../settings.py";
-        if( !exists(fn) ) {
-            if( exists("settings.py") )
+        if( !boost::filesystem::exists(fn) ) {
+            if( boost::filesystem::exists("settings.py") )
                 fn = "settings.py";
             else {
                 cout << "no ../../settings.py or ./settings.py file found. will not write perf stats to pstats db." << endl;

@@ -31,8 +31,9 @@
 #include "../util/file.h"
 #include "../db/repl/rs_member.h"
 
+#include <boost/filesystem/operations.hpp>
+
 using namespace std;
-using namespace boost::filesystem;
 using namespace mongo;
 
 string historyFile;
@@ -423,7 +424,7 @@ void show_help_text( const char* name, po::options_description options ) {
 
 bool fileExists( string file ) {
     try {
-        path p( file );
+        boost::filesystem::path p( file );
         return boost::filesystem::exists( file );
     }
     catch ( ... ) {

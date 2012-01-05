@@ -34,6 +34,8 @@ using namespace mongoutils;
 #include "file_allocator.h"
 #include "paths.h"
 
+#include <boost/filesystem/operations.hpp>
+
 namespace mongo {
 
     boost::filesystem::path ensureParentDirCreated(const boost::filesystem::path& p){
@@ -208,9 +210,9 @@ namespace mongo {
         return false;
     }
 
-    string makeTempFileName( path root ) {
+    string makeTempFileName( boost::filesystem::path root ) {
         while( 1 ) {
-            path p = root / "_tmp";
+            boost::filesystem::path p = root / "_tmp";
             stringstream ss;
             ss << (unsigned) rand();
             p /= ss.str();

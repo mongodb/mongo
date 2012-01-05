@@ -65,7 +65,7 @@ public:
             }
         }
 
-        path root = getParam( "file" );
+        boost::filesystem::path root = getParam( "file" );
         if ( root == "" ) {
             printExtraHelp(cout);
             return 1;

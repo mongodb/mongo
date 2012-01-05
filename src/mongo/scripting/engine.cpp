@@ -20,6 +20,8 @@
 #include "../util/file.h"
 #include "../client/dbclient.h"
 
+#include <boost/filesystem/operations.hpp>
+
 namespace mongo {
 
     long long Scope::_lastVersion = 1;
@@ -93,7 +95,7 @@ namespace mongo {
 
     bool Scope::execFile( const string& filename , bool printResult , bool reportError , bool assertOnError, int timeoutMs ) {
 
-        path p( filename );
+        boost::filesystem::path p( filename );
 
         if ( ! exists( p ) ) {
             log() << "file [" << filename << "] doesn't exist" << endl;
@@ -103,12 +105,12 @@ namespace mongo {
         }
 
         // iterate directories and recurse using all *.js files in the directory
-        if ( is_directory( p ) ) {
-            directory_iterator end;
+        if ( boost::filesystem::is_directory( p ) ) {
+            boost::filesystem::directory_iterator end;
             bool empty = true;
-            for (directory_iterator it (p); it != end; it++) {
+            for (boost::filesystem::directory_iterator it (p); it != end; it++) {
                 empty = false;
-                path sub (*it);
+                boost::filesystem::path sub(*it);
                 if (!endsWith(sub.string().c_str(), ".js"))
                     continue;
                 if (!execFile(sub.string().c_str(), printResult, reportError, assertOnError, timeoutMs))

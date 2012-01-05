@@ -25,6 +25,9 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#include <boost/filesystem/convenience.hpp>
+#include <boost/filesystem/operations.hpp>
+
 namespace mongo {
 
     IndexInterface *BSONObjExternalSorter::extSortIdxInterface;
@@ -225,7 +228,7 @@ namespace mongo {
         unsigned long long length;
         _buf = (char*)_file.map( file.c_str() , length , MemoryMappedFile::SEQUENTIAL );
         massert( 10308 ,  "mmap failed" , _buf );
-        assert( length == (unsigned long long) file_size( file ) );
+        assert( length == (unsigned long long)boost::filesystem::file_size( file ) );
         _end = _buf + length;
     }
     BSONObjExternalSorter::FileIterator::~FileIterator() {}

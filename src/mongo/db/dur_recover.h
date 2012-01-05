@@ -18,7 +18,7 @@ namespace mongo {
         public:
             RecoveryJob() : _lastDataSyncedFromLastRun(0), 
                 _mx("recovery"), _recovering(false) { _lastSeqMentionedInConsoleLog = 1; }
-            void go(vector<path>& files);
+            void go(vector<boost::filesystem::path>& files);
             ~RecoveryJob();
 
             /** @param data data between header and footer. compressed if recovering. */
@@ -32,7 +32,7 @@ namespace mongo {
             void applyEntry(const ParsedJournalEntry& entry, bool apply, bool dump);
             void applyEntries(const vector<ParsedJournalEntry> &entries);
             bool processFileBuffer(const void *, unsigned len);
-            bool processFile(path journalfile);
+            bool processFile(boost::filesystem::path journalfile);
             void _close(); // doesn't lock
 
             list<boost::shared_ptr<MongoMMF> > _mmfs;

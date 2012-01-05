@@ -41,6 +41,8 @@
 #include <openssl/ssl.h>
 #endif
 
+#include <boost/thread/once.hpp>
+
 using namespace mongoutils;
 
 namespace mongo {

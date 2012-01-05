@@ -52,6 +52,8 @@
 # include <sys/file.h>
 #endif
 
+#include <boost/filesystem/operations.hpp>
+
 namespace mongo {
 
     namespace dur { 
@@ -466,7 +468,7 @@ namespace mongo {
         }
 
         acquirePathLock(forceRepair);
-        remove_all( dbpath + "/_tmp/" );
+        boost::filesystem::remove_all( dbpath + "/_tmp/" );
 
         FileAllocator::get()->start();
 

@@ -19,6 +19,8 @@
 #include "dbclient.h"
 #include "distlock.h"
 
+#include <boost/thread/once.hpp>
+
 namespace mongo {
 
     LabeledLevel DistributedLock::logLvl( 1 );

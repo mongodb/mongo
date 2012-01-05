@@ -34,6 +34,8 @@ using namespace std;
 # define fileno _fileno
 #endif
 
+#include <boost/filesystem/operations.hpp>
+
 namespace mongo {
 
     Nullstream nullstream;

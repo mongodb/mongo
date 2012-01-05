@@ -18,6 +18,8 @@
 #include "pch.h"
 
 #include <boost/thread/xtime.hpp>
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/convenience.hpp>
 
 #include <cstring>
 #include <cstdio>
@@ -127,23 +129,23 @@ namespace mongo {
             BSONArrayBuilder lst;
 
             string rootname = args.firstElement().valuestrsafe();
-            path root( rootname );
+            boost::filesystem::path root( rootname );
             stringstream ss;
             ss << "listFiles: no such directory: " << rootname;
             string msg = ss.str();
             uassert( 12581, msg.c_str(), boost::filesystem::exists( root ) );
 
-            directory_iterator end;
-            directory_iterator i( root);
+            boost::filesystem::directory_iterator end;
+            boost::filesystem::directory_iterator i( root);
 
             while ( i != end ) {
-                path p = *i;
+                boost::filesystem::path p = *i;
                 BSONObjBuilder b;
                 b << "name" << p.string();
                 b.appendBool( "isDirectory", is_directory( p ) );
-                if ( ! is_directory( p ) ) {
+                if ( ! boost::filesystem::is_directory( p ) ) {
                     try {
-                        b.append( "size" , (double)file_size( p ) );
+                        b.append( "size" , (double)boost::filesystem::file_size( p ) );
                     }
                     catch ( ... ) {
                         i++;
@@ -254,7 +256,7 @@ namespace mongo {
             BSONElement e = oneArg(args);
             bool found = false;
 
-            path root( e.valuestrsafe() );
+            boost::filesystem::path root( e.valuestrsafe() );
             if ( boost::filesystem::exists( root ) ) {
                 found = true;
                 boost::filesystem::remove_all( root );
@@ -696,14 +698,14 @@ namespace mongo {
             return undefined_;
         }
 
-        void copyDir( const path &from, const path &to ) {
-            directory_iterator end;
-            directory_iterator i( from );
+        void copyDir( const boost::filesystem::path &from, const boost::filesystem::path &to ) {
+            boost::filesystem::directory_iterator end;
+            boost::filesystem::directory_iterator i( from );
             while( i != end ) {
-                path p = *i;
+                boost::filesystem::path p = *i;
                 if ( p.leaf() != "mongod.lock" ) {
-                    if ( is_directory( p ) ) {
-                        path newDir = to / p.leaf();
+                    if ( boost::filesystem::is_directory( p ) ) {
+                        boost::filesystem::path newDir = to / p.leaf();
                         boost::filesystem::create_directory( newDir );
                         copyDir( p, newDir );
                     }

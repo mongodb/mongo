@@ -30,6 +30,8 @@
 #include "ops/delete.h"
 #include "ops/query.h"
 
+#include <boost/filesystem/operations.hpp>
+
 namespace mongo {
 
     BOOST_STATIC_ASSERT( sizeof(Namespace) == 128 );
@@ -75,7 +77,7 @@ namespace mongo {
     }
 
     bool NamespaceIndex::exists() const {
-        return !MMF::exists(path());
+        return !boost::filesystem::exists(path());
     }
 
     boost::filesystem::path NamespaceIndex::path() const {
@@ -166,7 +168,7 @@ namespace mongo {
         boost::filesystem::path nsPath = path();
         string pathString = nsPath.string();
         void *p = 0;
-        if( MMF::exists(nsPath) ) {
+        if( boost::filesystem::exists(nsPath) ) {
             if( f.open(pathString, true) ) {
                 len = f.length();
                 if ( len % (1024*1024) != 0 ) {

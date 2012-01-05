@@ -21,6 +21,8 @@
 #include "../util/timer.h"
 #include "dbtests.h"
 
+#include <boost/filesystem/operations.hpp>
+
 namespace MMapTests {
 
     class LeakTest  {
@@ -28,7 +30,7 @@ namespace MMapTests {
         const int optOld;
     public:
         LeakTest() :
-            fn( (path(dbpath) / "testfile.map").string() ), optOld(cmdLine.durOptions)
+            fn( (boost::filesystem::path(dbpath) / "testfile.map").string() ), optOld(cmdLine.durOptions)
         { 
             cmdLine.durOptions = 0; // DurParanoid doesn't make sense with this test
         }

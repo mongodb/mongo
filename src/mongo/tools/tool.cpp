@@ -20,12 +20,13 @@
 
 #include <iostream>
 
-#include <boost/filesystem/operations.hpp>
 #include "pcrecpp.h"
 
 #include "util/file_allocator.h"
 #include "util/password.h"
 #include "util/version.h"
+
+#include <boost/filesystem/operations.hpp>
 
 using namespace std;
 using namespace mongo;
@@ -368,7 +369,7 @@ namespace mongo {
 
         if ( hasParam( "fieldFile" ) ) {
             string fn = getParam( "fieldFile" );
-            if ( ! exists( fn ) )
+            if ( ! boost::filesystem::exists( fn ) )
                 throw UserException( 9999 , ((string)"file: " + fn ) + " doesn't exist" );
 
             const int BUF_SIZE = 1024;
@@ -449,7 +450,7 @@ namespace mongo {
         return doRun();
     }
 
-    long long BSONTool::processFile( const path& root ) {
+    long long BSONTool::processFile( const boost::filesystem::path& root ) {
         _fileName = root.string();
 
         unsigned long long fileLength = file_size( root );

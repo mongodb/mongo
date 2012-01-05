@@ -29,6 +29,8 @@
 #include "ramlog.h"
 #include "../db/cmdline.h"
 
+#include <boost/filesystem/operations.hpp>
+
 namespace mongo {
 
     /* Approved formats for versionString:

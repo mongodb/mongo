@@ -154,7 +154,7 @@ namespace mongo {
 
         virtual int run();
 
-        long long processFile( const path& file );
+        long long processFile( const boost::filesystem::path& file );
 
     };
 

@@ -30,6 +30,8 @@
 #define MIN(a,b) ( (a) < (b) ? (a) : (b) )
 #endif
 
+#include <boost/filesystem/operations.hpp>
+
 namespace mongo {
 
     const unsigned DEFAULT_CHUNK_SIZE = 256 * 1024;

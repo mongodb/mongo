@@ -27,6 +27,8 @@
 
 using namespace mongoutils;
 
+#include <boost/filesystem/operations.hpp>
+
 namespace mongo {
 
     extern string dbpath; // --dbpath parm
@@ -109,7 +111,7 @@ namespace mongo {
 
         // if an operation deletes or creates a file (or moves etc.), it may need files closed.
         bool FileCreatedOp::needFilesClosed() {
-            return exists( _p.asFullPath() );
+            return boost::filesystem::exists( _p.asFullPath() );
         }
 
         void FileCreatedOp::replay() {
@@ -117,9 +119,9 @@ namespace mongo {
             // or rewrite at least, even if it were the right length.  perhaps one day we should change that
             // although easier to avoid defects if we assume it is zeros perhaps.
             string full = _p.asFullPath();
-            if( exists(full) ) {
+            if( boost::filesystem::exists(full) ) {
                 try {
-                    remove(full);
+                    boost::filesystem::remove(full);
                 }
                 catch(std::exception& e) {
                     log(1) << "recover info FileCreateOp::replay unlink " << e.what() << endl;
@@ -127,10 +129,10 @@ namespace mongo {
             }
 
             log() << "recover create file " << full << ' ' << _len/1024.0/1024.0 << "MB" << endl;
-            if( MemoryMappedFile::exists(full) ) {
+            if( boost::filesystem::exists(full) ) {
                 // first delete if exists.
                 try {
-                    remove(full);
+                    boost::filesystem::remove(full);
                 }
                 catch(...) {
                     log() << "warning could not delete file " << full << endl;

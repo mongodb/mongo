@@ -45,6 +45,8 @@
 #include "ops/update.h"
 #include "pagefault.h"
 
+#include <boost/filesystem/operations.hpp>
+
 namespace mongo {
 
     // "diaglog"
@@ -749,7 +751,7 @@ namespace mongo {
                 boost::filesystem::path p = *i;
                 string dbName = p.leaf();
                 p /= ( dbName + ".ns" );
-                if ( MMF::exists( p ) )
+                if ( exists( p ) )
                     names.push_back( dbName );
             }
             else {

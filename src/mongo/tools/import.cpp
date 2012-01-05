@@ -28,6 +28,7 @@
 
 #include <boost/program_options.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/filesystem/operations.hpp>
 
 using namespace mongo;
 using std::string;
@@ -297,12 +298,12 @@ public:
         ifstream file( filename.c_str() , ios_base::in);
 
         if ( filename.size() > 0 && filename != "-" ) {
-            if ( ! exists( filename ) ) {
+            if ( ! boost::filesystem::exists( filename ) ) {
                 error() << "file doesn't exist: " << filename << endl;
                 return -1;
             }
             in = &file;
-            fileSize = file_size( filename );
+            fileSize = boost::filesystem::file_size( filename );
         }
 
         // check if we're actually talking to a machine that can write
