@@ -19,6 +19,14 @@
 #include "../pch.h"
 #include "jsobj.h"
 
+namespace boost {
+    namespace program_options {
+        class options_description;
+        class positional_options_description;
+        class variables_map;
+    }
+}
+
 namespace mongo {
 
 #ifdef MONGO_SSL
