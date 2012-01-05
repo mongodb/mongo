@@ -230,7 +230,7 @@ struct DynamicPrompt : public PromptBase {
     int         reverseSearchBasePromptLen;
     int         endSearchBasePromptLen;
 
-    DynamicPrompt( PromptInfo& pi, int initialDirection ) : direction( initialDirection ) {
+    DynamicPrompt( PromptBase& pi, int initialDirection ) : direction( initialDirection ) {
         forwardSearchBasePromptLen = strlen( forwardSearchBasePrompt ); // store constant text lengths
         reverseSearchBasePromptLen = strlen( reverseSearchBasePrompt );
         endSearchBasePromptLen = strlen( endSearchBasePrompt );
@@ -347,16 +347,16 @@ class InputBuffer {
     int         len;
     int         pos;
 
-    void clearScreen( PromptInfo& pi );
-    int incrementalHistorySearch( PromptInfo& pi, int startChar );
-    int completeLine( PromptInfo& pi );
+    void clearScreen( PromptBase& pi );
+    int incrementalHistorySearch( PromptBase& pi, int startChar );
+    int completeLine( PromptBase& pi );
     void refreshLine( PromptBase& pi );
 
 public:
     InputBuffer( char* buffer, int bufferLen ) : buf( buffer ), buflen( bufferLen - 1 ), len( 0 ), pos( 0 ) {
         buf[0] = 0;
     }
-    int getInputLine( PromptInfo& pi );
+    int getInputLine( PromptBase& pi );
 
 };
 
@@ -558,7 +558,7 @@ static void setDisplayAttribute( bool enhancedDisplay ) {
 
 /**
  * Display the dynamic incremental search prompt and the current user input line.
- * @param pi   PromptInfo struct holding information about the prompt and our screen position
+ * @param pi   PromptBase struct holding information about the prompt and our screen position
  * @param buf  input buffer to be displayed
  * @param len  count of characters in the buffer
  * @param pos  current cursor position within the buffer (0 <= pos <= len)
@@ -639,7 +639,7 @@ static void dynamicRefresh( PromptBase& pi, char *buf, int len, int pos ) {
 
 /**
  * Refresh the user's input line: the prompt is already onscreen and is not redrawn here
- * @param pi   PromptInfo struct holding information about the prompt and our screen position
+ * @param pi   PromptBase struct holding information about the prompt and our screen position
  */
 void InputBuffer::refreshLine( PromptBase& pi ) {
 
@@ -1157,9 +1157,9 @@ static const int completionCountCutoff = 100;
  * Handle command completion, using a completionCallback() routine to provide possible substitutions
  * This routine handles the mechanics of updating the user's input buffer with possible replacement of
  * text as the user selects a proposed completion string, or cancels the completion attempt.
- * @param pi     PromptInfo struct holding information about the prompt and our screen position
+ * @param pi     PromptBase struct holding information about the prompt and our screen position
  */
-int InputBuffer::completeLine( PromptInfo& pi ) {
+int InputBuffer::completeLine( PromptBase& pi ) {
     linenoiseCompletions lc = { 0, NULL };
     char c = 0;
 
@@ -1396,7 +1396,7 @@ void linenoiseClearScreen( void ) {
 #endif
 }
 
-void InputBuffer::clearScreen( PromptInfo& pi ) {
+void InputBuffer::clearScreen( PromptBase& pi ) {
     linenoiseClearScreen();
     if ( write( 1, pi.promptText, pi.promptChars ) == -1 ) return;
 #ifndef _WIN32
@@ -1412,10 +1412,10 @@ void InputBuffer::clearScreen( PromptInfo& pi ) {
  * Incremental history search -- take over the prompt and keyboard as the user types a search string,
  * deletes characters from it, changes direction, and either accepts the found line (for execution or
  * editing) or cancels.
- * @param pi        PromptInfo struct holding information about the (old, static) prompt and our screen position
+ * @param pi        PromptBase struct holding information about the (old, static) prompt and our screen position
  * @param startChar the character that began the search, used to set the initial direction
  */
-int InputBuffer::incrementalHistorySearch( PromptInfo& pi, int startChar ) {
+int InputBuffer::incrementalHistorySearch( PromptBase& pi, int startChar ) {
 
     // add the current line to the history list so we don't have to special case it
     history[historyLen - 1] = reinterpret_cast<char *>( realloc( history[historyLen - 1], len + 1 ) );
@@ -1599,7 +1599,7 @@ int InputBuffer::incrementalHistorySearch( PromptInfo& pi, int startChar ) {
         len = historyLineLength;
         pos = historyLinePosition;
     }
-    dynamicRefresh( pb, buf, len, pos );              // redraw the original prompt with current input
+    dynamicRefresh( pb, buf, len, pos );    // redraw the original prompt with current input
     pi.promptPreviousInputLen = len;
     pi.promptCursorRowOffset = pi.promptExtraLines + pb.promptCursorRowOffset;
 
@@ -1607,7 +1607,8 @@ int InputBuffer::incrementalHistorySearch( PromptInfo& pi, int startChar ) {
     return c;                               // pass a character or -1 back to main loop
 }
 
-int InputBuffer::getInputLine( PromptInfo& pi ) {
+int InputBuffer::getInputLine( PromptBase& pi ) {
+
     // The latest history entry is always our current buffer
     linenoiseHistoryAdd( "" );
     historyIndex = historyLen - 1;
