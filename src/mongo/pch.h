@@ -84,7 +84,6 @@
 #include <boost/smart_ptr.hpp>
 #include <boost/function.hpp>
 #include <boost/bind.hpp>
-#include <boost/function.hpp>
 #include <boost/thread/tss.hpp>
 #include <boost/detail/endian.hpp>
 #include <boost/version.hpp>
