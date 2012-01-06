@@ -99,8 +99,6 @@ class test_config04(wttest.WiredTigerTestCase):
         # TODO: how do we verify that it was set?
 
     def test_eviction_bad(self):
-        self.KNOWN_FAILURE('bad eviction config will cause Resource busy ' +
-                           'on subsequent tests')
         self.assertRaises(WiredTigerError, lambda:
             wiredtiger.wiredtiger_open('.', 'create,eviction_target=91,' +
                                        'eviction_trigger=81'))
