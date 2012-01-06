@@ -24,17 +24,17 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	ret = 0;
 
 	/* WT_SESSION_IMPL and hazard arrays. */
-	WT_RET(__wt_calloc(session,
+	WT_ERR(__wt_calloc(session,
 	    conn->session_size, sizeof(WT_SESSION_IMPL *), &conn->sessions));
-	WT_RET(__wt_calloc(session,
+	WT_ERR(__wt_calloc(session,
 	    conn->session_size, sizeof(WT_SESSION_IMPL),
 	    &conn->session_array));
-	WT_RET(__wt_calloc(session,
+	WT_ERR(__wt_calloc(session,
 	   conn->session_size * conn->hazard_size, sizeof(WT_HAZARD),
 	   &conn->hazard));
 
 	/* Create the cache. */
-	WT_RET(__wt_cache_create(conn, cfg));
+	WT_ERR(__wt_cache_create(conn, cfg));
 
 	/*
 	 * Publish: there must be a barrier to ensure the connection structure
@@ -44,7 +44,6 @@ __wt_connection_open(WT_CONNECTION_IMPL *conn, const char *cfg[])
 
 	/* Start worker threads. */
 	F_SET(conn, WT_SERVER_RUN);
-
 	WT_ERR(__wt_thread_create(
 	    &conn->cache_evict_tid, __wt_cache_evict_server, conn));
 
@@ -102,8 +101,10 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 
 	/* Shut down the server threads. */
 	F_CLR(conn, WT_SERVER_RUN);
-	__wt_evict_server_wake(session);
-	WT_TRET(__wt_thread_join(conn->cache_evict_tid));
+	if (conn->cache_evict_tid != 0) {
+		__wt_evict_server_wake(session);
+		WT_TRET(__wt_thread_join(conn->cache_evict_tid));
+	}
 
 	/* Discard the cache. */
 	__wt_cache_destroy(conn);
