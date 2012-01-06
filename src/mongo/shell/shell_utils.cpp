@@ -308,7 +308,7 @@ namespace mongo {
                 buf << " m" << port << "| " << line;
             else
                 buf << "sh" << pid << "| " << line;
-            cout << buf.str() << endl;
+            printf( "%s\n", buf.str().c_str() ); // cout << buf.str() << endl;
             mongoProgramOutput_ << buf.str() << endl;
         }
 
