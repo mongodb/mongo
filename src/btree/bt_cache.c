@@ -32,11 +32,12 @@ __wt_cache_create(WT_CONNECTION_IMPL *conn, const char *cfg[])
 	cache->eviction_trigger = (u_int)cval.val;
 
 	/*
-	 * Sanity: the target size must be lower than the trigger size or we
-	 * will never get any work done.
+	 * The target size must be lower than the trigger size or we will never
+	 * get any work done.
 	 */
 	if (cache->eviction_target >= cache->eviction_trigger)
-		cache->eviction_target = cache->eviction_trigger - 1;
+		WT_ERR_MSG(session, EINVAL,
+		    "eviction target must be lower than the eviction trigger");
 
 	WT_ERR(__wt_cond_alloc(session,
 	    "cache eviction server", 1, &cache->evict_cond));
