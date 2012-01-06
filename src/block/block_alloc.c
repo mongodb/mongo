@@ -124,11 +124,9 @@ __block_extend(
 		    "information");
 
 	/*
-	 * Make sure we don't allocate past the maximum file size.
-	 *
-	 * XXX
-	 * We don't know the maximum off_t on the system; for now, limit growth
-	 * to a signed 64-bit value.
+	 * Make sure we don't allocate past the maximum file size.  There's no
+	 * easy way to know the maximum off_t on a system, limit growth to 64
+	 * bits, that should be big enough.
 	 *
 	 * XXX
 	 * This isn't sufficient: if we grow the file to the end, there isn't

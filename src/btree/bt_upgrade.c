@@ -14,8 +14,8 @@
 int
 __wt_upgrade(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_UNUSED(session);		/* XXX: unused for now */
-	WT_UNUSED(cfg);			/* XXX: unused for now */
+	WT_UNUSED(session);
+	WT_UNUSED(cfg);
 
 	/* There's nothing to upgrade, yet. */
 	return (0);

@@ -202,7 +202,8 @@ __curindex_search(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session, search, cindex->cbt.btree);
 
 	/*
-	 * XXX a very odd corner case is an index with a recno key.
+	 * XXX
+	 * A very odd corner case is an index with a recno key.
 	 * The only way to get here is by creating an index on a column store
 	 * using only the primary's recno as the index key.  Disallow that for
 	 * now.
@@ -216,8 +217,9 @@ __curindex_search(WT_CURSOR *cursor)
 
 	/*
 	 * Take a copy of the search key.
-	 * XXX we can avoid this with a cursor flag indicating when the
-	 * application owns the data.
+	 * XXX
+	 * We can avoid this with a cursor flag indicating when the application
+	 * owns the data.
 	 */
 	WT_ERR(__wt_scr_alloc(session, cursor->key.size, &oldkeyp));
 	memcpy(oldkeyp->mem, cursor->key.data, cursor->key.size);

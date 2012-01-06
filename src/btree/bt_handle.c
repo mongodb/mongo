@@ -151,12 +151,9 @@ __wt_btree_reopen(WT_SESSION_IMPL *session, uint32_t flags)
 	btree = session->btree;
 
 	/*
-	 * Clear any existing cache.
-	 *
-	 * XXX
-	 * The reason for this is because verify and salvage don't want to deal
-	 * with in-memory trees, that is, all reads must be satisfied from the
-	 * disk.
+	 * Clear any existing cache.  The reason for this is because verify and
+	 * salvage don't want to deal with in-memory trees, that is, reads must
+	 * be satisfied from the disk.
 	 */
 	if (btree->root_page != NULL)
 		WT_RET(__wt_evict_file_serial(session, 1));

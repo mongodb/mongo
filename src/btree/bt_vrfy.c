@@ -42,7 +42,7 @@ static int __verify_tree(WT_SESSION_IMPL *, WT_PAGE *, uint64_t, WT_VSTUFF *);
 int
 __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_UNUSED(cfg);			/* XXX: unused for now */
+	WT_UNUSED(cfg);
 
 	return (__verify_int(session, 0));
 }
@@ -54,7 +54,7 @@ __wt_verify(WT_SESSION_IMPL *session, const char *cfg[])
 int
 __wt_dumpfile(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_UNUSED(cfg);			/* XXX: unused for now */
+	WT_UNUSED(cfg);
 
 #ifdef HAVE_DIAGNOSTIC
 	/*

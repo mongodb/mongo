@@ -106,7 +106,7 @@ struct __wt_page_modify {
 	 * written by a serialized function when modifying a page, and must be
 	 * flushed in order as the serialized updates are flushed.
 	 *
-	 * XXX
+	 * !!!
 	 * 32-bit values are probably more than is needed: at some point we may
 	 * need to clean up pages once there have been sufficient modifications
 	 * to make our linked lists of inserted cells too slow to search, or as
@@ -114,7 +114,7 @@ struct __wt_page_modify {
 	 * (although we should be able to release memory from the MVCC list as
 	 * soon as there's no running thread/txn which might want that version
 	 * of the data).   I've used 32-bit types instead of 16-bit types as I
-	 * am less confident a 16-bit write to memory will be atomic.
+	 * am less confident a 16-bit write to memory will invariably be atomic.
 	 */
 	uint32_t write_gen;
 

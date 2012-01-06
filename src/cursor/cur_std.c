@@ -9,12 +9,13 @@
 
 /*
  * __wt_cursor_notsup --
- *	WT_CURSOR->XXX method for unsupported cursor actions.
+ *	Unsupported cursor actions.
  */
 int
 __wt_cursor_notsup(WT_CURSOR *cursor)
 {
 	WT_UNUSED(cursor);
+
 	return (ENOTSUP);
 }
 

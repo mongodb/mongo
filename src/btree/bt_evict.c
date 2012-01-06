@@ -346,7 +346,7 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 		/*
 		 * Resolve the request and clear the slot.
 		 *
-		 * XXX
+		 * !!!
 		 * Page eviction is special: the requesting thread is already
 		 * inside wrapup.
 		 */
