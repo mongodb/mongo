@@ -84,8 +84,8 @@ __rename_tree(WT_SESSION_IMPL *session, WT_BTREE *btree, const char *newname)
 	/*
 	 * Create the new file name, new schema key, new schema value.
 	 *
-	 * Names are of the form "XXX.oldname:YYY", where YYY is optional;
-	 * we need XXX and YYY.
+	 * Names are of the form "prefix.oldname:suffix", where suffix is
+	 * optional; we need prefix and suffix.
 	 */
 	if ((p = strchr(btree->name, ':')) == NULL)
 		WT_ERR_MSG(session, EINVAL,
