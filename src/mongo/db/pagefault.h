@@ -18,7 +18,6 @@ namespace mongo {
     };
 
     class PageFaultRetryableSection : boost::noncopyable { 
-        PageFaultRetryableSection *old;
         unsigned _laps;
     public:
         unsigned laps() const { return _laps; }

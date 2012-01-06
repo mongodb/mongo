@@ -126,6 +126,8 @@ namespace mongo {
         
         bool hasWrittenThisPass() const { return _hasWrittenThisPass; }
         void writeHappened() { _hasWrittenThisPass = true; }
+        
+        bool allowedToThrowPageFaultException() const;
 
     private:
         Client(const char *desc, AbstractMessagingPort *p = 0);

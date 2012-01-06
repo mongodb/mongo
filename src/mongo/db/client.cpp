@@ -35,6 +35,7 @@
 #include "../util/file_allocator.h"
 #include "repl/rs.h"
 #include "../scripting/engine.h"
+#include "pagefault.h"
 
 namespace mongo {
   
@@ -573,6 +574,13 @@ namespace mongo {
         }
 
         return writers + readers;
+    }
+
+    bool Client::allowedToThrowPageFaultException() const {
+        return 
+            _hasWrittenThisPass == false && 
+            _pageFaultRetryableSection != 0 && 
+            _pageFaultRetryableSection->laps() < 1000; 
     }
 
     void OpDebug::reset() {
