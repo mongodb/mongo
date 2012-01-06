@@ -214,8 +214,14 @@ namespace mongo {
         const size_t region = page >> 6;
         const size_t offset = page & 0x3f;
         
-        if ( ps::rolling.access( region , offset , false ) )
+        if ( ps::rolling.access( region , offset , false ) ) {
+#ifdef _DEBUG
+            if ( blockSupported && ! ProcessInfo::blockInMemory( data ) ) {
+                warning() << "we think data is in ram but system says no"  << endl;
+            }
+#endif
             return true;
+        }
 
         if ( ! blockSupported ) {
             // this means we don't fallback to system call 
