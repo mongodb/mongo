@@ -318,7 +318,7 @@ def runTest(test):
     print "         Test : " + os.path.basename(path) + " ..."
     # FIXME: we don't handle the case where the subprocess
     # hangs... that's bad.
-    if argv[0].endswith( 'mongo' ) and not '--eval' in argv :
+    if ( argv[0].endswith( 'mongo' ) or argv[0].endswith( 'mongo.exe' ) ) and not '--eval' in argv :
         evalString = 'TestData = new Object();' + \
                      'TestData.testPath = "' + path + '";' + \
                      'TestData.testFile = "' + os.path.basename( path ) + '";' + \
