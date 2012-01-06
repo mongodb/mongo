@@ -928,7 +928,7 @@ namespace mongo {
         }
         Record *r = loc.rec();
 
-        if ( cc().inPageFaultRetryableSection() && ! r->likelyInPhysicalMemory() ) {
+        if ( cc().allowedToThrowPageFaultException() && ! r->likelyInPhysicalMemory() ) {
             throw PageFaultException( r );
         }
 
@@ -1045,13 +1045,23 @@ namespace mongo {
 
                 bool atomic = c->matcher() && c->matcher()->docMatcher().atomic();
                 
-                if ( !atomic ) {
-                    // *****************
+                if ( ! atomic && ! c->currLoc().isNull() && ! c->currLoc().rec()->likelyInPhysicalMemory() ) {
+                    // we should do something so we don't fault in a write lock
+                    
+                    // if we haven't written anything and don't have a cursor yet,
+                    // throwing is best right now to avoid the bug in cursors
+                    // where a document can get moved backwards
+                    if ( cc.get() == 0 && 
+                         client.allowedToThrowPageFaultException() ) {
+                        throw PageFaultException( c->currLoc().rec() );
+                    }
+                             
+                    // we need to use a ClientCursor to yield
                     if ( cc.get() == 0 ) {
                         shared_ptr< Cursor > cPtr = c;
                         cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , cPtr , ns ) );
                     }
-    
+
                     bool didYield;
                     if ( ! cc->yieldSometimes( ClientCursor::WillNeed, &didYield ) ) {
                         cc.release();
@@ -1060,13 +1070,13 @@ namespace mongo {
                     if ( !c->ok() ) {
                         break;
                     }
-                
+                    
                     if ( didYield ) {
                         d = nsdetails(ns);
                         nsdt = &NamespaceDetailsTransient::get(ns);
                     }
-                    // *****************
-                }
+
+                } // end yielding block
 
                 if ( !c->currentMatches( &details ) ) {
                     c->advance();
