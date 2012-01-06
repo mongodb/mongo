@@ -40,7 +40,6 @@ __wt_drop_file(WT_SESSION_IMPL *session, const char *name, int force)
 	if (exist)
 		WT_TRET(__wt_remove(session, name));
 
-
 err:	__wt_scr_free(&buf);
 	return (ret);
 }

@@ -106,7 +106,7 @@ __rename_tree(WT_SESSION_IMPL *session, WT_BTREE *btree, const char *newname)
 		WT_ERR_MSG(session, EINVAL,
 		    "index or column-group value has no file name: %s", value);
 	t = strchr(p, ',');
-	WT_ERR(__wt_buf_fmt(session, nv, "%.*sfilename=%s%s",
+	WT_ERR(__wt_buf_fmt(session, nv, "%.*s" "filename=%s%s",
 	    (int)WT_PTRDIFF(p, value), value,
 	    (char *)nf->data, t == NULL ? "" : t));
 
