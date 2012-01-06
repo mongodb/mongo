@@ -20,6 +20,7 @@
 #include "../background.h"
 #include "../concurrency/value.h"
 #include "../mongoutils/str.h"
+#include "../../db/cmdline.h"
 
 #if !defined(_WIN32)
 # include <sys/socket.h>
@@ -302,6 +303,11 @@ namespace mongo {
     }
 
     SockAddr unknownAddress( "0.0.0.0", 0 );
+
+    string makeUnixSockPath(int port) {
+        return mongoutils::str::stream() << cmdLine.socket << "/mongodb-" << port << ".sock";
+    }
+
 
     // If an ip address is passed in, just return that.  If a hostname is passed
     // in, look up its ip and return that.  Returns "" on failure.

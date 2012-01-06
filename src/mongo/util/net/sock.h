@@ -20,10 +20,6 @@
 #include "../../pch.h"
 
 #include <stdio.h>
-#include <sstream>
-#include "../goodies.h"
-#include "../../db/cmdline.h"
-#include "../mongoutils/str.h"
 
 #ifndef _WIN32
 
@@ -68,9 +64,7 @@ namespace mongo {
 
 #endif // _WIN32
 
-    inline string makeUnixSockPath(int port) {
-        return mongoutils::str::stream() << cmdLine.socket << "/mongodb-" << port << ".sock";
-    }
+    string makeUnixSockPath(int port);
 
     // If an ip address is passed in, just return that.  If a hostname is passed
     // in, look up its ip and return that.  Returns "" on failure.
