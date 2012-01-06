@@ -595,9 +595,11 @@ namespace mongo {
 #endif
 
 #if defined(_WIN32)
-                if ( WSAGetLastError() == WSAETIMEDOUT && _timeout != 0 ) {
+                const int mongo_errno = WSAGetLastError();
+                if ( mongo_errno == WSAETIMEDOUT && _timeout != 0 ) {
 #else
-                if ( ( errno == EAGAIN || errno == EWOULDBLOCK ) && _timeout != 0 ) {
+                const int mongo_errno = errno;
+                if ( ( mongo_errno == EAGAIN || mongo_errno == EWOULDBLOCK ) && _timeout != 0 ) {
 #endif
                     log(_logLevel) << "Socket " << context << " send() timed out " << _remote.toString() << endl;
                     throw SocketException( SocketException::SEND_TIMEOUT , remoteString() );
@@ -605,7 +607,7 @@ namespace mongo {
                 else {
                     SocketException::Type t = SocketException::SEND_ERROR;
                     log(_logLevel) << "Socket " << context << " send() " 
-                                   << errnoWithDescription() << ' ' << remoteString() << endl;
+                                   << errnoWithDescription(mongo_errno) << ' ' << remoteString() << endl;
                     throw SocketException( t , remoteString() );
                 }
             }
