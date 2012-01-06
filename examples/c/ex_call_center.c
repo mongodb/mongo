@@ -61,9 +61,11 @@ int main(void)
 	CALL call;
 
 	ret = wiredtiger_open(home, NULL, "create", &conn);
-	if (ret != 0)
+	if (ret != 0) {
 		fprintf(stderr, "Error connecting to %s: %s\n",
 		    home, wiredtiger_strerror(ret));
+		return (1);
+	}
 	/* Note: further error checking omitted for clarity. */
 
 	ret = conn->open_session(conn, NULL, NULL, &session);
