@@ -206,9 +206,13 @@ namespace ReplSetTests {
             b.append("o", BSON("$set" << BSON("x" << 456)));
             b.append("o2", BSON("_id" << 123 << "x" << 123));
             b.append("ns", _ns);
+            BSONObj op = b.obj();
 
             // in an annoying twist of api, returns true on failure
-            assert(applyOperation_inlock(b.obj(), true));
+            assert(applyOperation_inlock(op, true));
+
+            Sync s("");
+            assert(!s.shouldRetry(op));
         }
     };
 

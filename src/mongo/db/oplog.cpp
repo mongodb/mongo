@@ -626,10 +626,17 @@ namespace mongo {
 
     BSONObj Sync::getMissingDoc(const BSONObj& o) {
         OplogReader missingObjReader;
+        const char *ns = o.getStringField("ns");
+
+        // capped collections
+        NamespaceDetails *nsd = nsdetails(ns);
+        if (nsd && nsd->capped) {
+            log() << "replication missing doc, but this is okay for a capped collection (" << ns << ")" << endl;
+            return BSONObj();
+        }
 
         uassert(15916, str::stream() << "Can no longer connect to initial sync source: " << hn, missingObjReader.connect(hn));
 
-        const char *ns = o.getStringField("ns");
         // might be more than just _id in the update criteria
         BSONObj query = BSONObjBuilder().append(o.getObjectField("o2")["_id"]).obj();
         BSONObj missingObj;
