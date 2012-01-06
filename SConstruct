@@ -429,6 +429,7 @@ serverOnlyFiles += [
     "src/mongo/db/commands/group.cpp",
     "src/mongo/db/commands/mr.cpp",
     "src/mongo/db/commands/pipeline_command.cpp",
+    "src/mongo/db/commands/pipeline_d.cpp",
     "src/mongo/db/commands/document_source_cursor.cpp" ]
 #    "src/mongo/db/commands/isself.cpp",
 #serverOnlyFiles += [ "src/mongo/db/commands/%s.cpp" % x for x in ["distinct","find_and_modify","group","mr"] ]

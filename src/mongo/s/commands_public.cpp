@@ -1423,11 +1423,14 @@ namespace mongo {
 	    BSONObj shardedCommand(commandBuilder.done());
 
 	    BSONObjBuilder shardQueryBuilder;
+#ifdef NEVER
 	    BSONObjBuilder shardSortBuilder;
 	    pShardPipeline->getCursorMods(
 		&shardQueryBuilder, &shardSortBuilder);
-	    BSONObj shardQuery(shardQueryBuilder.done());
 	    BSONObj shardSort(shardSortBuilder.done());
+#endif /* NEVER */
+	    pShardPipeline->getInitialQuery(&shardQueryBuilder);
+	    BSONObj shardQuery(shardQueryBuilder.done());
 
 	    ChunkManagerPtr cm(conf->getChunkManager(fullns));
 	    set<Shard> shards;

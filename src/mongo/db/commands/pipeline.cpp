@@ -268,27 +268,6 @@ namespace mongo {
 	while(!tempVector.empty()) {
 	    intrusive_ptr<DocumentSource> &pSource = tempVector.front();
 
-#ifdef MONGODB_SERVER3832 /* see https://jira.mongodb.org/browse/SERVER-3832 */
-	    DocumentSourceSort *pSort =
-		dynamic_cast<DocumentSourceSort *>(pSource.get());
-	    if (pSort) {
-		/*
-		  There's no point in sorting until the result is combined.
-		  Therefore, sorts should be done in mongos, and not in
-		  the shard at all.  Add all the remaining operators to
-		  the mongos list and quit.
-
-		  TODO:  unless the sort key is the shard key.
-		  TODO:  we could also do a merge sort in mongos in the
-		  future, and split here.
-		*/
-		for(size_t tempn = tempVector.size(), tempi = 0;
-		    tempi < tempn; ++tempi)
-		    sourceVector.push_back(tempVector[tempi]);
-		break;
-	    }
-#endif
-
 	    /* hang on to this in advance, in case it is a group */
 	    DocumentSourceGroup *pGroup =
 		dynamic_cast<DocumentSourceGroup *>(pSource.get());
@@ -315,39 +294,23 @@ namespace mongo {
 	return pShardPipeline;
     }
 
-    void Pipeline::getCursorMods(BSONObjBuilder *pQueryBuilder,
-	BSONObjBuilder *pSortBuilder) {
-	/* look for an initial $match */
+    bool Pipeline::getInitialQuery(BSONObjBuilder *pQueryBuilder) const
+    {
 	if (!sourceVector.size())
-	    return;
+	    return false;
+
+	/* look for an initial $match */
 	const intrusive_ptr<DocumentSource> &pMC = sourceVector.front();
 	const DocumentSourceMatch *pMatch =
 	    dynamic_cast<DocumentSourceMatch *>(pMC.get());
 
-	if (pMatch) {
-	    /* build the query */
-	    pMatch->toMatcherBson(pQueryBuilder);
+	if (!pMatch)
+	    return false;
 
-	    /* remove the match from the pipeline */
-	    sourceVector.erase(sourceVector.begin());
-	}
+	/* build the query */
+	pMatch->toMatcherBson(pQueryBuilder);
 
-	/* look for an initial $sort */
-	if (!sourceVector.size())
-	    return;
-#ifdef MONGODB_SERVER3832 /* see https://jira.mongodb.org/browse/SERVER-3832 */
-	const intrusive_ptr<DocumentSource> &pSC = sourceVector.front();
-	const DocumentSourceSort *pSort = 
-	    dynamic_cast<DocumentSourceSort *>(pSC.get());
-
-	if (pSort) {
-	    /* build the sort key */
-	    pSort->sortKeyToBson(pSortBuilder, false);
-
-	    /* remove the sort from the pipeline */
-	    sourceVector.erase(sourceVector.begin());
-	}
-#endif
+	return true;
     }
 
     void Pipeline::toBson(BSONObjBuilder *pBuilder) const {

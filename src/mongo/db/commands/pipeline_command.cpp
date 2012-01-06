@@ -17,6 +17,7 @@
 #include "pch.h"
 
 #include "db/commands/pipeline.h"
+#include "db/commands/pipeline_d.h"
 #include "db/cursor.h"
 #include "db/pdfile.h"
 #include "db/pipeline/accumulator.h"
@@ -74,39 +75,13 @@ namespace mongo {
 	intrusive_ptr<ExpressionContext> pCtx(ExpressionContext::create());
 
 	/* try to parse the command; if this fails, then we didn't run */
-	boost::shared_ptr<Pipeline> pPipeline(
+	shared_ptr<Pipeline> pPipeline(
 	    Pipeline::parseCommand(errmsg, cmdObj, pCtx));
 	if (!pPipeline.get())
 	    return false;
 
-	/* get a query to use, if any */
-	BSONObjBuilder queryBuilder;
-	BSONObjBuilder sortBuilder;
-	pPipeline->getCursorMods(&queryBuilder, &sortBuilder);
-	BSONObj query(queryBuilder.done());
-	BSONObj sort(sortBuilder.done());
-
-	/* for debugging purposes, show what the query and sort are */
-	DEV {
-	    (log() << "\n---- query BSON\n" <<
-	     query.jsonString(Strict, 1) << "\n----\n").flush();
-	    (log() << "\n---- sort BSON\n" <<
-	     sort.jsonString(Strict, 1) << "\n----\n").flush();
-	}
-	
-	/* create a cursor for that query */
-	string fullName(db + "." + pPipeline->getCollectionName());
-	shared_ptr<Cursor> pCursor(
-	    NamespaceDetailsTransient::getCursor(
-		fullName.c_str(), query
-#ifdef MONGODB_SERVER3832 /* see https://jira.mongodb.org/browse/SERVER-3832 */
-		   , sort
-#endif
-		));
-
-	/* wrap the cursor with a DocumentSource */
 	intrusive_ptr<DocumentSource> pSource(
-	    DocumentSourceCursor::create(pCursor));
+	    PipelineD::prepareCursorSource(pPipeline, db));
 
 	/* this is the normal non-debug path */
 	if (!pPipeline->getSplitMongodPipeline())

@@ -44,7 +44,7 @@ namespace mongo {
 	virtual ~DocumentSource();
 
 	// virtuals from StringWriter
-	/*
+	/**
 	  Write out a string representation of this pipeline operator.
 
 	  @param ss string stream to write the string representation to
@@ -52,14 +52,14 @@ namespace mongo {
 	virtual void writeString(stringstream &ss) const;
 
 
-        /*
+        /**
 	  Is the source at EOF?
 
 	  @returns true if the source has no more Documents to return.
         */
         virtual bool eof() = 0;
 
-        /*
+        /**
 	  Advance the state of the DocumentSource so that it will return the
 	  next Document.
 
@@ -68,7 +68,7 @@ namespace mongo {
         */
         virtual bool advance() = 0;
 
-        /*
+        /**
           Advance the source, and return the next Expression.
 
 	  @returns the current Document
@@ -76,7 +76,7 @@ namespace mongo {
         */
         virtual intrusive_ptr<Document> getCurrent() = 0;
 
-	/*
+	/**
 	  Set the underlying source this source should use to get Documents
 	  from.
 
@@ -88,7 +88,7 @@ namespace mongo {
 	 */
 	virtual void setSource(const intrusive_ptr<DocumentSource> &pSource);
 
-	/*
+	/**
 	  Attempt to coalesce this DocumentSource with its successor in the
 	  document processing pipeline.  If successful, the successor
 	  DocumentSource should be removed from the pipeline and discarded.
@@ -104,7 +104,7 @@ namespace mongo {
 	 */
 	virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
 
-	/*
+	/**
 	  Optimize the pipeline operation, if possible.  This is a local
 	  optimization that only looks within this DocumentSource.  For best
 	  results, first coalesce compatible sources using coalesce().
@@ -116,7 +116,7 @@ namespace mongo {
 	 */
 	virtual void optimize();
 
-        /*
+        /**
 	  Add the DocumentSource to the array builder.
 
 	  The default implementation calls sourceToBson() in order to
@@ -128,7 +128,7 @@ namespace mongo {
 	virtual void addToBsonArray(BSONArrayBuilder *pBuilder) const;
 	
     protected:
-	/*
+	/**
 	  Create an object that represents the document source.  The object
 	  will have a single field whose name is the source's name.  This
 	  will be used by the default implementation of addToBsonArray()
@@ -160,7 +160,7 @@ namespace mongo {
         virtual intrusive_ptr<Document> getCurrent();
 	virtual void setSource(const intrusive_ptr<DocumentSource> &pSource);
 
-	/*
+	/**
 	  Create a document source based on a BSON array.
 
 	  This is usually put at the beginning of a chain of document sources
@@ -203,7 +203,7 @@ namespace mongo {
 	/* convenient shorthand for a commonly used type */
 	typedef list<shared_ptr<Future::CommandResult> > FuturesList;
 
-	/*
+	/**
 	  Create a DocumentSource that wraps a list of Command::Futures.
 
 	  @param errmsg place to write error messages to; must exist for the
@@ -220,7 +220,7 @@ namespace mongo {
     private:
 	DocumentSourceCommandFutures(string &errmsg, FuturesList *pList);
 
-	/*
+	/**
 	  Advance to the next document, setting pCurrent appropriately.
 
 	  Adjusts pCurrent, pBsonSource, and iterator, as needed.  On exit,
@@ -248,7 +248,7 @@ namespace mongo {
         virtual intrusive_ptr<Document> getCurrent();
 	virtual void setSource(const intrusive_ptr<DocumentSource> &pSource);
 
-	/*
+	/**
 	  Create a document source based on a cursor.
 
 	  This is usually put at the beginning of a chain of document sources
@@ -259,6 +259,30 @@ namespace mongo {
 	static intrusive_ptr<DocumentSourceCursor> create(
 	    const shared_ptr<Cursor> &pCursor);
 
+	/**
+	   Add a BSONObj dependency.
+
+	   Some Cursor creation functions rely on BSON objects to specify
+	   their query predicate or sort.  These often take a BSONObj
+	   by reference for these, but to not copy it.  As a result, the
+	   BSONObjs specified must outlive the Cursor.  In order to ensure
+	   that, use this to preserve a pointer to the BSONObj here.
+
+	   From the outside, you must also make sure the BSONObjBuilder
+	   creates a lasting copy of the data, otherwise it will go away
+	   when the builder goes out of scope.  Therefore, the typical usage
+	   pattern for this is 
+	   {
+	       BSONObjBuilder builder;
+	       // do stuff to the builder
+	       shared_ptr<BSONObj> pBsonObj(new BSONObj(builder.obj()));
+	       pDocumentSourceCursor->addBsonDependency(pBsonObj);
+	   }
+
+	   @param pBsonObj pointer to the BSON object to preserve
+	 */
+	void addBsonDependency(const shared_ptr<BSONObj> &pBsonObj);
+
     protected:
 	// virtuals from DocumentSource
 	virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
@@ -267,8 +291,15 @@ namespace mongo {
         DocumentSourceCursor(const shared_ptr<Cursor> &pTheCursor);
 
 	void findNext();
-        shared_ptr<Cursor> pCursor;
 	intrusive_ptr<Document> pCurrent;
+
+	/*
+	  The bsonDependencies must outlive the Cursor wrapped by this
+	  source.  Therefore, bsonDependencies must appear before pCursor
+	  in order its destructor to be called *after* pCursor's.
+	 */
+	vector<shared_ptr<BSONObj> > bsonDependencies;
+        shared_ptr<Cursor> pCursor;
     };
 
 
@@ -287,7 +318,7 @@ namespace mongo {
         virtual bool advance();
         virtual intrusive_ptr<Document> getCurrent();
 
-	/*
+	/**
 	  Create a BSONObj suitable for Matcher construction.
 
 	  This is used after filter analysis has moved as many filters to
@@ -303,7 +334,7 @@ namespace mongo {
     protected:
         DocumentSourceFilterBase();
 
-	/*
+	/**
 	  Test the given document against the predicate and report if it
 	  should be accepted or not.
 
@@ -330,7 +361,7 @@ namespace mongo {
 	virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
 	virtual void optimize();
 
-	/*
+	/**
 	  Create a filter.
 
           @param pBsonElement the raw BSON specification for the filter
@@ -340,7 +371,7 @@ namespace mongo {
 	    BSONElement *pBsonElement,
 	    const intrusive_ptr<ExpressionContext> &pCtx);
 
-        /*
+        /**
           Create a filter.
 
           @param pFilter the expression to use to filter
@@ -349,7 +380,7 @@ namespace mongo {
         static intrusive_ptr<DocumentSourceFilter> create(
             const intrusive_ptr<Expression> &pFilter);
 
-	/*
+	/**
 	  Create a BSONObj suitable for Matcher construction.
 
 	  This is used after filter analysis has moved as many filters to
@@ -387,7 +418,7 @@ namespace mongo {
         virtual bool advance();
         virtual intrusive_ptr<Document> getCurrent();
 
-        /*
+        /**
           Create a new grouping DocumentSource.
 	  
 	  @param pCtx the expression context
@@ -396,7 +427,7 @@ namespace mongo {
         static intrusive_ptr<DocumentSourceGroup> create(
 	    const intrusive_ptr<ExpressionContext> &pCtx);
 
-        /*
+        /**
           Set the Id Expression.
 
           Documents that pass through the grouping Document are grouped
@@ -407,7 +438,7 @@ namespace mongo {
          */
         void setIdExpression(const intrusive_ptr<Expression> &pExpression);
 
-        /*
+        /**
           Add an accumulator.
 
           Accumulators become fields in the Documents that result from
@@ -424,7 +455,7 @@ namespace mongo {
 			    const intrusive_ptr<ExpressionContext> &),
                             const intrusive_ptr<Expression> &pExpression);
 
-	/*
+	/**
 	  Create a grouping DocumentSource from BSON.
 
 	  This is a convenience method that uses the above, and operates on
@@ -440,7 +471,7 @@ namespace mongo {
 	    const intrusive_ptr<ExpressionContext> &pCtx);
 
 
-	/*
+	/**
 	  Create a unifying group that can be used to combine group results
 	  from shards.
 
@@ -506,7 +537,7 @@ namespace mongo {
         // virtuals from DocumentSource
         virtual ~DocumentSourceMatch();
 
-	/*
+	/**
 	  Create a filter.
 
           @param pBsonElement the raw BSON specification for the filter
@@ -516,7 +547,7 @@ namespace mongo {
 	    BSONElement *pBsonElement,
 	    const intrusive_ptr<ExpressionContext> &pCtx);
 
-	/*
+	/**
 	  Create a BSONObj suitable for Matcher construction.
 
 	  This is used after filter analysis has moved as many filters to
@@ -554,7 +585,7 @@ namespace mongo {
         virtual bool advance();
         virtual intrusive_ptr<Document> getCurrent();
 
-	/*
+	/**
 	  Create a document source for output and pass-through.
 
 	  This can be put anywhere in a pipeline and will store content as
@@ -587,28 +618,28 @@ namespace mongo {
         virtual intrusive_ptr<Document> getCurrent();
 	virtual void optimize();
 
-        /*
+        /**
           Create a new DocumentSource that can implement projection.
 
 	  @returns the projection DocumentSource
         */
         static intrusive_ptr<DocumentSourceProject> create();
 
-	/*
+	/**
 	  Include a field path in a projection.
 
 	  @param fieldPath the path of the field to include
 	*/
 	void includePath(const string &fieldPath);
 
-	/*
+	/**
 	  Exclude a field path from the projection.
 
 	  @param fieldPath the path of the field to exclude
 	 */
 	void excludePath(const string &fieldPath);
 
-        /*
+        /**
           Add an output Expression in the projection.
 
           BSON document fields are ordered, so the new field will be
@@ -620,7 +651,7 @@ namespace mongo {
         void addField(const string &fieldName,
 		      const intrusive_ptr<Expression> &pExpression);
 
-	/*
+	/**
 	  Create a new projection DocumentSource from BSON.
 
 	  This is a convenience for directly handling BSON, and relies on the
@@ -662,7 +693,7 @@ namespace mongo {
 	virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
 	*/
 
-        /*
+        /**
           Create a new sorting DocumentSource.
 	  
 	  @param pCtx the expression context
@@ -671,7 +702,7 @@ namespace mongo {
         static intrusive_ptr<DocumentSourceSort> create(
 	    const intrusive_ptr<ExpressionContext> &pCtx);
 
-	/*
+	/**
 	  Add sort key field.
 
 	  Adds a sort key field to the key being built up.  A concatenated
@@ -683,7 +714,7 @@ namespace mongo {
 	*/
 	void addKey(const string &fieldPath, bool ascending);
 
-	/*
+	/**
 	  Write out an object whose contents are the sort key.
 
 	  @param pBuilder initialized object builder.
@@ -691,7 +722,7 @@ namespace mongo {
 	 */
 	void sortKeyToBson(BSONObjBuilder *pBuilder, bool usePrefix) const;
 
-	/*
+	/**
 	  Create a sorting DocumentSource from BSON.
 
 	  This is a convenience method that uses the above, and operates on
@@ -776,7 +807,7 @@ namespace mongo {
         virtual bool advance();
         virtual intrusive_ptr<Document> getCurrent();
 
-        /*
+        /**
           Create a new limiting DocumentSource.
 
 	  @param pCtx the expression context
@@ -785,7 +816,7 @@ namespace mongo {
         static intrusive_ptr<DocumentSourceLimit> create(
 	    const intrusive_ptr<ExpressionContext> &pCtx);
 
-	/*
+	/**
 	  Create a limiting DocumentSource from BSON.
 
 	  This is a convenience method that uses the above, and operates on
@@ -826,7 +857,7 @@ namespace mongo {
         virtual bool advance();
         virtual intrusive_ptr<Document> getCurrent();
 
-        /*
+        /**
           Create a new skipping DocumentSource.
 
 	  @param pCtx the expression context
@@ -835,7 +866,7 @@ namespace mongo {
         static intrusive_ptr<DocumentSourceSkip> create(
 	    const intrusive_ptr<ExpressionContext> &pCtx);
 
-	/*
+	/**
 	  Create a skipping DocumentSource from BSON.
 
 	  This is a convenience method that uses the above, and operates on
@@ -883,14 +914,14 @@ namespace mongo {
         virtual bool advance();
         virtual intrusive_ptr<Document> getCurrent();
 
-        /*
+        /**
           Create a new DocumentSource that can implement unwind.
 
 	  @returns the projection DocumentSource
         */
         static intrusive_ptr<DocumentSourceUnwind> create();
 
-        /*
+        /**
 	  Specify the field to unwind.  There must be exactly one before
 	  the pipeline begins execution.
 
@@ -898,7 +929,7 @@ namespace mongo {
         */
 	void unwindField(const FieldPath &rFieldPath);
 
-	/*
+	/**
 	  Create a new projection DocumentSource from BSON.
 
 	  This is a convenience for directly handling BSON, and relies on the

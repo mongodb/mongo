@@ -40,7 +40,7 @@ namespace mongo {
     public:
         virtual ~Pipeline();
 
-	/*
+	/**
 	  Create a pipeline from the command.
 
 	  @param errmsg where to write errors, if there are any
@@ -51,14 +51,14 @@ namespace mongo {
 	    string &errmsg, BSONObj &cmdObj,
 	    const intrusive_ptr<ExpressionContext> &pCtx);
 
-	/*
+	/**
 	  Get the collection name from the command.
 
 	  @returns the collection name
 	*/
 	string getCollectionName() const;
 
-	/*
+	/**
 	  Split the current Pipeline into a Pipeline for each shard, and
 	  a Pipeline that combines the results within mongos.
 
@@ -69,41 +69,17 @@ namespace mongo {
 	*/
 	boost::shared_ptr<Pipeline> splitForSharded();
 
-	/*
-	  Get Cursor creation modifiers.
+	/**
+	   If the pipeline starts with a $match, dump its BSON predicate
+	   specification to the supplied builder and return true.
 
-	  If we have a $match or a $sort at the beginning of the pipeline,
-	  these can be extracted and used to modify the cursor we'll use for
-	  the initial collection scan.
-
-	  If there is a Matcher query at the beginning of the pipeline,
-	  get it, by adding its terms to the object under construction.  If
-	  not, this adds nothing to the object under construction.
-
-	  If there is a sort at the beginning of the pipeline, get it, by
-	  adding its terms to the object under construction.  If not, this adds
-	  nothing.
-
-	  Optimization steps in parseCommand make sure that for any pairs
-	  of adjacent matches and sorts, the match comes first.  This ensures
-	  that we sort a minimum of items, and doesn't change the result.
-	  When getCursorMods() examines the pipeline, it looks for an initial
-	  $match.  If present, that is put into pQueryBuilder.  If there is
-	  a query, then the next stage is checked for a $sort, which will go
-	  into pSortBuilder.  If there is no initial $match, then a check is
-	  made for an initial $sort, which will then still be put into
-	  pSortBuilder.
-
-	  As a side-effect, retrieving the Cursor modifications removes them
-	  from the pipeline.
-
-	  @param pQueryBuilder an initialized object builder
-	  @param pSortBuilder an initialized object builder
+	   @param pQueryBuilder the builder to put the match BSON into
+	   @returns true if a match was found and dumped to pQueryBuilder,
+	     false otherwise
 	 */
-	void getCursorMods(BSONObjBuilder *pQueryBuilder,
-			   BSONObjBuilder *pSortBuilder);
+	bool getInitialQuery(BSONObjBuilder *pQueryBuilder) const;
 
-	/*
+	/**
 	  Write the Pipeline as a BSONObj command.  This should be the
 	  inverse of parseCommand().
 
@@ -116,7 +92,7 @@ namespace mongo {
 	*/
 	void toBson(BSONObjBuilder *pBuilder) const;
 
-	/*
+	/**
 	  Run the Pipeline on the given source.
 
 	  @param result builder to write the result to
@@ -127,7 +103,7 @@ namespace mongo {
 	bool run(BSONObjBuilder &result, string &errmsg,
 		 intrusive_ptr<DocumentSource> pSource);
 
-	/*
+	/**
 	  Debugging:  should the processing pipeline be split within
 	  mongod, simulating the real mongos/mongod split?  This is determined
 	  by setting the splitMongodPipeline field in an "aggregate"
@@ -140,10 +116,21 @@ namespace mongo {
 	 */
 	bool getSplitMongodPipeline() const;
 
-	/*
+	/**
 	  The aggregation command name.
 	 */
 	static const char commandName[];
+
+	/*
+	  PipelineD is a "sister" class that has additional functionality
+	  for the Pipeline.  It exists because of linkage requirements.
+	  Pipeline needs to function in mongod and mongos.  PipelineD
+	  contains extra functionality required in mongod, and which can't
+	  appear in mongos because the required symbols are unavailable
+	  for linking there.  Consider PipelineD to be an extension of this
+	  class for mongod only.
+	 */
+	friend class PipelineD;
 
     private:
 	static const char pipelineName[];

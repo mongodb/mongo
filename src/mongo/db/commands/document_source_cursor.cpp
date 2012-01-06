@@ -86,8 +86,9 @@ namespace mongo {
 
     DocumentSourceCursor::DocumentSourceCursor(
 	const shared_ptr<Cursor> &pTheCursor):
-        pCursor(pTheCursor),
-        pCurrent() {
+	pCurrent(),
+	bsonDependencies(),
+        pCursor(pTheCursor) {
     }
 
     intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
@@ -96,5 +97,10 @@ namespace mongo {
 	intrusive_ptr<DocumentSourceCursor> pSource(
 	    new DocumentSourceCursor(pCursor));
 	    return pSource;
+    }
+
+    void DocumentSourceCursor::addBsonDependency(
+	const shared_ptr<BSONObj> &pBsonObj) {
+	bsonDependencies.push_back(pBsonObj);
     }
 }

@@ -446,11 +446,11 @@ namespace mongo {
          * currKey() documents, the matcher(), and the isMultiKey() nature of the
          * cursor may change over the course of iteration.
          *
-         * @param query - Query used to select indexes and populate matchers.
+         * @param query - Query used to select indexes and populate matchers; this is not copied, and must outlive the Cursor
          *
          * @param order - Required ordering spec for documents produced by this cursor,
          * empty object default indicates no order requirement.  If no index exists that
-         * satisfies the required sort order, an empty shared_ptr is returned.
+         * satisfies the required sort order, an empty shared_ptr is returned.  This is nit copied, and must outlive the Cursor
          *
          * @param requireIndex - If true, no unindexed (ie collection scan) cursors are
          * used to generate the returned cursor.  If an unindexed cursor is required, an
