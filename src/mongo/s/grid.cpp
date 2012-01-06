@@ -378,18 +378,35 @@ namespace mongo {
         return ok;
     }
 
-    bool Grid::shouldBalance() const {
-        ShardConnection conn( configServer.getPrimary() , "" );
+    /*
+     * Returns whether balancing is enabled, with optional namespace "ns" parameter for balancing on a particular
+     * collection.
+     */
+    bool Grid::shouldBalance( const string& ns ) const {
 
-        // look for the stop balancer marker
-        BSONObj balancerDoc = conn->findOne( ShardNS::settings, BSON( "_id" << "balancer" ) );
-        conn.done();
+        ShardConnection conn( configServer.getPrimary() , "" );
+        BSONObj balancerDoc;
+        BSONObj collDoc;
+
+        try {
+            // look for the stop balancer marker
+            balancerDoc = conn->findOne( ShardNS::settings, BSON( "_id" << "balancer" ) );
+            if( ns.size() > 0 ) collDoc = conn->findOne( ShardNS::collection, BSON( "_id" << ns ) );
+            conn.done();
+        }
+        catch( DBException& e ){
+            conn.kill();
+            warning() << "could not determine whether balancer should be running, error getting config data from " << conn.getHost() << causedBy( e ) << endl;
+            // if anything goes wrong, we shouldn't try balancing
+            return false;
+        }
 
         boost::posix_time::ptime now = boost::posix_time::second_clock::local_time();
         if ( _balancerStopped( balancerDoc ) || ! _inBalancingWindow( balancerDoc , now ) ) {
             return false;
         }
 
+        if( collDoc["noBalance"].trueValue() ) return false;
         return true;
     }
 

@@ -80,7 +80,7 @@ namespace mongo {
         /**
          * @return true if the chunk balancing functionality is enabled
          */
-        bool shouldBalance() const;
+        bool shouldBalance( const string& ns = "" ) const;
 
         /**
          * 

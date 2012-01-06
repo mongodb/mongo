@@ -375,17 +375,18 @@ namespace mongo {
                 _dataWritten = 0; // we're splitting, so should wait a bit
             }
 
-
+            bool shouldBalance = grid.shouldBalance( _manager->getns() );
 
             log() << "autosplitted " << _manager->getns() << " shard: " << toString()
                   << " on: " << splitPoint << " (splitThreshold " << splitThreshold << ")"
 #ifdef _DEBUG
                   << " size: " << getPhysicalSize() // slow - but can be useful when debugging
 #endif
-                  << ( res["shouldMigrate"].eoo() ? "" : " (migrate suggested)" ) << endl;
+                  << ( res["shouldMigrate"].eoo() ? "" : (string)" (migrate suggested" +
+                     ( shouldBalance ? ")" : ", but no migrations allowed)" ) ) << endl;
 
             BSONElement shouldMigrate = res["shouldMigrate"]; // not in mongod < 1.9.1 but that is ok
-            if (!shouldMigrate.eoo() && grid.shouldBalance()){
+            if ( ! shouldMigrate.eoo() && shouldBalance ){
                 BSONObj range = shouldMigrate.embeddedObject();
                 BSONObj min = range["min"].embeddedObject();
                 BSONObj max = range["max"].embeddedObject();
