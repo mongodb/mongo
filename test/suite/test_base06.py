@@ -154,19 +154,18 @@ class test_base06(wttest.WiredTigerTestCase):
         self.checkDoesNotExist(self.table_name2)
 
     def test_rename(self):
-        self.KNOWN_FAILURE('rename not supported')
         self.populate(self.table_name1)
         self.session.rename('table:' + self.table_name1,
-                            'table:' + self.table_name2, None)
+				       self.table_name2, None)
         self.checkContents(self.table_name2)
         self.checkDoesNotExist(self.table_name1)
         self.session.rename('table:' + self.table_name2,
-                            'table:' + self.table_name1, None)
+				       self.table_name1, None)
         self.checkContents(self.table_name1)
         self.checkDoesNotExist(self.table_name2)
         self.assertRaises(WiredTigerError, lambda:
             self.session.rename('table:' + self.table_name2,
-                                'table:' + self.table_name1, None))
+					   self.table_name1, None))
 
     def test_drop(self):
         self.populate(self.table_name1)
