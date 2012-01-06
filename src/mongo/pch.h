@@ -88,7 +88,6 @@
 #include <boost/thread/tss.hpp>
 #include <boost/detail/endian.hpp>
 #include <boost/version.hpp>
-#include <boost/tuple/tuple.hpp>
 #include <boost/thread/thread.hpp>
 #include <boost/thread/condition.hpp>
 #include <boost/thread/recursive_mutex.hpp>
