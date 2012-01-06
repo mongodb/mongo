@@ -170,14 +170,4 @@ namespace mongo {
 
     Top Top::global;
 
-    TopOld::T TopOld::_snapshotStart = TopOld::currentTime();
-    TopOld::D TopOld::_snapshotDuration;
-    TopOld::UsageMap TopOld::_totalUsage;
-    TopOld::UsageMap TopOld::_snapshotA;
-    TopOld::UsageMap TopOld::_snapshotB;
-    TopOld::UsageMap &TopOld::_snapshot = TopOld::_snapshotA;
-    TopOld::UsageMap &TopOld::_nextSnapshot = TopOld::_snapshotB;
-    mongo::mutex TopOld::topMutex("topMutex");
-
-
 }
