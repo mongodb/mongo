@@ -13,7 +13,6 @@ __create_file(WT_SESSION_IMPL *session,
 {
 	WT_BUF *key, *val;
 	const char *cfg[] = API_CONF_DEFAULTS(session, create, config);
-	const char *dropcfg[] = API_CONF_DEFAULTS(session, drop, "force");
 	const char *filecfg[] = API_CONF_DEFAULTS(file, meta, config);
 	const char *filename, *treeconf;
 	int is_schema, vmajor, vminor, vpatch, ret;
@@ -76,7 +75,7 @@ __create_file(WT_SESSION_IMPL *session,
 
 	if (0) {
 		/* If something goes wrong, throw away anything we created. */
-err:		(void)__wt_drop_file(session, fileuri, dropcfg);
+err:		(void)__wt_drop_file(session, filename, 1);
 	}
 
 	__wt_scr_free(&key);

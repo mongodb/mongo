@@ -12,35 +12,34 @@
  *	Drop a file.
  */
 int
-__wt_drop_file(WT_SESSION_IMPL *session, const char *fileuri, const char *cfg[])
+__wt_drop_file(WT_SESSION_IMPL *session, const char *name, int force)
 {
 	static const char *list[] = { "file", "root", "version", NULL };
 	WT_BUF *buf;
 	int exist, ret;
-	const char *filename, **lp;
+	const char **lp;
 
-	WT_UNUSED(cfg);
 	buf = NULL;
 
-	filename = fileuri;
-	if (!WT_PREFIX_SKIP(filename, "file:"))
-		WT_RET_MSG(
-		    session, EINVAL, "Expected a 'file:' URI: %s", fileuri);
-
 	/* If open, close the btree handle. */
-	WT_RET(__wt_session_close_any_open_btree(session, filename));
+	WT_RET(__wt_session_close_any_open_btree(session, name));
 
 	/* Remove all of the schema table entries for this file. */
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 	for (lp = list; *lp != NULL; ++lp) {
-		WT_ERR(__wt_buf_fmt(session, buf, "%s:%s", *lp, filename));
+		WT_ERR(__wt_buf_fmt(session, buf, "%s:%s", *lp, name));
+
+		/* Remove the schema table entry (ignore missing items). */
 		WT_TRET(__wt_schema_table_remove(session, buf->data));
+		if (force && ret == WT_NOTFOUND)
+			ret = 0;
 	}
 
 	/* Remove the underlying physical file. */
-	WT_ERR(__wt_exist(session, filename, &exist));
+	WT_ERR(__wt_exist(session, name, &exist));
 	if (exist)
-		WT_TRET(__wt_remove(session, filename));
+		WT_TRET(__wt_remove(session, name));
+
 
 err:	__wt_scr_free(&buf);
 	return (ret);
@@ -48,27 +47,22 @@ err:	__wt_scr_free(&buf);
 
 /*
  * __drop_tree --
- *	Drop a btree handle (which may be an index or colgroup).
+ *	Drop an index or colgroup reference.
  */
 static int
-__drop_tree(WT_SESSION_IMPL *session, WT_BTREE *btree, const char *cfg[])
+__drop_tree(WT_SESSION_IMPL *session, WT_BTREE *btree, int force)
 {
-	WT_BUF uribuf;
-	const char *fileuri;
 	int ret;
 
 	ret = 0;
-	WT_CLEAR(uribuf);
-	WT_RET(__wt_buf_fmt(session, &uribuf, "file:%s", btree->filename));
-	fileuri = uribuf.data;
 
-	/* Remove the schema table entry. */
+	/* Remove the schema table entry (ignore missing items). */
 	WT_TRET(__wt_schema_table_remove(session, btree->name));
+	if (force && ret == WT_NOTFOUND)
+		ret = 0;
 
 	/* Remove the file. */
-	WT_TRET(__wt_drop_file(session, fileuri, cfg));
-
-	__wt_buf_free(session, &uribuf);
+	WT_TRET(__wt_drop_file(session, btree->filename, force));
 
 	return (ret);
 }
@@ -78,30 +72,26 @@ __drop_tree(WT_SESSION_IMPL *session, WT_BTREE *btree, const char *cfg[])
  *	WT_SESSION::drop for a table.
  */
 static int
-__drop_table(
-    WT_SESSION_IMPL *session, const char *tableuri, const char *cfg[])
+__drop_table(WT_SESSION_IMPL *session, const char *uri, int force)
 {
 	WT_BTREE *btree;
 	WT_TABLE *table;
-	const char *tablename;
 	int i, ret;
+	const char *name;
 
 	ret = 0;
 
-	tablename = tableuri;
-	if (!WT_PREFIX_SKIP(tablename, "table:"))
-		WT_RET_MSG(
-		    session, EINVAL, "Expected a 'table:' URI: %s", tableuri);
+	name = uri;
+	(void)WT_PREFIX_SKIP(name, "table:");
 
-	WT_RET(__wt_schema_get_table(session,
-	    tablename, strlen(tablename), &table));
+	WT_RET(__wt_schema_get_table(session, name, strlen(name), &table));
 
 	/* Drop the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++) {
 		if ((btree = table->colgroup[i]) == NULL)
 			continue;
 		table->colgroup[i] = NULL;
-		WT_TRET(__drop_tree(session, btree, cfg));
+		WT_TRET(__drop_tree(session, btree, force));
 	}
 
 	/* Drop the indices. */
@@ -109,11 +99,15 @@ __drop_table(
 	for (i = 0; i < table->nindices; i++) {
 		btree = table->index[i];
 		table->index[i] = NULL;
-		WT_TRET(__drop_tree(session, btree, cfg));
+		WT_TRET(__drop_tree(session, btree, force));
 	}
 
 	WT_TRET(__wt_schema_remove_table(session, table));
-	WT_TRET(__wt_schema_table_remove(session, tableuri));
+
+	/* Remove the schema table entry (ignore missing items). */
+	WT_TRET(__wt_schema_table_remove(session, uri));
+	if (force && ret == WT_NOTFOUND)
+		ret = 0;
 
 	return (ret);
 }
@@ -121,14 +115,19 @@ __drop_table(
 int
 __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 {
-	int ret;
+	WT_CONFIG_ITEM cval;
+	int force, ret;
 
-	WT_UNUSED(cfg);
+	cval.val = 0;
+	ret = __wt_config_gets(session, cfg, "force", &cval);
+	if (ret != 0 && ret != WT_NOTFOUND)
+		WT_RET(ret);
+	force = cval.val == 0 ? 0 : 1;
 
-	if (WT_PREFIX_MATCH(uri, "file:"))
-		ret = __wt_drop_file(session, uri, cfg);
-	else if (WT_PREFIX_MATCH(uri, "table:"))
-		ret = __drop_table(session, uri, cfg);
+	if (WT_PREFIX_SKIP(uri, "file:"))
+		ret = __wt_drop_file(session, uri, force);
+	else if (WT_PREFIX_MATCH(uri, "table:"))	/* NOT skip prefix */
+		ret = __drop_table(session, uri, force);
 	else
 		return (__wt_unknown_object_type(session, uri));
 
