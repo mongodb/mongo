@@ -15,6 +15,7 @@ namespace mongo {
         cc().getPageFaultRetryableSection()->didLap();
         r = _r;
         era = LockMongoFilesShared::getEra();
+        log(2) << "PageFaultException thrown" << endl;
     }
 
     void PageFaultException::touch() { 
