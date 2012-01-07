@@ -963,6 +963,7 @@
     <ClCompile Include="commands\mr.cpp" />
     <ClCompile Include="commands\pipeline_command.cpp" />
     <ClCompile Include="commands\pipeline.cpp" />
+    <ClCompile Include="commands\pipeline_d.cpp" />
     <ClCompile Include="compact.cpp" />
     <ClCompile Include="curop.cpp" />
     <ClCompile Include="dbcommands_generic.cpp" />
@@ -1221,6 +1222,8 @@
     <ClInclude Include="..\util\systeminfo.h" />
     <ClInclude Include="..\util\text.h" />
     <ClInclude Include="..\util\time_support.h" />
+    <ClInclude Include="commands\pipeline.h" />
+    <ClInclude Include="commands\pipeline_d.h" />
     <ClInclude Include="databaseholder.h" />
     <ClInclude Include="durop.h" />
     <ClInclude Include="dur_commitjob.h" />
