@@ -72,6 +72,6 @@ result = nodes[0].getDB("admin").runCommand({replSetInitiate : {_id : "testSet2"
     {_id : 0, tags : ["member0"]}
    ]}});
 
-assert(result.errmsg.match(/bad or missing host field/));
+assert( result.errmsg.match(/bad or missing host field/) , tojson(result) );
 
 replTest2.stopSet();
