@@ -1041,21 +1041,17 @@ namespace mongo {
             MatchDetails details;
             auto_ptr<ClientCursor> cc;
             do {
-                nscanned++;
+                
+                if ( cc.get() == 0 && 
+                     client.allowedToThrowPageFaultException() && 
+                     ! c->currLoc().isNull() && 
+                     ! c->currLoc().rec()->likelyInPhysicalMemory() ) {
+                    throw PageFaultException( c->currLoc().rec() );
+                }
 
                 bool atomic = c->matcher() && c->matcher()->docMatcher().atomic();
                 
-                if ( ! atomic && ! c->currLoc().isNull() && ! c->currLoc().rec()->likelyInPhysicalMemory() ) {
-                    // we should do something so we don't fault in a write lock
-                    
-                    // if we haven't written anything and don't have a cursor yet,
-                    // throwing is best right now to avoid the bug in cursors
-                    // where a document can get moved backwards
-                    if ( cc.get() == 0 && 
-                         client.allowedToThrowPageFaultException() ) {
-                        throw PageFaultException( c->currLoc().rec() );
-                    }
-                             
+                if ( ! atomic && nscanned > 0 ) {
                     // we need to use a ClientCursor to yield
                     if ( cc.get() == 0 ) {
                         shared_ptr< Cursor > cPtr = c;
@@ -1077,6 +1073,8 @@ namespace mongo {
                     }
 
                 } // end yielding block
+
+                nscanned++;
 
                 if ( !c->currentMatches( &details ) ) {
                     c->advance();
