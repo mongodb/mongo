@@ -204,10 +204,6 @@ doneCheckOrder:
         }
 
         if ( _impossible ) {
-            // TODO We might want to allow this dummy table scan even in no table
-            // scan mode, since it won't scan anything.
-            if ( _frs.nNontrivialRanges() )
-                checkTableScanAllowed( _frs.ns() );
             return shared_ptr<Cursor>( new BasicCursor( DiskLoc() ) );
         }
 
