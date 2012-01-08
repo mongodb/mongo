@@ -1029,9 +1029,8 @@ namespace mongo {
         }
 
         int numModded = 0;
-        long long nscanned = 0;
+        debug.nscanned = 0;
         shared_ptr< Cursor > c = NamespaceDetailsTransient::getCursor( ns, patternOrig );
-
         d = nsdetails(ns);
         nsdt = &NamespaceDetailsTransient::get(ns);
         bool autoDedup = c->autoDedup();
@@ -1051,7 +1050,7 @@ namespace mongo {
 
                 bool atomic = c->matcher() && c->matcher()->docMatcher().atomic();
                 
-                if ( ! atomic && nscanned > 0 ) {
+                if ( ! atomic && debug.nscanned > 0 ) {
                     // we need to use a ClientCursor to yield
                     if ( cc.get() == 0 ) {
                         shared_ptr< Cursor > cPtr = c;
@@ -1074,12 +1073,12 @@ namespace mongo {
 
                 } // end yielding block
 
-                nscanned++;
+                debug.nscanned++;
 
                 if ( !c->currentMatches( &details ) ) {
                     c->advance();
 
-                    if ( nscanned % 256 == 0 && ! atomic ) {
+                    if ( debug.nscanned % 256 == 0 && ! atomic ) {
                         if ( cc.get() == 0 ) {
                             shared_ptr< Cursor > cPtr = c;
                             cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , cPtr , ns ) );
@@ -1126,9 +1125,6 @@ namespace mongo {
                         uassert( 10157 ,  "multi-update requires all modified objects to have an _id" , ! multi );
                     }
                 }
-
-                if ( profile && !multi )
-                    debug.nscanned = (int) nscanned;
 
                 /* look for $inc etc.  note as listed here, all fields to inc must be this type, you can't set some
                     regular ones at the moment. */
@@ -1215,7 +1211,7 @@ namespace mongo {
                     if ( willAdvanceCursor )
                         c->recoverFromTouchingEarlierIterate();
 
-                    if ( nscanned % 64 == 0 && ! atomic ) {
+                    if ( debug.nscanned % 64 == 0 && ! atomic ) {
                         if ( cc.get() == 0 ) {
                             shared_ptr< Cursor > cPtr = c;
                             cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , cPtr , ns ) );
@@ -1251,10 +1247,6 @@ namespace mongo {
 
         if ( numModded )
             return UpdateResult( 1 , 1 , numModded );
-
-        // todo: no need for "if( profile )" here as that probably just makes things slower?
-        if ( profile )
-            debug.nscanned = (int) nscanned;
 
         if ( upsert ) {
             if ( updateobj.firstElementFieldName()[0] == '$' ) {
