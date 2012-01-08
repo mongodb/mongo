@@ -30,20 +30,6 @@
 
 namespace mongo {
 
-    void checkTableScanAllowed( const char * ns ) {
-        if ( ! cmdLine.noTableScan )
-            return;
-
-        if ( strstr( ns , ".system." ) ||
-                strstr( ns , "local." ) )
-            return;
-
-        if ( ! nsdetails( ns ) )
-            return;
-
-        uassert( 10111 ,  (string)"table scans not allowed:" + ns , ! cmdLine.noTableScan );
-    }
-
     double elementDirection( const BSONElement &e ) {
         if ( e.isNumber() )
             return e.number();
@@ -208,25 +194,8 @@ doneCheckOrder:
         }
 
         if ( willScanTable() ) {
-            if ( _frs.nNontrivialRanges() ) {
-                checkTableScanAllowed( _frs.ns() );
-                
-                // if we are doing a table scan on _id
-                // and it's a capped collection
-                // we warn /*disallow*/ as it's a common user error
-                // .system. and local collections are exempt
-                if ( _d && _d->capped && _frs.range( "_id" ).nontrivial() ) {
-                    if ( cc().isSyncThread() ||
-                         str::contains( _frs.ns() , ".system." ) || 
-                         str::startsWith( _frs.ns() , "local." ) ) {
-                        // ok
-                    }
-                    else {
-                        warning() << "_id query on capped collection without an _id index, performance will be poor collection: " << _frs.ns() << endl;
-                        //uassert( 14820, str::stream() << "doing _id query on a capped collection without an index is not allowed: " << _frs.ns() ,
-                    }
-                }
-            }
+            checkTableScanAllowed();
+            warnOnCappedIdTableScan();
             return findTableScan( _frs.ns(), _order, startLoc );
         }
                 
@@ -272,6 +241,44 @@ doneCheckOrder:
         NamespaceDetailsTransient::get_inlock( ns() ).registerIndexForPattern( _frs.pattern( _order ), indexKey(), nScanned );
     }
     
+    void QueryPlan::checkTableScanAllowed() const {
+        if ( !_frs.nNontrivialRanges() )
+            return;
+
+        if ( ! cmdLine.noTableScan )
+            return;
+
+        if ( strstr( ns() , ".system." ) ||
+            strstr( ns() , "local." ) )
+            return;
+
+        if ( ! nsdetails( ns() ) )
+            return;
+
+        uassert( 10111 ,  (string)"table scans not allowed:" + ns() , ! cmdLine.noTableScan );
+    }
+
+    void QueryPlan::warnOnCappedIdTableScan() const {
+        // if we are doing a table scan on _id
+        // and it's a capped collection
+        // we warn /*disallow*/ as it's a common user error
+        // .system. and local collections are exempt
+        if ( _d && _d->capped && _frs.range( "_id" ).nontrivial() ) {
+            if ( cc().isSyncThread() ||
+                str::contains( _frs.ns() , ".system." ) ||
+                str::startsWith( _frs.ns() , "local." ) ) {
+                // ok
+            }
+            else {
+                warning()
+                << "_id query on capped collection without an _id index, "
+                << "performance will be poor collection: " << _frs.ns() << endl;
+                //uassert( 14820, str::stream() << "doing _id query on a capped collection "
+                //<<"without an index is not allowed: " << _frs.ns() ,
+            }
+        }
+    }
+
     /**
      * @return a copy of the inheriting class, which will be run with its own
      * query plan.  If multiple plan sets are required for an $or query, the

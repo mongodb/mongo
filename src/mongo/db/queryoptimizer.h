@@ -93,6 +93,9 @@ namespace mongo {
         bool isMultiKey() const;
         
     private:
+        void checkTableScanAllowed() const;
+        void warnOnCappedIdTableScan() const;
+
         NamespaceDetails * _d;
         int _idxNo;
         const FieldRangeSet &_frs;
