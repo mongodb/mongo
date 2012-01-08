@@ -190,6 +190,7 @@ doneCheckOrder:
         }
 
         if ( _impossible ) {
+            // Dummy table scan cursor returning no results.  Allowed in --notablescan mode.
             return shared_ptr<Cursor>( new BasicCursor( DiskLoc() ) );
         }
 
