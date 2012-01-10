@@ -60,8 +60,8 @@ namespace mongo {
         /*
           Construct a Value from a BSONElement.
 
-	  This ignores the name of the element, and only uses the value,
-	  whatever type it is.
+          This ignores the name of the element, and only uses the value,
+          whatever type it is.
 
           @returns a new Value initialized from the bsonElement
         */
@@ -160,13 +160,13 @@ namespace mongo {
         unsigned long long getTimestamp() const;
         long long getLong() const;
 
-	/*
-	  Get the length of an array value.
+        /*
+          Get the length of an array value.
 
-	  @returns the length of the array, if this is array-valued; otherwise
-	     throws an error
-	*/
-	size_t getArrayLength() const;
+          @returns the length of the array, if this is array-valued; otherwise
+             throws an error
+        */
+        size_t getArrayLength() const;
 
         /*
           Add this value to the BSON object under construction.
@@ -183,7 +183,7 @@ namespace mongo {
         /*
           Get references to singleton instances of commonly used field values.
          */
-	static intrusive_ptr<const Value> getUndefined();
+        static intrusive_ptr<const Value> getUndefined();
         static intrusive_ptr<const Value> getNull();
         static intrusive_ptr<const Value> getTrue();
         static intrusive_ptr<const Value> getFalse();
@@ -264,39 +264,39 @@ namespace mongo {
         */
         static BSONType getWidestNumeric(BSONType lType, BSONType rType);
 
-	/*
-	  Get the approximate storage size of the value, in bytes.
+        /*
+          Get the approximate storage size of the value, in bytes.
 
-	  @returns approximate storage size of the value.
-	 */
-	size_t getApproximateSize() const;
+          @returns approximate storage size of the value.
+         */
+        size_t getApproximateSize() const;
 
-	/*
-	  Calculate a hash value.
+        /*
+          Calculate a hash value.
 
-	  Meant to be used to create composite hashes suitable for
-	  boost classes such as unordered_map<>.
+          Meant to be used to create composite hashes suitable for
+          boost classes such as unordered_map<>.
 
-	  @param seed value to augment with this' hash
-	*/
-	void hash_combine(size_t &seed) const;
+          @param seed value to augment with this' hash
+        */
+        void hash_combine(size_t &seed) const;
 
-	/*
-	  struct Hash is defined to enable the use of Values as
-	  keys in boost::unordered_map<>.
+        /*
+          struct Hash is defined to enable the use of Values as
+          keys in boost::unordered_map<>.
 
-	  Values are always referenced as immutables in the form
-	  intrusive_ptr<const Value>, so these operate on that construction.
-	*/
-	struct Hash :
-	    unary_function<intrusive_ptr<const Value>, size_t> {
-	    size_t operator()(const intrusive_ptr<const Value> &rV) const;
-	};
+          Values are always referenced as immutables in the form
+          intrusive_ptr<const Value>, so these operate on that construction.
+        */
+        struct Hash :
+            unary_function<intrusive_ptr<const Value>, size_t> {
+            size_t operator()(const intrusive_ptr<const Value> &rV) const;
+        };
 
     protected:
         Value(); // creates null value
-	Value(BSONType type); // creates an empty (unitialized value) of type
-	                                        // mostly useful for Undefined
+        Value(BSONType type); // creates an empty (unitialized value) of type
+                                                // mostly useful for Undefined
         Value(bool boolValue);
         Value(int intValue);
 
@@ -310,7 +310,7 @@ namespace mongo {
         Value(const intrusive_ptr<Document> &pDocument);
         Value(const vector<intrusive_ptr<const Value> > &vpValue);
 
-	void addToBson(Builder *pBuilder) const;
+        void addToBson(Builder *pBuilder) const;
 
         BSONType type;
 
@@ -336,7 +336,7 @@ namespace mongo {
 
         These are obtained via public static getters defined above.
         */
-	static const intrusive_ptr<const Value> pFieldUndefined;
+        static const intrusive_ptr<const Value> pFieldUndefined;
         static const intrusive_ptr<const Value> pFieldNull;
         static const intrusive_ptr<const Value> pFieldTrue;
         static const intrusive_ptr<const Value> pFieldFalse;
@@ -349,7 +349,7 @@ namespace mongo {
             public ValueIterator {
         public:
             // virtuals from ValueIterator
-	    virtual ~vi();
+            virtual ~vi();
             virtual bool more() const;
             virtual intrusive_ptr<const Value> next();
 
@@ -361,7 +361,7 @@ namespace mongo {
             size_t size;
             size_t nextIndex;
             const vector<intrusive_ptr<const Value> > *pvpValue;
-	}; /* class vi */
+        }; /* class vi */
 
     };
 
@@ -371,8 +371,8 @@ namespace mongo {
       Useful for unordered_map<>, etc.
      */
     inline bool operator==(const intrusive_ptr<const Value> &v1,
-		    const intrusive_ptr<const Value> &v2) {
-	return (Value::compare(v1, v2) == 0);
+                    const intrusive_ptr<const Value> &v2) {
+        return (Value::compare(v1, v2) == 0);
     }
 
     /*
@@ -390,15 +390,15 @@ namespace mongo {
     class ValueStatic :
         public Value {
     public:
-	// virtuals from IntrusiveCounterUnsigned
-	virtual void addRef() const;
-	virtual void release() const;
+        // virtuals from IntrusiveCounterUnsigned
+        virtual void addRef() const;
+        virtual void release() const;
 
-	// constructors
-	ValueStatic();
-	ValueStatic(BSONType type);
-	ValueStatic(bool boolValue);
-	ValueStatic(int intValue);
+        // constructors
+        ValueStatic();
+        ValueStatic(BSONType type);
+        ValueStatic(bool boolValue);
+        ValueStatic(int intValue);
     };
 }
 
@@ -412,7 +412,7 @@ namespace mongo {
 
     inline size_t Value::getArrayLength() const {
         assert(getType() == Array);
-	return vpValue.size();
+        return vpValue.size();
     }
 
     inline intrusive_ptr<const Value> Value::getUndefined() {
@@ -444,26 +444,26 @@ namespace mongo {
     }
 
     inline size_t Value::Hash::operator()(
-	const intrusive_ptr<const Value> &rV) const {
-	size_t seed = 0xf0afbeef;
-	rV->hash_combine(seed);
-	return seed;
+        const intrusive_ptr<const Value> &rV) const {
+        size_t seed = 0xf0afbeef;
+        rV->hash_combine(seed);
+        return seed;
     }
 
     inline ValueStatic::ValueStatic():
-	Value() {
+        Value() {
     }
 
     inline ValueStatic::ValueStatic(BSONType type):
-	Value(type) {
+        Value(type) {
     }
 
     inline ValueStatic::ValueStatic(bool boolValue):
-	Value(boolValue) {
+        Value(boolValue) {
     }
 
     inline ValueStatic::ValueStatic(int intValue):
-	Value(intValue) {
+        Value(intValue) {
     }
 
 };

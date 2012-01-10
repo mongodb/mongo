@@ -31,50 +31,50 @@ namespace mongo {
     }
 
     void DocumentSourceMatch::sourceToBson(BSONObjBuilder *pBuilder) const {
-	const BSONObj *pQuery = matcher.getQuery();
-	pBuilder->append(matchName, *pQuery);
+        const BSONObj *pQuery = matcher.getQuery();
+        pBuilder->append(matchName, *pQuery);
     }
 
     bool DocumentSourceMatch::accept(
-	const intrusive_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument) const {
 
-	/*
-	  The matcher only takes BSON documents, so we have to make one.
+        /*
+          The matcher only takes BSON documents, so we have to make one.
 
-	  LATER
-	  We could optimize this by making a document with only the
-	  fields referenced by the Matcher.  We could do this by looking inside
-	  the Matcher's BSON before it is created, and recording those.  The
-	  easiest implementation might be to hold onto an ExpressionDocument
-	  in here, and give that pDocument to create the created subset of
-	  fields, and then convert that instead.
-	*/
-	BSONObjBuilder objBuilder;
-	pDocument->toBson(&objBuilder);
-	BSONObj obj(objBuilder.done());
+          LATER
+          We could optimize this by making a document with only the
+          fields referenced by the Matcher.  We could do this by looking inside
+          the Matcher's BSON before it is created, and recording those.  The
+          easiest implementation might be to hold onto an ExpressionDocument
+          in here, and give that pDocument to create the created subset of
+          fields, and then convert that instead.
+        */
+        BSONObjBuilder objBuilder;
+        pDocument->toBson(&objBuilder);
+        BSONObj obj(objBuilder.done());
 
-	return matcher.matches(obj);
+        return matcher.matches(obj);
     }
 
     intrusive_ptr<DocumentSource> DocumentSourceMatch::createFromBson(
-	BSONElement *pBsonElement,
-	const intrusive_ptr<ExpressionContext> &pCtx) {
-	uassert(15959, "the match filter must be an expression in an object",
-		pBsonElement->type() == Object);
+        BSONElement *pBsonElement,
+        const intrusive_ptr<ExpressionContext> &pCtx) {
+        uassert(15959, "the match filter must be an expression in an object",
+                pBsonElement->type() == Object);
 
         intrusive_ptr<DocumentSourceMatch> pMatcher(
-	    new DocumentSourceMatch(pBsonElement->Obj()));
+            new DocumentSourceMatch(pBsonElement->Obj()));
 
         return pMatcher;
     }
 
     void DocumentSourceMatch::toMatcherBson(BSONObjBuilder *pBuilder) const {
-	const BSONObj *pQuery = matcher.getQuery();
-	pBuilder->appendElements(*pQuery);
+        const BSONObj *pQuery = matcher.getQuery();
+        pBuilder->appendElements(*pQuery);
     }
 
     DocumentSourceMatch::DocumentSourceMatch(const BSONObj &query):
-	DocumentSourceFilterBase(),
+        DocumentSourceFilterBase(),
         matcher(query) {
     }
 }

@@ -24,27 +24,27 @@ namespace mongo {
     intrusive_ptr<const Value> AccumulatorPush::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1);
-	intrusive_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
+        intrusive_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
 
-	if (prhs->getType() == Undefined)
-	    ; /* nothing to add to the array */
-	else if (!pCtx->getInRouter())
-	    vpValue.push_back(prhs);
-	else {
-	    /*
-	      If we're in the router, we need to take apart the arrays we
-	      receive and put their elements into the array we are collecting.
-	      If we didn't, then we'd get an array of arrays, with one array
-	      from each shard that responds.
-	     */
-	    assert(prhs->getType() == Array);
-	    
-	    intrusive_ptr<ValueIterator> pvi(prhs->getArray());
-	    while(pvi->more()) {
-		intrusive_ptr<const Value> pElement(pvi->next());
-		vpValue.push_back(pElement);
-	    }
-	}
+        if (prhs->getType() == Undefined)
+            ; /* nothing to add to the array */
+        else if (!pCtx->getInRouter())
+            vpValue.push_back(prhs);
+        else {
+            /*
+              If we're in the router, we need to take apart the arrays we
+              receive and put their elements into the array we are collecting.
+              If we didn't, then we'd get an array of arrays, with one array
+              from each shard that responds.
+             */
+            assert(prhs->getType() == Array);
+            
+            intrusive_ptr<ValueIterator> pvi(prhs->getArray());
+            while(pvi->more()) {
+                intrusive_ptr<const Value> pElement(pvi->next());
+                vpValue.push_back(pElement);
+            }
+        }
 
         return Value::getNull();
     }
@@ -54,20 +54,20 @@ namespace mongo {
     }
 
     AccumulatorPush::AccumulatorPush(
-	const intrusive_ptr<ExpressionContext> &pTheCtx):
+        const intrusive_ptr<ExpressionContext> &pTheCtx):
         Accumulator(),
         vpValue(),
         pCtx(pTheCtx) {
     }
 
     intrusive_ptr<Accumulator> AccumulatorPush::create(
-	const intrusive_ptr<ExpressionContext> &pCtx) {
-	intrusive_ptr<AccumulatorPush> pAccumulator(
-	    new AccumulatorPush(pCtx));
+        const intrusive_ptr<ExpressionContext> &pCtx) {
+        intrusive_ptr<AccumulatorPush> pAccumulator(
+            new AccumulatorPush(pCtx));
         return pAccumulator;
     }
 
     const char *AccumulatorPush::getOpName() const {
-	return "$push";
+        return "$push";
     }
 }

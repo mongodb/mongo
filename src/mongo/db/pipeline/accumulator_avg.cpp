@@ -28,96 +28,96 @@ namespace mongo {
 
     intrusive_ptr<const Value> AccumulatorAvg::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-	if (!pCtx->getInRouter()) {
-	    Super::evaluate(pDocument);
-	    ++count;
-	}
-	else {
-	    /*
-	      If we're in the router, we expect an object that contains
-	      both a subtotal and a count.  This is what getValue() produced
-	      below.
-	     */
-	    intrusive_ptr<const Value> prhs(
-		vpOperand[0]->evaluate(pDocument));
-	    assert(prhs->getType() == Object);
-	    intrusive_ptr<Document> pShardDoc(prhs->getDocument());
+        if (!pCtx->getInRouter()) {
+            Super::evaluate(pDocument);
+            ++count;
+        }
+        else {
+            /*
+              If we're in the router, we expect an object that contains
+              both a subtotal and a count.  This is what getValue() produced
+              below.
+             */
+            intrusive_ptr<const Value> prhs(
+                vpOperand[0]->evaluate(pDocument));
+            assert(prhs->getType() == Object);
+            intrusive_ptr<Document> pShardDoc(prhs->getDocument());
 
-	    intrusive_ptr<const Value> pSubTotal(
-		pShardDoc->getValue(subTotalName));
-	    assert(pSubTotal.get());
-	    BSONType subTotalType = pSubTotal->getType();
-	    if ((totalType == NumberLong) || (subTotalType == NumberLong))
-		totalType = NumberLong;
-	    if ((totalType == NumberDouble) || (subTotalType == NumberDouble))
-		totalType = NumberDouble;
+            intrusive_ptr<const Value> pSubTotal(
+                pShardDoc->getValue(subTotalName));
+            assert(pSubTotal.get());
+            BSONType subTotalType = pSubTotal->getType();
+            if ((totalType == NumberLong) || (subTotalType == NumberLong))
+                totalType = NumberLong;
+            if ((totalType == NumberDouble) || (subTotalType == NumberDouble))
+                totalType = NumberDouble;
 
-	    if (subTotalType == NumberInt) {
-		int v = pSubTotal->getInt();
-		longTotal += v;
-		doubleTotal += v;
-	    }
-	    else if (subTotalType == NumberLong) {
-		long long v = pSubTotal->getLong();
-		longTotal += v;
-		doubleTotal += v;
-	    }
-	    else {
-		double v = pSubTotal->getDouble();
-		doubleTotal += v;
-	    }
-		
-	    intrusive_ptr<const Value> pCount(pShardDoc->getValue(countName));
-	    count += pCount->getLong();
-	}
+            if (subTotalType == NumberInt) {
+                int v = pSubTotal->getInt();
+                longTotal += v;
+                doubleTotal += v;
+            }
+            else if (subTotalType == NumberLong) {
+                long long v = pSubTotal->getLong();
+                longTotal += v;
+                doubleTotal += v;
+            }
+            else {
+                double v = pSubTotal->getDouble();
+                doubleTotal += v;
+            }
+                
+            intrusive_ptr<const Value> pCount(pShardDoc->getValue(countName));
+            count += pCount->getLong();
+        }
 
         return Value::getZero();
     }
 
     intrusive_ptr<Accumulator> AccumulatorAvg::create(
-	const intrusive_ptr<ExpressionContext> &pCtx) {
-	intrusive_ptr<AccumulatorAvg> pA(new AccumulatorAvg(pCtx));
+        const intrusive_ptr<ExpressionContext> &pCtx) {
+        intrusive_ptr<AccumulatorAvg> pA(new AccumulatorAvg(pCtx));
         return pA;
     }
 
     intrusive_ptr<const Value> AccumulatorAvg::getValue() const {
-	if (!pCtx->getInShard()) {
-	    double avg = 0;
-	    if (count) {
-		if (totalType != NumberDouble)
-		    avg = static_cast<double>(longTotal / count);
-		else
-		    avg = doubleTotal / count;
-	    }
+        if (!pCtx->getInShard()) {
+            double avg = 0;
+            if (count) {
+                if (totalType != NumberDouble)
+                    avg = static_cast<double>(longTotal / count);
+                else
+                    avg = doubleTotal / count;
+            }
 
-	    return Value::createDouble(avg);
-	}
+            return Value::createDouble(avg);
+        }
 
-	intrusive_ptr<Document> pDocument(Document::create());
+        intrusive_ptr<Document> pDocument(Document::create());
 
-	intrusive_ptr<const Value> pSubTotal;
-	if (totalType == NumberInt)
-	    pSubTotal = Value::createInt((int)longTotal);
-	else if (totalType == NumberLong)
-	    pSubTotal = Value::createLong(longTotal);
-	else
-	    pSubTotal = Value::createDouble(doubleTotal);
-	pDocument->addField(subTotalName, pSubTotal);
+        intrusive_ptr<const Value> pSubTotal;
+        if (totalType == NumberInt)
+            pSubTotal = Value::createInt((int)longTotal);
+        else if (totalType == NumberLong)
+            pSubTotal = Value::createLong(longTotal);
+        else
+            pSubTotal = Value::createDouble(doubleTotal);
+        pDocument->addField(subTotalName, pSubTotal);
 
-	intrusive_ptr<const Value> pCount(Value::createLong(count));
-	pDocument->addField(countName, pCount);
+        intrusive_ptr<const Value> pCount(Value::createLong(count));
+        pDocument->addField(countName, pCount);
 
-	return Value::createDocument(pDocument);
+        return Value::createDocument(pDocument);
     }
 
     AccumulatorAvg::AccumulatorAvg(
-	const intrusive_ptr<ExpressionContext> &pTheCtx):
+        const intrusive_ptr<ExpressionContext> &pTheCtx):
         AccumulatorSum(),
-	count(0),
-	pCtx(pTheCtx) {
+        count(0),
+        pCtx(pTheCtx) {
     }
 
     const char *AccumulatorAvg::getOpName() const {
-	return "$avg";
+        return "$avg";
     }
 }

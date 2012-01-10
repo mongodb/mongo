@@ -54,10 +54,10 @@ namespace mongo {
 
           The new document shares all the fields' values with the original.
 
-	  This is not a deep copy.  Only the fields on the top-level document
-	  are cloned.
+          This is not a deep copy.  Only the fields on the top-level document
+          are cloned.
 
-	  @returns the shallow clone of the document
+          @returns the shallow clone of the document
         */
         intrusive_ptr<Document> clone();
 
@@ -91,7 +91,7 @@ namespace mongo {
           field.
         */
         void addField(const string &fieldName,
-		      const intrusive_ptr<const Value> &pValue);
+                      const intrusive_ptr<const Value> &pValue);
 
         /*
           Set the given field to be at the specified position in the
@@ -99,63 +99,63 @@ namespace mongo {
           position.  The index must be within the current range of field
           indices.
 
-	  pValue.get() may be NULL, in which case the field will be
-	  removed.  fieldName is ignored in this case.
+          pValue.get() may be NULL, in which case the field will be
+          removed.  fieldName is ignored in this case.
 
-	  @param index the field index in the list of fields
-	  @param fieldName the new field name
-	  @param pValue the new Value
+          @param index the field index in the list of fields
+          @param fieldName the new field name
+          @param pValue the new Value
         */
         void setField(size_t index,
                       const string &fieldName,
-		      const intrusive_ptr<const Value> &pValue);
+                      const intrusive_ptr<const Value> &pValue);
 
-	/*
-	  Convenience type for dealing with fields.
-	 */
-	typedef pair<string, intrusive_ptr<const Value> > FieldPair;
+        /*
+          Convenience type for dealing with fields.
+         */
+        typedef pair<string, intrusive_ptr<const Value> > FieldPair;
 
-	/*
-	  Get the indicated field.
+        /*
+          Get the indicated field.
 
-	  @param index the field index in the list of fields
-	  @returns the field name and value of the field
-	 */
-	FieldPair getField(size_t index) const;
+          @param index the field index in the list of fields
+          @returns the field name and value of the field
+         */
+        FieldPair getField(size_t index) const;
 
-	/*
-	  Get the number of fields in the Document.
+        /*
+          Get the number of fields in the Document.
 
-	  @returns the number of fields in the Document
-	 */
-	size_t getFieldCount() const;
+          @returns the number of fields in the Document
+         */
+        size_t getFieldCount() const;
 
-	/*
-	  Get the index of the given field.
+        /*
+          Get the index of the given field.
 
-	  @param fieldName the name of the field
-	  @returns the index of the field, or if it does not exist, the number
-	    of fields (getFieldCount())
-	*/
-	size_t getFieldIndex(const string &fieldName) const;
+          @param fieldName the name of the field
+          @returns the index of the field, or if it does not exist, the number
+            of fields (getFieldCount())
+        */
+        size_t getFieldIndex(const string &fieldName) const;
 
-	/*
-	  Get a field by name.
+        /*
+          Get a field by name.
 
-	  @param fieldName the name of the field
-	  @returns the value of the field
-	*/
-	intrusive_ptr<const Value> getField(const string &fieldName) const;
+          @param fieldName the name of the field
+          @returns the value of the field
+        */
+        intrusive_ptr<const Value> getField(const string &fieldName) const;
 
-	/*
-	  Get the approximate storage size of the document, in bytes.
+        /*
+          Get the approximate storage size of the document, in bytes.
 
-	  Under the assumption that field name strings are shared, they are
-	  not included in the total.
+          Under the assumption that field name strings are shared, they are
+          not included in the total.
 
-	  @returns the approximate storage
-	*/
-	size_t getApproximateSize() const;
+          @returns the approximate storage
+        */
+        size_t getApproximateSize() const;
 
         /*
           Compare two documents.
@@ -168,17 +168,17 @@ namespace mongo {
         static int compare(const intrusive_ptr<Document> &rL,
                            const intrusive_ptr<Document> &rR);
 
-	static string idName; // shared "_id"
+        static string idName; // shared "_id"
 
-	/*
-	  Calculate a hash value.
+        /*
+          Calculate a hash value.
 
-	  Meant to be used to create composite hashes suitable for
-	  boost classes such as unordered_map<>.
+          Meant to be used to create composite hashes suitable for
+          boost classes such as unordered_map<>.
 
-	  @param seed value to augment with this' hash
-	*/
-	void hash_combine(size_t &seed) const;
+          @param seed value to augment with this' hash
+        */
+        void hash_combine(size_t &seed) const;
 
     private:
         friend class FieldIterator;
@@ -207,7 +207,7 @@ namespace mongo {
 
           @return the next field's <name, Value>
         */
-	Document::FieldPair next();
+        Document::FieldPair next();
 
     private:
         friend class Document;
@@ -224,7 +224,7 @@ namespace mongo {
           We'll hang on to the original document to ensure we keep the
           fieldPtr vector alive.
         */
-	intrusive_ptr<Document> pDocument;
+        intrusive_ptr<Document> pDocument;
         size_t index; // current field in iteration
     };
 }
@@ -235,7 +235,7 @@ namespace mongo {
 namespace mongo {
 
     inline size_t Document::getFieldCount() const {
-	return vFieldName.size();
+        return vFieldName.size();
     }
     
     inline Document::FieldPair Document::getField(size_t index) const {

@@ -24,10 +24,10 @@ namespace mongo {
     intrusive_ptr<const Value> AccumulatorSum::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1);
-	intrusive_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
+        intrusive_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
 
         /* upgrade to the widest type required to hold the result */
-	totalType = Value::getWidestNumeric(totalType, prhs->getType());
+        totalType = Value::getWidestNumeric(totalType, prhs->getType());
 
         if (totalType == NumberInt) {
             int v = prhs->coerceToInt();
@@ -48,8 +48,8 @@ namespace mongo {
     }
 
     intrusive_ptr<Accumulator> AccumulatorSum::create(
-	const intrusive_ptr<ExpressionContext> &pCtx) {
-	intrusive_ptr<AccumulatorSum> pSummer(new AccumulatorSum());
+        const intrusive_ptr<ExpressionContext> &pCtx) {
+        intrusive_ptr<AccumulatorSum> pSummer(new AccumulatorSum());
         return pSummer;
     }
 
@@ -69,6 +69,6 @@ namespace mongo {
     }
 
     const char *AccumulatorSum::getOpName() const {
-	return "$sum";
+        return "$sum";
     }
 }

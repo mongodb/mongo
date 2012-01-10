@@ -25,21 +25,21 @@ namespace mongo {
     class ExpressionContext :
         public IntrusiveCounterUnsigned {
     public:
-	virtual ~ExpressionContext();
+        virtual ~ExpressionContext();
 
-	void setInShard(bool b);
-	void setInRouter(bool b);
+        void setInShard(bool b);
+        void setInRouter(bool b);
 
-	bool getInShard() const;
-	bool getInRouter() const;
+        bool getInShard() const;
+        bool getInRouter() const;
 
-	static ExpressionContext *create();
+        static ExpressionContext *create();
 
     private:
-	ExpressionContext();
-	
-	bool inShard;
-	bool inRouter;
+        ExpressionContext();
+        
+        bool inShard;
+        bool inRouter;
     };
 }
 
@@ -49,19 +49,19 @@ namespace mongo {
 namespace mongo {
 
     inline void ExpressionContext::setInShard(bool b) {
-	inShard = b;
+        inShard = b;
     }
     
     inline void ExpressionContext::setInRouter(bool b) {
-	inRouter = b;
+        inRouter = b;
     }
 
     inline bool ExpressionContext::getInShard() const {
-	return inShard;
+        return inShard;
     }
 
     inline bool ExpressionContext::getInRouter() const {
-	return inRouter;
+        return inRouter;
     }
 
 };

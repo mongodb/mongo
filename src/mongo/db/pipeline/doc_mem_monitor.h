@@ -39,56 +39,56 @@ namespace mongo {
      */
     class DocMemMonitor {
     public:
-	/*
-	  Constructor.
+        /*
+          Constructor.
 
-	  Uses default limits for warnings and errors.
+          Uses default limits for warnings and errors.
 
-	  The StringWriter parameter must outlive the DocMemMonitor instance.
+          The StringWriter parameter must outlive the DocMemMonitor instance.
 
-	  @param pWriter string writer that provides information about the
-	      operation being monitored
-	 */
-	DocMemMonitor(StringWriter *pWriter);
+          @param pWriter string writer that provides information about the
+              operation being monitored
+         */
+        DocMemMonitor(StringWriter *pWriter);
 
-	/*
-	  Constructor.
+        /*
+          Constructor.
 
-	  This variant allows explicit selection of the limits.  Note that
-	  limits of zero are treated as infinite.
+          This variant allows explicit selection of the limits.  Note that
+          limits of zero are treated as infinite.
 
-	  The StringWriter parameter must outlive the DocMemMonitor instance.
+          The StringWriter parameter must outlive the DocMemMonitor instance.
 
-	  @param pWriter string writer that provides information about the
-	      operation being monitored
-	  @param warnLimit the amount of ram to issue (log) a warning for
-	  @param errorLimit the amount of ram to throw an error for
-	 */
-	DocMemMonitor(StringWriter *pWriter, size_t warnLimit,
-		      size_t errorLimit);
+          @param pWriter string writer that provides information about the
+              operation being monitored
+          @param warnLimit the amount of ram to issue (log) a warning for
+          @param errorLimit the amount of ram to throw an error for
+         */
+        DocMemMonitor(StringWriter *pWriter, size_t warnLimit,
+                      size_t errorLimit);
 
-	/*
-	  Increment the total amount of memory used by the given amount.  If
-	  the warning threshold is exceeded, a warning will be logged.  If the
-	  error threshold is exceeded, an error will be thrown.
+        /*
+          Increment the total amount of memory used by the given amount.  If
+          the warning threshold is exceeded, a warning will be logged.  If the
+          error threshold is exceeded, an error will be thrown.
 
-	  @param amount the amount of memory to add to the current total
-	 */
-	void addToTotal(size_t amount);
+          @param amount the amount of memory to add to the current total
+         */
+        void addToTotal(size_t amount);
 
     private:
-	/*
-	  Real constructor body.
+        /*
+          Real constructor body.
 
-	  Provides common construction for all the variant constructors.
-	 */
-	void init(StringWriter *pW, size_t warnLimit, size_t errorLimit);
+          Provides common construction for all the variant constructors.
+         */
+        void init(StringWriter *pW, size_t warnLimit, size_t errorLimit);
 
-	bool warned;
-	size_t totalUsed;
-	size_t warnLimit;
-	size_t errorLimit;
-	StringWriter *pWriter;
+        bool warned;
+        size_t totalUsed;
+        size_t warnLimit;
+        size_t errorLimit;
+        StringWriter *pWriter;
     };
 
 }

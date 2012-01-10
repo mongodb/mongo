@@ -38,7 +38,7 @@ namespace mongo {
         // virtuals from Command
         virtual ~PipelineCommand();
         virtual bool run(const string &db, BSONObj &cmdObj, int options,
-			 string &errmsg, BSONObjBuilder &result, bool fromRepl);
+                         string &errmsg, BSONObjBuilder &result, bool fromRepl);
         virtual LockType locktype() const;
         virtual bool slaveOk() const;
         virtual void help(stringstream &help) const;
@@ -69,94 +69,94 @@ namespace mongo {
     }
 
     bool PipelineCommand::run(const string &db, BSONObj &cmdObj,
-			      int options, string &errmsg,
-			      BSONObjBuilder &result, bool fromRepl) {
+                              int options, string &errmsg,
+                              BSONObjBuilder &result, bool fromRepl) {
 
-	intrusive_ptr<ExpressionContext> pCtx(ExpressionContext::create());
+        intrusive_ptr<ExpressionContext> pCtx(ExpressionContext::create());
 
-	/* try to parse the command; if this fails, then we didn't run */
-	shared_ptr<Pipeline> pPipeline(
-	    Pipeline::parseCommand(errmsg, cmdObj, pCtx));
-	if (!pPipeline.get())
-	    return false;
+        /* try to parse the command; if this fails, then we didn't run */
+        shared_ptr<Pipeline> pPipeline(
+            Pipeline::parseCommand(errmsg, cmdObj, pCtx));
+        if (!pPipeline.get())
+            return false;
 
-	intrusive_ptr<DocumentSource> pSource(
-	    PipelineD::prepareCursorSource(pPipeline, db));
+        intrusive_ptr<DocumentSource> pSource(
+            PipelineD::prepareCursorSource(pPipeline, db));
 
-	/* this is the normal non-debug path */
-	if (!pPipeline->getSplitMongodPipeline())
-	    return pPipeline->run(result, errmsg, pSource);
+        /* this is the normal non-debug path */
+        if (!pPipeline->getSplitMongodPipeline())
+            return pPipeline->run(result, errmsg, pSource);
 
-	/* setup as if we're in the router */
-	pCtx->setInRouter(true);
+        /* setup as if we're in the router */
+        pCtx->setInRouter(true);
 
-	/*
-	  Here, we'll split the pipeline in the same way we would for sharding,
-	  for testing purposes.
+        /*
+          Here, we'll split the pipeline in the same way we would for sharding,
+          for testing purposes.
 
-	  Run the shard pipeline first, then feed the results into the remains
-	  of the existing pipeline.
+          Run the shard pipeline first, then feed the results into the remains
+          of the existing pipeline.
 
-	  Start by splitting the pipeline.
-	 */
-	shared_ptr<Pipeline> pShardSplit(
-	    pPipeline->splitForSharded());
+          Start by splitting the pipeline.
+         */
+        shared_ptr<Pipeline> pShardSplit(
+            pPipeline->splitForSharded());
 
-	/*
-	  Write the split pipeline as we would in order to transmit it to
-	  the shard servers.
-	*/
-	BSONObjBuilder shardBuilder;
-	pShardSplit->toBson(&shardBuilder);
-	BSONObj shardBson(shardBuilder.done());
+        /*
+          Write the split pipeline as we would in order to transmit it to
+          the shard servers.
+        */
+        BSONObjBuilder shardBuilder;
+        pShardSplit->toBson(&shardBuilder);
+        BSONObj shardBson(shardBuilder.done());
 
-	DEV (log() << "\n---- shardBson\n" <<
-	     shardBson.jsonString(Strict, 1) << "\n----\n").flush();
+        DEV (log() << "\n---- shardBson\n" <<
+             shardBson.jsonString(Strict, 1) << "\n----\n").flush();
 
-	/* for debugging purposes, show what the pipeline now looks like */
-	DEV {
-	    BSONObjBuilder pipelineBuilder;
-	    pPipeline->toBson(&pipelineBuilder);
-	    BSONObj pipelineBson(pipelineBuilder.done());
-	    (log() << "\n---- pipelineBson\n" <<
-	     pipelineBson.jsonString(Strict, 1) << "\n----\n").flush();
-	}
+        /* for debugging purposes, show what the pipeline now looks like */
+        DEV {
+            BSONObjBuilder pipelineBuilder;
+            pPipeline->toBson(&pipelineBuilder);
+            BSONObj pipelineBson(pipelineBuilder.done());
+            (log() << "\n---- pipelineBson\n" <<
+             pipelineBson.jsonString(Strict, 1) << "\n----\n").flush();
+        }
 
-	/* on the shard servers, create the local pipeline */
-	intrusive_ptr<ExpressionContext> pShardCtx(ExpressionContext::create());
-	shared_ptr<Pipeline> pShardPipeline(
-	    Pipeline::parseCommand(errmsg, shardBson, pShardCtx));
-	if (!pShardPipeline.get()) {
-	    return false;
-	}
+        /* on the shard servers, create the local pipeline */
+        intrusive_ptr<ExpressionContext> pShardCtx(ExpressionContext::create());
+        shared_ptr<Pipeline> pShardPipeline(
+            Pipeline::parseCommand(errmsg, shardBson, pShardCtx));
+        if (!pShardPipeline.get()) {
+            return false;
+        }
 
-	/* run the shard pipeline */
-	BSONObjBuilder shardResultBuilder;
-	string shardErrmsg;
-	pShardPipeline->run(shardResultBuilder, shardErrmsg, pSource);
-	BSONObj shardResult(shardResultBuilder.done());
+        /* run the shard pipeline */
+        BSONObjBuilder shardResultBuilder;
+        string shardErrmsg;
+        pShardPipeline->run(shardResultBuilder, shardErrmsg, pSource);
+        BSONObj shardResult(shardResultBuilder.done());
 
-	/* pick out the shard result, and prepare to read it */
-	intrusive_ptr<DocumentSourceBsonArray> pShardSource;
-	BSONObjIterator shardIter(shardResult);
-	while(shardIter.more()) {
-	    BSONElement shardElement(shardIter.next());
-	    const char *pFieldName = shardElement.fieldName();
+        /* pick out the shard result, and prepare to read it */
+        intrusive_ptr<DocumentSourceBsonArray> pShardSource;
+        BSONObjIterator shardIter(shardResult);
+        while(shardIter.more()) {
+            BSONElement shardElement(shardIter.next());
+            const char *pFieldName = shardElement.fieldName();
 
-	    if (strcmp(pFieldName, "result") == 0) {
-		pShardSource = DocumentSourceBsonArray::create(&shardElement);
+            if (strcmp(pFieldName, "result") == 0) {
+                pShardSource = DocumentSourceBsonArray::create(&shardElement);
 
-	        /*
-		  Connect the output of the shard pipeline with the mongos
-		  pipeline that will merge the results.
-		*/
-		return pPipeline->run(result, errmsg, pShardSource);
-	    }
-	}
+                /*
+                  Connect the output of the shard pipeline with the mongos
+                  pipeline that will merge the results.
+                */
+                return pPipeline->run(result, errmsg, pShardSource);
+            }
+        }
 
-	/* NOTREACHED */
-	assert(false);
-	return false;
+        /* NOTREACHED */
+        assert(false);
+        return false;
     }
 
 } // namespace mongo

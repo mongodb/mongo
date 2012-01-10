@@ -21,48 +21,48 @@
 namespace mongo {
 
     DocMemMonitor::DocMemMonitor(StringWriter *pW) {
-	/*
-	  Use the default values.
+        /*
+          Use the default values.
 
-	  Currently, we warn in log at 5%, and assert at 10%.
-	*/
-	size_t errorRam = SystemInfo::getPhysicalRam() / 10;
-	size_t warnRam = errorRam / 2;
+          Currently, we warn in log at 5%, and assert at 10%.
+        */
+        size_t errorRam = SystemInfo::getPhysicalRam() / 10;
+        size_t warnRam = errorRam / 2;
 
-	init(pW, warnRam, errorRam);
+        init(pW, warnRam, errorRam);
     }
 
     DocMemMonitor::DocMemMonitor(StringWriter *pW,
-				 size_t warnLimit, size_t errorLimit) {
-	init(pW, warnLimit, errorLimit);
+                                 size_t warnLimit, size_t errorLimit) {
+        init(pW, warnLimit, errorLimit);
     }
 
     void DocMemMonitor::addToTotal(size_t amount) {
-	totalUsed += amount;
+        totalUsed += amount;
 
-	if (!warned) {
-	    if (warnLimit && (totalUsed > warnLimit)) {
-		stringstream ss;
-		ss << "warning, 5% of physical RAM used for ";
-		pWriter->writeString(ss);
-		ss << endl;
-		warning() << ss.str();
-		warned = true;
-	    }
-	}
-	
-	if (errorLimit) {
-	    uassert(15944, "terminating request:  request heap use exceeded 10% of physical RAM", (totalUsed <= errorLimit));
-	}
+        if (!warned) {
+            if (warnLimit && (totalUsed > warnLimit)) {
+                stringstream ss;
+                ss << "warning, 5% of physical RAM used for ";
+                pWriter->writeString(ss);
+                ss << endl;
+                warning() << ss.str();
+                warned = true;
+            }
+        }
+        
+        if (errorLimit) {
+            uassert(15944, "terminating request:  request heap use exceeded 10% of physical RAM", (totalUsed <= errorLimit));
+        }
     }
 
     void DocMemMonitor::init(StringWriter *pW,
-			     size_t warnLimit, size_t errorLimit) {
-	this->pWriter = pW;
-	this->warnLimit = warnLimit;
-	this->errorLimit = errorLimit;
+                             size_t warnLimit, size_t errorLimit) {
+        this->pWriter = pW;
+        this->warnLimit = warnLimit;
+        this->errorLimit = errorLimit;
 
-	warned = false;
-	totalUsed = 0;
+        warned = false;
+        totalUsed = 0;
     }
 }

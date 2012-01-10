@@ -72,24 +72,24 @@ namespace mongo {
     }
 
     void DocumentSourceSkip::sourceToBson(BSONObjBuilder *pBuilder) const {
-	pBuilder->append("$skip", skip);
+        pBuilder->append("$skip", skip);
     }
 
     intrusive_ptr<DocumentSourceSkip> DocumentSourceSkip::create(
-	const intrusive_ptr<ExpressionContext> &pCtx) {
+        const intrusive_ptr<ExpressionContext> &pCtx) {
         intrusive_ptr<DocumentSourceSkip> pSource(
             new DocumentSourceSkip(pCtx));
         return pSource;
     }
 
     intrusive_ptr<DocumentSource> DocumentSourceSkip::createFromBson(
-	BSONElement *pBsonElement,
-	const intrusive_ptr<ExpressionContext> &pCtx) {
-	uassert(15972, str::stream() << "the value to " <<
-		skipName << " must be a number", pBsonElement->isNumber());
+        BSONElement *pBsonElement,
+        const intrusive_ptr<ExpressionContext> &pCtx) {
+        uassert(15972, str::stream() << "the value to " <<
+                skipName << " must be a number", pBsonElement->isNumber());
 
         intrusive_ptr<DocumentSourceSkip> pSkip(
-	    DocumentSourceSkip::create(pCtx));
+            DocumentSourceSkip::create(pCtx));
 
         pSkip->skip = (int)pBsonElement->numberLong();
         assert(pSkip->skip > 0); // CW TODO error code

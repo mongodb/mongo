@@ -26,24 +26,24 @@ namespace mongo {
     }
 
     bool DocumentSourceBsonArray::eof() {
-	return !haveCurrent;
+        return !haveCurrent;
     }
 
     bool DocumentSourceBsonArray::advance() {
-	if (eof())
-	    return false;
+        if (eof())
+            return false;
 
-	if (!arrayIterator.more()) {
-	    haveCurrent = false;
-	    return false;
-	}
+        if (!arrayIterator.more()) {
+            haveCurrent = false;
+            return false;
+        }
 
-	currentElement = arrayIterator.next();
-	return true;
+        currentElement = arrayIterator.next();
+        return true;
     }
 
     intrusive_ptr<Document> DocumentSourceBsonArray::getCurrent() {
-	assert(haveCurrent);
+        assert(haveCurrent);
         BSONObj documentObj(currentElement.Obj());
         intrusive_ptr<Document> pDocument(
             Document::createFromBsonObj(&documentObj));
@@ -51,33 +51,33 @@ namespace mongo {
     }
 
     void DocumentSourceBsonArray::setSource(
-	const intrusive_ptr<DocumentSource> &pSource) {
-	/* this doesn't take a source */
-	assert(false);
+        const intrusive_ptr<DocumentSource> &pSource) {
+        /* this doesn't take a source */
+        assert(false);
     }
 
     DocumentSourceBsonArray::DocumentSourceBsonArray(
-	BSONElement *pBsonElement):
+        BSONElement *pBsonElement):
         embeddedObject(pBsonElement->embeddedObject()),
         arrayIterator(embeddedObject),
         haveCurrent(false) {
-	if (arrayIterator.more()) {
-	    currentElement = arrayIterator.next();
-	    haveCurrent = true;
-	}
+        if (arrayIterator.more()) {
+            currentElement = arrayIterator.next();
+            haveCurrent = true;
+        }
     }
 
     intrusive_ptr<DocumentSourceBsonArray> DocumentSourceBsonArray::create(
-	BSONElement *pBsonElement) {
+        BSONElement *pBsonElement) {
 
-	assert(pBsonElement->type() == Array);
-	intrusive_ptr<DocumentSourceBsonArray> pSource(
-	    new DocumentSourceBsonArray(pBsonElement));
+        assert(pBsonElement->type() == Array);
+        intrusive_ptr<DocumentSourceBsonArray> pSource(
+            new DocumentSourceBsonArray(pBsonElement));
 
-	return pSource;
+        return pSource;
     }
 
     void DocumentSourceBsonArray::sourceToBson(BSONObjBuilder *pBuilder) const {
-	assert(false); // this has no analog in the BSON world
+        assert(false); // this has no analog in the BSON world
     }
 }

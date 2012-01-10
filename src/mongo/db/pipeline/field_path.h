@@ -22,46 +22,46 @@ namespace mongo {
 
     class FieldPath {
     public:
-	virtual ~FieldPath();
+        virtual ~FieldPath();
 
-	FieldPath(const string &fieldPath);
-	FieldPath();
+        FieldPath(const string &fieldPath);
+        FieldPath();
 
-	/*
-	  Get the number of path elements in the field path.
+        /*
+          Get the number of path elements in the field path.
 
-	  @returns the number of path elements
-	 */
-	size_t getPathLength() const;
+          @returns the number of path elements
+         */
+        size_t getPathLength() const;
 
-	/*
-	  Get a particular path element from the path.
+        /*
+          Get a particular path element from the path.
 
-	  @param i the index of the path element
-	  @returns the path element
-	 */
-	string getFieldName(size_t i) const;
+          @param i the index of the path element
+          @returns the path element
+         */
+        string getFieldName(size_t i) const;
 
-	/*
-	  Get the full path.
+        /*
+          Get the full path.
 
-	  @param fieldPrefix whether or not to include the field prefix
-	  @returns the complete field path
-	 */
-	string getPath(bool fieldPrefix) const;
+          @param fieldPrefix whether or not to include the field prefix
+          @returns the complete field path
+         */
+        string getPath(bool fieldPrefix) const;
 
-	/*
-	  Write the full path.
+        /*
+          Write the full path.
 
-	  @param outStream where to write the path to
-	  @param fieldPrefix whether or not to include the field prefix
-	*/
-	void writePath(ostream &outStream, bool fieldPrefix) const;
+          @param outStream where to write the path to
+          @param fieldPrefix whether or not to include the field prefix
+        */
+        void writePath(ostream &outStream, bool fieldPrefix) const;
 
-	FieldPath &operator=(const FieldPath &rRHS);
+        FieldPath &operator=(const FieldPath &rRHS);
 
     private:
-	vector<string> vFieldName;
+        vector<string> vFieldName;
     };
 }
 
@@ -71,11 +71,11 @@ namespace mongo {
 namespace mongo {
 
     inline size_t FieldPath::getPathLength() const {
-	return vFieldName.size();
+        return vFieldName.size();
     }
 
     inline string FieldPath::getFieldName(size_t i) const {
-	return vFieldName[i];
+        return vFieldName[i];
     }
 
 }

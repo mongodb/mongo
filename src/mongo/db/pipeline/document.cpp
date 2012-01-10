@@ -29,7 +29,7 @@ namespace mongo {
     string Document::idName("_id");
 
     intrusive_ptr<Document> Document::createFromBsonObj(BSONObj *pBsonObj) {
-	intrusive_ptr<Document> pDocument(new Document(pBsonObj));
+        intrusive_ptr<Document> pDocument(new Document(pBsonObj));
         return pDocument;
     }
 
@@ -40,7 +40,7 @@ namespace mongo {
         while(bsonIterator.more()) {
             BSONElement bsonElement(bsonIterator.next());
             string fieldName(bsonElement.fieldName());
-	    intrusive_ptr<const Value> pValue(
+            intrusive_ptr<const Value> pValue(
                 Value::createFromBsonElement(&bsonElement));
 
             vFieldName.push_back(fieldName);
@@ -55,7 +55,7 @@ namespace mongo {
     }
 
     intrusive_ptr<Document> Document::create(size_t sizeHint) {
-	intrusive_ptr<Document> pDocument(new Document(sizeHint));
+        intrusive_ptr<Document> pDocument(new Document(sizeHint));
         return pDocument;
     }
 
@@ -70,7 +70,7 @@ namespace mongo {
 
     intrusive_ptr<Document> Document::clone() {
         const size_t n = vFieldName.size();
-	intrusive_ptr<Document> pNew(Document::create(n));
+        intrusive_ptr<Document> pNew(Document::create(n));
         for(size_t i = 0; i < n; ++i)
             pNew->addField(vFieldName[i], vpValue[i]);
 
@@ -97,7 +97,7 @@ namespace mongo {
         */
         const size_t n = vFieldName.size();
         for(size_t i = 0; i < n; ++i) {
-	    if (fieldName.compare(vFieldName[i]) == 0)
+            if (fieldName.compare(vFieldName[i]) == 0)
                 return vpValue[i];
         }
 
@@ -105,9 +105,9 @@ namespace mongo {
     }
 
     void Document::addField(const string &fieldName,
-			    const intrusive_ptr<const Value> &pValue) {
-	uassert(15945, str::stream() << "cannot add undefined field " <<
-		fieldName << " to document", pValue->getType() != Undefined);
+                            const intrusive_ptr<const Value> &pValue) {
+        uassert(15945, str::stream() << "cannot add undefined field " <<
+                fieldName << " to document", pValue->getType() != Undefined);
 
         vFieldName.push_back(fieldName);
         vpValue.push_back(pValue);
@@ -115,60 +115,60 @@ namespace mongo {
 
     void Document::setField(size_t index,
                             const string &fieldName,
-			    const intrusive_ptr<const Value> &pValue) {
-	/* special case:  should this field be removed? */
-	if (!pValue.get()) {
-	    vFieldName.erase(vFieldName.begin() + index);
-	    vpValue.erase(vpValue.begin() + index);
-	    return;
-	}
+                            const intrusive_ptr<const Value> &pValue) {
+        /* special case:  should this field be removed? */
+        if (!pValue.get()) {
+            vFieldName.erase(vFieldName.begin() + index);
+            vpValue.erase(vpValue.begin() + index);
+            return;
+        }
 
-	/* make sure we have a valid value */
-	uassert(15968, str::stream() << "cannot set undefined field " <<
-		fieldName << " to document", pValue->getType() != Undefined);
+        /* make sure we have a valid value */
+        uassert(15968, str::stream() << "cannot set undefined field " <<
+                fieldName << " to document", pValue->getType() != Undefined);
 
-	/* set the indicated field */
+        /* set the indicated field */
         vFieldName[index] = fieldName;
         vpValue[index] = pValue;
     }
 
     intrusive_ptr<const Value> Document::getField(const string &fieldName) const {
-	const size_t n = vFieldName.size();
-	for(size_t i = 0; i < n; ++i) {
-	    if (fieldName.compare(vFieldName[i]) == 0)
-		return vpValue[i];
-	}
+        const size_t n = vFieldName.size();
+        for(size_t i = 0; i < n; ++i) {
+            if (fieldName.compare(vFieldName[i]) == 0)
+                return vpValue[i];
+        }
 
-	/* if we got here, there's no such field */
-	return intrusive_ptr<const Value>();
+        /* if we got here, there's no such field */
+        return intrusive_ptr<const Value>();
     }
 
     size_t Document::getApproximateSize() const {
-	size_t size = sizeof(Document);
-	const size_t n = vpValue.size();
-	for(size_t i = 0; i < n; ++i)
-	    size += vpValue[i]->getApproximateSize();
+        size_t size = sizeof(Document);
+        const size_t n = vpValue.size();
+        for(size_t i = 0; i < n; ++i)
+            size += vpValue[i]->getApproximateSize();
 
-	return size;
+        return size;
     }
 
     size_t Document::getFieldIndex(const string &fieldName) const {
-	const size_t n = vFieldName.size();
-	size_t i = 0;
-	for(; i < n; ++i) {
-	    if (fieldName.compare(vFieldName[i]) == 0)
-		break;
-	}
+        const size_t n = vFieldName.size();
+        size_t i = 0;
+        for(; i < n; ++i) {
+            if (fieldName.compare(vFieldName[i]) == 0)
+                break;
+        }
 
-	return i;
+        return i;
     }
 
     void Document::hash_combine(size_t &seed) const {
-	const size_t n = vFieldName.size();
-	for(size_t i = 0; i < n; ++i) {
-	    boost::hash_combine(seed, vFieldName[i]);
-	    vpValue[i]->hash_combine(seed);
-	}
+        const size_t n = vFieldName.size();
+        for(size_t i = 0; i < n; ++i) {
+            boost::hash_combine(seed, vFieldName[i]);
+            vpValue[i]->hash_combine(seed);
+        }
     }
 
     int Document::compare(const intrusive_ptr<Document> &rL,

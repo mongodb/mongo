@@ -24,7 +24,7 @@ namespace mongo {
     intrusive_ptr<const Value> AccumulatorMinMax::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1);
-	intrusive_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
+        intrusive_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
 
         /* if this is the first value, just use it */
         if (!pValue.get())
@@ -40,28 +40,28 @@ namespace mongo {
     }
 
     AccumulatorMinMax::AccumulatorMinMax(int theSense):
-	AccumulatorSingleValue(),
+        AccumulatorSingleValue(),
         sense(theSense) {
         assert((sense == 1) || (sense == -1));
     }
 
     intrusive_ptr<Accumulator> AccumulatorMinMax::createMin(
-	const intrusive_ptr<ExpressionContext> &pCtx) {
-	intrusive_ptr<AccumulatorMinMax> pAccumulator(
-	    new AccumulatorMinMax(1));
+        const intrusive_ptr<ExpressionContext> &pCtx) {
+        intrusive_ptr<AccumulatorMinMax> pAccumulator(
+            new AccumulatorMinMax(1));
         return pAccumulator;
     }
 
     intrusive_ptr<Accumulator> AccumulatorMinMax::createMax(
-	const intrusive_ptr<ExpressionContext> &pCtx) {
-	intrusive_ptr<AccumulatorMinMax> pAccumulator(
-	    new AccumulatorMinMax(-1));
+        const intrusive_ptr<ExpressionContext> &pCtx) {
+        intrusive_ptr<AccumulatorMinMax> pAccumulator(
+            new AccumulatorMinMax(-1));
         return pAccumulator;
     }
 
     const char *AccumulatorMinMax::getOpName() const {
-	if (sense == 1)
-	    return "$min";
-	return "$max";
+        if (sense == 1)
+            return "$min";
+        return "$max";
     }
 }
