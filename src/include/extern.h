@@ -591,6 +591,10 @@ extern int __wt_struct_unpack(WT_SESSION_IMPL *session,
     size_t size,
     const char *fmt,
     ...);
+extern int __wt_create_file(WT_SESSION_IMPL *session,
+    const char *name,
+    const char *fileuri,
+    const char *config);
 extern int __wt_schema_create( WT_SESSION_IMPL *session,
     const char *name,
     const char *config);

@@ -26,7 +26,8 @@ __open_schema_table(WT_SESSION_IMPL *session)
 		return (0);
 
 	WT_RET(__wt_config_collapse(session, cfg, &schemaconf));
-	WT_ERR(__wt_schema_create(session,
+	WT_ERR(__wt_create_file(session,
+	    "file:" WT_SCHEMA_FILENAME,
 	    "file:" WT_SCHEMA_FILENAME, schemaconf));
 	session->schematab = session->btree;
 err:	__wt_free(session, schemaconf);
