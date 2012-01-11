@@ -688,6 +688,7 @@ extern int __wt_schema_table_read( WT_SESSION_IMPL *session,
 extern int __wt_schema_truncate( WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[]);
+extern int __wt_schema_name_check(WT_SESSION_IMPL *session, const char *uri);
 extern int __wt_schema_worker(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],

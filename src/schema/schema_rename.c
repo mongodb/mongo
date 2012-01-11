@@ -197,6 +197,10 @@ __wt_schema_rename(WT_SESSION_IMPL *session,
 
 	WT_UNUSED(cfg);
 
+	/* Disallow renames to/from the WiredTiger name space. */
+	WT_RET(__wt_schema_name_check(session, uri));
+	WT_RET(__wt_schema_name_check(session, newname));
+
 	if (WT_PREFIX_SKIP(uri, "file:"))
 		ret = __rename_file(session, uri, newname);
 	else if (WT_PREFIX_SKIP(uri, "table:"))

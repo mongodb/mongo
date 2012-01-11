@@ -334,6 +334,9 @@ int
 __wt_schema_create(
     WT_SESSION_IMPL *session, const char *name, const char *config)
 {
+	/* Disallow creates in the WiredTiger name space. */
+	WT_RET(__wt_schema_name_check(session, name));
+
 	if (WT_PREFIX_MATCH(name, "colgroup:"))
 		return (__create_colgroup(session, name, config));
 	else if (WT_PREFIX_MATCH(name, "file:"))
