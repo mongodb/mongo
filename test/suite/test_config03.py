@@ -90,11 +90,19 @@ class test_config03(test_base03.test_base03):
         self.pr('wiredtiger_open with args: ' + args)
 
         expect_fail = False
+        successargs = args
         if self.s_create == False:
-            successargs = args.replace(',create=false,',',create,')
+            successargs = successargs.replace(',create=false,',',create,')
             expect_fail = True
         elif self.s_create == None:
-            successargs = args + 'create=true,'
+            successargs = successargs + 'create=true,'
+            expect_fail = True
+        if self.s_eviction_target >= self.s_eviction_trigger:
+            # construct args that guarantee that target < trigger
+            # we know that trigger >= 1
+            repfrom = ',eviction_target=' + str(self.s_eviction_target)
+            repto = ',eviction_target=' + str(self.s_eviction_trigger - 1)
+            successargs = successargs.replace(repfrom, repto);
             expect_fail = True
 
         if expect_fail:
