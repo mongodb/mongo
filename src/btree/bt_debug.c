@@ -793,7 +793,7 @@ __debug_ref(WT_DBG *ds, WT_REF *ref, WT_PAGE *page)
 		__dmsg(ds, "disk");
 		break;
 	case WT_REF_LOCKED:
-		__dmsg(ds, "locked");
+		__dmsg(ds, "locked %p", ref->page);
 		break;
 	case WT_REF_MEM:
 		__dmsg(ds, "memory %p", ref->page);
