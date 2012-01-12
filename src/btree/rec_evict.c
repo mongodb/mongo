@@ -384,16 +384,11 @@ __rec_excl(WT_SESSION_IMPL *session,
 		switch (ref->state) {
 		case WT_REF_DISK:			/* On-disk */
 			continue;
-		case WT_REF_READING:			/* Being read */
-			return (WT_ERROR);
 		case WT_REF_MEM:			/* In-memory */
 			break;
-		/*
-		 * I don't expect to see any WT_REF_LOCKED pages, that implies a
-		 * previous eviction walk for exclusivity set a flag, did not do
-		 * the eviction, and failed to clear the flag.
-		 */
-		WT_ILLEGAL_VALUE(session);
+		case WT_REF_LOCKED:			/* Being evicted */
+		case WT_REF_READING:			/* Being read */
+			return (WT_ERROR);
 		}
 		page = ref->page;
 		WT_RET(__rec_excl_page(session, ref, page, flags));
