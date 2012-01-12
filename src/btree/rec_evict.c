@@ -373,11 +373,11 @@ __rec_excl(WT_SESSION_IMPL *session,
 	uint32_t i;
 
 	/*
-	 * We lock pages in a specifc order (and unlock them in reverse order,
+	 * We lock pages in a specific order (and unlock them in reverse order,
 	 * otherwise tracking the last locked page would be meaningless).  In
 	 * this case, walk the tree depth-first and acquire each page's lock
 	 * before reviewing child pages it references.
-	 * 
+	 *
 	 * For each entry in the page...
 	 */
 	WT_REF_FOREACH(parent, ref, i) {
