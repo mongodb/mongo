@@ -51,6 +51,7 @@ err:	__wt_scr_free(&buf);
 static int
 __drop_tree(WT_SESSION_IMPL *session, WT_BTREE *btree, int force)
 {
+	WT_BUF *buf;
 	int ret;
 
 	ret = 0;
@@ -60,8 +61,17 @@ __drop_tree(WT_SESSION_IMPL *session, WT_BTREE *btree, int force)
 	if (force && ret == WT_NOTFOUND)
 		ret = 0;
 
-	/* Remove the file. */
-	WT_TRET(__wt_drop_file(session, btree->filename, force));
+	/*
+	 * Drop the file.
+	 * __drop_file closes the WT_BTREE handle, so we have to have a local
+	 * copy of the WT_BTREE->filename field.
+	 */
+	WT_ERR(__wt_scr_alloc(session, 0, &buf));
+	WT_ERR(__wt_buf_set(
+	    session, buf, btree->filename, strlen(btree->filename) + 1));
+	WT_ERR(__wt_drop_file(session, buf->data, force));
+
+err:	__wt_scr_free(&buf);
 
 	return (ret);
 }
