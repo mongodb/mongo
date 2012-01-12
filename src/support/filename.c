@@ -14,13 +14,17 @@
 int
 __wt_filename(WT_SESSION_IMPL *session, const char *name, const char **path)
 {
-	WT_BUF tmp;
 	WT_CONNECTION_IMPL *conn;
+	size_t len;
+	char *buf;
 
 	conn = S2C(session);
+	*path = NULL;
 
-	WT_CLEAR(tmp);
-	WT_RET(__wt_buf_fmt(session, &tmp, "%s/%s", conn->home, name));
-	*path = __wt_buf_steal(session, &tmp, NULL);
+	len = strlen(conn->home) + 1 + strlen(name) + 1;
+	WT_RET(__wt_calloc(session, 1, len, &buf));
+	snprintf(buf, len, "%s/%s", conn->home, name);
+
+	*path = buf;
 	return (0);
 }
