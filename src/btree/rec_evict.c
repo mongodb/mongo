@@ -309,6 +309,7 @@ __rec_review(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	int ret;
 
 	ret = 0;
+	last_page = NULL;
 
 	/*
 	 * Attempt exclusive access to the page if our caller doesn't have the
@@ -360,7 +361,7 @@ __rec_review(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	}
 
 	/* If can't evict this page, release our exclusive reference(s). */
-	if (ret != 0)
+	if (ret != 0 && last_page != NULL)
 		__rec_sub_excl_clear(session, page, last_page, flags);
 
 	return (ret);
@@ -520,7 +521,13 @@ __rec_sub_excl_row_clear(
 
 	/* For each entry in the page... */
 	WT_REF_FOREACH(parent, ref, i) {
-		WT_ASSERT(session, ref->state == WT_REF_LOCKED);
+		switch (ref->state) {
+		case WT_REF_DISK:			/* On-disk */
+			continue;
+		case WT_REF_LOCKED:			/* Eviction candidate */
+			break;
+		WT_ILLEGAL_VALUE(session);
+		}
 		ref->state = WT_REF_MEM;
 
 		/* Recurse down the tree. */
