@@ -11,6 +11,7 @@ static int  __hazard_bsearch_cmp(const void *, const void *);
 static void __hazard_copy(WT_SESSION_IMPL *);
 static int  __hazard_exclusive(WT_SESSION_IMPL *, WT_REF *, int);
 static int  __hazard_qsort_cmp(const void *, const void *);
+static int  __rec_discard(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_discard_page(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_page_clean_update(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_page_dirty_update(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
@@ -18,9 +19,6 @@ static int  __rec_review(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
 static int  __rec_root_addr_update(WT_SESSION_IMPL *, uint8_t *, uint32_t);
 static int  __rec_root_clean_update(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_root_dirty_update(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __rec_sub_discard(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __rec_sub_discard_col(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __rec_sub_discard_row(WT_SESSION_IMPL *, WT_PAGE *);
 static void __rec_sub_excl_clear(
 		WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE *, uint32_t);
 static int  __rec_sub_excl_col(
@@ -194,8 +192,7 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 * Discard pages which were merged into this page during reconciliation,
 	 * then discard the page itself.
 	 */
-	WT_RET(__rec_sub_discard(session, page));
-	WT_RET(__rec_discard_page(session, page));
+	WT_RET(__rec_discard(session, page));
 
 	return (0);
 }
@@ -270,8 +267,7 @@ __rec_root_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Discard pages which were merged into this page during reconciliation,
 	 * then discard the page itself.
 	 */
-	WT_RET(__rec_sub_discard(session, page));
-	WT_RET(__rec_discard_page(session, page));
+	WT_RET(__rec_discard(session, page));
 
 	if (next == NULL)
 		return (0);
@@ -308,8 +304,8 @@ __rec_review(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	WT_PAGE *last_page;
 	int ret;
 
-	ret = 0;
 	last_page = NULL;
+	ret = 0;
 
 	/*
 	 * Attempt exclusive access to the page if our caller doesn't have the
@@ -587,72 +583,27 @@ __rec_sub_excl_page(
 }
 
 /*
- * __rec_sub_discard --
- *	Discard any pages merged into the evicted page.
+ * __rec_discard --
+ *	Discard any pages merged into an evicted page, then the page itself.
  */
 static int
-__rec_sub_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
+__rec_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_REF *ref;
+	uint32_t i;
+
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
-		WT_RET(__rec_sub_discard_col(session, page));
-		break;
 	case WT_PAGE_ROW_INT:
-		WT_RET(__rec_sub_discard_row(session, page));
-		break;
+		/* For each entry in the page... */
+		WT_REF_FOREACH(page, ref, i)
+			if (ref->state != WT_REF_DISK)
+				WT_RET(__rec_discard(session, ref->page));
+		/* FALLTHROUGH */
 	default:
+		WT_RET(__rec_discard_page(session, page));
 		break;
 	}
-	return (0);
-}
-
-/*
- * __rec_sub_discard_col --
- *	Discard any column-store pages we merged.
- */
-static int
-__rec_sub_discard_col(WT_SESSION_IMPL *session, WT_PAGE *parent)
-{
-	WT_PAGE *page;
-	WT_REF *ref;
-	uint32_t i;
-
-	/* For each entry in the page... */
-	WT_REF_FOREACH(parent, ref, i)
-		if (ref->state != WT_REF_DISK) {
-			page = ref->page;
-
-			/* Recurse down the tree. */
-			if (page->type == WT_PAGE_COL_INT)
-				WT_RET(__rec_sub_discard_col(session, page));
-
-			WT_RET(__rec_discard_page(session, page));
-		}
-	return (0);
-}
-
-/*
- * __rec_sub_discard_row --
- *	Discard any row-store pages we merged.
- */
-static int
-__rec_sub_discard_row(WT_SESSION_IMPL *session, WT_PAGE *parent)
-{
-	WT_PAGE *page;
-	WT_REF *ref;
-	uint32_t i;
-
-	/* For each entry in the page... */
-	WT_REF_FOREACH(parent, ref, i)
-		if (ref->state != WT_REF_DISK) {
-			page = ref->page;
-
-			/* Recurse down the tree. */
-			if (page->type == WT_PAGE_ROW_INT)
-				WT_RET(__rec_sub_discard_row(session, page));
-
-			WT_RET(__rec_discard_page(session, page));
-		}
 	return (0);
 }
 
