@@ -7,6 +7,7 @@
 
 #include "wt_internal.h"
 
+#ifdef __WIREDTIGER_UNUSED__
 /*
  * __wt_nlpo2_round --
  *	Round up to the next-largest power-of-two for a 32-bit unsigned value.
@@ -52,6 +53,7 @@ __wt_nlpo2(uint32_t v)
 	v |= v >> 16;
 	return (v + 1);
 }
+#endif /* __WIREDTIGER_UNUSED__ */
 
 /*
  * __wt_ispo2 --

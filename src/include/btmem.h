@@ -474,8 +474,6 @@ struct __wt_col_rle {
  * structure.
  */
 struct __wt_ikey {
-	WT_SESSION_BUFFER *sb;		/* Session buffer holding the WT_IKEY */
-
 	uint32_t size;			/* Key length */
 
 	/*
@@ -504,8 +502,6 @@ struct __wt_ikey {
  * list.
  */
 struct __wt_update {
-	WT_SESSION_BUFFER *sb;		/* session buffer holding this update */
-
 	WT_UPDATE *next;		/* forward-linked list */
 
 	/*
@@ -556,8 +552,6 @@ struct __wt_update {
  * scale and it isn't useful enough to re-implement, IMNSHO.)
  */
 struct __wt_insert {
-	WT_SESSION_BUFFER *sb;			/* insert session buffer */
-
 	WT_UPDATE *upd;				/* value */
 
 	union {

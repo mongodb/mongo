@@ -66,7 +66,7 @@ __wt_col_append_serial(
 	if (!args->new_inshead_taken)
 		__wt_free(session, args->new_inshead);
 	if (!args->new_ins_taken)
-		__wt_sb_decrement(session, args->new_ins->sb, args->new_ins);
+		__wt_free(session, args->new_ins);
 	return (ret);
 }
 
@@ -225,7 +225,7 @@ __wt_insert_serial(
 	if (!args->new_inshead_taken)
 		__wt_free(session, args->new_inshead);
 	if (!args->new_ins_taken)
-		__wt_sb_decrement(session, args->new_ins->sb, args->new_ins);
+		__wt_free(session, args->new_ins);
 	return (ret);
 }
 
@@ -375,7 +375,7 @@ __wt_update_serial(
 	if (!args->new_upd_taken)
 		__wt_free(session, args->new_upd);
 	if (!args->upd_taken)
-		__wt_sb_decrement(session, args->upd->sb, args->upd);
+		__wt_free(session, args->upd);
 	return (ret);
 }
 

@@ -175,7 +175,7 @@ __free_page_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	WT_REF_FOREACH(page, ref, i) {
 		if ((ikey = ref->u.key) != NULL)
-			__wt_sb_free(session, ikey->sb, ikey);
+			__wt_free(session, ikey);
 		if (ref->addr != NULL &&
 		    __wt_off_page(page, ref->addr)) {
 			__wt_free(session, ((WT_ADDR *)ref->addr)->addr);
@@ -207,7 +207,7 @@ __free_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	WT_ROW_FOREACH(page, rip, i)
 		if ((ikey = rip->key) != NULL && __wt_off_page(page, ikey))
-			__wt_sb_free(session, ikey->sb, ikey);
+			__wt_free(session, ikey);
 	__wt_free(session, page->u.row.d);
 
 	/*
@@ -263,7 +263,7 @@ __free_insert_list(WT_SESSION_IMPL *session, WT_INSERT *ins)
 		__free_update_list(session, ins->upd);
 
 		next = WT_SKIP_NEXT(ins);
-		__wt_sb_free(session, ins->sb, ins);
+		__wt_free(session, ins);
 	} while ((ins = next) != NULL);
 }
 
@@ -301,6 +301,6 @@ __free_update_list(WT_SESSION_IMPL *session, WT_UPDATE *upd)
 
 	do {
 		next = upd->next;
-		__wt_sb_free(session, upd->sb, upd);
+		__wt_free(session, upd);
 	} while ((upd = next) != NULL);
 }

@@ -106,6 +106,5 @@ src/support/huffman.c
 src/support/pow.c
 src/support/rand.c
 src/support/scratch.c
-src/support/sess_buf.c
 src/support/sess_dump.c
 src/support/stat.c

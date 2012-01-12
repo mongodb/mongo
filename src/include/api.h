@@ -103,9 +103,6 @@ struct __wt_session_impl {
 
 	void	*reconcile;		/* Reconciliation structure */
 
-	WT_SESSION_BUFFER *sb;		/* Per-thread update buffer */
-	uint32_t update_alloc_size;	/* Allocation size */
-
 	uint32_t flags;
 };
 

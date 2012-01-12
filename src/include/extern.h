@@ -765,7 +765,6 @@ extern int __wt_assert(WT_SESSION_IMPL *session,
     5,
     6)));
 extern int __wt_illegal_value(WT_SESSION_IMPL *session);
-extern int __wt_file_item_too_big(WT_SESSION_IMPL *session);
 extern int __wt_unknown_object_type(WT_SESSION_IMPL *session, const char *uri);
 extern int __wt_filename(WT_SESSION_IMPL *session,
     const char *name,
@@ -850,16 +849,6 @@ extern void __wt_scr_free(WT_BUF **bufp);
 extern void __wt_scr_discard(WT_SESSION_IMPL *session);
 extern void *__wt_scr_alloc_ext(WT_SESSION *wt_session, size_t size);
 extern void __wt_scr_free_ext(WT_SESSION *wt_session, void *p);
-extern int __wt_sb_alloc( WT_SESSION_IMPL *session,
-    size_t size,
-    void *retp,
-    WT_SESSION_BUFFER **sbp);
-extern void __wt_sb_free(WT_SESSION_IMPL *session,
-    WT_SESSION_BUFFER *sb,
-    void *p);
-extern void __wt_sb_decrement(WT_SESSION_IMPL *session,
-    WT_SESSION_BUFFER *sb,
-    void *p);
 extern void __wt_session_dump_all(WT_SESSION_IMPL *session);
 extern void __wt_session_dump(WT_SESSION_IMPL *session);
 extern int __wt_stat_alloc_btree_stats(WT_SESSION_IMPL *session,

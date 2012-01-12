@@ -44,9 +44,6 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	WT_TRET(__wt_schema_close_tables(session));
 
 	__wt_spin_lock(session, &conn->spinlock);
-	/* Unpin the current session buffer. */
-	if (session->sb != NULL)
-		__wt_sb_decrement(session, session->sb, NULL);
 
 	/* Discard scratch buffers. */
 	__wt_scr_discard(session);

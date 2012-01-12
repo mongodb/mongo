@@ -330,7 +330,7 @@ next:		switch (direction) {
 	 * the key.
 	 */
 	if (rip_arg->key != ikey)
-		__wt_sb_decrement(session, ikey->sb, ikey);
+		__wt_free(session, ikey);
 
 	__wt_scr_free(&retb);
 
@@ -396,14 +396,12 @@ __wt_row_ikey_alloc(WT_SESSION_IMPL *session,
     uint32_t cell_offset, const void *key, uint32_t size, WT_IKEY **ikeyp)
 {
 	WT_IKEY *ikey;
-	WT_SESSION_BUFFER *sb;
 
 	/*
 	 * Allocate the WT_IKEY structure and room for the value, then copy
 	 * the value into place.
 	 */
-	WT_RET(__wt_sb_alloc(session, sizeof(WT_IKEY) + size, &ikey, &sb));
-	ikey->sb = sb;
+	WT_RET(__wt_calloc(session, 1, sizeof(WT_IKEY) + size, &ikey));
 	ikey->size = size;
 	ikey->cell_offset = cell_offset;
 	memcpy(WT_IKEY_DATA(ikey), key, size);

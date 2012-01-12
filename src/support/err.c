@@ -176,17 +176,6 @@ __wt_illegal_value(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_file_item_too_big --
- *	Print a standard error message when an element is too large to store.
- */
-int
-__wt_file_item_too_big(WT_SESSION_IMPL *session)
-{
-	WT_RET_MSG(session, WT_ERROR,
-	    "the item is too large for the file to store");
-}
-
-/*
  * __wt_unknown_object_type --
  *	Print a standard error message when given an unknown object type.
  */

@@ -136,9 +136,9 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 
 	if (ret != 0) {
 err:		if (ins != NULL)
-			__wt_sb_decrement(session, ins->sb, ins);
+			__wt_free(session, ins);
 		if (upd != NULL)
-			__wt_sb_decrement(session, upd->sb, upd);
+			__wt_free(session, upd);
 	}
 
 	/* Free any insert, update arrays. */
@@ -158,7 +158,6 @@ int
 __wt_row_insert_alloc(WT_SESSION_IMPL *session,
     WT_BUF *key, u_int skipdepth, WT_INSERT **insp, size_t *ins_sizep)
 {
-	WT_SESSION_BUFFER *sb;
 	WT_INSERT *ins;
 	size_t ins_size;
 
@@ -168,9 +167,8 @@ __wt_row_insert_alloc(WT_SESSION_IMPL *session,
 	 */
 	ins_size = sizeof(WT_INSERT) +
 	    skipdepth * sizeof(WT_INSERT *) + key->size;
-	WT_RET(__wt_sb_alloc(session, ins_size, &ins, &sb));
+	WT_RET(__wt_calloc(session, 1, ins_size, &ins));
 
-	ins->sb = sb;
 	ins->u.key.offset = WT_STORE_SIZE(ins_size - key->size);
 	WT_INSERT_KEY_SIZE(ins) = key->size;
 	memcpy(WT_INSERT_KEY(ins), key->data, key->size);
@@ -257,7 +255,6 @@ int
 __wt_update_alloc(WT_SESSION_IMPL *session,
     WT_BUF *value, WT_UPDATE **updp, size_t *sizep)
 {
-	WT_SESSION_BUFFER *sb;
 	WT_UPDATE *upd;
 	size_t size;
 
@@ -266,8 +263,7 @@ __wt_update_alloc(WT_SESSION_IMPL *session,
 	 * the value into place.
 	 */
 	size = value == NULL ? 0 : value->size;
-	WT_RET(__wt_sb_alloc(session, sizeof(WT_UPDATE) + size, &upd, &sb));
-	upd->sb = sb;
+	WT_RET(__wt_calloc(session, 1, sizeof(WT_UPDATE) + size, &upd));
 	if (value == NULL)
 		WT_UPDATE_DELETED_SET(upd);
 	else {

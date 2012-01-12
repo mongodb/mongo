@@ -175,9 +175,9 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 
 	if (ret != 0) {
 err:		if (ins != NULL)
-			__wt_sb_decrement(session, ins->sb, ins);
+			__wt_free(session, ins);
 		if (upd != NULL)
-			__wt_sb_decrement(session, upd->sb, upd);
+			__wt_free(session, upd);
 	}
 
 	__wt_free(session, new_inslist);
@@ -195,7 +195,6 @@ static int
 __col_insert_alloc(WT_SESSION_IMPL *session,
     uint64_t recno, u_int skipdepth, WT_INSERT **insp, size_t *ins_sizep)
 {
-	WT_SESSION_BUFFER *sb;
 	WT_INSERT *ins;
 	size_t ins_size;
 
@@ -204,9 +203,8 @@ __col_insert_alloc(WT_SESSION_IMPL *session,
 	 * the record number into place.
 	 */
 	ins_size = sizeof(WT_INSERT) + skipdepth * sizeof(WT_INSERT *);
-	WT_RET(__wt_sb_alloc(session, ins_size, &ins, &sb));
+	WT_RET(__wt_calloc(session, 1, ins_size, &ins));
 
-	ins->sb = sb;
 	WT_INSERT_RECNO(ins) = recno;
 
 	*insp = ins;
