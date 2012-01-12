@@ -8,7 +8,8 @@ var m = startMongod( "--port", port, "--dbpath", "/data/db/" + baseName );
 
 m.getDB( baseName )[ baseName ].save( {i:1} );
 
-expectedMB = 100;
+// Windows does not currently use preallocation
+expectedMB = ( _isWindows() ? 70 : 100 );
 if ( m.getDB( baseName ).serverBits() < 64 )
     expectedMB /= 4;
 

@@ -13,7 +13,8 @@ for (i=0;i<4*1024;i++) { str=str+"a"; }
 for (j=0; j<100; j++) for (i=0; i<512; i++){ db.foo.save({y:str})}
 db.getLastError();
 
-assert.eq( 51200, db.foo.find().itcount(), "Not all data was saved!" )
+assert.soon( function(){ var c = db.foo.find().itcount(); print( "Count is " + c ); return c == 51200 } )
+//assert.eq( 51200, db.foo.find().itcount(), "Not all data was saved!" )
 
 s.printChunks();
 s.printChangeLog();

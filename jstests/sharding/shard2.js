@@ -20,6 +20,10 @@ printAll = function(){
 
 s = new ShardingTest( "shard2" , 2 , 2 );
 
+// We're doing a lot of checks here that can get screwed up by the balancer, now that
+// it moves small #s of chunks too
+s.stopBalancer()
+
 db = s.getDB( "test" );
 
 s.adminCommand( { enablesharding : "test" } );

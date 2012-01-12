@@ -1,4 +1,4 @@
-// Yield and delete test case for query optimizer cursor.
+// Yield and delete test case for query optimizer cursor.  SERVER-4401
 
 t = db.jstests_distinct3;
 t.drop();

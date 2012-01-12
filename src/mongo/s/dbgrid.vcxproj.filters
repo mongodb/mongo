@@ -1,0 +1,608 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="libs_etc">
+      <UniqueIdentifier>{17d48ddf-5c49-4dfd-bafa-16d5fed290cd}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="libs_etc\pcre">
+      <UniqueIdentifier>{4c2dd526-4a57-4ff7-862f-2bd7ec4955b3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="client">
+      <UniqueIdentifier>{b4f6635b-8c64-4ceb-8077-43203533d0b9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shared Source Files">
+      <UniqueIdentifier>{e59da087-4433-46b9-862d-746cbed27b97}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Shared">
+      <UniqueIdentifier>{4048b883-7255-40b3-b0e9-4c1044cff049}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="balance.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="chunk.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="commands_admin.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="commands_public.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="config.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="config_migrate.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="cursors.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\queryutil.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="request.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="s_only.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="server.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="shard.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="shardkey.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="stats.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="strategy.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="strategy_shard.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="strategy_single.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\scripting\utils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\client\dbclient.cpp">
+      <Filter>client</Filter>
+    </ClCompile>
+    <ClCompile Include="..\client\dbclientcursor.cpp">
+      <Filter>client</Filter>
+    </ClCompile>
+    <ClCompile Include="..\client\model.cpp">
+      <Filter>client</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\assert_util.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\background.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\base64.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\cmdline.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\commands.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\stats\counters.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\debug_util.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\scripting\engine.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\scripting\engine_spidermonkey.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\indexkey.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\jsobj.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\json.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\lasterror.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\md5.c">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\md5main.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shell\mongo.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\nonce.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\client\parallel.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\processinfo_win32.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\client\syncclusterconnection.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\util.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\pch.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="shardconnection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\concurrency\vars.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\concurrency\thread_pool.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\version.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\text.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="balancer_policy.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\stringutils.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\client\distlock.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\log.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="grid.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\processinfo.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\dbwebserver.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\concurrency\task.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\signal_handlers.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\scripting\bench.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="writeback_listener.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="shard_version.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\concurrency\spin_lock.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\alignedbuilder.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\oid.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\client\dbclient_rs.cpp">
+      <Filter>client</Filter>
+    </ClCompile>
+    <ClCompile Include="client.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\dbcommands_generic.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\querypattern.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\ramlog.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mr_shard.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\common.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\security_common.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="security.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\dbmessage.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\net\miniwebserver.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\net\listen.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcrecpp.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_chartables.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_compile.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_config.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_dfa_exec.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_exec.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_fullinfo.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_get.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_globals.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_info.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_maketables.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_newline.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_ord2utf8.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_refcount.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_scanner.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_stringpiece.cc">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_study.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_tables.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_try_flipped.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_ucp_searchfuncs.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_valid_utf8.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_version.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_xclass.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-7.4\pcreposix.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\net\message.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\net\message_port.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\net\message_server_port.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\net\sock.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\security_commands.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClInclude Include="gridconfig.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="griddatabase.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="shard.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="strategy.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\background.h">
+      <Filter>Header Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\commands.h">
+      <Filter>Header Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\dbmessage.h">
+      <Filter>Header Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\goodies.h">
+      <Filter>Header Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\jsobj.h">
+      <Filter>Header Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\json.h">
+      <Filter>Header Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="..\pch.h">
+      <Filter>Header Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\boostw\boost_1_34_1\boost\config\auto_link.hpp">
+      <Filter>libs_etc</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\boostw\boost_1_34_1\boost\version.hpp">
+      <Filter>libs_etc</Filter>
+    </ClInclude>
+    <ClInclude Include="..\client\connpool.h">
+      <Filter>client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\client\dbclient.h">
+      <Filter>client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\client\model.h">
+      <Filter>client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\version.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="balancer_policy.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="grid.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\processinfo.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\signal_handlers.h">
+      <Filter>Shared Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="writeback_listener.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="balance.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="chunk.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="client.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="config.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="cursors.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="d_chunk_manager.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="d_logic.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="d_writeback.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="request.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="server.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="shard_version.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="shardkey.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="stats.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="util.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\pcre-7.4\config.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\pcre-7.4\pcre.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClCompile Include="..\client\connpool.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\commands\cloud.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\commands\pipeline.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\accumulator.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\accumulator_add_to_set.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\accumulator_avg.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\accumulator_first.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\accumulator_last.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\accumulator_min_max.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\accumulator_push.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\accumulator_single_value.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\accumulator_sum.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\builder.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\doc_mem_monitor.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\document.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\document_source.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\document_source_bson_array.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\document_source_command_futures.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\document_source_filter.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\document_source_filter_base.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\document_source_group.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\document_source_limit.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\document_source_match.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\document_source_out.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\document_source_project.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\document_source_skip.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\document_source_sort.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\document_source_unwind.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\expression.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\expression_context.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\field_path.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\pipeline\value.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\intrusive_counter.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\systeminfo_win32.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\stats\top.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="..\..\..\..\js\js32d.lib" />
+    <Library Include="..\..\..\..\js\js32r.lib" />
+    <Library Include="..\..\..\..\js\js64d.lib" />
+    <Library Include="..\..\..\..\js\js64r.lib" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\db\commands\pipeline.h">
+      <Filter>Shared Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\pipeline\accumulator.h">
+      <Filter>Shared Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\pipeline\builder.h">
+      <Filter>Shared Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\pipeline\doc_mem_monitor.h">
+      <Filter>Shared Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\pipeline\document.h">
+      <Filter>Shared Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\pipeline\document_source.h">
+      <Filter>Shared Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\pipeline\expression.h">
+      <Filter>Shared Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\pipeline\expression_context.h">
+      <Filter>Shared Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\pipeline\field_path.h">
+      <Filter>Shared Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\pipeline\value.h">
+      <Filter>Shared Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\intrusive_counter.h">
+      <Filter>Shared Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\systeminfo.h">
+      <Filter>Shared Source Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

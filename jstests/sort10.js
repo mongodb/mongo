@@ -1,5 +1,5 @@
 // signed dates check
-t = db.sort2;
+t = db.sort10;
 
 function checkSorting1(opts) {
     t.drop();

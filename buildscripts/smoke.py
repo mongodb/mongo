@@ -299,7 +299,7 @@ def runTest(test):
         if os.path.basename(path) in ["test", "test.exe", "perftest", "perftest.exe"]:
             argv = [path]
         # more blech
-        elif os.path.basename(path) == 'mongos':
+        elif os.path.basename(path) in ['mongos', 'mongos.exe']:
             argv = [path, "--test"]
         else:
             argv = [test_path and os.path.abspath(os.path.join(test_path, path)) or path,
@@ -318,7 +318,7 @@ def runTest(test):
     print "         Test : " + os.path.basename(path) + " ..."
     # FIXME: we don't handle the case where the subprocess
     # hangs... that's bad.
-    if argv[0].endswith( 'mongo' ) and not '--eval' in argv :
+    if ( argv[0].endswith( 'mongo' ) or argv[0].endswith( 'mongo.exe' ) ) and not '--eval' in argv :
         evalString = 'TestData = new Object();' + \
                      'TestData.testPath = "' + path + '";' + \
                      'TestData.testFile = "' + os.path.basename( path ) + '";' + \
@@ -426,7 +426,7 @@ def expand_suites(suites):
     tests = []
     for suite in suites:
         if suite == 'all':
-            return expand_suites(['test', 'perf', 'client', 'js', 'jsPerf', 'jsSlowNightly', 'jsSlowWeekly', 'parallel', 'clone', 'parallel', 'repl', 'auth', 'sharding', 'tool'])
+            return expand_suites(['test', 'perf', 'client', 'js', 'jsPerf', 'jsSlowNightly', 'jsSlowWeekly', 'clone', 'parallel', 'repl', 'auth', 'sharding', 'tool'])
         if suite == 'test':
             if os.sys.platform == "win32":
                 program = 'test.exe'

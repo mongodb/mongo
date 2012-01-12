@@ -1,0 +1,722 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="util">
+      <UniqueIdentifier>{2a0d6120-434d-4732-ac31-2a7bf077f6ee}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="util\concurrency">
+      <UniqueIdentifier>{a1e59094-b70c-463a-8dc1-691efe337f14}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="scripting">
+      <UniqueIdentifier>{2d0fd975-0cc9-43dc-ac8e-53cb8c3a0040}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="bson">
+      <UniqueIdentifier>{a33442e2-39da-4c70-8310-6de9fa70cd71}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="db">
+      <UniqueIdentifier>{1044ce7b-72c4-4892-82c0-f46d8708a6ff}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="client">
+      <UniqueIdentifier>{fc0f6c1a-9627-4254-9b5e-0bcb8b3257f3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="shell">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="_js files">
+      <UniqueIdentifier>{473e7192-9f2a-47c5-ad95-e5b75d4f48f9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="shell\generated_from_js">
+      <UniqueIdentifier>{96e4c411-7ab4-4bcd-b7c6-a33059f5d492}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party">
+      <UniqueIdentifier>{b68efe41-5e2c-4bef-b538-5265a839fc7a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\pcre">
+      <UniqueIdentifier>{291e0d72-13ca-42d7-b0fd-2e7b5f89639f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\linenoise">
+      <UniqueIdentifier>{2faba381-6961-4e3d-ad8b-086a141bd35b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="util\net">
+      <UniqueIdentifier>{474e6ad2-cf05-44b1-bfa9-95b86c0177d2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="bson\util">
+      <UniqueIdentifier>{27dae3d6-9b4d-4618-824b-96ae899f7f2c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="s">
+      <UniqueIdentifier>{c155f2dc-07c4-4fde-99ca-f8ed2eb5a2c0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="db\repl">
+      <UniqueIdentifier>{fc91e28f-f11f-4875-b0f5-638e704872d0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="util\mongoutils">
+      <UniqueIdentifier>{f5c2814a-be7e-47b4-a217-097f47ddd591}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="db\ops">
+      <UniqueIdentifier>{e0ea02df-8ebf-4d22-a584-459f907ef3d0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="db\stats">
+      <UniqueIdentifier>{311ce022-bacb-4778-86ec-b17a92107a0c}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\dbshell.cpp">
+      <Filter>shell</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\util\version.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\util\concurrency\vars.cpp">
+      <Filter>util\concurrency</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\scripting\engine.cpp">
+      <Filter>scripting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\db\jsobj.cpp">
+      <Filter>db</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\client\dbclient.cpp">
+      <Filter>client</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\client\dbclientcursor.cpp">
+      <Filter>client</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\pch.cpp" />
+    <ClCompile Include="..\..\client\connpool.cpp">
+      <Filter>client</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\util\processinfo_win32.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\db\commands.cpp">
+      <Filter>db</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\scripting\utils.cpp">
+      <Filter>scripting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\util\assert_util.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\util\background.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\util\base64.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\client\clientOnly.cpp">
+      <Filter>client</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\util\mmap.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\util\md5main.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\util\util.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\client\syncclusterconnection.cpp">
+      <Filter>client</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\util\mmap_win.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\shell_utils.cpp">
+      <Filter>shell</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\scripting\engine_spidermonkey.cpp">
+      <Filter>scripting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\util\password.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\mongo.cpp">
+      <Filter>shell\generated_from_js</Filter>
+    </ClCompile>
+    <ClCompile Include="..\mongo-server.cpp">
+      <Filter>shell\generated_from_js</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\scripting\bench.cpp">
+      <Filter>scripting</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\bson\oid.cpp">
+      <Filter>bson</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\client\dbclient_rs.cpp">
+      <Filter>client</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\util\concurrency\spin_lock.cpp">
+      <Filter>util\concurrency</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\util\ramlog.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\linenoise\linenoise.cpp">
+      <Filter>third_party\linenoise</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_chartables.c">
+      <Filter>third_party\pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcrecpp.cc">
+      <Filter>third_party\pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_compile.c">
+      <Filter>third_party\pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_config.c">
+      <Filter>third_party\pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_dfa_exec.c">
+      <Filter>third_party\pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_exec.c">
+      <Filter>third_party\pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_fullinfo.c">
+      <Filter>third_party\pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_get.c">
+      <Filter>third_party\pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_globals.c">
+      <Filter>third_party\pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_info.c">
+      <Filter>third_party\pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_maketables.c">
+      <Filter>third_party\pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_newline.c">
+      <Filter>third_party\pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_ord2utf8.c">
+      <Filter>third_party\pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_refcount.c">
+      <Filter>third_party\pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_stringpiece.cc">
+      <Filter>third_party\pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_study.c">
+      <Filter>third_party\pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_tables.c">
+      <Filter>third_party\pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_try_flipped.c">
+      <Filter>third_party\pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_ucp_searchfuncs.c">
+      <Filter>third_party\pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_valid_utf8.c">
+      <Filter>third_party\pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_version.c">
+      <Filter>third_party\pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_xclass.c">
+      <Filter>third_party\pcre</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\util\text.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\util\md5.c">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\util\debug_util.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\util\net\listen.cpp">
+      <Filter>util\net</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\util\net\message.cpp">
+      <Filter>util\net</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\util\net\message_port.cpp">
+      <Filter>util\net</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\util\net\sock.cpp">
+      <Filter>util\net</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\util\log.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\db\json.cpp">
+      <Filter>db</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\db\lasterror.cpp">
+      <Filter>db</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\db\nonce.cpp">
+      <Filter>db</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\scripting\sm_db.cpp">
+      <Filter>scripting</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\collection.js">
+      <Filter>_js files</Filter>
+    </None>
+    <None Include="..\db.js">
+      <Filter>_js files</Filter>
+    </None>
+    <None Include="..\mongo.js">
+      <Filter>_js files</Filter>
+    </None>
+    <None Include="..\mr.js">
+      <Filter>_js files</Filter>
+    </None>
+    <None Include="..\query.js">
+      <Filter>_js files</Filter>
+    </None>
+    <None Include="..\servers.js">
+      <Filter>_js files</Filter>
+    </None>
+    <None Include="..\utils.js">
+      <Filter>_js files</Filter>
+    </None>
+    <None Include="..\utils_sh.js">
+      <Filter>_js files</Filter>
+    </None>
+    <None Include="..\..\..\..\SConstruct" />
+  </ItemGroup>
+  <ItemGroup>
+    <Library Include="..\..\..\..\..\js\js32d.lib" />
+    <Library Include="..\..\..\..\..\js\js32r.lib" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\db\lasterror.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\third_party\linenoise\linenoise.h">
+      <Filter>third_party\linenoise</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\bson\util\atomic_int.h">
+      <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\pch.h" />
+    <ClInclude Include="..\..\targetver.h" />
+    <ClInclude Include="..\..\util\allocator.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\background.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\base64.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\bson\bson-inl.h">
+      <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\bson\bson_db.h">
+      <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\bson\bsonelement.h">
+      <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\bson\bsonmisc.h">
+      <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\bson\bsonobj.h">
+      <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\bson\bsonobjbuilder.h">
+      <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\bson\bsonobjiterator.h">
+      <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\bson\bsontypes.h">
+      <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\bson\util\builder.h">
+      <Filter>bson\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\client.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\client_common.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\clientcursor.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\cloner.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\cmdline.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\commands.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\concurrency.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\third_party\pcre-7.4\config.h">
+      <Filter>third_party\pcre</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\client\connpool.h">
+      <Filter>client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\client\constants.h">
+      <Filter>client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\curop-inl.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\curop.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\cursor.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\s\d_chunk_manager.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\d_concurrency.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\d_globals.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\database.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\databaseholder.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\db.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\client\dbclient.h">
+      <Filter>client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\client\dbclient_rs.h">
+      <Filter>client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\client\dbclientcursor.h">
+      <Filter>client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\dbhelpers.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\dbmessage.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\debug_util.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\diskloc.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\dur.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\embedded_builder.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\scripting\engine.h">
+      <Filter>scripting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\scripting\engine_spidermonkey.h">
+      <Filter>scripting</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\file.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\file_allocator.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\goodies.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\hashtab.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\repl\health.h">
+      <Filter>db\repl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\heapcheck.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\hex.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\net\hostandport.h">
+      <Filter>util\net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\mongoutils\html.h">
+      <Filter>util\mongoutils</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\index.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\indexkey.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\bson\inline_decls.h">
+      <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\instance.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\jsobj.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\jsobjmanipulator.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\json.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\key.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\concurrency\list.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\net\listen.h">
+      <Filter>util\net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\log.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\matcher.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\md5.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\md5.hpp">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\net\message.h">
+      <Filter>util\net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\net\message_port.h">
+      <Filter>util\net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\bson\util\misc.h">
+      <Filter>bson\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\mmap.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\mongommf.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\mongomutex.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\concurrency\msg.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\concurrency\mutex.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\concurrency\mutexdebugger.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\namespace-inl.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\namespace.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\third_party\pcre-7.4\pcrecpp_internal.h">
+      <Filter>third_party\pcre</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\third_party\pcre-7.4\pcre.h">
+      <Filter>third_party\pcre</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\third_party\pcre-7.4\pcre_internal.h">
+      <Filter>third_party\pcre</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\third_party\pcre-7.4\pcre_stringpiece.h">
+      <Filter>third_party\pcre</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\third_party\pcre-7.4\pcrecpp.h">
+      <Filter>third_party\pcre</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\namespacestring.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\nonce.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\bson\oid.h">
+      <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\oplog.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\oplogreader.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\optime.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\bson\ordering.h">
+      <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\password.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\paths.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\pdfile.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\processinfo.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\projection.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\ops\query.h">
+      <Filter>db\ops</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\querypattern.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\queryutil-inl.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\queryutil.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\concurrency\race.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\ramlog.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\client\redef_macros.h">
+      <Filter>client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\repl.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\replutil.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\repl\rs.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\repl\rs_config.h">
+      <Filter>db\repl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\repl\rs_optime.h">
+      <Filter>db\repl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\repl\rs_exception.h">
+      <Filter>db\repl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\repl\rs_member.h">
+      <Filter>db\repl</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\concurrency\rwlockimpl.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\concurrency\rwlock.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\security.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\s\shard.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\security_common.h">
+      <Filter>db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\concurrency\shared_mutex_win.hpp">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\net\sock.h">
+      <Filter>util\net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\concurrency\spin_lock.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\stringutils.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\mongoutils\str.h">
+      <Filter>util\mongoutils</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\bson\stringdata.h">
+      <Filter>bson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\client\syncclusterconnection.h">
+      <Filter>client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\concurrency\task.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\text.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\time_support.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\concurrency\threadlocal.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\concurrency\thread_pool.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\timer.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\db\stats\top.h">
+      <Filter>db\stats</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\third_party\pcre-7.4\ucptable.h">
+      <Filter>third_party\pcre</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\third_party\pcre-7.4\ucp.h">
+      <Filter>third_party\pcre</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\third_party\pcre-7.4\ucpinternal.h">
+      <Filter>third_party\pcre</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\client\undef_macros.h">
+      <Filter>client</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\unittest.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\s\util.h">
+      <Filter>s</Filter>
+    </ClInclude>
+    <ClInclude Include="..\utils.h">
+      <Filter>shell</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\concurrency\value.h">
+      <Filter>util\concurrency</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\version.h">
+      <Filter>util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\assert_util.h">
+      <Filter>util</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="..\..\db\db.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+</Project>

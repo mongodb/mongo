@@ -2,6 +2,8 @@
 
 s = new ShardingTest( "features1" , 2 , 1 , 1 );
 
+s.stopBalancer();
+
 s.adminCommand( { enablesharding : "test" } );
 
 // ---- can't shard system namespaces ----
