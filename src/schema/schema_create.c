@@ -334,17 +334,21 @@ int
 __wt_schema_create(
     WT_SESSION_IMPL *session, const char *name, const char *config)
 {
-	/* Disallow creates in the WiredTiger name space. */
-	WT_RET(__wt_schema_name_check(session, name));
 
 	if (WT_PREFIX_MATCH(name, "colgroup:"))
 		return (__create_colgroup(session, name, config));
-	else if (WT_PREFIX_MATCH(name, "file:"))
+	if (WT_PREFIX_MATCH(name, "file:")) {
+		/* Disallow objects in the WiredTiger name space. */
+		WT_RET(__wt_schema_name_check(session, name));
 		return (__wt_create_file(session, name, name, config));
-	else if (WT_PREFIX_MATCH(name, "index:"))
+	}
+	if (WT_PREFIX_MATCH(name, "index:"))
 		return (__create_index(session, name, config));
-	else if (WT_PREFIX_MATCH(name, "table:"))
+	if (WT_PREFIX_MATCH(name, "table:")) {
+		/* Disallow objects in the WiredTiger name space. */
+		WT_RET(__wt_schema_name_check(session, name));
 		return (__create_table(session, name, config));
+	}
 
 	return (__wt_unknown_object_type(session, name));
 }
