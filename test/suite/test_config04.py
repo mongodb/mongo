@@ -2,7 +2,7 @@
 #
 # See the file LICENSE for redistribution information.
 #
-# Copyright (c) 2008-2011 WiredTiger, Inc.
+# Copyright (c) 2008-2012 WiredTiger, Inc.
 #	All rights reserved.
 #
 # test_config04.py
@@ -102,6 +102,11 @@ class test_config04(wttest.WiredTigerTestCase):
         self.assertRaises(WiredTigerError, lambda:
             wiredtiger.wiredtiger_open('.', 'create,eviction_target=91,' +
                                        'eviction_trigger=81'))
+
+    def test_eviction_bad2(self):
+        self.assertRaises(WiredTigerError, lambda:
+            wiredtiger.wiredtiger_open('.', 'create,eviction_target=86,' +
+                                       'eviction_trigger=86'))
 
     def test_exclusive(self):
         self.common_test('exclusive')
