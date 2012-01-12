@@ -27,7 +27,7 @@ echo "Running swig to generate the Python API"
 (cd "$DEST/build_posix" && \
     ../configure --enable-python && \
     (cd lang/python && make ../../../lang/python/wiredtiger_wrap.c) && \
-    make distclean)
+    make distclean) > /dev/null
 
 echo "Building documentation"
 (cd "$DEST/dist" && sh s_docs > /dev/null)
