@@ -78,10 +78,10 @@ namespace mongo {
             pwd = internalSecurity.pwd;
         }
         else {
-            // static BSONObj userPattern = fromjson("{\"user\":1}");
             string systemUsers = dbname + ".system.users";
-            // OCCASIONALLY Helpers::ensureIndex(systemUsers.c_str(), userPattern, false, "user_1");
             {
+                Client::ReadContext ctx( systemUsers , dbpath, false );
+
                 BSONObjBuilder b;
                 b << "user" << user;
                 BSONObj query = b.done();
