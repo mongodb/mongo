@@ -593,7 +593,7 @@ process(void)
 	config[0] = '\0';
 	if (verbose)
 		snprintf(config, sizeof(config),
-		    "error_prefix=\"%s\",verbose=[verify]",
+		    "error_prefix=\"%s\",verbose=[salvage,verify]",
 		    progname);
 	assert(wiredtiger_open(NULL, NULL, config, &conn) == 0);
 	assert(conn->open_session(conn, NULL, NULL, &session) == 0);
