@@ -126,7 +126,7 @@ doneCheckOrder:
         BSONObjIterator i( idxKey );
         int exactIndexedQueryCount = 0;
         int optimalIndexedQueryCount = 0;
-        bool stillOptimalIndexedQueryCount = true;
+        bool awaitingLastOptimalField = true;
         set<string> orderFieldsUnindexed;
         order.getFieldNames( orderFieldsUnindexed );
         while( i.moreWithEOO() ) {
@@ -134,11 +134,11 @@ doneCheckOrder:
             if ( e.eoo() )
                 break;
             const FieldRange &fr = _frs.range( e.fieldName() );
-            if ( stillOptimalIndexedQueryCount ) {
+            if ( awaitingLastOptimalField ) {
                 if ( !fr.universal() )
                     ++optimalIndexedQueryCount;
                 if ( !fr.equality() )
-                    stillOptimalIndexedQueryCount = false;
+                    awaitingLastOptimalField = false;
             }
             else {
                 if ( !fr.universal() )
