@@ -49,6 +49,8 @@ namespace mongo {
                   const BSONObj &endKey = BSONObj(),
                   string special="" );
 
+        /** @return true iff this plan cannot return any documents. */
+        bool impossible() const { return _impossible; }
         /**
          * @return true iff this plan should run as the only candidate plan in the absence of an
          * impossible plan.
