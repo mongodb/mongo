@@ -50,6 +50,10 @@ class WiredTigerTestCase(unittest.TestCase):
         if not self._globalSetup:
             WiredTigerTestCase.globalSetup()
 
+    def __str__(self):
+        return "%s.%s.%s" %  (self.__module__,
+                              self.className(), self._testMethodName)
+
     # Can be overridden
     def setUpConnectionOpen(self, dir):
         conn = wiredtiger.wiredtiger_open(dir, 'create,error_prefix="' +

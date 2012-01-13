@@ -13,6 +13,8 @@ import os
 import sys
 import unittest
 import glob
+import re
+import json
 
 # Set paths
 suitedir = sys.path[0]
@@ -33,21 +35,119 @@ def usage():
   $ python ../test/suite/run.py [ options ] [ tests ]\n\
 \n\
 Options:\n\
-  -d   | --debug          run with \'pdb\', the python debugger\n\
-  -g   | --gdb            all subprocesses (like calls to wt) invoke gdb\n\
-  -h   | --help           show this message\n\
-  -p   | --preserve       preserve output files in WT_TEST/<testname>\n\
-  -t   | --timestamp      name WT_TEST according to timestamp\n\
-  -v N | --verbose N      set verboseness to N (0<=N<=3, default=1)\n\
+  -C file | --configcreate file  create a config file for controlling tests\n\
+  -c file | --config file        use a config file for controlling tests\n\
+  -d      | --debug              run with \'pdb\', the python debugger\n\
+  -g      | --gdb                all subprocesses (like calls to wt) use gdb\n\
+  -h      | --help               show this message\n\
+  -p      | --preserve           preserve output files in WT_TEST/<testname>\n\
+  -t      | --timestamp          name WT_TEST according to timestamp\n\
+  -v N    | --verbose N          set verboseness to N (0<=N<=3, default=1)\n\
 \n\
 Tests:\n\
   may be a file name in test/suite: (e.g. test_base01.py)\n\
   may be a subsuite name (e.g. \'base\' runs test_base*.py)\n\
+\n\
+  When -C or -c are present, there may not be any tests named.\n\
 '
+
+# capture the category (AKA 'subsuite') part of a test name,
+# e.g. test_util03 -> util
+reCatname = re.compile(r"test_([^0-9]+)[0-9]*")
 
 def addScenarioTests(tests, loader, testname):
     loaded = loader.loadTestsFromName(testname)
     tests.addTests(generate_scenarios(loaded))
+
+def configRecord(cmap, tup):
+    """
+    Records this tuple in the config.  It is marked as None
+    (appearing as null in json), so it can be easily adjusted
+    in the output file.
+    """
+    tuplen = len(tup)
+    pos = 0
+    for name in tup:
+        last = (pos == tuplen - 1)
+        pos += 1
+        if not name in cmap:
+            if last:
+                cmap[name] = {"run":None}
+            else:
+                cmap[name] = {"run":None, "sub":{}}
+        if not last:
+            cmap = cmap[name]["sub"]
+
+def configGet(cmap, tup):
+    """
+    Answers the question, should we do this test, given this config file?
+    Following the values of the tuple through the map,
+    returning the first non-null value.  If all values are null,
+    return True (handles tests that may have been added after the
+    config was generated).
+    """
+    for name in tup:
+        if not name in cmap:
+            return True
+        run = cmap[name]["run"] if "run" in cmap[name] else None
+        if run != None:
+            return run
+        cmap = cmap[name]["sub"] if "sub" in cmap[name] else {}
+    return True
+
+def configApplyInner(suites, configmap, configwrite):
+    newsuite = unittest.TestSuite()
+    for s in suites:
+        if type(s) is unittest.TestSuite:
+            newsuite.addTest(configApplyInner(s, configmap, configwrite))
+        else:
+            modname = s.__module__
+            catname = re.sub(reCatname, r"\1", modname)
+            classname = s.__class__.__name__
+            methname = s._testMethodName
+
+            tup = (catname, modname, classname, methname)
+            add = True
+            if configwrite:
+                configRecord(configmap, tup)
+            else:
+                add = configGet(configmap, tup)
+            if add:
+                newsuite.addTest(s)
+    return newsuite
+
+def configApply(suites, configfilename, configwrite):
+    configmap = None
+    if not configwrite:
+        with open(configfilename, 'r') as f:
+            line = f.readline()
+            while line != '\n' and line != '':
+                line = f.readline()
+            configmap = json.load(f)
+    else:
+        configmap = {}
+    newsuite = configApplyInner(suites, configmap, configwrite)
+    if configwrite:
+        with open(configfilename, 'w') as f:
+            f.write("""# Configuration file for wiredtiger test/suite/run.py,
+# generated with '-C filename' and consumed with '-c filename'.
+# This shows the hierarchy of tests, and can be used to rerun with
+# a specific subset of tests.  The value of "run" controls whether
+# a test or subtests will be run:
+#
+#   true   turn on a test and all subtests (overriding values beneath)
+#   false  turn on a test and all subtests (overriding values beneath)
+#   null   do not effect subtests
+#
+# If a test does not appear, or is marked as '"run": null' all the way down,
+# then the test is run.
+#
+# The remainder of the file is in JSON format.
+# !!! There must be a single blank line following this line!!!
+
+""")
+            json.dump(configmap, f, sort_keys=True, indent=4)
+    return newsuite
 
 def testsFromArg(tests, loader, arg):
     # If a group of test is mentioned, do all tests in that group
@@ -78,6 +178,8 @@ if __name__ == '__main__':
 
     # Turn numbers and ranges into test module names
     preserve = timestamp = debug = gdbSub = False
+    configfile = None
+    configwrite = False
     verbose = 1
     args = sys.argv[1:]
     testargs = []
@@ -109,6 +211,19 @@ if __name__ == '__main__':
                     sys.exit(False)
                 verbose = int(args.pop(0))
                 continue
+            if option == '-config' or option == 'c':
+                if configfile != None or len(args) == 0:
+                    usage()
+                    sys.exit(False)
+                configfile = args.pop(0)
+                continue
+            if option == '-configcreate' or option == 'C':
+                if configfile != None or len(args) == 0:
+                    usage()
+                    sys.exit(False)
+                configfile = args.pop(0)
+                configwrite = True
+                continue
             print 'unknown arg: ' + arg
             usage()
             sys.exit(False)
@@ -118,11 +233,17 @@ if __name__ == '__main__':
     # That way, verbose printing can be done at the class definition level.
     wttest.WiredTigerTestCase.globalSetup(preserve, timestamp, gdbSub, verbose)
 
+    if debug:
+        import pdb
+        pdb.set_trace()
+
     # Without any tests listed as arguments, do discovery
     if len(testargs) == 0:
         from discover import defaultTestLoader as loader
         suites = loader.discover(suitedir)
         suites = sorted(suites, key=lambda c: str(list(c)[0]))
+        if configfile != None:
+            suites = configApply(suites, configfile, configwrite)
         tests.addTests(generate_scenarios(suites))
     else:
         for arg in testargs:
