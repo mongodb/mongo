@@ -493,18 +493,11 @@ namespace mongo {
         // lock order: dbMutex first, then this
         mutex groupCommitMutex("groupCommit");
 
-        bool _groupCommitWithLimitedLocks() {
-
-            int p = 0;
-            LOG(4) << "groupcommitll " << p++ << endl;
+        static bool _groupCommitWithLimitedLocks() {
 
             scoped_ptr<ExcludeAllWrites> lk1( new ExcludeAllWrites() );
 
-            LOG(4) << "groupcommitll " << p++ << endl;
-
             scoped_lock lk2(groupCommitMutex);
-
-            LOG(4) << "groupcommitll " << p++ << endl;
 
             commitJob.beginCommit();
 
@@ -514,46 +507,30 @@ namespace mongo {
                 return true;
             }
 
-            LOG(4) << "groupcommitll " << p++ << endl;
-
             JSectHeader h;
             PREPLOGBUFFER(h); // need to be in readlock (writes excluded) for this
 
-            LOG(4) << "groupcommitll " << p++ << endl;
-
             LockMongoFilesShared lk3;
-
-            LOG(4) << "groupcommitll " << p++ << endl;
 
             unsigned abLen = commitJob._ab.len();
             commitJob.reset(); // must be reset before allowing anyone to write
             DEV assert( !commitJob.hasWritten() );
 
-            LOG(4) << "groupcommitll " << p++ << endl;
-
             // release the readlock -- allowing others to now write while we are writing to the journal (etc.)
             lk1.reset();
-
-            LOG(4) << "groupcommitll " << p++ << endl;
 
             // ****** now other threads can do writes ******
 
             WRITETOJOURNAL(h, commitJob._ab);
             assert( abLen == commitJob._ab.len() ); // a check that no one touched the builder while we were doing work. if so, our locking is wrong.
 
-            LOG(4) << "groupcommitll " << p++ << endl;
-
             // data is now in the journal, which is sufficient for acknowledging getLastError.
             // (ok to crash after that)
             commitJob.notifyCommitted();
 
-            LOG(4) << "groupcommitll " << p++ << " WRITETODATAFILES()" << endl;
-
             WRITETODATAFILES(h, commitJob._ab);
             assert( abLen == commitJob._ab.len() ); // check again wasn't modded
             commitJob._ab.reset();
-
-            LOG(4) << "groupcommitll " << p++ << endl;
 
             // can't : d.dbMutex._remapPrivateViewRequested = true;
 
@@ -674,7 +651,7 @@ namespace mongo {
             LOG(4) << "groupCommit end" << endl;
         }
 
-        static void go() {
+        static void durThreadGroupCommit() {
             const int N = 10;
             static int n;
             if( privateMapBytes < UncommittedBytesLimit && ++n % N && (cmdLine.durOptions&CmdLine::DurAlwaysRemap)==0 ) {
@@ -754,11 +731,13 @@ namespace mongo {
                     for( unsigned i = 1; i <= 2; i++ ) {
                         if( commitJob._notify.nWaiting() )
                             break;
+                        // once more concurrency in commitJob::note(), we can then perhaps get rid of this deferral optimization, 
+                        // which would be wise as there is some compexity to futures
                         commitJob.wi()._deferred.invoke();
                         sleepmillis(oneThird);
                     }
 
-                    go();
+                    durThreadGroupCommit();
                 }
                 catch(std::exception& e) {
                     log() << "exception in durThread causing immediate shutdown: " << e.what() << endl;
