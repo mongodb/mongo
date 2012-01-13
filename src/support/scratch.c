@@ -117,30 +117,25 @@ __wt_buf_set(
 
 /*
  * __wt_buf_set_printable --
- *	Set the contents of the buffer to a printable representation.
+ *	Set the contents of the buffer to a printable representation of a
+ * byte string.
  */
 int
 __wt_buf_set_printable(
     WT_SESSION_IMPL *session, WT_BUF *buf, const void *from_arg, size_t size)
 {
-	static const char hex[] = "0123456789abcdef";
-	const char *from;
-	char *to;
+	uint32_t u32size;
 
 	/*
-	 * The maximum size is the byte-string length, all hex characters, plus
-	 * a trailing nul byte.  Throw in a few extra bytes for fun.
+	 * In the worst case, every character takes up 3 spaces, plus a
+	 * trailing nul byte.
 	 */
-	WT_RET(__wt_buf_init(session, buf, size * 2 + 20));
+	WT_RET(__wt_buf_init(session, buf, size * 3 + 10));
 
-	buf->size = 0;
-	for (from = from_arg, to = buf->mem; size > 0; --size, ++from)
-		if (isprint(from[0]))
-			to[buf->size++] = from[0];
-		else {
-			to[buf->size++] = hex[(from[0] & 0xf0) >> 4];
-			to[buf->size++] = hex[from[0] & 0x0f];
-		}
+	u32size = (uint32_t)size;
+	__wt_raw_to_esc_hex(from_arg, buf->mem, &u32size);
+	buf->size = u32size;
+
 	return (0);
 }
 

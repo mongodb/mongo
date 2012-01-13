@@ -40,6 +40,10 @@ __wt_raw_to_esc_hex(const void *from, void *to, uint32_t *sizep)
 	const uint8_t *p;
 	uint8_t *t, *t_start;
 
+	/*
+	 * In the worst case, every character takes up 3 spaces, plus a
+	 * trailing nul byte.
+	 */
 	for (p = from, t = t_start = to, i = *sizep; i > 0; --i, ++p)
 		if (isprint((int)*p)) {
 			if (*p == '\\')
