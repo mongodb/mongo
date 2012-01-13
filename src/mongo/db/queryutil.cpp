@@ -665,16 +665,16 @@ namespace mongo {
     string FieldInterval::toString() const {
         StringBuilder buf;
         buf << ( _lower._inclusive ? "[" : "(" );
-        buf << _lower._bound;
+        buf << _lower._bound.toString( false );
         buf << " , ";
-        buf << _upper._bound;
+        buf << _upper._bound.toString( false );
         buf << ( _upper._inclusive ? "]" : ")" );
         return buf.str();
     }
 
     string FieldRange::toString() const {
         StringBuilder buf;
-        buf << "(FieldRange special: " << _special << " singleKey: " << _special << " intervals: ";
+        buf << "(FieldRange special: " << _special << " singleKey: " << _singleKey << " intervals: ";
         for( vector<FieldInterval>::const_iterator i = _intervals.begin(); i != _intervals.end(); ++i ) {
             buf << i->toString();
         }
