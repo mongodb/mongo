@@ -83,6 +83,9 @@ namespace mongo {
             string systemUsers = dbname + ".system.users";
             // OCCASIONALLY Helpers::ensureIndex(systemUsers.c_str(), userPattern, false, "user_1");
             {
+                mongolock lk(false);
+                Client::Context c(systemUsers, dbpath, &lk, false);
+
                 BSONObjBuilder b;
                 b << "user" << user;
                 BSONObj query = b.done();
@@ -101,10 +104,10 @@ namespace mongo {
         AuthenticationInfo *ai = cc().getAuthenticationInfo();
 
         if ( readOnly ) {
-            ai->authorizeReadOnly( cc().database()->name.c_str() , user );
+            ai->authorizeReadOnly( dbname.c_str() , user );
         }
         else {
-            ai->authorize( cc().database()->name.c_str() , user );
+            ai->authorize( dbname.c_str() , user );
         }
     }
 
