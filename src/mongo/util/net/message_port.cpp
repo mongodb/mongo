@@ -18,7 +18,6 @@
 #include "pch.h"
 
 #include <fcntl.h>
-#include <errno.h>
 #include <time.h>
 
 #include "message.h"
@@ -30,6 +29,7 @@
 #include "../time_support.h"
 #include "../../db/cmdline.h"
 #include "../../client/dbclient.h"
+#include "../scopeguard.h"
 
 
 #ifndef _WIN32
@@ -38,12 +38,6 @@
 # endif
 # include <sys/resource.h>
 # include <sys/stat.h>
-#else
-
-// errno doesn't work for winsock.
-#undef errno
-#define errno WSAGetLastError()
-
 #endif
 
 namespace mongo {
@@ -156,7 +150,7 @@ namespace mongo {
     bool MessagingPort::recv(Message& m) {
         try {
 again:
-            mmm( log() << "*  recv() sock:" << this->sock << endl; )
+            //mmm( log() << "*  recv() sock:" << this->sock << endl; )
             int len = -1;
 
             char *lenbuf = (char *) &len;
@@ -188,20 +182,16 @@ again:
             int z = (len+1023)&0xfffffc00;
             assert(z>=len);
             MsgData *md = (MsgData *) malloc(z);
+            ScopeGuard guard = MakeGuard(free, md);
             assert(md);
             md->len = len;
 
             char *p = (char *) &md->id;
             int left = len -4;
 
-            try {
-                Socket::recv( p, left );
-            }
-            catch (...) {
-                free(md);
-                throw;
-            }
+            Socket::recv( p, left );
 
+            guard.Dismiss();
             m.setData(md, true);
             return true;
 
@@ -230,8 +220,10 @@ again:
     bool MessagingPort::recv( const Message& toSend , Message& response ) {
         while ( 1 ) {
             bool ok = recv(response);
-            if ( !ok )
+            if ( !ok ) {
+                mmm( log() << "recv not ok" << endl; )
                 return false;
+            }
             //log() << "got response: " << response.data->responseTo << endl;
             if ( response.header()->responseTo == toSend.header()->id )
                 break;
@@ -255,7 +247,7 @@ again:
 
     void MessagingPort::say(Message& toSend, int responseTo) {
         assert( !toSend.empty() );
-        mmm( log() << "*  say() sock:" << this->sock << " thr:" << GetCurrentThreadId() << endl; )
+        mmm( log() << "*  say()  thr:" << GetCurrentThreadId() << endl; )
         toSend.header()->id = nextMessageId();
         toSend.header()->responseTo = responseTo;
 
