@@ -18,9 +18,10 @@
 
 #include "pch.h"
 
-#include "db/jsobj.h"
-#include "util/timer.h"
 #include "db/commands.h"
+#include "db/jsobj.h"
+#include "util/intrusive_counter.h"
+#include "util/timer.h"
 
 namespace mongo {
     class BSONObj;
@@ -36,7 +37,7 @@ namespace mongo {
         subclass to make a command.  define a singleton object for it.
         */
     class Pipeline :
-        boost::noncopyable {
+        public IntrusiveCounterUnsigned {
     public:
         virtual ~Pipeline();
 
@@ -47,7 +48,7 @@ namespace mongo {
           @param cmdObj the command object sent from the client
           @returns the pipeline, if created, otherwise a NULL reference
          */
-        static boost::shared_ptr<Pipeline> parseCommand(
+        static intrusive_ptr<Pipeline> parseCommand(
             string &errmsg, BSONObj &cmdObj,
             const intrusive_ptr<ExpressionContext> &pCtx);
 
@@ -67,7 +68,7 @@ namespace mongo {
           @returns the Spec for the pipeline command that should be sent
             to the shards
         */
-        boost::shared_ptr<Pipeline> splitForSharded();
+        intrusive_ptr<Pipeline> splitForSharded();
 
         /**
            If the pipeline starts with a $match, dump its BSON predicate
@@ -101,7 +102,7 @@ namespace mongo {
           @returns true on success, false if an error occurs
         */
         bool run(BSONObjBuilder &result, string &errmsg,
-                 intrusive_ptr<DocumentSource> pSource);
+                 const intrusive_ptr<DocumentSource> &pSource);
 
         /**
           Debugging:  should the processing pipeline be split within

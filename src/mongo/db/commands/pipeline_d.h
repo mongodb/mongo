@@ -51,7 +51,7 @@ namespace mongo {
              be at the beginning of this pipeline
          */
         static intrusive_ptr<DocumentSource> prepareCursorSource(
-            const shared_ptr<Pipeline> &pPipeline,
+            const intrusive_ptr<Pipeline> &pPipeline,
             const string &dbName);
 
     private:
