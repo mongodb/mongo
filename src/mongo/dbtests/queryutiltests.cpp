@@ -295,6 +295,22 @@ namespace QueryUtilTests {
                 ASSERT( p( BSON( "a" << NE << 5 ) ) == p( BSON( "a" << NE << "a" ) ) );
             }
         };
+        
+        /** Check QueryPattern categories for optimized bounds. */
+        class QueryPatternOptimizedBounds {
+        public:
+            void run() {
+                // With unoptimized bounds, different inequalities yield different query patterns.
+                ASSERT( p( BSON( "a" << GT << 1 ), false ) != p( BSON( "a" << LT << 1 ), false ) );
+                // SERVER-4675 Descriptive test - With optimized bounds, different inequalities
+                // yield different query patterns.
+                ASSERT( p( BSON( "a" << GT << 1 ), true ) == p( BSON( "a" << LT << 1 ), true ) );
+            }
+        private:
+            static QueryPattern p( const BSONObj &query, bool optimize ) {
+                return FieldRangeSet( "", query, true, optimize ).pattern( BSONObj() );
+            }
+        };
 
         class NoWhere {
         public:
@@ -1010,6 +1026,7 @@ namespace QueryUtilTests {
             add< FieldRangeTests::QueryPatternTest >();
             add< FieldRangeTests::QueryPatternEmpty >();
             add< FieldRangeTests::QueryPatternNeConstraint >();
+            add< FieldRangeTests::QueryPatternOptimizedBounds >();
             add< FieldRangeTests::NoWhere >();
             add< FieldRangeTests::Numeric >();
             add< FieldRangeTests::InLowerBound >();
