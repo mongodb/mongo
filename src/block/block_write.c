@@ -228,9 +228,8 @@ not_compressed:	/*
 	WT_CSTAT_INCR(session, block_write);
 
 	WT_VERBOSE(session, write,
-	    "%" PRIu32 " at offset/size %" PRIuMAX "/%" PRIu32 ", %s",
-	    dsk->size, (uintmax_t)offset, blk->disk_size,
-	    blk->disk_size < dsk->size ? "compressed, " : "");
+	    "off %" PRIuMAX ", size %" PRIu32 ", cksum %" PRIu32,
+	    offset, align_size, blk->cksum);
 
 	*offsetp = offset;
 	*sizep = align_size;

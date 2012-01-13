@@ -61,7 +61,8 @@ __wt_block_read(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	ret = 0;
 
 	WT_VERBOSE(session, read,
-	    "offset/size %" PRIuMAX "/%" PRIu32, (uintmax_t)offset, size);
+	    "off %" PRIuMAX ", size %" PRIu32 ", cksum %" PRIu32,
+	    (uintmax_t)offset, size, cksum);
 
 	/*
 	 * If we're compressing the file blocks, place the initial read into a
