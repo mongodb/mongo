@@ -97,23 +97,7 @@ namespace mongo {
                 isOp = 1;
                 kind = OPERATOR;
 
-                if (strcmp(pFieldName, unwindName) != 0) {
-                    pExpression = parseExpression(pFieldName, &fieldElement);
-                }
-                else {
-                    assert(pCtx->unwindOk());
-                    // CW TODO error: it's not OK to unwind in this context
-
-                    assert(!pCtx->unwindUsed());
-                    // CW TODO error: this projection already has an unwind
-
-                    assert(fieldElement.type() == String);
-                    // CW TODO $unwind operand must be single field name
-
-                    string fieldPath(removeFieldPrefix(fieldElement.String()));
-                    pExpression = ExpressionFieldPath::create(fieldPath);
-                    pCtx->unwind(fieldPath);
-                }
+                pExpression = parseExpression(pFieldName, &fieldElement);
             }
             else {
                 uassert(15984, str::stream() << "this object is already an operator expression, and can't be used as a document expression (at \"" <<
@@ -190,6 +174,12 @@ namespace mongo {
     struct OpDesc {
         const char *pName;
         intrusive_ptr<ExpressionNary> (*pFactory)(void);
+
+        unsigned flag;
+        static const unsigned FIXED_COUNT = 0x0001;
+        static const unsigned OBJECT_ARG = 0x0002;
+
+        unsigned argCount;
     };
 
     static int OpDescCmp(const void *pL, const void *pR) {
@@ -201,37 +191,37 @@ namespace mongo {
       OpDescCmp() above.
     */
     static const OpDesc OpTable[] = {
-        {"$add", ExpressionAdd::create},
-        {"$and", ExpressionAnd::create},
-        {"$cmp", ExpressionCompare::createCmp},
-        {"$cond", ExpressionCond::create},
-        {"$const", ExpressionNoOp::create},
-        {"$dayOfMonth", ExpressionDayOfMonth::create},
-        {"$dayOfWeek", ExpressionDayOfWeek::create},
-        {"$dayOfYear", ExpressionDayOfYear::create},
-        {"$divide", ExpressionDivide::create},
-        {"$eq", ExpressionCompare::createEq},
-        {"$gt", ExpressionCompare::createGt},
-        {"$gte", ExpressionCompare::createGte},
-        {"$hour", ExpressionHour::create},
-        {"$ifNull", ExpressionIfNull::create},
-        {"$lt", ExpressionCompare::createLt},
-        {"$lte", ExpressionCompare::createLte},
-        {"$minute", ExpressionMinute::create},
-        {"$mod", ExpressionMod::create},
-        {"$month", ExpressionMonth::create},
-        {"$multiply", ExpressionMultiply::create},
-        {"$ne", ExpressionCompare::createNe},
-        {"$not", ExpressionNot::create},
-        {"$or", ExpressionOr::create},
-        {"$second", ExpressionSecond::create},
-        {"$strcasecmp", ExpressionStrcasecmp::create},
-        {"$substr", ExpressionSubstr::create},
-        {"$subtract", ExpressionSubtract::create},
-        {"$toLower", ExpressionToLower::create},
-        {"$toUpper", ExpressionToUpper::create},
-        {"$week", ExpressionWeek::create},
-        {"$year", ExpressionYear::create},
+        {"$add", ExpressionAdd::create, 0},
+        {"$and", ExpressionAnd::create, 0},
+        {"$cmp", ExpressionCompare::createCmp, OpDesc::FIXED_COUNT, 2},
+        {"$cond", ExpressionCond::create, OpDesc::FIXED_COUNT, 3},
+        {"$const", ExpressionNoOp::create, 0},
+        {"$dayOfMonth", ExpressionDayOfMonth::create, OpDesc::FIXED_COUNT, 1},
+        {"$dayOfWeek", ExpressionDayOfWeek::create, OpDesc::FIXED_COUNT, 1},
+        {"$dayOfYear", ExpressionDayOfYear::create, OpDesc::FIXED_COUNT, 1},
+        {"$divide", ExpressionDivide::create, OpDesc::FIXED_COUNT, 2},
+        {"$eq", ExpressionCompare::createEq, OpDesc::FIXED_COUNT, 2},
+        {"$gt", ExpressionCompare::createGt, OpDesc::FIXED_COUNT, 2},
+        {"$gte", ExpressionCompare::createGte, OpDesc::FIXED_COUNT, 2},
+        {"$hour", ExpressionHour::create, OpDesc::FIXED_COUNT, 1},
+        {"$ifNull", ExpressionIfNull::create, OpDesc::FIXED_COUNT, 2},
+        {"$lt", ExpressionCompare::createLt, OpDesc::FIXED_COUNT, 2},
+        {"$lte", ExpressionCompare::createLte, OpDesc::FIXED_COUNT, 2},
+        {"$minute", ExpressionMinute::create, OpDesc::FIXED_COUNT, 1},
+        {"$mod", ExpressionMod::create, OpDesc::FIXED_COUNT, 2},
+        {"$month", ExpressionMonth::create, OpDesc::FIXED_COUNT, 1},
+        {"$multiply", ExpressionMultiply::create, 0},
+        {"$ne", ExpressionCompare::createNe, OpDesc::FIXED_COUNT, 2},
+        {"$not", ExpressionNot::create, OpDesc::FIXED_COUNT, 1},
+        {"$or", ExpressionOr::create, 0},
+        {"$second", ExpressionSecond::create, OpDesc::FIXED_COUNT, 1},
+        {"$strcasecmp", ExpressionStrcasecmp::create, OpDesc::FIXED_COUNT, 2},
+        {"$substr", ExpressionSubstr::create, OpDesc::FIXED_COUNT, 3},
+        {"$subtract", ExpressionSubtract::create, OpDesc::FIXED_COUNT, 2},
+        {"$toLower", ExpressionToLower::create, OpDesc::FIXED_COUNT, 1},
+        {"$toUpper", ExpressionToUpper::create, OpDesc::FIXED_COUNT, 1},
+        {"$week", ExpressionWeek::create, OpDesc::FIXED_COUNT, 1},
+        {"$year", ExpressionYear::create, OpDesc::FIXED_COUNT, 1},
     };
 
     static const size_t NOp = sizeof(OpTable)/sizeof(OpTable[0]);
@@ -252,8 +242,20 @@ namespace mongo {
 
         /* add the operands to the expression node */
         BSONType elementType = pBsonElement->type();
+
+        if (pOp->flag & OpDesc::FIXED_COUNT) {
+            if (pOp->argCount > 1)
+                uassert(16019, str::stream() << "the " << pOp->pName <<
+                        " operator requires an array of " << pOp->argCount <<
+                        " operands", elementType == Array);
+        }
+
         if (elementType == Object) {
             /* the operator must be unary and accept an object argument */
+            uassert(16021, str::stream() << "the " << pOp->pName <<
+                    " operator does not accept an object as an operand",
+                    pOp->flag & OpDesc::OBJECT_ARG);
+
             BSONObj objOperand(pBsonElement->Obj());
             ObjectCtx oCtx(ObjectCtx::DOCUMENT_OK);
             intrusive_ptr<Expression> pOperand(
@@ -264,6 +266,12 @@ namespace mongo {
             /* multiple operands - an n-ary operator */
             vector<BSONElement> bsonArray(pBsonElement->Array());
             const size_t n = bsonArray.size();
+
+            if (pOp->flag & OpDesc::FIXED_COUNT)
+                uassert(16020, str::stream() << "the " << pOp->pName <<
+                        " operator requires " << pOp->argCount <<
+                        " operand(s)", pOp->argCount == n);
+
             for(size_t i = 0; i < n; ++i) {
                 BSONElement *pBsonOperand = &bsonArray[i];
                 intrusive_ptr<Expression> pOperand(
@@ -271,7 +279,13 @@ namespace mongo {
                 pExpression->addOperand(pOperand);
             }
         }
-        else { /* assume it's an atomic operand */
+        else {
+            /* assume it's an atomic operand */
+            if (pOp->flag & OpDesc::FIXED_COUNT)
+                uassert(16022, str::stream() << "the " << pOp->pName <<
+                        " operator requires an array of " << pOp->argCount <<
+                        " operands", pOp->argCount == 1);
+
             intrusive_ptr<Expression> pOperand(
                 Expression::parseOperand(pBsonElement));
             pExpression->addOperand(pOperand);
@@ -1756,7 +1770,7 @@ namespace mongo {
         const intrusive_ptr<ExpressionFieldPath> &pTheFieldPath, CmpOp cmpOp,
         const intrusive_ptr<const Value> &pValue):
         pFieldPath(pTheFieldPath),
-        pRange(new Range(cmpOp, pValue)) {
+        pRange(new Range(cmpOp, pValue)) {
     }
 
     void ExpressionFieldRange::intersect(
