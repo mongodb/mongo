@@ -255,6 +255,16 @@ namespace QueryOptimizerTests {
                 ASSERT( p12.optimal() );
                 QueryPlan p13( nsd(), INDEXNO( "a" << 1 << "b" << 1 << "c" << 1 ), FRSP( BSON( "a" << LT << 1 ) ), FRSP2( BSON( "a" << LT << 1 ) ), BSON( "a" << LT << 1 ), BSON( "a" << 1 ) );
                 ASSERT( p13.optimal() );
+                // When no match is possible, optimal attribute is not set.
+                BSONObj impossibleQuery = BSON( "a" << BSON( "$in" << BSONArray() ) );
+                QueryPlan p14( nsd(), INDEXNO( "a" << 1 ), FRSP( impossibleQuery ),
+                             FRSP2( impossibleQuery ), impossibleQuery, BSONObj() );
+                ASSERT( !p14.optimal() );
+                // When no match is possible on an unindexed field, optimal attribute is not set.
+                BSONObj bImpossibleQuery = BSON( "a" << 1 << "b" << GT << 10 << LT << 10 );
+                QueryPlan p15( nsd(), INDEXNO( "a" << 1 ), FRSP( bImpossibleQuery ),
+                              FRSP2( bImpossibleQuery ), bImpossibleQuery, BSONObj() );
+                ASSERT( !p15.optimal() );
             }
         };
 
@@ -285,8 +295,21 @@ namespace QueryOptimizerTests {
         class MoreKeyMatch : public Base {
         public:
             void run() {
-                QueryPlan p( nsd(), INDEXNO( "a" << 1 ), FRSP( BSON( "a" << "r" << "b" << NE << "q" ) ), FRSP2( BSON( "a" << "r" << "b" << NE << "q" ) ), BSON( "a" << "r" << "b" << NE << "q" ), BSON( "a" << 1 ) );
+                QueryPlan p( nsd(), INDEXNO( "a" << 1 ),
+                            FRSP( BSON( "a" << "r" << "b" << NE << "q" ) ),
+                            FRSP2( BSON( "a" << "r" << "b" << NE << "q" ) ),
+                            BSON( "a" << "r" << "b" << NE << "q" ), BSON( "a" << 1 ) );
                 ASSERT( !p.exactKeyMatch() );
+                // When no match is possible, keyMatch attribute is not set.
+                BSONObj impossibleQuery = BSON( "a" << BSON( "$in" << BSONArray() ) );
+                QueryPlan p2( nsd(), INDEXNO( "a" << 1 ), FRSP( impossibleQuery ),
+                             FRSP2( impossibleQuery ), impossibleQuery, BSONObj() );
+                ASSERT( !p2.exactKeyMatch() );
+                // When no match is possible on an unindexed field, keyMatch attribute is not set.
+                BSONObj bImpossibleQuery = BSON( "a" << 1 << "b" << GT << 10 << LT << 10 );
+                QueryPlan p3( nsd(), INDEXNO( "a" << 1 ), FRSP( bImpossibleQuery ),
+                              FRSP2( bImpossibleQuery ), bImpossibleQuery, BSONObj() );
+                ASSERT( !p3.exactKeyMatch() );
             }
         };
 
@@ -313,17 +336,17 @@ namespace QueryOptimizerTests {
         public:
             void run() {
                 QueryPlan p( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSON( "b" << 1 ) ), FRSP2( BSON( "b" << 1 ) ), BSON( "b" << 1 ), BSONObj() );
-                ASSERT( !p.range( "a" ).nontrivial() );
+                ASSERT( p.range( "a" ).universal() );
                 ASSERT( p.unhelpful() );
                 QueryPlan p2( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSON( "b" << 1 << "c" << 1 ) ), FRSP2( BSON( "b" << 1 << "c" << 1 ) ), BSON( "b" << 1 << "c" << 1 ), BSON( "a" << 1 ) );
                 ASSERT( !p2.scanAndOrderRequired() );
-                ASSERT( !p2.range( "a" ).nontrivial() );
+                ASSERT( p2.range( "a" ).universal() );
                 ASSERT( !p2.unhelpful() );
                 QueryPlan p3( nsd(), INDEXNO( "b" << 1 ), FRSP( BSON( "b" << 1 << "c" << 1 ) ), FRSP2( BSON( "b" << 1 << "c" << 1 ) ), BSON( "b" << 1 << "c" << 1 ), BSONObj() );
-                ASSERT( p3.range( "b" ).nontrivial() );
+                ASSERT( !p3.range( "b" ).universal() );
                 ASSERT( !p3.unhelpful() );
                 QueryPlan p4( nsd(), INDEXNO( "b" << 1 << "c" << 1 ), FRSP( BSON( "c" << 1 << "d" << 1 ) ), FRSP2( BSON( "c" << 1 << "d" << 1 ) ), BSON( "c" << 1 << "d" << 1 ), BSONObj() );
-                ASSERT( !p4.range( "b" ).nontrivial() );
+                ASSERT( p4.range( "b" ).universal() );
                 ASSERT( p4.unhelpful() );
             }
         };

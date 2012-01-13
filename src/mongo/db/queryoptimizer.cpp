@@ -36,9 +36,10 @@ namespace mongo {
         return 1;
     }
 
-    QueryPlan::QueryPlan(
-        NamespaceDetails *d, int idxNo,
-        const FieldRangeSetPair &frsp, const FieldRangeSetPair *originalFrsp, const BSONObj &originalQuery, const BSONObj &order, bool mustAssertOnYieldFailure, const BSONObj &startKey, const BSONObj &endKey , string special ) :
+    QueryPlan::QueryPlan( NamespaceDetails *d, int idxNo, const FieldRangeSetPair &frsp,
+                         const FieldRangeSetPair *originalFrsp, const BSONObj &originalQuery,
+                         const BSONObj &order, bool mustAssertOnYieldFailure,
+                         const BSONObj &startKey, const BSONObj &endKey , string special ) :
         _d(d), _idxNo(idxNo),
         _frs( frsp.frsForIndex( _d, _idxNo ) ),
         _frsMulti( frsp.frsForIndex( _d, -1 ) ),
@@ -75,7 +76,8 @@ namespace mongo {
 
         // If the parsing or index indicates this is a special query, don't continue the processing
         if ( _special.size() ||
-            ( _index->getSpec().getType() && _index->getSpec().getType()->suitability( originalQuery, order ) != USELESS ) ) {
+            ( _index->getSpec().getType() &&
+             _index->getSpec().getType()->suitability( originalQuery, order ) != USELESS ) ) {
 
             if( _special.size() ) _optimal = true;
 
@@ -83,7 +85,8 @@ namespace mongo {
             if( !_special.size() ) _special = _index->getSpec().getType()->getPlugin()->getName();
 
             massert( 13040 , (string)"no type for special: " + _special , _type );
-            // hopefully safe to use original query in these contexts - don't think we can mix special with $or clause separation yet
+            // hopefully safe to use original query in these contexts;
+            // don't think we can mix special with $or clause separation yet
             _scanAndOrderRequired = _type->scanAndOrderRequired( _originalQuery , order );
             return;
         }
@@ -132,13 +135,13 @@ doneCheckOrder:
                 break;
             const FieldRange &fr = _frs.range( e.fieldName() );
             if ( stillOptimalIndexedQueryCount ) {
-                if ( fr.nontrivial() )
+                if ( !fr.universal() )
                     ++optimalIndexedQueryCount;
                 if ( !fr.equality() )
                     stillOptimalIndexedQueryCount = false;
             }
             else {
-                if ( fr.nontrivial() )
+                if ( !fr.universal() )
                     optimalIndexedQueryCount = -1;
             }
             if ( fr.equality() ) {
@@ -149,9 +152,9 @@ doneCheckOrder:
             orderFieldsUnindexed.erase( e.fieldName() );
         }
         if ( !_scanAndOrderRequired &&
-                ( optimalIndexedQueryCount == _frs.nNontrivialRanges() ) )
+                ( optimalIndexedQueryCount == _frs.numNonUniversalRanges() ) )
             _optimal = true;
-        if ( exactIndexedQueryCount == _frs.nNontrivialRanges() &&
+        if ( exactIndexedQueryCount == _frs.numNonUniversalRanges() &&
                 orderFieldsUnindexed.size() == 0 &&
                 exactIndexedQueryCount == idxKey.nFields() &&
                 exactIndexedQueryCount == _originalQuery.nFields() ) {
@@ -159,7 +162,8 @@ doneCheckOrder:
         }
         _frv.reset( new FieldRangeVector( _frs, idxSpec, _direction ) );
         if ( originalFrsp ) {
-            _originalFrv.reset( new FieldRangeVector( originalFrsp->frsForIndex( _d, _idxNo ), idxSpec, _direction ) );
+            _originalFrv.reset( new FieldRangeVector( originalFrsp->frsForIndex( _d, _idxNo ),
+                                                     idxSpec, _direction ) );
         }
         else {
             _originalFrv = _frv;
@@ -176,8 +180,8 @@ doneCheckOrder:
                 _endKey = _frv->endKey();
         }
 
-        if ( ( _scanAndOrderRequired || _order.isEmpty() ) &&
-                !_frs.range( idxKey.firstElementFieldName() ).nontrivial() ) {
+        if ( ( _scanAndOrderRequired || _order.isEmpty() ) && 
+            _frs.range( idxKey.firstElementFieldName() ).universal() ) { // NOTE SERVER-2140
             _unhelpful = true;
         }
     }
@@ -243,7 +247,8 @@ doneCheckOrder:
     }
     
     void QueryPlan::checkTableScanAllowed() const {
-        if ( !_frs.nNontrivialRanges() )
+        // TODO - is this desirable?  See SERVER-2222.
+        if ( _frs.numNonUniversalRanges() == 0 )
             return;
 
         if ( ! cmdLine.noTableScan )
@@ -264,7 +269,7 @@ doneCheckOrder:
         // and it's a capped collection
         // we warn /*disallow*/ as it's a common user error
         // .system. and local collections are exempt
-        if ( _d && _d->capped && _frs.range( "_id" ).nontrivial() ) {
+        if ( _d && _d->capped && !_frs.range( "_id" ).universal() ) {
             if ( cc().isSyncThread() ||
                 str::contains( _frs.ns() , ".system." ) ||
                 str::startsWith( _frs.ns() , "local." ) ) {
@@ -500,11 +505,14 @@ doneCheckOrder:
         if ( !d )
             return;
 
-        // If table scan is optimal or natural order requested or tailable cursor requested
-        if ( !_frsp->matchPossible() || ( _frsp->noNontrivialRanges() && _order.isEmpty() ) ||
+        // If table scan is optimal or natural order requested.
+        if ( !_frsp->matchPossible() || ( _frsp->noNonUniversalRanges() && _order.isEmpty() ) ||
                 ( !_order.isEmpty() && !strcmp( _order.firstElementFieldName(), "$natural" ) ) ) {
             // Table scan plan
-            addPlan( QueryPlanPtr( new QueryPlan( d, -1, *_frsp, _originalFrsp.get(), _originalQuery, _order, _mustAssertOnYieldFailure ) ), checkFirst );
+            QueryPlanPtr plan
+            ( new QueryPlan( d, -1, *_frsp, _originalFrsp.get(), _originalQuery, _order,
+                            _mustAssertOnYieldFailure ) );
+            addPlan( plan, checkFirst );
             return;
         }
 
@@ -519,7 +527,10 @@ doneCheckOrder:
                 if ( !_frsp->matchPossibleForIndex( d, i, keyPattern ) ) {
                     // If no match is possible, only generate a trival plan that won't
                     // scan any documents.
-                    QueryPlanPtr p( new QueryPlan( d, i, *_frsp, _originalFrsp.get(), _originalQuery, _order, _mustAssertOnYieldFailure ) );
+                    QueryPlanPtr p
+                    ( new QueryPlan
+                     ( d, i, *_frsp, _originalFrsp.get(), _originalQuery, _order,
+                      _mustAssertOnYieldFailure ) );
                     addPlan( p, checkFirst );
                     return;
                 }

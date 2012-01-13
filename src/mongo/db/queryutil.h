@@ -88,12 +88,15 @@ namespace mongo {
         bool equality() const;
         /** @return true if all the intervals for this range are equalities */
         bool inQuery() const;
-        /** @return true iff this range matches some but not all BSONElements. */
-        bool nontrivial() const;
-        /** @return true iff this range matches no BSONElements. */
+        /**
+         * @return true iff this range includes all BSONElements
+         * (the range is the universal set of BSONElements).
+         */
+        bool universal() const;
+        /** @return true iff this range includes no BSONElements. */
         bool empty() const { return _intervals.empty(); }
         
-        /** Empty the range so it matches no BSONElements. */
+        /** Empty the range so it includes no BSONElements. */
         void makeEmpty() { _intervals.clear(); }
         const vector<FieldInterval> &intervals() const { return _intervals; }
         string getSpecial() const { return _special; }
@@ -138,17 +141,12 @@ namespace mongo {
         friend class FieldRangeVector;
         FieldRangeSet( const char *ns, const BSONObj &query , bool singleKey , bool optimize=true );
         
-        /** @return true if there is a nontrivial range for the given field. */
-        bool hasRange( const char *fieldName ) const {
-            map<string, FieldRange>::const_iterator f = _ranges.find( fieldName );
-            return f != _ranges.end();
-        }
         /** @return range for the given field. */
         const FieldRange &range( const char *fieldName ) const;
         /** @return range for the given field. */
         FieldRange &range( const char *fieldName );
-        /** @return the number of nontrivial ranges. */
-        int nNontrivialRanges() const;
+        /** @return the number of non universal ranges. */
+        int numNonUniversalRanges() const;
         /** @return the field ranges comprising this set. */
         const map<string,FieldRange> &ranges() const { return _ranges; }
         /** 
@@ -167,7 +165,7 @@ namespace mongo {
         const char *ns() const { return _ns; }
         
         /**
-         * @return a simplified query from the extreme values of the nontrivial
+         * @return a simplified query from the extreme values of the non universal
          * fields.
          * @param fields If specified, the fields of the returned object are
          * ordered to match those of 'fields'.
@@ -214,9 +212,9 @@ namespace mongo {
         void makeEmpty();
         void processQueryField( const BSONElement &e, bool optimize );
         void processOpElement( const char *fieldName, const BSONElement &f, bool isNot, bool optimize );
-        static FieldRange *__singleKeyTrivialRange;
-        static FieldRange *__multiKeyTrivialRange;
-        const FieldRange &trivialRange() const;
+        static FieldRange *__singleKeyUniversalRange;
+        static FieldRange *__multiKeyUniversalRange;
+        const FieldRange &universalRange() const;
         map<string,FieldRange> _ranges;
         const char *_ns;
         // Owns memory for FieldRange BSONElements.
@@ -250,7 +248,7 @@ namespace mongo {
             return _singleKey.range( fieldName );
         }
         /** @return true if the range limits are equivalent to an empty query. */
-        bool noNontrivialRanges() const;
+        bool noNonUniversalRanges() const;
         /** @return false if a match is impossible regardless of index. */
         bool matchPossible() const { return _multiKey.matchPossible(); }
         /**
@@ -299,7 +297,8 @@ namespace mongo {
     class FieldRangeVector {
     public:
         /**
-         * @param frs The valid ranges for all fields, as defined by the query spec
+         * @param frs The valid ranges for all fields, as defined by the query spec.  None of the
+         * fields in indexSpec may be empty() ranges of frs.
          * @param indexSpec The index spec (key pattern and info)
          * @param direction The direction of index traversal
          */

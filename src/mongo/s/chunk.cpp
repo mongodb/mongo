@@ -816,8 +816,9 @@ namespace mongo {
             {
                 // special case if most-significant field isn't in query
                 FieldRange range = frsp->singleKeyRange(_key.key().firstElementFieldName());
-                if ( !range.nontrivial() ) {
-                    DEV PRINT(range.nontrivial());
+                bool nontrivial = !range.empty() && !range.universal();
+                if ( !nontrivial ) {
+                    DEV PRINT(nontrivial);
                     getShardsForRange( shards, _key.globalMin(), _key.globalMax() );
                     return;
                 }

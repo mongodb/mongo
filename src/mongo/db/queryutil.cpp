@@ -465,7 +465,9 @@ namespace mongo {
     }
 
     const FieldRange &FieldRange::operator&=( const FieldRange &other ) {
-        if ( !_singleKey && nontrivial() ) {
+        // Range intersections are not taken for multikey indexes.  See SERVER-958.
+        if ( !_singleKey && !universal() ) {
+            // Pick 'other' range if it is smaller than or equal to 'this'.
             if ( other <= *this ) {
              	*this = other;
             }
@@ -613,6 +615,29 @@ namespace mongo {
         return temp.empty();
     }
 
+    bool FieldRange::universal() const {
+        if ( empty() ) {
+            return false;
+        }
+        if ( minKey.firstElement().woCompare( min(), false ) != 0 ) {
+            return false;
+        }
+        if ( maxKey.firstElement().woCompare( max(), false ) != 0 ) {
+            return false;
+        }
+        for ( unsigned i = 1; i < _intervals.size(); ++i ) {
+            const FieldBound &prev = _intervals[ i-1 ]._upper;
+            const FieldBound &curr = _intervals[ i ]._lower;
+            if ( !prev._inclusive && !curr._inclusive ) {
+                return false;
+            }
+            if ( prev._bound.woCompare( curr._bound ) < 0 ) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     void FieldRange::setExclusiveBounds() {
         for( vector<FieldInterval>::iterator i = _intervals.begin(); i != _intervals.end(); ++i ) {
             i->_lower._inclusive = false;
@@ -653,7 +678,6 @@ namespace mongo {
         for( vector<FieldInterval>::const_iterator i = _intervals.begin(); i != _intervals.end(); ++i ) {
             buf << i->toString();
         }
-
         buf << ")";
         return buf.str();
     }
@@ -882,25 +906,27 @@ namespace mongo {
         }
     }
     
-    FieldRangeVector::FieldRangeVector( const FieldRangeSet &frs, const IndexSpec &indexSpec, int direction )
+    FieldRangeVector::FieldRangeVector( const FieldRangeSet &frs, const IndexSpec &indexSpec,
+                                       int direction )
     :_indexSpec( indexSpec ), _direction( direction >= 0 ? 1 : -1 ) {
+        verify( 16059, frs.matchPossibleForIndex( _indexSpec.keyPattern ) );
         _queries = frs._queries;
         BSONObjIterator i( _indexSpec.keyPattern );
-        set< string > baseObjectNontrivialPrefixes;
+        set< string > baseObjectNonUniversalPrefixes;
         while( i.more() ) {
             BSONElement e = i.next();
             const FieldRange *range = &frs.range( e.fieldName() );
+            verify( 16058, !range->empty() );
             if ( !frs.singleKey() ) {
                 string prefix = str::before( e.fieldName(), '.' );
-                if ( baseObjectNontrivialPrefixes.count( prefix ) > 0 ) {
+                if ( baseObjectNonUniversalPrefixes.count( prefix ) > 0 ) {
                     // A field with the same parent field has already been
                     // constrainted, and with a multikey index we cannot
-                    // constrain this field.
-                    range = &frs.trivialRange();
-                } else {
-                    if ( range->nontrivial() ) {
-                        baseObjectNontrivialPrefixes.insert( prefix );
-                    }
+                    // constrain this field.  SERVER-958
+                    range = &frs.universalRange();
+                }
+                else if ( !range->universal() ) {
+                    baseObjectNonUniversalPrefixes.insert( prefix );
                 }
             }
             int number = (int) e.number(); // returns 0.0 if not numeric
@@ -909,12 +935,14 @@ namespace mongo {
                 _ranges.push_back( *range );
             }
             else {
-                _ranges.push_back( FieldRange( BSONObj().firstElement(), frs.singleKey(), false, true ) );
+                _ranges.push_back( FieldRange( BSONObj().firstElement(), frs.singleKey(), false,
+                                              true ) );
                 range->reverse( _ranges.back() );
             }
             assert( !_ranges.back().empty() );
         }
-        uassert( 13385, "combinatorial limit of $in partitioning of result set exceeded", size() < 1000000 );
+        uassert( 13385, "combinatorial limit of $in partitioning of result set exceeded",
+                size() < 1000000 );
     }    
 
     BSONObj FieldRangeVector::startKey() const {
@@ -949,10 +977,10 @@ namespace mongo {
         return b.obj();
     }
     
-    FieldRange *FieldRangeSet::__singleKeyTrivialRange = 0;
-    FieldRange *FieldRangeSet::__multiKeyTrivialRange = 0;
-    const FieldRange &FieldRangeSet::trivialRange() const {
-        FieldRange *&ret = _singleKey ? __singleKeyTrivialRange : __multiKeyTrivialRange;
+    FieldRange *FieldRangeSet::__singleKeyUniversalRange = 0;
+    FieldRange *FieldRangeSet::__multiKeyUniversalRange = 0;
+    const FieldRange &FieldRangeSet::universalRange() const {
+        FieldRange *&ret = _singleKey ? __singleKeyUniversalRange : __multiKeyUniversalRange;
         if ( ret == 0 ) {
             ret = new FieldRange( BSONObj().firstElement(), _singleKey, false, true );
         }
@@ -974,10 +1002,10 @@ namespace mongo {
             BSONElement e = i.next();
             const char *name = e.fieldName();
             const FieldRange &eRange = range( name );
-            assert( !eRange.empty() );
+            verify( 16057, !eRange.empty() );
             if ( eRange.equality() )
                 b.appendAs( eRange.min(), name );
-            else if ( eRange.nontrivial() ) {
+            else if ( !eRange.universal() ) {
                 BSONObj o;
                 BSONObjBuilder c;
                 if ( eRange.min().type() != MinKey )
@@ -1062,12 +1090,21 @@ namespace mongo {
         return ret;
     }
 
+    int FieldRangeSet::numNonUniversalRanges() const {
+        int count = 0;
+        for( map<string,FieldRange>::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
+            if ( !i->second.universal() )
+                ++count;
+        }
+        return count;
+    }
+
     FieldRangeSet *FieldRangeSet::subset( const BSONObj &fields ) const {
         FieldRangeSet *ret = new FieldRangeSet( _ns, BSONObj(), _singleKey, true );
         BSONObjIterator i( fields );
         while( i.more() ) {
             BSONElement e = i.next();
-            if ( range( e.fieldName() ).nontrivial() ) {
+            if ( !range( e.fieldName() ).universal() ) {
                 ret->range( e.fieldName() ) = range( e.fieldName() );
             }
         }
@@ -1075,11 +1112,10 @@ namespace mongo {
         return ret;
     }
     
-    bool FieldRangeSetPair::noNontrivialRanges() const {
-        return _singleKey.matchPossible() && _singleKey.nNontrivialRanges() == 0 &&
-                 _multiKey.matchPossible() && _multiKey.nNontrivialRanges() == 0;
+    bool FieldRangeSetPair::noNonUniversalRanges() const {
+        return _singleKey.numNonUniversalRanges() == 0 && _multiKey.numNonUniversalRanges() == 0;
     }
-    
+
     FieldRangeSetPair &FieldRangeSetPair::operator&=( const FieldRangeSetPair &other ) {
         _singleKey &= other._singleKey;
         _multiKey &= other._multiKey;

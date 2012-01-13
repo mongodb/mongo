@@ -27,7 +27,7 @@ namespace mongo {
             else if ( i->second.empty() ) {
                 _fieldTypes[ i->first ] = QueryPattern::Empty;
             }
-            else if ( i->second.nontrivial() ) {
+            else if ( !i->second.universal() ) {
                 bool upper = i->second.max().type() != MaxKey;
                 bool lower = i->second.min().type() != MinKey;
                 if ( upper && lower )

@@ -44,41 +44,20 @@ namespace mongo {
         return true;
     }
 
-    /**
-     * TODO Assumes intervals are contiguous and minKey/maxKey will not be
-     * matched against.
-     */
-    inline bool FieldRange::nontrivial() const {
-        return
-            ! empty() &&
-            ( _intervals.size() != 1 ||
-              minKey.firstElement().woCompare( min(), false ) != 0 ||
-              maxKey.firstElement().woCompare( max(), false ) != 0 );
-    }
-
     inline const FieldRange &FieldRangeSet::range( const char *fieldName ) const {
         map<string,FieldRange>::const_iterator f = _ranges.find( fieldName );
         if ( f == _ranges.end() )
-            return trivialRange();
+            return universalRange();
         return f->second;
     }
 
     inline FieldRange &FieldRangeSet::range( const char *fieldName ) {
         map<string,FieldRange>::iterator f = _ranges.find( fieldName );
         if ( f == _ranges.end() ) {
-            _ranges.insert( make_pair( string( fieldName ), trivialRange() ) );
+            _ranges.insert( make_pair( string( fieldName ), universalRange() ) );
             return _ranges.find( fieldName )->second;
         }
         return f->second;
-    }
-
-    inline int FieldRangeSet::nNontrivialRanges() const {
-        int count = 0;
-        for( map<string,FieldRange>::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
-            if ( i->second.nontrivial() )
-                ++count;
-        }
-        return count;
     }
 
     inline bool FieldRangeSet::matchPossible() const {

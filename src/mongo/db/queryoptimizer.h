@@ -49,9 +49,12 @@ namespace mongo {
                   const BSONObj &endKey = BSONObj(),
                   string special="" );
 
-        /** @return true iff no other plans should be considered. */
+        /**
+         * @return true iff this plan should run as the only candidate plan in the absence of an
+         * impossible plan.
+         */
         bool optimal() const { return _optimal; }
-        /* @return true iff this plan should not be considered at all. */
+        /** @return true iff this plan should not be considered at all. */
         bool unhelpful() const { return _unhelpful; }
         /** @return true iff ScanAndOrder processing will be required for result set. */
         bool scanAndOrderRequired() const { return _scanAndOrderRequired; }
