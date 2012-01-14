@@ -182,7 +182,7 @@ namespace mongo {
 
 
         string toString() const {
-            StringBuilder buf( _bits * 2 );
+            StringBuilder buf;
             for ( unsigned x=0; x<_bits*2; x++ )
                 buf.append( _hash & geoBitSets.masks64[x] ? "1" : "0" );
             return buf.str();
@@ -490,7 +490,7 @@ namespace mongo {
         }
 
         string toString() const {
-            StringBuilder buf(32);
+            StringBuilder buf;
             buf << "(" << _x << "," << _y << ")";
             return buf.str();
 

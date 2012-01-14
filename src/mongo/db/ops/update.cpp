@@ -650,7 +650,7 @@ namespace mongo {
         BSONElement e = es.next();
 
         ModStateHolder::iterator m = _mods.lower_bound( root );
-        StringBuilder buf(root.size() + 2 );
+        StringBuilder buf;
         buf << root << (char)255;
         ModStateHolder::iterator mend = _mods.lower_bound( buf.str() );
 
@@ -880,7 +880,7 @@ namespace mongo {
                 n->_mods[s] = i->second;
                 continue;
             }
-            StringBuilder buf(s.size()+strlen(elemMatchKey));
+            StringBuilder buf;
             buf << s.substr(0,idx+1) << elemMatchKey << s.substr(idx+2);
             string fixed = buf.str();
             DEBUGUPDATE( "fixed dynamic: " << s << " -->> " << fixed );

@@ -475,7 +475,7 @@ namespace mongo {
         }
 
         string toString() const {
-            StringBuilder buf(64);
+            StringBuilder buf;
             buf << _min.toString() << " -->> " << _max.toString();
             return buf.str();
         }

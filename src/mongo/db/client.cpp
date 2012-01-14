@@ -617,7 +617,7 @@ namespace mongo {
 #define OPDEBUG_TOSTRING_HELP(x) if( x >= 0 ) s << " " #x ":" << (x)
 #define OPDEBUG_TOSTRING_HELP_BOOL(x) if( x ) s << " " #x ":" << (x)
     string OpDebug::toString() const {
-        StringBuilder s( ns.size() + 64 );
+        StringBuilder s;
         if ( iscommand )
             s << "command ";
         else

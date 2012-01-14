@@ -787,7 +787,7 @@ namespace mongo {
             BSONObjIterator k( g.embeddedObjectUserCheck() );
             while ( k.more() ) {
                 BSONElement h = k.next();
-                StringBuilder buf(32);
+                StringBuilder buf;
                 buf << fieldName << "." << h.fieldName();
                 string fullname = buf.str();
 

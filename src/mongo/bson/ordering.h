@@ -47,7 +47,7 @@ namespace mongo {
         unsigned descending(unsigned mask) const { return bits & mask; }
 
         /*operator string() const {
-            StringBuilder buf(32);
+            StringBuilder buf;
             for ( unsigned i=0; i<nkeys; i++)
                 buf.append( get(i) > 0 ? "+" : "-" );
             return buf.str();

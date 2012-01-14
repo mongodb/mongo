@@ -252,9 +252,7 @@ namespace mongo {
         static const size_t MONGO_U64_SIZE = 22;
         static const size_t MONGO_S16_SIZE = 7;
 
-        StringBuilder( int initsize=256 )
-            : _buf( initsize ) {
-        }
+        StringBuilder() { }
 
         StringBuilder& operator<<( double x ) {
             return SBNUM( x , MONGO_DBL_SIZE , "%g" );
@@ -314,7 +312,7 @@ namespace mongo {
         int len() const { return _buf.l; }
 
     private:
-        BufBuilder _buf;
+        StackBufBuilder _buf;
 
         // non-copyable, non-assignable
         StringBuilder( const StringBuilder& );

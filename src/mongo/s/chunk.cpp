@@ -479,7 +479,7 @@ namespace mongo {
     }
 
     string Chunk::genID( const string& ns , const BSONObj& o ) {
-        StringBuilder buf( ns.size() + o.objsize() + 16 );
+        StringBuilder buf;
         buf << ns << "-";
 
         BSONObjIterator i(o);
