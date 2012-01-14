@@ -37,6 +37,8 @@ namespace mongo {
                     _fieldTypes[ i->first ] = QueryPattern::UpperBound;
                 else if ( lower )
                     _fieldTypes[ i->first ] = QueryPattern::LowerBound;
+                else
+                    _fieldTypes[ i->first ] = QueryPattern::ConstraintPresent;
             }
         }
         setSort( sort );
@@ -65,6 +67,8 @@ namespace mongo {
                 return "UpperBound";
             case QueryPattern::UpperAndLowerBound:
                 return "UpperAndLowerBound";
+            case QueryPattern::ConstraintPresent:
+                return "ConstraintPresent";
         }
         return "";
     }
