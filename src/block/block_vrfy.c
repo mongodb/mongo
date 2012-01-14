@@ -188,15 +188,10 @@ __verify_checkfrag(WT_SESSION_IMPL *session, WT_BLOCK *block)
 				break;
 			__bit_set(fragbits, last);
 		}
-		if (first == last)
-			__wt_errx(session,
-			    "file fragment %" PRIu32 " was never verified",
-			    first);
-		else
-			__wt_errx(session,
-			    "file fragments %" PRIu32 "-%" PRIu32 " were "
-			    "never verified",
-			    first, last);
+		__wt_errx(session,
+		    "file range %" PRIuMAX "-%" PRIuMAX " was never verified",
+		    (uintmax_t)((off_t)first * block->allocsize),
+		    (uintmax_t)((off_t)last * block->allocsize));
 		ret = WT_ERROR;
 	}
 	return (ret);
