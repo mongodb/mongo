@@ -200,11 +200,9 @@ namespace mongo {
     private:
         /* "slow" portion of 'grow()'  */
         void NOINLINE_DECL grow_reallocate() {
-            int a = size * 2;
-            if ( a == 0 )
-                a = 512;
-            if ( l > a )
-                a = l + 16 * 1024;
+            int a = 64;
+            while( a < l ) 
+                a = a * 2;
             if ( a > BufferMaxSize ) {
                 std::stringstream ss;
                 ss << "BufBuilder attempted to grow() to " << a << " bytes, past the 64MB limit.";
