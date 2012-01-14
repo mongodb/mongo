@@ -2480,7 +2480,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		/* Discard the split page's leaf-page blocks. */
 		WT_REF_FOREACH(mod->u.split, ref, i)
 			WT_RET(__wt_rec_track_block(
-			    session, WT_PT_BLOCK, page, 
+			    session, WT_PT_BLOCK, page,
 			    ((WT_ADDR *)ref->addr)->addr,
 			    ((WT_ADDR *)ref->addr)->size));
 
