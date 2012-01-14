@@ -901,7 +901,7 @@ namespace PerfTests {
         OID oid;
         BSONObj query;
     public:
-        virtual int howLongMillis() { return 30000; }
+        virtual int howLongMillis() { return profiling ? 30000 : 5000; }
         Insert1() : x( BSON("x" << 99) ) {
             oid.init();
             query = BSON("_id" << oid);
