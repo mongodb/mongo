@@ -215,7 +215,7 @@ __wt_rec_write(
 	WT_RET(__rec_write_init(session, page));
 
 	/* Initialize the overflow tracking information for each new run. */
-	__wt_rec_track_init(session, page);
+	WT_RET(__wt_rec_track_init(session, page));
 
 	/* Reconcile the page. */
 	switch (page->type) {
@@ -1803,7 +1803,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_RECONCILE *r;
 	WT_REF *ref;
 	uint32_t i;
-	int ovfl_key, val_set;
+	int onpage_ovfl, ovfl_key, val_set;
 
 	r = session->reconcile;
 	unpack = &_unpack;
@@ -1835,16 +1835,23 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_REF_FOREACH(page, ref, i) {
 		/*
 		 * Keys are always instantiated for row-store internal pages,
-		 * set the WT_IKEY reference.  We may have key overflow items
-		 * on the page, in which case the disk image was retained and
-		 * the key's WT_CELL reference was set.
+		 * set the WT_IKEY reference, and unpack the cell if the key
+		 * references one.
 		 */
 		ikey = ref->u.key;
-		if (ikey->cell_offset == 0)
+		if (ikey->cell_offset == 0) {
 			cell = NULL;
-		else {
+
+			/*
+			 * We need to know if we're using on-page overflow cell
+			 * in a few places below, initialize the unpacked cell's
+			 * overflow value so there's an easy test.
+			 */
+			onpage_ovfl = 0;
+		} else {
 			cell = WT_PAGE_REF_OFFSET(page, ikey->cell_offset);
 			__wt_cell_unpack(cell, unpack);
+			onpage_ovfl = unpack->ovfl;
 		}
 
 		/*
@@ -1889,7 +1896,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 				 * Overflow keys referencing discarded pages are
 				 * no longer useful.
 				 */
-				if (cell != NULL)
+				if (onpage_ovfl)
 					WT_RET(__rec_track_cell(
 					    session, page, unpack));
 				continue;
@@ -1908,7 +1915,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 				 * no longer useful (the interesting key is the
 				 * key for the split page).
 				 */
-				if (cell != NULL)
+				if (onpage_ovfl)
 					WT_RET(__rec_track_cell(
 					    session, page, unpack));
 
@@ -1949,9 +1956,17 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * If the key is an overflow item, assume prefix compression
 		 * won't make things better, and simply copy it.
 		 *
+		 * XXX
+		 * We have the key in-hand (we instantiate all internal page
+		 * keys when the page is brought into memory), so it would be
+		 * easy to check prefix compression, I'm just not bothering.
+		 * If we did gain by prefix compression, we'd have to discard
+		 * the old overflow key and write a new one, and this isn't a
+		 * likely path anyway.
+		 *
 		 * Truncate any 0th key, internal pages don't need 0th keys.
 		 */
-		if (cell != NULL) {
+		if (onpage_ovfl) {
 			key->buf.data = cell;
 			key->buf.size = unpack->len;
 			key->cell_len = 0;
@@ -1974,7 +1989,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 			 * We have to have a copy of any overflow key because
 			 * we're about to promote it.
 			 */
-			if (ovfl_key && cell != NULL)
+			if (ovfl_key && onpage_ovfl)
 				WT_RET(__wt_cell_copy(session, cell, r->cur));
 			WT_RET(__rec_split(session));
 
@@ -2457,17 +2472,17 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	case WT_PAGE_REC_EMPTY:				/* Page deleted */
 		break;
 	case WT_PAGE_REC_REPLACE:			/* 1-for-1 page swap */
-		/* Discard the replacement page's blocks. */
+		/* Discard the replacement leaf page's blocks. */
 		WT_RET(__wt_rec_track_block(session, WT_PT_BLOCK,
 		    page, mod->u.replace.addr, mod->u.replace.size));
 		break;
 	case WT_PAGE_REC_SPLIT:				/* Page split */
-		/* The split page's blocks need to be discarded. */
-		WT_REF_FOREACH(mod->u.split, ref, i) {
-			__wt_get_addr(page, ref, &addr, &size);
+		/* Discard the split page's leaf-page blocks. */
+		WT_REF_FOREACH(mod->u.split, ref, i)
 			WT_RET(__wt_rec_track_block(
-			    session, WT_PT_BLOCK, page, addr, size));
-		}
+			    session, WT_PT_BLOCK, page, 
+			    ((WT_ADDR *)ref->addr)->addr,
+			    ((WT_ADDR *)ref->addr)->size));
 
 		/* Discard the split page itself. */
 		__wt_page_out(session, mod->u.split, 0);
@@ -2593,7 +2608,7 @@ err:			if (page->type == WT_PAGE_ROW_INT ||
 
 /*
  * __rec_split_row --
- *	Update a row-store parent page's reference when a page is split.
+ *	Split a row-store page, creating a new internal page.
  */
 static int
 __rec_split_row(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
@@ -2664,7 +2679,7 @@ err:	__wt_page_out(session, page, 0);
 
 /*
  * __rec_split_col --
- *	Update a column-store parent page's reference when a page is split.
+ *	Split a column--store page, creating a new internal page.
  */
 static int
 __rec_split_col(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
