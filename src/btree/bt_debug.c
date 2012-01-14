@@ -600,8 +600,10 @@ __debug_page_col_int(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 
 	if (LF_ISSET(WT_DEBUG_TREE_WALK))
 		WT_REF_FOREACH(page, ref, i)
-			if (ref->state == WT_REF_MEM)
+			if (ref->state == WT_REF_MEM) {
+				__dmsg(ds, "\n");
 				WT_RET(__debug_page(ds, ref->page, flags));
+			}
 
 	return (0);
 }
@@ -667,8 +669,10 @@ __debug_page_row_int(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 
 	if (LF_ISSET(WT_DEBUG_TREE_WALK))
 		WT_REF_FOREACH(page, ref, i)
-			if (ref->state == WT_REF_MEM)
+			if (ref->state == WT_REF_MEM) {
+				__dmsg(ds, "\n");
 				WT_RET(__debug_page(ds, ref->page, flags));
+			}
 	return (0);
 }
 
