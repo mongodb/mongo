@@ -95,7 +95,7 @@ namespace mongo {
 
         }
         else {
-            BufBuilder buf (obj.objsize());
+            BufBuilder buf (obj.objsize() + 5);
             buf.appendNum((unsigned)0); // refcount
             buf.appendNum(obj.objsize());
 
