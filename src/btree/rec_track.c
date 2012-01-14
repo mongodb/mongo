@@ -214,7 +214,7 @@ __wt_rec_track_ovfl_reuse(WT_SESSION_IMPL *session, WT_PAGE *page,
  * __wt_rec_track_init --
  *	Initialize/Reset the tracking information when writing a page.
  */
-void
+int
 __wt_rec_track_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_PAGE_MODIFY *mod;
@@ -223,20 +223,8 @@ __wt_rec_track_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	mod = page->modify;
 
-	/*
-	 * Mark all overflow references "discarded" at the start of a page
-	 * reconciliation: we'll reactivate ones we are using again as we
-	 * process the page.
-	 *
-	 * Discard any blocks intended to be discarded on eviction, we are
-	 * not evicting based on the last reconciliation, they're no longer
-	 * interesting.
-	 */
 	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i)
 		switch (track->type) {
-		case WT_PT_BLOCK:
-			WT_ASSERT(session, track->type != WT_PT_BLOCK);
-			break;
 		case WT_PT_BLOCK_EVICT:
 			/*
 			 * We had a block we would have discarded, had the last
@@ -246,16 +234,28 @@ __wt_rec_track_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 			__rec_track_clear(track);
 			break;
 		case WT_PT_OVFL:
+			/*
+			 * An overflow item associated with this page: mark it
+			 * "not in use", we'll reactivate any being re-used as
+			 * we process the page.
+			 */
 			WT_TRACK_MSG(
 			    session, page, "set overflow OFF", &track->addr);
 			track->type = WT_PT_OVFL_DISCARD;
 			break;
-		case WT_PT_OVFL_DISCARD:
-			WT_ASSERT(session, track->type != WT_PT_BLOCK);
-			break;
 		case WT_PT_EMPTY:
 			break;
+		case WT_PT_BLOCK:
+		case WT_PT_OVFL_DISCARD:
+			/*
+			 * We shouldn't see WT_PT_BLOCK or WT_PT_OVFL_DISCARD,
+			 * those blocks were discarded at the end of the last
+			 * reconciliation of this page.
+			 */
+			/* FALLTHROUGH */
+		WT_ILLEGAL_VALUE(session);
 		}
+	return (0);
 }
 
 /*
@@ -342,14 +342,16 @@ __track_print(WT_SESSION_IMPL *session, WT_PAGE *page, WT_PAGE_TRACK *track)
 {
 	switch (track->type) {
 	case WT_PT_BLOCK:
+		__track_msg(session, page, "block", &track->addr);
+		break;
 	case WT_PT_BLOCK_EVICT:
-		__track_msg(session, page, "track block", &track->addr);
+		__track_msg(session, page, "block-evict", &track->addr);
 		return;
 	case WT_PT_OVFL:
-		__track_msg(session, page, "track overflow ON", &track->addr);
+		__track_msg(session, page, "overflow (on)", &track->addr);
 		break;
 	case WT_PT_OVFL_DISCARD:
-		__track_msg(session, page, "track overflow OFF", &track->addr);
+		__track_msg(session, page, "overflow (off)", &track->addr);
 		break;
 	case WT_PT_EMPTY:
 	default:				/* Not possible. */
