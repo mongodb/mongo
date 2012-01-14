@@ -19,6 +19,11 @@
 #ifdef HAVE_VERBOSE
 static void __track_msg(WT_SESSION_IMPL *, WT_PAGE *, const char *, WT_ADDR *);
 static void __track_print(WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE_TRACK *);
+
+#define	WT_TRACK_MSG(session, page, msg, addr) do {			\
+	if (!WT_VERBOSE_ISSET(session, reconcile))			\
+		__track_msg(session, page, msg, addr);			\
+} while (0)
 #endif
 
 /*
@@ -111,7 +116,8 @@ __wt_rec_track_block(WT_SESSION_IMPL *session,
 	track->addr.size = size;
 
 #ifdef HAVE_VERBOSE
-	__track_print(session, page, track);
+	if (WT_VERBOSE_ISSET(session, reconcile))
+		__track_print(session, page, track);
 #endif
 	return (0);
 }
@@ -164,7 +170,8 @@ __wt_rec_track_ovfl(WT_SESSION_IMPL *session, WT_PAGE *page,
 	memcpy(track->data, data, data_size);
 
 #ifdef HAVE_VERBOSE
-	__track_print(session, page, track);
+	if (WT_VERBOSE_ISSET(session, reconcile))
+		__track_print(session, page, track);
 #endif
 	return (0);
 }
@@ -196,7 +203,8 @@ __wt_rec_track_ovfl_reuse(WT_SESSION_IMPL *session, WT_PAGE *page,
 		*addrp = track->addr.addr;
 		*sizep = track->addr.size;
 
-		__track_msg(session, page, "reactivate overflow", &track->addr);
+		WT_TRACK_MSG(
+		    session, page, "reactivate overflow", &track->addr);
 		return (1);
 	}
 	return (0);
@@ -238,7 +246,7 @@ __wt_rec_track_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 			__rec_track_clear(track);
 			break;
 		case WT_PT_OVFL:
-			__track_msg(
+			WT_TRACK_MSG(
 			    session, page, "set overflow OFF", &track->addr);
 			track->type = WT_PT_OVFL_DISCARD;
 			break;
@@ -293,14 +301,14 @@ __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int final)
 				continue;
 			/* FALLTHROUGH */
 		case WT_PT_BLOCK:
-			__track_msg(
+			WT_TRACK_MSG(
 			    session, page, "discard block", &track->addr);
 			WT_RET(__wt_bm_free(
 			    session, track->addr.addr, track->addr.size));
 			__wt_free(session, track->addr.addr);
 			break;
 		case WT_PT_OVFL:
-			__track_msg(
+			WT_TRACK_MSG(
 			    session, page, "retain overflow", &track->addr);
 			if (!final)
 				continue;
@@ -309,7 +317,7 @@ __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int final)
 			__wt_free(session, track->addr.addr);
 			break;
 		case WT_PT_OVFL_DISCARD:
-			__track_msg(
+			WT_TRACK_MSG(
 			    session, page, "discard overflow", &track->addr);
 			WT_RET(__wt_bm_free(
 			    session, track->addr.addr, track->addr.size));
@@ -326,25 +334,6 @@ __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int final)
 
 #ifdef HAVE_VERBOSE
 /*
- * __track_msg --
- *	Output a verbose message and associated page and address pair.
- */
-static void
-__track_msg(
-    WT_SESSION_IMPL *session, WT_PAGE *page, const char *msg, WT_ADDR *addr)
-{
-	WT_BUF *buf;
-
-	if (!WT_VERBOSE_ISSET(session, reconcile))
-		return;
-	if (__wt_scr_alloc(session, 64, &buf))
-		return;
-	WT_VERBOSE(session, reconcile, "page %p %s %s", page, msg,
-	    __wt_addr_string(session, buf, addr->addr, addr->size));
-	__wt_scr_free(&buf);
-}
-
-/*
  * __track_print --
  *	Display a tracked entry.
  */
@@ -354,19 +343,34 @@ __track_print(WT_SESSION_IMPL *session, WT_PAGE *page, WT_PAGE_TRACK *track)
 	switch (track->type) {
 	case WT_PT_BLOCK:
 	case WT_PT_BLOCK_EVICT:
-		__track_msg(session, page, "tracking block", &track->addr);
+		__track_msg(session, page, "track block", &track->addr);
 		return;
 	case WT_PT_OVFL:
-		__track_msg(
-		    session, page, "tracking overflow ON", &track->addr);
+		__track_msg(session, page, "track overflow ON", &track->addr);
 		break;
 	case WT_PT_OVFL_DISCARD:
-		__track_msg(
-		    session, page, "tracking overflow OFF", &track->addr);
+		__track_msg(session, page, "track overflow OFF", &track->addr);
 		break;
 	case WT_PT_EMPTY:
 	default:				/* Not possible. */
 		break;
 	}
+}
+
+/*
+ * __track_msg --
+ *	Output a verbose message and associated page and address pair.
+ */
+static void
+__track_msg(
+    WT_SESSION_IMPL *session, WT_PAGE *page, const char *msg, WT_ADDR *addr)
+{
+	WT_BUF *buf;
+
+	if (__wt_scr_alloc(session, 64, &buf))
+		return;
+	WT_VERBOSE(session, reconcile, "page %p %s %s", page, msg,
+	    __wt_addr_string(session, buf, addr->addr, addr->size));
+	__wt_scr_free(&buf);
 }
 #endif
