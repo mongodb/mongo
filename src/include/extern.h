@@ -282,7 +282,7 @@ extern int __wt_rec_track_ovfl_reuse(WT_SESSION_IMPL *session,
     uint32_t size,
     uint8_t **addrp,
     uint32_t *sizep);
-extern void __wt_rec_track_init(WT_SESSION_IMPL *session, WT_PAGE *page);
+extern int __wt_rec_track_init(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_rec_track_wrapup(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     int final);
