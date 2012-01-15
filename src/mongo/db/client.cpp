@@ -181,7 +181,6 @@ namespace mongo {
         assert( db == 0 || db->isOk() );
         _client->_context = this;
         checkNsAccess( doauth );
-        _client->checkLocks();
     }
 
     Client::Context::Context(const string& ns, string path , bool doauth, bool doVersion ) :
@@ -194,7 +193,6 @@ namespace mongo {
         _db(0) 
     {
         _finishInit( doauth );
-        _client->checkLocks();
     }
        
     /** "read lock, and set my context, all in one operation" 
@@ -270,7 +268,6 @@ namespace mongo {
         _client->_context = this;
         _client->_curOp->enter( this );
         checkNsAccess( doauth, d.dbMutex.getState() );
-        _client->checkLocks();
     }
        
     void Client::Context::_finishInit( bool doauth ) {

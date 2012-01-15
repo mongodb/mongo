@@ -226,19 +226,6 @@ namespace mongo {
             Database * _db;
         }; // class Client::Context
 
-        struct LockStatus {
-            LockStatus();
-            string whichCollection;
-            unsigned excluder, global, collection;
-            string toString() const;
-        } lockStatus;
-
-#if defined(CLC)
-        void checkLocks() const;
-#else
-        void checkLocks() const { }
-#endif
-
     }; // class Client
 
     /** get the Client object for this thread. */
