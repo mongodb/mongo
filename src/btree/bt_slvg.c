@@ -1058,7 +1058,8 @@ __slvg_col_build_internal(
 	page->u.intl.recno = 1;
 	page->entries = leaf_cnt;
 	page->type = WT_PAGE_COL_INT;
-	WT_RET(__wt_page_set_modified(session, page));
+	WT_RET(__wt_page_modify_init(session, page));
+	__wt_page_modify_set(page);
 
 	for (ref = page->u.intl.t, i = 0; i < ss->pages_next; ++i) {
 		if ((trk = ss->pages[i]) == NULL)
@@ -1175,7 +1176,8 @@ __slvg_col_build_leaf(
 	ref->addr = NULL;
 
 	/* Write the new version of the leaf page to disk. */
-	WT_ERR(__wt_page_set_modified(session, page));
+	WT_ERR(__wt_page_modify_init(session, page));
+	__wt_page_modify_set(page);
 	WT_ERR(__wt_rec_write(session, page, cookie));
 
 	/* Reset the page. */
@@ -1635,7 +1637,8 @@ __slvg_row_build_internal(
 	page->read_gen = 0;
 	page->entries = leaf_cnt;
 	page->type = WT_PAGE_ROW_INT;
-	WT_ERR(__wt_page_set_modified(session, page));
+	WT_ERR(__wt_page_modify_init(session, page));
+	__wt_page_modify_set(page);
 
 	for (ref = page->u.intl.t, i = 0; i < ss->pages_next; ++i) {
 		if ((trk = ss->pages[i]) == NULL)
@@ -1854,7 +1857,8 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 		ref->addr = NULL;
 
 		/* Write the new version of the leaf page to disk. */
-		WT_ERR(__wt_page_set_modified(session, page));
+		WT_ERR(__wt_page_modify_init(session, page));
+		__wt_page_modify_set(page);
 		WT_ERR(__wt_rec_write(session, page, cookie));
 
 		/* Reset the page. */

@@ -282,7 +282,8 @@ __rec_root_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * something huge, and now we're evicting the index page referencing all
 	 * of those leaf pages.
 	 */
-	WT_RET(__wt_page_set_modified(session, next));
+	WT_RET(__wt_page_modify_init(session, next));
+	__wt_page_modify_set(next);
 	F_CLR(next, WT_PAGE_REC_MASK);
 	WT_RET(__wt_rec_write(session, next, NULL));
 	return (__rec_root_dirty_update(session, next));

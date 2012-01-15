@@ -105,24 +105,12 @@ __wt_cache_bytes_inuse(WT_CACHE *cache)
 }
 
 /*
- * __wt_page_set_modified --
+ * __wt_page_modify_set --
  *	Mark the page dirty.
  */
-static inline int
-__wt_page_set_modified(WT_SESSION_IMPL *session, WT_PAGE *page)
+static inline void
+__wt_page_modify_set(WT_PAGE *page)
 {
-	/*
-	 * If the page has not yet been modified, it won't have a modification
-	 * structure.  This won't be the case for most leaf pages because we
-	 * create their modification structures early so we can fill in write
-	 * generation values during the search.  However, when writing a leaf
-	 * page to disk we have to mark the parent dirty, and that's likely the
-	 * first time the parent has been dirtied, and also, we have to do this
-	 * when we create pages in memory, for example, during salvage.
-	 */
-	if (page->modify == NULL)
-		WT_RET(__wt_page_modify_init(session, page));
-
 	/*
 	 * Publish: there must be a barrier to ensure all changes to the page
 	 * are flushed before we update the page's write generation, otherwise
@@ -133,8 +121,6 @@ __wt_page_set_modified(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* The page is dirty if the disk and write generations differ. */
 	++page->modify->write_gen;
-
-	return (0);
 }
 
 /*

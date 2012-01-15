@@ -68,7 +68,7 @@ __wt_session_serialize_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int ret)
 		 * page.  Wake the eviction server as necessary if the page
 		 * has become too large.
 		 */
-		ret = __wt_page_set_modified(session, page);
+		__wt_page_modify_set(page);
 		(void)__wt_eviction_page_check(session, page);
 	}
 

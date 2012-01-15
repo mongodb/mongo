@@ -257,8 +257,10 @@ __wt_rec_write(
 	 * We don't care if we race with updates: the page will still be marked
 	 * dirty and that's all we care about.
 	 */
-	if (!WT_PAGE_IS_ROOT(page))
-		WT_RET(__wt_page_set_modified(session, page->parent));
+	if (!WT_PAGE_IS_ROOT(page)) {
+		WT_RET(__wt_page_modify_init(session, page->parent));
+		__wt_page_modify_set(page->parent);
+	}
 
 	return (0);
 }
@@ -1022,7 +1024,11 @@ __wt_rec_bulk_wrapup(WT_CURSOR_BULK *cbulk)
 
 	WT_RET(__rec_split_finish(session));
 	WT_RET(__rec_write_wrapup(session, page));
-	WT_RET(__wt_page_set_modified(session, page->parent));
+
+	/* Mark the page's parent dirty. */
+	WT_RET(__wt_page_modify_init(session, page->parent));
+	__wt_page_modify_set(page->parent);
+
 	return (0);
 }
 

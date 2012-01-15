@@ -420,7 +420,8 @@ __btree_root_init_empty(WT_SESSION_IMPL *session)
 	 * Mark the child page dirty so that if it is evicted, the tree ends
 	 * up sane.
 	 */
-	WT_ERR(__wt_page_set_modified(session, leaf));
+	WT_ERR(__wt_page_modify_init(session, leaf));
+	__wt_page_modify_set(leaf);
 
 	return (0);
 
