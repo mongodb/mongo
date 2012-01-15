@@ -188,7 +188,7 @@ add_option("smokedbprefix", "prefix to dbpath et al. for smoke tests", 1 , False
 for shortName in getThirdPartyShortNames():
     add_option( "use-system-" + shortName , "use system version of library " + shortName , 0 , True )
 
-add_option( "use-system-all" , "use all system libraries " + shortName , 0 , True )
+add_option( "use-system-all" , "use all system libraries " , 0 , True )
 
 add_option( "use-cpu-profiler",
             "Link against the google-perftools profiler library",
