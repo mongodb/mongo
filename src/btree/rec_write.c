@@ -1959,8 +1959,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * references it and we built the value cell just above in the
 		 * switch statement.  Else, the WT_REF->addr reference points to
 		 * an on-page cell or an off-page WT_ADDR structure: if it's an
-		 * on-page cell and we copy it from the page, else build a new
-		 * cell.
+		 * on-page cell we copy it from the page, else build a new cell.
 		 */
 		if (!val_set) {
 			if (__wt_off_page(page, ref->addr))
@@ -2079,8 +2078,7 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * references it and we built the value cell just above in the
 		 * switch statement.  Else, the WT_REF->addr reference points to
 		 * an on-page cell or an off-page WT_ADDR structure: if it's an
-		 * on-page cell and we copy it from the page, else build a new
-		 * cell.
+		 * on-page cell we copy it from the page, else build a new cell.
 		 */
 		if (!val_set) {
 			if (__wt_off_page(page, ref->addr))
