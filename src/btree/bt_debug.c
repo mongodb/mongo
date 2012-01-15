@@ -820,7 +820,7 @@ __debug_ref(WT_DBG *ds, WT_REF *ref, WT_PAGE *page)
 
 /*
  * __debug_cell --
- *	Dump a single, optionally unpacked, WT_CELL.
+ *	Dump a single unpacked WT_CELL.
  */
 static int
 __debug_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
