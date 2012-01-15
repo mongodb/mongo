@@ -408,6 +408,7 @@ my_pre_size(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	/* Unused parameters */
 	(void)compressor;
 	(void)session;
+	(void)src;
 
 	*result_lenp = src_len;
 	return (0);
