@@ -1841,7 +1841,6 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		ikey = ref->u.key;
 		if (ikey->cell_offset == 0) {
 			cell = NULL;
-
 			/*
 			 * We need to know if we're using on-page overflow cell
 			 * in a few places below, initialize the unpacked cell's
@@ -1908,8 +1907,6 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 				break;
 			case WT_PAGE_REC_SPLIT:
 			case WT_PAGE_REC_SPLIT_MERGE:
-				r->merge_ref = ref;
-
 				/*
 				 * Overflow keys referencing split pages are no
 				 * no longer useful (the interesting key is the
@@ -1919,34 +1916,12 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 					WT_RET(__rec_track_cell(
 					    session, page, unpack));
 
+				r->merge_ref = ref;
 				WT_RET(__rec_row_merge(session,
 				    F_ISSET(rp, WT_PAGE_REC_MASK) ==
 				    WT_PAGE_REC_SPLIT_MERGE ?
 				    rp : rp->modify->u.split));
 				continue;
-			}
-		}
-
-		/*
-		 * Build the value cell.  The child page address is in one of 3
-		 * places: if the page was replaced, the page's modify structure
-		 * references it and we built the value cell just above in the
-		 * switch statement.  Else, the WT_REF->addr reference points to
-		 * an on-page cell or an off-page WT_ADDR structure: if it's an
-		 * on-page cell and we copy it from the page, else build a new
-		 * cell.
-		 */
-		if (!val_set) {
-			if (__wt_off_page(page, ref->addr))
-				__rec_cell_build_addr(session,
-				    ((WT_ADDR *)ref->addr)->addr,
-				    ((WT_ADDR *)ref->addr)->size, 0);
-			else {
-				__wt_cell_unpack(ref->addr, unpack);
-				val->buf.data = ref->addr;
-				val->buf.size = unpack->len;
-				val->cell_len = 0;
-				val->len = unpack->len;
 			}
 		}
 
@@ -1977,6 +1952,29 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 			    WT_IKEY_DATA(ikey),
 			    r->cell_zero ? 1 : ikey->size, 1, &ovfl_key));
 		r->cell_zero = 0;
+
+		/*
+		 * Build the value cell.  The child page address is in one of 3
+		 * places: if the page was replaced, the page's modify structure
+		 * references it and we built the value cell just above in the
+		 * switch statement.  Else, the WT_REF->addr reference points to
+		 * an on-page cell or an off-page WT_ADDR structure: if it's an
+		 * on-page cell and we copy it from the page, else build a new
+		 * cell.
+		 */
+		if (!val_set) {
+			if (__wt_off_page(page, ref->addr))
+				__rec_cell_build_addr(session,
+				    ((WT_ADDR *)ref->addr)->addr,
+				    ((WT_ADDR *)ref->addr)->size, 0);
+			else {
+				__wt_cell_unpack(ref->addr, unpack);
+				val->buf.data = ref->addr;
+				val->buf.size = unpack->len;
+				val->cell_len = 0;
+				val->len = unpack->len;
+			}
+		}
 
 		/*
 		 * Boundary, split or write the page.  If the K/V pair doesn't
@@ -2063,6 +2061,19 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 		}
 
 		/*
+		 * Build the key cell.  If this is the first key in a "to be
+		 * merged" subtree, use the merge correction key saved in the
+		 * top-level parent page when this function was called.
+		 *
+		 * Truncate any 0th key, internal pages don't need 0th keys.
+		 */
+		ikey = r->merge_ref == NULL ? ref->u.key : r->merge_ref->u.key;
+		r->merge_ref = NULL;
+		WT_RET(__rec_cell_build_key(session, WT_IKEY_DATA(ikey),
+		    r->cell_zero ? 1 : ikey->size, 1, &ovfl_key));
+		r->cell_zero = 0;
+
+		/*
 		 * Build the value cell.  The child page address is in one of 3
 		 * places: if the page was replaced, the page's modify structure
 		 * references it and we built the value cell just above in the
@@ -2084,19 +2095,6 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 				val->len = unpack->len;
 			}
 		}
-
-		/*
-		 * Build the key cell.  If this is the first key in a "to be
-		 * merged" subtree, use the merge correction key saved in the
-		 * top-level parent page when this function was called.
-		 *
-		 * Truncate any 0th key, internal pages don't need 0th keys.
-		 */
-		ikey = r->merge_ref == NULL ? ref->u.key : r->merge_ref->u.key;
-		r->merge_ref = NULL;
-		WT_RET(__rec_cell_build_key(session, WT_IKEY_DATA(ikey),
-		    r->cell_zero ? 1 : ikey->size, 1, &ovfl_key));
-		r->cell_zero = 0;
 
 		/*
 		 * Boundary, split or write the page.  If the K/V pair doesn't
