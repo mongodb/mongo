@@ -495,11 +495,13 @@ namespace mongo {
 
         static bool _groupCommitWithLimitedLocks() {
 
+            assert( !d.dbMutex.atLeastReadLocked() );
+
             scoped_ptr<ExcludeAllWrites> lk1( new ExcludeAllWrites() );
 
             scoped_lock lk2(groupCommitMutex);
 
-            commitJob.beginCommit();
+            commitJob.beginCommit(); // increments the commit epoch for getlasterror j:true
 
             if( !commitJob.hasWritten() ) {
                 // getlasterror request could have came after the data was already committed
@@ -660,6 +662,9 @@ namespace mongo {
                 // remapping a lot all at once could cause jitter from a large amount of copy-on-writes all at once.
                 if( groupCommitWithLimitedLocks() )
                     return;
+
+                // question : if we want to remapprivateview should we go straight to the read lock instead of the 
+                //            else block below?
             }
             else {
                 readlocktry lk("", 1000);
