@@ -151,7 +151,7 @@ namespace mongo {
         }
         else {
             views.push_back(view);
-            memconcept::is(view, memconcept::concept::memorymappedfile, this->filename(), length);
+            memconcept::is(view, memconcept::concept::memorymappedfile, this->filename(), (unsigned) length);
         }
         len = length;
         return view;
