@@ -19,6 +19,7 @@
 
 #if defined(_WIN32)
 #include <windows.h>
+#include "boost/program_options.hpp"
 
 namespace mongo {
 

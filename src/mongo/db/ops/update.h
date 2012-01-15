@@ -182,7 +182,7 @@ namespace mongo {
 
             if ( strstr( fieldName , "." ) ) {
                 // check for a.0.1
-                StringBuilder buf( fullName.size() + 1 );
+                StringBuilder buf;
                 for ( size_t i=0; i<fullName.size(); i++ ) {
                     char c = fullName[i];
 

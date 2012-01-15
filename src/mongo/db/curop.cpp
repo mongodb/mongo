@@ -147,7 +147,7 @@ namespace mongo {
         
         if ( ! _message.empty() ) {
             if ( _progressMeter.isActive() ) {
-                StringBuilder buf(128);
+                StringBuilder buf;
                 buf << _message.toString() << " " << _progressMeter.toString();
                 b.append( "msg" , buf.str() );
                 BSONObjBuilder sub( b.subobjStart( "progress" ) );

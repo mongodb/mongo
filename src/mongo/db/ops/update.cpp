@@ -25,6 +25,7 @@
 #include "../btree.h"
 #include "../../util/stringutils.h"
 #include "update.h"
+#include "../pagefault.h"
 
 //#define DEBUGUPDATE(x) cout << x << endl;
 #define DEBUGUPDATE(x)
@@ -649,7 +650,7 @@ namespace mongo {
         BSONElement e = es.next();
 
         ModStateHolder::iterator m = _mods.lower_bound( root );
-        StringBuilder buf(root.size() + 2 );
+        StringBuilder buf;
         buf << root << (char)255;
         ModStateHolder::iterator mend = _mods.lower_bound( buf.str() );
 
@@ -879,7 +880,7 @@ namespace mongo {
                 n->_mods[s] = i->second;
                 continue;
             }
-            StringBuilder buf(s.size()+strlen(elemMatchKey));
+            StringBuilder buf;
             buf << s.substr(0,idx+1) << elemMatchKey << s.substr(idx+2);
             string fixed = buf.str();
             DEBUGUPDATE( "fixed dynamic: " << s << " -->> " << fixed );
@@ -927,32 +928,8 @@ namespace mongo {
         }
         Record *r = loc.rec();
 
-        if ( ! r->likelyInPhysicalMemory() ) {
-            {
-                scoped_ptr<LockMongoFilesShared> lk( new LockMongoFilesShared() );
-                dbtempreleasewritelock t;
-                r->touch();
-                lk.reset(0); // we have to release mmmutex before we can re-acquire dbmutex
-            }
-            
-            {
-                // we need to re-find in case something changed
-                d = nsdetails( ns );
-                if ( ! d ) {
-                    // dropped 
-                    return UpdateResult(0, 0, 0);
-                }
-                nsdt = &NamespaceDetailsTransient::get(ns);
-                IndexDetails& i = d->idx(idIdxNo);
-                BSONObj key = i.getKeyFromQuery( patternOrig );            
-                loc = i.idxInterface().findSingle(i, i.head, key);
-                if( loc.isNull() ) {
-                    // no upsert support in _updateById yet, so we are done.
-                    return UpdateResult(0, 0, 0);
-                }
-                
-                r = loc.rec();
-            }
+        if ( cc().allowedToThrowPageFaultException() && ! r->likelyInPhysicalMemory() ) {
+            throw PageFaultException( r );
         }
 
         /* look for $inc etc.  note as listed here, all fields to inc must be this type, you can't set some
@@ -1052,9 +1029,8 @@ namespace mongo {
         }
 
         int numModded = 0;
-        long long nscanned = 0;
+        debug.nscanned = 0;
         shared_ptr< Cursor > c = NamespaceDetailsTransient::getCursor( ns, patternOrig );
-
         d = nsdetails(ns);
         nsdt = &NamespaceDetailsTransient::get(ns);
         bool autoDedup = c->autoDedup();
@@ -1064,17 +1040,23 @@ namespace mongo {
             MatchDetails details;
             auto_ptr<ClientCursor> cc;
             do {
-                nscanned++;
+                
+                if ( cc.get() == 0 && 
+                     client.allowedToThrowPageFaultException() && 
+                     ! c->currLoc().isNull() && 
+                     ! c->currLoc().rec()->likelyInPhysicalMemory() ) {
+                    throw PageFaultException( c->currLoc().rec() );
+                }
 
                 bool atomic = c->matcher() && c->matcher()->docMatcher().atomic();
                 
-                if ( !atomic ) {
-                    // *****************
+                if ( ! atomic && debug.nscanned > 0 ) {
+                    // we need to use a ClientCursor to yield
                     if ( cc.get() == 0 ) {
                         shared_ptr< Cursor > cPtr = c;
                         cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , cPtr , ns ) );
                     }
-    
+
                     bool didYield;
                     if ( ! cc->yieldSometimes( ClientCursor::WillNeed, &didYield ) ) {
                         cc.release();
@@ -1083,18 +1065,20 @@ namespace mongo {
                     if ( !c->ok() ) {
                         break;
                     }
-                
+                    
                     if ( didYield ) {
                         d = nsdetails(ns);
                         nsdt = &NamespaceDetailsTransient::get(ns);
                     }
-                    // *****************
-                }
+
+                } // end yielding block
+
+                debug.nscanned++;
 
                 if ( !c->currentMatches( &details ) ) {
                     c->advance();
 
-                    if ( nscanned % 256 == 0 && ! atomic ) {
+                    if ( debug.nscanned % 256 == 0 && ! atomic ) {
                         if ( cc.get() == 0 ) {
                             shared_ptr< Cursor > cPtr = c;
                             cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , cPtr , ns ) );
@@ -1141,9 +1125,6 @@ namespace mongo {
                         uassert( 10157 ,  "multi-update requires all modified objects to have an _id" , ! multi );
                     }
                 }
-
-                if ( profile && !multi )
-                    debug.nscanned = (int) nscanned;
 
                 /* look for $inc etc.  note as listed here, all fields to inc must be this type, you can't set some
                     regular ones at the moment. */
@@ -1230,7 +1211,7 @@ namespace mongo {
                     if ( willAdvanceCursor )
                         c->recoverFromTouchingEarlierIterate();
 
-                    if ( nscanned % 64 == 0 && ! atomic ) {
+                    if ( debug.nscanned % 64 == 0 && ! atomic ) {
                         if ( cc.get() == 0 ) {
                             shared_ptr< Cursor > cPtr = c;
                             cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , cPtr , ns ) );
@@ -1266,10 +1247,6 @@ namespace mongo {
 
         if ( numModded )
             return UpdateResult( 1 , 1 , numModded );
-
-        // todo: no need for "if( profile )" here as that probably just makes things slower?
-        if ( profile )
-            debug.nscanned = (int) nscanned;
 
         if ( upsert ) {
             if ( updateobj.firstElementFieldName()[0] == '$' ) {

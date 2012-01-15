@@ -391,19 +391,23 @@ namespace mongo {
             
             {
                 string orig = getParam( "host" );
+                bool showPorts = false;
                 if ( orig == "" )
                     orig = "localhost";
-                
-                if ( orig.find( ":" ) == string::npos ) {
-                    if ( hasParam( "port" ) )
-                        orig += ":" + _params["port"].as<string>();
-                    else 
-                        orig += ":27017";
-                }
-                
+
+                if ( orig.find( ":" ) != string::npos )
+                    showPorts = true;
+
                 StringSplitter ss( orig.c_str() , "," );
                 while ( ss.more() ) {
                     string host = ss.next();
+                    if ( showPorts && host.find( ":" ) == string::npos) {
+                        // port supplied, but not for this host.  use default.
+                        if ( hasParam( "port" ) )
+                            host += ":" + _params["port"].as<string>();
+                        else
+                            host += ":27017";
+                    }
                     _add( threads , host );
                 }
             }

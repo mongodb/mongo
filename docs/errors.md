@@ -1642,6 +1642,7 @@ src/mongo/tools/import.cpp
 src/mongo/tools/restore.cpp
 ----
 * 15934 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/tools/restore.cpp#L422) JSON object size didn't match file size
+* 15935 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/tools/restore.cpp#L81) user does not have write access
 * 15936 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/tools/restore.cpp#L486) Creating collection " + _curns + " failed. Errmsg: " + info["errmsg
 
 

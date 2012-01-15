@@ -26,8 +26,14 @@ for ( iter=0; iter<2; iter++ ){
     for (i=0; i<numbatch; i++){ db.foo.save({a: Math.random() * 1000, y:str})}
     db.getLastError();
     numdocs += numbatch
-    assert.eq( numdocs, db.foo.find().itcount(), "Not all data was saved!" )
-
+    
+    var isBad = db.foo.find().itcount() != numdocs
+    
+    // Verify that wbl weirdness isn't causing this
+    assert.soon( function(){ var c = db.foo.find().itcount(); print( "Count is " + c ); return c == numdocs } )
+    assert( ! isBad )
+    //assert.eq( numdocs, db.foo.find().itcount(), "Not all data was saved!" )
+    
     res = db.foo.mapReduce(map2, reduce2, { out : { replace: "mrShardedOut", sharded: true }});
     assert.eq( numdocs , res.counts.output , "Output is wrong " );
     printjson(res);

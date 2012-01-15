@@ -18,14 +18,16 @@
 
 #include "tool.h"
 
+#include <fstream>
 #include <iostream>
 
-#include <boost/filesystem/operations.hpp>
 #include "pcrecpp.h"
 
 #include "util/file_allocator.h"
 #include "util/password.h"
 #include "util/version.h"
+
+#include <boost/filesystem/operations.hpp>
 
 using namespace std;
 using namespace mongo;
@@ -368,7 +370,7 @@ namespace mongo {
 
         if ( hasParam( "fieldFile" ) ) {
             string fn = getParam( "fieldFile" );
-            if ( ! exists( fn ) )
+            if ( ! boost::filesystem::exists( fn ) )
                 throw UserException( 9999 , ((string)"file: " + fn ) + " doesn't exist" );
 
             const int BUF_SIZE = 1024;
@@ -393,7 +395,12 @@ namespace mongo {
         throw UserException( 9998 , "you need to specify fields" );
     }
 
-    void Tool::auth( string dbname ) {
+    /** 
+     * Validate authentication on the server for the given dbname.  populates
+     * level (if supplied) with the user's credentials.
+     */
+    void Tool::auth( string dbname, Auth::Level * level ) {
+
         if ( ! dbname.size() )
             dbname = _db;
 
@@ -404,17 +411,23 @@ namespace mongo {
                 // BSONTools don't have a collection
                 conn().findOne(getNS(), Query("{}"), 0, QueryOption_SlaveOk);
             }
+
+            // set write-level access if authentication is disabled
+            if ( level != NULL )
+                *level = Auth::WRITE;
+
             return;
         }
 
         string errmsg;
-        if ( _conn->auth( dbname , _username , _password , errmsg ) )
+        if ( _conn->auth( dbname , _username , _password , errmsg, true, level ) ) {
             return;
+        }
 
         // try against the admin db
-        string err2;
-        if ( _conn->auth( "admin" , _username , _password , errmsg ) )
+        if ( _conn->auth( "admin" , _username , _password , errmsg, true, level ) ) {
             return;
+        }
 
         throw UserException( 9997 , (string)"authentication failed: " + errmsg );
     }
@@ -438,7 +451,7 @@ namespace mongo {
         return doRun();
     }
 
-    long long BSONTool::processFile( const path& root ) {
+    long long BSONTool::processFile( const boost::filesystem::path& root ) {
         _fileName = root.string();
 
         unsigned long long fileLength = file_size( root );

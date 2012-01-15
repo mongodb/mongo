@@ -25,6 +25,7 @@
 #include "../util/net/message_port.h"
 #include "../db/jsobj.h"
 #include "../db/json.h"
+#include "../db/security.h"
 #include <stack>
 
 namespace mongo {
@@ -506,10 +507,11 @@ namespace mongo {
             number of databases on a single connection.
             The "admin" database is special and once authenticated provides access to all databases on the
             server.
-            @param digestPassword if password is plain text, set this to true.  otherwise assumed to be pre-digested
+            @param      digestPassword  if password is plain text, set this to true.  otherwise assumed to be pre-digested
+            @param[out] authLevel       level of authentication for the given user
             @return true if successful
         */
-        virtual bool auth(const string &dbname, const string &username, const string &pwd, string& errmsg, bool digestPassword = true);
+        virtual bool auth(const string &dbname, const string &username, const string &pwd, string& errmsg, bool digestPassword = true, Auth::Level * level = NULL);
 
         /** count number of objects in collection ns that match the query criteria specified
             throws UserAssertion if database returns an error

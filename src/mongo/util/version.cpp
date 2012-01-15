@@ -21,6 +21,7 @@
 #include <iomanip>
 #include <sstream>
 #include <string>
+#include <fstream>
 #include "unittest.h"
 #include "version.h"
 #include "stringutils.h"
@@ -28,6 +29,8 @@
 #include "file.h"
 #include "ramlog.h"
 #include "../db/cmdline.h"
+
+#include <boost/filesystem/operations.hpp>
 
 namespace mongo {
 

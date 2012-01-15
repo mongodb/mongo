@@ -24,42 +24,42 @@ namespace mongo {
     }
 
     bool DocumentSourceCommandFutures::eof() {
-	/* if we haven't even started yet, do so */
-	if (!pCurrent.get())
-	    getNextDocument();
+        /* if we haven't even started yet, do so */
+        if (!pCurrent.get())
+            getNextDocument();
 
-	return (pCurrent.get() == NULL);
+        return (pCurrent.get() == NULL);
     }
 
     bool DocumentSourceCommandFutures::advance() {
-	if (eof())
-	    return false;
+        if (eof())
+            return false;
 
-	/* advance */
-	getNextDocument();
+        /* advance */
+        getNextDocument();
 
-	return (pCurrent.get() != NULL);
+        return (pCurrent.get() != NULL);
     }
 
     intrusive_ptr<Document> DocumentSourceCommandFutures::getCurrent() {
-	assert(!eof());
-	return pCurrent;
+        assert(!eof());
+        return pCurrent;
     }
 
     void DocumentSourceCommandFutures::setSource(
-	const intrusive_ptr<DocumentSource> &pSource) {
-	/* this doesn't take a source */
-	assert(false);
+        const intrusive_ptr<DocumentSource> &pSource) {
+        /* this doesn't take a source */
+        assert(false);
     }
 
     void DocumentSourceCommandFutures::sourceToBson(
-	BSONObjBuilder *pBuilder) const {
+        BSONObjBuilder *pBuilder) const {
         /* this has no BSON equivalent */
-	assert(false);
+        assert(false);
     }
 
     DocumentSourceCommandFutures::DocumentSourceCommandFutures(
-	string &theErrmsg, FuturesList *pList):
+        string &theErrmsg, FuturesList *pList):
         newSource(false),
         pBsonSource(),
         pCurrent(),
@@ -70,63 +70,63 @@ namespace mongo {
 
     intrusive_ptr<DocumentSourceCommandFutures>
     DocumentSourceCommandFutures::create(
-	string &errmsg, FuturesList *pList) {
-	intrusive_ptr<DocumentSourceCommandFutures> pSource(
-	    new DocumentSourceCommandFutures(errmsg, pList));
-	return pSource;
+        string &errmsg, FuturesList *pList) {
+        intrusive_ptr<DocumentSourceCommandFutures> pSource(
+            new DocumentSourceCommandFutures(errmsg, pList));
+        return pSource;
     }
 
     void DocumentSourceCommandFutures::getNextDocument() {
-	while(true) {
-	    if (!pBsonSource.get()) {
-		/* if there aren't any more futures, we're done */
-		if (iterator == listEnd) {
-		    pCurrent.reset();
-		    return;
-		}
+        while(true) {
+            if (!pBsonSource.get()) {
+                /* if there aren't any more futures, we're done */
+                if (iterator == listEnd) {
+                    pCurrent.reset();
+                    return;
+                }
 
-		/* grab the next command result */
-		shared_ptr<Future::CommandResult> pResult(*iterator);
-		++iterator;
+                /* grab the next command result */
+                shared_ptr<Future::CommandResult> pResult(*iterator);
+                ++iterator;
 
-		/* try to wait for it */
-		if (!pResult->join()) {
-		    error() << "sharded pipeline failed on shard: " <<
-			pResult->getServer() << " error: " <<
-			pResult->result() << endl;
-		    errmsg += "-- mongod pipeline failed: ";
-		    errmsg += pResult->result().toString();
+                /* try to wait for it */
+                if (!pResult->join()) {
+                    error() << "sharded pipeline failed on shard: " <<
+                        pResult->getServer() << " error: " <<
+                        pResult->result() << endl;
+                    errmsg += "-- mongod pipeline failed: ";
+                    errmsg += pResult->result().toString();
 
-		    /* move on to the next command future */
-		    continue;
-		}
+                    /* move on to the next command future */
+                    continue;
+                }
 
-		/* grab the result array out of the shard server's response */
-		BSONObj shardResult(pResult->result());
-		BSONObjIterator objIterator(shardResult);
-		while(objIterator.more()) {
-		    BSONElement element(objIterator.next());
-		    const char *pFieldName = element.fieldName();
+                /* grab the result array out of the shard server's response */
+                BSONObj shardResult(pResult->result());
+                BSONObjIterator objIterator(shardResult);
+                while(objIterator.more()) {
+                    BSONElement element(objIterator.next());
+                    const char *pFieldName = element.fieldName();
 
-		    /* find the result array and quit this loop */
-		    if (strcmp(pFieldName, "result") == 0) {
-			pBsonSource = DocumentSourceBsonArray::create(&element);
-			newSource = true;
-			break;
-		    }
-		}
-	    }
+                    /* find the result array and quit this loop */
+                    if (strcmp(pFieldName, "result") == 0) {
+                        pBsonSource = DocumentSourceBsonArray::create(&element);
+                        newSource = true;
+                        break;
+                    }
+                }
+            }
 
-	    /* if we're done with this shard's results, try the next */
-	    if (pBsonSource->eof() ||
-		(!newSource && !pBsonSource->advance())) {
-		pBsonSource.reset();
-		continue;
-	    }
+            /* if we're done with this shard's results, try the next */
+            if (pBsonSource->eof() ||
+                (!newSource && !pBsonSource->advance())) {
+                pBsonSource.reset();
+                continue;
+            }
 
-	    pCurrent = pBsonSource->getCurrent();
-	    newSource = false;
-	    return;
-	}
+            pCurrent = pBsonSource->getCurrent();
+            newSource = false;
+            return;
+        }
     }
 }

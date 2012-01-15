@@ -149,8 +149,8 @@ namespace mongo {
         void goingToDelete( const BSONObj& o );
 
     private:
-        path _root;
-        path _file;
+        boost::filesystem::path _root;
+        boost::filesystem::path _file;
         ofstream* _out;
 
     };

@@ -45,11 +45,15 @@
 #include "ops/update.h"
 #include "pagefault.h"
 
-namespace mongo {
+#include <fstream>
 
-    // "diaglog"
+#include <boost/filesystem/operations.hpp>
+
+namespace mongo {
+    
+    // for diaglog
     inline void opread(Message& m) { if( _diaglog.getLevel() & 2 ) _diaglog.readop((char *) m.singleData(), m.header()->len); }
-    inline void opwrite(Message& m) { if( _diaglog.getLevel() & 1 ) _diaglog.write((char *) m.singleData(), m.header()->len); }
+    inline void opwrite(Message& m) { if( _diaglog.getLevel() & 1 ) _diaglog.writeop((char *) m.singleData(), m.header()->len); }
 
     void receivedKillCursors(Message& m);
     void receivedUpdate(Message& m, CurOp& op);
@@ -62,9 +66,6 @@ namespace mongo {
 
     string dbExecCommand;
 
-    DiagLog _diaglog;
-
-    bool useCursors = true;
     bool useHints = true;
 
     KillCurrentOp killCurrentOp;
@@ -291,7 +292,7 @@ namespace mongo {
     }
 
     // Returns false when request includes 'end'
-    void _assembleResponse( Message &m, DbResponse &dbresponse, const HostAndPort& remote ) {
+    void assembleResponse( Message &m, DbResponse &dbresponse, const HostAndPort& remote ) {
 
         // before we lock...
         int op = m.operation();
@@ -444,21 +445,7 @@ namespace mongo {
         }
         
         debug.reset();
-    } /* _assembleResponse() */
-
-    void assembleResponse( Message &m, DbResponse &dbresponse, const HostAndPort& remote ) {
-        PageFaultRetryableSection s;
-        while( 1 ) {
-            try {
-                _assembleResponse( m, dbresponse, remote );
-                break;
-            }
-            catch( PageFaultException& e ) { 
-                DEV log() << "TEMP PageFaultException touch and retry" << endl;
-                e.touch();
-            } 
-        }
-    }
+    } /* assembleResponse() */
 
     void receivedKillCursors(Message& m) {
         int *x = (int *) m.singleData()->_data;
@@ -532,20 +519,30 @@ namespace mongo {
         op.debug().query = query;
         op.setQuery(query);
 
-        writelock lk;
-
-        // void ReplSetImpl::relinquish() uses big write lock so 
-        // this is thus synchronized given our lock above.
-        uassert( 10054 ,  "not master", isMasterNs( ns ) );
         
-        // if this ever moves to outside of lock, need to adjust check Client::Context::_finishInit
-        if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
-            return;
-
-        Client::Context ctx( ns );
-
-        UpdateResult res = updateObjects(ns, toupdate, query, upsert, multi, true, op.debug() );
-        lastError.getSafe()->recordUpdate( res.existing , res.num , res.upserted ); // for getlasterror
+        PageFaultRetryableSection s;
+        while ( 1 ) {
+            try {
+                writelock lk;
+                
+                // void ReplSetImpl::relinquish() uses big write lock so 
+                // this is thus synchronized given our lock above.
+                uassert( 10054 ,  "not master", isMasterNs( ns ) );
+                
+                // if this ever moves to outside of lock, need to adjust check Client::Context::_finishInit
+                if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
+                    return;
+                
+                Client::Context ctx( ns );
+                
+                UpdateResult res = updateObjects(ns, toupdate, query, upsert, multi, true, op.debug() );
+                lastError.getSafe()->recordUpdate( res.existing , res.num , res.upserted ); // for getlasterror
+                break;
+            }
+            catch ( PageFaultException& e ) {
+                e.touch();
+            }
+        }
     }
 
     void receivedDelete(Message& m, CurOp& op) {
@@ -754,7 +751,7 @@ namespace mongo {
                 boost::filesystem::path p = *i;
                 string dbName = p.leaf();
                 p /= ( dbName + ".ns" );
-                if ( MMF::exists( p ) )
+                if ( exists( p ) )
                     names.push_back( dbName );
             }
             else {
@@ -1144,5 +1141,67 @@ namespace mongo {
         }
     }
 #endif
+
+    // ----- BEGIN Diaglog -----
+    DiagLog::DiagLog() : f(0) , level(0), mutex("DiagLog") { 
+    }
+
+    void DiagLog::openFile() {
+        assert( f == 0 );
+        stringstream ss;
+        ss << dbpath << "/diaglog." << hex << time(0);
+        string name = ss.str();
+        f = new ofstream(name.c_str(), ios::out | ios::binary);
+        if ( ! f->good() ) {
+            problem() << "diagLogging couldn't open " << name << endl;
+            // todo what is this? :
+            throw 1717;
+        }
+        else {
+            log() << "diagLogging using file " << name << endl;
+        }
+    }
+
+    int DiagLog::setLevel( int newLevel ) {
+        scoped_lock lk(mutex);
+        int old = level;
+        log() << "diagLogging level=" << newLevel << endl;
+        if( f == 0 ) { 
+            openFile();
+        }
+        level = newLevel; // must be done AFTER f is set
+        return old;
+    }
+    
+    void DiagLog::flush() {
+        if ( level ) {
+            log() << "flushing diag log" << endl;
+            scoped_lock lk(mutex);
+            f->flush();
+        }
+    }
+    
+    void DiagLog::writeop(char *data,int len) {
+        if ( level & 1 ) {
+            scoped_lock lk(mutex);
+            f->write(data,len);
+        }
+    }
+    
+    void DiagLog::readop(char *data, int len) {
+        if ( level & 2 ) {
+            bool log = (level & 4) == 0;
+            OCCASIONALLY log = true;
+            if ( log ) {
+                scoped_lock lk(mutex);
+                assert( f );
+                f->write(data,len);
+            }
+        }
+    }
+
+    DiagLog _diaglog;
+
+    // ----- END Diaglog -----
 
 } // namespace mongo

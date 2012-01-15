@@ -89,7 +89,7 @@ namespace mongo {
         static bool validDBName( const string& db ) {
             if ( db.size() == 0 || db.size() > 64 )
                 return false;
-            size_t good = strcspn( db.c_str() , "/\\. \"" );
+            size_t good = strcspn( db.c_str() , "/\\. \"*<>:|?" );
             return good == db.size();
         }
 

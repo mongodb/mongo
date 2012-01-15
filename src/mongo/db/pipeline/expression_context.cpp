@@ -24,12 +24,12 @@ namespace mongo {
     }
 
     inline ExpressionContext::ExpressionContext():
-	inShard(false),
-	inRouter(false) {
+        inShard(false),
+        inRouter(false) {
     }
 
     ExpressionContext *ExpressionContext::create() {
-	return new ExpressionContext();
+        return new ExpressionContext();
     }
 
 }

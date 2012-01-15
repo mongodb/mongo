@@ -22,6 +22,8 @@
 #include "../db/namespace.h"
 #include "../db/cmdline.h"
 
+#include <boost/filesystem/operations.hpp>
+
 namespace mongo {
 
     set<MongoFile*> MongoFile::mmfiles;
@@ -31,7 +33,7 @@ namespace mongo {
     @param zero fill file with zeros when true
     */
     void* MemoryMappedFile::create(string filename, unsigned long long len, bool zero) {
-        uassert( 13468, string("can't create file already exists ") + filename, !exists(filename) );
+        uassert( 13468, string("can't create file already exists ") + filename, ! boost::filesystem::exists(filename) );
         void *p = map(filename.c_str(), len);
         if( p && zero ) {
             size_t sz = (size_t) len;

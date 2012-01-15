@@ -27,74 +27,80 @@ namespace mongo {
     }
 
     bool DocumentSourceCursor::eof() {
-	/* if we haven't gotten the first one yet, do so now */
-	if (!pCurrent.get())
-	    findNext();
+        /* if we haven't gotten the first one yet, do so now */
+        if (!pCurrent.get())
+            findNext();
 
         return (pCurrent.get() == NULL);
     }
 
     bool DocumentSourceCursor::advance() {
-	/* if we haven't gotten the first one yet, do so now */
-	if (!pCurrent.get())
-	    findNext();
+        /* if we haven't gotten the first one yet, do so now */
+        if (!pCurrent.get())
+            findNext();
 
-	findNext();
+        findNext();
         return (pCurrent.get() != NULL);
     }
 
     intrusive_ptr<Document> DocumentSourceCursor::getCurrent() {
-	/* if we haven't gotten the first one yet, do so now */
-	if (!pCurrent.get())
-	    findNext();
+        /* if we haven't gotten the first one yet, do so now */
+        if (!pCurrent.get())
+            findNext();
 
-	return pCurrent;
+        return pCurrent;
     }
 
     void DocumentSourceCursor::findNext() {
-	/* standard cursor usage pattern */
-	while(pCursor->ok()) {
-	    CoveredIndexMatcher *pCIM; // save intermediate result
-	    if ((!(pCIM = pCursor->matcher()) ||
-		 pCIM->matchesCurrent(pCursor.get())) &&
-		!pCursor->getsetdup(pCursor->currLoc())) {
+        /* standard cursor usage pattern */
+        while(pCursor->ok()) {
+            CoveredIndexMatcher *pCIM; // save intermediate result
+            if ((!(pCIM = pCursor->matcher()) ||
+                 pCIM->matchesCurrent(pCursor.get())) &&
+                !pCursor->getsetdup(pCursor->currLoc())) {
 
-		/* grab the matching document */
-		BSONObj documentObj(pCursor->current());
-		pCurrent = Document::createFromBsonObj(&documentObj);
-		pCursor->advance();
-		return;
-	    }
+                /* grab the matching document */
+                BSONObj documentObj(pCursor->current());
+                pCurrent = Document::createFromBsonObj(&documentObj);
+                pCursor->advance();
+                return;
+            }
 
-	    pCursor->advance();
-	}
+            pCursor->advance();
+        }
 
-	/* if we got here, there aren't any more documents */
-	pCurrent.reset();
+        /* if we got here, there aren't any more documents */
+        pCurrent.reset();
     }
 
     void DocumentSourceCursor::setSource(
-	const intrusive_ptr<DocumentSource> &pSource) {
-	/* this doesn't take a source */
-	assert(false);
+        const intrusive_ptr<DocumentSource> &pSource) {
+        /* this doesn't take a source */
+        assert(false);
     }
 
     void DocumentSourceCursor::sourceToBson(BSONObjBuilder *pBuilder) const {
-	/* this has no analog in the BSON world */
-	assert(false);
+        /* this has no analog in the BSON world */
+        assert(false);
     }
 
     DocumentSourceCursor::DocumentSourceCursor(
-	const shared_ptr<Cursor> &pTheCursor):
-        pCursor(pTheCursor),
-        pCurrent() {
+        const shared_ptr<Cursor> &pTheCursor):
+        pCurrent(),
+        bsonDependencies(),
+        pCursor(pTheCursor) {
     }
 
     intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
-	const shared_ptr<Cursor> &pCursor) {
-	assert(pCursor.get());
-	intrusive_ptr<DocumentSourceCursor> pSource(
-	    new DocumentSourceCursor(pCursor));
-	    return pSource;
+        const shared_ptr<Cursor> &pCursor) {
+        assert(pCursor.get());
+        intrusive_ptr<DocumentSourceCursor> pSource(
+            new DocumentSourceCursor(pCursor));
+            return pSource;
+    }
+
+    void DocumentSourceCursor::addBsonDependency(
+        const shared_ptr<BSONObj> &pBsonObj) {
+        bsonDependencies.push_back(pBsonObj);
     }
 }

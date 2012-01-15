@@ -1361,130 +1361,133 @@ namespace mongo {
         } compactCmd;
 
 
-	/*
-	  Note these are in the pub_grid_cmds namespace, so they don't
-	  conflict with those in db/commands/pipeline_command.cpp.
-	 */
-	class PipelineCommand :
-	    public PublicGridCommand {
-	public:
-	    PipelineCommand();
+        /*
+          Note these are in the pub_grid_cmds namespace, so they don't
+          conflict with those in db/commands/pipeline_command.cpp.
+         */
+        class PipelineCommand :
+            public PublicGridCommand {
+        public:
+            PipelineCommand();
 
-	    // virtuals from Command
-	    virtual bool run(const string &dbName , BSONObj &cmdObj,
-			     int options, string &errmsg,
-			     BSONObjBuilder &result, bool fromRepl);
+            // virtuals from Command
+            virtual bool run(const string &dbName , BSONObj &cmdObj,
+                             int options, string &errmsg,
+                             BSONObjBuilder &result, bool fromRepl);
 
-	private:
-	    
-	};
+        private:
+            
+        };
 
 
-	/* -------------------- PipelineCommand ----------------------------- */
+        /* -------------------- PipelineCommand ----------------------------- */
 
-	static const PipelineCommand pipelineCommand;
+        static const PipelineCommand pipelineCommand;
 
-	PipelineCommand::PipelineCommand():
-	    PublicGridCommand(Pipeline::commandName) {
-	}
+        PipelineCommand::PipelineCommand():
+            PublicGridCommand(Pipeline::commandName) {
+        }
 
-	bool PipelineCommand::run(const string &dbName , BSONObj &cmdObj,
-				  int options, string &errmsg,
-				  BSONObjBuilder &result, bool fromRepl) {
-	    //const string shardedOutputCollection = getTmpName( collection );
+        bool PipelineCommand::run(const string &dbName , BSONObj &cmdObj,
+                                  int options, string &errmsg,
+                                  BSONObjBuilder &result, bool fromRepl) {
+            //const string shardedOutputCollection = getTmpName( collection );
 
-	    intrusive_ptr<ExpressionContext> pCtx(
-		ExpressionContext::create());
-	    pCtx->setInRouter(true);
+            intrusive_ptr<ExpressionContext> pCtx(
+                ExpressionContext::create());
+            pCtx->setInRouter(true);
 
-	    /* parse the pipeline specification */
-	    boost::shared_ptr<Pipeline> pPipeline(
-		Pipeline::parseCommand(errmsg, cmdObj, pCtx));
-	    if (!pPipeline.get())
-		return false; // there was some parsing error
+            /* parse the pipeline specification */
+            boost::shared_ptr<Pipeline> pPipeline(
+                Pipeline::parseCommand(errmsg, cmdObj, pCtx));
+            if (!pPipeline.get())
+                return false; // there was some parsing error
 
-	    string fullns(dbName + "." + pPipeline->getCollectionName());
+            string fullns(dbName + "." + pPipeline->getCollectionName());
 
-	    /*
-	      If the system isn't running sharded, or the target collection
-	      isn't sharded, pass this on to a mongod.
-	    */
-	    DBConfigPtr conf(grid.getDBConfig(dbName , false));
-	    if (!conf || !conf->isShardingEnabled() || !conf->isSharded(fullns))
-		return passthrough(conf, cmdObj, result);
+            /*
+              If the system isn't running sharded, or the target collection
+              isn't sharded, pass this on to a mongod.
+            */
+            DBConfigPtr conf(grid.getDBConfig(dbName , false));
+            if (!conf || !conf->isShardingEnabled() || !conf->isSharded(fullns))
+                return passthrough(conf, cmdObj, result);
 
-	    /* split the pipeline into pieces for mongods and this mongos */
-	    boost::shared_ptr<Pipeline> pShardPipeline(
-		pPipeline->splitForSharded());
+            /* split the pipeline into pieces for mongods and this mongos */
+            boost::shared_ptr<Pipeline> pShardPipeline(
+                pPipeline->splitForSharded());
 
-	    /* create the command for the shards */
-	    BSONObjBuilder commandBuilder;
-	    pShardPipeline->toBson(&commandBuilder);
-	    BSONObj shardedCommand(commandBuilder.done());
+            /* create the command for the shards */
+            BSONObjBuilder commandBuilder;
+            pShardPipeline->toBson(&commandBuilder);
+            BSONObj shardedCommand(commandBuilder.done());
 
-	    BSONObjBuilder shardQueryBuilder;
-	    BSONObjBuilder shardSortBuilder;
-	    pShardPipeline->getCursorMods(
-		&shardQueryBuilder, &shardSortBuilder);
-	    BSONObj shardQuery(shardQueryBuilder.done());
-	    BSONObj shardSort(shardSortBuilder.done());
+            BSONObjBuilder shardQueryBuilder;
+#ifdef NEVER
+            BSONObjBuilder shardSortBuilder;
+            pShardPipeline->getCursorMods(
+                &shardQueryBuilder, &shardSortBuilder);
+            BSONObj shardSort(shardSortBuilder.done());
+#endif /* NEVER */
+            pShardPipeline->getInitialQuery(&shardQueryBuilder);
+            BSONObj shardQuery(shardQueryBuilder.done());
 
-	    ChunkManagerPtr cm(conf->getChunkManager(fullns));
-	    set<Shard> shards;
-	    cm->getShardsForQuery(shards, shardQuery);
+            ChunkManagerPtr cm(conf->getChunkManager(fullns));
+            set<Shard> shards;
+            cm->getShardsForQuery(shards, shardQuery);
 
-	    /*
-	      From MRCmd::Run: "we need to use our connections to the shard
-	      so filtering is done correctly for un-owned docs so we allocate
-	      them in our thread and hand off"
-	    */
-	    vector<boost::shared_ptr<ShardConnection> > shardConns;
-	    list<boost::shared_ptr<Future::CommandResult> > futures;
-	    for (set<Shard>::iterator i=shards.begin(), end=shards.end();
-		 i != end; i++) {
-		boost::shared_ptr<ShardConnection> temp(
-		    new ShardConnection(i->getConnString(), fullns));
-		assert(temp->get());
-		futures.push_back(
-		    Future::spawnCommand(i->getConnString(), dbName,
-					 shardedCommand , 0, temp->get()));
-		shardConns.push_back(temp);
-	    }
+            /*
+              From MRCmd::Run: "we need to use our connections to the shard
+              so filtering is done correctly for un-owned docs so we allocate
+              them in our thread and hand off"
+            */
+            vector<boost::shared_ptr<ShardConnection> > shardConns;
+            list<boost::shared_ptr<Future::CommandResult> > futures;
+            for (set<Shard>::iterator i=shards.begin(), end=shards.end();
+                 i != end; i++) {
+                boost::shared_ptr<ShardConnection> temp(
+                    new ShardConnection(i->getConnString(), fullns));
+                assert(temp->get());
+                futures.push_back(
+                    Future::spawnCommand(i->getConnString(), dbName,
+                                         shardedCommand , 0, temp->get()));
+                shardConns.push_back(temp);
+            }
                     
-	    /* wrap the list of futures with a source */
-	    intrusive_ptr<DocumentSourceCommandFutures> pSource(
-		DocumentSourceCommandFutures::create(errmsg, &futures));
+            /* wrap the list of futures with a source */
+            intrusive_ptr<DocumentSourceCommandFutures> pSource(
+                DocumentSourceCommandFutures::create(errmsg, &futures));
 
-	    /* run the pipeline */
-	    bool failed = pPipeline->run(result, errmsg, pSource);
+            /* run the pipeline */
+            bool failed = pPipeline->run(result, errmsg, pSource);
 
 /*
-	    BSONObjBuilder shardresults;
-	    for (list<boost::shared_ptr<Future::CommandResult> >::iterator i(
-		     futures.begin()); i!=futures.end(); ++i) {
-		boost::shared_ptr<Future::CommandResult> res(*i);
-		if (!res->join()) {
-		    error() << "sharded pipeline failed on shard: " <<
-			res->getServer() << " error: " << res->result() << endl;
-		    result.append( "cause" , res->result() );
-		    errmsg = "mongod pipeline failed: ";
-		    errmsg += res->result().toString();
-		    failed = true;
-		    continue;
-		}
+            BSONObjBuilder shardresults;
+            for (list<boost::shared_ptr<Future::CommandResult> >::iterator i(
+                     futures.begin()); i!=futures.end(); ++i) {
+                boost::shared_ptr<Future::CommandResult> res(*i);
+                if (!res->join()) {
+                    error() << "sharded pipeline failed on shard: " <<
+                        res->getServer() << " error: " << res->result() << endl;
+                    result.append( "cause" , res->result() );
+                    errmsg = "mongod pipeline failed: ";
+                    errmsg += res->result().toString();
+                    failed = true;
+                    continue;
+                }
 
-		shardresults.append( res->getServer() , res->result() );
-	    }
+                shardresults.append( res->getServer() , res->result() );
+            }
 */
 
-	    for(unsigned i = 0; i < shardConns.size(); ++i)
-		shardConns[i]->done();
+            for(unsigned i = 0; i < shardConns.size(); ++i)
+                shardConns[i]->done();
 
-	    if (failed && (errmsg.length() > 0))
-		return false;
+            if (failed && (errmsg.length() > 0))
+                return false;
 
-	    return true;
-	}
+            return true;
+        }
 
     } // namespace pub_grid_cmds
 

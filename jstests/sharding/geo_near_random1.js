@@ -4,6 +4,8 @@ load("jstests/libs/geo_near_random.js");
 var testName = "geo_near_random1";
 var s = new ShardingTest( testName , 3 );
 
+s.stopBalancer()
+
 db = s.getDB("test"); // global db
 
 var test = new GeoNearRandomTest(testName);
@@ -24,6 +26,9 @@ for (var i = (test.nPts/10); i < test.nPts; i+= (test.nPts/10)){
         }
     }
 }
+
+// Turn balancer back on, for actual tests
+s.setBalancer( true )
 
 printShardingSizes()
 

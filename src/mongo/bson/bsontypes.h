@@ -98,7 +98,8 @@ namespace mongo {
         BinDataGeneral=0,
         Function=1,
         ByteArrayDeprecated=2, /* use BinGeneral instead */
-        bdtUUID = 3,
+        bdtUUID = 3, /* deprecated */
+	newUUID=4, /* language-independent UUID format across all drivers */
         MD5Type=5,
         bdtCustom=128
     };

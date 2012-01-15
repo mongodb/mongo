@@ -23,6 +23,10 @@
 
 #include <fcntl.h>
 #include <map>
+#include <fstream>
+
+#include <boost/filesystem/operations.hpp>
+#include <boost/filesystem/convenience.hpp>
 
 using namespace mongo;
 
@@ -113,7 +117,7 @@ public:
         }
     }
 
-    void writeCollectionFile( const string coll , path outputFile ) {
+    void writeCollectionFile( const string coll , boost::filesystem::path outputFile ) {
         log() << "\t" << coll << " to " << outputFile.string() << endl;
 
         FilePtr f (fopen(outputFile.string().c_str(), "wb"));
@@ -127,7 +131,8 @@ public:
         log() << "\t\t " << m.done() << " objects" << endl;
     }
 
-    void writeMetadataFile( const string coll, path outputFile, map<string, BSONObj> options, multimap<string, BSONObj> indexes ) {
+    void writeMetadataFile( const string coll, boost::filesystem::path outputFile, 
+                            map<string, BSONObj> options, multimap<string, BSONObj> indexes ) {
         log() << "\tMetadata for " << coll << " to " << outputFile.string() << endl;
 
         ofstream file (outputFile.string().c_str());
@@ -165,10 +170,10 @@ public:
         doCollection(coll, stdout, NULL);
     }
 
-    void go( const string db , const path outdir ) {
+    void go( const string db , const boost::filesystem::path outdir ) {
         log() << "DATABASE: " << db << "\t to \t" << outdir.string() << endl;
 
-        create_directories( outdir );
+        boost::filesystem::create_directories( outdir );
 
         map <string, BSONObj> collectionOptions;
         multimap <string, BSONObj> indexes;
@@ -310,7 +315,7 @@ public:
         
     }
 
-    void _repair( Database* db , string ns , path outfile ){
+    void _repair( Database* db , string ns , boost::filesystem::path outfile ){
         NamespaceDetails * nsd = nsdetails( ns.c_str() );
         log() << "nrecords: " << nsd->stats.nrecords 
               << " datasize: " << nsd->stats.datasize 
@@ -374,9 +379,9 @@ public:
         list<string> namespaces;
         db->namespaceIndex.getNamespaces( namespaces );
         
-        path root = getParam( "out" );
+        boost::filesystem::path root = getParam( "out" );
         root /= dbname;
-        create_directories( root );
+        boost::filesystem::create_directories( root );
 
         for ( list<string>::iterator i=namespaces.begin(); i!=namespaces.end(); ++i ){
             LogIndentLevel lil;
@@ -468,7 +473,7 @@ public:
 
         _usingMongos = isMongos();
 
-        path root( out );
+        boost::filesystem::path root( out );
         string db = _db;
 
         if ( db == "" ) {

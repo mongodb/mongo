@@ -43,6 +43,8 @@
 
 using namespace mongoutils;
 
+#include <boost/filesystem/operations.hpp>
+
 namespace mongo {
 
     namespace dur {
@@ -62,11 +64,11 @@ namespace mongo {
         };
 
         void removeJournalFiles();
-        path getJournalDir();
+        boost::filesystem::path getJournalDir();
 
         /** get journal filenames, in order. throws if unexpected content found */
-        static void getFiles(path dir, vector<path>& files) {
-            map<unsigned,path> m;
+        static void getFiles(boost::filesystem::path dir, vector<boost::filesystem::path>& files) {
+            map<unsigned,boost::filesystem::path> m;
             for ( boost::filesystem::directory_iterator i( dir );
                     i != boost::filesystem::directory_iterator();
                     ++i ) {
@@ -77,10 +79,10 @@ namespace mongo {
                     if( m.count(u) ) {
                         uasserted(13531, str::stream() << "unexpected files in journal directory " << dir.string() << " : " << fileName);
                     }
-                    m.insert( pair<unsigned,path>(u,filepath) );
+                    m.insert( pair<unsigned,boost::filesystem::path>(u,filepath) );
                 }
             }
-            for( map<unsigned,path>::iterator i = m.begin(); i != m.end(); ++i ) {
+            for( map<unsigned,boost::filesystem::path>::iterator i = m.begin(); i != m.end(); ++i ) {
                 if( i != m.begin() && m.count(i->first - 1) == 0 ) {
                     uasserted(13532,
                     str::stream() << "unexpected file in journal directory " << dir.string()
@@ -191,7 +193,7 @@ namespace mongo {
                 ss << fileNo;
 
             // relative name -> full path name
-            path full(dbpath);
+            boost::filesystem::path full(dbpath);
             full /= ss.str();
             return full.string();
         }
@@ -430,7 +432,7 @@ namespace mongo {
         }
 
         /** apply a specific journal file */
-        bool RecoveryJob::processFile(path journalfile) {
+        bool RecoveryJob::processFile(boost::filesystem::path journalfile) {
             log() << "recover " << journalfile.string() << endl;
 
             try { 
@@ -450,7 +452,7 @@ namespace mongo {
         }
 
         /** @param files all the j._0 style files we need to apply for recovery */
-        void RecoveryJob::go(vector<path>& files) {
+        void RecoveryJob::go(vector<boost::filesystem::path>& files) {
             log() << "recover begin" << endl;
             _recovering = true;
 
@@ -490,7 +492,7 @@ namespace mongo {
                 return;
             }
 
-            vector<path> journalFiles;
+            vector<boost::filesystem::path> journalFiles;
             getFiles(p, journalFiles);
 
             if( journalFiles.empty() ) {

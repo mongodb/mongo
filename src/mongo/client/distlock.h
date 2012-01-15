@@ -71,8 +71,22 @@ namespace mongo {
 
     	static LabeledLevel logLvl;
 
-    	typedef boost::tuple<string, Date_t, Date_t, OID> PingData;
+        struct PingData {
+            
+            PingData( const string& _id , Date_t _lastPing , Date_t _remote , OID _ts ) 
+                : id(_id), lastPing(_lastPing), remote(_remote), ts(_ts){
+            }
 
+            PingData()
+                : id(""), lastPing(0), remote(0), ts(){
+            }
+            
+            string id;
+            Date_t lastPing;
+            Date_t remote;
+            OID ts;
+        };
+        
     	class LastPings {
     	public:
     	    LastPings() : _mutex( "DistributedLock::LastPings" ) {}

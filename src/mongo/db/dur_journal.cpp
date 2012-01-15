@@ -40,6 +40,8 @@
 
 using namespace mongoutils;
 
+#include <boost/filesystem/operations.hpp>
+
 namespace mongo {
 
     class AlignedBuilder;
@@ -71,7 +73,7 @@ namespace mongo {
 
         bool usingPreallocate = false;
 
-        void removeOldJournalFile(path p);
+        void removeOldJournalFile(boost::filesystem::path p);
 
         boost::filesystem::path getJournalDir() {
             boost::filesystem::path p(dbpath);
@@ -79,7 +81,7 @@ namespace mongo {
             return p;
         }
 
-        path lsnPath() {
+        boost::filesystem::path lsnPath() {
             return getJournalDir()/"lsn";
         }
 
@@ -157,7 +159,7 @@ namespace mongo {
             _writeToLSNNeeded = false;
         }
 
-        path Journal::getFilePathFor(int filenumber) const {
+        boost::filesystem::path Journal::getFilePathFor(int filenumber) const {
             boost::filesystem::path p(dir);
             p /= string(str::stream() << "j._" << filenumber);
             return p;
@@ -371,7 +373,7 @@ namespace mongo {
             j.open();
         }
 
-        void removeOldJournalFile(path p) { 
+        void removeOldJournalFile(boost::filesystem::path p) { 
             if( usingPreallocate ) {
                 try {
                     for( int i = 0; i < NUM_PREALLOC_FILES; i++ ) {
@@ -410,7 +412,7 @@ namespace mongo {
         }
 
         // find a prealloc.<n> file, presumably to take and use
-        path findPrealloced() { 
+        boost::filesystem::path findPrealloced() { 
             try {
                 for( int i = 0; i < NUM_PREALLOC_FILES; i++ ) {
                     boost::filesystem::path filepath = preallocPath(i);
@@ -420,7 +422,7 @@ namespace mongo {
             } catch(...) { 
                 log() << "warning exception in dur::findPrealloced()" << endl;
             }
-            return path();
+            return boost::filesystem::path();
         }
 
         /** assure journal/ dir exists. throws. call during startup. */
@@ -430,9 +432,9 @@ namespace mongo {
             boost::filesystem::path p = getJournalDir();
             j.dir = p.string();
             log() << "journal dir=" << j.dir << endl;
-            if( !exists(j.dir) ) {
+            if( !boost::filesystem::exists(j.dir) ) {
                 try {
-                    create_directory(j.dir);
+                    boost::filesystem::create_directory(j.dir);
                 }
                 catch(std::exception& e) {
                     log() << "error creating directory " << j.dir << ' ' << e.what() << endl;
@@ -444,11 +446,11 @@ namespace mongo {
         void Journal::_open() {
             _curFileId = 0;
             assert( _curLogFile == 0 );
-            path fname = getFilePathFor(_nextFileNumber);
+            boost::filesystem::path fname = getFilePathFor(_nextFileNumber);
 
             // if we have a prealloced file, use it 
             {
-                path p = findPrealloced();
+                boost::filesystem::path p = findPrealloced();
                 if( !p.empty() ) { 
                     try { 
                         {
@@ -512,7 +514,7 @@ namespace mongo {
         /** called during recovery (the error message text below assumes that)
         */
         unsigned long long journalReadLSN() {
-            if( !MemoryMappedFile::exists(lsnPath()) ) {
+            if( !exists(lsnPath()) ) {
                 log() << "info no lsn file in journal/ directory" << endl;
                 return 0;
             }
@@ -607,7 +609,7 @@ namespace mongo {
 
                 if( f.lastEventTimeMs < _lastFlushTime + ExtraKeepTimeMs ) {
                     // eligible for deletion
-                    path p( f.filename );
+                    boost::filesystem::path p( f.filename );
                     log() << "old journal file will be removed: " << f.filename << endl;
                     removeOldJournalFile(p);
                 }

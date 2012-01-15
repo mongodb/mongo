@@ -603,6 +603,15 @@ namespace mongo {
             }
 
             if ( globalVersion == 0 && ! authoritative ) {
+                // Needed b/c when the last chunk is moved off a shard, the version gets reset to zero, which
+                // should require a reload.
+                // TODO: Maybe a more elegant way of doing this
+                while ( shardingState.inCriticalMigrateSection() ) {
+                    dbtemprelease r;
+                    sleepmillis(2);
+                    OCCASIONALLY log() << "waiting till out of critical section for version reset" << endl;
+                }
+
                 // need authoritative for first look
                 result.append( "ns" , ns );
                 result.appendBool( "need_authoritative" , true );

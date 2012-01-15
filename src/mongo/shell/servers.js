@@ -49,8 +49,8 @@ connectionURLTheSame = function( a , b ){
         return a[0] == b[0]
     }
     else {
-        a0 = a.split( "/" )[0]
-        b0 = b.split( "/" )[0]
+        var a0 = a.split( "/" )[0]
+        var b0 = b.split( "/" )[0]
         return a0 == b0
     }
 }

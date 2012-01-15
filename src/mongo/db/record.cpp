@@ -207,6 +207,8 @@ namespace mongo {
     const bool blockSupported = ProcessInfo::blockCheckSupported();
 
     bool Record::likelyInPhysicalMemory() {
+        DEV if ( rand() % 100 == 0 ) return false;
+
         if ( ! MemoryTrackingEnabled )
             return true;
 
@@ -214,8 +216,14 @@ namespace mongo {
         const size_t region = page >> 6;
         const size_t offset = page & 0x3f;
         
-        if ( ps::rolling.access( region , offset , false ) )
+        if ( ps::rolling.access( region , offset , false ) ) {
+#ifdef _DEBUG
+            if ( blockSupported && ! ProcessInfo::blockInMemory( data ) ) {
+                warning() << "we think data is in ram but system says no"  << endl;
+            }
+#endif
             return true;
+        }
 
         if ( ! blockSupported ) {
             // this means we don't fallback to system call 
@@ -244,13 +252,9 @@ namespace mongo {
             log() << "_DEBUG info _PAGEFAULTEXCEPTION is ON -- experimental at this time" << endl;
         }
         bool fault = !r->likelyInPhysicalMemory();
-        DEV if( rand() % 100 == 0 ) 
-            fault = true;
-        if( fault &&
-            !cc()._hasWrittenThisPass &&
-            cc()._pageFaultRetryableSection ) 
-        {
-            if( cc()._pageFaultRetryableSection->_laps > 100 ) { 
+        if( cc().allowedToThrowPageFaultException() && 
+            ! r->likelyInPhysicalMemory() ) {
+            if( cc().getPageFaultRetryableSection()->laps() > 100 ) { 
                 log() << "info pagefaultexception _laps > 100" << endl;
             }
             else {

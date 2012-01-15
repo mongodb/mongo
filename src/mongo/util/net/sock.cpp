@@ -20,6 +20,7 @@
 #include "../background.h"
 #include "../concurrency/value.h"
 #include "../mongoutils/str.h"
+#include "../../db/cmdline.h"
 
 #if !defined(_WIN32)
 # include <sys/socket.h>
@@ -40,6 +41,8 @@
 #include <openssl/err.h>
 #include <openssl/ssl.h>
 #endif
+
+#include <boost/thread/once.hpp>
 
 using namespace mongoutils;
 
@@ -300,6 +303,11 @@ namespace mongo {
     }
 
     SockAddr unknownAddress( "0.0.0.0", 0 );
+
+    string makeUnixSockPath(int port) {
+        return mongoutils::str::stream() << cmdLine.socket << "/mongodb-" << port << ".sock";
+    }
+
 
     // If an ip address is passed in, just return that.  If a hostname is passed
     // in, look up its ip and return that.  Returns "" on failure.
@@ -587,9 +595,11 @@ namespace mongo {
 #endif
 
 #if defined(_WIN32)
-                if ( WSAGetLastError() == WSAETIMEDOUT && _timeout != 0 ) {
+                const int mongo_errno = WSAGetLastError();
+                if ( mongo_errno == WSAETIMEDOUT && _timeout != 0 ) {
 #else
-                if ( ( errno == EAGAIN || errno == EWOULDBLOCK ) && _timeout != 0 ) {
+                const int mongo_errno = errno;
+                if ( ( mongo_errno == EAGAIN || mongo_errno == EWOULDBLOCK ) && _timeout != 0 ) {
 #endif
                     log(_logLevel) << "Socket " << context << " send() timed out " << _remote.toString() << endl;
                     throw SocketException( SocketException::SEND_TIMEOUT , remoteString() );
@@ -597,7 +607,7 @@ namespace mongo {
                 else {
                     SocketException::Type t = SocketException::SEND_ERROR;
                     log(_logLevel) << "Socket " << context << " send() " 
-                                   << errnoWithDescription() << ' ' << remoteString() << endl;
+                                   << errnoWithDescription(mongo_errno) << ' ' << remoteString() << endl;
                     throw SocketException( t , remoteString() );
                 }
             }

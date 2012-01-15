@@ -136,7 +136,7 @@ namespace mongo {
 
         BSONObj _order;
         long _maxFilesize;
-        path _root;
+        boost::filesystem::path _root;
 
         int _arraySize;
         InMemory * _cur;

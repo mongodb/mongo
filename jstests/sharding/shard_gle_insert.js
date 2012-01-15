@@ -23,18 +23,22 @@ jsTestLog( "Inserting into negative shard..." )
 
 coll.insert({ _id : -1 })
 print( "GLE start" )
+var gle_state = 0;
 try{
-    printjson( coll.getDB().getLastError() )
+    var myjson = coll.getDB().getLastError();
+    gle_state = 1;
+    print( "Unit test failure -- received response from getLastError:" );
+    printjson( myjson );
 }
 catch( e ){
     printjson( e )
 }
-
+assert( !gle_state );
 jsTestLog( "Inserting into positive shard..." )
 
 coll.insert({ _id : 1 })
 print( "GLE start" )
 printjson( coll.getDB().getLastError() )
-
+print( "test ending" )
 st.stop()
 

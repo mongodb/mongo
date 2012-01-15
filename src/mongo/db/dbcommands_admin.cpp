@@ -37,6 +37,9 @@
 #include "../scripting/engine.h"
 #include "../util/timer.h"
 
+#include <boost/filesystem/convenience.hpp>
+#include <boost/filesystem/operations.hpp>
+
 namespace mongo {
 
     class CleanCmd : public Command {
@@ -89,7 +92,7 @@ namespace mongo {
         
             // remove file if already present
             try { 
-                remove(p);
+                boost::filesystem::remove(p);
             }
             catch(...) { }
 

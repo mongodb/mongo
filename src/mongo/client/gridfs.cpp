@@ -18,6 +18,7 @@
 #include "pch.h"
 #include <fcntl.h>
 #include <utility>
+#include <fstream>
 
 #include "gridfs.h"
 #include <boost/smart_ptr.hpp>
@@ -29,6 +30,8 @@
 #ifndef MIN
 #define MIN(a,b) ( (a) < (b) ? (a) : (b) )
 #endif
+
+#include <boost/filesystem/operations.hpp>
 
 namespace mongo {
 

@@ -20,6 +20,8 @@
 #include "mmap.h"
 
 #include <iostream>
+#include <fstream>
+
 using namespace std;
 
 namespace mongo {

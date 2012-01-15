@@ -1,10 +1,8 @@
-// test sorting, mainly a test ver simple with no index
-
 debug = function( s ){
     //print( s );
 }
 
-t = db.sorrrt;
+t = db.sort1;
 t.drop();
 
 t.save({x:3,z:33});
@@ -28,23 +26,23 @@ for( var pass = 0; pass < 2; pass++ ) {
 debug( "b" )
 assert(t.validate().valid);
 
-
-db.sorrrt2.drop();
-db.sorrrt2.save({x:'a'});
-db.sorrrt2.save({x:'aba'});
-db.sorrrt2.save({x:'zed'});
-db.sorrrt2.save({x:'foo'});
+t.drop();
+t.save({x:'a'});
+t.save({x:'aba'});
+t.save({x:'zed'});
+t.save({x:'foo'});
 
 debug( "c" )
 
 for( var pass = 0; pass < 2; pass++ ) { 
-    debug( tojson( db.sorrrt2.find().sort( { "x" : 1 } ).limit(1).next() ) );
-    assert.eq( "a" , db.sorrrt2.find().sort({'x': 1}).limit(1).next().x , "c.1" );
-    assert.eq( "a" , db.sorrrt2.find().sort({'x': 1}).next().x , "c.2" );
-    assert.eq( "zed" , db.sorrrt2.find().sort({'x': -1}).limit(1).next().x , "c.3" );
-    assert.eq( "zed" , db.sorrrt2.find().sort({'x': -1}).next().x , "c.4" );
+    debug( tojson( t.find().sort( { "x" : 1 } ).limit(1).next() ) );
+    assert.eq( "a" , t.find().sort({'x': 1}).limit(1).next().x , "c.1" );
+    assert.eq( "a" , t.find().sort({'x': 1}).next().x , "c.2" );
+    assert.eq( "zed" , t.find().sort({'x': -1}).limit(1).next().x , "c.3" );
+    assert.eq( "zed" , t.find().sort({'x': -1}).next().x , "c.4" );
+    t.ensureIndex({x:1});
 }
 
 debug( "d" )
 
-assert(db.sorrrt2.validate().valid);
+assert(t.validate().valid);

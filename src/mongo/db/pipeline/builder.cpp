@@ -23,94 +23,94 @@
 namespace mongo {
 
     void BuilderObj::append() {
-	pBuilder->appendNull(fieldName);
+        pBuilder->appendNull(fieldName);
     }
 
     void BuilderObj::append(bool b) {
-	pBuilder->append(fieldName, b);
+        pBuilder->append(fieldName, b);
     }
 
     void BuilderObj::append(int i) {
-	pBuilder->append(fieldName, i);
+        pBuilder->append(fieldName, i);
     }
 
     void BuilderObj::append(long long ll) {
-	pBuilder->append(fieldName, ll);
+        pBuilder->append(fieldName, ll);
     }
 
     void BuilderObj::append(double d) {
-	pBuilder->append(fieldName, d);
+        pBuilder->append(fieldName, d);
     }
 
     void BuilderObj::append(string s) {
-	pBuilder->append(fieldName, s);
+        pBuilder->append(fieldName, s);
     }
 
     void BuilderObj::append(const OID &o) {
-	pBuilder->append(fieldName, o);
+        pBuilder->append(fieldName, o);
     }
 
     void BuilderObj::append(const Date_t &d) {
-	pBuilder->append(fieldName, d);
+        pBuilder->append(fieldName, d);
     }
 
     void BuilderObj::append(BSONObjBuilder *pDone) {
-	pBuilder->append(fieldName, pDone->done());
+        pBuilder->append(fieldName, pDone->done());
     }
 
     void BuilderObj::append(BSONArrayBuilder *pDone) {
-	pBuilder->append(fieldName, pDone->arr());
+        pBuilder->append(fieldName, pDone->arr());
     }
 
     BuilderObj::BuilderObj(
-	BSONObjBuilder *pObjBuilder, string theFieldName):
+        BSONObjBuilder *pObjBuilder, string theFieldName):
         pBuilder(pObjBuilder),
         fieldName(theFieldName) {
     }
 
 
     void BuilderArray::append() {
-	pBuilder->appendNull();
+        pBuilder->appendNull();
     }
 
     void BuilderArray::append(bool b) {
-	pBuilder->append(b);
+        pBuilder->append(b);
     }
 
     void BuilderArray::append(int i) {
-	pBuilder->append(i);
+        pBuilder->append(i);
     }
 
     void BuilderArray::append(long long ll) {
-	pBuilder->append(ll);
+        pBuilder->append(ll);
     }
 
     void BuilderArray::append(double d) {
-	pBuilder->append(d);
+        pBuilder->append(d);
     }
 
     void BuilderArray::append(string s) {
-	pBuilder->append(s);
+        pBuilder->append(s);
     }
 
     void BuilderArray::append(const OID &o) {
-	pBuilder->append(o);
+        pBuilder->append(o);
     }
 
     void BuilderArray::append(const Date_t &d) {
-	pBuilder->append(d);
+        pBuilder->append(d);
     }
 
     void BuilderArray::append(BSONObjBuilder *pDone) {
-	pBuilder->append(pDone->done());
+        pBuilder->append(pDone->done());
     }
 
     void BuilderArray::append(BSONArrayBuilder *pDone) {
-	pBuilder->append(pDone->arr());
+        pBuilder->append(pDone->arr());
     }
 
     BuilderArray::BuilderArray(
-	BSONArrayBuilder *pArrayBuilder):
+        BSONArrayBuilder *pArrayBuilder):
         pBuilder(pArrayBuilder) {
     }
 

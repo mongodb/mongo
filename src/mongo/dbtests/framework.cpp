@@ -19,6 +19,7 @@
 #include "pch.h"
 #include "../util/version.h"
 #include <boost/program_options.hpp>
+#include <boost/filesystem/operations.hpp>
 
 #undef assert
 #define assert MONGO_assert

@@ -25,11 +25,11 @@ namespace mongo {
     }
 
     FieldPath::FieldPath():
-	vFieldName() {
+        vFieldName() {
     }
 
     FieldPath::FieldPath(const string &fieldPath):
-	vFieldName() {
+        vFieldName() {
         /*
           The field path could be using dot notation.
           Break the field path up by peeling off successive pieces.
@@ -47,10 +47,10 @@ namespace mongo {
 
             /* use the string up to the dot */
             const size_t length = dotpos - startpos;
-	    uassert(15998, str::stream() <<
-		    "field names cannot be zero length (in path \"" <<
-		    fieldPath << "\")",
-		    length > 0);
+            uassert(15998, str::stream() <<
+                    "field names cannot be zero length (in path \"" <<
+                    fieldPath << "\")",
+                    length > 0);
 
             vFieldName.push_back(fieldPath.substr(startpos, length));
 
@@ -60,28 +60,28 @@ namespace mongo {
     }
 
     string FieldPath::getPath(bool fieldPrefix) const {
-	stringstream ss;
-	writePath(ss, fieldPrefix);
-	return ss.str();
+        stringstream ss;
+        writePath(ss, fieldPrefix);
+        return ss.str();
     }
 
     void FieldPath::writePath(ostream &outStream, bool fieldPrefix) const {
-	if (fieldPrefix)
-	    outStream << "$";
+        if (fieldPrefix)
+            outStream << "$";
 
-	outStream << vFieldName[0];
+        outStream << vFieldName[0];
 
-	const size_t n = vFieldName.size();
-	for(size_t i = 1; i < n; ++i)
-	    outStream << "." << vFieldName[i];
+        const size_t n = vFieldName.size();
+        for(size_t i = 1; i < n; ++i)
+            outStream << "." << vFieldName[i];
     }
 
     FieldPath &FieldPath::operator=(const FieldPath &rRHS) {
-	if (this != &rRHS) {
-	    vFieldName = rRHS.vFieldName;
-	}
+        if (this != &rRHS) {
+            vFieldName = rRHS.vFieldName;
+        }
 
-	return *this;
+        return *this;
     }
 
 }

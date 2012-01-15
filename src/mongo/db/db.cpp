@@ -52,14 +52,14 @@
 # include <sys/file.h>
 #endif
 
+#include <fstream>
+#include <boost/filesystem/operations.hpp>
+
 namespace mongo {
 
     namespace dur { 
         extern unsigned long long DataLimitPerJournalFile;
     }
-
-    /* only off if --nocursors which is for debugging. */
-    extern bool useCursors;
 
     /* only off if --nohints */
     extern bool useHints;
@@ -469,7 +469,7 @@ namespace mongo {
         }
 
         acquirePathLock(forceRepair);
-        remove_all( dbpath + "/_tmp/" );
+        boost::filesystem::remove_all( dbpath + "/_tmp/" );
 
         FileAllocator::get()->start();
 
@@ -597,10 +597,10 @@ int main(int argc, char* argv[]) {
     ("dbpath", po::value<string>() , "directory for datafiles")
     ("diaglog", po::value<int>(), "0=off 1=W 2=R 3=both 7=W+some reads")
     ("directoryperdb", "each database will be stored in a separate directory")
-    ("journal", "enable journaling")
-    ("journalOptions", po::value<int>(), "journal diagnostic options")
-    ("journalCommitInterval", po::value<unsigned>(), "how often to group/batch commit (ms)")
     ("ipv6", "enable IPv6 support (disabled by default)")
+    ("journal", "enable journaling")
+    ("journalCommitInterval", po::value<unsigned>(), "how often to group/batch commit (ms)")
+    ("journalOptions", po::value<int>(), "journal diagnostic options")
     ("jsonp","allow JSONP access via http (has security implications)")
     ("noauth", "run without security")
     ("nohttpinterface", "disable http interface")
@@ -611,15 +611,15 @@ int main(int argc, char* argv[]) {
     ("nssize", po::value<int>()->default_value(16), ".ns file size (in MB) for new databases")
     ("profile",po::value<int>(), "0=off 1=slow, 2=all")
     ("quota", "limits each database to a certain number of files (8 default)")
-    ("quotaFiles", po::value<int>(), "number of files allower per db, requires --quota")
-    ("rest","turn on simple rest api")
+    ("quotaFiles", po::value<int>(), "number of files allowed per db, requires --quota")
     ("repair", "run repair on all dbs")
     ("repairpath", po::value<string>() , "root directory for repair files - defaults to dbpath" )
-    ("slowms",po::value<int>(&cmdLine.slowMS)->default_value(100), "value of slow for profile and console log" )
-    ("smallfiles", "use a smaller default file size")
+    ("rest","turn on simple rest api")
 #if defined(__linux__)
     ("shutdown", "kill a running server (for init scripts)")
 #endif
+    ("slowms",po::value<int>(&cmdLine.slowMS)->default_value(100), "value of slow for profile and console log" )
+    ("smallfiles", "use a smaller default file size")
     ("syncdelay",po::value<double>(&cmdLine.syncdelay)->default_value(60), "seconds between disk syncs (0=never, but not recommended)")
     ("sysinfo", "print some diagnostic system information")
     ("upgrade", "upgrade db if needed")
@@ -659,7 +659,6 @@ int main(int argc, char* argv[]) {
     ("cacheSize", po::value<long>(), "cache size (in MB) for rec store")
     ("nodur", "disable journaling")
     // things we don't want people to use
-    ("nocursors", "diagnostic/debugging option that turns off cursors DO NOT USE IN PRODUCTION")
     ("nohints", "ignore query hints")
     ("nopreallocj", "don't preallocate journal files")
     ("dur", "enable journaling") // old name for --journal
@@ -801,9 +800,6 @@ int main(int argc, char* argv[]) {
                 out() << "repairpath is empty" << endl;
                 dbexit( EXIT_BADOPTIONS );
             }
-        }
-        if (params.count("nocursors")) {
-            useCursors = false;
         }
         if (params.count("nohints")) {
             useHints = false;
@@ -1212,7 +1208,7 @@ namespace mongo {
         set_new_handler( my_new_handler );
     }
 
-#else
+#else   // WIN32
     void consoleTerminate( const char* controlCodeName ) {
         Client::initThread( "consoleTerminate" );
         log() << "got " << controlCodeName << ", will terminate after current cmd ends" << endl;
@@ -1310,6 +1306,6 @@ namespace mongo {
         _set_purecall_handler( myPurecallHandler );
     }
 
-#endif
+#endif  // if !defined(_WIN32)
 
 } // namespace mongo

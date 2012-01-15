@@ -23,6 +23,8 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#include <boost/filesystem/path.hpp>
+
 namespace mongo {
     
     using namespace mongoutils;
@@ -42,10 +44,10 @@ namespace mongo {
             rp._p = f;
             return rp;
         }
-
+        
         /** from a full path */
-        static RelativePath fromFullPath(path f) {
-            path dbp(dbpath); // normalizes / and backslash
+        static RelativePath fromFullPath(boost::filesystem::path f) {
+            boost::filesystem::path dbp(dbpath); // normalizes / and backslash
             string fullpath = f.string();
             string relative = str::after(fullpath, dbp.string());
             if( relative.empty() ) {
@@ -72,7 +74,7 @@ namespace mongo {
         bool operator<(const RelativePath& r) const { return _p < r._p; }
 
         string asFullPath() const {
-            path x(dbpath);
+            boost::filesystem::path x(dbpath);
             x /= _p;
             return x.string();
         }
@@ -120,5 +122,7 @@ namespace mongo {
         close(fd);
 #endif
     }
+
+    boost::filesystem::path ensureParentDirCreated(const boost::filesystem::path& p);
 
 }

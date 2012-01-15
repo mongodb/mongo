@@ -35,6 +35,7 @@
 #include "../util/file_allocator.h"
 #include "repl/rs.h"
 #include "../scripting/engine.h"
+#include "pagefault.h"
 
 namespace mongo {
   
@@ -572,6 +573,13 @@ namespace mongo {
         return writers + readers;
     }
 
+    bool Client::allowedToThrowPageFaultException() const {
+        return 
+            _hasWrittenThisPass == false && 
+            _pageFaultRetryableSection != 0 && 
+            _pageFaultRetryableSection->laps() < 1000; 
+    }
+
     void OpDebug::reset() {
         extra.reset();
 
@@ -606,7 +614,7 @@ namespace mongo {
 #define OPDEBUG_TOSTRING_HELP(x) if( x >= 0 ) s << " " #x ":" << (x)
 #define OPDEBUG_TOSTRING_HELP_BOOL(x) if( x ) s << " " #x ":" << (x)
     string OpDebug::toString() const {
-        StringBuilder s( ns.size() + 64 );
+        StringBuilder s;
         if ( iscommand )
             s << "command ";
         else
@@ -650,7 +658,7 @@ namespace mongo {
         }
         
         OPDEBUG_TOSTRING_HELP( nreturned );
-        if ( responseLength )
+        if ( responseLength > 0 )
             s << " reslen:" << responseLength;
         s << " " << executionTime << "ms";
 

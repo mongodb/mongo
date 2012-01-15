@@ -33,6 +33,9 @@
 
 #define MAX_LINE_LENGTH 256
 
+#include <fstream>
+#include <boost/filesystem/operations.hpp>
+
 namespace po = boost::program_options;
 namespace fs = boost::filesystem;
 
@@ -359,7 +362,7 @@ namespace mongo {
         }
         
         if (params.count("syslog")) {
-            StringBuilder sb(128);
+            StringBuilder sb;
             sb << cmdLine.binaryName << "." << cmdLine.port;
             Logstream::useSyslog( sb.str().c_str() );
         }
@@ -494,7 +497,7 @@ namespace mongo {
     } cmdGetCmdLineOpts;
 
     string prettyHostName() {
-        StringBuilder s(128);
+        StringBuilder s;
         s << getHostNameCached();
         if( cmdLine.port != CmdLine::DefaultDBPort )
             s << ':' << mongo::cmdLine.port;

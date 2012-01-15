@@ -28,7 +28,7 @@ namespace mongo {
         string msg;
         enum UpdatedExistingType { NotUpdate, True, False } updatedExisting;
         OID upsertedId;
-        OID writebackId;
+        OID writebackId; // this shouldn't get reset so that old GLE are handled
         long long nObjects;
         int nPrev;
         bool valid;
@@ -66,7 +66,6 @@ namespace mongo {
             valid = _valid;
             disabled = false;
             upsertedId.clear();
-            writebackId.clear();
         }
 
         /**

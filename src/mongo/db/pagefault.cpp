@@ -11,11 +11,11 @@ namespace mongo {
 
     PageFaultException::PageFaultException(Record *_r)
     {
-        assert( cc()._pageFaultRetryableSection != 0 );
-        cc()._pageFaultRetryableSection->_laps++;
-        assert( cc()._pageFaultRetryableSection->_laps < 1000 );
+        assert( cc().allowedToThrowPageFaultException() );
+        cc().getPageFaultRetryableSection()->didLap();
         r = _r;
         era = LockMongoFilesShared::getEra();
+        log(2) << "PageFaultException thrown" << endl;
     }
 
     void PageFaultException::touch() { 
@@ -31,20 +31,16 @@ namespace mongo {
     }
 
     PageFaultRetryableSection::~PageFaultRetryableSection() {
-        cc()._pageFaultRetryableSection = old;
+        cc()._pageFaultRetryableSection = 0;
     }
     PageFaultRetryableSection::PageFaultRetryableSection() {
         _laps = 0;
-        old = cc()._pageFaultRetryableSection;
+        assert( cc()._pageFaultRetryableSection == 0 );
         if( d.dbMutex.atLeastReadLocked() ) { 
             cc()._pageFaultRetryableSection = 0;
             if( debug || logLevel > 2 ) { 
                 LOGSOME << "info PageFaultRetryableSection will not yield, already locked upon reaching" << endl;
             }
-        }
-        else if( cc()._pageFaultRetryableSection ) { 
-            cc()._pageFaultRetryableSection = 0;
-            dlog(2) << "info nested PageFaultRetryableSection will not yield on fault" << endl;
         }
         else {
             cc()._pageFaultRetryableSection = this;

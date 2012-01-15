@@ -30,11 +30,11 @@ namespace mongo {
         public ExpressionNary {
     public:
         // virtuals from ExpressionNary
-	virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
-	virtual void addToBsonObj(
-	    BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const;
-	virtual void addToBsonArray(
-	    BSONArrayBuilder *pBuilder, unsigned depth) const;
+        virtual void addOperand(const intrusive_ptr<Expression> &pExpression);
+        virtual void addToBsonObj(
+            BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const;
+        virtual void addToBsonArray(
+            BSONArrayBuilder *pBuilder, unsigned depth) const;
 
         /*
           Get the accumulated value.
@@ -46,18 +46,18 @@ namespace mongo {
     protected:
         Accumulator();
 
-	/*
-	  Convenience method for doing this for accumulators.  The pattern
-	  is always the same, so a common implementation works, but requires
-	  knowing the operator name.
+        /*
+          Convenience method for doing this for accumulators.  The pattern
+          is always the same, so a common implementation works, but requires
+          knowing the operator name.
 
-	  @param pBuilder the builder to add to
-	  @param fieldName the projected name
-	  @param opName the operator name
-	 */
-	void opToBson(
-	    BSONObjBuilder *pBuilder, string fieldName, string opName,
-	    unsigned depth) const;
+          @param pBuilder the builder to add to
+          @param fieldName the projected name
+          @param opName the operator name
+         */
+        void opToBson(
+            BSONObjBuilder *pBuilder, string fieldName, string opName,
+            unsigned depth) const;
     };
 
 
@@ -65,26 +65,26 @@ namespace mongo {
         public Accumulator {
     public:
         // virtuals from Expression
-	virtual intrusive_ptr<const Value> evaluate(
+        virtual intrusive_ptr<const Value> evaluate(
             const intrusive_ptr<Document> &pDocument) const;
         virtual intrusive_ptr<const Value> getValue() const;
-	virtual const char *getOpName() const;
+        virtual const char *getOpName() const;
 
         /*
           Create an appending accumulator.
 
-	  @param pCtx the expression context
+          @param pCtx the expression context
           @returns the created accumulator
          */
         static intrusive_ptr<Accumulator> create(
-	    const intrusive_ptr<ExpressionContext> &pCtx);
+            const intrusive_ptr<ExpressionContext> &pCtx);
 
     private:
         AccumulatorAddToSet(const intrusive_ptr<ExpressionContext> &pTheCtx);
         typedef boost::unordered_set<intrusive_ptr<const Value>, Value::Hash > SetType;
         mutable SetType set;
         mutable SetType::iterator itr; 
-	intrusive_ptr<ExpressionContext> pCtx;
+        intrusive_ptr<ExpressionContext> pCtx;
     };
 
 
@@ -111,9 +111,9 @@ namespace mongo {
         public AccumulatorSingleValue {
     public:
         // virtuals from Expression
-	virtual intrusive_ptr<const Value> evaluate(
+        virtual intrusive_ptr<const Value> evaluate(
             const intrusive_ptr<Document> &pDocument) const;
-	virtual const char *getOpName() const;
+        virtual const char *getOpName() const;
 
         /*
           Create the accumulator.
@@ -121,7 +121,7 @@ namespace mongo {
           @returns the created accumulator
          */
         static intrusive_ptr<Accumulator> create(
-	    const intrusive_ptr<ExpressionContext> &pCtx);
+            const intrusive_ptr<ExpressionContext> &pCtx);
 
     private:
         AccumulatorFirst();
@@ -132,9 +132,9 @@ namespace mongo {
         public AccumulatorSingleValue {
     public:
         // virtuals from Expression
-	virtual intrusive_ptr<const Value> evaluate(
+        virtual intrusive_ptr<const Value> evaluate(
             const intrusive_ptr<Document> &pDocument) const;
-	virtual const char *getOpName() const;
+        virtual const char *getOpName() const;
 
         /*
           Create the accumulator.
@@ -142,7 +142,7 @@ namespace mongo {
           @returns the created accumulator
          */
         static intrusive_ptr<Accumulator> create(
-	    const intrusive_ptr<ExpressionContext> &pCtx);
+            const intrusive_ptr<ExpressionContext> &pCtx);
 
     private:
         AccumulatorLast();
@@ -153,19 +153,19 @@ namespace mongo {
         public Accumulator {
     public:
         // virtuals from Accumulator
-	virtual intrusive_ptr<const Value> evaluate(
+        virtual intrusive_ptr<const Value> evaluate(
             const intrusive_ptr<Document> &pDocument) const;
         virtual intrusive_ptr<const Value> getValue() const;
-	virtual const char *getOpName() const;
+        virtual const char *getOpName() const;
 
         /*
           Create a summing accumulator.
 
-	  @param pCtx the expression context
+          @param pCtx the expression context
           @returns the created accumulator
          */
         static intrusive_ptr<Accumulator> create(
-	    const intrusive_ptr<ExpressionContext> &pCtx);
+            const intrusive_ptr<ExpressionContext> &pCtx);
 
     protected: /* reused by AccumulatorAvg */
         AccumulatorSum();
@@ -180,9 +180,9 @@ namespace mongo {
         public AccumulatorSingleValue {
     public:
         // virtuals from Expression
-	virtual intrusive_ptr<const Value> evaluate(
+        virtual intrusive_ptr<const Value> evaluate(
             const intrusive_ptr<Document> &pDocument) const;
-	virtual const char *getOpName() const;
+        virtual const char *getOpName() const;
 
         /*
           Create either the max or min accumulator.
@@ -190,9 +190,9 @@ namespace mongo {
           @returns the created accumulator
          */
         static intrusive_ptr<Accumulator> createMin(
-	    const intrusive_ptr<ExpressionContext> &pCtx);
+            const intrusive_ptr<ExpressionContext> &pCtx);
         static intrusive_ptr<Accumulator> createMax(
-	    const intrusive_ptr<ExpressionContext> &pCtx);
+            const intrusive_ptr<ExpressionContext> &pCtx);
 
     private:
         AccumulatorMinMax(int theSense);
@@ -205,55 +205,55 @@ namespace mongo {
         public Accumulator {
     public:
         // virtuals from Expression
-	virtual intrusive_ptr<const Value> evaluate(
+        virtual intrusive_ptr<const Value> evaluate(
             const intrusive_ptr<Document> &pDocument) const;
         virtual intrusive_ptr<const Value> getValue() const;
-	virtual const char *getOpName() const;
+        virtual const char *getOpName() const;
 
         /*
           Create an appending accumulator.
 
-	  @param pCtx the expression context
+          @param pCtx the expression context
           @returns the created accumulator
          */
         static intrusive_ptr<Accumulator> create(
-	    const intrusive_ptr<ExpressionContext> &pCtx);
+            const intrusive_ptr<ExpressionContext> &pCtx);
 
     private:
         AccumulatorPush(const intrusive_ptr<ExpressionContext> &pTheCtx);
 
         mutable vector<intrusive_ptr<const Value> > vpValue;
-	intrusive_ptr<ExpressionContext> pCtx;
+        intrusive_ptr<ExpressionContext> pCtx;
     };
 
 
     class AccumulatorAvg :
-	public AccumulatorSum {
+        public AccumulatorSum {
         typedef AccumulatorSum Super;
     public:
         // virtuals from Accumulator
-	virtual intrusive_ptr<const Value> evaluate(
+        virtual intrusive_ptr<const Value> evaluate(
             const intrusive_ptr<Document> &pDocument) const;
         virtual intrusive_ptr<const Value> getValue() const;
-	virtual const char *getOpName() const;
+        virtual const char *getOpName() const;
 
         /*
           Create an averaging accumulator.
 
-	  @param pCtx the expression context
+          @param pCtx the expression context
           @returns the created accumulator
          */
         static intrusive_ptr<Accumulator> create(
-	    const intrusive_ptr<ExpressionContext> &pCtx);
+            const intrusive_ptr<ExpressionContext> &pCtx);
 
     private:
-	static const char subTotalName[];
-	static const char countName[];
+        static const char subTotalName[];
+        static const char countName[];
 
         AccumulatorAvg(const intrusive_ptr<ExpressionContext> &pCtx);
 
-	mutable long long count;
-	intrusive_ptr<ExpressionContext> pCtx;
+        mutable long long count;
+        intrusive_ptr<ExpressionContext> pCtx;
     };
 
 }

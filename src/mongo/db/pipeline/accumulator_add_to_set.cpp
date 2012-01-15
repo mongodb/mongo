@@ -24,27 +24,27 @@ namespace mongo {
     intrusive_ptr<const Value> AccumulatorAddToSet::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1);
-	intrusive_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
+        intrusive_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
 
-	if (prhs->getType() == Undefined)
-	    ; /* nothing to add to the array */
-	else if (!pCtx->getInRouter())
-	    set.insert(prhs);
-	else {
-	    /*
-	      If we're in the router, we need to take apart the arrays we
-	      receive and put their elements into the array we are collecting.
-	      If we didn't, then we'd get an array of arrays, with one array
-	      from each shard that responds.
-	     */
-	    assert(prhs->getType() == Array);
-	    
-	    intrusive_ptr<ValueIterator> pvi(prhs->getArray());
-	    while(pvi->more()) {
-		intrusive_ptr<const Value> pElement(pvi->next());
-		set.insert(pElement);
-	    }
-	}
+        if (prhs->getType() == Undefined)
+            ; /* nothing to add to the array */
+        else if (!pCtx->getInRouter())
+            set.insert(prhs);
+        else {
+            /*
+              If we're in the router, we need to take apart the arrays we
+              receive and put their elements into the array we are collecting.
+              If we didn't, then we'd get an array of arrays, with one array
+              from each shard that responds.
+             */
+            assert(prhs->getType() == Array);
+            
+            intrusive_ptr<ValueIterator> pvi(prhs->getArray());
+            while(pvi->more()) {
+                intrusive_ptr<const Value> pElement(pvi->next());
+                set.insert(pElement);
+            }
+        }
 
         return Value::getNull();
     }
@@ -60,20 +60,20 @@ namespace mongo {
     }
 
     AccumulatorAddToSet::AccumulatorAddToSet(
-	const intrusive_ptr<ExpressionContext> &pTheCtx):
+        const intrusive_ptr<ExpressionContext> &pTheCtx):
         Accumulator(),
         set(),
         pCtx(pTheCtx) {
     }
 
     intrusive_ptr<Accumulator> AccumulatorAddToSet::create(
-	const intrusive_ptr<ExpressionContext> &pCtx) {
-	intrusive_ptr<AccumulatorAddToSet> pAccumulator(
-	    new AccumulatorAddToSet(pCtx));
+        const intrusive_ptr<ExpressionContext> &pCtx) {
+        intrusive_ptr<AccumulatorAddToSet> pAccumulator(
+            new AccumulatorAddToSet(pCtx));
         return pAccumulator;
     }
 
     const char *AccumulatorAddToSet::getOpName() const {
-	return "$addToSet";
+        return "$addToSet";
     }
 }

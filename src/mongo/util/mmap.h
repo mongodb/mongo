@@ -100,8 +100,6 @@ namespace mongo {
         static void unmarkAllWritable() { }
 #endif
 
-        static bool exists(boost::filesystem::path p) { return boost::filesystem::exists(p); }
-
         virtual bool isMongoMMF() { return false; }
 
         string filename() const { return _filename; }

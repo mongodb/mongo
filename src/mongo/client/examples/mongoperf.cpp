@@ -16,6 +16,8 @@
 #include "../../util/time_support.h"
 #include "../../bson/util/atomic_int.h"
 
+#include <boost/filesystem/operations.hpp>
+
 using namespace std;
 using namespace mongo;
 using namespace bson;

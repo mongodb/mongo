@@ -218,6 +218,8 @@
     <ClCompile Include="d_globals.cpp" />
     <ClCompile Include="curop.cpp" />
     <ClCompile Include="..\util\concurrency\rwlockimpl.cpp" />
+    <ClCompile Include="memconcept.cpp" />
+    <ClCompile Include="commands\pipeline_d.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\dbclientcursor.h" />
@@ -393,6 +395,8 @@
     <ClInclude Include="d_globals.h" />
     <ClInclude Include="..\util\concurrency\mapsf.h" />
     <ClInclude Include="..\util\concurrency\rwlockimpl.h" />
+    <ClInclude Include="commands\pipeline_d.h" />
+    <ClInclude Include="commands\pipeline.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="db.rc" />

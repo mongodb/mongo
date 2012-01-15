@@ -479,7 +479,7 @@ namespace mongo {
     }
 
     string Chunk::genID( const string& ns , const BSONObj& o ) {
-        StringBuilder buf( ns.size() + o.objsize() + 16 );
+        StringBuilder buf;
         buf << ns << "-";
 
         BSONObjIterator i(o);
@@ -872,6 +872,15 @@ namespace mongo {
         // Return true if the shard version is the same in the two chunk managers
         return other.getVersion( shard ).toLong() == getVersion( shard ).toLong();
 
+    }
+
+    bool ChunkManager::compatibleWith( const Chunk& other ) const {
+        ChunkPtr myChunk = this->findChunk( other.getMin() );
+
+        if( other.getMin() != myChunk->getMin() ) return false;
+        if( other.getMax() != myChunk->getMax() ) return false;
+        if( other.getShard() != myChunk->getShard() ) return false;
+        return true;
     }
 
     void ChunkManager::drop( ChunkManagerPtr me ) const {

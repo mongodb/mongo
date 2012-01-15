@@ -39,6 +39,8 @@
 #include "../db/key.h"
 #include "../util/compress.h"
 
+#include <boost/filesystem/operations.hpp>
+
 using namespace bson;
 
 namespace mongo {
@@ -119,8 +121,8 @@ namespace PerfTests {
         DEV return;
 
         const char *fn = "../../settings.py";
-        if( !exists(fn) ) {
-            if( exists("settings.py") )
+        if( !boost::filesystem::exists(fn) ) {
+            if( boost::filesystem::exists("settings.py") )
                 fn = "settings.py";
             else {
                 cout << "no ../../settings.py or ./settings.py file found. will not write perf stats to pstats db." << endl;
@@ -389,7 +391,7 @@ namespace PerfTests {
         }
     };
 
-    unsigned dontOptimizeOutHopefully;
+    unsigned dontOptimizeOutHopefully = 1;
 
     class NonDurTest : public B {
     public:
@@ -691,21 +693,62 @@ namespace PerfTests {
     public:
         TestException() : DBException("testexception",3) { }
     };
-
-    void foo_throws() { 
+    struct Z { 
+        Z() {  dontOptimizeOutHopefully--; }
+        ~Z() { dontOptimizeOutHopefully++; }
+    };
+    void thr1(int n) { 
         if( dontOptimizeOutHopefully ) { 
             throw TestException();
         }
         log() << "hmmm" << endl;
     }
-
+    void thr2(int n) { 
+        if( --n <= 0 ) {
+            if( dontOptimizeOutHopefully ) { 
+                throw TestException();
+            }
+            log() << "hmmm" << endl;
+        }
+        Z z;
+        try { 
+            thr2(n-1);
+        }
+        catch(DBException&) { 
+        }
+    }
+    void thr3(int n) { 
+        if( --n <= 0 ) {
+            if( dontOptimizeOutHopefully ) { 
+                throw TestException();
+            }
+            log() << "hmmm" << endl;
+        }
+        try { 
+            Z z;
+            thr3(n-1);
+        }
+        catch(DBException&) { 
+        }
+    }
+    void thr4(int n) { 
+        if( --n <= 0 ) {
+            if( dontOptimizeOutHopefully ) { 
+                throw TestException();
+            }
+            log() << "hmmm" << endl;
+        }
+        Z z;
+        thr4(n-1);
+    }
+    template< void T (int) >
     class Throw : public B {
     public:
         virtual int howLongMillis() { return 2000; }
         string name() { return "throw"; }
         void timed() {
             try { 
-                foo_throws();
+                T(10);
                 dontOptimizeOutHopefully += 2;
             }
             catch(DBException& e) {
@@ -858,7 +901,7 @@ namespace PerfTests {
         OID oid;
         BSONObj query;
     public:
-        virtual int howLongMillis() { return 30000; }
+        virtual int howLongMillis() { return profiling ? 30000 : 5000; }
         Insert1() : x( BSON("x" << 99) ) {
             oid.init();
             query = BSON("_id" << oid);
@@ -1014,7 +1057,10 @@ namespace PerfTests {
 #endif
                 add< New8 >();
                 add< New128 >();
-                add< Throw >();
+                add< Throw< thr1 > >();
+                add< Throw< thr2 > >();
+                add< Throw< thr3 > >();
+                add< Throw< thr4 > >();
                 add< Timer >();
                 add< Sleep0Ms >();
 #if defined(__USE_XOPEN2K)

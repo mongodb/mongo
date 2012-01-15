@@ -25,25 +25,25 @@ namespace mongo {
         const intrusive_ptr<Document> &pDocument) const {
         assert(vpOperand.size() == 1);
 
-	/* only remember the first value seen */
-	if (!pValue.get())
-	    pValue = vpOperand[0]->evaluate(pDocument);
+        /* only remember the first value seen */
+        if (!pValue.get())
+            pValue = vpOperand[0]->evaluate(pDocument);
 
         return pValue;
     }
 
     AccumulatorFirst::AccumulatorFirst():
-	AccumulatorSingleValue() {
+        AccumulatorSingleValue() {
     }
 
     intrusive_ptr<Accumulator> AccumulatorFirst::create(
-	const intrusive_ptr<ExpressionContext> &pCtx) {
-	intrusive_ptr<AccumulatorFirst> pAccumulator(
-	    new AccumulatorFirst());
+        const intrusive_ptr<ExpressionContext> &pCtx) {
+        intrusive_ptr<AccumulatorFirst> pAccumulator(
+            new AccumulatorFirst());
         return pAccumulator;
     }
 
     const char *AccumulatorFirst::getOpName() const {
-	return "$first";
+        return "$first";
     }
 }

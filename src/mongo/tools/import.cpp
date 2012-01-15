@@ -28,8 +28,11 @@
 
 #include <boost/program_options.hpp>
 #include <boost/algorithm/string.hpp>
+#include <boost/filesystem/operations.hpp>
 
 using namespace mongo;
+using std::string;
+using std::stringstream;
 
 namespace po = boost::program_options;
 
@@ -45,7 +48,7 @@ class Import : public Tool {
     bool _doimport;
     bool _jsonArray;
     vector<string> _upsertFields;
-    static const int BUF_SIZE = 1024 * 1024 * 4;
+    static const int BUF_SIZE = 1024 * 1024 * 16;
 
     void csvTokenizeRow(const string& row, vector<string>& tokens) {
         bool inQuotes = false;
@@ -146,7 +149,11 @@ class Import : public Tool {
             return -1;
 
         int jslen;
-        o = fromjson(buf, &jslen);
+        try {
+            o = fromjson(buf, &jslen);
+        } catch ( MsgAssertionException& e ) {
+            uasserted(13293, string("BSON representation of supplied JSON array is too large: ") + e.what());
+        }
         len += jslen;
 
         return len;
@@ -176,7 +183,11 @@ class Import : public Tool {
                 *end = 0;
                 end--;
             }
-            o = fromjson( line );
+            try {
+                o = fromjson( line );
+            } catch ( MsgAssertionException& e ) {
+                uasserted(13504, string("BSON representation of supplied JSON is too large: ") + e.what());
+            }
             return true;
         }
 
@@ -259,7 +270,7 @@ public:
         ("upsert", "insert or update objects that already exist" )
         ("upsertFields", po::value<string>(), "comma-separated fields for the query part of the upsert. You should make sure this is indexed" )
         ("stopOnError", "stop importing at first error rather than continuing" )
-        ("jsonArray", "load a json array, not one item per line. Currently limited to 4MB." )
+        ("jsonArray", "load a json array, not one item per line. Currently limited to 16MB." )
         ;
         add_hidden_options()
         ("noimport", "don't actually import. useful for benchmarking parser" )
@@ -287,12 +298,12 @@ public:
         ifstream file( filename.c_str() , ios_base::in);
 
         if ( filename.size() > 0 && filename != "-" ) {
-            if ( ! exists( filename ) ) {
+            if ( ! boost::filesystem::exists( filename ) ) {
                 error() << "file doesn't exist: " << filename << endl;
                 return -1;
             }
             in = &file;
-            fileSize = file_size( filename );
+            fileSize = boost::filesystem::file_size( filename );
         }
 
         // check if we're actually talking to a machine that can write

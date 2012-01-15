@@ -27,6 +27,11 @@
 #include "ops/update.h"
 #include "ops/delete.h"
 
+#include <fstream>
+
+#include <boost/filesystem/convenience.hpp>
+#include <boost/filesystem/operations.hpp>
+
 namespace mongo {
 
     void Helpers::ensureIndex(const char *ns, BSONObj keyPattern, bool unique, const char *name) {
@@ -335,7 +340,7 @@ namespace mongo {
 
     void RemoveSaver::goingToDelete( const BSONObj& o ) {
         if ( ! _out ) {
-            create_directories( _root );
+            boost::filesystem::create_directories( _root );
             _out = new ofstream();
             _out->open( _file.string().c_str() , ios_base::out | ios_base::binary );
             if ( ! _out->good() ) {

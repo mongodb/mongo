@@ -18,6 +18,7 @@
 #include "../pch.h"
 #include "processinfo.h"
 #include "log.h"
+#include <db/jsobj.h>
 
 #include <mach/vm_statistics.h>
 #include <mach/task_info.h>
@@ -93,7 +94,18 @@ namespace mongo {
         return (int)( ti.resident_size / (1024 * 1024 ) );
     }
 
-    void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {}
+    void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {
+        struct task_events_info taskInfo;
+        mach_msg_type_number_t taskInfoCount = TASK_EVENTS_INFO_COUNT;
+
+        if ( KERN_SUCCESS != task_info(mach_task_self(), TASK_EVENTS_INFO, 
+                                       (integer_t*)&taskInfo, &taskInfoCount) ) {
+            cout << "error getting extra task_info" << endl;
+            return;
+        }
+
+        info.append("page_faults", taskInfo.pageins);
+    }
 
     bool ProcessInfo::blockCheckSupported() {
         return true;

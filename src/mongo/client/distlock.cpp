@@ -19,6 +19,8 @@
 #include "dbclient.h"
 #include "distlock.h"
 
+#include <boost/thread/once.hpp>
+
 namespace mongo {
 
     LabeledLevel DistributedLock::logLvl( 1 );
@@ -527,7 +529,7 @@ namespace mongo {
                 unsigned long long takeover = _lockTimeout;
                 PingData _lastPingCheck = getLastPing();
 
-                log( logLvl ) << "checking last ping for lock '" << lockName << "'" << " against process " << _lastPingCheck.get<0>() << " and ping " << _lastPingCheck.get<1>() << endl;
+                log( logLvl ) << "checking last ping for lock '" << lockName << "'" << " against process " << _lastPingCheck.id << " and ping " << _lastPingCheck.lastPing << endl;
 
                 try {
 
@@ -536,8 +538,8 @@ namespace mongo {
                     // Timeout the elapsed time using comparisons of remote clock
                     // For non-finalized locks, timeout 15 minutes since last seen (ts)
                     // For finalized locks, timeout 15 minutes since last ping
-                    bool recPingChange = o["state"].numberInt() == 2 && ( _lastPingCheck.get<0>() != lastPing["_id"].String() || _lastPingCheck.get<1>() != lastPing["ping"].Date() );
-                    bool recTSChange = _lastPingCheck.get<3>() != o["ts"].OID();
+                    bool recPingChange = o["state"].numberInt() == 2 && ( _lastPingCheck.id != lastPing["_id"].String() || _lastPingCheck.lastPing != lastPing["ping"].Date() );
+                    bool recTSChange = _lastPingCheck.ts != o["ts"].OID();
 
                     if( recPingChange || recTSChange ) {
                         // If the ping has changed since we last checked, mark the current date and time
@@ -548,10 +550,10 @@ namespace mongo {
                         // GOTCHA!  Due to network issues, it is possible that the current time
                         // is less than the remote time.  We *have* to check this here, otherwise
                         // we overflow and our lock breaks.
-                        if(_lastPingCheck.get<2>() >= remote)
+                        if(_lastPingCheck.remote >= remote)
                             elapsed = 0;
                         else
-                            elapsed = remote - _lastPingCheck.get<2>();
+                            elapsed = remote - _lastPingCheck.remote;
                     }
                 }
                 catch( LockException& e ) {
@@ -761,7 +763,8 @@ namespace mongo {
                         indUpdate = indDB->findOne( locksNS, _id );
 
                         // Our lock should now be set until forcing.
-                        assert( indUpdate["state"].numberInt() == 1 );
+                        // It's possible another lock has won entirely by now, so state could be 1 or 2 here
+                        assert( indUpdate["state"].numberInt() > 0 );
 
                     }
                     // else our lock is the same, in which case we're safe, or it's a bigger lock,

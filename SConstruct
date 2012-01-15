@@ -429,6 +429,7 @@ serverOnlyFiles += [
     "src/mongo/db/commands/group.cpp",
     "src/mongo/db/commands/mr.cpp",
     "src/mongo/db/commands/pipeline_command.cpp",
+    "src/mongo/db/commands/pipeline_d.cpp",
     "src/mongo/db/commands/document_source_cursor.cpp" ]
 #    "src/mongo/db/commands/isself.cpp",
 #serverOnlyFiles += [ "src/mongo/db/commands/%s.cpp" % x for x in ["distinct","find_and_modify","group","mr"] ]
@@ -754,6 +755,10 @@ elif "win32" == os.sys.platform:
     else:
         winLibString += " user32.lib gdi32.lib winspool.lib comdlg32.lib  shell32.lib ole32.lib oleaut32.lib "
         winLibString += " odbc32.lib odbccp32.lib uuid.lib "
+
+    # v8 calls timeGetTime() 
+    if usev8:   
+        winLibString += " winmm.lib "
 
     env.Append( LIBS=Split(winLibString) )
 
@@ -1322,14 +1327,14 @@ addSmoketest( "mongosTest" , [ mongos[0].abspath ] )
 # These tests require the mongo shell
 if not onlyServer and not noshell:
     addSmoketest( "smokeJs", [add_exe("mongo")] )
-    addSmoketest( "smokeClone", [ "mongo", "mongod" ] )
-    addSmoketest( "smokeRepl", [ "mongo", "mongod", "mongobridge" ] )
-    addSmoketest( "smokeReplSets", [ "mongo", "mongod", "mongobridge" ] )
-    addSmoketest( "smokeDur", [ add_exe( "mongo" ) , add_exe( "mongod" ) , add_exe('mongorestore') ] )
+    addSmoketest( "smokeClone", [ add_exe( "mongo" ), add_exe( "mongod" ) ] )
+    addSmoketest( "smokeRepl", [ add_exe( "mongo" ), add_exe( "mongod" ), add_exe( "mongobridge" ) ] )
+    addSmoketest( "smokeReplSets", [ add_exe( "mongo" ), add_exe( "mongod" ), add_exe( "mongobridge" ) ] )
+    addSmoketest( "smokeDur", [ add_exe( "mongo" ) , add_exe( "mongod" ) , add_exe( 'mongorestore' ) ] )
     addSmoketest( "smokeDisk", [ add_exe( "mongo" ), add_exe( "mongod" ), add_exe( "mongodump" ), add_exe( "mongorestore" ) ] )
     addSmoketest( "smokeAuth", [ add_exe( "mongo" ), add_exe( "mongod" ) ] )
     addSmoketest( "smokeParallel", [ add_exe( "mongo" ), add_exe( "mongod" ) ] )
-    addSmoketest( "smokeSharding", [ "mongo", "mongod", "mongos" ] )
+    addSmoketest( "smokeSharding", [ add_exe( "mongo" ), add_exe( "mongod" ), add_exe( "mongos" ) ] )
     addSmoketest( "smokeJsPerf", [ "mongo" ] )
     addSmoketest( "smokeJsSlowNightly", [add_exe("mongo")])
     addSmoketest( "smokeJsSlowWeekly", [add_exe("mongo")])

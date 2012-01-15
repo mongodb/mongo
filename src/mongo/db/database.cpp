@@ -23,6 +23,8 @@
 #include "clientcursor.h"
 #include "databaseholder.h"
 
+#include <boost/filesystem/operations.hpp>
+
 namespace mongo {
 
     bool Database::_openAllFiles = true;
