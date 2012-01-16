@@ -31,19 +31,6 @@ struct __wt_btree_session {
 };
 
 /*
- * WT_SESSION_BUFFER --
- *	A structure to accumulate file changes on a per-thread basis.
- */
-struct __wt_session_buffer {
-	uint32_t len;			/* Buffer original size */
-	uint32_t space_avail;		/* Buffer's available memory */
-	uint8_t *first_free;		/* Buffer's first free byte */
-
-	uint32_t in;			/* Buffer chunks in use */
-	uint32_t out;			/* Buffer chunks not in use */
-};
-
-/*
  * WT_HAZARD --
  *	A hazard reference.
  */

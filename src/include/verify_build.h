@@ -46,9 +46,6 @@ __wt_verify_build(void)
 	/* On-disk structures should not be padded. */
 	SIZE_CHECK(WT_BLOCK_DESC, WT_BLOCK_DESC_SIZE);
 
-	/* Some structures must be aligned correctly. */
-	ALIGN_CHECK(WT_SESSION_BUFFER, sizeof(uint32_t));
-
 	/*
 	 * We mix-and-match 32-bit unsigned values and size_t's, mostly because
 	 * we allocate and handle 32-bit objects, and lots of the underlying C
