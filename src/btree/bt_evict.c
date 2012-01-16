@@ -562,8 +562,7 @@ __evict_dup_remove(WT_SESSION_IMPL *session)
 	 */
 	evict = cache->evict;
 	elem = cache->evict_entries;
-	qsort(evict,
-	    (size_t)elem, sizeof(WT_EVICT_LIST), __evict_page_cmp);
+	qsort(evict, (size_t)elem, sizeof(WT_EVICT_LIST), __evict_page_cmp);
 	for (i = 0; i < elem; i = j) {
 		/*
 		 * Once we hit a NULL, we're done, the NULLs all sorted to the
