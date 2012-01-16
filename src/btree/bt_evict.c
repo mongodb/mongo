@@ -644,6 +644,13 @@ __evict_get_page(
 		*btreep = evict->btree;
 
 		/*
+		 * If we're evicting our current eviction point in the file,
+		 * clear it and restart the walk.
+		 */
+		if (*pagep == evict->btree->evict_page)
+			evict->btree->evict_page = NULL;
+
+		/*
 		 * Paranoia: remove the entry so we never try and reconcile
 		 * the same page on reconciliation error.
 		 */
@@ -672,16 +679,9 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 	WT_SET_BTREE_IN_SESSION(session, btree);
 
 	/*
-	 * If we're evicting our current eviction point in the file,
-	 * clear it and start again.
-	 */
-	if (page == session->btree->evict_page)
-		session->btree->evict_page = NULL;
-
-	/*
-	 * We don't care why reconciliation failed: maybe the page was dirty
-	 * and we're out of disk space, or maybe a subtree was already being
-	 * evicted.  Regardless, don't pick the same page every time.
+	 * We don't care why eviction failed (maybe the page was dirty and we're
+	 * out of disk space, or the page had an in-memory subtree already being
+	 * evicted).  Regardless, don't pick the same page every time.
 	 */
 	if (__wt_rec_evict(session, page, 0) != 0)
 		page->read_gen = __wt_cache_read_gen(session);
