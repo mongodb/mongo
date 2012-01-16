@@ -168,16 +168,23 @@ int
 __wt_schema_table_track_update(WT_SESSION_IMPL *session, const char *key)
 {
 	WT_SCHEMA_TRACK *trk;
+	int ret;
 
 	WT_RET(__schema_table_track_next(session, &trk));
 
 	trk->op = WT_ST_SET;
 	WT_RET(__wt_strdup(session, key, &trk->a));
 
-	/* Save the original value from the schema table. */
-	WT_RET(__wt_schema_table_read(session, key, &trk->b));
-
-	return (0);
+	/*
+	 * If there was a previous value, keep it around -- if not, then this
+	 * "update" is really an insert.
+	 */
+	if ((ret =
+	    __wt_schema_table_read(session, key, &trk->b)) == WT_NOTFOUND) {
+		trk->op = WT_ST_REMOVE;
+		ret = 0;
+	}
+	return (ret);
 }
 
 /*
