@@ -25,8 +25,7 @@ namespace mongo {
                 _fieldTypes[ i->first ] = QueryPattern::Equality;
             }
             else if ( i->second.empty() ) {
-                // This case generally results from an upper and lower bound that are inconsistent for a single key index.
-                _fieldTypes[ i->first ] = QueryPattern::UpperAndLowerBound;
+                _fieldTypes[ i->first ] = QueryPattern::Empty;
             }
             else if ( i->second.nontrivial() ) {
                 bool upper = i->second.max().type() != MaxKey;
@@ -59,6 +58,8 @@ namespace mongo {
     
     string typeToString( enum QueryPattern::Type t ) {
         switch (t) {
+            case QueryPattern::Empty:
+                return "Empty";
             case QueryPattern::Equality:
                 return "Equality";
             case QueryPattern::LowerBound:

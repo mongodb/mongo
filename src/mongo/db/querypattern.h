@@ -34,6 +34,7 @@ namespace mongo {
     public:
         QueryPattern( const FieldRangeSet &frs, const BSONObj &sort );
         enum Type {
+            Empty,
             Equality,
             LowerBound,
             UpperBound,
