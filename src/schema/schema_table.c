@@ -62,6 +62,9 @@ __wt_schema_table_insert(
 
 	ret = 0;
 
+	if (session->schema_track != NULL)		/* Optional tracking */
+		WT_RET(__wt_schema_table_track_insert(session, key));
+
 	WT_RET(__wt_schema_table_cursor(session, NULL, &cursor));
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
@@ -83,6 +86,9 @@ __wt_schema_table_update(
 
 	ret = 0;
 
+	if (session->schema_track != NULL)		/* Optional tracking */
+		WT_RET(__wt_schema_table_track_update(session, key));
+
 	WT_RET(__wt_schema_table_cursor(session, "overwrite", &cursor));
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
@@ -102,6 +108,9 @@ __wt_schema_table_remove(WT_SESSION_IMPL *session, const char *key)
 	int ret;
 
 	ret = 0;
+
+	if (session->schema_track != NULL)		/* Optional tracking */
+		WT_RET(__wt_schema_table_track_update(session, key));
 
 	WT_RET(__wt_schema_table_cursor(session, NULL, &cursor));
 	cursor->set_key(cursor, key);

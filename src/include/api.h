@@ -90,6 +90,9 @@ struct __wt_session_impl {
 
 	void	*reconcile;		/* Reconciliation structure */
 
+	void	*schema_track;		/* Tracking schema operations */
+	u_int	 schema_track_entries;	/* Currently allocated */
+
 	uint32_t flags;
 };
 

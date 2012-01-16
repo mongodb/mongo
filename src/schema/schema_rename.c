@@ -56,6 +56,7 @@ __rename_file(
 	}
 
 	/* Rename the underlying file. */
+	WT_ERR(__wt_schema_table_track_fs_rename(session, newname, oldname));
 	WT_ERR(__wt_rename(session, oldname, newname));
 
 err:	__wt_scr_free(&buf);
@@ -201,12 +202,20 @@ __wt_schema_rename(WT_SESSION_IMPL *session,
 	WT_RET(__wt_schema_name_check(session, uri));
 	WT_RET(__wt_schema_name_check(session, newname));
 
+	/*
+	 * We track rename operations, if we fail in the middle, we want to
+	 * back it all out.
+	 */
+	WT_RET(__wt_schema_table_track_on(session));
+
 	if (WT_PREFIX_SKIP(uri, "file:"))
 		ret = __rename_file(session, uri, newname);
 	else if (WT_PREFIX_SKIP(uri, "table:"))
 		ret = __rename_table(session, uri, newname);
 	else
 		return (__wt_unknown_object_type(session, uri));
+
+	WT_TRET(__wt_schema_table_track_off(session, ret == 0 ? 0 : 1));
 
 	/* If we didn't find a schema file entry, map that error to ENOENT. */
 	return (ret == WT_NOTFOUND ? ENOENT : ret);
