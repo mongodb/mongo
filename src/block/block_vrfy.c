@@ -47,18 +47,23 @@ __wt_block_verify_start(WT_SESSION_IMPL *session, WT_BLOCK *block, int *emptyp)
 	 * size piece of the file (this is how we track the parts of the file
 	 * we've verified, and check for multiply referenced or unreferenced
 	 * blocks).  Storing this on the heap seems reasonable, verifying a 1TB
-	 * file with an 512B allocation size would require a 256MB bit array
+	 * file with an 512B allocation size would require a 256MB bit array:
 	 *
-	 *	(((1 * 2^40) / 512) / 8) / 2^20 = 256
+	 *	(((1 * 2^40) / 512) / 8) = 256 * 2^20
 	 *
 	 * To verify larger files than we can handle in this way, we'd have to
 	 * write parts of the bit array into a disk file.
+	 *
+	 * We also have a minimum maximum verifiable file size of 16TB because
+	 * the underlying bit package takes a 32-bit count of bits to allocate:
+	 *
+	 *	2^32 * 512 * 8 = 16 * 2^40
 	 */
 	if (file_size / block->allocsize > UINT32_MAX)
 		WT_RET_MSG(
 		    session, WT_ERROR, "the file is too large to verify");
 
-	block->frags = (uint32_t)file_size / block->allocsize;
+	block->frags = (uint32_t)(file_size / block->allocsize);
 	WT_RET(__bit_alloc(session, block->frags, &block->fragbits));
 
 	/* Verify the free-list. */
