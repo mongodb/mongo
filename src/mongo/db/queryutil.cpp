@@ -492,55 +492,73 @@ namespace mongo {
         return *this;
     }
 
-    void handleInterval( const FieldInterval &lower, FieldBound &low, FieldBound &high, vector<FieldInterval> &newIntervals ) {
-        if ( low._bound.eoo() ) {
-            low = lower._lower; high = lower._upper;
-        }
-        else {
-            int cmp = high._bound.woCompare( lower._lower._bound, false );
-            if ( ( cmp < 0 ) || ( cmp == 0 && !high._inclusive && !lower._lower._inclusive ) ) {
-                FieldInterval tmp;
-                tmp._lower = low;
-                tmp._upper = high;
-                newIntervals.push_back( tmp );
-                low = lower._lower; high = lower._upper;
+    /** Helper class for assembling a union of FieldRange objects. */
+    class RangeUnionBuilder : boost::noncopyable {
+    public:
+        RangeUnionBuilder() : _initial( true ) {}
+        /** @param next: Supply next ordered interval, ordered by _lower FieldBound. */
+        void nextOrderedInterval( const FieldInterval &next ) {
+            if ( _initial ) {
+                _tail = next;
+                _initial = false;
+                return;
             }
-            else {
-                high = lower._upper;
+            if ( !handleDisjoint( next ) ) {
+                handleExtend( next );
             }
         }
-    }
+        void done() {
+            if ( !_initial ) {
+                _unionIntervals.push_back( _tail );
+            }
+        }
+        const vector<FieldInterval> &unionIntervals() const { return _unionIntervals; }
+    private:
+        /** If _tail and next are disjoint, next becomes the new _tail. */
+        bool handleDisjoint( const FieldInterval &next ) {
+            int cmp = _tail._upper._bound.woCompare( next._lower._bound, false );
+            if ( ( cmp < 0 ) ||
+                ( cmp == 0 && !_tail._upper._inclusive && !next._lower._inclusive ) ) {
+                _unionIntervals.push_back( _tail );
+                _tail = next;
+                return true;
+            }
+            return false;
+        }
+        /** Extend _tail to upper bound of next if necessary. */
+        void handleExtend( const FieldInterval &next ) {
+            int cmp = _tail._upper._bound.woCompare( next._upper._bound, false );
+            if ( ( cmp < 0 ) ||
+                ( cmp == 0 && !_tail._upper._inclusive && next._upper._inclusive ) ) {
+                _tail._upper = next._upper;
+            }            
+        }
+        bool _initial;
+        FieldInterval _tail;
+        vector<FieldInterval> _unionIntervals;
+    };
 
     const FieldRange &FieldRange::operator|=( const FieldRange &other ) {
-        vector<FieldInterval> newIntervals;
-        FieldBound low;
-        FieldBound high;
+        RangeUnionBuilder b;
         vector<FieldInterval>::const_iterator i = _intervals.begin();
         vector<FieldInterval>::const_iterator j = other._intervals.begin();
         while( i != _intervals.end() && j != other._intervals.end() ) {
             int cmp = i->_lower._bound.woCompare( j->_lower._bound, false );
-            if ( ( cmp == 0 && i->_lower._inclusive ) || cmp < 0 ) {
-                handleInterval( *i, low, high, newIntervals );
-                ++i;
+            if ( cmp < 0 || ( cmp == 0 && i->_lower._inclusive ) ) {
+                b.nextOrderedInterval( *i++ );
             }
             else {
-                handleInterval( *j, low, high, newIntervals );
-                ++j;
+                b.nextOrderedInterval( *j++ );
             }
         }
         while( i != _intervals.end() ) {
-            handleInterval( *i, low, high, newIntervals );
-            ++i;
+            b.nextOrderedInterval( *i++ );
         }
         while( j != other._intervals.end() ) {
-            handleInterval( *j, low, high, newIntervals );
-            ++j;
+            b.nextOrderedInterval( *j++ );
         }
-        FieldInterval tmp;
-        tmp._lower = low;
-        tmp._upper = high;
-        newIntervals.push_back( tmp );
-        finishOperation( newIntervals, other );
+        b.done();
+        finishOperation( b.unionIntervals(), other );
         return *this;
     }
 

@@ -346,13 +346,60 @@ namespace QueryUtilTests {
             }
         };
 
-        class UnionBound {
+        /** Check union of two non overlapping ranges. */
+        class BoundUnion {
         public:
             void run() {
                 FieldRangeSet frs( "", fromjson( "{a:{$gt:1,$lt:9},b:{$gt:9,$lt:12}}" ), true );
                 FieldRange ret = frs.range( "a" );
                 ret |= frs.range( "b" );
                 ASSERT_EQUALS( 2U, ret.intervals().size() );
+            }
+        };
+
+        /** Check union of two ranges where one includes another. */
+        class BoundUnionFullyContained {
+        public:
+            void run() {
+                FieldRangeSet frs( "", fromjson( "{a:{$gt:1,$lte:9},b:{$gt:2,$lt:8},c:{$gt:2,$lt:9},d:{$gt:2,$lte:9}}" ), true );
+                FieldRange u = frs.range( "a" );
+                u |= frs.range( "b" );
+                ASSERT_EQUALS( 1U, u.intervals().size() );
+                ASSERT_EQUALS( frs.range( "a" ).toString(), u.toString() );
+                u |= frs.range( "c" );
+                ASSERT_EQUALS( 1U, u.intervals().size() );
+                ASSERT_EQUALS( frs.range( "a" ).toString(), u.toString() );
+                u |= frs.range( "d" );
+                ASSERT_EQUALS( 1U, u.intervals().size() );
+                ASSERT_EQUALS( frs.range( "a" ).toString(), u.toString() );
+            }
+        };
+
+        /**
+         * Check union of two ranges where one does not include another because of an inclusive
+         * bound.
+         */
+        class BoundUnionOverlapWithInclusivity {
+        public:
+            void run() {
+                FieldRangeSet frs( "", fromjson( "{a:{$gt:1,$lt:9},b:{$gt:2,$lte:9}}" ), true );
+                FieldRange u = frs.range( "a" );
+                u |= frs.range( "b" );
+                ASSERT_EQUALS( 1U, u.intervals().size() );
+                FieldRangeSet expected( "", fromjson( "{a:{$gt:1,$lte:9}}" ), true );
+                ASSERT_EQUALS( expected.range( "a" ).toString(), u.toString() );
+            }
+        };
+        
+        /** Check union of two empty ranges. */
+        class BoundUnionEmpty {
+        public:
+            void run() {
+                FieldRangeSet frs( "", fromjson( "{a:{$in:[]},b:{$in:[]}}" ), true );
+                FieldRange a = frs.range( "a" );
+                a |= frs.range( "b" );
+                ASSERT( a.empty() );
+                ASSERT_EQUALS( 0U, a.intervals().size() );
             }
         };
 
@@ -768,6 +815,7 @@ namespace QueryUtilTests {
                 ASSERT( !f2.universal() );
 
                 FieldRangeSet frs3( "", BSON( "a" << LT << 1 ), true );
+                FieldRange f3 = frs3.range( "a" );
                 ASSERT( !frs3.range( "a" ).universal() );
 
                 FieldRangeSet frs4( "", BSON( "a" << NE << 1 ), true );
@@ -1031,7 +1079,10 @@ namespace QueryUtilTests {
             add< FieldRangeTests::Numeric >();
             add< FieldRangeTests::InLowerBound >();
             add< FieldRangeTests::InUpperBound >();
-            add< FieldRangeTests::UnionBound >();
+            add< FieldRangeTests::BoundUnion >();
+            add< FieldRangeTests::BoundUnionFullyContained >();
+            add< FieldRangeTests::BoundUnionOverlapWithInclusivity >();
+            add< FieldRangeTests::BoundUnionEmpty >();
             add< FieldRangeTests::MultiBound >();
             add< FieldRangeTests::Diff1 >();
             add< FieldRangeTests::Diff2 >();
