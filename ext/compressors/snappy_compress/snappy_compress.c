@@ -82,10 +82,10 @@ wt_snappy_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	 * of compressed bytes.
 	 */
 	snaplen = dst_len - sizeof(size_t);
-	snapbuf = dst + sizeof(size_t);
+	snapbuf = (char *)dst + sizeof(size_t);
 
 	/* snaplen is an input and an output arg. */
-	snret = snappy_compress(src, src_len, snapbuf, &snaplen);
+	snret = snappy_compress((char *)src, src_len, snapbuf, &snaplen);
 
 	if (snret == SNAPPY_OK) {
 		/*
@@ -127,7 +127,8 @@ wt_snappy_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	}
 
 	/* dst_len is an input and an output arg. */
-	snret = snappy_uncompress(src + sizeof(size_t), snaplen, dst, &dst_len);
+	snret = snappy_uncompress(
+	    (char *)src + sizeof(size_t), snaplen, (char *)dst, &dst_len);
 
 	if (snret == SNAPPY_OK) {
 		*result_lenp = dst_len;

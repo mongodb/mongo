@@ -229,7 +229,7 @@ not_compressed:	/*
 
 	WT_VERBOSE(session, write,
 	    "off %" PRIuMAX ", size %" PRIu32 ", cksum %" PRIu32,
-	    offset, align_size, blk->cksum);
+	    (uintmax_t)offset, align_size, blk->cksum);
 
 	*offsetp = offset;
 	*sizep = align_size;
