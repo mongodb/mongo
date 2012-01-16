@@ -178,9 +178,8 @@ namespace mongo {
                 if ( temp == theShard )
                     continue;
 
-                ShardConnection conn( temp , "" );
-
                 try {
+                    ShardConnection conn( temp , "" );
                     _addWriteBack( writebacks , conn->getLastErrorDetailed() );
                 }
                 catch( std::exception &e ){
