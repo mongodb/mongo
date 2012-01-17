@@ -16,6 +16,14 @@ db.addUser( "eliot" , "eliot" );
 db.addUser( "guest" , "guest", true );
 db.getSisterDB( "admin" ).addUser( "super", "super" );
 
+print("make sure we can't run certain commands w/out auth");
+var errmsg = "need to login";
+res = db.adminCommand({getLog : "global"});
+printjson( res );
+assert( ! res.log || res.log.length == 0 , "getLog should fail: " + tojson( res ) )
+assert.eq( res.errmsg , "need to login" , tojson( res ) );
+
+
 assert.throws( function() { t.findOne() }, [], "read without login" );
 
 assert( db.auth( "eliot" , "eliot" ) , "auth failed" );

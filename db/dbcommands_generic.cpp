@@ -334,7 +334,7 @@ namespace mongo {
 
         virtual bool slaveOk() const { return true; }
         virtual LockType locktype() const { return NONE; }
-        virtual bool requiresAuth() { return false; }
+        virtual bool requiresAuth() { return true; }
         virtual bool adminOnly() const { return true; }
 
         virtual void help( stringstream& help ) const {
