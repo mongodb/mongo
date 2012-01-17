@@ -1026,10 +1026,8 @@ namespace mongo {
             else if ( !eRange.universal() ) {
                 BSONObj o;
                 BSONObjBuilder c;
-                if ( eRange.min().type() != MinKey )
-                    c.appendAs( eRange.min(), eRange.minInclusive() ? "$gte" : "$gt" );
-                if ( eRange.max().type() != MaxKey )
-                    c.appendAs( eRange.max(), eRange.maxInclusive() ? "$lte" : "$lt" );
+                c.appendAs( eRange.min(), eRange.minInclusive() ? "$gte" : "$gt" );
+                c.appendAs( eRange.max(), eRange.maxInclusive() ? "$lte" : "$lt" );
                 o = c.obj();
                 b.append( name, o );
             }

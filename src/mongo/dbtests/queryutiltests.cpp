@@ -244,7 +244,8 @@ namespace QueryUtilTests {
                                        "b" << 4 <<
                                        "c" << LT << 4 << LT << 6 <<
                                        "d" << GTE << 0 << GT << 0 <<
-                                       "e" << GTE << 0 << LTE << 10 ),
+                                       "e" << GTE << 0 << LTE << 10 <<
+                                       "f" << NE << 9 ),
                                   true );
                 BSONObj simple = frs.simplifiedQuery();
                 ASSERT_EQUALS( fromjson( "{$gt:5,$lt:10}" ), simple.getObjectField( "a" ) );
@@ -255,6 +256,8 @@ namespace QueryUtilTests {
                               simple.getObjectField( "d" ) );
                 ASSERT_EQUALS( fromjson( "{$gte:0,$lte:10}" ),
                               simple.getObjectField( "e" ) );
+                ASSERT_EQUALS( BSON( "$gte" << MINKEY << "$lte" << MAXKEY ),
+                              simple.getObjectField( "f" ) );
             }
         };
 
