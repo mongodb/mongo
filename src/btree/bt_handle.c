@@ -7,8 +7,7 @@
 
 #include "wt_internal.h"
 
-static int __btree_conf(
-	WT_SESSION_IMPL *, const char *, const char *, const char *, uint32_t);
+static int __btree_conf(WT_SESSION_IMPL *, const char *, uint32_t);
 static int __btree_last(WT_SESSION_IMPL *);
 static int __btree_page_sizes(WT_SESSION_IMPL *, const char *);
 static int __btree_root_init_empty(WT_SESSION_IMPL *);
@@ -94,12 +93,16 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 		return (0);
 	}
 
-	/* Allocate the WT_BTREE structure. */
+	/*
+	 * Allocate the WT_BTREE structure, its lock, and set the name so we
+	 * can put the handle into the list.
+	 */
 	btree = NULL;
-	if ((ret = __wt_calloc_def(session, 1, &btree)) == 0)
-		ret = __wt_rwlock_alloc(
-		     session, "btree handle", &btree->rwlock);
-	if (ret == 0) {
+	if ((ret = __wt_calloc_def(session, 1, &btree)) == 0 &&
+	    (ret = __wt_rwlock_alloc(
+	        session, "btree handle", &btree->rwlock)) == 0 &&
+	    (ret = __wt_strdup(session, name, &btree->name)) == 0 &&
+	    (ret = __wt_strdup(session, filename, &btree->filename)) == 0) {
 		/* Lock the handle before it is inserted in the list. */
 		__wt_writelock(session, btree->rwlock);
 
@@ -107,18 +110,24 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 		btree->refcnt = 1;
 		TAILQ_INSERT_TAIL(&conn->btqh, btree, q);
 		++conn->btqcnt;
-	} else
-		if (btree != NULL)
-			__wt_free(session, btree);
+	}
 	__wt_spin_unlock(session, &conn->spinlock);
 
-	if (ret != 0)
+	if (ret != 0) {
+		if (btree != NULL) {
+			if (btree->rwlock != NULL)
+				__wt_rwlock_destroy(session, btree->rwlock);
+			__wt_free(session, btree->name);
+			__wt_free(session, btree->filename);
+		}
+		__wt_free(session, btree);
 		return (ret);
+	}
 
 	session->btree = btree;
 
 	/* Initialize and configure the WT_BTREE structure. */
-conf:	WT_ERR(__btree_conf(session, name, filename, config, flags));
+conf:	WT_ERR(__btree_conf(session, config, flags));
 
 	/* Open the underlying block object. */
 	WT_ERR(__wt_bm_open(session, btree->filename,
@@ -190,8 +199,7 @@ __wt_btree_reopen(WT_SESSION_IMPL *session, uint32_t flags)
  *	Configure a WT_BTREE structure.
  */
 static int
-__btree_conf(WT_SESSION_IMPL *session,
-    const char *name, const char *filename, const char *config, uint32_t flags)
+__btree_conf(WT_SESSION_IMPL *session, const char *config, uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
@@ -202,10 +210,6 @@ __btree_conf(WT_SESSION_IMPL *session,
 
 	btree = session->btree;
 	conn = S2C(session);
-
-	/* Take copies of names for the new handle. */
-	WT_RET(__wt_strdup(session, name, &btree->name));
-	WT_RET(__wt_strdup(session, filename, &btree->filename));
 
 	/* Validate file types and check the data format plan. */
 	WT_RET(__wt_config_getones(session, config, "key_format", &cval));
