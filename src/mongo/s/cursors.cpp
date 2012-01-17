@@ -19,7 +19,6 @@
 #include "pch.h"
 #include "cursors.h"
 #include "../client/connpool.h"
-#include "../db/queryutil.h"
 #include "../db/commands.h"
 #include "../util/concurrency/task.h"
 #include "../util/net/listen.h"

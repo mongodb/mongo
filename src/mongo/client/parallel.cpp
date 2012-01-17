@@ -19,7 +19,6 @@
 #include "pch.h"
 #include "parallel.h"
 #include "connpool.h"
-#include "../db/queryutil.h"
 #include "../db/dbmessage.h"
 #include "../s/util.h"
 #include "../s/shard.h"

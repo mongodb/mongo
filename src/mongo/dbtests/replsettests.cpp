@@ -26,7 +26,6 @@
 
 #include "dbtests.h"
 #include "../db/oplog.h"
-#include "../db/queryoptimizer.h"
 
 #include "../db/repl/rs.h"
 

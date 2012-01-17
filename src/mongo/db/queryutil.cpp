@@ -1601,5 +1601,27 @@ namespace mongo {
         return num;
     }
 
+    bool isSimpleIdQuery( const BSONObj& query ) {
+        BSONObjIterator i(query);
+        
+        if( !i.more() ) 
+            return false;
+        
+        BSONElement e = i.next();
+        
+        if( i.more() ) 
+            return false;
+        
+        if( strcmp("_id", e.fieldName()) != 0 ) 
+            return false;
+        
+        if ( e.isSimpleType() ) // e.g. not something like { _id : { $gt : ...
+            return true;
+        
+        if ( e.type() == Object )
+            return e.Obj().firstElementFieldName()[0] != '$';
+        
+        return false;
+    }
 
 } // namespace mongo

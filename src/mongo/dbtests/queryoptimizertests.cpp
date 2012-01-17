@@ -1006,29 +1006,44 @@ namespace QueryOptimizerTests {
             temp = BSON( "b" << 1 );
             theDataFileMgr.insertWithObjMod( ns(), temp );
 
-            boost::shared_ptr< Cursor > c = bestGuessCursor( ns(), BSON( "b" << 1 ), BSON( "a" << 1 ) );
+            boost::shared_ptr< Cursor > c =
+            NamespaceDetailsTransient::bestGuessCursor( ns(), BSON( "b" << 1 ), BSON( "a" << 1 ) );
             ASSERT_EQUALS( string( "a" ), c->indexKeyPattern().firstElement().fieldName() );
-            c = bestGuessCursor( ns(), BSON( "a" << 1 ), BSON( "b" << 1 ) );
+            c = NamespaceDetailsTransient::bestGuessCursor( ns(), BSON( "a" << 1 ),
+                                                           BSON( "b" << 1 ) );
             ASSERT_EQUALS( string( "b" ), c->indexKeyPattern().firstElementFieldName() );
-            boost::shared_ptr< MultiCursor > m = dynamic_pointer_cast< MultiCursor >( bestGuessCursor( ns(), fromjson( "{b:1,$or:[{z:1}]}" ), BSON( "a" << 1 ) ) );
-            ASSERT_EQUALS( string( "a" ), m->sub_c()->indexKeyPattern().firstElement().fieldName() );
-            m = dynamic_pointer_cast< MultiCursor >( bestGuessCursor( ns(), fromjson( "{a:1,$or:[{y:1}]}" ), BSON( "b" << 1 ) ) );
+            boost::shared_ptr< MultiCursor > m =
+            dynamic_pointer_cast< MultiCursor >
+            ( NamespaceDetailsTransient::bestGuessCursor( ns(), fromjson( "{b:1,$or:[{z:1}]}" ),
+                                                         BSON( "a" << 1 ) ) );
+            ASSERT_EQUALS( string( "a" ),
+                          m->sub_c()->indexKeyPattern().firstElement().fieldName() );
+            m = dynamic_pointer_cast< MultiCursor >
+            ( NamespaceDetailsTransient::bestGuessCursor( ns(), fromjson( "{a:1,$or:[{y:1}]}" ),
+                                                         BSON( "b" << 1 ) ) );
             ASSERT_EQUALS( string( "b" ), m->sub_c()->indexKeyPattern().firstElementFieldName() );
 
             FieldRangeSet frs( "ns", BSON( "a" << 1 ), true );
             {
                 SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
-                NamespaceDetailsTransient::get_inlock( ns() ).registerIndexForPattern( frs.pattern( BSON( "b" << 1 ) ), BSON( "a" << 1 ), 0 );
+                NamespaceDetailsTransient::get_inlock( ns() ).
+                registerIndexForPattern( frs.pattern( BSON( "b" << 1 ) ), BSON( "a" << 1 ), 0 );
             }
-            m = dynamic_pointer_cast< MultiCursor >( bestGuessCursor( ns(), fromjson( "{a:1,$or:[{y:1}]}" ), BSON( "b" << 1 ) ) );
-            ASSERT_EQUALS( string( "b" ), m->sub_c()->indexKeyPattern().firstElement().fieldName() );
+            m = dynamic_pointer_cast< MultiCursor >
+            ( NamespaceDetailsTransient::bestGuessCursor( ns(), fromjson( "{a:1,$or:[{y:1}]}" ),
+                                                         BSON( "b" << 1 ) ) );
+            ASSERT_EQUALS( string( "b" ),
+                          m->sub_c()->indexKeyPattern().firstElement().fieldName() );
         }
     };
     
     class BestGuessOrSortAssertion : public Base {
     public:
         void run() {
-            ASSERT_THROWS( bestGuessCursor( ns(), BSON( "$or" << BSON_ARRAY( BSON( "b" << 1 ) ) ), BSON( "a" << 1 ) ), MsgAssertionException );
+            ASSERT_THROWS
+            ( NamespaceDetailsTransient::bestGuessCursor
+             ( ns(), BSON( "$or" << BSON_ARRAY( BSON( "b" << 1 ) ) ), BSON( "a" << 1 ) ),
+             MsgAssertionException );
         }
     };
     

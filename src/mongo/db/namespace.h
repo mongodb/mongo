@@ -470,7 +470,15 @@ namespace mongo {
         static shared_ptr<Cursor> getCursor( const char *ns, const BSONObj &query,
                                             const BSONObj &order = BSONObj(), bool requireIndex = false,
                                             bool *simpleEqualityMatch = 0 );
-                                     
+
+        /**
+         * @return a single cursor that may work well for the given query.
+         * It is possible no cursor is returned if the sort is not supported by an index.  Clients are responsible
+         * for checking this if they are not sure an index for a sort exists, and defaulting to a non-sort if
+         * no suitable indices exist.
+         */
+        static shared_ptr<Cursor> bestGuessCursor( const char *ns, const BSONObj &query, const BSONObj &sort );
+        
         /* indexKeys() cache ---------------------------------------------------- */
         /* assumed to be in write lock for this */
     private:

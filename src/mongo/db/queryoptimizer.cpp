@@ -1239,30 +1239,9 @@ doneCheckOrder:
         return id;
     }
     
-    bool isSimpleIdQuery( const BSONObj& query ) {
-        BSONObjIterator i(query);
-        
-        if( !i.more() ) 
-            return false;
-
-        BSONElement e = i.next();
-
-        if( i.more() ) 
-            return false;
-
-        if( strcmp("_id", e.fieldName()) != 0 ) 
-            return false;
-        
-        if ( e.isSimpleType() ) // e.g. not something like { _id : { $gt : ...
-            return true;
-
-        if ( e.type() == Object )
-            return e.Obj().firstElementFieldName()[0] != '$';
-
-        return false;
-    }
-
-    shared_ptr<Cursor> bestGuessCursor( const char *ns, const BSONObj &query, const BSONObj &sort ) {
+    shared_ptr<Cursor> NamespaceDetailsTransient::bestGuessCursor( const char *ns,
+                                                                  const BSONObj &query,
+                                                                  const BSONObj &sort ) {
         if( !query.getField( "$or" ).eoo() ) {
             return shared_ptr<Cursor>( new MultiCursor( ns, query, sort ) );
         }

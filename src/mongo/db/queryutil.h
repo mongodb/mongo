@@ -439,6 +439,8 @@ namespace mongo {
     string simpleRegexEnd( string prefix );
 
     long long applySkipLimit( long long num , const BSONObj& cmd );
+    
+    bool isSimpleIdQuery( const BSONObj& query );
 
 } // namespace mongo
 

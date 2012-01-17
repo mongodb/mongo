@@ -18,7 +18,7 @@
 
 #include "pch.h"
 #include "delete.h"
-#include "../queryoptimizer.h"
+#include "../queryutil.h"
 #include "../oplog.h"
 
 namespace mongo {

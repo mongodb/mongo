@@ -577,16 +577,6 @@ namespace mongo {
     /** NOTE min, max, and keyPattern will be updated to be consistent with the selected index. */
     IndexDetails *indexDetailsForRange( const char *ns, string &errmsg, BSONObj &min, BSONObj &max, BSONObj &keyPattern );
 
-    bool isSimpleIdQuery( const BSONObj& query );
-
-    /**
-     * @return a single cursor that may work well for the given query.
-     * It is possible no cursor is returned if the sort is not supported by an index.  Clients are responsible
-     * for checking this if they are not sure an index for a sort exists, and defaulting to a non-sort if
-     * no suitable indices exist.
-     */
-    shared_ptr<Cursor> bestGuessCursor( const char *ns, const BSONObj &query, const BSONObj &sort );
-
     /**
      * Add-on functionality for queryutil classes requiring access to indexing
      * functionality not currently linked to mongos.
