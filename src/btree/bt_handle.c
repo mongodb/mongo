@@ -100,7 +100,7 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	btree = NULL;
 	if ((ret = __wt_calloc_def(session, 1, &btree)) == 0 &&
 	    (ret = __wt_rwlock_alloc(
-	        session, "btree handle", &btree->rwlock)) == 0 &&
+		session, "btree handle", &btree->rwlock)) == 0 &&
 	    (ret = __wt_strdup(session, name, &btree->name)) == 0 &&
 	    (ret = __wt_strdup(session, filename, &btree->filename)) == 0) {
 		/* Lock the handle before it is inserted in the list. */
