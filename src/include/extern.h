@@ -696,8 +696,8 @@ extern int __wt_schema_table_track_insert(WT_SESSION_IMPL *session,
 extern int __wt_schema_table_track_update(WT_SESSION_IMPL *session,
     const char *key);
 extern int __wt_schema_table_track_fs_rename( WT_SESSION_IMPL *session,
-    const char *old,
-    const char *new);
+    const char *oldname,
+    const char *newname);
 extern int __wt_schema_truncate( WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[]);

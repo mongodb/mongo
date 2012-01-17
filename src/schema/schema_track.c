@@ -39,7 +39,7 @@ __schema_table_track_next(WT_SESSION_IMPL *session, WT_SCHEMA_TRACK **trkp)
 	 * of maybe 20 items.
 	 */
 	for (trk = session->schema_track,
-	    i = 0; i <  session->schema_track_entries; ++i)
+	    i = 0; i <  session->schema_track_entries; ++trk, ++i)
 		if (trk->op == WT_ST_EMPTY) {
 			if (trkp != NULL)
 				*trkp = trk;
@@ -101,13 +101,13 @@ __wt_schema_table_track_off(WT_SESSION_IMPL *session, int unroll)
 			switch (trk->op) {
 			case WT_ST_EMPTY:	/* Unused slot */
 				break;
-			case WT_ST_FS_RENAME:	/* Rename trk.a to trk.b */
+			case WT_ST_FS_RENAME:	/* Rename trk.b to trk.a */
 				if ((tret = __wt_rename(
-				    session, trk->a, trk->b)) != 0) {
+				    session, trk->b, trk->a)) != 0) {
 					__wt_err(session, ret,
 					    "schema table unroll rename "
 					    "%s to %s",
-					    trk->a, trk->b);
+					    trk->b, trk->a);
 					WT_TRET(tret);
 				}
 				break;
@@ -193,14 +193,14 @@ __wt_schema_table_track_update(WT_SESSION_IMPL *session, const char *key)
  */
 int
 __wt_schema_table_track_fs_rename(
-    WT_SESSION_IMPL *session, const char *old, const char *new)
+    WT_SESSION_IMPL *session, const char *oldname, const char *newname)
 {
 	WT_SCHEMA_TRACK *trk;
 
 	WT_RET(__schema_table_track_next(session, &trk));
 
 	trk->op = WT_ST_FS_RENAME;
-	WT_RET(__wt_strdup(session, old, &trk->a));
-	WT_RET(__wt_strdup(session, new, &trk->b));
+	WT_RET(__wt_strdup(session, oldname, &trk->a));
+	WT_RET(__wt_strdup(session, newname, &trk->b));
 	return (0);
 }

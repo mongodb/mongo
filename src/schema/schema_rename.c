@@ -56,7 +56,7 @@ __rename_file(
 	}
 
 	/* Rename the underlying file. */
-	WT_ERR(__wt_schema_table_track_fs_rename(session, newname, oldname));
+	WT_ERR(__wt_schema_table_track_fs_rename(session, oldname, newname));
 	WT_ERR(__wt_rename(session, oldname, newname));
 
 err:	__wt_scr_free(&buf);
