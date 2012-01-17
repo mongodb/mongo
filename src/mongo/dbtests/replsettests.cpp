@@ -196,6 +196,7 @@ namespace ReplSetTests {
         }
 
         void run() {
+            writelock lk("");
             create();
 
             BSONObjBuilder b;
@@ -206,7 +207,6 @@ namespace ReplSetTests {
             b.append("ns", _ns);
             BSONObj op = b.obj();
 
-            writelock lk("");
             {
                 Client::Context ctx(_ns);
                 // in an annoying twist of api, returns true on failure
