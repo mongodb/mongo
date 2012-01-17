@@ -30,14 +30,18 @@ namespace mongo {
             else if ( !i->second.universal() ) {
                 bool upper = i->second.max().type() != MaxKey;
                 bool lower = i->second.min().type() != MinKey;
-                if ( upper && lower )
+                if ( upper && lower ) {
                     _fieldTypes[ i->first ] = QueryPattern::UpperAndLowerBound;
-                else if ( upper )
+                }
+                else if ( upper ) {
                     _fieldTypes[ i->first ] = QueryPattern::UpperBound;
-                else if ( lower )
+                }
+                else if ( lower ) {
                     _fieldTypes[ i->first ] = QueryPattern::LowerBound;
-                else
+                }
+                else {
                     _fieldTypes[ i->first ] = QueryPattern::ConstraintPresent;
+                }
             }
         }
         setSort( sort );
