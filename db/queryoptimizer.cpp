@@ -482,7 +482,7 @@ doneCheckOrder:
                 }
 
                 massert( 10368 ,  "Unable to locate previously recorded index", p.get() );
-                if ( !( _bestGuessOnly && p->scanAndOrderRequired() ) ) {
+                if ( !p->unhelpful() && !( _bestGuessOnly && p->scanAndOrderRequired() ) ) {
                     _usingPrerecordedPlan = true;
                     _mayRecordPlan = false;
                     _plans.push_back( p );

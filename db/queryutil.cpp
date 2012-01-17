@@ -1007,6 +1007,8 @@ namespace mongo {
                     qp._fieldTypes[ i->first ] = QueryPattern::UpperBound;
                 else if ( lower )
                     qp._fieldTypes[ i->first ] = QueryPattern::LowerBound;
+                else
+                    qp._fieldTypes[ i->first ] = QueryPattern::ConstraintPresent;
             }
         }
         qp.setSort( sort );

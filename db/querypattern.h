@@ -36,7 +36,8 @@ namespace mongo {
             Equality,
             LowerBound,
             UpperBound,
-            UpperAndLowerBound
+            UpperAndLowerBound,
+            ConstraintPresent
         };
         bool operator<( const QueryPattern &other ) const;
         /** for testing only */
