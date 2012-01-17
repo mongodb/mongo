@@ -166,8 +166,17 @@ namespace mongo {
             }
         }
 
+        void* NonDurableImpl::writingPtr(void *x, unsigned len) { 
+            cc().writeHappened();
+            return x; 
+        }
+
         void NonDurableImpl::setNoJournal(void *dst, void *src, unsigned len) {
             memcpy(dst, src, len);
+        }
+
+        void NonDurableImpl::declareWriteIntent(void *, unsigned) { 
+            cc().writeHappened(); 
         }
 
         void DurableImpl::setNoJournal(void *dst, void *src, unsigned len) {

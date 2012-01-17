@@ -172,10 +172,10 @@ namespace mongo {
         }; // class DurableInterface
 
         class NonDurableImpl : public DurableInterface {
-            void* writingPtr(void *x, unsigned len) { return x; }
+            void* writingPtr(void *x, unsigned len);
             void* writingAtOffset(void *buf, unsigned ofs, unsigned len) { return buf; }
             void* writingRangesAtOffsets(void *buf, const vector< pair< long long, unsigned > > &ranges) { return buf; }
-            void declareWriteIntent(void *, unsigned) { }
+            void declareWriteIntent(void *, unsigned);
             void createdFile(string filename, unsigned long long len) { }
             bool awaitCommit() { return false; }
             bool commitNow() { return false; }
