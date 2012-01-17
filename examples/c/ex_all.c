@@ -246,7 +246,10 @@ cursor_search_near(WT_CURSOR *cursor)
 int
 session_ops(WT_SESSION *session)
 {
+	WT_CURSOR *c1, *c2;
 	int ret;
+
+	c1 = c2 = NULL;
 
 	cursor_ops(session);
 
@@ -267,6 +270,8 @@ session_ops(WT_SESSION *session)
 	/*! [Truncate cursor] */
 	WT_CURSOR *start, *stop;
 
+	start = c1;
+	stop = c2;
 	ret = session->truncate(session, NULL, start, stop, NULL);
 	/*! [Truncate cursor] */
 	}
