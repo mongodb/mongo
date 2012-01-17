@@ -166,34 +166,32 @@ namespace ReplSetTests {
 
     class CappedInitialSync : public Base {
         string _ns;
-        dblock lk;
-        Client::Context _context;
 
         string spec() const {
             return "{\"capped\":true,\"size\":512}";
         }
 
         void create() {
-            dblock lk;
+            writelock lk(_ns);
+            Client::Context c(_ns);
             string err;
             ASSERT(userCreateNS( _ns.c_str(), fromjson( spec() ), err, false ));
         }
 
         void drop() {
-            string s( _ns );
-            string errmsg;
-            BSONObjBuilder result;
-            dropCollection( s, errmsg, result );
-        }
-    public:
-        CappedInitialSync() : _ns("unittests.foo.bar"), _context(_ns) {
+            writelock lk(_ns);
+            Client::Context c(_ns);
             if (nsdetails(_ns.c_str()) != NULL) {
-                drop();
+                string errmsg;
+                BSONObjBuilder result;
+                dropCollection( string(_ns), errmsg, result );
             }
         }
+    public:
+        CappedInitialSync() : _ns("unittests.foo.bar") {
+            drop();
+        }
         ~CappedInitialSync() {
-            if ( nsdetails(_ns.c_str()) == NULL )
-                return;
             drop();
         }
 
@@ -208,8 +206,12 @@ namespace ReplSetTests {
             b.append("ns", _ns);
             BSONObj op = b.obj();
 
-            // in an annoying twist of api, returns true on failure
-            assert(applyOperation_inlock(op, true));
+            writelock lk("");
+            {
+                Client::Context ctx(_ns);
+                // in an annoying twist of api, returns true on failure
+                assert(applyOperation_inlock(op, true));
+            }
 
             Sync s("");
             assert(!s.shouldRetry(op));

@@ -651,6 +651,10 @@ namespace mongo {
     }
 
     bool Sync::shouldRetry(const BSONObj& o) {
+        // should already have write lock
+        const char *ns = o.getStringField("ns");
+        Client::Context ctx(ns);
+
         // we don't have the object yet, which is possible on initial sync.  get it.
         log() << "replication info adding missing object" << endl; // rare enough we can log
 
@@ -664,8 +668,6 @@ namespace mongo {
             return false;
         }
         else {
-            const char *ns = o.getStringField("ns");
-            Client::Context ctx(ns);
             DiskLoc d = theDataFileMgr.insert(ns, (void*) missingObj.objdata(), missingObj.objsize());
             uassert(15917, "Got bad disk location when attempting to insert", !d.isNull());
 
