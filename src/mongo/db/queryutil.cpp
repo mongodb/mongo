@@ -862,7 +862,8 @@ namespace mongo {
                     while( j.more() ) {
                         processQueryField( j.next(), optimize );
                     }
-                }            
+                }
+                return;
             }
         
             if ( strcmp( e.fieldName(), "$where" ) == 0 ) {

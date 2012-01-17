@@ -206,6 +206,26 @@ namespace QueryUtilTests {
             BSONObj o1_, o2_;
         };
 
+        class And : public Base {
+        public:
+            And() : _o1( BSON( "-" << 0 ) ), _o2( BSON( "-" << 10 ) ) {}
+            void run() {
+                Base::run();
+                const FieldRangeSet s( "ns", query(), true );
+                // There should not be an index constraint recorded for the $and field.
+                ASSERT( s.range( "$and" ).universal() );
+            }
+        private:
+            virtual BSONObj query() {
+                return BSON( "$and" <<
+                            BSON_ARRAY( BSON( "a" << GT << 0 ) << BSON( "a" << LTE << 10 ) ) );
+            }
+            virtual BSONElement lower() { return _o1.firstElement(); }
+            virtual bool lowerInclusive() { return false; }
+            virtual BSONElement upper() { return _o2.firstElement(); }
+            BSONObj _o1, _o2;
+        };
+        
         class Empty {
         public:
             void run() {
@@ -1079,6 +1099,7 @@ namespace QueryUtilTests {
             add< FieldRangeTests::RegexObj >();
             add< FieldRangeTests::UnhelpfulRegex >();
             add< FieldRangeTests::In >();
+            add< FieldRangeTests::And >();
             add< FieldRangeTests::Empty >();
             add< FieldRangeTests::Equality >();
             add< FieldRangeTests::SimplifiedQuery >();
