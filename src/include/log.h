@@ -5,6 +5,8 @@
  *	All rights reserved.
  */
 
+#define	WT_LOG_FILENAME	"WiredTiger.log"		/* Log file name */
+
 /* Logging subsystem declarations. */
 typedef enum {
 	WT_LOGREC_INT16,

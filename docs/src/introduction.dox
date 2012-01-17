@@ -29,5 +29,12 @@ For more information about using WiredTiger, see:
 
 - @ref wt_ext "WiredTiger extensions API reference manual"
 
+- @subpage security
+
 - @subpage file_formats
+
+- @subpage name_space
+
+- @subpage signals
+
 */

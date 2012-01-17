@@ -240,6 +240,7 @@ txn
 txns
 uint
 ul
+umask
 unallocated
 unencoded
 unescaped

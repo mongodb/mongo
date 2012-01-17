@@ -1118,7 +1118,7 @@ int wiredtiger_open(const char *home,
  * superset of the ISO C99/POSIX 1003.1-2001 function strerror.
  *
  * @dontinclude ex_all.c
- * @skipline wiredtiger_strerror
+ * @snippet ex_all.c Display an error
  *
  * @param err a return value from a WiredTiger, C library or POSIX function
  * @returns a string representation of the error
@@ -1206,7 +1206,8 @@ int wiredtiger_struct_unpack(const void *buffer, size_t size,
 
 /*! Get version information.
  *
- * @snippet ex_all.c Get the WiredTiger library version
+ * @snippet ex_all.c Get the WiredTiger library version #1
+ * @snippet ex_all.c Get the WiredTiger library version #2
  *
  * @param majorp a location where the major version number is returned
  * @param minorp a location where the minor version number is returned
@@ -1223,11 +1224,13 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  * @name Error returns
  * Most functions and methods in WiredTiger return an integer code indicating
  * whether the operation succeeded or failed.  A return of zero indicates
- * success, all non-zero return values indicate some kind of failure.  This
- * list below includes all of the the WiredTiger-specific error returns.
+ * success, all non-zero return values indicate some kind of failure.
  *
- * In addition, C99/POSIX error codes such as \c ENOMEM, \c EINVAL and
- * \c ENOTSUP may also be returned, with the usual meanings.
+ * WiredTiger reserves all values from -31,800 to -31,999 to itself as possible
+ * error values.  In addition, C99/POSIX error codes such as \c ENOMEM,
+ * \c EINVAL and \c ENOTSUP may also be returned, with the usual meanings.
+ *
+ * The following are all of the WiredTiger-specific error returns:
  * @{
  */
 /*

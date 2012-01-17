@@ -180,6 +180,16 @@ cursor_ops(WT_SESSION *session)
 	/*! [Remove a record] */
 	}
 
+	/*! [Display an error] */
+	const char *key = "some key";
+	cursor->set_key(cursor, key);
+	if ((ret = cursor->remove(cursor)) != 0) {
+		fprintf(stderr,
+		    "cursor.remove: %s\n", wiredtiger_strerror(ret));
+		return (ret);
+	}
+	/*! [Display an error] */
+
 	/*! [Close the cursor] */
 	ret = cursor->close(cursor, NULL);
 	/*! [Close the cursor] */
@@ -534,11 +544,16 @@ int main(void)
 	}
 
 	{
-	/*! [Get the WiredTiger library version] */
+	/*! [Get the WiredTiger library version #1] */
+	printf("WiredTiger version %s\n", wiredtiger_version(NULL, NULL, NULL));
+	/*! [Get the WiredTiger library version #1] */
+
+	/*! [Get the WiredTiger library version #2] */
 	int major, minor, patch;
-	printf("WiredTiger version %s\n",
-	    wiredtiger_version(&major, &minor, &patch));
-	/*! [Get the WiredTiger library version] */
+	(void)wiredtiger_version(&major, &minor, &patch);
+	printf("WiredTiger version is %d, %d (patch %d)\n",
+	    major, minor, patch);
+	/*! [Get the WiredTiger library version #2] */
 	}
 
 	return (ret);

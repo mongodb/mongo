@@ -465,7 +465,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	WT_ERR(__wt_config_gets(session, cfg, "logging", &cval));
 	if (cval.val != 0)
-		WT_ERR(__wt_open(session, "__wt.log", 0666, 1, &conn->log_fh));
+		WT_ERR(__wt_open(session, WT_LOG_FILENAME, 1, &conn->log_fh));
 
 	/* Load any extensions referenced in the config. */
 	WT_ERR(__wt_config_gets(session, cfg, "extensions", &cval));
@@ -604,7 +604,7 @@ __conn_single(WT_CONNECTION_IMPL *conn, const char **cfg)
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "create", &cval));
 	WT_RET(__wt_open(session,
-	    WT_FLAGFILE, 0666, cval.val == 0 ? 0 : 1, &conn->lock_fh));
+	    WT_FLAGFILE, cval.val == 0 ? 0 : 1, &conn->lock_fh));
 
 	/*
 	 * Lock a byte of the file: if we don't get the lock, some other process
@@ -696,7 +696,7 @@ __conn_config(WT_CONNECTION_IMPL *conn, const char **cfg, WT_BUF **cbufp)
 		return (0);
 
 	/* Open the configuration file. */
-	WT_RET(__wt_open(session, WT_CONFIGFILE, 0444, 0, &fh));
+	WT_RET(__wt_open(session, WT_CONFIGFILE, 0, &fh));
 	WT_ERR(__wt_filesize(session, fh, &size));
 	if (size == 0)
 		goto err;

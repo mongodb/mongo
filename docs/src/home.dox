@@ -41,6 +41,12 @@ the WIREDTIGER_HOME environment variable is set, and the
 home_environment or \c home_environment_priv strings, the open will
 fail.
 
+Finally, consider security when configuring WiredTiger to use the
+WIREDTIGER_HOME environment variable, especially in applications which
+run with permissions other than the user's.  Such applications are
+potentially vulnerable to allowing users access to databases they could
+not otherwise access.
+
 @section home_config Home Directory Configuration Strings
 
 The WiredTiger home directory optionally includes a file named \c

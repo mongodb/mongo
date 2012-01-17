@@ -1,0 +1,18 @@
+/*! @page name_space WiredTiger name spaces
+
+@section c C language name space
+
+WiredTiger's public function names begin with the string "wiredtiger".
+
+WiredTiger's public structure names begin with the string "wt_".
+
+WiredTiger's public \c \#defines begin with the string "WT_".
+
+WiredTiger's private function names begin with the string "__wt__".
+
+@section file Filesystem name space
+
+WiredTiger's files begin with the string "WiredTiger"; applications
+should not create files in the WiredTiger name space.
+
+*/
