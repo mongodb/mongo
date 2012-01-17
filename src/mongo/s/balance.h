@@ -92,7 +92,7 @@ namespace mongo {
          *
          * @param conn is the connection with the config server(s)
          */
-        void _ping( DBClientBase& conn );
+        void _ping( DBClientBase& conn, bool waiting = false );
 
         /**
          * @return true if all the servers listed in configdb as being shards are reachable and are distinct processes
