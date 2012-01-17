@@ -36,6 +36,23 @@ namespace mongo {
         return 1;
     }
 
+    bool exactKeyMatchSimpleQuery( const BSONObj &query, const int expectedFieldCount ) {
+        if ( query.nFields() != expectedFieldCount ) {
+            return false;
+        }
+        BSONObjIterator i( query );
+        while( i.more() ) {
+            BSONElement e = i.next();
+            if ( e.fieldName()[0] == '$' ) {
+                return false;
+            }
+            if ( e.mayEncapsulate() ) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     QueryPlan::QueryPlan( NamespaceDetails *d, int idxNo, const FieldRangeSetPair &frsp,
                          const FieldRangeSetPair *originalFrsp, const BSONObj &originalQuery,
                          const BSONObj &order, bool mustAssertOnYieldFailure,
@@ -155,9 +172,9 @@ doneCheckOrder:
                 ( optimalIndexedQueryCount == _frs.numNonUniversalRanges() ) )
             _optimal = true;
         if ( exactIndexedQueryCount == _frs.numNonUniversalRanges() &&
-                orderFieldsUnindexed.size() == 0 &&
-                exactIndexedQueryCount == idxKey.nFields() &&
-                exactIndexedQueryCount == _originalQuery.nFields() ) {
+            orderFieldsUnindexed.size() == 0 &&
+            exactIndexedQueryCount == idxKey.nFields() &&
+            exactKeyMatchSimpleQuery( _originalQuery, exactIndexedQueryCount ) ) {
             _exactKeyMatch = true;
         }
         _frv.reset( new FieldRangeVector( _frs, idxSpec, _direction ) );
