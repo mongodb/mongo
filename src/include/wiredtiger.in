@@ -533,18 +533,21 @@ struct wt_session {
 	 * @param session the session handle
 	 * @param name the URI of the object to create, such as \c "table:stock"
 	 * @configstart{session.create, see dist/api_data.py}
-	 * @config{allocation_size, the file unit allocation size\, in bytes;
-	 * must a power-of-two.,an integer between 512B and 128MB; default \c
-	 * 512B.}
-	 * @config{block_compressor, a compressor for file blocks.  Permitted
-	 * values are empty (off) or \c "<name>".  See @ref compression for more
-	 * details.,a string; default empty.}
-	 * @config{checksum, the configuration for file block checksums; if
-	 * false\, the block manager is free to not write or check block
-	 * checksums.  This can increase performance in applications where
-	 * compression provides checksum functionality or read-only applications
-	 * where blocks require no verification.,a boolean flag; default \c
-	 * true.}
+	 * @config{allocation_size, the file unit allocation size\, in bytes\,
+	 * must a power-of-two; smaller values decrease the file space required
+	 * by overflow items\, and the default value of 512B is a good choice
+	 * absent requirements from the operating system or storage device.,an
+	 * integer between 512B and 128MB; default \c 512B.}
+	 * @config{block_compressor, configure a compressor for file blocks.
+	 * Permitted values are empty (off) or \c "bzip2"\, \c "snappy" or
+	 * custom compression engine \c "name" created with
+	 * WT_CONNECTION::add_compressor. See @ref compression for more
+	 * information.,a string; default empty.}
+	 * @config{checksum, configure file block checksums; if false\, the
+	 * block manager is free to not write or check block checksums. This can
+	 * increase performance in applications where compression provides
+	 * checksum functionality or read-only applications where blocks require
+	 * no verification.,a boolean flag; default \c true.}
 	 * @config{colgroups, comma-separated list of names of column groups.
 	 * Each column group is stored separately\, keyed by the primary key of
 	 * the table.  If no column groups are specified\, all columns are
@@ -552,8 +555,8 @@ struct wt_session {
 	 * must appear in at least one column group.  Each column group must be
 	 * created with a separate call to WT_SESSION::create.,a list of
 	 * strings; default empty.}
-	 * @config{collator, custom collation for keys.  Value must be a
-	 * collator name created with WT_CONNECTION::add_collator.,a string;
+	 * @config{collator, configure custom collation for keys.  Value must be
+	 * a collator name created with WT_CONNECTION::add_collator.,a string;
 	 * default empty.}
 	 * @config{columns, list of the column names.  Comma-separated list of
 	 * the form <code>(column[\,...])</code>.  For tables\, the number of
@@ -566,22 +569,24 @@ struct wt_session {
 	 * specified configuration.,a boolean flag; default \c false.}
 	 * @config{filename, override the default filename derived from the
 	 * object name.,a string; default empty.}
-	 * @config{huffman_key, use Huffman encoding for keys.  Permitted values
-	 * are empty (off)\, \c "english" or \c "<filename>".  See @ref huffman
-	 * for more details.,a string; default empty.}
-	 * @config{huffman_value, use Huffman encoding for values.  Permitted
+	 * @config{huffman_key, configure Huffman encoding for keys.  Permitted
 	 * values are empty (off)\, \c "english" or \c "<filename>".  See @ref
-	 * huffman for more details.,a string; default empty.}
+	 * huffman for more information.,a string; default empty.}
+	 * @config{huffman_value, configure Huffman encoding for values.
+	 * Permitted values are empty (off)\, \c "english" or \c "<filename>".
+	 * See @ref huffman for more information.,a string; default empty.}
 	 * @config{internal_item_max, the maximum key size stored on internal
 	 * nodes\, in bytes.  If zero\, a maximum is calculated to permit at
 	 * least 8 keys per internal page.,an integer greater than or equal to
 	 * 0; default \c 0.}
-	 * @config{internal_key_truncate, the Btree configuration for truncation
-	 * of internal keys\, discarding unnecessary trailing bytes on internal
-	 * keys.,a boolean flag; default \c true.}
+	 * @config{internal_key_truncate, configure internal key truncation\,
+	 * discarding unnecessary trailing bytes on internal keys.,a boolean
+	 * flag; default \c true.}
 	 * @config{internal_page_max, the maximum page size for internal nodes\,
-	 * in bytes; the size must be a multiple of the allocation size.,an
-	 * integer between 512B and 512MB; default \c 2KB.}
+	 * in bytes; the size must be a multiple of the allocation size and is
+	 * significant for applications wanting to avoid excessive L2 cache
+	 * misses while searching the tree.,an integer between 512B and 512MB;
+	 * default \c 2KB.}
 	 * @config{key_format, the format of the data packed into key items.
 	 * See @ref schema_format_types for details.  By default\, the
 	 * key_format is \c 'u' and applications use WT_ITEM structures to
@@ -598,11 +603,12 @@ struct wt_session {
 	 * items (values or row store keys) per leaf page.,an integer greater
 	 * than or equal to 0; default \c 0.}
 	 * @config{leaf_page_max, the maximum page size for leaf nodes\, in
-	 * bytes; the size must be a multiple of the allocation size.,an integer
-	 * between 512B and 512MB; default \c 1MB.}
-	 * @config{prefix_compression, the Btree for prefix compression\,
-	 * storing keys as a count of bytes matching the previous key plus a
-	 * unique suffix.,a boolean flag; default \c true.}
+	 * bytes; the size must be a multiple of the allocation size\, and is
+	 * significant for applications wanting to maximize sequential data
+	 * transfer from a storage device.,an integer between 512B and 512MB;
+	 * default \c 1MB.}
+	 * @config{prefix_compression, configure row-store format key prefix
+	 * compression.,a boolean flag; default \c true.}
 	 * @config{split_pct, the Btree page split size as a percentage of the
 	 * maximum Btree page size\, that is\, when a Btree page is split\, it
 	 * will be split into smaller pages\, where each page is the specified
@@ -1082,11 +1088,11 @@ struct wt_connection {
  * handle.,an integer greater than or equal to 15; default \c 30.}
  * @config{home_environment, use the \c WIREDTIGER_HOME environment variable for
  * naming unless the process is running with special privileges. See @ref home
- * for details.,a boolean flag; default \c false.}
+ * for more information.,a boolean flag; default \c false.}
  * @config{home_environment_priv, use the \c WIREDTIGER_HOME environment
  * variable for naming regardless of whether or not the process is running with
- * special privileges.  See @ref home for details.,a boolean flag; default \c
- * false.}
+ * special privileges.  See @ref home for more information.,a boolean flag;
+ * default \c false.}
  * @config{logging, enable logging.,a boolean flag; default \c false.}
  * @config{multiprocess, permit sharing between processes (will automatically
  * start an RPC server for primary processes and use RPC for secondary

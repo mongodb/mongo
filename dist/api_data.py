@@ -82,36 +82,43 @@ format_meta = column_meta + [
 # Per-file configuration
 file_meta = format_meta + [
 	Config('allocation_size', '512B', r'''
-		the file unit allocation size, in bytes; must a power-of-two''',
+		the file unit allocation size, in bytes, must a power-of-two;
+		smaller values decrease the file space required by overflow
+		items, and the default value of 512B is a good choice absent
+		requirements from the operating system or storage device''',
 		min='512B', max='128MB'),
 	Config('block_compressor', '', r'''
-		a compressor for file blocks.  Permitted values are empty (off)
-		or \c "<name>".  See @ref compression for more details'''),
+		configure a compressor for file blocks.  Permitted values are
+		empty (off) or \c "bzip2", \c "snappy" or custom compression
+		engine \c "name" created with WT_CONNECTION::add_compressor.
+		See @ref compression for more information'''),
 	Config('checksum', 'true', r'''
-		the configuration for file block checksums; if false, the block
-		manager is free to not write or check block checksums.  This
-		can increase performance in applications where compression
-		provides checksum functionality or read-only applications where
-		blocks require no verification''',
+		configure file block checksums; if false, the block
+		manager is free to not write or check block checksums.
+		This can increase performance in applications where
+		compression provides checksum functionality or read-only
+		applications where blocks require no verification''',
 		type='boolean'),
 	Config('collator', '', r'''
-		custom collation for keys.  Value must be a collator name
-		created with WT_CONNECTION::add_collator'''),
+		configure custom collation for keys.  Value must be a collator
+		name created with WT_CONNECTION::add_collator'''),
 	Config('huffman_key', '', r'''
-		use Huffman encoding for keys.  Permitted values are empty
-		(off), \c "english" or \c "<filename>".  See @ref huffman for
-		more details'''),
+		configure Huffman encoding for keys.  Permitted values are
+		empty (off), \c "english" or \c "<filename>".  See @ref
+		huffman for more information'''),
 	Config('huffman_value', '', r'''
-		use Huffman encoding for values.  Permitted values are empty
-		(off), \c "english" or \c "<filename>".  See @ref huffman for
-		more details'''),
+		configure Huffman encoding for values.  Permitted values are
+		empty (off), \c "english" or \c "<filename>".  See @ref
+		huffman for more information'''),
 	Config('internal_key_truncate', 'true', r'''
-		the Btree configuration for truncation of internal keys,
-		discarding unnecessary trailing bytes on internal keys''',
+		configure internal key truncation, discarding unnecessary
+		trailing bytes on internal keys''',
 		type='boolean'),
 	Config('internal_page_max', '2KB', r'''
 		the maximum page size for internal nodes, in bytes; the size
-		must be a multiple of the allocation size''',
+		must be a multiple of the allocation size and is significant
+		for applications wanting to avoid excessive L2 cache misses
+		while searching the tree''',
 		min='512B', max='512MB'),
 	Config('internal_item_max', '0', r'''
 		the maximum key size stored on internal nodes, in bytes.  If
@@ -125,7 +132,9 @@ file_meta = format_meta + [
 		min='0'),
 	Config('leaf_page_max', '1MB', r'''
 		the maximum page size for leaf nodes, in bytes; the size must
-		be a multiple of the allocation size''',
+		be a multiple of the allocation size, and is significant for
+		applications wanting to maximize sequential data transfer from
+		a storage device''',
 		min='512B', max='512MB'),
 	Config('leaf_item_max', '0', r'''
 		the maximum key or value size stored on leaf nodes, in bytes.
@@ -133,8 +142,7 @@ file_meta = format_meta + [
 		(values or row store keys) per leaf page''',
 		min=0),
 	Config('prefix_compression', 'true', r'''
-		the Btree for prefix compression, storing keys as a count of
-		bytes matching the previous key plus a unique suffix''',
+		configure row-store format key prefix compression''',
 		type='boolean'),
 	Config('split_pct', '75', r'''
 		the Btree page split size as a percentage of the maximum Btree
@@ -310,12 +318,12 @@ methods = {
 	Config('home_environment', 'false', r'''
 		use the \c WIREDTIGER_HOME environment variable for naming
 		unless the process is running with special privileges.
-		See @ref home for details''',
+		See @ref home for more information''',
 		type='boolean'),
 	Config('home_environment_priv', 'false', r'''
 		use the \c WIREDTIGER_HOME environment variable for naming
 		regardless of whether or not the process is running with
-		special privileges.  See @ref home for details''',
+		special privileges.  See @ref home for more information''',
 		type='boolean'),
 	Config('exclusive', 'false', r'''
 		fail if the database already exists''',
