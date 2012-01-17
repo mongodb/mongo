@@ -121,10 +121,13 @@ namespace mongo {
 
             bool err = false;
 
-            if ( le->nPrev != 1 )
+            if ( le->nPrev != 1 ) {
                 err = LastError::noError.appendSelf( result , false );
-            else
+                le->appendSelfStatus( result );
+            }
+            else {
                 err = le->appendSelf( result , false );
+            }
 
             Client& c = cc();
             c.appendLastOp( result );

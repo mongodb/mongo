@@ -73,6 +73,13 @@ namespace mongo {
          */
         bool appendSelf( BSONObjBuilder &b , bool blankErr = true );
 
+        /**
+         * appends fields which are not "error" related
+         * this whole mechanism needs to be re-written
+         * but needs a lot of real thought
+         */
+        void appendSelfStatus( BSONObjBuilder &b );
+
         struct Disabled : boost::noncopyable {
             Disabled( LastError * le ) {
                 _le = le;
