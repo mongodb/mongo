@@ -1286,7 +1286,7 @@ doneCheckOrder:
         NamespaceDetailsTransient& nsd = NamespaceDetailsTransient::get_inlock( frsp.ns() );
         // TODO Maybe it would make sense to return the index with the lowest
         // nscanned if there are two possibilities.
-        if ( frsp._singleKey.matchPossible() ) {
+        {
             QueryPattern pattern = frsp._singleKey.pattern( order );
             BSONObj oldIdx = nsd.indexForPattern( pattern );
             if ( !oldIdx.isEmpty() ) {
@@ -1294,7 +1294,7 @@ doneCheckOrder:
                 return make_pair( oldIdx, oldNScanned );
             }
         }
-        if ( frsp._multiKey.matchPossible() ) {
+        {
             QueryPattern pattern = frsp._multiKey.pattern( order );
             BSONObj oldIdx = nsd.indexForPattern( pattern );
             if ( !oldIdx.isEmpty() ) {
