@@ -239,13 +239,22 @@ namespace QueryUtilTests {
         class SimplifiedQuery {
         public:
             void run() {
-                FieldRangeSet frs( "ns", BSON( "a" << GT << 1 << GT << 5 << LT << 10 << "b" << 4 << "c" << LT << 4 << LT << 6 << "d" << GTE << 0 << GT << 0 << "e" << GTE << 0 << LTE << 10 ), true );
+                FieldRangeSet frs( "ns",
+                                  BSON( "a" << GT << 1 << GT << 5 << LT << 10 <<
+                                       "b" << 4 <<
+                                       "c" << LT << 4 << LT << 6 <<
+                                       "d" << GTE << 0 << GT << 0 <<
+                                       "e" << GTE << 0 << LTE << 10 ),
+                                  true );
                 BSONObj simple = frs.simplifiedQuery();
-                ASSERT( !simple.getObjectField( "a" ).woCompare( fromjson( "{$gt:5,$lt:10}" ) ) );
+                ASSERT_EQUALS( fromjson( "{$gt:5,$lt:10}" ), simple.getObjectField( "a" ) );
                 ASSERT_EQUALS( 4, simple.getIntField( "b" ) );
-                ASSERT( !simple.getObjectField( "c" ).woCompare( BSON("$gte" << -numeric_limits<double>::max() << "$lt" << 4 ) ) );
-                ASSERT( !simple.getObjectField( "d" ).woCompare( BSON("$gt" << 0 << "$lte" << numeric_limits<double>::max() ) ) );
-                ASSERT( !simple.getObjectField( "e" ).woCompare( fromjson( "{$gte:0,$lte:10}" ) ) );
+                ASSERT_EQUALS( BSON("$gte" << -numeric_limits<double>::max() << "$lt" << 4 ),
+                              simple.getObjectField( "c" ) );
+                ASSERT_EQUALS( BSON("$gt" << 0 << "$lte" << numeric_limits<double>::max() ),
+                              simple.getObjectField( "d" ) );
+                ASSERT_EQUALS( fromjson( "{$gte:0,$lte:10}" ),
+                              simple.getObjectField( "e" ) );
             }
         };
 
