@@ -59,7 +59,7 @@ namespace mongo {
         _mustAssertOnYieldFailure( mustAssertOnYieldFailure ) {
 
         BSONObj idxKey = _idxNo < 0 ? BSONObj() : d->idx( _idxNo ).keyPattern();
-            
+
         if ( !_frs.matchPossibleForIndex( idxKey ) ) {
             _impossible = true;
             _scanAndOrderRequired = false;
@@ -69,9 +69,9 @@ namespace mongo {
         if ( willScanTable() ) {
             if ( _order.isEmpty() || !strcmp( _order.firstElementFieldName(), "$natural" ) )
                 _scanAndOrderRequired = false;
-            return;                
+            return;
         }
-            
+
         _index = &d->idx(_idxNo);
 
         // If the parsing or index indicates this is a special query, don't continue the processing

@@ -836,11 +836,11 @@ namespace mongo {
                 if( shards.size() == _shards.size() ) return;
             }
 
-            if (org.moreOrClauses())
+            if (!org.orRangesExhausted())
                 org.popOrClauseSingleKey();
 
         }
-        while (org.moreOrClauses());
+        while (!org.orRangesExhausted());
     }
 
     void ChunkManager::getShardsForRange(set<Shard>& shards, const BSONObj& min, const BSONObj& max, bool fullKeyReq ) const {

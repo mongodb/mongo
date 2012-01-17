@@ -394,11 +394,8 @@ namespace mongo {
     public:
         OrRangeGenerator( const char *ns, const BSONObj &query , bool optimize=true );
 
-        /**
-         * @return true iff we are done scanning $or clauses.  if there's a
-         * useless or clause, we won't use or index ranges to help with scanning.
-         */
-        bool orFinished() const { return _orFound && _orSets.empty(); }
+        /** @return true iff we are done scanning $or clauses, or if there are no $or clauses. */
+        bool orRangesExhausted() const { return _orSets.empty(); }
         /** Iterates to the next $or clause by removing the current $or clause. */
         void popOrClause( NamespaceDetails *nsd, int idxNo, const BSONObj &keyPattern );
         void popOrClauseSingleKey();
@@ -413,11 +410,9 @@ namespace mongo {
         FieldRangeSetPair *topFrspOriginal() const;
         
         string getSpecial() const { return _baseSet.getSpecial(); }
-
-        bool moreOrClauses() const { return !_orSets.empty(); }
     private:
         void assertMayPopOrClause();
-        void popOrClause( const FieldRangeSet *toDiff, NamespaceDetails *d = 0, int idxNo = -1, const BSONObj &keyPattern = BSONObj() );
+        void _popOrClause( const FieldRangeSet *toDiff, NamespaceDetails *d, int idxNo, const BSONObj &keyPattern );
         FieldRangeSetPair _baseSet;
         list<FieldRangeSetPair> _orSets;
         list<FieldRangeSetPair> _originalOrSets;

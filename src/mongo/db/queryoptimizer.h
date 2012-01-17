@@ -457,7 +457,9 @@ namespace mongo {
         const QueryPlan *singlePlan() const;
 
         /** @return true iff more $or clauses need to be scanned. */
-        bool mayRunMore() const { return _or ? ( !_tableScanned && !_org->orFinished() ) : _i == 0; }
+        bool mayRunMore() const {
+            return _or ? ( !_tableScanned && !_org->orRangesExhausted() ) : _i == 0;
+        }
         /** @return non-$or version of explain output. */
         BSONObj oldExplain() const { assertNotOr(); return _currentQps->explain(); }
         /** @return true iff this is not a $or query and a plan is selected based on previous success of this plan. */
