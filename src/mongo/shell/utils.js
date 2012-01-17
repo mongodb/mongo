@@ -228,7 +228,7 @@ assert.isnull = function( what , msg ){
     if ( what == null )
         return;
     
-    doassert( "supposed to null (" + ( msg || "" ) + ") was: " + tojson( what ) );
+    doassert( "supposed to be null (" + ( msg || "" ) + ") was: " + tojson( what ) );
 }
 
 assert.lt = function( a , b , msg ){
