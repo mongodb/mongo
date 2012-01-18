@@ -18,7 +18,7 @@
 
 #include "pch.h"
 #include "server.h"
-
+#include "../util/scopeguard.h"
 #include "../db/commands.h"
 #include "../db/dbmessage.h"
 #include "../db/stats/counters.h"
@@ -147,28 +147,31 @@ namespace mongo {
         // handle single server
         if ( shards->size() == 1 ) {
             string theShard = *(shards->begin() );
-
-            ShardConnection conn( theShard , "" );
+            
+            
             
             BSONObj res;
             bool ok = false;
-            try{
-            	ok = conn->runCommand( "admin" , options , res );
-            }
-            catch( std::exception &e ){
+            {
+                ShardConnection conn( theShard , "" );
+                try {
+                    ok = conn->runCommand( "admin" , options , res );
+                }
+                catch( std::exception &e ) {
                 
-                warning() << "could not get last error from shard " << theShard << causedBy( e ) << endl;
-                
-                // Catch everything that happens here, since we need to ensure we return our connection when we're
-            	// finished.
-            	conn.done();
-                
-            	return false;
-            }
+                    warning() << "could not get last error from shard " << theShard << causedBy( e ) << endl;
+                    
+                    // Catch everything that happens here, since we need to ensure we return our connection when we're
+                    // finished.
+                    conn.done();
+                    
+                    return false;
+                }
             
-            res = res.getOwned();
-            conn.done();
             
+                res = res.getOwned();
+                conn.done();
+            }
 
             _addWriteBack( writebacks , res );
 
@@ -180,13 +183,14 @@ namespace mongo {
 
                 try {
                     ShardConnection conn( temp , "" );
+                    ON_BLOCK_EXIT_OBJ( conn, &ShardConnection::done );
                     _addWriteBack( writebacks , conn->getLastErrorDetailed() );
+                    
                 }
                 catch( std::exception &e ){
                     warning() << "could not clear last error from shard " << temp << causedBy( e ) << endl;
                 }
-
-                conn.done();
+                
             }
             clearSinceLastGetError();
             
