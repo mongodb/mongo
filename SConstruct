@@ -294,6 +294,14 @@ elif env['PYSYSPLATFORM'] == 'darwin':
     env['RELOBJ_LIBDEPS_START'] = '-all_load'
     env['RELOBJ_LIBDEPS_END'] = ''
     env['RELOBJ_LIBDEPS_ITEM'] = ''
+elif env['PYSYSPLATFORM'].startswith('sunos'):
+    if force64:
+        env['RELOBJFLAGS'] = ['-64']
+    env['LINK_LIBGROUP_START'] = '-z rescan'
+    env['LINK_LIBGROUP_END'] = ''
+    env['RELOBJ_LIBDEPS_START'] = '-z allextract'
+    env['RELOBJ_LIBDEPS_END'] = '-z defaultextract'
+    env['RELOBJ_LIBDEPS_ITEM'] = ''
 
 env["LIBPATH"] = []
 

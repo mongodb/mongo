@@ -31,7 +31,7 @@ def exists( env ):
 
 def generate( env ):
     env['_RELOBJDEPSFLAGS'] = '$RELOBJ_LIBDEPS_START ${_concat("$RELOBJ_LIBDEPS_ITEM ", __env__.subst(_LIBDEPS, target=TARGET, source=SOURCE), "", __env__, target=TARGET, source=SOURCE)} $RELOBJ_LIBDEPS_END'
-    env['RELOBJCOM'] = 'ld -o $TARGET -r $SOURCES $_RELOBJDEPSFLAGS'
+    env['RELOBJCOM'] = 'ld -o $TARGET $RELOBJFLAGS -r $SOURCES $_RELOBJDEPSFLAGS'
     relobj_builder = Builder( action='$RELOBJCOM',
                               prefix="$OBJPREFIX",
                               suffix="$OBJSUFFIX",
