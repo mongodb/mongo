@@ -305,7 +305,6 @@ if has_option( "cpppath" ):
 
 env.Append( CPPDEFINES=[ "_SCONS" , "MONGO_EXPOSE_MACROS" ],
             CPPPATH=[ '$BUILD_DIR', "$BUILD_DIR/mongo" ] )
-#env.Append( CPPPATH=[ "src/mongo", "src" ] )
 
 if has_option( "safeshell" ):
     env.Append( CPPDEFINES=[ "MONGO_SAFE_SHELL" ] )
@@ -455,13 +454,13 @@ if "darwin" == os.sys.platform:
     nix = True
 
     if force64:
-        env.Append( CPPPATH=["/usr/64/include"] )
-        env.Append( LIBPATH=["/usr/64/lib"] )
+        env.Append( EXTRACPPPATH=["/usr/64/include"] )
+        env.Append( EXTRALIBPATH=["/usr/64/lib"] )
         if installDir == DEFAULT_INSTALL_DIR and not distBuild:
             installDir = "/usr/64/"
     else:
-        env.Append( CPPPATH=filterExists(["/sw/include" , "/opt/local/include"]) )
-        env.Append( LIBPATH=filterExists(["/sw/lib/", "/opt/local/lib"]) )
+        env.Append( EXTRACPPPATH=filterExists(["/sw/include" , "/opt/local/include"]) )
+        env.Append( EXTRALIBPATH=filterExists(["/sw/lib/", "/opt/local/lib"]) )
 
 elif os.sys.platform.startswith("linux"):
     linux = True
@@ -472,13 +471,13 @@ elif os.sys.platform.startswith("linux"):
     if os.uname()[4] == "x86_64" and not force32:
         linux64 = True
         nixLibPrefix = "lib64"
-        env.Append( LIBPATH=["/usr/lib64" , "/lib64" ] )
+        env.Append( EXTRALIBPATH=["/usr/lib64" , "/lib64" ] )
         env.Append( LIBS=["pthread"] )
 
         force64 = False
 
     if force32:
-        env.Append( LIBPATH=["/usr/lib32"] )
+        env.Append( EXTRALIBPATH=["/usr/lib32"] )
 
     nix = True
 
@@ -494,15 +493,15 @@ elif "sunos5" == os.sys.platform:
 elif os.sys.platform.startswith( "freebsd" ):
     nix = True
     freebsd = True
-    env.Append( CPPPATH=[ "/usr/local/include" ] )
-    env.Append( LIBPATH=[ "/usr/local/lib" ] )
+    env.Append( EXTRACPPPATH=[ "/usr/local/include" ] )
+    env.Append( EXTRALIBPATH=[ "/usr/local/lib" ] )
     env.Append( CPPDEFINES=[ "__freebsd__" ] )
 
 elif os.sys.platform.startswith( "openbsd" ):
     nix = True
     openbsd = True
-    env.Append( CPPPATH=[ "/usr/local/include" ] )
-    env.Append( LIBPATH=[ "/usr/local/lib" ] )
+    env.Append( EXTRACPPPATH=[ "/usr/local/include" ] )
+    env.Append( EXTRALIBPATH=[ "/usr/local/lib" ] )
     env.Append( CPPDEFINES=[ "__openbsd__" ] )
 
 elif "win32" == os.sys.platform:
@@ -553,7 +552,7 @@ elif "win32" == os.sys.platform:
                               [ "v7.1", "v7.0A", "v7.0", "v6.1", "v6.0a", "v6.0" ] )
     print( "Windows SDK Root '" + winSDKHome + "'" )
 
-    env.Append( CPPPATH=[ boostDir , winSDKHome + "/Include" ] )
+    env.Append( EXTRACPPPATH=[ boostDir , winSDKHome + "/Include" ] )
 
     # consider adding /MP build with multiple processes option.
 
@@ -614,16 +613,16 @@ elif "win32" == os.sys.platform:
             env.Append( CPPDEFINES=[ "_DEBUG" ] )
 
     if force64 and os.path.exists( boostDir + "/lib/vs2010_64" ):
-        env.Append( LIBPATH=[ boostDir + "/lib/vs2010_64" ] )
+        env.Append( EXTRALIBPATH=[ boostDir + "/lib/vs2010_64" ] )
     elif not force64 and os.path.exists( boostDir + "/lib/vs2010_32" ):
-        env.Append( LIBPATH=[ boostDir + "/lib/vs2010_32" ] )
+        env.Append( EXTRALIBPATH=[ boostDir + "/lib/vs2010_32" ] )
     else:
-        env.Append( LIBPATH=[ boostDir + "/Lib" ] )
+        env.Append( EXTRALIBPATH=[ boostDir + "/Lib" ] )
 
     if force64:
-        env.Append( LIBPATH=[ winSDKHome + "/Lib/x64" ] )
+        env.Append( EXTRALIBPATH=[ winSDKHome + "/Lib/x64" ] )
     else:
-        env.Append( LIBPATH=[ winSDKHome + "/Lib" ] )
+        env.Append( EXTRALIBPATH=[ winSDKHome + "/Lib" ] )
 
     if release:
         #env.Append( LINKFLAGS=" /NODEFAULTLIB:MSVCPRT  /NODEFAULTLIB:MSVCRTD " )
@@ -654,8 +653,8 @@ elif "win32" == os.sys.platform:
     #else:
     #    env.Append( CPPDEFINES=["_X86_=1"] )
 
-    env.Append( CPPPATH=["../winpcap/Include"] )
-    env.Append( LIBPATH=["../winpcap/Lib"] )
+    env.Append( EXTRACPPPATH=["../winpcap/Include"] )
+    env.Append( EXTRALIBPATH=["../winpcap/Lib"] )
 
 else:
     print( "No special config for [" + os.sys.platform + "] which probably means it won't work" )
@@ -729,8 +728,8 @@ if nix:
         os.unlink( env.File("$BUILD_DIR/mongo/pch.h.$GCHSUFFIX").abspath ) # gcc uses the file if it exists
 
 if usev8:
-    env.Prepend( CPPPATH=["../v8/include/"] )
-    env.Prepend( LIBPATH=["../v8/"] )
+    env.Prepend( EXTRACPPPATH=["../v8/include/"] )
+    env.Prepend( EXTRALIBPATH=["../v8/"] )
 
 if "uname" in dir(os):
     hacks = buildscripts.findHacks( os.uname() )
@@ -813,7 +812,7 @@ def doConfigure( myenv , shell=False ):
         allPlaces = [];
         allPlaces += extraLibPlaces
         if nix and release:
-            allPlaces += myenv["LIBPATH"]
+            allPlaces += myenv.subst( myenv["LIBPATH"] )
             if not force64:
                 allPlaces += [ "/usr/lib" , "/usr/local/lib" ]
 
