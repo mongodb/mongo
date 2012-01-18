@@ -41,9 +41,12 @@ class Dump : public Tool {
     private:
         FILE* _f;
     };
+protected:
+	string _excludeCollection;
 public:
     Dump() : Tool( "dump" , ALL , "" , "" , true ) {
         add_options()
+        ("excludeCollection", po::value<string>(), "exclude a certain collection from dump")
         ("out,o", po::value<string>()->default_value("dump"), "output directory or \"-\" for stdout")
         ("query,q", po::value<string>() , "json query" )
         ("oplog", "Use oplog for point-in-time snapshotting" )
@@ -208,6 +211,12 @@ public:
             //if a particular collections is specified, and it's not this one, skip it
             if ( _coll != "" && db + "." + _coll != name && _coll != name )
                 continue;
+
+            // if a particular collection is excluded, and it's this one, skip it
+            if ( _excludeCollection != "" && (db + "." + _excludeCollection == name || _excludeCollection == name ) ) {
+                log() << "\tskipping collection " << name << endl;
+                continue;
+            }
 
             // raise error before writing collection with non-permitted filename chars in the name
             size_t hasBadChars = name.find_first_of("/\0");
@@ -472,6 +481,8 @@ public:
         }
 
         _usingMongos = isMongos();
+
+        _excludeCollection = getParam("excludeCollection");
 
         boost::filesystem::path root( out );
         string db = _db;
