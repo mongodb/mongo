@@ -237,29 +237,33 @@ namespace mongo {
 
     // --------  FilteringClientCursor -----------
     FilteringClientCursor::FilteringClientCursor( const BSONObj filter )
-        : _matcher( filter ) , _done( true ) {
+        : _matcher( filter ) , _pcmData( NULL ), _done( true ) {
     }
 
     FilteringClientCursor::FilteringClientCursor( auto_ptr<DBClientCursor> cursor , const BSONObj filter )
-        : _matcher( filter ) , _cursor( cursor ) , _done( cursor.get() == 0 ) {
+        : _matcher( filter ) , _cursor( cursor ) , _pcmData( NULL ), _done( cursor.get() == 0 ) {
     }
 
     FilteringClientCursor::FilteringClientCursor( DBClientCursor* cursor , const BSONObj filter )
-        : _matcher( filter ) , _cursor( cursor ) , _done( cursor == 0 ) {
+        : _matcher( filter ) , _cursor( cursor ) , _pcmData( NULL ), _done( cursor == 0 ) {
     }
 
 
     FilteringClientCursor::~FilteringClientCursor() {
+        // Don't use _pcmData
+        _pcmData = NULL;
     }
 
     void FilteringClientCursor::reset( auto_ptr<DBClientCursor> cursor ) {
         _cursor = cursor;
         _next = BSONObj();
         _done = _cursor.get() == 0;
+        _pcmData = NULL;
     }
 
-    void FilteringClientCursor::reset( DBClientCursor* cursor ) {
+    void FilteringClientCursor::reset( DBClientCursor* cursor, ParallelConnectionMetadata* pcmData ) {
         _cursor.reset( cursor );
+        _pcmData = pcmData;
         _next = BSONObj();
         _done = cursor == 0;
     }
@@ -531,6 +535,10 @@ namespace mongo {
             if( v.size() == 0 ) stateB.append( "cursor", "(empty)" );
             else stateB.append( "cursor", v[0] );
         }
+
+        stateB.append( "count", count );
+        stateB.append( "done", done );
+
         return stateB.obj().getOwned();
     }
 
@@ -1041,7 +1049,7 @@ namespace mongo {
 
             PCMData& mdata = i->second;
 
-            _cursors[ index ].reset( mdata.pcState->cursor.get() );
+            _cursors[ index ].reset( mdata.pcState->cursor.get(), &mdata );
             _servers.insert( ServerAndQuery( i->first.getConnString(), BSONObj() ) );
 
             index++;
@@ -1384,8 +1392,11 @@ namespace mongo {
         int bestFrom = -1;
 
         for ( int i=0; i<_numServers; i++) {
-            if ( ! _cursors[i].more() )
+            if ( ! _cursors[i].more() ){
+                if( _cursors[i].rawMData() )
+                    _cursors[i].rawMData()->pcState->done = true;
                 continue;
+            }
 
             BSONObj me = _cursors[i].peek();
 
@@ -1406,6 +1417,9 @@ namespace mongo {
 
         uassert( 10019 ,  "no more elements" , ! best.isEmpty() );
         _cursors[bestFrom].next();
+
+        if( _cursors[bestFrom].rawMData() )
+            _cursors[bestFrom].rawMData()->pcState->count++;
 
         return best;
     }

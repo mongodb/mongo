@@ -116,7 +116,9 @@ namespace mongo {
         bool _done;
     };
 
+    class ParallelConnectionMetadata;
 
+    // TODO:  We probably don't really need this as a separate class.
     class FilteringClientCursor {
     public:
         FilteringClientCursor( const BSONObj filter = BSONObj() );
@@ -125,7 +127,7 @@ namespace mongo {
         ~FilteringClientCursor();
 
         void reset( auto_ptr<DBClientCursor> cursor );
-        void reset( DBClientCursor* cursor );
+        void reset( DBClientCursor* cursor, ParallelConnectionMetadata* _pcmData = NULL );
 
         bool more();
         BSONObj next();
@@ -133,15 +135,20 @@ namespace mongo {
         BSONObj peek();
 
         DBClientCursor* raw() { return _cursor.get(); }
+        ParallelConnectionMetadata* rawMData(){ return _pcmData; }
 
         // Required for new PCursor
-        void release(){ _cursor.release(); }
+        void release(){
+            _cursor.release();
+            _pcmData = NULL;
+        }
 
     private:
         void _advance();
 
         Matcher _matcher;
         auto_ptr<DBClientCursor> _cursor;
+        ParallelConnectionMetadata* _pcmData;
 
         BSONObj _next;
         bool _done;
@@ -260,12 +267,19 @@ namespace mongo {
     class ParallelConnectionState {
     public:
 
+        ParallelConnectionState() :
+            count( 0 ), done( false ) { }
+
         ShardConnectionPtr conn;
         DBClientCursorPtr cursor;
 
         // Version information
         ChunkManagerPtr manager;
         ShardPtr primary;
+
+        // Cursor status information
+        long long count;
+        bool done;
 
         BSONObj toBSON() const;
 
