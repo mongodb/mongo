@@ -766,7 +766,19 @@ namespace mongo {
                                                              // Does this need to be a ptr?
                                                              _qSpec.fields().isEmpty() ? 0 : &_qSpec._fields, // fieldsToReturn
                                                              _qSpec.options(), // options
-                                                             _qSpec.ntoreturn() == 0 ? 0 : _qSpec.ntoreturn() + _qSpec.ntoskip() ) ); // batchSize
+                                                             // NtoReturn is weird.
+                                                             // If zero, it means use default size, so we do that for all cursors
+                                                             // If positive, it's the batch size (we don't want this cursor limiting results), that's
+                                                             // done at a higher level
+                                                             // If negative, it's the batch size, but we don't create a cursor - so we don't want
+                                                             // to create a child cursor either.
+                                                             // Either way, if non-zero, we want to pull back the batch size + the skip amount as
+                                                             // quickly as possible.  Potentially, for a cursor on a single shard or if we keep better track of
+                                                             // chunks, we can actually add the skip value into the cursor and/or make some assumptions about the
+                                                             // return value size ( (batch size + skip amount) / num_servers ).
+                                                             _qSpec.ntoreturn() == 0 ? 0 :
+                                                                 ( _qSpec.ntoreturn() > 0 ? _qSpec.ntoreturn() + _qSpec.ntoskip() :
+                                                                                            _qSpec.ntoreturn() - _qSpec.ntoskip() ) ) ); // batchSize
                 }
 
                 bool lazyInit = state->conn->get()->lazySupported();

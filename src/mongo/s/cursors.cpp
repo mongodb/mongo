@@ -82,7 +82,10 @@ namespace mongo {
         BufBuilder b(32768);
 
         int num = 0;
-        bool sendMore = true;
+
+        // Send more if ntoreturn is 0, or any value > 1 (one is assumed to be a single doc return, with no cursor)
+        bool sendMore = ntoreturn == 0 || ntoreturn > 1;
+        ntoreturn = abs( ntoreturn );
 
         while ( _cursor->more() ) {
             BSONObj o = _cursor->next();
@@ -99,20 +102,15 @@ namespace mongo {
                 break;
             }
 
-            if ( ntoreturn != 0 && ( -1 * num + _totalSent ) == ntoreturn ) {
-                // hard limit - total to send
-                sendMore = false;
-                break;
-            }
-
-            if ( ntoreturn == 0 && _totalSent == 0 && num > 100 ) {
+            if ( ntoreturn == 0 && _totalSent == 0 && num >= 100 ) {
                 // first batch should be max 100 unless batch size specified
                 break;
             }
         }
 
         bool hasMore = sendMore && _cursor->more();
-        LOG(6) << "\t hasMore:" << hasMore << " wouldSendMoreIfHad: " << sendMore << " id:" << getId() << " totalSent: " << _totalSent << endl;
+        LOG(5) << "\t hasMore: " << hasMore << " sendMore: " << sendMore << " cursorMore: " << _cursor->more() << " ntoreturn: " << ntoreturn
+               << " num: " << num << " wouldSendMoreIfHad: " << sendMore << " id:" << getId() << " totalSent: " << _totalSent << endl;
 
         replyToQuery( 0 , r.p() , r.m() , b.buf() , b.len() , num , _totalSent , hasMore ? getId() : 0 );
         _totalSent += num;
