@@ -857,6 +857,17 @@ namespace QueryUtilTests {
                 ASSERT( f1.universal() );
                 f1 &= f2;
                 ASSERT( !f1.universal() );
+
+                FieldRangeSet frs5( "", BSON( "a" << GT << 1 << LTE << 2 ), true );
+                FieldRange f5 = frs5.range( "a" );
+                ASSERT( !f5.universal() );
+                
+                FieldRangeSet frs6( "", BSONObj(), true );
+                FieldRange f6 = frs6.range( "a" );
+                ASSERT( f6.universal() );
+                
+                f6 -= f5;
+                ASSERT( !f6.universal() );
             }
         };
 

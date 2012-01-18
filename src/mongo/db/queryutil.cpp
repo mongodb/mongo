@@ -643,6 +643,8 @@ namespace mongo {
         if ( maxKey.firstElement().woCompare( max(), false ) != 0 ) {
             return false;
         }
+        // TODO ensure that adjacent intervals are not possible (the two intervals should be
+        // merged), and just determine if the range is universal by testing _intervals.size() == 1.
         for ( unsigned i = 1; i < _intervals.size(); ++i ) {
             const FieldBound &prev = _intervals[ i-1 ]._upper;
             const FieldBound &curr = _intervals[ i ]._lower;
