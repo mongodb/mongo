@@ -336,11 +336,14 @@ distBuild = len( COMMAND_LINE_TARGETS ) == 1 and ( str( COMMAND_LINE_TARGETS[0] 
 
 extraLibPlaces = []
 
+env['EXTRACPPPATH'] = []
+env['EXTRALIBPATH'] = []
+
 def addExtraLibs( s ):
     for x in s.split(","):
-        env.Append( CPPPATH=[ x + "/include" ] )
-        env.Append( LIBPATH=[ x + "/lib" ] )
-        env.Append( LIBPATH=[ x + "/lib64" ] )
+        env.Append( EXTRACPPPATH=[ x + "/include" ] )
+        env.Append( EXTRALIBPATH=[ x + "/lib" ] )
+        env.Append( EXTRALIBPATH=[ x + "/lib64" ] )
         extraLibPlaces.append( x + "/lib" )
 
 if has_option( "extrapath" ):
@@ -770,6 +773,9 @@ for shortName in getThirdPartyShortNames():
 
 if not has_option("use-system-all") and not has_option("use-system-pcre"):
     env.Append(CPPPATH=[ '$BUILD_DIR/third_party/pcre-${PCRE_VERSION}' ])
+
+env.Append( CPPPATH=['$EXTRACPPPATH'],
+            LIBPATH=['$EXTRALIBPATH'] )
 
 env['MONGO_COMMON_FILES'] = commonFiles
 env['MONGO_SERVER_ONLY_FILES' ] = serverOnlyFiles

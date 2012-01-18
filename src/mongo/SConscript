@@ -326,8 +326,9 @@ if has_option( 'use-cpu-profiler' ):
 env.StaticLibrary("coreserver", coreServerFiles, LIBDEPS=["mongocommon"])
 
 # main db target
+env.MergeLibrary("mongoddeps", ["coreserver", "serveronly", "coredb"])
 mongod = env.Install( '#/', env.Program( "mongod", mongodOnlyFiles,
-                                         LIBDEPS=["coreserver", "serveronly", "coredb"] ) )
+                                         LIBDEPS=["mongoddeps"] ) )
 Default( mongod )
 
 # tools
@@ -349,8 +350,9 @@ env.Install( '#/', [
         ] )
 
 # mongos
+env.MergeLibrary("mongosdeps", ["coreserver", "coredb", "mongocommon", "coreshard", "dbcmdline"])
 mongos = env.Program( "mongos", shardServerFiles,
-                      LIBDEPS=["coreserver", "coredb", "mongocommon", "coreshard", "dbcmdline"])
+                      LIBDEPS=["mongosdeps"])
 env.Install( '#/', mongos )
 
 env.Library("clientandshell", "client/clientAndShell.cpp", LIBDEPS=["mongocommon", "coredb", "defaultversion", "gridfs"])
