@@ -1,3 +1,5 @@
+// Test $in regular expressions with overlapping index bounds.  SERVER-4677
+
 t = db.jstests_inb;
 t.drop();
 

@@ -1,5 +1,4 @@
 // Check that optimal query plans do not contain empty but unindexed ranges.
-// Check that fast count query plans do not contain empty but unindexed ranges.
 
 t = db.jstests_indexz;
 t.drop();
@@ -14,5 +13,4 @@ t.save( {a:1,b:[1,3]} );
 explain = t.find( {a:1,b:{$gt:2,$lt:2}} ).explain(true);
 assert.eq( 'BtreeCursor a_1_b_1', explain.cursor );
 assert.eq( 1, explain.allPlans.length );
-
 
