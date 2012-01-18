@@ -487,9 +487,10 @@ namespace mongo {
         }
 
         _cfg = new ReplSetConfig(c);
-        assert( _cfg->ok() );
-        assert( _name.empty() || _name == _cfg->_id );
-        _name = _cfg->_id;
+        dassert( &config() == _cfg ); // config() is same thing but const, so we use that when we can for clarity below
+        assert( config().ok() );
+        assert( _name.empty() || _name == config()._id );
+        _name = config()._id;
         assert( !_name.empty() );
 
         // this is a shortcut for simple changes
@@ -535,8 +536,8 @@ namespace mongo {
         // For logging
         string members = "";
 
-        for( vector<ReplSetConfig::MemberCfg>::iterator i = _cfg->members.begin(); i != _cfg->members.end(); i++ ) {
-            ReplSetConfig::MemberCfg& m = *i;
+        for( vector<ReplSetConfig::MemberCfg>::const_iterator i = config().members.begin(); i != config().members.end(); i++ ) {
+            const ReplSetConfig::MemberCfg& m = *i;
             Member *mi;
             members += ( members == "" ? "" : ", " ) + m.h.toString();
             if( m.h.isSelf() ) {
