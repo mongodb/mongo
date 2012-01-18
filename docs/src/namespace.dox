@@ -4,8 +4,8 @@
 
 WiredTiger's public function names begin with the string "wiredtiger".
 
-WiredTiger's public \c \#defines and structure \c typedefs begin with
-the string "WT_".
+WiredTiger's public \c \#define and structure \c typedef declarations
+begin with the string "WT_".
 
 WiredTiger's private function names begin with the string "__wt__".
 

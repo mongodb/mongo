@@ -238,6 +238,7 @@ transactionally
 tt
 txn
 txns
+typedef
 uint
 ul
 umask
