@@ -129,6 +129,7 @@ def get_libdeps(source, target, env, for_signature):
 
     if for_signature:
         return []
+    target = env.Flatten([target])
     return list(__get_libdeps(target[0], 'LIBDEPS'))
 
 def get_syslibdeps(source, target, env, for_signature):
