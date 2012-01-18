@@ -485,7 +485,7 @@ struct __wt_session {
 	 *		    value=(string)value\, (uint64_t)value)}
 	 * </table>
 	 *
-	 * See @ref cursor_types for more information.
+	 * See @ref cursor_types and @ref cursor_ops for more information.
 	 *
 	 * @snippet ex_all.c Open a cursor
 	 *
@@ -497,19 +497,22 @@ struct __wt_session {
 	 * @config{append, only supported by cursors with record number keys:
 	 * append the value as a new record\, creating a new record number
 	 * key.,a boolean flag; default \c false.}
-	 * @config{bulk, configure the cursor for bulk loads.,a boolean flag;
-	 * default \c false.}
+	 * @config{bulk, configure the cursor for bulk loads; bulk-load is a
+	 * fast load path for empty objects\, only empty objects may be
+	 * bulk-loaded.,a boolean flag; default \c false.}
 	 * @config{dump, configure the cursor for dump format inputs and
 	 * outputs: "hex" selects a simple hexadecimal format\, "print" selects
-	 * a format where only non-printing characters are hexadecimal
-	 * encoded.,a string\, chosen from the following options: \c "hex"\, \c
-	 * "print"; default empty.}
-	 * @config{isolation, the isolation level for this cursor. Ignored for
+	 * a format where only non-printing characters are hexadecimal encoded.
+	 * The cursor dump format is compatible with the @ref utility_dump and
+	 * @ref utility_load commands.,a string\, chosen from the following
+	 * options: \c "hex"\, \c "print"; default empty.}
+	 * @config{isolation, the isolation level for this cursor\, ignored for
 	 * transactional cursors.,a string\, chosen from the following options:
 	 * \c "snapshot"\, \c "read-committed"\, \c "read-uncommitted"; default
 	 * \c read-committed.}
-	 * @config{overwrite, if an existing key is inserted\, overwrite the
-	 * existing value.,a boolean flag; default \c false.}
+	 * @config{overwrite, change the behavior of the cursor's insert method
+	 * to overwrite previously existing values.,a boolean flag; default \c
+	 * false.}
 	 * @config{raw, ignore the encodings for the key and value\, manage data
 	 * as if the formats were \c "u".,a boolean flag; default \c false.}
 	 * @config{statistics, configure the cursor for statistics.,a boolean

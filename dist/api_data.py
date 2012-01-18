@@ -211,20 +211,24 @@ methods = {
 		value as a new record, creating a new record number key''',
 		type='boolean'),
 	Config('bulk', 'false', r'''
-		configure the cursor for bulk loads''',
+		configure the cursor for bulk loads; bulk-load is a fast
+		load path for empty objects, only empty objects may be
+		bulk-loaded''',
 		type='boolean'),
 	Config('dump', '', r'''
 		configure the cursor for dump format inputs and outputs:
 		"hex" selects a simple hexadecimal format, "print"
 		selects a format where only non-printing characters are
-		hexadecimal encoded''',
+		hexadecimal encoded.  The cursor dump format is compatible
+		with the @ref utility_dump and @ref utility_load commands''',
 		choices=['hex', 'print']),
 	Config('isolation', 'read-committed', r'''
-		the isolation level for this cursor.
-		Ignored for transactional cursors''',
+		the isolation level for this cursor, ignored for transactional
+		cursors''',
 		choices=['snapshot', 'read-committed', 'read-uncommitted']),
 	Config('overwrite', 'false', r'''
-		if an existing key is inserted, overwrite the existing value''',
+		change the behavior of the cursor's insert method to
+		overwrite previously existing values''',
 		type='boolean'),
 	Config('raw', 'false', r'''
 		ignore the encodings for the key and value, manage data as if
