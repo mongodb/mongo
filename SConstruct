@@ -291,9 +291,9 @@ if env['PYSYSPLATFORM'] == 'linux2':
 elif env['PYSYSPLATFORM'] == 'darwin':
     env['LINK_LIBGROUP_START'] = ''
     env['LINK_LIBGROUP_END'] = ''
-    env['RELOBJ_LIBDEPS_START'] = ''
+    env['RELOBJ_LIBDEPS_START'] = '-all_load'
     env['RELOBJ_LIBDEPS_END'] = ''
-    env['RELOBJ_LIBDEPS_ITEM'] = '-force_load'
+    env['RELOBJ_LIBDEPS_ITEM'] = ''
 
 env["LIBPATH"] = []
 
