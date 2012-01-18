@@ -421,7 +421,12 @@ namespace mongo
 #define LOKI_CONCATENATE(s1, s2)         LOKI_CONCATENATE_DIRECT(s1, s2)
 #define LOKI_ANONYMOUS_VARIABLE(str)     LOKI_CONCATENATE(str, __LINE__)
 
-#define ON_BLOCK_EXIT      ScopeGuard LOKI_ANONYMOUS_VARIABLE(scopeGuard) = MakeGuard
-#define ON_BLOCK_EXIT_OBJ  ScopeGuard LOKI_ANONYMOUS_VARIABLE(scopeGuard) = MakeObjGuard
+#ifdef __GNUC__
+#define ON_BLOCK_EXIT ScopeGuard LOKI_ANONYMOUS_VARIABLE(scopeGuard) __attribute__ ((unused)) = MakeGuard
+#define ON_BLOCK_EXIT_OBJ ScopeGuard LOKI_ANONYMOUS_VARIABLE(scopeGuard) __attribute__ ((unused)) = MakeObjGuard
+#else
+#define ON_BLOCK_EXIT ScopeGuard LOKI_ANONYMOUS_VARIABLE(scopeGuard) = MakeGuard
+#define ON_BLOCK_EXIT_OBJ ScopeGuard LOKI_ANONYMOUS_VARIABLE(scopeGuard) = MakeObjGuard
+#endif 
 
 #endif //LOKI_SCOPEGUARD_H_
