@@ -77,7 +77,7 @@ namespace mongo {
             void updateGroups(const OpTime& last) {
                 RACECHECK
                 for (set<TagSubgroup*>::const_iterator it = groups().begin(); it != groups().end(); it++) {
-                    ((TagSubgroup*)(*it))->updateLast(last);
+                    (*it)->updateLast(last);
                 }
             }
             bool operator==(const MemberCfg& r) const {
