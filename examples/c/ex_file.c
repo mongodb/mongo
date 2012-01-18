@@ -30,10 +30,12 @@ main(void)
 		    home, wiredtiger_strerror(ret));
 	/* Note: further error checking omitted for clarity. */
 
+	/*! [file create] */
 	ret = session->create(session, "file:example",
 	    "key_format=u,"
 	    "internal_page_max=32KB,internal_item_max=1KB,"
 	    "leaf_page_max=1MB,leaf_item_max=32KB");
+	/*! [file create] */
 
 	return (conn->close(conn, NULL) == 0 ? ret : EXIT_FAILURE);
 }

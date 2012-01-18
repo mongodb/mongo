@@ -22,7 +22,9 @@ const char *home = "WT_TEST";
 
 WT_CONNECTION *conn;
 
-void *scan_thread(void *arg)
+/*! [thread scan] */
+void *
+scan_thread(void *arg)
 {
 	WT_SESSION *session;
 	WT_CURSOR *cursor;
@@ -43,8 +45,11 @@ void *scan_thread(void *arg)
 
 	return (arg);
 }
+/*! [thread scan] */
 
-int main(void)
+/*! [thread main] */
+int
+main(void)
 {
 	WT_SESSION *session;
 	WT_CURSOR *cursor;
@@ -77,3 +82,4 @@ int main(void)
 
 	return (ret);
 }
+/*! [thread main] */

@@ -30,7 +30,6 @@ The remaining characters in the format string specify the type of each field to 
 
 The code below is taken from the complete example program @ex_ref{ex_pack.c}.  It demonstrates how to pack three integer values into a buffer and then unpack them again.
 
-@dontinclude ex_pack.c
-@skip struct_size
-@until unpack
+@snippet ex_pack.c packing
+
  */

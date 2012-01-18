@@ -17,12 +17,14 @@
 
 const char *home = "WT_TEST";
 
+/*! [schema decl] */
 /* The C struct for the data we are storing with WiredTiger. */
 typedef struct {
 	char country[5];
 	uint16_t year;
 	uint64_t population;
 } POP_RECORD;
+/*! [schema decl] */
 
 POP_RECORD pop_data[] = {
 	{ "USA", 1980, 226542250 },
@@ -49,6 +51,7 @@ int main(void)
 		    home, wiredtiger_strerror(ret));
 	/* Note: error checking omitted for clarity. */
 
+	/*! [schema work] */
 	ret = conn->open_session(conn, NULL, NULL, &session);
 
 	/*
@@ -102,6 +105,7 @@ int main(void)
 	}
 
 	ret = conn->close(conn, NULL);
+	/*! [schema work] */
 
 	return (ret);
 }

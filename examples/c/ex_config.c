@@ -24,17 +24,21 @@ int main(void)
 	WT_CURSOR *cursor;
 	const char *key, *value;
 
+	/*! [configure cache size] */
 	if ((ret = wiredtiger_open(home, NULL,
 	    "create,cache_size=10M", &conn)) != 0)
 		fprintf(stderr, "Error connecting to %s: %s\n",
 		    home, wiredtiger_strerror(ret));
-	/* Note: further error checking omitted for clarity. */
+	/*! [configure cache size] */
 
+	/*! [create a table] */
 	ret = conn->open_session(conn, NULL, NULL, &session);
 
-	ret = session->create(session, "table:access",
-	    "key_format=S,value_format=S");
+	ret = session->create(session,
+	    "table:access", "key_format=S,value_format=S");
+	/*! [create a table] */
 
+	/*! [transaction] */
 	ret = session->begin_transaction(session, "priority=100,name=mytxn");
 
 	ret = session->open_cursor(session, "config:", NULL, NULL, &cursor);
@@ -42,11 +46,11 @@ int main(void)
 	while ((ret = cursor->next(cursor)) == 0) {
 		cursor->get_key(cursor, &key);
 		cursor->get_value(cursor, &value);
-
-		printf("Got configuration value: %s = %s\n", key, value);
+		printf("configuration value: %s = %s\n", key, value);
 	}
 
 	ret = session->commit_transaction(session, NULL);
+	/*! [transaction] */
 
 	ret = conn->close(conn, NULL);
 

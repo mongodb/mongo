@@ -16,31 +16,37 @@ const char *home = "WT_TEST";
 
 int main(void)
 {
-	int ret;
+	/*! [access example connection] */
 	WT_CONNECTION *conn;
-	WT_SESSION *session;
 	WT_CURSOR *cursor;
+	WT_SESSION *session;
 	const char *key, *value;
+	int ret;
 
 	if ((ret = wiredtiger_open(home, NULL, "create", &conn)) != 0 ||
 	    (ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		fprintf(stderr, "Error connecting to %s: %s\n",
 		    home, wiredtiger_strerror(ret));
-	/* Note: further error checking omitted for clarity. */
+	/*! [access example connection] */
 
-	ret = session->create(session, "table:access",
-	    "key_format=S,value_format=S");
+	/*! [access example table create] */
+	ret = session->create(session,
+	    "table:access", "key_format=S,value_format=S");
+	/*! [access example table create] */
 
-	ret = session->open_cursor(session, "table:access",
-	    NULL, NULL, &cursor);
+	/*! [access example cursor open] */
+	ret = session->open_cursor(session,
+	    "table:access", NULL, NULL, &cursor);
+	/*! [access example cursor open] */
 
-	/* Insert a record. */
-	cursor->set_key(cursor, "key1");
+	/*! [access example cursor insert] */
+	cursor->set_key(cursor, "key1");	/* Insert a record. */
 	cursor->set_value(cursor, "value1");
 	ret = cursor->insert(cursor);
+	/*! [access example cursor insert] */
 
-	/* Show all records. */
-	for (ret = cursor->first(cursor);
+	/*! [access example cursor list] */
+	for (ret = cursor->first(cursor);	/* Show all records. */
 	    ret == 0;
 	    ret = cursor->next(cursor)) {
 		ret = cursor->get_key(cursor, &key);
@@ -48,8 +54,11 @@ int main(void)
 
 		printf("Got record: %s : %s\n", key, value);
 	}
+	/*! [access example cursor list] */
 
+	/*! [access example close] */
 	ret = conn->close(conn, NULL);
+	/*! [access example close] */
 
 	return (ret);
 }

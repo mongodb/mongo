@@ -72,17 +72,16 @@ unsigned 64-bit integral value,
 The following is an example of printing run-time statistics about the
 WiredTiger engine:
 
-@dontinclude ex_stat.c
-
-@skip home
-@skipline int
-@until }
-@until }
+@snippet ex_stat.c statistics database function
 
 The following is an example of printing statistics about an underlying
 file:
 
-@skipline int
-@until }
+@snippet ex_stat.c statistics file function
+
+Both examples can use a common display routine that iterates through the
+statistics until the cursor returns the end of the list.
+
+@snippet ex_stat.c statistics display function
 
  */

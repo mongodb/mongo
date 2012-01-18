@@ -2,17 +2,15 @@
 
 @section extending_example Code samples
 
-The code below is taken from the complete example program @ex_ref{ex_extending.c}.
+The code below is taken from the complete example program
+@ex_ref{ex_extending.c}.
 
-@dontinclude ex_extending.c
-@skip insensitive
-@until nocasecoll
+@snippet ex_extending.c case insensitive comparator
 
-@until pcoll10
+@snippet ex_extending.c n character comparator
 
-@skip add_collator
-@until add_collator
+@snippet ex_extending.c add collator nocase
 
-@until conn->close
+@snippet ex_extending.c add collator prefix10
 
 */

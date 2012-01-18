@@ -52,6 +52,7 @@ ckp
 colgroup
 colgroups
 command's
+comparator
 cond
 config
 conn
@@ -69,12 +70,12 @@ dataitem
 dbc
 dbm
 dbt
+decl
 del
 desc
 destructor
 destructors
 dlp
-dontinclude
 dontlock
 dp
 dsync
@@ -158,6 +159,7 @@ mygcc
 ndary
 ndbm
 newsite
+nocase
 nocasecoll
 nodup
 noflush
@@ -212,7 +214,6 @@ schemas
 selectable
 seqname
 serializable
-skipline
 spinlock
 spinlocks
 sql

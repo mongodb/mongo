@@ -188,22 +188,14 @@ read-only: they cannot be used to perform updates.
 The code below is taken from the complete example program
 @ex_ref{ex_schema.c}.
 
-@dontinclude ex_schema.c
-@skip C struct
-@until POP_RECORD
-
-@skip open_session
-@until conn->close
+@snippet ex_schema.c schema decl
+@snippet ex_schema.c schema work
 
 The code below is taken from the complete example program
 @ex_ref{ex_call_center.c}.
 
-@dontinclude ex_call_center.c
-@skip home
-@until CALL
-
-@skip create
-@until conn->close
+@snippet ex_call_center.c call-center decl
+@snippet ex_call_center.c call-center work
 
 @todo new section: schema_advanced Advanced Schemas
 @todo non-relational data such as multiple index keys per row

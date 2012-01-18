@@ -16,6 +16,7 @@
 
 const char *home = "WT_TEST";
 
+/*! [case insensitive comparator] */
 /* Case insensitive comparator. */
 static int
 __compare_nocase(WT_COLLATOR *collator, WT_SESSION *session,
@@ -32,7 +33,9 @@ __compare_nocase(WT_COLLATOR *collator, WT_SESSION *session,
 }
 
 static WT_COLLATOR nocasecoll = { __compare_nocase };
+/*! [case insensitive comparator] */
 
+/*! [n character comparator] */
 /*
  * Comparator that only compares the first N characters in strings.  This
  * has associated data, so we need to extend WT_COLLATOR.
@@ -57,6 +60,7 @@ __compare_prefixes(WT_COLLATOR *collator, WT_SESSION *session,
 }
 
 static PREFIX_COLLATOR pcoll10 = { {__compare_prefixes}, 10 };
+/*! [n character comparator] */
 
 int main(void)
 {
@@ -69,7 +73,10 @@ int main(void)
 		fprintf(stderr, "Error connecting to %s: %s\n",
 		    home, wiredtiger_strerror(ret));
 
+	/*! [add collator nocase] */
 	ret = conn->add_collator(conn, "nocase", &nocasecoll, NULL);
+	/*! [add collator nocase] */
+	/*! [add collator prefix10] */
 	ret = conn->add_collator(conn, "prefix10", &pcoll10.iface, NULL);
 
 	/* Open a session for the current thread's work. */
@@ -81,6 +88,7 @@ int main(void)
 
 	/* Note: closing the connection implicitly closes open session(s). */
 	if ((ret = conn->close(conn, NULL)) != 0)
+	/*! [add collator prefix10] */
 		fprintf(stderr, "Error connecting to %s: %s\n",
 		    home, wiredtiger_strerror(ret));
 

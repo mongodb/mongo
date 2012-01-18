@@ -25,6 +25,7 @@ int cursor_remove(WT_CURSOR *cursor);
 
 const char *home = "WT_TEST";
 
+/*! [cursor first] */
 int
 cursor_first(WT_CURSOR *cursor)
 {
@@ -37,7 +38,9 @@ cursor_first(WT_CURSOR *cursor)
 	}
 	return (ret);
 }
+/*! [cursor first] */
 
+/*! [cursor last] */
 int
 cursor_last(WT_CURSOR *cursor)
 {
@@ -50,7 +53,9 @@ cursor_last(WT_CURSOR *cursor)
 	}
 	return (ret);
 }
+/*! [cursor last] */
 
+/*! [cursor next] */
 int
 cursor_forward_scan(WT_CURSOR *cursor)
 {
@@ -63,7 +68,9 @@ cursor_forward_scan(WT_CURSOR *cursor)
 	}
 	return (ret);
 }
+/*! [cursor next] */
 
+/*! [cursor prev] */
 int
 cursor_reverse_scan(WT_CURSOR *cursor)
 {
@@ -76,7 +83,9 @@ cursor_reverse_scan(WT_CURSOR *cursor)
 	}
 	return (ret);
 }
+/*! [cursor prev] */
 
+/*! [cursor search] */
 int
 cursor_search(WT_CURSOR *cursor)
 {
@@ -90,7 +99,9 @@ cursor_search(WT_CURSOR *cursor)
 
 	return (ret);
 }
+/*! [cursor search] */
 
+/*! [cursor search near] */
 int
 cursor_search_near(WT_CURSOR *cursor)
 {
@@ -116,7 +127,9 @@ cursor_search_near(WT_CURSOR *cursor)
 
 	return (ret);
 }
+/*! [cursor search near] */
 
+/*! [cursor insert] */
 int
 cursor_insert(WT_CURSOR *cursor)
 {
@@ -125,7 +138,9 @@ cursor_insert(WT_CURSOR *cursor)
 
 	return (cursor->insert(cursor));
 }
+/*! [cursor insert] */
 
+/*! [cursor update] */
 int
 cursor_update(WT_CURSOR *cursor)
 {
@@ -134,13 +149,16 @@ cursor_update(WT_CURSOR *cursor)
 
 	return (cursor->update(cursor));
 }
+/*! [cursor update] */
 
+/*! [cursor remove] */
 int
 cursor_remove(WT_CURSOR *cursor)
 {
 	cursor->set_key(cursor, "foo");
 	return (cursor->remove(cursor));
 }
+/*! [cursor remove] */
 
 int main(void)
 {
@@ -163,18 +181,18 @@ int main(void)
 	    "key_format=r,value_format=5sii,"
 	    "columns=(id,country,population,area)");
 
+	/*! [open cursor #1] */
 	ret = session->open_cursor(session, "table:world", NULL, NULL, &cursor);
-	if (ret == 0)
-		ret = cursor->close(cursor, NULL);
+	/*! [open cursor #1] */
 
-	ret = session->open_cursor(session, "table:world(country,population)",
-	    NULL, NULL, &cursor);
-	if (ret == 0)
-		ret = cursor->close(cursor, NULL);
+	/*! [open cursor #2] */
+	ret = session->open_cursor(session,
+	    "table:world(country,population)", NULL, NULL, &cursor);
+	/*! [open cursor #2] */
 
+	/*! [open cursor #3] */
 	ret = session->open_cursor(session, "statistics:", NULL, NULL, &cursor);
-	if (ret == 0)
-		ret = cursor->close(cursor, NULL);
+	/*! [open cursor #3] */
 
 	/* Create a simple string table to illustrate basic operations. */
 	ret = session->create(session, "table:map",

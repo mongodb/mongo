@@ -36,63 +36,62 @@ values types can be chosen from a list, or composite keys or values made up
 of columns with any combination of types.  The 4GB limit on keys and values
 still applies.
 
-@dontinclude ex_access.c
-
 All applications that use WiredTiger will be structured roughly as follows.
 The code below is taken from the complete example program
 @ex_ref{ex_access.c}.
 
 @section basic_connection Connecting to a database
 
-To access a database, first open a connection with the following code:
-@skip main
-@until Note
+To access a database, first open a connection and create a session handle
+for the single thread accessing the database:
 
-Here the configuration string @c "create" is passed to ::wiredtiger_open to
-indicate that the database should be created if it does not already exist.
+@snippet ex_access.c access example connection
 
-Next we open a session handle for the single thread accessing the database.
+The configuration string @c "create" is passed to ::wiredtiger_open to
+indicate the database should be created if it does not already exist.
 
 The code block above also shows simple error handling with
-::wiredtiger_strerror (a function that returns a string describing an error
-code passed as its argument).  More complex error handling can be
+::wiredtiger_strerror (a function that returns a string describing an
+error code passed as its argument).  More complex error handling can be
 configured by passing an implementation of WT_ERROR_HANDLER to
 wiredtiger_open or WT_CONNECTION::open_session.
 
 @section basic_create_table Creating a table
 
-If the database was created by the ::wiredtiger_open call above, it will be
-empty.  We now create a table that we can use to store data:
+Create a table we can use to store data:
 
-@until ;
+@snippet ex_access.c access example table create
 
-This call creates a table called @c "access", configured to use strings for
-its key and value columns.  We go into more details about what is possible
-later in the section on @ref schema.
+This call creates a table called @c "access", configured to use strings
+for its key and value columns.  (See @ref schema for more information
+on tables with other types of key and value columns.)
 
-@section basic_cursors Accessing data With cursors
+@section basic_cursors Accessing data with cursors
 
-Now that we're sure we have a table, we open a cursor to perform some
-operations on it:
+Now that we have a table, we open a cursor to perform some operations
+on it:
 
-@until insert
+@snippet ex_access.c access example cursor open
 
-Here, the string @c "table:access" specifies that we are opening the cursor
-on the table named @c "access" that we created above.
+Here, the string @c "table:access" specifies that we are opening the
+cursor on the table named @c "access".
 
-The WT_CURSOR::set_key and WT_CURSOR::set_value calls put the application's
-data into the cursor.  The WT_CURSOR::insert call creates a record
-containing that data and inserts it into the table.
+Then we insert a new row into the table.  The WT_CURSOR::set_key and
+WT_CURSOR::set_value calls put the application's data into the cursor.
+The WT_CURSOR::insert call creates a record containing that data and
+inserts it into the table.
+
+@snippet ex_access.c access example cursor insert
 
 Now we iterate through all of the records in the table, printing them out
 as we go:
 
-@until }
+@snippet ex_access.c access example cursor list
 
-Note that the key and value parts of the records are returned as C strings
-because the table was created that way (even if it was created by a
-previous run of the example).  No data extraction or conversion is required
-in the application.
+Note that the key and value parts of the records are returned as C
+strings because the table was created that way (even if it was created
+by a previous run of the example).  No data extraction or conversion is
+required in the application.
 
 Because the cursor was positioned in the table after the WT_CURSOR::insert
 call, we had to re-position it using the WT_CURSOR::first call; if we
@@ -110,5 +109,6 @@ would simplify to:
 Lastly, we close the connection, which implicitly closes the cursor and
 session handles:
 
-@skipline close
+@snippet ex_access.c access example close
+
  */

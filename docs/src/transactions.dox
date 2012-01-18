@@ -77,7 +77,6 @@ checkpoints.
 The code below is taken from the complete example program
 @ex_ref{ex_transaction.c}.
 
-@dontinclude ex_transaction.c
-@skip begin_transaction
-@until commit
+@snippet ex_transaction.c transaction
+
  */

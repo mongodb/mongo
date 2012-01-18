@@ -64,23 +64,17 @@ For example, in Python, code might look as follows:
 
 @todo improve the example
 
-@dontinclude ex_config.c
-
-The code below is taken from the complete example program
-@ex_ref{ex_config.c}.
-
 Open a connection to a database, creating it if it does not exist and set a
-cache size of 10MB:
+cache size of 10MB, then open a session in the database:
 
-@skip wiredtiger_open
-@until != 0
+@snippet ex_config.c configure cache size
 
 Create a table that uses C language strings for keys and values:
 
-@skip create
-@until ;
+@snippet ex_config.c create a table
 
-Assign a priority to a transaction and give it a name for debugging:
+Walk a transactional cursor through the table:
 
-@skipline begin_transaction
+@snippet ex_config.c transaction
+
 */

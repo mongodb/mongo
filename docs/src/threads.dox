@@ -26,15 +26,12 @@ The code below is taken from the complete example program
 This is an example of a thread entry point.  A new session is opened for
 the thread and used for all operations within that thread.
 
-@dontinclude ex_thread.c
-@skip WT_CONNECTION
-@skip scan_thread
-@until }
-@until }
+@snippet ex_thread.c thread scan
 
 Here is the main function that starts the threads.  It opens a single
 connection, shared between the threads, and closes the connection after
 waiting for all of the threads to exit.
 
-@until }
+@snippet ex_thread.c thread main
+
  */

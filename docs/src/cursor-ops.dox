@@ -13,21 +13,14 @@ A cursor includes:
 Cursors are created using the WT_SESSION::open_cursor method.  The
 following are examples from the example program @ex_ref{ex_cursor.c}:
 
-@dontinclude ex_cursor.c
-@skipline open_cursor
+@snippet ex_cursor.c open cursor #1
+@snippet ex_cursor.c open cursor #2
 
-@skipline open_cursor
-@until ;
-
-@skipline open_cursor
-
-In addition to simple data sources, cursors in WiredTiger are used to
-access projections and even created data sources such as the run-time
+In addition to traditional data sources, cursors in WiredTiger are used
+to access projections and even created data sources such as the run-time
 statistics:
 
-@dontinclude ex_cursor.c
-@skipline statistics:
-@until close
+@snippet ex_cursor.c open cursor #3
 
 See @ref cursors for more information on available cursor types.
 
@@ -40,27 +33,14 @@ within the data source.
 To position a cursor at the beginning or end of the data source, use the
 WT_CURSOR::first and WT_CURSOR::last methods:
 
-@dontinclude ex_cursor.c
-
-@skip home
-@skipline int
-@until }
-@until }
-
-@skipline int
-@until }
-@until }
+@snippet ex_cursor.c cursor first
+@snippet ex_cursor.c cursor last
 
 To move a cursor forward or backward in the data source, use the cursor
 WT_CURSOR::next and WT_CURSOR::prev methods:
 
-@skipline int
-@until }
-@until }
-
-@skipline int
-@until }
-@until }
+@snippet ex_cursor.c cursor next
+@snippet ex_cursor.c cursor prev
 
 If the WT_CURSOR::next and WT_CURSOR::prev methods are called on cursors
 without a position in the data source, they are positioned at the beginning
@@ -69,23 +49,19 @@ or end of the data source, respectively.
 To position a cursor at a specific location in the data source, use the
 WT_CURSOR::search method:
 
-@skipline int
-@until }
+@snippet ex_cursor.c cursor search
 
 To position a cursor at or near a location in the data source, use the
 WT_CURSOR::search_near method:
 
-@skipline int
-@until }
-@until }
+@snippet ex_cursor.c cursor search near
 
 @section cursor_writes Inserting and updating
 
 To insert new data, and optionally update existing data, using a cursor,
 use the WT_CURSOR::insert method:
 
-@skipline int
-@until }
+@snippet ex_cursor.c cursor insert
 
 By default, when inserting into a row-store, the WT_CURSOR::insert method
 returns an error if the key already exists in the store, otherwise it
@@ -103,16 +79,14 @@ value will be used to specify the record number being inserted or updated.
 
 To update existing data using a cursor, use the WT_CURSOR::update method:
 
-@skipline int
-@until }
+@snippet ex_cursor.c cursor update
 
 In all cases, calling WT_CURSOR::update where the key does not already
 exist in the store will return an error.
 
 To remove existing data using a cursor, use the WT_CURSOR::remove method:
 
-@skipline int
-@until }
+@snippet ex_cursor.c cursor remove
 
 @section cursor_error Cursor position after error
 

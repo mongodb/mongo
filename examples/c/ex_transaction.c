@@ -32,9 +32,11 @@ int main(void)
 		fprintf(stderr, "Error opening a session on %s: %s\n",
 		    home, wiredtiger_strerror(ret));
 
+	/*! [transaction] */
 	session->begin_transaction(session, NULL);
 	/* ... */
 	session->commit_transaction(session, NULL);
+	/*! [transaction] */
 
 	/* Note: closing the connection implicitly closes open session(s). */
 	if ((ret = conn->close(conn, NULL)) != 0)

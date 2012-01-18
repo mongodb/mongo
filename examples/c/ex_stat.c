@@ -21,6 +21,7 @@ int print_file_stats(WT_SESSION *);
 
 const char *home = "WT_TEST";
 
+/*! [statistics display function] */
 int
 print_cursor(WT_CURSOR *cursor)
 {
@@ -36,6 +37,7 @@ print_cursor(WT_CURSOR *cursor)
 
 	return (ret == WT_NOTFOUND ? 0 : ret);
 }
+/*! [statistics display function] */
 
 int 
 print_database_stats(WT_SESSION *session)
@@ -43,11 +45,13 @@ print_database_stats(WT_SESSION *session)
 	WT_CURSOR *cursor;
 	int ret;
 
+	/*! [statistics database function] */
 	if ((ret = session->open_cursor(session,
 	    "statistics:", NULL, NULL, &cursor)) != 0)
 		return (ret);
 
 	return (print_cursor(cursor));
+	/*! [statistics database function] */
 }
 
 int 
@@ -56,11 +60,13 @@ print_file_stats(WT_SESSION *session)
 	WT_CURSOR *cursor;
 	int ret;
 
+	/*! [statistics file function] */
 	if ((ret = session->open_cursor(session,
 	    "statistics:file:access.wt", NULL, NULL, &cursor)) != 0)
 		return (ret);
 
 	return (print_cursor(cursor));
+	/*! [statistics file function] */
 }
 
 int

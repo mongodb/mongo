@@ -33,12 +33,14 @@ int main(void)
 		fprintf(stderr, "Error opening a session on %s: %s\n",
 		    home, wiredtiger_strerror(ret));
 
+	/*! [packing] */
 	size = wiredtiger_struct_size("iii", 42, 1000, -9);
 	if (size > sizeof (buf)) {
 		/* Allocate a bigger buffer. */
 	}
 	wiredtiger_struct_pack(buf, size, "iii", 42, 1000, -9);
 	wiredtiger_struct_unpack(buf, size, "iii", &i, &j, &k);
+	/*! [packing] */
 
 	/* Note: closing the connection implicitly closes open session(s). */
 	if ((ret = conn->close(conn, NULL)) != 0)

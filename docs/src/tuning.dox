@@ -1,36 +1,5 @@
 /*! @page tuning Performance Tuning
 
-@section statistics Performance monitoring with statistics
-
-WiredTiger maintains a variety of statistics that can be read with a
-cursor.  The statistics are at two levels: per-database statistics and
-per-underlying file statistics.  The database statistics are the
-default; the underlying file statistics are available by specifying the
-appropriate uri.
-
-The following is an example printing out the database statistics:
-
-@dontinclude ex_stat.c
-@skipline print_database_stats
-@until }
-
-The following is an example printing out the underlying file statistics:
-
-@dontinclude ex_stat.c
-@skipline print_file_stats
-@until }
-
-Both examples can use a common display routine that iterates through the
-statistics until the cursor returns the end of the list. 
-
-@dontinclude ex_stat.c
-@skipline display
-@until }
-@until }
-
-Note the raw value of the statistic is available from the /c value
-field, as well as a printable string version of the value.
-
 @section cache Cache size
 
 The cache size for the database is configurable by setting the \c
@@ -42,9 +11,7 @@ eviction statistics for the database.
 
 An example of setting a cache size to 10MB:
 
-@dontinclude ex_config.c
-@skipline wiredtiger_open
-@until wiredtiger_strerror
+@snippet ex_config.c configure cache size
 
 @section page Page and overflow sizes
 
@@ -121,8 +88,33 @@ pages room to grow.
 
 An example of configuring page sizes:
 
-@dontinclude ex_file.c
-@skipline file:example
-@until );
+@snippet ex_file.c file create
+
+@section statistics Performance monitoring with statistics
+
+WiredTiger maintains a variety of statistics that can be read with a
+cursor.  The statistics are at two levels: per-database statistics and
+per-underlying file statistics.  The database statistics are the
+default; the underlying file statistics are available by specifying the
+appropriate uri.
+
+The following is an example of printing run-time statistics about the
+WiredTiger engine:
+
+@snippet ex_stat.c statistics database function
+
+The following is an example of printing statistics about an underlying
+file:
+
+@snippet ex_stat.c statistics file function
+
+Both examples can use a common display routine that iterates through the
+statistics until the cursor returns the end of the list. 
+
+@snippet ex_stat.c statistics display function
+
+Note the raw value of the statistic is available from the \c value
+field, as well as a printable string version of the value.
+
 
  */

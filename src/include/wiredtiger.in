@@ -465,6 +465,7 @@ struct __wt_session {
 	 *
 	 * An existing cursor can be duplicated by passing it as the \c to_dup
 	 * parameter, otherwise the \c to_dup parameter should be NULL.
+	 * @notyet{to_dup}
 	 *
 	 * Cursors are commonly opened on ordinary tables.  However, cursors
 	 * can be opened on any data source, regardless of whether it is

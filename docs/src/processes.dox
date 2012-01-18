@@ -23,6 +23,6 @@ When ::wiredtiger_open is called for a database, one of the following occurs:
 
 The code below is taken from the complete example program @ex_ref{ex_process.c}.
 
-@dontinclude ex_process.c
-@skipline wiredtiger_open
+@snippet ex_process.c processes
+
  */

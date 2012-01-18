@@ -17,6 +17,7 @@
 
 const char *home = "WT_TEST";
 
+/*! [call-center decl] */
 /*
  * In SQL, the tables are described as follows:
  *
@@ -50,6 +51,7 @@ typedef struct {
 	char *call_type;
 	char *notes;
 } CALL;
+/*! [call-center decl] */
 
 int main(void)
 {
@@ -68,6 +70,7 @@ int main(void)
 	}
 	/* Note: further error checking omitted for clarity. */
 
+	/*! [call-center work] */
 	ret = conn->open_session(conn, NULL, NULL, &session);
 
 	/*
@@ -197,6 +200,7 @@ int main(void)
 		ret = cursor->get_value(cursor,
 		    &call.cust_id, &call.call_type, &call.notes);
 	}
+	/*! [call-center work] */
 
 	ret = conn->close(conn, NULL);
 
