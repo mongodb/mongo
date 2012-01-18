@@ -116,7 +116,8 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	if (ret != 0) {
 		if (btree != NULL) {
 			if (btree->rwlock != NULL)
-				__wt_rwlock_destroy(session, btree->rwlock);
+				(void)__wt_rwlock_destroy(
+				    session, btree->rwlock);
 			__wt_free(session, btree->name);
 			__wt_free(session, btree->filename);
 		}
