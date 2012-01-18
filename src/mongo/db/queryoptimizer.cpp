@@ -538,11 +538,8 @@ doneCheckOrder:
         QueryPlanPtr specialPlan;
         for( int i = 0; i < d->nIndexes; ++i ) {
 
-            bool normalQuery = _hint.isEmpty() && _min.isEmpty() && _max.isEmpty();
-            if ( normalQuery ) {
-                if ( !QueryUtilIndexed::indexUseful( *_frsp, d, i, _order ) ) {
-                    continue;
-                }
+            if ( !QueryUtilIndexed::indexUseful( *_frsp, d, i, _order ) ) {
+                continue;
             }
 
             QueryPlanPtr p( new QueryPlan( d, i, *_frsp, _originalFrsp.get(), _originalQuery, _order, _mustAssertOnYieldFailure ) );
