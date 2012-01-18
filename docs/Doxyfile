@@ -1505,15 +1505,16 @@ INCLUDE_FILE_PATTERNS  =
 # instead of the = operator.
 
 PREDEFINED             = DOXYGEN \
-                         wt_item=WT_ITEM \
-                         wt_cursor=WT_CURSOR \
-                         wt_session=WT_SESSION \
-                         wt_connection=WT_CONNECTION \
-                         wt_event_handler=WT_EVENT_HANDLER \
-                         wt_collator=WT_COLLATOR \
-                         wt_compressor=WT_COMPRESSOR \
-                         wt_cursor_type=WT_CURSOR_TYPE \
-                         wt_extractor=WT_EXTRACTOR
+                         __wt_collator:=WT_COLLATOR \
+                         __wt_compressor:=WT_COMPRESSOR \
+                         __wt_connection:=WT_CONNECTION \
+                         __wt_cursor:=WT_CURSOR \
+                         __wt_cursor_type:=WT_CURSOR_TYPE \
+                         __wt_event_handler:=WT_EVENT_HANDLER \
+                         __wt_extension_api:=WT_EXTENSION_API \
+                         __wt_extractor:=WT_EXTRACTOR \
+                         __wt_item:=WT_ITEM \
+                         __wt_session:=WT_SESSION \
 
 # If the MACRO_EXPANSION and EXPAND_ONLY_PREDEF tags are set to YES then 
 # this tag can be used to specify a list of macro names that should be expanded. 

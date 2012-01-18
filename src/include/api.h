@@ -68,9 +68,9 @@ struct __wt_session_impl {
 
 	WT_CURSOR *cursor;		/* Current cursor */
 					/* All file cursors */
-	TAILQ_HEAD(__file_cursors, wt_cursor) file_cursors;
+	TAILQ_HEAD(__file_cursors, __wt_cursor) file_cursors;
 					/* Cursors closed with the session */
-	TAILQ_HEAD(__public_cursors, wt_cursor) public_cursors;
+	TAILQ_HEAD(__public_cursors, __wt_cursor) public_cursors;
 
 	WT_BTREE *schematab;		/* Schema tables */
 	TAILQ_HEAD(__tables, __wt_table) tables;
@@ -143,13 +143,13 @@ struct __wt_connection_impl {
 	pthread_t cache_read_tid;	/* Cache read server thread ID */
 
 					/* Locked: btree list */
-	TAILQ_HEAD(wt_btree_qh, __wt_btree) btqh;
+	TAILQ_HEAD(__wt_btree_qh, __wt_btree) btqh;
 
-	TAILQ_HEAD(
-	    __wt_fh_qh, __wt_fh) fhqh;	/* Locked: file list */
+					/* Locked: file list */
+	TAILQ_HEAD(__wt_fh_qh, __wt_fh) fhqh;
 
-	TAILQ_HEAD(__wt_dlh_qh, __wt_dlh)
-	    dlhqh;			/* Locked: library list */
+					/* Locked: library list */
+	TAILQ_HEAD(__wt_dlh_qh, __wt_dlh) dlhqh;
 
 	u_int btqcnt;			/* Locked: btree count */
 	u_int next_file_id;		/* Locked: file ID counter */

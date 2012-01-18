@@ -68,23 +68,23 @@ extern "C" {
 /*******************************************
  * Public forward structure declarations
  *******************************************/
-struct wt_collator;	    typedef struct wt_collator WT_COLLATOR;
-struct wt_compressor;	    typedef struct wt_compressor WT_COMPRESSOR;
-struct wt_connection;	    typedef struct wt_connection WT_CONNECTION;
-struct wt_cursor;	    typedef struct wt_cursor WT_CURSOR;
-struct wt_cursor_type;	    typedef struct wt_cursor_type WT_CURSOR_TYPE;
-struct wt_event_handler;    typedef struct wt_event_handler WT_EVENT_HANDLER;
-struct wt_extension_api;    typedef struct wt_extension_api WT_EXTENSION_API;
-struct wt_extractor;	    typedef struct wt_extractor WT_EXTRACTOR;
-struct wt_item;		    typedef struct wt_item WT_ITEM;
-struct wt_session;	    typedef struct wt_session WT_SESSION;
+struct __wt_collator;	    typedef struct __wt_collator WT_COLLATOR;
+struct __wt_compressor;	    typedef struct __wt_compressor WT_COMPRESSOR;
+struct __wt_connection;	    typedef struct __wt_connection WT_CONNECTION;
+struct __wt_cursor;	    typedef struct __wt_cursor WT_CURSOR;
+struct __wt_cursor_type;    typedef struct __wt_cursor_type WT_CURSOR_TYPE;
+struct __wt_event_handler;  typedef struct __wt_event_handler WT_EVENT_HANDLER;
+struct __wt_extension_api;  typedef struct __wt_extension_api WT_EXTENSION_API;
+struct __wt_extractor;	    typedef struct __wt_extractor WT_EXTRACTOR;
+struct __wt_item;	    typedef struct __wt_item WT_ITEM;
+struct __wt_session;	    typedef struct __wt_session WT_SESSION;
 
 /*!
  * A raw item of data to be managed.  Data items have a pointer to the data and
  * a length (limited to 4GB for items stored in tables).  Records consist of a
  * pair of items: a key and an associated value.
  */
-struct wt_item {
+struct __wt_item {
 	/*!
 	 * The memory reference of the data item.
 	 *
@@ -114,13 +114,13 @@ struct wt_item {
 
 #ifndef DOXYGEN
 /* Forward structure declarations */
-struct wt_buf;		    typedef struct wt_buf WT_BUF;
+struct __wt_buf;		    typedef struct __wt_buf WT_BUF;
 
 /*!
  * A data item with memory management.  Used internally to manage returned keys
  * and values in the WT_CURSOR implementation.
  */
-struct wt_buf {
+struct __wt_buf {
 	/*
 	 * Note: the first two fields must match WT_ITEM, we cast between
 	 * those types.
@@ -163,7 +163,7 @@ struct wt_buf {
  * <b>Thread safety:</b> A WT_CURSOR handle cannot be shared between threads:
  * it may only be used within the same thread as the encapsulating WT_SESSION.
  */
-struct wt_cursor {
+struct __wt_cursor {
 	WT_SESSION *session;	/*!< The session handle for this cursor. */
 
 	/*!
@@ -424,7 +424,7 @@ struct wt_cursor {
  * it may only be used within a single thread.  Each thread accessing a
  * database should open a separate WT_SESSION handle.
  */
-struct wt_session {
+struct __wt_session {
 	/*! The connection for this session. */
 	WT_CONNECTION *connection;
 
@@ -899,7 +899,7 @@ struct wt_session {
  * will communicate with the first process over a socket connection to perform
  * their operations.
  */
-struct wt_connection {
+struct __wt_connection {
 	/*! Load an extension.
 	 *
 	 * @dontinclude ex_all.c
@@ -1136,7 +1136,7 @@ const char *wiredtiger_strerror(int err);
  * information messages and progress.  Entries set to NULL are ignored and will
  * continue to use the default handlers.
  */
-struct wt_event_handler {
+struct __wt_event_handler {
 	/*!
 	 * Callback to handle error messages; by default, error messages are
 	 * written to the stderr stream.
@@ -1291,7 +1291,7 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
  * records.  Applications register their implementation with WiredTiger by
  * calling WT_CONNECTION::add_collator.
  */
-struct wt_collator {
+struct __wt_collator {
 	/*! Callback to compare keys.
 	 *
 	 * @param[out] cmp set to -1 if <code>key1 < key2</code>,
@@ -1308,7 +1308,7 @@ struct wt_collator {
  * Applications register their implementation with WiredTiger by calling
  * WT_CONNECTION::add_compressor.
  */
-struct wt_compressor {
+struct __wt_compressor {
 	/*! Callback to compress a chunk of data.
 	 *
 	 * On entry, \c src will point to memory, with the length of the memory
@@ -1389,7 +1389,7 @@ struct wt_compressor {
  * interface from multiple threads concurrently.  It is the responsibility of
  * the implementation to protect any shared data.
  */
-struct wt_cursor_type {
+struct __wt_cursor_type {
 	/*! Callback to determine how much space to allocate for a cursor.
 	 *
 	 * If the callback is NULL, no additional space is allocated in the
@@ -1411,7 +1411,7 @@ struct wt_cursor_type {
  * index keys or column group values.  Applications register implementations
  * with WiredTiger by calling WT_CONNECTION::add_extractor.
  */
-struct wt_extractor {
+struct __wt_extractor {
 	/*! Callback to extract a value for an index or column group.
 	 *
 	 * @errors

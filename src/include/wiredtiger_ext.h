@@ -23,7 +23,7 @@ extern "C" {
  * This structure is used to avoid the need to link extension modules with the
  * library.
  */
-struct wt_extension_api {
+struct __wt_extension_api {
 /* !!! To maintain backwards compatibility, this structure is append-only. */
 	/*! Put an error message on the WiredTiger error stream.  */
 	void (*err_printf)(WT_SESSION *, const char *fmt, ...);

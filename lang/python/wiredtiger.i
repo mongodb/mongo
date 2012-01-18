@@ -45,16 +45,16 @@ from packing import pack, unpack
 /* Set the return value to the returned connection, session, or cursor */
 %typemap(argout) WT_CONNECTION ** {
         $result = SWIG_NewPointerObj(SWIG_as_voidptr(*$1),
-             SWIGTYPE_p_wt_connection, 0);
+             SWIGTYPE_p___wt_connection, 0);
 }
 %typemap(argout) WT_SESSION ** {
         $result = SWIG_NewPointerObj(SWIG_as_voidptr(*$1),
-             SWIGTYPE_p_wt_session, 0);
+             SWIGTYPE_p___wt_session, 0);
 }
 
 %typemap(argout) WT_CURSOR ** {
         $result = SWIG_NewPointerObj(SWIG_as_voidptr(*$1),
-             SWIGTYPE_p_wt_cursor, 0);
+             SWIGTYPE_p___wt_cursor, 0);
         if (*$1 != NULL) {
                 (*$1)->flags |= WT_CURSTD_RAW;
                 PyObject_SetAttrString($result, "is_column",
@@ -83,9 +83,9 @@ from packing import pack, unpack
             self.this = None
 %}
 %enddef
-DESTRUCTOR(wt_connection, close)
-DESTRUCTOR(wt_cursor, close)
-DESTRUCTOR(wt_session, close)
+DESTRUCTOR(__wt_connection, close)
+DESTRUCTOR(__wt_cursor, close)
+DESTRUCTOR(__wt_session, close)
 
 /* Don't require empty config strings. */
 %typemap(default) const char *config { $1 = NULL; }
@@ -144,11 +144,11 @@ class IterableCursor:
 /*
  * Extra 'self' elimination.
  * The methods we're wrapping look like this:
- * struct wt_xxx {
+ * struct __wt_xxx {
  *    int method(WT_XXX *, ...otherargs...);
  * };
  * To SWIG, that is equivalent to:
- *    int method(wt_xxx *self, WT_XXX *, ...otherargs...);
+ *    int method(struct __wt_xxx *self, WT_XXX *, ...otherargs...);
  * and we use consecutive argument matching of typemaps to convert two args to
  * one.
  */
@@ -164,21 +164,21 @@ class IterableCursor:
 %}
 %enddef
 
-SELFHELPER(struct wt_connection)
-SELFHELPER(struct wt_session)
-SELFHELPER(struct wt_cursor)
+SELFHELPER(struct __wt_connection)
+SELFHELPER(struct __wt_session)
+SELFHELPER(struct __wt_cursor)
      
 /* WT_CURSOR customization. */
 /* First, replace the varargs get / set methods with Python equivalents. */
-%ignore wt_cursor::get_key;
-%ignore wt_cursor::set_key;
-%ignore wt_cursor::get_value;
-%ignore wt_cursor::set_value;
+%ignore __wt_cursor::get_key;
+%ignore __wt_cursor::set_key;
+%ignore __wt_cursor::get_value;
+%ignore __wt_cursor::set_value;
 
 /* SWIG magic to turn Python byte strings into data / size. */
 %apply (char *STRING, int LENGTH) { (char *data, int size) };
 
-%extend wt_cursor {
+%extend __wt_cursor {
         /* Get / set keys and values */
         void _set_key(char *data, int size) {
                 WT_ITEM k;
@@ -305,22 +305,22 @@ SELFHELPER(struct wt_cursor)
 };
 
 /* Remove / rename parts of the C API that we don't want in Python. */
-%immutable wt_cursor::session;
-%immutable wt_cursor::key_format;
-%immutable wt_cursor::value_format;
-%immutable wt_session::connection;
+%immutable __wt_cursor::session;
+%immutable __wt_cursor::key_format;
+%immutable __wt_cursor::value_format;
+%immutable __wt_session::connection;
 
-%ignore wt_buf;
-%ignore wt_collator;
-%ignore wt_connection::add_collator;
-%ignore wt_compressor;
-%ignore wt_connection::add_compressor;
-%ignore wt_cursor_type;
-%ignore wt_connection::add_cursor_type;
-%ignore wt_event_handler;
-%ignore wt_extractor;
-%ignore wt_connection::add_extractor;
-%ignore wt_item;
+%ignore __wt_buf;
+%ignore __wt_collator;
+%ignore __wt_connection::add_collator;
+%ignore __wt_compressor;
+%ignore __wt_connection::add_compressor;
+%ignore __wt_cursor_type;
+%ignore __wt_connection::add_cursor_type;
+%ignore __wt_event_handler;
+%ignore __wt_extractor;
+%ignore __wt_connection::add_extractor;
+%ignore __wt_item;
 
 %ignore wiredtiger_struct_pack;
 %ignore wiredtiger_struct_packv;
@@ -331,9 +331,9 @@ SELFHELPER(struct wt_cursor)
 
 %ignore wiredtiger_extension_init;
 
-%rename(Cursor) wt_cursor;
-%rename(Session) wt_session;
-%rename(Connection) wt_connection;
+%rename(Cursor) __wt_cursor;
+%rename(Session) __wt_session;
+%rename(Connection) __wt_connection;
 
 %include "wiredtiger.h"
 
