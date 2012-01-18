@@ -142,7 +142,9 @@ namespace mongo {
          * there are more arbiters than non-arbiters (writing to 3 out of 7
          * servers is safe if 4 of the servers are arbiters).
          */
+    private:
         void setMajority();
+    public:
         int getMajority() const;
 
         bool _constructed;
