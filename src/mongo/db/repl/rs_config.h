@@ -132,7 +132,7 @@ namespace mongo {
         /**
          * Update members' groups when the config changes but members stay the same.
          */
-        void updateMembers(List1<Member> &dest);
+        void updateMembers(List1<Member> &dest) const;
 
         BSONObj asBson() const;
 

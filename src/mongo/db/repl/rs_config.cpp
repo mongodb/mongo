@@ -93,8 +93,8 @@ namespace mongo {
         return b.obj();
     }
 
-    void ReplSetConfig::updateMembers(List1<Member> &dest) {
-        for (vector<MemberCfg>::iterator source = members.begin(); source < members.end(); source++) {
+    void ReplSetConfig::updateMembers(List1<Member> &dest) const {
+        for (vector<MemberCfg>::const_iterator source = members.begin(); source < members.end(); source++) {
             for( Member *d = dest.head(); d; d = d->next() ) {
                 if (d->fullName() == (*source).h.toString()) {
                     d->configw().groupsw() = (*source).groups();
