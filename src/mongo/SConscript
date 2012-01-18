@@ -383,15 +383,17 @@ clientTests = [
     ]
 
 # dbtests test binary
+env.StaticLibrary('testframework', ['dbtests/framework.cpp'])
+
 test = testEnv.Install(
     '#/',
-    testEnv.Program( "test", Glob( "dbtests/*.cpp" ),
-                     LIBDEPS=["mongocommon", "serveronly", "coreserver", "coredb" ] ) )
+    testEnv.Program( "test", [ f for f in Glob( "dbtests/*.cpp" ) if not str( f ).endswith( 'framework.cpp' ) ],
+                     LIBDEPS=["mongocommon", "serveronly", "coreserver", "coredb", "testframework" ] ) )
 
 if len(testEnv.subst('$PROGSUFFIX')):
     testEnv.Alias( "test", "#/${PROGPREFIX}test${PROGSUFFIX}" )
 
-env.Install( '#/', testEnv.Program( "perftest", [ "dbtests/framework.cpp", "dbtests/perf/perftest.cpp" ], LIBDEPS=["serveronly", "coreserver", "coredb"] ) )
+env.Install( '#/', testEnv.Program( "perftest", [ "dbtests/perf/perftest.cpp" ], LIBDEPS=["serveronly", "coreserver", "coredb", "testframework" ] ) )
 clientTests += [ clientEnv.Program( "clientTest", [ "client/examples/clientTest.cpp" ] ) ]
 
 env.Install( '#/', clientTests )
