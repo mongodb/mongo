@@ -923,12 +923,8 @@ struct __wt_connection {
 	 *
 	 * @dontinclude ex_all.c
 	 *
-	 * First the application must implement the WT_CURSOR_TYPE interface
-	 * as follows:
-	 *
-	 * @snippet ex_all.c Implement WT_CURSOR_TYPE
-	 *
-	 * Then the implementation is registered with WiredTiger as follows:
+	 * The application must first implement the WT_CURSOR_TYPE interface
+	 * and then register the implementation with WiredTiger as follows:
 	 *
 	 * @snippet ex_all.c Register a new cursor type
 	 *
@@ -945,12 +941,8 @@ struct __wt_connection {
 
 	/*! Add a custom collation function. @notyet{custom collation}
 	 *
-	 * First the application has to implement the WT_COLLATOR interface
-	 * as follows:
-	 *
-	 * @snippet ex_all.c Implement WT_COLLATOR
-	 *
-	 * Then the implementation is registered with WiredTiger as follows:
+	 * The application must first implement the WT_COLLATOR interface and
+	 * then register the implementation with WiredTiger as follows:
 	 *
 	 * @snippet ex_all.c Register a new collator
 	 *
@@ -966,12 +958,8 @@ struct __wt_connection {
 
 	/*! Add a compression function.
 	 *
-	 * First the application has to implement the WT_COMPRESSOR interface
-	 * as follows:
-	 *
-	 * @snippet ex_all.c Implement WT_COMPRESSOR
-	 *
-	 * Then the implementation is registered with WiredTiger as follows:
+	 * The application must first implement the WT_COMPRESSOR interface
+	 * and then register the implementation with WiredTiger as follows:
 	 *
 	 * @snippet ex_all.c Register a new compressor
 	 *
@@ -988,12 +976,8 @@ struct __wt_connection {
 	/*! Add a custom extractor for index keys or column groups.
 	 * @notyet{custom extractors}
 	 *
-	 * First the application has to implement the WT_EXTRACTOR interface
-	 * as follows:
-	 *
-	 * @snippet ex_all.c Implement WT_EXTRACTOR
-	 *
-	 * Then the implementation is registered with WiredTiger as follows:
+	 * The application must first implement the WT_EXTRACTOR interface and
+	 * then register the implementation with WiredTiger as follows:
 	 *
 	 * @snippet ex_all.c Register a new extractor
 	 *
@@ -1288,8 +1272,12 @@ const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
 
 /*!
  * The interface implemented by applications to provide custom ordering of
- * records.  Applications register their implementation with WiredTiger by
- * calling WT_CONNECTION::add_collator.
+ * records.  The following is a simple example of the collator API:
+ *
+ * @snippet ex_all.c Implement WT_COLLATOR
+ *
+ * Applications register their implementation with WiredTiger by calling
+ * WT_CONNECTION::add_collator.
  */
 struct __wt_collator {
 	/*! Callback to compare keys.
@@ -1305,6 +1293,10 @@ struct __wt_collator {
 
 /*!
  * The interface implemented by applications to provide custom compression.
+ * The following is a simple example of the compressor API:
+ *
+ * @snippet ex_all.c Implement WT_COMPRESSOR
+ *
  * Applications register their implementation with WiredTiger by calling
  * WT_CONNECTION::add_compressor.
  */
@@ -1381,9 +1373,15 @@ struct __wt_compressor {
 };
 
 /*!
- * Applications can extend WiredTiger by providing new implementation of the
- * WT_CURSOR class.  This is done by implementing the WT_CURSOR_TYPE
- * interface, then calling WT_CONNECTION::add_cursor_type.
+ * Applications can extend WiredTiger by providing new implementations of the
+ * WT_CURSOR class.
+ *
+ * The following is a simple example of the WT_CURSOR API:
+ *
+ * @snippet ex_all.c Implement WT_CURSOR_TYPE
+ *
+ * Applications register their implementation with WiredTiger by calling
+ * WT_CONNECTION::add_cursor_type.
  *
  * <b>Thread safety:</b> WiredTiger may invoke methods on the WT_CURSOR_TYPE
  * interface from multiple threads concurrently.  It is the responsibility of
@@ -1408,8 +1406,14 @@ struct __wt_cursor_type {
 
 /*!
  * The interface implemented by applications to provide custom extraction of
- * index keys or column group values.  Applications register implementations
- * with WiredTiger by calling WT_CONNECTION::add_extractor.
+ * index keys or column group values.
+ *
+ * The following is a simple example of the WT_EXTRACTOR API:
+ *
+ * @snippet ex_all.c Implement WT_EXTRACTOR
+ *
+ * Applications register implementations with WiredTiger by calling
+ * WT_CONNECTION::add_extractor.
  */
 struct __wt_extractor {
 	/*! Callback to extract a value for an index or column group.
