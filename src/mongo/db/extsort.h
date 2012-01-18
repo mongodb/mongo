@@ -36,16 +36,10 @@ namespace mongo {
         typedef pair<BSONObj,DiskLoc> Data;
  
     private:
+        static HLMutex _extSortMutex;
         IndexInterface& _idxi;
 
-        static int _compare(IndexInterface& i, const Data& l, const Data& r, const Ordering& order) { 
-            RARELY killCurrentOp.checkForInterrupt();
-            _compares++;
-            int x = i.keyCompare(l.first, r.first, order);
-            if ( x )
-                return x;
-            return l.second.compare( r.second );
-        }
+        static int _compare(IndexInterface& i, const Data& l, const Data& r, const Ordering& order);
 
         class MyCmp {
         public:
@@ -60,14 +54,7 @@ namespace mongo {
 
         static IndexInterface *extSortIdxInterface;
         static Ordering extSortOrder;
-        static int extSortComp( const void *lv, const void *rv ) {
-            DEV RARELY {                 
-                d.dbMutex.assertWriteLocked(); // must be as we use a global var
-            }
-            Data * l = (Data*)lv;
-            Data * r = (Data*)rv;
-            return _compare(*extSortIdxInterface, *l, *r, extSortOrder);
-        };
+        static int extSortComp( const void *lv, const void *rv );
 
         class FileIterator : boost::noncopyable {
         public:

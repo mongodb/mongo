@@ -17,7 +17,6 @@
 */
 
 #include "pch.h"
-
 #include "extsort.h"
 #include "namespace-inl.h"
 #include "../util/file.h"
@@ -25,15 +24,35 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <fstream>
-
 #include <boost/filesystem/convenience.hpp>
 #include <boost/filesystem/operations.hpp>
 
 namespace mongo {
 
+    HLMutex BSONObjExternalSorter::_extSortMutex('s');
     IndexInterface *BSONObjExternalSorter::extSortIdxInterface;
     Ordering BSONObjExternalSorter::extSortOrder( Ordering::make(BSONObj()) );
     unsigned long long BSONObjExternalSorter::_compares = 0;
+
+    /*static*/
+    int BSONObjExternalSorter::_compare(IndexInterface& i, const Data& l, const Data& r, const Ordering& order) { 
+        RARELY killCurrentOp.checkForInterrupt();
+        _compares++;
+        int x = i.keyCompare(l.first, r.first, order);
+        if ( x )
+            return x;
+        return l.second.compare( r.second );
+    }
+
+    /*static*/
+    int BSONObjExternalSorter::extSortComp( const void *lv, const void *rv ) {
+        DEV RARELY {
+            _extSortMutex.dassertLocked(); // must be as we use a global var
+        }
+        Data * l = (Data*)lv;
+        Data * r = (Data*)rv;
+        return _compare(*extSortIdxInterface, *l, *r, extSortOrder);
+    };
 
     BSONObjExternalSorter::BSONObjExternalSorter( IndexInterface &i, const BSONObj & order , long maxFileSize )
         : _idxi(i), _order( order.getOwned() ) , _maxFilesize( maxFileSize ) ,
@@ -62,9 +81,9 @@ namespace mongo {
     }
 
     void BSONObjExternalSorter::_sortInMem() {
-        // extSortComp needs to use glbals
+        // extSortComp needs to use glpbals
         // qsort_r only seems available on bsd, which is what i really want to use
-        dblock l;
+        HLMutex::scoped_lock lk(_extSortMutex);
         extSortIdxInterface = &_idxi;
         extSortOrder = Ordering::make(_order);
         _cur->sort( BSONObjExternalSorter::extSortComp );
