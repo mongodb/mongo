@@ -466,31 +466,39 @@ struct __wt_session {
 	 * parameter, otherwise the \c to_dup parameter should be NULL.
 	 * @notyet{to_dup}
 	 *
-	 * Cursors are commonly opened on ordinary tables.  However, cursors
-	 * can be opened on any data source, regardless of whether it is
-	 * ultimately stored in a table.  Some cursor types may have limited
-	 * functionality (for example, be read-only, or not support
-	 * transactional updates).
-	 *
-	 * The following are common builtin cursor types:
-	 * <table>
-	 *   @hrow{URI, Type}
-	 *   @row{<tt>table:[\<tablename\>]</tt>, ordinary table cursor
-	 *   		(key=table key\, value=table value)}
-	 *   @row{<tt>index:\<tablename\>.\<indexname\></tt>, index cursor
-	 *   		(key=index key\, value=table value)}
-	 *   @row{<tt>statistics:[file</tt><tt>:\<filename\>]</tt>,
-	 *   		database or table statistics
-	 *   		(key=(string)description\,
-	 *		    value=(string)value\, (uint64_t)value)}
-	 * </table>
-	 *
-	 * See @ref cursor_types and @ref cursor_ops for more information.
-	 *
 	 * @snippet ex_all.c Open a cursor
 	 *
 	 * @param session the session handle
 	 * @param uri the data source on which the cursor operates
+	 *  <br>
+	 *  Cursors are usually opened on tables, however, cursors can be
+	 *  opened on any data source, regardless of whether it is ultimately
+	 *  stored in a table.  Some cursor types may have limited
+	 *  functionality (for example, be read-only or not support
+	 *  transactional updates).  See @ref cursor_types for more
+	 *  information.
+	 *  <br>
+	 *  The following are the builtin cursor types:
+	 *  <table>
+	 *  @hrow{URI, Type}
+	 *    @row{<tt>colgroup:\<tablename\>.\<columnset\></tt>,
+	 *	column group cursor}
+	 *    @row{<tt>config:[\<uri\>]</tt>,
+	 *	object configuration cursor (key=config string\,
+	 *	value=config value}
+	 *    @row{<tt>table:\<tablename\></tt>,
+	 *	table cursor (key=table key\, value=table value)}
+	 *    @row{<tt>file:\<filename\></tt>,
+	 *	file cursor (key=file key\, value=file value)}
+	 *    @row{<tt>index:\<tablename\>.\<indexname\></tt>,
+	 *	index cursor (key=index key\, value=table value)}
+	 *    @row{<tt>join:\<cursor1\>\&\<cursor2\>[&\<cursor3\>...]</tt>,
+	 *	join cursor}
+	 *    @row{<tt>statistics:[file</tt><tt>:\<filename\>]</tt>,
+	 *	database or file statistics (key=(string)description\,
+	 *	value=(string)value\, (uint64_t)value)\, see @ref stat_desc
+	 *	for details}
+	 *  </table>
 	 * @param to_dup a cursor to duplicate
 	 * @param session the session handle
 	 * @configstart{session.open_cursor, see dist/api_data.py}

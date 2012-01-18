@@ -10,19 +10,26 @@ A cursor includes:
 
 @section cursor_types Cursor types
 
-The following are builtin cursor types:
+The following are the builtin cursor types:
+
 <table>
-@hrow{URI, Function}
-@row{<tt>table:\<tablename\></tt>, ordinary table cursor}
-@row{<tt>colgroup:\<tablename\>.\<columnset\></tt>, column group cursor}
-@row{<tt>index:\<tablename\>.\<index\></tt>, index cursor}
-@row{<tt>file</tt><tt>:\<filename\></tt>, low-level file cursor}
-@row{<tt>join:\<cursor1\>\&\<cursor2\>[&\<cursor3\>...]</tt>, Join the contents
-of multiple cursors together. @notyet{join cursors}}
-@row{<tt>config:[\<uri\>]</tt>, iterate through the configuration of an object}
-@row{<tt>statistics:[file</tt><tt>:\<filename\>]</tt>, database or file
-statistics (key=(string)fieldname\,
-data=((uint64_t)value\, (string)printvalue\, (string)description)}
+  @hrow{URI, Type}
+   @row{<tt>colgroup:\<tablename\>.\<columnset\></tt>,
+column group cursor}
+   @row{<tt>config:[\<uri\>]</tt>,
+object configuration cursor (key=config string\,
+value=config value}
+  @row{<tt>table:\<tablename\></tt>,
+table cursor (key=table key\, value=table value)}
+  @row{<tt>file:\<filename\></tt>,
+file cursor (key=file key\, value=file value)}
+  @row{<tt>index:\<tablename\>.\<indexname\></tt>,
+index cursor (key=index key\, value=table value)}
+  @row{<tt>join:\<cursor1\>\&\<cursor2\>[&\<cursor3\>...]</tt>,
+join cursor @notyet{join cursors}}
+  @row{<tt>statistics:[file</tt><tt>:\<filename\>]</tt>,
+database or file statistics (key=(string)description\,
+value=(string)value\, (uint64_t)value)}
 </table>
 
 @section cursor_projections Projections
