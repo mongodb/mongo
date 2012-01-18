@@ -259,7 +259,7 @@ int
 session_ops(WT_SESSION *session)
 {
 	unsigned long mypid = 0;
-	int exact, ret;
+	int ret;
 
 	cursor_ops(session);
 
@@ -304,11 +304,15 @@ session_ops(WT_SESSION *session)
 	/*! [session range truncate] */
 	WT_CURSOR *start, *stop;
 
+	ret = session->open_cursor(
+	    session, "table:mytable", NULL, NULL, &start);
 	start->set_key(start, "June01");
-	ret = start->search_near(start, &exact);
+	ret = start->search(start);
 
+	ret = session->open_cursor(
+	    session, "table:mytable", NULL, NULL, &stop);
 	stop->set_key(stop, "June30");
-	ret = stop->search_near(stop, &exact);
+	ret = stop->search(stop);
 
 	ret = session->truncate(session, NULL, start, stop, NULL);
 	/*! [session range truncate] */
