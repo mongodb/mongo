@@ -345,6 +345,8 @@ negint
 newname
 nl
 nlpo
+nocase
+nop
 notsup
 notyet
 np
@@ -363,6 +365,7 @@ posint
 posix
 pre
 prepended
+presize
 printf
 priv
 pthread

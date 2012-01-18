@@ -123,7 +123,7 @@ natural integer ordering under the default collator.
 
 See @subpage packing for details of WiredTiger's packing format.
 
-WiredTiger can also be extended with @ref collators "custom collators".
+WiredTiger can also be extended with @ref WT_COLLATOR.
 
 @section schema_data_access Columns in key and values
 

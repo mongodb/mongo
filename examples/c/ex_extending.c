@@ -17,7 +17,7 @@
 const char *home = "WT_TEST";
 
 /*! [case insensitive comparator] */
-/* Case insensitive comparator. */
+/* A simple case insensitive comparator. */
 static int
 __compare_nocase(WT_COLLATOR *collator, WT_SESSION *session,
     const WT_ITEM *v1, const WT_ITEM *v2, int *cmp)
@@ -37,8 +37,8 @@ static WT_COLLATOR nocasecoll = { __compare_nocase };
 
 /*! [n character comparator] */
 /*
- * Comparator that only compares the first N characters in strings.  This
- * has associated data, so we need to extend WT_COLLATOR.
+ * Comparator that only compares the first N prefix characters of the string.
+ * This has associated data, so we need to extend WT_COLLATOR.
  */
 typedef struct {
 	WT_COLLATOR iface;

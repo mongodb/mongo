@@ -105,7 +105,7 @@ Configure WiredTiger to sleep and wait for a debugger to attach on failure.
 
 @par \c --enable-bzip2
 Configure WiredTiger for <a href="http://www.bzip.org/">bzip2</a>
-compression.
+compression; see @ref compression for more information.
 
 @par \c --enable-debug
 Configure WiredTiger for debugging, including building with the
@@ -121,7 +121,7 @@ Build the WiredTiger <a href="http://www.python.org">Python</a> API.
 
 @par \c --enable-snappy
 Configure WiredTiger for <a href="http://code.google.com/p/snappy/">snappy</a>
-compression.
+compression; see @ref compression for more information.
 
 @par \c --enable-verbose
 Configure WiredTiger to support the \c verbose configuration string to

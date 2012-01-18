@@ -258,10 +258,8 @@ cursor_search_near(WT_CURSOR *cursor)
 int
 session_ops(WT_SESSION *session)
 {
-	WT_CURSOR *c1, *c2;
-	int ret;
-
-	c1 = c2 = NULL;
+	unsigned long mypid = 0;
+	int exact, ret;
 
 	cursor_ops(session);
 
@@ -270,40 +268,80 @@ session_ops(WT_SESSION *session)
 	    "key_format=S,value_format=S");
 	/*! [Create a table] */
 
-	ret = session->rename(session, "table:old", "table:new", NULL);
+	/*! [session checkpoint] */
+	ret = session->checkpoint(session, NULL);
+	/*! [session checkpoint] */
 
+	/*! [session drop] */
 	ret = session->drop(session, "table:mytable", NULL);
+	/*! [session drop] */
 
+	/*! [session dumpfile] */
+	ret = session->dumpfile(session, "file:myfile", NULL);
+	/*! [session dumpfile] */
+
+	/*! [session msg_printf] */
+	ret = session->msg_printf(session, "process pid %lu", mypid);
+	/*! [session msg_printf] */
+
+	/*! [session rename] */
+	ret = session->rename(session, "table:old", "table:new", NULL);
+	/*! [session rename] */
+
+	/*! [session salvage] */
+	ret = session->salvage(session, "table:mytable", NULL);
+	/*! [session salvage] */
+
+	/*! [session sync] */
 	ret = session->sync(session, "table:mytable", NULL);
+	/*! [session sync] */
 
+	/*! [session truncate] */
 	ret = session->truncate(session, "table:mytable", NULL, NULL, NULL);
+	/*! [session truncate] */
 
 	{
-	/*! [Truncate cursor] */
+	/*! [session range truncate] */
 	WT_CURSOR *start, *stop;
 
-	start = c1;
-	stop = c2;
+	start->set_key(start, "June01");
+	ret = start->search_near(start, &exact);
+
+	stop->set_key(stop, "June30");
+	ret = stop->search_near(stop, &exact);
+
 	ret = session->truncate(session, NULL, start, stop, NULL);
-	/*! [Truncate cursor] */
+	/*! [session range truncate] */
 	}
 
+	/*! [session upgrade] */
+	ret = session->upgrade(session, "table:mytable", NULL);
+	/*! [session upgrade] */
+
+	/*! [session verify] */
 	ret = session->verify(session, "table:mytable", NULL);
+	/*! [session verify] */
 
+	/*! [session begin transaction] */
 	ret = session->begin_transaction(session, NULL);
+	/*! [session begin transaction] */
 
+	/*! [session commit transaction] */
 	ret = session->commit_transaction(session, NULL);
+	/*! [session commit transaction] */
 
+	/*! [session rollback transaction] */
 	ret = session->rollback_transaction(session, NULL);
+	/*! [session rollback transaction] */
 
-	ret = session->checkpoint(session, NULL);
-
+	/*! [session close] */
 	ret = session->close(session, NULL);
+	/*! [session close] */
 
 	return (ret);
 }
 
-/*! [Implement WT_CURSOR_TYPE] */
+/*! [WT_CURSOR_TYPE size] */
 static int
 my_cursor_size(WT_CURSOR_TYPE *ctype, const char *obj, size_t *sizep)
 {
@@ -313,7 +351,9 @@ my_cursor_size(WT_CURSOR_TYPE *ctype, const char *obj, size_t *sizep)
 	*sizep = sizeof (WT_CURSOR);
 	return (0);
 }
+/*! [WT_CURSOR_TYPE size] */
 
+/*! [WT_CURSOR_TYPE init] */
 static int
 my_init_cursor(WT_CURSOR_TYPE *ctype, WT_SESSION *session,
     const char *obj, WT_CURSOR *old_cursor, const char *config,
@@ -329,22 +369,25 @@ my_init_cursor(WT_CURSOR_TYPE *ctype, WT_SESSION *session,
 
 	return (0);
 }
-/*! [Implement WT_CURSOR_TYPE] */
+/*! [WT_CURSOR_TYPE init] */
 
 int
 add_cursor_type(WT_CONNECTION *conn)
 {
 	int ret;
 
-	/*! [Register a new cursor type] */
+	/*! [WT_CURSOR_TYPE register] */
 	static WT_CURSOR_TYPE my_ctype = { my_cursor_size, my_init_cursor };
 	ret = conn->add_cursor_type(conn, NULL, &my_ctype, NULL);
-	/*! [Register a new cursor type] */
+	/*! [WT_CURSOR_TYPE register] */
 
 	return (ret);
 }
 
 /*! [Implement WT_COLLATOR] */
+/*
+ * A simple example of the collator API: compare the keys as strings.
+ */
 static int
 my_compare(WT_COLLATOR *collator, WT_SESSION *session,
     const WT_ITEM *value1, const WT_ITEM *value2, int *cmp)
@@ -370,15 +413,18 @@ add_collator(WT_CONNECTION *conn)
 {
 	int ret;
 
-	/*! [Register a new collator] */
+	/*! [WT_COLLATOR register] */
 	static WT_COLLATOR my_collator = { my_compare };
 	ret = conn->add_collator(conn, "my_collator", &my_collator, NULL);
-	/*! [Register a new collator] */
+	/*! [WT_COLLATOR register] */
 
 	return (ret);
 }
 
-/*! [Implement WT_COMPRESSOR] */
+/*! [WT_COMPRESSOR compress] */
+/*
+ * A simple compression example that passes data through unchanged.
+ */
 static int
 my_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
     uint8_t *src, size_t src_len,
@@ -398,7 +444,12 @@ my_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	*result_lenp = src_len;
 	return (0);
 }
+/*! [WT_COMPRESSOR compress] */
 
+/*! [WT_COMPRESSOR decompress] */
+/*
+ * A simple decompression example that passes data through unchanged.
+ */
 static int
 my_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
     uint8_t *src, size_t src_len,
@@ -416,7 +467,12 @@ my_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	*result_lenp = src_len;
 	return (0);
 }
+/*! [WT_COMPRESSOR decompress] */
 
+/*! [WT_COMPRESSOR presize] */
+/*
+ * A simple pre-size example that returns the source length.
+ */
 static int
 my_pre_size(WT_COMPRESSOR *compressor, WT_SESSION *session,
     uint8_t *src, size_t src_len,
@@ -430,23 +486,23 @@ my_pre_size(WT_COMPRESSOR *compressor, WT_SESSION *session,
 	*result_lenp = src_len;
 	return (0);
 }
-/*! [Implement WT_COMPRESSOR] */
+/*! [WT_COMPRESSOR presize] */
 
 int
 add_compressor(WT_CONNECTION *conn)
 {
 	int ret;
 	
-	/*! [Register a new compressor] */
+	/*! [WT_COMPRESSOR register] */
 	static WT_COMPRESSOR my_compressor = {
 	    my_compress, my_decompress, my_pre_size };
 	ret = conn->add_compressor(conn, "my_compress", &my_compressor, NULL);
-	/*! [Register a new compressor] */
+	/*! [WT_COMPRESSOR register] */
 
 	return (ret);
 }
 
-/*! [Implement WT_EXTRACTOR] */
+/*! [WT_EXTRACTOR] */
 static int
 my_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
     const WT_ITEM *key, const WT_ITEM *value,
@@ -460,18 +516,18 @@ my_extract(WT_EXTRACTOR *extractor, WT_SESSION *session,
 	*result = *value;
 	return (0);
 }
-/*! [Implement WT_EXTRACTOR] */
+/*! [WT_EXTRACTOR] */
 
 int
 add_extractor(WT_CONNECTION *conn)
 {
 	int ret;
 
-	/*! [Register a new extractor] */
+	/*! [WT_EXTRACTOR register] */
 	static WT_EXTRACTOR my_extractor;
 	my_extractor.extract = my_extract;
 	ret = conn->add_extractor(conn, "my_extractor", &my_extractor, NULL);
-	/*! [Register a new extractor] */
+	/*! [WT_EXTRACTOR register] */
 
 	return (ret);
 }
@@ -481,15 +537,21 @@ connection_ops(WT_CONNECTION *conn)
 {
 	int ret;
 
+	/*! [conn load extension] */
 	ret = conn->load_extension(conn, "my_extension.dll", NULL);
+	/*! [conn load extension] */
 
 	add_cursor_type(conn);
 	add_collator(conn);
 	add_extractor(conn);
 
+	/*! [conn close] */
 	ret = conn->close(conn, NULL);
+	/*! [conn close] */
 
-	printf("The home is %s\n", conn->get_home(conn));
+	/*! [conn get_home] */
+	printf("The database home is %s\n", conn->get_home(conn));
+	/*! [conn get_home] */
 
 	/*! [is_new] */
 	if (conn->is_new(conn)) {

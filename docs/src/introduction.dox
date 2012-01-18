@@ -1,8 +1,8 @@
 /*! @mainpage Reference Guide
 
-The WiredTiger Data Store is an extensible platform for data management.
-This documentation describes the programming interface to WiredTiger
-used by developers to construct applications.
+WiredTiger is an extensible platform for data management.  This
+documentation describes the programming interface to WiredTiger used by
+developers to construct applications.
 
 We follow SQL terminology: a database is set of tables managed together.
 Tables consist of rows, where each row is a key and its associated
@@ -24,17 +24,5 @@ For more information about using WiredTiger, see:
 - @ref wt "WiredTiger API reference manual"
 
 - @subpage command_line\n
-
-- @subpage extending\n
-
-- @ref wt_ext "WiredTiger extensions API reference manual"
-
-- @subpage security
-
-- @subpage file_formats
-
-- @subpage name_space
-
-- @subpage signals
 
 */
