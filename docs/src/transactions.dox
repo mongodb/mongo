@@ -3,7 +3,7 @@
 @notyet{transactions}
 <b>This page describes the expected behavior of the 2.X releases.</b>
 
-@section transactions_acid The ACID properties.
+@section transactions_acid ACID properties
 
 Transactions provide a powerful abstraction for multiple threads to operate
 on data concurrently because they have the following properties:
@@ -15,7 +15,7 @@ on data concurrently because they have the following properties:
 - Isolation: developers can reason about transactions independently.
 - Durability: once a transaction commits, its updates are saved.
 
-@section transactions_api The Transaction API
+@section transactions_api Transactional API
 
 To configure for transactions, the database must be created with
 transaction support enabled.  This is done by passing the configuration
@@ -35,13 +35,13 @@ as ::WT_DEADLOCK.
 
 @todo describe transaction error cases more fully
 
-@section transactions_cc Concurrency Control
+@section transactions_cc Concurrency control
 
 WiredTiger uses an optimistic concurrency control algorithm.  This avoids
 the bottleneck of a centralized lock manager and expensive graph searching
 to identify deadlock cycles.
 
-@section transaction_isolation Isolation Levels
+@section transaction_isolation Isolation levels
 
 The default isolation level is <code>serializable</code>, which means that
 the concurrent execution of committed transactions is equivalent to
@@ -72,7 +72,7 @@ of work required during recovery, which speeds up the ::wiredtiger_open
 call.  See WT_SESSION::checkpoint for information about triggering
 checkpoints.
 
-@section transaction_example Code Samples
+@section transaction_example Code samples
 
 The code below is taken from the complete example program
 @ex_ref{ex_transaction.c}.

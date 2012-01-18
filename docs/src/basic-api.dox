@@ -59,7 +59,7 @@ code passed as its argument).  More complex error handling can be
 configured by passing an implementation of WT_ERROR_HANDLER to
 wiredtiger_open or WT_CONNECTION::open_session.
 
-@section basic_create_table Creating a Table
+@section basic_create_table Creating a table
 
 If the database was created by the ::wiredtiger_open call above, it will be
 empty.  We now create a table that we can use to store data:
@@ -70,7 +70,7 @@ This call creates a table called @c "access", configured to use strings for
 its key and value columns.  We go into more details about what is possible
 later in the section on @ref schema.
 
-@section basic_cursors Accessing Data With Cursors
+@section basic_cursors Accessing data With cursors
 
 Now that we're sure we have a table, we open a cursor to perform some
 operations on it:
@@ -105,7 +105,7 @@ would simplify to:
 	}
 @endcode
 
-@section basic_close Closing Handles
+@section basic_close Closing handles
 
 Lastly, we close the connection, which implicitly closes the cursor and
 session handles:

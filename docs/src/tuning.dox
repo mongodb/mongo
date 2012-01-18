@@ -1,6 +1,6 @@
 /*! @page tuning Performance Tuning
 
-@section statistics Performance Monitoring with Statistics
+@section statistics Performance monitoring with statistics
 
 WiredTiger maintains a variety of statistics that can be read with a
 cursor.  The statistics are at two levels: per-database statistics and
@@ -31,7 +31,7 @@ statistics until the cursor returns the end of the list.
 Note the raw value of the statistic is available from the /c value
 field, as well as a printable string version of the value.
 
-@section cache Cache Size
+@section cache Cache size
 
 The cache size for the database is configurable by setting the \c
 cache_size configuration string when calling the ::wiredtiger_open
@@ -46,7 +46,7 @@ An example of setting a cache size to 10MB:
 @skipline wiredtiger_open
 @until wiredtiger_strerror
 
-@section page Page and Overflow Sizes
+@section page Page and overflow sizes
 
 There are four page and item size configuration values: \c internal_page_max,
 \c internal_item_max, \c leaf_page_max and \c leaf_item_max.  All four should

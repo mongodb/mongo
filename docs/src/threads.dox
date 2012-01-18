@@ -18,7 +18,7 @@ no built-in synchronization of session state either, so if multiple threads
 access a session handle or dependencies such as cursors, the access must be
 serialized by the application.
 
-@section threads_example Code Samples
+@section threads_example Code samples
 
 The code below is taken from the complete example program
 @ex_ref{ex_thread.c}.

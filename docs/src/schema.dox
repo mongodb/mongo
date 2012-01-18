@@ -3,7 +3,7 @@
 While many tables have simple key/value pairs for records, WiredTiger
 also supports more complex data patterns.
 
-@section schema_intro Tables, Rows and Columns
+@section schema_intro Tables, rows and columns
 
 A table is a logical representation of data consisting of cells in rows and
 columns.  For example, a database might have this table.
@@ -144,14 +144,14 @@ projection is specified to WT_SESSION::open_cursor.  WT_CURSOR::set_value is
 used to set value columns, and WT_CURSOR::get_value is used to get value
 columns.
 
-@section schema_columns Describing Columns
+@section schema_columns Describing columns
 
 The columns in a table can be assigned names by passing a \c columns key to
 WT_SESSION::create.  The column names are assigned first to the columns in
 the \c key_format, and then to the columns in \c value_format.  There must be
 a name for every column, and no column names may be repeated.
 
-@section schema_column_groups Storing Groups of Columns Together
+@section schema_column_groups Storing groups of columns together
 
 Once column names are assigned, they can be used to configure column groups,
 where groups of columns are stored in separate files.
@@ -169,7 +169,7 @@ so there is no repetition of keys across multiple files.  Also note that key
 columns cannot be stored in column group values: they can be retrieved with
 WT_CURSOR::get_key.
 
-@section schema_indices Adding an Index
+@section schema_indices Adding an index
 
 Schema columns can also be used to configure indices on tables.  To create an
 index, call WT_SESSION::create using the URI
@@ -183,7 +183,7 @@ for WT_CURSOR::get_key and WT_CURSOR::set_key, and by default return all of
 the table value columns in WT_CURSOR::get_value.  Index cursors are
 read-only: they cannot be used to perform updates.
 
-@section schema_examples Code Samples
+@section schema_examples Code samples
 
 The code below is taken from the complete example program
 @ex_ref{ex_schema.c}.

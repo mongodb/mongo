@@ -10,7 +10,7 @@ The server can be embedded in an application or run from the command line.  To e
 
 For details on running a standalone RPC server, see @ref utility.
 
-@section processes_sharing Opening Connections from Multiple Processes
+@section processes_sharing Opening connections from multiple processes
 
 When ::wiredtiger_open is called for a database, one of the following occurs:
 
@@ -19,7 +19,7 @@ When ::wiredtiger_open is called for a database, one of the following occurs:
 # another process has the database open and is running the RPC server, in which case the opening process becomes a client.
 # another process has the database open but is not running the RPC server, in which case the open fails.
 
-@section processes_example Code Samples
+@section processes_example Code samples
 
 The code below is taken from the complete example program @ex_ref{ex_process.c}.
 

@@ -1,10 +1,10 @@
 /*! @page extending Extending WiredTiger
 
-@section modules Loadable Modules
+@section modules Loadable modules
 
 @todo describe loadable modules
 
-@section adding_cursor_types Adding Cursor Types
+@section adding_cursor_types Adding cursor types
 
 - @subpage stat_desc
 
@@ -20,7 +20,7 @@
 
 - @subpage compression
 
-@section extractors Custom Field Extractors
+@section extractors Custom field extractors
 
 @todo explain custom extractors
 

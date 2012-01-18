@@ -47,7 +47,7 @@ run with permissions other than the user's.  Such applications are
 potentially vulnerable to allowing users access to databases they could
 not otherwise access.
 
-@section home_config Home Directory Configuration Strings
+@section home_config Home directory configuration strings
 
 The WiredTiger home directory optionally includes a file named \c
 WiredTiger.config.  If this file exists when ::wiredtiger_open is

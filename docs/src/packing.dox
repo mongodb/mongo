@@ -26,7 +26,7 @@ The remaining characters in the format string specify the type of each field to 
 
 @todo Describe the variable-length integer packing in sufficient detail that it can be re-implemented in other programming languages or in network clients.
 
-@section config_examples Code Samples
+@section config_examples Code samples
 
 The code below is taken from the complete example program @ex_ref{ex_pack.c}.  It demonstrates how to pack three integer values into a buffer and then unpack them again.
 
