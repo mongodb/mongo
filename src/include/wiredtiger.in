@@ -114,7 +114,7 @@ struct __wt_item {
 
 #ifndef DOXYGEN
 /* Forward structure declarations */
-struct __wt_buf;		    typedef struct __wt_buf WT_BUF;
+struct __wt_buf;		typedef struct __wt_buf WT_BUF;
 
 /*!
  * A data item with memory management.  Used internally to manage returned keys
@@ -394,7 +394,7 @@ struct __wt_cursor {
 	struct {
 		WT_CURSOR *tqe_next;
 		WT_CURSOR **tqe_prev;
-	} q;                            /* Linked list of WT_CURSORs. */
+	} q;				/* Linked list of WT_CURSORs. */
 
 	uint64_t recno;
 	uint8_t raw_recno_buf[WT_INTPACK64_MAXSIZE];
@@ -1030,14 +1030,14 @@ struct __wt_connection {
 	 */
 	const char *__F(get_home)(WT_CONNECTION *connection);
 
-	/*! Did opening this handle create the database?
+	/*! Return if opening this handle created the database.
 	 *
 	 * @snippet ex_all.c is_new
 	 *
 	 * @param connection the connection handle
 	 * @returns false (zero) if the connection existed before the call to
-	 *    ::wiredtiger_open, true (non-zero) if it was created by opening
-	 *    this handle.
+	 * ::wiredtiger_open, true (non-zero) if it was created by opening this
+	 * handle.
 	 */
 	int __F(is_new)(WT_CONNECTION *connection);
 
