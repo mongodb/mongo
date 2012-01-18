@@ -38,3 +38,6 @@ assert.eq( 1, t.find().max( { a: 1, b: 1.5 } ).hint( { a: 1, b: -1 } ).toArray()
 assert.throws( function() { t.find().min( { a: 1 } ).hint( { a: 1, b: -1 } ).toArray() } );
 assert.throws( function() { t.find().min( { a: 1, b: 1 } ).max( { a: 1 } ).hint( { a: 1, b: -1 } ).toArray() } );
 assert.throws( function() { t.find().min( { b: 1 } ).max( { a: 1, b: 2 } ).hint( { a: 1, b: -1 } ).toArray() } );
+assert.throws( function() { t.find().min( { a: 1 } ).hint( { $natural: 1 } ).toArray() } );
+assert.throws( function() { t.find().max( { a: 1 } ).hint( { $natural: 1 } ).toArray() } );
+
