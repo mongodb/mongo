@@ -664,8 +664,8 @@ elif "win32" == os.sys.platform:
     #else:
     #    env.Append( CPPDEFINES=["_X86_=1"] )
 
-    env.Append( EXTRACPPPATH=["../winpcap/Include"] )
-    env.Append( EXTRALIBPATH=["../winpcap/Lib"] )
+    env.Append( EXTRACPPPATH=["#/../winpcap/Include"] )
+    env.Append( EXTRALIBPATH=["#/../winpcap/Lib"] )
 
 else:
     print( "No special config for [" + os.sys.platform + "] which probably means it won't work" )
@@ -739,8 +739,8 @@ if nix:
         os.unlink( env.File("$BUILD_DIR/mongo/pch.h.$GCHSUFFIX").abspath ) # gcc uses the file if it exists
 
 if usev8:
-    env.Prepend( EXTRACPPPATH=["../v8/include/"] )
-    env.Prepend( EXTRALIBPATH=["../v8/"] )
+    env.Prepend( EXTRACPPPATH=["#/../v8/include/"] )
+    env.Prepend( EXTRALIBPATH=["#/../v8/"] )
 
 if "uname" in dir(os):
     hacks = buildscripts.findHacks( os.uname() )
