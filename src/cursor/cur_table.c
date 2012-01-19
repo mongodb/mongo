@@ -103,61 +103,29 @@ err:	API_END(session);
 void
 __wt_curtable_set_key(WT_CURSOR *cursor, ...)
 {
-	WT_BUF *buf;
-	WT_CURSOR **cp;
+	WT_CURSOR **cp, *primary;
 	WT_CURSOR_TABLE *ctable;
-	WT_ITEM *item;
-	WT_SESSION_IMPL *session;
-	const char *fmt, *str;
-	size_t sz;
 	va_list ap;
-	int i, ret;
+	int i;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
-	CURSOR_API_CALL(cursor, session, set_key, NULL);
 	cp = ctable->cg_cursors;
+	primary = *cp++;
 
 	va_start(ap, cursor);
-	fmt = F_ISSET(cursor,
-	    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW) ?
-	    "u" : cursor->key_format;
-	/* Fast path some common cases: single strings or byte arrays. */
-	if (strcmp(fmt, "r") == 0) {
-		cursor->recno = va_arg(ap, uint64_t);
-		cursor->key.data = &cursor->recno;
-		sz = sizeof(cursor->recno);
-	} else if (strcmp(fmt, "S") == 0) {
-		str = va_arg(ap, const char *);
-		sz = strlen(str) + 1;
-		cursor->key.data = (void *)str;
-	} else if (strcmp(fmt, "u") == 0) {
-		item = va_arg(ap, WT_ITEM *);
-		sz = item->size;
-		cursor->key.data = (void *)item->data;
-	} else {
-		buf = &cursor->key;
-		sz = __wt_struct_sizev(session, cursor->key_format, ap);
-		va_end(ap);
-		va_start(ap, cursor);
-		if ((ret = __wt_buf_initsize(session, buf, sz)) != 0 ||
-		    (ret = __wt_struct_packv(session, buf->mem, sz,
-		    cursor->key_format, ap)) != 0) {
-			(*cp)->saved_err = ret;
-			F_CLR(*cp, WT_CURSTD_KEY_SET);
-			goto err;
-		}
-	}
-	cursor->key.size = WT_STORE_SIZE(sz);
+	__wt_cursor_set_keyv(primary, cursor->flags, ap);
 	va_end(ap);
 
-	for (i = 0; i < WT_COLGROUPS(ctable->table); i++, cp++) {
-		(*cp)->recno = cursor->recno;
-		(*cp)->key.data = cursor->key.data;
-		(*cp)->key.size = cursor->key.size;
+	if (!F_ISSET(primary, WT_CURSTD_KEY_SET))
+		return;
+
+	/* Copy the primary key to the other cursors. */
+	for (i = 1; i < WT_COLGROUPS(ctable->table); i++, cp++) {
+		(*cp)->recno = primary->recno;
+		(*cp)->key.data = primary->key.data;
+		(*cp)->key.size = primary->key.size;
 		F_SET(*cp, WT_CURSTD_KEY_SET);
 	}
-
-err:	API_END(session);
 }
 
 /*

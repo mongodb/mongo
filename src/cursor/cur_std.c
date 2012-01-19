@@ -101,26 +101,39 @@ err:	API_END(session);
 }
 
 /*
- * __wt_cursor_set_key --
+ * __wt_cursor_set_keyv --
  *	WT_CURSOR->set_key default implementation.
  */
 void
 __wt_cursor_set_key(WT_CURSOR *cursor, ...)
 {
+	va_list ap;
+
+	va_start(ap, cursor);
+	__wt_cursor_set_keyv(cursor, cursor->flags, ap);
+	va_end(ap);
+}
+
+/*
+ * __wt_cursor_set_keyv --
+ *	WT_CURSOR->set_key default implementation.
+ */
+void
+__wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap)
+{
 	WT_SESSION_IMPL *session;
 	WT_BUF *buf;
 	WT_ITEM *item;
+	va_list ap_copy;
 	const char *fmt, *str;
 	size_t sz;
-	va_list ap;
 	int ret;
 
 	CURSOR_API_CALL(cursor, session, set_key, NULL);
 
-	va_start(ap, cursor);
 	/* Fast path some common cases: single strings or byte arrays. */
 	if (WT_CURSOR_RECNO(cursor)) {
-		if (F_ISSET(cursor, WT_CURSTD_RAW)) {
+		if (LF_ISSET(WT_CURSTD_RAW)) {
 			item = va_arg(ap, WT_ITEM *);
 			WT_ERR(__wt_struct_unpack(session,
 			    item->data, item->size, "q", &cursor->recno));
@@ -133,7 +146,7 @@ __wt_cursor_set_key(WT_CURSOR *cursor, ...)
 		sz = sizeof(cursor->recno);
 	} else {
 		fmt = cursor->key_format;
-		if (F_ISSET(cursor,
+		if (LF_ISSET(
 		    WT_CURSTD_DUMP_HEX | WT_CURSTD_DUMP_PRINT | WT_CURSTD_RAW))
 			fmt = "u";
 		if (strcmp(fmt, "S") == 0) {
@@ -146,12 +159,15 @@ __wt_cursor_set_key(WT_CURSOR *cursor, ...)
 			cursor->key.data = (void *)item->data;
 		} else {
 			buf = &cursor->key;
-			sz = __wt_struct_sizev(session, cursor->key_format, ap);
-			va_end(ap);
-			va_start(ap, cursor);
+
+			va_copy(ap_copy, ap);
+			sz = __wt_struct_sizev(
+			    session, cursor->key_format, ap_copy);
+			va_end(ap_copy);
+
 			WT_ERR(__wt_buf_initsize(session, buf, sz));
-			WT_ERR(__wt_struct_packv(session, buf->mem, sz,
-			    cursor->key_format, ap));
+			WT_ERR(__wt_struct_packv(
+			    session, buf->mem, sz, cursor->key_format, ap));
 		}
 	}
 	if (sz == 0)
@@ -167,7 +183,6 @@ err:		cursor->saved_err = ret;
 		F_CLR(cursor, WT_CURSTD_KEY_SET);
 	}
 
-	va_end(ap);
 	API_END(session);
 }
 
