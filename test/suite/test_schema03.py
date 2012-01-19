@@ -2,7 +2,7 @@
 #
 # See the file LICENSE for redistribution information.
 #
-# Copyright (c) 2008-2011 WiredTiger, Inc.
+# Copyright (c) 2008-2012 WiredTiger, Inc.
 #	All rights reserved.
 #
 # test_schema03.py
@@ -55,6 +55,8 @@ class tabconfig:
                 keys.append(str(rev))
             elif format == 'i':
                 keys.append(rev)
+            elif format == 'r':
+                keys.append(long(i+1))
         return keys
 
     def gen_values(self, i):
@@ -112,7 +114,7 @@ class tabconfig:
         # more columns.
         for idx in self.idxlist:
             prob = 1.0
-            for i in range(0, ncolumns - startcol - 1):
+            for i in range(0, ncolumns - startcol):
                 if rand.rand_float() > prob:
                     break
                 colno = collist[rand.rand_range(startcol, ncolumns)]
@@ -220,7 +222,7 @@ class test_schema03(wttest.WiredTigerTestCase):
     # We need to have a large number of open files available
     # to run this test.  We probably don't need quite this many,
     # but boost it up to this limit anyway.
-    OPEN_FILE_LIMIT = 4096
+    OPEN_FILE_LIMIT = 8192
 
     restart_scenarios = [('table', dict(s_restart=['table'],P=0.3)),
                          ('colgroup0', dict(s_restart=['colgroup0'],P=0.3)),
@@ -242,15 +244,16 @@ class test_schema03(wttest.WiredTigerTestCase):
 
     all_scenarios = wtscenario.multiply_scenarios('_', restart_scenarios, ntable_scenarios, ncolgroup_scenarios, nindex_scenarios)
 
+    # Prune the scenarios according to the probabilities given above.
     scenarios = wtscenario.prune_scenarios(all_scenarios)
     scenarios = wtscenario.number_scenarios(scenarios)
-    print 'test_schema03: running ' + str(len(scenarios)) + ' scenarios'
 
-    # TODO: reduce the set to one for initial debugging
-#    scenarios = [ scenarios[0], scenarios[30], scenarios[40], scenarios[50] ]
-    scenarios = [ scenarios[40] ]
-#    scenarios = [ scenarios[30] ]
-#    scenarios = [ scenarios[0] ]
+    # Note: the set can be reduced here for debugging, e.g.
+    # scenarios = [ scenarios[40] ]
+    #   or
+    # scenarios = [ scenarios[0], scenarios[30], scenarios[40] ]
+
+    print 'test_schema03: running ' + str(len(scenarios)) + ' scenarios'
 
     # This test requires a large number of open files.
     # Increase our resource limits before we start
@@ -263,7 +266,7 @@ class test_schema03(wttest.WiredTigerTestCase):
     def setUpConnectionOpen(self, dir):
         cs = 10 * 1024 * 1024
         conn = wiredtiger.wiredtiger_open(dir, 'create,cache_size=' +
-                                          str(cs) + ',hazard_max=100')
+                                          str(cs) + ',hazard_max=300')
         self.pr(`conn`)
         return conn
         
