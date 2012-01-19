@@ -27,6 +27,8 @@ WiredTiger
 WiredTiger's
 aR
 ack'ed
+alloc
+allocsize
 ao
 api
 apiflags
@@ -115,6 +117,9 @@ html
 huffman
 indices
 init
+intl
+inuse
+io
 ip
 je
 jni
@@ -139,6 +144,12 @@ lt
 malloc'd
 marshalled
 marshalling
+maxintlitem
+maxintlpage
+maxleafitem
+maxleafpage
+memalloc
+memfree
 memp
 metadata
 minkey
@@ -193,6 +204,7 @@ pthread
 pthreads
 qnx
 rdbms
+rdlock
 readlock
 readonly
 realclean
@@ -260,5 +272,6 @@ wiredtiger
 workQ
 writelock
 writelocks
+wrlock
 xa
 yieldcpu

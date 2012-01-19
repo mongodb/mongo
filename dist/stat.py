@@ -8,7 +8,7 @@ from dist import source_paths_list
 # Read the source files.
 from stat_data import btree_stats, connection_stats
 
-# print_def --
+# print_struct --
 #	Print the structures for the stat.h file.
 def print_struct(title, name, list):
 	f.write('/*\n')
@@ -20,8 +20,6 @@ def print_struct(title, name, list):
 	# disply is sorted by string.
 	for l in sorted(list, key=attrgetter('desc')):
 		f.write('\tWT_STATS ' + l.name + ';\n')
-
-	f.write('\tWT_STATS __end;\n')
 	f.write('};\n\n')
 
 # Update the #defines in the stat.h file.
@@ -42,6 +40,43 @@ for line in open('../src/include/stat.h', 'r'):
 f.close()
 compare_srcfile(tmp_file, '../src/include/stat.h')
 
+# print_define --
+#	Print the #defines for the wiredtiger.in file.
+def print_define():
+	# Sort the structure fields by their description so they match
+	# the structure lists.
+	v = 0
+	for l in sorted(connection_stats, key=attrgetter('desc')):
+		f.write('#define\tWT_STAT_' + l.name + "\t" *
+		    max(1, 6 - int((len('WT_STAT_') + len(l.name)) / 8)) +
+		    str(v) + '\n')
+		v = v + 1
+	f.write('\n')
+	v = 0
+	for l in sorted(btree_stats, key=attrgetter('desc')):
+		f.write('#define\tWT_STAT_' + l.name + "\t" *
+		    max(1, 6 - int((len('WT_STAT_') + len(l.name)) / 8)) +
+		    str(v) + '\n')
+		v = v + 1
+
+# Update the #defines in the wiredtiger.in file.
+tmp_file = '__tmp'
+f = open(tmp_file, 'w')
+skip = 0
+for line in open('../src/include/wiredtiger.in', 'r'):
+	if not skip:
+		f.write(line)
+	if line.count('Statistics section: END'):
+		f.write(line)
+		skip = 0
+	elif line.count('Statistics section: BEGIN'):
+		f.write(' */\n')
+		skip = 1
+		print_define()
+		f.write('/*\n')
+f.close()
+compare_srcfile(tmp_file, '../src/include/wiredtiger.in')
+
 # print_func --
 #	Print the functions for the stat.c file.
 def print_func(name, list):
@@ -57,7 +92,6 @@ __wt_stat_alloc_''' + name + '''_stats(WT_SESSION_IMPL *session, WT_''' +
 ''')
 
 	for l in sorted(list):
-		f.write('\tstats->' + l.name + '.name = "' + l.name + '";\n')
 		o = '\tstats->' + l.name + '.desc = "' + l.desc + '";\n'
 		if len(o) + 7  > 80:
 			o = o.replace('= ', '=\n\t    ')
@@ -99,12 +133,12 @@ compare_srcfile(tmp_file, '../src/support/stat.c')
 #	Print the tables for the dox file.
 def print_dox(name, list):
 	f.write('<table>\n')
-	f.write('@hrow{' + name + ' Statistics}\n')
+	f.write('@hrow{Key,Description}\n')
 
 	# Sort the structure fields by their description, so the eventual
 	# disply is sorted by string.
 	for l in sorted(list, key=attrgetter('desc')):
-		f.write('@row{' + l.desc + '}\n')
+		f.write('@row{' + 'WT_STAT_' + l.name + "," + l.desc + '}\n')
 	f.write('</table>\n\n')
 
 # Update dox file

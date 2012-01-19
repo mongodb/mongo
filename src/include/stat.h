@@ -6,7 +6,6 @@
  */
 
 struct __wt_stats {
-	const char	*name;				/* field name */
 	const char	*desc;				/* text description */
 	uint64_t	 v;				/* 64-bit value */
 };
@@ -94,7 +93,6 @@ struct __wt_btree_stats {
 	WT_STATS file_row_int_pages;
 	WT_STATS file_row_leaf_pages;
 	WT_STATS file_entries;
-	WT_STATS __end;
 };
 
 /*
@@ -119,7 +117,6 @@ struct __wt_connection_stats {
 	WT_STATS memfree;
 	WT_STATS total_read_io;
 	WT_STATS total_write_io;
-	WT_STATS __end;
 };
 
 /* Statistics section: END */

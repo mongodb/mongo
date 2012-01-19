@@ -419,8 +419,7 @@ wts_stats(void)
 	}
 	while (
 	    (ret = cursor->next(cursor)) == 0 &&
-	    (ret = cursor->get_key(cursor, &desc)) == 0 &&
-	    (ret = cursor->get_value(cursor, &pval, &v)) == 0)
+	    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
 		if (fprintf(fp, "%s=%s\n", desc, pval) < 0) {
 			ret = errno;
 			break;
@@ -440,8 +439,7 @@ wts_stats(void)
 	}
 	while (
 	    (ret = cursor->next(cursor)) == 0 &&
-	    (ret = cursor->get_key(cursor, &desc)) == 0 &&
-	    (ret = cursor->get_value(cursor, &pval, &v)) == 0)
+	    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
 		if (fprintf(fp, "%s=%s\n", desc, pval) < 0) {
 			ret = errno;
 			break;

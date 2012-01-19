@@ -31,8 +31,7 @@ print_cursor(WT_CURSOR *cursor)
 
 	while (
 	    (ret = cursor->next(cursor)) == 0 &&
-	    (ret = cursor->get_key(cursor, &desc)) == 0 &&
-	    (ret = cursor->get_value(cursor, &pvalue, &value)) == 0)
+	    (ret = cursor->get_value(cursor, &desc, &pvalue, &value)) == 0)
 		printf("%s=%s\n", desc, pvalue);
 
 	return (ret == WT_NOTFOUND ? 0 : ret);
@@ -69,6 +68,28 @@ print_file_stats(WT_SESSION *session)
 	/*! [statistics file function] */
 }
 
+int 
+print_overflow_pages(WT_SESSION *session)
+{
+	/*! [statistics retrieve by key] */
+	WT_CURSOR *cursor;
+	const char *desc, *pvalue;
+	uint64_t value;
+	int ret;
+
+	if ((ret = session->open_cursor(session,
+	    "statistics:file:access.wt", NULL, NULL, &cursor)) != 0)
+		return (ret);
+
+	cursor->set_key(cursor, WT_STAT_file_overflow);
+	ret = cursor->search(cursor);
+	ret = cursor->get_value(cursor, &desc, &pvalue, &value);
+	printf("%s=%s\n", desc, pvalue);
+	/*! [statistics retrieve by key] */
+
+	return (ret);
+}
+
 int
 main(void)
 {
@@ -84,6 +105,8 @@ main(void)
 	ret = print_database_stats(session);
 
 	ret = print_file_stats(session);
+
+	ret = print_overflow_pages(session);
 
 	return (conn->close(conn, NULL) == 0 ? ret : EXIT_FAILURE);
 }

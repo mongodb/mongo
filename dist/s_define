@@ -8,46 +8,22 @@ trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 l=`sed -e 's,#.*,,' -e '/^$/d' -e 's,^,../,' filelist`
 l="$l `echo ../src/include/*.i ../src/utilities/*.c `"
 
-# Special include files: ignore their macros by including them in the search
-l="$l ../src/include/verify_build.h ../src/include/wiredtiger_ext.h"
-
 (
 # Copy out the list of #defines we don't use, but it's OK.
 sed -e '/^$/d' -e '/^#/d' < s_define.list
 
-# Get the list of macros
-search=`cat ../src/include/*.[hi] ../src/include/*.in | egrep '^#define' |
+# Get the list of #defines.
+# Ignore the list of statistic "keys" generated for applications.
+search=`cat ../src/include/*.[hi] ../src/include/*.in |
+    sed -e '/Statistics section: BEGIN/,/Statistics section: END/d' |
+    egrep '^#define' |
     sed 's/#define[	 ][	 ]*\([A-Za-z_][A-Za-z0-9_]*\).*/\1/' |
     sort -u`
 
 # Print the list of macros, followed by the occurrences: we're looking for
-# macros that only appear once
+# macros that only appear once.
 echo "$search"
 fgrep -who "$search" $l
-
-# The stat #defines are harder for two reasons: first, we don't care about uses
-# of the #define in support/stat.c because it's initialization code, using all
-# of the #defines by definition -- we care if the #define is used somewhere else
-# Second, we don't use the "WT_STAT_" prefix when we call a stat macro, the stat
-# macro handles that for us, so we have to remove that prefix before searching.
-#
-# The special cases listed below are because the INCR, INCRV, SET and WT_STAT
-# #defines are in stat.h, but shouldn't have the leading WT_STAT prefix
-# stripped.  They are heavily used, so just delete them from the search.
-
-l=`echo $l | sed -e 's,\.\./support/stat.c,,'`
-
-search=`cat ../src/include/stat.h | egrep '^#define' |
-    sed -e 's/#define[	 ][	 ]*\([A-Za-z_]*\).*/\1/' \
-        -e '/^WT_STAT_INCR$/d' \
-        -e '/^WT_STAT_INCRV$/d' \
-        -e '/^WT_STAT_SET$/d' \
-        -e '/^WT_STAT$/d' \
-        -e 's/WT_STAT_//' |
-    sort -u`
-
-echo "$search" | sed 's/^/WT_STAT_/'
-fgrep -who "$search" $l | sed 's/^/WT_STAT_/'
 
 ) | sort | uniq -u > $t
 

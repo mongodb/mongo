@@ -8,19 +8,6 @@
 #include "wt_internal.h"
 
 /*
- * __curconfig_search_near --
- *	WT_CURSOR->search_near method for the config cursor type.
- */
-static int
-__curconfig_search_near(WT_CURSOR *cursor, int *exact)
-{
-	WT_UNUSED(cursor);
-	WT_UNUSED(exact);
-
-	return (ENOTSUP);
-}
-
-/*
  * __curconfig_close --
  *	WT_CURSOR->close method for the config cursor type.
  */
@@ -50,8 +37,9 @@ __wt_curconfig_open(WT_SESSION_IMPL *session,
 		__wt_cursor_notsup,	/* last */
 		__wt_cursor_notsup,	/* next */
 		__wt_cursor_notsup,	/* prev */
-		NULL,
-		__curconfig_search_near,
+		__wt_cursor_notsup,	/* search */
+					/* search-near */
+		(int (*)(WT_CURSOR *, int *))__wt_cursor_notsup,
 		__wt_cursor_notsup,	/* insert */
 		__wt_cursor_notsup,	/* update */
 		__wt_cursor_notsup,	/* remove */

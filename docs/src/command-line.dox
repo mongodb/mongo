@@ -210,7 +210,7 @@ By default, the \c loadtext command reads from the standard input; the
 
 <hr>
 @section utility_printlog wt printlog
-Output the database log.
+Display the database log.
 
 The \c printlog command outputs the database log.
 
@@ -251,9 +251,9 @@ The \c read command has no command-specific options.
 @section utility_salvage wt salvage
 Recover data from a corrupted file.
 
-The \c salvage command salvages the specified file, discarding any data
-that cannot be recovered.  Underlying files are re-written in place,
-overwriting the original file contents.
+The \c salvage command salvages the specified object, discarding any
+data that cannot be recovered.  Underlying files are re-written in
+place, overwriting the original file contents.
 
 @subsection utility_salvage_synopsis Synopsis
 <code>wt [-Vv] [-C config] [-h directory] salvage [-F force] uri</code>
@@ -269,22 +269,16 @@ The \c -F option forces the salvage of the file, regardless.
 
 <hr>
 @section utility_stat wt stat
-Output statistics.
+Display database or object statistics.
 
 The \c stat command outputs run-time statistics for the WiredTiger
-engine, or, if specified, for the command-line file.
+engine, or, if specified, for the command-line object.
 
 @subsection utility_stat_synopsis Synopsis
-<code>wt [-Vv] [-C config] [-h directory] stat [-p prefix] [file]</code>
+<code>wt [-Vv] [-C config] [-h directory] stat [uri]</code>
 
 @subsection utility_stat_options Options
-The following are command-specific options for the \c stat command:
-
-@par <code>-p prefix</code>
-By default, stat prints all available statistics.  The \c -p option
-specifies a prefix of the statistics to be printed: all of the
-statistics where the statistic's description field begins with the
-argument \c prefix will be printed.
+The \c stat command has no command-specific options.
 
 
 <hr>

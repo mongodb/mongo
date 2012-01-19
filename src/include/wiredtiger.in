@@ -469,9 +469,8 @@ struct __wt_session {
 	 * @snippet ex_all.c Open a cursor
 	 *
 	 * @param session the session handle
-	 * @param uri the data source on which the cursor operates
-	 *  <br>
-	 *  Cursors are usually opened on tables, however, cursors can be
+	 * @param uri the data source on which the cursor operates;
+	 *  cursors are usually opened on tables, however, cursors can be
 	 *  opened on any data source, regardless of whether it is ultimately
 	 *  stored in a table.  Some cursor types may have limited
 	 *  functionality (for example, be read-only or not support
@@ -495,9 +494,9 @@ struct __wt_session {
 	 *    @row{<tt>join:\<cursor1\>\&\<cursor2\>[&\<cursor3\>...]</tt>,
 	 *	join cursor}
 	 *    @row{<tt>statistics:[file</tt><tt>:\<filename\>]</tt>,
-	 *	database or file statistics (key=(string)description\,
-	 *	value=(string)value\, (uint64_t)value)\, see @ref stat_desc
-	 *	for details}
+	 *	database or file statistics (key=int\,
+	 *	value=(string)description\, (string)value\,
+	 *	(uint64_t)value)\, see @ref stat_desc for details}
 	 *  </table>
 	 * @param to_dup a cursor to duplicate
 	 * @param session the session handle
@@ -1487,6 +1486,83 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
     WT_EXTENSION_API *api, const char *config);
 
 /*! @} */
+
+#if !defined(SWIG) && !defined(DOXYGEN)
+/*******************************************
+ * Statistic reference.
+ *******************************************/
+/*
+ * DO NOT EDIT: automatically built by dist/api_stat.py.
+ * Statistics section: BEGIN
+ */
+#define	WT_STAT_block_read				0
+#define	WT_STAT_block_write				1
+#define	WT_STAT_cache_bytes_inuse			2
+#define	WT_STAT_cache_evict_slow			3
+#define	WT_STAT_cache_evict_internal			4
+#define	WT_STAT_cache_bytes_max				5
+#define	WT_STAT_cache_evict_modified			6
+#define	WT_STAT_cache_pages_inuse			7
+#define	WT_STAT_cache_evict_hazard			8
+#define	WT_STAT_cache_evict_unmodified			9
+#define	WT_STAT_cond_wait				10
+#define	WT_STAT_file_open				11
+#define	WT_STAT_rwlock_rdlock				12
+#define	WT_STAT_rwlock_wrlock				13
+#define	WT_STAT_memalloc				14
+#define	WT_STAT_memfree					15
+#define	WT_STAT_total_read_io				16
+#define	WT_STAT_total_write_io				17
+
+#define	WT_STAT_file_bulk_loaded			0
+#define	WT_STAT_file_col_deleted			1
+#define	WT_STAT_file_col_fix_pages			2
+#define	WT_STAT_file_col_int_pages			3
+#define	WT_STAT_file_col_var_pages			4
+#define	WT_STAT_cursor_first				5
+#define	WT_STAT_cursor_inserts				6
+#define	WT_STAT_cursor_last				7
+#define	WT_STAT_cursor_read				8
+#define	WT_STAT_cursor_read_near			9
+#define	WT_STAT_cursor_read_next			10
+#define	WT_STAT_cursor_read_prev			11
+#define	WT_STAT_cursor_removes				12
+#define	WT_STAT_cursor_updates				13
+#define	WT_STAT_alloc					14
+#define	WT_STAT_extend					15
+#define	WT_STAT_free					16
+#define	WT_STAT_overflow_read				17
+#define	WT_STAT_page_read				18
+#define	WT_STAT_page_write				19
+#define	WT_STAT_file_size				20
+#define	WT_STAT_file_fixed_len				21
+#define	WT_STAT_file_magic				22
+#define	WT_STAT_file_major				23
+#define	WT_STAT_file_maxintlitem			24
+#define	WT_STAT_file_maxintlpage			25
+#define	WT_STAT_file_maxleafitem			26
+#define	WT_STAT_file_maxleafpage			27
+#define	WT_STAT_file_minor				28
+#define	WT_STAT_file_freelist_bytes			29
+#define	WT_STAT_file_freelist_entries			30
+#define	WT_STAT_file_overflow				31
+#define	WT_STAT_file_allocsize				32
+#define	WT_STAT_rec_page_merge				33
+#define	WT_STAT_rec_split_intl				34
+#define	WT_STAT_rec_split_leaf				35
+#define	WT_STAT_rec_ovfl_key				36
+#define	WT_STAT_rec_ovfl_value				37
+#define	WT_STAT_rec_page_delete				38
+#define	WT_STAT_rec_written				39
+#define	WT_STAT_rec_hazard				40
+#define	WT_STAT_file_row_int_pages			41
+#define	WT_STAT_file_row_leaf_pages			42
+#define	WT_STAT_file_entries				43
+/*
+ * Statistics section: END
+ * DO NOT EDIT: automatically built by dist/api_stat.py.
+ */
+#endif
 
 #undef __F
 

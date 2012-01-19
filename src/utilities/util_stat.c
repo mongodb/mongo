@@ -14,18 +14,15 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 {
 	WT_CURSOR *cursor;
 	uint64_t v;
-	size_t len, urilen;
+	size_t urilen;
 	int ch, objname_free, ret;
 	const char *pval, *desc;
-	char *objname, *pfx, *uri;
+	char *objname, *uri;
 
 	objname_free = 0;
-	objname = pfx = uri = NULL;
-	while ((ch = util_getopt(argc, argv, "p:")) != EOF)
+	objname = uri = NULL;
+	while ((ch = util_getopt(argc, argv, "")) != EOF)
 		switch (ch) {
-		case 'p':
-			pfx = util_optarg;
-			break;
 		case '?':
 		default:
 			return (usage());
@@ -58,43 +55,21 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 	}
 	snprintf(uri, urilen, "statistics:%s", objname);
 
-	if ((ret = session->open_cursor(session,
-	    uri, NULL, NULL, &cursor)) != 0) {
+	if ((ret = session->open_cursor(
+	    session, uri, NULL, NULL, &cursor)) != 0) {
 		fprintf(stderr, "%s: cursor open(%s) failed: %s\n",
 		    progname, uri, wiredtiger_strerror(ret));
 		goto err;
 	}
 
-	/* Optionally search for a specific value. */
-	if (pfx == NULL) {
-		while (
-		    (ret = cursor->next(cursor)) == 0 &&
-		    (ret = cursor->get_key(cursor, &desc)) == 0 &&
-		    (ret = cursor->get_value(cursor, &pval, &v)) == 0)
-			if (printf("%s=%s\n", desc, pval) < 0) {
-				ret = errno;
-				break;
-			}
-	} else {
-		cursor->set_key(cursor, pfx);
-		if ((ret = cursor->search(cursor)) == 0 &&
-		    (ret = cursor->get_key(cursor, &desc)) == 0 &&
-		    (ret = cursor->get_value(cursor, &pval, &v)) == 0)
-			if (printf("%s=%s\n", desc, pval) < 0)
-				ret = errno;
-		if (ret == 0) {
-			len = strlen(pfx);
-			while ((ret = cursor->next(cursor)) == 0 &&
-			    (ret = cursor->get_key(cursor, &desc)) == 0 &&
-			    (ret = cursor->get_value(
-			    cursor, &pval, &v)) == 0 &&
-			    strncmp(pfx, desc, len) == 0)
-				if (printf("%s=%s\n", desc, pval) < 0) {
-					ret = errno;
-					break;
-				}
+	/* List the statistics. */
+	while (
+	    (ret = cursor->next(cursor)) == 0 &&
+	    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
+		if (printf("%s=%s\n", desc, pval) < 0) {
+			ret = errno;
+			break;
 		}
-	}
 	if (ret == WT_NOTFOUND)
 		ret = 0;
 
@@ -104,11 +79,7 @@ util_stat(WT_SESSION *session, int argc, char *argv[])
 		goto err;
 	}
 
-	if (0) {
-err:		ret = 1;
-	}
-
-	if (objname_free)
+err:	if (objname_free)
 		free(objname);
 	free(uri);
 
@@ -120,7 +91,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s %s "
-	    "stat [-p prefix] [file]\n",
+	    "stat [uri]\n",
 	    progname, usage_prefix);
 	return (1);
 }

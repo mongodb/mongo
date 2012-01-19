@@ -131,11 +131,14 @@ struct __wt_cursor_index {
 struct __wt_cursor_stat {
 	WT_CURSOR iface;
 
-	WT_STATS *stats_first;		/* First stats references */
-	WT_STATS *stats_last;		/* Last stats references */
-	WT_STATS *stats;		/* Current stats reference */
+	WT_STATS *stats_first;		/* First stats reference */
+	int	  stats_count;		/* Count of stats elements */
 
-	WT_BUF pvalue;			/* Current stats (pretty). */
+	int	 notpositioned;		/* Cursor not positioned */
+
+	int	 key;			/* Current stats key */
+	uint64_t v;			/* Current stats value */
+	WT_BUF   pv;			/* Current stats value (string) */
 
 	void (*clear_func)(WT_STATS *);	/* Function to clear stats. */
 	WT_BTREE *btree;		/* Pinned btree handle. */

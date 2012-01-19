@@ -113,6 +113,7 @@ Redistributions
 Resize
 SCHED
 SLIST
+SSq
 STAILQ
 SYS
 Skiplist
