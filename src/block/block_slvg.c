@@ -132,7 +132,13 @@ skip:			WT_VERBOSE(session, salvage,
 			continue;
 		}
 
-		/* Valid block, return to our caller. */
+		/*
+                 * Valid block, return to our caller.
+                 *
+                 * The buffer may have grown: make sure we read from the full
+                 * page image.
+                 */
+		blk = WT_BLOCK_HEADER_REF(buf->mem);
 		break;
 	}
 
