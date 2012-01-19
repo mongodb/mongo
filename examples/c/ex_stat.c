@@ -18,6 +18,7 @@
 int print_cursor(WT_CURSOR *);
 int print_database_stats(WT_SESSION *);
 int print_file_stats(WT_SESSION *);
+int print_overflow_pages(WT_SESSION *);
 
 const char *home = "WT_TEST";
 
