@@ -5,6 +5,8 @@
  *	All rights reserved.
  */
 
+#include "wt_internal.h"
+
 #include <sys/types.h>
 
 #include <assert.h>
@@ -16,8 +18,6 @@
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-
-#include "wt_internal.h"
 
 #define	DUMP	"__slvg.dump"			/* Dump file */
 #define	LOAD	"__slvg.load"			/* Build file */

@@ -5,6 +5,8 @@
  *	All rights reserved.
  */
 
+#include <wt_internal.h>
+
 #include <ctype.h>
 #include <errno.h>
 #include <inttypes.h>
@@ -12,8 +14,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
-#include <wt_internal.h>
 
 #define	UTIL_FILE_OK	0x01			/* file: prefix OK */
 #define	UTIL_TABLE_OK	0x02			/* table: prefix OK */
