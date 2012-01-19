@@ -7,17 +7,7 @@
 
 #include "wt_internal.h"
 
-#include <sys/types.h>
-
 #include <assert.h>
-#include <ctype.h>
-#include <errno.h>
-#include <limits.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <time.h>
-#include <unistd.h>
 
 #define	DUMP	"__slvg.dump"			/* Dump file */
 #define	LOAD	"__slvg.load"			/* Build file */
