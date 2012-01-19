@@ -159,6 +159,7 @@ bitwise
 bm
 bnd
 boolean
+br
 breakpoint
 bsearch
 bt
