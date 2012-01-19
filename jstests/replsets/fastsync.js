@@ -178,7 +178,9 @@ sleep(10000);
 pargs = new MongodRunner( ports[ 3 ], basePath + "-p", false, false,
                           ["--replSet", basename, "--oplogSize", 2],
                           {no_bind : true} );
-p = pargs.start(true);
+pargs.start(true);
+
+p = new Mongo("localhost:"+ports[3]);
 
 printjson(p.getDB("admin").runCommand({replSetGetStatus:1}));
 
