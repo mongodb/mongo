@@ -849,6 +849,7 @@ namespace mongo {
 
         QueryResult *qr = (QueryResult *) result.header();
         qr->cursorId = cursorid;
+        curop.debug().cursorid = cursorid == 0 ? -1 : qr->cursorId;
         qr->setResultFlagsToOk();
         // qr->len is updated automatically by appendData()
         curop.debug().responseLength = qr->len;

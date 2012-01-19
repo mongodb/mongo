@@ -142,7 +142,7 @@ namespace mongo {
                     replyToQuery( ResultFlag_CursorNotFound , r.p() , r.m() , 0 , 0 , 0 );
                     return;
                 }
-
+                // TODO: Try to match logic of mongod, where on subsequent getMore() we pull lots more data?
                 if ( cursor->sendNextBatch( r , ntoreturn ) ) {
                     // still more data
                     cursor->accessed();
