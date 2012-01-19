@@ -15,7 +15,7 @@
  *    limitations under the License.
  */
 
-#include "mongo/util/net/hostandport.h"
+#include "../util/net/hostandport.h"
 
 namespace mongo {
 
