@@ -233,10 +233,6 @@ if __name__ == '__main__':
     # That way, verbose printing can be done at the class definition level.
     wttest.WiredTigerTestCase.globalSetup(preserve, timestamp, gdbSub, verbose)
 
-    if debug:
-        import pdb
-        pdb.set_trace()
-
     # Without any tests listed as arguments, do discovery
     if len(testargs) == 0:
         from discover import defaultTestLoader as loader
