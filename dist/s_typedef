@@ -55,7 +55,7 @@ while :
 	-b)				# -b builds the typedefs
 		build
 		shift;;
-	-c)				# -d checks the typedefs
+	-c)				# -c checks the typedefs
 		check
 		shift;;
 	*)
