@@ -28,6 +28,7 @@ def removeAll(top):
 
 class WiredTigerTestCase(unittest.TestCase):
     _globalSetup = False
+    _printOnceSeen = {}
 
     @staticmethod
     def globalSetup(preserveFiles = False, useTimestamp = False,
@@ -51,6 +52,15 @@ class WiredTigerTestCase(unittest.TestCase):
             WiredTigerTestCase.globalSetup()
 
     def __str__(self):
+        # when running with scenarios, if the number_scenarios() method
+        # is used, then each scenario is given a number, which can
+        # help distinguish tests.
+        scen = ''
+        if hasattr(self, 'scenario_number'):
+            scen = '(scenario ' + str(self.scenario_number) + ')'
+        return self.simpleName() + scen
+
+    def simpleName(self):
         return "%s.%s.%s" %  (self.__module__,
                               self.className(), self._testMethodName)
 
@@ -128,12 +138,25 @@ class WiredTigerTestCase(unittest.TestCase):
         if WiredTigerTestCase._verbose > 2:
             self.prhead('TEST COMPLETED')
 
+    @staticmethod
+    def printOnce(msg):
+        # There's a race condition with multiple threads,
+        # but we won't worry about it.  We err on the side
+        # of printing the message too many times.
+        if not msg in WiredTigerTestCase._printOnceSeen:
+            WiredTigerTestCase._printOnceSeen[msg] = msg
+            print msg
+
     def KNOWN_FAILURE(self, name):
-        print '**** THIS TEST HAS A KNOWN FAILURE: ' + name + ' ****'
+        myname = self.simpleName()
+        msg = '**** ' + myname + ' HAS A KNOWN FAILURE: ' + name + ' ****'
+        self.printOnce(msg)
         self.skipTest('KNOWN FAILURE: ' + name)
 
     def KNOWN_LIMITATION(self, name):
-        print '**** THIS TEST HAS A KNOWN LIMITATION: ' + name + ' ****'
+        myname = self.simpleName()
+        msg = '**** ' + myname + ' HAS A KNOWN LIMITATION: ' + name + ' ****'
+        self.printOnce(msg)
 
     @staticmethod
     def printVerbose(level, message):
