@@ -289,6 +289,7 @@ if env['PYSYSPLATFORM'] == 'linux2':
     env['RELOBJ_LIBDEPS_END'] = '--no-whole-archive'
     env['RELOBJ_LIBDEPS_ITEM'] = ''
 elif env['PYSYSPLATFORM'] == 'darwin':
+    env['RELOBJFLAGS'] = [ '-arch', '$PROCESSOR_ARCHITECTURE' ]
     env['LINK_LIBGROUP_START'] = ''
     env['LINK_LIBGROUP_END'] = ''
     env['RELOBJ_LIBDEPS_START'] = '-all_load'
@@ -391,7 +392,7 @@ class InstallSetup:
         self.bannerDir = "distsrc/client/"
         self.headerRoot = ""
         self.clientTestsDir = "src/mongo/client/examples/"
-        
+
 installSetup = InstallSetup()
 if distBuild:
     installSetup.bannerDir = "distsrc"
@@ -412,6 +413,8 @@ if force32:
     processor = "i386"
 if force64:
     processor = "x86_64"
+
+env['PROCESSOR_ARCHITECTURE'] = processor
 
 DEFAULT_INSTALL_DIR = "/usr/local"
 installDir = DEFAULT_INSTALL_DIR
@@ -672,13 +675,13 @@ if nix:
 
     if has_option( "distcc" ):
         env["CXX"] = "distcc " + env["CXX"]
-        
+
     # -Winvalid-pch Warn if a precompiled header (see Precompiled Headers) is found in the search path but can't be used. 
     env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -Wall -Wsign-compare -Wno-unknown-pragmas -Winvalid-pch" )
     # env.Append( " -Wconversion" ) TODO: this doesn't really work yet
     if linux:
         env.Append( CPPFLAGS=" -Werror -pipe " )
-        if not has_option('clang'): 
+        if not has_option('clang'):
             env.Append( CPPFLAGS=" -fno-builtin-memcmp " ) # glibc's memcmp is faster than gcc's
 
     env.Append( CPPDEFINES="_FILE_OFFSET_BITS=64" )
@@ -702,7 +705,7 @@ if nix:
         #env.Append( LINKFLAGS=" -fprofile-generate" )
         # then:
         #env.Append( CPPFLAGS=" -fprofile-use" )
-        #env.Append( LINKFLAGS=" -fprofile-use" )        
+        #env.Append( LINKFLAGS=" -fprofile-use" )
 
     if debugLogging:
         env.Append( CPPFLAGS=" -D_DEBUG" );
