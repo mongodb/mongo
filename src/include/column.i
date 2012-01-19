@@ -10,7 +10,7 @@
  *	Search an column-store insert list for an exact match.
  */
 static inline WT_INSERT *
-__col_insert_search_match(WT_INSERT_HEAD *inshead, uint64_t recno)
+__col_insert_search_match(WT_SKIP_HEAD *inshead, uint64_t recno)
 {
 	WT_INSERT **insp, *ret_ins;
 	uint64_t ins_recno;
@@ -59,7 +59,7 @@ __col_insert_search_match(WT_INSERT_HEAD *inshead, uint64_t recno)
  */
 static inline WT_INSERT *
 __col_insert_search(
-    WT_INSERT_HEAD *inshead, WT_INSERT ***ins_stack, uint64_t recno)
+    WT_SKIP_HEAD *inshead, WT_INSERT ***ins_stack, uint64_t recno)
 {
 	WT_INSERT **insp, *ret_ins;
 	uint64_t ins_recno;

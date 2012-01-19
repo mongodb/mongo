@@ -7,13 +7,13 @@
 
 #include "wt_internal.h"
 
-static void __free_insert(WT_SESSION_IMPL *, WT_INSERT_HEAD **, uint32_t);
-static void __free_insert_list(WT_SESSION_IMPL *, WT_INSERT *);
 static void __free_page_col_fix(WT_SESSION_IMPL *, WT_PAGE *);
 static void __free_page_col_int(WT_SESSION_IMPL *, WT_PAGE *);
 static void __free_page_col_var(WT_SESSION_IMPL *, WT_PAGE *);
 static void __free_page_row_int(WT_SESSION_IMPL *, WT_PAGE *);
 static void __free_page_row_leaf(WT_SESSION_IMPL *, WT_PAGE *);
+static void __free_skip_array(WT_SESSION_IMPL *, WT_SKIP_HEAD **, uint32_t);
+static void __free_skip_list(WT_SESSION_IMPL *, WT_INSERT *);
 static void __free_update(WT_SESSION_IMPL *, WT_UPDATE **, uint32_t);
 static void __free_update_list(WT_SESSION_IMPL *, WT_UPDATE *);
 
@@ -85,20 +85,20 @@ static void
 __free_page_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
-	WT_INSERT_HEAD *ins_head;
+	WT_SKIP_HEAD *append;
 
 	btree = session->btree;
 
 	/* Free the append array. */
-	if ((ins_head = WT_COL_APPEND(btree, page)) != NULL) {
-		__free_insert_list(session, WT_SKIP_FIRST(ins_head));
-		__wt_free(session, ins_head);
+	if ((append = WT_COL_APPEND(btree, page)) != NULL) {
+		__free_skip_list(session, WT_SKIP_FIRST(append));
+		__wt_free(session, append);
 		__wt_free(session, btree->append);
 	}
 
 	/* Free the update array. */
 	if (page->modify != NULL && page->modify->update != NULL)
-		__free_insert(session, page->modify->update, 1);
+		__free_skip_array(session, page->modify->update, 1);
 }
 
 /*
@@ -134,7 +134,7 @@ static void
 __free_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
-	WT_INSERT_HEAD *ins_head;
+	WT_SKIP_HEAD *append;
 
 	btree = session->btree;
 
@@ -145,15 +145,15 @@ __free_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 	__wt_free(session, page->u.col_var.repeats);
 
 	/* Free the append array. */
-	if ((ins_head = WT_COL_APPEND(btree, page)) != NULL) {
-		__free_insert_list(session, WT_SKIP_FIRST(ins_head));
-		__wt_free(session, ins_head);
+	if ((append = WT_COL_APPEND(btree, page)) != NULL) {
+		__free_skip_list(session, WT_SKIP_FIRST(append));
+		__wt_free(session, append);
 		__wt_free(session, btree->append);
 	}
 
 	/* Free the insert array. */
 	if (page->modify != NULL && page->modify->update != NULL)
-		__free_insert(session, page->modify->update, page->entries);
+		__free_skip_array(session, page->modify->update, page->entries);
 }
 
 /*
@@ -218,7 +218,7 @@ __free_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * found on the original page).
 	 */
 	if (page->u.row.ins != NULL)
-		__free_insert(session, page->u.row.ins, page->entries + 1);
+		__free_skip_array(session, page->u.row.ins, page->entries + 1);
 
 	/* Free the update array. */
 	if (page->u.row.upd != NULL)
@@ -226,36 +226,36 @@ __free_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __free_insert --
- *	Discard the insert array.
+ * __free_skip_array --
+ *	Discard an array of skip list headers.
  */
 static void
-__free_insert(
-    WT_SESSION_IMPL *session, WT_INSERT_HEAD **insert_head, uint32_t entries)
+__free_skip_array(
+    WT_SESSION_IMPL *session, WT_SKIP_HEAD **head_arg, uint32_t entries)
 {
-	WT_INSERT_HEAD **insheadp;
+	WT_SKIP_HEAD **head;
 
 	/*
 	 * For each non-NULL slot in the page's array of inserts, free the
 	 * linked list anchored in that slot.
 	 */
-	for (insheadp = insert_head; entries > 0; --entries, ++insheadp)
-		if (*insheadp != NULL) {
-			__free_insert_list(session, WT_SKIP_FIRST(*insheadp));
-			__wt_free(session, *insheadp);
+	for (head = head_arg; entries > 0; --entries, ++head)
+		if (*head != NULL) {
+			__free_skip_list(session, WT_SKIP_FIRST(*head));
+			__wt_free(session, *head);
 		}
 
 	/* Free the page's array of inserts. */
-	__wt_free(session, insert_head);
+	__wt_free(session, head_arg);
 }
 
 /*
- * __free_insert_list --
+ * __free_skip_list --
  *	Walk a WT_INSERT forward-linked list and free the per-thread combination
  * of a WT_INSERT structure and its associated chain of WT_UPDATE structures.
  */
 static void
-__free_insert_list(WT_SESSION_IMPL *session, WT_INSERT *ins)
+__free_skip_list(WT_SESSION_IMPL *session, WT_INSERT *ins)
 {
 	WT_INSERT *next;
 

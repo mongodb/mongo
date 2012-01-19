@@ -1,12 +1,12 @@
 /* DO NOT EDIT: automatically built by dist/serial.py. */
 
 typedef struct {
-	WT_INSERT_HEAD **inshead;
+	WT_SKIP_HEAD **inshead;
 	WT_INSERT ***ins_stack;
-	WT_INSERT_HEAD **new_inslist;
+	WT_SKIP_HEAD **new_inslist;
 	size_t new_inslist_size;
 	int new_inslist_taken;
-	WT_INSERT_HEAD *new_inshead;
+	WT_SKIP_HEAD *new_inshead;
 	size_t new_inshead_size;
 	int new_inshead_taken;
 	WT_INSERT *new_ins;
@@ -17,9 +17,9 @@ typedef struct {
 
 static inline int
 __wt_col_append_serial(
-	WT_SESSION_IMPL *session, WT_INSERT_HEAD **inshead, WT_INSERT
-	***ins_stack, WT_INSERT_HEAD ***new_inslistp, size_t new_inslist_size,
-	WT_INSERT_HEAD **new_insheadp, size_t new_inshead_size, WT_INSERT
+	WT_SESSION_IMPL *session, WT_SKIP_HEAD **inshead, WT_INSERT
+	***ins_stack, WT_SKIP_HEAD ***new_inslistp, size_t new_inslist_size,
+	WT_SKIP_HEAD **new_insheadp, size_t new_inshead_size, WT_INSERT
 	**new_insp, size_t new_ins_size, u_int skipdepth)
 {
 	__wt_col_append_args _args, *args = &_args;
@@ -72,8 +72,8 @@ __wt_col_append_serial(
 
 static inline void
 __wt_col_append_unpack(
-	WT_SESSION_IMPL *session, WT_INSERT_HEAD ***insheadp, WT_INSERT
-	****ins_stackp, WT_INSERT_HEAD ***new_inslistp, WT_INSERT_HEAD
+	WT_SESSION_IMPL *session, WT_SKIP_HEAD ***insheadp, WT_INSERT
+	****ins_stackp, WT_SKIP_HEAD ***new_inslistp, WT_SKIP_HEAD
 	**new_insheadp, WT_INSERT **new_insp, u_int *skipdepthp)
 {
 	__wt_col_append_args *args =
@@ -155,12 +155,12 @@ __wt_evict_file_unpack(
 typedef struct {
 	WT_PAGE *page;
 	uint32_t write_gen;
-	WT_INSERT_HEAD **inshead;
+	WT_SKIP_HEAD **inshead;
 	WT_INSERT ***ins_stack;
-	WT_INSERT_HEAD **new_inslist;
+	WT_SKIP_HEAD **new_inslist;
 	size_t new_inslist_size;
 	int new_inslist_taken;
-	WT_INSERT_HEAD *new_inshead;
+	WT_SKIP_HEAD *new_inshead;
 	size_t new_inshead_size;
 	int new_inshead_taken;
 	WT_INSERT *new_ins;
@@ -172,10 +172,10 @@ typedef struct {
 static inline int
 __wt_insert_serial(
 	WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t write_gen,
-	WT_INSERT_HEAD **inshead, WT_INSERT ***ins_stack, WT_INSERT_HEAD
-	***new_inslistp, size_t new_inslist_size, WT_INSERT_HEAD
-	**new_insheadp, size_t new_inshead_size, WT_INSERT **new_insp, size_t
-	new_ins_size, u_int skipdepth)
+	WT_SKIP_HEAD **inshead, WT_INSERT ***ins_stack, WT_SKIP_HEAD
+	***new_inslistp, size_t new_inslist_size, WT_SKIP_HEAD **new_insheadp,
+	size_t new_inshead_size, WT_INSERT **new_insp, size_t new_ins_size,
+	u_int skipdepth)
 {
 	__wt_insert_args _args, *args = &_args;
 	int ret;
@@ -232,8 +232,8 @@ __wt_insert_serial(
 static inline void
 __wt_insert_unpack(
 	WT_SESSION_IMPL *session, WT_PAGE **pagep, uint32_t *write_genp,
-	WT_INSERT_HEAD ***insheadp, WT_INSERT ****ins_stackp, WT_INSERT_HEAD
-	***new_inslistp, WT_INSERT_HEAD **new_insheadp, WT_INSERT **new_insp,
+	WT_SKIP_HEAD ***insheadp, WT_INSERT ****ins_stackp, WT_SKIP_HEAD
+	***new_inslistp, WT_SKIP_HEAD **new_insheadp, WT_INSERT **new_insp,
 	u_int *skipdepthp)
 {
 	__wt_insert_args *args =

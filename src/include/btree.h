@@ -87,7 +87,7 @@ struct __wt_btree {
 	 */
 	WT_PAGE *last_page;		/* Col-store append, last page */
 	uint64_t last_recno;		/* Col-store append, last recno */
-	WT_INSERT_HEAD **append;	/* Appended items */
+	WT_SKIP_HEAD **append;		/* Appended items */
 
 	WT_PAGE *root_page;		/* Root page */
 	WT_ADDR  root_addr;		/* Replacement root address */

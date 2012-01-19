@@ -16,7 +16,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 {
 	WT_BUF *key, *value;
 	WT_INSERT *ins;
-	WT_INSERT_HEAD **inshead, *new_inshead, **new_inslist;
+	WT_SKIP_HEAD **inshead, *new_inshead, **new_inslist;
 	WT_PAGE *page;
 	WT_UPDATE **new_upd, *upd, **upd_entry;
 	size_t ins_size, upd_size;
@@ -73,8 +73,8 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		    upd_entry, &new_upd, new_upd_size, &upd, upd_size);
 	} else {
 		/*
-		 * Allocate insert array if necessary, and set the WT_INSERT
-		 * array reference.
+		 * Allocate insert array if necessary, and set the array
+		 * reference.
 		 *
 		 * We allocate an additional insert array slot for insert keys
 		 * sorting less than any key on the page.  The test to select
@@ -92,7 +92,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 			WT_ERR(__wt_calloc_def(
 			    session, page->entries + 1, &new_inslist));
 			new_inslist_size =
-			    (page->entries + 1) * sizeof(WT_INSERT_HEAD *);
+			    (page->entries + 1) * sizeof(WT_SKIP_HEAD *);
 			inshead = &new_inslist[ins_slot];
 		} else
 			inshead = &page->u.row.ins[ins_slot];
@@ -105,7 +105,7 @@ __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 		 * well, search couldn't have.
 		 */
 		if (*inshead == NULL) {
-			new_inshead_size = sizeof(WT_INSERT_HEAD);
+			new_inshead_size = sizeof(WT_SKIP_HEAD);
 			WT_ERR(__wt_calloc_def(session, 1, &new_inshead));
 			for (i = 0; i < WT_SKIP_MAXDEPTH; i++)
 				cbt->ins_stack[i] = &new_inshead->head[i];
@@ -186,9 +186,9 @@ __wt_row_insert_alloc(WT_SESSION_IMPL *session,
 void
 __wt_insert_serial_func(WT_SESSION_IMPL *session)
 {
-	WT_PAGE *page;
-	WT_INSERT_HEAD **inshead, **new_inslist, *new_inshead;
 	WT_INSERT *new_ins, ***ins_stack;
+	WT_PAGE *page;
+	WT_SKIP_HEAD **inshead, **new_inslist, *new_inshead;
 	uint32_t write_gen;
 	u_int i, skipdepth;
 	int  ret;

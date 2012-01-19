@@ -216,9 +216,9 @@ __cursor_row_next(WT_CURSOR_BTREE *cbt, int newpage)
 	 * For row-store pages, we need a single item that tells us the part
 	 * of the page we're walking (otherwise switching from next to prev
 	 * and vice-versa is just too complicated), so we map the WT_ROW and
-	 * WT_INSERT_HEAD array slots into a single name space: slot 1 is the
-	 * "smallest key insert list", slot 2 is WT_ROW[0], slot 3 is
-	 * WT_INSERT_HEAD[0], and so on.  This means WT_INSERT lists are
+	 * WT_SKIP_HEAD insert array slots into a single name space: slot 1 is
+	 * the "smallest key insert list", slot 2 is WT_ROW[0], slot 3 is
+	 * WT_SKIP_HEAD[0], and so on.  This means WT_INSERT lists are
 	 * odd-numbered slots, and WT_ROW array slots are even-numbered slots.
 	 *
 	 * New page configuration.
@@ -257,7 +257,7 @@ new_insert:	if (cbt->ins != NULL) {
 		++cbt->slot;
 
 		/*
-		 * Odd-numbered slots configure as WT_INSERT_HEAD entries,
+		 * Odd-numbered slots configure as WT_SKIP_HEAD entries,
 		 * even-numbered slots configure as WT_ROW entries.
 		 */
 		if (cbt->slot & 0x01) {
@@ -309,9 +309,9 @@ __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt, int next)
 		 * For row-store pages, we need a single item that tells us the
 		 * part of the page we're walking (otherwise switching from next
 		 * to prev and vice-versa is just too complicated), so we map
-		 * the WT_ROW and WT_INSERT_HEAD array slots into a single name
-		 * space: slot 1 is the "smallest key insert list", slot 2 is
-		 * WT_ROW[0], slot 3 is WT_INSERT_HEAD[0], and so on.  This
+		 * the WT_ROW and WT_SKIP_HEAD insert array slots into a single
+		 * name space: slot 1 is the "smallest key insert list", slot 2
+		 * is WT_ROW[0], slot 3 is WT_SKIP_HEAD[0], and so on.  This
 		 * means WT_INSERT lists are odd-numbered slots, and WT_ROW
 		 * array slots are even-numbered slots.
 		 *

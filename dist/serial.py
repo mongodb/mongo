@@ -17,10 +17,10 @@ class Serial:
 
 msgtypes = [
 Serial('col_append', 'WT_SERIAL_FUNC', [
-		SerialArg('WT_INSERT_HEAD **', 'inshead'),
+		SerialArg('WT_SKIP_HEAD **', 'inshead'),
 		SerialArg('WT_INSERT ***', 'ins_stack'),
-		SerialArg('WT_INSERT_HEAD **', 'new_inslist', 1),
-		SerialArg('WT_INSERT_HEAD *', 'new_inshead', 1),
+		SerialArg('WT_SKIP_HEAD **', 'new_inslist', 1),
+		SerialArg('WT_SKIP_HEAD *', 'new_inshead', 1),
 		SerialArg('WT_INSERT *', 'new_ins', 1),
 		SerialArg('u_int', 'skipdepth'),
 	]),
@@ -32,10 +32,10 @@ Serial('evict_file', 'WT_SERIAL_EVICT', [
 Serial('insert', 'WT_SERIAL_FUNC', [
 		SerialArg('WT_PAGE *', 'page'),
 		SerialArg('uint32_t', 'write_gen'),
-		SerialArg('WT_INSERT_HEAD **', 'inshead'),
+		SerialArg('WT_SKIP_HEAD **', 'inshead'),
 		SerialArg('WT_INSERT ***', 'ins_stack'),
-		SerialArg('WT_INSERT_HEAD **', 'new_inslist', 1),
-		SerialArg('WT_INSERT_HEAD *', 'new_inshead', 1),
+		SerialArg('WT_SKIP_HEAD **', 'new_inslist', 1),
+		SerialArg('WT_SKIP_HEAD *', 'new_inshead', 1),
 		SerialArg('WT_INSERT *', 'new_ins', 1),
 		SerialArg('u_int', 'skipdepth'),
 	]),

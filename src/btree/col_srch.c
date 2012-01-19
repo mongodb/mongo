@@ -17,9 +17,9 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	WT_BTREE *btree;
 	WT_COL *cip;
 	WT_INSERT *ins;
-	WT_INSERT_HEAD *ins_head;
 	WT_PAGE *page;
 	WT_REF *ref;
+	WT_SKIP_HEAD *ins_head;
 	uint64_t recno;
 	uint32_t base, indx, limit;
 	int ret;
@@ -116,7 +116,7 @@ __wt_col_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 	 * update list (fixed-length), or slot's update list (variable-length)
 	 * for a better match.  The only better match we can find is an exact
 	 * match, otherwise the existing match on the page is the one we want.
-	 * For that reason, don't set the cursor's WT_INSERT_HEAD/WT_INSERT pair
+	 * For that reason, don't set the cursor's WT_SKIP_HEAD/WT_INSERT pair
 	 * until we know we have a useful entry.
 	 */
 	if ((ins =
