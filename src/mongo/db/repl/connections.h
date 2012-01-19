@@ -117,12 +117,18 @@ namespace mongo {
             }
         }
 
-        // Keep trying to connect if we're not yet connected
-        if( !first && x->connected ) {
-            connLock.reset( new scoped_lock(x->z) );
+        // already locked connLock above
+        if (first) {
+            connect();
             return;
         }
 
+        connLock.reset( new scoped_lock(x->z) );
+        if (x->connected) {
+            return;
+        }
+
+        // Keep trying to connect if we're not yet connected
         connect();
     }
 
