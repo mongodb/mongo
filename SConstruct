@@ -13,7 +13,7 @@
 # This file, SConstruct, configures the build environment, and then delegates to
 # several, subordinate SConscript files, which describe specific build rules.
 
-EnsureSConsVersion(0, 98, 4) # this is a common version known to work
+EnsureSConsVersion( 1, 1, 0 )
 
 import os
 import sys
