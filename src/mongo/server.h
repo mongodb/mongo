@@ -12,11 +12,7 @@
 # error this file is for mongo server programs not client lib
 #endif
 
-#if defined(_DEBUG)
-# define BOOST_ENABLE_ASSERT_HANDLER 1
-#else
-# define BOOST_DISABLE_ASSERTS 1
-#endif
+#define BOOST_ENABLE_ASSERT_HANDLER 1
 
 #include <map>
 #include <vector>
