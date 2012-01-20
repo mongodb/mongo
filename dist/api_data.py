@@ -232,7 +232,7 @@ methods = {
 		type='boolean'),
 	Config('raw', 'false', r'''
 		ignore the encodings for the key and value, manage data as if
-		the formats were \c "u"''',
+		the formats were \c "u".  See @ref cursor_raw for more details''',
 		type='boolean'),
 	Config('statistics', 'false', r'''
 		configure the cursor for statistics''',

@@ -521,7 +521,8 @@ struct __wt_session {
 	 * to overwrite previously existing values.,a boolean flag; default \c
 	 * false.}
 	 * @config{raw, ignore the encodings for the key and value\, manage data
-	 * as if the formats were \c "u".,a boolean flag; default \c false.}
+	 * as if the formats were \c "u".  See @ref cursor_raw for more
+	 * details.,a boolean flag; default \c false.}
 	 * @config{statistics, configure the cursor for statistics.,a boolean
 	 * flag; default \c false.}
 	 * @configend
