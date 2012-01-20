@@ -299,10 +299,6 @@ __rec_root_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 static int
 __rec_review(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 {
-	int ret;
-
-	ret = 0;
-
 	session->excl_next = 0;			/* Track the pages we lock. */
 
 	/*
@@ -313,38 +309,17 @@ __rec_review(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 		WT_RET(__hazard_exclusive(
 		    session, page->ref, LF_ISSET(WT_REC_WAIT) ? 1 : 0));
 
-	/*
-	 * Walk the page's subtree and make sure we can evict this page.
-	 *
-	 * When evicting a page, it may reference deleted or split pages which
-	 * will be merged into the evicted page.
-	 *
-	 * If we find an in-memory page, we're done: you can't evict a page that
-	 * references other in-memory pages, those pages must be evicted first.
-	 * While the test is necessary, it shouldn't happen much: reading any
-	 * internal page increments its read generation, and so internal pages
-	 * shouldn't be selected for eviction until after any children have been
-	 * evicted.
-	 *
-	 * If we find a split page, get exclusive access to the page and then
-	 * continue, the split page will be merged into our page.
-	 *
-	 * If we find a deleted page, get exclusive access to the page and then
-	 * check its status.  If still deleted, we can continue, the page will
-	 * be merged into our page.  However, another thread of control might
-	 * have inserted new material and the page is no longer deleted, which
-	 * means the reconciliation fails.
-	 */
+	/* Walk the page's subtree and make sure we can evict this page. */
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_ROW_INT:
-		ret = __rec_excl(session, page, flags);
+		WT_RET(__rec_excl(session, page, flags));
 		break;
 	default:
 		break;
 	}
 
-	return (ret);
+	return (0);
 }
 
 /*
@@ -418,27 +393,46 @@ __rec_excl_page(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	page = ref->page;
 
 	/*
-	 * An in-memory page: if the page can't be merged into its parent, then
-	 * we can't evict the subtree.  This is not a problem, it just means we
-	 * chose badly when selecting a page for eviction.
+	 * If we find a page that can't be merged into its parent, we're done:
+	 * you can't evict a page that references other in-memory pages, those
+	 * pages must be evicted first.  While the test is necessary, it should
+	 * not happen much: reading an internal page increments its read
+	 * generation, and so internal pages shouldn't be selected for eviction
+	 * until after their children have been evicted.
 	 *
-	 * First, a cheap test: if the child page doesn't at least have a chance
-	 * of a merge, we can't evict the candidate page.
+	 * A cheap test: if the child page doesn't at least have a chance of a
+	 * merge, we're done.
 	 */
 	if (!F_ISSET(page,
 	    WT_PAGE_REC_EMPTY | WT_PAGE_REC_SPLIT | WT_PAGE_REC_SPLIT_MERGE))
 		return (1);
 
 	/*
+	 * If the page is dirty, try and write it.   This is because once a page
+	 * is flagged for a merge into its parent, the eviction server no longer
+	 * makes any attempt to evict it, it only attempts to evict its parent.
+	 * If a parent page is blocked from eviction because of a dirty child
+	 * page, we would never write the child page and never evict the parent.
+	 * This prevents that from happening.
+	 */
+	if (__wt_page_is_modified(page))
+		WT_RET(__wt_rec_write(session, page, NULL));
+
+	/* Repeat the cheap test: an empty page might no longer be "empty". */
+	if (!F_ISSET(page,
+	    WT_PAGE_REC_EMPTY | WT_PAGE_REC_SPLIT | WT_PAGE_REC_SPLIT_MERGE))
+		return (1);
+
+	/*
 	 * Next, if our caller doesn't have the tree locked down, get exclusive
-	 * access to the page and test again.
+	 * access to the page.
 	 */
 	if (!LF_ISSET(WT_REC_SINGLE))
 		WT_RET(__hazard_exclusive(
 		    session, ref, LF_ISSET(WT_REC_WAIT) ? 1 : 0));
 
 	/*
-	 * Second, a more careful test: merge-split pages are OK, no matter if
+	 * Finally, a more careful test: merge-split pages are OK, no matter if
 	 * they're clean or dirty, we can always merge them into the parent.
 	 * Clean split or empty pages are OK too.  Dirty split or empty pages
 	 * are not OK, they must be written first so we know what they're going
