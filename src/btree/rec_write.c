@@ -2468,7 +2468,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		if (!WT_PAGE_IS_ROOT(page) && page->ref->addr != NULL) {
 			__wt_get_addr(page->parent, page->ref, &addr, &size);
 			WT_RET(__wt_rec_track_block(
-			    session, WT_PT_BLOCK_EVICT, page, addr, size));
+			    session, WT_PT_BLOCK, page, addr, size));
 		}
 		break;
 	case WT_PAGE_REC_EMPTY:				/* Page deleted */
