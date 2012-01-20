@@ -479,24 +479,24 @@ struct __wt_session {
 	 *  <br>
 	 *  The following are the builtin cursor types:
 	 *  <table>
-	 *  @hrow{URI, Type}
-	 *    @row{<tt>colgroup:\<tablename\>.\<columnset\></tt>,
-	 *	column group cursor}
-	 *    @row{<tt>config:[\<uri\>]</tt>,
-	 *	object configuration cursor (key=config string\,
-	 *	value=config value}
-	 *    @row{<tt>table:\<tablename\></tt>,
-	 *	table cursor (key=table key\, value=table value)}
-	 *    @row{<tt>file:\<filename\></tt>,
-	 *	file cursor (key=file key\, value=file value)}
-	 *    @row{<tt>index:\<tablename\>.\<indexname\></tt>,
-	 *	index cursor (key=index key\, value=table value)}
-	 *    @row{<tt>join:\<cursor1\>\&\<cursor2\>[&\<cursor3\>...]</tt>,
-	 *	join cursor}
-	 *    @row{<tt>statistics:[file</tt><tt>:\<filename\>]</tt>,
-	 *	database or file statistics (key=int\,
-	 *	value=(string)description\, (string)value\,
-	 *	(uint64_t)value)\, see @ref stat_desc for details}
+	 *  @hrow{URI, Type, Key/Value types}
+	 *  @row{<tt>colgroup:\<tablename\>.\<columnset\></tt>,
+	 *	column group cursor,
+	 *	table key\, column group value(s)}
+	 *  @row{<tt>table:\<tablename\></tt>,
+	 *	table cursor,
+	 *	table key\, table value(s)}
+	 *  @row{<tt>file:\<filename\></tt>,
+	 *	file cursor,
+	 *	file key\, file value(s)}
+	 *  @row{<tt>index:\<tablename\>.\<indexname\></tt>,
+	 *	index cursor,
+	 *	key=index key\, value=table value(s)}
+	 *  @row{<tt>statistics:[file</tt><tt>:\<filename\>]</tt>,
+	 *	database or file statistics cursor,
+	 *	key=<code>int id</code>\, value=(<code>string description\,
+	 *	string value\, uint64_t value</code>)\,
+	 *	see @ref cursor_statistics for details}
 	 *  </table>
 	 * @param to_dup a cursor to duplicate
 	 * @param session the session handle
@@ -1488,81 +1488,166 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 
 /*! @} */
 
-#if !defined(SWIG) && !defined(DOXYGEN)
+#if !defined(SWIG)
 /*******************************************
  * Statistic reference.
  *******************************************/
+/*! @addtogroup wt
+ * @{
+ */
 /*
  * DO NOT EDIT: automatically built by dist/api_stat.py.
  * Statistics section: BEGIN
  */
+
+/*!
+ * @name Statistics for connection handles
+ * @anchor statistics_keys
+ * @anchor statistics_conn
+ * Statistics in WiredTiger are accessed through cursors with \c "statistics:"
+ * URIs.  Individual statistics can be queried through the cursor using the
+ * following keys.
+ * @{
+ */
+/*! blocks read from a file */
 #define	WT_STAT_block_read				0
+/*! blocks written to a file */
 #define	WT_STAT_block_write				1
+/*! cache: bytes currently held in the cache */
 #define	WT_STAT_cache_bytes_inuse			2
+/*! cache: eviction server unable to reach eviction goal */
 #define	WT_STAT_cache_evict_slow			3
+/*! cache: internal pages evicted */
 #define	WT_STAT_cache_evict_internal			4
+/*! cache: maximum bytes configured */
 #define	WT_STAT_cache_bytes_max				5
+/*! cache: modified pages evicted */
 #define	WT_STAT_cache_evict_modified			6
+/*! cache: pages currently held in the cache */
 #define	WT_STAT_cache_pages_inuse			7
+/*! cache: pages selected for eviction not evicted because of a hazard
+ * reference */
 #define	WT_STAT_cache_evict_hazard			8
+/*! cache: unmodified pages evicted */
 #define	WT_STAT_cache_evict_unmodified			9
+/*! condition wait calls */
 #define	WT_STAT_cond_wait				10
+/*! files currently open */
 #define	WT_STAT_file_open				11
+/*! rwlock readlock calls */
 #define	WT_STAT_rwlock_rdlock				12
+/*! rwlock writelock calls */
 #define	WT_STAT_rwlock_wrlock				13
+/*! total memory allocations */
 #define	WT_STAT_memalloc				14
+/*! total memory frees */
 #define	WT_STAT_memfree					15
+/*! total read I/Os */
 #define	WT_STAT_total_read_io				16
+/*! total write I/Os */
 #define	WT_STAT_total_write_io				17
 
+/*!
+ * @}
+ * @name Statistics for file objects
+ * @anchor statistics_file
+ * @{
+ */
+/*! bulk-loaded entries */
 #define	WT_STAT_file_bulk_loaded			0
+/*! column-store deleted values */
 #define	WT_STAT_file_col_deleted			1
+/*! column-store fixed-size leaf pages */
 #define	WT_STAT_file_col_fix_pages			2
+/*! column-store internal pages */
 #define	WT_STAT_file_col_int_pages			3
+/*! column-store variable-size leaf pages */
 #define	WT_STAT_file_col_var_pages			4
+/*! cursor-first */
 #define	WT_STAT_cursor_first				5
+/*! cursor-inserts */
 #define	WT_STAT_cursor_inserts				6
+/*! cursor-last */
 #define	WT_STAT_cursor_last				7
+/*! cursor-read */
 #define	WT_STAT_cursor_read				8
+/*! cursor-read-near */
 #define	WT_STAT_cursor_read_near			9
+/*! cursor-read-next */
 #define	WT_STAT_cursor_read_next			10
+/*! cursor-read-prev */
 #define	WT_STAT_cursor_read_prev			11
+/*! cursor-removes */
 #define	WT_STAT_cursor_removes				12
+/*! cursor-updates */
 #define	WT_STAT_cursor_updates				13
+/*! file: block allocations */
 #define	WT_STAT_alloc					14
+/*! file: block allocations required file extension */
 #define	WT_STAT_extend					15
+/*! file: block frees */
 #define	WT_STAT_free					16
+/*! file: overflow pages read from the file */
 #define	WT_STAT_overflow_read				17
+/*! file: pages read from the file */
 #define	WT_STAT_page_read				18
+/*! file: pages written to the file */
 #define	WT_STAT_page_write				19
+/*! file: size */
 #define	WT_STAT_file_size				20
+/*! fixed-record size */
 #define	WT_STAT_file_fixed_len				21
+/*! magic number */
 #define	WT_STAT_file_magic				22
+/*! major version number */
 #define	WT_STAT_file_major				23
+/*! maximum internal page item size */
 #define	WT_STAT_file_maxintlitem			24
+/*! maximum internal page size */
 #define	WT_STAT_file_maxintlpage			25
+/*! maximum leaf page item size */
 #define	WT_STAT_file_maxleafitem			26
+/*! maximum leaf page size */
 #define	WT_STAT_file_maxleafpage			27
+/*! minor version number */
 #define	WT_STAT_file_minor				28
+/*! number of bytes in the freelist */
 #define	WT_STAT_file_freelist_bytes			29
+/*! number of entries in the freelist */
 #define	WT_STAT_file_freelist_entries			30
+/*! overflow pages */
 #define	WT_STAT_file_overflow				31
+/*! page size allocation unit */
 #define	WT_STAT_file_allocsize				32
+/*! reconcile: deleted or temporary pages merged */
 #define	WT_STAT_rec_page_merge				33
+/*! reconcile: internal pages split */
 #define	WT_STAT_rec_split_intl				34
+/*! reconcile: leaf pages split */
 #define	WT_STAT_rec_split_leaf				35
+/*! reconcile: overflow key */
 #define	WT_STAT_rec_ovfl_key				36
+/*! reconcile: overflow value */
 #define	WT_STAT_rec_ovfl_value				37
+/*! reconcile: pages deleted */
 #define	WT_STAT_rec_page_delete				38
+/*! reconcile: pages written */
 #define	WT_STAT_rec_written				39
+/*! reconcile: unable to acquire hazard reference */
 #define	WT_STAT_rec_hazard				40
+/*! row-store internal pages */
 #define	WT_STAT_file_row_int_pages			41
+/*! row-store leaf pages */
 #define	WT_STAT_file_row_leaf_pages			42
+/*! total entries */
 #define	WT_STAT_file_entries				43
+/*! @} */
 /*
  * Statistics section: END
  * DO NOT EDIT: automatically built by dist/api_stat.py.
  */
+/*! @} */
+/*! @} */
 #endif
 
 #undef __F

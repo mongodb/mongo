@@ -1,6 +1,6 @@
 # Read the source files and output the statistics #defines and allocation code.
 
-import re, string, sys
+import re, string, sys, textwrap
 from operator import attrgetter
 from dist import compare_srcfile
 from dist import source_paths_list
@@ -45,19 +45,36 @@ compare_srcfile(tmp_file, '../src/include/stat.h')
 def print_define():
 	# Sort the structure fields by their description so they match
 	# the structure lists.
-	v = 0
-	for l in sorted(connection_stats, key=attrgetter('desc')):
+	f.write('''
+/*!
+ * @name Statistics for connection handles
+ * @anchor statistics_keys
+ * @anchor statistics_conn
+ * Statistics in WiredTiger are accessed through cursors with \c "statistics:"
+ * URIs.  Individual statistics can be queried through the cursor using the
+ * following keys.
+ * @{
+ */
+''')
+	for v, l in enumerate(sorted(connection_stats, key=attrgetter('desc'))):
+		f.write('/*! %s */\n' % '\n * '.join(textwrap.wrap(l.desc, 70)))
 		f.write('#define\tWT_STAT_' + l.name + "\t" *
 		    max(1, 6 - int((len('WT_STAT_') + len(l.name)) / 8)) +
 		    str(v) + '\n')
-		v = v + 1
-	f.write('\n')
-	v = 0
-	for l in sorted(btree_stats, key=attrgetter('desc')):
+	f.write('''
+/*!
+ * @}
+ * @name Statistics for file objects
+ * @anchor statistics_file
+ * @{
+ */
+''')
+	for v, l in enumerate(sorted(btree_stats, key=attrgetter('desc'))):
+		f.write('/*! %s */\n' % '\n * '.join(textwrap.wrap(l.desc, 70)))
 		f.write('#define\tWT_STAT_' + l.name + "\t" *
 		    max(1, 6 - int((len('WT_STAT_') + len(l.name)) / 8)) +
 		    str(v) + '\n')
-		v = v + 1
+	f.write('/*! @} */\n')
 
 # Update the #defines in the wiredtiger.in file.
 tmp_file = '__tmp'
@@ -124,43 +141,5 @@ f.write('#include "wt_internal.h"\n')
 
 print_func('btree', btree_stats)
 print_func('connection', connection_stats)
-
 f.close()
-
 compare_srcfile(tmp_file, '../src/support/stat.c')
-
-# print_dox --
-#	Print the tables for the dox file.
-def print_dox(name, list):
-	f.write('<table>\n')
-	f.write('@hrow{Key,Description}\n')
-
-	# Sort the structure fields by their description, so the eventual
-	# disply is sorted by string.
-	for l in sorted(list, key=attrgetter('desc')):
-		f.write('@row{' + 'WT_STAT_' + l.name + "," + l.desc + '}\n')
-	f.write('</table>\n\n')
-
-# Update dox file
-tmp_file = '__tmp'
-f = open(tmp_file, 'w')
-skip = 0
-for line in open('../docs/src/stat-desc.dox', 'r'):
-	if not skip:
-		f.write(line)
-	if line.count('connection statistics section: END'):
-		f.write(line)
-		skip = 0
-	elif line.count('connection statistics section: BEGIN'):
-		f.write('\n')
-		skip = 1
-		print_dox('Connection', connection_stats)
-	if line.count('file statistics section: END'):
-		f.write(line)
-		skip = 0
-	elif line.count('file statistics section: BEGIN'):
-		f.write('\n')
-		skip = 1
-		print_dox('File', btree_stats)
-f.close()
-compare_srcfile(tmp_file, '../docs/src/stat-desc.dox')

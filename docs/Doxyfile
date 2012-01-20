@@ -115,7 +115,7 @@ ABBREVIATE_BRIEF       = "The $name class" \
 # Doxygen will generate a detailed section even if there is only a brief 
 # description.
 
-ALWAYS_DETAILED_SEC    = YES
+ALWAYS_DETAILED_SEC    = NO
 
 # If the INLINE_INHERITED_MEMB tag is set to YES, doxygen will show all 
 # inherited members of a class in the documentation of that class as if those 
