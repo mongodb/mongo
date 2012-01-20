@@ -228,10 +228,10 @@ __wt_debug_disk(
 		/* FALLTHROUGH */
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
-		__dmsg(ds, ", entries %" PRIu32, dsk->u.entries);
+		__dmsg(ds, ", entries %" PRIu32 "\n", dsk->u.entries);
 		break;
 	case WT_PAGE_OVFL:
-		__dmsg(ds, ", datalen %" PRIu32, dsk->u.datalen);
+		__dmsg(ds, ", datalen %" PRIu32 "\n", dsk->u.datalen);
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
