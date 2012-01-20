@@ -15,7 +15,7 @@ static int  __rec_discard(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_discard_page(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_excl(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
 static void __rec_excl_clear(WT_SESSION_IMPL *);
-static int  __rec_excl_page(WT_SESSION_IMPL *, WT_REF *, WT_PAGE *, uint32_t);
+static int  __rec_excl_page(WT_SESSION_IMPL *, WT_REF *, uint32_t);
 static int  __rec_page_clean_update(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_page_dirty_update(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_review(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
@@ -382,10 +382,10 @@ __rec_excl(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t flags)
 		case WT_REF_READING:			/* Being read */
 			return (WT_ERROR);
 		}
-		page = ref->page;
-		WT_RET(__rec_excl_page(session, ref, page, flags));
+		WT_RET(__rec_excl_page(session, ref, flags));
 
 		/* Recurse down the tree. */
+		page = ref->page;
 		switch (page->type) {
 		case WT_PAGE_COL_INT:
 		case WT_PAGE_ROW_INT:
@@ -423,9 +423,12 @@ __rec_excl_clear(WT_SESSION_IMPL *session)
  * can be evicted.
  */
 static int
-__rec_excl_page(
-    WT_SESSION_IMPL *session, WT_REF *ref, WT_PAGE *page, uint32_t flags)
+__rec_excl_page(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 {
+	WT_PAGE *page;
+
+	page = ref->page;
+
 	/*
 	 * An in-memory page: if the page can't be merged into its parent, then
 	 * we can't evict the subtree.  This is not a problem, it just means we
