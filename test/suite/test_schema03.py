@@ -236,7 +236,7 @@ class test_schema03(wttest.WiredTigerTestCase):
                          ('all', dict(s_restart=['table','colgroup0','index0','colgroup1','index1','populate0','index2','populate1'],P=1.0))]
 
     ntable_scenarios = wtscenario.quick_scenarios('s_ntable',
-        [1,2,7,43], [1.0,0.4,0.5,1.0])
+        [1,2,7,43], [1.0,0.4,0.5,0.5])
     ncolgroup_scenarios = wtscenario.quick_scenarios('s_colgroup',
         [[1,0],[0,1],[2,4],[18,5]], [1.0,0.2,0.3,1.0])
     nindex_scenarios = wtscenario.quick_scenarios('s_index',
@@ -245,11 +245,11 @@ class test_schema03(wttest.WiredTigerTestCase):
     all_scenarios = wtscenario.multiply_scenarios('_', restart_scenarios, ntable_scenarios, ncolgroup_scenarios, nindex_scenarios)
 
     # Prune the scenarios according to the probabilities given above.
-    scenarios = wtscenario.prune_scenarios(all_scenarios)
+    scenarios = wtscenario.prune_scenarios(all_scenarios, 30)
     scenarios = wtscenario.number_scenarios(scenarios)
 
     # Note: the set can be reduced here for debugging, e.g.
-    # scenarios = [ scenarios[40] ]
+    # scenarios = scenarios[40:44]
     #   or
     # scenarios = [ scenarios[0], scenarios[30], scenarios[40] ]
 
@@ -264,7 +264,7 @@ class test_schema03(wttest.WiredTigerTestCase):
         resource.setrlimit(resource.RLIMIT_NOFILE, newlimit)
 
     def setUpConnectionOpen(self, dir):
-        cs = 10 * 1024 * 1024
+        cs = 50 * 1024 * 1024
         conn = wiredtiger.wiredtiger_open(dir, 'create,cache_size=' +
                                           str(cs) + ',hazard_max=300')
         self.pr(`conn`)
