@@ -334,11 +334,6 @@ __rec_review(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 * be merged into our page.  However, another thread of control might
 	 * have inserted new material and the page is no longer deleted, which
 	 * means the reconciliation fails.
-	 *
-	 * If reconciliation isn't going to be possible, we have to clear any
-	 * pages we locked while we were looking.  We keep track of the last
-	 * page we successfully locked, and traverse the tree in the same order
-	 * to clear locks, stopping when we reach the last locked page.
 	 */
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
@@ -364,14 +359,7 @@ __rec_excl(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t flags)
 	WT_REF *ref;
 	uint32_t i;
 
-	/*
-	 * We lock pages in a specific order (and unlock them in reverse order,
-	 * otherwise tracking the last locked page would be meaningless).  In
-	 * this case, walk the tree depth-first and acquire each page's lock
-	 * before reviewing child pages it references.
-	 *
-	 * For each entry in the page...
-	 */
+	/* For each entry in the page... */
 	WT_REF_FOREACH(parent, ref, i) {
 		switch (ref->state) {
 		case WT_REF_DISK:			/* On-disk */
