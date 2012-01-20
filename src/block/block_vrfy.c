@@ -138,6 +138,12 @@ __verify_freelist(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	return (ret);
 }
 
+/* The bit list ignores the first sector: convert to/from an frag/offset. */
+#define	WT_OFF_TO_FRAG(block, off)					\
+	(((off) - WT_BLOCK_DESC_SECTOR) / (block)->allocsize)
+#define	WT_FRAG_TO_OFF(block, frag)					\
+	(((off_t)(frag)) * (block)->allocsize + WT_BLOCK_DESC_SECTOR)
+
 /*
  * __verify_addfrag --
  *	Add the fragments to the list, and complain if we've already verified
@@ -149,8 +155,9 @@ __verify_addfrag(
 {
 	uint32_t frags, i;
 
-	offset = (offset - WT_BLOCK_DESC_SECTOR) / block->allocsize;
+	offset = WT_OFF_TO_FRAG(block, offset);
 	frags = size / block->allocsize;
+
 	for (i = 0; i < frags; ++i)
 		if (__bit_test(block->fragbits, (uint32_t)offset + i))
 			WT_RET_MSG(session, WT_ERROR,
@@ -193,10 +200,11 @@ __verify_checkfrag(WT_SESSION_IMPL *session, WT_BLOCK *block)
 				break;
 			__bit_set(fragbits, last);
 		}
+
 		__wt_errx(session,
 		    "file range %" PRIuMAX "-%" PRIuMAX " was never verified",
-		    (uintmax_t)((off_t)first * block->allocsize),
-		    (uintmax_t)((off_t)last * block->allocsize));
+		    (uintmax_t)WT_FRAG_TO_OFF(block, first),
+		    (uintmax_t)WT_FRAG_TO_OFF(block, last));
 		ret = WT_ERROR;
 	}
 	return (ret);
