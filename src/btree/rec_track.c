@@ -17,6 +17,7 @@
  */
 
 #ifdef HAVE_VERBOSE
+static void __track_dump(WT_SESSION_IMPL *, WT_PAGE *, const char *);
 static void __track_msg(WT_SESSION_IMPL *, WT_PAGE *, const char *, WT_ADDR *);
 static void __track_print(WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE_TRACK *);
 
@@ -221,6 +222,11 @@ __wt_rec_track_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_PAGE_TRACK *track;
 	uint32_t i;
 
+#ifdef HAVE_VERBOSE
+	if (WT_VERBOSE_ISSET(session, reconcile))
+		__track_dump(session, page, "reconcile init");
+#endif
+
 	mod = page->modify;
 
 	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i)
@@ -267,6 +273,12 @@ __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int final)
 {
 	WT_PAGE_TRACK *track;
 	uint32_t i;
+
+#ifdef HAVE_VERBOSE
+	if (WT_VERBOSE_ISSET(session, reconcile))
+		__track_dump(session,
+		    page, final ? "eviction wrapup" : "reconcile wrapup");
+#endif
 
 	/*
 	 * After a sync of a page, some of the objects we're tracking are no
@@ -333,6 +345,28 @@ __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page, int final)
 }
 
 #ifdef HAVE_VERBOSE
+/*
+ * __track_dump --
+ *	Dump the list of tracked objects.
+ */
+static void
+__track_dump(WT_SESSION_IMPL *session, WT_PAGE *page, const char *tag)
+{
+	WT_PAGE_MODIFY *mod;
+	WT_PAGE_TRACK *track;
+	uint32_t i;
+
+	mod = page->modify;
+
+	if (mod->track_entries == 0)
+		return;
+
+	WT_VERBOSE(session,
+	    reconcile, "page %p tracking list at %s:", page, tag);
+	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i)
+		__track_print(session, page, track);
+}
+
 /*
  * __track_print --
  *	Display a tracked entry.
