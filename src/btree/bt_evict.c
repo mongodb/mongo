@@ -502,30 +502,46 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 	 */
 	i = restarted_once = 0;
 	do {
+		if ((page = btree->evict_page) == NULL)
+			goto skip;
+
 		/*
-		 * Root and pinned pages can't be evicted, nor can pages that
-		 * are already locked.  We would skip locked pages later, but
-		 * they just fill up the eviction list for no benefit.
-		 *
+		 * Root and pinned pages can't be evicted.
 		 * !!!
 		 * It's still in flux if root pages are pinned or not, test for
 		 * both cases for now.
 		 */
-		page = btree->evict_page;
-		if (page != NULL &&
-		    !WT_PAGE_IS_ROOT(page) && !F_ISSET(page, WT_PAGE_PINNED) &&
-		    page->ref->state == WT_REF_MEM) {
-			WT_VERBOSE(session, evictserver,
-			    "walk: %p, size %" PRIu32,
-			    page, page->memory_footprint);
+		if (WT_PAGE_IS_ROOT(page) || F_ISSET(page, WT_PAGE_PINNED))
+			goto skip;
 
-			++i;
-			cache->evict[*slotp].page = page;
-			cache->evict[*slotp].btree = btree;
-			++*slotp;
-		}
+		/*
+		 * Skip locked pages: we would skip them later, and they just
+		 * fill up the eviction list for no benefit.
+		 */
+		if (page->ref->state != WT_REF_MEM)
+			goto skip;
 
-		WT_RET(__wt_tree_np(session, &btree->evict_page, 1, 1));
+		/*
+		 * Skip pages expected to be merged into their parents.  The
+		 * problem is if a parent and its child are both added to the
+		 * eviction list and the child is merged into the parent when
+		 * the parent is evicted, the child is left corrupted on the
+		 * list (and might have already been selected for eviction by
+		 * another thread).
+		 */
+		if (F_ISSET(page, WT_PAGE_REC_EMPTY |
+		    WT_PAGE_REC_SPLIT | WT_PAGE_REC_SPLIT_MERGE))
+			goto skip;
+
+		WT_VERBOSE(session, evictserver,
+		    "select: %p, size %" PRIu32, page, page->memory_footprint);
+
+		++i;
+		cache->evict[*slotp].page = page;
+		cache->evict[*slotp].btree = btree;
+		++*slotp;
+
+skip:		WT_RET(__wt_tree_np(session, &btree->evict_page, 1, 1));
 		if (btree->evict_page == NULL && restarted_once++ == 1)
 			break;
 	} while (i < WT_EVICT_WALK_PER_TABLE);
