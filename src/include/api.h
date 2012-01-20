@@ -88,7 +88,11 @@ struct __wt_session_impl {
 
 	WT_HAZARD *hazard;		/* Hazard reference array */
 
-	void	*reconcile;		/* Reconciliation structure */
+	void	*reconcile;		/* Reconciliation information */
+
+	WT_REF **excl;			/* Eviction exclusive list */
+	u_int	 excl_next;		/* Next empty slot */
+	size_t	 excl_allocated;	/* Bytes allocated */
 
 	void	*schema_track;		/* Tracking schema operations */
 	u_int	 schema_track_entries;	/* Currently allocated */
