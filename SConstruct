@@ -369,7 +369,7 @@ class InstallSetup:
     binaries = False
     clientSrc = False
     headers = False
-    bannerDir = None
+    bannerFiles = tuple()
     headerRoot = "include"
 
     def __init__(self):
@@ -380,7 +380,7 @@ class InstallSetup:
         self.libraries = False
         self.clientSrc = False
         self.headers = False
-        self.bannerDir = None
+        self.bannerFiles = tuple()
         self.headerRoot = "include"
         self.clientTestsDir = None
 
@@ -389,13 +389,16 @@ class InstallSetup:
         self.libraries = False
         self.clientSrc = True
         self.headers = True
-        self.bannerDir = "distsrc/client/"
+        self.bannerFiles = [ "#distsrc/client/LICENSE.txt",
+                             "#distsrc/client/SConstruct" ]
         self.headerRoot = ""
         self.clientTestsDir = "src/mongo/client/examples/"
 
 installSetup = InstallSetup()
 if distBuild:
-    installSetup.bannerDir = "distsrc"
+    installSetup.bannerFiles = [ "#distsrc/GNU-AGPL-3.0",
+                                 "#distsrc/README",
+                                 "#distsrc/THIRD-PARTY-NOTICES", ]
 
 if has_option( "full" ):
     installSetup.headers = True
@@ -1076,9 +1079,9 @@ if distBuild:
     else:
         from datetime import date
         today = date.today()
-        installDir = "mongodb-" + getSystemInstallName() + "-"
+        installDir = "#mongodb-" + getSystemInstallName() + "-"
         installDir += getDistName( installDir )
-        print "going to make dist: " + installDir
+        print "going to make dist: " + installDir[1:]
 
 env['NIX_LIB_DIR'] = nixLibPrefix
 env['INSTALL_DIR'] = installDir
@@ -1114,6 +1117,8 @@ env.AlwaysBuild( "push" )
 # ---- deploying ---
 
 def s3push( localName , remoteName=None , remotePrefix=None , fixName=True , platformDir=True ):
+
+    localName = str( localName )
 
     if remotePrefix is None:
         if distName is None:
@@ -1167,14 +1172,12 @@ env.Append( TARFLAGS=" -z " )
 
 if installDir[-1] != "/":
     if windows:
-        distFile = installDir + ".zip"
-        env.Zip( distFile , installDir )
+        distFile = env.Zip( installDir + ".zip", installDir )[0]
     else:
-        distFile = installDir + ".tgz"
-        env.Tar( distFile , installDir )
+        distFile = env.Tar( installDir + '.tgz', installDir )[0]
 
     env.Alias( "dist" , distFile )
-    env.Alias( "s3dist" , [ "install"  , distFile ] , [ s3dist ] )
+    env.Alias( "s3dist" , [ distFile ] , [ s3dist ] )
     env.AlwaysBuild( "s3dist" )
 
 # --- an uninstall target ---
