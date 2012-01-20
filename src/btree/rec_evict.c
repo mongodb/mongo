@@ -499,6 +499,8 @@ __rec_excl_page(
 	if (F_ISSET(page, WT_PAGE_REC_SPLIT | WT_PAGE_REC_EMPTY))
 		if (!__wt_page_is_modified(page))
 			return (0);
+	if (!LF_ISSET(WT_REC_SINGLE))
+		ref->state = WT_REF_MEM;
 	return (1);
 }
 
