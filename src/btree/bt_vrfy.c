@@ -188,8 +188,11 @@ __verify_tree(WT_SESSION_IMPL *session,
 
 #ifdef HAVE_DIAGNOSTIC
 	/* Optionally dump the page in debugging mode. */
-	if (vs->dumpfile)
+	if (vs->dumpfile) {
 		WT_RET(__wt_debug_page(session, page, NULL));
+		if (page->dsk != NULL)
+			WT_RET(__wt_debug_disk(session, page->dsk, NULL));
+	}
 #endif
 
 	/*
