@@ -69,9 +69,9 @@ class test_config04(wttest.WiredTigerTestCase):
         Given a stat cursor, return the value for the matching string.
         We do expect the string, so assert if it's not present.
         """
-        for key in cursor:
-            if key[0] == matchstr:
-                return key[2]
+        for k, desc, pv, v in cursor:
+            if desc == matchstr:
+                return v
         self.fail('In stat cursor, cannot find match for: ' + matchstr)
 
     def test_bad_config(self):

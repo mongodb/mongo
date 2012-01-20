@@ -32,10 +32,8 @@ stats(void)
 	    "statistics:", NULL, NULL, &cursor)) != 0)
 		die("session.open_cursor", ret);
 
-	while (
-	    (ret = cursor->next(cursor)) == 0 &&
-	    (ret = cursor->get_key(cursor, &desc)) == 0 &&
-	    (ret = cursor->get_value(cursor, &pval, &v)) == 0)
+	while ((ret = cursor->next(cursor)) == 0 &&
+	    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
 		(void)fprintf(fp, "%s=%s\n", desc, pval);
 
 	if (ret != WT_NOTFOUND)
@@ -48,10 +46,8 @@ stats(void)
 	    "statistics:" FNAME, NULL, NULL, &cursor)) != 0)
 		die("session.open_cursor", ret);
 
-	while (
-	    (ret = cursor->next(cursor)) == 0 &&
-	    (ret = cursor->get_key(cursor, &desc)) == 0 &&
-	    (ret = cursor->get_value(cursor, &pval, &v)) == 0)
+	while ((ret = cursor->next(cursor)) == 0 &&
+	    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
 		(void)fprintf(fp, "%s=%s\n", desc, pval);
 
 	if (ret != WT_NOTFOUND)

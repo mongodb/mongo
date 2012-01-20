@@ -40,6 +40,7 @@ __curstat_get_key(WT_CURSOR *cursor, ...)
 	WT_ITEM *item;
 	WT_SESSION_IMPL *session;
 	va_list ap;
+	size_t size;
 	int ret;
 
 	ret = 0;
@@ -50,9 +51,14 @@ __curstat_get_key(WT_CURSOR *cursor, ...)
 	WT_CURSOR_NEEDKEY(cursor);
 
 	if (F_ISSET(cursor, WT_CURSTD_RAW)) {
+		size = __wt_struct_size(session, cursor->key_format, cst->key);
+		WT_ERR(__wt_buf_initsize(session, &cursor->key, size));
+		WT_ERR(__wt_struct_pack(session, cursor->key.mem, size,
+		    cursor->key_format, cst->key));
+
 		item = va_arg(ap, WT_ITEM *);
-		item->data = &cst->key;
-		item->size = sizeof(cst->key);
+		item->data = cursor->key.data;
+		item->size = cursor->key.size;
 	} else
 		*va_arg(ap, int *) = cst->key;
 
@@ -83,12 +89,13 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
 	WT_CURSOR_NEEDVALUE(cursor);
 
 	if (F_ISSET(cursor, WT_CURSTD_RAW)) {
-		size = __wt_struct_size(
-		    session, cursor->value_format,
+		size = __wt_struct_size(session, cursor->value_format,
 		    cst->stats_first[cst->key].desc, cst->pv.data, cst->v);
 		WT_ERR(__wt_buf_initsize(session, &cursor->value, size));
-		WT_ERR(__wt_struct_pack(session, cursor->value.mem,
-		    size, cursor->value_format, cst->pv.data, cst->v));
+		WT_ERR(__wt_struct_pack(session, cursor->value.mem, size,
+		    cursor->value_format,
+		    cst->stats_first[cst->key].desc, cst->pv.data, cst->v));
+
 		item = va_arg(ap, WT_ITEM *);
 		item->data = cursor->value.data;
 		item->size = cursor->value.size;

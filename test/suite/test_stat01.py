@@ -33,7 +33,7 @@ class test_stat01(wttest.WiredTigerTestCase):
         # make sure statistics basically look right
         count = 0
         found = False
-        for desc, valstr, val in statcursor:
+        for id, desc, valstr, val in statcursor:
             self.assertEqual(type(desc), stringclass)
             self.assertEqual(type(valstr), stringclass)
             self.assertEqual(type(val), intclass)
