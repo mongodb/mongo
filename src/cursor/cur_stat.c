@@ -121,8 +121,14 @@ __curstat_set_key(WT_CURSOR *cursor, ...)
 
 	va_start(ap, cursor);
 	cst->key = va_arg(ap, int);
-	F_SET(cursor, WT_CURSTD_KEY_SET);
 	va_end(ap);
+
+	/*
+	 * There is currently no way for this call to fail, but do something
+	 * with ret to avoid compile warnings.
+	 */
+	cursor->saved_err = ret;
+	F_SET(cursor, WT_CURSTD_KEY_SET);
 
 	API_END(session);
 }
