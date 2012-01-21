@@ -362,7 +362,7 @@ clientLib = env.MergeLibrary( "mongoclient", ["allclient"] )
 env.Install( '#/', clientLib )
 clientLibName = str( clientLib[0] )
 if has_option( "sharedclient" ):
-    sharedClientLibName = str( env.MergeSharedLibrary( "mongoclient", ["allclient"] )[0] )
+    sharedClientLibName = str( env.SharedLibrary( "mongoclient", [], LIBDEPS=["allclient"], _LIBDEPS='$_LIBDEPS_OBJS' )[0] )
 
 clientEnv = env.Clone();
 clientEnv.Append( CPPPATH=["../"] )

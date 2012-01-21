@@ -6,19 +6,27 @@ The following rule creates a library "mylib" whose contents are the contents of
 be distributed to customers.
 
 MergeLibrary('mylib', ['firstlib', 'secondlib'])
-MergeSharedLibrary('mylib', ['firstlib', 'secondlib'])
 
-This file provides the platform-independent tool, which just selects and imports
-the platform-specific tool providing MergeLibrary and MergeSharedLibrary.
 """
 
-import sys
+import libdeps
+from SCons.Action import Action
+from SCons.Builder import Builder
+
+def merge_library_method(env, target, source, LIBDEPS=None, **kwargs):
+    return env._MergeLibrary(target, [], LIBDEPS=source, **kwargs)
 
 def exists( env ):
     return True
 
 def generate( env ):
-    if sys.platform == 'win32':
-        env.Tool( 'mergelibwin' )
-    else:
-        env.Tool( 'mergelibposix' )
+    merge_library = Builder(
+        action='$ARCOM $_LIBDEPS_OBJS',
+        src_prefix='$LIBPREFIX',
+        src_suffix='$LIBSUFFIX',
+        prefix='$LIBPREFIX',
+        suffix='$LIBSUFFIX',
+        emitter=libdeps.libdeps_emitter )
+    libdeps.update_scanner( merge_library )
+    env['BUILDERS']['_MergeLibrary'] = merge_library
+    env.AddMethod( merge_library_method, 'MergeLibrary' )
