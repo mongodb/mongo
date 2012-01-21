@@ -7,11 +7,42 @@
 
 #include "wt_internal.h"
 
+/*
+ * __cursor_size_chk --
+ *	Return if an inserted item is too large.
+ */
+static inline int
+__cursor_size_chk(WT_SESSION_IMPL *session, WT_BUF *kv)
+{
+	WT_BTREE *btree;
+
+	btree = session->btree;
+
+	if (btree->type == BTREE_COL_FIX) {
+		/* Fixed-size column-stores take a single byte. */
+		if (kv->size != 1)
+			WT_RET_MSG(session, EINVAL,
+			    "item size of %" PRIu32 " does not match "
+			    "fixed-length file requirement of 1 byte",
+			    kv->size);
+	} else {
+		if (kv->size > WT_BTREE_MAX_OBJECT_SIZE)
+			WT_RET_MSG(session, EINVAL,
+			    "item size of %" PRIu32 " exceeds the maximum "
+			    "supported size of %" PRIu32,
+			    kv->size, WT_BTREE_MAX_OBJECT_SIZE);
+	}
+	return (0);
+}
+
+/*
+ * __cursor_fix_implicit --
+ *	Return if search went past the end of the tree.
+ */
 static inline int
 __cursor_fix_implicit(WT_BTREE *btree, WT_CURSOR_BTREE *cbt)
 {
-	return (
-	    btree->type == BTREE_COL_FIX &&
+	return (btree->type == BTREE_COL_FIX &&
 	    !F_ISSET(cbt, WT_CBT_MAX_RECORD) ? 1 : 0);
 }
 
@@ -80,8 +111,10 @@ __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 	btree = cbt->btree;
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
-
 	WT_BSTAT_INCR(session, cursor_read);
+
+	if (btree->type == BTREE_ROW)
+		WT_RET(__cursor_size_chk(session, &cursor->key));
 
 	__cursor_func_init(cbt, 1);
 
@@ -124,8 +157,10 @@ __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 	btree = cbt->btree;
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
-
 	WT_BSTAT_INCR(session, cursor_read_near);
+
+	if (btree->type == BTREE_ROW)
+		WT_RET(__cursor_size_chk(session, &cursor->key));
 
 	__cursor_func_init(cbt, 1);
 
@@ -191,16 +226,14 @@ __wt_btcur_insert(WT_CURSOR_BTREE *cbt)
 	session = (WT_SESSION_IMPL *)cursor->session;
 	WT_BSTAT_INCR(session, cursor_inserts);
 
+	if (btree->type == BTREE_ROW)
+		WT_RET(__cursor_size_chk(session, &cursor->key));
+	WT_RET(__cursor_size_chk(session, &cursor->value));
+
 retry:	__cursor_func_init(cbt, 1);
 
 	switch (btree->type) {
 	case BTREE_COL_FIX:
-		if (cursor->value.size != 1)
-			WT_RET_MSG(session, EINVAL,
-			    "item size of %" PRIu32 " does not match "
-			    "fixed-length file requirement of 1 byte",
-			    cursor->value.size);
-		/* FALLTHROUGH */
 	case BTREE_COL_VAR:
 		/*
 		 * If WT_CURSTD_APPEND set insert a new record (ignoring the
@@ -276,6 +309,9 @@ __wt_btcur_remove(WT_CURSOR_BTREE *cbt)
 	session = (WT_SESSION_IMPL *)cursor->session;
 	WT_BSTAT_INCR(session, cursor_removes);
 
+	if (btree->type == BTREE_ROW)
+		WT_RET(__cursor_size_chk(session, &cursor->key));
+
 retry:	__cursor_func_init(cbt, 1);
 
 	switch (btree->type) {
@@ -327,6 +363,10 @@ __wt_btcur_update(WT_CURSOR_BTREE *cbt)
 	cursor = &cbt->iface;
 	session = (WT_SESSION_IMPL *)cursor->session;
 	WT_BSTAT_INCR(session, cursor_updates);
+
+	if (btree->type == BTREE_ROW)
+		WT_RET(__cursor_size_chk(session, &cursor->key));
+	WT_RET(__cursor_size_chk(session, &cursor->value));
 
 retry:	__cursor_func_init(cbt, 1);
 

@@ -27,14 +27,15 @@ application.  WiredTiger supports the C, C++, Java and Python programming
 languages (among others).
 
 By default, WiredTiger works as a traditional key/value store, where the
-key and value are raw byte arrays accessed with WT_ITEM.  Keys can be up to
-4GB, but depending on how @ref WT_SESSION::create "page sizes" are
-configured, keys larger than some size will be stored on overflow pages.  
+keys and values are raw byte arrays accessed using a WT_ITEM structure.
+Keys and values may be up to (4GB - 512B) bytes in size, but depending
+on how @ref WT_SESSION::create "maximum item sizes" are configured,
+large key and value items will be stored on overflow pages.
 
 WiredTiger also supports a @ref schema "schema layer" so that keys and
-values types can be chosen from a list, or composite keys or values made up
-of columns with any combination of types.  The 4GB limit on keys and values
-still applies.
+values types can be chosen from a list, or composite keys or values made
+up of columns with any combination of types.  The size (4GB - 512B) byte
+limit on keys and values still applies.
 
 All applications that use WiredTiger will be structured roughly as follows.
 The code below is taken from the complete example program

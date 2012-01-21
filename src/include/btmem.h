@@ -505,10 +505,9 @@ struct __wt_update {
 	WT_UPDATE *next;		/* forward-linked list */
 
 	/*
-	 * We can't store 4GB cells: we're short by a few bytes because each
-	 * change/insert item requires a leading WT_UPDATE structure.  For that
-	 * reason, we can use the maximum size as an is-deleted flag and don't
-	 * have to increase the size of this structure for a flag bit.
+	 * We use the maximum size as an is-deleted flag, which means we can't
+	 * store 4GB objects; I'd rather do that than increase the size of this
+	 * structure for a flag bit.
 	 */
 #define	WT_UPDATE_DELETED_ISSET(upd)	((upd)->size == UINT32_MAX)
 #define	WT_UPDATE_DELETED_SET(upd)	((upd)->size = UINT32_MAX)

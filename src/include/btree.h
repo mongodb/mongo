@@ -9,10 +9,6 @@
 #define	WT_BTREE_MINOR_VERSION	0
 
 /*
- * Key and data item lengths are stored in 32-bit unsigned integers, meaning
- * the largest key or data item is 4GB.  Record numbers are stored in 64-bit
- * unsigned integers, meaning the largest record number is "really, really big".
- *
  * The minimum btree leaf and internal page sizes are 512B, the maximum 512MB.
  * (The maximum of 512MB is enforced by the software, it could be set as high
  * as 4GB.)
@@ -20,6 +16,20 @@
 #define	WT_BTREE_ALLOCATION_SIZE_MIN	512
 #define	WT_BTREE_ALLOCATION_SIZE_MAX	(128 * WT_MEGABYTE)
 #define	WT_BTREE_PAGE_SIZE_MAX		(512 * WT_MEGABYTE)
+
+/*
+ * Variable-length value items and row-store key/value item lengths are stored
+ * in 32-bit unsigned integers, meaning the largest theoretical key/value item
+ * is 4GB.  However, in the WT_UPDATE structure we use the UINT32_MAX size as a
+ * "deleted" flag.  Limit the size of a single object to 4GB - 512B: it's a few
+ * additional bytes if we ever want to store a small structure length plus the
+ * object size in 32 bits, or if we ever need more denoted values.  Storing 4GB
+ * objects in a Btree borders on clinical insanity, anyway.
+ *
+ * Record numbers are stored in 64-bit unsigned integers, meaning the largest
+ * record number is "really, really big".
+ */
+#define	WT_BTREE_MAX_OBJECT_SIZE	(UINT32_MAX - 512)
 
 /*
  * Split page size calculation -- we don't want to repeatedly split every time
