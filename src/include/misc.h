@@ -109,9 +109,14 @@
 	if (WT_VERBOSE_ISSET(session, f))				\
 		__wt_verbose(session, #f ": " __VA_ARGS__);		\
 } while (0)
+#define	WT_VERBOSE_CALL(session, f, func) do {				\
+	if (WT_VERBOSE_ISSET(session, f))				\
+		func;							\
+} while (0)
 #else
 #define	WT_VERBOSE_ISSET(session, f)	0
 #define	WT_VERBOSE(session, f, ...)
+#define	WT_VERBOSE_CALL(session, f, func)
 #endif
 
 /* Clear a structure. */

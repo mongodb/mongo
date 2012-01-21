@@ -441,10 +441,7 @@ __wt_block_freelist_write(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		return (0);
 	}
 
-#ifdef HAVE_VERBOSE
-	if (WT_VERBOSE_ISSET(session, block))
-		__wt_block_dump(session, block);
-#endif
+	WT_VERBOSE_CALL(session, block, __wt_block_dump(session, block));
 
 	/* Truncate the file if possible. */
 	WT_RET(__block_truncate(session, block));
