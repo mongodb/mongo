@@ -86,7 +86,7 @@ main(int argc, char *argv[])
 		if (wts_bulk_load())		/* Load initial records */
 			goto err;
 						/* Close, verify */
-		if (wts_teardown() || wts_verify("bulk-verify"))
+		if (wts_teardown() || wts_verify("post-bulk verify"))
 			goto err;
 						/* Loop reading & operations */
 		for (reps = 0; reps < 3; ++reps) {
@@ -105,7 +105,7 @@ main(int argc, char *argv[])
 				goto err;
 
 						/* Close, verify */
-			if (wts_teardown() || wts_verify("ops-verify"))
+			if (wts_teardown() || wts_verify("post-ops verify"))
 				goto err;
 
 			/*
@@ -128,13 +128,24 @@ main(int argc, char *argv[])
 		 * deleted records if a page fragments leaving a deleted record
 		 * on one side of the split.
 		 *
-		 * Salvage, verify, dump.
+		 * Save a copy, salvage, verify, dump.
 		 */
-		if (g.c_delete_pct == 0 && (
-		    wts_salvage() ||
-		    wts_verify("post-salvage verify") ||
-		    wts_dump("salvage", 0)))
-			goto err;
+		if (g.c_delete_pct == 0) {
+			/*
+			 * Save a copy of the interesting files so we can replay
+			 * the salvage step as necessary.
+			 */
+			if (system(
+			    "rm -rf __slvg.copy && "
+			    "mkdir __slvg.copy && "
+			    "cp WiredTiger* __wt __slvg.copy/") != 0)
+				goto err;
+
+			if (wts_salvage() ||
+			    wts_verify("post-salvage verify") ||
+			    wts_dump("salvage", 0))
+				goto err;
+		}
 
 		printf("%4d: %-40s\n", g.run_cnt, config_dtype());
 	}
@@ -172,7 +183,7 @@ startup(void)
 	}
 
 	/* Remove the run's files except for __rand. */
-	(void)system("rm -f WiredTiger WiredTiger.* __[a-qs-z]* __run");
+	(void)system("rm -rf WiredTiger WiredTiger.* __[a-qs-z]* __run");
 
 	/* Open/truncate the logging file. */
 	if (g.logging) {
@@ -192,7 +203,7 @@ onint(int signo)
 	UNUSED(signo);
 
 	/* Remove the run's files except for __rand. */
-	(void)system("rm -f WiredTiger WiredTiger.* __[a-qs-z]* __run");
+	(void)system("rm -rf WiredTiger WiredTiger.* __[a-qs-z]* __run");
 
 	fprintf(stderr, "\n");
 	exit (EXIT_FAILURE);

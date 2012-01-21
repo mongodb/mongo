@@ -336,9 +336,6 @@ wts_salvage(void)
 
 	track("salvage", 0ULL);
 
-	/* Save a copy of the file before we salvage it. */
-	(void)system("cp __wt __salvage_copy");
-
 	if (wts_open(&conn, &session))
 		return (1);
 
