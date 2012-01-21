@@ -153,20 +153,19 @@ static int
 __verify_addfrag(
     WT_SESSION_IMPL *session, WT_BLOCK *block, off_t offset, uint32_t size)
 {
-	uint32_t frags, i;
+	uint32_t frag, frags, i;
 
-	offset = WT_OFF_TO_FRAG(block, offset);
+	frag = (uint32_t)WT_OFF_TO_FRAG(block, offset);
 	frags = size / block->allocsize;
 
 	for (i = 0; i < frags; ++i)
-		if (__bit_test(block->fragbits, (uint32_t)offset + i))
+		if (__bit_test(block->fragbits, frag + i))
 			WT_RET_MSG(session, WT_ERROR,
 			    "file fragment at offset %" PRIuMAX
 			    " already verified",
 			    (uintmax_t)offset);
 	if (frags > 0)
-		__bit_nset(block->fragbits,
-		    (uint32_t)offset, (uint32_t)offset + (frags - 1));
+		__bit_nset(block->fragbits, frag, frag + (frags - 1));
 	return (0);
 }
 
