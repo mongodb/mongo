@@ -132,6 +132,12 @@ def get_libdeps(source, target, env, for_signature):
     target = env.Flatten([target])
     return list(__get_libdeps(target[0], 'LIBDEPS'))
 
+def get_libdeps_objs(source, target, env, for_signature):
+    objs = set()
+    for lib in get_libdeps(source, target, env, for_signature):
+        objs.update(lib.sources_set)
+    return list(objs)
+
 def get_syslibdeps(source, target, env, for_signature):
     if for_signature:
         return[]
@@ -173,7 +179,13 @@ def libdeps_emitter(target, source, env):
 def setup_environment(env):
     """Set up the given build environment to do LIBDEPS tracking."""
 
-    env['_LIBDEPS'] = get_libdeps
+    try:
+        env['_LIBDEPS']
+    except KeyError:
+        env['_LIBDEPS'] = '$_LIBDEPS_LIBS'
+
+    env['_LIBDEPS_LIBS'] = get_libdeps
+    env['_LIBDEPS_OBJS'] = get_libdeps_objs
     env['_SYSLIBDEPS'] = ' ${_stripixes(LIBLINKPREFIX, SYSLIBDEPS, LIBLINKSUFFIX, LIBPREFIXES, LIBSUFFIXES, __env__)} '
     env['_SHLIBDEPS'] = '$SHLIBDEP_GROUP_START ${_concat(SHLIBDEPPREFIX, __env__.subst(_LIBDEPS, target=TARGET, source=SOURCE), SHLIBDEPSUFFIX, __env__, target=TARGET, source=SOURCE)} $SHLIBDEP_GROUP_END'
 
