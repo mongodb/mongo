@@ -124,15 +124,15 @@ main(int argc, char *argv[])
 
 		/*
 		 * If we don't delete any records, we can salvage the file.  The
-		 * problem with deleting records is that WiredTiger will restore
-		 * deleted records during salvage when a page fragments, leaving
-		 * a deleted record on one side of the split.
+		 * problem with deleting records is that salvage will restore
+		 * deleted records if a page fragments leaving a deleted record
+		 * on one side of the split.
 		 *
-		 * Close, salvage, verify, re-open, dump.
+		 * Salvage, verify, dump.
 		 */
 		if (g.c_delete_pct == 0 && (
 		    wts_salvage() ||
-		    wts_verify("salvage-verify") ||
+		    wts_verify("post-salvage verify") ||
 		    wts_dump("salvage", 0)))
 			goto err;
 
