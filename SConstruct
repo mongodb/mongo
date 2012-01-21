@@ -1206,3 +1206,18 @@ Export("darwin windows solaris linux nix")
 
 env.SConscript( 'src/SConscript', variant_dir=variantDir, duplicate=False )
 env.SConscript( 'SConscript.smoke' )
+
+def clean_old_dist_builds(env, target, source):
+    prefix = "mongodb-%s-%s" % (platform, processor)
+    filenames = sorted(os.listdir("."))
+    filenames = [x for x in filenames if x.startswith(prefix)]
+    to_keep = [x for x in filenames if x.endswith(".tgz") or x.endswith(".zip")][-2:]
+    for filename in [x for x in filenames if x not in to_keep]:
+        print "removing %s" % filename
+        try:
+            shutil.rmtree(filename)
+        except:
+            os.remove(filename)
+
+env.Alias("dist_clean", [], [clean_old_dist_builds])
+env.AlwaysBuild("dist_clean")
