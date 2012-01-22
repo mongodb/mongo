@@ -9,6 +9,7 @@
 #include "client.h"
 #include "namespacestring.h"
 #include "d_globals.h"
+#include "mongomutex.h"
 
 // oplog locking
 // no top level read locks
@@ -17,7 +18,53 @@
 // yielding
 // commitIfNeeded
 
+namespace mongo { 
+
+    //static RWLockRecursive excludeWrites("excludeWrites");
+    //static mapsf<string,RWLockRecursive*> dblocks;
+
+    HLMutex::HLMutex(const char *name) : SimpleMutex(name)
+    { }
+
+    bool Lock::isLocked() {
+        return d.dbMutex.atLeastReadLocked();
+    }
+
+    Lock::Global::TempRelease::TempRelease() {
+    }
+
+    Lock::Global::TempRelease::~TempRelease() {
+    }
+
+    Lock::Global::Global() {
+        d.dbMutex.lock();
+    }
+    Lock::Global::~Global() {
+        DESTRUCTOR_GUARD(
+          d.dbMutex.unlock();
+        )
+    }
+    Lock::DBWrite::DBWrite(const StringData& ns) { 
+        d.dbMutex.lock();
+    }
+    Lock::DBWrite::~DBWrite() { 
+        DESTRUCTOR_GUARD(
+          d.dbMutex.unlock();
+        )
+    }
+    Lock::DBRead::DBRead(const StringData& ns) { 
+        d.dbMutex.lock_shared();
+    } 
+    Lock::DBRead::~DBRead() { 
+        DESTRUCTOR_GUARD(
+          d.dbMutex.unlock_shared();
+        )
+    }
+
+}
+
 namespace mongo {
+
     // this tie-in temporary until MongoMutex is folded in more directly.Exclud
     // called when the lock has been achieved
     void MongoMutex::lockedExclusively() {
@@ -36,22 +83,5 @@ namespace mongo {
         assert( ++n == 1 ); // below releasingWriteLock we assume MongoMutex is a singleton, and uses dbMutex ref above
         _remapPrivateViewRequested = false;
     }
-
-    /** Notes on d.writeExcluder
-        we want to be able to block any attempted write while allowing reads; additionally 
-        force non-greedy acquisition so that reads can continue -- 
-        that is, disallow greediness of write lock acquisitions.  This is for that purpose.  The 
-        #1 need is by groupCommitWithLimitedLocks() but useful elsewhere such as for lock and fsync.
-    */
-    
-    ExcludeAllWrites::ExcludeAllWrites() : 
-    lk(d.writeExcluder)
-    {
-        LOG(3) << "ExcludeAllWrites" << endl;
-        wassert( !d.dbMutex.isWriteLocked() );
-    };
-    /*
-    ExcludeAllWrites::~ExcludeAllWrites() {
-    }*/
 
 }

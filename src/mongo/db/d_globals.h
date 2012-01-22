@@ -16,7 +16,6 @@ namespace mongo {
         DGlobals();
 
         // these are intentionally never deleted:
-        RWLockRecursive& writeExcluder;
         MongoMutex &dbMutex;
         ClientCursorMonitor& clientCursorMonitor;
 

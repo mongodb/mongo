@@ -7,17 +7,36 @@
 
 namespace mongo {
 
-    class ExcludeAllWrites : boost::noncopyable {
-        RWLockRecursive::Exclusive lk;
-        readlock gslk;
+    // a mutex, but reported in curop() - thus a "high level" (HL) one
+    // some overhead so we don't use this for everything
+    class HLMutex : public SimpleMutex {
     public:
-        ExcludeAllWrites();
+        HLMutex(const char *name);
     };
 
-    class LockCollectionForReading : boost::noncopyable { 
-        readlock lk;
+    class Lock : boost::noncopyable { 
     public:
-        explicit LockCollectionForReading(const string& ns) { }
+        static bool isLocked(); // true if *anything* is locked (by us)
+        class Global : boost::noncopyable { // stop the world 
+        public:
+            Global(); 
+            ~Global();
+            struct TempRelease {
+                TempRelease(); ~TempRelease();
+            };
+        };
+        class ExcludeWrites : boost::noncopyable { // stop all writers 
+        };
+        class DBWrite : boost::noncopyable { // exclusive for this db
+        public:
+            DBWrite(const StringData& dbOrNs);
+            ~DBWrite();
+        };
+        class DBRead : boost::noncopyable { // shared for this db
+        public:
+            DBRead(const StringData& dbOrNs);
+            ~DBRead();
+        };
     };
 
 }

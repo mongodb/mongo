@@ -201,7 +201,7 @@ namespace mongo {
      */
     Client::ReadContext::ReadContext(const string& ns, string path, bool doauth ) {
         {
-            lk.reset( new _LockCollectionForReading(ns) );
+            lk.reset( new Lock::DBRead(ns) );
             Database *db = dbHolder().get(ns, path);
             if( db ) {
                 c.reset( new Context(path, ns, db, doauth) );
@@ -224,7 +224,7 @@ namespace mongo {
                     Context c(ns, path, doauth);
                 }
                 // db could be closed at this interim point -- that is ok, we will throw, and don't mind throwing.
-                lk.reset( new _LockCollectionForReading(ns) );
+                lk.reset( new Lock::DBRead(ns) );
                 c.reset( new Context(ns, path, doauth) );
             }
             else { 

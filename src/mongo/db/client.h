@@ -47,12 +47,6 @@ namespace mongo {
     class LockCollectionForReading;
     class PageFaultRetryableSection;
 
-#if defined(CLC)
-    typedef LockCollectionForReading _LockCollectionForReading;
-#else
-    typedef readlock _LockCollectionForReading;
-#endif
-
     TSP_DECLARE(Client, currentClient)
 
     typedef long long ConnectionId;
@@ -177,7 +171,7 @@ namespace mongo {
             ReadContext(const string& ns, string path=dbpath, bool doauth=true );
             Context& ctx() { return *c.get(); }
         private:
-            scoped_ptr<_LockCollectionForReading> lk;
+            scoped_ptr<Lock::DBRead> lk;
             scoped_ptr<Context> c;
         };
 
