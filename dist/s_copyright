@@ -1,30 +1,44 @@
 #! /bin/sh
 
 # It was a pain updating all the copyrights in the Berkeley DB tree: I'm not
-# doing that again: the only files carrying copyrights in the WiredTiger tree
+# doing that again, the only files carrying copyrights in the WiredTiger tree
 # are the source files, that is, *.[ch] and *.in.  Check automatically to be
 # sure the copyright is up-to-date.
 
-t=__wt.$$
-trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+l1=__wt.1$$
+l2=__wt.2$$
+trap 'rm -f l1 l2; exit 0' 0 1 2 3 13 15
 
-cat > $t <<ENDOFTEXT
+year=`date | sed 's/.* //'`
+
+cat > $l1 <<ENDOFTEXT
 /*-
- * See the file LICENSE for redistribution information.
- *
- * Copyright (c) 2008-2011 WiredTiger, Inc.
+ * Copyright (c) 2008-$year WiredTiger, Inc.
  *	All rights reserved.
+ *
+ * See the file LICENSE for redistribution information.
+ENDOFTEXT
+
+# Copyright for files WiredTiger does not own.
+cat > $l2 <<ENDOFTEXT
+/*-
+ * Copyright (c) 2008-$year WiredTiger, Inc.
+ *
+ * This is free and unencumbered software released into the public domain.
 ENDOFTEXT
 
 check()
 {
-	# Skip auto-generated files and files we didn't author.
+	# Skip auto-generated files, files in which WiredTiger holds no rights.
 	if `egrep "skip	$1" s_copyright.list > /dev/null`; then
 		return;
 	fi
 
 	# Check for a correct copyright header.
-	if `sed -e 5q ../$1 | diff - $t > /dev/null` ; then
+	if `sed -e 5q ../$1 | diff - $l1 > /dev/null` ; then
+		return;
+	fi
+	if `sed -e 4q ../$1 | diff - $l2 > /dev/null` ; then
 		return;
 	fi
 

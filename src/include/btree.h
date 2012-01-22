@@ -1,8 +1,8 @@
 /*-
- * See the file LICENSE for redistribution information.
- *
- * Copyright (c) 2008-2011 WiredTiger, Inc.
+ * Copyright (c) 2008-2012 WiredTiger, Inc.
  *	All rights reserved.
+ *
+ * See the file LICENSE for redistribution information.
  */
 
 #define	WT_BTREE_MAJOR_VERSION	1	/* Version */
