@@ -32,6 +32,9 @@ def assignErrorCodes():
 codes = []
 
 def readErrorCodes( callback, replaceZero = False ):
+    
+    quick = [ "assert" , "Exception" , "verify" ]
+
     ps = [ re.compile( "(([umsg]asser(t|ted))) *\(( *)(\d+)" ) ,
            re.compile( "((User|Msg|MsgAssertion)Exceptio(n))\(( *)(\d+)" ) ,
            re.compile( "(((verify))) *\(( *)(\d+)" )
@@ -45,30 +48,38 @@ def readErrorCodes( callback, replaceZero = False ):
         lineNum = 1
         
         for line in open( x ):
-            
-            for p in ps:               
-                
-                def repl( m ):
-                    m = m.groups()
-                    
-                    start = m[0]
-                    spaces = m[3]
-                    code = m[4]
-                    if code == '0' and replaceZero :
-                        code = getNextCode( lastCodes )
-                        lastCodes.append( code )
-                        code = str( code )
-                        needReplace[0] = True
-                                            
-                        print( "Adding code " + code + " to line " + x + ":" + str( lineNum ) )
-                        
-                    else :
-                        codes.append( ( x , lineNum , line , code ) )
-                        callback( x , lineNum , line , code )
-                    
-                    return start + "(" + spaces + code
-                
-                line = re.sub( p, repl, line )
+
+            found = False
+            for zz in quick:
+                if line.find( zz ) >= 0:
+                    found = True
+                    break
+
+            if found:
+                for p in ps:               
+
+                    def repl( m ):
+                        m = m.groups()
+
+                        start = m[0]
+                        spaces = m[3]
+                        code = m[4]
+                        if code == '0' and replaceZero :
+                            code = getNextCode( lastCodes )
+                            lastCodes.append( code )
+                            code = str( code )
+                            needReplace[0] = True
+
+                            print( "Adding code " + code + " to line " + x + ":" + str( lineNum ) )
+
+                        else :
+                            codes.append( ( x , lineNum , line , code ) )
+                            callback( x , lineNum , line , code )
+
+                        return start + "(" + spaces + code
+
+                    line = re.sub( p, repl, line )
+                    # end if ps loop
             
             if replaceZero : lines.append( line )
             lineNum = lineNum + 1
