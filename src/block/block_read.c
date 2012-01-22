@@ -85,7 +85,9 @@ __wt_block_read(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	blk = WT_BLOCK_HEADER_REF(dsk);
 
 	/* Validate the checksum. */
-	if (block->checksum && cksum != 0 && blk->cksum != 0) {
+	if (block->checksum &&
+	    cksum != WT_BLOCK_CHECKSUM_NOT_SET &&
+	    blk->cksum != WT_BLOCK_CHECKSUM_NOT_SET) {
 		blk->cksum = 0;
 		page_cksum = __wt_cksum(dsk, size);
 		if (cksum != page_cksum) {

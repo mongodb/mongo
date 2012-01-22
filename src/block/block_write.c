@@ -216,9 +216,11 @@ not_compressed:	/*
 	 * Update the block's checksum: checksum the compressed contents, not
 	 * the uncompressed contents.
 	 */
-	blk->cksum = 0;
-	if (block->checksum)
+	if (block->checksum) {
+		blk->cksum = 0;
 		blk->cksum = __wt_cksum(dsk, align_size);
+	} else
+		blk->cksum = WT_BLOCK_CHECKSUM_NOT_SET;
 
 	/* Allocate space from the underlying file and write the block. */
 	WT_ERR(__wt_block_alloc(session, block, &offset, align_size));

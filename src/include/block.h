@@ -143,7 +143,14 @@ struct __wt_block_header {
 	 * the page will result in a valid checksum).  Second, a page's checksum
 	 * is stored in the disk header.  This is for salvage, so that salvage
 	 * knows when it's found a page that may be useful.
+	 *
+	 * Applications can turn off checksums which is a promise that the file
+	 * can never become corrupted, but people sometimes make promises they
+	 * can't keep.  If no checksums are configured, we use a byte pattern of
+	 * alternating bits as the checksum, as that is unlikely to occur as the
+	 * result of corruption in the file.
 	 */
+#define	WT_BLOCK_CHECKSUM_NOT_SET	0xA5C35A33
 	uint32_t cksum;			/* 12-15: checksum */
 };
 /*
