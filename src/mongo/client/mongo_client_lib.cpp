@@ -77,6 +77,6 @@
 #include "../pch.cpp"
 
 extern "C" {
-#include "../util/md5.c"
+#include "../util/md5.cpp"
 }
 
