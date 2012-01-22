@@ -110,8 +110,10 @@ def get_variant_dir():
         if o["nargs"] == 0:
             a.append( name )
         else:
-            a.append( name + "-" + get_option( name ) )
-
+            x = get_option( name )
+            x = re.sub( "[,\\\\/]" , "_" , x )
+            a.append( name + "_" + x )
+            
     s = "#build/${PYSYSPLATFORM}/"
 
     if len(a) > 0:
