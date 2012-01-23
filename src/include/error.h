@@ -56,7 +56,7 @@
 		ret = __ret;						\
 } while (0)
 
-/* Loop to retry an operation that returns WT_RESTART. */
+/* Loop to retry an operation that returns EBUSY. */
 #define	WT_RETRY_YIELD(a) do {						\
 	if ((ret = (a)) == EBUSY) {					\
 		__wt_yield();						\
