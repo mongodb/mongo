@@ -311,42 +311,8 @@ struct __wt_page {
 
 /*
  * WT_REF --
- * A single in-memory page and the state information used to determine if it's
- * OK to dereference the pointer to the page.
- *
- * Synchronization is based on the WT_REF->state field, which has 4 states:
- *
- * WT_REF_DISK:
- *      The initial setting before a page is brought into memory, and set as
- *	a result of page eviction; the page is on disk, and must be read into
- *	into memory before use.
- * WT_REF_LOCKED:
- *	Set by eviction; an eviction thread has selected this page for eviction;
- *	once hazard references are checked, the page will be evicted.
- * WT_REF_MEM:
- *	Set by a reading thread once the page has been read from disk; the page
- *	is in the cache and the page reference is OK.
- * WT_REF_READING:
- *	Set by a reading thread before reading a page from disk; other readers
- *	of the page wait until the read completes.
- *
- * The life cycle of a typical page goes like this: pages are read into memory
- * from disk and their state set to WT_REF_MEM.  When the page is selected for
- * eviction, the page state is set to WT_REF_LOCKED.  In all cases, evicting
- * threads reset the page's state when finished with the page: if eviction was
- * successful (a clean page was simply discarded, and a dirty page was written
- * to disk and then discarded), the page state is set to WT_REF_DISK; if
- * eviction failed because the page was busy, page state is reset to WT_REF_MEM.
- *
- * Readers check the state field and if it's WT_REF_MEM, they set a hazard
- * reference to the page, flush memory and re-confirm the page state.  If the
- * page state is unchanged, the reader has a valid reference and can proceed.
- *
- * When an evicting thread wants to discard a page from the tree, it sets the
- * WT_REF_LOCKED state, flushes memory, then checks hazard references.  If a
- * hazard reference is found, state is reset to WT_REF_MEM, restoring the page
- * to the readers.  If the evicting thread does not find a hazard reference,
- * the page is evicted.
+ *	A single in-memory page and the state information used to determine if
+ * it's OK to dereference the pointer to the page.
  */
 struct __wt_ref {
 	WT_PAGE *page;			/* In-memory page */
@@ -363,6 +329,47 @@ struct __wt_ref {
 	 *
 	 * WT_REF_DISK has a value of 0, the default state after allocating
 	 * cleared memory.
+	 *
+	 * Synchronization is based on the WT_REF->state field, which has 5
+	 * possible states:
+	 *
+	 * WT_REF_DISK:
+	 *	The initial setting before a page is brought into memory, and
+	 * set as a result of page eviction; the page is on disk, and must be
+	 * read into into memory before use.
+	 *
+	 * WT_REF_LOCKED:
+	 *	Set by eviction; an eviction thread has selected this page for
+	 * eviction; once hazard references are checked, the page will be
+	 * evicted.
+	 *
+	 * WT_REF_MEM:
+	 *	Set by a reading thread once the page has been read from disk;
+	 * the page is in the cache and the page reference is OK.
+	 *
+	 * WT_REF_READING:
+	 *	Set by a reading thread before reading a page from disk; other
+	 * readers of the page wait until the read completes.
+	 *
+	 * The life cycle of a typical page goes like this: pages are read into
+	 * memory from disk and their state set to WT_REF_MEM.  When the page is
+	 * selected for eviction, the page state is set to WT_REF_LOCKED.  In
+	 * all cases, evicting threads reset the page's state when finished with
+	 * the page: if eviction was successful (a clean page was discarded, and
+	 * a dirty page was written to disk and then discarded), the page state
+	 * is set to WT_REF_DISK; if eviction failed because the page was busy,
+	 * page state is reset to WT_REF_MEM.
+	 *
+	 * Readers check the state field and if it's WT_REF_MEM, they set a
+	 * hazard reference to the page, flush memory and re-confirm the page
+	 * state.  If the page state is unchanged, the reader has a valid
+	 * reference and can proceed.
+	 *
+	 * When an evicting thread wants to discard a page from the tree, it
+	 * sets the WT_REF_LOCKED state, flushes memory, then checks hazard
+	 * references.  If a hazard reference is found, state is reset to
+	 * WT_REF_MEM, restoring the page to the readers.  If the evicting
+	 * thread does not find a hazard reference, the page is evicted.
 	 */
 	volatile enum {
 		WT_REF_DISK=0,		/* Page is on disk */
