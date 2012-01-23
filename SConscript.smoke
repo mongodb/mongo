@@ -71,6 +71,7 @@ if shellEnv is not None:
     addSmoketest( "smokeJsSlowWeekly", [add_exe("mongo")])
     addSmoketest( "smokeQuota", [ add_exe("mongo") ] )
     addSmoketest( "smokeTool", [ add_exe( "mongo" ), add_exe("mongod"), add_exe("mongos"), "tools" ] )
+    addSmoketest( "smokeAggregation", [ add_exe( "mongo" ), add_exe( "mongod" ) ] )
 
 # Note: although the test running logic has been moved to
 # buildscripts/smoke.py, the interface to running the tests has been

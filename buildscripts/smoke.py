@@ -468,7 +468,9 @@ def expand_suites(suites):
                                   "dur": ("dur/*.js", False),
                                   "auth": ("auth/*.js", False),
                                   "sharding": ("sharding/*.js", False),
-                                  "tool": ("tool/*.js", False)}[suite]
+                                  "tool": ("tool/*.js", False),
+                                  "aggregation": ("aggregation/test[ab]*.js", True),
+                                 }[suite]
             except KeyError:
                 raise Exception('unknown test suite %s' % suite)
 
