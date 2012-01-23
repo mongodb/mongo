@@ -1873,7 +1873,9 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * into the tree.  But, if a new "smallest" key is inserted into
 		 * our split-created subtree, and we don't update the internal
 		 * page, when we merge that internal page into its parent page,
-		 * the key may be incorrect.  Imagine the following tree:
+		 * the key may be incorrect (or more likely, have been coerced
+		 * to a single byte because it's an internal page's 0th key.
+		 * Imagine the following tree:
 		 *
 		 *	2	5	40	internal page
 		 *		|
@@ -1887,8 +1889,8 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 *	     |
 		 *	     6			key sorts before parent's key
 		 *
-		 * To fix this problem, we take the original page's key as our
-		 * first key, because we know that key sorts before any possible
+		 * To fix this problem, we take the higher-level page's key as
+		 * our first key, because that key sorts before any possible
 		 * key inserted into the subtree, and discard whatever 0th key
 		 * is on the split-created internal page.
 		 */
@@ -2056,11 +2058,19 @@ __rec_row_merge(WT_SESSION_IMPL *session, WT_PAGE *page)
 				val_set = 1;
 				break;
 			case WT_PAGE_REC_SPLIT:
-				WT_RET(__rec_row_merge(
-				    session, rp->modify->u.split));
-				continue;
 			case WT_PAGE_REC_SPLIT_MERGE:
-				WT_RET(__rec_row_merge(session, rp));
+				/*
+				 * If we have a merge key set, we're working our
+				 * way down a merge tree.  If we have not set a
+				 * merge key, we're starting descent of a new
+				 * merge tree, set the merge key.
+				 */
+				if (r->merge_ref == NULL)
+					r->merge_ref = ref;
+				WT_RET(__rec_row_merge(session,
+				    F_ISSET(rp, WT_PAGE_REC_MASK) ==
+				    WT_PAGE_REC_SPLIT_MERGE ?
+				    rp : rp->modify->u.split));
 				continue;
 			}
 		}
