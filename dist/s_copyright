@@ -9,7 +9,7 @@ l1=__wt.1$$
 l2=__wt.2$$
 trap 'rm -f l1 l2; exit 0' 0 1 2 3 13 15
 
-year=`date | sed 's/.* //'`
+year=`date +%Y`
 
 cat > $l1 <<ENDOFTEXT
 /*-
