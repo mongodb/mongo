@@ -675,6 +675,15 @@ doneCheckOrder:
         }
         return _plans[0];
     }
+    
+    bool QueryPlanSet::haveOrderedPlan() const {
+        for( PlanSet::const_iterator i = _plans.begin(); i != _plans.end(); ++i ) {
+            if ( !(*i)->scanAndOrderRequired() ) {
+                return true;
+            }
+        }
+        return false;
+    }
 
     QueryPlanSet::Runner::Runner( QueryPlanSet &plans, QueryOp &op ) :
         _op( op ),
@@ -1066,6 +1075,10 @@ doneCheckOrder:
     
     void MultiPlanScanner::clearIndexesForPatterns() const {
         QueryUtilIndexed::clearIndexesForPatterns( _currentQps->frsp(), _currentQps->order() );
+    }
+    
+    bool MultiPlanScanner::haveOrderedPlan() const {
+        return _currentQps->haveOrderedPlan();
     }
 
     MultiCursor::MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order, shared_ptr<CursorOp> op, bool mayYield )

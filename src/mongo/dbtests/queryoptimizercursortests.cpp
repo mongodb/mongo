@@ -30,7 +30,8 @@ namespace mongo {
     shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query,
                                                const BSONObj &order = BSONObj(),
                                                const QueryPlanSelectionPolicy &planPolicy =
-                                               QueryPlanSelectionPolicy::any() );
+                                               QueryPlanSelectionPolicy::any(),
+                                               bool requireOrder = true );
 } // namespace mongo
 
 namespace QueryOptimizerCursorTests {
@@ -1800,12 +1801,13 @@ namespace QueryOptimizerCursorTests {
             _cli.insert( ns(), BSON( "a" << 3 << "b" << 3 ) );
             _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
             _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
+            // Plan {a:1} will be chosen and recorded.
             ASSERT( _cli.query( ns(), QUERY( "a" << 2 ).sort( "b" ) )->more() );
             
             dblock lk;
             Client::Context ctx( ns() );
             shared_ptr<Cursor> c = newQueryOptimizerCursor( ns(), BSON( "a" << 2 ), BSON( "b" << 1 ) );
-            // Check that we are scanning {b:1} not {a:1}.
+            // Check that we are scanning {b:1} not {a:1}, since {a:1} is not properly ordered.
             for( int i = 0; i < 3; ++i ) {
                 ASSERT( c->ok() );
                 c->advance();
@@ -2207,6 +2209,51 @@ namespace QueryOptimizerCursorTests {
         }
     };
     
+    class AllowOutOfOrderPlan : public Base {
+    public:
+        void run() {
+            dblock lk;
+            Client::Context ctx( ns() );
+            shared_ptr<Cursor> c =
+            newQueryOptimizerCursor( ns(), BSONObj(), BSON( "a" << 1 ), false, false );
+            ASSERT( c );
+        }
+    };
+    
+    class NoTakeoverByOutOfOrderPlan : public Base {
+    public:
+        void run() {
+            _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+            // Add enough early matches that the {$natural:1} plan would be chosen if it did not
+            // require scan and order.
+            for( int i = 0; i < 150; ++i ) {
+                _cli.insert( ns(), BSON( "a" << 2 << "b" << 1 ) );
+            }
+            // Add non matches early on the {a:1} plan.
+            for( int i = 0; i < 150; ++i ) {
+                _cli.insert( ns(), BSON( "a" << 1 << "b" << 5 ) );
+            }
+            // Add enough matches outside the {a:1} index range that the {$natural:1} scan will not
+            // complete before the {a:1} plan records 101 matches and is selected for takeover.
+            for( int i = 0; i < 150; ++i ) {
+                _cli.insert( ns(), BSON( "a" << 3 << "b" << 10 ) );
+            }            
+            dblock lk;
+            Client::Context ctx( ns() );
+            shared_ptr<Cursor> c =
+            newQueryOptimizerCursor( ns(), BSON( "a" << LT << 3 << "b" << 1 ), BSON( "a" << 1 ), false, false );
+            ASSERT( c );
+            BSONObj idxKey;
+            while( c->ok() ) {
+                idxKey = c->indexKeyPattern();
+                c->advance();
+            }
+            // Check that the ordered plan {a:1} took over, despite the unordered plan {$natural:1}
+            // seeing > 101 matches.
+            ASSERT_EQUALS( BSON( "a" << 1 ), idxKey );
+        }
+    };
+    
     namespace GetCursor {
         
         class Base : public QueryOptimizerCursorTests::Base {
@@ -2320,7 +2367,7 @@ namespace QueryOptimizerCursorTests {
             }
         };
         
-        class OutOfOrder : public QueryOptimizerCursorTests::Base {
+        class PreventOutOfOrderPlan : public QueryOptimizerCursorTests::Base {
         public:
             void run() {
                 _cli.insert( ns(), BSON( "_id" << 5 ) );
@@ -2328,6 +2375,21 @@ namespace QueryOptimizerCursorTests {
                 Client::Context ctx( ns() );
                 shared_ptr<Cursor> c = NamespaceDetailsTransient::getCursor( ns(), BSONObj(), BSON( "b" << 1 ) );
                 ASSERT( !c );
+            }
+        };
+        
+        class AllowOutOfOrderPlan : public Base {
+        public:
+            void run() {
+                dblock lk;
+                Client::Context ctx( ns() );
+                ParsedQuery parsedQuery
+                ( ns(), 0, 0, 0, BSON( "$query" << BSONObj() << "$orderby" << BSON( "a" << 1 ) ),
+                 BSONObj() );
+                shared_ptr<Cursor> c =
+                NamespaceDetailsTransient::getCursor( ns(), BSONObj(), BSON( "a" << 1 ), false, 0,
+                                                     &parsedQuery );
+                ASSERT( c );
             }
         };
         
@@ -2658,12 +2720,15 @@ namespace QueryOptimizerCursorTests {
             add<QueryOptimizerCursorTests::TakeoverCappedWrapYieldRecoveryFailure>();
             add<QueryOptimizerCursorTests::InvalidateClientCursorHolder>();
             add<QueryOptimizerCursorTests::TimeoutClientCursorHolder>();
+            add<QueryOptimizerCursorTests::AllowOutOfOrderPlan>();
+            add<QueryOptimizerCursorTests::NoTakeoverByOutOfOrderPlan>();
             add<QueryOptimizerCursorTests::GetCursor::NoConstraints>();
             add<QueryOptimizerCursorTests::GetCursor::SimpleId>();
             add<QueryOptimizerCursorTests::GetCursor::OptimalIndex>();
             add<QueryOptimizerCursorTests::GetCursor::SimpleKeyMatch>();
             add<QueryOptimizerCursorTests::GetCursor::Geo>();
-            add<QueryOptimizerCursorTests::GetCursor::OutOfOrder>();
+            add<QueryOptimizerCursorTests::GetCursor::PreventOutOfOrderPlan>();
+            add<QueryOptimizerCursorTests::GetCursor::AllowOutOfOrderPlan>();
             add<QueryOptimizerCursorTests::GetCursor::BestSavedOutOfOrder>();
             add<QueryOptimizerCursorTests::GetCursor::BestSavedOptimal>();
             add<QueryOptimizerCursorTests::GetCursor::BestSavedNotOptimal>();

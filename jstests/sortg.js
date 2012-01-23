@@ -11,13 +11,15 @@ for( i = 0; i < 40; ++i ) {
 
 function memoryException( sortSpec, querySpec ) {
     querySpec = querySpec || {};
-    assert.throws( function() { t.find( querySpec ).sort( sortSpec ).itcount() } );
+    assert.throws( function() {
+                  t.find( querySpec ).sort( sortSpec ).batchSize( 1000 ).itcount()
+                  } );
     assert( db.getLastError().match( /too much data for sort\(\) with no index/ ) );
 }
 
 function noMemoryException( sortSpec, querySpec ) {
     querySpec = querySpec || {};
-    t.find( querySpec ).sort( sortSpec ).itcount();
+    t.find( querySpec ).sort( sortSpec ).batchSize( 1000 ).itcount();
     assert( !db.getLastError() );
 }
 
@@ -37,10 +39,10 @@ noMemoryException( {a:1} );
 noMemoryException( {b:1} );
 
 // With an indexed plan on _id:1 and an unindexed plan on b:1, the indexed plan
-// should succeed even if the unindexed one exhausts its memory limit.
+// should succeed even if the unindexed one would exhaust its memory limit.
 noMemoryException( {_id:1}, {b:null} );
 
 // With an unindexed plan on b:1 recorded for a query, the query should be
 // retried when the unindexed plan exhausts its memory limit.
-assert.eq( 'BtreeCursor b_1', t.find( {b:1} ).sort( {_id:1} ).explain().cursor );
+assert.eq( 'BtreeCursor b_1', t.find( {b:1} ).sort( {_id:1} ).explain().cursor ); // Record b:1 plan
 noMemoryException( {_id:1}, {b:null} );

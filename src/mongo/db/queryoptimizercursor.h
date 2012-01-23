@@ -82,6 +82,7 @@ namespace mongo {
         virtual const QueryPlan *queryPlan() const = 0;
         virtual const QueryPlan *completeQueryPlan() const = 0;
         virtual const MultiPlanScanner *multiPlanScanner() const = 0;
+        virtual void abortUnorderedPlans() = 0;
     };
     
 } // namespace mongo

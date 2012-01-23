@@ -63,7 +63,7 @@ namespace mongo {
          * query ops for all cursors.
          */
         QueryOptimizerCursorOp( long long &aggregateNscanned, const QueryPlanSelectionPolicy &selectionPolicy,
-                               bool requireOrder, int cumulativeCount = 0 ) :
+                               const bool &requireOrder, int cumulativeCount = 0 ) :
         _matchCounter( aggregateNscanned, cumulativeCount ),
         _countingMatches(),
         _mustAdvance(),
@@ -74,9 +74,7 @@ namespace mongo {
         }
         
         virtual void _init() {
-            if ( _requireOrder && qp().scanAndOrderRequired() ) {
-                throw MsgAssertionException( OutOfOrderDocumentsAssertionCode, "order spec cannot be satisfied with index" );
-            }
+            checkCursorOrdering();
             if ( !_selectionPolicy.permitPlan( qp() ) ) {
                 throw MsgAssertionException( 9011,
                                             str::stream()
@@ -84,6 +82,7 @@ namespace mongo {
                                             << _selectionPolicy.name()
                                             << "'" );
             }
+            
             _c = qp().newCursor();
 
             // The QueryOptimizerCursor::prepareToTouchEarlierIterate() implementation requires _c->prepareToYield() to work.
@@ -152,10 +151,11 @@ namespace mongo {
         }
         
         virtual void next() {
+            checkCursorOrdering();
 
             mayAdvance();
             
-            if ( _matchCounter.enoughCumulativeMatchesToChooseAPlan() ) {
+            if ( !qp().scanAndOrderRequired() && _matchCounter.enoughCumulativeMatchesToChooseAPlan() ) {
                 setStop();
                 return;
             }
@@ -224,6 +224,11 @@ namespace mongo {
             _mustAdvance = false;
             _matchCounter.resetMatch();
         }
+        void checkCursorOrdering() {
+            if ( _requireOrder && qp().scanAndOrderRequired() ) {
+                throw MsgAssertionException( OutOfOrderDocumentsAssertionCode, "order spec cannot be satisfied with index" );
+            }
+        }
 
         CachedMatchCounter _matchCounter;
         bool _countingMatches;
@@ -235,7 +240,7 @@ namespace mongo {
         ClientCursor::YieldData _yieldData;
         bool _yieldRecoveryFailed;
         const QueryPlanSelectionPolicy &_selectionPolicy;
-        bool _requireOrder;
+        const bool &_requireOrder;
     };
     
     /**
@@ -247,8 +252,9 @@ namespace mongo {
     class QueryOptimizerCursorImpl : public QueryOptimizerCursor {
     public:
         QueryOptimizerCursorImpl( auto_ptr<MultiPlanScanner> &mps, const QueryPlanSelectionPolicy &planPolicy, bool requireOrder ) :
+        _requireOrder( requireOrder ),
         _mps( mps ),
-        _originalOp( new QueryOptimizerCursorOp( _nscanned, planPolicy, requireOrder ) ),
+        _originalOp( new QueryOptimizerCursorOp( _nscanned, planPolicy, _requireOrder ) ),
         _currOp(),
         _completeOp(),
         _nscanned() {
@@ -440,6 +446,10 @@ namespace mongo {
             return _mps.get();
         }
         
+        virtual void abortUnorderedPlans() {
+            _requireOrder = true;
+        }
+        
     private:
         /**
          * Advances the QueryPlanSet::Runner.
@@ -513,13 +523,15 @@ namespace mongo {
             return _dups.getdup( loc );
         }
         
+        bool _requireOrder;
         auto_ptr<MultiPlanScanner> _mps;
         shared_ptr<QueryOptimizerCursorOp> _originalOp;
         QueryOptimizerCursorOp *_currOp;
         QueryOptimizerCursorOp *_completeOp;
         shared_ptr<Cursor> _takeover;
         long long _nscanned;
-        // Using a SmallDupSet seems a bit hokey, but I've measured a 5% performance improvement with ~100 document non multi key scans.
+        // Using a SmallDupSet seems a bit hokey, but I've measured a 5% performance improvement
+        // with ~100 document non multi key scans.
         SmallDupSet _dups;
     };
     
@@ -597,9 +609,9 @@ namespace mongo {
             }
         }
         auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order, &hint, true, parsedQuery ? parsedQuery->getMin() : BSONObj(), parsedQuery ? parsedQuery->getMax() : BSONObj() ) ); // mayYield == false
-        const QueryPlan *singlePlan = mps->singleCursor();
+        const QueryPlan *singlePlan = mps->singlePlan();
         bool requireOrder = ( parsedQuery == 0 );
-        if ( singlePlan && ( requireOrder || !singlePlan->scanAndOrderRequired() ) ) {
+        if ( singlePlan && !singlePlan->scanAndOrderRequired() ) {
             if ( planPolicy.permitPlan( *singlePlan ) ) {
                 shared_ptr<Cursor> single = singlePlan->newCursor();
                 if ( !query.isEmpty() && !single->matcher() ) {
@@ -614,15 +626,16 @@ namespace mongo {
                 return single;
             }
         }
+        bool requireOrder = ( parsedQuery == 0 );
         return newQueryOptimizerCursor( mps, planPolicy, requireOrder );
     }
 
-    /** This interface just available for testing. */
-    shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query,
-                                               const BSONObj &order,
-                                               const QueryPlanSelectionPolicy &planPolicy ) {
+    /** This interface is just available for testing. */
+    shared_ptr<Cursor> newQueryOptimizerCursor
+    ( const char *ns, const BSONObj &query, const BSONObj &order, const QueryPlanSelectionPolicy &planPolicy,
+     bool requireOrder ) {
         auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order ) ); // mayYield == false
-        return newQueryOptimizerCursor( mps, planPolicy, true );
+        return newQueryOptimizerCursor( mps, planPolicy, requireOrder );
     }
         
 } // namespace mongo;

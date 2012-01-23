@@ -312,6 +312,8 @@ namespace mongo {
 
         const FieldRangeSetPair &frsp() const { return *_frsp; }
         BSONObj order() const { return _order; }
+        
+        bool haveOrderedPlan() const;
 
         //for testing
         const FieldRangeSetPair *originalFrsp() const { return _originalFrsp.get(); }
@@ -472,6 +474,8 @@ namespace mongo {
         bool hasMultiKey() const { return _currentQps->hasMultiKey(); }
         
         void clearIndexesForPatterns() const;
+
+        bool haveOrderedPlan() const;
 
     private:
         void assertNotOr() const {

@@ -38,7 +38,7 @@
 #include "../repl_block.h"
 #include "../../server.h"
 #include "../d_concurrency.h"
-#include "../queryoptimizercursor.h"
+#include "../queryoptimizercursorimpl.h"
 
 namespace mongo {
 
@@ -668,22 +668,36 @@ namespace mongo {
         void mayAddMatch() {
             DiskLoc loc = _cursor->currLoc();
             if ( _scanAndOrder ) {
-                try {
-                    _scanAndOrder->add( _cursor->current(), _parsedQuery.showDiskLoc() ? &loc : 0 );
-                } catch ( const UserException &e ) {
-                    if ( e.getCode() == ScanAndOrderMemoryLimitExceededAssertionCode ) {
-                        _queryOptimizerCursor->multiPlanScanner()->clearIndexesForPatterns();
+                if ( !_scanAndOrderDups.getsetdup( loc ) ) {
+                    try {
+                        _scanAndOrder->add( _cursor->current(), _parsedQuery.showDiskLoc() ? &loc : 0 );
+                    } catch ( const UserException &e ) {
+                        bool rethrow = true;
+                        if ( e.getCode() == ScanAndOrderMemoryLimitExceededAssertionCode ) {
+                            if ( _queryOptimizerCursor->multiPlanScanner()->haveOrderedPlan() ) {
+                                _scanAndOrder.reset();
+                                _queryOptimizerCursor->abortUnorderedPlans();
+                                rethrow = false;
+                            }
+                            else if ( _queryOptimizerCursor->multiPlanScanner()->usingCachedPlan() ) {
+                                _queryOptimizerCursor->multiPlanScanner()->clearIndexesForPatterns();
+                            }
+                        }
+                        if ( rethrow ) {
+                            throw;
+                        }
                     }
-                    throw;
                 }
             }
             if ( !iterateNeedsSort() ) {
-                if ( _skip > 0 ) {
-                    --_skip;
-                }
-                else {
-                    ++_n;
-                    fillQueryResultFromObj( _buf, _parsedQuery.getFields(), loc.obj(), ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
+                if ( !_cursor->getsetdup( loc ) ) {
+                    if ( _skip > 0 ) {
+                        --_skip;
+                    }
+                    else {
+                        ++_n;
+                        fillQueryResultFromObj( _buf, _parsedQuery.getFields(), loc.obj(), ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
+                    }
                 }
             }
         }
@@ -693,13 +707,26 @@ namespace mongo {
         bool enoughTotalResults() const {
             return ( _parsedQuery.enough( _n ) || _buf.len() >= MaxBytesToReturnToClientAtOnce );
         }
+        void finishedFirstBatch() {
+            if ( _queryOptimizerCursor ) {
+                _queryOptimizerCursor->abortUnorderedPlans();
+            }            
+        }
         long long handoff( Message &result ) {
             int ret = _n;
             if ( resultsNeedSort() ) {
                 _buf.reset();
                 _buf.skip( sizeof( QueryResult ) );
-                // Handle exception here
-                _scanAndOrder->fill( _buf, _parsedQuery.getFields(), ret );
+//                try {
+//                log() << "going to fill" << endl;
+                    _scanAndOrder->fill( _buf, _parsedQuery.getFields(), ret );
+//                } catch ( const UserException &e ) {
+//                    if ( e.getCode() == ScanAndOrderMemoryLimitExceededAssertionCode ) {
+//                        log() << "filled exception" << endl;
+//                        _queryOptimizerCursor->multiPlanScanner()->clearIndexesForPatterns();
+//                    }
+//                    throw;
+//                }
             }
             if ( _buf.len() > 0 ) {
                 result.appendData( _buf.buf(), _buf.len() );
@@ -751,6 +778,7 @@ namespace mongo {
         QueryOptimizerCursor *_queryOptimizerCursor;
         BufBuilder _buf;
         shared_ptr<ScanAndOrder> _scanAndOrder;
+        SmallDupSet _scanAndOrderDups;
         long long _skip;
         long long _n;
     };
@@ -925,19 +953,18 @@ namespace mongo {
                     }
                     
                     DiskLoc currLoc = cursor->currLoc();
-                    if ( cursor->getsetdup( currLoc ) ) {
-                        continue;
-                    }
+//                    log() << "idx: " << cursor->indexKeyPattern() << " obj: " << cursor->current() << endl;
                     
                     BSONObj js = cursor->current();
                     assert( js.isValid() );
-                    
-                    if ( pq.hasOption( QueryOption_OplogReplay ) ) {
-                        BSONElement e = js["ts"];
-                        if ( e.type() == Date || e.type() == Timestamp ) {
-                            slaveReadTill = e._opTime();
-                        }
-                    }
+
+                    // This should happen after matching?
+//                    if ( pq.hasOption( QueryOption_OplogReplay ) ) {
+//                        BSONElement e = js["ts"];
+//                        if ( e.type() == Date || e.type() == Timestamp ) {
+//                            slaveReadTill = e._opTime();
+//                        }
+//                    }
                     
                     queryResponseBuilder.mayAddMatch();
                     if ( !cursor->supportGetMore() ) {
@@ -948,6 +975,7 @@ namespace mongo {
                     else if ( queryResponseBuilder.enoughForFirstBatch() ) {
                         /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
                         if ( pq.wantMore() && pq.getNumToReturn() != 1 ) {
+                            queryResponseBuilder.finishedFirstBatch();
                             cursor->advance();
                             cursorid = ccPointer->cursorid();
                         }
