@@ -25,30 +25,6 @@ namespace mongo {
 
     const unsigned ScanAndOrder::MaxScanAndOrderBytes = 32 * 1024 * 1024;
 
-    void ScanAndOrder::_add(BSONObj& k, BSONObj o, DiskLoc* loc) {
-        if (!loc) {
-            _best.insert(make_pair(k.getOwned(),o.getOwned()));
-        }
-        else {
-            BSONObjBuilder b;
-            b.appendElements(o);
-            b.append("$diskLoc", loc->toBSONObj());
-            _best.insert(make_pair(k.getOwned(), b.obj().getOwned()));
-        }
-    }
-
-    void ScanAndOrder::_addIfBetter(BSONObj& k, BSONObj o, BestMap::iterator i, DiskLoc* loc) {
-        /* todo : we don't correct _approxSize here. */
-        const BSONObj& worstBestKey = i->first;
-        int c = worstBestKey.woCompare(k, _order._spec.keyPattern);
-        if ( c > 0 ) {
-            // k is better, 'upgrade'
-            _best.erase(i);
-            _add(k, o, loc);
-        }
-    }
-
-
     void ScanAndOrder::add(BSONObj o, DiskLoc* loc) {
         assert( o.isValid() );
         BSONObj k;
@@ -102,4 +78,27 @@ namespace mongo {
         nout = nFilled;
     }
 
+    void ScanAndOrder::_add(BSONObj& k, BSONObj o, DiskLoc* loc) {
+        if (!loc) {
+            _best.insert(make_pair(k.getOwned(),o.getOwned()));
+        }
+        else {
+            BSONObjBuilder b;
+            b.appendElements(o);
+            b.append("$diskLoc", loc->toBSONObj());
+            _best.insert(make_pair(k.getOwned(), b.obj().getOwned()));
+        }
+    }
+    
+    void ScanAndOrder::_addIfBetter(BSONObj& k, BSONObj o, BestMap::iterator i, DiskLoc* loc) {
+        /* todo : we don't correct _approxSize here. */
+        const BSONObj& worstBestKey = i->first;
+        int c = worstBestKey.woCompare(k, _order._spec.keyPattern);
+        if ( c > 0 ) {
+            // k is better, 'upgrade'
+            _best.erase(i);
+            _add(k, o, loc);
+        }
+    }
+    
 } // namespace mongo
