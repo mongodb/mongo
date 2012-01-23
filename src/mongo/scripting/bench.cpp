@@ -260,10 +260,16 @@ namespace mongo {
                         int options = e["options"].eoo() ? 0 : e["options"].Int();
                         int batchSize = e["batchSize"].eoo() ? 0 : e["batchSize"].Int();
                         BSONObj filter = e["filter"].eoo() ? BSONObj() : e["filter"].Obj();
+                        int expected = e["expected"].eoo() ? -1 : e["expected"].Int();
 
                         auto_ptr<DBClientCursor> cursor = conn->query( ns, fixQuery( e["query"].Obj() ), limit, skip, &filter, options, batchSize );
 
                         int count = cursor->itcount();
+
+                        if ( expected >= 0 &&  count != expected ) {
+                            cout << "bench query on: " << ns << " expected: " << expected << " got: " << cout << endl;
+                            assert(false);
+                        }
 
                         if( check ){
                             BSONObj thisValue = BSON( "count" << count );
