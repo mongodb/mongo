@@ -87,9 +87,10 @@ for line in open(f, 'r'):
 		name = c.name
 		if '.' in name:
 			print >>sys.stderr, "Bad config key " + name
-		# Deal with duplicates: with complex configurationso
-		# (like WT_SESSION::create), it's simpler to deal with duplicates
-		# here than in config_data.py.
+
+		# Deal with duplicates: with complex configurations (like
+		# WT_SESSION::create), it's simpler to deal with duplicates here than
+		# manually in api_data.py.
 		if name == lastname:
 			continue
 		lastname = name
