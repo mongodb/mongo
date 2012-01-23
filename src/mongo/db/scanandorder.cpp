@@ -98,7 +98,7 @@ namespace mongo {
     void ScanAndOrder::_validateAndUpdateApproxSize( const int approxSizeDelta ) {
         // note : adjust when bson return limit adjusts. note this limit should be a bit higher.
         int newApproxSize = _approxSize + approxSizeDelta;
-        verify( 16060, newApproxSize >= 0 );
+        verify( 16061, newApproxSize >= 0 );
         uassert( ScanAndOrderMemoryLimitExceededAssertionCode,
                 "too much data for sort() with no index.  add an index or specify a smaller limit",
                 (unsigned)newApproxSize < MaxScanAndOrderBytes );
