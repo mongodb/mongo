@@ -43,7 +43,7 @@ namespace mongo {
          * scanning index with keySpec 'pattern' using constraints 'frs', or
          * BSONObj() if no such key.
          */
-        BSONObj getKeyFromObject(const BSONObj &o) {
+        BSONObj getKeyFromObject(const BSONObj &o) const {
             return _keyCutter.firstMatch(o);
         }
     };
@@ -88,7 +88,7 @@ namespace mongo {
 
         /**
          * @throw ScanAndOrderMemoryLimitExceededAssertionCode if adding would grow memory usage
-         * beyond ScanAndOrder::MaxScanAndOrderBytes.
+         * to ScanAndOrder::MaxScanAndOrderBytes.
          */
         void add(const BSONObj &o, const DiskLoc* loc);
 
