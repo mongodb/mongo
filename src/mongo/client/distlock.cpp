@@ -113,6 +113,9 @@ namespace mongo {
                     // replace it for a quite a while)
                     // if the lock is taken, the take-over mechanism should handle the situation
                     auto_ptr<DBClientCursor> c = conn->query( DistributedLock::locksNS , BSONObj() );
+                    // TODO:  Would be good to make clear whether query throws or returns empty on errors
+                    uassert( 16060, str::stream() << "cannot query locks collection on config server " << conn.getHost(), c.get() );
+
                     set<string> pids;
                     while ( c->more() ) {
                         BSONObj lock = c->next();
