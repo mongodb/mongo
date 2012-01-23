@@ -214,11 +214,15 @@ not_compressed:	/*
 
 	/*
 	 * Update the block's checksum: checksum the compressed contents, not
-	 * the uncompressed contents.
+	 * the uncompressed contents.  If the computed checksum happens to be
+	 * equal to the special "not set" value, increment it.  We do the same
+	 * on the checking side.
 	 */
 	if (block->checksum) {
 		blk->cksum = 0;
 		blk->cksum = __wt_cksum(dsk, align_size);
+		if (blk->cksum == WT_BLOCK_CHECKSUM_NOT_SET)
+			++blk->cksum;
 	} else
 		blk->cksum = WT_BLOCK_CHECKSUM_NOT_SET;
 

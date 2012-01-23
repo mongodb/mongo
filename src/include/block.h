@@ -136,19 +136,21 @@ struct __wt_block_header {
 	uint32_t disk_size;		/* 08-11: on-disk page size */
 
 	/*
-	 * Page checksums are stored in two places.  First, a page's checksum is
-	 * in the internal page that references a page as part of the address
-	 * cookie.  This is done to ensure we detect corruption, as storing the
-	 * checksum in the on-disk page implies a 1 in 2^32 chance corruption of
-	 * the page will result in a valid checksum).  Second, a page's checksum
-	 * is stored in the disk header.  This is for salvage, so that salvage
-	 * knows when it's found a page that may be useful.
+	 * Page checksums are stored in two places.  First, a page's checksum
+	 * is in the internal page that references a page as part of the
+	 * address cookie.  This is done to improve the chances that we detect
+	 * corruption (e.g., overwriting a page with another valid page image).
+	 * Second, a page's checksum is stored in the disk header.  This is for
+	 * salvage, so that salvage knows when it has found a page that may be
+	 * useful.
 	 *
-	 * Applications can turn off checksums which is a promise that the file
-	 * can never become corrupted, but people sometimes make promises they
-	 * can't keep.  If no checksums are configured, we use a byte pattern of
-	 * alternating bits as the checksum, as that is unlikely to occur as the
-	 * result of corruption in the file.
+	 * Applications can turn off checksums, which is a promise that the
+	 * file can never become corrupted, but people sometimes make promises
+	 * they can't keep.  If no checksums are configured, we use a pattern
+	 * of alternating bits as the checksum, as that is unlikely to occur as
+	 * the result of corruption in the file.  If a page happens to checksum
+	 * to this special bit pattern, we bump it by one during reads and
+	 * writes to avoid ambiguity.
 	 */
 #define	WT_BLOCK_CHECKSUM_NOT_SET	0xA5C35A33
 	uint32_t cksum;			/* 12-15: checksum */

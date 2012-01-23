@@ -90,6 +90,8 @@ __wt_block_read(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	    blk->cksum != WT_BLOCK_CHECKSUM_NOT_SET) {
 		blk->cksum = 0;
 		page_cksum = __wt_cksum(dsk, size);
+		if (page_cksum == WT_BLOCK_CHECKSUM_NOT_SET)
+			++page_cksum;
 		if (cksum != page_cksum) {
 			if (!F_ISSET(session, WT_SESSION_SALVAGE_QUIET_ERR))
 				__wt_errx(session,
