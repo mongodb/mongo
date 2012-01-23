@@ -256,6 +256,14 @@ namespace mongo {
             cmdLine.objcheck = true;
         }
 
+        if (params.count("bind_ip")) {
+            // passing in wildcard is the same as default behavior; remove and warn
+            if ( cmdLine.bind_ip ==  "0.0.0.0" ) {
+                cout << "warning: bind_ip of 0.0.0.0 is unnecessary; listens on all ips by default" << endl;
+                cmdLine.bind_ip = "";
+            }
+        }
+
         string logpath;
 
 #ifndef _WIN32
