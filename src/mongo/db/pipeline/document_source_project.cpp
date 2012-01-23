@@ -146,6 +146,12 @@ namespace mongo {
                 goto IncludeExclude;
             }
 
+            case NumberLong: {
+                long inclusion = outFieldElement.numberLong();
+                fieldInclusion = static_cast<int>(inclusion);
+                goto IncludeExclude;
+            }
+
             case NumberInt:
                 /* just a plain integer include/exclude specification */
                 fieldInclusion = outFieldElement.numberInt();

@@ -78,7 +78,6 @@ namespace mongo {
 
         intrusive_ptr<Expression> pExpression; // the result
         intrusive_ptr<ExpressionObject> pExpressionObject; // alt result
-        int isOp = -1; /* -1 -> unknown, 0 -> not an operator, 1 -> operator */
         enum { UNKNOWN, NOTOPERATOR, OPERATOR } kind = UNKNOWN;
 
         BSONObj obj(pBsonElement->Obj());
@@ -94,15 +93,11 @@ namespace mongo {
                         fieldCount == 0);
 
                 /* we've determined this "object" is an operator expression */
-                isOp = 1;
                 kind = OPERATOR;
 
                 pExpression = parseExpression(pFieldName, &fieldElement);
             }
             else {
-                uassert(15984, str::stream() << "this object is already an operator expression, and can't be used as a document expression (at \"" <<
-                        pFieldName << "\")",
-                        isOp != 1);
                 uassert(15990, str::stream() << "this object is already an operator expression, and can't be used as a document expression (at \"" <<
                         pFieldName << "\")",
                         kind != OPERATOR);
@@ -116,12 +111,12 @@ namespace mongo {
                     pExpression = pExpressionObject;
 
                     /* this "object" is not an operator expression */
-                    isOp = 0;
                     kind = NOTOPERATOR;
                 }
 
                 BSONType fieldType = fieldElement.type();
                 string fieldName(pFieldName);
+                int inclusion = -1;
                 if (fieldType == Object) {
                     /* it's a nested document */
                     ObjectCtx oCtx(
@@ -140,7 +135,8 @@ namespace mongo {
                 }
                 else if (fieldType == NumberDouble) {
                     /* it's an inclusion specification */
-                    int inclusion = static_cast<int>(fieldElement.Double());
+                    inclusion = static_cast<int>(fieldElement.Double());
+                field_inclusion:
                     if (inclusion == 0)
                         pExpressionObject->excludePath(fieldName);
                     else if (inclusion == 1)
@@ -152,11 +148,16 @@ namespace mongo {
                                 false);
                 }
                 else if (fieldType == Bool) {
-                    bool inclusion = fieldElement.Bool();
-                    if (!inclusion)
-                        pExpressionObject->excludePath(fieldName);
-                    else
-                        pExpressionObject->includePath(fieldName);
+                    inclusion = fieldElement.Bool() ? 1 : 0;
+                    goto field_inclusion;
+                }
+                else if (fieldType == NumberInt) {
+                    inclusion = fieldElement.Int();
+                    goto field_inclusion;
+                }
+                else if (fieldType == NumberLong) {
+                    inclusion = fieldElement.Long();
+                    goto field_inclusion;
                 }
                 else { /* nothing else is allowed */
                     uassert(15992, str::stream() <<

@@ -19,6 +19,7 @@
 
 #include "db/cursor.h"
 #include "db/pipeline/accumulator.h"
+#include "db/pipeline/dependency_tracker.h"
 #include "db/pipeline/document.h"
 #include "db/pipeline/document_source.h"
 #include "db/pipeline/expression.h"
@@ -337,6 +338,21 @@ namespace mongo {
 
     bool Pipeline::run(BSONObjBuilder &result, string &errmsg,
                        const intrusive_ptr<DocumentSource> &pInputSource) {
+        /*
+          Analyze dependency information.
+
+          This pushes dependencies from the end of the pipeline back to the
+          front of it, and finally passes that to the input source before we
+          execute the pipeline.
+        */
+        intrusive_ptr<DependencyTracker> pTracker;
+        for(SourceVector::reverse_iterator iter(sourceVector.rbegin()),
+                listBeg(sourceVector.rend()); iter != listBeg; ++iter) {
+            intrusive_ptr<DocumentSource> pTemp(*iter);
+            pTemp->manageDependencies(pTracker);
+        }
+        pInputSource->manageDependencies(pTracker);
+        
         /* chain together the sources we found */
         intrusive_ptr<DocumentSource> pSource(pInputSource);
         for(SourceVector::iterator iter(sourceVector.begin()),

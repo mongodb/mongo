@@ -30,6 +30,7 @@
 namespace mongo {
     class Accumulator;
     class Cursor;
+    class DependencyTracker;
     class Document;
     class Expression;
     class ExpressionContext;
@@ -115,6 +116,15 @@ namespace mongo {
           The default implementation is to do nothing.
          */
         virtual void optimize();
+
+        /**
+           Adjust dependencies according to the needs of this source.
+
+           $$$
+           @param pTracker the dependency tracker
+         */
+        virtual void manageDependencies(
+            const intrusive_ptr<DependencyTracker> &pTracker);
 
         /**
           Add the DocumentSource to the array builder.
