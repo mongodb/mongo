@@ -348,10 +348,11 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 		memset(cache->evict, 0, cache->evict_allocated);
 
 		/*
-		 * Discard any page we're holding: we're about to do a walk of
-		 * the file tree, and if we're closing the file, there won't be
-		 * pages to evict in the future, that is, our location in the
-		 * tree is no longer useful.
+		 * If we're about to do a walk of the file tree (and possibly
+		 * close the file), any page we're referencing won't be useful;
+		 * if we pushing out a page, that page might be our eviction
+		 * location.   Regardless, discard any page we're holding and
+		 * we can restart our walk as needed.
 		 */
 		session->btree->evict_page = NULL;
 
