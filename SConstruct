@@ -30,6 +30,17 @@ from buildscripts import utils
 
 import libdeps
 
+
+def _rpartition(string, sep):
+    """A replacement for str.rpartition which is missing in Python < 2.5
+    """
+    idx = string.rfind(sep)
+    if idx == -1:
+        return '', '', string
+    return string[:idx], sep, string[idx + 1:]
+
+
+
 buildscripts.bb.checkOk()
 
 def findSettingsSetup():
@@ -43,7 +54,7 @@ def getThirdPartyShortNames():
         if not x.endswith( ".py" ) or x.find( "#" ) >= 0:
             continue
 
-        lst.append( x.rpartition( "." )[0] )
+        lst.append( _rpartition( x, "." )[0] )
     return lst
 
 
@@ -1139,7 +1150,7 @@ def s3push( localName , remoteName=None , remotePrefix=None , fixName=True , pla
         remoteName = localName
 
     if fixName:
-        (root,dot,suffix) = localName.rpartition( "." )
+        (root,dot,suffix) = _rpartition( localName, "." )
         name = remoteName + "-" + getSystemInstallName()
         name += remotePrefix
         if dot == "." :
