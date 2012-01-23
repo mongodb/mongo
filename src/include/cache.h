@@ -68,7 +68,4 @@ struct __wt_cache {
 	WT_EVICT_REQ *evict_request;	/* Eviction requests:
 					   slot available if session is NULL */
 	uint32_t max_evict_request;	/* Size of the evict request array */
-
-	WT_HAZARD  *hazard;		/* Copy of the hazard references */
-	uint32_t    hazard_elem;	/* Number of entries in the list */
 };

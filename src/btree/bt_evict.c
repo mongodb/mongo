@@ -190,13 +190,6 @@ __wt_cache_evict_server(void *arg)
 	session = &conn->default_session;
 	WT_ERR(__wt_open_session(conn, 1, NULL, NULL, &session));
 
-	/*
-	 * Allocate memory for a copy of the hazard references (it's a fixed
-	 * size, so doesn't need run-time adjustments).
-	 */
-	WT_ERR(__wt_calloc_def(session,
-	    conn->session_size * conn->hazard_size, &cache->hazard));
-
 	while (F_ISSET(conn, WT_SERVER_RUN)) {
 		WT_VERBOSE(session, evictserver, "sleeping");
 		__wt_cond_wait(session, cache->evict_cond);
@@ -222,7 +215,6 @@ err:		__wt_err(session, ret, "eviction server error");
 	WT_VERBOSE(session, evictserver, "exiting");
 
 	__wt_free(session, cache->evict);
-	__wt_free(session, cache->hazard);
 
 	if (session != &conn->default_session)
 		(void)session->iface.close(&session->iface, NULL);
@@ -334,7 +326,7 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 		if (F_ISSET(er, WT_EVICT_REQ_PAGE)) {
 			WT_VERBOSE(session, evictserver,
 			    "forcing eviction of page %p", er->page);
-			ret = __wt_rec_evict(session, er->page, WT_REC_WAIT);
+			WT_RETRY_YIELD(__wt_rec_evict(session, er->page, 0));
 		} else
 			ret = __evict_file(session, er);
 
@@ -652,7 +644,7 @@ __evict_get_page(
 		 * prevent multiple attempts to evict it.
 		 */
 		ref = evict->page->ref;
-		if (!WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED))
+		if (!WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_EVICTING))
 			goto done;
 
 		*pagep = evict->page;
@@ -698,8 +690,16 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 	 * out of disk space, or the page had an in-memory subtree already being
 	 * evicted).  Regardless, don't pick the same page every time.
 	 */
-	if (__wt_rec_evict(session, page, 0) != 0)
+	if (__wt_rec_evict(session, page, 0) != 0) {
 		page->read_gen = __wt_cache_read_gen(session);
+
+		/*
+		 * If the evicting state of the page was not cleared, clear it
+		 * now to make the page available again.
+		 */
+		if (page->ref->state == WT_REF_EVICTING)
+			page->ref->state = WT_REF_MEM;
+	}
 
 	WT_CLEAR_BTREE_IN_SESSION(session);
 	session->btree = saved_btree;

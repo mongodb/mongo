@@ -57,6 +57,9 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	/* Free the eviction exclusive-lock information. */
 	__wt_free(session, session->excl);
 
+	/* Free the session's copy of hazard references. */
+	__wt_free(session, session->hazard_copy);
+
 	/* Destroy the thread's mutex. */
 	if (session->cond != NULL)
 		(void)__wt_cond_destroy(session, session->cond);

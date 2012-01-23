@@ -61,7 +61,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref
 		if (ref->state == WT_REF_MEM) {
 			WT_VERBOSE(session, hazard,
 			    "session %p hazard %p: set", session, ref->page);
-			return (1);
+			return (0);
 		}
 
 		/*
@@ -77,7 +77,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref
 		 * again until it loops around through the tree.
 		 */
 		hp->page = NULL;
-		return (0);
+		return (EBUSY);
 	}
 
 	__wt_errx(session,
@@ -87,7 +87,7 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref
 	__hazard_dump(session);
 #endif
 
-	return (0);
+	return (ENOMEM);
 }
 
 /*

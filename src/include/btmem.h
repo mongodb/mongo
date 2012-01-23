@@ -364,11 +364,13 @@ struct __wt_ref {
 	 * WT_REF_DISK has a value of 0, the default state after allocating
 	 * cleared memory.
 	 */
-#define	WT_REF_DISK		0	/* Page is on disk */
-#define	WT_REF_LOCKED		1	/* Page being evaluated for eviction */
-#define	WT_REF_MEM		2	/* Page is in cache and valid */
-#define	WT_REF_READING		3	/* Page being read */
-	uint32_t volatile state;
+	volatile enum {
+		WT_REF_DISK=0,		/* Page is on disk */
+		WT_REF_EVICTING,	/* Page being evaluated for eviction */
+		WT_REF_LOCKED,		/* Page being evicted */
+		WT_REF_MEM,		/* Page is in cache and valid */
+		WT_REF_READING		/* Page being read */
+	} state;
 };
 
 /*

@@ -389,7 +389,7 @@ flags = {
 # Internal routine flag declarations
 ###################################################
 	'page_free' : [ 'PAGE_FREE_IGNORE_DISK' ],
-	'rec_evict' : [ 'REC_SINGLE', 'REC_WAIT' ],
+	'rec_evict' : [ 'REC_SINGLE' ],
 	'verbose' : [
 		'VERB_block',
 		'VERB_evict',

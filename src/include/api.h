@@ -88,6 +88,9 @@ struct __wt_session_impl {
 
 	WT_HAZARD *hazard;		/* Hazard reference array */
 
+	WT_HAZARD *hazard_copy;		/* Copy of the hazard references */
+	uint32_t   hazard_copy_elem;	/* Number of copied references */
+
 	void	*reconcile;		/* Reconciliation information */
 
 	WT_REF **excl;			/* Eviction exclusive list */
@@ -263,8 +266,7 @@ extern WT_PROCESS __wt_process;
  */
 #define	WT_BUF_INUSE					0x00000001
 #define	WT_PAGE_FREE_IGNORE_DISK			0x00000001
-#define	WT_REC_SINGLE					0x00000002
-#define	WT_REC_WAIT					0x00000001
+#define	WT_REC_SINGLE					0x00000001
 #define	WT_SERVER_RUN					0x00000001
 #define	WT_SESSION_INTERNAL				0x00000002
 #define	WT_SESSION_SALVAGE_QUIET_ERR			0x00000001

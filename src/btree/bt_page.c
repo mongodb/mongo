@@ -42,6 +42,7 @@ __wt_page_in_func(
 
 			WT_RET(__wt_cache_read(session, parent, ref));
 			continue;
+		case WT_REF_EVICTING:
 		case WT_REF_LOCKED:
 		case WT_REF_READING:
 			/*
@@ -61,7 +62,7 @@ __wt_page_in_func(
 #ifdef HAVE_DIAGNOSTIC
 			    , file, line
 #endif
-			    )) {
+			    ) == 0) {
 				ref->page->read_gen =
 				    __wt_cache_read_gen(session);
 				return (0);
