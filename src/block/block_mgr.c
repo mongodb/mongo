@@ -39,7 +39,7 @@ __wt_bm_addr_stderr(
     WT_SESSION_IMPL *session, const uint8_t *addr, uint32_t addr_size)
 {
 	WT_BLOCK *block;
-	WT_BUF *buf;
+	WT_ITEM *buf;
 	int ret;
 
 	if ((block = session->btree->block) == NULL)
@@ -60,7 +60,7 @@ __wt_bm_addr_stderr(
  */
 int
 __wt_bm_addr_string(WT_SESSION_IMPL *session,
-    WT_BUF *buf, const uint8_t *addr, uint32_t addr_size)
+    WT_ITEM *buf, const uint8_t *addr, uint32_t addr_size)
 {
 	WT_BLOCK *block;
 
@@ -143,7 +143,7 @@ __wt_bm_free(WT_SESSION_IMPL *session, const uint8_t *addr, uint32_t addr_size)
  */
 int
 __wt_bm_read(WT_SESSION_IMPL *session,
-    WT_BUF *buf, const uint8_t *addr, uint32_t addr_size)
+    WT_ITEM *buf, const uint8_t *addr, uint32_t addr_size)
 {
 	WT_BLOCK *block;
 
@@ -189,7 +189,7 @@ __wt_bm_write_size(WT_SESSION_IMPL *session, uint32_t *sizep)
  */
 int
 __wt_bm_write(
-    WT_SESSION_IMPL *session, WT_BUF *buf, uint8_t *addr, uint32_t *addr_size)
+    WT_SESSION_IMPL *session, WT_ITEM *buf, uint8_t *addr, uint32_t *addr_size)
 {
 	WT_BLOCK *block;
 
@@ -235,7 +235,7 @@ __wt_bm_salvage_start(WT_SESSION_IMPL *session)
  *	Return the next block from the file.
  */
 int
-__wt_bm_salvage_next(WT_SESSION_IMPL *session, WT_BUF *buf,
+__wt_bm_salvage_next(WT_SESSION_IMPL *session, WT_ITEM *buf,
     uint8_t *addr, uint32_t *addr_sizep, uint64_t *write_genp, int *eofp)
 {
 	WT_BLOCK *block;

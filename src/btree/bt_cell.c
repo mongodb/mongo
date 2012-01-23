@@ -12,7 +12,7 @@
  *	Copy an on-page cell into a return buffer, processing as needed.
  */
 int
-__wt_cell_copy(WT_SESSION_IMPL *session, WT_CELL *cell, WT_BUF *retb)
+__wt_cell_copy(WT_SESSION_IMPL *session, WT_CELL *cell, WT_ITEM *retb)
 {
 	WT_CELL_UNPACK *unpack, _unpack;
 
@@ -28,7 +28,7 @@ __wt_cell_copy(WT_SESSION_IMPL *session, WT_CELL *cell, WT_BUF *retb)
  */
 int
 __wt_cell_unpack_copy(
-    WT_SESSION_IMPL *session, WT_CELL_UNPACK *unpack, WT_BUF *retb)
+    WT_SESSION_IMPL *session, WT_CELL_UNPACK *unpack, WT_ITEM *retb)
 {
 	WT_BTREE *btree;
 	void *huffman;

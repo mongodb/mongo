@@ -73,7 +73,7 @@ __wt_cell_type_string(uint8_t type)
  * nul-terminated representation of that address.
  */
 const char *
-__wt_page_addr_string(WT_SESSION_IMPL *session, WT_BUF *buf, WT_PAGE *page)
+__wt_page_addr_string(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_PAGE *page)
 {
 	uint32_t size;
 	const uint8_t *addr;
@@ -96,7 +96,7 @@ __wt_page_addr_string(WT_SESSION_IMPL *session, WT_BUF *buf, WT_PAGE *page)
  */
 const char *
 __wt_addr_string(
-    WT_SESSION_IMPL *session, WT_BUF *buf, const uint8_t *addr, uint32_t size)
+    WT_SESSION_IMPL *session, WT_ITEM *buf, const uint8_t *addr, uint32_t size)
 {
 	if (addr == NULL) {
 		buf->data = WT_NOADDR;

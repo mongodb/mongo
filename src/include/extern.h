@@ -16,7 +16,7 @@ extern int __wt_block_addr_valid(WT_SESSION_IMPL *session,
     uint32_t addr_size);
 extern int __wt_block_addr_string(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
-    WT_BUF *buf,
+    WT_ITEM *buf,
     const uint8_t *addr,
     uint32_t addr_size);
 extern int __wt_block_alloc( WT_SESSION_IMPL *session,
@@ -47,7 +47,7 @@ extern int __wt_bm_addr_stderr( WT_SESSION_IMPL *session,
     const uint8_t *addr,
     uint32_t addr_size);
 extern int __wt_bm_addr_string(WT_SESSION_IMPL *session,
-    WT_BUF *buf,
+    WT_ITEM *buf,
     const uint8_t *addr,
     uint32_t addr_size);
 extern int __wt_bm_create(WT_SESSION_IMPL *session, const char *filename);
@@ -62,19 +62,19 @@ extern int __wt_bm_free(WT_SESSION_IMPL *session,
     const uint8_t *addr,
     uint32_t addr_size);
 extern int __wt_bm_read(WT_SESSION_IMPL *session,
-    WT_BUF *buf,
+    WT_ITEM *buf,
     const uint8_t *addr,
     uint32_t addr_size);
 extern int __wt_bm_block_header(WT_SESSION_IMPL *session, uint32_t *headerp);
 extern int __wt_bm_write_size(WT_SESSION_IMPL *session, uint32_t *sizep);
 extern int __wt_bm_write( WT_SESSION_IMPL *session,
-    WT_BUF *buf,
+    WT_ITEM *buf,
     uint8_t *addr,
     uint32_t *addr_size);
 extern int __wt_bm_stat(WT_SESSION_IMPL *session);
 extern int __wt_bm_salvage_start(WT_SESSION_IMPL *session);
 extern int __wt_bm_salvage_next(WT_SESSION_IMPL *session,
-    WT_BUF *buf,
+    WT_ITEM *buf,
     uint8_t *addr,
     uint32_t *addr_sizep,
     uint64_t *write_genp,
@@ -97,12 +97,12 @@ extern int __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh);
 extern int __wt_block_read_buf(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
-    WT_BUF *buf,
+    WT_ITEM *buf,
     const uint8_t *addr,
     uint32_t addr_size);
 extern int __wt_block_read(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
-    WT_BUF *buf,
+    WT_ITEM *buf,
     off_t offset,
     uint32_t size,
     uint32_t cksum);
@@ -112,7 +112,7 @@ extern int __wt_block_salvage_end(WT_SESSION_IMPL *session,
     int success);
 extern int __wt_block_salvage_next( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
-    WT_BUF *buf,
+    WT_ITEM *buf,
     uint8_t *addr,
     uint32_t *addr_sizep,
     uint64_t *write_genp,
@@ -133,12 +133,12 @@ extern int __wt_block_write_size( WT_SESSION_IMPL *session,
     uint32_t *sizep);
 extern int __wt_block_write_buf(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
-    WT_BUF *buf,
+    WT_ITEM *buf,
     uint8_t *addr,
     uint32_t *addr_size);
 extern int __wt_block_write(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
-    WT_BUF *buf,
+    WT_ITEM *buf,
     off_t *offsetp,
     uint32_t *sizep,
     uint32_t *cksump);
@@ -150,10 +150,10 @@ extern void __wt_cache_stats_update(WT_CONNECTION_IMPL *conn);
 extern void __wt_cache_destroy(WT_CONNECTION_IMPL *conn);
 extern int __wt_cell_copy(WT_SESSION_IMPL *session,
     WT_CELL *cell,
-    WT_BUF *retb);
+    WT_ITEM *retb);
 extern int __wt_cell_unpack_copy( WT_SESSION_IMPL *session,
     WT_CELL_UNPACK *unpack,
-    WT_BUF *retb);
+    WT_ITEM *retb);
 extern void __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt, int next);
 extern int __wt_btcur_first(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_next(WT_CURSOR_BTREE *cbt);
@@ -198,7 +198,7 @@ extern int __wt_btree_open(WT_SESSION_IMPL *session,
     const char *cfg[],
     uint32_t flags);
 extern int __wt_btree_reopen(WT_SESSION_IMPL *session, uint32_t flags);
-extern int __wt_btree_root_init(WT_SESSION_IMPL *session, WT_BUF *addr);
+extern int __wt_btree_root_init(WT_SESSION_IMPL *session, WT_ITEM *addr);
 extern int __wt_btree_root_empty(WT_SESSION_IMPL *session, WT_PAGE **leafp);
 extern int __wt_btree_close(WT_SESSION_IMPL *session);
 extern int __wt_btree_huffman_open(WT_SESSION_IMPL *session,
@@ -207,14 +207,14 @@ extern void __wt_btree_huffman_close(WT_SESSION_IMPL *session);
 extern const char *__wt_page_type_string(u_int type);
 extern const char *__wt_cell_type_string(uint8_t type);
 extern const char *__wt_page_addr_string(WT_SESSION_IMPL *session,
-    WT_BUF *buf,
+    WT_ITEM *buf,
     WT_PAGE *page);
 extern const char *__wt_addr_string( WT_SESSION_IMPL *session,
-    WT_BUF *buf,
+    WT_ITEM *buf,
     const uint8_t *addr,
     uint32_t size);
 extern int __wt_ovfl_in( WT_SESSION_IMPL *session,
-    WT_BUF *store,
+    WT_ITEM *store,
     const uint8_t *addr,
     uint32_t len);
 extern int
@@ -236,7 +236,7 @@ extern int __wt_cache_read(WT_SESSION_IMPL *session,
 extern int __wt_kv_return(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
     int key_ret);
-extern int __wt_btree_get_root(WT_SESSION_IMPL *session, WT_BUF *addr);
+extern int __wt_btree_get_root(WT_SESSION_IMPL *session, WT_ITEM *addr);
 extern int __wt_btree_free_root(WT_SESSION_IMPL *session);
 extern int __wt_btree_set_root(WT_SESSION_IMPL *session,
     uint8_t *addr,
@@ -299,7 +299,7 @@ extern int __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_row_key( WT_SESSION_IMPL *session,
     WT_PAGE *page,
     WT_ROW *rip_arg,
-    WT_BUF *retb);
+    WT_ITEM *retb);
 extern WT_CELL *__wt_row_value(WT_PAGE *page, WT_ROW *rip);
 extern int __wt_row_ikey_alloc(WT_SESSION_IMPL *session,
     uint32_t cell_offset,
@@ -311,13 +311,13 @@ extern int __wt_row_modify(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
     int is_remove);
 extern int __wt_row_insert_alloc(WT_SESSION_IMPL *session,
-    WT_BUF *key,
+    WT_ITEM *key,
     u_int skipdepth,
     WT_INSERT **insp,
     size_t *ins_sizep);
 extern void __wt_insert_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_update_alloc(WT_SESSION_IMPL *session,
-    WT_BUF *value,
+    WT_ITEM *value,
     WT_UPDATE **updp,
     size_t *sizep);
 extern void __wt_update_serial_func(WT_SESSION_IMPL *session);
@@ -641,18 +641,18 @@ extern int __wt_struct_plan(WT_SESSION_IMPL *session,
     const char *columns,
     size_t len,
     int value_only,
-    WT_BUF *plan);
+    WT_ITEM *plan);
 extern int __wt_struct_reformat(WT_SESSION_IMPL *session,
     WT_TABLE *table,
     const char *columns,
     size_t len,
     const char *extra_cols,
     int value_only,
-    WT_BUF *format);
+    WT_ITEM *format);
 extern int __wt_struct_truncate(WT_SESSION_IMPL *session,
     const char *input_fmt,
     u_int ncols,
-    WT_BUF *format);
+    WT_ITEM *format);
 extern int __wt_schema_project_in(WT_SESSION_IMPL *session,
     WT_CURSOR **cp,
     const char *proj_arg,
@@ -671,7 +671,7 @@ extern int __wt_schema_project_merge(WT_SESSION_IMPL *session,
     WT_CURSOR **cp,
     const char *proj_arg,
     const char *vformat,
-    WT_BUF *value);
+    WT_ITEM *value);
 extern int __wt_schema_rename(WT_SESSION_IMPL *session,
     const char *uri,
     const char *newname,
@@ -811,50 +811,50 @@ extern int __wt_huffman_encode(WT_SESSION_IMPL *session,
     void *huffman_arg,
     const uint8_t *from_arg,
     uint32_t from_len,
-    WT_BUF *to_buf);
+    WT_ITEM *to_buf);
 extern int __wt_huffman_decode(WT_SESSION_IMPL *session,
     void *huffman_arg,
     const uint8_t *from_arg,
     uint32_t from_len,
-    WT_BUF *to_buf);
+    WT_ITEM *to_buf);
 extern uint32_t __wt_nlpo2_round(uint32_t v);
 extern uint32_t __wt_nlpo2(uint32_t v);
 extern int __wt_ispo2(uint32_t v);
 extern uint32_t __wt_random(void);
-extern int __wt_buf_init(WT_SESSION_IMPL *session, WT_BUF *buf, size_t size);
+extern int __wt_buf_init(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size);
 extern int __wt_buf_initsize(WT_SESSION_IMPL *session,
-    WT_BUF *buf,
+    WT_ITEM *buf,
     size_t size);
-extern int __wt_buf_grow(WT_SESSION_IMPL *session, WT_BUF *buf, size_t size);
+extern int __wt_buf_grow(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size);
 extern int __wt_buf_set( WT_SESSION_IMPL *session,
-    WT_BUF *buf,
+    WT_ITEM *buf,
     const void *data,
     size_t size);
 extern int __wt_buf_set_printable( WT_SESSION_IMPL *session,
-    WT_BUF *buf,
+    WT_ITEM *buf,
     const void *from_arg,
     size_t size);
 extern void *__wt_buf_steal(WT_SESSION_IMPL *session,
-    WT_BUF *buf,
+    WT_ITEM *buf,
     uint32_t *sizep);
-extern void __wt_buf_swap(WT_BUF *a, WT_BUF *b);
-extern void __wt_buf_free(WT_SESSION_IMPL *session, WT_BUF *buf);
+extern void __wt_buf_swap(WT_ITEM *a, WT_ITEM *b);
+extern void __wt_buf_free(WT_SESSION_IMPL *session, WT_ITEM *buf);
 extern int __wt_buf_fmt(WT_SESSION_IMPL *session,
-    WT_BUF *buf,
+    WT_ITEM *buf,
     const char *fmt,
     ...) WT_GCC_ATTRIBUTE((format (printf,
     3,
     4)));
 extern int __wt_buf_catfmt(WT_SESSION_IMPL *session,
-    WT_BUF *buf,
+    WT_ITEM *buf,
     const char *fmt,
     ...) WT_GCC_ATTRIBUTE((format (printf,
     3,
     4)));
 extern int __wt_scr_alloc(WT_SESSION_IMPL *session,
     uint32_t size,
-    WT_BUF **scratchp);
-extern void __wt_scr_free(WT_BUF **bufp);
+    WT_ITEM **scratchp);
+extern void __wt_scr_free(WT_ITEM **bufp);
 extern void __wt_scr_discard(WT_SESSION_IMPL *session);
 extern void *__wt_scr_alloc_ext(WT_SESSION *wt_session, size_t size);
 extern void __wt_scr_free_ext(WT_SESSION *wt_session, void *p);

@@ -69,7 +69,7 @@ __wt_block_salvage_end(WT_SESSION_IMPL *session, WT_BLOCK *block, int success)
  */
 int
 __wt_block_salvage_next(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_BUF *buf,
+    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf,
     uint8_t *addr, uint32_t *addr_sizep, uint64_t *write_genp, int *eofp)
 {
 	WT_BLOCK_HEADER *blk;

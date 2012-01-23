@@ -13,9 +13,9 @@
  */
 int
 __wt_block_read_buf(WT_SESSION_IMPL *session, WT_BLOCK *block,
-    WT_BUF *buf, const uint8_t *addr, uint32_t addr_size)
+    WT_ITEM *buf, const uint8_t *addr, uint32_t addr_size)
 {
-	WT_BUF *tmp;
+	WT_ITEM *tmp;
 	off_t offset;
 	uint32_t size, cksum;
 	int ret;
@@ -48,10 +48,10 @@ err:	__wt_scr_free(&tmp);
  */
 int
 __wt_block_read(WT_SESSION_IMPL *session, WT_BLOCK *block,
-    WT_BUF *buf, off_t offset, uint32_t size, uint32_t cksum)
+    WT_ITEM *buf, off_t offset, uint32_t size, uint32_t cksum)
 {
 	WT_BLOCK_HEADER *blk;
-	WT_BUF *tmp;
+	WT_ITEM *tmp;
 	WT_PAGE_HEADER *dsk;
 	size_t result_len;
 	uint32_t page_cksum;

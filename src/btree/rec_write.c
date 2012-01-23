@@ -21,7 +21,7 @@ struct __rec_boundary;		typedef struct __rec_boundary WT_BOUNDARY;
 typedef struct {
 	WT_PAGE *page;			/* Page being reconciled */
 
-	WT_BUF	 dsk;			/* Temporary disk-image buffer */
+	WT_ITEM	 dsk;			/* Temporary disk-image buffer */
 
 	/*
 	 * Reconciliation gets tricky if we have to split a page, that is, if
@@ -74,7 +74,7 @@ typedef struct {
 		 * because the page's recno, stored in the recno field, is the
 		 * column-store key.
 		 */
-		WT_BUF key;		/* Promoted row-store key */
+		WT_ITEM key;		/* Promoted row-store key */
 	} *bnd;				/* Saved boundaries */
 	uint32_t bnd_next;		/* Next boundary slot */
 	uint32_t bnd_entries;		/* Total boundary slots */
@@ -127,14 +127,14 @@ typedef struct {
 	 *	An on-page key/value item we're building.
 	 */
 	struct __rec_kv {
-		WT_BUF	 buf;		/* Data */
+		WT_ITEM	 buf;		/* Data */
 		WT_CELL	 cell;		/* Cell and cell's length */
 		uint32_t cell_len;
 		uint32_t len;		/* Total length of cell + data */
 	} k, v;				/* Key/Value being built */
 
-	WT_BUF *cur, _cur;		/* Key/Value being built */
-	WT_BUF *last, _last;		/* Last key/value built */
+	WT_ITEM *cur, _cur;		/* Key/Value being built */
+	WT_ITEM *last, _last;		/* Last key/value built */
 
 	int	key_pfx_compress;	/* If can prefix-compress next key */
 	int     key_pfx_compress_conf;	/* If prefix compression configured */
@@ -157,7 +157,7 @@ static int  __rec_col_int(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_col_merge(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_col_var(WT_SESSION_IMPL *, WT_PAGE *, WT_SALVAGE_COOKIE *);
 static int  __rec_col_var_helper(WT_SESSION_IMPL *,
-		WT_SALVAGE_COOKIE *, WT_BUF *, int, int, uint64_t);
+		WT_SALVAGE_COOKIE *, WT_ITEM *, int, int, uint64_t);
 static int  __rec_row_int(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, WT_SALVAGE_COOKIE *);
 static int  __rec_row_leaf_insert(WT_SESSION_IMPL *, WT_INSERT *);
@@ -169,7 +169,7 @@ static int  __rec_split_fixup(WT_SESSION_IMPL *);
 static int  __rec_split_init(WT_SESSION_IMPL *, WT_PAGE *, uint64_t, uint32_t);
 static int  __rec_split_row(WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE **);
 static int  __rec_split_row_promote(WT_SESSION_IMPL *, uint8_t);
-static int  __rec_split_write(WT_SESSION_IMPL *, WT_BOUNDARY *, WT_BUF *);
+static int  __rec_split_write(WT_SESSION_IMPL *, WT_BOUNDARY *, WT_ITEM *);
 static int  __rec_write_init(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_write_wrapup(WT_SESSION_IMPL *, WT_PAGE *);
 
@@ -370,7 +370,7 @@ __rec_copy_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_KV *kv)
 	/*
 	 * If there's only one chunk of data to copy (because the cell and data
 	 * are being copied from the original disk page), the cell length won't
-	 * be set, the WT_BUF data/length will reference the data to be copied.
+	 * be set, the WT_ITEM data/length will reference the data to be copied.
 	 *
 	 * WT_CELLs are typically small, 1 or 2 bytes -- don't call memcpy, do
 	 * the copy in-line.
@@ -394,7 +394,7 @@ __rec_copy_incr(WT_SESSION_IMPL *session, WT_RECONCILE *r, WT_KV *kv)
 static inline void
 __rec_key_state_update(WT_RECONCILE *r, int ovfl_key)
 {
-	WT_BUF *a;
+	WT_ITEM *a;
 
 	/*
 	 * If writing an overflow key onto the page, don't update the "last key"
@@ -758,7 +758,7 @@ __rec_split_fixup(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_BOUNDARY *bnd;
-	WT_BUF *tmp;
+	WT_ITEM *tmp;
 	WT_PAGE_HEADER *dsk;
 	WT_RECONCILE *r;
 	uint32_t i, len;
@@ -835,7 +835,7 @@ err:	__wt_scr_free(&tmp);
  *	Write a disk block out for the split helper functions.
  */
 static int
-__rec_split_write(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_BUF *buf)
+__rec_split_write(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_ITEM *buf)
 {
 	WT_CELL *cell;
 	WT_PAGE_HEADER *dsk;
@@ -1434,7 +1434,7 @@ __rec_col_fix_slvg(
 static int
 __rec_col_var_helper(
     WT_SESSION_IMPL *session, WT_SALVAGE_COOKIE *salvage,
-    WT_BUF *value, int deleted, int raw, uint64_t rle)
+    WT_ITEM *value, int deleted, int raw, uint64_t rle)
 {
 	WT_RECONCILE *r;
 	WT_KV *val;
@@ -1508,11 +1508,11 @@ __rec_col_var(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_SALVAGE_COOKIE *salvage)
 {
 	WT_BTREE *btree;
-	WT_BUF *last, orig;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
 	WT_INSERT *ins;
+	WT_ITEM *last, orig;
 	WT_RECONCILE *r;
 	WT_SKIP_HEAD *append;
 	WT_UPDATE *upd;
@@ -2134,11 +2134,11 @@ static int
 __rec_row_leaf(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_SALVAGE_COOKIE *salvage)
 {
-	WT_BUF *tmpkey;
 	WT_CELL *cell, *val_cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_IKEY *ikey;
 	WT_INSERT *ins;
+	WT_ITEM *tmpkey;
 	WT_KV *key, *val;
 	WT_RECONCILE *r;
 	WT_ROW *rip;
@@ -2296,16 +2296,16 @@ __rec_row_leaf(
 			    tmpkey->size >= unpack->prefix) {
 				/*
 				 * If we previously built a prefix-compressed
-				 * key in the temporary buffer, WT_BUF->data
-				 * will be the same as WT_BUF->mem: grow the
+				 * key in the temporary buffer, WT_ITEM->data
+				 * will be the same as WT_ITEM->mem: grow the
 				 * buffer if necessary and copy the suffix into
 				 * place.
 				 *
 				 * If we previously pointed the temporary buffer
-				 * at an on-page key, WT_BUF->data will not be
-				 * the same as WT_BUF->mem: grow the buffer if
+				 * at an on-page key, WT_ITEM->data will not be
+				 * the same as WT_ITEM->mem: grow the buffer if
 				 * necessary, copy the prefix into place, then
-				 * re-point the WT_BUF->data field to the newly
+				 * re-point the WT_ITEM->data field to the newly
 				 * constructed memory, and then copy the suffix
 				 * into place.
 				 */
@@ -2524,7 +2524,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		bnd = &r->bnd[0];
 #ifdef HAVE_VERBOSE
 		if (WT_VERBOSE_ISSET(session, reconcile)) {
-			WT_BUF *buf;
+			WT_ITEM *buf;
 			WT_RET(__wt_scr_alloc(session, 64, &buf));
 			WT_VERBOSE(session, reconcile, "page %p written to %s",
 			    page, __wt_addr_string(
@@ -2557,7 +2557,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 #ifdef HAVE_VERBOSE
 		if (WT_VERBOSE_ISSET(session, reconcile)) {
-			WT_BUF *tkey;
+			WT_ITEM *tkey;
 			if (page->type == WT_PAGE_ROW_INT ||
 			    page->type == WT_PAGE_ROW_LEAF)
 				WT_RET(__wt_scr_alloc(session, 0, &tkey));
@@ -2904,7 +2904,7 @@ __rec_cell_build_ovfl(
     WT_SESSION_IMPL *session, WT_KV *kv, uint8_t type, uint64_t rle)
 {
 	WT_BTREE *btree;
-	WT_BUF *tmp;
+	WT_ITEM *tmp;
 	WT_PAGE *page;
 	WT_PAGE_HEADER *dsk;
 	WT_RECONCILE *r;

@@ -49,7 +49,7 @@ int
 __wt_schema_get_btree(WT_SESSION_IMPL *session,
     const char *objname, size_t len, const char *cfg[], uint32_t flags)
 {
-	WT_BUF uribuf;
+	WT_ITEM uribuf;
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
 	const char *fileuri, *name, *objconf;
@@ -99,9 +99,9 @@ err:	__wt_buf_free(session, &uribuf);
 int
 __wt_schema_open_colgroups(WT_SESSION_IMPL *session, WT_TABLE *table)
 {
-	WT_BUF plan;
 	WT_CONFIG cparser;
 	WT_CONFIG_ITEM ckey, cval;
+	WT_ITEM plan;
 	char *cgname;
 	const char *fileconf;
 	int i, ret;
@@ -162,9 +162,9 @@ __open_index(WT_SESSION_IMPL *session, WT_TABLE *table,
     const char *uri, const char *idxconf, WT_BTREE **btreep)
 {
 	WT_BTREE *btree;
-	WT_BUF cols, fmt, plan, uribuf;
 	WT_CONFIG colconf;
 	WT_CONFIG_ITEM ckey, cval, icols;
+	WT_ITEM cols, fmt, plan, uribuf;
 	const char *fileuri;
 	u_int cursor_key_cols;
 	int i, ret;

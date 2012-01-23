@@ -14,7 +14,7 @@
 static int
 __truncate_file(WT_SESSION_IMPL *session, const char *name)
 {
-	WT_BUF *uribuf;
+	WT_ITEM *uribuf;
 	int ret;
 
 	uribuf = NULL;

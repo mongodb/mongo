@@ -22,7 +22,7 @@ static int __btree_set_turtle(WT_SESSION_IMPL *, char *);
  *	Get the file's root address.
  */
 int
-__wt_btree_get_root(WT_SESSION_IMPL *session, WT_BUF *addr)
+__wt_btree_get_root(WT_SESSION_IMPL *session, WT_ITEM *addr)
 {
 	WT_BTREE *btree;
 	uint32_t size;
@@ -77,7 +77,7 @@ err:	if (ret != 0)
 int
 __wt_btree_free_root(WT_SESSION_IMPL *session)
 {
-	WT_BUF *addr, *as;
+	WT_ITEM *addr, *as;
 	WT_BTREE *btree;
 	int ret;
 
@@ -108,7 +108,7 @@ int
 __wt_btree_set_root(WT_SESSION_IMPL *session, uint8_t *addr, uint32_t size)
 {
 	WT_BTREE *btree;
-	WT_BUF *v;
+	WT_ITEM *v;
 	int ret;
 
 	btree = session->btree;
@@ -126,7 +126,7 @@ __wt_btree_set_root(WT_SESSION_IMPL *session, uint8_t *addr, uint32_t size)
 	    btree->filename, __wt_addr_string(session, v, addr, size));
 
 	/*
-	 * We're not using the WT_BUF as a buffer going forward, but fill
+	 * We're not using the WT_ITEM as a buffer going forward, but fill
 	 * in the values anyway, just for safety.
 	 */
 	if (addr == NULL) {
@@ -223,7 +223,7 @@ err:	if (fp != NULL)
 static int
 __btree_set_turtle(WT_SESSION_IMPL *session, char *v)
 {
-	WT_BUF *buf;
+	WT_ITEM *buf;
 	FILE *fp;
 	size_t len;
 	int ret;
@@ -270,7 +270,7 @@ __btree_get_root(
     WT_SESSION_IMPL *session, const char **vp, int *majorp, int *minorp)
 {
 	WT_BTREE *btree;
-	WT_BUF *key;
+	WT_ITEM *key;
 	int ret;
 	const char *version;
 
@@ -306,7 +306,7 @@ static int
 __btree_set_root(WT_SESSION_IMPL *session, char *v)
 {
 	WT_BTREE *btree;
-	WT_BUF *key;
+	WT_ITEM *key;
 	int ret;
 
 	btree = session->btree;

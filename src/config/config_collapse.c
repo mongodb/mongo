@@ -17,9 +17,9 @@ int
 __wt_config_collapse(WT_SESSION_IMPL *session,
     const char **cfg, const char **config_ret)
 {
-	WT_BUF buf;
 	WT_CONFIG cparser;
 	WT_CONFIG_ITEM k, v;
+	WT_ITEM buf;
 	int ret;
 
 	WT_CLEAR(buf);

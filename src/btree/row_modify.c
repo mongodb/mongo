@@ -14,8 +14,8 @@
 int
 __wt_row_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_remove)
 {
-	WT_BUF *key, *value;
 	WT_INSERT *ins;
+	WT_ITEM *key, *value;
 	WT_SKIP_HEAD **inshead, *new_inshead, **new_inslist;
 	WT_PAGE *page;
 	WT_UPDATE **new_upd, *upd, **upd_entry;
@@ -156,7 +156,7 @@ err:		if (ins != NULL)
  */
 int
 __wt_row_insert_alloc(WT_SESSION_IMPL *session,
-    WT_BUF *key, u_int skipdepth, WT_INSERT **insp, size_t *ins_sizep)
+    WT_ITEM *key, u_int skipdepth, WT_INSERT **insp, size_t *ins_sizep)
 {
 	WT_INSERT *ins;
 	size_t ins_size;
@@ -253,7 +253,7 @@ err:	__wt_session_serialize_wrapup(session, page, ret);
  */
 int
 __wt_update_alloc(WT_SESSION_IMPL *session,
-    WT_BUF *value, WT_UPDATE **updp, size_t *sizep)
+    WT_ITEM *value, WT_UPDATE **updp, size_t *sizep)
 {
 	WT_UPDATE *upd;
 	size_t size;

@@ -14,7 +14,7 @@
 int
 __wt_cache_read(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref)
 {
-	WT_BUF tmp;
+	WT_ITEM tmp;
 	WT_PAGE *page;
 	uint32_t size;
 	const uint8_t *addr;

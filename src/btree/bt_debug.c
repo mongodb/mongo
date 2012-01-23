@@ -19,9 +19,9 @@ typedef struct {
 	 * do its own message handling because its output isn't line-oriented.
 	 */
 	FILE		*fp;			/* Output file stream */
-	WT_BUF		*msg;			/* Buffered message */
+	WT_ITEM		*msg;			/* Buffered message */
 
-	WT_BUF		*tmp;			/* Temporary space */
+	WT_ITEM		*tmp;			/* Temporary space */
 } WT_DBG;
 
 /* Diagnostic output separator. */
@@ -99,7 +99,7 @@ static void
 __dmsg_wrapup(WT_DBG *ds)
 {
 	WT_SESSION_IMPL *session;
-	WT_BUF *msg;
+	WT_ITEM *msg;
 
 	session = ds->session;
 	msg = ds->msg;
@@ -129,7 +129,7 @@ static void
 __dmsg(WT_DBG *ds, const char *fmt, ...)
 {
 	va_list ap;
-	WT_BUF *msg;
+	WT_ITEM *msg;
 	WT_SESSION_IMPL *session;
 	size_t len, space;
 	char *p;
@@ -188,7 +188,7 @@ int
 __wt_debug_addr(
     WT_SESSION_IMPL *session, uint32_t addr, uint32_t size, const char *ofile)
 {
-	WT_BUF *buf;
+	WT_ITEM *buf;
 	int ret;
 
 	buf = NULL;
@@ -824,7 +824,7 @@ __debug_ref(WT_DBG *ds, WT_REF *ref, WT_PAGE *page)
 static int
 __debug_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 {
-	WT_BUF *buf;
+	WT_ITEM *buf;
 	WT_SESSION_IMPL *session;
 	int ret;
 
@@ -876,7 +876,7 @@ __debug_cell(WT_DBG *ds, WT_PAGE_HEADER *dsk, WT_CELL_UNPACK *unpack)
 static int
 __debug_cell_data(WT_DBG *ds, const char *tag, WT_CELL_UNPACK *unpack)
 {
-	WT_BUF *buf;
+	WT_ITEM *buf;
 	WT_SESSION_IMPL *session;
 	int ret;
 

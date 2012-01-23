@@ -47,8 +47,8 @@ __wt_curconfig_open(WT_SESSION_IMPL *session,
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
 		0,			/* recno key */
 		{ 0 },                  /* recno raw buffer */
-		{ NULL, 0, 0, NULL, 0 },/* WT_BUF key */
-		{ NULL, 0, 0, NULL, 0 },/* WT_BUF value */
+		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM key */
+		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM value */
 		0,			/* int saved_err */
 		0			/* uint32_t flags */
 	};

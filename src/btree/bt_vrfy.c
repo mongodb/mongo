@@ -14,15 +14,15 @@
 typedef struct {
 	uint64_t record_total;			/* Total record count */
 
-	WT_BUF *max_key;			/* Largest key */
-	WT_BUF *max_addr;			/* Largest key page */
+	WT_ITEM *max_key;			/* Largest key */
+	WT_ITEM *max_addr;			/* Largest key page */
 
 	uint64_t fcnt;				/* Progress counter */
 
 	int	 dumpfile;			/* Dump file stream */
 
-	WT_BUF *tmp1;				/* Temporary buffer */
-	WT_BUF *tmp2;				/* Temporary buffer */
+	WT_ITEM *tmp1;				/* Temporary buffer */
+	WT_ITEM *tmp2;				/* Temporary buffer */
 } WT_VSTUFF;
 
 static int __verify_int(WT_SESSION_IMPL *, int);
@@ -143,10 +143,10 @@ static int
 __verify_tree(WT_SESSION_IMPL *session,
     WT_PAGE *page, uint64_t parent_recno, WT_VSTUFF *vs)
 {
-	WT_BUF *tmp;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
+	WT_ITEM *tmp;
 	WT_REF *ref;
 	uint64_t recno;
 	const uint8_t *addr;
@@ -348,8 +348,7 @@ __verify_row_int_key_order(WT_SESSION_IMPL *session,
 	item.size = ikey->size;
 
 	/* Compare the key against the largest key we've seen so far. */
-	WT_RET(
-	    WT_BTREE_CMP(session, btree, &item, (WT_ITEM *)vs->max_key, cmp));
+	WT_RET(WT_BTREE_CMP(session, btree, &item, vs->max_key, cmp));
 	if (cmp <= 0)
 		WT_RET_MSG(session, WT_ERROR,
 		    "the internal key in entry %" PRIu32 " on the page at %s "
@@ -406,7 +405,7 @@ __verify_row_leaf_key_order(
 		 * OK to compare equally in that case.
 		 */
 		WT_RET(WT_BTREE_CMP(session,
-		    btree, (WT_ITEM *)vs->tmp1, (WT_ITEM *)vs->max_key, cmp));
+		    btree, vs->tmp1, (WT_ITEM *)vs->max_key, cmp));
 		if (cmp < 0)
 			WT_RET_MSG(session, WT_ERROR,
 			    "the first key on the page at %s sorts equal to or "

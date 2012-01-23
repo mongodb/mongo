@@ -388,7 +388,7 @@ static void
 __track_msg(
     WT_SESSION_IMPL *session, WT_PAGE *page, const char *msg, WT_ADDR *addr)
 {
-	WT_BUF *buf;
+	WT_ITEM *buf;
 
 	if (__wt_scr_alloc(session, 64, &buf))
 		return;

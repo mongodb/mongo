@@ -288,7 +288,7 @@ static int
 __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
-	WT_BUF *current, *last, *tmp;
+	WT_ITEM *current, *last, *tmp;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_PAGE_HEADER *dsk;

@@ -16,8 +16,8 @@ int
 __wt_schema_project_in(WT_SESSION_IMPL *session,
     WT_CURSOR **cp, const char *proj_arg, va_list ap)
 {
-	WT_BUF *buf;
 	WT_CURSOR *c;
+	WT_ITEM *buf;
 	WT_PACK pack;
 	WT_PACK_VALUE pv;
 	char *proj;
@@ -218,8 +218,8 @@ int
 __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
     const char *proj_arg, int key_only, const char *vformat, WT_ITEM *value)
 {
-	WT_BUF *buf;
 	WT_CURSOR *c;
+	WT_ITEM *buf;
 	WT_PACK pack, vpack;
 	WT_PACK_VALUE pv, vpv;
 	char *proj;
@@ -372,10 +372,10 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
  */
 int
 __wt_schema_project_merge(WT_SESSION_IMPL *session,
-    WT_CURSOR **cp, const char *proj_arg, const char *vformat, WT_BUF *value)
+    WT_CURSOR **cp, const char *proj_arg, const char *vformat, WT_ITEM *value)
 {
-	WT_BUF *buf;
 	WT_CURSOR *c;
+	WT_ITEM *buf;
 	WT_PACK pack, vpack;
 	WT_PACK_VALUE pv, vpv;
 	char *proj;

@@ -282,7 +282,7 @@ __btree_conf(WT_SESSION_IMPL *session, const char *config, uint32_t flags)
 static int
 __btree_tree_init(WT_SESSION_IMPL *session)
 {
-	WT_BUF *addr;
+	WT_ITEM *addr;
 	int ret;
 
 	ret = 0;
@@ -312,10 +312,10 @@ err:	__wt_scr_free(&addr);
  *      Read in a tree from disk.
  */
 int
-__wt_btree_root_init(WT_SESSION_IMPL *session, WT_BUF *addr)
+__wt_btree_root_init(WT_SESSION_IMPL *session, WT_ITEM *addr)
 {
 	WT_BTREE *btree;
-	WT_BUF tmp;
+	WT_ITEM tmp;
 	WT_PAGE *page;
 	int ret;
 

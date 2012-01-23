@@ -14,7 +14,7 @@
 static inline int
 __cursor_fix_append_next(WT_CURSOR_BTREE *cbt, int newpage)
 {
-	WT_BUF *val;
+	WT_ITEM *val;
 
 	val = &cbt->iface.value;
 
@@ -44,8 +44,8 @@ static inline int
 __cursor_fix_next(WT_CURSOR_BTREE *cbt, int newpage)
 {
 	WT_BTREE *btree;
-	WT_BUF *val;
 	WT_INSERT *ins;
+	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
 	uint64_t *recnop;
 
@@ -94,7 +94,7 @@ new_page:	*recnop = cbt->recno;
 static inline int
 __cursor_var_append_next(WT_CURSOR_BTREE *cbt, int newpage)
 {
-	WT_BUF *val;
+	WT_ITEM *val;
 
 	val = &cbt->iface.value;
 
@@ -124,11 +124,11 @@ new_page:	cbt->iface.recno = WT_INSERT_RECNO(cbt->ins);
 static inline int
 __cursor_var_next(WT_CURSOR_BTREE *cbt, int newpage)
 {
-	WT_BUF *val;
 	WT_CELL *cell;
 	WT_CELL_UNPACK unpack;
 	WT_COL *cip;
 	WT_INSERT *ins;
+	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
 	uint64_t *recnop;
 
@@ -205,7 +205,7 @@ new_page:	*recnop = cbt->recno;
 static inline int
 __cursor_row_next(WT_CURSOR_BTREE *cbt, int newpage)
 {
-	WT_BUF *key, *val;
+	WT_ITEM *key, *val;
 	WT_ROW *rip;
 	WT_UPDATE *upd;
 

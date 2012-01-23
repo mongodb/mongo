@@ -87,7 +87,7 @@ static inline int
 __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip)
 {
 	WT_BTREE *btree;
-	WT_BUF *kb, *vb;
+	WT_ITEM *kb, *vb;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_IKEY *ikey;
@@ -147,14 +147,14 @@ __cursor_row_slot_return(WT_CURSOR_BTREE *cbt, WT_ROW *rip)
 		    cbt->rip_saved != NULL && cbt->rip_saved == rip - 1) {
 			/*
 			 * If we previously built a prefix-compressed key in the
-			 * temporary buffer, the WT_BUF->data field will be the
-			 * same as the WT_BUF->mem field: grow the buffer if
+			 * temporary buffer, the WT_ITEM->data field will be the
+			 * same as the WT_ITEM->mem field: grow the buffer if
 			 * necessary and copy the suffix into place.  If we
 			 * previously pointed the temporary buffer at an on-page
-			 * key, the WT_BUF->data field will not be the same as
-			 * the WT_BUF->mem field: grow the buffer if necessary,
+			 * key, the WT_ITEM->data field will not be the same as
+			 * the WT_ITEM->mem field: grow the buffer if necessary,
 			 * copy the prefix into place, and then re-point the
-			 * WT_BUF->data field to the newly constructed memory.
+			 * WT_ITEM->data field to the newly constructed memory.
 			 */
 			WT_RET(__wt_buf_grow(
 			    session, &cbt->tmp, unpack->prefix + unpack->size));

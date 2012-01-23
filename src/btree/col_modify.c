@@ -18,8 +18,8 @@ int
 __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 {
 	WT_BTREE *btree;
-	WT_BUF *value, _value;
 	WT_INSERT *ins, *ins_copy;
+	WT_ITEM *value, _value;
 	WT_PAGE *page;
 	WT_SKIP_HEAD **inshead, *new_inshead, **new_inslist;
 	WT_UPDATE *upd;

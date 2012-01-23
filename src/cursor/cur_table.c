@@ -153,7 +153,7 @@ __wt_curtable_set_value(WT_CURSOR *cursor, ...)
 		cursor->value.size = item->size;
 		ret = __wt_schema_project_slice(session,
 		    ctable->cg_cursors, ctable->plan, 0,
-		    cursor->value_format, (WT_ITEM *)&cursor->value);
+		    cursor->value_format, &cursor->value);
 	} else
 		ret = __wt_schema_project_in(session,
 		    ctable->cg_cursors, ctable->plan, ap);
@@ -371,7 +371,7 @@ __curtable_update(WT_CURSOR *cursor)
 		APPLY_IDX(ctable, remove);
 		WT_ERR(__wt_schema_project_slice(session,
 		    ctable->cg_cursors, ctable->plan, 0,
-		    cursor->value_format, (WT_ITEM *)&cursor->value));
+		    cursor->value_format, &cursor->value));
 	}
 	APPLY_CG(ctable, update);
 	if (ctable->idx_cursors != NULL)
@@ -542,15 +542,15 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
 		0,			/* recno key */
 		{ 0 },                  /* raw recno buffer */
-		{ NULL, 0, 0, NULL, 0 },/* WT_BUF key */
-		{ NULL, 0, 0, NULL, 0 },/* WT_BUF value */
+		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM key */
+		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM value */
 		0,			/* int saved_err */
 		0			/* uint32_t flags */
 	};
-	WT_BUF fmt, plan;
 	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
 	WT_CURSOR_TABLE *ctable;
+	WT_ITEM fmt, plan;
 	WT_TABLE *table;
 	size_t size;
 	int ret;

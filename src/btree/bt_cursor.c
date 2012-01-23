@@ -12,7 +12,7 @@
  *	Return if an inserted item is too large.
  */
 static inline int
-__cursor_size_chk(WT_SESSION_IMPL *session, WT_BUF *kv)
+__cursor_size_chk(WT_SESSION_IMPL *session, WT_ITEM *kv)
 {
 	WT_BTREE *btree;
 
@@ -103,8 +103,8 @@ int
 __wt_btcur_search(WT_CURSOR_BTREE *cbt)
 {
 	WT_BTREE *btree;
-	WT_BUF *val;
 	WT_CURSOR *cursor;
+	WT_ITEM *val;
 	WT_SESSION_IMPL *session;
 	int ret;
 
@@ -149,7 +149,7 @@ int
 __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact)
 {
 	WT_BTREE *btree;
-	WT_BUF *val;
+	WT_ITEM *val;
 	WT_CURSOR *cursor;
 	WT_SESSION_IMPL *session;
 	int ret;

@@ -88,8 +88,7 @@ __wt_bulk_insert(WT_CURSOR_BULK *cbulk)
 		 */
 		if (cbulk->rle != 0) {
 			WT_RET(WT_BTREE_CMP(session, session->btree,
-			    (WT_ITEM *)&cursor->key,
-			    (WT_ITEM *)&cbulk->cmp, cmp));
+			    &cursor->key, &cbulk->cmp, cmp));
 			if (cmp <= 0)
 				return (__bulk_row_keycmp_err(cbulk));
 		}
@@ -132,7 +131,7 @@ __wt_bulk_end(WT_CURSOR_BULK *cbulk)
 static int
 __bulk_row_keycmp_err(WT_CURSOR_BULK *cbulk)
 {
-	WT_BUF a, b;
+	WT_ITEM a, b;
 	WT_CURSOR *cursor;
 	WT_SESSION_IMPL *session;
 

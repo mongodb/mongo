@@ -11,7 +11,7 @@ int
 __wt_create_file(WT_SESSION_IMPL *session,
     const char *name, const char *fileuri, const char *config)
 {
-	WT_BUF *key, *val;
+	WT_ITEM *key, *val;
 	const char *cfg[] = API_CONF_DEFAULTS(session, create, config);
 	const char *filecfg[] = API_CONF_DEFAULTS(file, meta, config);
 	const char *filename, *treeconf;
@@ -88,8 +88,8 @@ static int
 __create_colgroup(
     WT_SESSION_IMPL *session, const char *name, const char *config)
 {
-	WT_BUF fmt, namebuf, uribuf;
 	WT_CONFIG_ITEM cval;
+	WT_ITEM fmt, namebuf, uribuf;
 	WT_TABLE *table;
 	const char *cfg[] = { __wt_confdfl_colgroup_meta, config, NULL, NULL };
 	const char *filecfg[] = { config, NULL, NULL };
@@ -184,9 +184,9 @@ err:    __wt_free(session, cgconf);
 static int
 __create_index(WT_SESSION_IMPL *session, const char *name, const char *config)
 {
-	WT_BUF extra_cols, fmt, namebuf, uribuf;
 	WT_CONFIG pkcols;
 	WT_CONFIG_ITEM ckey, cval, icols;
+	WT_ITEM extra_cols, fmt, namebuf, uribuf;
 	WT_TABLE *table;
 	const char *cfg[] = { __wt_confdfl_index_meta, config, NULL, NULL };
 	const char *filecfg[] = { config, NULL, NULL };

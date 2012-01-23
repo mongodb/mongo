@@ -99,7 +99,7 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 
 	__cursor_search_clear(cbt);
 
-	srch_key = (WT_ITEM *)&cbt->iface.key;
+	srch_key = &cbt->iface.key;
 
 	btree = session->btree;
 	unpack = &_unpack;

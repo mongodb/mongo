@@ -15,7 +15,7 @@ static int  __curstat_prev(WT_CURSOR *cursor);
  *	Convert statistics cursor value to printable format.
  */
 static int
-__curstat_print_value(WT_SESSION_IMPL *session, uint64_t v, WT_BUF *buf)
+__curstat_print_value(WT_SESSION_IMPL *session, uint64_t v, WT_ITEM *buf)
 {
 	if (v >= WT_BILLION)
 		WT_RET(__wt_buf_fmt(session, buf,
@@ -339,8 +339,8 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
 		0,			/* recno key */
 		{ 0 },                  /* recno raw buffer */
-		{ NULL, 0, 0, NULL, 0 },/* WT_BUF key */
-		{ NULL, 0, 0, NULL, 0 },/* WT_BUF value */
+		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM key */
+		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM value */
 		0,			/* int saved_err */
 		0			/* uint32_t flags */
 	};

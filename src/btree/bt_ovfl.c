@@ -13,7 +13,7 @@
  */
 int
 __wt_ovfl_in(
-    WT_SESSION_IMPL *session, WT_BUF *store, const uint8_t *addr, uint32_t len)
+    WT_SESSION_IMPL *session, WT_ITEM *store, const uint8_t *addr, uint32_t len)
 {
 	WT_BTREE *btree;
 

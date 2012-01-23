@@ -41,7 +41,7 @@ __wt_block_write_size(
  */
 int
 __wt_block_write_buf(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, WT_BUF *buf, uint8_t *addr, uint32_t *addr_size)
+    WT_BLOCK *block, WT_ITEM *buf, uint8_t *addr, uint32_t *addr_size)
 {
 	off_t offset;
 	uint32_t size, cksum;
@@ -65,11 +65,11 @@ __wt_block_write_buf(WT_SESSION_IMPL *session,
  */
 int
 __wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
-    WT_BUF *buf, off_t *offsetp, uint32_t *sizep, uint32_t *cksump)
+    WT_ITEM *buf, off_t *offsetp, uint32_t *sizep, uint32_t *cksump)
 {
 	WT_BLOCK_HEADER *blk;
 	WT_PAGE_HEADER *dsk;
-	WT_BUF *tmp;
+	WT_ITEM *tmp;
 	off_t offset;
 	uint32_t align_size, size;
 	int compression_failed, ret;
@@ -89,7 +89,7 @@ __wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	dsk->size = buf->size;
 
 	/*
-	 * We're passed a table's page image: WT_BUF->{mem,size} are the image
+	 * We're passed a table's page image: WT_ITEM->{mem,size} are the image
 	 * and byte count.
 	 *
 	 * Diagnostics: verify the disk page: this violates layering, but it's

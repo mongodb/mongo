@@ -75,10 +75,10 @@ struct __wt_session_impl {
 	WT_BTREE *schematab;		/* Schema tables */
 	TAILQ_HEAD(__tables, __wt_table) tables;
 
-	WT_BUF	logrec_buf;		/* Buffer for log records */
-	WT_BUF	logprint_buf;		/* Buffer for debug log records */
+	WT_ITEM	logrec_buf;		/* Buffer for log records */
+	WT_ITEM	logprint_buf;		/* Buffer for debug log records */
 
-	WT_BUF	**scratch;		/* Temporary memory for any function */
+	WT_ITEM	**scratch;		/* Temporary memory for any function */
 	u_int	scratch_alloc;		/* Currently allocated */
 
 					/* Serialized operation state */
@@ -264,7 +264,6 @@ extern WT_PROCESS __wt_process;
  * DO NOT EDIT: automatically built by dist/api_flags.py.
  * API flags section: BEGIN
  */
-#define	WT_BUF_INUSE					0x00000001
 #define	WT_PAGE_FREE_IGNORE_DISK			0x00000001
 #define	WT_REC_SINGLE					0x00000001
 #define	WT_SERVER_RUN					0x00000001

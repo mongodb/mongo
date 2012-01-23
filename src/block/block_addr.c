@@ -78,7 +78,7 @@ __wt_block_addr_valid(WT_SESSION_IMPL *session,
  */
 int
 __wt_block_addr_string(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, WT_BUF *buf, const uint8_t *addr, uint32_t addr_size)
+    WT_BLOCK *block, WT_ITEM *buf, const uint8_t *addr, uint32_t addr_size)
 {
 	off_t offset;
 	uint32_t cksum, size;

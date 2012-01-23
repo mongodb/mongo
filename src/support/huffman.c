@@ -588,11 +588,11 @@ __wt_print_huffman_code(void *huffman_arg, uint16_t symbol)
  */
 int
 __wt_huffman_encode(WT_SESSION_IMPL *session, void *huffman_arg,
-    const uint8_t *from_arg, uint32_t from_len, WT_BUF *to_buf)
+    const uint8_t *from_arg, uint32_t from_len, WT_ITEM *to_buf)
 {
-	WT_BUF *tmp;
 	WT_HUFFMAN_CODE code;
 	WT_HUFFMAN_OBJ *huffman;
+	WT_ITEM *tmp;
 	uint64_t bitpos;
 	uint32_t max_len, outlen, bytes;
 	const uint8_t *from;
@@ -727,9 +727,9 @@ err:	__wt_scr_free(&tmp);
  */
 int
 __wt_huffman_decode(WT_SESSION_IMPL *session, void *huffman_arg,
-    const uint8_t *from_arg, uint32_t from_len, WT_BUF *to_buf)
+    const uint8_t *from_arg, uint32_t from_len, WT_ITEM *to_buf)
 {
-	WT_BUF *tmp;
+	WT_ITEM *tmp;
 	WT_HUFFMAN_OBJ *huffman;
 	uint64_t from_len_bits;
 	uint32_t bits, from_bytes, len, mask, max, max_len, outlen;

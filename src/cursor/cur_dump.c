@@ -14,9 +14,9 @@
  */
 static int
 __raw_to_dump(
-    WT_SESSION_IMPL *session, WT_ITEM *from, WT_BUF *to, int hexonly)
+    WT_SESSION_IMPL *session, WT_ITEM *from, WT_ITEM *to, int hexonly)
 {
-	WT_BUF *tmp;
+	WT_ITEM *tmp;
 	uint32_t size;
 
 	/*

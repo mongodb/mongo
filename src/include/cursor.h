@@ -73,7 +73,7 @@ struct __wt_cursor_btree {
 	 * A temporary buffer with two uses: caching RLE values for column-store
 	 * files, and caching the last-returned keys for row-store files.
 	 */
-	WT_BUF tmp;
+	WT_ITEM tmp;
 
 	/*
 	 * Fixed-length column-store items are a single byte, and it's simpler
@@ -100,7 +100,7 @@ struct __wt_cursor_bulk {
 	 * part of RLE compression, row-store compares keys during bulk load
 	 * to avoid corruption.
 	 */
-	WT_BUF cmp;				/* Comparison buffer */
+	WT_ITEM cmp;				/* Comparison buffer */
 
 	/*
 	 * Variable-length column-store RLE counter (also overloaded to mean
@@ -138,7 +138,7 @@ struct __wt_cursor_stat {
 
 	int	 key;			/* Current stats key */
 	uint64_t v;			/* Current stats value */
-	WT_BUF   pv;			/* Current stats value (string) */
+	WT_ITEM   pv;			/* Current stats value (string) */
 
 	void (*clear_func)(WT_STATS *);	/* Function to clear stats. */
 	WT_BTREE *btree;		/* Pinned btree handle. */

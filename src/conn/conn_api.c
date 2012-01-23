@@ -7,7 +7,7 @@
 
 #include "wt_internal.h"
 
-static int __conn_config(WT_CONNECTION_IMPL *, const char **, WT_BUF **);
+static int __conn_config(WT_CONNECTION_IMPL *, const char **, WT_ITEM **);
 static int __conn_home(WT_CONNECTION_IMPL *, const char *, const char **);
 static int __conn_single(WT_CONNECTION_IMPL *, const char **);
 
@@ -370,10 +370,10 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		{ "write",	WT_VERB_write },
 		{ NULL, 0 }
 	};
-	WT_BUF *cbuf, expath, exconfig;
 	WT_CONFIG subconfig;
 	WT_CONFIG_ITEM cval, skey, sval;
 	WT_CONNECTION_IMPL *conn;
+	WT_ITEM *cbuf, expath, exconfig;
 	WT_SESSION_IMPL *session;
 	int ret;
 	const char *cfg[] =
@@ -672,9 +672,9 @@ err:	if (conn->lock_fh != NULL) {
  *	Read in any WiredTiger_config file in the home directory.
  */
 static int
-__conn_config(WT_CONNECTION_IMPL *conn, const char **cfg, WT_BUF **cbufp)
+__conn_config(WT_CONNECTION_IMPL *conn, const char **cfg, WT_ITEM **cbufp)
 {
-	WT_BUF *cbuf;
+	WT_ITEM *cbuf;
 	WT_FH *fh;
 	WT_SESSION_IMPL *session;
 	off_t size;

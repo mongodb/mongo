@@ -17,7 +17,7 @@ int
 __wt_row_leaf_keys(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
-	WT_BUF *tmp;
+	WT_ITEM *tmp;
 	WT_ROW *rip;
 	uint32_t i;
 	int ret;
@@ -104,12 +104,12 @@ __inmem_row_leaf_slots(
  */
 int
 __wt_row_key(
-    WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip_arg, WT_BUF *retb)
+    WT_SESSION_IMPL *session, WT_PAGE *page, WT_ROW *rip_arg, WT_ITEM *retb)
 {
 	enum { FORWARD, BACKWARD } direction;
-	WT_BUF *tmp;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_IKEY *ikey;
+	WT_ITEM *tmp;
 	WT_ROW *rip;
 	int is_local, ret, slot_offset;
 	void *key;

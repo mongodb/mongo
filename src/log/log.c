@@ -20,7 +20,7 @@ __log_record_size(WT_SESSION_IMPL *session,
 int
 __wt_log_put(WT_SESSION_IMPL *session, WT_LOGREC_DESC *recdesc, ...)
 {
-	WT_BUF *buf;
+	WT_ITEM *buf;
 	va_list ap;
 	size_t size;
 	int ret;
@@ -44,7 +44,7 @@ int
 __wt_log_vprintf(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 {
 	WT_CONNECTION_IMPL *conn;
-	WT_BUF *buf;
+	WT_ITEM *buf;
 	va_list ap_copy;
 	size_t len;
 

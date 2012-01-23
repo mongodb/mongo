@@ -31,8 +31,8 @@ struct __wt_stuff {
 	/* If need to free blocks backing merged page ranges. */
 	int	   merge_free;
 
-	WT_BUF	  *tmp1;			/* Verbose print buffer */
-	WT_BUF	  *tmp2;			/* Verbose print buffer */
+	WT_ITEM	  *tmp1;			/* Verbose print buffer */
+	WT_ITEM	  *tmp2;			/* Verbose print buffer */
 
 	uint64_t fcnt;				/* Progress counter */
 };
@@ -59,10 +59,10 @@ struct __wt_track {
 		struct {
 #undef	row_start
 #define	row_start	u.row._row_start
-			WT_BUF   _row_start;	/* Row-store start range */
+			WT_ITEM   _row_start;	/* Row-store start range */
 #undef	row_stop
 #define	row_stop	u.row._row_stop
-			WT_BUF   _row_stop;	/* Row-store stop range */
+			WT_ITEM   _row_stop;	/* Row-store stop range */
 		} row;
 
 		struct {
@@ -317,7 +317,7 @@ err:	if (started)
 static int
 __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 {
-	WT_BUF *as, *buf;
+	WT_ITEM *as, *buf;
 	WT_PAGE_HEADER *dsk;
 	uint64_t gen;
 	uint32_t addrbuf_size;
@@ -1275,8 +1275,8 @@ __slvg_row_range(WT_SESSION_IMPL *session, WT_STUFF *ss)
 			 * subsequent pages can overlap our page.
 			 */
 			WT_RET(WT_BTREE_CMP(session, btree,
-			    (WT_ITEM *)&ss->pages[j]->row_start,
-			    (WT_ITEM *)&ss->pages[i]->row_stop, cmp));
+			    &ss->pages[j]->row_start,
+			    &ss->pages[i]->row_stop, cmp));
 			if (cmp > 0)
 				break;
 
@@ -1346,15 +1346,11 @@ __slvg_row_range_overlap(
 	 * Finally, there's one additional complicating factor -- final ranges
 	 * are assigned based on the page's LSN.
 	 */
-#define	A_TRK_START	((WT_ITEM *)A_TRK_START_BUF)
-#define	A_TRK_START_BUF	(&a_trk->row_start)
-#define	A_TRK_STOP	((WT_ITEM *)A_TRK_STOP_BUF)
-#define	A_TRK_STOP_BUF	(&a_trk->row_stop)
-#define	B_TRK_START_BUF	(&b_trk->row_start)
-#define	B_TRK_START	((WT_ITEM *)B_TRK_START_BUF)
-#define	B_TRK_STOP_BUF	(&b_trk->row_stop)
-#define	B_TRK_STOP	((WT_ITEM *)B_TRK_STOP_BUF)
-#define	SLOT_START(i)	((WT_ITEM *)&ss->pages[i]->row_start)
+#define	A_TRK_START	(&a_trk->row_start)
+#define	A_TRK_STOP	(&a_trk->row_stop)
+#define	B_TRK_START	(&b_trk->row_start)
+#define	B_TRK_STOP	(&b_trk->row_stop)
+#define	SLOT_START(i)	(&ss->pages[i]->row_start)
 #define	__slvg_key_copy(session, dst, src)				\
 	__wt_buf_set(session, dst, (src)->data, (src)->size)
 
@@ -1404,8 +1400,7 @@ __slvg_row_range_overlap(
 		 * Case #6: a_trk is a superset of b_trk, but b_trk is more
 		 * desirable: keep both but delete b_trk's key range from a_trk.
 		 */
-		WT_RET(
-		    __slvg_key_copy(session, A_TRK_STOP_BUF, B_TRK_START_BUF));
+		WT_RET(__slvg_key_copy(session, A_TRK_STOP, B_TRK_START));
 		F_SET(a_trk, WT_TRACK_CHECK_STOP | WT_TRACK_MERGE);
 		goto merge;
 	}
@@ -1427,7 +1422,7 @@ __slvg_row_range_overlap(
 			 * key range from a_trk;
 			 */
 			WT_RET(__slvg_key_copy(
-			    session, A_TRK_STOP_BUF, B_TRK_START_BUF));
+			    session, A_TRK_STOP, B_TRK_START));
 			F_SET(a_trk, WT_TRACK_CHECK_STOP | WT_TRACK_MERGE);
 		}
 		goto merge;
@@ -1475,7 +1470,7 @@ delete:		WT_RET(__slvg_trk_free(session,
 	 * chunk (that's b_trk), and re-sort the WT_TRACK array as necessary to
 	 * move our new entry into the right sorted location.
 	 */
-	WT_RET(__slvg_key_copy(session, &new->row_stop, A_TRK_STOP_BUF));
+	WT_RET(__slvg_key_copy(session, &new->row_stop, A_TRK_STOP));
 	WT_RET(
 	    __slvg_row_trk_update_start(session, B_TRK_STOP, a_slot + 1, ss));
 
@@ -1491,7 +1486,7 @@ delete:		WT_RET(__slvg_trk_free(session,
 	 * the initial key space in the page, that is, everything up to the
 	 * starting key of the middle chunk (that's b_trk).
 	 */
-	WT_RET(__slvg_key_copy(session, A_TRK_STOP_BUF, B_TRK_START_BUF));
+	WT_RET(__slvg_key_copy(session, A_TRK_STOP, B_TRK_START));
 	F_SET(a_trk, WT_TRACK_CHECK_STOP | WT_TRACK_MERGE);
 
 merge:	WT_VERBOSE(session, salvage,
@@ -1512,9 +1507,8 @@ __slvg_row_trk_update_start(
     WT_SESSION_IMPL *session, WT_ITEM *stop, uint32_t slot, WT_STUFF *ss)
 {
 	WT_BTREE *btree;
-	WT_BUF *key, *dsk;
 	WT_IKEY *ikey;
-	WT_ITEM *item, _item;
+	WT_ITEM *dsk, *key, *item, _item;
 	WT_PAGE *page;
 	WT_ROW *rip;
 	WT_TRACK *trk;
@@ -1565,7 +1559,7 @@ __slvg_row_trk_update_start(
 			item = &_item;
 		} else {
 			WT_ERR(__wt_row_key(session, page, rip, key));
-			item = (WT_ITEM *)key;
+			item = key;
 		}
 		WT_ERR(WT_BTREE_CMP(session, btree, item, stop, cmp));
 		if (cmp > 0) {
@@ -1593,7 +1587,7 @@ __slvg_row_trk_update_start(
 		if (ss->pages[i] == NULL)
 			continue;
 		WT_ERR(WT_BTREE_CMP(session, btree,
-		    SLOT_START(i), (WT_ITEM *)&trk->row_stop, cmp));
+		    SLOT_START(i), &trk->row_stop, cmp));
 		if (cmp > 0)
 			break;
 	}
@@ -1690,9 +1684,8 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
     WT_TRACK *trk, WT_PAGE *parent, WT_REF *ref, WT_STUFF *ss)
 {
 	WT_BTREE *btree;
-	WT_BUF *key;
 	WT_IKEY *ikey;
-	WT_ITEM *item, _item;
+	WT_ITEM *item, _item, *key;
 	WT_PAGE *page;
 	WT_ROW *rip;
 	WT_SALVAGE_COOKIE *cookie, _cookie;
@@ -1738,14 +1731,14 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 				item = &_item;
 			} else {
 				WT_ERR(__wt_row_key(session, page, rip, key));
-				item = (WT_ITEM *)key;
+				item = key;
 			}
 
 			/*
 			 * >= is correct: see the comment above.
 			 */
 			WT_ERR(WT_BTREE_CMP(session, btree,
-			    item, (WT_ITEM *)&trk->row_start, cmp));
+			    item, &trk->row_start, cmp));
 			if (cmp >= 0)
 				break;
 			if (WT_VERBOSE_ISSET(session, salvage)) {
@@ -1769,14 +1762,14 @@ __slvg_row_build_leaf(WT_SESSION_IMPL *session,
 				item = &_item;
 			} else {
 				WT_ERR(__wt_row_key(session, page, rip, key));
-				item = (WT_ITEM *)key;
+				item = key;
 			}
 
 			/*
 			 * < is correct: see the comment above.
 			 */
 			WT_ERR(WT_BTREE_CMP(session, btree,
-			    item, (WT_ITEM *)&trk->row_stop, cmp));
+			    item, &trk->row_stop, cmp));
 			if (cmp < 0)
 				break;
 			if (WT_VERBOSE_ISSET(session, salvage)) {
@@ -2106,8 +2099,7 @@ __slvg_trk_compare_key(const void *a, const void *b)
 	case WT_PAGE_ROW_LEAF:
 		btree = a_trk->ss->btree;
 		(void)WT_BTREE_CMP(a_trk->ss->session, btree,
-		    (WT_ITEM *)&a_trk->row_start,
-		    (WT_ITEM *)&b_trk->row_start, cmp);
+		    &a_trk->row_start, &b_trk->row_start, cmp);
 		if (cmp != 0)
 			return (cmp);
 		break;

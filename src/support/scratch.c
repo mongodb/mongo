@@ -7,14 +7,14 @@
 
 #include "wt_internal.h"
 
-static void __wt_buf_clear(WT_BUF *);
+static void __wt_buf_clear(WT_ITEM *);
 
 /*
  * __wt_buf_clear --
  *	Clear a buffer.
  */
 static void
-__wt_buf_clear(WT_BUF *buf)
+__wt_buf_clear(WT_ITEM *buf)
 {
 	buf->data = NULL;
 	buf->size = 0;
@@ -30,7 +30,7 @@ __wt_buf_clear(WT_BUF *buf)
  *	Initialize a buffer at a specific size.
  */
 int
-__wt_buf_init(WT_SESSION_IMPL *session, WT_BUF *buf, size_t size)
+__wt_buf_init(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 {
 	WT_ASSERT(session, size <= UINT32_MAX);
 
@@ -48,7 +48,7 @@ __wt_buf_init(WT_SESSION_IMPL *session, WT_BUF *buf, size_t size)
  *	Initialize a buffer at a specific size, and set the data length.
  */
 int
-__wt_buf_initsize(WT_SESSION_IMPL *session, WT_BUF *buf, size_t size)
+__wt_buf_initsize(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 {
 	WT_RET(__wt_buf_init(session, buf, size));
 
@@ -62,7 +62,7 @@ __wt_buf_initsize(WT_SESSION_IMPL *session, WT_BUF *buf, size_t size)
  *	Grow a buffer that's currently in-use.
  */
 int
-__wt_buf_grow(WT_SESSION_IMPL *session, WT_BUF *buf, size_t size)
+__wt_buf_grow(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 {
 	size_t offset;
 	int set_data;
@@ -105,7 +105,7 @@ __wt_buf_grow(WT_SESSION_IMPL *session, WT_BUF *buf, size_t size)
  */
 int
 __wt_buf_set(
-    WT_SESSION_IMPL *session, WT_BUF *buf, const void *data, size_t size)
+    WT_SESSION_IMPL *session, WT_ITEM *buf, const void *data, size_t size)
 {
 	/* Ensure the buffer is large enough. */
 	WT_RET(__wt_buf_initsize(session, buf, size));
@@ -122,7 +122,7 @@ __wt_buf_set(
  */
 int
 __wt_buf_set_printable(
-    WT_SESSION_IMPL *session, WT_BUF *buf, const void *from_arg, size_t size)
+    WT_SESSION_IMPL *session, WT_ITEM *buf, const void *from_arg, size_t size)
 {
 	uint32_t u32size;
 
@@ -144,7 +144,7 @@ __wt_buf_set_printable(
  *	Steal a buffer for another purpose.
  */
 void *
-__wt_buf_steal(WT_SESSION_IMPL *session, WT_BUF *buf, uint32_t *sizep)
+__wt_buf_steal(WT_SESSION_IMPL *session, WT_ITEM *buf, uint32_t *sizep)
 {
 	void *retp;
 
@@ -186,9 +186,9 @@ __wt_buf_steal(WT_SESSION_IMPL *session, WT_BUF *buf, uint32_t *sizep)
  *	Swap a pair of buffers.
  */
 void
-__wt_buf_swap(WT_BUF *a, WT_BUF *b)
+__wt_buf_swap(WT_ITEM *a, WT_ITEM *b)
 {
-	WT_BUF tmp;
+	WT_ITEM tmp;
 
 	tmp = *a;
 	*a = *b;
@@ -200,7 +200,7 @@ __wt_buf_swap(WT_BUF *a, WT_BUF *b)
  *	Free a buffer.
  */
 void
-__wt_buf_free(WT_SESSION_IMPL *session, WT_BUF *buf)
+__wt_buf_free(WT_SESSION_IMPL *session, WT_ITEM *buf)
 {
 	__wt_free(session, buf->mem);
 	__wt_buf_clear(buf);
@@ -211,7 +211,7 @@ __wt_buf_free(WT_SESSION_IMPL *session, WT_BUF *buf)
  *	Grow a buffer to accommodate a formatted string.
  */
 int
-__wt_buf_fmt(WT_SESSION_IMPL *session, WT_BUF *buf, const char *fmt, ...)
+__wt_buf_fmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
 {
 	va_list ap;
@@ -244,7 +244,7 @@ __wt_buf_fmt(WT_SESSION_IMPL *session, WT_BUF *buf, const char *fmt, ...)
  *	Grow a buffer to append a formatted string.
  */
 int
-__wt_buf_catfmt(WT_SESSION_IMPL *session, WT_BUF *buf, const char *fmt, ...)
+__wt_buf_catfmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
     WT_GCC_FUNC_ATTRIBUTE((format (printf, 3, 4)))
 {
 	va_list ap;
@@ -279,9 +279,9 @@ __wt_buf_catfmt(WT_SESSION_IMPL *session, WT_BUF *buf, const char *fmt, ...)
  *	Scratch buffer allocation function.
  */
 int
-__wt_scr_alloc(WT_SESSION_IMPL *session, uint32_t size, WT_BUF **scratchp)
+__wt_scr_alloc(WT_SESSION_IMPL *session, uint32_t size, WT_ITEM **scratchp)
 {
-	WT_BUF *buf, **p, *small, **slot;
+	WT_ITEM *buf, **p, *small, **slot;
 	size_t allocated;
 	u_int i;
 	int ret;
@@ -291,7 +291,7 @@ __wt_scr_alloc(WT_SESSION_IMPL *session, uint32_t size, WT_BUF **scratchp)
 
 	/*
 	 * There's an array of scratch buffers in each WT_SESSION_IMPL that can
-	 * be used by any function.  We use WT_BUF structures for scratch
+	 * be used by any function.  We use WT_ITEM structures for scratch
 	 * memory because we already have to have functions that do
 	 * variable-length allocation on WT_BUFs.  Scratch buffers are
 	 * allocated only by a single thread of control, so no locking is
@@ -308,7 +308,7 @@ __wt_scr_alloc(WT_SESSION_IMPL *session, uint32_t size, WT_BUF **scratchp)
 			continue;
 		}
 
-		if (F_ISSET(buf, WT_BUF_INUSE))
+		if (F_ISSET(buf, WT_ITEM_INUSE))
 			continue;
 
 		/*
@@ -320,7 +320,7 @@ __wt_scr_alloc(WT_SESSION_IMPL *session, uint32_t size, WT_BUF **scratchp)
 		if (buf->memsize >= size &&
 		    (buf->memsize - size) < 4 * 1024) {
 			WT_ERR(__wt_buf_init(session, buf, size));
-			F_SET(buf, WT_BUF_INUSE);
+			F_SET(buf, WT_ITEM_INUSE);
 			*scratchp = buf;
 			return (0);
 		}
@@ -336,7 +336,7 @@ __wt_scr_alloc(WT_SESSION_IMPL *session, uint32_t size, WT_BUF **scratchp)
 	 */
 	if (small != NULL) {
 		WT_ERR(__wt_buf_init(session, small, size));
-		F_SET(small, WT_BUF_INUSE);
+		F_SET(small, WT_ITEM_INUSE);
 
 		*scratchp = small;
 		return (0);
@@ -355,9 +355,9 @@ __wt_scr_alloc(WT_SESSION_IMPL *session, uint32_t size, WT_BUF **scratchp)
 	 * Resize the array, we need more scratch buffers, then call recursively
 	 * to find the empty slot, and so on and so forth.
 	 */
-	allocated = session->scratch_alloc * sizeof(WT_BUF *);
+	allocated = session->scratch_alloc * sizeof(WT_ITEM *);
 	WT_ERR(__wt_realloc(session, &allocated,
-	    (session->scratch_alloc + 10) * sizeof(WT_BUF *),
+	    (session->scratch_alloc + 10) * sizeof(WT_ITEM *),
 	    &session->scratch));
 	session->scratch_alloc += 10;
 	return (__wt_scr_alloc(session, size, scratchp));
@@ -371,11 +371,11 @@ err:	WT_RET_MSG(session, ret,
  *	Release a scratch buffer.
  */
 void
-__wt_scr_free(WT_BUF **bufp)
+__wt_scr_free(WT_ITEM **bufp)
 {
 	if (*bufp == NULL)
 		return;
-	F_CLR(*bufp, WT_BUF_INUSE);
+	F_CLR(*bufp, WT_ITEM_INUSE);
 	*bufp = NULL;
 }
 
@@ -386,7 +386,7 @@ __wt_scr_free(WT_BUF **bufp)
 void
 __wt_scr_discard(WT_SESSION_IMPL *session)
 {
-	WT_BUF **bufp;
+	WT_ITEM **bufp;
 	u_int i;
 
 	for (i = 0,
@@ -406,7 +406,7 @@ __wt_scr_discard(WT_SESSION_IMPL *session)
 void *
 __wt_scr_alloc_ext(WT_SESSION *wt_session, size_t size)
 {
-	WT_BUF *buf;
+	WT_ITEM *buf;
 	WT_SESSION_IMPL *session;
 
 	session = (WT_SESSION_IMPL *)wt_session;
@@ -422,7 +422,7 @@ __wt_scr_alloc_ext(WT_SESSION *wt_session, size_t size)
 void
 __wt_scr_free_ext(WT_SESSION *wt_session, void *p)
 {
-	WT_BUF **bufp;
+	WT_ITEM **bufp;
 	WT_SESSION_IMPL *session;
 	u_int i;
 
@@ -435,7 +435,7 @@ __wt_scr_free_ext(WT_SESSION *wt_session, void *p)
 			 * Do NOT call __wt_scr_free() here, it clears the
 			 * caller's pointer, which would truncate the list.
 			 */
-			F_CLR(*bufp, WT_BUF_INUSE);
+			F_CLR(*bufp, WT_ITEM_INUSE);
 			return;
 		}
 	__wt_errx(session, "extension free'd non-existent scratch buffer");

@@ -15,7 +15,7 @@ int
 __wt_drop_file(WT_SESSION_IMPL *session, const char *name, int force)
 {
 	static const char *list[] = { "file", "root", "version", NULL };
-	WT_BUF *buf;
+	WT_ITEM *buf;
 	int exist, ret;
 	const char **lp;
 
@@ -51,7 +51,7 @@ err:	__wt_scr_free(&buf);
 static int
 __drop_tree(WT_SESSION_IMPL *session, WT_BTREE *btree, int force)
 {
-	WT_BUF *buf;
+	WT_ITEM *buf;
 	int ret;
 
 	ret = 0;

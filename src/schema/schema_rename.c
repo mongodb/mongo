@@ -16,7 +16,7 @@ __rename_file(
     WT_SESSION_IMPL *session, const char *oldname, const char *newname)
 {
 	static const char *list[] = { "file", "root", "version", NULL };
-	WT_BUF *buf;
+	WT_ITEM *buf;
 	int exist, ret;
 	const char *value, **lp;
 
@@ -72,7 +72,7 @@ err:	__wt_scr_free(&buf);
 static int
 __rename_tree(WT_SESSION_IMPL *session, WT_BTREE *btree, const char *newname)
 {
-	WT_BUF *of, *nf, *nk, *nv;
+	WT_ITEM *of, *nf, *nk, *nv;
 	int ret;
 	const char *p, *t, *value;
 
@@ -145,7 +145,7 @@ __rename_table(
     WT_SESSION_IMPL *session, const char *oldname, const char *newname)
 {
 	WT_BTREE *btree;
-	WT_BUF *buf;
+	WT_ITEM *buf;
 	WT_TABLE *table;
 	int i, ret;
 	const char *value;

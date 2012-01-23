@@ -125,9 +125,9 @@ __verify_dsk_row(
     WT_SESSION_IMPL *session, const char *addr, WT_PAGE_HEADER *dsk)
 {
 	WT_BTREE *btree;
-	WT_BUF *current, *last, *last_pfx, *last_ovfl;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
+	WT_ITEM *current, *last, *last_pfx, *last_ovfl;
 	enum { FIRST, WAS_KEY, WAS_VALUE } last_cell_type;
 	void *huffman;
 	uint32_t cell_num, cell_type, i, prefix;
@@ -313,8 +313,8 @@ key_compare:	/*
 		 */
 		if ((dsk->type == WT_PAGE_ROW_INT && cell_num > 3) ||
 		    (dsk->type != WT_PAGE_ROW_INT && cell_num > 1)) {
-			WT_ERR(WT_BTREE_CMP(session, btree,
-			    (WT_ITEM *)last, (WT_ITEM *)current, cmp));
+			WT_ERR(
+			    WT_BTREE_CMP(session, btree, last, current, cmp));
 			if (cmp >= 0)
 				WT_ERR_VRFY(session,
 				    "the %" PRIu32 " and %" PRIu32 " keys on "

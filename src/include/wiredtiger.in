@@ -98,6 +98,18 @@ struct __wt_item {
 	 * The number of bytes in the data item.
 	 */
 	uint32_t size;
+
+#ifndef DOXYGEN
+#define	WT_ITEM_INUSE					0x00000001
+	/* This appears in the middle of the struct to avoid padding. */
+	/*! Object flags (internal use). */
+	uint32_t flags;
+
+	/*! Managed memory chunk (internal use). */
+	void *mem;
+	/*! Managed memory size (internal use). */
+	size_t memsize;
+#endif
 };
 
 /*!
@@ -111,36 +123,6 @@ struct __wt_item {
  * function will pack single integers into at most this many bytes.
  */
 #define	WT_INTPACK32_MAXSIZE	((int)sizeof (int32_t) + 1)
-
-#ifndef DOXYGEN
-/* Forward structure declarations */
-struct __wt_buf;		typedef struct __wt_buf WT_BUF;
-
-/*!
- * A data item with memory management.  Used internally to manage returned keys
- * and values in the WT_CURSOR implementation.
- */
-struct __wt_buf {
-	/*
-	 * Note: the first two fields must match WT_ITEM, we cast between
-	 * those types.
-	 */
-	/*! The memory reference of the data item. */
-	const void *data;
-	/*! The number of bytes in the data item. */
-	uint32_t size;
-
-	/* This appears in the middle of the struct to avoid padding. */
-#define	WT_BUF_INUSE					0x00000001
-	/*! Object flags (internal use). */
-	uint32_t flags;
-
-	/*! Managed memory chunk (internal use). */
-	void *mem;
-	/*! Managed memory size (internal use). */
-	size_t memsize;
-};
-#endif
 
 /*!
  * A WT_CURSOR handle is the interface to a cursor.
@@ -399,7 +381,7 @@ struct __wt_cursor {
 	uint64_t recno;
 	uint8_t raw_recno_buf[WT_INTPACK64_MAXSIZE];
 					/* Holds a recno in raw mode. */
-	WT_BUF key, value;
+	WT_ITEM key, value;
 	int saved_err;			/* Saved error in set_{key,value}. */
 
 #define	WT_CURSTD_APPEND	0x0001

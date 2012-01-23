@@ -125,7 +125,7 @@ __wt_table_check(WT_SESSION_IMPL *session, WT_TABLE *table)
  */
 int
 __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
-    const char *columns, size_t len, int value_only, WT_BUF *plan)
+    const char *columns, size_t len, int value_only, WT_ITEM *plan)
 {
 	WT_CONFIG conf;
 	WT_CONFIG_ITEM k, v;
@@ -245,7 +245,7 @@ __find_column_format(WT_SESSION_IMPL *session,
 int
 __wt_struct_reformat(WT_SESSION_IMPL *session, WT_TABLE *table,
     const char *columns, size_t len, const char *extra_cols, int value_only,
-    WT_BUF *format)
+    WT_ITEM *format)
 {
 	WT_CONFIG config;
 	WT_CONFIG_ITEM k, next_k, next_v;
@@ -305,7 +305,7 @@ __wt_struct_reformat(WT_SESSION_IMPL *session, WT_TABLE *table,
  */
 int
 __wt_struct_truncate(WT_SESSION_IMPL *session,
-    const char *input_fmt, u_int ncols, WT_BUF *format)
+    const char *input_fmt, u_int ncols, WT_ITEM *format)
 {
 	WT_PACK pack;
 	WT_PACK_VALUE pv;

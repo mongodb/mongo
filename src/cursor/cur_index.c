@@ -68,8 +68,8 @@ __curindex_set_value(WT_CURSOR *cursor, ...)
 static int
 __curindex_move(WT_CURSOR_INDEX *cindex)
 {
-	WT_BUF *firstkey;
 	WT_CURSOR **cp;
+	WT_ITEM *firstkey;
 	WT_SESSION_IMPL *session;
 	uint64_t recno;
 	int i;
@@ -91,7 +91,7 @@ __curindex_move(WT_CURSOR_INDEX *cindex)
 			WT_RET(__wt_schema_project_slice(session,
 			    cp, cindex->cbt.btree->key_plan,
 			    1, cindex->cbt.btree->key_format,
-			    (WT_ITEM *)&cindex->cbt.iface.key));
+			    &cindex->cbt.iface.key));
 			firstkey = &(*cp)->key;
 			recno = (*cp)->recno;
 		} else {
@@ -194,7 +194,7 @@ static int
 __curindex_search(WT_CURSOR *cursor)
 {
 	WT_CURSOR_INDEX *cindex;
-	WT_BUF *oldkeyp;
+	WT_ITEM *oldkeyp;
 	WT_SESSION_IMPL *session;
 	int exact, ret;
 
@@ -346,7 +346,7 @@ int
 __wt_curindex_open(WT_SESSION_IMPL *session,
     const char *uri, const char *cfg[], WT_CURSOR **cursorp)
 {
-	WT_BUF fmt, plan;
+	WT_ITEM fmt, plan;
 	static WT_CURSOR iface = {
 		NULL,
 		NULL,
@@ -368,8 +368,8 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 		{ NULL, NULL },		/* TAILQ_ENTRY q */
 		0,			/* recno key */
 		{ 0 },                  /* recno raw buffer */
-		{ NULL, 0, 0, NULL, 0 },/* WT_BUF key */
-		{ NULL, 0, 0, NULL, 0 },/* WT_BUF value */
+		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM key */
+		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM value */
 		0,			/* int saved_err */
 		0			/* uint32_t flags */
 	};

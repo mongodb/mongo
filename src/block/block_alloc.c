@@ -343,7 +343,7 @@ __wt_block_freelist_open(WT_SESSION_IMPL *session, WT_BLOCK *block)
 int
 __wt_block_freelist_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
-	WT_BUF *tmp;
+	WT_ITEM *tmp;
 	off_t offset;
 	uint32_t size;
 	uint8_t *p;
@@ -419,7 +419,7 @@ __wt_block_freelist_close(WT_SESSION_IMPL *session, WT_BLOCK *block)
 int
 __wt_block_freelist_write(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
-	WT_BUF *tmp;
+	WT_ITEM *tmp;
 	WT_FREE_ENTRY *fe;
 	WT_PAGE_HEADER *dsk;
 	off_t offset;
