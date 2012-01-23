@@ -1,7 +1,8 @@
 // https://jira.mongodb.org/browse/SERVER-4508
 
 // load the testing utilities
-load('utils.js')
+// load('utils.js')
+// this is loaded by testbugs.js which calls us
 
 // use the aggregation test db
 db = db.getSiblingDB('aggdb');
