@@ -71,7 +71,8 @@
  */
 #if defined(_lint)
 #define	WT_ATOMIC_ADD(v, val)
-#define	WT_ATOMIC_CAS(v, oldv, newv)
+#define	WT_ATOMIC_CAS(v, oldv, newv)					\
+	((v) == (oldv) || (v) == (newv) ? 1 : 0)
 #define	WT_FULL_BARRIER()
 #define	WT_READ_BARRIER()
 #define	WT_WRITE_BARRIER()
