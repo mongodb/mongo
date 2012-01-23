@@ -712,6 +712,7 @@ namespace mongo {
         }
 
         Client::ReadContext ctx( ns , dbpath ); // read locks
+        const ConfigVersion shardingVersionAtStart = shardingState.getVersion( ns );
 
         replVerifyReadsOk(pq);
 
@@ -804,6 +805,15 @@ namespace mongo {
         UserQueryOp &dqo = *o;
         if ( ! dqo.complete() )
             throw MsgAssertionException( dqo.exception() );
+        
+        if ( shardingState.getVersion( ns ) != shardingVersionAtStart ) {
+            // if the version changed during the query
+            // we might be missing some data
+            // and its safe to send this as mongos can resend
+            // at this point
+            throw SendStaleConfigException( ns , "version changed during initial query" );
+        }
+
         if ( explain ) {
             dqo.finishExplain( explainSuffix );
         }
