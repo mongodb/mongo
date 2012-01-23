@@ -39,12 +39,6 @@ Shows how to use transactions.  @notyet{transactions}
 A more complex schema based on a call center example, showing how to map some
 SQL constructs onto the WiredTiger API.
 
-@cond bdb
-@notyet{remove bdb code from TPC-B example}
-@example ex_tpcb.c
-Translates the Berkeley DB TPC-B example program onto the WiredTiger API.
-@endcond
-
 @example ex_extending.c
 Shows how to extend WiredTiger with application-specific collations, extractors and cursor types.
  */

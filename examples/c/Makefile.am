@@ -1,7 +1,6 @@
 LDADD = $(top_builddir)/libwiredtiger.la
 
-# Most of the examples can be run with no arguments
-STANDALONE_EXAMPLES = \
+noinst_PROGRAMS = \
 	ex_access \
 	ex_all \
 	ex_call_center \
@@ -17,10 +16,7 @@ STANDALONE_EXAMPLES = \
 	ex_thread \
 	ex_transaction
 
-noinst_PROGRAMS = $(STANDALONE_EXAMPLES) \
-	ex_tpcb
-
-TESTS = $(STANDALONE_EXAMPLES) \
-	$(srcdir)/run-tpcb
+# The examples can be run with no arguments as simple smoke tests
+TESTS = $(noinst_PROGRAMS)
 
 TESTS_ENVIRONMENT = rm -rf WT_TEST ; mkdir WT_TEST ;
