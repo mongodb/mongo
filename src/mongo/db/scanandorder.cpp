@@ -25,7 +25,7 @@ namespace mongo {
 
     const unsigned ScanAndOrder::MaxScanAndOrderBytes = 32 * 1024 * 1024;
 
-    void ScanAndOrder::add(BSONObj o, DiskLoc* loc) {
+    void ScanAndOrder::add(const BSONObj& o, const DiskLoc* loc) {
         assert( o.isValid() );
         BSONObj k;
         try {
@@ -44,12 +44,6 @@ namespace mongo {
             return;   
         }
         if ( (int) _best.size() < _limit ) {
-            _approxSize += k.objsize();
-            _approxSize += o.objsize();
-            
-            /* note : adjust when bson return limit adjusts. note this limit should be a bit higher. */
-            uassert( 10128 ,  "too much data for sort() with no index.  add an index or specify a smaller limit", _approxSize < MaxScanAndOrderBytes );
-            
             _add(k, o, loc);
             return;
         }
@@ -61,7 +55,7 @@ namespace mongo {
     }
 
 
-    void ScanAndOrder::fill(BufBuilder& b, Projection *filter, int& nout ) const {
+    void ScanAndOrder::fill(BufBuilder& b, const Projection *filter, int& nout ) const {
         int n = 0;
         int nFilled = 0;
         for ( BestMap::const_iterator i = _best.begin(); i != _best.end(); i++ ) {
@@ -73,32 +67,42 @@ namespace mongo {
             nFilled++;
             if ( nFilled >= _limit )
                 break;
-            uassert( 10129 ,  "too much data for sort() with no index", b.len() < (int)MaxScanAndOrderBytes ); // appserver limit
         }
         nout = nFilled;
     }
 
-    void ScanAndOrder::_add(BSONObj& k, BSONObj o, DiskLoc* loc) {
-        if (!loc) {
-            _best.insert(make_pair(k.getOwned(),o.getOwned()));
-        }
-        else {
+    void ScanAndOrder::_add(const BSONObj& k, const BSONObj& o, const DiskLoc* loc) {
+        BSONObj docToReturn = o;
+        if ( loc ) {
             BSONObjBuilder b;
             b.appendElements(o);
             b.append("$diskLoc", loc->toBSONObj());
-            _best.insert(make_pair(k.getOwned(), b.obj().getOwned()));
+            docToReturn = b.obj();
         }
+        _validateAndUpdateApproxSize( k.objsize() + docToReturn.objsize() );
+        _best.insert(make_pair(k.getOwned(),docToReturn.getOwned()));
     }
     
-    void ScanAndOrder::_addIfBetter(BSONObj& k, BSONObj o, BestMap::iterator i, DiskLoc* loc) {
-        /* todo : we don't correct _approxSize here. */
+    void ScanAndOrder::_addIfBetter(const BSONObj& k, const BSONObj& o, const BestMap::iterator& i,
+                                    const DiskLoc* loc) {
         const BSONObj& worstBestKey = i->first;
-        int c = worstBestKey.woCompare(k, _order._spec.keyPattern);
-        if ( c > 0 ) {
+        int cmp = worstBestKey.woCompare(k, _order._spec.keyPattern);
+        if ( cmp > 0 ) {
             // k is better, 'upgrade'
+            _validateAndUpdateApproxSize( -i->first.objsize() + -i->second.objsize() );
             _best.erase(i);
             _add(k, o, loc);
         }
     }
-    
+
+    void ScanAndOrder::_validateAndUpdateApproxSize( const int approxSizeDelta ) {
+        // note : adjust when bson return limit adjusts. note this limit should be a bit higher.
+        int newApproxSize = _approxSize + approxSizeDelta;
+        verify( 16060, newApproxSize >= 0 );
+        uassert( ScanAndOrderMemoryLimitExceededAssertionCode,
+                "too much data for sort() with no index.  add an index or specify a smaller limit",
+                (unsigned)newApproxSize < MaxScanAndOrderBytes );
+        _approxSize = newApproxSize;
+    }
+
 } // namespace mongo
