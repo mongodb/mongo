@@ -429,12 +429,12 @@ namespace mongo {
                     ss << "field not found, expected type " << t;
                 else
                     ss << "wrong type for field (" << fieldName() << ") " << type() << " != " << t;
-                uasserted(13111, ss.str() );
+                msgasserted(13111, ss.str() );
             }
             return *this;
         }
         const BSONElement& chk(bool expr) const {
-            uassert(13118, "unexpected or missing type value in BSON object", expr);
+            massert(13118, "unexpected or missing type value in BSON object", expr);
             return *this;
         }
     };
