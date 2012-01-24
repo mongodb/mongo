@@ -331,8 +331,8 @@ def runTest(test):
                      'TestData.noJournal = ' + ternary( no_journal )  + ";" + \
                      'TestData.noJournalPrealloc = ' + ternary( no_preallocj )  + ";" + \
                      'TestData.auth = ' + ternary( auth ) + ";" + \
-                     'TestData.keyFile = ' + ternary( keyFile , '"' + keyFile + '"' , 'null' ) + ";" + \
-                     'TestData.keyFileData = ' + ( keyFile , '"' + keyFileData + '"' , 'null' ) + ";"
+                     'TestData.keyFile = ' + ternary( keyFile , '"' + str(keyFile) + '"' , 'null' ) + ";" + \
+                     'TestData.keyFileData = ' + ( keyFile , '"' + str(keyFileData) + '"' , 'null' ) + ";"
         if auth and usedb:
             evalString += 'db.getSiblingDB("admin").addUser("admin","password");'
             evalString += 'jsTest.authenticate(db.getMongo());'
