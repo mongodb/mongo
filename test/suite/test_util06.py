@@ -2,7 +2,7 @@
 #
 # See the file LICENSE for redistribution information.
 #
-# Copyright (c) 2008-2011 WiredTiger, Inc.
+# Copyright (c) 2008-2012 WiredTiger, Inc.
 #	All rights reserved.
 #
 # test_util06.py
@@ -50,14 +50,45 @@ class test_util06(wttest.WiredTigerTestCase, suite_subprocess):
             wantkey += str(i)
             if i == self.nentries / 2:
                 wantval = self.unique + '0'
-                wantval2 = self.unique + '1'
             else:
                 wantval = wantkey + wantkey
-                wantval2 = 'DoNotMatch'
-            self.assertTrue(gotkey == wantkey or gotkey == wantkey2)
-            self.assertEqual(gotval, wantval)
+            self.assertEqual(gotkey, wantkey)
+            self.assertTrue(gotval, wantval)
             i += 1
         self.assertEqual(i, self.nentries)
+        cursor.close()
+
+    def check_damaged(self, tablename):
+        """
+        Check a damaged table with a lower standard than check_populate.
+        We don't require that all entries are here,
+        just that the ones that are here are correct.
+        """
+        cursor = self.session.open_cursor('table:' + tablename, None, None)
+        wantkey = ''
+        i = -1
+        correct = 0
+        for gotkey, gotval in cursor:
+            i += 1
+            wantkey += str(i)
+            if gotkey != wantkey:
+                continue
+            if i == self.nentries / 2:
+                wantval = self.unique + '0'
+            else:
+                wantval = wantkey + wantkey
+            self.assertEqual(gotkey, wantkey)
+            self.assertTrue(gotval, wantval)
+            correct += 1
+        self.assertTrue(correct > 0)
+        self.printVerbose(2, 'after salvaging, file has ' + str(correct) + '/' +
+                          str(self.nentries) + ' entries')
+        cursor.close()
+
+    def check_empty_table(self, tablename):
+        cursor = self.session.open_cursor('table:' + tablename, None, None)
+        for gotkey, gotval in cursor:
+            self.fail(tablename + ': has unexpected entries')
         cursor.close()
 
     def damage(self, tablename):
@@ -99,6 +130,7 @@ class test_util06(wttest.WiredTigerTestCase, suite_subprocess):
         errfile = "salvageerr.out"
         self.runWt(["salvage", self.tablename + ".wt"], errfilename=errfile)
         self.check_empty_file(errfile)
+        self.check_empty_table(self.tablename)
 
     def test_salvage_process(self):
         """
@@ -117,6 +149,7 @@ class test_util06(wttest.WiredTigerTestCase, suite_subprocess):
         """
         self.session.create('table:' + self.tablename, self.session_params)
         self.session.salvage('table:' + self.tablename, None)
+        self.check_empty_table(self.tablename)
 
     def test_salvage_api(self):
         """
@@ -139,8 +172,9 @@ class test_util06(wttest.WiredTigerTestCase, suite_subprocess):
         # damage() closed the session/connection, reopen them now.
         self.open_conn()
         self.session.salvage('file:' + self.tablename + ".wt", None)
+        self.check_damaged(self.tablename)
 
-    def test_salvage_api_damaged(self):  #TODO
+    def test_salvage_api_damaged(self):
         """
         Test salvage via API, on a damaged table.
         """
@@ -153,6 +187,7 @@ class test_util06(wttest.WiredTigerTestCase, suite_subprocess):
         self.assertRaises(WiredTigerError, lambda: self.session.verify('table:' + self.tablename, None))
 
         self.session.salvage('file:' + self.tablename + ".wt", None)
+        self.check_damaged(self.tablename)
 
     def test_salvage_process_damaged(self):
         """
@@ -165,6 +200,7 @@ class test_util06(wttest.WiredTigerTestCase, suite_subprocess):
         self.runWt(["salvage", self.tablename + ".wt"], errfilename=errfile)
         self.check_empty_file(errfile)  # expect no output
         self.check_no_error_in_file(errfile)
+        self.check_damaged(self.tablename)
 
 if __name__ == '__main__':
     wttest.run()
