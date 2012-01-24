@@ -56,14 +56,6 @@
 		ret = __ret;						\
 } while (0)
 
-/* Loop to retry an operation that returns EBUSY. */
-#define	WT_RETRY_YIELD(a) do {						\
-	if ((ret = (a)) == EBUSY) {					\
-		__wt_yield();						\
-		continue;						\
-	}								\
-} while (0)
-
 /*
  * WT_ASSERT, WT_ASSERT_RET --
  *	Assert an expression, abort in diagnostic mode, otherwise, optionally

@@ -338,10 +338,14 @@ struct __wt_ref {
 	 * set as a result of page eviction; the page is on disk, and must be
 	 * read into into memory before use.
 	 *
+	 * WT_REF_EVICTING:
+	 *	Set by eviction when a page is about to be locked;
+	 * prevents a page from being evictive multiple times concurrently.
+	 *
 	 * WT_REF_LOCKED:
-	 *	Set by eviction; an eviction thread has selected this page for
-	 * eviction; once hazard references are checked, the page will be
-	 * evicted.
+	 *	Set by eviction; an eviction thread has selected this page or
+	 * a parent for eviction; once hazard references are checked, the page
+	 * will be evicted.
 	 *
 	 * WT_REF_MEM:
 	 *	Set by a reading thread once the page has been read from disk;

@@ -88,9 +88,6 @@ struct __wt_session_impl {
 
 	WT_HAZARD *hazard;		/* Hazard reference array */
 
-	WT_HAZARD *hazard_copy;		/* Copy of the hazard references */
-	uint32_t   hazard_copy_elem;	/* Number of copied references */
-
 	void	*reconcile;		/* Reconciliation information */
 
 	WT_REF **excl;			/* Eviction exclusive list */

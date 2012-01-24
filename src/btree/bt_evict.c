@@ -152,8 +152,40 @@ __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CACHE *cache;
 	WT_EVICT_REQ *er, *er_end;
+	int owned;
 
 	cache = S2C(session)->cache;
+
+	/*
+	 * Application threads request forced eviction of pages when they
+	 * become too big.  The application thread must hold a hazard reference
+	 * when this function is called, which protects it from being freed.
+	 *
+	 * However, it is possible (but unlikely) that the page is already part
+	 * way through the process of being evicted: a thread may have selected
+	 * it from the LRU list but not yet checked its hazard references.
+	 *
+	 * To avoid a freed page pointer ending up on the request list, we
+	 * check the page state here while holding the LRU lock.  Since the
+	 * state of page references in the eviction list is switched to
+	 * WT_REF_EVICTING while holding the LRU lock, this check prevents a
+	 * page from being evicted twice.
+	 */
+	owned = 0;
+	__wt_spin_lock(session, &cache->lru_lock);
+	if (!F_ISSET(page, WT_PAGE_FORCE_EVICT) &&
+	    WT_ATOMIC_CAS(page->ref->state, WT_REF_MEM, WT_REF_EVICTING)) {
+		F_SET(page, WT_PAGE_FORCE_EVICT);
+		owned = 1;
+	}
+	__wt_spin_unlock(session, &cache->lru_lock);
+
+	/*
+	 * If we didn't swap the page state, some other thread is already
+	 * evicting it, which is fine.
+	 */
+	if (!owned)
+		return (0);
 
 	/* Find an empty slot and enter the eviction request. */
 	WT_EVICT_REQ_FOREACH(er, er_end, cache)
@@ -326,7 +358,12 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 		if (F_ISSET(er, WT_EVICT_REQ_PAGE)) {
 			WT_VERBOSE(session, evictserver,
 			    "forcing eviction of page %p", er->page);
-			WT_RETRY_YIELD(__wt_rec_evict(session, er->page, 0));
+			for (;;) {
+				ret = __wt_rec_evict(session, er->page, 0);
+				if (ret != EBUSY)
+					break;
+				__wt_yield();
+			}
 		} else
 			ret = __evict_file(session, er);
 
@@ -347,9 +384,6 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 			    request_session, NULL, ret);
 
 		__evict_req_clr(session, er);
-
-		/* Clear the reference to the btree handle. */
-		WT_CLEAR_BTREE_IN_SESSION(session);
 	}
 	return (0);
 }

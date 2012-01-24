@@ -55,7 +55,6 @@ __wt_eviction_page_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 	    !F_ISSET(page, WT_PAGE_FORCE_EVICT | WT_PAGE_PINNED) &&
 	    (((int64_t)page->memory_footprint > conn->cache_size / 2) ||
 	    (page->memory_footprint > 20 * session->btree->maxleafpage))) {
-		F_SET(page, WT_PAGE_FORCE_EVICT);
 		/*
 		 * We're already inside a serialized function, so we need to
 		 * take some care.

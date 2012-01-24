@@ -7,10 +7,7 @@
 
 #include "wt_internal.h"
 
-static int  __hazard_bsearch_cmp(const void *, const void *);
-static int  __hazard_copy(WT_SESSION_IMPL *);
 static int  __hazard_exclusive(WT_SESSION_IMPL *, WT_REF *);
-static int  __hazard_qsort_cmp(const void *, const void *);
 static int  __rec_discard(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_discard_page(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_excl(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
@@ -408,6 +405,13 @@ __rec_excl_page(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 		return (EBUSY);
 
 	/*
+	 * Next, if our caller doesn't have the tree locked down, get exclusive
+	 * access to the page.
+	 */
+	if (!LF_ISSET(WT_REC_SINGLE))
+		WT_RET(__hazard_exclusive(session, ref));
+
+	/*
 	 * If the page is dirty, try and write it.   This is because once a page
 	 * is flagged for a merge into its parent, the eviction server no longer
 	 * makes any attempt to evict it, it only attempts to evict its parent.
@@ -422,13 +426,6 @@ __rec_excl_page(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	if (!F_ISSET(page,
 	    WT_PAGE_REC_EMPTY | WT_PAGE_REC_SPLIT | WT_PAGE_REC_SPLIT_MERGE))
 		return (EBUSY);
-
-	/*
-	 * Next, if our caller doesn't have the tree locked down, get exclusive
-	 * access to the page.
-	 */
-	if (!LF_ISSET(WT_REC_SINGLE))
-		WT_RET(__hazard_exclusive(session, ref));
 
 	/*
 	 * Finally, a more careful test: merge-split pages are OK, no matter if
@@ -494,6 +491,10 @@ __rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 static int
 __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
 {
+	WT_CONNECTION_IMPL *conn;
+	uint32_t elem, i;
+	int ret, was_evicting;
+
 	/*
 	 * Hazard references are acquired down the tree, which means we can't
 	 * deadlock.
@@ -502,96 +503,42 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * evicting state (if this is the top-level page for this eviction
 	 * operation), or a child page in memory.  If another thread already
 	 * has this page, give up.
+	 *
+	 * Keep track of the original state: if it was WT_REF_EVICTING and
+	 * we cannot get it exclusive, restore it to that state.  This ensures
+	 * that application threads drain from a page that eviction is trying
+	 * to force out.  Without this, application threads can starve eviction
+	 * and heap usage grows without bounds.
 	 */
-	if (!WT_ATOMIC_CAS(ref->state, WT_REF_EVICTING, WT_REF_LOCKED) &&
-	    !WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED))
-		return (EBUSY);
+	was_evicting = 0;
+	if (WT_ATOMIC_CAS(ref->state, WT_REF_EVICTING, WT_REF_LOCKED))
+		was_evicting = 1;
+	else if (!WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED))
+		return (EBUSY);	/* We couldn't change the state. */
 
+	/* Walk the list of hazard references to search for a match. */
+	conn = S2C(session);
+	elem = conn->session_size * conn->hazard_size;
+	for (i = 0; i < elem; ++i)
+		if (conn->hazard[i].page == ref->page) {
+			WT_BSTAT_INCR(session, rec_hazard);
+			WT_CSTAT_INCR(session, cache_evict_hazard);
+
+			WT_VERBOSE(session,
+			    evict, "page %p hazard request failed", ref->page);
+			WT_ERR(EBUSY);
+		}
+
+	/* We have exclusive access, track that so we can unlock to clean up. */
 	if (session->excl_next * sizeof(WT_REF *) == session->excl_allocated)
-		WT_RET(__wt_realloc(session, &session->excl_allocated,
+		WT_ERR(__wt_realloc(session, &session->excl_allocated,
 		    (session->excl_next + 50) * sizeof(WT_REF *),
 		    &session->excl));
 	session->excl[session->excl_next++] = ref;
 
-	/* Get a fresh copy of the hazard reference array. */
-	WT_RET(__hazard_copy(session));
-
-	/* If we find a matching hazard reference, the page is still in use. */
-	if (bsearch(ref->page, session->hazard_copy, session->hazard_copy_elem,
-	    sizeof(WT_HAZARD), __hazard_bsearch_cmp) == NULL)
-		return (0);
-
-	WT_BSTAT_INCR(session, rec_hazard);
-	WT_CSTAT_INCR(session, cache_evict_hazard);
-
-	WT_VERBOSE(session, evict, "page %p hazard request failed", ref->page);
-	return (EBUSY);
-}
-
-/*
- * __hazard_qsort_cmp --
- *	Qsort function: sort hazard list based on the page's address.
- */
-static int
-__hazard_qsort_cmp(const void *a, const void *b)
-{
-	WT_PAGE *a_page, *b_page;
-
-	a_page = ((WT_HAZARD *)a)->page;
-	b_page = ((WT_HAZARD *)b)->page;
-
-	return (a_page > b_page ? 1 : (a_page < b_page ? -1 : 0));
-}
-
-/*
- * __hazard_copy --
- *	Copy the hazard array and prepare it for searching.
- */
-static int
-__hazard_copy(WT_SESSION_IMPL *session)
-{
-	WT_CONNECTION_IMPL *conn;
-	uint32_t elem, i, j;
-
-	conn = S2C(session);
-
-	/*
-	 * Allocate memory for a copy of the hazard references (it's a fixed
-	 * size, so doesn't need run-time adjustments).
-	 */
-	if (session->hazard_copy == NULL)
-		WT_RET(__wt_calloc_def(session,
-		    conn->session_size * conn->hazard_size,
-		    &session->hazard_copy));
-
-	/* Copy the list of hazard references, compacting it as we go. */
-	elem = conn->session_size * conn->hazard_size;
-	for (i = j = 0; j < elem; ++j) {
-		if (conn->hazard[j].page == NULL)
-			continue;
-		session->hazard_copy[i] = conn->hazard[j];
-		++i;
-	}
-	elem = i;
-
-	/* Sort the list by page address. */
-	qsort(session->hazard_copy, (size_t)elem, sizeof(WT_HAZARD),
-	    __hazard_qsort_cmp);
-	session->hazard_copy_elem = elem;
-
 	return (0);
-}
 
-/*
- * __hazard_bsearch_cmp --
- *	Bsearch function: search sorted hazard list.
- */
-static int
-__hazard_bsearch_cmp(const void *search, const void *b)
-{
-	void *entry;
-
-	entry = ((WT_HAZARD *)b)->page;
-
-	return (search > entry ? 1 : ((search < entry) ? -1 : 0));
+	/* Restore to the original state on error. */
+err:	ref->state = (was_evicting ? WT_REF_EVICTING : WT_REF_MEM);
+	return (ret);
 }
