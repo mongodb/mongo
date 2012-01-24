@@ -216,8 +216,7 @@ class test_schema03(wttest.WiredTigerTestCase):
     # Set whenever we are working with a table
     current_table = None
 
-#TODO:    nentries = 1000
-    nentries = 15
+    nentries = 50
 
     # We need to have a large number of open files available
     # to run this test.  We probably don't need quite this many,
@@ -264,7 +263,7 @@ class test_schema03(wttest.WiredTigerTestCase):
         resource.setrlimit(resource.RLIMIT_NOFILE, newlimit)
 
     def setUpConnectionOpen(self, dir):
-        cs = 50 * 1024 * 1024
+        cs = 100 * 1024 * 1024
         conn = wiredtiger.wiredtiger_open(dir, 'create,cache_size=' +
                                           str(cs) + ',hazard_max=300')
         self.pr(`conn`)
