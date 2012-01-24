@@ -16,15 +16,6 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* Mutex heirarchy (1 = "leaf")
-     name                   level
-     Logstream::mutex       1
-     ClientCursor::ccmutex  2
-     dblock                 3
-
-     End func name with _inlock to indicate "caller must lock before calling".
-*/
-
 #pragma once
 
 #include "../util/concurrency/rwlock.h"
@@ -375,11 +366,6 @@ namespace mongo {
         }
         /* this unlocks, does NOT upgrade. that works for our current usage */
         //void releaseAndWriteLock();
-    };
-
-    /* deprecated - use writelock and readlock instead */
-    struct dblock : public writelock {
-        dblock() : writelock("") { }
     };
 
     // eliminate this - we should just type "d.dbMutex.assertWriteLocked();" instead

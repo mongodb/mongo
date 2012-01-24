@@ -29,7 +29,7 @@
 
 namespace mongo {
 
-    HLMutex BSONObjExternalSorter::_extSortMutex('s');
+    HLMutex BSONObjExternalSorter::_extSortMutex("s");
     IndexInterface *BSONObjExternalSorter::extSortIdxInterface;
     Ordering BSONObjExternalSorter::extSortOrder( Ordering::make(BSONObj()) );
     unsigned long long BSONObjExternalSorter::_compares = 0;

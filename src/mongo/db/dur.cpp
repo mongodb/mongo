@@ -497,7 +497,7 @@ namespace mongo {
 
             assert( !d.dbMutex.atLeastReadLocked() );
 
-            scoped_ptr<ExcludeAllWrites> lk1( new ExcludeAllWrites() );
+            scoped_ptr<Lock::ExcludeWrites> lk1( new Lock::ExcludeWrites() );
 
             scoped_lock lk2(groupCommitMutex);
 

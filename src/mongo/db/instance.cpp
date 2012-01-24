@@ -821,7 +821,7 @@ namespace mongo {
     HostAndPort DBDirectClient::_clientHost = HostAndPort( "0.0.0.0" , 0 );
 
     unsigned long long DBDirectClient::count(const string &ns, const BSONObj& query, int options, int limit, int skip ) {
-        LockCollectionForReading lk( ns );
+        Lock::DBRead lk( ns );
         string errmsg;
         long long res = runCount( ns.c_str() , _countCmd( ns , query , options , limit , skip ) , errmsg );
         if ( res == -1 )
@@ -930,12 +930,11 @@ namespace mongo {
     void exitCleanly( ExitCode code ) {
         killCurrentOp.killAll();
         {
-            dblock lk;
+            Lock::Global lk;
             log() << "now exiting" << endl;
             dbexit( code );
         }
     }
-
 
     namespace dur { 
         extern mutex groupCommitMutex;

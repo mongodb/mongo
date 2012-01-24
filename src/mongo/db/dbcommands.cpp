@@ -1595,7 +1595,7 @@ namespace mongo {
             string ns = dbname + "." + coll;
             BSONObj obj = cmdObj[ "obj" ].embeddedObjectUserCheck();
             {
-                dblock lk;
+                Lock::DBWrite lk(ns);
                 Client::Context ctx( ns );
                 theDataFileMgr.insertWithObjMod( ns.c_str(), obj, true );
             }

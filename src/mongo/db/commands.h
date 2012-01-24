@@ -37,7 +37,7 @@ namespace mongo {
         // only makes sense for commands where 1st parm is the collection.
         virtual string parseNs(const string& dbname, const BSONObj& cmdObj) const;
 
-        enum LockType { READ = -1 , NONE = 0 , WRITE = 1 };
+        enum LockType { READ = -1 , NONE = 0 , WRITE = 1, GLOBAL = 2 };
 
         const string name;
 
