@@ -64,18 +64,46 @@ class test_config04(wttest.WiredTigerTestCase):
         self.session = self.conn.open_session(None)
         self.populate_and_check()
 
-    def test_bad_config(self):
-        self.assertRaises(WiredTigerError, lambda:
-            wiredtiger.wiredtiger_open('.', 'not_valid,another_bad=10'))
-
-    # TODO: test all multipliers (K M G T) in config strings
-    def test_cache_size(self):
-        self.common_test('cache_size=30M')
+    def common_cache_size_test(self, sizestr, size):
+        self.common_test('cache_size=' + sizestr)
         cursor = self.session.open_cursor('statistics:', None, None)
         cursor.set_key(wiredtiger.stat.cache_bytes_max)
         self.assertEqual(cursor.search(), 0)
         got_cache = cursor.get_values()[2]
-        self.assertEqual(got_cache, 30*self.M)
+        self.assertEqual(got_cache, size)
+
+    def test_bad_config(self):
+        self.assertRaises(WiredTigerError, lambda:
+            wiredtiger.wiredtiger_open('.', 'not_valid,another_bad=10'))
+
+    def test_cache_size_number(self):
+        # Use a number without multipliers
+        # 1M is the minimum, we'll ask for 1025 * 1024
+        cache_size_str = str(1025 * 1024)
+        self.common_cache_size_test(cache_size_str, 1025*self.K)
+
+    def test_cache_size_K(self):
+        # Kilobyte sizing test
+        # 1M is the minimum, so ask for that using K notation.
+        self.common_cache_size_test('1024K', 1024*self.K)
+
+    def test_cache_size_M(self):
+        # Megabyte sizing test
+        self.common_cache_size_test('30M', 30*self.M)
+
+    def test_cache_size_G(self):
+        # Gigabyte sizing test
+        # We are specifying the maximum the cache can grow,
+        # not the initial cache amount, so small tests like
+        # this can still run on smaller machines.
+        self.common_cache_size_test('7G', 7*self.G)
+
+    def test_cache_size_T(self):
+        # Terabyte sizing test
+        # We are specifying the maximum the cache can grow,
+        # not the initial cache amount, so small tests like
+        # this can still run on smaller machines.
+        self.common_cache_size_test('2T', 2*self.T)
 
     def test_cache_too_small(self):
         self.assertRaises(WiredTigerError, lambda:
