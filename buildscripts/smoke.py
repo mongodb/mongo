@@ -265,6 +265,11 @@ def check_db_hashes(master, slave):
             lost_in_master.append(db)
 
 
+def ternary( b , l="true", r="false" ):
+    if b:
+        return l
+    return r
+
 
 # Blech.
 def skipTest(path):
@@ -323,11 +328,11 @@ def runTest(test):
                      'TestData.testPath = "' + path + '";' + \
                      'TestData.testFile = "' + os.path.basename( path ) + '";' + \
                      'TestData.testName = "' + re.sub( ".js$", "", os.path.basename( path ) ) + '";' + \
-                     'TestData.noJournal = ' + ( 'true' if no_journal else 'false' )  + ";" + \
-                     'TestData.noJournalPrealloc = ' + ( 'true' if no_preallocj else 'false' )  + ";" + \
-                     'TestData.auth = ' + ( 'true' if auth else 'false' ) + ";" + \
-                     'TestData.keyFile = ' + ( '"' + keyFile + '"' if keyFile else 'null' ) + ";" + \
-                     'TestData.keyFileData = ' + ( '"' + keyFileData + '"' if keyFile else 'null' ) + ";"
+                     'TestData.noJournal = ' + ternary( no_journal )  + ";" + \
+                     'TestData.noJournalPrealloc = ' + ternary( no_preallocj )  + ";" + \
+                     'TestData.auth = ' + ternary( auth ) + ";" + \
+                     'TestData.keyFile = ' + ternary( keyFile , '"' + keyFile + '"' , 'null' ) + ";" + \
+                     'TestData.keyFileData = ' + ( keyFile , '"' + keyFileData + '"' , 'null' ) + ";"
         if auth and usedb:
             evalString += 'db.getSiblingDB("admin").addUser("admin","password");'
             evalString += 'jsTest.authenticate(db.getMongo());'
