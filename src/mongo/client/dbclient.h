@@ -338,7 +338,6 @@ namespace mongo {
      * to other hosts
      */
     class QuerySpec {
-    public:
 
         string _ns;
         int _ntoskip;
@@ -348,58 +347,43 @@ namespace mongo {
         BSONObj _fields;
         Query _queryObj;
 
+    public:
+        
         QuerySpec( const string& ns,
                    const BSONObj& query, const BSONObj& fields,
                    int ntoskip, int ntoreturn, int options )
             : _ns( ns ), _ntoskip( ntoskip ), _ntoreturn( ntoreturn ), _options( options ),
-              _query( query ), _fields( fields )
-        {
-            _query = _query.getOwned();
-            _fields = _fields.getOwned();
-            _queryObj = Query( _query );
+              _query( query.getOwned() ), _fields( fields.getOwned() ) , _queryObj( _query ) {
         }
 
         QuerySpec() {}
 
-        bool isEmpty() const {
-            return _ns.size() == 0;
-        }
+        bool isEmpty() const { return _ns.size() == 0; }
 
-        bool isExplain() const {
-            return _queryObj.isExplain();
-        }
+        bool isExplain() const { return _queryObj.isExplain(); }
+        BSONObj filter() const { return _queryObj.getFilter(); }
 
-        BSONObj filter() const {
-            return _queryObj.getFilter();
-        }
-
-        BSONObj hint() const {
-            return _queryObj.getHint();
-        }
-
-        BSONObj sort() const {
-            return _queryObj.getSort();
-        }
-
-        BSONObj query(){
-            return _query;
-        }
-
+        BSONObj hint() const { return _queryObj.getHint(); }
+        BSONObj sort() const { return _queryObj.getSort(); }
+        BSONObj query() const { return _query; }
         BSONObj fields() const { return _fields; }
 
+        // don't love this, but needed downstrem
+        const BSONObj* fieldsPtr() const { return &_fields; } 
+
         string ns() const { return _ns; }
-
         int ntoskip() const { return _ntoskip; }
-
         int ntoreturn() const { return _ntoreturn; }
-
         int options() const { return _options; }
+        
+        void setFields( BSONObj& o ) { _fields = o.getOwned(); }
 
         string toString() const {
-            return str::stream() << "QSpec " << BSON( "ns" << _ns << "n2skip" << _ntoskip << "n2return" << _ntoreturn << "options" << _options
-                                                           << "query" << _query << "fields" << _fields );
+            return str::stream() << "QSpec " << 
+                BSON( "ns" << _ns << "n2skip" << _ntoskip << "n2return" << _ntoreturn << "options" << _options
+                      << "query" << _query << "fields" << _fields );
         }
-
+        
     };
 
 

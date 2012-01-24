@@ -107,6 +107,9 @@ namespace mongo {
 
         string _ns;
         BSONObj _query;
+        BSONObj _hint;
+        BSONObj _sort;
+
         int _options;
         BSONObj _fields;
         int _batchSize;

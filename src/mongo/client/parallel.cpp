@@ -35,12 +35,14 @@ namespace mongo {
     ClusteredCursor::ClusteredCursor( const QuerySpec& q ) {
         _ns = q.ns();
         _query = q.filter().copy();
+        _hint = q.hint();
+        _sort = q.sort();
         _options = q.options();
         _fields = q.fields().copy();
         _batchSize = q.ntoreturn();
         if ( _batchSize == 1 )
             _batchSize = 2;
-
+        
         _done = false;
         _didInit = false;
     }
@@ -143,11 +145,18 @@ namespace mongo {
         if ( ! extra.isEmpty() ) {
             q = concatQuery( q , extra );
         }
+        
+        Query qu( q );
+        qu.explain();
+        if ( ! _hint.isEmpty() )
+            qu.hint( _hint );
+        if ( ! _sort.isEmpty() )
+            qu.sort( _sort );
 
         BSONObj o;
 
         ShardConnection conn( server , _ns );
-        auto_ptr<DBClientCursor> cursor = conn->query( _ns , Query( q ).explain() , abs( _batchSize ) * -1 , 0 , _fields.isEmpty() ? 0 : &_fields );
+        auto_ptr<DBClientCursor> cursor = conn->query( _ns , qu , abs( _batchSize ) * -1 , 0 , _fields.isEmpty() ? 0 : &_fields );
         if ( cursor.get() && cursor->more() )
             o = cursor->next().getOwned();
         conn.done();
@@ -188,11 +197,15 @@ namespace mongo {
 
         b.append( "clusteredType" , type() );
 
+        string cursorType;
+        BSONObj indexBounds;
+        BSONObj oldPlan;
+        
         long long millis = 0;
         double numExplains = 0;
 
         map<string,long long> counters;
-
+        
         map<string,list<BSONObj> > out;
         {
             _explain( out );
@@ -217,12 +230,27 @@ namespace mongo {
 
                     millis += temp["millis"].numberLong();
                     numExplains++;
+
+                    if ( temp["cursor"].type() == String ) { 
+                        if ( cursorType.size() == 0 )
+                            cursorType = temp["cursor"].String();
+                        else if ( cursorType != temp["cursor"].String() )
+                            cursorType = "multiple";
+                    }
+
+                    if ( temp["indexBounds"].type() == Object )
+                        indexBounds = temp["indexBounds"].Obj();
+
+                    if ( temp["oldPlan"].type() == Object )
+                        oldPlan = temp["oldPlan"].Obj();
+
                 }
                 y.done();
             }
             x.done();
         }
 
+        b.append( "cursor" , cursorType );
         for ( map<string,long long>::iterator i=counters.begin(); i!=counters.end(); ++i )
             b.appendNumber( i->first , i->second );
 
@@ -232,6 +260,19 @@ namespace mongo {
                   : 0 );
         b.append( "numQueries" , (int)numExplains );
         b.append( "numShards" , (int)out.size() );
+
+        if ( out.size() == 1 ) {
+            b.append( "indexBounds" , indexBounds );
+            if ( ! oldPlan.isEmpty() ) {
+                // this is to stay in compliance with mongod behavior
+                // we should make this cleaner, i.e. {} == nothing
+                b.append( "oldPlan" , oldPlan );
+            }
+        }
+        else {
+            // TODO: this is lame...
+        }
+
     }
 
     // --------  FilteringClientCursor -----------
@@ -457,7 +498,7 @@ namespace mongo {
         }
 
         if( ! _qSpec.isEmpty() ){
-            _qSpec._fields = _fields;
+            _qSpec.setFields( _fields );
         }
     }
 
@@ -763,7 +804,7 @@ namespace mongo {
                                                              isCommand() ? 1 : 0, // nToReturn (0 if query indicates multi)
                                                              0, // nToSkip
                                                              // Does this need to be a ptr?
-                                                             _qSpec.fields().isEmpty() ? 0 : &_qSpec._fields, // fieldsToReturn
+                                                             _qSpec.fields().isEmpty() ? 0 : _qSpec.fieldsPtr(), // fieldsToReturn
                                                              _qSpec.options(), // options
                                                              // NtoReturn is weird.
                                                              // If zero, it means use default size, so we do that for all cursors
