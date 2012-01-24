@@ -651,6 +651,10 @@ namespace mongo {
     }
 
     bool Sync::shouldRetry(const BSONObj& o) {
+        // should already have write lock
+        const char *ns = o.getStringField("ns");
+        Client::Context ctx(ns);
+
         // we don't have the object yet, which is possible on initial sync.  get it.
         log() << "replication info adding missing object" << endl; // rare enough we can log
 
@@ -664,8 +668,6 @@ namespace mongo {
             return false;
         }
         else {
-            const char *ns = o.getStringField("ns");
-            Client::Context ctx(ns);
             DiskLoc d = theDataFileMgr.insert(ns, (void*) missingObj.objdata(), missingObj.objsize());
             uassert(15917, "Got bad disk location when attempting to insert", !d.isNull());
 
@@ -692,6 +694,7 @@ namespace mongo {
             o = fields[0].embeddedObject();
             
         const char *ns = fields[1].valuestrsafe();
+        NamespaceDetails *nsd = nsdetails(ns);
 
         // operation type -- see logOp() comments for types
         const char *opType = fields[2].valuestrsafe();
@@ -719,7 +722,7 @@ namespace mongo {
                 }
                 else {
                     /* erh 10/16/2009 - this is probably not relevant any more since its auto-created, but not worth removing */
-                    RARELY ensureHaveIdIndex(ns); // otherwise updates will be slow
+                    RARELY if (nsd && !nsd->capped) { ensureHaveIdIndex(ns); } // otherwise updates will be slow
 
                     /* todo : it may be better to do an insert here, and then catch the dup key exception and do update
                               then.  very few upserts will not be inserts...
@@ -736,9 +739,9 @@ namespace mongo {
             //  - if not, updates would be slow
             //    - but if were by id would be slow on primary too so maybe ok
             //    - if on primary was by another key and there are other indexes, this could be very bad w/out an index
-            //  - if do create, odd to have on secondary but not primary.  also can cause secondary to block for 
-            //    quite a while on creation.  
-            RARELY ensureHaveIdIndex(ns); // otherwise updates will be super slow
+            //  - if do create, odd to have on secondary but not primary.  also can cause secondary to block for
+            //    quite a while on creation.
+            RARELY if (nsd && !nsd->capped) { ensureHaveIdIndex(ns); } // otherwise updates will be super slow
             OpDebug debug;
             BSONObj updateCriteria = op.getObjectField("o2");
             bool upsert = fields[3].booleanSafe();
@@ -756,8 +759,6 @@ namespace mongo {
                     //   { _id:..., { x : {$size:...} }
                     // thus this is not ideal.
                     else {
-                        NamespaceDetails *nsd = nsdetails(ns);
-
                         if (nsd == NULL ||
                             (nsd->findIdIndex() >= 0 && Helpers::findById(nsd, updateCriteria).isNull()) ||
                             // capped collections won't have an _id index

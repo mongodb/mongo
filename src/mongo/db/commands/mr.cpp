@@ -23,7 +23,6 @@
 #include "../../client/dbclient.h"
 #include "../../client/connpool.h"
 #include "../../client/parallel.h"
-#include "../queryoptimizer.h"
 #include "../matcher.h"
 #include "../clientcursor.h"
 #include "../replutil.h"
@@ -755,7 +754,9 @@ namespace mongo {
 
             assert( pm == op->setMessage( "m/r: (3/3) final reduce to collection" , _db.count( _config.incLong, BSONObj(), QueryOption_SlaveOk ) ) );
 
-            shared_ptr<Cursor> temp = bestGuessCursor( _config.incLong.c_str() , BSONObj() , sortKey );
+            shared_ptr<Cursor> temp =
+            NamespaceDetailsTransient::bestGuessCursor( _config.incLong.c_str() , BSONObj() ,
+                                                       sortKey );
             auto_ptr<ClientCursor> cursor( new ClientCursor( QueryOption_NoCursorTimeout , temp , _config.incLong.c_str() ) );
 
             // iterate over all sorted objects

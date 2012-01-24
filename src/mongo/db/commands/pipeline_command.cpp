@@ -75,7 +75,7 @@ namespace mongo {
         intrusive_ptr<ExpressionContext> pCtx(ExpressionContext::create());
 
         /* try to parse the command; if this fails, then we didn't run */
-        shared_ptr<Pipeline> pPipeline(
+        intrusive_ptr<Pipeline> pPipeline(
             Pipeline::parseCommand(errmsg, cmdObj, pCtx));
         if (!pPipeline.get())
             return false;
@@ -99,7 +99,7 @@ namespace mongo {
 
           Start by splitting the pipeline.
          */
-        shared_ptr<Pipeline> pShardSplit(
+        intrusive_ptr<Pipeline> pShardSplit(
             pPipeline->splitForSharded());
 
         /*
@@ -124,7 +124,7 @@ namespace mongo {
 
         /* on the shard servers, create the local pipeline */
         intrusive_ptr<ExpressionContext> pShardCtx(ExpressionContext::create());
-        shared_ptr<Pipeline> pShardPipeline(
+        intrusive_ptr<Pipeline> pShardPipeline(
             Pipeline::parseCommand(errmsg, shardBson, pShardCtx));
         if (!pShardPipeline.get()) {
             return false;

@@ -9,10 +9,14 @@ t.save( {b:1} );
 t.save( {b:null} );
 
 checkExists = function( query ) {
-    // Constraint on 'b' is trivial, so a BasicCursor is the default cursor type.
-    assert.eq( 'BasicCursor', t.find( query ).explain().cursor );
+    // Index range constraint on 'b' is universal, so a BasicCursor is the default cursor type.
+    var x = t.find( query ).explain()
+    assert.eq( 'BasicCursor', x.cursor , tojson(x) );
     // Index bounds include all elements.
-    assert.eq( [ [ { $minElement:1 }, { $maxElement:1 } ] ], t.find( query ).hint( {b:1} ).explain().indexBounds.b );
+    
+    var x = t.find( query ).hint( {b:1} ).explain()
+    if ( ! x.indexBounds ) x.indexBounds = {}
+    assert.eq( [ [ { $minElement:1 }, { $maxElement:1 } ] ], x.indexBounds.b , tojson(x) );
     // All keys must be scanned.
     assert.eq( 3, t.find( query ).hint( {b:1} ).explain().nscanned );
     // 2 docs will match.
@@ -22,7 +26,7 @@ checkExists( {b:{$exists:true}} );
 checkExists( {b:{$not:{$exists:false}}} );
 
 checkMissing = function( query ) {
-    // Constraint on 'b' is nontrivial, so a BtreeCursor is the default cursor type.
+    // Index range constraint on 'b' is not universal, so a BtreeCursor is the default cursor type.
     assert.eq( 'BtreeCursor b_1', t.find( query ).explain().cursor );
     // Scan null index keys.
     assert.eq( [ [ null, null ] ], t.find( query ).explain().indexBounds.b );

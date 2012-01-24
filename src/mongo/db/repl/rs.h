@@ -59,7 +59,7 @@ namespace mongo {
         ~Member(); // intentionally unimplemented as should never be called -- see List1<>::Base.
         Member(const Member&); 
     public:
-        Member(HostAndPort h, unsigned ord, ReplSetConfig::MemberCfg *c, bool self);
+        Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c, bool self);
 
         string fullName() const { return h().toString(); }
         const ReplSetConfig::MemberCfg& config() const { return _config; }
@@ -657,7 +657,7 @@ namespace mongo {
 
     /** inlines ----------------- */
 
-    inline Member::Member(HostAndPort h, unsigned ord, ReplSetConfig::MemberCfg *c, bool self) :
+    inline Member::Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c, bool self) :
         _config(*c), _h(h), _hbinfo(ord) {
         assert(c);
         if( self )

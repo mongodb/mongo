@@ -965,7 +965,7 @@
     <ClCompile Include="..\db\json.cpp" />
     <ClCompile Include="..\db\lasterror.cpp" />
     <ClCompile Include="..\db\matcher.cpp" />
-    <ClCompile Include="..\util\md5.c">
+    <ClCompile Include="..\util\md5.cpppp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
       </PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">

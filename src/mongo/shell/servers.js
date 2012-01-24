@@ -543,6 +543,8 @@ myPort = function() {
  */
 ShardingTest = function( testName , numShards , verboseLevel , numMongos , otherParams ){
     
+    this._startTime = new Date();
+
     // Check if testName is an object, if so, pull params from there
     var keyFile = undefined
     otherParams = Object.merge( otherParams || {}, {} )
@@ -962,7 +964,9 @@ ShardingTest.prototype.stop = function(){
         }
     }
 
-    print('*** ShardingTest ' + this._testName + " completed successfully ***");
+    var timeMillis = new Date().getTime() - this._startTime.getTime();
+
+    print('*** ShardingTest ' + this._testName + " completed successfully in " + ( timeMillis / 1000 ) + " seconds ***");
 }
 
 ShardingTest.prototype.adminCommand = function(cmd){

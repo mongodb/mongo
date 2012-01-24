@@ -18,7 +18,6 @@
 //#include "pch.h"
 #include "../commands.h"
 #include "../instance.h"
-#include "../queryoptimizer.h"
 #include "../clientcursor.h"
 #include "../../util/timer.h"
 
@@ -78,7 +77,9 @@ namespace mongo {
                         continue;
 
                     if ( idx.inKeyPattern( key ) ) {
-                        cursor = bestGuessCursor( ns.c_str() , BSONObj() , idx.keyPattern() );
+                        cursor = NamespaceDetailsTransient::bestGuessCursor( ns.c_str() ,
+                                                                            BSONObj() ,
+                                                                            idx.keyPattern() );
                         if( cursor.get() ) break;
                     }
 

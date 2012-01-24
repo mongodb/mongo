@@ -1,0 +1,118 @@
+# -*- mode: python -*-
+#
+# This SConscript file describes the build rules for smoke tests (scons smoke,
+# e.g.)
+
+import os
+
+Import( "has_option env shellEnv testEnv" )
+
+def add_exe( v ):
+    return "${PROGPREFIX}%s${PROGSUFFIX}" % v
+
+smokeEnv = testEnv.Clone()
+smokeEnv['ENV']['PATH']=os.environ['PATH']
+smokeEnv.Alias( "dummySmokeSideEffect", [], [] )
+
+smokeFlags = []
+
+# Ugh.  Frobbing the smokeFlags must precede using them to construct
+# actions, I think.
+if has_option( 'smokedbprefix'):
+    smokeFlags += ['--smoke-db-prefix', GetOption( 'smokedbprefix')]
+
+if 'startMongodSmallOplog' in COMMAND_LINE_TARGETS:
+    smokeFlags += ["--small-oplog"]
+
+def addTest(name, deps, actions):
+    smokeEnv.Alias( name, deps, actions )
+    smokeEnv.AlwaysBuild( name )
+    # Prevent smoke tests from running in parallel
+    smokeEnv.SideEffect( "dummySmokeSideEffect", name )
+
+def addSmoketest( name, deps ):
+    # Convert from smoke to test, smokeJs to js, and foo to foo
+    target = name
+    if name.startswith("smoke"):
+        if name == "smoke":
+            target = File("test").path
+        else:
+            target = name[5].lower() + name[6:]
+
+    addTest(name, deps, [ "python buildscripts/smoke.py " + " ".join(smokeFlags) + ' ' + target ])
+
+addSmoketest( "smoke", [ add_exe( "test" ), add_exe( "mongod" ), add_exe( "mongo" ) ] )
+addSmoketest( "smokePerf", [ add_exe("perftest") ]  )
+addSmoketest( "smokeClient", [
+        add_exe('firstExample'),
+        add_exe('rsExample'),
+        add_exe('secondExample'),
+        add_exe('whereExample'),
+        add_exe('authTest'),
+        add_exe('httpClientTest'),
+        add_exe('bsondemo'),
+        add_exe('clientTest'),
+        ] )
+addSmoketest( "mongosTest", [ add_exe( 'mongos' ) ])
+
+# These tests require the mongo shell
+if shellEnv is not None:
+    addSmoketest( "smokeJs", [add_exe("mongo")] )
+    addSmoketest( "smokeClone", [ add_exe("mongo"), add_exe("mongod") ] )
+    addSmoketest( "smokeRepl", [ add_exe("mongo"), add_exe("mongod"), add_exe("mongobridge") ] )
+    addSmoketest( "smokeReplSets", [ add_exe("mongo"), add_exe("mongod"), add_exe("mongobridge") ] )
+    addSmoketest( "smokeDur", [ add_exe( "mongo" ), add_exe( "mongod" ), add_exe('mongorestore') ] )
+    addSmoketest( "smokeDisk", [ add_exe( "mongo" ), add_exe( "mongod" ), add_exe( "mongodump" ), add_exe( "mongorestore" ) ] )
+    addSmoketest( "smokeAuth", [ add_exe( "mongo" ), add_exe( "mongod" ) ] )
+    addSmoketest( "smokeParallel", [ add_exe( "mongo" ), add_exe( "mongod" ) ] )
+    addSmoketest( "smokeSharding", [ add_exe("mongo"), add_exe("mongod"), add_exe("mongos") ] )
+    addSmoketest( "smokeJsPerf", [ add_exe("mongo") ] )
+    addSmoketest( "smokeJsSlowNightly", [add_exe("mongo")])
+    addSmoketest( "smokeJsSlowWeekly", [add_exe("mongo")])
+    addSmoketest( "smokeQuota", [ add_exe("mongo") ] )
+    addSmoketest( "smokeTool", [ add_exe( "mongo" ), add_exe("mongod"), add_exe("mongos"), "tools" ] )
+    addSmoketest( "smokeAggregation", [ add_exe( "mongo" ), add_exe( "mongod" ) ] )
+
+# Note: although the test running logic has been moved to
+# buildscripts/smoke.py, the interface to running the tests has been
+# something like 'scons startMongod <suite>'; startMongod is now a
+# no-op, and should go away eventually.
+smokeEnv.Alias( "startMongod", [add_exe("mongod")]);
+smokeEnv.AlwaysBuild( "startMongod" );
+smokeEnv.SideEffect( "dummySmokeSideEffect", "startMongod" )
+
+smokeEnv.Alias( "startMongodSmallOplog", [add_exe("mongod")], [] );
+smokeEnv.AlwaysBuild( "startMongodSmallOplog" );
+smokeEnv.SideEffect( "dummySmokeSideEffect", "startMongodSmallOplog" )
+
+def addMongodReqTargets( env, target, source ):
+    mongodReqTargets = [ "smokeClient", "smokeJs" ]
+    for target in mongodReqTargets:
+        smokeEnv.Depends( target, "startMongod" )
+        smokeEnv.Depends( "smokeAll", target )
+
+smokeEnv.Alias( "addMongodReqTargets", [], [addMongodReqTargets] )
+smokeEnv.AlwaysBuild( "addMongodReqTargets" )
+
+smokeEnv.Alias( "smokeAll", [ "smoke", "mongosTest", "smokeClone", "smokeRepl", "addMongodReqTargets", "smokeDisk", "smokeAuth", "smokeSharding", "smokeTool" ] )
+smokeEnv.AlwaysBuild( "smokeAll" )
+
+def addMongodReqNoJsTargets( env, target, source ):
+    mongodReqTargets = [ "smokeClient" ]
+    for target in mongodReqTargets:
+        smokeEnv.Depends( target, "startMongod" )
+        smokeEnv.Depends( "smokeAllNoJs", target )
+
+smokeEnv.Alias( "addMongodReqNoJsTargets", [], [addMongodReqNoJsTargets] )
+smokeEnv.AlwaysBuild( "addMongodReqNoJsTargets" )
+
+smokeEnv.Alias( "smokeAllNoJs", [ "smoke", "mongosTest", "addMongodReqNoJsTargets" ] )
+smokeEnv.AlwaysBuild( "smokeAllNoJs" )
+
+def run_shell_tests(env, target, source):
+    from buildscripts import test_shell
+    test_shell.mongo_path = windows and "mongo.exe" or "mongo"
+    test_shell.run_tests()
+
+env.Alias("test_shell", [], [run_shell_tests])
+env.AlwaysBuild("test_shell")

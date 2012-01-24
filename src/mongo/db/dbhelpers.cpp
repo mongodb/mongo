@@ -20,7 +20,6 @@
 #include "db.h"
 #include "dbhelpers.h"
 #include "json.h"
-#include "queryoptimizer.h"
 #include "btree.h"
 #include "pdfile.h"
 #include "oplog.h"

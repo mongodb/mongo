@@ -101,13 +101,14 @@ namespace mongo {
         return movedCount;
     }
 
-    void Balancer::_ping( DBClientBase& conn ) {
+    void Balancer::_ping( DBClientBase& conn, bool waiting ) {
         WriteConcern w = conn.getWriteConcern();
         conn.setWriteConcern( W_NONE );
 
         conn.update( ShardNS::mongos ,
                      BSON( "_id" << _myid ) ,
-                     BSON( "$set" << BSON( "ping" << DATENOW << "up" << (int)(time(0)-_started) ) ) ,
+                     BSON( "$set" << BSON( "ping" << DATENOW << "up" << (int)(time(0)-_started)
+                                        << "waiting" << waiting ) ) ,
                      true );
 
         conn.setWriteConcern( w);
@@ -290,6 +291,10 @@ namespace mongo {
                 // now make sure we should even be running
                 if ( ! grid.shouldBalance() ) {
                     LOG(1) << "skipping balancing round because balancing is disabled" << endl;
+
+                    // Ping again so scripts can determine if we're active without waiting
+                    _ping( conn.conn(), true );
+
                     conn.done();
                     
                     sleepsecs( 30 );
@@ -308,6 +313,10 @@ namespace mongo {
                     dist_lock_try lk( &balanceLock , "doing balance round" );
                     if ( ! lk.got() ) {
                         LOG(1) << "skipping balancing round because another balancer is active" << endl;
+
+                        // Ping again so scripts can determine if we're active without waiting
+                        _ping( conn.conn(), true );
+
                         conn.done();
                         
                         sleepsecs( 30 ); // no need to wake up soon
@@ -327,9 +336,12 @@ namespace mongo {
                     
                     LOG(1) << "*** end of balancing round" << endl;
                 }
+
+                // Ping again so scripts can determine if we're active without waiting
+                _ping( conn.conn(), true );
                 
                 conn.done();
-                    
+
                 sleepsecs( _balancedLastTime ? 5 : 10 );
             }
             catch ( std::exception& e ) {

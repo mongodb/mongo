@@ -36,6 +36,10 @@ namespace mongo {
     void DocumentSource::optimize() {
     }
 
+    void DocumentSource::manageDependencies(
+        const intrusive_ptr<DependencyTracker> &pTracker) {
+    }
+
     void DocumentSource::addToBsonArray(BSONArrayBuilder *pBuilder) const {
         BSONObjBuilder insides;
         sourceToBson(&insides);

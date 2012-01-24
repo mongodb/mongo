@@ -49,9 +49,14 @@ namespace mongo {
                   const BSONObj &endKey = BSONObj(),
                   string special="" );
 
-        /** @return true iff no other plans should be considered. */
+        /** @return true iff this plan cannot return any documents. */
+        bool impossible() const { return _impossible; }
+        /**
+         * @return true iff this plan should run as the only candidate plan in the absence of an
+         * impossible plan.
+         */
         bool optimal() const { return _optimal; }
-        /* @return true iff this plan should not be considered at all. */
+        /** @return true iff this plan should not be considered at all. */
         bool unhelpful() const { return _unhelpful; }
         /** @return true iff ScanAndOrder processing will be required for result set. */
         bool scanAndOrderRequired() const { return _scanAndOrderRequired; }
@@ -93,6 +98,9 @@ namespace mongo {
         bool isMultiKey() const;
         
     private:
+        void checkTableScanAllowed() const;
+        void warnOnCappedIdTableScan() const;
+
         NamespaceDetails * _d;
         int _idxNo;
         const FieldRangeSet &_frs;
@@ -449,7 +457,9 @@ namespace mongo {
         const QueryPlan *singlePlan() const;
 
         /** @return true iff more $or clauses need to be scanned. */
-        bool mayRunMore() const { return _or ? ( !_tableScanned && !_org->orFinished() ) : _i == 0; }
+        bool mayRunMore() const {
+            return _or ? ( !_tableScanned && !_org->orRangesExhausted() ) : _i == 0;
+        }
         /** @return non-$or version of explain output. */
         BSONObj oldExplain() const { assertNotOr(); return _currentQps->explain(); }
         /** @return true iff this is not a $or query and a plan is selected based on previous success of this plan. */
@@ -568,16 +578,6 @@ namespace mongo {
 
     /** NOTE min, max, and keyPattern will be updated to be consistent with the selected index. */
     IndexDetails *indexDetailsForRange( const char *ns, string &errmsg, BSONObj &min, BSONObj &max, BSONObj &keyPattern );
-
-    bool isSimpleIdQuery( const BSONObj& query );
-
-    /**
-     * @return a single cursor that may work well for the given query.
-     * It is possible no cursor is returned if the sort is not supported by an index.  Clients are responsible
-     * for checking this if they are not sure an index for a sort exists, and defaulting to a non-sort if
-     * no suitable indices exist.
-     */
-    shared_ptr<Cursor> bestGuessCursor( const char *ns, const BSONObj &query, const BSONObj &sort );
 
     /**
      * Add-on functionality for queryutil classes requiring access to indexing

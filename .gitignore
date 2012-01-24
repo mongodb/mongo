@@ -1,9 +1,10 @@
-.jsdbshell
-.dbshell
-.sconsign.dblite
-.sconf_temp
-perf.data
-massif.out.*
+/build
+/.jsdbshell
+/.dbshell
+/.sconsign.dblite
+/.sconf_temp
+/perf.data
+/massif.out.*
 
 *~
 *.swp
@@ -17,7 +18,6 @@ massif.out.*
 *.ncb
 *.idb 
 *.obj 
-*/*.obj
 *.opt 
 *.pch 
 *.jsh
@@ -36,8 +36,6 @@ massif.out.*
 *.psess
 *#
 .#*
-/src/mongo/shell/mongo.cpp
-/src/mongo/shell/mongo-server.cpp
 
 /src/mongo/*/*Debug/
 /src/mongo/*/*/*Debug/
@@ -50,7 +48,6 @@ massif.out.*
 /src/mongo/db/_ReSharper.db
 config.log
 settings.py
-buildinfo.cpp
 tags
 TAGS
 failfile.smoke
@@ -67,50 +64,47 @@ scratch
 
 # binaries
 /mongo
-mongod
-mongogrid
-mongos
+/mongod
+/mongogrid
+/mongos
 
-mongodump
-mongorestore
+/mongodump
+/mongorestore
 
-mongofiles
-mongoexport
+/mongofiles
+/mongoexport
 
-mongoimport
-mongosniff
-mongobridge
-mongostat
-mongotop
-mongooplog
-mongoperf
-bsondump
+/mongoimport
+/mongosniff
+/mongobridge
+/mongostat
+/mongotop
+/mongooplog
+/mongoperf
+/bsondump
 
 *.tgz
 *.zip
 *.tar.gz
 
-mongodb-*
-mongo-cxx-driver-*
-
 #libs
-libmongoclient.*
-libmongotestfiles.*
-libmongoshellfiles.*
+/libmongoclient.*
+/libmongotestfiles.*
+/libmongoshellfiles.*
 
 # examples
-firstExample
-secondExample
-whereExample
-bsondemo
-rsExample
+/firstExample
+/secondExample
+/whereExample
+/bsondemo
+/rsExample
 
 #tests
-test
-authTest
-perftest
-clientTest
-httpClientTest
+/test
+/authTest
+/perftest
+/clientTest
+/httpClientTest
 
 #debian
 build-stamp
@@ -122,12 +116,6 @@ debian/mongodb
 #osx
 .DS_Store
 
-#third party
-src/third_party/js-1.7/jsautocfg.h
-src/third_party/js-1.7/jsautokw.h
-src/third_party/js-1.7/jskwgen
-src/third_party/js-1.7/jscpucfg
-
 # QtCreator
 *.config
 *.creator
@@ -135,3 +123,15 @@ src/third_party/js-1.7/jscpucfg
 *.files
 *.includes
 *.orig
+
+
+# old things that should be removed
+# maybe remove this mid 2012
+src/third_party/js-1.7/jscpucfg
+src/third_party/js-1.7/jskwgen
+src/mongo/buildinfo.cpp
+src/mongo/shell/mongo-server.cpp
+src/mongo/shell/mongo.cpp
+src/third_party/js-1.7/jsautocfg.h
+src/third_party/js-1.7/jsautokw.h
+buildinfo.cpp

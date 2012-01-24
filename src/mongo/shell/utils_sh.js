@@ -114,6 +114,15 @@ sh.isBalancerRunning = function () {
     return x.state > 0;
 }
 
+sh.getBalancerHost = function() {   
+    var x = db.getSisterDB("config").locks.findOne({ _id: "balancer" });
+    if( x == null ){
+        print("config.locks collection does not contain balancer lock. be sure you are connected to a mongos");
+        return ""
+    }
+    return x.process.match(/[^:]+:[^:]+/)[0]
+}
+
 sh.stopBalancer = function( timeout, interval ) {
     sh.setBalancerState( false )
     sh.waitForBalancer( false, timeout, interval )
@@ -124,41 +133,127 @@ sh.startBalancer = function( timeout, interval ) {
     sh.waitForBalancer( true, timeout, interval )
 }
 
+sh.waitForDLock = function( lockId, onOrNot, timeout, interval ){
+    
+    // Wait for balancer to be on or off
+    // Can also wait for particular balancer state
+    var state = onOrNot
+    
+    var beginTS = undefined
+    if( state == undefined ){
+        var beginTS = db.getSisterDB( "config" ).locks.findOne({ _id : lockId }).ts
+    }
+        
+    var lockStateOk = function(){
+        var lock = db.getSisterDB( "config" ).locks.findOne({ _id : lockId })
+
+        if( state == false ) return ! lock || lock.state == 0
+        if( state == true ) return lock && lock.state == 2
+        if( state == undefined ) return (beginTS == undefined && lock) || 
+                                        (beginTS != undefined && ( !lock || lock.ts + "" != beginTS + "" ) )
+        else return lock && lock.state == state
+    }
+    
+    assert.soon( lockStateOk,
+                 "Waited too long for lock " + lockId + " to " + 
+                      (state == true ? "lock" : ( state == false ? "unlock" : 
+                                       "change to state " + state ) ),
+                 timeout,
+                 interval
+    )
+}
+
+sh.waitForPingChange = function( activePings, timeout, interval ){
+    
+    var isPingChanged = function( activePing ){
+        var newPing = db.getSisterDB( "config" ).mongos.findOne({ _id : activePing._id })
+        return ! newPing || newPing.ping + "" != activePing.ping + ""
+    }
+    
+    // First wait for all active pings to change, so we're sure a settings reload
+    // happened
+    
+    // Timeout all pings on the same clock
+    var start = new Date()
+    
+    var remainingPings = []
+    for( var i = 0; i < activePings.length; i++ ){
+        
+        var activePing = activePings[ i ]
+        print( "Waiting for active host " + activePing._id + " to recognize new settings... (ping : " + activePing.ping + ")" )
+       
+        // Do a manual timeout here, avoid scary assert.soon errors
+        var timeout = timeout || 30000;
+        var interval = interval || 200;
+        while( isPingChanged( activePing ) != true ){
+            if( ( new Date() ).getTime() - start.getTime() > timeout ){
+                print( "Waited for active ping to change for host " + activePing._id + 
+                       ", a migration may be in progress or the host may be down." )
+                remainingPings.push( activePing )
+                break
+            }
+            sleep( interval )   
+        }
+    
+    }
+    
+    return remainingPings
+}
+
+sh.waitForBalancerOff = function( timeout, interval ){
+    
+    var pings = db.getSisterDB( "config" ).mongos.find().toArray()
+    var activePings = []
+    for( var i = 0; i < pings.length; i++ ){
+        if( ! pings[i].waiting ) activePings.push( pings[i] )
+    }
+    
+    print( "Waiting for active hosts..." )
+    
+    activePings = sh.waitForPingChange( activePings, 60 * 1000 )
+    
+    // After 1min, we assume that all hosts with unchanged pings are either 
+    // offline (this is enough time for a full errored balance round, if a network
+    // issue, which would reload settings) or balancing, which we wait for next
+    // Legacy hosts we always have to wait for
+    
+    print( "Waiting for the balancer lock..." )
+    
+    // Wait for the balancer lock to become inactive
+    // We can guess this is stale after 15 mins, but need to double-check manually
+    try{ 
+        sh.waitForDLock( "balancer", false, 15 * 60 * 1000 )
+    }
+    catch( e ){
+        print( "Balancer still may be active, you must manually verify this is not the case using the config.changelog collection." )
+        throw e
+    }
+        
+    print( "Waiting again for active hosts after balancer is off..." )
+    
+    // Wait a short time afterwards, to catch the host which was balancing earlier
+    activePings = sh.waitForPingChange( activePings, 5 * 1000 )
+    
+    // Warn about all the stale host pings remaining
+    for( var i = 0; i < activePings.length; i++ ){
+        print( "Warning : host " + activePings[i]._id + " seems to have been offline since " + activePings[i].ping )
+    }
+    
+}
+
 sh.waitForBalancer = function( onOrNot, timeout, interval ){
     
-    if( onOrNot != undefined ){
-        
-        // Wait for balancer to be on or off
-        // Can also wait for particular balancer state
-        var state = null
-        if( ! onOrNot ) state = 0
-        else if( onOrNot == true ) state = 2
-        else state = onOrNot
-        
-        assert.soon( function(){ var lock = db.getSisterDB( "config" ).locks.findOne( { _id : "balancer" } );
-                                 return ( lock == null && state == 0 ) || ( lock != null && lock.state == state ) 
-                     },
-                     "waited too long for balancer to " + ( state > 0 ? "start" : "stop" ) + " [ state : " + state + "]",
-                     timeout,
-                     interval
-        )
-        
+    // If we're waiting for the balancer to turn on or switch state or
+    // go to a particular state
+    if( onOrNot ){
+        // Just wait for the balancer lock to change, can't ensure we'll ever see it
+        // actually locked
+        sh.waitForDLock( "balancer", undefined, timeout, interval )
     }
-    else{
-        
-        // Wait for balancer to run at least once
-        
-        var lock = db.getSisterDB( "config" ).locks.findOne({ _id : "balancer" })
-        var ts = lock ? lock.ts : ""
-        
-        assert.soon( function(){ var lock = db.getSisterDB( "config" ).locks.findOne({ _id : "balancer" });
-                                 if( ! lock ) return false;
-                                 return lock.ts != ts
-                                },
-                                "waited too long for balancer to activate",
-                                timeout,
-                                interval
-        )        
+    else {
+        // Otherwise we need to wait until we're sure balancing stops
+        sh.waitForBalancerOff( timeout, interval )
     }
+    
 }
 

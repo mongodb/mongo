@@ -20,7 +20,7 @@
 #include "query.h"
 #include "../pdfile.h"
 #include "../jsobjmanipulator.h"
-#include "../queryoptimizer.h"
+#include "../queryutil.h"
 #include "../repl.h"
 #include "../btree.h"
 #include "../../util/stringutils.h"

@@ -67,6 +67,7 @@ namespace mongo {
             errCount = 0;
             throwGLE = false;
             breakOnTrap = true;
+            loopCommands = true;
         }
 
         string host;
@@ -94,6 +95,7 @@ namespace mongo {
         bool error;
         bool throwGLE;
         bool breakOnTrap;
+        bool loopCommands;
 
         AtomicUInt threadsActive;
 
@@ -176,15 +178,21 @@ namespace mongo {
     static void _benchThread( BenchRunConfig * config, ScopedDbConnection& conn ){
 
         long long count = 0;
-        while ( config->active ) {
+        while ( config->active || ! config->loopCommands ) {
             BSONObjIterator i( config->ops );
             while ( i.more() ) {
+
+                // Break out if we should stop and we're not running all commands then stopping
+                if( ! config->active && config->loopCommands ) break;
+
                 BSONElement e = i.next();
 
                 string ns = e["ns"].String();
                 string op = e["op"].String();
 
                 int delay = e["delay"].eoo() ? 0 : e["delay"].Int();
+
+                BSONObj context = e["context"].eoo() ? BSONObj() : e["context"].Obj();
 
                 auto_ptr<Scope> scope;
                 ScriptingFunction scopeFunc = 0;
@@ -229,6 +237,10 @@ namespace mongo {
                             int err = scope->invoke( scopeFunc , 0 , &result,  1000 * 60 , false );
                             if( err ){
                                 log() << "Error checking in benchRun thread [findOne]" << causedBy( scope->getError() ) << endl;
+
+                                scoped_lock lock( config->_mutex );
+                                config->errCount++;
+
                                 return;
                             }
                         }
@@ -246,6 +258,10 @@ namespace mongo {
                             int err = scope->invoke( scopeFunc , 0 , &result,  1000 * 60 , false );
                             if( err ){
                                 log() << "Error checking in benchRun thread [command]" << causedBy( scope->getError() ) << endl;
+
+                                scoped_lock lock( config->_mutex );
+                                config->errCount++;
+
                                 return;
                             }
                         }
@@ -260,16 +276,26 @@ namespace mongo {
                         int options = e["options"].eoo() ? 0 : e["options"].Int();
                         int batchSize = e["batchSize"].eoo() ? 0 : e["batchSize"].Int();
                         BSONObj filter = e["filter"].eoo() ? BSONObj() : e["filter"].Obj();
+                        int expected = e["expected"].eoo() ? -1 : e["expected"].Int();
 
                         auto_ptr<DBClientCursor> cursor = conn->query( ns, fixQuery( e["query"].Obj() ), limit, skip, &filter, options, batchSize );
 
                         int count = cursor->itcount();
 
+                        if ( expected >= 0 &&  count != expected ) {
+                            cout << "bench query on: " << ns << " expected: " << expected << " got: " << cout << endl;
+                            assert(false);
+                        }
+
                         if( check ){
-                            BSONObj thisValue = BSON( "count" << count );
+                            BSONObj thisValue = BSON( "count" << count << "context" << context );
                             int err = scope->invoke( scopeFunc , 0 , &thisValue, 1000 * 60 , false );
                             if( err ){
                                 log() << "Error checking in benchRun thread [find]" << causedBy( scope->getError() ) << endl;
+
+                                scoped_lock lock( config->_mutex );
+                                config->errCount++;
+
                                 return;
                             }
                         }
@@ -294,6 +320,10 @@ namespace mongo {
                                 int err = scope->invoke( scopeFunc , 0 , &result, 1000 * 60 , false );
                                 if( err ){
                                     log() << "Error checking in benchRun thread [update]" << causedBy( scope->getError() ) << endl;
+
+                                    scoped_lock lock( config->_mutex );
+                                    config->errCount++;
+
                                     return;
                                 }
                             }
@@ -317,6 +347,10 @@ namespace mongo {
                                 int err = scope->invoke( scopeFunc , 0 , &result, 1000 * 60 , false );
                                 if( err ){
                                     log() << "Error checking in benchRun thread [insert]" << causedBy( scope->getError() ) << endl;
+
+                                    scoped_lock lock( config->_mutex );
+                                    config->errCount++;
+
                                     return;
                                 }
                             }
@@ -343,6 +377,10 @@ namespace mongo {
                                 int err = scope->invoke( scopeFunc , 0 , &result, 1000 * 60 , false );
                                 if( err ){
                                     log() << "Error checking in benchRun thread [delete]" << causedBy( scope->getError() ) << endl;
+
+                                    scoped_lock lock( config->_mutex );
+                                    config->errCount++;
+
                                     return;
                                 }
                             }
@@ -412,8 +450,9 @@ namespace mongo {
                 }
 
                 sleepmillis( delay );
-
             }
+
+            if( ! config->loopCommands ) break;
         }
     }
 
@@ -486,6 +525,8 @@ namespace mongo {
                 config.throwGLE = args["throwGLE"].trueValue();
             if ( ! args["breakOnTrap"].eoo() )
                 config.breakOnTrap = args["breakOnTrap"].trueValue();
+            if ( ! args["loopCommands"].eoo() )
+                config.loopCommands = args["loopCommands"].trueValue();
 
 
             if ( ! args["trapPattern"].eoo() ){

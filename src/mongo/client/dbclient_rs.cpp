@@ -458,8 +458,6 @@ namespace mongo {
             }
             catch( DBException& e ){
                 warning() << "cannot connect to new host " << *i << " to replica set " << this->_name << causedBy( e ) << endl;
-                delete newConn;
-                newConn = NULL;
             }
 
             _nodes.push_back( Node( h , newConn ) );
@@ -470,6 +468,7 @@ namespace mongo {
     
 
     bool ReplicaSetMonitor::_checkConnection( DBClientConnection * c , string& maybePrimary , bool verbose , int nodesOffset ) {
+        assert( c );
         scoped_lock lk( _checkConnectionLock );
         bool isMaster = false;
         bool changed = false;

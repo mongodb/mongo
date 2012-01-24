@@ -30,29 +30,33 @@
 
 namespace mongo {
 
-    void checkTableScanAllowed( const char * ns ) {
-        if ( ! cmdLine.noTableScan )
-            return;
-
-        if ( strstr( ns , ".system." ) ||
-                strstr( ns , "local." ) )
-            return;
-
-        if ( ! nsdetails( ns ) )
-            return;
-
-        uassert( 10111 ,  (string)"table scans not allowed:" + ns , ! cmdLine.noTableScan );
-    }
-
     double elementDirection( const BSONElement &e ) {
         if ( e.isNumber() )
             return e.number();
         return 1;
     }
 
-    QueryPlan::QueryPlan(
-        NamespaceDetails *d, int idxNo,
-        const FieldRangeSetPair &frsp, const FieldRangeSetPair *originalFrsp, const BSONObj &originalQuery, const BSONObj &order, bool mustAssertOnYieldFailure, const BSONObj &startKey, const BSONObj &endKey , string special ) :
+    bool exactKeyMatchSimpleQuery( const BSONObj &query, const int expectedFieldCount ) {
+        if ( query.nFields() != expectedFieldCount ) {
+            return false;
+        }
+        BSONObjIterator i( query );
+        while( i.more() ) {
+            BSONElement e = i.next();
+            if ( e.fieldName()[0] == '$' ) {
+                return false;
+            }
+            if ( e.mayEncapsulate() ) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    QueryPlan::QueryPlan( NamespaceDetails *d, int idxNo, const FieldRangeSetPair &frsp,
+                         const FieldRangeSetPair *originalFrsp, const BSONObj &originalQuery,
+                         const BSONObj &order, bool mustAssertOnYieldFailure,
+                         const BSONObj &startKey, const BSONObj &endKey , string special ) :
         _d(d), _idxNo(idxNo),
         _frs( frsp.frsForIndex( _d, _idxNo ) ),
         _frsMulti( frsp.frsForIndex( _d, -1 ) ),
@@ -72,7 +76,7 @@ namespace mongo {
         _mustAssertOnYieldFailure( mustAssertOnYieldFailure ) {
 
         BSONObj idxKey = _idxNo < 0 ? BSONObj() : d->idx( _idxNo ).keyPattern();
-            
+
         if ( !_frs.matchPossibleForIndex( idxKey ) ) {
             _impossible = true;
             _scanAndOrderRequired = false;
@@ -82,14 +86,15 @@ namespace mongo {
         if ( willScanTable() ) {
             if ( _order.isEmpty() || !strcmp( _order.firstElementFieldName(), "$natural" ) )
                 _scanAndOrderRequired = false;
-            return;                
+            return;
         }
-            
+
         _index = &d->idx(_idxNo);
 
         // If the parsing or index indicates this is a special query, don't continue the processing
         if ( _special.size() ||
-            ( _index->getSpec().getType() && _index->getSpec().getType()->suitability( originalQuery, order ) != USELESS ) ) {
+            ( _index->getSpec().getType() &&
+             _index->getSpec().getType()->suitability( originalQuery, order ) != USELESS ) ) {
 
             if( _special.size() ) _optimal = true;
 
@@ -97,7 +102,8 @@ namespace mongo {
             if( !_special.size() ) _special = _index->getSpec().getType()->getPlugin()->getName();
 
             massert( 13040 , (string)"no type for special: " + _special , _type );
-            // hopefully safe to use original query in these contexts - don't think we can mix special with $or clause separation yet
+            // hopefully safe to use original query in these contexts;
+            // don't think we can mix special with $or clause separation yet
             _scanAndOrderRequired = _type->scanAndOrderRequired( _originalQuery , order );
             return;
         }
@@ -137,7 +143,7 @@ doneCheckOrder:
         BSONObjIterator i( idxKey );
         int exactIndexedQueryCount = 0;
         int optimalIndexedQueryCount = 0;
-        bool stillOptimalIndexedQueryCount = true;
+        bool awaitingLastOptimalField = true;
         set<string> orderFieldsUnindexed;
         order.getFieldNames( orderFieldsUnindexed );
         while( i.moreWithEOO() ) {
@@ -145,14 +151,14 @@ doneCheckOrder:
             if ( e.eoo() )
                 break;
             const FieldRange &fr = _frs.range( e.fieldName() );
-            if ( stillOptimalIndexedQueryCount ) {
-                if ( fr.nontrivial() )
+            if ( awaitingLastOptimalField ) {
+                if ( !fr.universal() )
                     ++optimalIndexedQueryCount;
                 if ( !fr.equality() )
-                    stillOptimalIndexedQueryCount = false;
+                    awaitingLastOptimalField = false;
             }
             else {
-                if ( fr.nontrivial() )
+                if ( !fr.universal() )
                     optimalIndexedQueryCount = -1;
             }
             if ( fr.equality() ) {
@@ -163,17 +169,18 @@ doneCheckOrder:
             orderFieldsUnindexed.erase( e.fieldName() );
         }
         if ( !_scanAndOrderRequired &&
-                ( optimalIndexedQueryCount == _frs.nNontrivialRanges() ) )
+                ( optimalIndexedQueryCount == _frs.numNonUniversalRanges() ) )
             _optimal = true;
-        if ( exactIndexedQueryCount == _frs.nNontrivialRanges() &&
-                orderFieldsUnindexed.size() == 0 &&
-                exactIndexedQueryCount == idxKey.nFields() &&
-                exactIndexedQueryCount == _originalQuery.nFields() ) {
+        if ( exactIndexedQueryCount == _frs.numNonUniversalRanges() &&
+            orderFieldsUnindexed.size() == 0 &&
+            exactIndexedQueryCount == idxKey.nFields() &&
+            exactKeyMatchSimpleQuery( _originalQuery, exactIndexedQueryCount ) ) {
             _exactKeyMatch = true;
         }
         _frv.reset( new FieldRangeVector( _frs, idxSpec, _direction ) );
         if ( originalFrsp ) {
-            _originalFrv.reset( new FieldRangeVector( originalFrsp->frsForIndex( _d, _idxNo ), idxSpec, _direction ) );
+            _originalFrv.reset( new FieldRangeVector( originalFrsp->frsForIndex( _d, _idxNo ),
+                                                     idxSpec, _direction ) );
         }
         else {
             _originalFrv = _frv;
@@ -190,8 +197,8 @@ doneCheckOrder:
                 _endKey = _frv->endKey();
         }
 
-        if ( ( _scanAndOrderRequired || _order.isEmpty() ) &&
-                !_frs.range( idxKey.firstElementFieldName() ).nontrivial() ) {
+        if ( ( _scanAndOrderRequired || _order.isEmpty() ) && 
+            _frs.range( idxKey.firstElementFieldName() ).universal() ) { // NOTE SERVER-2140
             _unhelpful = true;
         }
     }
@@ -204,33 +211,13 @@ doneCheckOrder:
         }
 
         if ( _impossible ) {
-            // TODO We might want to allow this dummy table scan even in no table
-            // scan mode, since it won't scan anything.
-            if ( _frs.nNontrivialRanges() )
-                checkTableScanAllowed( _frs.ns() );
+            // Dummy table scan cursor returning no results.  Allowed in --notablescan mode.
             return shared_ptr<Cursor>( new BasicCursor( DiskLoc() ) );
         }
 
         if ( willScanTable() ) {
-            if ( _frs.nNontrivialRanges() ) {
-                checkTableScanAllowed( _frs.ns() );
-                
-                // if we are doing a table scan on _id
-                // and it's a capped collection
-                // we warn /*disallow*/ as it's a common user error
-                // .system. and local collections are exempt
-                if ( _d && _d->capped && _frs.range( "_id" ).nontrivial() ) {
-                    if ( cc().isSyncThread() ||
-                         str::contains( _frs.ns() , ".system." ) || 
-                         str::startsWith( _frs.ns() , "local." ) ) {
-                        // ok
-                    }
-                    else {
-                        warning() << "_id query on capped collection without an _id index, performance will be poor collection: " << _frs.ns() << endl;
-                        //uassert( 14820, str::stream() << "doing _id query on a capped collection without an index is not allowed: " << _frs.ns() ,
-                    }
-                }
-            }
+            checkTableScanAllowed();
+            warnOnCappedIdTableScan();
             return findTableScan( _frs.ns(), _order, startLoc );
         }
                 
@@ -276,6 +263,45 @@ doneCheckOrder:
         NamespaceDetailsTransient::get_inlock( ns() ).registerIndexForPattern( _frs.pattern( _order ), indexKey(), nScanned );
     }
     
+    void QueryPlan::checkTableScanAllowed() const {
+        // TODO - is this desirable?  See SERVER-2222.
+        if ( _frs.numNonUniversalRanges() == 0 )
+            return;
+
+        if ( ! cmdLine.noTableScan )
+            return;
+
+        if ( strstr( ns() , ".system." ) ||
+            strstr( ns() , "local." ) )
+            return;
+
+        if ( ! nsdetails( ns() ) )
+            return;
+
+        uassert( 10111 ,  (string)"table scans not allowed:" + ns() , ! cmdLine.noTableScan );
+    }
+
+    void QueryPlan::warnOnCappedIdTableScan() const {
+        // if we are doing a table scan on _id
+        // and it's a capped collection
+        // we warn /*disallow*/ as it's a common user error
+        // .system. and local collections are exempt
+        if ( _d && _d->capped && !_frs.range( "_id" ).universal() ) {
+            if ( cc().isSyncThread() ||
+                str::contains( _frs.ns() , ".system." ) ||
+                str::startsWith( _frs.ns() , "local." ) ) {
+                // ok
+            }
+            else {
+                warning()
+                << "_id query on capped collection without an _id index, "
+                << "performance will be poor collection: " << _frs.ns() << endl;
+                //uassert( 14820, str::stream() << "doing _id query on a capped collection "
+                //<<"without an index is not allowed: " << _frs.ns() ,
+            }
+        }
+    }
+
     /**
      * @return a copy of the inheriting class, which will be run with its own
      * query plan.  If multiple plan sets are required for an $or query, the
@@ -411,7 +437,7 @@ doneCheckOrder:
                 addHint( *id );
             }
             else {
-                massert( 10366 ,  "natural order cannot be specified with $min/$max", _min.isEmpty() && _max.isEmpty() );
+                uassert( 10366 ,  "natural order cannot be specified with $min/$max", _min.isEmpty() && _max.isEmpty() );
                 // Table scan plan
                 _plans.push_back( QueryPlanPtr( new QueryPlan( d, -1, *_frsp, _originalFrsp.get(), _originalQuery, _order, _mustAssertOnYieldFailure ) ) );
             }
@@ -422,7 +448,7 @@ doneCheckOrder:
             string errmsg;
             BSONObj keyPattern;
             IndexDetails *idx = indexDetailsForRange( ns, errmsg, _min, _max, keyPattern );
-            massert( 10367 ,  errmsg, idx );
+            uassert( 10367 ,  errmsg, idx );
             _plans.push_back( QueryPlanPtr( new QueryPlan( d, d->idxNo(*idx), *_frsp, _originalFrsp.get(), _originalQuery, _order, _mustAssertOnYieldFailure, _min, _max ) ) );
             return;
         }
@@ -479,7 +505,7 @@ doneCheckOrder:
                 }
 
                 massert( 10368 ,  "Unable to locate previously recorded index", p.get() );
-                if ( !( _bestGuessOnly && p->scanAndOrderRequired() ) ) {
+                if ( !p->unhelpful() && !( _bestGuessOnly && p->scanAndOrderRequired() ) ) {
                     _usingCachedPlan = true;
                     _plans.push_back( p );
                     return;
@@ -496,35 +522,31 @@ doneCheckOrder:
         if ( !d )
             return;
 
-        // If table scan is optimal or natural order requested or tailable cursor requested
-        if ( !_frsp->matchPossible() || ( _frsp->noNontrivialRanges() && _order.isEmpty() ) ||
+        // If table scan is optimal or natural order requested.
+        if ( !_frsp->matchPossible() || ( _frsp->noNonUniversalRanges() && _order.isEmpty() ) ||
                 ( !_order.isEmpty() && !strcmp( _order.firstElementFieldName(), "$natural" ) ) ) {
             // Table scan plan
-            addPlan( QueryPlanPtr( new QueryPlan( d, -1, *_frsp, _originalFrsp.get(), _originalQuery, _order, _mustAssertOnYieldFailure ) ), checkFirst );
+            QueryPlanPtr plan
+            ( new QueryPlan( d, -1, *_frsp, _originalFrsp.get(), _originalQuery, _order,
+                            _mustAssertOnYieldFailure ) );
+            addPlan( plan, checkFirst );
             return;
         }
-
-        bool normalQuery = _hint.isEmpty() && _min.isEmpty() && _max.isEmpty();
 
         PlanSet plans;
         QueryPlanPtr optimalPlan;
         QueryPlanPtr specialPlan;
         for( int i = 0; i < d->nIndexes; ++i ) {
-            if ( normalQuery ) {
-                BSONObj keyPattern = d->idx( i ).keyPattern();
-                if ( !_frsp->matchPossibleForIndex( d, i, keyPattern ) ) {
-                    // If no match is possible, only generate a trival plan that won't
-                    // scan any documents.
-                    QueryPlanPtr p( new QueryPlan( d, i, *_frsp, _originalFrsp.get(), _originalQuery, _order, _mustAssertOnYieldFailure ) );
-                    addPlan( p, checkFirst );
-                    return;
-                }
-                if ( !QueryUtilIndexed::indexUseful( *_frsp, d, i, _order ) ) {
-                    continue;
-                }
+
+            if ( !QueryUtilIndexed::indexUseful( *_frsp, d, i, _order ) ) {
+                continue;
             }
 
             QueryPlanPtr p( new QueryPlan( d, i, *_frsp, _originalFrsp.get(), _originalQuery, _order, _mustAssertOnYieldFailure ) );
+            if ( p->impossible() ) {
+                addPlan( p, checkFirst );
+                return;
+            }
             if ( p->optimal() ) {
                 if ( !optimalPlan.get() ) {
                     optimalPlan = p;
@@ -1231,30 +1253,9 @@ doneCheckOrder:
         return id;
     }
     
-    bool isSimpleIdQuery( const BSONObj& query ) {
-        BSONObjIterator i(query);
-        
-        if( !i.more() ) 
-            return false;
-
-        BSONElement e = i.next();
-
-        if( i.more() ) 
-            return false;
-
-        if( strcmp("_id", e.fieldName()) != 0 ) 
-            return false;
-        
-        if ( e.isSimpleType() ) // e.g. not something like { _id : { $gt : ...
-            return true;
-
-        if ( e.type() == Object )
-            return e.Obj().firstElementFieldName()[0] != '$';
-
-        return false;
-    }
-
-    shared_ptr<Cursor> bestGuessCursor( const char *ns, const BSONObj &query, const BSONObj &sort ) {
+    shared_ptr<Cursor> NamespaceDetailsTransient::bestGuessCursor( const char *ns,
+                                                                  const BSONObj &query,
+                                                                  const BSONObj &sort ) {
         if( !query.getField( "$or" ).eoo() ) {
             return shared_ptr<Cursor>( new MultiCursor( ns, query, sort ) );
         }
@@ -1299,7 +1300,7 @@ doneCheckOrder:
         NamespaceDetailsTransient& nsd = NamespaceDetailsTransient::get_inlock( frsp.ns() );
         // TODO Maybe it would make sense to return the index with the lowest
         // nscanned if there are two possibilities.
-        if ( frsp._singleKey.matchPossible() ) {
+        {
             QueryPattern pattern = frsp._singleKey.pattern( order );
             BSONObj oldIdx = nsd.indexForPattern( pattern );
             if ( !oldIdx.isEmpty() ) {
@@ -1307,7 +1308,7 @@ doneCheckOrder:
                 return make_pair( oldIdx, oldNScanned );
             }
         }
-        if ( frsp._multiKey.matchPossible() ) {
+        {
             QueryPattern pattern = frsp._multiKey.pattern( order );
             BSONObj oldIdx = nsd.indexForPattern( pattern );
             if ( !oldIdx.isEmpty() ) {

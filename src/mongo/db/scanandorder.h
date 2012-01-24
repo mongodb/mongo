@@ -26,16 +26,14 @@
 
 namespace mongo {
 
-    /* todo:
-       _ limit amount of data
-    */
+    static const int ScanAndOrderMemoryLimitExceededAssertionCode = 10128;
 
     class KeyType : boost::noncopyable {
     public:
         IndexSpec _spec;
         FieldRangeVector _keyCutter;
     public:
-        KeyType(BSONObj pattern, const FieldRangeSet &frs):
+        KeyType(const BSONObj &pattern, const FieldRangeSet &frs):
         _spec((assert(!pattern.isEmpty()),pattern)),
         _keyCutter(frs, _spec, 1) {
         }
@@ -45,18 +43,17 @@ namespace mongo {
          * scanning index with keySpec 'pattern' using constraints 'frs', or
          * BSONObj() if no such key.
          */
-        BSONObj getKeyFromObject(BSONObj o) {
+        BSONObj getKeyFromObject(const BSONObj &o) const {
             return _keyCutter.firstMatch(o);
         }
     };
 
     /* todo:
-       _ respect limit
-       _ check for excess mem usage
        _ response size limit from runquery; push it up a bit.
     */
 
-    inline void fillQueryResultFromObj(BufBuilder& bb, Projection *filter, const BSONObj& js, DiskLoc* loc=NULL) {
+    inline void fillQueryResultFromObj(BufBuilder& bb, const Projection *filter, const BSONObj& js,
+                                       const DiskLoc* loc=NULL) {
         if ( filter ) {
             BSONObjBuilder b( bb );
             filter->transform( js , b );
@@ -80,7 +77,7 @@ namespace mongo {
     public:
         static const unsigned MaxScanAndOrderBytes;
 
-        ScanAndOrder(int startFrom, int limit, BSONObj order, const FieldRangeSet &frs) :
+        ScanAndOrder(int startFrom, int limit, const BSONObj &order, const FieldRangeSet &frs) :
             _best( BSONObjCmp( order ) ),
             _startFrom(startFrom), _order(order, frs) {
             _limit = limit > 0 ? limit + _startFrom : 0x7fffffff;
@@ -89,16 +86,32 @@ namespace mongo {
 
         int size() const { return _best.size(); }
 
-        void add(BSONObj o, DiskLoc* loc);
+        /**
+         * @throw ScanAndOrderMemoryLimitExceededAssertionCode if adding would grow memory usage
+         * to ScanAndOrder::MaxScanAndOrderBytes.
+         */
+        void add(const BSONObj &o, const DiskLoc* loc);
 
         /* scanning complete. stick the query result in b for n objects. */
-        void fill(BufBuilder& b, Projection *filter, int& nout ) const;
+        void fill(BufBuilder& b, const Projection *filter, int& nout ) const;
+
+    /** Functions for testing. */
+    protected:
+
+        unsigned approxSize() const { return _approxSize; }
 
     private:
 
-        void _add(BSONObj& k, BSONObj o, DiskLoc* loc);
+        void _add(const BSONObj& k, const BSONObj& o, const DiskLoc* loc);
 
-        void _addIfBetter(BSONObj& k, BSONObj o, BestMap::iterator i, DiskLoc* loc);
+        void _addIfBetter(const BSONObj& k, const BSONObj& o, const BestMap::iterator& i,
+                          const DiskLoc* loc);
+
+        /**
+         * @throw ScanAndOrderMemoryLimitExceededAssertionCode if approxSize would grow too high,
+         * otherwise update _approxSize.
+         */
+        void _validateAndUpdateApproxSize( const int approxSizeDelta );
 
         BestMap _best; // key -> full object
         int _startFrom;

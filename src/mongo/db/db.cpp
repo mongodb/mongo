@@ -945,6 +945,8 @@ int main(int argc, char* argv[]) {
         }
         if ( params.count("configsvr" ) ) {
             cmdLine.configsvr = true;
+            cmdLine.smallfiles = true; // config server implies small files
+            dur::DataLimitPerJournalFile = 128 * 1024 * 1024;
             if (cmdLine.usingReplSets() || replSettings.master || replSettings.slave) {
                 log() << "replication should not be enabled on a config server" << endl;
                 ::exit(-1);

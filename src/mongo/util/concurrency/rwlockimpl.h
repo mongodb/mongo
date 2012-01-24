@@ -111,13 +111,13 @@ namespace mongo {
             assert( x == 0 );
         }        
 
+    protected:
         ~RWLockBase() {
             if ( ! StaticObserver::_destroyingStatics ) {
                 wassert( pthread_rwlock_destroy( &_lock ) == 0 ); // wassert as don't want to throw from a destructor
             }
         }
 
-    protected:
         RWLockBase() {
             check( pthread_rwlock_init( &_lock , 0 ) );
         }

@@ -1398,7 +1398,7 @@ namespace mongo {
             pCtx->setInRouter(true);
 
             /* parse the pipeline specification */
-            boost::shared_ptr<Pipeline> pPipeline(
+            intrusive_ptr<Pipeline> pPipeline(
                 Pipeline::parseCommand(errmsg, cmdObj, pCtx));
             if (!pPipeline.get())
                 return false; // there was some parsing error
@@ -1414,7 +1414,7 @@ namespace mongo {
                 return passthrough(conf, cmdObj, result);
 
             /* split the pipeline into pieces for mongods and this mongos */
-            boost::shared_ptr<Pipeline> pShardPipeline(
+            intrusive_ptr<Pipeline> pShardPipeline(
                 pPipeline->splitForSharded());
 
             /* create the command for the shards */

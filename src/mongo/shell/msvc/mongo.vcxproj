@@ -178,7 +178,13 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\..\bson\oid.cpp" />
-    <ClCompile Include="..\..\client\clientOnly.cpp" />
+    <ClCompile Include="..\..\client\clientAndShell.cpp" />
+    <ClCompile Include="..\..\client\clientOnly.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\..\client\connpool.cpp" />
     <ClCompile Include="..\..\client\dbclient_rs.cpp" />
     <ClCompile Include="..\..\client\syncclusterconnection.cpp" />
@@ -237,7 +243,7 @@
     <ClCompile Include="..\..\util\processinfo_win32.cpp" />
     <ClCompile Include="..\..\util\assert_util.cpp" />
     <ClCompile Include="..\..\util\md5main.cpp" />
-    <ClCompile Include="..\..\util\md5.c">
+    <ClCompile Include="..\..\util\md5.cpppp">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="..\..\util\base64.cpp" />

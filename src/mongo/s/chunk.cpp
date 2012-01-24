@@ -816,8 +816,9 @@ namespace mongo {
             {
                 // special case if most-significant field isn't in query
                 FieldRange range = frsp->singleKeyRange(_key.key().firstElementFieldName());
-                if ( !range.nontrivial() ) {
-                    DEV PRINT(range.nontrivial());
+                bool nontrivial = !range.empty() && !range.universal();
+                if ( !nontrivial ) {
+                    DEV PRINT(nontrivial);
                     getShardsForRange( shards, _key.globalMin(), _key.globalMax() );
                     return;
                 }
@@ -835,11 +836,11 @@ namespace mongo {
                 if( shards.size() == _shards.size() ) return;
             }
 
-            if (org.moreOrClauses())
+            if (!org.orRangesExhausted())
                 org.popOrClauseSingleKey();
 
         }
-        while (org.moreOrClauses());
+        while (!org.orRangesExhausted());
     }
 
     void ChunkManager::getShardsForRange(set<Shard>& shards, const BSONObj& min, const BSONObj& max, bool fullKeyReq ) const {

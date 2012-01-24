@@ -48,8 +48,9 @@ namespace mongo {
             // conLock releases...
         }
         void reconnect() {
-          conn()->port().shutdown();
-          connect();
+            conn().reset(new DBClientConnection(true, 0, 10));
+            x->connected = false;
+            connect();
         }
 
         /* If we were to run a query and not exhaust the cursor, future use of the connection would be problematic.
@@ -71,21 +72,21 @@ namespace mongo {
         static mongo::mutex mapMutex;
         struct X {
             mongo::mutex z;
-            DBClientConnection cc;
+            scoped_ptr<DBClientConnection> cc;
             bool connected;
-            X() : z("X"), cc(/*reconnect*/ true, 0, /*timeout*/ 10.0), connected(false) {
-                cc._logLevel = 2;
+            X() : z("X"), cc(new DBClientConnection(/*reconnect*/ true, 0, /*timeout*/ 10.0)), connected(false) {
+                cc->_logLevel = 2;
             }
         } *x;
         typedef map<string,ScopedConn::X*> M;
         static M& _map;
-        DBClientConnection* conn() { return &x->cc; }
+        scoped_ptr<DBClientConnection>& conn() { return x->cc; }
         const string _hostport;
 
         // we should already be locked...
         bool connect() {
           string err;
-          if (!x->cc.connect(_hostport, err)) {
+          if (!x->cc->connect(_hostport, err)) {
             log() << "couldn't connect to " << _hostport << ": " << err << rsLog;
             return false;
           }
@@ -95,7 +96,7 @@ namespace mongo {
           // or our key file has to change.  if our key file has to change, we'll
           // be rebooting. if their file has to change, they'll be rebooted so the
           // connection created above will go dead, reconnect, and reauth.
-          if (!noauth && !x->cc.auth("local", internalSecurity.user, internalSecurity.pwd, err, false)) {
+          if (!noauth && !x->cc->auth("local", internalSecurity.user, internalSecurity.pwd, err, false)) {
             log() << "could not authenticate against " << _hostport << ", " << err << rsLog;
             return false;
           }
@@ -116,12 +117,18 @@ namespace mongo {
             }
         }
 
-        // Keep trying to connect if we're not yet connected
-        if( !first && x->connected ) {
-            connLock.reset( new scoped_lock(x->z) );
+        // already locked connLock above
+        if (first) {
+            connect();
             return;
         }
 
+        connLock.reset( new scoped_lock(x->z) );
+        if (x->connected) {
+            return;
+        }
+
+        // Keep trying to connect if we're not yet connected
         connect();
     }
 

@@ -25,18 +25,23 @@ namespace mongo {
                 _fieldTypes[ i->first ] = QueryPattern::Equality;
             }
             else if ( i->second.empty() ) {
-                // This case generally results from an upper and lower bound that are inconsistent for a single key index.
-                _fieldTypes[ i->first ] = QueryPattern::UpperAndLowerBound;
+                _fieldTypes[ i->first ] = QueryPattern::Empty;
             }
-            else if ( i->second.nontrivial() ) {
+            else if ( !i->second.universal() ) {
                 bool upper = i->second.max().type() != MaxKey;
                 bool lower = i->second.min().type() != MinKey;
-                if ( upper && lower )
+                if ( upper && lower ) {
                     _fieldTypes[ i->first ] = QueryPattern::UpperAndLowerBound;
-                else if ( upper )
+                }
+                else if ( upper ) {
                     _fieldTypes[ i->first ] = QueryPattern::UpperBound;
-                else if ( lower )
+                }
+                else if ( lower ) {
                     _fieldTypes[ i->first ] = QueryPattern::LowerBound;
+                }
+                else {
+                    _fieldTypes[ i->first ] = QueryPattern::ConstraintPresent;
+                }
             }
         }
         setSort( sort );
@@ -57,6 +62,8 @@ namespace mongo {
     
     string typeToString( enum QueryPattern::Type t ) {
         switch (t) {
+            case QueryPattern::Empty:
+                return "Empty";
             case QueryPattern::Equality:
                 return "Equality";
             case QueryPattern::LowerBound:
@@ -65,6 +72,8 @@ namespace mongo {
                 return "UpperBound";
             case QueryPattern::UpperAndLowerBound:
                 return "UpperAndLowerBound";
+            case QueryPattern::ConstraintPresent:
+                return "ConstraintPresent";
         }
         return "";
     }

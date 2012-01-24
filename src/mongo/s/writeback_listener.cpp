@@ -89,7 +89,7 @@ namespace mongo {
     /* static */
     BSONObj WriteBackListener::waitFor( const ConnectionIdent& ident, const OID& oid ) {
         Timer t;
-        for ( int i=0; i<10000; i++ ) {
+        while ( t.minutes() < 60 ) {
             {
                 scoped_lock lk( _seenWritebacksLock );
                 WBStatus s = _seenWritebacks[ident];

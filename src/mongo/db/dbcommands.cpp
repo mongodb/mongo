@@ -121,10 +121,13 @@ namespace mongo {
 
             bool err = false;
 
-            if ( le->nPrev != 1 )
+            if ( le->nPrev != 1 ) {
                 err = LastError::noError.appendSelf( result , false );
-            else
+                le->appendSelfStatus( result );
+            }
+            else {
                 err = le->appendSelf( result , false );
+            }
 
             Client& c = cc();
             c.appendLastOp( result );
@@ -1093,7 +1096,8 @@ namespace mongo {
             BSONObj query = BSON( "files_id" << jsobj["filemd5"] );
             BSONObj sort = BSON( "files_id" << 1 << "n" << 1 );
 
-            shared_ptr<Cursor> cursor = bestGuessCursor(ns.c_str(), query, sort);
+            shared_ptr<Cursor> cursor = NamespaceDetailsTransient::bestGuessCursor(ns.c_str(),
+                                                                                   query, sort);
             if ( ! cursor ) {
                 errmsg = "need an index on { files_id : 1 , n : 1 }";
                 return false;

@@ -132,10 +132,16 @@ var startSlave = function(n) {
 
     admin.foo.insert({x:1});
     assert.soon(function() {
-        var last = local.oplog.rs.find().sort({$natural:-1}).limit(1).next();
-        var cur = conn.getDB("local").oplog.rs.find().sort({$natural:-1}).limit(1).next();
-        print("last: "+tojson(last)+" cur: "+tojson(cur));
-        return cur != null && last != null && cur.ts.t == last.ts.t && cur.ts.i == last.ts.i;
+        try {
+            var last = local.oplog.rs.find().sort({$natural:-1}).limit(1).next();
+            var cur = conn.getDB("local").oplog.rs.find().sort({$natural:-1}).limit(1).next();
+            print("last: "+tojson(last)+" cur: "+tojson(cur));
+            return cur != null && last != null && cur.ts.t == last.ts.t && cur.ts.i == last.ts.i;
+        }
+        catch (e) {
+            print(e);
+        }
+        return false;
     });
 
     return conn;
@@ -172,7 +178,9 @@ sleep(10000);
 pargs = new MongodRunner( ports[ 3 ], basePath + "-p", false, false,
                           ["--replSet", basename, "--oplogSize", 2],
                           {no_bind : true} );
-p = pargs.start(true);
+pargs.start(true);
+
+p = new Mongo("localhost:"+ports[3]);
 
 printjson(p.getDB("admin").runCommand({replSetGetStatus:1}));
 

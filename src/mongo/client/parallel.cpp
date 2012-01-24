@@ -19,7 +19,6 @@
 #include "pch.h"
 #include "parallel.h"
 #include "connpool.h"
-#include "../db/queryutil.h"
 #include "../db/dbmessage.h"
 #include "../s/util.h"
 #include "../s/shard.h"
@@ -36,12 +35,14 @@ namespace mongo {
     ClusteredCursor::ClusteredCursor( const QuerySpec& q ) {
         _ns = q.ns();
         _query = q.filter().copy();
+        _hint = q.hint();
+        _sort = q.sort();
         _options = q.options();
         _fields = q.fields().copy();
         _batchSize = q.ntoreturn();
         if ( _batchSize == 1 )
             _batchSize = 2;
-
+        
         _done = false;
         _didInit = false;
     }
@@ -144,11 +145,18 @@ namespace mongo {
         if ( ! extra.isEmpty() ) {
             q = concatQuery( q , extra );
         }
+        
+        Query qu( q );
+        qu.explain();
+        if ( ! _hint.isEmpty() )
+            qu.hint( _hint );
+        if ( ! _sort.isEmpty() )
+            qu.sort( _sort );
 
         BSONObj o;
 
         ShardConnection conn( server , _ns );
-        auto_ptr<DBClientCursor> cursor = conn->query( _ns , Query( q ).explain() , abs( _batchSize ) * -1 , 0 , _fields.isEmpty() ? 0 : &_fields );
+        auto_ptr<DBClientCursor> cursor = conn->query( _ns , qu , abs( _batchSize ) * -1 , 0 , _fields.isEmpty() ? 0 : &_fields );
         if ( cursor.get() && cursor->more() )
             o = cursor->next().getOwned();
         conn.done();
@@ -182,18 +190,36 @@ namespace mongo {
         // TODO: should do some simplification here if possibl ideally
     }
 
-    void ClusteredCursor::explain(BSONObjBuilder& b) {
+    void ParallelSortClusteredCursor::explain(BSONObjBuilder& b) {
         // Note: by default we filter out allPlans and oldPlan in the shell's
         // explain() function. If you add any recursive structures, make sure to
         // edit the JS to make sure everything gets filtered.
 
+        // Return single shard output if we're versioned but not sharded, or
+        // if we specified only a single shard
+        // TODO:  We should really make this simpler - all queries via mongos
+        // *always* get the same explain format
+        if( ( isVersioned() && ! isSharded() ) || _qShards.size() == 1 ){
+            map<string,list<BSONObj> > out;
+            _explain( out );
+            assert( out.size() == 1 );
+            list<BSONObj>& l = out.begin()->second;
+            assert( l.size() == 1 );
+            b.appendElements( *(l.begin()) );
+            return;
+        }
+
         b.append( "clusteredType" , type() );
 
+        string cursorType;
+        BSONObj indexBounds;
+        BSONObj oldPlan;
+        
         long long millis = 0;
         double numExplains = 0;
 
         map<string,long long> counters;
-
+        
         map<string,list<BSONObj> > out;
         {
             _explain( out );
@@ -218,12 +244,27 @@ namespace mongo {
 
                     millis += temp["millis"].numberLong();
                     numExplains++;
+
+                    if ( temp["cursor"].type() == String ) { 
+                        if ( cursorType.size() == 0 )
+                            cursorType = temp["cursor"].String();
+                        else if ( cursorType != temp["cursor"].String() )
+                            cursorType = "multiple";
+                    }
+
+                    if ( temp["indexBounds"].type() == Object )
+                        indexBounds = temp["indexBounds"].Obj();
+
+                    if ( temp["oldPlan"].type() == Object )
+                        oldPlan = temp["oldPlan"].Obj();
+
                 }
                 y.done();
             }
             x.done();
         }
 
+        b.append( "cursor" , cursorType );
         for ( map<string,long long>::iterator i=counters.begin(); i!=counters.end(); ++i )
             b.appendNumber( i->first , i->second );
 
@@ -233,33 +274,50 @@ namespace mongo {
                   : 0 );
         b.append( "numQueries" , (int)numExplains );
         b.append( "numShards" , (int)out.size() );
+
+        if ( out.size() == 1 ) {
+            b.append( "indexBounds" , indexBounds );
+            if ( ! oldPlan.isEmpty() ) {
+                // this is to stay in compliance with mongod behavior
+                // we should make this cleaner, i.e. {} == nothing
+                b.append( "oldPlan" , oldPlan );
+            }
+        }
+        else {
+            // TODO: this is lame...
+        }
+
     }
 
     // --------  FilteringClientCursor -----------
     FilteringClientCursor::FilteringClientCursor( const BSONObj filter )
-        : _matcher( filter ) , _done( true ) {
+        : _matcher( filter ) , _pcmData( NULL ), _done( true ) {
     }
 
     FilteringClientCursor::FilteringClientCursor( auto_ptr<DBClientCursor> cursor , const BSONObj filter )
-        : _matcher( filter ) , _cursor( cursor ) , _done( cursor.get() == 0 ) {
+        : _matcher( filter ) , _cursor( cursor ) , _pcmData( NULL ), _done( cursor.get() == 0 ) {
     }
 
     FilteringClientCursor::FilteringClientCursor( DBClientCursor* cursor , const BSONObj filter )
-        : _matcher( filter ) , _cursor( cursor ) , _done( cursor == 0 ) {
+        : _matcher( filter ) , _cursor( cursor ) , _pcmData( NULL ), _done( cursor == 0 ) {
     }
 
 
     FilteringClientCursor::~FilteringClientCursor() {
+        // Don't use _pcmData
+        _pcmData = NULL;
     }
 
     void FilteringClientCursor::reset( auto_ptr<DBClientCursor> cursor ) {
         _cursor = cursor;
         _next = BSONObj();
         _done = _cursor.get() == 0;
+        _pcmData = NULL;
     }
 
-    void FilteringClientCursor::reset( DBClientCursor* cursor ) {
+    void FilteringClientCursor::reset( DBClientCursor* cursor, ParallelConnectionMetadata* pcmData ) {
         _cursor.reset( cursor );
+        _pcmData = pcmData;
         _next = BSONObj();
         _done = cursor == 0;
     }
@@ -454,7 +512,7 @@ namespace mongo {
         }
 
         if( ! _qSpec.isEmpty() ){
-            _qSpec._fields = _fields;
+            _qSpec.setFields( _fields );
         }
     }
 
@@ -531,6 +589,10 @@ namespace mongo {
             if( v.size() == 0 ) stateB.append( "cursor", "(empty)" );
             else stateB.append( "cursor", v[0] );
         }
+
+        stateB.append( "count", count );
+        stateB.append( "done", done );
+
         return stateB.obj().getOwned();
     }
 
@@ -752,13 +814,42 @@ namespace mongo {
 
                 // Setup cursor
                 if( ! state->cursor ){
-                    state->cursor.reset( new DBClientCursor( state->conn->get(), _qSpec.ns(), _qSpec.query(),
-                                                             isCommand() ? 1 : 0, // nToReturn (0 if query indicates multi)
-                                                             0, // nToSkip
-                                                             // Does this need to be a ptr?
-                                                             _qSpec.fields().isEmpty() ? 0 : &_qSpec._fields, // fieldsToReturn
-                                                             _qSpec.options(), // options
-                                                             _qSpec.ntoreturn() == 0 ? 0 : _qSpec.ntoreturn() + _qSpec.ntoskip() ) ); // batchSize
+
+                    // Do a sharded query if this is not a primary shard *and* this is a versioned query,
+                    // or if the number of shards to query is > 1
+                    if( ( isVersioned() && ! primary ) || _qShards.size() > 1 ){
+
+                        state->cursor.reset( new DBClientCursor( state->conn->get(), _qSpec.ns(), _qSpec.query(),
+                                                                 isCommand() ? 1 : 0, // nToReturn (0 if query indicates multi)
+                                                                 0, // nToSkip
+                                                                 // Does this need to be a ptr?
+                                                                 _qSpec.fields().isEmpty() ? 0 : _qSpec.fieldsData(), // fieldsToReturn
+                                                                 _qSpec.options(), // options
+                                                                 // NtoReturn is weird.
+                                                                 // If zero, it means use default size, so we do that for all cursors
+                                                                 // If positive, it's the batch size (we don't want this cursor limiting results), that's
+                                                                 // done at a higher level
+                                                                 // If negative, it's the batch size, but we don't create a cursor - so we don't want
+                                                                 // to create a child cursor either.
+                                                                 // Either way, if non-zero, we want to pull back the batch size + the skip amount as
+                                                                 // quickly as possible.  Potentially, for a cursor on a single shard or if we keep better track of
+                                                                 // chunks, we can actually add the skip value into the cursor and/or make some assumptions about the
+                                                                 // return value size ( (batch size + skip amount) / num_servers ).
+                                                                 _qSpec.ntoreturn() == 0 ? 0 :
+                                                                     ( _qSpec.ntoreturn() > 0 ? _qSpec.ntoreturn() + _qSpec.ntoskip() :
+                                                                                                _qSpec.ntoreturn() - _qSpec.ntoskip() ) ) ); // batchSize
+                    }
+                    else{
+
+                        // Non-sharded
+                        state->cursor.reset( new DBClientCursor( state->conn->get(), _qSpec.ns(), _qSpec.query(),
+                                                                 _qSpec.ntoreturn(), // nToReturn
+                                                                 _qSpec.ntoskip(), // nToSkip
+                                                                 // Does this need to be a ptr?
+                                                                 _qSpec.fields().isEmpty() ? 0 : _qSpec.fieldsData(), // fieldsToReturn
+                                                                 _qSpec.options(), // options
+                                                                 0 ) ); // batchSize
+                    }
                 }
 
                 bool lazyInit = state->conn->get()->lazySupported();
@@ -1041,7 +1132,7 @@ namespace mongo {
 
             PCMData& mdata = i->second;
 
-            _cursors[ index ].reset( mdata.pcState->cursor.get() );
+            _cursors[ index ].reset( mdata.pcState->cursor.get(), &mdata );
             _servers.insert( ServerAndQuery( i->first.getConnString(), BSONObj() ) );
 
             index++;
@@ -1384,8 +1475,11 @@ namespace mongo {
         int bestFrom = -1;
 
         for ( int i=0; i<_numServers; i++) {
-            if ( ! _cursors[i].more() )
+            if ( ! _cursors[i].more() ){
+                if( _cursors[i].rawMData() )
+                    _cursors[i].rawMData()->pcState->done = true;
                 continue;
+            }
 
             BSONObj me = _cursors[i].peek();
 
@@ -1407,14 +1501,21 @@ namespace mongo {
         uassert( 10019 ,  "no more elements" , ! best.isEmpty() );
         _cursors[bestFrom].next();
 
+        if( _cursors[bestFrom].rawMData() )
+            _cursors[bestFrom].rawMData()->pcState->count++;
+
         return best;
     }
 
     void ParallelSortClusteredCursor::_explain( map< string,list<BSONObj> >& out ) {
-        for ( set<ServerAndQuery>::iterator i=_servers.begin(); i!=_servers.end(); ++i ) {
-            const ServerAndQuery& sq = *i;
-            list<BSONObj> & l = out[sq._server];
-            l.push_back( explain( sq._server , sq._extra ) );
+
+        set<Shard> shards;
+        getQueryShards( shards );
+
+        for( set<Shard>::iterator i = shards.begin(), end = shards.end(); i != end; ++i ){
+            // TODO: Make this the shard name, not address
+            list<BSONObj>& l = out[ i->getAddress().toString() ];
+            l.push_back( getShardCursor( *i )->peekFirst().getOwned() );
         }
 
     }

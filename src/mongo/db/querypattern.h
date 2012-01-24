@@ -34,10 +34,12 @@ namespace mongo {
     public:
         QueryPattern( const FieldRangeSet &frs, const BSONObj &sort );
         enum Type {
+            Empty,
             Equality,
             LowerBound,
             UpperBound,
-            UpperAndLowerBound
+            UpperAndLowerBound,
+            ConstraintPresent
         };
         bool operator<( const QueryPattern &other ) const;
         /** for testing only */

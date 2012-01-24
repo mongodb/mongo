@@ -18,5 +18,6 @@ for ( i=0; i<2; i++ ){
 db.getLastError();
 res = t.aggregate( { $project : { x : 1 } } )//, { $group : { _id : "$x" , total : { $sum : 1 } } } )
 printjson(res)
-//assert(res.ok)
+
+assert(res.ok, 'server4638 failed');
 

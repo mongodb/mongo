@@ -93,8 +93,8 @@ namespace mongo {
         return b.obj();
     }
 
-    void ReplSetConfig::updateMembers(List1<Member> &dest) {
-        for (vector<MemberCfg>::iterator source = members.begin(); source < members.end(); source++) {
+    void ReplSetConfig::updateMembers(List1<Member> &dest) const {
+        for (vector<MemberCfg>::const_iterator source = members.begin(); source < members.end(); source++) {
             for( Member *d = dest.head(); d; d = d->next() ) {
                 if (d->fullName() == (*source).h.toString()) {
                     d->configw().groupsw() = (*source).groups();
@@ -563,7 +563,9 @@ namespace mongo {
         uassert(13122, "bad repl set config?", expr);
     }
 
-    ReplSetConfig::ReplSetConfig(BSONObj cfg, bool force) {
+    ReplSetConfig::ReplSetConfig(BSONObj cfg, bool force) :
+        _ok(false),_majority(-1)
+    {
         _constructed = false;
         clear();
         from(cfg);
@@ -577,7 +579,9 @@ namespace mongo {
         _constructed = true;
     }
 
-    ReplSetConfig::ReplSetConfig(const HostAndPort& h) {
+    ReplSetConfig::ReplSetConfig(const HostAndPort& h) :
+      _ok(false),_majority(-1)
+    {
         LOG(2) << "ReplSetConfig load " << h.toStringLong() << rsLog;
 
         _constructed = false;

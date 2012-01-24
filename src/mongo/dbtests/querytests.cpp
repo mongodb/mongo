@@ -17,7 +17,10 @@
  */
 
 #include "pch.h"
+
 #include "../db/ops/query.h"
+#include "../db/scanandorder.h"
+
 #include "../db/dbhelpers.h"
 #include "../db/clientcursor.h"
 
@@ -1339,6 +1342,73 @@ namespace QueryTests {
 
 
     }
+    
+    namespace ScanAndOrderTests {
+        
+        class TestableScanAndOrder : public ScanAndOrder {
+        public:
+            TestableScanAndOrder(int startFrom, int limit, BSONObj order, const FieldRangeSet &frs)
+            : ScanAndOrder( startFrom, limit, order, frs ) {
+            }
+            unsigned approxSize() const { return ScanAndOrder::approxSize(); }
+        };
+        typedef TestableScanAndOrder Testable;
+        
+        class Base {
+        protected:
+            void assertNumFilled( int expected, const Testable &t ) {
+                ASSERT_EQUALS( expected, t.size() );
+                BufBuilder bb;
+                int nout;
+                t.fill( bb, 0, nout );
+                ASSERT_EQUALS( expected, nout );                
+            }
+        };
+        
+        class Unlimited : public Base {
+        public:
+            void run() {
+                FieldRangeSet frs( "n/a", BSONObj(), true );
+                Testable t( 0, 0, BSON( "a" << 1 ), frs );
+                ASSERT_EQUALS( 0U, t.approxSize() );
+                BSONObj o = BSON( "a" << 1 );
+                t.add( o, 0 );
+                ASSERT( (int)t.approxSize() > o.objsize() );
+
+                t.add( o, 0 );
+                ASSERT( (int)t.approxSize() > 2 * o.objsize() );
+
+                assertNumFilled( 2, t );
+            }
+        };
+
+        class LimitOne : public Base {
+        public:
+            void run() {
+                runWithDiskLoc( 0 );
+                DiskLoc loc;
+                runWithDiskLoc( &loc );
+            }
+        private:
+            void runWithDiskLoc( const DiskLoc *loc ) {
+                FieldRangeSet frs( "n/a", BSONObj(), true );
+                Testable t( 0, 1, BSON( "a" << 1 ), frs );
+                ASSERT_EQUALS( 0U, t.approxSize() );
+                t.add( BSON( "a" << 3 ), loc );
+                unsigned smallSize = t.approxSize();
+
+                t.add( BSON( "a" << 2 << "extra" << "read all about it" ), loc );
+                unsigned largeSize = t.approxSize();
+                ASSERT( largeSize > smallSize );
+
+                t.add( BSON( "a" << 1 ), loc );
+                ASSERT_EQUALS( smallSize, t.approxSize() );
+
+                assertNumFilled( 1, t );
+            }
+        };
+        
+    } // namespace ScanAndOrderTests
 
     class All : public Suite {
     public:
@@ -1401,6 +1471,9 @@ namespace QueryTests {
             add< proj::K1 >();
             add< proj::K2 >();
             add< proj::K3 >();
+            
+            add< ScanAndOrderTests::Unlimited >();
+            add< ScanAndOrderTests::LimitOne >();
         }
     } myall;
 

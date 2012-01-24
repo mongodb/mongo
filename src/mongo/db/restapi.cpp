@@ -235,13 +235,27 @@ namespace mongo {
 
     } restHandler;
 
+    void openAdminDb() { 
+        {
+            readlocktryassert rl("admin.system.users", 10000);
+            if( dbHolder().get("admin.system.users",dbpath) )
+                return;
+        }
+
+        writelocktry wl("admin.", 10000);
+        assert( wl.got() );
+        Client::Context cx( "admin.system.users", dbpath, false );
+    }
+
     bool RestAdminAccess::haveAdminUsers() const {
+        openAdminDb();
         readlocktryassert rl("admin.system.users", 10000);
         Client::Context cx( "admin.system.users", dbpath, false );
         return ! Helpers::isEmpty("admin.system.users", false);
     }
 
     BSONObj RestAdminAccess::getAdminUser( const string& username ) const {
+        openAdminDb();
         Client::GodScope gs;
         readlocktryassert rl("admin.system.users", 10000);
         Client::Context cx( "admin.system.users" );

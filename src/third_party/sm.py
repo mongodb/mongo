@@ -37,7 +37,7 @@ basicFiles = [ "jsapi.c" ,
                "jsxml.c" ,
                "prmjtime.c" ]
 
-root = "src/third_party/js-1.7"
+root = "$BUILD_DIR/third_party/js-1.7"
 
 def r(x):
     return "%s/%s" % ( root , x )

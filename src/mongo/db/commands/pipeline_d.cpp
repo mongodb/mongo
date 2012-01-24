@@ -25,7 +25,7 @@
 namespace mongo {
 
     intrusive_ptr<DocumentSource> PipelineD::prepareCursorSource(
-        const shared_ptr<Pipeline> &pPipeline,
+        const intrusive_ptr<Pipeline> &pPipeline,
         const string &dbName) {
 
         Pipeline::SourceVector *pSources = &pPipeline->sourceVector;

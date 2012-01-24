@@ -18,7 +18,6 @@
 #include "pch.h"
 #include "../commands.h"
 #include "../instance.h"
-#include "../queryoptimizer.h"
 #include "../../scripting/engine.h"
 #include "../clientcursor.h"
 

@@ -19,6 +19,7 @@
 
 #include "db/cursor.h"
 #include "db/pipeline/accumulator.h"
+#include "db/pipeline/dependency_tracker.h"
 #include "db/pipeline/document.h"
 #include "db/pipeline/document_source.h"
 #include "db/pipeline/expression.h"
@@ -84,10 +85,10 @@ namespace mongo {
                       ((const StageDesc *)pR)->pName);
     }
 
-    boost::shared_ptr<Pipeline> Pipeline::parseCommand(
+    intrusive_ptr<Pipeline> Pipeline::parseCommand(
         string &errmsg, BSONObj &cmdObj,
         const intrusive_ptr<ExpressionContext> &pCtx) {
-        boost::shared_ptr<Pipeline> pPipeline(new Pipeline(pCtx));
+        intrusive_ptr<Pipeline> pPipeline(new Pipeline(pCtx));
         vector<BSONElement> pipeline;
 
         /* gather the specification for the aggregation */
@@ -126,7 +127,7 @@ namespace mongo {
                "Pipeline::parseCommand(): unrecognized field \"" <<
                cmdElement.fieldName();
             errmsg = sb.str();
-            return boost::shared_ptr<Pipeline>();
+            return intrusive_ptr<Pipeline>();
         }
 
         /*
@@ -168,7 +169,7 @@ namespace mongo {
                        "Pipeline::run(): unrecognized pipeline op \"" <<
                        pFieldName;
                     errmsg = sb.str();
-                    return shared_ptr<Pipeline>();
+                    return intrusive_ptr<Pipeline>();
                 }
             }
 
@@ -252,9 +253,9 @@ namespace mongo {
         return pPipeline;
     }
 
-    shared_ptr<Pipeline> Pipeline::splitForSharded() {
+    intrusive_ptr<Pipeline> Pipeline::splitForSharded() {
         /* create an initialize the shard spec we'll return */
-        shared_ptr<Pipeline> pShardPipeline(new Pipeline(pCtx));
+        intrusive_ptr<Pipeline> pShardPipeline(new Pipeline(pCtx));
         pShardPipeline->collectionName = collectionName;
 
         /* put the source list aside */
@@ -336,8 +337,24 @@ namespace mongo {
     }
 
     bool Pipeline::run(BSONObjBuilder &result, string &errmsg,
-                       intrusive_ptr<DocumentSource> pSource) {
+                       const intrusive_ptr<DocumentSource> &pInputSource) {
+        /*
+          Analyze dependency information.
+
+          This pushes dependencies from the end of the pipeline back to the
+          front of it, and finally passes that to the input source before we
+          execute the pipeline.
+        */
+        intrusive_ptr<DependencyTracker> pTracker;
+        for(SourceVector::reverse_iterator iter(sourceVector.rbegin()),
+                listBeg(sourceVector.rend()); iter != listBeg; ++iter) {
+            intrusive_ptr<DocumentSource> pTemp(*iter);
+            pTemp->manageDependencies(pTracker);
+        }
+        pInputSource->manageDependencies(pTracker);
+        
         /* chain together the sources we found */
+        intrusive_ptr<DocumentSource> pSource(pInputSource);
         for(SourceVector::iterator iter(sourceVector.begin()),
                 listEnd(sourceVector.end()); iter != listEnd; ++iter) {
             intrusive_ptr<DocumentSource> pTemp(*iter);

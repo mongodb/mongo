@@ -389,8 +389,9 @@ int _main(int argc, char* argv[]) {
     opts.port = cmdLine.port;
     opts.ipList = cmdLine.bind_ip;
     start(opts);
-
-    dbexit( EXIT_CLEAN );
+    
+    // listen() will return when exit code closes its socket.
+    dbexit( EXIT_NET_ERROR );
     return 0;
 }
 int main(int argc, char* argv[]) {

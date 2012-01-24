@@ -18,7 +18,7 @@
 
 #include "pch.h"
 #include "server.h"
-
+#include "../util/scopeguard.h"
 #include "../db/commands.h"
 #include "../db/dbmessage.h"
 #include "../db/stats/counters.h"
@@ -147,28 +147,31 @@ namespace mongo {
         // handle single server
         if ( shards->size() == 1 ) {
             string theShard = *(shards->begin() );
-
-            ShardConnection conn( theShard , "" );
+            
+            
             
             BSONObj res;
             bool ok = false;
-            try{
-            	ok = conn->runCommand( "admin" , options , res );
-            }
-            catch( std::exception &e ){
+            {
+                ShardConnection conn( theShard , "" );
+                try {
+                    ok = conn->runCommand( "admin" , options , res );
+                }
+                catch( std::exception &e ) {
                 
-                warning() << "could not get last error from shard " << theShard << causedBy( e ) << endl;
-                
-                // Catch everything that happens here, since we need to ensure we return our connection when we're
-            	// finished.
-            	conn.done();
-                
-            	return false;
-            }
+                    warning() << "could not get last error from shard " << theShard << causedBy( e ) << endl;
+                    
+                    // Catch everything that happens here, since we need to ensure we return our connection when we're
+                    // finished.
+                    conn.done();
+                    
+                    return false;
+                }
             
-            res = res.getOwned();
-            conn.done();
             
+                res = res.getOwned();
+                conn.done();
+            }
 
             _addWriteBack( writebacks , res );
 
@@ -178,16 +181,16 @@ namespace mongo {
                 if ( temp == theShard )
                     continue;
 
-                ShardConnection conn( temp , "" );
-
                 try {
+                    ShardConnection conn( temp , "" );
+                    ON_BLOCK_EXIT_OBJ( conn, &ShardConnection::done );
                     _addWriteBack( writebacks , conn->getLastErrorDetailed() );
+                    
                 }
                 catch( std::exception &e ){
                     warning() << "could not clear last error from shard " << temp << causedBy( e ) << endl;
                 }
-
-                conn.done();
+                
             }
             clearSinceLastGetError();
             
@@ -231,11 +234,12 @@ namespace mongo {
         for ( set<string>::iterator i = shards->begin(); i != shards->end(); i++ ) {
             string theShard = *i;
             bbb.append( theShard );
-            ShardConnection conn( theShard , "" );
+            boost::scoped_ptr<ShardConnection> conn;
             BSONObj res;
             bool ok = false;
             try {
-                ok = conn->runCommand( "admin" , options , res );
+                conn.reset( new ShardConnection( theShard , "" ) ); // constructor can throw if shard is down
+                ok = (*conn)->runCommand( "admin" , options , res );
                 shardRawGLE.append( theShard , res );
             }
             catch( std::exception &e ){
@@ -244,7 +248,7 @@ namespace mongo {
         	    // responses.
                 
         	    warning() << "could not get last error from a shard " << theShard << causedBy( e ) << endl;
-                conn.done();
+                conn->done();
                 
                 return false;
             }
@@ -252,7 +256,7 @@ namespace mongo {
             _addWriteBack( writebacks, res );
             
             string temp = DBClientWithCommands::getLastErrorString( res );
-            if ( conn->type() != ConnectionString::SYNC && ( ok == false || temp.size() ) ) {
+            if ( (*conn)->type() != ConnectionString::SYNC && ( ok == false || temp.size() ) ) {
                 errors.push_back( temp );
                 errorObjects.push_back( res );
             }
@@ -265,7 +269,7 @@ namespace mongo {
                     updatedExistingStat = -1;
             }
 
-            conn.done();
+            conn->done();
         }
 
         bbb.done();

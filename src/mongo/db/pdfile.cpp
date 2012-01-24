@@ -38,7 +38,6 @@ _ disallow system* manipulations from the database.
 #include "repl.h"
 #include "dbhelpers.h"
 #include "namespace-inl.h"
-#include "queryutil.h"
 #include "extsort.h"
 #include "curop-inl.h"
 #include "background.h"

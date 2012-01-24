@@ -151,6 +151,16 @@ namespace mongo {
                 result.appendBool( "noop" , true );
             }
 
+#ifdef _DEBUG
+            // Sleep a short amount of time usually
+            int sleepFor = rand() % 10;
+            sleepmillis( sleepFor );
+
+            // Sleep a longer amount of time every once and awhile
+            int sleepLong = rand() % 50;
+            if( sleepLong == 0 ) sleepsecs( 2 );
+#endif
+
             return true;
         }
     } writeBackCommand;

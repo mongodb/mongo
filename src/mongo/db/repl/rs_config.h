@@ -77,7 +77,7 @@ namespace mongo {
             void updateGroups(const OpTime& last) {
                 RACECHECK
                 for (set<TagSubgroup*>::const_iterator it = groups().begin(); it != groups().end(); it++) {
-                    ((TagSubgroup*)(*it))->updateLast(last);
+                    (*it)->updateLast(last);
                 }
             }
             bool operator==(const MemberCfg& r) const {
@@ -132,7 +132,7 @@ namespace mongo {
         /**
          * Update members' groups when the config changes but members stay the same.
          */
-        void updateMembers(List1<Member> &dest);
+        void updateMembers(List1<Member> &dest) const;
 
         BSONObj asBson() const;
 
@@ -142,7 +142,9 @@ namespace mongo {
          * there are more arbiters than non-arbiters (writing to 3 out of 7
          * servers is safe if 4 of the servers are arbiters).
          */
+    private:
         void setMajority();
+    public:
         int getMajority() const;
 
         bool _constructed;

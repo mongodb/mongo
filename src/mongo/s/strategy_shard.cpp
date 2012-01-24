@@ -84,11 +84,11 @@ namespace mongo {
             if( cursor->isSharded() ){
                 ShardedClientCursorPtr cc (new ShardedClientCursor( q , cursor ));
 
-                if ( ! cc->sendNextBatch( r ) ) {
+                if ( ! cc->sendNextBatch( r, q.ntoreturn ) ) {
                     return;
                 }
 
-                LOG(6) << "storing cursor : " << cc->getId() << endl;
+                LOG(5) << "storing cursor : " << cc->getId() << endl;
                 cursorCache.store( cc );
             }
             else{
@@ -142,7 +142,7 @@ namespace mongo {
                     replyToQuery( ResultFlag_CursorNotFound , r.p() , r.m() , 0 , 0 , 0 );
                     return;
                 }
-
+                // TODO: Try to match logic of mongod, where on subsequent getMore() we pull lots more data?
                 if ( cursor->sendNextBatch( r , ntoreturn ) ) {
                     // still more data
                     cursor->accessed();

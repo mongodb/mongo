@@ -25,7 +25,6 @@
 #include "btree.h"
 #include <algorithm>
 #include <list>
-#include "queryutil.h"
 #include "json.h"
 #include "ops/delete.h"
 #include "ops/query.h"
