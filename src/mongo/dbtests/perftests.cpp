@@ -38,7 +38,7 @@
 #include "../util/version.h"
 #include "../db/key.h"
 #include "../util/compress.h"
-
+#include "../util/concurrency/qlock.h"
 #include <boost/filesystem/operations.hpp>
 
 using namespace bson;
@@ -575,6 +575,19 @@ namespace PerfTests {
         }
     };
 
+    QLock _qlock;
+
+    class qlock : public B {
+    public:
+        string name() { return "qlock"; }
+        //virtual int howLongMillis() { return 500; }
+        virtual bool showDurStats() { return false; }
+        void timed() {
+            _qlock.lock_r();
+            _qlock.unlock_r();
+        }
+    };
+
 #if 0
     class ulock : public B {
     public:
@@ -1068,6 +1081,7 @@ namespace PerfTests {
 #endif
                 add< rlock >();
                 add< wlock >();
+                add< qlock >();
                 //add< ulock >();
                 add< mutexspeed >();
                 add< simplemutexspeed >();

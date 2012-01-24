@@ -1,6 +1,7 @@
 // @file d_concurrency.cpp 
 
 #include "pch.h"
+#include "../util/concurrency/qlock.h"
 #include "d_concurrency.h"
 #include "../util/concurrency/threadlocal.h"
 #include "../util/concurrency/rwlock.h"
