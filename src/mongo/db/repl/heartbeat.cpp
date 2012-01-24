@@ -179,7 +179,7 @@ namespace mongo {
         string name() const { return "rsHealthPoll"; }
         void doWork() {
             if ( !theReplSet ) {
-                LOG(2) << "replSet not initialized yet, skipping health poll this round" << rsLog;
+                MONGO_LOG(2) << "replSet not initialized yet, skipping health poll this round" << rsLog;
                 return;
             }
 

@@ -934,12 +934,12 @@ namespace mongo {
                     break;
                 }
                 else{
-                    LOG( CDEBUG + 1 ) << "Key doesn't match : " << cursor->current()["_id"] << " saved : " << _id << endl;
+                    MONGO_LOG( CDEBUG + 1 ) << "Key doesn't match : " << cursor->current()["_id"] << " saved : " << _id << endl;
                 }
                 cursor->advance();
             }
 
-            if( ! count ) { LOG( CDEBUG ) << "No key found for " << _key << endl; }
+            if( ! count ) { MONGO_LOG( CDEBUG ) << "No key found for " << _key << endl; }
 
             _dirty = false;
 
@@ -1311,7 +1311,7 @@ namespace mongo {
 
             bool filled = false;
 
-            LOG( CDEBUG ) << "Checking cursor, in state " << (int) _state << ", first call " << _firstCall <<
+            MONGO_LOG( CDEBUG ) << "Checking cursor, in state " << (int) _state << ", first call " << _firstCall <<
                              ", empty : " << _cur.isEmpty() << ", dirty : " << _cur.isDirty() << ", stack : " << _stack.size() << endl;
 
             bool first = _firstCall;
@@ -1331,7 +1331,7 @@ namespace mongo {
 
             while ( moreToDo() ) {
 
-                LOG( CDEBUG ) << "Refilling stack..." << endl;
+                MONGO_LOG( CDEBUG ) << "Refilling stack..." << endl;
 
                 fillStack( maxPointsHeuristic );
                 filled = true;
@@ -1376,7 +1376,7 @@ namespace mongo {
         virtual void noteLocation() {
             _noted = true;
 
-            LOG( CDEBUG ) << "Noting location with " << _stack.size() << ( _cur.isEmpty() ? "" : " + 1 " ) << " points " << endl;
+            MONGO_LOG( CDEBUG ) << "Noting location with " << _stack.size() << ( _cur.isEmpty() ? "" : " + 1 " ) << " points " << endl;
 
             // Make sure we advance past the point we're at now,
             // since the current location may move on an update/delete
@@ -1389,13 +1389,13 @@ namespace mongo {
             _min.save();
             _max.save();
 
-            LOG( CDEBUG ) << "Min " << _min.toString() << endl;
-            LOG( CDEBUG ) << "Max " << _max.toString() << endl;
+            MONGO_LOG( CDEBUG ) << "Min " << _min.toString() << endl;
+            MONGO_LOG( CDEBUG ) << "Max " << _max.toString() << endl;
 
             // Dirty all our queued stuff
             for( list<GeoPoint>::iterator i = _stack.begin(); i != _stack.end(); i++ ){
 
-                LOG( CDEBUG ) << "Undirtying stack point with id " << i->_id << endl;
+                MONGO_LOG( CDEBUG ) << "Undirtying stack point with id " << i->_id << endl;
 
                 if( i->makeDirty() ) _nDirtied++;
                 assert( i->isDirty() );
@@ -1422,7 +1422,7 @@ namespace mongo {
         /* called before query getmore block is iterated */
         virtual void checkLocation() {
 
-            LOG( CDEBUG ) << "Restoring location with " << _stack.size() << ( ! _cur.isDirty() ? "" : " + 1 " ) << " points " << endl;
+            MONGO_LOG( CDEBUG ) << "Restoring location with " << _stack.size() << ( ! _cur.isDirty() ? "" : " + 1 " ) << " points " << endl;
 
             // We can assume an error was thrown earlier if this database somehow disappears
 
@@ -1430,8 +1430,8 @@ namespace mongo {
             _min.restore();
             _max.restore();
 
-            LOG( CDEBUG ) << "Min " << _min.toString() << endl;
-            LOG( CDEBUG ) << "Max " << _max.toString() << endl;
+            MONGO_LOG( CDEBUG ) << "Min " << _min.toString() << endl;
+            MONGO_LOG( CDEBUG ) << "Max " << _max.toString() << endl;
 
             // If the current key moved, we may have been advanced past the current point - need to check this
             // if( _state == DOING_EXPAND ){
@@ -1444,19 +1444,19 @@ namespace mongo {
             list<GeoPoint>::iterator i = _stack.begin();
             while( i != _stack.end() ){
 
-                LOG( CDEBUG ) << "Undirtying stack point with id " << i->_id << endl;
+                MONGO_LOG( CDEBUG ) << "Undirtying stack point with id " << i->_id << endl;
 
                 DiskLoc oldLoc;
                 if( i->unDirty( _spec, oldLoc ) ){
                     // Document is in same location
-                    LOG( CDEBUG ) << "Undirtied " << oldLoc << endl;
+                    MONGO_LOG( CDEBUG ) << "Undirtied " << oldLoc << endl;
 
                     i++;
                 }
                 else if( ! i->loc().isNull() ){
 
                     // Re-found document somewhere else
-                    LOG( CDEBUG ) << "Changed location of " << i->_id << " : " << i->loc() << " vs " << oldLoc << endl;
+                    MONGO_LOG( CDEBUG ) << "Changed location of " << i->_id << " : " << i->loc() << " vs " << oldLoc << endl;
 
                     _nChangedOnYield++;
                     fixMatches( oldLoc, i->loc() );
@@ -1465,7 +1465,7 @@ namespace mongo {
                 else {
 
                     // Can't re-find document
-                    LOG( CDEBUG ) << "Removing document " << i->_id << endl;
+                    MONGO_LOG( CDEBUG ) << "Removing document " << i->_id << endl;
 
                     _nRemovedOnYield++;
                     _found--;
@@ -1477,7 +1477,7 @@ namespace mongo {
             }
 
             if( _cur.isDirty() ){
-                LOG( CDEBUG ) << "Undirtying cur point with id : " << _cur._id << endl;
+                MONGO_LOG( CDEBUG ) << "Undirtying cur point with id : " << _cur._id << endl;
             }
 
             // Check current item
@@ -1486,7 +1486,7 @@ namespace mongo {
                 if( _cur.loc().isNull() ){
 
                     // Document disappeared!
-                    LOG( CDEBUG ) << "Removing cur point " << _cur._id << endl;
+                    MONGO_LOG( CDEBUG ) << "Removing cur point " << _cur._id << endl;
 
                     _nRemovedOnYield++;
                     advance();
@@ -1494,7 +1494,7 @@ namespace mongo {
                 else{
 
                     // Document moved
-                    LOG( CDEBUG ) << "Changed location of cur point " << _cur._id << " : " << _cur.loc() << " vs " << oldLoc << endl;
+                    MONGO_LOG( CDEBUG ) << "Changed location of cur point " << _cur._id << " : " << _cur.loc() << " vs " << oldLoc << endl;
 
                     _nChangedOnYield++;
                     fixMatches( oldLoc, _cur.loc() );
@@ -1504,9 +1504,9 @@ namespace mongo {
             _noted = false;
         }
 
-        virtual Record* _current() { assert(ok()); LOG( CDEBUG + 1 ) << "_current " << _cur._loc.obj()["_id"] << endl; return _cur._loc.rec(); }
-        virtual BSONObj current() { assert(ok()); LOG( CDEBUG + 1 ) << "current " << _cur._o << endl; return _cur._o; }
-        virtual DiskLoc currLoc() { assert(ok()); LOG( CDEBUG + 1 ) << "currLoc " << _cur._loc << endl; return _cur._loc; }
+        virtual Record* _current() { assert(ok()); MONGO_LOG( CDEBUG + 1 ) << "_current " << _cur._loc.obj()["_id"] << endl; return _cur._loc.rec(); }
+        virtual BSONObj current() { assert(ok()); MONGO_LOG( CDEBUG + 1 ) << "current " << _cur._o << endl; return _cur._o; }
+        virtual DiskLoc currLoc() { assert(ok()); MONGO_LOG( CDEBUG + 1 ) << "currLoc " << _cur._loc << endl; return _cur._loc; }
         virtual BSONObj currKey() const { return _cur._key; }
 
         virtual CoveredIndexMatcher* matcher() const {
@@ -1768,12 +1768,12 @@ namespace mongo {
         bool remembered( BSONObj o ){
             BSONObj seenId = o["_id"].wrap("").getOwned();
             if( _seenIds.find( seenId ) != _seenIds.end() ){
-                LOG( CDEBUG + 1 ) << "Object " << o["_id"] << " already seen." << endl;
+                MONGO_LOG( CDEBUG + 1 ) << "Object " << o["_id"] << " already seen." << endl;
                 return true;
             }
             else{
                 _seenIds.insert( seenId );
-                LOG( CDEBUG + 1 ) << "Object " << o["_id"] << " remembered." << endl;
+                MONGO_LOG( CDEBUG + 1 ) << "Object " << o["_id"] << " remembered." << endl;
                 return false;
             }
         }

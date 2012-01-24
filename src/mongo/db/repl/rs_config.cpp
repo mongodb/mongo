@@ -443,7 +443,7 @@ namespace mongo {
             }
 
             // if we got here, this is a valid rule
-            LOG(1) << "replSet new rule " << rule.fieldName() << ": " << r->toString() << rsLog;
+            MONGO_LOG(1) << "replSet new rule " << rule.fieldName() << ": " << r->toString() << rsLog;
             rules[rule.fieldName()] = r;
         }
     }
@@ -582,7 +582,7 @@ namespace mongo {
     ReplSetConfig::ReplSetConfig(const HostAndPort& h) :
       _ok(false),_majority(-1)
     {
-        LOG(2) << "ReplSetConfig load " << h.toStringLong() << rsLog;
+        MONGO_LOG(2) << "ReplSetConfig load " << h.toStringLong() << rsLog;
 
         _constructed = false;
         clear();

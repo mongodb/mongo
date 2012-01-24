@@ -161,7 +161,7 @@ namespace mongo {
                     string name = i->first;
                     if ( seen.count( name ) )
                         continue;
-                    LOG(1) << "checking replica set: " << name << endl;
+                    MONGO_LOG(1) << "checking replica set: " << name << endl;
                     seen.insert( name );
                     m = i->second;
                     break;
@@ -263,17 +263,17 @@ namespace mongo {
         }
         
         if( prev.host().size() ){
-            if( wasFound ){ LOG(1) << "slave '" << prev << ( wasMaster ? "' is master node, trying to find another node" :
+            if( wasFound ){ MONGO_LOG(1) << "slave '" << prev << ( wasMaster ? "' is master node, trying to find another node" :
                                                                          "' is no longer ok to use" ) << endl; }
-            else{ LOG(1) << "slave '" << prev << "' was not found in the replica set" << endl; }
+            else{ MONGO_LOG(1) << "slave '" << prev << "' was not found in the replica set" << endl; }
         }
-        else LOG(1) << "slave '" << prev << "' is not initialized or invalid" << endl;
+        else MONGO_LOG(1) << "slave '" << prev << "' is not initialized or invalid" << endl;
 
         return getSlave();
     }
 
     HostAndPort ReplicaSetMonitor::getSlave() {
-        LOG(2) << "dbclient_rs getSlave " << getServerAddress() << endl;
+        MONGO_LOG(2) << "dbclient_rs getSlave " << getServerAddress() << endl;
 
         scoped_lock lk( _lock );
 
@@ -282,14 +282,14 @@ namespace mongo {
             if ( _nextSlave != _master ) {
                 if ( _nodes[ _nextSlave ].okForSecondaryQueries() )
                     return _nodes[ _nextSlave ].addr;
-                LOG(2) << "dbclient_rs getSlave not selecting " << _nodes[_nextSlave] << ", not currently okForSecondaryQueries" << endl;
+                MONGO_LOG(2) << "dbclient_rs getSlave not selecting " << _nodes[_nextSlave] << ", not currently okForSecondaryQueries" << endl;
             }
         }
         uassert(15899, str::stream() << "No suitable member found for slaveOk query in replica set: " << _name, _master >= 0 && _nodes[_master].ok);
 
         // Fall back to primary
         assert( static_cast<unsigned>(_master) < _nodes.size() );
-        LOG(2) << "dbclient_rs getSlave no member in secondary state found, returning primary " << _nodes[ _master ] << endl;
+        MONGO_LOG(2) << "dbclient_rs getSlave no member in secondary state found, returning primary " << _nodes[ _master ] << endl;
         return _nodes[_master].addr;
     }
 
@@ -308,7 +308,7 @@ namespace mongo {
         BSONObj status;
 
         if (!conn->runCommand("admin", BSON("replSetGetStatus" << 1), status) ) {
-            LOG(1) << "dbclient_rs replSetGetStatus failed" << endl;
+            MONGO_LOG(1) << "dbclient_rs replSetGetStatus failed" << endl;
             return;
         }
         if( !status.hasField("members") ) { 
@@ -327,18 +327,18 @@ namespace mongo {
 
             int m = -1;
             if ((m = _find(host)) < 0) {
-                LOG(1) << "dbclient_rs _checkStatus couldn't _find(" << host << ')' << endl;
+                MONGO_LOG(1) << "dbclient_rs _checkStatus couldn't _find(" << host << ')' << endl;
                 continue;
             }
 
             double state = member["state"].Number();
             if (member["health"].Number() == 1 && (state == 1 || state == 2)) {
-                LOG(1) << "dbclient_rs nodes["<<m<<"].ok = true " << host << endl;
+                MONGO_LOG(1) << "dbclient_rs nodes["<<m<<"].ok = true " << host << endl;
                 scoped_lock lk( _lock );
                 _nodes[m].ok = true;
             }
             else {
-                LOG(1) << "dbclient_rs nodes["<<m<<"].ok = false " << host << endl;
+                MONGO_LOG(1) << "dbclient_rs nodes["<<m<<"].ok = false " << host << endl;
                 scoped_lock lk( _lock );
                 _nodes[m].ok = false;
             }
@@ -529,7 +529,7 @@ namespace mongo {
 
         bool triedQuickCheck = false;
 
-        LOG(1) <<  "_check : " << getServerAddress() << endl;
+        MONGO_LOG(1) <<  "_check : " << getServerAddress() << endl;
 
         int newMaster = -1;
         
@@ -765,7 +765,7 @@ namespace mongo {
                     return checkSlaveQueryResult( checkSlave()->query(ns,query,nToReturn,nToSkip,fieldsToReturn,queryOptions,batchSize) );
                 }
                 catch ( DBException &e ) {
-                    LOG(1) << "can't query replica set slave " << i << " : " << _slaveHost << causedBy( e ) << endl;
+                    MONGO_LOG(1) << "can't query replica set slave " << i << " : " << _slaveHost << causedBy( e ) << endl;
                 }
             }
         }
@@ -783,7 +783,7 @@ namespace mongo {
                     return checkSlave()->findOne(ns,query,fieldsToReturn,queryOptions);
                 }
                 catch ( DBException &e ) {
-                	LOG(1) << "can't findone replica set slave " << i << " : " << _slaveHost << causedBy( e ) << endl;
+                	MONGO_LOG(1) << "can't findone replica set slave " << i << " : " << _slaveHost << causedBy( e ) << endl;
                 }
             }
         }
@@ -855,7 +855,7 @@ namespace mongo {
                         return;
                     }
                     catch ( DBException &e ) {
-                       LOG(1) << "can't callLazy replica set slave " << i << " : " << _slaveHost << causedBy( e ) << endl;
+                       MONGO_LOG(1) << "can't callLazy replica set slave " << i << " : " << _slaveHost << causedBy( e ) << endl;
                     }
                 }
             }
@@ -968,7 +968,7 @@ namespace mongo {
                         return s->call( toSend , response , assertOk );
                     }
                     catch ( DBException &e ) {
-                    	LOG(1) << "can't call replica set slave " << i << " : " << _slaveHost << causedBy( e ) << endl;
+                        MONGO_LOG(1) << "can't call replica set slave " << i << " : " << _slaveHost << causedBy( e ) << endl;
                         if ( actualServer )
                             *actualServer = "";
                     }

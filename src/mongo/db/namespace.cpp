@@ -684,7 +684,7 @@ namespace mongo {
        options: { capped : ..., size : ... }
     */
     void addNewNamespaceToCatalog(const char *ns, const BSONObj *options = 0) {
-        LOG(1) << "New namespace: " << ns << endl;
+        MONGO_LOG(1) << "New namespace: " << ns << endl;
         if ( strstr(ns, "system.namespaces") ) {
             // system.namespaces holds all the others, so it is not explicitly listed in the catalog.
             // TODO: fix above should not be strstr!

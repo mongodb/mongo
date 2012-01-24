@@ -171,7 +171,7 @@ namespace mongo {
             Timer t;
             for ( int i=0; i<3600; i++ ) {
                 if ( opReplicatedEnough( lastOpApplied , ( getSlaveCount() / 2 ) + 1 ) ) {
-                    LOG(t.seconds() < 30 ? 1 : 0) << "moveChunk repl sync took " << t.seconds() << " seconds" << migrateLog;
+                    MONGO_LOG(t.seconds() < 30 ? 1 : 0) << "moveChunk repl sync took " << t.seconds() << " seconds" << migrateLog;
                     return;
                 }
                 sleepsecs(1);
@@ -1122,7 +1122,7 @@ namespace mongo {
                 preCond.done();
 
                 BSONObj cmd = cmdBuilder.obj();
-                LOG(7) << "moveChunk update: " << cmd << migrateLog;
+                MONGO_LOG(7) << "moveChunk update: " << cmd << migrateLog;
 
                 bool ok = false;
                 BSONObj cmdResult;
@@ -1722,7 +1722,7 @@ namespace mongo {
             assert( ! isInRange( BSON( "x" << 5 ) , min , max ) );
             assert( ! isInRange( BSON( "x" << 6 ) , min , max ) );
 
-            LOG(1) << "isInRangeTest passed" << migrateLog;
+            MONGO_LOG(1) << "isInRangeTest passed" << migrateLog;
         }
     } isInRangeTest;
 }

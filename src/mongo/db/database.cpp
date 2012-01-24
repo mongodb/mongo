@@ -334,7 +334,7 @@ namespace mongo {
             fromFreeList = false;
             e = suitableFile( ns, size, !capped, enforceQuota )->createExtent( ns, size, capped );
         }
-        LOG(1) << "allocExtent " << ns << " size " << size << ' ' << fromFreeList << endl; 
+        MONGO_LOG(1) << "allocExtent " << ns << " size " << size << ' ' << fromFreeList << endl; 
         return e;
     }
 

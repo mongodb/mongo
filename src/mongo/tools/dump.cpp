@@ -293,7 +293,7 @@ public:
             try {
                 obj = loc.obj();
                 assert( obj.valid() );
-                LOG(1) << obj << endl;
+                MONGO_LOG(1) << obj << endl;
                 w( obj );
             }
             catch ( std::exception& e ) {

@@ -1249,7 +1249,7 @@ namespace mongo {
             }
         }
 
-        LOG(5) << "FieldRangeVector::matches() returns " << ok << endl;
+        MONGO_LOG(5) << "FieldRangeVector::matches() returns " << ok << endl;
 
         return ok;
     }

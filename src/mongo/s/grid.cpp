@@ -524,7 +524,7 @@ namespace mongo {
             assert( Grid::_inBalancingWindow( w8 , now ) );
             assert( Grid::_inBalancingWindow( w9 , now ) );
 
-            LOG(1) << "BalancingWidowObjTest passed" << endl;
+            MONGO_LOG(1) << "BalancingWidowObjTest passed" << endl;
         }
     } BalancingWindowObjTest;
 

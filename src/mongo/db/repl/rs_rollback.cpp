@@ -568,7 +568,7 @@ namespace mongo {
         sethbmsg("rollback 6");
 
         // clean up oplog
-        LOG(2) << "replSet rollback truncate oplog after " << h.commonPoint.toStringPretty() << rsLog;
+        MONGO_LOG(2) << "replSet rollback truncate oplog after " << h.commonPoint.toStringPretty() << rsLog;
         // todo: fatal error if this throws?
         oplogDetails->cappedTruncateAfter(rsoplog, h.commonPointOurDiskloc, false);
 

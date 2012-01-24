@@ -75,7 +75,7 @@ namespace mongo {
         if( d && d->stats.nrecords == 0 )
             return; // already empty, ok.
 
-        LOG(1) << "replSet empty oplog" << rsLog;
+        MONGO_LOG(1) << "replSet empty oplog" << rsLog;
         d->emptyCappedCollection(rsoplog);
     }
 

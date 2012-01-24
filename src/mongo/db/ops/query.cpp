@@ -162,7 +162,7 @@ namespace mongo {
                 if ( c->matcher() && !c->matcher()->matchesCurrent( c ) ) {
                 }
                 else if ( manager && ! manager->belongsToMe( cc ) ){
-                    LOG(2) << "cursor skipping document in un-owned chunk: " << c->current() << endl;
+                    MONGO_LOG(2) << "cursor skipping document in un-owned chunk: " << c->current() << endl;
                 }
                 else {
                     if( c->getsetdup(c->currLoc()) ) {

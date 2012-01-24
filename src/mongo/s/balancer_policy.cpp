@@ -66,10 +66,10 @@ namespace mongo {
                 }
             }
             else if ( opsQueued ) {
-                LOG(1) << "won't send a chunk to: " << shard << " because it has ops queued" << endl;
+                MONGO_LOG(1) << "won't send a chunk to: " << shard << " because it has ops queued" << endl;
             }
             else if ( maxedOut ) {
-                LOG(1) << "won't send a chunk to: " << shard << " because it is maxedOut" << endl;
+                MONGO_LOG(1) << "won't send a chunk to: " << shard << " because it is maxedOut" << endl;
             }
 
 
@@ -96,13 +96,13 @@ namespace mongo {
             return NULL;
         }
 
-        LOG(1) << "collection : " << ns << endl;
-        LOG(1) << "donor      : " << max.second << " chunks on " << max.first << endl;
-        LOG(1) << "receiver   : " << min.second << " chunks on " << min.first << endl;
+        MONGO_LOG(1) << "collection : " << ns << endl;
+        MONGO_LOG(1) << "donor      : " << max.second << " chunks on " << max.first << endl;
+        MONGO_LOG(1) << "receiver   : " << min.second << " chunks on " << min.first << endl;
         if ( ! drainingShards.empty() ) {
             string drainingStr;
             joinStringDelim( drainingShards, &drainingStr, ',' );
-            LOG(1) << "draining           : " << ! drainingShards.empty() << "(" << drainingShards.size() << ")" << endl;
+            MONGO_LOG(1) << "draining           : " << ! drainingShards.empty() << "(" << drainingShards.size() << ")" << endl;
         }
 
         // Solving imbalances takes a higher priority than draining shards. Many shards can

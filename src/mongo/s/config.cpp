@@ -340,7 +340,7 @@ namespace mongo {
     }
 
     void DBConfig::unserialize(const BSONObj& from) {
-        LOG(1) << "DBConfig unserialize: " << _name << " " << from << endl;
+        MONGO_LOG(1) << "DBConfig unserialize: " << _name << " " << from << endl;
         assert( _name == from["_id"].String() );
 
         _shardingEnabled = from.getBoolField("partitioned");
@@ -442,7 +442,7 @@ namespace mongo {
 
         // 1
         if ( ! configServer.allUp( errmsg ) ) {
-            LOG(1) << "\t DBConfig::dropDatabase not all up" << endl;
+            MONGO_LOG(1) << "\t DBConfig::dropDatabase not all up" << endl;
             return 0;
         }
 
@@ -465,7 +465,7 @@ namespace mongo {
             log() << "error removing from config server even after checking!" << endl;
             return 0;
         }
-        LOG(1) << "\t removed entry from config server for: " << _name << endl;
+        MONGO_LOG(1) << "\t removed entry from config server for: " << _name << endl;
 
         set<Shard> allServers;
 
@@ -501,7 +501,7 @@ namespace mongo {
             conn.done();
         }
 
-        LOG(1) << "\t dropped primary db for: " << _name << endl;
+        MONGO_LOG(1) << "\t dropped primary db for: " << _name << endl;
 
         configServer.logChange( "dropDatabase" , _name , BSONObj() );
         return true;
@@ -527,7 +527,7 @@ namespace mongo {
             }
 
             seen.insert( i->first );
-            LOG(1) << "\t dropping sharded collection: " << i->first << endl;
+            MONGO_LOG(1) << "\t dropping sharded collection: " << i->first << endl;
 
             i->second.getCM()->getAllShards( allServers );
             i->second.getCM()->drop( i->second.getCM() );
@@ -535,7 +535,7 @@ namespace mongo {
 
             num++;
             uassert( 10184 ,  "_dropShardedCollections too many collections - bailing" , num < 100000 );
-            LOG(2) << "\t\t dropped " << num << " so far" << endl;
+            MONGO_LOG(2) << "\t\t dropped " << num << " so far" << endl;
         }
 
         return true;
@@ -603,7 +603,7 @@ namespace mongo {
         string fullString;
         joinStringDelim( configHosts, &fullString, ',' );
         _primary.setAddress( ConnectionString( fullString , ConnectionString::SYNC ) );
-        LOG(1) << " config string : " << fullString << endl;
+        MONGO_LOG(1) << " config string : " << fullString << endl;
 
         return true;
     }
@@ -764,7 +764,7 @@ namespace mongo {
                     got.erase(name);
                     log() << "warning: invalid chunksize (" << csize << ") ignored" << endl;
                 } else {
-                    LOG(1) << "MaxChunkSize: " << csize << endl;
+                    MONGO_LOG(1) << "MaxChunkSize: " << csize << endl;
                     Chunk::MaxChunkSize = csize * 1024 * 1024;
                 }
             }
@@ -839,7 +839,7 @@ namespace mongo {
                     conn->createCollection( "config.changelog" , 1024 * 1024 * 10 , true );
                 }
                 catch ( UserException& e ) {
-                    LOG(1) << "couldn't create changelog (like race condition): " << e << endl;
+                    MONGO_LOG(1) << "couldn't create changelog (like race condition): " << e << endl;
                     // don't care
                 }
                 createdCapped = true;

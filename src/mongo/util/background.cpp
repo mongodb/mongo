@@ -46,7 +46,7 @@ namespace mongo {
 
     // Background object can be only be destroyed after jobBody() ran
     void BackgroundJob::jobBody( boost::shared_ptr<JobStatus> status ) {
-        LOG(1) << "BackgroundJob starting: " << name() << endl;
+        MONGO_LOG(1) << "BackgroundJob starting: " << name() << endl;
         {
             scoped_lock l( status->m );
             massert( 13643 , mongoutils::str::stream() << "backgroundjob already started: " << name() , status->state == NotStarted );
@@ -180,7 +180,7 @@ namespace mongo {
                 }
                 
                 int ms = timer.millis();
-                LOG( ms <= 3 ? 1 : 0 ) << "task: " << t->taskName() << " took: " << ms << "ms" << endl;
+                MONGO_LOG( ms <= 3 ? 1 : 0 ) << "task: " << t->taskName() << " took: " << ms << "ms" << endl;
             }
         }
     }

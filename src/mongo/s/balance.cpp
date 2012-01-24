@@ -162,7 +162,7 @@ namespace mongo {
         cursor.reset();
 
         if ( collections.empty() ) {
-            LOG(1) << "no collections to balance" << endl;
+            MONGO_LOG(1) << "no collections to balance" << endl;
             return;
         }
 
@@ -177,7 +177,7 @@ namespace mongo {
         vector<Shard> allShards;
         Shard::getAllShards( allShards );
         if ( allShards.size() < 2) {
-            LOG(1) << "can't balance without more active shards" << endl;
+            MONGO_LOG(1) << "can't balance without more active shards" << endl;
             return;
         }
 
@@ -214,7 +214,7 @@ namespace mongo {
             cursor.reset();
 
             if (shardToChunksMap.empty()) {
-                LOG(1) << "skipping empty collection (" << ns << ")";
+                MONGO_LOG(1) << "skipping empty collection (" << ns << ")";
                 continue;
             }
 
@@ -290,7 +290,7 @@ namespace mongo {
 
                 // now make sure we should even be running
                 if ( ! grid.shouldBalance() ) {
-                    LOG(1) << "skipping balancing round because balancing is disabled" << endl;
+                    MONGO_LOG(1) << "skipping balancing round because balancing is disabled" << endl;
 
                     // Ping again so scripts can determine if we're active without waiting
                     _ping( conn.conn(), true );
@@ -312,7 +312,7 @@ namespace mongo {
                 {
                     dist_lock_try lk( &balanceLock , "doing balance round" );
                     if ( ! lk.got() ) {
-                        LOG(1) << "skipping balancing round because another balancer is active" << endl;
+                        MONGO_LOG(1) << "skipping balancing round because another balancer is active" << endl;
 
                         // Ping again so scripts can determine if we're active without waiting
                         _ping( conn.conn(), true );
@@ -323,18 +323,18 @@ namespace mongo {
                         continue;
                     }
                     
-                    LOG(1) << "*** start balancing round" << endl;
+                    MONGO_LOG(1) << "*** start balancing round" << endl;
 
                     vector<CandidateChunkPtr> candidateChunks;
                     _doBalanceRound( conn.conn() , &candidateChunks );
                     if ( candidateChunks.size() == 0 ) {
-                        LOG(1) << "no need to move any chunk" << endl;
+                        MONGO_LOG(1) << "no need to move any chunk" << endl;
                     }
                     else {
                         _balancedLastTime = _moveChunks( &candidateChunks );
                     }
                     
-                    LOG(1) << "*** end of balancing round" << endl;
+                    MONGO_LOG(1) << "*** end of balancing round" << endl;
                 }
 
                 // Ping again so scripts can determine if we're active without waiting
@@ -348,7 +348,7 @@ namespace mongo {
                 log() << "caught exception while doing balance: " << e.what() << endl;
 
                 // Just to match the opening statement if in log level 1
-                LOG(1) << "*** End of balancing round" << endl;
+                MONGO_LOG(1) << "*** End of balancing round" << endl;
 
                 sleepsecs( 30 ); // sleep a fair amount b/c of error
                 continue;

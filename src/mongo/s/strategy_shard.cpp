@@ -44,7 +44,7 @@ namespace mongo {
 
             r.checkAuth( Auth::READ );
 
-            LOG(3) << "shard query: " << q.ns << "  " << q.query << endl;
+            MONGO_LOG(3) << "shard query: " << q.ns << "  " << q.query << endl;
 
             if ( q.ntoreturn == 1 && strstr(q.ns, ".$cmd") )
                 throw UserException( 8010 , "something is wrong, shouldn't see a command here" );
@@ -60,7 +60,7 @@ namespace mongo {
                 if ( qSpec.isExplain() ) start_millis = curTimeMillis64();
                 cursor->init();
 
-                LOG(5) << "   cursor type: " << cursor->type() << endl;
+                MONGO_LOG(5) << "   cursor type: " << cursor->type() << endl;
                 shardedCursorTypes.hit( cursor->type() );
 
                 if ( qSpec.isExplain() ) {
@@ -88,7 +88,7 @@ namespace mongo {
                     return;
                 }
 
-                LOG(5) << "storing cursor : " << cc->getId() << endl;
+                MONGO_LOG(5) << "storing cursor : " << cc->getId() << endl;
                 cursorCache.store( cc );
             }
             else{
@@ -134,11 +134,11 @@ namespace mongo {
                 int ntoreturn = r.d().pullInt();
                 long long id = r.d().pullInt64();
 
-                LOG(6) << "want cursor : " << id << endl;
+                MONGO_LOG(6) << "want cursor : " << id << endl;
 
                 ShardedClientCursorPtr cursor = cursorCache.get( id );
                 if ( ! cursor ) {
-                    LOG(6) << "\t invalid cursor :(" << endl;
+                    MONGO_LOG(6) << "\t invalid cursor :(" << endl;
                     replyToQuery( ResultFlag_CursorNotFound , r.p() , r.m() , 0 , 0 , 0 );
                     return;
                 }
@@ -220,7 +220,7 @@ namespace mongo {
 
                 try {
 
-                    LOG(4) << "  server:" << c->getShard().toString() << " bulk insert " << objs.size() << " documents" << endl;
+                    MONGO_LOG(4) << "  server:" << c->getShard().toString() << " bulk insert " << objs.size() << " documents" << endl;
 
                     // Taken from single-shard bulk insert, should not need multiple methods in future
                     // insert( c->getShard() , r.getns() , objs , flags);
@@ -252,7 +252,7 @@ namespace mongo {
                     // Assume the inserts did *not* succeed, so we don't want to erase them
 
                     int logLevel = retries < 2;
-                    LOG( logLevel ) << "retrying bulk insert of " << objs.size() << " documents to chunk " << c << " because of StaleConfigException: " << e << endl;
+                    MONGO_LOG( logLevel ) << "retrying bulk insert of " << objs.size() << " documents to chunk " << c << " because of StaleConfigException: " << e << endl;
 
                     if( retries > 2 ){
                         versionManager.forceRemoteCheckShardVersionCB( e.getns() );
@@ -420,7 +420,7 @@ namespace mongo {
             while ( true ) {
                 try {
                     manager->getShardsForQuery( shards , pattern );
-                    LOG(2) << "delete : " << pattern << " \t " << shards.size() << " justOne: " << justOne << endl;
+                    MONGO_LOG(2) << "delete : " << pattern << " \t " << shards.size() << " justOne: " << justOne << endl;
                     if ( shards.size() == 1 ) {
                         doWrite( dbDelete , r , *shards.begin() );
                         return;
@@ -462,7 +462,7 @@ namespace mongo {
             }
             else{
                 const char *ns = r.getns();
-                LOG(3) << "write: " << ns << endl;
+                MONGO_LOG(3) << "write: " << ns << endl;
 
                 DbMessage& d = r.d();
 

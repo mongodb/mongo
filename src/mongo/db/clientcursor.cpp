@@ -179,7 +179,7 @@ namespace mongo {
                 ClientCursor *cc = i.current();
                 if( cc->shouldTimeout(0) ) {
                     numberTimedOut++;
-                    LOG(1) << "killing old cursor " << cc->_cursorid << ' ' << cc->_ns
+                    MONGO_LOG(1) << "killing old cursor " << cc->_cursorid << ' ' << cc->_ns
                            << " idle:" << cc->idleTime() << "ms\n";
                     i.deleteAndAdvance();
                 }

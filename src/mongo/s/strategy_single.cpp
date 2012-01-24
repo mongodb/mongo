@@ -36,7 +36,7 @@ namespace mongo {
         virtual void queryOp( Request& r ) {
             QueryMessage q( r.d() );
 
-            LOG(3) << "single query: " << q.ns << "  " << q.query << "  ntoreturn: " << q.ntoreturn << " options : " << q.queryOptions << endl;
+            MONGO_LOG(3) << "single query: " << q.ns << "  " << q.query << "  ntoreturn: " << q.ntoreturn << " options : " << q.queryOptions << endl;
 
             if ( r.isCommand() ) {
 
@@ -93,7 +93,7 @@ namespace mongo {
         virtual void getMore( Request& r ) {
             const char *ns = r.getns();
 
-            LOG(3) << "single getmore: " << ns << endl;
+            MONGO_LOG(3) << "single getmore: " << ns << endl;
 
             long long id = r.d().getInt64( 4 );
             
@@ -162,12 +162,12 @@ namespace mongo {
             if ( r.isShardingEnabled() &&
                     strstr( ns , ".system.indexes" ) == strchr( ns , '.' ) &&
                     strchr( ns , '.' ) ) {
-                LOG(1) << " .system.indexes write for: " << ns << endl;
+                MONGO_LOG(1) << " .system.indexes write for: " << ns << endl;
                 handleIndexWrite( op , r );
                 return;
             }
 
-            LOG(3) << "single write: " << ns << endl;
+            MONGO_LOG(3) << "single write: " << ns << endl;
             doWrite( op , r , r.primaryShard() );
             r.gotInsert(); // Won't handle mulit-insert correctly. Not worth parsing the request.
         }

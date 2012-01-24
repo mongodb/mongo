@@ -273,21 +273,21 @@ namespace mongo {
     }
 
     bool MongoMMF::open(string fname, bool sequentialHint) {
-        LOG(3) << "mmf open " << fname << endl;
+        MONGO_LOG(3) << "mmf open " << fname << endl;
         setPath(fname);
         _view_write = mapWithOptions(fname.c_str(), sequentialHint ? SEQUENTIAL : 0);
         return finishOpening();
     }
 
     bool MongoMMF::create(string fname, unsigned long long& len, bool sequentialHint) {
-        LOG(3) << "mmf create " << fname << endl;
+        MONGO_LOG(3) << "mmf create " << fname << endl;
         setPath(fname);
         _view_write = map(fname.c_str(), len, sequentialHint ? SEQUENTIAL : 0);
         return finishOpening();
     }
 
     bool MongoMMF::finishOpening() {
-        LOG(3) << "mmf finishOpening " << (void*) _view_write << ' ' << filename() << " len:" << length() << endl;
+        MONGO_LOG(3) << "mmf finishOpening " << (void*) _view_write << ' ' << filename() << " len:" << length() << endl;
         if( _view_write ) {
             if( cmdLine.dur ) {
                 _view_private = createPrivateMap();
@@ -320,7 +320,7 @@ namespace mongo {
     }
 
     /*virtual*/ void MongoMMF::close() {
-        LOG(3) << "mmf close " << filename() << endl;
+        MONGO_LOG(3) << "mmf close " << filename() << endl;
 
         if( view_write() /*actually was opened*/ ) {
             if( cmdLine.dur ) {

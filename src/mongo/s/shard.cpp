@@ -366,7 +366,7 @@ namespace mongo {
                 best = t;
         }
 
-        LOG(1) << "best shard for new allocation is " << best << endl;
+        MONGO_LOG(1) << "best shard for new allocation is " << best << endl;
         return best.shard();
     }
 
@@ -380,7 +380,7 @@ namespace mongo {
     void ShardingConnectionHook::onCreate( DBClientBase * conn ) {
         if( !noauth ) {
             string err;
-            LOG(2) << "calling onCreate auth for " << conn->toString() << endl;
+            MONGO_LOG(2) << "calling onCreate auth for " << conn->toString() << endl;
             uassert( 15847, "can't authenticate to shard server",
                     conn->auth("local", internalSecurity.user, internalSecurity.pwd, err, false));
         }

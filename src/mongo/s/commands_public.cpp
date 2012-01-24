@@ -116,7 +116,7 @@ namespace mongo {
 
             // don't override
             virtual bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& output, bool) {
-                LOG(1) << "RunOnAllShardsCommand db: " << dbName << " cmd:" << cmdObj << endl;
+                MONGO_LOG(1) << "RunOnAllShardsCommand db: " << dbName << " cmd:" << cmdObj << endl;
                 set<Shard> shards;
                 getShards(dbName, cmdObj, shards);
 
@@ -1008,7 +1008,7 @@ namespace mongo {
                 // note here, the MR output process requires no splitting / migration during process, hence StaleConfigException should not happen
                 Strategy* s = SHARDED;
                 ChunkPtr c = manager->findChunk( o );
-                LOG(4) << "  server:" << c->getShard().toString() << " " << o << endl;
+                MONGO_LOG(4) << "  server:" << c->getShard().toString() << " " << o << endl;
                 s->insert( c->getShard() , ns , o , flags, safe);
                 return c;
             }
@@ -1082,7 +1082,7 @@ namespace mongo {
                 BSONObj shardedCommand = fixForShards( cmdObj , shardResultCollection , badShardedField, static_cast<int>(maxChunkSizeBytes) );
 
                 if ( ! shardedInput && ! shardedOutput && ! customOutDB ) {
-                    LOG(1) << "simple MR, just passthrough" << endl;
+                    MONGO_LOG(1) << "simple MR, just passthrough" << endl;
                     return passthrough( confIn , cmdObj , result );
                 }
 
@@ -1191,7 +1191,7 @@ namespace mongo {
                 BSONObjBuilder postCountsB;
 
                 if (!shardedOutput) {
-                    LOG(1) << "MR with single shard output, NS=" << finalColLong << " primary=" << confOut->getPrimary() << endl;
+                    MONGO_LOG(1) << "MR with single shard output, NS=" << finalColLong << " primary=" << confOut->getPrimary() << endl;
                     ShardConnection conn( confOut->getPrimary() , finalColLong );
                     ok = conn->runCommand( outDB , finalCmd.obj() , singleResult );
 
@@ -1203,7 +1203,7 @@ namespace mongo {
                     conn.done();
                 } else {
 
-                    LOG(1) << "MR with sharded output, NS=" << finalColLong << endl;
+                    MONGO_LOG(1) << "MR with sharded output, NS=" << finalColLong << endl;
 
                     // create the sharded collection if needed
                     if (!confOut->isSharded(finalColLong)) {

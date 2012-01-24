@@ -108,7 +108,7 @@ namespace mongo {
         }
 
         bool hasMore = sendMore && _cursor->more();
-        LOG(5) << "\t hasMore: " << hasMore << " sendMore: " << sendMore << " cursorMore: " << _cursor->more() << " ntoreturn: " << ntoreturn
+        MONGO_LOG(5) << "\t hasMore: " << hasMore << " sendMore: " << sendMore << " cursorMore: " << _cursor->more() << " ntoreturn: " << ntoreturn
                << " num: " << num << " wouldSendMoreIfHad: " << sendMore << " id:" << getId() << " totalSent: " << _totalSent << endl;
 
         replyToQuery( 0 , r.p() , r.m() , b.buf() , b.len() , num , _totalSent , hasMore ? getId() : 0 );
@@ -140,7 +140,7 @@ namespace mongo {
     }
 
     ShardedClientCursorPtr CursorCache::get( long long id ) const {
-        LOG(_myLogLevel) << "CursorCache::get id: " << id << endl;
+        MONGO_LOG(_myLogLevel) << "CursorCache::get id: " << id << endl;
         scoped_lock lk( _mutex );
         MapSharded::const_iterator i = _cursors.find( id );
         if ( i == _cursors.end() ) {
@@ -152,7 +152,7 @@ namespace mongo {
     }
 
     void CursorCache::store( ShardedClientCursorPtr cursor ) {
-        LOG(_myLogLevel) << "CursorCache::store cursor " << " id: " << cursor->getId() << endl;
+        MONGO_LOG(_myLogLevel) << "CursorCache::store cursor " << " id: " << cursor->getId() << endl;
         assert( cursor->getId() );
         scoped_lock lk( _mutex );
         _cursors[cursor->getId()] = cursor;
@@ -165,14 +165,14 @@ namespace mongo {
     }
     
     void CursorCache::storeRef( const string& server , long long id ) {
-        LOG(_myLogLevel) << "CursorCache::storeRef server: " << server << " id: " << id << endl;
+        MONGO_LOG(_myLogLevel) << "CursorCache::storeRef server: " << server << " id: " << id << endl;
         assert( id );
         scoped_lock lk( _mutex );
         _refs[id] = server;
     }
 
     string CursorCache::getRef( long long id ) const {
-        LOG(_myLogLevel) << "CursorCache::getRef id: " << id << endl;
+        MONGO_LOG(_myLogLevel) << "CursorCache::getRef id: " << id << endl;
         assert( id );
         scoped_lock lk( _mutex );
         MapNormal::const_iterator i = _refs.find( id );
@@ -219,7 +219,7 @@ namespace mongo {
         long long * cursors = (long long *)x;
         for ( int i=0; i<n; i++ ) {
             long long id = cursors[i];
-            LOG(_myLogLevel) << "CursorCache::gotKillCursors id: " << id << endl;
+            MONGO_LOG(_myLogLevel) << "CursorCache::gotKillCursors id: " << id << endl;
 
             if ( ! id ) {
                 log( LL_WARNING ) << " got cursor id of 0 to kill" << endl;
@@ -245,7 +245,7 @@ namespace mongo {
                 _refs.erase( j );
             }
 
-            LOG(_myLogLevel) << "CursorCache::found gotKillCursors id: " << id << " server: " << server << endl;
+            MONGO_LOG(_myLogLevel) << "CursorCache::found gotKillCursors id: " << id << " server: " << server << endl;
 
             assert( server.size() );
             ScopedDbConnection conn( server );

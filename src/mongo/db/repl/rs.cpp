@@ -69,7 +69,7 @@ namespace mongo {
     }
 
     void ReplSetImpl::assumePrimary() {
-        LOG(2) << "replSet assuming primary" << endl;
+        MONGO_LOG(2) << "replSet assuming primary" << endl;
         assert( iAmPotentiallyHot() );
         writelock lk("admin."); // so we are synchronized with _logOp()
 
@@ -125,7 +125,7 @@ namespace mongo {
     const bool closeOnRelinquish = true;
 
     void ReplSetImpl::relinquish() {
-        LOG(2) << "replSet attempting to relinquish" << endl;
+        MONGO_LOG(2) << "replSet attempting to relinquish" << endl;
         if( box.getState().primary() ) {
             {
                 writelock lk("admin."); // so we are synchronized with _logOp()
@@ -350,7 +350,7 @@ namespace mongo {
 
         _seeds = &replSetCmdline.seeds;
 
-        LOG(1) << "replSet beginning startup..." << rsLog;
+        MONGO_LOG(1) << "replSet beginning startup..." << rsLog;
 
         loadConfig();
 
@@ -361,7 +361,7 @@ namespace mongo {
         for( set<HostAndPort>::iterator i = replSetCmdline.seedSet.begin(); i != replSetCmdline.seedSet.end(); i++ ) {
             if( i->isSelf() ) {
                 if( sss == 1 ) {
-                    LOG(1) << "replSet warning self is listed in the seed list and there are no other seeds listed did you intend that?" << rsLog;
+                    MONGO_LOG(1) << "replSet warning self is listed in the seed list and there are no other seeds listed did you intend that?" << rsLog;
                 }
             }
             else {
@@ -597,7 +597,7 @@ namespace mongo {
         while( 1 ) {
             startupStatus = LOADINGCONFIG;
             startupStatusMsg.set("loading " + rsConfigNs + " config (LOADINGCONFIG)");
-            LOG(1) << "loadConfig() " << rsConfigNs << endl;
+            MONGO_LOG(1) << "loadConfig() " << rsConfigNs << endl;
             try {
                 vector<ReplSetConfig> configs;
                 try {
@@ -660,7 +660,7 @@ namespace mongo {
                             log() << "replSet info you may need to run replSetInitiate -- rs.initiate() in the shell -- if that is not already done" << rsLog;
                         }
                         if( _seeds->size() == 0 ) {
-                            LOG(1) << "replSet info no seed hosts were specified on the --replSet command line" << rsLog;
+                            MONGO_LOG(1) << "replSet info no seed hosts were specified on the --replSet command line" << rsLog;
                         }
                     }
                     else {

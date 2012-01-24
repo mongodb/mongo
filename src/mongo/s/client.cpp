@@ -121,7 +121,7 @@ namespace mongo {
             return res;
         
         if ( fromWriteBackListener ) {
-            LOG(1) << "not doing recursive writeback" << endl;
+            MONGO_LOG(1) << "not doing recursive writeback" << endl;
             return res;
         }
         

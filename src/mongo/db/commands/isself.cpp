@@ -158,7 +158,7 @@ namespace mongo {
     bool HostAndPort::isSelf() const {
 
         if( dyn() ) { 
-            LOG(2) << "isSelf " << _dynName << ' ' << dynHostMyName() << endl;
+            MONGO_LOG(2) << "isSelf " << _dynName << ' ' << dynHostMyName() << endl;
             return dynHostMyName() == _dynName;
         }
 

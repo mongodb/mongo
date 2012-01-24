@@ -110,7 +110,7 @@ namespace mongo {
         }
 
 
-        LOG(3) << "Request::process ns: " << getns() << " msg id:" << (int)(_m.header()->id) << " attempt: " << attempt << endl;
+        MONGO_LOG(3) << "Request::process ns: " << getns() << " msg id:" << (int)(_m.header()->id) << " attempt: " << attempt << endl;
 
         Strategy * s = SHARDED;
         _counter = &opsNonSharded;

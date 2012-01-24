@@ -563,7 +563,7 @@ namespace mongo {
                     log() << "warning: open of lsn file failed" << endl;
                     return;
                 }
-                LOG(1) << "lsn set " << _lastFlushTime << endl;
+                MONGO_LOG(1) << "lsn set " << _lastFlushTime << endl;
                 LSNFile lsnf;
                 lsnf.set(_lastFlushTime);
                 f.write(0, (char*)&lsnf, sizeof(lsnf));

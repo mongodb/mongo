@@ -59,7 +59,7 @@ namespace mongo {
 
     bool CoveredIndexMatcher::matches(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details , bool keyUsable ) {
 
-        LOG(5) << "CoveredIndexMatcher::matches() " << key.toString() << ' ' << recLoc.toString() << ' ' << keyUsable << endl;
+        MONGO_LOG(5) << "CoveredIndexMatcher::matches() " << key.toString() << ' ' << recLoc.toString() << ' ' << keyUsable << endl;
 
         dassert( key.isValid() );
 
@@ -79,7 +79,7 @@ namespace mongo {
             details->_loadedObject = true;
 
         bool res = _docMatcher->matches(recLoc.obj() , details );
-        LOG(5) << "CoveredIndexMatcher _docMatcher->matches() returns " << res << endl;
+        MONGO_LOG(5) << "CoveredIndexMatcher _docMatcher->matches() returns " << res << endl;
         return res;
     }
 

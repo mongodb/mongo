@@ -117,7 +117,7 @@ namespace mongo {
         while ( ! inShutdown() ) {
             
             if ( ! Shard::isAShardNode( _addr ) ) {
-                LOG(1) << _addr << " is not a shard node" << endl;
+                MONGO_LOG(1) << _addr << " is not a shard node" << endl;
                 sleepsecs( 60 );
                 continue;
             }
@@ -139,7 +139,7 @@ namespace mongo {
 
                 }
 
-                LOG(1) << "writebacklisten result: " << result << endl;
+                MONGO_LOG(1) << "writebacklisten result: " << result << endl;
 
                 BSONObj data = result.getObjectField( "data" );
                 if ( data.getBoolField( "writeBack" ) ) {
@@ -168,11 +168,11 @@ namespace mongo {
                     // TODO: The logic here could be refactored, but keeping to the original codepath for safety for now
                     ChunkManagerPtr manager = db->getChunkManagerIfExists( ns );
 
-                    LOG(1) << "connectionId: " << cid << " writebackId: " << wid << " needVersion : " << needVersion.toString()
+                    MONGO_LOG(1) << "connectionId: " << cid << " writebackId: " << wid << " needVersion : " << needVersion.toString()
                            << " mine : " << ( manager ? manager->getVersion().toString() : "(unknown)" )
                            << endl;
 
-                    LOG(1) << m.toString() << endl;
+                    MONGO_LOG(1) << m.toString() << endl;
 
                     if ( needVersion.isSet() && manager && needVersion <= manager->getVersion() ) {
                         // this means when the write went originally, the version was old

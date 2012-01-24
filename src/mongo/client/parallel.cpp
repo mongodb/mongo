@@ -110,7 +110,7 @@ namespace mongo {
                 throw RecvStaleConfigException( _ns , "ClusteredCursor::query" , true );
             }
             
-            LOG(5) << "ClusteredCursor::query (" << type() << ") server:" << server
+            MONGO_LOG(5) << "ClusteredCursor::query (" << type() << ") server:" << server
                    << " ns:" << _ns << " query:" << q << " num:" << num
                    << " _fields:" << _fields << " options: " << _options << endl;
         
@@ -1201,7 +1201,7 @@ namespace mongo {
                     break;
                 }
 
-                LOG(5) << "ParallelSortClusteredCursor::init server:" << sq._server << " ns:" << _ns
+                MONGO_LOG(5) << "ParallelSortClusteredCursor::init server:" << sq._server << " ns:" << _ns
                        << " query:" << q << " _fields:" << _fields << " options: " << _options  << endl;
 
                 if( ! _cursors[i].raw() )
@@ -1519,7 +1519,7 @@ namespace mongo {
 
                 versionManager.checkShardVersionCB( _conn, e.getns(), false, 1 );
 
-                LOG( i > 1 ? 0 : 1 ) << "retrying lazy command" << causedBy( e ) << endl;
+                MONGO_LOG( i > 1 ? 0 : 1 ) << "retrying lazy command" << causedBy( e ) << endl;
 
                 assert( _conn->lazySupported() );
                 _done = false;

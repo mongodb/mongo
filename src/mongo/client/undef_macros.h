@@ -54,8 +54,5 @@
 #undef RARELY
 #undef ONCE
 
-// util/log.h
-#undef LOG
-
 #define MONGO_MACROS_CLEANED
 #endif

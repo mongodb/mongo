@@ -642,7 +642,7 @@ namespace mongo {
     }
 
     DiskLoc Extent::_reuse(const char *nsname, bool capped) {
-        LOG(3) << "reset extent was:" << nsDiagnostic.toString() << " now:" << nsname << '\n';
+        MONGO_LOG(3) << "reset extent was:" << nsDiagnostic.toString() << " now:" << nsname << '\n';
         massert( 10360 ,  "Extent::reset bad magic value", magic == 0x41424344 );
         nsDiagnostic = nsname;
         markEmpty();

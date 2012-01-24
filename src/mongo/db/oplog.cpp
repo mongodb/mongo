@@ -680,7 +680,7 @@ namespace mongo {
      */
     bool applyOperation_inlock(const BSONObj& op , bool fromRepl ) {
         assertInWriteLock();
-        LOG(6) << "applying op: " << op << endl;
+        MONGO_LOG(6) << "applying op: " << op << endl;
         bool failedUpdate = false;
 
         OpCounters * opCounters = fromRepl ? &replOpCounters : &globalOpCounters;

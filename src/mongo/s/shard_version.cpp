@@ -114,8 +114,8 @@ namespace mongo {
 
         BSONObj cmd = cmdBuilder.obj();
 
-        LOG(1) << "initializing shard connection to " << conn->toString() << endl;
-        LOG(2) << "initial sharding settings : " << cmd << endl;
+        MONGO_LOG(1) << "initializing shard connection to " << conn->toString() << endl;
+        MONGO_LOG(2) << "initial sharding settings : " << cmd << endl;
 
         bool ok = conn->runCommand( "admin" , cmd , result );
 
@@ -127,7 +127,7 @@ namespace mongo {
             ok = true;
         }
 
-        LOG(3) << "initial sharding result : " << result << endl;
+        MONGO_LOG(3) << "initial sharding result : " << result << endl;
 
         return ok;
 
@@ -202,14 +202,14 @@ namespace mongo {
         }
 
         if( version == 0 ){
-            LOG(0) << "resetting shard version of " << ns << " on " << conn->getServerAddress() << ", " <<
+            MONGO_LOG(0) << "resetting shard version of " << ns << " on " << conn->getServerAddress() << ", " <<
                       ( ! isSharded ? "no longer sharded" :
                       ( ! manager ? "no chunk manager found" :
                                     "version is zero" ) ) << endl;
         }
 
 
-        LOG(2) << " have to set shard version for conn: " << conn << " ns:" << ns
+        MONGO_LOG(2) << " have to set shard version for conn: " << conn << " ns:" << ns
                << " my last seq: " << sequenceNumber << "  current: " << officialSequenceNumber
                << " version: " << version << " manager: " << manager.get()
                << endl;
@@ -217,12 +217,12 @@ namespace mongo {
         BSONObj result;
         if ( setShardVersion( *conn , ns , version , authoritative , result ) ) {
             // success!
-            LOG(1) << "      setShardVersion success: " << result << endl;
+            MONGO_LOG(1) << "      setShardVersion success: " << result << endl;
             connectionShardStatus.setSequence( conn , ns , officialSequenceNumber );
             return true;
         }
 
-        LOG(1) << "       setShardVersion failed!\n" << result << endl;
+        MONGO_LOG(1) << "       setShardVersion failed!\n" << result << endl;
 
         if ( result["need_authoritative"].trueValue() )
             massert( 10428 ,  "need_authoritative set but in authoritative mode already" , ! authoritative );
@@ -245,7 +245,7 @@ namespace mongo {
 
         const int maxNumTries = 7;
         if ( tryNumber < maxNumTries ) {
-            LOG( tryNumber < ( maxNumTries / 2 ) ? 1 : 0 ) 
+            MONGO_LOG( tryNumber < ( maxNumTries / 2 ) ? 1 : 0 ) 
                 << "going to retry checkShardVersion host: " << conn->getServerAddress() << " " << result << endl;
             sleepmillis( 10 * tryNumber );
             checkShardVersion( conn , ns , refManager, true , tryNumber + 1 );

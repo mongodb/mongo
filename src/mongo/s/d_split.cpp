@@ -410,7 +410,7 @@ namespace mongo {
                                 currCount = 0;
                                 numChunks++;
                                 
-                                LOG(4) << "picked a split key: " << bc->prettyKey( currKey ) << endl;
+                                MONGO_LOG(4) << "picked a split key: " << bc->prettyKey( currKey ) << endl;
                             }
                             
                         }
@@ -692,7 +692,7 @@ namespace mongo {
 
             BSONObjBuilder logDetail;
             origChunk.appendShortVersion( "before" , logDetail );
-            LOG(1) << "before split on " << origChunk << endl;
+            MONGO_LOG(1) << "before split on " << origChunk << endl;
             vector<ChunkInfo> newChunks;
 
             ShardChunkVersion myVersion = maxVersion;
@@ -760,7 +760,7 @@ namespace mongo {
 
             BSONObj cmd = cmdBuilder.obj();
 
-            LOG(1) << "splitChunk update: " << cmd << endl;
+            MONGO_LOG(1) << "splitChunk update: " << cmd << endl;
 
             bool ok;
             BSONObj cmdResult;
