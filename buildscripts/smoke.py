@@ -316,6 +316,8 @@ def runTest(test):
         f = open(keyFile, 'r')
         keyFileData = re.sub(r'\s', '', f.read()) # Remove all whitespace
         f.close()
+    else:
+        keyFileData = None
 
     sys.stderr.write( "starting test : %s \n" % os.path.basename(path) )
     sys.stderr.flush()
@@ -332,7 +334,7 @@ def runTest(test):
                      'TestData.noJournalPrealloc = ' + ternary( no_preallocj )  + ";" + \
                      'TestData.auth = ' + ternary( auth ) + ";" + \
                      'TestData.keyFile = ' + ternary( keyFile , '"' + str(keyFile) + '"' , 'null' ) + ";" + \
-                     'TestData.keyFileData = ' + ( keyFile , '"' + str(keyFileData) + '"' , 'null' ) + ";"
+                     'TestData.keyFileData = ' + ternary( keyFile , '"' + str(keyFileData) + '"' , 'null' ) + ";"
         if auth and usedb:
             evalString += 'db.getSiblingDB("admin").addUser("admin","password");'
             evalString += 'jsTest.authenticate(db.getMongo());'
