@@ -36,7 +36,7 @@ namespace mongo {
 namespace QueryTests {
 
     class Base {
-        dblock lk;
+        Lock::Global lk;
         Client::Context _context;
     public:
         Base() : _context( ns() ) {
@@ -126,7 +126,7 @@ namespace QueryTests {
         void run() {
             // We don't normally allow empty objects in the database, but test that we can find
             // an empty object (one might be allowed inside a reserved namespace at some point).
-            dblock lk;
+            Lock::Global lk;
             Client::Context ctx( "unittests.querytests" );
             // Set up security so godinsert command can run.
             cc().getAuthenticationInfo()->isLocalHost = true;
@@ -822,7 +822,7 @@ namespace QueryTests {
     class DirectLocking : public ClientBase {
     public:
         void run() {
-            dblock lk;
+            Lock::Global lk;
             Client::Context ctx( "unittests.DirectLocking" );
             client().remove( "a.b", BSONObj() );
             ASSERT_EQUALS( "unittests", cc().database()->name );

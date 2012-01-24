@@ -90,7 +90,7 @@ namespace QueryOptimizerTests {
                 return p.frv()->endKey();
             }
         private:
-            dblock lk_;
+            Lock::Global lk_;
             Client::Context _ctx;
             int indexNum_;
             static DBDirectClient client_;
@@ -360,7 +360,7 @@ namespace QueryOptimizerTests {
             static const char *ns() { return "unittests.QueryPlanSetTests"; }
             static NamespaceDetails *nsd() { return nsdetails( ns() ); }
         private:
-            dblock lk_;
+            Lock::Global lk_;
             Client::Context _context;
         };
 
@@ -969,7 +969,7 @@ namespace QueryOptimizerTests {
         static const char *ns() { return "unittests.QueryOptimizerTests"; }
         static NamespaceDetails *nsd() { return nsdetails( ns() ); }
     private:
-        dblock lk_;
+        Lock::Global lk_;
         Client::Context _ctx;
     };
 

@@ -467,7 +467,7 @@ namespace ThreadedTests {
         }
     };
 
-    class Hierarchical1 {
+    /*class Hierarchical1 {
     public:
         void run() {
             {
@@ -497,7 +497,7 @@ namespace ThreadedTests {
 #endif
             cout << "temp ok" << endl;
         }
-    };
+    };*/
 
 #if 1
     class UpgradableTest : public ThreadedTest<7> {
@@ -756,11 +756,13 @@ namespace ThreadedTests {
         All() : Suite( "threading" ) { }
 
         void setupTests() {
+            // Slack is a test to see how long it takes for another thread to pick up
+            // and begin work after another relinquishes the lock.  e.g. a spin lock 
+            // would have very little slack.
             add< Slack<mongo::mutex,mongo::mutex::scoped_lock> >();
             add< Slack<SimpleMutex,SimpleMutex::scoped_lock> >();
             add< Slack<SimpleRWLock,SimpleRWLock::Exclusive> >();
             add< CondSlack >();
-            add< Hierarchical1 >();
 
             add< WriteLocksAreGreedy >();
             add< UpgradableTest >();

@@ -41,7 +41,7 @@ namespace ReplTests {
     }
 
     class Base {
-        dblock lk;
+        Lock::Global lk;
         Client::Context _context;
     public:
         Base() : _context( ns() ) {
@@ -92,7 +92,7 @@ namespace ReplTests {
         }
         int count() const {
             int count = 0;
-            dblock lk;
+            Lock::Global lk;
             Client::Context ctx( ns() );
             boost::shared_ptr<Cursor> c = theDataFileMgr.findAll( ns() );
             for(; c->ok(); c->advance(), ++count ) {
@@ -101,7 +101,7 @@ namespace ReplTests {
             return count;
         }
         static int opCount() {
-            dblock lk;
+            Lock::Global lk;
             Client::Context ctx( cllNS() );
             int count = 0;
             for( boost::shared_ptr<Cursor> c = theDataFileMgr.findAll( cllNS() ); c->ok(); c->advance() )
@@ -109,7 +109,7 @@ namespace ReplTests {
             return count;
         }
         static void applyAllOperations() {
-            dblock lk;
+            Lock::Global lk;
             vector< BSONObj > ops;
             {
                 Client::Context ctx( cllNS() );
@@ -128,7 +128,7 @@ namespace ReplTests {
             }
         }
         static void printAll( const char *ns ) {
-            dblock lk;
+            Lock::Global lk;
             Client::Context ctx( ns );
             boost::shared_ptr<Cursor> c = theDataFileMgr.findAll( ns );
             vector< DiskLoc > toDelete;
@@ -139,7 +139,7 @@ namespace ReplTests {
         }
         // These deletes don't get logged.
         static void deleteAll( const char *ns ) {
-            dblock lk;
+            Lock::Global lk;
             Client::Context ctx( ns );
             boost::shared_ptr<Cursor> c = theDataFileMgr.findAll( ns );
             vector< DiskLoc > toDelete;
@@ -151,7 +151,7 @@ namespace ReplTests {
             }
         }
         static void insert( const BSONObj &o, bool god = false ) {
-            dblock lk;
+            Lock::Global lk;
             Client::Context ctx( ns() );
             theDataFileMgr.insert( ns(), o.objdata(), o.objsize(), god );
         }
@@ -1062,7 +1062,7 @@ namespace ReplTests {
             for( int i = 0; i < 10; ++i ) {
                 client()->insert( ns(), BSON( "_id" << i ) );
             }
-            dblock lk;
+            Lock::Global lk;
             Client::Context ctx( cllNS() );
             NamespaceDetails *nsd = nsdetails( cllNS() );
             BSONObjBuilder b;

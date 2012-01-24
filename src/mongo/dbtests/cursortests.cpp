@@ -58,7 +58,7 @@ namespace CursorTests {
         class MultiRange : public Base {
         public:
             void run() {
-                dblock lk;
+                Lock::Global lk;
                 const char *ns = "unittests.cursortests.BtreeCursorTests.MultiRange";
                 {
                     DBDirectClient c;
@@ -85,7 +85,7 @@ namespace CursorTests {
         class MultiRangeGap : public Base {
         public:
             void run() {
-                dblock lk;
+                Lock::Global lk;
                 const char *ns = "unittests.cursortests.BtreeCursorTests.MultiRangeGap";
                 {
                     DBDirectClient c;
@@ -114,7 +114,7 @@ namespace CursorTests {
         class MultiRangeReverse : public Base {
         public:
             void run() {
-                dblock lk;
+                Lock::Global lk;
                 const char *ns = "unittests.cursortests.BtreeCursorTests.MultiRangeReverse";
                 {
                     DBDirectClient c;
@@ -179,7 +179,7 @@ namespace CursorTests {
                 ASSERT_EQUALS( expectedCount, count );
             }
         private:
-            dblock _lk;
+            Lock::Global _lk;
             vector< BSONObj > _objs;
         };
 
@@ -264,7 +264,7 @@ namespace CursorTests {
         class AbortImplicitScan : public Base {
         public:
             void run() {
-                dblock lk;
+                Lock::Global lk;
                 IndexSpec idx( BSON( "a" << 1 << "b" << 1 ) );
                 _c.ensureIndex( ns(), idx.keyPattern );
                 for( int i = 0; i < 300; ++i ) {

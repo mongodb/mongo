@@ -135,7 +135,7 @@
             ASSERT( present( key, -1 ) );
         }
     private:
-        dblock lk_;
+        Lock::Global lk_;
         Client::Context _context;
     };
 
