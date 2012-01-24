@@ -117,8 +117,9 @@ err:	va_end(ap);
 static void
 __curstat_set_key(WT_CURSOR *cursor, ...)
 {
-	WT_SESSION_IMPL *session;
 	WT_CURSOR_STAT *cst;
+	WT_SESSION_IMPL *session;
+	WT_ITEM *item;
 	va_list ap;
 	int ret;
 
@@ -127,15 +128,18 @@ __curstat_set_key(WT_CURSOR *cursor, ...)
 	cst = (WT_CURSOR_STAT *)cursor;
 
 	va_start(ap, cursor);
-	cst->key = va_arg(ap, int);
+	if (F_ISSET(cursor, WT_CURSTD_RAW)) {
+		item = va_arg(ap, WT_ITEM *);
+		ret = __wt_struct_unpack(session, item->data, item->size,
+		    cursor->key_format, &cst->key);
+	} else
+		cst->key = va_arg(ap, int);
 	va_end(ap);
 
-	/*
-	 * There is currently no way for this call to fail, but do something
-	 * with ret to avoid compile warnings.
-	 */
-	cursor->saved_err = ret;
-	F_SET(cursor, WT_CURSTD_KEY_SET);
+	if ((cursor->saved_err = ret) == 0)
+		F_SET(cursor, WT_CURSTD_KEY_SET);
+	else
+		F_CLR(cursor, WT_CURSTD_KEY_SET);
 
 	API_END(session);
 }
