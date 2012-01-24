@@ -10,9 +10,13 @@ t.save( {b:null} );
 
 checkExists = function( query ) {
     // Index range constraint on 'b' is universal, so a BasicCursor is the default cursor type.
-    assert.eq( 'BasicCursor', t.find( query ).explain().cursor );
+    var x = t.find( query ).explain()
+    assert.eq( 'BasicCursor', x.cursor , tojson(x) );
     // Index bounds include all elements.
-    assert.eq( [ [ { $minElement:1 }, { $maxElement:1 } ] ], t.find( query ).hint( {b:1} ).explain().indexBounds.b );
+    
+    var x = t.find( query ).hint( {b:1} ).explain()
+    if ( ! x.indexBounds ) x.indexBounds = {}
+    assert.eq( [ [ { $minElement:1 }, { $maxElement:1 } ] ], x.indexBounds.b , tojson(x) );
     // All keys must be scanned.
     assert.eq( 3, t.find( query ).hint( {b:1} ).explain().nscanned );
     // 2 docs will match.

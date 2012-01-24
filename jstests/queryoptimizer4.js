@@ -24,7 +24,8 @@ function reset( matches, filler ) {
 function checkCursor( query, cursor ) {
     t.find(query).itcount();
     // Check that index on 'cursor' was chosen in the above query.
-    assert.eq( 'BtreeCursor ' + cursor, t.find(query).explain(true).oldPlan.cursor );    
+    var x = t.find(query).explain(true);
+    assert.eq( 'BtreeCursor ' + cursor, x.oldPlan.cursor , tojson(x) );    
 }
 
 // Check {b:1} takes over when {a:1} is much worse for query {a:100,b:100}.
