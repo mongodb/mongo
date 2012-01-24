@@ -119,17 +119,8 @@ namespace mongo {
 
         bool iscmd = false;
         if ( op == dbQuery ) {
-            try {
-                iscmd = isCommand();
-                s->queryOp( *this );
-            }
-            catch ( RecvStaleConfigException& stale ) {
-                _d.markReset();
-                log( attempt == 0 ) << "got RecvStaleConfigException at top level: " << stale.toString() << " attempt: " << attempt << endl;
-                massert( 16062 , "too many attemps to handle RecvStaleConfigException at top level" , attempt <= 5 );
-                process( attempt + 1 );
-                return;
-            }
+            iscmd = isCommand();
+            s->queryOp( *this );
         }
         else if ( op == dbGetMore ) {
             checkAuth( Auth::READ ); // this is important so someone can't steal a cursor
