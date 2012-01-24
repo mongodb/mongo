@@ -21,6 +21,8 @@
 
 namespace mongo { 
 
+    static QLock& q = *new QLock();
+
     //static RWLockRecursive excludeWrites("excludeWrites");
     //static mapsf<string,RWLockRecursive*> dblocks;
 
@@ -28,39 +30,79 @@ namespace mongo {
     HLMutex::HLMutex(const char *name) : SimpleMutex(name)
     { }
 
+    // ' ', 'r', 'w', 'R', 'W'
+    __declspec( thread ) char threadState;
+
+    static void lock_W() { 
+        assert( threadState == ' ' );
+        threadState = 'W';
+        q.lock_W();
+    }
+    static void unlock_W() { 
+        assert( threadState == 'W' );
+        threadState = ' ';
+        q.unlock_W();
+    }
+    static void lock_R() { 
+        assert( threadState == ' ' );
+        threadState = 'R';
+        q.lock_R();
+    }
+    static void unlock_R() { 
+        assert( threadState == 'R' );
+        threadState = ' ';
+        q.unlock_R();
+    }
+    static void lock_w() { 
+        assert( threadState == ' ' );
+        threadState = 'w';
+        q.lock_w();
+    }
+    static void unlock_w() { 
+        assert( threadState == 'w' );
+        threadState = ' ';
+        q.unlock_w();
+    }
+
     bool Lock::isLocked() {
-        return d.dbMutex.atLeastReadLocked();
+        return threadState != ' ';
     }
 
     Lock::GlobalWrite::TempRelease::TempRelease() {
+        unlock_W();
     }
-
     Lock::GlobalWrite::TempRelease::~TempRelease() {
+        lock_W();
     }
-
     Lock::GlobalWrite::GlobalWrite() {
-        d.dbMutex.lock();
+        lock_W();
     }
     Lock::GlobalWrite::~GlobalWrite() {
-        DESTRUCTOR_GUARD(
-          d.dbMutex.unlock();
-        )
+        unlock_W();
+    }
+    Lock::GlobalRead::GlobalRead() {
+        lock_R();
+    }
+    Lock::GlobalRead::~GlobalRead() {
+        unlock_R();
     }
     Lock::DBWrite::DBWrite(const StringData& ns) { 
-        d.dbMutex.lock();
+        // TEMP : 
+        lock_W();
+        // todo: 
+        //lock_w();
+        //lock_the_db
     }
     Lock::DBWrite::~DBWrite() { 
-        DESTRUCTOR_GUARD(
-          d.dbMutex.unlock();
-        )
+        // TEMP : 
+        unlock_W();
     }
     Lock::DBRead::DBRead(const StringData& ns) { 
-        d.dbMutex.lock_shared();
+        // TEMP : 
+        lock_R();
     } 
     Lock::DBRead::~DBRead() { 
-        DESTRUCTOR_GUARD(
-          d.dbMutex.unlock_shared();
-        )
+        unlock_R();
     }
 
 }

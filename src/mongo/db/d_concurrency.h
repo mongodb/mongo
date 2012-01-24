@@ -17,7 +17,7 @@ namespace mongo {
     class Lock : boost::noncopyable { 
     public:
         static bool isLocked(); // true if *anything* is locked (by us)
-        class GlobalWrite : boost::noncopyable { // stop the world 
+        class GlobalWrite : boost::noncopyable {
         public:
             GlobalWrite(); 
             ~GlobalWrite();
@@ -25,14 +25,19 @@ namespace mongo {
                 TempRelease(); ~TempRelease();
             };
         };
-        class GlobalRead : boost::noncopyable { // stop all writers 
+        class GlobalRead : boost::noncopyable {
+        public:
+            GlobalRead(); 
+            ~GlobalRead();
         };
-        class DBWrite : boost::noncopyable { // exclusive for this db
+        // lock this database. do not shared_lock globally first, that is handledin herein. 
+        class DBWrite : boost::noncopyable {
         public:
             DBWrite(const StringData& dbOrNs);
             ~DBWrite();
         };
-        class DBRead : boost::noncopyable { // shared for this db
+        // lock this database for reading. do not shared_lock globally first, that is handledin herein. 
+        class DBRead : boost::noncopyable {
         public:
             DBRead(const StringData& dbOrNs);
             ~DBRead();
