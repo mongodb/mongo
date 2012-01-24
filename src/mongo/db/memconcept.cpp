@@ -1,6 +1,9 @@
-#if defined(_DEBUG)
-
 #include "pch.h"
+
+#if 1
+
+#define DDD(x) 
+
 #include <string>
 #include <map>
 #include "memconcept.h"
@@ -84,9 +87,10 @@ namespace mongo {
             }
         }
 
+#if defined(_DEBUG)
         bool d = false;
         void is(void *p, concept c, string description, unsigned len) {
-            log() << "is  " << p << ' ' << c.toString() << ' ' << description << ' ' << len << endl;
+            DDD( log() << "is  " << p << ' ' << c.toString() << ' ' << description << ' ' << len << endl; )
             C &node = map.find(p);
             node.p = p;
             node.c = c;
@@ -95,12 +99,13 @@ namespace mongo {
         }
 
         void invalidate(void *p, unsigned len) {
-            log() << "inv " << p << " invalidate" << endl;
+            DDD( log() << "inv " << p << " invalidate" << endl; )
             C &node = map.find(p);
             node.p = p;
             node.c = concept::err;
             // len is not used currenntly. hmmm.
         }
+#endif
 
     }
 }
