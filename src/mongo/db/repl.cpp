@@ -121,7 +121,7 @@ namespace mongo {
                 if ( syncing == 0 || t.millis() > 30000 )
                     break;
                 {
-                    Lock::Global::TempRelease t;
+                    Lock::GlobalWrite::TempRelease t;
                     relinquishSyncingSome = 1;
                     sleepmillis(1);
                 }
@@ -817,7 +817,7 @@ namespace mongo {
                 }
                 // obviously global isn't ideal, but non-repl set is old so 
                 // keeping it simple
-                Lock::Global lk;
+                Lock::GlobalWrite lk;
                 save();
             }
 
@@ -868,7 +868,7 @@ namespace mongo {
                 log() << "repl:   " << ns << " oplog is empty\n";
             }
             {
-                Lock::Global lk;
+                Lock::GlobalWrite lk;
                 save();
             }
             return okResultCode;
@@ -942,7 +942,7 @@ namespace mongo {
                 bool moreInitialSyncsPending = !addDbNextPass.empty() && n; // we need "&& n" to assure we actually process at least one op to get a sync point recorded in the first place.
 
                 if ( moreInitialSyncsPending || !oplogReader.more() ) {
-                    Lock::Global lk;
+                    Lock::GlobalWrite lk;
 
                     // NOTE aaron 2011-03-29 This block may be unnecessary, but I'm leaving it in place to avoid changing timing behavior.
                     {
@@ -967,7 +967,7 @@ namespace mongo {
 
                 OCCASIONALLY if( n > 0 && ( n > 100000 || time(0) - saveLast > 60 ) ) {
                     // periodically note our progress, in case we are doing a lot of work and crash
-                    Lock::Global lk;
+                    Lock::GlobalWrite lk;
                     syncedTo = nextOpTime;
                     // can't update local log ts since there are pending operations from our peer
                     save();
@@ -1006,7 +1006,7 @@ namespace mongo {
                         assert( justOne );
                         oplogReader.putBack( op );
                         _sleepAdviceTime = nextOpTime.getSecs() + replSettings.slavedelay + 1;
-                        Lock::Global lk;
+                        Lock::GlobalWrite lk;
                         if ( n > 0 ) {
                             syncedTo = last;
                             save();
@@ -1057,7 +1057,7 @@ namespace mongo {
         else {
             BSONObj user;
             {
-                Lock::Global lk;
+                Lock::GlobalWrite lk;
                 Client::Context ctxt("local.");
                 if( !Helpers::findOne("local.system.users", userReplQuery, user) ||
                         // try the first user in local
@@ -1087,7 +1087,7 @@ namespace mongo {
         BSONObj me;
         {
             
-            Lock::Global l;
+            Lock::GlobalWrite l;
             // local.me is an identifier for a server for getLastError w:2+
             if ( ! Helpers::getSingleton( "local.me" , me ) ||
                  ! me.hasField("host") ||
@@ -1224,7 +1224,7 @@ namespace mongo {
     int _replMain(ReplSource::SourceVector& sources, int& nApplied) {
         {
             ReplInfo r("replMain load sources");
-            Lock::Global lk;
+            Lock::GlobalWrite lk;
             ReplSource::loadAll(sources);
             replSettings.fastsync = false; // only need this param for initial reset
         }
@@ -1293,7 +1293,7 @@ namespace mongo {
         while ( 1 ) {
             int s = 0;
             {
-                Lock::Global lk;
+                Lock::GlobalWrite lk;
                 if ( replAllDead ) {
                     // throttledForceResyncDead can throw
                     if ( !replSettings.autoresync || !ReplSource::throttledForceResyncDead( "auto" ) ) {
@@ -1321,7 +1321,7 @@ namespace mongo {
                 s = 4;
             }
             {
-                Lock::Global lk;
+                Lock::GlobalWrite lk;
                 assert( syncing == 1 );
                 syncing--;
             }
@@ -1382,7 +1382,7 @@ namespace mongo {
         cc().iAmSyncThread();
 
         {
-            Lock::Global lk;
+            Lock::GlobalWrite lk;
             replLocalAuth();
         }
 
@@ -1446,7 +1446,7 @@ namespace mongo {
             return;
 
         {
-            Lock::Global lk;
+            Lock::GlobalWrite lk;
             replLocalAuth();
         }
 

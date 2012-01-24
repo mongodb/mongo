@@ -497,7 +497,9 @@ namespace mongo {
 
             assert( !d.dbMutex.atLeastReadLocked() );
 
-            scoped_ptr<Lock::ExcludeWrites> lk1( new Lock::ExcludeWrites() );
+            // question : do we need this to be greedy, so that it can start working fairly soon?
+            //            perhaps.  todo.
+            scoped_ptr<Lock::GlobalRead> lk1( new Lock::GlobalRead() );
 
             scoped_lock lk2(groupCommitMutex);
 

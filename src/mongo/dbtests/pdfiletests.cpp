@@ -99,7 +99,7 @@ namespace PdfileTests {
                 return nsdetails( ns() );
             }
         private:
-            Lock::Global lk_;
+            Lock::GlobalWrite lk_;
             Client::Context _context;
         };
 
@@ -288,7 +288,7 @@ namespace PdfileTests {
                 return nsdetails( ns() );
             }
         private:
-            Lock::Global lk_;
+            Lock::GlobalWrite lk_;
             Client::Context _context;
         };
 
@@ -343,7 +343,7 @@ namespace PdfileTests {
                 db.dropDatabase( dbname );
             }
 
-            Lock::Global mylock;
+            Lock::GlobalWrite mylock;
             Client::Context cx( dbname );
 
             bool isnew;

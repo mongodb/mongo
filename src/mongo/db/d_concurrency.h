@@ -17,15 +17,15 @@ namespace mongo {
     class Lock : boost::noncopyable { 
     public:
         static bool isLocked(); // true if *anything* is locked (by us)
-        class Global : boost::noncopyable { // stop the world 
+        class GlobalWrite : boost::noncopyable { // stop the world 
         public:
-            Global(); 
-            ~Global();
+            GlobalWrite(); 
+            ~GlobalWrite();
             struct TempRelease {
                 TempRelease(); ~TempRelease();
             };
         };
-        class ExcludeWrites : boost::noncopyable { // stop all writers 
+        class GlobalRead : boost::noncopyable { // stop all writers 
         };
         class DBWrite : boost::noncopyable { // exclusive for this db
         public:

@@ -317,7 +317,7 @@ namespace mongo {
     }
 
     void createOplog() {
-        Lock::Global lk;
+        Lock::GlobalWrite lk;
 
         const char * ns = "local.oplog.$main";
 

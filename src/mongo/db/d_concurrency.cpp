@@ -24,6 +24,7 @@ namespace mongo {
     //static RWLockRecursive excludeWrites("excludeWrites");
     //static mapsf<string,RWLockRecursive*> dblocks;
 
+    // todo : report HLMutex status in db.currentOp() output
     HLMutex::HLMutex(const char *name) : SimpleMutex(name)
     { }
 
@@ -31,16 +32,16 @@ namespace mongo {
         return d.dbMutex.atLeastReadLocked();
     }
 
-    Lock::Global::TempRelease::TempRelease() {
+    Lock::GlobalWrite::TempRelease::TempRelease() {
     }
 
-    Lock::Global::TempRelease::~TempRelease() {
+    Lock::GlobalWrite::TempRelease::~TempRelease() {
     }
 
-    Lock::Global::Global() {
+    Lock::GlobalWrite::GlobalWrite() {
         d.dbMutex.lock();
     }
-    Lock::Global::~Global() {
+    Lock::GlobalWrite::~GlobalWrite() {
         DESTRUCTOR_GUARD(
           d.dbMutex.unlock();
         )

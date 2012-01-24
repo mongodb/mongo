@@ -135,7 +135,7 @@
             ASSERT( present( key, -1 ) );
         }
     private:
-        Lock::Global lk_;
+        Lock::GlobalWrite lk_;
         Client::Context _context;
     };
 

@@ -930,7 +930,7 @@ namespace mongo {
     void exitCleanly( ExitCode code ) {
         killCurrentOp.killAll();
         {
-            Lock::Global lk;
+            Lock::GlobalWrite lk;
             log() << "now exiting" << endl;
             dbexit( code );
         }

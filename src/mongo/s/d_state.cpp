@@ -428,7 +428,7 @@ namespace mongo {
                 return true;
             }
 
-            Lock::Global lk;
+            Lock::GlobalWrite lk;
             return checkConfigOrInit( configdb , authoritative , errmsg , result , true );
         }
         
@@ -550,7 +550,7 @@ namespace mongo {
             // this is because of a weird segfault I saw and I can't see why this should ever be set
             massert( 13647 , str::stream() << "context should be empty here, is: " << cc().getContext()->ns() , cc().getContext() == 0 ); 
         
-            Lock::Global setShardVersionLock; // TODO: can we get rid of this??
+            Lock::GlobalWrite setShardVersionLock; // TODO: can we get rid of this??
             
             if ( oldVersion > 0 && globalVersion == 0 ) {
                 // this had been reset
