@@ -35,9 +35,8 @@ class test_util11(wttest.WiredTigerTestCase, suite_subprocess):
         """
 
         # Construct what we think we'll find
-        filelist = 'file:WiredTiger.wt\n'
+        filelist = ''
         outfile = "listout.txt"
-        self.KNOWN_FAILURE('"wt list" with empty schema returns WT_NOTFOUND')
         self.runWt(["list"], outfilename=outfile)
         self.check_file_content(outfile, filelist)
 

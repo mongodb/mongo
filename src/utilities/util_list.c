@@ -46,6 +46,13 @@ list_print(WT_SESSION *session)
 	/* Open the schema file. */
 	if ((ret = session->open_cursor(
 	    session, WT_SCHEMA_URI, NULL, NULL, &cursor)) != 0) {
+		/*
+		 * If there is no schema (yet), this will return WT_NOTFOUND.
+		 * Treat that the same as an empty schema.
+		 */
+		if (ret == WT_NOTFOUND)
+			return (0);
+
 		fprintf(stderr, "%s: %s: session.open_cursor: %s\n",
 		    progname, WT_SCHEMA_URI, wiredtiger_strerror(ret));
 		return (1);
