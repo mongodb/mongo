@@ -339,8 +339,8 @@ struct __wt_ref {
 	 * read into into memory before use.
 	 *
 	 * WT_REF_EVICTING:
-	 *	Set by eviction when a page is about to be locked;
-	 * prevents a page from being evictive multiple times concurrently.
+	 *	Set by eviction when a page is about to be locked; prevents a
+	 * page from being evicted multiple times concurrently.
 	 *
 	 * WT_REF_LOCKED:
 	 *	Set by eviction; an eviction thread has selected this page or
