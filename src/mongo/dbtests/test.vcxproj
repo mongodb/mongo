@@ -1047,7 +1047,7 @@
     <ClCompile Include="..\util\assert_util.cpp" />
     <ClCompile Include="..\util\background.cpp" />
     <ClCompile Include="..\util\base64.cpp" />
-    <ClCompile Include="..\util\md5.cpppp">
+    <ClCompile Include="..\util\md5.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
       </PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">
