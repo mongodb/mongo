@@ -192,7 +192,7 @@ namespace mongo {
                 for ( unsigned i=0; i<shards.size(); i++ ) {
                     Shard shard = shards[i];
                     ScopedDbConnection conn( shard );
-                    BSONObj temp = conn->findOne( r.getns() , BSONObj() );
+                    BSONObj temp = conn->findOne( r.getns() , q.query );
                     if ( temp["inprog"].isABSONObj() ) {
                         BSONObjIterator i( temp["inprog"].Obj() );
                         while ( i.more() ) {
