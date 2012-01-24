@@ -72,7 +72,7 @@ class test_config04(wttest.WiredTigerTestCase):
     def test_cache_size(self):
         self.common_test('cache_size=30M')
         cursor = self.session.open_cursor('statistics:', None, None)
-        cursor.set_key(int(wiredtiger.stat.cache_bytes_max))
+        cursor.set_key(wiredtiger.stat.cache_bytes_max)
         self.assertEqual(cursor.search(), 0)
         got_cache = cursor.get_values()[2]
         self.assertEqual(got_cache, 30*self.M)
