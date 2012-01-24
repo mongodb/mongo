@@ -39,8 +39,8 @@ __curstat_get_key(WT_CURSOR *cursor, ...)
 	WT_CURSOR_STAT *cst;
 	WT_ITEM *item;
 	WT_SESSION_IMPL *session;
-	va_list ap;
 	size_t size;
+	va_list ap;
 	int ret;
 
 	ret = 0;
@@ -118,8 +118,8 @@ static void
 __curstat_set_key(WT_CURSOR *cursor, ...)
 {
 	WT_CURSOR_STAT *cst;
-	WT_SESSION_IMPL *session;
 	WT_ITEM *item;
+	WT_SESSION_IMPL *session;
 	va_list ap;
 	int ret;
 
