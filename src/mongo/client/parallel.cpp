@@ -1436,10 +1436,14 @@ namespace mongo {
     }
 
     void ParallelSortClusteredCursor::_explain( map< string,list<BSONObj> >& out ) {
-        for ( set<ServerAndQuery>::iterator i=_servers.begin(); i!=_servers.end(); ++i ) {
-            const ServerAndQuery& sq = *i;
-            list<BSONObj> & l = out[sq._server];
-            l.push_back( explain( sq._server , sq._extra ) );
+
+        set<Shard> shards;
+        getQueryShards( shards );
+
+        for( set<Shard>::iterator i = shards.begin(), end = shards.end(); i != end; ++i ){
+            // TODO: Make this the shard name, not address
+            list<BSONObj>& l = out[ i->getAddress().toString() ];
+            l.push_back( getShardCursor( *i )->peekFirst().getOwned() );
         }
 
     }
