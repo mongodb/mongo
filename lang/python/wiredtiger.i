@@ -1,7 +1,7 @@
 /*
  * See the file LICENSE for redistribution information.
  *
- * Copyright (c) 2011 WiredTiger, Inc.
+ * Copyright (c) 2011-2012 WiredTiger, Inc.
  *	All rights reserved.
  *
  * wiredtiger.i
@@ -339,5 +339,29 @@ SELFHELPER(struct __wt_cursor)
 
 %pythoncode %{
 ## @}
+
+class stat:
+	""" a set of static defines used by statistics cursor """
+	pass
+
+class filestat:
+	""" a set of static defines used by statistics cursor """
+	pass
+
+import sys
+# All names starting with 'WT_STAT_file_' are renamed to
+# the wiredtiger.filestat class, those starting with 'WT_STAT_' are
+# renamed to wiredtiger.stat .
+def _rename_with_prefix(prefix, toclass):
+	curmodule = sys.modules[__name__]
+	for name in dir(curmodule):
+		if name.startswith(prefix):
+			shortname = name[len(prefix):]
+			setattr(toclass, shortname, getattr(curmodule, name))
+			delattr(curmodule, name)
+
+_rename_with_prefix('WT_STAT_file_', filestat)
+_rename_with_prefix('WT_STAT_', stat)
+del _rename_with_prefix
 %}
 

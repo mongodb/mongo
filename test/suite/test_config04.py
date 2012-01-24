@@ -64,16 +64,6 @@ class test_config04(wttest.WiredTigerTestCase):
         self.session = self.conn.open_session(None)
         self.populate_and_check()
 
-    def find_stat(self, cursor, matchstr):
-        """
-        Given a stat cursor, return the value for the matching string.
-        We do expect the string, so assert if it's not present.
-        """
-        for k, desc, pv, v in cursor:
-            if desc == matchstr:
-                return v
-        self.fail('In stat cursor, cannot find match for: ' + matchstr)
-
     def test_bad_config(self):
         self.assertRaises(WiredTigerError, lambda:
             wiredtiger.wiredtiger_open('.', 'not_valid,another_bad=10'))
@@ -82,7 +72,9 @@ class test_config04(wttest.WiredTigerTestCase):
     def test_cache_size(self):
         self.common_test('cache_size=30M')
         cursor = self.session.open_cursor('statistics:', None, None)
-        got_cache = self.find_stat(cursor, 'cache: maximum bytes configured')
+        cursor.set_key(int(wiredtiger.stat.cache_bytes_max))
+        self.assertEqual(cursor.search(), 0)
+        got_cache = cursor.get_values()[2]
         self.assertEqual(got_cache, 30*self.M)
 
     def test_cache_too_small(self):

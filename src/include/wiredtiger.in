@@ -1470,7 +1470,6 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 
 /*! @} */
 
-#if !defined(SWIG)
 /*******************************************
  * Statistic reference.
  *******************************************/
@@ -1630,7 +1629,6 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
  */
 /*! @} */
 /*! @} */
-#endif
 
 #undef __F
 
