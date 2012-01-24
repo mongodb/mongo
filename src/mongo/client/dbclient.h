@@ -367,6 +367,7 @@ namespace mongo {
         BSONObj sort() const { return _queryObj.getSort(); }
         BSONObj query() const { return _query; }
         BSONObj fields() const { return _fields; }
+        BSONObj* fieldsData() { return &_fields; }
 
         // don't love this, but needed downstrem
         const BSONObj* fieldsPtr() const { return &_fields; } 

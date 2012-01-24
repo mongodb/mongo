@@ -190,10 +190,24 @@ namespace mongo {
         // TODO: should do some simplification here if possibl ideally
     }
 
-    void ClusteredCursor::explain(BSONObjBuilder& b) {
+    void ParallelSortClusteredCursor::explain(BSONObjBuilder& b) {
         // Note: by default we filter out allPlans and oldPlan in the shell's
         // explain() function. If you add any recursive structures, make sure to
         // edit the JS to make sure everything gets filtered.
+
+        // Return single shard output if we're versioned but not sharded, or
+        // if we specified only a single shard
+        // TODO:  We should really make this simpler - all queries via mongos
+        // *always* get the same explain format
+        if( ( isVersioned() && ! isSharded() ) || _qShards.size() == 1 ){
+            map<string,list<BSONObj> > out;
+            _explain( out );
+            assert( out.size() == 1 );
+            list<BSONObj>& l = out.begin()->second;
+            assert( l.size() == 1 );
+            b.appendElements( *(l.begin()) );
+            return;
+        }
 
         b.append( "clusteredType" , type() );
 
@@ -800,25 +814,42 @@ namespace mongo {
 
                 // Setup cursor
                 if( ! state->cursor ){
-                    state->cursor.reset( new DBClientCursor( state->conn->get(), _qSpec.ns(), _qSpec.query(),
-                                                             isCommand() ? 1 : 0, // nToReturn (0 if query indicates multi)
-                                                             0, // nToSkip
-                                                             // Does this need to be a ptr?
-                                                             _qSpec.fields().isEmpty() ? 0 : _qSpec.fieldsPtr(), // fieldsToReturn
-                                                             _qSpec.options(), // options
-                                                             // NtoReturn is weird.
-                                                             // If zero, it means use default size, so we do that for all cursors
-                                                             // If positive, it's the batch size (we don't want this cursor limiting results), that's
-                                                             // done at a higher level
-                                                             // If negative, it's the batch size, but we don't create a cursor - so we don't want
-                                                             // to create a child cursor either.
-                                                             // Either way, if non-zero, we want to pull back the batch size + the skip amount as
-                                                             // quickly as possible.  Potentially, for a cursor on a single shard or if we keep better track of
-                                                             // chunks, we can actually add the skip value into the cursor and/or make some assumptions about the
-                                                             // return value size ( (batch size + skip amount) / num_servers ).
-                                                             _qSpec.ntoreturn() == 0 ? 0 :
-                                                                 ( _qSpec.ntoreturn() > 0 ? _qSpec.ntoreturn() + _qSpec.ntoskip() :
-                                                                                            _qSpec.ntoreturn() - _qSpec.ntoskip() ) ) ); // batchSize
+
+                    // Do a sharded query if this is not a primary shard *and* this is a versioned query,
+                    // or if the number of shards to query is > 1
+                    if( ( isVersioned() && ! primary ) || _qShards.size() > 1 ){
+
+                        state->cursor.reset( new DBClientCursor( state->conn->get(), _qSpec.ns(), _qSpec.query(),
+                                                                 isCommand() ? 1 : 0, // nToReturn (0 if query indicates multi)
+                                                                 0, // nToSkip
+                                                                 // Does this need to be a ptr?
+                                                                 _qSpec.fields().isEmpty() ? 0 : _qSpec.fieldsData(), // fieldsToReturn
+                                                                 _qSpec.options(), // options
+                                                                 // NtoReturn is weird.
+                                                                 // If zero, it means use default size, so we do that for all cursors
+                                                                 // If positive, it's the batch size (we don't want this cursor limiting results), that's
+                                                                 // done at a higher level
+                                                                 // If negative, it's the batch size, but we don't create a cursor - so we don't want
+                                                                 // to create a child cursor either.
+                                                                 // Either way, if non-zero, we want to pull back the batch size + the skip amount as
+                                                                 // quickly as possible.  Potentially, for a cursor on a single shard or if we keep better track of
+                                                                 // chunks, we can actually add the skip value into the cursor and/or make some assumptions about the
+                                                                 // return value size ( (batch size + skip amount) / num_servers ).
+                                                                 _qSpec.ntoreturn() == 0 ? 0 :
+                                                                     ( _qSpec.ntoreturn() > 0 ? _qSpec.ntoreturn() + _qSpec.ntoskip() :
+                                                                                                _qSpec.ntoreturn() - _qSpec.ntoskip() ) ) ); // batchSize
+                    }
+                    else{
+
+                        // Non-sharded
+                        state->cursor.reset( new DBClientCursor( state->conn->get(), _qSpec.ns(), _qSpec.query(),
+                                                                 _qSpec.ntoreturn(), // nToReturn
+                                                                 _qSpec.ntoskip(), // nToSkip
+                                                                 // Does this need to be a ptr?
+                                                                 _qSpec.fields().isEmpty() ? 0 : _qSpec.fieldsData(), // fieldsToReturn
+                                                                 _qSpec.options(), // options
+                                                                 0 ) ); // batchSize
+                    }
                 }
 
                 bool lazyInit = state->conn->get()->lazySupported();

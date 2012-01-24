@@ -86,7 +86,7 @@ namespace mongo {
 
         virtual string type() const = 0;
 
-        virtual void explain(BSONObjBuilder& b);
+        virtual void explain(BSONObjBuilder& b) = 0;
 
     protected:
 
@@ -365,6 +365,8 @@ namespace mongo {
 
         BSONObj toBSON() const;
         string toString() const;
+
+        virtual void explain(BSONObjBuilder& b);
 
     protected:
         void _finishCons();
