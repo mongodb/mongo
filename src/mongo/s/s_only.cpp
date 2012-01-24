@@ -99,6 +99,7 @@ namespace mongo {
 
         if (!client.getAuthenticationInfo()->isAuthorized(dbname)) {
             result.append("errmsg" , "unauthorized");
+            result.append("note" , "from execCommand" );
             return false;
         }
 

@@ -225,6 +225,7 @@ namespace mongo {
                 BSONElement e = q.query["op"];
                 if ( strstr( r.getns() , "admin." ) == 0 ) {
                     b.append( "err" , "unauthorized" );
+                    b.append( "note" , str::stream() << "mongos killop hack ns:" << r.getns() );
                 }
                 else if ( e.type() != String ) {
                     b.append( "err" , "bad op" );
