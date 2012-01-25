@@ -1360,7 +1360,7 @@ namespace mongo {
 
     template< class V >
     void buildBottomUpPhases2And3(bool dupsAllowed, IndexDetails& idx, BSONObjExternalSorter& sorter, 
-        bool dropDups, list<DiskLoc> &dupsToDrop, CurOp * op, SortPhaseOne *phase1, ProgressMeterHolder &pm,
+        bool dropDups, set<DiskLoc> &dupsToDrop, CurOp * op, SortPhaseOne *phase1, ProgressMeterHolder &pm,
         Timer& t
         )
     {
@@ -1397,7 +1397,7 @@ namespace mongo {
                 /* we could queue these on disk, but normally there are very few dups, so instead we
                     keep in ram and have a limit.
                 */
-                dupsToDrop.push_back(d.second);
+                dupsToDrop.insert(d.second);
                 uassert( 10092 , "too may dups on index build with dropDups=true", dupsToDrop.size() < 1000000 );
             }
             pm.hit();
@@ -1462,7 +1462,7 @@ namespace mongo {
 
         log(t.seconds() > 5 ? 0 : 1) << "\t external sort used : " << sorter.numFiles() << " files " << " in " << t.seconds() << " secs" << endl;
 
-        list<DiskLoc> dupsToDrop;
+        set<DiskLoc> dupsToDrop;
 
         /* build index --- */
         if( idx.version() == 0 )
@@ -1474,7 +1474,7 @@ namespace mongo {
 
         log(1) << "\t fastBuildIndex dupsToDrop:" << dupsToDrop.size() << endl;
 
-        for( list<DiskLoc>::iterator i = dupsToDrop.begin(); i != dupsToDrop.end(); i++ ){
+        for( set<DiskLoc>::iterator i = dupsToDrop.begin(); i != dupsToDrop.end(); i++ ){
             theDataFileMgr.deleteRecord( ns, i->rec(), *i, false /* cappedOk */ , true /* noWarn */ , isMaster( ns ) /* logOp */ );
             getDur().commitIfNeeded();
         }
