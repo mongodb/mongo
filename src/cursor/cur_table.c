@@ -16,7 +16,7 @@ static int __curtable_update(WT_CURSOR *cursor);
 	for (__i = 0, __cp = ctable->cg_cursors;			\
 	     __i < WT_COLGROUPS(ctable->table);				\
 	     __i++, __cp++)						\
-		WT_ERR((*__cp)->f(*__cp));				\
+		WT_TRET((*__cp)->f(*__cp));				\
 } while (0)
 
 #define	APPLY_IDX(ctable, f) do {					\
@@ -186,7 +186,7 @@ __curtable_next(WT_CURSOR *cursor)
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	CURSOR_API_CALL(cursor, session, next, NULL);
 	APPLY_CG(ctable, next);
-err:	API_END(session);
+	API_END(session);
 
 	return (ret);
 }
@@ -205,7 +205,7 @@ __curtable_prev(WT_CURSOR *cursor)
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	CURSOR_API_CALL(cursor, session, prev, NULL);
 	APPLY_CG(ctable, prev);
-err:	API_END(session);
+	API_END(session);
 
 	return (ret);
 }
@@ -224,7 +224,7 @@ __curtable_reset(WT_CURSOR *cursor)
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	CURSOR_API_CALL(cursor, session, reset, NULL);
 	APPLY_CG(ctable, reset);
-err:	API_END(session);
+	API_END(session);
 
 	return (ret);
 }
@@ -243,7 +243,7 @@ __curtable_search(WT_CURSOR *cursor)
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	CURSOR_API_CALL(cursor, session, search, NULL);
 	APPLY_CG(ctable, search);
-err:	API_END(session);
+	API_END(session);
 
 	return (ret);
 }
@@ -349,12 +349,14 @@ __curtable_update(WT_CURSOR *cursor)
 		    ctable->cg_cursors, ctable->plan,
 		    cursor->value_format, &cursor->value));
 		APPLY_CG(ctable, search);
+		WT_ERR(ret);
 		APPLY_IDX(ctable, remove);
 		WT_ERR(__wt_schema_project_slice(session,
 		    ctable->cg_cursors, ctable->plan, 0,
 		    cursor->value_format, &cursor->value));
 	}
 	APPLY_CG(ctable, update);
+	WT_ERR(ret);
 	if (ctable->idx_cursors != NULL)
 		APPLY_IDX(ctable, insert);
 err:	API_END(session);
@@ -380,6 +382,7 @@ __curtable_remove(WT_CURSOR *cursor)
 	WT_ERR(__curtable_open_indices(ctable));
 	if (ctable->table->nindices > 0) {
 		APPLY_CG(ctable, search);
+		WT_ERR(ret);
 		APPLY_IDX(ctable, remove);
 	}
 
