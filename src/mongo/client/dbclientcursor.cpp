@@ -27,6 +27,10 @@ namespace mongo {
 
     void assembleRequest( const string &ns, BSONObj query, int nToReturn, int nToSkip, const BSONObj *fieldsToReturn, int queryOptions, Message &toSend );
 
+    void DBClientCursor::_finishConsInit() {
+        _originalHost = _client->toString();
+    }
+
     int DBClientCursor::nextBatchSize() {
 
         if ( nToReturn == 0 )
@@ -55,8 +59,8 @@ namespace mongo {
     bool DBClientCursor::init() {
         Message toSend;
         _assembleInit( toSend );
-
-        if ( !_client->call( toSend, *batch.m, false ) ) {
+        assert( _client );
+        if ( !_client->call( toSend, *batch.m, false, &_originalHost ) ) {
             // log msg temp?
             log() << "DBClientCursor::init call() failed" << endl;
             return false;
@@ -74,7 +78,7 @@ namespace mongo {
         verify( 15875 , _client->lazySupported() );
         Message toSend;
         _assembleInit( toSend );
-        _client->say( toSend, isRetry );
+        _client->say( toSend, isRetry, &_originalHost );
     }
 
     bool DBClientCursor::initLazyFinish( bool& retry ) {

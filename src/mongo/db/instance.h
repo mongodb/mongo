@@ -98,7 +98,7 @@ namespace mongo {
             return "localhost"; // TODO: should this have the port?
         }
         virtual bool call( Message &toSend, Message &response, bool assertOk=true , string * actualServer = 0 );
-        virtual void say( Message &toSend, bool isRetry = false );
+        virtual void say( Message &toSend, bool isRetry = false , string * actualServer = 0 );
         virtual void sayPiggyBack( Message &toSend ) {
             // don't need to piggy back when connected locally
             return say( toSend );

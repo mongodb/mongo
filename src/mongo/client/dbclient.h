@@ -408,7 +408,7 @@ namespace mongo {
         virtual ~DBConnector() {}
         /** actualServer is set to the actual server where they call went if there was a choice (SlaveOk) */
         virtual bool call( Message &toSend, Message &response, bool assertOk=true , string * actualServer = 0 ) = 0;
-        virtual void say( Message &toSend, bool isRetry = false ) = 0;
+        virtual void say( Message &toSend, bool isRetry = false , string * actualServer = 0 ) = 0;
         virtual void sayPiggyBack( Message &toSend ) = 0;
         /* used by QueryOption_Exhaust.  To use that your subclass must implement this. */
         virtual bool recv( Message& m ) { assert(false); return false; }
@@ -969,7 +969,7 @@ namespace mongo {
 
         virtual void killCursor( long long cursorID );
         virtual bool callRead( Message& toSend , Message& response ) { return call( toSend , response ); }
-        virtual void say( Message &toSend, bool isRetry = false );
+        virtual void say( Message &toSend, bool isRetry = false , string * actualServer = 0 );
         virtual bool recv( Message& m );
         virtual void checkResponse( const char *data, int nReturned, bool* retry = NULL, string* host = NULL );
         virtual bool call( Message &toSend, Message &response, bool assertOk = true , string * actualServer = 0 );

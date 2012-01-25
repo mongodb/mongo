@@ -172,10 +172,12 @@ namespace mongo {
     }
 
     string CursorCache::getRef( long long id ) const {
-        LOG(_myLogLevel) << "CursorCache::getRef id: " << id << endl;
         assert( id );
         scoped_lock lk( _mutex );
         MapNormal::const_iterator i = _refs.find( id );
+
+        LOG(_myLogLevel) << "CursorCache::getRef id: " << id << " out: " << ( i == _refs.end() ? " NONE " : i->second ) << endl;
+
         if ( i == _refs.end() )
             return "";
         return i->second;

@@ -138,6 +138,7 @@ namespace mongo {
             cursorId(),
             _ownCursor( true ),
             wasError( false ) {
+            _finishConsInit();
         }
 
         DBClientCursor( DBClientBase* client, const string &_ns, long long _cursorId, int _nToReturn, int options ) :
@@ -148,6 +149,7 @@ namespace mongo {
             opts( options ),
             cursorId(_cursorId),
             _ownCursor( true ) {
+            _finishConsInit();
         }
 
         virtual ~DBClientCursor();
@@ -160,6 +162,8 @@ namespace mongo {
         void decouple() { _ownCursor = false; }
 
         void attach( AScopedConnection * conn );
+
+        string originalHost() const { return _originalHost; }
 
         Message* getMessage(){ return batch.m.get(); }
 
@@ -186,9 +190,11 @@ namespace mongo {
         friend class DBClientConnection;
 
         int nextBatchSize();
+        void _finishConsInit();
         
         Batch batch;
         DBClientBase* _client;
+        string _originalHost;
         string ns;
         BSONObj query;
         int nToReturn;
