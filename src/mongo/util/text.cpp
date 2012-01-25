@@ -93,7 +93,8 @@ namespace mongo {
             }
         }
 
-        msgasserted( 16062 , str::stream() << "can't wstring to utf8: " << ::GetLastError() );
+        throw boost::system::system_error(
+            ::GetLastError(), boost::system::system_category);
     }
 
 #if defined(_UNICODE)
