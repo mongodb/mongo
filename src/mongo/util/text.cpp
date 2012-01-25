@@ -18,7 +18,6 @@
 #include "pch.h"
 #include "text.h"
 #include "unittest.h"
-#include "boost/system/system_error.hpp"
 
 namespace mongo {
 

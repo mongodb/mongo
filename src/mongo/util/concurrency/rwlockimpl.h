@@ -2,6 +2,8 @@
 
 #pragma once
 
+#include "mutex.h"
+
 //#define RWLOCK_TEST 1
 
 namespace mongo {
@@ -101,6 +103,7 @@ namespace mongo {
 // pthreads version
 
 # include <pthread.h>
+# include <errno.h>
 
 namespace mongo { 
     class RWLockBase : boost::noncopyable {
