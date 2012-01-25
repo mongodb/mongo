@@ -642,6 +642,14 @@ namespace mongo {
 
     }
 
+    bool ModSetState::duplicateFieldName( const BSONElement &a, const BSONElement &b ) {
+        return
+        !a.eoo() &&
+        !b.eoo() &&
+        ( a.rawdata() != b.rawdata() ) &&
+        ( a.fieldName() == string( b.fieldName() ) );
+    }
+
     template< class Builder >
     void ModSetState::createNewFromMods( const string& root , Builder& b , const BSONObj &obj ) {
         DEBUGUPDATE( "\t\t createNewFromMods root: " << root );
@@ -654,8 +662,18 @@ namespace mongo {
         ModStateHolder::iterator mend = _mods.lower_bound( buf.str() );
 
         set<string> onedownseen;
-
+        BSONElement prevE;
         while ( e.type() && m != mend ) {
+
+            if ( duplicateFieldName( prevE, e ) ) {
+                // Just copy through an element with a duplicate field name.
+                b.append( e );
+                prevE = e;
+                e = es.next();
+                continue;
+            }
+            prevE = e;
+
             string field = root + e.fieldName();
             FieldCompareResult cmp = compareDottedFieldNames( m->second.m->fieldName , field );
 
@@ -684,11 +702,9 @@ namespace mongo {
                     m++;
                 }
                 else {
-                    // this is a very weird case
-                    // have seen it in production, but can't reproduce
-                    // this assert prevents an inf. loop
-                    // but likely isn't the correct solution
-                    assert(0);
+                    massert( 16062 , "ModSet::createNewFromMods - "
+                            "SERVER-4777 unhandled duplicate field" , 0 );
+
                 }
                 continue;
             }
