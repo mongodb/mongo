@@ -519,15 +519,6 @@ namespace UpdateTests {
         }
     };
 
-    class TwoModsWithinDuplicatedField : public SetBase {
-    public:
-        void run() {
-            client().insert( ns(), BSON( "a" << BSONObj() << "a" << BSONObj() ) );
-            client().update( ns(), BSONObj(), BSON( "$set" << BSON( "a.b" << 1 << "a.c" << 1 ) ) );
-            ASSERT( error() ); // descriptive test, not sure of correct behavior yet SERVER-4777
-        }
-    };
-    
     namespace ModSetTests {
 
         class internal1 {
@@ -863,7 +854,6 @@ namespace UpdateTests {
             add< PreserveIdWithIndex >();
             add< CheckNoMods >();
             add< UpdateMissingToNull >();
-            add< TwoModsWithinDuplicatedField >();
 
             add< ModSetTests::internal1 >();
             add< ModSetTests::inc1 >();
