@@ -36,6 +36,8 @@ assert.eq( 1 , s1.onNumShards( "foo" ) , "on 1 shards" );
 //   where we try to issue a move chunk from a mongos that's stale
 //   followed by a split on a valid chunk, albeit one with not the highest lastmod
 
+s1.stopBalancer()
+
 // split in [Minkey->1), [1->N), [N,Maxkey)
 s1.adminCommand( { split : "test.foo" , middle : { num : 1 } } );
 s1.adminCommand( { split : "test.foo" , middle : { num : N } } );
@@ -55,6 +57,8 @@ assert.eq( 1 , res.ok , "mongos did not reload after a failed migrate" + tojson(
 // s.printShardingStatus()
 res = s1.getDB( "admin" ).runCommand( { split : "test.foo" , middle : { num : N+1 } } ); // replace with { num: -1 } instead in 1.6
 assert.eq( 1, res.ok , "split over accurate boudaries should have succeeded" + tojson(res) );
+
+s1.setBalancer( true )
 
 // { num : 4 } is on primary
 // { num : 1 , 2 , 3 } are on secondary
