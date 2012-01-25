@@ -55,7 +55,7 @@ namespace mongo {
 
             bool exists = boost::filesystem::exists(lp);
             bool isdir = boost::filesystem::is_directory(lp);
-            bool isreg = boost::filesystem::is_regular_file(lp);
+            bool isreg = boost::filesystem::is_regular(lp);
 
             if ( exists ) {
                 if ( isdir ) {
