@@ -3,6 +3,8 @@
 s = new ShardingTest( "count1" , 2 , 1 );
 db = s.getDB( "test" );
 
+sh.setBalancerState( false );
+
 db.bar.save( { n : 1 } )
 db.bar.save( { n : 2 } )
 db.bar.save( { n : 3 } )
