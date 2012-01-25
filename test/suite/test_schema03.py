@@ -257,10 +257,12 @@ class test_schema03(wttest.WiredTigerTestCase):
     # This test requires a large number of open files.
     # Increase our resource limits before we start
     def setUp(self):
-        super(test_schema03, self).setUp()
         self.origFileLimit = resource.getrlimit(resource.RLIMIT_NOFILE)
         newlimit = (self.OPEN_FILE_LIMIT, self.origFileLimit[1])
+        if newlimit[0] > newlimit[1]:
+            self.skipTest('Require %d open files, only %d available' % newlimit)
         resource.setrlimit(resource.RLIMIT_NOFILE, newlimit)
+        super(test_schema03, self).setUp()
 
     def setUpConnectionOpen(self, dir):
         cs = 100 * 1024 * 1024
