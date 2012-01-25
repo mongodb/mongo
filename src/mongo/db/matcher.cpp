@@ -108,6 +108,9 @@ namespace mongo {
         else if ( op == BSONObj::opTYPE ) {
             _type = (BSONType)(e.numberInt());
         }
+        else if ( op == BSONObj::opBITAND || op == BSONObj::opBITOR ) {
+        	_bitCmp = e.numberInt();
+        }
         else if ( op == BSONObj::opELEM_MATCH ) {
             BSONElement m = e;
             uassert( 12517 , "$elemMatch needs an Object" , m.type() == Object );
@@ -282,6 +285,14 @@ namespace mongo {
         case BSONObj::opOPTIONS: {
             uassert( 13029, "can't use $not with $options, use BSON regex type instead", !isNot );
             flags = fe.valuestrsafe();
+            break;
+        }
+        case BSONObj::opBITAND:
+        case BSONObj::opBITOR: {
+            shared_ptr< BSONObjBuilder > b( new BSONObjBuilder() );
+            _builders.push_back( b );
+            b->appendAs(fe, e.fieldName());
+            addBasic(b->done().firstElement(), op, isNot);
             break;
         }
         case BSONObj::opNEAR:
@@ -567,6 +578,16 @@ namespace mongo {
                 return false;
 
             return l.numberLong() % bm._mod == bm._modm;
+        }
+
+        if ( op == BSONObj::opBITOR || op == BSONObj::opBITAND) {
+            if ( ! l.isNumber() )
+                return false;
+
+            if ( op == BSONObj::opBITOR )
+            	return l.numberLong() | bm._bitCmp;
+            else
+            	return l.numberLong() & bm._bitCmp;
         }
 
         if ( op == BSONObj::opTYPE ) {
