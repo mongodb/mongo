@@ -27,6 +27,10 @@ db.foo.save( { _id : 6 , name : "allan" } )
 
 assert.eq( 6 , db.foo.find().count() , "basic count" );
 
+// Need to stop balancer if doing manual stuff
+// Waits for balancer stop
+s.stopBalancer()
+
 s.adminCommand( { split : "test.foo" , find : { name : "joe" } } ); // [Minkey -> allan) , * [allan -> ..)
 s.adminCommand( { split : "test.foo" , find : { name : "joe" } } ); // * [allan -> sara) , [sara -> Maxkey)
 s.adminCommand( { split : "test.foo" , find : { name : "joe" } } ); // [alan -> joe) , [joe -> sara]
@@ -37,6 +41,9 @@ assert.eq( 6 , db.foo.find().count() , "basic count after split " );
 assert.eq( 6 , db.foo.find().sort( { name : 1 } ).count() , "basic count after split sorted " );
 
 s.adminCommand( { movechunk : "test.foo" , find : { name : "allan" } , to : secondary.getMongo().name } );
+
+// Eventually restart balancer
+s.setBalancer( true )
 
 assert.eq( 3 , primary.foo.find().toArray().length , "primary count" );
 assert.eq( 3 , secondary.foo.find().toArray().length , "secondary count" );
