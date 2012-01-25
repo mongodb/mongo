@@ -1472,7 +1472,8 @@ namespace mongo {
         else
             assert(false);
 
-        log(1) << "\t fastBuildIndex dupsToDrop:" << dupsToDrop.size() << endl;
+        if( dropDups ) 
+            log() << "\t fastBuildIndex dupsToDrop:" << dupsToDrop.size() << endl;
 
         for( set<DiskLoc>::iterator i = dupsToDrop.begin(); i != dupsToDrop.end(); i++ ){
             theDataFileMgr.deleteRecord( ns, i->rec(), *i, false /* cappedOk */ , true /* noWarn */ , isMaster( ns ) /* logOp */ );
@@ -1491,6 +1492,7 @@ namespace mongo {
             ProgressMeter& progress = cc().curop()->setMessage( "bg index build" , d->stats.nrecords );
 
             unsigned long long n = 0;
+            unsigned long long numDropped = 0;
             auto_ptr<ClientCursor> cc;
             {
                 shared_ptr<Cursor> c = theDataFileMgr.findAll(ns);
@@ -1532,6 +1534,7 @@ namespace mongo {
                             }
                             break;
                         }
+                        numDropped++;
                     }
                     else {
                         log() << "background addExistingToIndex exception " << e.what() << endl;
@@ -1553,6 +1556,8 @@ namespace mongo {
                 }
             }
             progress.finished();
+            if ( dropDups )
+                log() << "\t backgroundIndexBuild dupsToDrop: " << numDropped << endl;
             return n;
         }
 
@@ -1643,7 +1648,7 @@ namespace mongo {
             BackgroundIndexBuildJob j(ns.c_str());
             n = j.go(ns, d, idx, idxNo);
         }
-        tlog() << "build index done " << n << " records " << t.millis() / 1000.0 << " secs" << endl;
+        tlog() << "build index done.  scanned " << n << " total records. " << t.millis() / 1000.0 << " secs" << endl;
     }
 
     /* add keys to indexes for a new record */
