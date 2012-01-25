@@ -173,44 +173,6 @@ __wt_curtable_set_value(WT_CURSOR *cursor, ...)
 }
 
 /*
- * __curtable_first --
- *	WT_CURSOR->first method for the table cursor type.
- */
-static int
-__curtable_first(WT_CURSOR *cursor)
-{
-	WT_CURSOR_TABLE *ctable;
-	WT_SESSION_IMPL *session;
-	int ret;
-
-	ctable = (WT_CURSOR_TABLE *)cursor;
-	CURSOR_API_CALL(cursor, session, first, NULL);
-	APPLY_CG(ctable, first);
-err:	API_END(session);
-
-	return (ret);
-}
-
-/*
- * __curtable_last --
- *	WT_CURSOR->last method for the table cursor type.
- */
-static int
-__curtable_last(WT_CURSOR *cursor)
-{
-	WT_CURSOR_TABLE *ctable;
-	WT_SESSION_IMPL *session;
-	int ret;
-
-	ctable = (WT_CURSOR_TABLE *)cursor;
-	CURSOR_API_CALL(cursor, session, last, NULL);
-	APPLY_CG(ctable, last);
-err:	API_END(session);
-
-	return (ret);
-}
-
-/*
  * __curtable_next --
  *	WT_CURSOR->next method for the table cursor type.
  */
@@ -243,6 +205,25 @@ __curtable_prev(WT_CURSOR *cursor)
 	ctable = (WT_CURSOR_TABLE *)cursor;
 	CURSOR_API_CALL(cursor, session, prev, NULL);
 	APPLY_CG(ctable, prev);
+err:	API_END(session);
+
+	return (ret);
+}
+
+/*
+ * __curtable_reset --
+ *	WT_CURSOR->reset method for the table cursor type.
+ */
+static int
+__curtable_reset(WT_CURSOR *cursor)
+{
+	WT_CURSOR_TABLE *ctable;
+	WT_SESSION_IMPL *session;
+	int ret;
+
+	ctable = (WT_CURSOR_TABLE *)cursor;
+	CURSOR_API_CALL(cursor, session, reset, NULL);
+	APPLY_CG(ctable, reset);
 err:	API_END(session);
 
 	return (ret);
@@ -529,10 +510,9 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		__wt_curtable_get_value,
 		__wt_curtable_set_key,
 		__wt_curtable_set_value,
-		__curtable_first,
-		__curtable_last,
 		__curtable_next,
 		__curtable_prev,
+		__curtable_reset,
 		__curtable_search,
 		__curtable_search_near,
 		__curtable_insert,

@@ -402,25 +402,6 @@ new_insert:	if ((ins = cbt->ins) != NULL) {
 }
 
 /*
- * __wt_btcur_last --
- *	Move to the last record in the tree.
- */
-int
-__wt_btcur_last(WT_CURSOR_BTREE *cbt)
-{
-	WT_SESSION_IMPL *session;
-
-	session = (WT_SESSION_IMPL *)cbt->iface.session;
-
-	WT_BSTAT_INCR(session, cursor_last);
-
-	__cursor_func_init(cbt, 1);
-	cbt->flags = WT_CBT_ITERATE_PREV;
-
-	return (__wt_btcur_prev(cbt));
-}
-
-/*
  * __wt_btcur_prev --
  *	Move to the previous record in the tree.
  */

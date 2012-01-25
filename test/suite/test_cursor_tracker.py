@@ -265,13 +265,15 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
     def cur_first(self, cursor, expect=0):
         self.setpos(0, True)
         self.traceapi('cursor.first()')
-        self.assertEquals(expect, cursor.first())
+        self.assertEquals(0, cursor.reset())
+        self.assertEquals(expect, cursor.next())
         self.curremoved = False
 
     def cur_last(self, cursor, expect=0):
         self.setpos(len(self.bitlist) - 1, False)
         self.traceapi('cursor.last()')
-        self.assertEquals(expect, cursor.last())
+        self.assertEquals(0, cursor.reset())
+        self.assertEquals(expect, cursor.prev())
         self.curremoved = False
 
     def cur_update(self, cursor, key):

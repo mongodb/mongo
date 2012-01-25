@@ -156,34 +156,6 @@ __curstat_set_value(WT_CURSOR *cursor, ...)
 }
 
 /*
- * __curstat_first --
- *	WT_CURSOR->first method for the statistics cursor type.
- */
-static int
-__curstat_first(WT_CURSOR *cursor)
-{
-	WT_CURSOR_STAT *cst;
-
-	cst = (WT_CURSOR_STAT *)cursor;
-	cst->notpositioned = 1;
-	return (__curstat_next(cursor));
-}
-
-/*
- * __curstat_last --
- *	WT_CURSOR->last method for the statistics cursor type.
- */
-static int
-__curstat_last(WT_CURSOR *cursor)
-{
-	WT_CURSOR_STAT *cst;
-
-	cst = (WT_CURSOR_STAT *)cursor;
-	cst->notpositioned = 1;
-	return (__curstat_prev(cursor));
-}
-
-/*
  * __curstat_next --
  *	WT_CURSOR->next method for the statistics cursor type.
  */
@@ -248,6 +220,20 @@ __curstat_prev(WT_CURSOR *cursor)
 
 err:	API_END(session);
 	return (ret);
+}
+
+/*
+ * __curstat_reset --
+ *	WT_CURSOR->reset method for the statistics cursor type.
+ */
+static int
+__curstat_reset(WT_CURSOR *cursor)
+{
+	WT_CURSOR_STAT *cst;
+
+	cst = (WT_CURSOR_STAT *)cursor;
+	cst->notpositioned = 1;
+	return (0);
 }
 
 /*
@@ -329,10 +315,9 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 		NULL,
 		NULL,
 		NULL,
-		__curstat_first,
-		__curstat_last,
 		__curstat_next,
 		__curstat_prev,
+		__curstat_reset,
 		__curstat_search,
 					/* search-near */
 		(int (*)(WT_CURSOR *, int *))__wt_cursor_notsup,

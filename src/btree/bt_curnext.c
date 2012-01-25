@@ -345,26 +345,6 @@ __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt, int next)
 }
 
 /*
- * __wt_btcur_first --
- *	Move to the first record in the tree.
- */
-int
-__wt_btcur_first(WT_CURSOR_BTREE *cbt)
-{
-	WT_SESSION_IMPL *session;
-
-	session = (WT_SESSION_IMPL *)cbt->iface.session;
-	WT_BSTAT_INCR(session, cursor_first);
-
-	__cursor_func_init(cbt, 1);
-
-	cbt->recno = 0;
-	cbt->flags = WT_CBT_ITERATE_NEXT;
-
-	return (__wt_btcur_next(cbt));
-}
-
-/*
  * __wt_btcur_next --
  *	Move to the next record in the tree.
  */

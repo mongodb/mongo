@@ -30,11 +30,10 @@ Cursors may be positioned at the beginning of the data source, the end of
 the data source, at an exact key within the data source, and near a key
 within the data source.  
 
-To position a cursor at the beginning or end of the data source, use the
-WT_CURSOR::first and WT_CURSOR::last methods:
+To invalidate the position of a cursor so that subsequent iterations start
+from the beginning or end of the data source, use the WT_CURSOR::reset method:
 
-@snippet ex_cursor.c cursor first
-@snippet ex_cursor.c cursor last
+@snippet ex_cursor.c cursor reset
 
 To move a cursor forward or backward in the data source, use the cursor
 WT_CURSOR::next and WT_CURSOR::prev methods:

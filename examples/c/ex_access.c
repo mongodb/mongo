@@ -66,9 +66,8 @@ int main(void)
 	/*! [access example cursor insert] */
 
 	/*! [access example cursor list] */
-	for (ret = cursor->first(cursor);	/* Show all records. */
-	    ret == 0;
-	    ret = cursor->next(cursor)) {
+	ret = cursor->reset(cursor);	        /* Restart the scan. */
+	while ((ret = cursor->next(cursor)) == 0) {
 		ret = cursor->get_key(cursor, &key);
 		ret = cursor->get_value(cursor, &value);
 

@@ -8,44 +8,6 @@
 #include "wt_internal.h"
 
 /*
- * __curfile_first --
- *	WT_CURSOR->first method for the btree cursor type.
- */
-static int
-__curfile_first(WT_CURSOR *cursor)
-{
-	WT_CURSOR_BTREE *cbt;
-	WT_SESSION_IMPL *session;
-	int ret;
-
-	cbt = (WT_CURSOR_BTREE *)cursor;
-	CURSOR_API_CALL(cursor, session, first, cbt->btree);
-	ret = __wt_btcur_first(cbt);
-	API_END(session);
-
-	return (ret);
-}
-
-/*
- * __curfile_last --
- *	WT_CURSOR->last method for the btree cursor type.
- */
-static int
-__curfile_last(WT_CURSOR *cursor)
-{
-	WT_CURSOR_BTREE *cbt;
-	WT_SESSION_IMPL *session;
-	int ret;
-
-	cbt = (WT_CURSOR_BTREE *)cursor;
-	CURSOR_API_CALL(cursor, session, last, cbt->btree);
-	ret = __wt_btcur_last(cbt);
-	API_END(session);
-
-	return (ret);
-}
-
-/*
  * __curfile_next --
  *	WT_CURSOR->next method for the btree cursor type.
  */
@@ -78,6 +40,25 @@ __curfile_prev(WT_CURSOR *cursor)
 	cbt = (WT_CURSOR_BTREE *)cursor;
 	CURSOR_API_CALL(cursor, session, prev, cbt->btree);
 	ret = __wt_btcur_prev((WT_CURSOR_BTREE *)cursor);
+	API_END(session);
+
+	return (ret);
+}
+
+/*
+ * __curfile_reset --
+ *	WT_CURSOR->reset method for the btree cursor type.
+ */
+static int
+__curfile_reset(WT_CURSOR *cursor)
+{
+	WT_CURSOR_BTREE *cbt;
+	WT_SESSION_IMPL *session;
+	int ret;
+
+	cbt = (WT_CURSOR_BTREE *)cursor;
+	CURSOR_API_CALL(cursor, session, reset, cbt->btree);
+	ret = __wt_btcur_reset(cbt);
 	API_END(session);
 
 	return (ret);
@@ -224,10 +205,9 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 		NULL,
 		NULL,
 		NULL,
-		__curfile_first,
-		__curfile_last,
 		__curfile_next,
 		__curfile_prev,
+		__curfile_reset,
 		__curfile_search,
 		__curfile_search_near,
 		__curfile_insert,

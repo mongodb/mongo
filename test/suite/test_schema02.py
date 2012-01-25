@@ -148,16 +148,9 @@ class test_schema02(wttest.WiredTigerTestCase):
             self.assertEqual(s3, 'val' + str(cube))
             self.assertEqual(i4, cube)
 
-# TODO: why doesn't just cursor.reset() work here?
-# Another alternative (but not any nicer) is:
-#        cursor.close()
-#        cursor = self.session.open_cursor('table:main', None, None)
-        cursor.reset()
-        cursor.next()
-        cursor.prev()
-
         i = 0
         # then check all via cursor
+        cursor.reset()
         for ikey, skey, s1, i2, s3, i4 in cursor:
             square = i * i
             cube = square * i

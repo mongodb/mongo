@@ -54,14 +54,13 @@ struct __wt_btree_stats {
 	WT_STATS file_col_fix_pages;
 	WT_STATS file_col_int_pages;
 	WT_STATS file_col_var_pages;
-	WT_STATS cursor_first;
 	WT_STATS cursor_inserts;
-	WT_STATS cursor_last;
 	WT_STATS cursor_read;
 	WT_STATS cursor_read_near;
 	WT_STATS cursor_read_next;
 	WT_STATS cursor_read_prev;
 	WT_STATS cursor_removes;
+	WT_STATS cursor_resets;
 	WT_STATS cursor_updates;
 	WT_STATS alloc;
 	WT_STATS extend;

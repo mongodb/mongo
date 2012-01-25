@@ -296,11 +296,6 @@ SELFHELPER(struct __wt_cursor)
             if not hasattr(self, '_iterable'):
                 self._iterable = IterableCursor(self)
             return self._iterable
-
-        def reset(self):
-            '''Forget the current cursor position'''
-            self.last()
-            self.next()
 %}
 };
 

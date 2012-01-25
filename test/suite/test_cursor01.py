@@ -95,17 +95,19 @@ class test_cursor01(wttest.WiredTigerTestCase):
         # Don't use the builtin 'for ... in cursor',
         # iterate using the basic API.
 
-        # 1. Calling first() should place us on the first k/v pair.
-        nextret = cursor.first()
+        # 1. Start with the first k/v pair.
+        cursor.reset()
         i = 0
-        while nextret == 0:
+        while True:
+            nextret = cursor.next()
+            if nextret != 0:
+                break
             key = cursor.get_key()
             value = cursor.get_value()
             #print('want: ' + str(self.genkey(i)) + ' got: ' + str(key))
             self.assertEqual(key, self.genkey(i))
             self.assertEqual(value, self.genvalue(i))
             i += 1
-            nextret = cursor.next()
 
         self.assertEqual(nextret, wiredtiger.WT_NOTFOUND)
         self.assertEqual(i, self.nentries)
@@ -146,16 +148,18 @@ class test_cursor01(wttest.WiredTigerTestCase):
         # Don't use the builtin 'for ... in cursor',
         # iterate using the basic API.
 
-        # 1. Calling last() should place us on the last k/v pair.
-        prevret = cursor.last()
+        # 1. Start with the last k/v pair.
+        cursor.reset()
         i = self.nentries - 1
-        while prevret == 0:
+        while True:
+            prevret = cursor.prev()
+            if prevret != 0:
+                break
             key = cursor.get_key()
             value = cursor.get_value()
             self.assertEqual(key, self.genkey(i))
             self.assertEqual(value, self.genvalue(i))
             i -= 1
-            prevret = cursor.prev()
 
         self.assertEqual(prevret, wiredtiger.WT_NOTFOUND)
         self.assertEqual(i, -1)

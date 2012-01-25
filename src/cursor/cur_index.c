@@ -107,46 +107,6 @@ __curindex_move(WT_CURSOR_INDEX *cindex)
 }
 
 /*
- * __curindex_first --
- *	WT_CURSOR->first method for index cursors.
- */
-static int
-__curindex_first(WT_CURSOR *cursor)
-{
-	WT_CURSOR_INDEX *cindex;
-	WT_SESSION_IMPL *session;
-	int ret;
-
-	cindex = (WT_CURSOR_INDEX *)cursor;
-	CURSOR_API_CALL(cursor, session, first, cindex->cbt.btree);
-	if ((ret = __wt_btcur_first(&cindex->cbt)) == 0)
-		ret = __curindex_move(cindex);
-	API_END(session);
-
-	return (ret);
-}
-
-/*
- * __curindex_last --
- *	WT_CURSOR->last method for index cursors.
- */
-static int
-__curindex_last(WT_CURSOR *cursor)
-{
-	WT_CURSOR_INDEX *cindex;
-	WT_SESSION_IMPL *session;
-	int ret;
-
-	cindex = (WT_CURSOR_INDEX *)cursor;
-	CURSOR_API_CALL(cursor, session, last, cindex->cbt.btree);
-	if ((ret = __wt_btcur_last(&cindex->cbt)) == 0)
-		ret = __curindex_move(cindex);
-	API_END(session);
-
-	return (ret);
-}
-
-/*
  * __curindex_next --
  *	WT_CURSOR->next method for index cursors.
  */
@@ -181,6 +141,34 @@ __curindex_prev(WT_CURSOR *cursor)
 	CURSOR_API_CALL(cursor, session, prev, cindex->cbt.btree);
 	if ((ret = __wt_btcur_prev(&cindex->cbt)) == 0)
 		ret = __curindex_move(cindex);
+	API_END(session);
+
+	return (ret);
+}
+
+/*
+ * __curindex_reset --
+ *	WT_CURSOR->reset method for index cursors.
+ */
+static int
+__curindex_reset(WT_CURSOR *cursor)
+{
+	WT_CURSOR **cp;
+	WT_CURSOR_INDEX *cindex;
+	WT_SESSION_IMPL *session;
+	int i, ret;
+
+	cindex = (WT_CURSOR_INDEX *)cursor;
+	CURSOR_API_CALL(cursor, session, reset, cindex->cbt.btree);
+	WT_TRET(__wt_btcur_reset(&cindex->cbt));
+
+	for (i = 0, cp = cindex->cg_cursors;
+	    i < WT_COLGROUPS(cindex->table);
+	    i++, cp++) {
+		if (*cp == NULL)
+			continue;
+		WT_TRET((*cp)->reset(*cp));
+	}
 	API_END(session);
 
 	return (ret);
@@ -355,10 +343,9 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 		__curindex_get_value,
 		NULL,
 		__curindex_set_value,
-		__curindex_first,
-		__curindex_last,
 		__curindex_next,
 		__curindex_prev,
+		__curindex_reset,
 		__curindex_search,
 		__curindex_search_near,
 		__wt_cursor_notsup,	/* insert */

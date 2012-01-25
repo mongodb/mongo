@@ -33,8 +33,7 @@
 
 #include <wiredtiger.h>
 
-int cursor_first(WT_CURSOR *cursor);
-int cursor_last(WT_CURSOR *cursor);
+int cursor_reset(WT_CURSOR *cursor);
 int cursor_forward_scan(WT_CURSOR *cursor);
 int cursor_reverse_scan(WT_CURSOR *cursor);
 int cursor_search(WT_CURSOR *cursor);
@@ -44,36 +43,6 @@ int cursor_update(WT_CURSOR *cursor);
 int cursor_remove(WT_CURSOR *cursor);
 
 const char *home = "WT_TEST";
-
-/*! [cursor first] */
-int
-cursor_first(WT_CURSOR *cursor)
-{
-	const char *key, *value;
-	int ret;
-
-	if ((ret = cursor->first(cursor)) == 0) {
-		ret = cursor->get_key(cursor, &key);
-		ret = cursor->get_value(cursor, &value);
-	}
-	return (ret);
-}
-/*! [cursor first] */
-
-/*! [cursor last] */
-int
-cursor_last(WT_CURSOR *cursor)
-{
-	const char *key, *value;
-	int ret;
-
-	if ((ret = cursor->last(cursor)) == 0) {
-		ret = cursor->get_key(cursor, &key);
-		ret = cursor->get_value(cursor, &value);
-	}
-	return (ret);
-}
-/*! [cursor last] */
 
 /*! [cursor next] */
 int
@@ -104,6 +73,14 @@ cursor_reverse_scan(WT_CURSOR *cursor)
 	return (ret);
 }
 /*! [cursor prev] */
+
+/*! [cursor reset] */
+int
+cursor_reset(WT_CURSOR *cursor)
+{
+	return (cursor->reset(cursor));
+}
+/*! [cursor reset] */
 
 /*! [cursor search] */
 int
@@ -219,9 +196,9 @@ int main(void)
 	    "key_format=S,value_format=S");
 	ret = session->open_cursor(session, "table:map", NULL, NULL, &cursor);
 	ret = cursor_insert(cursor);
-	ret = cursor_first(cursor);
+	ret = cursor_reset(cursor);
 	ret = cursor_forward_scan(cursor);
-	ret = cursor_last(cursor);
+	ret = cursor_reset(cursor);
 	ret = cursor_reverse_scan(cursor);
 	ret = cursor_update(cursor);
 	ret = cursor_remove(cursor);

@@ -118,21 +118,17 @@ cursor_ops(WT_SESSION *session)
 	/*! [Set the cursor's raw value] */
 	}
 
-	/*! [Return the first key/value pair] */
-	ret = cursor->first(cursor);
-	/*! [Return the first key/value pair] */
-
-	/*! [Return the last key/value pair] */
-	ret = cursor->last(cursor);
-	/*! [Return the last key/value pair] */
-
-	/*! [Return the next key/value pair] */
+	/*! [Return the next record] */
 	ret = cursor->next(cursor);
-	/*! [Return the next key/value pair] */
+	/*! [Return the next record] */
 
-	/*! [Return the previous key/value pair] */
+	/*! [Return the previous record] */
 	ret = cursor->prev(cursor);
-	/*! [Return the previous key/value pair] */
+	/*! [Return the previous record] */
+
+	/*! [Reset the cursor] */
+	ret = cursor->reset(cursor);
+	/*! [Reset the cursor] */
 
 	{
 	/*! [Search for an exact match] */

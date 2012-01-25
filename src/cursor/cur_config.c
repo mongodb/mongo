@@ -33,10 +33,9 @@ __wt_curconfig_open(WT_SESSION_IMPL *session,
 		NULL,
 		NULL,
 		NULL,
-		__wt_cursor_notsup,	/* first */
-		__wt_cursor_notsup,	/* last */
 		__wt_cursor_notsup,	/* next */
 		__wt_cursor_notsup,	/* prev */
+		__wt_cursor_notsup,	/* reset */
 		__wt_cursor_notsup,	/* search */
 					/* search-near */
 		(int (*)(WT_CURSOR *, int *))__wt_cursor_notsup,

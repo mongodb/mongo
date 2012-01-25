@@ -81,8 +81,7 @@ struct __wt_session;	    typedef struct __wt_session WT_SESSION;
 
 /*!
  * A raw item of data to be managed.  Data items have a pointer to the data and
- * a length (limited to 4GB for items stored in tables).  Records consist of a
- * pair of items: a key and an associated value.
+ * a length (limited to 4GB for items stored in tables).
  */
 struct __wt_item {
 	/*!
@@ -221,27 +220,9 @@ struct __wt_cursor {
 	/*! @name Cursor positioning
 	 * @{
 	 */
-	/*! Return the first record.
-	 *
-	 * @snippet ex_all.c Return the first key/value pair
-	 *
-	 * @param cursor the cursor handle
-	 * @errors
-	 */
-	int __F(first)(WT_CURSOR *cursor);
-
-	/*! Return the last record.
-	 *
-	 * @snippet ex_all.c Return the last key/value pair
-	 *
-	 * @param cursor the cursor handle
-	 * @errors
-	 */
-	int __F(last)(WT_CURSOR *cursor);
-
 	/*! Return the next record.
 	 *
-	 * @snippet ex_all.c Return the next key/value pair
+	 * @snippet ex_all.c Return the next record
 	 *
 	 * @param cursor the cursor handle
 	 * @errors
@@ -250,14 +231,26 @@ struct __wt_cursor {
 
 	/*! Return the previous record.
 	 *
-	 * @snippet ex_all.c Return the previous key/value pair
+	 * @snippet ex_all.c Return the previous record
 	 *
 	 * @param cursor the cursor handle
 	 * @errors
 	 */
 	int __F(prev)(WT_CURSOR *cursor);
 
-	/*! Return the record matching the key; the key must first be set.
+	/*! Reset the position of the cursor.  Any resources held by the cursor
+	 * are released, and the cursor position is no longer valid.  Subsequent
+	 * iteration with WT_CURSOR::next will move to the first record, or
+	 * with WT_CURSOR::prev will move to the last record.
+	 *
+	 * @snippet ex_all.c Reset the cursor
+	 *
+	 * @param cursor the cursor handle
+	 * @errors
+	 */
+	int __F(reset)(WT_CURSOR *cursor);
+
+	/*! Move to the record matching the key. The key must first be set.
 	 *
 	 * @snippet ex_all.c Search for an exact match
 	 *
@@ -266,11 +259,10 @@ struct __wt_cursor {
 	 */
 	int __F(search)(WT_CURSOR *cursor);
 
-	/*!
-	 * Return the record matching the key if it exists, otherwise the
-	 * smallest record larger than the key or the largest record smaller
-	 * than the key (in other words, a logically adjacent key); the key
-	 * must first be set.
+	/*! Move to the record matching the key if it exists, or a record that
+	 * would be adjacent.  Either the smallest record larger than the key
+	 * or the largest record smaller than the key (in other words, a
+	 * logically adjacent key).  The key must first be set.
 	 *
 	 * @snippet ex_all.c Search for an exact or adjacent match
 	 *
@@ -291,17 +283,17 @@ struct __wt_cursor {
 	 * @{
 	 */
 	/*! Insert a record, and optionally overwrite an existing record.
-	 * If the cursor was not configured with "overwrite", both the key and
-	 * value must be set and the record must not already exist; the
-	 * key/value pair will be inserted.
+	 * If the cursor was not configured with "append" or "overwrite", both
+	 * the key and value must be set and the record must not already exist;
+	 * the record will be inserted.
 	 *
 	 * If the cursor was configured with "overwrite", both the key and value
 	 * must be set; if the record already exists, the key's value will be
-	 * updated, otherwise, the key/value pair will be inserted.
+	 * updated, otherwise, the record will be inserted.
 	 *
-	 * In table or file with a record number key, if the cursor was
-	 * configured with "append", the value must be set; a new record will
-	 * be appended and the record number returned as the key value.
+	 * In a cursor with record number keys was configured with "append",
+	 * the value must be set; a new record will be appended and the record
+	 * number set as the cursor key value.
 	 *
 	 * Inserting a new record after the current maximum record in a
 	 * fixed-length column-store implicitly creates skipped records as
@@ -1544,84 +1536,82 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_file_col_int_pages			3
 /*! column-store variable-size leaf pages */
 #define	WT_STAT_file_col_var_pages			4
-/*! cursor-first */
-#define	WT_STAT_cursor_first				5
 /*! cursor-inserts */
-#define	WT_STAT_cursor_inserts				6
-/*! cursor-last */
-#define	WT_STAT_cursor_last				7
+#define	WT_STAT_cursor_inserts				5
 /*! cursor-read */
-#define	WT_STAT_cursor_read				8
+#define	WT_STAT_cursor_read				6
 /*! cursor-read-near */
-#define	WT_STAT_cursor_read_near			9
+#define	WT_STAT_cursor_read_near			7
 /*! cursor-read-next */
-#define	WT_STAT_cursor_read_next			10
+#define	WT_STAT_cursor_read_next			8
 /*! cursor-read-prev */
-#define	WT_STAT_cursor_read_prev			11
+#define	WT_STAT_cursor_read_prev			9
 /*! cursor-removes */
-#define	WT_STAT_cursor_removes				12
+#define	WT_STAT_cursor_removes				10
+/*! cursor-resets */
+#define	WT_STAT_cursor_resets				11
 /*! cursor-updates */
-#define	WT_STAT_cursor_updates				13
+#define	WT_STAT_cursor_updates				12
 /*! file: block allocations */
-#define	WT_STAT_alloc					14
+#define	WT_STAT_alloc					13
 /*! file: block allocations required file extension */
-#define	WT_STAT_extend					15
+#define	WT_STAT_extend					14
 /*! file: block frees */
-#define	WT_STAT_free					16
+#define	WT_STAT_free					15
 /*! file: overflow pages read from the file */
-#define	WT_STAT_overflow_read				17
+#define	WT_STAT_overflow_read				16
 /*! file: pages read from the file */
-#define	WT_STAT_page_read				18
+#define	WT_STAT_page_read				17
 /*! file: pages written to the file */
-#define	WT_STAT_page_write				19
+#define	WT_STAT_page_write				18
 /*! file: size */
-#define	WT_STAT_file_size				20
+#define	WT_STAT_file_size				19
 /*! fixed-record size */
-#define	WT_STAT_file_fixed_len				21
+#define	WT_STAT_file_fixed_len				20
 /*! magic number */
-#define	WT_STAT_file_magic				22
+#define	WT_STAT_file_magic				21
 /*! major version number */
-#define	WT_STAT_file_major				23
+#define	WT_STAT_file_major				22
 /*! maximum internal page item size */
-#define	WT_STAT_file_maxintlitem			24
+#define	WT_STAT_file_maxintlitem			23
 /*! maximum internal page size */
-#define	WT_STAT_file_maxintlpage			25
+#define	WT_STAT_file_maxintlpage			24
 /*! maximum leaf page item size */
-#define	WT_STAT_file_maxleafitem			26
+#define	WT_STAT_file_maxleafitem			25
 /*! maximum leaf page size */
-#define	WT_STAT_file_maxleafpage			27
+#define	WT_STAT_file_maxleafpage			26
 /*! minor version number */
-#define	WT_STAT_file_minor				28
+#define	WT_STAT_file_minor				27
 /*! number of bytes in the freelist */
-#define	WT_STAT_file_freelist_bytes			29
+#define	WT_STAT_file_freelist_bytes			28
 /*! number of entries in the freelist */
-#define	WT_STAT_file_freelist_entries			30
+#define	WT_STAT_file_freelist_entries			29
 /*! overflow pages */
-#define	WT_STAT_file_overflow				31
+#define	WT_STAT_file_overflow				30
 /*! page size allocation unit */
-#define	WT_STAT_file_allocsize				32
+#define	WT_STAT_file_allocsize				31
 /*! reconcile: deleted or temporary pages merged */
-#define	WT_STAT_rec_page_merge				33
+#define	WT_STAT_rec_page_merge				32
 /*! reconcile: internal pages split */
-#define	WT_STAT_rec_split_intl				34
+#define	WT_STAT_rec_split_intl				33
 /*! reconcile: leaf pages split */
-#define	WT_STAT_rec_split_leaf				35
+#define	WT_STAT_rec_split_leaf				34
 /*! reconcile: overflow key */
-#define	WT_STAT_rec_ovfl_key				36
+#define	WT_STAT_rec_ovfl_key				35
 /*! reconcile: overflow value */
-#define	WT_STAT_rec_ovfl_value				37
+#define	WT_STAT_rec_ovfl_value				36
 /*! reconcile: pages deleted */
-#define	WT_STAT_rec_page_delete				38
+#define	WT_STAT_rec_page_delete				37
 /*! reconcile: pages written */
-#define	WT_STAT_rec_written				39
+#define	WT_STAT_rec_written				38
 /*! reconcile: unable to acquire hazard reference */
-#define	WT_STAT_rec_hazard				40
+#define	WT_STAT_rec_hazard				39
 /*! row-store internal pages */
-#define	WT_STAT_file_row_int_pages			41
+#define	WT_STAT_file_row_int_pages			40
 /*! row-store leaf pages */
-#define	WT_STAT_file_row_leaf_pages			42
+#define	WT_STAT_file_row_leaf_pages			41
 /*! total entries */
-#define	WT_STAT_file_entries				43
+#define	WT_STAT_file_entries				42
 /*! @} */
 /*
  * Statistics section: END

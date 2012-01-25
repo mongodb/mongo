@@ -43,13 +43,12 @@ connection_stats = [
 ##########################################
 btree_stats = [
 	Stat('alloc', 'file: block allocations'),
-	Stat('cursor_first', 'cursor-first'),
 	Stat('cursor_inserts', 'cursor-inserts'),
-	Stat('cursor_last', 'cursor-last'),
 	Stat('cursor_read', 'cursor-read'),
 	Stat('cursor_read_near', 'cursor-read-near'),
 	Stat('cursor_read_next', 'cursor-read-next'),
 	Stat('cursor_read_prev', 'cursor-read-prev'),
+	Stat('cursor_resets', 'cursor-resets'),
 	Stat('cursor_removes', 'cursor-removes'),
 	Stat('cursor_updates', 'cursor-updates'),
 	Stat('extend', 'file: block allocations required file extension'),

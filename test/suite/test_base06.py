@@ -62,8 +62,6 @@ class test_base06(wttest.WiredTigerTestCase):
         # Add a hint in case we're using mytruncate
         cursor._position_hint = ''
         if value >= self.nentries:
-            cursor.last()
-            cursor.next()
             cursor._position_hint = 'END'
         elif value < 0:
             cursor._position_hint = 'BEGIN'

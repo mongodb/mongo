@@ -10,14 +10,13 @@ __wt_stat_alloc_btree_stats(WT_SESSION_IMPL *session, WT_BTREE_STATS **statsp)
 	WT_RET(__wt_calloc_def(session, 1, &stats));
 
 	stats->alloc.desc = "file: block allocations";
-	stats->cursor_first.desc = "cursor-first";
 	stats->cursor_inserts.desc = "cursor-inserts";
-	stats->cursor_last.desc = "cursor-last";
 	stats->cursor_read.desc = "cursor-read";
 	stats->cursor_read_near.desc = "cursor-read-near";
 	stats->cursor_read_next.desc = "cursor-read-next";
 	stats->cursor_read_prev.desc = "cursor-read-prev";
 	stats->cursor_removes.desc = "cursor-removes";
+	stats->cursor_resets.desc = "cursor-resets";
 	stats->cursor_updates.desc = "cursor-updates";
 	stats->extend.desc = "file: block allocations required file extension";
 	stats->file_allocsize.desc = "page size allocation unit";
@@ -69,14 +68,13 @@ __wt_stat_clear_btree_stats(WT_STATS *stats_arg)
 
 	stats = (WT_BTREE_STATS *)stats_arg;
 	stats->alloc.v = 0;
-	stats->cursor_first.v = 0;
 	stats->cursor_inserts.v = 0;
-	stats->cursor_last.v = 0;
 	stats->cursor_read.v = 0;
 	stats->cursor_read_near.v = 0;
 	stats->cursor_read_next.v = 0;
 	stats->cursor_read_prev.v = 0;
 	stats->cursor_removes.v = 0;
+	stats->cursor_resets.v = 0;
 	stats->cursor_updates.v = 0;
 	stats->extend.v = 0;
 	stats->file_allocsize.v = 0;

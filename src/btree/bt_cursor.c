@@ -96,6 +96,26 @@ __cursor_invalid(WT_CURSOR_BTREE *cbt)
 }
 
 /*
+ * __wt_btcur_reset --
+ *	Invalidate the cursor position.
+ */
+int
+__wt_btcur_reset(WT_CURSOR_BTREE *cbt)
+{
+	WT_SESSION_IMPL *session;
+
+	session = (WT_SESSION_IMPL *)cbt->iface.session;
+	WT_BSTAT_INCR(session, cursor_resets);
+
+	__cursor_func_init(cbt, 1);
+	cbt->recno = 0;
+	F_CLR(cbt,
+	    WT_CBT_ITERATE_APPEND | WT_CBT_ITERATE_NEXT | WT_CBT_ITERATE_PREV);
+
+	return (0);
+}
+
+/*
  * __wt_btcur_search --
  *	Search for a matching record in the tree.
  */
