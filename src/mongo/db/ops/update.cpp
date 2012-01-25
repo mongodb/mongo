@@ -309,6 +309,34 @@ namespace mongo {
                     default: assert( 0 );
                     }
                 }
+                else if ( str::equals(e.fieldName(), "xor") ) {
+                    switch( in.type() ) {
+                    case NumberInt: x = x^e.numberInt(); break;
+                    case NumberLong: y = y^e.numberLong(); break;
+                    default: assert( 0 );
+                    }
+                }
+                else if ( str::equals(e.fieldName(), "not") ) {
+                    switch( in.type() ) {
+                    case NumberInt: x = ~x; break;
+                    case NumberLong: y = ~y; break;
+                    default: assert( 0 );
+                    }
+                }
+                else if ( str::equals(e.fieldName(), "shl") ) {
+                    switch( in.type() ) {
+                    case NumberInt: x = x << e.numberInt(); break;
+                    case NumberLong: y = y << e.numberLong(); break;
+                    default: assert( 0 );
+                    }
+                }
+                else if ( str::equals(e.fieldName(), "shr") ) {
+                    switch( in.type() ) {
+                    case NumberInt: x = x >> e.numberInt(); break;
+                    case NumberLong: y = y >> e.numberLong(); break;
+                    default: assert( 0 );
+                    }
+                }
                 else {
                     uasserted(9016, str::stream() << "unknown $bit operation: " << e.fieldName());
                 }
