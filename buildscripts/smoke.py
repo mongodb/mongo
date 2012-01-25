@@ -367,10 +367,10 @@ def run_tests(tests):
     # The reason we want to use "with" is so that we get __exit__ semantics
     # but "with" is only supported on Python 2.5+
 
-    master = mongod(small_oplog=small_oplog,no_journal=no_journal,no_preallocj=no_preallocj,auth=auth)
+    master = mongod(small_oplog=small_oplog,no_journal=no_journal,no_preallocj=no_preallocj,auth=auth).__enter__()
     try:
         if small_oplog:
-            slave = mongod(slave=True)
+            slave = mongod(slave=True).__enter__()
         else:
             slave = Nothing()
         try:
@@ -400,9 +400,9 @@ def run_tests(tests):
             if isinstance(slave, mongod):
                 check_db_hashes(master, slave)
         finally:
-            slave.__exit__()
+            slave.__exit__(None, None, None)
     finally:
-        master.__exit__()
+        master.__exit__(None, None, None)
     return 0
 
 
