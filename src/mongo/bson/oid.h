@@ -74,6 +74,10 @@ namespace mongo {
 
         bool isSet() const { return a || b; }
 
+        /**
+         * this is not consistent
+         * do not store on disk
+         */
         void hash_combine(size_t &seed) const;
 
         /** call this after a fork to update the process id */
@@ -99,6 +103,14 @@ namespace mongo {
             struct {
                 long long a;
                 unsigned b;
+            };
+            struct {
+                // TODO: get rid of this eventually
+                //       this is a hack because of hash_combine with older versions of boost
+                //       on 32-bit platforms
+                int x;
+                int y;
+                int z;
             };
             unsigned char data[12];
         };

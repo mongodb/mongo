@@ -29,8 +29,9 @@ BOOST_STATIC_ASSERT( sizeof(mongo::OID) == 12 );
 namespace mongo {
 
 	void OID::hash_combine(size_t &seed) const {
-	    boost::hash_combine(seed, a);
-	    boost::hash_combine(seed, b);
+	    boost::hash_combine(seed, x);
+	    boost::hash_combine(seed, y);
+	    boost::hash_combine(seed, z);
 	}
 
     // machine # before folding in the process id
