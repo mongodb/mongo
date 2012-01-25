@@ -117,22 +117,23 @@ __wt_block_verify_addr(WT_SESSION_IMPL *session,
 static int
 __verify_freelist(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
-	WT_FREE_ENTRY *fe;
+	WT_FREE *fe;
 	int ret;
 
 	ret = 0;
 
-	TAILQ_FOREACH(fe, &block->freeqa, qa) {
-		if (fe->offset + (off_t)fe->size > block->fh->file_size)
+	WT_FREE_FOREACH(fe, block->foff) {
+		if (fe->off + (off_t)fe->size > block->fh->file_size)
 			WT_RET_MSG(session, WT_ERROR,
 			    "free-list entry offset %" PRIuMAX "references "
 			    "non-existent file pages",
-			    (uintmax_t)fe->offset);
+			    (uintmax_t)fe->off);
 
 		WT_VERBOSE(session, verify,
-		    "free-list offset/frags %" PRIuMAX "/%" PRIu32,
-		    (uintmax_t)fe->offset, fe->size / block->allocsize);
-		WT_TRET(__verify_addfrag(session, block, fe->offset, fe->size));
+		    "free-list range %" PRIuMAX "-%" PRIuMAX,
+		    (uintmax_t)fe->off, (uintmax_t)fe->off + fe->size);
+
+		WT_TRET(__verify_addfrag(session, block, fe->off, fe->size));
 	}
 
 	return (ret);

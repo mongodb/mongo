@@ -11,6 +11,235 @@ static int  __block_extend(WT_SESSION_IMPL *, WT_BLOCK *, off_t *, uint32_t);
 static int  __block_truncate(WT_SESSION_IMPL *, WT_BLOCK *);
 
 /*
+ * __block_off_srch --
+ *	Search a by-offset skiplist (either the primary one, or the per-size
+ * bucket offset list).
+ */
+static WT_FREE *
+__block_off_srch(WT_FREE **head, off_t off, WT_FREE ***stack, int skip_off)
+{
+	WT_FREE *retp, **fep;
+	int i;
+
+	retp = NULL;
+
+	/*
+	 * Start at the highest skip level, then go as far as possible at each
+	 * level before stepping down to the next.
+	 */
+	for (i = WT_SKIP_MAXDEPTH - 1, fep = &head[i]; i >= 0;) {
+		if (*fep == NULL) {
+			stack[i--] = fep--;
+			continue;
+		}
+
+		/* Return the adjacent item, including an exact match. */
+		retp = *fep;
+
+		/*
+		 * The stack is used for insert and remove, that is, we don't
+		 * want the "exact match" stack, we want a insert/remove stack.
+		 * Only move forward on this level if the chunk has an offset
+		 * less than the argument offset.
+		 */
+		if ((*fep)->off < off)		/* Keep going at this level */
+			fep = &(*fep)->next[i + (skip_off ? (*fep)->depth : 0)];
+		else				/* Drop down a level */
+			stack[i--] = fep--;
+	}
+	return (retp);
+}
+
+/*
+ * __block_off_pair_srch --
+ *	Search the primary by-offset skiplist for before/after records of the
+ * specified offset.
+ */
+static void
+__block_off_pair_srch(
+    WT_FREE **head, off_t off, WT_FREE **beforep, WT_FREE **afterp)
+{
+	WT_FREE **fep;
+	int i;
+
+	*beforep = *afterp = NULL;
+
+	/*
+	 * Start at the highest skip level, then go as far as possible at each
+	 * level before stepping down to the next.
+	 */
+	for (i = WT_SKIP_MAXDEPTH - 1, fep = &head[i]; i >= 0;) {
+		if (*fep == NULL) {
+			--i;
+			--fep;
+			continue;
+		}
+
+		if ((*fep)->off < off) {	/* Keep going at this level */
+			*beforep = *fep;
+			fep = &(*fep)->next[i];
+		} else {			/* Drop down a level */
+			*afterp = *fep;
+			--i;
+			--fep;
+		}
+	}
+}
+
+/*
+ * __block_off_last --
+ *	Return the last free range in the offset skiplist.
+ */
+static WT_FREE *
+__block_off_last(WT_FREE **head)
+{
+	WT_FREE *fe, **fep;
+	int i;
+
+	fe = NULL;
+
+	for (i = WT_SKIP_MAXDEPTH - 1, fep = &head[i]; i >= 0;) {
+		if (*fep == NULL) {
+			--i;
+			--fep;
+			continue;
+		}
+		fe = *fep;
+		fep = &(*fep)->next[i];
+	}
+	return (fe);
+}
+
+/*
+ * __block_size_srch --
+ *	Search the by-size skiplist.
+ */
+static WT_SIZE *
+__block_size_srch(WT_SIZE **head, uint32_t size, WT_SIZE ***stack)
+{
+	WT_SIZE **szp, *retp;
+	int i;
+
+	retp = NULL;
+
+	/*
+	 * Start at the highest skip level, then go as far as possible at each
+	 * level before stepping down to the next.
+	 */
+	for (i = WT_SKIP_MAXDEPTH - 1, szp = &head[i]; i >= 0;) {
+		if (*szp == NULL) {
+			stack[i--] = szp--;
+			continue;
+		}
+		retp = *szp;
+		if ((*szp)->size < size)	/* Keep going at this level */
+			szp = &(*szp)->next[i];
+		else if ((*szp)->size == size)	/* Exact match: return */
+			for (; i >= 0; i--)
+				stack[i] = &(*szp)->next[i];
+		else				/* Drop down a level */
+			stack[i--] = szp--;
+	}
+	return (retp);
+}
+
+/*
+ * __block_off_insert --
+ *	Insert a record into the system.
+ */
+static int
+__block_off_insert(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_FREE *fe)
+{
+	WT_FREE **astack[WT_SKIP_MAXDEPTH];
+	WT_SIZE *szp, **sstack[WT_SKIP_MAXDEPTH];
+	u_int i;
+
+	/*
+	 * If we are inserting a new size onto the size skiplist, we'll need
+	 * a new WT_FREE structure for that skiplist.  This doesn't need any
+	 * particularly interesting error handling, leaving an empty entry on
+	 * the size skiplist doesn't cause problems.
+	 */
+	szp = __block_size_srch((WT_SIZE **)block->fsize, fe->size, sstack);
+	if (szp == NULL || szp->size != fe->size) {
+		WT_RET(__wt_calloc(session, 1,
+		    sizeof(WT_SIZE) + fe->depth * sizeof(WT_SIZE *), &szp));
+		szp->size = fe->size;
+		for (i = 0; i < fe->depth; ++i)
+			szp->next[i] = *sstack[i];
+		for (i = 0; i < fe->depth; ++i)
+			*sstack[i] = szp;
+	}
+
+	/* Insert the new WT_FREE structure into the offset skiplist. */
+	(void)__block_off_srch(block->foff, fe->off, astack, 0);
+	for (i = 0; i < fe->depth; ++i) {
+		fe->next[i] = *astack[i];
+		*astack[i] = fe;
+	}
+
+	/*
+	 * Insert the new WT_FREE structure into the size element's offset
+	 * skiplist.
+	 */
+	(void)__block_off_srch(szp->foff, fe->off, astack, 1);
+	for (i = 0; i < fe->depth; ++i) {
+		fe->next[i + fe->depth] = *astack[i];
+		*astack[i] = fe;
+	}
+
+	++block->freelist_entries;
+	block->freelist_bytes += fe->size;
+	block->freelist_dirty = 1;
+
+	return (0);
+}
+
+/*
+ * __block_off_remove --
+ *	Remove a record from the system.
+ */
+static int
+__block_off_remove(
+    WT_SESSION_IMPL *session, WT_BLOCK *block, off_t off, WT_FREE **fep)
+{
+	WT_FREE *fe, **astack[WT_SKIP_MAXDEPTH];
+	WT_SIZE *szp, **sstack[WT_SKIP_MAXDEPTH];
+	u_int i;
+
+	/* Find and remove the record from the by-offset skiplist. */
+	fe = __block_off_srch(block->foff, off, astack, 0);
+	if (fe == NULL || fe->off != off)
+		return (EINVAL);
+	for (i = 0; i < fe->depth; ++i)
+		*astack[i] = fe->next[i];
+
+	/* Find the appropriate size element. */
+	if ((szp = __block_size_srch(
+	    (WT_SIZE **)block->fsize, fe->size, sstack)) == NULL ||
+	    szp->size != fe->size)
+		return (EINVAL);
+
+	/* Find and remove the record from the size's offset skiplist. */
+	if (__block_off_srch(szp->foff, off, astack, 1) == NULL)
+		return (EINVAL);
+	for (i = 0; i < fe->depth; ++i)
+		*astack[i] = fe->next[i + fe->depth];
+
+	--block->freelist_entries;
+	block->freelist_bytes -= fe->size;
+	block->freelist_dirty = 1;
+
+	/* Return the record if our caller wants it, otherwise free it. */
+	if (fep == NULL)
+		__wt_free(session, fe);
+	else
+		*fep = fe;
+
+	return (0);
+}
+
+/*
  * __wt_block_alloc --
  *	Alloc a chunk of space from the underlying file.
  */
@@ -18,90 +247,61 @@ int
 __wt_block_alloc(
     WT_SESSION_IMPL *session, WT_BLOCK *block, off_t *offsetp, uint32_t size)
 {
-	WT_FREE_ENTRY *fe, *new;
-	int n, ret;
+	WT_FREE *fe;
+	WT_SIZE *szp, **sstack[WT_SKIP_MAXDEPTH];
+	int ret;
 
 	ret = 0;
 
+	WT_BSTAT_INCR(session, alloc);
 	if (size % block->allocsize != 0)
 		WT_RET_MSG(session, EINVAL,
 		    "cannot allocate a block size %" PRIu32 " that is not "
 		    "a multiple of the allocation size %" PRIu32,
 		    size, block->allocsize);
 
-	WT_BSTAT_INCR(session, alloc);
-
 	__wt_spin_lock(session, &block->freelist_lock);
 
-	n = 0;
-	TAILQ_FOREACH(fe, &block->freeqa, qa) {
-		if (fe->size < size) {
-#ifndef HAVE_BLOCK_SMARTS
-			/* Limit how many blocks we will examine */
-			if (++n > 100)
-				break;
-#endif
-			continue;
-		}
-
-		/* Nothing fancy: first fit on the queue. */
-		*offsetp = fe->offset;
-
-		/*
-		 * If the size is exact, remove it from the linked lists and
-		 * free the entry.
-		 */
-		if (fe->size == size) {
-			WT_VERBOSE(session, block,
-			    "allocate block %" PRIuMAX "/%" PRIu32,
-			    (uintmax_t)fe->offset, size);
-
-			TAILQ_REMOVE(&block->freeqa, fe, qa);
-			TAILQ_REMOVE(&block->freeqs, fe, qs);
-			--block->freelist_entries;
-			__wt_free(session, fe);
-
-			goto done;
-		}
-
-		WT_VERBOSE(session, block,
-		    "allocate partial block %" PRIuMAX "/%" PRIu32
-		    " from %" PRIuMAX "/%" PRIu32,
-		    (uintmax_t)fe->offset, size,
-		    (uintmax_t)fe->offset, fe->size);
-
-		/*
-		 * Otherwise, adjust the entry.   The address remains correctly
-		 * sorted, but we have to re-insert at the appropriate location
-		 * in the size-sorted queue.
-		 */
-		fe->offset += size;
-		fe->size -= size;
-		block->freelist_bytes -= size;
-		TAILQ_REMOVE(&block->freeqs, fe, qs);
-
-		new = fe;
-#ifdef HAVE_BLOCK_SMARTS
-		TAILQ_FOREACH(fe, &block->freeqs, qs) {
-			if (new->size > fe->size)
-				continue;
-			if (new->size < fe->size || new->offset < fe->offset)
-				break;
-		}
-		if (fe == NULL)
-			TAILQ_INSERT_TAIL(&block->freeqs, new, qs);
-		else
-			TAILQ_INSERT_BEFORE(fe, new, qs);
-#else
-		TAILQ_INSERT_TAIL(&block->freeqs, new, qs);
-#endif
+	/*
+	 * Allocation is first-fit by size: search the by-size skiplist for the
+	 * requested size and take the first entry on the by-size offset list.
+	 * If we don't have anything large enough, extend the file.
+	 */
+	if ((szp = __block_size_srch(
+	    (WT_SIZE **)block->fsize, size, sstack)) == NULL ||
+	    (fe = szp->foff[0]) == NULL || fe->size < size) {
+		WT_ERR(__block_extend(session, block, offsetp, size));
 		goto done;
 	}
 
-	/* No segments large enough found, extend the file. */
-	ret = __block_extend(session, block, offsetp, size);
+	*offsetp = fe->off;
 
-done:	__wt_spin_unlock(session, &block->freelist_lock);
+	/* Remove the record from the system. */
+	WT_ERR(__block_off_remove(session, block, fe->off, &fe));
+
+	/* If doing a partial allocation, adjust the record and put it back. */
+	if (fe->size > size) {
+		WT_VERBOSE(session, block,
+		    "allocate %" PRIu32 " from range %" PRIuMAX "-%"
+		    PRIuMAX ", range shrinks to %" PRIuMAX "-%" PRIuMAX,
+		    size,
+		    (uintmax_t)fe->off, (uintmax_t)fe->off + fe->size,
+		    (uintmax_t)fe->off + size,
+		    (uintmax_t)fe->off + size + (fe->size - size));
+
+		fe->off += size;
+		fe->size -= size;
+		WT_ERR(__block_off_insert(session, block,fe));
+	} else {
+		WT_VERBOSE(session, block,
+		    "allocate range %" PRIuMAX "-%" PRIuMAX,
+		    (uintmax_t)fe->off, (uintmax_t)fe->off + fe->size);
+
+		__wt_free(session, fe);
+	}
+
+done: err:
+	__wt_spin_unlock(session, &block->freelist_lock);
 	return (ret);
 }
 
@@ -133,7 +333,7 @@ __block_extend(
 	 * enough room to write the free-list out when we close the file.  It
 	 * is vanishingly unlikely to happen (we use free blocks where they're
 	 * available to write the free list), but if the free-list is a bunch
-	 * of small blocks, each group of which are insufficient to hole the
+	 * of small blocks, each group of which are insufficient to hold the
 	 * free list, and the file has been fully populated, file close will
 	 * fail because we can't write the free list.
 	 */
@@ -144,10 +344,10 @@ __block_extend(
 	*offsetp = fh->file_size;
 	fh->file_size += size;
 
+	WT_BSTAT_INCR(session, extend);
 	WT_VERBOSE(session, block,
 	    "file extend %" PRIu32 "B @ %" PRIuMAX, size, (uintmax_t)*offsetp);
 
-	WT_BSTAT_INCR(session, extend);
 	return (0);
 }
 
@@ -178,142 +378,99 @@ __wt_block_free_buf(WT_SESSION_IMPL *session,
  */
 int
 __wt_block_free(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, off_t offset, uint32_t size)
+    WT_SESSION_IMPL *session, WT_BLOCK *block, off_t off, uint32_t size)
 {
-	WT_FREE_ENTRY *fe, *new;
+	WT_FREE *fe, *after, *before;
+	u_int skipdepth;
+	int ret;
 
-	new = NULL;
-
-	WT_VERBOSE(session, block,
-	    "free %" PRIuMAX "/%" PRIu32, (uintmax_t)offset, size);
-
-	__wt_spin_lock(session, &block->freelist_lock);
-	block->freelist_dirty = 1;
+	ret = 0;
 
 	WT_BSTAT_INCR(session, free);
-	++block->freelist_entries;
-	block->freelist_bytes += size;
+	WT_VERBOSE(session, block,
+	    "free %" PRIuMAX "/%" PRIu32, (uintmax_t)off, size);
 
-	/* Allocate memory for the new entry. */
-	WT_RET(__wt_calloc_def(session, 1, &new));
-	new->offset = offset;
-	new->size = size;
+	__wt_spin_lock(session, &block->freelist_lock);
 
-#ifdef HAVE_BLOCK_SMARTS
-combine:/*
-	 * Insert the entry at the appropriate place in the address list after
-	 * checking to see if it adjoins adjacent entries.
+	/*
+	 * Retrieve the records preceding/following the offset.  If the records
+	 * are contiguous with the free'd offset, combine records.
 	 */
-	TAILQ_FOREACH(fe, &block->freeqa, qa) {
-		/*
-		 * If the freed entry follows (but doesn't immediate follow)
-		 * the list entry, continue -- this is a fast test to get us
-		 * to the right location in the list.
-		 */
-		if (new->offset > fe->offset + fe->size)
-			continue;
-
-		/*
-		 * If the freed entry immediately precedes the list entry, fix
-		 * the list entry and we're done -- no further checking needs
-		 * to be done.  (We already checked to see if the freed entry
-		 * immediately follows the previous list entry, and that's the
-		 * only possibility.)
-		 */
-		if (new->offset + new->size == fe->offset) {
-			fe->offset = new->offset;
-			fe->size += new->size;
-			TAILQ_REMOVE(&block->freeqs, fe, qs);
-
-			--block->freelist_entries;
-			__wt_free(session, new);
-			new = fe;
-			break;
-		}
-
-		/*
-		 * If the freed entry immediately follows the list entry, fix
-		 * the list entry and restart the search (restart the search
-		 * because the new, extended entry may immediately precede the
-		 * next entry in the list.).
-		 */
-		if (fe->offset + fe->size == new->offset) {
-			fe->size += new->size;
-			TAILQ_REMOVE(&block->freeqa, fe, qa);
-			TAILQ_REMOVE(&block->freeqs, fe, qs);
-
-			--block->freelist_entries;
-			__wt_free(session, new);
-
-			new = fe;
-			goto combine;
-		}
-
-		/*
-		 * The freed entry must appear before the list entry, but does
-		 * not adjoin it. Insert the freed entry before the list entry.
-		 */
-		TAILQ_INSERT_BEFORE(fe, new, qa);
-		break;
+	__block_off_pair_srch(block->foff, off, &before, &after);
+	if (before != NULL) {
+		if (before->off + before->size > off)
+			WT_ERR_MSG(session, EINVAL,
+			    "existing range %" PRIuMAX "-%" PRIuMAX " overlaps "
+			    "with free'd range %" PRIuMAX "-%" PRIuMAX,
+			    (uintmax_t)before->off,
+			    (uintmax_t)before->off + before->size,
+			    (uintmax_t)off,
+			    (uintmax_t)off + size);
+		if (before->off + before->size != off)
+			before = NULL;
+	}
+	if (after != NULL) {
+		if (off + size > after->off)
+			WT_ERR_MSG(session, EINVAL,
+			    "free'd range %" PRIuMAX "-%" PRIuMAX " overlaps "
+			    "with existing range %" PRIuMAX "-%" PRIuMAX,
+			    (uintmax_t)off,
+			    (uintmax_t)off + size,
+			    (uintmax_t)after->off,
+			    (uintmax_t)after->off + after->size);
+		if (off + size != after->off)
+			after = NULL;
+	}
+	if (before == NULL && after == NULL) {
+		/* Allocate a new WT_FREE structure. */
+		skipdepth = __wt_skip_choose_depth();
+		WT_ERR(__wt_calloc(session, 1,
+		    sizeof(WT_FREE) + skipdepth * 2 * sizeof(WT_FREE *), &fe));
+		fe->off = off;
+		fe->size = size;
+		fe->depth = (uint8_t)skipdepth;
+		goto done;
 	}
 
 	/*
-	 * If we reached the end of the list, the freed entry comes after any
-	 * list entry, append it.
+	 * If the "before" offset range abuts, we'll use it as our new record;
+	 * if the "after" offset range also abuts, include its size and remove
+	 * it from the system.  Else, only the "after" offset range abuts, use
+	 * the "after" offset range as our new record.  In either case, remove
+	 * the record we're going to use, adjust it and re-insert it.
 	 */
-	if (fe == NULL)
-		TAILQ_INSERT_TAIL(&block->freeqa, new, qa);
+	if (before == NULL) {
+		WT_ERR(__block_off_remove(session, block, after->off, &fe));
 
-#ifdef HAVE_DIAGNOSTIC
-	/* Check to make sure we haven't inserted overlapping ranges. */
-	if (((fe = TAILQ_PREV(new, __wt_free_qah, qa)) != NULL &&
-	    fe->offset + fe->size > new->offset) ||
-	    ((fe = TAILQ_NEXT(new, qa)) != NULL &&
-	    new->offset + new->size > fe->offset)) {
-		TAILQ_REMOVE(&block->freeqa, new, qa);
-		__wt_spin_unlock(session, &block->freelist_lock);
+		WT_VERBOSE(session, block,
+		    "free range grows from %" PRIuMAX "-%" PRIuMAX ", to %"
+		    PRIuMAX "-%" PRIuMAX,
+		    (uintmax_t)fe->off, (uintmax_t)fe->off + fe->size,
+		    (uintmax_t)off, (uintmax_t)off + fe->size + size);
 
-		WT_RET_MSG(session, WT_ERROR,
-		    "block free at offset range %" PRIuMAX "-%" PRIuMAX
-		    " overlaps already free block at offset range "
-		    "%" PRIuMAX "-%" PRIuMAX,
-		    (uintmax_t)new->offset, (uintmax_t)new->offset + new->size,
-		    (uintmax_t)fe->offset, (uintmax_t)fe->offset + fe->size);
+		fe->off = off;
+		fe->size += size;
+	} else {
+		if (after != NULL) {
+			size += after->size;
+			WT_ERR(__block_off_remove(
+			    session, block, after->off, NULL));
+		}
+		WT_ERR(__block_off_remove(session, block, before->off, &fe));
+
+		WT_VERBOSE(session, block,
+		    "free range grows from %" PRIuMAX "-%" PRIuMAX ", to %"
+		    PRIuMAX "-%" PRIuMAX,
+		    (uintmax_t)fe->off, (uintmax_t)fe->off + fe->size,
+		    (uintmax_t)fe->off, (uintmax_t)fe->off + fe->size + size);
+
+		fe->size += size;
 	}
-#endif
 
-#else
-	WT_UNUSED(fe);
+done:	WT_ERR(__block_off_insert(session, block,fe));
 
-	/* No smarts: just insert at the head of the list. */
-	TAILQ_INSERT_HEAD(&block->freeqa, new, qa);
-#endif
-
-#ifdef HAVE_BLOCK_SMARTS
-	/*
-	 * The variable new now references a WT_FREE_ENTRY structure not linked
-	 * into the size list at all (if it was linked in, we unlinked it while
-	 * processing the address list because the size changed).  Insert the
-	 * entry into the size list, sorted first by size, and then by address
-	 * (the latter so we tend to write pages at the start of the file when
-	 * possible).
-	 */
-	TAILQ_FOREACH(fe, &block->freeqs, qs) {
-		if (new->size > fe->size)
-			continue;
-		if (new->size < fe->size || new->offset < fe->offset)
-			break;
-	}
-	if (fe == NULL)
-		TAILQ_INSERT_TAIL(&block->freeqs, new, qs);
-	else
-		TAILQ_INSERT_BEFORE(fe, new, qs);
-#else
-	TAILQ_INSERT_HEAD(&block->freeqs, new, qs);
-#endif
-
-	__wt_spin_unlock(session, &block->freelist_lock);
-	return (0);
+err:	__wt_spin_unlock(session, &block->freelist_lock);
+	return (ret);
 }
 
 /*
@@ -327,13 +484,10 @@ __wt_block_freelist_open(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
 	block->freelist_bytes = 0;
 	block->freelist_entries = 0;
+	block->freelist_dirty = 0;
 
 	block->free_offset = WT_BLOCK_INVALID_OFFSET;
 	block->free_size = block->free_cksum = 0;
-
-	TAILQ_INIT(&block->freeqa);
-	TAILQ_INIT(&block->freeqs);
-	block->freelist_dirty = 0;
 }
 
 /*
@@ -385,8 +539,10 @@ __wt_block_freelist_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		if ((offset - WT_BLOCK_DESC_SECTOR) % block->allocsize != 0 ||
 		    size % block->allocsize != 0 ||
 		    offset + size > block->fh->file_size)
-corrupted:		WT_ERR_MSG(session,
-			    WT_ERROR, "file contains a corrupted free-list");
+corrupted:		WT_ERR_MSG(session, WT_ERROR,
+			    "file contains a corrupted free-list, range %"
+			    PRIuMAX "-%" PRIuMAX " past end-of-file",
+			    (uintmax_t)offset, (uintmax_t)offset + size);
 
 		WT_ERR(__wt_block_free(session, block, offset, size));
 	}
@@ -420,10 +576,9 @@ int
 __wt_block_freelist_write(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
 	WT_ITEM *tmp;
-	WT_FREE_ENTRY *fe;
+	WT_FREE *fe;
 	WT_PAGE_HEADER *dsk;
-	off_t offset;
-	uint32_t cksum, datasize, size;
+	uint32_t datasize, size;
 	uint8_t *p;
 	int ret;
 
@@ -441,10 +596,10 @@ __wt_block_freelist_write(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		return (0);
 	}
 
-	WT_VERBOSE_CALL(session, block, __wt_block_dump(session, block));
-
 	/* Truncate the file if possible. */
 	WT_RET(__block_truncate(session, block));
+
+	WT_VERBOSE_CALL(session, block, __wt_block_dump(session, block));
 
 	/*
 	 * Get a scratch buffer, clear the page's header and data, initialize
@@ -466,18 +621,14 @@ __wt_block_freelist_write(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	dsk->type = WT_PAGE_FREELIST;
 	tmp->size = WT_STORE_SIZE(WT_BLOCK_HEADER_BYTE_SIZE + datasize);
 
-	/*
-	 * Fill the page's data.  We output the data in reverse order so we
-	 * insert quickly, at least into the address queue, when we read it
-	 * back in.
-	 */
+	/* Fill the page's data. */
 	p = WT_BLOCK_HEADER_BYTE(dsk);
 	*(off_t *)p = WT_BLOCK_FREELIST_MAGIC;		/* Initial value */
 	p += sizeof(off_t);
 	*(uint32_t *)p = 0;
 	p += sizeof(uint32_t);
-	TAILQ_FOREACH_REVERSE(fe, &block->freeqa, __wt_free_qah, qa) {
-		*(off_t *)p = fe->offset;
+	WT_FREE_FOREACH(fe, block->foff) {		/* Free ranges */
+		*(off_t *)p = fe->off;
 		p += sizeof(off_t);
 		*(uint32_t *)p = fe->size;
 		p += sizeof(uint32_t);
@@ -499,16 +650,13 @@ __wt_block_freelist_write(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	 */
 	__wt_block_discard(session, block);
 
-	/* Write the free list to disk. */
-	WT_ERR(__wt_block_write(session, block, tmp, &offset, &size, &cksum));
-
-	/* Update the file's meta-data. */
-	block->free_offset = offset;
-	block->free_size = size;
-	block->free_cksum = cksum;
+	/* Write the free list to disk and update the file's meta-data. */
+	WT_ERR(__wt_block_write(session, block, tmp,
+	    &block->free_offset, &block->free_size, &block->free_cksum));
 
 	WT_VERBOSE(session, block,
-	    "free-list written %" PRIuMAX "/%" PRIu32, (uintmax_t)offset, size);
+	    "free-list written %" PRIuMAX "/%" PRIu32,
+	    (uintmax_t)block->free_offset, block->free_size);
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
@@ -522,36 +670,27 @@ static int
 __block_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
 	WT_FH *fh;
-	WT_FREE_ENTRY *fe;
-	int need_trunc;
+	WT_FREE *fe;
 
 	fh = block->fh;
 
 	/*
-	 * Repeatedly check the last element in the free-list, truncating the
-	 * file if the last free-list element is also at the end of the file.
+	 * Check if the last free range is at the end of the file, and if so,
+	 * truncate the file and discard the range.
 	 */
-	need_trunc = 0;
-	while ((fe = TAILQ_LAST(&block->freeqa, __wt_free_qah)) != NULL) {
-		if (fe->offset + fe->size != fh->file_size)
-			break;
+	if ((fe = __block_off_last(block->foff)) == NULL)
+		return (0);
+	if (fe->off + fe->size != fh->file_size)
+		return (0);
 
-		WT_VERBOSE(session, block,
-		    "truncate free-list %" PRIuMAX "/%" PRIu32,
-		    (uintmax_t)fe->offset, fe->size);
+	WT_VERBOSE(session, block,
+	    "truncate file from %" PRIuMAX " to %" PRIuMAX,
+	    (uintmax_t)fh->file_size, (uintmax_t)fe->off);
 
-		fh->file_size -= fe->size;
-		need_trunc = 1;
+	fh->file_size = fe->off;
+	WT_RET(__wt_ftruncate(session, fh, fh->file_size));
 
-		TAILQ_REMOVE(&block->freeqa, fe, qa);
-		TAILQ_REMOVE(&block->freeqs, fe, qs);
-
-		--block->freelist_entries;
-		__wt_free(session, fe);
-	}
-
-	if (need_trunc)
-		WT_RET(__wt_ftruncate(session, fh, fh->file_size));
+	WT_RET(__block_off_remove(session, block, fe->off, NULL));
 
 	return (0);
 }
@@ -563,14 +702,23 @@ __block_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block)
 void
 __wt_block_discard(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
-	WT_FREE_ENTRY *fe;
+	WT_FREE *fe, *nfe;
+	WT_SIZE *szp, *nszp;
 
-	while ((fe = TAILQ_FIRST(&block->freeqa)) != NULL) {
-		TAILQ_REMOVE(&block->freeqa, fe, qa);
-		TAILQ_REMOVE(&block->freeqs, fe, qs);
+	for (fe = block->foff[0]; fe != NULL; fe = nfe) {
+		nfe = fe->next[0];
 		__wt_free(session, fe);
 	}
+	WT_CLEAR(block->foff);
+	for (szp = block->fsize[0]; szp != NULL; szp = nszp) {
+		nszp = szp->next[0];
+		__wt_free(session, szp);
+	}
+	WT_CLEAR(block->fsize);
+
+	block->freelist_bytes = 0;
 	block->freelist_entries = 0;
+	block->freelist_dirty = 0;
 }
 
 /*
@@ -592,18 +740,24 @@ __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block)
 void
 __wt_block_dump(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
-	WT_FREE_ENTRY *fe;
+	WT_FREE *fe;
+	WT_SIZE *szp;
 
 	WT_VERBOSE(session, block, "freelist by offset:");
-	TAILQ_FOREACH(fe, &block->freeqa, qa)
+	WT_FREE_FOREACH(fe, block->foff)
 		WT_VERBOSE(session, block,
 		    "\t{%" PRIuMAX "/%" PRIu32 "}",
-		    (uintmax_t)fe->offset, fe->size);
+		    (uintmax_t)fe->off, fe->size);
 
 	WT_VERBOSE(session, block, "freelist by size:");
-	TAILQ_FOREACH(fe, &block->freeqs, qs)
+	WT_FREE_FOREACH(szp, block->fsize) {
 		WT_VERBOSE(session, block,
-		    "\t{%" PRIuMAX "/%" PRIu32 "}",
-		    (uintmax_t)fe->offset, fe->size);
+		    "\t{%" PRIu32 "}",
+		    szp->size);
+		WT_FREE_FOREACH_OFF(fe, szp->foff)
+			WT_VERBOSE(session, block,
+			    "\t\t{%" PRIuMAX "/%" PRIu32 "}",
+			    (uintmax_t)fe->off, fe->size);
+	}
 }
 #endif

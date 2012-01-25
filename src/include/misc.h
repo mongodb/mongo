@@ -43,6 +43,10 @@
 /* Elements in an array. */
 #define	WT_ELEMENTS(a)	(sizeof(a) / sizeof(a[0]))
 
+/* 10 level skip lists, 1/2 have a link to the next element. */
+#define	WT_SKIP_MAXDEPTH        10
+#define	WT_SKIP_PROBABILITY     (UINT32_MAX >> 2)
+
 /*
  * Quiet compiler warnings about unused parameters.
  */

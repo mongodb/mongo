@@ -29,7 +29,7 @@ extern int __wt_block_free_buf(WT_SESSION_IMPL *session,
     uint32_t addr_size);
 extern int __wt_block_free( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
-    off_t offset,
+    off_t off,
     uint32_t size);
 extern void __wt_block_freelist_open(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_block_freelist_read(WT_SESSION_IMPL *session, WT_BLOCK *block);

@@ -580,10 +580,6 @@ struct __wt_insert {
 	WT_INSERT *next[0];			/* forward-linked skip list */
 };
 
-/* 10 level skip lists, 1/2 have a link to the next element. */
-#define	WT_SKIP_MAXDEPTH        10
-#define	WT_SKIP_PROBABILITY     (UINT32_MAX >> 2)
-
 /*
  * Skiplist helper macros.
  */

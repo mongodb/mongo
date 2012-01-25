@@ -18,16 +18,65 @@
 #define	WT_BLOCK_INVALID_OFFSET		0
 
 /*
- * WT_FREE_ENTRY  --
- *	Encapsulation of an entry on the Btree free list.
+ * The block allocator maintains two primary skiplists: first, the by-offset
+ * list linking WT_FREE elements and sorted by file offset (low-to-high):
+ * this list has an entry for every free chunk in the file.  The second primary
+ * skiplist is the by-size list linking WT_SIZE elements and sorted by chunk
+ * size (low-to-high).  This list has an entry for every free chunk size seen
+ * since the list was created.
+ *	Additionally, each WT_SIZE element has a skiplist of its own, linking
+ * WT_FREE elements and sorted by file offset (low-to-high).  This list has an
+ * entry for every free chunk in the file of a particular size.
+ *	The trickiness is that each individual WT_FREE element appears on two
+ * skiplists.  In order to minimize allocation calls, we allocate a single
+ * array of WT_FREE pointers at the end of the WT_FREE structure, for both
+ * skiplists, and store the depth of the skiplist in the WT_FREE structure.
+ * The skiplist entries for the offset skiplist start at WT_FREE.next[0] and
+ * the entries for the size skiplist start at WT_FREE.next[WT_FREE.depth].
+ *
+ * WT_FREE  --
+ *	Encapsulation of a free chunk of space.
  */
-struct __wt_free_entry {
-	TAILQ_ENTRY(__wt_free_entry) qa;	/* Address queue */
-	TAILQ_ENTRY(__wt_free_entry) qs;	/* Size queue */
-
-	off_t	 offset;			/* Disk offset */
+struct __wt_free {
+	off_t	 off;				/* File offset */
 	uint32_t size;				/* Size */
+
+	uint8_t	 depth;				/* Skip list depth */
+
+	/*
+	 * Variable-length array, sized by the number of skiplist elements.
+	 * The first depth array entries are the offset skiplist elements,
+	 * the second depth array entries are the size skiplist.
+	 */
+	WT_FREE	*next[0];			/* Offset, size skiplists */
 };
+
+/*
+ * WT_SIZE  --
+ *	Encapsulation of a block size skiplist entry.
+ */
+struct __wt_size {
+	uint32_t size;				/* Size */
+
+	WT_FREE *foff[WT_SKIP_MAXDEPTH];	/* Per-size offset skiplist */
+
+	/* Variable-length array, sized by the number of skiplist elements. */
+	WT_SIZE *next[0];			/* Size skiplist */
+};
+
+/*
+ * WT_FREE_FOREACH --
+ *	Walk a block manager skiplist.
+ * WT_FREE_FOREACH_OFF --
+ *	Walk a block manager skiplist where the WT_FREE.next entries are offset
+ * by the depth.
+ */
+#define	WT_FREE_FOREACH(skip, head)					\
+	for ((skip) = (head)[0];					\
+	    (skip) != NULL; (skip) = (skip)->next[0])
+#define	WT_FREE_FOREACH_OFF(skip, head)					\
+	for ((skip) = (head)[0];					\
+	    (skip) != NULL; (skip) = (skip)->next[(skip)->depth])
 
 /*
  * WT_BLOCK --
@@ -47,14 +96,16 @@ struct __wt_block {
 
 					/* Freelist support */
 	WT_SPINLOCK freelist_lock;	/* Lock to protect the freelist. */
-	uint64_t freelist_bytes;	/* Free-list byte count */
-	uint32_t freelist_entries;	/* Free-list entry count */
-					/* Free-list queues */
-	TAILQ_HEAD(__wt_free_qah, __wt_free_entry) freeqa;
-	TAILQ_HEAD(__wt_free_qsh, __wt_free_entry) freeqs;
-	int	 freelist_dirty;	/* Free-list has been modified */
 
-	off_t	 free_offset;		/* Free-list addr/size/checksum  */
+	uint64_t freelist_bytes;	/* Freelist byte count */
+	uint32_t freelist_entries;	/* Freelist entry count */
+	int	 freelist_dirty;	/* Freelist has been modified */
+
+					/* Freelist offset/size skiplists */
+	WT_FREE *foff[WT_SKIP_MAXDEPTH];
+	WT_SIZE *fsize[WT_SKIP_MAXDEPTH];
+
+	off_t	 free_offset;		/* Freelist file location */
 	uint32_t free_size;
 	uint32_t free_cksum;
 
@@ -85,7 +136,7 @@ struct __wt_block_desc {
 
 	uint32_t unused;		/* 12-15: Padding */
 #define	WT_BLOCK_FREELIST_MAGIC	071002
-	uint64_t free_offset;		/* 16-23: Free list page address */
+	uint64_t free_offset;		/* 16-23: Free list page offset */
 	uint32_t free_size;		/* 24-27: Free list page length */
 	uint32_t free_cksum;		/* 28-31: Free list page checksum */
 
