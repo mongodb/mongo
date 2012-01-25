@@ -84,6 +84,7 @@ typedef struct {
 	uint32_t c_write_pct;
 
 	uint32_t key_cnt;			/* Keys loaded so far */
+	uint32_t rows;				/* Total rows */
 	uint16_t key_rand_len[1031];		/* Key lengths */
 } GLOBAL;
 extern GLOBAL g;

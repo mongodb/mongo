@@ -461,10 +461,9 @@ bulk(WT_ITEM **keyp, WT_ITEM **valuep)
 	WT_SESSION *session;
 
 	session = g.wts_session;
-	++g.key_cnt;
 
-	if (g.key_cnt > g.c_rows) {
-		g.key_cnt = g.c_rows;
+	if (++g.key_cnt > g.c_rows) {
+		g.key_cnt = g.rows = g.c_rows;
 		return (1);
 	}
 
@@ -526,7 +525,7 @@ wts_ops(void)
 			track("read/write ops", cnt);
 
 		insert = notfound = 0;
-		keyno = MMRAND(1, g.c_rows);
+		keyno = MMRAND(1, g.rows);
 
 		/*
 		 * Perform some number of operations: the percentage of deletes,
@@ -615,8 +614,8 @@ wts_read_scan(void)
 	/* Check a random subset of the records using the key. */
 	for (last_cnt = cnt = 0; cnt < g.key_cnt;) {
 		cnt += wts_rand() % 17 + 1;
-		if (cnt > g.c_rows)
-			cnt = g.c_rows;
+		if (cnt > g.rows)
+			cnt = g.rows;
 		if (cnt - last_cnt > 1000) {
 			track("read row scan", cnt);
 			last_cnt = cnt;
@@ -935,7 +934,7 @@ wts_col_insert(uint64_t *keynop)
 	cursor = g.wts_cursor_insert;
 	session = g.wts_session;
 
-	value_gen(&value.data, &value.size, g.c_rows + 1);
+	value_gen(&value.data, &value.size, g.rows + 1);
 
 	if (g.c_file_type == FIX)
 		cursor->set_value(cursor, *(uint8_t *)value.data);
@@ -952,12 +951,12 @@ wts_col_insert(uint64_t *keynop)
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
-	if (keyno <= g.c_rows) {
+	if (keyno <= g.rows) {
 		fprintf(stderr,
 		    "%s: inserted key did not create new row\n", g.progname);
 		return (1);
 	}
-	*keynop = g.c_rows = (uint32_t)keyno;
+	*keynop = g.rows = (uint32_t)keyno;
 
 	if (g.logging) {
 		if (g.c_file_type == FIX)
