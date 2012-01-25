@@ -4,7 +4,7 @@ t.drop();
 //if ( typeof _threadInject == "undefined" ) { // don't run in v8 mode - SERVER-1900
 
 function debug( x ) {
-//    printjson( x );
+    printjson( x );
 }
 
 t.save( {} );
@@ -27,7 +27,7 @@ s1 = startParallelShell( "db.jstests_killop.count( { $where: function() { while(
 s2 = startParallelShell( "db.jstests_killop.count( { $where: function() { while( 1 ) { ; } } } )" );
 
 o = [];
-assert.soon( function() { o = ops(); printjson( o ); return o.length == 2; } );
+assert.soon( function() { o = ops(); return o.length == 2; } );
 debug( o );
 db.killOp( o[ 0 ] );
 db.killOp( o[ 1 ] );
