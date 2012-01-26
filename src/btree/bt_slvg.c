@@ -747,7 +747,7 @@ __slvg_col_range(WT_SESSION_IMPL *session, WT_STUFF *ss)
 			continue;
 
 		/* Check for pages that overlap our page. */
-		for (j = i + 1; j < ss->pages_next; ++j) {
+		for (j = i + 1; j < ss->pages_next;) {
 			if (ss->pages[j] == NULL)
 				continue;
 			/*
@@ -760,6 +760,21 @@ __slvg_col_range(WT_SESSION_IMPL *session, WT_STUFF *ss)
 
 			/* There's an overlap, fix it up. */
 			WT_RET(__slvg_col_range_overlap(session, i, j, ss));
+
+			/*
+			 * If the overlap resolution changed the entry's start
+			 * key, the entry might have moved and the page array
+			 * re-sorted, and pages[j] would reference a different
+			 * page.  We don't move forward if that happened, we
+			 * re-process the slot again.
+			 */
+			if (ss->pages[j] == NULL)
+				++j;
+			else {
+				if (ss->pages[j]->col_start >
+				    ss->pages[i]->col_stop)
+					++j;
+			}
 		}
 	}
 	return (0);
@@ -1267,7 +1282,7 @@ __slvg_row_range(WT_SESSION_IMPL *session, WT_STUFF *ss)
 			continue;
 
 		/* Check for pages that overlap our page. */
-		for (j = i + 1; j < ss->pages_next; ++j) {
+		for (j = i + 1; j < ss->pages_next;) {
 			if (ss->pages[j] == NULL)
 				continue;
 			/*
@@ -1282,6 +1297,23 @@ __slvg_row_range(WT_SESSION_IMPL *session, WT_STUFF *ss)
 
 			/* There's an overlap, fix it up. */
 			WT_RET(__slvg_row_range_overlap(session, i, j, ss));
+
+			/*
+			 * If the overlap resolution changed the entry's start
+			 * key, the entry might have moved and the page array
+			 * re-sorted, and pages[j] would reference a different
+			 * page.  We don't move forward if that happened, we
+			 * re-process the slot again.
+			 */
+			if (ss->pages[j] == NULL)
+				++j;
+			else {
+				WT_RET(WT_BTREE_CMP(session, btree,
+				    &ss->pages[j]->row_start,
+				    &ss->pages[i]->row_stop, cmp));
+				if (cmp > 0)
+					++j;
+			}
 		}
 	}
 	return (0);
