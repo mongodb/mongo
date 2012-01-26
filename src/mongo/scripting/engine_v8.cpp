@@ -1168,7 +1168,6 @@ namespace mongo {
 
         if (readOnly) {
             o = roObjectTemplate->NewInstance();
-            o->SetHiddenValue(V8STR_RO, v8::Boolean::New(true));
         } else {
             if (array) {
                 o = lzArrayTemplate->NewInstance();
@@ -1497,9 +1496,8 @@ namespace mongo {
         if (o->InternalFieldCount() > 0) {
             originalBSON = unwrapBSONObj(o);
             BSONHolder* holder = unwrapHolder(o);
-            if ( !o->GetHiddenValue( V8STR_RO ).IsEmpty() ||
-                    ( o->HasNamedLookupInterceptor() && !holder->_modified ) ) {
-                // object was readonly, use bson as is
+            if ( o->HasNamedLookupInterceptor() && !holder->_modified ) {
+                // object was not modified, use bson as is
                 return originalBSON;
             }
         }
