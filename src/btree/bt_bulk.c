@@ -117,7 +117,6 @@ __wt_bulk_end(WT_CURSOR_BULK *cbulk)
 	session = (WT_SESSION_IMPL *)cbulk->cbt.iface.session;
 
 	WT_RET(__wt_rec_bulk_wrapup(cbulk));
-	WT_RET(__wt_rec_evict(session, cbulk->leaf, WT_REC_SINGLE));
 
 	__wt_buf_free(session, &cbulk->cmp);
 
