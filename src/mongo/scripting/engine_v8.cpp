@@ -40,6 +40,14 @@ namespace mongo {
       return ((BSONHolder*)ptr)->_obj;
     }
 
+    static BSONHolder* unwrapHolder(const Handle<v8::Object>& obj) {
+      Handle<External> field = Handle<External>::Cast(obj->GetInternalField(0));
+      if (field.IsEmpty() || !field->IsExternal())
+          return 0;
+      void* ptr = field->Value();
+      return (BSONHolder*)ptr;
+    }
+
     static void weakRefBSONCallback(v8::Persistent<v8::Value> p, void* scope) {
         // should we lock here? no idea, and no doc from v8 of course
         HandleScope handle_scope;
@@ -100,7 +108,7 @@ namespace mongo {
       if (elmt.type() == mongo::Object || elmt.type() == mongo::Array) {
           // if accessing a subobject, it may get modified and base obj would not know
           // have to set base as modified, which means some optim is lost
-          info.This()->SetHiddenValue(scope->V8STR_MODIFIED, v8::Boolean::New(true));
+          unwrapHolder(info.Holder())->_modified = true;
       }
       return val;
     }
@@ -119,8 +127,7 @@ namespace mongo {
 
     static Handle<v8::Value> namedSet(Local<v8::String> name, Local<v8::Value> value_obj, const v8::AccessorInfo& info) {
         Local< External > scp = External::Cast( *info.Data() );
-        V8Scope* scope = (V8Scope*)(scp->Value());
-        info.This()->SetHiddenValue(scope->V8STR_MODIFIED, v8::Boolean::New(true));
+        unwrapHolder(info.Holder())->_modified = true;
         return Handle<Value>();
     }
 
@@ -142,8 +149,7 @@ namespace mongo {
 
     Handle<Boolean> namedDelete( Local<v8::String> property, const AccessorInfo& info ) {
         Local< External > scp = External::Cast( *info.Data() );
-        V8Scope* scope = (V8Scope*)(scp->Value());
-        info.This()->SetHiddenValue(scope->V8STR_MODIFIED, v8::Boolean::New(true));
+        unwrapHolder(info.Holder())->_modified = true;
         return Handle<Boolean>();
     }
 
@@ -180,15 +186,14 @@ namespace mongo {
         if (elmt.type() == mongo::Object || elmt.type() == mongo::Array) {
             // if accessing a subobject, it may get modified and base obj would not know
             // have to set base as modified, which means some optim is lost
-            info.This()->SetHiddenValue(scope->V8STR_MODIFIED, v8::Boolean::New(true));
+            unwrapHolder(info.Holder())->_modified = true;
         }
         return val;
     }
 
     Handle<Boolean> indexedDelete( ::uint32_t index, const AccessorInfo& info ) {
         Local< External > scp = External::Cast( *info.Data() );
-        V8Scope* scope = (V8Scope*)(scp->Value());
-        info.This()->SetHiddenValue(scope->V8STR_MODIFIED, v8::Boolean::New(true));
+        unwrapHolder(info.Holder())->_modified = true;
         return Handle<Boolean>();
     }
 
@@ -217,8 +222,7 @@ namespace mongo {
 
     static Handle<v8::Value> indexedSet(::uint32_t index, Local<v8::Value> value_obj, const v8::AccessorInfo& info) {
         Local< External > scp = External::Cast( *info.Data() );
-        V8Scope* scope = (V8Scope*)(scp->Value());
-        info.This()->SetHiddenValue(scope->V8STR_MODIFIED, v8::Boolean::New(true));
+        unwrapHolder(info.Holder())->_modified = true;
         return Handle<Value>();
     }
 
@@ -374,7 +378,6 @@ namespace mongo {
         V8STR_NATIVE_DATA = getV8Str( "_native_data" );
         V8STR_V8_FUNC = getV8Str( "_v8_function" );
         V8STR_RO = getV8Str( "_ro" );
-        V8STR_MODIFIED = getV8Str( "_mod" );
         V8STR_FULLNAME = getV8Str( "_fullName" );
 
         injectV8Function("print", Print);
@@ -1171,7 +1174,6 @@ namespace mongo {
                 o = lzArrayTemplate->NewInstance();
                 o->SetPrototype(v8::Array::New(1)->GetPrototype());
                 o->Set(V8STR_LENGTH, v8::Integer::New(m.nFields()), DontEnum);
-    //            o->Set(ARRAY_STRING, v8::Boolean::New(true), DontEnum);
             } else {
                 o = lzObjectTemplate->NewInstance();
 
@@ -1184,16 +1186,20 @@ namespace mongo {
                   }
                 }
             }
+        }
 
+        Persistent<v8::Object> p = wrapBSONObject(o, own);
+
+        if (!readOnly) {
             // need to set all keys with dummy values, so that order of keys is correct during enumeration
             // otherwise v8 will list any newly set property in JS before the ones of underlying BSON obj.
             for (BSONObjIterator it(m); it.more();) {
                 const BSONElement& f = it.next();
                 o->ForceSet(getV8Str(f.fieldName()), v8::Undefined());
             }
+            own->_modified = false;
         }
 
-        Persistent<v8::Object> p = wrapBSONObject(o, own);
         return p;
     }
 
@@ -1490,9 +1496,9 @@ namespace mongo {
         BSONObj originalBSON;
         if (o->InternalFieldCount() > 0) {
             originalBSON = unwrapBSONObj(o);
-
+            BSONHolder* holder = unwrapHolder(o);
             if ( !o->GetHiddenValue( V8STR_RO ).IsEmpty() ||
-                    (o->HasNamedLookupInterceptor() && o->GetHiddenValue( V8STR_MODIFIED ).IsEmpty()) ) {
+                    ( o->HasNamedLookupInterceptor() && !holder->_modified ) ) {
                 // object was readonly, use bson as is
                 return originalBSON;
             }
