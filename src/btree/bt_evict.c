@@ -416,11 +416,29 @@ __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 		/*
 		 * Close: discarding all of the file's pages from the cache.
 		 *  Sync: only dirty pages need to be written.
+		 *
+		 * First, write the dirty pages: if we're closing the file, we
+		 * will be evicting all of the pages, and all child pages have
+		 * to be in their final, clean state, to evict the parent.
+		 *
+		 * The specific problem this solves is an empty page, which is
+		 * dirty because new material was added: reconciling it clears
+		 * the empty flag, and then we evict it.
 		 */
-		if (F_ISSET(er, WT_EVICT_REQ_CLOSE))
-			WT_RET(__wt_rec_evict(session, page, WT_REC_SINGLE));
-		else if (__wt_page_is_modified(page))
+		if (__wt_page_is_modified(page))
 			WT_RET(__wt_rec_write(session, page, NULL));
+		if (!F_ISSET(er, WT_EVICT_REQ_CLOSE))
+			continue;
+
+		/*
+		 * We do not attempt to evict pages expected to be merged into
+		 * their parents, with the single exception that the root page
+		 * can't be merged into anything, it must be written.
+		 */
+		if (WT_PAGE_IS_ROOT(page) ||
+		    !F_ISSET(page, WT_PAGE_REC_EMPTY |
+		    WT_PAGE_REC_SPLIT | WT_PAGE_REC_SPLIT_MERGE))
+			WT_RET(__wt_rec_evict(session, page, WT_REC_SINGLE));
 	}
 
 	return (0);

@@ -36,19 +36,17 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	    "page %p (%s)", page, __wt_page_type_string(page->type));
 
 	/*
-	 * You cannot evict pages merge-split pages (that is, internal pages
-	 * that are a result of a split of another page).  They can only be
-	 * evicted as a result of evicting their parents, else we would lose
-	 * the merge flag and they would be written separately, permanently
-	 * deepening the tree.  Should the eviction server request eviction
-	 * of a merge-split page, ignore the request (but unlock the page and
-	 * bump the read generation to ensure it isn't selected again).
-	 */
-	if (F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE)) {
-		page->read_gen = __wt_cache_read_gen(session);
-		page->ref->state = WT_REF_MEM;
-		return (0);
-	}
+         * We don't separately evict pages which are expected to be merged into
+         * their parents when the parent is evicted.  The exception is root
+         * pages that split (the eviction code calls this function with a split
+	 * page when closing a file where the root page has split).
+         */
+        if (F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE) ||
+	    (!WT_PAGE_IS_ROOT(page) &&
+	        F_ISSET(page, WT_PAGE_REC_EMPTY | WT_PAGE_REC_SPLIT)))
+                WT_ERR_MSG(session, EINVAL,
+                    "attempt to evict an empty or split page that should "
+		    "have been merged into its parent");
 
 	/*
 	 * Get exclusive access to the page and review the page and its subtree
