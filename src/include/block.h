@@ -203,7 +203,7 @@ struct __wt_block_header {
 	 * to this special bit pattern, we bump it by one during reads and
 	 * writes to avoid ambiguity.
 	 */
-#define	WT_BLOCK_CHECKSUM_NOT_SET	0xA5C35A33
+#define	WT_BLOCK_CHECKSUM_NOT_SET	0xA5C35A3C
 	uint32_t cksum;			/* 12-15: checksum */
 };
 /*
