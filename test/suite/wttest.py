@@ -75,6 +75,7 @@ class WiredTigerTestCase(unittest.TestCase):
     def setUpSessionOpen(self, conn):
         return conn.open_session(None)
         
+    # Can be overridden
     def close_conn(self):
         """
         Close the connection if already open.
@@ -120,9 +121,7 @@ class WiredTigerTestCase(unittest.TestCase):
 
     def tearDown(self):
         self.pr('finishing')
-        if self.conn != None:
-            self.conn.close(None)
-            self.conn = None
+        self.close_conn()
         os.chdir(self.origcwd)
         # Clean up unless there's a failure
         excinfo = sys.exc_info()
