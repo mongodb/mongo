@@ -479,13 +479,18 @@ namespace mongo {
         _bytesOut = 0;
         _bytesIn = 0;
 #ifdef MONGO_SSL
+        _ssl = 0;
         _sslAccepted = 0;
 #endif
     }
 
     void Socket::close() {
 #ifdef MONGO_SSL
-        _ssl.reset();
+        if ( _ssl ) {
+            SSL_shutdown( _ssl );
+            SSL_free( _ssl );
+            _ssl = 0;
+        }
 #endif
         if ( _fd >= 0 ) {
             closesocket( _fd );
@@ -497,8 +502,8 @@ namespace mongo {
     void Socket::secure( SSLManager * ssl ) {
         assert( ssl );
         assert( _fd >= 0 );
-        _ssl.reset( ssl->secure( _fd ) );
-        SSL_connect( _ssl.get() );
+        _ssl = ssl->secure( _fd );
+        SSL_connect( _ssl );
     }
 
     void Socket::secureAccepted( SSLManager * ssl ) { 
@@ -510,8 +515,8 @@ namespace mongo {
 #ifdef MONGO_SSL
         if ( _sslAccepted ) {
             assert( _fd );
-            _ssl.reset( _sslAccepted->secure( _fd ) );
-            SSL_accept( _ssl.get() );
+            _ssl = _sslAccepted->secure( _fd );
+            SSL_accept( _ssl );
             _sslAccepted = 0;
         }
 #endif
@@ -574,7 +579,7 @@ namespace mongo {
     int Socket::_send( const char * data , int len ) {
 #ifdef MONGO_SSL
         if ( _ssl ) {
-            return SSL_write( _ssl.get() , data , len );
+            return SSL_write( _ssl , data , len );
         }
 #endif
         return ::send( _fd , data , len , portSendFlags );
@@ -588,7 +593,7 @@ namespace mongo {
                 
 #ifdef MONGO_SSL
                 if ( _ssl ) {
-                    log() << "SSL Error ret: " << ret << " err: " << SSL_get_error( _ssl.get() , ret ) 
+                    log() << "SSL Error ret: " << ret << " err: " << SSL_get_error( _ssl , ret ) 
                           << " " << ERR_error_string(ERR_get_error(), NULL) 
                           << endl;
                 }
@@ -743,7 +748,7 @@ namespace mongo {
     int Socket::_recv( char *buf, int max ) {
 #ifdef MONGO_SSL
         if ( _ssl ){
-            return SSL_read( _ssl.get() , buf , max );
+            return SSL_read( _ssl , buf , max );
         }
 #endif
         return ::recv( _fd , buf , max , portRecvFlags );

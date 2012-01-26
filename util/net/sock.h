@@ -243,7 +243,7 @@ namespace mongo {
         long long _bytesOut;
 
 #ifdef MONGO_SSL
-        shared_ptr<SSL> _ssl;
+        SSL* _ssl;
         SSLManager * _sslAccepted;
 #endif
 
