@@ -3,7 +3,9 @@
 s = new ShardingTest( "count1" , 2 , 1 );
 db = s.getDB( "test" );
 
-sh.setBalancerState( false );
+// Stop balancer since doing manual stuff
+// Make sure we totally stop here, otherwise balancing round can intermittently slip by
+s.stopBalancer();
 
 db.bar.save( { n : 1 } )
 db.bar.save( { n : 2 } )
@@ -28,10 +30,6 @@ db.foo.save( { _id : 5 , name : "mark" } )
 db.foo.save( { _id : 6 , name : "allan" } )
 
 assert.eq( 6 , db.foo.find().count() , "basic count" );
-
-// Need to stop balancer if doing manual stuff
-// Waits for balancer stop
-s.stopBalancer()
 
 s.adminCommand( { split : "test.foo" , find : { name : "joe" } } ); // [Minkey -> allan) , * [allan -> ..)
 s.adminCommand( { split : "test.foo" , find : { name : "joe" } } ); // * [allan -> sara) , [sara -> Maxkey)
