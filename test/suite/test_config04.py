@@ -116,7 +116,7 @@ class test_config04(wttest.WiredTigerTestCase):
 
     def test_eviction(self):
         self.common_test('eviction_target=84,eviction_trigger=94')
-        # TODO: how do we verify that it was set?
+        # Note
 
     def test_eviction_bad(self):
         self.assertRaises(WiredTigerError, lambda:
@@ -129,16 +129,19 @@ class test_config04(wttest.WiredTigerTestCase):
                                        'eviction_trigger=86'))
 
     def test_exclusive(self):
+        # This is a simple test to set the flag,
+        # there is a separate functionality test for the exclusive flag.
         self.common_test('exclusive')
-        # TODO: how do we verify that it was set?
 
     def test_hazard_max(self):
+        # Note: There isn't any direct way to know that this was set.
         self.common_test('hazard_max=50')
-        # TODO: how do we verify that it was set?
 
     def test_session_max(self):
+        # Note: There isn't any direct way to know that this was set,
+        # but we'll have a separate functionality test to test for
+        # this indirectly.
         self.common_test('session_max=99')
-        # TODO: how do we verify that it was set?
 
     def test_multiprocess(self):
         self.common_test('multiprocess')
@@ -149,12 +152,12 @@ class test_config04(wttest.WiredTigerTestCase):
         # TODO: how do we verify that it was set?
 
     def test_logging(self):
+        # Note: this will have functional tests in the future.
         self.common_test('logging')
-        # TODO: how do we verify that it was set?
 
     def test_transactional(self):
+        # Note: this will have functional tests in the future.
         self.common_test('transactional')
-        # TODO: how do we verify that it was set?
 
 if __name__ == '__main__':
     wttest.run()
