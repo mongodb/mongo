@@ -748,7 +748,7 @@ __slvg_col_range(WT_SESSION_IMPL *session, WT_STUFF *ss)
 			continue;
 
 		/* Check for pages that overlap our page. */
-		for (j = i + 1; j < ss->pages_next;) {
+		for (j = i + 1; j < ss->pages_next; ++j) {
 			if (ss->pages[j] == NULL)
 				continue;
 			/*
@@ -759,19 +759,20 @@ __slvg_col_range(WT_SESSION_IMPL *session, WT_STUFF *ss)
 			    ss->pages[i]->col_stop)
 				break;
 
+			/* There's an overlap, fix it up. */
+			jtrk = ss->pages[j];
+			WT_RET(__slvg_col_range_overlap(session, i, j, ss));
+
 			/*
-			 * There's an overlap, fix it up.
-			 *
 			 * If the overlap resolution changed the entry's start
 			 * key, the entry might have moved and the page array
 			 * re-sorted, and pages[j] would reference a different
 			 * page.  We don't move forward if that happened, we
-			 * re-process the slot again.
+			 * re-process the slot again (by decrementing j before
+			 * the loop's increment).
 			 */
-			jtrk = ss->pages[j];
-			WT_RET(__slvg_col_range_overlap(session, i, j, ss));
-			if (ss->pages[j] == NULL || jtrk == ss->pages[j])
-				++j;
+			if (ss->pages[j] != NULL && jtrk != ss->pages[j])
+				--j;
 		}
 	}
 	return (0);
@@ -1280,7 +1281,7 @@ __slvg_row_range(WT_SESSION_IMPL *session, WT_STUFF *ss)
 			continue;
 
 		/* Check for pages that overlap our page. */
-		for (j = i + 1; j < ss->pages_next;) {
+		for (j = i + 1; j < ss->pages_next; ++j) {
 			if (ss->pages[j] == NULL)
 				continue;
 			/*
@@ -1293,19 +1294,20 @@ __slvg_row_range(WT_SESSION_IMPL *session, WT_STUFF *ss)
 			if (cmp > 0)
 				break;
 
+			/* There's an overlap, fix it up. */
+			jtrk = ss->pages[j];
+			WT_RET(__slvg_row_range_overlap(session, i, j, ss));
+
 			/*
-			 * There's an overlap, fix it up.
-			 *
 			 * If the overlap resolution changed the entry's start
 			 * key, the entry might have moved and the page array
 			 * re-sorted, and pages[j] would reference a different
 			 * page.  We don't move forward if that happened, we
-			 * re-process the slot again.
+			 * re-process the slot again (by decrementing j before
+			 * the loop's increment).
 			 */
-			jtrk = ss->pages[j];
-			WT_RET(__slvg_row_range_overlap(session, i, j, ss));
-			if (ss->pages[j] == NULL || jtrk == ss->pages[j])
-				++j;
+			if (ss->pages[j] != NULL && jtrk != ss->pages[j])
+				--j;
 		}
 	}
 	return (0);
