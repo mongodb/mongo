@@ -709,12 +709,12 @@ __wt_block_discard(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		nfe = fe->next[0];
 		__wt_free(session, fe);
 	}
-	WT_CLEAR(block->foff);
+	memset(block->foff, 0, sizeof(block->foff));
 	for (szp = block->fsize[0]; szp != NULL; szp = nszp) {
 		nszp = szp->next[0];
 		__wt_free(session, szp);
 	}
-	WT_CLEAR(block->fsize);
+	memset(block->fsize, 0, sizeof(block->fsize));
 
 	block->freelist_bytes = 0;
 	block->freelist_entries = 0;
