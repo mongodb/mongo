@@ -2,8 +2,8 @@
 
 var st = new ShardingTest( name = "test", shards = 0, verbose = 2, mongos = 2, other = { rs : true } )
 
-var rsA = new ReplSetTest({ nodes : 2, name : "rsA", startPort : 45000 })
-var rsB = new ReplSetTest({ nodes : 2, name : "rsB", startPort : 45010 })
+var rsA = new ReplSetTest({ nodes : 2, name : "rsA", startPort : 28000 })
+var rsB = new ReplSetTest({ nodes : 2, name : "rsB", startPort : 28010 })
 
 rsA.startSet()
 rsB.startSet()

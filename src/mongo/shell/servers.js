@@ -740,7 +740,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
             
             var options = { useHostname : otherParams.useHostname, 
                             noJournalPrealloc : otherParams.nopreallocj, 
-                            port : 40000 + i,
+                            port : 29000 + i,
                             pathOpts : Object.merge( pathOpts, { config : i } ),
                             dbpath : "$testName-config$config",
                             keyFile : keyFile
