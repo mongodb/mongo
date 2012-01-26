@@ -29,7 +29,7 @@ static const char *sep = "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=\n";
 
 static int  __debug_cell(WT_DBG *, WT_PAGE_HEADER *, WT_CELL_UNPACK *);
 static int  __debug_cell_data(WT_DBG *, const char *, WT_CELL_UNPACK *);
-static void __debug_col_skip(WT_DBG *, WT_SKIP_HEAD *, const char *, int);
+static void __debug_col_skip(WT_DBG *, WT_INSERT_HEAD *, const char *, int);
 static int  __debug_config(WT_SESSION_IMPL *, WT_DBG *, const char *);
 static int  __debug_dsk_cell(WT_DBG *, WT_PAGE_HEADER *);
 static void __debug_dsk_col_fix(WT_DBG *, WT_PAGE_HEADER *);
@@ -44,7 +44,7 @@ static int  __debug_page_modify(WT_DBG *, WT_PAGE *);
 static int  __debug_page_row_int(WT_DBG *, WT_PAGE *, uint32_t);
 static int  __debug_page_row_leaf(WT_DBG *, WT_PAGE *);
 static int  __debug_ref(WT_DBG *, WT_REF *, WT_PAGE *);
-static void __debug_row_skip(WT_DBG *, WT_SKIP_HEAD *);
+static void __debug_row_skip(WT_DBG *, WT_INSERT_HEAD *);
 static int  __debug_tree(WT_SESSION_IMPL *, WT_PAGE *, const char *, uint32_t);
 static void __debug_update(WT_DBG *, WT_UPDATE *, int);
 static void __dmsg(WT_DBG *, const char *, ...)
@@ -619,7 +619,7 @@ __debug_page_col_var(WT_DBG *ds, WT_PAGE *page)
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
-	WT_SKIP_HEAD *update;
+	WT_INSERT_HEAD *update;
 	uint64_t recno, rle;
 	uint32_t i;
 	char tag[64];
@@ -685,7 +685,7 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
 {
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
-	WT_SKIP_HEAD *insert;
+	WT_INSERT_HEAD *insert;
 	WT_ROW *rip;
 	WT_UPDATE *upd;
 	uint32_t i;
@@ -730,7 +730,7 @@ __debug_page_row_leaf(WT_DBG *ds, WT_PAGE *page)
  *	Dump a column-store skiplist.
  */
 static void
-__debug_col_skip(WT_DBG *ds, WT_SKIP_HEAD *head, const char *tag, int hexbyte)
+__debug_col_skip(WT_DBG *ds, WT_INSERT_HEAD *head, const char *tag, int hexbyte)
 {
 	WT_INSERT *ins;
 
@@ -746,7 +746,7 @@ __debug_col_skip(WT_DBG *ds, WT_SKIP_HEAD *head, const char *tag, int hexbyte)
  *	Dump an insert array.
  */
 static void
-__debug_row_skip(WT_DBG *ds, WT_SKIP_HEAD *head)
+__debug_row_skip(WT_DBG *ds, WT_INSERT_HEAD *head)
 {
 	WT_INSERT *ins;
 

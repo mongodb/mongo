@@ -12,7 +12,7 @@ static void __free_page_col_int(WT_SESSION_IMPL *, WT_PAGE *);
 static void __free_page_col_var(WT_SESSION_IMPL *, WT_PAGE *);
 static void __free_page_row_int(WT_SESSION_IMPL *, WT_PAGE *);
 static void __free_page_row_leaf(WT_SESSION_IMPL *, WT_PAGE *);
-static void __free_skip_array(WT_SESSION_IMPL *, WT_SKIP_HEAD **, uint32_t);
+static void __free_skip_array(WT_SESSION_IMPL *, WT_INSERT_HEAD **, uint32_t);
 static void __free_skip_list(WT_SESSION_IMPL *, WT_INSERT *);
 static void __free_update(WT_SESSION_IMPL *, WT_UPDATE **, uint32_t);
 static void __free_update_list(WT_SESSION_IMPL *, WT_UPDATE *);
@@ -85,7 +85,7 @@ static void
 __free_page_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
-	WT_SKIP_HEAD *append;
+	WT_INSERT_HEAD *append;
 
 	btree = session->btree;
 
@@ -134,7 +134,7 @@ static void
 __free_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_BTREE *btree;
-	WT_SKIP_HEAD *append;
+	WT_INSERT_HEAD *append;
 
 	btree = session->btree;
 
@@ -231,9 +231,9 @@ __free_page_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
  */
 static void
 __free_skip_array(
-    WT_SESSION_IMPL *session, WT_SKIP_HEAD **head_arg, uint32_t entries)
+    WT_SESSION_IMPL *session, WT_INSERT_HEAD **head_arg, uint32_t entries)
 {
-	WT_SKIP_HEAD **head;
+	WT_INSERT_HEAD **head;
 
 	/*
 	 * For each non-NULL slot in the page's array of inserts, free the

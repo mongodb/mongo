@@ -13,7 +13,7 @@
  */
 WT_INSERT *
 __wt_search_insert(WT_SESSION_IMPL *session,
-    WT_CURSOR_BTREE *cbt, WT_SKIP_HEAD *inshead, WT_ITEM *srch_key)
+    WT_CURSOR_BTREE *cbt, WT_INSERT_HEAD *inshead, WT_ITEM *srch_key)
 {
 	WT_BTREE *btree;
 	WT_INSERT **insp, *ret_ins;

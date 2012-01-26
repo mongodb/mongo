@@ -140,7 +140,7 @@ struct __wt_page_modify {
 	 * very large number of bits on a single page, and the cost of the
 	 * WT_UPDATE array would be huge.
 	 */
-	WT_SKIP_HEAD **update;		/* Updated items */
+	WT_INSERT_HEAD **update;	/* Updated items */
 
 	/*
 	 * Track pages, blocks to discard: as pages are reconciled, overflow
@@ -210,7 +210,7 @@ struct __wt_page {
 			 * won't be pretty.  So far, avoiding ugly naming has
 			 * overridden consistency.
 			 */
-			WT_SKIP_HEAD	**ins;	/* Inserts */
+			WT_INSERT_HEAD	**ins;	/* Inserts */
 			WT_UPDATE	**upd;	/* Updates */
 		} row;
 
@@ -535,11 +535,12 @@ struct __wt_update {
  * WT_INSERT --
  *
  * Row-store leaf pages support inserts of new K/V pairs.  When the first K/V
- * pair is inserted, the WT_SKIP_HEAD array is allocated, with one slot for
+ * pair is inserted, the WT_INSERT_HEAD array is allocated, with one slot for
  * every existing element in the page, plus one additional slot.  A slot points
- * to a WT_SKIP_HEAD structure for the items which sort after the WT_ROW element
- * that references it and before the subsequent WT_ROW element; the skip list
- * structure has a randomly chosen depth of next pointers in each inserted node.
+ * to a WT_INSERT_HEAD structure for the items which sort after the WT_ROW
+ * element that references it and before the subsequent WT_ROW element; the
+ * skiplist structure has a randomly chosen depth of next pointers in each
+ * inserted node.
  *
  * The additional slot is because it's possible to insert items smaller than any
  * existing key on the page: for that reason, the first slot of the insert array
@@ -594,10 +595,10 @@ struct __wt_insert {
 	    (ins) = WT_SKIP_NEXT(ins))
 
 /*
- * WT_SKIP_HEAD --
- * 	The head of a skip list of WT_INSERT items.
+ * WT_INSERT_HEAD --
+ * 	The head of a skiplist of WT_INSERT items.
  */
-struct __wt_skip_head {
+struct __wt_insert_head {
 	WT_INSERT *head[WT_SKIP_MAXDEPTH];	/* first item on skiplists */
 	WT_INSERT *tail[WT_SKIP_MAXDEPTH];	/* last item on skiplists */
 };

@@ -19,9 +19,9 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 {
 	WT_BTREE *btree;
 	WT_INSERT *ins, *ins_copy;
+	WT_INSERT_HEAD **inshead, *new_inshead, **new_inslist;
 	WT_ITEM *value, _value;
 	WT_PAGE *page;
-	WT_SKIP_HEAD **inshead, *new_inshead, **new_inslist;
 	WT_UPDATE *upd;
 	size_t ins_size, new_inshead_size, new_inslist_size, upd_size;
 	uint64_t recno;
@@ -96,7 +96,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 		new_inshead_size = new_inslist_size = 0;
 		if (op == 1) {
 			if (btree->append == NULL) {
-				new_inslist_size = 1 * sizeof(WT_SKIP_HEAD *);
+				new_inslist_size = 1 * sizeof(WT_INSERT_HEAD *);
 				WT_ERR(
 				    __wt_calloc_def(session, 1, &new_inslist));
 				inshead = &new_inslist[0];
@@ -105,7 +105,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 			cbt->ins_head = *inshead;
 		} else if (page->type == WT_PAGE_COL_FIX) {
 			if (page->modify->update == NULL) {
-				new_inslist_size = 1 * sizeof(WT_SKIP_HEAD *);
+				new_inslist_size = 1 * sizeof(WT_INSERT_HEAD *);
 				WT_ERR(
 				    __wt_calloc_def(session, 1, &new_inslist));
 				inshead = &new_inslist[0];
@@ -114,7 +114,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 		} else {
 			if (page->modify->update == NULL) {
 				new_inslist_size =
-				    page->entries * sizeof(WT_SKIP_HEAD *);
+				    page->entries * sizeof(WT_INSERT_HEAD *);
 				WT_ERR(__wt_calloc_def(
 				    session, page->entries, &new_inslist));
 				inshead = &new_inslist[cbt->slot];
@@ -124,7 +124,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 
 		/* There may be no WT_INSERT list, allocate as necessary. */
 		if (*inshead == NULL) {
-			new_inshead_size = sizeof(WT_SKIP_HEAD);
+			new_inshead_size = sizeof(WT_INSERT_HEAD);
 			WT_RET(__wt_calloc_def(session, 1, &new_inshead));
 			for (i = 0; i < WT_SKIP_MAXDEPTH; i++)
 				cbt->ins_stack[i] = &new_inshead->head[i];
@@ -222,7 +222,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 	WT_BTREE *btree;
 	WT_PAGE *page;
 	WT_INSERT *ins, *new_ins, ***ins_stack;
-	WT_SKIP_HEAD **inshead, **new_inslist, *new_inshead;
+	WT_INSERT_HEAD **inshead, **new_inslist, *new_inshead;
 	uint64_t recno;
 	u_int i, skipdepth;
 	int ret;
