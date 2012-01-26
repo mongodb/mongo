@@ -157,9 +157,6 @@ __salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	btree = session->btree;
 	ret = started = 0;
 
-				/* Set "silent on format error" flag. */
-	F_SET(session, WT_SESSION_SALVAGE_QUIET_ERR);
-
 	WT_CLEAR(stuff);
 	ss = &stuff;
 	ss->session = session;
@@ -194,8 +191,14 @@ __salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	 * Read the file and build in-memory structures that reference any leaf
 	 * or overflow page.  Any pages other than leaf or overflow pages are
 	 * added to the free list.
+	 *
+	 * Turn off read checksum and verification error messages while we're
+	 * reading the file, we expect to see corrupted blocks.
 	 */
-	WT_ERR(__slvg_read(session, ss));
+	F_SET(session, WT_SESSION_SALVAGE_QUIET_ERR);
+	ret = __slvg_read(session, ss);
+	F_CLR(session, WT_SESSION_SALVAGE_QUIET_ERR);
+	WT_ERR(ret);
 
 	/*
 	 * Step 4:
@@ -303,9 +306,6 @@ err:	if (started)
 
 	/* Wrap up reporting. */
 	__wt_progress(session, NULL, ss->fcnt);
-
-				/* Clear "silent on format error" flag. */
-	F_CLR(session, WT_SESSION_SALVAGE_QUIET_ERR);
 
 	return (ret);
 }
