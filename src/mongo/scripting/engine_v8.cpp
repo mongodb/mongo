@@ -32,12 +32,12 @@ namespace mongo {
     /**
      * Unwraps a BSONObj from the JS wrapper
      */
-    static BSONObj* unwrapBSONObj(const Handle<v8::Object>& obj) {
+    static BSONObj unwrapBSONObj(const Handle<v8::Object>& obj) {
       Handle<External> field = Handle<External>::Cast(obj->GetInternalField(0));
       if (field.IsEmpty() || !field->IsExternal())
-          return 0;
+          return BSONObj();
       void* ptr = field->Value();
-      return (BSONObj*)ptr;
+      return ((BSONHolder*)ptr)->_obj;
     }
 
     static void weakRefBSONCallback(v8::Persistent<v8::Value> p, void* scope) {
@@ -51,7 +51,7 @@ namespace mongo {
         p.Dispose();
     }
 
-    Persistent<v8::Object> V8Scope::wrapBSONObject(Local<v8::Object> obj, BSONObj* data) {
+    Persistent<v8::Object> V8Scope::wrapBSONObject(Local<v8::Object> obj, BSONHolder* data) {
         obj->SetInternalField(0, v8::External::New(data));
         Persistent<v8::Object> p = Persistent<v8::Object>::New(obj);
         p.MakeWeak(this, weakRefBSONCallback);
@@ -88,8 +88,8 @@ namespace mongo {
       }
 
       string key = toSTLString(name);
-      BSONObj *obj = unwrapBSONObj(info.Holder());
-      BSONElement elmt = obj->getField(key.c_str());
+      BSONObj obj = unwrapBSONObj(info.Holder());
+      BSONElement elmt = obj.getField(key.c_str());
       if (elmt.eoo())
           return Handle<Value>();
       Local< External > scp = External::Cast( *info.Data() );
@@ -107,8 +107,8 @@ namespace mongo {
 
     static Handle<v8::Value> namedGetRO(Local<v8::String> name, const v8::AccessorInfo &info) {
       string key = toSTLString(name);
-      BSONObj *obj = unwrapBSONObj(info.Holder());
-      BSONElement elmt = obj->getField(key.c_str());
+      BSONObj obj = unwrapBSONObj(info.Holder());
+      BSONElement elmt = obj.getField(key.c_str());
       if (elmt.eoo())
           return Handle<Value>();
       Local< External > scp = External::Cast( *info.Data() );
@@ -125,13 +125,13 @@ namespace mongo {
     }
 
     static Handle<v8::Array> namedEnumerator(const AccessorInfo &info) {
-        BSONObj *obj = unwrapBSONObj(info.Holder());
-        Handle<v8::Array> arr = Handle<v8::Array>(v8::Array::New(obj->nFields()));
+        BSONObj obj = unwrapBSONObj(info.Holder());
+        Handle<v8::Array> arr = Handle<v8::Array>(v8::Array::New(obj.nFields()));
         int i = 0;
         Local< External > scp = External::Cast( *info.Data() );
         V8Scope* scope = (V8Scope*)(scp->Value());
         // note here that if keys are parseable number, v8 will access them using index
-        for ( BSONObjIterator it(*obj); it.more(); ++i) {
+        for ( BSONObjIterator it(obj); it.more(); ++i) {
             const BSONElement& f = it.next();
 //            arr->Set(i, v8::String::NewExternal(new ExternalString(f.fieldName())));
             Handle<v8::String> name = scope->getV8Str(f.fieldName());
@@ -170,8 +170,8 @@ namespace mongo {
 //            if (!val.IsEmpty() && !val->IsNull())
 //                return val;
 //        }
-        BSONObj *obj = unwrapBSONObj(info.Holder());
-        BSONElement elmt = obj->getField(key);
+        BSONObj obj = unwrapBSONObj(info.Holder());
+        BSONElement elmt = obj.getField(key);
         if (elmt.eoo())
             return Handle<Value>();
         Handle<Value> val = scope->mongoToV8Element(elmt, false);
@@ -206,8 +206,8 @@ namespace mongo {
 //            if (!val.IsEmpty() && !val->IsNull())
 //                return val;
 //        }
-        BSONObj *obj = unwrapBSONObj(info.Holder());
-        BSONElement elmt = obj->getField(key);
+        BSONObj obj = unwrapBSONObj(info.Holder());
+        BSONElement elmt = obj.getField(key);
         if (elmt.eoo())
             return Handle<Value>();
         Handle<Value> val = scope->mongoToV8Element(elmt, true);
@@ -1161,6 +1161,7 @@ namespace mongo {
      */
     Handle<v8::Object> V8Scope::mongoToLZV8( const BSONObj& m , bool array, bool readOnly ) {
         Local<v8::Object> o;
+        BSONHolder* own = new BSONHolder(m);
 
         if (readOnly) {
             o = roObjectTemplate->NewInstance();
@@ -1192,8 +1193,6 @@ namespace mongo {
             }
         }
 
-        BSONObj* own = new BSONObj(m.getOwned());
-//        BSONObj* own = new BSONObj(m);
         Persistent<v8::Object> p = wrapBSONObject(o, own);
         return p;
     }
@@ -1488,14 +1487,14 @@ namespace mongo {
     }
 
     BSONObj V8Scope::v8ToMongo( v8::Handle<v8::Object> o , int depth ) {
-        BSONObj* originalBSON = 0;
+        BSONObj originalBSON;
         if (o->InternalFieldCount() > 0) {
             originalBSON = unwrapBSONObj(o);
 
             if ( !o->GetHiddenValue( V8STR_RO ).IsEmpty() ||
                     (o->HasNamedLookupInterceptor() && o->GetHiddenValue( V8STR_MODIFIED ).IsEmpty()) ) {
                 // object was readonly, use bson as is
-                return *originalBSON;
+                return originalBSON;
             }
         }
 
@@ -1503,7 +1502,7 @@ namespace mongo {
 
         if ( depth == 0 ) {
             if ( o->HasRealNamedProperty( V8STR_ID ) ) {
-                v8ToMongoElement( b , "_id" , o->Get( V8STR_ID ), 0, originalBSON );
+                v8ToMongoElement( b , "_id" , o->Get( V8STR_ID ), 0, &originalBSON );
             }
         }
 
@@ -1521,7 +1520,7 @@ namespace mongo {
             if ( depth == 0 && sname == "_id" )
                 continue;
 
-            v8ToMongoElement( b , sname , value , depth + 1, originalBSON );
+            v8ToMongoElement( b , sname , value , depth + 1, &originalBSON );
         }
         return b.obj();
     }
