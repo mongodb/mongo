@@ -16,10 +16,10 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "../s/d_chunk_manager.h"
+
 #include "pch.h"
 #include "dbtests.h"
-
-#include "../s/d_chunk_manager.h"
 
 namespace {
 
