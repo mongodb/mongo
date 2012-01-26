@@ -728,6 +728,7 @@ __slvg_trk_leaf_ovfl(
 static int
 __slvg_col_range(WT_SESSION_IMPL *session, WT_STUFF *ss)
 {
+	WT_TRACK *jtrk;
 	uint32_t i, j;
 
 	/*
@@ -758,23 +759,19 @@ __slvg_col_range(WT_SESSION_IMPL *session, WT_STUFF *ss)
 			    ss->pages[i]->col_stop)
 				break;
 
-			/* There's an overlap, fix it up. */
-			WT_RET(__slvg_col_range_overlap(session, i, j, ss));
-
 			/*
+			 * There's an overlap, fix it up.
+			 *
 			 * If the overlap resolution changed the entry's start
 			 * key, the entry might have moved and the page array
 			 * re-sorted, and pages[j] would reference a different
 			 * page.  We don't move forward if that happened, we
 			 * re-process the slot again.
 			 */
-			if (ss->pages[j] == NULL)
+			jtrk = ss->pages[j];
+			WT_RET(__slvg_col_range_overlap(session, i, j, ss));
+			if (ss->pages[j] == NULL || jtrk == ss->pages[j])
 				++j;
-			else {
-				if (ss->pages[j]->col_start >
-				    ss->pages[i]->col_stop)
-					++j;
-			}
 		}
 	}
 	return (0);
@@ -1259,6 +1256,7 @@ __slvg_col_merge_ovfl(WT_SESSION_IMPL *session,
 static int
 __slvg_row_range(WT_SESSION_IMPL *session, WT_STUFF *ss)
 {
+	WT_TRACK *jtrk;
 	WT_BTREE *btree;
 	uint32_t i, j;
 	int cmp;
@@ -1295,25 +1293,19 @@ __slvg_row_range(WT_SESSION_IMPL *session, WT_STUFF *ss)
 			if (cmp > 0)
 				break;
 
-			/* There's an overlap, fix it up. */
-			WT_RET(__slvg_row_range_overlap(session, i, j, ss));
-
 			/*
+			 * There's an overlap, fix it up.
+			 *
 			 * If the overlap resolution changed the entry's start
 			 * key, the entry might have moved and the page array
 			 * re-sorted, and pages[j] would reference a different
 			 * page.  We don't move forward if that happened, we
 			 * re-process the slot again.
 			 */
-			if (ss->pages[j] == NULL)
+			jtrk = ss->pages[j];
+			WT_RET(__slvg_row_range_overlap(session, i, j, ss));
+			if (ss->pages[j] == NULL || jtrk == ss->pages[j])
 				++j;
-			else {
-				WT_RET(WT_BTREE_CMP(session, btree,
-				    &ss->pages[j]->row_start,
-				    &ss->pages[i]->row_stop, cmp));
-				if (cmp > 0)
-					++j;
-			}
 		}
 	}
 	return (0);
