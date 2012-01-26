@@ -303,9 +303,9 @@ namespace mongo {
             else if ( fn[1] == 'w' && fn[2] == 'i' && fn[3] == 't' && fn[4] == 'h' && fn[5] == 'i' && fn[6] == 'n' && fn[7] == 0 )
                 return BSONObj::opWITHIN;
             else if ( fn[1] == 'b' && fn[2] == 'i' && fn[3] == 't' ) {
-                if ( fn[4] == 'a' && fn[5] == 'n' && fn[6] == 'd' )
+                if ( fn[4] == 'A' && fn[5] == 'n' && fn[6] == 'd' )
                     return BSONObj::opBITAND;
-                if ( fn[4] == 'o' && fn[5] == 'r' )
+                if ( fn[4] == 'O' && fn[5] == 'r' )
                     return BSONObj::opBITOR;
             }
         }
