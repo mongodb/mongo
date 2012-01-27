@@ -22,6 +22,7 @@ namespace mongo {
         void lock_w();
         void lock_R();
         void lock_W();
+        bool lock_W(int millis);
         void unlock_r();
         void unlock_w();
         void unlock_R();
@@ -62,6 +63,22 @@ namespace mongo {
             R.c.wait(m);
         }
         R.n++;
+    }
+
+    inline bool QLock::lock_W(int millis) { 
+        boost::mutex::scoped_lock lk(m);
+        W.n++; // ahead of time so we are then greedy
+        while( 1 ) {
+            if( W.n + R.n + w.n + r.n == 1 )
+                break;
+            if( W.c.timed_wait(m, boost::posix_time::milliseconds(millis)) == false ) { 
+                // timed out
+                dassert( W.n > 0 );
+                W.n--;
+                return false;
+            }
+        }
+        return true;
     }
 
     // "i will be writing. i will coordinate with no one. you better stop them all"
