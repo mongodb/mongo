@@ -233,6 +233,11 @@ namespace mongo {
     bool ReplSetImpl::tryToGoLiveAsASecondary(OpTime& /*out*/ minvalid) {
         bool golive = false;
 
+        // make sure we're not primary
+        if (box.getState().primary()) {
+            return false;
+        }
+
         {
             lock lk( this );
 
