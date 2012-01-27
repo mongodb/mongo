@@ -2,7 +2,7 @@
 #
 # See the file LICENSE for redistribution information.
 #
-# Copyright (c) 2008-2011 WiredTiger, Inc.
+# Copyright (c) 2008-2012 WiredTiger, Inc.
 #	All rights reserved.
 #
 # test_base03.py
@@ -82,10 +82,7 @@ class test_cursor01(wttest.WiredTigerTestCase):
         Create entries, and read back in a cursor: key=string, value=string
         """
         cursor = self.create_session_and_cursor()
-
-        # TODO: these should fail regardless of table type
-        if self.tablekind == 'row':
-            self.assertCursorHasNoKeyValue(cursor)
+        self.assertCursorHasNoKeyValue(cursor)
 
         for i in range(0, self.nentries):
             cursor.set_key(self.genkey(i))
