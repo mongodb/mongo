@@ -38,7 +38,7 @@ main(int argc, char *argv[])
 	g.track = isatty(STDOUT_FILENO) ? 1 : 0;
 
 	/* Set values from the command line. */
-	while ((ch = getopt(argc, argv, "1C:c:lqr")) != EOF)
+	while ((ch = getopt(argc, argv, "1C:c:Llqr")) != EOF)
 		switch (ch) {
 		case '1':			/* One run */
 			g.c_runs = 1;
@@ -49,8 +49,16 @@ main(int argc, char *argv[])
 		case 'c':			/* Configuration from a file */
 			config_file(optarg);
 			break;
+		case 'L':			/* Re-direct output to a log */
+			/*
+			 * The -l option is a superset of -L, ignore -L if we
+			 * have already configured logging for operations.
+			 */
+			if (g.logging == 0)
+				g.logging = LOG_FILE;
+			break;
 		case 'l':			/* Turn on operation logging */
-			g.logging = 1;
+			g.logging = LOG_OPS;
 			break;
 		case 'q':			/* Quiet */
 			g.track = 0;
@@ -186,7 +194,7 @@ startup(void)
 	(void)system("rm -rf WiredTiger WiredTiger.* __[a-qs-z]* __run");
 
 	/* Open/truncate the logging file. */
-	if (g.logging) {
+	if (g.logging != 0) {
 		if ((g.logfp = fopen("__log", "w")) == NULL)
 			die("__log", errno);
 		(void)setvbuf(g.logfp, NULL, _IOLBF, 0);
@@ -228,14 +236,15 @@ static void
 usage(void)
 {
 	fprintf(stderr,
-	    "usage: %s [-1lqr] [-C wiredtiger-config] [-c config-file] "
+	    "usage: %s [-1Llqr] [-C wiredtiger-config] [-c config-file] "
 	    "[name=value ...]\n",
 	    g.progname);
 	fprintf(stderr, "%s",
 	    "\t-1 run once\n"
 	    "\t-C specify wiredtiger_open configuration arguments\n"
 	    "\t-c read test program configuration from a file\n"
-	    "\t-l log operations\n"
+	    "\t-L output to a log file\n"
+	    "\t-l log operations (implies -L)\n"
 	    "\t-q run quietly\n"
 	    "\t-r replay the last run\n");
 

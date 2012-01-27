@@ -204,7 +204,7 @@ wts_startup(int open_cursors)
 		}
 	}
 
-	if (g.logging) {
+	if (g.logging == LOG_OPS) {
 		(void)time(&now);
 		(void)session->msg_printf(session,
 		    "===============\nWT start: %s===============",
@@ -233,7 +233,7 @@ wts_teardown(void)
 	cursor_insert = g.wts_cursor_insert;
 	session = g.wts_session;
 
-	if (g.logging) {
+	if (g.logging == LOG_OPS) {
 		(void)time(&now);
 		(void)session->msg_printf(session,
 		    "===============\nWT stop: %s===============",
@@ -474,7 +474,7 @@ bulk(WT_ITEM **keyp, WT_ITEM **valuep)
 	case FIX:
 		*keyp = NULL;
 		*valuep = &value;
-		if (g.logging)
+		if (g.logging == LOG_OPS)
 			(void)session->msg_printf(session,
 			    "%-10s %" PRIu32 " {0x%02" PRIx8 "}",
 			    "bulk V",
@@ -483,19 +483,19 @@ bulk(WT_ITEM **keyp, WT_ITEM **valuep)
 	case VAR:
 		*keyp = NULL;
 		*valuep = &value;
-		if (g.logging)
+		if (g.logging == LOG_OPS)
 			(void)session->msg_printf(session,
 			    "%-10s %" PRIu32 " {%.*s}", "bulk V",
 			    g.key_cnt, (int)value.size, (char *)value.data);
 		break;
 	case ROW:
 		*keyp = &key;
-		if (g.logging)
+		if (g.logging == LOG_OPS)
 			(void)session->msg_printf(session,
 			    "%-10s %" PRIu32 " {%.*s}", "bulk K",
 		    g.key_cnt, (int)key.size, (char *)key.data);
 		*valuep = &value;
-		if (g.logging)
+		if (g.logging == LOG_OPS)
 			(void)session->msg_printf(session,
 			    "%-10s %" PRIu32 " {%.*s}", "bulk V",
 			    g.key_cnt, (int)value.size, (char *)value.data);
@@ -655,7 +655,7 @@ wts_read(uint64_t keyno)
 	session = g.wts_session;
 
 	/* Log the operation */
-	if (g.logging)
+	if (g.logging == LOG_OPS)
 		(void)session->msg_printf(
 		    session, "%-10s%" PRIu64, "read", keyno);
 
@@ -799,7 +799,7 @@ wts_np(int next, int insert, int *notfoundp)
 		return (1);
 	}
 
-	if (g.logging)
+	if (g.logging == LOG_OPS)
 		switch (g.c_file_type) {
 		case FIX:
 			(void)session->msg_printf(
@@ -841,7 +841,7 @@ wts_row_put(uint64_t keyno, int insert)
 	value_gen(&value.data, &value.size, keyno);
 
 	/* Log the operation */
-	if (g.logging)
+	if (g.logging == LOG_OPS)
 		(void)session->msg_printf(session, "%-10s{%.*s}\n%-10s{%.*s}",
 		    insert ? "insertK" : "putK",
 		    (int)key.size, (char *)key.data,
@@ -885,7 +885,7 @@ wts_col_put(uint64_t keyno)
 	value_gen(&value.data, &value.size, keyno);
 
 	/* Log the operation */
-	if (g.logging) {
+	if (g.logging == LOG_OPS) {
 		if (g.c_file_type == FIX)
 			(void)session->msg_printf(session,
 			    "%-10s%" PRIu64 " {0x%02" PRIx8 "}",
@@ -958,7 +958,7 @@ wts_col_insert(uint64_t *keynop)
 	}
 	*keynop = g.rows = (uint32_t)keyno;
 
-	if (g.logging) {
+	if (g.logging == LOG_OPS) {
 		if (g.c_file_type == FIX)
 			(void)session->msg_printf(session,
 			    "%-10s%" PRIu64 " {0x%02" PRIx8 "}",
@@ -995,7 +995,7 @@ wts_row_del(uint64_t keyno, int *notfoundp)
 	key_gen(&key.data, &key.size, keyno, 0);
 
 	/* Log the operation */
-	if (g.logging)
+	if (g.logging == LOG_OPS)
 		(void)session->msg_printf(
 		    session, "%-10s%" PRIu64, "remove", keyno);
 
@@ -1032,7 +1032,7 @@ wts_col_del(uint64_t keyno, int *notfoundp)
 	session = g.wts_session;
 
 	/* Log the operation */
-	if (g.logging)
+	if (g.logging == LOG_OPS)
 		(void)session->msg_printf(
 		    session, "%-10s%" PRIu64, "remove", keyno);
 

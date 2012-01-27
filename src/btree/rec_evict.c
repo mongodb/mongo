@@ -36,16 +36,16 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	    "page %p (%s)", page, __wt_page_type_string(page->type));
 
 	/*
-         * We don't separately evict pages which are expected to be merged into
-         * their parents when the parent is evicted.  The exception is root
-         * pages that split (the eviction code calls this function with a split
+	 * We don't separately evict pages which are expected to be merged into
+	 * their parents when the parent is evicted.  The exception is root
+	 * pages that split (the eviction code calls this function with a split
 	 * page when closing a file where the root page has split).
-         */
-        if (F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE) ||
+	 */
+	if (F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE) ||
 	    (!WT_PAGE_IS_ROOT(page) &&
-	        F_ISSET(page, WT_PAGE_REC_EMPTY | WT_PAGE_REC_SPLIT)))
-                WT_ERR_MSG(session, EINVAL,
-                    "attempt to evict an empty or split page that should "
+		F_ISSET(page, WT_PAGE_REC_EMPTY | WT_PAGE_REC_SPLIT)))
+		WT_ERR_MSG(session, EINVAL,
+		    "attempt to evict an empty or split page that should "
 		    "have been merged into its parent");
 
 	/*

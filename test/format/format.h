@@ -52,7 +52,10 @@ typedef struct {
 
 	uint32_t run_cnt;			/* Run counter */
 
-	int   logging;				/* Are we logging everything? */
+	enum {
+	    LOG_FILE=1,				/* Use a log file */
+	    LOG_OPS=2				/* Log all operations */
+	} logging;
 	FILE *logfp;				/* Log file. */
 
 	int replay;				/* Replaying a run. */
