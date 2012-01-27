@@ -232,7 +232,7 @@ namespace ThreadedTests {
             counter++;
             ASSERT( counter == 0 );
 
-            writelocktry lk( "" , 0 );
+            writelocktry lk( 0 );
             ASSERT( lk.got() );
             ASSERT( d.dbMutex.isWriteLocked() );
         }

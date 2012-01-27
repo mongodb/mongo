@@ -32,7 +32,14 @@ namespace mongo {
 
     // ' ', 'r', 'w', 'R', 'W'
     __declspec( thread ) char threadState;
-
+    
+    static bool lock_W_try(int ms) { 
+        assert( threadState == ' ' );
+        bool got = q.lock_W(ms);
+        if( got ) 
+            threadState = 'W';
+        return got;
+    }
     static void lock_W() { 
         assert( threadState == ' ' );
         threadState = 'W';
@@ -112,7 +119,6 @@ namespace mongo {
     writelock::writelock() { 
         lk1.reset( new Lock::GlobalWrite() );
     }
-
     writelock::writelock(const string& ns) { 
         if( ns.empty() ) { 
             lk1.reset( new Lock::GlobalWrite() );
@@ -120,6 +126,14 @@ namespace mongo {
         else {
             lk2.reset( new Lock::DBWrite(ns) );
         }
+    }
+
+    writelocktry::writelocktry( int tryms ) : 
+        _got( lock_W_try(tryms) )
+    { }
+    writelocktry::~writelocktry() { 
+        if( _got )
+            unlock_W();
     }
 
     readlock::readlock() {

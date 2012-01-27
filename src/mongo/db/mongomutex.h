@@ -283,17 +283,10 @@ namespace mongo {
     };
 
     struct writelocktry {
-        writelocktry( int tryms ) {
-            _got = d.dbMutex.lock_try( tryms );
-        }
-        ~writelocktry() {
-            if ( _got ) {
-                d.dbMutex.unlock();
-            }
-        }
+        const bool _got;
+        writelocktry( int tryms );
+        ~writelocktry();
         bool got() const { return _got; }
-    private:
-        bool _got;
     };
 
     struct readlocktryassert : public readlocktry {

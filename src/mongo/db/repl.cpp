@@ -1355,7 +1355,7 @@ namespace mongo {
                even when things are idle.
             */
             {
-                writelocktry lk("",1);
+                writelocktry lk(1);
                 if ( lk.got() ) {
                     toSleep = 10;
 
