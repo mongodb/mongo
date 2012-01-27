@@ -167,8 +167,12 @@ namespace ChunkTests {
         };
 
         class OrEqualityInequalityUnhelpful : public MultiShardBase {
-            virtual BSONObj query() const { return fromjson( "{$or:[{a:'u'},{a:{$gte:'zz'}},{}]}" ); }
-            virtual BSONArray expectedShardNames() const { return BSON_ARRAY( "0" << "1" << "2" << "3" ); }
+            virtual BSONObj query() const {
+                return fromjson( "{$or:[{a:'u'},{a:{$gte:'zz'}},{}]}" );
+            }
+            virtual BSONArray expectedShardNames() const {
+                return BSON_ARRAY( "0" << "1" << "2" << "3" );
+            }
         };
 
         /**
