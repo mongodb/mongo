@@ -723,11 +723,11 @@ namespace mongo {
         return true;
     }
 
-    bool DBClientReplicaSet::auth(const string &dbname, const string &username, const string &pwd, string& errmsg, bool digestPassword ) {
+    bool DBClientReplicaSet::auth(const string &dbname, const string &username, const string &pwd, string& errmsg, bool digestPassword, Auth::Level * level) {
         DBClientConnection * m = checkMaster();
 
         // first make sure it actually works
-        if( ! m->auth(dbname, username, pwd, errmsg, digestPassword ) )
+        if( ! m->auth(dbname, username, pwd, errmsg, digestPassword, level ) )
             return false;
 
         // now that it does, we should save so that for a new node we can auth
