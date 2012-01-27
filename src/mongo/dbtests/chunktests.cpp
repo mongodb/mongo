@@ -165,7 +165,12 @@ namespace ChunkTests {
             virtual BSONObj query() const { return fromjson( "{$or:[{a:'u'},{a:{$gte:'y'}}]}" ); }
             virtual BSONArray expectedShardNames() const { return BSON_ARRAY( "0" << "2" << "3" ); }
         };
-        
+
+        class OrEqualityInequalityUnhelpful : public MultiShardBase {
+            virtual BSONObj query() const { return fromjson( "{$or:[{a:'u'},{a:{$gte:'zz'}},{}]}" ); }
+            virtual BSONArray expectedShardNames() const { return BSON_ARRAY( "0" << "1" << "2" << "3" ); }
+        };
+
         /**
          * SERVER-4554 For now the first shard is returned for unsatisfiable queries, as some
          * clients of getShardsForQuery() expect at least one shard.
@@ -224,6 +229,7 @@ namespace ChunkTests {
             add<ChunkManagerTests::LTERangeMultiShard>();
             add<ChunkManagerTests::OrEqualities>();
             add<ChunkManagerTests::OrEqualityInequality>();
+            add<ChunkManagerTests::OrEqualityInequalityUnhelpful>();
             add<ChunkManagerTests::UnsatisfiableRangeSingleShard>();
             add<ChunkManagerTests::UnsatisfiableRangeMultiShard>();
             add<ChunkManagerTests::EqualityThenUnsatisfiable>();
