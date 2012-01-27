@@ -18,7 +18,9 @@
 #include "pch.h"
 #include "text.h"
 #include "unittest.h"
-#include "boost/system/system_error.hpp"
+#if defined(_WIN32)
+#include <boost/system/system_error.hpp>
+#endif
 
 namespace mongo {
 

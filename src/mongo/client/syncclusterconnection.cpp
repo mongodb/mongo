@@ -361,7 +361,7 @@ namespace mongo {
         throw UserException( 8008 , "all servers down!" );
     }
 
-    void SyncClusterConnection::say( Message &toSend, bool isRetry ) {
+    void SyncClusterConnection::say( Message &toSend, bool isRetry , string * actualServer ) {
         string errmsg;
         if ( ! prepare( errmsg ) )
             throw UserException( 13397 , (string)"SyncClusterConnection::say prepare failed: " + errmsg );
@@ -369,6 +369,8 @@ namespace mongo {
         for ( size_t i=0; i<_conns.size(); i++ ) {
             _conns[i]->say( toSend );
         }
+
+        // TODO: should we set actualServer??
 
         _checkLast();
     }

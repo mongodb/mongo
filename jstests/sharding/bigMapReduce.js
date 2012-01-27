@@ -8,10 +8,30 @@ s.adminCommand( { enablesharding : "test" } )
 s.adminCommand( { shardcollection : "test.foo", key : { "_id" : 1 } } )
 
 db = s.getDB( "test" );
+var idInc = 0;
 var str=""
 for (i=0;i<4*1024;i++) { str=str+"a"; }
-for (j=0; j<100; j++) for (i=0; i<512; i++){ db.foo.save({y:str})}
+for (j=0; j<100; j++) for (i=0; i<512; i++){ db.foo.save({ i : idInc++, y:str})}
 db.getLastError();
+
+// Collect some useful stats to figure out what happened
+if( db.foo.find().itcount() != 51200 ){
+    sleep( 1000 )
+    
+    s.printShardingStatus(true);
+    
+    print( "Shard 0: " + s.shard0.getCollection( db.foo + "" ).find().itcount() )
+    print( "Shard 1: " + s.shard1.getCollection( db.foo + "" ).find().itcount() )
+    
+    for( var i = 0; i < 51200; i++ ){
+        if( ! db.foo.findOne({ i : i }, { i : 1 }) ){
+            print( "Could not find: " + i )
+        }
+        if( i % 100 == 0 ) print( "Checked " + i )
+    }
+    
+    print( "PROBABLY WILL ASSERT NOW" )
+}
 
 assert.soon( function(){ var c = db.foo.find().itcount(); print( "Count is " + c ); return c == 51200 } )
 //assert.eq( 51200, db.foo.find().itcount(), "Not all data was saved!" )

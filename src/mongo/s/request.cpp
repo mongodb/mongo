@@ -45,12 +45,18 @@ namespace mongo {
         _clientInfo->newRequest( p );
     }
 
-    void Request::checkAuth( Auth::Level levelNeeded ) const {
+    void Request::checkAuth( Auth::Level levelNeeded , const char * need ) const {
         char cl[256];
-        nsToDatabase(getns(), cl);
+
+        const char * use = cl;
+        if ( need )
+            use = need;
+        else
+            nsToDatabase(getns(), cl);
+        
         uassert( 15845 , 
-                 str::stream() << "unauthorized for db:" << cl << " level: " << levelNeeded ,
-                 _clientInfo->getAuthenticationInfo()->isAuthorizedForLevel(cl,levelNeeded) );
+                 str::stream() << "unauthorized for db:" << use << " level: " << levelNeeded ,
+                 _clientInfo->getAuthenticationInfo()->isAuthorizedForLevel(use,levelNeeded) );
     }
 
     void Request::init() {

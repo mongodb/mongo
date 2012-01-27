@@ -1,9 +1,15 @@
 // Tests sharding with a key file
 
-var st = new ShardingTest({ name : jsTestName(),
+myTestName = "sharding_with_keyfile"
+
+keyFile = "jstests/sharding/" + myTestName + ".key";
+
+run( "chmod" , "600" , keyFile );
+
+var st = new ShardingTest({ name : myTestName ,
                             shards : 2,
                             mongos : 1,
-                            keyFile : keyFile = "jstests/sharding/" + jsTestName() + ".key" })
+                            keyFile : keyFile })
 
 // Make sure all our instances got the key
 var configs = st._configServers

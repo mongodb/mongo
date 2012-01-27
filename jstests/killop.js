@@ -4,7 +4,7 @@ t.drop();
 //if ( typeof _threadInject == "undefined" ) { // don't run in v8 mode - SERVER-1900
 
 function debug( x ) {
-//    printjson( x );
+    //printjson( x );
 }
 
 t.save( {} );
@@ -16,7 +16,10 @@ function ops() {
     ids = [];
     for ( var i in p ) {
         var o = p[ i ];
-        if ( o.active && o.query && o.query.query && o.query.query.$where && o.ns == "test.jstests_killop" ) {
+        // We *can't* check for ns, b/c it's not guaranteed to be there unless the query is active, which 
+        // it may not be in our polling cycle - particularly b/c we sleep every second in both the query and
+        // the assert
+        if ( ( o.active || o.waitingForLock ) && o.query && o.query.query && o.query.query.$where && o.query.count == "jstests_killop" ) {
             ids.push( o.opid );
         }
     }

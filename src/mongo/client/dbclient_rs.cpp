@@ -829,7 +829,7 @@ namespace mongo {
         _slave.reset();
     }
 
-    void DBClientReplicaSet::say( Message& toSend, bool isRetry ) {
+    void DBClientReplicaSet::say( Message& toSend, bool isRetry , string * actualServer ) {
 
         if( ! isRetry )
             _lazyState = LazyState();
@@ -846,6 +846,8 @@ namespace mongo {
                 for ( int i = _lazyState._retries; i < 3; i++ ) {
                     try {
                         DBClientConnection* slave = checkSlave();
+                        if ( actualServer )
+                            *actualServer = slave->getServerAddress();
                         slave->say( toSend );
 
                         _lazyState._lastOp = lastOp;
@@ -862,6 +864,9 @@ namespace mongo {
         }
 
         DBClientConnection* master = checkMaster();
+        if ( actualServer )
+            *actualServer = master->getServerAddress();
+
         master->say( toSend );
 
         _lazyState._lastOp = lastOp;

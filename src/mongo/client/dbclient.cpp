@@ -953,7 +953,7 @@ namespace mongo {
         toSend.setData(dbQuery, b.buf(), b.len());
     }
 
-    void DBClientConnection::say( Message &toSend, bool isRetry ) {
+    void DBClientConnection::say( Message &toSend, bool isRetry , string * actualServer ) {
         checkConnection();
         try {
             port().say( toSend );

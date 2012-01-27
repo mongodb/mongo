@@ -73,8 +73,8 @@ if ( typeof _threadInject == "undefined" ) { // don't run in v8 mode - SERVER-19
         o = null;
         assert.soon( function() { o = op( where ); return o != -1 } );
 
-        db.killOp( o );
-        debug( "did kill" );
+        res = db.killOp( o );
+        debug( "did kill : " + tojson( res ) );
         
         // When the map reduce op is killed, the spawned shell will exit
         s();

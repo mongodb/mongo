@@ -95,7 +95,7 @@ namespace mongo {
                 // TODO:  Better merge this logic.  We potentially can now use the same cursor logic for everything.
                 ShardPtr primary = cursor->getPrimary();
                 DBClientCursorPtr shardCursor = cursor->getShardCursor( *primary );
-                r.reply( *(shardCursor->getMessage()) , primary->getConnString() );
+                r.reply( *(shardCursor->getMessage()) , shardCursor->originalHost() );
             }
         }
 

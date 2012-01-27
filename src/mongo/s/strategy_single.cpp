@@ -222,11 +222,10 @@ namespace mongo {
                 arr.done();
             }
             else if ( strcmp( ns , "killop" ) == 0 ) {
+                r.checkAuth( Auth::WRITE , "admin" );
+                
                 BSONElement e = q.query["op"];
-                if ( strstr( r.getns() , "admin." ) == 0 ) {
-                    b.append( "err" , "unauthorized" );
-                }
-                else if ( e.type() != String ) {
+                if ( e.type() != String ) {
                     b.append( "err" , "bad op" );
                     b.append( e );
                 }

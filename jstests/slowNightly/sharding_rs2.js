@@ -1,13 +1,17 @@
 // mostly for testing mongos w/replica sets
 
 
-s = new ShardingTest( "rs2" , 2 , 2 , 1 , { rs : true , chunksize : 1 } )
+function debug( x ) {
+    print( "RS2-DEBUG: " + x );
+}
+
+s = new ShardingTest( "rs2" , 2 , 0 , 1 , { rs : true , chunksize : 1 } )
 
 db = s.getDB( "test" )
 t = db.foo
 
 // -------------------------------------------------------------------------------------------
-// ---------- test that config server updates when replica set config changes ----------------
+debug( "test that config server updates when replica set config changes" )
 // -------------------------------------------------------------------------------------------
 
 
@@ -57,31 +61,42 @@ for ( i=0; i<5; i++ ){
 }
 
 // -------------------------------------------------------------------------------------------
-// ---------- test routing to slaves ----------------
+debug( "test routing to slaves" )
 // -------------------------------------------------------------------------------------------
 
 // --- not sharded ----
 
+debug( "Z1" )
+
 m = new Mongo( s.s.name );
 ts = m.getDB( "test" ).foo
+
+debug( "Z1.a" )
 
 before = rs.test.getMaster().adminCommand( "serverStatus" ).opcounters
 
 for ( i=0; i<10; i++ )
     assert.eq( 17 , ts.findOne().x , "B1" )
 
+debug( "Z1.b" )
+
 m.setSlaveOk()
 for ( i=0; i<10; i++ )
     assert.eq( 17 , ts.findOne().x , "B2" )
 
+debug( "Z1.c" )
+
 after = rs.test.getMaster().adminCommand( "serverStatus" ).opcounters
+
+debug( "Z1.d" )
 
 printjson( before )
 printjson( after )
 
-assert.eq( before.query + 10 , after.query , "B3" )
+assert( Math.abs( before.query + 10 - after.query ) < 2 , "B3" )
 
 // --- add more data ----
+debug( "Z2" )
 
 db.foo.ensureIndex( { x : 1 } )
 
@@ -91,14 +106,18 @@ for ( i=0; i<100; i++ ){
 }
 db.getLastError( 3 , 10000 );
 
+debug( "Z2.a" )
 assert.eq( 100 , ts.count() , "B4" )
+debug( "Z2.b" )
 assert.eq( 100 , ts.find().itcount() , "B5" )
+debug( "Z2.c" )
 assert.eq( 100 , ts.find().batchSize(5).itcount() , "B6" )
+debug( "Z2.d" )
 
 t.find().batchSize(3).next();
 gc(); gc(); gc();
 
-// --- sharded ----
+debug( "sharded" )
 
 assert.eq( 100 , db.foo.count() , "C1" )
 
@@ -116,7 +135,7 @@ assert.eq( 100 , t.count() , "C3" )
 
 assert.eq( 50 , rs.test.getMaster().getDB( "test" ).foo.count() , "C4" )
 
-// by non-shard key
+debug( "by non-shard key" )
 
 m = new Mongo( s.s.name );
 ts = m.getDB( "test" ).foo
@@ -134,7 +153,7 @@ after = rs.test.getMaster().adminCommand( "serverStatus" ).opcounters
 
 assert.eq( before.query + 10 , after.query , "D3" )
 
-// by shard key
+debug( "by shard key" )
 
 m = new Mongo( s.s.name );
 ts = m.getDB( "test" ).foo
