@@ -244,7 +244,7 @@ namespace mongo {
         const FieldRangeSet &frsForIndex( const NamespaceDetails* nsd, int idxNo ) const;
 
         /** @return a field range in the single key FieldRangeSet. */
-        const FieldRange &singleKeyRange( const char *fieldName ) const {
+        const FieldRange &shardKeyRange( const char *fieldName ) const {
             return _singleKey.range( fieldName );
         }
         /** @return true if the range limits are equivalent to an empty query. */
@@ -269,8 +269,12 @@ namespace mongo {
          */
         FieldRangeSetPair &operator-=( const FieldRangeSet &scanned );
 
-        BoundList singleKeyIndexBounds( const BSONObj &keyPattern, int direction ) const {
-            return _singleKey.indexBounds( keyPattern, direction );
+        BoundList shardKeyIndexBounds( const BSONObj &keyPattern ) const {
+            return _singleKey.indexBounds( keyPattern, 1 );
+        }
+        
+        bool matchPossibleForShardKey( const BSONObj &keyPattern ) const {
+            return _singleKey.matchPossibleForIndex( keyPattern );
         }
         
         BSONObj originalQuery() const { return _singleKey.originalQuery(); }

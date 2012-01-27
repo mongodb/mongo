@@ -813,27 +813,28 @@ namespace mongo {
 
         do {
             boost::scoped_ptr<FieldRangeSetPair> frsp (org.topFrsp());
-            {
-                // special case if most-significant field isn't in query
-                FieldRange range = frsp->singleKeyRange(_key.key().firstElementFieldName());
-                bool nontrivial = !range.empty() && !range.universal();
-                if ( !nontrivial ) {
-                    DEV PRINT(nontrivial);
-                    getShardsForRange( shards, _key.globalMin(), _key.globalMax() );
-                    return;
-                }
+
+            // special case if most-significant field isn't in query
+            FieldRange range = frsp->shardKeyRange(_key.key().firstElementFieldName());
+            if ( range.universal() ) {
+                DEV PRINT(range.universal());
+                getShardsForRange( shards, _key.globalMin(), _key.globalMax() );
+                return;
             }
+            
+            if ( frsp->matchPossibleForShardKey( _key.key() ) ) {
+                BoundList ranges = frsp->shardKeyIndexBounds(_key.key());
+                for (BoundList::const_iterator it=ranges.begin(), end=ranges.end();
+                     it != end; ++it) {
 
-            BoundList ranges = frsp->singleKeyIndexBounds(_key.key(), 1);
-            for (BoundList::const_iterator it=ranges.begin(), end=ranges.end(); it != end; ++it) {
+                    BSONObj minObj = it->first.replaceFieldNames(_key.key());
+                    BSONObj maxObj = it->second.replaceFieldNames(_key.key());
 
-                BSONObj minObj = it->first.replaceFieldNames(_key.key());
-                BSONObj maxObj = it->second.replaceFieldNames(_key.key());
+                    getShardsForRange( shards, minObj, maxObj, false );
 
-                getShardsForRange( shards, minObj, maxObj, false );
-
-                // once we know we need to visit all shards no need to keep looping
-                if( shards.size() == _shards.size() ) return;
+                    // once we know we need to visit all shards no need to keep looping
+                    if( shards.size() == _shards.size() ) return;
+                }
             }
 
             if (!org.orRangesExhausted())
@@ -841,6 +842,14 @@ namespace mongo {
 
         }
         while (!org.orRangesExhausted());
+        
+        // SERVER-4554 Some clients of getShardsForQuery() assume at least one shard will be
+        // returned.  For now, we satisfy that assumption by adding a shard with no matches rather
+        // than return an empty set of shards.
+        if ( shards.empty() ) {
+            massert( 16062, "no chunk ranges available", !_chunkRanges.ranges().empty() );
+            shards.insert( _chunkRanges.ranges().begin()->second->getShard() );
+        }
     }
 
     void ChunkManager::getShardsForRange(set<Shard>& shards, const BSONObj& min, const BSONObj& max, bool fullKeyReq ) const {
@@ -1060,6 +1069,15 @@ namespace mongo {
         }
 
         return splitThreshold;
+    }
+    
+    /** This is for testing only, just setting up minimal basic defaults. */
+    ChunkManager::ChunkManager() :
+    _unique(),
+    _mutex( "ChunkManager" ),
+    _nsLock( ConnectionString(), "" ),
+    _sequenceNumber(),
+    _splitTickets( 0 ){
     }
 
     class ChunkObjUnitTest : public UnitTest {
