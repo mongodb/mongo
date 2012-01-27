@@ -279,7 +279,7 @@ namespace mongo {
 
         string myMinValid;
         try {
-            readlocktry lk("local.replset.minvalid", 300);
+            readlocktry lk(/*"local.replset.minvalid", */300);
             if( lk.got() ) {
                 BSONObj mv;
                 if( Helpers::getSingleton("local.replset.minvalid", mv) ) {

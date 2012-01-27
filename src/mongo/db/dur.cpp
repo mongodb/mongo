@@ -678,7 +678,7 @@ namespace mongo {
                 //            else block below?
             }
             else {
-                readlocktry lk("", 1000);
+                readlocktry lk(1000);
                 if( lk.got() ) {
                     groupCommit();
                     return;

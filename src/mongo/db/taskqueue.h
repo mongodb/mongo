@@ -72,7 +72,7 @@ namespace mongo {
             int toDrain = 0;
             {
                 // flip queueing to the other queue (we are double buffered)
-                readlocktry lk("", 5);
+                readlocktry lk(5);
                 if( !lk.got() )
                     return;
                 toDrain = _which;

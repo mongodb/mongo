@@ -269,7 +269,7 @@ namespace mongo {
     }
 
     struct readlocktry {
-        readlocktry( const string&ns , int tryms ) {
+        readlocktry( int tryms ) {
             _got = d.dbMutex.lock_shared_try( tryms );
         }
         ~readlocktry() {
@@ -290,8 +290,8 @@ namespace mongo {
     };
 
     struct readlocktryassert : public readlocktry {
-        readlocktryassert(const string& ns, int tryms) :
-            readlocktry(ns,tryms) {
+        readlocktryassert(int tryms) :
+            readlocktry(tryms) {
             uassert(13142, "timeout getting readlock", got());
         }
     };
