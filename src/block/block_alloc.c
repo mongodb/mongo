@@ -33,7 +33,7 @@ __block_off_srch(WT_FREE **head, off_t off, WT_FREE ***stack, int skip_off)
 			continue;
 		}
 
-		/* Return the adjacent item, including an exact match. */
+		/* Return the next item, including an exact match. */
 		retp = *fep;
 
 		/*
@@ -131,7 +131,10 @@ __block_size_srch(WT_SIZE **head, uint32_t size, WT_SIZE ***stack)
 			stack[i--] = szp--;
 			continue;
 		}
+
+		/* Return the next item, including an exact match. */
 		retp = *szp;
+
 		if ((*szp)->size < size)	/* Keep going at this level */
 			szp = &(*szp)->next[i];
 		else if ((*szp)->size == size)	/* Exact match: return */
@@ -160,7 +163,7 @@ __block_off_insert(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_FREE *fe)
 	 * particularly interesting error handling, leaving an empty entry on
 	 * the size skiplist doesn't cause problems.
 	 */
-	szp = __block_size_srch((WT_SIZE **)block->fsize, fe->size, sstack);
+	szp = __block_size_srch(block->fsize, fe->size, sstack);
 	if (szp == NULL || szp->size != fe->size) {
 		WT_RET(__wt_calloc(session, 1,
 		    sizeof(WT_SIZE) + fe->depth * sizeof(WT_SIZE *), &szp));
@@ -215,9 +218,8 @@ __block_off_remove(
 		*astack[i] = fe->next[i];
 
 	/* Find the appropriate size element. */
-	if ((szp = __block_size_srch(
-	    (WT_SIZE **)block->fsize, fe->size, sstack)) == NULL ||
-	    szp->size != fe->size)
+	szp = __block_size_srch(block->fsize, fe->size, sstack);
+	if (szp == NULL || szp->size != fe->size)
 		return (EINVAL);
 
 	/* Find and remove the record from the size's offset skiplist. */
@@ -267,9 +269,8 @@ __wt_block_alloc(
 	 * requested size and take the first entry on the by-size offset list.
 	 * If we don't have anything large enough, extend the file.
 	 */
-	if ((szp = __block_size_srch(
-	    (WT_SIZE **)block->fsize, size, sstack)) == NULL ||
-	    (fe = szp->foff[0]) == NULL || fe->size < size) {
+	szp = __block_size_srch(block->fsize, size, sstack);
+	if (szp == NULL || (fe = szp->foff[0]) == NULL || fe->size < size) {
 		WT_ERR(__block_extend(session, block, offsetp, size));
 		goto done;
 	}
