@@ -717,16 +717,7 @@ namespace mongo {
             if ( resultsNeedSort() ) {
                 _buf.reset();
                 _buf.skip( sizeof( QueryResult ) );
-//                try {
-//                log() << "going to fill" << endl;
-                    _scanAndOrder->fill( _buf, _parsedQuery.getFields(), ret );
-//                } catch ( const UserException &e ) {
-//                    if ( e.getCode() == ScanAndOrderMemoryLimitExceededAssertionCode ) {
-//                        log() << "filled exception" << endl;
-//                        _queryOptimizerCursor->multiPlanScanner()->clearIndexesForPatterns();
-//                    }
-//                    throw;
-//                }
+                _scanAndOrder->fill( _buf, _parsedQuery.getFields(), ret );
             }
             if ( _buf.len() > 0 ) {
                 result.appendData( _buf.buf(), _buf.len() );
