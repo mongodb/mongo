@@ -85,11 +85,19 @@ class test_index01(wttest.WiredTigerTestCase):
         cursor.close(None)
 
     def update(self, *cols):
-        self.pr('insert')
+        self.pr('update')
         cursor = self.cursor()
         cursor.set_key(*cols[:2]);
         cursor.set_value(*cols[2:])
         self.assertEqual(cursor.update(), 0)
+        cursor.close(None)
+
+    def update_nonexistent(self, *cols):
+        self.pr('update')
+        cursor = self.cursor()
+        cursor.set_key(*cols[:2]);
+        cursor.set_value(*cols[2:])
+        self.assertEqual(cursor.update(), WT_NOTFOUND)
         cursor.close(None)
 
     def remove(self, name, ID):
@@ -131,6 +139,8 @@ class test_index01(wttest.WiredTigerTestCase):
         self.create_table()
         self.insert('smith', 1, 'HR', 'manager', 100000, 1970)
         self.update('smith', 1, 'HR', 'janitor', 10000, 1970)
+        self.update_nonexistent('smith', 2, 'HR', 'janitor', 1000, 1970)
+        self.update_nonexistent('Smith', 1, 'HR', 'janitor', 1000, 1970)
         self.check_exists('smith', 1, 0)
         result = ''
         for i in xrange(self.NUM_INDICES):
