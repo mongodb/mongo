@@ -283,7 +283,7 @@ namespace mongo {
     };
 
     struct writelocktry {
-        writelocktry( const string&ns , int tryms ) {
+        writelocktry( int tryms ) {
             _got = d.dbMutex.lock_try( tryms );
         }
         ~writelocktry() {

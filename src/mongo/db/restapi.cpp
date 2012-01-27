@@ -242,7 +242,7 @@ namespace mongo {
                 return;
         }
 
-        writelocktry wl("admin.", 10000);
+        writelocktry wl(10000);
         assert( wl.got() );
         Client::Context cx( "admin.system.users", dbpath, false );
     }

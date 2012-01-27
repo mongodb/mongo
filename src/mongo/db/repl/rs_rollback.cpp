@@ -597,7 +597,7 @@ namespace mongo {
 
         sethbmsg("rollback 0");
 
-        writelocktry lk(rsoplog, 20000);
+        writelocktry lk(20000);
         if( !lk.got() ) {
             sethbmsg("rollback couldn't get write lock in a reasonable time");
             return 2;
