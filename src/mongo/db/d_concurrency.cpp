@@ -107,6 +107,35 @@ namespace mongo {
 
 }
 
+namespace mongo { 
+
+    writelock::writelock() { 
+        lk1.reset( new Lock::GlobalWrite() );
+    }
+
+    writelock::writelock(const string& ns) { 
+        if( ns.empty() ) { 
+            lk1.reset( new Lock::GlobalWrite() );
+        }
+        else {
+            lk2.reset( new Lock::DBWrite(ns) );
+        }
+    }
+
+    readlock::readlock() {
+        lk1.reset( new Lock::GlobalRead() );
+    }
+    readlock::readlock(const string& ns) {
+        if( ns.empty() ) { 
+            lk1.reset( new Lock::GlobalRead() );
+        }
+        else {
+            lk2.reset( new Lock::DBRead(ns) );
+        }
+    }
+
+}
+
 namespace mongo {
 
     // this tie-in temporary until MongoMutex is folded in more directly.Exclud

@@ -268,27 +268,6 @@ namespace mongo {
         return false;
     }
 
-    struct writelock {
-        writelock() { d.dbMutex.lock(); }
-        writelock(const string& ns) { d.dbMutex.lock(); }
-        ~writelock() {
-            DESTRUCTOR_GUARD(
-                d.dbMutex.unlock();
-            );
-        }
-    };
-
-    struct readlock {
-        readlock(const string& ns) {
-            d.dbMutex.lock_shared();
-        }
-        readlock() { d.dbMutex.lock_shared(); }
-        ~readlock() {
-            DESTRUCTOR_GUARD(
-                d.dbMutex.unlock_shared();
-            );
-        }
-    };
     struct readlocktry {
         readlocktry( const string&ns , int tryms ) {
             _got = d.dbMutex.lock_shared_try( tryms );
@@ -322,50 +301,6 @@ namespace mongo {
             readlocktry(ns,tryms) {
             uassert(13142, "timeout getting readlock", got());
         }
-    };
-
-    /** assure we have at least a read lock - they key with this being
-        if you have a write lock, that's ok too.
-    */
-    struct atleastreadlock {
-        atleastreadlock( const string& ns = "" ) {
-            _prev = d.dbMutex.getState();
-            if ( _prev == 0 )
-                d.dbMutex.lock_shared();
-        }
-        ~atleastreadlock() {
-            if ( _prev == 0 )
-                d.dbMutex.unlock_shared();
-        }
-    private:
-        int _prev;
-    };
-
-    /* parameterized choice of read or write locking
-       use readlock and writelock instead of this when statically known which you want
-    */
-    class mongolock {
-        bool _writelock;
-    public:
-        mongolock(bool write) : _writelock(write) {
-            if( _writelock ) {
-                d.dbMutex.lock();
-            }
-            else
-                d.dbMutex.lock_shared();
-        }
-        ~mongolock() {
-            DESTRUCTOR_GUARD(
-            if( _writelock ) {
-                d.dbMutex.unlock();
-            }
-            else {
-                d.dbMutex.unlock_shared();
-            }
-            );
-        }
-        /* this unlocks, does NOT upgrade. that works for our current usage */
-        //void releaseAndWriteLock();
     };
 
     // eliminate this - we should just type "d.dbMutex.assertWriteLocked();" instead

@@ -44,4 +44,37 @@ namespace mongo {
         };
     };
 
+    class readlock {
+        scoped_ptr<Lock::GlobalRead> lk1;
+        scoped_ptr<Lock::DBRead> lk2;
+    public:
+        readlock(const string& ns);
+        readlock();
+    };
+
+    class writelock {
+        scoped_ptr<Lock::GlobalWrite> lk1;
+        scoped_ptr<Lock::DBWrite> lk2;
+    public:
+        writelock(const string& ns);
+        writelock();
+    };
+
+    /* parameterized choice of read or write locking
+       use readlock and writelock instead of this when statically known which you want
+    */
+    class mongolock {
+        scoped_ptr<readlock> r;
+        scoped_ptr<writelock> w;
+    public:
+        mongolock(bool write) {
+            if( write ) {
+                w.reset( new writelock() );
+            }
+            else {
+                r.reset( new readlock() );
+            }
+        }
+    };
+
 }
