@@ -27,6 +27,8 @@
 #include "../util/mongoutils/str.h"
 
 namespace mongo {
+    static const unsigned maxCombinations = 4000000;
+
     extern BSONObj staticNull;
     extern BSONObj staticUndefined;
 
@@ -963,7 +965,7 @@ namespace mongo {
             assert( !_ranges.back().empty() );
         }
         uassert( 13385, "combinatorial limit of $in partitioning of result set exceeded",
-                size() < 1000000 );
+                size() < maxCombinations );
     }    
 
     BSONObj FieldRangeVector::startKey() const {
@@ -1071,7 +1073,6 @@ namespace mongo {
                         BSONObj first = i->first->obj();
                         BSONObj second = i->second->obj();
 
-                        const unsigned maxCombinations = 4000000;
                         if ( forward ) {
                             for( vector<FieldInterval>::const_iterator j = intervals.begin(); j != intervals.end(); ++j ) {
                                 uassert( 13303, "combinatorial limit of $in partitioning of result set exceeded", newBuilders.size() < maxCombinations );
