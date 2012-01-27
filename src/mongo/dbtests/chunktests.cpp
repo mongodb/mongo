@@ -146,7 +146,7 @@ namespace ChunkTests {
             virtual BSONObj query() const { return BSON( "a" << LT << "y" ); }
             /**
              * It isn't actually necessary to return shard 2 because its lowest key is "y", which
-             * is excluded from the query.
+             * is excluded from the query.  SERVER-4791
              */
             virtual BSONArray expectedShardNames() const { return BSON_ARRAY( "0" << "1" << "2" ); }
         };
