@@ -23,7 +23,7 @@ esac
 # This check would normally be done after the library is built, but this way
 # we don't forget about a symbol during development.   Check the previously
 # built library, if it exists.
-f=../build_posix/libwiredtiger.a
+f=../build_posix/.libs/libwiredtiger.a
 test -f $f || {
 	echo "skipped: libwiredtiger.a not found"
 	exit 0
