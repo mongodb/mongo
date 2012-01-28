@@ -12,8 +12,7 @@ static int  __block_truncate(WT_SESSION_IMPL *, WT_BLOCK *);
 
 /*
  * __block_off_srch --
- *	Search a by-offset skiplist (either the primary one, or the per-size
- * bucket offset list).
+ *	Search a by-offset skiplist.
  */
 static void
 __block_off_srch(WT_FREE **head, off_t off, WT_FREE ***stack, int skip_off)
@@ -24,19 +23,41 @@ __block_off_srch(WT_FREE **head, off_t off, WT_FREE ***stack, int skip_off)
 	/*
 	 * Start at the highest skip level, then go as far as possible at each
 	 * level before stepping down to the next.
+	 *
+	 * Return a stack for an exact match or the next-largest item.
+	 *
+	 * The WT_FREE structure contains two skiplists, the primary one and the
+	 * per-size bucket one: if the skip_off flag is set, offset the skiplist
+	 * array by the depth specified in this particular structure.
 	 */
-	for (i = WT_SKIP_MAXDEPTH - 1, fep = &head[i]; i >= 0;) {
-		if (*fep == NULL) {
-			stack[i--] = fep--;
-			continue;
-		}
-
-		/* Set the stack for an exact match or the next-largest item. */
-		if ((*fep)->off < off)		/* Keep going at this level */
+	for (i = WT_SKIP_MAXDEPTH - 1, fep = &head[i]; i >= 0;)
+		if (*fep != NULL && (*fep)->off < off)
 			fep = &(*fep)->next[i + (skip_off ? (*fep)->depth : 0)];
-		else				/* Drop down a level */
+		else
 			stack[i--] = fep--;
-	}
+}
+
+/*
+ * __block_size_srch --
+ *	Search the by-size skiplist.
+ */
+static void
+__block_size_srch(WT_SIZE **head, uint32_t size, WT_SIZE ***stack)
+{
+	WT_SIZE **szp;
+	int i;
+
+	/*
+	 * Start at the highest skip level, then go as far as possible at each
+	 * level before stepping down to the next.
+	 *
+	 * Return a stack for an exact match or the next-largest item.
+	 */
+	for (i = WT_SKIP_MAXDEPTH - 1, szp = &head[i]; i >= 0;)
+		if (*szp != NULL && (*szp)->size < size)
+			szp = &(*szp)->next[i];
+		else
+			stack[i--] = szp--;
 }
 
 /*
@@ -97,34 +118,6 @@ __block_off_last(WT_FREE **head)
 		fep = &(*fep)->next[i];
 	}
 	return (fe);
-}
-
-/*
- * __block_size_srch --
- *	Search the by-size skiplist.
- */
-static void
-__block_size_srch(WT_SIZE **head, uint32_t size, WT_SIZE ***stack)
-{
-	WT_SIZE **szp;
-	int i;
-
-	/*
-	 * Start at the highest skip level, then go as far as possible at each
-	 * level before stepping down to the next.
-	 */
-	for (i = WT_SKIP_MAXDEPTH - 1, szp = &head[i]; i >= 0;) {
-		if (*szp == NULL) {
-			stack[i--] = szp--;
-			continue;
-		}
-
-		/* Set the stack for an exact match or the next-largest item. */
-		if ((*szp)->size < size)	/* Keep going at this level */
-			szp = &(*szp)->next[i];
-		else				/* Drop down a level */
-			stack[i--] = szp--;
-	}
 }
 
 /*
