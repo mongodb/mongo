@@ -34,7 +34,7 @@
  * The skiplist entries for the offset skiplist start at WT_FREE.next[0] and
  * the entries for the size skiplist start at WT_FREE.next[WT_FREE.depth].
  *
- * WT_FREE  --
+ * WT_FREE --
  *	Encapsulation of a free chunk of space.
  */
 struct __wt_free {
@@ -52,11 +52,13 @@ struct __wt_free {
 };
 
 /*
- * WT_SIZE  --
+ * WT_SIZE --
  *	Encapsulation of a block size skiplist entry.
  */
 struct __wt_size {
 	uint32_t size;				/* Size */
+
+	uint8_t	 depth;				/* Skip list depth */
 
 	WT_FREE *foff[WT_SKIP_MAXDEPTH];	/* Per-size offset skiplist */
 

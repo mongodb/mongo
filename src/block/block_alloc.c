@@ -15,13 +15,11 @@ static int  __block_truncate(WT_SESSION_IMPL *, WT_BLOCK *);
  *	Search a by-offset skiplist (either the primary one, or the per-size
  * bucket offset list).
  */
-static WT_FREE *
+static void
 __block_off_srch(WT_FREE **head, off_t off, WT_FREE ***stack, int skip_off)
 {
-	WT_FREE *retp, **fep;
+	WT_FREE **fep;
 	int i;
-
-	retp = NULL;
 
 	/*
 	 * Start at the highest skip level, then go as far as possible at each
@@ -33,21 +31,12 @@ __block_off_srch(WT_FREE **head, off_t off, WT_FREE ***stack, int skip_off)
 			continue;
 		}
 
-		/* Return the next item, including an exact match. */
-		retp = *fep;
-
-		/*
-		 * The stack is used for insert and remove, that is, we don't
-		 * want the "exact match" stack, we want a insert/remove stack.
-		 * Only move forward on this level if the chunk has an offset
-		 * less than the argument offset.
-		 */
+		/* Set the stack for an exact match or the next-largest item. */
 		if ((*fep)->off < off)		/* Keep going at this level */
 			fep = &(*fep)->next[i + (skip_off ? (*fep)->depth : 0)];
 		else				/* Drop down a level */
 			stack[i--] = fep--;
 	}
-	return (retp);
 }
 
 /*
@@ -114,13 +103,11 @@ __block_off_last(WT_FREE **head)
  * __block_size_srch --
  *	Search the by-size skiplist.
  */
-static WT_SIZE *
+static void
 __block_size_srch(WT_SIZE **head, uint32_t size, WT_SIZE ***stack)
 {
-	WT_SIZE **szp, *retp;
+	WT_SIZE **szp;
 	int i;
-
-	retp = NULL;
 
 	/*
 	 * Start at the highest skip level, then go as far as possible at each
@@ -132,18 +119,12 @@ __block_size_srch(WT_SIZE **head, uint32_t size, WT_SIZE ***stack)
 			continue;
 		}
 
-		/* Return the next item, including an exact match. */
-		retp = *szp;
-
+		/* Set the stack for an exact match or the next-largest item. */
 		if ((*szp)->size < size)	/* Keep going at this level */
 			szp = &(*szp)->next[i];
-		else if ((*szp)->size == size)	/* Exact match: return */
-			for (; i >= 0; i--)
-				stack[i] = &(*szp)->next[i];
 		else				/* Drop down a level */
 			stack[i--] = szp--;
 	}
-	return (retp);
 }
 
 /*
@@ -159,23 +140,23 @@ __block_off_insert(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_FREE *fe)
 
 	/*
 	 * If we are inserting a new size onto the size skiplist, we'll need
-	 * a new WT_FREE structure for that skiplist.  This doesn't need any
-	 * particularly interesting error handling, leaving an empty entry on
-	 * the size skiplist doesn't cause problems.
+	 * a new WT_FREE structure for that skiplist.
 	 */
-	szp = __block_size_srch(block->fsize, fe->size, sstack);
+	__block_size_srch(block->fsize, fe->size, sstack);
+	szp = *sstack[0];
 	if (szp == NULL || szp->size != fe->size) {
 		WT_RET(__wt_calloc(session, 1,
 		    sizeof(WT_SIZE) + fe->depth * sizeof(WT_SIZE *), &szp));
 		szp->size = fe->size;
-		for (i = 0; i < fe->depth; ++i)
+		szp->depth = fe->depth;
+		for (i = 0; i < fe->depth; ++i) {
 			szp->next[i] = *sstack[i];
-		for (i = 0; i < fe->depth; ++i)
 			*sstack[i] = szp;
+		}
 	}
 
 	/* Insert the new WT_FREE structure into the offset skiplist. */
-	(void)__block_off_srch(block->foff, fe->off, astack, 0);
+	__block_off_srch(block->foff, fe->off, astack, 0);
 	for (i = 0; i < fe->depth; ++i) {
 		fe->next[i] = *astack[i];
 		*astack[i] = fe;
@@ -185,7 +166,7 @@ __block_off_insert(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_FREE *fe)
 	 * Insert the new WT_FREE structure into the size element's offset
 	 * skiplist.
 	 */
-	(void)__block_off_srch(szp->foff, fe->off, astack, 1);
+	__block_off_srch(szp->foff, fe->off, astack, 1);
 	for (i = 0; i < fe->depth; ++i) {
 		fe->next[i + fe->depth] = *astack[i];
 		*astack[i] = fe;
@@ -211,22 +192,32 @@ __block_off_remove(
 	u_int i;
 
 	/* Find and remove the record from the by-offset skiplist. */
-	fe = __block_off_srch(block->foff, off, astack, 0);
+	__block_off_srch(block->foff, off, astack, 0);
+	fe = *astack[0];
 	if (fe == NULL || fe->off != off)
 		return (EINVAL);
 	for (i = 0; i < fe->depth; ++i)
 		*astack[i] = fe->next[i];
 
-	/* Find the appropriate size element. */
-	szp = __block_size_srch(block->fsize, fe->size, sstack);
+	/*
+	 * Find and remove the record from the size's offset skiplist; if that
+	 * empties the by-size skiplist entry, remove it as well.
+	 */
+	__block_size_srch(block->fsize, fe->size, sstack);
+	szp = *sstack[0];
 	if (szp == NULL || szp->size != fe->size)
 		return (EINVAL);
-
-	/* Find and remove the record from the size's offset skiplist. */
-	if (__block_off_srch(szp->foff, off, astack, 1) == NULL)
+	__block_off_srch(szp->foff, off, astack, 1);
+	fe = *astack[0];
+	if (fe == NULL || fe->off != off)
 		return (EINVAL);
 	for (i = 0; i < fe->depth; ++i)
 		*astack[i] = fe->next[i + fe->depth];
+	if (szp->foff[0] == NULL) {
+		for (i = 0; i < szp->depth; ++i)
+			*sstack[i] = szp->next[i];
+		__wt_free(session, szp);
+	}
 
 	--block->freelist_entries;
 	block->freelist_bytes -= fe->size;
@@ -269,16 +260,17 @@ __wt_block_alloc(
 	 * requested size and take the first entry on the by-size offset list.
 	 * If we don't have anything large enough, extend the file.
 	 */
-	szp = __block_size_srch(block->fsize, size, sstack);
-	if (szp == NULL || (fe = szp->foff[0]) == NULL || fe->size < size) {
+	__block_size_srch(block->fsize, size, sstack);
+	szp = *sstack[0];
+	if (szp == NULL) {
 		WT_ERR(__block_extend(session, block, offsetp, size));
 		goto done;
 	}
 
-	*offsetp = fe->off;
-
-	/* Remove the record from the system. */
+	/* Remove the first record, and set the returned offset. */
+	fe = szp->foff[0];
 	WT_ERR(__block_off_remove(session, block, fe->off, &fe));
+	*offsetp = fe->off;
 
 	/* If doing a partial allocation, adjust the record and put it back. */
 	if (fe->size > size) {
