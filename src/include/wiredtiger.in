@@ -628,7 +628,7 @@ struct __wt_session {
 	int __F(drop)(WT_SESSION *session,
 	    const char *name, const char *config);
 
-	/*! Rename an object. @notyet{session->rename}
+	/*! Rename an object.
 	 *
 	 * @snippet ex_all.c session rename
 	 *
