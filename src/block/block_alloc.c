@@ -7,7 +7,7 @@
 
 #include "wt_internal.h"
 
-static int  __block_extend(WT_SESSION_IMPL *, WT_BLOCK *, off_t *, uint32_t);
+static int  __block_extend(WT_SESSION_IMPL *, WT_BLOCK *, off_t *, off_t);
 static int  __block_truncate(WT_SESSION_IMPL *, WT_BLOCK *);
 
 /*
@@ -42,7 +42,7 @@ __block_off_srch(WT_FREE **head, off_t off, WT_FREE ***stack, int skip_off)
  *	Search the by-size skiplist.
  */
 static void
-__block_size_srch(WT_SIZE **head, uint32_t size, WT_SIZE ***stack)
+__block_size_srch(WT_SIZE **head, off_t size, WT_SIZE ***stack)
 {
 	WT_SIZE **szp;
 	int i;
@@ -166,7 +166,7 @@ __block_off_insert(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_FREE *fe)
 	}
 
 	++block->freelist_entries;
-	block->freelist_bytes += fe->size;
+	block->freelist_bytes += (uint64_t)fe->size;
 	block->freelist_dirty = 1;
 
 	return (0);
@@ -213,7 +213,7 @@ __block_off_remove(
 	}
 
 	--block->freelist_entries;
-	block->freelist_bytes -= fe->size;
+	block->freelist_bytes -= (uint64_t)fe->size;
 	block->freelist_dirty = 1;
 
 	/* Return the record if our caller wants it, otherwise free it. */
@@ -231,7 +231,7 @@ __block_off_remove(
  */
 int
 __wt_block_alloc(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, off_t *offsetp, uint32_t size)
+    WT_SESSION_IMPL *session, WT_BLOCK *block, off_t *offsetp, off_t size)
 {
 	WT_FREE *fe;
 	WT_SIZE *szp, **sstack[WT_SKIP_MAXDEPTH];
@@ -242,9 +242,9 @@ __wt_block_alloc(
 	WT_BSTAT_INCR(session, alloc);
 	if (size % block->allocsize != 0)
 		WT_RET_MSG(session, EINVAL,
-		    "cannot allocate a block size %" PRIu32 " that is not "
+		    "cannot allocate a block size %" PRIdMAX " that is not "
 		    "a multiple of the allocation size %" PRIu32,
-		    size, block->allocsize);
+		    (intmax_t)size, block->allocsize);
 
 	__wt_spin_lock(session, &block->freelist_lock);
 
@@ -268,20 +268,20 @@ __wt_block_alloc(
 	/* If doing a partial allocation, adjust the record and put it back. */
 	if (fe->size > size) {
 		WT_VERBOSE(session, block,
-		    "allocate %" PRIu32 " from range %" PRIuMAX "-%"
-		    PRIuMAX ", range shrinks to %" PRIuMAX "-%" PRIuMAX,
-		    size,
-		    (uintmax_t)fe->off, (uintmax_t)fe->off + fe->size,
-		    (uintmax_t)fe->off + size,
-		    (uintmax_t)fe->off + size + (fe->size - size));
+		    "allocate %" PRIdMAX " from range %" PRIdMAX "-%"
+		    PRIdMAX ", range shrinks to %" PRIdMAX "-%" PRIdMAX,
+		    (intmax_t)size,
+		    (intmax_t)fe->off, (intmax_t)fe->off + fe->size,
+		    (intmax_t)fe->off + size,
+		    (intmax_t)fe->off + size + (fe->size - size));
 
 		fe->off += size;
 		fe->size -= size;
 		WT_ERR(__block_off_insert(session, block,fe));
 	} else {
 		WT_VERBOSE(session, block,
-		    "allocate range %" PRIuMAX "-%" PRIuMAX,
-		    (uintmax_t)fe->off, (uintmax_t)fe->off + fe->size);
+		    "allocate range %" PRIdMAX "-%" PRIdMAX,
+		    (intmax_t)fe->off, (intmax_t)fe->off + fe->size);
 
 		__wt_free(session, fe);
 	}
@@ -297,7 +297,7 @@ done: err:
  */
 static int
 __block_extend(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, off_t *offsetp, uint32_t size)
+    WT_SESSION_IMPL *session, WT_BLOCK *block, off_t *offsetp, off_t size)
 {
 	WT_FH *fh;
 
@@ -311,8 +311,9 @@ __block_extend(
 
 	/*
 	 * Make sure we don't allocate past the maximum file size.  There's no
-	 * easy way to know the maximum off_t on a system, limit growth to 64
-	 * bits, that should be big enough.
+	 * easy way to know the maximum off_t on a system, limit growth to 8B
+	 * bits (we currently check an off_t is 8B in verify_build.h).  I don't
+	 * think we're likely to see anything bigger for awhile.
 	 *
 	 * XXX
 	 * This isn't sufficient: if we grow the file to the end, there isn't
@@ -323,7 +324,7 @@ __block_extend(
 	 * free list, and the file has been fully populated, file close will
 	 * fail because we can't write the free list.
 	 */
-	if (fh->file_size > (off_t)(INT64_MAX - size))
+	if (fh->file_size > (off_t)INT64_MAX - size)
 		WT_RET_MSG(session, WT_ERROR,
 		    "block allocation failed, file cannot grow further");
 
@@ -332,7 +333,8 @@ __block_extend(
 
 	WT_BSTAT_INCR(session, extend);
 	WT_VERBOSE(session, block,
-	    "file extend %" PRIu32 "B @ %" PRIuMAX, size, (uintmax_t)*offsetp);
+	    "file extend %" PRIdMAX "B @ %" PRIdMAX,
+	    (intmax_t)size, (intmax_t)*offsetp);
 
 	return (0);
 }
@@ -353,7 +355,7 @@ __wt_block_free_buf(WT_SESSION_IMPL *session,
 	/* Crack the cookie. */
 	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, NULL));
 
-	WT_RET(__wt_block_free(session, block, offset, size));
+	WT_RET(__wt_block_free(session, block, offset, (off_t)size));
 
 	return (0);
 }
@@ -364,7 +366,7 @@ __wt_block_free_buf(WT_SESSION_IMPL *session,
  */
 int
 __wt_block_free(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, off_t off, uint32_t size)
+    WT_SESSION_IMPL *session, WT_BLOCK *block, off_t off, off_t size)
 {
 	WT_FREE *fe, *after, *before;
 	u_int skipdepth;
@@ -374,7 +376,7 @@ __wt_block_free(
 
 	WT_BSTAT_INCR(session, free);
 	WT_VERBOSE(session, block,
-	    "free %" PRIuMAX "/%" PRIu32, (uintmax_t)off, size);
+	    "free %" PRIdMAX "/%" PRIdMAX, (intmax_t)off, (intmax_t)size);
 
 	__wt_spin_lock(session, &block->freelist_lock);
 
@@ -386,24 +388,24 @@ __wt_block_free(
 	if (before != NULL) {
 		if (before->off + before->size > off)
 			WT_ERR_MSG(session, EINVAL,
-			    "existing range %" PRIuMAX "-%" PRIuMAX " overlaps "
-			    "with free'd range %" PRIuMAX "-%" PRIuMAX,
-			    (uintmax_t)before->off,
-			    (uintmax_t)before->off + before->size,
-			    (uintmax_t)off,
-			    (uintmax_t)off + size);
+			    "existing range %" PRIdMAX "-%" PRIdMAX " overlaps "
+			    "with free'd range %" PRIdMAX "-%" PRIdMAX,
+			    (intmax_t)before->off,
+			    (intmax_t)before->off + before->size,
+			    (intmax_t)off,
+			    (intmax_t)off + size);
 		if (before->off + before->size != off)
 			before = NULL;
 	}
 	if (after != NULL) {
 		if (off + size > after->off)
 			WT_ERR_MSG(session, EINVAL,
-			    "free'd range %" PRIuMAX "-%" PRIuMAX " overlaps "
-			    "with existing range %" PRIuMAX "-%" PRIuMAX,
-			    (uintmax_t)off,
-			    (uintmax_t)off + size,
-			    (uintmax_t)after->off,
-			    (uintmax_t)after->off + after->size);
+			    "free'd range %" PRIdMAX "-%" PRIdMAX " overlaps "
+			    "with existing range %" PRIdMAX "-%" PRIdMAX,
+			    (intmax_t)off,
+			    (intmax_t)off + size,
+			    (intmax_t)after->off,
+			    (intmax_t)after->off + after->size);
 		if (off + size != after->off)
 			after = NULL;
 	}
@@ -429,10 +431,10 @@ __wt_block_free(
 		WT_ERR(__block_off_remove(session, block, after->off, &fe));
 
 		WT_VERBOSE(session, block,
-		    "free range grows from %" PRIuMAX "-%" PRIuMAX ", to %"
-		    PRIuMAX "-%" PRIuMAX,
-		    (uintmax_t)fe->off, (uintmax_t)fe->off + fe->size,
-		    (uintmax_t)off, (uintmax_t)off + fe->size + size);
+		    "free range grows from %" PRIdMAX "-%" PRIdMAX ", to %"
+		    PRIdMAX "-%" PRIdMAX,
+		    (intmax_t)fe->off, (intmax_t)fe->off + fe->size,
+		    (intmax_t)off, (intmax_t)off + fe->size + size);
 
 		fe->off = off;
 		fe->size += size;
@@ -445,10 +447,10 @@ __wt_block_free(
 		WT_ERR(__block_off_remove(session, block, before->off, &fe));
 
 		WT_VERBOSE(session, block,
-		    "free range grows from %" PRIuMAX "-%" PRIuMAX ", to %"
-		    PRIuMAX "-%" PRIuMAX,
-		    (uintmax_t)fe->off, (uintmax_t)fe->off + fe->size,
-		    (uintmax_t)fe->off, (uintmax_t)fe->off + fe->size + size);
+		    "free range grows from %" PRIdMAX "-%" PRIdMAX ", to %"
+		    PRIdMAX "-%" PRIdMAX,
+		    (intmax_t)fe->off, (intmax_t)fe->off + fe->size,
+		    (intmax_t)fe->off, (intmax_t)fe->off + fe->size + size);
 
 		fe->size += size;
 	}
@@ -484,8 +486,7 @@ int
 __wt_block_freelist_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
 	WT_ITEM *tmp;
-	off_t offset;
-	uint32_t size;
+	off_t offset, size;
 	uint8_t *p;
 	int ret;
 
@@ -508,27 +509,29 @@ __wt_block_freelist_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	 * valid, then insert them into the linked list.
 	 */
 	p = WT_BLOCK_HEADER_BYTE(tmp->mem);
-	offset = *(off_t *)p;
-	p += sizeof(off_t);
-	size = *(uint32_t *)p;
-	p += sizeof(uint32_t);
+
+#define	WT_FREELIST_READ(p, v) do {					\
+	(v) = *(off_t *)(p);						\
+	(p) += sizeof(off_t);						\
+} while (0)
+
+	WT_FREELIST_READ(p, offset);
+	WT_FREELIST_READ(p, size);
 	if (offset != WT_BLOCK_FREELIST_MAGIC || size != 0)
 		goto corrupted;
 	for (;;) {
-		offset = *(off_t *)p;
+		WT_FREELIST_READ(p, offset);
+		WT_FREELIST_READ(p, size);
 		if (offset == WT_BLOCK_INVALID_OFFSET)
 			break;
-		p += sizeof(off_t);
-		size = *(uint32_t *)p;
-		p += sizeof(uint32_t);
 
 		if ((offset - WT_BLOCK_DESC_SECTOR) % block->allocsize != 0 ||
 		    size % block->allocsize != 0 ||
 		    offset + size > block->fh->file_size)
 corrupted:		WT_ERR_MSG(session, WT_ERROR,
 			    "file contains a corrupted free-list, range %"
-			    PRIuMAX "-%" PRIuMAX " past end-of-file",
-			    (uintmax_t)offset, (uintmax_t)offset + size);
+			    PRIdMAX "-%" PRIdMAX " past end-of-file",
+			    (intmax_t)offset, (intmax_t)offset + size);
 
 		WT_ERR(__wt_block_free(session, block, offset, size));
 	}
@@ -538,7 +541,7 @@ corrupted:		WT_ERR_MSG(session, WT_ERROR,
 	 * the values, if the free-list is never modified, we don't write it.
 	 */
 	WT_ERR(__wt_block_free(
-	    session, block, block->free_offset, block->free_size));
+	    session, block, block->free_offset, (off_t)block->free_size));
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
@@ -597,8 +600,8 @@ __wt_block_freelist_write(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	 * the initial WT_BLOCK_FREELIST_MAGIC/0 pair and the list-terminating
 	 * WT_BLOCK_INVALID_OFFSET/0 pair.
 	 */
-	datasize = size = (block->freelist_entries + 2) *
-	    WT_STORE_SIZE(sizeof(off_t) + sizeof(uint32_t));
+	datasize = size =
+	    (block->freelist_entries + 2) * WT_STORE_SIZE(sizeof(off_t)  * 2);
 	WT_RET(__wt_block_write_size(session, block, &size));
 	WT_RET(__wt_scr_alloc(session, size, &tmp));
 	dsk = tmp->mem;
@@ -609,20 +612,20 @@ __wt_block_freelist_write(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
 	/* Fill the page's data. */
 	p = WT_BLOCK_HEADER_BYTE(dsk);
-	*(off_t *)p = WT_BLOCK_FREELIST_MAGIC;		/* Initial value */
-	p += sizeof(off_t);
-	*(uint32_t *)p = 0;
-	p += sizeof(uint32_t);
+
+#define	WT_FREELIST_WRITE(p, v) do {					\
+	*(off_t *)(p) = (v);						\
+	(p) += sizeof(off_t);						\
+} while (0)
+
+	WT_FREELIST_WRITE(p, WT_BLOCK_FREELIST_MAGIC);	/* Initial value */
+	WT_FREELIST_WRITE(p, 0);
 	WT_FREE_FOREACH(fe, block->foff) {		/* Free ranges */
-		*(off_t *)p = fe->off;
-		p += sizeof(off_t);
-		*(uint32_t *)p = fe->size;
-		p += sizeof(uint32_t);
+		WT_FREELIST_WRITE(p, fe->off);
+		WT_FREELIST_WRITE(p, fe->size);
 	}
-	*(off_t *)p = WT_BLOCK_INVALID_OFFSET;		/* Ending value */
-	p += sizeof(off_t);
-	*(uint32_t *)p = 0;
-	p += sizeof(uint32_t);
+	WT_FREELIST_WRITE(p, WT_BLOCK_INVALID_OFFSET);	/* Ending value */
+	WT_FREELIST_WRITE(p, 0);
 
 	/*
 	 * Discard the in-memory free-list: this has to happen before writing
@@ -641,8 +644,8 @@ __wt_block_freelist_write(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	    &block->free_offset, &block->free_size, &block->free_cksum));
 
 	WT_VERBOSE(session, block,
-	    "free-list written %" PRIuMAX "/%" PRIu32,
-	    (uintmax_t)block->free_offset, block->free_size);
+	    "free-list written %" PRIdMAX "/%" PRIu32,
+	    (intmax_t)block->free_offset, block->free_size);
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
@@ -670,8 +673,8 @@ __block_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		return (0);
 
 	WT_VERBOSE(session, block,
-	    "truncate file from %" PRIuMAX " to %" PRIuMAX,
-	    (uintmax_t)fh->file_size, (uintmax_t)fe->off);
+	    "truncate file from %" PRIdMAX " to %" PRIdMAX,
+	    (intmax_t)fh->file_size, (intmax_t)fe->off);
 
 	fh->file_size = fe->off;
 	WT_RET(__wt_ftruncate(session, fh, fh->file_size));
@@ -732,18 +735,18 @@ __wt_block_dump(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	WT_VERBOSE(session, block, "freelist by offset:");
 	WT_FREE_FOREACH(fe, block->foff)
 		WT_VERBOSE(session, block,
-		    "\t{%" PRIuMAX "/%" PRIu32 "}",
-		    (uintmax_t)fe->off, fe->size);
+		    "\t{%" PRIuMAX "/%" PRIuMAX "}",
+		    (uintmax_t)fe->off, (uintmax_t)fe->size);
 
 	WT_VERBOSE(session, block, "freelist by size:");
 	WT_FREE_FOREACH(szp, block->fsize) {
 		WT_VERBOSE(session, block,
-		    "\t{%" PRIu32 "}",
-		    szp->size);
+		    "\t{%" PRIuMAX "}",
+		    (uintmax_t)szp->size);
 		WT_FREE_FOREACH_OFF(fe, szp->foff)
 			WT_VERBOSE(session, block,
-			    "\t\t{%" PRIuMAX "/%" PRIu32 "}",
-			    (uintmax_t)fe->off, fe->size);
+			    "\t\t{%" PRIuMAX "/%" PRIuMAX "}",
+			    (uintmax_t)fe->off, (uintmax_t)fe->size);
 	}
 }
 #endif

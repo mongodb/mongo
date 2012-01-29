@@ -227,7 +227,7 @@ not_compressed:	/*
 		blk->cksum = WT_BLOCK_CHECKSUM_NOT_SET;
 
 	/* Allocate space from the underlying file and write the block. */
-	WT_ERR(__wt_block_alloc(session, block, &offset, align_size));
+	WT_ERR(__wt_block_alloc(session, block, &offset, (off_t)align_size));
 	WT_ERR(__wt_write(session, block->fh, offset, align_size, dsk));
 
 	WT_BSTAT_INCR(session, page_write);

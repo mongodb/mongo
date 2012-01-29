@@ -61,7 +61,7 @@ __wt_verify_build(void)
 	 * WiredTiger has never been tested on a system with 4B off_t types,
 	 * disallow them for now.
 	 */
-	STATIC_ASSERT(sizeof(off_t) == sizeof(uint64_t));
+	STATIC_ASSERT(sizeof(off_t) == sizeof(int64_t));
 }
 
 #undef ALIGN_CHECK

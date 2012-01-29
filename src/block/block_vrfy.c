@@ -7,7 +7,7 @@
 
 #include "wt_internal.h"
 
-static int __verify_addfrag(WT_SESSION_IMPL *, WT_BLOCK *, off_t, uint32_t);
+static int __verify_addfrag(WT_SESSION_IMPL *, WT_BLOCK *, off_t, off_t);
 static int __verify_checkfrag(WT_SESSION_IMPL *, WT_BLOCK *);
 static int __verify_freelist(WT_SESSION_IMPL *, WT_BLOCK *);
 
@@ -105,7 +105,7 @@ __wt_block_verify_addr(WT_SESSION_IMPL *session,
 	/* Crack the cookie. */
 	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, NULL));
 
-	WT_RET(__verify_addfrag(session, block, offset, size));
+	WT_RET(__verify_addfrag(session, block, offset, (off_t)size));
 
 	return (0);
 }
@@ -130,8 +130,8 @@ __verify_freelist(WT_SESSION_IMPL *session, WT_BLOCK *block)
 			    (uintmax_t)fe->off);
 
 		WT_VERBOSE(session, verify,
-		    "free-list range %" PRIuMAX "-%" PRIuMAX,
-		    (uintmax_t)fe->off, (uintmax_t)fe->off + fe->size);
+		    "free-list range %" PRIdMAX "-%" PRIdMAX,
+		    (intmax_t)fe->off, (intmax_t)fe->off + fe->size);
 
 		WT_TRET(__verify_addfrag(session, block, fe->off, fe->size));
 	}
@@ -152,12 +152,12 @@ __verify_freelist(WT_SESSION_IMPL *session, WT_BLOCK *block)
  */
 static int
 __verify_addfrag(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, off_t offset, uint32_t size)
+    WT_SESSION_IMPL *session, WT_BLOCK *block, off_t offset, off_t size)
 {
 	uint32_t frag, frags, i;
 
 	frag = (uint32_t)WT_OFF_TO_FRAG(block, offset);
-	frags = size / block->allocsize;
+	frags = (uint32_t)(size / block->allocsize);
 
 	for (i = 0; i < frags; ++i)
 		if (__bit_test(block->fragbits, frag + i))
@@ -165,8 +165,8 @@ __verify_addfrag(
 			    "file fragment at offset %" PRIuMAX
 			    " already verified",
 			    (uintmax_t)offset);
-	if (frags > 0)
-		__bit_nset(block->fragbits, frag, frag + (frags - 1));
+
+	__bit_nset(block->fragbits, frag, frag + (frags - 1));
 	return (0);
 }
 

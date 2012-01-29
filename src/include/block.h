@@ -39,7 +39,7 @@
  */
 struct __wt_free {
 	off_t	 off;				/* File offset */
-	uint32_t size;				/* Size */
+	off_t	 size;				/* Size */
 
 	uint8_t	 depth;				/* Skip list depth */
 
@@ -56,7 +56,7 @@ struct __wt_free {
  *	Encapsulation of a block size skiplist entry.
  */
 struct __wt_size {
-	uint32_t size;				/* Size */
+	off_t	 size;				/* Size */
 
 	uint8_t	 depth;				/* Skip list depth */
 
