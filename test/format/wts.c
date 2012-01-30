@@ -262,6 +262,7 @@ wts_bulk_load(void)
 	int ret;
 
 	session = g.wts_session;
+	key = NULL;		/* -Wuninitialized */
 
         /*
          * Avoid bulk load with a custom collator, because the order of

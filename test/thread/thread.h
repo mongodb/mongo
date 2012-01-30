@@ -32,7 +32,11 @@ extern __ftype ftype;
 extern u_int nkeys;				/* Keys to load */
 extern u_int nops;				/* Operations per thread */
 
+#if defined (__GNUC__)
+void die(const char *, int) __attribute__((noreturn));
+#else
 void die(const char *, int);
+#endif
 void load(void);
 int  run(int, int);
 void stats(void);

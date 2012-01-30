@@ -20,6 +20,8 @@ __wt_struct_check(WT_SESSION_IMPL *session,
 	WT_PACK_VALUE pv;
 	int fields, ret;
 
+	WT_CLEAR(pv);		/* -Wuninitialized. */
+
 	WT_RET(__pack_initn(session, &pack, fmt, len));
 
 	for (fields = 0; (ret = __pack_next(&pack, &pv)) == 0; fields++)
@@ -52,6 +54,8 @@ __wt_struct_sizev(WT_SESSION_IMPL *session, const char *fmt, va_list ap)
 	WT_PACK pack;
 	WT_PACK_VALUE pv;
 	size_t total;
+
+	WT_CLEAR(pv);		/* -Wuninitialized */
 
 	if (__pack_init(session, &pack, fmt) != 0)
 		return ((size_t)-1);
@@ -92,6 +96,8 @@ __wt_struct_packv(WT_SESSION_IMPL *session,
 	WT_PACK_VALUE pv;
 	uint8_t *p, *end;
 	int ret;
+
+	WT_CLEAR(pv);		/* -Wuninitialized */
 
 	WT_RET(__pack_init(session, &pack, fmt));
 

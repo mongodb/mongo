@@ -133,6 +133,8 @@ __wt_struct_plan(WT_SESSION_IMPL *session, WT_TABLE *table,
 	int i, have_it;
 	char coltype, current_coltype;
 
+	start_cg = start_col = -1;      /* -Wuninitialized */
+
 	/* Work through the value columns by skipping over the key columns. */
 	WT_RET(__wt_config_initn(session, &conf, columns, len));
 
@@ -309,6 +311,8 @@ __wt_struct_truncate(WT_SESSION_IMPL *session,
 {
 	WT_PACK pack;
 	WT_PACK_VALUE pv;
+
+	WT_CLEAR(pv);   /* -Wuninitialized */
 
 	WT_RET(__pack_init(session, &pack, input_fmt));
 	while (ncols-- > 0) {

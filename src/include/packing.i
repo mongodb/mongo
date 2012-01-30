@@ -340,12 +340,13 @@ __unpack_read(WT_SESSION_IMPL *session,
 		break;
 	case 'U':
 		WT_RET(__wt_vunpack_uint(pp, maxlen, &pv->u.u));
-		s = (size_t)pv->u.u;
 		/* FALLTHROUGH */
 	case 'u':
 		if (pv->havesize)
 			s = pv->size;
-		else if (pv->type != 'U')
+		else if (pv->type == 'U')
+			s = (size_t)pv->u.u;
+		else
 			s = maxlen;
 		WT_SIZE_CHECK(s, maxlen);
 		pv->u.item.data = *pp;

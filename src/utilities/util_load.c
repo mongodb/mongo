@@ -75,6 +75,9 @@ load_dump(WT_SESSION *session)
 	int hex, ret, tret;
 	char **entry, **list, *p, *uri, config[64];
 
+        list = NULL;            /* -Wuninitialized */
+        hex = 0;                /* -Wuninitialized */
+
 	/* Read the schema file. */
 	if ((ret = schema_read(&list, &hex)) != 0)
 		return (ret);

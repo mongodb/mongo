@@ -68,21 +68,19 @@ __curindex_set_value(WT_CURSOR *cursor, ...)
 static int
 __curindex_move(WT_CURSOR_INDEX *cindex)
 {
-	WT_CURSOR **cp;
-	WT_ITEM *firstkey;
+	WT_CURSOR **cp, *first;
 	WT_SESSION_IMPL *session;
-	uint64_t recno;
 	int i;
 
 	session = (WT_SESSION_IMPL *)cindex->cbt.iface.session;
-	firstkey = NULL;
+	first = NULL;
 
 	for (i = 0, cp = cindex->cg_cursors;
 	    i < WT_COLGROUPS(cindex->table);
 	    i++, cp++) {
 		if (*cp == NULL)
 			continue;
-		if (firstkey == NULL) {
+		if (first == NULL) {
 			/*
 			 * Set the primary key -- note that we need the primary
 			 * key columns, so we have to use the full key format,
@@ -92,12 +90,11 @@ __curindex_move(WT_CURSOR_INDEX *cindex)
 			    cp, cindex->cbt.btree->key_plan,
 			    1, cindex->cbt.btree->key_format,
 			    &cindex->cbt.iface.key));
-			firstkey = &(*cp)->key;
-			recno = (*cp)->recno;
+			first = *cp;
 		} else {
-			(*cp)->key.data = firstkey->data;
-			(*cp)->key.size = firstkey->size;
-			(*cp)->recno = recno;
+			(*cp)->key.data = first->key.data;
+			(*cp)->key.size = first->key.size;
+			(*cp)->recno = first->recno;
 		}
 		F_SET(*cp, WT_CURSTD_KEY_SET);
 		WT_RET((*cp)->search(*cp));
