@@ -148,7 +148,9 @@ err:	__wt_free(session, page);
 int
 __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	return (__wt_calloc_def(session, 1, &page->modify));
+	if (page->modify == NULL)
+		WT_RET(__wt_calloc_def(session, 1, &page->modify));
+	return (0);
 }
 
 /*
