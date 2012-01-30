@@ -51,8 +51,10 @@ int session_ops(WT_SESSION *session);
 int
 cursor_ops(WT_SESSION *session)
 {
-	WT_CURSOR *cursor;
+	WT_CURSOR *cursor, *other;
 	int ret;
+
+	other = NULL;
 
 	/*! [Open a cursor] */
 	ret = session->open_cursor(
@@ -129,6 +131,12 @@ cursor_ops(WT_SESSION *session)
 	/*! [Reset the cursor] */
 	ret = cursor->reset(cursor);
 	/*! [Reset the cursor] */
+
+	/*! [Test cursor equality] */
+	if (cursor->equals(cursor, other)) {
+		/* Take some action. */
+	}
+	/*! [Test cursor equality] */
 
 	{
 	/*! [Search for an exact match] */

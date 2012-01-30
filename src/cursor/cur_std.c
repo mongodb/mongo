@@ -249,6 +249,36 @@ __cursor_search(WT_CURSOR *cursor)
 }
 
 /*
+ * __cursor_equals --
+ *	WT_CURSOR->equals default implementation.
+ */
+static int
+__cursor_equals(WT_CURSOR *cursor, WT_CURSOR *other)
+{
+	WT_SESSION_IMPL *session;
+	int ret;
+
+	CURSOR_API_CALL(cursor, session, equals, NULL);
+
+	/* Both cursors must refer to the same source. */
+	if (other == NULL || strcmp(cursor->uri, other->uri) != 0)
+		goto done;
+
+	/* Check that both have keys set and the keys match. */
+	if (F_ISSET(cursor, WT_CURSTD_KEY_SET) &&
+	    F_ISSET(other, WT_CURSTD_KEY_SET)) {
+		if (WT_CURSOR_RECNO(cursor))
+			ret = (cursor->recno == other->recno);
+		else if (cursor->key.size == other->key.size)
+			ret = (memcmp(cursor->key.data, other->key.data,
+			    cursor->key.size) == 0);
+	}
+
+done:	API_END(session);
+	return (ret);
+}
+
+/*
  * __wt_cursor_close --
  *	WT_CURSOR->close default implementation.
  */
@@ -304,6 +334,8 @@ __wt_cursor_init(WT_CURSOR *cursor,
 		cursor->set_key = __wt_cursor_set_key;
 	if (cursor->set_value == NULL)
 		cursor->set_value = __wt_cursor_set_value;
+	if (cursor->equals == NULL)
+		cursor->equals = __cursor_equals;
 	if (cursor->search == NULL)
 		cursor->search = __cursor_search;
 

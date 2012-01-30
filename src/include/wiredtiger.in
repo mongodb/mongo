@@ -226,6 +226,19 @@ struct __wt_cursor {
 	/*! @name Cursor positioning
 	 * @{
 	 */
+	/*! Test whether two cursors refer to the same item.  To be equal,
+	 * both cursors must have the same data source, have valid keys, and
+	 * the keys must be equal.
+	 *
+	 * @snippet ex_all.c Test cursor equality
+	 *
+	 * @param cursor the cursor handle
+	 * @param other another cursor handle
+	 * @returns true (non-zero) if both cursors reference the same item,
+	 * false (zero) otherwise
+	 */
+	int __F(equals)(WT_CURSOR *cursor, WT_CURSOR *other);
+
 	/*! Return the next record.
 	 *
 	 * @snippet ex_all.c Return the next record

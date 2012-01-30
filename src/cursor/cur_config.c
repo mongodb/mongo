@@ -34,6 +34,7 @@ __wt_curconfig_open(WT_SESSION_IMPL *session,
 		NULL,
 		NULL,
 		NULL,
+		NULL,			/* equals */
 		__wt_cursor_notsup,	/* next */
 		__wt_cursor_notsup,	/* prev */
 		__wt_cursor_notsup,	/* reset */
