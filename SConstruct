@@ -312,7 +312,12 @@ elif env['PYSYSPLATFORM'].startswith('sunos'):
     if force64:
         env['RELOBJFLAGS'] = ['-64']
     env['LINK_LIBGROUP_START'] = '-z rescan'
-    env['LINK_LIBGROUP_END'] = ''
+
+    #TODO: remove this
+    # this is a horrible horrible hack
+    # added by ERH 1/30/12 to make sun32 compile
+    env['LINK_LIBGROUP_END'] = ' $_LIBDEPS $_LIBDEPS ' 
+            
     env['RELOBJ_LIBDEPS_START'] = '-z allextract'
     env['RELOBJ_LIBDEPS_END'] = '-z defaultextract'
     env['RELOBJ_LIBDEPS_ITEM'] = ''
