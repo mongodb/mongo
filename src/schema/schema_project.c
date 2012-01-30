@@ -28,7 +28,7 @@ __wt_schema_project_in(WT_SESSION_IMPL *session,
 
 	WT_CLEAR(pack);         /* -Wuninitialized */
 	buf = NULL;             /* -Wuninitialized */
-	end = NULL;             /* -Wuninitialized */
+	p = end = NULL;         /* -Wuninitialized */
 
 	/* Reset any of the buffers we will be setting. */
 	for (proj = (char *)proj_arg; *proj != '\0'; proj++) {
@@ -163,6 +163,7 @@ __wt_schema_project_out(WT_SESSION_IMPL *session,
 	uint32_t arg;
 
 	WT_CLEAR(pack);         /* -Wuninitialized */
+	WT_CLEAR(pv);           /* -Wuninitialized */
 	p = end = NULL;         /* -Wuninitialized */
 
 	for (proj = (char *)proj_arg; *proj != '\0'; proj++) {
@@ -237,8 +238,9 @@ __wt_schema_project_slice(WT_SESSION_IMPL *session, WT_CURSOR **cp,
 	int skip;
 
 	WT_CLEAR(pack);         /* -Wuninitialized */
+	WT_CLEAR(vpv);          /* -Wuninitialized */
 	buf = NULL;             /* -Wuninitialized */
-	end = NULL;             /* -Wuninitialized */
+	p = end = NULL;         /* -Wuninitialized */
 
 	WT_RET(__pack_init(session, &vpack, vformat));
 	vp = (uint8_t *)value->data;
@@ -395,7 +397,9 @@ __wt_schema_project_merge(WT_SESSION_IMPL *session,
 	uint32_t arg;
 
 	WT_CLEAR(pack);         /* -Wuninitialized */
-	end = NULL;             /* -Wuninitialized */
+	WT_CLEAR(pv);           /* -Wuninitialized */
+	WT_CLEAR(vpv);          /* -Wuninitialized */
+	p = end = NULL;         /* -Wuninitialized */
 
 	WT_RET(__wt_buf_init(session, value, 0));
 	WT_RET(__pack_init(session, &vpack, vformat));

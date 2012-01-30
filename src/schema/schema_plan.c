@@ -254,6 +254,8 @@ __wt_struct_reformat(WT_SESSION_IMPL *session, WT_TABLE *table,
 	WT_PACK_VALUE pv;
 	int have_next, ret;
 
+	WT_CLEAR(pv);		/* -Wuninitialized */
+
 	WT_RET(__wt_config_initn(session, &config, columns, len));
 	WT_RET(__wt_config_next(&config, &next_k, &next_v));
 	do {
