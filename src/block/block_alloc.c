@@ -271,9 +271,9 @@ __wt_block_alloc(
 		    "allocate %" PRIdMAX " from range %" PRIdMAX "-%"
 		    PRIdMAX ", range shrinks to %" PRIdMAX "-%" PRIdMAX,
 		    (intmax_t)size,
-		    (intmax_t)fe->off, (intmax_t)fe->off + fe->size,
-		    (intmax_t)fe->off + size,
-		    (intmax_t)fe->off + size + (fe->size - size));
+		    (intmax_t)fe->off, (intmax_t)(fe->off + fe->size),
+		    (intmax_t)(fe->off + size),
+		    (intmax_t)(fe->off + size + fe->size - size));
 
 		fe->off += size;
 		fe->size -= size;
@@ -281,7 +281,7 @@ __wt_block_alloc(
 	} else {
 		WT_VERBOSE(session, block,
 		    "allocate range %" PRIdMAX "-%" PRIdMAX,
-		    (intmax_t)fe->off, (intmax_t)fe->off + fe->size);
+		    (intmax_t)fe->off, (intmax_t)(fe->off + fe->size));
 
 		__wt_free(session, fe);
 	}
@@ -391,9 +391,9 @@ __wt_block_free(
 			    "existing range %" PRIdMAX "-%" PRIdMAX " overlaps "
 			    "with free'd range %" PRIdMAX "-%" PRIdMAX,
 			    (intmax_t)before->off,
-			    (intmax_t)before->off + before->size,
+			    (intmax_t)(before->off + before->size),
 			    (intmax_t)off,
-			    (intmax_t)off + size);
+			    (intmax_t)(off + size));
 		if (before->off + before->size != off)
 			before = NULL;
 	}
@@ -403,9 +403,9 @@ __wt_block_free(
 			    "free'd range %" PRIdMAX "-%" PRIdMAX " overlaps "
 			    "with existing range %" PRIdMAX "-%" PRIdMAX,
 			    (intmax_t)off,
-			    (intmax_t)off + size,
+			    (intmax_t)(off + size),
 			    (intmax_t)after->off,
-			    (intmax_t)after->off + after->size);
+			    (intmax_t)(after->off + after->size));
 		if (off + size != after->off)
 			after = NULL;
 	}
@@ -433,8 +433,8 @@ __wt_block_free(
 		WT_VERBOSE(session, block,
 		    "free range grows from %" PRIdMAX "-%" PRIdMAX ", to %"
 		    PRIdMAX "-%" PRIdMAX,
-		    (intmax_t)fe->off, (intmax_t)fe->off + fe->size,
-		    (intmax_t)off, (intmax_t)off + fe->size + size);
+		    (intmax_t)fe->off, (intmax_t)(fe->off + fe->size),
+		    (intmax_t)off, (intmax_t)(off + fe->size + size));
 
 		fe->off = off;
 		fe->size += size;
@@ -449,8 +449,8 @@ __wt_block_free(
 		WT_VERBOSE(session, block,
 		    "free range grows from %" PRIdMAX "-%" PRIdMAX ", to %"
 		    PRIdMAX "-%" PRIdMAX,
-		    (intmax_t)fe->off, (intmax_t)fe->off + fe->size,
-		    (intmax_t)fe->off, (intmax_t)fe->off + fe->size + size);
+		    (intmax_t)fe->off, (intmax_t)(fe->off + fe->size),
+		    (intmax_t)fe->off, (intmax_t)(fe->off + fe->size + size));
 
 		fe->size += size;
 	}
@@ -531,7 +531,7 @@ __wt_block_freelist_read(WT_SESSION_IMPL *session, WT_BLOCK *block)
 corrupted:		WT_ERR_MSG(session, WT_ERROR,
 			    "file contains a corrupted free-list, range %"
 			    PRIdMAX "-%" PRIdMAX " past end-of-file",
-			    (intmax_t)offset, (intmax_t)offset + size);
+			    (intmax_t)offset, (intmax_t)(offset + size));
 
 		WT_ERR(__wt_block_free(session, block, offset, size));
 	}

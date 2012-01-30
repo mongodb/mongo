@@ -131,7 +131,7 @@ __verify_freelist(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
 		WT_VERBOSE(session, verify,
 		    "free-list range %" PRIdMAX "-%" PRIdMAX,
-		    (intmax_t)fe->off, (intmax_t)fe->off + fe->size);
+		    (intmax_t)fe->off, (intmax_t)(fe->off + fe->size));
 
 		WT_TRET(__verify_addfrag(session, block, fe->off, fe->size));
 	}
