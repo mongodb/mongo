@@ -54,7 +54,7 @@ namespace mongo {
         if (!p.IsNearDeath())
             return;
         Handle<External> field = Handle<External>::Cast(p->ToObject()->GetInternalField(0));
-        BSONObj* data = (BSONObj*) field->Value();
+        BSONHolder* data = (BSONHolder*) field->Value();
         delete data;
         p.Dispose();
     }
