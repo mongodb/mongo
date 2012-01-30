@@ -2690,7 +2690,7 @@ err:	__wt_page_out(session, page, 0);
 
 /*
  * __rec_split_col --
- *	Split a column--store page, creating a new internal page.
+ *	Split a column-store page, creating a new internal page.
  */
 static int
 __rec_split_col(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
