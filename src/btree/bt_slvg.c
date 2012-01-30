@@ -2269,9 +2269,11 @@ __slvg_trk_free(WT_SESSION_IMPL *session, WT_TRACK **trkp, uint32_t flags)
 		    trk->size);
 		WT_RET(__wt_bm_free(session, trk->addr.addr, trk->addr.size));
 	}
-	if (LF_ISSET(WT_TRK_FREE_OVFL))
-		for (i = 0; i < trk->ovfl_cnt; ++i) {
-			addr = &trk->ovfl[i];
+	__wt_free(session, trk->addr.addr);
+
+	for (i = 0; i < trk->ovfl_cnt; ++i) {
+		addr = &trk->ovfl[i];
+		if (LF_ISSET(WT_TRK_FREE_OVFL)) {
 			WT_VERBOSE(session, salvage,
 			    "%s page discarded: discard freed overflow page %s",
 			    __wt_addr_string(session,
@@ -2281,16 +2283,14 @@ __slvg_trk_free(WT_SESSION_IMPL *session, WT_TRACK **trkp, uint32_t flags)
 
 			WT_RET(__wt_bm_free(session, addr->addr, addr->size));
 		}
-
-	if (trk->addr.addr != NULL)
-		__wt_free(session, trk->addr.addr);
+		__wt_free(session, addr->addr);
+	}
+	__wt_free(session, trk->ovfl);
 
 	if (trk->ss->page_type == WT_PAGE_ROW_LEAF) {
 		__wt_buf_free(session, &trk->row_start);
 		__wt_buf_free(session, &trk->row_stop);
 	}
-
-	__wt_free(session, trk->ovfl);
 	__wt_free(session, trk);
 
 	return (0);
