@@ -59,63 +59,32 @@ class test_base06(wttest.WiredTigerTestCase):
         if value == None:
             return None
         cursor = self.session.open_cursor('table:' + tablename, None, None)
-        # Add a hint in case we're using mytruncate
-        cursor._position_hint = ''
-        if value >= self.nentries:
-            cursor._position_hint = 'END'
-        elif value < 0:
-            cursor._position_hint = 'BEGIN'
-        elif value >= 0:
+        if value >= 0 and value < self.nentries:
             cursor.set_key(value)
             self.assertEqual(cursor.search(), 0)
-            cursor._position_hint = str(value)
         return cursor
-
-    def mytruncate(self, uri, begcursor, endcursor, notused):
-        """
-        A replacement for session.truncate() that can be used
-        to test the testcase.
-        """
-        endkey = None
-        if endcursor != None:
-            if endcursor._position_hint != 'END':
-                endkey = endcursor.get_key()
-        cursor = begcursor
-        done = False
-        if cursor == None:
-            cursor = self.session.open_cursor(uri, None, None)
-            if cursor.next() == wiredtiger.WT_NOTFOUND:
-                done = True
-        removed = 0
-        while not done and (endcursor == None or cursor.get_key() != endkey):
-            cursor.remove()
-            removed += 1
-            if cursor.next() == wiredtiger.WT_NOTFOUND:
-                done = True
-        if begcursor == None:
-            cursor.close()
-        self.pr(uri + ' removed ' + str(removed))
 
     def truncateRangeAndCheck(self, tablename, begin, end):
         self.pr('truncateRangeAndCheck: ' + str(begin) + ',' + str(end))
-        self.populate(self.table_name1)
+        self.populate(tablename)
         cur1 = self.setupCursor(tablename, begin)
         cur2 = self.setupCursor(tablename, end)
         beginerror = (begin != None and begin < 0)
-        if beginerror:
+        if not cur1 and not cur2:
+            self.session.truncate('table:' + tablename, None, None, None)
+        elif beginerror:
             self.assertRaises(WiredTigerError, lambda:
-                self.session.truncate('table:' + self.table_name1,
-                                      cur1, cur2, None))
+                self.session.truncate(None, cur1, cur2, None))
         else:
-            self.session.truncate('table:' + self.table_name1, cur1, cur2, None)
-        if cur1 != None:
+            self.session.truncate(None, cur1, cur2, None)
+        if cur1:
             cur1.close()
-        if cur2 != None:
+        if cur2:
             cur2.close()
-        if begin == None:
+        if begin is None:
             begin = 0
-        if end == None:
-            end = self.nentries
+        if end is None:
+            end = self.nentries - 1
 
         cursor = self.session.open_cursor('table:' + tablename, None, None)
         self.pr('truncate(' + str(begin) + ' through ' + str(end) + ') => ' + \
@@ -125,15 +94,15 @@ class test_base06(wttest.WiredTigerTestCase):
         cursor = self.session.open_cursor('table:' + tablename, None, None)
         want = 0
         # skip over numbers truncated
-        if (not beginerror) and want >= begin and want < end:
-            want = end
+        if (not beginerror) and want >= begin and want <= end:
+            want = end + 1
         for key,val in cursor:
             self.assertEqual(key, want)
             self.assertEqual(val, str(want))
             want += 1
             # skip over numbers truncated
-            if (not beginerror) and want >= begin and want < end:
-                want = end
+            if want >= begin and want <= end:
+                want = end + 1
         self.assertEqual(want, self.nentries)
         cursor.close()
 
@@ -153,37 +122,32 @@ class test_base06(wttest.WiredTigerTestCase):
 
     def test_rename(self):
         self.populate(self.table_name1)
-        self.session.rename('table:' + self.table_name1,
-				       self.table_name2, None)
+        self.session.rename('table:' + self.table_name1, self.table_name2, None)
         self.checkContents(self.table_name2)
         self.checkDoesNotExist(self.table_name1)
-        self.session.rename('table:' + self.table_name2,
-				       self.table_name1, None)
+        self.session.rename('table:' + self.table_name2, self.table_name1, None)
         self.checkContents(self.table_name1)
         self.checkDoesNotExist(self.table_name2)
         self.assertRaises(WiredTigerError, lambda:
-            self.session.rename('table:' + self.table_name2,
-					   self.table_name1, None))
+            self.session.rename(
+                'table:' + self.table_name2, self.table_name1, None))
 
     def test_drop(self):
         self.populate(self.table_name1)
         self.session.drop('table:' + self.table_name1, None)
         self.checkDoesNotExist(self.table_name1)
         self.session.drop('table:' + self.table_name1, 'force')
-	self.assertRaises(WiredTigerError, lambda:
-	    self.session.drop('table:' + self.table_name1, None))
+        self.assertRaises(WiredTigerError, lambda:
+            self.session.drop('table:' + self.table_name1, None))
 
     def test_truncate(self):
         self.populate(self.table_name1)
 
-        # Note: to allow this test to proceed, even with a
-        # non-functioning truncate, replace
-        # self.session.truncate() with self.mytruncate().
-        self.KNOWN_FAILURE('truncate not supported')
         self.session.truncate('table:' + self.table_name1, None, None, None)
         self.checkEmpty(self.table_name1)
         self.session.drop('table:' + self.table_name1, None)
 
+    def test_truncate_cursor(self):
         # Test using cursors for the begin and end of truncate
         # For begin and end, the following applies:
         #   None means pass None for the cursor arg to truncate
@@ -194,8 +158,8 @@ class test_base06(wttest.WiredTigerTestCase):
         #
         # We assume that the begin cursor must be positioned over
         # a value.  If not, we assume it raises an error.
-        for begin in [None, -1, 0, 10]:
-            for end in [None, self.nentries-1, self.nentries, self.nentries-10]:
+        for begin in [None, 0, 10]:
+            for end in [None, self.nentries - 1, self.nentries - 10]:
                 self.truncateRangeAndCheck(self.table_name1, begin, end)
                 self.session.drop('table:' + self.table_name1, None)
         self.truncateRangeAndCheck(self.table_name1, 10, 10)
