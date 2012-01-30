@@ -208,7 +208,9 @@ namespace mongo {
                 ss << "BufBuilder attempted to grow() to " << a << " bytes, past the 64MB limit.";
                 msgasserted(13548, ss.str().c_str());
             }
-            data = (char *) al.Realloc(data, a);
+            void* newData = al.Realloc(data, a);
+            if (newData == 0) msgasserted(16062, "out of memory BufBuilder::grow_reallocate");
+            data = (char*) newData;
             size= a;
         }
 
