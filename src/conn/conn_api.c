@@ -572,35 +572,16 @@ __conn_single(WT_CONNECTION_IMPL *conn, const char **cfg)
 	WT_SESSION_IMPL *session;
 	off_t size;
 	uint32_t len;
-	int created, exist, ret;
+	int created, ret;
 	char buf[256];
 
 	session = &conn->default_session;
 
 #define	WT_FLAGFILE	"WiredTiger"
 	/*
-	 * We need to check that no other process, or thread in this process,
-	 * "owns" this database.
-	 *
-	 * Check for exclusive creation.
-	 */
-	WT_RET(__wt_config_gets(session, cfg, "exclusive", &cval));
-	if (cval.val) {
-		WT_RET(__wt_exist(session, WT_FLAGFILE, &exist));
-		if (exist)
-			WT_RET_MSG(session, EEXIST,
-			    "%s", "WiredTiger database already exists");
-	}
-
-	/*
 	 * Optionally create the wiredtiger flag file if it doesn't already
-	 * exist.  We don't actually care if we create it or not, the "am I
-	 * the only locker" tests are all that matter.  The tricky part is
-	 * the "exclusive" flag, but if another thread, with which we are
-	 * racing, does the actual create, and we still win the eventual "am
-	 * I the only locker" test, we don't care that we didn't do the actual
-	 * physical create of the file, we are the final owner and get to act
-	 * as if we created the database.
+	 * exist.  We don't actually care if we create it or not, the "am I the
+	 * only locker" tests are all that matter.
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "create", &cval));
 	WT_RET(__wt_open(session,

@@ -329,9 +329,6 @@ methods = {
 		regardless of whether or not the process is running with
 		special privileges.  See @ref home for more information''',
 		type='boolean'),
-	Config('exclusive', 'false', r'''
-		fail if the database already exists''',
-		type='boolean'),
 	Config('extensions', '', r'''
 		list of extensions to load.  Optional values are passed as the
 		\c config parameter to WT_CONNECTION::load_extension.  Complex

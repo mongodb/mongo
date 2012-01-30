@@ -128,11 +128,6 @@ class test_config04(wttest.WiredTigerTestCase):
             wiredtiger.wiredtiger_open('.', 'create,eviction_target=86,' +
                                        'eviction_trigger=86'))
 
-    def test_exclusive(self):
-        # This is a simple test to set the flag,
-        # there is a separate functionality test for the exclusive flag.
-        self.common_test('exclusive')
-
     def test_hazard_max(self):
         # Note: There isn't any direct way to know that this was set.
         self.common_test('hazard_max=50')

@@ -6,7 +6,7 @@
 #	All rights reserved.
 #
 # test_config05.py
-# 	Test exclusive opens
+# 	Test multiple connection opens
 #
 
 import unittest
@@ -67,32 +67,8 @@ class test_config05(wttest.WiredTigerTestCase):
         self.populate(self.session)
         self.verify_entries(self.session)
 
-    def test_one_exclusive(self):
-        self.conn = wiredtiger.wiredtiger_open('.', 'create,exclusive')
-        self.session = self.conn.open_session(None)
-        self.populate(self.session)
-        self.verify_entries(self.session)
-
     def test_multi_create(self):
         self.conn = wiredtiger.wiredtiger_open('.', 'create')
-        self.session = self.conn.open_session(None)
-        self.assertRaises(WiredTigerError, lambda: wiredtiger.wiredtiger_open
-                          ('.', 'create'))
-
-    def test_multi_exclusive(self):
-        self.conn = wiredtiger.wiredtiger_open('.', 'create,exclusive')
-        self.session = self.conn.open_session(None)
-        self.assertRaises(WiredTigerError, lambda: wiredtiger.wiredtiger_open
-                          ('.', 'create,exclusive'))
-
-    def test_multi_second_exclusive(self):
-        self.conn = wiredtiger.wiredtiger_open('.', 'create')
-        self.session = self.conn.open_session(None)
-        self.assertRaises(WiredTigerError, lambda: wiredtiger.wiredtiger_open
-                          ('.', 'create,exclusive'))
-
-    def test_multi_first_exclusive(self):
-        self.conn = wiredtiger.wiredtiger_open('.', 'create,exclusive')
         self.session = self.conn.open_session(None)
         self.assertRaises(WiredTigerError, lambda: wiredtiger.wiredtiger_open
                           ('.', 'create'))
