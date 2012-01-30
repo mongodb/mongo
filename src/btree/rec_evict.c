@@ -152,8 +152,10 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 		return (0);
 	case WT_PAGE_REC_REPLACE: 			/* 1-for-1 page swap */
 		if (parent_ref->addr != NULL &&
-		    __wt_off_page(page->parent, parent_ref->addr))
+		    __wt_off_page(page->parent, parent_ref->addr)) {
+			__wt_free(session, ((WT_ADDR *)parent_ref->addr)->addr);
 			__wt_free(session, parent_ref->addr);
+		}
 		WT_RET(__wt_calloc(
 		    session, 1, sizeof(WT_ADDR), &parent_ref->addr));
 
@@ -209,7 +211,6 @@ __rec_root_addr_update(WT_SESSION_IMPL *session, uint8_t *addr, uint32_t size)
 	/* Free any previously created root addresses. */
 	if (root_addr->addr != NULL) {
 		WT_RET(__wt_bm_free(session, root_addr->addr, root_addr->size));
-
 		__wt_free(session, root_addr->addr);
 	}
 	btree->root_update = 1;
@@ -497,7 +498,7 @@ __rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 		WT_RET(__wt_rec_track_wrapup(session, page, 1));
 
 		/*
-		 * If the page was split and eventually merged into the parent, 
+		 * If the page was split and eventually merged into the parent,
 		 * discard the split page; if the split page was promoted into
 		 * a split-merge page, then the reference must be cleared before
 		 * the page is discarded.
