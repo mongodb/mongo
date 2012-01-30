@@ -2486,6 +2486,11 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		/* Discard the replacement leaf page's blocks. */
 		WT_RET(__wt_rec_track_block(session, WT_PT_BLOCK,
 		    page, mod->u.replace.addr, mod->u.replace.size));
+
+		/* Discard the replacement page's address. */
+		__wt_free(session, mod->u.replace.addr);
+		mod->u.replace.addr = NULL;
+		mod->u.replace.size = 0;
 		break;
 	case WT_PAGE_REC_SPLIT:				/* Page split */
 		/* Discard the split page's leaf-page blocks. */
@@ -2497,6 +2502,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 		/* Discard the split page itself. */
 		__wt_page_out(session, mod->u.split, 0);
+		mod->u.split = NULL;
 		break;
 	case WT_PAGE_REC_SPLIT_MERGE:			/* Page split */
 		/*
