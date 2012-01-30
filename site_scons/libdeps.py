@@ -184,7 +184,14 @@ def setup_environment(env):
     except KeyError:
         env['_LIBDEPS'] = '$_LIBDEPS_LIBS'
 
-    env['_LIBDEPS_LIBS'] = get_libdeps
+    # TODO: remove this
+    # this is a horrible horrible hack for 
+    # for 32-bit solaris
+    if os.uname()[1] == "sun32b":
+        env['_LIBDEPS_LIBS'] = get_libdeps_objs
+    else:
+        env['_LIBDEPS_LIBS'] = get_libdeps
+
     env['_LIBDEPS_OBJS'] = get_libdeps_objs
     env['_SYSLIBDEPS'] = ' ${_stripixes(LIBLINKPREFIX, SYSLIBDEPS, LIBLINKSUFFIX, LIBPREFIXES, LIBSUFFIXES, __env__)} '
     env['_SHLIBDEPS'] = '$SHLIBDEP_GROUP_START ${_concat(SHLIBDEPPREFIX, __env__.subst(_LIBDEPS, target=TARGET, source=SOURCE), SHLIBDEPSUFFIX, __env__, target=TARGET, source=SOURCE)} $SHLIBDEP_GROUP_END'
