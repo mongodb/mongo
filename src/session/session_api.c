@@ -282,17 +282,18 @@ __session_truncate(WT_SESSION *wt_session,
 					break;
 				}
 			}
-		else if (stop == NULL)
+		else
 			for (;;) {
 				WT_ERR(start->remove(start));
+				if (stop != NULL &&
+				    start->equals(start, stop))
+					break;
 				if ((ret = start->next(start)) != 0) {
 					if (ret == WT_NOTFOUND)
 						ret = 0;
 					break;
 				}
 			}
-		else
-			WT_ERR(ENOTSUP);		/* XXX */
 	} else
 		ret = __wt_schema_truncate(session, uri, cfg);
 err:	API_END(session);

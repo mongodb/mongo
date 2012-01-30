@@ -42,19 +42,32 @@ static int
 __truncate_table(WT_SESSION_IMPL *session, const char *name)
 {
 	WT_BTREE *btree;
+	WT_ITEM *buf;
 	WT_TABLE *table;
 	int i, ret;
 
 	ret = 0;
+	WT_RET(__wt_scr_alloc(session, 0, &buf));
 
 	WT_RET(__wt_schema_get_table(session, name, strlen(name), &table));
+	/*
+	 * We are closing the column groups, they must be reopened for future
+	 * accesses to the table.
+	 */
+	table->cg_complete = 0;
 
 	/* Truncate the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++) {
 		if ((btree = table->colgroup[i]) == NULL)
 			continue;
 		table->colgroup[i] = NULL;
-		WT_TRET(__truncate_file(session, btree->filename));
+		/*
+		 * Take a copy of the file name: it will be freed when the
+		 * handle is closed.
+		 */
+		WT_ERR(__wt_buf_set(session, buf,
+		    btree->filename, strlen(btree->filename) + 1));
+		WT_TRET(__truncate_file(session, buf->data));
 	}
 
 	/* Truncate the indices. */
@@ -62,9 +75,20 @@ __truncate_table(WT_SESSION_IMPL *session, const char *name)
 	for (i = 0; i < table->nindices; i++) {
 		btree = table->index[i];
 		table->index[i] = NULL;
-		WT_TRET(__truncate_file(session, btree->filename));
+		/*
+		 * Take a copy of the file name: it will be freed when the
+		 * handle is closed.
+		 */
+		WT_ERR(__wt_buf_set(session, buf,
+		    btree->filename, strlen(btree->filename) + 1));
+		WT_TRET(__truncate_file(session, buf->data));
 	}
 
+	/* Reopen the column groups. */
+	if (ret == 0)
+		ret = __wt_schema_open_colgroups(session, table);
+
+err:	__wt_scr_free(&buf);
 	return (ret);
 }
 
