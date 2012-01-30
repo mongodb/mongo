@@ -169,12 +169,16 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 		break;
 	case WT_PAGE_REC_SPLIT:				/* Page split */
 		/*
-		 * Update the parent to reference new internal page(s).
+		 * Update the parent to reference new internal page(s), clear
+		 * the reference so we can discard the current page.
 		 *
 		 * Publish: a barrier to ensure the structure fields are set
 		 * before the state change makes the page available to readers.
 		 */
 		parent_ref->page = mod->u.split;
+		mod->u.split = NULL;
+		F_CLR(page, WT_PAGE_REC_SPLIT);
+
 		WT_PUBLISH(parent_ref->state, WT_REF_MEM);
 		break;
 	WT_ILLEGAL_VALUE(session);
@@ -251,7 +255,13 @@ __rec_root_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 		WT_VERBOSE(session, evict,
 		    "root page split %p -> %p", page, mod->u.split);
 
+		/*
+		 * Steal the split page, clear the reference so we can discard
+		 * the current page.
+		 */
 		next = mod->u.split;
+		mod->u.split = NULL;
+		F_CLR(page, WT_PAGE_REC_SPLIT);
 		break;
 	}
 
@@ -282,7 +292,9 @@ __rec_root_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_RET(__wt_page_modify_init(session, next));
 	__wt_page_modify_set(next);
 	F_CLR(next, WT_PAGE_REC_MASK);
+
 	WT_RET(__wt_rec_write(session, next, NULL));
+
 	return (__rec_root_dirty_update(session, next));
 }
 
@@ -475,6 +487,10 @@ __rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	/* If the page has tracked objects, resolve them. */
 	if (page->modify != NULL)
 		WT_RET(__wt_rec_track_wrapup(session, page, 1));
+
+	/* If a split page was merged from this page, discard it. */
+	if (F_ISSET(page, WT_PAGE_REC_SPLIT))
+		__wt_page_out(session, page->modify->u.split, 0);
 
 	/* Discard the page itself. */
 	__wt_page_out(session, page, 0);
