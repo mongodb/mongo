@@ -138,6 +138,10 @@ def get_libdeps_objs(source, target, env, for_signature):
         objs.update(lib.sources_set)
     return list(objs)
 
+def get_libdeps_special_sun(source, target, env, for_signature):
+    x = get_libdeps(source, target, env, for_signature )
+    return x + x + x
+
 def get_syslibdeps(source, target, env, for_signature):
     if for_signature:
         return[]
@@ -188,7 +192,7 @@ def setup_environment(env):
     # this is a horrible horrible hack for 
     # for 32-bit solaris
     if "uname" in dir(os) and os.uname()[1] == "sun32b":
-        env['_LIBDEPS_LIBS'] = get_libdeps_objs
+        env['_LIBDEPS_LIBS'] = get_libdeps_special_sun
     else:
         env['_LIBDEPS_LIBS'] = get_libdeps
 
