@@ -156,8 +156,6 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 			__wt_free(session, ((WT_ADDR *)parent_ref->addr)->addr);
 			__wt_free(session, parent_ref->addr);
 		}
-		WT_RET(__wt_calloc(
-		    session, 1, sizeof(WT_ADDR), &parent_ref->addr));
 
 		/*
 		 * Update the parent to reference the replacement page.
@@ -165,6 +163,8 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * Publish: a barrier to ensure the structure fields are set
 		 * before the state change makes the page available to readers.
 		 */
+		WT_RET(__wt_calloc(
+		    session, 1, sizeof(WT_ADDR), &parent_ref->addr));
 		((WT_ADDR *)parent_ref->addr)->addr = mod->u.replace.addr;
 		((WT_ADDR *)parent_ref->addr)->size = mod->u.replace.size;
 		parent_ref->page = NULL;
