@@ -187,7 +187,7 @@ def setup_environment(env):
     # TODO: remove this
     # this is a horrible horrible hack for 
     # for 32-bit solaris
-    if os.uname()[1] == "sun32b":
+    if "uname" in dir(os) and os.uname()[1] == "sun32b":
         env['_LIBDEPS_LIBS'] = get_libdeps_objs
     else:
         env['_LIBDEPS_LIBS'] = get_libdeps
