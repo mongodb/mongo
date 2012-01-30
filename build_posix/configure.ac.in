@@ -15,9 +15,9 @@ AM_INIT_AUTOMAKE
 AM_OPTIONS
 
 if test "$wt_cv_enable_debug" = "yes"; then
-	: ${CFLAGS="-g"}
+	CFLAGS="$CFLAGS -g"
 else
-	: ${CFLAGS="-O3"}
+	CFLAGS="$CFLAGS -O3"
 fi
 
 define([AC_LIBTOOL_LANG_CXX_CONFIG], [:])dnl
