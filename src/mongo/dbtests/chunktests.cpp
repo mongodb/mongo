@@ -175,34 +175,35 @@ namespace ChunkTests {
             }
         };
 
-        /**
-         * SERVER-4554 For now the first shard is returned for unsatisfiable queries, as some
-         * clients of getShardsForQuery() expect at least one shard.
-         */
-        BSONArray unsatisfiableShardNames() { return BSON_ARRAY( "0" ) /* BSONArray() */; }
-        
-        class UnsatisfiableRangeSingleShard : public Base {
-            virtual BSONObj query() const { return BSON( "a" << GT << "x" << LT << "x" ); }
-            virtual BSONArray expectedShardNames() const { return unsatisfiableShardNames(); }
+        template<class BASE>
+        class Unsatisfiable : public BASE {
+            /**
+             * SERVER-4554 For now the first shard is returned for unsatisfiable queries, as some
+             * clients of getShardsForQuery() expect at least one shard.
+             */
+            virtual BSONArray expectedShardNames() const {
+                return BSON_ARRAY( "0" ) /* BSONArray() */;
+            }
         };
         
-        class UnsatisfiableRangeMultiShard : public MultiShardBase {
+        class UnsatisfiableRangeSingleShard : public Unsatisfiable<Base> {
+            virtual BSONObj query() const { return BSON( "a" << GT << "x" << LT << "x" ); }
+        };
+        
+        class UnsatisfiableRangeMultiShard : public Unsatisfiable<MultiShardBase> {
             virtual BSONObj query() const { return BSON( "a" << GT << "x" << LT << "x" ); }            
-            virtual BSONArray expectedShardNames() const { return unsatisfiableShardNames(); }
         };
 
-        class EqualityThenUnsatisfiable : public Base {
+        class EqualityThenUnsatisfiable : public Unsatisfiable<Base> {
             virtual BSONObj shardKey() const { return BSON( "a" << 1 << "b" << 1 ); }
             virtual BSONObj query() const { return BSON( "a" << 1 << "b" << GT << 4 << LT << 4 ); }
-            virtual BSONArray expectedShardNames() const { return unsatisfiableShardNames(); }
         };
 
-        class InequalityThenUnsatisfiable : public Base {
+        class InequalityThenUnsatisfiable : public Unsatisfiable<Base> {
             virtual BSONObj shardKey() const { return BSON( "a" << 1 << "b" << 1 ); }
             virtual BSONObj query() const {
                 return BSON( "a" << GT << 1 << "b" << GT << 4 << LT << 4 );
             }
-            virtual BSONArray expectedShardNames() const { return unsatisfiableShardNames(); }
         };
         
         class OrEqualityUnsatisfiableInequality : public MultiShardBase {
