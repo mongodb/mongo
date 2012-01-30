@@ -268,6 +268,8 @@ __wt_cursor_close(WT_CURSOR *cursor, const char *config)
 		TAILQ_REMOVE(&session->public_cursors, cursor, q);
 	else if (F_ISSET(cursor, WT_CURSTD_FILE))
 		TAILQ_REMOVE(&session->file_cursors, cursor, q);
+
+	__wt_free(session, cursor->uri);
 	__wt_free(session, cursor);
 
 err:	API_END(session);
@@ -285,9 +287,9 @@ err:	API_END(session);
  *	cursors to the list introduces ordering dependencies into
  *	WT_SESSION->close that we prefer to avoid.
  */
-void
-__wt_cursor_init(
-    WT_CURSOR *cursor, int is_file, int is_public, const char *cfg[])
+int
+__wt_cursor_init(WT_CURSOR *cursor,
+    const char *uri, int is_file, int is_public, const char *cfg[])
 {
 	WT_SESSION_IMPL *session;
 
@@ -305,6 +307,9 @@ __wt_cursor_init(
 	if (cursor->search == NULL)
 		cursor->search = __cursor_search;
 
+	if (cursor->uri == NULL)
+		WT_RET(__wt_strdup(session, uri, &cursor->uri));
+
 	WT_CLEAR(cursor->key);
 	WT_CLEAR(cursor->value);
 
@@ -315,6 +320,8 @@ __wt_cursor_init(
 		F_SET(cursor, WT_CURSTD_PUBLIC);
 		TAILQ_INSERT_HEAD(&session->public_cursors, cursor, q);
 	}
+
+	return (0);
 }
 
 /*

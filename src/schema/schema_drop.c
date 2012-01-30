@@ -12,22 +12,26 @@
  *	Drop a file.
  */
 int
-__wt_drop_file(WT_SESSION_IMPL *session, const char *name, int force)
+__wt_drop_file(WT_SESSION_IMPL *session, const char *uri, int force)
 {
 	static const char *list[] = { "file", "root", "version", NULL };
 	WT_ITEM *buf;
 	int exist, ret;
-	const char **lp;
+	const char *filename, **lp;
 
 	buf = NULL;
 
+	filename = uri;
+	if (!WT_PREFIX_SKIP(filename, "file:"))
+		return (EINVAL);
+
 	/* If open, close the btree handle. */
-	WT_RET(__wt_session_close_any_open_btree(session, name));
+	WT_RET(__wt_session_close_any_open_btree(session, filename));
 
 	/* Remove all of the schema table entries for this file. */
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
 	for (lp = list; *lp != NULL; ++lp) {
-		WT_ERR(__wt_buf_fmt(session, buf, "%s:%s", *lp, name));
+		WT_ERR(__wt_buf_fmt(session, buf, "%s:%s", *lp, filename));
 
 		/* Remove the schema table entry (ignore missing items). */
 		WT_TRET(__wt_schema_table_remove(session, buf->data));
@@ -36,9 +40,9 @@ __wt_drop_file(WT_SESSION_IMPL *session, const char *name, int force)
 	}
 
 	/* Remove the underlying physical file. */
-	WT_ERR(__wt_exist(session, name, &exist));
+	WT_ERR(__wt_exist(session, filename, &exist));
 	if (exist)
-		WT_TRET(__wt_remove(session, name));
+		WT_TRET(__wt_remove(session, filename));
 
 err:	__wt_scr_free(&buf);
 	return (ret);
@@ -63,12 +67,11 @@ __drop_tree(WT_SESSION_IMPL *session, WT_BTREE *btree, int force)
 
 	/*
 	 * Drop the file.
-	 * __drop_file closes the WT_BTREE handle, so we have to have a local
-	 * copy of the WT_BTREE->filename field.
+	 * __drop_file closes the WT_BTREE handle, so we copy the
+	 * WT_BTREE->filename field to make a URI.
 	 */
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
-	WT_ERR(__wt_buf_set(
-	    session, buf, btree->filename, strlen(btree->filename) + 1));
+	WT_ERR(__wt_buf_fmt(session, buf, "file:%s", btree->filename));
 	WT_ERR(__wt_drop_file(session, buf->data, force));
 
 err:	__wt_scr_free(&buf);
@@ -136,9 +139,9 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	/* Disallow drops from the WiredTiger name space. */
 	WT_RET(__wt_schema_name_check(session, uri));
 
-	if (WT_PREFIX_SKIP(uri, "file:"))
+	if (WT_PREFIX_MATCH(uri, "file:"))
 		ret = __wt_drop_file(session, uri, force);
-	else if (WT_PREFIX_MATCH(uri, "table:"))	/* NOT skip prefix */
+	else if (WT_PREFIX_MATCH(uri, "table:"))
 		ret = __drop_table(session, uri, force);
 	else
 		return (__wt_unknown_object_type(session, uri));

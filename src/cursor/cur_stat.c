@@ -315,6 +315,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 		NULL,
 		NULL,
 		NULL,
+		NULL,
 		__curstat_next,
 		__curstat_prev,
 		__curstat_reset,
@@ -385,7 +386,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 		F_SET(cursor, WT_CURSTD_RAW);
 
 	STATIC_ASSERT(offsetof(WT_CURSOR_STAT, iface) == 0);
-	__wt_cursor_init(cursor, 0, 1, cfg);
+	__wt_cursor_init(cursor, uri, 0, 1, cfg);
 
 	/*
 	 * We return the statistics field's offset as the key, and a string

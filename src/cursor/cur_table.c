@@ -427,6 +427,8 @@ __curtable_close(WT_CURSOR *cursor, const char *config)
 		__wt_free(session, ctable->plan);
 	__wt_free(session, ctable->cg_cursors);
 	__wt_free(session, ctable->idx_cursors);
+	/* The URI is owned by the table. */
+	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor, config));
 err:	API_END(session);
 
@@ -453,7 +455,7 @@ __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg[])
 
 	if (!table->cg_complete)
 		WT_RET_MSG(session, EINVAL,
-		    "Can't use table '%s' until all column groups are created",
+		    "Can't use '%s' until all column groups are created",
 		    table->name);
 
 	WT_RET(__wt_calloc_def(session,
@@ -506,6 +508,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
     const char *uri, const char *cfg[], WT_CURSOR **cursorp)
 {
 	static WT_CURSOR iface = {
+		NULL,
 		NULL,
 		NULL,
 		NULL,
@@ -576,6 +579,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	cursor = &ctable->iface;
 	*cursor = iface;
 	cursor->session = &session->iface;
+	cursor->uri = table->name;
 	cursor->key_format = table->key_format;
 	cursor->value_format = table->value_format;
 	F_SET(cursor, WT_CURSTD_TABLE);
@@ -625,7 +629,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	WT_ERR(__curtable_open_colgroups(ctable, cfg));
 
 	STATIC_ASSERT(offsetof(WT_CURSOR_TABLE, iface) == 0);
-	__wt_cursor_init(cursor, 0, 1, cfg);
+	__wt_cursor_init(cursor, cursor->uri, 0, 1, cfg);
 	*cursorp = cursor;
 
 	if (0) {

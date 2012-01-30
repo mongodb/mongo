@@ -294,6 +294,8 @@ __curindex_close(WT_CURSOR *cursor, const char *config)
 
 	WT_TRET(__wt_btcur_close(&cindex->cbt, cfg));
 	WT_TRET(__wt_session_release_btree(session));
+	/* The URI is owned by the btree handle. */
+	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor, config));
 err:	API_END(session);
 
@@ -336,6 +338,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 {
 	WT_ITEM fmt, plan;
 	static WT_CURSOR iface = {
+		NULL,
 		NULL,
 		NULL,
 		NULL,
@@ -405,6 +408,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	cindex->key_plan = session->btree->key_plan;
 	cindex->value_plan = session->btree->value_plan;
 
+	cursor->uri = cbt->btree->name;
 	cursor->key_format = cbt->btree->idxkey_format;
 	cursor->value_format = table->value_format;
 
@@ -424,7 +428,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	/* Open the column groups needed for this index cursor. */
 	WT_RET(__curindex_open_colgroups(session, cindex, cfg));
 
-	__wt_cursor_init(cursor, 1, 1, cfg);
+	__wt_cursor_init(cursor, cursor->uri, 1, 1, cfg);
 	*cursorp = cursor;
 
 	return (0);

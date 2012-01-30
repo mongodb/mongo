@@ -101,7 +101,7 @@ __wt_table_check(WT_SESSION_IMPL *session, WT_TABLE *table)
 		if (__find_next_col(
 		    session, table, &k, &cg, &col, &coltype) != 0)
 			WT_RET_MSG(session, EINVAL,
-			    "Column '%.*s' in table '%s' does not appear in a "
+			    "Column '%.*s' in '%s' does not appear in a "
 			    "column group",
 			    (int)k.len, k.str, table->name);
 		/*

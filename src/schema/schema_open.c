@@ -17,23 +17,24 @@ int
 __wt_schema_colgroup_name(WT_SESSION_IMPL *session,
     WT_TABLE *table, const char *cgname, size_t len, char **namebufp)
 {
+	const char *tablename;
 	char *namebuf;
 	size_t namesize;
 
 	namebuf = *namebufp;
+	tablename = table->name;
+	WT_PREFIX_SKIP(tablename, "table:");
 
 	/* The primary filename is in the table config. */
 	if (table->ncolgroups == 0) {
-		namesize = strlen("colgroup:") +
-		    strlen(table->name) + 1;
+		namesize = strlen("colgroup:") + strlen(tablename) + 1;
 		WT_RET(__wt_realloc(session, NULL, namesize, &namebuf));
-		snprintf(namebuf, namesize, "colgroup:%s", table->name);
+		snprintf(namebuf, namesize, "colgroup:%s", tablename);
 	} else {
-		namesize = strlen("colgroup::") +
-		    strlen(table->name) + len + 1;
+		namesize = strlen("colgroup::") + strlen(tablename) + len + 1;
 		WT_RET(__wt_realloc(session, NULL, namesize, &namebuf));
 		snprintf(namebuf, namesize, "colgroup:%s:%.*s",
-		    table->name, (int)len, cgname);
+		    tablename, (int)len, cgname);
 	}
 
 	*namebufp = namebuf;
@@ -267,12 +268,14 @@ __wt_schema_open_index(
     WT_SESSION_IMPL *session, WT_TABLE *table, const char *idxname, size_t len)
 {
 	WT_CURSOR *cursor;
+	const char *idxconf, *name, *tablename, *uri;
 	int i, match, ret, skipped;
-	const char *idxconf, *name, *uri;
 
 	cursor = NULL;
 	skipped = 0;
 	idxconf = NULL;
+	tablename = table->name;
+	WT_PREFIX_SKIP(tablename, "table:");
 
 	if (len == 0 && table->idx_complete)
 		return (0);
@@ -288,7 +291,7 @@ __wt_schema_open_index(
 		WT_ERR(cursor->get_key(cursor, &uri));
 		name = uri;
 		if (!WT_PREFIX_SKIP(name, "index:") ||
-		    !WT_PREFIX_SKIP(name, table->name) ||
+		    !WT_PREFIX_SKIP(name, tablename) ||
 		    !WT_PREFIX_SKIP(name, ":"))
 			continue;
 
@@ -345,15 +348,15 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 	WT_CONFIG cparser;
 	WT_CONFIG_ITEM ckey, cval;
 	WT_CURSOR *cursor;
+	WT_ITEM buf;
 	WT_TABLE *table;
 	const char *tconfig;
 	char *tablename;
-	size_t bufsize;
 	int ret;
 
-	bufsize = namelen + strlen("table:") + 1;
-	WT_RET(__wt_calloc_def(session, bufsize, &tablename));
-	snprintf(tablename, bufsize, "table:%.*s", (int)namelen, name);
+	WT_CLEAR(buf);
+	WT_RET(__wt_buf_fmt(session, &buf, "table:%.*s", (int)namelen, name));
+	tablename = __wt_buf_steal(session, &buf, NULL);
 
 	cursor = NULL;
 	WT_ERR(__wt_schema_table_cursor(session, NULL, &cursor));
@@ -362,7 +365,8 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 	WT_ERR(cursor->get_value(cursor, &tconfig));
 
 	WT_ERR(__wt_calloc_def(session, 1, &table));
-	WT_ERR(__wt_strndup(session, name, namelen, &table->name));
+	table->name = tablename;
+	tablename = NULL;
 
 	WT_ERR(__wt_config_getones(session, tconfig, "columns", &cval));
 

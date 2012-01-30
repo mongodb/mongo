@@ -148,6 +148,12 @@ struct __wt_cursor {
 	WT_SESSION *session;	/*!< The session handle for this cursor. */
 
 	/*!
+	 * The name of the data source for the cursor, matches the \c uri
+	 * parameter to WT_SESSION::open_cursor used to open the cursor.
+	 */
+	const char *uri;
+
+	/*!
 	 * The format of the data packed into key items.  See @ref packing for
 	 * details.  If not set, a default value of "u" is assumed, and
 	 * applications must use WT_ITEM structures to manipulate untyped byte

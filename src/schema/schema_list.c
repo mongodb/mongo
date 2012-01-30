@@ -29,10 +29,13 @@ __wt_schema_find_table(WT_SESSION_IMPL *session,
     const char *name, size_t namelen, WT_TABLE **tablep)
 {
 	WT_TABLE *table;
+	const char *tablename;
 
 	TAILQ_FOREACH(table, &session->tables, q) {
-		if (strncmp(name, table->name, namelen) == 0 &&
-		    table->name[namelen] == '\0') {
+		tablename = table->name;
+		WT_PREFIX_SKIP(tablename, "table:");
+		if (strncmp(tablename, name, namelen) == 0 &&
+		    tablename[namelen] == '\0') {
 			*tablep = table;
 			return (0);
 		}

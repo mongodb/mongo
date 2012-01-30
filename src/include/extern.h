@@ -468,7 +468,8 @@ extern void __wt_cursor_set_key(WT_CURSOR *cursor, ...);
 extern void __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap);
 extern void __wt_cursor_set_value(WT_CURSOR *cursor, ...);
 extern int __wt_cursor_close(WT_CURSOR *cursor, const char *config);
-extern void __wt_cursor_init( WT_CURSOR *cursor,
+extern int __wt_cursor_init(WT_CURSOR *cursor,
+    const char *uri,
     int is_file,
     int is_public,
     const char *cfg[]);
@@ -597,9 +598,7 @@ extern int __wt_create_file(WT_SESSION_IMPL *session,
 extern int __wt_schema_create( WT_SESSION_IMPL *session,
     const char *name,
     const char *config);
-extern int __wt_drop_file(WT_SESSION_IMPL *session,
-    const char *name,
-    int force);
+extern int __wt_drop_file(WT_SESSION_IMPL *session, const char *uri, int force);
 extern int __wt_schema_drop(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[]);

@@ -301,6 +301,7 @@ SELFHELPER(struct __wt_cursor)
 
 /* Remove / rename parts of the C API that we don't want in Python. */
 %immutable __wt_cursor::session;
+%immutable __wt_cursor::uri;
 %immutable __wt_cursor::key_format;
 %immutable __wt_cursor::value_format;
 %immutable __wt_session::connection;

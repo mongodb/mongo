@@ -75,7 +75,7 @@ __wt_create_file(WT_SESSION_IMPL *session,
 
 	if (0) {
 		/* If something goes wrong, throw away anything we created. */
-err:		(void)__wt_drop_file(session, filename, 1);
+err:		(void)__wt_drop_file(session, fileuri, 1);
 	}
 
 	__wt_scr_free(&key);
@@ -293,7 +293,10 @@ __create_table(WT_SESSION_IMPL *session, const char *name, const char *config)
 
 	cgname = NULL;
 	tableconf = NULL;
-	tablename = name + strlen("table:");
+
+	tablename = name;
+	if (!WT_PREFIX_SKIP(tablename, "table:"))
+		return (EINVAL);
 
 	if ((ret = __wt_schema_get_table(session,
 	    tablename, strlen(tablename), &table)) == 0) {

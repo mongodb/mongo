@@ -183,6 +183,8 @@ __curfile_close(WT_CURSOR *cursor, const char *config)
 	WT_TRET(__wt_btcur_close(cbt, cfg));
 	if (session->btree != NULL)
 		WT_TRET(__wt_session_release_btree(session));
+	/* The URI is owned by the btree handle. */
+	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor, config));
 err:	API_END(session);
 
@@ -198,6 +200,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
     const char *cfg[], WT_CURSOR **cursorp)
 {
 	static WT_CURSOR iface = {
+		NULL,
 		NULL,
 		NULL,
 		NULL,
@@ -248,6 +251,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	cursor = &cbt->iface;
 	*cursor = iface;
 	cursor->session = &session->iface;
+	cursor->uri = btree->name;
 	cursor->key_format = btree->key_format;
 	cursor->value_format = btree->value_format;
 
@@ -279,7 +283,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 		F_SET(cursor, WT_CURSTD_OVERWRITE);
 
 	STATIC_ASSERT(offsetof(WT_CURSOR_BTREE, iface) == 0);
-	__wt_cursor_init(cursor, 1, 0, cfg);
+	__wt_cursor_init(cursor, cursor->uri, 1, 0, cfg);
 	*cursorp = cursor;
 
 	if (0) {
