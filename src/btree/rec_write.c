@@ -208,9 +208,6 @@ __wt_rec_write(
 	if (F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE))
 		return (0);
 
-	/* Update the disk generation before we read anything from the page. */
-	WT_ORDERED_READ(page->modify->disk_gen, page->modify->write_gen);
-
 	/* Initialize the reconciliation structures for each new run. */
 	WT_RET(__rec_write_init(session, page));
 
@@ -274,6 +271,9 @@ __rec_write_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CONFIG_ITEM cval;
 	WT_RECONCILE *r;
+
+	/* Update the disk generation before we read anything from the page. */
+	WT_ORDERED_READ(page->modify->disk_gen, page->modify->write_gen);
 
 	/* Allocate a reconciliation structure if we don't already have one. */
 	if ((r = session->reconcile) == NULL) {
@@ -969,7 +969,6 @@ __wt_rec_bulk_init(WT_CURSOR_BULK *cbulk)
 	btree = session->btree;
 	page = cbulk->leaf;
 
-	WT_RET(__wt_page_modify_init(session, page));
 	WT_RET(__rec_write_init(session, page));
 
 	switch (btree->type) {
