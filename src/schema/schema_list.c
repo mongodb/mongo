@@ -33,7 +33,7 @@ __wt_schema_find_table(WT_SESSION_IMPL *session,
 
 	TAILQ_FOREACH(table, &session->tables, q) {
 		tablename = table->name;
-		WT_PREFIX_SKIP(tablename, "table:");
+		(void)WT_PREFIX_SKIP(tablename, "table:");
 		if (strncmp(tablename, name, namelen) == 0 &&
 		    tablename[namelen] == '\0') {
 			*tablep = table;

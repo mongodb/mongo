@@ -23,7 +23,7 @@ __wt_schema_colgroup_name(WT_SESSION_IMPL *session,
 
 	namebuf = *namebufp;
 	tablename = table->name;
-	WT_PREFIX_SKIP(tablename, "table:");
+	(void)WT_PREFIX_SKIP(tablename, "table:");
 
 	/* The primary filename is in the table config. */
 	if (table->ncolgroups == 0) {
@@ -275,7 +275,7 @@ __wt_schema_open_index(
 	skipped = 0;
 	idxconf = NULL;
 	tablename = table->name;
-	WT_PREFIX_SKIP(tablename, "table:");
+	(void)WT_PREFIX_SKIP(tablename, "table:");
 
 	if (len == 0 && table->idx_complete)
 		return (0);
