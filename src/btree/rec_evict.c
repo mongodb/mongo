@@ -157,29 +157,29 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 		WT_RET(__wt_calloc(
 		    session, 1, sizeof(WT_ADDR), &parent_ref->addr));
 
-		((WT_ADDR *)parent_ref->addr)->addr = mod->u.replace.addr;
-		((WT_ADDR *)parent_ref->addr)->size = mod->u.replace.size;
-		parent_ref->page = NULL;
-
 		/*
+		 * Update the parent to reference the replacement page.
+		 *
 		 * Publish: a barrier to ensure the structure fields are set
 		 * before the state change makes the page available to readers.
 		 */
+		((WT_ADDR *)parent_ref->addr)->addr = mod->u.replace.addr;
+		((WT_ADDR *)parent_ref->addr)->size = mod->u.replace.size;
+		parent_ref->page = NULL;
 		WT_PUBLISH(parent_ref->state, WT_REF_DISK);
 		break;
 	case WT_PAGE_REC_SPLIT:				/* Page split */
 		/*
-		 * Update the parent to reference new internal page(s), clear
-		 * the reference so we can discard the current page.
+		 * Update the parent to reference new internal page(s).
 		 *
 		 * Publish: a barrier to ensure the structure fields are set
 		 * before the state change makes the page available to readers.
 		 */
 		parent_ref->page = mod->u.split;
-		mod->u.split = NULL;
-		F_CLR(page, WT_PAGE_REC_SPLIT);
-
 		WT_PUBLISH(parent_ref->state, WT_REF_MEM);
+
+		/* Clear the reference else discarding the page will free it. */
+		mod->u.split = NULL;
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -255,13 +255,11 @@ __rec_root_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 		WT_VERBOSE(session, evict,
 		    "root page split %p -> %p", page, mod->u.split);
 
-		/*
-		 * Steal the split page, clear the reference so we can discard
-		 * the current page.
-		 */
+		/* Update the root to the split page. */
 		next = mod->u.split;
+
+		/* Clear the reference else discarding the page will free it. */
 		mod->u.split = NULL;
-		F_CLR(page, WT_PAGE_REC_SPLIT);
 		break;
 	}
 
@@ -484,13 +482,31 @@ __rec_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 static int
 __rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	/* If the page has tracked objects, resolve them. */
-	if (page->modify != NULL)
+	WT_PAGE_MODIFY *mod;
+
+	mod = page->modify;
+
+	/*
+	 * or if the page was split and later merged, discard it.
+	 */
+	if (mod != NULL) {
+		/*
+		 * If the page has been modified and was tracking objects,
+		 * resolve them.
+		 */
 		WT_RET(__wt_rec_track_wrapup(session, page, 1));
 
-	/* If a split page was merged from this page, discard it. */
-	if (F_ISSET(page, WT_PAGE_REC_SPLIT))
-		__wt_page_out(session, page->modify->u.split, 0);
+		/*
+		 * If the page was split and eventually merged into the parent, 
+		 * discard the split page; if the split page was promoted into
+		 * a split-merge page, then the reference must be cleared before
+		 * the page is discarded.
+		 */
+		if (F_ISSET(
+		    page, WT_PAGE_REC_MASK) == WT_PAGE_REC_SPLIT &&
+		    mod->u.split != NULL)
+			__wt_page_out(session, mod->u.split, 0);
+	}
 
 	/* Discard the page itself. */
 	__wt_page_out(session, page, 0);
