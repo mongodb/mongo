@@ -594,10 +594,11 @@ namespace mongo {
     }
 
     void ReplSetImpl::loadConfig() {
+        startupStatus = LOADINGCONFIG;
+        startupStatusMsg.set("loading " + rsConfigNs + " config (LOADINGCONFIG)");
+        LOG(1) << "loadConfig() " << rsConfigNs << endl;
+
         while( 1 ) {
-            startupStatus = LOADINGCONFIG;
-            startupStatusMsg.set("loading " + rsConfigNs + " config (LOADINGCONFIG)");
-            LOG(1) << "loadConfig() " << rsConfigNs << endl;
             try {
                 vector<ReplSetConfig> configs;
                 try {
