@@ -14,10 +14,10 @@ AC_CONFIG_SRCDIR([dist/RELEASE])
 AM_INIT_AUTOMAKE
 AM_OPTIONS
 
-if test "$wt_cv_enable_debug" = "yes"; then
-	CFLAGS="$CFLAGS -g"
-else
-	CFLAGS="$CFLAGS -O3"
+# If CFLAGS was not set on entry and we are not debugging, default to -O3
+wt_test_CFLAGS=${CFLAGS+set}
+if test "$wt_test_CFLAGS" != set && test "$wt_cv_enable_debug" != "yes"; then
+	CFLAGS="-O3"
 fi
 
 define([AC_LIBTOOL_LANG_CXX_CONFIG], [:])dnl
@@ -27,6 +27,14 @@ AC_SUBST([LIBTOOL_DEPS])
 
 AC_PROG_CC(cc gcc)
 # AC_PROG_CXX(c++ g++)
+
+# Add debugging flags if requested and not already in CFLAGS
+if test "$wt_cv_enable_debug" = "yes"; then
+	case "$CFLAGS" in
+		*-g*)	;;
+		*)	AM_CFLAGS="$AM_CFLAGS -g" ;;
+	esac
+fi
 
 if test "$GCC" = "yes"; then
 	# The Solaris gcc compiler gets the additional -pthreads flag.
