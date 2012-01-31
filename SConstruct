@@ -816,6 +816,15 @@ def add_exe(target):
         return target + ".exe"
     return target
 
+def smoke_python_name():
+    # if this script is being run by py2.5 or greater,
+    # then we assume that "python" points to a 2.5 or
+    # greater python VM. otherwise, explicitly use 2.5
+    # which we assume to be installed.
+    if sys.version_info >= (2, 5):
+        return "python"
+    return "python2.5"
+
 def setupBuildInfoFile( outFile ):
     version = utils.getGitVersion()
     if len(moduleNames) > 0:
@@ -1229,7 +1238,7 @@ def addSmoketest( name, deps ):
         else:
             target = name[5].lower() + name[6:]
 
-    addTest(name, deps, [ "python2.5 buildscripts/smoke.py " + " ".join(smokeFlags) + ' ' + target ])
+    addTest(name, deps, [ smoke_python_name() + " buildscripts/smoke.py " + " ".join(smokeFlags) + ' ' + target ])
 
 addSmoketest( "smoke", [ add_exe( "test" ) ] )
 addSmoketest( "smokePerf", [ "perftest" ]  )
@@ -1627,7 +1636,7 @@ def build_and_test_client(env, target, source):
 
     call(scons_command + ["libmongoclient.a", "clientTests"], cwd=installDir)
 
-    return bool(call(["python2.5", "buildscripts/smoke.py",
+    return bool(call([smoke_python_name(), "buildscripts/smoke.py",
                       "--test-path", installDir, "client"]))
 env.Alias("clientBuild", [mongod, installDir], [build_and_test_client])
 env.AlwaysBuild("clientBuild")
