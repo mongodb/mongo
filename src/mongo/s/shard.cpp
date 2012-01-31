@@ -102,17 +102,6 @@ namespace mongo {
 
             scoped_lock lk( _mutex );
             ShardMap::iterator i = _lookup.find( mykey );
-            
-            if ( i == _lookup.end() ) {
-                size_t x = ident.find( '/' );
-                if ( x != string::npos ) {
-                    string y = ident.substr( 0 , x );
-                    ShardMap::iterator j = _rsLookup.find( y );
-                    if ( j != _rsLookup.end() )
-                        return j->second;
-                }
-            }
-
             massert( 13129 , (string)"can't find shard for: " + mykey , i != _lookup.end() );
             return i->second;
         }

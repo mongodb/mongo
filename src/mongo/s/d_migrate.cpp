@@ -727,11 +727,11 @@ namespace mongo {
             }
 
             if ( to.empty() ) {
-                errmsg = "need to specify server to move chunk to";
+                errmsg = "need to specify shard to move chunk to";
                 return false;
             }
             if ( from.empty() ) {
-                errmsg = "need to specify server to move chunk from";
+                errmsg = "need to specify shard to move chunk from";
                 return false;
             }
 
@@ -877,13 +877,13 @@ namespace mongo {
                 if ( ! migrateFromStatus.storeCurrentLocs( maxChunkSize , errmsg , result ) )
                     return false;
 
-                ScopedDbConnection connTo( to );
+                ScopedDbConnection connTo( toShard.getConnString() );
                 BSONObj res;
                 bool ok;
                 try{
                     ok = connTo->runCommand( "admin" ,
                                               BSON( "_recvChunkStart" << ns <<
-                                                    "from" << from <<
+                                                    "from" << fromShard.getConnString() <<
                                                     "min" << min <<
                                                     "max" << max <<
                                                     "configServer" << configServer.modelServer()
@@ -913,7 +913,7 @@ namespace mongo {
             for ( int i=0; i<86400; i++ ) { // don't want a single chunk move to take more than a day
                 assert( d.dbMutex.getState() == 0 );
                 sleepsecs( 1 );
-                ScopedDbConnection conn( to );
+                ScopedDbConnection conn( toShard.getConnString() );
                 BSONObj res;
                 bool ok;
                 try {
@@ -943,7 +943,7 @@ namespace mongo {
                 if ( migrateFromStatus.mbUsed() > (500 * 1024 * 1024) ) {
                     // this is too much memory for us to use for this
                     // so we're going to abort the migrate
-                    ScopedDbConnection conn( to );
+                    ScopedDbConnection conn( toShard.getConnString() );
                     BSONObj res;
                     conn->runCommand( "admin" , BSON( "_recvChunkAbort" << 1 ) , res );
                     res = res.getOwned();
@@ -983,7 +983,7 @@ namespace mongo {
                 // could be ongoing
                 {
                     BSONObj res;
-                    ScopedDbConnection connTo( to );
+                    ScopedDbConnection connTo( toShard.getConnString() );
                     bool ok;
 
                     try{
@@ -992,7 +992,7 @@ namespace mongo {
                                                   res );
                     }
                     catch( DBException& e ){
-                        errmsg = str::stream() << "moveChunk could not contact to: shard " << to << " to commit transfer" << causedBy( e );
+                        errmsg = str::stream() << "moveChunk could not contact to: shard " << toShard.getConnString() << " to commit transfer" << causedBy( e );
                         warning() << errmsg << endl;
                         return false;
                     }

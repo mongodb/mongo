@@ -273,7 +273,7 @@ namespace mongo {
         cmd.append( "keyPattern" , _manager->getShardKey().key() );
         cmd.append( "min" , getMin() );
         cmd.append( "max" , getMax() );
-        cmd.append( "from" , getShard().getConnString() );
+        cmd.append( "from" , getShard().getName() );
         cmd.append( "splitKeys" , m );
         cmd.append( "shardId" , genID() );
         cmd.append( "configdb" , configServer.modelServer() );
@@ -309,8 +309,8 @@ namespace mongo {
 
         bool worked = fromconn->runCommand( "admin" ,
                                             BSON( "moveChunk" << _manager->getns() <<
-                                                    "from" << from.getConnString() <<
-                                                    "to" << to.getConnString() <<
+                                                    "from" << from.getName() <<
+                                                    "to" << to.getName() <<
                                                     "min" << _min <<
                                                     "max" << _max <<
                                                     "maxChunkSizeBytes" << chunkSize <<
