@@ -519,12 +519,45 @@ namespace UpdateTests {
         }
     };
 
+    /** SERVER-4777 */
     class TwoModsWithinDuplicatedField : public SetBase {
     public:
         void run() {
-            client().insert( ns(), BSON( "a" << BSONObj() << "a" << BSONObj() ) );
-            client().update( ns(), BSONObj(), BSON( "$set" << BSON( "a.b" << 1 << "a.c" << 1 ) ) );
-            ASSERT( error() ); // descriptive test, not sure of correct behavior yet SERVER-4777
+            client().insert( ns(), BSON( "_id" << 0 << "a" << 1
+                                        << "x" << BSONObj() << "x" << BSONObj()
+                                        << "z" << 5 ) );
+            client().update( ns(), BSONObj(), BSON( "$set" << BSON( "x.b" << 1 << "x.c" << 1 ) ) );
+            ASSERT_EQUALS( BSON( "_id" << 0 << "a" << 1
+                                << "x" << BSON( "b" << 1 << "c" << 1 ) << "x" << BSONObj()
+                                << "z" << 5 ),
+                          client().findOne( ns(), BSONObj() ) );
+        }
+    };
+
+    /** SERVER-4777 */
+    class ThreeModsWithinDuplicatedField : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(),
+                            BSON( "_id" << 0
+                                 << "x" << BSONObj() << "x" << BSONObj() << "x" << BSONObj() ) );
+            client().update( ns(), BSONObj(),
+                            BSON( "$set" << BSON( "x.b" << 1 << "x.c" << 1 << "x.d" << 1 ) ) );
+            ASSERT_EQUALS( BSON( "_id" << 0
+                                << "x" << BSON( "b" << 1 << "c" << 1 << "d" << 1 )
+                                << "x" << BSONObj() << "x" << BSONObj() ),
+                          client().findOne( ns(), BSONObj() ) );
+        }
+    };
+
+    class TwoModsBeforeExistingField : public SetBase {
+    public:
+        void run() {
+            client().insert( ns(), BSON( "_id" << 0 << "x" << 5 ) );
+            client().update( ns(), BSONObj(),
+                            BSON( "$set" << BSON( "a" << 1 << "b" << 1 << "x" << 10 ) ) );
+            ASSERT_EQUALS( BSON( "_id" << 0 << "a" << 1 << "b" << 1 << "x" << 10 ),
+                          client().findOne( ns(), BSONObj() ) );
         }
     };
     
@@ -864,6 +897,8 @@ namespace UpdateTests {
             add< CheckNoMods >();
             add< UpdateMissingToNull >();
             add< TwoModsWithinDuplicatedField >();
+            add< ThreeModsWithinDuplicatedField >();
+            add< TwoModsBeforeExistingField >();
 
             add< ModSetTests::internal1 >();
             add< ModSetTests::inc1 >();

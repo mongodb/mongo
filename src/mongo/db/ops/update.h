@@ -642,6 +642,9 @@ namespace mongo {
 
         }
 
+        /** @return true iff the elements aren't eoo(), are distinct, and share a field name. */
+        static bool duplicateFieldName( const BSONElement &a, const BSONElement &b );
+
     public:
 
         bool canApplyInPlace() const {
