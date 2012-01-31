@@ -630,13 +630,11 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	WT_ERR(__curtable_open_colgroups(ctable, cfg));
 
 	STATIC_ASSERT(offsetof(WT_CURSOR_TABLE, iface) == 0);
-	__wt_cursor_init(cursor, cursor->uri, 0, 1, cfg);
+	WT_ERR(__wt_cursor_init(cursor, cursor->uri, 0, 1, cfg));
 	*cursorp = cursor;
 
 	if (0) {
-err:		__wt_free(session, ctable);
-		__wt_buf_free(session, &fmt);
-		__wt_buf_free(session, &plan);
+err:		(void)__curtable_close(cursor, NULL);
 	}
 
 	return (ret);

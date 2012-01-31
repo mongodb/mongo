@@ -393,6 +393,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 		namesize = (size_t)(columns - idxname);
 
 	WT_RET(__wt_schema_open_index(session, table, idxname, namesize));
+	WT_RET(__wt_session_lock_btree(session, NULL, 0));
 	WT_RET(__wt_calloc_def(session, 1, &cindex));
 
 	cbt = &cindex->cbt;
@@ -402,7 +403,6 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	cbt->btree = session->btree;
 
 	cindex->table = table;
-	WT_RET(__wt_session_lock_btree(session, NULL, 0));
 	cindex->key_plan = session->btree->key_plan;
 	cindex->value_plan = session->btree->value_plan;
 
@@ -413,21 +413,25 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	/* Handle projections. */
 	if (columns != NULL) {
 		WT_CLEAR(fmt);
-		WT_RET(__wt_struct_reformat(session, table,
+		WT_ERR(__wt_struct_reformat(session, table,
 		    columns, strlen(columns), NULL, 0, &fmt));
 		cursor->value_format = __wt_buf_steal(session, &fmt, NULL);
 
 		WT_CLEAR(plan);
-		WT_RET(__wt_struct_plan(session, table,
+		WT_ERR(__wt_struct_plan(session, table,
 		    columns, strlen(columns), 0, &plan));
 		cindex->value_plan = __wt_buf_steal(session, &plan, NULL);
 	}
 
 	/* Open the column groups needed for this index cursor. */
-	WT_RET(__curindex_open_colgroups(session, cindex, cfg));
+	WT_ERR(__curindex_open_colgroups(session, cindex, cfg));
 
-	__wt_cursor_init(cursor, cursor->uri, 1, 1, cfg);
+	WT_ERR(__wt_cursor_init(cursor, cursor->uri, 1, 1, cfg));
 	*cursorp = cursor;
 
-	return (0);
+	if (0) {
+err:		(void)__curindex_close(cursor, NULL);
+	}
+
+	return (ret);
 }

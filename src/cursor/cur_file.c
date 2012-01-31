@@ -284,7 +284,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 		F_SET(cursor, WT_CURSTD_OVERWRITE);
 
 	STATIC_ASSERT(offsetof(WT_CURSOR_BTREE, iface) == 0);
-	__wt_cursor_init(cursor, cursor->uri, 1, 0, cfg);
+	WT_ERR(__wt_cursor_init(cursor, cursor->uri, 1, 0, cfg));
 	*cursorp = cursor;
 
 	if (0) {

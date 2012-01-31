@@ -472,7 +472,7 @@ extern int __wt_cursor_init(WT_CURSOR *cursor,
     const char *uri,
     int is_file,
     int is_public,
-    const char *cfg[]);
+    const char *cfg[]) 	WT_GCC_ATTRIBUTE((warn_unused_result));
 extern int __wt_cursor_kv_not_set(WT_CURSOR *cursor, int key);
 extern int __wt_curtable_get_key(WT_CURSOR *cursor, ...);
 extern int __wt_curtable_get_value(WT_CURSOR *cursor, ...);
