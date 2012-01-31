@@ -23,6 +23,10 @@
 #include <sys/stat.h>
 #endif
 
+#if defined(__linux__)
+#include <sys/vfs.h>
+#endif
+
 #include "timer.h"
 #include "mongoutils/str.h"
 using namespace mongoutils;
@@ -142,7 +146,38 @@ namespace mongo {
             _pendingUpdated.wait( lk.boost() );
     }
 
+    // TODO: pull this out to per-OS files once they exist
+    static bool useSparseFiles(int fd) {
+#if defined(__linux__)
+        // these are from <linux/magic.h> but that isn't available on all systems
+        const unsigned NFS_SUPER_MAGIC = 0x6969;
+        const unsigned BTRFS_SUPER_MAGIC = 0x9123683E;
+
+        struct statfs fs_stats;
+        int ret = fstatfs(fd, &fs_stats);
+        uassert(16062, "fstatfs failed: " + errnoWithDescription(), ret == 0);
+
+        return (  fs_stats.f_type == NFS_SUPER_MAGIC
+               || fs_stats.f_type == BTRFS_SUPER_MAGIC
+               );
+
+#elif defined(__freebsd__) || defined(__sunos__)
+        // assume using ZFS which is copy-on-write so no benefit to zero-filling
+        // TODO: check which fs we are using like we do on linux
+        return true;
+#else
+        return false;
+#endif
+    }
+
     void FileAllocator::ensureLength(int fd , long size) {
+        if (useSparseFiles(fd)) {
+            log(1) << "using ftruncate to create a sparse file" << endl;
+            int ret = ftruncate(fd, size);
+            uassert(16063, "ftruncate failed: " + errnoWithDescription(), ret == 0);
+            return;
+        }
+
 #if defined(__linux__)
         int ret = posix_fallocate(fd,0,size);
         if ( ret == 0 )
