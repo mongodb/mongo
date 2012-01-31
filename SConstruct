@@ -821,9 +821,22 @@ def smoke_python_name():
     # then we assume that "python" points to a 2.5 or
     # greater python VM. otherwise, explicitly use 2.5
     # which we assume to be installed.
-    if sys.version_info >= (2, 5):
-        return "python"
-    return "python2.5"
+    import subprocess
+    version = re.compile(r'[Pp]ython ([\d\.]+)', re.MULTILINE)
+    binaries = ['python', 'python2.5', 'python2.6', 'python2.7', 'python25', 'python26', 'python27']
+    for binary in binaries:
+        try:
+            # py-2.4 compatible replacement for shell backticks
+            output = subprocess.Popen([binary, '--version'], stdout=subprocess.PIPE).communicate()[0]
+            match = version.search(output)
+            if match and float(match.group(1)) >= 2.5:
+                return binary
+        except Exception, e:
+            print >> sys.stderr, "error detecting suitable python:", e
+            pass
+
+    # if that all fails, fall back to "python"
+    return "python"
 
 def setupBuildInfoFile( outFile ):
     version = utils.getGitVersion()
