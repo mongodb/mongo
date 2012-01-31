@@ -1,5 +1,6 @@
 // Test renaming a collection during a background index build.  SERVER-4820
 
+if ( 0 ) { // SERVER-4820
 c = db.jstests_index12;
 c.drop();
 
@@ -20,3 +21,4 @@ for( i = 0; i < 10; ++i ) {
 }
 
 s();
+}
