@@ -1229,7 +1229,7 @@ def addSmoketest( name, deps ):
         else:
             target = name[5].lower() + name[6:]
 
-    addTest(name, deps, [ "python buildscripts/smoke.py " + " ".join(smokeFlags) + ' ' + target ])
+    addTest(name, deps, [ "python2.5 buildscripts/smoke.py " + " ".join(smokeFlags) + ' ' + target ])
 
 addSmoketest( "smoke", [ add_exe( "test" ) ] )
 addSmoketest( "smokePerf", [ "perftest" ]  )
@@ -1627,7 +1627,7 @@ def build_and_test_client(env, target, source):
 
     call(scons_command + ["libmongoclient.a", "clientTests"], cwd=installDir)
 
-    return bool(call(["python", "buildscripts/smoke.py",
+    return bool(call(["python2.5", "buildscripts/smoke.py",
                       "--test-path", installDir, "client"]))
 env.Alias("clientBuild", [mongod, installDir], [build_and_test_client])
 env.AlwaysBuild("clientBuild")
