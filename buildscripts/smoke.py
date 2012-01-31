@@ -290,8 +290,8 @@ def runTest(test):
                                   'TestData.testPath = "' + path + '";' + 
                                   'TestData.testFile = "' + os.path.basename( path ) + '";' +
                                   'TestData.testName = "' + re.sub( ".js$", "", os.path.basename( path ) ) + '";' + 
-                                  'TestData.noJournal = ' + ( no_journal and 'true' or 'false' )  + ";" +
-                                  'TestData.noJournalPrealloc = ' + ( no_preallocj and 'true' or 'false' )  + ";" ]
+                                  'TestData.noJournal = ' + ( 'true' if no_journal else 'false' )  + ";" +
+                                  'TestData.noJournalPrealloc = ' + ( 'true' if no_preallocj else 'false' )  + ";" ]
     
     if argv[0].endswith( 'test' ) and no_preallocj :
         argv = argv + [ '--nopreallocj' ]
@@ -320,7 +320,7 @@ def run_tests(tests):
     # The reason we use with is so that we get __exit__ semantics
 
     with mongod(small_oplog=small_oplog,no_journal=no_journal,no_preallocj=no_preallocj) as master:
-        with small_oplog and mongod(slave=True) or Nothing() as slave:
+        with mongod(slave=True) if small_oplog else Nothing() as slave:
             if small_oplog:
                 master.wait_for_repl()
 
@@ -346,7 +346,7 @@ def run_tests(tests):
 
 
 def report():
-    print "%d test%s succeeded" % (len(winners), len(winners) != 1 and 's' or '')
+    print "%d test%s succeeded" % (len(winners), '' if len(winners) == 1 else 's')
     num_missed = len(tests) - (len(winners) + len(losers.keys()))
     if num_missed:
         print "%d tests didn't get run" % num_missed
@@ -426,7 +426,7 @@ def expand_suites(suites):
                 raise Exception('unknown test suite %s' % suite)
 
         if globstr:
-            globstr = os.path.join(mongo_repo, (os.path.join((globstr.endswith('.js') and 'jstests/' or ''), globstr)))
+            globstr = os.path.join(mongo_repo, (os.path.join(('jstests/' if globstr.endswith('.js') else ''), globstr)))
             paths = glob.glob(globstr)
             paths.sort()
             tests += [(path, usedb) for path in paths]
