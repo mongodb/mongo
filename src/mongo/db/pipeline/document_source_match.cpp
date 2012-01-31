@@ -30,6 +30,10 @@ namespace mongo {
     DocumentSourceMatch::~DocumentSourceMatch() {
     }
 
+    const char *DocumentSourceMatch::getSourceName() const {
+        return matchName;
+    }
+
     void DocumentSourceMatch::sourceToBson(BSONObjBuilder *pBuilder) const {
         const BSONObj *pQuery = matcher.getQuery();
         pBuilder->append(matchName, *pQuery);
@@ -77,4 +81,5 @@ namespace mongo {
         DocumentSourceFilterBase(),
         matcher(query) {
     }
+
 }

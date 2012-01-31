@@ -37,6 +37,10 @@ namespace mongo {
         pUnwindValue() {
     }
 
+    const char *DocumentSourceUnwind::getSourceName() const {
+        return unwindName;
+    }
+
     bool DocumentSourceUnwind::eof() {
         /*
           If we're unwinding an array, and there are more elements, then we
@@ -230,4 +234,10 @@ namespace mongo {
 
         return pUnwind;
     }
+
+    void DocumentSourceUnwind::manageDependencies(
+        const intrusive_ptr<DependencyTracker> &pTracker) {
+        pTracker->addDependency(unwindPath.getPath(false), this);
+    }
+    
 }

@@ -19,6 +19,7 @@
 #include "db/pipeline/document_source.h"
 
 #include "db/jsobj.h"
+#include "db/pipeline/dependency_tracker.h"
 #include "db/pipeline/doc_mem_monitor.h"
 #include "db/pipeline/document.h"
 #include "db/pipeline/expression.h"
@@ -30,6 +31,10 @@ namespace mongo {
     const char DocumentSourceSort::sortName[] = "$sort";
 
     DocumentSourceSort::~DocumentSourceSort() {
+    }
+
+    const char *DocumentSourceSort::getSourceName() const {
+        return sortName;
     }
 
     bool DocumentSourceSort::eof() {
@@ -213,4 +218,14 @@ namespace mongo {
         /* compare the documents according to the sort key */
         return (rL.pSort->compare(rL.pDocument, rR.pDocument) < 0);
     }
+
+    void DocumentSourceSort::manageDependencies(
+        const intrusive_ptr<DependencyTracker> &pTracker) {
+        /* get the dependencies out of the matcher */
+        for(SortPaths::iterator i(vSortKey.begin()); i != vSortKey.end(); ++i) {
+            string fieldPath((*i)->getFieldPath(false));
+            pTracker->addDependency(fieldPath, this);
+        }
+    }
+
 }

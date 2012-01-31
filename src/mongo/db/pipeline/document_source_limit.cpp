@@ -36,6 +36,10 @@ namespace mongo {
     DocumentSourceLimit::~DocumentSourceLimit() {
     }
 
+    const char *DocumentSourceLimit::getSourceName() const {
+        return limitName;
+    }
+
     bool DocumentSourceLimit::eof() {
         return pSource->eof() || count >= limit;
     }

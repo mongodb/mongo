@@ -161,8 +161,10 @@ namespace mongo {
                 const StageDesc *pDesc = (const StageDesc *)
                     bsearch(&key, stageDesc, nStageDesc, sizeof(StageDesc),
                             stageDescCmp);
-                if (pDesc)
+                if (pDesc) {
                     pSource = (*pDesc->pFactory)(&bsonElement, pCtx);
+                    pSource->setPipelineStep(iStep);
+                }
                 else {
                     ostringstream sb;
                     sb <<
@@ -345,12 +347,13 @@ namespace mongo {
           front of it, and finally passes that to the input source before we
           execute the pipeline.
         */
-        intrusive_ptr<DependencyTracker> pTracker;
+        intrusive_ptr<DependencyTracker> pTracker(new DependencyTracker());
         for(SourceVector::reverse_iterator iter(sourceVector.rbegin()),
                 listBeg(sourceVector.rend()); iter != listBeg; ++iter) {
             intrusive_ptr<DocumentSource> pTemp(*iter);
             pTemp->manageDependencies(pTracker);
         }
+
         pInputSource->manageDependencies(pTracker);
         
         /* chain together the sources we found */

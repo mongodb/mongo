@@ -20,6 +20,7 @@
 #include <cstdio>
 #include "db/jsobj.h"
 #include "db/pipeline/builder.h"
+#include "db/pipeline/dependency_tracker.h"
 #include "db/pipeline/document.h"
 #include "db/pipeline/expression_context.h"
 #include "db/pipeline/value.h"
@@ -295,7 +296,8 @@ namespace mongo {
         return pExpression;
     }
 
-    intrusive_ptr<Expression> Expression::parseOperand(BSONElement *pBsonElement) {
+    intrusive_ptr<Expression> Expression::parseOperand(
+        BSONElement *pBsonElement) {
         BSONType type = pBsonElement->type();
 
         switch(type) {
@@ -626,6 +628,12 @@ namespace mongo {
         return intrusive_ptr<Expression>(this);
     }
 
+    void ExpressionCoerceToBool::addDependencies(
+        const intrusive_ptr<DependencyTracker> &pTracker,
+        const DocumentSource *pSource) const {
+        /* nothing to do */
+    }
+
     intrusive_ptr<const Value> ExpressionCoerceToBool::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
 
@@ -919,6 +927,12 @@ namespace mongo {
         return intrusive_ptr<Expression>(this);
     }
 
+    void ExpressionConstant::addDependencies(
+        const intrusive_ptr<DependencyTracker> &pTracker,
+        const DocumentSource *pSource) const {
+        /* nothing to do */
+    }
+
     intrusive_ptr<const Value> ExpressionConstant::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
         return pValue;
@@ -1125,6 +1139,15 @@ namespace mongo {
         }
 
         return intrusive_ptr<Expression>(this);
+    }
+
+    void ExpressionObject::addDependencies(
+        const intrusive_ptr<DependencyTracker> &pTracker,
+        const DocumentSource *pSource) const {
+        for(ExpressionVector::const_iterator i(vpExpression.begin());
+            i != vpExpression.end(); ++i) {
+            (*i)->addDependencies(pTracker, pSource);
+        }
     }
 
     void ExpressionObject::addToDocument(
@@ -1415,8 +1438,13 @@ namespace mongo {
         return intrusive_ptr<Expression>();
     }
 
+    void ExpressionObject::emitPaths(PathSink *pPathSink) const {
+        vector<string> vPath;
+        emitPaths(pPathSink, &vPath);
+    }
+
     void ExpressionObject::emitPaths(
-        BSONObjBuilder *pBuilder, vector<string> *pvPath) const {
+        PathSink *pPathSink, vector<string> *pvPath) const {
         if (!path.size())
             return;
         
@@ -1451,7 +1479,7 @@ namespace mongo {
                     ss << (*pvPath)[iPath] << ".";
                 ss << *iter;
 
-                pBuilder->append(ss.str(), !excludePaths);
+                pPathSink->path(ss.str(), !excludePaths);
             }
             else {
                 /*
@@ -1467,7 +1495,7 @@ namespace mongo {
                   then go down into the next level.
                  */
                 PathPusher pathPusher(pvPath, vFieldName[iField]);
-                pEO->emitPaths(pBuilder, pvPath);
+                pEO->emitPaths(pPathSink, pvPath);
             }
         }
     }
@@ -1476,8 +1504,8 @@ namespace mongo {
         BSONObjBuilder *pBuilder, unsigned depth) const {
 
         /* emit any inclusion/exclusion paths */
-        vector<string> vPath;
-        emitPaths(pBuilder, &vPath);
+        BuilderPathSink builderPathSink(pBuilder);
+        emitPaths(&builderPathSink);
 
         /* then add any expressions */
         const size_t nField = vFieldName.size();
@@ -1509,6 +1537,11 @@ namespace mongo {
         pBuilder->append(objBuilder.done());
     }
 
+    void ExpressionObject::BuilderPathSink::path(
+        const string &path, bool include) {
+        pBuilder->append(path, include);
+    }
+
     /* --------------------- ExpressionFieldPath --------------------------- */
 
     ExpressionFieldPath::~ExpressionFieldPath() {
@@ -1529,6 +1562,12 @@ namespace mongo {
     intrusive_ptr<Expression> ExpressionFieldPath::optimize() {
         /* nothing can be done for these */
         return intrusive_ptr<Expression>(this);
+    }
+
+    void ExpressionFieldPath::addDependencies(
+        const intrusive_ptr<DependencyTracker> &pTracker,
+        const DocumentSource *pSource) const {
+        pTracker->addDependency(fieldPath.getPath(false), pSource);
     }
 
     intrusive_ptr<const Value> ExpressionFieldPath::evaluatePath(
@@ -1611,7 +1650,7 @@ namespace mongo {
         pBuilder->append(getFieldPath(true));
     }
 
-    /* --------------------- ExpressionFieldPath --------------------------- */
+    /* --------------------- ExpressionFieldRange -------------------------- */
 
     ExpressionFieldRange::~ExpressionFieldRange() {
     }
@@ -1635,6 +1674,12 @@ namespace mongo {
           aren't any more optimizations to look for here.
         */
         return intrusive_ptr<Expression>(this);
+    }
+
+    void ExpressionFieldRange::addDependencies(
+        const intrusive_ptr<DependencyTracker> &pTracker,
+        const DocumentSource *pSource) const {
+        pFieldPath->addDependencies(pTracker, pSource);
     }
 
     intrusive_ptr<const Value> ExpressionFieldRange::evaluate(
@@ -2285,6 +2330,15 @@ namespace mongo {
         }
 
         return pNew;
+    }
+
+    void ExpressionNary::addDependencies(
+        const intrusive_ptr<DependencyTracker> &pTracker,
+        const DocumentSource *pSource) const {
+        for(ExpressionVector::const_iterator i(vpOperand.begin());
+            i != vpOperand.end(); ++i) {
+            (*i)->addDependencies(pTracker, pSource);
+        }
     }
 
     void ExpressionNary::addOperand(

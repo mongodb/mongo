@@ -19,7 +19,17 @@
 #include "db/pipeline/document_source.h"
 
 namespace mongo {
+
+    DocumentSource::DocumentSource():
+        step(-1) {
+    }
+
     DocumentSource::~DocumentSource() {
+    }
+
+    const char *DocumentSource::getSourceName() const {
+        static const char unknown[] = "[UNKNOWN]";
+        return unknown;
     }
 
     void DocumentSource::setSource(

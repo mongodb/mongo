@@ -25,6 +25,7 @@
 #include "db/pipeline/value.h"
 
 namespace mongo {
+
     const char DocumentSourceSkip::skipName[] = "$skip";
 
     DocumentSourceSkip::DocumentSourceSkip(const intrusive_ptr<ExpressionContext> &pTheCtx):
@@ -34,6 +35,10 @@ namespace mongo {
     }
 
     DocumentSourceSkip::~DocumentSourceSkip() {
+    }
+
+    const char *DocumentSourceSkip::getSourceName() const {
+        return skipName;
     }
 
     void DocumentSourceSkip::skipper() {

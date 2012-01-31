@@ -22,6 +22,7 @@
 #include "util/intrusive_counter.h"
 #include "client/parallel.h"
 #include "db/jsobj.h"
+#include "db/pipeline/dependency_tracker.h"
 #include "db/pipeline/document.h"
 #include "db/pipeline/expression.h"
 #include "db/pipeline/value.h"
@@ -45,13 +46,23 @@ namespace mongo {
         virtual ~DocumentSource();
 
         // virtuals from StringWriter
-        /**
-          Write out a string representation of this pipeline operator.
-
-          @param ss string stream to write the string representation to
-         */
         virtual void writeString(stringstream &ss) const;
 
+        /**
+           Set the step for a user-specified pipeline step.
+
+           The step is used for diagnostics.
+
+           @param step step number 0 to n.
+        */
+        void setPipelineStep(int step);
+
+        /**
+           Get the user-specified pipeline step.
+
+           @returns the step number, or -1 if it has never been set
+        */
+        int getPipelineStep() const;
 
         /**
           Is the source at EOF?
@@ -76,6 +87,14 @@ namespace mongo {
           TODO throws an exception if there are no more expressions to return.
         */
         virtual intrusive_ptr<Document> getCurrent() = 0;
+
+        /**
+           Get the source's name.
+
+           @returns the string name of the source as a constant string;
+             this is static, and there's no need to worry about adopting it
+         */
+        virtual const char *getSourceName() const;
 
         /**
           Set the underlying source this source should use to get Documents
@@ -139,6 +158,11 @@ namespace mongo {
         
     protected:
         /**
+           Base constructor.
+         */
+        DocumentSource();
+
+        /**
           Create an object that represents the document source.  The object
           will have a single field whose name is the source's name.  This
           will be used by the default implementation of addToBsonArray()
@@ -157,6 +181,13 @@ namespace mongo {
           assert() if this has already been set.
         */
         intrusive_ptr<DocumentSource> pSource;
+
+        /*
+          The zero-based user-specified pipeline step.  Used for diagnostics.
+          Will be set to -1 for artificial pipeline steps that were not part
+          of the original user specification.
+         */
+        int step;
     };
 
 
@@ -257,6 +288,8 @@ namespace mongo {
         virtual bool advance();
         virtual intrusive_ptr<Document> getCurrent();
         virtual void setSource(const intrusive_ptr<DocumentSource> &pSource);
+        virtual void manageDependencies(
+            const intrusive_ptr<DependencyTracker> &pTracker);
 
         /**
           Create a document source based on a cursor.
@@ -306,10 +339,18 @@ namespace mongo {
         /*
           The bsonDependencies must outlive the Cursor wrapped by this
           source.  Therefore, bsonDependencies must appear before pCursor
-          in order its destructor to be called *after* pCursor's.
+          in order cause its destructor to be called *after* pCursor's.
          */
         vector<shared_ptr<BSONObj> > bsonDependencies;
         shared_ptr<Cursor> pCursor;
+
+        /*
+          This document source hangs on to the dependency tracker when it
+          gets it so that it can be used for selective reification of
+          fields in order to avoid fields that are not required through the
+          pipeline.
+         */
+        intrusive_ptr<DependencyTracker> pDependencies;
     };
 
 
@@ -370,6 +411,7 @@ namespace mongo {
         virtual ~DocumentSourceFilter();
         virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
         virtual void optimize();
+        virtual const char *getSourceName() const;
 
         /**
           Create a filter.
@@ -426,6 +468,7 @@ namespace mongo {
         virtual ~DocumentSourceGroup();
         virtual bool eof();
         virtual bool advance();
+        virtual const char *getSourceName() const;
         virtual intrusive_ptr<Document> getCurrent();
 
         /**
@@ -546,6 +589,7 @@ namespace mongo {
     public:
         // virtuals from DocumentSource
         virtual ~DocumentSourceMatch();
+        virtual const char *getSourceName() const;
 
         /**
           Create a filter.
@@ -593,6 +637,7 @@ namespace mongo {
         virtual ~DocumentSourceOut();
         virtual bool eof();
         virtual bool advance();
+        virtual const char *getSourceName() const;
         virtual intrusive_ptr<Document> getCurrent();
 
         /**
@@ -618,15 +663,17 @@ namespace mongo {
 
     
     class DocumentSourceProject :
-        public DocumentSource,
-        public boost::enable_shared_from_this<DocumentSourceProject> {
+        public DocumentSource {
     public:
         // virtuals from DocumentSource
         virtual ~DocumentSourceProject();
         virtual bool eof();
         virtual bool advance();
+        virtual const char *getSourceName() const;
         virtual intrusive_ptr<Document> getCurrent();
         virtual void optimize();
+        virtual void manageDependencies(
+            const intrusive_ptr<DependencyTracker> &pTracker);
 
         /**
           Create a new DocumentSource that can implement projection.
@@ -686,6 +733,65 @@ namespace mongo {
         // configuration state
         bool excludeId;
         intrusive_ptr<ExpressionObject> pEO;
+
+        /*
+          Utility object used by manageDependencies().
+
+          Removes dependencies from a DependencyTracker.
+         */
+        class DependencyRemover :
+            public ExpressionObject::PathSink {
+        public:
+            // virtuals from PathSink
+            virtual void path(const string &path, bool include);
+
+            /*
+              Constructor.
+
+              Captures a reference to the smart pointer to the DependencyTracker
+              that this will remove dependencies from via
+              ExpressionObject::emitPaths().
+
+              @param pTracker reference to the smart pointer to the
+                DependencyTracker
+             */
+            DependencyRemover(const intrusive_ptr<DependencyTracker> &pTracker);
+
+        private:
+            const intrusive_ptr<DependencyTracker> &pTracker;
+        };
+
+        /*
+          Utility object used by manageDependencies().
+
+          Checks dependencies to see if they are present.  If not, then
+          throws a user error.
+         */
+        class DependencyChecker :
+            public ExpressionObject::PathSink {
+        public:
+            // virtuals from PathSink
+            virtual void path(const string &path, bool include);
+
+            /*
+              Constructor.
+
+              Captures a reference to the smart pointer to the DependencyTracker
+              that this will check dependencies from from
+              ExpressionObject::emitPaths() to see if they are required.
+
+              @param pTracker reference to the smart pointer to the
+                DependencyTracker
+              @param pThis the projection that is making this request
+             */
+            DependencyChecker(
+                const intrusive_ptr<DependencyTracker> &pTracker,
+                const DocumentSourceProject *pThis);
+
+        private:
+            const intrusive_ptr<DependencyTracker> &pTracker;
+            const DocumentSourceProject *pThis;
+        };
     };
 
 
@@ -696,7 +802,10 @@ namespace mongo {
         virtual ~DocumentSourceSort();
         virtual bool eof();
         virtual bool advance();
+        virtual const char *getSourceName() const;
         virtual intrusive_ptr<Document> getCurrent();
+        virtual void manageDependencies(
+            const intrusive_ptr<DependencyTracker> &pTracker);
         /*
           TODO
           Adjacent sorts should reduce to the last sort.
@@ -768,7 +877,8 @@ namespace mongo {
         long long count;
 
         /* these two parallel each other */
-        vector<intrusive_ptr<ExpressionFieldPath> > vSortKey;
+        typedef vector<intrusive_ptr<ExpressionFieldPath> > SortPaths;
+        SortPaths vSortKey;
         vector<bool> vAscending;
 
         class Carrier {
@@ -815,6 +925,7 @@ namespace mongo {
         virtual ~DocumentSourceLimit();
         virtual bool eof();
         virtual bool advance();
+        virtual const char *getSourceName() const;
         virtual intrusive_ptr<Document> getCurrent();
 
         /**
@@ -865,6 +976,7 @@ namespace mongo {
         virtual ~DocumentSourceSkip();
         virtual bool eof();
         virtual bool advance();
+        virtual const char *getSourceName() const;
         virtual intrusive_ptr<Document> getCurrent();
 
         /**
@@ -915,14 +1027,16 @@ namespace mongo {
 
 
     class DocumentSourceUnwind :
-        public DocumentSource,
-        public boost::enable_shared_from_this<DocumentSourceUnwind> {
+        public DocumentSource {
     public:
         // virtuals from DocumentSource
         virtual ~DocumentSourceUnwind();
         virtual bool eof();
         virtual bool advance();
+        virtual const char *getSourceName() const;
         virtual intrusive_ptr<Document> getCurrent();
+        virtual void manageDependencies(
+            const intrusive_ptr<DependencyTracker> &pTracker);
 
         /**
           Create a new DocumentSource that can implement unwind.
@@ -995,7 +1109,6 @@ namespace mongo {
           @returns a partial deep clone of pNoUnwindDocument
          */
         intrusive_ptr<Document> clonePath() const;
-
     };
 
 }
@@ -1005,9 +1118,29 @@ namespace mongo {
 
 namespace mongo {
 
+    inline void DocumentSource::setPipelineStep(int s) {
+        step = s;
+    }
+
+    inline int DocumentSource::getPipelineStep() const {
+        return step;
+    }
+    
     inline void DocumentSourceGroup::setIdExpression(
         const intrusive_ptr<Expression> &pExpression) {
         pIdExpression = pExpression;
+    }
+
+    inline DocumentSourceProject::DependencyRemover::DependencyRemover(
+        const intrusive_ptr<DependencyTracker> &pT):
+        pTracker(pT) {
+    }
+
+    inline DocumentSourceProject::DependencyChecker::DependencyChecker(
+        const intrusive_ptr<DependencyTracker> &pTrack,
+        const DocumentSourceProject *pT):
+        pTracker(pTrack),
+        pThis(pT) {
     }
 
     inline void DocumentSourceUnwind::resetArray() {

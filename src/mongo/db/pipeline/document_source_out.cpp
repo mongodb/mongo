@@ -26,6 +26,10 @@ namespace mongo {
     DocumentSourceOut::~DocumentSourceOut() {
     }
 
+    const char *DocumentSourceOut::getSourceName() const {
+        return outName;
+    }
+
     bool DocumentSourceOut::eof() {
         return pSource->eof();
     }

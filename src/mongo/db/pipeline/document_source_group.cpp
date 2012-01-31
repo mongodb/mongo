@@ -31,6 +31,10 @@ namespace mongo {
     DocumentSourceGroup::~DocumentSourceGroup() {
     }
 
+    const char *DocumentSourceGroup::getSourceName() const {
+        return groupName;
+    }
+
     bool DocumentSourceGroup::eof() {
         if (!populated)
             populate();

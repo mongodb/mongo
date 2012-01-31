@@ -61,7 +61,8 @@ namespace mongo {
 
                 /* grab the matching document */
                 BSONObj documentObj(pCursor->current());
-                pCurrent = Document::createFromBsonObj(&documentObj);
+                pCurrent = Document::createFromBsonObj(
+                    &documentObj, NULL /* LATER pDependencies.get()*/);
                 pCursor->advance();
                 return;
             }
@@ -103,4 +104,11 @@ namespace mongo {
         const shared_ptr<BSONObj> &pBsonObj) {
         bsonDependencies.push_back(pBsonObj);
     }
+
+    void DocumentSourceCursor::manageDependencies(
+        const intrusive_ptr<DependencyTracker> &pTracker) {
+        /* hang on to the tracker */
+        pDependencies = pTracker;
+    }
+
 }

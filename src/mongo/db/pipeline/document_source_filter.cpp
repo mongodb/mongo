@@ -29,6 +29,10 @@ namespace mongo {
     DocumentSourceFilter::~DocumentSourceFilter() {
     }
 
+    const char *DocumentSourceFilter::getSourceName() const {
+        return filterName;
+    }
+
     bool DocumentSourceFilter::coalesce(
         const intrusive_ptr<DocumentSource> &pNextSource) {
 

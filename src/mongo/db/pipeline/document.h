@@ -22,6 +22,7 @@
 
 namespace mongo {
     class BSONObj;
+    class DependencyTracker;
     class FieldIterator;
     class Value;
 
@@ -36,9 +37,14 @@ namespace mongo {
           Document field values may be pointed to in the BSONObj, so it
           must live at least as long as the resulting Document.
 
+          LATER - use an abstract class for the dependencies; something like
+          a "lookup(const string &fieldName)" so there can be other
+          implementations.
+
           @returns shared pointer to the newly created Document
         */
-        static intrusive_ptr<Document> createFromBsonObj(BSONObj *pBsonObj);
+        static intrusive_ptr<Document> createFromBsonObj(
+            BSONObj *pBsonObj, const DependencyTracker *pDependencies = NULL);
 
         /*
           Create a new empty Document.
@@ -184,7 +190,7 @@ namespace mongo {
         friend class FieldIterator;
 
         Document(size_t sizeHint);
-        Document(BSONObj *pBsonObj);
+        Document(BSONObj *pBsonObj, const DependencyTracker *pDependencies);
 
         /* these two vectors parallel each other */
         vector<string> vFieldName;
