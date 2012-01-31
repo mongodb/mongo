@@ -831,8 +831,7 @@ def smoke_python_name():
             match = version.search(output)
             if match and float(match.group(1)) >= 2.5:
                 return binary
-        except Exception, e:
-            print >> sys.stderr, "error detecting suitable python:", e
+        except:
             pass
 
     # if that all fails, fall back to "python"
