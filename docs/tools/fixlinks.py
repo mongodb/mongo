@@ -1,8 +1,5 @@
 #!/usr/bin/env python
-
-# Copyright (c) 2011 WiredTiger, Inc.
-# All rights reserved.
-
+#
 # This Python script is run as part of generating the documentation for the
 # WiredTiger Python API.  It runs after doxypy, and turns method names in
 # comments into references to the corresponding function in the C API.
