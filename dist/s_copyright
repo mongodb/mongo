@@ -31,10 +31,9 @@ ENDOFTEXT
 cat > $c3 <<ENDOFTEXT
 #!/usr/bin/env python
 #
-# Copyright (c) 2008-$year WiredTiger, Inc.
-#	All rights reserved.
+# Copyright (c) 2008-2012 WiredTiger, Inc.
 #
-# See the file LICENSE for redistribution information.
+# This is free and unencumbered software released into the public domain.
 ENDOFTEXT
 
 check()
@@ -51,7 +50,7 @@ check()
 	if `sed -e 4q ../$1 | diff - $c2 > /dev/null` ; then
 		return;
 	fi
-	if `sed -e 6q ../$1 | diff - $c3 > /dev/null` ; then
+	if `sed -e 5q ../$1 | diff - $c3 > /dev/null` ; then
 		return;
 	fi
 
