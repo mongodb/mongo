@@ -77,7 +77,7 @@ namespace mongo {
         operator unsigned long long&() { return millis; }
         operator const unsigned long long&() const { return millis; }
         void toTm (tm *buf) {
-            time_t dtime = (time_t) millis/1000;
+            time_t dtime = (time_t)(millis/1000);
 #if defined(_WIN32)
             gmtime_s(buf, &dtime);
 #else
