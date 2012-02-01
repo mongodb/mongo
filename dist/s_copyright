@@ -51,3 +51,13 @@ l="$l `sed -e 's/^add	\(.*\)/\1/p' -e d s_copyright.list`"
 for i in $l `sed -e '/^[a-z]/! d' filelist`; do
 	check $i
 done
+
+# The documentation copyright appears in two files.
+s="Copyright (c) 2008-$year WiredTiger, Inc.  All rights reserved."
+f="../docs/build-javadoc.sh ../docs/style/footer.html"
+for i in $f; do
+	if `grep "$s" $i > /dev/null`; then
+		continue;
+	fi
+	echo "$i: copyright information is incorrect"
+done
