@@ -307,72 +307,72 @@ namespace mongo {
         }
 
         void _update( Request& r , DbMessage& d, ChunkManagerPtr manager ) {
-            int flags = d.pullInt();
-
-            BSONObj query = d.nextJsObj();
-            uassert( 13506 ,  "$atomic not supported sharded" , query["$atomic"].eoo() );
+            // const details of the request
+            const int flags = d.pullInt();
+            const BSONObj query = d.nextJsObj();
             uassert( 10201 ,  "invalid update" , d.moreJSObjs() );
-            BSONObj toupdate = d.nextJsObj();
-            BSONObj chunkFinder = query;
+            const BSONObj toupdate = d.nextJsObj();
+            const bool upsert = flags & UpdateOption_Upsert;
+            const bool multi = flags & UpdateOption_Multi;
 
-            bool upsert = flags & UpdateOption_Upsert;
-            bool multi = flags & UpdateOption_Multi;
+            uassert( 13506 ,  "$atomic not supported sharded" , !query.hasField("$atomic") );
 
-            if (upsert) {
-                uassert(8012, "can't upsert something without valid shard key",
-                        (manager->hasShardKey(toupdate) ||
-                         (toupdate.firstElementFieldName()[0] == '$' && manager->hasShardKey(query))));
+            // This are used for routing the request and are listed in order of priority
+            // If one is empty, go to next. If both are empty, send to all shards
+            BSONObj key; // the exact shard key
+            BSONObj chunkFinder; // a query listing
 
-                BSONObj key = manager->getShardKey().extractKey(query);
-                BSONForEach(e, key) {
-                    uassert(13465, "shard key in upsert query must be an exact match", getGtLtOp(e) == BSONObj::Equality);
-                }
-            }
+            const ShardKeyPattern& sk = manager->getShardKey();
 
-            bool save = false;
-            if ( ! manager->hasShardKey( query ) ) {
-                if ( multi ) {
-                }
-                else if ( strcmp( query.firstElementFieldName() , "_id" ) || query.nFields() != 1 ) {
-                    log() << "Query " << query << endl;
-                    throw UserException( 8013 , "can't do non-multi update with query that doesn't have a valid shard key" );
-                }
-                else {
-                    save = true;
-                    chunkFinder = toupdate;
-                }
-            }
+            if (toupdate.firstElementFieldName()[0] == '$') { // $op style update
+                chunkFinder = query;
 
-
-            if ( ! save ) {
-                if ( toupdate.firstElementFieldName()[0] == '$' ) {
-                    BSONObjIterator ops(toupdate);
-                    while(ops.more()) {
-                        BSONElement op(ops.next());
-                        if (op.type() != Object)
-                            continue;
-                        BSONObjIterator fields(op.embeddedObject());
-                        while(fields.more()) {
-                            const string field = fields.next().fieldName();
-                            uassert(13123,
-                                    str::stream() << "Can't modify shard key's value field" << field
-                                    << " for collection: " << manager->getns(),
-                                    ! manager->getShardKey().partOfShardKey(field));
-                        }
+                BSONForEach(op, toupdate){
+                    // this block is all about validation
+                    uassert(16064, "can't mix $operator style update with non-$op fields", op.fieldName()[0] == '$');
+                    if (op.type() != Object)
+                        continue;
+                    BSONForEach(field, op.embeddedObject()){
+                        if (sk.partOfShardKey(field.fieldName()))
+                            uasserted(13123, str::stream() << "Can't modify shard key's value. field: " << field
+                                                            << " collection: " << manager->getns());
                     }
                 }
-                else if ( manager->hasShardKey( toupdate ) ) {
-                    uassert( 8014,
-                             str::stream() << "cannot modify shard key for collection: " << manager->getns(),
-                             manager->getShardKey().compare( query , toupdate ) == 0 );
-                }
-                else {
-                    uasserted(12376,
-                              str::stream() << "valid shard key must be in update object for collection: " << manager->getns() );
+
+                if (!multi || upsert) {
+                    // upsert needs full key and multi needs full key or _id
+                    // the _id exception because that guarantees that only one object will be updated even if we send to all shards
+                    // Also, db.foo.update({_id:'asdf'}, {$inc:{a:1}}) is a common pattern that we need to allow,
+                    // even if it is less efficient than if the shard key were supplied.
+                    const bool hasId = query.hasField("_id") && getGtLtOp(query["_id"]) == BSONObj::Equality;
+                    if (sk.hasShardKey(query))
+                        key = sk.extractKey(query);
+
+                    if (!multi){ // upsert part handled below
+                        uassert(8013, "For non-multi updates, must have _id or full shard key in query", hasId || !key.isEmpty());
+                    }
                 }
             }
+            else { // replace style update
+                uassert(16065, "multi-updates require $ops rather than replacement object", !multi);
 
-            if ( multi ) {
+                uassert(12376, str::stream() << "full shard key must be in update object for collection: " << manager->getns(),
+                        sk.hasShardKey(toupdate));
+
+                key = sk.extractKey(toupdate);
+
+                BSONForEach(field, query){
+                    if (!sk.partOfShardKey(field.fieldName()) || getGtLtOp(field) != BSONObj::Equality)
+                        continue;
+                    uassert(8014, str::stream() << "cannot modify shard key for collection: " << manager->getns(),
+                            field == key[field.fieldName()]);
+                }
+
+            }
+
+            if ( key.isEmpty() ) {
+                uassert(8012, "can't upsert something without full valid shard key", !upsert);
+
                 set<Shard> shards;
                 manager->getShardsForQuery( shards , chunkFinder );
                 int * x = (int*)(r.d().afterNS());
@@ -382,10 +382,12 @@ namespace mongo {
                 }
             }
             else {
+                verify(16066, sk.hasShardKey(key)); // sanity check
+
                 int left = 5;
                 while ( true ) {
                     try {
-                        ChunkPtr c = manager->findChunk( chunkFinder );
+                        ChunkPtr c = manager->findChunk( key );
                         doWrite( dbUpdate , r , c->getShard() );
                         if ( r.getClientInfo()->autoSplitOk() )
                             c->splitIfShould( d.msg().header()->dataLen() );
