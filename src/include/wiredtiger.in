@@ -366,10 +366,7 @@ struct __wt_cursor {
 	 * @snippet ex_all.c Close the cursor
 	 *
 	 * @param cursor the cursor handle
-	 * @configstart{cursor.close, see dist/api_data.py}
-	 * @config{clear, for statistics cursors\, reset statistics counters.,a
-	 * boolean flag; default \c false.}
-	 * @configend
+	 * @configempty{cursor.close, see dist/api_data.py}
 	 * @errors
 	 */
 	int __F(close)(WT_CURSOR *cursor, const char *config);
@@ -500,6 +497,9 @@ struct __wt_session {
 	 * @config{bulk, configure the cursor for bulk loads; bulk-load is a
 	 * fast load path for empty objects\, only empty objects may be
 	 * bulk-loaded.,a boolean flag; default \c false.}
+	 * @config{clear_on_close, for statistics cursors\, reset statistics
+	 * counters when the cursor is closed.,a boolean flag; default \c
+	 * false.}
 	 * @config{dump, configure the cursor for dump format inputs and
 	 * outputs: "hex" selects a simple hexadecimal format\, "print" selects
 	 * a format where only non-printing characters are hexadecimal encoded.

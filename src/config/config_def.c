@@ -68,11 +68,11 @@ __wt_confchk_connection_open_session =
 
 const char *
 __wt_confdfl_cursor_close =
-    "clear=false";
+    "";
 
 const char *
 __wt_confchk_cursor_close =
-    "clear=(type=boolean)";
+    "";
 
 const char *
 __wt_confdfl_file_meta =
@@ -188,15 +188,15 @@ __wt_confchk_session_log_printf =
 
 const char *
 __wt_confdfl_session_open_cursor =
-    "append=false,bulk=false,dump="",isolation=read-committed,overwrite=false"
-    ",raw=false,statistics=false";
+    "append=false,bulk=false,clear_on_close=false,dump="","
+    "isolation=read-committed,overwrite=false,raw=false,statistics=false";
 
 const char *
 __wt_confchk_session_open_cursor =
-    "append=(type=boolean),bulk=(type=boolean),dump=(choices=[\"hex\","
-    "\"print\"]),isolation=(choices=[\"snapshot\",\"read-committed\","
-    "\"read-uncommitted\"]),overwrite=(type=boolean),raw=(type=boolean),"
-    "statistics=(type=boolean)";
+    "append=(type=boolean),bulk=(type=boolean),clear_on_close=(type=boolean),"
+    "dump=(choices=[\"hex\",\"print\"]),isolation=(choices=[\"snapshot\","
+    "\"read-committed\",\"read-uncommitted\"]),overwrite=(type=boolean),"
+    "raw=(type=boolean),statistics=(type=boolean)";
 
 const char *
 __wt_confdfl_session_rename =

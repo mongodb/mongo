@@ -182,9 +182,6 @@ methods = {
 'table.meta' : Method(table_meta),
 
 'cursor.close' : Method([
-	Config('clear', 'false', r'''
-		for statistics cursors, reset statistics counters''',
-		type='boolean'),
 ]),
 
 'session.close' : Method([]),
@@ -214,6 +211,10 @@ methods = {
 		configure the cursor for bulk loads; bulk-load is a fast
 		load path for empty objects, only empty objects may be
 		bulk-loaded''',
+		type='boolean'),
+	Config('clear_on_close', 'false', r'''
+		for statistics cursors, reset statistics counters when the cursor is
+		closed''',
 		type='boolean'),
 	Config('dump', '', r'''
 		configure the cursor for dump format inputs and outputs:

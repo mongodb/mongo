@@ -272,17 +272,16 @@ err:	API_END(session);
 static int
 __curstat_close(WT_CURSOR *cursor, const char *config)
 {
-	WT_CONFIG_ITEM cval;
 	WT_CURSOR_STAT *cst;
 	WT_SESSION_IMPL *session;
 	int ret;
 
 	ret = 0;
 	CURSOR_API_CALL_CONF(cursor, session, close, NULL, config, cfg);
+	WT_UNUSED(cfg);
 	cst = (WT_CURSOR_STAT *)cursor;
 
-	WT_TRET(__wt_config_gets(session, cfg, "clear", &cval));
-	if (ret == 0 && cval.val != 0 && cst->clear_func)
+	if (ret == 0 && cst->clear_func)
 		cst->clear_func(cst->stats_first);
 
 	__wt_buf_free(session, &cst->pv);
@@ -341,11 +340,18 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	WT_CURSOR *cursor;
 	WT_STATS *stats_first;
 	void (*clear_func)(WT_STATS *);
-	int raw, ret, stats_count;
+	int clear_on_close, raw, ret, stats_count;
 
 	btree = NULL;
+	clear_func = NULL;
 	cst = NULL;
 	ret = 0;
+
+	WT_RET(__wt_config_gets(session, cfg, "clear_on_close", &cval));
+	clear_on_close = (cval.val != 0);
+
+	WT_RET(__wt_config_gets(session, cfg, "raw", &cval));
+	raw = (cval.val != 0);
 
 	if (!WT_PREFIX_SKIP(uri, "statistics:"))
 		return (EINVAL);
@@ -356,16 +362,15 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_btree_stat_init(session));
 		stats_first = (WT_STATS *)session->btree->stats;
 		stats_count = sizeof(WT_BTREE_STATS) / sizeof(WT_STATS);
-		clear_func = __wt_stat_clear_btree_stats;
+		if (clear_on_close)
+			clear_func = __wt_stat_clear_btree_stats;
 	} else {
 		__wt_conn_stat_init(session);
 		stats_first = (WT_STATS *)S2C(session)->stats;
 		stats_count = sizeof(WT_CONNECTION_STATS) / sizeof(WT_STATS);
-		clear_func = __wt_stat_clear_connection_stats;
+		if (clear_on_close)
+			clear_func = __wt_stat_clear_connection_stats;
 	}
-
-	WT_ERR(__wt_config_gets(session, cfg, "raw", &cval));
-	raw = (cval.val != 0);
 
 	WT_ERR(__wt_calloc_def(session, 1, &cst));
 	cst->stats_first = stats_first;
