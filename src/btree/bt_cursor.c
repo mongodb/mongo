@@ -108,9 +108,7 @@ __wt_btcur_reset(WT_CURSOR_BTREE *cbt)
 	WT_BSTAT_INCR(session, cursor_resets);
 
 	__cursor_func_init(cbt, 1);
-	cbt->recno = 0;
-	F_CLR(cbt,
-	    WT_CBT_ITERATE_APPEND | WT_CBT_ITERATE_NEXT | WT_CBT_ITERATE_PREV);
+	__cursor_search_clear(cbt);
 
 	return (0);
 }
