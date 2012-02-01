@@ -295,7 +295,7 @@ __curstat_close(WT_CURSOR *cursor, const char *config)
 
 	WT_TRET(__wt_cursor_close(cursor, config));
 
-err:	API_END(session);
+	API_END(session);
 	return (ret);
 }
 

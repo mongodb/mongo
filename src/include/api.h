@@ -207,6 +207,7 @@ struct __wt_connection_impl {
 	uint32_t flags;
 };
 
+/* Standard entry points to the API: declares/initializes local variables. */
 #define	API_CONF_DEFAULTS(h, n, cfg)					\
 	{ __wt_confdfl_##h##_##n, (cfg), NULL }
 
@@ -216,16 +217,21 @@ struct __wt_connection_impl {
 	(s)->cursor = (cur);						\
 	(s)->btree = (bt);						\
 	(s)->name = #h "." #n;						\
+	ret = 0;
 
 #define	API_CALL_NOCONF(s, h, n, cur, bt) do {				\
-	API_SESSION_INIT(s, h, n, cur, bt);				\
-	ret = 0
+	API_SESSION_INIT(s, h, n, cur, bt);
 
-/* Standard entry point to the API.  Sets ret to 0 on success */
-#define	API_CALL(s, h, n, cur, bt, cfg, cfgvar)	do {			\
+#define	API_CALL(s, h, n, cur, bt, cfg, cfgvar) do {			\
 	const char *cfgvar[] = API_CONF_DEFAULTS(h, n, cfg);		\
 	API_SESSION_INIT(s, h, n, cur, bt);				\
-	WT_ERR((cfg != NULL) ?						\
+	WT_ERR(((cfg) != NULL) ?					\
+	    __wt_config_check((s), __wt_confchk_##h##_##n, (cfg)) : 0)
+
+#define	API_CALL_TRET(s, h, n, cur, bt, cfg, cfgvar) do {		\
+	const char *cfgvar[] = API_CONF_DEFAULTS(h, n, cfg);		\
+	API_SESSION_INIT(s, h, n, cur, bt);				\
+	WT_TRET(((cfg) != NULL) ?					\
 	    __wt_config_check((s), __wt_confchk_##h##_##n, (cfg)) : 0)
 
 #define	API_END(s)							\
@@ -248,7 +254,7 @@ struct __wt_connection_impl {
 
 #define	CURSOR_API_CALL_CONF(cur, s, n, bt, cfg, cfgvar)		\
 	(s) = (WT_SESSION_IMPL *)(cur)->session;			\
-	API_CALL(s, cursor, n, cur, bt, cfg, cfgvar);			\
+	API_CALL_TRET(s, cursor, n, cur, bt, cfg, cfgvar);		\
 
 /*******************************************
  * Global variables.

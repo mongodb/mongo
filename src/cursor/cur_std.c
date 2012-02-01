@@ -302,7 +302,7 @@ __wt_cursor_close(WT_CURSOR *cursor, const char *config)
 	__wt_free(session, cursor->uri);
 	__wt_free(session, cursor);
 
-err:	API_END(session);
+	API_END(session);
 	return (ret);
 }
 

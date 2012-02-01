@@ -186,7 +186,7 @@ __curfile_close(WT_CURSOR *cursor, const char *config)
 	/* The URI is owned by the btree handle. */
 	cursor->uri = NULL;
 	WT_TRET(__wt_cursor_close(cursor, config));
-err:	API_END(session);
+	API_END(session);
 
 	return (ret);
 }
