@@ -93,7 +93,7 @@ class test_cursor03(TestCursorTracker):
         self.cur_check_here(cursor)
         self.cur_check_forward(cursor, 2)
 
-        cursor.close(None)
+        cursor.close()
 
     def test_insert_and_remove(self):
         """
@@ -121,7 +121,7 @@ class test_cursor03(TestCursorTracker):
         self.cur_check_forward(cursor, -1)
         self.cur_last(cursor)
         self.cur_check_backward(cursor, -1)
-        cursor.close(None)
+        cursor.close()
 
 if __name__ == '__main__':
     wttest.run()

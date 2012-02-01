@@ -36,7 +36,7 @@ err:	API_END(session);
  *	WT_CURSOR->close for the bulk cursor type.
  */
 static int
-__curbulk_close(WT_CURSOR *cursor, const char *config)
+__curbulk_close(WT_CURSOR *cursor)
 {
 	WT_BTREE *btree;
 	WT_CURSOR_BULK *cbulk;
@@ -46,14 +46,13 @@ __curbulk_close(WT_CURSOR *cursor, const char *config)
 	cbulk = (WT_CURSOR_BULK *)cursor;
 	btree = cbulk->cbt.btree;
 
-	CURSOR_API_CALL_CONF(cursor, session, close, btree, config, cfg);
-	WT_UNUSED(cfg);
+	CURSOR_API_CALL(cursor, session, close, btree);
 	WT_TRET(__wt_bulk_end(cbulk));
 	if (session->btree != NULL)
 		WT_TRET(__wt_session_release_btree(session));
 	/* The URI is owned by the btree handle. */
 	cursor->uri = NULL;
-	WT_TRET(__wt_cursor_close(cursor, config));
+	WT_TRET(__wt_cursor_close(cursor));
 	API_END(session);
 
 	return (ret);

@@ -261,7 +261,7 @@ __curindex_search_near(WT_CURSOR *cursor, int *exact)
  *	WT_CURSOR->close method for index cursors.
  */
 static int
-__curindex_close(WT_CURSOR *cursor, const char *config)
+__curindex_close(WT_CURSOR *cursor)
 {
 	WT_BTREE *btree;
 	WT_CURSOR_INDEX *cindex;
@@ -272,12 +272,12 @@ __curindex_close(WT_CURSOR *cursor, const char *config)
 	cindex = (WT_CURSOR_INDEX *)cursor;
 	btree = cindex->cbt.btree;
 
-	CURSOR_API_CALL_CONF(cursor, session, close, btree, config, cfg);
+	CURSOR_API_CALL(cursor, session, close, btree);
 
 	for (i = 0, cp = (cindex)->cg_cursors;
 	    i < WT_COLGROUPS(cindex->table); i++, cp++)
 		if (*cp != NULL) {
-			WT_TRET((*cp)->close(*cp, config));
+			WT_TRET((*cp)->close(*cp));
 			*cp = NULL;
 		}
 
@@ -289,11 +289,11 @@ __curindex_close(WT_CURSOR *cursor, const char *config)
 	if (cursor->value_format != cindex->table->value_format)
 		__wt_free(session, cindex->value_plan);
 
-	WT_TRET(__wt_btcur_close(&cindex->cbt, cfg));
+	WT_TRET(__wt_btcur_close(&cindex->cbt));
 	WT_TRET(__wt_session_release_btree(session));
 	/* The URI is owned by the btree handle. */
 	cursor->uri = NULL;
-	WT_TRET(__wt_cursor_close(cursor, config));
+	WT_TRET(__wt_cursor_close(cursor));
 	API_END(session);
 
 	return (ret);
@@ -430,7 +430,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	*cursorp = cursor;
 
 	if (0) {
-err:		(void)__curindex_close(cursor, NULL);
+err:		(void)__curindex_close(cursor);
 	}
 
 	return (ret);

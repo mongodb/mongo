@@ -93,12 +93,12 @@ class test_compress01_base(wttest.WiredTigerTestCase):
             ret = getcursor.search()
             self.assertTrue(ret == 0)
             self.assertEquals(getcursor.get_value(), val)
-            getcursor.close(None)
+            getcursor.close()
 
     def do_fresh_cache(self):
         # Since we are running WT in-process, we just need
         # to shut down the connection and start again.
-        self.conn.close(None)
+        self.conn.close()
         self.conn = self.setUpConnectionOpen(".")
         self.session = self.setUpSessionOpen(self.conn)
 

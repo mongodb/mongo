@@ -110,7 +110,7 @@ int main(void)
 		cursor->set_value(cursor, p->country, p->year, p->population);
 		ret = cursor->insert(cursor);
 	}
-	ret = cursor->close(cursor, NULL);
+	ret = cursor->close(cursor);
 
 	/* Now just read through the countries we know about */
 	ret = session->open_cursor(session,

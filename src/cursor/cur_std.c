@@ -283,13 +283,12 @@ done:	API_END(session);
  *	WT_CURSOR->close default implementation.
  */
 int
-__wt_cursor_close(WT_CURSOR *cursor, const char *config)
+__wt_cursor_close(WT_CURSOR *cursor)
 {
 	WT_SESSION_IMPL *session;
 	int ret;
 
-	CURSOR_API_CALL_CONF(cursor, session, close, NULL, config, cfg);
-	WT_UNUSED(cfg);
+	CURSOR_API_CALL(cursor, session, close, NULL);
 
 	__wt_buf_free(session, &cursor->key);
 	__wt_buf_free(session, &cursor->value);

@@ -194,7 +194,7 @@ class test_base05(wttest.WiredTigerTestCase):
 
         self.assertEqual(total, self.nentries)
         self.assertEqual(0, len(numbers))
-        cursor.close(None)
+        cursor.close()
 
 if __name__ == '__main__':
     wttest.run()

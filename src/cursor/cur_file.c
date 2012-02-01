@@ -172,20 +172,20 @@ err:	API_END(session);
  *	WT_CURSOR->close method for the btree cursor type.
  */
 static int
-__curfile_close(WT_CURSOR *cursor, const char *config)
+__curfile_close(WT_CURSOR *cursor)
 {
 	WT_CURSOR_BTREE *cbt;
 	WT_SESSION_IMPL *session;
 	int ret;
 
 	cbt = (WT_CURSOR_BTREE *)cursor;
-	CURSOR_API_CALL_CONF(cursor, session, close, cbt->btree, config, cfg);
-	WT_TRET(__wt_btcur_close(cbt, cfg));
+	CURSOR_API_CALL(cursor, session, close, cbt->btree);
+	WT_TRET(__wt_btcur_close(cbt));
 	if (session->btree != NULL)
 		WT_TRET(__wt_session_release_btree(session));
 	/* The URI is owned by the btree handle. */
 	cursor->uri = NULL;
-	WT_TRET(__wt_cursor_close(cursor, config));
+	WT_TRET(__wt_cursor_close(cursor));
 	API_END(session);
 
 	return (ret);

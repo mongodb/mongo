@@ -49,10 +49,10 @@ class test_config05(wttest.WiredTigerTestCase):
 
     def close_conn(self):
         if self.conn != None:
-            self.conn.close(None)
+            self.conn.close()
             self.conn = None
         if hasattr(self, 'conn2') and self.conn2 != None:
-            self.conn2.close(None)
+            self.conn2.close()
             self.conn2 = None
 
     def populate(self, session):
@@ -66,7 +66,7 @@ class test_config05(wttest.WiredTigerTestCase):
             cursor.set_key(str(1000000 + i))
             cursor.set_value('value' + str(i))
             cursor.insert()
-        cursor.close(None)
+        cursor.close()
 
     def verify_entries(self, session):
         """
@@ -79,7 +79,7 @@ class test_config05(wttest.WiredTigerTestCase):
             self.assertEqual(value, ('value' + str(i)))
             i += 1
         self.assertEqual(i, self.nentries)
-        cursor.close(None)
+        cursor.close()
 
     def test_one(self):
         self.conn = wiredtiger.wiredtiger_open('.', 'create')

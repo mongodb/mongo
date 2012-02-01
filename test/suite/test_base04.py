@@ -66,7 +66,7 @@ class test_base04(wttest.WiredTigerTestCase):
 		self.pr('search')
 		self.assertEqual(cursor.search(), expected)
 		self.pr('closing cursor')
-		cursor.close(None)
+		cursor.close()
 
 	def insert(self, key, value):
 		self.pr('insert')
@@ -74,7 +74,7 @@ class test_base04(wttest.WiredTigerTestCase):
 		cursor.set_key(key);
 		cursor.set_value(value)
 		cursor.insert()
-		cursor.close(None)
+		cursor.close()
 		if self.reconcile:
 			self.reopen()
 
@@ -83,7 +83,7 @@ class test_base04(wttest.WiredTigerTestCase):
 		cursor = self.cursor()
 		cursor.set_key(key);
 		cursor.remove()
-		cursor.close(None)
+		cursor.close()
 		if self.reconcile:
 			self.reopen()
 

@@ -77,7 +77,7 @@ class test_base01(wttest.WiredTigerTestCase):
         ret = cursor.search()
         self.assertTrue(ret == wiredtiger.WT_NOTFOUND)
         self.pr('closing cursor')
-        cursor.close(None)
+        cursor.close()
 
     def test_insert(self):
         """
@@ -96,7 +96,7 @@ class test_base01(wttest.WiredTigerTestCase):
         self.assertTrue(ret == 0)
         self.assertTrue(getcursor.get_value(), 'value1')
         self.pr('closing cursor')
-        getcursor.close(None)
+        getcursor.close()
 
 if __name__ == '__main__':
     wttest.run()

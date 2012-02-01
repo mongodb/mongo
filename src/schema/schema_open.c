@@ -75,7 +75,7 @@ __wt_schema_get_btree(WT_SESSION_IMPL *session,
 	fileuri = uribuf.data;
 
 	/* !!! Close the schema cursor first, this overwrites session->btree. */
-	ret = cursor->close(cursor, NULL);
+	ret = cursor->close(cursor);
 	cursor = NULL;
 	if (ret != 0)
 		goto err;
@@ -89,7 +89,7 @@ err:	__wt_buf_free(session, &uribuf);
 	if (name != objname)
 		__wt_free(session, name);
 	if (cursor != NULL)
-		WT_TRET(cursor->close(cursor, NULL));
+		WT_TRET(cursor->close(cursor));
 	return (ret);
 }
 
@@ -315,7 +315,7 @@ __wt_schema_open_index(
 		}
 
 		if (match) {
-			ret = cursor->close(cursor, NULL);
+			ret = cursor->close(cursor);
 			cursor = NULL;
 			session->btree = table->index[i];
 			break;
@@ -333,7 +333,7 @@ __wt_schema_open_index(
 	}
 
 err:	if (cursor != NULL)
-		WT_TRET(cursor->close(cursor, NULL));
+		WT_TRET(cursor->close(cursor));
 	return (ret);
 }
 
@@ -408,7 +408,7 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 	*tablep = table;
 
 err:	if (cursor != NULL)
-		WT_TRET(cursor->close(cursor, NULL));
+		WT_TRET(cursor->close(cursor));
 	__wt_free(session, tablename);
 	return (ret);
 }

@@ -244,8 +244,8 @@ wts_teardown(void)
 	 * Close the open cursors -- they will block sync.
 	 */
 	if ((cursor_insert != NULL &&
-	    (ret = cursor_insert->close(cursor_insert, NULL)) != 0) ||
-	    (cursor != NULL && (ret = cursor->close(cursor, NULL)) != 0))
+	    (ret = cursor_insert->close(cursor_insert)) != 0) ||
+	    (cursor != NULL && (ret = cursor->close(cursor)) != 0))
 		die("cursor.close", ret);
 
 	ret = wts_sync();
@@ -296,7 +296,7 @@ wts_bulk_load(void)
 		}
 	}
 
-err:	(void)cursor->close(cursor, NULL);
+err:	(void)cursor->close(cursor);
 	return (ret);
 }
 
@@ -424,7 +424,7 @@ wts_stats(void)
 
 	if (ret != WT_NOTFOUND)
 		die("cursor.next", ret);
-	if ((ret = cursor->close(cursor, NULL)) != 0)
+	if ((ret = cursor->close(cursor)) != 0)
 		die("cursor.close", ret);
 	
 	/* File statistics. */
@@ -443,7 +443,7 @@ wts_stats(void)
 
 	if (ret != WT_NOTFOUND)
 		die("cursor.next", ret);
-	if ((ret = cursor->close(cursor, NULL)) != 0)
+	if ((ret = cursor->close(cursor)) != 0)
 		die("cursor.close", ret);
 
 	(void)fclose(fp);

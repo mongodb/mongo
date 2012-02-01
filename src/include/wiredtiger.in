@@ -366,10 +366,9 @@ struct __wt_cursor {
 	 * @snippet ex_all.c Close the cursor
 	 *
 	 * @param cursor the cursor handle
-	 * @configempty{cursor.close, see dist/api_data.py}
 	 * @errors
 	 */
-	int __F(close)(WT_CURSOR *cursor, const char *config);
+	int __F(close)(WT_CURSOR *cursor);
 
 	/*
 	 * Protected fields, only to be used by cursor implementations.

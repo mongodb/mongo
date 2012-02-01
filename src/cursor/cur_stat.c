@@ -270,15 +270,14 @@ err:	API_END(session);
  *	WT_CURSOR->close method for the statistics cursor type.
  */
 static int
-__curstat_close(WT_CURSOR *cursor, const char *config)
+__curstat_close(WT_CURSOR *cursor)
 {
 	WT_CURSOR_STAT *cst;
 	WT_SESSION_IMPL *session;
 	int ret;
 
 	ret = 0;
-	CURSOR_API_CALL_CONF(cursor, session, close, NULL, config, cfg);
-	WT_UNUSED(cfg);
+	CURSOR_API_CALL(cursor, session, close, NULL);
 	cst = (WT_CURSOR_STAT *)cursor;
 
 	if (ret == 0 && cst->clear_func)
@@ -292,7 +291,7 @@ __curstat_close(WT_CURSOR *cursor, const char *config)
 		session->btree = NULL;
 	}
 
-	WT_TRET(__wt_cursor_close(cursor, config));
+	WT_TRET(__wt_cursor_close(cursor));
 
 	API_END(session);
 	return (ret);

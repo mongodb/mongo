@@ -12,9 +12,9 @@
  *	WT_CURSOR->close method for the config cursor type.
  */
 static int
-__curconfig_close(WT_CURSOR *cursor, const char *config)
+__curconfig_close(WT_CURSOR *cursor)
 {
-	return (__wt_cursor_close(cursor, config));
+	return (__wt_cursor_close(cursor));
 }
 
 /*

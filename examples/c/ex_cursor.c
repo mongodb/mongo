@@ -202,7 +202,7 @@ int main(void)
 	ret = cursor_reverse_scan(cursor);
 	ret = cursor_update(cursor);
 	ret = cursor_remove(cursor);
-	ret = cursor->close(cursor, NULL);
+	ret = cursor->close(cursor);
 
 	/* Note: closing the connection implicitly closes open session(s). */
 	if ((ret = conn->close(conn, NULL)) != 0)

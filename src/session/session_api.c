@@ -33,10 +33,10 @@ __session_close(WT_SESSION *wt_session, const char *config)
 	 * to work out whether pages are in use.
 	 */
 	while ((cursor = TAILQ_FIRST(&session->public_cursors)) != NULL)
-		WT_TRET(cursor->close(cursor, config));
+		WT_TRET(cursor->close(cursor));
 
 	while ((cursor = TAILQ_FIRST(&session->file_cursors)) != NULL)
-		WT_TRET(cursor->close(cursor, config));
+		WT_TRET(cursor->close(cursor));
 
 	while ((btree_session = TAILQ_FIRST(&session->btrees)) != NULL)
 		WT_TRET(__wt_session_remove_btree(session, btree_session));

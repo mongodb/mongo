@@ -83,7 +83,7 @@ text(WT_SESSION *session, const char *uri)
 	 * handle will do it for us, but I'd like to see the flush to disk and
 	 * the close succeed, it's better to fail early when loading files.
 	 */
-	if ((tret = cursor->close(cursor, NULL)) != 0) {
+	if ((tret = cursor->close(cursor)) != 0) {
 		tret = util_err(tret, "%s: cursor.close", uri);
 		if (ret == 0)
 			ret = tret;

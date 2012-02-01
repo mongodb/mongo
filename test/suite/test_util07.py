@@ -59,7 +59,7 @@ class test_util07(wttest.WiredTigerTestCase, suite_subprocess):
         Close the connection if already open.
         """
         if self.conn != None:
-            self.conn.close(None)
+            self.conn.close()
             self.conn = None
 
     def open_conn(self):

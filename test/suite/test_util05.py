@@ -79,7 +79,7 @@ class test_util05(wttest.WiredTigerTestCase, suite_subprocess):
         # we close the connection to guarantee everything is
         # flushed and closed from the WT point of view.
         if self.conn != None:
-            self.conn.close(None)
+            self.conn.close()
             self.conn = None
         filename = tablename + ".wt"
 

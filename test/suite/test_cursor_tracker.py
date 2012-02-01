@@ -103,7 +103,7 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
     def table_dump(self, name):
         cursor = self.session.open_cursor('table:' + name, None, None)
         self._dumpcursor(cursor)
-        cursor.close(None)
+        cursor.close()
 
     def __init__(self, testname):
         wttest.WiredTigerTestCase.__init__(self, testname)
@@ -166,7 +166,7 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
                 cursor.insert()
             cursor.close()
             self.pr('reopening the connection')
-            self.conn.close(None)
+            self.conn.close()
             self.conn = self.setUpConnectionOpen(".")
             self.session = self.setUpSessionOpen(self.conn)
 

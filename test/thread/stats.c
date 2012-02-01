@@ -38,7 +38,7 @@ stats(void)
 
 	if (ret != WT_NOTFOUND)
 		die("cursor.next", ret);
-	if ((ret = cursor->close(cursor, NULL)) != 0)
+	if ((ret = cursor->close(cursor)) != 0)
 		die("cursor.close", ret);
 	
 	/* File statistics. */
@@ -52,7 +52,7 @@ stats(void)
 
 	if (ret != WT_NOTFOUND)
 		die("cursor.next", ret);
-	if ((ret = cursor->close(cursor, NULL)) != 0)
+	if ((ret = cursor->close(cursor)) != 0)
 		die("cursor.close", ret);
 
 	if ((ret = session->close(session, NULL)) != 0)

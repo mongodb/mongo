@@ -163,7 +163,7 @@ extern int __wt_btcur_search_near(WT_CURSOR_BTREE *cbt, int *exact);
 extern int __wt_btcur_insert(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_remove(WT_CURSOR_BTREE *cbt);
 extern int __wt_btcur_update(WT_CURSOR_BTREE *cbt);
-extern int __wt_btcur_close(WT_CURSOR_BTREE *cbt, const char *cfg[]);
+extern int __wt_btcur_close(WT_CURSOR_BTREE *cbt);
 extern int __wt_debug_addr( WT_SESSION_IMPL *session,
     uint32_t addr,
     uint32_t size,
@@ -467,7 +467,7 @@ extern int __wt_cursor_get_value(WT_CURSOR *cursor, ...);
 extern void __wt_cursor_set_key(WT_CURSOR *cursor, ...);
 extern void __wt_cursor_set_keyv(WT_CURSOR *cursor, uint32_t flags, va_list ap);
 extern void __wt_cursor_set_value(WT_CURSOR *cursor, ...);
-extern int __wt_cursor_close(WT_CURSOR *cursor, const char *config);
+extern int __wt_cursor_close(WT_CURSOR *cursor);
 extern int __wt_cursor_init(WT_CURSOR *cursor,
     const char *uri,
     int is_file,

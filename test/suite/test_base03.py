@@ -82,7 +82,7 @@ class test_base03(wttest.WiredTigerTestCase):
             i += 1
 
         self.assertEqual(i, self.nentries)
-        cursor.close(None)
+        cursor.close()
 
     def test_table_si(self):
         """
@@ -108,7 +108,7 @@ class test_base03(wttest.WiredTigerTestCase):
         self.pr("i = " + str(i))
         self.pr("self.... = " + str(self.nentries))
         self.assertEqual(i, self.nentries)
-        cursor.close(None)
+        cursor.close()
 
     def test_table_is(self):
         """
@@ -132,7 +132,7 @@ class test_base03(wttest.WiredTigerTestCase):
             i += 1
 
         self.assertEqual(i, self.nentries)
-        cursor.close(None)
+        cursor.close()
 
     def test_table_ii(self):
         """
@@ -158,7 +158,7 @@ class test_base03(wttest.WiredTigerTestCase):
             i += 1
 
         self.assertEqual(i, self.nentries)
-        cursor.close(None)
+        cursor.close()
 
 
 if __name__ == '__main__':

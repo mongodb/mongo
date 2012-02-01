@@ -200,7 +200,7 @@ class test_cursor04(wttest.WiredTigerTestCase):
         cursor.set_key(self.genkey(10))
         self.expect_either(cursor, 8, 11)
 
-        cursor.close(None)
+        cursor.close()
 
 if __name__ == '__main__':
     wttest.run()

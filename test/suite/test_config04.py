@@ -70,7 +70,7 @@ class test_config04(wttest.WiredTigerTestCase):
             self.assertEqual(value, ('value' + str(i)))
             i += 1
         self.assertEqual(i, self.nentries)
-        cursor.close(None)
+        cursor.close()
 
     def common_test(self, configextra):
         """

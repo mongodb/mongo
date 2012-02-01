@@ -137,7 +137,7 @@ schema(WT_SESSION *session, const char *uri)
 	else
 		ret = schema_file(cursor, uri);
 
-	if ((tret = cursor->close(cursor, NULL)) != 0 && ret == 0)
+	if ((tret = cursor->close(cursor)) != 0 && ret == 0)
 		ret = tret;
 
 	return (ret);

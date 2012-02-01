@@ -217,7 +217,7 @@ cursor_ops(WT_SESSION *session)
 	}
 
 	/*! [Close the cursor] */
-	ret = cursor->close(cursor, NULL);
+	ret = cursor->close(cursor);
 	/*! [Close the cursor] */
 
 	return (ret);

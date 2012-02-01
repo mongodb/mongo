@@ -80,7 +80,7 @@ class test_cursor02(TestCursorTracker):
         self.cur_check_forward(cursor, 2)
 
         #self.cur_dump_here(cursor, 'after second next: ')
-        cursor.close(None)
+        cursor.close()
 
     def test_insert_and_remove(self):
         """
@@ -108,7 +108,7 @@ class test_cursor02(TestCursorTracker):
         self.cur_check_forward(cursor, -1)
         self.cur_last(cursor)
         self.cur_check_backward(cursor, -1)
-        cursor.close(None)
+        cursor.close()
 
     def test_iterate_empty(self):
         """
@@ -121,7 +121,7 @@ class test_cursor02(TestCursorTracker):
         self.cur_last(cursor, wiredtiger.WT_NOTFOUND)
         self.cur_check_backward(cursor, -1)
         self.cur_check_forward(cursor, -1)
-        cursor.close(None)
+        cursor.close()
 
     def test_iterate_one_preexisting(self):
         """
@@ -134,7 +134,7 @@ class test_cursor02(TestCursorTracker):
         self.cur_last(cursor)
         self.cur_check_backward(cursor, -1)
         self.cur_check_forward(cursor, -1)
-        cursor.close(None)
+        cursor.close()
 
     def test_iterate_one_added(self):
         """
@@ -149,7 +149,7 @@ class test_cursor02(TestCursorTracker):
         self.cur_last(cursor)
         self.cur_check_backward(cursor, -1)
         self.cur_check_forward(cursor, -1)
-        cursor.close(None)
+        cursor.close()
 
 
 if __name__ == '__main__':

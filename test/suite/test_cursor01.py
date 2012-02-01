@@ -148,7 +148,7 @@ class test_cursor01(wttest.WiredTigerTestCase):
 
         self.assertEqual(nextret, wiredtiger.WT_NOTFOUND)
         self.assertEqual(i, self.nentries)
-        cursor.close(None)
+        cursor.close()
 
     def test_backward_iter(self):
         """
@@ -200,7 +200,7 @@ class test_cursor01(wttest.WiredTigerTestCase):
 
         self.assertEqual(prevret, wiredtiger.WT_NOTFOUND)
         self.assertEqual(i, -1)
-        cursor.close(None)
+        cursor.close()
 
 if __name__ == '__main__':
     wttest.run()

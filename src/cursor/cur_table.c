@@ -397,7 +397,7 @@ err:	API_END(session);
  *	WT_CURSOR->close method for the table cursor type.
  */
 static int
-__curtable_close(WT_CURSOR *cursor, const char *config)
+__curtable_close(WT_CURSOR *cursor)
 {
 	WT_CURSOR_TABLE *ctable;
 	WT_CURSOR **cp;
@@ -405,13 +405,12 @@ __curtable_close(WT_CURSOR *cursor, const char *config)
 	int i, ret;
 
 	ctable = (WT_CURSOR_TABLE *)cursor;
-	CURSOR_API_CALL_CONF(cursor, session, close, NULL, config, cfg);
-	WT_UNUSED(cfg);
+	CURSOR_API_CALL(cursor, session, close, NULL);
 
 	for (i = 0, cp = (ctable)->cg_cursors;
 	    i < WT_COLGROUPS(ctable->table); i++, cp++)
 		if (*cp != NULL) {
-			WT_TRET((*cp)->close(*cp, config));
+			WT_TRET((*cp)->close(*cp));
 			*cp = NULL;
 		}
 
@@ -419,7 +418,7 @@ __curtable_close(WT_CURSOR *cursor, const char *config)
 		for (i = 0, cp = (ctable)->idx_cursors;
 		    i < ctable->table->nindices; i++, cp++)
 			if (*cp != NULL) {
-				WT_TRET((*cp)->close(*cp, config));
+				WT_TRET((*cp)->close(*cp));
 				*cp = NULL;
 			}
 
@@ -429,7 +428,7 @@ __curtable_close(WT_CURSOR *cursor, const char *config)
 	__wt_free(session, ctable->idx_cursors);
 	/* The URI is owned by the table. */
 	cursor->uri = NULL;
-	WT_TRET(__wt_cursor_close(cursor, config));
+	WT_TRET(__wt_cursor_close(cursor));
 	API_END(session);
 
 	return (ret);
@@ -634,7 +633,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	*cursorp = cursor;
 
 	if (0) {
-err:		(void)__curtable_close(cursor, NULL);
+err:		(void)__curtable_close(cursor);
 	}
 
 	return (ret);

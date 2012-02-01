@@ -77,7 +77,7 @@ class test_priv01(wttest.WiredTigerTestCase):
             self.assertEqual(value, ('value' + str(i)))
             i += 1
         self.assertEqual(i, self.nentries)
-        cursor.close(None)
+        cursor.close()
 
     def checkfiles(self, dirname):
         self.assertTrue(os.path.exists(dirname + os.sep + self.table_name1 + ".wt"))

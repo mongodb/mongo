@@ -146,7 +146,7 @@ int main(void)
 	cursor->set_value(cursor, "Lorelei", "Sevii Islands", "098-765-4321");
 	ret = cursor->insert(cursor);
 
-	ret = cursor->close(cursor, NULL);
+	ret = cursor->close(cursor);
 
 	/*
 	 * First query: a call arrives.  In SQL:
@@ -170,7 +170,7 @@ int main(void)
 		ret = cursor->get_value(cursor, &cust.id, &cust.name);
 		printf("Got customer record for %s\n", cust.name);
 	}
-	ret = cursor->close(cursor, NULL);
+	ret = cursor->close(cursor);
 
 	/*
 	 * Next query: get the recent order history.  In SQL:

@@ -86,7 +86,7 @@ class test_index01(wttest.WiredTigerTestCase):
         self.pr('search')
         self.assertEqual(cursor.search(), expected)
         self.pr('closing cursor')
-        cursor.close(None)
+        cursor.close()
 
     def insert(self, *cols):
         self.pr('insert')
@@ -94,7 +94,7 @@ class test_index01(wttest.WiredTigerTestCase):
         cursor.set_key(*cols[:2]);
         cursor.set_value(*cols[2:])
         self.assertEqual(cursor.insert(), 0)
-        cursor.close(None)
+        cursor.close()
 
     def insert_overwrite(self, *cols):
         self.pr('insert')
@@ -102,7 +102,7 @@ class test_index01(wttest.WiredTigerTestCase):
         cursor.set_key(*cols[:2]);
         cursor.set_value(*cols[2:])
         self.assertEqual(cursor.insert(), 0)
-        cursor.close(None)
+        cursor.close()
 
     def update(self, *cols):
         self.pr('update')
@@ -110,7 +110,7 @@ class test_index01(wttest.WiredTigerTestCase):
         cursor.set_key(*cols[:2]);
         cursor.set_value(*cols[2:])
         self.assertEqual(cursor.update(), 0)
-        cursor.close(None)
+        cursor.close()
 
     def update_nonexistent(self, *cols):
         self.pr('update')
@@ -118,14 +118,14 @@ class test_index01(wttest.WiredTigerTestCase):
         cursor.set_key(*cols[:2]);
         cursor.set_value(*cols[2:])
         self.assertEqual(cursor.update(), WT_NOTFOUND)
-        cursor.close(None)
+        cursor.close()
 
     def remove(self, name, ID):
         self.pr('remove')
         cursor = self.cursor()
         cursor.set_key(name, ID);
         self.assertEqual(cursor.remove(), 0)
-        cursor.close(None)
+        cursor.close()
 
     def test_empty(self):
         '''Create a table, look for a nonexistent key'''
