@@ -15,6 +15,9 @@ of a row are stored together, WiredTiger supports column-oriented
 storage, where one or more columns can be stored individually, allowing
 more efficient access and storage.
 
+To download the WiredTiger source code, visit our
+<a href="https://github.com/wiredtiger/wiredtiger"><b>Project page</b></a>.
+
 For more information about using WiredTiger, see:
 
 - @subpage install\n

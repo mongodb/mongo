@@ -15,6 +15,7 @@ Additional Notes:
 - @subpage home
 - @subpage security
 - @subpage file_formats
+- @subpage compression
 - @subpage name_space
 - @subpage signals
 - @subpage tuning
