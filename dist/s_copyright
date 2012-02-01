@@ -89,6 +89,9 @@ l="`cd .. && \
 
 l="$l `sed -e 's/^add	\(.*\)/\1/p' -e d s_copyright.list`"
 for i in $l `sed -e '/^[a-z]/! d' filelist`; do
+	# It's okay if the file doesn't exist: we may be running in a release
+	# tree with some files removed.
+	test -f $i || continue
 	check $i
 done
 
