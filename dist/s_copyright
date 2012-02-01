@@ -5,13 +5,14 @@
 # are the source files, that is, *.[ch] and *.in.  Check automatically to be
 # sure the copyright is up-to-date.
 
-l1=__wt.1$$
-l2=__wt.2$$
-trap 'rm -f l1 l2; exit 0' 0 1 2 3 13 15
+c1=__wt.1$$
+c2=__wt.2$$
+c3=__wt.3$$
+trap 'rm -f c1 c2 c3; exit 0' 0 1 2 3 13 15
 
 year=`date +%Y`
 
-cat > $l1 <<ENDOFTEXT
+cat > $c1 <<ENDOFTEXT
 /*-
  * Copyright (c) 2008-$year WiredTiger, Inc.
  *	All rights reserved.
@@ -20,11 +21,20 @@ cat > $l1 <<ENDOFTEXT
 ENDOFTEXT
 
 # Copyright for files WiredTiger does not own.
-cat > $l2 <<ENDOFTEXT
+cat > $c2 <<ENDOFTEXT
 /*-
  * Copyright (c) 2008-$year WiredTiger, Inc.
  *
  * This is free and unencumbered software released into the public domain.
+ENDOFTEXT
+
+cat > $c3 <<ENDOFTEXT
+#!/usr/bin/env python
+#
+# Copyright (c) 2008-$year WiredTiger, Inc.
+#	All rights reserved.
+#
+# See the file LICENSE for redistribution information.
 ENDOFTEXT
 
 check()
@@ -35,18 +45,26 @@ check()
 	fi
 
 	# Check for a correct copyright header.
-	if `sed -e 5q ../$1 | diff - $l1 > /dev/null` ; then
+	if `sed -e 5q ../$1 | diff - $c1 > /dev/null` ; then
 		return;
 	fi
-	if `sed -e 4q ../$1 | diff - $l2 > /dev/null` ; then
+	if `sed -e 4q ../$1 | diff - $c2 > /dev/null` ; then
+		return;
+	fi
+	if `sed -e 6q ../$1 | diff - $c3 > /dev/null` ; then
 		return;
 	fi
 
 	echo "$1: copyright information is incorrect"
 }
 
-l="`cd .. && echo examples/c/*.c \
-    src/include/*.[hi] src/include/*.in src/utilities/*.c`"
+l="`cd .. && \
+    echo examples/c/*.c \
+	 src/include/*.[hi] \
+	 src/include/*.in \
+	 src/utilities/*.c \
+	 test/suite/*.py`"
+
 l="$l `sed -e 's/^add	\(.*\)/\1/p' -e d s_copyright.list`"
 for i in $l `sed -e '/^[a-z]/! d' filelist`; do
 	check $i

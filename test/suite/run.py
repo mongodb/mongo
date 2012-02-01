@@ -1,9 +1,9 @@
 #!/usr/bin/env python
 #
-# See the file LICENSE for redistribution information.
-#
 # Copyright (c) 2008-2012 WiredTiger, Inc.
 #	All rights reserved.
+#
+# See the file LICENSE for redistribution information.
 #
 # WiredTigerTestCase
 #	parent class for all test cases

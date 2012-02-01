@@ -1,14 +1,13 @@
 #!/usr/bin/env python
 #
-# See the file LICENSE for redistribution information.
-#
-# Copyright (c) 2008-2011 WiredTiger, Inc.
+# Copyright (c) 2008-2012 WiredTiger, Inc.
 #	All rights reserved.
+#
+# See the file LICENSE for redistribution information.
 #
 # suite_random.py
 # 	A quick and predictable pseudo random number generator.
 #
-
 
 class suite_random:
     """
