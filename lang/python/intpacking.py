@@ -1,12 +1,17 @@
 #!/usr/bin/env python
+#
+# Copyright (c) 2008-2012 WiredTiger, Inc.
+#	All rights reserved.
+#
+# See the file LICENSE for redistribution information.
 
 import math, struct
 
 # Variable-length integer packing
 # need: up to 64 bits, both signed and unsigned
 #
-# First attempt: try hard for small values (up to ~2 bytes), after that, just
-# encode the length in the first byte.
+# Try hard for small values (up to ~2 bytes), after that, just encode the
+# length in the first byte.
 #
 #  First byte | Next |                        |
 #  byte       | bytes| Min Value              | Max Value

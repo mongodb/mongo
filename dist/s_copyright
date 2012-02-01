@@ -8,7 +8,8 @@
 c1=__wt.1$$
 c2=__wt.2$$
 c3=__wt.3$$
-trap 'rm -f c1 c2 c3; exit 0' 0 1 2 3 13 15
+c4=__wt.4$$
+trap 'rm -f $c1 $c2 $c3 $c4; exit 0' 0 1 2 3 13 15
 
 year=`date +%Y`
 
@@ -31,7 +32,16 @@ ENDOFTEXT
 cat > $c3 <<ENDOFTEXT
 #!
 #
-# Copyright (c) 2008-2012 WiredTiger, Inc.
+# Copyright (c) 2008-$year WiredTiger, Inc.
+#	All rights reserved.
+#
+# See the file LICENSE for redistribution information.
+ENDOFTEXT
+
+cat > $c4 <<ENDOFTEXT
+#!
+#
+# Copyright (c) 2008-$year WiredTiger, Inc.
 #
 # This is free and unencumbered software released into the public domain.
 ENDOFTEXT
@@ -51,7 +61,11 @@ check()
 		return;
 	fi
 	if `sed -e 's/#!.*/#!/' \
-		-e 5q ../$1 | diff - $c3 > /dev/null` ; then
+		-e 6q ../$1 | diff - $c3 > /dev/null` ; then
+		return;
+	fi
+	if `sed -e 's/#!.*/#!/' \
+		-e 5q ../$1 | diff - $c4 > /dev/null` ; then
 		return;
 	fi
 
@@ -63,8 +77,8 @@ l="`cd .. && \
 	 COPYING \
 	 examples/c/*.c \
 	 examples/python/*.py \
-	 lang/python/tests/*.py \
-	 src/bdb/bdb.cpp \
+	 lang/python/*pack*.py \
+	 src/bdb/*.[ch]* \
 	 src/include/*.[hi] \
 	 src/include/*.in \
 	 src/utilities/*.[ch] \

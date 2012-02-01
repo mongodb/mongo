@@ -1,3 +1,10 @@
+#!/usr/bin/env python
+#
+# Copyright (c) 2008-2012 WiredTiger, Inc.
+#	All rights reserved.
+#
+# See the file LICENSE for redistribution information.
+#
 # WiredTiger variable-length packing and unpacking functions
 
 from intpacking import pack_int, unpack_int
