@@ -1,0 +1,23 @@
+WiredTiger 0.10.0: (January 13, 2012)
+
+This is version 0.10.0 of WiredTiger.
+
+See the file LICENSE for redistribution information.
+
+To view release and installation documentation, open
+
+	http://source.wiredtiger.com/
+
+in your web browser.
+
+To build in a POSIX environment (for example, Linux or other UNIX-like
+system), run:
+
+	./configure && make
+
+To install in the standard POSIX environment locations, enter:
+
+	make install
+
+For more information on build and installation options, see the
+WiredTiger documentation.
