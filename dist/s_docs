@@ -53,7 +53,11 @@ EOF
 QUIET=YES
 INPUT+=../lang/python/wiredtiger.py
 EOF
-) | doxygen -)
+) | doxygen -
+
+	# Fix up bad links doxygen generates in navtree.js
+	sed -i~ 's,/\.html,/,' navtree.js && rm -f navtree.js~
+	)
 }
 
 filter="|sed '/PROJECT_NUMBER/s,=.*,=\"Version $WIREDTIGER_VERSION\",'"
