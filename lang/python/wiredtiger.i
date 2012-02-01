@@ -1,12 +1,6 @@
-/*
- * See the file LICENSE for redistribution information.
- *
- * Copyright (c) 2011-2012 WiredTiger, Inc.
- *	All rights reserved.
- *
+/*-
  * wiredtiger.i
  * 	The SWIG interface file defining the wiredtiger python API.
- *
  */
 
 %define DOCSTRING

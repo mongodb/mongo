@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-
+#
 # WiredTiger Python RPC server for testing and tutorials.
-# Copyright (c) 2011 WiredTiger, Inc.  All rights reserved.
+#
 
 import sys
 

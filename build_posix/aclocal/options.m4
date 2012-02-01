@@ -1,6 +1,3 @@
-# Copyright (c) 2008-2011 WiredTiger, Inc.
-#	All rights reserved.
-
 # Optional configuration.
 AC_DEFUN([AM_OPTIONS], [
 

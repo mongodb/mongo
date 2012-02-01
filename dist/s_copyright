@@ -29,7 +29,7 @@ cat > $c2 <<ENDOFTEXT
 ENDOFTEXT
 
 cat > $c3 <<ENDOFTEXT
-#!/usr/bin/env python
+#!
 #
 # Copyright (c) 2008-2012 WiredTiger, Inc.
 #
@@ -50,7 +50,8 @@ check()
 	if `sed -e 4q ../$1 | diff - $c2 > /dev/null` ; then
 		return;
 	fi
-	if `sed -e 5q ../$1 | diff - $c3 > /dev/null` ; then
+	if `sed -e 's/#!.*/#!/' \
+		-e 5q ../$1 | diff - $c3 > /dev/null` ; then
 		return;
 	fi
 
@@ -58,11 +59,17 @@ check()
 }
 
 l="`cd .. && \
-    echo examples/c/*.c \
+    echo LICENSE \
+	 COPYING \
+	 examples/c/*.c \
+	 examples/python/*.py \
 	 src/include/*.[hi] \
 	 src/include/*.in \
-	 src/utilities/*.c \
-	 test/suite/*.py`"
+	 src/utilities/*.[ch] \
+	 test/format/*.[ch] \
+	 test/salvage/*.[ch] \
+	 test/suite/*.py \
+	 test/thread/*.[ch]`"
 
 l="$l `sed -e 's/^add	\(.*\)/\1/p' -e d s_copyright.list`"
 for i in $l `sed -e '/^[a-z]/! d' filelist`; do
@@ -70,10 +77,20 @@ for i in $l `sed -e '/^[a-z]/! d' filelist`; do
 done
 
 # The documentation copyright appears in two files.
-s="Copyright (c) 2008-$year WiredTiger, Inc.  All rights reserved."
-f="../docs/build-javadoc.sh ../docs/style/footer.html"
+s="Copyright (c) 2008-$year WiredTiger, Inc."
+f="docs/build-javadoc.sh docs/style/footer.html"
 for i in $f; do
-	if `grep "$s" $i > /dev/null`; then
+	if `grep "$s" ../$i > /dev/null`; then
+		continue;
+	fi
+	echo "$i: copyright information is incorrect"
+done
+
+# The wt utility has a copyright it displays.
+s="printf.*Copyright (c) 2008-$year WiredTiger, Inc."
+f="src/utilities/util_cpyright.c"
+for i in $f; do
+	if `grep "$s" ../$i > /dev/null`; then
 		continue;
 	fi
 	echo "$i: copyright information is incorrect"

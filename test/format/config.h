@@ -1,3 +1,10 @@
+/*-
+ * Copyright (c) 2008-2012 WiredTiger, Inc.
+ *	All rights reserved.
+ *
+ * See the file LICENSE for redistribution information.
+ */
+
 /*
  * Configuration for the wts program is an array of string-based paramters.
  * This is the structure used to declare them.

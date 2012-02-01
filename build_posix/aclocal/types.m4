@@ -1,6 +1,3 @@
-# Copyright (c) 2008-2011 WiredTiger, Inc.
-#	All rights reserved.
-
 # AM_SIGNED_TYPES, AM_UNSIGNED_TYPES --
 #	Search standard type names for something of the same size and
 #	signed-ness as the type we want to declare.

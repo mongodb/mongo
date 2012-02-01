@@ -10,7 +10,7 @@
 void
 util_copyright(void)
 {
-	printf("%s\n", "Copyright (c) 2008-2011 WiredTiger, Inc.");
+	printf("%s\n", "Copyright (c) 2008-2012 WiredTiger, Inc.");
 	printf("%s\n\n", "All rights reserved.");
 
 	printf("%s\n\n",

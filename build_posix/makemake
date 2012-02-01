@@ -1,8 +1,5 @@
 #! /bin/sh
 #
-# Copyright (c) 2008-2011 WiredTiger, Inc.
-#	All rights reserved.
-
 # Build Makefile.am
 
 # Process Make.base, insert subdirs that exist from Make.subdirs
