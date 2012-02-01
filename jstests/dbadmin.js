@@ -18,8 +18,11 @@ t.save( { x : 1 } );
 res = db._adminCommand( "listDatabases" );
 assert( res.databases && res.databases.length > 0 , "listDatabases 1 " + tojson(res) );
 
+now = new Date();
 x = db._adminCommand( "ismaster" );
 assert( x.ismaster , "ismaster failed: " + tojson( x ) )
+assert( x.localTime, "ismaster didn't include time: " + tojson(x))
+assert.lt( x.localTime - now, 5, "isMaster.localTime" )
 
 before = db.runCommand( "serverStatus" )
 sleep( 5000 )
