@@ -63,6 +63,8 @@ l="`cd .. && \
 	 COPYING \
 	 examples/c/*.c \
 	 examples/python/*.py \
+	 lang/python/tests/*.py \
+	 src/bdb/bdb.cpp \
 	 src/include/*.[hi] \
 	 src/include/*.in \
 	 src/utilities/*.[ch] \
