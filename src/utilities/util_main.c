@@ -227,7 +227,15 @@ util_name(const char *s, const char *type, u_int flags)
 	char *name;
 
 	copy = 0;
-	if (strncmp(s, "file:", strlen("file:")) == 0) {
+	if (WT_PREFIX_MATCH(s, "colgroup:")) {
+		if (!(flags & UTIL_COLGROUP_OK)) {
+			fprintf(stderr,
+			    "%s: %s: \"colgroup\" type not supported\n",
+			    progname, command);
+			return (NULL);
+		}
+		copy = 1;
+	} else if (WT_PREFIX_MATCH(s, "file:")) {
 		if (!(flags & UTIL_FILE_OK)) {
 			fprintf(stderr,
 			    "%s: %s: \"file\" type not supported\n",
@@ -235,7 +243,15 @@ util_name(const char *s, const char *type, u_int flags)
 			return (NULL);
 		}
 		copy = 1;
-	} else if (strncmp(s, "table:", strlen("table:")) == 0) {
+	} else if (WT_PREFIX_MATCH(s, "index:")) {
+		if (!(flags & UTIL_INDEX_OK)) {
+			fprintf(stderr,
+			    "%s: %s: \"index\" type not supported\n",
+			    progname, command);
+			return (NULL);
+		}
+		copy = 1;
+	} else if (WT_PREFIX_MATCH(s, "table:")) {
 		if (!(flags & UTIL_TABLE_OK)) {
 			fprintf(stderr,
 			    "%s: %s: \"table\" type not supported\n",

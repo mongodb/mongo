@@ -31,8 +31,7 @@ util_read(WT_SESSION *session, int argc, char *argv[])
 	/* The remaining arguments are a uri followed by a list of keys. */
 	if (argc < 2)
 		return (usage());
-	if ((uri =
-	    util_name(*argv, "table", UTIL_FILE_OK | UTIL_TABLE_OK)) == NULL)
+	if ((uri = util_name(*argv, "table", UTIL_ALL_OK)) == NULL)
 		return (1);
 
 	/* Open the object. */

@@ -7,8 +7,14 @@
 
 #include <wt_internal.h>
 
-#define	UTIL_FILE_OK	0x01			/* file: prefix OK */
-#define	UTIL_TABLE_OK	0x02			/* table: prefix OK */
+#define	UTIL_COLGROUP_OK	0x01		/* colgroup: prefix OK */
+#define	UTIL_FILE_OK		0x02		/* file: prefix OK */
+#define	UTIL_INDEX_OK		0x04		/* index: prefix OK */
+#define	UTIL_TABLE_OK		0x08		/* table: prefix OK */
+
+/* all known prefixes OK */
+#define	UTIL_ALL_OK							\
+	(UTIL_COLGROUP_OK | UTIL_FILE_OK | UTIL_INDEX_OK | UTIL_TABLE_OK)
 
 typedef struct {
 	void   *mem;				/* Managed memory chunk */

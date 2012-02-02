@@ -33,8 +33,7 @@ util_create(WT_SESSION *session, int argc, char *argv[])
 	if (argc != 1)
 		return (usage());
 
-	if ((uri =
-	    util_name(*argv, "table", UTIL_FILE_OK | UTIL_TABLE_OK)) == NULL)
+	if ((uri = util_name(*argv, "table", UTIL_ALL_OK)) == NULL)
 		return (1);
 
 	if ((ret = session->create(session, uri, config)) != 0)
