@@ -226,7 +226,7 @@ __wt_schema_rename(WT_SESSION_IMPL *session,
 	} else
 		return (__wt_unknown_object_type(session, uri));
 
-	WT_TRET(__wt_schema_table_track_off(session, ret == 0 ? 0 : 1));
+	WT_TRET(__wt_schema_table_track_off(session, ret != 0));
 
 	/* If we didn't find a schema file entry, map that error to ENOENT. */
 	return (ret == WT_NOTFOUND ? ENOENT : ret);

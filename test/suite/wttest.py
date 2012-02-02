@@ -170,7 +170,7 @@ class WiredTigerTestCase(unittest.TestCase):
         myname = self.simpleName()
         msg = '**** ' + myname + ' HAS A KNOWN FAILURE: ' + name + ' ****'
         self.printOnce(msg)
-        self.skipTest('KNOWN FAILURE: ' + name)
+        #self.skipTest('KNOWN FAILURE: ' + name)
 
     def KNOWN_LIMITATION(self, name):
         myname = self.simpleName()

@@ -338,20 +338,31 @@ __wt_schema_create(
     WT_SESSION_IMPL *session, const char *name, const char *config)
 {
 
-	if (WT_PREFIX_MATCH(name, "colgroup:"))
-		return (__create_colgroup(session, name, config));
-	if (WT_PREFIX_MATCH(name, "file:")) {
-		/* Disallow objects in the WiredTiger name space. */
-		WT_RET(__wt_schema_name_check(session, name));
-		return (__wt_create_file(session, name, name, config));
-	}
-	if (WT_PREFIX_MATCH(name, "index:"))
-		return (__create_index(session, name, config));
-	if (WT_PREFIX_MATCH(name, "table:")) {
-		/* Disallow objects in the WiredTiger name space. */
-		WT_RET(__wt_schema_name_check(session, name));
-		return (__create_table(session, name, config));
-	}
+	int ret;
 
-	return (__wt_unknown_object_type(session, name));
+	ret = 0;
+
+	/* Disallow objects in the WiredTiger name space. */
+	WT_RET(__wt_schema_name_check(session, name));
+
+	/*
+	 * We track rename operations, if we fail in the middle, we want to
+	 * back it all out.
+	 */
+	WT_RET(__wt_schema_table_track_on(session));
+
+	if (WT_PREFIX_MATCH(name, "colgroup:"))
+		ret = __create_colgroup(session, name, config);
+	else if (WT_PREFIX_MATCH(name, "file:"))
+		ret = __wt_create_file(session, name, name, config);
+	else if (WT_PREFIX_MATCH(name, "index:"))
+		ret = __create_index(session, name, config);
+	else if (WT_PREFIX_MATCH(name, "table:"))
+		ret = __create_table(session, name, config);
+	else
+		ret = __wt_unknown_object_type(session, name);
+
+	WT_TRET(__wt_schema_table_track_off(session, ret != 0));
+
+	return (ret);
 }
