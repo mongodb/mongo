@@ -30,7 +30,7 @@ cat > $c2 <<ENDOFTEXT
 ENDOFTEXT
 
 cat > $c3 <<ENDOFTEXT
-#!
+#
 #
 # Copyright (c) 2008-$year WiredTiger, Inc.
 #	All rights reserved.
@@ -39,7 +39,7 @@ cat > $c3 <<ENDOFTEXT
 ENDOFTEXT
 
 cat > $c4 <<ENDOFTEXT
-#!
+#
 #
 # Copyright (c) 2008-$year WiredTiger, Inc.
 #
@@ -64,11 +64,11 @@ check()
 	if `sed -e 4q ../$1 | diff - $c2 > /dev/null` ; then
 		return;
 	fi
-	if `sed -e 's/#!.*/#!/' \
+	if `sed -e 's/^#!.*/#/' \
 		-e 6q ../$1 | diff - $c3 > /dev/null` ; then
 		return;
 	fi
-	if `sed -e 's/#!.*/#!/' \
+	if `sed -e 's/^#!.*/#/' \
 		-e 5q ../$1 | diff - $c4 > /dev/null` ; then
 		return;
 	fi
@@ -93,7 +93,6 @@ l="`cd .. && \
 	 test/suite/*.py \
 	 test/thread/*.[ch]`"
 
-l="$l `sed -e 's/^add	\(.*\)/\1/p' -e d s_copyright.list`"
 for i in $l `sed -e '/^[a-z]/! d' filelist`; do
 	check $i
 done

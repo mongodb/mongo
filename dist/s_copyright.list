@@ -1,4 +1,5 @@
-add	LICENSE
+skip	lang/python/setup.py
+skip	lang/python/wiredtiger.py
 skip	src/api/api_strerror.c
 skip	src/config/config_def.c
 skip	src/include/extern.h
