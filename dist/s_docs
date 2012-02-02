@@ -66,9 +66,6 @@ EOF
 filter="|sed '/PROJECT_NUMBER/s,=.*,=\"Version $WIREDTIGER_VERSION\",'"
 while :
 	do case "$1" in
-	-b)     # Include the Berkeley DB cross-reference
-		filter="$filter| sed 's,src/bdb-map.dox,,'"
-		shift;;
 	-p)     # Generate PDFs
 		filter="$filter| sed '/GENERATE_LATEX/s,=.*,=YES,'"
 		shift;;

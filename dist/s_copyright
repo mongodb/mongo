@@ -78,7 +78,6 @@ l="`cd .. && \
 	 examples/c/*.c \
 	 examples/python/*.py \
 	 lang/python/*pack*.py \
-	 src/bdb/*.[ch]* \
 	 src/include/*.[hi] \
 	 src/include/*.in \
 	 src/utilities/*.[ch] \
