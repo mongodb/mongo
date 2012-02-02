@@ -424,4 +424,3 @@ err:		if (table != NULL)
 	__wt_free(session, tablename);
 	return (ret);
 }
-

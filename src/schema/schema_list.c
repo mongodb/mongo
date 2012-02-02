@@ -143,4 +143,3 @@ __wt_schema_detach_tree(WT_SESSION_IMPL *session, WT_BTREE *btree)
 			}
 	}
 }
-
