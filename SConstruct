@@ -241,15 +241,17 @@ windows = False
 freebsd = False
 openbsd = False
 solaris = False
+force32 = has_option( "force32" ) 
 force64 = has_option( "force64" )
-if not force64 and os.getcwd().endswith( "mongo-64" ):
+if not force64 and not force32 and os.getcwd().endswith( "mongo-64" ):
     force64 = True
     print( "*** assuming you want a 64-bit build b/c of directory *** " )
 msarch = None
-if force64:
+if force32:
+    msarch = "x86"
+elif force64:
     msarch = "amd64"
 
-force32 = has_option( "force32" ) 
 release = has_option( "release" )
 static = has_option( "static" )
 
@@ -268,6 +270,7 @@ justClientLib = (COMMAND_LINE_TARGETS == ['mongoclient'])
 
 env = Environment( BUILD_DIR=variantDir,
                    MSVS_ARCH=msarch ,
+                   TARGET_ARCH=msarch ,
                    tools=["default", "gch", "jsheader", "mergelib" ],
                    PYSYSPLATFORM=os.sys.platform,
 
