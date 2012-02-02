@@ -158,7 +158,10 @@ class mongod(object):
                 argv = ["python", "buildscripts/cleanbb.py", '--nokill', dir_name]
             else:
                 argv = ["python", "buildscripts/cleanbb.py", dir_name]
-            call(argv)
+            returncode = call(argv)
+            if returncode != 0:
+                raise Exception('could not run %s (return code %d)' % (' '.join(argv), returncode))
+
         utils.ensureDir(dir_name)
         argv = [mongod_executable, "--port", str(self.port), "--dbpath", dir_name]
         if self.kwargs.get('small_oplog'):
