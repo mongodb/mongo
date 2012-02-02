@@ -83,6 +83,7 @@ l="`cd .. && \
 	 examples/python/*.py \
 	 lang/java/src/com/wiredtiger/*.java \
 	 lang/java/src/com/wiredtiger/*/*.java \
+	 lang/python/*.py \
 	 lang/python/*pack*.py \
 	 src/include/*.[hi] \
 	 src/include/*.in \
