@@ -213,20 +213,20 @@ __wt_session_close_any_open_btree(WT_SESSION_IMPL *session, const char *name)
 	WT_BTREE_SESSION *btree_session;
 	int ret;
 
-	switch (ret = __wt_session_find_btree(session,
-	    name, strlen(name), NULL, WT_BTREE_EXCLUSIVE, &btree_session)) {
-	case 0:
+	if ((ret = __wt_session_find_btree(session, name, strlen(name),
+	    NULL, WT_BTREE_EXCLUSIVE, &btree_session)) == 0) {
 		/*
 		 * XXX
 		 * We have an exclusive lock, which means there are no cursors
 		 * open but some other thread may have the handle cached.
+		 * Fixing this will mean adding additional synchronization to
+		 * the cursor open path.
 		 */
 		WT_ASSERT(session, btree_session->btree->refcnt == 1);
-		return (__wt_session_remove_btree(session, btree_session));
-	case WT_NOTFOUND:
-		return (0);
-	default:
-		return (ret);
-	}
-	/* NOTREACHED */
+		__wt_schema_detach_tree(session, btree_session->btree);
+		ret = __wt_session_remove_btree(session, btree_session);
+	} else if (ret == WT_NOTFOUND)
+		ret = 0;
+
+	return (ret);
 }

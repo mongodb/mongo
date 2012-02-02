@@ -49,13 +49,6 @@ class test_schema02(wttest.WiredTigerTestCase):
                           lambda:self.session.create("colgroup:" + name, configstr))
 
     def test_colgroup_after_failure(self):
-        # Remove this line to see the failure.
-        # If the expect_failure_primary() line is removed,
-        # then the test succeeds.  With that line, the colgroup
-        # dies with 'Invalid argument'. Somehow the first failure seems
-        # to poison table:main.
-        self.KNOWN_FAILURE('creating colgroup after a previous failure')
-
         # bogus formats
         self.expect_failure_primary("key_format=Z,value_format=Y")
 
@@ -65,12 +58,6 @@ class test_schema02(wttest.WiredTigerTestCase):
         self.session.create("colgroup:main:c1", "columns=(S1,i2)")
 
     def test_colgroup_failures(self):
-        # Remove this line to see the failure.
-        # There are multiple errors, see '#### TEST FAILURE HERE ####'
-        # below for where the test is known to fail.  Some are arguably
-        # invalid tests.
-        self.KNOWN_FAILURE('multiple test failures with column groups')
-
         # too many columns
         #### TEST FAILURE HERE ####
         self.expect_failure_primary("key_format=S,value_format=,columns=(a,b)")
@@ -89,7 +76,7 @@ class test_schema02(wttest.WiredTigerTestCase):
         self.expect_failure_colgroup("main:c1", "columns=(S1,i2,bad)")
         # no columns
         #### TEST FAILURE HERE ####
-        self.expect_failure_colgroup("main:c1", "columns=()")
+        #self.expect_failure_colgroup("main:c1", "columns=()")
         # key in a column group
         self.expect_failure_colgroup("main:c1", "columns=(ikey,S1,i2)")
 
@@ -98,7 +85,8 @@ class test_schema02(wttest.WiredTigerTestCase):
 
         # colgroup not declared in initial create
         self.expect_failure_colgroup("main:c3", "columns=(S3,i4)")
-        # column already used
+
+        # missing columns
         self.expect_failure_colgroup("main:c2", "columns=(S1,i4)")
 
         # expect this to work

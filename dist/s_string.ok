@@ -186,6 +186,7 @@ cip
 cksum
 clr
 cmp
+colcheck
 colgroup
 colgroups
 comparator

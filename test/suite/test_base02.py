@@ -59,10 +59,10 @@ class test_base02(wttest.WiredTigerTestCase):
             'leaf_page_max=256k,leaf_item_max=256,internal_page_max=8k,internal_item_max=128',
             ]
         conf_col = [
-            'columns=(first,second, third)',
-            'columns=(first)',
+            'columns=(first,second)',
+            'columns=(first,   second,,,)',
             'key_format="5S", value_format="Su", columns=(first,second, third)',
-            ',,columns=(first=S,second="4u", third=S),,',
+            ',,columns=(first=S,second="4u"),,',
             ]
         conf_encoding = [
             None,
@@ -80,7 +80,7 @@ class test_base02(wttest.WiredTigerTestCase):
         Spot check various combinations of configuration options, using JSON format.
         """
         conf_jsonstr = [
-            json.dumps({'columns' : ('one', 'two', 'three')}),
+            json.dumps({'columns' : ('key', 'value')}),
             json.dumps({
                     "key_format" : "r",
                     "value_format" : "5sHQ",

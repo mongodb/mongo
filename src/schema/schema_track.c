@@ -15,7 +15,7 @@
 typedef struct __wt_schema_track {
 	enum {
 		WT_ST_EMPTY=0,		/* Unused slot */
-		WT_ST_FS_RENAME=1,	/* Rename a file */
+		WT_ST_FILEOP=1,		/* File operation */
 		WT_ST_REMOVE=2,		/* Remove a schema table entry */
 		WT_ST_SET=3		/* Reset a schema table entry */
 	} op;
@@ -101,15 +101,34 @@ __wt_schema_table_track_off(WT_SESSION_IMPL *session, int unroll)
 			switch (trk->op) {
 			case WT_ST_EMPTY:	/* Unused slot */
 				break;
-			case WT_ST_FS_RENAME:	/* Rename trk.b to trk.a */
-				if ((tret = __wt_rename(
+			case WT_ST_FILEOP:	/* File operation */
+				/*
+				 * For renames, both a and b are set.
+				 * For creates, a is NULL.
+				 * For removes, b is NULL.
+				 */
+				if (trk->a != NULL && trk->b != NULL &&
+				    (tret = __wt_rename(
 				    session, trk->b, trk->a)) != 0) {
-					__wt_err(session, ret,
+					__wt_err(session, tret,
 					    "schema table unroll rename "
 					    "%s to %s",
 					    trk->b, trk->a);
 					WT_TRET(tret);
+				} else if (trk->a == NULL &&
+				    ((tret = __wt_session_close_any_open_btree(
+				    session, trk->b)) != 0 || (tret =
+				    __wt_remove(session, trk->b)) != 0)) {
+					__wt_err(session, tret,
+					    "schema table unroll create %s",
+					    trk->b);
+					WT_TRET(tret);
 				}
+				/*
+				 * We can't undo removes yet: that would imply
+				 * some kind of temporary rename and remove in
+				 * roll forward.
+				 */
 				break;
 			case WT_ST_REMOVE:	/* Remove trk.a */
 				if ((tret = __wt_schema_table_remove(
@@ -192,15 +211,17 @@ __wt_schema_table_track_update(WT_SESSION_IMPL *session, const char *key)
  *	Track a filesystem rename operation.
  */
 int
-__wt_schema_table_track_fs_rename(
+__wt_schema_table_track_fileop(
     WT_SESSION_IMPL *session, const char *oldname, const char *newname)
 {
 	WT_SCHEMA_TRACK *trk;
 
 	WT_RET(__schema_table_track_next(session, &trk));
 
-	trk->op = WT_ST_FS_RENAME;
-	WT_RET(__wt_strdup(session, oldname, &trk->a));
-	WT_RET(__wt_strdup(session, newname, &trk->b));
+	trk->op = WT_ST_FILEOP;
+	if (oldname != NULL)
+		WT_RET(__wt_strdup(session, oldname, &trk->a));
+	if (newname != NULL)
+		WT_RET(__wt_strdup(session, newname, &trk->b));
 	return (0);
 }

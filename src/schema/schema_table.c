@@ -18,7 +18,7 @@ __open_schema_table(WT_SESSION_IMPL *session)
 {
 	const char *cfg[] = API_CONF_DEFAULTS(file, meta, schematab_config);
 	const char *schemaconf;
-	int ret;
+	int ret, tracking;
 
 	ret = 0;
 
@@ -26,11 +26,21 @@ __open_schema_table(WT_SESSION_IMPL *session)
 		return (0);
 
 	WT_RET(__wt_config_collapse(session, cfg, &schemaconf));
+
+	/*
+	 * Turn off tracking when creating the schema file: this is always done
+	 * before any other schema operations and there is no going back.
+	 */
+	tracking = (session->schema_track != NULL);
+	if (tracking)
+		__wt_schema_table_track_off(session, 0);
 	WT_ERR(__wt_create_file(session,
 	    "file:" WT_SCHEMA_FILENAME,
 	    "file:" WT_SCHEMA_FILENAME, schemaconf));
 	session->schematab = session->btree;
 err:	__wt_free(session, schemaconf);
+	if (tracking)
+		WT_TRET(__wt_schema_table_track_on(session));
 	return (ret);
 }
 

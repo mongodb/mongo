@@ -67,6 +67,49 @@ cgcols:			WT_RET(__wt_config_getones(session,
 }
 
 /*
+ * __wt_schema_colcheck --
+ *	Check that a list of columns matches a (key,value) format pair.
+ */
+int
+__wt_schema_colcheck(WT_SESSION_IMPL *session,
+    const char *key_format, const char *value_format, WT_CONFIG_ITEM *colconf,
+    int *kcolsp, int *vcolsp)
+{
+	WT_CONFIG conf;
+	WT_CONFIG_ITEM k, v;
+	WT_PACK pack;
+	WT_PACK_VALUE pv;
+	int kcols, ncols, ret, vcols;
+
+	WT_RET(__pack_init(session, &pack, key_format));
+	for (kcols = 0; (ret = __pack_next(&pack, &pv)) == 0; kcols++)
+		;
+	WT_RET_TEST(ret != WT_NOTFOUND, ret);
+
+	WT_RET(__pack_init(session, &pack, value_format));
+	for (vcols = 0; (ret = __pack_next(&pack, &pv)) == 0; vcols++)
+		;
+	WT_RET_TEST(ret != WT_NOTFOUND, ret);
+
+	/* Walk through the named columns. */
+	WT_RET(__wt_config_subinit(session, &conf, colconf));
+	for (ncols = 0; (ret = __wt_config_next(&conf, &k, &v)) == 0; ncols++)
+		;
+
+	if (ncols != 0 && ncols != kcols + vcols)
+		WT_RET_MSG(session, EINVAL, "Number of columns in '%.*s' "
+		    "does not match key format '%s' plus value format '%s'",
+		    (int)colconf->len, colconf->str, key_format, value_format);
+
+	if (kcolsp != NULL)
+		*kcolsp = kcols;
+	if (vcolsp != NULL)
+		*vcolsp = vcols;
+
+	return (0);
+}
+
+/*
  * __wt_table_check --
  *	Make sure all columns appear in a column group.
  */
@@ -75,20 +118,11 @@ __wt_table_check(WT_SESSION_IMPL *session, WT_TABLE *table)
 {
 	WT_CONFIG conf;
 	WT_CONFIG_ITEM k, v;
-	WT_PACK pack;
-	WT_PACK_VALUE pv;
 	int cg, col, i, ret;
 	char coltype;
 
 	if (table->is_simple)
 		return (0);
-
-	/* Count the number of key columns. */
-	WT_RET(__pack_init(session, &pack, table->key_format));
-	table->nkey_columns = 0;
-	while ((ret = __pack_next(&pack, &pv)) == 0)
-		++table->nkey_columns;
-	WT_ASSERT(session, ret == WT_NOTFOUND);
 
 	/* Walk through the columns. */
 	WT_RET(__wt_config_subinit(session, &conf, &table->colconf));

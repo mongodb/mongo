@@ -124,7 +124,7 @@ class tabconfig:
 
         # KNOWN LIMITATION: Indices should not include primary keys
         # Remove this statement when the limitation is fixed.
-        startcol = self.nkeys
+        #startcol = self.nkeys
         # END KNOWN LIMITATION.
 
         rand = suite_random.suite_random(ncolumns, totalindices)
@@ -340,7 +340,6 @@ class test_schema03(wttest.WiredTigerTestCase):
         # we'll work around these later, in a loop where we don't want to print.
         self.KNOWN_LIMITATION('Indices created after data population will have no entries')
         self.KNOWN_LIMITATION('Column groups created after indices confuses things')
-        self.KNOWN_LIMITATION('Indices should not include primary keys')
 
         # Column groups are created in two different times.
         # We call these two batches 'createsets'.

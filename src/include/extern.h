@@ -598,7 +598,6 @@ extern int __wt_create_file(WT_SESSION_IMPL *session,
 extern int __wt_schema_create( WT_SESSION_IMPL *session,
     const char *name,
     const char *config);
-extern int __wt_drop_file(WT_SESSION_IMPL *session, const char *uri, int force);
 extern int __wt_schema_drop(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[]);
@@ -611,8 +610,11 @@ extern int __wt_schema_get_table(WT_SESSION_IMPL *session,
     const char *name,
     size_t namelen,
     WT_TABLE **tablep);
+extern void __wt_schema_destroy_table(WT_SESSION_IMPL *session,
+    WT_TABLE *table);
 extern int __wt_schema_remove_table( WT_SESSION_IMPL *session, WT_TABLE *table);
 extern int __wt_schema_close_tables(WT_SESSION_IMPL *session);
+extern void __wt_schema_detach_tree(WT_SESSION_IMPL *session, WT_BTREE *btree);
 extern int __wt_schema_colgroup_name(WT_SESSION_IMPL *session,
     WT_TABLE *table,
     const char *cgname,
@@ -633,6 +635,12 @@ extern int __wt_schema_open_table(WT_SESSION_IMPL *session,
     const char *name,
     size_t namelen,
     WT_TABLE **tablep);
+extern int __wt_schema_colcheck(WT_SESSION_IMPL *session,
+    const char *key_format,
+    const char *value_format,
+    WT_CONFIG_ITEM *colconf,
+    int *kcolsp,
+    int *vcolsp);
 extern int __wt_table_check(WT_SESSION_IMPL *session, WT_TABLE *table);
 extern int __wt_struct_plan(WT_SESSION_IMPL *session,
     WT_TABLE *table,
@@ -693,7 +701,7 @@ extern int __wt_schema_table_track_insert(WT_SESSION_IMPL *session,
     const char *key);
 extern int __wt_schema_table_track_update(WT_SESSION_IMPL *session,
     const char *key);
-extern int __wt_schema_table_track_fs_rename( WT_SESSION_IMPL *session,
+extern int __wt_schema_table_track_fileop( WT_SESSION_IMPL *session,
     const char *oldname,
     const char *newname);
 extern int __wt_schema_truncate( WT_SESSION_IMPL *session,

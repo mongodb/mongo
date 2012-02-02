@@ -38,6 +38,7 @@ __wt_create_file(WT_SESSION_IMPL *session,
 		return (ret);
 
 	WT_RET(__wt_btree_create(session, filename));
+	WT_ERR(__wt_schema_table_track_fileop(session, NULL, filename));
 
 	/* Insert WiredTiger version numbers into the schema file. */
 	WT_ERR(__wt_scr_alloc(session, 0, &val));
@@ -73,12 +74,8 @@ __wt_create_file(WT_SESSION_IMPL *session,
 	treeconf = NULL;
 	WT_ERR(__wt_session_add_btree(session, NULL));
 
-	if (0) {
-		/* If something goes wrong, throw away anything we created. */
-err:		(void)__wt_drop_file(session, fileuri, 1);
-	}
-
-	__wt_scr_free(&key);
+	/* If something goes wrong, throw away anything we created. */
+err:	__wt_scr_free(&key);
 	__wt_scr_free(&val);
 	__wt_free(session, treeconf);
 	return (ret);
@@ -115,7 +112,7 @@ __create_colgroup(
 
 	if ((ret =
 	    __wt_schema_get_table(session, tablename, tlen, &table)) != 0)
-		WT_RET_MSG(session, ret,
+		WT_RET_MSG(session, (ret == WT_NOTFOUND) ? ENOENT : ret,
 		    "Can't create '%s' for non-existent table %.*s",
 		    name, (int)tlen, tablename);
 
@@ -168,8 +165,8 @@ __create_colgroup(
 	WT_ERR(__wt_buf_fmt(session, &uribuf, "file:%s", filename));
 	fileuri = uribuf.data;
 
-	WT_ERR(__wt_create_file(session, name, fileuri, fileconf));
 	WT_ERR(__wt_schema_table_insert(session, name, cgconf));
+	WT_ERR(__wt_create_file(session, name, fileuri, fileconf));
 
 	WT_ERR(__wt_schema_open_colgroups(session, table));
 
@@ -292,6 +289,7 @@ __create_table(WT_SESSION_IMPL *session, const char *name, const char *config)
 	int ncolgroups, ret;
 
 	cgname = NULL;
+	table = NULL;
 	tableconf = NULL;
 
 	tablename = name;
@@ -321,6 +319,10 @@ __create_table(WT_SESSION_IMPL *session, const char *name, const char *config)
 	WT_RET(__wt_config_collapse(session, cfg, &tableconf));
 	WT_ERR(__wt_schema_table_insert(session, name, tableconf));
 
+	/* Attempt to open the table now to catch any errors. */
+	WT_ERR(__wt_schema_get_table(
+	    session, tablename, strlen(tablename), &table));
+
 	if (ncolgroups == 0) {
 		cgsize = strlen("colgroup:") + strlen(tablename) + 1;
 		WT_ERR(__wt_calloc_def(session, cgsize, &cgname));
@@ -328,7 +330,11 @@ __create_table(WT_SESSION_IMPL *session, const char *name, const char *config)
 		WT_ERR(__create_colgroup(session, cgname, config));
 	}
 
-err:	__wt_free(session, cgname);
+	if (0) {
+err:		if (table != NULL)
+			(void)__wt_schema_remove_table(session, table);
+	}
+	__wt_free(session, cgname);
 	__wt_free(session, tableconf);
 	return (ret);
 }
@@ -338,20 +344,29 @@ __wt_schema_create(
     WT_SESSION_IMPL *session, const char *name, const char *config)
 {
 
-	if (WT_PREFIX_MATCH(name, "colgroup:"))
-		return (__create_colgroup(session, name, config));
-	if (WT_PREFIX_MATCH(name, "file:")) {
-		/* Disallow objects in the WiredTiger name space. */
-		WT_RET(__wt_schema_name_check(session, name));
-		return (__wt_create_file(session, name, name, config));
-	}
-	if (WT_PREFIX_MATCH(name, "index:"))
-		return (__create_index(session, name, config));
-	if (WT_PREFIX_MATCH(name, "table:")) {
-		/* Disallow objects in the WiredTiger name space. */
-		WT_RET(__wt_schema_name_check(session, name));
-		return (__create_table(session, name, config));
-	}
+	int ret;
 
-	return (__wt_unknown_object_type(session, name));
+	/* Disallow objects in the WiredTiger name space. */
+	WT_RET(__wt_schema_name_check(session, name));
+
+	/*
+	 * We track rename operations, if we fail in the middle, we want to
+	 * back it all out.
+	 */
+	WT_RET(__wt_schema_table_track_on(session));
+
+	if (WT_PREFIX_MATCH(name, "colgroup:"))
+		ret = __create_colgroup(session, name, config);
+	else if (WT_PREFIX_MATCH(name, "file:"))
+		ret = __wt_create_file(session, name, name, config);
+	else if (WT_PREFIX_MATCH(name, "index:"))
+		ret = __create_index(session, name, config);
+	else if (WT_PREFIX_MATCH(name, "table:"))
+		ret = __create_table(session, name, config);
+	else
+		ret = __wt_unknown_object_type(session, name);
+
+	WT_TRET(__wt_schema_table_track_off(session, ret != 0));
+
+	return (ret);
 }

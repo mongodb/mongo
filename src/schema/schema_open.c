@@ -354,11 +354,13 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 	char *tablename;
 	int ret;
 
+	cursor = NULL;
+	table = NULL;
+
 	WT_CLEAR(buf);
 	WT_RET(__wt_buf_fmt(session, &buf, "table:%.*s", (int)namelen, name));
 	tablename = __wt_buf_steal(session, &buf, NULL);
 
-	cursor = NULL;
 	WT_ERR(__wt_schema_table_cursor(session, NULL, &cursor));
 	cursor->set_key(cursor, tablename);
 	WT_ERR(cursor->search(cursor));
@@ -391,6 +393,12 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 	if (ret != WT_NOTFOUND)
 		goto err;
 
+	/* Check that the columns match the key and value formats. */
+	if (!table->is_simple)
+		WT_ERR(__wt_schema_colcheck(session,
+		    table->key_format, table->value_format, &table->colconf,
+		    &table->nkey_columns, NULL));
+
 	WT_ERR(__wt_config_getones(session, table->config,
 	    "colgroups", &table->cgconf));
 
@@ -407,8 +415,13 @@ __wt_schema_open_table(WT_SESSION_IMPL *session,
 
 	*tablep = table;
 
-err:	if (cursor != NULL)
+	if (0) {
+err:		if (table != NULL)
+			__wt_schema_destroy_table(session, table);
+	}
+	if (cursor != NULL)
 		WT_TRET(cursor->close(cursor));
 	__wt_free(session, tablename);
 	return (ret);
 }
+
