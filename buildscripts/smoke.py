@@ -592,7 +592,7 @@ def main():
                       "currently only used for 'client' (%default)")
     parser.add_option('--mongod', dest='mongod_executable', default=os.path.join(mongo_repo, 'mongod'),
                       help='Path to mongod to run (%default)')
-    parser.add_option('--port', dest='mongod_port', default="32000",
+    parser.add_option('--port', dest='mongod_port', default="27999",
                       help='Port the mongod will bind to (%default)')
     parser.add_option('--mongo', dest='shell_executable', default=os.path.join(mongo_repo, 'mongo'),
                       help='Path to mongo, for .js test files (%default)')
