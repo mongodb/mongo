@@ -17,6 +17,7 @@ IEC
 LDFLAGS
 LIBS
 LSB
+MERCHANTABILITY
 MVCC's
 RepMgr
 Rrx
@@ -38,6 +39,7 @@ autoconf
 bdb
 bdbmap
 bindir
+bitstring
 bool
 boolean
 br
@@ -106,6 +108,7 @@ fput
 freelist
 gcc
 gdbm
+getopt
 getter
 gid
 hb
@@ -141,6 +144,7 @@ lookup
 lrtf
 lsn
 lt
+mailto
 malloc'd
 marshalled
 marshalling
@@ -229,12 +233,14 @@ serializable
 spinlock
 spinlocks
 sql
+src
 startsync
 strerror
 struct
 structs
 subdatabases
 subpage
+superset
 tablename
 tcl
 td
@@ -263,6 +269,7 @@ uri
 useconds
 usr
 utf
+util
 valign
 valuefmt
 vec
