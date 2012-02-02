@@ -1,3 +1,10 @@
+#
+#
+# Copyright (c) 2008-2012 WiredTiger, Inc.
+#	All rights reserved.
+#
+# See the file LICENSE for redistribution information.
+#
 # WiredTiger API implementation
 
 '''
