@@ -53,6 +53,10 @@ check()
 		return;
 	fi
 
+	# It's okay if the file doesn't exist: we may be running in a release
+	# tree with some files removed.
+	test -f ../$i || return
+
 	# Check for a correct copyright header.
 	if `sed -e 5q ../$1 | diff - $c1 > /dev/null` ; then
 		return;
@@ -77,6 +81,8 @@ l="`cd .. && \
 	 COPYING \
 	 examples/c/*.c \
 	 examples/python/*.py \
+	 lang/java/src/com/wiredtiger/*.java \
+	 lang/java/src/com/wiredtiger/*/*.java \
 	 lang/python/*pack*.py \
 	 src/include/*.[hi] \
 	 src/include/*.in \
@@ -88,9 +94,6 @@ l="`cd .. && \
 
 l="$l `sed -e 's/^add	\(.*\)/\1/p' -e d s_copyright.list`"
 for i in $l `sed -e '/^[a-z]/! d' filelist`; do
-	# It's okay if the file doesn't exist: we may be running in a release
-	# tree with some files removed.
-	test -f $i || continue
 	check $i
 done
 
