@@ -167,6 +167,21 @@ namespace mongo {
 
                     // TODO: The logic here could be refactored, but keeping to the original codepath for safety for now
                     ChunkManagerPtr manager = db->getChunkManagerIfExists( ns );
+                    
+                    if ( ! manager ) {
+                        // I don't trust the above code
+                        // for this to be valid, we would have to have gotten a writeback because
+                        // a collection was sharded
+                        // and then for the collection to be dropped between the time the write hit mongod
+                        // and the time it gets here
+                        // possible - but I think there are more likely cases
+                        // and in that case a little slowness isn't a horrible issue
+                        manager = db->getChunkManagerIfExists( ns , true , true );
+                        if ( manager ) {
+                            warning() << "after reload, getChunkManagerIfExists works, this is inefficient, but should be" << endl;
+                        }
+                        
+                    }
 
                     LOG(1) << "connectionId: " << cid << " writebackId: " << wid << " needVersion : " << needVersion.toString()
                            << " mine : " << ( manager ? manager->getVersion().toString() : "(unknown)" )
