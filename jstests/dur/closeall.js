@@ -32,6 +32,17 @@ function f() {
 
     print("closeall.js run test");
 
+    print("wait for initial sync to finish") // SERVER-4852
+    db1.foo.insert({});
+    err = db1.getLastErrorObj(2);
+    printjson(err)
+    assert.isnull(err.err);
+    db1.foo.remove({});
+    err = db1.getLastErrorObj(2);
+    printjson(err)
+    assert.isnull(err.err);
+    print("initial sync done")
+
     for( var i = 0; i < N; i++ ) { 
             db1.foo.insert({x:1}); // this does wait for a return code so we will get some parallelism
             if( i % 7 == 0 )
