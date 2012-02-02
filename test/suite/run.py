@@ -40,11 +40,14 @@ import json
 suitedir = sys.path[0]
 wt_disttop = os.path.dirname(os.path.dirname(suitedir))
 wt_builddir = os.path.join(wt_disttop, 'build_posix')
+wt_3rdpartydir = os.path.join(wt_disttop, 'test', '3rdparty')
 
 # Cannot import wiredtiger and supporting utils until we set up paths
 sys.path.append(os.path.join(wt_builddir, 'lang', 'python'))
 sys.path.append(os.path.join(wt_disttop, 'lang', 'python'))
-sys.path.append(os.path.join(wt_disttop, 'test', 'suiteutil'))
+sys.path.append(os.path.join(wt_3rdpartydir, 'discover-0.4.0'))
+sys.path.append(os.path.join(wt_3rdpartydir, 'testtools-0.9.12'))
+sys.path.append(os.path.join(wt_3rdpartydir, 'testscenarios-0.2', 'lib'))
 
 import wttest
 from testscenarios.scenarios import generate_scenarios

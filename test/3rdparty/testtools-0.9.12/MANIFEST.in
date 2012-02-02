@@ -1,0 +1,12 @@
+include LICENSE
+include HACKING
+include Makefile
+include MANIFEST.in
+include MANUAL
+include NEWS
+include README
+include .bzrignore
+graft doc
+graft doc/_static
+graft doc/_templates
+prune doc/_build
