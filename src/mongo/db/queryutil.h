@@ -86,8 +86,6 @@ namespace mongo {
 
         /** @return true iff this range expresses a single equality interval. */
         bool equality() const;
-        /** @return true if all the intervals for this range are equalities */
-        bool inQuery() const;
         /**
          * @return true iff this range includes all BSONElements
          * (the range is the universal set of BSONElements).
