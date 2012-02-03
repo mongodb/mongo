@@ -96,9 +96,9 @@ __wt_bm_open(WT_SESSION_IMPL *session,
 	 * a limit of WT_BM_MAX_ADDR_COOKIE, but at 255B, WT_BM_MAX_ADDR_COOKIE
 	 * is too large for a Btree with 512B internal pages.  The default block
 	 * manager packs an off_t and 2 uint32_t's into its cookie, so there's
-	 * no problem there, but if/when we create a block manager extension, we
-	 * need to have a way to consider the maximum cookie size of the block
-	 * manager when evaluating the minimum Btree internal node page size.
+	 * no problem now, but when we create a block manager extension API,
+	 * we need some way to consider the block manager's maximum cookie size
+	 * vs. the minimum Btree internal node size.
 	 */
 	return (__wt_block_open(
 	    session, filename, config, cfg, salvage, &session->btree->block));
