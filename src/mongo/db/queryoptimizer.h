@@ -500,13 +500,6 @@ namespace mongo {
     /** Provides a cursor interface for certain limited uses of a MultiPlanScanner. */
     class MultiCursor : public Cursor {
     public:
-        class CursorOp : public QueryOp {
-        public:
-            CursorOp() {}
-            CursorOp( const QueryOp &other ) : QueryOp( other ) {}
-            virtual shared_ptr<Cursor> newCursor() const = 0;
-        };
-        /** takes ownership of 'op' */
         MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order );
         /**
          * Used
@@ -559,10 +552,10 @@ namespace mongo {
         /** just for testing */
         shared_ptr<Cursor> sub_c() const { return _c; }
     private:
-        class NoOp : public CursorOp {
+        class NoOp : public QueryOp {
         public:
             NoOp() {}
-            NoOp( const QueryOp &other ) : CursorOp( other ) {}
+            NoOp( const QueryOp &other ) : QueryOp( other ) {}
             virtual void _init() { setComplete(); }
             virtual void next() {}
             virtual bool mayRecordPlan() const { return false; }
@@ -571,7 +564,7 @@ namespace mongo {
             virtual long long nscanned() { assert( false ); return 0; }
         };
         void nextClause();
-        shared_ptr<CursorOp> _op;
+        shared_ptr<NoOp> _op;
         shared_ptr<Cursor> _c;
         auto_ptr<MultiPlanScanner> _mps;
         shared_ptr<CoveredIndexMatcher> _matcher;

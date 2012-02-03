@@ -1108,7 +1108,7 @@ doneCheckOrder:
         if ( _nscanned >= 0 && _c.get() ) {
             _nscanned += _c->nscanned();
         }
-        shared_ptr<CursorOp> best = _mps->runOpOnce( *_op );
+        shared_ptr<NoOp> best = _mps->runOpOnce( *_op );
         if ( ! best->complete() )
             throw MsgAssertionException( best->exception() );
         _c = best->newCursor();
