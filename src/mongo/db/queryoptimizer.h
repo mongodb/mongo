@@ -507,7 +507,7 @@ namespace mongo {
             virtual shared_ptr<Cursor> newCursor() const = 0;
         };
         /** takes ownership of 'op' */
-        MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order, shared_ptr<CursorOp> op = shared_ptr<CursorOp>(), bool mayYield = false );
+        MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order );
         /**
          * Used
          * 1. To handoff a query to a getMore()

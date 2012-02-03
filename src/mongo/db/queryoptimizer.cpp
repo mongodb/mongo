@@ -1079,14 +1079,10 @@ doneCheckOrder:
         return _currentQps->haveOrderedPlan();
     }
 
-    MultiCursor::MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order, shared_ptr<CursorOp> op, bool mayYield )
-    : _mps( new MultiPlanScanner( ns, pattern, order, BSONObj(), true, BSONObj(), BSONObj(), !op.get(), mayYield ) ), _nscanned() {
-        if ( op.get() ) {
-            _op = op;
-        }
-        else {
-            _op.reset( new NoOp() );
-        }
+    MultiCursor::MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order ) :
+    _op( new NoOp() ),
+    _mps( new MultiPlanScanner( ns, pattern, order, BSONObj(), true, BSONObj(), BSONObj(), true ) ),
+    _nscanned() {
         if ( _mps->mayRunMore() ) {
             nextClause();
             if ( !ok() ) {
