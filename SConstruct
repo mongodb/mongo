@@ -827,7 +827,7 @@ def smoke_python_name():
     for binary in binaries:
         try:
             # py-2.4 compatible replacement for shell backticks
-            output = subprocess.Popen([binary, '--version'], stdout=subprocess.PIPE).communicate()[0]
+            output = subprocess.Popen([binary, '-V'], stdout=subprocess.PIPE).communicate()[0]
             match = version.search(output)
             if match and float(match.group(1)) >= 2.5:
                 return binary
