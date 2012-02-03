@@ -111,4 +111,14 @@ def configureSystem( env , fileLists , options ):
     
     configureBasics( env , fileLists , options )
 
+    # Try to use pkg-config to get our cflags and libs
+    cflags = os.popen("pkg-config --cflags libjs").read().split()
+    libs = os.popen("pkg-config --libs libjs").read().split()
+    libs = filter(lambda x: x.startswith("-l"), libs)
+    libs = map(lambda x: x[2:], libs)
+    if cflags or libs:
+        env.Append( CXXFLAGS=cflags )
+        env.Append( LIBS=libs )
+        return
+
     env.Append( LIBS=[ "js" ] )
