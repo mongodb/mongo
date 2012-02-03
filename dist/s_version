@@ -20,7 +20,7 @@ dnl WiredTiger product version for AC_INIT.  Maintained by dist/s_version
 ${WIREDTIGER_VERSION_MAJOR}.${WIREDTIGER_VERSION_MINOR}.${WIREDTIGER_VERSION_PATCH}
 EOF
 
-echo "Building $m4dir/version.m4"
+echo "Building $m4dir/version-set.m4"
 cat <<EOF > $m4dir/version-set.m4
 dnl build by dist/s_version
 
