@@ -1,1 +1,11 @@
-# TODO: add relevant configuration stuff here.
+# enable auth.
+AUTH_ENABLED=0
+
+# path to auth key for replica sets and sharding authentification
+AUTH_KEY_PATH="/etc/mongod/keyfile"
+
+# enables replica set
+REPLICA_SET_ENABLED=0
+
+# make sure this name is the same on all nodes in repl-set
+REPLICA_SET_SETNAME="mongo-replica"

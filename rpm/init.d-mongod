@@ -15,7 +15,7 @@
 
 # NOTE: if you change any OPTIONS here, you get what you pay for:
 # this script assumes all options are in the config file.
-CONFIGFILE="/etc/mongod.conf"
+CONFIGFILE="/etc/mongod/mongod.conf"
 OPTIONS=" -f $CONFIGFILE"
 SYSCONFIG="/etc/sysconfig/mongod"
 
@@ -30,6 +30,18 @@ MONGO_GROUP=mongod
 
 . "$SYSCONFIG" || true
 
+# Add auth flag if authentification is enabled
+
+if [ $AUTH_ENABLED -eq 1 ]; then
+	OPTIONS="$OPTIONS --auth"
+fi
+
+# If replica set is enabled, add config. params to daemon
+
+if [ $REPLICA_SET_ENABLED -eq 1 ]; then
+	OPTIONS="$OPTIONS --replSet $REPLICA_SET_SETNAME --rest --keyFile $AUTH_KEY_PATH"
+fi
+
 start()
 {
   echo -n $"Starting mongod: "
@@ -42,7 +54,7 @@ start()
 stop()
 {
   echo -n $"Stopping mongod: "
-  killproc -p "$DBPATH"/mongod.lock -d 300 /usr/bin/mongod
+  killproc -p "$DBPATH"/mongod.lock -t30 -TERM /usr/bin/mongod
   RETVAL=$?
   echo
   [ $RETVAL -eq 0 ] && rm -f /var/lock/subsys/mongod
