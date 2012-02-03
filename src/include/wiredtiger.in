@@ -1,0 +1,1644 @@
+/*-
+ * Copyright (c) 2008-2012 WiredTiger, Inc.
+ *	All rights reserved.
+ *
+ * See the file LICENSE for redistribution information.
+ */
+
+#ifndef	__WIREDTIGER_H_
+#define	__WIREDTIGER_H_
+
+#if defined(__cplusplus)
+extern "C" {
+#endif
+
+/*******************************************
+ * Version information
+ *******************************************/
+#define	WIREDTIGER_VERSION_MAJOR	@VERSION_MAJOR@
+#define	WIREDTIGER_VERSION_MINOR	@VERSION_MINOR@
+#define	WIREDTIGER_VERSION_PATCH	@VERSION_PATCH@
+#define	WIREDTIGER_VERSION_STRING	@VERSION_STRING@
+
+/*******************************************
+ * Required includes
+ *******************************************/
+@wiredtiger_includes_decl@
+
+/*******************************************
+ * Portable type names
+ *******************************************/
+@int8_decl@
+@u_int8_decl@
+@int16_decl@
+@u_int16_decl@
+@int32_decl@
+@u_int32_decl@
+@int64_decl@
+@u_int64_decl@
+
+@u_char_decl@
+@u_short_decl@
+@u_int_decl@
+@u_long_decl@
+@u_quad_decl@
+
+@uintmax_t_decl@
+@uintptr_t_decl@
+
+#if defined(DOXYGEN) || defined(SWIG)
+#define	__F(func) func
+#else
+#define	__F(func) (*func)
+#endif
+
+#ifdef SWIG
+%{
+#include <wiredtiger.h>
+%}
+#endif
+
+/*! @defgroup wt WiredTiger API
+ * The functions, handles and methods applications use to access and manage
+ * data with WiredTiger.
+ *
+ * @{
+ */
+
+/*******************************************
+ * Public forward structure declarations
+ *******************************************/
+struct __wt_collator;	    typedef struct __wt_collator WT_COLLATOR;
+struct __wt_compressor;	    typedef struct __wt_compressor WT_COMPRESSOR;
+struct __wt_connection;	    typedef struct __wt_connection WT_CONNECTION;
+struct __wt_cursor;	    typedef struct __wt_cursor WT_CURSOR;
+struct __wt_cursor_type;    typedef struct __wt_cursor_type WT_CURSOR_TYPE;
+struct __wt_event_handler;  typedef struct __wt_event_handler WT_EVENT_HANDLER;
+struct __wt_extension_api;  typedef struct __wt_extension_api WT_EXTENSION_API;
+struct __wt_extractor;	    typedef struct __wt_extractor WT_EXTRACTOR;
+struct __wt_item;	    typedef struct __wt_item WT_ITEM;
+struct __wt_session;	    typedef struct __wt_session WT_SESSION;
+
+/*!
+ * A raw item of data to be managed.  Data items have a pointer to the data and
+ * a length (limited to 4GB for items stored in tables).
+ */
+struct __wt_item {
+	/*!
+	 * The memory reference of the data item.
+	 *
+	 * For items returned by a WT_CURSOR, the pointer is only valid until
+	 * the next operation on that cursor.  Applications that need to keep
+	 * an item across multiple cursor operations must make a copy.
+	 */
+	const void *data;
+
+	/*!
+	 * The number of bytes in the data item.
+	 */
+	uint32_t size;
+
+#ifndef DOXYGEN
+#define	WT_ITEM_INUSE					0x00000001
+	/* This appears in the middle of the struct to avoid padding. */
+	/*! Object flags (internal use). */
+	uint32_t flags;
+
+	/*! Managed memory chunk (internal use). */
+	void *mem;
+	/*! Managed memory size (internal use). */
+	size_t memsize;
+#endif
+};
+
+/*!
+ * The maximum packed size of a 64-bit integer.  The ::wiredtiger_struct_pack
+ * function will pack single long integers into at most this many bytes.
+ */
+#define	WT_INTPACK64_MAXSIZE	((int)sizeof (int64_t) + 1)
+
+/*!
+ * The maximum packed size of a 32-bit integer.  The ::wiredtiger_struct_pack
+ * function will pack single integers into at most this many bytes.
+ */
+#define	WT_INTPACK32_MAXSIZE	((int)sizeof (int32_t) + 1)
+
+/*!
+ * A WT_CURSOR handle is the interface to a cursor.
+ *
+ * Cursors allow data to be searched, stepped through and updated: the
+ * so-called CRUD operations (create, read, update and delete).
+ *
+ * Raw data is represented by key/value pairs of WT_ITEM structures, but
+ * cursors can also provide access to fields within the key and value if the
+ * formats are described in the WT_SESSION::create method.
+ *
+ * A cursor can be positioned in a collection of data.  Cursors are opened in
+ * the context of a session (which may have an associated transaction), and can
+ * query and update records.  In the common case, a cursor is used to access
+ * records in a table.  However, cursors can be used on subsets of tables (such
+ * as a single column or a projection of multiple columns), as an interface to
+ * statistics, configuration data or application-specific data sources.  See
+ * WT_SESSION::open_cursor for more information.
+ *
+ * <b>Thread safety:</b> A WT_CURSOR handle cannot be shared between threads:
+ * it may only be used within the same thread as the encapsulating WT_SESSION.
+ */
+struct __wt_cursor {
+	WT_SESSION *session;	/*!< The session handle for this cursor. */
+
+	/*!
+	 * The name of the data source for the cursor, matches the \c uri
+	 * parameter to WT_SESSION::open_cursor used to open the cursor.
+	 */
+	const char *uri;
+
+	/*!
+	 * The format of the data packed into key items.  See @ref packing for
+	 * details.  If not set, a default value of "u" is assumed, and
+	 * applications must use WT_ITEM structures to manipulate untyped byte
+	 * arrays.
+	 */
+	const char *key_format;
+
+	/*!
+	 * The format of the data packed into value items.  See @ref packing
+	 * for details.  If not set, a default value of "u" is assumed, and
+	 * applications must use WT_ITEM structures to manipulate untyped byte
+	 * arrays.
+	 */
+	const char *value_format;
+
+	/*! @name Data access
+	 * @{
+	 */
+	/*! Get the key for the current record.
+	 *
+	 * @snippet ex_all.c Get the cursor's string key
+	 *
+	 * @snippet ex_all.c Get the cursor's record number key
+	 *
+	 * @param cursor the cursor handle
+	 * @errors
+	 */
+	int __F(get_key)(WT_CURSOR *cursor, ...);
+
+	/*! Get the value for the current record.
+	 *
+	 * @snippet ex_all.c Get the cursor's string value
+	 *
+	 * @snippet ex_all.c Get the cursor's raw value
+	 *
+	 * @param cursor the cursor handle
+	 * @errors
+	 */
+	int __F(get_value)(WT_CURSOR *cursor, ...);
+
+	/*! Set the key for the next operation.
+	 *
+	 * @snippet ex_all.c Set the cursor's string key
+	 *
+	 * @snippet ex_all.c Set the cursor's record number key
+	 *
+	 * @param cursor the cursor handle
+	 *
+	 * If an error occurs during this operation, a flag will be set in the
+	 * cursor, and the next operation to access the key will fail.  This
+	 * simplifies error handling in applications.
+	 */
+	void __F(set_key)(WT_CURSOR *cursor, ...);
+
+	/*! Set the value for the next operation.
+	 *
+	 * @snippet ex_all.c Set the cursor's string value
+	 *
+	 * @snippet ex_all.c Set the cursor's raw value
+	 *
+	 * @param cursor the cursor handle
+	 *
+	 * If an error occurs during this operation, a flag will be set in the
+	 * cursor, and the next operation to access the value will fail.  This
+	 * simplifies error handling in applications.
+	 */
+	void __F(set_value)(WT_CURSOR *cursor, ...);
+	/*! @} */
+
+	/*! @name Cursor positioning
+	 * @{
+	 */
+	/*! Test whether two cursors refer to the same item.  To be equal,
+	 * both cursors must have the same data source, have valid keys, and
+	 * the keys must be equal.
+	 *
+	 * @snippet ex_all.c Test cursor equality
+	 *
+	 * @param cursor the cursor handle
+	 * @param other another cursor handle
+	 * @returns true (non-zero) if both cursors reference the same item,
+	 * false (zero) otherwise
+	 */
+	int __F(equals)(WT_CURSOR *cursor, WT_CURSOR *other);
+
+	/*! Return the next record.
+	 *
+	 * @snippet ex_all.c Return the next record
+	 *
+	 * @param cursor the cursor handle
+	 * @errors
+	 */
+	int __F(next)(WT_CURSOR *cursor);
+
+	/*! Return the previous record.
+	 *
+	 * @snippet ex_all.c Return the previous record
+	 *
+	 * @param cursor the cursor handle
+	 * @errors
+	 */
+	int __F(prev)(WT_CURSOR *cursor);
+
+	/*! Reset the position of the cursor.  Any resources held by the cursor
+	 * are released, and the cursor position is no longer valid.  Subsequent
+	 * iteration with WT_CURSOR::next will move to the first record, or
+	 * with WT_CURSOR::prev will move to the last record.
+	 *
+	 * @snippet ex_all.c Reset the cursor
+	 *
+	 * @param cursor the cursor handle
+	 * @errors
+	 */
+	int __F(reset)(WT_CURSOR *cursor);
+
+	/*! Move to the record matching the key. The key must first be set.
+	 *
+	 * @snippet ex_all.c Search for an exact match
+	 *
+	 * @param cursor the cursor handle
+	 * @errors
+	 */
+	int __F(search)(WT_CURSOR *cursor);
+
+	/*! Move to the record matching the key if it exists, or a record that
+	 * would be adjacent.  Either the smallest record larger than the key
+	 * or the largest record smaller than the key (in other words, a
+	 * logically adjacent key).  The key must first be set.
+	 *
+	 * @snippet ex_all.c Search for an exact or adjacent match
+	 *
+	 * @snippet ex_all.c Forward scan greater than or equal
+	 *
+	 * @snippet ex_all.c Backward scan less than
+	 *
+	 * @param cursor the cursor handle
+	 * @param exactp the status of the search: 0 if an exact match is
+	 * found, < 0 if a smaller key is returned, > 0 if a larger key is
+	 * returned
+	 * @errors
+	 */
+	int __F(search_near)(WT_CURSOR *cursor, int *exactp);
+	/*! @} */
+
+	/*! @name Data modification
+	 * @{
+	 */
+	/*! Insert a record, and optionally overwrite an existing record.
+	 * If the cursor was not configured with "append" or "overwrite", both
+	 * the key and value must be set and the record must not already exist;
+	 * the record will be inserted.
+	 *
+	 * If the cursor was configured with "overwrite", both the key and value
+	 * must be set; if the record already exists, the key's value will be
+	 * updated, otherwise, the record will be inserted.
+	 *
+	 * In a cursor with record number keys was configured with "append",
+	 * the value must be set; a new record will be appended and the record
+	 * number set as the cursor key value.
+	 *
+	 * Inserting a new record after the current maximum record in a
+	 * fixed-length column-store implicitly creates skipped records as
+	 * records with a value of 0.
+	 *
+	 * @snippet ex_all.c Insert a new record
+	 *
+	 * @snippet ex_all.c Insert a new record or overwrite an existing record
+	 *
+	 * @snippet ex_all.c Insert a new record and assign a record number
+	 *
+	 * @param cursor the cursor handle
+	 * @errors
+	 */
+	int __F(insert)(WT_CURSOR *cursor);
+
+	/*! Update a record.  Both key and value must be set, the key must
+	 * exist, and the value of the key's record will be updated.
+	 *
+	 * @snippet ex_all.c Update an existing record
+	 *
+	 * @param cursor the cursor handle
+	 * @errors
+	 * In particular, if no record with the specified key exists,
+	 * ::WT_NOTFOUND is returned.
+	 */
+	int __F(update)(WT_CURSOR *cursor);
+
+	/*! Remove a record.  The key must be set, and the key's record will be
+	 * removed.
+	 *
+	 * Removing a record in a fixed-length column-store is identical to
+	 * setting the record's value to 0.
+	 *
+	 * @snippet ex_all.c Remove a record
+	 *
+	 * @param cursor the cursor handle
+	 * @errors
+	 * In particular, if no record with the specified key exists,
+	 * ::WT_NOTFOUND is returned.
+	 */
+	int __F(remove)(WT_CURSOR *cursor);
+	/*! @} */
+
+	/*! Close the cursor.
+	 *
+	 * This releases the resources associated with the cursor handle.
+	 * Cursors are closed implicitly by ending the enclosing transaction or
+	 * closing the session in which they were opened.
+	 *
+	 * @snippet ex_all.c Close the cursor
+	 *
+	 * @param cursor the cursor handle
+	 * @errors
+	 */
+	int __F(close)(WT_CURSOR *cursor);
+
+	/*
+	 * Protected fields, only to be used by cursor implementations.
+	 */
+
+#if !defined(SWIG) && !defined(DOXYGEN)
+	/*
+	 * !!!
+	 * Explicit representations of structures from queue.h.
+	 * TAILQ_ENTRY(wt_cursor) q;
+	 */
+	struct {
+		WT_CURSOR *tqe_next;
+		WT_CURSOR **tqe_prev;
+	} q;				/* Linked list of WT_CURSORs. */
+
+	uint64_t recno;
+	uint8_t raw_recno_buf[WT_INTPACK64_MAXSIZE];
+					/* Holds a recno in raw mode. */
+	WT_ITEM key, value;
+	int saved_err;			/* Saved error in set_{key,value}. */
+
+#define	WT_CURSTD_APPEND	0x0001
+#define	WT_CURSTD_DUMP_HEX	0x0002
+#define	WT_CURSTD_DUMP_PRINT	0x0004
+#define	WT_CURSTD_FILE		0x0008
+#define	WT_CURSTD_KEY_SET	0x0010
+#define	WT_CURSTD_OVERWRITE	0x0020
+#define	WT_CURSTD_PUBLIC	0x0040
+#define	WT_CURSTD_RAW		0x0080
+#define	WT_CURSTD_TABLE		0x0100
+#define	WT_CURSTD_VALUE_SET	0x0200
+	uint32_t flags;
+#endif
+};
+
+/*!
+ * All data operations are performed in the context of a WT_SESSION.  This
+ * encapsulates the thread and transactional context of the operation.
+ *
+ * <b>Thread safety:</b> A WT_SESSION handle cannot be shared between threads:
+ * it may only be used within a single thread.  Each thread accessing a
+ * database should open a separate WT_SESSION handle.
+ */
+struct __wt_session {
+	/*! The connection for this session. */
+	WT_CONNECTION *connection;
+
+	/*! Close the session handle.
+	 *
+	 * This will release the resources associated with the session handle,
+	 * including rolling any active transactions and closing any cursors
+	 * that remain open in the session.
+	 *
+	 * @snippet ex_all.c session close
+	 *
+	 * @param session the session handle
+	 * @configempty{session.close, see dist/api_data.py}
+	 * @errors
+	 */
+	int __F(close)(WT_SESSION *session, const char *config);
+
+	/*! @name Cursor handles
+	 * @{
+	 */
+
+	/*! Open a cursor.
+	 *
+	 * Open a new cursor on the specified data source.  Cursor handles
+	 * should be discarded by calling WT_CURSOR::close.
+	 *
+	 * Cursors are light-weight objects but may hold references to
+	 * heavier-weight objects.  Applications should usually not cache
+	 * cursors as a performance optimization, instead, a new cursor
+	 * should be opened for new groups of operations.
+	 *
+	 * Cursors are opened in the context of the current transaction.  The
+	 * cursor must be closed before the transaction can end.  If
+	 * WT_SESSION::commit_transaction or WT_SESSION::rollback_transaction
+	 * are called with cursors open in the transaction, the cursor handles
+	 * will be closed implicitly and must not be accessed again.
+	 *
+	 * An existing cursor can be duplicated by passing it as the \c to_dup
+	 * parameter, otherwise the \c to_dup parameter should be NULL.
+	 * @notyet{to_dup}
+	 *
+	 * @snippet ex_all.c Open a cursor
+	 *
+	 * @param session the session handle
+	 * @param uri the data source on which the cursor operates;
+	 *  cursors are usually opened on tables, however, cursors can be
+	 *  opened on any data source, regardless of whether it is ultimately
+	 *  stored in a table.  Some cursor types may have limited
+	 *  functionality (for example, be read-only or not support
+	 *  transactional updates).  See @ref cursor_types for more
+	 *  information.
+	 *  <br>
+	 *  The following are the builtin cursor types:
+	 *  <table>
+	 *  @hrow{URI, Type, Key/Value types}
+	 *  @row{<tt>colgroup:\<tablename\>.\<columnset\></tt>,
+	 *	column group cursor,
+	 *	table key\, column group value(s)}
+	 *  @row{<tt>table:\<tablename\></tt>,
+	 *	table cursor,
+	 *	table key\, table value(s)}
+	 *  @row{<tt>file:\<filename\></tt>,
+	 *	file cursor,
+	 *	file key\, file value(s)}
+	 *  @row{<tt>index:\<tablename\>.\<indexname\></tt>,
+	 *	index cursor,
+	 *	key=index key\, value=table value(s)}
+	 *  @row{<tt>statistics:[file</tt><tt>:\<filename\>]</tt>,
+	 *	database or file statistics cursor,
+	 *	key=<code>int id</code>\, value=(<code>string description\,
+	 *	string value\, uint64_t value</code>)\,
+	 *	see @ref cursor_statistics for details}
+	 *  </table>
+	 * @param to_dup a cursor to duplicate
+	 * @param session the session handle
+	 * @configstart{session.open_cursor, see dist/api_data.py}
+	 * @config{append, only supported by cursors with record number keys:
+	 * append the value as a new record\, creating a new record number
+	 * key.,a boolean flag; default \c false.}
+	 * @config{bulk, configure the cursor for bulk loads; bulk-load is a
+	 * fast load path for empty objects\, only empty objects may be
+	 * bulk-loaded.,a boolean flag; default \c false.}
+	 * @config{clear_on_close, for statistics cursors\, reset statistics
+	 * counters when the cursor is closed.,a boolean flag; default \c
+	 * false.}
+	 * @config{dump, configure the cursor for dump format inputs and
+	 * outputs: "hex" selects a simple hexadecimal format\, "print" selects
+	 * a format where only non-printing characters are hexadecimal encoded.
+	 * The cursor dump format is compatible with the @ref utility_dump and
+	 * @ref utility_load commands.,a string\, chosen from the following
+	 * options: \c "hex"\, \c "print"; default empty.}
+	 * @config{isolation, the isolation level for this cursor\, ignored for
+	 * transactional cursors.,a string\, chosen from the following options:
+	 * \c "snapshot"\, \c "read-committed"\, \c "read-uncommitted"; default
+	 * \c read-committed.}
+	 * @config{overwrite, change the behavior of the cursor's insert method
+	 * to overwrite previously existing values.,a boolean flag; default \c
+	 * false.}
+	 * @config{raw, ignore the encodings for the key and value\, manage data
+	 * as if the formats were \c "u".  See @ref cursor_raw for more
+	 * details.,a boolean flag; default \c false.}
+	 * @config{statistics, configure the cursor for statistics.,a boolean
+	 * flag; default \c false.}
+	 * @configend
+	 * @param cursorp a pointer to the newly opened cursor
+	 * @errors
+	 */
+	int __F(open_cursor)(WT_SESSION *session,
+	    const char *uri, WT_CURSOR *to_dup,
+	    const char *config, WT_CURSOR **cursorp);
+	/*! @} */
+
+	/*! @name Table operations
+	 * @{
+	 */
+	/*! Create a table, column group, index or file.
+	 *
+	 * @snippet ex_all.c Create a table
+	 *
+	 * @param session the session handle
+	 * @param name the URI of the object to create, such as \c "table:stock"
+	 * @configstart{session.create, see dist/api_data.py}
+	 * @config{allocation_size, the file unit allocation size\, in bytes\,
+	 * must a power-of-two; smaller values decrease the file space required
+	 * by overflow items\, and the default value of 512B is a good choice
+	 * absent requirements from the operating system or storage device.,an
+	 * integer between 512B and 128MB; default \c 512B.}
+	 * @config{block_compressor, configure a compressor for file blocks.
+	 * Permitted values are empty (off) or \c "bzip2"\, \c "snappy" or
+	 * custom compression engine \c "name" created with
+	 * WT_CONNECTION::add_compressor. See @ref compression for more
+	 * information.,a string; default empty.}
+	 * @config{checksum, configure file block checksums; if false\, the
+	 * block manager is free to not write or check block checksums. This can
+	 * increase performance in applications where compression provides
+	 * checksum functionality or read-only applications where blocks require
+	 * no verification.,a boolean flag; default \c true.}
+	 * @config{colgroups, comma-separated list of names of column groups.
+	 * Each column group is stored separately\, keyed by the primary key of
+	 * the table.  If no column groups are specified\, all columns are
+	 * stored together in a single file.  All value columns in the table
+	 * must appear in at least one column group.  Each column group must be
+	 * created with a separate call to WT_SESSION::create.,a list of
+	 * strings; default empty.}
+	 * @config{collator, configure custom collation for keys.  Value must be
+	 * a collator name created with WT_CONNECTION::add_collator.,a string;
+	 * default empty.}
+	 * @config{columns, list of the column names.  Comma-separated list of
+	 * the form <code>(column[\,...])</code>.  For tables\, the number of
+	 * entries must match the total number of values in \c key_format and \c
+	 * value_format.  For colgroups and indices\, all column names must
+	 * appear in the list of columns for the table.,a list of strings;
+	 * default empty.}
+	 * @config{exclusive, fail if the object exists.  When false (the
+	 * default)\, if the object exists\, check that its settings match the
+	 * specified configuration.,a boolean flag; default \c false.}
+	 * @config{filename, override the default filename derived from the
+	 * object name.,a string; default empty.}
+	 * @config{huffman_key, configure Huffman encoding for keys.  Permitted
+	 * values are empty (off)\, \c "english" or \c "<filename>".  See @ref
+	 * huffman for more information.,a string; default empty.}
+	 * @config{huffman_value, configure Huffman encoding for values.
+	 * Permitted values are empty (off)\, \c "english" or \c "<filename>".
+	 * See @ref huffman for more information.,a string; default empty.}
+	 * @config{internal_item_max, the maximum key size stored on internal
+	 * nodes\, in bytes.  If zero\, a maximum is calculated to permit at
+	 * least 8 keys per internal page.,an integer greater than or equal to
+	 * 0; default \c 0.}
+	 * @config{internal_key_truncate, configure internal key truncation\,
+	 * discarding unnecessary trailing bytes on internal keys.,a boolean
+	 * flag; default \c true.}
+	 * @config{internal_page_max, the maximum page size for internal nodes\,
+	 * in bytes; the size must be a multiple of the allocation size and is
+	 * significant for applications wanting to avoid excessive L2 cache
+	 * misses while searching the tree.,an integer between 512B and 512MB;
+	 * default \c 2KB.}
+	 * @config{key_format, the format of the data packed into key items.
+	 * See @ref schema_format_types for details.  By default\, the
+	 * key_format is \c 'u' and applications use WT_ITEM structures to
+	 * manipulate raw byte arrays. By default\, records are stored in
+	 * row-store files: keys of type \c 'r' are record numbers and records
+	 * referenced by record number are stored in column-store files.,a
+	 * format string; default \c u.}
+	 * @config{key_gap, the maximum gap between instantiated keys in a Btree
+	 * leaf page\, constraining the number of keys processed to instantiate
+	 * a random Btree leaf page key.,an integer greater than or equal to 0;
+	 * default \c 10.}
+	 * @config{leaf_item_max, the maximum key or value size stored on leaf
+	 * nodes\, in bytes. If zero\, a size is calculated to permit at least 8
+	 * items (values or row store keys) per leaf page.,an integer greater
+	 * than or equal to 0; default \c 0.}
+	 * @config{leaf_page_max, the maximum page size for leaf nodes\, in
+	 * bytes; the size must be a multiple of the allocation size\, and is
+	 * significant for applications wanting to maximize sequential data
+	 * transfer from a storage device.,an integer between 512B and 512MB;
+	 * default \c 1MB.}
+	 * @config{prefix_compression, configure row-store format key prefix
+	 * compression.,a boolean flag; default \c true.}
+	 * @config{split_pct, the Btree page split size as a percentage of the
+	 * maximum Btree page size\, that is\, when a Btree page is split\, it
+	 * will be split into smaller pages\, where each page is the specified
+	 * percentage of the maximum Btree page size.,an integer between 25 and
+	 * 100; default \c 75.}
+	 * @config{type, the file type.,a string\, chosen from the following
+	 * options: \c "btree"; default \c btree.}
+	 * @config{value_format, the format of the data packed into value items.
+	 * See @ref schema_format_types for details.  By default\, the
+	 * value_format is \c 'u' and applications use a WT_ITEM structure to
+	 * manipulate raw byte arrays. Value items of type 't' are bitfields\,
+	 * and when configured with record number type keys\, will be stored
+	 * using a fixed-length store.,a format string; default \c u.}
+	 * @configend
+	 * @errors
+	 */
+	int __F(create)(WT_SESSION *session,
+	    const char *name, const char *config);
+
+	/*! Drop (delete) an object.
+	 *
+	 * @snippet ex_all.c session drop
+	 *
+	 * @param session the session handle
+	 * @param name the URI of the object to drop, such as \c "table:stock"
+	 * @configstart{session.drop, see dist/api_data.py}
+	 * @config{force, return success if the object does not exist.,a boolean
+	 * flag; default \c false.}
+	 * @configend
+	 * @errors
+	 */
+	int __F(drop)(WT_SESSION *session,
+	    const char *name, const char *config);
+
+	/*! Rename an object.
+	 *
+	 * @snippet ex_all.c session rename
+	 *
+	 * @param session the session handle
+	 * @param oldname the current URI of the object, such as \c "table:old"
+	 * @param newname the new name of the object, such as \c "table:new"
+	 * @configempty{session.rename, see dist/api_data.py}
+	 * @errors
+	 */
+	int __F(rename)(WT_SESSION *session,
+	    const char *oldname, const char *newname, const char *config);
+
+	/*! Salvage a file or table
+	 *
+	 * Salvage rebuilds the file, or files of which a table is comprised,
+	 * discarding any corrupted file blocks.
+	 *
+	 * Previously deleted records may re-appear, and inserted records may
+	 * disappear, when salvage is done, so salvage should not be run
+	 * unless it is known to be necessary.  Normally, salvage should be
+	 * called after a file or table has been corrupted, as reported by the
+	 * WT_SESSION::verify method.
+	 *
+	 * Files are rebuilt in place, the salvage method overwrites the
+	 * existing files.
+	 *
+	 * @snippet ex_all.c session salvage
+	 *
+	 * @param session the session handle
+	 * @param name the URI of the file or table to salvage
+	 * @configstart{session.salvage, see dist/api_data.py}
+	 * @config{force, force salvage even of files that do not appear to be
+	 * WiredTiger files.,a boolean flag; default \c false.}
+	 * @configend
+	 * @errors
+	 */
+	int __F(salvage)(WT_SESSION *session,
+	    const char *name, const char *config);
+
+	/*! Sync a file or table.
+	 *
+	 * Flush dirty pages from a table to stable storage.  Note that not
+	 * all pages are necessarily flushed (pages pinned in memory, or in
+	 * use by other threads of control may not be written until all open
+	 * session handles for the table are closed).
+	 *
+	 * @snippet ex_all.c session sync
+	 *
+	 * @param session the session handle
+	 * @param name the URI of the file or table to sync
+	 * @configempty{session.sync, see dist/api_data.py}
+	 * @errors
+	 */
+	int __F(sync)(WT_SESSION *session,
+	    const char *name, const char *config);
+
+	/*! Truncate a file, table or a cursor range.
+	 *
+	 * @snippet ex_all.c session truncate
+	 *
+	 * @snippet ex_all.c session range truncate
+	 *
+	 * @param session the session handle
+	 * @param name the URI of the file or table to truncate
+	 * @param start optional cursor marking the first record discarded;
+	 * if <code>NULL</code>, the truncate starts from the beginning of
+	 * the table
+	 * @param stop optional cursor marking the last record discarded;
+	 * if <code>NULL</code>, the truncate continues to the end of the
+	 * table
+	 * @configempty{session.truncate, see dist/api_data.py}
+	 * @errors
+	 */
+	int __F(truncate)(WT_SESSION *session,
+	    const char *name,
+	    WT_CURSOR *start, WT_CURSOR *stop, const char *config);
+
+	/*! Upgrade a file or table.
+	 *
+	 * Upgrade upgrades a file, or the files of which a table is comprised.
+	 *
+	 * @snippet ex_all.c session upgrade
+	 *
+	 * @param session the session handle
+	 * @param name the URI of the file or table to upgrade
+	 * @configempty{session.upgrade, see dist/api_data.py}
+	 * @errors
+	 */
+	int __F(upgrade)(WT_SESSION *session,
+	    const char *name, const char *config);
+
+	/*! Verify a file or table.
+	 *
+	 * Verify reports if a file, or the files of which a table is
+	 * comprised, have been corrupted.  The WT_SESSION::salvage method
+	 * can be used to repair a corrupted file,
+	 *
+	 * @snippet ex_all.c session verify
+	 *
+	 * @param session the session handle
+	 * @param name the URI of the file or table to verify
+	 * @configempty{session.verify, see dist/api_data.py}
+	 * @errors
+	 */
+	int __F(verify)(WT_SESSION *session,
+	    const char *name, const char *config);
+	/*! @} */
+
+	/*! @name Transactions
+	 * @{
+	 */
+	/*! Start a transaction in this session. @notyet{transactions}
+	 *
+	 * All cursors opened in this session that support transactional
+	 * semantics will operate in the context of the transaction.  The
+	 * transaction remains active until ended with
+	 * WT_SESSION::commit_transaction or WT_SESSION::rollback_transaction.
+	 *
+	 * Ignored if a transaction is in progress.
+	 *
+	 * @todo describe nested transactions / savepoints
+	 *
+	 * @snippet ex_all.c session begin transaction
+	 *
+	 * @param session the session handle
+	 * @configstart{session.begin_transaction, see dist/api_data.py}
+	 * @config{isolation, the isolation level for this transaction.,a
+	 * string\, chosen from the following options: \c "serializable"\, \c
+	 * "snapshot"\, \c "read-committed"\, \c "read-uncommitted"; default \c
+	 * read-committed.}
+	 * @config{name, name of the transaction for tracing and debugging.,a
+	 * string; default empty.}
+	 * @config{priority, priority of the transaction for resolving
+	 * conflicts. Transactions with higher values are less likely to
+	 * abort.,an integer between -100 and 100; default \c 0.}
+	 * @config{sync, how to sync log records when the transaction commits.,a
+	 * string\, chosen from the following options: \c "full"\, \c "flush"\,
+	 * \c "write"\, \c "none"; default \c full.}
+	 * @configend
+	 * @errors
+	 */
+	int __F(begin_transaction)(WT_SESSION *session, const char *config);
+
+	/*! Commit the current transaction. @notyet{transactions}
+	 *
+	 * Any cursors opened during the transaction will be closed before
+	 * the commit is processed.
+	 *
+	 * Ignored if no transaction is in progress.
+	 *
+	 * @snippet ex_all.c session commit transaction
+	 *
+	 * @param session the session handle
+	 * @configempty{session.commit_transaction, see dist/api_data.py}
+	 * @errors
+	 */
+	int __F(commit_transaction)(WT_SESSION *session, const char *config);
+
+	/*! Roll back the current transaction. @notyet{transactions}
+	 *
+	 * Any cursors opened during the transaction will be closed before
+	 * the rollback is processed.
+	 *
+	 * Ignored if no transaction is in progress.
+	 *
+	 * @snippet ex_all.c session rollback transaction
+	 *
+	 * @param session the session handle
+	 * @configempty{session.rollback_transaction, see dist/api_data.py}
+	 * @errors
+	 */
+	int __F(rollback_transaction)(WT_SESSION *session, const char *config);
+
+	/*! Flush the cache and/or the log and optionally archive log files.
+	 * @notyet{checkpoint}
+	 *
+	 * @snippet ex_all.c session checkpoint
+	 *
+	 * @param session the session handle
+	 * @configstart{session.checkpoint, see dist/api_data.py}
+	 * @config{archive, remove log files no longer required for
+	 * transactional durability.,a boolean flag; default \c false.}
+	 * @config{flush_cache, flush the cache.,a boolean flag; default \c
+	 * true.}
+	 * @config{flush_log, flush the log to disk.,a boolean flag; default \c
+	 * true.}
+	 * @config{force, write a new checkpoint even if nothing has changed
+	 * since the last one.,a boolean flag; default \c false.}
+	 * @config{log_size, only proceed if more than the specified number of
+	 * bytes of log records have been written since the last checkpoint.,an
+	 * integer greater than or equal to 0; default \c 0.}
+	 * @config{timeout, only proceed if more than the specified number of
+	 * milliseconds have elapsed since the last checkpoint.,an integer
+	 * greater than or equal to 0; default \c 0.}
+	 * @configend
+	 * @errors
+	 */
+	int __F(checkpoint)(WT_SESSION *session, const char *config);
+
+	/*! @} */
+	/*! @name Debugging
+	 * @{
+	 */
+
+	/*! Dump a physical file in debugging mode.
+	 *
+	 * The specified file is displayed in a non-portable debugging mode to
+	 * the application's standard output.
+	 *
+	 * @snippet ex_all.c session dumpfile
+	 *
+	 * @param session the session handle
+	 * @param name the URI of the file to dump
+	 * @configempty{session.dumpfile, see dist/api_data.py}
+	 * @errors
+	 */
+	int __F(dumpfile)(WT_SESSION *session,
+	    const char *name, const char *config);
+
+	/*! Send a string to the message handler for debugging.
+	 *
+	 * @snippet ex_all.c session msg_printf
+	 *
+	 * @param session the session handle
+	 * @param fmt a printf-like format specification
+	 * @errors
+	 */
+	int __F(msg_printf)(WT_SESSION *session, const char *fmt, ...);
+
+	/*! @} */
+};
+
+/*!
+ * A connection to a WiredTiger database.  The connection may be opened within
+ * the same address space as the caller or accessed over a socket connection.
+ *
+ * Most applications will open a single connection to a database for each
+ * process.  The first process to open a connection to a database will access
+ * the database in its own address space.  Subsequent connections (if allowed)
+ * will communicate with the first process over a socket connection to perform
+ * their operations.
+ */
+struct __wt_connection {
+	/*! Load an extension.
+	 *
+	 * @snippet ex_all.c conn load extension
+	 *
+	 * @param connection the connection handle
+	 * @param path the filename of the extension module
+	 * @configstart{connection.load_extension, see dist/api_data.py}
+	 * @config{entry, the entry point of the extension.,a string; default \c
+	 * wiredtiger_extension_init.}
+	 * @config{prefix, a prefix for all names registered by this extension
+	 * (e.g.\, to make namespaces distinct or during upgrades.,a string;
+	 * default empty.}
+	 * @configend
+	 * @errors
+	 */
+	int __F(load_extension)(WT_CONNECTION *connection,
+	    const char *path, const char *config);
+
+	/*! Add a new type of cursor. @notyet{custom cursors}
+	 *
+	 * The application must first implement the WT_CURSOR_TYPE interface
+	 * and then register the implementation with WiredTiger:
+	 *
+	 * @snippet ex_all.c WT_CURSOR_TYPE register
+	 *
+	 * @param connection the connection handle
+	 * @param prefix the prefix for location strings passed to
+	 * WT_SESSION::open_cursor
+	 * @param ctype the application-supplied code to manage cursors of
+	 * this type
+	 * @configempty{connection.add_cursor_type, see dist/api_data.py}
+	 * @errors
+	 */
+	int __F(add_cursor_type)(WT_CONNECTION *connection,
+	    const char *prefix, WT_CURSOR_TYPE *ctype, const char *config);
+
+	/*! Add a custom collation function. @notyet{custom collation}
+	 *
+	 * The application must first implement the WT_COLLATOR interface and
+	 * then register the implementation with WiredTiger:
+	 *
+	 * @snippet ex_all.c WT_COLLATOR register
+	 *
+	 * @param connection the connection handle
+	 * @param name the name of the collation to be used in calls to
+	 * 	WT_SESSION::create
+	 * @param collator the application-supplied collation handler
+	 * @configempty{connection.add_collator, see dist/api_data.py}
+	 * @errors
+	 */
+	int __F(add_collator)(WT_CONNECTION *connection,
+	    const char *name, WT_COLLATOR *collator, const char *config);
+
+	/*! Add a compression function.
+	 *
+	 * The application must first implement the WT_COMPRESSOR interface
+	 * and then register the implementation with WiredTiger:
+	 *
+	 * @snippet ex_all.c WT_COMPRESSOR register
+	 *
+	 * @param connection the connection handle
+	 * @param name the name of the compression function to be used in calls
+	 *	to WT_SESSION::create
+	 * @param compressor the application-supplied compression handler
+	 * @configempty{connection.add_compressor, see dist/api_data.py}
+	 * @errors
+	 */
+	int __F(add_compressor)(WT_CONNECTION *connection,
+	    const char *name, WT_COMPRESSOR *compressor, const char *config);
+
+	/*! Add a custom extractor for index keys or column groups.
+	 * @notyet{custom extractors}
+	 *
+	 * The application must first implement the WT_EXTRACTOR interface and
+	 * then register the implementation with WiredTiger:
+	 *
+	 * @snippet ex_all.c WT_EXTRACTOR register
+	 *
+	 * @param connection the connection handle
+	 * @param name the name of the extractor to be used in calls to
+	 * 	WT_SESSION::create
+	 * @param extractor the application-supplied extractor
+	 * @configempty{connection.add_extractor, see dist/api_data.py}
+	 * @errors
+	 */
+	int __F(add_extractor)(WT_CONNECTION *connection, const char *name,
+	    WT_EXTRACTOR *extractor, const char *config);
+
+	/*! Close a connection.
+	 *
+	 * Any open sessions will be closed.
+	 *
+	 * @snippet ex_all.c conn close
+	 *
+	 * @param connection the connection handle
+	 * @configempty{connection.close, see dist/api_data.py}
+	 * @errors
+	 */
+	int __F(close)(WT_CONNECTION *connection, const char *config);
+
+	/*! The home directory of the connection.
+	 *
+	 * @snippet ex_all.c conn get_home
+	 *
+	 * @param connection the connection handle
+	 * @returns a pointer to a string naming the home directory
+	 */
+	const char *__F(get_home)(WT_CONNECTION *connection);
+
+	/*! Return if opening this handle created the database.
+	 *
+	 * @snippet ex_all.c is_new
+	 *
+	 * @param connection the connection handle
+	 * @returns false (zero) if the connection existed before the call to
+	 * ::wiredtiger_open, true (non-zero) if it was created by opening this
+	 * handle.
+	 */
+	int __F(is_new)(WT_CONNECTION *connection);
+
+	/*! Open a session.
+	 *
+	 * @snippet ex_all.c Open a session
+	 *
+	 * @param connection the connection handle
+	 * @param errhandler An error handler.  If <code>NULL</code>, the
+	 * connection's error handler is used
+	 * @configempty{connection.open_session, see dist/api_data.py}
+	 * @param sessionp the new session handle
+	 * @errors
+	 */
+	int __F(open_session)(WT_CONNECTION *connection,
+	    WT_EVENT_HANDLER *errhandler, const char *config,
+	    WT_SESSION **sessionp);
+};
+
+/*! Open a connection to a database.
+ *
+ * @snippet ex_all.c Open a connection
+ *
+ * @param home The path to the database home directory.  See @ref home
+ * for more information.
+ * @param errhandler An error handler.  If <code>NULL</code>, a builtin error
+ * handler is installed that writes error messages to stderr
+ * @configstart{wiredtiger_open, see dist/api_data.py}
+ * @config{cache_size, maximum heap memory to allocate for the cache.,an integer
+ * between 1MB and 10TB; default \c 100MB.}
+ * @config{create, create the database if it does not exist.,a boolean flag;
+ * default \c false.}
+ * @config{error_prefix, prefix string for error messages.,a string; default
+ * empty.}
+ * @config{eviction_target, continue evicting until the cache becomes less full
+ * than this (as a percentage).  Must be less than \c eviction_trigger.,an
+ * integer between 10 and 99; default \c 80.}
+ * @config{eviction_trigger, trigger eviction when the cache becomes this full
+ * (as a percentage).,an integer between 10 and 99; default \c 95.}
+ * @config{extensions, list of extensions to load.  Optional values are passed
+ * as the \c config parameter to WT_CONNECTION::load_extension.  Complex paths
+ * may need quoting\, for example\,
+ * <code>extensions=("/path/to/ext.so"="entry=my_entry")</code>.,a list of
+ * strings; default empty.}
+ * @config{hazard_max, number of simultaneous hazard references per session
+ * handle.,an integer greater than or equal to 15; default \c 30.}
+ * @config{home_environment, use the \c WIREDTIGER_HOME environment variable for
+ * naming unless the process is running with special privileges. See @ref home
+ * for more information.,a boolean flag; default \c false.}
+ * @config{home_environment_priv, use the \c WIREDTIGER_HOME environment
+ * variable for naming regardless of whether or not the process is running with
+ * special privileges.  See @ref home for more information.,a boolean flag;
+ * default \c false.}
+ * @config{logging, enable logging.,a boolean flag; default \c false.}
+ * @config{multiprocess, permit sharing between processes (will automatically
+ * start an RPC server for primary processes and use RPC for secondary
+ * processes).,a boolean flag; default \c false.}
+ * @config{session_max, maximum expected number of sessions (including server
+ * threads).,an integer greater than or equal to 1; default \c 50.}
+ * @config{transactional, support transactional semantics.,a boolean flag;
+ * default \c false.}
+ * @config{verbose, enable messages for various events.  Options are given as a
+ * list\, such as <code>"verbose=[evictserver\,read]"</code>.,a list\, with
+ * values chosen from the following options: \c "block"\, \c "evict"\, \c
+ * "evictserver"\, \c "fileops"\, \c "hazard"\, \c "mutex"\, \c "read"\, \c
+ * "readserver"\, \c "reconcile"\, \c "salvage"\, \c "verify"\, \c "write";
+ * default empty.}
+ * @configend
+ * Additionally, if a file named \c WiredTiger.config appears in the WiredTiger
+ * home directory, it is read for configuration values (see @ref config_file
+ * for details).  Configuration values specified in the \c config argument to
+ * the ::wiredtiger_open function override configuration values specified in
+ * the \c WiredTiger.config file.
+ * @param connectionp A pointer to the newly opened connection handle
+ * @errors
+ */
+int wiredtiger_open(const char *home,
+    WT_EVENT_HANDLER *errhandler, const char *config,
+    WT_CONNECTION **connectionp);
+
+/*! Return information about an error as a string; wiredtiger_strerror is a
+ * superset of the ISO C99/POSIX 1003.1-2001 function strerror.
+ *
+ * @snippet ex_all.c Display an error
+ *
+ * @param err a return value from a WiredTiger, C library or POSIX function
+ * @returns a string representation of the error
+ */
+const char *wiredtiger_strerror(int err);
+
+/*!
+ * The interface implemented by applications in order to handle error messages,
+ * information messages and progress.  Entries set to NULL are ignored and will
+ * continue to use the default handlers.
+ */
+struct __wt_event_handler {
+	/*!
+	 * Callback to handle error messages; by default, error messages are
+	 * written to the stderr stream.
+	 */
+	void (*handle_error)(WT_EVENT_HANDLER *handler,
+	    int error, const char *errmsg);
+
+	/*!
+	 * Callback to handle informational messages; by default, informational
+	 * messages are written to the stdout stream.
+	 */
+	int (*handle_message)(WT_EVENT_HANDLER *handler, const char *message);
+
+	/*!
+	 * Callback to handle progress messages; by default, progress messages
+	 * are ignored.
+	 */
+	int (*handle_progress)(WT_EVENT_HANDLER *handler,
+	    const char *operation, uint64_t progress);
+};
+
+/*! Pack a structure into a buffer.
+ *
+ * See @ref packing for a description of the permitted format strings.
+ *
+ * @section pack_examples Packing Examples
+ *
+ * For example, the string <code>"iSh"</code> will pack a 32-bit integer
+ * followed by a NUL-terminated string, followed by a 16-bit integer.  The
+ * default, big-endian encoding will be used, with no alignment.  This could
+ * be used in C as follows:
+ *
+ * @snippet ex_all.c Pack fields into a buffer
+ *
+ * Then later, the values can be unpacked as follows:
+ *
+ * @snippet ex_all.c Unpack fields from a buffer
+ *
+ * @param buffer a pointer to a packed byte array
+ * @param size the number of valid bytes in the buffer
+ * @param format the data format, see ::wiredtiger_struct_pack
+ * @errors
+ */
+int wiredtiger_struct_pack(void *buffer, size_t size, const char *format, ...);
+
+/*! Calculate the size required to pack a structure.
+ *
+ * Note that for variable-sized fields including variable-sized strings and
+ * integers, the calculated sized merely reflects the expected sizes specified
+ * in the format string itself.
+ *
+ * @snippet ex_all.c Get the packed size
+ *
+ * @param format the data format, see ::wiredtiger_struct_pack
+ * @returns the number of bytes needed for the matching call to
+ * ::wiredtiger_struct_pack
+ */
+size_t wiredtiger_struct_size(const char *format, ...);
+
+/*! Unpack a structure from a buffer.
+ *
+ * Reverse of ::wiredtiger_struct_pack: gets values out of a packed byte string.
+ *
+ * @snippet ex_all.c Unpack fields from a buffer
+ *
+ * @param buffer a pointer to a packed byte array
+ * @param size the number of valid bytes in the buffer
+ * @param format the data format, see ::wiredtiger_struct_pack
+ * @errors
+ */
+int wiredtiger_struct_unpack(const void *buffer, size_t size,
+    const char *format, ...);
+
+/*! Get version information.
+ *
+ * @snippet ex_all.c Get the WiredTiger library version #1
+ * @snippet ex_all.c Get the WiredTiger library version #2
+ *
+ * @param majorp a location where the major version number is returned
+ * @param minorp a location where the minor version number is returned
+ * @param patchp a location where the patch version number is returned
+ * @returns a string representation of the version
+ */
+const char *wiredtiger_version(int *majorp, int *minorp, int *patchp);
+
+/*******************************************
+ * Error returns
+ *******************************************/
+/*!
+ * @anchor error_returns
+ * @name Error returns
+ * Most functions and methods in WiredTiger return an integer code indicating
+ * whether the operation succeeded or failed.  A return of zero indicates
+ * success, all non-zero return values indicate some kind of failure.
+ *
+ * WiredTiger reserves all values from -31,800 to -31,999 to itself as possible
+ * error values.  In addition, C99/POSIX error codes such as \c ENOMEM,
+ * \c EINVAL and \c ENOTSUP may also be returned, with the usual meanings.
+ *
+ * The following are all of the WiredTiger-specific error returns:
+ * @{
+ */
+/*
+ * DO NOT EDIT: automatically built by dist/api_err.py.
+ * Error return section: BEGIN
+ */
+/*! Conflict between concurrent operations.
+ * This error is generated when an operation cannot be completed due to a
+ * conflict with concurrent operations.  The operation should be retried.  If a
+ * transaction is in progress, it should be rolled back and the operation
+ * retried in a new transaction.
+ */
+#define	WT_DEADLOCK	-31800
+/*! Attempt to insert an existing key.
+ * This error is generated when the application attempts to insert a record with
+ * the same key as an existing record without the 'overwrite' configuration to
+ * WT_SESSION::open_cursor.
+ */
+#define	WT_DUPLICATE_KEY	-31801
+/*! Non-specific WiredTiger error.
+ * This error is generated for cases that are not covered by specific error
+ * returns.
+ */
+#define	WT_ERROR	-31802
+/*! Item not found.
+ * This return value indicates that a search operation did not find a record
+ * matching the application's search key.  This includes implicit search
+ * operations in WT_CURSOR::update or WT_CURSOR::remove operations.
+ */
+#define	WT_NOTFOUND	-31803
+/*! @cond internal */
+/*! Restart the operation (internal). */
+#define	WT_RESTART	-31804
+/*! @endcond */
+/*
+ * Error return section: END
+ * DO NOT EDIT: automatically built by dist/api_err.py.
+ */
+/*! @} */
+
+/*! @} */
+
+/*! @defgroup wt_ext WiredTiger Extension API
+ * The functions and interfaces applications use to customize and extend the
+ * behavior of WiredTiger.
+ * @{
+ */
+
+/*!
+ * The interface implemented by applications to provide custom ordering of
+ * records.
+ *
+ * Applications register their implementation with WiredTiger by calling
+ * WT_CONNECTION::add_collator.
+ *
+ * @snippet ex_extending.c add collator nocase
+ *
+ * @snippet ex_extending.c add collator prefix10
+ */
+struct __wt_collator {
+	/*! Callback to compare keys.
+	 *
+	 * @param[out] cmp set to -1 if <code>key1 < key2</code>,
+	 * 	0 if <code>key1 == key2</code>,
+	 * 	1 if <code>key1 > key2</code>.
+	 * @returns zero for success, non-zero to indicate an error.
+	 *
+	 * @snippet ex_all.c Implement WT_COLLATOR
+	 *
+	 * @snippet ex_extending.c case insensitive comparator
+	 *
+	 * @snippet ex_extending.c n character comparator
+	 */
+	int (*compare)(WT_COLLATOR *collator, WT_SESSION *session,
+	    const WT_ITEM *key1, const WT_ITEM *key2, int *cmp);
+};
+
+/*!
+ * The interface implemented by applications to provide custom compression.
+ *
+ * Compressors must implement the WT_COMPRESSOR interface: the
+ * WT_COMPRESSOR::compress and WT_COMPRESSOR::decompress callbacks must be
+ * specified, and WT_COMPRESSOR::pre_size is optional.  To build your own
+ * compressor, use one of the compressors in \c ext/compressors as a template:
+ * \c ext/nop_compress is a simple compressor that passes through data
+ * unchanged, and is a reasonable starting point.
+ *
+ * Applications register their implementation with WiredTiger by calling
+ * WT_CONNECTION::add_compressor.
+ *
+ * @snippet ex_all.c WT_COMPRESSOR register
+ */
+struct __wt_compressor {
+	/*! Callback to compress a chunk of data.
+	 *
+	 * WT_COMPRESSOR::compress is given a source buffer and a destination
+	 * buffer, by default of the same size.  If the callback can compress
+	 * the buffer to a smaller size in the destination, it does so, sets
+	 * the \c compression_failed return to 0 and returns 0.  If compression
+	 * does not produce a smaller result, the callback sets the
+	 * \c compression_failed return to 1 and returns 0. If another
+	 * error occurs, it returns an errno or WiredTiger error code.
+	 *
+	 * On entry, \c src will point to memory, with the length of the memory
+	 * in \c src_len.  After successful completion, the callback should
+	 * return \c 0 and set \c result_lenp to the number of bytes required
+	 * for the compressed representation.
+	 *
+	 * If compression would not shrink the data or the \c dst buffer is not
+	 * large enough to hold the compressed data, the callback should set
+	 * \c compression_failed to a non-zero value and return 0.
+	 *
+	 * @param[in] src the data to compress
+	 * @param[in] src_len the length of the data to compress
+	 * @param[in] dst the destination buffer
+	 * @param[in] dst_len the length of the destination buffer
+	 * @param[out] result_lenp the length of the compressed data
+	 * @param[out] compression_failed non-zero if compression did not
+	 * decrease the length of the data (compression may not have completed)
+	 * @returns zero for success, non-zero to indicate an error.
+	 *
+	 * @snippet ex_all.c WT_COMPRESSOR compress
+	 */
+	int (*compress)(WT_COMPRESSOR *compressor, WT_SESSION *session,
+	    uint8_t *src, size_t src_len,
+	    uint8_t *dst, size_t dst_len,
+	    size_t *result_lenp, int *compression_failed);
+
+	/*! Callback to decompress a chunk of data.
+	 *
+	 * WT_COMPRESSOR::decompress is given a source buffer and a destination
+	 * buffer.  The contents are switched from \c compress: the
+	 * source buffer is the compressed value, and the destination buffer is
+	 * sized to be the original size.  If the callback successfully
+	 * decompresses the source buffer to the destination buffer, it returns
+	 * 0.  If an error occurs, it returns an errno or WiredTiger error code.
+	 * The source buffer that WT_COMPRESSOR::decompress is given may have a
+	 * size that is rounded up from the size originally produced by
+	 * WT_COMPRESSOR::compress, with the remainder of the buffer set to
+	 * zeroes. Most compressors do not care about this difference if the
+	 * size to be decompressed can be implicitly discovered from the
+	 * compressed data.  If your compressor cares, you may need to allocate
+	 * space for, and store, the actual size in the compressed buffer.  See
+	 * the source code for the included snappy compressor for an example.
+	 *
+	 * On entry, \c src will point to memory, with the length of the memory
+	 * in \c src_len.  After successful completion, the callback should
+	 * return \c 0 and set \c result_lenp to the number of bytes required
+	 * for the decompressed representation.
+	 *
+	 * If the \c dst buffer is not big enough to hold the decompressed
+	 * data, the callback should return an error.
+	 *
+	 * @param[in] src the data to decompress
+	 * @param[in] src_len the length of the data to decompress
+	 * @param[in] dst the destination buffer
+	 * @param[in] dst_len the length of the destination buffer
+	 * @param[out] result_lenp the length of the decompressed data
+	 * @returns zero for success, non-zero to indicate an error.
+	 *
+	 * @snippet ex_all.c WT_COMPRESSOR decompress
+	 */
+	int (*decompress)(WT_COMPRESSOR *compressor, WT_SESSION *session,
+	    uint8_t *src, size_t src_len,
+	    uint8_t *dst, size_t dst_len,
+	    size_t *result_lenp);
+
+	/*! Callback to size a destination buffer for compression
+	 *
+	 * WT_COMPRESSOR::pre_size is an optional callback that, given the
+	 * source buffer and size, produces the size of the destination buffer
+	 * to be given to WT_COMPRESSOR::compress.  This is useful for
+	 * compressors that assume that the output buffer is sized for the
+	 * worst case and thus no overrun checks are made.  If your compressor
+	 * works like this, WT_COMPRESSOR::pre_size will need to be defined.
+	 * See the source code for the snappy compressor for an example.
+	 * However, if your compressor detects and avoids overruns against its
+	 * target buffer, you will not need to define WT_COMPRESSOR::pre_size.
+	 * When WT_COMPRESSOR::pre_size is set to NULL, the destination buffer
+	 * is sized the same as the source buffer.  This is always sufficient,
+	 * since a compression result that is larger than the source buffer is
+	 * discarded by WiredTiger.
+	 *
+	 * If not NULL, this callback is called before each call to
+	 * WT_COMPRESS::compress to determine the size of the destination
+	 * buffer to provide.  If the callback is NULL, the destination
+	 * buffer will be the same size as the source buffer.
+	 *
+	 * The callback should set \c result_lenp to a suitable buffer size
+	 * for compression, typically the maximum length required by
+	 * WT_COMPRESSOR::compress.
+	 *
+	 * This callback function is for compressors that require an output
+	 * buffer larger than the source buffer (for example, that do not
+	 * check for buffer overflow during compression).
+	 *
+	 * @param[in] src the data to compress
+	 * @param[in] src_len the length of the data to compress
+	 * @param[out] result_lenp the required destination buffer size
+	 * @returns zero for success, non-zero to indicate an error.
+	 *
+	 * @snippet ex_all.c WT_COMPRESSOR presize
+	 */
+	int (*pre_size)(WT_COMPRESSOR *compressor, WT_SESSION *session,
+	    uint8_t *src, size_t src_len, size_t *result_lenp);
+};
+
+/*!
+ * Applications can extend WiredTiger by providing new implementations of the
+ * WT_CURSOR class.
+ *
+ * <b>Thread safety:</b> WiredTiger may invoke methods on the WT_CURSOR_TYPE
+ * interface from multiple threads concurrently.  It is the responsibility of
+ * the implementation to protect any shared data.
+ *
+ * Applications register their implementation with WiredTiger by calling
+ * WT_CONNECTION::add_cursor_type.
+ *
+ * @snippet ex_all.c WT_CURSOR_TYPE register
+ */
+struct __wt_cursor_type {
+	/*! Callback to determine how much space to allocate for a cursor.
+	 *
+	 * If the callback is NULL, no additional space is allocated in the
+	 * WT_CURSOR implementation.
+	 *
+	 * @errors
+	 *
+	 * @snippet ex_all.c WT_CURSOR_TYPE size
+	 */
+	int (*cursor_size)(WT_CURSOR_TYPE *ctype,
+	    const char *obj, size_t *sizep);
+
+	/*! Callback to initialize a cursor.
+	 *
+	 * @snippet ex_all.c WT_CURSOR_TYPE init
+	 */
+	int (*init_cursor)(WT_CURSOR_TYPE *ctype,
+	    WT_SESSION *session, const char *obj, WT_CURSOR *old_cursor,
+	    const char *config, WT_CURSOR *new_cursor);
+};
+
+/*!
+ * The interface implemented by applications to provide custom extraction of
+ * index keys or column group values.
+ *
+ * Applications register implementations with WiredTiger by calling
+ * WT_CONNECTION::add_extractor.
+ *
+ * @snippet ex_all.c WT_EXTRACTOR register
+ */
+struct __wt_extractor {
+	/*! Callback to extract a value for an index or column group.
+	 *
+	 * @errors
+	 *
+	 * @snippet ex_all.c WT_EXTRACTOR
+	 */
+	int (*extract)(WT_EXTRACTOR *extractor, WT_SESSION *session,
+	    const WT_ITEM *key, const WT_ITEM *value,
+	    WT_ITEM *result);
+};
+
+/*! Entry point to an extension, implemented by loadable modules.
+ *
+ * @param session the session handle
+ * @param api entry points for WiredTiger functions exported to extensions
+ * @param config the config string passed to WT_CONNECTION::load_extension
+ * @errors
+ */
+extern int wiredtiger_extension_init(WT_SESSION *session,
+    WT_EXTENSION_API *api, const char *config);
+
+/*! @} */
+
+/*******************************************
+ * Statistic reference.
+ *******************************************/
+/*! @addtogroup wt
+ * @{
+ */
+/*
+ * DO NOT EDIT: automatically built by dist/api_stat.py.
+ * Statistics section: BEGIN
+ */
+
+/*!
+ * @name Statistics for connection handles
+ * @anchor statistics_keys
+ * @anchor statistics_conn
+ * Statistics in WiredTiger are accessed through cursors with \c "statistics:"
+ * URIs.  Individual statistics can be queried through the cursor using the
+ * following keys.
+ * @{
+ */
+/*! blocks read from a file */
+#define	WT_STAT_block_read				0
+/*! blocks written to a file */
+#define	WT_STAT_block_write				1
+/*! cache: bytes currently held in the cache */
+#define	WT_STAT_cache_bytes_inuse			2
+/*! cache: eviction server unable to reach eviction goal */
+#define	WT_STAT_cache_evict_slow			3
+/*! cache: internal pages evicted */
+#define	WT_STAT_cache_evict_internal			4
+/*! cache: maximum bytes configured */
+#define	WT_STAT_cache_bytes_max				5
+/*! cache: modified pages evicted */
+#define	WT_STAT_cache_evict_modified			6
+/*! cache: pages currently held in the cache */
+#define	WT_STAT_cache_pages_inuse			7
+/*! cache: pages selected for eviction not evicted because of a hazard
+ * reference */
+#define	WT_STAT_cache_evict_hazard			8
+/*! cache: unmodified pages evicted */
+#define	WT_STAT_cache_evict_unmodified			9
+/*! condition wait calls */
+#define	WT_STAT_cond_wait				10
+/*! files currently open */
+#define	WT_STAT_file_open				11
+/*! rwlock readlock calls */
+#define	WT_STAT_rwlock_rdlock				12
+/*! rwlock writelock calls */
+#define	WT_STAT_rwlock_wrlock				13
+/*! total memory allocations */
+#define	WT_STAT_memalloc				14
+/*! total memory frees */
+#define	WT_STAT_memfree					15
+/*! total read I/Os */
+#define	WT_STAT_total_read_io				16
+/*! total write I/Os */
+#define	WT_STAT_total_write_io				17
+
+/*!
+ * @}
+ * @name Statistics for file objects
+ * @anchor statistics_file
+ * @{
+ */
+/*! bulk-loaded entries */
+#define	WT_STAT_file_bulk_loaded			0
+/*! column-store deleted values */
+#define	WT_STAT_file_col_deleted			1
+/*! column-store fixed-size leaf pages */
+#define	WT_STAT_file_col_fix_pages			2
+/*! column-store internal pages */
+#define	WT_STAT_file_col_int_pages			3
+/*! column-store variable-size leaf pages */
+#define	WT_STAT_file_col_var_pages			4
+/*! cursor-inserts */
+#define	WT_STAT_cursor_inserts				5
+/*! cursor-read */
+#define	WT_STAT_cursor_read				6
+/*! cursor-read-near */
+#define	WT_STAT_cursor_read_near			7
+/*! cursor-read-next */
+#define	WT_STAT_cursor_read_next			8
+/*! cursor-read-prev */
+#define	WT_STAT_cursor_read_prev			9
+/*! cursor-removes */
+#define	WT_STAT_cursor_removes				10
+/*! cursor-resets */
+#define	WT_STAT_cursor_resets				11
+/*! cursor-updates */
+#define	WT_STAT_cursor_updates				12
+/*! file: block allocations */
+#define	WT_STAT_alloc					13
+/*! file: block allocations required file extension */
+#define	WT_STAT_extend					14
+/*! file: block frees */
+#define	WT_STAT_free					15
+/*! file: overflow pages read from the file */
+#define	WT_STAT_overflow_read				16
+/*! file: pages read from the file */
+#define	WT_STAT_page_read				17
+/*! file: pages written to the file */
+#define	WT_STAT_page_write				18
+/*! file: size */
+#define	WT_STAT_file_size				19
+/*! fixed-record size */
+#define	WT_STAT_file_fixed_len				20
+/*! magic number */
+#define	WT_STAT_file_magic				21
+/*! major version number */
+#define	WT_STAT_file_major				22
+/*! maximum internal page item size */
+#define	WT_STAT_file_maxintlitem			23
+/*! maximum internal page size */
+#define	WT_STAT_file_maxintlpage			24
+/*! maximum leaf page item size */
+#define	WT_STAT_file_maxleafitem			25
+/*! maximum leaf page size */
+#define	WT_STAT_file_maxleafpage			26
+/*! minor version number */
+#define	WT_STAT_file_minor				27
+/*! number of bytes in the freelist */
+#define	WT_STAT_file_freelist_bytes			28
+/*! number of entries in the freelist */
+#define	WT_STAT_file_freelist_entries			29
+/*! overflow pages */
+#define	WT_STAT_file_overflow				30
+/*! page size allocation unit */
+#define	WT_STAT_file_allocsize				31
+/*! reconcile: deleted or temporary pages merged */
+#define	WT_STAT_rec_page_merge				32
+/*! reconcile: internal pages split */
+#define	WT_STAT_rec_split_intl				33
+/*! reconcile: leaf pages split */
+#define	WT_STAT_rec_split_leaf				34
+/*! reconcile: overflow key */
+#define	WT_STAT_rec_ovfl_key				35
+/*! reconcile: overflow value */
+#define	WT_STAT_rec_ovfl_value				36
+/*! reconcile: pages deleted */
+#define	WT_STAT_rec_page_delete				37
+/*! reconcile: pages written */
+#define	WT_STAT_rec_written				38
+/*! reconcile: unable to acquire hazard reference */
+#define	WT_STAT_rec_hazard				39
+/*! row-store internal pages */
+#define	WT_STAT_file_row_int_pages			40
+/*! row-store leaf pages */
+#define	WT_STAT_file_row_leaf_pages			41
+/*! total entries */
+#define	WT_STAT_file_entries				42
+/*! @} */
+/*
+ * Statistics section: END
+ * DO NOT EDIT: automatically built by dist/api_stat.py.
+ */
+/*! @} */
+/*! @} */
+
+#undef __F
+
+#if defined(__cplusplus)
+}
+#endif
+#endif /* __WIREDTIGER_H_ */

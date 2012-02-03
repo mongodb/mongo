@@ -1,0 +1,10 @@
+__pycache__
+./build
+MANIFEST
+dist
+tags
+TAGS
+apidocs
+_trial_temp
+doc/_build
+./.testrepository

@@ -1,0 +1,181 @@
+/*! @page install How to build and install WiredTiger
+
+This section explains how to build and install the WiredTiger software.
+
+@section ports Ports
+
+WiredTiger has been tested on the following systems:
+@par
+Linux\n
+FreeBSD\n
+Mac OS X\n
+
+WiredTiger should be portable to any system that supports the ANSI C99,
+POSIX 1003.1 and POSIX 1003.1c (threads extension) standards.
+
+@section building Building WiredTiger
+
+WiredTiger uses the <a href="http://gcc.gnu.org/">GNU Compiler
+Collection</a> (GCC) toolchain for configuration and building (but does
+not require the gcc compiler for building), including <a
+href="http://www.gnu.org/software/autoconf/autoconf.html">autoconf</a>
+and <a
+href="http://www.gnu.org/software/libtool/libtool.html">libtool</a>.
+The standard options for those tools can be specified when configuring
+and building WiredTiger.
+
+To build the WiredTiger software on a POSIX-like system, change
+directory to the top-level <code>build_posix</code> directory,
+then configure and build the software:
+
+@code
+cd build_posix
+../configure
+make
+@endcode
+
+To rebuild from scratch, discard any previous configuration by cleaning
+out the build area:
+
+@code
+cd build_posix
+make realclean
+@endcode
+
+@section installing Installing WiredTiger
+
+The WiredTiger software consists of a library and a single standalone
+utility.
+
+WiredTiger's distribution follows the GNU Coding Standards installation
+guidelines, and by default WiredTiger builds and installs four versions
+of the library in <code>/usr/local/lib</code>.  For example:
+
+@code
+file /usr/local/lib/libwiredtiger*
+/usr/local/lib/libwiredtiger-1.0.0.so: ELF 64-bit LSB shared object, x86-64, version 1 (FreeBSD), dynamically linked, not stripped
+/usr/local/lib/libwiredtiger.a:        current ar archive
+/usr/local/lib/libwiredtiger.la:       libtool library file
+/usr/local/lib/libwiredtiger.so:       symbolic link to `libwiredtiger-1.0.0.so'
+@endcode
+
+WiredTiger uses
+<a href="http://www.gnu.org/software/libtool/libtool.html">libtool</a> to
+build the libraries.  By default, this tool builds both shared and
+static libraries.  To build only static libraries, configure WiredTiger
+using the \c --disable-shared argument. To build only shared libraries,
+configure using WiredTiger using the \c --disable-static argument.
+
+In addition, WiredTiger installs a standalone utility program named
+<code>wt</code>.  By default, this utility is installed in
+<code>/usr/local/bin/wt</code>.
+
+To install WiredTiger:
+
+@code
+cd build_posix
+make install
+@endcode
+
+To uninstall WiredTiger:
+
+@code
+cd build_posix
+make uninstall
+@endcode
+
+To install WiredTiger's libraries or binaries into alternate locations,
+use the configuration or installation options described in the
+<a href="http://www.gnu.org/prep/standards/">GNU coding standards</a>
+documentation.  For example, to install the libraries and binaries into
+a different location:
+
+@code
+cd build_posix
+../dist/configure --prefix=/c/wiredtiger
+@endcode
+
+@section configure Configuring WiredTiger
+
+The WiredTiger software supports some additional configuration options:
+
+@par \c --enable-attach
+Configure WiredTiger to sleep and wait for a debugger to attach on failure.
+<b>DO NOT</b> configure this option in production environments.
+
+@par \c --enable-bzip2
+Configure WiredTiger for <a href="http://www.bzip.org/">bzip2</a>
+compression; see @ref compression for more information.
+
+@par \c --enable-debug
+Configure WiredTiger for debugging, including building with the
+compiler's \c -g flag.
+<b>DO NOT</b> configure this option in production environments.
+
+@par \c --enable-diagnostic
+Configure WiredTiger to perform various run-time diagnostic tests.
+<b>DO NOT</b> configure this option in production environments.
+
+@par \c --enable-python
+Build the WiredTiger <a href="http://www.python.org">Python</a> API.
+
+@par \c --enable-snappy
+Configure WiredTiger for <a href="http://code.google.com/p/snappy/">snappy</a>
+compression; see @ref compression for more information.
+
+@par \c --enable-verbose
+Configure WiredTiger to support the \c verbose configuration string to
+::wiredtiger_open.
+
+@par <code>--with-spinlock</code>
+Configure WiredTiger to use a specific mutex type, options are \c
+pthread_mutex (the default, which configures WiredTiger to use POSIX 1003.1c
+pthread mutexes for serialization) or \c gcc (which configures WiredTiger to
+use gcc-based spinlocks for serialization).
+
+@section compiler Changing compiler or loader options
+
+To change the compiler or loader behavior during the build, use the
+<code>CC</code>, <code>CFLAGS</code>, <code>LDFLAGS</code>, or
+<code>LIBS</code> environment variables:
+
+@par \c CC
+The compiler.
+@par \c CFLAGS
+Compiler flags.
+@par \c LDFLAGS
+Loader flags.
+@par \c LIBS
+Additional libraries.
+
+For example, to specify a different compiler:
+
+@code
+cd build_posix
+env CC=mygcc ../configure
+@endcode
+
+By default, WiredTiger builds with the \c -O3 compiler optimization flag
+unless the \c --enable-debug configuration option is specified, in which
+case the \c -g compiler flag is used instead.  For example, to specify
+a different level of optimization:
+
+@code
+cd build_posix
+env CFLAGS=-Os ../configure
+@endcode
+
+To specify a different set of include files:
+
+@code
+cd build_posix
+env CFLAGS=-I/usr/local/include ../configure
+@endcode
+
+To specify an additional library:
+
+@code
+cd build_posix
+env LIBS="-lrtf -lmin" LDFLAGS=-L/usr/local/lib ../configure
+@endcode
+ */

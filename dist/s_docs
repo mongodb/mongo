@@ -1,0 +1,86 @@
+#! /bin/sh
+
+t=__wt.$$
+trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+
+# Skip this when building release packages: docs are built separately
+test -n "$WT_RELEASE_BUILD" && exit 0
+
+# We require doxygen which may not be installed.
+type doxygen > /dev/null 2>&1 || {
+	echo 'skipped: doxygen not found'
+	exit 0
+}
+
+. ./RELEASE
+
+e=0
+spellchk()
+{
+	# If aspell has been installed, run a spell check.
+	type aspell > /dev/null 2>&1 || return
+
+	(cd ../docs/src &&
+	cat *.dox | aspell --mode=ccpp --lang=en --personal=./spell.ok list) |
+	sort -u > $t
+	test -s $t && {
+		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+		echo 'Documentation spelling notes'
+		echo 'Update docs/src/spell.ok to remove warnings.'
+		sed -e 's/^/	/' < $t
+		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
+		e=1
+	}
+}
+
+build()
+{
+	# Run doxygen to generate warnings for the base HTML documentation.
+	#
+	# We omit Python because warnings are expected there (the code generated
+	# by swig does not have named arguments, but we want to document them
+	# as if they do.
+	(cd ../docs &&
+	    (eval cat Doxyfile $filter ; cat <<EOF
+QUIET=YES
+EOF
+) | doxygen -
+	test -s doxygen.log && cat doxygen.log) > $t 2>&1
+	test -s $t && {
+		cat $t
+		e=1
+	}
+
+	# Run again to generate the full documentation set (with Python).
+	(cd ../docs && (eval cat Doxyfile $filter ; cat <<EOF
+QUIET=YES
+INPUT+=../lang/python/wiredtiger.py
+EOF
+) | doxygen -
+
+	# Fix up bad links doxygen generates in navtree.js
+	sed -i~ 's,/\.html,/,' navtree.js && rm -f navtree.js~
+	)
+}
+
+filter="|sed '/PROJECT_NUMBER/s,=.*,=\"Version $WIREDTIGER_VERSION\",'"
+while :
+	do case "$1" in
+	-p)     # Generate PDFs
+		filter="$filter| sed '/GENERATE_LATEX/s,=.*,=YES,'"
+		shift;;
+	-t)     # Include the TODO list
+		filter="$filter| sed '/GENERATE_TODOLIST/s,=.*,=YES,'"
+		shift;;
+	*)
+		break;;
+	esac
+done
+
+# Spell check the documentation.
+spellchk
+
+# Build the documentation.
+build
+
+exit $e

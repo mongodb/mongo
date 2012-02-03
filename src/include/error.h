@@ -1,0 +1,73 @@
+/*-
+ * Copyright (c) 2008-2012 WiredTiger, Inc.
+ *	All rights reserved.
+ *
+ * See the file LICENSE for redistribution information.
+ */
+
+#define	WT_DEBUG_POINT	((void *)0xdeadbeef)
+
+/* Return and branch-to-err-label cases for switch statements. */
+#define	WT_ILLEGAL_VALUE(session)					\
+	default:							\
+		return (__wt_illegal_value(session))
+#define	WT_ILLEGAL_VALUE_ERR(session)					\
+	default:							\
+		ret = __wt_illegal_value(session);			\
+		goto err
+
+/* Set "ret" and branch-to-err-label tests. */
+#define	WT_ERR(a) do {							\
+	if ((ret = (a)) != 0)						\
+		goto err;						\
+} while (0)
+#define	WT_ERR_MSG(session, v, ...) do {				\
+	ret = (v);							\
+	__wt_err(session, ret, __VA_ARGS__);				\
+	goto err;							\
+} while (0)
+#define	WT_ERR_TEST(a, v) do {						\
+	if (a) {							\
+		ret = (v);						\
+		goto err;						\
+	}								\
+} while (0)
+
+/* Return tests. */
+#define	WT_RET(a) do {							\
+	int __ret;							\
+	if ((__ret = (a)) != 0)						\
+		return (__ret);						\
+} while (0)
+#define	WT_RET_TEST(a, v) do {						\
+	if (a)								\
+		return (v);						\
+} while (0)
+#define	WT_RET_MSG(session, v, ...) do {				\
+	int __ret = (v);						\
+	__wt_err(session, __ret, __VA_ARGS__);				\
+	return (__ret);							\
+} while (0)
+
+/* Set "ret" if not already set. */
+#define	WT_TRET(a) do {							\
+	int __ret;							\
+	if ((__ret = (a)) != 0 && ret == 0)				\
+		ret = __ret;						\
+} while (0)
+
+/*
+ * WT_ASSERT, WT_ASSERT_RET --
+ *	Assert an expression, abort in diagnostic mode, otherwise, optionally
+ * return an error.
+ */
+#define	WT_ASSERT(session, exp) do {					\
+	if (!(exp))							\
+		(void)__wt_assert(					\
+		    session, 0, __FILE__, __LINE__, "%s", #exp);	\
+} while (0)
+#define	WT_ASSERT_RET(session, exp) do {				\
+	if (!(exp))							\
+		return (__wt_assert(					\
+		    session, WT_ERROR, __FILE__, __LINE__, "%s", #exp));\
+} while (0)

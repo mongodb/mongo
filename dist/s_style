@@ -1,0 +1,58 @@
+#! /bin/sh
+
+# General style correction and cleanup.
+t=__wt.$$
+trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+
+extra=`cd .. && echo src/include/*.[hi] src/include/*.in dist/*.py`
+(
+for f in `sed -e '/^[a-z]/! d' filelist` $extra; do
+	f="../$f"
+	if grep "^[^}]*while (0);" $f > /dev/null; then
+		echo "$f: while (0) has trailing semi-colon"
+	fi
+	if grep "%dl|%ul|%xl" $f > /dev/null; then
+		echo "$f: bad printf format: %[dux]l"
+	fi
+	if grep "(unsigned)" $f > /dev/null; then
+		echo "$f: (unsigned) cast is wrong"
+	fi
+
+	# Early exits from critical loops
+	sed -n -e '/API_CALL/,/API_END/{=;p;}' \
+	       -e '/va_start/,/va_end/{=;p;}' $f | \
+		sed 'N;s/\n/:/' | \
+		egrep 'return|WT_RET' | \
+		sed -e "s,^,$f:," -e 's/$/ [return skips API_END call]/'
+
+	# Bad code we can't easily fix
+	grep -Hn 'bzero|exit[ ]*\(1\)|^[	 ]+[|&=+-]' $f
+
+	tr -cd '[:alnum:][:space:][:punct:]' < $f |
+	unexpand |
+	sed -e 's/){/) {/' \
+	    -e 's/\([	 ]\)exit (/\1exit(/g' \
+	    -e 's/\([	 ]\)for(/\1for (/' \
+	    -e 's/\([	 ]\)if(/\1if (/' \
+	    -e 's/\([	 ]\)index(/\1strchr(/' \
+	    -e 's/\([	 ]\)return(/\1return (/' \
+	    -e 's/^\([	 ]+\)return \([^()]*\);/\1return (\2);/' \
+	    -e 's/\([	 ]\)rindex(/\1strrchr(/' \
+	    -e 's/\([	 ]\)sizeof (/\1sizeof(/g' \
+	    -e 's/\([	 ]\)switch(/\1switch (/' \
+	    -e 's/\([	 ]\)while(/\1while (/' \
+	    -e 's/\([	 ,]\)uint\([	 ,]\)/\1u_int\2/g' \
+	    -e 's/\([	 ,]\)u_int8_t\([	 ,]\)/\1uint8_t\2/g' \
+	    -e 's/\([	 ,]\)u_int16_t\([	 ,]\)/\1uint16_t\2/g' \
+	    -e 's/\([	 ,]\)u_int32_t\([	 ,]\)/\1uint32_t\2/g' \
+	    -e 's/\([	 ,]\)u_int64_t\([	 ,]\)/\1uint64_t\2/g' \
+	    -e 's/%\([dux]\)l/%l\1/' \
+	    -e 's/\([|&=+-]\)  *\([^*]\)/\1 \2/' \
+	    -e 's/(void) /(void)/' \
+	    -e '/for /!s/;;$/;/' \
+	    -e 's/(unsigned)/(u_int)/' \
+	    -e 's/^#define /#define	/' \
+	    -e 's/sizeof(WT_PAGE_DISK)/WT_PAGE_DISK_SIZE/g' >$t
+
+	cmp $t $f > /dev/null 2>&1 || (echo "$f" && cp $t $f)
+done)

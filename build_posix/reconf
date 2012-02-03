@@ -1,0 +1,64 @@
+#! /bin/sh
+
+t=/tmp/__configure.$$
+trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+
+# There's a cleanup function so we can easily clean out the directory.
+clean()
+{
+	test -f Makefile && make distclean > /dev/null
+	rm -rf ../Makefile.am ../Makefile.in \
+	    ../aclocal.m4 ../autom4te.cache ../config.hin ../config.hin~ \
+	    ../configure flexlint.out mklog
+}
+
+while :
+	do case "$1" in
+	-c)
+		clean			# Clean and leave empty
+		exit 0;;
+	*)
+		clean			# Clean and then re-create
+		break;;
+	esac
+done
+
+# Build configure.ac
+(
+echo "# DO NOT EDIT"
+echo "# This file is built automatically from build_posix/configure.ac.in."
+
+sed -n '1,/BEGIN check existence/p' configure.ac.in
+
+sed -e 's/#.*$//' -e '/^$/d' Make.subdirs | while read dir cond ; do
+	test -d ../$dir || continue
+	echo 'AC_CONFIG_FILES(['$dir/Makefile'])'
+done
+
+sed -n '/END check existence/,$p' configure.ac.in
+) > ../configure.ac
+
+# Build Makefile.am
+sh ./makemake
+
+# From here on, work in the top of the tree
+cd ..
+
+# Initialize standard automake files.
+cp LICENSE COPYING
+cat << END > NEWS
+To view release and installation documentation, load the distribution
+file docs/index.html into your web browser.
+END
+cp NEWS ChangeLog
+cp NEWS INSTALL
+
+autoreconf --install
+
+# Make sure any missing files are writable
+chmod 755 build_posix/gnu-support/*
+
+# Cleanup
+rm -rf autom4te.cache
+
+exit 0

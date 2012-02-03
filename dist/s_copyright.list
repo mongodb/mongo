@@ -1,0 +1,10 @@
+skip	lang/python/setup.py
+skip	lang/python/wiredtiger.py
+skip	src/api/api_strerror.c
+skip	src/config/config_def.c
+skip	src/include/extern.h
+skip	src/include/log.i
+skip	src/include/queue.h
+skip	src/include/serial_funcs.i
+skip	src/log/log_desc.c
+skip	src/support/stat.c

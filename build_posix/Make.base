@@ -1,0 +1,48 @@
+ACLOCAL_AMFLAGS = -I build_posix/aclocal
+
+# BEGIN SUBDIRS, maintained by makemake and subdirs.list
+# END SUBDIRS
+
+lib_LTLIBRARIES = libwiredtiger.la
+LDADD = $(lib_LTLIBRARIES)
+
+bin_PROGRAMS = wt
+wt_SOURCES =\
+	src/utilities/util_cpyright.c \
+	src/utilities/util_create.c \
+	src/utilities/util_drop.c \
+	src/utilities/util_dump.c \
+	src/utilities/util_dumpfile.c \
+	src/utilities/util_getopt.c \
+	src/utilities/util_list.c \
+	src/utilities/util_load.c \
+	src/utilities/util_loadtext.c \
+	src/utilities/util_main.c \
+	src/utilities/util_misc.c \
+	src/utilities/util_printlog.c \
+	src/utilities/util_read.c \
+	src/utilities/util_rename.c \
+	src/utilities/util_salvage.c \
+	src/utilities/util_stat.c \
+	src/utilities/util_upgrade.c \
+	src/utilities/util_verbose.c \
+	src/utilities/util_verify.c \
+	src/utilities/util_write.c
+
+include_HEADERS= wiredtiger.h
+INCLUDES = -I$(srcdir)/src/include
+
+pkgconfigdir = $(libdir)/pkgconfig
+pkgconfig_DATA = wiredtiger.pc
+
+$(srcdir)/Makefile.am: $(srcdir)/build_posix/Make.base $(srcdir)/build_posix/makemake $(srcdir)/dist/filelist
+	@cd $(srcdir)/build_posix && sh makemake
+
+libtool: $(LIBTOOL_DEPS)
+	$(SHELL) ./config.status libtool
+
+$(top_srcdir)/src/include/extern.h: auto-includes.chk
+$(top_srcdir)/src/include/wt_internal.in: auto-includes.chk
+
+auto-includes.chk: $(libwiredtiger_la_SOURCES)
+	@(cd $(srcdir)/dist && sh s_prototypes && sh s_typedef -b) && touch $@

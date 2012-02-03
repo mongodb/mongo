@@ -1,0 +1,7 @@
+# List of OK external symbols.
+wiredtiger_open
+wiredtiger_strerror
+wiredtiger_struct_pack
+wiredtiger_struct_size
+wiredtiger_struct_unpack
+wiredtiger_version

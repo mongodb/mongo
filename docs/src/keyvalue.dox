@@ -1,0 +1,19 @@
+/*! @page keyvalue Key/Value pairs
+
+Underlying WiredTiger files are key/value stores, that is, entries in
+the file are paired keys and values.  These keys and values can be
+accessed directly, and a file cursor will only return the data from the
+single file, without reference to any other related files or data.  For
+example, if an index were lost or to become inconsistent with its
+primary, a file cursor could read from the index without problems (even
+though some of the returned keys might not exist in the primary).
+
+In the case of a row-store file, keys and values are both
+variable-length byte strings, up to (4GB - 512B) in length.
+
+In the case of a column-store file, keys are 64-bit record numbers,
+where the first record in the file is record number 1.   Values are
+either variable-length byte strings, up to (4GB - 512B) in length, or
+bit fields, where a bit field is 1 to 8 bits.
+
+ */

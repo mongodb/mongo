@@ -1,0 +1,40 @@
+#! /bin/sh
+
+t=__wt.$$
+trap 'rm -f $t; exit 0' 0 1 2 3 13 15
+
+f=../README
+
+. ./RELEASE
+
+# If the version number has changed, generate a new README file (don't generate
+# a new one just because the date changed, that happens all the time).
+cnt=`(sed -e q < $f; echo "$WIREDTIGER_VERSION_STRING") |
+    sed -e 's/:.*//' | sort -u | wc -l`
+test $cnt -eq 1 && exit 0
+
+cat << END_TEXT > $t
+$WIREDTIGER_VERSION_STRING
+
+This is version $WIREDTIGER_VERSION_MAJOR.$WIREDTIGER_VERSION_MINOR.$WIREDTIGER_VERSION_PATCH of WiredTiger.
+
+See the file LICENSE for redistribution information.
+
+To view release and installation documentation, open docs/index.html
+in your web browser.
+
+To build in a POSIX environment (for example, Linux or other UNIX-like
+system), run:
+
+	./configure && make
+
+To install in the standard POSIX environment locations, enter:
+
+	make install
+
+For more information on build and installation options, see the
+WiredTiger documentation.
+END_TEXT
+
+cmp $t $f > /dev/null 2>&1 ||
+    (echo "Building $f" && rm -f $f && cp $t $f)

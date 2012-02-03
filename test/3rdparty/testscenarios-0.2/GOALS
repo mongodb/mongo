@@ -1,0 +1,25 @@
+
+testscenarios goals
+===================
+
+  * nice, declarative interface for multiplying tests by scenarios.
+
+  * plays nice with testresources - when a scenario uses a resource, the
+    resource ordering logic should be able to group them together.
+
+  * (at user discretion) plays nice with $random test discovery
+
+  * arbitrary post-load multiplication.
+
+  * cross-productable scenarios (for X and for Y)
+
+  * extenable scenarios (for X using Y)
+
+  * scenarios and the tests that use them are loosely coupled
+
+  * tests that use scenarios should be easy to debug
+
+  * fast
+
+  * usable in trial, bzr, Zope testrunner, nose and the default unittest
+    TestRunner

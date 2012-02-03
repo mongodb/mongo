@@ -1,0 +1,47 @@
+/*! @page compression Compressors
+
+This section explains how to use compression engines with WiredTiger, including the builtin support for bzip2 and snappy.
+
+@section bzip2 Using bzip2 compression
+
+To use the builtin <a href="http://www.bzip.org/">bzip2</a> compression, first verify that bzip2 is installed on your system.  On most UNIX and Linux variants, there will be a <code>bzlib.h</code> header file in the include directory for the compiler, as well as a library file available, often named <code>libbz2.so</code>, in <code>/usr/lib</code>.  If these are available, you can simply enable bzip2 by using the \c --enable-bzip2 option when running configure.
+
+If you have installed your own version of bzip2 in a non-standard location, you'll need to modify the \c CPPFLAGS and \c LDFLAGS to indicate these locations.  For example, with bzip2 includes and libraries installed in <code>/usr/local/include</code> and <code>/usr/local/lib</code>, run configure as:
+
+@code
+cd build_posix
+../dist/configure --enable-bzip2 CPPFLAGS="-I/usr/local/include" LDFLAGS="-L/usr/local/include"
+@endcode
+
+After building, check that this compressor is built and working by running the compression part of the test suite:
+
+@code
+cd build_posix
+python ../test/suite/run.py compress
+@endcode
+
+Verify that the bzip2 part of the test passes and was not skipped.
+
+@section snappy Using snappy compression
+
+Google's <a href="http://code.google.com/p/snappy/">snappy</a> compressor is generally not installed by default on UNIX and Linux distributions, so you will need to download, build and install it first.  To configure WiredTiger to include snappy, use the \c --enable-snappy option along with \c CPPFLAGS and \c LDFLAGS.  For example, with snappy includes and libraries installed in <code>/usr/local/include</code> and <code>/usr/local/lib</code>, run configure as:
+
+@code
+cd build_posix
+../dist/configure --enable-snappy CPPFLAGS="-I/usr/local/include" LDFLAGS="-L/usr/local/include"
+@endcode
+
+After building, check that this compressor is built and working by running the compression part of the test suite:
+
+@code
+cd build_posix
+python ../test/suite/run.py compress
+@endcode
+
+Verify that the snappy part of the test passes and was not skipped.
+
+@section custom Custom compression engines
+
+WiredTiger may be extended by adding custom compression engines; see @ref WT_COMPRESSOR for more information.
+
+ */
