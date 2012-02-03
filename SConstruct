@@ -823,17 +823,19 @@ def smoke_python_name():
     # which we assume to be installed.
     import subprocess
     version = re.compile(r'[Pp]ython ([\d\.]+)', re.MULTILINE)
-    binaries = ['python', 'python2.5', 'python2.6', 'python2.7', 'python25', 'python26', 'python27']
+    binaries = ['python2.5', 'python2.6', 'python2.7', 'python25', 'python26', 'python27', 'python']
     for binary in binaries:
         try:
             # py-2.4 compatible replacement for shell backticks
-            output = subprocess.Popen([binary, '-V'], stdout=subprocess.PIPE).communicate()[0]
-            match = version.search(output)
-            if match and float(match.group(1)) >= 2.5:
-                return binary
+            out, err = subprocess.Popen([binary, '-V'], stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
+            for stream in (out, err):
+                match = version.search(stream)
+                if match:
+                    versiontuple = tuple(map(int, match.group(1).split('.')))
+                    if versiontuple >= (2, 5):
+                        return binary
         except:
             pass
-
     # if that all fails, fall back to "python"
     return "python"
 
