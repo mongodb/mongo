@@ -17,7 +17,9 @@ key=`cat /dev/urandom |tr -dc A-Za-z0-9 | head -c 256`
 echo -e $key > $KEYFILE_PATH
 chmod 700 $KEYFILE_PATH
 chown mongod:mongod $KEYFILE_PATH
-echo "File generated"
+echo "File generated."
+echo "Make sure that '$KEYFILE_PATH' is copied across"
+echo "all servers in replica-set/shard."
 
 exit 0
 
