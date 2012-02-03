@@ -420,7 +420,6 @@ doneCheckOrder:
 
     void QueryPlanSet::init() {
         DEBUGQO( "QueryPlanSet::init " << ns << "\t" << _originalQuery );
-        _runner.reset();
         _plans.clear();
         _usingCachedPlan = false;
 
@@ -599,47 +598,6 @@ doneCheckOrder:
         return r.runUntilFirstCompletes();
     }
     
-    shared_ptr<QueryOp> QueryPlanSet::nextOp( QueryOp &originalOp, bool retried ) {
-        if ( !_runner ) {
-            _runner.reset( new Runner( *this, originalOp ) );
-            shared_ptr<QueryOp> op = _runner->init();
-            if ( op->complete() ) {
-                return op;   
-            }
-        }
-        shared_ptr<QueryOp> op = _runner->nextNonError();
-        if ( !op->error() ) {
-            return op;   
-        }
-        if ( !_usingCachedPlan || _bestGuessOnly || _plans.size() > 1 ) {
-            return op;
-        }
-
-        // Avoid an infinite loop here - this should never occur.
-        verify( 15878, !retried );
-
-        // A cached plan was used, so clear the plan for this query pattern and retry the query without a cached plan.
-        QueryUtilIndexed::clearIndexesForPatterns( *_frsp, _order );
-        init();
-        return nextOp( originalOp, true );
-    }
-
-    bool QueryPlanSet::prepareToYield() {
-        return _runner ? _runner->prepareToYield() : true;   
-    }
-    
-    void QueryPlanSet::recoverFromYield() {
-        if ( _runner ) {
-            _runner->recoverFromYield();   
-        }
-    }
-    
-    void QueryPlanSet::clearRunner() {
-        if ( _runner ) {
-            _runner.reset();
-        }
-    }
-    
     BSONObj QueryPlanSet::explain() const {
         vector<BSONObj> arr;
         for( PlanSet::const_iterator i = _plans.begin(); i != _plans.end(); ++i ) {
@@ -684,6 +642,46 @@ doneCheckOrder:
         }
         return false;
     }
+    
+    bool QueryPlanSet::prepareToRetryQuery() {
+        if ( !_usingCachedPlan || _bestGuessOnly || _plans.size() > 1 ) {
+            return false;
+        }
+        
+        // A cached plan was used, so clear the plan for this query pattern so the query may be
+        // retried without a cached plan.
+        QueryUtilIndexed::clearIndexesForPatterns( *_frsp, _order );
+        init();
+        return true;
+    }
+
+    shared_ptr<QueryOp> MultiPlanScanner::iterateRunner( QueryOp &originalOp, bool retried ) {
+        if ( !_runner ) {
+            _runner.reset( new QueryPlanSet::Runner( *_currentQps, originalOp ) );
+            shared_ptr<QueryOp> op = _runner->init();
+            if ( op->complete() ) {
+                return op;   
+            }
+        }
+        shared_ptr<QueryOp> op = _runner->nextNonError();
+        if ( !op->error() ) {
+            return op;   
+        }
+        if ( !_currentQps->prepareToRetryQuery() ) {
+            return op;
+        }
+        
+        // Avoid an infinite loop here - this should never occur.
+        verify( 15878, !retried );
+        
+        _runner.reset();
+        return iterateRunner( originalOp, true );
+    }
+
+    void MultiPlanScanner::updateCurrentQps( QueryPlanSet *qps ) {
+        _currentQps.reset( qps );
+        _runner.reset();
+    }    
 
     QueryPlanSet::Runner::Runner( QueryPlanSet &plans, QueryOp &op ) :
         _op( op ),
@@ -918,8 +916,8 @@ doneCheckOrder:
         // if _or == false, don't use or clauses for index selection
         if ( !_or ) {
             auto_ptr<FieldRangeSetPair> frsp( new FieldRangeSetPair( _ns.c_str(), _query, true ) );
-            _currentQps.reset( new QueryPlanSet( _ns.c_str(), frsp, auto_ptr<FieldRangeSetPair>(),
-                                                _query, order, false, _hint, honorRecordedPlan, min,
+            updateCurrentQps( new QueryPlanSet( _ns.c_str(), frsp, auto_ptr<FieldRangeSetPair>(),
+                                                _query, order, false, hint, honorRecordedPlan, min,
                                                 max, _bestGuessOnly, _mayYield ) );
         }
         else {
@@ -961,7 +959,7 @@ doneCheckOrder:
     }
     
     shared_ptr<QueryOp> MultiPlanScanner::nextOpHandleEndOfClause() {
-        shared_ptr<QueryOp> op = _currentQps->nextOp( *_baseOp );
+        shared_ptr<QueryOp> op = iterateRunner( *_baseOp );
         if ( !op->complete() ) {
             return op;   
         }
@@ -999,7 +997,7 @@ doneCheckOrder:
                 assertMayRunMore();
 	         	++_i;
             }            
-            return _currentQps->nextOp( *_baseOp );   
+            return iterateRunner( *_baseOp );
         }
         if ( _i == 0 ) {
             return nextOpBeginningClause();
@@ -1018,19 +1016,19 @@ doneCheckOrder:
     }
     
     bool MultiPlanScanner::prepareToYield() {
-        return _currentQps.get() ? _currentQps->prepareToYield() : true;
+        return _runner ? _runner->prepareToYield() : true;   
     }
     
     void MultiPlanScanner::recoverFromYield() {
-        if ( _currentQps.get() ) {
-            _currentQps->recoverFromYield();
+        if ( _runner ) {
+            _runner->recoverFromYield();   
         }
     }
 
     void MultiPlanScanner::clearRunner() {
-        if ( _currentQps.get() ) {
-            _currentQps->clearRunner();
-        }    
+        if ( _runner ) {
+            _runner.reset();
+        }
     }
     
     int MultiPlanScanner::currentNPlans() const {

@@ -1809,7 +1809,7 @@ namespace QueryOptimizerCursorTests {
             shared_ptr<Cursor> c = newQueryOptimizerCursor( ns(), BSON( "a" << 2 ), BSON( "b" << 1 ) );
             // Check that we are scanning {b:1} not {a:1}, since {a:1} is not properly ordered.
             for( int i = 0; i < 3; ++i ) {
-                ASSERT( c->ok() );
+                ASSERT( c->ok() );  
                 c->advance();
             }
             ASSERT( !c->ok() );

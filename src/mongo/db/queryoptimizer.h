@@ -251,12 +251,11 @@ namespace mongo {
     };
 
     /**
-     * A set of candidate query plans for a query.  This class can return a best buess plan or run a
+     * A set of candidate query plans for a query.  This class can return a best guess plan or run a
      * QueryOp on all the plans.
      */
     class QueryPlanSet {
     public:
-
         typedef boost::shared_ptr<QueryPlan> QueryPlanPtr;
         typedef vector<QueryPlanPtr> PlanSet;
 
@@ -290,17 +289,6 @@ namespace mongo {
             return dynamic_pointer_cast<T>( runOp( static_cast<QueryOp&>( op ) ) );
         }
 
-        /** Initialize or iterate a runner generated from @param originalOp. */
-        shared_ptr<QueryOp> nextOp( QueryOp &originalOp, bool retried = false );
-        
-        /** Yield the runner member. */
-        
-        bool prepareToYield();
-        void recoverFromYield();
-        
-        /** Clear the runner member. */
-        void clearRunner();
-        
         QueryPlanPtr firstPlan() const { return _plans[ 0 ]; }
         
         /** @return metadata about cursors and index bounds for all plans, suitable for explain output. */
@@ -315,24 +303,17 @@ namespace mongo {
         
         bool haveOrderedPlan() const;
 
+        bool prepareToRetryQuery();
+        
         //for testing
         const FieldRangeSetPair *originalFrsp() const { return _originalFrsp.get(); }
         bool modifiedKeys() const;
         bool hasMultiKey() const;
 
-    private:
-        void addOtherPlans( bool checkFirst );
-        void addPlan( QueryPlanPtr plan, bool checkFirst ) {
-            if ( checkFirst && plan->indexKey().woCompare( _plans[ 0 ]->indexKey() ) == 0 )
-                return;
-            _plans.push_back( plan );
-        }
-        void init();
-        void addHint( IndexDetails &id );
         class Runner {
         public:
             Runner( QueryPlanSet &plans, QueryOp &op );
-
+            
             /**
              * Iterate interactively through candidate documents on all plans.
              * QueryOp objects are returned at each interleaved step.
@@ -347,13 +328,13 @@ namespace mongo {
             shared_ptr<QueryOp> next();
             /** @return next non error op if there is one, otherwise an error op. */
             shared_ptr<QueryOp> nextNonError();
-
+            
             bool prepareToYield();
             void recoverFromYield();
             
             /** Run until first op completes. */
             shared_ptr<QueryOp> runUntilFirstCompletes();
-             
+            
             void mayYield();
             QueryOp &_op;
             QueryPlanSet &_plans;
@@ -374,6 +355,16 @@ namespace mongo {
             our_priority_queue<OpHolder> _queue;
         };
 
+    private:
+        void addOtherPlans( bool checkFirst );
+        void addPlan( QueryPlanPtr plan, bool checkFirst ) {
+            if ( checkFirst && plan->indexKey().woCompare( _plans[ 0 ]->indexKey() ) == 0 )
+                return;
+            _plans.push_back( plan );
+        }
+        void init();
+        void addHint( IndexDetails &id );
+
         const char *_ns;
         BSONObj _originalQuery;
         auto_ptr<FieldRangeSetPair> _frsp;
@@ -391,7 +382,6 @@ namespace mongo {
         bool _bestGuessOnly;
         bool _mayYield;
         ElapsedTracker _yieldSometimesTracker;
-        shared_ptr<Runner> _runner;
         bool _mustAssertOnYieldFailure;
     };
 
@@ -478,6 +468,11 @@ namespace mongo {
         bool haveOrderedPlan() const;
 
     private:
+        /** Initialize or iterate a runner generated from @param originalOp. */
+        shared_ptr<QueryOp> iterateRunner( QueryOp &originalOp, bool retried = false );
+        
+        void updateCurrentQps( QueryPlanSet *qps );
+        
         void assertNotOr() const {
             massert( 13266, "not implemented for $or query", !_or );
         }
@@ -499,6 +494,7 @@ namespace mongo {
         bool _mayYield;
         bool _tableScanned;
         shared_ptr<QueryOp> _baseOp;
+        shared_ptr<QueryPlanSet::Runner> _runner;
     };
 
     /** Provides a cursor interface for certain limited uses of a MultiPlanScanner. */
