@@ -52,15 +52,16 @@ EOF
 	}
 
 	# Run again to generate the full documentation set (with Python).
-	(cd ../docs && (eval cat Doxyfile $filter ; cat <<EOF
+	[ -f ../lang/python/wiredtiger.py ] && (cd ../docs &&
+		(eval cat Doxyfile $filter ; cat <<EOF
 QUIET=YES
 INPUT+=../lang/python/wiredtiger.py
 EOF
-) | doxygen -
+) | doxygen -)
 
 	# Fix up bad links doxygen generates in navtree.js
-	sed -i~ 's,/\.html,/,' navtree.js && rm -f navtree.js~
-	)
+	(cd ../docs &&
+	    sed -i~ 's,/\.html,/,' navtree.js && rm -f navtree.js~)
 }
 
 filter="|sed '/PROJECT_NUMBER/s,=.*,=\"Version $WIREDTIGER_VERSION\",'"
