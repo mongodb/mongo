@@ -61,7 +61,8 @@ EOF
 
 	# Fix up bad links doxygen generates in navtree.js
 	(cd ../docs &&
-	    sed -i~ 's,/\.html,/,' navtree.js && rm -f navtree.js~)
+	    sed -i~ -e 's,/\.html,/,' -e 's,\.html\.html,.html,' navtree.js &&
+	    rm -f navtree.js~)
 }
 
 filter="|sed '/PROJECT_NUMBER/s,=.*,=\"Version $WIREDTIGER_VERSION\",'"
