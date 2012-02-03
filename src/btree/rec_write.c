@@ -2844,7 +2844,7 @@ __rec_cell_build_key(WT_SESSION_IMPL *session,
  */
 static void
 __rec_cell_build_addr(
-    WT_SESSION_IMPL *session, const void *data, uint32_t size, uint64_t recno)
+    WT_SESSION_IMPL *session, const void *addr, uint32_t size, uint64_t recno)
 {
 	WT_KV *val;
 	WT_RECONCILE *r;
@@ -2853,10 +2853,19 @@ __rec_cell_build_addr(
 	val = &r->v;
 
 	/*
+	 * We don't check the address size because we can't store an address on
+	 * an overflow page: if the address won't fit, the overflow page's
+	 * address won't fit either.  This possibility must be handled by Btree
+	 * configuration, we have to disallow internal page sizes that are too
+	 * small with respect to the largest address cookie the underlying block
+	 * manager might return.
+	 */
+
+	/*
 	 * We don't copy the data into the buffer, it's not necessary; just
 	 * re-point the buffer's data/length fields.
 	 */
-	val->buf.data = data;
+	val->buf.data = addr;
 	val->buf.size = size;
 	val->cell_len = __wt_cell_pack_addr(&val->cell, recno, val->buf.size);
 	val->len = val->cell_len + val->buf.size;
