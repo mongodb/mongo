@@ -262,12 +262,25 @@ __session_truncate(WT_SESSION *wt_session,
 	/*
 	 * If the URI is specified, we don't need a start/stop, if start/stop
 	 * is specified, we don't need a URI.
+	 *
+	 * If no URI is specified, and both cursors are specified, start/stop
+	 * must reference the same object.
+	 *
+	 * Any specified cursor must have been initialized.
 	 */
 	if ((uri == NULL && start == NULL && stop == NULL) ||
 	    (uri != NULL && (start != NULL || stop != NULL)))
 		WT_ERR_MSG(session, EINVAL,
 		    "the truncate method should be passed either a URI or "
 		    "start/stop cursors, but not both");
+	if (start != NULL && stop != NULL && strcmp(start->uri, stop->uri) != 0)
+		WT_ERR_MSG(session, EINVAL,
+		    "truncate method cursors must reference the same object");
+	if ((start != NULL && !F_ISSET(start, WT_CURSTD_KEY_SET)) ||
+	    (stop != NULL && !F_ISSET(stop, WT_CURSTD_KEY_SET)))
+		WT_ERR_MSG(session, EINVAL,
+		    "the truncate method cursors must have their keys set");
+
 	if (uri == NULL) {
 		/*
 		 * From a starting/stopping cursor to the begin/end of the
