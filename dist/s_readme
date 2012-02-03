@@ -20,8 +20,11 @@ This is version $WIREDTIGER_VERSION_MAJOR.$WIREDTIGER_VERSION_MINOR.$WIREDTIGER_
 
 See the file LICENSE for redistribution information.
 
-To view release and installation documentation, open docs/index.html
-in your web browser.
+To view release and installation documentation, open
+
+	http://source.wiredtiger.com/
+
+or docs/index.html in your web browser.
 
 To build in a POSIX environment (for example, Linux or other UNIX-like
 system), run:
