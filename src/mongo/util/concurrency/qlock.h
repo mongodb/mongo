@@ -17,9 +17,10 @@ namespace mongo {
         };
         boost::mutex m;
         Z r,w,R,W;
-        int pre, post;
+        int greed; // 1 if someone wants to acquire a write lock
+        int greedyWrites;
     public:
-        QLock() : pre(1),post(0) { }
+        QLock() : greedyWrites(1), greed(0) { }
         void lock_r();
         void lock_w();
         void lock_R();
@@ -35,23 +36,19 @@ namespace mongo {
 
     inline void QLock::stop_greed() {
         boost::mutex::scoped_lock lk(m);
-        pre = 0; 
-        post = 1;
+        greedyWrites = 0;
     }
 
     inline void QLock::start_greed() { 
         boost::mutex::scoped_lock lk(m);
-        pre = 1;
-        post = 0;
+        greedyWrites = 1;
     }
 
     // "i will be reading. i promise to coordinate my activities with w's as i go with more 
     //  granular locks."
     inline void QLock::lock_r() {
         boost::mutex::scoped_lock lk(m);
-        while( 1 ) {
-            if( W.n == 0 )
-                break;
+        while( greed + W.n ) {
             r.c.wait(m);
         }
         r.n++;
@@ -61,9 +58,7 @@ namespace mongo {
     //  granular locks."
     inline void QLock::lock_w() { 
         boost::mutex::scoped_lock lk(m);
-        while( 1 ) {
-            if( W.n + R.n == 0 )
-                break;
+        while( greed + W.n + R.n ) {
             w.c.wait(m);
         }
         w.n++;
@@ -73,9 +68,7 @@ namespace mongo {
     // are writing."
     inline void QLock::lock_R() {
         boost::mutex::scoped_lock lk(m);
-        while( 1 ) {
-            if( W.n + w.n == 0 )
-                break;
+        while( greed + W.n + w.n ) { 
             R.c.wait(m);
         }
         R.n++;
@@ -83,31 +76,32 @@ namespace mongo {
 
     inline bool QLock::lock_W(int millis) { 
         boost::mutex::scoped_lock lk(m);
-        int pre=this->pre; // snapshot the pre post greedy values. the case they change on you in the loop is when going from nongreedy to greedy
-        int post=this->post;
-        W.n += pre; // ahead of time so we are then greedy
-        while( W.n + R.n + w.n + r.n != pre ) {
+        int g = greedyWrites;
+        greed += g;
+        while( W.n + R.n + w.n + r.n ) {
             if( W.c.timed_wait(m, boost::posix_time::milliseconds(millis)) == false ) { 
                 // timed out
-                dassert( W.n > 0 );
-                W.n -= pre;
+                dassert( greed > 0 );
+                greed -= g;
                 return false;
             }
         }
-        W.n += post;
+        W.n += 1;
+        dassert( W.n == 1 );
+        greed -= g;
         return true;
     }
 
     // "i will be writing. i will coordinate with no one. you better stop them all"
     inline void QLock::lock_W() { // lock the world for writing 
         boost::mutex::scoped_lock lk(m);
-        int pre=this->pre; // snapshot the pre post greedy values. the case they change on you in the loop is when going from nongreedy to greedy
-        int post=this->post;
-        W.n += pre; // ahead of time so we are then greedy
-        while( W.n + R.n + w.n + r.n != pre ) {
+        int g = greedyWrites;
+        greed += g;
+        while( W.n + R.n + w.n + r.n ) {
             W.c.wait(m);
         }
-        W.n += post;
+        W.n++;
+        greed -= g;
     }
 
     inline void QLock::unlock_r() {
@@ -137,12 +131,11 @@ namespace mongo {
     }    
     inline void QLock::unlock_W() {
         boost::mutex::scoped_lock lk(m);
-        W.n -= pre;
-        W.n -= post;
-        if( W.n ) {
-            // someone else would like to write
-            dassert( pre == 1 );
-            W.c.notify_one();
+        W.n--;
+        dassert( W.n == 0 );
+        W.c.notify_one();
+        if( greed ) {
+            // someone else would like to write, no need to notify further
         }
         else {
             R.c.notify_all();
