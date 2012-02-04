@@ -398,12 +398,6 @@ namespace mongo {
         }
     } validateCmd;
 
-    bool lockedForWriting = false; // read from db/instance.cpp
-    static bool unlockRequested = false;
-    static mongo::mutex fsyncLockMutex("fsyncLock");
-    static boost::condition fsyncLockCondition;
-    static OID fsyncLockID; // identifies the current lock job
-
     /*
         class UnlockCommand : public Command {
         public:
@@ -426,128 +420,76 @@ namespace mongo {
 
         } unlockCommand;
     */
+
     /* see unlockFsync() for unlocking:
        db.$cmd.sys.unlock.findOne()
     */
     class FSyncCommand : public Command {
-        static const char* url() { return  "http://www.mongodb.org/display/DOCS/fsync+Command"; }
-        class LockDBJob : public BackgroundJob {
-        protected:
-            virtual string name() const { return "lockdbjob"; }
-            void run() {
-                Client::initThread("fsyncjob");
-                Client& c = cc();
-                {
-                    scoped_lock lk(fsyncLockMutex);
-                    while (lockedForWriting){ // there is a small window for two LockDBJob's to be active. This prevents it.
-                        fsyncLockCondition.wait(lk.boost());
-                    }
-                    lockedForWriting = true;
-                    fsyncLockID.init();
-                }
-                readlock lk("");
-                MemoryMappedFile::flushAll(true);
-                log() << "db is now locked for snapshotting, no writes allowed. db.fsyncUnlock() to unlock" << endl;
-                log() << "    For more info see " << FSyncCommand::url() << endl;
-                _ready = true;
-                {
-                    scoped_lock lk(fsyncLockMutex);
-                    while( !unlockRequested ) {
-                        fsyncLockCondition.wait(lk.boost());
-                    }
-                    unlockRequested = false;
-                    lockedForWriting = false;
-                    fsyncLockCondition.notify_all();
-                }
-                c.shutdown();
-            }
-        public:
-            bool& _ready;
-            LockDBJob(bool& ready) : BackgroundJob( true /* delete self */ ), _ready(ready) {
-                _ready = false;
-            }
-        };
+        static const char* url() { return "http://www.mongodb.org/display/DOCS/fsync+Command"; }
     public:
-        FSyncCommand() : Command( "fsync" ) {}
-        virtual LockType locktype() const { return WRITE; }
+        bool locked;
+        SimpleMutex m; // protects locked var above
+        FSyncCommand() : Command( "fsync" ), m("lockfsync") { locked=false; }
+        virtual LockType locktype() const { return NONE; }
         virtual bool slaveOk() const { return true; }
         virtual bool adminOnly() const { return true; }
-        /*virtual bool localHostOnlyIfNoAuth(const BSONObj& cmdObj) {
-            string x = cmdObj["exec"].valuestrsafe();
-            return !x.empty();
-        }*/
         virtual void help(stringstream& h) const { h << url(); }
         virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             bool sync = !cmdObj["async"].trueValue(); // async means do an fsync, but return immediately
             bool lock = cmdObj["lock"].trueValue();
-            log() << "CMD fsync:  sync:" << sync << " lock:" << lock << endl;
-
+            log() << "CMD fsync: sync:" << sync << " lock:" << lock << endl;
             if( lock ) {
-                // fsync and lock variation 
-
-                uassert(12034, "fsync: can't lock while an unlock is pending", !unlockRequested);
-                uassert(12032, "fsync: sync option must be true when using lock", sync);
-                /* With releaseEarly(), we must be extremely careful we don't do anything
-                   where we would have assumed we were locked.  profiling is one of those things.
-                   Perhaps at profile time we could check if we released early -- however,
-                   we need to be careful to keep that code very fast it's a very common code path when on.
-                */
-                uassert(12033, "fsync: profiling must be off to enter locked mode", cc().database()->profile == 0);
-
-                // todo future: Perhaps we could do this in the background thread.  As is now, writes may interleave between 
-                //              the releaseEarly below and the acquisition of the readlock in the background thread. 
-                //              However the real problem is that it seems complex to unlock here and then have a window for 
-                //              writes before the bg job -- can be done correctly but harder to reason about correctness.
-                //              If this command ran within a read lock in the first place, would it work, and then that 
-                //              would be quite easy?
-                //              Or, could we downgrade the write lock to a read lock, wait for ready, then release?
-                getDur().syncDataAndTruncateJournal();
-
-                bool ready = false;
-                LockDBJob *l = new LockDBJob(ready);
-
-                d.dbMutex.releaseEarly();
-                
-                // There is a narrow window for another lock request to come in
-                // here before the LockDBJob grabs the readlock. LockDBJob will
-                // ensure that the requests are serialized and never running
-                // concurrently
-
-                l->go();
-                // don't return until background thread has acquired the read lock
-                while( !ready ) {
-                    sleepmillis(10);
+                Lock::ThreadSpan::setWLockedNongreedy();
+                assert( !locked ); // impossible to get here if locked is true
+                try { 
+                    //uassert(12034, "fsync: can't lock while an unlock is pending", !unlockRequested);
+                    uassert(12032, "fsync: sync option must be true when using lock", sync);
+                    uassert(12033, "fsync: profiling must be off to enter locked mode", cc().database()->profile == 0);
+                    getDur().syncDataAndTruncateJournal();
+                } catch(...) { 
+                    Lock::ThreadSpan::unsetW();
+                    throw;
                 }
+                SimpleMutex::scoped_lock lk(m);
+                Lock::ThreadSpan::W_to_R();
+                try {
+                    MemoryMappedFile::flushAll(true);
+                }
+                catch(...) { 
+                    Lock::ThreadSpan::unsetR();
+                    throw;
+                }
+                assert( !locked );
+                locked = true;
+                log() << "db is now locked for snapshotting, no writes allowed. db.fsyncUnlock() to unlock" << endl;
+                log() << "    For more info see " << FSyncCommand::url() << endl;
                 result.append("info", "now locked against writes, use db.fsyncUnlock() to unlock");
                 result.append("seeAlso", url());
             }
             else {
                 // the simple fsync command case
-
-                if (sync)
+                if (sync) {
+                    Lock::GlobalWrite w; // can this be GlobalRead? and if it can, it should be nongreedy.
                     getDur().commitNow();
+                }
+                // question : is it ok this is not in the dblock? i think so but this is a change from past behavior, 
+                // please advise.
                 result.append( "numFiles" , MemoryMappedFile::flushAll( sync ) );
             }
             return 1;
         }
-
     } fsyncCmd;
 
-    // Note that this will only unlock the current lock.  If another thread
-    // relocks before we return we still consider the unlocking successful.
-    // This is imporant because if two scripts are trying to fsync-lock, each
-    // one must be assured that between the fsync return and the call to unlock
-    // that the database is fully locked
-    void unlockFsyncAndWait(){
-        scoped_lock lk(fsyncLockMutex);
-        if (lockedForWriting) { // could have handled another unlock before we grabbed the lock
-            OID curOp = fsyncLockID;
-            unlockRequested = true;
-            fsyncLockCondition.notify_all();
-            while (lockedForWriting && fsyncLockID == curOp){
-                fsyncLockCondition.wait( lk.boost() );
-            }
+    bool lockedForWriting() { return fsyncCmd.locked; }
+
+    // @return true if unlocked
+    bool _unlockFsync() {
+        SimpleMutex::scoped_lock lk(fsyncCmd.m);
+        if( !fsyncCmd.locked ) { 
+            return false;
         }
+        fsyncCmd.locked = false;
+        Lock::ThreadSpan::unsetR();
+        return true;
     }
 }
-
