@@ -1103,10 +1103,10 @@ var p19result = [
         "hour" : 4,
         "dayOfYear" : 220,
         "dayOfMonth" : 8,
-        "dayOfWeek" : 1,
+        "dayOfWeek" : 5,
         "month" : 8,
-        "week" : 32,
-        "year" : 2100
+        "week" : 31,
+        "year" : 2030
     },
     {
         "_id" : ObjectId("4e14a3f1ffc569a332159c6b"),
@@ -1121,6 +1121,9 @@ var p19result = [
         "year" : 2000
     }
 ];
+
+printjson( p19.result );
+printjson( p19result );
 
 assert(arrayEq(p19.result, p19result), 'p19 failed');
 
