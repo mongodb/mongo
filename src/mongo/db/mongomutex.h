@@ -77,11 +77,11 @@ namespace mongo {
          */
         int getState() const { return _state.get(); }
 
-        bool atLeastReadLocked() const { return _state.get() != 0; }
+        static bool atLeastReadLocked();
         void assertAtLeastReadLocked() const { assert(atLeastReadLocked()); }
-        bool isWriteLocked/*by our thread*/() const { return getState() > 0; }
+        static bool isWriteLocked();
         void assertWriteLocked() const {
-            assert( getState() > 0 );
+            assert( isWriteLocked() );
             DEV assert( !_releasedEarly.get() );
         }
 

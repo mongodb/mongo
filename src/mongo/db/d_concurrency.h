@@ -18,16 +18,16 @@ namespace mongo {
     public:
         static int isLocked(); // true if *anything* is locked (by us)
         static int isWriteLocked(); // w or W
-        class GlobalWrite : boost::noncopyable {
-        public:
+        struct GlobalWrite : boost::noncopyable { // recursive is ok
+            const bool already;
             GlobalWrite(); 
             ~GlobalWrite();
             struct TempRelease {
                 TempRelease(); ~TempRelease();
             };
         };
-        class GlobalRead : boost::noncopyable {
-        public:
+        struct GlobalRead : boost::noncopyable { // recursive is ok
+            const bool already;
             GlobalRead(); 
             ~GlobalRead();
         };
@@ -44,6 +44,8 @@ namespace mongo {
             ~DBRead();
         };
     };
+
+    // the below are for backward compatibility.  use Lock classes above instead.
 
     class readlock {
         scoped_ptr<Lock::GlobalRead> lk1;
@@ -62,7 +64,6 @@ namespace mongo {
     };
 
     /* parameterized choice of read or write locking
-       use readlock and writelock instead of this when statically known which you want
     */
     class mongolock {
         scoped_ptr<readlock> r;

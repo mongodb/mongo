@@ -23,10 +23,6 @@ namespace mongo {
 
     static QLock& q = *new QLock();
 
-    void testNonGreedy() { 
-        q.stop_greed();
-    }
-
     //static RWLockRecursive excludeWrites("excludeWrites");
     //static mapsf<string,RWLockRecursive*> dblocks;
 
@@ -50,7 +46,7 @@ namespace mongo {
         q.lock_W();
     }
     static void unlock_W() { 
-        assert( threadState == 'W' );
+        wassert( threadState == 'W' );
         threadState = 0;
         q.unlock_W();
     }
@@ -86,19 +82,23 @@ namespace mongo {
         unlock_W();
     }
     Lock::GlobalWrite::TempRelease::~TempRelease() {
-        lock_W();
+        DESTRUCTOR_GUARD( lock_W(); )
     }
-    Lock::GlobalWrite::GlobalWrite() {
-        lock_W();
+    Lock::GlobalWrite::GlobalWrite() : already(threadState == 'W') {
+        if( !already ) 
+            lock_W();
     }
     Lock::GlobalWrite::~GlobalWrite() {
-        unlock_W();
+        if( !already ) 
+            unlock_W();
     }
-    Lock::GlobalRead::GlobalRead() {
-        lock_R();
+    Lock::GlobalRead::GlobalRead() : already(threadState == 'R' || threadState == 'W') {
+        if( !already )
+            lock_R();
     }
     Lock::GlobalRead::~GlobalRead() {
-        unlock_R();
+        if( !already ) 
+            unlock_R();
     }
     Lock::DBWrite::DBWrite(const StringData& ns) { 
         // TEMP : 
@@ -158,6 +158,17 @@ namespace mongo {
 }
 
 namespace mongo {
+
+    /* backward compatible glue. it could be that the assumption was that 
+       it's a global read lock, so 'r' and 'w' don't qualify.
+       */ 
+    bool MongoMutex::atLeastReadLocked() { 
+        int x = Lock::isLocked();
+        return x == 'R' || x == 'W';
+    }
+    bool MongoMutex::isWriteLocked() { 
+        return Lock::isLocked() == 'W';
+    }
 
     // this tie-in temporary until MongoMutex is folded in more directly.Exclud
     // called when the lock has been achieved
