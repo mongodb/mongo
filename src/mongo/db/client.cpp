@@ -272,9 +272,9 @@ namespace mongo {
     }
        
     void Client::Context::_finishInit( bool doauth ) {
-        int lockState = d.dbMutex.getState();
-        assert( lockState );        
-        if ( lockState > 0 && FileAllocator::get()->hasFailed() ) {
+        dassert( Lock::isLocked() );
+        int writeLocked = Lock::isWriteLocked();
+        if ( writeLocked && FileAllocator::get()->hasFailed() ) {
             uassert(14031, "Can't take a write lock while out of disk space", false);
         }
         
@@ -283,7 +283,7 @@ namespace mongo {
         if( _doVersion ) checkNotStale();
         _client->_context = this;
         _client->_curOp->enter( this );
-        checkNsAccess( doauth, lockState );
+        checkNsAccess( doauth, writeLocked ? 1 : 0 );
     }
 
     void Client::Context::_auth( int lockState ) {

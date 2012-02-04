@@ -75,8 +75,11 @@ namespace mongo {
         q.unlock_w();
     }
 
-    bool Lock::isLocked() {
-        return threadState != 0;
+    int Lock::isLocked() {
+        return threadState;
+    }
+    int Lock::isWriteLocked() { // w or W
+        return threadState & 'W'; // ascii assumed
     }
 
     Lock::GlobalWrite::TempRelease::TempRelease() {

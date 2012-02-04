@@ -16,7 +16,8 @@ namespace mongo {
 
     class Lock : boost::noncopyable { 
     public:
-        static bool isLocked(); // true if *anything* is locked (by us)
+        static int isLocked(); // true if *anything* is locked (by us)
+        static int isWriteLocked(); // w or W
         class GlobalWrite : boost::noncopyable {
         public:
             GlobalWrite(); 
