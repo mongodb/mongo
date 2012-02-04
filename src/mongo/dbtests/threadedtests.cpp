@@ -28,7 +28,12 @@
 #include <boost/bind.hpp>
 #include "../db/d_concurrency.h"
 #include "../util/concurrency/synchronization.h"
+#include "../util/concurrency/qlock.h"
 #include "dbtests.h"
+
+namespace mongo { 
+    void testNonGreedy();
+}
 
 namespace ThreadedTests {
 
@@ -570,7 +575,7 @@ namespace ThreadedTests {
                     log() << x << ' ' << ch << " got " << endl;
                     if( what[x] == 'R' ) {
                         if( t.millis() > 15 ) { 
-                            log() << x << " warning: when in upgradable, write locks are still greedy on this platform" << endl;
+                            log() << x << " info: when in upgradable, write locks are still greedy on this platform" << endl;
                         }
                     }
                     sleepmillis(200);
@@ -734,9 +739,7 @@ namespace ThreadedTests {
                 sleepmillis(100);
                 cout << mongo::curTimeMillis64() % 10000 << " 2" << endl;
                 rwlock lk(m, true);
-                //m._lock();
                 cout << mongo::curTimeMillis64() % 10000 << " 2x" << endl;
-                //m.unlock();
             }
             if( x == 3 ) {
                 sleepmillis(200);
@@ -751,11 +754,69 @@ namespace ThreadedTests {
         }
     };
 
+    static int pass;
+    class QLockTest : public ThreadedTest<3> {
+    public:
+        bool gotW;
+        QLockTest() : gotW(false),m() {
+
+        }
+        void setup() { 
+            if(pass == 1) { 
+                m.stop_greed();
+                testNonGreedy();
+            }
+        }
+        ~QLockTest() {
+            m.start_greed();
+            cout << "!QLocktest" << endl;
+        }
+    private:
+        QLock m;
+        virtual void validate() { }
+        virtual void subthread(int x) {
+            Client::initThread("qtest");
+            if( x == 1 ) { 
+                cout << mongo::curTimeMillis64() % 10000 << " 1 lock_r()..." << endl;
+                m.lock_r();
+                cout << mongo::curTimeMillis64() % 10000 << " 1            got" << endl;
+                sleepmillis(300);
+                m.unlock_r();
+                cout << mongo::curTimeMillis64() % 10000 << " 1 unlock_r()" << endl;
+            }
+            if( x == 2 || x == 4 ) {
+                sleepmillis(x*50);
+                cout << mongo::curTimeMillis64() % 10000 << " 2 lock_W()..." << endl;
+                m.lock_W();
+                cout << mongo::curTimeMillis64() % 10000 << " 2            got" << endl;
+                gotW = true;
+                m.unlock_W();
+            }
+            if( x == 3 ) {
+                sleepmillis(200);
+
+                Timer t;
+                cout << mongo::curTimeMillis64() % 10000 << " 3 lock_r()..." << endl;
+                m.lock_r();
+                assert( gotW );
+                cout << mongo::curTimeMillis64() % 10000 << " 3            got" << gotW << endl;
+                cout << t.millis() << endl;
+                m.unlock_r();
+                ASSERT( t.millis() > 50 );
+            }
+            cc().shutdown();
+        }
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "threading" ) { }
 
         void setupTests() {
+            add< WriteLocksAreGreedy >();
+            add< QLockTest >();
+            add< QLockTest >();
+
             // Slack is a test to see how long it takes for another thread to pick up
             // and begin work after another relinquishes the lock.  e.g. a spin lock 
             // would have very little slack.
@@ -764,7 +825,6 @@ namespace ThreadedTests {
             add< Slack<SimpleRWLock,SimpleRWLock::Exclusive> >();
             add< CondSlack >();
 
-            add< WriteLocksAreGreedy >();
             add< UpgradableTest >();
             add< List1Test >();
             add< List1Test2 >();

@@ -23,6 +23,10 @@ namespace mongo {
 
     static QLock& q = *new QLock();
 
+    void testNonGreedy() { 
+        q.stop_greed();
+    }
+
     //static RWLockRecursive excludeWrites("excludeWrites");
     //static mapsf<string,RWLockRecursive*> dblocks;
 
@@ -30,49 +34,49 @@ namespace mongo {
     HLMutex::HLMutex(const char *name) : SimpleMutex(name)
     { }
 
-    // ' ', 'r', 'w', 'R', 'W'
+    // 0, 'r', 'w', 'R', 'W'
     __declspec( thread ) char threadState;
     
     static bool lock_W_try(int ms) { 
-        assert( threadState == ' ' );
+        assert( threadState == 0 );
         bool got = q.lock_W(ms);
         if( got ) 
             threadState = 'W';
         return got;
     }
     static void lock_W() { 
-        assert( threadState == ' ' );
+        assert( threadState == 0 );
         threadState = 'W';
         q.lock_W();
     }
     static void unlock_W() { 
         assert( threadState == 'W' );
-        threadState = ' ';
+        threadState = 0;
         q.unlock_W();
     }
     static void lock_R() { 
-        assert( threadState == ' ' );
+        assert( threadState == 0 );
         threadState = 'R';
         q.lock_R();
     }
     static void unlock_R() { 
         assert( threadState == 'R' );
-        threadState = ' ';
+        threadState = 0;
         q.unlock_R();
     }
     static void lock_w() { 
-        assert( threadState == ' ' );
+        assert( threadState == 0 );
         threadState = 'w';
         q.lock_w();
     }
     static void unlock_w() { 
         assert( threadState == 'w' );
-        threadState = ' ';
+        threadState = 0;
         q.unlock_w();
     }
 
     bool Lock::isLocked() {
-        return threadState != ' ';
+        return threadState != 0;
     }
 
     Lock::GlobalWrite::TempRelease::TempRelease() {
