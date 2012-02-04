@@ -19,29 +19,33 @@ namespace mongo {
         Z r,w,R,W;
         int greed; // 1 if someone wants to acquire a write lock
         int greedyWrites;
+        int stopped;
     public:
-        QLock() : greedyWrites(1), greed(0) { }
+        QLock() : greedyWrites(1), greed(0), stopped(0) { }
         void lock_r();
         void lock_w();
         void lock_R();
-        void start_greed();
-        void stop_greed();
         void lock_W();
         bool lock_W(int millis);
         void unlock_r();
         void unlock_w();
         void unlock_R();
         void unlock_W();
+        void start_greed();
+        void stop_greed();
+        void W_to_R();
     };
 
     inline void QLock::stop_greed() {
         boost::mutex::scoped_lock lk(m);
-        greedyWrites = 0;
+        if( ++stopped == 1 ) // ie recursion on stop_greed/start_greed is ok
+            greedyWrites = 0;
     }
 
     inline void QLock::start_greed() { 
         boost::mutex::scoped_lock lk(m);
-        greedyWrites = 1;
+        if( --stopped == 1 ) 
+            greedyWrites = 1;
     }
 
     // "i will be reading. i promise to coordinate my activities with w's as i go with more 
@@ -90,6 +94,15 @@ namespace mongo {
         dassert( W.n == 1 );
         greed -= g;
         return true;
+    }
+
+    // downgrade from W state to R state
+    inline void QLock::W_to_R() { 
+        boost::mutex::scoped_lock lk(m);
+        assert( W.n == 1 );
+        assert( R.n == 0 );
+        W.n = 0;
+        R.n = 1;
     }
 
     // "i will be writing. i will coordinate with no one. you better stop them all"

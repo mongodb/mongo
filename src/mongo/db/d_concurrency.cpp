@@ -23,6 +23,13 @@ namespace mongo {
 
     static QLock& q = *new QLock();
 
+    Lock::Nongreedy::Nongreedy() {
+        q.stop_greed();
+    }
+    Lock::Nongreedy::~Nongreedy() {
+        q.start_greed();
+    }
+
     //static RWLockRecursive excludeWrites("excludeWrites");
     //static mapsf<string,RWLockRecursive*> dblocks;
 
@@ -69,6 +76,29 @@ namespace mongo {
         assert( threadState == 'w' );
         threadState = 0;
         q.unlock_w();
+    }
+
+    // these are safe for use ACROSS threads.  i.e. one thread can lock and 
+    // another unlock!
+    void Lock::ThreadSpan::setWLockedNongreedy() { 
+        assert( threadState == 0 ); // as this spans threads the tls wouldn't make sense
+        q.lock_W();
+        q.stop_greed();
+    }
+    void Lock::ThreadSpan::W_to_R() { 
+        assert( threadState == 0 );
+        q.lock_W();
+        q.stop_greed();
+    }
+    void Lock::ThreadSpan::unsetW() {
+        assert( threadState == 0 );
+        q.unlock_W();
+        q.start_greed();
+    }
+    void Lock::ThreadSpan::unsetR() {
+        assert( threadState == 0 );
+        q.unlock_R();
+        q.start_greed();
     }
 
     int Lock::isLocked() {

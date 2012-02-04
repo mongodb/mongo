@@ -26,6 +26,12 @@ namespace mongo {
                 TempRelease(); ~TempRelease();
             };
         };
+        struct ThreadSpan { 
+            static void setWLockedNongreedy();
+            static void W_to_R();
+            static void unsetW(); // reverts to greedy
+            static void unsetR(); // reverts to greedy
+        };
         struct GlobalRead : boost::noncopyable { // recursive is ok
             const bool already;
             GlobalRead(); 
@@ -42,6 +48,9 @@ namespace mongo {
         public:
             DBRead(const StringData& dbOrNs);
             ~DBRead();
+        };
+        struct Nongreedy : boost::noncopyable { // temporarily disable greediness of W lock acquisitions
+            Nongreedy(); ~Nongreedy();
         };
     };
 
