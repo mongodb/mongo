@@ -72,7 +72,7 @@ using namespace mongoutils;
 
 namespace mongo {
 
-    extern bool lockedForWriting;
+    bool lockedForWriting();
 
     namespace dur {
 
@@ -687,7 +687,7 @@ namespace mongo {
                 }
             }
 
-            if ( lockedForWriting ) {
+            if ( lockedForWriting() ) {
                 warning() << "group commit delayed beacuse of fsync + lock" << endl;
                 return;
             }
