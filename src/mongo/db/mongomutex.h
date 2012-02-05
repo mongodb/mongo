@@ -249,6 +249,7 @@ namespace mongo {
 
     inline void MongoMutex::_acquiredWriteLock() {
         lockedExclusively();
+        // get rid of this with the new model
         if( _remapPrivateViewRequested ) {
             dur::REMAPPRIVATEVIEW();
             dassert( !_remapPrivateViewRequested );
@@ -269,17 +270,10 @@ namespace mongo {
     }
 
     struct readlocktry {
-        readlocktry( int tryms ) {
-            _got = d.dbMutex.lock_shared_try( tryms );
-        }
-        ~readlocktry() {
-            if ( _got ) {
-                d.dbMutex.unlock_shared();
-            }
-        }
+        readlocktry( int tryms );
+        ~readlocktry();
+        const bool _got;
         bool got() const { return _got; }
-    private:
-        bool _got;
     };
 
     struct writelocktry {

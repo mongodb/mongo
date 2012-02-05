@@ -40,6 +40,13 @@ namespace mongo {
     // 0, 'r', 'w', 'R', 'W'
     __declspec( thread ) char threadState;
     
+    static bool lock_R_try(int ms) { 
+        assert( threadState == 0 );
+        bool got = q.lock_R(ms);
+        if( got ) 
+            threadState = 'R';
+        return got;
+    }
     static bool lock_W_try(int ms) { 
         assert( threadState == 0 );
         bool got = q.lock_W(ms);
@@ -171,6 +178,14 @@ namespace mongo {
     writelocktry::~writelocktry() { 
         if( _got )
             unlock_W();
+    }
+
+    readlocktry::readlocktry( int tryms ) : 
+      _got( lock_R_try(tryms) )
+    { }
+    readlocktry::~readlocktry() { 
+        if( _got )
+            unlock_R();
     }
 
     readlock::readlock() {

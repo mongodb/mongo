@@ -25,8 +25,9 @@ namespace mongo {
         void lock_r();
         void lock_w();
         void lock_R();
+        bool lock_R(int millis); // try
         void lock_W();
-        bool lock_W(int millis);
+        bool lock_W(int millis); // try
         void unlock_r();
         void unlock_w();
         void unlock_R();
@@ -76,6 +77,17 @@ namespace mongo {
             R.c.wait(m);
         }
         R.n++;
+    }
+
+    inline bool QLock::lock_R(int millis) {
+        boost::mutex::scoped_lock lk(m);
+        while( greed + W.n + w.n ) { 
+            if( R.c.timed_wait(m, boost::posix_time::milliseconds(millis)) == false ) { 
+                return false;
+            }
+        }
+        R.n++;
+        return true;
     }
 
     inline bool QLock::lock_W(int millis) { 
