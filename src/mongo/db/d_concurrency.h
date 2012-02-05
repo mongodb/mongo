@@ -16,8 +16,9 @@ namespace mongo {
 
     class Lock : boost::noncopyable { 
     public:
-        static int isLocked(); // true if *anything* is locked (by us)
+        static int isLocked();      // true if *anything* is locked (by us)
         static int isWriteLocked(); // w or W
+
         struct GlobalWrite : boost::noncopyable { // recursive is ok
             const bool already;
             GlobalWrite(); 
@@ -25,12 +26,6 @@ namespace mongo {
             struct TempRelease {
                 TempRelease(); ~TempRelease();
             };
-        };
-        struct ThreadSpan { 
-            static void setWLockedNongreedy();
-            static void W_to_R();
-            static void unsetW(); // reverts to greedy
-            static void unsetR(); // reverts to greedy
         };
         struct GlobalRead : boost::noncopyable { // recursive is ok
             const bool already;
@@ -49,8 +44,16 @@ namespace mongo {
             DBRead(const StringData& dbOrNs);
             ~DBRead();
         };
+
+        // specialty things:
         struct Nongreedy : boost::noncopyable { // temporarily disable greediness of W lock acquisitions
             Nongreedy(); ~Nongreedy();
+        };
+        struct ThreadSpan { 
+            static void setWLockedNongreedy();
+            static void W_to_R();
+            static void unsetW(); // reverts to greedy
+            static void unsetR(); // reverts to greedy
         };
     };
 
