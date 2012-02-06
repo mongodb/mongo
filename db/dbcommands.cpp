@@ -514,7 +514,15 @@ namespace mongo {
 
                 if( overhead > 4000 ) { 
                     t.append("note", "virtual minus mapped is large. could indicate a memory leak");
-                    log() << "warning: virtual size (" << v << "MB) - mapped size (" << m << "MB) is large (" << overhead << "MB). could indicate a memory leak" << endl;
+
+                    static time_t last = 0;
+                    time_t now = time(0);
+                    
+                    if ( last + 60 < now ) {
+                        last = now;
+                        log() << "warning: virtual size (" << v << "MB) - mapped size (" << m << "MB) is large (" << overhead << "MB). could indicate a memory leak" << endl;
+                    }
+
                 }
 
                 t.done();
