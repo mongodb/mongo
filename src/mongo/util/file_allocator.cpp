@@ -149,9 +149,9 @@ namespace mongo {
     // TODO: pull this out to per-OS files once they exist
     static bool useSparseFiles(int fd) {
 #if defined(__linux__)
-        // these are from <linux/magic.h> but that isn't available on all systems
-        const unsigned NFS_SUPER_MAGIC = 0x6969;
-        const unsigned BTRFS_SUPER_MAGIC = 0x9123683E;
+// these are from <linux/magic.h> but that isn't available on all systems
+# define NFS_SUPER_MAGIC 0x6969
+# define BTRFS_SUPER_MAGIC 0x9123683E
 
         struct statfs fs_stats;
         int ret = fstatfs(fd, &fs_stats);
