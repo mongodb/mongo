@@ -158,7 +158,7 @@ namespace mongo {
         uassert(16062, "fstatfs failed: " + errnoWithDescription(), ret == 0);
 
         return (  fs_stats.f_type == NFS_SUPER_MAGIC
-               || fs_stats.f_type == BTRFS_SUPER_MAGIC
+               //|| fs_stats.f_type == BTRFS_SUPER_MAGIC // commented out due to signed unsigned comparison
                );
 
 #elif defined(__freebsd__) || defined(__sunos__)
