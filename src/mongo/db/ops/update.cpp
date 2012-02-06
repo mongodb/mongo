@@ -664,7 +664,7 @@ namespace mongo {
 
         set<string> onedownseen;
         BSONElement prevE;
-        while ( e.type() && m != mend ) {
+        while ( !e.eoo() && m != mend ) {
 
             if ( duplicateFieldName( prevE, e ) ) {
                 // Just copy through an element with a duplicate field name.
@@ -734,7 +734,7 @@ namespace mongo {
         }
 
         // finished looping the mods, just adding the rest of the elements
-        while ( e.type() ) {
+        while ( !e.eoo() ) {
             DEBUGUPDATE( "\t\t\t copying: " << e.fieldName() );
             b.append( e );  // if array, ignore field name
             e = es.next();
