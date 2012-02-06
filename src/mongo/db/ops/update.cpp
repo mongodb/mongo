@@ -1116,7 +1116,6 @@ namespace mongo {
                 Record *r = c->_current();
                 DiskLoc loc = c->currLoc();
 
-                // TODO Maybe this is unnecessary since we have seenObjects
                 if ( c->getsetdup( loc ) && autoDedup ) {
                     c->advance();
                     continue;
