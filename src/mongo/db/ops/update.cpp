@@ -604,24 +604,6 @@ namespace mongo {
         }
     }
 
-    void ModSet::extractFields( map< string, BSONElement > &fields, const BSONElement &top, const string &base ) {
-        if ( top.type() != Object ) {
-            fields[ base + top.fieldName() ] = top;
-            return;
-        }
-        BSONObjIterator i( top.embeddedObject() );
-        bool empty = true;
-        while( i.moreWithEOO() ) {
-            BSONElement e = i.next();
-            if ( e.eoo() )
-                break;
-            extractFields( fields, e, base + top.fieldName() + "." );
-            empty = false;
-        }
-        if ( empty )
-            fields[ base + top.fieldName() ] = top;
-    }
-
     template< class Builder >
     void ModSetState::_appendNewFromMods( const string& root , ModState& m , Builder& b , set<string>& onedownseen ) {
         const char * temp = m.fieldName();
