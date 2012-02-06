@@ -1383,7 +1383,7 @@ namespace mongo {
             }
             catch( AssertionException& e ) {
                 if ( dupsAllowed ) {
-                    // unknow exception??
+                    // unknown exception??
                     throw;
                 }
 
