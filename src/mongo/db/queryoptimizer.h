@@ -500,7 +500,6 @@ namespace mongo {
     /** Provides a cursor interface for certain limited uses of a MultiPlanScanner. */
     class MultiCursor : public Cursor {
     public:
-        MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order );
         /**
          * Used
          * 1. To handoff a query to a getMore()

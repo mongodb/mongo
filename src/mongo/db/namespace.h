@@ -476,7 +476,8 @@ namespace mongo {
                                             const ParsedQuery *parsedQuery = 0 );
 
         /**
-         * @return a single cursor that may work well for the given query.
+         * @return a single cursor that may work well for the given query.  A $or style query will
+         * produce a single cursor, not a MultiCursor.
          * It is possible no cursor is returned if the sort is not supported by an index.  Clients are responsible
          * for checking this if they are not sure an index for a sort exists, and defaulting to a non-sort if
          * no suitable indices exist.

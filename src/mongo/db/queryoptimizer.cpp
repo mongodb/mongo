@@ -1079,21 +1079,6 @@ doneCheckOrder:
         return _currentQps->haveOrderedPlan();
     }
 
-    MultiCursor::MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order ) :
-    _op( new NoOp() ),
-    _mps( new MultiPlanScanner( ns, pattern, order, BSONObj(), true, BSONObj(), BSONObj(), true ) ),
-    _nscanned() {
-        if ( _mps->mayRunMore() ) {
-            nextClause();
-            if ( !ok() ) {
-                advance();
-            }
-        }
-        else {
-            _c.reset( new BasicCursor( DiskLoc() ) );
-        }
-    }    
-
     MultiCursor::MultiCursor( auto_ptr<MultiPlanScanner> mps, const shared_ptr<Cursor> &c, const shared_ptr<CoveredIndexMatcher> &matcher, const QueryOp &op, long long nscanned )
     : _op( new NoOp( op ) ), _c( c ), _mps( mps ), _matcher( matcher ), _nscanned( nscanned ) {
         _mps->setBestGuessOnly();
@@ -1271,26 +1256,21 @@ doneCheckOrder:
     shared_ptr<Cursor> NamespaceDetailsTransient::bestGuessCursor( const char *ns,
                                                                   const BSONObj &query,
                                                                   const BSONObj &sort ) {
-        if( !query.getField( "$or" ).eoo() ) {
-            return shared_ptr<Cursor>( new MultiCursor( ns, query, sort ) );
+        auto_ptr<FieldRangeSetPair> frsp( new FieldRangeSetPair( ns, query, true ) );
+        auto_ptr<FieldRangeSetPair> origFrsp( new FieldRangeSetPair( *frsp ) );
+
+        QueryPlanSet qps( ns, frsp, origFrsp, query, sort, false, 0, false );
+        QueryPlanSet::QueryPlanPtr qpp = qps.getBestGuess();
+        if( ! qpp.get() ) return shared_ptr<Cursor>();
+
+        shared_ptr<Cursor> ret = qpp->newCursor();
+
+        // If we don't already have a matcher, supply one.
+        if ( !query.isEmpty() && ! ret->matcher() ) {
+            shared_ptr<CoveredIndexMatcher> matcher( new CoveredIndexMatcher( query, ret->indexKeyPattern() ) );
+            ret->setMatcher( matcher );
         }
-        else {
-            auto_ptr<FieldRangeSetPair> frsp( new FieldRangeSetPair( ns, query, true ) );
-            auto_ptr<FieldRangeSetPair> origFrsp( new FieldRangeSetPair( *frsp ) );
-
-            QueryPlanSet qps( ns, frsp, origFrsp, query, sort, false );
-            QueryPlanSet::QueryPlanPtr qpp = qps.getBestGuess();
-            if( ! qpp.get() ) return shared_ptr<Cursor>();
-
-            shared_ptr<Cursor> ret = qpp->newCursor();
-
-            // If we don't already have a matcher, supply one.
-            if ( !query.isEmpty() && ! ret->matcher() ) {
-                shared_ptr<CoveredIndexMatcher> matcher( new CoveredIndexMatcher( query, ret->indexKeyPattern() ) );
-                ret->setMatcher( matcher );
-            }
-            return ret;
-        }
+        return ret;
     }
 
     bool QueryUtilIndexed::indexUseful( const FieldRangeSetPair &frsp, NamespaceDetails *d, int idxNo, const BSONObj &order ) {
