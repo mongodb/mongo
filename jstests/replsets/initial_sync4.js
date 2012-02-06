@@ -1,5 +1,7 @@
 // Test update modifier uassert during initial sync. SERVER-4781
 
+if( 0 ) { // SERVER-4781
+
 load("jstests/replsets/rslib.js");
 basename = "jstests_initsync4";
 
@@ -61,3 +63,5 @@ wait(function() {
      return status.members &&
      (status.members[1].state == 2);
      });
+
+}
