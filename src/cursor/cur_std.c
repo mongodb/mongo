@@ -319,7 +319,6 @@ __wt_cursor_close(WT_CURSOR *cursor)
 int
 __wt_cursor_init(WT_CURSOR *cursor,
     const char *uri, int is_file, int is_public, const char *cfg[])
-	WT_GCC_FUNC_ATTRIBUTE((warn_unused_result))
 {
 	WT_SESSION_IMPL *session;
 
