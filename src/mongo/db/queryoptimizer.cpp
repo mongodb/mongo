@@ -346,8 +346,8 @@ doneCheckOrder:
                                auto_ptr<FieldRangeSetPair> originalFrsp,
                                const BSONObj &originalQuery, const BSONObj &order,
                                bool mustAssertOnYieldFailure, const BSONObj &hint,
-                               bool honorRecordedPlan, const BSONObj &min, const BSONObj &max,
-                               bool bestGuessOnly, bool mayYield ) :
+                               QueryPlanSet::RecordedPlanPolicy recordedPlanPolicy,
+                               const BSONObj &min, const BSONObj &max, bool mayYield ) :
         _ns(ns),
         _originalQuery( originalQuery ),
         _frsp( frsp ),
@@ -357,10 +357,9 @@ doneCheckOrder:
         _hint( hint.getOwned() ),
         _order( order.getOwned() ),
         _oldNScanned( 0 ),
-        _honorRecordedPlan( honorRecordedPlan ),
+        _recordedPlanPolicy( recordedPlanPolicy ),
         _min( min.getOwned() ),
         _max( max.getOwned() ),
-        _bestGuessOnly( bestGuessOnly ),
         _mayYield( mayYield ),
 	    _yieldSometimesTracker( 256, 20 ),
         _mustAssertOnYieldFailure( mustAssertOnYieldFailure ) {
@@ -491,7 +490,7 @@ doneCheckOrder:
             uassert( 13038 , (string)"can't find special index: " + _special + " for: " + _originalQuery.toString() , 0 );
         }
 
-        if ( _honorRecordedPlan ) {
+        if ( _recordedPlanPolicy != Ignore ) {
             pair< BSONObj, long long > best = QueryUtilIndexed::bestIndexForPatterns( *_frsp, _order );
             BSONObj bestIndex = best.first;
             long long oldNScanned = best.second;
@@ -513,7 +512,8 @@ doneCheckOrder:
                 }
 
                 massert( 10368 ,  "Unable to locate previously recorded index", p.get() );
-                if ( !p->unhelpful() && !( _bestGuessOnly && p->scanAndOrderRequired() ) ) {
+                if ( !p->unhelpful() &&
+                    !( _recordedPlanPolicy == UseIfInOrder && p->scanAndOrderRequired() ) ) {
                     _usingCachedPlan = true;
                     _plans.push_back( p );
                     return;
@@ -594,7 +594,7 @@ doneCheckOrder:
             Runner r( *this, op );
             shared_ptr<QueryOp> res = r.runUntilFirstCompletes();
             // _plans.size() > 1 if addOtherPlans was called in Runner::runUntilFirstCompletes().
-            if ( _bestGuessOnly || res->complete() || _plans.size() > 1 )
+            if ( res->complete() || _plans.size() > 1 )
                 return res;
             // A cached plan was used, so clear the plan for this query pattern and retry the query without a cached plan.
             // Careful here, as the namespace may have been dropped.
@@ -651,7 +651,7 @@ doneCheckOrder:
     }
     
     bool QueryPlanSet::prepareToRetryQuery() {
-        if ( !_usingCachedPlan || _bestGuessOnly || _plans.size() > 1 ) {
+        if ( !_usingCachedPlan || _plans.size() > 1 ) {
             return false;
         }
         
@@ -739,21 +739,12 @@ doneCheckOrder:
     shared_ptr<QueryOp> QueryPlanSet::Runner::init() {
         massert( 10369 ,  "no plans", _plans._plans.size() > 0 );
         
-        if ( _plans._bestGuessOnly ) {
+        if ( _plans._plans.size() > 1 )
+            log(1) << "  running multiple plans" << endl;
+        for( PlanSet::iterator i = _plans._plans.begin(); i != _plans._plans.end(); ++i ) {
             shared_ptr<QueryOp> op( _op.createChild() );
-            shared_ptr<QueryPlan> plan = _plans.getBestGuess();
-            massert( 15894, "no index matches QueryPlanSet's sort with _bestGuessOnly", plan.get() );
-            op->setQueryPlan( plan.get() );
+            op->setQueryPlan( i->get() );
             _ops.push_back( op );
-        }
-        else {
-            if ( _plans._plans.size() > 1 )
-                log(1) << "  running multiple plans" << endl;
-            for( PlanSet::iterator i = _plans._plans.begin(); i != _plans._plans.end(); ++i ) {
-                shared_ptr<QueryOp> op( _op.createChild() );
-                op->setQueryPlan( i->get() );
-                _ops.push_back( op );
-            }
         }
         
         // Initialize ops.
@@ -799,7 +790,7 @@ doneCheckOrder:
         if ( op.error() ) {
             return holder._op;
         }
-        if ( !_plans._bestGuessOnly && _plans._usingCachedPlan && op.nscanned() > _plans._oldNScanned * 10 && _plans._special.empty() ) {
+        if ( _plans._usingCachedPlan && op.nscanned() > _plans._oldNScanned * 10 && _plans._special.empty() ) {
             holder._offset = -op.nscanned();
             _plans.addOtherPlans( /* avoid duplicating the initial plan */ true );
             PlanSet::iterator i = _plans._plans.begin();
@@ -901,17 +892,15 @@ doneCheckOrder:
                                         const BSONObj &query,
                                         const BSONObj &order,
                                         const BSONObj &hint,
-                                        bool honorRecordedPlan,
+                                        QueryPlanSet::RecordedPlanPolicy recordedPlanPolicy,
                                         const BSONObj &min,
                                         const BSONObj &max,
-                                        bool bestGuessOnly,
                                         bool mayYield ) :
         _ns( ns ),
         _or( !query.getField( "$or" ).eoo() ),
         _query( query.getOwned() ),
         _i(),
-        _honorRecordedPlan( honorRecordedPlan ),
-        _bestGuessOnly( bestGuessOnly ),
+        _recordedPlanPolicy( recordedPlanPolicy ),
         _hint( hint.getOwned() ),
         _mayYield( mayYield ),
         _tableScanned() {
@@ -932,8 +921,8 @@ doneCheckOrder:
         if ( !_or ) {
             auto_ptr<FieldRangeSetPair> frsp( new FieldRangeSetPair( _ns.c_str(), _query, true ) );
             updateCurrentQps( new QueryPlanSet( _ns.c_str(), frsp, auto_ptr<FieldRangeSetPair>(),
-                                                _query, order, false, hint, honorRecordedPlan, min,
-                                                max, _bestGuessOnly, _mayYield ) );
+                                                _query, order, false, hint, _recordedPlanPolicy,
+                                                min, max, _mayYield ) );
         }
         else {
             BSONElement e = _query.getField( "$or" );
@@ -950,9 +939,9 @@ doneCheckOrder:
         ++_i;
         auto_ptr<FieldRangeSetPair> frsp( _org->topFrsp() );
         auto_ptr<FieldRangeSetPair> originalFrsp( _org->topFrspOriginal() );
-        _currentQps.reset( new QueryPlanSet( _ns.c_str(), frsp, originalFrsp, _query, BSONObj(),
-                                            true, _hint, _honorRecordedPlan, BSONObj(),
-                                            BSONObj(), _bestGuessOnly, _mayYield ) );
+        updateCurrentQps( new QueryPlanSet( _ns.c_str(), frsp, originalFrsp, _query, BSONObj(),
+                                            true, _hint, _recordedPlanPolicy, BSONObj(),
+                                            BSONObj(), _mayYield ) );
         shared_ptr<QueryOp> ret( _currentQps->runOp( op ) );
         if ( ! ret->complete() )
             throw MsgAssertionException( ret->exception() );
@@ -1010,9 +999,8 @@ doneCheckOrder:
         auto_ptr<FieldRangeSetPair> frsp( _org->topFrsp() );
         auto_ptr<FieldRangeSetPair> originalFrsp( _org->topFrspOriginal() );
         updateCurrentQps( new QueryPlanSet( _ns.c_str(), frsp, originalFrsp, _query,
-                                           BSONObj(), true, _hint, _honorRecordedPlan,
-                                           BSONObj(), BSONObj(), _bestGuessOnly,
-                                           _mayYield ) );
+                                           BSONObj(), true, _hint, _recordedPlanPolicy,
+                                           BSONObj(), BSONObj(), _mayYield ) );
     }
 
     shared_ptr<QueryOp> MultiPlanScanner::nextOp() {
@@ -1131,8 +1119,7 @@ doneCheckOrder:
     _queryPlan( &op.qp() ),
     _nscanned( nscanned ) {
         _mps->clearRunner();
-        _mps->setBestGuessOnly();
-        _mps->mayYield( false ); // with a NoOp, there's no need to yield in QueryPlanSet
+        _mps->setRecordedPlanPolicy( QueryPlanSet::UseIfInOrder );
         if ( !ok() ) {
             // If supplied cursor exhausted, try to advance.
             advance();
@@ -1320,7 +1307,7 @@ doneCheckOrder:
         auto_ptr<FieldRangeSetPair> frsp( new FieldRangeSetPair( ns, query, true ) );
         auto_ptr<FieldRangeSetPair> origFrsp( new FieldRangeSetPair( *frsp ) );
 
-        QueryPlanSet qps( ns, frsp, origFrsp, query, sort, false, 0, false );
+        QueryPlanSet qps( ns, frsp, origFrsp, query, sort, false, 0, QueryPlanSet::UseIfInOrder );
         QueryPlanSet::QueryPlanPtr qpp = qps.getBestGuess();
         if( ! qpp.get() ) return shared_ptr<Cursor>();
 

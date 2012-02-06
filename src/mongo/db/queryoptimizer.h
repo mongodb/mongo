@@ -262,6 +262,12 @@ namespace mongo {
         typedef boost::shared_ptr<QueryPlan> QueryPlanPtr;
         typedef vector<QueryPlanPtr> PlanSet;
 
+        typedef enum {
+            Ignore,
+            UseIfInOrder,
+            Use
+        } RecordedPlanPolicy;
+        
         /**
          * @param originalFrsp - original constraints for this query clause; if null, frsp will be used.
          */
@@ -272,10 +278,9 @@ namespace mongo {
                       const BSONObj &order,
                       bool mustAssertOnYieldFailure = true,
                       const BSONObj &hint = BSONObj(),
-                      bool honorRecordedPlan = true,
+                      RecordedPlanPolicy RecordedPlanPolicy = Use,
                       const BSONObj &min = BSONObj(),
                       const BSONObj &max = BSONObj(),
-                      bool bestGuessOnly = false,
                       bool mayYield = false);
 
         /** @return number of candidate plans. */
@@ -380,11 +385,10 @@ namespace mongo {
         BSONObj _hint;
         BSONObj _order;
         long long _oldNScanned;
-        bool _honorRecordedPlan;
+        RecordedPlanPolicy _recordedPlanPolicy;
         BSONObj _min;
         BSONObj _max;
         string _special;
-        bool _bestGuessOnly;
         bool _mayYield;
         ElapsedTracker _yieldSometimesTracker;
         bool _mustAssertOnYieldFailure;
@@ -397,10 +401,9 @@ namespace mongo {
                           const BSONObj &query,
                           const BSONObj &order,
                           const BSONObj &hint = BSONObj(),
-                          bool honorRecordedPlan = true,
+                          QueryPlanSet::RecordedPlanPolicy recordedPlanPolicy = QueryPlanSet::Use,
                           const BSONObj &min = BSONObj(),
                           const BSONObj &max = BSONObj(),
-                          bool bestGuessOnly = false,
                           bool mayYield = false);
 
         /**
@@ -445,6 +448,10 @@ namespace mongo {
         /** Clear the runner member. */
         void clearRunner();
         
+        void setRecordedPlanPolicy( QueryPlanSet::RecordedPlanPolicy recordedPlanPolicy ) {
+            _recordedPlanPolicy = recordedPlanPolicy;
+        }
+        
         int currentNPlans() const;
 
         /**
@@ -459,7 +466,7 @@ namespace mongo {
          * MultiPlanScanner is destroyed, hence we return a raw pointer.
          */
         const QueryPlan *singlePlan() const;
-
+        
         /** @return true iff more $or clauses need to be scanned. */
         bool mayRunMore() const {
             return _or ? ( !_tableScanned && !_org->orRangesExhausted() ) : _i == 0;
@@ -468,10 +475,6 @@ namespace mongo {
         BSONObj oldExplain() const { assertNotOr(); return _currentQps->explain(); }
         /** @return true iff this is not a $or query and a plan is selected based on previous success of this plan. */
         bool usingCachedPlan() const { return !_or && _currentQps->usingCachedPlan(); }
-        /** Don't attempt to scan multiple plans, just use the best guess. */
-        void setBestGuessOnly() { _bestGuessOnly = true; }
-        /** Yielding is allowed while running each QueryPlan. */
-        void mayYield( bool val ) { _mayYield = val; }
         bool modifiedKeys() const { return _currentQps->modifiedKeys(); }
         bool hasMultiKey() const { return _currentQps->hasMultiKey(); }
         
@@ -504,8 +507,7 @@ namespace mongo {
         shared_ptr<OrRangeGenerator> _org; // May be null in certain non $or query cases.
         auto_ptr<QueryPlanSet> _currentQps;
         int _i;
-        bool _honorRecordedPlan;
-        bool _bestGuessOnly;
+        QueryPlanSet::RecordedPlanPolicy _recordedPlanPolicy;
         BSONObj _hint;
         bool _mayYield;
         bool _tableScanned;

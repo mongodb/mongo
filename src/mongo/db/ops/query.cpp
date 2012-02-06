@@ -1015,9 +1015,7 @@ namespace mongo {
             if ( mps.usingCachedPlan() )
                 oldPlan = mps.oldExplain();
         }
-        auto_ptr< MultiPlanScanner > mps
-        ( new MultiPlanScanner( ns, query, order, hint, !explain, pq.getMin(), pq.getMax(), false,
-                               true ) );
+        auto_ptr< MultiPlanScanner > mps( new MultiPlanScanner( ns, query, order, hint, explain ? QueryPlanSet::Ignore : QueryPlanSet::Use, pq.getMin(), pq.getMax(), true ) );
         BSONObj explainSuffix;
         if ( explain ) {
             BSONObjBuilder bb;

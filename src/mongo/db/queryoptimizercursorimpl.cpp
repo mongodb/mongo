@@ -606,7 +606,7 @@ namespace mongo {
                 }
             }
         }
-        auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order, &hint, true, parsedQuery ? parsedQuery->getMin() : BSONObj(), parsedQuery ? parsedQuery->getMax() : BSONObj() ) ); // mayYield == false
+        auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order, &hint, QueryPlanSet::Use, parsedQuery ? parsedQuery->getMin() : BSONObj(), parsedQuery ? parsedQuery->getMax() : BSONObj() ) ); // mayYield == false
         const QueryPlan *singlePlan = mps->singlePlan();
         bool requireOrder = ( parsedQuery == 0 );
         if ( singlePlan && !singlePlan->scanAndOrderRequired() ) {
