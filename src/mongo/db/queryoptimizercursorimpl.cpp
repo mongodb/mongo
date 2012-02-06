@@ -103,7 +103,6 @@ namespace mongo {
         
         virtual bool prepareToYield() {
             if ( _c && !_cc ) {
-                log() << "making cursor" << endl;
                 _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , _c , qp().ns() ) );
             }
             if ( _cc ) {
@@ -487,7 +486,6 @@ namespace mongo {
                         qocop->cursor()->advance();
                     }
                     // Clear the Runner and any unnecessary QueryOps and their ClientCursors.
-                    _mps->clearRunner();
                     _takeover.reset( new MultiCursor( _mps,
                                                      qocop->cursor(),
                                                      op->matcher( qocop->cursor() ),

@@ -975,13 +975,8 @@ doneCheckOrder:
     
     shared_ptr<QueryOp> MultiPlanScanner::nextOpHandleEndOfClause() {
         shared_ptr<QueryOp> op = iterateRunner( *_baseOp );
-        if ( !op->complete() ) {
-            return op;   
-        }
-        if ( op->qp().willScanTable() ) {
-            _tableScanned = true;   
-        } else {
-            _org->popOrClause( op->qp().nsd(), op->qp().idxNo(), op->qp().indexed() ? op->qp().indexKey() : BSONObj() );         	   
+        if ( op->completeWithoutStop() ) {
+            handleEndOfClause( op->qp() );
         }
         return op;
     }
@@ -990,20 +985,34 @@ doneCheckOrder:
         assertMayRunMore();
         shared_ptr<QueryOp> op;
         while( mayRunMore() ) {
-	        ++_i;
-    	    auto_ptr<FieldRangeSetPair> frsp( _org->topFrsp() );
-        	auto_ptr<FieldRangeSetPair> originalFrsp( _org->topFrspOriginal() );
-    	    _currentQps.reset( new QueryPlanSet( _ns.c_str(), frsp, originalFrsp, _query,
-                                                BSONObj(), true, _hint, _honorRecordedPlan,
-                                                BSONObj(), BSONObj(), _bestGuessOnly,
-                                                _mayYield ) );
+            handleBeginningOfClause();
             op = nextOpHandleEndOfClause();
-            if ( !op->complete() ) {
+            if ( !op->completeWithoutStop() ) {
              	return op;
             }
             _baseOp = op;
         }
         return op;
+    }
+    
+    void MultiPlanScanner::handleEndOfClause( const QueryPlan &clausePlan ) {
+        if ( clausePlan.willScanTable() ) {
+            _tableScanned = true;   
+        } else {
+            _org->popOrClause( clausePlan.nsd(), clausePlan.idxNo(),
+                              clausePlan.indexed() ? clausePlan.indexKey() : BSONObj() );
+        }
+    }
+    
+    void MultiPlanScanner::handleBeginningOfClause() {
+        assertMayRunMore();
+        ++_i;
+        auto_ptr<FieldRangeSetPair> frsp( _org->topFrsp() );
+        auto_ptr<FieldRangeSetPair> originalFrsp( _org->topFrspOriginal() );
+        updateCurrentQps( new QueryPlanSet( _ns.c_str(), frsp, originalFrsp, _query,
+                                           BSONObj(), true, _hint, _honorRecordedPlan,
+                                           BSONObj(), BSONObj(), _bestGuessOnly,
+                                           _mayYield ) );
     }
 
     shared_ptr<QueryOp> MultiPlanScanner::nextOp() {
@@ -1011,23 +1020,35 @@ doneCheckOrder:
             if ( _i == 0 ) {
                 assertMayRunMore();
 	         	++_i;
-            }            
+            }
             return iterateRunner( *_baseOp );
         }
         if ( _i == 0 ) {
             return nextOpBeginningClause();
         }
         shared_ptr<QueryOp> op = nextOpHandleEndOfClause();
-        if ( !op->complete() ) {
+        if ( !op->completeWithoutStop() ) {
             return op;   
         }
-        if ( !op->stopRequested() && mayRunMore() ) {
+        if ( mayRunMore() ) {
             // Finished scanning the clause, but stop hasn't been requested.
             // Start scanning the next clause.
             _baseOp = op;
             return nextOpBeginningClause();
         }
         return op;
+    }
+    
+    const QueryPlan *MultiPlanScanner::nextClauseBestGuessPlan( const QueryPlan &currentPlan ) {
+        assertMayRunMore();
+        handleEndOfClause( currentPlan );
+        if ( !mayRunMore() ) {
+            return 0;
+        }
+        handleBeginningOfClause();
+        shared_ptr<QueryPlan> bestGuess = _currentQps->getBestGuess();
+        verify( 16066, bestGuess );
+        return bestGuess.get();
     }
     
     bool MultiPlanScanner::prepareToYield() {
@@ -1094,26 +1115,51 @@ doneCheckOrder:
         return _currentQps->haveOrderedPlan();
     }
 
-    MultiCursor::MultiCursor( auto_ptr<MultiPlanScanner> mps, const shared_ptr<Cursor> &c, const shared_ptr<CoveredIndexMatcher> &matcher, const QueryOp &op, long long nscanned )
-    : _op( new NoOp( op ) ), _c( c ), _mps( mps ), _matcher( matcher ), _nscanned( nscanned ) {
+    string MultiPlanScanner::toString() const {
+        return BSON(
+                    "or" << _or <<
+                    "currentQps" << ( _currentQps.get() ? _currentQps->toString() : "" )
+                    ).jsonString();
+    }
+    
+    MultiCursor::MultiCursor( auto_ptr<MultiPlanScanner> mps, const shared_ptr<Cursor> &c,
+                             const shared_ptr<CoveredIndexMatcher> &matcher,
+                             const QueryOp &op, long long nscanned ) :
+    _mps( mps ),
+    _c( c ),
+    _matcher( matcher ),
+    _queryPlan( &op.qp() ),
+    _nscanned( nscanned ) {
+        _mps->clearRunner();
         _mps->setBestGuessOnly();
         _mps->mayYield( false ); // with a NoOp, there's no need to yield in QueryPlanSet
         if ( !ok() ) {
-            // would have been advanced by UserQueryOp if possible
+            // If supplied cursor exhausted, try to advance.
             advance();
         }
     }
     
+    bool MultiCursor::advance() {
+        _c->advance();
+        while( !ok() && _mps->mayRunMore() ) {
+            nextClause();
+        }
+        return ok();
+    }
+
     void MultiCursor::nextClause() {
         if ( _nscanned >= 0 && _c.get() ) {
             _nscanned += _c->nscanned();
         }
-        shared_ptr<NoOp> best = _mps->runOpOnce( *_op );
-        if ( ! best->complete() )
-            throw MsgAssertionException( best->exception() );
-        _c = best->newCursor();
-        _matcher = best->matcher( _c );
-        _op = best;
+        _matcher->advanceOrClause( _queryPlan->originalFrv() );
+        shared_ptr<CoveredIndexMatcher> newMatcher
+        ( _matcher->nextClauseMatcher( _queryPlan->indexKey() ) );
+        const QueryPlan *nextPlan = _mps->nextClauseBestGuessPlan( *_queryPlan );
+        if ( nextPlan ) {
+            _queryPlan = nextPlan;
+            _matcher = newMatcher;
+            _c = nextPlan->newCursor();
+        }
     }    
     
     bool indexWorks( const BSONObj &idxPattern, const BSONObj &sampleKey, int direction, int firstSignificantField ) {

@@ -174,6 +174,7 @@ namespace mongo {
         bool complete() const { return _complete; }
         /** @return true iff the implementation called steStop(). */
         bool stopRequested() const { return _stopRequested; }
+        bool completeWithoutStop() const { return complete() && !stopRequested(); }
         /** @return true iff the implementation threw an exception. */
         bool error() const { return _error; }
         /** @return the exception thrown by implementation if one was thrown. */
@@ -428,6 +429,13 @@ namespace mongo {
         
         void initialOp( const shared_ptr<QueryOp> &originalOp ) { _baseOp = originalOp; }
         shared_ptr<QueryOp> nextOp();
+
+        /**
+         * Advance to the next $or clause; mayRunMore() must be true.
+         * @param currentPlan QueryPlan of the current $or clause
+         * @return best guess query plan of the next $or clause
+         */
+        const QueryPlan *nextClauseBestGuessPlan( const QueryPlan &currentPlan );
         
         /** Yield the runner member. */
         
@@ -487,6 +495,8 @@ namespace mongo {
         }
         shared_ptr<QueryOp> nextOpBeginningClause();
         shared_ptr<QueryOp> nextOpHandleEndOfClause();
+        void handleEndOfClause( const QueryPlan &clausePlan );
+        void handleBeginningOfClause();
         bool haveUselessOr() const;
         const string _ns;
         bool _or;
@@ -519,13 +529,7 @@ namespace mongo {
         virtual Record* _current() { return _c->_current(); }
         virtual BSONObj current() { return _c->current(); }
         virtual DiskLoc currLoc() { return _c->currLoc(); }
-        virtual bool advance() {
-            _c->advance();
-            while( !ok() && _mps->mayRunMore() ) {
-                nextClause();
-            }
-            return ok();
-        }
+        virtual bool advance();
         virtual BSONObj currKey() const { return _c->currKey(); }
         virtual DiskLoc refLoc() { return _c->refLoc(); }
         virtual void noteLocation() { _c->noteLocation(); }
@@ -534,11 +538,7 @@ namespace mongo {
         virtual bool supportYields() { return _c->supportYields(); }
         virtual BSONObj indexKeyPattern() { return _c->indexKeyPattern(); }
 
-        /**
-         * with update we could potentially get the same document on multiple
-         * indexes, but update appears to already handle this with seenObjects
-         * so we don't have to do anything special here.
-         */
+        /** Deduping documents from a prior cursor is handled by the matcher. */
         virtual bool getsetdup(DiskLoc loc) { return _c->getsetdup( loc ); }
 
         virtual bool autoDedup() const { return _c->autoDedup(); }
@@ -554,25 +554,12 @@ namespace mongo {
 
         /** return -1 if we're a getmore handoff */
         virtual long long nscanned() { return _nscanned >= 0 ? _nscanned + _c->nscanned() : _nscanned; }
-        /** just for testing */
-        shared_ptr<Cursor> sub_c() const { return _c; }
     private:
-        class NoOp : public QueryOp {
-        public:
-            NoOp() {}
-            NoOp( const QueryOp &other ) : QueryOp( other ) {}
-            virtual void _init() { setComplete(); }
-            virtual void next() {}
-            virtual bool mayRecordPlan() const { return false; }
-            virtual QueryOp *_createChild() const { return new NoOp(); }
-            virtual shared_ptr<Cursor> newCursor() const { return qp().newCursor(); }
-            virtual long long nscanned() { assert( false ); return 0; }
-        };
         void nextClause();
-        shared_ptr<NoOp> _op;
-        shared_ptr<Cursor> _c;
         auto_ptr<MultiPlanScanner> _mps;
+        shared_ptr<Cursor> _c;
         shared_ptr<CoveredIndexMatcher> _matcher;
+        const QueryPlan *_queryPlan;
         long long _nscanned;
     };
 
