@@ -35,6 +35,7 @@ namespace mongo {
         void start_greed();
         void stop_greed();
         void W_to_R();
+        void R_to_W(); // caution see notes below
     };
 
     inline void QLock::stop_greed() {
@@ -115,6 +116,31 @@ namespace mongo {
         assert( R.n == 0 );
         W.n = 0;
         R.n = 1;
+        if( greed ) {
+            // someone else would like to write, no need to notify further
+        }
+        else {
+            R.c.notify_all();
+            w.c.notify_all();
+            r.c.notify_all();
+        }
+    }
+
+    // upgrade from R to W state.
+    // there is no "upgradable" state so this is NOT a classic upgrade - 
+    // if two threads try to do this you will deadlock.
+    inline void QLock::R_to_W() { 
+        boost::mutex::scoped_lock lk(m);
+        assert( R.n > 0 && W.n == 0 );
+        int g = greedyWrites;
+        greed += g;
+        while( W.n + R.n + w.n + r.n > 1 ) {
+            W.c.wait(m);
+        }
+        W.n++;
+        R.n--;
+        greed -= g;
+        assert( R.n == 0 && W.n == 1 );
     }
 
     // "i will be writing. i will coordinate with no one. you better stop them all"
