@@ -51,6 +51,16 @@ namespace QueryOptimizerTests {
     namespace QueryPlanTests {
 
         using boost::shared_ptr;
+        
+        class ToString {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << 1 );
+                FieldRangeSetPair fieldRangeSetPair( "", obj );
+                QueryPlan queryPlan( 0, -1, fieldRangeSetPair, 0, obj, BSONObj() );
+                queryPlan.toString(); // Just test that we don't crash.
+            }
+        };
 
         class Base {
         public:
@@ -354,6 +364,7 @@ namespace QueryOptimizerTests {
     } // namespace QueryPlanTests
 
     namespace QueryPlanSetTests {
+
         class Base {
         public:
             Base() : _context( ns() ) {
@@ -387,6 +398,16 @@ namespace QueryOptimizerTests {
             Client::Context _context;
         };
 
+        class ToString : public Base {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << 1 );
+                auto_ptr<FieldRangeSetPair> fieldRangeSetPair( new FieldRangeSetPair( "", obj ) );
+                QueryPlanSet queryPlanSet( "", fieldRangeSetPair, auto_ptr<FieldRangeSetPair>(), obj, BSONObj() );
+                queryPlanSet.toString(); // Just test that we don't crash.
+            }
+        };
+        
         class NoIndexes : public Base {
         public:
             void run() {
@@ -962,6 +983,16 @@ namespace QueryOptimizerTests {
         Client::Context _ctx;
     };
 
+    namespace MultiPlanScannerTests {
+        class ToString : public Base {
+        public:
+            void run() {
+                MultiPlanScanner multiPlanScanner( ns(), BSON( "a" << 1 ), BSONObj() );
+                multiPlanScanner.toString(); // Just test that we don't crash.
+            }
+        };
+    } // namespace MultiPlanScannerTests
+    
     class BestGuess : public Base {
     public:
         void run() {
@@ -1008,6 +1039,7 @@ namespace QueryOptimizerTests {
 
         void setupTests() {
             __forceLinkGeoPlugin();
+            add<QueryPlanTests::ToString>();
             add<QueryPlanTests::NoIndex>();
             add<QueryPlanTests::SimpleOrder>();
             add<QueryPlanTests::MoreIndexThanNeeded>();
@@ -1021,6 +1053,7 @@ namespace QueryOptimizerTests {
             add<QueryPlanTests::MoreKeyMatch>();
             add<QueryPlanTests::ExactKeyQueryTypes>();
             add<QueryPlanTests::Unhelpful>();
+            add<QueryPlanSetTests::ToString>();
             add<QueryPlanSetTests::NoIndexes>();
             add<QueryPlanSetTests::Optimal>();
             add<QueryPlanSetTests::NoOptimal>();
@@ -1046,6 +1079,7 @@ namespace QueryOptimizerTests {
             add<QueryPlanSetTests::NotEqualityThenIn>();
             add<QueryPlanSetTests::ExcludeSpecialPlanWhenBtreePlan>();
             add<QueryPlanSetTests::ExcludeUnindexedPlanWhenSpecialPlan>();
+            add<MultiPlanScannerTests::ToString>();
             add<BestGuess>();
         }
     } myall;

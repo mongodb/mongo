@@ -90,6 +90,8 @@ namespace mongo {
         
         bool mustAssertOnYieldFailure() const { return _mustAssertOnYieldFailure; }
         
+        string toString() const;
+        
         /** The following member functions are just for testing. */
         
         shared_ptr<FieldRangeVector> frv() const { return _frv; }
@@ -305,6 +307,8 @@ namespace mongo {
 
         bool prepareToRetryQuery();
         
+        string toString() const;
+        
         //for testing
         const FieldRangeSetPair *originalFrsp() const { return _originalFrsp.get(); }
         bool modifiedKeys() const;
@@ -466,6 +470,8 @@ namespace mongo {
         void clearIndexesForPatterns() const;
 
         bool haveOrderedPlan() const;
+        
+        string toString() const;
 
     private:
         /** Initialize or iterate a runner generated from @param originalOp. */

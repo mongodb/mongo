@@ -412,6 +412,8 @@ namespace mongo {
         bool singleKey() const { return _singleKey; }
         
         BSONObj originalQuery() const { return _queries[ 0 ]; }
+        
+        string toString() const;
     private:
         void appendQueries( const FieldRangeSet &other );
         void makeEmpty();
@@ -484,6 +486,7 @@ namespace mongo {
         
         BSONObj originalQuery() const { return _singleKey.originalQuery(); }
 
+        string toString() const;
     private:
         FieldRangeSetPair( const FieldRangeSet &singleKey, const FieldRangeSet &multiKey )
         :_singleKey( singleKey ), _multiKey( multiKey ) {}
@@ -537,6 +540,8 @@ namespace mongo {
          * index scan using this FieldRangeVector, BSONObj() if no such key.
          */
         BSONObj firstMatch( const BSONObj &obj ) const;
+        
+        string toString() const;
         
     private:
         int matchingLowElement( const BSONElement &e, int i, bool direction, bool &lowEquality ) const;

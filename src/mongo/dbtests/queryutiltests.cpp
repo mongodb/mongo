@@ -26,7 +26,27 @@
 
 namespace QueryUtilTests {
 
+    namespace FieldIntervalTests {
+        class ToString {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << 1 );
+                FieldInterval fieldInterval( obj.firstElement() );
+                fieldInterval.toString(); // Just test that we don't crash.
+            }
+        };
+    } // namespace FieldIntervalTests
+    
     namespace FieldRangeTests {
+        class ToString {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << 1 );
+                FieldRange fieldRange( obj.firstElement(), true );
+                fieldRange.toString(); // Just test that we don't crash.
+            }
+        };        
+        
         class Base {
         public:
             virtual ~Base() {}
@@ -874,6 +894,15 @@ namespace QueryUtilTests {
 
     namespace FieldRangeSetTests {
 
+        class ToString {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << 1 );
+                FieldRangeSet fieldRangeSet( "", obj, true );
+                fieldRangeSet.toString(); // Just test that we don't crash.
+            }
+        };
+
         class Intersect {
         public:
             void run() {
@@ -995,6 +1024,15 @@ namespace QueryUtilTests {
     
     namespace FieldRangeSetPairTests {
 
+        class ToString {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << 1 );
+                FieldRangeSetPair FieldRangeSetPair( "", obj );
+                FieldRangeSetPair.toString(); // Just test that we don't crash.
+            }
+        };
+
         class NoNonUniversalRanges {
         public:
             void run() {
@@ -1089,11 +1127,26 @@ namespace QueryUtilTests {
         
     } // namespace FieldRangeSetPairTests
     
+    namespace FieldRangeVectorTests {
+        class ToString {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << 1 );
+                FieldRangeSet fieldRangeSet( "", obj, true );
+                IndexSpec indexSpec( BSON( "a" << 1 ) );
+                FieldRangeVector fieldRangeVector( fieldRangeSet, indexSpec, 1 );
+                fieldRangeVector.toString(); // Just test that we don't crash.
+            }
+        };
+    } // namespace FieldRangeVectorTests
+    
     class All : public Suite {
     public:
         All() : Suite( "queryutil" ) {}
 
         void setupTests() {
+            add< FieldIntervalTests::ToString >();
+            add< FieldRangeTests::ToString >();
             add< FieldRangeTests::EmptyQuery >();
             add< FieldRangeTests::Eq >();
             add< FieldRangeTests::DupEq >();
@@ -1193,6 +1246,7 @@ namespace QueryUtilTests {
             add< FieldRangeTests::DiffMulti1 >();
             add< FieldRangeTests::DiffMulti2 >();
             add< FieldRangeTests::Universal >();
+            add< FieldRangeSetTests::ToString >();
             add< FieldRangeSetTests::Intersect >();
             add< FieldRangeSetTests::MultiKeyIntersect >();
             add< FieldRangeSetTests::EmptyMultiKeyIntersect >();
@@ -1200,9 +1254,11 @@ namespace QueryUtilTests {
             add< FieldRangeSetTests::MatchPossible >();
             add< FieldRangeSetTests::MatchPossibleForIndex >();
             add< FieldRangeSetTests::Subset >();
+            add< FieldRangeSetPairTests::ToString >();
             add< FieldRangeSetPairTests::NoNonUniversalRanges >();
             add< FieldRangeSetPairTests::MatchPossible >();
             add< FieldRangeSetPairTests::MatchPossibleForIndex >();
+            add< FieldRangeVectorTests::ToString >();
         }
     } myall;
 

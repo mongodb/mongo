@@ -319,6 +319,13 @@ doneCheckOrder:
         return ret;
     }    
 
+    string QueryPlan::toString() const {
+        return BSON(
+                    "index" << indexKey() <<
+                    "frv" << ( _frv ? _frv->toString() : "" )
+                    ).jsonString();
+    }
+    
     bool QueryPlan::isMultiKey() const {
         if ( _idxNo < 0 )
             return false;
@@ -655,6 +662,14 @@ doneCheckOrder:
         return true;
     }
 
+    string QueryPlanSet::toString() const {
+        BSONArrayBuilder bab;
+        for( PlanSet::const_iterator i = _plans.begin(); i != _plans.end(); ++i ) {
+            bab << (*i)->toString();
+        }
+        return bab.arr().jsonString();
+    }
+    
     shared_ptr<QueryOp> MultiPlanScanner::iterateRunner( QueryOp &originalOp, bool retried ) {
         if ( !_runner ) {
             _runner.reset( new QueryPlanSet::Runner( *_currentQps, originalOp ) );

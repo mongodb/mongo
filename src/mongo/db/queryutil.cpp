@@ -693,11 +693,11 @@ namespace mongo {
 
     string FieldInterval::toString() const {
         StringBuilder buf;
-        buf << ( _lower._inclusive ? "[" : "(" );
+        buf << ( _lower._inclusive ? "[" : "(" ) << " ";
         buf << _lower._bound.toString( false );
         buf << " , ";
         buf << _upper._bound.toString( false );
-        buf << ( _upper._inclusive ? "]" : ")" );
+        buf << " " << ( _upper._inclusive ? "]" : ")" );
         return buf.str();
     }
 
@@ -705,7 +705,7 @@ namespace mongo {
         StringBuilder buf;
         buf << "(FieldRange special: " << _special << " singleKey: " << _singleKey << " intervals: ";
         for( vector<FieldInterval>::const_iterator i = _intervals.begin(); i != _intervals.end(); ++i ) {
-            buf << i->toString();
+            buf << i->toString() << " ";
         }
         buf << ")";
         return buf.str();
@@ -1138,6 +1138,14 @@ namespace mongo {
         return ret;
     }
     
+    string FieldRangeSet::toString() const {
+        BSONObjBuilder bob;
+        for( map<string,FieldRange>::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
+            bob << i->first << i->second.toString();
+        }
+        return bob.obj().jsonString();
+    }
+    
     bool FieldRangeSetPair::noNonUniversalRanges() const {
         return _singleKey.numNonUniversalRanges() == 0 && _multiKey.numNonUniversalRanges() == 0;
     }
@@ -1153,6 +1161,13 @@ namespace mongo {
         _multiKey -= scanned;
         return *this;            
     }    
+    
+    string FieldRangeSetPair::toString() const {
+        return BSON(
+                    "singleKey" << _singleKey.toString() <<
+                    "multiKey" << _multiKey.toString()
+                    ).jsonString();
+    }
     
     BSONObj FieldRangeSetPair::simplifiedQueryForIndex( NamespaceDetails *d, int idxNo, const BSONObj &keyPattern ) const {
         return frsForIndex( d, idxNo ).simplifiedQuery( keyPattern );
@@ -1272,6 +1287,17 @@ namespace mongo {
             }
         }
         return BSONObj();
+    }
+    
+    string FieldRangeVector::toString() const {
+        BSONObjBuilder bob;
+        BSONObjIterator i( _indexSpec.keyPattern );
+        for( vector<FieldRange>::const_iterator r = _ranges.begin();
+            r != _ranges.end() && i.more(); ++r ) {
+            BSONElement e = i.next();
+            bob << e.fieldName() << r->toString();
+        }
+        return bob.obj().jsonString();
     }
     
     // TODO optimize more
