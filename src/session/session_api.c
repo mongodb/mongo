@@ -99,12 +99,16 @@ __session_open_cursor(WT_SESSION *wt_session,
 	WT_SESSION_IMPL *session;
 	int ret;
 
-	WT_UNUSED(to_dup);
-
 	session = (WT_SESSION_IMPL *)wt_session;
 	SESSION_API_CALL(session, open_cursor, config, cfg);
 
-	if (WT_PREFIX_MATCH(uri, "colgroup:"))
+	if (uri != NULL && to_dup != NULL)
+		WT_ERR_MSG(session, EINVAL,
+		    "should be passed either a URI or a cursor, but not both");
+
+	if (to_dup != NULL)
+		ret = __wt_cursor_dup(session, to_dup, config, cursorp);
+	else if (WT_PREFIX_MATCH(uri, "colgroup:"))
 		ret = __wt_curfile_open(session, uri, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "config:"))
 		ret = __wt_curconfig_open(session, uri, cfg, cursorp);
