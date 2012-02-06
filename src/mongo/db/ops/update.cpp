@@ -685,9 +685,8 @@ namespace mongo {
                     m++;
                 }
                 else {
-                    massert( 16062 , "ModSet::createNewFromMods - "
+                    massert( 16063 , "ModSet::createNewFromMods - "
                             "SERVER-4777 unhandled duplicate field" , 0 );
-
                 }
                 continue;
             }
