@@ -18,11 +18,14 @@ namespace mongo {
     public:
         static int isLocked();      // true if *anything* is locked (by us)
         static int isWriteLocked(); // w or W
+        static bool isW();          // W
 
         struct GlobalWrite : boost::noncopyable { // recursive is ok
             const bool already;
             GlobalWrite(); 
             ~GlobalWrite();
+            void downgrade(); // W -> R
+            void upgrade();   // caution see notes
             struct TempRelease {
                 TempRelease(); ~TempRelease();
             };
@@ -55,6 +58,7 @@ namespace mongo {
             static void unsetW(); // reverts to greedy
             static void unsetR(); // reverts to greedy
         };
+
     };
 
     // the below are for backward compatibility.  use Lock classes above instead.

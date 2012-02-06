@@ -83,7 +83,7 @@ namespace mongo {
         /** declared later in this file
             only used in this file -- use DurableInterface::commitNow() outside
         */
-        static void groupCommit();
+        static void groupCommit(Lock::GlobalWrite *lgw = 0);
 
         CommitJob& commitJob = *(new CommitJob()); // don't destroy
 
@@ -233,7 +233,7 @@ namespace mongo {
 
         bool DurableImpl::commitNow() {
             stats.curr->_earlyCommits++;
-            groupCommit();
+            groupCommit(0);
             return true;
         }
 
@@ -290,7 +290,7 @@ namespace mongo {
             DEV commitJob._nSinceCommitIfNeededCall = 0;
             if (commitJob.bytes() > UncommittedBytesLimit) { // should this also fire if CmdLine::DurAlwaysCommit?
                 stats.curr->_earlyCommits++;
-                groupCommit();
+                groupCommit(0);
                 return true;
             }
             return false;
@@ -431,7 +431,6 @@ namespace mongo {
             LOG(4) << "journal REMAPPRIVATEVIEW" << endl;
 
             d.dbMutex.assertWriteLocked();
-            d.dbMutex._remapPrivateViewRequested = false;
             assert( !commitJob.hasWritten() );
 
             // we want to remap all private views about every 2 seconds.  there could be ~1000 views so
@@ -548,6 +547,7 @@ namespace mongo {
             commitJob._ab.reset();
 
             // can't : d.dbMutex._remapPrivateViewRequested = true;
+            // (writes have happened we released)
 
             return true;
         }
@@ -576,7 +576,7 @@ namespace mongo {
             return false;
         }
 
-        static void _groupCommit() {
+        static void _groupCommit(Lock::GlobalWrite *lgw) {
 
             LOG(4) << "_groupCommit " << endl;
 
@@ -620,14 +620,22 @@ namespace mongo {
             // we wouldn't see newly written data on reads.
             //
             DEV assert( !commitJob.hasWritten() );
-            if( !d.dbMutex.isWriteLocked() ) {
-                // this needs done in a write lock (as there is a short window during remapping when each view 
-                // might not exist) thus we do it on the next acquisition of that instead of here (there is no 
-                // rush if you aren't writing anyway -- but it must happen, if it is done, before any uncommitted 
-                // writes occur).  If desired, perhaps this can be eliminated on posix as it may be that the remap 
-                // is race-free there.
+            if( !Lock::isW() ) {
+                // REMAPPRIVATEVIEW needs done in a write lock (as there is a short window during remapping when each view 
+                // might not exist) thus we do it later.
+                // 
+                // if commitIfNeeded() operations are not in a W lock, you could get too big of a private map 
+                // on a giant operation.  for now they will all be W.
+                // 
+                // If desired, perhaps this can be eliminated on posix as it may be that the remap is race-free there.
                 //
-                d.dbMutex._remapPrivateViewRequested = true;
+                // For durthread, lgw is set, and we can upgrade to a W lock for the remap. we do this way as we don't want 
+                // to be in W the entire time we were committing about (in particular for WRITETOJOURNAL() which takes time).
+                if( lgw ) { 
+                    LOG(4) << "_groupCommit upgrade" << endl;
+                    lgw->upgrade();
+                    REMAPPRIVATEVIEW();
+                }
             }
             else {
                 stats.curr->_commitsInWriteLock++;
@@ -641,11 +649,14 @@ namespace mongo {
 
         /** locking: in read lock when called
                      or, for early commits (commitIfNeeded), in write lock
+            @param lwg set if the durcommitthread *only* -- then we will upgrade the lock 
+                   to W so we can remapprivateview. only durcommitthread as more than one 
+                   thread upgrading would potentially deadlock
             @see MongoMMF::close()
         */
-        static void groupCommit() {
+        static void groupCommit(Lock::GlobalWrite *lgw) {
             try {
-                _groupCommit();
+                _groupCommit(lgw);
             }
             catch(DBException& e ) { 
                 log() << "dbexception in groupCommit causing immediate shutdown: " << e.toString() << endl;
@@ -675,29 +686,22 @@ namespace mongo {
                 // remapping a lot all at once could cause jitter from a large amount of copy-on-writes all at once.
                 if( groupCommitWithLimitedLocks() )
                     return;
-
-                // question : if we want to remapprivateview should we go straight to the read lock instead of the 
-                //            else block below?
-            }
-            else {
-                readlocktry lk(1000);
-                if( lk.got() ) {
-                    groupCommit();
-                    return;
-                }
-            }
-
-            if ( lockedForWriting() ) {
-                warning() << "group commit delayed beacuse of fsync + lock" << endl;
-                return;
             }
 
             // starvation on read locks could occur.  so if read lock acquisition is slow, try to get a
             // write lock instead.  otherwise journaling could be delayed too long (too much data will 
             // not accumulate though, as commitIfNeeded logic will have executed in the meantime if there 
             // has been writes)
-            writelock lk;
-            groupCommit();
+            //
+            // we could greedily get an R lock, but we need to remapprivateview anyway.
+            // todo : 
+            //   greedily get R 
+            //   group commit
+            //   upgrade to W
+            //   remap private view
+            Lock::GlobalWrite w;
+            w.downgrade();
+            groupCommit(&w);
         }
 
         /** called when a MongoMMF is closing -- we need to go ahead and group commit in that case before its

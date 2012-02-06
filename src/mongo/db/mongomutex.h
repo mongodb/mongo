@@ -221,11 +221,6 @@ namespace mongo {
 
         MutexInfo _minfo;
 
-    public:
-        // indicates we need to call dur::REMAPPRIVATEVIEW on the next write lock
-        bool _remapPrivateViewRequested;
-
-    private:
         /* See the releaseEarly() method.
            we use a separate TLS value for releasedEarly - that is ok as
            our normal/common code path, we never even touch it */
@@ -249,11 +244,6 @@ namespace mongo {
 
     inline void MongoMutex::_acquiredWriteLock() {
         lockedExclusively();
-        // get rid of this with the new model
-        if( _remapPrivateViewRequested ) {
-            dur::REMAPPRIVATEVIEW();
-            dassert( !_remapPrivateViewRequested );
-        }
     }
 
     string sayClientState();

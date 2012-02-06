@@ -70,7 +70,7 @@ namespace mongo {
         q.lock_R();
     }
     static void unlock_R() { 
-        assert( threadState == 'R' );
+        wassert( threadState == 'R' );
         threadState = 0;
         q.unlock_R();
     }
@@ -80,13 +80,13 @@ namespace mongo {
         q.lock_w();
     }
     static void unlock_w() { 
-        assert( threadState == 'w' );
+        wassert( threadState == 'w' );
         threadState = 0;
         q.unlock_w();
     }
 
     // these are safe for use ACROSS threads.  i.e. one thread can lock and 
-    // another unlock!
+    // another unlock
     void Lock::ThreadSpan::setWLockedNongreedy() { 
         assert( threadState == 0 ); // as this spans threads the tls wouldn't make sense
         q.lock_W();
@@ -94,8 +94,7 @@ namespace mongo {
     }
     void Lock::ThreadSpan::W_to_R() { 
         assert( threadState == 0 );
-        q.lock_W();
-        q.stop_greed();
+        q.W_to_R();
     }
     void Lock::ThreadSpan::unsetW() {
         assert( threadState == 0 );
@@ -114,6 +113,9 @@ namespace mongo {
     int Lock::isWriteLocked() { // w or W
         return threadState & 'W'; // ascii assumed
     }
+    bool Lock::isW() { 
+        return threadState == 'W';
+    }
 
     Lock::GlobalWrite::TempRelease::TempRelease() {
         unlock_W();
@@ -126,9 +128,27 @@ namespace mongo {
             lock_W();
     }
     Lock::GlobalWrite::~GlobalWrite() {
-        if( !already ) 
-            unlock_W();
+        if( !already ) {
+            if( threadState == 'R' )
+                unlock_R();
+            else
+                unlock_W();
+        }
     }
+    void Lock::GlobalWrite::downgrade() { 
+        assert( !already );
+        assert( threadState == 'W' );
+        q.W_to_R();
+        threadState = 'R';
+    }
+    // you will deadlock if 2 threads doing this
+    void Lock::GlobalWrite::upgrade() { 
+        assert( !already );
+        assert( threadState == 'R' );
+        q.R_to_W();
+        threadState = 'W';
+    }
+
     Lock::GlobalRead::GlobalRead() : already(threadState == 'R' || threadState == 'W') {
         if( !already )
             lock_R();
@@ -158,6 +178,7 @@ namespace mongo {
 
 }
 
+// legacy hooks
 namespace mongo { 
 
     writelock::writelock() { 
@@ -202,6 +223,7 @@ namespace mongo {
 
 }
 
+// legacy MongoMutex glue
 namespace mongo {
 
     /* backward compatible glue. it could be that the assumption was that 
@@ -212,7 +234,7 @@ namespace mongo {
         return x == 'R' || x == 'W';
     }
     bool MongoMutex::isWriteLocked() { 
-        return Lock::isLocked() == 'W';
+        return Lock::isW();
     }
 
     // this tie-in temporary until MongoMutex is folded in more directly.Exclud
@@ -231,7 +253,6 @@ namespace mongo {
     MongoMutex::MongoMutex(const char *name) : _m(name) {
         static int n = 0;
         assert( ++n == 1 ); // below releasingWriteLock we assume MongoMutex is a singleton, and uses dbMutex ref above
-        _remapPrivateViewRequested = false;
     }
 
 }

@@ -120,7 +120,6 @@ namespace mongo {
             dassert( cmdLine.dur );
             cc().writeHappened();
             if( !_hasWritten ) {
-                assert( !d.dbMutex._remapPrivateViewRequested );
                 _hasWritten = true;
             }
             _wi._ops.push_back(p);
@@ -161,9 +160,6 @@ namespace mongo {
                 MemoryMappedFile::makeWritable(p, len);
 
                 if( !_hasWritten ) {
-                    // you can't be writing if one of these is pending, so this is a verification.
-                    assert( !d.dbMutex._remapPrivateViewRequested ); // safe to assert here since it must be the first write in a write lock
-
                     // we don't bother doing a group commit when nothing is written, so we have a var to track that
                     _hasWritten = true;
                 }
