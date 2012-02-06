@@ -320,7 +320,7 @@ int _main(int argc, char* argv[]) {
     shardConnectionPool.addHook( new ShardingConnectionHook( true ) );
     shardConnectionPool.setName( "mongos shardconnection connectionpool" );
 
-    
+    // Mongos shouldn't lazily kill cursors, otherwise we can end up with extras from migration
     DBClientConnection::setLazyKillCursor( false );
 
     ReplicaSetMonitor::setConfigChangeHook( boost::bind( &ConfigServer::replicaSetChange , &configServer , _1 ) );

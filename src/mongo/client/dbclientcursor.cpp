@@ -311,12 +311,23 @@ namespace mongo {
             m.setData( dbKillCursors , b.buf() , b.len() );
 
             if ( _client ) {
-                _client->sayPiggyBack( m );
+
+                // Kill the cursor the same way the connection itself would.  Usually, non-lazily
+                if( DBClientConnection::getLazyKillCursor() )
+                    _client->sayPiggyBack( m );
+                else
+                    _client->say( m );
+
             }
             else {
                 assert( _scopedHost.size() );
                 ScopedDbConnection conn( _scopedHost );
-                conn->sayPiggyBack( m );
+
+                if( DBClientConnection::getLazyKillCursor() )
+                    conn->sayPiggyBack( m );
+                else
+                    conn->say( m );
+
                 conn.done();
             }
         }
