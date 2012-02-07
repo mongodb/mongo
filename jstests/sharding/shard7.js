@@ -40,7 +40,7 @@ c.save( {a:1,b:1} );
 c.remove( unsatisfiable );
 assert( !db.getLastError() );
 assert.eq( 2, c.count() );
-c.update( unsatisfiable, {$set:{c:1}} );
+c.update( unsatisfiable, {$set:{c:1}}, false, true );
 assert( !db.getLastError() );
 assert.eq( 2, c.count() );
 assert.eq( 0, c.count( {c:1} ) );
