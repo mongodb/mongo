@@ -328,7 +328,7 @@ namespace mongo {
    
     //  --- my --
 
-    DiagStr _hostNameCached;
+    DiagStr& _hostNameCached = *(new DiagStr); // this is also written to from commands/cloud.cpp
 
     string getHostName() {
         {
