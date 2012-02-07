@@ -16,9 +16,10 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "pch.h"
+
 #include "../s/chunk.h"
 
-#include "pch.h"
 #include "dbtests.h"
 
 namespace mongo {
