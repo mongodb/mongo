@@ -236,9 +236,10 @@ namespace mongo {
             unlock_W();
     }
 
+    // note: the 'already' concept here might be a bad idea as a temprelease wouldn't notice it is nested then
     readlocktry::readlocktry( int tryms )      
     {
-        if( threadState == 'R' ) {
+        if( threadState == 'R' || threadState == 'W' ) {
             _already = true;
             _got = true;
         }
