@@ -201,11 +201,19 @@ namespace mongo {
             unlock_W();
     }
 
-    readlocktry::readlocktry( int tryms ) : 
-      _got( lock_R_try(tryms) )
-    { }
+    readlocktry::readlocktry( int tryms )      
+    {
+        if( threadState == 'R' ) {
+            _already = true;
+            _got = true;
+        }
+        else {
+            _already = false;
+            _got = lock_R_try(tryms);
+        }
+    }
     readlocktry::~readlocktry() { 
-        if( _got )
+        if( !_already && _got )
             unlock_R();
     }
 

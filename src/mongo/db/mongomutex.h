@@ -259,10 +259,12 @@ namespace mongo {
         return false;
     }
 
-    struct readlocktry {
+    class readlocktry : boost::noncopyable {
+        bool _already;
+        bool _got;
+    public:
         readlocktry( int tryms );
         ~readlocktry();
-        const bool _got;
         bool got() const { return _got; }
     };
 
