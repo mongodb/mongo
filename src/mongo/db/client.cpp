@@ -211,13 +211,12 @@ namespace mongo {
 
         // we usually don't get here, so doesn't matter how fast this part is
         {
-            int x = d.dbMutex.getState();
-            if( x > 0 ) { 
+            if( Lock::isW() ) { 
                 // write locked already
                 DEV RARELY log() << "write locked on ReadContext construction " << ns << endl;
                 c.reset( new Context(ns, path, doauth) );
             }
-            else if( x == -1 ) { 
+            else if( !Lock::nested() ) { 
                 lk.reset(0);
                 {
                     writelock w;
@@ -228,7 +227,6 @@ namespace mongo {
                 c.reset( new Context(ns, path, doauth) );
             }
             else { 
-                assert( x < -1 );
                 uasserted(15928, str::stream() << "can't open a database from a nested read lock " << ns);
             }
         }
