@@ -45,7 +45,7 @@ namespace mongo {
     public:
         void unlock() { pthread_spin_unlock(&_lock); }
         void lock() {
-            if ( pthread_spin_trylock( &_lock ) == 0 )
+            if ( MONGO_likely( pthread_spin_trylock( &_lock ) == 0 ) )
                 return;
             _lk(); 
         }
