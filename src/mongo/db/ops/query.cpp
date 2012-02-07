@@ -662,7 +662,6 @@ namespace mongo {
 
         curop.debug().ns = ns;
         curop.debug().ntoreturn = pq.getNumToReturn();
-        curop.debug().query = jsobj;
         curop.setQuery(jsobj);
 
         if ( pq.couldBeCommand() ) {
