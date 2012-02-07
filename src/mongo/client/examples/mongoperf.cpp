@@ -225,16 +225,15 @@ cout <<
         }
 
         string s = input;
-        str::stripTrailing(s, "\n\r\0x1a");
+        str::stripTrailing(s, " \n\r\0x1a");
         try { 
             options = fromjson(s);
         }
         catch(...) { 
-            cout << s << endl;
-            cout << "couldn't parse json options" << endl;
+            cout << "couldn't parse json options. input was:\n|" << s << "|" << endl;
             return -1;
         }
-        cout << "options:\n" << options.toString() << endl;
+        cout << "parsed options:\n" << options.toString() << endl;
 
         go();
 #if 0
