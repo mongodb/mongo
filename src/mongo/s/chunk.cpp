@@ -1074,6 +1074,7 @@ namespace mongo {
     /** This is for testing only, just setting up minimal basic defaults. */
     ChunkManager::ChunkManager() :
     _unique(),
+    _chunkRanges(),
     _mutex( "ChunkManager" ),
     _nsLock( ConnectionString(), "" ),
     _sequenceNumber(),
