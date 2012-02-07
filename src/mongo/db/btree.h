@@ -1162,7 +1162,6 @@ namespace mongo {
     BtreeBucket<V> * DiskLoc::btreemod() const {
         assert( _a != -1 );
         BtreeBucket<V> *b = const_cast< BtreeBucket<V> * >( btree<V>() );
-cout << "todo btreemod?" << endl;
         return static_cast< BtreeBucket<V>* >( getDur().writingPtr( b, V::BucketSize ) );
     }
 
