@@ -19,19 +19,22 @@ namespace mongo {
         static int isLocked();      // true if *anything* is locked (by us)
         static int isWriteLocked(); // w or W
         static bool isW();          // W
+        static bool nested();
 
+        struct TempRelease {
+            TempRelease(); 
+            ~TempRelease();
+            const bool cant;
+        private:
+            const char type;
+        };
         struct GlobalWrite : boost::noncopyable { // recursive is ok
-            const bool already;
             GlobalWrite(); 
             ~GlobalWrite();
             void downgrade(); // W -> R
             void upgrade();   // caution see notes
-            struct TempRelease {
-                TempRelease(); ~TempRelease();
-            };
         };
         struct GlobalRead : boost::noncopyable { // recursive is ok
-            const bool already;
             GlobalRead(); 
             ~GlobalRead();
         };
@@ -40,12 +43,16 @@ namespace mongo {
         public:
             DBWrite(const StringData& dbOrNs);
             ~DBWrite();
+            // TEMP:
+            GlobalWrite w;
         };
         // lock this database for reading. do not shared_lock globally first, that is handledin herein. 
         class DBRead : boost::noncopyable {
         public:
             DBRead(const StringData& dbOrNs);
             ~DBRead();
+            // TEMP: 
+            GlobalRead r;
         };
 
         // specialty things:

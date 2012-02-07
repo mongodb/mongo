@@ -121,7 +121,7 @@ namespace mongo {
                 if ( syncing == 0 || t.millis() > 30000 )
                     break;
                 {
-                    Lock::GlobalWrite::TempRelease t;
+                    Lock::TempRelease t;
                     relinquishSyncingSome = 1;
                     sleepmillis(1);
                 }

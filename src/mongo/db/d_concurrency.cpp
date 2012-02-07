@@ -39,6 +39,7 @@ namespace mongo {
 
     // 0, 'r', 'w', 'R', 'W'
     __declspec( thread ) char threadState;
+    __declspec( thread ) unsigned recursive;
     
     static bool lock_R_try(int ms) { 
         assert( threadState == 0 );
@@ -116,64 +117,98 @@ namespace mongo {
     bool Lock::isW() { 
         return threadState == 'W';
     }
+    bool Lock::nested() { 
+        return recursive != 0;
+    }
 
-    Lock::GlobalWrite::TempRelease::TempRelease() {
-        unlock_W();
+    Lock::TempRelease::TempRelease() : 
+        cant( recursive ), type(threadState)
+    {
+        if( cant )
+            return;
+        if( threadState == 'W' ) {
+            unlock_W();
+        }
+        else if( threadState == 'R' ) { 
+            unlock_R();
+        }
+        else {
+            error() << "TempRelease called but threadState=" << threadState << endl;
+            assert(false);
+        }
     }
-    Lock::GlobalWrite::TempRelease::~TempRelease() {
-        DESTRUCTOR_GUARD( lock_W(); )
+    Lock::TempRelease::~TempRelease() {
+        if( cant )
+            return;
+        DESTRUCTOR_GUARD( 
+            fassert(0, threadState == 0);
+            if( type == 'W' ) {
+                lock_W();
+            }
+            else if( type == 'R' ) { 
+                lock_R();
+            }
+            else {
+                wassert(false);
+            }
+        )
     }
-    Lock::GlobalWrite::GlobalWrite() : already(threadState == 'W') {
-        if( !already ) 
+    Lock::GlobalWrite::GlobalWrite() {
+        if( threadState == 'W' ) { 
+            recursive++;
+        }
+        else {
             lock_W();
+        }
     }
     Lock::GlobalWrite::~GlobalWrite() {
-        if( !already ) {
-            if( threadState == 'R' )
+        if( recursive ) { 
+            recursive--;
+        }
+        else {
+            if( threadState == 'R' ) // downgraded
                 unlock_R();
             else
                 unlock_W();
         }
     }
     void Lock::GlobalWrite::downgrade() { 
-        assert( !already );
+        assert( !recursive );
         assert( threadState == 'W' );
         q.W_to_R();
         threadState = 'R';
     }
     // you will deadlock if 2 threads doing this
     void Lock::GlobalWrite::upgrade() { 
-        assert( !already );
+        assert( !recursive );
         assert( threadState == 'R' );
         q.R_to_W();
         threadState = 'W';
     }
 
-    Lock::GlobalRead::GlobalRead() : already(threadState == 'R' || threadState == 'W') {
-        if( !already )
+    Lock::GlobalRead::GlobalRead() {
+        if( threadState == 'R' || threadState == 'W' ) { 
+            recursive++;
+        }
+        else {
             lock_R();
+        }
     }
     Lock::GlobalRead::~GlobalRead() {
-        if( !already ) 
+        if( recursive ) { 
+            recursive--;
+        }
+        else {
             unlock_R();
+        }
     }
     Lock::DBWrite::DBWrite(const StringData& ns) { 
-        // TEMP : 
-        lock_W();
-        // todo: 
-        //lock_w();
-        //lock_the_db
     }
     Lock::DBWrite::~DBWrite() { 
-        // TEMP : 
-        unlock_W();
     }
     Lock::DBRead::DBRead(const StringData& ns) { 
-        // TEMP : 
-        lock_R();
     } 
     Lock::DBRead::~DBRead() { 
-        unlock_R();
     }
 
 }
