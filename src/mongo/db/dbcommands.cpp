@@ -49,6 +49,7 @@
 #include "../util/version.h"
 #include "../s/d_writeback.h"
 #include "dur_stats.h"
+#include "../server.h"
 
 namespace mongo {
 
@@ -511,7 +512,7 @@ namespace mongo {
 
                 if( overhead > 4000 ) { 
                     t.append("note", "virtual minus mapped is large. could indicate a memory leak");
-                    log() << "warning: virtual size (" << v << "MB) - mapped size (" << m << "MB) is large (" << overhead << "MB). could indicate a memory leak" << endl;
+                    LOGATMOST(60) << "warning: virtual size (" << v << "MB) - mapped size (" << m << "MB) is large (" << overhead << "MB). could indicate a memory leak" << endl;
                 }
 
                 t.done();

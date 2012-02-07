@@ -65,6 +65,13 @@ namespace mongo {
            @return whether or not obj has all fields in this shard key pattern
            e.g.
              ShardKey({num:1}).hasShardKey({ name:"joe", num:3 }) is true
+             ShardKey({"a.b":1}).hasShardKey({ "a.b":"joe"}) is true
+             ShardKey({"a.b":1}).hasShardKey({ "a": {"b":"joe"}}) is true
+
+             ShardKey({num:1}).hasShardKey({ name:"joe"}) is false
+             ShardKey({num:1}).hasShardKey({ name:"joe", num:{$gt:3} }) is false
+
+             see unit test for more examples
          */
         bool hasShardKey( const BSONObj& obj ) const;
 
