@@ -21,7 +21,7 @@
 #include "v8_utils.h"
 #include "v8_db.h"
 
-#define V8_SIMPLE_HEADER v8::Isolate::Scope iscope(_isolate); v8::Locker l(_isolate); HandleScope handle_scope; Context::Scope context_scope( _context );
+#define V8_SIMPLE_HEADER v8::Locker l(_isolate); v8::Isolate::Scope iscope(_isolate); HandleScope handle_scope; Context::Scope context_scope( _context );
 
 namespace mongo {
 
@@ -54,7 +54,7 @@ namespace mongo {
         if (!p.IsNearDeath())
             return;
         Handle<External> field = Handle<External>::Cast(p->ToObject()->GetInternalField(0));
-        BSONObj* data = (BSONObj*) field->Value();
+        BSONHolder* data = (BSONHolder*) field->Value();
         delete data;
         p.Dispose();
     }
@@ -335,28 +335,6 @@ namespace mongo {
         _global = Persistent< v8::Object >::New( _context->Global() );
         _emptyObj = Persistent< v8::Object >::New( v8::Object::New() );
 
-        // initialize lazy object template
-        lzObjectTemplate = Persistent<ObjectTemplate>::New(ObjectTemplate::New());
-        lzObjectTemplate->SetInternalFieldCount( 1 );
-        lzObjectTemplate->SetNamedPropertyHandler(namedGet, namedSet, 0, namedDelete, 0, v8::External::New(this));
-        lzObjectTemplate->SetIndexedPropertyHandler(indexedGet, indexedSet, 0, indexedDelete, 0, v8::External::New(this));
-
-        roObjectTemplate = Persistent<ObjectTemplate>::New(ObjectTemplate::New());
-        roObjectTemplate->SetInternalFieldCount( 1 );
-        roObjectTemplate->SetNamedPropertyHandler(namedGetRO, NamedReadOnlySet, 0, NamedReadOnlyDelete, namedEnumerator, v8::External::New(this));
-        roObjectTemplate->SetIndexedPropertyHandler(indexedGetRO, IndexedReadOnlySet, 0, IndexedReadOnlyDelete, 0, v8::External::New(this));
-
-        // initialize lazy array template
-        // unfortunately it is not possible to create true v8 array from a template
-        // this means we use an object template and copy methods over
-        // this it creates issues when calling certain methods that check array type
-        lzArrayTemplate = Persistent<ObjectTemplate>::New(ObjectTemplate::New());
-        lzArrayTemplate->SetInternalFieldCount( 1 );
-        lzArrayTemplate->SetIndexedPropertyHandler(indexedGet, 0, 0, 0, 0, v8::External::New(this));
-
-        internalFieldObjects = Persistent<ObjectTemplate>::New(ObjectTemplate::New());
-        internalFieldObjects->SetInternalFieldCount( 1 );
-
         V8STR_CONN = getV8Str( "_conn" );
         V8STR_ID = getV8Str( "_id" );
         V8STR_LENGTH = getV8Str( "length" );
@@ -379,6 +357,32 @@ namespace mongo {
         V8STR_V8_FUNC = getV8Str( "_v8_function" );
         V8STR_RO = getV8Str( "_ro" );
         V8STR_FULLNAME = getV8Str( "_fullName" );
+        V8STR_BSON = getV8Str( "_bson" );
+
+        // initialize lazy object template
+        lzObjectTemplate = Persistent<ObjectTemplate>::New(ObjectTemplate::New());
+        lzObjectTemplate->SetInternalFieldCount( 1 );
+        lzObjectTemplate->SetNamedPropertyHandler(namedGet, namedSet, 0, namedDelete, 0, v8::External::New(this));
+        lzObjectTemplate->SetIndexedPropertyHandler(indexedGet, indexedSet, 0, indexedDelete, 0, v8::External::New(this));
+        lzObjectTemplate->NewInstance()->GetPrototype()->ToObject()->Set(V8STR_BSON, v8::Boolean::New(true), DontEnum);
+
+        roObjectTemplate = Persistent<ObjectTemplate>::New(ObjectTemplate::New());
+        roObjectTemplate->SetInternalFieldCount( 1 );
+        roObjectTemplate->SetNamedPropertyHandler(namedGetRO, NamedReadOnlySet, 0, NamedReadOnlyDelete, namedEnumerator, v8::External::New(this));
+        roObjectTemplate->SetIndexedPropertyHandler(indexedGetRO, IndexedReadOnlySet, 0, IndexedReadOnlyDelete, 0, v8::External::New(this));
+        roObjectTemplate->NewInstance()->GetPrototype()->ToObject()->Set(V8STR_BSON, v8::Boolean::New(true), DontEnum);
+
+        // initialize lazy array template
+        // unfortunately it is not possible to create true v8 array from a template
+        // this means we use an object template and copy methods over
+        // this it creates issues when calling certain methods that check array type
+        lzArrayTemplate = Persistent<ObjectTemplate>::New(ObjectTemplate::New());
+        lzArrayTemplate->SetInternalFieldCount( 1 );
+        lzArrayTemplate->SetIndexedPropertyHandler(indexedGet, 0, 0, 0, 0, v8::External::New(this));
+        lzArrayTemplate->NewInstance()->GetPrototype()->ToObject()->Set(V8STR_BSON, v8::Boolean::New(true), DontEnum);
+
+        internalFieldObjects = Persistent<ObjectTemplate>::New(ObjectTemplate::New());
+        internalFieldObjects->SetInternalFieldCount( 1 );
 
         injectV8Function("print", Print);
         injectV8Function("version", Version);
@@ -1493,10 +1497,10 @@ namespace mongo {
 
     BSONObj V8Scope::v8ToMongo( v8::Handle<v8::Object> o , int depth ) {
         BSONObj originalBSON;
-        if (o->InternalFieldCount() > 0) {
+        if (o->Has(V8STR_BSON)) {
             originalBSON = unwrapBSONObj(o);
             BSONHolder* holder = unwrapHolder(o);
-            if ( o->HasNamedLookupInterceptor() && !holder->_modified ) {
+            if ( !holder->_modified ) {
                 // object was not modified, use bson as is
                 return originalBSON;
             }

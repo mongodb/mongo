@@ -10,4 +10,4 @@ def configure( env , fileLists , options ):
     fileLists["serverOnlyFiles"] += [ myenv.Object(f) for f in files ]
 
 def configureSystem( env , fileLists , options ):
-    configure( env , fileLists , options )
+    env.Append( LIBS=[ "snappy" ] )

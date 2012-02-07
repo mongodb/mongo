@@ -547,7 +547,7 @@ namespace mongo {
 
     /* --- dbclientconnection --- */
 
-    bool DBClientConnection::auth(const string &dbname, const string &username, const string &password_text, string& errmsg, bool digestPassword) {
+    bool DBClientConnection::auth(const string &dbname, const string &username, const string &password_text, string& errmsg, bool digestPassword, Auth::Level* level) {
         string password = password_text;
         if( digestPassword )
             password = createPasswordDigest( username , password_text );
@@ -560,7 +560,7 @@ namespace mongo {
             authCache[dbname] = p;
         }
 
-        return DBClientBase::auth(dbname, username, password.c_str(), errmsg, false);
+        return DBClientBase::auth(dbname, username, password.c_str(), errmsg, false, level);
     }
 
     /** query N objects from the database into an array.  makes sense mostly when you want a small number of results.  if a huge number, use 

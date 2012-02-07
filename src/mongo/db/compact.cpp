@@ -80,17 +80,17 @@ namespace mongo {
 
         {
             log() << "compact copying records" << endl;
-            unsigned totalSize = 0;
-            int nrecs = 0;
+            long long datasize = 0;
+            long long nrecords = 0;
             DiskLoc L = e->firstRecord;
             if( !L.isNull() ) {
                 while( 1 ) {
                     Record *recOld = L.rec();
                     L = recOld->nextInExtent(L);
-                    nrecs++;
                     BSONObj objOld(recOld);
 
                     if( !validate || objOld.valid() ) {
+                        nrecords++;
                         unsigned sz = objOld.objsize();
 
                         oldObjSize += sz;
@@ -106,10 +106,11 @@ namespace mongo {
                                 lenWPadding = lenWHdr;
                             }
                         }
-                        totalSize += lenWPadding;
+                        
                         DiskLoc loc = allocateSpaceForANewRecord(ns, d, lenWPadding, false);
                         uassert(14024, "compact error out of space during compaction", !loc.isNull());
                         Record *recNew = loc.rec();
+                        datasize += recNew->netLength();
                         recNew = (Record *) getDur().writingPtr(recNew, lenWHdr);
                         addRecordToRecListInExtent(recNew, loc);
                         memcpy(recNew->data, objOld.objdata(), sz);
@@ -152,13 +153,20 @@ namespace mongo {
             newFirst.ext()->xprev.writing().Null();
             getDur().writing(e)->markEmpty();
             freeExtents(ext,ext);
+            // update datasize/record count for this namespace
+            {
+                NamespaceDetails::Stats *s = getDur().writing(&d->stats);
+                s->datasize = datasize;
+                s->nrecords = nrecords;
+            }
+
             getDur().commitIfNeeded();
 
             { 
                 double op = 1.0;
                 if( oldObjSize ) 
                     op = static_cast<double>(oldObjSizeWithPadding)/oldObjSize;
-                log() << "compact " << nrecs << " documents " << totalSize/1000000.0 << "MB"
+                log() << "compact " << nrecords << " documents " << datasize/1000000.0 << "MB"
                     << " oldPadding: " << op << ' ' << static_cast<unsigned>(op*100.0)/100
                     << endl;                    
             }

@@ -189,6 +189,7 @@ namespace mongo {
         Handle<v8::String> V8STR_WRAPPER;
         Handle<v8::String> V8STR_RO;
         Handle<v8::String> V8STR_FULLNAME;
+        Handle<v8::String> V8STR_BSON;
 
     private:
         void _startCall();
@@ -217,6 +218,7 @@ namespace mongo {
 
         std::map <string, v8::Persistent <v8::String> > _strCache;
 
+        Persistent<v8::FunctionTemplate> lzFunctionTemplate;
         Persistent<v8::ObjectTemplate> lzObjectTemplate;
         Persistent<v8::ObjectTemplate> roObjectTemplate;
         Persistent<v8::ObjectTemplate> lzArrayTemplate;

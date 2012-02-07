@@ -46,6 +46,7 @@ namespace mongo {
     protected:
         void doWrite( int op , Request& r , const Shard& shard , bool checkVersion = true );
         void doQuery( Request& r , const Shard& shard );
+        void broadcastWrite(int op, Request& r); // Sends to all shards in cluster. DOESN'T CHECK VERSION
 
         void insert( const Shard& shard , const char * ns , const vector<BSONObj>& v , int flags=0 , bool safe=false );
         void update( const Shard& shard , const char * ns , const BSONObj& query , const BSONObj& toupdate , int flags=0, bool safe=false );

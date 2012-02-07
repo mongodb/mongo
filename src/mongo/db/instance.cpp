@@ -76,7 +76,7 @@ namespace mongo {
 #endif
 
     // see FSyncCommand:
-    extern bool lockedForWriting;
+    extern bool lockedForWriting();
 
     OpTime OpTime::now() {
         DEV d.dbMutex.assertWriteLocked();
@@ -153,9 +153,8 @@ namespace mongo {
                 }
             }
             b.append("inprog", vals);
-            unsigned x = lockedForWriting;
-            if( x ) {
-                b.append("fsyncLock", x);
+            if( lockedForWriting() ) {
+                b.append("fsyncLock", true);
                 b.append("info", "use db.fsyncUnlock() to terminate the fsync write/snapshot lock");
             }
         }
@@ -187,7 +186,7 @@ namespace mongo {
         replyToQuery(0, m, dbresponse, obj);
     }
 
-    void unlockFsyncAndWait();
+    bool _unlockFsync();
     void unlockFsync(const char *ns, Message& m, DbResponse &dbresponse) {
         BSONObj obj;
         if ( ! cc().isAdmin() ) { // checks auth
@@ -197,10 +196,9 @@ namespace mongo {
             obj = fromjson("{\"err\":\"unauthorized - this command must be run against the admin DB\"}");
         }
         else {
-            if( lockedForWriting ) {
-                log() << "command: unlock requested" << endl;
+            log() << "command: unlock requested" << endl;
+            if( _unlockFsync() ) {
                 obj = fromjson("{ok:1,\"info\":\"unlock completed\"}");
-                unlockFsyncAndWait();
             }
             else {
                 obj = fromjson("{ok:0,\"errmsg\":\"not locked\"}");

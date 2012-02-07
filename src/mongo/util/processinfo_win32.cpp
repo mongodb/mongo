@@ -28,6 +28,29 @@ int getpid() {
 
 namespace mongo {
 
+    // dynamically link to psapi.dll (in case this version of Windows
+    // does not support what we need)
+    struct PsApiInit {
+        bool supported;
+        typedef BOOL (WINAPI *pQueryWorkingSetEx)(HANDLE hProcess, 
+                                                  PVOID pv, 
+                                                  DWORD cb);
+        pQueryWorkingSetEx QueryWSEx;
+        
+        PsApiInit() {
+            HINSTANCE psapiLib = LoadLibrary( TEXT("psapi.dll") );
+            if (psapiLib) {
+                QueryWSEx = reinterpret_cast<pQueryWorkingSetEx>
+                    ( GetProcAddress( psapiLib, "QueryWorkingSetEx" ) );
+                if (QueryWSEx) {
+                    supported = true;
+                    return;
+                }
+            }
+            supported = false;
+        }
+    } psapiGlobal;
+                
     int _wconvertmtos( SIZE_T s ) {
         return (int)( s / ( 1024 * 1024 ) );
     }
@@ -73,7 +96,7 @@ namespace mongo {
     }
 
     bool ProcessInfo::blockCheckSupported() {
-        return true;
+        return psapiGlobal.supported;
     }
 
     bool ProcessInfo::blockInMemory( char * start ) {
@@ -93,7 +116,7 @@ namespace mongo {
 #endif
         PSAPI_WORKING_SET_EX_INFORMATION wsinfo;
         wsinfo.VirtualAddress = start;
-        BOOL result = QueryWorkingSetEx( GetCurrentProcess(), &wsinfo, sizeof(wsinfo) );
+        BOOL result = psapiGlobal.QueryWSEx( GetCurrentProcess(), &wsinfo, sizeof(wsinfo) );
         if ( result )
             if ( wsinfo.VirtualAttributes.Valid )
                 return true;

@@ -77,11 +77,11 @@ namespace mongo {
          */
         int getState() const { return _state.get(); }
 
-        bool atLeastReadLocked() const { return _state.get() != 0; }
+        static bool atLeastReadLocked();
         void assertAtLeastReadLocked() const { assert(atLeastReadLocked()); }
-        bool isWriteLocked/*by our thread*/() const { return getState() > 0; }
+        static bool isWriteLocked();
         void assertWriteLocked() const {
-            assert( getState() > 0 );
+            assert( isWriteLocked() );
             DEV assert( !_releasedEarly.get() );
         }
 
@@ -221,11 +221,6 @@ namespace mongo {
 
         MutexInfo _minfo;
 
-    public:
-        // indicates we need to call dur::REMAPPRIVATEVIEW on the next write lock
-        bool _remapPrivateViewRequested;
-
-    private:
         /* See the releaseEarly() method.
            we use a separate TLS value for releasedEarly - that is ok as
            our normal/common code path, we never even touch it */
@@ -249,10 +244,6 @@ namespace mongo {
 
     inline void MongoMutex::_acquiredWriteLock() {
         lockedExclusively();
-        if( _remapPrivateViewRequested ) {
-            dur::REMAPPRIVATEVIEW();
-            dassert( !_remapPrivateViewRequested );
-        }
     }
 
     string sayClientState();
@@ -268,18 +259,13 @@ namespace mongo {
         return false;
     }
 
-    struct readlocktry {
-        readlocktry( int tryms ) {
-            _got = d.dbMutex.lock_shared_try( tryms );
-        }
-        ~readlocktry() {
-            if ( _got ) {
-                d.dbMutex.unlock_shared();
-            }
-        }
-        bool got() const { return _got; }
-    private:
+    class readlocktry : boost::noncopyable {
+        bool _already;
         bool _got;
+    public:
+        readlocktry( int tryms );
+        ~readlocktry();
+        bool got() const { return _got; }
     };
 
     struct writelocktry {

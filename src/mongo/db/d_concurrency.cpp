@@ -23,6 +23,13 @@ namespace mongo {
 
     static QLock& q = *new QLock();
 
+    Lock::Nongreedy::Nongreedy() {
+        q.stop_greed();
+    }
+    Lock::Nongreedy::~Nongreedy() {
+        q.start_greed();
+    }
+
     //static RWLockRecursive excludeWrites("excludeWrites");
     //static mapsf<string,RWLockRecursive*> dblocks;
 
@@ -30,68 +37,125 @@ namespace mongo {
     HLMutex::HLMutex(const char *name) : SimpleMutex(name)
     { }
 
-    // ' ', 'r', 'w', 'R', 'W'
+    // 0, 'r', 'w', 'R', 'W'
     __declspec( thread ) char threadState;
     
+    static bool lock_R_try(int ms) { 
+        assert( threadState == 0 );
+        bool got = q.lock_R(ms);
+        if( got ) 
+            threadState = 'R';
+        return got;
+    }
     static bool lock_W_try(int ms) { 
-        assert( threadState == ' ' );
+        assert( threadState == 0 );
         bool got = q.lock_W(ms);
         if( got ) 
             threadState = 'W';
         return got;
     }
     static void lock_W() { 
-        assert( threadState == ' ' );
+        assert( threadState == 0 );
         threadState = 'W';
         q.lock_W();
     }
     static void unlock_W() { 
-        assert( threadState == 'W' );
-        threadState = ' ';
+        wassert( threadState == 'W' );
+        threadState = 0;
         q.unlock_W();
     }
     static void lock_R() { 
-        assert( threadState == ' ' );
+        assert( threadState == 0 );
         threadState = 'R';
         q.lock_R();
     }
     static void unlock_R() { 
-        assert( threadState == 'R' );
-        threadState = ' ';
+        wassert( threadState == 'R' );
+        threadState = 0;
         q.unlock_R();
     }
     static void lock_w() { 
-        assert( threadState == ' ' );
+        assert( threadState == 0 );
         threadState = 'w';
         q.lock_w();
     }
     static void unlock_w() { 
-        assert( threadState == 'w' );
-        threadState = ' ';
+        wassert( threadState == 'w' );
+        threadState = 0;
         q.unlock_w();
     }
 
-    bool Lock::isLocked() {
-        return threadState != ' ';
+    // these are safe for use ACROSS threads.  i.e. one thread can lock and 
+    // another unlock
+    void Lock::ThreadSpan::setWLockedNongreedy() { 
+        assert( threadState == 0 ); // as this spans threads the tls wouldn't make sense
+        q.lock_W();
+        q.stop_greed();
+    }
+    void Lock::ThreadSpan::W_to_R() { 
+        assert( threadState == 0 );
+        q.W_to_R();
+    }
+    void Lock::ThreadSpan::unsetW() {
+        assert( threadState == 0 );
+        q.unlock_W();
+        q.start_greed();
+    }
+    void Lock::ThreadSpan::unsetR() {
+        assert( threadState == 0 );
+        q.unlock_R();
+        q.start_greed();
+    }
+
+    int Lock::isLocked() {
+        return threadState;
+    }
+    int Lock::isWriteLocked() { // w or W
+        return threadState & 'W'; // ascii assumed
+    }
+    bool Lock::isW() { 
+        return threadState == 'W';
     }
 
     Lock::GlobalWrite::TempRelease::TempRelease() {
         unlock_W();
     }
     Lock::GlobalWrite::TempRelease::~TempRelease() {
-        lock_W();
+        DESTRUCTOR_GUARD( lock_W(); )
     }
-    Lock::GlobalWrite::GlobalWrite() {
-        lock_W();
+    Lock::GlobalWrite::GlobalWrite() : already(threadState == 'W') {
+        if( !already ) 
+            lock_W();
     }
     Lock::GlobalWrite::~GlobalWrite() {
-        unlock_W();
+        if( !already ) {
+            if( threadState == 'R' )
+                unlock_R();
+            else
+                unlock_W();
+        }
     }
-    Lock::GlobalRead::GlobalRead() {
-        lock_R();
+    void Lock::GlobalWrite::downgrade() { 
+        assert( !already );
+        assert( threadState == 'W' );
+        q.W_to_R();
+        threadState = 'R';
+    }
+    // you will deadlock if 2 threads doing this
+    void Lock::GlobalWrite::upgrade() { 
+        assert( !already );
+        assert( threadState == 'R' );
+        q.R_to_W();
+        threadState = 'W';
+    }
+
+    Lock::GlobalRead::GlobalRead() : already(threadState == 'R' || threadState == 'W') {
+        if( !already )
+            lock_R();
     }
     Lock::GlobalRead::~GlobalRead() {
-        unlock_R();
+        if( !already ) 
+            unlock_R();
     }
     Lock::DBWrite::DBWrite(const StringData& ns) { 
         // TEMP : 
@@ -114,6 +178,7 @@ namespace mongo {
 
 }
 
+// legacy hooks
 namespace mongo { 
 
     writelock::writelock() { 
@@ -136,6 +201,22 @@ namespace mongo {
             unlock_W();
     }
 
+    readlocktry::readlocktry( int tryms )      
+    {
+        if( threadState == 'R' ) {
+            _already = true;
+            _got = true;
+        }
+        else {
+            _already = false;
+            _got = lock_R_try(tryms);
+        }
+    }
+    readlocktry::~readlocktry() { 
+        if( !_already && _got )
+            unlock_R();
+    }
+
     readlock::readlock() {
         lk1.reset( new Lock::GlobalRead() );
     }
@@ -150,7 +231,19 @@ namespace mongo {
 
 }
 
+// legacy MongoMutex glue
 namespace mongo {
+
+    /* backward compatible glue. it could be that the assumption was that 
+       it's a global read lock, so 'r' and 'w' don't qualify.
+       */ 
+    bool MongoMutex::atLeastReadLocked() { 
+        int x = Lock::isLocked();
+        return x == 'R' || x == 'W';
+    }
+    bool MongoMutex::isWriteLocked() { 
+        return Lock::isW();
+    }
 
     // this tie-in temporary until MongoMutex is folded in more directly.Exclud
     // called when the lock has been achieved
@@ -168,7 +261,6 @@ namespace mongo {
     MongoMutex::MongoMutex(const char *name) : _m(name) {
         static int n = 0;
         assert( ++n == 1 ); // below releasingWriteLock we assume MongoMutex is a singleton, and uses dbMutex ref above
-        _remapPrivateViewRequested = false;
     }
 
 }

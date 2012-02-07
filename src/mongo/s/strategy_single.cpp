@@ -168,7 +168,7 @@ namespace mongo {
             }
 
             LOG(3) << "single write: " << ns << endl;
-            doWrite( op , r , r.primaryShard() );
+            doWrite( op , r , r.primaryShard() , false );
             r.gotInsert(); // Won't handle mulit-insert correctly. Not worth parsing the request.
         }
 

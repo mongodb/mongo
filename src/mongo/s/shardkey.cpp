@@ -58,8 +58,10 @@ namespace mongo {
 
         for(set<string>::const_iterator it = patternfields.begin(); it != patternfields.end(); ++it) {
             BSONElement e = obj.getFieldDotted(it->c_str());
-            if(e.eoo() || e.type() == Array)
+            if(e.eoo() || e.type() == Array || (e.type() == Object && e.embeddedObject().firstElementFieldName()[0] == '$')) {
+                // cant use getGtLtOp here as it returns Equality for unknown $ops and we want to reject them
                 return false;
+            }
         }
         return true;
     }
@@ -173,6 +175,7 @@ namespace mongo {
             ShardKeyPattern k( BSON( "num" << 1 ) );
             assert( k.hasShardKey(x) );
             assert( !k.hasShardKey( fromjson("{foo:'a'}") ) );
+            assert( !k.hasShardKey( fromjson("{x: {$gt: 1}}") ) );
 
             // try compound key
             {
@@ -180,6 +183,17 @@ namespace mongo {
                 assert( k.hasShardKey( fromjson("{foo:'a',a:'b',c:'z',b:9,k:99}") ) );
                 assert( !k.hasShardKey( fromjson("{foo:'a',a:'b',c:'z',bb:9,k:99}") ) );
                 assert( !k.hasShardKey( fromjson("{k:99}") ) );
+            }
+
+            // try dotted key
+            {
+                ShardKeyPattern k( fromjson("{'a.b':1}") );
+                assert( k.hasShardKey( fromjson("{a:{b:1,c:1},d:1}") ) );
+                assert( k.hasShardKey( fromjson("{'a.b':1}") ) );
+                assert( !k.hasShardKey( fromjson("{'a.c':1}") ) );
+                assert( !k.hasShardKey( fromjson("{a:{c:1},d:1}") ) );
+                assert( !k.hasShardKey( fromjson("{a:1}") ) );
+                assert( !k.hasShardKey( fromjson("{b:1}") ) );
             }
 
         }

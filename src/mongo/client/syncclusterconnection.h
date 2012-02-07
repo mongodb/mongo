@@ -94,7 +94,7 @@ namespace mongo {
         void setAllSoTimeouts( double socketTimeout );
         double getSoTimeout() const { return _socketTimeout; }
 
-        virtual bool auth(const string &dbname, const string &username, const string &password_text, string& errmsg, bool digestPassword);
+        virtual bool auth(const string &dbname, const string &username, const string &password_text, string& errmsg, bool digestPassword, Auth::Level* level=NULL);
 
         virtual bool lazySupported() const { return false; }
     private:
