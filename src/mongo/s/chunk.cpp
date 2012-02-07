@@ -847,7 +847,7 @@ namespace mongo {
         // returned.  For now, we satisfy that assumption by adding a shard with no matches rather
         // than return an empty set of shards.
         if ( shards.empty() ) {
-            massert( 16062, "no chunk ranges available", !_chunkRanges.ranges().empty() );
+            massert( 16068, "no chunk ranges available", !_chunkRanges.ranges().empty() );
             shards.insert( _chunkRanges.ranges().begin()->second->getShard() );
         }
     }
