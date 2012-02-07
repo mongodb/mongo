@@ -404,8 +404,8 @@ class InstallSetup:
         self.headers = True
         self.bannerFiles = [ "#distsrc/client/LICENSE.txt",
                              "#distsrc/client/SConstruct" ]
-        self.headerRoot = ""
-        self.clientTestsDir = "src/mongo/client/examples/"
+        self.headerRoot = "mongo/"
+        self.clientTestsDir = "#src/mongo/client/examples/"
 
 installSetup = InstallSetup()
 if distBuild:
@@ -448,8 +448,8 @@ def isDriverBuild():
 if has_option( "prefix" ):
     installDir = GetOption( "prefix" )
     if isDriverBuild():
+        installDir = '#' + installDir
         installSetup.justClient()
-
 
 def findVersion( root , choices ):
     if not isinstance(root, list):
