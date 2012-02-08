@@ -209,7 +209,7 @@ __drop_table(WT_SESSION_IMPL *session, const char *uri, int force)
 	name = uri;
 	(void)WT_PREFIX_SKIP(name, "table:");
 
-	WT_RET(__wt_schema_get_table(session, name, strlen(name), &table));
+	WT_ERR(__wt_schema_get_table(session, name, strlen(name), &table));
 
 	/* Drop the column groups. */
 	for (i = 0; i < WT_COLGROUPS(table); i++) {
@@ -231,9 +231,9 @@ __drop_table(WT_SESSION_IMPL *session, const char *uri, int force)
 
 	/* Remove the schema table entry (ignore missing items). */
 	WT_TRET(__wt_schema_table_remove(session, uri));
-	if (force && ret == WT_NOTFOUND)
-		ret = 0;
 
+err:	if (force && ret == WT_NOTFOUND)
+		ret = 0;
 	return (ret);
 }
 
@@ -263,6 +263,13 @@ __wt_schema_drop(WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 	else
 		return (__wt_unknown_object_type(session, uri));
 
-	/* If we didn't find a schema file entry, map that error to ENOENT. */
-	return (ret == WT_NOTFOUND ? ENOENT : ret);
+	/*
+	 * Map WT_NOTFOUND to ENOENT (or to 0 if "force" is set), based on the
+	 * assumption WT_NOTFOUND means there was no schema file entry.  The
+	 * underlying drop functions should handle this case (we passed them
+	 * the "force" value), but better safe than sorry.
+	 */
+	if (ret == WT_NOTFOUND)
+		ret = force ? 0 : ENOENT;
+	return (ret);
 }
