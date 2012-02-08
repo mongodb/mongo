@@ -76,7 +76,7 @@ class test_util07(wttest.WiredTigerTestCase, suite_subprocess):
         errfile = "readerr.txt"
         self.runWt(["read", 'table:' + self.tablename, 'NoMatch'], outfilename=outfile, errfilename=errfile)
         self.check_empty_file(outfile)
-        self.check_file_content(errfile, 'wt: NoMatch: not found\n')
+        self.check_file_contains(errfile, 'NoMatch: not found\n')
 
     def test_read_populated(self):
         """
@@ -91,7 +91,7 @@ class test_util07(wttest.WiredTigerTestCase, suite_subprocess):
         self.check_empty_file(errfile)
         self.runWt(["read", 'table:' + self.tablename, 'key49'], outfilename=outfile, errfilename=errfile)
         self.check_empty_file(outfile)
-        self.check_file_content(errfile, 'wt: key49: not found\n')
+        self.check_file_contains(errfile, 'key49: not found\n')
 
 
 if __name__ == '__main__':
