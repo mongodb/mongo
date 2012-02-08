@@ -47,10 +47,10 @@ list_print(WT_SESSION *session)
 	if ((ret = session->open_cursor(
 	    session, WT_SCHEMA_URI, NULL, NULL, &cursor)) != 0) {
 		/*
-		 * If there is no schema (yet), this will return WT_NOTFOUND.
+		 * If there is no schema (yet), this will return ENOENT.
 		 * Treat that the same as an empty schema.
 		 */
-		if (ret == WT_NOTFOUND)
+		if (ret == ENOENT)
 			return (0);
 
 		fprintf(stderr, "%s: %s: session.open_cursor: %s\n",
