@@ -465,6 +465,18 @@ namespace mongo {
         };
 #pragma pack()
 
+    BSONObj(const BSONObj &rO):
+        _objdata(rO._objdata), _holder(rO._holder) {
+        }
+
+    BSONObj &operator=(const BSONObj &rRHS) {
+        if (this != &rRHS) {
+            _objdata = rRHS._objdata;
+            _holder = rRHS._holder;
+        }
+        return *this;
+    }
+
     private:
         const char *_objdata;
         boost::intrusive_ptr< Holder > _holder;

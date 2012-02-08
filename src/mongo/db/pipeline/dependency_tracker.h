@@ -57,7 +57,7 @@ namespace mongo {
 
 }
 
-/* ======================= INLINED IMPLEMENTATIONS ========================== */
+/* ======================= PRIVATE IMPLEMENTATIONS ========================== */
 
 namespace mongo {
 
