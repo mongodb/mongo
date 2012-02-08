@@ -9,6 +9,7 @@ AC_CONFIG_MACRO_DIR([build_posix/aclocal])
 AC_CONFIG_SRCDIR([dist/RELEASE])
 
 AM_INIT_AUTOMAKE
+AM_SILENT_RULES([yes])
 AM_OPTIONS
 
 # If CFLAGS was not set on entry and we are not debugging, default to -O3
