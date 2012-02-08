@@ -34,35 +34,42 @@ namespace mongo {
         q.start_greed();
     }*/
 
-    //static RWLockRecursive excludeWrites("excludeWrites");
-    //static mapsf<string,RWLockRecursive*> dblocks;
-
     // e.g. externalobjsortmutex uses hlmutex as it can be locked for very long times
     // todo : report HLMutex status in db.currentOp() output
     HLMutex::HLMutex(const char *name) : SimpleMutex(name)
     { }
 
+    static mapsf<string,RWLockRecursive*> dblocks;
+    RWLockRecursive localDBLock("localDBLock");
+
     struct LockState {
-        LockState() : threadState(0), recursive(0) { }
-        char threadState;    // 0, 'r', 'w', 'R', 'W'
+        LockState() : threadState(0), recursive(0), localDB(0), otherDB(0), otherLock(0) { }
+
+        // global lock related
+        char threadState;             // 0, 'r', 'w', 'R', 'W'
         unsigned recursive;
+
+        // db lock related
+        unsigned localDB;             // recursive lock count on local db
+        unsigned otherDB;
+        string other;                 // which database are we locking and working with (besides local)
+        RWLockRecursive *otherLock;   // so we don't have to check the map too often (the map has a mutex)
     };
 
     TSP_DEFINE(LockState,ls);
 
-    inline char& threadState() { 
+    inline LockState& lockState() { 
         LockState *p = ls.get();
         if( unlikely( p == 0 ) ) { 
             ls.reset(p = new LockState());
         }
-        return p->threadState;
+        return *p;
+    }
+    inline char& threadState() { 
+        return lockState().threadState;
     }
     inline unsigned& recursive() { 
-        LockState *p = ls.get();
-        if( unlikely( p == 0 ) ) { 
-            ls.reset(p = new LockState());
-        }
-        return p->recursive;
+        return lockState().recursive;
     }
 
     static bool lock_R_try(int ms) { 
@@ -240,11 +247,26 @@ namespace mongo {
     }
     Lock::DBWrite::~DBWrite() { 
     }
-    Lock::DBRead::DBRead(const StringData& ns) { 
-    } 
-    Lock::DBRead::~DBRead() { 
-    }
 
+    Lock::DBRead::DBRead(const StringData& ns) {
+    }
+    Lock::DBRead::~DBRead() {
+    }
+    /* stub() {
+        LockState& ls = lockState();
+        if( ls.threadState == 'R' || ls.threadState == 'W' ) {
+            // already globally locked, so no need to be more granular
+            ls.recursive++;
+            return;
+        }
+        assert( ls.threadState == 0 || ls.threadState == 'r' );
+        bool local = str::equals(ns.data(),"local");
+        if( local ) {
+            if( ++ls.localDB == 1 ) { 
+                // we're the first
+            }
+        }
+    }*/
 }
 
 // legacy hooks
