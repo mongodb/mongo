@@ -68,6 +68,8 @@ namespace mongo {
     };
 #pragma pack()
 
+    BOOST_STATIC_ASSERT( Namespace::MaxNsLen == MaxDatabaseNameLen );
+
 } // namespace mongo
 
 #include "index.h"

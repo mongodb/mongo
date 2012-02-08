@@ -26,7 +26,7 @@ namespace mongo {
 
     /* in the mongo source code, "client" means "database". */
 
-    const int MaxDatabaseNameLen = 256; // max str len for the db name, including null char
+    const int MaxDatabaseNameLen = 128; // max str len for the db name, including null char
 
     /* e.g.
        NamespaceString ns("acme.orders");
@@ -119,18 +119,14 @@ namespace mongo {
 
     // "database.a.b.c" -> "database"
     inline void nsToDatabase(const char *ns, char *database) {
-        const char *p = ns;
-        char *q = database;
-        while ( *p != '.' ) {
-            if ( *p == 0 )
-                break;
-            *q++ = *p++;
+        int i = 0;
+        for( int i = 0; i < MaxDatabaseNameLen; i++ ) {
+            database[i] = ns[i];
+            if( database[i] == 0 )
+                return;
         }
-        *q = 0;
-        if (q-database>=MaxDatabaseNameLen) {
-            log() << "nsToDatabase: ns too long. terminating, buf overrun condition" << endl;
-            dbexit( EXIT_POSSIBLE_CORRUPTION );
-        }
+        // other checks should have happened already, this is defensive. thus massert not uassert
+        massert(10078, "nsToDatabase: ns too long", false);
     }
     inline string nsToDatabase(const char *ns) {
         char buf[MaxDatabaseNameLen];
@@ -141,6 +137,7 @@ namespace mongo {
         size_t i = ns.find( '.' );
         if ( i == string::npos )
             return ns;
+        massert(10088, "nsToDatabase: ns too long", i < MaxDatabaseNameLen);
         return ns.substr( 0 , i );
     }
 
