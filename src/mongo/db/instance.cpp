@@ -427,7 +427,7 @@ namespace mongo {
 
         if ( currentOp.shouldDBProfile( debug.executionTime ) ) {
             // performance profiling is on
-            if ( d.dbMutex.getState() < 0 ) {
+            if ( Lock::isReadLocked() ) {
                 mongo::log(1) << "note: not profiling because recursive read lock" << endl;
             }
             else {

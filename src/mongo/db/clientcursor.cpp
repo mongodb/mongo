@@ -446,7 +446,7 @@ namespace mongo {
 
         int micros = Client::recommendedYieldMicros( &writers , &readers );
 
-        if ( micros > 0 && writers == 0 && d.dbMutex.getState() <= 0 ) {
+        if ( micros > 0 && writers == 0 && Lock::isR() ) {
             // we have a read lock, and only reads are coming on, so why bother unlocking
             return 0;
         }

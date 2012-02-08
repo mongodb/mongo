@@ -26,16 +26,17 @@ namespace mongo {
 
     static QLock& q = *new QLock();
 
-    Lock::Nongreedy::Nongreedy() {
+    /*Lock::Nongreedy::Nongreedy() {
         q.stop_greed();
     }
     Lock::Nongreedy::~Nongreedy() {
         q.start_greed();
-    }
+    }*/
 
     //static RWLockRecursive excludeWrites("excludeWrites");
     //static mapsf<string,RWLockRecursive*> dblocks;
 
+    // e.g. externalobjsortmutex uses hlmutex as it can be locked for very long times
     // todo : report HLMutex status in db.currentOp() output
     HLMutex::HLMutex(const char *name) : SimpleMutex(name)
     { }
@@ -118,11 +119,17 @@ namespace mongo {
     int Lock::isLocked() {
         return threadState;
     }
+    int Lock::isReadLocked() {
+        return threadState & 'R'; // ascii assumed
+    }
     int Lock::isWriteLocked() { // w or W
         return threadState & 'W'; // ascii assumed
     }
     bool Lock::isW() { 
         return threadState == 'W';
+    }
+    bool Lock::isR() { 
+        return threadState == 'R';
     }
     bool Lock::nested() { 
         return recursive != 0;

@@ -17,8 +17,10 @@ namespace mongo {
     class Lock : boost::noncopyable { 
     public:
         static int isLocked();      // true if *anything* is locked (by us)
+        static int isReadLocked();  // r or R
         static int isWriteLocked(); // w or W
         static bool isW();          // W
+        static bool isR();          
         static bool nested();
 
         struct TempRelease {
@@ -56,9 +58,9 @@ namespace mongo {
         };
 
         // specialty things:
-        struct Nongreedy : boost::noncopyable { // temporarily disable greediness of W lock acquisitions
+        /*struct Nongreedy : boost::noncopyable { // temporarily disable greediness of W lock acquisitions
             Nongreedy(); ~Nongreedy();
-        };
+        };*/
         struct ThreadSpan { 
             static void setWLockedNongreedy();
             static void W_to_R();
