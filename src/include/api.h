@@ -235,6 +235,15 @@ struct __wt_connection_impl {
 	}								\
 } while (0)
 
+/*
+ * If a session or connection method is about to return WT_NOTFOUND (some
+ * underlying object was not found), map it to ENOENT, only cursor methods
+ * return WT_NOTFOUND.
+ */
+#define	API_END_NOTFOUND_MAP(s, ret)					\
+	API_END(s);							\
+	return ((ret) == WT_NOTFOUND ? ENOENT : (ret))
+
 #define	SESSION_API_CALL(s, n, cfg, cfgvar)				\
 	API_CALL(s, session, n, NULL, NULL, cfg, cfgvar);
 

@@ -80,9 +80,7 @@ err:		if (dlh != NULL)
 	}
 	__wt_free(session, entry_name);
 
-	API_END(session);
-
-	return (ret);
+	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -104,9 +102,8 @@ __conn_add_cursor_type(WT_CONNECTION *wt_conn,
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, add_cursor_type, config, cfg);
 	WT_UNUSED(cfg);
-err:	API_END(session);
 
-	return (ret);
+err:	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -134,10 +131,9 @@ __conn_add_collator(WT_CONNECTION *wt_conn,
 	TAILQ_INSERT_TAIL(&conn->collqh, ncoll, q);
 	__wt_spin_unlock(session, &conn->spinlock);
 	ncoll = NULL;
-err:	API_END(session);
-	__wt_free(session, ncoll);
+err:	__wt_free(session, ncoll);
 
-	return (ret);
+	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -168,9 +164,9 @@ __conn_add_compressor(WT_CONNECTION *wt_conn,
 	TAILQ_INSERT_TAIL(&conn->compqh, ncomp, q);
 	__wt_spin_unlock(session, &conn->spinlock);
 	ncomp = NULL;
-err:	API_END(session);
-	__wt_free(session, ncomp);
-	return (ret);
+err:	__wt_free(session, ncomp);
+
+	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -232,9 +228,8 @@ __conn_add_extractor(WT_CONNECTION *wt_conn,
 	conn = (WT_CONNECTION_IMPL *)wt_conn;
 	CONNECTION_API_CALL(conn, session, add_extractor, config, cfg);
 	WT_UNUSED(cfg);
-err:	API_END(session);
 
-	return (ret);
+err:	API_END_NOTFOUND_MAP(session, ret);
 }
 
 static const char *
@@ -299,9 +294,8 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 	WT_TRET(__wt_connection_close(conn));
 	/* We no longer have a session, don't try to update it. */
 	session = NULL;
-err:	API_END(session);
 
-	return (ret);
+err:	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
@@ -327,9 +321,8 @@ __conn_open_session(WT_CONNECTION *wt_conn,
 	WT_ERR(__wt_open_session(conn, 0, event_handler, config, &session_ret));
 
 	*wt_sessionp = &session_ret->iface;
-err:	API_END(session);
 
-	return (ret);
+err:	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
