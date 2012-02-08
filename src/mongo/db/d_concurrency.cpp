@@ -11,6 +11,7 @@
 #include "namespacestring.h"
 #include "d_globals.h"
 #include "mongomutex.h"
+#include "server.h"
 
 // oplog locking
 // no top level read locks
@@ -41,113 +42,132 @@ namespace mongo {
     HLMutex::HLMutex(const char *name) : SimpleMutex(name)
     { }
 
-    // 0, 'r', 'w', 'R', 'W'
-    __declspec( thread ) char threadState;
-    __declspec( thread ) unsigned recursive;
-    
+    struct LockState {
+        LockState() : threadState(0), recursive(0) { }
+        char threadState;    // 0, 'r', 'w', 'R', 'W'
+        unsigned recursive;
+    };
+
+    TSP_DEFINE(LockState,ls);
+
+    inline char& threadState() { 
+        LockState *p = ls.get();
+        if( unlikely( p == 0 ) ) { 
+            ls.reset(p = new LockState());
+        }
+        return p->threadState;
+    }
+    inline unsigned& recursive() { 
+        LockState *p = ls.get();
+        if( unlikely( p == 0 ) ) { 
+            ls.reset(p = new LockState());
+        }
+        return p->recursive;
+    }
+
     static bool lock_R_try(int ms) { 
-        assert( threadState == 0 );
+        assert( threadState() == 0 );
         bool got = q.lock_R(ms);
         if( got ) 
-            threadState = 'R';
+            threadState() = 'R';
         return got;
     }
     static bool lock_W_try(int ms) { 
-        assert( threadState == 0 );
+        assert( threadState() == 0 );
         bool got = q.lock_W(ms);
         if( got ) {
-            threadState = 'W';
+            threadState() = 'W';
             lockedExclusively();
         }
         return got;
     }
     static void lock_W() { 
-        assert( threadState == 0 );
-        threadState = 'W';
+        assert( threadState() == 0 );
+        threadState() = 'W';
         q.lock_W();
         lockedExclusively();
     }
     static void unlock_W() { 
-        wassert( threadState == 'W' );
+        wassert( threadState() == 'W' );
         unlockingExclusively();
-        threadState = 0;
+        threadState() = 0;
         q.unlock_W();
     }
     static void lock_R() { 
-        assert( threadState == 0 );
-        threadState = 'R';
+        assert( threadState() == 0 );
+        threadState() = 'R';
         q.lock_R();
     }
     static void unlock_R() { 
-        wassert( threadState == 'R' );
-        threadState = 0;
+        wassert( threadState() == 'R' );
+        threadState() = 0;
         q.unlock_R();
     }
     static void lock_w() { 
-        assert( threadState == 0 );
-        threadState = 'w';
+        assert( threadState() == 0 );
+        threadState() = 'w';
         q.lock_w();
     }
     static void unlock_w() { 
-        wassert( threadState == 'w' );
-        threadState = 0;
+        wassert( threadState() == 'w' );
+        threadState() = 0;
         q.unlock_w();
     }
 
     // these are safe for use ACROSS threads.  i.e. one thread can lock and 
     // another unlock
     void Lock::ThreadSpan::setWLockedNongreedy() { 
-        assert( threadState == 0 ); // as this spans threads the tls wouldn't make sense
+        assert( threadState() == 0 ); // as this spans threads the tls wouldn't make sense
         q.lock_W();
         q.stop_greed();
     }
     void Lock::ThreadSpan::W_to_R() { 
-        assert( threadState == 0 );
+        assert( threadState() == 0 );
         q.W_to_R();
     }
     void Lock::ThreadSpan::unsetW() {
-        assert( threadState == 0 );
+        assert( threadState() == 0 );
         q.unlock_W();
         q.start_greed();
     }
     void Lock::ThreadSpan::unsetR() {
-        assert( threadState == 0 );
+        assert( threadState() == 0 );
         q.unlock_R();
         q.start_greed();
     }
 
     int Lock::isLocked() {
-        return threadState;
+        return threadState();
     }
     int Lock::isReadLocked() {
-        return threadState & 'R'; // ascii assumed
+        return threadState() & 'R'; // ascii assumed
     }
     int Lock::isWriteLocked() { // w or W
-        return threadState & 'W'; // ascii assumed
+        return threadState() & 'W'; // ascii assumed
     }
     bool Lock::isW() { 
-        return threadState == 'W';
+        return threadState() == 'W';
     }
     bool Lock::isR() { 
-        return threadState == 'R';
+        return threadState() == 'R';
     }
     bool Lock::nested() { 
-        return recursive != 0;
+        return recursive() != 0;
     }
 
     Lock::TempRelease::TempRelease() : 
-        cant( recursive ), type(threadState)
+        cant( recursive() ), type(threadState())
     {
         if( cant )
             return;
-        if( threadState == 'W' ) {
+        if( threadState() == 'W' ) {
             unlock_W();
         }
-        else if( threadState == 'R' ) { 
+        else if( threadState() == 'R' ) { 
             unlock_R();
         }
         else {
-            error() << "TempRelease called but threadState=" << threadState << endl;
+            error() << "TempRelease called but threadState()=" << threadState() << endl;
             assert(false);
         }
     }
@@ -155,7 +175,7 @@ namespace mongo {
         if( cant )
             return;
         DESTRUCTOR_GUARD( 
-            fassert(0, threadState == 0);
+            fassert(0, threadState() == 0);
             if( type == 'W' ) {
                 lock_W();
             }
@@ -168,49 +188,49 @@ namespace mongo {
         )
     }
     Lock::GlobalWrite::GlobalWrite() {
-        if( threadState == 'W' ) { 
-            recursive++;
+        if( threadState() == 'W' ) { 
+            recursive()++;
         }
         else {
             lock_W();
         }
     }
     Lock::GlobalWrite::~GlobalWrite() {
-        if( recursive ) { 
-            recursive--;
+        if( recursive() ) { 
+            recursive()--;
         }
         else {
-            if( threadState == 'R' ) // downgraded
+            if( threadState() == 'R' ) // downgraded
                 unlock_R();
             else
                 unlock_W();
         }
     }
     void Lock::GlobalWrite::downgrade() { 
-        assert( !recursive );
-        assert( threadState == 'W' );
+        assert( !recursive() );
+        assert( threadState() == 'W' );
         q.W_to_R();
-        threadState = 'R';
+        threadState() = 'R';
     }
     // you will deadlock if 2 threads doing this
     void Lock::GlobalWrite::upgrade() { 
-        assert( !recursive );
-        assert( threadState == 'R' );
+        assert( !recursive() );
+        assert( threadState() == 'R' );
         q.R_to_W();
-        threadState = 'W';
+        threadState() = 'W';
     }
 
     Lock::GlobalRead::GlobalRead() {
-        if( threadState == 'R' || threadState == 'W' ) { 
-            recursive++;
+        if( threadState() == 'R' || threadState() == 'W' ) { 
+            recursive()++;
         }
         else {
             lock_R();
         }
     }
     Lock::GlobalRead::~GlobalRead() {
-        if( recursive ) { 
-            recursive--;
+        if( recursive() ) { 
+            recursive()--;
         }
         else {
             unlock_R();
@@ -253,7 +273,7 @@ namespace mongo {
     // note: the 'already' concept here might be a bad idea as a temprelease wouldn't notice it is nested then
     readlocktry::readlocktry( int tryms )      
     {
-        if( threadState == 'R' || threadState == 'W' ) {
+        if( threadState() == 'R' || threadState() == 'W' ) {
             _already = true;
             _got = true;
         }
