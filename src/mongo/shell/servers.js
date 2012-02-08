@@ -125,7 +125,7 @@ MongoRunner.toRealPath = function( path, pathOpts ){
     path = path.replace( /\$dataPath/g, MongoRunner.dataPath )
     path = path.replace( /\$dataDir/g, MongoRunner.dataDir )
     for( key in pathOpts ){
-        path = path.replace( RegExp( "\\$" + key, "g" ), pathOpts[ key ] )
+        path = path.replace( RegExp( "\\$" + RegExp.escape(key), "g" ), pathOpts[ key ] )
     }
     
     // Relative path
@@ -1077,7 +1077,7 @@ printShardingStatus = function( configDB , verbose ){
             output( "\t" + tojsononeline(db,"",true) );
         
             if (db.partitioned){
-                configDB.collections.find( { _id : new RegExp( "^" + db._id + "\\." ) } ).sort( { _id : 1 } ).forEach(
+                configDB.collections.find( { _id : new RegExp( "^" + RegExp.escape(db._id) + "\\." ) } ).sort( { _id : 1 } ).forEach(
                     function( coll ){
                         if ( coll.dropped == false ){
                             output("\t\t" + coll._id + " chunks:");
@@ -1143,7 +1143,7 @@ printShardingSizes = function(){
             output( "\t" + tojson(db,"",true) );
         
             if (db.partitioned){
-                configDB.collections.find( { _id : new RegExp( "^" + db._id + "\." ) } ).sort( { _id : 1 } ).forEach(
+                configDB.collections.find( { _id : new RegExp( "^" + RegExp.escape(db._id) + "\." ) } ).sort( { _id : 1 } ).forEach(
                     function( coll ){
                         output("\t\t" + coll._id + " chunks:");
                         configDB.chunks.find( { "ns" : coll._id } ).sort( { min : 1 } ).forEach( 
