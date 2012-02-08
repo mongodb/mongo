@@ -21,11 +21,11 @@ errors = [
 	Error('WT_ERROR', 'non-specific WiredTiger error', '''
 		This error is generated for cases that are not covered by
 		specific error returns.'''),
-	Error('WT_NOTFOUND', 'item not found', '''
-		This return value indicates that a search operation did not
-		find a record matching the application's search key.  This
-		includes implicit search operations in WT_CURSOR::update or
-		WT_CURSOR::remove operations.'''),
+	Error('WT_NOTFOUND', 'cursor item not found', '''
+		This error indicates a cursor operation did not find a
+		record to return.  This includes search and other
+		operations where no record matched the cursor's search
+		key such as WT_CURSOR::update or WT_CURSOR::remove.'''),
 	Error('WT_RESTART', 'restart the operation (internal)', undoc=True),
 ]
 
