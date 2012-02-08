@@ -539,6 +539,7 @@ def build_and_test_client(env, target, source):
     from subprocess import call
 
     installDir = env.subst('$INSTALL_DIR', target=target, source=source)
+    installDir = env.GetBuildPath(installDir)
     if GetOption("extrapath") is not None:
         scons_command = ["scons", "--extrapath=" + GetOption("extrapath")]
     else:
