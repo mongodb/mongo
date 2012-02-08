@@ -112,8 +112,9 @@ class test_stat01(wttest.WiredTigerTestCase):
         self.assertEqual(val, values[2])
         filestat_cursor.close()
 
-        no_cursor = self.session.open_cursor('statistics:file:DoesNotExist', None, None)
-        self.assertEqual(no_cursor, None)
+        self.assertRaises(wiredtiger.WiredTigerError,
+	    lambda: self.session.open_cursor(
+	    'statistics:file:DoesNotExist', None, None))
 
 if __name__ == '__main__':
     wttest.run()
