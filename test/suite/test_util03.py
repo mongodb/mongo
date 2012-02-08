@@ -29,10 +29,8 @@
 # 	Utilities: wt create
 #
 
-import unittest
-from wiredtiger import WiredTigerError
-import wttest
 from suite_subprocess import suite_subprocess
+import wiredtiger, wttest
 
 class test_util03(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_util03.a'

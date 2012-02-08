@@ -29,9 +29,7 @@
 # 	Cursor operations
 #
 
-import unittest
-import wiredtiger
-import wttest
+import wiredtiger, wttest
 
 class test_base05(wttest.WiredTigerTestCase):
     """

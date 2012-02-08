@@ -30,7 +30,6 @@
 #       with key/values of various sizes.
 #
 
-import unittest
 import wiredtiger
 from test_cursor_tracker import TestCursorTracker
 from wtscenario import multiply_scenarios

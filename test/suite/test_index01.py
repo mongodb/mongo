@@ -29,10 +29,7 @@
 #	basic tests for indices
 #
 
-import unittest
-import wiredtiger
-from wiredtiger import WT_NOTFOUND
-import wttest
+import wiredtiger, wttest
 
 class test_index01(wttest.WiredTigerTestCase):
     '''Test basic operations for indices'''
@@ -117,7 +114,7 @@ class test_index01(wttest.WiredTigerTestCase):
         cursor = self.cursor()
         cursor.set_key(*cols[:2]);
         cursor.set_value(*cols[2:])
-        self.assertEqual(cursor.update(), WT_NOTFOUND)
+        self.assertEqual(cursor.update(), wiredtiger.WT_NOTFOUND)
         cursor.close()
 
     def remove(self, name, ID):
@@ -130,7 +127,7 @@ class test_index01(wttest.WiredTigerTestCase):
     def test_empty(self):
         '''Create a table, look for a nonexistent key'''
         self.create_table()
-        self.check_exists('jones', 10, WT_NOTFOUND)
+        self.check_exists('jones', 10, wiredtiger.WT_NOTFOUND)
         for i in xrange(self.NUM_INDICES):
             self.assertEqual(list(self.index_iter(i)), [])
         self.drop_table()
@@ -212,7 +209,7 @@ class test_index01(wttest.WiredTigerTestCase):
         self.insert('smith', 1, 'HR', 'manager', 100000, 1970)
         self.check_exists('smith', 1, 0)
         self.remove('smith', 1)
-        self.check_exists('smith', 1, WT_NOTFOUND)
+        self.check_exists('smith', 1, wiredtiger.WT_NOTFOUND)
         for i in xrange(self.NUM_INDICES):
             self.assertEqual(list(self.index_iter(i)), [])
         self.drop_table()

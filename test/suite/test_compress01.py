@@ -29,11 +29,8 @@
 #   Basic operations
 #
 
-import unittest
-import wiredtiger
-import wttest
 import os
-import sys
+import wiredtiger, wttest
 
 class test_compress01_base(wttest.WiredTigerTestCase):
     """

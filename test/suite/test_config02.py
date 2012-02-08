@@ -29,11 +29,8 @@
 # 	The home directory for wiredtiger_open
 #
 
-import unittest
-import wiredtiger
-from wiredtiger import WiredTigerError
-import wttest
 import os
+import wiredtiger, wttest
 
 class test_config02(wttest.WiredTigerTestCase):
     table_name1 = 'test_config02'
@@ -148,19 +145,19 @@ class test_config02(wttest.WiredTigerTestCase):
 	# env var, but no open configuration string, should fail
         edir = 'envdir'
         os.mkdir(edir)
-        self.assertRaises(WiredTigerError,
+        self.assertRaises(wiredtiger.WiredTigerError,
                           lambda: self.common_test(None, edir, None))
 
     def test_home_does_not_exist(self):
         dir = 'nondir'
-        self.assertRaises(WiredTigerError,
+        self.assertRaises(wiredtiger.WiredTigerError,
                           lambda: wiredtiger.wiredtiger_open(dir, 'create'))
 
     def test_home_not_writeable(self):
         dir = 'subdir'
         os.mkdir(dir)
         os.chmod(dir, 0555)
-        self.assertRaises(WiredTigerError,
+        self.assertRaises(wiredtiger.WiredTigerError,
                           lambda: wiredtiger.wiredtiger_open(dir, 'create'))
 
 if __name__ == '__main__':

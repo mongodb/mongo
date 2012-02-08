@@ -29,12 +29,9 @@
 # 	Utilities: wt verify
 #
 
-import unittest
-from wiredtiger import WiredTigerError
-import wttest
+import os, struct
 from suite_subprocess import suite_subprocess
-import os
-import struct
+import wiredtiger, wttest
 
 class test_util05(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_util05.a'
@@ -143,7 +140,8 @@ class test_util05(wttest.WiredTigerTestCase, suite_subprocess):
         # open_and_position closed the session/connection, reopen them now.
         self.conn = self.setUpConnectionOpen(".")
         self.session = self.setUpSessionOpen(self.conn)
-        self.assertRaises(WiredTigerError, lambda: self.session.verify('table:' + self.tablename, None))
+        self.assertRaises(wiredtiger.WiredTigerError,
+			lambda: self.session.verify('table:' + self.tablename, None))
 
     def test_verify_process_75pct_null(self):
         """

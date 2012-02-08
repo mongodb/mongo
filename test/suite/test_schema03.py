@@ -31,13 +31,9 @@
 #       modified values for SHOW_PYTHON* variables.
 #
 
-import unittest
-import wiredtiger
-from wiredtiger import WiredTigerError
-import wttest
-import wtscenario
-import suite_random
 import resource
+import suite_random
+import wiredtiger, wtscenario, wttest
 
 def extract_random_from_list(rand, list):
     pos = rand.rand_range(0, len(list))

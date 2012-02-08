@@ -29,12 +29,9 @@
 #	Utilities: wt dumpfile
 #
 
-import unittest
-from wiredtiger import WiredTigerError
-import wttest
+import os, struct
 from suite_subprocess import suite_subprocess
-import os
-import struct
+import wiredtiger, wttest
 
 class test_util10(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_util10.a'

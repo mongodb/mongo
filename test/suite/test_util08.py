@@ -29,10 +29,8 @@
 # 	Utilities: wt copyright
 #
 
-import unittest
-from wiredtiger import WiredTigerError
-import wttest
 from suite_subprocess import suite_subprocess
+import wiredtiger, wttest
 
 class test_util08(wttest.WiredTigerTestCase, suite_subprocess):
     def test_copyright(self):

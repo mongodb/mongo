@@ -29,11 +29,8 @@
 # 	Configuration strings for wiredtiger_open
 #
 
-import unittest
-import wiredtiger
-import wttest
+import wiredtiger, wtscenario, wttest
 import test_base03
-import wtscenario
 
 class test_config01(test_base03.test_base03):
     scenarios = wtscenario.wtscenario.session_create_scenario()

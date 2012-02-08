@@ -29,9 +29,7 @@
 # 	Basic operations
 #
 
-import unittest
-import wiredtiger
-import wttest
+import wiredtiger, wttest
 
 class test_base01(wttest.WiredTigerTestCase):
     """

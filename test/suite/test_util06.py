@@ -29,12 +29,9 @@
 # 	Utilities: wt salvage
 #
 
-import unittest
-from wiredtiger import WiredTigerError
-import wttest
+import os, struct
 from suite_subprocess import suite_subprocess
-import os
-import struct
+import wiredtiger, wttest
 
 class test_util06(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_util06.a'
@@ -204,7 +201,8 @@ class test_util06(wttest.WiredTigerTestCase, suite_subprocess):
 
         # damage() closed the session/connection, reopen them now.
         self.open_conn()
-        self.assertRaises(WiredTigerError, lambda: self.session.verify('table:' + self.tablename, None))
+        self.assertRaises(wiredtiger.WiredTigerError,
+			lambda: self.session.verify('table:' + self.tablename, None))
 
         self.session.salvage('file:' + self.tablename + ".wt", None)
         self.check_damaged(self.tablename)

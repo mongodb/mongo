@@ -29,12 +29,8 @@
 # 	Run a subprocess within the test suite
 #
 
-import unittest
-from wiredtiger import WiredTigerError
-import wttest
 from run import wt_builddir
-import subprocess
-import os
+import os, subprocess
 
 # Used as a 'mixin' class along with a WiredTigerTestCase class
 class suite_subprocess:

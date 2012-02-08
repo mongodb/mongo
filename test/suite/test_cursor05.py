@@ -31,10 +31,7 @@
 #	Mix that in with column groups.
 #
 
-import unittest
-import wiredtiger
-from wiredtiger import WiredTigerError
-import wttest
+import wiredtiger, wttest
 
 class test_cursor05(wttest.WiredTigerTestCase):
     """

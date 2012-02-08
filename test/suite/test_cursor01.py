@@ -29,10 +29,7 @@
 # 	Cursor operations
 #
 
-import unittest
-import wiredtiger
-from wiredtiger import WiredTigerError
-import wttest
+import wiredtiger, wttest
 
 class test_cursor01(wttest.WiredTigerTestCase):
     """
@@ -94,8 +91,8 @@ class test_cursor01(wttest.WiredTigerTestCase):
 
     def assertCursorHasNoKeyValue(self, cursor):
         print('Expect to see messages: \'requires key/value to be set\'')
-        self.assertRaises(WiredTigerError, cursor.get_key)
-        self.assertRaises(WiredTigerError, cursor.get_value)
+        self.assertRaises(wiredtiger.WiredTigerError, cursor.get_key)
+        self.assertRaises(wiredtiger.WiredTigerError, cursor.get_value)
         
     def test_forward_iter(self):
         """

@@ -29,11 +29,8 @@
 # 	Individually test config options
 #
 
-import unittest
-import wiredtiger
-from wiredtiger import WiredTigerError
-import wttest
 import os
+import wiredtiger, wttest
 
 class test_config04(wttest.WiredTigerTestCase):
     table_name1 = 'test_config04'
@@ -93,7 +90,7 @@ class test_config04(wttest.WiredTigerTestCase):
         self.assertEqual(got_cache, size)
 
     def test_bad_config(self):
-        self.assertRaises(WiredTigerError, lambda:
+        self.assertRaises(wiredtiger.WiredTigerError, lambda:
             wiredtiger.wiredtiger_open('.', 'not_valid,another_bad=10'))
 
     def test_cache_size_number(self):
@@ -126,12 +123,12 @@ class test_config04(wttest.WiredTigerTestCase):
         self.common_cache_size_test('2T', 2*self.T)
 
     def test_cache_too_small(self):
-        self.assertRaises(WiredTigerError, lambda:
+        self.assertRaises(wiredtiger.WiredTigerError, lambda:
             wiredtiger.wiredtiger_open('.', 'create,cache_size=900000'))
 
     def test_cache_too_large(self):
         T11 = 11 * self.T  # 11 Terabytes
-        self.assertRaises(WiredTigerError, lambda:
+        self.assertRaises(wiredtiger.WiredTigerError, lambda:
             wiredtiger.wiredtiger_open('.', 'create,cache_size=' + str(T11)))
 
     def test_eviction(self):
@@ -139,12 +136,12 @@ class test_config04(wttest.WiredTigerTestCase):
         # Note
 
     def test_eviction_bad(self):
-        self.assertRaises(WiredTigerError, lambda:
+        self.assertRaises(wiredtiger.WiredTigerError, lambda:
             wiredtiger.wiredtiger_open('.', 'create,eviction_target=91,' +
                                        'eviction_trigger=81'))
 
     def test_eviction_bad2(self):
-        self.assertRaises(WiredTigerError, lambda:
+        self.assertRaises(wiredtiger.WiredTigerError, lambda:
             wiredtiger.wiredtiger_open('.', 'create,eviction_target=86,' +
                                        'eviction_trigger=86'))
 

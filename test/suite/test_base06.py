@@ -29,12 +29,8 @@
 #	session level operations on tables
 #
 
-import unittest
-import wiredtiger
-from wiredtiger import WiredTigerError
-import wttest
-import time
-import os
+import os, time
+import wiredtiger, wttest
 
 class test_base06(wttest.WiredTigerTestCase):
     """
@@ -71,7 +67,7 @@ class test_base06(wttest.WiredTigerTestCase):
 
     def checkDoesNotExist(self, t):
         self.assertFalse(os.path.exists(t + ".wt"))
-        self.assertRaises(WiredTigerError, lambda:
+        self.assertRaises(wiredtiger.WiredTigerError, lambda:
                               self.session.open_cursor('table:' + t,
                                                        None, None))
 
@@ -93,7 +89,7 @@ class test_base06(wttest.WiredTigerTestCase):
         if not cur1 and not cur2:
             self.session.truncate('table:' + tablename, None, None, None)
         elif beginerror:
-            self.assertRaises(WiredTigerError, lambda:
+            self.assertRaises(wiredtiger.WiredTigerError, lambda:
                 self.session.truncate(None, cur1, cur2, None))
         else:
             self.session.truncate(None, cur1, cur2, None)
@@ -150,7 +146,7 @@ class test_base06(wttest.WiredTigerTestCase):
             'table:' + self.table_name1, None)
         self.checkContents(self.table_name1)
         self.checkDoesNotExist(self.table_name2)
-        self.assertRaises(WiredTigerError, lambda:
+        self.assertRaises(wiredtiger.WiredTigerError, lambda:
             self.session.rename('table:' + self.table_name2,
                 'table:' + self.table_name1, None))
 
@@ -159,7 +155,7 @@ class test_base06(wttest.WiredTigerTestCase):
         self.session.drop('table:' + self.table_name1, None)
         self.checkDoesNotExist(self.table_name1)
         self.session.drop('table:' + self.table_name1, 'force')
-        self.assertRaises(WiredTigerError, lambda:
+        self.assertRaises(wiredtiger.WiredTigerError, lambda:
             self.session.drop('table:' + self.table_name1, None))
 
     def test_truncate(self):

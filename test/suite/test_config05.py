@@ -29,11 +29,7 @@
 # 	Test multiple connection opens
 #
 
-import unittest
-import wiredtiger
-from wiredtiger import WiredTigerError
-import wttest
-import os
+import wiredtiger, wttest
 
 class test_config05(wttest.WiredTigerTestCase):
     table_name1 = 'test_config05'
@@ -90,8 +86,8 @@ class test_config05(wttest.WiredTigerTestCase):
     def test_multi_create(self):
         self.conn = wiredtiger.wiredtiger_open('.', 'create')
         self.session = self.conn.open_session(None)
-        self.assertRaises(WiredTigerError, lambda: wiredtiger.wiredtiger_open
-                          ('.', 'create'))
+        self.assertRaises(wiredtiger.WiredTigerError,
+			lambda: wiredtiger.wiredtiger_open('.', 'create'))
 
 if __name__ == '__main__':
     wttest.run()

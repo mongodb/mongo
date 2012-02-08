@@ -29,12 +29,9 @@
 # 	Utilities: wt dump, as well as the dump cursor
 #
 
-import unittest
-import wiredtiger
-import wttest
+import string, os
 from suite_subprocess import suite_subprocess
-import os
-import string
+import wiredtiger, wttest
 
 class test_util01(wttest.WiredTigerTestCase, suite_subprocess):
     """

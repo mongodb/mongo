@@ -32,11 +32,8 @@
 #	(e.g. root) user, and should pass in both cases.
 #
 
-import unittest
-import wiredtiger
-from wiredtiger import WiredTigerError
-import wttest
 import os
+import wiredtiger, wttest
 
 class test_priv01(wttest.WiredTigerTestCase):
     """
@@ -169,7 +166,7 @@ class test_priv01(wttest.WiredTigerTestCase):
             self.checkfiles(edir)
             self.checknofiles(".")
         else:
-            self.assertRaises(WiredTigerError,
+            self.assertRaises(wiredtiger.WiredTigerError,
                               lambda: self.common_test(None, edir, privarg))
 
     def test_env_conf_without_env_var_priv(self):

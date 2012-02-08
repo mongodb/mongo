@@ -29,10 +29,7 @@
 # 	Cursor operations
 #
 
-import unittest
-import wiredtiger
-from wiredtiger import WiredTigerError
-import wttest
+import wiredtiger, wttest
 
 class test_cursor04(wttest.WiredTigerTestCase):
     """
@@ -143,8 +140,8 @@ class test_cursor04(wttest.WiredTigerTestCase):
         self.assertEqual(cursor.search(), wiredtiger.WT_NOTFOUND)
 
         # The key/value should be cleared on NOTFOUND
-        self.assertRaises(WiredTigerError, cursor.get_key)
-        self.assertRaises(WiredTigerError, cursor.get_value)
+        self.assertRaises(wiredtiger.WiredTigerError, cursor.get_key)
+        self.assertRaises(wiredtiger.WiredTigerError, cursor.get_value)
 
         # 2. Calling search_near for a value beyond the end
         cursor.set_key(self.genkey(self.nentries))

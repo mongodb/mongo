@@ -30,12 +30,8 @@
 #       combined probabilistically.
 #
 
-import unittest
-from wiredtiger import WiredTigerError
-import wiredtiger
-import wttest
+import wiredtiger, wtscenario, wttest
 import test_base03
-import wtscenario
 
 class test_config03(test_base03.test_base03):
     K = 1024
@@ -125,7 +121,7 @@ class test_config03(test_base03.test_base03):
 
         if expect_fail:
             self.verbose(3, 'wiredtiger_open (should fail) with args: ' + args)
-            self.assertRaises(WiredTigerError, lambda:
+            self.assertRaises(wiredtiger.WiredTigerError, lambda:
                                   wiredtiger.wiredtiger_open(dir, args))
             args = successargs
 

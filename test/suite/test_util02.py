@@ -29,12 +29,9 @@
 # 	Utilities: wt load
 #
 
-import unittest
-import wiredtiger
-import wttest
+import string, os
 from suite_subprocess import suite_subprocess
-import os
-import string
+import wiredtiger, wttest
 
 class test_util02(wttest.WiredTigerTestCase, suite_subprocess):
     """

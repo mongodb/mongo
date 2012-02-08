@@ -72,11 +72,8 @@
 #	(though simulating transactions would probably be beyond what
 #	we want to do here).
 
-import unittest
 import hashlib
-import wiredtiger
-from wiredtiger import WiredTigerError
-import wttest
+import wiredtiger, wttest
 
 class TestCursorTracker(wttest.WiredTigerTestCase):
     table_name1 = 'test_cursor'
@@ -420,10 +417,10 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
             raise Exception('cur_check_here: cursor.get_key, get_value are not valid')
         elif self.nopos:
             self.traceapi_before('cursor.get_key()')
-            self.assertRaises(WiredTigerError, cursor.get_key)
+            self.assertRaises(wiredtiger.WiredTigerError, cursor.get_key)
             self.traceapi_after('<unknown>')
             self.traceapi_before('cursor.get_value()')
-            self.assertRaises(WiredTigerError, cursor.get_value)
+            self.assertRaises(wiredtiger.WiredTigerError, cursor.get_value)
             self.traceapi_after('<unknown>')
         else:
             bits = self.curbits

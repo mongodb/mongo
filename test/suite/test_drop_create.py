@@ -25,14 +25,11 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# test_base03.py
-# 	Cursor operations
+# test_drop_create.py
+# 	Test dropping and creating
 #
 
-import unittest
-import wiredtiger
-from wiredtiger import WiredTigerError
-import wttest
+import wiredtiger, wttest
 
 class test_drop_create(wttest.WiredTigerTestCase):
     def test_drop_create(self):

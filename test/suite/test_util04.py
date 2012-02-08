@@ -29,11 +29,9 @@
 # 	Utilities: wt drop
 #
 
-import unittest
-from wiredtiger import WiredTigerError
-import wttest
-from suite_subprocess import suite_subprocess
 import os
+from suite_subprocess import suite_subprocess
+import wiredtiger, wttest
 
 class test_util04(wttest.WiredTigerTestCase, suite_subprocess):
     tablename = 'test_util04.a'
@@ -50,7 +48,8 @@ class test_util04(wttest.WiredTigerTestCase, suite_subprocess):
         self.runWt(["drop", "table:" + self.tablename])
 
         self.assertFalse(os.path.exists(self.tablename + ".wt"))
-        self.assertRaises(WiredTigerError, lambda: self.session.open_cursor('table:' + self.tablename, None, None))
+        self.assertRaises(wiredtiger.WiredTigerError,
+			lambda: self.session.open_cursor('table:' + self.tablename, None, None))
 
 
 if __name__ == '__main__':

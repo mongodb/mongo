@@ -29,7 +29,6 @@
 # 	Cursor operations on small tables.
 #
 
-import unittest
 import wiredtiger
 from test_cursor_tracker import TestCursorTracker
 

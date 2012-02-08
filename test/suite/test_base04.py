@@ -29,10 +29,7 @@
 #	Test that tables are reconciled correctly when they are empty.
 #
 
-import unittest
-import wiredtiger
-from wiredtiger import WT_NOTFOUND
-import wttest
+import wiredtiger, wttest
 
 class test_base04(wttest.WiredTigerTestCase):
 	'''Test various tree types becoming empty'''
@@ -90,7 +87,7 @@ class test_base04(wttest.WiredTigerTestCase):
 	def test_empty(self):
 		'''Create a table, look for a nonexistent key'''
 		self.create_table()
-		self.check_exists('somekey', WT_NOTFOUND)
+		self.check_exists('somekey', wiredtiger.WT_NOTFOUND)
 		self.drop_table()
 
 	def test_insert(self):
@@ -108,7 +105,7 @@ class test_base04(wttest.WiredTigerTestCase):
 			self.insert('key1', 'value1')
 			self.check_exists('key1', 0)
 			self.remove('key1')
-			self.check_exists('key1', WT_NOTFOUND)
+			self.check_exists('key1', wiredtiger.WT_NOTFOUND)
 			self.drop_table()
 
 if __name__ == '__main__':

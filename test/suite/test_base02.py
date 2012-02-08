@@ -31,9 +31,7 @@
 
 #### This test has workarounds to allow it to complete, marked with '####' comments
 
-import unittest
-import wiredtiger
-import wttest
+import wiredtiger, wttest
 import json
 
 class test_base02(wttest.WiredTigerTestCase):

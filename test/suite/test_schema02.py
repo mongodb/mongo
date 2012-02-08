@@ -29,10 +29,7 @@
 # 	Columns, column groups, indexes
 #
 
-import unittest
-import wiredtiger
-from wiredtiger import WiredTigerError
-import wttest
+import wiredtiger, wttest
 
 class test_schema02(wttest.WiredTigerTestCase):
     """
@@ -41,11 +38,11 @@ class test_schema02(wttest.WiredTigerTestCase):
     nentries = 1000
 
     def expect_failure_primary(self, configstr):
-        self.assertRaises(WiredTigerError,
+        self.assertRaises(wiredtiger.WiredTigerError,
                           lambda:self.session.create("table:main", configstr))
 
     def expect_failure_colgroup(self, name, configstr):
-        self.assertRaises(WiredTigerError,
+        self.assertRaises(wiredtiger.WiredTigerError,
                           lambda:self.session.create("colgroup:" + name, configstr))
 
     def test_colgroup_after_failure(self):

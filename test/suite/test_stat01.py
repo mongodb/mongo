@@ -29,10 +29,7 @@
 # 	Statistics operations
 #
 
-import unittest
-import wiredtiger
-import wttest
-import test_base03
+import wiredtiger, wttest
 
 class test_stat01(wttest.WiredTigerTestCase):
     """

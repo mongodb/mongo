@@ -29,10 +29,7 @@
 #	Test that tables are reconciled correctly when they are empty.
 #
 
-import unittest
-import wiredtiger
-from wiredtiger import WT_NOTFOUND
-import wttest
+import wiredtiger, wttest
 
 pop_data = [
 	( 'USA', 1980, 226542250 ),

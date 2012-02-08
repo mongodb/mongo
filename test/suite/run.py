@@ -29,12 +29,7 @@
 #	parent class for all test cases
 #
 
-import os
-import sys
-import unittest
-import glob
-import re
-import json
+import glob, json, os, re, sys
 
 # Set paths
 suitedir = sys.path[0]
@@ -50,6 +45,8 @@ sys.path.append(os.path.join(wt_3rdpartydir, 'testtools-0.9.12'))
 sys.path.append(os.path.join(wt_3rdpartydir, 'testscenarios-0.2', 'lib'))
 
 import wttest
+# Use the same version of unittest found by wttest.py
+unittest = wttest.unittest
 from testscenarios.scenarios import generate_scenarios
 
 def usage():
