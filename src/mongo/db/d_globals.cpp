@@ -9,7 +9,7 @@
 namespace mongo { 
 
     DGlobals::DGlobals() :
-        dbMutex( *(new MongoMutex("dbMutex")) ),
+        dbMutex( *(new MongoMutex()) ),
         clientCursorMonitor( *(new ClientCursorMonitor()) )
     {
     }

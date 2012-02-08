@@ -147,10 +147,12 @@ namespace ThreadedTests {
         }
         virtual void validate() {
             ASSERT( !d.dbMutex.atLeastReadLocked() );
-            d.dbMutex.lock();
-            d.dbMutex.unlock();
-            d.dbMutex.lock_shared();
-            d.dbMutex.unlock_shared();
+            {
+                    Lock::GlobalWrite w;
+            }
+            {
+                    Lock::GlobalRead r;
+            }
         }
     };
 

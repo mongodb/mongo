@@ -266,7 +266,7 @@ namespace mongo {
         checkNotStale();
         _client->_context = this;
         _client->_curOp->enter( this );
-        checkNsAccess( doauth, d.dbMutex.getState() );
+        checkNsAccess( doauth );
     }
        
     void Client::Context::_finishInit( bool doauth ) {
@@ -323,6 +323,9 @@ namespace mongo {
         if ( doauth ) {
             _auth( lockState );
         }
+    }
+    void Client::Context::checkNsAccess( bool doauth ) {
+        checkNsAccess( doauth, Lock::isWriteLocked() ? 1 : 0 );
     }
 
     void Client::appendLastOp( BSONObjBuilder& b ) const {

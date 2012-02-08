@@ -21,6 +21,9 @@
 
 namespace mongo { 
 
+    void lockedExclusively();
+    void unlockingExclusively();
+
     static QLock& q = *new QLock();
 
     Lock::Nongreedy::Nongreedy() {
@@ -51,17 +54,21 @@ namespace mongo {
     static bool lock_W_try(int ms) { 
         assert( threadState == 0 );
         bool got = q.lock_W(ms);
-        if( got ) 
+        if( got ) {
             threadState = 'W';
+            lockedExclusively();
+        }
         return got;
     }
     static void lock_W() { 
         assert( threadState == 0 );
         threadState = 'W';
         q.lock_W();
+        lockedExclusively();
     }
     static void unlock_W() { 
         wassert( threadState == 'W' );
+        unlockingExclusively();
         threadState = 0;
         q.unlock_W();
     }
@@ -281,20 +288,24 @@ namespace mongo {
         return Lock::isW();
     }
 
-    // this tie-in temporary until MongoMutex is folded in more directly.Exclud
-    // called when the lock has been achieved
-    void MongoMutex::lockedExclusively() {
+    void curopGotLock(Client*);
+
+    void lockedExclusively() {
         Client& c = cc();
-        curopGotLock(&c); // hopefully lockStatus replaces one day
-        _minfo.entered(); // hopefully eliminate one day 
+        curopGotLock(&c);
+        d.dbMutex._minfo.entered(); // hopefully eliminate one day 
     }
 
-    void MongoMutex::unlockingExclusively() {
-        Client& c = cc();
-        _minfo.leaving();
+    namespace dur {
+        void releasingWriteLock(); // because it's hard to include dur.h here
     }
 
-    MongoMutex::MongoMutex(const char *name) : _m(name) {
+    void unlockingExclusively() {
+        dur::releasingWriteLock();
+        d.dbMutex._minfo.leaving();
+    }
+
+    MongoMutex::MongoMutex() {
         static int n = 0;
         assert( ++n == 1 ); // below releasingWriteLock we assume MongoMutex is a singleton, and uses dbMutex ref above
     }

@@ -780,7 +780,7 @@ namespace mongo {
 
         void releasingWriteLock() {
             DEV notesThisLock = 0;
-            // implicit commitIfNeeded check on each write unlock
+            // implicit commitIfNeeded check on each global write unlock
             DEV commitJob._nSinceCommitIfNeededCall = 0; // implicit commit if needed
             if( commitJob.bytes() > UncommittedBytesLimit || cmdLine.durOptions & CmdLine::DurAlwaysCommit ) {
                 stats.curr->_earlyCommits++;

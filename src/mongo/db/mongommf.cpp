@@ -329,7 +329,7 @@ namespace mongo {
             if( !d.dbMutex.isWriteLocked() ) { 
                 assert( inShutdown() );
                 DEV { 
-                    log() << "is it really ok to close a mongommf outside a write lock? dbmutex status:" << d.dbMutex.getState() << " file:" << filename() << endl;
+                    log() << "is it really ok to close a mongommf outside a write lock? file:" << filename() << endl;
                 }
             }
         }

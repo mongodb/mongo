@@ -1562,7 +1562,7 @@ namespace mongo {
 
         void prep(const char *ns, NamespaceDetails *d) {
             assertInWriteLock();
-            uassert( 13130 , "can't start bg index b/c in recursive lock (db.eval?)" , mongo::d.dbMutex.getState() == 1 );
+            uassert( 13130 , "can't start bg index b/c in recursive lock (db.eval?)" , !Lock::nested() );
             bgJobsInProgress.insert(d);
         }
         void done(const char *ns, NamespaceDetails *d) {

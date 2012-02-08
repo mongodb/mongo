@@ -222,7 +222,8 @@ namespace mongo {
             void _finishInit( bool doauth=true);
             void _auth( int lockState );
             void checkNotStale() const;
-            void checkNsAccess( bool doauth, int lockState = d.dbMutex.getState() );
+            void checkNsAccess( bool doauth );
+            void checkNsAccess( bool doauth, int lockState );
             Client * const _client;
             Context * const _oldContext;
             const string _path;
