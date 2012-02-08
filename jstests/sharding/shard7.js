@@ -1,4 +1,5 @@
-// Check that shard selection does not assert for certain unsatisfiable queries.  SERVER-4554
+// Check that shard selection does not assert for certain unsatisfiable queries.
+// SERVER-4554, SERVER-4914
 
 s = new ShardingTest( 'shard7', 2, 0, 1 );
 

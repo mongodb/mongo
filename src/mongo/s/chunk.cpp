@@ -843,7 +843,7 @@ namespace mongo {
         }
         while (!org.orRangesExhausted());
         
-        // SERVER-4554 Some clients of getShardsForQuery() assume at least one shard will be
+        // SERVER-4914 Some clients of getShardsForQuery() assume at least one shard will be
         // returned.  For now, we satisfy that assumption by adding a shard with no matches rather
         // than return an empty set of shards.
         if ( shards.empty() ) {

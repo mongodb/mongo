@@ -179,7 +179,7 @@ namespace ChunkTests {
         template<class BASE>
         class Unsatisfiable : public BASE {
             /**
-             * SERVER-4554 For now the first shard is returned for unsatisfiable queries, as some
+             * SERVER-4914 For now the first shard is returned for unsatisfiable queries, as some
              * clients of getShardsForQuery() expect at least one shard.
              */
             virtual BSONArray expectedShardNames() const {
