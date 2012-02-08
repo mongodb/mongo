@@ -22,7 +22,6 @@ __session_close(WT_SESSION *wt_session, const char *config)
 
 	conn = (WT_CONNECTION_IMPL *)wt_session->connection;
 	session = (WT_SESSION_IMPL *)wt_session;
-	ret = 0;
 
 	SESSION_API_CALL(session, close, config, cfg);
 	WT_UNUSED(cfg);
@@ -138,7 +137,6 @@ __session_create(WT_SESSION *wt_session, const char *name, const char *config)
 	int ret;
 
 	session = (WT_SESSION_IMPL *)wt_session;
-	ret = 0;
 	SESSION_API_CALL(session, create, config, cfg);
 	WT_UNUSED(cfg);
 	WT_ERR(__wt_schema_create(session, name, config));
@@ -172,21 +170,11 @@ static int
 __session_drop(WT_SESSION *wt_session, const char *name, const char *config)
 {
 	WT_SESSION_IMPL *session;
-	WT_CONFIG_ITEM cval;
-	int force, ret;
-
-	force = 0;
+	int ret;
 
 	session = (WT_SESSION_IMPL *)wt_session;
-
 	SESSION_API_CALL(session, drop, config, cfg);
-
-	WT_ERR(__wt_config_gets(session, cfg, "force", &cval));
-	force = (cval.val != 0);
-
 	ret = __wt_schema_drop(session, name, cfg);
-	if (force && ret == WT_NOTFOUND)
-		ret = 0;
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }
@@ -202,8 +190,6 @@ __session_dumpfile(WT_SESSION *wt_session, const char *uri, const char *config)
 	int ret;
 
 	session = (WT_SESSION_IMPL *)wt_session;
-	ret = 0;
-
 	SESSION_API_CALL(session, dumpfile, config, cfg);
 	ret = __wt_schema_worker(session, uri, cfg,
 	    __wt_dumpfile, WT_BTREE_EXCLUSIVE | WT_BTREE_VERIFY);
