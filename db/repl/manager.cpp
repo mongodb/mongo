@@ -98,7 +98,10 @@ namespace mongo {
         const Member *primary = rs->box.getPrimary();
         
         if (primary && highestPriority &&
-            highestPriority->config().priority > primary->config().priority) {
+            highestPriority->config().priority > primary->config().priority &&
+            // if we're stepping down to allow another member to become primary, we
+            // better have another member (otherOp), and it should be up-to-date
+            otherOp != 0 && highestPriority->hbinfo().opTime.getSecs() >= otherOp - 10) {
             log() << "stepping down " << primary->fullName() << endl;
 
             if (primary->h().isSelf()) {
