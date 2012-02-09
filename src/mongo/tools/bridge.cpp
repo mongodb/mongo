@@ -42,7 +42,7 @@ public:
             try {
                 m.reset();
                 if ( !mp_.recv( m ) ) {
-                    cout << "end connection " << mp_.remoteString() << endl;
+                    cout << "end connection " << mp_.psock->remoteString() << endl;
                     mp_.shutdown();
                     break;
                 }

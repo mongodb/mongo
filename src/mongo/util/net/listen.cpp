@@ -313,13 +313,13 @@ namespace mongo {
                     log() << "connection accepted from " << from.toString() << " #" << ++connNumber << " (" << conns << word << " now open)" << endl;
                 }
                 
-                Socket newSock = Socket(s, from);
+                boost::shared_ptr<Socket> pnewSock( new Socket(s, from) );
 #ifdef MONGO_SSL
                 if ( _ssl && ( _sslPort == 0 || sslSocks.count(*it) ) ) {
-                    newSock.secureAccepted( _ssl );
+                    pnewSock->secureAccepted( _ssl );
                 }
 #endif
-                accepted( newSock );
+                accepted( pnewSock );
             }
         }
     }
@@ -329,8 +329,8 @@ namespace mongo {
     }
 
 
-    void Listener::accepted(Socket socket) {
-        accepted( new MessagingPort(socket) );
+    void Listener::accepted(boost::shared_ptr<Socket> psocket) {
+        accepted( new MessagingPort(psocket) );
     }
     
     void Listener::accepted(MessagingPort *mp) {
