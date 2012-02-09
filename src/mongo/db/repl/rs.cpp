@@ -122,8 +122,6 @@ namespace mongo {
         return max;
     }
 
-    const bool closeOnRelinquish = true;
-
     void ReplSetImpl::relinquish() {
         LOG(2) << "replSet attempting to relinquish" << endl;
         if( box.getState().primary() ) {
@@ -132,9 +130,7 @@ namespace mongo {
             
                 log() << "replSet relinquishing primary state" << rsLog;
                 changeState(MemberState::RS_SECONDARY);
-            }
-            
-            if( closeOnRelinquish ) {
+
                 /* close sockets that were talking to us so they don't blithly send many writes that will fail
                    with "not master" (of course client could check result code, but in case they are not)
                 */
