@@ -119,11 +119,15 @@ namespace mongo {
 
     // "database.a.b.c" -> "database"
     inline void nsToDatabase(const char *ns, char *database) {
-        int i = 0;
         for( int i = 0; i < MaxDatabaseNameLen; i++ ) {
             database[i] = ns[i];
-            if( database[i] == 0 )
+            if( database[i] == '.' ) {
+                database[i] = 0;
                 return;
+            }
+            if( database[i] == 0 ) {
+                return;
+            }
         }
         // other checks should have happened already, this is defensive. thus massert not uassert
         massert(10078, "nsToDatabase: ns too long", false);
