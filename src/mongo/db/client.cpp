@@ -670,7 +670,7 @@ namespace mongo {
         return s.str();
     }
 
-#define OPDEBUG_APPEND_NUMBER(x) if( x != -1 ) b.append( #x , (x) )
+#define OPDEBUG_APPEND_NUMBER(x) if( x != -1 ) b.appendNumber( #x , (x) )
 #define OPDEBUG_APPEND_BOOL(x) if( x ) b.appendBool( #x , (x) )
     void OpDebug::append( const CurOp& curop, BSONObjBuilder& b ) const {
         b.append( "op" , iscommand ? "command" : opToString( op ) );
