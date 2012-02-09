@@ -290,11 +290,11 @@ namespace mongo {
         else {
             // This is the non test case, where we don't have a $nExtents spec.
             while ( size > 0 ) {
-                int max = MongoDataFile::maxSize() - DataFileHeader::HeaderSize;
-                int desiredExtentSize = (int) (size > max ? max : size);
-                if ( desiredExtentSize < Extent::minSize() ) {
-                    desiredExtentSize = Extent::minSize();
-                }
+                const int max = Extent::maxSize();
+                const int min = Extent::minSize();
+                int desiredExtentSize = static_cast<int> (size > max ? max : size);
+                desiredExtentSize = static_cast<int> (desiredExtentSize < min ? min : desiredExtentSize);
+
                 desiredExtentSize &= 0xffffff00;
                 Extent *e = database->allocExtent( ns, desiredExtentSize, newCapped, true );
                 size -= e->length;
