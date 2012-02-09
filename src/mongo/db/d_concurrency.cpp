@@ -39,22 +39,16 @@ namespace mongo {
     HLMutex::HLMutex(const char *name) : SimpleMutex(name)
     { }
 
-    static mapsf<string,RWLockRecursive*> dblocks;
-    RWLockRecursive localDBLock("localDBLock");
-
-    struct LockState {
-        LockState() : threadState(0), recursive(0), localDB(0), otherDB(0), otherLock(0) { }
-
-        // global lock related
-        char threadState;             // 0, 'r', 'w', 'R', 'W'
-        unsigned recursive;
-
-        // db lock related
-        unsigned localDB;             // recursive lock count on local db
-        unsigned otherDB;
-        string other;                 // which database are we locking and working with (besides local)
-        RWLockRecursive *otherLock;   // so we don't have to check the map too often (the map has a mutex)
-    };
+    /* dbname->lock
+       Currently these are never deleted - will linger if db was closed. (that should be fine.)
+       We don't put the lock inside the Database object as those can come and go with open and 
+       closes and that would just add complexity. 
+       Note there is no path concept for where the database is; if somehow you had two db's open 
+       in different directories with the same name, it will be ok but they are sharing a lock 
+       then.
+    */
+    static mapsf<string,SimpleRWLock*> dblocks;
+    SimpleRWLock localDBLock("localDBLock");
 
     TSP_DEFINE(LockState,ls);
 
@@ -125,6 +119,16 @@ namespace mongo {
         wassert( threadState() == 'w' );
         threadState() = 0;
         q.unlock_w();
+    }
+    static void lock_r(char& thrState) {
+        assert(thrState == 0);
+        thrState = 'r';
+        q.lock_r();
+    }
+    static void unlock_r() { 
+        wassert( threadState() == 'r' );
+        threadState() = 0;
+        q.unlock_r();
     }
 
     // these are safe for use ACROSS threads.  i.e. one thread can lock and 
@@ -261,25 +265,76 @@ namespace mongo {
     Lock::DBWrite::~DBWrite() { 
     }
 
-    Lock::DBRead::DBRead(const StringData& ns) {
+    void Lock::DBRead::lockTop(LockState& ls) { 
+        switch( ls.threadState ) { 
+        case 'W' :
+        case 'R' : 
+            return;
+        case 'w' : assert(false);
+        case  0  : lock_r(ls.threadState); // need the top level shared lock
+                   locked_r = true;
+        case 'r' : ;                       // already have top level lock in this case
+        }
     }
-    Lock::DBRead::~DBRead() {
-    }
-    /* stub() {
+    void Lock::DBRead::lockLocal() { 
         LockState& ls = lockState();
-        if( ls.threadState == 'R' || ls.threadState == 'W' ) {
-            // already globally locked, so no need to be more granular
-            ls.recursive++;
+        lockTop(ls);
+        ourCounter = &ls.local;
+        if( ++ls.local == 1 ) {
+            localDBLock.lock_shared();
+            weLocked = &localDBLock;
+        }
+    }
+    void Lock::DBRead::lock(const string& db) {
+        LockState& ls = lockState();
+
+        // we do checks first, as on assert destructor won't be called so don't want to be half finished with our work.
+        bool same = (db == ls.otherName);
+        if( ls.other ) { 
+            // nested call
+            massert(0, str::stream() << "internal error tried to lock two databases at the same time. old:" << ls.otherName << " new:" << db,same);
             return;
         }
-        assert( ls.threadState == 0 || ls.threadState == 'r' );
-        bool local = str::equals(ns.data(),"local");
-        if( local ) {
-            if( ++ls.localDB == 1 ) { 
-                // we're the first
-            }
+
+        // first lock for this db. check consistent order with local db lock (so we never deadlock)
+        massert(0, str::stream() << "can't dblock:" << db << " when local is already locked", ls.local == 0);
+
+        lockTop(ls);
+
+        ourCounter = &ls.other;
+        ls.other++;
+        dassert( ls.other == 1 );
+        if( !same ) {
+            ls.otherName = db;
+            mapsf<string,SimpleRWLock*>::ref r(dblocks);
+            SimpleRWLock*& lock = r[db];
+            if( lock == 0 )
+                lock = new SimpleRWLock();
+            ls.otherLock = lock;
         }
-    }*/
+        ls.otherLock->lock_shared();
+        weLocked = ls.otherLock;
+    }
+    Lock::DBRead::DBRead(const StringData& ns) {
+        locked_r=false; weLocked=0; ourCounter = 0;
+        if( str::equals(ns.data(),"local") ) {
+            lockLocal();
+        } else { 
+            lock(nsToDatabase(ns.data()));
+        }
+    }
+    Lock::DBRead::~DBRead() {
+        if( ourCounter ) {
+            (*ourCounter)--;
+            wassert( *ourCounter >= 0 );
+        }
+        if( weLocked ) {
+            wassert( ourCounter && *ourCounter == 0 );
+            weLocked->unlock_shared();
+        }
+        if( locked_r )
+            unlock_r();
+    }
 }
 
 // legacy hooks

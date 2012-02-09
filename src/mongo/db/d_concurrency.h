@@ -1,4 +1,6 @@
 // @file d_concurrency.h
+// only used by mongod, thus the name ('d')
+// (also used by dbtests test binary, which is running mongod test code)
 
 #pragma once
 
@@ -7,8 +9,11 @@
 
 namespace mongo {
 
-    // a mutex, but reported in curop() - thus a "high level" (HL) one
-    // some overhead so we don't use this for everything
+    struct LockState;
+
+    /** a mutex, but reported in curop() - thus a "high level" (HL) one
+        some overhead so we don't use this for everything.  the externalobjsort mutex
+        uses this, as it can be held for eons. implementation still needed. */
     class HLMutex : public SimpleMutex {
     public:
         HLMutex(const char *name);
@@ -52,11 +57,15 @@ namespace mongo {
         };
         // lock this database for reading. do not shared_lock globally first, that is handledin herein. 
         class DBRead : boost::noncopyable {
+            void lockTop(LockState&);
+            void lockLocal();
+            void lock(const string& db);
+            bool locked_r;
+            SimpleRWLock *weLocked;
+            unsigned *ourCounter;
         public:
             DBRead(const StringData& dbOrNs);
             ~DBRead();
-            // TEMP: 
-            GlobalRead r;
         };
 
         // specialty things:
@@ -69,7 +78,6 @@ namespace mongo {
             static void unsetW(); // reverts to greedy
             static void unsetR(); // reverts to greedy
         };
-
     };
 
     // the below are for backward compatibility.  use Lock classes above instead.
@@ -104,6 +112,20 @@ namespace mongo {
                 r.reset( new readlock() );
             }
         }
+    };
+
+    struct LockState {
+        LockState() : threadState(0), recursive(0), local(0), other(0), otherLock(0) { }
+
+        // global lock related
+        char threadState;             // 0, 'r', 'w', 'R', 'W'
+        unsigned recursive;           // nested locking is allowed
+
+        // db lock related
+        unsigned local;               // recursive lock count on local db
+        unsigned other;
+        string otherName;             // which database are we locking and working with (besides local)
+        SimpleRWLock *otherLock;      // so we don't have to check the map too often (the map has a mutex)
     };
 
 }

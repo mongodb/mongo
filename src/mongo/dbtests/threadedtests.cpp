@@ -120,16 +120,23 @@ namespace ThreadedTests {
                     /*mm->lock();
                     mm->releaseEarly();
                     mm->unlock();*/
-                    ONCE cout << "todo threadedtests" << endl;
+                    ONCE cout << "todo threadedtests releaseearly? lock_try? lock_shared_try?" << endl;
                 }
                 else if( i % 7 == 5 ) {
-                    ONCE cout << "todo threadedtests" << endl;
+                    {
+                        Lock::DBRead r("foo");
+                    }
+                    {
+                        Lock::DBRead r("bar");
+                    }
                     /*if( mm->lock_try(1) ) {
                         mm->unlock();
                     }*/
                 }
                 else if( i % 7 == 6 ) {
-                    ONCE cout << "todo threadedtests" << endl;
+                    Lock::DBRead r("foo");
+                    Lock::DBRead r2("foo");
+                    Lock::DBRead r3("local");
                     /*if( mm->lock_shared_try(0) ) {
                         mm->unlock_shared();
                     }*/
