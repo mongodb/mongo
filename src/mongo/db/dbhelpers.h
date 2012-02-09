@@ -125,25 +125,6 @@ namespace mongo {
 
     };
 
-    class Database;
-
-    // manage a set using collection backed storage
-    class DbSet {
-    public:
-        DbSet( const string &name = "", const BSONObj &key = BSONObj() ) :
-            name_( name ),
-            key_( key.getOwned() ) {
-        }
-        ~DbSet();
-        void reset( const string &name = "", const BSONObj &key = BSONObj() );
-        bool get( const BSONObj &obj ) const;
-        void set( const BSONObj &obj, bool val );
-    private:
-        string name_;
-        BSONObj key_;
-    };
-
-
     /**
      * user for saving deleted bson objects to a flat file
      */
