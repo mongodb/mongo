@@ -507,8 +507,10 @@ namespace mongo {
 
             assert( !d.dbMutex.atLeastReadLocked() );
 
-            // question : do we need this to be greedy, so that it can start working fairly soon?
-            //            perhaps.  todo.
+            // do we need this to be greedy, so that it can start working fairly soon?
+            // probably: as this is a read lock, it wouldn't change anything if only reads anyway.
+            // also needs to stop greed. our time to work before clearing lk1 is not too bad, so 
+            // not super critical, but likely 'correct'.  todo.
             scoped_ptr<Lock::GlobalRead> lk1( new Lock::GlobalRead() );
 
             scoped_lock lk2(groupCommitMutex);
@@ -699,7 +701,7 @@ namespace mongo {
             //   group commit
             //   upgrade to W
             //   remap private view
-            Lock::GlobalWrite w;
+            Lock::GlobalWrite w(true);
             w.downgrade();
             groupCommit(&w);
         }

@@ -26,12 +26,14 @@ namespace mongo {
         struct TempRelease {
             TempRelease(); 
             ~TempRelease();
-            const bool cant;
+            const bool cant; // true if couldn't because of recursive locking
         private:
             const char type;
         };
-        struct GlobalWrite : boost::noncopyable { // recursive is ok
-            GlobalWrite(); 
+        class GlobalWrite : boost::noncopyable { // recursive is ok
+            const bool stopGreed;
+        public:
+            GlobalWrite(bool stopGreed = false); 
             ~GlobalWrite();
             void downgrade(); // W -> R
             void upgrade();   // caution see notes

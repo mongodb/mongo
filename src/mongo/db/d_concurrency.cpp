@@ -88,6 +88,12 @@ namespace mongo {
         }
         return got;
     }
+    static void lock_W_stop_greed() { 
+        assert( threadState() == 0 );
+        threadState() = 'W';
+        q.lock_W_stop_greed();
+        lockedExclusively();
+    }
     static void lock_W() { 
         assert( threadState() == 0 );
         threadState() = 'W';
@@ -193,12 +199,18 @@ namespace mongo {
             }
         )
     }
-    Lock::GlobalWrite::GlobalWrite() {
+    Lock::GlobalWrite::GlobalWrite(bool sg) : stopGreed(sg) {
         if( threadState() == 'W' ) { 
             recursive()++;
+            DEV if( stopGreed ) { 
+                log() << "info Lock::GlobalWrite does not stop greed on recursive invocation" << endl;
+            }
         }
         else {
-            lock_W();
+            if( stopGreed )
+                lock_W_stop_greed();
+            else
+                lock_W();
         }
     }
     Lock::GlobalWrite::~GlobalWrite() {
@@ -210,6 +222,8 @@ namespace mongo {
                 unlock_R();
             else
                 unlock_W();
+            if( stopGreed )
+                q.start_greed();
         }
     }
     void Lock::GlobalWrite::downgrade() { 
