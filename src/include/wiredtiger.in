@@ -452,8 +452,8 @@ struct __wt_session {
 	 * will be closed implicitly and must not be accessed again.
 	 *
 	 * An existing cursor can be duplicated by passing it as the \c to_dup
-	 * parameter, otherwise the \c to_dup parameter should be NULL.
-	 * @notyet{to_dup}
+	 * parameter and setting the \c uri parameter to \c NULL, otherwise the
+	 * \c to_dup parameter should be \c NULL.
 	 *
 	 * @snippet ex_all.c Open a cursor
 	 *
