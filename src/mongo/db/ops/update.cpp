@@ -908,10 +908,19 @@ namespace mongo {
              - not mods is indexed
              - not upsert
     */
-    static UpdateResult _updateById(bool isOperatorUpdate, int idIdxNo, ModSet *mods, int profile, NamespaceDetails *d,
+    static UpdateResult _updateById(bool isOperatorUpdate, 
+                                    int idIdxNo, 
+                                    ModSet *mods, 
+                                    int profile, 
+                                    NamespaceDetails *d,
                                     NamespaceDetailsTransient *nsdt,
-                                    bool god, const char *ns,
-                                    const BSONObj& updateobj, BSONObj patternOrig, bool logop, OpDebug& debug) {
+                                    bool god, 
+                                    const char *ns,
+                                    const BSONObj& updateobj, 
+                                    BSONObj patternOrig, 
+                                    bool logop, 
+                                    OpDebug& debug, 
+                                    bool fromMigrate = false) {
 
         DiskLoc loc;
         {
@@ -979,7 +988,16 @@ namespace mongo {
         return UpdateResult( 1 , 0 , 1 );
     }
 
-    UpdateResult _updateObjects(bool god, const char *ns, const BSONObj& updateobj, BSONObj patternOrig, bool upsert, bool multi, bool logop , OpDebug& debug, RemoveSaver* rs ) {
+    UpdateResult _updateObjects( bool god, 
+                                 const char *ns, 
+                                 const BSONObj& updateobj, 
+                                 BSONObj patternOrig, 
+                                 bool upsert, 
+                                 bool multi, 
+                                 bool logop , 
+                                 OpDebug& debug, 
+                                 RemoveSaver* rs,
+                                 bool fromMigrate ) {
         DEBUGUPDATE( "update: " << ns << " update: " << updateobj << " query: " << patternOrig << " upsert: " << upsert << " multi: " << multi );
         Client& client = cc();
         int profile = client.database()->profile;
@@ -1010,7 +1028,7 @@ namespace mongo {
             int idxNo = d->findIdIndex();
             if( idxNo >= 0 ) {
                 debug.idhack = true;
-                UpdateResult result = _updateById(isOperatorUpdate, idxNo, mods.get(), profile, d, nsdt, god, ns, updateobj, patternOrig, logop, debug);
+                UpdateResult result = _updateById(isOperatorUpdate, idxNo, mods.get(), profile, d, nsdt, god, ns, updateobj, patternOrig, logop, debug, fromMigrate);
                 if ( result.existing || ! upsert ) {
                     return result;
                 }
@@ -1270,13 +1288,20 @@ namespace mongo {
         return UpdateResult( 0 , isOperatorUpdate , 0 );
     }
 
-    UpdateResult updateObjects(const char *ns, const BSONObj& updateobj, BSONObj patternOrig, bool upsert, bool multi, bool logop , OpDebug& debug ) {
+    UpdateResult updateObjects( const char *ns, 
+                                const BSONObj& updateobj, 
+                                BSONObj patternOrig, 
+                                bool upsert, 
+                                bool multi, 
+                                bool logop , 
+                                OpDebug& debug, 
+                                bool fromMigrate ) {
         uassert( 10155 , "cannot update reserved $ collection", strchr(ns, '$') == 0 );
         if ( strstr(ns, ".system.") ) {
             /* dm: it's very important that system.indexes is never updated as IndexDetails has pointers into it */
             uassert( 10156 , str::stream() << "cannot update system collection: " << ns << " q: " << patternOrig << " u: " << updateobj , legalClientSystemNS( ns , true ) );
         }
-        UpdateResult ur = _updateObjects(false, ns, updateobj, patternOrig, upsert, multi, logop, debug);
+        UpdateResult ur = _updateObjects(false, ns, updateobj, patternOrig, upsert, multi, logop, debug, 0, fromMigrate );
         debug.nupdated = ur.num;
         return ur;
     }

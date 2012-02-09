@@ -159,14 +159,14 @@ namespace mongo {
         return true;
     }
 
-    void Helpers::upsert( const string& ns , const BSONObj& o ) {
+    void Helpers::upsert( const string& ns , const BSONObj& o, bool fromMigrate ) {
         BSONElement e = o["_id"];
         assert( e.type() );
         BSONObj id = e.wrap();
 
         OpDebug debug;
         Client::Context context(ns);
-        updateObjects(ns.c_str(), o, /*pattern=*/id, /*upsert=*/true, /*multi=*/false , /*logtheop=*/true , debug );
+        updateObjects(ns.c_str(), o, /*pattern=*/id, /*upsert=*/true, /*multi=*/false , /*logtheop=*/true , debug, fromMigrate );
     }
 
     void Helpers::putSingleton(const char *ns, BSONObj obj) {
@@ -197,7 +197,7 @@ namespace mongo {
         return me.obj();
     }
 
-    long long Helpers::removeRange( const string& ns , const BSONObj& min , const BSONObj& max , bool yield , bool maxInclusive , RemoveCallback * callback ) {
+    long long Helpers::removeRange( const string& ns , const BSONObj& min , const BSONObj& max , bool yield , bool maxInclusive , RemoveCallback * callback, bool fromMigrate ) {
         BSONObj keya , keyb;
         BSONObj minClean = toKeyFormat( min , keya );
         BSONObj maxClean = toKeyFormat( max , keyb );
@@ -238,7 +238,7 @@ namespace mongo {
             c->advance();
             c->noteLocation();
 
-            logOp( "d" , ns.c_str() , rloc.obj()["_id"].wrap() );
+            logOp( "d" , ns.c_str() , rloc.obj()["_id"].wrap() , 0 , 0 , fromMigrate );
             theDataFileMgr.deleteRecord(ns.c_str() , rloc.rec(), rloc);
             num++;
 

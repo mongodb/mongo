@@ -1727,10 +1727,10 @@ namespace mongo {
     } idToInsert;
 #pragma pack()
 
-    void DataFileMgr::insertAndLog( const char *ns, const BSONObj &o, bool god ) {
+    void DataFileMgr::insertAndLog( const char *ns, const BSONObj &o, bool god, bool fromMigrate ) {
         BSONObj tmp = o;
         insertWithObjMod( ns, tmp, god );
-        logOp( "i", ns, tmp );
+        logOp( "i", ns, tmp, 0, 0, fromMigrate );
     }
 
     /** @param o the object to insert. can be modified to add _id and thus be an in/out param
