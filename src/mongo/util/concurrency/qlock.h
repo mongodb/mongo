@@ -20,6 +20,8 @@ namespace mongo {
         int greed; // 1 if someone wants to acquire a write lock
         int greedyWrites;
         int stopped;
+        void _stop_greed(); // we are already inlock for these underscore methods
+        void _lock_W();
     public:
         QLock() : greedyWrites(1), greed(0), stopped(0) { }
         void lock_r();
@@ -28,6 +30,7 @@ namespace mongo {
         bool lock_R(int millis); // try
         void lock_W();
         bool lock_W(int millis); // try
+        void lock_W_stop_greed();
         void unlock_r();
         void unlock_w();
         void unlock_R();
@@ -38,10 +41,13 @@ namespace mongo {
         void R_to_W(); // caution see notes below
     };
 
-    inline void QLock::stop_greed() {
-        boost::mutex::scoped_lock lk(m);
+    inline void QLock::_stop_greed() {
         if( ++stopped == 1 ) // ie recursion on stop_greed/start_greed is ok
             greedyWrites = 0;
+    }
+    inline void QLock::stop_greed() {
+        boost::mutex::scoped_lock lk(m);
+        _stop_greed();
     }
 
     inline void QLock::start_greed() { 
@@ -144,8 +150,7 @@ namespace mongo {
     }
 
     // "i will be writing. i will coordinate with no one. you better stop them all"
-    inline void QLock::lock_W() { // lock the world for writing 
-        boost::mutex::scoped_lock lk(m);
+    inline void QLock::_lock_W() {
         int g = greedyWrites;
         greed += g;
         while( W.n + R.n + w.n + r.n ) {
@@ -153,6 +158,15 @@ namespace mongo {
         }
         W.n++;
         greed -= g;
+    }
+    inline void QLock::lock_W() {
+        boost::mutex::scoped_lock lk(m);
+        _lock_W();
+    }
+    inline void QLock::lock_W_stop_greed() {
+        boost::mutex::scoped_lock lk(m);
+        _lock_W();
+        _stop_greed();
     }
 
     inline void QLock::unlock_r() {

@@ -125,8 +125,7 @@ namespace mongo {
     // another unlock
     void Lock::ThreadSpan::setWLockedNongreedy() { 
         assert( threadState() == 0 ); // as this spans threads the tls wouldn't make sense
-        q.lock_W();
-        q.stop_greed();
+        q.lock_W_stop_greed();
     }
     void Lock::ThreadSpan::W_to_R() { 
         assert( threadState() == 0 );
