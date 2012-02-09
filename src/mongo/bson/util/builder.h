@@ -209,7 +209,9 @@ namespace mongo {
                 msgasserted(13548, ss.str().c_str());
             }
             data = (char *) al.Realloc(data, a);
-            size= a;
+            if ( data == NULL )
+                msgasserted( 16070 , "out of memory BufBuilder::grow_reallocate" );
+            size = a;
         }
 
         char *data;

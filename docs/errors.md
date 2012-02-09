@@ -63,6 +63,7 @@ src/mongo/bson/util/builder.h
 * 13548 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/bson/util/builder.h#L209) 
 * 15912 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/bson/util/builder.h#L72) out of memory StackAllocator::Realloc
 * 15913 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/bson/util/builder.h#L122) out of memory BufBuilder::reset
+* 16070 [code](http://github.com/mongodb/mongo/blob/master/src/mongo/bson/util/builder.h#L212) out of memory BufBuilder::grow_reallocate
 
 
 src/mongo/client/clientAndShell.cpp
