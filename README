@@ -1,4 +1,4 @@
-WiredTiger 1.0.0: (February  3, 2012)
+WiredTiger 1.0.0: (February  9, 2012)
 
 This is version 1.0.0 of WiredTiger.
 
@@ -19,5 +19,8 @@ To install in the standard POSIX environment locations, enter:
 
 	make install
 
-For more information on build and installation options, see the
-WiredTiger documentation.
+For more information on build and installation options, see the 
+WiredTiger documentation.  For general questions and discussion,
+please use our mailing list:
+
+	http://groups.google.com/group/wiredtiger-users

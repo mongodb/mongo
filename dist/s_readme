@@ -35,8 +35,11 @@ To install in the standard POSIX environment locations, enter:
 
 	make install
 
-For more information on build and installation options, see the
-WiredTiger documentation.
+For more information on build and installation options, see the 
+WiredTiger documentation.  For general questions and discussion,
+please use our mailing list:
+
+	http://groups.google.com/group/wiredtiger-users
 END_TEXT
 
 cmp $t $f > /dev/null 2>&1 ||
