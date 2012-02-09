@@ -166,10 +166,16 @@ __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 *
 	 * To avoid that race, we try to atomically switch the page state to
 	 * WT_REF_EVICTING.  Since only one thread can do that successfully,
-	 * this prevents a page from being evicted twice.
+	 * this prevents a page from being evicted twice.  Threads looking for
+	 * a page to evict on the ordinary LRU eviction queue will ignore this
+	 * page and it will be evicted by the main eviction thread.
+	 *
+	 * If the state is not WT_REF_MEM, some other thread is already
+	 * evicting this page, which is fine, and in that case we don't want to
+	 * put it on the request queue because the memory may be freed by the
+	 * time the eviction thread sees it.
 	 */
 	if (!WT_ATOMIC_CAS(page->ref->state, WT_REF_MEM, WT_REF_EVICTING))
-		/* Some other thread is already evicting it, which is fine. */
 		return (0);
 
 	/* Find an empty slot and enter the eviction request. */
