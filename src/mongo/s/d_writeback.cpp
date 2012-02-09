@@ -40,6 +40,19 @@ namespace mongo {
     }
 
     void WriteBackManager::queueWriteBack( const string& remote , const BSONObj& o ) {
+        static mongo::mutex xxx( "WriteBackManager::queueWriteBack tmp" );
+        static OID lastOID;
+
+        scoped_lock lk( xxx );
+        const BSONElement& e = o["id"];
+        
+        if ( lastOID.isSet() ) {
+            if ( e.OID() < lastOID ) {
+                log() << "this could fail" << endl;
+                printStackTrace();
+            }
+        }
+        lastOID = e.OID();
         getWritebackQueue( remote )->queue.push( o );
     }
 

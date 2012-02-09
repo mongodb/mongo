@@ -138,7 +138,7 @@ namespace mongo {
                 /* close sockets that were talking to us so they don't blithly send many writes that will fail
                    with "not master" (of course client could check result code, but in case they are not)
                 */
-                log() << "replSet closing client sockets after reqlinquishing primary" << rsLog;
+                log() << "replSet closing client sockets after relinquishing primary" << rsLog;
                 MessagingPort::closeAllSockets(1);
             }
 
@@ -594,10 +594,11 @@ namespace mongo {
     }
 
     void ReplSetImpl::loadConfig() {
+        startupStatus = LOADINGCONFIG;
+        startupStatusMsg.set("loading " + rsConfigNs + " config (LOADINGCONFIG)");
+        LOG(1) << "loadConfig() " << rsConfigNs << endl;
+
         while( 1 ) {
-            startupStatus = LOADINGCONFIG;
-            startupStatusMsg.set("loading " + rsConfigNs + " config (LOADINGCONFIG)");
-            LOG(1) << "loadConfig() " << rsConfigNs << endl;
             try {
                 vector<ReplSetConfig> configs;
                 try {

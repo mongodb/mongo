@@ -1,5 +1,4 @@
 //Test for SERVER-3650 (rollback from slave)
-if (0) { // enable for SERVER-3772
 
 var num = 7;
 var host = getHostName();
@@ -97,7 +96,18 @@ replTest.unPartition(2,5)
 replTest.unPartition(2,6)
 printjson({endUnPartition: new Date()});
 
-printjson(master2.adminCommand({getLastError:1, w:7, wtimeout:30*1000}));
+assert.soon(function() {
+    try {
+        printjson(master2.adminCommand({getLastError:1, w:7, wtimeout:30*1000}));
+        return true;
+    }
+    catch (e) {
+        print("getLastError returned an exception; retrying");
+        print(e);
+        return false;
+    }
+});
+
 printjson(master2.adminCommand("replSetGetStatus"));
 
 assert.soon(function() {return master.adminCommand('isMaster').ismaster},
@@ -111,7 +121,6 @@ assert.eq(mColl.count(sentinel), 1, "check sentinal on node 0");
 
 replTest.stopSet();
 
-}
 
 
 

@@ -136,6 +136,7 @@ coreServerFiles = [ "util/net/message_server_port.cpp",
                     "db/pipeline/expression_context.cpp",
                     "db/pipeline/field_path.cpp",
                     "db/pipeline/value.cpp",
+
                     "db/stats/counters.cpp",
                     "db/stats/service_stats.cpp",
                     "db/stats/top.cpp",
@@ -146,6 +147,13 @@ coreServerFiles = [ "util/net/message_server_port.cpp",
                     "scripting/utils.cpp",
                     "scripting/bench.cpp",
                     ] + env['MONGO_SCRIPTING_FILES']
+
+clientFiles = commonFiles + [
+    'client/clientOnly.cpp',
+    'client/gridfs.cpp',
+    'db/commands.cpp',
+]
+
 
 if usesm:
     coreServerFiles.append( "scripting/engine_spidermonkey.cpp" )
@@ -500,8 +508,13 @@ if installSetup.headers:
         env.Install( "$INSTALL_DIR/" + installSetup.headerRoot + "/" + id, Glob( id + "*.hpp" ) )
 
 if installSetup.clientSrc:
-    print "ERROR!  NOT IMPLEMENTED: client source installation"
-    Exit(1)
+    for x in clientFiles:
+        if isinstance(x, basestring):
+            x = [x]
+        for path in x:
+            path = str(path)
+            dirname, filename = os.path.split(path)
+            env.Install( "$INSTALL_DIR/mongo/" + dirname , path )
 
 #lib
 if installSetup.libraries:
@@ -513,13 +526,7 @@ if installSetup.libraries:
 env.Install( "$INSTALL_DIR", installSetup.bannerFiles )
 
 if installSetup.clientTestsDir:
-    for x in os.listdir( installSetup.clientTestsDir ):
-        full = installSetup.clientTestsDir + "/" + x
-        if os.path.isdir( full ):
-            continue
-        if x.find( "~" ) >= 0:
-            continue
-        env.Install( '$INSTALL_DIR/' + installSetup.clientTestsDir, full )
+    env.Install( '$INSTALL_DIR/client/', installSetup.clientTestsDir )
 
 #final alias
 env.Alias( "install", "$INSTALL_DIR" )
@@ -532,6 +539,7 @@ def build_and_test_client(env, target, source):
     from subprocess import call
 
     installDir = env.subst('$INSTALL_DIR', target=target, source=source)
+    installDir = env.GetBuildPath(installDir)
     if GetOption("extrapath") is not None:
         scons_command = ["scons", "--extrapath=" + GetOption("extrapath")]
     else:

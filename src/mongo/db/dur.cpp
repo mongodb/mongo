@@ -72,6 +72,8 @@ using namespace mongoutils;
 
 namespace mongo {
 
+    extern bool lockedForWriting;
+
     namespace dur {
 
         void PREPLOGBUFFER(JSectHeader& outParm);
@@ -699,6 +701,11 @@ namespace mongo {
                     groupCommit();
                     return;
                 }
+            }
+
+            if ( lockedForWriting ) {
+                warning() << "group commit delayed beacuse of fsync + lock" << endl;
+                return;
             }
 
             // starvation on read locks could occur.  so if read lock acquisition is slow, try to get a

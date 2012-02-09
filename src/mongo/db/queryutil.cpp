@@ -27,6 +27,8 @@
 #include "../util/mongoutils/str.h"
 
 namespace mongo {
+    static const unsigned maxCombinations = 4000000;
+
     extern BSONObj staticNull;
     extern BSONObj staticUndefined;
 
@@ -963,7 +965,7 @@ namespace mongo {
             assert( !_ranges.back().empty() );
         }
         uassert( 13385, "combinatorial limit of $in partitioning of result set exceeded",
-                size() < 1000000 );
+                size() < maxCombinations );
     }    
 
     BSONObj FieldRangeVector::startKey() const {
@@ -1048,13 +1050,13 @@ namespace mongo {
         BoundBuilders builders;
         builders.push_back( make_pair( shared_ptr<BSONObjBuilder>( new BSONObjBuilder() ), shared_ptr<BSONObjBuilder>( new BSONObjBuilder() ) ) );
         BSONObjIterator i( keyPattern );
-        bool ineq = false; // until ineq is true, we are just dealing with equality and $in bounds
+        bool equalityOnly = true; // until equalityOnly is false, we are just dealing with equality (no range or $in querys).
         while( i.more() ) {
             BSONElement e = i.next();
             const FieldRange &fr = range( e.fieldName() );
             int number = (int) e.number(); // returns 0.0 if not numeric
             bool forward = ( ( number >= 0 ? 1 : -1 ) * ( direction >= 0 ? 1 : -1 ) > 0 );
-            if ( !ineq ) {
+            if ( equalityOnly ) {
                 if ( fr.equality() ) {
                     for( BoundBuilders::const_iterator j = builders.begin(); j != builders.end(); ++j ) {
                         j->first->appendAs( fr.min(), "" );
@@ -1062,16 +1064,14 @@ namespace mongo {
                     }
                 }
                 else {
-                    if ( !fr.inQuery() ) {
-                        ineq = true;
-                    }
+                    equalityOnly = false;
+
                     BoundBuilders newBuilders;
                     const vector<FieldInterval> &intervals = fr.intervals();
                     for( BoundBuilders::const_iterator i = builders.begin(); i != builders.end(); ++i ) {
                         BSONObj first = i->first->obj();
                         BSONObj second = i->second->obj();
 
-                        const unsigned maxCombinations = 4000000;
                         if ( forward ) {
                             for( vector<FieldInterval>::const_iterator j = intervals.begin(); j != intervals.end(); ++j ) {
                                 uassert( 13303, "combinatorial limit of $in partitioning of result set exceeded", newBuilders.size() < maxCombinations );

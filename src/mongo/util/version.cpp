@@ -29,6 +29,7 @@
 #include "file.h"
 #include "ramlog.h"
 #include "../db/cmdline.h"
+#include "processinfo.h"
 
 #include <boost/filesystem/operations.hpp>
 
@@ -41,7 +42,7 @@ namespace mongo {
      *      1.2.3-rc4-pre-
      * If you really need to do something else you'll need to fix _versionArray()
      */
-    const char versionString[] = "2.1.0-pre-";
+    const char versionString[] = "2.1.1-pre-";
 
     // See unit test for example outputs
     static BSONArray _versionArray(const char* version){
@@ -148,6 +149,13 @@ namespace mongo {
             warned = true;
         }
 
+        if ( !ProcessInfo::blockCheckSupported() ) {
+            log() << startupWarningsLog;
+            log() << "** NOTE: your operating system version does not support the method that MongoDB" << startupWarningsLog;
+            log() << "**       uses to detect impending page faults." << startupWarningsLog;
+            log() << "**       This may result in slower performance for certain use cases" << startupWarningsLog;
+            warned = true;
+        }
 #ifdef __linux__
         if (boost::filesystem::exists("/proc/vz") && !boost::filesystem::exists("/proc/bc")) {
             log() << startupWarningsLog;

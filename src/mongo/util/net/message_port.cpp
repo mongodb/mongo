@@ -121,23 +121,23 @@ namespace mongo {
     }
 
     MessagingPort::MessagingPort(int fd, const SockAddr& remote) 
-        : Socket( fd , remote ) , piggyBackData(0) {
+        : psock( new Socket( fd , remote ) ) , piggyBackData(0) {
         ports.insert(this);
     }
 
     MessagingPort::MessagingPort( double timeout, int ll ) 
-        : Socket( timeout, ll ) {
+        : psock( new Socket( timeout, ll ) ) {
         ports.insert(this);
         piggyBackData = 0;
     }
 
-    MessagingPort::MessagingPort( Socket& sock )
-        : Socket( sock ) , piggyBackData( 0 ) {
+    MessagingPort::MessagingPort( boost::shared_ptr<Socket> sock )
+        : psock( sock ), piggyBackData( 0 ) {
         ports.insert(this);
     }
 
     void MessagingPort::shutdown() {
-        close();
+        psock->close();
     }
 
     MessagingPort::~MessagingPort() {
@@ -155,7 +155,7 @@ again:
 
             char *lenbuf = (char *) &len;
             int lft = 4;
-            Socket::recv( lenbuf, lft );
+            psock->recv( lenbuf, lft );
 
             if ( len < 16 || len > 48000000 ) { // messages must be large enough for headers
                 if ( len == -1 ) {
@@ -167,7 +167,7 @@ again:
 
                 if ( len == 542393671 ) {
                     // an http GET
-                    log(_logLevel) << "looks like you're trying to access db over http on native driver port.  please add 1000 for webserver" << endl;
+                    log( psock->getLogLevel() ) << "looks like you're trying to access db over http on native driver port.  please add 1000 for webserver" << endl;
                     string msg = "You are trying to access MongoDB on the native driver port. For http diagnostic access, add 1000 to the port number\n";
                     stringstream ss;
                     ss << "HTTP/1.0 200 OK\r\nConnection: close\r\nContent-Type: text/plain\r\nContent-Length: " << msg.size() << "\r\n\r\n" << msg;
@@ -189,7 +189,7 @@ again:
             char *p = (char *) &md->id;
             int left = len -4;
 
-            Socket::recv( p, left );
+            psock->recv( p, left );
 
             guard.Dismiss();
             m.setData(md, true);
@@ -197,7 +197,7 @@ again:
 
         }
         catch ( const SocketException & e ) {
-            log(_logLevel + (e.shouldPrint() ? 0 : 1) ) << "SocketException: remote: " << remote() << " error: " << e << endl;
+            log(psock->getLogLevel() + (e.shouldPrint() ? 0 : 1) ) << "SocketException: remote: " << remote() << " error: " << e << endl;
             m.reset();
             return false;
         }
@@ -233,7 +233,7 @@ again:
                     << "  response msgid:" << (unsigned)response.header()->id << '\n'
                     << "  response len:  " << (unsigned)response.header()->len << '\n'
                     << "  response op:  " << response.operation() << '\n'
-                    << "  remote: " << remoteString() << endl;
+                    << "  remote: " << psock->remoteString() << endl;
             assert(false);
             response.reset();
         }
@@ -242,7 +242,7 @@ again:
     }
 
     void MessagingPort::assertStillConnected() { 
-        uassert(15901, "client disconnected during operation", Socket::stillConnected());
+        uassert(15901, "client disconnected during operation", psock->stillConnected());
     }
 
     void MessagingPort::say(Message& toSend, int responseTo) {
@@ -287,7 +287,7 @@ again:
 
     HostAndPort MessagingPort::remote() const {
         if ( ! _remoteParsed.hasPort() )
-            _remoteParsed = HostAndPort( remoteAddr() );
+            _remoteParsed = HostAndPort( psock->remoteAddr() );
         return _remoteParsed;
     }
 

@@ -233,7 +233,6 @@ namespace QueryUtilTests {
                 const FieldRange &r = s.range( "a" );
                 ASSERT( r.empty() );
                 ASSERT( !r.equality() );
-                ASSERT( r.inQuery() ); // A $in query can be empty {$in:[]}.
                 ASSERT( !r.universal() );
             }
         };
