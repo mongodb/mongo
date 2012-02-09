@@ -117,7 +117,7 @@ namespace mongo {
             pms::handler = handler;
         }
 
-        virtual void accepted(MessagingPort * p) {
+        virtual void acceptedMP(MessagingPort * p) {
 
             if ( ! connTicketHolder.tryAcquire() ) {
                 log() << "connection refused because too many open connections: " << connTicketHolder.used() << endl;

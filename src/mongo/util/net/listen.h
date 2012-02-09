@@ -44,7 +44,7 @@ namespace mongo {
 
         /* spawn a thread, etc., then return */
         virtual void accepted(boost::shared_ptr<Socket> psocket);
-        virtual void accepted(MessagingPort *mp);
+        virtual void acceptedMP(MessagingPort *mp);
 
         const int _port;
 

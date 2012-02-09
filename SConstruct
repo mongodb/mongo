@@ -701,7 +701,7 @@ if nix:
             env.Append( CPPFLAGS=" -fno-builtin-memcmp " ) # glibc's memcmp is faster than gcc's
 
     env.Append( CPPDEFINES="_FILE_OFFSET_BITS=64" )
-    env.Append( CXXFLAGS=" -Wnon-virtual-dtor " )
+    env.Append( CXXFLAGS=" -Wnon-virtual-dtor -Woverloaded-virtual" )
     env.Append( LINKFLAGS=" -fPIC -pthread -rdynamic" )
     env.Append( LIBS=[] )
 

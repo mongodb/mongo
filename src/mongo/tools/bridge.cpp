@@ -89,7 +89,7 @@ set<MessagingPort*> ports;
 class MyListener : public Listener {
 public:
     MyListener( int port ) : Listener( "bridge" , "", port ) {}
-    virtual void accepted(MessagingPort *mp) {
+    virtual void acceptedMP(MessagingPort *mp) {
         ports.insert( mp );
         Forwarder f( *mp );
         boost::thread t( f );

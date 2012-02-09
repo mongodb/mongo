@@ -330,10 +330,10 @@ namespace mongo {
 
 
     void Listener::accepted(boost::shared_ptr<Socket> psocket) {
-        accepted( new MessagingPort(psocket) );
+        acceptedMP( new MessagingPort(psocket) );
     }
     
-    void Listener::accepted(MessagingPort *mp) {
+    void Listener::acceptedMP(MessagingPort *mp) {
         assert(!"You must overwrite one of the accepted methods");
     }
 
