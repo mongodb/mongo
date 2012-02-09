@@ -44,8 +44,8 @@ __curstat_get_key(WT_CURSOR *cursor, ...)
 	int ret;
 
 	ret = 0;
-	CURSOR_API_CALL(cursor, session, get_key, NULL);
 	cst = (WT_CURSOR_STAT *)cursor;
+	CURSOR_API_CALL(cursor, session, get_key, cst->btree);
 	va_start(ap, cursor);
 
 	WT_CURSOR_NEEDKEY(cursor);
@@ -82,8 +82,8 @@ __curstat_get_value(WT_CURSOR *cursor, ...)
 	int ret;
 
 	ret = 0;
-	CURSOR_API_CALL(cursor, session, get_value, NULL);
 	cst = (WT_CURSOR_STAT *)cursor;
+	CURSOR_API_CALL(cursor, session, get_value, cst->btree);
 	va_start(ap, cursor);
 
 	WT_CURSOR_NEEDVALUE(cursor);
@@ -124,8 +124,8 @@ __curstat_set_key(WT_CURSOR *cursor, ...)
 	int ret;
 
 	ret = 0;
-	CURSOR_API_CALL(cursor, session, set_key, NULL);
 	cst = (WT_CURSOR_STAT *)cursor;
+	CURSOR_API_CALL(cursor, session, set_key, cst->btree);
 
 	va_start(ap, cursor);
 	if (F_ISSET(cursor, WT_CURSTD_RAW)) {
@@ -167,8 +167,8 @@ __curstat_next(WT_CURSOR *cursor)
 	int ret;
 
 	ret = 0;
-	CURSOR_API_CALL(cursor, session, next, NULL);
 	cst = (WT_CURSOR_STAT *)cursor;
+	CURSOR_API_CALL(cursor, session, next, cst->btree);
 
 	/* Move to the next item. */
 	if (cst->notpositioned) {
@@ -200,8 +200,8 @@ __curstat_prev(WT_CURSOR *cursor)
 	int ret;
 
 	ret = 0;
-	CURSOR_API_CALL(cursor, session, prev, NULL);
 	cst = (WT_CURSOR_STAT *)cursor;
+	CURSOR_API_CALL(cursor, session, prev, cst->btree);
 
 	/* Move to the previous item. */
 	if (cst->notpositioned) {
@@ -248,8 +248,8 @@ __curstat_search(WT_CURSOR *cursor)
 	int ret;
 
 	ret = 0;
-	CURSOR_API_CALL(cursor, session, search, NULL);
 	cst = (WT_CURSOR_STAT *)cursor;
+	CURSOR_API_CALL(cursor, session, search, cst->btree);
 
 	WT_CURSOR_NEEDKEY(cursor);
 	F_CLR(cursor, WT_CURSTD_VALUE_SET);
@@ -277,18 +277,17 @@ __curstat_close(WT_CURSOR *cursor)
 	int ret;
 
 	ret = 0;
-	CURSOR_API_CALL(cursor, session, close, NULL);
 	cst = (WT_CURSOR_STAT *)cursor;
+	CURSOR_API_CALL(cursor, session, close, cst->btree);
 
 	if (ret == 0 && cst->clear_func)
 		cst->clear_func(cst->stats_first);
 
 	__wt_buf_free(session, &cst->pv);
 
-	if (cst->btree != NULL) {
-		session->btree = cst->btree;
+	if (session->btree != NULL) {
 		WT_TRET(__wt_session_release_btree(session));
-		session->btree = NULL;
+		cst->btree = session->btree = NULL;
 	}
 
 	WT_TRET(__wt_cursor_close(cursor));

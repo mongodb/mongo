@@ -67,6 +67,7 @@ int
 __wt_schema_table_insert(
     WT_SESSION_IMPL *session, const char *key, const char *value)
 {
+	WT_BTREE *btree;
 	WT_CURSOR *cursor;
 	int ret;
 
@@ -75,11 +76,16 @@ __wt_schema_table_insert(
 	if (session->schema_track != NULL)		/* Optional tracking */
 		WT_RET(__wt_schema_table_track_insert(session, key));
 
+	/* Save the caller's btree: the schema cursor will overwrite it. */
+	btree = session->btree;
 	WT_RET(__wt_schema_table_cursor(session, NULL, &cursor));
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
 	WT_TRET(cursor->insert(cursor));
 	WT_TRET(cursor->close(cursor));
+
+	/* Restore the caller's btree. */
+	session->btree = btree;
 	return (ret);
 }
 
@@ -91,6 +97,7 @@ int
 __wt_schema_table_update(
     WT_SESSION_IMPL *session, const char *key, const char *value)
 {
+	WT_BTREE *btree;
 	WT_CURSOR *cursor;
 	int ret;
 
@@ -99,11 +106,16 @@ __wt_schema_table_update(
 	if (session->schema_track != NULL)		/* Optional tracking */
 		WT_RET(__wt_schema_table_track_update(session, key));
 
+	/* Save the caller's btree: the schema cursor will overwrite it. */
+	btree = session->btree;
 	WT_RET(__wt_schema_table_cursor(session, "overwrite", &cursor));
 	cursor->set_key(cursor, key);
 	cursor->set_value(cursor, value);
 	WT_TRET(cursor->insert(cursor));
 	WT_TRET(cursor->close(cursor));
+
+	/* Restore the caller's btree. */
+	session->btree = btree;
 	return (ret);
 }
 
@@ -114,6 +126,7 @@ __wt_schema_table_update(
 int
 __wt_schema_table_remove(WT_SESSION_IMPL *session, const char *key)
 {
+	WT_BTREE *btree;
 	WT_CURSOR *cursor;
 	int ret;
 
@@ -122,10 +135,15 @@ __wt_schema_table_remove(WT_SESSION_IMPL *session, const char *key)
 	if (session->schema_track != NULL)		/* Optional tracking */
 		WT_RET(__wt_schema_table_track_update(session, key));
 
+	/* Save the caller's btree: the schema cursor will overwrite it. */
+	btree = session->btree;
 	WT_RET(__wt_schema_table_cursor(session, NULL, &cursor));
 	cursor->set_key(cursor, key);
 	WT_TRET(cursor->remove(cursor));
 	WT_TRET(cursor->close(cursor));
+
+	/* Restore the caller's btree. */
+	session->btree = btree;
 	return (ret);
 }
 
@@ -138,12 +156,15 @@ int
 __wt_schema_table_read(
     WT_SESSION_IMPL *session, const char *key, const char **valuep)
 {
+	WT_BTREE *btree;
 	WT_CURSOR *cursor;
 	const char *value;
 	int ret;
 
 	ret = 0;
 
+	/* Save the caller's btree: the schema cursor will overwrite it. */
+	btree = session->btree;
 	WT_RET(__wt_schema_table_cursor(session, NULL, &cursor));
 	cursor->set_key(cursor, key);
 	WT_ERR(cursor->search(cursor));
@@ -151,5 +172,7 @@ __wt_schema_table_read(
 	WT_ERR(__wt_strdup(session, value, valuep));
 
 err:    WT_TRET(cursor->close(cursor));
+	/* Restore the caller's btree. */
+	session->btree = btree;
 	return (ret);
 }

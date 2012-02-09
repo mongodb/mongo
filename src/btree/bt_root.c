@@ -293,8 +293,6 @@ __btree_get_root(
 
 	__wt_free(session, version);
 err:	__wt_scr_free(&key);
-
-	session->btree = btree;		/* XXX: schema-read overwrites */
 	return (ret == WT_NOTFOUND ? 0 : ret);
 }
 
@@ -318,7 +316,5 @@ __btree_set_root(WT_SESSION_IMPL *session, char *v)
 	WT_ERR(__wt_schema_table_update(session, key->data, v));
 
 err:	__wt_scr_free(&key);
-
-	session->btree = btree;		/* XXX: schema-insert overwrites */
 	return (ret);
 }
