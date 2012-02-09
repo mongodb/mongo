@@ -1101,7 +1101,10 @@ namespace mongo {
             // doesn't fit.  reallocate -----------------------------------------------------
             uassert( 10003 , "failing update: objects in a capped ns cannot grow", !(d && d->capped));
             d->paddingTooSmall();
-            debug.moved = true;
+            if (debug.nmoved == -1) // default of -1 rather than 0
+                debug.nmoved = 1;
+            else
+                debug.nmoved += 1;
             deleteRecord(ns, toupdate, dl);
             return insert(ns, objNew.objdata(), objNew.objsize(), god);
         }

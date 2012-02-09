@@ -600,7 +600,8 @@ namespace mongo {
         nscanned = -1;
         idhack = false;
         scanAndOrder = false;
-        moved = false;
+        nupdated = -1;
+        nmoved = -1;
         fastmod = false;
         fastmodinsert = false;
         upsert = false;
@@ -636,7 +637,7 @@ namespace mongo {
             s << " update: ";
             updateobj.toString( s );
         }
-        
+
         OPDEBUG_TOSTRING_HELP( cursorid );
         OPDEBUG_TOSTRING_HELP( ntoreturn );
         OPDEBUG_TOSTRING_HELP( ntoskip );
@@ -645,7 +646,8 @@ namespace mongo {
         OPDEBUG_TOSTRING_HELP( nscanned );
         OPDEBUG_TOSTRING_HELP_BOOL( idhack );
         OPDEBUG_TOSTRING_HELP_BOOL( scanAndOrder );
-        OPDEBUG_TOSTRING_HELP_BOOL( moved );
+        OPDEBUG_TOSTRING_HELP( nmoved );
+        OPDEBUG_TOSTRING_HELP( nupdated );
         OPDEBUG_TOSTRING_HELP_BOOL( fastmod );
         OPDEBUG_TOSTRING_HELP_BOOL( fastmodinsert );
         OPDEBUG_TOSTRING_HELP_BOOL( upsert );
@@ -681,6 +683,8 @@ namespace mongo {
         if ( ! updateobj.isEmpty() )
             b.append( "updateobj" , updateobj );
         
+        const bool moved = (nmoved >= 1);
+
         OPDEBUG_APPEND_NUMBER( cursorid );
         OPDEBUG_APPEND_NUMBER( ntoreturn );
         OPDEBUG_APPEND_NUMBER( ntoskip );
@@ -690,6 +694,8 @@ namespace mongo {
         OPDEBUG_APPEND_BOOL( idhack );
         OPDEBUG_APPEND_BOOL( scanAndOrder );
         OPDEBUG_APPEND_BOOL( moved );
+        OPDEBUG_APPEND_NUMBER( nmoved );
+        OPDEBUG_APPEND_NUMBER( nupdated );
         OPDEBUG_APPEND_BOOL( fastmod );
         OPDEBUG_APPEND_BOOL( fastmodinsert );
         OPDEBUG_APPEND_BOOL( upsert );

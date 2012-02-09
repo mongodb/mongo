@@ -1276,7 +1276,9 @@ namespace mongo {
             /* dm: it's very important that system.indexes is never updated as IndexDetails has pointers into it */
             uassert( 10156 , str::stream() << "cannot update system collection: " << ns << " q: " << patternOrig << " u: " << updateobj , legalClientSystemNS( ns , true ) );
         }
-        return _updateObjects(false, ns, updateobj, patternOrig, upsert, multi, logop, debug);
+        UpdateResult ur = _updateObjects(false, ns, updateobj, patternOrig, upsert, multi, logop, debug);
+        debug.nupdated = ur.num;
+        return ur;
     }
 
 }
