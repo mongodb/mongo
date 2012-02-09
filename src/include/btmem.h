@@ -286,13 +286,12 @@ struct __wt_page {
 	 * the threads could race.
 	 */
 #define	WT_PAGE_BUILD_KEYS	0x001	/* Keys have been built in memory */
-#define	WT_PAGE_FORCE_EVICT	0x002	/* Waiting for forced eviction */
-#define	WT_PAGE_LAST_PAGE	0x004	/* Page is pinned */
-#define	WT_PAGE_PINNED		0x008	/* Page is pinned */
-#define	WT_PAGE_REC_EMPTY	0x010	/* Reconciliation: page empty */
-#define	WT_PAGE_REC_REPLACE	0x020	/* Reconciliation: page replaced */
-#define	WT_PAGE_REC_SPLIT	0x040	/* Reconciliation: page split */
-#define	WT_PAGE_REC_SPLIT_MERGE	0x080	/* Reconciliation: page split merge */
+#define	WT_PAGE_LAST_PAGE	0x002	/* Page is pinned */
+#define	WT_PAGE_PINNED		0x004	/* Page is pinned */
+#define	WT_PAGE_REC_EMPTY	0x008	/* Reconciliation: page empty */
+#define	WT_PAGE_REC_REPLACE	0x010	/* Reconciliation: page replaced */
+#define	WT_PAGE_REC_SPLIT	0x020	/* Reconciliation: page split */
+#define	WT_PAGE_REC_SPLIT_MERGE	0x040	/* Reconciliation: page split merge */
 	uint8_t flags;			/* Page flags */
 };
 

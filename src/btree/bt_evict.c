@@ -152,7 +152,6 @@ __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CACHE *cache;
 	WT_EVICT_REQ *er, *er_end;
-	int owned;
 
 	cache = S2C(session)->cache;
 
@@ -165,26 +164,12 @@ __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * way through the process of being evicted: a thread may have selected
 	 * it from the LRU list but not yet checked its hazard references.
 	 *
-	 * To avoid a freed page pointer ending up on the request list, we
-	 * check the page state here while holding the LRU lock.  Since the
-	 * state of page references in the eviction list is switched to
-	 * WT_REF_EVICTING while holding the LRU lock, this check prevents a
-	 * page from being evicted twice.
+	 * To avoid that race, we try to atomically switch the page state to
+	 * WT_REF_EVICTING.  Since only one thread can do that successfully,
+	 * this prevents a page from being evicted twice.
 	 */
-	owned = 0;
-	__wt_spin_lock(session, &cache->lru_lock);
-	if (!F_ISSET(page, WT_PAGE_FORCE_EVICT) &&
-	    WT_ATOMIC_CAS(page->ref->state, WT_REF_MEM, WT_REF_EVICTING)) {
-		F_SET(page, WT_PAGE_FORCE_EVICT);
-		owned = 1;
-	}
-	__wt_spin_unlock(session, &cache->lru_lock);
-
-	/*
-	 * If we didn't swap the page state, some other thread is already
-	 * evicting it, which is fine.
-	 */
-	if (!owned)
+	if (!WT_ATOMIC_CAS(page->ref->state, WT_REF_MEM, WT_REF_EVICTING))
+		/* Some other thread is already evicting it, which is fine. */
 		return (0);
 
 	/* Find an empty slot and enter the eviction request. */
@@ -664,11 +649,14 @@ __evict_get_page(
 	if (__wt_spin_trylock(session, &cache->lru_lock) != 0)
 		return;
 
-	evict = cache->evict_current;
-	if (evict != NULL &&
+	/* Get the next page queued for eviction. */
+	while ((evict = cache->evict_current) != NULL &&
 	    evict >= cache->evict && evict < cache->evict + WT_EVICT_GROUP &&
 	    evict->page != NULL) {
 		WT_ASSERT(session, evict->btree != NULL);
+
+		/* Move to the next item. */
+		++cache->evict_current;
 
 		/*
 		 * For now, application sessions can only evict pages from
@@ -680,25 +668,16 @@ __evict_get_page(
 		    __wt_session_has_btree(session, evict->btree) != 0)
 			goto done;
 
-		/* Move to the next page queued for eviction. */
-		++cache->evict_current;
-
 		/*
-		 * If the page happens to be marked for forced eviction, ignore
-		 * it: it will be sitting in the request queue.  This is
-		 * unlikely, and it is simpler to leave it for the eviction
-		 * thread than trying to find it and clear the request.
-		 */
-		if (F_ISSET(evict->page, WT_PAGE_FORCE_EVICT))
-			goto done;
-
-		/*
-		 * Set the page locked here while holding the eviction mutex to
-		 * prevent multiple attempts to evict it.
+		 * Switch the page state to evicting while holding the eviction
+		 * mutex to prevent multiple attempts to evict it.  For pages
+		 * that are already being evicted, including pages on the
+		 * request queue for forced eviction, this operation will fail
+		 * and we will move on.
 		 */
 		ref = evict->page->ref;
 		if (!WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_EVICTING))
-			goto done;
+			continue;
 
 		*pagep = evict->page;
 		*btreep = evict->btree;
@@ -715,6 +694,7 @@ __evict_get_page(
 		 * the same page on reconciliation error.
 		 */
 		__evict_clr(evict);
+		break;
 	}
 
 done:	__wt_spin_unlock(session, &cache->lru_lock);

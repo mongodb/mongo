@@ -51,8 +51,7 @@ __wt_eviction_page_check(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Otherwise, if the cache is more than 95% full, wake up the eviction
 	 * thread.
 	 */
-	if (page != NULL &&
-	    !F_ISSET(page, WT_PAGE_FORCE_EVICT | WT_PAGE_PINNED) &&
+	if (page != NULL && !F_ISSET(page, WT_PAGE_PINNED) &&
 	    (((int64_t)page->memory_footprint > conn->cache_size / 2) ||
 	    (page->memory_footprint > 20 * session->btree->maxleafpage))) {
 		/*
