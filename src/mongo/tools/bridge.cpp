@@ -57,6 +57,10 @@ public:
                     }
                     Message response;
                     dest.port().call( m, response );
+
+                    // nothing to reply with?
+                    if ( response.empty() ) continue;
+
                     mp_.reply( m, response, oldId );
                     while ( exhaust ) {
                         MsgData *header = response.header();
