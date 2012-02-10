@@ -11,14 +11,6 @@ namespace mongo {
 
     struct LockState;
 
-    /** a mutex, but reported in curop() - thus a "high level" (HL) one
-        some overhead so we don't use this for everything.  the externalobjsort mutex
-        uses this, as it can be held for eons. implementation still needed. */
-    class HLMutex : public SimpleMutex {
-    public:
-        HLMutex(const char *name);
-    };
-
     class Lock : boost::noncopyable { 
     public:
         static int isLocked();      // true if *anything* is locked (by us)
@@ -62,17 +54,14 @@ namespace mongo {
             void lock(const string& db);
             bool locked_r;
             SimpleRWLock *weLocked;
-            unsigned *ourCounter;
+            int *ourCounter;
         public:
             DBRead(const StringData& dbOrNs);
             ~DBRead();
         };
 
         // specialty things:
-        /*struct Nongreedy : boost::noncopyable { // temporarily disable greediness of W lock acquisitions
-            Nongreedy(); ~Nongreedy();
-        };*/
-        struct ThreadSpan { 
+        struct ThreadSpanningOp { 
             static void setWLockedNongreedy();
             static void W_to_R();
             static void unsetW(); // reverts to greedy
@@ -81,7 +70,6 @@ namespace mongo {
     };
 
     // the below are for backward compatibility.  use Lock classes above instead.
-
     class readlock {
         scoped_ptr<Lock::GlobalRead> lk1;
         scoped_ptr<Lock::DBRead> lk2;
@@ -90,6 +78,8 @@ namespace mongo {
         readlock();
     };
 
+    // writelock is an old helper the code has used for a long time.
+    // it now DBWrite locks if ns parm is specified. otherwise global W locks
     class writelock {
         scoped_ptr<Lock::GlobalWrite> lk1;
         scoped_ptr<Lock::DBWrite> lk2;
@@ -98,8 +88,7 @@ namespace mongo {
         writelock();
     };
 
-    /* parameterized choice of read or write locking
-    */
+    /** parameterized choice of read or write locking */
     class mongolock {
         scoped_ptr<readlock> r;
         scoped_ptr<writelock> w;
@@ -114,6 +103,15 @@ namespace mongo {
         }
     };
 
+    /** a mutex, but reported in curop() - thus a "high level" (HL) one
+        some overhead so we don't use this for everything.  the externalobjsort mutex
+        uses this, as it can be held for eons. implementation still needed. */
+    class HLMutex : public SimpleMutex {
+    public:
+        HLMutex(const char *name);
+    };
+
+    // implementation stuff
     struct LockState {
         LockState() : threadState(0), recursive(0), local(0), other(0), otherLock(0) { }
 
@@ -121,9 +119,9 @@ namespace mongo {
         char threadState;             // 0, 'r', 'w', 'R', 'W'
         unsigned recursive;           // nested locking is allowed
 
-        // db lock related
-        unsigned local;               // recursive lock count on local db
-        unsigned other;
+        // db level locking related
+        int local;                    // recursive lock count on local db and other db
+        int other;                    //   >0 means write lock, <0 read lock
         string otherName;             // which database are we locking and working with (besides local)
         SimpleRWLock *otherLock;      // so we don't have to check the map too often (the map has a mutex)
     };

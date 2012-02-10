@@ -22,22 +22,9 @@
 
 namespace mongo { 
 
-    void lockedExclusively();
-    void unlockingExclusively();
-
-    static QLock& q = *new QLock();
-
-    /*Lock::Nongreedy::Nongreedy() {
-        q.stop_greed();
-    }
-    Lock::Nongreedy::~Nongreedy() {
-        q.start_greed();
-    }*/
-
     // e.g. externalobjsortmutex uses hlmutex as it can be locked for very long times
     // todo : report HLMutex status in db.currentOp() output
-    HLMutex::HLMutex(const char *name) : SimpleMutex(name)
-    { }
+    HLMutex::HLMutex(const char *name) : SimpleMutex(name) { }
 
     /* dbname->lock
        Currently these are never deleted - will linger if db was closed. (that should be fine.)
@@ -50,6 +37,9 @@ namespace mongo {
     static mapsf<string,SimpleRWLock*> dblocks;
     SimpleRWLock localDBLock("localDBLock");
 
+    void lockedExclusively();
+    void unlockingExclusively();
+    static QLock& q = *new QLock();
     TSP_DEFINE(LockState,ls);
 
     inline LockState& lockState() { 
@@ -62,7 +52,7 @@ namespace mongo {
     inline char& threadState() { 
         return lockState().threadState;
     }
-    inline unsigned& recursive() { 
+    inline unsigned& recursive() { // the nested locking counter for the big outer QLock
         return lockState().recursive;
     }
 
@@ -133,20 +123,20 @@ namespace mongo {
 
     // these are safe for use ACROSS threads.  i.e. one thread can lock and 
     // another unlock
-    void Lock::ThreadSpan::setWLockedNongreedy() { 
+    void Lock::ThreadSpanningOp::setWLockedNongreedy() { 
         assert( threadState() == 0 ); // as this spans threads the tls wouldn't make sense
         q.lock_W_stop_greed();
     }
-    void Lock::ThreadSpan::W_to_R() { 
+    void Lock::ThreadSpanningOp::W_to_R() { 
         assert( threadState() == 0 );
         q.W_to_R();
     }
-    void Lock::ThreadSpan::unsetW() {
+    void Lock::ThreadSpanningOp::unsetW() {
         assert( threadState() == 0 );
         q.unlock_W();
         q.start_greed();
     }
-    void Lock::ThreadSpan::unsetR() {
+    void Lock::ThreadSpanningOp::unsetR() {
         assert( threadState() == 0 );
         q.unlock_R();
         q.start_greed();

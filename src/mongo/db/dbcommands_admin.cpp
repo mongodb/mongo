@@ -439,7 +439,7 @@ namespace mongo {
             bool lock = cmdObj["lock"].trueValue();
             log() << "CMD fsync: sync:" << sync << " lock:" << lock << endl;
             if( lock ) {
-                Lock::ThreadSpan::setWLockedNongreedy();
+                Lock::ThreadSpanningOp::setWLockedNongreedy();
                 assert( !locked ); // impossible to get here if locked is true
                 try { 
                     //uassert(12034, "fsync: can't lock while an unlock is pending", !unlockRequested);
@@ -447,16 +447,16 @@ namespace mongo {
                     uassert(12033, "fsync: profiling must be off to enter locked mode", cc().database()->profile == 0);
                     getDur().syncDataAndTruncateJournal();
                 } catch(...) { 
-                    Lock::ThreadSpan::unsetW();
+                    Lock::ThreadSpanningOp::unsetW();
                     throw;
                 }
                 SimpleMutex::scoped_lock lk(m);
-                Lock::ThreadSpan::W_to_R();
+                Lock::ThreadSpanningOp::W_to_R();
                 try {
                     MemoryMappedFile::flushAll(true);
                 }
                 catch(...) { 
-                    Lock::ThreadSpan::unsetR();
+                    Lock::ThreadSpanningOp::unsetR();
                     throw;
                 }
                 assert( !locked );
@@ -489,7 +489,7 @@ namespace mongo {
             return false;
         }
         fsyncCmd.locked = false;
-        Lock::ThreadSpan::unsetR();
+        Lock::ThreadSpanningOp::unsetR();
         return true;
     }
 }

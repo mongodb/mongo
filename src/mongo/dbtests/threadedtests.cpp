@@ -142,11 +142,11 @@ namespace ThreadedTests {
                     }*/
                 }
                 else {
-                    Lock::ThreadSpan::setWLockedNongreedy();
-                    Lock::ThreadSpan::unsetW();
-                    Lock::ThreadSpan::setWLockedNongreedy();
-                    Lock::ThreadSpan::W_to_R();
-                    Lock::ThreadSpan::unsetR();
+                    Lock::ThreadSpanningOp::setWLockedNongreedy();
+                    Lock::ThreadSpanningOp::unsetW();
+                    Lock::ThreadSpanningOp::setWLockedNongreedy();
+                    Lock::ThreadSpanningOp::W_to_R();
+                    Lock::ThreadSpanningOp::unsetR();
                 }
                 pm.hit();
             }
