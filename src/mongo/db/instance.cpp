@@ -374,43 +374,44 @@ namespace mongo {
             dbresponse.responseTo = m.header()->id;
         }
         else {
-            const char *ns = m.singleData()->_data + 4;
-            char cl[256];
-            nsToDatabase(ns, cl);
-            if( ! c.getAuthenticationInfo()->isAuthorized(cl) ) {
-                uassert_nothrow("unauthorized");
-            }
-            else {
-                try {
-                    if ( op == dbInsert ) {
-                        receivedInsert(m, currentOp);
-                    }
-                    else if ( op == dbUpdate ) {
-                        receivedUpdate(m, currentOp);
-                    }
-                    else if ( op == dbDelete ) {
-                        receivedDelete(m, currentOp);
-                    }
-                    else if ( op == dbKillCursors ) {
-                        currentOp.ensureStarted();
-                        logThreshold = 10;
-                        receivedKillCursors(m);
-                    }
-                    else {
-                        mongo::log() << "    operation isn't supported: " << op << endl;
-                        currentOp.done();
-                        log = true;
-                    }
+            try {
+                // The following operations all require authorization.
+                // dbInsert, dbUpdate and dbDelete can be easily pre-authorized,
+                // here, but dbKillCursors cannot.
+                if ( op == dbKillCursors ) {
+                    currentOp.ensureStarted();
+                    logThreshold = 10;
+                    receivedKillCursors(m);
                 }
-                catch ( UserException& ue ) {
-                    tlog(3) << " Caught Assertion in " << opToString(op) << ", continuing " << ue.toString() << endl;
-                    debug.exceptionInfo = ue.getInfo();
+                else if ( ! c.getAuthenticationInfo()->isAuthorized(
+                                  nsToDatabase( m.singleData()->_data + 4 ) ) ) {
+                    uassert_nothrow("unauthorized");
                 }
-                catch ( AssertionException& e ) {
-                    tlog(3) << " Caught Assertion in " << opToString(op) << ", continuing " << e.toString() << endl;
-                    debug.exceptionInfo = e.getInfo();
+                else if ( op == dbInsert ) {
+                    receivedInsert(m, currentOp);
+                }
+                else if ( op == dbUpdate ) {
+                    receivedUpdate(m, currentOp);
+                }
+                else if ( op == dbDelete ) {
+                    receivedDelete(m, currentOp);
+                }
+                else {
+                    mongo::log() << "    operation isn't supported: " << op << endl;
+                    currentOp.done();
                     log = true;
                 }
+            }
+            catch ( UserException& ue ) {
+                tlog(3) << " Caught Assertion in " << opToString(op) << ", continuing "
+                        << ue.toString() << endl;
+                debug.exceptionInfo = ue.getInfo();
+            }
+            catch ( AssertionException& e ) {
+                tlog(3) << " Caught Assertion in " << opToString(op) << ", continuing "
+                        << e.toString() << endl;
+                debug.exceptionInfo = e.getInfo();
+                log = true;
             }
         }
         currentOp.ensureStarted();

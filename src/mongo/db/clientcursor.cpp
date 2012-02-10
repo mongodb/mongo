@@ -738,6 +738,20 @@ namespace mongo {
         }
     }
 
+    bool ClientCursor::erase( CursorId id ) {
+        recursive_scoped_lock lock( ccmutex );
+        ClientCursor *cursor = find_inlock( id );
+        if ( ! cursor )
+            return false;
+
+        if ( ! cc().getAuthenticationInfo()->isAuthorizedReads( nsToDatabase( cursor->ns() ) ) )
+            return false;
+
+        assert( cursor->_pinValue < 100 ); // mustn't have an active ClientCursor::Pointer
+        delete cursor;
+        return true;
+    }
+
     int ClientCursor::erase(int n, long long *ids) {
         int found = 0;
         for ( int i = 0; i < n; i++ ) {

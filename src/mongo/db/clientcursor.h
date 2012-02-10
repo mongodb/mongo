@@ -71,7 +71,7 @@ namespace mongo {
 
     extern BSONObj id_obj;
 
-    class ClientCursor {
+    class ClientCursor : private boost::noncopyable {
         friend class CmdCursorInfo;
     public:
         static void assertNoCursors();
@@ -324,16 +324,7 @@ namespace mongo {
          * Deletes the cursor with the provided @param 'id' if one exists.
          * @throw if the cursor with the provided id is pinned.
          */
-        static bool erase(CursorId id) {
-            recursive_scoped_lock lock(ccmutex);
-            ClientCursor *cc = find_inlock(id);
-            if ( cc ) {
-                assert( cc->_pinValue < 100 ); // you can't still have an active ClientCursor::Pointer
-                delete cc;
-                return true;
-            }
-            return false;
-        }
+        static bool erase(CursorId id);
 
         /**
          * @return number of cursors found
