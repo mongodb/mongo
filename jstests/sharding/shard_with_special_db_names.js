@@ -16,5 +16,11 @@ s.adminCommand( { shardcollection :  specialNS, key : { num : 1 } } );
 var exists = s.getDB("config").collections.find( { _id: specialNS } ).count();
 assert.eq( exists, 1 );
 
+// Test that drop database properly cleans up config
+s.getDB(specialDB).dropDatabase();
+
+exists = s.getDB(specialDB).collections.find( { _id: specialNS } ).count();
+assert.eq( exists, 0 );
+
 })();
 

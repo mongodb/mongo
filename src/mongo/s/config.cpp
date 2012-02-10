@@ -29,6 +29,7 @@
 #include "config.h"
 #include "grid.h"
 #include "server.h"
+#include "pcrecpp.h"
 
 namespace mongo {
 
@@ -414,9 +415,9 @@ namespace mongo {
         unserialize( o );
 
         BSONObjBuilder b;
-        b.appendRegex( "_id" , (string)"^" + _name + "\\." );
+        b.appendRegex( "_id" , (string)"^" + pcrecpp::RE::QuoteMeta( _name ) + "\\." );
 
-        auto_ptr<DBClientCursor> cursor = conn->query( ShardNS::collection ,b.obj() );
+        auto_ptr<DBClientCursor> cursor = conn->query( ShardNS::collection, b.obj() );
         assert( cursor.get() );
         while ( cursor->more() ) {
             BSONObj o = cursor->next();
