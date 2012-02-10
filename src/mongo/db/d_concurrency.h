@@ -41,11 +41,15 @@ namespace mongo {
         };
         // lock this database. do not shared_lock globally first, that is handledin herein. 
         class DBWrite : boost::noncopyable {
+            void lockTop(LockState&);
+            void lockLocal();
+            void lock(const string& db);
+            bool locked_w;
+            SimpleRWLock *weLocked;
+            int *ourCounter;
         public:
             DBWrite(const StringData& dbOrNs);
             ~DBWrite();
-            // TEMP:
-            GlobalWrite w;
         };
         // lock this database for reading. do not shared_lock globally first, that is handledin herein. 
         class DBRead : boost::noncopyable {

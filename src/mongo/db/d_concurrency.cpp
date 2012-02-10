@@ -251,20 +251,108 @@ namespace mongo {
         }
     }
 
-    Lock::DBWrite::DBWrite(const StringData& ns) { 
+    void Lock::DBWrite::lockTop(LockState& ls) { 
+        switch( ls.threadState ) { 
+        case 'R' : 
+            assert(false);
+        case 'r' : 
+            assert(false);
+        case 'w' :
+        case 'W' :
+            ls.recursive++;
+            break;
+        case  0  : 
+            lock_w();
+            locked_w = true;
+        }
     }
-    Lock::DBWrite::~DBWrite() { 
+    void Lock::DBWrite::lockLocal() { 
+        LockState& ls = lockState();
+        lockTop(ls);
+        if( ls.local ) { 
+            // we are nested in our locking of local.
+            // we could increment ls.local here; that would be recommended if 
+            // temprelease is supported here - but it is not yet, so we don't need to.
+            assert( ls.local > 0 );
+        }
+        else {
+            ourCounter = &ls.local;
+            ls.local++;
+            localDBLock.lock();
+            weLocked = &localDBLock;
+        }
+    }
+    void Lock::DBWrite::lock(const string& db) {
+        LockState& ls = lockState();
+
+        // we do checks first, as on assert destructor won't be called so don't want to be half finished with our work.
+        bool same = (db == ls.otherName);
+        if( ls.other ) { 
+            // nested. if/when we do temprelease with DBWrite we will need to increment here
+            // (so we can not release or assert if nested).
+            massert(0, str::stream() << "internal error tried to lock two databases at the same time. old:" << ls.otherName << " new:" << db,same);
+
+            // we do the top lock though so its temprelease semantics are preserved:
+            lockTop(ls);
+            return;
+        }
+
+        // first lock for this db. check consistent order with local db lock so we never deadlock. local always comes last
+        massert(0, str::stream() << "can't dblock:" << db << " when local is already locked", ls.local == 0);
+
+        lockTop(ls);
+
+        ourCounter = &ls.other;
+        dassert( ls.other == 0 );
+        ls.other++;
+        if( !same ) {
+            ls.otherName = db;
+            mapsf<string,SimpleRWLock*>::ref r(dblocks);
+            SimpleRWLock*& lock = r[db];
+            if( lock == 0 )
+                lock = new SimpleRWLock();
+            ls.otherLock = lock;
+        }
+        ls.otherLock->lock();
+        weLocked = ls.otherLock;
+    }
+    Lock::DBWrite::DBWrite(const StringData& ns) {
+        locked_w=false; weLocked=0; ourCounter = 0;
+        if( str::equals(ns.data(),"local") ) {
+            lockLocal();
+        } else { 
+            lock(nsToDatabase(ns.data()));
+        }
+    }
+    Lock::DBWrite::~DBWrite() {
+        if( ourCounter ) {
+            (*ourCounter)--;
+            wassert( *ourCounter >= 0 );
+        }
+        if( weLocked ) {
+            wassert( ourCounter && *ourCounter == 0 );
+            weLocked->unlock();
+        }
+        if( locked_w ) {
+            unlock_w();
+        }
+        else { 
+            recursive()--;
+            dassert( recursive() >= 0 );
+        }
     }
 
     void Lock::DBRead::lockTop(LockState& ls) { 
         switch( ls.threadState ) { 
         case 'W' :
         case 'R' : 
-            return;
-        case  0  : lock_r(ls.threadState); // need the top level shared lock
-                   locked_r = true;
-        case 'r' : ;                       // already have top level lock in this case
-        case 'w' : ;                       // r nested under w is ok
+        case 'r' :
+        case 'w' :
+            ls.recursive++;
+            break;
+        case  0  : 
+            lock_r(ls.threadState);
+            locked_r = true;
         }
     }
     void Lock::DBRead::lockLocal() { 
@@ -333,9 +421,13 @@ namespace mongo {
             wassert( ourCounter && *ourCounter == 0 );
             weLocked->unlock_shared();
         }
-        if( locked_r )
+        if( locked_r ) {
             unlock_r();
-    }
+        } else { 
+            recursive()--;
+            dassert( recursive() >= 0 );
+        }
+   }
 }
 
 // legacy hooks
