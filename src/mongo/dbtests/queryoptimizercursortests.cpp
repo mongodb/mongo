@@ -2470,6 +2470,26 @@ namespace QueryOptimizerCursorTests {
             }
         };
         
+        class RequireIndexRecordedUnindexedPlan : public Base {
+        public:
+            RequireIndexRecordedUnindexedPlan() {
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                _cli.insert( ns(), BSON( "a" << BSON_ARRAY( 1 << 2 << 3 ) << "b" << 1 ) );
+                BSONObj explain = _cli.findOne( ns(), QUERY( "a" << GT << 0 << "b" << 1 ).explain() );
+                ASSERT_EQUALS( "BasicCursor", explain[ "cursor" ].String() );
+            }
+            bool requireIndex() const { return true; }
+            string expectedType() const { return "QueryOptimizerCursor"; }
+            BSONObj query() const { return BSON( "a" << GT << 0 << "b" << 1 ); }
+            void check( const shared_ptr<Cursor> &c ) {
+                ASSERT( c->ok() );
+                ASSERT_EQUALS( BSON( "a" << 1 ), c->indexKeyPattern() );
+                while( c->advance() ) {
+                    ASSERT_EQUALS( BSON( "a" << 1 ), c->indexKeyPattern() );                    
+                }
+            }
+        };
+        
     } // namespace GetCursor
     
     class All : public Suite {
@@ -2575,6 +2595,7 @@ namespace QueryOptimizerCursorTests {
             add<QueryOptimizerCursorTests::GetCursor::RequireIndexSecondOrClauseIndexed>();
             add<QueryOptimizerCursorTests::GetCursor::RequireIndexSecondOrClauseUnindexed>();
             add<QueryOptimizerCursorTests::GetCursor::RequireIndexSecondOrClauseUnindexedUndetected>();
+            add<QueryOptimizerCursorTests::GetCursor::RequireIndexRecordedUnindexedPlan>();
         }
     } myall;
     
