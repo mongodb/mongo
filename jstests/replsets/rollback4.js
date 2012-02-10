@@ -1,4 +1,5 @@
 //Test for SERVER-3650 (rollback from slave)
+if (0) { // enable for SERVER-3772
 
 var num = 7;
 var host = getHostName();
@@ -121,6 +122,6 @@ assert.eq(mColl.count(sentinel), 1, "check sentinal on node 0");
 
 replTest.stopSet();
 
-
+}
 
 
