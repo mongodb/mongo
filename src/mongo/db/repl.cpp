@@ -1120,7 +1120,7 @@ namespace mongo {
 
     bool OplogReader::commonConnect(const string& hostName) {
         if( conn() == 0 ) {
-            _conn = shared_ptr<DBClientConnection>(new DBClientConnection( false, 0, 0 /* tcp timeout */));
+            _conn = shared_ptr<DBClientConnection>(new DBClientConnection( false, 0, 10 /* tcp timeout */));
             string errmsg;
             ReplInfo r("trying to connect to sync source");
             if ( !_conn->connect(hostName.c_str(), errmsg) ||
