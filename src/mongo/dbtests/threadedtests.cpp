@@ -134,9 +134,23 @@ namespace ThreadedTests {
                     }*/
                 }
                 else if( i % 7 == 6 ) {
-                    Lock::DBRead r("foo");
-                    Lock::DBRead r2("foo");
-                    Lock::DBRead r3("local");
+                    if( i > N/2 ) { 
+                        if( i % 11 == 0 ) { 
+                            Lock::DBRead r("foo");
+                            Lock::DBRead r2("foo");
+                            Lock::DBRead r3("local");
+                        }
+                        else { 
+                            Lock::DBWrite w("foo");
+                            Lock::DBRead r2("foo");
+                            Lock::DBRead r3("local");
+                        }
+                    }
+                    else { 
+                        Lock::DBRead r("foo");
+                        Lock::DBRead r2("foo");
+                        Lock::DBRead r3("local");
+                    }
                     /*if( mm->lock_shared_try(0) ) {
                         mm->unlock_shared();
                     }*/
