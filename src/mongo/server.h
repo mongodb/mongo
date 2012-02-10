@@ -48,5 +48,9 @@
 
 #endif
 
+
+// logs at most once per secs
+#define LOGATMOST(secs) static time_t __last = 0; time_t __now=time(0); if(__last+secs>__now) {} else if ( ( __last = __now ) > 0 ) log() 
+
 // log but not too fast.  this is rather simplistic we can do something fancier later
-#define LOGSOME static time_t __last; time_t __now=time(0); if(__last+5<__now) {} else log() 
+#define LOGSOME LOGATMOST(5)

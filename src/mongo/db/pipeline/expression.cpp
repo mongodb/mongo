@@ -156,7 +156,7 @@ namespace mongo {
                     goto field_inclusion;
                 }
                 else if (fieldType == NumberLong) {
-                    inclusion = fieldElement.Long();
+                    inclusion = fieldElement.numberInt();
                     goto field_inclusion;
                 }
                 else { /* nothing else is allowed */

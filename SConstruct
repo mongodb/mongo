@@ -404,8 +404,8 @@ class InstallSetup:
         self.headers = True
         self.bannerFiles = [ "#distsrc/client/LICENSE.txt",
                              "#distsrc/client/SConstruct" ]
-        self.headerRoot = ""
-        self.clientTestsDir = "src/mongo/client/examples/"
+        self.headerRoot = "mongo/"
+        self.clientTestsDir = "#src/mongo/client/examples/"
 
 installSetup = InstallSetup()
 if distBuild:
@@ -448,8 +448,8 @@ def isDriverBuild():
 if has_option( "prefix" ):
     installDir = GetOption( "prefix" )
     if isDriverBuild():
+        installDir = '#' + installDir
         installSetup.justClient()
-
 
 def findVersion( root , choices ):
     if not isinstance(root, list):
@@ -701,13 +701,16 @@ if nix:
             env.Append( CPPFLAGS=" -fno-builtin-memcmp " ) # glibc's memcmp is faster than gcc's
 
     env.Append( CPPDEFINES="_FILE_OFFSET_BITS=64" )
-    env.Append( CXXFLAGS=" -Wnon-virtual-dtor " )
+    env.Append( CXXFLAGS=" -Wnon-virtual-dtor -Woverloaded-virtual" )
     env.Append( LINKFLAGS=" -fPIC -pthread -rdynamic" )
     env.Append( LIBS=[] )
 
     #make scons colorgcc friendly
     env['ENV']['HOME'] = os.environ['HOME']
-    env['ENV']['TERM'] = os.environ['TERM']
+    try:
+        env['ENV']['TERM'] = os.environ['TERM']
+    except KeyError:
+        pass
 
     if linux and has_option( "sharedclient" ):
         env.Append( LINKFLAGS=" -Wl,--as-needed -Wl,-zdefs " )

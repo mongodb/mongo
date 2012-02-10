@@ -390,6 +390,7 @@ static const int DELETE_KEY         = 0x107;
 static const int CTRL               = 0x200;
 static const int META               = 0x400;
 
+static const char* unsupported_term[] = { "dumb", "cons25", "emacs", NULL };
 static linenoiseCompletionCallback* completionCallback = NULL;
 
 #ifdef _WIN32
@@ -416,6 +417,17 @@ static int historyPreviousIndex = -2;
 static bool historyRecallMostRecent = false;
 
 static void linenoiseAtExit( void );
+
+static bool isUnsupportedTerm( void ) {
+    char* term = getenv( "TERM" );
+    if ( term == NULL )
+        return false;
+    for ( int j = 0; unsupported_term[j]; ++j )
+        if ( ! strcasecmp( term, unsupported_term[j] ) ) {
+            return true;
+        }
+    return false;
+}
 
 static void beep() {
     fprintf( stderr, "\x7" );   // ctrl-G == bell/beep
@@ -2135,15 +2147,29 @@ char* linenoise( const char* prompt ) {
     char buf[LINENOISE_MAX_LINE];               // buffer for user's input
     int count;
     if ( isatty( STDIN_FILENO ) ) {             // input is from a terminal
-        if ( enableRawMode() == -1 )
-            return NULL;
         PromptInfo pi( prompt, getScreenColumns() );
-        InputBuffer ib( buf, LINENOISE_MAX_LINE );
-        count = ib.getInputLine( pi );
-        disableRawMode();
-        printf( "\n" );
-        if ( count == -1 )
-            return NULL;
+        if ( isUnsupportedTerm() ) {
+            printf( "%s", pi.promptText );
+            fflush( stdout );
+            if ( fgets( buf, LINENOISE_MAX_LINE, stdin ) == NULL ) {
+                return NULL;
+            }
+            size_t len = strlen( buf );
+            while ( len && ( buf[len - 1] == '\n' || buf[len - 1] == '\r' ) ) {
+                --len;
+                buf[len] = '\0';
+            }
+        }
+        else {
+            if ( enableRawMode() == -1 )
+                return NULL;
+            InputBuffer ib( buf, LINENOISE_MAX_LINE );
+            count = ib.getInputLine( pi );
+            disableRawMode();
+            printf( "\n" );
+            if ( count == -1 )
+                return NULL;
+        }
     }
     else {  // input not from a terminal, we should work with piped input, i.e. redirected stdin
         if ( fgets( buf, sizeof buf, stdin ) == NULL )

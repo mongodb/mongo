@@ -667,7 +667,7 @@ namespace mongo {
             return prop;
         } else if ( sname.length() == 0 || sname[0] == '_' ) {
             // if starts with '_' we dont return collection, one must use getCollection()
-            return v8::Undefined();
+            return v8::Handle<v8::Value>();
         }
 
         // no hit, create new collection

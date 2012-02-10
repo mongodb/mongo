@@ -20,7 +20,7 @@ db.article.save( {
 db.article.save( {
     title : "this is your title" , 
     author : "dave" , 
-    posted : new Date(4121381470000) , 
+    posted : new Date(1912392670000) , 
     pageViews : 7 , 
     tags : [ "fun" , "nasty" ] ,
     comments : [ 

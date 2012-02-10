@@ -740,7 +740,7 @@ ShardingTest = function( testName , numShards , verboseLevel , numMongos , other
             
             var options = { useHostname : otherParams.useHostname, 
                             noJournalPrealloc : otherParams.nopreallocj, 
-                            port : 40000 + i,
+                            port : 29000 + i,
                             pathOpts : Object.merge( pathOpts, { config : i } ),
                             dbpath : "$testName-config$config",
                             keyFile : keyFile
@@ -2082,7 +2082,7 @@ ReplSetTest.prototype.reInitiate = function() {
 
 ReplSetTest.prototype.getLastOpTimeWritten = function() {
     this.getMaster();
-    jsTest.attempt({context : this, desc : "awaiting oplog query"},
+    jsTest.attempt({context : this, desc : "awaiting oplog query", timeout: 30000},
                  function() {
                      try {
                          this.latest = this.liveNodes.master.getDB("local")['oplog.rs'].find({}).sort({'$natural': -1}).limit(1).next()['ts'];

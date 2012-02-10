@@ -42,8 +42,6 @@
 #include <openssl/ssl.h>
 #endif
 
-#include <boost/thread/once.hpp>
-
 using namespace mongoutils;
 
 namespace mongo {
@@ -328,7 +326,7 @@ namespace mongo {
    
     //  --- my --
 
-    DiagStr _hostNameCached;
+    DiagStr& _hostNameCached = *(new DiagStr); // this is also written to from commands/cloud.cpp
 
     string getHostName() {
         {
@@ -346,16 +344,15 @@ namespace mongo {
         return buf;
     }
 
-    static void _hostNameCachedInit() {
-        _hostNameCached = getHostName();
-    }
-    boost::once_flag _hostNameCachedInitFlags = BOOST_ONCE_INIT;
-
     /** we store our host name once */
     // ok w dynhosts map?
     string getHostNameCached() {
-        boost::call_once( _hostNameCachedInit , _hostNameCachedInitFlags );
-        return _hostNameCached;
+        string temp = _hostNameCached.get();
+        if (_hostNameCached.empty()) {
+            temp = getHostName();
+            _hostNameCached = temp;
+        }
+        return temp;
     }
 
     // --------- SocketException ----------

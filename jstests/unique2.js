@@ -16,6 +16,7 @@ t.drop();
 t.insert({k:3});
 t.insert({k:[2,3]});
 t.insert({k:[4,3]});
+t.insert({k:[4,3]}); // tests SERVER-4770
 
 t.ensureIndex({k:1}, {unique:true, dropDups:true});
 
@@ -24,6 +25,23 @@ assert( t.find().sort({k:1}).toArray().length == 1 ) ;
 assert( t.find().sort({k:1}).count() == 1 ) ;
 
 t.drop();
+
+/* same test wtih background:true*/
+
+t.insert({k:3});
+t.insert({k:[2,3]});
+t.insert({k:[4,3]});
+t.insert({k:[4,3]}); 
+
+t.ensureIndex({k:1}, {unique:true, dropDups:true, background:true});
+
+assert( t.count() == 1 ) ;
+assert( t.find().sort({k:1}).toArray().length == 1 ) ;
+assert( t.find().sort({k:1}).count() == 1 ) ;
+
+t.drop();
+
+/* */
 
 t.ensureIndex({k:1}, {unique:true});
 

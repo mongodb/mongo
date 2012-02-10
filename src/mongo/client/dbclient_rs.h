@@ -229,7 +229,7 @@ namespace mongo {
 
         /** Authorize.  Authorizes all nodes as needed
         */
-        virtual bool auth(const string &dbname, const string &username, const string &pwd, string& errmsg, bool digestPassword = true );
+        virtual bool auth(const string &dbname, const string &username, const string &pwd, string& errmsg, bool digestPassword = true, Auth::Level * level = NULL);
 
         // ----------- simple functions --------------
 

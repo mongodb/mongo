@@ -147,7 +147,7 @@ namespace mongo {
             }
 
             case NumberLong: {
-                long inclusion = outFieldElement.numberLong();
+                long long inclusion = outFieldElement.numberLong();
                 fieldInclusion = static_cast<int>(inclusion);
                 goto IncludeExclude;
             }

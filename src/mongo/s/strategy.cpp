@@ -44,6 +44,15 @@ namespace mongo {
         conn.done();
     }
 
+    void Strategy::broadcastWrite(int op, Request& r){
+        vector<Shard> shards;
+        Shard::getAllShards(shards);
+        for (vector<Shard>::iterator it(shards.begin()), end(shards.end()); it != end; ++it){
+            doWrite(op, r, *it, false);
+        }
+    }
+
+
     void Strategy::doQuery( Request& r , const Shard& shard ) {
 
         r.checkAuth( Auth::READ );

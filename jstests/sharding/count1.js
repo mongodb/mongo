@@ -3,6 +3,10 @@
 s = new ShardingTest( "count1" , 2 , 1 );
 db = s.getDB( "test" );
 
+// Stop balancer since doing manual stuff
+// Make sure we totally stop here, otherwise balancing round can intermittently slip by
+s.stopBalancer();
+
 db.bar.save( { n : 1 } )
 db.bar.save( { n : 2 } )
 db.bar.save( { n : 3 } )
@@ -37,6 +41,9 @@ assert.eq( 6 , db.foo.find().count() , "basic count after split " );
 assert.eq( 6 , db.foo.find().sort( { name : 1 } ).count() , "basic count after split sorted " );
 
 s.adminCommand( { movechunk : "test.foo" , find : { name : "allan" } , to : secondary.getMongo().name } );
+
+// Eventually restart balancer
+s.setBalancer( true )
 
 assert.eq( 3 , primary.foo.find().toArray().length , "primary count" );
 assert.eq( 3 , secondary.foo.find().toArray().length , "secondary count" );

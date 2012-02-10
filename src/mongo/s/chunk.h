@@ -384,6 +384,10 @@ namespace mongo {
         friend class Chunk;
         friend class ChunkRangeManager; // only needed for CRM::assertValid()
         static AtomicUInt NextSequenceNumber;
+        
+        /** Just for testing */
+        friend class TestableChunkManager;
+        ChunkManager();
     };
 
     // like BSONObjCmp. for use as an STL comparison functor

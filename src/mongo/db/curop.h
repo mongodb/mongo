@@ -58,10 +58,11 @@ namespace mongo {
         bool exhaust;
 
         // debugging/profile info
-        int nscanned;
+        long long nscanned;
         bool idhack;         // indicates short circuited code path on an update to make the update faster
         bool scanAndOrder;   // scanandorder query plan aspect was used
-        bool moved;          // update resulted in a move (moves are expensive)
+        long long  nupdated; // number of records updated
+        long long  nmoved;   // updates resulted in a move (moves are expensive)
         bool fastmod;
         bool fastmodinsert;  // upsert of an $operation. builds a default object
         bool upsert;         // true if the update actually did an insert

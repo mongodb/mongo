@@ -19,7 +19,10 @@ doTest = function( signal ) {
     print("Insert data");
     for (var i = 0; i < N; i++) {
         db1['foo'].insert({x: i, text: Text})
-        db1.getLastError(2)  // wait to be copied to at least one secondary
+        var le = db1.getLastErrorObj(2, 1000);  // wait to be copied to at least one secondary
+        if (le.err) {
+            printjson(le);
+        }
     }
     
     print("Create single server");

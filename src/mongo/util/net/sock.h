@@ -171,7 +171,7 @@ namespace mongo {
      * thin wrapped around file descriptor and system calls
      * todo: ssl
      */
-    class Socket {
+    class Socket : boost::noncopyable {
     public:
         Socket(int sock, const SockAddr& farEnd);
 
@@ -182,6 +182,10 @@ namespace mongo {
             Generally you don't want a timeout, you should be very prepared for errors if you set one.
         */
         Socket(double so_timeout = 0, int logLevel = 0 );
+
+        ~Socket() {
+            close();
+        }
 
         bool connect(SockAddr& farEnd);
         void close();
@@ -245,8 +249,6 @@ namespace mongo {
         SSL* _ssl;
         SSLManager * _sslAccepted;
 #endif
-
-    protected:
         int _logLevel; // passed to log() when logging errors
 
     };

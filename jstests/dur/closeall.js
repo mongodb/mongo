@@ -26,30 +26,41 @@ function f() {
     var db1 = conn.getDB(ourdb);
     var db2 = new Mongo(db1.getMongo().host).getDB(ourdb);
     if( QuickCommits ) {
-	print("closeall.js QuickCommits variant (using a small syncdelay)");
-	assert( db2.adminCommand({setParameter:1, syncdelay:5}).ok );
+        print("closeall.js QuickCommits variant (using a small syncdelay)");
+        assert( db2.adminCommand({setParameter:1, syncdelay:5}).ok );
     }
 
     print("closeall.js run test");
 
+    print("wait for initial sync to finish") // SERVER-4852
+    db1.foo.insert({});
+    err = db1.getLastErrorObj(2);
+    printjson(err)
+    assert.isnull(err.err);
+    db1.foo.remove({});
+    err = db1.getLastErrorObj(2);
+    printjson(err)
+    assert.isnull(err.err);
+    print("initial sync done")
+
     for( var i = 0; i < N; i++ ) { 
-    	db1.foo.insert({x:1}); // this does wait for a return code so we will get some parallelism
-	    if( i % 7 == 0 )
-	        db1.foo.insert({x:99, y:2});
-	    if( i %     49 == 0 )
-	        db1.foo.update({ x: 99 }, { a: 1, b: 2, c: 3, d: 4 });
-	    if (i % 100 == 0)
-	        db1.foo.find();
-	    if( i == 800 )
-	        db1.foo.ensureIndex({ x: 1 });
+            db1.foo.insert({x:1}); // this does wait for a return code so we will get some parallelism
+            if( i % 7 == 0 )
+                db1.foo.insert({x:99, y:2});
+            if( i %     49 == 0 )
+                db1.foo.update({ x: 99 }, { a: 1, b: 2, c: 3, d: 4 });
+            if (i % 100 == 0)
+                db1.foo.find();
+            if( i == 800 )
+                db1.foo.ensureIndex({ x: 1 });
         var res = null;
         try {
-	    if( variant == 1 )
-		sleep(0);
-	    else if( variant == 2 ) 
-		sleep(1);
-	    else if( variant == 3 && i % 10 == 0 )
-		print(i);
+            if( variant == 1 )
+                sleep(0);
+            else if( variant == 2 ) 
+                sleep(1);
+            else if( variant == 3 && i % 10 == 0 )
+                print(i);
             res = db2.adminCommand("closeAllDatabases");
         }
         catch (e) {
@@ -70,15 +81,15 @@ function f() {
             sleep(2000);
             throw e;
         }
-	    assert( res.ok, "closeAllDatabases res.ok=false");
-	}
+        assert( res.ok, "closeAllDatabases res.ok=false");
+    }
 
-	print("closeall.js end test loop.  slave.foo.count:");
-	print(slave.foo.count());
+    print("closeall.js end test loop.  slave.foo.count:");
+    print(slave.foo.count());
 
-	print("closeall.js shutting down servers");
-	stopMongod(30002);
-	stopMongod(30001);
+    print("closeall.js shutting down servers");
+    stopMongod(30002);
+    stopMongod(30001);
 }
 
 f();

@@ -6,14 +6,13 @@ import sys
 
 def go( boost_root ):
     
-    OUTPUT = "third_party/boost"
+    OUTPUT = "src/third_party/boost"
     if os.path.exists( OUTPUT ):
         shutil.rmtree( OUTPUT )
 
     cmd = [ "bcp" , "--scan" , "--boost=%s" % boost_root ]
     
     src = utils.getAllSourceFiles()
-    src.remove( "./util/net/message_server_asio.cpp" )
     
     cmd += src
     cmd.append( OUTPUT )
