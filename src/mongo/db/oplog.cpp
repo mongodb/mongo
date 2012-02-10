@@ -861,14 +861,16 @@ namespace mongo {
             // apply
             int num = 0;
             BSONObjIterator i( ops );
+            BSONArrayBuilder ab;
             while ( i.more() ) {
                 BSONElement e = i.next();
-                // todo SERVER-4259 ?
-                applyOperation_inlock( e.Obj() , false );
+                bool failed = applyOperation_inlock( e.Obj() , false );
+                ab.append(!failed);
                 num++;
             }
 
             result.append( "applied" , num );
+            result.append( "results" , ab.arr() );
 
             if ( ! fromRepl ) {
                 // We want this applied atomically on slaves
