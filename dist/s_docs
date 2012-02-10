@@ -21,7 +21,7 @@ spellchk()
 	type aspell > /dev/null 2>&1 || return
 
 	(cd ../docs/src &&
-	cat *.dox | aspell --mode=ccpp --lang=en --personal=./spell.ok list) |
+	cat *.dox | aspell --lang=en --personal=./spell.ok list) |
 	sort -u > $t
 	test -s $t && {
 		echo "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-="
