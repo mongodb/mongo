@@ -335,14 +335,19 @@ doneCheckOrder:
         _init();
     }    
 
-    QueryPlanSet::QueryPlanSet( const char *ns, auto_ptr<FieldRangeSetPair> frsp, auto_ptr<FieldRangeSetPair> originalFrsp, const BSONObj &originalQuery, const BSONObj &order, bool mustAssertOnYieldFailure, const BSONElement *hint, bool honorRecordedPlan, const BSONObj &min, const BSONObj &max, bool bestGuessOnly, bool mayYield ) :
+    QueryPlanSet::QueryPlanSet( const char *ns, auto_ptr<FieldRangeSetPair> frsp,
+                               auto_ptr<FieldRangeSetPair> originalFrsp,
+                               const BSONObj &originalQuery, const BSONObj &order,
+                               bool mustAssertOnYieldFailure, const BSONObj &hint,
+                               bool honorRecordedPlan, const BSONObj &min, const BSONObj &max,
+                               bool bestGuessOnly, bool mayYield ) :
         _ns(ns),
         _originalQuery( originalQuery ),
         _frsp( frsp ),
         _originalFrsp( originalFrsp ),
         _mayRecordPlan( false ),
         _usingCachedPlan( false ),
-        _hint( BSONObj() ),
+        _hint( hint.getOwned() ),
         _order( order.getOwned() ),
         _oldNScanned( 0 ),
         _honorRecordedPlan( honorRecordedPlan ),
@@ -352,9 +357,6 @@ doneCheckOrder:
         _mayYield( mayYield ),
 	    _yieldSometimesTracker( 256, 20 ),
         _mustAssertOnYieldFailure( mustAssertOnYieldFailure ) {
-        if ( hint && !hint->eoo() ) {
-            _hint = hint->wrap();
-        }
         init();
     }
 
@@ -875,7 +877,7 @@ doneCheckOrder:
     MultiPlanScanner::MultiPlanScanner( const char *ns,
                                         const BSONObj &query,
                                         const BSONObj &order,
-                                        const BSONElement *hint,
+                                        const BSONObj &hint,
                                         bool honorRecordedPlan,
                                         const BSONObj &min,
                                         const BSONObj &max,
@@ -887,7 +889,7 @@ doneCheckOrder:
         _i(),
         _honorRecordedPlan( honorRecordedPlan ),
         _bestGuessOnly( bestGuessOnly ),
-        _hint( ( hint && !hint->eoo() ) ? hint->wrap() : BSONObj() ),
+        _hint( hint.getOwned() ),
         _mayYield( mayYield ),
         _tableScanned() {
         if ( !order.isEmpty() || !min.isEmpty() || !max.isEmpty() ) {
@@ -899,7 +901,7 @@ doneCheckOrder:
             if ( !_org->getSpecial().empty() ) {
                 _or = false;
             }
-            else if ( uselessOr( _hint.firstElement() ) ) {
+            else if ( haveUselessOr() ) {
                 _or = false;   
             }
         }
@@ -907,7 +909,7 @@ doneCheckOrder:
         if ( !_or ) {
             auto_ptr<FieldRangeSetPair> frsp( new FieldRangeSetPair( _ns.c_str(), _query, true ) );
             _currentQps.reset( new QueryPlanSet( _ns.c_str(), frsp, auto_ptr<FieldRangeSetPair>(),
-                                                _query, order, false, hint, honorRecordedPlan, min,
+                                                _query, order, false, _hint, honorRecordedPlan, min,
                                                 max, _bestGuessOnly, _mayYield ) );
         }
         else {
@@ -925,9 +927,8 @@ doneCheckOrder:
         ++_i;
         auto_ptr<FieldRangeSetPair> frsp( _org->topFrsp() );
         auto_ptr<FieldRangeSetPair> originalFrsp( _org->topFrspOriginal() );
-        BSONElement hintElt = _hint.firstElement();
         _currentQps.reset( new QueryPlanSet( _ns.c_str(), frsp, originalFrsp, _query, BSONObj(),
-                                            true, &hintElt, _honorRecordedPlan, BSONObj(),
+                                            true, _hint, _honorRecordedPlan, BSONObj(),
                                             BSONObj(), _bestGuessOnly, _mayYield ) );
         shared_ptr<QueryOp> ret( _currentQps->runOp( op ) );
         if ( ! ret->complete() )
@@ -969,9 +970,8 @@ doneCheckOrder:
 	        ++_i;
     	    auto_ptr<FieldRangeSetPair> frsp( _org->topFrsp() );
         	auto_ptr<FieldRangeSetPair> originalFrsp( _org->topFrspOriginal() );
-	        BSONElement hintElt = _hint.firstElement();
     	    _currentQps.reset( new QueryPlanSet( _ns.c_str(), frsp, originalFrsp, _query,
-                                                BSONObj(), true, &hintElt, _honorRecordedPlan,
+                                                BSONObj(), true, _hint, _honorRecordedPlan,
                                                 BSONObj(), BSONObj(), _bestGuessOnly,
                                                 _mayYield ) );
             op = nextOpHandleEndOfClause();
@@ -1045,13 +1045,14 @@ doneCheckOrder:
         return _currentQps->firstPlan().get();
     }
 
-    bool MultiPlanScanner::uselessOr( const BSONElement &hint ) const {
+    bool MultiPlanScanner::haveUselessOr() const {
         NamespaceDetails *nsd = nsdetails( _ns.c_str() );
         if ( !nsd ) {
             return true;
         }
-        if ( !hint.eoo() ) {
-            IndexDetails *id = parseHint( hint, nsd );
+        BSONElement hintElt = _hint.firstElement();
+        if ( !hintElt.eoo() ) {
+            IndexDetails *id = parseHint( hintElt, nsd );
             if ( !id ) {
                 return true;
             }
@@ -1060,8 +1061,11 @@ doneCheckOrder:
         return QueryUtilIndexed::uselessOr( *_org, nsd, -1 );
     }
     
-    MultiCursor::MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order, shared_ptr<CursorOp> op, bool mayYield )
-    : _mps( new MultiPlanScanner( ns, pattern, order, 0, true, BSONObj(), BSONObj(), !op.get(), mayYield ) ), _nscanned() {
+    MultiCursor::MultiCursor( const char *ns, const BSONObj &pattern, const BSONObj &order,
+                             shared_ptr<CursorOp> op, bool mayYield ) :
+    _mps( new MultiPlanScanner( ns, pattern, order, BSONObj(), true, BSONObj(), BSONObj(),
+                               !op.get(), mayYield ) ),
+    _nscanned() {
         if ( op.get() ) {
             _op = op;
         }

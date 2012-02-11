@@ -545,7 +545,7 @@ namespace mongo {
 
             if ( _pq.isExplain() ) {
                 _eb.noteScan( _c.get(), _nscanned, _nscannedObjects, _n, scanAndOrderRequired(),
-                              _curop.elapsedMillis(), useHints && !_pq.getHint().eoo(), _nYields ,
+                              _curop.elapsedMillis(), useHints && !_pq.getHint().isEmpty(), _nYields ,
                               _nChunkSkips, _keyFieldsOnly.get() > 0 );
             }
             else {
@@ -695,7 +695,10 @@ namespace mongo {
         /* --- regular query --- */
 
         int n = 0;
-        BSONElement hint = useHints ? pq.getHint() : BSONElement();
+        BSONObj hint;
+        if ( useHints ) {
+            hint = pq.getHint();
+        }
         bool explain = pq.isExplain();
         bool snapshot = pq.isSnapshot();
         BSONObj order = pq.getOrder();
@@ -729,7 +732,6 @@ namespace mongo {
             }
         }
 
-        BSONObj snapshotHint; // put here to keep the data in scope
         if( snapshot ) {
             NamespaceDetails *d = nsdetails(ns);
             if ( d ) {
@@ -743,10 +745,7 @@ namespace mongo {
                        probably need a better way to specify "use the _id index" as a hint.  if someone is
                        in the query optimizer please fix this then!
                     */
-                    BSONObjBuilder b;
-                    b.append("$hint", d->idx(i).indexName());
-                    snapshotHint = b.obj();
-                    hint = snapshotHint.firstElement();
+                    hint = BSON( "$hint" << d->idx(i).indexName() );
                 }
             }
         }
@@ -792,7 +791,9 @@ namespace mongo {
             if ( mps.usingCachedPlan() )
                 oldPlan = mps.oldExplain();
         }
-        auto_ptr< MultiPlanScanner > mps( new MultiPlanScanner( ns, query, order, &hint, !explain, pq.getMin(), pq.getMax(), false, true ) );
+        auto_ptr< MultiPlanScanner > mps
+        ( new MultiPlanScanner( ns, query, order, hint, !explain, pq.getMin(), pq.getMax(), false,
+                               true ) );
         BSONObj explainSuffix;
         if ( explain ) {
             BSONObjBuilder bb;

@@ -271,7 +271,7 @@ namespace mongo {
                       const BSONObj &originalQuery,
                       const BSONObj &order,
                       bool mustAssertOnYieldFailure = true,
-                      const BSONElement *hint = 0,
+                      const BSONObj &hint = BSONObj(),
                       bool honorRecordedPlan = true,
                       const BSONObj &min = BSONObj(),
                       const BSONObj &max = BSONObj(),
@@ -399,7 +399,7 @@ namespace mongo {
         MultiPlanScanner( const char *ns,
                           const BSONObj &query,
                           const BSONObj &order,
-                          const BSONElement *hint = 0,
+                          const BSONObj &hint = BSONObj(),
                           bool honorRecordedPlan = true,
                           const BSONObj &min = BSONObj(),
                           const BSONObj &max = BSONObj(),
@@ -480,7 +480,7 @@ namespace mongo {
         }
         shared_ptr<QueryOp> nextOpBeginningClause();
         shared_ptr<QueryOp> nextOpHandleEndOfClause();
-        bool uselessOr( const BSONElement &hint ) const;
+        bool haveUselessOr() const;
         const string _ns;
         bool _or;
         BSONObj _query;
