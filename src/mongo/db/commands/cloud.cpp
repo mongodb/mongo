@@ -10,7 +10,7 @@ using namespace mongoutils;
 namespace mongo {
 
     mapsf<string,string> dynHostNames;
-    extern DiagStr _hostNameCached;
+    extern DiagStr& _hostNameCached;
 
     string dynHostMyName() {
         if( !str::startsWith(_hostNameCached, '#') )

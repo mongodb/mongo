@@ -124,7 +124,7 @@ namespace mongo {
             const char *buf, int len, OpDebug& debug, bool god=false);
 
         // The object o may be updated if modified on insert.
-        void insertAndLog( const char *ns, const BSONObj &o, bool god = false );
+        void insertAndLog( const char *ns, const BSONObj &o, bool god = false, bool fromMigrate = false );
 
         /** insert will add an _id to the object if not present.  if you would like to see the final object
             after such an addition, use this method.

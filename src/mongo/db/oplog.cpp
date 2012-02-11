@@ -32,6 +32,7 @@
 
 namespace mongo {
 
+    // from d_migrate.cpp
     void logOpForSharding( const char * opstr , const char * ns , const BSONObj& obj , BSONObj * patt );
 
     int __findingStartInitialTimeout = 5; // configurable for testing
@@ -47,7 +48,7 @@ namespace mongo {
         resetSlaveCache();
     }
 
-    static void _logOpUninitialized(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb ) {
+    static void _logOpUninitialized(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, bool fromMigrate ) {
         uassert(13288, "replSet error write op to db before replSet initialized", str::startsWith(ns, "local.") || *opstr == 'n');
     }
 
@@ -123,7 +124,7 @@ namespace mongo {
     // the compiler would use if inside the function.  the reason this is static is to avoid a malloc/free for this
     // on every logop call.
     static BufBuilder logopbufbuilder(8*1024);
-    static void _logOpRS(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb ) {
+    static void _logOpRS(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, bool fromMigrate ) {
         DEV assertInWriteLock();
 
         if ( strncmp(ns, "local.", 6) == 0 ) {
@@ -154,6 +155,8 @@ namespace mongo {
         b.append("h", hashNew);
         b.append("op", opstr);
         b.append("ns", ns);
+        if (fromMigrate) 
+            b.appendBool("fromMigrate", true);
         if ( bb )
             b.appendBool("b", *bb);
         if ( o2 )
@@ -197,7 +200,7 @@ namespace mongo {
         }
     }
 
-    /* we write to local.opload.$main:
+    /* we write to local.oplog.$main:
          { ts : ..., op: ..., ns: ..., o: ... }
        ts: an OpTime timestamp
        op:
@@ -207,7 +210,7 @@ namespace mongo {
         "c" db cmd
         "db" declares presence of a database (ns is set to the db name + '.')
         "n" no op
-       logNS - where to log it.  0/null means "local.oplog.$main".
+       logNS: where to log it.  0/null means "local.oplog.$main".
        bb:
          if not null, specifies a boolean to pass along to the other side as b: param.
          used for "justOne" or "upsert" flags on 'd', 'u'
@@ -217,7 +220,7 @@ namespace mongo {
 
        note this is used for single collection logging even when --replSet is enabled.
     */
-    static void _logOpOld(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb ) {
+    static void _logOpOld(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, bool fromMigrate ) {
         DEV assertInWriteLock();
         static BufBuilder bufbuilder(8*1024);
 
@@ -240,6 +243,8 @@ namespace mongo {
         b.appendTimestamp("ts", ts.asDate());
         b.append("op", opstr);
         b.append("ns", ns);
+        if (fromMigrate) 
+            b.appendBool("fromMigrate", true);
         if ( bb )
             b.appendBool("b", *bb);
         if ( o2 )
@@ -280,7 +285,7 @@ namespace mongo {
 
     }
 
-    static void (*_logOp)(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb ) = _logOpOld;
+    static void (*_logOp)(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, bool fromMigrate ) = _logOpOld;
     void newReplUp() {
         replSettings.master = true;
         _logOp = _logOpRS;
@@ -292,13 +297,13 @@ namespace mongo {
     void oldRepl() { _logOp = _logOpOld; }
 
     void logKeepalive() {
-        _logOp("n", "", 0, BSONObj(), 0, 0);
+        _logOp("n", "", 0, BSONObj(), 0, 0, false);
     }
     void logOpComment(const BSONObj& obj) {
-        _logOp("n", "", 0, obj, 0, 0);
+        _logOp("n", "", 0, obj, 0, 0, false);
     }
     void logOpInitiate(const BSONObj& obj) {
-        _logOpRS("n", "", 0, obj, 0, 0);
+        _logOpRS("n", "", 0, obj, 0, 0, false);
     }
 
     /*@ @param opstr:
@@ -308,9 +313,9 @@ namespace mongo {
           d delete / remove
           u update
     */
-    void logOp(const char *opstr, const char *ns, const BSONObj& obj, BSONObj *patt, bool *b) {
+    void logOp(const char *opstr, const char *ns, const BSONObj& obj, BSONObj *patt, bool *b, bool fromMigrate) {
         if ( replSettings.master ) {
-            _logOp(opstr, ns, 0, obj, patt, b);
+            _logOp(opstr, ns, 0, obj, patt, b, fromMigrate);
         }
 
         logOpForSharding( opstr , ns , obj , patt );

@@ -32,18 +32,6 @@ namespace mongo {
             minInclusive();
     }
 
-    inline bool FieldRange::inQuery() const {
-        if ( equality() ) {
-            return true;
-        }
-        for( vector<FieldInterval>::const_iterator i = _intervals.begin(); i != _intervals.end(); ++i ) {
-            if ( !i->equality() ) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     inline const FieldRange &FieldRangeSet::range( const char *fieldName ) const {
         map<string,FieldRange>::const_iterator f = _ranges.find( fieldName );
         if ( f == _ranges.end() )

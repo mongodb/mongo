@@ -47,9 +47,24 @@ namespace mongo {
        multi - update multiple objects - mostly useful with things like $set
        god - allow access to system namespaces
     */
-    UpdateResult updateObjects(const char *ns, const BSONObj& updateobj, BSONObj pattern, bool upsert, bool multi , bool logop , OpDebug& debug );
-    UpdateResult _updateObjects(bool god, const char *ns, const BSONObj& updateobj, BSONObj pattern,
-                                bool upsert, bool multi , bool logop , OpDebug& debug , RemoveSaver * rs = 0 );
+    UpdateResult updateObjects(const char *ns, 
+                               const BSONObj& updateobj, 
+                               BSONObj pattern, 
+                               bool upsert, 
+                               bool multi , 
+                               bool logop , 
+                               OpDebug& debug, 
+                               bool fromMigrate = false );
+    UpdateResult _updateObjects(bool god, 
+                                const char *ns, 
+                                const BSONObj& updateobj, 
+                                BSONObj pattern,
+                                bool upsert, 
+                                bool multi , 
+                                bool logop , 
+                                OpDebug& debug , 
+                                RemoveSaver * rs = 0, 
+                                bool fromMigrate = false );
 
 
 
@@ -279,35 +294,6 @@ namespace mongo {
         int _isIndexed;
         bool _hasDynamicArray;
 
-        static void extractFields( map< string, BSONElement > &fields, const BSONElement &top, const string &base );
-
-        FieldCompareResult compare( const ModHolder::iterator &m, map< string, BSONElement >::iterator &p, const map< string, BSONElement >::iterator &pEnd ) const {
-            bool mDone = ( m == _mods.end() );
-            bool pDone = ( p == pEnd );
-            assert( ! mDone );
-            assert( ! pDone );
-            if ( mDone && pDone )
-                return SAME;
-            // If one iterator is done we want to read from the other one, so say the other one is lower.
-            if ( mDone )
-                return RIGHT_BEFORE;
-            if ( pDone )
-                return LEFT_BEFORE;
-
-            return compareDottedFieldNames( m->first, p->first.c_str() );
-        }
-
-        bool mayAddEmbedded( map< string, BSONElement > &existing, string right ) {
-            for( string left = EmbeddedBuilder::splitDot( right );
-                    left.length() > 0 && left[ left.length() - 1 ] != '.';
-                    left += "." + EmbeddedBuilder::splitDot( right ) ) {
-                if ( existing.count( left ) > 0 && existing[ left ].type() != Object )
-                    return false;
-                if ( haveModForField( left.c_str() ) )
-                    return false;
-            }
-            return true;
-        }
         static Mod::Op opFromStr( const char *fn ) {
             assert( fn[0] == '$' );
             switch( fn[1] ) {
@@ -641,6 +627,9 @@ namespace mongo {
             }
 
         }
+
+        /** @return true iff the elements aren't eoo(), are distinct, and share a field name. */
+        static bool duplicateFieldName( const BSONElement &a, const BSONElement &b );
 
     public:
 

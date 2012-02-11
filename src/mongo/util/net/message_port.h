@@ -47,7 +47,7 @@ namespace mongo {
 
     };
 
-    class MessagingPort : public AbstractMessagingPort , public Socket {
+    class MessagingPort : public AbstractMessagingPort {
     public:
         MessagingPort(int fd, const SockAddr& remote);
 
@@ -56,7 +56,7 @@ namespace mongo {
         // no data sent, then we detect that the other side is down
         MessagingPort(double so_timeout = 0, int logLevel = 0 );
 
-        MessagingPort(Socket& socket);
+        MessagingPort(boost::shared_ptr<Socket> socket);
 
         virtual ~MessagingPort();
 
@@ -85,10 +85,22 @@ namespace mongo {
 
         void piggyBack( Message& toSend , int responseTo = -1 );
 
-        unsigned remotePort() const { return Socket::remotePort(); }
+        unsigned remotePort() const { return psock->remotePort(); }
         virtual HostAndPort remote() const;
 
         void assertStillConnected();
+
+        boost::shared_ptr<Socket> psock;
+                
+        void send( const char * data , int len, const char *context ) {
+            psock->send( data, len, context );
+        }
+        void send( const vector< pair< char *, int > > &data, const char *context ) {
+            psock->send( data, context );
+        }
+        bool connect(SockAddr& farEnd) {
+            return psock->connect( farEnd );
+        }
 
     private:
         

@@ -182,12 +182,21 @@ pargs.start(true);
 
 p = new Mongo("localhost:"+ports[3]);
 
-printjson(p.getDB("admin").runCommand({replSetGetStatus:1}));
-
-p.getDB("admin").runCommand({replSetReconfig : {
-      _id : basename,
-      members : [{_id:0, host : hostname+":"+ports[3]}]
+// initFromConfig will keep closing sockets, so we'll a couple of times
+assert.soon(function() {
+    try {
+        p.getDB("admin").runCommand({replSetReconfig : {
+            _id : basename,
+            members : [{_id:0, host : hostname+":"+ports[3]}]
         }, force : true});
+    }
+    catch (e) {
+        print(e);
+        return false;
+    }
+
+    return true;
+});
 
 print("start waiting for primary...");
 assert.soon(function() {

@@ -290,11 +290,11 @@ namespace mongo {
         else {
             // This is the non test case, where we don't have a $nExtents spec.
             while ( size > 0 ) {
-                int max = MongoDataFile::maxSize() - DataFileHeader::HeaderSize;
-                int desiredExtentSize = (int) (size > max ? max : size);
-                if ( desiredExtentSize < Extent::minSize() ) {
-                    desiredExtentSize = Extent::minSize();
-                }
+                const int max = Extent::maxSize();
+                const int min = Extent::minSize();
+                int desiredExtentSize = static_cast<int> (size > max ? max : size);
+                desiredExtentSize = static_cast<int> (desiredExtentSize < min ? min : desiredExtentSize);
+
                 desiredExtentSize &= 0xffffff00;
                 Extent *e = database->allocExtent( ns, desiredExtentSize, newCapped, true );
                 size -= e->length;
@@ -1101,7 +1101,10 @@ namespace mongo {
             // doesn't fit.  reallocate -----------------------------------------------------
             uassert( 10003 , "failing update: objects in a capped ns cannot grow", !(d && d->capped));
             d->paddingTooSmall();
-            debug.moved = true;
+            if (debug.nmoved == -1) // default of -1 rather than 0
+                debug.nmoved = 1;
+            else
+                debug.nmoved += 1;
             deleteRecord(ns, toupdate, dl);
             return insert(ns, objNew.objdata(), objNew.objsize(), god);
         }
@@ -1360,7 +1363,7 @@ namespace mongo {
 
     template< class V >
     void buildBottomUpPhases2And3(bool dupsAllowed, IndexDetails& idx, BSONObjExternalSorter& sorter, 
-        bool dropDups, list<DiskLoc> &dupsToDrop, CurOp * op, SortPhaseOne *phase1, ProgressMeterHolder &pm,
+        bool dropDups, set<DiskLoc> &dupsToDrop, CurOp * op, SortPhaseOne *phase1, ProgressMeterHolder &pm,
         Timer& t
         )
     {
@@ -1383,7 +1386,7 @@ namespace mongo {
             }
             catch( AssertionException& e ) {
                 if ( dupsAllowed ) {
-                    // unknow exception??
+                    // unknown exception??
                     throw;
                 }
 
@@ -1397,7 +1400,7 @@ namespace mongo {
                 /* we could queue these on disk, but normally there are very few dups, so instead we
                     keep in ram and have a limit.
                 */
-                dupsToDrop.push_back(d.second);
+                dupsToDrop.insert(d.second);
                 uassert( 10092 , "too may dups on index build with dropDups=true", dupsToDrop.size() < 1000000 );
             }
             pm.hit();
@@ -1462,7 +1465,7 @@ namespace mongo {
 
         log(t.seconds() > 5 ? 0 : 1) << "\t external sort used : " << sorter.numFiles() << " files " << " in " << t.seconds() << " secs" << endl;
 
-        list<DiskLoc> dupsToDrop;
+        set<DiskLoc> dupsToDrop;
 
         /* build index --- */
         if( idx.version() == 0 )
@@ -1472,9 +1475,10 @@ namespace mongo {
         else
             assert(false);
 
-        log(1) << "\t fastBuildIndex dupsToDrop:" << dupsToDrop.size() << endl;
+        if( dropDups ) 
+            log() << "\t fastBuildIndex dupsToDrop:" << dupsToDrop.size() << endl;
 
-        for( list<DiskLoc>::iterator i = dupsToDrop.begin(); i != dupsToDrop.end(); i++ ){
+        for( set<DiskLoc>::iterator i = dupsToDrop.begin(); i != dupsToDrop.end(); i++ ){
             theDataFileMgr.deleteRecord( ns, i->rec(), *i, false /* cappedOk */ , true /* noWarn */ , isMaster( ns ) /* logOp */ );
             getDur().commitIfNeeded();
         }
@@ -1491,6 +1495,7 @@ namespace mongo {
             ProgressMeter& progress = cc().curop()->setMessage( "bg index build" , d->stats.nrecords );
 
             unsigned long long n = 0;
+            unsigned long long numDropped = 0;
             auto_ptr<ClientCursor> cc;
             {
                 shared_ptr<Cursor> c = theDataFileMgr.findAll(ns);
@@ -1532,6 +1537,7 @@ namespace mongo {
                             }
                             break;
                         }
+                        numDropped++;
                     }
                     else {
                         log() << "background addExistingToIndex exception " << e.what() << endl;
@@ -1553,6 +1559,8 @@ namespace mongo {
                 }
             }
             progress.finished();
+            if ( dropDups )
+                log() << "\t backgroundIndexBuild dupsToDrop: " << numDropped << endl;
             return n;
         }
 
@@ -1643,7 +1651,7 @@ namespace mongo {
             BackgroundIndexBuildJob j(ns.c_str());
             n = j.go(ns, d, idx, idxNo);
         }
-        tlog() << "build index done " << n << " records " << t.millis() / 1000.0 << " secs" << endl;
+        tlog() << "build index done.  scanned " << n << " total records. " << t.millis() / 1000.0 << " secs" << endl;
     }
 
     /* add keys to indexes for a new record */
@@ -1719,10 +1727,10 @@ namespace mongo {
     } idToInsert;
 #pragma pack()
 
-    void DataFileMgr::insertAndLog( const char *ns, const BSONObj &o, bool god ) {
+    void DataFileMgr::insertAndLog( const char *ns, const BSONObj &o, bool god, bool fromMigrate ) {
         BSONObj tmp = o;
         insertWithObjMod( ns, tmp, god );
-        logOp( "i", ns, tmp );
+        logOp( "i", ns, tmp, 0, 0, fromMigrate );
     }
 
     /** @param o the object to insert. can be modified to add _id and thus be an in/out param

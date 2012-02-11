@@ -19,8 +19,6 @@
 #include "dbclient.h"
 #include "distlock.h"
 
-#include <boost/thread/once.hpp>
-
 namespace mongo {
 
     LabeledLevel DistributedLock::logLvl( 1 );
@@ -32,10 +30,16 @@ namespace mongo {
      * Module initialization
      */
 
-    boost::once_flag _init = BOOST_ONCE_INIT;
+    static SimpleMutex _cachedProcessMutex("distlock_initmodule");
     static string* _cachedProcessString = NULL;
 
     static void initModule() {
+        SimpleMutex::scoped_lock lk(_cachedProcessMutex);
+        if (_cachedProcessString) {
+            // someone got the lock before us
+            return;
+        }
+
         // cache process string
         stringstream ss;
         ss << getHostName() << ":" << cmdLine.port << ":" << time(0) << ":" << rand();
@@ -45,7 +49,8 @@ namespace mongo {
     /* =================== */
 
     string getDistLockProcess() {
-        boost::call_once( initModule, _init );
+        if (!_cachedProcessString)
+            initModule();
         assert( _cachedProcessString );
         return *_cachedProcessString;
     }

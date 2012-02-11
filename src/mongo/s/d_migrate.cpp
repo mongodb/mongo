@@ -162,7 +162,7 @@ namespace mongo {
             {
                 writelock lk(ns);
                 RemoveSaver rs("moveChunk",ns,"post-cleanup");
-                long long numDeleted = Helpers::removeRange( ns , min , max , true , false , cmdLine.moveParanoia ? &rs : 0 );
+                long long numDeleted = Helpers::removeRange( ns , min , max , true , false , cmdLine.moveParanoia ? &rs : 0, true );
                 log() << "moveChunk deleted: " << numDeleted << migrateLog;
             }
             
@@ -727,11 +727,11 @@ namespace mongo {
             }
 
             if ( to.empty() ) {
-                errmsg = "need to specify server to move chunk to";
+                errmsg = "need to specify shard to move chunk to";
                 return false;
             }
             if ( from.empty() ) {
-                errmsg = "need to specify server to move chunk from";
+                errmsg = "need to specify shard to move chunk from";
                 return false;
             }
 
@@ -877,13 +877,13 @@ namespace mongo {
                 if ( ! migrateFromStatus.storeCurrentLocs( maxChunkSize , errmsg , result ) )
                     return false;
 
-                ScopedDbConnection connTo( to );
+                ScopedDbConnection connTo( toShard.getConnString() );
                 BSONObj res;
                 bool ok;
                 try{
                     ok = connTo->runCommand( "admin" ,
                                               BSON( "_recvChunkStart" << ns <<
-                                                    "from" << from <<
+                                                    "from" << fromShard.getConnString() <<
                                                     "min" << min <<
                                                     "max" << max <<
                                                     "configServer" << configServer.modelServer()
@@ -913,7 +913,7 @@ namespace mongo {
             for ( int i=0; i<86400; i++ ) { // don't want a single chunk move to take more than a day
                 assert( !Lock::isLocked() );
                 sleepsecs( 1 );
-                ScopedDbConnection conn( to );
+                ScopedDbConnection conn( toShard.getConnString() );
                 BSONObj res;
                 bool ok;
                 try {
@@ -943,7 +943,7 @@ namespace mongo {
                 if ( migrateFromStatus.mbUsed() > (500 * 1024 * 1024) ) {
                     // this is too much memory for us to use for this
                     // so we're going to abort the migrate
-                    ScopedDbConnection conn( to );
+                    ScopedDbConnection conn( toShard.getConnString() );
                     BSONObj res;
                     conn->runCommand( "admin" , BSON( "_recvChunkAbort" << 1 ) , res );
                     res = res.getOwned();
@@ -983,7 +983,7 @@ namespace mongo {
                 // could be ongoing
                 {
                     BSONObj res;
-                    ScopedDbConnection connTo( to );
+                    ScopedDbConnection connTo( toShard.getConnString() );
                     bool ok;
 
                     try{
@@ -992,7 +992,7 @@ namespace mongo {
                                                   res );
                     }
                     catch( DBException& e ){
-                        errmsg = str::stream() << "moveChunk could not contact to: shard " << to << " to commit transfer" << causedBy( e );
+                        errmsg = str::stream() << "moveChunk could not contact to: shard " << toShard.getConnString() << " to commit transfer" << causedBy( e );
                         warning() << errmsg << endl;
                         return false;
                     }
@@ -1297,7 +1297,7 @@ namespace mongo {
                 string system_indexes = cc().database()->name + ".system.indexes";
                 for ( unsigned i=0; i<all.size(); i++ ) {
                     BSONObj idx = all[i];
-                    theDataFileMgr.insertAndLog( system_indexes.c_str() , idx );
+                    theDataFileMgr.insertAndLog( system_indexes.c_str() , idx, true /* flag fromMigrate in oplog */ );
                 }
 
                 timing.done(1);
@@ -1307,7 +1307,7 @@ namespace mongo {
                 // 2. delete any data already in range
                 writelock lk( ns );
                 RemoveSaver rs( "moveChunk" , ns , "preCleanup" );
-                long long num = Helpers::removeRange( ns , min , max , true , false , cmdLine.moveParanoia ? &rs : 0 );
+                long long num = Helpers::removeRange( ns , min , max , true , false , cmdLine.moveParanoia ? &rs : 0, true /* flag fromMigrate in oplog */ );
                 if ( num )
                     warning() << "moveChunkCmd deleted data already in chunk # objects: " << num << migrateLog;
 
@@ -1321,7 +1321,7 @@ namespace mongo {
 
                 while ( true ) {
                     BSONObj res;
-                    if ( ! conn->runCommand( "admin" , BSON( "_migrateClone" << 1 ) , res ) ) {
+                    if ( ! conn->runCommand( "admin" , BSON( "_migrateClone" << 1 ) , res ) ) {  // gets array of objects to copy, in disk order
                         state = FAIL;
                         errmsg = "_migrateClone failed: ";
                         errmsg += res.toString();
@@ -1338,7 +1338,7 @@ namespace mongo {
                         BSONObj o = i.next().Obj();
                         {
                             writelock lk( ns );
-                            Helpers::upsert( ns , o );
+                            Helpers::upsert( ns, o, true );
                         }
                         thisTime++;
                         numCloned++;
@@ -1445,7 +1445,7 @@ namespace mongo {
                 }
 
                 if ( state == FAIL ) {
-                    errmsg = "imted out waiting for commit";
+                    errmsg = "timed out waiting for commit";
                     return;
                 }
 
@@ -1507,7 +1507,7 @@ namespace mongo {
                         }
                     }
 
-                    Helpers::removeRange( ns , id , id, false , true , cmdLine.moveParanoia ? &rs : 0 );
+                    Helpers::removeRange( ns , id , id, false , true , cmdLine.moveParanoia ? &rs : 0, true );
 
                     *lastOpApplied = cx.getClient()->getLastOp().asDate();
                     didAnything = true;
@@ -1522,7 +1522,7 @@ namespace mongo {
                 while ( i.more() ) {
                     BSONObj it = i.next().Obj();
 
-                    Helpers::upsert( ns , it );
+                    Helpers::upsert( ns , it , true );
 
                     *lastOpApplied = cx.getClient()->getLastOp().asDate();
                     didAnything = true;

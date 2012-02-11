@@ -17,9 +17,10 @@
 */
 
 #include "pch.h"
-#include "dbtests.h"
 
 #include "../s/d_chunk_manager.h"
+
+#include "dbtests.h"
 
 namespace {
 

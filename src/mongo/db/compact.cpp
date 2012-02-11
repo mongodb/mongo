@@ -54,7 +54,7 @@ namespace mongo {
                 scoped_array<SortPhaseOne>& phase1, int nidx, bool validate, 
                 double pf, int pb)
     {
-        log() << "compact extent #" << n << endl;
+        log() << "compact begin extent #" << n << " for namespace " << ns << endl;
         unsigned oldObjSize = 0; // we'll report what the old padding was
         unsigned oldObjSizeWithPadding = 0;
 
@@ -106,7 +106,6 @@ namespace mongo {
                                 lenWPadding = lenWHdr;
                             }
                         }
-                        
                         DiskLoc loc = allocateSpaceForANewRecord(ns, d, lenWPadding, false);
                         uassert(14024, "compact error out of space during compaction", !loc.isNull());
                         Record *recNew = loc.rec();
@@ -153,11 +152,11 @@ namespace mongo {
             newFirst.ext()->xprev.writing().Null();
             getDur().writing(e)->markEmpty();
             freeExtents(ext,ext);
-            // update datasize/record count for this namespace
+            // update datasize/record count for this namespace's extent
             {
                 NamespaceDetails::Stats *s = getDur().writing(&d->stats);
-                s->datasize = datasize;
-                s->nrecords = nrecords;
+                s->datasize += datasize;
+                s->nrecords += nrecords;
             }
 
             getDur().commitIfNeeded();
@@ -166,7 +165,7 @@ namespace mongo {
                 double op = 1.0;
                 if( oldObjSize ) 
                     op = static_cast<double>(oldObjSizeWithPadding)/oldObjSize;
-                log() << "compact " << nrecords << " documents " << datasize/1000000.0 << "MB"
+                log() << "compact finished extent #" << n << " containing " << nrecords << " documents (" << datasize/1000000.0 << "MB)"
                     << " oldPadding: " << op << ' ' << static_cast<unsigned>(op*100.0)/100
                     << endl;                    
             }
@@ -242,6 +241,15 @@ namespace mongo {
 
         long long skipped = 0;
         int n = 0;
+
+        // reset data size and record counts to 0 for this namespace
+        // as we're about to tally them up again for each new extent
+        {
+            NamespaceDetails::Stats *s = getDur().writing(&d->stats);
+            s->datasize = 0;
+            s->nrecords = 0;
+        }
+
         for( list<DiskLoc>::iterator i = extents.begin(); i != extents.end(); i++ ) { 
             skipped += compactExtent(ns, d, *i, n++, indexSpecs, phase1, nidx, validate, pf, pb);
             pm.hit();
