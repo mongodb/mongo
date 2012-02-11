@@ -160,8 +160,6 @@ namespace mongo {
         */
         class CommitJob : boost::noncopyable {
         public:
-            AlignedBuilder _ab; // for direct i/o writes to journal
-
             CommitJob();
 
             ~CommitJob(){ assert(!"shouldn't destroy CommitJob!"); }

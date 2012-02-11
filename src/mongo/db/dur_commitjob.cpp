@@ -141,7 +141,7 @@ namespace mongo {
             _nSinceCommitIfNeededCall = 0;
         }
 
-        CommitJob::CommitJob() : _ab(4 * 1024 * 1024) , _hasWritten(false), 
+        CommitJob::CommitJob() : _hasWritten(false), 
             _bytes(0), _nSinceCommitIfNeededCall(0) { 
             _commitNumber = 0;
         }

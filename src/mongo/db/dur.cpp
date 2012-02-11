@@ -76,7 +76,7 @@ namespace mongo {
 
     namespace dur {
 
-        void PREPLOGBUFFER(JSectHeader& outParm);
+        void PREPLOGBUFFER(JSectHeader& outParm, AlignedBuilder&);
         void WRITETOJOURNAL(JSectHeader h, AlignedBuilder& uncompressed);
         void WRITETODATAFILES(const JSectHeader& h, AlignedBuilder& uncompressed);
 
@@ -503,7 +503,13 @@ namespace mongo {
         // lock order: dbMutex first, then this
         mutex groupCommitMutex("groupCommit");
 
+        // this is a pseudo-local variable in the groupcommit functions 
+        // below.  however we don't truly do that so that we don't have to 
+        // reallocate, and more importantly regrow it, on every single commit.
+        static AlignedBuilder __theBuilder(4 * 1024 * 1024);
+
         static bool _groupCommitWithLimitedLocks() {
+            AlignedBuilder &ab = __theBuilder;
 
             assert( !d.dbMutex.atLeastReadLocked() );
 
@@ -524,11 +530,11 @@ namespace mongo {
             }
 
             JSectHeader h;
-            PREPLOGBUFFER(h); // need to be in readlock (writes excluded) for this
+            PREPLOGBUFFER(h,ab); // need to be in readlock (writes excluded) for this
 
             LockMongoFilesShared lk3;
 
-            unsigned abLen = commitJob._ab.len();
+            unsigned abLen = ab.len();
             commitJob.reset(); // must be reset before allowing anyone to write
             DEV assert( !commitJob.hasWritten() );
 
@@ -537,16 +543,16 @@ namespace mongo {
 
             // ****** now other threads can do writes ******
 
-            WRITETOJOURNAL(h, commitJob._ab);
-            assert( abLen == commitJob._ab.len() ); // a check that no one touched the builder while we were doing work. if so, our locking is wrong.
+            WRITETOJOURNAL(h, ab);
+            assert( abLen == ab.len() ); // a check that no one touched the builder while we were doing work. if so, our locking is wrong.
 
             // data is now in the journal, which is sufficient for acknowledging getLastError.
             // (ok to crash after that)
             commitJob.notifyCommitted();
 
-            WRITETODATAFILES(h, commitJob._ab);
-            assert( abLen == commitJob._ab.len() ); // check again wasn't modded
-            commitJob._ab.reset();
+            WRITETODATAFILES(h, ab);
+            assert( abLen == ab.len() ); // check again wasn't modded
+            ab.reset();
 
             // can't : d.dbMutex._remapPrivateViewRequested = true;
             // (writes have happened we released)
@@ -579,6 +585,7 @@ namespace mongo {
         }
 
         static void _groupCommit(Lock::GlobalWrite *lgw) {
+            AlignedBuilder &ab = __theBuilder;
 
             LOG(4) << "_groupCommit " << endl;
 
@@ -599,22 +606,22 @@ namespace mongo {
             scoped_lock lk(groupCommitMutex);
 
             JSectHeader h;
-            PREPLOGBUFFER(h);
+            PREPLOGBUFFER(h,ab);
 
             // todo : write to the journal outside locks, as this write can be slow.
             //        however, be careful then about remapprivateview as that cannot be done 
             //        if new writes are then pending in the private maps.
-            WRITETOJOURNAL(h, commitJob._ab);
+            WRITETOJOURNAL(h, ab);
 
             // data is now in the journal, which is sufficient for acknowledging getLastError.
             // (ok to crash after that)
             commitJob.notifyCommitted();
 
-            WRITETODATAFILES(h, commitJob._ab);
+            WRITETODATAFILES(h, ab);
             debugValidateAllMapsMatch();
 
             commitJob.reset();
-            commitJob._ab.reset();
+            ab.reset();
 
             // REMAPPRIVATEVIEW
             //

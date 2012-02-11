@@ -141,7 +141,7 @@ namespace mongo {
             caller handles locking
             @return partially populated sectheader and _ab set
         */
-        static void _PREPLOGBUFFER(JSectHeader& h) {
+        static void _PREPLOGBUFFER(JSectHeader& h, AlignedBuilder& bb) {
             assert( cmdLine.dur );
 
             {
@@ -152,7 +152,6 @@ namespace mongo {
                 writes._drained = true;
             }
 
-            AlignedBuilder& bb = commitJob._ab;
             resetLogBuffer(h, bb); // adds JSectHeader
 
             // ops other than basic writes (DurOp's)
@@ -166,10 +165,10 @@ namespace mongo {
 
             return;
         }
-        void PREPLOGBUFFER(/*out*/ JSectHeader& h) {
+        void PREPLOGBUFFER(/*out*/ JSectHeader& h, AlignedBuilder& ab) {
             Timer t;
             j.assureLogFileOpen(); // so fileId is set
-            _PREPLOGBUFFER(h);
+            _PREPLOGBUFFER(h, ab);
             stats.curr->_prepLogBufferMicros += t.micros();
         }
 
