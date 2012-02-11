@@ -85,7 +85,7 @@ namespace mongo {
             virtual T * create() {
                 return new T( _a );
             }
-            const A& _a;
+            const A _a;
         };
 
         class Suite {
