@@ -24,6 +24,9 @@ if has_option( 'smokedbprefix'):
 if 'startMongodSmallOplog' in COMMAND_LINE_TARGETS:
     smokeFlags += ["--small-oplog"]
 
+if has_option('smokeauth'):
+    smokeFlags += ['--auth']
+
 def addTest(name, deps, actions):
     smokeEnv.Alias( name, deps, actions )
     smokeEnv.AlwaysBuild( name )
