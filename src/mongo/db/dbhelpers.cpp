@@ -25,6 +25,7 @@
 #include "oplog.h"
 #include "ops/update.h"
 #include "ops/delete.h"
+#include "queryoptimizercursor.h"
 
 #include <fstream>
 
@@ -78,7 +79,11 @@ namespace mongo {
        set your db SavedContext first
     */
     DiskLoc Helpers::findOne(const char *ns, const BSONObj &query, bool requireIndex) {
-        shared_ptr<Cursor> c = NamespaceDetailsTransient::getCursor( ns, query, BSONObj(), requireIndex );
+        shared_ptr<Cursor> c =
+        NamespaceDetailsTransient::getCursor( ns, query, BSONObj(),
+                                             requireIndex ?
+                                             QueryPlanSelectionPolicy::indexOnly() :
+                                             QueryPlanSelectionPolicy::any() );
         while( c->ok() ) {
             if ( c->currentMatches() && !c->getsetdup( c->currLoc() ) ) {
                 return c->currLoc();

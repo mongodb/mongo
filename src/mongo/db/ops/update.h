@@ -54,7 +54,9 @@ namespace mongo {
                                bool multi , 
                                bool logop , 
                                OpDebug& debug, 
-                               bool fromMigrate = false );
+                               bool fromMigrate = false,
+                               const QueryPlanSelectionPolicy &planPolicy =
+                               QueryPlanSelectionPolicy::any());
     UpdateResult _updateObjects(bool god, 
                                 const char *ns, 
                                 const BSONObj& updateobj, 
@@ -64,9 +66,9 @@ namespace mongo {
                                 bool logop , 
                                 OpDebug& debug , 
                                 RemoveSaver * rs = 0, 
-                                bool fromMigrate = false );
-
-
+                                bool fromMigrate = false,
+                                const QueryPlanSelectionPolicy &planPolicy =
+                                QueryPlanSelectionPolicy::any());
 
     // ---------- private -------------
 

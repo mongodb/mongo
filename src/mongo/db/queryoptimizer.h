@@ -19,17 +19,14 @@
 #pragma once
 
 #include "cursor.h"
-#include "jsobj.h"
 #include "queryutil.h"
 #include "matcher.h"
 #include "../util/net/listen.h"
-#include <queue>
 
 namespace mongo {
 
     class IndexDetails;
     class IndexType;
-    class ElapsedTracker;
 
     /** A plan for executing a query using the given index spec and FieldRangeSet. */
     class QueryPlan : boost::noncopyable {
@@ -80,6 +77,7 @@ namespace mongo {
         int direction() const { return _direction; }
         BSONObj indexKey() const;
         bool indexed() const { return _index; }
+        const IndexDetails *index() const { return _index; }
         int idxNo() const { return _idxNo; }
         const char *ns() const { return _frs.ns(); }
         NamespaceDetails *nsd() const { return _d; }

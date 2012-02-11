@@ -26,6 +26,7 @@
 #include "../util/hashtab.h"
 #include "mongommf.h"
 #include "d_concurrency.h"
+#include "queryoptimizercursor.h"
 
 namespace mongo {
 
@@ -468,7 +469,9 @@ namespace mongo {
          * - in memory sorting
          */
         static shared_ptr<Cursor> getCursor( const char *ns, const BSONObj &query,
-                                            const BSONObj &order = BSONObj(), bool requireIndex = false,
+                                            const BSONObj &order = BSONObj(),
+                                            const QueryPlanSelectionPolicy &planPolicy =
+                                            QueryPlanSelectionPolicy::any(),
                                             bool *simpleEqualityMatch = 0 );
 
         /**
