@@ -284,7 +284,7 @@ namespace mongo {
         }
 
         case BIT: {
-            uassert( 10136 ,  "$bit needs an array" , elt.type() == Object );
+            uassert( 10136 ,  "$bit needs an object" , elt.type() == Object );
             uassert( 10137 ,  "$bit can only be applied to numbers" , in.isNumber() );
             uassert( 10138 ,  "$bit cannot update a value of type double" , in.type() != NumberDouble );
 
