@@ -1,5 +1,8 @@
 print("profile2.js BEGIN");
 
+// special db so that it can be run in parallel tests
+db = db.getSisterDB("profile2");
+
 try {
 
     assert.commandWorked( db.runCommand( {profile:2} ) );

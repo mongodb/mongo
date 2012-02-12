@@ -1,4 +1,7 @@
 
+// special db so that it can be run in parallel tests
+db = db.getSisterDB("profile3");
+
 t = db.profile3;
 t.drop();
 
