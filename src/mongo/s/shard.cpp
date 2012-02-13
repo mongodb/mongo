@@ -102,6 +102,12 @@ namespace mongo {
 
             scoped_lock lk( _mutex );
             ShardMap::iterator i = _lookup.find( mykey );
+            if (i == _lookup.end()) {
+                warning() << "Couldn't find shard for " + mykey + ", adding default port and trying lookup again" << endl;
+                stringstream ss;
+                ss << mykey << ":" << CmdLine::DefaultDBPort;
+                i = _lookup.find( ss.str() );
+            }
             massert( 13129 , (string)"can't find shard for: " + mykey , i != _lookup.end() );
             return i->second;
         }
