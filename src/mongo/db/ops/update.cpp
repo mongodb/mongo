@@ -333,9 +333,7 @@ namespace mongo {
         }
 
         default:
-            stringstream ss;
-            ss << "Mod::apply can't handle type: " << op;
-            throw UserException( 9017, ss.str() );
+            uasserted( 9017 , str::stream() << "Mod::apply can't handle type: " << op );
         }
     }
 
