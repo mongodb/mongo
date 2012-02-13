@@ -630,7 +630,7 @@ namespace mongo {
         !a.eoo() &&
         !b.eoo() &&
         ( a.rawdata() != b.rawdata() ) &&
-        ( a.fieldName() == string( b.fieldName() ) );
+        str::equals( a.fieldName(), b.fieldName() );
     }
 
     template< class Builder >
