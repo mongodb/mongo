@@ -443,23 +443,23 @@ namespace JsobjTests {
                     BSONObj b = BSON( "x" << d );
 
                     long long back = (long long) d;
-//3717
+//3719
 //////                    int res = a.woCompare(b);
 
                     ASSERT( n > back );
-                    //ASSERT( res > 0 );  // SERVER-3717
+                    //ASSERT( res > 0 );  // SERVER-3719
 
                     keyTest(a, false);
 
                     KeyV1Owned A(a);
                     KeyV1Owned B(b);
-//3717
+//3719
 //////                    int res2 =  A.woCompare(B, Ordering::make(BSONObj()));
-                    // ASSERT( res2 > 0 ); // SERVER-3717
+                    // ASSERT( res2 > 0 ); // SERVER-3719
 
                     // fixing requires an index v# change.
 
-                    cout << "todo fix SERVER-3717 and uncomment test in AppendIntOrLL" << endl;
+                    cout << "todo fix SERVER-3719 and uncomment test in AppendIntOrLL" << endl;
 
                     n++;
                 }
