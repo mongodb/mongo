@@ -290,10 +290,10 @@ namespace mongo {
         virtual void doWork() {
             cursorCache.doTimeouts();
         }
-    } cursorTimeoutTask;
+    };
 
     void CursorCache::startTimeoutThread() {
-        task::repeat( &cursorTimeoutTask , 400 );
+        task::repeat( new CursorTimeoutTask , 400 );
     }
 
     class CmdCursorInfo : public Command {

@@ -354,9 +354,8 @@ int _main(int argc, char* argv[]) {
             virtual string name() const { return "CheckConfigServers"; }
             virtual void doWork() { configServer.ok(true); }
         };
-        static CheckConfigServers checkConfigServers;
 
-        task::repeat(&checkConfigServers, 60*1000);
+        task::repeat(new CheckConfigServers, 60*1000);
     }
 
     int configError = configServer.checkConfigVersion( params.count( "upgrade" ) );
