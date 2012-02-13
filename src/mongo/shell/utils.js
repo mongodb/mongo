@@ -1897,3 +1897,176 @@ help = shellHelper.help = function (x) {
     else
         print("unknown help option");
 }
+
+function BasicTutorial () {
+    this.currentState = 0;
+    this.numSteps = 10;
+    
+}
+
+currentTutorial = new BasicTutorial();
+
+shellHelper.tutorial = function (what) {
+    assert(typeof what == "string");
+    if (what == "" ) {
+        //default tutorial is already set so just kick it off
+        currentTutorial.currentState = 0;
+        shellHelper.next()
+        return "";
+    }
+    // you can add more tutorial types here
+    
+    throw "I don't know about the tutorial [" + what + "]";
+}
+
+shellHelper.next = function () {
+    if (currentTutorial.currentState > currentTutorial.numSteps) {
+        currentTutorial.currentState = 0;
+    }
+    
+    eval("currentTutorial.t"+ currentTutorial.currentState+"()");
+    currentTutorial.currentState = currentTutorial.currentState + 1;
+    
+    return "";
+}
+
+
+shellHelper.back = function () {
+    currentTutorial.currentState = currentTutorial.currentState - 2;
+    if (currentTutorial.currentState < 0) {
+        currentTutorial.currentState = 0;
+    }
+    eval("currentTutorial.t"+ currentTutorial.currentState+"()");
+    currentTutorial.currentState = currentTutorial.currentState + 1;
+    
+}
+
+BasicTutorial.prototype.t0 = function() {
+    print("This is a self-guided tutorial on MongoDB and the MongoDB shell.\n\
+          The tutorial is simple, more or less a few basic commands to try.\n\
+          Use can use 'next' and 'back' to navigate through the tutorial.\n\
+          Start by typing 'next' and pressing enter.");
+};
+
+BasicTutorial.prototype.t1 = function() {
+    print("1. JavaScript Shell\n\
+          The first thing to notice is that the MongoDB shell is JavaScript-based.\n\
+          So you can do things like:\n\
+          a = 5; \n\
+          a * 10; \n\
+          for(i=0; i<10; i++) { print('hello'); }; \n\
+          Try a few JS commands; when you're ready to move on, enter 'next'");
+}
+
+BasicTutorial.prototype.t2 = function() {
+    print("2. Documents\n\
+          MongoDB is a document database. This means that we store data as documents,\n\
+          which are similar to JavaScript objects. Here below are a few sample JS objects:\n\
+          var a = {age: 25}; \n\
+          var n = {name: 'Ed', languages: ['c', 'ruby', 'js']}; \n\
+          var student = {name: 'Jim', scores: [75, 99, 87.2]}; \n\
+          Create some documents, then enter 'next'");
+}
+
+
+BasicTutorial.prototype.t3 = function() {
+    print("3. Saving\n\
+          Here's how you save a document to MongoDB:\n\
+          db.scores.save({a: 99}); \n\
+          \n\
+          This says, \"save the document '{a: 99}' to the 'scores' collection.\"\n\
+          Go ahead and try it. Then, to see if the document was saved, try\n\
+          db.scores.find(); \n\
+          Once you've tried this, type 'next'.\n\
+          \n\
+          ");
+}
+
+BasicTutorial.prototype.t4 = function() {
+    print("4. Saving and Querying\n\
+          Try adding some documents to the scores collection:\n\
+          for(i=0; i<20; i++) { db.scores.save({a: i, exam: 5}) }; \n\
+          \n\
+          Try that, then enter\n\
+          db.scores.find(); \n\
+          to see if the save succeeded. Since the shell only displays 10 results at time,\n\
+          you'll need to enter the 'it' command to iterate over the rest.\n\
+          \n\
+          (enter 'next' when you're ready)");
+}
+
+BasicTutorial.prototype.t5 = function() {
+    print("5. Basic Queries\n\
+          You've already tried a few queries, but let's make them more specific.\n\
+          How about finding all documents where a == 2:\n\
+          db.scores.find({a: 2}); \n\
+          \n\
+          Or what about documents where a > 15?\n\
+          db.scores.find({a: {'$gt': 15}}); \n\
+          \n\
+          ");
+}
+
+BasicTutorial.prototype.t6 = function() {
+    print("6. Query Operators\n\
+          Query Operators:\n\
+          $gt is one of many special query operators. Here are few others:\n\
+          $lt  - '<',   $lte - '<=', \n\
+          $gte - '>=',  $ne  - '!='\n\
+          $in - 'is in array',  $nin - '! in array'\n\
+          \n\
+          db.scores.find({a: {'$in': [2, 3, 4]}}); \n\
+          db.scores.find({a: {\'$gte\': 2, \'$lte\': 4}});\n\
+          Try creating some queries, then type 'next.'\n\
+          \n\
+          ");
+}
+          
+
+          
+BasicTutorial.prototype.t7 = function() {
+    print("7. Updates\n\
+          Now create a couple documents like these for updating:\n\
+          db.users.save({name: 'Johnny', languages: ['ruby', 'c']});\n\
+          db.users.save({name: 'Sue', languages: ['scala', 'lisp']});\n\
+          Make sure they were saved by called db.users.find()\n\
+          Update the first document like so:\n\
+          db.users.update({name: 'Johnny'}, {name: 'Cash', languages: ['english']});\n\
+          ");
+}
+
+BasicTutorial.prototype.t8 = function() {
+    print("8. Update Operators\n\
+          The previous update replaced the entire document, but MongoDB also\n\
+          supports partial updates to documents. For example, you can set a value:\n\
+          db.users.update({name: 'Cash'}, {'$set': {'age': 50} });\n\
+          You can also push and pull items from arrays:\n\
+          db.users.update({name: 'Sue'}, {'$pull': {'languages': 'scala'} });\n\
+          db.users.update({name: 'Sue'}, {'$push': {'languages': 'ruby'} });\n\
+          Give these a try, check the results, and then enter 'next'.\n\
+          ");
+}
+
+BasicTutorial.prototype.t9 = function() {
+    print("9. Deleting data\n\
+          To delete matching documents only, add a query selector to the remove method:\n\
+          db.users.remove({name: 'Sue'});\n\
+          To delete everything from a collection:\n\
+          db.scores.remove();\n\
+          ");
+}
+
+BasicTutorial.prototype.t10 = function() {
+    print("10. Thanks for trying out MongoDB!\n\
+          There's a lot more to MongoDB than what's presented in this tutorial.\n\
+          Best thing is to go to mongodb.org to check out the docs.\n\
+           \n\
+          Happy Hacking!\n\
+          ");
+}
+           
+                
+                
+                
+          
+
