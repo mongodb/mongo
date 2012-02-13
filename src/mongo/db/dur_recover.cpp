@@ -37,13 +37,12 @@
 #include "curop.h"
 #include "mongommf.h"
 #include "../util/compress.h"
-
 #include <sys/stat.h>
 #include <fcntl.h>
+#include "dur_commitjob.h"
+#include <boost/filesystem/operations.hpp>
 
 using namespace mongoutils;
-
-#include <boost/filesystem/operations.hpp>
 
 namespace mongo {
 
@@ -504,8 +503,6 @@ namespace mongo {
             RecoveryJob::get().go(journalFiles);
         }
 
-        extern mutex groupCommitMutex;
-
         /** recover from a crash
             called during startup
             throws on error
@@ -517,7 +514,7 @@ namespace mongo {
 
             // this is so the mutexdebugger doesn't get confused.  we are actually single threaded 
             // at this point in the program so it wouldn't have been a true problem (I think)
-            scoped_lock lk2(groupCommitMutex);
+            SimpleMutex::scoped_lock lk2(commitJob.groupCommitMutex);
 
             _recover(); // throws on interruption
         }

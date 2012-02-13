@@ -26,6 +26,7 @@
 #include "durop.h"
 #include "dur.h"
 #include "taskqueue.h"
+#include "d_concurrency.h"
 
 //#define DEBUG_WRITE_INTENT 1
 
@@ -160,6 +161,8 @@ namespace mongo {
         */
         class CommitJob : boost::noncopyable {
         public:
+            SimpleMutex groupCommitMutex;
+
             CommitJob();
 
             ~CommitJob(){ assert(!"shouldn't destroy CommitJob!"); }
@@ -179,7 +182,10 @@ namespace mongo {
                 return _wi._writes;
             }
 
-            vector< shared_ptr<DurOp> >& ops() { return _wi._ops; }
+            vector< shared_ptr<DurOp> >& ops() { 
+                dassert( Lock::isRW() );
+                return _wi._ops; 
+            }
 
             /** this method is safe to call outside of locks. when haswritten is false we don't do any group commit and avoid even
                 trying to acquire a lock, which might be helpful at times.

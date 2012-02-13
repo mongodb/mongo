@@ -116,12 +116,11 @@ namespace mongo {
 
         /** note an operation other than a "basic write" */
         void CommitJob::noteOp(shared_ptr<DurOp> p) {
-            d.dbMutex.assertWriteLocked();
             dassert( cmdLine.dur );
+            // DurOp's are rare so it is ok to have the lock cost here
+            SimpleMutex::scoped_lock lk(groupCommitMutex);
             cc().writeHappened();
-            if( !_hasWritten ) {
-                _hasWritten = true;
-            }
+            _hasWritten = true;
             _wi._ops.push_back(p);
         }
 
@@ -142,7 +141,8 @@ namespace mongo {
         }
 
         CommitJob::CommitJob() : _hasWritten(false), 
-            _bytes(0), _nSinceCommitIfNeededCall(0) { 
+            _bytes(0), _nSinceCommitIfNeededCall(0), groupCommitMutex("groupCommit")
+        { 
             _commitNumber = 0;
         }
 

@@ -500,9 +500,6 @@ namespace mongo {
             stats.curr->_remapPrivateViewMicros += t.micros();
         }
 
-        // lock order: dbMutex first, then this
-        mutex groupCommitMutex("groupCommit");
-
         // this is a pseudo-local variable in the groupcommit functions 
         // below.  however we don't truly do that so that we don't have to 
         // reallocate, and more importantly regrow it, on every single commit.
@@ -519,7 +516,7 @@ namespace mongo {
             // not super critical, but likely 'correct'.  todo.
             scoped_ptr<Lock::GlobalRead> lk1( new Lock::GlobalRead() );
 
-            scoped_lock lk2(groupCommitMutex);
+            SimpleMutex::scoped_lock lk2(commitJob.groupCommitMutex);
 
             commitJob.beginCommit(); // increments the commit epoch for getlasterror j:true
 
@@ -603,7 +600,7 @@ namespace mongo {
 
             // we need to make sure two group commits aren't running at the same time
             // (and we are only read locked in the dbMutex, so it could happen)
-            scoped_lock lk(groupCommitMutex);
+            SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
 
             JSectHeader h;
             PREPLOGBUFFER(h,ab);
@@ -840,7 +837,7 @@ namespace mongo {
             // but it may already be in progress and the end of that work is done outside 
             // (dbMutex) locks. This line waits for that to complete if already underway.
             {
-                scoped_lock lk(groupCommitMutex);
+                SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
             }
 
             groupCommit();
