@@ -1,6 +1,6 @@
 doTest = function( signal ) {
 
-    // Make sure that we can manually shutdown a remove a 
+    // Make sure that we can manually shutdown a remove a
     // slave from the configuration.
 
     // Create a new replica set test. Specify set name and the number of nodes you want.
@@ -12,7 +12,14 @@ doTest = function( signal ) {
 
     // Call initiate() to send the replSetInitiate command
     // This will wait for initiation
-    replTest.initiate();
+    var name = replTest.nodeList();
+    replTest.initiate({"_id" : "testSet",
+                       "members" : [
+                           // make sure 0 becomes primary so we don't try to remove the
+                           // primary below
+                           {"_id" : 0, "host" : name[0], priority:2},
+                           {"_id" : 1, "host" : name[1]},
+                           {"_id" : 2, "host" : name[2]}]});
 
     // Call getMaster to return a reference to the node that's been
     // elected master.
@@ -41,7 +48,7 @@ doTest = function( signal ) {
         print(e);
     }
 
-    
+
     // Make sure that a new master comes up
     master = replTest.getMaster();
     slaves = replTest.liveNodes.slaves;
