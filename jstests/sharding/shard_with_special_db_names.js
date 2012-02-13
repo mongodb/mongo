@@ -19,8 +19,15 @@ assert.eq( exists, 1 );
 // Test that drop database properly cleans up config
 s.getDB(specialDB).dropDatabase();
 
-exists = s.getDB(specialDB).collections.find( { _id: specialNS } ).count();
-assert.eq( exists, 0 );
+var cursor = s.getDB("config").collections.find( { _id: specialNS } );
+
+if (cursor.hasNext()) {
+  assert.eq( cursor.count(), 1 );
+  assert( cursor.next()["dropped"] );
+}
+else {
+  // It's alright if not found since it should be deleted
+}
 
 })();
 
