@@ -150,7 +150,7 @@ namespace mongo {
     NOINLINE_DECL void NamespaceIndex::_init() {
         assert( !ht );
 
-        d.dbMutex.assertWriteLocked();
+        Lock::assertWriteLocked(database_);
 
         /* if someone manually deleted the datafiles for a database,
            we need to be sure to clear any cached info for the database in

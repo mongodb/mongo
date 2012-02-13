@@ -108,13 +108,13 @@ namespace ThreadedTests {
                 else if( i % 7 == 2 ) {
                     Lock::GlobalWrite w;
                     ASSERT( d.dbMutex.isWriteLocked() );
-                    ASSERT( Lock::isWriteLocked() );
+                    ASSERT( Lock::isW() );
                 }
                 else if( i % 7 == 3 ) {
                     Lock::GlobalWrite w;
                     Lock::GlobalRead r;
                     ASSERT( d.dbMutex.isWriteLocked() );
-                    ASSERT( Lock::isWriteLocked() );
+                    ASSERT( Lock::isW() );
                 }
                 else if( i % 7 == 4 ) {
                     /*mm->lock();

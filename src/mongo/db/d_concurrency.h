@@ -15,13 +15,14 @@ namespace mongo {
     public:
         static int isLocked();      // true if *anything* is locked (by us)
         static int isReadLocked();  // r or R
-        static int isWriteLocked(); // w or W
+        static int somethingWriteLocked(); // w or W
         static bool isW();          // W
         static bool isR();          
         static bool nested();
         static bool isWriteLocked(const StringData& ns);
         static bool atLeastReadLocked(const StringData& ns); // true if this db is locked
         static void assertAtLeastReadLocked(const StringData& ns);
+        static void assertWriteLocked(const StringData& ns);
 
         struct TempRelease {
             TempRelease(); 
@@ -121,6 +122,7 @@ namespace mongo {
     // implementation stuff
     struct LockState {
         LockState() : threadState(0), recursive(0), local(0), other(0), otherLock(0) { }
+        void dump();
 
         // global lock related
         char threadState;             // 0, 'r', 'w', 'R', 'W'

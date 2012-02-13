@@ -29,14 +29,22 @@ namespace mongo {
 
     bool Database::_openAllFiles = true;
 
-    void assertDbAtLeastReadLocked(const Database *) { 
-        // temp impl
-        d.dbMutex.assertAtLeastReadLocked(); 
+    void assertDbAtLeastReadLocked(const Database *db) { 
+        if( db ) { 
+            Lock::assertAtLeastReadLocked(db->name);
+        }
+        else {
+            assert( Lock::isLocked() );
+        }
     }
 
-    void assertDbWriteLocked(const Database *) { 
-        // temp impl
-        d.dbMutex.assertWriteLocked();
+    void assertDbWriteLocked(const Database *db) { 
+        if( db ) { 
+            Lock::assertWriteLocked(db->name);
+        }
+        else {
+            d.dbMutex.assertWriteLocked();
+        }
     }
 
     Database::~Database() {
@@ -96,7 +104,7 @@ namespace mongo {
 
     /*static*/
     string Database::duplicateUncasedName( bool inholderlock, const string &name, const string &path, set< string > *duplicates ) {
-        d.dbMutex.assertAtLeastReadLocked();
+        Lock::assertAtLeastReadLocked(name);
 
         if ( duplicates ) {
             duplicates->clear();   

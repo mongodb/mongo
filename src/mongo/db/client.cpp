@@ -271,7 +271,7 @@ namespace mongo {
        
     void Client::Context::_finishInit( bool doauth ) {
         dassert( Lock::isLocked() );
-        int writeLocked = Lock::isWriteLocked();
+        int writeLocked = Lock::somethingWriteLocked();
         if ( writeLocked && FileAllocator::get()->hasFailed() ) {
             uassert(14031, "Can't take a write lock while out of disk space", false);
         }
@@ -325,7 +325,7 @@ namespace mongo {
         }
     }
     void Client::Context::checkNsAccess( bool doauth ) {
-        checkNsAccess( doauth, Lock::isWriteLocked() ? 1 : 0 );
+        checkNsAccess( doauth, Lock::somethingWriteLocked() ? 1 : 0 );
     }
 
     void Client::appendLastOp( BSONObjBuilder& b ) const {

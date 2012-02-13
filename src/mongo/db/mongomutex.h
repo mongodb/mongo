@@ -63,7 +63,7 @@ namespace mongo {
         static bool atLeastReadLocked();
         void assertAtLeastReadLocked() const { assert( atLeastReadLocked() ); }
         static bool isWriteLocked();
-        void assertWriteLocked() const       { assert( isWriteLocked() );   }
+        void assertWriteLocked() const;
         MutexInfo& info() { return _minfo; }
         MutexInfo _minfo;
     };

@@ -85,7 +85,7 @@ namespace mongo {
          * gets all unique db names, ignoring paths
          */
         void getAllShortNames( bool locked, set<string>& all ) const {
-            d.dbMutex.assertAtLeastReadLocked();
+            assert( Lock::isReadLocked() );
             for ( Paths::const_iterator i=_paths.begin(); i!=_paths.end(); i++ ) {
                 DBs m = i->second;
                 for( DBs::const_iterator j=m.begin(); j!=m.end(); j++ ) {
@@ -115,7 +115,7 @@ namespace mongo {
 
     DatabaseHolder& dbHolderUnchecked();
     inline const DatabaseHolder& dbHolder() { 
-        dassert( d.dbMutex.atLeastReadLocked() );
+        dassert( Lock::isLocked() );
         return dbHolderUnchecked();
     }
     inline DatabaseHolder& dbHolderW() { 

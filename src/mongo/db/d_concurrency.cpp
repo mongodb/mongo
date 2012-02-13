@@ -49,6 +49,27 @@ namespace mongo {
         }
         return *p;
     }
+    void LockState::dump() {
+        char s = threadState;
+        stringstream ss;
+        ss << "lock status: ";
+        if( s == 0 ){
+            ss << "unlocked"; 
+        }
+        else {
+            ss << s;
+            if( recursive ) { 
+                ss << " recursive:" << recursive;
+            }
+            if( other ) {
+                ss << " db:" << otherName;
+            }
+            if( local ) {
+                ss << " local:" << local;
+            }
+        }
+        log() << ss.str() << endl;
+    }
     inline char& threadState() { 
         return lockState().threadState;
     }
@@ -148,7 +169,7 @@ namespace mongo {
     int Lock::isReadLocked() {
         return threadState() & 'R'; // ascii assumed
     }
-    int Lock::isWriteLocked() { // w or W
+    int Lock::somethingWriteLocked() { // w or W
         return threadState() & 'W'; // ascii assumed
     }
     bool Lock::isW() { 
@@ -189,6 +210,12 @@ namespace mongo {
             LockState &ls = lockState();
             log() << ns << endl;
             msgasserted(0, str::stream() << "expected to be read locked for " << ns);
+        }
+    }
+    void Lock::assertWriteLocked(const StringData& ns) { 
+        if( !Lock::isWriteLocked(ns) ) { 
+            lockState().dump();
+            msgasserted(0, str::stream() << "expected to be write locked for " << ns);
         }
     }
 
@@ -528,9 +555,14 @@ namespace mongo {
     bool MongoMutex::isWriteLocked() { 
         return Lock::isW();
     }
+    void MongoMutex::assertWriteLocked() const { 
+        if( !isWriteLocked() ) { 
+            lockState().dump();
+            msgasserted(0, "expected write lock");
+        }
+    }
 
     void curopGotLock(Client*);
-
     void lockedExclusively() {
         Client& c = cc();
         curopGotLock(&c);
