@@ -102,7 +102,10 @@ namespace mongo {
             // if we're stepping down to allow another member to become primary, we
             // better have another member (otherOp), and it should be up-to-date
             otherOp != 0 && highestPriority->hbinfo().opTime.getSecs() >= otherOp - 10) {
-            log() << "stepping down " << primary->fullName() << endl;
+            log() << "stepping down " << primary->fullName() << " (priority " <<
+                primary->config().priority << "), " << highestPriority->fullName() <<
+                " is priority " << highestPriority->config().priority << " and " <<
+                (otherOp - highestPriority->hbinfo().opTime.getSecs()) << " seconds behind" << endl;
 
             if (primary->h().isSelf()) {
                 // replSetStepDown tries to acquire the same lock
