@@ -124,6 +124,7 @@ namespace mongo {
     struct LockState {
         LockState() : threadState(0), recursive(0), local(0), other(0), otherLock(0) { }
         void dump();
+        static void Dump();
 
         // global lock related
         char threadState;             // 0, 'r', 'w', 'R', 'W'

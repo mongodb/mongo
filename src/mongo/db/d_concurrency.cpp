@@ -49,6 +49,9 @@ namespace mongo {
         }
         return *p;
     }
+    void LockState::Dump() {
+        lockState().dump();
+    }
     void LockState::dump() {
         char s = threadState;
         stringstream ss;

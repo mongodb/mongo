@@ -146,7 +146,7 @@ namespace mongo {
 
             {
                 // now that we are locked, fully drain deferred notes of write intents
-                DEV d.dbMutex.assertAtLeastReadLocked();
+                assert( Lock::isRW() );
                 Writes& writes = commitJob.wi();
                 writes._deferred.invoke();
                 writes._drained = true;

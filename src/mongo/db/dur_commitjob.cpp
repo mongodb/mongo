@@ -45,10 +45,10 @@ namespace mongo {
 
         void Writes::clear() {
             d.dbMutex.assertAtLeastReadLocked();
-
+            commitJob.groupCommitMutex.dassertLocked();
             _alreadyNoted.clear();
             _writes.clear();
-            _ops.clear();
+            _durOps.clear();
             _drained = false;
 #if defined(DEBUG_WRITE_INTENT)
             cout << "_debug clear\n";
@@ -121,7 +121,7 @@ namespace mongo {
             SimpleMutex::scoped_lock lk(groupCommitMutex);
             cc().writeHappened();
             _hasWritten = true;
-            _wi._ops.push_back(p);
+            _wi._durOps.push_back(p);
         }
 
         size_t privateMapBytes = 0; // used by _REMAPPRIVATEVIEW to track how much / how fast to remap

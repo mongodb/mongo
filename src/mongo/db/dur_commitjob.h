@@ -119,7 +119,7 @@ namespace mongo {
             TaskQueue<D> _deferred;
             Already<127> _alreadyNoted;
             set<WriteIntent> _writes;
-            vector< shared_ptr<DurOp> > _ops; // all the ops other than basic writes
+            vector< shared_ptr<DurOp> > _durOps; // all the ops other than basic writes
             bool _drained; // _deferred is drained?  for asserting/testing
 
             /** reset the Writes structure (empties all the above) */
@@ -184,7 +184,8 @@ namespace mongo {
 
             vector< shared_ptr<DurOp> >& ops() { 
                 dassert( Lock::isRW() );
-                return _wi._ops; 
+                groupCommitMutex.dassertLocked();
+                return _wi._durOps;                
             }
 
             /** this method is safe to call outside of locks. when haswritten is false we don't do any group commit and avoid even
