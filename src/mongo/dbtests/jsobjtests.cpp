@@ -1047,6 +1047,7 @@ namespace JsobjTests {
             };
 
             // Randomized BSON parsing test.  See if we seg fault.
+            // NOTE This test is disabled (below), see SERVER-4948.
             class Fuzz {
             public:
                 Fuzz( double frequency ) : frequency_( frequency ) {}
@@ -2147,11 +2148,13 @@ namespace JsobjTests {
             add< BSONObjTests::Validation::NoSize >( Object );
             add< BSONObjTests::Validation::NoSize >( Array );
             add< BSONObjTests::Validation::NoSize >( BinData );
+            if ( 0 ) { // SERVER-4948
             add< BSONObjTests::Validation::Fuzz >( .5 );
             add< BSONObjTests::Validation::Fuzz >( .1 );
             add< BSONObjTests::Validation::Fuzz >( .05 );
             add< BSONObjTests::Validation::Fuzz >( .01 );
             add< BSONObjTests::Validation::Fuzz >( .001 );
+            }
             add< OIDTests::init1 >();
             add< OIDTests::initParse1 >();
             add< OIDTests::append >();
