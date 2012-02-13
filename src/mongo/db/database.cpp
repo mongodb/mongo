@@ -393,7 +393,7 @@ namespace mongo {
     }
 
     Database* DatabaseHolder::getOrCreate( const string& ns , const string& path , bool& justCreated ) {
-        d.dbMutex.assertAtLeastReadLocked();
+        Lock::assertAtLeastReadLocked(ns);
 
         DBs& m = _paths[path];
 
@@ -410,7 +410,7 @@ namespace mongo {
         // todo: protect against getting sprayed with requests for different db names that DNE - 
         //       that would make the DBs map very large.  not clear what to do to handle though, 
         //       perhaps just log it, which is what we do here with the "> 40" : 
-        bool cant = !d.dbMutex.isWriteLocked();
+        bool cant = !Lock::isWriteLocked(ns);
         if( logLevel >= 1 || m.size() > 40 || cant || DEBUG_BUILD ) {
             log() << "opening db: " << (path==dbpath?"":path) << ' ' << dbname << endl;
         }

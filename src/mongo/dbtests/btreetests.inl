@@ -141,6 +141,7 @@
 
     class Create : public Base {
     public:
+        Create() { }
         void run() {
             checkValid( 0 );
         }

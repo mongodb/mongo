@@ -19,6 +19,9 @@ namespace mongo {
         static bool isW();          // W
         static bool isR();          
         static bool nested();
+        static bool isWriteLocked(const StringData& ns);
+        static bool atLeastReadLocked(const StringData& ns); // true if this db is locked
+        static void assertAtLeastReadLocked(const StringData& ns);
 
         struct TempRelease {
             TempRelease(); 

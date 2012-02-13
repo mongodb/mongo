@@ -160,6 +160,37 @@ namespace mongo {
     bool Lock::nested() { 
         return recursive() != 0;
     }
+    static bool weLocked(const LockState &ls, const StringData& ns) { 
+        string db = nsToDatabase(ns.data());
+        if( db == "local" ) {
+            return ls.local;
+        }
+        return db == ls.otherName && ls.other;
+    }
+    bool Lock::isWriteLocked(const StringData& ns) { 
+        LockState &ls = lockState();
+        if( ls.threadState == 'W' ) 
+            return true;
+        if( ls.threadState != 'w' ) 
+            return false;
+        return weLocked(ls,ns);
+    }
+    bool Lock::atLeastReadLocked(const StringData& ns)
+    { 
+        LockState &ls = lockState();
+        if( ls.threadState == 'R' || ls.threadState == 'W' ) 
+            return true; // global
+        if( ls.threadState == 0 ) 
+            return false;
+        return weLocked(ls,ns);
+    }
+    void Lock::assertAtLeastReadLocked(const StringData& ns) { 
+        if( !atLeastReadLocked(ns) ) { 
+            LockState &ls = lockState();
+            log() << ns << endl;
+            msgasserted(0, str::stream() << "expected to be read locked for " << ns);
+        }
+    }
 
     Lock::TempRelease::TempRelease() : 
         cant( recursive() ), type(threadState())
