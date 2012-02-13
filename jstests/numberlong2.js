@@ -1,7 +1,5 @@
 // Test precision of NumberLong values with v1 index code SERVER-3717
 
-if ( 1 ) { // SERVER-3717
-
 t = db.jstests_numberlong2;
 t.drop();
 
@@ -28,5 +26,3 @@ for( i = 99; i >= 0; --i ) {
 }
 
 assert.eq( t.find().sort( {x:1} ).hint( {$natural:1} ).toArray(), t.find().sort( {x:1} ).hint( {x:1} ).toArray() );
-
-}
