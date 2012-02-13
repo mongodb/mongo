@@ -27,8 +27,8 @@ db = db.getSiblingDB("aggdb");
 var p1 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
-	tags : 1,
-	pageViews : 1
+  tags : 1,
+  pageViews : 1
     }}
 ]});
 
@@ -281,9 +281,9 @@ assert(arrayEq(u2.result, u2result), 'u2 failed');
 var p2 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
-	author : 1,
-	tags : 1,
-	pageViews : 1
+  author : 1,
+  tags : 1,
+  pageViews : 1
     }},
     { $unwind : "$tags" }
 ]});
@@ -340,8 +340,8 @@ assert(arrayEq(p2.result, p2result), 'p2 failed');
 var p3 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
-	otherfoo : "$other.foo",
-	otherbar : "$other.bar"
+  otherfoo : "$other.foo",
+  otherbar : "$other.bar"
     }}
 ]});
 
@@ -367,8 +367,8 @@ assert(arrayEq(p3.result, p3result), 'p3 failed');
 var p4 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
-	author : 1,
-	daveWroteIt : { $eq:["$author", "dave"] }
+  author : 1,
+  daveWroteIt : { $eq:["$author", "dave"] }
     }}
 ]});
 
@@ -397,14 +397,14 @@ assert(arrayEq(p4.result, p4result), 'p4 failed');
 var p5 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
-	author : 1,
-	pageViews : 1,
-	tags : 1
+  author : 1,
+  pageViews : 1,
+  tags : 1
     }},
     { $unwind : "$tags" },
     { $project : {
-	author : 1,
-	subDocument : { foo : "$pageViews", bar : "$tags"  }
+  author : 1,
+  subDocument : { foo : "$pageViews", bar : "$tags"  }
     }}
 ]});
 
@@ -475,18 +475,18 @@ assert(arrayEq(p5.result, p5result), 'p5 failed');
 var p6 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
-	author : 1,
-	tags : 1,
-	pageViews : 1
+  author : 1,
+  tags : 1,
+  pageViews : 1
     }},
     { $unwind : "$tags" },
     { $project : {
-	author : 1,
-	tag : "$tags",
-	pageViews : 1,
-	daveWroteIt : { $eq:["$author", "dave"] },
-	weLikeIt : { $or:[ { $eq:["$author", "dave"] },
-			   { $eq:["$tags", "good"] } ] }
+  author : 1,
+  tag : "$tags",
+  pageViews : 1,
+  daveWroteIt : { $eq:["$author", "dave"] },
+  weLikeIt : { $or:[ { $eq:["$author", "dave"] },
+         { $eq:["$tags", "good"] } ] }
     }}
 ]});
 
@@ -556,9 +556,9 @@ assert(arrayEq(p6.result, p6result), 'p6 failed');
 var p7 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
-	theSum : { $add:["$pageViews",
-			 { $ifNull:["$other.foo",
-				    "$other.bar"] } ] }
+  theSum : { $add:["$pageViews",
+       { $ifNull:["$other.foo",
+            "$other.bar"] } ] }
     }}
 ]});
 
@@ -584,10 +584,10 @@ assert(arrayEq(p7.result, p7result), 'p7 failed');
 var p8 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
-	_id : 0,
-	author : 1,
-	tags : 1,
-	"comments.author" : 1
+  _id : 0,
+  author : 1,
+  tags : 1,
+  "comments.author" : 1
     }},
     { $unwind : "$tags" }
 ]});
@@ -686,9 +686,9 @@ assert(arrayEq(p8.result, p8result), 'p8 failed');
 var p9 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
-	_id : 0,
-	author : 1,
-	commentsAuthor : "$comments.author"
+  _id : 0,
+  author : 1,
+  commentsAuthor : "$comments.author"
     }}
 ]});
 
@@ -811,8 +811,8 @@ db.p11.drop();
 db.p11.save( {
     name : 'MongoDB',
     items : {
-	authors : ['jay', 'vivek', 'bjornar'],
-	dbg : [17, 42]
+  authors : ['jay', 'vivek', 'bjornar'],
+  dbg : [17, 42]
     },
     favorites : ['pickles', 'ice cream', 'kettle chips']
 });
@@ -821,8 +821,8 @@ var p11 = db.runCommand(
 { aggregate : "p11", pipeline : [
     { $unwind : "$items.authors" },
     { $project : {
-	name : 1,
-	author : "$items.authors"
+  name : 1,
+  author : "$items.authors"
     }},
 ]});
 
@@ -851,9 +851,9 @@ assert(arrayEq(p11.result, p11result), 'p11 failed');
 var p12 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
-	theProduct : { $multiply:["$pageViews",
-			 { $ifNull:["$other.foo",
-				    "$other.bar"] } ] }
+  theProduct : { $multiply:["$pageViews",
+       { $ifNull:["$other.foo",
+            "$other.bar"] } ] }
     }}
 ]});
 
@@ -879,9 +879,9 @@ assert(arrayEq(p12.result, p12result), 'p12 failed');
 var p13 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
-	theDifference : { $subtract:["$pageViews",
-			 { $ifNull:["$other.foo",
-				    "$other.bar"] } ] }
+  theDifference : { $subtract:["$pageViews",
+       { $ifNull:["$other.foo",
+            "$other.bar"] } ] }
     }}
 ]});
 
@@ -907,9 +907,9 @@ assert(arrayEq(p13.result, p13result), 'p13 failed');
 var p14 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
-	theRemainder : { $mod:[
-	    { $ifNull:["$other.foo",
-		    "$other.bar"] },
+  theRemainder : { $mod:[
+      { $ifNull:["$other.foo",
+        "$other.bar"] },
                 "$pageViews", ] }
     }}
 ]});
@@ -936,8 +936,8 @@ assert(arrayEq(p14.result, p14result), 'p14 failed');
 var p15 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
-	author : {$toUpper: "$author"},
-	pageViews : 1
+  author : {$toUpper: "$author"},
+  pageViews : 1
     }}
 ]});
 
@@ -966,8 +966,8 @@ assert(arrayEq(p15.result, p15result), 'p15 failed');
 var p16 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
-	author : {$toUpper: "$author"},
-	pageViews : 1
+  author : {$toUpper: "$author"},
+  pageViews : 1
     }},
     { $project : {
     author : {$toLower: "$author"},
@@ -1000,7 +1000,7 @@ assert(arrayEq(p16.result, p16result), 'p16 failed');
 var p17 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
-	author : {$substr: ["$author", 1, 2]},
+  author : {$substr: ["$author", 1, 2]},
     }}
 ]});
 
@@ -1135,15 +1135,15 @@ db.vartype.save({ x : 17, y : "foo"});
 var p20 = db.runCommand(
 { aggregate : "vartype", pipeline : [
     { $project : {
-	all_numbers : { $add:[1, "$x", 2, "$x"] },
-	string_fields : { $add:[3, "$y", 4, "$y"] },
-	number_fields : { $add:["a", "$x", "b", "$x"] },
-	all_strings : { $add:["c", "$y", "d", "$y"] },
-	potpourri_1 : { $add:[5, "$y", "e", "$x"] },
-	potpourri_2 : { $add:[6, "$x", "f", "$y"] },
-	potpourri_3 : { $add:["g", "$y", 7, "$x"] },
-	potpourri_4 : { $add:["h", "$x", 8, "$y"] },
-	_id: 0
+  all_numbers : { $add:[1, "$x", 2, "$x"] },
+  string_fields : { $add:[3, "$y", 4, "$y"] },
+  number_fields : { $add:["a", "$x", "b", "$x"] },
+  all_strings : { $add:["c", "$y", "d", "$y"] },
+  potpourri_1 : { $add:[5, "$y", "e", "$x"] },
+  potpourri_2 : { $add:[6, "$x", "f", "$y"] },
+  potpourri_3 : { $add:["g", "$y", 7, "$x"] },
+  potpourri_4 : { $add:["h", "$x", 8, "$y"] },
+  _id: 0
     }}
 ]});
 
@@ -1166,11 +1166,11 @@ assert(arrayEq(p20.result, p20result), 'p20 failed');
 var p21 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
-	_id : 0,
-	author : 1,
-	pageViews : { $cond : [ {$eq:["$author", "dave"]},
-				{$add:["$pageViews", 1000]}, "$pageViews" ]
-	}
+  _id : 0,
+  author : 1,
+  pageViews : { $cond : [ {$eq:["$author", "dave"]},
+        {$add:["$pageViews", 1000]}, "$pageViews" ]
+  }
     }}
 ]});
 
@@ -1233,11 +1233,11 @@ assert(arrayEq(m1.result, m1result), 'm1 failed');
 var m2 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
-	title : 1,
-	author : 1,
-	pageViews : 1,
-	tags : 1,
-	comments : 1
+  title : 1,
+  author : 1,
+  pageViews : 1,
+  tags : 1,
+  comments : 1
     }},
     { $unwind : "$tags" },
     { $match : { tags : "nasty" } }
@@ -1288,15 +1288,15 @@ assert(arrayEq(m2.result, m2result), 'm2 failed');
 var g1 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
-	author : 1,
-	tags : 1,
-	pageViews : 1
+  author : 1,
+  tags : 1,
+  pageViews : 1
     }},
     { $unwind : "$tags" },
     { $group : {
-	_id : "$tags",
-	docsByTag : { $sum : 1 },
-	viewsByTag : { $sum : "$pageViews" }
+  _id : "$tags",
+  docsByTag : { $sum : 1 },
+  viewsByTag : { $sum : "$pageViews" }
     }}
 ]});
 
@@ -1330,24 +1330,24 @@ assert(arrayEq(g1.result, g1result), 'g1 failed');
 var g2 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
-	author : 1,
-	tags : 1,
-	pageViews : 1
+  author : 1,
+  tags : 1,
+  pageViews : 1
     }},
     { $unwind : "$tags" },
     { $group : {
-	_id: { tags : 1 },
-	docsByTag : { $sum : 1 },
-	viewsByTag : { $sum : "$pageViews" },
-	mostViewsByTag : { $max : "$pageViews" },
+  _id: { tags : 1 },
+  docsByTag : { $sum : 1 },
+  viewsByTag : { $sum : "$pageViews" },
+  mostViewsByTag : { $max : "$pageViews" },
     }},
     { $project : {
-	_id: false,
-	tag : "$_id.tags",
-	mostViewsByTag : 1,
-	docsByTag : 1,
-	viewsByTag : 1,
-	avgByTag : { $divide:["$viewsByTag", "$docsByTag"] }
+  _id: false,
+  tag : "$_id.tags",
+  mostViewsByTag : 1,
+  docsByTag : 1,
+  viewsByTag : 1,
+  avgByTag : { $divide:["$viewsByTag", "$docsByTag"] }
     }}
 ]});
 
@@ -1389,13 +1389,13 @@ assert(arrayEq(g2.result, g2result), 'g2 failed');
 var g3 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
-	author : 1,
-	tags : 1,
+  author : 1,
+  tags : 1,
     }},
     { $unwind : "$tags" },
     { $group : {
-	_id : { tags : 1 },
-	authors : { $push : "$author" }
+  _id : { tags : 1 },
+  authors : { $push : "$author" }
     }}
 ]});
 
@@ -1444,16 +1444,16 @@ assert(arrayEq(g3.result, g3result), 'g3 failed');
 var g4 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
-	author : 1,
-	tags : 1,
-	pageViews : 1
+  author : 1,
+  tags : 1,
+  pageViews : 1
     }},
     { $unwind : "$tags" },
     { $group : {
-	_id: { tags : 1 },
-	docsByTag : { $sum : 1 },
-	viewsByTag : { $sum : "$pageViews" },
-	avgByTag : { $avg : "$pageViews" },
+  _id: { tags : 1 },
+  docsByTag : { $sum : 1 },
+  viewsByTag : { $sum : "$pageViews" },
+  avgByTag : { $avg : "$pageViews" },
     }}
 ]});
 
@@ -1499,13 +1499,13 @@ assert(arrayEq(g4.result, g4result), 'g4 failed');
 var g5 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $project : {
-	author : 1,
-	tags : 1,
+  author : 1,
+  tags : 1,
     }},
     { $unwind : "$tags" },
     { $group : {
-	_id : { tags : 1 },
-	authors : { $addToSet : "$author" }
+  _id : { tags : 1 },
+  authors : { $addToSet : "$author" }
     }}
 ]});
 
@@ -1554,20 +1554,107 @@ var g6 = db.runCommand(
 { aggregate : "article", pipeline : [
     { $sort : { author : -1 } },
     { $group : {
-	_id : "authors", /* constant string, *not* a field reference */
-	firstAuthor : { $last : "$author" }, /* note reverse sort above */
-	lastAuthor : { $first : "$author" }, /* note reverse sort above */
-	count : { $sum : 1 }
+  _id : "authors", /* constant string, *not* a field reference */
+  firstAuthor : { $last : "$author" }, /* note reverse sort above */
+  lastAuthor : { $first : "$author" }, /* note reverse sort above */
+  count : { $sum : 1 }
     }}
 ]});
 
 var g6result = [
     {
         "_id" : "authors",
-	firstAuthor : "bob",
-	lastAuthor : "jane",
-	count : 3
+  firstAuthor : "bob",
+  lastAuthor : "jane",
+  count : 3
     }
 ];
 
 assert(arrayEq(g6.result, g6result), 'g6 failed');
+
+// $size expression 
+
+db.s4899.drop();
+db.s4899.save({
+     client_id:4,
+     source:"google.com",
+     kw:"pet",
+     original_url:"http://www.ABC.com",
+     urllower:"http://www.abc.com",
+     source_type:"search_engine",
+     pageviews:10,
+     visits:2,
+     trafficDate:new Date()
+   });
+db.s4899.save({
+     client_id:4,
+     source:"google.com",
+     kw:"food",
+     original_url:"http://www.BCD.com",
+     urllower:"http://www.bcd.com",
+     source_type:"search_engine",
+     pageviews:7,
+     visits:3,
+     trafficDate:new Date()
+   });
+db.s4899.save({
+     client_id:4,
+     source:"google.com",
+     kw:"cars",
+     original_url:"http://www.CDE.com",
+     urllower:"http://www.cde.com",
+     source_type:"search_engine",
+     pageviews:8,
+     visits:1,
+     trafficDate:new Date()
+   });
+db.s4899.save({
+    client_id:4,
+    source:"google.com",
+    kw:"cars",
+    original_url:"http://www.ABC.com",
+    urllower:"http://www.abc.com",
+    source_type:"search_engine",
+    pageviews:9,
+    visits:3,
+    trafficDate:new Date()
+  });
+
+var a1 = db.runCommand({aggregate:'s4899',pipeline:[
+      { $group: { 
+          _id: "$urllower",
+          visits: { $sum: "$visits" },
+          kw: { $addToSet: "$kw" } } 
+      },
+      { $project: { 
+          urllower: "$_id",
+          visits: 1 ,
+          keywords: { $size: "$kw" } } 
+      }
+  ]});
+
+var a1result = [
+  { 
+    "_id": "http://www.cde.com",
+    "visits":1,
+    "urllower": "http://www.cde.com",
+    "keywords": 1
+  },
+  {
+    "_id": "http://www.bcd.com",
+    "visits": 3,
+    "urllower":"http://www.bcd.com",
+    "keywords": 1
+  },
+  {
+    "_id": "http://www.abc.com",
+    "visits": 5,
+    "urllower":"http://www.abc.com",
+    "keywords": 2
+  }
+]
+assert( a1.result, 's4899.a1 failed');
+assert.eq( a1.result, a1result, "s4899.a1 unexepected result");
+
+
+
