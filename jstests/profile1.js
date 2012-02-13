@@ -1,8 +1,5 @@
 print("profile1.js BEGIN");
 
-// special db so that it can be run in parallel tests
-db = db.getSisterDB("profile1");
-
 try {
 
     function getProfileAString() {
@@ -123,7 +120,7 @@ try {
     assert.eq( q , r.query , "Y1" );
     assert.eq( u , r.updateobj , "Y2" );
     assert.eq( "update" , r.op , "Y3" );
-    assert.eq("profile1.profile1", r.ns, "Y4");
+    assert.eq("test.profile1", r.ns, "Y4");
 
     print("profile1.js SUCCESS OK");
     
