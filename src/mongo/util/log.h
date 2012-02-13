@@ -366,7 +366,9 @@ namespace mongo {
     /** logging which we may not want during unit tests (dbtests) runs.
         set tlogLevel to -1 to suppress tlog() output in a test program. */
     inline Nullstream& tlog( int level = 0 ) {
-        if ( level > tlogLevel || level > logLevel )
+        if ( !debug && level > tlogLevel )
+            return nullstream;
+        if ( level > logLevel )
             return nullstream;
         return Logstream::get().prolog();
     }
