@@ -395,8 +395,8 @@ namespace mongo {
                         ss << "journal error warning views mismatch " << mmf->filename() << ' ' << (hex) << low << ".." << high << " len:" << high-low+1;
                         log() << ss.str() << endl;
                         log() << "priv loc: " << (void*)(p+low) << ' ' << endl;
-                        set<WriteIntent>& b = commitJob.writes();
-                        (void)b; // mark as unused. Useful for inspection in debugger
+                        //vector<WriteIntent>& _intents = commitJob.wi()._intents;
+                        //(void) _intents; // mark as unused. Useful for inspection in debugger
 
                         // should we abort() here so this isn't unnoticed in some circumstances?
                         massert(13599, "Written data does not match in-memory view. Missing WriteIntent?", false);
@@ -764,9 +764,6 @@ namespace mongo {
                     for( unsigned i = 1; i <= 2; i++ ) {
                         if( commitJob._notify.nWaiting() )
                             break;
-                        // once more concurrency in commitJob::note(), we can then perhaps get rid of this deferral optimization, 
-                        // which would be wise as there is some compexity to futures
-                        commitJob.wi()._deferred.invoke();
                         sleepmillis(oneThird);
                     }
 

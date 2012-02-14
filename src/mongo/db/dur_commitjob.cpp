@@ -29,10 +29,6 @@ namespace mongo {
         BOOST_STATIC_ASSERT( UncommittedBytesLimit > BSONObjMaxInternalSize * 3 );
         BOOST_STATIC_ASSERT( sizeof(void*)==4 || UncommittedBytesLimit > BSONObjMaxInternalSize * 6 );
 
-        void Writes::D::go(const Writes::D& d) {
-            commitJob.wi()._insertWriteIntent(d.p, d.len);
-        }
-
         void WriteIntent::absorb(const WriteIntent& other) {
             dassert(overlaps(other));
 
@@ -47,9 +43,8 @@ namespace mongo {
             d.dbMutex.assertAtLeastReadLocked();
             commitJob.groupCommitMutex.dassertLocked();
             _alreadyNoted.clear();
-            _writes.clear();
+            _intents.clear();
             _durOps.clear();
-            _drained = false;
 #if defined(DEBUG_WRITE_INTENT)
             cout << "_debug clear\n";
             _debug.clear();
@@ -65,54 +60,6 @@ namespace mongo {
             abort();
         }
 #endif
-
-        void Writes::_insertWriteIntent(void* p, int len) {
-            WriteIntent wi(p, len);
-
-            if (_writes.empty()) {
-                _writes.insert(wi);
-                return;
-            }
-
-            typedef set<WriteIntent>::const_iterator iterator; // shorter
-
-            iterator closest = _writes.lower_bound(wi);
-            // closest.end() >= wi.end()
-
-            if ((closest != _writes.end() && closest->overlaps(wi)) || // high end
-                    (closest != _writes.begin() && (--closest)->overlaps(wi))) { // low end
-                if (closest->contains(wi))
-                    return; // nothing to do
-
-                // find overlapping range and merge into wi
-                iterator   end(closest);
-                iterator begin(closest);
-                while (  end->overlaps(wi)) { wi.absorb(*end); ++end; if (end == _writes.end()) break; }  // look forwards
-                while (begin->overlaps(wi)) { wi.absorb(*begin); if (begin == _writes.begin()) break; --begin; } // look backwards
-                if (!begin->overlaps(wi)) ++begin; // make inclusive
-
-                DEV { // ensure we're not deleting anything we shouldn't
-                    for (iterator it(begin); it != end; ++it) {
-                        assert(wi.contains(*it));
-                    }
-                }
-
-                _writes.erase(begin, end);
-                _writes.insert(wi);
-
-                DEV { // ensure there are no overlaps
-                    // this can be very slow - n^2 - so make it RARELY
-                    RARELY {
-                        for (iterator it(_writes.begin()), end(boost::prior(_writes.end())); it != end; ++it) {
-                            assert(!it->overlaps(*boost::next(it)));
-                        }
-                    }
-                }
-            }
-            else { // no entries overlapping wi
-                _writes.insert(closest, wi);
-            }
-        }
 
         /** note an operation other than a "basic write" */
         void CommitJob::noteOp(shared_ptr<DurOp> p) {
@@ -153,8 +100,12 @@ namespace mongo {
             // be read locked here.  but must be at least read locked to avoid race with
             // remapprivateview
             DEV notesThisLock++;
-            DEV d.dbMutex.assertWriteLocked();
+
+            //DEV d.dbMutex.assertWriteLocked();
+            log() << "TODO temp finish concurrency" << endl;
+
             dassert( cmdLine.dur );
+
             cc().writeHappened();
             if( !_wi._alreadyNoted.checkAndSet(p, len) ) {
                 MemoryMappedFile::makeWritable(p, len);
@@ -191,8 +142,6 @@ namespace mongo {
 
                 // remember intent. we will journal it in a bit
                 _wi.insertWriteIntent(p, len);
-                wassert( _wi._writes.size() <  2000000 );
-                //assert(  _wi._writes.size() < 20000000 );
 
                 {
                     // a bit over conservative in counting pagebytes used

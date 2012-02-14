@@ -110,33 +110,17 @@ namespace mongo {
 
         /** our record of pending/uncommitted write intents */
         class Writes : boost::noncopyable {
-            struct D {
-                void *p;
-                unsigned len;
-                static void go(const D& d);
-            };
         public:
-            TaskQueue<D> _deferred;
+            vector<WriteIntent> _intents;
             Already<127> _alreadyNoted;
-            set<WriteIntent> _writes;
             vector< shared_ptr<DurOp> > _durOps; // all the ops other than basic writes
-            bool _drained; // _deferred is drained?  for asserting/testing
 
             /** reset the Writes structure (empties all the above) */
             void clear();
 
-            /** merges into set (ie non-deferred version) */
-            void _insertWriteIntent(void* p, int len);
-
             void insertWriteIntent(void* p, int len) {
-#if defined(DEBUG_WRITE_INTENT)
-                if( _debug[p] < len )
-                    _debug[p] = len;
-#endif
-                D d;
-                d.p = p;
-                d.len = len;
-                _deferred.defer(d);
+                _intents.push_back(WriteIntent(p,len));
+                wassert( _intents.size() < 2000000 );
             }
 
 #ifdef _DEBUG
@@ -172,15 +156,6 @@ namespace mongo {
 
             /** note an operation other than a "basic write" */
             void noteOp(shared_ptr<DurOp> p);
-
-            set<WriteIntent>& writes() {
-                if( !_wi._drained ) {
-                    // generally, you don't want to use the set until it is prepared (after deferred ops are applied)
-                    // thus this assert here.
-                    assert(false);
-                }
-                return _wi._writes;
-            }
 
             vector< shared_ptr<DurOp> >& ops() { 
                 dassert( Lock::isRW() );

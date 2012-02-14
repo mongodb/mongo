@@ -121,11 +121,26 @@ namespace mongo {
             scoped_lock lk(privateViews._mutex());
 
             // each time events switch to a different database we journal a JDbContext
+            // switches will be rare as we sort by memory location first and we batch commit.
             RelativePath lastDbPath;
 
-            for( set<WriteIntent>::iterator i = commitJob.writes().begin(); i != commitJob.writes().end(); i++ ) {
-                prepBasicWrite_inlock(bb, &(*i), lastDbPath);
+            vector<WriteIntent>& _intents = commitJob.wi()._intents;
+            assert( !_intents.empty() );
+            sort(_intents.begin(), _intents.end());
+
+            WriteIntent last;
+            for( vector<WriteIntent>::const_iterator i = _intents.begin(); i != _intents.end(); i++ ) { 
+                if( i->start() < last.end() ) { 
+                    // overlaps
+                    last.absorb(*i);
+                }
+                else { 
+                    // discontinuous
+                    prepBasicWrite_inlock(bb, &last, lastDbPath);
+                    last = *i;
+                }
             }
+            prepBasicWrite_inlock(bb, &last, lastDbPath);
         }
 
         static void resetLogBuffer(/*out*/JSectHeader& h, AlignedBuilder& bb) {
@@ -143,14 +158,7 @@ namespace mongo {
         */
         static void _PREPLOGBUFFER(JSectHeader& h, AlignedBuilder& bb) {
             assert( cmdLine.dur );
-
-            {
-                // now that we are locked, fully drain deferred notes of write intents
-                assert( Lock::isRW() );
-                Writes& writes = commitJob.wi();
-                writes._deferred.invoke();
-                writes._drained = true;
-            }
+            assert( Lock::isRW() );
 
             resetLogBuffer(h, bb); // adds JSectHeader
 
