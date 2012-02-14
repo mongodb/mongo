@@ -1924,7 +1924,8 @@ shellHelper.next = function () {
         currentTutorial.currentState = 0;
     }
     
-    eval("currentTutorial.t"+ currentTutorial.currentState+"()");
+    var property = 't' + currentTutorial.currentState;
+    currentTutorial[property]();
     currentTutorial.currentState = currentTutorial.currentState + 1;
     
     return "";
@@ -1936,8 +1937,12 @@ shellHelper.back = function () {
     if (currentTutorial.currentState < 0) {
         currentTutorial.currentState = 0;
     }
-    eval("currentTutorial.t"+ currentTutorial.currentState+"()");
+    
+    var property = 't' + currentTutorial.currentState;
+    currentTutorial[property]();
     currentTutorial.currentState = currentTutorial.currentState + 1;
+    
+    return "";
     
 }
 
