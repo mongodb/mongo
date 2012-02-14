@@ -61,7 +61,7 @@ namespace mongo {
     public:
         MongoMutex();
         static bool atLeastReadLocked();
-        void assertAtLeastReadLocked() const { assert( atLeastReadLocked() ); }
+        void assertAtLeastReadLocked() const;
         static bool isWriteLocked();
         void assertWriteLocked() const;
         MutexInfo& info() { return _minfo; }
