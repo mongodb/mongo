@@ -1642,7 +1642,7 @@ namespace mongo {
 
         assert( !BackgroundOperation::inProgForNs(ns.c_str()) ); // should have been checked earlier, better not be...
         assert( d->indexBuildInProgress == 0 );
-        assertInWriteLock();
+        assert( Lock::isWriteLocked(ns) );
         RecoverableIndexState recoverable( d );
 
         // Build index spec here in case the collection is empty and the index details are invalid
