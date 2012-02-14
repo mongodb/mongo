@@ -9,7 +9,7 @@ for ( i=1; i<10; i++ ){
 }
 
 function go( q , c , b , o ){
-    var e = t.find( q ).explain();
+    var e = t.find( q ).hint( {a:1,b:1} ).explain();
     assert.eq( c , e.n , "count " + tojson( q ) )
     assert.eq( b , e.nscanned , "nscanned " + tojson( q ) )
     assert.eq( o , e.nscannedObjects , "nscannedObjects " + tojson( q ) )

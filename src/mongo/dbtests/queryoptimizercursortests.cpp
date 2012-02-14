@@ -170,6 +170,18 @@ namespace QueryOptimizerCursorTests {
             }
         }
     };
+    
+    class DurationTimerStop {
+    public:
+        void run() {
+            DurationTimer t;
+            while( t.duration() == 0 );
+            ASSERT( t.duration() > 0 );
+            t.stop();
+            ASSERT( t.duration() > 0 );
+            ASSERT( t.duration() > 0 );
+        }
+    };
 
     class Base {
     public:
@@ -2634,122 +2646,614 @@ namespace QueryOptimizerCursorTests {
         
     } // namespace GetCursor
     
+    namespace Explain {
+        
+        class ClearRecordedIndex : public QueryOptimizerCursorTests::Base {
+        public:
+            void run() {
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
+                _cli.insert( ns(), BSON( "a" << 1 << "b" << 1 ) );
+                _cli.insert( ns(), BSON( "a" << 1 << "b" << 1 ) );
+                
+                dblock lk;
+                Client::Context ctx( ns() );
+                BSONObj query = BSON( "a" << 1 << "b" << 1 );
+                shared_ptr<Cursor> c =
+                NamespaceDetailsTransient::getCursor( ns(), query );
+                while( c->advance() );
+                ParsedQuery parsedQuery( ns(), 0, 0, 0,
+                                        BSON( "$query" << query << "$explain" << true ),
+                                        BSONObj() );
+                c = NamespaceDetailsTransient::getCursor( ns(), query, BSONObj(), false, 0,
+                                                         &parsedQuery );
+                set<BSONObj> indexKeys;
+                while( c->ok() ) {
+                    indexKeys.insert( c->indexKeyPattern() );
+                    c->advance();
+                }
+                ASSERT( indexKeys.size() > 1 );
+            }
+        };
+        
+        class Base : public QueryOptimizerCursorTests::Base {
+        public:
+            virtual ~Base() {}
+            void run() {
+                setupCollection();
+                
+                dblock lk;
+                Client::Context ctx( ns() );
+                ParsedQuery parsedQuery( ns(), 0, 0, 0,
+                                        BSON( "$query" << query() << "$explain" << true ),
+                                        BSONObj() );
+                _cursor =
+                dynamic_pointer_cast<QueryOptimizerCursor>
+                ( NamespaceDetailsTransient::getCursor( ns(), query(), BSONObj(), false, 0,
+                                                       &parsedQuery ) );
+                ASSERT( _cursor );
+                
+                handleCursor();
+                
+                _explainInfo = _cursor->explainQueryInfo();
+                _explain = _explainInfo->bson();
+
+                checkExplain();
+            }
+        protected:
+            virtual void setupCollection() {
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                _cli.insert( ns(), BSON( "a" << 1 << "b" << 1 ) );
+                _cli.insert( ns(), BSON( "a" << 2 << "b" << 1 ) );
+            }
+            virtual BSONObj query() const { return BSON( "a" << 1 << "b" << 1 ); }
+            virtual void handleCursor() {
+            }
+            virtual void checkExplain() {
+            }
+            shared_ptr<QueryOptimizerCursor> _cursor;
+            shared_ptr<ExplainQueryInfo> _explainInfo;
+            BSONObj _explain;
+        };
+        
+        class Initial : public Base {
+            virtual void checkExplain() {
+                ASSERT( !_explain[ "cursor" ].eoo() );
+                ASSERT( !_explain[ "isMultiKey" ].Bool() );
+                ASSERT_EQUALS( 0, _explain[ "n" ].Long() );
+                ASSERT_EQUALS( 0, _explain[ "nscannedObjects" ].Long() );
+                ASSERT_EQUALS( 2, _explain[ "nscanned" ].Long() );
+                ASSERT( !_explain[ "scanAndOrder" ].Bool() );
+                ASSERT( !_explain[ "indexOnly" ].Bool() );
+                ASSERT_EQUALS( 0, _explain[ "nYields" ].Int() );
+                ASSERT_EQUALS( 0, _explain[ "nChunkSkips" ].Long() );
+                ASSERT( !_explain[ "millis" ].eoo() );
+                ASSERT( !_explain[ "indexBounds" ].eoo() );
+                ASSERT_EQUALS( 2U, _explain[ "allPlans" ].Array().size() );
+
+                BSONObj plan1 = _explain[ "allPlans" ].Array()[ 0 ].Obj();
+                ASSERT_EQUALS( "BtreeCursor a_1", plan1[ "cursor" ].String() );
+                ASSERT_EQUALS( 0, plan1[ "n" ].Long() );
+                ASSERT_EQUALS( 0, plan1[ "nscannedObjects" ].Long() );
+                ASSERT_EQUALS( 1, plan1[ "nscanned" ].Long() );
+                ASSERT_EQUALS( fromjson( "{a:[[1,1]]}" ), plan1[ "indexBounds" ].Obj() );
+
+                BSONObj plan2 = _explain[ "allPlans" ].Array()[ 1 ].Obj();
+                ASSERT_EQUALS( "BasicCursor", plan2[ "cursor" ].String() );
+                ASSERT_EQUALS( 0, plan2[ "n" ].Long() );
+                ASSERT_EQUALS( 0, plan2[ "nscannedObjects" ].Long() );
+                ASSERT_EQUALS( 1, plan2[ "nscanned" ].Long() );
+                ASSERT_EQUALS( BSONObj(), plan2[ "indexBounds" ].Obj() );
+            }
+        };
+        
+        class Empty : public Base {
+            virtual void setupCollection() {
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+            }
+            virtual void handleCursor() {
+                ASSERT( !_cursor->ok() );
+            }
+            virtual void checkExplain() {
+                ASSERT( !_explain[ "cursor" ].eoo() );
+                ASSERT( !_explain[ "isMultiKey" ].Bool() );
+                ASSERT_EQUALS( 0, _explain[ "n" ].Long() );
+                ASSERT_EQUALS( 0, _explain[ "nscannedObjects" ].Long() );
+                ASSERT_EQUALS( 0, _explain[ "nscanned" ].Long() );
+                ASSERT( !_explain[ "scanAndOrder" ].Bool() );
+                ASSERT( !_explain[ "indexOnly" ].Bool() );
+                ASSERT_EQUALS( 0, _explain[ "nYields" ].Int() );
+                ASSERT_EQUALS( 0, _explain[ "nChunkSkips" ].Long() );
+                ASSERT( !_explain[ "millis" ].eoo() );
+                ASSERT( !_explain[ "indexBounds" ].eoo() );
+                ASSERT_EQUALS( 2U, _explain[ "allPlans" ].Array().size() );
+                
+                BSONObj plan1 = _explain[ "allPlans" ].Array()[ 0 ].Obj();
+                ASSERT_EQUALS( "BtreeCursor a_1", plan1[ "cursor" ].String() );
+                ASSERT_EQUALS( 0, plan1[ "n" ].Long() );
+                ASSERT_EQUALS( 0, plan1[ "nscannedObjects" ].Long() );
+                ASSERT_EQUALS( 0, plan1[ "nscanned" ].Long() );
+                ASSERT_EQUALS( fromjson( "{a:[[1,1]]}" ), plan1[ "indexBounds" ].Obj() );
+                
+                BSONObj plan2 = _explain[ "allPlans" ].Array()[ 1 ].Obj();
+                ASSERT_EQUALS( "BasicCursor", plan2[ "cursor" ].String() );
+                ASSERT_EQUALS( 0, plan2[ "n" ].Long() );
+                ASSERT_EQUALS( 0, plan2[ "nscannedObjects" ].Long() );
+                ASSERT_EQUALS( 0, plan2[ "nscanned" ].Long() );
+                ASSERT_EQUALS( BSONObj(), plan2[ "indexBounds" ].Obj() );                
+            }
+        };
+        
+        class SimpleCount : public Base {
+            virtual void handleCursor() {
+                while( _cursor->ok() ) {
+                    MatchDetails matchDetails;
+                    if ( _cursor->currentMatches( &matchDetails ) &&
+                        !_cursor->getsetdup( _cursor->currLoc() ) ) {
+                        _cursor->noteIterate( true, true, false );
+                    }
+                    else {
+                        _cursor->noteIterate( false, matchDetails._loadedObject, false );
+                    }
+                    _cursor->advance();
+                }
+            }
+            virtual void checkExplain() {
+                ASSERT_EQUALS( "BtreeCursor a_1", _explain[ "cursor" ].String() );
+                ASSERT_EQUALS( 1, _explain[ "n" ].Long() );
+                ASSERT_EQUALS( 2, _explain[ "nscannedObjects" ].Long() );
+                ASSERT_EQUALS( 2, _explain[ "nscanned" ].Long() );
+
+                BSONObj plan1 = _explain[ "allPlans" ].Array()[ 0 ].Obj();
+                ASSERT_EQUALS( 1, plan1[ "n" ].Long() );
+                ASSERT_EQUALS( 1, plan1[ "nscannedObjects" ].Long() );
+                ASSERT_EQUALS( 1, plan1[ "nscanned" ].Long() );
+
+                BSONObj plan2 = _explain[ "allPlans" ].Array()[ 1 ].Obj();
+                ASSERT_EQUALS( 1, plan2[ "n" ].Long() );
+                ASSERT_EQUALS( 1, plan2[ "nscannedObjects" ].Long() );
+                ASSERT_EQUALS( 1, plan2[ "nscanned" ].Long() );
+            }
+        };
+        
+        class IterateOnly : public Base {
+            virtual BSONObj query() const { return BSON( "a" << GT << 0 << "b" << 1 ); }
+            virtual void handleCursor() {
+                while( _cursor->ok() ) {
+                    _cursor->advance();
+                }
+            }
+            virtual void checkExplain() {
+                ASSERT_EQUALS( "BtreeCursor a_1", _explain[ "cursor" ].String() );
+                ASSERT_EQUALS( 0, _explain[ "n" ].Long() ); // needs to be set with noteIterate()
+                ASSERT_EQUALS( 0, _explain[ "nscannedObjects" ].Long() );
+                ASSERT_EQUALS( 3, _explain[ "nscanned" ].Long() );
+
+                BSONObj plan1 = _explain[ "allPlans" ].Array()[ 0 ].Obj();
+                ASSERT_EQUALS( 2, plan1[ "n" ].Long() );
+                ASSERT_EQUALS( 2, plan1[ "nscannedObjects" ].Long() );
+                ASSERT_EQUALS( 2, plan1[ "nscanned" ].Long() );
+                
+                // Not fully incremented without checking for matches.
+                BSONObj plan2 = _explain[ "allPlans" ].Array()[ 1 ].Obj();
+                ASSERT_EQUALS( 1, plan2[ "n" ].Long() );
+                ASSERT_EQUALS( 1, plan2[ "nscannedObjects" ].Long() );
+                ASSERT_EQUALS( 1, plan2[ "nscanned" ].Long() );                
+            }
+        };
+        
+        class ExtraMatchChecks : public Base {
+            virtual BSONObj query() const { return BSON( "a" << GT << 0 << "b" << 1 ); }
+            virtual void handleCursor() {
+                while( _cursor->ok() ) {
+                    _cursor->currentMatches();
+                    _cursor->currentMatches();
+                    _cursor->currentMatches();
+                    _cursor->advance();
+                }
+            }
+            virtual void checkExplain() {
+                ASSERT_EQUALS( "BtreeCursor a_1", _explain[ "cursor" ].String() );
+                ASSERT_EQUALS( 0, _explain[ "n" ].Long() ); // needs to be set with noteIterate()
+                ASSERT_EQUALS( 0, _explain[ "nscannedObjects" ].Long() );
+                ASSERT_EQUALS( 4, _explain[ "nscanned" ].Long() );
+                
+                BSONObj plan1 = _explain[ "allPlans" ].Array()[ 0 ].Obj();
+                ASSERT_EQUALS( 2, plan1[ "n" ].Long() );
+                // nscannedObjects are not deduped.
+                ASSERT_EQUALS( 6, plan1[ "nscannedObjects" ].Long() );
+                ASSERT_EQUALS( 2, plan1[ "nscanned" ].Long() );
+                
+                BSONObj plan2 = _explain[ "allPlans" ].Array()[ 1 ].Obj();
+                ASSERT_EQUALS( 2, plan2[ "n" ].Long() );
+                ASSERT_EQUALS( 6, plan2[ "nscannedObjects" ].Long() );
+                ASSERT_EQUALS( 2, plan2[ "nscanned" ].Long() );                
+            }
+        };
+        
+        class PartialIteration : public Base {
+            virtual void handleCursor() {
+                _cursor->currentMatches();
+                _cursor->advance();
+                _cursor->noteIterate( true, true, false );
+            }
+            virtual void checkExplain() {
+                ASSERT_EQUALS( "BtreeCursor a_1", _explain[ "cursor" ].String() );
+                ASSERT_EQUALS( 1, _explain[ "n" ].Long() );
+                ASSERT_EQUALS( 1, _explain[ "nscannedObjects" ].Long() );
+                ASSERT_EQUALS( 2, _explain[ "nscanned" ].Long() );
+                
+                BSONObj plan1 = _explain[ "allPlans" ].Array()[ 0 ].Obj();
+                ASSERT_EQUALS( 1, plan1[ "n" ].Long() );
+                ASSERT_EQUALS( 1, plan1[ "nscannedObjects" ].Long() );
+                ASSERT_EQUALS( 1, plan1[ "nscanned" ].Long() );
+                
+                BSONObj plan2 = _explain[ "allPlans" ].Array()[ 1 ].Obj();
+                ASSERT_EQUALS( 0, plan2[ "n" ].Long() );
+                ASSERT_EQUALS( 0, plan2[ "nscannedObjects" ].Long() );
+                ASSERT_EQUALS( 1, plan2[ "nscanned" ].Long() );                
+            }
+        };
+        
+        class Multikey : public Base {
+            virtual void setupCollection() {
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                _cli.insert( ns(), BSON( "a" << BSON_ARRAY( 1 << 2 ) ) );
+            }
+            virtual void handleCursor() {
+                while( _cursor->advance() );
+            }
+            virtual void checkExplain() {
+                ASSERT( _explain[ "isMultiKey" ].Bool() );
+            }            
+        };
+        
+        class MultikeyInitial : public Base {
+            virtual void setupCollection() {
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                _cli.insert( ns(), BSON( "a" << BSON_ARRAY( 1 << 2 ) ) );
+            }
+            virtual void checkExplain() {
+                ASSERT( _explain[ "isMultiKey" ].Bool() );
+            }
+        };
+
+        class BecomesMultikey : public Base {
+            virtual void setupCollection() {
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                _cli.insert( ns(), BSON( "a" << 1 ) );
+            }
+            virtual void checkExplain() {
+                ASSERT( !_explain[ "isMultiKey" ].Bool() );
+                
+                _cursor->prepareToYield();
+                {
+                    dbtemprelease t;
+                    _cli.insert( ns(), BSON( "a" << BSON_ARRAY( 1 << 2 ) ) );
+                }
+                _cursor->recoverFromYield();
+                _cursor->currentMatches();
+                ASSERT( _explainInfo->bson()[ "isMultiKey" ].Bool() );
+            }
+        };
+        
+        class CountAndYield : public Base {
+            virtual void setupCollection() {
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                for( int i = 0; i < 5; ++i ) {
+                    _cli.insert( ns(), BSON( "a" << 1 << "b" << 1 ) );
+                }
+            }
+            virtual void handleCursor() {
+                _nYields = 0;
+                while( _cursor->ok() ) {
+                    _cursor->prepareToYield();
+                    ++_nYields;
+                    _cursor->recoverFromYield();
+                    MatchDetails matchDetails;
+                    if ( _cursor->currentMatches( &matchDetails ) &&
+                        !_cursor->getsetdup( _cursor->currLoc() ) ) {
+                        _cursor->noteIterate( true, true, false );
+                    }
+                    else {
+                        _cursor->noteIterate( false, matchDetails._loadedObject, false );
+                    }
+                    _cursor->advance();
+                }
+            }
+            virtual void checkExplain() {
+                ASSERT( _nYields > 0 );
+                ASSERT_EQUALS( _nYields, _explain[ "nYields" ].Int() );
+                
+                ASSERT_EQUALS( "BtreeCursor a_1", _explain[ "cursor" ].String() );
+                ASSERT_EQUALS( 5, _explain[ "n" ].Long() );
+                ASSERT_EQUALS( 10, _explain[ "nscannedObjects" ].Long() );
+                ASSERT_EQUALS( 10, _explain[ "nscanned" ].Long() );
+                
+                BSONObj plan1 = _explain[ "allPlans" ].Array()[ 0 ].Obj();
+                ASSERT_EQUALS( 5, plan1[ "n" ].Long() );
+                ASSERT_EQUALS( 5, plan1[ "nscannedObjects" ].Long() );
+                ASSERT_EQUALS( 5, plan1[ "nscanned" ].Long() );
+                
+                BSONObj plan2 = _explain[ "allPlans" ].Array()[ 1 ].Obj();
+                ASSERT_EQUALS( 5, plan2[ "n" ].Long() );
+                ASSERT_EQUALS( 5, plan2[ "nscannedObjects" ].Long() );
+                ASSERT_EQUALS( 5, plan2[ "nscanned" ].Long() );                
+            }
+        protected:
+            int _nYields;
+        };
+        
+        class MultipleClauses : public CountAndYield {
+            virtual void setupCollection() {
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
+                for( int i = 0; i < 4; ++i ) {
+                    _cli.insert( ns(), BSON( "a" << 1 << "b" << 1 ) );
+                }
+                _cli.insert( ns(), BSON( "a" << 0 << "b" << 1 ) );
+            }
+            virtual BSONObj query() const { return fromjson( "{$or:[{a:1,c:null},{b:1,c:null}]}"); }
+            virtual void checkExplain() {
+                ASSERT_EQUALS( 18, _nYields );
+
+                ASSERT_EQUALS( 5, _explain[ "n" ].Long() );
+                ASSERT_EQUALS( 18, _explain[ "nscannedObjects" ].Long() );
+                ASSERT_EQUALS( 18, _explain[ "nscanned" ].Long() );
+
+                BSONObj clause1 = _explain[ "clauses" ].Array()[ 0 ].Obj();
+                ASSERT_EQUALS( "BtreeCursor a_1", clause1[ "cursor" ].String() );
+                ASSERT_EQUALS( 4, clause1[ "n" ].Long() );
+                ASSERT_EQUALS( 8, clause1[ "nscannedObjects" ].Long() );
+                ASSERT_EQUALS( 8, clause1[ "nscanned" ].Long() );
+                ASSERT_EQUALS( 8, clause1[ "nYields" ].Int() );
+                
+                BSONObj c1plan1 = clause1[ "allPlans" ].Array()[ 0 ].Obj();
+                ASSERT_EQUALS( "BtreeCursor a_1", c1plan1[ "cursor" ].String() );
+                ASSERT_EQUALS( 4, c1plan1[ "n" ].Long() );
+                ASSERT_EQUALS( 4, c1plan1[ "nscannedObjects" ].Long() );
+                ASSERT_EQUALS( 4, c1plan1[ "nscanned" ].Long() );
+
+                BSONObj c1plan2 = clause1[ "allPlans" ].Array()[ 1 ].Obj();
+                ASSERT_EQUALS( "BasicCursor", c1plan2[ "cursor" ].String() );
+                ASSERT_EQUALS( 4, c1plan2[ "n" ].Long() );
+                ASSERT_EQUALS( 4, c1plan2[ "nscannedObjects" ].Long() );
+                ASSERT_EQUALS( 4, c1plan2[ "nscanned" ].Long() );
+
+                BSONObj clause2 = _explain[ "clauses" ].Array()[ 1 ].Obj();
+                ASSERT_EQUALS( "BtreeCursor b_1", clause2[ "cursor" ].String() );
+                ASSERT_EQUALS( 1, clause2[ "n" ].Long() );
+                ASSERT_EQUALS( 10, clause2[ "nscannedObjects" ].Long() );
+                ASSERT_EQUALS( 10, clause2[ "nscanned" ].Long() );
+                ASSERT_EQUALS( 10, clause2[ "nYields" ].Int() );
+
+                BSONObj c2plan1 = clause2[ "allPlans" ].Array()[ 0 ].Obj();
+                ASSERT_EQUALS( "BtreeCursor b_1", c2plan1[ "cursor" ].String() );
+                ASSERT_EQUALS( 1, c2plan1[ "n" ].Long() );
+                ASSERT_EQUALS( 5, c2plan1[ "nscannedObjects" ].Long() );
+                ASSERT_EQUALS( 5, c2plan1[ "nscanned" ].Long() );
+                
+                BSONObj c2plan2 = clause2[ "allPlans" ].Array()[ 1 ].Obj();
+                ASSERT_EQUALS( "BasicCursor", c2plan2[ "cursor" ].String() );
+                ASSERT_EQUALS( 1, c2plan2[ "n" ].Long() );
+                ASSERT_EQUALS( 5, c2plan2[ "nscannedObjects" ].Long() );
+                ASSERT_EQUALS( 5, c2plan2[ "nscanned" ].Long() );
+            }
+        };
+        
+        class MultiCursorTakeover : public CountAndYield {
+            virtual void setupCollection() {
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                for( int i = 20; i >= 1; --i ) {
+                    for( int j = 0; j < i; ++j ) {
+                        _cli.insert( ns(), BSON( "a" << i ) );
+                    }
+                }
+            }
+            virtual BSONObj query() const {
+                BSONArrayBuilder bab;
+                for( int i = 20; i >= 1; --i ) {
+                    bab << BSON( "a" << i );
+                }
+                return BSON( "$or" << bab.arr() );
+            }
+            virtual void checkExplain() {
+                ASSERT_EQUALS( 20U, _explain[ "clauses" ].Array().size() );
+                for( int i = 20; i >= 1; --i ) {
+                    BSONObj clause = _explain[ "clauses" ].Array()[ 20-i ].Obj();
+                    ASSERT_EQUALS( "BtreeCursor a_1", clause[ "cursor" ].String() );
+                    ASSERT_EQUALS( BSON( "a" << BSON_ARRAY( BSON_ARRAY( i << i ) ) ),
+                                  clause[ "indexBounds" ].Obj() );
+                    ASSERT_EQUALS( i, clause[ "n" ].Long() );
+                    ASSERT_EQUALS( i, clause[ "nscannedObjects" ].Long() );
+                    ASSERT_EQUALS( i, clause[ "nscanned" ].Long() );
+                    ASSERT_EQUALS( i, clause[ "nYields" ].Int() );
+                    
+                    ASSERT_EQUALS( 1U, clause[ "allPlans" ].Array().size() );
+                    BSONObj plan = clause[ "allPlans" ].Array()[ 0 ].Obj();
+                    ASSERT_EQUALS( i, plan[ "n" ].Long() );
+                    ASSERT_EQUALS( i, plan[ "nscannedObjects" ].Long() );
+                    ASSERT_EQUALS( i, plan[ "nscanned" ].Long() );                    
+                }
+                
+                ASSERT_EQUALS( 210, _explain[ "n" ].Long() );
+                ASSERT_EQUALS( 210, _explain[ "nscannedObjects" ].Long() );
+                ASSERT_EQUALS( 210, _explain[ "nscanned" ].Long() );
+            }
+        };
+        
+        class NChunkSkipsTakeover : public Base {
+            virtual void setupCollection() {
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                for( int i = 0; i < 200; ++i ) {
+                    _cli.insert( ns(), BSON( "a" << 1 << "b" << 1 ) );
+                }
+                for( int i = 0; i < 200; ++i ) {
+                    _cli.insert( ns(), BSON( "a" << 2 << "b" << 2 ) );
+                }
+            }
+            virtual BSONObj query() const { return fromjson( "{$or:[{a:1,b:1},{a:2,b:2}]}" ); }
+            virtual void handleCursor() {
+                ASSERT_EQUALS( "QueryOptimizerCursor", _cursor->toString() );
+                int i = 0;
+                while( _cursor->ok() ) {
+                    if ( _cursor->currentMatches() && !_cursor->getsetdup( _cursor->currLoc() ) ) {
+                        _cursor->noteIterate( true, true, i++ %2 == 0 );
+                    }
+                    _cursor->advance();
+                }
+            }
+            virtual void checkExplain() {
+                // Historically, nChunkSkips has been excluded from the query summary.
+                ASSERT( _explain[ "nChunkSkips" ].eoo() );
+
+                BSONObj clause0 = _explain[ "clauses" ].Array()[ 0 ].Obj();
+                ASSERT_EQUALS( 100, clause0[ "nChunkSkips" ].Long() );
+                BSONObj plan0 = clause0[ "allPlans" ].Array()[ 0 ].Obj();
+                ASSERT( plan0[ "nChunkSkips" ].eoo() );
+
+                BSONObj clause1 = _explain[ "clauses" ].Array()[ 1 ].Obj();
+                ASSERT_EQUALS( 100, clause1[ "nChunkSkips" ].Long() );
+                BSONObj plan1 = clause1[ "allPlans" ].Array()[ 0 ].Obj();
+                ASSERT( plan1[ "nChunkSkips" ].eoo() );
+            }            
+        };
+
+        // test takeover w/ mixed plan clause ? necessary?
+
+    } // namespace Explain
+    
     class All : public Suite {
     public:
         All() : Suite( "queryoptimizercursor" ) {}
         
         void setupTests() {
             __forceLinkGeoPlugin();
-            add<QueryOptimizerCursorTests::CachedMatchCounterCount>();
-            add<QueryOptimizerCursorTests::CachedMatchCounterAccumulate>();
-            add<QueryOptimizerCursorTests::CachedMatchCounterDedup>();
-            add<QueryOptimizerCursorTests::CachedMatchCounterNscanned>();
-            add<QueryOptimizerCursorTests::SmallDupSetUpgrade>();
-            add<QueryOptimizerCursorTests::CachedMatchCounterCount>();
-            add<QueryOptimizerCursorTests::SmallDupSetUpgradeRead>();
-            add<QueryOptimizerCursorTests::SmallDupSetUpgradeWrite>();
-            add<QueryOptimizerCursorTests::Empty>();
-            add<QueryOptimizerCursorTests::Unindexed>();
-            add<QueryOptimizerCursorTests::Basic>();
-            add<QueryOptimizerCursorTests::NoMatch>();
-            add<QueryOptimizerCursorTests::Interleaved>();
-            add<QueryOptimizerCursorTests::NotMatch>();
-            add<QueryOptimizerCursorTests::StopInterleaving>();
-            add<QueryOptimizerCursorTests::TakeoverWithDup>();
-            add<QueryOptimizerCursorTests::TakeoverWithNonMatches>();
-            add<QueryOptimizerCursorTests::TakeoverWithTakeoverDup>();
-            add<QueryOptimizerCursorTests::BasicOr>();
-            add<QueryOptimizerCursorTests::OrFirstClauseEmpty>();
-            add<QueryOptimizerCursorTests::OrSecondClauseEmpty>();
-            add<QueryOptimizerCursorTests::OrMultipleClausesEmpty>();
-            add<QueryOptimizerCursorTests::TakeoverCountOr>();
-            add<QueryOptimizerCursorTests::TakeoverEndOfOrClause>();
-            add<QueryOptimizerCursorTests::TakeoverBeforeEndOfOrClause>();
-            add<QueryOptimizerCursorTests::TakeoverAfterEndOfOrClause>();
-            add<QueryOptimizerCursorTests::ManualMatchingDeduping>();
-            add<QueryOptimizerCursorTests::ManualMatchingUsingCurrKey>();
-            add<QueryOptimizerCursorTests::ManualMatchingDedupingTakeover>();
-            add<QueryOptimizerCursorTests::Singlekey>();
-            add<QueryOptimizerCursorTests::Multikey>();
-            add<QueryOptimizerCursorTests::AddOtherPlans>();
-            add<QueryOptimizerCursorTests::AddOtherPlansDelete>();
-            add<QueryOptimizerCursorTests::AddOtherPlansContinuousDelete>();
-            add<QueryOptimizerCursorTests::OrRangeElimination>();
-            add<QueryOptimizerCursorTests::OrDedup>();
-            add<QueryOptimizerCursorTests::EarlyDups>();
-            add<QueryOptimizerCursorTests::OrPopInTakeover>();
-            add<QueryOptimizerCursorTests::OrCollectionScanAbort>();
-            add<QueryOptimizerCursorTests::YieldNoOp>();
-            add<QueryOptimizerCursorTests::YieldDelete>();
-            add<QueryOptimizerCursorTests::YieldDeleteContinue>();
-            add<QueryOptimizerCursorTests::YieldDeleteContinueFurther>();
-            add<QueryOptimizerCursorTests::YieldUpdate>();
-            add<QueryOptimizerCursorTests::YieldDrop>();
-            add<QueryOptimizerCursorTests::YieldDropOr>();
-            add<QueryOptimizerCursorTests::YieldRemoveOr>();
-            add<QueryOptimizerCursorTests::YieldCappedOverwrite>();
-            add<QueryOptimizerCursorTests::YieldDropIndex>();
-            add<QueryOptimizerCursorTests::YieldMultiplePlansNoOp>();
-            add<QueryOptimizerCursorTests::YieldMultiplePlansAdvanceNoOp>();
-            add<QueryOptimizerCursorTests::YieldMultiplePlansDelete>();
-            add<QueryOptimizerCursorTests::YieldMultiplePlansDeleteOr>();
-            add<QueryOptimizerCursorTests::YieldMultiplePlansDeleteOrAdvance>();
-            add<QueryOptimizerCursorTests::YieldMultiplePlansCappedOverwrite>();
-            add<QueryOptimizerCursorTests::YieldMultiplePlansCappedOverwriteManual>();
-            add<QueryOptimizerCursorTests::YieldMultiplePlansCappedOverwriteManual2>();
-            add<QueryOptimizerCursorTests::YieldTakeover>();
-            add<QueryOptimizerCursorTests::YieldTakeoverBasic>();
-            add<QueryOptimizerCursorTests::YieldInactiveCursorAdvance>();
-            add<QueryOptimizerCursorTests::OrderId>();
-            add<QueryOptimizerCursorTests::OrderMultiIndex>();
-            add<QueryOptimizerCursorTests::OrderReject>();
-            add<QueryOptimizerCursorTests::OrderNatural>();
-            add<QueryOptimizerCursorTests::OrderUnindexed>();
-            add<QueryOptimizerCursorTests::RecordedOrderInvalid>();
-            add<QueryOptimizerCursorTests::KillOp>();
-            add<QueryOptimizerCursorTests::KillOpFirstClause>();
-            add<QueryOptimizerCursorTests::Nscanned>();
-            add<QueryOptimizerCursorTests::TouchEarlierIterate>();
-            add<QueryOptimizerCursorTests::TouchEarlierIterateDelete>();
-            add<QueryOptimizerCursorTests::TouchEarlierIterateDeleteMultiple>();
-            add<QueryOptimizerCursorTests::TouchEarlierIterateTakeover>();
-            add<QueryOptimizerCursorTests::TouchEarlierIterateTakeoverDeleteMultiple>();
-            add<QueryOptimizerCursorTests::TouchEarlierIterateUnindexedTakeoverDeleteMultiple>();
-            add<QueryOptimizerCursorTests::TouchEarlierIterateTakeoverDeleteMultipleMultiAdvance>();
-            add<QueryOptimizerCursorTests::InitialCappedWrapYieldRecoveryFailure>();
-            add<QueryOptimizerCursorTests::TakeoverCappedWrapYieldRecoveryFailure>();
-            add<QueryOptimizerCursorTests::InvalidateClientCursorHolder>();
-            add<QueryOptimizerCursorTests::TimeoutClientCursorHolder>();
-            add<QueryOptimizerCursorTests::AllowOutOfOrderPlan>();
-            add<QueryOptimizerCursorTests::NoTakeoverByOutOfOrderPlan>();
-            add<QueryOptimizerCursorTests::GetCursor::NoConstraints>();
-            add<QueryOptimizerCursorTests::GetCursor::SimpleId>();
-            add<QueryOptimizerCursorTests::GetCursor::OptimalIndex>();
-            add<QueryOptimizerCursorTests::GetCursor::SimpleKeyMatch>();
-            add<QueryOptimizerCursorTests::GetCursor::Geo>();
-            add<QueryOptimizerCursorTests::GetCursor::PreventOutOfOrderPlan>();
-            add<QueryOptimizerCursorTests::GetCursor::AllowOutOfOrderPlan>();
-            add<QueryOptimizerCursorTests::GetCursor::BestSavedOutOfOrder>();
-            add<QueryOptimizerCursorTests::GetCursor::BestSavedOptimal>();
-            add<QueryOptimizerCursorTests::GetCursor::BestSavedNotOptimal>();
-            add<QueryOptimizerCursorTests::GetCursor::MultiIndex>();
-            add<QueryOptimizerCursorTests::GetCursor::RequireIndex::NoConstraints>();
-            add<QueryOptimizerCursorTests::GetCursor::RequireIndex::SimpleId>();
-            add<QueryOptimizerCursorTests::GetCursor::RequireIndex::UnindexedQuery>();
-            add<QueryOptimizerCursorTests::GetCursor::RequireIndex::IndexedQuery>();
-            add<QueryOptimizerCursorTests::GetCursor::RequireIndex::SecondOrClauseIndexed>();
-            add<QueryOptimizerCursorTests::GetCursor::RequireIndex::SecondOrClauseUnindexed>();
-            add<QueryOptimizerCursorTests::GetCursor::RequireIndex::SecondOrClauseUnindexedUndetected>();
-            add<QueryOptimizerCursorTests::GetCursor::RequireIndex::RecordedUnindexedPlan>();
-            add<QueryOptimizerCursorTests::GetCursor::IdElseNatural::AllowOptimalNaturalPlan>();
-            add<QueryOptimizerCursorTests::GetCursor::IdElseNatural::AllowOptimalIdPlan>();
-            add<QueryOptimizerCursorTests::GetCursor::IdElseNatural::HintedIdForQuery>( BSON( "_id" << 1 ) );
-            add<QueryOptimizerCursorTests::GetCursor::IdElseNatural::HintedIdForQuery>( BSON( "a" << 1 ) );
-            add<QueryOptimizerCursorTests::GetCursor::IdElseNatural::HintedIdForQuery>( BSON( "_id" << 1 << "a" << 1 ) );
-            add<QueryOptimizerCursorTests::GetCursor::IdElseNatural::HintedNaturalForQuery>( BSONObj() );
-            add<QueryOptimizerCursorTests::GetCursor::IdElseNatural::HintedNaturalForQuery>( BSON( "_id" << 1 ) );
-            add<QueryOptimizerCursorTests::GetCursor::IdElseNatural::HintedNaturalForQuery>( BSON( "a" << 1 ) );
-            add<QueryOptimizerCursorTests::GetCursor::IdElseNatural::HintedNaturalForQuery>( BSON( "_id" << 1 << "a" << 1 ) );
+            add<CachedMatchCounterCount>();
+            add<CachedMatchCounterAccumulate>();
+            add<CachedMatchCounterDedup>();
+            add<CachedMatchCounterNscanned>();
+            add<SmallDupSetUpgrade>();
+            add<CachedMatchCounterCount>();
+            add<SmallDupSetUpgradeRead>();
+            add<SmallDupSetUpgradeWrite>();
+            add<DurationTimerStop>();
+            add<Empty>();
+            add<Unindexed>();
+            add<Basic>();
+            add<NoMatch>();
+            add<Interleaved>();
+            add<NotMatch>();
+            add<StopInterleaving>();
+            add<TakeoverWithDup>();
+            add<TakeoverWithNonMatches>();
+            add<TakeoverWithTakeoverDup>();
+            add<BasicOr>();
+            add<OrFirstClauseEmpty>();
+            add<OrSecondClauseEmpty>();
+            add<OrMultipleClausesEmpty>();
+            add<TakeoverCountOr>();
+            add<TakeoverEndOfOrClause>();
+            add<TakeoverBeforeEndOfOrClause>();
+            add<TakeoverAfterEndOfOrClause>();
+            add<ManualMatchingDeduping>();
+            add<ManualMatchingUsingCurrKey>();
+            add<ManualMatchingDedupingTakeover>();
+            add<Singlekey>();
+            add<Multikey>();
+            add<AddOtherPlans>();
+            add<AddOtherPlansDelete>();
+            add<AddOtherPlansContinuousDelete>();
+            add<OrRangeElimination>();
+            add<OrDedup>();
+            add<EarlyDups>();
+            add<OrPopInTakeover>();
+            add<OrCollectionScanAbort>();
+            add<YieldNoOp>();
+            add<YieldDelete>();
+            add<YieldDeleteContinue>();
+            add<YieldDeleteContinueFurther>();
+            add<YieldUpdate>();
+            add<YieldDrop>();
+            add<YieldDropOr>();
+            add<YieldRemoveOr>();
+            add<YieldCappedOverwrite>();
+            add<YieldDropIndex>();
+            add<YieldMultiplePlansNoOp>();
+            add<YieldMultiplePlansAdvanceNoOp>();
+            add<YieldMultiplePlansDelete>();
+            add<YieldMultiplePlansDeleteOr>();
+            add<YieldMultiplePlansDeleteOrAdvance>();
+            add<YieldMultiplePlansCappedOverwrite>();
+            add<YieldMultiplePlansCappedOverwriteManual>();
+            add<YieldMultiplePlansCappedOverwriteManual2>();
+            add<YieldTakeover>();
+            add<YieldTakeoverBasic>();
+            add<YieldInactiveCursorAdvance>();
+            add<OrderId>();
+            add<OrderMultiIndex>();
+            add<OrderReject>();
+            add<OrderNatural>();
+            add<OrderUnindexed>();
+            add<RecordedOrderInvalid>();
+            add<KillOp>();
+            add<KillOpFirstClause>();
+            add<Nscanned>();
+            add<TouchEarlierIterate>();
+            add<TouchEarlierIterateDelete>();
+            add<TouchEarlierIterateDeleteMultiple>();
+            add<TouchEarlierIterateTakeover>();
+            add<TouchEarlierIterateTakeoverDeleteMultiple>();
+            add<TouchEarlierIterateUnindexedTakeoverDeleteMultiple>();
+            add<TouchEarlierIterateTakeoverDeleteMultipleMultiAdvance>();
+            add<InitialCappedWrapYieldRecoveryFailure>();
+            add<TakeoverCappedWrapYieldRecoveryFailure>();
+            add<InvalidateClientCursorHolder>();
+            add<TimeoutClientCursorHolder>();
+            add<AllowOutOfOrderPlan>();
+            add<NoTakeoverByOutOfOrderPlan>();
+            add<GetCursor::NoConstraints>();
+            add<GetCursor::SimpleId>();
+            add<GetCursor::OptimalIndex>();
+            add<GetCursor::SimpleKeyMatch>();
+            add<GetCursor::Geo>();
+            add<GetCursor::PreventOutOfOrderPlan>();
+            add<GetCursor::AllowOutOfOrderPlan>();
+            add<GetCursor::BestSavedOutOfOrder>();
+            add<GetCursor::BestSavedOptimal>();
+            add<GetCursor::BestSavedNotOptimal>();
+            add<GetCursor::MultiIndex>();
+            add<GetCursor::RequireIndex::NoConstraints>();
+            add<GetCursor::RequireIndex::SimpleId>();
+            add<GetCursor::RequireIndex::UnindexedQuery>();
+            add<GetCursor::RequireIndex::IndexedQuery>();
+            add<GetCursor::RequireIndex::SecondOrClauseIndexed>();
+            add<GetCursor::RequireIndex::SecondOrClauseUnindexed>();
+            add<GetCursor::RequireIndex::SecondOrClauseUnindexedUndetected>();
+            add<GetCursor::RequireIndex::RecordedUnindexedPlan>();
+            add<GetCursor::IdElseNatural::AllowOptimalNaturalPlan>();
+            add<GetCursor::IdElseNatural::AllowOptimalIdPlan>();
+            add<GetCursor::IdElseNatural::HintedIdForQuery>( BSON( "_id" << 1 ) );
+            add<GetCursor::IdElseNatural::HintedIdForQuery>( BSON( "a" << 1 ) );
+            add<GetCursor::IdElseNatural::HintedIdForQuery>( BSON( "_id" << 1 << "a" << 1 ) );
+            add<GetCursor::IdElseNatural::HintedNaturalForQuery>( BSONObj() );
+            add<GetCursor::IdElseNatural::HintedNaturalForQuery>( BSON( "_id" << 1 ) );
+            add<GetCursor::IdElseNatural::HintedNaturalForQuery>( BSON( "a" << 1 ) );
+            add<GetCursor::IdElseNatural::HintedNaturalForQuery>( BSON( "_id" << 1 << "a" << 1 ) );
+            add<Explain::ClearRecordedIndex>();
+            add<Explain::Initial>();
+            add<Explain::Empty>();
+            add<Explain::SimpleCount>();
+            add<Explain::IterateOnly>();
+            add<Explain::ExtraMatchChecks>();
+            add<Explain::PartialIteration>();
+            add<Explain::Multikey>();
+            add<Explain::MultikeyInitial>();
+            add<Explain::BecomesMultikey>();
+            add<Explain::CountAndYield>();
+            add<Explain::MultipleClauses>();
+            add<Explain::MultiCursorTakeover>();
+            add<Explain::NChunkSkipsTakeover>();
         }
     } myall;
     

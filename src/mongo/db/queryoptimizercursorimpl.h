@@ -46,7 +46,12 @@ namespace mongo {
             _match = Unknown;
             _counted = false;
         }
-        void setMatch( bool match ) { _match = match ? True : False; }
+        /** @return true if the match was not previously recorded. */
+        bool setMatch( bool match ) {
+            MatchState oldMatch = _match;
+            _match = match ? True : False;
+            return _match == True && oldMatch != True;
+        }
         bool knowMatch() const { return _match != Unknown; }
         void countMatch( const DiskLoc &loc ) {
             if ( !_counted && _match == True && !getsetdup( loc ) ) {
@@ -54,6 +59,9 @@ namespace mongo {
                 ++_count;
                 _counted = true;
             }
+        }
+        bool wouldCountMatch( const DiskLoc &loc ) const {
+            return !_counted && _match == True && !getdup( loc );
         }
 
         bool enoughCumulativeMatchesToChooseAPlan() const {
@@ -84,6 +92,12 @@ namespace mongo {
             }
             pair<set<DiskLoc>::iterator, bool> p = _dups.insert( loc );
             return !p.second;
+        }
+        bool getdup( const DiskLoc &loc ) const {
+            if ( !_checkDups ) {
+                return false;
+            }
+            return _dups.find( loc ) != _dups.end();
         }
         long long &_aggregateNscanned;
         long long _nscanned;

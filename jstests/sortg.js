@@ -33,7 +33,7 @@ noMemoryException( {$natural:1} );
 
 t.ensureIndex( {a:1} );
 t.ensureIndex( {b:1} );
-
+//
 // These sorts are now indexed.
 noMemoryException( {a:1} );
 noMemoryException( {b:1} );

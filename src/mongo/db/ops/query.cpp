@@ -39,6 +39,7 @@
 #include "../../server.h"
 #include "../d_concurrency.h"
 #include "../queryoptimizercursorimpl.h"
+#include "../explain.h"
 
 namespace mongo {
 
@@ -652,57 +653,47 @@ namespace mongo {
 
         bool _yieldRecoveryFailed;
     };
-
+    
+    // separate explain strategies
+    
     class QueryResponseBuilder {
     public:
-        QueryResponseBuilder( const ParsedQuery &parsedQuery, const shared_ptr<Cursor> &cursor ) :
+        QueryResponseBuilder( const ParsedQuery &parsedQuery, const shared_ptr<Cursor> &cursor,
+                             const BSONObj &oldPlan ) :
         _parsedQuery( parsedQuery ),
         _cursor( cursor ),
         _queryOptimizerCursor( dynamic_cast<QueryOptimizerCursor*>( cursor.get() ) ),
         _buf( 32768 ),
         _scanAndOrder( newScanAndOrder() ),
         _skip( _parsedQuery.getSkip() ),
-        _n() {
+        _n(),
+        _chunkManager( newChunkManager() ),
+        _explainInfo( newExplainInfo() ),
+        _oldPlan( oldPlan ) {
+            if ( _explainInfo ) _explainInfo->notePlan( *_cursor, false );
             _buf.skip( sizeof( QueryResult ) );
         }
-        void mayAddMatch() {
-            DiskLoc loc = _cursor->currLoc();
+        bool mayAddMatch() {
+            if ( !currentMatches() ) {
+                return false;
+            }
+            if ( !chunkMatches() ) {
+                return false;
+            }
             if ( _scanAndOrder ) {
-                if ( !_scanAndOrderDups.getsetdup( loc ) ) {
-                    try {
-                        _scanAndOrder->add( _cursor->current(), _parsedQuery.showDiskLoc() ? &loc : 0 );
-                    } catch ( const UserException &e ) {
-                        bool rethrow = true;
-                        if ( e.getCode() == ScanAndOrderMemoryLimitExceededAssertionCode ) {
-                            if ( _queryOptimizerCursor->multiPlanScanner()->haveOrderedPlan() ) {
-                                _scanAndOrder.reset();
-                                _queryOptimizerCursor->abortUnorderedPlans();
-                                rethrow = false;
-                            }
-                            else if ( _queryOptimizerCursor->multiPlanScanner()->usingCachedPlan() ) {
-                                _queryOptimizerCursor->multiPlanScanner()->clearIndexesForPatterns();
-                            }
-                        }
-                        if ( rethrow ) {
-                            throw;
-                        }
-                    }
-                }
+                handleScanAndOrderMatch();
             }
             if ( !iterateNeedsSort() ) {
-                if ( !_cursor->getsetdup( loc ) ) {
-                    if ( _skip > 0 ) {
-                        --_skip;
-                    }
-                    else {
-                        ++_n;
-                        fillQueryResultFromObj( _buf, _parsedQuery.getFields(), loc.obj(), ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
-                    }
-                }
+                handleOrderedMatch();
             }
+            return true;
+        }
+        void noteYield() {
+            if ( _explainInfo ) _explainInfo->noteYield();
+            // _queryOptimizerCursor counts yields internally.
         }
         bool enoughForFirstBatch() const {
-            return _parsedQuery.enoughForFirstBatch( _n, _buf.len() );
+            return !_parsedQuery.isExplain() && _parsedQuery.enoughForFirstBatch( _n, _buf.len() );
         }
         bool enoughTotalResults() const {
             return ( _parsedQuery.enough( _n ) || _buf.len() >= MaxBytesToReturnToClientAtOnce );
@@ -713,6 +704,29 @@ namespace mongo {
             }            
         }
         long long handoff( Message &result ) {
+            if ( _parsedQuery.isExplain() ) {
+                shared_ptr<ExplainQueryInfo> explainQueryInfo;
+                if ( _explainInfo ) {
+                    _explainInfo->noteDone( *_cursor );
+                    explainQueryInfo = ExplainQueryInfo::fromSinglePlan( _explainInfo );
+                }
+                else {
+                    verify( 16067, _queryOptimizerCursor );
+                    explainQueryInfo = _queryOptimizerCursor->explainQueryInfo();
+                }
+                if ( resultsNeedSort() ) {
+                    explainQueryInfo->reviseN( _scanAndOrder->nout() );
+                }
+                ExplainQueryInfo::AncillaryInfo ancillaryInfo;
+                ancillaryInfo._oldPlan = _oldPlan;
+                explainQueryInfo->setAncillaryInfo( ancillaryInfo );
+                _buf.reset();
+                _buf.skip( sizeof( QueryResult ) );
+                fillQueryResultFromObj( _buf, 0, explainQueryInfo->bson() );
+                result.appendData( _buf.buf(), _buf.len() );
+                _buf.decouple();
+                return 1;
+            }
             int ret = _n;
             if ( resultsNeedSort() ) {
                 _buf.reset();
@@ -721,7 +735,7 @@ namespace mongo {
             }
             if ( _buf.len() > 0 ) {
                 result.appendData( _buf.buf(), _buf.len() );
-                _buf.decouple();
+                _buf.decouple(); // only decouple here ok?
             }
             return ret;
         }
@@ -730,13 +744,80 @@ namespace mongo {
             if ( _parsedQuery.getOrder().isEmpty() ) {
                 return 0;
             }
-            if ( !_queryOptimizerCursor ) {
+            if ( !_queryOptimizerCursor || !_queryOptimizerCursor->ok() ) {
                 return 0;
             }
             return new ScanAndOrder( _parsedQuery.getSkip(),
                                     _parsedQuery.getNumToReturn(),
                                     _parsedQuery.getOrder(),
                                     _queryOptimizerCursor->queryPlan()->multikeyFrs() );
+        }
+        ShardChunkManagerPtr newChunkManager() const {
+            if ( !shardingState.needShardChunkManager( _parsedQuery.ns() ) ) {
+                return ShardChunkManagerPtr();
+            }
+            return shardingState.getShardChunkManager( _parsedQuery.ns() );
+        }
+        ExplainPlanInfo *newExplainInfo() const {
+            if ( !_parsedQuery.isExplain() ) {
+                return 0;
+            }
+            if ( _queryOptimizerCursor ) {
+                return 0;
+            }
+            return new ExplainPlanInfo();
+        }
+        void handleScanAndOrderMatch() {
+            DiskLoc loc = _cursor->currLoc();
+            if ( _scanAndOrderDups.getsetdup( loc ) ) {
+                return;
+            }
+            try {
+                _scanAndOrder->add( _cursor->current(), _parsedQuery.showDiskLoc() ? &loc : 0 );
+            } catch ( const UserException &e ) {
+                bool rethrow = true;
+                if ( e.getCode() == ScanAndOrderMemoryLimitExceededAssertionCode ) {
+                    if ( _queryOptimizerCursor->multiPlanScanner()->haveOrderedPlan() ) {
+                        _scanAndOrder.reset();
+                        _queryOptimizerCursor->abortUnorderedPlans();
+                        rethrow = false;
+                    }
+                    else if ( _queryOptimizerCursor->multiPlanScanner()->usingCachedPlan() ) {
+                        _queryOptimizerCursor->multiPlanScanner()->clearIndexesForPatterns();
+                    }
+                }
+                if ( rethrow ) {
+                    throw;
+                }
+            }            
+        }
+        void handleOrderedMatch() {
+            DiskLoc loc = _cursor->currLoc();
+            if ( _cursor->getsetdup( loc ) ) {
+                return;
+            }
+            if ( _skip > 0 ) {
+                --_skip;
+                return;
+            }
+            ++_n;
+            if ( _parsedQuery.isExplain() ) {
+                noteIterate( true, true, false );
+            }
+            else {
+                fillQueryResultFromObj( _buf, _parsedQuery.getFields(), loc.obj(), ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
+            }
+        }
+        void noteIterate( bool match, bool loadedDocument, bool chunkSkip ) {
+            if ( !_parsedQuery.isExplain() ) {
+                return;
+            }
+            if ( _explainInfo ) {
+                _explainInfo->noteIterate( match, loadedDocument, chunkSkip, *_cursor );
+            }
+            else if ( _queryOptimizerCursor ) {
+                _queryOptimizerCursor->noteIterate( match, loadedDocument, chunkSkip );
+            }
         }
         bool iterateNeedsSort() const {
             if ( !_scanAndOrder ) {
@@ -764,6 +845,25 @@ namespace mongo {
             }
             return true;            
         }
+        bool currentMatches() {
+            MatchDetails details;
+            if ( _cursor->currentMatches( &details ) ) {
+                return true;
+            }
+            noteIterate( false, details._loadedObject, false );
+            return false;
+        }
+        bool chunkMatches() {
+            if ( !_chunkManager ) {
+                return true;
+            }
+            // TODO: should make this covered at some point
+            if ( _chunkManager->belongsToMe( _cursor->current() ) ) {
+                return true;
+            }
+            noteIterate( false, true, true );
+            return false;
+        }
         const ParsedQuery &_parsedQuery;
         shared_ptr<Cursor> _cursor;
         QueryOptimizerCursor *_queryOptimizerCursor;
@@ -772,6 +872,9 @@ namespace mongo {
         SmallDupSet _scanAndOrderDups;
         long long _skip;
         long long _n;
+        ShardChunkManagerPtr _chunkManager;
+        shared_ptr<ExplainPlanInfo> _explainInfo;
+        BSONObj _oldPlan;
     };
     
     /* run a query -- includes checking for and running a Command \
@@ -911,43 +1014,58 @@ namespace mongo {
             }
         }
         
+        // TODO clean this up a bit.
+        BSONObj oldPlan;
+        if ( explain && ! pq.hasIndexSpecifier() ) {
+            MultiPlanScanner mps( ns, query, order );
+            if ( mps.usingCachedPlan() ) {
+                oldPlan = mps.oldExplain().firstElement().embeddedObject().firstElement().embeddedObject().getOwned();
+            }
+        }
+
         for( int retries = 0; retries < 2; ++retries ) {
         try {
             shared_ptr<Cursor> cursor;
             if ( pq.hasOption( QueryOption_OplogReplay ) ) {
                 cursor = FindingStartCursor::getCursor( ns, query, order );
             }
-            else if ( !pq.getFields() && !pq.isExplain() && !pq.returnKey() ) {
+            else if ( !pq.getFields() && !pq.returnKey() ) {
                 cursor = NamespaceDetailsTransient::getCursor( ns, query, order, false, 0, &pq );
             }
             if ( !cursor ) {
                 break;
             }
             {
-                QueryResponseBuilder queryResponseBuilder( pq, cursor );
+                QueryResponseBuilder queryResponseBuilder( pq, cursor, oldPlan );
                 long long cursorid = 0;
                 OpTime slaveReadTill;
                 ClientCursor::CleanupPointer ccPointer;
                 ccPointer.reset( new ClientCursor( QueryOption_NoCursorTimeout, cursor, ns ) );
 
                 for( ; cursor->ok(); cursor->advance() ) {
-                    if ( !ccPointer->yieldSometimes( ClientCursor::MaybeCovered ) || !cursor->ok() ) {
+                    bool yielded = false;
+                    if ( !ccPointer->yieldSometimes( ClientCursor::MaybeCovered, &yielded ) || !cursor->ok() ) {
+                        queryResponseBuilder.noteYield();
                         break;
+                    }
+                    if ( yielded ) {
+                        queryResponseBuilder.noteYield();
                     }
 
                     if ( pq.getMaxScan() && cursor->nscanned() > pq.getMaxScan() ) {
                         break;
                     }
                     
-                    if ( !cursor->currentMatches() ) {
+                    // right place for this?
+                    BSONObj js = cursor->current();
+                    assert( js.isValid() );
+
+                    if ( !queryResponseBuilder.mayAddMatch() ) {
                         continue;
                     }
                     
-                    DiskLoc currLoc = cursor->currLoc();
 //                    log() << "idx: " << cursor->indexKeyPattern() << " obj: " << cursor->current() << endl;
                     
-                    BSONObj js = cursor->current();
-                    assert( js.isValid() );
 
                     // This should happen after matching?
 //                    if ( pq.hasOption( QueryOption_OplogReplay ) ) {
@@ -957,8 +1075,7 @@ namespace mongo {
 //                        }
 //                    }
                     
-                    queryResponseBuilder.mayAddMatch();
-                    if ( !cursor->supportGetMore() ) {
+                    if ( !cursor->supportGetMore() || pq.isExplain() ) {
                         if ( queryResponseBuilder.enoughTotalResults() ) {
                             break;
                         }
@@ -987,6 +1104,7 @@ namespace mongo {
                     }
                     ccPointer->originalMessage = m;
                     ccPointer.release();
+                    // undo unlimited timeout
                 }
 
                 long long nReturned = queryResponseBuilder.handoff( result );
@@ -1009,6 +1127,7 @@ namespace mongo {
 
         // regular, not QO bypass query
 
+        {
         BSONObj oldPlan;
         if ( explain && ! pq.hasIndexSpecifier() ) {
             MultiPlanScanner mps( ns, query, order );
@@ -1055,7 +1174,7 @@ namespace mongo {
             bool moreClauses = mps->mayRunMore();
             if ( moreClauses ) {
                 // this MultiCursor will use a dumb NoOp to advance(), so no need to specify mayYield
-                shared_ptr< Cursor > multi( new MultiCursor( mps, cursor, dqo.matcher( cursor ), dqo ) );
+                shared_ptr< Cursor > multi( new MultiCursor( mps, cursor, dqo.matcher( cursor ), shared_ptr<ExplainPlanInfo>(), dqo ) );
                 cc = new ClientCursor(queryOptions, multi, ns, jsobj.getOwned());
             }
             else {
@@ -1099,6 +1218,7 @@ namespace mongo {
         }
         curop.debug().nreturned = n;
         return exhaust;
+        }
     }
 
 } // namespace mongo

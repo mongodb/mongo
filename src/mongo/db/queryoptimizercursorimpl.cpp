@@ -22,6 +22,7 @@
 #include "pdfile.h"
 #include "clientcursor.h"
 #include "btree.h"
+#include "explain.h"
 
 namespace mongo {
     
@@ -93,6 +94,7 @@ namespace mongo {
             // dups rather than avoid poisoning the cursor's dup set with unreturned documents.  Deduping documents
             // matched in this QueryOptimizerCursorOp will run against the takeover cursor.
             _matchCounter.setCheckDups( _c->isMultiKey() );
+            // TODO ok if cursor becomes multikey later?
 
             _matchCounter.updateNscanned( _c->nscanned() );
         }
@@ -114,6 +116,7 @@ namespace mongo {
         }
         
         virtual void recoverFromYield() {
+            if ( _explainPlanInfo ) _explainPlanInfo->noteYield();
             if ( _cc && !ClientCursor::recoverFromYield( _yieldData ) ) {
                 _yieldRecoveryFailed = true;
                 _c.reset();
@@ -156,9 +159,11 @@ namespace mongo {
             
             if ( !qp().scanAndOrderRequired() && _matchCounter.enoughCumulativeMatchesToChooseAPlan() ) {
                 setStop();
+                if ( _explainPlanInfo ) _explainPlanInfo->notePicked();
                 return;
             }
             if ( !_c || !_c->ok() ) {
+                if ( _explainPlanInfo && _c ) _explainPlanInfo->noteDone( *_c );
                 setComplete();
                 return;
             }
@@ -171,15 +176,42 @@ namespace mongo {
         DiskLoc currLoc() const { return _c ? _c->currLoc() : DiskLoc(); }
         BSONObj currKey() const { return _c ? _c->currKey() : BSONObj(); }
         bool currentMatches( MatchDetails *details ) {
-            bool ret = ( _c && _c->ok() ) ? matcher( _c.get() )->matchesCurrent( _c.get(), details ) : false;
+            if ( !_c || !_c->ok() ) {
+                _matchCounter.setMatch( false );
+                return false;
+            }
+            
+            MatchDetails myDetails;
+            bool wantDetails = details || _explainPlanInfo;
+
+            bool match = matcher( _c.get() )->matchesCurrent( _c.get(),
+                                                             wantDetails ? &myDetails : 0 );
             // Cache the match, so we can count it in mayAdvance().
-            _matchCounter.setMatch( ret );
-            return ret;
+            bool newMatch = _matchCounter.setMatch( match );
+
+            if ( _explainPlanInfo ) {
+                bool countableMatch = newMatch && _matchCounter.wouldCountMatch( _c->currLoc() );
+                _explainPlanInfo->noteIterate( countableMatch,
+                                              countableMatch || myDetails._loadedObject,
+                                              false, *_c );
+            }
+            if ( details ) *details = myDetails;
+
+            return match;
         }
         virtual bool mayRecordPlan() const {
             return !_yieldRecoveryFailed && complete() && ( !stopRequested() || _matchCounter.enoughMatchesToRecordPlan() );
         }
         shared_ptr<Cursor> cursor() const { return _c; }
+        virtual shared_ptr<ExplainPlanInfo> generateExplainInfo() {
+            if ( !_c ) {
+                return QueryOp::generateExplainInfo();
+            }
+            _explainPlanInfo.reset( new ExplainPlanInfo() );
+            _explainPlanInfo->notePlan( *_c, qp().scanAndOrderRequired() );
+            return _explainPlanInfo;
+        }
+        shared_ptr<ExplainPlanInfo> explainInfo() const { return _explainPlanInfo; }
     private:
         void mayAdvance() {
             if ( !_c ) {
@@ -239,7 +271,8 @@ namespace mongo {
         ClientCursor::YieldData _yieldData;
         bool _yieldRecoveryFailed;
         const QueryPlanSelectionPolicy &_selectionPolicy;
-        const bool &_requireOrder;
+        const bool &_requireOrder; // TODO don't use a ref for this, but signal change explicitly
+        shared_ptr<ExplainPlanInfo> _explainPlanInfo;
     };
     
     /**
@@ -258,6 +291,7 @@ namespace mongo {
         _completeOp(),
         _nscanned() {
             _mps->initialOp( _originalOp );
+            _explainQueryInfo = _mps->generateExplainInfo();
             shared_ptr<QueryOp> op = _mps->nextOp();
             rethrowOnError( op );
             if ( !op->complete() ) {
@@ -436,9 +470,18 @@ namespace mongo {
             assertOk();
             return _currOp ? &_currOp->qp() : 0;
         }
-        
+
+        virtual const Cursor *queryCursor() const {
+            assertOk();
+            return _currOp ? _currOp->cursor().get() : 0;
+        }
+
         virtual const QueryPlan *completeQueryPlan() const {
             return _completeOp ? &_completeOp->qp() : 0;
+        }
+
+        virtual const Cursor *completeQueryCursor() const {
+            return _completeOp ? _completeOp->cursor().get() : 0;
         }
 
         virtual const MultiPlanScanner *multiPlanScanner() const {
@@ -447,6 +490,19 @@ namespace mongo {
         
         virtual void abortUnorderedPlans() {
             _requireOrder = true;
+        }
+        
+        virtual void noteIterate( bool match, bool loadedDocument, bool chunkSkip ) {
+            if ( _explainQueryInfo ) {
+                _explainQueryInfo->noteIterate( match, loadedDocument, chunkSkip );
+            }
+            if ( _takeover ) {
+                _takeover->noteIterate( match, loadedDocument );
+            }
+        }
+        
+        virtual shared_ptr<ExplainQueryInfo> explainQueryInfo() const {
+            return _explainQueryInfo;
         }
         
     private:
@@ -479,21 +535,22 @@ namespace mongo {
                 _currOp = qocop;
             }
             else if ( op->stopRequested() ) {
-                log() << "stop requested" << endl;
+//                log() << "stop requested" << endl;
                 if ( qocop->cursor() ) {
                     // Ensure that prepareToTouchEarlierIterate() may be called safely when a BasicCursor takes over.
                     if ( !prevLoc.isNull() && prevLoc == qocop->currLoc() ) {
                         qocop->cursor()->advance();
                     }
-                    // Clear the Runner and any unnecessary QueryOps and their ClientCursors.
                     _takeover.reset( new MultiCursor( _mps,
                                                      qocop->cursor(),
                                                      op->matcher( qocop->cursor() ),
+                                                     qocop->explainInfo(),
                                                      *op,
                                                      _nscanned - qocop->cursor()->nscanned() ) );
                 }
             }
             else {
+                // TODO not set if takeover
                 _completeOp = qocop;
             }
 
@@ -526,11 +583,12 @@ namespace mongo {
         shared_ptr<QueryOptimizerCursorOp> _originalOp;
         QueryOptimizerCursorOp *_currOp;
         QueryOptimizerCursorOp *_completeOp;
-        shared_ptr<Cursor> _takeover;
+        shared_ptr<MultiCursor> _takeover;
         long long _nscanned;
         // Using a SmallDupSet seems a bit hokey, but I've measured a 5% performance improvement
         // with ~100 document non multi key scans.
         SmallDupSet _dups;
+        shared_ptr<ExplainQueryInfo> _explainQueryInfo;
     };
     
     shared_ptr<Cursor> newQueryOptimizerCursor( auto_ptr<MultiPlanScanner> mps, const QueryPlanSelectionPolicy &planPolicy, bool requireOrder ) {
@@ -606,7 +664,7 @@ namespace mongo {
                 }
             }
         }
-        auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order, &hint, QueryPlanSet::Use, parsedQuery ? parsedQuery->getMin() : BSONObj(), parsedQuery ? parsedQuery->getMax() : BSONObj() ) ); // mayYield == false
+        auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order, &hint, ( parsedQuery && parsedQuery->isExplain() ) ? QueryPlanSet::Ignore : QueryPlanSet::Use, parsedQuery ? parsedQuery->getMin() : BSONObj(), parsedQuery ? parsedQuery->getMax() : BSONObj() ) ); // mayYield == false
         const QueryPlan *singlePlan = mps->singlePlan();
         bool requireOrder = ( parsedQuery == 0 );
         if ( singlePlan && !singlePlan->scanAndOrderRequired() ) {
@@ -623,6 +681,9 @@ namespace mongo {
                 }
                 return single;
             }
+        }
+        if ( parsedQuery && parsedQuery->isExplain() ) {
+            mps->generateExplainInfo();
         }
         bool requireOrder = ( parsedQuery == 0 );
         return newQueryOptimizerCursor( mps, planPolicy, requireOrder );

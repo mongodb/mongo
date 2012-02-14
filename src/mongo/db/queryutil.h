@@ -324,7 +324,7 @@ namespace mongo {
         string _special;
         bool _singleKey;
     };
-
+    
     /**
      * A BoundList contains intervals specified by inclusive start
      * and end bounds.  The intervals should be nonoverlapping and occur in

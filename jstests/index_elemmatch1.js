@@ -22,7 +22,18 @@ assert.eq( 30 , t.find( q ).itcount() , "A3" )
 q.arr = { $elemMatch : { x : 5 , y : 5 } }
 assert.eq( 10 , t.find( q ).itcount() , "A4" )
 
-assert.eq( t.find(q).itcount() , t.find(q).explain().nscanned , "A5" )
+function nscannedForCursor( explain, cursor ) {
+    plans = explain.allPlans;
+    for( i in plans ) {
+        if ( plans[ i ].cursor == cursor ) {
+            return plans[ i ].nscanned;
+        }
+    }
+    return -1;
+}
+
+assert.eq( t.find(q).itcount(),
+          nscannedForCursor( t.find(q).explain(true), 'BtreeCursor arr.x_1_a_1' ), "A5" );
 
 
 

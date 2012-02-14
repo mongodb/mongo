@@ -21,6 +21,7 @@
 #include "cursor.h"
 #include "queryutil.h"
 #include "matcher.h"
+#include "explain.h"
 #include "../util/net/listen.h"
 
 namespace mongo {
@@ -197,6 +198,11 @@ namespace mongo {
             if( ! c ) return _matcher;
             return c->matcher() ? c->matcherPtr() : _matcher;
         }
+
+        /** @return an ExplainPlanInfo object that will be updated as the query runs. */
+        virtual shared_ptr<ExplainPlanInfo> generateExplainInfo() {
+            return shared_ptr<ExplainPlanInfo>( new ExplainPlanInfo() );
+        }
         
     protected:
         /** Call if all results have been found. */
@@ -352,6 +358,12 @@ namespace mongo {
             static void nextOp( QueryOp &op );
             static bool prepareToYieldOp( QueryOp &op );
             static void recoverFromYieldOp( QueryOp &op );
+            
+            /** @return an ExplainClauseInfo object that will be updated as the query runs. */
+            shared_ptr<ExplainClauseInfo> generateExplainInfo() {
+                _explainClauseInfo.reset( new ExplainClauseInfo() );
+                return _explainClauseInfo;
+            }
         private:
             vector<shared_ptr<QueryOp> > _ops;
             struct OpHolder {
@@ -363,6 +375,7 @@ namespace mongo {
                 }
             };
             our_priority_queue<OpHolder> _queue;
+            shared_ptr<ExplainClauseInfo> _explainClauseInfo;
         };
 
     private:
@@ -392,6 +405,7 @@ namespace mongo {
         bool _mayYield;
         ElapsedTracker _yieldSometimesTracker;
         bool _mustAssertOnYieldFailure;
+        shared_ptr<ExplainClauseInfo> _explainClauseInfo;
     };
 
     /** Handles $or type queries by generating a QueryPlanSet for each $or clause. */
@@ -439,6 +453,17 @@ namespace mongo {
          * @return best guess query plan of the next $or clause
          */
         const QueryPlan *nextClauseBestGuessPlan( const QueryPlan &currentPlan );
+        
+        void addClauseInfo( const shared_ptr<ExplainClauseInfo> &clauseInfo ) {
+            verify( 16068, _explainQueryInfo );
+            _explainQueryInfo->addClauseInfo( clauseInfo );
+        }
+        
+        /** @return an ExplainQueryInfo object that will be updated as the query runs. */
+        shared_ptr<ExplainQueryInfo> generateExplainInfo() {
+            _explainQueryInfo.reset( new ExplainQueryInfo() );
+            return _explainQueryInfo;
+        }
         
         /** Yield the runner member. */
         
@@ -513,6 +538,7 @@ namespace mongo {
         bool _tableScanned;
         shared_ptr<QueryOp> _baseOp;
         shared_ptr<QueryPlanSet::Runner> _runner;
+        shared_ptr<ExplainQueryInfo> _explainQueryInfo;
     };
 
     /** Provides a cursor interface for certain limited uses of a MultiPlanScanner. */
@@ -525,7 +551,10 @@ namespace mongo {
          * @param nscanned is an optional initial value, if not supplied nscanned()
          * will always return -1
          */
-        MultiCursor( auto_ptr<MultiPlanScanner> mps, const shared_ptr<Cursor> &c, const shared_ptr<CoveredIndexMatcher> &matcher, const QueryOp &op, long long nscanned = -1 );
+        MultiCursor( auto_ptr<MultiPlanScanner> mps, const shared_ptr<Cursor> &c,
+                    const shared_ptr<CoveredIndexMatcher> &matcher,
+                    const shared_ptr<ExplainPlanInfo> &explainPlanInfo,
+                    const QueryOp &op, long long nscanned = -1 );
 
         virtual bool ok() { return _c->ok(); }
         virtual Record* _current() { return _c->_current(); }
@@ -536,6 +565,7 @@ namespace mongo {
         virtual DiskLoc refLoc() { return _c->refLoc(); }
         virtual void noteLocation() { _c->noteLocation(); }
         virtual void checkLocation() { _c->checkLocation(); }
+        virtual void recoverFromYield();
         virtual bool supportGetMore() { return true; }
         virtual bool supportYields() { return _c->supportYields(); }
         virtual BSONObj indexKeyPattern() { return _c->indexKeyPattern(); }
@@ -553,9 +583,13 @@ namespace mongo {
         virtual CoveredIndexMatcher* matcher() const { return _matcher.get(); }
 
         virtual bool capped() const { return _c->capped(); }
-
+        
         /** return -1 if we're a getmore handoff */
         virtual long long nscanned() { return _nscanned >= 0 ? _nscanned + _c->nscanned() : _nscanned; }
+        
+        void noteIterate( bool match, bool loadedObject );
+        
+        void noteYield();
     private:
         void nextClause();
         auto_ptr<MultiPlanScanner> _mps;
@@ -563,6 +597,7 @@ namespace mongo {
         shared_ptr<CoveredIndexMatcher> _matcher;
         const QueryPlan *_queryPlan;
         long long _nscanned;
+        shared_ptr<ExplainPlanInfo> _explainPlanInfo;
     };
 
     /** NOTE min, max, and keyPattern will be updated to be consistent with the selected index. */

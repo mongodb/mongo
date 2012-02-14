@@ -673,6 +673,9 @@ doneCheckOrder:
     shared_ptr<QueryOp> MultiPlanScanner::iterateRunner( QueryOp &originalOp, bool retried ) {
         if ( !_runner ) {
             _runner.reset( new QueryPlanSet::Runner( *_currentQps, originalOp ) );
+            if ( _explainQueryInfo ) {
+                _explainQueryInfo->addClauseInfo( _runner->generateExplainInfo() );
+            }
             shared_ptr<QueryOp> op = _runner->init();
             if ( op->complete() ) {
                 return op;   
@@ -680,7 +683,7 @@ doneCheckOrder:
         }
         shared_ptr<QueryOp> op = _runner->nextNonError();
         if ( !op->error() ) {
-            return op;   
+            return op;
         }
         if ( !_currentQps->prepareToRetryQuery() ) {
             return op;
@@ -696,7 +699,7 @@ doneCheckOrder:
     void MultiPlanScanner::updateCurrentQps( QueryPlanSet *qps ) {
         _currentQps.reset( qps );
         _runner.reset();
-    }    
+    }
 
     QueryPlanSet::Runner::Runner( QueryPlanSet &plans, QueryOp &op ) :
         _op( op ),
@@ -750,8 +753,16 @@ doneCheckOrder:
         // Initialize ops.
         for( vector<shared_ptr<QueryOp> >::iterator i = _ops.begin(); i != _ops.end(); ++i ) {
             initOp( **i );
-            if ( (*i)->complete() )
+            if ( _explainClauseInfo ) {
+                _explainClauseInfo->addPlanInfo( (*i)->generateExplainInfo() );
+            }
+        }
+        
+        // See if an op has completed.
+        for( vector<shared_ptr<QueryOp> >::iterator i = _ops.begin(); i != _ops.end(); ++i ) {
+            if ( (*i)->complete() ) {
                 return *i;
+            }
         }
         
         // Put runnable ops in the priority queue.
@@ -1071,6 +1082,7 @@ doneCheckOrder:
     }
 
     const QueryPlan *MultiPlanScanner::singlePlan() const {
+//        log() << "_or: " << _or << endl;
         if ( _or ||
             _currentQps->nPlans() != 1 ||
             _currentQps->usingCachedPlan() ) {
@@ -1112,12 +1124,14 @@ doneCheckOrder:
     
     MultiCursor::MultiCursor( auto_ptr<MultiPlanScanner> mps, const shared_ptr<Cursor> &c,
                              const shared_ptr<CoveredIndexMatcher> &matcher,
+                             const shared_ptr<ExplainPlanInfo> &explainPlanInfo,
                              const QueryOp &op, long long nscanned ) :
     _mps( mps ),
     _c( c ),
     _matcher( matcher ),
     _queryPlan( &op.qp() ),
-    _nscanned( nscanned ) {
+    _nscanned( nscanned ),
+    _explainPlanInfo( explainPlanInfo ) {
         _mps->clearRunner();
         _mps->setRecordedPlanPolicy( QueryPlanSet::UseIfInOrder );
         if ( !ok() ) {
@@ -1134,10 +1148,16 @@ doneCheckOrder:
         return ok();
     }
 
+    void MultiCursor::recoverFromYield() {
+        noteYield();
+        Cursor::recoverFromYield();
+    }
+    
     void MultiCursor::nextClause() {
-        if ( _nscanned >= 0 && _c.get() ) {
+        if ( _nscanned >= 0 ) {
             _nscanned += _c->nscanned();
         }
+        if ( _explainPlanInfo ) _explainPlanInfo->noteDone( *_c );
         _matcher->advanceOrClause( _queryPlan->originalFrv() );
         shared_ptr<CoveredIndexMatcher> newMatcher
         ( _matcher->nextClauseMatcher( _queryPlan->indexKey() ) );
@@ -1146,9 +1166,24 @@ doneCheckOrder:
             _queryPlan = nextPlan;
             _matcher = newMatcher;
             _c = nextPlan->newCursor();
+            if ( _explainPlanInfo ) {
+                _explainPlanInfo.reset( new ExplainPlanInfo() );
+                _explainPlanInfo->notePlan( *_c, _queryPlan->scanAndOrderRequired() );
+                shared_ptr<ExplainClauseInfo> clauseInfo( new ExplainClauseInfo() );
+                clauseInfo->addPlanInfo( _explainPlanInfo );
+                _mps->addClauseInfo( clauseInfo );
+            }
         }
-    }    
+    }
+
+    void MultiCursor::noteIterate( bool match, bool loadedObject ) {
+        if ( _explainPlanInfo ) _explainPlanInfo->noteIterate( match, loadedObject, false, *_c );
+    }
     
+    void MultiCursor::noteYield() {
+        if ( _explainPlanInfo ) _explainPlanInfo->noteYield();
+    }
+
     bool indexWorks( const BSONObj &idxPattern, const BSONObj &sampleKey, int direction, int firstSignificantField ) {
         BSONObjIterator p( idxPattern );
         BSONObjIterator k( sampleKey );
