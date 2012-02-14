@@ -401,32 +401,40 @@ namespace mongo {
     }
 
     Database* DatabaseHolder::getOrCreate( const string& ns , const string& path , bool& justCreated ) {
-        Lock::assertAtLeastReadLocked(ns);
-
-        DBs& m = _paths[path];
-
         string dbname = _todb( ns );
+        {
+            SimpleMutex::scoped_lock lk(_m);
+            Lock::assertAtLeastReadLocked(ns);
+            DBs& m = _paths[path];
+            {
+                DBs::iterator i = m.find(dbname); 
+                if( i != m.end() ) {
+                    justCreated = false;
+                    return i->second;
+                }
+            }
+
+            // todo: protect against getting sprayed with requests for different db names that DNE - 
+            //       that would make the DBs map very large.  not clear what to do to handle though, 
+            //       perhaps just log it, which is what we do here with the "> 40" : 
+            bool cant = !Lock::isWriteLocked(ns);
+            if( logLevel >= 1 || m.size() > 40 || cant || DEBUG_BUILD ) {
+                log() << "opening db: " << (path==dbpath?"":path) << ' ' << dbname << endl;
+            }
+            massert(15927, "can't open database in a read lock. if db was just closed, consider retrying the query. might otherwise indicate an internal error", !cant);
+        }
+
+        // this locks _m for defensive checks, so we don't want to be locked right here : 
+        Database *db = new Database( dbname.c_str() , justCreated , path );
 
         {
-            DBs::iterator i = m.find(dbname); 
-            if( i != m.end() ) {
-                justCreated = false;
-                return i->second;
-            }
+            SimpleMutex::scoped_lock lk(_m);
+            DBs& m = _paths[path];
+            assert( m[dbname] == 0 );
+            m[dbname] = db;
+            _size++;
         }
 
-        // todo: protect against getting sprayed with requests for different db names that DNE - 
-        //       that would make the DBs map very large.  not clear what to do to handle though, 
-        //       perhaps just log it, which is what we do here with the "> 40" : 
-        bool cant = !Lock::isWriteLocked(ns);
-        if( logLevel >= 1 || m.size() > 40 || cant || DEBUG_BUILD ) {
-            log() << "opening db: " << (path==dbpath?"":path) << ' ' << dbname << endl;
-        }
-        massert(15927, "can't open database in a read lock. if db was just closed, consider retrying the query. might otherwise indicate an internal error", !cant);
-        
-        Database *db = new Database( dbname.c_str() , justCreated , path );
-        m[dbname] = db;
-        _size++;
         return db;
     }
 
