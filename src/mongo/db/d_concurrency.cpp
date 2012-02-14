@@ -37,8 +37,9 @@ namespace mongo {
     static mapsf<string,SimpleRWLock*> dblocks;
     SimpleRWLock localDBLock("localDBLock");
 
-    void lockedExclusively();
-    void unlockingExclusively();
+    static void locked_W();
+    static void unlocking_w();
+    static void unlocking_W();
     static QLock& q = *new QLock();
     TSP_DEFINE(LockState,ls);
 
@@ -92,7 +93,7 @@ namespace mongo {
         bool got = q.lock_W(ms);
         if( got ) {
             threadState() = 'W';
-            lockedExclusively();
+            locked_W();
         }
         return got;
     }
@@ -100,17 +101,17 @@ namespace mongo {
         assert( threadState() == 0 );
         threadState() = 'W';
         q.lock_W_stop_greed();
-        lockedExclusively();
+        locked_W();
     }
     static void lock_W() { 
         assert( threadState() == 0 );
         threadState() = 'W';
         q.lock_W();
-        lockedExclusively();
+        locked_W();
     }
     static void unlock_W() { 
         wassert( threadState() == 'W' );
-        unlockingExclusively();
+        unlocking_W();
         threadState() = 0;
         q.unlock_W();
     }
@@ -131,6 +132,7 @@ namespace mongo {
     }
     static void unlock_w() { 
         wassert( threadState() == 'w' );
+        unlocking_w();
         threadState() = 0;
         q.unlock_w();
     }
@@ -155,7 +157,7 @@ namespace mongo {
         assert( threadState() == 0 );
         q.W_to_R();
     }
-    void Lock::ThreadSpanningOp::unsetW() {
+    void Lock::ThreadSpanningOp::unsetW() { // note there is no unlocking_W() call here
         assert( threadState() == 0 );
         q.unlock_W();
         q.start_greed();
@@ -574,18 +576,19 @@ namespace mongo {
         }
     }
 
+    namespace dur {
+        void releasingWriteLock(); // because it's hard to include dur.h here
+    }
     void curopGotLock(Client*);
-    void lockedExclusively() {
+    void locked_W() {
         Client& c = cc();
         curopGotLock(&c);
         d.dbMutex._minfo.entered(); // hopefully eliminate one day 
     }
-
-    namespace dur {
-        void releasingWriteLock(); // because it's hard to include dur.h here
+    void unlocking_w() { 
+        // todo 
     }
-
-    void unlockingExclusively() {
+    void unlocking_W() {
         dur::releasingWriteLock();
         d.dbMutex._minfo.leaving();
     }

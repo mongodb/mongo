@@ -782,7 +782,11 @@ namespace mongo {
         unsigned notesThisLock = 0;
 
         void releasingWriteLock() {
+            // SERVER-4328 todo this isn't quite what we want for notesThisLock with db level concurrency:
             DEV notesThisLock = 0;
+
+            // SERVER-4328 todo commitIfNeeded won't work with 'w' locks
+
             // implicit commitIfNeeded check on each global write unlock
             DEV commitJob._nSinceCommitIfNeededCall = 0; // implicit commit if needed
             if( commitJob.bytes() > UncommittedBytesLimit || cmdLine.durOptions & CmdLine::DurAlwaysCommit ) {
