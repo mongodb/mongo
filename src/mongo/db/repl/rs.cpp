@@ -440,11 +440,6 @@ namespace mongo {
                 }
                 
                 if( reconf ) {
-                    if (m.h.isSelf() && (!_self || (int)_self->id() != m._id)) {
-                        log() << "self doesn't match: " << m._id << rsLog;
-                        assert(false);
-                    }
-
                     const Member *old = findById(m._id);
                     if( old ) {
                         nfound++;
@@ -458,22 +453,30 @@ namespace mongo {
                     }
                 }
             }
-            if( me == 0 ) {
+            if( me == 0 ) { // we're not in the config -- we must have been removed
+                if (state().shunned()) {
+                    // already took note of our ejection from the set
+                    // so just sit tight and poll again
+                    return false;
+                }
+
                 _members.orphanAll();
 
-                // sending hbs must continue to pick up new config, so we leave
-                // hb threads alone
+                // kill off rsHealthPoll threads (because they Know Too Much about our past)
+                endOldHealthTasks();
 
                 // close sockets to force clients to re-evaluate this member
                 MessagingPort::closeAllSockets(0);
 
-                // stop sync thread
-                box.set(MemberState::RS_STARTUP, 0);
+                // take note of our ejection
+                changeState(MemberState::RS_SHUNNED);
 
                 // go into holding pattern
-                log() << "replSet error self not present in the repl set configuration:" << rsLog;
+                log() << "replSet info self not present in the repl set configuration:" << rsLog;
                 log() << c.toString() << rsLog;
-                return false;
+
+                loadConfig();  // redo config from scratch
+                return false; 
             }
             uassert( 13302, "replSet error self appears twice in the repl set configuration", me<=1 );
 
@@ -550,7 +553,6 @@ namespace mongo {
             else {
                 mi = new Member(m.h, m._id, &m, false);
                 _members.push(mi);
-                startHealthTaskFor(mi);
                 if( (int)mi->id() == oldPrimaryId )
                     box.setOtherPrimary(mi);
             }
@@ -559,7 +561,13 @@ namespace mongo {
         if( me == 0 ){
             log() << "replSet warning did not detect own host in full reconfig, members " << members << " config: " << c << rsLog;
         }
-
+        else {
+            // Do this after we've found ourselves, since _self needs
+            // to be set before we can start the heartbeat tasks
+            for( Member *mb = _members.head(); mb; mb=mb->next() ) {
+                startHealthTaskFor( mb );
+            }
+        }
         return true;
     }
 
@@ -571,6 +579,7 @@ namespace mongo {
         int n = 0;
         for( vector<ReplSetConfig>::iterator i = cfgs.begin(); i != cfgs.end(); i++ ) {
             ReplSetConfig& cfg = *i;
+            DEV log(1) << n+1 << " config shows version " << cfg.version << rsLog; 
             if( ++n == 1 ) myVersion = cfg.version;
             if( cfg.ok() && cfg.version > v ) {
                 highest = &cfg;

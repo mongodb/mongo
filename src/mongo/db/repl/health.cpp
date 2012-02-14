@@ -430,7 +430,9 @@ namespace mongo {
         b.appendTimeT("date", time(0));
         b.append("myState", myState.s);
         const Member *syncTarget = _currentSyncTarget;
-        if (syncTarget && myState != MemberState::RS_PRIMARY) {
+        if ( syncTarget && 
+            (myState != MemberState::RS_PRIMARY) && 
+            (myState != MemberState::RS_SHUNNED) ) {
             b.append("syncingTo", syncTarget->fullName());
         }
         b.append("members", v);

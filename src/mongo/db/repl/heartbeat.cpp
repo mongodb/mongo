@@ -97,7 +97,7 @@ namespace mongo {
             if( cmdObj["checkEmpty"].trueValue() ) {
                 result.append("hasData", replHasDatabases());
             }
-            if( theReplSet == 0 ) {
+            if( (theReplSet == 0) || (theReplSet->startupStatus == ReplSetImpl::LOADINGCONFIG) ) {
                 string from( cmdObj.getStringField("from") );
                 if( !from.empty() ) {
                     scoped_lock lck( replSettings.discoveredSeeds_mx );
@@ -353,6 +353,7 @@ namespace mongo {
     }
 
     void ReplSetImpl::startHealthTaskFor(Member *m) {
+        DEV log() << "starting rsHealthPoll for " << m->fullName() << endl;
         ReplSetHealthPollTask *task = new ReplSetHealthPollTask(m->h(), m->hbinfo());
         healthTasks.insert(task);
         task::repeat(task, 2000);
