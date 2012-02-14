@@ -136,7 +136,8 @@ namespace mongo {
                 }
                 else { 
                     // discontinuous
-                    prepBasicWrite_inlock(bb, &last, lastDbPath);
+                    if( i != _intents.begin() )
+                        prepBasicWrite_inlock(bb, &last, lastDbPath);
                     last = *i;
                 }
             }
