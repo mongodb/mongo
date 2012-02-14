@@ -93,7 +93,7 @@ namespace mongo {
         time_t toTimeT() const {
             // cant use uassert from bson/util
             assert((long long)millis >= 0); // TODO when millis is signed, delete
-            assert(((long long)millis/1000) < numeric_limits<time_t>::max());
+            assert(((long long)millis/1000) < (numeric_limits<time_t>::max)());
             return millis / 1000;
         }
     };
