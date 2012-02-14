@@ -59,7 +59,7 @@ namespace mongo {
 
     boost::thread_specific_ptr<SMScope> currentScope( dontDeleteScope );
     boost::recursive_mutex &smmutex = *( new boost::recursive_mutex );
-#define smlock recursive_scoped_lock ___lk( smmutex );
+#define smlock boost::recursive_mutex::scoped_lock ___lk( smmutex );
 
 #define GETHOLDER(x,o) ((BSONHolder*)JS_GetPrivate( x , o ))
 
