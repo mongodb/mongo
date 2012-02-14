@@ -126,7 +126,7 @@ namespace mongo {
         case RS_DOWN: return "DOWN";
         case RS_ROLLBACK: return "ROLLBACK";
         case RS_UNKNOWN: return "UNKNOWN";
-        case RS_SHUNNED: return "SHUNNED";
+        case RS_SHUNNED: return "REMOVED";
         }
         return "";
     }
