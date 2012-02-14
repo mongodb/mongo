@@ -86,12 +86,12 @@ commonFiles = [ "pch.cpp",
                 "client/model.cpp",
                 "client/syncclusterconnection.cpp",
                 "client/distlock.cpp",
-                "s/shardconnection.cpp" ]
+                "s/shardconnection.cpp"]
 
 commonFiles += env['MONGO_COMMON_FILES']
 
 env.StaticLibrary('mongocommon', commonFiles,
-                  LIBDEPS=['$BUILD_DIR/third_party/pcrecpp'])
+                  LIBDEPS=['$BUILD_DIR/third_party/pcrecpp', '$BUILD_DIR/third_party/murmurhash3/murmurhash3'],)
 
 #mmap stuff
 
