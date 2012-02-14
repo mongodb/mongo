@@ -612,7 +612,7 @@ namespace mongo {
     typedef map< string, shared_ptr< NamespaceDetailsTransient > >::iterator ouriter;
 
     void NamespaceDetailsTransient::reset() {
-        DEV assertInWriteLock();
+        Lock::assertWriteLocked(_ns); 
         clearQueryCache();
         _keysComputed = false;
         _indexSpecs.clear();
