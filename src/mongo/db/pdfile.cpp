@@ -138,8 +138,11 @@ namespace mongo {
     }
 
     /* ----------------------------------------- */
-
+#ifdef _WIN32
+    string dbpath = "\\data\\db\\";
+#else
     string dbpath = "/data/db/";
+#endif
     const char FREELIST_NS[] = ".$freelist";
     bool directoryperdb = false;
     string repairpath;

@@ -737,9 +737,6 @@ int main(int argc, char* argv[]) {
                 dbpath = cmdLine.cwd + "/" + dbpath;
             }
         }
-        else {
-            dbpath = "/data/db/";
-        }
 #ifdef _WIN32
         if (dbpath.size() > 1 && dbpath[dbpath.size()-1] == '/') {
             // size() check is for the unlikely possibility of --dbpath "/"
