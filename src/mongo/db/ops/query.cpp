@@ -708,7 +708,7 @@ namespace mongo {
                 shared_ptr<ExplainQueryInfo> explainQueryInfo;
                 if ( _explainInfo ) {
                     _explainInfo->noteDone( *_cursor );
-                    explainQueryInfo = ExplainQueryInfo::fromSinglePlan( _explainInfo );
+                    explainQueryInfo = _explainInfo->queryInfo();
                 }
                 else {
                     verify( 16067, _queryOptimizerCursor );
@@ -758,14 +758,14 @@ namespace mongo {
             }
             return shardingState.getShardChunkManager( _parsedQuery.ns() );
         }
-        ExplainPlanInfo *newExplainInfo() const {
+        ExplainSinglePlanQueryInfo *newExplainInfo() const {
             if ( !_parsedQuery.isExplain() ) {
                 return 0;
             }
             if ( _queryOptimizerCursor ) {
                 return 0;
             }
-            return new ExplainPlanInfo();
+            return new ExplainSinglePlanQueryInfo();
         }
         void handleScanAndOrderMatch() {
             DiskLoc loc = _cursor->currLoc();
@@ -873,7 +873,7 @@ namespace mongo {
         long long _skip;
         long long _n;
         ShardChunkManagerPtr _chunkManager;
-        shared_ptr<ExplainPlanInfo> _explainInfo;
+        shared_ptr<ExplainSinglePlanQueryInfo> _explainInfo;
         BSONObj _oldPlan;
     };
     

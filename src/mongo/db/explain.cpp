@@ -32,7 +32,6 @@ namespace mongo {
     _nscanned(),
     _scanAndOrder(),
     _nYields(),
-    _nChunkSkips(),
     _picked(),
     _done() {
     }
@@ -44,16 +43,12 @@ namespace mongo {
         noteCursorUpdate( cursor );
     }
     
-    void ExplainPlanInfo::noteIterate( bool match, bool loadedObject, bool chunkSkip,
-                                      const Cursor &cursor ) {
+    void ExplainPlanInfo::noteIterate( bool match, bool loadedObject, const Cursor &cursor ) {
         if ( match ) {
             ++_n;
         }
         if ( loadedObject ) {
             ++_nscannedObjects;
-        }
-        if ( chunkSkip ) {
-            ++_nChunkSkips;
         }
         noteCursorUpdate( cursor );
     }
@@ -106,17 +101,6 @@ namespace mongo {
     _nChunkSkips() {
     }
     
-    shared_ptr<ExplainClauseInfo>
-    ExplainClauseInfo::fromSinglePlan( const shared_ptr<ExplainPlanInfo> &info ) {
-        shared_ptr<ExplainClauseInfo> clauseInfo( new ExplainClauseInfo() );
-        clauseInfo->addPlanInfo( info );
-        clauseInfo->_n = info->n();
-        clauseInfo->_nscannedObjects = info->nscannedObjects();
-        clauseInfo->_nChunkSkips = info->nChunkSkips();
-        clauseInfo->_timer = info->timer();
-        return clauseInfo;
-    }
-
     BSONObj ExplainClauseInfo::bson() const {
         BSONObjBuilder bb;
         bb.appendElements( virtualPickedPlan().pickedPlanBson( *this ) );
@@ -196,14 +180,6 @@ namespace mongo {
         return *(new ExplainPlanInfo());  // TODO better
     }
     
-    shared_ptr<ExplainQueryInfo>
-    ExplainQueryInfo::fromSinglePlan( const shared_ptr<ExplainPlanInfo> &info ) {
-        shared_ptr<ExplainClauseInfo> clauseInfo = ExplainClauseInfo::fromSinglePlan( info );
-        shared_ptr<ExplainQueryInfo> queryInfo( new ExplainQueryInfo() );
-        queryInfo->addClauseInfo( clauseInfo );
-        return queryInfo;
-    }
-    
     void ExplainQueryInfo::noteIterate( bool match, bool loadedObject, bool chunkSkip ) {
         verify( 16063, !_clauses.empty() );
         _clauses.back()->noteIterate( match, loadedObject, chunkSkip );
@@ -260,4 +236,12 @@ namespace mongo {
         _clauses.push_back( info );
     }
 
+    ExplainSinglePlanQueryInfo::ExplainSinglePlanQueryInfo() :
+    _planInfo( new ExplainPlanInfo() ),
+    _queryInfo( new ExplainQueryInfo() ) {
+        shared_ptr<ExplainClauseInfo> clauseInfo( new ExplainClauseInfo() );
+        clauseInfo->addPlanInfo( _planInfo );
+        _queryInfo->addClauseInfo( clauseInfo );
+    }
+    
 } // namespace mongo

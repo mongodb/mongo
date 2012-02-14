@@ -1177,7 +1177,7 @@ doneCheckOrder:
     }
 
     void MultiCursor::noteIterate( bool match, bool loadedObject ) {
-        if ( _explainPlanInfo ) _explainPlanInfo->noteIterate( match, loadedObject, false, *_c );
+        if ( _explainPlanInfo ) _explainPlanInfo->noteIterate( match, loadedObject, *_c );
     }
     
     void MultiCursor::noteYield() {

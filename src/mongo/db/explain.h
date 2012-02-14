@@ -40,7 +40,7 @@ namespace mongo {
         ExplainPlanInfo();
         
         void notePlan( const Cursor &cursor, bool scanAndOrder );
-        void noteIterate( bool match, bool loadedObject, bool chunkSkip, const Cursor &cursor );
+        void noteIterate( bool match, bool loadedObject, const Cursor &cursor );
         void noteYield();
         void noteDone( const Cursor &cursor );
         void notePicked();
@@ -53,8 +53,6 @@ namespace mongo {
         long long n() const { return _n; }
         long long nscannedObjects() const { return _nscannedObjects; }
         long long nscanned() const { return _nscanned; }
-        long long nChunkSkips() const { return _nChunkSkips; }
-        DurationTimer timer() const { return _timer; }
 
     private:
         void noteCursorUpdate( const Cursor &cursor );
@@ -65,18 +63,14 @@ namespace mongo {
         long long _nscanned;
         bool _scanAndOrder;
         int _nYields;
-        long long _nChunkSkips;
         BSONObj _indexBounds;
         bool _picked;
         bool _done;
-        DurationTimer _timer;
     };
     
     class ExplainClauseInfo {
     public:
         ExplainClauseInfo();
-        static shared_ptr<ExplainClauseInfo>
-        fromSinglePlan( const shared_ptr<ExplainPlanInfo> &info );
 
         void noteIterate( bool match, bool loadedObject, bool chunkSkip );
         void reviseN( long long n );
@@ -102,9 +96,6 @@ namespace mongo {
     
     class ExplainQueryInfo {
     public:
-        static shared_ptr<ExplainQueryInfo>
-        fromSinglePlan( const shared_ptr<ExplainPlanInfo> &info );
-        
         void noteIterate( bool match, bool loadedObject, bool chunkSkip );
         void reviseN( long long n );
 
@@ -120,6 +111,33 @@ namespace mongo {
         list<shared_ptr<ExplainClauseInfo> > _clauses;
         AncillaryInfo _ancillaryInfo;
         DurationTimer _timer;
+    };
+    
+    class ExplainSinglePlanQueryInfo {
+    public:
+        ExplainSinglePlanQueryInfo();
+
+        void notePlan( const Cursor &cursor, bool scanAndOrder ) {
+            _planInfo->notePlan( cursor, scanAndOrder );
+        }
+        void noteIterate( bool match, bool loadedObject, bool chunkSkip, const Cursor &cursor ) {
+            _planInfo->noteIterate( match, loadedObject, cursor );
+            _queryInfo->noteIterate( match, loadedObject, chunkSkip );
+        }
+        void noteYield() {
+            _planInfo->noteYield();
+        }
+        void noteDone( const Cursor &cursor ) {
+            _planInfo->noteDone( cursor );
+        }
+
+        shared_ptr<ExplainQueryInfo> queryInfo() const {
+            return _queryInfo;
+        }
+
+    private:
+        shared_ptr<ExplainPlanInfo> _planInfo;
+        shared_ptr<ExplainQueryInfo> _queryInfo;
     };
 
 } // namespace mongo
