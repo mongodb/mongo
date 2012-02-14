@@ -214,6 +214,13 @@ __wt_cache_evict_server(void *arg)
 	WT_ERR(__wt_open_session(conn, 1, NULL, NULL, &session));
 
 	while (F_ISSET(conn, WT_SERVER_RUN)) {
+		/*
+		 * Use the same logic as application threads to decide
+		 * whether there is work to do.  If so, evict_cond will
+		 * be signalled and the wait below won't block.
+		 */
+		__wt_eviction_check(session, NULL);
+
 		WT_VERBOSE(session, evictserver, "sleeping");
 		__wt_cond_wait(session, cache->evict_cond);
 		if (!F_ISSET(conn, WT_SERVER_RUN))
@@ -264,10 +271,6 @@ __evict_worker(WT_SESSION_IMPL *session)
 	for (loop = 0;; loop++) {
 		/* Walk the eviction-request queue. */
 		WT_RET(__evict_request_walk(session));
-
-		/* Keep evicting until we hit 90% of the maximum cache size. */
-		bytes_inuse = __wt_cache_bytes_inuse(cache);
-		bytes_max = conn->cache_size;
 
 		/*
 		 * Keep evicting until we hit the target cache usage.
@@ -338,21 +341,30 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 		 */
 		memset(cache->evict, 0, cache->evict_allocated);
 
-		/*
-		 * If we're about to do a walk of the file tree (and possibly
-		 * close the file), any page we're referencing won't be useful;
-		 * if we pushing out a page, that page might be our eviction
-		 * location.   Regardless, discard any page we're holding and
-		 * we can restart our walk as needed.
-		 */
-		session->btree->evict_page = NULL;
-
 		if (F_ISSET(er, WT_EVICT_REQ_PAGE)) {
+			/*
+			 * If we are pushing out a page, that page might be our
+			 * eviction location.  If so, try to move on to the
+			 * next page, or restart the walk if that fails
+			 * (evict_page will be set to NULL).
+			 */
+			if (session->btree->evict_page == er->page)
+				(void)__wt_tree_np(
+				    session, &session->btree->evict_page, 1, 1);
+
 			WT_VERBOSE(session, evictserver,
 			    "forcing eviction of page %p", er->page);
 			ret = __wt_rec_evict(session, er->page, 0);
-		} else
+		} else {
+			/*
+			 * If we're about to do a walk of the file tree (and
+			 * possibly close the file), any page we're referencing
+			 * won't be useful; Discard any page we're holding and
+			 * we can restart our walk as needed.
+			 */
+			session->btree->evict_page = NULL;
 			ret = __evict_file(session, er);
+		}
 
 		__wt_spin_unlock(session, &cache->lru_lock);
 
@@ -671,7 +683,7 @@ __evict_get_page(
 		 */
 		if (is_app &&
 		    __wt_session_has_btree(session, evict->btree) != 0)
-			goto done;
+			break;
 
 		/*
 		 * Switch the page state to evicting while holding the eviction
@@ -689,10 +701,12 @@ __evict_get_page(
 
 		/*
 		 * If we're evicting our current eviction point in the file,
-		 * clear it and restart the walk.
+		 * try to move on to the next page, or restart the walk if that
+		 * fails (evict_page will be set to NULL).
 		 */
 		if (*pagep == evict->btree->evict_page)
-			evict->btree->evict_page = NULL;
+			(void)__wt_tree_np(
+			    session, &evict->btree->evict_page, 1, 1);
 
 		/*
 		 * Paranoia: remove the entry so we never try and reconcile
@@ -702,7 +716,7 @@ __evict_get_page(
 		break;
 	}
 
-done:	__wt_spin_unlock(session, &cache->lru_lock);
+	__wt_spin_unlock(session, &cache->lru_lock);
 }
 
 /*
