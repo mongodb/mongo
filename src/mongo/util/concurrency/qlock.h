@@ -123,9 +123,11 @@ namespace mongo {
         W.n = 0;
         R.n = 1;
         if( greed ) {
-            // someone else would like to write, no need to notify further
+            // writers await (greedily) but our R state stops them,
+            // so no need to notify anyone
         }
         else {
+            // no need to W.c.notify, you can't do W while R state is engaged
             R.c.notify_all();
             w.c.notify_all();
             r.c.notify_all();
@@ -174,7 +176,7 @@ namespace mongo {
         fassert(0, r.n > 0);
         r.n--;
         if( R.n + w.n + r.n == 0 )
-            W.c.notify_one();
+            W.c.notify_one(); // only thing we possibly would have blocked would be a W
     }
     inline void QLock::unlock_w() {
         boost::mutex::scoped_lock lk(m);
@@ -198,8 +200,9 @@ namespace mongo {
         boost::mutex::scoped_lock lk(m);
         W.n--;
         dassert( W.n == 0 );
+        int writersWereQueued = greed;
         W.c.notify_one();
-        if( greed ) {
+        if( writersWereQueued ) {
             // someone else would like to write, no need to notify further
         }
         else {
