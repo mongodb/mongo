@@ -271,8 +271,10 @@ doneCheckOrder:
         if ( ! cmdLine.noTableScan )
             return;
 
-        if ( strstr( ns() , ".system." ) ||
-            strstr( ns() , "local." ) )
+        if ( strstr( ns() , ".system." ) ) 
+            return;
+
+        if( str::startsWith(ns(), "local.") )
             return;
 
         if ( ! nsdetails( ns() ) )
