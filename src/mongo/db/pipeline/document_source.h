@@ -590,6 +590,8 @@ namespace mongo {
         // virtuals from DocumentSource
         virtual ~DocumentSourceMatch();
         virtual const char *getSourceName() const;
+        virtual void manageDependencies(
+            const intrusive_ptr<DependencyTracker> &pTracker);
 
         /**
           Create a filter.

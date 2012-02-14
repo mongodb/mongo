@@ -724,13 +724,13 @@ namespace mongo {
 
                     if( strcmp(z.fieldName(),fieldName) == 0 ) {
                         if ( compareOp == BSONObj::opEXISTS ) {
-                         	return retExistsFound( em );
+                                return retExistsFound( em );
                         }
                         if (valuesMatch(z, toMatch, compareOp, em) ) {
-	                        // "field.<n>" array notation was used
-    	                    if ( details )
-        	                    details->_elemMatchKey = z.fieldName();
-            	            return 1;
+                                // "field.<n>" array notation was used
+                            if ( details )
+                                    details->_elemMatchKey = z.fieldName();
+                            return 1;
                         }
                     }
 
@@ -761,9 +761,9 @@ namespace mongo {
 
         if ( compareOp == BSONObj::opEXISTS ) {
             if( e.eoo() ) {
-             	return 0;
+                return 0;
             } else {
-             	return retExistsFound( em );   
+                return retExistsFound( em );   
             }
         }
         else if ( ( e.type() != Array || indexed || compareOp == BSONObj::opSIZE ) &&
@@ -807,7 +807,7 @@ namespace mongo {
                 return 1;
             }
             if ( compareOp == BSONObj::opIN && valuesMatch( e, toMatch, compareOp, em ) ) {
-             	return 1;
+                return 1;
             }
         }
         else if ( e.eoo() ) {
@@ -821,6 +821,12 @@ namespace mongo {
     /* See if an object matches the query.
     */
     bool Matcher::matches(const BSONObj& jsobj , MatchDetails * details ) const {
+        /*
+          NB:  if any modifications are made to how this operates, make sure
+          they are reflected in visitReferences(), whose implementation
+          parallels this.
+         */
+
         LOG(5) << "Matcher::matches() " << jsobj.toString() << endl;
 
         /* assuming there is usually only one thing to match.  if more this
@@ -857,8 +863,8 @@ namespace mongo {
         }
 
         for (vector<RegexMatcher>::const_iterator it = _regexs.begin();
-	     it != _regexs.end();
-	     ++it) {
+             it != _regexs.end();
+             ++it) {
             BSONElementSet s;
             if ( !_constrainIndexKey.isEmpty() ) {
                 BSONElement e = jsobj.getFieldUsingIndexNames(it->_fieldName, _constrainIndexKey);
@@ -866,10 +872,10 @@ namespace mongo {
                 // Should only have keys nested one deep here, for geo-indices
                 // TODO: future indices may nest deeper?
                 if( e.type() == Array ){
-                	BSONObjIterator i( e.Obj() );
-                	while( i.more() ){
-                		s.insert( i.next() );
-                	}
+                        BSONObjIterator i( e.Obj() );
+                        while( i.more() ){
+                                s.insert( i.next() );
+                        }
                 }
                 else if ( !e.eoo() )
                     s.insert( e );
@@ -964,13 +970,152 @@ namespace mongo {
         return true;
     }
 
+#ifdef MONGO_LATER_SERVER_4644
+    void Matcher::visitReferences(FieldSink *pSink) const {
+        // check normal non-regex cases:
+        for ( unsigned i = 0; i < _basics.size(); i++ ) {
+            const ElementMatcher& bm = _basics[i];
+            const BSONElement& m = bm._toMatch;
+            // -1=mismatch. 0=missing element. 1=match
+            int cmp = matchesDotted(m.fieldName(), m, jsobj, bm._compareOp, bm , false , details );
+            if ( cmp == 0 && bm._compareOp == BSONObj::opEXISTS ) {
+                // If missing, match cmp is opposite of $exists spec.
+                cmp = -retExistsFound(bm);
+            }
+            if ( bm._isNot )
+                cmp = -cmp;
+            if ( cmp < 0 )
+                return false;
+            if ( cmp == 0 ) {
+                /* missing is ok iff we were looking for null */
+                if ( m.type() == jstNULL || m.type() == Undefined ||
+                    ( ( bm._compareOp == BSONObj::opIN || bm._compareOp == BSONObj::NIN ) && bm._myset->count( staticNull.firstElement() ) > 0 ) ) {
+                    if ( bm.negativeCompareOp() ^ bm._isNot ) {
+                        return false;
+                    }
+                }
+                else {
+                    if ( !bm._isNot ) {
+                        return false;
+                    }
+                }
+            }
+        }
+
+        for (vector<RegexMatcher>::const_iterator it = _regexs.begin();
+             it != _regexs.end();
+             ++it) {
+            BSONElementSet s;
+            if ( !_constrainIndexKey.isEmpty() ) {
+                BSONElement e = jsobj.getFieldUsingIndexNames(it->_fieldName, _constrainIndexKey);
+
+                // Should only have keys nested one deep here, for geo-indices
+                // TODO: future indices may nest deeper?
+                if( e.type() == Array ){
+                        BSONObjIterator i( e.Obj() );
+                        while( i.more() ){
+                                s.insert( i.next() );
+                        }
+                }
+                else if ( !e.eoo() )
+                    s.insert( e );
+
+            }
+            else {
+                jsobj.getFieldsDotted( it->_fieldName, s );
+            }
+            bool match = false;
+            for( BSONElementSet::const_iterator i = s.begin(); i != s.end(); ++i )
+                if ( regexMatches(*it, *i) )
+                    match = true;
+            if ( !match ^ it->_isNot )
+                return false;
+        }
+
+        if ( _orDedupConstraints.size() > 0 ) {
+            for( vector< shared_ptr< FieldRangeVector > >::const_iterator i = _orDedupConstraints.begin();
+                i != _orDedupConstraints.end(); ++i ) {
+                if ( (*i)->matches( jsobj ) ) {
+                    return false;
+                }
+            }
+        }
+        
+        if ( _andMatchers.size() > 0 ) {
+            for( list< shared_ptr< Matcher > >::const_iterator i = _andMatchers.begin();
+                i != _andMatchers.end(); ++i ) {
+                // SERVER-3192 Track field matched using details the same as for
+                // top level fields, at least for now.
+                if ( !(*i)->matches( jsobj, details ) ) {
+                    return false;
+                }
+            }
+        }
+
+        if ( _orMatchers.size() > 0 ) {
+            bool match = false;
+            for( list< shared_ptr< Matcher > >::const_iterator i = _orMatchers.begin();
+                    i != _orMatchers.end(); ++i ) {
+                // SERVER-205 don't submit details - we don't want to track field
+                // matched within $or
+                if ( (*i)->matches( jsobj ) ) {
+                    match = true;
+                    break;
+                }
+            }
+            if ( !match ) {
+                return false;
+            }
+        }
+
+        if ( _norMatchers.size() > 0 ) {
+            for( list< shared_ptr< Matcher > >::const_iterator i = _norMatchers.begin();
+                    i != _norMatchers.end(); ++i ) {
+                // SERVER-205 don't submit details - we don't want to track field
+                // matched within $nor
+                if ( (*i)->matches( jsobj ) ) {
+                    return false;
+                }
+            }
+        }
+
+        if ( _where ) {
+            if ( _where->func == 0 ) {
+                u_assert( 10070 , "$where compile error", false);
+                return false; // didn't compile
+            }
+
+            if ( _where->jsScope ) {
+                _where->scope->init( _where->jsScope );
+            }
+            _where->scope->setObject( "obj", const_cast< BSONObj & >( jsobj ) );
+            _where->scope->setBoolean( "fullObject" , true ); // this is a hack b/c fullObject used to be relevant
+
+            int err = _where->scope->invoke( _where->func , 0, &jsobj , 1000 * 60 , false );
+            if ( err == -3 ) { // INVOKE_ERROR
+                stringstream ss;
+                ss << "error on invocation of $where function:\n"
+                   << _where->scope->getError();
+                u_assert( 10071 , ss.str(), false);
+                return false;
+            }
+            else if ( err != 0 ) {   // ! INVOKE_SUCCESS
+                u_assert( 10072 , "unknown error in invocation of $where function", false);
+                return false;
+            }
+            return _where->scope->getBoolean( "return" ) != 0;
+
+        }
+    }
+#endif /* MONGO_LATER_SERVER_4644 */
+
     bool Matcher::keyMatch( const Matcher &docMatcher ) const {
         // Quick check certain non key match cases.
         if ( docMatcher._all
-        	|| docMatcher._haveSize
-        	|| docMatcher._hasArray // We can't match an array to its first indexed element using keymatch
-        	|| docMatcher._haveNeg ) {
-         	return false;   
+                || docMatcher._haveSize
+                || docMatcher._hasArray // We can't match an array to its first indexed element using keymatch
+                || docMatcher._haveNeg ) {
+                return false;   
         }
         
         // Check that all match components are available in the index matcher.
