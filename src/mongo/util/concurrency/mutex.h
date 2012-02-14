@@ -113,8 +113,7 @@ namespace mongo {
         boost::timed_mutex *_m;
     };
 
-    typedef mutex::scoped_lock scoped_lock;
-    typedef boost::recursive_mutex::scoped_lock recursive_scoped_lock;
+    typedef mongo::mutex::scoped_lock scoped_lock;
 
     /** The concept with SimpleMutex is that it is a basic lock/unlock with no 
           special functionality (such as try and try timeout).  Thus it can be 
@@ -128,39 +127,28 @@ namespace mongo {
         SimpleMutex(const char *name) { InitializeCriticalSection(&_cs); }
         ~SimpleMutex() { DeleteCriticalSection(&_cs); }
 
-#if defined(_DEBUG)
-        ThreadLocalValue<int> _nlocksByMe;
         void lock() { 
-            assert( _nlocksByMe.get() == 0 ); // indicates you rae trying to lock recursively
-            _nlocksByMe.set(1);
             EnterCriticalSection(&_cs); 
+#if defined(_DEBUG)
+            assert( _cs.RecursionCount == 1 );
+#endif
         }
         void dassertLocked() const { 
-            assert( _nlocksByMe.get() == 1 );
+#if defined(_DEBUG)
+            assert( _cs.OwningThread == (HANDLE) GetCurrentThreadId() );
+#endif
         }
         void unlock() { 
             dassertLocked();
-            _nlocksByMe.set(0);
             LeaveCriticalSection(&_cs); 
         }
-#else
-        void dassertLocked() const { }
-        void lock() { 
-            EnterCriticalSection(&_cs); 
-        }
-        void unlock() { 
-            LeaveCriticalSection(&_cs); 
-        }
-#endif
 
         class scoped_lock : boost::noncopyable {
             SimpleMutex& _m;
         public:
             scoped_lock( SimpleMutex &m ) : _m(m) { _m.lock(); }
             ~scoped_lock() { _m.unlock(); }
-# if defined(_DEBUG)
             const SimpleMutex& m() const { return _m; }
-# endif
         };
     };
 #else
