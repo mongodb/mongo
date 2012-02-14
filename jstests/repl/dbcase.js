@@ -65,6 +65,7 @@ m2 = m.getDB( n2 );
 
 m1.c.save( {} );
 m2.c.save( {} ); // will fail due to conflict
+m1.getLastError(); // Wait for write operations to complete.
 check( n1 );
 
 m1.dropDatabase();
