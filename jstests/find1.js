@@ -17,6 +17,7 @@ assert( t.findOne( { a : 1 } , { a : 1 } ).b == null , "B");
 
 assert( t.find( { a : 1 } )[0].b != null , "C" );
 assert( t.find( { a : 1 } , { a : 1 } )[0].b == null , "D" );
+assert( t.find( { a : 1 } , { a : 1 } ).sort( { a : 1 } )[0].b == null , "D" );
 
 id = t.findOne()._id;
 

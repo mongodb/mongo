@@ -1083,7 +1083,7 @@ namespace mongo {
             if ( pq.hasOption( QueryOption_OplogReplay ) ) {
                 cursor = FindingStartCursor::getCursor( ns, query, order );
             }
-            else if ( !pq.getFields() && !pq.returnKey() ) {
+            else if ( !pq.returnKey() ) {
                 cursor = NamespaceDetailsTransient::getCursor( ns, query, order, false, 0, &pq );
             }
             if ( !cursor ) {
