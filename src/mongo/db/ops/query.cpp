@@ -654,7 +654,80 @@ namespace mongo {
         bool _yieldRecoveryFailed;
     };
     
-    // separate explain strategies
+    class ExplainRecordingStrategy {
+    public:
+        ExplainRecordingStrategy( const ExplainQueryInfo::AncillaryInfo &ancillaryInfo ) :
+        _ancillaryInfo( ancillaryInfo ) {
+        }
+        virtual ~ExplainRecordingStrategy() {}
+        virtual void notePlan( bool scanAndOrder ) {}
+        virtual void noteIterate( bool match, bool loadedObject, bool chunkSkip ) {}
+        virtual void noteYield() {}
+        shared_ptr<ExplainQueryInfo> doneQueryInfo() {
+            shared_ptr<ExplainQueryInfo> ret = _doneQueryInfo();
+            ret->setAncillaryInfo( _ancillaryInfo );
+            return ret;
+        }
+    protected:
+        virtual shared_ptr<ExplainQueryInfo> _doneQueryInfo() = 0;
+    private:
+        ExplainQueryInfo::AncillaryInfo _ancillaryInfo;
+    };
+    
+    class NoExplainStrategy : public ExplainRecordingStrategy {
+    public:
+        NoExplainStrategy() :
+        ExplainRecordingStrategy( ExplainQueryInfo::AncillaryInfo() ) {
+        }
+    private:
+        virtual shared_ptr<ExplainQueryInfo> _doneQueryInfo() {
+            verify( 16069, false );
+            return shared_ptr<ExplainQueryInfo>();
+        }
+    };
+    
+    class SimpleCursorExplainStrategy : public ExplainRecordingStrategy {
+    public:
+        SimpleCursorExplainStrategy( const ExplainQueryInfo::AncillaryInfo &ancillaryInfo,
+                                    const shared_ptr<Cursor> &cursor ) :
+        ExplainRecordingStrategy( ancillaryInfo ),
+        _cursor( cursor ),
+        _explainInfo( new ExplainSinglePlanQueryInfo() ) {
+        }
+    private:
+        virtual void notePlan( bool scanAndOrder ) {
+            _explainInfo->notePlan( *_cursor, scanAndOrder );
+        }
+        virtual void noteIterate( bool match, bool loadedObject, bool chunkSkip ) {
+            _explainInfo->noteIterate( match, loadedObject, chunkSkip, *_cursor );
+        }
+        virtual void noteYield() {
+            _explainInfo->noteYield();
+        }
+        virtual shared_ptr<ExplainQueryInfo> _doneQueryInfo() {
+            _explainInfo->noteDone( *_cursor );
+            return _explainInfo->queryInfo();
+        }
+        shared_ptr<Cursor> _cursor;
+        shared_ptr<ExplainSinglePlanQueryInfo> _explainInfo;
+    };
+
+    class QueryOptimizerCursorExplainStrategy : public ExplainRecordingStrategy {
+    public:
+        QueryOptimizerCursorExplainStrategy( const ExplainQueryInfo::AncillaryInfo &ancillaryInfo,
+                                            const shared_ptr<QueryOptimizerCursor> cursor ) :
+        ExplainRecordingStrategy( ancillaryInfo ),
+        _cursor( cursor ) {
+        }
+        virtual void noteIterate( bool match, bool loadedObject, bool chunkSkip ) {
+            _cursor->noteIterate( match, loadedObject, chunkSkip );
+        }
+        virtual shared_ptr<ExplainQueryInfo> _doneQueryInfo() {
+            return _cursor->explainQueryInfo();
+        }
+    private:
+        shared_ptr<QueryOptimizerCursor> _cursor;
+    };
     
     class QueryResponseBuilder {
     public:
@@ -662,15 +735,13 @@ namespace mongo {
                              const BSONObj &oldPlan ) :
         _parsedQuery( parsedQuery ),
         _cursor( cursor ),
-        _queryOptimizerCursor( dynamic_cast<QueryOptimizerCursor*>( cursor.get() ) ),
+        _queryOptimizerCursor( dynamic_pointer_cast<QueryOptimizerCursor>( _cursor ) ),
         _buf( 32768 ),
         _scanAndOrder( newScanAndOrder() ),
         _skip( _parsedQuery.getSkip() ),
         _n(),
         _chunkManager( newChunkManager() ),
-        _explainInfo( newExplainInfo() ),
-        _oldPlan( oldPlan ) {
-            if ( _explainInfo ) _explainInfo->notePlan( *_cursor, false );
+        _explain( newExplainRecordingStrategy( oldPlan ) ) {
             _buf.skip( sizeof( QueryResult ) );
         }
         bool mayAddMatch() {
@@ -689,8 +760,7 @@ namespace mongo {
             return true;
         }
         void noteYield() {
-            if ( _explainInfo ) _explainInfo->noteYield();
-            // _queryOptimizerCursor counts yields internally.
+            _explain->noteYield();
         }
         bool enoughForFirstBatch() const {
             return !_parsedQuery.isExplain() && _parsedQuery.enoughForFirstBatch( _n, _buf.len() );
@@ -705,24 +775,13 @@ namespace mongo {
         }
         long long handoff( Message &result ) {
             if ( _parsedQuery.isExplain() ) {
-                shared_ptr<ExplainQueryInfo> explainQueryInfo;
-                if ( _explainInfo ) {
-                    _explainInfo->noteDone( *_cursor );
-                    explainQueryInfo = _explainInfo->queryInfo();
-                }
-                else {
-                    verify( 16067, _queryOptimizerCursor );
-                    explainQueryInfo = _queryOptimizerCursor->explainQueryInfo();
-                }
+                shared_ptr<ExplainQueryInfo> explainInfo = _explain->doneQueryInfo();
                 if ( resultsNeedSort() ) {
-                    explainQueryInfo->reviseN( _scanAndOrder->nout() );
+                    explainInfo->reviseN( _scanAndOrder->nout() );
                 }
-                ExplainQueryInfo::AncillaryInfo ancillaryInfo;
-                ancillaryInfo._oldPlan = _oldPlan;
-                explainQueryInfo->setAncillaryInfo( ancillaryInfo );
                 _buf.reset();
                 _buf.skip( sizeof( QueryResult ) );
-                fillQueryResultFromObj( _buf, 0, explainQueryInfo->bson() );
+                fillQueryResultFromObj( _buf, 0, explainInfo->bson() );
                 result.appendData( _buf.buf(), _buf.len() );
                 _buf.decouple();
                 return 1;
@@ -758,14 +817,21 @@ namespace mongo {
             }
             return shardingState.getShardChunkManager( _parsedQuery.ns() );
         }
-        ExplainSinglePlanQueryInfo *newExplainInfo() const {
+        shared_ptr<ExplainRecordingStrategy> newExplainRecordingStrategy( const BSONObj &oldPlan )
+        const {
+            ExplainQueryInfo::AncillaryInfo ancillaryInfo;
+            ancillaryInfo._oldPlan = oldPlan;
             if ( !_parsedQuery.isExplain() ) {
-                return 0;
+                return shared_ptr<ExplainRecordingStrategy>( new NoExplainStrategy() );
             }
             if ( _queryOptimizerCursor ) {
-                return 0;
+                return shared_ptr<ExplainRecordingStrategy>
+                ( new QueryOptimizerCursorExplainStrategy( ancillaryInfo, _queryOptimizerCursor ) );
             }
-            return new ExplainSinglePlanQueryInfo();
+            shared_ptr<ExplainRecordingStrategy> ret
+            ( new SimpleCursorExplainStrategy( ancillaryInfo, _cursor ) );
+            ret->notePlan( false );
+            return ret;
         }
         void handleScanAndOrderMatch() {
             DiskLoc loc = _cursor->currLoc();
@@ -802,21 +868,10 @@ namespace mongo {
             }
             ++_n;
             if ( _parsedQuery.isExplain() ) {
-                noteIterate( true, true, false );
+                _explain->noteIterate( true, true, false );
             }
             else {
                 fillQueryResultFromObj( _buf, _parsedQuery.getFields(), loc.obj(), ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
-            }
-        }
-        void noteIterate( bool match, bool loadedDocument, bool chunkSkip ) {
-            if ( !_parsedQuery.isExplain() ) {
-                return;
-            }
-            if ( _explainInfo ) {
-                _explainInfo->noteIterate( match, loadedDocument, chunkSkip, *_cursor );
-            }
-            else if ( _queryOptimizerCursor ) {
-                _queryOptimizerCursor->noteIterate( match, loadedDocument, chunkSkip );
             }
         }
         bool iterateNeedsSort() const {
@@ -850,7 +905,7 @@ namespace mongo {
             if ( _cursor->currentMatches( &details ) ) {
                 return true;
             }
-            noteIterate( false, details._loadedObject, false );
+            _explain->noteIterate( false, details._loadedObject, false );
             return false;
         }
         bool chunkMatches() {
@@ -861,20 +916,19 @@ namespace mongo {
             if ( _chunkManager->belongsToMe( _cursor->current() ) ) {
                 return true;
             }
-            noteIterate( false, true, true );
+            _explain->noteIterate( false, true, true );
             return false;
         }
         const ParsedQuery &_parsedQuery;
         shared_ptr<Cursor> _cursor;
-        QueryOptimizerCursor *_queryOptimizerCursor;
+        shared_ptr<QueryOptimizerCursor> _queryOptimizerCursor;
         BufBuilder _buf;
         shared_ptr<ScanAndOrder> _scanAndOrder;
         SmallDupSet _scanAndOrderDups;
         long long _skip;
         long long _n;
         ShardChunkManagerPtr _chunkManager;
-        shared_ptr<ExplainSinglePlanQueryInfo> _explainInfo;
-        BSONObj _oldPlan;
+        shared_ptr<ExplainRecordingStrategy> _explain;
     };
     
     /* run a query -- includes checking for and running a Command \
