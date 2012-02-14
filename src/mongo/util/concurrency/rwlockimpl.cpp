@@ -9,7 +9,6 @@
 #include <boost/version.hpp>
 #include <boost/noncopyable.hpp>
 #include <boost/thread/mutex.hpp>
-#include <boost/thread/recursive_mutex.hpp>
 #include <boost/thread/condition.hpp>
 
 using namespace std;
