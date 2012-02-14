@@ -78,6 +78,7 @@ namespace mongo {
         return *x > 0;
     }
 
+    // TODO SERVER-4328
     bool inDBRepair = false;
     struct doingRepair {
         doingRepair() {
@@ -89,43 +90,47 @@ namespace mongo {
         }
     };
 
+    SimpleMutex BackgroundOperation::m("bg");
     map<string, unsigned> BackgroundOperation::dbsInProg;
     set<string> BackgroundOperation::nsInProg;
 
     bool BackgroundOperation::inProgForDb(const char *db) {
-        assertInWriteLock();
+        SimpleMutex::scoped_lock lk(m);
         return dbsInProg[db] != 0;
     }
 
     bool BackgroundOperation::inProgForNs(const char *ns) {
-        assertInWriteLock();
+        SimpleMutex::scoped_lock lk(m);
         return nsInProg.count(ns) != 0;
     }
 
     void BackgroundOperation::assertNoBgOpInProgForDb(const char *db) {
+        SimpleMutex::scoped_lock lk(m);
         uassert(12586, "cannot perform operation: a background operation is currently running for this database",
                 !inProgForDb(db));
     }
 
     void BackgroundOperation::assertNoBgOpInProgForNs(const char *ns) {
+        SimpleMutex::scoped_lock lk(m);
         uassert(12587, "cannot perform operation: a background operation is currently running for this collection",
                 !inProgForNs(ns));
     }
 
     BackgroundOperation::BackgroundOperation(const char *ns) : _ns(ns) {
-        assertInWriteLock();
+        SimpleMutex::scoped_lock lk(m);
         dbsInProg[_ns.db]++;
         assert( nsInProg.count(_ns.ns()) == 0 );
         nsInProg.insert(_ns.ns());
     }
 
     BackgroundOperation::~BackgroundOperation() {
-        wassert( d.dbMutex.isWriteLocked() );
+        SimpleMutex::scoped_lock lk(m);
         dbsInProg[_ns.db]--;
         nsInProg.erase(_ns.ns());
     }
 
     void BackgroundOperation::dump(stringstream& ss) {
+        SimpleMutex::scoped_lock lk(m);
         if( nsInProg.size() ) {
             ss << "\n<b>Background Jobs in Progress</b>\n";
             for( set<string>::iterator i = nsInProg.begin(); i != nsInProg.end(); i++ )
