@@ -181,7 +181,8 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		WT_RET(__wt_strdup(session, tconfig, &treeconf));
 	else
 		WT_RET(__wt_schema_table_read(session, fileuri, &treeconf));
-	WT_RET(__wt_btree_open(session, name, filename, treeconf, cfg, flags));
+	WT_RET(__wt_conn_open_btree(
+	    session, name, filename, treeconf, cfg, flags));
 	WT_RET(__wt_session_lock_btree(session, NULL, flags));
 	WT_RET(__wt_session_add_btree(session, NULL));
 
@@ -200,7 +201,7 @@ __wt_session_remove_btree(
 	session->btree = btree_session->btree;
 	__wt_free(session, btree_session);
 
-	return (__wt_btree_close(session));
+	return (__wt_conn_close_btree(session));
 }
 
 /*

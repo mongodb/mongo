@@ -69,9 +69,14 @@ __wt_create_file(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_config_collapse(session, filecfg, &treeconf));
 	WT_ERR(__wt_schema_table_insert(session, fileuri, treeconf));
 
-	/* Allocate a WT_BTREE handle, and open the underlying file. */
-	WT_ERR(__wt_btree_open(session, name, filename, treeconf, cfg, 0));
+	/*
+	 * Call the underlying connection function to allocate a WT_BTREE handle
+	 * and open the underlying file (note we no longer own the configuration
+	 * string after that call).
+	 */
+	ret = __wt_conn_open_btree(session, name, filename, treeconf, cfg, 0);
 	treeconf = NULL;
+	WT_ERR(ret);
 	WT_ERR(__wt_session_add_btree(session, NULL));
 
 	/* If something goes wrong, throw away anything we created. */

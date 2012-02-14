@@ -82,7 +82,7 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 		 * This won't work, you can't close a btree handle with the
 		 * default session.
 		 */
-		WT_TRET(__wt_btree_close(session));
+		WT_TRET(__wt_conn_close_btree(session));
 	}
 
 	/*

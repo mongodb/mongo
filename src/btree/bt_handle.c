@@ -7,7 +7,7 @@
 
 #include "wt_internal.h"
 
-static int __btree_conf(WT_SESSION_IMPL *, const char *, uint32_t);
+static int __btree_conf(WT_SESSION_IMPL *, uint32_t);
 static int __btree_last(WT_SESSION_IMPL *);
 static int __btree_page_sizes(WT_SESSION_IMPL *, const char *);
 static int __btree_root_init_empty(WT_SESSION_IMPL *);
@@ -41,111 +41,28 @@ __wt_btree_truncate(WT_SESSION_IMPL *session, const char *filename)
  *	Open a Btree.
  */
 int
-__wt_btree_open(WT_SESSION_IMPL *session,
-    const char *name, const char *filename,
-    const char *config, const char *cfg[], uint32_t flags)
+__wt_btree_open(WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
 {
 	WT_BTREE *btree;
-	WT_CONNECTION_IMPL *conn;
-	int matched, ret;
+	int ret;
 
-	conn = S2C(session);
-
-	/*
-	 * The file configuration string must point to allocated memory: it
-	 * is stored in the returned btree handle and freed when the handle
-	 * is closed.
-	 */
-
-	/* Increment the reference count if we already have the btree open. */
-	matched = 0;
-	__wt_spin_lock(session, &conn->spinlock);
-	TAILQ_FOREACH(btree, &conn->btqh, q) {
-		if (strcmp(filename, btree->filename) == 0) {
-			++btree->refcnt;
-			session->btree = btree;
-			matched = 1;
-			break;
-		}
-	}
-	if (matched) {
-		__wt_spin_unlock(session, &conn->spinlock);
-
-		/* Check that the handle is open. */
-		__wt_readlock(session, btree->rwlock);
-		matched = F_ISSET(btree, WT_BTREE_OPEN);
-		__wt_rwunlock(session, btree->rwlock);
-
-		if (!matched) {
-			__wt_writelock(session, btree->rwlock);
-			if (!F_ISSET(btree, WT_BTREE_OPEN)) {
-				/* We're going to overwrite the old config. */
-				__wt_free(session, btree->config);
-				goto conf;
-			}
-
-			/* It was opened while we waited. */
-			__wt_rwunlock(session, btree->rwlock);
-		}
-
-		/* The config string will not be needed: free it now. */
-		__wt_free(session, config);
-		return (0);
-	}
-
-	/*
-	 * Allocate the WT_BTREE structure, its lock, and set the name so we
-	 * can put the handle into the list.
-	 */
-	btree = NULL;
-	if ((ret = __wt_calloc_def(session, 1, &btree)) == 0 &&
-	    (ret = __wt_rwlock_alloc(
-		session, "btree handle", &btree->rwlock)) == 0 &&
-	    (ret = __wt_strdup(session, name, &btree->name)) == 0 &&
-	    (ret = __wt_strdup(session, filename, &btree->filename)) == 0) {
-		/* Lock the handle before it is inserted in the list. */
-		__wt_writelock(session, btree->rwlock);
-
-		/* Add to the connection list. */
-		btree->refcnt = 1;
-		TAILQ_INSERT_TAIL(&conn->btqh, btree, q);
-		++conn->btqcnt;
-	}
-	__wt_spin_unlock(session, &conn->spinlock);
-
-	if (ret != 0) {
-		if (btree != NULL) {
-			if (btree->rwlock != NULL)
-				(void)__wt_rwlock_destroy(
-				    session, btree->rwlock);
-			__wt_free(session, btree->name);
-			__wt_free(session, btree->filename);
-		}
-		__wt_free(session, btree);
-		return (ret);
-	}
-
-	session->btree = btree;
+	btree = session->btree;
+	ret = 0;
 
 	/* Initialize and configure the WT_BTREE structure. */
-conf:	WT_ERR(__btree_conf(session, config, flags));
+	WT_RET(__btree_conf(session, flags));
 
 	/* Open the underlying block object. */
-	WT_ERR(__wt_bm_open(session, btree->filename,
+	WT_RET(__wt_bm_open(session, btree->filename,
 	    btree->config, cfg, F_ISSET(btree, WT_BTREE_SALVAGE) ? 1 : 0));
-	WT_ERR(__wt_bm_block_header(session, &btree->block_header));
+	WT_RET(__wt_bm_block_header(session, &btree->block_header));
 
 	/* Initialize the tree if not a special command. */
 	if (!F_ISSET(btree,
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
-		WT_ERR(__btree_tree_init(session));
+		WT_RET(__btree_tree_init(session));
 
 	F_SET(btree, WT_BTREE_OPEN);
-	WT_STAT_INCR(conn->stats, file_open);
-
-err:	__wt_rwunlock(session, btree->rwlock);
-	if (ret != 0)
-		(void)__wt_btree_close(session);
 	return (ret);
 }
 
@@ -196,11 +113,61 @@ __wt_btree_reopen(WT_SESSION_IMPL *session, uint32_t flags)
 }
 
 /*
+ * __wt_btree_close --
+ *	Close a Btree.
+ */
+int
+__wt_btree_close(WT_SESSION_IMPL *session)
+{
+	WT_BTREE *btree;
+	int ret;
+
+	btree = session->btree;
+	ret = 0;
+
+	/* Clear any cache. */
+	if (btree->root_page != NULL)
+		WT_TRET(__wt_evict_file_serial(session, 1));
+	WT_ASSERT(session, btree->root_page == NULL);
+
+	/* After all pages are evicted, update the root's address. */
+	if (btree->root_update) {
+		/*
+		 * Release the original blocks held by the root, that is,
+		 * the blocks listed in the schema file.
+		 */
+		WT_RET(__wt_btree_free_root(session));
+
+		WT_RET(__wt_btree_set_root(
+		    session, btree->root_addr.addr, btree->root_addr.size));
+		if (btree->root_addr.addr != NULL)
+			__wt_free(session, btree->root_addr.addr);
+		btree->root_update = 0;
+	}
+
+	/* Close the underlying block manager reference. */
+	WT_TRET(__wt_bm_close(session));
+
+	/* Close the Huffman tree. */
+	__wt_btree_huffman_close(session);
+
+	/* Free allocated memory. */
+	__wt_free(session, btree->key_format);
+	__wt_free(session, btree->key_plan);
+	__wt_free(session, btree->idxkey_format);
+	__wt_free(session, btree->value_format);
+	__wt_free(session, btree->value_plan);
+	__wt_free(session, btree->stats);
+
+	return (ret);
+}
+
+/*
  * __btree_conf --
  *	Configure a WT_BTREE structure.
  */
 static int
-__btree_conf(WT_SESSION_IMPL *session, const char *config, uint32_t flags)
+__btree_conf(WT_SESSION_IMPL *session, uint32_t flags)
 {
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
@@ -208,9 +175,11 @@ __btree_conf(WT_SESSION_IMPL *session, const char *config, uint32_t flags)
 	WT_NAMED_COLLATOR *ncoll;
 	uint32_t bitcnt;
 	int fixed;
+	const char *config;
 
 	btree = session->btree;
 	conn = S2C(session);
+	config = btree->config;
 
 	/* Validate file types and check the data format plan. */
 	WT_RET(__wt_config_getones(session, config, "key_format", &cval));
@@ -494,76 +463,6 @@ __btree_last(WT_SESSION_IMPL *session)
 	__wt_hazard_clear(session, page);
 
 	return (0);
-}
-
-/*
- * __wt_btree_close --
- *	Close a Btree.
- */
-int
-__wt_btree_close(WT_SESSION_IMPL *session)
-{
-	WT_BTREE *btree;
-	WT_CONNECTION_IMPL *conn;
-	int inuse, ret;
-
-	btree = session->btree;
-	conn = S2C(session);
-	ret = 0;
-
-	/* Remove from the connection's list. */
-	__wt_spin_lock(session, &conn->spinlock);
-	inuse = (--btree->refcnt > 0);
-	if (!inuse) {
-		TAILQ_REMOVE(&conn->btqh, btree, q);
-		--conn->btqcnt;
-	}
-	__wt_spin_unlock(session, &conn->spinlock);
-	if (inuse)
-		return (0);
-
-	if (F_ISSET(btree, WT_BTREE_OPEN))
-		WT_STAT_DECR(conn->stats, file_open);
-
-	/* Clear any cache. */
-	if (btree->root_page != NULL)
-		WT_TRET(__wt_evict_file_serial(session, 1));
-	WT_ASSERT(session, btree->root_page == NULL);
-
-	/* After all pages are evicted, update the root's address. */
-	if (btree->root_update) {
-		/*
-		 * Release the original blocks held by the root, that is,
-		 * the blocks listed in the schema file.
-		 */
-		WT_RET(__wt_btree_free_root(session));
-
-		WT_RET(__wt_btree_set_root(
-		    session, btree->root_addr.addr, btree->root_addr.size));
-		if (btree->root_addr.addr != NULL)
-			__wt_free(session, btree->root_addr.addr);
-		btree->root_update = 0;
-	}
-
-	/* Close the underlying block manager reference. */
-	WT_TRET(__wt_bm_close(session));
-
-	/* Free allocated memory. */
-	__wt_free(session, btree->name);
-	__wt_free(session, btree->filename);
-	__wt_free(session, btree->config);
-	__wt_free(session, btree->key_format);
-	__wt_free(session, btree->key_plan);
-	__wt_free(session, btree->idxkey_format);
-	__wt_free(session, btree->value_format);
-	__wt_free(session, btree->value_plan);
-	__wt_btree_huffman_close(session);
-	__wt_free(session, btree->stats);
-
-	WT_TRET(__wt_rwlock_destroy(session, btree->rwlock));
-	__wt_free(session, session->btree);
-
-	return (ret);
 }
 
 /*
