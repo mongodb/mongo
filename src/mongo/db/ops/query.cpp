@@ -744,7 +744,7 @@ namespace mongo {
         _explain( newExplainRecordingStrategy( oldPlan ) ) {
             _buf.skip( sizeof( QueryResult ) );
         }
-        bool mayAddMatch() {
+        bool addMatch() {
             if ( !currentMatches() ) {
                 return false;
             }
@@ -1114,7 +1114,7 @@ namespace mongo {
                     BSONObj js = cursor->current();
                     assert( js.isValid() );
 
-                    if ( !queryResponseBuilder.mayAddMatch() ) {
+                    if ( !queryResponseBuilder.addMatch() ) {
                         continue;
                     }
                     
