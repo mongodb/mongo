@@ -65,7 +65,6 @@ commonFiles = [ "pch.cpp",
                 "util/debug_util.cpp",
                  "util/concurrency/thread_pool.cpp",
                 "util/password.cpp",
-                "util/version.cpp",
                 "util/signal_handlers.cpp",
                  "util/concurrency/rwlockimpl.cpp",
                 "util/histogram.cpp",
@@ -97,7 +96,8 @@ env.StaticLibrary('mongocommon', commonFiles,
 
 env.StaticLibrary("coredb", [ "db/commands.cpp" ])
 
-coreServerFiles = [ "util/net/message_server_port.cpp",
+coreServerFiles = [ "util/version.cpp",
+                    "util/net/message_server_port.cpp",
                     "client/parallel.cpp",
                     "db/common.cpp",
                     "util/net/miniwebserver.cpp",
