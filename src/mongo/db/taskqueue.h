@@ -20,6 +20,9 @@
 
 #include "mongomutex.h"
 
+// if you turn this back on be sure to enable TaskQueueTest again
+#if 0
+
 namespace mongo {
 
     /** defer work items by queueing them for invocation by another thread.  presumption is that
@@ -104,3 +107,5 @@ namespace mongo {
     };
 
 }
+
+#endif

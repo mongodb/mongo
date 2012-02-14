@@ -83,6 +83,7 @@ namespace PerfTests {
     DBClientType ClientBase::_client;
 
     // todo: use a couple threads. not a very good test yet.
+#if 0
     class TaskQueueTest {
         static int tot;
         struct V {
@@ -109,6 +110,7 @@ namespace PerfTests {
         }
     };
     int TaskQueueTest::tot;
+#endif
 
     /* if you want recording of the timings, place the password for the perf database
         in ./../settings.py:
@@ -1096,7 +1098,7 @@ namespace PerfTests {
                 add< BSONIter >();
                 add< BSONGetFields1 >();
                 add< BSONGetFields2 >();
-                add< TaskQueueTest >();
+                //add< TaskQueueTest >();
                 add< InsertDup >();
                 add< Insert1 >();
                 add< InsertRandom >();
