@@ -111,7 +111,6 @@ namespace mongo {
     }
 
     void BackgroundOperation::assertNoBgOpInProgForNs(const char *ns) {
-        SimpleMutex::scoped_lock lk(m);
         uassert(12587, "cannot perform operation: a background operation is currently running for this collection",
                 !inProgForNs(ns));
     }

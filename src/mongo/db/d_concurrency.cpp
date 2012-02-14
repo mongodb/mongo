@@ -567,6 +567,12 @@ namespace mongo {
             msgasserted(0, "expected write lock");
         }
     }
+    void MongoMutex::assertAtLeastReadLocked() const { 
+        if( !atLeastReadLocked() ) { 
+            lockState().dump();
+            msgasserted(0, "expected read lock");
+        }
+    }
 
     void curopGotLock(Client*);
     void lockedExclusively() {
