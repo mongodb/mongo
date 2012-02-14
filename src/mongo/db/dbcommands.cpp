@@ -1270,7 +1270,7 @@ namespace mongo {
 
     namespace {
         long long getIndexSizeForCollection(string db, string ns, BSONObjBuilder* details=NULL, int scale = 1 ) {
-            d.dbMutex.assertAtLeastReadLocked();
+            Lock::assertAtLeastReadLocked(ns);
 
             NamespaceDetails * nsd = nsdetails( ns.c_str() );
             if ( ! nsd )

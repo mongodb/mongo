@@ -304,7 +304,7 @@ namespace mongo {
         _idleAgeMillis(0), _pinValue(0),
         _doingDeletes(false), _yieldSometimesTracker(128,10) {
 
-        d.dbMutex.assertAtLeastReadLocked();
+        Lock::assertAtLeastReadLocked(ns);
 
         assert( _db );
         assert( str::startsWith(_ns, _db->name) );

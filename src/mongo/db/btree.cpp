@@ -518,9 +518,8 @@ namespace mongo {
 
     template< class V >
     inline void BucketBasics<V>::truncateTo(int N, const Ordering &order, int &refPos) {
-        d.dbMutex.assertWriteLocked();
+        assert( Lock::somethingWriteLocked() );
         assertWritable();
-
         this->n = N;
         setNotPacked();
         _packReadyForMod( order, refPos );

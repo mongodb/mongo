@@ -515,7 +515,8 @@ namespace mongo {
         }
 
         void aboutToDelete( const Database* db , const DiskLoc& dl ) {
-            d.dbMutex.assertWriteLocked();
+            assert(db);
+            Lock::assertWriteLocked(db->name);
 
             if ( ! _getActive() )
                 return;

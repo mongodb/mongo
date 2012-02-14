@@ -38,7 +38,7 @@ namespace mongo {
 
         Database * get( const string& ns , const string& path ) const {
             SimpleMutex::scoped_lock lk(_m);
-            d.dbMutex.assertAtLeastReadLocked();
+            Lock::assertAtLeastReadLocked(ns);
             Paths::const_iterator x = _paths.find( path );
             if ( x == _paths.end() )
                 return 0;
