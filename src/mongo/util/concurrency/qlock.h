@@ -8,7 +8,25 @@
 
 namespace mongo { 
 
-    // "Quad Lock"
+    /** "Quad Lock"
+        we want to be able to do semi-granular locking now, and read/write style locking for that. 
+        if that is all we want we could just have a rwlock per lockable entity, and we are done. 
+        however at times we want to stop-the-world.  in addition, sometimes we want to stop the 
+        world *for writing only*.  
+
+        A hierarchy of locks could achieve this; instead here we've modeled it in one synchronization
+        object our "QLock".  Our possible locked states are:
+
+          w - i will write, and i will granularly lock after the qlock acquisition
+          r - i will read,  and i will granularly lock after the qlock acquisition
+          W - i will write globally. stop the world.
+          R - i will read globally. stop any writer.
+
+        For example there is a point during journal batch commits where we wish to block all writers 
+        but no readers.
+
+        Non-recursive.
+    */
     class QLock : boost::noncopyable { 
         struct Z { 
             Z() : n(0) { }
@@ -17,19 +35,19 @@ namespace mongo {
         };
         boost::mutex m;
         Z r,w,R,W;
-        int greed; // 1 if someone wants to acquire a write lock
+        int greed;           // >0 if someone wants to acquire a write lock
         int greedyWrites;
-        int stopped;
-        void _stop_greed(); // we are already inlock for these underscore methods
+        int stopped;         // greed stopped?
+        void _stop_greed();  // we are already inlock for these underscore methods
         void _lock_W();
     public:
         QLock() : greedyWrites(1), greed(0), stopped(0) { }
         void lock_r();
         void lock_w();
         void lock_R();
-        bool lock_R(int millis); // try
+        bool lock_R(int millis);  // try
         void lock_W();
-        bool lock_W(int millis); // try
+        bool lock_W(int millis);  // try
         void lock_W_stop_greed();
         void unlock_r();
         void unlock_w();
