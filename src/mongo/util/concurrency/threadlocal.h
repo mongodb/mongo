@@ -78,6 +78,12 @@ namespace mongo {
     public:
         T* get() const;
         void reset(T* v);
+        T* getMake() { 
+            T *t = get();
+            if( t == 0 )
+                reset( t = new T() );
+            return t;
+        }
     };
 
 # if defined(_WIN32)
