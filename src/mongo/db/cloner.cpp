@@ -685,6 +685,9 @@ namespace mongo {
                     return false;
             }
 
+
+            // if we are renaming in the same database, just
+            // rename the namespace and we're done.
             {
                 char from[256];
                 nsToDatabase( source.c_str(), from );
@@ -698,6 +701,8 @@ namespace mongo {
                 }
             }
 
+            // renaming across databases, so we must copy all
+            // the data and then remove the source collection.
             BSONObjBuilder spec;
             if ( capped ) {
                 spec.appendBool( "capped", true );
@@ -710,7 +715,7 @@ namespace mongo {
             DBDirectClient bridge;
 
             {
-                c = bridge.query( source, BSONObj() );
+                c = bridge.query( source, BSONObj(), 0, 0, 0, fromRepl ? QueryOption_SlaveOk : 0 );
             }
             while( 1 ) {
                 {
@@ -727,7 +732,7 @@ namespace mongo {
             nsToDatabase( target.c_str(), cl );
             string targetIndexes = string( cl ) + ".system.indexes";
             {
-                c = bridge.query( sourceIndexes, QUERY( "ns" << source ) );
+                c = bridge.query( sourceIndexes, QUERY( "ns" << source ), 0, 0, 0, fromRepl ? QueryOption_SlaveOk : 0 );
             }
             while( 1 ) {
                 {
