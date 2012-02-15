@@ -249,7 +249,8 @@ IncludeExclude:
           list of dependencies, because this product will satisfy that
           dependency.
          */
-        pEO->emitPaths(&DependencyRemover(pTracker));
+        DependencyRemover dependencyRemover(pTracker);
+        pEO->emitPaths(&dependencyRemover);
 
         /*
           Look at the exclusions of this projection.  If any of them are
@@ -261,7 +262,8 @@ IncludeExclude:
           a new computed product field name.  The latter would satisfy the
           dependency.
          */
-        pEO->emitPaths(&DependencyChecker(pTracker, this));
+        DependencyChecker dependencyChecker(pTracker, this);
+        pEO->emitPaths(&dependencyChecker);
 
         /*
           Look at the products of this projection.  For inclusions, add the
