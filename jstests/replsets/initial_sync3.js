@@ -3,7 +3,6 @@
  * Make sure member can't sync from a member with a different buildIndexes setting.
  */
 
-if ( !_isWindows() ) {  // SERVER-4966
 
 load("jstests/replsets/rslib.js");
 var name = "initialsync3";
@@ -103,5 +102,4 @@ assert.eq(null, x.err);
 
 rs2.stopSet();
 
-} // !isWindows
 print("initialSync3 success!");
