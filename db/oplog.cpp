@@ -627,12 +627,19 @@ namespace mongo {
 
     bool shouldRetry(const BSONObj& o, const string& hn) {
         OplogReader missingObjReader;
+        const char *ns = o.getStringField("ns");
+
+        // capped collections
+        NamespaceDetails *nsd = nsdetails(ns);
+        if (nsd && nsd->capped) {
+            log() << "replication missing doc, but this is okay for a capped collection (" << ns << ")" << endl;
+            return false;
+        }
 
         // we don't have the object yet, which is possible on initial sync.  get it.
         log() << "replication info adding missing object" << endl; // rare enough we can log
         uassert(15916, str::stream() << "Can no longer connect to initial sync source: " << hn, missingObjReader.connect(hn));
 
-        const char *ns = o.getStringField("ns");
         // might be more than just _id in the update criteria
         BSONObj query = BSONObjBuilder().append(o.getObjectField("o2")["_id"]).obj();
         BSONObj missingObj;
