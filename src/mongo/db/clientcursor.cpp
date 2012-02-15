@@ -77,7 +77,7 @@ namespace mongo {
 
     // ns is either a full namespace or "dbname." when invalidating for a whole db
     void ClientCursor::invalidate(const char *ns) {
-        d.dbMutex.assertWriteLocked();
+        Lock::assertWriteLocked(ns);
         int len = strlen(ns);
         const char* dot = strchr(ns, '.');
         assert( len > 0 && dot);
