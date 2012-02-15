@@ -1,6 +1,7 @@
 print("profile2.js BEGIN");
 
 // special db so that it can be run in parallel tests
+var stddb = db;
 var db = db.getSisterDB("profile2");
 
 try {
@@ -20,4 +21,5 @@ try {
 } finally {
     // disable profiling for subsequent tests
     assert.commandWorked( db.runCommand( {profile:0} ) );
+    db = stddb;
 }

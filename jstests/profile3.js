@@ -1,5 +1,6 @@
 
 // special db so that it can be run in parallel tests
+var stddb = db;
 var db = db.getSisterDB("profile3");
 
 t = db.profile3;
@@ -35,5 +36,6 @@ try {
 }
 finally {
     db.setProfilingLevel(0);
+    db = stddb;
 }
     
