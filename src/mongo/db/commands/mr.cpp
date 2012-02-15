@@ -457,7 +457,7 @@ namespace mongo {
          */
         long long State::postProcessCollection(CurOp* op, ProgressMeterHolder& pm) {
             if ( _onDisk == false || _config.outType == Config::INMEMORY )
-                return _temp->size();
+                return numInMemKeys();
 
             if (_config.outNonAtomic)
                 return postProcessCollectionNonAtomic(op, pm);
