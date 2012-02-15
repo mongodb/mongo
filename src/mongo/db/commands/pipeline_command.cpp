@@ -81,7 +81,7 @@ namespace mongo {
             return false;
 
         intrusive_ptr<DocumentSource> pSource(
-            PipelineD::prepareCursorSource(pPipeline, db));
+            PipelineD::prepareCursorSource(pPipeline, db, pCtx));
 
         /* this is the normal non-debug path */
         if (!pPipeline->getSplitMongodPipeline())
@@ -144,7 +144,8 @@ namespace mongo {
             const char *pFieldName = shardElement.fieldName();
 
             if (strcmp(pFieldName, "result") == 0) {
-                pShardSource = DocumentSourceBsonArray::create(&shardElement);
+                pShardSource = DocumentSourceBsonArray::create(
+                    &shardElement, pCtx);
 
                 /*
                   Connect the output of the shard pipeline with the mongos

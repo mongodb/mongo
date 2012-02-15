@@ -1393,13 +1393,13 @@ namespace mongo {
                                   BSONObjBuilder &result, bool fromRepl) {
             //const string shardedOutputCollection = getTmpName( collection );
 
-            intrusive_ptr<ExpressionContext> pCtx(
+            intrusive_ptr<ExpressionContext> pExpCtx(
                 ExpressionContext::create());
-            pCtx->setInRouter(true);
+            pExpCtx->setInRouter(true);
 
             /* parse the pipeline specification */
             intrusive_ptr<Pipeline> pPipeline(
-                Pipeline::parseCommand(errmsg, cmdObj, pCtx));
+                Pipeline::parseCommand(errmsg, cmdObj, pExpCtx));
             if (!pPipeline.get())
                 return false; // there was some parsing error
 
@@ -1456,7 +1456,8 @@ namespace mongo {
                     
             /* wrap the list of futures with a source */
             intrusive_ptr<DocumentSourceCommandFutures> pSource(
-                DocumentSourceCommandFutures::create(errmsg, &futures));
+                DocumentSourceCommandFutures::create(
+                    errmsg, &futures, pExpCtx));
 
             /* run the pipeline */
             bool failed = pPipeline->run(result, errmsg, pSource);

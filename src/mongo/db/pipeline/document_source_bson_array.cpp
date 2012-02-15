@@ -17,8 +17,8 @@
 #include "pch.h"
 
 #include "db/pipeline/document_source.h"
-
 #include "db/pipeline/document.h"
+
 
 namespace mongo {
 
@@ -30,6 +30,8 @@ namespace mongo {
     }
 
     bool DocumentSourceBsonArray::advance() {
+        DocumentSource::advance(); // check for interrupts
+
         if (eof())
             return false;
 
@@ -57,7 +59,9 @@ namespace mongo {
     }
 
     DocumentSourceBsonArray::DocumentSourceBsonArray(
-        BSONElement *pBsonElement):
+        BSONElement *pBsonElement,
+        const intrusive_ptr<ExpressionContext> &pExpCtx):
+        DocumentSource(pExpCtx),
         embeddedObject(pBsonElement->embeddedObject()),
         arrayIterator(embeddedObject),
         haveCurrent(false) {
@@ -68,11 +72,12 @@ namespace mongo {
     }
 
     intrusive_ptr<DocumentSourceBsonArray> DocumentSourceBsonArray::create(
-        BSONElement *pBsonElement) {
+        BSONElement *pBsonElement,
+        const intrusive_ptr<ExpressionContext> &pExpCtx) {
 
         assert(pBsonElement->type() == Array);
         intrusive_ptr<DocumentSourceBsonArray> pSource(
-            new DocumentSourceBsonArray(pBsonElement));
+            new DocumentSourceBsonArray(pBsonElement, pExpCtx));
 
         return pSource;
     }

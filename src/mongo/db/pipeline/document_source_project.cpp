@@ -29,7 +29,9 @@ namespace mongo {
     DocumentSourceProject::~DocumentSourceProject() {
     }
 
-    DocumentSourceProject::DocumentSourceProject():
+    DocumentSourceProject::DocumentSourceProject(
+        const intrusive_ptr<ExpressionContext> &pExpCtx):
+        DocumentSource(pExpCtx),
         excludeId(false),
         pEO(ExpressionObject::create()) {
     }
@@ -43,6 +45,8 @@ namespace mongo {
     }
 
     bool DocumentSourceProject::advance() {
+        DocumentSource::advance(); // check for interrupts
+
         return pSource->advance();
     }
 
@@ -79,9 +83,10 @@ namespace mongo {
         pBuilder->append(projectName, insides.done());
     }
 
-    intrusive_ptr<DocumentSourceProject> DocumentSourceProject::create() {
+    intrusive_ptr<DocumentSourceProject> DocumentSourceProject::create(
+        const intrusive_ptr<ExpressionContext> &pExpCtx) {
         intrusive_ptr<DocumentSourceProject> pSource(
-            new DocumentSourceProject());
+            new DocumentSourceProject(pExpCtx));
         return pSource;
     }
 
@@ -117,7 +122,7 @@ namespace mongo {
 
     intrusive_ptr<DocumentSource> DocumentSourceProject::createFromBson(
         BSONElement *pBsonElement,
-        const intrusive_ptr<ExpressionContext> &pCtx) {
+        const intrusive_ptr<ExpressionContext> &pExpCtx) {
         /* validate */
         uassert(15969, str::stream() << projectName <<
                 " specification must be an object",
@@ -125,7 +130,7 @@ namespace mongo {
 
         /* chain the projection onto the original source */
         intrusive_ptr<DocumentSourceProject> pProject(
-            DocumentSourceProject::create());
+            DocumentSourceProject::create(pExpCtx));
 
         /*
           Pull out the $project object.  This should just be a list of

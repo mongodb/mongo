@@ -32,6 +32,8 @@ namespace mongo {
     }
 
     bool DocumentSourceCommandFutures::advance() {
+        DocumentSource::advance(); // check for interrupts
+
         if (eof())
             return false;
 
@@ -59,7 +61,9 @@ namespace mongo {
     }
 
     DocumentSourceCommandFutures::DocumentSourceCommandFutures(
-        string &theErrmsg, FuturesList *pList):
+        string &theErrmsg, FuturesList *pList,
+        const intrusive_ptr<ExpressionContext> &pExpCtx):
+        DocumentSource(pExpCtx),
         newSource(false),
         pBsonSource(),
         pCurrent(),
@@ -70,9 +74,10 @@ namespace mongo {
 
     intrusive_ptr<DocumentSourceCommandFutures>
     DocumentSourceCommandFutures::create(
-        string &errmsg, FuturesList *pList) {
+        string &errmsg, FuturesList *pList,
+        const intrusive_ptr<ExpressionContext> &pExpCtx) {
         intrusive_ptr<DocumentSourceCommandFutures> pSource(
-            new DocumentSourceCommandFutures(errmsg, pList));
+            new DocumentSourceCommandFutures(errmsg, pList, pExpCtx));
         return pSource;
     }
 
@@ -110,7 +115,8 @@ namespace mongo {
 
                     /* find the result array and quit this loop */
                     if (strcmp(pFieldName, "result") == 0) {
-                        pBsonSource = DocumentSourceBsonArray::create(&element);
+                        pBsonSource = DocumentSourceBsonArray::create(
+                            &element, pExpCtx);
                         newSource = true;
                         break;
                     }

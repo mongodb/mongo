@@ -47,12 +47,14 @@ namespace mongo {
 
            @param pPipeline the logical "this" for this operation
            @param dbName the name of the database
+           @param pExpCtx the expression context for this pipeline
            @returns a document source that wraps an appropriate cursor to
              be at the beginning of this pipeline
          */
         static intrusive_ptr<DocumentSource> prepareCursorSource(
             const intrusive_ptr<Pipeline> &pPipeline,
-            const string &dbName);
+            const string &dbName,
+            const intrusive_ptr<ExpressionContext> &pExpCtx);
 
     private:
         PipelineD(); // does not exist:  prevent instantiation

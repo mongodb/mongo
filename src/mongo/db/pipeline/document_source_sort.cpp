@@ -45,6 +45,8 @@ namespace mongo {
     }
 
     bool DocumentSourceSort::advance() {
+        DocumentSource::advance(); // check for interrupts
+
         if (!populated)
             populate();
 
@@ -75,16 +77,16 @@ namespace mongo {
     }
 
     intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
-        const intrusive_ptr<ExpressionContext> &pCtx) {
+        const intrusive_ptr<ExpressionContext> &pExpCtx) {
         intrusive_ptr<DocumentSourceSort> pSource(
-            new DocumentSourceSort(pCtx));
+            new DocumentSourceSort(pExpCtx));
         return pSource;
     }
 
     DocumentSourceSort::DocumentSourceSort(
-        const intrusive_ptr<ExpressionContext> &pTheCtx):
-        populated(false),
-        pCtx(pTheCtx) {
+        const intrusive_ptr<ExpressionContext> &pExpCtx):
+        DocumentSource(pExpCtx),
+        populated(false) {
     }
 
     void DocumentSourceSort::addKey(const string &fieldPath, bool ascending) {
@@ -110,13 +112,13 @@ namespace mongo {
 
     intrusive_ptr<DocumentSource> DocumentSourceSort::createFromBson(
         BSONElement *pBsonElement,
-        const intrusive_ptr<ExpressionContext> &pCtx) {
+        const intrusive_ptr<ExpressionContext> &pExpCtx) {
         uassert(15973, str::stream() << " the " <<
                 sortName << " key specification must be an object",
                 pBsonElement->type() == Object);
 
         intrusive_ptr<DocumentSourceSort> pSort(
-            DocumentSourceSort::create(pCtx));
+            DocumentSourceSort::create(pExpCtx));
 
         /* check for then iterate over the sort object */
         size_t sortKeys = 0;

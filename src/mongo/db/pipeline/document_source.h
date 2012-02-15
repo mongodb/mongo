@@ -75,10 +75,15 @@ namespace mongo {
           Advance the state of the DocumentSource so that it will return the
           next Document.
 
+          The default implementation returns false, after checking for
+          interrupts.  Derived classes can call the default implementation
+          in their own implementations in order to check for interrupts.
+
           @returns whether there is another document to fetch, i.e., whether or
-            not getCurrent() will succeed.
+            not getCurrent() will succeed.  This default implementation always
+            returns false.
         */
-        virtual bool advance() = 0;
+        virtual bool advance();
 
         /**
           Advance the source, and return the next Expression.
@@ -139,7 +144,7 @@ namespace mongo {
         /**
            Adjust dependencies according to the needs of this source.
 
-           $$$
+           $$$ MONGO_LATER_SERVER_4644
            @param pTracker the dependency tracker
          */
         virtual void manageDependencies(
@@ -160,7 +165,7 @@ namespace mongo {
         /**
            Base constructor.
          */
-        DocumentSource();
+        DocumentSource(const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         /**
           Create an object that represents the document source.  The object
@@ -188,6 +193,8 @@ namespace mongo {
           of the original user specification.
          */
         int step;
+
+        intrusive_ptr<ExpressionContext> pExpCtx;
     };
 
 
@@ -212,17 +219,20 @@ namespace mongo {
           this source is exhausted.
 
           @param pBsonElement the BSON array to treat as a document source
+          @param pExpCtx the expression context for the pipeline
           @returns the newly created document source
         */
         static intrusive_ptr<DocumentSourceBsonArray> create(
-            BSONElement *pBsonElement);
+            BSONElement *pBsonElement,
+            const intrusive_ptr<ExpressionContext> &pExpCtx);
 
     protected:
         // virtuals from DocumentSource
         virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
 
     private:
-        DocumentSourceBsonArray(BSONElement *pBsonElement);
+        DocumentSourceBsonArray(BSONElement *pBsonElement,
+            const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         BSONObj embeddedObject;
         BSONObjIterator arrayIterator;
@@ -250,16 +260,20 @@ namespace mongo {
           @param errmsg place to write error messages to; must exist for the
             lifetime of the created DocumentSourceCommandFutures
           @param pList the list of futures
+          @param pExpCtx the expression context for the pipeline
+          @returns the newly created DocumentSource
          */
         static intrusive_ptr<DocumentSourceCommandFutures> create(
-            string &errmsg, FuturesList *pList);
+            string &errmsg, FuturesList *pList,
+            const intrusive_ptr<ExpressionContext> &pExpCtx);
 
     protected:
         // virtuals from DocumentSource
         virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
 
     private:
-        DocumentSourceCommandFutures(string &errmsg, FuturesList *pList);
+        DocumentSourceCommandFutures(string &errmsg, FuturesList *pList,
+            const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         /**
           Advance to the next document, setting pCurrent appropriately.
@@ -298,9 +312,11 @@ namespace mongo {
           in order to fetch data from the database.
 
           @param pCursor the cursor to use to fetch data
+          @param pExpCtx the expression context for the pipeline
         */
         static intrusive_ptr<DocumentSourceCursor> create(
-            const shared_ptr<Cursor> &pCursor);
+            const shared_ptr<Cursor> &pCursor,
+            const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         /**
            Add a BSONObj dependency.
@@ -331,7 +347,8 @@ namespace mongo {
         virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
 
     private:
-        DocumentSourceCursor(const shared_ptr<Cursor> &pTheCursor);
+        DocumentSourceCursor(const shared_ptr<Cursor> &pTheCursor,
+            const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         void findNext();
         intrusive_ptr<Document> pCurrent;
@@ -383,7 +400,8 @@ namespace mongo {
         virtual void toMatcherBson(BSONObjBuilder *pBuilder) const = 0;
 
     protected:
-        DocumentSourceFilterBase();
+        DocumentSourceFilterBase(
+            const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         /**
           Test the given document against the predicate and report if it
@@ -417,20 +435,23 @@ namespace mongo {
           Create a filter.
 
           @param pBsonElement the raw BSON specification for the filter
+          @param pExpCtx the expression context for the pipeline
           @returns the filter
          */
         static intrusive_ptr<DocumentSource> createFromBson(
             BSONElement *pBsonElement,
-            const intrusive_ptr<ExpressionContext> &pCtx);
+            const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         /**
           Create a filter.
 
           @param pFilter the expression to use to filter
+          @param pExpCtx the expression context for the pipeline
           @returns the filter
          */
         static intrusive_ptr<DocumentSourceFilter> create(
-            const intrusive_ptr<Expression> &pFilter);
+            const intrusive_ptr<Expression> &pFilter,
+            const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         /**
           Create a BSONObj suitable for Matcher construction.
@@ -455,7 +476,8 @@ namespace mongo {
         virtual bool accept(const intrusive_ptr<Document> &pDocument) const;
 
     private:
-        DocumentSourceFilter(const intrusive_ptr<Expression> &pFilter);
+        DocumentSourceFilter(const intrusive_ptr<Expression> &pFilter,
+                             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         intrusive_ptr<Expression> pFilter;
     };
@@ -474,11 +496,11 @@ namespace mongo {
         /**
           Create a new grouping DocumentSource.
           
-          @param pCtx the expression context
+          @param pExpCtx the expression context for the pipeline
           @returns the DocumentSource
          */
         static intrusive_ptr<DocumentSourceGroup> create(
-            const intrusive_ptr<ExpressionContext> &pCtx);
+            const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         /**
           Set the Id Expression.
@@ -516,12 +538,12 @@ namespace mongo {
           element named $group.
 
           @param pBsonElement the BSONELement that defines the group
-          @param pCtx the expression context
+          @param pExpCtx the expression context
           @returns the grouping DocumentSource
          */
         static intrusive_ptr<DocumentSource> createFromBson(
             BSONElement *pBsonElement,
-            const intrusive_ptr<ExpressionContext> &pCtx);
+            const intrusive_ptr<ExpressionContext> &pExpCtx);
 
 
         /**
@@ -539,7 +561,7 @@ namespace mongo {
         virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
 
     private:
-        DocumentSourceGroup(const intrusive_ptr<ExpressionContext> &pCtx);
+        DocumentSourceGroup(const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         /*
           Before returning anything, this source must fetch everything from
@@ -579,8 +601,6 @@ namespace mongo {
 
         GroupsType::iterator groupsIterator;
         intrusive_ptr<Document> pCurrent;
-
-        intrusive_ptr<ExpressionContext> pCtx;
     };
 
 
@@ -626,7 +646,8 @@ namespace mongo {
         virtual bool accept(const intrusive_ptr<Document> &pDocument) const;
 
     private:
-        DocumentSourceMatch(const BSONObj &query);
+        DocumentSourceMatch(const BSONObj &query,
+            const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         Matcher matcher;
     };
@@ -648,10 +669,13 @@ namespace mongo {
           This can be put anywhere in a pipeline and will store content as
           well as pass it on.
 
+          @param pBsonElement the raw BSON specification for the source
+          @param pExpCtx the expression context for the pipeline
           @returns the newly created document source
         */
         static intrusive_ptr<DocumentSourceOut> createFromBson(
-            BSONElement *pBsonElement);
+            BSONElement *pBsonElement,
+            const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         static const char outName[];
 
@@ -660,7 +684,8 @@ namespace mongo {
         virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
 
     private:
-        DocumentSourceOut(BSONElement *pBsonElement);
+        DocumentSourceOut(BSONElement *pBsonElement,
+            const intrusive_ptr<ExpressionContext> &pExpCtx);
     };
 
     
@@ -680,9 +705,11 @@ namespace mongo {
         /**
           Create a new DocumentSource that can implement projection.
 
+          @param pExpCtx the expression context for the pipeline
           @returns the projection DocumentSource
         */
-        static intrusive_ptr<DocumentSourceProject> create();
+        static intrusive_ptr<DocumentSourceProject> create(
+            const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         /**
           Include a field path in a projection.
@@ -717,11 +744,12 @@ namespace mongo {
           above methods.
 
           @param pBsonElement the BSONElement with an object named $project
+          @param pExpCtx the expression context for the pipeline
           @returns the created projection
          */
         static intrusive_ptr<DocumentSource> createFromBson(
             BSONElement *pBsonElement,
-            const intrusive_ptr<ExpressionContext> &pCtx);
+            const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         static const char projectName[];
 
@@ -730,7 +758,7 @@ namespace mongo {
         virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
 
     private:
-        DocumentSourceProject();
+        DocumentSourceProject(const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         // configuration state
         bool excludeId;
@@ -817,11 +845,11 @@ namespace mongo {
         /**
           Create a new sorting DocumentSource.
           
-          @param pCtx the expression context
+          @param pExpCtx the expression context for the pipeline
           @returns the DocumentSource
          */
         static intrusive_ptr<DocumentSourceSort> create(
-            const intrusive_ptr<ExpressionContext> &pCtx);
+            const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         /**
           Add sort key field.
@@ -851,12 +879,12 @@ namespace mongo {
           element named $group.
 
           @param pBsonElement the BSONELement that defines the group
-          @param pCtx the expression context
+          @param pExpCtx the expression context for the pipeline
           @returns the grouping DocumentSource
          */
         static intrusive_ptr<DocumentSource> createFromBson(
             BSONElement *pBsonElement,
-            const intrusive_ptr<ExpressionContext> &pCtx);
+            const intrusive_ptr<ExpressionContext> &pExpCtx);
 
 
         static const char sortName[];
@@ -866,7 +894,7 @@ namespace mongo {
         virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
 
     private:
-        DocumentSourceSort(const intrusive_ptr<ExpressionContext> &pCtx);
+        DocumentSourceSort(const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         /*
           Before returning anything, this source must fetch everything from
@@ -915,8 +943,6 @@ namespace mongo {
 
         ListType::iterator listIterator;
         intrusive_ptr<Document> pCurrent;
-
-        intrusive_ptr<ExpressionContext> pCtx;
     };
 
 
@@ -933,11 +959,11 @@ namespace mongo {
         /**
           Create a new limiting DocumentSource.
 
-          @param pCtx the expression context
+          @param pExpCtx the expression context for the pipeline
           @returns the DocumentSource
          */
         static intrusive_ptr<DocumentSourceLimit> create(
-            const intrusive_ptr<ExpressionContext> &pCtx);
+            const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         /**
           Create a limiting DocumentSource from BSON.
@@ -947,12 +973,12 @@ namespace mongo {
           element named $limit.
 
           @param pBsonElement the BSONELement that defines the limit
-          @param pCtx the expression context
+          @param pExpCtx the expression context
           @returns the grouping DocumentSource
          */
         static intrusive_ptr<DocumentSource> createFromBson(
             BSONElement *pBsonElement,
-            const intrusive_ptr<ExpressionContext> &pCtx);
+            const intrusive_ptr<ExpressionContext> &pExpCtx);
 
 
         static const char limitName[];
@@ -962,13 +988,12 @@ namespace mongo {
         virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
 
     private:
-        DocumentSourceLimit(const intrusive_ptr<ExpressionContext> &pCtx);
+        DocumentSourceLimit(
+            const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         long long limit;
         long long count;
         intrusive_ptr<Document> pCurrent;
-
-        intrusive_ptr<ExpressionContext> pCtx;
     };
 
     class DocumentSourceSkip :
@@ -984,11 +1009,11 @@ namespace mongo {
         /**
           Create a new skipping DocumentSource.
 
-          @param pCtx the expression context
+          @param pExpCtx the expression context
           @returns the DocumentSource
          */
         static intrusive_ptr<DocumentSourceSkip> create(
-            const intrusive_ptr<ExpressionContext> &pCtx);
+            const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         /**
           Create a skipping DocumentSource from BSON.
@@ -998,12 +1023,12 @@ namespace mongo {
           element named $skip.
 
           @param pBsonElement the BSONELement that defines the skip
-          @param pCtx the expression context
+          @param pExpCtx the expression context
           @returns the grouping DocumentSource
          */
         static intrusive_ptr<DocumentSource> createFromBson(
             BSONElement *pBsonElement,
-            const intrusive_ptr<ExpressionContext> &pCtx);
+            const intrusive_ptr<ExpressionContext> &pExpCtx);
 
 
         static const char skipName[];
@@ -1013,7 +1038,7 @@ namespace mongo {
         virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
 
     private:
-        DocumentSourceSkip(const intrusive_ptr<ExpressionContext> &pCtx);
+        DocumentSourceSkip(const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         /*
           Skips initial documents.
@@ -1023,8 +1048,6 @@ namespace mongo {
         long long skip;
         long long count;
         intrusive_ptr<Document> pCurrent;
-
-        intrusive_ptr<ExpressionContext> pCtx;
     };
 
 
@@ -1043,9 +1066,11 @@ namespace mongo {
         /**
           Create a new DocumentSource that can implement unwind.
 
+          @param pExpCtx the expression context for the pipeline
           @returns the projection DocumentSource
         */
-        static intrusive_ptr<DocumentSourceUnwind> create();
+        static intrusive_ptr<DocumentSourceUnwind> create(
+            const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         /**
           Specify the field to unwind.  There must be exactly one before
@@ -1062,11 +1087,12 @@ namespace mongo {
           above methods.
 
           @param pBsonElement the BSONElement with an object named $project
+          @param pExpCtx the expression context for the pipeline
           @returns the created projection
          */
         static intrusive_ptr<DocumentSource> createFromBson(
             BSONElement *pBsonElement,
-            const intrusive_ptr<ExpressionContext> &pCtx);
+            const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         static const char unwindName[];
 
@@ -1075,7 +1101,7 @@ namespace mongo {
         virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
 
     private:
-        DocumentSourceUnwind();
+        DocumentSourceUnwind(const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         // configuration state
         FieldPath unwindPath;

@@ -62,12 +62,12 @@ namespace mongo {
 
     intrusive_ptr<DocumentSource> DocumentSourceMatch::createFromBson(
         BSONElement *pBsonElement,
-        const intrusive_ptr<ExpressionContext> &pCtx) {
+        const intrusive_ptr<ExpressionContext> &pExpCtx) {
         uassert(15959, "the match filter must be an expression in an object",
                 pBsonElement->type() == Object);
 
         intrusive_ptr<DocumentSourceMatch> pMatcher(
-            new DocumentSourceMatch(pBsonElement->Obj()));
+            new DocumentSourceMatch(pBsonElement->Obj(), pExpCtx));
 
         return pMatcher;
     }
@@ -77,8 +77,10 @@ namespace mongo {
         pBuilder->appendElements(*pQuery);
     }
 
-    DocumentSourceMatch::DocumentSourceMatch(const BSONObj &query):
-        DocumentSourceFilterBase(),
+    DocumentSourceMatch::DocumentSourceMatch(
+        const BSONObj &query,
+        const intrusive_ptr<ExpressionContext> &pExpCtx):
+        DocumentSourceFilterBase(pExpCtx),
         matcher(query) {
     }
 

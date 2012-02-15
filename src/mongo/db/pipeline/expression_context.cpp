@@ -16,6 +16,7 @@
 
 #include "pch.h"
 
+#include "db/curop.h"
 #include "db/pipeline/expression_context.h"
 
 namespace mongo {
@@ -25,7 +26,19 @@ namespace mongo {
 
     inline ExpressionContext::ExpressionContext():
         inShard(false),
-        inRouter(false) {
+        inRouter(false),
+        intCheckCounter(1) {
+    }
+
+    void ExpressionContext::checkForInterrupt() {
+        /*
+          Only really check periodically; the check gets a mutex, and could
+          be expensive, at least in relative terms.
+        */
+#ifdef MONGO_LATER_SERVER_4844
+        if ((++intCheckCounter % 128) == 0)
+            killCurrentOp.checkForInterrupt();
+#endif /* MONGO_LATER_SERVER_4844 */
     }
 
     ExpressionContext *ExpressionContext::create() {

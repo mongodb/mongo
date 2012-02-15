@@ -35,6 +35,8 @@ namespace mongo {
     }
 
     bool DocumentSourceCursor::advance() {
+        DocumentSource::advance(); // check for interrupts
+
         /* if we haven't gotten the first one yet, do so now */
         if (!pCurrent.get())
             findNext();
@@ -86,17 +88,20 @@ namespace mongo {
     }
 
     DocumentSourceCursor::DocumentSourceCursor(
-        const shared_ptr<Cursor> &pTheCursor):
+        const shared_ptr<Cursor> &pTheCursor,
+        const intrusive_ptr<ExpressionContext> &pCtx):
+        DocumentSource(pCtx),
         pCurrent(),
         bsonDependencies(),
         pCursor(pTheCursor) {
     }
 
     intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
-        const shared_ptr<Cursor> &pCursor) {
+        const shared_ptr<Cursor> &pCursor,
+        const intrusive_ptr<ExpressionContext> &pExpCtx) {
         assert(pCursor.get());
         intrusive_ptr<DocumentSourceCursor> pSource(
-            new DocumentSourceCursor(pCursor));
+            new DocumentSourceCursor(pCursor, pExpCtx));
             return pSource;
     }
 

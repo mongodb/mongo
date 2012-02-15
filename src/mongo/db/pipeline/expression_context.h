@@ -33,6 +33,13 @@ namespace mongo {
         bool getInShard() const;
         bool getInRouter() const;
 
+        /**
+           Used by a pipeline to check for interrupts so that killOp() works.
+
+           @throws if the operation has been interrupted
+         */
+        void checkForInterrupt();
+
         static ExpressionContext *create();
 
     private:
@@ -40,6 +47,7 @@ namespace mongo {
         
         bool inShard;
         bool inRouter;
+        unsigned intCheckCounter; // interrupt check counter
     };
 }
 
