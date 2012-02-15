@@ -21,10 +21,56 @@
 #include "dur_stats.h"
 #include "taskqueue.h"
 #include "client.h"
+#include "../util/concurrency/threadlocal.h"
 
 namespace mongo {
 
     namespace dur {
+        extern unsigned notesThisLock;
+        struct ThreadLocalIntents {
+            enum { N = 21 };
+            dur::WriteIntent i[N];
+            int n;
+            void unspool();
+        public:
+            ThreadLocalIntents() : n(0) { }
+            void push(const WriteIntent& i);
+        };
+        void ThreadLocalIntents::push(const WriteIntent& x) { 
+            if( n == 21 )
+                unspool();
+            i[n++] = x;
+        }
+        void ThreadLocalIntents::unspool() {
+            if( n ) { 
+                SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
+                DEV notesThisLock += n;
+                for( int j = 0; j < n; j++ )
+                    commitJob.note(i[j].start(), i[j].length());
+                n = 0;
+                dassert( cmdLine.dur );
+            }
+        }
+    }
+
+    TSP_DEFINE(dur::ThreadLocalIntents,tlIntents)
+
+    namespace dur {
+
+        // when we release our w or W lock this is invoked
+        void unspoolWriteIntents() { 
+            ThreadLocalIntents *t = tlIntents.get();
+            if( t ) 
+                t->unspool();
+        }
+        /** base declare write intent function that all the helpers call. */
+        /** we batch up our write intents so that we do not have to synchronize too often */
+        void DurableImpl::declareWriteIntent(void *p, unsigned len) {
+            cc().writeHappened();
+            MemoryMappedFile::makeWritable(p, len);
+            ThreadLocalIntents *t = tlIntents.getMake();
+            t->push(WriteIntent(p,len));
+        }
 
         BOOST_STATIC_ASSERT( UncommittedBytesLimit > BSONObjMaxInternalSize * 3 );
         BOOST_STATIC_ASSERT( sizeof(void*)==4 || UncommittedBytesLimit > BSONObjMaxInternalSize * 6 );
@@ -93,27 +139,17 @@ namespace mongo {
             _commitNumber = 0;
         }
 
-        extern unsigned notesThisLock;
-
         void CommitJob::note(void* p, int len) {
+            groupCommitMutex.dassertLocked();
+
             // from the point of view of the dur module, it would be fine (i think) to only
             // be read locked here.  but must be at least read locked to avoid race with
             // remapprivateview
-            DEV notesThisLock++;
 
-            //DEV d.dbMutex.assertWriteLocked();
-            log() << "TODO temp finish concurrency" << endl;
-
-            dassert( cmdLine.dur );
-
-            cc().writeHappened();
             if( !_wi._alreadyNoted.checkAndSet(p, len) ) {
-                MemoryMappedFile::makeWritable(p, len);
 
-                if( !_hasWritten ) {
-                    // we don't bother doing a group commit when nothing is written, so we have a var to track that
+                if( !_hasWritten )
                     _hasWritten = true;
-                }
 
                 /** tips for debugging:
                         if you have an incorrect diff between data files in different folders

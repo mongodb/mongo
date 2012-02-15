@@ -1,5 +1,4 @@
-/* @file dur_commitjob.h used by dur.cpp
-*/
+/* @file dur_commitjob.h used by dur.cpp */
 
 /**
 *    Copyright (C) 2009 10gen Inc.
@@ -28,48 +27,27 @@
 #include "taskqueue.h"
 #include "d_concurrency.h"
 
-//#define DEBUG_WRITE_INTENT 1
-
 namespace mongo {
     namespace dur {
 
-        /** declaration of an intent to write to a region of a memory mapped view
-         *
-         * We store the end rather than the start pointer to make operator< faster
-         * since that is heavily used in set lookup.
+        /** Declaration of an intent to write to a region of a memory mapped view
+         *  We store the end rather than the start pointer to make operator< faster
+         *    since that is heavily used in set lookup.
          */
         struct WriteIntent { /* copyable */
-            WriteIntent() : /*w_ptr(0), */ p(0) { }
-            WriteIntent(void *a, unsigned b) : /*w_ptr(0), */ p((char*)a+b), len(b) { }
-
-            void* start() const { return (char*)p - len; }
-            void* end() const { return p; }
-            unsigned length() const { return len; }
-
+            WriteIntent() : p(0) { }
+            WriteIntent(void *a, unsigned b) : p((char*)a+b), len(b) { }
+            void* start() const                            { return (char*)p - len; }
+            void* end() const                              { return p; }
+            unsigned length() const                        { return len; }
             bool operator < (const WriteIntent& rhs) const { return end() < rhs.end(); }
-
-            // can they be merged?
-            bool overlaps(const WriteIntent& rhs) const {
-                return (start() <= rhs.end() && end() >= rhs.start());
-            }
-
-            // is merging necessary?
-            bool contains(const WriteIntent& rhs) const {
-                return (start() <= rhs.start() && end() >= rhs.end());
-            }
-
-            // merge into me
+            bool overlaps(const WriteIntent& rhs) const    { return (start() <= rhs.end() && end() >= rhs.start()); }
+            bool contains(const WriteIntent& rhs) const    { return (start() <= rhs.start() && end() >= rhs.end()); }
+            // merge into me:
             void absorb(const WriteIntent& other);
-
             friend ostream& operator << (ostream& out, const WriteIntent& wi) {
                 return (out << "p: " << wi.p << " end: " << wi.end() << " len: " << wi.len);
             }
-
-            //mutable void *w_ptr;  // writable mapping of p.
-            // mutable because set::iterator is const but this isn't used in op<
-#if defined(_EXPERIMENTAL)
-            mutable unsigned ofsInJournalBuffer;
-#endif
         private:
             void *p;      // intent to write up to p
             unsigned len; // up to this len

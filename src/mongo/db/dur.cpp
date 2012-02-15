@@ -76,6 +76,8 @@ namespace mongo {
 
     namespace dur {
 
+        void unspoolWriteIntents();
+
         void PREPLOGBUFFER(JSectHeader& outParm, AlignedBuilder&);
         void WRITETOJOURNAL(JSectHeader h, AlignedBuilder& uncompressed);
         void WRITETODATAFILES(const JSectHeader& h, AlignedBuilder& uncompressed);
@@ -211,11 +213,6 @@ namespace mongo {
             }
         }
 
-        /** base declare write intent function that all the helpers call. */
-        void DurableImpl::declareWriteIntent(void *p, unsigned len) {
-            commitJob.note(p, len);
-        }
-
         static DurableImpl* durableImpl = new DurableImpl();
         static NonDurableImpl* nonDurableImpl = new NonDurableImpl();
         DurableInterface* DurableInterface::_impl = nonDurableImpl;
@@ -284,11 +281,18 @@ namespace mongo {
         }
 
         bool DurableImpl::commitIfNeeded() {
-            if ( !d.dbMutex.isWriteLocked() )
+            if( !Lock::somethingWriteLocked() )
                 return false;
-
+            unspoolWriteIntents();
+            bool needed = commitJob.bytes() > UncommittedBytesLimit;
+            if( Lock::isLocked() == 'w' ) { 
+                if( needed ) {
+                    wassert(false); // can't commit early in a 'w' lock
+                }
+                return false;
+            }
             DEV commitJob._nSinceCommitIfNeededCall = 0;
-            if (commitJob.bytes() > UncommittedBytesLimit) { // should this also fire if CmdLine::DurAlwaysCommit?
+            if (needed) { // should this also fire if CmdLine::DurAlwaysCommit?
                 stats.curr->_earlyCommits++;
                 groupCommit(0);
                 return true;
@@ -506,6 +510,7 @@ namespace mongo {
         static AlignedBuilder __theBuilder(4 * 1024 * 1024);
 
         static bool _groupCommitWithLimitedLocks() {
+            unspoolWriteIntents(); // in case we were doing some writing ourself (likely impossible with limitedlocks version)
             AlignedBuilder &ab = __theBuilder;
 
             assert( !d.dbMutex.atLeastReadLocked() );
@@ -582,6 +587,7 @@ namespace mongo {
         }
 
         static void _groupCommit(Lock::GlobalWrite *lgw) {
+            unspoolWriteIntents(); // in case we were doing some writing ourself
             AlignedBuilder &ab = __theBuilder;
 
             LOG(4) << "_groupCommit " << endl;
@@ -782,6 +788,8 @@ namespace mongo {
         unsigned notesThisLock = 0;
 
         void releasingWriteLock() {
+            unspoolWriteIntents();
+
             // SERVER-4328 todo this isn't quite what we want for notesThisLock with db level concurrency:
             DEV notesThisLock = 0;
 
