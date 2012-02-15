@@ -1673,6 +1673,12 @@ int InputBuffer::getInputLine( PromptBase& pi ) {
 
         // ctrl-I/tab, command completion, needs to be before switch statement
         if ( c == ctrlChar( 'I' ) && completionCallback ) {
+
+            if ( pos == 0 )             // SERVER-4967 -- in earlier versions, you could paste previous output
+                continue;               //  back into the shell ... this output may have leading tabs.
+                                        // This hack (i.e. what the old code did) prevents command completion
+                                        //  on an empty line but lets users paste text with leading tabs.
+
             killRing.lastAction = KillRing::actionOther;
             historyRecallMostRecent = false;
 
