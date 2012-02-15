@@ -636,6 +636,9 @@ namespace mongo {
             return false;
         }
 
+        // should already have write lock
+        Client::Context ctx(ns);
+
         // we don't have the object yet, which is possible on initial sync.  get it.
         log() << "replication info adding missing object" << endl; // rare enough we can log
         uassert(15916, str::stream() << "Can no longer connect to initial sync source: " << hn, missingObjReader.connect(hn));
@@ -658,7 +661,6 @@ namespace mongo {
             return false;
         }
         else {
-            Client::Context ctx(ns);
             DiskLoc d = theDataFileMgr.insert(ns, (void*) missingObj.objdata(), missingObj.objsize());
             uassert(15917, "Got bad disk location when attempting to insert", !d.isNull());
 
