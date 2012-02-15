@@ -2330,13 +2330,22 @@ ReplSetTest.prototype.stopSet = function( signal , forRestart ) {
     for(i=0; i < this.ports.length; i++) {
         this.stop( i, signal );
     }
-    if ( ! forRestart && this._alldbpaths ){
+    if ( forRestart ) { return; }
+    if ( this._alldbpaths ){
         print("ReplSetTest stopSet deleting all dbpaths");
         for( i=0; i<this._alldbpaths.length; i++ ){
             resetDbpath( this._alldbpaths[i] );
         }
     }
-
+    if ( this.bridges ) {
+        for(i=0; i < this.bridges.length; i++) {
+            var mybridge;
+            while (mybridge = this.bridges[i].pop()) {
+                mybridge.stop();
+            }       
+        }
+    }
+    
     print('ReplSetTest stopSet *** Shut down repl set - test worked ****' )
 };
 
@@ -2614,7 +2623,7 @@ ReplSetBridge.prototype.start = function() {
 
 ReplSetBridge.prototype.stop = function() {
     print("ReplSetBridge stopping: " + this.port);
-    stopMongod(this.port);
+    stopMongod(this.port, 9);
 };
 
 ReplSetBridge.prototype.toString = function() {
