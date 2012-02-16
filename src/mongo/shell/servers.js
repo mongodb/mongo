@@ -2338,9 +2338,10 @@ ReplSetTest.prototype.stopSet = function( signal , forRestart ) {
         }
     }
     if ( this.bridges ) {
-        for(i=0; i < this.bridges.length; i++) {
+        var mybridgevec;
+        while (mybridgevec = this.bridges.pop()) {
             var mybridge;
-            while (mybridge = this.bridges[i].pop()) {
+            while (mybridge = mybridgevec.pop()) {
                 mybridge.stop();
             }       
         }
