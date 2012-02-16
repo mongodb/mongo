@@ -43,6 +43,10 @@ namespace mongo {
             assert( false );
         }
 
+        // These interfaces will merge soon, so make it easy to share logic
+        friend class ShardStrategy;
+        friend class SingleStrategy;
+
     protected:
         void doWrite( int op , Request& r , const Shard& shard , bool checkVersion = true );
         void doQuery( Request& r , const Shard& shard );
