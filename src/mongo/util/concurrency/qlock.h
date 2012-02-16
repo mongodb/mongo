@@ -5,6 +5,7 @@
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition.hpp>
 #include "../assert_util.h"
+#include "../time_support.h"
 
 namespace mongo { 
 
@@ -45,9 +46,9 @@ namespace mongo {
         void lock_r();
         void lock_w();
         void lock_R();
-        bool lock_R(int millis);  // try
+        bool lock_R_try(int millis);
         void lock_W();
-        bool lock_W(int millis);  // try
+        bool lock_W_try(int millis);
         void lock_W_stop_greed();
         void unlock_r();
         void unlock_w();
@@ -60,7 +61,7 @@ namespace mongo {
     };
 
     inline void QLock::_stop_greed() {
-        if( ++stopped == 1 ) // ie recursion on stop_greed/start_greed is ok
+        if( ++stopped == 1 ) // recursion on stop_greed/start_greed is ok
             greedyWrites = 0;
     }
     inline void QLock::stop_greed() {
@@ -70,7 +71,7 @@ namespace mongo {
 
     inline void QLock::start_greed() { 
         boost::mutex::scoped_lock lk(m);
-        if( --stopped == 1 ) 
+        if( --stopped == 0 ) 
             greedyWrites = 1;
     }
 
@@ -104,26 +105,40 @@ namespace mongo {
         R.n++;
     }
 
-    inline bool QLock::lock_R(int millis) {
+    inline bool QLock::lock_R_try(int millis) {
+        unsigned long long end = curTimeMillis64() + millis;
         boost::mutex::scoped_lock lk(m);
-        while( greed + W.n + w.n ) { 
-            if( R.c.timed_wait(m, boost::posix_time::milliseconds(millis)) == false ) { 
+        while( 1 ) {
+            if( greed + W.n + w.n == 0 )
+                break;
+            R.c.timed_wait(m, boost::posix_time::milliseconds(millis));
+            if( greed + W.n + w.n == 0 )
+                break;
+            if( curTimeMillis64() >= end )
                 return false;
-            }
         }
         R.n++;
         return true;
     }
 
-    inline bool QLock::lock_W(int millis) { 
+    inline bool QLock::lock_W_try(int millis) { 
+        unsigned long long end = curTimeMillis64() + millis;
         boost::mutex::scoped_lock lk(m);
         int g = greedyWrites;
         greed += g;
-        while( W.n + R.n + w.n + r.n ) {
-            if( W.c.timed_wait(m, boost::posix_time::milliseconds(millis)) == false ) { 
+        while( 1 ) {
+            if( W.n + R.n + w.n + r.n == 0 )
+                break;
+            W.c.timed_wait(m, boost::posix_time::milliseconds(millis));
+            if( W.n + R.n + w.n + r.n == 0 )
+                break;
+            if( curTimeMillis64() >= end ) {
                 // timed out
                 dassert( greed > 0 );
                 greed -= g;
+                // we do notify_one on W.c so we should be careful not to leave someone 
+                // else waiting when we give up here perhaps
+                W.c.notify_one();
                 return false;
             }
         }

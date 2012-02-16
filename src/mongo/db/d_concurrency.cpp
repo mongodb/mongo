@@ -83,14 +83,14 @@ namespace mongo {
 
     static bool lock_R_try(int ms) { 
         assert( threadState() == 0 );
-        bool got = q.lock_R(ms);
+        bool got = q.lock_R_try(ms);
         if( got ) 
             threadState() = 'R';
         return got;
     }
     static bool lock_W_try(int ms) { 
         assert( threadState() == 0 );
-        bool got = q.lock_W(ms);
+        bool got = q.lock_W_try(ms);
         if( got ) {
             threadState() = 'W';
             locked_W();
