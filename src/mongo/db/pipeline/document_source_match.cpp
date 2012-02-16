@@ -30,6 +30,10 @@ namespace mongo {
     DocumentSourceMatch::~DocumentSourceMatch() {
     }
 
+    const char *DocumentSourceMatch::getSourceName() const {
+        return matchName;
+    }
+
     void DocumentSourceMatch::sourceToBson(BSONObjBuilder *pBuilder) const {
         const BSONObj *pQuery = matcher.getQuery();
         pBuilder->append(matchName, *pQuery);
@@ -58,12 +62,12 @@ namespace mongo {
 
     intrusive_ptr<DocumentSource> DocumentSourceMatch::createFromBson(
         BSONElement *pBsonElement,
-        const intrusive_ptr<ExpressionContext> &pCtx) {
+        const intrusive_ptr<ExpressionContext> &pExpCtx) {
         uassert(15959, "the match filter must be an expression in an object",
                 pBsonElement->type() == Object);
 
         intrusive_ptr<DocumentSourceMatch> pMatcher(
-            new DocumentSourceMatch(pBsonElement->Obj()));
+            new DocumentSourceMatch(pBsonElement->Obj(), pExpCtx));
 
         return pMatcher;
     }
@@ -73,8 +77,17 @@ namespace mongo {
         pBuilder->appendElements(*pQuery);
     }
 
-    DocumentSourceMatch::DocumentSourceMatch(const BSONObj &query):
-        DocumentSourceFilterBase(),
+    DocumentSourceMatch::DocumentSourceMatch(
+        const BSONObj &query,
+        const intrusive_ptr<ExpressionContext> &pExpCtx):
+        DocumentSourceFilterBase(pExpCtx),
         matcher(query) {
+    }
+
+    void DocumentSourceMatch::manageDependencies(
+        const intrusive_ptr<DependencyTracker> &pTracker) {
+#ifdef MONGO_LATER_SERVER_4644
+        assert(false); // $$$ implement dependencies on Matcher
+#endif /* MONGO_LATER_SERVER_4644 */
     }
 }

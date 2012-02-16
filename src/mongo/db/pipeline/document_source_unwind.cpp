@@ -29,12 +29,18 @@ namespace mongo {
     DocumentSourceUnwind::~DocumentSourceUnwind() {
     }
 
-    DocumentSourceUnwind::DocumentSourceUnwind():
+    DocumentSourceUnwind::DocumentSourceUnwind(
+        const intrusive_ptr<ExpressionContext> &pExpCtx):
+        DocumentSource(pExpCtx),
         unwindPath(),
         pNoUnwindDocument(),
         pUnwindArray(),
         pUnwinder(),
         pUnwindValue() {
+    }
+
+    const char *DocumentSourceUnwind::getSourceName() const {
+        return unwindName;
     }
 
     bool DocumentSourceUnwind::eof() {
@@ -49,6 +55,8 @@ namespace mongo {
     }
 
     bool DocumentSourceUnwind::advance() {
+        DocumentSource::advance(); // check for interrupts
+
         if (pUnwinder.get() && pUnwinder->more()) {
             pUnwindValue = pUnwinder->next();
             return true;
@@ -193,9 +201,10 @@ namespace mongo {
         pBuilder->append(unwindName, unwindPath.getPath(true));
     }
 
-    intrusive_ptr<DocumentSourceUnwind> DocumentSourceUnwind::create() {
+    intrusive_ptr<DocumentSourceUnwind> DocumentSourceUnwind::create(
+        const intrusive_ptr<ExpressionContext> &pExpCtx) {
         intrusive_ptr<DocumentSourceUnwind> pSource(
-            new DocumentSourceUnwind());
+            new DocumentSourceUnwind(pExpCtx));
         return pSource;
     }
 
@@ -214,7 +223,7 @@ namespace mongo {
 
     intrusive_ptr<DocumentSource> DocumentSourceUnwind::createFromBson(
         BSONElement *pBsonElement,
-        const intrusive_ptr<ExpressionContext> &pCtx) {
+        const intrusive_ptr<ExpressionContext> &pExpCtx) {
         /*
           The value of $unwind should just be a field path.
          */
@@ -225,9 +234,15 @@ namespace mongo {
         string prefixedPathString(pBsonElement->String());
         string pathString(Expression::removeFieldPrefix(prefixedPathString));
         intrusive_ptr<DocumentSourceUnwind> pUnwind(
-            DocumentSourceUnwind::create());
+            DocumentSourceUnwind::create(pExpCtx));
         pUnwind->unwindPath = FieldPath(pathString);
 
         return pUnwind;
     }
+
+    void DocumentSourceUnwind::manageDependencies(
+        const intrusive_ptr<DependencyTracker> &pTracker) {
+        pTracker->addDependency(unwindPath.getPath(false), this);
+    }
+    
 }

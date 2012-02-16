@@ -20,6 +20,7 @@
 #pragma once
 
 #include <ctime>
+#include <limits>
 
 namespace mongo {
 
@@ -77,7 +78,7 @@ namespace mongo {
         operator unsigned long long&() { return millis; }
         operator const unsigned long long&() const { return millis; }
         void toTm (tm *buf) {
-            time_t dtime = (time_t)(millis/1000);
+            time_t dtime = toTimeT();
 #if defined(_WIN32)
             gmtime_s(buf, &dtime);
 #else
@@ -86,8 +87,14 @@ namespace mongo {
         }
         string toString() const {
             char buf[64];
-            time_t_to_String(millis/1000, buf);
+            time_t_to_String(toTimeT(), buf);
             return buf;
+        }
+        time_t toTimeT() const {
+            // cant use uassert from bson/util
+            assert((long long)millis >= 0); // TODO when millis is signed, delete
+            assert(((long long)millis/1000) < (numeric_limits<time_t>::max)());
+            return millis / 1000;
         }
     };
 

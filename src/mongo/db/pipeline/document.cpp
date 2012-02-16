@@ -19,6 +19,7 @@
 #undef assert
 #define assert MONGO_assert
 #include "db/jsobj.h"
+#include "db/pipeline/dependency_tracker.h"
 #include "db/pipeline/document.h"
 #include "db/pipeline/value.h"
 #include "util/mongoutils/str.h"
@@ -28,18 +29,24 @@ namespace mongo {
 
     string Document::idName("_id");
 
-    intrusive_ptr<Document> Document::createFromBsonObj(BSONObj *pBsonObj) {
-        intrusive_ptr<Document> pDocument(new Document(pBsonObj));
+    intrusive_ptr<Document> Document::createFromBsonObj(
+        BSONObj *pBsonObj, const DependencyTracker *pDependencies) {
+        intrusive_ptr<Document> pDocument(
+            new Document(pBsonObj, pDependencies));
         return pDocument;
     }
 
-    Document::Document(BSONObj *pBsonObj):
+    Document::Document(BSONObj *pBsonObj,
+                       const DependencyTracker *pDependencies):
         vFieldName(),
         vpValue() {
         BSONObjIterator bsonIterator(pBsonObj->begin());
         while(bsonIterator.more()) {
             BSONElement bsonElement(bsonIterator.next());
             string fieldName(bsonElement.fieldName());
+
+            // LATER check pDependencies
+            // LATER grovel through structures???
             intrusive_ptr<const Value> pValue(
                 Value::createFromBsonElement(&bsonElement));
 

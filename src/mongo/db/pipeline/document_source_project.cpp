@@ -29,9 +29,15 @@ namespace mongo {
     DocumentSourceProject::~DocumentSourceProject() {
     }
 
-    DocumentSourceProject::DocumentSourceProject():
+    DocumentSourceProject::DocumentSourceProject(
+        const intrusive_ptr<ExpressionContext> &pExpCtx):
+        DocumentSource(pExpCtx),
         excludeId(false),
         pEO(ExpressionObject::create()) {
+    }
+
+    const char *DocumentSourceProject::getSourceName() const {
+        return projectName;
     }
 
     bool DocumentSourceProject::eof() {
@@ -39,6 +45,8 @@ namespace mongo {
     }
 
     bool DocumentSourceProject::advance() {
+        DocumentSource::advance(); // check for interrupts
+
         return pSource->advance();
     }
 
@@ -75,9 +83,10 @@ namespace mongo {
         pBuilder->append(projectName, insides.done());
     }
 
-    intrusive_ptr<DocumentSourceProject> DocumentSourceProject::create() {
+    intrusive_ptr<DocumentSourceProject> DocumentSourceProject::create(
+        const intrusive_ptr<ExpressionContext> &pExpCtx) {
         intrusive_ptr<DocumentSourceProject> pSource(
-            new DocumentSourceProject());
+            new DocumentSourceProject(pExpCtx));
         return pSource;
     }
 
@@ -113,7 +122,7 @@ namespace mongo {
 
     intrusive_ptr<DocumentSource> DocumentSourceProject::createFromBson(
         BSONElement *pBsonElement,
-        const intrusive_ptr<ExpressionContext> &pCtx) {
+        const intrusive_ptr<ExpressionContext> &pExpCtx) {
         /* validate */
         uassert(15969, str::stream() << projectName <<
                 " specification must be an object",
@@ -121,7 +130,7 @@ namespace mongo {
 
         /* chain the projection onto the original source */
         intrusive_ptr<DocumentSourceProject> pProject(
-            DocumentSourceProject::create());
+            DocumentSourceProject::create(pExpCtx));
 
         /*
           Pull out the $project object.  This should just be a list of
@@ -204,4 +213,64 @@ IncludeExclude:
 
         return pProject;
     }
+
+    void DocumentSourceProject::DependencyRemover::path(
+        const string &path, bool include) {
+        if (include)
+            pTracker->removeDependency(path);
+    }
+
+    void DocumentSourceProject::DependencyChecker::path(
+        const string &path, bool include) {
+        /* if the specified path is included, there's nothing to check */
+        if (include)
+            return;
+
+        /* if the specified path is excluded, see if it is required */
+        intrusive_ptr<const DocumentSource> pSource;
+        if (pTracker->getDependency(&pSource, path)) {
+            uassert(15984, str::stream() <<
+                    "unable to satisfy dependency on " <<
+                    FieldPath::getPrefix() <<
+                    path << " in pipeline step " <<
+                    pSource->getPipelineStep() <<
+                    " (" << pSource->getSourceName() << "), because step " <<
+                    pThis->getPipelineStep() << " ("
+                    << pThis->getSourceName() << ") excludes it",
+                    false); // printf() is way easier to read than this crap
+        }
+    }
+
+    void DocumentSourceProject::manageDependencies(
+        const intrusive_ptr<DependencyTracker> &pTracker) {
+        /*
+          Look at all the products (inclusions and computed fields) of this
+          projection.  For each one that is a dependency, remove it from the
+          list of dependencies, because this product will satisfy that
+          dependency.
+         */
+        DependencyRemover dependencyRemover(pTracker);
+        pEO->emitPaths(&dependencyRemover);
+
+        /*
+          Look at the exclusions of this projection.  If any of them are
+          dependencies, inform the user (error/usassert) that the dependency
+          can't be satisfied.
+
+          Note we need to do this after the product examination above because
+          it is possible for there to be an exclusion field name that matches
+          a new computed product field name.  The latter would satisfy the
+          dependency.
+         */
+        DependencyChecker dependencyChecker(pTracker, this);
+        pEO->emitPaths(&dependencyChecker);
+
+        /*
+          Look at the products of this projection.  For inclusions, add the
+          field names to the list of dependencies.  For computed expressions,
+          add their dependencies to the list of dependencies.
+         */
+        pEO->addDependencies(pTracker, this);
+    }
+
 }

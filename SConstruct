@@ -199,6 +199,7 @@ add_option( "gdbserver" , "build in gdb server support" , 0 , True )
 add_option( "heapcheck", "link to heap-checking malloc-lib and look for memory leaks during tests" , 0 , False )
 
 add_option("smokedbprefix", "prefix to dbpath et al. for smoke tests", 1 , False )
+add_option("smokeauth", "run smoke tests with --auth", 0 , False )
 
 for shortName in getThirdPartyShortNames():
     add_option( "use-system-" + shortName , "use system version of library " + shortName , 0 , True )

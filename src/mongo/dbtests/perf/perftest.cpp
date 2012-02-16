@@ -660,16 +660,14 @@ namespace Plan {
             lk_.reset( new dblock );
             Client::Context ctx( ns_ );
             hint_ = BSON( "hint" << BSON( "a" << 1 ) );
-            hintElt_ = hint_.firstElement();
         }
         void run() {
             for( int i = 0; i < 10000; ++i )
-                MultiPlanScanner s( ns_.c_str(), BSONObj(), BSONObj(), &hintElt_ );
+                MultiPlanScanner s( ns_.c_str(), BSONObj(), BSONObj(), hint_ );
         }
         string ns_;
         auto_ptr< dblock > lk_;
         BSONObj hint_;
-        BSONElement hintElt_;
     };
 
     class Sort {

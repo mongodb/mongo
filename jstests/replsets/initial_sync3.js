@@ -3,6 +3,7 @@
  * Make sure member can't sync from a member with a different buildIndexes setting.
  */
 
+
 load("jstests/replsets/rslib.js");
 var name = "initialsync3";
 var host = getHostName();

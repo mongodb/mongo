@@ -1,0 +1,2 @@
+Import("env")
+env.StaticLibrary("murmurhash3", ["MurmurHash3.cpp"])

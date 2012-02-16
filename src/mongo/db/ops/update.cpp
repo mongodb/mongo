@@ -284,7 +284,7 @@ namespace mongo {
         }
 
         case BIT: {
-            uassert( 10136 ,  "$bit needs an array" , elt.type() == Object );
+            uassert( 10136 ,  "$bit needs an object" , elt.type() == Object );
             uassert( 10137 ,  "$bit can only be applied to numbers" , in.isNumber() );
             uassert( 10138 ,  "$bit cannot update a value of type double" , in.type() != NumberDouble );
 
@@ -333,9 +333,7 @@ namespace mongo {
         }
 
         default:
-            stringstream ss;
-            ss << "Mod::apply can't handle type: " << op;
-            throw UserException( 9017, ss.str() );
+            uasserted( 9017 , str::stream() << "Mod::apply can't handle type: " << op );
         }
     }
 
@@ -630,7 +628,7 @@ namespace mongo {
         !a.eoo() &&
         !b.eoo() &&
         ( a.rawdata() != b.rawdata() ) &&
-        ( a.fieldName() == string( b.fieldName() ) );
+        str::equals( a.fieldName(), b.fieldName() );
     }
 
     template< class Builder >
@@ -997,7 +995,8 @@ namespace mongo {
                                  bool logop , 
                                  OpDebug& debug, 
                                  RemoveSaver* rs,
-                                 bool fromMigrate ) {
+                                 bool fromMigrate,
+                                 const QueryPlanSelectionPolicy &planPolicy ) {
         DEBUGUPDATE( "update: " << ns << " update: " << updateobj << " query: " << patternOrig << " upsert: " << upsert << " multi: " << multi );
         Client& client = cc();
         int profile = client.database()->profile;
@@ -1024,7 +1023,8 @@ namespace mongo {
             modsIsIndexed = mods->isIndexed();
         }
 
-        if( !multi && isSimpleIdQuery(patternOrig) && d && !modsIsIndexed ) {
+        if( planPolicy.permitOptimalIdPlan() && !multi && isSimpleIdQuery(patternOrig) && d &&
+           !modsIsIndexed ) {
             int idxNo = d->findIdIndex();
             if( idxNo >= 0 ) {
                 debug.idhack = true;
@@ -1045,7 +1045,8 @@ namespace mongo {
 
         int numModded = 0;
         debug.nscanned = 0;
-        shared_ptr< Cursor > c = NamespaceDetailsTransient::getCursor( ns, patternOrig );
+        shared_ptr<Cursor> c =
+        NamespaceDetailsTransient::getCursor( ns, patternOrig, BSONObj(), planPolicy );
         d = nsdetails(ns);
         nsdt = &NamespaceDetailsTransient::get(ns);
         bool autoDedup = c->autoDedup();
@@ -1295,13 +1296,15 @@ namespace mongo {
                                 bool multi, 
                                 bool logop , 
                                 OpDebug& debug, 
-                                bool fromMigrate ) {
+                                bool fromMigrate,
+                                const QueryPlanSelectionPolicy &planPolicy ) {
         uassert( 10155 , "cannot update reserved $ collection", strchr(ns, '$') == 0 );
         if ( strstr(ns, ".system.") ) {
             /* dm: it's very important that system.indexes is never updated as IndexDetails has pointers into it */
             uassert( 10156 , str::stream() << "cannot update system collection: " << ns << " q: " << patternOrig << " u: " << updateobj , legalClientSystemNS( ns , true ) );
         }
-        UpdateResult ur = _updateObjects(false, ns, updateobj, patternOrig, upsert, multi, logop, debug, 0, fromMigrate );
+        UpdateResult ur = _updateObjects(false, ns, updateobj, patternOrig, upsert, multi, logop,
+                                         debug, 0, fromMigrate, planPolicy );
         debug.nupdated = ur.num;
         return ur;
     }

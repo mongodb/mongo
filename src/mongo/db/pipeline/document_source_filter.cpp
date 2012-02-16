@@ -29,6 +29,10 @@ namespace mongo {
     DocumentSourceFilter::~DocumentSourceFilter() {
     }
 
+    const char *DocumentSourceFilter::getSourceName() const {
+        return filterName;
+    }
+
     bool DocumentSourceFilter::coalesce(
         const intrusive_ptr<DocumentSource> &pNextSource) {
 
@@ -74,21 +78,23 @@ namespace mongo {
         intrusive_ptr<Expression> pExpression(
             Expression::parseObject(pBsonElement, &oCtx));
         intrusive_ptr<DocumentSourceFilter> pFilter(
-            DocumentSourceFilter::create(pExpression));
+            DocumentSourceFilter::create(pExpression, pCtx));
 
         return pFilter;
     }
 
     intrusive_ptr<DocumentSourceFilter> DocumentSourceFilter::create(
-        const intrusive_ptr<Expression> &pFilter) {
+        const intrusive_ptr<Expression> &pFilter,
+        const intrusive_ptr<ExpressionContext> &pExpCtx) {
         intrusive_ptr<DocumentSourceFilter> pSource(
-            new DocumentSourceFilter(pFilter));
+            new DocumentSourceFilter(pFilter, pExpCtx));
         return pSource;
     }
 
     DocumentSourceFilter::DocumentSourceFilter(
-        const intrusive_ptr<Expression> &pTheFilter):
-        DocumentSourceFilterBase(),
+        const intrusive_ptr<Expression> &pTheFilter,
+        const intrusive_ptr<ExpressionContext> &pExpCtx):
+        DocumentSourceFilterBase(pExpCtx),
         pFilter(pTheFilter) {
     }
 

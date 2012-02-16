@@ -95,13 +95,6 @@ namespace mongo {
         //   (used in reponses from db)
         int opCode;
     };
-    struct OP_GETMORE : public MSGHEADER {
-        MSGHEADER header;             // standard message header
-        int       ZERO_or_flags;      // 0 - reserved for future use
-        //cstring   fullCollectionName; // "dbname.collectionname"
-        //int32     numberToReturn;     // number of documents to return
-        //int64     cursorID;           // cursorID from the OP_REPLY
-    };
 #pragma pack()
 
 #pragma pack(1)

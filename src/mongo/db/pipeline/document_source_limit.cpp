@@ -27,13 +27,33 @@
 namespace mongo {
     const char DocumentSourceLimit::limitName[] = "$limit";
 
-    DocumentSourceLimit::DocumentSourceLimit(const intrusive_ptr<ExpressionContext> &pTheCtx):
+    DocumentSourceLimit::DocumentSourceLimit(
+        const intrusive_ptr<ExpressionContext> &pExpCtx):
+        DocumentSource(pExpCtx),
         limit(0),
-        count(0),
-        pCtx(pTheCtx) {
+        count(0) {
     }
 
     DocumentSourceLimit::~DocumentSourceLimit() {
+    }
+
+    const char *DocumentSourceLimit::getSourceName() const {
+        return limitName;
+    }
+
+    bool DocumentSourceLimit::coalesce(
+        const intrusive_ptr<DocumentSource> &pNextSource) {
+        DocumentSourceLimit *pLimit =
+            dynamic_cast<DocumentSourceLimit *>(pNextSource.get());
+
+        /* if it's not another $skip, we can't coalesce */
+        if (!pLimit)
+            return false;
+
+        /* we need to limit by the minimum of the two limits */
+        if (pLimit->limit < limit)
+            limit = pLimit->limit;
+        return true;
     }
 
     bool DocumentSourceLimit::eof() {
@@ -41,6 +61,8 @@ namespace mongo {
     }
 
     bool DocumentSourceLimit::advance() {
+        DocumentSource::advance(); // check for interrupts
+
         ++count;
         if (count >= limit) {
             pCurrent.reset();
@@ -59,20 +81,20 @@ namespace mongo {
     }
 
     intrusive_ptr<DocumentSourceLimit> DocumentSourceLimit::create(
-        const intrusive_ptr<ExpressionContext> &pCtx) {
+        const intrusive_ptr<ExpressionContext> &pExpCtx) {
         intrusive_ptr<DocumentSourceLimit> pSource(
-            new DocumentSourceLimit(pCtx));
+            new DocumentSourceLimit(pExpCtx));
         return pSource;
     }
 
     intrusive_ptr<DocumentSource> DocumentSourceLimit::createFromBson(
         BSONElement *pBsonElement,
-        const intrusive_ptr<ExpressionContext> &pCtx) {
+        const intrusive_ptr<ExpressionContext> &pExpCtx) {
         uassert(15957, "the limit must be specified as a number",
                 pBsonElement->isNumber());
 
         intrusive_ptr<DocumentSourceLimit> pLimit(
-            DocumentSourceLimit::create(pCtx));
+            DocumentSourceLimit::create(pExpCtx));
 
         pLimit->limit = (int)pBsonElement->numberLong();
         uassert(15958, "the limit must be positive",

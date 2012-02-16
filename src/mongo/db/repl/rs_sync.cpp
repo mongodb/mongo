@@ -539,8 +539,9 @@ namespace mongo {
             // check that we are in the set (and not an arbiter) before
             // trying to sync with other replicas.
             if( ! _self ) {
-            	log() << "replSet warning did not detect own host and port, not syncing, config: " << theReplSet->config() << rsLog;
-                return;
+                log() << "replSet warning did not receive a valid config yet, sleeping 20 seconds " << rsLog;
+                sleepsecs(20);
+                continue;
             }
             if( myConfig().arbiterOnly ) {
                 return;

@@ -123,6 +123,9 @@ namespace ReplTests {
                 b.appendTimestamp("syncedTo", 0);
                 ReplSource a(b.obj());
                 for( vector< BSONObj >::iterator i = ops.begin(); i != ops.end(); ++i ) {
+                    if ( 0 ) {
+                        log() << "op: " << *i << endl;
+                    }
                     a.applyOperation( *i );
                 }
             }
@@ -784,6 +787,18 @@ namespace ReplTests {
             }
         };
 
+        class EmptyPushSparseIndex : public EmptyPush {
+        public:
+            EmptyPushSparseIndex() {
+                client()->insert( "unittests.system.indexes",
+                                 BSON( "ns" << ns() << "key" << BSON( "a" << 1 ) <<
+                                      "name" << "foo" << "sparse" << true ) );
+            }
+            ~EmptyPushSparseIndex() {
+                client()->dropIndexes( ns() );
+            }
+        };
+
         class PushAll : public Base {
         public:
             void doIt() const {
@@ -1201,6 +1216,7 @@ namespace ReplTests {
             add< Idempotence::PushUpsert >();
             add< Idempotence::MultiPush >();
             add< Idempotence::EmptyPush >();
+            add< Idempotence::EmptyPushSparseIndex >();
             add< Idempotence::PushAll >();
             add< Idempotence::PushAllUpsert >();
             add< Idempotence::EmptyPushAll >();

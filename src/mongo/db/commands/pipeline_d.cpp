@@ -26,7 +26,8 @@ namespace mongo {
 
     intrusive_ptr<DocumentSource> PipelineD::prepareCursorSource(
         const intrusive_ptr<Pipeline> &pPipeline,
-        const string &dbName) {
+        const string &dbName,
+        const intrusive_ptr<ExpressionContext> &pExpCtx) {
 
         Pipeline::SourceVector *pSources = &pPipeline->sourceVector;
 
@@ -133,7 +134,7 @@ namespace mongo {
 
         /* wrap the cursor with a DocumentSource and return that */
         intrusive_ptr<DocumentSourceCursor> pSource(
-            DocumentSourceCursor::create(pCursor));
+            DocumentSourceCursor::create(pCursor, pExpCtx));
 
         /* record any dependencies we created */
         if (initQuery)

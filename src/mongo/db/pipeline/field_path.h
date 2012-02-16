@@ -24,17 +24,26 @@ namespace mongo {
     public:
         virtual ~FieldPath();
 
+        /**
+           Constructor.
+
+           @param fieldPath the dotted field path string
+         */
         FieldPath(const string &fieldPath);
+
+        /**
+           Constructor.
+        */
         FieldPath();
 
-        /*
+        /**
           Get the number of path elements in the field path.
 
           @returns the number of path elements
          */
         size_t getPathLength() const;
 
-        /*
+        /**
           Get a particular path element from the path.
 
           @param i the index of the path element
@@ -42,7 +51,7 @@ namespace mongo {
          */
         string getFieldName(size_t i) const;
 
-        /*
+        /**
           Get the full path.
 
           @param fieldPrefix whether or not to include the field prefix
@@ -50,7 +59,7 @@ namespace mongo {
          */
         string getPath(bool fieldPrefix) const;
 
-        /*
+        /**
           Write the full path.
 
           @param outStream where to write the path to
@@ -58,7 +67,21 @@ namespace mongo {
         */
         void writePath(ostream &outStream, bool fieldPrefix) const;
 
+        /**
+           Assignment operator.
+
+           @param rRHS right hand side of the assignment
+        */
         FieldPath &operator=(const FieldPath &rRHS);
+
+        /**
+           Get the prefix string.
+
+           @returns the prefix string
+         */
+        static const char *getPrefix();
+
+        static const char prefix[];
 
     private:
         vector<string> vFieldName;
@@ -76,6 +99,10 @@ namespace mongo {
 
     inline string FieldPath::getFieldName(size_t i) const {
         return vFieldName[i];
+    }
+
+    inline const char *FieldPath::getPrefix() {
+        return prefix;
     }
 
 }

@@ -101,6 +101,12 @@ namespace mongo {
         bool connect(SockAddr& farEnd) {
             return psock->connect( farEnd );
         }
+#ifdef MONGO_SSL
+        /** secures inline */
+        void secure( SSLManager * ssl ) {
+            psock->secure( ssl );
+        }
+#endif
 
     private:
         

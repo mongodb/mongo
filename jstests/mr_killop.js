@@ -3,8 +3,6 @@ t.drop();
 t2 = db.jstests_mr_killop_out;
 t2.drop();
 
-if ( typeof _threadInject == "undefined" ) { // don't run in v8 mode - SERVER-1900 
-
     function debug( x ) {
 //        printjson( x );
     }
@@ -124,4 +122,3 @@ if ( typeof _threadInject == "undefined" ) { // don't run in v8 mode - SERVER-19
     }
     runMRTests( loop, true );
 
-}

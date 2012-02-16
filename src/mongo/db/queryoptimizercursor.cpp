@@ -17,16 +17,40 @@
  */
 
 #include "pch.h"
+#include "queryoptimizercursor.h"
 #include "queryoptimizer.h"
 #include "pdfile.h"
 #include "clientcursor.h"
 #include "btree.h"
-#include "queryoptimizercursor.h"
 
 namespace mongo {
     
     static const int OutOfOrderDocumentsAssertionCode = 14810;
+        
+    QueryPlanSelectionPolicy::Any QueryPlanSelectionPolicy::__any;
+    const QueryPlanSelectionPolicy &QueryPlanSelectionPolicy::any() { return __any; }
     
+    bool QueryPlanSelectionPolicy::IndexOnly::permitPlan( const QueryPlan &plan ) const {
+        return !plan.willScanTable();
+    }
+    QueryPlanSelectionPolicy::IndexOnly QueryPlanSelectionPolicy::__indexOnly;
+    const QueryPlanSelectionPolicy &QueryPlanSelectionPolicy::indexOnly() { return __indexOnly; }
+    
+    bool QueryPlanSelectionPolicy::IdElseNatural::permitPlan( const QueryPlan &plan ) const {
+        return !plan.indexed() || plan.index()->isIdIndex();
+    }
+    BSONObj QueryPlanSelectionPolicy::IdElseNatural::planHint( const char *ns ) const {
+        NamespaceDetails *nsd = nsdetails( ns );
+        if ( !nsd || !nsd->haveIdIndex() ) {
+            return BSON( "$hint" << BSON( "$natural" << 1 ) );
+        }
+        return BSON( "$hint" << nsd->idx( nsd->findIdIndex() ).indexName() );
+    }
+    QueryPlanSelectionPolicy::IdElseNatural QueryPlanSelectionPolicy::__idElseNatural;
+    const QueryPlanSelectionPolicy &QueryPlanSelectionPolicy::idElseNatural() {
+        return __idElseNatural;
+    }
+
     /**
      * A QueryOp implementation utilized by the QueryOptimizerCursor
      */
@@ -35,16 +59,28 @@ namespace mongo {
         /**
          * @param aggregateNscanned - shared long long counting total nscanned for
          * query ops for all cursors.
-         * @param requireIndex - if unindexed scans should be prohibited.
          */
-        QueryOptimizerCursorOp( long long &aggregateNscanned, bool requireIndex, int cumulativeCount = 0 ) : _matchCounter( aggregateNscanned, cumulativeCount ), _countingMatches(), _mustAdvance(), _capped(), _yieldRecoveryFailed(), _requireIndex( requireIndex ) {}
+        QueryOptimizerCursorOp( long long &aggregateNscanned,
+                               const QueryPlanSelectionPolicy &selectionPolicy,
+                               int cumulativeCount = 0 ) :
+        _matchCounter( aggregateNscanned, cumulativeCount ),
+        _countingMatches(),
+        _mustAdvance(),
+        _capped(),
+        _yieldRecoveryFailed(),
+        _selectionPolicy( selectionPolicy ) {
+        }
         
         virtual void _init() {
             if ( qp().scanAndOrderRequired() ) {
                 throw MsgAssertionException( OutOfOrderDocumentsAssertionCode, "order spec cannot be satisfied with index" );
             }
-            if ( _requireIndex && strcmp( qp().indexKey().firstElementFieldName(), "$natural" ) == 0 ) {
-                throw MsgAssertionException( 9011, "Not an index cursor" );                
+            if ( !_selectionPolicy.permitPlan( qp() ) ) {
+                throw MsgAssertionException( 9011,
+                                            str::stream()
+                                            << "Plan not permitted by query plan selection policy '"
+                                            << _selectionPolicy.name()
+                                            << "'" );
             }
             _c = qp().newCursor();
 
@@ -127,7 +163,8 @@ namespace mongo {
             _mustAdvance = true;
         }
         virtual QueryOp *_createChild() const {
-            return new QueryOptimizerCursorOp( _matchCounter.aggregateNscanned(), _requireIndex, _matchCounter.cumulativeCount() );
+            return new QueryOptimizerCursorOp( _matchCounter.aggregateNscanned(), _selectionPolicy,
+                                              _matchCounter.cumulativeCount() );
         }
         DiskLoc currLoc() const { return _c ? _c->currLoc() : DiskLoc(); }
         BSONObj currKey() const { return _c ? _c->currKey() : BSONObj(); }
@@ -194,7 +231,7 @@ namespace mongo {
         DiskLoc _posBeforeYield;
         ClientCursor::YieldData _yieldData;
         bool _yieldRecoveryFailed;
-        bool _requireIndex;
+        const QueryPlanSelectionPolicy &_selectionPolicy;
     };
     
     /**
@@ -205,9 +242,10 @@ namespace mongo {
      */
     class QueryOptimizerCursor : public Cursor {
     public:
-        QueryOptimizerCursor( auto_ptr<MultiPlanScanner> &mps, bool requireIndex ) :
+        QueryOptimizerCursor( auto_ptr<MultiPlanScanner> &mps,
+                             const QueryPlanSelectionPolicy &planPolicy ) :
         _mps( mps ),
-        _originalOp( new QueryOptimizerCursorOp( _nscanned, requireIndex ) ),
+        _originalOp( new QueryOptimizerCursorOp( _nscanned, planPolicy ) ),
         _currOp(),
         _nscanned() {
             _mps->initialOp( _originalOp );
@@ -463,9 +501,10 @@ namespace mongo {
         SmallDupSet _dups;
     };
     
-    shared_ptr<Cursor> newQueryOptimizerCursor( auto_ptr<MultiPlanScanner> mps, bool requireIndex ) {
+    shared_ptr<Cursor> newQueryOptimizerCursor( auto_ptr<MultiPlanScanner> mps,
+                                               const QueryPlanSelectionPolicy &planPolicy ) {
         try {
-            return shared_ptr<Cursor>( new QueryOptimizerCursor( mps, requireIndex ) );
+            return shared_ptr<Cursor>( new QueryOptimizerCursor( mps, planPolicy ) );
         } catch( const AssertionException &e ) {
             if ( e.getCode() == OutOfOrderDocumentsAssertionCode ) {
                 // If no indexes follow the requested sort order, return an
@@ -478,16 +517,18 @@ namespace mongo {
     }
     
     shared_ptr<Cursor> NamespaceDetailsTransient::getCursor( const char *ns, const BSONObj &query,
-                                                            const BSONObj &order, bool requireIndex,
+                                                            const BSONObj &order,
+                                                            const QueryPlanSelectionPolicy
+                                                            &planPolicy,
                                                             bool *simpleEqualityMatch ) {
         if ( simpleEqualityMatch ) {
             *simpleEqualityMatch = false;
         }
-        if ( query.isEmpty() && order.isEmpty() && !requireIndex ) {
+        if ( planPolicy.permitOptimalNaturalPlan() && query.isEmpty() && order.isEmpty() ) {
             // TODO This will not use a covered index currently.
             return theDataFileMgr.findAll( ns );
         }
-        if ( isSimpleIdQuery( query ) ) {
+        if ( planPolicy.permitOptimalIdPlan() && isSimpleIdQuery( query ) ) {
             Database *database = cc().database();
             verify( 15985, database );
             NamespaceDetails *d = database->namespaceIndex.details(ns);
@@ -500,31 +541,33 @@ namespace mongo {
                 }
             }
         }
-        auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order ) ); // mayYield == false
-        shared_ptr<Cursor> single = mps->singleCursor();
-        if ( single ) {
-            if ( !( requireIndex &&
-                   dynamic_cast<BasicCursor*>( single.get() ) /* May not use an unindexed cursor */ ) ) {
+        auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order,
+                                                             planPolicy.planHint( ns ) ) ); // mayYield == false
+        const QueryPlan *singlePlan = mps->singlePlan();
+        if ( singlePlan ) {
+            if ( planPolicy.permitPlan( *singlePlan ) ) {
+                shared_ptr<Cursor> single = singlePlan->newCursor();
                 if ( !query.isEmpty() && !single->matcher() ) {
                     shared_ptr<CoveredIndexMatcher> matcher( new CoveredIndexMatcher( query, single->indexKeyPattern() ) );
                     single->setMatcher( matcher );
                 }
                 if ( simpleEqualityMatch ) {
-                    const QueryPlan *qp = mps->singlePlan();
-                    if ( qp->exactKeyMatch() && !single->matcher()->needRecord() ) {
+                    if ( singlePlan->exactKeyMatch() && !single->matcher()->needRecord() ) {
                         *simpleEqualityMatch = true;
                     }
                 }
                 return single;
             }
         }
-        return newQueryOptimizerCursor( mps, requireIndex );
+        return newQueryOptimizerCursor( mps, planPolicy );
     }
 
     /** This interface just available for testing. */
-    shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query, const BSONObj &order, bool requireIndex ) {
+    shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query,
+                                               const BSONObj &order,
+                                               const QueryPlanSelectionPolicy &planPolicy ) {
         auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order ) ); // mayYield == false
-        return newQueryOptimizerCursor( mps, requireIndex );
+        return newQueryOptimizerCursor( mps, planPolicy );
     }
         
 } // namespace mongo;

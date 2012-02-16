@@ -148,6 +148,27 @@ namespace mongo {
 
         bool matches(const BSONObj& j, MatchDetails * details = 0 ) const;
 
+#ifdef MONGO_LATER_SERVER_4644
+        class FieldSink {
+        public:
+            virtual ~FieldSink() {};
+            virtual void referenceField(const string &fieldPath) = 0;
+        };
+
+        /**
+           Visit all of the fields that are referenced by this Matcher
+           (and any descendants).
+
+           This can be used to gather a list of all the references made by
+           this matcher.  The implementation of this parallels that of
+           matches() above.
+
+           @param pSink a FieldSink that the caller will use to gather or
+             process the references
+         */
+        void visitReferences(FieldSink *pSink) const;
+#endif /* MONGO_LATER_SERVER_4644 */
+
         bool atomic() const { return _atomic; }
 
         string toString() const {
@@ -176,7 +197,7 @@ namespace mongo {
 //            return ( ( basics.size() + nRegex ) < 2 ) && !where && !_orMatchers.size() && !_norMatchers.size();
         }
 
-	const BSONObj *getQuery() const { return &_jsobj; };
+        const BSONObj *getQuery() const { return &_jsobj; };
 
     private:
         /**

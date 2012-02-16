@@ -737,9 +737,6 @@ int main(int argc, char* argv[]) {
                 dbpath = cmdLine.cwd + "/" + dbpath;
             }
         }
-        else {
-            dbpath = "/data/db/";
-        }
 #ifdef _WIN32
         if (dbpath.size() > 1 && dbpath[dbpath.size()-1] == '/') {
             // size() check is for the unlikely possibility of --dbpath "/"
@@ -1141,22 +1138,23 @@ namespace mongo {
         if ( signal == SIGSEGV || signal == SIGBUS ) {
             oss << " access";
         } else {
-            oss << " operation";   
+            oss << " operation";
         }
         oss << " at address: " << siginfo->si_addr << " from thread: " << getThreadName() << endl;
         rawOut( oss.str() );
-        abruptQuit( signal );   
+        abruptQuit( signal );
     }
-        
+
     sigset_t asyncSignals;
     // The above signals will be processed by this thread only, in order to
     // ensure the db and log mutexes aren't held.
     void interruptThread() {
-        int x;
-        sigwait( &asyncSignals, &x );
-        log() << "got kill or ctrl c or hup signal " << x << " (" << strsignal( x ) << "), will terminate after current cmd ends" << endl;
+        int actualSignal;
+        sigwait( &asyncSignals, &actualSignal );
+        log() << "got signal " << actualSignal << " (" << strsignal( actualSignal )
+              << "), will terminate after current cmd ends" << endl;
         Client::initThread( "interruptThread" );
-        exitCleanly( EXIT_KILL );
+        exitCleanly( EXIT_CLEAN );
     }
 
     // this will be called in certain c++ error cases, for example if there are two active

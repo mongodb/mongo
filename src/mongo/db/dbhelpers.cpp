@@ -25,6 +25,7 @@
 #include "oplog.h"
 #include "ops/update.h"
 #include "ops/delete.h"
+#include "queryoptimizercursor.h"
 
 #include <fstream>
 
@@ -78,7 +79,11 @@ namespace mongo {
        set your db SavedContext first
     */
     DiskLoc Helpers::findOne(const char *ns, const BSONObj &query, bool requireIndex) {
-        shared_ptr<Cursor> c = NamespaceDetailsTransient::getCursor( ns, query, BSONObj(), requireIndex );
+        shared_ptr<Cursor> c =
+        NamespaceDetailsTransient::getCursor( ns, query, BSONObj(),
+                                             requireIndex ?
+                                             QueryPlanSelectionPolicy::indexOnly() :
+                                             QueryPlanSelectionPolicy::any() );
         while( c->ok() ) {
             if ( c->currentMatches() && !c->getsetdup( c->currLoc() ) ) {
                 return c->currLoc();
@@ -255,60 +260,6 @@ namespace mongo {
     void Helpers::emptyCollection(const char *ns) {
         Client::Context context(ns);
         deleteObjects(ns, BSONObj(), false);
-    }
-
-    DbSet::~DbSet() {
-        if ( name_.empty() )
-            return;
-        try {
-            Client::Context c( name_.c_str() );
-            if ( nsdetails( name_.c_str() ) ) {
-                string errmsg;
-                BSONObjBuilder result;
-                dropCollection( name_, errmsg, result );
-            }
-        }
-        catch ( ... ) {
-            problem() << "exception cleaning up DbSet" << endl;
-        }
-    }
-
-    void DbSet::reset( const string &name, const BSONObj &key ) {
-        if ( !name.empty() )
-            name_ = name;
-        if ( !key.isEmpty() )
-            key_ = key.getOwned();
-        Client::Context c( name_.c_str() );
-        if ( nsdetails( name_.c_str() ) ) {
-            Helpers::emptyCollection( name_.c_str() );
-        }
-        else {
-            string err;
-            massert( 10303 ,  err, userCreateNS( name_.c_str(), fromjson( "{autoIndexId:false}" ), err, false ) );
-        }
-        Helpers::ensureIndex( name_.c_str(), key_, true, "setIdx" );
-    }
-
-    bool DbSet::get( const BSONObj &obj ) const {
-        Client::Context c( name_.c_str() );
-        BSONObj temp;
-        return Helpers::findOne( name_.c_str(), obj, temp, true );
-    }
-
-    void DbSet::set( const BSONObj &obj, bool val ) {
-        Client::Context c( name_.c_str() );
-        if ( val ) {
-            try {
-                BSONObj k = obj;
-                theDataFileMgr.insertWithObjMod( name_.c_str(), k, false );
-            }
-            catch ( DBException& ) {
-                // dup key - already in set
-            }
-        }
-        else {
-            deleteObjects( name_.c_str(), obj, true, false, false );
-        }
     }
 
     RemoveSaver::RemoveSaver( const string& a , const string& b , const string& why) : _out(0) {

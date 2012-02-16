@@ -52,7 +52,7 @@ namespace mongo {
 
         long long nDeleted = 0;
 
-        shared_ptr< Cursor > creal = NamespaceDetailsTransient::getCursor( ns, pattern, BSONObj(), false, 0 );
+        shared_ptr< Cursor > creal = NamespaceDetailsTransient::getCursor( ns, pattern );
 
         if( !creal->ok() )
             return nDeleted;

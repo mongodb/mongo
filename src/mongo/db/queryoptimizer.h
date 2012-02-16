@@ -19,17 +19,14 @@
 #pragma once
 
 #include "cursor.h"
-#include "jsobj.h"
 #include "queryutil.h"
 #include "matcher.h"
 #include "../util/net/listen.h"
-#include <queue>
 
 namespace mongo {
 
     class IndexDetails;
     class IndexType;
-    class ElapsedTracker;
 
     /** A plan for executing a query using the given index spec and FieldRangeSet. */
     class QueryPlan : boost::noncopyable {
@@ -80,6 +77,7 @@ namespace mongo {
         int direction() const { return _direction; }
         BSONObj indexKey() const;
         bool indexed() const { return _index; }
+        const IndexDetails *index() const { return _index; }
         int idxNo() const { return _idxNo; }
         const char *ns() const { return _frs.ns(); }
         NamespaceDetails *nsd() const { return _d; }
@@ -271,7 +269,7 @@ namespace mongo {
                       const BSONObj &originalQuery,
                       const BSONObj &order,
                       bool mustAssertOnYieldFailure = true,
-                      const BSONElement *hint = 0,
+                      const BSONObj &hint = BSONObj(),
                       bool honorRecordedPlan = true,
                       const BSONObj &min = BSONObj(),
                       const BSONObj &max = BSONObj(),
@@ -399,7 +397,7 @@ namespace mongo {
         MultiPlanScanner( const char *ns,
                           const BSONObj &query,
                           const BSONObj &order,
-                          const BSONElement *hint = 0,
+                          const BSONObj &hint = BSONObj(),
                           bool honorRecordedPlan = true,
                           const BSONObj &min = BSONObj(),
                           const BSONObj &max = BSONObj(),
@@ -480,7 +478,7 @@ namespace mongo {
         }
         shared_ptr<QueryOp> nextOpBeginningClause();
         shared_ptr<QueryOp> nextOpHandleEndOfClause();
-        bool uselessOr( const BSONElement &hint ) const;
+        bool haveUselessOr() const;
         const string _ns;
         bool _or;
         BSONObj _query;

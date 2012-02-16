@@ -26,11 +26,17 @@ namespace mongo {
     DocumentSourceOut::~DocumentSourceOut() {
     }
 
+    const char *DocumentSourceOut::getSourceName() const {
+        return outName;
+    }
+
     bool DocumentSourceOut::eof() {
         return pSource->eof();
     }
 
     bool DocumentSourceOut::advance() {
+        DocumentSource::advance(); // check for interrupts
+
         return pSource->advance();
     }
 
@@ -38,14 +44,18 @@ namespace mongo {
         return pSource->getCurrent();
     }
 
-    DocumentSourceOut::DocumentSourceOut(BSONElement *pBsonElement) {
+    DocumentSourceOut::DocumentSourceOut(
+        BSONElement *pBsonElement,
+        const intrusive_ptr<ExpressionContext> &pExpCtx):
+        DocumentSource(pExpCtx) {
         assert(false && "unimplemented");
     }
 
     intrusive_ptr<DocumentSourceOut> DocumentSourceOut::createFromBson(
-        BSONElement *pBsonElement) {
+        BSONElement *pBsonElement,
+        const intrusive_ptr<ExpressionContext> &pExpCtx) {
         intrusive_ptr<DocumentSourceOut> pSource(
-            new DocumentSourceOut(pBsonElement));
+            new DocumentSourceOut(pBsonElement, pExpCtx));
 
         return pSource;
     }

@@ -19,6 +19,7 @@
 #include "db/pipeline/document_source.h"
 
 #include "db/jsobj.h"
+#include "db/pipeline/dependency_tracker.h"
 #include "db/pipeline/doc_mem_monitor.h"
 #include "db/pipeline/document.h"
 #include "db/pipeline/expression.h"
@@ -32,6 +33,10 @@ namespace mongo {
     DocumentSourceSort::~DocumentSourceSort() {
     }
 
+    const char *DocumentSourceSort::getSourceName() const {
+        return sortName;
+    }
+
     bool DocumentSourceSort::eof() {
         if (!populated)
             populate();
@@ -40,6 +45,8 @@ namespace mongo {
     }
 
     bool DocumentSourceSort::advance() {
+        DocumentSource::advance(); // check for interrupts
+
         if (!populated)
             populate();
 
@@ -70,16 +77,16 @@ namespace mongo {
     }
 
     intrusive_ptr<DocumentSourceSort> DocumentSourceSort::create(
-        const intrusive_ptr<ExpressionContext> &pCtx) {
+        const intrusive_ptr<ExpressionContext> &pExpCtx) {
         intrusive_ptr<DocumentSourceSort> pSource(
-            new DocumentSourceSort(pCtx));
+            new DocumentSourceSort(pExpCtx));
         return pSource;
     }
 
     DocumentSourceSort::DocumentSourceSort(
-        const intrusive_ptr<ExpressionContext> &pTheCtx):
-        populated(false),
-        pCtx(pTheCtx) {
+        const intrusive_ptr<ExpressionContext> &pExpCtx):
+        DocumentSource(pExpCtx),
+        populated(false) {
     }
 
     void DocumentSourceSort::addKey(const string &fieldPath, bool ascending) {
@@ -105,13 +112,13 @@ namespace mongo {
 
     intrusive_ptr<DocumentSource> DocumentSourceSort::createFromBson(
         BSONElement *pBsonElement,
-        const intrusive_ptr<ExpressionContext> &pCtx) {
+        const intrusive_ptr<ExpressionContext> &pExpCtx) {
         uassert(15973, str::stream() << " the " <<
                 sortName << " key specification must be an object",
                 pBsonElement->type() == Object);
 
         intrusive_ptr<DocumentSourceSort> pSort(
-            DocumentSourceSort::create(pCtx));
+            DocumentSourceSort::create(pExpCtx));
 
         /* check for then iterate over the sort object */
         size_t sortKeys = 0;
@@ -213,4 +220,14 @@ namespace mongo {
         /* compare the documents according to the sort key */
         return (rL.pSort->compare(rL.pDocument, rR.pDocument) < 0);
     }
+
+    void DocumentSourceSort::manageDependencies(
+        const intrusive_ptr<DependencyTracker> &pTracker) {
+        /* get the dependencies out of the matcher */
+        for(SortPaths::iterator i(vSortKey.begin()); i != vSortKey.end(); ++i) {
+            string fieldPath((*i)->getFieldPath(false));
+            pTracker->addDependency(fieldPath, this);
+        }
+    }
+
 }

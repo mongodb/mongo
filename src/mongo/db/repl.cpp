@@ -243,6 +243,7 @@ namespace mongo {
             appendReplicationInfo( result , authed );
 
             result.appendNumber("maxBsonObjectSize", BSONObjMaxUserSize);
+            result.appendDate("localTime", jsTime());
             return true;
         }
     } cmdismaster;

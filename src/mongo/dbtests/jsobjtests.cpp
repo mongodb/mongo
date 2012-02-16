@@ -443,23 +443,23 @@ namespace JsobjTests {
                     BSONObj b = BSON( "x" << d );
 
                     long long back = (long long) d;
-//3717
+//3719
 //////                    int res = a.woCompare(b);
 
                     ASSERT( n > back );
-                    //ASSERT( res > 0 );  // SERVER-3717
+                    //ASSERT( res > 0 );  // SERVER-3719
 
                     keyTest(a, false);
 
                     KeyV1Owned A(a);
                     KeyV1Owned B(b);
-//3717
+//3719
 //////                    int res2 =  A.woCompare(B, Ordering::make(BSONObj()));
-                    // ASSERT( res2 > 0 ); // SERVER-3717
+                    // ASSERT( res2 > 0 ); // SERVER-3719
 
                     // fixing requires an index v# change.
 
-                    cout << "todo fix SERVER-3717 and uncomment test in AppendIntOrLL" << endl;
+                    cout << "todo fix SERVER-3719 and uncomment test in AppendIntOrLL" << endl;
 
                     n++;
                 }
@@ -1047,6 +1047,7 @@ namespace JsobjTests {
             };
 
             // Randomized BSON parsing test.  See if we seg fault.
+            // NOTE This test is disabled (below), see SERVER-4948.
             class Fuzz {
             public:
                 Fuzz( double frequency ) : frequency_( frequency ) {}
@@ -2147,11 +2148,13 @@ namespace JsobjTests {
             add< BSONObjTests::Validation::NoSize >( Object );
             add< BSONObjTests::Validation::NoSize >( Array );
             add< BSONObjTests::Validation::NoSize >( BinData );
+            if ( 0 ) { // SERVER-4948
             add< BSONObjTests::Validation::Fuzz >( .5 );
             add< BSONObjTests::Validation::Fuzz >( .1 );
             add< BSONObjTests::Validation::Fuzz >( .05 );
             add< BSONObjTests::Validation::Fuzz >( .01 );
             add< BSONObjTests::Validation::Fuzz >( .001 );
+            }
             add< OIDTests::init1 >();
             add< OIDTests::initParse1 >();
             add< OIDTests::append >();
@@ -2165,8 +2168,6 @@ namespace JsobjTests {
             add< ValueStreamTests::LabelSize >();
             add< ValueStreamTests::LabelMulti >();
             add< ValueStreamTests::LabelishOr >();
-            add< ValueStreamTests::Unallowed >();
-            add< ValueStreamTests::ElementAppend >();
             add< ValueStreamTests::Unallowed >();
             add< ValueStreamTests::ElementAppend >();
             add< SubObjectBuilder >();

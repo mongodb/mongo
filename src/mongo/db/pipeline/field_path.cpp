@@ -19,7 +19,10 @@
 #include "util/mongoutils/str.h"
 
 namespace mongo {
+
     using namespace mongoutils;
+
+    const char FieldPath::prefix[] = "$";
 
     FieldPath::~FieldPath() {
     }
@@ -67,7 +70,7 @@ namespace mongo {
 
     void FieldPath::writePath(ostream &outStream, bool fieldPrefix) const {
         if (fieldPrefix)
-            outStream << "$";
+            outStream << prefix;
 
         outStream << vFieldName[0];
 

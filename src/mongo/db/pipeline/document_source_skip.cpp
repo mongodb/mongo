@@ -25,15 +25,35 @@
 #include "db/pipeline/value.h"
 
 namespace mongo {
+
     const char DocumentSourceSkip::skipName[] = "$skip";
 
-    DocumentSourceSkip::DocumentSourceSkip(const intrusive_ptr<ExpressionContext> &pTheCtx):
+    DocumentSourceSkip::DocumentSourceSkip(
+        const intrusive_ptr<ExpressionContext> &pExpCtx):
+        DocumentSource(pExpCtx),
         skip(0),
-        count(0),
-        pCtx(pTheCtx) {
+        count(0) {
     }
 
     DocumentSourceSkip::~DocumentSourceSkip() {
+    }
+
+    const char *DocumentSourceSkip::getSourceName() const {
+        return skipName;
+    }
+
+    bool DocumentSourceSkip::coalesce(
+        const intrusive_ptr<DocumentSource> &pNextSource) {
+        DocumentSourceSkip *pSkip =
+            dynamic_cast<DocumentSourceSkip *>(pNextSource.get());
+
+        /* if it's not another $skip, we can't coalesce */
+        if (!pSkip)
+            return false;
+
+        /* we need to skip over the sum of the two consecutive $skips */
+        skip += pSkip->skip;
+        return true;
     }
 
     void DocumentSourceSkip::skipper() {
@@ -57,6 +77,8 @@ namespace mongo {
     }
 
     bool DocumentSourceSkip::advance() {
+        DocumentSource::advance(); // check for interrupts
+
         if (eof()) {
             pCurrent.reset();
             return false;
@@ -76,20 +98,20 @@ namespace mongo {
     }
 
     intrusive_ptr<DocumentSourceSkip> DocumentSourceSkip::create(
-        const intrusive_ptr<ExpressionContext> &pCtx) {
+        const intrusive_ptr<ExpressionContext> &pExpCtx) {
         intrusive_ptr<DocumentSourceSkip> pSource(
-            new DocumentSourceSkip(pCtx));
+            new DocumentSourceSkip(pExpCtx));
         return pSource;
     }
 
     intrusive_ptr<DocumentSource> DocumentSourceSkip::createFromBson(
         BSONElement *pBsonElement,
-        const intrusive_ptr<ExpressionContext> &pCtx) {
+        const intrusive_ptr<ExpressionContext> &pExpCtx) {
         uassert(15972, str::stream() << "the value to " <<
                 skipName << " must be a number", pBsonElement->isNumber());
 
         intrusive_ptr<DocumentSourceSkip> pSkip(
-            DocumentSourceSkip::create(pCtx));
+            DocumentSourceSkip::create(pExpCtx));
 
         pSkip->skip = (int)pBsonElement->numberLong();
         assert(pSkip->skip > 0); // CW TODO error code

@@ -720,7 +720,8 @@ namespace mongo {
                 if( !o.getObjectID(_id) ) {
                     /* No _id.  This will be very slow. */
                     Timer t;
-                    updateObjects(ns, o, o, true, false, false, debug );
+                    updateObjects(ns, o, o, true, false, false, debug, false,
+                                  QueryPlanSelectionPolicy::idElseNatural() );
                     if( t.millis() >= 2 ) {
                         RARELY OCCASIONALLY log() << "warning, repl doing slow updates (no _id field) for " << ns << endl;
                     }
@@ -734,7 +735,8 @@ namespace mongo {
                               */
                     BSONObjBuilder b;
                     b.append(_id);
-                    updateObjects(ns, o, b.done(), true, false, false , debug );
+                    updateObjects(ns, o, b.done(), true, false, false , debug, false,
+                                  QueryPlanSelectionPolicy::idElseNatural() );
                 }
             }
         }
@@ -750,7 +752,9 @@ namespace mongo {
             OpDebug debug;
             BSONObj updateCriteria = op.getObjectField("o2");
             bool upsert = fields[3].booleanSafe();
-            UpdateResult ur = updateObjects(ns, o, updateCriteria, upsert, /*multi*/ false, /*logop*/ false , debug );
+            UpdateResult ur = updateObjects(ns, o, updateCriteria, upsert, /*multi*/ false,
+                                            /*logop*/ false , debug, /*fromMigrate*/ false,
+                                            QueryPlanSelectionPolicy::idElseNatural() );
             if( ur.num == 0 ) { 
                 if( ur.mod ) {
                     if( updateCriteria.nFields() == 1 ) {
@@ -857,14 +861,16 @@ namespace mongo {
             // apply
             int num = 0;
             BSONObjIterator i( ops );
+            BSONArrayBuilder ab;
             while ( i.more() ) {
                 BSONElement e = i.next();
-                // todo SERVER-4259 ?
-                applyOperation_inlock( e.Obj() , false );
+                bool failed = applyOperation_inlock( e.Obj() , false );
+                ab.append(!failed);
                 num++;
             }
 
             result.append( "applied" , num );
+            result.append( "results" , ab.arr() );
 
             if ( ! fromRepl ) {
                 // We want this applied atomically on slaves

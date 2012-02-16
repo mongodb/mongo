@@ -53,10 +53,10 @@ namespace mongo {
                     doWork();
                 }
                 catch(...) { }
-                if( repeat == 0 )
-                    break;
                 sleepmillis(repeat);
                 if( inShutdown() )
+                    break;
+                if( repeat == 0 )
                     break;
             }
         }

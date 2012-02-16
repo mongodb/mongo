@@ -35,6 +35,8 @@ namespace mongo {
     }
 
     bool DocumentSourceCursor::advance() {
+        DocumentSource::advance(); // check for interrupts
+
         /* if we haven't gotten the first one yet, do so now */
         if (!pCurrent.get())
             findNext();
@@ -61,7 +63,8 @@ namespace mongo {
 
                 /* grab the matching document */
                 BSONObj documentObj(pCursor->current());
-                pCurrent = Document::createFromBsonObj(&documentObj);
+                pCurrent = Document::createFromBsonObj(
+                    &documentObj, NULL /* LATER pDependencies.get()*/);
                 pCursor->advance();
                 return;
             }
@@ -85,17 +88,20 @@ namespace mongo {
     }
 
     DocumentSourceCursor::DocumentSourceCursor(
-        const shared_ptr<Cursor> &pTheCursor):
+        const shared_ptr<Cursor> &pTheCursor,
+        const intrusive_ptr<ExpressionContext> &pCtx):
+        DocumentSource(pCtx),
         pCurrent(),
         bsonDependencies(),
         pCursor(pTheCursor) {
     }
 
     intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
-        const shared_ptr<Cursor> &pCursor) {
+        const shared_ptr<Cursor> &pCursor,
+        const intrusive_ptr<ExpressionContext> &pExpCtx) {
         assert(pCursor.get());
         intrusive_ptr<DocumentSourceCursor> pSource(
-            new DocumentSourceCursor(pCursor));
+            new DocumentSourceCursor(pCursor, pExpCtx));
             return pSource;
     }
 
@@ -103,4 +109,11 @@ namespace mongo {
         const shared_ptr<BSONObj> &pBsonObj) {
         bsonDependencies.push_back(pBsonObj);
     }
+
+    void DocumentSourceCursor::manageDependencies(
+        const intrusive_ptr<DependencyTracker> &pTracker) {
+        /* hang on to the tracker */
+        pDependencies = pTracker;
+    }
+
 }

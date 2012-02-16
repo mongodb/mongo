@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -940,6 +940,16 @@
     <ClCompile Include="..\util\stringutils.cpp" />
     <ClCompile Include="..\util\systeminfo_win32.cpp" />
     <ClCompile Include="..\util\text.cpp" />
+    <ClCompile Include="..\util\trace.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\util\version.cpp" />
     <ClCompile Include="btreebuilder.cpp" />
     <ClCompile Include="cap.cpp" />
@@ -979,6 +989,7 @@
     <ClCompile Include="d_globals.cpp" />
     <ClCompile Include="geo\2d.cpp" />
     <ClCompile Include="geo\haystack.cpp" />
+    <ClCompile Include="interrupt_status_mongod.cpp" />
     <ClCompile Include="key.cpp" />
     <ClCompile Include="mongommf.cpp" />
     <ClCompile Include="oplog.cpp" />
@@ -1006,6 +1017,7 @@
     <ClCompile Include="pipeline\accumulator_single_value.cpp" />
     <ClCompile Include="pipeline\accumulator_sum.cpp" />
     <ClCompile Include="pipeline\builder.cpp" />
+    <ClCompile Include="pipeline\dependency_tracker.cpp" />
     <ClCompile Include="pipeline\document.cpp" />
     <ClCompile Include="pipeline\document_source.cpp" />
     <ClCompile Include="pipeline\document_source_bson_array.cpp" />
@@ -1222,6 +1234,7 @@
     <ClInclude Include="..\util\systeminfo.h" />
     <ClInclude Include="..\util\text.h" />
     <ClInclude Include="..\util\time_support.h" />
+    <ClInclude Include="..\util\trace.h" />
     <ClInclude Include="commands\pipeline.h" />
     <ClInclude Include="commands\pipeline_d.h" />
     <ClInclude Include="databaseholder.h" />
@@ -1236,6 +1249,8 @@
     <ClInclude Include="globals.h" />
     <ClInclude Include="helpers\dblogger.h" />
     <ClInclude Include="instance.h" />
+    <ClInclude Include="interrupt_status.h" />
+    <ClInclude Include="interrupt_status_mongod.h" />
     <ClInclude Include="mongommf.h" />
     <ClInclude Include="mongomutex.h" />
     <ClInclude Include="namespace-inl.h" />
@@ -1247,6 +1262,7 @@
     <ClInclude Include="pagefault.h" />
     <ClInclude Include="pipeline\accumulator.h" />
     <ClInclude Include="pipeline\builder.h" />
+    <ClInclude Include="pipeline\dependency_tracker.h" />
     <ClInclude Include="pipeline\document.h" />
     <ClInclude Include="pipeline\document_source.h" />
     <ClInclude Include="pipeline\doc_mem_monitor.h" />
