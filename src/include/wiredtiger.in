@@ -1063,7 +1063,8 @@ struct __wt_connection {
  * @config{logging, enable logging.,a boolean flag; default \c false.}
  * @config{multiprocess, permit sharing between processes (will automatically
  * start an RPC server for primary processes and use RPC for secondary
- * processes).,a boolean flag; default \c false.}
+ * processes). <b>Not yet supported in WiredTiger</b>.,a boolean flag; default
+ * \c false.}
  * @config{session_max, maximum expected number of sessions (including server
  * threads).,an integer greater than or equal to 1; default \c 50.}
  * @config{transactional, support transactional semantics.,a boolean flag;
