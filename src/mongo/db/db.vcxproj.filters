@@ -222,6 +222,7 @@
     <ClCompile Include="..\util\md5.cpp" />
     <ClCompile Include="pipeline\dependency_tracker.cpp" />
     <ClCompile Include="..\util\trace.cpp" />
+    <ClCompile Include="interrupt_status_mongod.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\dbclientcursor.h" />
@@ -401,6 +402,8 @@
     <ClInclude Include="commands\pipeline.h" />
     <ClInclude Include="pipeline\dependency_tracker.h" />
     <ClInclude Include="..\util\trace.h" />
+    <ClInclude Include="interrupt_status.h" />
+    <ClInclude Include="interrupt_status_mongod.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="db.rc" />

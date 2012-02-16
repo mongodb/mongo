@@ -989,6 +989,7 @@
     <ClCompile Include="d_globals.cpp" />
     <ClCompile Include="geo\2d.cpp" />
     <ClCompile Include="geo\haystack.cpp" />
+    <ClCompile Include="interrupt_status_mongod.cpp" />
     <ClCompile Include="key.cpp" />
     <ClCompile Include="mongommf.cpp" />
     <ClCompile Include="oplog.cpp" />
@@ -1248,6 +1249,8 @@
     <ClInclude Include="globals.h" />
     <ClInclude Include="helpers\dblogger.h" />
     <ClInclude Include="instance.h" />
+    <ClInclude Include="interrupt_status.h" />
+    <ClInclude Include="interrupt_status_mongod.h" />
     <ClInclude Include="mongommf.h" />
     <ClInclude Include="mongomutex.h" />
     <ClInclude Include="namespace-inl.h" />

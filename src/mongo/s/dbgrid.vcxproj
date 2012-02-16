@@ -513,6 +513,7 @@
     </ClCompile>
     <ClCompile Include="..\db\queryutil.cpp" />
     <ClCompile Include="grid.cpp" />
+    <ClCompile Include="interrupt_status_mongos.cpp" />
     <ClCompile Include="mr_shard.cpp" />
     <ClCompile Include="request.cpp" />
     <ClCompile Include="security.cpp" />
@@ -1031,6 +1032,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\db\commands\pipeline.h" />
+    <ClInclude Include="..\db\interrupt_status.h" />
     <ClInclude Include="..\db\pipeline\accumulator.h" />
     <ClInclude Include="..\db\pipeline\builder.h" />
     <ClInclude Include="..\db\pipeline\dependency_tracker.h" />
@@ -1059,6 +1061,7 @@
     <ClInclude Include="grid.h" />
     <ClInclude Include="gridconfig.h" />
     <ClInclude Include="griddatabase.h" />
+    <ClInclude Include="interrupt_status_mongos.h" />
     <ClInclude Include="request.h" />
     <ClInclude Include="server.h" />
     <ClInclude Include="shard.h" />
