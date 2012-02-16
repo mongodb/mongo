@@ -700,18 +700,7 @@ namespace mongo {
             uassert( 15989, "database not found for parallel cursor request", config );
 
             // Try to get either the chunk manager or the primary shard
-            int cmRetries = 0;
-            // We need to test config->isSharded() to avoid throwing a stupid exception in most cases
-            // b/c that's how getChunkManager works
-            // This loop basically retries getting either the chunk manager or primary, one or the other *should* exist
-            // eventually?  TODO: Verify that we need / don't need the loop b/c we are / are not protected by const fields or mutexes
-            while( ! ( config->isSharded( ns ) && ( manager = config->getChunkManagerIfExists( ns ) ).get() ) &&
-                   ! ( primary = config->getShardIfExists( ns ) ) &&
-                   cmRetries++ < 5 ) sleepmillis( 100 ); // TODO: Do we need to loop here?
-
-            uassert( 15919, "too many retries for chunk manager or primary", cmRetries < 5 );
-            assert( manager || primary );
-            assert( ! manager || ! primary );
+            config->getChunkManagerOrPrimary( ns, manager, primary );
 
             if( manager ) vinfo = ( str::stream() << "[" << manager->getns() << " @ " << manager->getVersion().toString() << "]" );
             else vinfo = (str::stream() << "[unsharded @ " << primary->toString() << "]" );
