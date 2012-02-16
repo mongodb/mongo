@@ -490,6 +490,7 @@ def installBinary( e, name ):
 
 for x in normalTools:
     installBinary( env, "mongo" + x )
+installBinary( env, "mongofiles" )
 installBinary( env, "bsondump" )
 installBinary( env, "mongoperf" )
 
