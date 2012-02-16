@@ -1,3 +1,5 @@
+if (!_isWindows()) {
+
 var testInsert = function() {
     master.getDB("foo").bar.insert({x:1});
     var result = master.getDB("foo").runCommand({getLastError:1, w:"majority", wtimeout:timeout});
@@ -94,3 +96,5 @@ master = replTest.getMaster();
 print("make sure majority works");
 assert.eq(testInsert().err, null);
 
+replTest.stopSet();
+}

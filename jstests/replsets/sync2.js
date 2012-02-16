@@ -46,3 +46,4 @@ replTest.awaitReplication();
 result = master.getDB("admin").runCommand({getLastError:1,w:5,wtimeout:1000});
 assert.eq(null, result.err, tojson(result));
 
+replTest.stopSet();
