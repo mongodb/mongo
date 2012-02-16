@@ -263,6 +263,7 @@ namespace mongo {
         _oldContext( _client->_context ),
         _path( path ), 
         _justCreated(false),
+        _doVersion( true ),
         _ns( ns ), 
         _db(db)
     {
