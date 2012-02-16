@@ -13,54 +13,50 @@
  */
 static int
 __rename_file(
-    WT_SESSION_IMPL *session, const char *oldname, const char *newname)
+    WT_SESSION_IMPL *session, const char *uri, const char *newuri)
 {
-	static const char *list[] = { "file", "root", "version", NULL };
-	WT_ITEM *buf;
 	int exist, ret;
-	const char *value, **lp;
+	const char *filename, *newfile, *value;
 
-	buf = NULL;
 	value = NULL;
 	ret = 0;
 
+	filename = uri;
+	newfile = newuri;
+	if (!WT_PREFIX_SKIP(filename, "file:") ||
+	    !WT_PREFIX_SKIP(newfile, "file:"))
+		return (EINVAL);
+
 	/* If open, close the btree handle. */
-	WT_RET(__wt_session_close_any_open_btree(session, oldname));
+	WT_RET(__wt_session_close_any_open_btree(session, filename));
 
 	/*
 	 * Check to see if the proposed name is already in use, in either
 	 * the schema table or the filesystem.
 	 */
-	WT_ERR(__wt_scr_alloc(session, 0, &buf));
-	WT_ERR(__wt_buf_fmt(session, buf, "file:%s", newname));
-	switch (ret = __wt_schema_table_read(session, buf->data, &value)) {
+	switch (ret = __wt_schema_table_read(session, newuri, &value)) {
 	case 0:
-		WT_ERR_MSG(session, EEXIST, "%s", (char *)buf->data);
+		WT_ERR_MSG(session, EEXIST, "%s", newuri);
 	case WT_NOTFOUND:
 		ret = 0;
 		break;
 	default:
 		WT_ERR(ret);
 	}
-	WT_ERR(__wt_exist(session, newname, &exist));
+	WT_ERR(__wt_exist(session, newfile, &exist));
 	if (exist)
-		WT_ERR_MSG(session, EEXIST, "%s", newname);
+		WT_ERR_MSG(session, EEXIST, "%s", newfile);
 
 	/* Replace the old file entries with new file entries. */
-	for (lp = list; *lp != NULL; ++lp) {
-		WT_ERR(__wt_buf_fmt(session, buf, "%s:%s", *lp, oldname));
-		WT_ERR(__wt_schema_table_read(session, buf->data, &value));
-		WT_ERR(__wt_schema_table_remove(session, buf->data));
-		WT_ERR(__wt_buf_fmt(session, buf, "%s:%s",  *lp, newname));
-		WT_ERR(__wt_schema_table_insert(session, buf->data, value));
-	}
+	WT_ERR(__wt_schema_table_read(session, uri, &value));
+	WT_ERR(__wt_schema_table_remove(session, uri));
+	WT_ERR(__wt_schema_table_insert(session, newuri, value));
 
 	/* Rename the underlying file. */
-	WT_ERR(__wt_schema_table_track_fileop(session, oldname, newname));
-	WT_ERR(__wt_rename(session, oldname, newname));
+	WT_ERR(__wt_schema_table_track_fileop(session, filename, newfile));
+	WT_ERR(__wt_rename(session, filename, newfile));
 
-err:	__wt_scr_free(&buf);
-	__wt_free(session, value);
+err:	__wt_free(session, value);
 
 	return (ret);
 }
@@ -74,7 +70,7 @@ __rename_tree(WT_SESSION_IMPL *session, WT_BTREE *btree, const char *newname)
 {
 	WT_ITEM *of, *nf, *nk, *nv;
 	int ret;
-	const char *p, *t, *value;
+	const char *newfile, *p, *t, *value;
 
 	nf = nk = nv = of = NULL;
 	ret = 0;
@@ -94,8 +90,9 @@ __rename_tree(WT_SESSION_IMPL *session, WT_BTREE *btree, const char *newname)
 	t = strchr(p + 1, ':');
 
 	WT_ERR(__wt_scr_alloc(session, 0, &nf));
-	WT_ERR(__wt_buf_fmt(session, nf, "%s%s%s.wt", newname,
+	WT_ERR(__wt_buf_fmt(session, nf, "file:%s%s%s.wt", newname,
 	    t == NULL ? "" : "_",  t == NULL ? "" : t + 1));
+	newfile = (const char *)nf->data + strlen("file:");
 
 	WT_ERR(__wt_scr_alloc(session, 0, &nk));
 	WT_ERR(__wt_buf_fmt(session, nk, "%.*s:%s%s%s",
@@ -109,7 +106,7 @@ __rename_tree(WT_SESSION_IMPL *session, WT_BTREE *btree, const char *newname)
 	t = strchr(p, ',');
 	WT_ERR(__wt_buf_fmt(session, nv, "%.*s" "filename=%s%s",
 	    (int)WT_PTRDIFF(p, value), value,
-	    (char *)nf->data, t == NULL ? "" : t));
+	    newfile, t == NULL ? "" : t));
 
 	/*
 	 * Remove the old schema table entry
@@ -124,8 +121,7 @@ __rename_tree(WT_SESSION_IMPL *session, WT_BTREE *btree, const char *newname)
 	 * copy of the WT_BTREE->filename field.
 	 */
 	WT_ERR(__wt_scr_alloc(session, 0, &of));
-	WT_ERR(__wt_buf_set(
-	    session, of, btree->filename, strlen(btree->filename) + 1));
+	WT_ERR(__wt_buf_fmt(session, of, "file:%s", btree->filename));
 	WT_ERR(__rename_file(session, of->data, nf->data));
 
 err:	__wt_scr_free(&nf);
@@ -216,7 +212,7 @@ __wt_schema_rename(WT_SESSION_IMPL *session,
 			WT_RET_MSG(session, EINVAL,
 			    "rename target type must match URI: %s to %s",
 			    uri, newuri);
-		ret = __rename_file(session, oldname, newname);
+		ret = __rename_file(session, uri, newuri);
 	} else if (WT_PREFIX_SKIP(oldname, "table:")) {
 		if (!WT_PREFIX_SKIP(newname, "table:"))
 			WT_RET_MSG(session, EINVAL,

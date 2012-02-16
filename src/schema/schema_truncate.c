@@ -12,26 +12,16 @@
  *	WT_SESSION::truncate for a file.
  */
 static int
-__truncate_file(WT_SESSION_IMPL *session, const char *name)
+__truncate_file(WT_SESSION_IMPL *session, const char *filename)
 {
-	WT_ITEM *uribuf;
-	int ret;
-
-	uribuf = NULL;
-	ret = 0;
-
 	/* If open, close the btree handle. */
-	WT_RET(__wt_session_close_any_open_btree(session, name));
+	WT_RET(__wt_session_close_any_open_btree(session, filename));
 
 	/* Delete the root address and truncate the file. */
-	WT_ERR(__wt_scr_alloc(session, 0, &uribuf));
-	WT_ERR(__wt_buf_fmt(session, uribuf, "root:%s", name));
-	WT_ERR(__wt_schema_table_remove(session, uribuf->data));
+	WT_RET(__wt_btree_set_root(session, filename, NULL, 0));
+	WT_RET(__wt_btree_truncate(session, filename));
 
-	WT_ERR(__wt_btree_truncate(session, name));
-
-err:	__wt_scr_free(&uribuf);
-	return (ret);
+	return (0);
 }
 
 /*

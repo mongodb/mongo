@@ -11,13 +11,13 @@ int
 __wt_create_file(WT_SESSION_IMPL *session,
     const char *name, const char *fileuri, const char *config)
 {
-	WT_ITEM *key, *val;
+	WT_ITEM *val;
 	const char *cfg[] = API_CONF_DEFAULTS(session, create, config);
-	const char *filecfg[] = API_CONF_DEFAULTS(file, meta, config);
+	const char *filecfg[4] = API_CONF_DEFAULTS(file, meta, config);
 	const char *filename, *treeconf;
 	int is_schema, vmajor, vminor, vpatch, ret;
 
-	key = val = NULL;
+	val = NULL;
 	treeconf = NULL;
 	ret = 0;
 
@@ -57,11 +57,9 @@ __wt_create_file(WT_SESSION_IMPL *session,
 	 * the schema file itself, although the schema file version numbers
 	 * can never be trusted, we have to get them from the turtle file).
 	 */
-	WT_ERR(__wt_scr_alloc(session, 0, &key));
-	WT_ERR(__wt_buf_fmt(session, key, "version:%s", filename));
-	WT_ERR(__wt_buf_fmt(session, val, "major=%d,minor=%d",
+	WT_ERR(__wt_buf_fmt(session, val, "version=(major=%d,minor=%d)",
 	    WT_BTREE_MAJOR_VERSION, WT_BTREE_MINOR_VERSION));
-	WT_ERR(__wt_schema_table_insert(session, key->data, val->data));
+	filecfg[2] = val->data;
 
 	if (is_schema)
 		WT_ERR(__wt_strdup(session, config, &treeconf));
@@ -80,8 +78,7 @@ __wt_create_file(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_session_add_btree(session, NULL));
 
 	/* If something goes wrong, throw away anything we created. */
-err:	__wt_scr_free(&key);
-	__wt_scr_free(&val);
+err:	__wt_scr_free(&val);
 	__wt_free(session, treeconf);
 	return (ret);
 }

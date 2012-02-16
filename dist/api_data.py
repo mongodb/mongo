@@ -80,7 +80,7 @@ format_meta = column_meta + [
 ]
 
 # Per-file configuration
-file_meta = format_meta + [
+file_config = format_meta + [
 	Config('allocation_size', '512B', r'''
 		the file unit allocation size, in bytes, must a power-of-two;
 		smaller values decrease the file space required by overflow
@@ -155,6 +155,14 @@ file_meta = format_meta + [
 		choices=['btree']),
 ]
 
+# File metadata, including both configurable and non-configurable (internal)
+file_meta = file_config + [
+	Config('root', '', r'''
+		the root page address'''),
+	Config('version', '(major=0,minor=0)', r'''
+		the file version'''),
+]
+
 table_only_meta = [
 	Config('colgroups', '', r'''
 		comma-separated list of names of column groups.  Each column
@@ -186,7 +194,7 @@ methods = {
 
 'session.close' : Method([]),
 
-'session.create' : Method(table_meta + file_meta + filename_meta + [
+'session.create' : Method(table_meta + file_config + filename_meta + [
 	Config('exclusive', 'false', r'''
 		fail if the object exists.  When false (the default), if the
 		object exists, check that its settings match the specified

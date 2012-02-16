@@ -90,7 +90,6 @@ struct __wt_track {
 #define	WT_TRK_FREE_BLOCKS	0x01		/* Free any blocks */
 #define	WT_TRK_FREE_OVFL	0x02		/* Free any overflow pages */
 
-static int  __salvage(WT_SESSION_IMPL *, const char **);
 static int  __slvg_cleanup(WT_SESSION_IMPL *, WT_STUFF *);
 static int  __slvg_col_build_internal(WT_SESSION_IMPL *, uint32_t, WT_STUFF *);
 static int  __slvg_col_build_leaf(
@@ -137,16 +136,6 @@ static int  __slvg_trk_ovfl(WT_SESSION_IMPL *,
 int
 __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	return (__salvage(session, cfg));
-}
-
-/*
- * __salvage --
- *	Salvage a Btree.
- */
-static int
-__salvage(WT_SESSION_IMPL *session, const char *cfg[])
-{
 	WT_BTREE *btree;
 	WT_STUFF *ss, stuff;
 	uint32_t i, leaf_cnt;
@@ -177,7 +166,7 @@ __salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	 * salvage freeing the previous root page when it reads those blocks
 	 * from the file.
 	 */
-	WT_ERR(__wt_btree_set_root(session, NULL, 0));
+	WT_ERR(__wt_btree_set_root(session, btree->filename, NULL, 0));
 
 	/*
 	 * Step 2:

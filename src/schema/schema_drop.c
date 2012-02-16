@@ -14,12 +14,8 @@
 static int
 __drop_file(WT_SESSION_IMPL *session, const char *uri, int force)
 {
-	static const char *list[] = { "file", "root", "version", NULL };
-	WT_ITEM *buf;
 	int exist, ret;
-	const char *filename, **lp;
-
-	buf = NULL;
+	const char *filename;
 
 	filename = uri;
 	if (!WT_PREFIX_SKIP(filename, "file:"))
@@ -28,23 +24,17 @@ __drop_file(WT_SESSION_IMPL *session, const char *uri, int force)
 	/* If open, close the btree handle. */
 	WT_RET(__wt_session_close_any_open_btree(session, filename));
 
-	/* Remove all of the schema table entries for this file. */
-	WT_ERR(__wt_scr_alloc(session, 0, &buf));
-	for (lp = list; *lp != NULL; ++lp) {
-		WT_ERR(__wt_buf_fmt(session, buf, "%s:%s", *lp, filename));
-
-		/* Remove the schema table entry (ignore missing items). */
-		WT_TRET(__wt_schema_table_remove(session, buf->data));
-		if (force && ret == WT_NOTFOUND)
-			ret = 0;
-	}
+	/* Remove the schema table entry (ignore missing items). */
+	WT_TRET(__wt_schema_table_remove(session, uri));
+	if (force && ret == WT_NOTFOUND)
+		ret = 0;
 
 	/* Remove the underlying physical file. */
-	WT_ERR(__wt_exist(session, filename, &exist));
+	exist = 0;
+	WT_TRET(__wt_exist(session, filename, &exist));
 	if (exist)
 		WT_TRET(__wt_remove(session, filename));
 
-err:	__wt_scr_free(&buf);
 	return (ret);
 }
 

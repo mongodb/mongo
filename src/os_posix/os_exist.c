@@ -12,13 +12,13 @@
  *	Return if the file exists.
  */
 int
-__wt_exist(WT_SESSION_IMPL *session, const char *name, int *existp)
+__wt_exist(WT_SESSION_IMPL *session, const char *filename, int *existp)
 {
 	const char *path;
 	struct stat sb;
 	int ret;
 
-	WT_RET(__wt_filename(session, name, &path));
+	WT_RET(__wt_filename(session, filename, &path));
 
 	WT_SYSCALL_RETRY(stat(path, &sb), ret);
 
@@ -33,5 +33,5 @@ __wt_exist(WT_SESSION_IMPL *session, const char *name, int *existp)
 		return (0);
 	}
 
-	WT_RET_MSG(session, ret, "%s: fstat", name);
+	WT_RET_MSG(session, ret, "%s: fstat", filename);
 }

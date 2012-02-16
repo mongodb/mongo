@@ -94,8 +94,8 @@ __wt_btree_reopen(WT_SESSION_IMPL *session, uint32_t flags)
 		 */
 		WT_RET(__wt_btree_free_root(session));
 
-		WT_RET(__wt_btree_set_root(
-		    session, btree->root_addr.addr, btree->root_addr.size));
+		WT_RET(__wt_btree_set_root(session, btree->filename,
+		    btree->root_addr.addr, btree->root_addr.size));
 		if (btree->root_addr.addr != NULL)
 			__wt_free(session, btree->root_addr.addr);
 		btree->root_update = 0;
@@ -138,8 +138,8 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 		 */
 		WT_RET(__wt_btree_free_root(session));
 
-		WT_RET(__wt_btree_set_root(
-		    session, btree->root_addr.addr, btree->root_addr.size));
+		WT_RET(__wt_btree_set_root(session, btree->filename,
+		    btree->root_addr.addr, btree->root_addr.size));
 		if (btree->root_addr.addr != NULL)
 			__wt_free(session, btree->root_addr.addr);
 		btree->root_update = 0;
