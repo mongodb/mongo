@@ -27,6 +27,14 @@ namespace mongo {
         but no readers.
 
         Non-recursive.
+
+          r w R W  <== lock that was around
+        r - - - X
+        w - - X X             - allowed
+        R - X - X             X not allowed (blocks)
+        W X X X X
+        ^
+        lock we are requesting
     */
     class QLock : boost::noncopyable { 
         struct Z { 
