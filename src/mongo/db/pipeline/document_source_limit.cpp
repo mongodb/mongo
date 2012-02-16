@@ -41,6 +41,21 @@ namespace mongo {
         return limitName;
     }
 
+    bool DocumentSourceLimit::coalesce(
+        const intrusive_ptr<DocumentSource> &pNextSource) {
+        DocumentSourceLimit *pLimit =
+            dynamic_cast<DocumentSourceLimit *>(pNextSource.get());
+
+        /* if it's not another $skip, we can't coalesce */
+        if (!pLimit)
+            return false;
+
+        /* we need to limit by the minimum of the two limits */
+        if (pLimit->limit < limit)
+            limit = pLimit->limit;
+        return true;
+    }
+
     bool DocumentSourceLimit::eof() {
         return pSource->eof() || count >= limit;
     }

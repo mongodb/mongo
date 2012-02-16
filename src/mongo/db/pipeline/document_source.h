@@ -953,8 +953,9 @@ namespace mongo {
         virtual ~DocumentSourceLimit();
         virtual bool eof();
         virtual bool advance();
-        virtual const char *getSourceName() const;
         virtual intrusive_ptr<Document> getCurrent();
+        virtual const char *getSourceName() const;
+        virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
 
         /**
           Create a new limiting DocumentSource.
@@ -1003,8 +1004,9 @@ namespace mongo {
         virtual ~DocumentSourceSkip();
         virtual bool eof();
         virtual bool advance();
-        virtual const char *getSourceName() const;
         virtual intrusive_ptr<Document> getCurrent();
+        virtual const char *getSourceName() const;
+        virtual bool coalesce(const intrusive_ptr<DocumentSource> &pNextSource);
 
         /**
           Create a new skipping DocumentSource.

@@ -42,6 +42,20 @@ namespace mongo {
         return skipName;
     }
 
+    bool DocumentSourceSkip::coalesce(
+        const intrusive_ptr<DocumentSource> &pNextSource) {
+        DocumentSourceSkip *pSkip =
+            dynamic_cast<DocumentSourceSkip *>(pNextSource.get());
+
+        /* if it's not another $skip, we can't coalesce */
+        if (!pSkip)
+            return false;
+
+        /* we need to skip over the sum of the two consecutive $skips */
+        skip += pSkip->skip;
+        return true;
+    }
+
     void DocumentSourceSkip::skipper() {
         if (count == 0) {
             while (!pSource->eof() && count++ < skip) {

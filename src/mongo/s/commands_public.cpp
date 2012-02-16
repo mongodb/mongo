@@ -26,6 +26,7 @@
 #include "../db/pipeline/document_source.h"
 #include "../db/pipeline/expression_context.h"
 #include "../db/queryutil.h"
+#include "s/interrupt_status_mongos.h"
 #include "../scripting/engine.h"
 #include "../util/timer.h"
 
@@ -1394,7 +1395,7 @@ namespace mongo {
             //const string shardedOutputCollection = getTmpName( collection );
 
             intrusive_ptr<ExpressionContext> pExpCtx(
-                ExpressionContext::create());
+                ExpressionContext::create(&InterruptStatusMongos::status));
             pExpCtx->setInRouter(true);
 
             /* parse the pipeline specification */
