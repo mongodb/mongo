@@ -27,6 +27,7 @@ namespace mongo {
     public:
         // virtuals from InterruptStatus
         virtual void checkForInterrupt();
+        virtual const char *checkForInterruptNoAssert();
 
         /*
           Static singleton instance.

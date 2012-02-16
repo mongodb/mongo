@@ -40,6 +40,15 @@ namespace mongo {
          */
         virtual void checkForInterrupt() = 0;
 
+        /**
+           Check for interrupt.
+
+           @returns a pointer to a string with additional information; will be
+             "" if there hasn't been an interrupt.  These strings are static
+             and don't need to be freed.
+         */
+        virtual const char *checkForInterruptNoAssert() = 0;
+
     protected:
         /**
            This interface is meant to be used in the implementation of static

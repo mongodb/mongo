@@ -30,4 +30,8 @@ namespace mongo {
         killCurrentOp.checkForInterrupt();
     }
 
+    const char *InterruptStatusMongod::checkForInterruptNoAssert() {
+        return killCurrentOp.checkForInterruptNoAssert();
+    }
+
 };

@@ -29,4 +29,8 @@ namespace mongo {
         // nothing as yet
     }
 
+    const char *InterruptStatusMongos::checkForInterruptNoAssert() {
+        return "";
+    }
+
 };
