@@ -302,7 +302,6 @@ shardServerFiles = [
     "s/balancer_policy.cpp",
     "s/writeback_listener.cpp",
     "s/shard_version.cpp",
-    "s/mr_shard.cpp",
     "s/security.cpp",
     ]
 

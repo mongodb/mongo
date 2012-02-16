@@ -378,12 +378,6 @@ int _main(int argc, char* argv[]) {
 
     boost::thread web( boost::bind(&webServerThread, new NoAdminAccess() /* takes ownership */) );
 
-    if ( scriptingEnabled ) {
-        ScriptEngine::setup();
-//        globalScriptEngine->setCheckInterruptCallback( jsInterruptCallback );
-//        globalScriptEngine->setGetInterruptSpecCallback( jsGetInterruptSpecCallback );
-    }
-
     MessageServer::Options opts;
     opts.port = cmdLine.port;
     opts.ipList = cmdLine.bind_ip;
