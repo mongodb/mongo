@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include "../util/concurrency/rwlock.h"
-#include "../util/mmap.h"
 #include "../util/time_support.h"
 #include "d_globals.h"
 
