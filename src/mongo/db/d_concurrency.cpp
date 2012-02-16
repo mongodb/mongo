@@ -1,8 +1,8 @@
 // @file d_concurrency.cpp 
 
 #include "pch.h"
-#include "../util/concurrency/qlock.h"
 #include "d_concurrency.h"
+#include "../util/concurrency/qlock.h"
 #include "../util/concurrency/threadlocal.h"
 #include "../util/concurrency/rwlock.h"
 #include "../util/concurrency/mapsf.h"
@@ -24,6 +24,7 @@ namespace mongo {
 
     // e.g. externalobjsortmutex uses hlmutex as it can be locked for very long times
     // todo : report HLMutex status in db.currentOp() output
+    // perhaps move this elsewhere as this could be used in mongos and this file is for mongod
     HLMutex::HLMutex(const char *name) : SimpleMutex(name) { }
 
     /* dbname->lock

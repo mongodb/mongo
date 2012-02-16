@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <boost/noncopyable.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition.hpp>
 #include "../assert_util.h"

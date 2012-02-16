@@ -4,11 +4,9 @@
 
 #pragma once
 
-#include "../util/concurrency/rwlock.h"
-#include "db/mongomutex.h"
-
 namespace mongo {
 
+    class SimpleRWLock;
     struct LockState;
 
     class Lock : boost::noncopyable { 
