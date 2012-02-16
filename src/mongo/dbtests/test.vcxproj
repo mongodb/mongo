@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -430,6 +430,7 @@
     <ClInclude Include="..\db\dur.h" />
     <ClInclude Include="..\db\durop.h" />
     <ClInclude Include="..\db\dur_journal.h" />
+    <ClInclude Include="..\db\d_concurrency.h" />
     <ClInclude Include="..\db\jsobjmanipulator.h" />
     <ClInclude Include="..\db\mongommf.h" />
     <ClInclude Include="..\db\mongomutex.h" />
@@ -489,6 +490,7 @@
     <ClInclude Include="..\util\checksum.h" />
     <ClInclude Include="..\util\compress.h" />
     <ClInclude Include="..\util\concurrency\list.h" />
+    <ClInclude Include="..\util\concurrency\qlock.h" />
     <ClInclude Include="..\util\concurrency\task.h" />
     <ClInclude Include="..\util\concurrency\value.h" />
     <ClInclude Include="..\util\file.h" />

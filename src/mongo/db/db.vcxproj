@@ -1212,6 +1212,7 @@
     <ClInclude Include="..\..\third_party\snappy\snappy.h" />
     <ClInclude Include="..\util\alignedbuilder.h" />
     <ClInclude Include="..\util\concurrency\mapsf.h" />
+    <ClInclude Include="..\util\concurrency\qlock.h" />
     <ClInclude Include="..\util\concurrency\race.h" />
     <ClInclude Include="..\util\concurrency\rwlock.h" />
     <ClInclude Include="..\util\concurrency\msg.h" />
@@ -1244,6 +1245,7 @@
     <ClInclude Include="dur_journalformat.h" />
     <ClInclude Include="dur_journalimpl.h" />
     <ClInclude Include="dur_stats.h" />
+    <ClInclude Include="d_concurrency.h" />
     <ClInclude Include="d_globals.h" />
     <ClInclude Include="geo\core.h" />
     <ClInclude Include="globals.h" />
