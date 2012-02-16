@@ -587,7 +587,8 @@ namespace mongo {
         d.dbMutex._minfo.entered(); // hopefully eliminate one day 
     }
     void unlocking_w() { 
-        // todo 
+        // we can't commit early in this case; so a bit more to do here.
+        dur::releasingWriteLock();
     }
     void unlocking_W() {
         dur::releasingWriteLock();

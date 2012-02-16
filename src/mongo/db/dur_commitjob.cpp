@@ -27,42 +27,58 @@ namespace mongo {
 
     namespace dur {
         extern unsigned notesThisLock;
-        struct ThreadLocalIntents {
-            enum { N = 21 };
-            dur::WriteIntent i[N];
-            int n;
-            void unspool();
-        public:
-            ThreadLocalIntents() : n(0) { }
-            void push(const WriteIntent& i);
-        };
         void ThreadLocalIntents::push(const WriteIntent& x) { 
+            if( !commitJob._hasWritten )
+                commitJob._hasWritten = true;
             if( n == 21 )
                 unspool();
             i[n++] = x;
+            DEV nSpooled++;
         }
-        void ThreadLocalIntents::unspool() {
+        void ThreadLocalIntents::_unspool() {
             if( n ) { 
-                SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
                 DEV notesThisLock += n;
                 for( int j = 0; j < n; j++ )
                     commitJob.note(i[j].start(), i[j].length());
+                DEV nSpooled.signedAdd(-n);
                 n = 0;
                 dassert( cmdLine.dur );
             }
         }
+        void ThreadLocalIntents::unspool() {
+            if( n ) { 
+                SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
+                _unspool();
+            }
+        }
+        AtomicUInt ThreadLocalIntents::nSpooled;
     }
 
     TSP_DEFINE(dur::ThreadLocalIntents,tlIntents)
 
     namespace dur {
 
+        void assertNothingSpooled() { 
+            DEV if( ThreadLocalIntents::nSpooled != 0 ) {
+                log() << ThreadLocalIntents::nSpooled.get() << endl;
+                if( tlIntents.get() )
+                    log() << "me:" << tlIntents.get()->n_informational() << endl;
+                else 
+                    log() << "no tlIntent for my thread" << endl;
+                assert(false);
+            }
+        }
         // when we release our w or W lock this is invoked
         void unspoolWriteIntents() { 
             ThreadLocalIntents *t = tlIntents.get();
             if( t ) 
                 t->unspool();
         }
+        /*void _unspoolWriteIntents() { 
+            ThreadLocalIntents *t = tlIntents.get();
+            if( t ) 
+                t->_unspool();
+        }*/
         /** base declare write intent function that all the helpers call. */
         /** we batch up our write intents so that we do not have to synchronize too often */
         void DurableImpl::declareWriteIntent(void *p, unsigned len) {
@@ -85,7 +101,7 @@ namespace mongo {
             dassert(contains(other));
         }
 
-        void Writes::clear() {
+        void IntentsAndDurOps::clear() {
             d.dbMutex.assertAtLeastReadLocked();
             commitJob.groupCommitMutex.dassertLocked();
             _alreadyNoted.clear();
@@ -114,20 +130,20 @@ namespace mongo {
             SimpleMutex::scoped_lock lk(groupCommitMutex);
             cc().writeHappened();
             _hasWritten = true;
-            _wi._durOps.push_back(p);
+            _intentsAndDurOps._durOps.push_back(p);
         }
 
         size_t privateMapBytes = 0; // used by _REMAPPRIVATEVIEW to track how much / how fast to remap
 
-        void CommitJob::beginCommit() { 
+        void CommitJob::commitingBegin() { 
             DEV d.dbMutex.assertAtLeastReadLocked();
             _commitNumber = _notify.now();
             stats.curr->_commits++;
         }
 
-        void CommitJob::reset() {
+        void CommitJob::_committingReset() {
             _hasWritten = false;
-            _wi.clear();
+            _intentsAndDurOps.clear();
             privateMapBytes += _bytes;
             _bytes = 0;
             _nSinceCommitIfNeededCall = 0;
@@ -142,14 +158,13 @@ namespace mongo {
         void CommitJob::note(void* p, int len) {
             groupCommitMutex.dassertLocked();
 
+            dassert( _hasWritten );
+
             // from the point of view of the dur module, it would be fine (i think) to only
             // be read locked here.  but must be at least read locked to avoid race with
             // remapprivateview
 
-            if( !_wi._alreadyNoted.checkAndSet(p, len) ) {
-
-                if( !_hasWritten )
-                    _hasWritten = true;
+            if( !_intentsAndDurOps._alreadyNoted.checkAndSet(p, len) ) {
 
                 /** tips for debugging:
                         if you have an incorrect diff between data files in different folders
@@ -177,7 +192,7 @@ namespace mongo {
 #endif
 
                 // remember intent. we will journal it in a bit
-                _wi.insertWriteIntent(p, len);
+                _intentsAndDurOps.insertWriteIntent(p, len);
 
                 {
                     // a bit over conservative in counting pagebytes used

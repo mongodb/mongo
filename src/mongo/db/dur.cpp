@@ -523,11 +523,11 @@ namespace mongo {
 
             SimpleMutex::scoped_lock lk2(commitJob.groupCommitMutex);
 
-            commitJob.beginCommit(); // increments the commit epoch for getlasterror j:true
+            commitJob.commitingBegin(); // increments the commit epoch for getlasterror j:true
 
             if( !commitJob.hasWritten() ) {
                 // getlasterror request could have came after the data was already committed
-                commitJob.notifyCommitted();
+                commitJob.committingNotifyCommitted();
                 return true;
             }
 
@@ -537,7 +537,7 @@ namespace mongo {
             LockMongoFilesShared lk3;
 
             unsigned abLen = ab.len();
-            commitJob.reset(); // must be reset before allowing anyone to write
+            commitJob.committingReset(); // must be reset before allowing anyone to write
             DEV assert( !commitJob.hasWritten() );
 
             // release the readlock -- allowing others to now write while we are writing to the journal (etc.)
@@ -550,7 +550,7 @@ namespace mongo {
 
             // data is now in the journal, which is sufficient for acknowledging getLastError.
             // (ok to crash after that)
-            commitJob.notifyCommitted();
+            commitJob.committingNotifyCommitted();
 
             WRITETODATAFILES(h, ab);
             assert( abLen == ab.len() ); // check again wasn't modded
@@ -587,26 +587,22 @@ namespace mongo {
         }
 
         static void _groupCommit(Lock::GlobalWrite *lgw) {
+            LOG(4) << "_groupCommit " << endl;
+            d.dbMutex.assertAtLeastReadLocked();
             unspoolWriteIntents(); // in case we were doing some writing ourself
             AlignedBuilder &ab = __theBuilder;
-
-            LOG(4) << "_groupCommit " << endl;
-
-            // we need to be at least read locked on the dbMutex so that we know the write intent data 
-            // structures are not changing while we work
-            d.dbMutex.assertAtLeastReadLocked();
-
-            commitJob.beginCommit();
-
-            if( !commitJob.hasWritten() ) {
-                // getlasterror request could have came after the data was already committed
-                commitJob.notifyCommitted();
-                return;
-            }
 
             // we need to make sure two group commits aren't running at the same time
             // (and we are only read locked in the dbMutex, so it could happen)
             SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
+
+            commitJob.commitingBegin();
+
+            if( !commitJob.hasWritten() ) {
+                // getlasterror request could have came after the data was already committed
+                commitJob.committingNotifyCommitted();
+                return;
+            }
 
             JSectHeader h;
             PREPLOGBUFFER(h,ab);
@@ -618,12 +614,12 @@ namespace mongo {
 
             // data is now in the journal, which is sufficient for acknowledging getLastError.
             // (ok to crash after that)
-            commitJob.notifyCommitted();
+            commitJob.committingNotifyCommitted();
 
             WRITETODATAFILES(h, ab);
             debugValidateAllMapsMatch();
 
-            commitJob.reset();
+            commitJob.committingReset();
             ab.reset();
 
             // REMAPPRIVATEVIEW
@@ -798,6 +794,7 @@ namespace mongo {
             // implicit commitIfNeeded check on each global write unlock
             DEV commitJob._nSinceCommitIfNeededCall = 0; // implicit commit if needed
             if( commitJob.bytes() > UncommittedBytesLimit || cmdLine.durOptions & CmdLine::DurAlwaysCommit ) {
+                assert( Lock::isW() ); // todo
                 stats.curr->_earlyCommits++;
                 groupCommit();
             }
