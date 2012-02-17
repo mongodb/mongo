@@ -1077,12 +1077,14 @@ printShardingStatus = function( configDB , verbose ){
             output( "\t" + tojsononeline(db,"",true) );
         
             if (db.partitioned){
-                configDB.collections.find( { _id : new RegExp( "^" + RegExp.escape(db._id) + "\\." ) } ).sort( { _id : 1 } ).forEach(
-                    function( coll ){
+                configDB.collections.find( { _id : new RegExp( "^" +
+                    RegExp.escape(db._id) + "\\." ) } ).
+                    sort( { _id : 1 } ).forEach( function( coll ){
                         if ( coll.dropped == false ){
                             output("\t\t" + coll._id + " chunks:");
                             
-                            res = configDB.chunks.group( { cond : { ns : coll._id } , key : { shard : 1 }  , reduce : function( doc , out ){ out.nChunks++; } , initial : { nChunks : 0 } } );
+                            res = configDB.chunks.group( { cond : { ns : coll._id } , key : { shard : 1 },
+                                reduce : function( doc , out ){ out.nChunks++; } , initial : { nChunks : 0 } } );
                             var totalChunks = 0;
                             res.forEach( function(z){
                                 totalChunks += z.nChunks;
@@ -1143,8 +1145,9 @@ printShardingSizes = function(){
             output( "\t" + tojson(db,"",true) );
         
             if (db.partitioned){
-                configDB.collections.find( { _id : new RegExp( "^" + RegExp.escape(db._id) + "\." ) } ).sort( { _id : 1 } ).forEach(
-                    function( coll ){
+                configDB.collections.find( { _id : new RegExp( "^" +
+                    RegExp.escape(db._id) + "\." ) } ).
+                    sort( { _id : 1 } ).forEach( function( coll ){
                         output("\t\t" + coll._id + " chunks:");
                         configDB.chunks.find( { "ns" : coll._id } ).sort( { min : 1 } ).forEach( 
                             function(chunk){
