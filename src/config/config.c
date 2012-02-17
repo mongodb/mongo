@@ -548,18 +548,19 @@ __wt_config_getraw(
     WT_CONFIG *cparser, WT_CONFIG_ITEM *key, WT_CONFIG_ITEM *value)
 {
 	WT_CONFIG_ITEM k, v;
-	int ret;
+	int found, ret;
 
+	found = 0;
 	while ((ret = __wt_config_next(cparser, &k, &v)) == 0) {
 		if ((k.type == ITEM_STRING || k.type == ITEM_ID) &&
 		    key->len == k.len &&
 		    strncasecmp(key->str, k.str, k.len) == 0) {
 			*value = v;
-			return (0);
+			found = 1;
 		}
 	}
 
-	return (ret);
+	return (found && ret == WT_NOTFOUND ? 0 : ret);
 }
 
 /*
