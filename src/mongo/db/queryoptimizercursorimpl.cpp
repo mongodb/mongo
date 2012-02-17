@@ -472,17 +472,8 @@ namespace mongo {
             return _currOp ? &_currOp->qp() : 0;
         }
 
-        virtual const Cursor *queryCursor() const {
-            assertOk();
-            return _currOp ? _currOp->cursor().get() : 0;
-        }
-
         virtual const QueryPlan *completeQueryPlan() const {
             return _completeOp ? &_completeOp->qp() : 0;
-        }
-
-        virtual const Cursor *completeQueryCursor() const {
-            return _completeOp ? _completeOp->cursor().get() : 0;
         }
 
         virtual const MultiPlanScanner *multiPlanScanner() const {
