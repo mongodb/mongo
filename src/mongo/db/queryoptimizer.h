@@ -455,7 +455,7 @@ namespace mongo {
         const QueryPlan *nextClauseBestGuessPlan( const QueryPlan &currentPlan );
         
         void addClauseInfo( const shared_ptr<ExplainClauseInfo> &clauseInfo ) {
-            verify( 16068, _explainQueryInfo );
+            verify( 16072, _explainQueryInfo );
             _explainQueryInfo->addClauseInfo( clauseInfo );
         }
         

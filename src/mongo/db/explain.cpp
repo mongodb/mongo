@@ -176,17 +176,17 @@ namespace mongo {
                 return **i;
             }
         }
-        verify( 16062, false );
+        verify( 16076, false );
         return *(new ExplainPlanInfo());  // TODO better
     }
     
     void ExplainQueryInfo::noteIterate( bool match, bool loadedObject, bool chunkSkip ) {
-        verify( 16063, !_clauses.empty() );
+        verify( 16077, !_clauses.empty() );
         _clauses.back()->noteIterate( match, loadedObject, chunkSkip );
     }
 
     void ExplainQueryInfo::reviseN( long long n ) {
-        verify( 16064, !_clauses.empty() );
+        verify( 16073, !_clauses.empty() );
         _clauses.back()->reviseN( n );
     }
 

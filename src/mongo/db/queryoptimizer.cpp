@@ -1046,7 +1046,7 @@ doneCheckOrder:
         }
         handleBeginningOfClause();
         shared_ptr<QueryPlan> bestGuess = _currentQps->getBestGuess();
-        verify( 16066, bestGuess );
+        verify( 16075, bestGuess );
         return bestGuess.get();
     }
     

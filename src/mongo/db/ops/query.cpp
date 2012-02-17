@@ -669,7 +669,7 @@ namespace mongo {
     }
 
     shared_ptr<ExplainQueryInfo> NoExplainStrategy::_doneQueryInfo() {
-        verify( 16069, false );
+        verify( 16071, false );
         return shared_ptr<ExplainQueryInfo>();
     }
     
