@@ -52,13 +52,13 @@ AC_ARG_ENABLE(python,
 	    [Configure for python symbols.])], r=$enableval, r=no)
 case "$r" in
 no)	wt_cv_enable_python=no;;
-*)	wt_cv_enable_python=yes;;
+*)	if test "$enable_shared" = "no"; then
+		AC_MSG_ERROR([--enable-python requires shared libraries])
+	fi
+	wt_cv_enable_python=yes;;
 esac
 AC_MSG_RESULT($wt_cv_enable_python)
-AM_CONDITIONAL(PYTHON, test x$wt_cv_enable_python = xyes)
-if test "$enable_shared" = "no"; then
-	AC_MSG_ERROR([--enable-python requires shared libraries])
-fi
+AM_CONDITIONAL([PYTHON], [test x$wt_cv_enable_python = xyes])
 
 AC_MSG_CHECKING(if --enable-snappy option specified)
 AC_ARG_ENABLE(snappy,
