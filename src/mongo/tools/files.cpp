@@ -89,7 +89,8 @@ public:
         if ( cmd == "list" ) {
             BSONObjBuilder b;
             if ( filename.size() ) {
-                b.appendRegex( "filename" , ( (string)"^" + pcrecpp::RE::QuoteMeta( filename )) );
+                b.appendRegex( "filename" , (string)"^" +
+                               pcrecpp::RE::QuoteMeta( filename ) );
             }
             
             display( &g , b.obj() );
