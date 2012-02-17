@@ -217,6 +217,7 @@ namespace mongo {
         {"$not", ExpressionNot::create, OpDesc::FIXED_COUNT, 1},
         {"$or", ExpressionOr::create, 0},
         {"$second", ExpressionSecond::create, OpDesc::FIXED_COUNT, 1},
+				{"$size", ExpressionSize::create, OpDesc::FIXED_COUNT, 1},
         {"$strcasecmp", ExpressionStrcasecmp::create, OpDesc::FIXED_COUNT, 2},
         {"$substr", ExpressionSubstr::create, OpDesc::FIXED_COUNT, 3},
         {"$subtract", ExpressionSubtract::create, OpDesc::FIXED_COUNT, 2},
@@ -2881,4 +2882,38 @@ namespace mongo {
     const char *ExpressionYear::getOpName() const {
         return "$year";
     }
+
+		/*----------------------------- ExpressionSize ------------------------*/
+
+		ExpressionSize::~ExpressionSize() { 
+		}
+
+		intrusive_ptr<ExpressionNary> ExpressionSize::create() { 
+			intrusive_ptr<ExpressionSize> pExpression(new ExpressionSize());
+			return pExpression;
+		} 
+
+		ExpressionSize::ExpressionSize():
+			ExpressionNary() { 
+		} 
+
+		void ExpressionSize::addOperand(
+			const intrusive_ptr<Expression> &pExpression) { 
+			checkArgLimit(1);
+			ExpressionNary::addOperand(pExpression);
+		}
+
+		intrusive_ptr<const Value> ExpressionSize::evaluate(
+			const intrusive_ptr<Document> &pDocument) const { 
+			checkArgCount(1);
+
+			intrusive_ptr<const Value> pValue(
+				vpOperand[0]->evaluate( pDocument ));
+
+			return Value::createInt( pValue->getArrayLength() );
+		} 
+
+		const char *ExpressionSize::getOpName() const { 
+			return "$size";
+		} 
 }

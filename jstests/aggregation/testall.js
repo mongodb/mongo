@@ -1571,3 +1571,22 @@ var g6result = [
 ];
 
 assert(arrayEq(g6.result, g6result), 'g6 failed');
+
+// $size expression 
+db.s4899.drop();
+db.s4899.save( { _id: "s4899", a: [1,2,3,4,5] } );
+
+var a1 = db.runCommand({aggregate: 's4899', pipeline: [ 
+	{ $project: { 
+      array_size: { $size: "$a" } }
+  }
+]});
+
+var a1result = [ 
+	{ "_id" : "s4899",
+    "array_size" : 5 } 
+]
+
+assert( a1.result, 's4899.a1 failed to compute $size');
+assert.eq( a1.result, a1result, 's4899.a1 computed wrong $size');
+
