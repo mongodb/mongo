@@ -57,11 +57,7 @@ namespace mongo {
      */
     class ParsedQuery : boost::noncopyable {
     public:
-        ParsedQuery( QueryMessage& qm )
-        : _ns( qm.ns ) , _ntoskip( qm.ntoskip ) , _ntoreturn( qm.ntoreturn ) , _options( qm.queryOptions ) {
-            init( qm.query );
-            initFields( qm.fields );
-        }
+        ParsedQuery( QueryMessage& qm );
         ParsedQuery( const char* ns , int ntoskip , int ntoreturn , int queryoptions , const BSONObj& query , const BSONObj& fields )
         : _ns( ns ) , _ntoskip( ntoskip ) , _ntoreturn( ntoreturn ) , _options( queryoptions ) {
             init( query );

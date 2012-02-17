@@ -1106,7 +1106,7 @@ namespace mongo {
                 cursor = FindingStartCursor::getCursor( ns, query, order );
             }
             else if ( !pq.returnKey() ) {
-                cursor = NamespaceDetailsTransient::getCursor( ns, query, order, false, 0, &pq );
+                cursor = NamespaceDetailsTransient::getCursor( ns, query, order, QueryPlanSelectionPolicy::any(), 0, &pq );
             }
             if ( !cursor ) {
                 break;

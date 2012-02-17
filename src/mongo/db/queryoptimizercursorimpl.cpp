@@ -607,10 +607,12 @@ namespace mongo {
             *simpleEqualityMatch = false;
         }
 
-        BSONElement hint = (useHints && parsedQuery) ? parsedQuery->getHint() : BSONElement();
+        BSONObj hint;
+        if ( useHints && parsedQuery ) {
+            hint = parsedQuery->getHint();
+        }
         bool snapshot = parsedQuery && parsedQuery->isSnapshot();
 
-        BSONObj snapshotHint; // put here to keep the data in scope
         if( snapshot ) {
             NamespaceDetails *d = nsdetails(ns);
             if ( d ) {
@@ -624,10 +626,7 @@ namespace mongo {
                      probably need a better way to specify "use the _id index" as a hint.  if someone is
                      in the query optimizer please fix this then!
                      */
-                    BSONObjBuilder b;
-                    b.append("$hint", d->idx(i).indexName());
-                    snapshotHint = b.obj();
-                    hint = snapshotHint.firstElement();
+                    hint = BSON( "$hint" << d->idx(i).indexName() );
                 }
             }
         }
@@ -636,9 +635,9 @@ namespace mongo {
         ( !parsedQuery ||
          ( parsedQuery->getMin().isEmpty() &&
           parsedQuery->getMax().isEmpty() ) ) &&
-        hint.eoo();
+        hint.isEmpty();
         if ( mayShortcutQueryOptimizer ) {
-            if ( planPolicy.permitOptimalNaturalPlan() && query.isEmpty() && order.isEmpty() && !requireIndex ) {
+            if ( planPolicy.permitOptimalNaturalPlan() && query.isEmpty() && order.isEmpty() ) {
                 // TODO This will not use a covered index currently.
                 return theDataFileMgr.findAll( ns );
             }
@@ -656,9 +655,13 @@ namespace mongo {
                 }
             }
         }
-        auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order, &hint, ( parsedQuery && parsedQuery->isExplain() ) ? QueryPlanSet::Ignore : QueryPlanSet::Use, parsedQuery ? parsedQuery->getMin() : BSONObj(), parsedQuery ? parsedQuery->getMax() : BSONObj() ) ); // mayYield == false
+        
+        if ( hint.isEmpty() ) {
+            hint = planPolicy.planHint( ns );
+        }
+        
+        auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order, hint, ( parsedQuery && parsedQuery->isExplain() ) ? QueryPlanSet::Ignore : QueryPlanSet::Use, parsedQuery ? parsedQuery->getMin() : BSONObj(), parsedQuery ? parsedQuery->getMax() : BSONObj() ) ); // mayYield == false
         const QueryPlan *singlePlan = mps->singlePlan();
-        bool requireOrder = ( parsedQuery == 0 );
         if ( singlePlan && !singlePlan->scanAndOrderRequired() ) {
             if ( planPolicy.permitPlan( *singlePlan ) ) {
                 shared_ptr<Cursor> single = singlePlan->newCursor();
