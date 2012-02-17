@@ -1,9 +1,6 @@
 (function() {
 
-// SERVER-3702
-
-var baseName = "jstests_repl_repl9";
-var rt = new ReplTest( "repl13tests" );
+var rt = new ReplTest( "repl_sync_only_db_with_special_chars" );
 var normalDB = "abc";
 var specialDB = "[a-z]+";
 var master = rt.start( true );

@@ -827,7 +827,7 @@ namespace mongo {
             if ( !only.empty() ) {
                 // note we may here skip a LOT of data table scanning, a lot of work for the master.
                 // maybe append "\\." here?
-                query.appendRegex("ns", string("^") + pcrecpp::RE::QuoteMeta( only )); 
+                query.appendRegex("ns", string("^") + pcrecpp::RE::QuoteMeta( only ));
             }
             BSONObj queryObj = query.done();
             // e.g. queryObj = { ts: { $gte: syncedTo } }
