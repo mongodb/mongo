@@ -171,7 +171,6 @@ namespace mongo {
         else {
             // no need to W.c.notify, you can't do W while R state is engaged
             R.c.notify_all();
-            w.c.notify_all();
             r.c.notify_all();
         }
     }
