@@ -1924,9 +1924,9 @@ shellHelper.next = function () {
         currentTutorial.currentState = 0;
     }
     
-    var property = 't' + currentTutorial.currentState;
-    currentTutorial[property]();
-    currentTutorial.currentState = currentTutorial.currentState + 1;
+    var tutorialStep = 't' + currentTutorial.currentState;
+    currentTutorial[tutorialStep]();
+    currentTutorial.currentState++;
     
     return "";
 }
@@ -1938,9 +1938,9 @@ shellHelper.back = function () {
         currentTutorial.currentState = 0;
     }
     
-    var property = 't' + currentTutorial.currentState;
-    currentTutorial[property]();
-    currentTutorial.currentState = currentTutorial.currentState + 1;
+    var tutorialStep = 't' + currentTutorial.currentState;
+    currentTutorial[tutorialStep]();
+    currentTutorial.currentState++;
     
     return "";
     
