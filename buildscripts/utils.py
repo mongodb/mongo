@@ -182,3 +182,15 @@ def smoke_command(*args):
         (find_python(), smoke_py),
         args))
 
+def run_s3tool(settings_file, bucket_name, command, *args):
+    if settings_file.endswith('.pyc'):
+        settings_file = settings_file[:-1]
+
+    here = os.path.dirname(__file__)
+    s3tool = os.path.join(here, 's3tool')
+    cmd = [find_python(), s3tool, '--config=%s' % settings_file, bucket_name, command]
+    cmd.extend(args)
+    print ' '.join(cmd)
+    exitcode = subprocess.call(cmd)
+    return exitcode == 0
+

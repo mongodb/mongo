@@ -1,0 +1,138 @@
+#!/usr/bin/env python
+# vim:filetype=python
+
+import sys
+import os
+import os.path
+import simples3
+
+def put(bucket, local_path, remote_path):
+    remote_path = remote_path.lstrip('/')
+
+    sys.stdout.write('put %s => %s:/%s ...' % (local_path, bucket.name, remote_path))
+    sys.stdout.flush()
+
+    bucket.put(remote_path, open(local_path, 'rb').read(), acl='public-read')
+
+    sys.stdout.write(' done.\n')
+    sys.stdout.flush()
+
+def ls(bucket, remote_path=''):
+    remote_path = remote_path.lstrip('/')
+    if remote_path and not remote_path.endswith('/'):
+        remote_path = '%s/' % remote_path
+
+    printed_dirs = set()
+    empty = True
+
+    print '%-23s   %-9s  %s' % ('Modified', 'Size', 'Name')
+    for filename, mtime, etag, size in bucket.listdir(prefix=remote_path):
+        filename = filename[len(remote_path):]
+        dirname, filename = os.path.split(filename)
+        if dirname and dirname not in printed_dirs:
+            print '%-23s   %-9s  %s/' % ('', '(dir)', dirname)
+            printed_dirs.add(dirname)
+        else:
+            print '%-23s   %-9d  %s' % (mtime.strftime('%Y-%m-%d %H:%M:%S UTC'), size, filename)
+
+        empty = False
+
+    if empty:
+        print '(directory has no files)'
+
+def exists(bucket, remote_path):
+    if remote_path in bucket:
+        return 0
+    return 1
+
+
+def rm(bucket, remote_path):
+    del bucket[remote_path]
+
+def help():
+    print """
+Command Help:
+
+  put local_path remote_path
+    Uploads the file at local_path to the remote_path in the
+    given bucket. Overwrites existing file, if any.
+
+  rm remote_path
+    Removes the file at remote_path if it exists.
+
+  ls remote_path
+    List the contents of the remote_path (assumed to be a
+    directory)
+
+  exists remote_path
+    Check if a remote path exists (return code 0) or not
+    (return code 1)
+    """.strip()
+
+commands = {
+    'put': put,
+    'rm': rm,
+    'ls': ls,
+    'exists': exists,
+}
+
+def _read_config(options):
+    if options.config.endswith('.py'):
+        path, filename = os.path.split(options.config)
+        path = os.path.abspath(os.path.join(os.getcwd(), path))
+
+        modname = filename[:-3]
+
+        orig_sys_path = list(sys.path)
+        sys.path.append(path)
+        try:
+            module = __import__(modname)
+            options.key_id = getattr(module, 'key_id', getattr(module, 'id', None))
+            options.secret = getattr(module, 'secret', getattr(module, 'key', None))
+        finally:
+            sys.path = orig_sys_path
+
+    else:
+        sys.exit('cannot understand config file "%s"' % options.config)
+
+
+def main():
+    from optparse import OptionParser
+    epilog = """Type %prog help for command help."""
+    parser = OptionParser('%prog bucket command [argument ...]', epilog=epilog)
+
+    parser.add_option('-k', '--key', help='Authenticate with the given Access Key ID',
+                      action='store', dest='key_id', default=None, metavar='ACCESS_KEY_ID')
+    parser.add_option('-s', '--secret', help='Authenticate with the given Secret',
+                      action='store', dest='secret', default=None, metavar='SECRET')
+    parser.add_option('-c', '--config', help='Load authentication credentials from CONFIG_FILE',
+                      action='store', dest='config', metavar='CONFIG_FILE')
+
+
+    options, args = parser.parse_args()
+    if len(args) == 1 and args[0] == 'help':
+        return help()
+    elif len(args) < 2:
+        parser.error('must specify a bucket and command')
+
+    if not any((options.key_id, options.secret, options.config)):
+        parser.error('must specify --key and --secret or --config')
+    if options.config and any((options.key_id, options.secret)):
+        parser.error('cannot specify --config and --key or --secret')
+    if any((options.key_id, options.secret)) and not all((options.key_id, options.secret)):
+        parser.error('--config and --key must be specified together')
+
+    bucket_name, command, args = args[0], args[1], args[2:]
+
+    func = commands.get(command)
+    if not func:
+        parser.error('unknown command "%s"' % command)
+
+    if options.config:
+        _read_config(options)
+
+    bucket = simples3.S3Bucket(bucket_name, options.key_id, options.secret)
+    return func(bucket, *args)
+
+if __name__ == '__main__':
+    sys.exit(main())
