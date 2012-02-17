@@ -17,6 +17,7 @@ __drop_file(WT_SESSION_IMPL *session, const char *uri, int force)
 	int exist, ret;
 	const char *filename;
 
+	ret = 0;
 	filename = uri;
 	if (!WT_PREFIX_SKIP(filename, "file:"))
 		return (EINVAL);
