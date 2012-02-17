@@ -718,7 +718,7 @@ namespace mongo {
     
     class ResponseBuildingStrategy {
     public:
-        ResponseBuildingStrategy( QueryResponseBuilder &parent );
+        ResponseBuildingStrategy( QueryResponseBuilder &parent, const ParsedQuery &parsedQuery );
         bool handleMatch();
         bool iterateNeedsSort() const;
         bool resultsNeedSort() const;
@@ -726,11 +726,15 @@ namespace mongo {
         bool handleOrderedMatch();
         void handoff( int &ret );
         void reviseExplain( ExplainQueryInfo &explainInfo );
+        long long n() const { return _n; }
     private:
         ScanAndOrder *newScanAndOrder() const;
         QueryResponseBuilder &_parent;
+        const ParsedQuery &_parsedQuery;
         shared_ptr<ScanAndOrder> _scanAndOrder;
         SmallDupSet _scanAndOrderDups;
+        long long _skip;
+        long long _n;
     };
     
     class QueryResponseBuilder {
@@ -742,11 +746,9 @@ namespace mongo {
         _cursor( cursor ),
         _queryOptimizerCursor( dynamic_pointer_cast<QueryOptimizerCursor>( _cursor ) ),
         _buf( 32768 ),
-        _skip( _parsedQuery.getSkip() ),
-        _n(),
         _chunkManager( newChunkManager() ),
         _explain( newExplainRecordingStrategy( oldPlan ) ),
-        _builder( new ResponseBuildingStrategy( *this ) ) {
+        _builder( new ResponseBuildingStrategy( *this, parsedQuery ) ) {
             _buf.skip( sizeof( QueryResult ) );
         }
         bool addMatch() {
@@ -764,10 +766,10 @@ namespace mongo {
             _explain->noteYield();
         }
         bool enoughForFirstBatch() const {
-            return !_parsedQuery.isExplain() && _parsedQuery.enoughForFirstBatch( _n, _buf.len() );
+            return !_parsedQuery.isExplain() && _parsedQuery.enoughForFirstBatch( _builder->n(), _buf.len() );
         }
         bool enoughTotalResults() const {
-            return ( _parsedQuery.enough( _n ) || _buf.len() >= MaxBytesToReturnToClientAtOnce );
+            return ( _parsedQuery.enough( _builder->n() ) || _buf.len() >= MaxBytesToReturnToClientAtOnce );
         }
         void finishedFirstBatch() {
             if ( _queryOptimizerCursor ) {
@@ -785,7 +787,7 @@ namespace mongo {
                 _buf.decouple();
                 return 1;
             }
-            int ret = _n;
+            int ret = _builder->n();
             _builder->handoff( ret );
             if ( _buf.len() > 0 ) {
                 result.appendData( _buf.buf(), _buf.len() );
@@ -839,16 +841,17 @@ namespace mongo {
         shared_ptr<Cursor> _cursor;
         shared_ptr<QueryOptimizerCursor> _queryOptimizerCursor;
         BufBuilder _buf;
-        long long _skip;
-        long long _n;
         ShardChunkManagerPtr _chunkManager;
         shared_ptr<ExplainRecordingStrategy> _explain;
         shared_ptr<ResponseBuildingStrategy> _builder;
     };
     
-    ResponseBuildingStrategy::ResponseBuildingStrategy( QueryResponseBuilder &parent ) :
+    ResponseBuildingStrategy::ResponseBuildingStrategy( QueryResponseBuilder &parent, const ParsedQuery &parsedQuery ) :
     _parent( parent ),
-    _scanAndOrder( newScanAndOrder() ) {
+    _parsedQuery( parsedQuery ),
+    _scanAndOrder( newScanAndOrder() ),
+    _skip( _parsedQuery.getSkip() ),
+    _n() {
     }
     bool ResponseBuildingStrategy::handleMatch() {
         if ( _scanAndOrder ) {
@@ -892,7 +895,7 @@ namespace mongo {
             return;
         }
         try {
-            _scanAndOrder->add( _parent._cursor->current(), _parent._parsedQuery.showDiskLoc() ? &loc : 0 );
+            _scanAndOrder->add( _parent._cursor->current(), _parsedQuery.showDiskLoc() ? &loc : 0 );
         } catch ( const UserException &e ) {
             bool rethrow = true;
             if ( e.getCode() == ScanAndOrderMemoryLimitExceededAssertionCode ) {
@@ -915,13 +918,13 @@ namespace mongo {
         if ( _parent._cursor->getsetdup( loc ) ) {
             return false;
         }
-        if ( _parent._skip > 0 ) {
-            --_parent._skip;
+        if ( _skip > 0 ) {
+            --_skip;
             return false;
         }
-        ++_parent._n;
-        if ( !_parent._parsedQuery.isExplain() ) {
-            fillQueryResultFromObj( _parent._buf, _parent._parsedQuery.getFields(), loc.obj(), ( _parent._parsedQuery.showDiskLoc() ? &loc : 0 ) );
+        ++_n;
+        if ( !_parsedQuery.isExplain() ) {
+            fillQueryResultFromObj( _parent._buf, _parsedQuery.getFields(), loc.obj(), ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
         }
         return true;
     }
@@ -934,19 +937,19 @@ namespace mongo {
         if ( resultsNeedSort() ) {
             _parent._buf.reset();
             _parent._buf.skip( sizeof( QueryResult ) );
-            _scanAndOrder->fill( _parent._buf, _parent._parsedQuery.getFields(), ret );
+            _scanAndOrder->fill( _parent._buf, _parsedQuery.getFields(), ret );
         }
     }
     ScanAndOrder *ResponseBuildingStrategy::newScanAndOrder() const {
-        if ( _parent._parsedQuery.getOrder().isEmpty() ) {
+        if ( _parsedQuery.getOrder().isEmpty() ) {
             return 0;
         }
         if ( !_parent._queryOptimizerCursor || !_parent._queryOptimizerCursor->ok() ) {
             return 0;
         }
-        return new ScanAndOrder( _parent._parsedQuery.getSkip(),
-                                _parent._parsedQuery.getNumToReturn(),
-                                _parent._parsedQuery.getOrder(),
+        return new ScanAndOrder( _parsedQuery.getSkip(),
+                                _parsedQuery.getNumToReturn(),
+                                _parsedQuery.getOrder(),
                                 _parent._queryOptimizerCursor->queryPlan()->multikeyFrs() );
     }
                                  
