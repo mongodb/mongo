@@ -260,9 +260,6 @@
     <ClCompile Include="..\client\connpool.cpp">
       <Filter>y</Filter>
     </ClCompile>
-    <ClCompile Include="repl\consensus.cpp">
-      <Filter>y</Filter>
-    </ClCompile>
     <ClCompile Include="ops\count.cpp">
       <Filter>y</Filter>
     </ClCompile>
@@ -339,6 +336,9 @@
       <Filter>z</Filter>
     </ClCompile>
     <ClCompile Include="ops\delete.cpp">
+      <Filter>z</Filter>
+    </ClCompile>
+    <ClCompile Include="repl\consensus.cpp">
       <Filter>z</Filter>
     </ClCompile>
   </ItemGroup>
