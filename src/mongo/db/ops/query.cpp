@@ -721,15 +721,27 @@ namespace mongo {
                               BufBuilder &buf ) :
         _parsedQuery( parsedQuery ),
         _cursor( cursor ),
-        _buf( buf ),
-        _skip( _parsedQuery.getSkip() ) {
+        _buf( buf ) {
         }
         virtual ~ResponseBuildStrategy() {}
         virtual bool handleMatch() = 0;
         virtual void finish( int &ret ) {}
         virtual void reviseExplain( ExplainQueryInfo &explainInfo ) {}
     protected:
-        bool addCursorMatchToBuf() {
+        const ParsedQuery &_parsedQuery;
+        shared_ptr<Cursor> _cursor;
+        BufBuilder &_buf;
+    };
+    
+    class OrderedBuildStrategy : public ResponseBuildStrategy {
+    public:
+        OrderedBuildStrategy( const ParsedQuery &parsedQuery,
+                                   const shared_ptr<Cursor> &cursor,
+                                   BufBuilder &buf ) :
+        ResponseBuildStrategy( parsedQuery, cursor, buf ),
+        _skip( _parsedQuery.getSkip() ) {
+        }
+        virtual bool handleMatch() {
             DiskLoc loc = _cursor->currLoc();
             if ( _cursor->getsetdup( loc ) ) {
                 return false;
@@ -743,22 +755,8 @@ namespace mongo {
             }
             return true;
         }
-        const ParsedQuery &_parsedQuery;
-        shared_ptr<Cursor> _cursor;
-        BufBuilder &_buf;
-        long long _skip;
-    };
-    
-    class OrderedBuildStrategy : public ResponseBuildStrategy {
-    public:
-        OrderedBuildStrategy( const ParsedQuery &parsedQuery,
-                                   const shared_ptr<Cursor> &cursor,
-                                   BufBuilder &buf ) :
-        ResponseBuildStrategy( parsedQuery, cursor, buf ) {
-        }
-        virtual bool handleMatch() {
-            return addCursorMatchToBuf();
-        }
+    private:
+        long long _skip;        
     };
     
 //    class ReorderBuildStrategy : public ResponseBuildStrategy {
@@ -787,6 +785,7 @@ namespace mongo {
         shared_ptr<QueryOptimizerCursor> _queryOptimizerCursor;
         shared_ptr<ScanAndOrder> _scanAndOrder;
         SmallDupSet _scanAndOrderDups;
+        OrderedBuildStrategy _orderedBuild;
     };
     
     class QueryResponseBuilder {
@@ -915,14 +914,15 @@ namespace mongo {
                                                        BufBuilder &buf ) :
     ResponseBuildStrategy( parsedQuery, cursor, buf ),
     _queryOptimizerCursor( dynamic_pointer_cast<QueryOptimizerCursor>( _cursor ) ),
-    _scanAndOrder( newScanAndOrder() ) {
+    _scanAndOrder( newScanAndOrder() ),
+    _orderedBuild( parsedQuery, cursor, buf ) {
     }
     bool HybridBuildStrategy::handleMatch() {
         if ( _scanAndOrder ) {
             handleScanAndOrderMatch();
         }
         if ( !iterateNeedsSort() ) {
-            return addCursorMatchToBuf();
+            return _orderedBuild.handleMatch();
         }
         return false;
     }
