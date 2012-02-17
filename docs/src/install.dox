@@ -2,16 +2,37 @@
 
 This section explains how to build and install the WiredTiger software.
 
-@section ports Ports
+@section github Building using Git and GitHub
 
-WiredTiger has been tested on the following systems:
-@par
-Linux\n
-FreeBSD\n
-Mac OS X\n
+Skip this step if you are building from a WiredTiger release package,
+and proceed with @ref building.
 
-WiredTiger should be portable to any system that supports the ANSI C99,
-POSIX 1003.1 and POSIX 1003.1c (threads extension) standards.
+To clone WiredTiger and build from the WiredTiger GitHub repository
+requires the
+<a href="http://gcc.gnu.org/">GNU Compiler Collection</a>
+(GCC) toolchain for configuration and building, including
+<a href="http://www.gnu.org/software/autoconf/autoconf.html">autoconf</a>,
+<a href="http://www.gnu.org/software/autoconf/automake.html">automake</a>,
+<a href="http://www.gnu.org/software/libtool/libtool.html">libtool</a> and
+related tools.  The standard options for those tools can be specified
+when configuring and building WiredTiger.
+
+First, clone the repository:
+
+@code
+git clone git@github.com:wiredtiger/wiredtiger.git wiredtiger
+@endcode
+
+Second, change into the \c build_posix directory of the repository, and
+run the \c reconf script.
+
+@code
+cd wiredtiger/build_posix
+sh ./reconf
+@endcode
+
+This creates the \c wiredtiger/configure autoconf script, and you can
+now proceed with @ref building.
 
 @section building Building WiredTiger
 

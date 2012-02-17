@@ -1,19 +1,23 @@
-/*! @mainpage Reference Guide
+-/*! @mainpage Reference Guide
 
-WiredTiger is an extensible platform for data management.  This
-documentation describes the programming interface to WiredTiger used by
-developers to construct applications.
+WiredTiger is an extensible platform for data management.\n
 
-We follow SQL terminology: a database is set of tables managed together.
-Tables consist of rows, where each row is a key and its associated
-value.  Tables may optionally have an associated schema, splitting the
-value into a set of columns.  Tables may also have associated indices,
-each of which is ordered by one or more columns.
+WiredTiger supports both traditional row-oriented storage, where all
+columns of a row are stored together, and column-oriented storage, where
+one or more columns can be stored individually, allowing more efficient
+access and storage.
 
-In addition to the traditional row-oriented storage where all columns
-of a row are stored together, WiredTiger supports column-oriented
-storage, where one or more columns can be stored individually, allowing
-more efficient access and storage.
+This documentation describes the programming interface to WiredTiger
+used by developers to construct applications.  We follow SQL
+terminology: a database is set of tables managed together.  Tables
+consist of rows, where each row is a key and its associated value.
+Tables may optionally have an associated schema, splitting the value
+into a set of columns.  Tables may also have associated indices, each
+of which is ordered by one or more columns.
+
+WiredTiger distributions are tested on Linux, FreeBSD and Mac OS X.
+WiredTiger should be portable to any system that supports the ANSI C99,
+POSIX 1003.1 and POSIX 1003.1c (threads extension) standards.
 
 To browse or download the WiredTiger source code, visit our
 

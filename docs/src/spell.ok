@@ -13,6 +13,7 @@ EB
 EmpId
 FreeBSD
 GCC
+GitHub
 IEC
 LDFLAGS
 LIBS
@@ -36,6 +37,7 @@ apiflags
 ar
 arg
 autoconf
+automake
 bdb
 bdbmap
 bindir
@@ -111,6 +113,7 @@ gdbm
 getopt
 getter
 gid
+github
 hb
 hotbackup
 href
@@ -218,6 +221,7 @@ realloc'd
 recno
 recnoN
 recnum
+reconf
 recs
 rerequests
 ret
