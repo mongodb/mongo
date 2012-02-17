@@ -2,17 +2,9 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="..\bson\oid.cpp" />
-    <ClCompile Include="..\client\dbclientcursor.cpp" />
-    <ClCompile Include="..\client\dbclient_rs.cpp" />
     <ClCompile Include="..\client\distlock.cpp" />
     <ClCompile Include="..\client\model.cpp" />
     <ClCompile Include="..\shell\mongo.cpp" />
-    <ClCompile Include="..\s\config.cpp" />
-    <ClCompile Include="..\s\d_chunk_manager.cpp" />
-    <ClCompile Include="..\s\d_migrate.cpp" />
-    <ClCompile Include="..\s\d_split.cpp" />
-    <ClCompile Include="..\s\d_state.cpp" />
-    <ClCompile Include="..\s\d_writeback.cpp" />
     <ClCompile Include="..\s\grid.cpp" />
     <ClCompile Include="..\s\shard.cpp" />
     <ClCompile Include="..\s\shardconnection.cpp" />
@@ -32,8 +24,6 @@
     <ClCompile Include="commands\group.cpp" />
     <ClCompile Include="commands\isself.cpp" />
     <ClCompile Include="commands\mr.cpp" />
-    <ClCompile Include="compact.cpp" />
-    <ClCompile Include="dbcommands_generic.cpp" />
     <ClCompile Include="dur.cpp" />
     <ClCompile Include="durop.cpp" />
     <ClCompile Include="dur_commitjob.cpp" />
@@ -46,7 +36,6 @@
     <ClCompile Include="oplog.cpp" />
     <ClCompile Include="projection.cpp" />
     <ClCompile Include="repl.cpp" />
-    <ClCompile Include="repl\consensus.cpp" />
     <ClCompile Include="repl\heartbeat.cpp" />
     <ClCompile Include="repl\manager.cpp" />
     <ClCompile Include="repl\rs_initialsync.cpp" />
@@ -55,20 +44,8 @@
     <ClCompile Include="repl\rs_sync.cpp" />
     <ClCompile Include="repl_block.cpp" />
     <ClCompile Include="restapi.cpp" />
-    <ClCompile Include="..\client\connpool.cpp" />
-    <ClCompile Include="..\client\dbclient.cpp" />
     <ClCompile Include="..\client\syncclusterconnection.cpp" />
     <ClCompile Include="..\pch.cpp" />
-    <ClCompile Include="commands.cpp" />
-    <ClCompile Include="common.cpp" />
-    <ClCompile Include="cursor.cpp" />
-    <ClCompile Include="database.cpp" />
-    <ClCompile Include="db.cpp" />
-    <ClCompile Include="dbcommands.cpp" />
-    <ClCompile Include="dbcommands_admin.cpp" />
-    <ClCompile Include="dbeval.cpp" />
-    <ClCompile Include="dbhelpers.cpp" />
-    <ClCompile Include="dbwebserver.cpp" />
     <ClCompile Include="extsort.cpp" />
     <ClCompile Include="index.cpp" />
     <ClCompile Include="indexkey.cpp" />
@@ -90,18 +67,15 @@
     <ClCompile Include="security.cpp" />
     <ClCompile Include="security_commands.cpp" />
     <ClCompile Include="tests.cpp" />
-    <ClCompile Include="cmdline.cpp" />
     <ClCompile Include="queryutil.cpp" />
     <ClCompile Include="..\util\mmap.cpp" />
     <ClCompile Include="..\util\ntservice.cpp" />
     <ClCompile Include="..\util\processinfo_win32.cpp" />
     <ClCompile Include="..\util\util.cpp" />
     <ClCompile Include="..\util\md5main.cpp" />
-    <ClCompile Include="..\s\d_logic.cpp" />
     <ClCompile Include="..\scripting\engine.cpp" />
     <ClCompile Include="..\scripting\engine_spidermonkey.cpp" />
     <ClCompile Include="..\scripting\utils.cpp" />
-    <ClCompile Include="stats\counters.cpp" />
     <ClCompile Include="stats\snapshots.cpp" />
     <ClCompile Include="stats\top.cpp" />
     <ClCompile Include="repl\health.cpp" />
@@ -114,7 +88,6 @@
     <ClCompile Include="key.cpp" />
     <ClCompile Include="queryoptimizercursor.cpp" />
     <ClCompile Include="record.cpp" />
-    <ClCompile Include="ops\delete.cpp" />
     <ClCompile Include="ops\update.cpp" />
     <ClCompile Include="security_common.cpp" />
     <ClCompile Include="ops\query.cpp" />
@@ -125,7 +98,6 @@
     <ClCompile Include="..\util\net\miniwebserver.cpp" />
     <ClCompile Include="..\util\net\listen.cpp" />
     <ClCompile Include="..\util\net\message_port.cpp" />
-    <ClCompile Include="dbmessage.cpp" />
     <ClCompile Include="commands\find_and_modify.cpp" />
     <ClCompile Include="..\util\compress.cpp">
       <Filter>snappy</Filter>
@@ -185,17 +157,11 @@
     <ClCompile Include="..\util\intrusive_counter.cpp" />
     <ClCompile Include="..\util\systeminfo_win32.cpp" />
     <ClCompile Include="commands\document_source_cursor.cpp" />
-    <ClCompile Include="d_concurrency.cpp" />
-    <ClCompile Include="..\s\default_version.cpp" />
-    <ClCompile Include="ops\count.cpp" />
     <ClCompile Include="pagefault.cpp" />
-    <ClCompile Include="d_globals.cpp" />
-    <ClCompile Include="curop.cpp" />
     <ClCompile Include="..\util\concurrency\rwlockimpl.cpp" />
     <ClCompile Include="memconcept.cpp" />
     <ClCompile Include="commands\pipeline_d.cpp" />
     <ClCompile Include="..\util\md5.cpp" />
-    <ClCompile Include="pipeline\dependency_tracker.cpp" />
     <ClCompile Include="..\util\trace.cpp" />
     <ClCompile Include="interrupt_status_mongod.cpp" />
     <ClCompile Include="commands\cloud.cpp">
@@ -273,13 +239,113 @@
     <ClCompile Include="cloner.cpp">
       <Filter>x</Filter>
     </ClCompile>
+    <ClCompile Include="..\s\d_split.cpp">
+      <Filter>y</Filter>
+    </ClCompile>
+    <ClCompile Include="cmdline.cpp">
+      <Filter>y</Filter>
+    </ClCompile>
+    <ClCompile Include="commands.cpp">
+      <Filter>y</Filter>
+    </ClCompile>
+    <ClCompile Include="common.cpp">
+      <Filter>y</Filter>
+    </ClCompile>
+    <ClCompile Include="compact.cpp">
+      <Filter>y</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\config.cpp">
+      <Filter>y</Filter>
+    </ClCompile>
+    <ClCompile Include="..\client\connpool.cpp">
+      <Filter>y</Filter>
+    </ClCompile>
+    <ClCompile Include="repl\consensus.cpp">
+      <Filter>y</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\count.cpp">
+      <Filter>y</Filter>
+    </ClCompile>
+    <ClCompile Include="stats\counters.cpp">
+      <Filter>y</Filter>
+    </ClCompile>
+    <ClCompile Include="curop.cpp">
+      <Filter>y</Filter>
+    </ClCompile>
+    <ClCompile Include="cursor.cpp">
+      <Filter>y</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\d_chunk_manager.cpp">
+      <Filter>y</Filter>
+    </ClCompile>
+    <ClCompile Include="d_concurrency.cpp">
+      <Filter>y</Filter>
+    </ClCompile>
+    <ClCompile Include="d_globals.cpp">
+      <Filter>y</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\d_logic.cpp">
+      <Filter>y</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\d_migrate.cpp">
+      <Filter>y</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\d_state.cpp">
+      <Filter>z</Filter>
+    </ClCompile>
+    <ClCompile Include="pipeline\dependency_tracker.cpp">
+      <Filter>z</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\d_writeback.cpp">
+      <Filter>z</Filter>
+    </ClCompile>
+    <ClCompile Include="database.cpp">
+      <Filter>z</Filter>
+    </ClCompile>
+    <ClCompile Include="db.cpp">
+      <Filter>z</Filter>
+    </ClCompile>
+    <ClCompile Include="..\client\dbclient.cpp">
+      <Filter>z</Filter>
+    </ClCompile>
+    <ClCompile Include="..\client\dbclient_rs.cpp">
+      <Filter>z</Filter>
+    </ClCompile>
+    <ClCompile Include="..\client\dbclientcursor.cpp">
+      <Filter>z</Filter>
+    </ClCompile>
+    <ClCompile Include="dbcommands.cpp">
+      <Filter>z</Filter>
+    </ClCompile>
+    <ClCompile Include="dbcommands_admin.cpp">
+      <Filter>z</Filter>
+    </ClCompile>
+    <ClCompile Include="dbcommands_generic.cpp">
+      <Filter>z</Filter>
+    </ClCompile>
+    <ClCompile Include="dbeval.cpp">
+      <Filter>z</Filter>
+    </ClCompile>
+    <ClCompile Include="dbhelpers.cpp">
+      <Filter>z</Filter>
+    </ClCompile>
+    <ClCompile Include="dbmessage.cpp">
+      <Filter>z</Filter>
+    </ClCompile>
+    <ClCompile Include="dbwebserver.cpp">
+      <Filter>z</Filter>
+    </ClCompile>
+    <ClCompile Include="..\s\default_version.cpp">
+      <Filter>z</Filter>
+    </ClCompile>
+    <ClCompile Include="ops\delete.cpp">
+      <Filter>z</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\client\dbclientcursor.h" />
     <ClInclude Include="..\client\distlock.h" />
     <ClInclude Include="..\client\gridfs.h" />
     <ClInclude Include="..\client\parallel.h" />
-    <ClInclude Include="..\s\d_logic.h" />
     <ClInclude Include="..\targetver.h" />
     <ClInclude Include="..\util\concurrency\rwlock.h" />
     <ClInclude Include="..\util\concurrency\msg.h" />
@@ -299,8 +365,6 @@
     <ClInclude Include="dur_journal.h" />
     <ClInclude Include="dur_journalformat.h" />
     <ClInclude Include="dur_stats.h" />
-    <ClInclude Include="geo\core.h" />
-    <ClInclude Include="helpers\dblogger.h" />
     <ClInclude Include="instance.h" />
     <ClInclude Include="mongommf.h" />
     <ClInclude Include="mongomutex.h" />
@@ -309,29 +373,15 @@
     <ClInclude Include="projection.h" />
     <ClInclude Include="repl.h" />
     <ClInclude Include="replpair.h" />
-    <ClInclude Include="repl\connections.h" />
     <ClInclude Include="repl\multicmd.h" />
     <ClInclude Include="repl\rsmember.h" />
     <ClInclude Include="repl\rs_optime.h" />
-    <ClInclude Include="stats\counters.h" />
     <ClInclude Include="stats\snapshots.h" />
     <ClInclude Include="stats\top.h" />
-    <ClInclude Include="..\client\connpool.h" />
-    <ClInclude Include="..\client\dbclient.h" />
     <ClInclude Include="..\client\model.h" />
     <ClInclude Include="..\client\redef_macros.h" />
     <ClInclude Include="..\client\syncclusterconnection.h" />
     <ClInclude Include="..\client\undef_macros.h" />
-    <ClInclude Include="cmdline.h" />
-    <ClInclude Include="commands.h" />
-    <ClInclude Include="concurrency.h" />
-    <ClInclude Include="curop.h" />
-    <ClInclude Include="cursor.h" />
-    <ClInclude Include="database.h" />
-    <ClInclude Include="db.h" />
-    <ClInclude Include="dbhelpers.h" />
-    <ClInclude Include="dbinfo.h" />
-    <ClInclude Include="dbmessage.h" />
     <ClInclude Include="diskloc.h" />
     <ClInclude Include="index.h" />
     <ClInclude Include="indexkey.h" />
@@ -347,7 +397,6 @@
     <ClInclude Include="resource.h" />
     <ClInclude Include="scanandorder.h" />
     <ClInclude Include="security.h" />
-    <ClInclude Include="..\util\debug_util.h" />
     <ClInclude Include="..\util\embedded_builder.h" />
     <ClInclude Include="..\util\file.h" />
     <ClInclude Include="..\util\file_allocator.h" />
@@ -387,7 +436,6 @@
     <ClInclude Include="..\bson\inline_decls.h" />
     <ClInclude Include="..\bson\stringdata.h" />
     <ClInclude Include="..\bson\util\misc.h" />
-    <ClInclude Include="ops\delete.h" />
     <ClInclude Include="ops\update.h" />
     <ClInclude Include="..\util\net\httpclient.h" />
     <ClInclude Include="..\util\net\message.h" />
@@ -399,14 +447,12 @@
     <ClInclude Include="..\..\third_party\snappy\snappy.h">
       <Filter>snappy</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\third_party\pcre-7.4\config.h" />
     <ClInclude Include="..\..\third_party\pcre-7.4\pcre.h" />
     <ClInclude Include="globals.h" />
     <ClInclude Include="..\util\net\hostandport.h" />
     <ClInclude Include="..\util\net\listen.h" />
     <ClInclude Include="..\util\net\message_port.h" />
     <ClInclude Include="..\util\net\miniwebserver.h" />
-    <ClInclude Include="databaseholder.h" />
     <ClInclude Include="pipeline\doc_mem_monitor.h" />
     <ClInclude Include="pipeline\document.h" />
     <ClInclude Include="pipeline\document_source.h" />
@@ -417,9 +463,7 @@
     <ClInclude Include="..\util\intrusive_counter.h" />
     <ClInclude Include="..\util\systeminfo.h" />
     <ClInclude Include="namespacestring.h" />
-    <ClInclude Include="ops\count.h" />
     <ClInclude Include="pagefault.h" />
-    <ClInclude Include="d_globals.h" />
     <ClInclude Include="..\util\concurrency\mapsf.h" />
     <ClInclude Include="..\util\concurrency\rwlockimpl.h" />
     <ClInclude Include="commands\pipeline_d.h" />
@@ -429,7 +473,6 @@
     <ClInclude Include="interrupt_status.h" />
     <ClInclude Include="interrupt_status_mongod.h" />
     <ClInclude Include="..\util\concurrency\qlock.h" />
-    <ClInclude Include="d_concurrency.h" />
     <ClInclude Include="pipeline\accumulator.h">
       <Filter>x</Filter>
     </ClInclude>
@@ -508,9 +551,81 @@
     <ClInclude Include="clientcursor.h">
       <Filter>x</Filter>
     </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ResourceCompile Include="db.rc" />
+    <ClInclude Include="cmdline.h">
+      <Filter>y</Filter>
+    </ClInclude>
+    <ClInclude Include="commands.h">
+      <Filter>y</Filter>
+    </ClInclude>
+    <ClInclude Include="concurrency.h">
+      <Filter>y</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\pcre-7.4\config.h">
+      <Filter>y</Filter>
+    </ClInclude>
+    <ClInclude Include="repl\connections.h">
+      <Filter>y</Filter>
+    </ClInclude>
+    <ClInclude Include="..\client\connpool.h">
+      <Filter>y</Filter>
+    </ClInclude>
+    <ClInclude Include="geo\core.h">
+      <Filter>y</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\count.h">
+      <Filter>y</Filter>
+    </ClInclude>
+    <ClInclude Include="stats\counters.h">
+      <Filter>y</Filter>
+    </ClInclude>
+    <ClInclude Include="curop.h">
+      <Filter>y</Filter>
+    </ClInclude>
+    <ClInclude Include="cursor.h">
+      <Filter>y</Filter>
+    </ClInclude>
+    <ClInclude Include="d_concurrency.h">
+      <Filter>y</Filter>
+    </ClInclude>
+    <ClInclude Include="d_globals.h">
+      <Filter>y</Filter>
+    </ClInclude>
+    <ClInclude Include="..\s\d_logic.h">
+      <Filter>y</Filter>
+    </ClInclude>
+    <ClInclude Include="database.h">
+      <Filter>z</Filter>
+    </ClInclude>
+    <ClInclude Include="databaseholder.h">
+      <Filter>z</Filter>
+    </ClInclude>
+    <ClInclude Include="db.h">
+      <Filter>z</Filter>
+    </ClInclude>
+    <ClInclude Include="..\client\dbclient.h">
+      <Filter>z</Filter>
+    </ClInclude>
+    <ClInclude Include="..\client\dbclientcursor.h">
+      <Filter>z</Filter>
+    </ClInclude>
+    <ClInclude Include="dbhelpers.h">
+      <Filter>z</Filter>
+    </ClInclude>
+    <ClInclude Include="dbinfo.h">
+      <Filter>z</Filter>
+    </ClInclude>
+    <ClInclude Include="helpers\dblogger.h">
+      <Filter>z</Filter>
+    </ClInclude>
+    <ClInclude Include="dbmessage.h">
+      <Filter>z</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\debug_util.h">
+      <Filter>z</Filter>
+    </ClInclude>
+    <ClInclude Include="ops\delete.h">
+      <Filter>z</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\jstests\dur\dur1.js" />
@@ -551,5 +666,16 @@
     <Filter Include="x">
       <UniqueIdentifier>{adfce371-d602-47e0-8381-1edc0c4a9d4a}</UniqueIdentifier>
     </Filter>
+    <Filter Include="y">
+      <UniqueIdentifier>{dcc9ad44-6142-4272-8253-f3d4ff322f00}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="z">
+      <UniqueIdentifier>{263b94d7-3bc6-41e2-9f3e-808558c2a92e}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="db.rc">
+      <Filter>z</Filter>
+    </ResourceCompile>
   </ItemGroup>
 </Project>
