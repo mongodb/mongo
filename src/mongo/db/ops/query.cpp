@@ -39,7 +39,6 @@
 #include "../../server.h"
 #include "../d_concurrency.h"
 #include "../queryoptimizercursorimpl.h"
-#include "../explain.h"
 
 namespace mongo {
 
@@ -714,20 +713,40 @@ namespace mongo {
     shared_ptr<ExplainQueryInfo> QueryOptimizerCursorExplainStrategy::_doneQueryInfo() {
         return _cursor->explainQueryInfo();
     }
+
+    class QueryResponseBuilder;
+    
+    class ResponseBuildingStrategy {
+    public:
+        ResponseBuildingStrategy( QueryResponseBuilder &parent );
+        bool handleMatch();
+        bool iterateNeedsSort() const;
+        bool resultsNeedSort() const;
+        void handleScanAndOrderMatch();
+        bool handleOrderedMatch();
+        void handoff( int &ret );
+        void reviseExplain( ExplainQueryInfo &explainInfo );
+    private:
+        ScanAndOrder *newScanAndOrder() const;
+        QueryResponseBuilder &_parent;
+        shared_ptr<ScanAndOrder> _scanAndOrder;
+        SmallDupSet _scanAndOrderDups;
+    };
     
     class QueryResponseBuilder {
     public:
+        friend class ResponseBuildingStrategy;
         QueryResponseBuilder( const ParsedQuery &parsedQuery, const shared_ptr<Cursor> &cursor,
                              const BSONObj &oldPlan ) :
         _parsedQuery( parsedQuery ),
         _cursor( cursor ),
         _queryOptimizerCursor( dynamic_pointer_cast<QueryOptimizerCursor>( _cursor ) ),
         _buf( 32768 ),
-        _scanAndOrder( newScanAndOrder() ),
         _skip( _parsedQuery.getSkip() ),
         _n(),
         _chunkManager( newChunkManager() ),
-        _explain( newExplainRecordingStrategy( oldPlan ) ) {
+        _explain( newExplainRecordingStrategy( oldPlan ) ),
+        _builder( new ResponseBuildingStrategy( *this ) ) {
             _buf.skip( sizeof( QueryResult ) );
         }
         bool addMatch() {
@@ -737,13 +756,7 @@ namespace mongo {
             if ( !chunkMatches() ) {
                 return false;
             }
-            if ( _scanAndOrder ) {
-                handleScanAndOrderMatch();
-            }
-            bool countMatch = true;
-            if ( !iterateNeedsSort() ) {
-                countMatch = handleOrderedMatch();
-            }
+            bool countMatch = _builder->handleMatch();
             _explain->noteIterate( countMatch, true, false );
             return true;
         }
@@ -764,9 +777,7 @@ namespace mongo {
         long long handoff( Message &result ) {
             if ( _parsedQuery.isExplain() ) {
                 shared_ptr<ExplainQueryInfo> explainInfo = _explain->doneQueryInfo();
-                if ( resultsNeedSort() ) {
-                    explainInfo->reviseN( _scanAndOrder->nout() );
-                }
+                _builder->reviseExplain( *explainInfo );
                 _buf.reset();
                 _buf.skip( sizeof( QueryResult ) );
                 fillQueryResultFromObj( _buf, 0, explainInfo->bson() );
@@ -775,11 +786,7 @@ namespace mongo {
                 return 1;
             }
             int ret = _n;
-            if ( resultsNeedSort() ) {
-                _buf.reset();
-                _buf.skip( sizeof( QueryResult ) );
-                _scanAndOrder->fill( _buf, _parsedQuery.getFields(), ret );
-            }
+            _builder->handoff( ret );
             if ( _buf.len() > 0 ) {
                 result.appendData( _buf.buf(), _buf.len() );
                 _buf.decouple(); // only decouple here ok?
@@ -787,18 +794,6 @@ namespace mongo {
             return ret;
         }
     private:
-        ScanAndOrder *newScanAndOrder() const {
-            if ( _parsedQuery.getOrder().isEmpty() ) {
-                return 0;
-            }
-            if ( !_queryOptimizerCursor || !_queryOptimizerCursor->ok() ) {
-                return 0;
-            }
-            return new ScanAndOrder( _parsedQuery.getSkip(),
-                                    _parsedQuery.getNumToReturn(),
-                                    _parsedQuery.getOrder(),
-                                    _queryOptimizerCursor->queryPlan()->multikeyFrs() );
-        }
         ShardChunkManagerPtr newChunkManager() const {
             if ( !shardingState.needShardChunkManager( _parsedQuery.ns() ) ) {
                 return ShardChunkManagerPtr();
@@ -820,71 +815,6 @@ namespace mongo {
             ( new SimpleCursorExplainStrategy( ancillaryInfo, _cursor ) );
             ret->notePlan( false );
             return ret;
-        }
-        void handleScanAndOrderMatch() {
-            DiskLoc loc = _cursor->currLoc();
-            if ( _scanAndOrderDups.getsetdup( loc ) ) {
-                return;
-            }
-            try {
-                _scanAndOrder->add( _cursor->current(), _parsedQuery.showDiskLoc() ? &loc : 0 );
-            } catch ( const UserException &e ) {
-                bool rethrow = true;
-                if ( e.getCode() == ScanAndOrderMemoryLimitExceededAssertionCode ) {
-                    if ( _queryOptimizerCursor->multiPlanScanner()->haveOrderedPlan() ) {
-                        _scanAndOrder.reset();
-                        _queryOptimizerCursor->abortUnorderedPlans();
-                        rethrow = false;
-                    }
-                    else if ( _queryOptimizerCursor->multiPlanScanner()->usingCachedPlan() ) {
-                        _queryOptimizerCursor->multiPlanScanner()->clearIndexesForPatterns();
-                    }
-                }
-                if ( rethrow ) {
-                    throw;
-                }
-            }            
-        }
-        bool handleOrderedMatch() {
-            DiskLoc loc = _cursor->currLoc();
-            if ( _cursor->getsetdup( loc ) ) {
-                return false;
-            }
-            if ( _skip > 0 ) {
-                --_skip;
-                return false;
-            }
-            ++_n;
-            if ( !_parsedQuery.isExplain() ) {
-                fillQueryResultFromObj( _buf, _parsedQuery.getFields(), loc.obj(), ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
-            }
-            return true;
-        }
-        bool iterateNeedsSort() const {
-            if ( !_scanAndOrder ) {
-                return false;
-            }
-            const QueryPlan *queryPlan = _queryOptimizerCursor->queryPlan();
-            if ( !queryPlan ) {
-                return false;
-            }
-            if ( !queryPlan->scanAndOrderRequired() ) {
-                return false;
-            }
-            return true;
-        }
-        bool resultsNeedSort() const {
-            if ( !_scanAndOrder ) {
-                return false;
-            }
-            const QueryPlan *queryPlan = _queryOptimizerCursor->completeQueryPlan();
-            if ( !queryPlan ) {
-                return false;
-            }
-            if ( !queryPlan->scanAndOrderRequired() ) {
-                return false;
-            }
-            return true;            
         }
         bool currentMatches() {
             MatchDetails details;
@@ -909,14 +839,117 @@ namespace mongo {
         shared_ptr<Cursor> _cursor;
         shared_ptr<QueryOptimizerCursor> _queryOptimizerCursor;
         BufBuilder _buf;
-        shared_ptr<ScanAndOrder> _scanAndOrder;
-        SmallDupSet _scanAndOrderDups;
         long long _skip;
         long long _n;
         ShardChunkManagerPtr _chunkManager;
         shared_ptr<ExplainRecordingStrategy> _explain;
+        shared_ptr<ResponseBuildingStrategy> _builder;
     };
     
+    ResponseBuildingStrategy::ResponseBuildingStrategy( QueryResponseBuilder &parent ) :
+    _parent( parent ),
+    _scanAndOrder( newScanAndOrder() ) {
+    }
+    bool ResponseBuildingStrategy::handleMatch() {
+        if ( _scanAndOrder ) {
+            handleScanAndOrderMatch();
+        }
+        bool countMatch = true;
+        if ( !iterateNeedsSort() ) {
+            countMatch = handleOrderedMatch();
+        }
+        return countMatch;
+    }
+    bool ResponseBuildingStrategy::iterateNeedsSort() const {
+        if ( !_scanAndOrder ) {
+            return false;
+        }
+        const QueryPlan *queryPlan = _parent._queryOptimizerCursor->queryPlan();
+        if ( !queryPlan ) {
+            return false;
+        }
+        if ( !queryPlan->scanAndOrderRequired() ) {
+            return false;
+        }
+        return true;
+    }
+    bool ResponseBuildingStrategy::resultsNeedSort() const {
+        if ( !_scanAndOrder ) {
+            return false;
+        }
+        const QueryPlan *queryPlan = _parent._queryOptimizerCursor->completeQueryPlan();
+        if ( !queryPlan ) {
+            return false;
+        }
+        if ( !queryPlan->scanAndOrderRequired() ) {
+            return false;
+        }
+        return true;            
+    }
+    void ResponseBuildingStrategy::handleScanAndOrderMatch() {
+        DiskLoc loc = _parent._cursor->currLoc();
+        if ( _scanAndOrderDups.getsetdup( loc ) ) {
+            return;
+        }
+        try {
+            _scanAndOrder->add( _parent._cursor->current(), _parent._parsedQuery.showDiskLoc() ? &loc : 0 );
+        } catch ( const UserException &e ) {
+            bool rethrow = true;
+            if ( e.getCode() == ScanAndOrderMemoryLimitExceededAssertionCode ) {
+                if ( _parent._queryOptimizerCursor->multiPlanScanner()->haveOrderedPlan() ) {
+                    _scanAndOrder.reset();
+                    _parent._queryOptimizerCursor->abortUnorderedPlans();
+                    rethrow = false;
+                }
+                else if ( _parent._queryOptimizerCursor->multiPlanScanner()->usingCachedPlan() ) {
+                    _parent._queryOptimizerCursor->multiPlanScanner()->clearIndexesForPatterns();
+                }
+            }
+            if ( rethrow ) {
+                throw;
+            }
+        }            
+    }
+    bool ResponseBuildingStrategy::handleOrderedMatch() {
+        DiskLoc loc = _parent._cursor->currLoc();
+        if ( _parent._cursor->getsetdup( loc ) ) {
+            return false;
+        }
+        if ( _parent._skip > 0 ) {
+            --_parent._skip;
+            return false;
+        }
+        ++_parent._n;
+        if ( !_parent._parsedQuery.isExplain() ) {
+            fillQueryResultFromObj( _parent._buf, _parent._parsedQuery.getFields(), loc.obj(), ( _parent._parsedQuery.showDiskLoc() ? &loc : 0 ) );
+        }
+        return true;
+    }
+    void ResponseBuildingStrategy::reviseExplain( ExplainQueryInfo &explainInfo ) {
+        if ( resultsNeedSort() ) {
+            explainInfo.reviseN( _scanAndOrder->nout() );
+        }
+    }
+    void ResponseBuildingStrategy::handoff( int &ret ) {
+        if ( resultsNeedSort() ) {
+            _parent._buf.reset();
+            _parent._buf.skip( sizeof( QueryResult ) );
+            _scanAndOrder->fill( _parent._buf, _parent._parsedQuery.getFields(), ret );
+        }
+    }
+    ScanAndOrder *ResponseBuildingStrategy::newScanAndOrder() const {
+        if ( _parent._parsedQuery.getOrder().isEmpty() ) {
+            return 0;
+        }
+        if ( !_parent._queryOptimizerCursor || !_parent._queryOptimizerCursor->ok() ) {
+            return 0;
+        }
+        return new ScanAndOrder( _parent._parsedQuery.getSkip(),
+                                _parent._parsedQuery.getNumToReturn(),
+                                _parent._parsedQuery.getOrder(),
+                                _parent._queryOptimizerCursor->queryPlan()->multikeyFrs() );
+    }
+                                 
     /* run a query -- includes checking for and running a Command \
        @return points to ns if exhaust mode. 0=normal mode
     */
