@@ -216,8 +216,11 @@ namespace mongo {
         boost::mutex::scoped_lock lk(m);
         fassert(0, r.n > 0);
         r.n--;
-        if( R.n + w.n + r.n == 0 )
-            W.c.notify_one(); // only thing we possibly would have blocked would be a W
+        // we may need to notify here even if R.n != 0 as the R thread could be 
+        // attempting R_to_W, and it leaves R.n set while it waits. (It does that 
+        // so that no writers can interleave in.)
+        if( w.n + r.n == 0 )
+            W.c.notify_one(); // only thing we would have blocked would be a W or a R_to_W
     }
     inline void QLock::unlock_w() {
         boost::mutex::scoped_lock lk(m);
