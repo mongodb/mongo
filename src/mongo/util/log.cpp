@@ -38,6 +38,7 @@ using namespace std;
 
 namespace mongo {
 
+    bool progress_meter_use_stdout = true; // Move this to ProgressMeter if there is a .cpp file for it.
     Nullstream nullstream;
     vector<Tee*>* Logstream::globalTees = 0;
 

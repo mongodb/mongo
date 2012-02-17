@@ -157,13 +157,16 @@ namespace mongo {
     typedef void *HANDLE;
 #endif
 
+    extern bool progress_meter_use_stdout;
     class ProgressMeter : boost::noncopyable {
     public:
-        ProgressMeter( unsigned long long total , int secondsBetween = 3 , int checkInterval = 100 , string units = "" ) : _units(units) {
+        ProgressMeter( unsigned long long total , int secondsBetween = 3 , int checkInterval = 100 , string units = "" ) : 
+	    _units(units)
+	   ,_useStdout(progress_meter_use_stdout) {
             reset( total , secondsBetween , checkInterval );
         }
 
-        ProgressMeter() {
+        ProgressMeter(): _useStdout(progress_meter_use_stdout) {
             _active = 0;
             _units = "";
         }
@@ -195,7 +198,7 @@ namespace mongo {
          */
         bool hit( int n = 1 ) {
             if ( ! _active ) {
-                cout << "warning: hit an inactive ProgressMeter" << endl;
+                _useStdout?cout:cerr << "warning: hit an inactive ProgressMeter" << endl;
                 return false;
             }
 
@@ -210,10 +213,10 @@ namespace mongo {
 
             if ( _total > 0 ) {
                 int per = (int)( ( (double)_done * 100.0 ) / (double)_total );
-                cout << "\t\t" << _done << "/" << _total << "\t" << per << "%";
+                _useStdout?cout:cerr << "\t\t" << _done << "/" << _total << "\t" << per << "%";
 
                 if ( ! _units.empty() ) {
-                    cout << "\t(" << _units << ")" << endl;
+                    _useStdout?cout:cerr << "\t(" << _units << ")" << endl;
                 }
                 else {
                     cout << endl;
@@ -266,6 +269,7 @@ namespace mongo {
         int _lastTime;
 
         string _units;
+	bool _useStdout;
     };
 
     // e.g.: 
