@@ -716,49 +716,72 @@ namespace mongo {
 
     class ResponseBuildStrategy {
     public:
+        ResponseBuildStrategy( const ParsedQuery &parsedQuery,
+                              const shared_ptr<Cursor> &cursor,
+                              BufBuilder &buf ) :
+        _parsedQuery( parsedQuery ),
+        _cursor( cursor ),
+        _buf( buf ),
+        _skip( _parsedQuery.getSkip() ),
+        _n() {
+        }
         virtual ~ResponseBuildStrategy() {}
-        virtual bool handleMatch() = 0;
+        virtual bool addMatch() = 0;
         virtual void finish( int &ret ) {}
         virtual void reviseExplain( ExplainQueryInfo &explainInfo ) {}
-        virtual long long n() const = 0;
+        long long n() const { return _n; }
+    protected:
+        bool addCursorMatchToBuf() {
+            DiskLoc loc = _cursor->currLoc();
+            if ( _cursor->getsetdup( loc ) ) {
+                return false;
+            }
+            if ( _skip > 0 ) {
+                --_skip;
+                return false;
+            }
+            ++_n;
+            if ( !_parsedQuery.isExplain() ) {
+                fillQueryResultFromObj( _buf, _parsedQuery.getFields(), loc.obj(), ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
+            }
+            return true;
+        }
+        const ParsedQuery &_parsedQuery;
+        shared_ptr<Cursor> _cursor;
+        BufBuilder &_buf;
+        long long _skip;
+        long long _n;
     };
     
-//    class SimpleOrderedBuildStrategy : public ResponseBuildStrategy {
-//    public:
-//        SimpleOrderedBuildStrategy( const ParsedQuery &parsedQuery,
-//                            const shared_ptr<Cursor> &cursor,
-//                            BufBuilder &buf );
-//        bool handleMatch() {
-//            
-//        }
-//        void finish( int &ret );
-//        void reviseExplain( ExplainQueryInfo &explainInfo );
-//        long long n() const { return _n; }        
-//    };
-//    
+    class OrderedBuildStrategy : public ResponseBuildStrategy {
+    public:
+        OrderedBuildStrategy( const ParsedQuery &parsedQuery,
+                                   const shared_ptr<Cursor> &cursor,
+                                   BufBuilder &buf ) :
+        ResponseBuildStrategy( parsedQuery, cursor, buf ) {
+        }
+        virtual bool addMatch() {
+            return addCursorMatchToBuf();
+        }
+    };
+    
     class HybridBuildStrategy : public ResponseBuildStrategy {
     public:
         HybridBuildStrategy( const ParsedQuery &parsedQuery,
                                  const shared_ptr<Cursor> &cursor,
                                  BufBuilder &buf );
-        bool handleMatch();
-        void finish( int &ret );
-        void reviseExplain( ExplainQueryInfo &explainInfo );
-        long long n() const { return _n; }
+        virtual bool addMatch();
+        virtual void finish( int &ret );
+        virtual void reviseExplain( ExplainQueryInfo &explainInfo );
     private:
         bool iterateNeedsSort() const;
         bool resultsNeedSort() const;
         void handleScanAndOrderMatch();
         bool handleOrderedMatch();
         ScanAndOrder *newScanAndOrder() const;
-        shared_ptr<Cursor> _cursor;
         shared_ptr<QueryOptimizerCursor> _queryOptimizerCursor;
-        BufBuilder &_buf;
-        const ParsedQuery &_parsedQuery;
         shared_ptr<ScanAndOrder> _scanAndOrder;
         SmallDupSet _scanAndOrderDups;
-        long long _skip;
-        long long _n;
     };
     
     class QueryResponseBuilder {
@@ -771,7 +794,7 @@ namespace mongo {
         _buf( 32768 ),
         _chunkManager( newChunkManager() ),
         _explain( newExplainRecordingStrategy( oldPlan ) ),
-        _builder( new HybridBuildStrategy( _parsedQuery, _cursor, _buf ) ) {
+        _builder( newResponseBuildStrategy() ) {
             _buf.skip( sizeof( QueryResult ) );
         }
         bool addMatch() {
@@ -781,7 +804,7 @@ namespace mongo {
             if ( !chunkMatches() ) {
                 return false;
             }
-            bool countMatch = _builder->handleMatch();
+            bool countMatch = _builder->addMatch();
             _explain->noteIterate( countMatch, true, false );
             return true;
         }
@@ -841,6 +864,14 @@ namespace mongo {
             ret->notePlan( false );
             return ret;
         }
+        shared_ptr<ResponseBuildStrategy> newResponseBuildStrategy() {
+            if ( !_queryOptimizerCursor ) {
+                return shared_ptr<ResponseBuildStrategy>
+                ( new OrderedBuildStrategy( _parsedQuery, _cursor, _buf ) );
+            }
+            return shared_ptr<ResponseBuildStrategy>
+            ( new HybridBuildStrategy( _parsedQuery, _cursor, _buf ) );
+        }
         bool currentMatches() {
             MatchDetails details;
             if ( _cursor->currentMatches( &details ) ) {
@@ -872,21 +903,17 @@ namespace mongo {
     HybridBuildStrategy::HybridBuildStrategy( const ParsedQuery &parsedQuery,
                                                        const shared_ptr<Cursor> &cursor,
                                                        BufBuilder &buf ) :
-    _cursor( cursor ),
+    ResponseBuildStrategy( parsedQuery, cursor, buf ),
     _queryOptimizerCursor( dynamic_pointer_cast<QueryOptimizerCursor>( _cursor ) ),
-    _buf( buf ),
-    _parsedQuery( parsedQuery ),
-    _scanAndOrder( newScanAndOrder() ),
-    _skip( _parsedQuery.getSkip() ),
-    _n() {
+    _scanAndOrder( newScanAndOrder() ) {
     }
-    bool HybridBuildStrategy::handleMatch() {
+    bool HybridBuildStrategy::addMatch() {
         if ( _scanAndOrder ) {
             handleScanAndOrderMatch();
         }
         bool countMatch = true;
         if ( !iterateNeedsSort() ) {
-            countMatch = handleOrderedMatch();
+            countMatch = addCursorMatchToBuf();
         }
         return countMatch;
     }
@@ -939,21 +966,6 @@ namespace mongo {
                 throw;
             }
         }            
-    }
-    bool HybridBuildStrategy::handleOrderedMatch() {
-        DiskLoc loc = _cursor->currLoc();
-        if ( _cursor->getsetdup( loc ) ) {
-            return false;
-        }
-        if ( _skip > 0 ) {
-            --_skip;
-            return false;
-        }
-        ++_n;
-        if ( !_parsedQuery.isExplain() ) {
-            fillQueryResultFromObj( _buf, _parsedQuery.getFields(), loc.obj(), ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
-        }
-        return true;
     }
     void HybridBuildStrategy::reviseExplain( ExplainQueryInfo &explainInfo ) {
         if ( resultsNeedSort() ) {
