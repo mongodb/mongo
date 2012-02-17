@@ -654,80 +654,66 @@ namespace mongo {
         bool _yieldRecoveryFailed;
     };
     
-    class ExplainRecordingStrategy {
-    public:
-        ExplainRecordingStrategy( const ExplainQueryInfo::AncillaryInfo &ancillaryInfo ) :
-        _ancillaryInfo( ancillaryInfo ) {
-        }
-        virtual ~ExplainRecordingStrategy() {}
-        virtual void notePlan( bool scanAndOrder ) {}
-        virtual void noteIterate( bool match, bool loadedObject, bool chunkSkip ) {}
-        virtual void noteYield() {}
-        shared_ptr<ExplainQueryInfo> doneQueryInfo() {
-            shared_ptr<ExplainQueryInfo> ret = _doneQueryInfo();
-            ret->setAncillaryInfo( _ancillaryInfo );
-            return ret;
-        }
-    protected:
-        virtual shared_ptr<ExplainQueryInfo> _doneQueryInfo() = 0;
-    private:
-        ExplainQueryInfo::AncillaryInfo _ancillaryInfo;
-    };
-    
-    class NoExplainStrategy : public ExplainRecordingStrategy {
-    public:
-        NoExplainStrategy() :
-        ExplainRecordingStrategy( ExplainQueryInfo::AncillaryInfo() ) {
-        }
-    private:
-        virtual shared_ptr<ExplainQueryInfo> _doneQueryInfo() {
-            verify( 16069, false );
-            return shared_ptr<ExplainQueryInfo>();
-        }
-    };
-    
-    class SimpleCursorExplainStrategy : public ExplainRecordingStrategy {
-    public:
-        SimpleCursorExplainStrategy( const ExplainQueryInfo::AncillaryInfo &ancillaryInfo,
-                                    const shared_ptr<Cursor> &cursor ) :
-        ExplainRecordingStrategy( ancillaryInfo ),
-        _cursor( cursor ),
-        _explainInfo( new ExplainSinglePlanQueryInfo() ) {
-        }
-    private:
-        virtual void notePlan( bool scanAndOrder ) {
-            _explainInfo->notePlan( *_cursor, scanAndOrder );
-        }
-        virtual void noteIterate( bool match, bool loadedObject, bool chunkSkip ) {
-            _explainInfo->noteIterate( match, loadedObject, chunkSkip, *_cursor );
-        }
-        virtual void noteYield() {
-            _explainInfo->noteYield();
-        }
-        virtual shared_ptr<ExplainQueryInfo> _doneQueryInfo() {
-            _explainInfo->noteDone( *_cursor );
-            return _explainInfo->queryInfo();
-        }
-        shared_ptr<Cursor> _cursor;
-        shared_ptr<ExplainSinglePlanQueryInfo> _explainInfo;
-    };
+    ExplainRecordingStrategy::ExplainRecordingStrategy
+    ( const ExplainQueryInfo::AncillaryInfo &ancillaryInfo ) :
+    _ancillaryInfo( ancillaryInfo ) {
+    }
 
-    class QueryOptimizerCursorExplainStrategy : public ExplainRecordingStrategy {
-    public:
-        QueryOptimizerCursorExplainStrategy( const ExplainQueryInfo::AncillaryInfo &ancillaryInfo,
-                                            const shared_ptr<QueryOptimizerCursor> cursor ) :
-        ExplainRecordingStrategy( ancillaryInfo ),
-        _cursor( cursor ) {
-        }
-        virtual void noteIterate( bool match, bool loadedObject, bool chunkSkip ) {
-            _cursor->noteIterate( match, loadedObject, chunkSkip );
-        }
-        virtual shared_ptr<ExplainQueryInfo> _doneQueryInfo() {
-            return _cursor->explainQueryInfo();
-        }
-    private:
-        shared_ptr<QueryOptimizerCursor> _cursor;
-    };
+    shared_ptr<ExplainQueryInfo> ExplainRecordingStrategy::doneQueryInfo() {
+        shared_ptr<ExplainQueryInfo> ret = _doneQueryInfo();
+        ret->setAncillaryInfo( _ancillaryInfo );
+        return ret;
+    }
+    
+    NoExplainStrategy::NoExplainStrategy() :
+    ExplainRecordingStrategy( ExplainQueryInfo::AncillaryInfo() ) {
+    }
+
+    shared_ptr<ExplainQueryInfo> NoExplainStrategy::_doneQueryInfo() {
+        verify( 16069, false );
+        return shared_ptr<ExplainQueryInfo>();
+    }
+    
+    SimpleCursorExplainStrategy::SimpleCursorExplainStrategy
+    ( const ExplainQueryInfo::AncillaryInfo &ancillaryInfo,
+     const shared_ptr<Cursor> &cursor ) :
+    ExplainRecordingStrategy( ancillaryInfo ),
+    _cursor( cursor ),
+    _explainInfo( new ExplainSinglePlanQueryInfo() ) {
+    }
+ 
+    void SimpleCursorExplainStrategy::notePlan( bool scanAndOrder ) {
+        _explainInfo->notePlan( *_cursor, scanAndOrder );
+    }
+
+    void SimpleCursorExplainStrategy::noteIterate( bool match, bool loadedObject, bool chunkSkip ) {
+        _explainInfo->noteIterate( match, loadedObject, chunkSkip, *_cursor );
+    }
+
+    void SimpleCursorExplainStrategy::noteYield() {
+        _explainInfo->noteYield();
+    }
+
+    shared_ptr<ExplainQueryInfo> SimpleCursorExplainStrategy::_doneQueryInfo() {
+        _explainInfo->noteDone( *_cursor );
+        return _explainInfo->queryInfo();
+    }
+
+    QueryOptimizerCursorExplainStrategy::QueryOptimizerCursorExplainStrategy
+    ( const ExplainQueryInfo::AncillaryInfo &ancillaryInfo,
+     const shared_ptr<QueryOptimizerCursor> cursor ) :
+    ExplainRecordingStrategy( ancillaryInfo ),
+    _cursor( cursor ) {
+    }
+    
+    void QueryOptimizerCursorExplainStrategy::noteIterate( bool match, bool loadedObject,
+                                                          bool chunkSkip ) {
+        _cursor->noteIterate( match, loadedObject, chunkSkip );
+    }
+
+    shared_ptr<ExplainQueryInfo> QueryOptimizerCursorExplainStrategy::_doneQueryInfo() {
+        return _cursor->explainQueryInfo();
+    }
     
     class QueryResponseBuilder {
     public:

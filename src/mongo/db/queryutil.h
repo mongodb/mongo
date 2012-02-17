@@ -57,7 +57,11 @@ namespace mongo {
      */
     class ParsedQuery : boost::noncopyable {
     public:
-        ParsedQuery( QueryMessage& qm );
+        ParsedQuery( QueryMessage& qm )
+        : _ns( qm.ns ) , _ntoskip( qm.ntoskip ) , _ntoreturn( qm.ntoreturn ) , _options( qm.queryOptions ) {
+            init( qm.query );
+            initFields( qm.fields );
+        }
         ParsedQuery( const char* ns , int ntoskip , int ntoreturn , int queryoptions , const BSONObj& query , const BSONObj& fields )
         : _ns( ns ) , _ntoskip( ntoskip ) , _ntoreturn( ntoreturn ) , _options( queryoptions ) {
             init( query );
@@ -85,7 +89,7 @@ namespace mongo {
         const BSONObj& getMin() const { return _min; }
         const BSONObj& getMax() const { return _max; }
         const BSONObj& getOrder() const { return _order; }
-        const BSONElement& getHint() const { return _hint; }
+        const BSONObj& getHint() const { return _hint; }
         int getMaxScan() const { return _maxScan; }
         
         bool couldBeCommand() const {
@@ -94,7 +98,7 @@ namespace mongo {
         }
         
         bool hasIndexSpecifier() const {
-            return ! _hint.eoo() || ! _min.isEmpty() || ! _max.isEmpty();
+            return ! _hint.isEmpty() || ! _min.isEmpty() || ! _max.isEmpty();
         }
         
         /* if ntoreturn is zero, we return up to 101 objects.  on the subsequent getmore, there
@@ -184,7 +188,7 @@ namespace mongo {
                     else if ( strcmp( "max" , name ) == 0 )
                         _max = e.embeddedObject();
                     else if ( strcmp( "hint" , name ) == 0 )
-                        _hint = e;
+                        _hint = e.wrap();
                     else if ( strcmp( "returnKey" , name ) == 0 )
                         _returnKey = e.trueValue();
                     else if ( strcmp( "maxScan" , name ) == 0 )
@@ -199,7 +203,7 @@ namespace mongo {
             
             if ( _snapshot ) {
                 uassert( 12001 , "E12001 can't sort with $snapshot", _order.isEmpty() );
-                uassert( 12002 , "E12002 can't use hint with $snapshot", _hint.eoo() );
+                uassert( 12002 , "E12002 can't use hint with $snapshot", _hint.isEmpty() );
             }
             
         }
@@ -225,7 +229,7 @@ namespace mongo {
         bool _showDiskLoc;
         BSONObj _min;
         BSONObj _max;
-        BSONElement _hint;
+        BSONObj _hint;
         int _maxScan;
     };
     
