@@ -233,14 +233,15 @@ namespace mongo {
     {
         if( cant )
             return;
-        if( threadState() == 'W' ) {
+        if( type == 'W' ) {
             unlock_W();
         }
-        else if( threadState() == 'R' ) { 
+        else if( type == 'R' ) { 
             unlock_R();
         }
         else {
-            error() << "TempRelease called but threadState()=" << threadState() << endl;
+            LockState& ls = lockState();
+            error() << "TempRelease called but threadState()=" << type << endl;
             assert(false);
         }
     }
