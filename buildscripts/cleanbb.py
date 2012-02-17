@@ -12,6 +12,12 @@ if cwd.find("buildscripts" ) > 0 :
 print( "cwd [" + cwd + "]" )
 
 def shouldKill( c ):
+    here = os.path.dirname(__file__)
+    smoke_py = os.path.abspath(os.path.join(here, 'smoke.py'))
+    if smoke_py in c:
+        # don't kill smoke.py
+        return False
+
     if c.find( cwd ) >= 0:
         return True
 

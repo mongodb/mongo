@@ -177,7 +177,7 @@ def find_python(min_version=(2, 5)):
 
 def smoke_command(*args):
     here = os.path.dirname(__file__)
-    smoke_py = os.path.join(here, 'smoke.py')
+    smoke_py = os.path.abspath(os.path.join(here, 'smoke.py'))
     return ' '.join(itertools.chain(
         (find_python(), smoke_py),
         args))
