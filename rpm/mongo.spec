@@ -131,6 +131,7 @@ fi
 #/etc/rc.d/init.d/mongos
 %attr(0755,mongod,mongod) %dir /var/lib/mongo
 %attr(0755,mongod,mongod) %dir /var/log/mongo
+%attr(0755,mongod,mongod) %dir /var/run/mongo
 %attr(0640,mongod,mongod) %config(noreplace) %verify(not md5 size mtime) /var/log/mongo/mongod.log
 
 %changelog
