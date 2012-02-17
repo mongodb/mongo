@@ -345,6 +345,7 @@ class InstallSetup:
         self.clientTestsDir = "client/examples/"
         
 installSetup = InstallSetup()
+env["installSetup"] = installSetup
 if distBuild:
     installSetup.bannerDir = "distsrc"
 
