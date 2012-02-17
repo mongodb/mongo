@@ -3,7 +3,7 @@
 # This SConscript describes build rules for the "mongo" project.
 
 import os
-import buildscripts.utils as utils
+from buildscripts import utils
 
 Import("env")
 Import("shellEnv")
@@ -302,7 +302,6 @@ shardServerFiles = [
     "s/balancer_policy.cpp",
     "s/writeback_listener.cpp",
     "s/shard_version.cpp",
-    "s/mr_shard.cpp",
     "s/security.cpp",
     ]
 
@@ -552,7 +551,7 @@ def build_and_test_client(env, target, source):
 
     call(scons_command + ["libmongoclient.a", "clientTests"], cwd=installDir)
 
-    return bool(call(["python", "buildscripts/smoke.py",
-                      "--test-path", installDir, "client"]))
+    return bool(call(utils.smoke_command([
+                      "--test-path", installDir, "client"])))
 env.Alias("clientBuild", [mongod, '$INSTALL_DIR'], [build_and_test_client])
 env.AlwaysBuild("clientBuild")

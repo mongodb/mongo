@@ -257,3 +257,63 @@ sh.waitForBalancer = function( onOrNot, timeout, interval ){
     
 }
 
+sh.disableBalancing = function( coll ){
+    var dbase = db
+    if( coll instanceof DBCollection ) dbase = coll.getDB()
+    dbase.getSisterDB( "config" ).collections.update({ _id : coll + "" }, { $set : { "noBalance" : true } })
+}
+
+sh.enableBalancing = function( coll ){
+    var dbase = db
+    if( coll instanceof DBCollection ) dbase = coll.getDB()
+    dbase.getSisterDB( "config" ).collections.update({ _id : coll + "" }, { $set : { "noBalance" : false } })
+}
+
+/*
+ * Can call _lastMigration( coll ), _lastMigration( db ), _lastMigration( st ), _lastMigration( mongos ) 
+ */
+sh._lastMigration = function( ns ){
+    
+    var coll = null
+    var dbase = null
+    var config = null
+    
+    if( ! ns ){
+        config = db.getSisterDB( "config" )
+    }   
+    else if( ns instanceof DBCollection ){
+        coll = ns
+        config = coll.getDB().getSisterDB( "config" )
+    }
+    else if( ns instanceof DB ){
+        dbase = ns
+        config = dbase.getSisterDB( "config" )
+    }
+    else if( ns instanceof ShardingTest ){
+        config = ns.s.getDB( "config" )
+    }
+    else if( ns instanceof Mongo ){
+        config = ns.getDB( "config" )
+    }
+    else {
+        // String namespace
+        ns = ns + ""
+        if( ns.indexOf( "." ) > 0 ){
+            config = db.getSisterDB( "config" )
+            coll = db.getMongo().getCollection( ns )
+        }
+        else{
+            config = db.getSisterDB( "config" )
+            dbase = db.getSisterDB( ns )
+        }
+    }
+        
+    var searchDoc = { what : /^moveChunk/ }
+    if( coll ) searchDoc.ns = coll + ""
+    if( dbase ) searchDoc.ns = new RegExp( "^" + dbase + "\\." )
+        
+    var cursor = config.changelog.find( searchDoc ).sort({ time : -1 }).limit( 1 )
+    if( cursor.hasNext() ) return cursor.next()
+    else return null
+}
+

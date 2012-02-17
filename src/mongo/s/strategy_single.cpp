@@ -111,65 +111,10 @@ namespace mongo {
 
         }
 
-        void handleIndexWrite( int op , Request& r ) {
-
-            DbMessage& d = r.d();
-
-            if ( op == dbInsert ) {
-                while( d.moreJSObjs() ) {
-                    BSONObj o = d.nextJsObj();
-                    const char * ns = o["ns"].valuestr();
-                    if ( r.getConfig()->isSharded( ns ) ) {
-                        BSONObj newIndexKey = o["key"].embeddedObjectUserCheck();
-
-                        uassert( 10205 ,  (string)"can't use unique indexes with sharding  ns:" + ns +
-                                 " key: " + o["key"].embeddedObjectUserCheck().toString() ,
-                                 IndexDetails::isIdIndexPattern( newIndexKey ) ||
-                                 ! o["unique"].trueValue() ||
-                                 r.getConfig()->getChunkManager( ns )->getShardKey().isPrefixOf( newIndexKey ) );
-
-                        ChunkManagerPtr cm = r.getConfig()->getChunkManager( ns );
-                        assert( cm );
-
-                        set<Shard> shards;
-                        cm->getAllShards(shards);
-                        for (set<Shard>::const_iterator it=shards.begin(), end=shards.end(); it != end; ++it)
-                            doWrite( op , r , *it );
-                    }
-                    else {
-                        doWrite( op , r , r.primaryShard() );
-                    }
-                    r.gotInsert();
-                }
-            }
-            else if ( op == dbUpdate ) {
-                throw UserException( 8050 , "can't update system.indexes" );
-            }
-            else if ( op == dbDelete ) {
-                // TODO
-                throw UserException( 8051 , "can't delete indexes on sharded collection yet" );
-            }
-            else {
-                log() << "handleIndexWrite invalid write op: " << op << endl;
-                throw UserException( 8052 , "handleIndexWrite invalid write op" );
-            }
-
-        }
-
+        // Deprecated
         virtual void writeOp( int op , Request& r ) {
-            const char *ns = r.getns();
-
-            if ( r.isShardingEnabled() &&
-                    strstr( ns , ".system.indexes" ) == strchr( ns , '.' ) &&
-                    strchr( ns , '.' ) ) {
-                LOG(1) << " .system.indexes write for: " << ns << endl;
-                handleIndexWrite( op , r );
-                return;
-            }
-
-            LOG(3) << "single write: " << ns << endl;
-            doWrite( op , r , r.primaryShard() , false );
-            r.gotInsert(); // Won't handle mulit-insert correctly. Not worth parsing the request.
+            // Don't use anymore, requires single-step detection of chunk manager or primary
+            assert( 0 );
         }
 
         bool handleSpecialNamespaces( Request& r , QueryMessage& q ) {
@@ -223,7 +168,7 @@ namespace mongo {
             }
             else if ( strcmp( ns , "killop" ) == 0 ) {
                 r.checkAuth( Auth::WRITE , "admin" );
-                
+
                 BSONElement e = q.query["op"];
                 if ( e.type() != String ) {
                     b.append( "err" , "bad op" );

@@ -1,4 +1,4 @@
-
+if (!_isWindows()) {
 function myprint( x ) {
     print( "tags output: " + x );
 }
@@ -168,4 +168,7 @@ result = master.getDB("foo").runCommand({getLastError:1,w:"2",wtimeout:timeout})
 printjson(result);
 assert.eq(result.err, "timeout");
 
+replTest.stopSet();
 myprint("\n\ntags.js SUCCESS\n\n");
+
+}

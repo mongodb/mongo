@@ -144,6 +144,10 @@ namespace mongo {
          */
         bool isSharded( const string& ns );
 
+        // Atomically returns *either* the chunk manager *or* the primary shard for the collection,
+        // neither if the collection doesn't exist.
+        void getChunkManagerOrPrimary( const string& ns, ChunkManagerPtr& manager, ShardPtr& primary );
+
         ChunkManagerPtr getChunkManager( const string& ns , bool reload = false, bool forceReload = false );
         ChunkManagerPtr getChunkManagerIfExists( const string& ns , bool reload = false, bool forceReload = false );
 

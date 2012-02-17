@@ -156,8 +156,13 @@ namespace mongo {
             BSONObj col = cursor->nextSafe();
 
             // sharded collections will have a shard "key".
-            if ( ! col["key"].eoo() )
+            if ( ! col["key"].eoo() && ! col["noBalance"].trueValue() ){
                 collections.push_back( col["_id"].String() );
+            }
+            else if( col["noBalance"].trueValue() ){
+                LOG(1) << "not balancing collection " << col["_id"].String() << ", explicitly disabled" << endl;
+            }
+
         }
         cursor.reset();
 
