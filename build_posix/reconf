@@ -7,9 +7,8 @@ trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 clean()
 {
 	test -f Makefile && make distclean > /dev/null
-	rm -rf ../Makefile.am ../Makefile.in \
-	    ../aclocal.m4 ../autom4te.cache ../config.hin ../config.hin~ \
-	    ../configure flexlint.out mklog gnu-support
+	rm -rf ../Makefile.am ../Makefile.in ../aclocal.m4 ../autom4te.cache \
+	    ../config.hin ../config.hin~ ../configure gnu-support mklog
 }
 
 while :
