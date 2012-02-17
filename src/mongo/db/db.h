@@ -36,7 +36,10 @@ namespace mongo {
             const Client& c = cc();
             _context = c.getContext();
             assert( Lock::isLocked() );
-            massert(10298 , "can't temprelease nested lock", !Lock::nested());
+            if( Lock::nested() ) {
+                Lock::nested();
+                massert(10298 , "can't temprelease nested lock", false);
+            }
             if ( _context ) {
                 _context->unlocked();
             }
@@ -81,12 +84,17 @@ namespace mongo {
     /**
        only does a temp release if we're not nested and have a lock
      */
-    struct dbtempreleasecond {
+    class dbtempreleasecond : boost::noncopyable {
         dbtemprelease * real;
+    public:
         dbtempreleasecond() {
             real = 0;
-            if( Lock::isLocked() )
-                real = new dbtemprelease();
+            if( Lock::isLocked() ) {
+                // if nested don't temprelease, and we don't complain either for this class
+                if( !Lock::nested() ) {
+                    real = new dbtemprelease();
+                }
+            }
         }
         ~dbtempreleasecond() {
             if ( real ) {
@@ -94,9 +102,7 @@ namespace mongo {
                 real = 0;
             }
         }
-        bool unlocked() {
-            return real != 0;
-        }
+        bool unlocked() const { return real != 0; }
     };
 
 } // namespace mongo
