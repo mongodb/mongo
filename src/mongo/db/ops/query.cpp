@@ -722,14 +722,12 @@ namespace mongo {
         _parsedQuery( parsedQuery ),
         _cursor( cursor ),
         _buf( buf ),
-        _skip( _parsedQuery.getSkip() ),
-        _n() {
+        _skip( _parsedQuery.getSkip() ) {
         }
         virtual ~ResponseBuildStrategy() {}
-        virtual bool addMatch() = 0;
+        virtual bool handleMatch() = 0;
         virtual void finish( int &ret ) {}
         virtual void reviseExplain( ExplainQueryInfo &explainInfo ) {}
-        long long n() const { return _n; }
     protected:
         bool addCursorMatchToBuf() {
             DiskLoc loc = _cursor->currLoc();
@@ -740,7 +738,6 @@ namespace mongo {
                 --_skip;
                 return false;
             }
-            ++_n;
             if ( !_parsedQuery.isExplain() ) {
                 fillQueryResultFromObj( _buf, _parsedQuery.getFields(), loc.obj(), ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
             }
@@ -750,7 +747,6 @@ namespace mongo {
         shared_ptr<Cursor> _cursor;
         BufBuilder &_buf;
         long long _skip;
-        long long _n;
     };
     
     class OrderedBuildStrategy : public ResponseBuildStrategy {
@@ -760,17 +756,26 @@ namespace mongo {
                                    BufBuilder &buf ) :
         ResponseBuildStrategy( parsedQuery, cursor, buf ) {
         }
-        virtual bool addMatch() {
+        virtual bool handleMatch() {
             return addCursorMatchToBuf();
         }
     };
     
+//    class ReorderBuildStrategy : public ResponseBuildStrategy {
+//    public:
+//        ReorderBuildStrategy( const ParsedQuery &parsedQuery,
+//                             const shared_ptr<Cursor> &cursor,
+//                             BufBuilder &buf ) :
+//        ResponseBuildStrategy( parsedQuery, cursor, buf ) {
+//        }        
+//    };
+//    
     class HybridBuildStrategy : public ResponseBuildStrategy {
     public:
         HybridBuildStrategy( const ParsedQuery &parsedQuery,
                                  const shared_ptr<Cursor> &cursor,
                                  BufBuilder &buf );
-        virtual bool addMatch();
+        virtual bool handleMatch();
         virtual void finish( int &ret );
         virtual void reviseExplain( ExplainQueryInfo &explainInfo );
     private:
@@ -794,7 +799,8 @@ namespace mongo {
         _buf( 32768 ),
         _chunkManager( newChunkManager() ),
         _explain( newExplainRecordingStrategy( oldPlan ) ),
-        _builder( newResponseBuildStrategy() ) {
+        _builder( newResponseBuildStrategy() ),
+        _bufferedMatches() {
             _buf.skip( sizeof( QueryResult ) );
         }
         bool addMatch() {
@@ -804,18 +810,21 @@ namespace mongo {
             if ( !chunkMatches() ) {
                 return false;
             }
-            bool countMatch = _builder->addMatch();
-            _explain->noteIterate( countMatch, true, false );
+            bool bufferedMatch = _builder->handleMatch();
+            _explain->noteIterate( bufferedMatch, true, false );
+            if ( bufferedMatch ) {
+                ++_bufferedMatches;
+            }
             return true;
         }
         void noteYield() {
             _explain->noteYield();
         }
         bool enoughForFirstBatch() const {
-            return !_parsedQuery.isExplain() && _parsedQuery.enoughForFirstBatch( _builder->n(), _buf.len() );
+            return !_parsedQuery.isExplain() && _parsedQuery.enoughForFirstBatch( _bufferedMatches, _buf.len() );
         }
         bool enoughTotalResults() const {
-            return ( _parsedQuery.enough( _builder->n() ) || _buf.len() >= MaxBytesToReturnToClientAtOnce );
+            return ( _parsedQuery.enough( _bufferedMatches ) || _buf.len() >= MaxBytesToReturnToClientAtOnce );
         }
         void finishedFirstBatch() {
             if ( _queryOptimizerCursor ) {
@@ -833,7 +842,7 @@ namespace mongo {
                 _buf.decouple();
                 return 1;
             }
-            int ret = _builder->n();
+            int ret = _bufferedMatches;
             _builder->finish( ret );
             if ( _buf.len() > 0 ) {
                 result.appendData( _buf.buf(), _buf.len() );
@@ -898,6 +907,7 @@ namespace mongo {
         ShardChunkManagerPtr _chunkManager;
         shared_ptr<ExplainRecordingStrategy> _explain;
         shared_ptr<ResponseBuildStrategy> _builder;
+        long long _bufferedMatches;
     };
     
     HybridBuildStrategy::HybridBuildStrategy( const ParsedQuery &parsedQuery,
@@ -907,15 +917,14 @@ namespace mongo {
     _queryOptimizerCursor( dynamic_pointer_cast<QueryOptimizerCursor>( _cursor ) ),
     _scanAndOrder( newScanAndOrder() ) {
     }
-    bool HybridBuildStrategy::addMatch() {
+    bool HybridBuildStrategy::handleMatch() {
         if ( _scanAndOrder ) {
             handleScanAndOrderMatch();
         }
-        bool countMatch = true;
         if ( !iterateNeedsSort() ) {
-            countMatch = addCursorMatchToBuf();
+            return addCursorMatchToBuf();
         }
-        return countMatch;
+        return false;
     }
     bool HybridBuildStrategy::iterateNeedsSort() const {
         if ( !_scanAndOrder ) {
