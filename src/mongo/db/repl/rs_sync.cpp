@@ -491,6 +491,7 @@ namespace mongo {
                         catch (DBException& e) {
                             sethbmsg(str::stream() << "syncTail: " << e.toString() << ", syncing: " << o);
                             veto(target->fullName(), 300);
+                            dbtemprelease tempRelease;
                             sleepsecs(30);
                             return;
                         }
