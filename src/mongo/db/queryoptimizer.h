@@ -590,6 +590,8 @@ namespace mongo {
         void noteIterate( bool match, bool loadedObject );
         
         void noteYield();
+        
+        const QueryPlan *queryPlan() const { return _queryPlan; }
     private:
         void nextClause();
         auto_ptr<MultiPlanScanner> _mps;

@@ -466,7 +466,9 @@ namespace mongo {
         }
         
         virtual const QueryPlan *queryPlan() const {
-            assertOk();
+            if ( _takeover ) {
+                return _takeover->queryPlan();
+            }
             return _currOp ? &_currOp->qp() : 0;
         }
 
