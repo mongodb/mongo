@@ -754,9 +754,11 @@ namespace mongo {
             if ( _scanAndOrder ) {
                 handleScanAndOrderMatch();
             }
+            bool countMatch = true;
             if ( !iterateNeedsSort() ) {
-                handleOrderedMatch();
+                countMatch = handleOrderedMatch();
             }
+            _explain->noteIterate( countMatch, true, false );
             return true;
         }
         void noteYield() {
@@ -857,22 +859,20 @@ namespace mongo {
                 }
             }            
         }
-        void handleOrderedMatch() {
+        bool handleOrderedMatch() {
             DiskLoc loc = _cursor->currLoc();
             if ( _cursor->getsetdup( loc ) ) {
-                return;
+                return false;
             }
             if ( _skip > 0 ) {
                 --_skip;
-                return;
+                return false;
             }
             ++_n;
-            if ( _parsedQuery.isExplain() ) {
-                _explain->noteIterate( true, true, false );
-            }
-            else {
+            if ( !_parsedQuery.isExplain() ) {
                 fillQueryResultFromObj( _buf, _parsedQuery.getFields(), loc.obj(), ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
             }
+            return true;
         }
         bool iterateNeedsSort() const {
             if ( !_scanAndOrder ) {

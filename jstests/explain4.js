@@ -27,7 +27,7 @@ function checkFields( matches, sort, limit ) {
         it.limit( limit );
     }
     explain = it.explain( true );
-    printjson( explain );
+//    printjson( explain );
     checkPlanFields( explain, matches, matches > 0 ? 1 : 0 );
     checkField( "scanAndOrder", sort );
     checkField( "millis" );
