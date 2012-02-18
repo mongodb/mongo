@@ -135,3 +135,4 @@ src/mongo/shell/mongo.cpp
 src/third_party/js-1.7/jsautocfg.h
 src/third_party/js-1.7/jsautokw.h
 buildinfo.cpp
+/.settings/
