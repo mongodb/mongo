@@ -35,6 +35,9 @@ spellchk()
 
 build()
 {
+	# Build from scratch on demand.
+	[ "$1" -eq 0 ] || (cd ../docs && make clean)
+
 	# Run doxygen to generate warnings for the base HTML documentation.
 	#
 	# We omit Python because warnings are expected there (the code generated
@@ -65,9 +68,13 @@ EOF
 	    rm -f navtree.js~)
 }
 
+clean=0
 filter="|sed '/PROJECT_NUMBER/s,=.*,=\"Version $WIREDTIGER_VERSION\",'"
 while :
 	do case "$1" in
+	-a)	# Build from scratch
+		clean=1
+		shift;;
 	-p)     # Generate PDFs
 		filter="$filter| sed '/GENERATE_LATEX/s,=.*,=YES,'"
 		shift;;
@@ -83,6 +90,6 @@ done
 spellchk
 
 # Build the documentation.
-build
+build $clean
 
 exit $e
