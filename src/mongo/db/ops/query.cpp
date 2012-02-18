@@ -725,8 +725,7 @@ namespace mongo {
         }
         virtual ~ResponseBuildStrategy() {}
         virtual bool handleMatch() = 0;
-        virtual void finish( int &ret ) {}
-        virtual void reviseExplain( ExplainQueryInfo &explainInfo ) {}
+        virtual int rewriteMatches() { return -1; }
     protected:
         const ParsedQuery &_parsedQuery;
         shared_ptr<Cursor> _cursor;
@@ -777,13 +776,10 @@ namespace mongo {
             _scanAndOrder->add( _cursor->current(), _parsedQuery.showDiskLoc() ? &loc : 0 );
             return false;
         }
-        virtual void finish( int &ret ) {
-            _buf.reset();
-            _buf.skip( sizeof( QueryResult ) );
+        virtual int rewriteMatches() {
+            int ret = 0;
             _scanAndOrder->fill( _buf, _parsedQuery.getFields(), ret );
-        }
-        virtual void reviseExplain( ExplainQueryInfo &explainInfo ) {
-            explainInfo.reviseN( _scanAndOrder->nout() );
+            return ret;
         }
     private:
         ScanAndOrder *newScanAndOrder() const {
@@ -804,8 +800,7 @@ namespace mongo {
                                  const shared_ptr<Cursor> &cursor,
                                  BufBuilder &buf );
         virtual bool handleMatch();
-        virtual void finish( int &ret );
-        virtual void reviseExplain( ExplainQueryInfo &explainInfo );
+        virtual int rewriteMatches();
     private:
         bool iterateNeedsSort() const;
         bool resultsNeedSort() const;
@@ -861,9 +856,15 @@ namespace mongo {
             }            
         }
         long long handoff( Message &result ) {
+            int rewriteCount = _builder->rewriteMatches();
+            if ( rewriteCount != -1 ) {
+                _bufferedMatches = rewriteCount;
+            }
             if ( _parsedQuery.isExplain() ) {
                 shared_ptr<ExplainQueryInfo> explainInfo = _explain->doneQueryInfo();
-                _builder->reviseExplain( *explainInfo );
+                if ( rewriteCount != -1 ) {
+                    explainInfo->reviseN( rewriteCount );
+                }
                 _buf.reset();
                 _buf.skip( sizeof( QueryResult ) );
                 fillQueryResultFromObj( _buf, 0, explainInfo->bson() );
@@ -871,13 +872,11 @@ namespace mongo {
                 _buf.decouple();
                 return 1;
             }
-            int ret = _bufferedMatches;
-            _builder->finish( ret );
             if ( _buf.len() > 0 ) {
                 result.appendData( _buf.buf(), _buf.len() );
                 _buf.decouple(); // only decouple here ok?
             }
-            return ret;
+            return _bufferedMatches;
         }
     private:
         ShardChunkManagerPtr newChunkManager() const {
@@ -1010,17 +1009,15 @@ namespace mongo {
             }
         }            
     }
-    void HybridBuildStrategy::reviseExplain( ExplainQueryInfo &explainInfo ) {
-        if ( resultsNeedSort() ) {
-            explainInfo.reviseN( _scanAndOrder->nout() );
-        }
-    }
-    void HybridBuildStrategy::finish( int &ret ) {
+    int HybridBuildStrategy::rewriteMatches() {
         if ( resultsNeedSort() ) {
             _buf.reset();
             _buf.skip( sizeof( QueryResult ) );
+            int ret = 0;
             _scanAndOrder->fill( _buf, _parsedQuery.getFields(), ret );
+            return ret;
         }
+        return -1;
     }
     ScanAndOrder *HybridBuildStrategy::newScanAndOrder() const {
         if ( _parsedQuery.getOrder().isEmpty() ) {

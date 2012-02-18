@@ -85,7 +85,6 @@ namespace mongo {
         }
 
         int size() const { return _best.size(); }
-        int nout() const { return (int)_best.size() > _startFrom ? _best.size() - _startFrom : 0; }
 
         /**
          * @throw ScanAndOrderMemoryLimitExceededAssertionCode if adding would grow memory usage
