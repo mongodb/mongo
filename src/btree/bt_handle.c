@@ -67,52 +67,6 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
 }
 
 /*
- * __wt_btree_reopen --
- *	Reset an open btree handle back to its initial state.
- */
-int
-__wt_btree_reopen(WT_SESSION_IMPL *session, uint32_t flags)
-{
-	WT_BTREE *btree;
-
-	btree = session->btree;
-
-	/*
-	 * Clear any existing cache.  The reason for this is because verify and
-	 * salvage don't want to deal with in-memory trees, that is, reads must
-	 * be satisfied from the disk.
-	 */
-	if (btree->root_page != NULL)
-		WT_RET(__wt_evict_file_serial(session, 1));
-	WT_ASSERT(session, btree->root_page == NULL);
-
-	/* After all pages are evicted, update the root's address. */
-	if (btree->root_update) {
-		/*
-		 * Release the original blocks held by the root, that is,
-		 * the blocks listed in the schema file.
-		 */
-		WT_RET(__wt_btree_free_root(session));
-
-		WT_RET(__wt_btree_set_root(session, btree->filename,
-		    btree->root_addr.addr, btree->root_addr.size));
-		if (btree->root_addr.addr != NULL)
-			__wt_free(session, btree->root_addr.addr);
-		btree->root_update = 0;
-	}
-
-	btree->flags = flags;				/* XXX */
-
-	/* Initialize the tree if not a special command. */
-	if (!F_ISSET(btree,
-	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
-		WT_RET(__btree_tree_init(session));
-
-	F_SET(btree, WT_BTREE_OPEN);			/* XXX */
-	return (0);
-}
-
-/*
  * __wt_btree_close --
  *	Close a Btree.
  */

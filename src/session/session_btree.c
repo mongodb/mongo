@@ -77,7 +77,7 @@ __wt_session_lock_btree(
 		 */
 		if (cfg != NULL && LF_ISSET(WT_BTREE_BULK |
 		    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
-			return (__wt_btree_reopen(session, flags));
+			return (__wt_conn_reopen_btree(session, flags));
 		else
 			F_SET(btree, flags);
 	} else if (!LF_ISSET(WT_BTREE_NO_LOCK))
@@ -107,7 +107,7 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	if (F_ISSET(btree, WT_BTREE_BULK |
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)) {
 		WT_ASSERT(session, F_ISSET(btree, WT_BTREE_EXCLUSIVE));
-		ret = __wt_btree_reopen(session, 0);
+		ret = __wt_conn_reopen_btree(session, 0);
 	} else if (F_ISSET(btree, WT_BTREE_EXCLUSIVE))
 		F_CLR(btree, WT_BTREE_EXCLUSIVE);
 
