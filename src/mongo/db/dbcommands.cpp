@@ -437,6 +437,7 @@ namespace mongo {
             result.append( "host" , prettyHostName() );
             result.append("version", versionString);
             result.append("process","mongod");
+            result.append("pid", (int)getpid());
             result.append("uptime",(double) (time(0)-cmdLine.started));
             result.append("uptimeEstimate",(double) (start/1000));
             result.appendDate( "localTime" , jsTime() );

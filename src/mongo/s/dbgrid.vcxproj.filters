@@ -164,9 +164,6 @@
     <ClCompile Include="..\util\concurrency\thread_pool.cpp">
       <Filter>Shared Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\util\version.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\util\text.cpp">
       <Filter>Shared Source Files</Filter>
     </ClCompile>
@@ -175,12 +172,6 @@
     </ClCompile>
     <ClCompile Include="..\util\stringutils.cpp">
       <Filter>Shared Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\client\distlock.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\util\log.cpp">
-      <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="grid.cpp">
       <Filter>Source Files</Filter>
@@ -230,9 +221,6 @@
     <ClCompile Include="..\util\ramlog.cpp">
       <Filter>Shared Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="mr_shard.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\db\common.cpp">
       <Filter>Shared Source Files</Filter>
     </ClCompile>
@@ -242,13 +230,7 @@
     <ClCompile Include="security.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\dbmessage.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\util\net\miniwebserver.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\util\net\listen.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\third_party\pcre-7.4\pcrecpp.cc">
@@ -323,9 +305,6 @@
     <ClCompile Include="..\..\third_party\pcre-7.4\pcreposix.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\util\net\message.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\util\net\message_port.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -386,17 +365,11 @@
     <ClInclude Include="..\client\model.h">
       <Filter>client</Filter>
     </ClInclude>
-    <ClInclude Include="..\util\version.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="balancer_policy.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="grid.h">
       <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\util\processinfo.h">
-      <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\util\signal_handlers.h">
       <Filter>Shared Source Files</Filter>
@@ -446,17 +419,8 @@
     <ClInclude Include="util.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\third_party\pcre-7.4\config.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\third_party\pcre-7.4\pcre.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClCompile Include="..\client\connpool.cpp">
       <Filter>Shared Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\commands\cloud.cpp">
-      <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\db\commands\pipeline.cpp">
       <Filter>Shared Source Files</Filter>
@@ -557,9 +521,6 @@
     <ClCompile Include="..\db\stats\top.cpp">
       <Filter>Shared Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\util\md5.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\db\pipeline\dependency_tracker.cpp">
       <Filter>Shared Source Files</Filter>
     </ClCompile>
@@ -568,6 +529,30 @@
     </ClCompile>
     <ClCompile Include="interrupt_status_mongos.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\commands\cloud.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\dbmessage.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\client\distlock.cpp">
+      <Filter>client</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\net\listen.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\log.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\md5.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\net\message.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\version.cpp">
+      <Filter>Shared Source Files</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -624,6 +609,18 @@
     </ClInclude>
     <ClInclude Include="interrupt_status_mongos.h">
       <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\pcre-7.4\config.h">
+      <Filter>Header Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\third_party\pcre-7.4\pcre.h">
+      <Filter>Header Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\processinfo.h">
+      <Filter>Header Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\version.h">
+      <Filter>Header Shared</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

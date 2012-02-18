@@ -1145,35 +1145,47 @@ def s3push( localName , remoteName=None , remotePrefix=None , fixName=True , pla
 
     findSettingsSetup()
 
-    import simples3
-    import settings
+    try:
+        import settings
+        settings_file = os.path.abspath(settings.__file__)
+    except ImportError:
+        print "could not find settings.py, not attempting push"
+        Exit(2)
 
-    s = simples3.S3Bucket( settings.bucket , settings.id , settings.key )
+    try:
+        bucket_name = settings.bucket
+    except:
+        print "no bucket defined in settings.py, not attempting push"
+        Exit(2)
 
-    if remoteName is None:
+    if not remoteName:
         remoteName = localName
 
     if fixName:
-        (root,dot,suffix) = _rpartition( localName, "." )
+        root, suffix = os.path.splitext(localName)
         name = remoteName + "-" + getSystemInstallName()
         name += remotePrefix
-        if dot == "." :
-            name += "." + suffix
+        # "suffix" contains the dot, if any, or is an empty string
+        name += suffix
         name = name.lower()
     else:
         name = remoteName
-        
+
     if isDriverBuild():
         name = "cxx-driver/" + name
     elif platformDir:
         name = platform + "/" + name
 
-    print( "uploading " + localName + " to http://s3.amazonaws.com/" + s.name + "/" + name )
+    print( "uploading " + localName + " to http://s3.amazonaws.com/" + bucket_name + "/" + name )
     if dontReplacePackage:
-        for ( key , modify , etag , size ) in s.listdir( prefix=name ):
+        if utils.run_s3tool(settings_file, bucket_name, 'exists', name):
             print( "error: already a file with that name, not uploading" )
             Exit(2)
-    s.put( name  , open( localName , "rb" ).read() , acl="public-read" );
+
+    if not utils.run_s3tool(settings_file, bucket_name, 'put', localName, name):
+        print( "error: could not put '%s' to s3 as '%s'" % (localName, name) )
+        Exit(2)
+
     print( "  done uploading!" )
 
 def s3shellpush( env , target , source ):

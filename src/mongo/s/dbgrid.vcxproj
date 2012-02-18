@@ -514,7 +514,6 @@
     <ClCompile Include="..\db\queryutil.cpp" />
     <ClCompile Include="grid.cpp" />
     <ClCompile Include="interrupt_status_mongos.cpp" />
-    <ClCompile Include="mr_shard.cpp" />
     <ClCompile Include="request.cpp" />
     <ClCompile Include="security.cpp" />
     <ClCompile Include="shardconnection.cpp" />

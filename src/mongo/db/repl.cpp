@@ -50,6 +50,7 @@
 #include "replutil.h"
 #include "repl/connections.h"
 #include "ops/update.h"
+#include "pcrecpp.h"
 
 namespace mongo {
 
@@ -765,7 +766,7 @@ namespace mongo {
         string _ns = ns();
         BSONObjBuilder b;
         if ( !only.empty() ) {
-            b.appendRegex("ns", string("^") + only);
+            b.appendRegex("ns", string("^") + pcrecpp::RE::QuoteMeta( only ));
         }
         BSONObj last = oplogReader.findOne( _ns.c_str(), Query( b.done() ).sort( BSON( "$natural" << -1 ) ) );
         if ( !last.isEmpty() ) {
@@ -825,7 +826,8 @@ namespace mongo {
             query.append("ts", q.done());
             if ( !only.empty() ) {
                 // note we may here skip a LOT of data table scanning, a lot of work for the master.
-                query.appendRegex("ns", string("^") + only); // maybe append "\\." here?
+                // maybe append "\\." here?
+                query.appendRegex("ns", string("^") + pcrecpp::RE::QuoteMeta( only ));
             }
             BSONObj queryObj = query.done();
             // e.g. queryObj = { ts: { $gte: syncedTo } }
