@@ -414,6 +414,38 @@ namespace QueryTests {
         }
     };
 
+    class OplogReplaySlaveReadTill : public ClientBase {
+    public:
+        ~OplogReplaySlaveReadTill() {
+            client().dropCollection( "unittests.querytests.OplogReplaySlaveReadTill" );
+        }
+        void run() {
+            const char *ns = "unittests.querytests.OplogReplaySlaveReadTill";
+            BSONObj info;
+            client().runCommand( "unittests",
+                                BSON( "create" << "querytests.OplogReplaySlaveReadTill" <<
+                                     "capped" << true << "size" << 8192 ),
+                                info );
+            Date_t one = OpTime::now().asDate();
+            Date_t two = OpTime::now().asDate();
+            Date_t three = OpTime::now().asDate();
+            insert( ns, BSON( "ts" << one ) );
+            insert( ns, BSON( "ts" << two ) );
+            insert( ns, BSON( "ts" << three ) );
+            auto_ptr<DBClientCursor> c =
+            client().query( ns, QUERY( "ts" << GTE << two ).hint( BSON( "$natural" << 1 ) ),
+                           0, 0, 0, QueryOption_OplogReplay | QueryOption_CursorTailable );
+            ASSERT( c->more() );
+            ASSERT_EQUALS( two, c->next()["ts"].Date() );
+            long long cursorId = c->getCursorId();
+            
+            dblock lk;
+            Client::Context ctx( "unittests.querytests.OplogReplaySlaveReadTill" );
+            ClientCursor::Pointer clientCursor( cursorId );
+            ASSERT_EQUALS( three.millis, clientCursor.c()->getSlaveReadTill().asDate() );
+        }
+    };
+
     class BasicCount : public ClientBase {
     public:
         ~BasicCount() {
@@ -1435,6 +1467,7 @@ namespace QueryTests {
             add< TailCappedOnly >();
             add< TailableQueryOnId >();
             add< OplogReplayMode >();
+            add< OplogReplaySlaveReadTill >();
             add< ArrayId >();
             add< UnderscoreNs >();
             add< EmptyFieldSpec >();

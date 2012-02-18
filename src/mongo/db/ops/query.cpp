@@ -605,8 +605,9 @@ namespace mongo {
         bool wouldSaveClientCursor() const { return _wouldSaveClientCursor; }
 
         void finishForOplogReplay( ClientCursor * cc ) {
-            if ( _oplogReplay && ! _slaveReadTill.isNull() )
+            if ( _oplogReplay && ! _slaveReadTill.isNull() ) {
                 cc->slaveReadTill( _slaveReadTill );
+            }
 
         }
 
@@ -1221,13 +1222,13 @@ namespace mongo {
 //                    log() << "idx: " << cursor->indexKeyPattern() << " obj: " << cursor->current() << endl;
                     
 
-                    // This should happen after matching?
-//                    if ( pq.hasOption( QueryOption_OplogReplay ) ) {
-//                        BSONElement e = js["ts"];
-//                        if ( e.type() == Date || e.type() == Timestamp ) {
-//                            slaveReadTill = e._opTime();
-//                        }
-//                    }
+                    if ( pq.hasOption( QueryOption_OplogReplay ) ) {
+                        BSONObj current = cursor->current();
+                        BSONElement e = current["ts"];
+                        if ( e.type() == Date || e.type() == Timestamp ) {
+                            slaveReadTill = e._opTime();
+                        }
+                    }
                     
                     if ( !cursor->supportGetMore() || pq.isExplain() ) {
                         if ( queryResponseBuilder.enoughTotalResults() ) {
@@ -1266,6 +1267,8 @@ namespace mongo {
                         ccPointer->updateLocation();
                     }
                     ccPointer->originalMessage = m;
+                    if ( pq.hasOption( QueryOption_OplogReplay ) && !slaveReadTill.isNull() )
+                        ccPointer->slaveReadTill( slaveReadTill );
                     ccPointer.release();
                     // undo unlimited timeout
                 }

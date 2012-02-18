@@ -362,6 +362,9 @@ namespace mongo {
         void setDoingDeletes( bool doingDeletes ) {_doingDeletes = doingDeletes; }
 
         void slaveReadTill( const OpTime& t ) { _slaveReadTill = t; }
+        
+        /** Just for testing. */
+        OpTime getSlaveReadTill() const { return _slaveReadTill; }
 
     public: // static methods
 
