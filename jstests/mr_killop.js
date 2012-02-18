@@ -13,12 +13,22 @@ t2.drop();
         debug( p );
         for ( var i in p ) {
             var o = p[ i ];
+            // Identify a map/reduce or where distinct operation by its collection, whether or not
+            // it is currently active.
             if ( where ) {
-                if ( o.active && o.ns == "test.jstests_mr_killop" && o.query && o.query.$where ) {
+                if ( ( o.active || o.waitingForLock ) &&
+                    o.query &&
+                    o.query.query &&
+                    o.query.query.$where &&
+                    o.query.distinct == "jstests_mr_killop" ) {
                     return o.opid;
                 }
-            } else {
-                if ( o.active && o.query && o.query.mapreduce && o.query.mapreduce == "jstests_mr_killop" ) {
+            }
+            else {
+                if ( ( o.active || o.waitingForLock ) &&
+                    o.query &&
+                    o.query.mapreduce &&
+                    o.query.mapreduce == "jstests_mr_killop" ) {
                     return o.opid;
                 }
             }
@@ -30,8 +40,8 @@ t2.drop();
  * Run one map reduce with the specified parameters in a parallel shell, kill the
  * map reduce op or its child op with killOp, and wait for the map reduce op to
  * terminate.
- * @where - if true, a count $where op is killed rather than the map reduce op.
- * This is necessay for a child count $where of a map reduce op because child
+ * @where - if true, a distinct $where op is killed rather than the map reduce op.
+ * This is necessay for a child distinct $where of a map reduce op because child
  * ops currently mask parent ops in currentOp.
  */
     function testOne( map, reduce, finalize, scope, where, wait ) {
@@ -111,14 +121,20 @@ t2.drop();
     var loop = function() {
         while( 1 ) {
             db.jstests_mr_killop.count( { a:1 } );
+            // The test will attempt to kill the mr operation making the above count call.  Sleep to
+            // try and allow the test to see the mr operation (as the count operation will obscure
+            // its parent mr operation).
+            sleep( 113 );
         }
     }
     runMRTests( loop, false );
     // db can't be accessed from finalize() so not running that test
 
-    /** Test that we can kill the child op of a map reduce op */
+    // Test that we can kill the child op of a map reduce op.  The distinct command is used because
+    // its currentOp() output includes namespace information, and it does not suffer from
+    // SERVER-2291 as count does.
     var loop = function() {
-        db.jstests_mr_killop.find( {$where:function() { while( 1 ) { ; } }} ).toArray();
+        db.jstests_mr_killop.distinct( { a:1 }, {$where:function() { while( 1 ) { ; } }} );
     }
     runMRTests( loop, true );
 
