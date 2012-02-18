@@ -1269,6 +1269,10 @@ namespace mongo {
                     ccPointer->originalMessage = m;
                     if ( pq.hasOption( QueryOption_OplogReplay ) && !slaveReadTill.isNull() )
                         ccPointer->slaveReadTill( slaveReadTill );
+                    if ( !ccPointer->ok() && ccPointer->c()->tailable() ) {
+                        DEV tlog() << "query has no more but tailable, cursorid: "
+                            << cursorid << endl;
+                    }
                     ccPointer.release();
                     // undo unlimited timeout
                 }
