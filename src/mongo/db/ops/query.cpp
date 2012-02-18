@@ -759,15 +759,45 @@ namespace mongo {
         long long _skip;        
     };
     
-//    class ReorderBuildStrategy : public ResponseBuildStrategy {
-//    public:
-//        ReorderBuildStrategy( const ParsedQuery &parsedQuery,
-//                             const shared_ptr<Cursor> &cursor,
-//                             BufBuilder &buf ) :
-//        ResponseBuildStrategy( parsedQuery, cursor, buf ) {
-//        }        
-//    };
-//    
+    class ReorderBuildStrategy : public ResponseBuildStrategy {
+    public:
+        ReorderBuildStrategy( const ParsedQuery &parsedQuery,
+                             const shared_ptr<QueryOptimizerCursor> &cursor,
+                             BufBuilder &buf ) :
+        ResponseBuildStrategy( parsedQuery, cursor, buf ),
+        _cursor( cursor ),
+        _scanAndOrder( newScanAndOrder() ) {
+        }
+        virtual bool handleMatch() {
+            DiskLoc loc = _cursor->currLoc();
+            if ( _cursor->getsetdup( loc ) ) {
+                return false;
+            }
+            // TODO exception
+            _scanAndOrder->add( _cursor->current(), _parsedQuery.showDiskLoc() ? &loc : 0 );
+            return false;
+        }
+        virtual void finish( int &ret ) {
+            _buf.reset();
+            _buf.skip( sizeof( QueryResult ) );
+            _scanAndOrder->fill( _buf, _parsedQuery.getFields(), ret );
+        }
+        virtual void reviseExplain( ExplainQueryInfo &explainInfo ) {
+            explainInfo.reviseN( _scanAndOrder->nout() );
+        }
+    private:
+        ScanAndOrder *newScanAndOrder() const {
+            verify( 16078, !_parsedQuery.getOrder().isEmpty() );
+            verify( 16079, _cursor->ok() );
+            return new ScanAndOrder( _parsedQuery.getSkip(),
+                                    _parsedQuery.getNumToReturn(),
+                                    _parsedQuery.getOrder(),
+                                    _cursor->queryPlan()->multikeyFrs() );
+        }
+        shared_ptr<QueryOptimizerCursor> _cursor;
+        shared_ptr<ScanAndOrder> _scanAndOrder;
+    };
+    
     class HybridBuildStrategy : public ResponseBuildStrategy {
     public:
         HybridBuildStrategy( const ParsedQuery &parsedQuery,
@@ -873,9 +903,13 @@ namespace mongo {
             return ret;
         }
         shared_ptr<ResponseBuildStrategy> newResponseBuildStrategy() {
-            if ( !_queryOptimizerCursor ) {
+            if ( !_cursor->ok() || !_queryOptimizerCursor ) {
                 return shared_ptr<ResponseBuildStrategy>
                 ( new OrderedBuildStrategy( _parsedQuery, _cursor, _buf ) );
+            }
+            if ( !_queryOptimizerCursor->multiPlanScanner()->haveOrderedPlan() ) {
+                return shared_ptr<ResponseBuildStrategy>
+                ( new ReorderBuildStrategy( _parsedQuery, _queryOptimizerCursor, _buf ) );
             }
             return shared_ptr<ResponseBuildStrategy>
             ( new HybridBuildStrategy( _parsedQuery, _cursor, _buf ) );
