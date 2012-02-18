@@ -1200,6 +1200,7 @@ namespace mongo {
                 for( ; cursor->ok(); cursor->advance() ) {
                     bool yielded = false;
                     if ( !ccPointer->yieldSometimes( ClientCursor::MaybeCovered, &yielded ) || !cursor->ok() ) {
+                        cursor.reset();
                         queryResponseBuilder.noteYield();
                         break;
                     }
@@ -1246,6 +1247,15 @@ namespace mongo {
                     }
                 }
 
+                if ( cursor ) {
+                    if ( pq.hasOption( QueryOption_CursorTailable ) && pq.getNumToReturn() != 1 )
+                        cursor->setTailable();
+                    
+                    // If the tailing request succeeded.
+                    if ( cursor->tailable() )
+                        cursorid = ccPointer->cursorid();
+                }
+                
                 if ( cursorid == 0 ) {
                     ccPointer.reset();
                 }
