@@ -87,7 +87,7 @@ namespace mongo {
             _c = qp().newCursor();
 
             // The QueryOptimizerCursor::prepareToTouchEarlierIterate() implementation requires _c->prepareToYield() to work.
-//            verify( 15940, _c->supportYields() );
+            verify( 15940, _c->supportYields() );
             _capped = _c->capped();
 
             // TODO This violates the current Cursor interface abstraction, but for now it's simpler to keep our own set of
