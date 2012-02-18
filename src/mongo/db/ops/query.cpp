@@ -1247,12 +1247,14 @@ namespace mongo {
                 }
 
                 if ( cursor ) {
-                    if ( pq.hasOption( QueryOption_CursorTailable ) && pq.getNumToReturn() != 1 )
+                    if ( pq.hasOption( QueryOption_CursorTailable ) && pq.getNumToReturn() != 1 ) {
                         cursor->setTailable();
+                    }
                     
                     // If the tailing request succeeded.
-                    if ( cursor->tailable() )
+                    if ( cursor->tailable() ) {
                         cursorid = ccPointer->cursorid();
+                    }
                 }
                 
                 if ( cursorid == 0 ) {
@@ -1267,8 +1269,9 @@ namespace mongo {
                         ccPointer->updateLocation();
                     }
                     ccPointer->originalMessage = m;
-                    if ( pq.hasOption( QueryOption_OplogReplay ) && !slaveReadTill.isNull() )
+                    if ( pq.hasOption( QueryOption_OplogReplay ) && !slaveReadTill.isNull() ) {
                         ccPointer->slaveReadTill( slaveReadTill );
+                    }
                     if ( !ccPointer->ok() && ccPointer->c()->tailable() ) {
                         DEV tlog() << "query has no more but tailable, cursorid: "
                             << cursorid << endl;
