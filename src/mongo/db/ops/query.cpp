@@ -750,7 +750,9 @@ namespace mongo {
                 return false;
             }
             if ( !_parsedQuery.isExplain() ) {
-                fillQueryResultFromObj( _buf, _parsedQuery.getFields(), loc.obj(), ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
+                BSONObj js = _cursor->current();
+                assert( js.isValid() );
+                fillQueryResultFromObj( _buf, _parsedQuery.getFields(), js, ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
             }
             return true;
         }
@@ -1212,10 +1214,6 @@ namespace mongo {
                         break;
                     }
                     
-                    // right place for this?
-                    BSONObj js = cursor->current();
-                    assert( js.isValid() );
-
                     if ( !queryResponseBuilder.addMatch() ) {
                         continue;
                     }
