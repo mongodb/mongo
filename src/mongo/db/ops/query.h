@@ -78,7 +78,64 @@ namespace mongo {
         virtual shared_ptr<ExplainQueryInfo> _doneQueryInfo();
         shared_ptr<QueryOptimizerCursor> _cursor;
     };
+
+    class ResponseBuildStrategy {
+    public:
+        ResponseBuildStrategy( const ParsedQuery &parsedQuery, const shared_ptr<Cursor> &cursor,
+                              BufBuilder &buf );
+        virtual ~ResponseBuildStrategy() {}
+        virtual bool handleMatch() = 0;
+        virtual int rewriteMatches() { return -1; }
+    protected:
+        BSONObj current() const;
+        const ParsedQuery &_parsedQuery;
+        shared_ptr<Cursor> _cursor;
+        BufBuilder &_buf;
+    };
+
+    class OrderedBuildStrategy : public ResponseBuildStrategy {
+    public:
+        OrderedBuildStrategy( const ParsedQuery &parsedQuery, const shared_ptr<Cursor> &cursor,
+                             BufBuilder &buf );
+        virtual bool handleMatch();
+    private:
+        long long _skip;        
+    };
     
+    class ScanAndOrder;
+    
+    class ReorderBuildStrategy : public ResponseBuildStrategy {
+    public:
+        ReorderBuildStrategy( const ParsedQuery &parsedQuery,
+                             const shared_ptr<Cursor> &cursor,
+                             BufBuilder &buf,
+                             const QueryPlan::Summary &queryPlan );
+        virtual bool handleMatch();
+        virtual int rewriteMatches();
+    private:
+        ScanAndOrder *newScanAndOrder( const QueryPlan::Summary &queryPlan ) const;
+        shared_ptr<ScanAndOrder> _scanAndOrder;
+    };
+
+    class HybridBuildStrategy : public ResponseBuildStrategy {
+    public:
+        HybridBuildStrategy( const ParsedQuery &parsedQuery,
+                            const shared_ptr<Cursor> &cursor,
+                            BufBuilder &buf );
+        virtual bool handleMatch();
+        virtual int rewriteMatches();
+    private:
+        bool iterateNeedsSort() const;
+        bool resultsNeedSort() const;
+        void handleScanAndOrderMatch();
+        bool handleOrderedMatch();
+        ScanAndOrder *newScanAndOrder() const;
+        shared_ptr<QueryOptimizerCursor> _queryOptimizerCursor;
+        shared_ptr<ScanAndOrder> _scanAndOrder;
+        SmallDupSet _scanAndOrderDups;
+        OrderedBuildStrategy _orderedBuild;
+    };
+
 } // namespace mongo
 
 
