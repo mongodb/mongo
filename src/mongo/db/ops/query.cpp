@@ -764,11 +764,11 @@ namespace mongo {
     class ReorderBuildStrategy : public ResponseBuildStrategy {
     public:
         ReorderBuildStrategy( const ParsedQuery &parsedQuery,
-                             const shared_ptr<QueryOptimizerCursor> &cursor,
-                             BufBuilder &buf ) :
+                             const shared_ptr<Cursor> &cursor,
+                             BufBuilder &buf,
+                             const QueryPlan::Summary &queryPlan ) :
         ResponseBuildStrategy( parsedQuery, cursor, buf ),
-        _cursor( cursor ),
-        _scanAndOrder( newScanAndOrder() ) {
+        _scanAndOrder( newScanAndOrder( queryPlan ) ) {
         }
         virtual bool handleMatch() {
             DiskLoc loc = _cursor->currLoc();
@@ -785,15 +785,23 @@ namespace mongo {
             return ret;
         }
     private:
-        ScanAndOrder *newScanAndOrder() const {
+        ScanAndOrder *newScanAndOrder( const QueryPlan::Summary &queryPlan ) const {
             verify( 16078, !_parsedQuery.getOrder().isEmpty() );
             verify( 16079, _cursor->ok() );
+            const FieldRangeSet *fieldRangeSet = 0;
+            if ( queryPlan.valid() ) {
+                fieldRangeSet = queryPlan._fieldRangeSetMulti.get();
+            }
+            else {
+                QueryOptimizerCursor *cursor = dynamic_cast<QueryOptimizerCursor*>( _cursor.get() );
+                verify( 16080, cursor );
+                fieldRangeSet = &cursor->queryPlan()->multikeyFrs();
+            }
             return new ScanAndOrder( _parsedQuery.getSkip(),
                                     _parsedQuery.getNumToReturn(),
                                     _parsedQuery.getOrder(),
-                                    _cursor->queryPlan()->multikeyFrs() );
+                                    *fieldRangeSet );
         }
-        shared_ptr<QueryOptimizerCursor> _cursor;
         shared_ptr<ScanAndOrder> _scanAndOrder;
     };
     
@@ -819,14 +827,14 @@ namespace mongo {
     class QueryResponseBuilder {
     public:
         QueryResponseBuilder( const ParsedQuery &parsedQuery, const shared_ptr<Cursor> &cursor,
-                             const BSONObj &oldPlan ) :
+                             const QueryPlan::Summary &queryPlan, const BSONObj &oldPlan ) :
         _parsedQuery( parsedQuery ),
         _cursor( cursor ),
         _queryOptimizerCursor( dynamic_pointer_cast<QueryOptimizerCursor>( _cursor ) ),
         _buf( 32768 ),
         _chunkManager( newChunkManager() ),
-        _explain( newExplainRecordingStrategy( oldPlan ) ),
-        _builder( newResponseBuildStrategy() ),
+        _explain( newExplainRecordingStrategy( queryPlan, oldPlan ) ),
+        _builder( newResponseBuildStrategy( queryPlan ) ),
         _bufferedMatches() {
             _buf.skip( sizeof( QueryResult ) );
         }
@@ -888,8 +896,8 @@ namespace mongo {
             }
             return shardingState.getShardChunkManager( _parsedQuery.ns() );
         }
-        shared_ptr<ExplainRecordingStrategy> newExplainRecordingStrategy( const BSONObj &oldPlan )
-        const {
+        shared_ptr<ExplainRecordingStrategy> newExplainRecordingStrategy
+        ( const QueryPlan::Summary &queryPlan, const BSONObj &oldPlan ) const {
             ExplainQueryInfo::AncillaryInfo ancillaryInfo;
             ancillaryInfo._oldPlan = oldPlan;
             if ( !_parsedQuery.isExplain() ) {
@@ -901,17 +909,20 @@ namespace mongo {
             }
             shared_ptr<ExplainRecordingStrategy> ret
             ( new SimpleCursorExplainStrategy( ancillaryInfo, _cursor ) );
-            ret->notePlan( false );
+            ret->notePlan( queryPlan.valid() ? queryPlan._scanAndOrderRequired : false );
             return ret;
         }
-        shared_ptr<ResponseBuildStrategy> newResponseBuildStrategy() {
-            if ( !_cursor->ok() || !_queryOptimizerCursor ) {
+        shared_ptr<ResponseBuildStrategy> newResponseBuildStrategy
+        ( const QueryPlan::Summary &queryPlan ) {
+            bool singlePlan = !_queryOptimizerCursor;
+            bool singleOrderedPlan = singlePlan && ( !queryPlan.valid() || !queryPlan._scanAndOrderRequired );
+            if ( !_cursor->ok() || singleOrderedPlan ) {
                 return shared_ptr<ResponseBuildStrategy>
                 ( new OrderedBuildStrategy( _parsedQuery, _cursor, _buf ) );
             }
-            if ( !_queryOptimizerCursor->multiPlanScanner()->haveOrderedPlan() ) {
+            if ( singlePlan || !_queryOptimizerCursor->multiPlanScanner()->haveOrderedPlan() ) {
                 return shared_ptr<ResponseBuildStrategy>
-                ( new ReorderBuildStrategy( _parsedQuery, _queryOptimizerCursor, _buf ) );
+                ( new ReorderBuildStrategy( _parsedQuery, _cursor, _buf, queryPlan ) );
             }
             return shared_ptr<ResponseBuildStrategy>
             ( new HybridBuildStrategy( _parsedQuery, _cursor, _buf ) );
@@ -1184,17 +1195,18 @@ namespace mongo {
         for( int retries = 0; retries < 2; ++retries ) {
         try {
             shared_ptr<Cursor> cursor;
+            QueryPlan::Summary queryPlan;
             if ( pq.hasOption( QueryOption_OplogReplay ) ) {
                 cursor = FindingStartCursor::getCursor( ns, query, order );
             }
             else if ( !pq.returnKey() ) {
-                cursor = NamespaceDetailsTransient::getCursor( ns, query, order, QueryPlanSelectionPolicy::any(), 0, &pq );
+                cursor = NamespaceDetailsTransient::getCursor( ns, query, order, QueryPlanSelectionPolicy::any(), 0, &pq, &queryPlan );
             }
             if ( !cursor ) {
                 break;
             }
             {
-                QueryResponseBuilder queryResponseBuilder( pq, cursor, oldPlan );
+                QueryResponseBuilder queryResponseBuilder( pq, cursor, queryPlan, oldPlan );
                 bool saveClientCursor = false;
                 const char * exhaust = 0;
                 OpTime slaveReadTill;

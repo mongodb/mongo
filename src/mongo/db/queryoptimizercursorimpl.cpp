@@ -602,9 +602,13 @@ namespace mongo {
                                                             const QueryPlanSelectionPolicy
                                                             &planPolicy,
                                                             bool *simpleEqualityMatch,
-                                                            const ParsedQuery *parsedQuery ) {
+                                                            const ParsedQuery *parsedQuery,
+                                                            QueryPlan::Summary *singlePlanSummary ) {
         if ( simpleEqualityMatch ) {
             *simpleEqualityMatch = false;
+        }
+        if ( singlePlanSummary ) {
+            *singlePlanSummary = QueryPlan::Summary();
         }
 
         BSONObj hint;
@@ -662,8 +666,12 @@ namespace mongo {
         
         auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order, hint, ( parsedQuery && parsedQuery->isExplain() ) ? QueryPlanSet::Ignore : QueryPlanSet::Use, parsedQuery ? parsedQuery->getMin() : BSONObj(), parsedQuery ? parsedQuery->getMax() : BSONObj() ) ); // mayYield == false
         const QueryPlan *singlePlan = mps->singlePlan();
-        if ( singlePlan && !singlePlan->scanAndOrderRequired() ) {
+        bool requireOrder = ( parsedQuery == 0 ); // TODO more clear
+        if ( singlePlan && !( requireOrder && singlePlan->scanAndOrderRequired() ) ) {
             if ( planPolicy.permitPlan( *singlePlan ) ) {
+                if ( singlePlanSummary ) {
+                    *singlePlanSummary = singlePlan->summary();
+                }
                 shared_ptr<Cursor> single = singlePlan->newCursor();
                 if ( !query.isEmpty() && !single->matcher() ) {
                     shared_ptr<CoveredIndexMatcher> matcher( new CoveredIndexMatcher( query, single->indexKeyPattern() ) );
@@ -680,7 +688,6 @@ namespace mongo {
         if ( parsedQuery && parsedQuery->isExplain() ) {
             mps->generateExplainInfo();
         }
-        bool requireOrder = ( parsedQuery == 0 );
         return newQueryOptimizerCursor( mps, planPolicy, requireOrder );
     }
 

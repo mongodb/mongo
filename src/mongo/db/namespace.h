@@ -473,7 +473,8 @@ namespace mongo {
                                             const QueryPlanSelectionPolicy &planPolicy =
                                             QueryPlanSelectionPolicy::any(),
                                             bool *simpleEqualityMatch = 0,
-                                            const ParsedQuery *parsedQuery = 0 );
+                                            const ParsedQuery *parsedQuery = 0,
+                                            QueryPlan::Summary *singlePlanSummary = 0 );
 
         /**
          * @return a single cursor that may work well for the given query.  A $or style query will

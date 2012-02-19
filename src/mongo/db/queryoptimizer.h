@@ -98,6 +98,20 @@ namespace mongo {
         shared_ptr<FieldRangeVector> frv() const { return _frv; }
         bool isMultiKey() const;
         
+        struct Summary {
+            Summary() :
+            _scanAndOrderRequired() {
+            }
+            Summary( const QueryPlan &queryPlan ) :
+            _fieldRangeSetMulti( new FieldRangeSet( queryPlan._frsMulti ) ),
+            _scanAndOrderRequired( queryPlan._scanAndOrderRequired ) {
+            }
+            bool valid() const { return _fieldRangeSetMulti; }
+            shared_ptr<FieldRangeSet> _fieldRangeSetMulti;
+            bool _scanAndOrderRequired;
+        };
+        Summary summary() const { return Summary( *this ); }
+        
     private:
         void checkTableScanAllowed() const;
         void warnOnCappedIdTableScan() const;
