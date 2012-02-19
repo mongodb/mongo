@@ -1126,7 +1126,7 @@ namespace mongo {
     }
 
     FieldRangeSet *FieldRangeSet::subset( const BSONObj &fields ) const {
-        FieldRangeSet *ret = new FieldRangeSet( _ns, BSONObj(), _singleKey, true );
+        FieldRangeSet *ret = new FieldRangeSet( ns(), BSONObj(), _singleKey, true );
         BSONObjIterator i( fields );
         while( i.more() ) {
             BSONElement e = i.next();

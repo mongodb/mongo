@@ -367,7 +367,7 @@ namespace mongo {
          */
         bool matchPossibleForIndex( const BSONObj &keyPattern ) const;
         
-        const char *ns() const { return _ns; }
+        const char *ns() const { return _ns.c_str(); }
         
         /**
          * @return a simplified query from the extreme values of the non universal
@@ -423,7 +423,7 @@ namespace mongo {
         static FieldRange *__multiKeyUniversalRange;
         const FieldRange &universalRange() const;
         map<string,FieldRange> _ranges;
-        const char *_ns;
+        string _ns;
         // Owns memory for FieldRange BSONElements.
         vector<BSONObj> _queries;
         bool _singleKey;

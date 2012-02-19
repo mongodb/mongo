@@ -902,6 +902,18 @@ namespace QueryUtilTests {
                 fieldRangeSet.toString(); // Just test that we don't crash.
             }
         };
+        
+        class Namespace {
+        public:
+            void run() {
+                shared_ptr<FieldRangeSet> frs;
+                {
+                    string ns = str::stream() << "foo";
+                    frs.reset( new FieldRangeSet( ns.c_str(), BSONObj(), true ) );
+                }
+                ASSERT_EQUALS( string( "foo" ), frs->ns() );
+            }
+        };
 
         class Intersect {
         public:
@@ -1247,6 +1259,7 @@ namespace QueryUtilTests {
             add<FieldRangeTests::DiffMulti2>();
             add<FieldRangeTests::Universal>();
             add<FieldRangeSetTests::ToString>();
+            add<FieldRangeSetTests::Namespace>();
             add<FieldRangeSetTests::Intersect>();
             add<FieldRangeSetTests::MultiKeyIntersect>();
             add<FieldRangeSetTests::EmptyMultiKeyIntersect>();
