@@ -1196,6 +1196,7 @@ namespace mongo {
             {
                 QueryResponseBuilder queryResponseBuilder( pq, cursor, oldPlan );
                 long long cursorid = 0;
+                const char * exhaust = 0;
                 OpTime slaveReadTill;
                 ClientCursor::CleanupPointer ccPointer;
                 ccPointer.reset( new ClientCursor( QueryOption_NoCursorTimeout, cursor, ns ) );
@@ -1276,6 +1277,10 @@ namespace mongo {
                         DEV tlog() << "query has no more but tailable, cursorid: "
                             << cursorid << endl;
                     }
+                    if( queryOptions & QueryOption_Exhaust ) {
+                        exhaust = ns;
+                        curop.debug().exhaust = true;
+                    }
                     ccPointer.release();
                     // undo unlimited timeout
                 }
@@ -1289,7 +1294,7 @@ namespace mongo {
                 qr->setOperation(opReply);
                 qr->startingFrom = 0;
                 qr->nReturned = nReturned;
-                return 0;
+                return exhaust;
             }
         } catch ( const UserException &u ) {
             if ( retries != 0 || u.getCode() != ScanAndOrderMemoryLimitExceededAssertionCode ) {
