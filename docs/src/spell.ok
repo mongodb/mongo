@@ -20,6 +20,7 @@ LIBS
 LSB
 MERCHANTABILITY
 MVCC's
+NoSQL
 RepMgr
 Rrx
 TimesTen's
@@ -73,6 +74,7 @@ dNOff
 dT
 dataN
 dataitem
+datasets
 dbc
 dbm
 dbt
@@ -185,6 +187,7 @@ noflush
 nolocking
 nommap
 nop
+nosql
 nosync
 notgranted
 notyet
@@ -230,6 +233,7 @@ rpc
 rwlock
 rx
 sHQ
+scalable
 scanf
 schemas
 selectable
