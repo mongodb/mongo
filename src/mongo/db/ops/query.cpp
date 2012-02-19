@@ -1053,7 +1053,135 @@ namespace mongo {
                                 _parsedQuery.getOrder(),
                                 _queryOptimizerCursor->queryPlan()->multikeyFrs() );
     }
-                                 
+
+    const char *queryWithQueryOptimizer( Message &m, int queryOptions, const char *ns,
+                                        const BSONObj &jsobj, CurOp& curop,
+                                        const BSONObj &query, const BSONObj &order,
+                                        const ParsedQuery &pq, const BSONObj &oldPlan,
+                                        const ConfigVersion &shardingVersionAtStart,
+                                        Message &result ) {
+        shared_ptr<Cursor> cursor;
+        QueryPlan::Summary queryPlan;
+        if ( pq.hasOption( QueryOption_OplogReplay ) ) {
+            cursor = FindingStartCursor::getCursor( ns, query, order );
+        }
+        else {
+            cursor =
+            NamespaceDetailsTransient::getCursor( ns, query, order, QueryPlanSelectionPolicy::any(),
+                                                 0, &pq, &queryPlan );
+        }
+        verify( 16081, cursor );
+        
+        QueryResponseBuilder queryResponseBuilder( pq, cursor, queryPlan, oldPlan );
+        bool saveClientCursor = false;
+        const char * exhaust = 0;
+        OpTime slaveReadTill;
+        ClientCursor::CleanupPointer ccPointer;
+        ccPointer.reset( new ClientCursor( QueryOption_NoCursorTimeout, cursor, ns ) );
+        
+        for( ; cursor->ok(); cursor->advance() ) {
+            bool yielded = false;
+            if ( !ccPointer->yieldSometimes( ClientCursor::MaybeCovered, &yielded ) ||
+                !cursor->ok() ) {
+                cursor.reset();
+                queryResponseBuilder.noteYield();
+                break;
+            }
+            if ( yielded ) {
+                queryResponseBuilder.noteYield();
+            }
+            
+            if ( pq.getMaxScan() && cursor->nscanned() > pq.getMaxScan() ) {
+                break;
+            }
+            
+            if ( !queryResponseBuilder.addMatch() ) {
+                continue;
+            }
+            
+            if ( pq.hasOption( QueryOption_OplogReplay ) ) {
+                BSONObj current = cursor->current();
+                BSONElement e = current["ts"];
+                if ( e.type() == Date || e.type() == Timestamp ) {
+                    slaveReadTill = e._opTime();
+                }
+            }
+            
+            if ( !cursor->supportGetMore() || pq.isExplain() ) {
+                if ( queryResponseBuilder.enoughTotalResults() ) {
+                    break;
+                }
+            }
+            else if ( queryResponseBuilder.enoughForFirstBatch() ) {
+                // if only 1 requested, no cursor saved for efficiency...we assume it is findOne()
+                if ( pq.wantMore() && pq.getNumToReturn() != 1 ) {
+                    queryResponseBuilder.finishedFirstBatch();
+                    cursor->advance();
+                    saveClientCursor = true;
+                }
+                break;
+            }
+        }
+        
+        if ( cursor ) {
+            if ( pq.hasOption( QueryOption_CursorTailable ) && pq.getNumToReturn() != 1 ) {
+                cursor->setTailable();
+            }
+            
+            // If the tailing request succeeded.
+            if ( cursor->tailable() ) {
+                saveClientCursor = true;
+            }
+        }
+        
+        if ( shardingState.getVersion( ns ) != shardingVersionAtStart ) {
+            // if the version changed during the query
+            // we might be missing some data
+            // and its safe to send this as mongos can resend
+            // at this point
+            throw SendStaleConfigException( ns , "version changed during initial query" );
+        }
+        
+        ccPointer.reset();
+        long long cursorid = 0;
+        if ( saveClientCursor ) {
+            ccPointer.reset( new ClientCursor( queryOptions, cursor, ns,
+                                              jsobj.getOwned() ) );
+            cursorid = ccPointer->cursorid();
+            if ( cursor->supportYields() ) {
+                ClientCursor::YieldData data;
+                ccPointer->prepareToYield( data );
+            }
+            else {
+                ccPointer->updateLocation();
+            }
+            ccPointer->originalMessage = m;
+            if ( pq.hasOption( QueryOption_OplogReplay ) && !slaveReadTill.isNull() ) {
+                ccPointer->slaveReadTill( slaveReadTill );
+            }
+            if ( !ccPointer->ok() && ccPointer->c()->tailable() ) {
+                DEV tlog() << "query has no more but tailable, cursorid: "
+                << cursorid << endl;
+            }
+            if( queryOptions & QueryOption_Exhaust ) {
+                exhaust = ns;
+                curop.debug().exhaust = true;
+            }
+            ccPointer.release();
+        }
+        
+        long long nReturned = queryResponseBuilder.handoff( result );
+        QueryResult *qr = (QueryResult *) result.header();
+        qr->cursorId = cursorid;
+        qr->setResultFlagsToOk();
+        // qr->len is updated automatically by appendData()
+        curop.debug().responseLength = qr->len;
+        qr->setOperation(opReply);
+        qr->startingFrom = 0;
+        qr->nReturned = nReturned;
+        return exhaust;
+    }
+    
     /* run a query -- includes checking for and running a Command \
        @return points to ns if exhaust mode. 0=normal mode
     */
@@ -1191,147 +1319,31 @@ namespace mongo {
             }
         }
         
+        // regular, not QO bypass query
+        
         // TODO clean this up a bit.
         BSONObj oldPlan;
         if ( explain && ! pq.hasIndexSpecifier() ) {
             MultiPlanScanner mps( ns, query, order );
             if ( mps.usingCachedPlan() ) {
-                oldPlan = mps.oldExplain().firstElement().embeddedObject().firstElement().embeddedObject().getOwned();
+                oldPlan =
+                mps.oldExplain().firstElement().embeddedObject()
+                .firstElement().embeddedObject().getOwned();
             }
         }
 
-        for( int retries = 0; retries < 2; ++retries ) {
-        try {
-            shared_ptr<Cursor> cursor;
-            QueryPlan::Summary queryPlan;
-            if ( pq.hasOption( QueryOption_OplogReplay ) ) {
-                cursor = FindingStartCursor::getCursor( ns, query, order );
-            }
-            else {
-                cursor = NamespaceDetailsTransient::getCursor( ns, query, order, QueryPlanSelectionPolicy::any(), 0, &pq, &queryPlan );
-            }
-            verify( 16081, cursor );
-            {
-                QueryResponseBuilder queryResponseBuilder( pq, cursor, queryPlan, oldPlan );
-                bool saveClientCursor = false;
-                const char * exhaust = 0;
-                OpTime slaveReadTill;
-                ClientCursor::CleanupPointer ccPointer;
-                ccPointer.reset( new ClientCursor( QueryOption_NoCursorTimeout, cursor, ns ) );
-
-                for( ; cursor->ok(); cursor->advance() ) {
-                    bool yielded = false;
-                    if ( !ccPointer->yieldSometimes( ClientCursor::MaybeCovered, &yielded ) || !cursor->ok() ) {
-                        cursor.reset();
-                        queryResponseBuilder.noteYield();
-                        break;
-                    }
-                    if ( yielded ) {
-                        queryResponseBuilder.noteYield();
-                    }
-
-                    if ( pq.getMaxScan() && cursor->nscanned() > pq.getMaxScan() ) {
-                        break;
-                    }
-                    
-                    if ( !queryResponseBuilder.addMatch() ) {
-                        continue;
-                    }
-                    
-//                    log() << "idx: " << cursor->indexKeyPattern() << " obj: " << cursor->current() << endl;
-                    
-
-                    if ( pq.hasOption( QueryOption_OplogReplay ) ) {
-                        BSONObj current = cursor->current();
-                        BSONElement e = current["ts"];
-                        if ( e.type() == Date || e.type() == Timestamp ) {
-                            slaveReadTill = e._opTime();
-                        }
-                    }
-                    
-                    if ( !cursor->supportGetMore() || pq.isExplain() ) {
-                        if ( queryResponseBuilder.enoughTotalResults() ) {
-                            break;
-                        }
-                    }
-                    else if ( queryResponseBuilder.enoughForFirstBatch() ) {
-                        /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
-                        if ( pq.wantMore() && pq.getNumToReturn() != 1 ) {
-                            queryResponseBuilder.finishedFirstBatch();
-                            cursor->advance();
-                            saveClientCursor = true;
-                        }
-                        break;
-                    }
+        for( int retry = 0; retry < 2; ++retry ) {
+            try {
+                return queryWithQueryOptimizer( m, queryOptions, ns, jsobj, curop, query, order, pq,
+                                               oldPlan, shardingVersionAtStart, result );
+            } catch ( const UserException &u ) {
+                if ( retry > 0 || u.getCode() != ScanAndOrderMemoryLimitExceededAssertionCode ) {
+                    throw;
                 }
-
-                if ( cursor ) {
-                    if ( pq.hasOption( QueryOption_CursorTailable ) && pq.getNumToReturn() != 1 ) {
-                        cursor->setTailable();
-                    }
-                    
-                    // If the tailing request succeeded.
-                    if ( cursor->tailable() ) {
-                        saveClientCursor = true;
-                    }
-                }
-                
-                if ( shardingState.getVersion( ns ) != shardingVersionAtStart ) {
-                    // if the version changed during the query
-                    // we might be missing some data
-                    // and its safe to send this as mongos can resend
-                    // at this point
-                    throw SendStaleConfigException( ns , "version changed during initial query" );
-                }
-
-                ccPointer.reset();
-                long long cursorid = 0;
-                if ( saveClientCursor ) {
-                    ccPointer.reset( new ClientCursor( queryOptions, cursor, ns,
-                                                      jsobj.getOwned() ) );
-                    cursorid = ccPointer->cursorid();
-                    if ( cursor->supportYields() ) {
-                        ClientCursor::YieldData data;
-                        ccPointer->prepareToYield( data );
-                    }
-                    else {
-                        ccPointer->updateLocation();
-                    }
-                    ccPointer->originalMessage = m;
-                    if ( pq.hasOption( QueryOption_OplogReplay ) && !slaveReadTill.isNull() ) {
-                        ccPointer->slaveReadTill( slaveReadTill );
-                    }
-                    if ( !ccPointer->ok() && ccPointer->c()->tailable() ) {
-                        DEV tlog() << "query has no more but tailable, cursorid: "
-                            << cursorid << endl;
-                    }
-                    if( queryOptions & QueryOption_Exhaust ) {
-                        exhaust = ns;
-                        curop.debug().exhaust = true;
-                    }
-                    ccPointer.release();
-                }
-
-                long long nReturned = queryResponseBuilder.handoff( result );
-                QueryResult *qr = (QueryResult *) result.header();
-                qr->cursorId = cursorid;
-                qr->setResultFlagsToOk();
-                // qr->len is updated automatically by appendData()
-                curop.debug().responseLength = qr->len;
-                qr->setOperation(opReply);
-                qr->startingFrom = 0;
-                qr->nReturned = nReturned;
-                return exhaust;
-            }
-        } catch ( const UserException &u ) {
-            if ( retries != 0 || u.getCode() != ScanAndOrderMemoryLimitExceededAssertionCode ) {
-                throw;
             }
         }
-        }
-
-        // regular, not QO bypass query
-
+        verify( 16082, false );
+        
         {
         BSONObj oldPlan;
         if ( explain && ! pq.hasIndexSpecifier() ) {
