@@ -439,8 +439,6 @@ namespace QueryTests {
             ASSERT_EQUALS( two, c->next()["ts"].Date() );
             long long cursorId = c->getCursorId();
             
-            dblock lk;
-            Client::Context ctx( "unittests.querytests.OplogReplaySlaveReadTill" );
             ClientCursor::Pointer clientCursor( cursorId );
             ASSERT_EQUALS( three.millis, clientCursor.c()->getSlaveReadTill().asDate() );
         }
@@ -1225,7 +1223,7 @@ namespace QueryTests {
             ASSERT_EQUALS( unknownAddress.toString(), result[ "you" ].str() );
         }
     };
-
+    
     namespace parsedtests {
         class basic1 {
         public:
