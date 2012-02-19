@@ -122,12 +122,12 @@ var loop = function() {
 runMRTests( loop, false );
 runFinalizeTests( loop, false );
 
+// The test will attempt to kill the mr operation making the above count call.  Sleep to
+// try and allow the test to see the mr operation (as the count operation will obscure
+// its parent mr operation).
 var loop = function() {
     while( 1 ) {
         db.jstests_mr_killop.count( { a:1 } );
-        // The test will attempt to kill the mr operation making the above count call.  Sleep to
-        // try and allow the test to see the mr operation (as the count operation will obscure
-        // its parent mr operation).
         sleep( 113 );
     }
 }
