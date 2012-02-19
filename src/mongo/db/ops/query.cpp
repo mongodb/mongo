@@ -728,6 +728,14 @@ namespace mongo {
         virtual bool handleMatch() = 0;
         virtual int rewriteMatches() { return -1; }
     protected:
+        BSONObj current() const {
+            if ( !_parsedQuery.returnKey() ) {
+                return _cursor->current();
+            }
+            BSONObjBuilder bob;
+            bob.appendKeys( _cursor->indexKeyPattern(), _cursor->currKey() );
+            return bob.obj();
+        }
         const ParsedQuery &_parsedQuery;
         shared_ptr<Cursor> _cursor;
         BufBuilder &_buf;
@@ -753,7 +761,7 @@ namespace mongo {
             if ( !_parsedQuery.isExplain() ) {
                 BSONObj js = _cursor->current();
                 assert( js.isValid() );
-                fillQueryResultFromObj( _buf, _parsedQuery.getFields(), js, ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
+                fillQueryResultFromObj( _buf, _parsedQuery.getFields(), current(), ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
             }
             return true;
         }
@@ -776,7 +784,7 @@ namespace mongo {
                 return false;
             }
             // TODO exception
-            _scanAndOrder->add( _cursor->current(), _parsedQuery.showDiskLoc() ? &loc : 0 );
+            _scanAndOrder->add( current(), _parsedQuery.showDiskLoc() ? &loc : 0 );
             return false;
         }
         virtual int rewriteMatches() {
@@ -1005,7 +1013,7 @@ namespace mongo {
             return;
         }
         try {
-            _scanAndOrder->add( _cursor->current(), _parsedQuery.showDiskLoc() ? &loc : 0 );
+            _scanAndOrder->add( current(), _parsedQuery.showDiskLoc() ? &loc : 0 );
         } catch ( const UserException &e ) {
             bool rethrow = true;
             if ( e.getCode() == ScanAndOrderMemoryLimitExceededAssertionCode ) {
@@ -1199,12 +1207,10 @@ namespace mongo {
             if ( pq.hasOption( QueryOption_OplogReplay ) ) {
                 cursor = FindingStartCursor::getCursor( ns, query, order );
             }
-            else if ( !pq.returnKey() ) {
+            else {
                 cursor = NamespaceDetailsTransient::getCursor( ns, query, order, QueryPlanSelectionPolicy::any(), 0, &pq, &queryPlan );
             }
-            if ( !cursor ) {
-                break;
-            }
+            verify( 16081, cursor );
             {
                 QueryResponseBuilder queryResponseBuilder( pq, cursor, queryPlan, oldPlan );
                 bool saveClientCursor = false;

@@ -16,7 +16,7 @@ function r( a ){
 }
 
 for ( i=1; i<4; i++ ){
-    o = { _id : i , x : -i, y : -i }
+    o = { _id : i , x : -i }
     t.insert( o );
     all.push( o );
     ids.push( { _id : i } );
@@ -36,11 +36,11 @@ assert.eq( r( xs ) , t.find().sort( { x : 1 } )._addSpecial( "$returnKey" , true
 
 assert.eq( r( xs ) , t.find().hint( { x : 1 } )._addSpecial( "$returnKey" , true ).toArray() , "B4" )
 
-if ( 0 ) { // SERVER-4981
-assert.eq( r( xs ) ,
-          t.find().hint( { x : 1 } ).sort( { y : 1 } )._addSpecial( "$returnKey" , true ).toArray()
+// SERVER-4981
+t.ensureIndex( { _id : 1 , x : 1 } );
+assert.eq( r( all ) ,
+          t.find().hint( { _id : 1 , x : 1 } ).sort( { x : 1 } )._addSpecial( "$returnKey" , true ).toArray()
           )
-}
 
 assert.eq( [ {}, {}, {} ],
           t.find().hint( { $natural : 1 } )._addSpecial( "$returnKey" , true ).toArray() )
