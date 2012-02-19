@@ -1258,6 +1258,14 @@ namespace mongo {
                     }
                 }
                 
+                if ( shardingState.getVersion( ns ) != shardingVersionAtStart ) {
+                    // if the version changed during the query
+                    // we might be missing some data
+                    // and its safe to send this as mongos can resend
+                    // at this point
+                    throw SendStaleConfigException( ns , "version changed during initial query" );
+                }
+
                 if ( cursorid == 0 ) {
                     ccPointer.reset();
                 }
