@@ -1195,7 +1195,7 @@ namespace mongo {
             }
             {
                 QueryResponseBuilder queryResponseBuilder( pq, cursor, oldPlan );
-                long long cursorid = 0;
+                bool saveClientCursor = false;
                 const char * exhaust = 0;
                 OpTime slaveReadTill;
                 ClientCursor::CleanupPointer ccPointer;
@@ -1241,7 +1241,7 @@ namespace mongo {
                         if ( pq.wantMore() && pq.getNumToReturn() != 1 ) {
                             queryResponseBuilder.finishedFirstBatch();
                             cursor->advance();
-                            cursorid = ccPointer->cursorid();
+                            saveClientCursor = true;
                         }
                         break;
                     }
@@ -1254,7 +1254,7 @@ namespace mongo {
                     
                     // If the tailing request succeeded.
                     if ( cursor->tailable() ) {
-                        cursorid = ccPointer->cursorid();
+                        saveClientCursor = true;
                     }
                 }
                 
@@ -1266,10 +1266,12 @@ namespace mongo {
                     throw SendStaleConfigException( ns , "version changed during initial query" );
                 }
 
-                if ( cursorid == 0 ) {
-                    ccPointer.reset();
-                }
-                else {
+                ccPointer.reset();
+                long long cursorid = 0;
+                if ( saveClientCursor ) {
+                    ccPointer.reset( new ClientCursor( queryOptions, cursor, ns,
+                                                      jsobj.getOwned() ) );
+                    cursorid = ccPointer->cursorid();
                     if ( cursor->supportYields() ) {
                         ClientCursor::YieldData data;
                         ccPointer->prepareToYield( data );
@@ -1290,7 +1292,6 @@ namespace mongo {
                         curop.debug().exhaust = true;
                     }
                     ccPointer.release();
-                    // undo unlimited timeout
                 }
 
                 long long nReturned = queryResponseBuilder.handoff( result );

@@ -1248,6 +1248,30 @@ namespace QueryTests {
             ASSERT_EQUALS( string( ns() ), exhaust );
         }
     };
+
+    class QueryCursorTimeout : public ClientBase {
+    public:
+        ~QueryCursorTimeout() {
+            client().dropCollection( "unittests.querytests.QueryCursorTimeout" );
+        }
+        void run() {
+            const char *ns = "unittests.querytests.QueryCursorTimeout";
+            for( int i = 0; i < 150; ++i ) {
+                insert( ns, BSONObj() );
+            }
+            auto_ptr<DBClientCursor> c = client().query( ns, Query() );
+            ASSERT( c->more() );
+            long long cursorId = c->getCursorId();
+            
+            ClientCursor *clientCursor = 0;
+            {
+                ClientCursor::Pointer clientCursorPointer( cursorId );
+                clientCursor = clientCursorPointer.c();
+                // clientCursorPointer destructor unpins the cursor.
+            }
+            ASSERT( clientCursor->shouldTimeout( 600001 ) );
+        }
+    };
     
     namespace parsedtests {
         class basic1 {
@@ -1521,6 +1545,7 @@ namespace QueryTests {
             add< FindingStartStale >();
             add< WhatsMyUri >();
             add< Exhaust >();
+            add< QueryCursorTimeout >();
 
             add< parsedtests::basic1 >();
 
