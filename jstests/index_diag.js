@@ -38,9 +38,23 @@ assert.eq( r( xs ) , t.find().hint( { x : 1 } )._addSpecial( "$returnKey" , true
 
 // SERVER-4981
 t.ensureIndex( { _id : 1 , x : 1 } );
+assert.eq( all ,
+          t.find().hint( { _id : 1 , x : 1 } )._addSpecial( "$returnKey" , true ).toArray()
+          )
 assert.eq( r( all ) ,
-          t.find().hint( { _id : 1 , x : 1 } ).sort( { x : 1 } )._addSpecial( "$returnKey" , true ).toArray()
+          t.find().hint( { _id : 1 , x : 1 } ).sort( { x : 1 } )
+          ._addSpecial( "$returnKey" , true ).toArray()
           )
 
-assert.eq( [ {}, {}, {} ],
+// Descriptive test that a query involving multiple plans may return keys from multiple indexes.
+t.dropIndex( { _id : 1 , x : 1 } );
+ret =
+t.find( { _id : { $gt : -10 }, x : { $gt : -10 } } )._addSpecial( "$returnKey" , true ).toArray()
+keys = {};
+for( i in ret ) {
+    Object.extend( keys, ret[ i ] );
+}
+assert.eq( [ "_id" , "x" ], Object.keySet( keys ).sort() );
+
+assert.eq( [ {} , {} , {} ],
           t.find().hint( { $natural : 1 } )._addSpecial( "$returnKey" , true ).toArray() )
