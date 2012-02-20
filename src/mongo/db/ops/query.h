@@ -25,6 +25,7 @@
 #include "../diskloc.h"
 #include "../explain.h"
 #include "../queryoptimizercursor.h"
+#include "../../s/d_chunk_manager.h"
 
 // struct QueryOptions, QueryResult, QueryResultFlags in:
 #include "../../client/dbclient.h"
@@ -141,6 +142,32 @@ namespace mongo {
         OrderedBuildStrategy _orderedBuild;
     };
 
+    class QueryResponseBuilder {
+    public:
+        QueryResponseBuilder( const ParsedQuery &parsedQuery, const shared_ptr<Cursor> &cursor,
+                             const QueryPlan::Summary &queryPlan, const BSONObj &oldPlan );
+        bool addMatch();
+        void noteYield();
+        bool enoughForFirstBatch() const;
+        bool enoughTotalResults() const;
+        void finishedFirstBatch();
+        long long handoff( Message &result );
+    private:
+        ShardChunkManagerPtr newChunkManager() const;
+        shared_ptr<ExplainRecordingStrategy> newExplainRecordingStrategy
+        ( const QueryPlan::Summary &queryPlan, const BSONObj &oldPlan ) const;
+        shared_ptr<ResponseBuildStrategy> newResponseBuildStrategy
+        ( const QueryPlan::Summary &queryPlan );
+        bool currentMatches();
+        bool chunkMatches();
+        const ParsedQuery &_parsedQuery;
+        shared_ptr<Cursor> _cursor;
+        shared_ptr<QueryOptimizerCursor> _queryOptimizerCursor;
+        BufBuilder _buf;
+        ShardChunkManagerPtr _chunkManager;
+        shared_ptr<ExplainRecordingStrategy> _explain;
+        shared_ptr<ResponseBuildStrategy> _builder;
+        long long _bufferedMatches;
+    };
+
 } // namespace mongo
-
-

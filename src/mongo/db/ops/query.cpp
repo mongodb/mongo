@@ -889,137 +889,138 @@ namespace mongo {
                                 _queryOptimizerCursor->queryPlan()->multikeyFrs() );
     }
     
-    class QueryResponseBuilder {
-    public:
-        QueryResponseBuilder( const ParsedQuery &parsedQuery, const shared_ptr<Cursor> &cursor,
-                             const QueryPlan::Summary &queryPlan, const BSONObj &oldPlan ) :
-        _parsedQuery( parsedQuery ),
-        _cursor( cursor ),
-        _queryOptimizerCursor( dynamic_pointer_cast<QueryOptimizerCursor>( _cursor ) ),
-        _buf( 32768 ),
-        _chunkManager( newChunkManager() ),
-        _explain( newExplainRecordingStrategy( queryPlan, oldPlan ) ),
-        _builder( newResponseBuildStrategy( queryPlan ) ),
-        _bufferedMatches() {
-            _buf.skip( sizeof( QueryResult ) );
+    QueryResponseBuilder::QueryResponseBuilder( const ParsedQuery &parsedQuery,
+                                               const shared_ptr<Cursor> &cursor,
+                                               const QueryPlan::Summary &queryPlan,
+                                               const BSONObj &oldPlan ) :
+    _parsedQuery( parsedQuery ),
+    _cursor( cursor ),
+    _queryOptimizerCursor( dynamic_pointer_cast<QueryOptimizerCursor>( _cursor ) ),
+    _buf( 32768 ),
+    _chunkManager( newChunkManager() ),
+    _explain( newExplainRecordingStrategy( queryPlan, oldPlan ) ),
+    _builder( newResponseBuildStrategy( queryPlan ) ),
+    _bufferedMatches() {
+        _buf.skip( sizeof( QueryResult ) );
+    }
+
+    bool QueryResponseBuilder::addMatch() {
+        if ( !currentMatches() ) {
+            return false;
         }
-        bool addMatch() {
-            if ( !currentMatches() ) {
-                return false;
+        if ( !chunkMatches() ) {
+            return false;
+        }
+        bool bufferedMatch = _builder->handleMatch();
+        _explain->noteIterate( bufferedMatch, true, false );
+        if ( bufferedMatch ) {
+            ++_bufferedMatches;
+        }
+        return true;
+    }
+
+    void QueryResponseBuilder::noteYield() {
+        _explain->noteYield();
+    }
+
+    bool QueryResponseBuilder::enoughForFirstBatch() const {
+        return !_parsedQuery.isExplain() && _parsedQuery.enoughForFirstBatch( _bufferedMatches, _buf.len() );
+    }
+
+    bool QueryResponseBuilder::enoughTotalResults() const {
+        return ( _parsedQuery.enough( _bufferedMatches ) || _buf.len() >= MaxBytesToReturnToClientAtOnce );
+    }
+
+    void QueryResponseBuilder::finishedFirstBatch() {
+        if ( _queryOptimizerCursor ) {
+            _queryOptimizerCursor->abortUnorderedPlans();
+        }            
+    }
+
+    long long QueryResponseBuilder::handoff( Message &result ) {
+        int rewriteCount = _builder->rewriteMatches();
+        if ( rewriteCount != -1 ) {
+            _bufferedMatches = rewriteCount;
+        }
+        if ( _parsedQuery.isExplain() ) {
+            shared_ptr<ExplainQueryInfo> explainInfo = _explain->doneQueryInfo();
+            if ( rewriteCount != -1 ) {
+                explainInfo->reviseN( rewriteCount );
             }
-            if ( !chunkMatches() ) {
-                return false;
-            }
-            bool bufferedMatch = _builder->handleMatch();
-            _explain->noteIterate( bufferedMatch, true, false );
-            if ( bufferedMatch ) {
-                ++_bufferedMatches;
-            }
+            _buf.reset();
+            _buf.skip( sizeof( QueryResult ) );
+            fillQueryResultFromObj( _buf, 0, explainInfo->bson() );
+            result.appendData( _buf.buf(), _buf.len() );
+            _buf.decouple();
+            return 1;
+        }
+        if ( _buf.len() > 0 ) {
+            result.appendData( _buf.buf(), _buf.len() );
+            _buf.decouple(); // only decouple here ok?
+        }
+        return _bufferedMatches;
+    }
+
+    ShardChunkManagerPtr QueryResponseBuilder::newChunkManager() const {
+        if ( !shardingState.needShardChunkManager( _parsedQuery.ns() ) ) {
+            return ShardChunkManagerPtr();
+        }
+        return shardingState.getShardChunkManager( _parsedQuery.ns() );
+    }
+
+    shared_ptr<ExplainRecordingStrategy> QueryResponseBuilder::newExplainRecordingStrategy
+    ( const QueryPlan::Summary &queryPlan, const BSONObj &oldPlan ) const {
+        ExplainQueryInfo::AncillaryInfo ancillaryInfo;
+        ancillaryInfo._oldPlan = oldPlan;
+        if ( !_parsedQuery.isExplain() ) {
+            return shared_ptr<ExplainRecordingStrategy>( new NoExplainStrategy() );
+        }
+        if ( _queryOptimizerCursor ) {
+            return shared_ptr<ExplainRecordingStrategy>
+            ( new QueryOptimizerCursorExplainStrategy( ancillaryInfo, _queryOptimizerCursor ) );
+        }
+        shared_ptr<ExplainRecordingStrategy> ret
+        ( new SimpleCursorExplainStrategy( ancillaryInfo, _cursor ) );
+        ret->notePlan( queryPlan.valid() ? queryPlan._scanAndOrderRequired : false );
+        return ret;
+    }
+
+    shared_ptr<ResponseBuildStrategy> QueryResponseBuilder::newResponseBuildStrategy
+    ( const QueryPlan::Summary &queryPlan ) {
+        bool singlePlan = !_queryOptimizerCursor;
+        bool singleOrderedPlan = singlePlan && ( !queryPlan.valid() || !queryPlan._scanAndOrderRequired );
+        if ( !_cursor->ok() || singleOrderedPlan ) {
+            return shared_ptr<ResponseBuildStrategy>
+            ( new OrderedBuildStrategy( _parsedQuery, _cursor, _buf ) );
+        }
+        if ( singlePlan || !_queryOptimizerCursor->mayRunInOrderPlans() ) {
+            return shared_ptr<ResponseBuildStrategy>
+            ( new ReorderBuildStrategy( _parsedQuery, _cursor, _buf, queryPlan ) );
+        }
+        return shared_ptr<ResponseBuildStrategy>
+        ( new HybridBuildStrategy( _parsedQuery, _cursor, _buf ) );
+    }
+
+    bool QueryResponseBuilder::currentMatches() {
+        MatchDetails details;
+        if ( _cursor->currentMatches( &details ) ) {
             return true;
         }
-        void noteYield() {
-            _explain->noteYield();
+        _explain->noteIterate( false, details._loadedObject, false );
+        return false;
+    }
+
+    bool QueryResponseBuilder::chunkMatches() {
+        if ( !_chunkManager ) {
+            return true;
         }
-        bool enoughForFirstBatch() const {
-            return !_parsedQuery.isExplain() && _parsedQuery.enoughForFirstBatch( _bufferedMatches, _buf.len() );
+        // TODO: should make this covered at some point
+        if ( _chunkManager->belongsToMe( _cursor->current() ) ) {
+            return true;
         }
-        bool enoughTotalResults() const {
-            return ( _parsedQuery.enough( _bufferedMatches ) || _buf.len() >= MaxBytesToReturnToClientAtOnce );
-        }
-        void finishedFirstBatch() {
-            if ( _queryOptimizerCursor ) {
-                _queryOptimizerCursor->abortUnorderedPlans();
-            }            
-        }
-        long long handoff( Message &result ) {
-            int rewriteCount = _builder->rewriteMatches();
-            if ( rewriteCount != -1 ) {
-                _bufferedMatches = rewriteCount;
-            }
-            if ( _parsedQuery.isExplain() ) {
-                shared_ptr<ExplainQueryInfo> explainInfo = _explain->doneQueryInfo();
-                if ( rewriteCount != -1 ) {
-                    explainInfo->reviseN( rewriteCount );
-                }
-                _buf.reset();
-                _buf.skip( sizeof( QueryResult ) );
-                fillQueryResultFromObj( _buf, 0, explainInfo->bson() );
-                result.appendData( _buf.buf(), _buf.len() );
-                _buf.decouple();
-                return 1;
-            }
-            if ( _buf.len() > 0 ) {
-                result.appendData( _buf.buf(), _buf.len() );
-                _buf.decouple(); // only decouple here ok?
-            }
-            return _bufferedMatches;
-        }
-    private:
-        ShardChunkManagerPtr newChunkManager() const {
-            if ( !shardingState.needShardChunkManager( _parsedQuery.ns() ) ) {
-                return ShardChunkManagerPtr();
-            }
-            return shardingState.getShardChunkManager( _parsedQuery.ns() );
-        }
-        shared_ptr<ExplainRecordingStrategy> newExplainRecordingStrategy
-        ( const QueryPlan::Summary &queryPlan, const BSONObj &oldPlan ) const {
-            ExplainQueryInfo::AncillaryInfo ancillaryInfo;
-            ancillaryInfo._oldPlan = oldPlan;
-            if ( !_parsedQuery.isExplain() ) {
-                return shared_ptr<ExplainRecordingStrategy>( new NoExplainStrategy() );
-            }
-            if ( _queryOptimizerCursor ) {
-                return shared_ptr<ExplainRecordingStrategy>
-                ( new QueryOptimizerCursorExplainStrategy( ancillaryInfo, _queryOptimizerCursor ) );
-            }
-            shared_ptr<ExplainRecordingStrategy> ret
-            ( new SimpleCursorExplainStrategy( ancillaryInfo, _cursor ) );
-            ret->notePlan( queryPlan.valid() ? queryPlan._scanAndOrderRequired : false );
-            return ret;
-        }
-        shared_ptr<ResponseBuildStrategy> newResponseBuildStrategy
-        ( const QueryPlan::Summary &queryPlan ) {
-            bool singlePlan = !_queryOptimizerCursor;
-            bool singleOrderedPlan = singlePlan && ( !queryPlan.valid() || !queryPlan._scanAndOrderRequired );
-            if ( !_cursor->ok() || singleOrderedPlan ) {
-                return shared_ptr<ResponseBuildStrategy>
-                ( new OrderedBuildStrategy( _parsedQuery, _cursor, _buf ) );
-            }
-            if ( singlePlan || !_queryOptimizerCursor->mayRunInOrderPlans() ) {
-                return shared_ptr<ResponseBuildStrategy>
-                ( new ReorderBuildStrategy( _parsedQuery, _cursor, _buf, queryPlan ) );
-            }
-            return shared_ptr<ResponseBuildStrategy>
-            ( new HybridBuildStrategy( _parsedQuery, _cursor, _buf ) );
-        }
-        bool currentMatches() {
-            MatchDetails details;
-            if ( _cursor->currentMatches( &details ) ) {
-                return true;
-            }
-            _explain->noteIterate( false, details._loadedObject, false );
-            return false;
-        }
-        bool chunkMatches() {
-            if ( !_chunkManager ) {
-                return true;
-            }
-            // TODO: should make this covered at some point
-            if ( _chunkManager->belongsToMe( _cursor->current() ) ) {
-                return true;
-            }
-            _explain->noteIterate( false, true, true );
-            return false;
-        }
-        const ParsedQuery &_parsedQuery;
-        shared_ptr<Cursor> _cursor;
-        shared_ptr<QueryOptimizerCursor> _queryOptimizerCursor;
-        BufBuilder _buf;
-        ShardChunkManagerPtr _chunkManager;
-        shared_ptr<ExplainRecordingStrategy> _explain;
-        shared_ptr<ResponseBuildStrategy> _builder;
-        long long _bufferedMatches;
-    };
+        _explain->noteIterate( false, true, true );
+        return false;
+    }
     
     const char *queryWithQueryOptimizer( Message &m, int queryOptions, const char *ns,
                                         const BSONObj &jsobj, CurOp& curop,
