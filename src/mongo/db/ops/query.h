@@ -117,6 +117,7 @@ namespace mongo {
                              BufBuilder &buf,
                              const QueryPlan::Summary &queryPlan );
         virtual bool handleMatch();
+        bool _handleMatchNoDedup();
         virtual int rewriteMatches();
     private:
         ScanAndOrder *newScanAndOrder( const QueryPlan::Summary &queryPlan ) const;
@@ -126,20 +127,20 @@ namespace mongo {
     class HybridBuildStrategy : public ResponseBuildStrategy {
     public:
         HybridBuildStrategy( const ParsedQuery &parsedQuery,
-                            const shared_ptr<Cursor> &cursor,
+                            const shared_ptr<QueryOptimizerCursor> &cursor,
                             BufBuilder &buf );
         virtual bool handleMatch();
         virtual int rewriteMatches();
     private:
         bool iterateNeedsSort() const;
         bool resultsNeedSort() const;
-        void handleScanAndOrderMatch();
+        void handleReorderMatch();
         bool handleOrderedMatch();
-        ScanAndOrder *newScanAndOrder() const;
+        ReorderBuildStrategy *newReorderBuildStrategy() const;
         shared_ptr<QueryOptimizerCursor> _queryOptimizerCursor;
-        shared_ptr<ScanAndOrder> _scanAndOrder;
         SmallDupSet _scanAndOrderDups;
         OrderedBuildStrategy _orderedBuild;
+        shared_ptr<ReorderBuildStrategy> _reorderBuild;
     };
 
     class QueryResponseBuilder {

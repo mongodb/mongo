@@ -764,10 +764,14 @@ namespace mongo {
     }
 
     bool ReorderBuildStrategy::handleMatch() {
-        DiskLoc loc = _cursor->currLoc();
-        if ( _cursor->getsetdup( loc ) ) {
+        if ( _cursor->getsetdup( _cursor->currLoc() ) ) {
             return false;
         }
+        return _handleMatchNoDedup();
+    }
+    
+    bool ReorderBuildStrategy::_handleMatchNoDedup() {
+        DiskLoc loc = _cursor->currLoc();
         _scanAndOrder->add( current(), _parsedQuery.showDiskLoc() ? &loc : 0 );
         return false;
     }
@@ -797,18 +801,16 @@ namespace mongo {
     }
     
     HybridBuildStrategy::HybridBuildStrategy( const ParsedQuery &parsedQuery,
-                                             const shared_ptr<Cursor> &cursor,
+                                             const shared_ptr<QueryOptimizerCursor> &cursor,
                                              BufBuilder &buf ) :
     ResponseBuildStrategy( parsedQuery, cursor, buf ),
-    _queryOptimizerCursor( dynamic_pointer_cast<QueryOptimizerCursor>( _cursor ) ),
-    _scanAndOrder( newScanAndOrder() ),
-    _orderedBuild( parsedQuery, cursor, buf ) {
+    _queryOptimizerCursor( cursor ),
+    _orderedBuild( parsedQuery, cursor, buf ),
+    _reorderBuild( newReorderBuildStrategy() ) {
     }
     
     bool HybridBuildStrategy::handleMatch() {
-        if ( _scanAndOrder ) {
-            handleScanAndOrderMatch();
-        }
+        handleReorderMatch();
         if ( !iterateNeedsSort() ) {
             return _orderedBuild.handleMatch();
         }
@@ -816,9 +818,6 @@ namespace mongo {
     }
     
     bool HybridBuildStrategy::iterateNeedsSort() const {
-        if ( !_scanAndOrder ) {
-            return false;
-        }
         const QueryPlan *queryPlan = _queryOptimizerCursor->queryPlan();
         if ( !queryPlan ) {
             return false;
@@ -830,9 +829,6 @@ namespace mongo {
     }
     
     bool HybridBuildStrategy::resultsNeedSort() const {
-        if ( !_scanAndOrder ) {
-            return false;
-        }
         const QueryPlan *queryPlan = _queryOptimizerCursor->completeQueryPlan();
         if ( !queryPlan ) {
             return false;
@@ -843,13 +839,17 @@ namespace mongo {
         return true;            
     }
     
-    void HybridBuildStrategy::handleScanAndOrderMatch() {
+    void HybridBuildStrategy::handleReorderMatch() {
+        if ( !_reorderBuild ) {
+            return;
+        }
+        // todo improve
         DiskLoc loc = _cursor->currLoc();
         if ( _scanAndOrderDups.getsetdup( loc ) ) {
             return;
         }
         try {
-            _scanAndOrder->add( current(), _parsedQuery.showDiskLoc() ? &loc : 0 );
+            _reorderBuild->_handleMatchNoDedup();
         } catch ( const UserException &e ) {
             if ( e.getCode() == ScanAndOrderMemoryLimitExceededAssertionCode ) {
                 if ( _queryOptimizerCursor->mayRetryQuery() ) {
@@ -866,27 +866,23 @@ namespace mongo {
     }
     
     int HybridBuildStrategy::rewriteMatches() {
-        if ( resultsNeedSort() ) {
-            _buf.reset();
-            _buf.skip( sizeof( QueryResult ) );
-            int ret = 0;
-            _scanAndOrder->fill( _buf, _parsedQuery.getFields(), ret );
-            return ret;
+        if ( !resultsNeedSort() ) {
+            return -1;
         }
-        return -1;
+        verify( 16084, _reorderBuild );
+        _buf.reset();
+        _buf.skip( sizeof( QueryResult ) );
+        return _reorderBuild->rewriteMatches();
     }
     
-    ScanAndOrder *HybridBuildStrategy::newScanAndOrder() const {
+    ReorderBuildStrategy *HybridBuildStrategy::newReorderBuildStrategy() const {
         if ( _parsedQuery.getOrder().isEmpty() ) {
             return 0;
         }
-        if ( !_queryOptimizerCursor || !_queryOptimizerCursor->ok() ) {
+        if ( !_queryOptimizerCursor->ok() ) {
             return 0;
         }
-        return new ScanAndOrder( _parsedQuery.getSkip(),
-                                _parsedQuery.getNumToReturn(),
-                                _parsedQuery.getOrder(),
-                                _queryOptimizerCursor->queryPlan()->multikeyFrs() );
+        return new ReorderBuildStrategy( _parsedQuery, _cursor, _buf, QueryPlan::Summary() );
     }
     
     QueryResponseBuilder::QueryResponseBuilder( const ParsedQuery &parsedQuery,
@@ -998,7 +994,7 @@ namespace mongo {
             ( new ReorderBuildStrategy( _parsedQuery, _cursor, _buf, queryPlan ) );
         }
         return shared_ptr<ResponseBuildStrategy>
-        ( new HybridBuildStrategy( _parsedQuery, _cursor, _buf ) );
+        ( new HybridBuildStrategy( _parsedQuery, _queryOptimizerCursor, _buf ) );
     }
 
     bool QueryResponseBuilder::currentMatches() {
