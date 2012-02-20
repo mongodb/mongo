@@ -797,6 +797,7 @@ namespace mongo {
     }
 
     int ReorderBuildStrategy::rewriteMatches() {
+        cc().curop()->debug().scanAndOrder = true;
         int ret = 0;
         _scanAndOrder->fill( _buf, _parsedQuery.getFields(), ret );
         return ret;
@@ -1158,12 +1159,22 @@ namespace mongo {
         long long nReturned = queryResponseBuilder.handoff( result );
         QueryResult *qr = (QueryResult *) result.header();
         qr->cursorId = cursorid;
+        curop.debug().cursorid = ( cursorid == 0 ? -1 : qr->cursorId );
         qr->setResultFlagsToOk();
         // qr->len is updated automatically by appendData()
         curop.debug().responseLength = qr->len;
         qr->setOperation(opReply);
         qr->startingFrom = 0;
         qr->nReturned = nReturned;
+        
+        int duration = curop.elapsedMillis();
+        bool dbprofile = curop.shouldDBProfile( duration );
+        if ( dbprofile || duration >= cmdLine.slowMS ) {
+            curop.debug().nscanned = (int)( cursor ? cursor->nscanned() : 0 );
+            curop.debug().ntoskip = pq.getSkip();
+        }
+        curop.debug().nreturned = nReturned;
+
         return exhaust;
     }
     
@@ -1173,7 +1184,7 @@ namespace mongo {
     const char *runQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result) {
         shared_ptr<ParsedQuery> pq_shared( new ParsedQuery(q) );
         ParsedQuery& pq( *pq_shared );
-        int ntoskip = q.ntoskip;
+//        int ntoskip = q.ntoskip;
         BSONObj jsobj = q.query;
         int queryOptions = q.queryOptions;
         const char *ns = q.ns;
@@ -1326,6 +1337,7 @@ namespace mongo {
             }
         }
         verify( 16082, false );
+        return 0;
         
         {
         BSONObj oldPlan;
@@ -1361,14 +1373,14 @@ namespace mongo {
             dqo.finishExplain( explainSuffix );
         }
         n = dqo.n();
-        long long nscanned = dqo.totalNscanned();
-        curop.debug().scanAndOrder = dqo.scanAndOrderRequired();
+//        long long nscanned = dqo.totalNscanned();
+//        curop.debug().scanAndOrder = dqo.scanAndOrderRequired();
 
         shared_ptr<Cursor> cursor = dqo.cursor();
         if( logLevel >= 5 )
             log() << "   used cursor: " << cursor.get() << endl;
         long long cursorid = 0;
-        const char * exhaust = 0;
+//        const char * exhaust = 0;
         if ( dqo.saveClientCursor() || ( dqo.wouldSaveClientCursor() && mps->mayRunMore() ) ) {
             ClientCursor *cc;
 //            bool moreClauses = mps->mayRunMore();
@@ -1400,25 +1412,26 @@ namespace mongo {
 //            dqo.finishForOplogReplay(cc);
         }
 
-        QueryResult *qr = (QueryResult *) result.header();
+//        QueryResult *qr = (QueryResult *) result.header();
 //        qr->cursorId = cursorid;
-        curop.debug().cursorid = cursorid == 0 ? -1 : qr->cursorId;
+//        curop.debug().cursorid = cursorid == 0 ? -1 : qr->cursorId;
 //        qr->setResultFlagsToOk();
         // qr->len is updated automatically by appendData()
-        curop.debug().responseLength = qr->len;
+//        curop.debug().responseLength = qr->len;
 //        qr->setOperation(opReply);
 //        qr->startingFrom = 0;
 //        qr->nReturned = n;
 
-        int duration = curop.elapsedMillis();
-        bool dbprofile = curop.shouldDBProfile( duration );
-        if ( dbprofile || duration >= cmdLine.slowMS ) {
-            curop.debug().nscanned = (int) nscanned;
-            curop.debug().ntoskip = ntoskip;
+//        int duration = curop.elapsedMillis();
+//        bool dbprofile = curop.shouldDBProfile( duration );
+//        if ( dbprofile || duration >= cmdLine.slowMS ) {
+//            curop.debug().nscanned = (int) nscanned;
+//            curop.debug().ntoskip = ntoskip;
+//        }
+//        curop.debug().nreturned = n;
+//        return exhaust;
         }
-        curop.debug().nreturned = n;
-        return exhaust;
-        }
+        return 0;
     }
 
 } // namespace mongo
