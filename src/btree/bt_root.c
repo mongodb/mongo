@@ -313,6 +313,7 @@ __btree_set_root(WT_SESSION_IMPL *session, const char *filename, const char *v)
 	int ret;
 
 	key = newv = NULL;
+	newcfg = NULL;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &key));
 	WT_ERR(__wt_buf_fmt(session, key, "file:%s", filename));
