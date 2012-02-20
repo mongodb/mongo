@@ -203,7 +203,7 @@ doneCheckOrder:
             _unhelpful = true;
         }
             
-        if ( fields && !d->isMultikey( _idxNo ) ) {
+        if ( fields && !d->isMultikey( _idxNo ) ) { // Does not check modifiedKeys()
             _keyFieldsOnly.reset( fields->checkKey( _index->keyPattern() ) );
         }
     }

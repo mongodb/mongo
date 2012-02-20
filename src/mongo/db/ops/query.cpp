@@ -571,14 +571,14 @@ namespace mongo {
 
         }
 
-        void finishExplain( const BSONObj &suffix ) {
-            BSONObj obj = _eb.finishWithSuffix( totalNscanned(), nscannedObjects(), n(), _curop.elapsedMillis(), suffix);
-            fillQueryResultFromObj(_buf, 0, obj);
-            _n = 1;
-            _oldN = 0;
-            _response.appendData( _buf.buf(), _buf.len() );
-            _buf.decouple();
-        }
+//        void finishExplain( const BSONObj &suffix ) {
+//            BSONObj obj = _eb.finishWithSuffix( totalNscanned(), nscannedObjects(), n(), _curop.elapsedMillis(), suffix);
+//            fillQueryResultFromObj(_buf, 0, obj);
+//            _n = 1;
+//            _oldN = 0;
+//            _response.appendData( _buf.buf(), _buf.len() );
+//            _buf.decouple();
+//        }
 
         virtual bool mayRecordPlan() const {
             return !_yieldRecoveryFailed && ( _pq.getNumToReturn() != 1 ) && ( ( _n > _pq.getNumToReturn() / 2 ) || ( complete() && !stopRequested() ) );
@@ -912,7 +912,7 @@ namespace mongo {
     _parsedQuery( parsedQuery ),
     _cursor( cursor ),
     _queryOptimizerCursor( dynamic_pointer_cast<QueryOptimizerCursor>( _cursor ) ),
-    _buf( 32768 ),
+    _buf( 32768 ), // TODO be smarter here
     _chunkManager( newChunkManager() ),
     _explain( newExplainRecordingStrategy( queryPlan, oldPlan ) ),
     _builder( newResponseBuildStrategy( queryPlan ) ),
@@ -1364,31 +1364,31 @@ namespace mongo {
         ExplainBuilder eb;
         UserQueryOp original( pq, result, eb, curop );
         shared_ptr< UserQueryOp > o = mps->runOp( original );
-        UserQueryOp &dqo = *o;
-        if ( ! dqo.complete() )
-            throw MsgAssertionException( dqo.exception() );
-        
-        if ( shardingState.getVersion( ns ) != shardingVersionAtStart ) {
-            // if the version changed during the query
-            // we might be missing some data
-            // and its safe to send this as mongos can resend
-            // at this point
-            throw SendStaleConfigException( ns , "version changed during initial query" );
-        }
-
-        if ( explain ) {
-            dqo.finishExplain( explainSuffix );
-        }
-        n = dqo.n();
+//        UserQueryOp &dqo = *o;
+//        if ( ! dqo.complete() )
+//            throw MsgAssertionException( dqo.exception() );
+//        
+//        if ( shardingState.getVersion( ns ) != shardingVersionAtStart ) {
+//            // if the version changed during the query
+//            // we might be missing some data
+//            // and its safe to send this as mongos can resend
+//            // at this point
+//            throw SendStaleConfigException( ns , "version changed during initial query" );
+//        }
+//
+//        if ( explain ) {
+//            dqo.finishExplain( explainSuffix );
+//        }
+//        n = dqo.n();
 //        long long nscanned = dqo.totalNscanned();
 //        curop.debug().scanAndOrder = dqo.scanAndOrderRequired();
 
-        shared_ptr<Cursor> cursor = dqo.cursor();
-        if( logLevel >= 5 )
-            log() << "   used cursor: " << cursor.get() << endl;
+//        shared_ptr<Cursor> cursor = dqo.cursor();
+//        if( logLevel >= 5 )
+//            log() << "   used cursor: " << cursor.get() << endl;
 //        long long cursorid = 0;
 //        const char * exhaust = 0;
-        if ( dqo.saveClientCursor() || ( dqo.wouldSaveClientCursor() && mps->mayRunMore() ) ) {
+//        if ( dqo.saveClientCursor() || ( dqo.wouldSaveClientCursor() && mps->mayRunMore() ) ) {
 //            ClientCursor *cc;
 //            bool moreClauses = mps->mayRunMore();
 //            if ( moreClauses ) {
@@ -1417,7 +1417,7 @@ namespace mongo {
 //                curop.debug().exhaust = true;
 //            }
 //            dqo.finishForOplogReplay(cc);
-        }
+//        }
 
 //        QueryResult *qr = (QueryResult *) result.header();
 //        qr->cursorId = cursorid;
