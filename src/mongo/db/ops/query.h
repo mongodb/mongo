@@ -35,6 +35,11 @@ namespace mongo {
 
     const char * runQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result);
 
+    class QueryRetryException : public DBException {
+    public:
+        QueryRetryException() : DBException( "query retry exception" , 16083 ) {}
+    };
+
     class ExplainRecordingStrategy {
     public:
         ExplainRecordingStrategy( const ExplainQueryInfo::AncillaryInfo &ancillaryInfo );

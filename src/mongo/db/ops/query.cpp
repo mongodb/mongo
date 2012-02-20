@@ -768,7 +768,6 @@ namespace mongo {
         if ( _cursor->getsetdup( loc ) ) {
             return false;
         }
-        // TODO exception
         _scanAndOrder->add( current(), _parsedQuery.showDiskLoc() ? &loc : 0 );
         return false;
     }
@@ -852,20 +851,17 @@ namespace mongo {
         try {
             _scanAndOrder->add( current(), _parsedQuery.showDiskLoc() ? &loc : 0 );
         } catch ( const UserException &e ) {
-            bool rethrow = true;
             if ( e.getCode() == ScanAndOrderMemoryLimitExceededAssertionCode ) {
-                if ( _queryOptimizerCursor->multiPlanScanner()->haveOrderedPlan() ) {
-                    _scanAndOrder.reset();
+                if ( _queryOptimizerCursor->mayRetryQuery() ) {
+                    _queryOptimizerCursor->clearIndexesForPatterns();
+                    throw QueryRetryException();
+                }
+                else if ( _queryOptimizerCursor->mayFailOverToInOrderPlans() ) {
                     _queryOptimizerCursor->abortUnorderedPlans();
-                    rethrow = false;
-                }
-                else if ( _queryOptimizerCursor->multiPlanScanner()->usingCachedPlan() ) {
-                    _queryOptimizerCursor->multiPlanScanner()->clearIndexesForPatterns();
+                    return;
                 }
             }
-            if ( rethrow ) {
-                throw;
-            }
+            throw;
         }            
     }
     
@@ -989,7 +985,7 @@ namespace mongo {
                 return shared_ptr<ResponseBuildStrategy>
                 ( new OrderedBuildStrategy( _parsedQuery, _cursor, _buf ) );
             }
-            if ( singlePlan || !_queryOptimizerCursor->multiPlanScanner()->haveOrderedPlan() ) {
+            if ( singlePlan || !_queryOptimizerCursor->mayRunInOrderPlans() ) {
                 return shared_ptr<ResponseBuildStrategy>
                 ( new ReorderBuildStrategy( _parsedQuery, _cursor, _buf, queryPlan ) );
             }
@@ -1307,10 +1303,8 @@ namespace mongo {
             try {
                 return queryWithQueryOptimizer( m, queryOptions, ns, jsobj, curop, query, order, pq,
                                                oldPlan, shardingVersionAtStart, result );
-            } catch ( const UserException &u ) {
-                if ( retry > 0 || u.getCode() != ScanAndOrderMemoryLimitExceededAssertionCode ) {
-                    throw;
-                }
+            } catch ( const QueryRetryException & ) {
+                verify( 16083, retry == 0 );
             }
         }
         verify( 16082, false );

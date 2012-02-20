@@ -476,8 +476,31 @@ namespace mongo {
             return _completeOp ? &_completeOp->qp() : 0;
         }
 
-        virtual const MultiPlanScanner *multiPlanScanner() const {
-            return _mps.get();
+        virtual bool mayFailOverToInOrderPlans() const {
+            if ( _takeover ) {
+                return false;
+            }
+            return _mps->haveOrderedPlan();
+        }
+
+        virtual bool mayRunInOrderPlans() const {
+            if ( _takeover ) {
+                return true;
+            }
+            return _mps->haveOrderedPlan() || _mps->usingCachedPlan();
+        }
+        
+        virtual bool mayRetryQuery() const {
+            if ( _takeover ) {
+                return false;
+            }
+            return _mps->usingCachedPlan();
+        }
+
+        virtual void clearIndexesForPatterns() {
+            if ( !_takeover ) {
+                _mps->clearIndexesForPatterns();
+            }
         }
         
         virtual void abortUnorderedPlans() {

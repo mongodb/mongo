@@ -5,8 +5,12 @@ t.drop();
 
 big = new Array( 1000000 ).toString()
 
+for( i = 0; i < 100; ++i ) {
+    t.save( {b:0} );
+}
+
 for( i = 0; i < 40; ++i ) {
-    t.save({a:big});
+    t.save( {a:big} );
 }
 
 function memoryException( sortSpec, querySpec ) {
@@ -56,5 +60,5 @@ noMemoryException( {_id:1}, {b:null} );
 
 // With an unindexed plan on b:1 recorded for a query, the query should be
 // retried when the unindexed plan exhausts its memory limit.
-assert.eq( 'BtreeCursor b_1', t.find( {b:1} ).sort( {_id:1} ).explain().cursor ); // Record b:1 plan
+assert.eq( 'BtreeCursor b_1', t.find( {b:0} ).sort( {_id:1} ).explain().cursor ); // Record b:1 plan
 noMemoryException( {_id:1}, {b:null} );

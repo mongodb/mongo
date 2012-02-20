@@ -83,7 +83,10 @@ namespace mongo {
     public:
         virtual const QueryPlan *queryPlan() const = 0;
         virtual const QueryPlan *completeQueryPlan() const = 0;
-        virtual const MultiPlanScanner *multiPlanScanner() const = 0;
+        virtual bool mayFailOverToInOrderPlans() const = 0;
+        virtual bool mayRunInOrderPlans() const = 0;
+        virtual bool mayRetryQuery() const = 0;
+        virtual void clearIndexesForPatterns() = 0;
         virtual void abortUnorderedPlans() = 0;
         virtual void noteIterate( bool match, bool loadedDocument, bool chunkSkip ) = 0;
         virtual shared_ptr<ExplainQueryInfo> explainQueryInfo() const = 0;
