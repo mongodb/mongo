@@ -105,7 +105,8 @@ namespace mongo {
         locked_W();
     }
     static void lock_W() { 
-        assert( threadState() == 0 );
+        LockState& ls = lockState();
+        massert(0, str::stream() << "can't lock_W, threadState=" << (int) threadState, ls.threadState == 0);
         threadState() = 'W';
         q.lock_W();
         locked_W();
@@ -117,8 +118,9 @@ namespace mongo {
         q.unlock_W();
     }
     static void lock_R() { 
-        assert( threadState() == 0 );
-        threadState() = 'R';
+        LockState& ls = lockState();
+        massert(0, str::stream() << "can't lock_R, threadState=" << (int) threadState, ls.threadState == 0);
+        ls.threadState = 'R';
         q.lock_R();
     }
     static void unlock_R() { 
@@ -137,9 +139,9 @@ namespace mongo {
         threadState() = 0;
         q.unlock_w();
     }
-    static void lock_r(char& thrState) {
-        assert(thrState == 0);
-        thrState = 'r';
+    static void lock_r() {
+        assert( threadState() == 0 );
+        threadState() = 'r';
         q.lock_r();
     }
     static void unlock_r() { 
@@ -233,30 +235,65 @@ namespace mongo {
     {
         if( cant )
             return;
-        if( type == 'W' ) {
+
+        LockState& ls = lockState();
+        switch(type) {
+        case 'W':
             unlock_W();
-        }
-        else if( type == 'R' ) { 
+            break;
+        case 'R':
             unlock_R();
-        }
-        else {
-            LockState& ls = lockState();
+            break;
+        case 'w':
+            if( ls.local ) {
+                log() << "can't TempRelease w lock when local db is locked" << endl;
+                dassert(false);
+            }
+            assert(ls.other>0);
+            ls.otherLock->unlock();
+            unlock_w();
+            break;
+        case 'r':
+            if( ls.local ) {
+                log() << "TempRelease r lock when local db is locked" << endl;
+                dassert(false);
+            }
+            assert(ls.other<0);
+            ls.otherLock->unlock_shared();
+            unlock_r();
+            break;
+        default:
             error() << "TempRelease called but threadState()=" << type << endl;
             assert(false);
         }
+        ls.threadState = 't';
+        dassert( ls.recursive == 0 );
     }
     Lock::TempRelease::~TempRelease() {
         if( cant )
             return;
+
+        LockState& ls = lockState();
+        dassert( ls.recursive == 0 );
         DESTRUCTOR_GUARD( 
-            fassert(0, threadState() == 0);
-            if( type == 'W' ) {
+            fassert(0, ls.threadState == 't');
+            ls.threadState = 0;
+            switch( type ) {
+            case 'W':
                 lock_W();
-            }
-            else if( type == 'R' ) { 
+                break;
+            case 'R':        
                 lock_R();
-            }
-            else {
+                break;
+            case 'w':
+                lock_w();
+                ls.otherLock->lock();
+                break;
+            case 'r':
+                lock_r();
+                ls.otherLock->lock_shared();
+                break;
+            default:
                 wassert(false);
             }
         )
@@ -287,6 +324,7 @@ namespace mongo {
             if( stopGreed )
                 q.start_greed();
         }
+        fassert( 0, recursive() < 1000 );
     }
     void Lock::GlobalWrite::downgrade() { 
         assert( !recursive() );
@@ -317,6 +355,7 @@ namespace mongo {
         else {
             unlock_R();
         }
+        fassert( 0, recursive() < 1000 );
     }
 
     void Lock::DBWrite::lockTop(LockState& ls) { 
@@ -329,6 +368,8 @@ namespace mongo {
         case 'W' :
             ls.recursive++;
             break;
+        default: // 't'
+            assert(false);
         case  0  : 
             lock_w();
             locked_w = true;
@@ -418,8 +459,10 @@ namespace mongo {
         case 'w' :
             ls.recursive++;
             break;
+        default: // 't' 
+            assert(false);
         case  0  : 
-            lock_r(ls.threadState);
+            lock_r();
             locked_r = true;
         }
     }

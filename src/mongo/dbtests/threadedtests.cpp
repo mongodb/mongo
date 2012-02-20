@@ -96,35 +96,50 @@ namespace ThreadedTests {
             Client::initThread("mongomutextest");
             sleepmillis(0);
             for( int i = 0; i < N; i++ ) {
+                bool sometimes = std::rand() % 16 == 0;
                 if( i % 7 == 0 ) {
                     Lock::GlobalRead r; // nested test
                     Lock::GlobalRead r2;
+                    if( sometimes ) {
+                        Lock::TempRelease t;
+                    }
                 }
                 else if( i % 7 == 1 ) {
                     Lock::GlobalRead r;
                     ASSERT( d.dbMutex.atLeastReadLocked() );
                     ASSERT( Lock::isLocked() );
+                    if( sometimes ) {
+                        Lock::TempRelease t;
+                    }
                 }
                 else if( i % 7 == 2 ) {
                     Lock::GlobalWrite w;
                     ASSERT( d.dbMutex.isWriteLocked() );
                     ASSERT( Lock::isW() );
+                    if( sometimes ) {
+                        Lock::TempRelease t;
+                    }
                 }
                 else if( i % 7 == 3 ) {
                     Lock::GlobalWrite w;
+                    {
+                        Lock::TempRelease t;
+                    }
                     Lock::GlobalRead r;
                     ASSERT( d.dbMutex.isWriteLocked() );
                     ASSERT( Lock::isW() );
+                    if( sometimes ) {
+                        Lock::TempRelease t;
+                    }
                 }
-                else if( i % 7 == 4 ) {
-                    /*mm->lock();
-                    mm->releaseEarly();
-                    mm->unlock();*/
-                    ONCE cout << "todo threadedtests releaseearly? lock_try? lock_shared_try?" << endl;
-                }
+            // _try
+            // _temprelrease
                 else if( i % 7 == 5 ) {
                     {
                         Lock::DBRead r("foo");
+                        if( sometimes ) {
+                            Lock::TempRelease t;
+                        }
                     }
                     {
                         Lock::DBRead r("bar");
@@ -139,11 +154,20 @@ namespace ThreadedTests {
                             Lock::DBRead r("foo");
                             Lock::DBRead r2("foo");
                             Lock::DBRead r3("local");
+                            if( sometimes ) {
+                                Lock::TempRelease t;
+                            }
                         }
                         else { 
                             Lock::DBWrite w("foo");
+                            {
+                                Lock::TempRelease t;
+                            }
                             Lock::DBRead r2("foo");
                             Lock::DBRead r3("local");
+                            if( sometimes ) {
+                                Lock::TempRelease t;
+                            }
                         }
                     }
                     else { 

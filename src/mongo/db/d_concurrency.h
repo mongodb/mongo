@@ -26,7 +26,7 @@ namespace mongo {
         struct TempRelease {
             TempRelease(); 
             ~TempRelease();
-            const bool cant; // true if couldn't because of recursive locking
+            bool cant; // true if couldn't because of recursive locking
         private:
             const char type;
         };
