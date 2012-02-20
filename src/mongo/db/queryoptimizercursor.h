@@ -85,6 +85,7 @@ namespace mongo {
         virtual const QueryPlan *completeQueryPlan() const = 0;
         virtual bool mayFailOverToInOrderPlans() const = 0;
         virtual bool mayRunInOrderPlans() const = 0;
+        virtual bool mayRunOutOfOrderPlans() const = 0;
         virtual bool mayRetryQuery() const = 0;
         virtual void clearIndexesForPatterns() = 0;
         virtual void abortUnorderedPlans() = 0;

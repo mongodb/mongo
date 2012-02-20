@@ -867,7 +867,7 @@ namespace mongo {
     
     int HybridBuildStrategy::rewriteMatches() {
         if ( !resultsNeedSort() ) {
-            return -1;
+            return _orderedBuild.rewriteMatches();
         }
         verify( 16084, _reorderBuild );
         _buf.reset();
@@ -985,7 +985,8 @@ namespace mongo {
     ( const QueryPlan::Summary &queryPlan ) {
         bool singlePlan = !_queryOptimizerCursor;
         bool singleOrderedPlan = singlePlan && ( !queryPlan.valid() || !queryPlan._scanAndOrderRequired );
-        if ( !_cursor->ok() || singleOrderedPlan ) {
+        if ( !_cursor->ok() || singleOrderedPlan ||
+            ( _queryOptimizerCursor && !_queryOptimizerCursor->mayRunOutOfOrderPlans() ) ) {
             return shared_ptr<ResponseBuildStrategy>
             ( new OrderedBuildStrategy( _parsedQuery, _cursor, _buf ) );
         }

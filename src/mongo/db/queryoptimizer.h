@@ -330,6 +330,7 @@ namespace mongo {
         BSONObj order() const { return _order; }
         
         bool haveOrderedPlan() const;
+        bool haveOutOfOrderPlan() const;
 
         bool prepareToRetryQuery();
         
@@ -520,6 +521,7 @@ namespace mongo {
         void clearIndexesForPatterns() const;
 
         bool haveOrderedPlan() const;
+        bool haveOutOfOrderPlan() const;
         
         string toString() const;
 

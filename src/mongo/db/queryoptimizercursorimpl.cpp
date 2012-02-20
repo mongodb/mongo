@@ -490,6 +490,13 @@ namespace mongo {
             return _mps->haveOrderedPlan() || _mps->usingCachedPlan();
         }
         
+        virtual bool mayRunOutOfOrderPlans() const {
+            if ( _takeover ) {
+                return true;
+            }
+            return _mps->haveOutOfOrderPlan() || _mps->usingCachedPlan();
+        }
+        
         virtual bool mayRetryQuery() const {
             if ( _takeover ) {
                 return false;

@@ -649,7 +649,16 @@ doneCheckOrder:
         }
         return false;
     }
-    
+
+    bool QueryPlanSet::haveOutOfOrderPlan() const {
+        for( PlanSet::const_iterator i = _plans.begin(); i != _plans.end(); ++i ) {
+            if ( (*i)->scanAndOrderRequired() ) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     bool QueryPlanSet::prepareToRetryQuery() {
         if ( !_usingCachedPlan || _plans.size() > 1 ) {
             return false;
@@ -1113,6 +1122,10 @@ doneCheckOrder:
     
     bool MultiPlanScanner::haveOrderedPlan() const {
         return _currentQps->haveOrderedPlan();
+    }
+
+    bool MultiPlanScanner::haveOutOfOrderPlan() const {
+        return _currentQps->haveOutOfOrderPlan();
     }
 
     string MultiPlanScanner::toString() const {
