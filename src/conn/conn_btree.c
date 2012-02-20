@@ -169,10 +169,11 @@ __wt_conn_close_btree(WT_SESSION_IMPL *session)
  *	Reset an open btree handle back to its initial state.
  */
 int
-__wt_conn_reopen_btree(WT_SESSION_IMPL *session, uint32_t flags)
+__wt_conn_reopen_btree(
+    WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
 {
 	WT_RET(__wt_btree_close(session));
-	WT_RET(__wt_btree_open(session, NULL, flags));
+	WT_RET(__wt_btree_open(session, cfg, flags));
 
 	return (0);
 }
