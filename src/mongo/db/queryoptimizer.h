@@ -91,13 +91,6 @@ namespace mongo {
         
         bool mustAssertOnYieldFailure() const { return _mustAssertOnYieldFailure; }
         
-        string toString() const;
-        
-        /** The following member functions are just for testing. */
-        
-        shared_ptr<FieldRangeVector> frv() const { return _frv; }
-        bool isMultiKey() const;
-        
         struct Summary {
             Summary() :
             _scanAndOrderRequired() {
@@ -111,6 +104,12 @@ namespace mongo {
             bool _scanAndOrderRequired;
         };
         Summary summary() const { return Summary( *this ); }
+
+        /** The following member functions are just for testing. */
+        
+        shared_ptr<FieldRangeVector> frv() const { return _frv; }
+        bool isMultiKey() const;
+        string toString() const;        
         
     private:
         void checkTableScanAllowed() const;
