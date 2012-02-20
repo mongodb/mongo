@@ -21,4 +21,4 @@ assert.eq( 20 , t.find( q ).limit(20).itcount() , "F" );
 assert.eq( 49 , t.find(q).explain().n , "G" );
 assert.eq( 20 , t.find(q).limit(20).explain().n , "H" );
 assert.eq( 20 , t.find(q).limit(-20).explain().n , "I" );
-
+assert.eq( 49 , t.find(q).batchSize(20).explain().n , "J" );

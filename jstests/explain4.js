@@ -34,7 +34,7 @@ function checkFields( matches, sort, limit ) {
     checkField( "nYields" );
     checkField( "nChunkSkips", 0 );
     checkField( "isMultiKey", false );
-//    checkField( "indexOnly", false );
+    checkField( "indexOnly", false );
     checkField( "server" );
     checkField( "allPlans" );
     explain.allPlans.forEach( function( x ) { checkPlanFields( x, matches ); } );
@@ -49,6 +49,6 @@ checkFields( 1, true );
 
 t.save( {} );
 checkFields( 1, false, 1 );
-//checkFields( 2, true, 1 );
+checkFields( 2, true, 1 );
 //
 //// check all other fields, eg oldPlan

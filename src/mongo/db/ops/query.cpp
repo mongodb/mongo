@@ -944,6 +944,9 @@ namespace mongo {
     }
 
     bool QueryResponseBuilder::enoughTotalResults() const {
+        if ( _parsedQuery.isExplain() ) {
+            return _parsedQuery.enough( _bufferedMatches ) && !_parsedQuery.wantMore();
+        }
         return ( _parsedQuery.enough( _bufferedMatches ) || _buf.len() >= MaxBytesToReturnToClientAtOnce );
     }
 
