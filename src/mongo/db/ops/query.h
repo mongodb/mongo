@@ -156,6 +156,7 @@ namespace mongo {
         bool enoughTotalResults() const;
         void finishedFirstBatch();
         long long handoff( Message &result );
+        ShardChunkManagerPtr chunkManager() const { return _chunkManager; }
     private:
         ShardChunkManagerPtr newChunkManager() const;
         shared_ptr<ExplainRecordingStrategy> newExplainRecordingStrategy

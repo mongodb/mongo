@@ -1138,6 +1138,7 @@ namespace mongo {
             ccPointer.reset( new ClientCursor( queryOptions, cursor, ns,
                                               jsobj.getOwned() ) );
             cursorid = ccPointer->cursorid();
+            DEV tlog(2) << "query has more, cursorid: " << cursorid << endl;
             if ( cursor->supportYields() ) {
                 ClientCursor::YieldData data;
                 ccPointer->prepareToYield( data );
@@ -1156,6 +1157,7 @@ namespace mongo {
                 exhaust = ns;
                 curop.debug().exhaust = true;
             }
+            ccPointer->setChunkManager( queryResponseBuilder.chunkManager() );
             ccPointer->setPos( nReturned );
             ccPointer->pq = pq_shared;
             ccPointer->fields = pq.getFieldPtr();
@@ -1384,10 +1386,10 @@ namespace mongo {
         shared_ptr<Cursor> cursor = dqo.cursor();
         if( logLevel >= 5 )
             log() << "   used cursor: " << cursor.get() << endl;
-        long long cursorid = 0;
+//        long long cursorid = 0;
 //        const char * exhaust = 0;
         if ( dqo.saveClientCursor() || ( dqo.wouldSaveClientCursor() && mps->mayRunMore() ) ) {
-            ClientCursor *cc;
+//            ClientCursor *cc;
 //            bool moreClauses = mps->mayRunMore();
 //            if ( moreClauses ) {
 //                // this MultiCursor will use a dumb NoOp to advance(), so no need to specify mayYield
@@ -1398,11 +1400,11 @@ namespace mongo {
 //                if( ! cursor->matcher() ) cursor->setMatcher( dqo.matcher( cursor ) );
 //                cc = new ClientCursor( queryOptions, cursor, ns, jsobj.getOwned() );
 //            }
-
-            cc->setChunkManager( dqo.getChunkManager() );
-
-            cursorid = cc->cursorid();
-            DEV tlog(2) << "query has more, cursorid: " << cursorid << endl;
+//
+//            cc->setChunkManager( dqo.getChunkManager() );
+//
+//            cursorid = cc->cursorid();
+//            DEV tlog(2) << "query has more, cursorid: " << cursorid << endl;
 //            cc->setPos( n );
 //            cc->pq = pq_shared;
 //            cc->fields = pq.getFieldPtr();
