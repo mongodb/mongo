@@ -15,12 +15,20 @@ function memoryException( sortSpec, querySpec ) {
                   t.find( querySpec ).sort( sortSpec ).batchSize( 1000 ).itcount()
                   } );
     assert( db.getLastError().match( /too much data for sort\(\) with no index/ ) );
+    assert.throws( function() {
+                  t.find( querySpec ).sort( sortSpec ).batchSize( 1000 ).explain( true )
+                  } );
+    assert( db.getLastError().match( /too much data for sort\(\) with no index/ ) );
 }
 
 function noMemoryException( sortSpec, querySpec ) {
     querySpec = querySpec || {};
     t.find( querySpec ).sort( sortSpec ).batchSize( 1000 ).itcount();
     assert( !db.getLastError() );
+    if ( 0 ) { // SERVER-5016
+    t.find( querySpec ).sort( sortSpec ).batchSize( 1000 ).explain( true );
+    assert( !db.getLastError() );
+    }
 }
 
 // Unindexed sorts.
@@ -33,10 +41,14 @@ noMemoryException( {$natural:1} );
 
 t.ensureIndex( {a:1} );
 t.ensureIndex( {b:1} );
-//
+t.ensureIndex( {c:1} );
+
 // These sorts are now indexed.
 noMemoryException( {a:1} );
 noMemoryException( {b:1} );
+
+// A memory exception is triggered for an unindexed sort involving multiple plans.
+memoryException( {d:1}, {b:null,c:null} );
 
 // With an indexed plan on _id:1 and an unindexed plan on b:1, the indexed plan
 // should succeed even if the unindexed one would exhaust its memory limit.
