@@ -1043,9 +1043,11 @@ namespace mongo {
     const char *queryWithQueryOptimizer( Message &m, int queryOptions, const char *ns,
                                         const BSONObj &jsobj, CurOp& curop,
                                         const BSONObj &query, const BSONObj &order,
-                                        const ParsedQuery &pq, const BSONObj &oldPlan,
+                                        const shared_ptr<ParsedQuery> &pq_shared,
+                                        const BSONObj &oldPlan,
                                         const ConfigVersion &shardingVersionAtStart,
                                         Message &result ) {
+        const ParsedQuery& pq( *pq_shared );
         shared_ptr<Cursor> cursor;
         QueryPlan::Summary queryPlan;
         if ( pq.hasOption( QueryOption_OplogReplay ) ) {
@@ -1152,6 +1154,7 @@ namespace mongo {
                 exhaust = ns;
                 curop.debug().exhaust = true;
             }
+            ccPointer->pq = pq_shared;
             ccPointer->fields = pq.getFieldPtr();
             ccPointer.release();
         }
@@ -1330,8 +1333,8 @@ namespace mongo {
 
         for( int retry = 0; retry < 2; ++retry ) {
             try {
-                return queryWithQueryOptimizer( m, queryOptions, ns, jsobj, curop, query, order, pq,
-                                               oldPlan, shardingVersionAtStart, result );
+                return queryWithQueryOptimizer( m, queryOptions, ns, jsobj, curop, query, order,
+                                               pq_shared, oldPlan, shardingVersionAtStart, result );
             } catch ( const QueryRetryException & ) {
                 verify( 16083, retry == 0 );
             }
@@ -1399,7 +1402,7 @@ namespace mongo {
             cursorid = cc->cursorid();
             DEV tlog(2) << "query has more, cursorid: " << cursorid << endl;
             cc->setPos( n );
-            cc->pq = pq_shared;
+//            cc->pq = pq_shared;
 //            cc->fields = pq.getFieldPtr();
 //            cc->originalMessage = m;
 //            cc->updateLocation();

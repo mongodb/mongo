@@ -202,6 +202,14 @@ namespace QueryTests {
             long long cursorId = cursor->getCursorId();
             cursor->decouple();
             cursor.reset();
+
+            {
+                // Check internal server handoff to getmore.
+                ClientCursor::Pointer clientCursor( cursorId );
+                ASSERT( clientCursor.c()->pq );
+                ASSERT_EQUALS( 2, clientCursor.c()->pq->getNumToReturn() );
+            }
+            
             cursor = client().getMore( ns, cursorId );
             ASSERT( cursor->more() );
             ASSERT_EQUALS( 3, cursor->next().getIntField( "a" ) );
