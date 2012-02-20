@@ -682,8 +682,8 @@ namespace mongo {
     _explainInfo( new ExplainSinglePlanQueryInfo() ) {
     }
  
-    void SimpleCursorExplainStrategy::notePlan( bool scanAndOrder ) {
-        _explainInfo->notePlan( *_cursor, scanAndOrder );
+    void SimpleCursorExplainStrategy::notePlan( bool scanAndOrder, bool indexOnly ) {
+        _explainInfo->notePlan( *_cursor, scanAndOrder, indexOnly );
     }
 
     void SimpleCursorExplainStrategy::noteIterate( bool match, bool loadedObject, bool chunkSkip ) {
@@ -716,25 +716,45 @@ namespace mongo {
     }
 
     ResponseBuildStrategy::ResponseBuildStrategy( const ParsedQuery &parsedQuery,
-                            const shared_ptr<Cursor> &cursor, BufBuilder &buf ) :
+                                                 const shared_ptr<Cursor> &cursor, BufBuilder &buf,
+                                                 const QueryPlan::Summary &queryPlan ) :
     _parsedQuery( parsedQuery ),
     _cursor( cursor ),
-    _buf( buf ) {
+    _queryOptimizerCursor( dynamic_pointer_cast<QueryOptimizerCursor>( _cursor ) ),
+    _buf( buf ),
+    _planKeyFieldsOnly( queryPlan._keyFieldsOnly ) {
     }
 
-    BSONObj ResponseBuildStrategy::current() const {
-        if ( !_parsedQuery.returnKey() ) {
-            return _cursor->current();
+    BSONObj ResponseBuildStrategy::current( bool allowCovered ) const {
+        if ( _parsedQuery.returnKey() ) {
+            BSONObjBuilder bob;
+            bob.appendKeys( _cursor->indexKeyPattern(), _cursor->currKey() );
+            return bob.obj();
         }
-        BSONObjBuilder bob;
-        bob.appendKeys( _cursor->indexKeyPattern(), _cursor->currKey() );
-        return bob.obj();
+        if ( allowCovered ) {
+            const Projection::KeyOnly *fields = keyFieldsOnly();
+            if ( fields ) {
+                return fields->hydrate( _cursor->currKey() );
+            }
+        }
+        return _cursor->current();
+    }
+
+    const Projection::KeyOnly *ResponseBuildStrategy::keyFieldsOnly() const {
+        if ( !_parsedQuery.getFields() ) {
+            return 0;
+        }
+        if ( _queryOptimizerCursor ) {
+            return _queryOptimizerCursor->keyFieldsOnly();
+        }
+        return _planKeyFieldsOnly.get();
     }
     
     OrderedBuildStrategy::OrderedBuildStrategy( const ParsedQuery &parsedQuery,
                                                const shared_ptr<Cursor> &cursor,
-                                               BufBuilder &buf ) :
-    ResponseBuildStrategy( parsedQuery, cursor, buf ),
+                                               BufBuilder &buf,
+                                               const QueryPlan::Summary &queryPlan ) :
+    ResponseBuildStrategy( parsedQuery, cursor, buf, queryPlan ),
     _skip( _parsedQuery.getSkip() ) {
     }
     
@@ -750,7 +770,7 @@ namespace mongo {
         if ( !_parsedQuery.isExplain() ) {
             BSONObj js = _cursor->current();
             assert( js.isValid() );
-            fillQueryResultFromObj( _buf, _parsedQuery.getFields(), current(), ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
+            fillQueryResultFromObj( _buf, _parsedQuery.getFields(), current( true ), ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
         }
         return true;
     }
@@ -759,7 +779,7 @@ namespace mongo {
                                                const shared_ptr<Cursor> &cursor,
                                                BufBuilder &buf,
                                                const QueryPlan::Summary &queryPlan ) :
-    ResponseBuildStrategy( parsedQuery, cursor, buf ),
+    ResponseBuildStrategy( parsedQuery, cursor, buf, queryPlan ),
     _scanAndOrder( newScanAndOrder( queryPlan ) ) {
     }
 
@@ -772,7 +792,7 @@ namespace mongo {
     
     bool ReorderBuildStrategy::_handleMatchNoDedup() {
         DiskLoc loc = _cursor->currLoc();
-        _scanAndOrder->add( current(), _parsedQuery.showDiskLoc() ? &loc : 0 );
+        _scanAndOrder->add( current( false ), _parsedQuery.showDiskLoc() ? &loc : 0 );
         return false;
     }
 
@@ -803,9 +823,8 @@ namespace mongo {
     HybridBuildStrategy::HybridBuildStrategy( const ParsedQuery &parsedQuery,
                                              const shared_ptr<QueryOptimizerCursor> &cursor,
                                              BufBuilder &buf ) :
-    ResponseBuildStrategy( parsedQuery, cursor, buf ),
-    _queryOptimizerCursor( cursor ),
-    _orderedBuild( parsedQuery, cursor, buf ),
+    ResponseBuildStrategy( parsedQuery, cursor, buf, QueryPlan::Summary() ),
+    _orderedBuild( parsedQuery, cursor, buf, QueryPlan::Summary() ),
     _reorderBuild( newReorderBuildStrategy() ) {
     }
     
@@ -977,7 +996,8 @@ namespace mongo {
         }
         shared_ptr<ExplainRecordingStrategy> ret
         ( new SimpleCursorExplainStrategy( ancillaryInfo, _cursor ) );
-        ret->notePlan( queryPlan.valid() ? queryPlan._scanAndOrderRequired : false );
+        ret->notePlan( queryPlan.valid() ? queryPlan._scanAndOrderRequired : false,
+                      queryPlan._keyFieldsOnly );
         return ret;
     }
 
@@ -988,7 +1008,7 @@ namespace mongo {
         if ( !_cursor->ok() || singleOrderedPlan ||
             ( _queryOptimizerCursor && !_queryOptimizerCursor->mayRunOutOfOrderPlans() ) ) {
             return shared_ptr<ResponseBuildStrategy>
-            ( new OrderedBuildStrategy( _parsedQuery, _cursor, _buf ) );
+            ( new OrderedBuildStrategy( _parsedQuery, _cursor, _buf, queryPlan ) );
         }
         if ( singlePlan || !_queryOptimizerCursor->mayRunInOrderPlans() ) {
             return shared_ptr<ResponseBuildStrategy>
@@ -1132,6 +1152,7 @@ namespace mongo {
                 exhaust = ns;
                 curop.debug().exhaust = true;
             }
+            ccPointer->fields = pq.getFieldPtr();
             ccPointer.release();
         }
         
@@ -1289,7 +1310,7 @@ namespace mongo {
         // TODO clean this up a bit.
         BSONObj oldPlan;
         if ( explain && ! pq.hasIndexSpecifier() ) {
-            MultiPlanScanner mps( ns, query, order );
+            MultiPlanScanner mps( ns, query, shared_ptr<Projection>(), order );
             if ( mps.usingCachedPlan() ) {
                 oldPlan =
                 mps.oldExplain().firstElement().embeddedObject()
@@ -1310,11 +1331,11 @@ namespace mongo {
         {
         BSONObj oldPlan;
         if ( explain && ! pq.hasIndexSpecifier() ) {
-            MultiPlanScanner mps( ns, query, order );
+            MultiPlanScanner mps( ns, query, shared_ptr<Projection>(), order );
             if ( mps.usingCachedPlan() )
                 oldPlan = mps.oldExplain();
         }
-        auto_ptr< MultiPlanScanner > mps( new MultiPlanScanner( ns, query, order, hint, explain ? QueryPlanSet::Ignore : QueryPlanSet::Use, pq.getMin(), pq.getMax(), true ) );
+        auto_ptr< MultiPlanScanner > mps( new MultiPlanScanner( ns, query, shared_ptr<Projection>(), order, hint, explain ? QueryPlanSet::Ignore : QueryPlanSet::Use, pq.getMin(), pq.getMax(), true ) );
         BSONObj explainSuffix;
         if ( explain ) {
             BSONObjBuilder bb;

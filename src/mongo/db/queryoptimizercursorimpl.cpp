@@ -207,10 +207,13 @@ namespace mongo {
                 return QueryOp::generateExplainInfo();
             }
             _explainPlanInfo.reset( new ExplainPlanInfo() );
-            _explainPlanInfo->notePlan( *_c, qp().scanAndOrderRequired() );
+            _explainPlanInfo->notePlan( *_c, qp().scanAndOrderRequired(), qp().keyFieldsOnly() );
             return _explainPlanInfo;
         }
         shared_ptr<ExplainPlanInfo> explainInfo() const { return _explainPlanInfo; }
+        
+        const Projection::KeyOnly *keyFieldsOnly() const { return qp().keyFieldsOnly().get(); }
+        
     private:
         void mayAdvance() {
             if ( !_c ) {
@@ -476,6 +479,13 @@ namespace mongo {
             return _completeOp ? &_completeOp->qp() : 0;
         }
 
+        virtual const Projection::KeyOnly *keyFieldsOnly() const {
+            if ( _takeover ) {
+                return _takeover->keyFieldsOnly();
+            }
+            return _currOp ? _currOp->keyFieldsOnly() : 0;
+        }
+
         virtual bool mayFailOverToInOrderPlans() const {
             if ( _takeover ) {
                 return false;
@@ -668,7 +678,8 @@ namespace mongo {
         bool mayShortcutQueryOptimizer =
         ( !parsedQuery ||
          ( parsedQuery->getMin().isEmpty() &&
-          parsedQuery->getMax().isEmpty() ) ) &&
+          parsedQuery->getMax().isEmpty() &&
+          !parsedQuery->getFields() ) ) &&
         hint.isEmpty();
         if ( mayShortcutQueryOptimizer ) {
             if ( planPolicy.permitOptimalNaturalPlan() && query.isEmpty() && order.isEmpty() ) {
@@ -694,7 +705,13 @@ namespace mongo {
             hint = planPolicy.planHint( ns );
         }
         
-        auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order, hint, ( parsedQuery && parsedQuery->isExplain() ) ? QueryPlanSet::Ignore : QueryPlanSet::Use, parsedQuery ? parsedQuery->getMin() : BSONObj(), parsedQuery ? parsedQuery->getMax() : BSONObj() ) ); // mayYield == false
+        auto_ptr<MultiPlanScanner> mps
+        ( new MultiPlanScanner
+         ( ns, query, ( parsedQuery ? parsedQuery->getFieldPtr() : shared_ptr<Projection>() ),
+          order, hint,
+          ( parsedQuery && parsedQuery->isExplain() ) ? QueryPlanSet::Ignore : QueryPlanSet::Use,
+          parsedQuery ? parsedQuery->getMin() : BSONObj(),
+          parsedQuery ? parsedQuery->getMax() : BSONObj() ) ); // mayYield == false
         const QueryPlan *singlePlan = mps->singlePlan();
         bool requireOrder = ( parsedQuery == 0 ); // TODO more clear
         if ( singlePlan && !( requireOrder && singlePlan->scanAndOrderRequired() ) ) {
@@ -723,9 +740,10 @@ namespace mongo {
 
     /** This interface is just available for testing. */
     shared_ptr<Cursor> newQueryOptimizerCursor
-    ( const char *ns, const BSONObj &query, const BSONObj &order, const QueryPlanSelectionPolicy &planPolicy,
-     bool requireOrder ) {
-        auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order ) ); // mayYield == false
+    ( const char *ns, const BSONObj &query, const shared_ptr<Projection> &fields,
+     const BSONObj &order, const QueryPlanSelectionPolicy &planPolicy, bool requireOrder ) {
+        auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, fields,
+                                                             order ) ); // mayYield == false
         return newQueryOptimizerCursor( mps, planPolicy, requireOrder );
     }
         

@@ -57,7 +57,8 @@ namespace QueryOptimizerTests {
             void run() {
                 BSONObj obj = BSON( "a" << 1 );
                 FieldRangeSetPair fieldRangeSetPair( "", obj );
-                QueryPlan queryPlan( 0, -1, fieldRangeSetPair, 0, obj, BSONObj() );
+                QueryPlan queryPlan( 0, -1, fieldRangeSetPair, 0, obj, shared_ptr<Projection>(),
+                                    BSONObj() );
                 queryPlan.toString(); // Just test that we don't crash.
             }
         };
@@ -118,7 +119,8 @@ namespace QueryOptimizerTests {
         class NoIndex : public Base {
         public:
             void run() {
-                QueryPlan p( nsd(), -1, FRSP( BSONObj() ), FRSP2( BSONObj() ), BSONObj(), BSONObj() );
+                QueryPlan p( nsd(), -1, FRSP( BSONObj() ), FRSP2( BSONObj() ), BSONObj(),
+                            shared_ptr<Projection>(), BSONObj() );
                 ASSERT( !p.optimal() );
                 ASSERT( !p.scanAndOrderRequired() );
                 ASSERT( !p.exactKeyMatch() );
@@ -135,13 +137,17 @@ namespace QueryOptimizerTests {
                 b2.appendMaxKey( "" );
                 BSONObj end = b2.obj();
 
-                QueryPlan p( nsd(), INDEXNO( "a" << 1 ), FRSP( BSONObj() ), FRSP2( BSONObj() ), BSONObj(), BSON( "a" << 1 ) );
+                QueryPlan p( nsd(), INDEXNO( "a" << 1 ), FRSP( BSONObj() ), FRSP2( BSONObj() ),
+                            BSONObj(), shared_ptr<Projection>(), BSON( "a" << 1 ) );
                 ASSERT( !p.scanAndOrderRequired() );
                 ASSERT( !startKey( p ).woCompare( start ) );
                 ASSERT( !endKey( p ).woCompare( end ) );
-                QueryPlan p2( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSONObj() ), FRSP2( BSONObj() ), BSONObj(), BSON( "a" << 1 << "b" << 1 ) );
+                QueryPlan p2( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSONObj() ),
+                             FRSP2( BSONObj() ), BSONObj(), shared_ptr<Projection>(),
+                             BSON( "a" << 1 << "b" << 1 ) );
                 ASSERT( !p2.scanAndOrderRequired() );
-                QueryPlan p3( nsd(), INDEXNO( "a" << 1 ), FRSP( BSONObj() ), FRSP2( BSONObj() ), BSONObj(), BSON( "b" << 1 ) );
+                QueryPlan p3( nsd(), INDEXNO( "a" << 1 ), FRSP( BSONObj() ), FRSP2( BSONObj() ),
+                             BSONObj(), shared_ptr<Projection>(), BSON( "b" << 1 ) );
                 ASSERT( p3.scanAndOrderRequired() );
                 ASSERT( !startKey( p3 ).woCompare( start ) );
                 ASSERT( !endKey( p3 ).woCompare( end ) );
@@ -151,7 +157,9 @@ namespace QueryOptimizerTests {
         class MoreIndexThanNeeded : public Base {
         public:
             void run() {
-                QueryPlan p( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSONObj() ), FRSP2( BSONObj() ), BSONObj(), BSON( "a" << 1 ) );
+                QueryPlan p( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSONObj() ),
+                            FRSP2( BSONObj() ), BSONObj(), shared_ptr<Projection>(),
+                            BSON( "a" << 1 ) );
                 ASSERT( !p.scanAndOrderRequired() );
             }
         };
@@ -159,13 +167,18 @@ namespace QueryOptimizerTests {
         class IndexSigns : public Base {
         public:
             void run() {
-                QueryPlan p( nsd(), INDEXNO( "a" << 1 << "b" << -1 ) , FRSP( BSONObj() ), FRSP2( BSONObj() ), BSONObj(), BSON( "a" << 1 << "b" << -1 ) );
+                QueryPlan p( nsd(), INDEXNO( "a" << 1 << "b" << -1 ) , FRSP( BSONObj() ),
+                            FRSP2( BSONObj() ), BSONObj(), shared_ptr<Projection>(),
+                            BSON( "a" << 1 << "b" << -1 ) );
                 ASSERT( !p.scanAndOrderRequired() );
                 ASSERT_EQUALS( 1, p.direction() );
-                QueryPlan p2( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSONObj() ), FRSP2( BSONObj() ), BSONObj(), BSON( "a" << 1 << "b" << -1 ) );
+                QueryPlan p2( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSONObj() ),
+                             FRSP2( BSONObj() ), BSONObj(), shared_ptr<Projection>(),
+                             BSON( "a" << 1 << "b" << -1 ) );
                 ASSERT( p2.scanAndOrderRequired() );
                 ASSERT_EQUALS( 0, p2.direction() );
-                QueryPlan p3( nsd(), indexno( id_obj ), FRSP( BSONObj() ), FRSP2( BSONObj() ), BSONObj(), BSON( "_id" << 1 ) );
+                QueryPlan p3( nsd(), indexno( id_obj ), FRSP( BSONObj() ), FRSP2( BSONObj() ),
+                             BSONObj(), shared_ptr<Projection>(), BSON( "_id" << 1 ) );
                 ASSERT( !p3.scanAndOrderRequired() );
                 ASSERT_EQUALS( 1, p3.direction() );
             }
@@ -182,15 +195,21 @@ namespace QueryOptimizerTests {
                 b2.appendMaxKey( "" );
                 b2.appendMinKey( "" );
                 BSONObj end = b2.obj();
-                QueryPlan p( nsd(),  INDEXNO( "a" << -1 << "b" << 1 ),FRSP( BSONObj() ), FRSP2( BSONObj() ), BSONObj(), BSON( "a" << 1 << "b" << -1 ) );
+                QueryPlan p( nsd(),  INDEXNO( "a" << -1 << "b" << 1 ),FRSP( BSONObj() ),
+                            FRSP2( BSONObj() ), BSONObj(), shared_ptr<Projection>(),
+                            BSON( "a" << 1 << "b" << -1 ) );
                 ASSERT( !p.scanAndOrderRequired() );
                 ASSERT_EQUALS( -1, p.direction() );
                 ASSERT( !startKey( p ).woCompare( start ) );
                 ASSERT( !endKey( p ).woCompare( end ) );
-                QueryPlan p2( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSONObj() ), FRSP2( BSONObj() ), BSONObj(), BSON( "a" << -1 << "b" << -1 ) );
+                QueryPlan p2( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSONObj() ),
+                             FRSP2( BSONObj() ), BSONObj(), shared_ptr<Projection>(),
+                             BSON( "a" << -1 << "b" << -1 ) );
                 ASSERT( !p2.scanAndOrderRequired() );
                 ASSERT_EQUALS( -1, p2.direction() );
-                QueryPlan p3( nsd(), INDEXNO( "a" << 1 << "b" << -1 ), FRSP( BSONObj() ), FRSP2( BSONObj() ), BSONObj(), BSON( "a" << -1 << "b" << -1 ) );
+                QueryPlan p3( nsd(), INDEXNO( "a" << 1 << "b" << -1 ), FRSP( BSONObj() ),
+                             FRSP2( BSONObj() ), BSONObj(), shared_ptr<Projection>(),
+                             BSON( "a" << -1 << "b" << -1 ) );
                 ASSERT( p3.scanAndOrderRequired() );
                 ASSERT_EQUALS( 0, p3.direction() );
             }
@@ -207,11 +226,15 @@ namespace QueryOptimizerTests {
                 b2.append( "", 3 );
                 b2.appendMaxKey( "" );
                 BSONObj end = b2.obj();
-                QueryPlan p( nsd(), INDEXNO( "a" << -1 << "b" << 1 ), FRSP( BSON( "a" << 3 ) ), FRSP2( BSON( "a" << 3 ) ), BSON( "a" << 3 ), BSONObj() );
+                QueryPlan p( nsd(), INDEXNO( "a" << -1 << "b" << 1 ), FRSP( BSON( "a" << 3 ) ),
+                            FRSP2( BSON( "a" << 3 ) ), BSON( "a" << 3 ), shared_ptr<Projection>(),
+                            BSONObj() );
                 ASSERT( !p.scanAndOrderRequired() );
                 ASSERT( !startKey( p ).woCompare( start ) );
                 ASSERT( !endKey( p ).woCompare( end ) );
-                QueryPlan p2( nsd(), INDEXNO( "a" << -1 << "b" << 1 ), FRSP( BSON( "a" << 3 ) ), FRSP2( BSON( "a" << 3 ) ), BSON( "a" << 3 ), BSONObj() );
+                QueryPlan p2( nsd(), INDEXNO( "a" << -1 << "b" << 1 ), FRSP( BSON( "a" << 3 ) ),
+                             FRSP2( BSON( "a" << 3 ) ), BSON( "a" << 3 ), shared_ptr<Projection>(),
+                             BSONObj() );
                 ASSERT( !p2.scanAndOrderRequired() );
                 ASSERT( !startKey( p ).woCompare( start ) );
                 ASSERT( !endKey( p ).woCompare( end ) );
@@ -221,11 +244,18 @@ namespace QueryOptimizerTests {
         class EqualWithOrder : public Base {
         public:
             void run() {
-                QueryPlan p( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSON( "a" << 4 ) ), FRSP2( BSON( "a" << 4 ) ), BSON( "a" << 4 ), BSON( "b" << 1 ) );
+                QueryPlan p( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSON( "a" << 4 ) ),
+                            FRSP2( BSON( "a" << 4 ) ), BSON( "a" << 4 ), shared_ptr<Projection>(),
+                            BSON( "b" << 1 ) );
                 ASSERT( !p.scanAndOrderRequired() );
-                QueryPlan p2( nsd(), INDEXNO( "a" << 1 << "b" << 1 << "c" << 1 ), FRSP( BSON( "b" << 4 ) ), FRSP2( BSON( "b" << 4 ) ), BSON( "b" << 4 ), BSON( "a" << 1 << "c" << 1 ) );
+                QueryPlan p2( nsd(), INDEXNO( "a" << 1 << "b" << 1 << "c" << 1 ),
+                             FRSP( BSON( "b" << 4 ) ), FRSP2( BSON( "b" << 4 ) ),
+                             BSON( "b" << 4 ), shared_ptr<Projection>(),
+                             BSON( "a" << 1 << "c" << 1 ) );
                 ASSERT( !p2.scanAndOrderRequired() );
-                QueryPlan p3( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSON( "b" << 4 ) ), FRSP2( BSON( "b" << 4 ) ), BSON( "b" << 4 ), BSON( "a" << 1 << "c" << 1 ) );
+                QueryPlan p3( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSON( "b" << 4 ) ),
+                             FRSP2( BSON( "b" << 4 ) ), BSON( "b" << 4 ), shared_ptr<Projection>(),
+                             BSON( "a" << 1 << "c" << 1 ) );
                 ASSERT( p3.scanAndOrderRequired() );
             }
         };
@@ -233,23 +263,46 @@ namespace QueryOptimizerTests {
         class Optimal : public Base {
         public:
             void run() {
-                QueryPlan p( nsd(), INDEXNO( "a" << 1 ), FRSP( BSONObj() ), FRSP2( BSONObj() ), BSONObj(), BSON( "a" << 1 ) );
+                QueryPlan p( nsd(), INDEXNO( "a" << 1 ), FRSP( BSONObj() ), FRSP2( BSONObj() ),
+                            BSONObj(), shared_ptr<Projection>(), BSON( "a" << 1 ) );
                 ASSERT( p.optimal() );
-                QueryPlan p2( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSONObj() ), FRSP2( BSONObj() ), BSONObj(), BSON( "a" << 1 ) );
+                QueryPlan p2( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSONObj() ),
+                             FRSP2( BSONObj() ), BSONObj(), shared_ptr<Projection>(),
+                             BSON( "a" << 1 ) );
                 ASSERT( p2.optimal() );
-                QueryPlan p3( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSON( "a" << 1 ) ), FRSP2( BSON( "a" << 1 ) ), BSON( "a" << 1 ), BSON( "a" << 1 ) );
+                QueryPlan p3( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSON( "a" << 1 ) ),
+                             FRSP2( BSON( "a" << 1 ) ), BSON( "a" << 1 ), shared_ptr<Projection>(),
+                             BSON( "a" << 1 ) );
                 ASSERT( p3.optimal() );
-                QueryPlan p4( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSON( "b" << 1 ) ), FRSP2( BSON( "b" << 1 ) ), BSON( "b" << 1 ), BSON( "a" << 1 ) );
+                QueryPlan p4( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSON( "b" << 1 ) ),
+                             FRSP2( BSON( "b" << 1 ) ), BSON( "b" << 1 ), shared_ptr<Projection>(),
+                             BSON( "a" << 1 ) );
                 ASSERT( !p4.optimal() );
-                QueryPlan p5( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSON( "a" << 1 ) ), FRSP2( BSON( "a" << 1 ) ), BSON( "a" << 1 ), BSON( "b" << 1 ) );
+                QueryPlan p5( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSON( "a" << 1 ) ),
+                             FRSP2( BSON( "a" << 1 ) ), BSON( "a" << 1 ), shared_ptr<Projection>(),
+                             BSON( "b" << 1 ) );
                 ASSERT( p5.optimal() );
-                QueryPlan p6( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSON( "b" << 1 ) ), FRSP2( BSON( "b" << 1 ) ), BSON( "b" << 1 ), BSON( "b" << 1 ) );
+                QueryPlan p6( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSON( "b" << 1 ) ),
+                             FRSP2( BSON( "b" << 1 ) ), BSON( "b" << 1 ), shared_ptr<Projection>(),
+                             BSON( "b" << 1 ) );
                 ASSERT( !p6.optimal() );
-                QueryPlan p7( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSON( "a" << 1 << "b" << 1 ) ), FRSP2( BSON( "a" << 1 << "b" << 1 ) ), BSON( "a" << 1 << "b" << 1 ), BSON( "a" << 1 ) );
+                QueryPlan p7( nsd(), INDEXNO( "a" << 1 << "b" << 1 ),
+                             FRSP( BSON( "a" << 1 << "b" << 1 ) ),
+                             FRSP2( BSON( "a" << 1 << "b" << 1 ) ),
+                             BSON( "a" << 1 << "b" << 1 ),
+                             shared_ptr<Projection>(), BSON( "a" << 1 ) );
                 ASSERT( p7.optimal() );
-                QueryPlan p8( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSON( "a" << 1 << "b" << LT << 1 ) ), FRSP2( BSON( "a" << 1 << "b" << LT << 1 ) ), BSON( "a" << 1 << "b" << LT << 1 ), BSON( "a" << 1 )  );
+                QueryPlan p8( nsd(), INDEXNO( "a" << 1 << "b" << 1 ),
+                             FRSP( BSON( "a" << 1 << "b" << LT << 1 ) ),
+                             FRSP2( BSON( "a" << 1 << "b" << LT << 1 ) ),
+                             BSON( "a" << 1 << "b" << LT << 1 ), shared_ptr<Projection>(),
+                             BSON( "a" << 1 )  );
                 ASSERT( p8.optimal() );
-                QueryPlan p9( nsd(), INDEXNO( "a" << 1 << "b" << 1 << "c" << 1 ), FRSP( BSON( "a" << 1 << "b" << LT << 1 ) ), FRSP2( BSON( "a" << 1 << "b" << LT << 1 ) ), BSON( "a" << 1 << "b" << LT << 1 ), BSON( "a" << 1 ) );
+                QueryPlan p9( nsd(), INDEXNO( "a" << 1 << "b" << 1 << "c" << 1 ),
+                             FRSP( BSON( "a" << 1 << "b" << LT << 1 ) ),
+                             FRSP2( BSON( "a" << 1 << "b" << LT << 1 ) ),
+                             BSON( "a" << 1 << "b" << LT << 1 ), shared_ptr<Projection>(),
+                             BSON( "a" << 1 ) );
                 ASSERT( p9.optimal() );
             }
         };
@@ -257,23 +310,36 @@ namespace QueryOptimizerTests {
         class MoreOptimal : public Base {
         public:
             void run() {
-                QueryPlan p10( nsd(), INDEXNO( "a" << 1 << "b" << 1 << "c" << 1 ), FRSP( BSON( "a" << 1 ) ), FRSP2( BSON( "a" << 1 ) ), BSON( "a" << 1 ), BSONObj() );
+                QueryPlan p10( nsd(), INDEXNO( "a" << 1 << "b" << 1 << "c" << 1 ),
+                              FRSP( BSON( "a" << 1 ) ), FRSP2( BSON( "a" << 1 ) ), BSON( "a" << 1 ),
+                              shared_ptr<Projection>(), BSONObj() );
                 ASSERT( p10.optimal() );
-                QueryPlan p11( nsd(), INDEXNO( "a" << 1 << "b" << 1 << "c" << 1 ), FRSP( BSON( "a" << 1 << "b" << LT << 1 ) ), FRSP2( BSON( "a" << 1 << "b" << LT << 1 ) ), BSON( "a" << 1 << "b" << LT << 1 ), BSONObj() );
+                QueryPlan p11( nsd(), INDEXNO( "a" << 1 << "b" << 1 << "c" << 1 ),
+                              FRSP( BSON( "a" << 1 << "b" << LT << 1 ) ),
+                              FRSP2( BSON( "a" << 1 << "b" << LT << 1 ) ),
+                              BSON( "a" << 1 << "b" << LT << 1 ), shared_ptr<Projection>(),
+                              BSONObj() );
                 ASSERT( p11.optimal() );
-                QueryPlan p12( nsd(), INDEXNO( "a" << 1 << "b" << 1 << "c" << 1 ), FRSP( BSON( "a" << LT << 1 ) ), FRSP2( BSON( "a" << LT << 1 ) ), BSON( "a" << LT << 1 ), BSONObj() );
+                QueryPlan p12( nsd(), INDEXNO( "a" << 1 << "b" << 1 << "c" << 1 ),
+                              FRSP( BSON( "a" << LT << 1 ) ),
+                              FRSP2( BSON( "a" << LT << 1 ) ), BSON( "a" << LT << 1 ),
+                              shared_ptr<Projection>(), BSONObj() );
                 ASSERT( p12.optimal() );
-                QueryPlan p13( nsd(), INDEXNO( "a" << 1 << "b" << 1 << "c" << 1 ), FRSP( BSON( "a" << LT << 1 ) ), FRSP2( BSON( "a" << LT << 1 ) ), BSON( "a" << LT << 1 ), BSON( "a" << 1 ) );
+                QueryPlan p13( nsd(), INDEXNO( "a" << 1 << "b" << 1 << "c" << 1 ),
+                              FRSP( BSON( "a" << LT << 1 ) ), FRSP2( BSON( "a" << LT << 1 ) ),
+                              BSON( "a" << LT << 1 ), shared_ptr<Projection>(), BSON( "a" << 1 ) );
                 ASSERT( p13.optimal() );
                 // When no match is possible, optimal attribute is not set.
                 BSONObj impossibleQuery = BSON( "a" << BSON( "$in" << BSONArray() ) );
                 QueryPlan p14( nsd(), INDEXNO( "a" << 1 ), FRSP( impossibleQuery ),
-                             FRSP2( impossibleQuery ), impossibleQuery, BSONObj() );
+                             FRSP2( impossibleQuery ), impossibleQuery, shared_ptr<Projection>(),
+                              BSONObj() );
                 ASSERT( !p14.optimal() );
                 // When no match is possible on an unindexed field, optimal attribute is not set.
                 BSONObj bImpossibleQuery = BSON( "a" << 1 << "b" << GT << 10 << LT << 10 );
                 QueryPlan p15( nsd(), INDEXNO( "a" << 1 ), FRSP( bImpossibleQuery ),
-                              FRSP2( bImpossibleQuery ), bImpossibleQuery, BSONObj() );
+                              FRSP2( bImpossibleQuery ), bImpossibleQuery, shared_ptr<Projection>(), 
+                              BSONObj() );
                 ASSERT( !p15.optimal() );
             }
         };
@@ -281,23 +347,47 @@ namespace QueryOptimizerTests {
         class KeyMatch : public Base {
         public:
             void run() {
-                QueryPlan p( nsd(), INDEXNO( "a" << 1 ), FRSP( BSONObj() ), FRSP2( BSONObj() ), BSONObj(), BSON( "a" << 1 ) );
+                QueryPlan p( nsd(), INDEXNO( "a" << 1 ), FRSP( BSONObj() ), FRSP2( BSONObj() ),
+                            BSONObj(), shared_ptr<Projection>(), BSON( "a" << 1 ) );
                 ASSERT( !p.exactKeyMatch() );
-                QueryPlan p2( nsd(), INDEXNO( "b" << 1 << "a" << 1 ), FRSP( BSONObj() ), FRSP2( BSONObj() ), BSONObj(), BSON( "a" << 1 ) );
+                QueryPlan p2( nsd(), INDEXNO( "b" << 1 << "a" << 1 ), FRSP( BSONObj() ),
+                             FRSP2( BSONObj() ), BSONObj(), shared_ptr<Projection>(),
+                             BSON( "a" << 1 ) );
                 ASSERT( !p2.exactKeyMatch() );
-                QueryPlan p3( nsd(), INDEXNO( "b" << 1 << "a" << 1 ), FRSP( BSON( "b" << "z" ) ), FRSP2( BSON( "b" << "z" ) ), BSON( "b" << "z" ), BSON( "a" << 1 ) );
+                QueryPlan p3( nsd(), INDEXNO( "b" << 1 << "a" << 1 ), FRSP( BSON( "b" << "z" ) ),
+                             FRSP2( BSON( "b" << "z" ) ), BSON( "b" << "z" ),
+                             shared_ptr<Projection>(), BSON( "a" << 1 ) );
                 ASSERT( !p3.exactKeyMatch() );
-                QueryPlan p4( nsd(), INDEXNO( "b" << 1 << "a" << 1 << "c" << 1 ), FRSP( BSON( "c" << "y" << "b" << "z" ) ), FRSP2( BSON( "c" << "y" << "b" << "z" ) ), BSON( "c" << "y" << "b" << "z" ), BSON( "a" << 1 ) );
+                QueryPlan p4( nsd(), INDEXNO( "b" << 1 << "a" << 1 << "c" << 1 ),
+                             FRSP( BSON( "c" << "y" << "b" << "z" ) ),
+                             FRSP2( BSON( "c" << "y" << "b" << "z" ) ),
+                             BSON( "c" << "y" << "b" << "z" ), shared_ptr<Projection>(),
+                             BSON( "a" << 1 ) );
                 ASSERT( !p4.exactKeyMatch() );
-                QueryPlan p5( nsd(), INDEXNO( "b" << 1 << "a" << 1 << "c" << 1 ), FRSP( BSON( "c" << "y" << "b" << "z" ) ), FRSP2( BSON( "c" << "y" << "b" << "z" ) ), BSON( "c" << "y" << "b" << "z" ), BSONObj() );
+                QueryPlan p5( nsd(), INDEXNO( "b" << 1 << "a" << 1 << "c" << 1 ),
+                             FRSP( BSON( "c" << "y" << "b" << "z" ) ),
+                             FRSP2( BSON( "c" << "y" << "b" << "z" ) ),
+                             BSON( "c" << "y" << "b" << "z" ), shared_ptr<Projection>(),
+                             BSONObj() );
                 ASSERT( !p5.exactKeyMatch() );
-                QueryPlan p6( nsd(), INDEXNO( "b" << 1 << "a" << 1 << "c" << 1 ), FRSP( BSON( "c" << LT << "y" << "b" << GT << "z" ) ), FRSP2( BSON( "c" << LT << "y" << "b" << GT << "z" ) ), BSON( "c" << LT << "y" << "b" << GT << "z" ), BSONObj() );
+                QueryPlan p6( nsd(), INDEXNO( "b" << 1 << "a" << 1 << "c" << 1 ),
+                             FRSP( BSON( "c" << LT << "y" << "b" << GT << "z" ) ),
+                             FRSP2( BSON( "c" << LT << "y" << "b" << GT << "z" ) ),
+                             BSON( "c" << LT << "y" << "b" << GT << "z" ), shared_ptr<Projection>(),
+                             BSONObj() );
                 ASSERT( !p6.exactKeyMatch() );
-                QueryPlan p7( nsd(), INDEXNO( "b" << 1 ), FRSP( BSONObj() ), FRSP2( BSONObj() ), BSONObj(), BSON( "a" << 1 ) );
+                QueryPlan p7( nsd(), INDEXNO( "b" << 1 ), FRSP( BSONObj() ), FRSP2( BSONObj() ),
+                             BSONObj(), shared_ptr<Projection>(), BSON( "a" << 1 ) );
                 ASSERT( !p7.exactKeyMatch() );
-                QueryPlan p8( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSON( "b" << "y" << "a" << "z" ) ), FRSP2( BSON( "b" << "y" << "a" << "z" ) ), BSON( "b" << "y" << "a" << "z" ), BSONObj() );
+                QueryPlan p8( nsd(), INDEXNO( "a" << 1 << "b" << 1 ),
+                             FRSP( BSON( "b" << "y" << "a" << "z" ) ),
+                             FRSP2( BSON( "b" << "y" << "a" << "z" ) ),
+                             BSON( "b" << "y" << "a" << "z" ), shared_ptr<Projection>(),
+                             BSONObj() );
                 ASSERT( p8.exactKeyMatch() );
-                QueryPlan p9( nsd(), INDEXNO( "a" << 1 ), FRSP( BSON( "a" << "z" ) ), FRSP2( BSON( "a" << "z" ) ), BSON( "a" << "z" ), BSON( "a" << 1 ) );
+                QueryPlan p9( nsd(), INDEXNO( "a" << 1 ), FRSP( BSON( "a" << "z" ) ),
+                             FRSP2( BSON( "a" << "z" ) ), BSON( "a" << "z" ),
+                             shared_ptr<Projection>(), BSON( "a" << 1 ) );
                 ASSERT( p9.exactKeyMatch() );
             }
         };
@@ -308,17 +398,20 @@ namespace QueryOptimizerTests {
                 QueryPlan p( nsd(), INDEXNO( "a" << 1 ),
                             FRSP( BSON( "a" << "r" << "b" << NE << "q" ) ),
                             FRSP2( BSON( "a" << "r" << "b" << NE << "q" ) ),
-                            BSON( "a" << "r" << "b" << NE << "q" ), BSON( "a" << 1 ) );
+                            BSON( "a" << "r" << "b" << NE << "q" ), shared_ptr<Projection>(),
+                            BSON( "a" << 1 ) );
                 ASSERT( !p.exactKeyMatch() );
                 // When no match is possible, keyMatch attribute is not set.
                 BSONObj impossibleQuery = BSON( "a" << BSON( "$in" << BSONArray() ) );
                 QueryPlan p2( nsd(), INDEXNO( "a" << 1 ), FRSP( impossibleQuery ),
-                             FRSP2( impossibleQuery ), impossibleQuery, BSONObj() );
+                             FRSP2( impossibleQuery ), impossibleQuery, shared_ptr<Projection>(),
+                             BSONObj() );
                 ASSERT( !p2.exactKeyMatch() );
                 // When no match is possible on an unindexed field, keyMatch attribute is not set.
                 BSONObj bImpossibleQuery = BSON( "a" << 1 << "b" << GT << 10 << LT << 10 );
                 QueryPlan p3( nsd(), INDEXNO( "a" << 1 ), FRSP( bImpossibleQuery ),
-                              FRSP2( bImpossibleQuery ), bImpossibleQuery, BSONObj() );
+                              FRSP2( bImpossibleQuery ), bImpossibleQuery, shared_ptr<Projection>(),
+                             BSONObj() );
                 ASSERT( !p3.exactKeyMatch() );
             }
         };
@@ -326,18 +419,29 @@ namespace QueryOptimizerTests {
         class ExactKeyQueryTypes : public Base {
         public:
             void run() {
-                QueryPlan p( nsd(), INDEXNO( "a" << 1 ), FRSP( BSON( "a" << "b" ) ), FRSP2( BSON( "a" << "b" ) ), BSON( "a" << "b" ), BSONObj() );
+                QueryPlan p( nsd(), INDEXNO( "a" << 1 ), FRSP( BSON( "a" << "b" ) ),
+                            FRSP2( BSON( "a" << "b" ) ), BSON( "a" << "b" ),
+                            shared_ptr<Projection>(), BSONObj() );
                 ASSERT( p.exactKeyMatch() );
-                QueryPlan p2( nsd(), INDEXNO( "a" << 1 ), FRSP( BSON( "a" << 4 ) ), FRSP2( BSON( "a" << 4 ) ), BSON( "a" << 4 ), BSONObj() );
+                QueryPlan p2( nsd(), INDEXNO( "a" << 1 ), FRSP( BSON( "a" << 4 ) ),
+                             FRSP2( BSON( "a" << 4 ) ), BSON( "a" << 4 ), shared_ptr<Projection>(),
+                             BSONObj() );
                 ASSERT( !p2.exactKeyMatch() );
-                QueryPlan p3( nsd(), INDEXNO( "a" << 1 ), FRSP( BSON( "a" << BSON( "c" << "d" ) ) ), FRSP2( BSON( "a" << BSON( "c" << "d" ) ) ), BSON( "a" << BSON( "c" << "d" ) ), BSONObj() );
+                QueryPlan p3( nsd(), INDEXNO( "a" << 1 ), FRSP( BSON( "a" << BSON( "c" << "d" ) ) ),
+                             FRSP2( BSON( "a" << BSON( "c" << "d" ) ) ),
+                             BSON( "a" << BSON( "c" << "d" ) ), shared_ptr<Projection>(),
+                             BSONObj() );
                 ASSERT( !p3.exactKeyMatch() );
                 BSONObjBuilder b;
                 b.appendRegex( "a", "^ddd" );
                 BSONObj q = b.obj();
-                QueryPlan p4( nsd(), INDEXNO( "a" << 1 ), FRSP( q ), FRSP2( q ), q, BSONObj() );
+                QueryPlan p4( nsd(), INDEXNO( "a" << 1 ), FRSP( q ), FRSP2( q ), q,
+                             shared_ptr<Projection>(), BSONObj() );
                 ASSERT( !p4.exactKeyMatch() );
-                QueryPlan p5( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSON( "a" << "z" << "b" << 4 ) ), FRSP2( BSON( "a" << "z" << "b" << 4 ) ), BSON( "a" << "z" << "b" << 4 ), BSONObj() );
+                QueryPlan p5( nsd(), INDEXNO( "a" << 1 << "b" << 1 ),
+                             FRSP( BSON( "a" << "z" << "b" << 4 ) ),
+                             FRSP2( BSON( "a" << "z" << "b" << 4 ) ),
+                             BSON( "a" << "z" << "b" << 4 ), shared_ptr<Projection>(), BSONObj() );
                 ASSERT( !p5.exactKeyMatch() );
             }
         };
@@ -345,19 +449,58 @@ namespace QueryOptimizerTests {
         class Unhelpful : public Base {
         public:
             void run() {
-                QueryPlan p( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSON( "b" << 1 ) ), FRSP2( BSON( "b" << 1 ) ), BSON( "b" << 1 ), BSONObj() );
+                QueryPlan p( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSON( "b" << 1 ) ),
+                            FRSP2( BSON( "b" << 1 ) ), BSON( "b" << 1 ), shared_ptr<Projection>(),
+                            BSONObj() );
                 ASSERT( p.range( "a" ).universal() );
                 ASSERT( p.unhelpful() );
-                QueryPlan p2( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSON( "b" << 1 << "c" << 1 ) ), FRSP2( BSON( "b" << 1 << "c" << 1 ) ), BSON( "b" << 1 << "c" << 1 ), BSON( "a" << 1 ) );
+                QueryPlan p2( nsd(), INDEXNO( "a" << 1 << "b" << 1 ),
+                             FRSP( BSON( "b" << 1 << "c" << 1 ) ),
+                             FRSP2( BSON( "b" << 1 << "c" << 1 ) ),
+                             BSON( "b" << 1 << "c" << 1 ), shared_ptr<Projection>(),
+                             BSON( "a" << 1 ) );
                 ASSERT( !p2.scanAndOrderRequired() );
                 ASSERT( p2.range( "a" ).universal() );
                 ASSERT( !p2.unhelpful() );
-                QueryPlan p3( nsd(), INDEXNO( "b" << 1 ), FRSP( BSON( "b" << 1 << "c" << 1 ) ), FRSP2( BSON( "b" << 1 << "c" << 1 ) ), BSON( "b" << 1 << "c" << 1 ), BSONObj() );
+                QueryPlan p3( nsd(), INDEXNO( "b" << 1 ), FRSP( BSON( "b" << 1 << "c" << 1 ) ),
+                             FRSP2( BSON( "b" << 1 << "c" << 1 ) ), BSON( "b" << 1 << "c" << 1 ),
+                             shared_ptr<Projection>(), BSONObj() );
                 ASSERT( !p3.range( "b" ).universal() );
                 ASSERT( !p3.unhelpful() );
-                QueryPlan p4( nsd(), INDEXNO( "b" << 1 << "c" << 1 ), FRSP( BSON( "c" << 1 << "d" << 1 ) ), FRSP2( BSON( "c" << 1 << "d" << 1 ) ), BSON( "c" << 1 << "d" << 1 ), BSONObj() );
+                QueryPlan p4( nsd(), INDEXNO( "b" << 1 << "c" << 1 ),
+                             FRSP( BSON( "c" << 1 << "d" << 1 ) ),
+                             FRSP2( BSON( "c" << 1 << "d" << 1 ) ), BSON( "c" << 1 << "d" << 1 ),
+                             shared_ptr<Projection>(), BSONObj() );
                 ASSERT( p4.range( "b" ).universal() );
                 ASSERT( p4.unhelpful() );
+            }
+        };
+        
+        class KeyFieldsOnly : public Base {
+        public:
+            void run() {
+                int idx = INDEXNO( "a" << 1 );
+
+                // No fields supplied.
+                QueryPlan p( nsd(), idx, FRSP( BSON( "a" << 1 ) ),
+                            FRSP2( BSON( "a" << 1 ) ), BSON( "a" << 1 ), shared_ptr<Projection>(),
+                            BSONObj() );
+                ASSERT( !p.keyFieldsOnly() );
+                
+                // Fields supplied.
+                shared_ptr<Projection> fields( new Projection() );
+                fields->init( BSON( "_id" << 0 << "a" << 1 ) );
+                QueryPlan p2( nsd(), idx, FRSP( BSON( "a" << 1 ) ),
+                             FRSP2( BSON( "a" << 1 ) ), BSON( "a" << 1 ), fields, BSONObj() );
+                ASSERT( p2.keyFieldsOnly() );
+                ASSERT_EQUALS( BSON( "a" << 4 ), p2.keyFieldsOnly()->hydrate( BSON( "" << 4 ) ) );
+                
+                // Fields supplied, but index is multikey.
+                DBDirectClient client;
+                client.insert( ns(), BSON( "a" << BSON_ARRAY( 1 << 2 ) ) );
+                QueryPlan p3( nsd(), idx, FRSP( BSON( "a" << 1 ) ),
+                             FRSP2( BSON( "a" << 1 ) ), BSON( "a" << 1 ), fields, BSONObj() );
+                ASSERT( !p3.keyFieldsOnly() );
             }
         };
 
@@ -403,7 +546,8 @@ namespace QueryOptimizerTests {
             void run() {
                 BSONObj obj = BSON( "a" << 1 );
                 auto_ptr<FieldRangeSetPair> fieldRangeSetPair( new FieldRangeSetPair( "", obj ) );
-                QueryPlanSet queryPlanSet( "", fieldRangeSetPair, auto_ptr<FieldRangeSetPair>(), obj, BSONObj() );
+                QueryPlanSet queryPlanSet( "", fieldRangeSetPair, auto_ptr<FieldRangeSetPair>(),
+                                          obj, shared_ptr<Projection>(), BSONObj() );
                 queryPlanSet.toString(); // Just test that we don't crash.
             }
         };
@@ -413,7 +557,8 @@ namespace QueryOptimizerTests {
             void run() {
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 4 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 4 ), BSON( "b" << 1 ) );
+                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 4 ), shared_ptr<Projection>(),
+                               BSON( "b" << 1 ) );
                 ASSERT_EQUALS( 1, s.nPlans() );
             }
         };
@@ -425,7 +570,8 @@ namespace QueryOptimizerTests {
                 Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "b_2" );
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 4 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 4 ), BSONObj() );
+                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 4 ), shared_ptr<Projection>(),
+                               BSONObj() );
                 ASSERT_EQUALS( 1, s.nPlans() );
             }
         };
@@ -437,7 +583,8 @@ namespace QueryOptimizerTests {
                 Helpers::ensureIndex( ns(), BSON( "b" << 1 ), false, "b_1" );
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 4 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 4 ), BSON( "b" << 1 ) );
+                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 4 ), shared_ptr<Projection>(),
+                               BSON( "b" << 1 ) );
                 ASSERT_EQUALS( 3, s.nPlans() );
             }
         };
@@ -449,7 +596,8 @@ namespace QueryOptimizerTests {
                 Helpers::ensureIndex( ns(), BSON( "b" << 1 ), false, "b_1" );
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSONObj() ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, BSONObj(), BSONObj() );
+                QueryPlanSet s( ns(), frsp, frspOrig, BSONObj(), shared_ptr<Projection>(),
+                               BSONObj() );
                 ASSERT_EQUALS( 1, s.nPlans() );
             }
         };
@@ -462,8 +610,8 @@ namespace QueryOptimizerTests {
                 BSONObj hint = BSON( "hint" << BSON( "a" << 1 ) );
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 1 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 1 ), BSON( "b" << 1 ), true,
-                               hint );
+                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 1 ), shared_ptr<Projection>(),
+                               BSON( "b" << 1 ), true, hint );
                 ASSERT_EQUALS( 1, s.nPlans() );
             }
         };
@@ -476,7 +624,8 @@ namespace QueryOptimizerTests {
                 BSONObj hint = BSON( "hint" << "a_1" );
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 1 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 1 ), BSON( "b" << 1 ), true,
+                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 1 ), shared_ptr<Projection>(),
+                               BSON( "b" << 1 ), true,
                                hint );
                 ASSERT_EQUALS( 1, s.nPlans() );
             }
@@ -490,7 +639,8 @@ namespace QueryOptimizerTests {
                 BSONObj hint = BSON( "hint" << BSON( "$natural" << 1 ) );
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 1 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 1 ), BSON( "b" << 1 ), true,
+                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 1 ), shared_ptr<Projection>(),
+                               BSON( "b" << 1 ), true,
                                hint );
                 ASSERT_EQUALS( 1, s.nPlans() );
             }
@@ -503,7 +653,8 @@ namespace QueryOptimizerTests {
                 Helpers::ensureIndex( ns(), BSON( "a" << 1 ), false, "b_2" );
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 1 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 1 ), BSON( "$natural" << 1 ) );
+                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 1 ), shared_ptr<Projection>(),
+                               BSON( "$natural" << 1 ) );
                 ASSERT_EQUALS( 1, s.nPlans() );
             }
         };
@@ -515,6 +666,7 @@ namespace QueryOptimizerTests {
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 1 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
                 ASSERT_THROWS( QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 1 ),
+                                              shared_ptr<Projection>(),
                                               BSON( "b" << 1 ), true, hint ),
                                   AssertionException );
             }
@@ -570,7 +722,8 @@ namespace QueryOptimizerTests {
                 Helpers::ensureIndex( ns(), BSON( "b" << 1 ), false, "b_1" );
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 1 << "c" << 2 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 1 << "c" << 2 ), BSONObj() );
+                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 1 << "c" << 2 )
+                               , shared_ptr<Projection>(), BSONObj() );
                 ASSERT_EQUALS( 2, s.nPlans() );
             }
         };
@@ -582,7 +735,8 @@ namespace QueryOptimizerTests {
                 Helpers::ensureIndex( ns(), BSON( "b" << 1 ), false, "b_1" );
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 4 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 4 ), BSON( "b" << 1 ) );
+                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 4 ), shared_ptr<Projection>(),
+                               BSON( "b" << 1 ) );
                 ASSERT_EQUALS( 3, s.nPlans() );
                 bool threw = false;
                 auto_ptr< TestOp > t( new TestOp( true, threw ) );
@@ -626,7 +780,8 @@ namespace QueryOptimizerTests {
                 Helpers::ensureIndex( ns(), BSON( "b" << 1 ), false, "b_1" );
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 4 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 4 ), BSON( "b" << 1 ) );
+                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 4 ), shared_ptr<Projection>(),
+                               BSON( "b" << 1 ) );
                 ASSERT_EQUALS( 3, s.nPlans() );
                 auto_ptr< TestOp > t( new TestOp() );
                 boost::shared_ptr< TestOp > done = s.runOp( *t );
@@ -680,7 +835,8 @@ namespace QueryOptimizerTests {
 
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 4 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 4 ), BSON( "b" << 1 ) );
+                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 4 ), shared_ptr<Projection>(),
+                               BSON( "b" << 1 ) );
                 NoRecordTestOp original;
                 s.runOp( original );
                 // NoRecordTestOp doesn't record a best plan (test cases where mayRecordPlan() is false).
@@ -689,7 +845,8 @@ namespace QueryOptimizerTests {
                 BSONObj hint = fromjson( "{hint:{$natural:1}}" );
                 auto_ptr< FieldRangeSetPair > frsp2( new FieldRangeSetPair( ns(), BSON( "a" << 4 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig2( new FieldRangeSetPair( *frsp2 ) );
-                QueryPlanSet s2( ns(), frsp2, frspOrig2, BSON( "a" << 4 ), BSON( "b" << 1 ), true,
+                QueryPlanSet s2( ns(), frsp2, frspOrig2, BSON( "a" << 4 ), shared_ptr<Projection>(),
+                                BSON( "b" << 1 ), true,
                                 hint );
                 TestOp newOriginal;
                 s2.runOp( newOriginal );
@@ -698,7 +855,8 @@ namespace QueryOptimizerTests {
 
                 auto_ptr< FieldRangeSetPair > frsp3( new FieldRangeSetPair( ns(), BSON( "a" << 4 ), true ) );
                 auto_ptr< FieldRangeSetPair > frspOrig3( new FieldRangeSetPair( *frsp3 ) );
-                QueryPlanSet s3( ns(), frsp3, frspOrig3, BSON( "a" << 4 ), BSON( "b" << 1 << "c" << 1 ) );
+                QueryPlanSet s3( ns(), frsp3, frspOrig3, BSON( "a" << 4 ), shared_ptr<Projection>(),
+                                BSON( "b" << 1 << "c" << 1 ) );
                 TestOp newerOriginal;
                 s3.runOp( newerOriginal );
                 // Plan recorded was for a different query pattern (different sort spec).
@@ -712,13 +870,15 @@ namespace QueryOptimizerTests {
             void nPlans( int n ) {
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 4 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 4 ), BSON( "b" << 1 ) );
+                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 4 ), shared_ptr<Projection>(),
+                               BSON( "b" << 1 ) );
                 ASSERT_EQUALS( n, s.nPlans() );
             }
             void runQuery() {
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 4 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 4 ), BSON( "b" << 1 ) );
+                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 4 ), shared_ptr<Projection>(),
+                               BSON( "b" << 1 ) );
                 TestOp original;
                 s.runOp( original );
             }
@@ -747,7 +907,8 @@ namespace QueryOptimizerTests {
 
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 4 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 4 ), BSON( "b" << 1 ) );
+                QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 4 ), shared_ptr<Projection>(),
+                               BSON( "b" << 1 ) );
                 ScanOnlyTestOp op;
                 s.runOp( op );
                 pair< BSONObj, long long > best = QueryUtilIndexed::bestIndexForPatterns( s.frsp(), BSON( "b" << 1 ) );
@@ -756,7 +917,8 @@ namespace QueryOptimizerTests {
 
                 auto_ptr< FieldRangeSetPair > frsp2( new FieldRangeSetPair( ns(), BSON( "a" << 4 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig2( new FieldRangeSetPair( *frsp2 ) );
-                QueryPlanSet s2( ns(), frsp2, frspOrig2, BSON( "a" << 4 ), BSON( "b" << 1 ) );
+                QueryPlanSet s2( ns(), frsp2, frspOrig2, BSON( "a" << 4 ), shared_ptr<Projection>(),
+                                BSON( "b" << 1 ) );
                 TestOp op2;
                 ASSERT( s2.runOp( op2 )->complete() );
             }
@@ -862,8 +1024,11 @@ namespace QueryOptimizerTests {
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), fromjson( "{a:{$in:[2,3,6,9,11]}}" ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
                 QueryPlanSet s( ns(), frsp, frspOrig, fromjson( "{a:{$in:[2,3,6,9,11]}}" ),
+                               shared_ptr<Projection>(),
                                BSONObj(), true, hint );
-                QueryPlan qp( nsd(), 1, s.frsp(), s.originalFrsp(), fromjson( "{a:{$in:[2,3,6,9,11]}}" ), BSONObj() );
+                QueryPlan qp( nsd(), 1, s.frsp(), s.originalFrsp(),
+                             fromjson( "{a:{$in:[2,3,6,9,11]}}" ), shared_ptr<Projection>(),
+                             BSONObj() );
                 boost::shared_ptr<Cursor> c = qp.newCursor();
                 double expected[] = { 2, 3, 6, 9 };
                 for( int i = 0; i < 4; ++i, c->advance() ) {
@@ -876,8 +1041,11 @@ namespace QueryOptimizerTests {
                     auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), fromjson( "{a:{$in:[2,3,6,9,11]}}" ) ) );
                     auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
                     QueryPlanSet s( ns(), frsp, frspOrig, fromjson( "{a:{$in:[2,3,6,9,11]}}" ),
+                                   shared_ptr<Projection>(),
                                    BSON( "a" << -1 ), true, hint );
-                    QueryPlan qp( nsd(), 1, s.frsp(), s.originalFrsp(), fromjson( "{a:{$in:[2,3,6,9,11]}}" ), BSON( "a" << -1 ) );
+                    QueryPlan qp( nsd(), 1, s.frsp(), s.originalFrsp(),
+                                 fromjson( "{a:{$in:[2,3,6,9,11]}}" ), shared_ptr<Projection>(),
+                                 BSON( "a" << -1 ) );
                     boost::shared_ptr<Cursor> c = qp.newCursor();
                     double expected[] = { 9, 6, 3, 2 };
                     for( int i = 0; i < 4; ++i, c->advance() ) {
@@ -897,7 +1065,8 @@ namespace QueryOptimizerTests {
                     theDataFileMgr.insertWithObjMod( ns(), temp );
                 }
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), fromjson( "{a:5,b:{$in:[2,3,6,9,11]}}" ) ) );
-                QueryPlan qp( nsd(), 1, *frsp, frsp.get(), fromjson( "{a:5,b:{$in:[2,3,6,9,11]}}" ), BSONObj() );
+                QueryPlan qp( nsd(), 1, *frsp, frsp.get(), fromjson( "{a:5,b:{$in:[2,3,6,9,11]}}" ),
+                             shared_ptr<Projection>(), BSONObj() );
                 boost::shared_ptr<Cursor> c = qp.newCursor();
                 double expected[] = { 2, 3, 6, 9 };
                 ASSERT( c->ok() );
@@ -918,7 +1087,9 @@ namespace QueryOptimizerTests {
                     theDataFileMgr.insertWithObjMod( ns(), temp );
                 }
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), fromjson( "{a:{$gte:5},b:{$in:[2,3,6,9,11]}}" ) ) );
-                QueryPlan qp( nsd(), 1, *frsp, frsp.get(), fromjson( "{a:{$gte:5},b:{$in:[2,3,6,9,11]}}" ), BSONObj() );
+                QueryPlan qp( nsd(), 1, *frsp, frsp.get(),
+                             fromjson( "{a:{$gte:5},b:{$in:[2,3,6,9,11]}}" ),
+                             shared_ptr<Projection>(), BSONObj() );
                 boost::shared_ptr<Cursor> c = qp.newCursor();
                 int matches[] = { 2, 3, 6, 9 };
                 for( int i = 0; i < 4; ++i, c->advance() ) {
@@ -937,7 +1108,7 @@ namespace QueryOptimizerTests {
                 BSONObj query = BSON( "a" << BSON_ARRAY( 0 << 0 ) << "b" << 1 );
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), query ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, query, BSONObj() );
+                QueryPlanSet s( ns(), frsp, frspOrig, query, shared_ptr<Projection>(), BSONObj() );
                 // Two query plans, btree and collection scan.
                 ASSERT_EQUALS( 2, s.nPlans() );
                 // Not the geo plan.
@@ -953,7 +1124,7 @@ namespace QueryOptimizerTests {
                 BSONObj query = BSON( "a" << BSON_ARRAY( 0 << 0 ) << "b" << 1 );
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), query ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, query, BSONObj() );
+                QueryPlanSet s( ns(), frsp, frspOrig, query, shared_ptr<Projection>(), BSONObj() );
                 // Single query plan.
                 ASSERT_EQUALS( 1, s.nPlans() );
                 // It's the geo plan.
@@ -987,7 +1158,8 @@ namespace QueryOptimizerTests {
         class ToString : public Base {
         public:
             void run() {
-                MultiPlanScanner multiPlanScanner( ns(), BSON( "a" << 1 ), BSONObj() );
+                MultiPlanScanner multiPlanScanner( ns(), BSON( "a" << 1 ), shared_ptr<Projection>(),
+                                                  BSONObj() );
                 multiPlanScanner.toString(); // Just test that we don't crash.
             }
         };
@@ -1053,6 +1225,7 @@ namespace QueryOptimizerTests {
             add<QueryPlanTests::MoreKeyMatch>();
             add<QueryPlanTests::ExactKeyQueryTypes>();
             add<QueryPlanTests::Unhelpful>();
+            add<QueryPlanTests::KeyFieldsOnly>();
             add<QueryPlanSetTests::ToString>();
             add<QueryPlanSetTests::NoIndexes>();
             add<QueryPlanSetTests::Optimal>();

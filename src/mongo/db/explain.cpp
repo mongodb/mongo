@@ -31,15 +31,17 @@ namespace mongo {
     _nscannedObjects(),
     _nscanned(),
     _scanAndOrder(),
+    _indexOnly(),
     _nYields(),
     _picked(),
     _done() {
     }
 
-    void ExplainPlanInfo::notePlan( const Cursor &cursor, bool scanAndOrder ) {
+    void ExplainPlanInfo::notePlan( const Cursor &cursor, bool scanAndOrder, bool indexOnly ) {
         _cursorName = const_cast<Cursor&>(cursor).toString();
         _indexBounds = cursor.prettyIndexBounds();
         _scanAndOrder = scanAndOrder;
+        _indexOnly = indexOnly;
         noteCursorUpdate( cursor );
     }
     
@@ -82,7 +84,7 @@ namespace mongo {
                     "nscannedObjects" << clauseInfo.nscannedObjects() <<
                     "nscanned" << clauseInfo.nscanned() <<
                     "scanAndOrder" << _scanAndOrder <<
-                    "indexOnly" << false << // TODO
+                    "indexOnly" << _indexOnly <<
                     "nYields" << _nYields <<
                     "nChunkSkips" << clauseInfo.nChunkSkips() <<
                     "millis" << clauseInfo.millis() <<

@@ -28,6 +28,8 @@
 namespace mongo {
     void __forceLinkGeoPlugin();
     shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query,
+                                               const shared_ptr<Projection> &fields =
+                                               shared_ptr<Projection>(),
                                                const BSONObj &order = BSONObj(),
                                                const QueryPlanSelectionPolicy &planPolicy =
                                                QueryPlanSelectionPolicy::any(),
@@ -205,7 +207,7 @@ namespace QueryOptimizerCursorTests {
             }
         }
         void setQueryOptimizerCursorWithoutAdvancing( const BSONObj &query, const BSONObj &order = BSONObj() ) {
-            _c = newQueryOptimizerCursor( ns(), query, order );
+            _c = newQueryOptimizerCursor( ns(), query, shared_ptr<Projection>(), order );
         }
         bool ok() const { return _c->ok(); }
         /** Handles matching and deduping. */
@@ -1801,7 +1803,8 @@ namespace QueryOptimizerCursorTests {
         void run() {
             dblock lk;
             Client::Context ctx( ns() );
-            ASSERT( !newQueryOptimizerCursor( ns(), BSONObj(), BSON( "a" << 1 ) ).get() );
+            ASSERT( !newQueryOptimizerCursor( ns(), BSONObj(), shared_ptr<Projection>(),
+                                             BSON( "a" << 1 ) ).get() );
         }
     };
     
@@ -1818,7 +1821,9 @@ namespace QueryOptimizerCursorTests {
             
             dblock lk;
             Client::Context ctx( ns() );
-            shared_ptr<Cursor> c = newQueryOptimizerCursor( ns(), BSON( "a" << 2 ), BSON( "b" << 1 ) );
+            shared_ptr<Cursor> c = newQueryOptimizerCursor( ns(), BSON( "a" << 2 ),
+                                                           shared_ptr<Projection>(),
+                                                           BSON( "b" << 1 ) );
             // Check that we are scanning {b:1} not {a:1}, since {a:1} is not properly ordered.
             for( int i = 0; i < 3; ++i ) {
                 ASSERT( c->ok() );  
@@ -2227,7 +2232,8 @@ namespace QueryOptimizerCursorTests {
             dblock lk;
             Client::Context ctx( ns() );
             shared_ptr<Cursor> c =
-            newQueryOptimizerCursor( ns(), BSONObj(), BSON( "a" << 1 ), QueryPlanSelectionPolicy::any(), false );
+            newQueryOptimizerCursor( ns(), BSONObj(), shared_ptr<Projection>(), BSON( "a" << 1 ),
+                                    QueryPlanSelectionPolicy::any(), false );
             ASSERT( c );
         }
     };
@@ -2253,7 +2259,9 @@ namespace QueryOptimizerCursorTests {
             dblock lk;
             Client::Context ctx( ns() );
             shared_ptr<Cursor> c =
-            newQueryOptimizerCursor( ns(), BSON( "a" << LT << 3 << "b" << 1 ), BSON( "a" << 1 ), QueryPlanSelectionPolicy::any(), false );
+            newQueryOptimizerCursor( ns(), BSON( "a" << LT << 3 << "b" << 1 ),
+                                    shared_ptr<Projection>(), BSON( "a" << 1 ),
+                                    QueryPlanSelectionPolicy::any(), false );
             ASSERT( c );
             BSONObj idxKey;
             while( c->ok() ) {
@@ -2263,6 +2271,81 @@ namespace QueryOptimizerCursorTests {
             // Check that the ordered plan {a:1} took over, despite the unordered plan {$natural:1}
             // seeing > 101 matches.
             ASSERT_EQUALS( BSON( "a" << 1 ), idxKey );
+        }
+    };
+    
+    class CoveredIndex : public Base {
+    public:
+        void run() {
+            _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+            _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
+            _cli.insert( ns(), BSON( "a" << 1 << "b" << 10 ) );
+            
+            dblock lk;
+            Client::Context ctx( ns() );
+            shared_ptr<Projection> fields( new Projection() );
+            fields->init( BSON( "_id" << 0 << "a" << 1 ) );
+            shared_ptr<QueryOptimizerCursor> c =
+            dynamic_pointer_cast<QueryOptimizerCursor>
+            ( newQueryOptimizerCursor( ns(), BSON( "a" << GTE << 0 << "b" << GTE << 0 ),
+                                      fields, BSON( "a" << 1 ),
+                                      QueryPlanSelectionPolicy::any(), false ) );
+            bool foundA = false;
+            bool foundB = false;
+            while( c->ok() ) {
+                if ( c->indexKeyPattern() == BSON( "a" << 1 ) ) {
+                    foundA = true;
+                    ASSERT( c->keyFieldsOnly() );
+                    ASSERT_EQUALS( BSON( "a" << 1 ), c->keyFieldsOnly()->hydrate( c->currKey() ) );
+                }
+                if ( c->indexKeyPattern() == BSON( "b" << 1 ) ) {
+                    foundB = true;
+                    ASSERT( !c->keyFieldsOnly() );
+                }
+                c->advance();
+            }
+            ASSERT( foundA );
+            ASSERT( foundB );
+        }
+    };
+    
+    class CoveredIndexTakeover : public Base {
+    public:
+        void run() {
+            _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+            _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
+            for( int i = 0; i < 150; ++i ) {
+                _cli.insert( ns(), BSON( "a" << 1 << "b" << 1 ) );
+            }
+            _cli.insert( ns(), BSON( "a" << 2 ) );
+            
+            dblock lk;
+            Client::Context ctx( ns() );
+            shared_ptr<Projection> fields( new Projection() );
+            fields->init( BSON( "_id" << 0 << "a" << 1 ) );
+            shared_ptr<QueryOptimizerCursor> c =
+            dynamic_pointer_cast<QueryOptimizerCursor>
+            ( newQueryOptimizerCursor( ns(),
+                                      fromjson( "{$or:[{a:1},{b:1},{a:2}]}" ),
+                                      fields, BSONObj(),
+                                      QueryPlanSelectionPolicy::any(), false ) );
+            bool foundA = false;
+            bool foundB = false;
+            while( c->ok() ) {
+                if ( c->indexKeyPattern() == BSON( "a" << 1 ) ) {
+                    foundA = true;
+                    ASSERT( c->keyFieldsOnly() );
+                    ASSERT( BSON( "a" << 1 ) == c->keyFieldsOnly()->hydrate( c->currKey() ) ||
+                           BSON( "a" << 2 ) == c->keyFieldsOnly()->hydrate( c->currKey() ) );
+                }
+                if ( c->indexKeyPattern() == BSON( "b" << 1 ) ) {
+                    foundB = true;
+                    ASSERT( !c->keyFieldsOnly() );
+                }
+                c->advance();
+            }
+            ASSERT( foundA );
+            ASSERT( foundB );
         }
     };
     
@@ -2687,7 +2770,7 @@ namespace QueryOptimizerCursorTests {
                 Client::Context ctx( ns() );
                 ParsedQuery parsedQuery( ns(), 0, 0, 0,
                                         BSON( "$query" << query() << "$explain" << true ),
-                                        BSONObj() );
+                                        fields() );
                 _cursor =
                 dynamic_pointer_cast<QueryOptimizerCursor>
                 ( NamespaceDetailsTransient::getCursor( ns(), query(), BSONObj(), QueryPlanSelectionPolicy::any(), 0,
@@ -2708,6 +2791,7 @@ namespace QueryOptimizerCursorTests {
                 _cli.insert( ns(), BSON( "a" << 2 << "b" << 1 ) );
             }
             virtual BSONObj query() const { return BSON( "a" << 1 << "b" << 1 ); }
+            virtual BSONObj fields() const { return BSONObj(); }
             virtual void handleCursor() {
             }
             virtual void checkExplain() {
@@ -3120,6 +3204,45 @@ namespace QueryOptimizerCursorTests {
             }            
         };
 
+        class CoveredIndex : public Base {
+            virtual BSONObj query() const { return fromjson( "{$or:[{a:1},{a:2}]}" ); }
+            virtual BSONObj fields() const { return BSON( "_id" << 0 << "a" << 1 ); }
+            virtual void handleCursor() {
+                ASSERT_EQUALS( "QueryOptimizerCursor", _cursor->toString() );
+                while( _cursor->advance() );
+            }
+            virtual void checkExplain() {
+                BSONObj clause0 = _explain[ "clauses" ].Array()[ 0 ].Obj();
+                ASSERT( clause0[ "indexOnly" ].Bool() );
+                
+                BSONObj clause1 = _explain[ "clauses" ].Array()[ 1 ].Obj();
+                ASSERT( clause1[ "indexOnly" ].Bool() );
+            }
+        };
+
+        class CoveredIndexTakeover : public Base {
+            virtual void setupCollection() {
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                for( int i = 0; i < 150; ++i ) {
+                    _cli.insert( ns(), BSON( "a" << 1 ) );
+                }
+                _cli.insert( ns(), BSON( "a" << 2 ) );
+            }
+            virtual BSONObj query() const { return fromjson( "{$or:[{a:1},{a:2}]}" ); }
+            virtual BSONObj fields() const { return BSON( "_id" << 0 << "a" << 1 ); }
+            virtual void handleCursor() {
+                ASSERT_EQUALS( "QueryOptimizerCursor", _cursor->toString() );
+                while( _cursor->advance() );
+            }
+            virtual void checkExplain() {
+                BSONObj clause0 = _explain[ "clauses" ].Array()[ 0 ].Obj();
+                ASSERT( clause0[ "indexOnly" ].Bool() );
+                
+                BSONObj clause1 = _explain[ "clauses" ].Array()[ 1 ].Obj();
+                ASSERT( clause1[ "indexOnly" ].Bool() );
+            }
+        };
+
         // test takeover w/ mixed plan clause ? necessary?
 
     } // namespace Explain
@@ -3213,6 +3336,8 @@ namespace QueryOptimizerCursorTests {
             add<TimeoutClientCursorHolder>();
             add<AllowOutOfOrderPlan>();
             add<NoTakeoverByOutOfOrderPlan>();
+            add<CoveredIndex>();
+            add<CoveredIndexTakeover>();
             add<GetCursor::NoConstraints>();
             add<GetCursor::SimpleId>();
             add<GetCursor::OptimalIndex>();
@@ -3255,6 +3380,8 @@ namespace QueryOptimizerCursorTests {
             add<Explain::MultipleClauses>();
             add<Explain::MultiCursorTakeover>();
             add<Explain::NChunkSkipsTakeover>();
+            add<Explain::CoveredIndex>();
+            add<Explain::CoveredIndexTakeover>();
         }
     } myall;
     

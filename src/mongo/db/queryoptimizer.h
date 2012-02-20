@@ -41,6 +41,7 @@ namespace mongo {
                   const FieldRangeSetPair &frsp,
                   const FieldRangeSetPair *originalFrsp,
                   const BSONObj &originalQuery,
+                  const shared_ptr<Projection> &fields,
                   const BSONObj &order,
                   bool mustAssertOnYieldFailure = true,
                   const BSONObj &startKey = BSONObj(),
@@ -90,6 +91,8 @@ namespace mongo {
         const FieldRangeSet &multikeyFrs() const { return _frsMulti; }
         
         bool mustAssertOnYieldFailure() const { return _mustAssertOnYieldFailure; }
+
+        shared_ptr<Projection::KeyOnly> keyFieldsOnly() const { return _keyFieldsOnly; }
         
         struct Summary {
             Summary() :
@@ -97,10 +100,12 @@ namespace mongo {
             }
             Summary( const QueryPlan &queryPlan ) :
             _fieldRangeSetMulti( new FieldRangeSet( queryPlan._frsMulti ) ),
+            _keyFieldsOnly( queryPlan._keyFieldsOnly ),
             _scanAndOrderRequired( queryPlan._scanAndOrderRequired ) {
             }
             bool valid() const { return _fieldRangeSetMulti; }
             shared_ptr<FieldRangeSet> _fieldRangeSetMulti;
+            shared_ptr<Projection::KeyOnly> _keyFieldsOnly;
             bool _scanAndOrderRequired;
         };
         Summary summary() const { return Summary( *this ); }
@@ -137,6 +142,7 @@ namespace mongo {
         IndexType * _type;
         bool _startOrEndSpec;
         bool _mustAssertOnYieldFailure;
+        shared_ptr<Projection::KeyOnly> _keyFieldsOnly;
     };
 
     /**
@@ -294,6 +300,7 @@ namespace mongo {
                       auto_ptr<FieldRangeSetPair> frsp,
                       auto_ptr<FieldRangeSetPair> originalFrsp,
                       const BSONObj &originalQuery,
+                      const shared_ptr<Projection> &fields,
                       const BSONObj &order,
                       bool mustAssertOnYieldFailure = true,
                       const BSONObj &hint = BSONObj(),
@@ -404,6 +411,7 @@ namespace mongo {
 
         const char *_ns;
         BSONObj _originalQuery;
+        shared_ptr<Projection> _fields;
         auto_ptr<FieldRangeSetPair> _frsp;
         auto_ptr<FieldRangeSetPair> _originalFrsp;
         PlanSet _plans;
@@ -427,6 +435,7 @@ namespace mongo {
     public:
         MultiPlanScanner( const char *ns,
                           const BSONObj &query,
+                          const shared_ptr<Projection> &fields,
                           const BSONObj &order,
                           const BSONObj &hint = BSONObj(),
                           QueryPlanSet::RecordedPlanPolicy recordedPlanPolicy = QueryPlanSet::Use,
@@ -544,6 +553,7 @@ namespace mongo {
         const string _ns;
         bool _or;
         BSONObj _query;
+        shared_ptr<Projection> _fields;
         shared_ptr<OrRangeGenerator> _org; // May be null in certain non $or query cases.
         auto_ptr<QueryPlanSet> _currentQps;
         int _i;
@@ -607,6 +617,8 @@ namespace mongo {
         void noteYield();
         
         const QueryPlan *queryPlan() const { return _queryPlan; }
+        
+        const Projection::KeyOnly *keyFieldsOnly() const { return _queryPlan->keyFieldsOnly().get(); }
     private:
         void nextClause();
         auto_ptr<MultiPlanScanner> _mps;

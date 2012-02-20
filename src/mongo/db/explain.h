@@ -39,7 +39,7 @@ namespace mongo {
     public:
         ExplainPlanInfo();
         
-        void notePlan( const Cursor &cursor, bool scanAndOrder );
+        void notePlan( const Cursor &cursor, bool scanAndOrder, bool indexOnly );
         void noteIterate( bool match, bool loadedObject, const Cursor &cursor );
         void noteYield();
         void noteDone( const Cursor &cursor );
@@ -62,6 +62,7 @@ namespace mongo {
         long long _nscannedObjects;
         long long _nscanned;
         bool _scanAndOrder;
+        bool _indexOnly;
         int _nYields;
         BSONObj _indexBounds;
         bool _picked;
@@ -117,8 +118,8 @@ namespace mongo {
     public:
         ExplainSinglePlanQueryInfo();
 
-        void notePlan( const Cursor &cursor, bool scanAndOrder ) {
-            _planInfo->notePlan( cursor, scanAndOrder );
+        void notePlan( const Cursor &cursor, bool scanAndOrder, bool indexOnly ) {
+            _planInfo->notePlan( cursor, scanAndOrder, indexOnly );
         }
         void noteIterate( bool match, bool loadedObject, bool chunkSkip, const Cursor &cursor ) {
             _planInfo->noteIterate( match, loadedObject, cursor );

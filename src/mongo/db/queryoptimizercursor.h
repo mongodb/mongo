@@ -83,6 +83,7 @@ namespace mongo {
     public:
         virtual const QueryPlan *queryPlan() const = 0;
         virtual const QueryPlan *completeQueryPlan() const = 0;
+        virtual const Projection::KeyOnly *keyFieldsOnly() const = 0;
         virtual bool mayFailOverToInOrderPlans() const = 0;
         virtual bool mayRunInOrderPlans() const = 0;
         virtual bool mayRunOutOfOrderPlans() const = 0;

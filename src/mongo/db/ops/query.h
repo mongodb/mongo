@@ -45,7 +45,7 @@ namespace mongo {
     public:
         ExplainRecordingStrategy( const ExplainQueryInfo::AncillaryInfo &ancillaryInfo );
         virtual ~ExplainRecordingStrategy() {}
-        virtual void notePlan( bool scanAndOrder ) {}
+        virtual void notePlan( bool scanAndOrder, bool indexOnly ) {}
         virtual void noteIterate( bool match, bool loadedObject, bool chunkSkip ) {}
         virtual void noteYield() {}
         shared_ptr<ExplainQueryInfo> doneQueryInfo();
@@ -67,7 +67,7 @@ namespace mongo {
         SimpleCursorExplainStrategy( const ExplainQueryInfo::AncillaryInfo &ancillaryInfo,
                                     const shared_ptr<Cursor> &cursor );
     private:
-        virtual void notePlan( bool scanAndOrder );
+        virtual void notePlan( bool scanAndOrder, bool indexOnly );
         virtual void noteIterate( bool match, bool loadedObject, bool chunkSkip );
         virtual void noteYield();
         virtual shared_ptr<ExplainQueryInfo> _doneQueryInfo();
@@ -88,21 +88,25 @@ namespace mongo {
     class ResponseBuildStrategy {
     public:
         ResponseBuildStrategy( const ParsedQuery &parsedQuery, const shared_ptr<Cursor> &cursor,
-                              BufBuilder &buf );
+                              BufBuilder &buf, const QueryPlan::Summary &queryPlan );
         virtual ~ResponseBuildStrategy() {}
         virtual bool handleMatch() = 0;
         virtual int rewriteMatches() { return -1; }
     protected:
-        BSONObj current() const;
+        BSONObj current( bool allowCovered ) const;
         const ParsedQuery &_parsedQuery;
         shared_ptr<Cursor> _cursor;
+        shared_ptr<QueryOptimizerCursor> _queryOptimizerCursor;
         BufBuilder &_buf;
+    private:
+        const Projection::KeyOnly *keyFieldsOnly() const;
+        shared_ptr<Projection::KeyOnly> _planKeyFieldsOnly;
     };
 
     class OrderedBuildStrategy : public ResponseBuildStrategy {
     public:
         OrderedBuildStrategy( const ParsedQuery &parsedQuery, const shared_ptr<Cursor> &cursor,
-                             BufBuilder &buf );
+                             BufBuilder &buf, const QueryPlan::Summary &queryPlan );
         virtual bool handleMatch();
     private:
         long long _skip;        
@@ -137,7 +141,6 @@ namespace mongo {
         void handleReorderMatch();
         bool handleOrderedMatch();
         ReorderBuildStrategy *newReorderBuildStrategy() const;
-        shared_ptr<QueryOptimizerCursor> _queryOptimizerCursor;
         SmallDupSet _scanAndOrderDups;
         OrderedBuildStrategy _orderedBuild;
         shared_ptr<ReorderBuildStrategy> _reorderBuild;
