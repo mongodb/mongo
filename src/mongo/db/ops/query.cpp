@@ -1129,7 +1129,9 @@ namespace mongo {
             // at this point
             throw SendStaleConfigException( ns , "version changed during initial query" );
         }
-        
+
+        long long nReturned = queryResponseBuilder.handoff( result );
+
         ccPointer.reset();
         long long cursorid = 0;
         if ( saveClientCursor ) {
@@ -1154,12 +1156,12 @@ namespace mongo {
                 exhaust = ns;
                 curop.debug().exhaust = true;
             }
+            ccPointer->setPos( nReturned );
             ccPointer->pq = pq_shared;
             ccPointer->fields = pq.getFieldPtr();
             ccPointer.release();
         }
         
-        long long nReturned = queryResponseBuilder.handoff( result );
         QueryResult *qr = (QueryResult *) result.header();
         qr->cursorId = cursorid;
         curop.debug().cursorid = ( cursorid == 0 ? -1 : qr->cursorId );
@@ -1401,7 +1403,7 @@ namespace mongo {
 
             cursorid = cc->cursorid();
             DEV tlog(2) << "query has more, cursorid: " << cursorid << endl;
-            cc->setPos( n );
+//            cc->setPos( n );
 //            cc->pq = pq_shared;
 //            cc->fields = pq.getFieldPtr();
 //            cc->originalMessage = m;

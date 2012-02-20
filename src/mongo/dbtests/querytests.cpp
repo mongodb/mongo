@@ -208,6 +208,7 @@ namespace QueryTests {
                 ClientCursor::Pointer clientCursor( cursorId );
                 ASSERT( clientCursor.c()->pq );
                 ASSERT_EQUALS( 2, clientCursor.c()->pq->getNumToReturn() );
+                ASSERT_EQUALS( 2, clientCursor.c()->pos() );
             }
             
             cursor = client().getMore( ns, cursorId );
