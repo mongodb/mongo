@@ -604,12 +604,12 @@ namespace mongo {
         bool saveClientCursor() const { return _saveClientCursor; }
         bool wouldSaveClientCursor() const { return _wouldSaveClientCursor; }
 
-        void finishForOplogReplay( ClientCursor * cc ) {
-            if ( _oplogReplay && ! _slaveReadTill.isNull() ) {
-                cc->slaveReadTill( _slaveReadTill );
-            }
-
-        }
+//        void finishForOplogReplay( ClientCursor * cc ) {
+//            if ( _oplogReplay && ! _slaveReadTill.isNull() ) {
+//                cc->slaveReadTill( _slaveReadTill );
+//            }
+//
+//        }
 
         ShardChunkManagerPtr getChunkManager(){ return _chunkManager; }
 
@@ -1145,8 +1145,7 @@ namespace mongo {
                 ccPointer->slaveReadTill( slaveReadTill );
             }
             if ( !ccPointer->ok() && ccPointer->c()->tailable() ) {
-                DEV tlog() << "query has no more but tailable, cursorid: "
-                << cursorid << endl;
+                DEV tlog() << "query has no more but tailable, cursorid: " << cursorid << endl;
             }
             if( queryOptions & QueryOption_Exhaust ) {
                 exhaust = ns;
@@ -1372,16 +1371,16 @@ namespace mongo {
         const char * exhaust = 0;
         if ( dqo.saveClientCursor() || ( dqo.wouldSaveClientCursor() && mps->mayRunMore() ) ) {
             ClientCursor *cc;
-            bool moreClauses = mps->mayRunMore();
-            if ( moreClauses ) {
-                // this MultiCursor will use a dumb NoOp to advance(), so no need to specify mayYield
-                shared_ptr< Cursor > multi( new MultiCursor( mps, cursor, dqo.matcher( cursor ), shared_ptr<ExplainPlanInfo>(), dqo ) );
-                cc = new ClientCursor(queryOptions, multi, ns, jsobj.getOwned());
-            }
-            else {
-                if( ! cursor->matcher() ) cursor->setMatcher( dqo.matcher( cursor ) );
-                cc = new ClientCursor( queryOptions, cursor, ns, jsobj.getOwned() );
-            }
+//            bool moreClauses = mps->mayRunMore();
+//            if ( moreClauses ) {
+//                // this MultiCursor will use a dumb NoOp to advance(), so no need to specify mayYield
+//                shared_ptr< Cursor > multi( new MultiCursor( mps, cursor, dqo.matcher( cursor ), shared_ptr<ExplainPlanInfo>(), dqo ) );
+//                cc = new ClientCursor(queryOptions, multi, ns, jsobj.getOwned());
+//            }
+//            else {
+//                if( ! cursor->matcher() ) cursor->setMatcher( dqo.matcher( cursor ) );
+//                cc = new ClientCursor( queryOptions, cursor, ns, jsobj.getOwned() );
+//            }
 
             cc->setChunkManager( dqo.getChunkManager() );
 
@@ -1389,27 +1388,27 @@ namespace mongo {
             DEV tlog(2) << "query has more, cursorid: " << cursorid << endl;
             cc->setPos( n );
             cc->pq = pq_shared;
-            cc->fields = pq.getFieldPtr();
-            cc->originalMessage = m;
-            cc->updateLocation();
-            if ( !cc->ok() && cc->c()->tailable() )
-                DEV tlog() << "query has no more but tailable, cursorid: " << cursorid << endl;
-            if( queryOptions & QueryOption_Exhaust ) {
-                exhaust = ns;
-                curop.debug().exhaust = true;
-            }
-            dqo.finishForOplogReplay(cc);
+//            cc->fields = pq.getFieldPtr();
+//            cc->originalMessage = m;
+//            cc->updateLocation();
+//            if ( !cc->ok() && cc->c()->tailable() )
+//                DEV tlog() << "query has no more but tailable, cursorid: " << cursorid << endl;
+//            if( queryOptions & QueryOption_Exhaust ) {
+//                exhaust = ns;
+//                curop.debug().exhaust = true;
+//            }
+//            dqo.finishForOplogReplay(cc);
         }
 
         QueryResult *qr = (QueryResult *) result.header();
-        qr->cursorId = cursorid;
+//        qr->cursorId = cursorid;
         curop.debug().cursorid = cursorid == 0 ? -1 : qr->cursorId;
-        qr->setResultFlagsToOk();
+//        qr->setResultFlagsToOk();
         // qr->len is updated automatically by appendData()
         curop.debug().responseLength = qr->len;
-        qr->setOperation(opReply);
-        qr->startingFrom = 0;
-        qr->nReturned = n;
+//        qr->setOperation(opReply);
+//        qr->startingFrom = 0;
+//        qr->nReturned = n;
 
         int duration = curop.elapsedMillis();
         bool dbprofile = curop.shouldDBProfile( duration );
