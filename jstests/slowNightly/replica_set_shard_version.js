@@ -14,17 +14,34 @@ try { sadmin.getLastError(); } catch (e) { print("reconnecting: "+e); }
 
 st.rs0.getMaster();
 
+iterations = 0;
+
+// sleep a bit to let servers allocate journals
+sleep(30);
+
+// make sure there is a master
+assert.soon(
+    function(z){
+        iterations++;
+        try {
+            coll.findOne();
+            return true;
+        }
+        catch ( e ){
+            return false;
+        }
+    } );
+
 mongosA.getDB("admin").runCommand({ setParameter : 1, traceExceptions : true })
 
 coll = mongosA.getCollection( jsTestName() + ".coll" );
 
 start = new Date();
 
-iteratioons = 0;
-
+// make sure there is a master
 assert.soon(
     function(z){
-        iteratioons++;
+        iterations++;
         try {
             coll.findOne();
             return true;
@@ -42,8 +59,8 @@ mongosA.getDB("admin").runCommand({ setParameter : 1, traceExceptions : false })
 
 print( "time to work for primary: " + ( ( end.getTime() - start.getTime() ) / 1000 ) + " seconds" );
 
-assert.gt( 3 , iteratioons );
-
+// not sure how long it takes to elect primary, seen it as low as 3
+assert.gt( 2 , iterations );
 
 // now check secondary
 
