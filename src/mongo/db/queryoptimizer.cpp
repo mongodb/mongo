@@ -618,21 +618,21 @@ doneCheckOrder:
         _mayRecordPlan = true;
     }
 
-    shared_ptr<QueryOp> QueryPlanSet::runOp( QueryOp &op ) {
-        if ( _usingCachedPlan ) {
-            Runner r( *this, op );
-            shared_ptr<QueryOp> res = r.runUntilFirstCompletes();
-            // _plans.size() > 1 if addOtherPlans was called in Runner::runUntilFirstCompletes().
-            if ( res->complete() || _plans.size() > 1 )
-                return res;
-            // A cached plan was used, so clear the plan for this query pattern and retry the query without a cached plan.
-            // Careful here, as the namespace may have been dropped.
-            QueryUtilIndexed::clearIndexesForPatterns( *_frsp, _order );
-            init();
-        }
-        Runner r( *this, op );
-        return r.runUntilFirstCompletes();
-    }
+//    shared_ptr<QueryOp> QueryPlanSet::runOp( QueryOp &op ) {
+//        if ( _usingCachedPlan ) {
+//            Runner r( *this, op );
+//            shared_ptr<QueryOp> res = r.runUntilFirstCompletes();
+//            // _plans.size() > 1 if addOtherPlans was called in Runner::runUntilFirstCompletes().
+//            if ( res->complete() || _plans.size() > 1 )
+//                return res;
+//            // A cached plan was used, so clear the plan for this query pattern and retry the query without a cached plan.
+//            // Careful here, as the namespace may have been dropped.
+//            QueryUtilIndexed::clearIndexesForPatterns( *_frsp, _order );
+//            init();
+//        }
+//        Runner r( *this, op );
+//        return r.runUntilFirstCompletes();
+//    }
     
     BSONObj QueryPlanSet::explain() const {
         vector<BSONObj> arr;
@@ -982,38 +982,38 @@ doneCheckOrder:
         }
     }
 
-    shared_ptr<QueryOp> MultiPlanScanner::runOpOnce( QueryOp &op ) {
-        assertMayRunMore();
-        if ( !_or ) {
-            ++_i;
-            return _currentQps->runOp( op );
-        }
-        ++_i;
-        auto_ptr<FieldRangeSetPair> frsp( _org->topFrsp() );
-        auto_ptr<FieldRangeSetPair> originalFrsp( _org->topFrspOriginal() );
-        updateCurrentQps( new QueryPlanSet( _ns.c_str(), frsp, originalFrsp, _query, _fields,
-                                            BSONObj(),
-                                            true, _hint, _recordedPlanPolicy, BSONObj(),
-                                            BSONObj(), _mayYield ) );
-        shared_ptr<QueryOp> ret( _currentQps->runOp( op ) );
-        if ( ! ret->complete() )
-            throw MsgAssertionException( ret->exception() );
-        if ( ret->qp().willScanTable() ) {
-            _tableScanned = true;
-        } else {
-            // If the full table was scanned, don't bother popping the last or clause.
-	        _org->popOrClause( ret->qp().nsd(), ret->qp().idxNo(), ret->qp().indexed() ? ret->qp().indexKey() : BSONObj() );
-        }
-        return ret;
-    }
-
-    shared_ptr<QueryOp> MultiPlanScanner::runOp( QueryOp &op ) {
-        shared_ptr<QueryOp> ret = runOpOnce( op );
-        while( !ret->stopRequested() && mayRunMore() ) {
-            ret = runOpOnce( *ret );
-        }
-        return ret;
-    }
+//    shared_ptr<QueryOp> MultiPlanScanner::runOpOnce( QueryOp &op ) {
+//        assertMayRunMore();
+//        if ( !_or ) {
+//            ++_i;
+//            return _currentQps->runOp( op );
+//        }
+//        ++_i;
+//        auto_ptr<FieldRangeSetPair> frsp( _org->topFrsp() );
+//        auto_ptr<FieldRangeSetPair> originalFrsp( _org->topFrspOriginal() );
+//        updateCurrentQps( new QueryPlanSet( _ns.c_str(), frsp, originalFrsp, _query, _fields,
+//                                            BSONObj(),
+//                                            true, _hint, _recordedPlanPolicy, BSONObj(),
+//                                            BSONObj(), _mayYield ) );
+//        shared_ptr<QueryOp> ret( _currentQps->runOp( op ) );
+//        if ( ! ret->complete() )
+//            throw MsgAssertionException( ret->exception() );
+//        if ( ret->qp().willScanTable() ) {
+//            _tableScanned = true;
+//        } else {
+//            // If the full table was scanned, don't bother popping the last or clause.
+//	        _org->popOrClause( ret->qp().nsd(), ret->qp().idxNo(), ret->qp().indexed() ? ret->qp().indexKey() : BSONObj() );
+//        }
+//        return ret;
+//    }
+//
+//    shared_ptr<QueryOp> MultiPlanScanner::runOp( QueryOp &op ) {
+//        shared_ptr<QueryOp> ret = runOpOnce( op );
+//        while( !ret->stopRequested() && mayRunMore() ) {
+//            ret = runOpOnce( *ret );
+//        }
+//        return ret;
+//    }
     
     shared_ptr<QueryOp> MultiPlanScanner::nextOpHandleEndOfClause() {
         shared_ptr<QueryOp> op = iterateRunner( *_baseOp );
