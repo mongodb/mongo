@@ -7,10 +7,7 @@ This section explains how to build and install the WiredTiger software.
 Skip this step if you are building from a WiredTiger release package,
 and proceed with @ref building.
 
-To clone WiredTiger and build from the WiredTiger GitHub repository
-requires the
-<a href="http://gcc.gnu.org/">GNU Compiler Collection</a>
-(GCC) toolchain for configuration and building, including
+To build from the WiredTiger GitHub repository requires
 <a href="http://www.gnu.org/software/autoconf/autoconf.html">autoconf</a>,
 <a href="http://www.gnu.org/software/autoconf/automake.html">automake</a>,
 <a href="http://www.gnu.org/software/libtool/libtool.html">libtool</a> and
@@ -20,48 +17,47 @@ when configuring and building WiredTiger.
 First, clone the repository:
 
 @code
-git clone git@github.com:wiredtiger/wiredtiger.git wiredtiger
+git clone git://github.com/wiredtiger/wiredtiger.git
 @endcode
 
-Second, change into the \c build_posix directory of the repository, and
-run the \c reconf script.
+Second, run the \c build_posix/reconf script:
 
 @code
-cd wiredtiger/build_posix
-sh ./reconf
+cd wiredtiger
+sh build_posix/reconf
 @endcode
 
-This creates the \c wiredtiger/configure autoconf script, and you can
-now proceed with @ref building.
+This creates the \c configure script, and you can now proceed with @ref
+building.
 
 @section building Building WiredTiger
 
-WiredTiger uses the <a href="http://gcc.gnu.org/">GNU Compiler
-Collection</a> (GCC) toolchain for configuration and building (but does
-not require the gcc compiler for building), including <a
-href="http://www.gnu.org/software/autoconf/autoconf.html">autoconf</a>
-and <a
-href="http://www.gnu.org/software/libtool/libtool.html">libtool</a>.
-The standard options for those tools can be specified when configuring
-and building WiredTiger.
-
-To build the WiredTiger software on a POSIX-like system, change
-directory to the top-level <code>build_posix</code> directory,
-then configure and build the software:
+To build the WiredTiger software on a POSIX-like system, change directory to
+the top-level directory, then configure and build the software:
 
 @code
-cd build_posix
-../configure
-make
+./configure && make
 @endcode
 
 To rebuild from scratch, discard any previous configuration by cleaning
 out the build area:
 
 @code
-cd build_posix
 make realclean
 @endcode
+
+To see additional configuration options, run:
+
+@code
+./configure --help
+@endcode
+
+WiredTiger uses
+<a href="http://www.gnu.org/software/autoconf/autoconf.html">autoconf</a>
+<a href="http://www.gnu.org/software/autoconf/automake.html">automake</a>,
+and <a href="http://www.gnu.org/software/libtool/libtool.html">libtool</a>
+to create the configure script and Makefiles.  The standard options for those
+tools can be specified when configuring and building WiredTiger.
 
 @section installing Installing WiredTiger
 
@@ -82,10 +78,10 @@ file /usr/local/lib/libwiredtiger*
 
 WiredTiger uses
 <a href="http://www.gnu.org/software/libtool/libtool.html">libtool</a> to
-build the libraries.  By default, this tool builds both shared and
-static libraries.  To build only static libraries, configure WiredTiger
-using the \c --disable-shared argument. To build only shared libraries,
-configure using WiredTiger using the \c --disable-static argument.
+build the libraries.  By default, both shared and static libraries are built.
+To build only static libraries, configure WiredTiger using the
+\c --disable-shared argument. To build only shared libraries, configure using
+WiredTiger using the \c --disable-static argument.
 
 In addition, WiredTiger installs a standalone utility program named
 <code>wt</code>.  By default, this utility is installed in
@@ -94,14 +90,12 @@ In addition, WiredTiger installs a standalone utility program named
 To install WiredTiger:
 
 @code
-cd build_posix
 make install
 @endcode
 
 To uninstall WiredTiger:
 
 @code
-cd build_posix
 make uninstall
 @endcode
 
@@ -112,8 +106,7 @@ documentation.  For example, to install the libraries and binaries into
 a different location:
 
 @code
-cd build_posix
-../dist/configure --prefix=/c/wiredtiger
+./configure --prefix=/c/wiredtiger
 @endcode
 
 @section configure Configuring WiredTiger
@@ -172,8 +165,7 @@ Additional libraries.
 For example, to specify a different compiler:
 
 @code
-cd build_posix
-env CC=mygcc ../configure
+env CC=mygcc ./configure
 @endcode
 
 By default, WiredTiger builds with the \c -O3 compiler optimization flag
@@ -182,21 +174,18 @@ case the \c -g compiler flag is used instead.  For example, to specify
 a different level of optimization:
 
 @code
-cd build_posix
-env CFLAGS=-Os ../configure
+env CFLAGS=-Os ./configure
 @endcode
 
 To specify a different set of include files:
 
 @code
-cd build_posix
-env CFLAGS=-I/usr/local/include ../configure
+env CFLAGS=-I/usr/local/include ./configure
 @endcode
 
 To specify an additional library:
 
 @code
-cd build_posix
-env LIBS="-lrtf -lmin" LDFLAGS=-L/usr/local/lib ../configure
+env LIBS="-lrtf -lmin" LDFLAGS=-L/usr/local/lib ./configure
 @endcode
  */

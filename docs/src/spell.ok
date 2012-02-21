@@ -20,6 +20,7 @@ LIBS
 LSB
 MERCHANTABILITY
 MVCC's
+Makefiles
 NoSQL
 RepMgr
 Rrx

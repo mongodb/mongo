@@ -26,8 +26,8 @@ To view release and installation documentation, open
 
 or docs/index.html in your web browser.
 
-To build in a POSIX environment (for example, Linux or other UNIX-like
-system), run:
+To build in a POSIX environment (for example, Linux or another
+UNIX-like system), run:
 
 	./configure && make
 
