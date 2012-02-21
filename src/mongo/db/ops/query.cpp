@@ -737,7 +737,9 @@ namespace mongo {
                 return fields->hydrate( _cursor->currKey() );
             }
         }
-        return _cursor->current();
+        BSONObj ret = _cursor->current();
+        assert( ret.isValid() );
+        return ret;
     }
 
     const Projection::KeyOnly *ResponseBuildStrategy::keyFieldsOnly() const {
@@ -768,8 +770,6 @@ namespace mongo {
             return false;
         }
         if ( !_parsedQuery.isExplain() ) {
-            BSONObj js = _cursor->current();
-            assert( js.isValid() );
             fillQueryResultFromObj( _buf, _parsedQuery.getFields(), current( true ), ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
         }
         return true;
