@@ -4,6 +4,12 @@
  *
  * For our purposes, "prompt" is defined as "before stopMongod() decides to send a SIGKILL" and also
  * "before mongod starts executing the next pending operation after the currently executing one."
+ *
+ * This is also a regression test for SERVER-1818.  By queuing up a collection drop behind an
+ * infinitely looping operation, we ensure that killall interrupts the drop command (drop is
+ * normally a short lived operation and is otherwise difficult to kill deterministically).  The
+ * subsequent drop() on restart would historically assert if the data integrity issue caused by
+ * SERVER-1818 occured.
  */
 
 port = allocatePorts( 1 )[ 0 ]
