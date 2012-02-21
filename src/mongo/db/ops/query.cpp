@@ -50,7 +50,7 @@ namespace mongo {
     //ns->query->DiskLoc
 //    LRUishMap<BSONObj,DiskLoc,5> lrutest(123);
 
-    extern bool useHints;
+//    extern bool useHints;
 
     bool runCommands(const char *ns, BSONObj& jsobj, CurOp& curop, BufBuilder &b, BSONObjBuilder& anObjBuilder, bool fromRepl, int queryOptions) {
         try {
@@ -308,351 +308,351 @@ namespace mongo {
 //        int _i;
 //    };
 
-    // Implements database 'query' requests using the query optimizer's QueryOp interface
-    class UserQueryOp : public QueryOp {
-    public:
-
-        UserQueryOp( const ParsedQuery& pq, Message &response, ExplainBuilder &eb, CurOp &curop ) :
-            _buf( 32768 ) , // TODO be smarter here
-            _pq( pq ) ,
-            _ntoskip( pq.getSkip() ) ,
-            _nscanned(0), _oldNscanned(0), _nscannedObjects(0), _oldNscannedObjects(0),
-            _n(0),
-            _oldN(0),
-            _nYields(),
-            _nChunkSkips(),
-            _chunkManager( shardingState.needShardChunkManager(pq.ns()) ?
-                           shardingState.getShardChunkManager(pq.ns()) : ShardChunkManagerPtr() ),
-            _inMemSort(false),
-            _capped(false),
-            _saveClientCursor(false),
-            _wouldSaveClientCursor(false),
-            _oplogReplay( pq.hasOption( QueryOption_OplogReplay) ),
-            _response( response ),
-            _eb( eb ),
-            _curop( curop ),
-            _yieldRecoveryFailed()
-        {}
-
-        virtual void _init() {
-            // only need to put the QueryResult fields there if we're building the first buffer in the message.
-            if ( _response.empty() ) {
-                _buf.skip( sizeof( QueryResult ) );
-            }
-
-            if ( _oplogReplay ) {
-                _findingStartCursor.reset( new FindingStartCursor( qp() ) );
-                _capped = true;
-            }
-            else {
-                _c = qp().newCursor( DiskLoc() , _pq.getNumToReturn() + _pq.getSkip() );
-                _capped = _c->capped();
-
-                // setup check for if we can only use index to extract
-                if ( _c->modifiedKeys() == false && _c->isMultiKey() == false && _pq.getFields() ) {
-                    _keyFieldsOnly.reset( _pq.getFields()->checkKey( _c->indexKeyPattern() ) );
-                }
-            }
-
-            if ( qp().scanAndOrderRequired() ) {
-                _inMemSort = true;
-                _so.reset( new ScanAndOrder( _pq.getSkip() , _pq.getNumToReturn() , _pq.getOrder(), qp().multikeyFrs() ) );
-            }
-
-            if ( _pq.isExplain() ) {
-                _eb.noteCursor( _c.get() );
-            }
-
-        }
-
-        virtual bool prepareToYield() {
-            if ( _findingStartCursor.get() ) {
-                return _findingStartCursor->prepareToYield();
-            }
-            else {
-                if ( _c && !_cc ) {
-                    _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , _c , _pq.ns() ) );
-                }
-                if ( _cc ) {
-	                return _cc->prepareToYield( _yieldData );
-                }
-            }
-            // no active cursor - ok to yield
-            return true;
-        }
-
-        virtual void recoverFromYield() {
-            _nYields++;
-
-            if ( _findingStartCursor.get() ) {
-                _findingStartCursor->recoverFromYield();
-            }
-            else if ( _cc && !ClientCursor::recoverFromYield( _yieldData ) ) {
-                _yieldRecoveryFailed = true;
-                _c.reset();
-                _cc.reset();
-                _so.reset();
-
-                if ( _capped ) {
-                    msgassertedNoTrace( 13338, str::stream() << "capped cursor overrun during query: " << _pq.ns() );
-                }
-                else if ( qp().mustAssertOnYieldFailure() ) {
-                    msgassertedNoTrace( 15890, str::stream() << "UserQueryOp::recoverFromYield() failed to recover: " << _pq.ns() );
-                }
-                else {
-                    // we don't fail query since we're fine with returning partial data if collection dropped
-
-                    // todo: this is wrong.  the cursor could be gone if closeAllDatabases command just ran
-                }
-
-            }
-        }
-
-        virtual long long nscanned() {
-            if ( _findingStartCursor.get() ) {
-                return 0; // should only be one query plan, so value doesn't really matter.
-            }
-            return _c.get() ? _c->nscanned() : _nscanned;
-        }
-
-        virtual void next() {
-            if ( _findingStartCursor.get() ) {
-                if ( !_findingStartCursor->done() ) {
-                    _findingStartCursor->next();
-                }                    
-                if ( _findingStartCursor->done() ) {
-                    _c = _findingStartCursor->cursor();
-                    _findingStartCursor.reset( 0 );
-                }
-                _capped = true;
-                return;
-            }
-
-            if ( !_c || !_c->ok() ) {
-                finish( false );
-                return;
-            }
-
-            bool mayCreateCursor1 = _pq.wantMore() && ! _inMemSort && _pq.getNumToReturn() != 1;
-
-            if( 0 ) {
-                cout << "SCANNING this: " << this << " key: " << _c->currKey() << " obj: " << _c->current() << endl;
-            }
-
-            if ( _pq.getMaxScan() && _nscanned >= _pq.getMaxScan() ) {
-                finish( true ); //?
-                return;
-            }
-
-            _nscanned = _c->nscanned();
-            if ( !matcher( _c )->matchesCurrent(_c.get() , &_details ) ) {
-                // not a match, continue onward
-                if ( _details._loadedObject )
-                    _nscannedObjects++;
-            }
-            else {
-                _nscannedObjects++;
-                DiskLoc cl = _c->currLoc();
-                if ( _chunkManager && ! _chunkManager->belongsToMe( cl.obj() ) ) { // TODO: should make this covered at some point
-                    _nChunkSkips++;
-                    // log() << "TEMP skipping un-owned chunk: " << _c->current() << endl;
-                }
-                else if( _c->getsetdup(cl) ) {
-                    // dup
-                }
-                else {
-                    // got a match.
-
-                    if ( _inMemSort ) {
-                        // note: no cursors for non-indexed, ordered results.  results must be fairly small.
-                        _so->add( _pq.returnKey() ? _c->currKey() : _c->current(), _pq.showDiskLoc() ? &cl : 0 );
-                    }
-                    else if ( _ntoskip > 0 ) {
-                        _ntoskip--;
-                    }
-                    else {
-                        if ( _pq.isExplain() ) {
-                            _n++;
-                            if ( n() >= _pq.getNumToReturn() && !_pq.wantMore() ) {
-                                // .limit() was used, show just that much.
-                                finish( true ); //?
-                                return;
-                            }
-                        }
-                        else {
-
-                            if ( _pq.returnKey() ) {
-                                BSONObjBuilder bb( _buf );
-                                bb.appendKeys( _c->indexKeyPattern() , _c->currKey() );
-                                bb.done();
-                            }
-                            else if ( _keyFieldsOnly ) {
-                                fillQueryResultFromObj( _buf , 0 , _keyFieldsOnly->hydrate( _c->currKey() ) );
-                            }
-                            else {
-                                BSONObj js = _c->current();
-                                assert( js.isValid() );
-
-                                if ( _oplogReplay ) {
-                                    BSONElement e = js["ts"];
-                                    if ( e.type() == Date || e.type() == Timestamp )
-                                        _slaveReadTill = e._opTime();
-                                }
-
-                                fillQueryResultFromObj( _buf , _pq.getFields() , js , (_pq.showDiskLoc() ? &cl : 0));
-                            }
-                            _n++;
-                            if ( ! _c->supportGetMore() ) {
-                                if ( _pq.enough( n() ) || _buf.len() >= MaxBytesToReturnToClientAtOnce ) {
-                                    finish( true );
-                                    return;
-                                }
-                            }
-                            else if ( _pq.enoughForFirstBatch( n() , _buf.len() ) ) {
-                                /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
-                                if ( mayCreateCursor1 ) {
-                                    _wouldSaveClientCursor = true;
-                                    if ( _c->advance() ) {
-                                        // more...so save a cursor
-                                        _saveClientCursor = true;
-                                    }
-                                }
-                                finish( true );
-                                return;
-                            }
-                        }
-                    }
-                }
-            }
-            _c->advance();
-        }
-
-        // this plan won, so set data for response broadly
-        void finish( bool stop ) {
-            massert( 13638, "client cursor dropped during explain query yield", !_pq.isExplain() || _c.get() );
-
-            if ( _pq.isExplain() ) {
-                _n = _inMemSort ? _so->size() : _n;
-            }
-            else if ( _inMemSort ) {
-                if( _so.get() )
-                    _so->fill( _buf, _pq.getFields() , _n );
-            }
-
-            if ( _c.get() ) {
-                _nscanned = _c->nscanned();
-
-                if ( _pq.hasOption( QueryOption_CursorTailable ) && _pq.getNumToReturn() != 1 )
-                    _c->setTailable();
-
-                // If the tailing request succeeded.
-                if ( _c->tailable() )
-                    _saveClientCursor = true;
-            }
-
-            if ( _pq.isExplain() ) {
-                _eb.noteScan( _c.get(), _nscanned, _nscannedObjects, _n, scanAndOrderRequired(),
-                              _curop.elapsedMillis(), useHints && !_pq.getHint().isEmpty(), _nYields ,
-                              _nChunkSkips, _keyFieldsOnly.get() > 0 );
-            }
-            else {
-                if ( _buf.len() ) {
-                    _response.appendData( _buf.buf(), _buf.len() );
-                    _buf.decouple();
-                }
-            }
-
-            if ( stop ) {
-                setStop();
-            }
-            else {
-                setComplete();
-            }
-
-        }
-
-//        void finishExplain( const BSONObj &suffix ) {
-//            BSONObj obj = _eb.finishWithSuffix( totalNscanned(), nscannedObjects(), n(), _curop.elapsedMillis(), suffix);
-//            fillQueryResultFromObj(_buf, 0, obj);
-//            _n = 1;
-//            _oldN = 0;
-//            _response.appendData( _buf.buf(), _buf.len() );
-//            _buf.decouple();
-//        }
-
-        virtual bool mayRecordPlan() const {
-            return !_yieldRecoveryFailed && ( _pq.getNumToReturn() != 1 ) && ( ( _n > _pq.getNumToReturn() / 2 ) || ( complete() && !stopRequested() ) );
-        }
-
-        virtual QueryOp *_createChild() const {
-            if ( _pq.isExplain() ) {
-                _eb.ensureStartScan();
-            }
-            UserQueryOp *ret = new UserQueryOp( _pq, _response, _eb, _curop );
-            ret->_oldN = n();
-            ret->_oldNscanned = totalNscanned();
-            ret->_oldNscannedObjects = nscannedObjects();
-            ret->_ntoskip = _ntoskip;
-            return ret;
-        }
-
-        bool scanAndOrderRequired() const { return _inMemSort; }
-        shared_ptr<Cursor> cursor() { return _c; }
-        int n() const { return _oldN + _n; }
-        long long totalNscanned() const { return _nscanned + _oldNscanned; }
-        long long nscannedObjects() const { return _nscannedObjects + _oldNscannedObjects; }
-        bool saveClientCursor() const { return _saveClientCursor; }
-        bool wouldSaveClientCursor() const { return _wouldSaveClientCursor; }
-
-//        void finishForOplogReplay( ClientCursor * cc ) {
-//            if ( _oplogReplay && ! _slaveReadTill.isNull() ) {
-//                cc->slaveReadTill( _slaveReadTill );
+//    // Implements database 'query' requests using the query optimizer's QueryOp interface
+//    class UserQueryOp : public QueryOp {
+//    public:
+//
+//        UserQueryOp( const ParsedQuery& pq, Message &response, ExplainBuilder &eb, CurOp &curop ) :
+//            _buf( 32768 ) , // TODO be smarter here
+//            _pq( pq ) ,
+//            _ntoskip( pq.getSkip() ) ,
+//            _nscanned(0), _oldNscanned(0), _nscannedObjects(0), _oldNscannedObjects(0),
+//            _n(0),
+//            _oldN(0),
+//            _nYields(),
+//            _nChunkSkips(),
+//            _chunkManager( shardingState.needShardChunkManager(pq.ns()) ?
+//                           shardingState.getShardChunkManager(pq.ns()) : ShardChunkManagerPtr() ),
+//            _inMemSort(false),
+//            _capped(false),
+//            _saveClientCursor(false),
+//            _wouldSaveClientCursor(false),
+//            _oplogReplay( pq.hasOption( QueryOption_OplogReplay) ),
+//            _response( response ),
+//            _eb( eb ),
+//            _curop( curop ),
+//            _yieldRecoveryFailed()
+//        {}
+//
+//        virtual void _init() {
+//            // only need to put the QueryResult fields there if we're building the first buffer in the message.
+//            if ( _response.empty() ) {
+//                _buf.skip( sizeof( QueryResult ) );
+//            }
+//
+//            if ( _oplogReplay ) {
+//                _findingStartCursor.reset( new FindingStartCursor( qp() ) );
+//                _capped = true;
+//            }
+//            else {
+//                _c = qp().newCursor( DiskLoc() , _pq.getNumToReturn() + _pq.getSkip() );
+//                _capped = _c->capped();
+//
+//                // setup check for if we can only use index to extract
+//                if ( _c->modifiedKeys() == false && _c->isMultiKey() == false && _pq.getFields() ) {
+//                    _keyFieldsOnly.reset( _pq.getFields()->checkKey( _c->indexKeyPattern() ) );
+//                }
+//            }
+//
+//            if ( qp().scanAndOrderRequired() ) {
+//                _inMemSort = true;
+//                _so.reset( new ScanAndOrder( _pq.getSkip() , _pq.getNumToReturn() , _pq.getOrder(), qp().multikeyFrs() ) );
+//            }
+//
+//            if ( _pq.isExplain() ) {
+//                _eb.noteCursor( _c.get() );
 //            }
 //
 //        }
-
-        ShardChunkManagerPtr getChunkManager(){ return _chunkManager; }
-
-    private:
-        BufBuilder _buf;
-        const ParsedQuery& _pq;
-        scoped_ptr<Projection::KeyOnly> _keyFieldsOnly;
-
-        long long _ntoskip;
-        long long _nscanned;
-        long long _oldNscanned;
-        long long _nscannedObjects;
-        long long _oldNscannedObjects;
-        int _n; // found so far
-        int _oldN;
-
-        int _nYields;
-        int _nChunkSkips;
-
-        MatchDetails _details;
-
-        ShardChunkManagerPtr _chunkManager;
-
-        bool _inMemSort;
-        auto_ptr< ScanAndOrder > _so;
-
-        shared_ptr<Cursor> _c;
-        ClientCursor::CleanupPointer _cc;
-        ClientCursor::YieldData _yieldData;
-
-        bool _capped;
-        bool _saveClientCursor;
-        bool _wouldSaveClientCursor;
-        bool _oplogReplay;
-        auto_ptr< FindingStartCursor > _findingStartCursor;
-
-        Message &_response;
-        ExplainBuilder &_eb;
-        CurOp &_curop;
-        OpTime _slaveReadTill;
-
-        bool _yieldRecoveryFailed;
-    };
+//
+//        virtual bool prepareToYield() {
+//            if ( _findingStartCursor.get() ) {
+//                return _findingStartCursor->prepareToYield();
+//            }
+//            else {
+//                if ( _c && !_cc ) {
+//                    _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , _c , _pq.ns() ) );
+//                }
+//                if ( _cc ) {
+//	                return _cc->prepareToYield( _yieldData );
+//                }
+//            }
+//            // no active cursor - ok to yield
+//            return true;
+//        }
+//
+//        virtual void recoverFromYield() {
+//            _nYields++;
+//
+//            if ( _findingStartCursor.get() ) {
+//                _findingStartCursor->recoverFromYield();
+//            }
+//            else if ( _cc && !ClientCursor::recoverFromYield( _yieldData ) ) {
+//                _yieldRecoveryFailed = true;
+//                _c.reset();
+//                _cc.reset();
+//                _so.reset();
+//
+//                if ( _capped ) {
+//                    msgassertedNoTrace( 13338, str::stream() << "capped cursor overrun during query: " << _pq.ns() );
+//                }
+//                else if ( qp().mustAssertOnYieldFailure() ) {
+//                    msgassertedNoTrace( 15890, str::stream() << "UserQueryOp::recoverFromYield() failed to recover: " << _pq.ns() );
+//                }
+//                else {
+//                    // we don't fail query since we're fine with returning partial data if collection dropped
+//
+//                    // todo: this is wrong.  the cursor could be gone if closeAllDatabases command just ran
+//                }
+//
+//            }
+//        }
+//
+//        virtual long long nscanned() {
+//            if ( _findingStartCursor.get() ) {
+//                return 0; // should only be one query plan, so value doesn't really matter.
+//            }
+//            return _c.get() ? _c->nscanned() : _nscanned;
+//        }
+//
+//        virtual void next() {
+//            if ( _findingStartCursor.get() ) {
+//                if ( !_findingStartCursor->done() ) {
+//                    _findingStartCursor->next();
+//                }                    
+//                if ( _findingStartCursor->done() ) {
+//                    _c = _findingStartCursor->cursor();
+//                    _findingStartCursor.reset( 0 );
+//                }
+//                _capped = true;
+//                return;
+//            }
+//
+//            if ( !_c || !_c->ok() ) {
+//                finish( false );
+//                return;
+//            }
+//
+//            bool mayCreateCursor1 = _pq.wantMore() && ! _inMemSort && _pq.getNumToReturn() != 1;
+//
+//            if( 0 ) {
+//                cout << "SCANNING this: " << this << " key: " << _c->currKey() << " obj: " << _c->current() << endl;
+//            }
+//
+//            if ( _pq.getMaxScan() && _nscanned >= _pq.getMaxScan() ) {
+//                finish( true ); //?
+//                return;
+//            }
+//
+//            _nscanned = _c->nscanned();
+//            if ( !matcher( _c )->matchesCurrent(_c.get() , &_details ) ) {
+//                // not a match, continue onward
+//                if ( _details._loadedObject )
+//                    _nscannedObjects++;
+//            }
+//            else {
+//                _nscannedObjects++;
+//                DiskLoc cl = _c->currLoc();
+//                if ( _chunkManager && ! _chunkManager->belongsToMe( cl.obj() ) ) { // TODO: should make this covered at some point
+//                    _nChunkSkips++;
+//                    // log() << "TEMP skipping un-owned chunk: " << _c->current() << endl;
+//                }
+//                else if( _c->getsetdup(cl) ) {
+//                    // dup
+//                }
+//                else {
+//                    // got a match.
+//
+//                    if ( _inMemSort ) {
+//                        // note: no cursors for non-indexed, ordered results.  results must be fairly small.
+//                        _so->add( _pq.returnKey() ? _c->currKey() : _c->current(), _pq.showDiskLoc() ? &cl : 0 );
+//                    }
+//                    else if ( _ntoskip > 0 ) {
+//                        _ntoskip--;
+//                    }
+//                    else {
+//                        if ( _pq.isExplain() ) {
+//                            _n++;
+//                            if ( n() >= _pq.getNumToReturn() && !_pq.wantMore() ) {
+//                                // .limit() was used, show just that much.
+//                                finish( true ); //?
+//                                return;
+//                            }
+//                        }
+//                        else {
+//
+//                            if ( _pq.returnKey() ) {
+//                                BSONObjBuilder bb( _buf );
+//                                bb.appendKeys( _c->indexKeyPattern() , _c->currKey() );
+//                                bb.done();
+//                            }
+//                            else if ( _keyFieldsOnly ) {
+//                                fillQueryResultFromObj( _buf , 0 , _keyFieldsOnly->hydrate( _c->currKey() ) );
+//                            }
+//                            else {
+//                                BSONObj js = _c->current();
+//                                assert( js.isValid() );
+//
+//                                if ( _oplogReplay ) {
+//                                    BSONElement e = js["ts"];
+//                                    if ( e.type() == Date || e.type() == Timestamp )
+//                                        _slaveReadTill = e._opTime();
+//                                }
+//
+//                                fillQueryResultFromObj( _buf , _pq.getFields() , js , (_pq.showDiskLoc() ? &cl : 0));
+//                            }
+//                            _n++;
+//                            if ( ! _c->supportGetMore() ) {
+//                                if ( _pq.enough( n() ) || _buf.len() >= MaxBytesToReturnToClientAtOnce ) {
+//                                    finish( true );
+//                                    return;
+//                                }
+//                            }
+//                            else if ( _pq.enoughForFirstBatch( n() , _buf.len() ) ) {
+//                                /* if only 1 requested, no cursor saved for efficiency...we assume it is findOne() */
+//                                if ( mayCreateCursor1 ) {
+//                                    _wouldSaveClientCursor = true;
+//                                    if ( _c->advance() ) {
+//                                        // more...so save a cursor
+//                                        _saveClientCursor = true;
+//                                    }
+//                                }
+//                                finish( true );
+//                                return;
+//                            }
+//                        }
+//                    }
+//                }
+//            }
+//            _c->advance();
+//        }
+//
+//        // this plan won, so set data for response broadly
+//        void finish( bool stop ) {
+//            massert( 13638, "client cursor dropped during explain query yield", !_pq.isExplain() || _c.get() );
+//
+//            if ( _pq.isExplain() ) {
+//                _n = _inMemSort ? _so->size() : _n;
+//            }
+//            else if ( _inMemSort ) {
+//                if( _so.get() )
+//                    _so->fill( _buf, _pq.getFields() , _n );
+//            }
+//
+//            if ( _c.get() ) {
+//                _nscanned = _c->nscanned();
+//
+//                if ( _pq.hasOption( QueryOption_CursorTailable ) && _pq.getNumToReturn() != 1 )
+//                    _c->setTailable();
+//
+//                // If the tailing request succeeded.
+//                if ( _c->tailable() )
+//                    _saveClientCursor = true;
+//            }
+//
+//            if ( _pq.isExplain() ) {
+//                _eb.noteScan( _c.get(), _nscanned, _nscannedObjects, _n, scanAndOrderRequired(),
+//                              _curop.elapsedMillis(), useHints && !_pq.getHint().isEmpty(), _nYields ,
+//                              _nChunkSkips, _keyFieldsOnly.get() > 0 );
+//            }
+//            else {
+//                if ( _buf.len() ) {
+//                    _response.appendData( _buf.buf(), _buf.len() );
+//                    _buf.decouple();
+//                }
+//            }
+//
+//            if ( stop ) {
+//                setStop();
+//            }
+//            else {
+//                setComplete();
+//            }
+//
+//        }
+//
+////        void finishExplain( const BSONObj &suffix ) {
+////            BSONObj obj = _eb.finishWithSuffix( totalNscanned(), nscannedObjects(), n(), _curop.elapsedMillis(), suffix);
+////            fillQueryResultFromObj(_buf, 0, obj);
+////            _n = 1;
+////            _oldN = 0;
+////            _response.appendData( _buf.buf(), _buf.len() );
+////            _buf.decouple();
+////        }
+//
+//        virtual bool mayRecordPlan() const {
+//            return !_yieldRecoveryFailed && ( _pq.getNumToReturn() != 1 ) && ( ( _n > _pq.getNumToReturn() / 2 ) || ( complete() && !stopRequested() ) );
+//        }
+//
+//        virtual QueryOp *_createChild() const {
+//            if ( _pq.isExplain() ) {
+//                _eb.ensureStartScan();
+//            }
+//            UserQueryOp *ret = new UserQueryOp( _pq, _response, _eb, _curop );
+//            ret->_oldN = n();
+//            ret->_oldNscanned = totalNscanned();
+//            ret->_oldNscannedObjects = nscannedObjects();
+//            ret->_ntoskip = _ntoskip;
+//            return ret;
+//        }
+//
+//        bool scanAndOrderRequired() const { return _inMemSort; }
+//        shared_ptr<Cursor> cursor() { return _c; }
+//        int n() const { return _oldN + _n; }
+//        long long totalNscanned() const { return _nscanned + _oldNscanned; }
+//        long long nscannedObjects() const { return _nscannedObjects + _oldNscannedObjects; }
+//        bool saveClientCursor() const { return _saveClientCursor; }
+//        bool wouldSaveClientCursor() const { return _wouldSaveClientCursor; }
+//
+////        void finishForOplogReplay( ClientCursor * cc ) {
+////            if ( _oplogReplay && ! _slaveReadTill.isNull() ) {
+////                cc->slaveReadTill( _slaveReadTill );
+////            }
+////
+////        }
+//
+//        ShardChunkManagerPtr getChunkManager(){ return _chunkManager; }
+//
+//    private:
+//        BufBuilder _buf;
+//        const ParsedQuery& _pq;
+//        scoped_ptr<Projection::KeyOnly> _keyFieldsOnly;
+//
+//        long long _ntoskip;
+//        long long _nscanned;
+//        long long _oldNscanned;
+//        long long _nscannedObjects;
+//        long long _oldNscannedObjects;
+//        int _n; // found so far
+//        int _oldN;
+//
+//        int _nYields;
+//        int _nChunkSkips;
+//
+//        MatchDetails _details;
+//
+//        ShardChunkManagerPtr _chunkManager;
+//
+//        bool _inMemSort;
+//        auto_ptr< ScanAndOrder > _so;
+//
+//        shared_ptr<Cursor> _c;
+//        ClientCursor::CleanupPointer _cc;
+//        ClientCursor::YieldData _yieldData;
+//
+//        bool _capped;
+//        bool _saveClientCursor;
+//        bool _wouldSaveClientCursor;
+//        bool _oplogReplay;
+//        auto_ptr< FindingStartCursor > _findingStartCursor;
+//
+//        Message &_response;
+//        ExplainBuilder &_eb;
+//        CurOp &_curop;
+//        OpTime _slaveReadTill;
+//
+//        bool _yieldRecoveryFailed;
+//    };
     
     ExplainRecordingStrategy::ExplainRecordingStrategy
     ( const ExplainQueryInfo::AncillaryInfo &ancillaryInfo ) :
@@ -1237,13 +1237,12 @@ namespace mongo {
 
         /* --- regular query --- */
 
-        int n = 0;
-        BSONObj hint;
-        if ( useHints ) {
-            hint = pq.getHint();
-        }
+//        BSONObj hint;
+//        if ( useHints ) {
+//            hint = pq.getHint();
+//        }
         bool explain = pq.isExplain();
-        bool snapshot = pq.isSnapshot();
+//        bool snapshot = pq.isSnapshot();
         BSONObj order = pq.getOrder();
         BSONObj query = pq.getFilter();
 
@@ -1275,26 +1274,27 @@ namespace mongo {
             }
         }
 
-        if( snapshot ) {
-            NamespaceDetails *d = nsdetails(ns);
-            if ( d ) {
-                int i = d->findIdIndex();
-                if( i < 0 ) {
-                    if ( strstr( ns , ".system." ) == 0 )
-                        log() << "warning: no _id index on $snapshot query, ns:" << ns << endl;
-                }
-                else {
-                    /* [dm] the name of an _id index tends to vary, so we build the hint the hard way here.
-                       probably need a better way to specify "use the _id index" as a hint.  if someone is
-                       in the query optimizer please fix this then!
-                    */
-                    hint = BSON( "$hint" << d->idx(i).indexName() );
-                }
-            }
-        }
-
+//        if( snapshot ) {
+//            NamespaceDetails *d = nsdetails(ns);
+//            if ( d ) {
+//                int i = d->findIdIndex();
+//                if( i < 0 ) {
+//                    if ( strstr( ns , ".system." ) == 0 )
+//                        log() << "warning: no _id index on $snapshot query, ns:" << ns << endl;
+//                }
+//                else {
+//                    /* [dm] the name of an _id index tends to vary, so we build the hint the hard way here.
+//                       probably need a better way to specify "use the _id index" as a hint.  if someone is
+//                       in the query optimizer please fix this then!
+//                    */
+//                    hint = BSON( "$hint" << d->idx(i).indexName() );
+//                }
+//            }
+//        }
+//
         if ( ! (explain || pq.showDiskLoc()) && isSimpleIdQuery( query ) && !pq.hasOption( QueryOption_CursorTailable ) ) {
 
+            int n = 0;
             bool nsFound = false;
             bool indexFound = false;
 
@@ -1351,23 +1351,23 @@ namespace mongo {
         return 0;
         
         {
-        BSONObj oldPlan;
-        if ( explain && ! pq.hasIndexSpecifier() ) {
-            MultiPlanScanner mps( ns, query, shared_ptr<Projection>(), order );
-            if ( mps.usingCachedPlan() )
-                oldPlan = mps.oldExplain();
-        }
-        auto_ptr< MultiPlanScanner > mps( new MultiPlanScanner( ns, query, shared_ptr<Projection>(), order, hint, explain ? QueryPlanSet::Ignore : QueryPlanSet::Use, pq.getMin(), pq.getMax(), true ) );
-        BSONObj explainSuffix;
-        if ( explain ) {
-            BSONObjBuilder bb;
-            if ( !oldPlan.isEmpty() )
-                bb.append( "oldPlan", oldPlan.firstElement().embeddedObject().firstElement().embeddedObject() );
-            explainSuffix = bb.obj();
-        }
-        ExplainBuilder eb;
-        UserQueryOp original( pq, result, eb, curop );
-        shared_ptr< UserQueryOp > o = mps->runOp( original );
+//        BSONObj oldPlan;
+//        if ( explain && ! pq.hasIndexSpecifier() ) {
+//            MultiPlanScanner mps( ns, query, shared_ptr<Projection>(), order );
+//            if ( mps.usingCachedPlan() )
+//                oldPlan = mps.oldExplain();
+//        }
+//        auto_ptr< MultiPlanScanner > mps( new MultiPlanScanner( ns, query, shared_ptr<Projection>(), order, hint, explain ? QueryPlanSet::Ignore : QueryPlanSet::Use, pq.getMin(), pq.getMax(), true ) );
+//        BSONObj explainSuffix;
+//        if ( explain ) {
+//            BSONObjBuilder bb;
+//            if ( !oldPlan.isEmpty() )
+//                bb.append( "oldPlan", oldPlan.firstElement().embeddedObject().firstElement().embeddedObject() );
+//            explainSuffix = bb.obj();
+//        }
+//        ExplainBuilder eb;
+//        UserQueryOp original( pq, result, eb, curop );
+//        shared_ptr< UserQueryOp > o = mps->runOp( original );
 //        UserQueryOp &dqo = *o;
 //        if ( ! dqo.complete() )
 //            throw MsgAssertionException( dqo.exception() );
