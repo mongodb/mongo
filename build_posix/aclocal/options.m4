@@ -75,7 +75,7 @@ AH_TEMPLATE(HAVE_VERBOSE, [Define to 1 to support the Env.verbose_set method.])
 AC_MSG_CHECKING(if --disable-verbose option specified)
 AC_ARG_ENABLE(verbose,
 	[AC_HELP_STRING([--disable-verbose],
-	    [Disable the verbose support.])], r=$enableval, r=yes)
+	    [Disable support for verbose messages.])], r=$enableval, r=yes)
 case "$r" in
 no)	wt_cv_enable_verbose=no;;
 *)	AC_DEFINE(HAVE_VERBOSE)
