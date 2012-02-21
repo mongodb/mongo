@@ -1257,6 +1257,20 @@ namespace mongo {
     private:
         ExpressionYear();
     };
+
+		class ExpressionSize : 
+			public ExpressionNary { 
+		public: 
+			virtual ~ExpressionSize();
+			virtual intrusive_ptr<const Value> evaluate(
+					const intrusive_ptr<Document> &pDocument) const;
+			virtual const char *getOpName() const;
+			virtual void addOperand( const intrusive_ptr<Expression> &pExpression);
+			static intrusive_ptr<ExpressionNary> create();
+
+		private:
+			ExpressionSize();
+		};
 }
 
 
