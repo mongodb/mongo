@@ -267,13 +267,20 @@ namespace mongo {
     }
 
     void Logstream::flush(Tee *t) {
+        const size_t MAX_LOG_LINE = 1024 * 10;
+
         // this ensures things are sane
         if ( doneSetup == 1717 ) {
             string msg = ss.str();
+            
             string threadName = getThreadName();
             const char * type = logLevelToString(logLevel);
 
-            int spaceNeeded = (int)(msg.size() + 64 + threadName.size());
+            size_t msgLen = msg.size();
+            if ( msgLen > MAX_LOG_LINE )
+                msgLen = MAX_LOG_LINE;
+
+            const int spaceNeeded = (int)( msgLen + 64 /* for extra info */ + threadName.size());
             int bufSize = 128;
             while ( bufSize < spaceNeeded )
                 bufSize += 128;
@@ -295,9 +302,22 @@ namespace mongo {
                 b.appendStr( ": " , false );
             }
 
-            b.appendStr( msg );
+            if ( msg.size() > MAX_LOG_LINE ) {
+                stringstream sss;
+                sss << "warning: log line attempted (" << msg.size() / 1024 << "k) over max size(" << MAX_LOG_LINE / 1024 << "k)";
+                sss << ", printing beginning and end ... ";
+                b.appendStr( sss.str() );
+                const char * xx = msg.c_str();
+                b.appendBuf( xx , MAX_LOG_LINE / 3 );
+                b.appendStr( " .......... " );
+                b.appendStr( xx + msg.size() - ( MAX_LOG_LINE / 3 ) );
+            }
+            else {
+                b.appendStr( msg );
+            }
 
             string out( b.buf() , b.len() - 1);
+            assert( b.len() < spaceNeeded );
 
             scoped_lock lk(mutex);
 
