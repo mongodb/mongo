@@ -84,6 +84,7 @@ namespace mongo {
                                             << "'" );
             }
             
+            // TODO set numWanted?
             _c = qp().newCursor();
 
             // The QueryOptimizerCursor::prepareToTouchEarlierIterate() implementation requires _c->prepareToYield() to work.

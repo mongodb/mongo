@@ -226,87 +226,87 @@ namespace mongo {
         return qr;
     }
 
-    class ExplainBuilder {
-        // Note: by default we filter out allPlans and oldPlan in the shell's
-        // explain() function. If you add any recursive structures, make sure to
-        // edit the JS to make sure everything gets filtered.
-    public:
-        ExplainBuilder() : _i() {}
-        void ensureStartScan() {
-            if ( !_a.get() ) {
-                _a.reset( new BSONArrayBuilder() );
-            }
-        }
-        void noteCursor( Cursor *c ) {
-            BSONObjBuilder b( _a->subobjStart() );
-            b << "cursor" << c->toString() << "indexBounds" << c->prettyIndexBounds();
-            b.done();
-        }
-        void noteScan( Cursor *c, long long nscanned, long long nscannedObjects, int n, bool scanAndOrder,
-                       int millis, bool hint, int nYields , int nChunkSkips , bool indexOnly ) {
-            if ( _i == 1 ) {
-                _c.reset( new BSONArrayBuilder() );
-                *_c << _b->obj();
-            }
-            if ( _i == 0 ) {
-                _b.reset( new BSONObjBuilder() );
-            }
-            else {
-                _b.reset( new BSONObjBuilder( _c->subobjStart() ) );
-            }
-            *_b << "cursor" << c->toString();
-            _b->appendNumber( "nscanned", nscanned );
-            _b->appendNumber( "nscannedObjects", nscannedObjects );
-            *_b << "n" << n;
-
-            if ( scanAndOrder )
-                *_b << "scanAndOrder" << true;
-
-            *_b << "millis" << millis;
-
-            *_b << "nYields" << nYields;
-            *_b << "nChunkSkips" << nChunkSkips;
-            *_b << "isMultiKey" << c->isMultiKey();
-            *_b << "indexOnly" << indexOnly;
-
-            *_b << "indexBounds" << c->prettyIndexBounds();
-
-            c->explainDetails( *_b );
-
-            if ( !hint ) {
-                *_b << "allPlans" << _a->arr();
-            }
-            if ( _i != 0 ) {
-                _b->done();
-            }
-            _a.reset( 0 );
-            ++_i;
-        }
-        BSONObj finishWithSuffix( long long nscanned, long long nscannedObjects, int n, int millis, const BSONObj &suffix ) {
-            if ( _i > 1 ) {
-                BSONObjBuilder b;
-                b << "clauses" << _c->arr();
-                b.appendNumber( "nscanned", nscanned );
-                b.appendNumber( "nscannedObjects", nscannedObjects );
-                b << "n" << n;
-                b << "millis" << millis;
-                b.appendElements( suffix );
-                return b.obj();
-            }
-            else {
-            	stringstream host;
-            	host << getHostNameCached() << ":" << cmdLine.port;
-            	*_b << "server" << host.str();
-                _b->appendElements( suffix );
-                return _b->obj();
-            }
-        }
-    private:
-        auto_ptr< BSONArrayBuilder > _a;
-        auto_ptr< BSONObjBuilder > _b;
-        auto_ptr< BSONArrayBuilder > _c;
-        int _i;
-    };
+//    class ExplainBuilder {
+//        // Note: by default we filter out allPlans and oldPlan in the shell's
+//        // explain() function. If you add any recursive structures, make sure to
+//        // edit the JS to make sure everything gets filtered.
+//    public:
+//        ExplainBuilder() : _i() {}
+//        void ensureStartScan() {
+//            if ( !_a.get() ) {
+//                _a.reset( new BSONArrayBuilder() );
+//            }
+//        }
+//        void noteCursor( Cursor *c ) {
+//            BSONObjBuilder b( _a->subobjStart() );
+//            b << "cursor" << c->toString() << "indexBounds" << c->prettyIndexBounds();
+//            b.done();
+//        }
+//        void noteScan( Cursor *c, long long nscanned, long long nscannedObjects, int n, bool scanAndOrder,
+//                       int millis, bool hint, int nYields , int nChunkSkips , bool indexOnly ) {
+//            if ( _i == 1 ) {
+//                _c.reset( new BSONArrayBuilder() );
+//                *_c << _b->obj();
+//            }
+//            if ( _i == 0 ) {
+//                _b.reset( new BSONObjBuilder() );
+//            }
+//            else {
+//                _b.reset( new BSONObjBuilder( _c->subobjStart() ) );
+//            }
+//            *_b << "cursor" << c->toString();
+//            _b->appendNumber( "nscanned", nscanned );
+//            _b->appendNumber( "nscannedObjects", nscannedObjects );
+//            *_b << "n" << n;
+//
+//            if ( scanAndOrder )
+//                *_b << "scanAndOrder" << true;
+//
+//            *_b << "millis" << millis;
+//
+//            *_b << "nYields" << nYields;
+//            *_b << "nChunkSkips" << nChunkSkips;
+//            *_b << "isMultiKey" << c->isMultiKey();
+//            *_b << "indexOnly" << indexOnly;
+//
+//            *_b << "indexBounds" << c->prettyIndexBounds();
+//
+//            c->explainDetails( *_b );
+//
+//            if ( !hint ) {
+//                *_b << "allPlans" << _a->arr();
+//            }
+//            if ( _i != 0 ) {
+//                _b->done();
+//            }
+//            _a.reset( 0 );
+//            ++_i;
+//        }
+//        BSONObj finishWithSuffix( long long nscanned, long long nscannedObjects, int n, int millis, const BSONObj &suffix ) {
+//            if ( _i > 1 ) {
+//                BSONObjBuilder b;
+//                b << "clauses" << _c->arr();
+//                b.appendNumber( "nscanned", nscanned );
+//                b.appendNumber( "nscannedObjects", nscannedObjects );
+//                b << "n" << n;
+//                b << "millis" << millis;
+//                b.appendElements( suffix );
+//                return b.obj();
+//            }
+//            else {
+//            	stringstream host;
+//            	host << getHostNameCached() << ":" << cmdLine.port;
+//            	*_b << "server" << host.str();
+//                _b->appendElements( suffix );
+//                return _b->obj();
+//            }
+//        }
+//    private:
+//        auto_ptr< BSONArrayBuilder > _a;
+//        auto_ptr< BSONObjBuilder > _b;
+//        auto_ptr< BSONArrayBuilder > _c;
+//        int _i;
+//    };
 
     // Implements database 'query' requests using the query optimizer's QueryOp interface
     class UserQueryOp : public QueryOp {
@@ -975,7 +975,7 @@ namespace mongo {
         }
         if ( _buf.len() > 0 ) {
             result.appendData( _buf.buf(), _buf.len() );
-            _buf.decouple(); // only decouple here ok?
+            _buf.decouple();
         }
         return _bufferedMatches;
     }
