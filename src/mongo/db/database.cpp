@@ -151,7 +151,7 @@ namespace mongo {
 
     bool Database::openExistingFile( int n ) { 
         assert(this);
-        d.dbMutex.assertWriteLocked();
+        Lock::assertWriteLocked(name);
         {
             // must not yet be visible to others as we aren't in the db's write lock and 
             // we will write to _files vector - thus this assert.

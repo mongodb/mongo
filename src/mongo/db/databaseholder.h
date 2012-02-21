@@ -10,12 +10,12 @@ namespace mongo {
     class DatabaseHolder {
         typedef map<string,Database*> DBs;
         typedef map<string,DBs> Paths;
+        // todo: we want something faster than this if called a lot:
         mutable SimpleMutex _m;
         Paths _paths;
         int _size;
     public:
-        DatabaseHolder() : _m("dbholder"),_size(0) { 
-        }
+        DatabaseHolder() : _m("dbholder"),_size(0) { }
 
         bool __isLoaded( const string& ns , const string& path ) const {
             SimpleMutex::scoped_lock lk(_m);
