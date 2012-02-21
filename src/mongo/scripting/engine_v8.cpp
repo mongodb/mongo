@@ -126,7 +126,7 @@ namespace mongo {
     }
 
     static Handle<v8::Value> namedSet(Local<v8::String> name, Local<v8::Value> value_obj, const v8::AccessorInfo& info) {
-        Local< External > scp = External::Cast( *info.Data() );
+        /*Local< External > scp = */External::Cast( *info.Data() );
         unwrapHolder(info.Holder())->_modified = true;
         return Handle<Value>();
     }
@@ -148,7 +148,7 @@ namespace mongo {
     }
 
     Handle<Boolean> namedDelete( Local<v8::String> property, const AccessorInfo& info ) {
-        Local< External > scp = External::Cast( *info.Data() );
+        /*Local< External > scp = */External::Cast( *info.Data() );
         unwrapHolder(info.Holder())->_modified = true;
         return Handle<Boolean>();
     }
@@ -192,7 +192,7 @@ namespace mongo {
     }
 
     Handle<Boolean> indexedDelete( ::uint32_t index, const AccessorInfo& info ) {
-        Local< External > scp = External::Cast( *info.Data() );
+        /*Local< External > scp = */External::Cast( *info.Data() );
         unwrapHolder(info.Holder())->_modified = true;
         return Handle<Boolean>();
     }
@@ -221,7 +221,7 @@ namespace mongo {
     }
 
     static Handle<v8::Value> indexedSet(::uint32_t index, Local<v8::Value> value_obj, const v8::AccessorInfo& info) {
-        Local< External > scp = External::Cast( *info.Data() );
+        /*Local< External > scp = */External::Cast( *info.Data() );
         unwrapHolder(info.Holder())->_modified = true;
         return Handle<Value>();
     }
