@@ -1281,7 +1281,24 @@ namespace QueryTests {
             ASSERT( clientCursor->shouldTimeout( 600001 ) );
         }
     };
-    
+
+    class QueryReadsAll : public ClientBase {
+    public:
+        ~QueryReadsAll() {
+            client().dropCollection( "unittests.querytests.QueryReadsAll" );
+        }
+        void run() {
+            const char *ns = "unittests.querytests.QueryReadsAll";
+            for( int i = 0; i < 5; ++i ) {
+                insert( ns, BSONObj() );
+            }
+            auto_ptr<DBClientCursor> c = client().query( ns, Query(), 5 );
+            ASSERT( c->more() );
+            // With five results and a batch size of 5, no cursor is created.
+            ASSERT_EQUALS( 0, c->getCursorId() );
+        }
+    };
+
     namespace parsedtests {
         class basic1 {
         public:
@@ -1555,6 +1572,7 @@ namespace QueryTests {
             add< WhatsMyUri >();
             add< Exhaust >();
             add< QueryCursorTimeout >();
+            add< QueryReadsAll >();
 
             add< parsedtests::basic1 >();
 

@@ -1107,8 +1107,9 @@ namespace mongo {
                 // if only 1 requested, no cursor saved for efficiency...we assume it is findOne()
                 if ( pq.wantMore() && pq.getNumToReturn() != 1 ) {
                     queryResponseBuilder.finishedFirstBatch();
-                    cursor->advance();
-                    saveClientCursor = true;
+                    if ( cursor->advance() ) {
+                        saveClientCursor = true;
+                    }
                 }
                 break;
             }
