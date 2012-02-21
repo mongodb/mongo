@@ -19,7 +19,7 @@ var mongod_common_args = [
  */
 function with_mongod( extra_mongod_args, operation ) {
     var mongod = startMongoProgram.apply(
-        null, Array.concat( ['mongod'], mongod_common_args, extra_mongod_args ) );
+        null, ['mongod'].concat( mongod_common_args, extra_mongod_args ) );
 
     try {
         operation( mongod );
