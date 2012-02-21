@@ -67,6 +67,7 @@ namespace mongo {
         BSONObj _indexBounds;
         bool _picked;
         bool _done;
+        BSONObj _details;
     };
     
     class ExplainClauseInfo {

@@ -60,6 +60,9 @@ namespace mongo {
     void ExplainPlanInfo::noteDone( const Cursor &cursor ) {
         _done = true;
         noteCursorUpdate( cursor );
+        BSONObjBuilder bob;
+        const_cast<Cursor&>(cursor).explainDetails( bob );
+        _details = bob.obj();
     }
     
     void ExplainPlanInfo::notePicked() {
@@ -77,19 +80,22 @@ namespace mongo {
     }
     
     BSONObj ExplainPlanInfo::pickedPlanBson( const ExplainClauseInfo &clauseInfo ) const {
-        return BSON(
-                    "cursor" << _cursorName <<
-                    "isMultiKey" << _isMultiKey <<
-                    "n" << clauseInfo.n() <<
-                    "nscannedObjects" << clauseInfo.nscannedObjects() <<
-                    "nscanned" << clauseInfo.nscanned() <<
-                    "scanAndOrder" << _scanAndOrder <<
-                    "indexOnly" << _indexOnly <<
-                    "nYields" << _nYields <<
-                    "nChunkSkips" << clauseInfo.nChunkSkips() <<
-                    "millis" << clauseInfo.millis() <<
-                    "indexBounds" << _indexBounds
-                    );
+        BSONObjBuilder bob;
+        bob <<
+        "cursor" << _cursorName <<
+        "isMultiKey" << _isMultiKey <<
+        "n" << clauseInfo.n() <<
+        "nscannedObjects" << clauseInfo.nscannedObjects() <<
+        "nscanned" << clauseInfo.nscanned() <<
+        "scanAndOrder" << _scanAndOrder <<
+        "indexOnly" << _indexOnly <<
+        "nYields" << _nYields <<
+        "nChunkSkips" << clauseInfo.nChunkSkips() <<
+        "millis" << clauseInfo.millis() <<
+        "indexBounds" << _indexBounds
+        ;
+        bob.appendElements( _details );
+        return bob.obj();
     }
 
     void ExplainPlanInfo::noteCursorUpdate( const Cursor &cursor ) {
