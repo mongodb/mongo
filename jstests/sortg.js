@@ -28,9 +28,11 @@ function memoryException( sortSpec, querySpec ) {
 function noMemoryException( sortSpec, querySpec ) {
     querySpec = querySpec || {};
     t.find( querySpec ).sort( sortSpec ).batchSize( 1000 ).itcount();
-    assert( !db.getLastError() );
     if ( 0 ) { // SERVER-5016
+    assert( !db.getLastError() );
+    }
     t.find( querySpec ).sort( sortSpec ).batchSize( 1000 ).explain( true );
+    if ( 0 ) { // SERVER-5016
     assert( !db.getLastError() );
     }
 }
