@@ -52,13 +52,26 @@ Or download a prebuilt binary for Windows at www.mongodb.org.
 UBUNTU
 --------------
 
-     scons libboost-dev libpcre++-dev xulrunner-1.9.1-dev
+To install dependencies on Ubuntu systems:
+
+    # aptitude install scons build-essential
+    # aptitude install libboost-filesystem-dev libboost-program-options-dev libboost-system-dev libboost-thread-dev
+
+To run tests as well, you will need PyMongo:
+
+    # aptitude install python-pymongo
+
+Then build as usual with `scons`:
+
+    $ scons all
 
 
 OS X
 --------------
 
-Try homebrew -- brew install mongodb.
+Try [Homebrew](http://mxcl.github.com/homebrew/):
+
+    $ brew install mongodb
 
 
 FREEBSD
