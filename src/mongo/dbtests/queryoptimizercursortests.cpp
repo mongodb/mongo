@@ -2369,9 +2369,10 @@ namespace QueryOptimizerCursorTests {
                      MsgAssertionException );
                     return;
                 }
+                ParsedQuery parsedQuery( ns(), skip(), limit(), 0, query(), BSONObj() );
                 shared_ptr<Cursor> c =
                 NamespaceDetailsTransient::getCursor( ns(), query(), order(), planPolicy(),
-                                                     &simpleEqualityMatch );
+                                                     &simpleEqualityMatch, &parsedQuery );
                 ASSERT_EQUALS( expectSimpleEquality(), simpleEqualityMatch );
                 string type = c->toString().substr( 0, expectedType().length() );
                 ASSERT_EQUALS( expectedType(), type );
@@ -2383,6 +2384,8 @@ namespace QueryOptimizerCursorTests {
             virtual bool expectSimpleEquality() const { return false; }
             virtual BSONObj query() const { return BSONObj(); }
             virtual BSONObj order() const { return BSONObj(); }
+            virtual long long skip() const { return 0; }
+            virtual long long limit() const { return 0; }
             virtual const QueryPlanSelectionPolicy &planPolicy() const {
                 return QueryPlanSelectionPolicy::any();
             }
@@ -2460,6 +2463,28 @@ namespace QueryOptimizerCursorTests {
                 ASSERT_EQUALS( 44, c->current().getIntField( "_id" ) );
                 ASSERT( !c->advance() );
             }
+        };
+        
+        class GeoNumWanted : public Base {
+        public:
+            GeoNumWanted() {
+                _cli.ensureIndex( ns(), BSON( "loc" << "2d" ) );
+                for( int i = 0; i < 140; ++i ) {
+                    _cli.insert( ns(), BSON( "loc" << BSON_ARRAY( 44 << 45 ) ) );
+                }
+            }
+            string expectedType() const { return "GeoSearchCursor"; }
+            BSONObj query() const { return fromjson( "{ loc : { $near : [50,50] } }" ); }
+            void check( const shared_ptr<Cursor> &c ) {
+                int count = 0;
+                while( c->ok() ) {
+                    ++count;
+                    c->advance();
+                }
+                ASSERT_EQUALS( 130, count );
+            }
+            long long skip() const { return 27; }
+            long long limit() const { return 103; }
         };
         
         class PreventOutOfOrderPlan : public QueryOptimizerCursorTests::Base {
@@ -3343,6 +3368,7 @@ namespace QueryOptimizerCursorTests {
             add<GetCursor::OptimalIndex>();
             add<GetCursor::SimpleKeyMatch>();
             add<GetCursor::Geo>();
+            add<GetCursor::GeoNumWanted>();
             add<GetCursor::PreventOutOfOrderPlan>();
             add<GetCursor::AllowOutOfOrderPlan>();
             add<GetCursor::BestSavedOutOfOrder>();

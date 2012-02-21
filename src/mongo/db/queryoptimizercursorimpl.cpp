@@ -84,7 +84,7 @@ namespace mongo {
                                             << "'" );
             }
             
-            // TODO set numWanted?
+            // No geo cursor could be generated here, and we do not specify numWanted.
             _c = qp().newCursor();
 
             // The QueryOptimizerCursor::prepareToTouchEarlierIterate() implementation requires _c->prepareToYield() to work.
@@ -721,7 +721,11 @@ namespace mongo {
                 if ( singlePlanSummary ) {
                     *singlePlanSummary = singlePlan->summary();
                 }
-                shared_ptr<Cursor> single = singlePlan->newCursor();
+                int numWanted = 0;
+                if ( parsedQuery ) {
+                    numWanted = parsedQuery->getSkip() + parsedQuery->getNumToReturn();
+                }
+                shared_ptr<Cursor> single = singlePlan->newCursor( DiskLoc(), numWanted );
                 if ( !query.isEmpty() && !single->matcher() ) {
                     shared_ptr<CoveredIndexMatcher> matcher( new CoveredIndexMatcher( query, single->indexKeyPattern() ) );
                     single->setMatcher( matcher );
