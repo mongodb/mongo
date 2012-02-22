@@ -139,7 +139,7 @@ namespace mongo {
     template<class T, class O>
     inline IteratorVectorIntrusive<T, O>::IteratorVectorIntrusive(
         const vector<T> &vector, const intrusive_ptr<const O> &pO):
-        IteratorVector(vector),
+        IteratorVector<T>(vector),
         pOwner(pO) {
     }
 
