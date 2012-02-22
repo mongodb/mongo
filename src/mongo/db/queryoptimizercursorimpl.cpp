@@ -492,21 +492,21 @@ namespace mongo {
             if ( _takeover ) {
                 return false;
             }
-            return _mps->haveOrderedPlan();
+            return _mps->possibleOrderedPlan();
         }
 
         virtual bool mayRunInOrderPlans() const {
             if ( _takeover ) {
                 return true;
             }
-            return _mps->haveOrderedPlan() || _mps->usingCachedPlan();
+            return _mps->possibleOrderedPlan() || _mps->usingCachedPlan();
         }
         
         virtual bool mayRunOutOfOrderPlans() const {
             if ( _takeover ) {
                 return true;
             }
-            return _mps->haveOutOfOrderPlan() || _mps->usingCachedPlan();
+            return _mps->possibleOutOfOrderPlan() || _mps->usingCachedPlan();
         }
         
         virtual bool mayRetryQuery() const {

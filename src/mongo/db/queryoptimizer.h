@@ -336,7 +336,8 @@ namespace mongo {
         BSONObj order() const { return _order; }
         
         bool haveOrderedPlan() const;
-        bool haveOutOfOrderPlan() const;
+        bool possibleOrderedPlan() const;
+        bool possibleOutOfOrderPlan() const;
 
         bool prepareToRetryQuery();
         
@@ -400,12 +401,9 @@ namespace mongo {
         };
 
     private:
-        void addOtherPlans( bool checkFirst );
-        void addPlan( QueryPlanPtr plan, bool checkFirst ) {
-            if ( checkFirst && plan->indexKey().woCompare( _plans[ 0 ]->indexKey() ) == 0 )
-                return;
-            _plans.push_back( plan );
-        }
+        void addOtherPlans( PlanSet &planSet );
+        void addFallbackPlans();
+        void addPlan( QueryPlanPtr plan, PlanSet &planSet );
         void init();
         void addHint( IndexDetails &id );
 
@@ -415,6 +413,7 @@ namespace mongo {
         auto_ptr<FieldRangeSetPair> _frsp;
         auto_ptr<FieldRangeSetPair> _originalFrsp;
         PlanSet _plans;
+        PlanSet _fallbackPlans;
         bool _mayRecordPlan;
         bool _usingCachedPlan;
         BSONObj _hint;
@@ -529,7 +528,8 @@ namespace mongo {
         void clearIndexesForPatterns() const;
 
         bool haveOrderedPlan() const;
-        bool haveOutOfOrderPlan() const;
+        bool possibleOrderedPlan() const;
+        bool possibleOutOfOrderPlan() const;
         
         string toString() const;
 

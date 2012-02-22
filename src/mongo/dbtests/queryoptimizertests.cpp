@@ -533,12 +533,25 @@ namespace QueryOptimizerTests {
                     fieldsToReturn->appendSelfToBufBuilder(b);
                 toSend.setData(dbQuery, b.buf(), b.len());
             }
+            QueryPattern makePattern( const BSONObj &query, const BSONObj &order ) {
+                FieldRangeSet frs( ns(), query, true );
+                return QueryPattern( frs, order );
+            }
+            shared_ptr<QueryPlanSet> makeQps( const BSONObj &query, const BSONObj &order ) {
+                auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), query ) );
+                auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
+                return shared_ptr<QueryPlanSet>
+                ( new QueryPlanSet
+                 ( ns(), frsp, frspOrig, query, shared_ptr<Projection>(), order ) );
+            }
         protected:
             static const char *ns() { return "unittests.QueryPlanSetTests"; }
             static NamespaceDetails *nsd() { return nsdetails( ns() ); }
+            DBDirectClient &client() { return _client; }
         private:
-            dblock lk_;
+            dblock _lk;
             Client::Context _context;
+            DBDirectClient _client;
         };
 
         class ToString : public Base {
@@ -909,6 +922,62 @@ namespace QueryOptimizerTests {
                 ASSERT( !s.firstPlan()->special().empty() );                
             }
         };
+        
+        class PossiblePlans : public Base {
+        public:
+            void run() {
+                client().ensureIndex( ns(), BSON( "a" << 1 ) );
+                client().ensureIndex( ns(), BSON( "b" << 1 ) );
+                
+                {
+                    shared_ptr<QueryPlanSet> qps = makeQps( BSON( "a" << 1 ), BSONObj() );
+                    ASSERT_EQUALS( 1, qps->nPlans() );
+                    ASSERT( qps->possibleOrderedPlan() );
+                    ASSERT( qps->haveOrderedPlan() );
+                    ASSERT( !qps->possibleOutOfOrderPlan() );
+                }
+                
+                {
+                    shared_ptr<QueryPlanSet> qps = makeQps( BSON( "a" << 1 ), BSON( "b" << 1 ) );
+                    ASSERT_EQUALS( 3, qps->nPlans() );
+                    ASSERT( qps->possibleOrderedPlan() );
+                    ASSERT( qps->haveOrderedPlan() );
+                    ASSERT( qps->possibleOutOfOrderPlan() );
+                }
+                
+                NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
+                
+                nsdt.registerIndexForPattern
+                ( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ), BSON( "a" << 1 ), 1 );
+
+                {
+                    shared_ptr<QueryPlanSet> qps = makeQps( BSON( "a" << 1 ), BSON( "b" << 1 ) );
+                    ASSERT_EQUALS( 1, qps->nPlans() );
+                    ASSERT( qps->possibleOrderedPlan() );
+                    ASSERT( !qps->haveOrderedPlan() );
+                    ASSERT( qps->possibleOutOfOrderPlan() );
+                }
+
+                nsdt.registerIndexForPattern
+                ( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ), BSON( "b" << 1 ), 1 );
+                
+                {
+                    shared_ptr<QueryPlanSet> qps = makeQps( BSON( "a" << 1 ), BSON( "b" << 1 ) );
+                    ASSERT_EQUALS( 1, qps->nPlans() );
+                    ASSERT( qps->possibleOrderedPlan() );
+                    ASSERT( qps->haveOrderedPlan() );
+                    ASSERT( qps->possibleOutOfOrderPlan() );
+                }
+                
+                {
+                    shared_ptr<QueryPlanSet> qps = makeQps( BSON( "a" << 1 ), BSON( "c" << 1 ) );
+                    ASSERT_EQUALS( 2, qps->nPlans() );
+                    ASSERT( !qps->possibleOrderedPlan() );
+                    ASSERT( !qps->haveOrderedPlan() );
+                    ASSERT( qps->possibleOutOfOrderPlan() );
+                }                
+            }
+        };
 
     } // namespace QueryPlanSetTests
 
@@ -927,9 +996,20 @@ namespace QueryOptimizerTests {
     protected:
         static const char *ns() { return "unittests.QueryOptimizerTests"; }
         static NamespaceDetails *nsd() { return nsdetails( ns() ); }
+        QueryPattern makePattern( const BSONObj &query, const BSONObj &order ) {
+            FieldRangeSet frs( ns(), query, true );
+            return QueryPattern( frs, order );
+        }
+        shared_ptr<MultiPlanScanner> makeMps( const BSONObj &query, const BSONObj &order ) {
+            return shared_ptr<MultiPlanScanner>
+            ( new MultiPlanScanner
+             ( ns(), query, shared_ptr<Projection>(), order ) );
+        }
+        DBDirectClient &client() { return _client; }
     private:
         dblock lk_;
         Client::Context _ctx;
+        DBDirectClient _client;
     };
 
     namespace MultiPlanScannerTests {
@@ -941,6 +1021,85 @@ namespace QueryOptimizerTests {
                 multiPlanScanner.toString(); // Just test that we don't crash.
             }
         };
+        
+        class PossiblePlans : public Base {
+        public:
+            void run() {
+                client().ensureIndex( ns(), BSON( "a" << 1 ) );
+                client().ensureIndex( ns(), BSON( "b" << 1 ) );
+                
+                {
+                    shared_ptr<MultiPlanScanner> mps = makeMps( BSON( "a" << 1 ), BSONObj() );
+                    ASSERT_EQUALS( 1, mps->currentNPlans() );
+                    ASSERT( mps->possibleOrderedPlan() );
+                    ASSERT( mps->haveOrderedPlan() );
+                    ASSERT( !mps->possibleOutOfOrderPlan() );
+                }
+                
+                {
+                    shared_ptr<MultiPlanScanner> mps =
+                    makeMps( BSON( "a" << 1 ), BSON( "b" << 1 ) );
+                    ASSERT_EQUALS( 3, mps->currentNPlans() );
+                    ASSERT( mps->possibleOrderedPlan() );
+                    ASSERT( mps->haveOrderedPlan() );
+                    ASSERT( mps->possibleOutOfOrderPlan() );
+                }
+                
+                NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
+                
+                nsdt.registerIndexForPattern
+                ( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ), BSON( "a" << 1 ), 1 );
+                
+                {
+                    shared_ptr<MultiPlanScanner> mps =
+                    makeMps( BSON( "a" << 1 ), BSON( "b" << 1 ) );
+                    ASSERT_EQUALS( 1, mps->currentNPlans() );
+                    ASSERT( mps->possibleOrderedPlan() );
+                    ASSERT( !mps->haveOrderedPlan() );
+                    ASSERT( mps->possibleOutOfOrderPlan() );
+                }
+                
+                nsdt.registerIndexForPattern
+                ( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ), BSON( "b" << 1 ), 1 );
+                
+                {
+                    shared_ptr<MultiPlanScanner> mps =
+                    makeMps( BSON( "a" << 1 ), BSON( "b" << 1 ) );
+                    ASSERT_EQUALS( 1, mps->currentNPlans() );
+                    ASSERT( mps->possibleOrderedPlan() );
+                    ASSERT( mps->haveOrderedPlan() );
+                    ASSERT( mps->possibleOutOfOrderPlan() );
+                }
+                
+                {
+                    shared_ptr<MultiPlanScanner> mps =
+                    makeMps( BSON( "a" << 1 ), BSON( "c" << 1 ) );
+                    ASSERT_EQUALS( 2, mps->currentNPlans() );
+                    ASSERT( !mps->possibleOrderedPlan() );
+                    ASSERT( !mps->haveOrderedPlan() );
+                    ASSERT( mps->possibleOutOfOrderPlan() );
+                }
+                
+                {
+                    shared_ptr<MultiPlanScanner> mps =
+                    makeMps( fromjson( "{$or:[{a:1}]}" ), BSON( "c" << 1 ) );
+                    ASSERT_EQUALS( 1, mps->currentNPlans() );
+                    ASSERT( !mps->possibleOrderedPlan() );
+                    ASSERT( !mps->haveOrderedPlan() );
+                    ASSERT( mps->possibleOutOfOrderPlan() );
+                }
+
+                {
+                    shared_ptr<MultiPlanScanner> mps =
+                    makeMps( fromjson( "{$or:[{a:1,b:1}]}" ), BSONObj() );
+                    ASSERT_EQUALS( 0, mps->currentNPlans() );
+                    ASSERT( mps->possibleOrderedPlan() );
+                    ASSERT( mps->haveOrderedPlan() );
+                    ASSERT( !mps->possibleOutOfOrderPlan() );
+                }
+            }
+        };
+
     } // namespace MultiPlanScannerTests
     
     class BestGuess : public Base {
@@ -1026,7 +1185,9 @@ namespace QueryOptimizerTests {
             add<QueryPlanSetTests::NotEqualityThenIn>();
             add<QueryPlanSetTests::ExcludeSpecialPlanWhenBtreePlan>();
             add<QueryPlanSetTests::ExcludeUnindexedPlanWhenSpecialPlan>();
+            add<QueryPlanSetTests::PossiblePlans>();
             add<MultiPlanScannerTests::ToString>();
+            add<MultiPlanScannerTests::PossiblePlans>();
             add<BestGuess>();
         }
     } myall;

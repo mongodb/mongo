@@ -543,15 +543,30 @@ doneCheckOrder:
                     !( _recordedPlanPolicy == UseIfInOrder && p->scanAndOrderRequired() ) ) {
                     _usingCachedPlan = true;
                     _plans.push_back( p );
+                    addOtherPlans( _fallbackPlans );
                     return;
                 }
             }
         }
 
-        addOtherPlans( false );
+        addOtherPlans( _plans );
     }
 
-    void QueryPlanSet::addOtherPlans( bool checkFirst ) {
+    void QueryPlanSet::addPlan( QueryPlanPtr plan, PlanSet &planSet ) {
+        planSet.push_back( plan );
+    }
+
+    void QueryPlanSet::addFallbackPlans() {
+        for( PlanSet::const_iterator i = _fallbackPlans.begin(); i != _fallbackPlans.end(); ++i ) {
+            if ( (*i)->indexKey() != _plans[ 0 ]->indexKey() ) {
+                _plans.push_back( *i );
+            }
+        }
+        _fallbackPlans.clear();
+        _mayRecordPlan = true;
+    }
+    
+    void QueryPlanSet::addOtherPlans( PlanSet &planSet ) {
         const char *ns = _frsp->ns();
         NamespaceDetails *d = nsdetails( ns );
         if ( !d )
@@ -564,7 +579,7 @@ doneCheckOrder:
             QueryPlanPtr plan
             ( new QueryPlan( d, -1, *_frsp, _originalFrsp.get(), _originalQuery, _fields, _order,
                             _mustAssertOnYieldFailure ) );
-            addPlan( plan, checkFirst );
+            addPlan( plan, planSet );
             return;
         }
 
@@ -580,7 +595,7 @@ doneCheckOrder:
             QueryPlanPtr p( new QueryPlan( d, i, *_frsp, _originalFrsp.get(), _originalQuery,
                                           _fields, _order, _mustAssertOnYieldFailure ) );
             if ( p->impossible() ) {
-                addPlan( p, checkFirst );
+                addPlan( p, planSet );
                 return;
             }
             if ( p->optimal() ) {
@@ -598,22 +613,22 @@ doneCheckOrder:
             }
         }
         if ( optimalPlan.get() ) {
-            addPlan( optimalPlan, checkFirst );
+            addPlan( optimalPlan, planSet );
             return;
         }
         for( PlanSet::const_iterator i = plans.begin(); i != plans.end(); ++i ) {
-            addPlan( *i, checkFirst );
+            addPlan( *i, planSet );
         }
 
         // Only add a special plan if no standard btree plans have been added. SERVER-4531
         if ( plans.empty() && specialPlan ) {
-            addPlan( specialPlan, checkFirst );
+            addPlan( specialPlan, planSet );
             return;
         }
 
         // Table scan plan
         addPlan( QueryPlanPtr( new QueryPlan( d, -1, *_frsp, _originalFrsp.get(), _originalQuery,
-                                             _fields, _order, _mustAssertOnYieldFailure ) ), checkFirst );
+                                             _fields, _order, _mustAssertOnYieldFailure ) ), planSet );
 
         _mayRecordPlan = true;
     }
@@ -679,8 +694,25 @@ doneCheckOrder:
         return false;
     }
 
-    bool QueryPlanSet::haveOutOfOrderPlan() const {
+    bool QueryPlanSet::possibleOrderedPlan() const {
+        if ( haveOrderedPlan() ) {
+            return true;
+        }
+        for( PlanSet::const_iterator i = _fallbackPlans.begin(); i != _fallbackPlans.end(); ++i ) {
+            if ( !(*i)->scanAndOrderRequired() ) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool QueryPlanSet::possibleOutOfOrderPlan() const {
         for( PlanSet::const_iterator i = _plans.begin(); i != _plans.end(); ++i ) {
+            if ( (*i)->scanAndOrderRequired() ) {
+                return true;
+            }
+        }
+        for( PlanSet::const_iterator i = _fallbackPlans.begin(); i != _fallbackPlans.end(); ++i ) {
             if ( (*i)->scanAndOrderRequired() ) {
                 return true;
             }
@@ -841,7 +873,7 @@ doneCheckOrder:
         }
         if ( _plans._usingCachedPlan && op.nscanned() > _plans._oldNScanned * 10 && _plans._special.empty() ) {
             holder._offset = -op.nscanned();
-            _plans.addOtherPlans( /* avoid duplicating the initial plan */ true );
+            _plans.addFallbackPlans();
             PlanSet::iterator i = _plans._plans.begin();
             ++i;
             for( ; i != _plans._plans.end(); ++i ) {
@@ -1154,11 +1186,15 @@ doneCheckOrder:
     }
     
     bool MultiPlanScanner::haveOrderedPlan() const {
-        return _currentQps->haveOrderedPlan();
+        return _or ? true : _currentQps->haveOrderedPlan();
     }
 
-    bool MultiPlanScanner::haveOutOfOrderPlan() const {
-        return _currentQps->haveOutOfOrderPlan();
+    bool MultiPlanScanner::possibleOrderedPlan() const {
+        return _or ? true : _currentQps->possibleOrderedPlan();
+    }
+
+    bool MultiPlanScanner::possibleOutOfOrderPlan() const {
+        return _or ? false : _currentQps->possibleOutOfOrderPlan();
     }
 
     string MultiPlanScanner::toString() const {
