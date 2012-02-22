@@ -2349,6 +2349,80 @@ namespace QueryOptimizerCursorTests {
         }
     };
     
+    class SaveGoodIndex : public Base {
+    public:
+        void run() {
+            _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+            _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
+
+            dblock lk;
+            Client::Context ctx( ns() );
+            
+            // No best plan - all must be tried.
+            nPlans( 3 );
+            runQuery();
+            // Best plan selected by query.
+            nPlans( 1 );
+            nPlans( 1 );
+            Helpers::ensureIndex( ns(), BSON( "c" << 1 ), false, "c_1" );
+            // Best plan cleared when new index added.
+            nPlans( 3 );
+            runQuery();
+            // Best plan selected by query.
+            nPlans( 1 );
+            
+            {
+                DBDirectClient client;
+                for( int i = 0; i < 334; ++i ) {
+                    client.insert( ns(), BSON( "i" << i ) );
+                    client.update( ns(), QUERY( "i" << i ), BSON( "i" << i + 1 ) );
+                    client.remove( ns(), BSON( "i" << i + 1 ) );
+                }
+            }
+            // Best plan cleared by ~1000 writes.
+            nPlans( 3 );
+
+            ParsedQuery parsedQuery( ns(), 0, 0, 0,
+                                    BSON( "$query" << BSON( "a" << 4 ) <<
+                                         "$hint" << BSON( "$natural" << 1 ) ), BSON( "b" << 1 ) );
+            shared_ptr<Cursor> cursor =
+            NamespaceDetailsTransient::getCursor( ns(), BSON( "a" << 4 ), BSONObj(),
+                                                 QueryPlanSelectionPolicy::any(), 0, &parsedQuery );
+            while( cursor->advance() );
+            // No plan recorded when a hint is used.
+            nPlans( 3 );
+            
+            ParsedQuery parsedQuery2( ns(), 0, 0, 0,
+                                     BSON( "$query" << BSON( "a" << 4 ) <<
+                                          "$orderby" << BSON( "b" << 1 << "c" << 1 ) ), BSONObj() );
+            shared_ptr<Cursor> cursor2 =
+            NamespaceDetailsTransient::getCursor( ns(), BSON( "a" << 4 ),
+                                                 BSON( "b" << 1 << "c" << 1 ),
+                                                 QueryPlanSelectionPolicy::any(), 0,
+                                                 &parsedQuery2 );
+            while( cursor2->advance() );
+            // Plan recorded was for a different query pattern (different sort spec).
+            nPlans( 3 );
+            
+            // Best plan still selected by query after all these other tests.
+            runQuery();
+            nPlans( 1 );
+        }
+    private:
+        void nPlans( int n ) {
+            auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 4 ) ) );
+            auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
+            QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 4 ), shared_ptr<Projection>(),
+                           BSON( "b" << 1 ) );
+            ASSERT_EQUALS( n, s.nPlans() );
+        }
+        void runQuery() {
+            shared_ptr<Cursor> cursor =
+            NamespaceDetailsTransient::getCursor( ns(), BSON( "a" << 4 ), BSON( "b" << 1 ) );
+            while( cursor->advance() );
+        }
+    };
+    
     namespace GetCursor {
         
         class Base : public QueryOptimizerCursorTests::Base {
@@ -3363,6 +3437,7 @@ namespace QueryOptimizerCursorTests {
             add<NoTakeoverByOutOfOrderPlan>();
             add<CoveredIndex>();
             add<CoveredIndexTakeover>();
+            add<SaveGoodIndex>();
             add<GetCursor::NoConstraints>();
             add<GetCursor::SimpleId>();
             add<GetCursor::OptimalIndex>();
