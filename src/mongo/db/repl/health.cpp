@@ -259,6 +259,14 @@ namespace mongo {
         s << table(0, false);
         s << tr("Set name:", _name);
         s << tr("Majority up:", elect.aMajoritySeemsToBeUp()?"yes":"no" );
+
+        // lag
+        const Member *primary = box.getPrimary();
+        if (primary != 0 && primary != _self && !iAmArbiterOnly() && !lastOpTimeWritten.isNull()) {
+            int lag = primary->hbinfo().opTime.getSecs() - lastOpTimeWritten.getSecs();
+            s << tr("Lag: ", str::stream() << lag << " secs");
+        }
+
         s << _table();
 
         const char *h[] = {"Member",
