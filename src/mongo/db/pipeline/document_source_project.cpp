@@ -61,7 +61,14 @@ namespace mongo {
         if (!excludeId) {
             intrusive_ptr<const Value> pId(
                 pInDocument->getField(Document::idName));
-            pResultDocument->addField(Document::idName, pId);
+
+            /*
+              Previous projections could have removed _id, (or declined to
+              generate it) so it might already not exist.  Only attempt to add
+              if we found it.
+            */
+            if (pId.get())
+                pResultDocument->addField(Document::idName, pId);
         }
 
         /* use the ExpressionObject to create the base result */
