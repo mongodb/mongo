@@ -72,7 +72,7 @@ shrink by a fixed amount in order to benefit from stream compression.
 Stream compression is selectable on a per-table basis, allowing
 applications to choose the compression algorithm most appropriate for
 their data.  Stream compression typically reduces the amount of
-information written to disk by 20-50%, or even more.
+information written to disk by 30-80%.
 
 WiredTiger supports leaf pages of up to 512MB in size.  Disk seeks are
 less likely when reading large amounts of data from disk, significantly
