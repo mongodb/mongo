@@ -118,7 +118,7 @@ namespace mongo {
         lk(cc().lockStatus.excluder, d.writeExcluder), 
         gslk()
     {
-        LOG(3) << "ExcludeAllWrites" << endl;
+        LOG(4) << "ExcludeAllWrites" << endl;
         wassert( !d.dbMutex.isWriteLocked() );
     };
     ExcludeAllWrites::~ExcludeAllWrites() {
