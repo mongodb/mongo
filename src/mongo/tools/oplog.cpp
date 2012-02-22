@@ -58,7 +58,8 @@ public:
 
         log() << "going to connect" << endl;
         
-        OplogReader r;
+        OplogReader r(false);
+        r.setTailingQueryOptions( QueryOption_SlaveOk | QueryOption_AwaitData );
         r.connect( getParam( "from" ) );
 
         log() << "connected" << endl;
@@ -72,11 +73,19 @@ public:
         int num = 0;
         while ( r.more() ) {
             BSONObj o = r.next();
+            LOG(2) << o << endl;
+            
+            if ( o["$err"].type() ) {
+                log() << "error getting oplog" << endl;
+                log() << o << endl;
+                return -1;
+            }
+                
 
             bool print = ++num % 100000 == 0;
             if ( print )
                 cout << num << "\t" << o << endl;
-
+            
             if ( o["op"].String() == "n" )
                 continue;
 
@@ -91,11 +100,11 @@ public:
             updates.done();
 
             BSONObj c = b.obj();
-
+            
             BSONObj res;
-            conn().runCommand( "admin" , c , res );
-            if ( print )
-                cout << res << endl;
+            bool ok = conn().runCommand( "admin" , c , res );
+            if ( print || ! ok )
+                log() << res << endl;
         }
 
         return 0;
