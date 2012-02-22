@@ -24,7 +24,7 @@ function with_mongod( extra_mongod_args, operation ) {
     try {
         operation( mongod );
     } finally {
-        assert( stopMongod( port ) == 0 );
+        stopMongod( port );
     }
 }
 
