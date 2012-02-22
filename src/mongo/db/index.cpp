@@ -315,7 +315,7 @@ namespace mongo {
         // the collection for which we are building an index
         sourceNS = io.getStringField("ns");
         uassert(10096, "invalid ns to index", sourceNS.find( '.' ) != string::npos);
-        uassert(10097, "bad table to index name on add index attempt",
+        massert(10097, str::stream() << "bad table to index name on add index attempt current db: " << cc().database()->name << "  source: " << sourceNS ,
                 cc().database()->name == nsToDatabase(sourceNS.c_str()));
 
         BSONObj key = io.getObjectField("key");
