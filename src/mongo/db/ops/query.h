@@ -141,10 +141,9 @@ namespace mongo {
         bool resultsNeedSort() const;
         void handleReorderMatch();
         bool handleOrderedMatch();
-        ReorderBuildStrategy *newReorderBuildStrategy() const;
         SmallDupSet _scanAndOrderDups;
         OrderedBuildStrategy _orderedBuild;
-        shared_ptr<ReorderBuildStrategy> _reorderBuild;
+        ReorderBuildStrategy _reorderBuild;
     };
 
     class QueryResponseBuilder {

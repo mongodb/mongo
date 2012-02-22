@@ -826,7 +826,7 @@ namespace mongo {
                                              BufBuilder &buf ) :
     ResponseBuildStrategy( parsedQuery, cursor, buf, QueryPlan::Summary() ),
     _orderedBuild( parsedQuery, cursor, buf, QueryPlan::Summary() ),
-    _reorderBuild( newReorderBuildStrategy() ) {
+    _reorderBuild( _parsedQuery, _cursor, _buf, QueryPlan::Summary() ) {
     }
     
     bool HybridBuildStrategy::handleMatch() {
@@ -860,16 +860,13 @@ namespace mongo {
     }
     
     void HybridBuildStrategy::handleReorderMatch() {
-        if ( !_reorderBuild ) {
-            return;
-        }
         // todo improve
         DiskLoc loc = _cursor->currLoc();
         if ( _scanAndOrderDups.getsetdup( loc ) ) {
             return;
         }
         try {
-            _reorderBuild->_handleMatchNoDedup();
+            _reorderBuild._handleMatchNoDedup();
         } catch ( const UserException &e ) {
             if ( e.getCode() == ScanAndOrderMemoryLimitExceededAssertionCode ) {
                 if ( _queryOptimizerCursor->mayRetryQuery() ) {
@@ -889,20 +886,9 @@ namespace mongo {
         if ( !resultsNeedSort() ) {
             return _orderedBuild.rewriteMatches();
         }
-        verify( 16084, _reorderBuild );
         _buf.reset();
         _buf.skip( sizeof( QueryResult ) );
-        return _reorderBuild->rewriteMatches();
-    }
-    
-    ReorderBuildStrategy *HybridBuildStrategy::newReorderBuildStrategy() const {
-        if ( _parsedQuery.getOrder().isEmpty() ) {
-            return 0;
-        }
-        if ( !_queryOptimizerCursor->ok() ) {
-            return 0;
-        }
-        return new ReorderBuildStrategy( _parsedQuery, _cursor, _buf, QueryPlan::Summary() );
+        return _reorderBuild.rewriteMatches();
     }
     
     QueryResponseBuilder::QueryResponseBuilder( const ParsedQuery &parsedQuery,
@@ -1009,7 +995,7 @@ namespace mongo {
     ( const QueryPlan::Summary &queryPlan ) {
         bool singlePlan = !_queryOptimizerCursor;
         bool singleOrderedPlan = singlePlan && ( !queryPlan.valid() || !queryPlan._scanAndOrderRequired );
-        if ( !_cursor->ok() || singleOrderedPlan ||
+        if ( _parsedQuery.getOrder().isEmpty() || !_cursor->ok() || singleOrderedPlan ||
             ( _queryOptimizerCursor && !_queryOptimizerCursor->mayRunOutOfOrderPlans() ) ) {
             return shared_ptr<ResponseBuildStrategy>
             ( new OrderedBuildStrategy( _parsedQuery, _cursor, _buf, queryPlan ) );
