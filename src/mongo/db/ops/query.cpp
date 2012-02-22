@@ -830,10 +830,10 @@ namespace mongo {
     }
     
     bool HybridBuildStrategy::handleMatch() {
-        handleReorderMatch();
         if ( !iterateNeedsSort() ) {
             return _orderedBuild.handleMatch();
         }
+        handleReorderMatch();
         return false;
     }
     
