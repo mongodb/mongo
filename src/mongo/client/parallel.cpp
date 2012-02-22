@@ -1019,15 +1019,6 @@ namespace mongo {
                 mdata.cleanup();
                 continue;
             }
-            catch ( MsgAssertionException& e ){
-                warning() << "socket (msg) exception when finishing on " << shard << ", current connection state is " << mdata.toBSON() << causedBy( e ) << endl;
-                mdata.errored = true;
-                if( returnPartial ){
-                    mdata.cleanup();
-                    continue;
-                }
-                throw;
-            }
             catch( SocketException& e ){
                 warning() << "socket exception when finishing on " << shard << ", current connection state is " << mdata.toBSON() << causedBy( e ) << endl;
                 mdata.errored = true;
@@ -1335,12 +1326,6 @@ namespace mongo {
                     allConfigStale = true;
 
                     staleConfigExs.push_back( (string)"stale config detected when receiving response for " + e.what() + errLoc );
-                    _cursors[i].reset( NULL );
-                    conns[i]->done();
-                    continue;
-                }
-                catch ( MsgAssertionException& e ){
-                    socketExs.push_back( e.what() + errLoc );
                     _cursors[i].reset( NULL );
                     conns[i]->done();
                     continue;

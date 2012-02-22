@@ -45,6 +45,7 @@
 #include "replutil.h"
 #include "repl/connections.h"
 #include "ops/update.h"
+#include "pcrecpp.h"
 
 namespace mongo {
 
@@ -766,7 +767,7 @@ namespace mongo {
         string _ns = ns();
         BSONObjBuilder b;
         if ( !only.empty() ) {
-            b.appendRegex("ns", string("^") + only);
+            b.appendRegex("ns", string("^") + pcrecpp::RE::QuoteMeta( only ));
         }
         BSONObj last = oplogReader.findOne( _ns.c_str(), Query( b.done() ).sort( BSON( "$natural" << -1 ) ) );
         if ( !last.isEmpty() ) {
@@ -828,7 +829,8 @@ namespace mongo {
             query.append("ts", q.done());
             if ( !only.empty() ) {
                 // note we may here skip a LOT of data table scanning, a lot of work for the master.
-                query.appendRegex("ns", string("^") + only); // maybe append "\\." here?
+                // maybe append "\\." here?
+                query.appendRegex("ns", string("^") + pcrecpp::RE::QuoteMeta( only ));
             }
             BSONObj queryObj = query.done();
             // e.g. queryObj = { ts: { $gte: syncedTo } }
@@ -1082,7 +1084,6 @@ namespace mongo {
     }
 
     bool replHandshake(DBClientConnection *conn) {
-
         string myname = getHostName();
 
         BSONObj me;
@@ -1119,9 +1120,19 @@ namespace mongo {
         return true;
     }
 
+    OplogReader::OplogReader( bool doHandshake ) : 
+        _doHandshake( doHandshake ) { 
+        
+        _tailingQueryOptions = QueryOption_SlaveOk;
+        _tailingQueryOptions |= QueryOption_CursorTailable | QueryOption_OplogReplay;
+        
+        /* TODO: slaveOk maybe shouldn't use? */
+        _tailingQueryOptions |= QueryOption_AwaitData;
+    }
+
     bool OplogReader::commonConnect(const string& hostName) {
         if( conn() == 0 ) {
-            _conn = shared_ptr<DBClientConnection>(new DBClientConnection( false, 0, 0 /* tcp timeout */));
+            _conn = shared_ptr<DBClientConnection>(new DBClientConnection( false, 0, 10 /* tcp timeout */));
             string errmsg;
             ReplInfo r("trying to connect to sync source");
             if ( !_conn->connect(hostName.c_str(), errmsg) ||
@@ -1139,10 +1150,16 @@ namespace mongo {
             return true;
         }
 
-        if (commonConnect(hostName)) {
-            return replHandshake(_conn.get());
+        if ( ! commonConnect(hostName) ) {
+            return false;
         }
-        return false;
+        
+        
+        if ( _doHandshake && ! replHandshake(_conn.get() ) ) {
+            return false;
+        }
+
+        return true;
     }
 
     bool OplogReader::connect(const BSONObj& rid, const int from, const string& to) {
@@ -1164,6 +1181,21 @@ namespace mongo {
         BSONObj res;
         return conn()->runCommand( "admin" , cmd.obj() , res );
     }
+
+    void OplogReader::tailingQuery(const char *ns, const BSONObj& query, const BSONObj* fields ) {
+        assert( !haveCursor() );
+        LOG(2) << "repl: " << ns << ".find(" << query.toString() << ')' << endl;
+        cursor.reset( _conn->query( ns, query, 0, 0, fields, _tailingQueryOptions ).release() );
+    }
+    
+    void OplogReader::tailingQueryGTE(const char *ns, OpTime t, const BSONObj* fields ) {
+        BSONObjBuilder q;
+        q.appendDate("$gte", t.asDate());
+        BSONObjBuilder query;
+        query.append("ts", q.done());
+        tailingQuery(ns, query.done(), fields);
+    }
+
 
     /* note: not yet in mutex at this point.
        returns >= 0 if ok.  return -1 if you want to reconnect.

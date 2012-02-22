@@ -19,7 +19,7 @@ if ( doIt ) {
     files.forEach( function( x ) { removeFile( x.name ) } );
     
     port = allocatePorts( 1 )[ 0 ];
-    m = startMongoProgram( "mongod", "--port", port, "--dbpath", dbpath, "--nohttpinterface", "--bind_ip", "127.0.0.1", '--durOptions', 64 );
+    m = startMongoProgram( "mongod", "--port", port, "--dbpath", dbpath, "--nohttpinterface", "--bind_ip", "127.0.0.1", '--nojournal' );
     d = m.getDB( "diskfulltest" );
     c = d.getCollection( "diskfulltest" );
     c.save( { a: 6 } );

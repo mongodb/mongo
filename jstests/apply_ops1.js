@@ -3,7 +3,7 @@ t = db.apply_ops1;
 t.drop();
 
 assert.eq( 0 , t.find().count() , "A0" );
-a = db.runCommand( { applyOps : [ { "op" : "i" , "ns" : t.getFullName() , "o" : { _id : 5 , x : 17 } } ] } )
+a = db.adminCommand( { applyOps : [ { "op" : "i" , "ns" : t.getFullName() , "o" : { _id : 5 , x : 17 } } ] } )
 assert.eq( 1 , t.find().count() , "A1a" );
 assert.eq( true, a.results[0], "A1b" );
 

@@ -29,6 +29,7 @@
 #include "config.h"
 #include "grid.h"
 #include "server.h"
+#include "pcrecpp.h"
 
 namespace mongo {
 
@@ -280,7 +281,7 @@ namespace mongo {
                 _reload();
                 ci = _collections[ns];
             }
-            massert( 10181 ,  (string)"not sharded:" + ns , ci.isSharded() );
+            uassert( 10181 ,  (string)"not sharded:" + ns , ci.isSharded() );
             assert( ! ci.key().isEmpty() );
             
             if ( ! ( shouldReload || forceReload ) || earlyReload )
@@ -306,7 +307,7 @@ namespace mongo {
                 if ( v == oldVersion ) {
                     scoped_lock lk( _lock );
                     CollectionInfo& ci = _collections[ns];
-                    massert( 15885 , str::stream() << "not sharded after reloading from chunks : " << ns , ci.isSharded() );
+                    uassert( 15885 , str::stream() << "not sharded after reloading from chunks : " << ns , ci.isSharded() );
                     return ci.getCM();
                 }
             }
@@ -350,7 +351,7 @@ namespace mongo {
         scoped_lock lk( _lock );
         
         CollectionInfo& ci = _collections[ns];
-        massert( 14822 ,  (string)"state changed in the middle: " + ns , ci.isSharded() );
+        uassert( 14822 ,  (string)"state changed in the middle: " + ns , ci.isSharded() );
         
         bool forced = false;
         if ( temp->getVersion() > ci.getCM()->getVersion() ||
@@ -365,7 +366,7 @@ namespace mongo {
             ci.resetCM( temp.release() );
         }
         
-        massert( 15883 , str::stream() << "not sharded after chunk manager reset : " << ns , ci.isSharded() );
+        uassert( 15883 , str::stream() << "not sharded after chunk manager reset : " << ns , ci.isSharded() );
         return ci.getCM();
     }
 
@@ -414,9 +415,9 @@ namespace mongo {
         unserialize( o );
 
         BSONObjBuilder b;
-        b.appendRegex( "_id" , (string)"^" + _name + "\\." );
+        b.appendRegex( "_id" , (string)"^" + pcrecpp::RE::QuoteMeta( _name ) + "\\." );
 
-        auto_ptr<DBClientCursor> cursor = conn->query( ShardNS::collection ,b.obj() );
+        auto_ptr<DBClientCursor> cursor = conn->query( ShardNS::collection, b.obj() );
         assert( cursor.get() );
         while ( cursor->more() ) {
             BSONObj o = cursor->next();

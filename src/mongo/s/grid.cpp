@@ -26,6 +26,7 @@
 
 #include "grid.h"
 #include "shard.h"
+#include "pcrecpp.h"
 
 namespace mongo {
 
@@ -55,7 +56,8 @@ namespace mongo {
                         // lets check case
                         ScopedDbConnection conn( configServer.modelServer() );
                         BSONObjBuilder b;
-                        b.appendRegex( "_id" , (string)"^" + database + "$" , "i" );
+                        b.appendRegex( "_id" , (string)"^" +
+                                       pcrecpp::RE::QuoteMeta( database ) + "$" , "i" );
                         BSONObj d = conn->findOne( ShardNS::database , b.obj() );
                         conn.done();
 

@@ -860,12 +860,21 @@ namespace mongo {
 
             // apply
             int num = 0;
+            int errors = 0;
+            
             BSONObjIterator i( ops );
             BSONArrayBuilder ab;
+            
             while ( i.more() ) {
                 BSONElement e = i.next();
-                bool failed = applyOperation_inlock( e.Obj() , false );
+                const BSONObj& temp = e.Obj();
+                
+                Client::Context ctx( temp["ns"].String() ); // this handles security
+                bool failed = applyOperation_inlock( temp , false );
                 ab.append(!failed);
+                if ( failed )
+                    errors++;
+
                 num++;
             }
 
@@ -881,7 +890,7 @@ namespace mongo {
                 logOp( "c" , tempNS.c_str() , cmdObj.firstElement().wrap() );
             }
 
-            return true;
+            return errors == 0;
         }
 
         DBDirectClient db;

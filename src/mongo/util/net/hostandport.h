@@ -207,7 +207,7 @@ namespace mongo {
     }
 
     inline void HostAndPort::init(const char *p) {
-        uassert(13110, "HostAndPort: bad host:port config string", *p);
+        massert(13110, "HostAndPort: host is empty", *p);
         assert( *p != '#' );
         assert( _dynName.empty() );
         const char *colon = strrchr(p, ':');

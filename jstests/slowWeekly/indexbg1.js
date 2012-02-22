@@ -61,7 +61,7 @@ while( 1 ) { // if indexing finishes before we can run checks, try indexing w/ m
         assert.eq( "BasicCursor", t.find( {i:100} ).explain().cursor, "used btree cursor" );
         t.remove( {i:40} );
         t.update( {i:10}, {i:-10} );
-        id = t.find().hint( {$natural:-1} )._id;
+        id = t.find().hint( {$natural:-1} ).next()._id;
         t.update( {_id:id}, {i:-2} );
         t.save( {i:-50} );
         t.save( {i:size+2} );

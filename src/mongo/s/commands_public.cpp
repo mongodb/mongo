@@ -1013,6 +1013,19 @@ namespace mongo {
                 return c;
             }
 
+            void cleanUp( const set<ServerAndQuery>& servers, string dbName, string shardResultCollection ) {
+                try {
+                    // drop collections with tmp results on each shard
+                    for ( set<ServerAndQuery>::iterator i=servers.begin(); i!=servers.end(); i++ ) {
+                        ScopedDbConnection conn( i->_server );
+                        conn->dropCollection( dbName + "." + shardResultCollection );
+                        conn.done();
+                    }
+                } catch ( std::exception e ) {
+                    log() << "Cannot cleanup shard results" << causedBy( e ) << endl;
+                }
+            }
+
             bool run(const string& dbName , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 return run( dbName, cmdObj, errmsg, result, 0 );
             }
@@ -1105,6 +1118,8 @@ namespace mongo {
                 BSONObjBuilder aggCountsB;
                 map<string,long long> countsMap;
                 set< BSONObj > splitPts;
+                BSONObj singleResult;
+                bool ok = true;
 
                 {
                     // take distributed lock to prevent split / migration
@@ -1143,12 +1158,17 @@ namespace mongo {
 
                     for ( map<Shard,BSONObj>::iterator i = results.begin(); i != results.end(); ++i ){
 
-                        BSONObj mrResult = i->second;
+                    	// need to gather list of all servers even if an error happened
                         string server = i->first.getConnString();
-
-                        BSONObj counts = mrResult["counts"].embeddedObjectUserCheck();
-                        shardCountsB.append( server , counts );
                         servers.insert( server );
+                        if ( !ok ) continue;
+
+                        singleResult = i->second;
+                        ok = singleResult["ok"].trueValue();
+                        if ( !ok ) continue;
+
+                        BSONObj counts = singleResult["counts"].embeddedObjectUserCheck();
+                        shardCountsB.append( server , counts );
 
                         // add up the counts for each shard
                         // some of them will be fixed later like output and reduce
@@ -1158,14 +1178,21 @@ namespace mongo {
                             countsMap[temp.fieldName()] += temp.numberLong();
                         }
 
-                        if (mrResult.hasField("splitKeys")) {
-                            BSONElement splitKeys = mrResult.getField("splitKeys");
+                        if (singleResult.hasField("splitKeys")) {
+                            BSONElement splitKeys = singleResult.getField("splitKeys");
                             vector<BSONElement> pts = splitKeys.Array();
                             for (vector<BSONElement>::iterator it = pts.begin(); it != pts.end(); ++it) {
                                 splitPts.insert(it->Obj().getOwned());
                             }
                         }
                     }
+                }
+
+                if ( ! ok ) {
+                    cleanUp( servers, dbName, shardResultCollection );
+                    errmsg = "MR parallel processing failed: ";
+                    errmsg += singleResult.toString();
+                    return 0;
                 }
 
                 // build the sharded finish command
@@ -1184,8 +1211,6 @@ namespace mongo {
                 finalCmd.append( "counts" , aggCounts );
 
                 Timer t2;
-                BSONObj singleResult;
-                bool ok = false;
                 long long reduceCount = 0;
                 long long outputCount = 0;
                 BSONObjBuilder postCountsB;
@@ -1258,6 +1283,8 @@ namespace mongo {
 
                             string server = i->first.getConnString();
                             singleResult = i->second;
+                            ok = singleResult["ok"].trueValue();
+                            if ( !ok ) break;
 
                             BSONObj counts = singleResult.getObjectField("counts");
                             reduceCount += counts.getIntField("reduce");
@@ -1295,19 +1322,10 @@ namespace mongo {
                     }
                 }
 
-                try {
-                    // drop collections with tmp results on each shard
-                    for ( set<ServerAndQuery>::iterator i=servers.begin(); i!=servers.end(); i++ ) {
-                        ScopedDbConnection conn( i->_server );
-                        conn->dropCollection( dbName + "." + shardResultCollection );
-                        conn.done();
-                    }
-                } catch ( std::exception e ) {
-                    log() << "Cannot cleanup shard results" << causedBy( e ) << endl;
-                }
+                cleanUp( servers, dbName, shardResultCollection );
 
                 if ( ! ok ) {
-                    errmsg = "final reduce failed: ";
+                    errmsg = "MR post processing failed: ";
                     errmsg += singleResult.toString();
                     return 0;
                 }

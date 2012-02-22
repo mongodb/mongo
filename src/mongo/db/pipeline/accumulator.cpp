@@ -56,11 +56,6 @@ namespace mongo {
     }
 
     void agg_framework_reservedErrors() {
-        uassert(16023, "reserved error", false);
-        uassert(16024, "reserved error", false);
-        uassert(16025, "reserved error", false);
-        uassert(16026, "reserved error", false);
-        uassert(16027, "reserved error", false);
         uassert(16028, "reserved error", false);
         uassert(16029, "reserved error", false);
         uassert(16030, "reserved error", false);

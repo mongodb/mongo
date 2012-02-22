@@ -1,3 +1,4 @@
+if ( !_isWindows() ) { //SERVER-5024
 var name = "rs_auth2";
 var port = allocatePorts(3);
 var path = "jstests/libs/";
@@ -101,3 +102,4 @@ rs.stop(0);
 m = rs.restart(0, {"keyFile" : path+"key1"});
 
 print("0 becomes a secondary");
+} // !_isWindows()

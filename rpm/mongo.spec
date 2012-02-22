@@ -1,7 +1,7 @@
 Name: mongo
-Version: 2.1.0
+Version: 2.1.1
 Release: mongodb_1%{?dist}
-Summary: mongo client shell and tools
+Summary: mongodb client shell and tools
 License: AGPL 3.0
 URL: http://www.mongodb.org
 Group: Applications/Databases
@@ -12,7 +12,7 @@ BuildRequires: js-devel, readline-devel, boost-devel, pcre-devel
 BuildRequires: gcc-c++, scons
 
 %description
-Mongo (from "huMONGOus") is a schema-free document-oriented database.
+MongoDB (from "huMONGOus") is a schema-free document-oriented database.
 It features dynamic profileable queries, full indexing, replication
 and fail-over support, efficient storage of large binary data objects,
 and auto-sharding.
@@ -21,22 +21,22 @@ This package provides the mongo shell, import/export tools, and other
 client utilities.
 
 %package server
-Summary: mongo server, sharding server, and support scripts
+Summary: mongodb server, sharding server, and support scripts
 Group: Applications/Databases
 Requires: mongo
 
 %description server
-Mongo (from "huMONGOus") is a schema-free document-oriented database.
+MongoDB (from "huMONGOus") is a schema-free document-oriented database.
 
 This package provides the mongo server software, mongo sharding server
-softwware, default configuration files, and init.d scripts.
+software, default configuration files, and init.d scripts.
 
 %package devel
-Summary: Headers and libraries for mongo development. 
+Summary: Headers and libraries for mongodb development.
 Group: Applications/Databases
 
 %description devel
-Mongo (from "huMONGOus") is a schema-free document-oriented database.
+MongoDB (from "huMONGOus") is a schema-free document-oriented database.
 
 This package provides the mongo static library and header files needed
 to develop mongo client software.
@@ -127,13 +127,17 @@ fi
 #%{_mandir}/man1/mongod.1*
 %{_mandir}/man1/mongos.1*
 /etc/rc.d/init.d/mongod
-/etc/sysconfig/mongod
+%config(noreplace) /etc/sysconfig/mongod
 #/etc/rc.d/init.d/mongos
 %attr(0755,mongod,mongod) %dir /var/lib/mongo
 %attr(0755,mongod,mongod) %dir /var/log/mongo
+%attr(0755,mongod,mongod) %dir /var/run/mongo
 %attr(0640,mongod,mongod) %config(noreplace) %verify(not md5 size mtime) /var/log/mongo/mongod.log
 
 %changelog
+* Fri Feb 17 2012 Michael A. Fiedler <michael@10gen.com>
+- Added proper pid file usage
+
 * Thu Jan 28 2010 Richard M Kreuter <richard@10gen.com>
 - Minor fixes.
 
