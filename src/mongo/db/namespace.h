@@ -27,6 +27,7 @@
 #include "mongommf.h"
 #include "d_concurrency.h"
 #include "queryoptimizercursor.h"
+#include "queryoptimizer.h"
 
 namespace mongo {
 

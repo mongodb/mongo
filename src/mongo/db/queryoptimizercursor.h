@@ -20,7 +20,7 @@
 
 #include "cursor.h"
 #include "diskloc.h"
-#include "queryoptimizer.h"
+#include "projection.h"
 
 namespace mongo {
     
@@ -78,6 +78,8 @@ namespace mongo {
         virtual bool permitPlan( const QueryPlan &plan ) const;
         virtual BSONObj planHint( const char *ns ) const;
     };
+    
+    class ExplainQueryInfo;
     
     class QueryOptimizerCursor : public Cursor {
     public:

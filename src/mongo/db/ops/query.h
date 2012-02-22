@@ -25,6 +25,7 @@
 #include "../diskloc.h"
 #include "../explain.h"
 #include "../queryoptimizercursor.h"
+#include "../queryoptimizer.h"
 #include "../../s/d_chunk_manager.h"
 
 // struct QueryOptions, QueryResult, QueryResultFlags in:
