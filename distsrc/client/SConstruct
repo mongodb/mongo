@@ -68,10 +68,7 @@ for x in dirs:
     allClientFiles += Glob( "mongo/" + x + "*.cpp" )
 allClientFiles += Glob( "mongo/util/*.c" )
 
-libs = []
-libs += env.SharedLibrary( "mongoclient" , allClientFiles )
-sharedClientLibName = str(libs[-1])
-libs += env.Library( "mongoclient" , allClientFiles )
+libs = env.Library( "mongoclient" , allClientFiles )
 
 # install
 
@@ -86,12 +83,11 @@ for x in dirs:
 
 env.Alias( "install" , prefix )
 
-
 # example setup
 
 clientTests = []
 clientEnv = env.Clone();
-clientEnv.Prepend( LIBS=["libmongoclient.a", sharedClientLibName])
+clientEnv.Prepend( LIBS=["mongoclient"] )
 clientEnv.Prepend( LIBPATH=["."] )
 
 # examples
