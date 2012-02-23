@@ -266,20 +266,21 @@ __wt_confchk_table_meta =
 
 const char *
 __wt_confdfl_wiredtiger_open =
-    "cache_size=100MB,create=false,direct_io=(),error_prefix="","
-    "eviction_target=80,eviction_trigger=95,extensions=(),hazard_max=30,"
-    "home_environment=false,home_environment_priv=false,logging=false,"
-    "multiprocess=false,session_max=50,transactional=false,verbose=()";
+    "buffer_alignment=-1,cache_size=100MB,create=false,direct_io=(),"
+    "error_prefix="",eviction_target=80,eviction_trigger=95,extensions=(),"
+    "hazard_max=30,home_environment=false,home_environment_priv=false,"
+    "logging=false,multiprocess=false,session_max=50,transactional=false,"
+    "verbose=()";
 
 const char *
 __wt_confchk_wiredtiger_open =
-    "cache_size=(type=int,min=1MB,max=10TB),create=(type=boolean),"
-    "direct_io=(type=list,choices=[\"data\",\"log\"]),error_prefix=(),"
-    "eviction_target=(type=int,min=10,max=99),eviction_trigger=(type=int,"
-    "min=10,max=99),extensions=(type=list),hazard_max=(type=int,min=15),"
-    "home_environment=(type=boolean),home_environment_priv=(type=boolean),"
-    "logging=(type=boolean),multiprocess=(type=boolean),session_max=(type=int"
-    ",min=1),transactional=(type=boolean),verbose=(type=list,"
-    "choices=[\"block\",\"evict\",\"evictserver\",\"fileops\",\"hazard\","
-    "\"mutex\",\"read\",\"readserver\",\"reconcile\",\"salvage\",\"verify\","
-    "\"write\"])";
+    "buffer_alignment=(type=int,min=-1,max=1MB),cache_size=(type=int,min=1MB,"
+    "max=10TB),create=(type=boolean),direct_io=(type=list,choices=[\"data\","
+    "\"log\"]),error_prefix=(),eviction_target=(type=int,min=10,max=99),"
+    "eviction_trigger=(type=int,min=10,max=99),extensions=(type=list),"
+    "hazard_max=(type=int,min=15),home_environment=(type=boolean),"
+    "home_environment_priv=(type=boolean),logging=(type=boolean),"
+    "multiprocess=(type=boolean),session_max=(type=int,min=1),"
+    "transactional=(type=boolean),verbose=(type=list,choices=[\"block\","
+    "\"evict\",\"evictserver\",\"fileops\",\"hazard\",\"mutex\",\"read\","
+    "\"readserver\",\"reconcile\",\"salvage\",\"verify\",\"write\"])";

@@ -189,11 +189,11 @@ static int
 __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block, int salvage)
 {
 	WT_BLOCK_DESC *desc;
+	WT_ITEM *buf;
 	uint32_t cksum;
-	uint8_t *buf;
 	int ret;
 
-	WT_RET(__wt_calloc_def(session, WT_BLOCK_DESC_SECTOR, &buf));
+	WT_RET(__wt_scr_alloc(session, WT_BLOCK_DESC_SECTOR, &buf));
 
 	/*
 	 * We currently always do the verification step, because it's cheap
@@ -202,9 +202,9 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block, int salvage)
 	 * Read the first sector.
 	 */
 	WT_ERR(__wt_read(
-	    session, block->fh, (off_t)0, WT_BLOCK_DESC_SECTOR, buf));
+	    session, block->fh, (off_t)0, WT_BLOCK_DESC_SECTOR, buf->mem));
 
-	desc = (WT_BLOCK_DESC *)buf;
+	desc = (WT_BLOCK_DESC *)buf->mem;
 	WT_VERBOSE(session, block,
 	    "open: magic %" PRIu32
 	    ", major/minor: %" PRIu32 "/%" PRIu32
@@ -229,8 +229,8 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block, int salvage)
 	cksum = desc->cksum;
 	desc->cksum = 0;
 	if (desc->magic != WT_BLOCK_MAGIC ||
-	    cksum != __wt_cksum(buf, WT_BLOCK_DESC_SECTOR))
-		WT_RET_MSG(session, WT_ERROR, "%s %s%s",
+	    cksum != __wt_cksum(buf->mem, WT_BLOCK_DESC_SECTOR))
+		WT_ERR_MSG(session, WT_ERROR, "%s %s%s",
 		    "does not appear to be a WiredTiger file",
 		    block->name,
 		    salvage ? "; to salvage this file, configure the salvage "
@@ -239,7 +239,7 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block, int salvage)
 	if (desc->majorv > WT_BLOCK_MAJOR_VERSION ||
 	    (desc->majorv == WT_BLOCK_MAJOR_VERSION &&
 	    desc->minorv > WT_BLOCK_MINOR_VERSION))
-		WT_RET_MSG(session, WT_ERROR,
+		WT_ERR_MSG(session, WT_ERROR,
 		    "%s is an unsupported version of a WiredTiger file",
 		    block->name);
 
@@ -259,7 +259,7 @@ __desc_read(WT_SESSION_IMPL *session, WT_BLOCK *block, int salvage)
 		block->free_cksum = desc->free_cksum;
 	}
 
-err:	__wt_free(session, buf);
+err:	__wt_scr_free(&buf);
 	return (ret);
 }
 
@@ -271,11 +271,11 @@ int
 __wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh)
 {
 	WT_BLOCK_DESC *desc;
-	uint8_t *buf;
+	WT_ITEM *buf;
 	int ret;
 
-	WT_RET(__wt_calloc_def(session, WT_BLOCK_DESC_SECTOR, &buf));
-	desc = (WT_BLOCK_DESC *)buf;
+	WT_RET(__wt_scr_alloc(session, WT_BLOCK_DESC_SECTOR, &buf));
+	desc = (WT_BLOCK_DESC *)buf->mem;
 
 	desc->magic = WT_BLOCK_MAGIC;
 	desc->majorv = WT_BLOCK_MAJOR_VERSION;
@@ -286,11 +286,11 @@ __wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh)
 
 	/* Update the checksum. */
 	desc->cksum = 0;
-	desc->cksum = __wt_cksum(buf, WT_BLOCK_DESC_SECTOR);
+	desc->cksum = __wt_cksum(buf->mem, WT_BLOCK_DESC_SECTOR);
 
-	ret = __wt_write(session, fh, (off_t)0, WT_BLOCK_DESC_SECTOR, buf);
+	ret = __wt_write(session, fh, (off_t)0, WT_BLOCK_DESC_SECTOR, buf->mem);
 
-	__wt_free(session, buf);
+	__wt_scr_free(&buf);
 	return (ret);
 }
 
@@ -302,15 +302,15 @@ static int
 __desc_update(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
 	WT_BLOCK_DESC *desc;
-	uint8_t *buf;
+	WT_ITEM *buf;
 	int ret;
 
-	WT_RET(__wt_calloc_def(session, WT_BLOCK_DESC_SECTOR, &buf));
+	WT_RET(__wt_scr_alloc(session, WT_BLOCK_DESC_SECTOR, &buf));
 
 	/* Read the first sector. */
 	WT_ERR(__wt_read(
-	    session, block->fh, (off_t)0, WT_BLOCK_DESC_SECTOR, buf));
-	desc = (WT_BLOCK_DESC *)buf;
+	    session, block->fh, (off_t)0, WT_BLOCK_DESC_SECTOR, buf->mem));
+	desc = (WT_BLOCK_DESC *)buf->mem;
 
 	/* See if anything has changed. */
 	if (desc->free_offset == (uint64_t)block->free_offset &&
@@ -330,12 +330,12 @@ __desc_update(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
 	/* Update the checksum. */
 	desc->cksum = 0;
-	desc->cksum = __wt_cksum(buf, WT_BLOCK_DESC_SECTOR);
+	desc->cksum = __wt_cksum(buf->mem, WT_BLOCK_DESC_SECTOR);
 
 	/* Write the first sector. */
 	ret = __wt_write(session,
-	    block->fh, (off_t)0, WT_BLOCK_DESC_SECTOR, buf);
+	    block->fh, (off_t)0, WT_BLOCK_DESC_SECTOR, buf->mem);
 
-err:	__wt_free(session, buf);
+err:	__wt_scr_free(&buf);
 	return (ret);
 }

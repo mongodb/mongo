@@ -512,6 +512,10 @@ extern int __wt_realloc(WT_SESSION_IMPL *session,
     size_t *bytes_allocated_ret,
     size_t bytes_to_allocate,
     void *retp);
+extern int __wt_realloc_aligned(WT_SESSION_IMPL *session,
+    size_t *bytes_allocated_ret,
+    size_t bytes_to_allocate,
+    void *retp);
 extern int __wt_strndup(WT_SESSION_IMPL *session,
     const char *str,
     size_t len,
@@ -841,11 +845,11 @@ extern uint32_t __wt_nlpo2_round(uint32_t v);
 extern uint32_t __wt_nlpo2(uint32_t v);
 extern int __wt_ispo2(uint32_t v);
 extern uint32_t __wt_random(void);
+extern int __wt_buf_grow(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size);
 extern int __wt_buf_init(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size);
 extern int __wt_buf_initsize(WT_SESSION_IMPL *session,
     WT_ITEM *buf,
     size_t size);
-extern int __wt_buf_grow(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size);
 extern int __wt_buf_set( WT_SESSION_IMPL *session,
     WT_ITEM *buf,
     const void *data,

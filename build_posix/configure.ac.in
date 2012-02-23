@@ -46,10 +46,18 @@ else
 	fi
 fi
 
-# Linux requires _GNU_SOURCE to be defined for O_DIRECT
-if test "`uname -s`" = "Linux"; then
-	AM_CFLAGS="$AM_CFLAGS -D_GNU_SOURCE"
+# Linux requires _GNU_SOURCE to be defined and buffers aligned to 512 byte
+# boundaries for O_DIRECT to work.
+BUFFER_ALIGNMENT=0
+if test "$ac_cv_func_posix_memalign" = "yes" ; then
+	case "`uname -s`" in
+	Linux)	AM_CFLAGS="$AM_CFLAGS -D_GNU_SOURCE"
+		BUFFER_ALIGNMENT=512
+		;;
+	esac
 fi
+AC_DEFINE_UNQUOTED(WT_BUFFER_ALIGNMENT_DEFAULT, $BUFFER_ALIGNMENT,
+	[Default alignment of bufffers used for I/O])
 
 AC_SUBST(AM_CFLAGS)
 
@@ -78,7 +86,8 @@ AM_CONDITIONAL([HAVE_BDB], [test -d ../test/format && test -e db])
 
 # Warn that diagnostic builds should not be used in production
 if test "$wt_cv_enable_diagnostic" = "yes"; then
-	AC_MSG_WARN([DIAGNOSTIC BUILDS ARE NOT RECOMMENDED FOR PRODUCTION DEPLOYMENT.])
+	AC_MSG_WARN(
+	    [DIAGNOSTIC BUILDS ARE NOT RECOMMENDED FOR PRODUCTION DEPLOYMENT.])
 fi
 
 # Output files

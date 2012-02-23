@@ -35,23 +35,9 @@ __wt_calloc(WT_SESSION_IMPL *session, size_t number, size_t size, void *retp)
 	if (session != NULL && S2C(session)->stats != NULL)
 		WT_CSTAT_INCR(session, memalloc);
 
-#ifdef HAVE_POSIX_MEMALIGN
-#define	ALIGN_SIZE	512
-	if (size * number >= ALIGN_SIZE) {
-		int ret;
-		if ((ret = posix_memalign(&p, ALIGN_SIZE, number * size)) != 0)
-			WT_RET_MSG(session, ret, "memory allocation");
-		memset(p, 0, number * size);
-		goto done;
-	}
-#endif
-
 	if ((p = calloc(number, size)) == NULL)
 		WT_RET_MSG(session, __wt_errno(), "memory allocation");
 
-#ifdef HAVE_POSIX_MEMALIGN
-done:
-#endif
 	*(void **)retp = p;
 	return (0);
 }
@@ -64,7 +50,7 @@ int
 __wt_realloc(WT_SESSION_IMPL *session,
     size_t *bytes_allocated_ret, size_t bytes_to_allocate, void *retp)
 {
-	void *p, *newp;
+	void *p;
 	size_t bytes_allocated;
 
 	/*
@@ -77,23 +63,11 @@ __wt_realloc(WT_SESSION_IMPL *session,
 	 * Sometimes we're allocating memory and we don't care about the
 	 * final length -- bytes_allocated_ret may be NULL.
 	 */
-	bytes_allocated =
-	    bytes_allocated_ret == NULL ? 0 : *bytes_allocated_ret;
+	bytes_allocated = (bytes_allocated_ret == NULL) ?
+	    0 : *bytes_allocated_ret;
 	WT_ASSERT(session, bytes_allocated < bytes_to_allocate);
 
 	p = *(void **)retp;
-
-#ifdef HAVE_POSIX_MEMALIGN
-	if (bytes_allocated >= ALIGN_SIZE || bytes_to_allocate >= ALIGN_SIZE) {
-		WT_RET(__wt_calloc(session, bytes_to_allocate, 1, &newp));
-		memcpy(newp, p, bytes_allocated);
-		__wt_free(session, p);
-		p = newp;
-		goto done;
-	}
-#else
-	WT_UNUSED(newp);
-#endif
 
 	if (p == NULL && session != NULL && S2C(session)->stats != NULL)
 		WT_CSTAT_INCR(session, memalloc);
@@ -112,15 +86,76 @@ __wt_realloc(WT_SESSION_IMPL *session,
 	memset((uint8_t *)
 	    p + bytes_allocated, 0, bytes_to_allocate - bytes_allocated);
 
-#ifdef HAVE_POSIX_MEMALIGN
-done:
-#endif
 	/* Update caller's bytes allocated value. */
 	if (bytes_allocated_ret != NULL)
 		*bytes_allocated_ret = bytes_to_allocate;
 
 	*(void **)retp = p;
 	return (0);
+}
+
+/*
+ * __wt_realloc_aligned --
+ *	ANSI realloc function that aligns to buffer boundaries, configured with
+ *	the "buffer_alignment" key to wiredtiger_open.
+ */
+int
+__wt_realloc_aligned(WT_SESSION_IMPL *session,
+    size_t *bytes_allocated_ret, size_t bytes_to_allocate, void *retp)
+{
+#if defined(HAVE_POSIX_MEMALIGN)
+	int ret;
+
+	/*
+	 * !!!
+	 * This function MUST handle a NULL WT_SESSION_IMPL handle.
+	 */
+	if (session != NULL && S2C(session)->buffer_alignment > 0) {
+		void *p, *newp;
+		size_t bytes_allocated;
+
+		WT_ASSERT(session, bytes_to_allocate != 0);
+
+		/*
+		 * Sometimes we're allocating memory and we don't care about the
+		 * final length -- bytes_allocated_ret may be NULL.
+		 */
+		bytes_allocated = (bytes_allocated_ret == NULL) ?
+		    0 : *bytes_allocated_ret;
+		WT_ASSERT(session, bytes_allocated < bytes_to_allocate);
+
+		p = *(void **)retp;
+
+		if (p == NULL && session != NULL && S2C(session)->stats != NULL)
+			WT_CSTAT_INCR(session, memalloc);
+
+		if ((ret = posix_memalign(&newp,
+		    S2C(session)->buffer_alignment,
+		    bytes_to_allocate)) != 0)
+			WT_RET_MSG(session, ret, "memory allocation");
+
+		memcpy(newp, p, bytes_allocated);
+		__wt_free(session, p);
+		p = newp;
+
+		/* Clear the allocated memory (see above). */
+		memset((uint8_t *)p + bytes_allocated, 0,
+		    bytes_to_allocate - bytes_allocated);
+
+		/* Update caller's bytes allocated value. */
+		if (bytes_allocated_ret != NULL)
+			*bytes_allocated_ret = bytes_to_allocate;
+
+		*(void **)retp = p;
+		return (0);
+	}
+#endif
+	/*
+	 * If there is no posix_memalign function, or no alignment configured,
+	 * fall back to realloc.
+	 */
+	return (__wt_realloc(
+	    session, bytes_allocated_ret, bytes_to_allocate, retp));
 }
 
 /*

@@ -322,6 +322,11 @@ methods = {
 'connection.open_session' : Method([]),
 
 'wiredtiger_open' : Method([
+	Config('buffer_alignment', '-1', r'''
+		in-memory alignment (in bytes) for buffers used for I/O.  By default,
+		a platform-specific alignment value is used (512 bytes on Linux,
+		zero elsewhere)''',
+		min='-1', max='1MB'),
 	Config('cache_size', '100MB', r'''
 		maximum heap memory to allocate for the cache''',
 		min='1MB', max='10TB'),

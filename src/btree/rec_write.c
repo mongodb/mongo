@@ -284,6 +284,9 @@ __rec_write_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 		r->cur = &r->_cur;
 		r->last = &r->_last;
 
+		/* Disk buffers may need to be aligned. */
+		F_SET(&r->dsk, WT_ITEM_ALIGNED);
+		
 		/* Configuration. */
 		WT_RET(__wt_config_getones(session,
 		    session->btree->config, "split_pct", &cval));

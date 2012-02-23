@@ -330,6 +330,7 @@ maxleafitem
 maxleafpage
 mb
 mem
+memalign
 memalloc
 membar
 memcpy

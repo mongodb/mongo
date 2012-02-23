@@ -99,7 +99,8 @@ struct __wt_item {
 	uint32_t size;
 
 #ifndef DOXYGEN
-#define	WT_ITEM_INUSE					0x00000001
+#define	WT_ITEM_ALIGNED					0x00000001
+#define	WT_ITEM_INUSE					0x00000002
 	/* This appears in the middle of the struct to avoid padding. */
 	/*! Object flags (internal use). */
 	uint32_t flags;
@@ -1035,6 +1036,9 @@ struct __wt_connection {
  * @param errhandler An error handler.  If <code>NULL</code>, a builtin error
  * handler is installed that writes error messages to stderr
  * @configstart{wiredtiger_open, see dist/api_data.py}
+ * @config{buffer_alignment, in-memory alignment (in bytes) for buffers used for
+ * I/O.  By default\, a platform-specific alignment value is used (512 bytes on
+ * Linux\, zero elsewhere).,an integer between -1 and 1MB; default \c -1.}
  * @config{cache_size, maximum heap memory to allocate for the cache.,an integer
  * between 1MB and 10TB; default \c 100MB.}
  * @config{create, create the database if it does not exist.,a boolean flag;

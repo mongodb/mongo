@@ -202,6 +202,9 @@ struct __wt_connection_impl {
 	FILE *msgfile;
 	void (*msgcall)(const WT_CONNECTION_IMPL *, const char *);
 
+	/* If non-zero, all buffers used for I/O will be aligned to this. */
+	size_t buffer_alignment;
+
 	uint32_t direct_io;
 	uint32_t verbose;
 

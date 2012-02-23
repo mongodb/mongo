@@ -460,9 +460,21 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 
 	WT_ERR(__wt_config_gets(session, cfg, "logging", &cval));
 	if (cval.val != 0)
-		WT_ERR(__wt_open(session, WT_LOG_FILENAME, 1, 0, &conn->log_fh));
+		WT_ERR(__wt_open(
+		   session, WT_LOG_FILENAME, 1, 0, &conn->log_fh));
 
-	/* Configure direct I/O flags. */
+	/* Configure direct I/O and buffer alignment. */
+	WT_ERR(__wt_config_gets(session, cfg, "buffer_alignment", &cval));
+	if (cval.val == -1)
+		conn->buffer_alignment = WT_BUFFER_ALIGNMENT_DEFAULT;
+	else
+		conn->buffer_alignment = (size_t)cval.val;
+#ifndef HAVE_POSIX_MEMALIGN
+	if (conn->buffer_alignment != 0)
+		WT_ERR_MSG(session, EINVAL,
+		    "buffer_alignment requires posix_memalign");
+#endif
+
 	WT_ERR(__wt_config_gets(session, cfg, "direct_io", &cval));
 	for (ft = directio_types; ft->name != NULL; ft++) {
 		ret = __wt_config_subgets(session, &cval, ft->name, &sval);

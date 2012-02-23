@@ -26,17 +26,56 @@ __wt_buf_clear(WT_ITEM *buf)
 }
 
 /*
+ * __wt_buf_grow --
+ *	Grow a buffer that's currently in-use.
+ */
+int
+__wt_buf_grow(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
+{
+	size_t offset;
+	int set_data;
+
+	WT_ASSERT(session, size <= UINT32_MAX);
+
+	if (size > buf->memsize) {
+		/*
+		 * Grow the buffer's memory: if the data reference is not set
+		 * or references the buffer's memory, maintain it.
+		 */
+		WT_ASSERT(session, buf->mem == NULL || buf->memsize > 0);
+		if (buf->data == NULL) {
+			offset = 0;
+			set_data = 1;
+		} else if (buf->data >= buf->mem &&
+		    (uint8_t *)buf->data < (uint8_t *)buf->mem + buf->memsize) {
+			offset = WT_PTRDIFF(buf->data, buf->mem);
+			set_data = 1;
+		} else {
+			offset = 0;
+			set_data = 0;
+		}
+
+		if (F_ISSET(buf, WT_ITEM_ALIGNED))
+			WT_RET(__wt_realloc_aligned(
+			    session, &buf->memsize, size, &buf->mem));
+		else
+			WT_RET(__wt_realloc(
+			    session, &buf->memsize, size, &buf->mem));
+
+		if (set_data)
+			buf->data = (uint8_t *)buf->mem + offset;
+	}
+	return (0);
+}
+
+/*
  * __wt_buf_init --
  *	Initialize a buffer at a specific size.
  */
 int
 __wt_buf_init(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 {
-	WT_ASSERT(session, size <= UINT32_MAX);
-
-	if (size > buf->memsize)
-		WT_RET(__wt_realloc(session, &buf->memsize, size, &buf->mem));
-
+	WT_RET(__wt_buf_grow(session, buf, size));
 	buf->data = buf->mem;
 	buf->size = 0;
 
@@ -51,51 +90,8 @@ int
 __wt_buf_initsize(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
 {
 	WT_RET(__wt_buf_init(session, buf, size));
-
 	buf->size = WT_STORE_SIZE(size);	/* Set the data length. */
 
-	return (0);
-}
-
-/*
- * __wt_buf_grow --
- *	Grow a buffer that's currently in-use.
- */
-int
-__wt_buf_grow(WT_SESSION_IMPL *session, WT_ITEM *buf, size_t size)
-{
-	size_t offset;
-	int set_data;
-
-	WT_ASSERT(session, size <= UINT32_MAX);
-
-	if (size > buf->memsize) {
-		/*
-		 * Grow the buffer's memory: if the data reference is not set or
-		 * references the buffer's memory, maintain it.
-		 *
-		 * This test is complicated so it won't fail if buf->mem is non-
-		 * NULL and buf->memsize is 0.  That shouldn't be possible, but
-		 * I don't want to find out I'm wrong, either.
-		 */
-		if (buf->data == NULL || buf->data == buf->mem) {
-			offset = 0;
-			set_data = 1;
-		} else if (buf->data >= buf->mem &&
-		    (uint8_t *)buf->data <
-		    (uint8_t *)buf->mem + buf->memsize) {
-			offset = WT_PTRDIFF(buf->data, buf->mem);
-			set_data = 1;
-		} else {
-			offset = 0;
-			set_data = 0;
-		}
-
-		WT_RET(__wt_realloc(session, &buf->memsize, size, &buf->mem));
-
-		if (set_data)
-			buf->data = (uint8_t *)buf->mem + offset;
-	}
 	return (0);
 }
 
@@ -347,6 +343,9 @@ __wt_scr_alloc(WT_SESSION_IMPL *session, uint32_t size, WT_ITEM **scratchp)
 	 */
 	if (slot != NULL) {
 		WT_ERR(__wt_calloc_def(session, 1, slot));
+
+		/* Scratch buffers must be aligned. */
+		F_SET(*slot, WT_ITEM_ALIGNED);
 		return (__wt_scr_alloc(session, size, scratchp));
 	}
 
