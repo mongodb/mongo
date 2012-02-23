@@ -297,8 +297,10 @@ namespace mongo {
 
             /* get the _id document */
             intrusive_ptr<const Value> pId(pIdExpression->evaluate(pDocument));
-            uassert(15956, "the _id field for a group must not be undefined",
-                    pId->getType() != Undefined);
+
+            /* treat Undefined the same as NULL SERVER-4674 */
+            if (pId->getType() == Undefined)
+                pId = Value::getNull();
 
             /*
               Look for the _id value in the map; if it's not there, add a
