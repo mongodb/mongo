@@ -574,11 +574,13 @@ struct __wt_session {
 	 * @config{filename, override the default filename derived from the
 	 * object name.,a string; default empty.}
 	 * @config{huffman_key, configure Huffman encoding for keys.  Permitted
-	 * values are empty (off)\, \c "english" or \c "<filename>".  See @ref
-	 * huffman for more information.,a string; default empty.}
+	 * values are empty (off)\, \c "english"\, \c "utf8<file>" or \c
+	 * "utf16<file>".  See @ref huffman for more information.,a string;
+	 * default empty.}
 	 * @config{huffman_value, configure Huffman encoding for values.
-	 * Permitted values are empty (off)\, \c "english" or \c "<filename>".
-	 * See @ref huffman for more information.,a string; default empty.}
+	 * Permitted values are empty (off)\, \c "english"\, \c "utf8<file>" or
+	 * \c "utf16<file>".  See @ref huffman for more information.,a string;
+	 * default empty.}
 	 * @config{internal_item_max, the maximum key size stored on internal
 	 * nodes\, in bytes.  If zero\, a maximum is calculated to permit at
 	 * least 8 keys per internal page.,an integer greater than or equal to

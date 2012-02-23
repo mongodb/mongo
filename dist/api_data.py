@@ -103,13 +103,13 @@ file_config = format_meta + [
 		configure custom collation for keys.  Value must be a collator
 		name created with WT_CONNECTION::add_collator'''),
 	Config('huffman_key', '', r'''
-		configure Huffman encoding for keys.  Permitted values are
-		empty (off), \c "english" or \c "<filename>".  See @ref
-		huffman for more information'''),
+		configure Huffman encoding for keys.  Permitted values
+		are empty (off), \c "english", \c "utf8<file>" or \c
+		"utf16<file>".  See @ref huffman for more information'''),
 	Config('huffman_value', '', r'''
-		configure Huffman encoding for values.  Permitted values are
-		empty (off), \c "english" or \c "<filename>".  See @ref
-		huffman for more information'''),
+		configure Huffman encoding for values.  Permitted values
+		are empty (off), \c "english", \c "utf8<file>" or \c
+		"utf16<file>".  See @ref huffman for more information'''),
 	Config('internal_key_truncate', 'true', r'''
 		configure internal key truncation, discarding unnecessary
 		trailing bytes on internal keys''',

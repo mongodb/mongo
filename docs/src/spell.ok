@@ -21,6 +21,7 @@ LSB
 MERCHANTABILITY
 MVCC's
 Makefiles
+Mewhort
 NoSQL
 RepMgr
 Rrx
@@ -42,6 +43,7 @@ autoconf
 automake
 bdb
 bdbmap
+bigram
 bindir
 bitstring
 bool
