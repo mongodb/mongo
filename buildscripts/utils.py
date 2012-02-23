@@ -176,9 +176,15 @@ def find_python(min_version=(2, 5)):
     raise Exception('could not find suitable Python (version >= %s)' % '.'.join(min_version))
 
 def smoke_command(*args):
+    # return a list of arguments that comprises a complete
+    # invocation of smoke.py
     here = os.path.dirname(__file__)
     smoke_py = os.path.abspath(os.path.join(here, 'smoke.py'))
-    return ' '.join(itertools.chain(
-        (find_python(), smoke_py),
-        args))
+    return [find_python(), smoke_py] + list(args)
+
+def run_smoke_command(*args):
+    # to run a command line script from a scons Alias (or any
+    # Action), the command sequence must be enclosed in a list,
+    # otherwise SCons treats it as a list of dependencies.
+    return [smoke_command(*args)]
 
