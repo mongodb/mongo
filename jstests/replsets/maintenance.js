@@ -48,6 +48,12 @@ print("primary cannot go into maintence mode");
 result = master.getDB("admin").runCommand({replSetMaintenance : 1});
 assert.eq(result.ok, 0, tojson(result));
 
+print("check getMore works on a secondary, not on a recovering node");
+var cursor = conns[1].getDB("bar").foo.find();
+for (var i=0; i<50; i++) {
+    cursor.next();
+}
+
 print("secondary can");
 result = conns[1].getDB("admin").runCommand({replSetMaintenance : 1});
 assert.eq(result.ok, 1, tojson(result));
@@ -60,7 +66,19 @@ assert.soon(function() {
     return !im.secondary && !im.ismaster;
 });
 
+print("now getmore shouldn't work");
+lastDoc = null;
+while (cursor.hasNext()) {
+    lastDoc = cursor.next();
+}
+
+print("the shell is currently stupid and won't throw once it's returned any query results");
+printjson(lastDoc);
+assert("$err" in lastDoc);
+assert.eq(lastDoc.code, 13436);
+
 result = conns[1].getDB("admin").runCommand({replSetMaintenance : 0});
 assert.eq(result.ok, 1, tojson(result));
 
 secondarySoon();
+

@@ -718,7 +718,7 @@ namespace mongo {
         Client::ReadContext ctx( ns , dbpath ); // read locks
         const ConfigVersion shardingVersionAtStart = shardingState.getVersion( ns );
 
-        replVerifyReadsOk(pq);
+        replVerifyReadsOk(&pq);
 
         if ( pq.hasOption( QueryOption_CursorTailable ) ) {
             NamespaceDetails *d = nsdetails( ns );

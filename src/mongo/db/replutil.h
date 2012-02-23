@@ -85,15 +85,15 @@ namespace mongo {
     }
 
     /** we allow queries to SimpleSlave's */
-    inline void replVerifyReadsOk(ParsedQuery& pq) {
+    inline void replVerifyReadsOk(ParsedQuery* pq = 0) {
         if( replSet ) {
             /* todo: speed up the secondary case.  as written here there are 2 mutex entries, it can b 1. */
             if( isMaster() ) return;
-            uassert(13435, "not master and slaveOk=false", pq.hasOption(QueryOption_SlaveOk));
+            uassert(13435, "not master and slaveOk=false", !pq || pq->hasOption(QueryOption_SlaveOk));
             uassert(13436, "not master or secondary; cannot currently read from this replSet member", theReplSet && theReplSet->isSecondary() );
         }
         else {
-            notMasterUnless(isMaster() || pq.hasOption(QueryOption_SlaveOk) || replSettings.slave == SimpleSlave );
+            notMasterUnless(isMaster() || (!pq || pq->hasOption(QueryOption_SlaveOk)) || replSettings.slave == SimpleSlave );
         }
     }
 
