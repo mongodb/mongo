@@ -221,8 +221,8 @@ methods = {
 		bulk-loaded''',
 		type='boolean'),
 	Config('clear_on_close', 'false', r'''
-		for statistics cursors, reset statistics counters when the cursor is
-		closed''',
+		for statistics cursors, reset statistics counters when the
+		cursor is closed''',
 		type='boolean'),
 	Config('dump', '', r'''
 		configure the cursor for dump format inputs and outputs:
@@ -241,7 +241,7 @@ methods = {
 		type='boolean'),
 	Config('raw', 'false', r'''
 		ignore the encodings for the key and value, manage data as if
-		the formats were \c "u".  See @ref cursor_raw for more details''',
+		the formats were \c "u".  See @ref cursor_raw for details''',
 		type='boolean'),
 	Config('statistics', 'false', r'''
 		configure the cursor for statistics''',
@@ -323,9 +323,9 @@ methods = {
 
 'wiredtiger_open' : Method([
 	Config('buffer_alignment', '-1', r'''
-		in-memory alignment (in bytes) for buffers used for I/O.  By default,
-		a platform-specific alignment value is used (512 bytes on Linux,
-		zero elsewhere)''',
+		in-memory alignment (in bytes) for buffers used for I/O.  By
+		default, a platform-specific alignment value is used (512 bytes
+		on Linux systems, zero elsewhere)''',
 		min='-1', max='1MB'),
 	Config('cache_size', '100MB', r'''
 		maximum heap memory to allocate for the cache''',
@@ -356,11 +356,12 @@ methods = {
 	Config('error_prefix', '', r'''
 		prefix string for error messages'''),
 	Config('eviction_target', '80', r'''
-		continue evicting until the cache becomes less full than this (as a
-		percentage).  Must be less than \c eviction_trigger''',
+		continue evicting until the cache becomes less full than this
+		(as a percentage).  Must be less than \c eviction_trigger''',
 		min=10, max=99),
 	Config('eviction_trigger', '95', r'''
-		trigger eviction when the cache becomes this full (as a percentage)''',
+		trigger eviction when the cache becomes this full (as a
+		percentage)''',
 		min=10, max=99),
 	Config('hazard_max', '30', r'''
 		number of simultaneous hazard references per session handle''',
