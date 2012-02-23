@@ -615,7 +615,7 @@ namespace mongo {
         time_t start = 0;
         int pass = 0;
         bool exhaust = false;
-        QueryResult* msgdata;
+        QueryResult* msgdata = 0;
         OpTime last;
         while( 1 ) {
             try {
