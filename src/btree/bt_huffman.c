@@ -227,7 +227,7 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 	struct __wt_huffman_table *table, *tp;
 	FILE *fp;
 	uint64_t symbol, frequency;
-	u_int entries, lineno, max;
+	u_int entries, lineno;
 	int ret;
 	char *file;
 
@@ -241,7 +241,6 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 	 */
 	if (strncasecmp(ip->str, "utf8", 4) == 0) {
 		entries = UINT8_MAX;
-		max = UINT8_MAX - 1;
 		*numbytesp = 1;
 		WT_RET(__wt_calloc_def(session, entries, &table));
 
@@ -252,7 +251,6 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 		memcpy(file, ip->str + 4, ip->len - 4);
 	} else if (strncasecmp(ip->str, "utf16", 5) == 0) {
 		entries = UINT16_MAX;
-		max = UINT16_MAX - 1;
 		*numbytesp = 2;
 		WT_RET(__wt_calloc_def(session, entries, &table));
 
@@ -285,11 +283,11 @@ __wt_huffman_read(WT_SESSION_IMPL *session, WT_CONFIG_ITEM *ip,
 			    "line %u of Huffman table file %.*s is corrupted: "
 			    "expected two unsigned integral values",
 			    lineno, (int)ip->len, ip->str);
-		if (symbol > max)
+		if (symbol > entries)
 			WT_ERR_MSG(session, EINVAL,
 			    "line %u of Huffman table file %.*s is corrupted: "
 			    "symbol larger than maximum value of %u",
-			    lineno, (int)ip->len, ip->str, max);
+			    lineno, (int)ip->len, ip->str, entries);
 		if (frequency > UINT32_MAX)
 			WT_ERR_MSG(session, EINVAL,
 			    "line %u of Huffman table file %.*s is corrupted: "
