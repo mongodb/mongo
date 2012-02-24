@@ -738,10 +738,7 @@ int
 __wt_evict_lru_page(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree, *saved_btree;
-	WT_CACHE *cache;
 	WT_PAGE *page;
-
-	cache = S2C(session)->cache;
 
 	__evict_get_page(session, &btree, &page);
 	if (page == NULL)
