@@ -339,7 +339,7 @@ __wt_btcur_iterate_setup(WT_CURSOR_BTREE *cbt, int next)
 
 		/* If we're traversing the append list, set the reference. */
 		if (cbt->ins_head != NULL &&
-		    cbt->ins_head == WT_COL_APPEND(cbt->btree, page))
+		    cbt->ins_head == WT_COL_APPEND(page))
 			F_SET(cbt, WT_CBT_ITERATE_APPEND);
 	}
 }
@@ -410,7 +410,7 @@ __wt_btcur_next(WT_CURSOR_BTREE *cbt)
 			 */
 			if (cbt->page->type != WT_PAGE_ROW_LEAF &&
 			    (cbt->ins_head =
-			    WT_COL_APPEND(cbt->btree, cbt->page)) != NULL) {
+			    WT_COL_APPEND(cbt->page)) != NULL) {
 				F_SET(cbt, WT_CBT_ITERATE_APPEND);
 				continue;
 			}

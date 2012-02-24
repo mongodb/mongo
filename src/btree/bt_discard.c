@@ -84,16 +84,13 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 static void
 __free_page_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_BTREE *btree;
 	WT_INSERT_HEAD *append;
 
-	btree = session->btree;
-
 	/* Free the append array. */
-	if ((append = WT_COL_APPEND(btree, page)) != NULL) {
+	if ((append = WT_COL_APPEND(page)) != NULL) {
 		__free_skip_list(session, WT_SKIP_FIRST(append));
 		__wt_free(session, append);
-		__wt_free(session, btree->append);
+		__wt_free(session, page->modify->append);
 	}
 
 	/* Free the update array. */
@@ -133,10 +130,7 @@ __free_page_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 static void
 __free_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_BTREE *btree;
 	WT_INSERT_HEAD *append;
-
-	btree = session->btree;
 
 	/* Free the in-memory index array. */
 	__wt_free(session, page->u.col_var.d);
@@ -145,10 +139,10 @@ __free_page_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 	__wt_free(session, page->u.col_var.repeats);
 
 	/* Free the append array. */
-	if ((append = WT_COL_APPEND(btree, page)) != NULL) {
+	if ((append = WT_COL_APPEND(page)) != NULL) {
 		__free_skip_list(session, WT_SKIP_FIRST(append));
 		__wt_free(session, append);
-		__wt_free(session, btree->append);
+		__wt_free(session, page->modify->append);
 	}
 
 	/* Free the insert array. */

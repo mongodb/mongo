@@ -1316,7 +1316,7 @@ __rec_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
 	r->recno += entry;
 
 	/* Walk any append list. */
-	append = WT_COL_APPEND(btree, page);
+	append = WT_COL_APPEND(page);
 	WT_SKIP_FOREACH(ins, append)
 		for (;;) {
 			/*
@@ -1733,7 +1733,7 @@ __rec_col_var(
 	}
 
 	/* Walk any append list. */
-	append = WT_COL_APPEND(btree, page);
+	append = WT_COL_APPEND(page);
 	WT_SKIP_FOREACH(ins, append)
 		for (n = WT_INSERT_RECNO(ins); src_recno <= n; ++src_recno) {
 			/*

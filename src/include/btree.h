@@ -92,8 +92,7 @@ struct __wt_btree {
 	void *huffman_key;		/* Key huffman encoding */
 	void *huffman_value;		/* Value huffman encoding */
 
-	uint64_t last_recno;		/* Col-store append, last recno */
-	WT_INSERT_HEAD **append;	/* Appended items */
+	uint64_t last_recno;		/* Column-store last record number */
 
 	WT_PAGE *root_page;		/* Root page */
 	WT_ADDR  root_addr;		/* Replacement root address */
