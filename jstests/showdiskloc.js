@@ -1,6 +1,7 @@
 // Sanity check for the $showDiskLoc option.
 
 t = db.jstests_showdiskloc;
+t.drop();
 
 function checkResults( arr ) {
     for( i in arr ) {
