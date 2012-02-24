@@ -8,7 +8,7 @@
 #include "wt_internal.h"
 
 static int __btree_conf(WT_SESSION_IMPL *, uint32_t);
-static int __btree_last(WT_SESSION_IMPL *);
+static int __btree_get_last_recno(WT_SESSION_IMPL *);
 static int __btree_page_sizes(WT_SESSION_IMPL *, const char *);
 static int __btree_root_init_empty(WT_SESSION_IMPL *);
 static int __btree_tree_init(WT_SESSION_IMPL *);
@@ -205,9 +205,11 @@ __btree_conf(WT_SESSION_IMPL *session, uint32_t flags)
 static int
 __btree_tree_init(WT_SESSION_IMPL *session)
 {
+	WT_BTREE *btree;
 	WT_ITEM *addr;
 	int ret;
 
+	btree = session->btree;
 	ret = 0;
 
 	WT_RET(__wt_scr_alloc(session, 0, &addr));
@@ -222,8 +224,9 @@ __btree_tree_init(WT_SESSION_IMPL *session)
 	else
 		WT_ERR(__wt_btree_root_init(session, addr));
 
-	/* Get the last page of the file. */
-	WT_ERR(__btree_last(session));
+	/* Get the last record number in a column-store file. */
+	if (btree->type != BTREE_ROW)
+		WT_ERR(__btree_get_last_recno(session));
 
 err:	__wt_scr_free(&addr);
 
@@ -385,26 +388,24 @@ __wt_btree_root_empty(WT_SESSION_IMPL *session, WT_PAGE **leafp)
 }
 
 /*
- * __btree_last --
- *      Read and pin the last page of the file.
+ * __btree_get_last_recno --
+ *      Set the last record number for a column-store.
  */
 static int
-__btree_last(WT_SESSION_IMPL *session)
+__btree_get_last_recno(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_PAGE *page;
 
 	btree = session->btree;
 
-	if (btree->type != BTREE_ROW) {
-		page = NULL;
-		WT_RET(__wt_tree_np(session, &page, 0, 0));
-		if (page == NULL)
-			return (WT_NOTFOUND);
+	page = NULL;
+	WT_RET(__wt_tree_np(session, &page, 0, 0));
+	if (page == NULL)
+		return (WT_NOTFOUND);
 
-		btree->last_recno = __col_last_recno(page);
-		__wt_page_release(session, page);
-	}
+	btree->last_recno = __col_last_recno(page);
+	__wt_page_release(session, page);
 
 	return (0);
 }
