@@ -405,7 +405,7 @@ namespace mongo {
         if ( _conn ) {
             if ( ! _conn->isFailed() ) {
                 /* see done() comments above for why we log this line */
-                log() << "~ScopedDbConnection: _conn != null" << endl;
+                log() << "scoped connection to " << _conn->getServerAddress() << " not being returned to the pool" << endl;
             }
             kill();
         }
