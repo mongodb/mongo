@@ -334,7 +334,6 @@ def runTest(test):
                      'TestData.keyFile = ' + ternary( keyFile , '"' + str(keyFile) + '"' , 'null' ) + ";" + \
                      'TestData.keyFileData = ' + ternary( keyFile , '"' + str(keyFileData) + '"' , 'null' ) + ";"
         if auth and usedb:
-            evalString += 'db.getSiblingDB("admin").addUser("admin","password");'
             evalString += 'jsTest.authenticate(db.getMongo());'
         argv = argv + [ '--eval', evalString]
 
