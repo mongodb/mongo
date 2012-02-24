@@ -58,7 +58,7 @@ mongosA.getDB("admin").runCommand({ setParameter : 1, traceExceptions : false })
 print( "time to work for primary: " + ( ( end.getTime() - start.getTime() ) / 1000 ) + " seconds" );
 
 // not sure how long it takes to elect primary, seen it as low as 2
-assert.gt( 1 , iterations );
+assert.gt( iterations, 1 );
 
 // now check secondary
 
