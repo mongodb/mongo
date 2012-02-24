@@ -514,8 +514,8 @@ struct __wt_session {
 	 * to overwrite previously existing values.,a boolean flag; default \c
 	 * false.}
 	 * @config{raw, ignore the encodings for the key and value\, manage data
-	 * as if the formats were \c "u".  See @ref cursor_raw for more
-	 * details.,a boolean flag; default \c false.}
+	 * as if the formats were \c "u".  See @ref cursor_raw for details.,a
+	 * boolean flag; default \c false.}
 	 * @config{statistics, configure the cursor for statistics.,a boolean
 	 * flag; default \c false.}
 	 * @configend
@@ -1040,7 +1040,8 @@ struct __wt_connection {
  * @configstart{wiredtiger_open, see dist/api_data.py}
  * @config{buffer_alignment, in-memory alignment (in bytes) for buffers used for
  * I/O.  By default\, a platform-specific alignment value is used (512 bytes on
- * Linux\, zero elsewhere).,an integer between -1 and 1MB; default \c -1.}
+ * Linux systems\, zero elsewhere).,an integer between -1 and 1MB; default \c
+ * -1.}
  * @config{cache_size, maximum heap memory to allocate for the cache.,an integer
  * between 1MB and 10TB; default \c 100MB.}
  * @config{create, create the database if it does not exist.,a boolean flag;
