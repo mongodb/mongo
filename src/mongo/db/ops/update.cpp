@@ -33,7 +33,7 @@
 namespace mongo {
 
     const char* Mod::modNames[] = { "$inc", "$set", "$push", "$pushAll", "$pull", "$pullAll" , "$pop", "$unset" ,
-                                    "$bitand" , "$bitor" , "$bit" , "$addToSet", "$rename", "$rename"
+                                    "$bitand" , "$bitor" , "$bit" , "$addToSet", "$rename", "$rename", "$trim",
                                   };
     unsigned Mod::modNamesNum = sizeof(Mod::modNames)/sizeof(char*);
 
@@ -358,8 +358,7 @@ namespace mongo {
 
     auto_ptr<ModSetState> ModSet::prepare(const BSONObj &obj) const {
         DEBUGUPDATE( "\t start prepare" );
-        auto_ptr<ModSetState> mss( new ModSetState( obj ) );
-
+        auto_ptr<ModSetState> mss( new ModSetState( obj, _trims ) );
 
         // Perform this check first, so that we don't leave a partially modified object on uassert.
         for ( ModHolder::const_iterator i = _mods.begin(); i != _mods.end(); ++i ) {
@@ -578,6 +577,9 @@ namespace mongo {
             case Mod::PULL_ALL:
                 // this should have been handled by prepare
                 break;
+            case Mod::TRIM:
+                // this should have been handled by prepare
+                break;
             case Mod::POP:
                 assert( m.old.eoo() || ( m.old.isABSONObj() && m.old.Obj().isEmpty() ) );
                 break;
@@ -618,7 +620,18 @@ namespace mongo {
             bb.done();
         }
         else {
-            appendNewFromMod( m , b );
+            if ( shouldTrim( temp ) ) {
+                // Update the field into a temporary object and re-trim it
+                // into the resulting object
+                BSONObjBuilder bbb;
+                appendNewFromMod( m , bbb );
+                BSONObj bob = bbb.obj();
+                BSONObjIterator bes( bob );
+                BSONElement be = bes.next();
+                appendTrimmed( b, be );
+            } else {
+                appendNewFromMod( m , b );
+            }
         }
 
     }
@@ -695,7 +708,19 @@ namespace mongo {
                 continue;
             case SAME:
                 DEBUGUPDATE( "\t\t\t\t applying mod on: " << m->second.m->fieldName );
-                m->second.apply( b , e );
+
+                if ( shouldTrim( e.fieldName() ) ) {
+                    // Update the field into a temporary object and re-trim it
+                    // into the resulting object
+                    BSONObjBuilder bbb;
+                    m->second.apply( bbb , e );
+                    BSONObj bob = bbb.obj();
+                    BSONObjIterator bes( bob );
+                    BSONElement be = bes.next();
+                    appendTrimmed( b, be );
+                } else {
+                    m->second.apply( b, e );
+                }
                 e = es.next();
                 m++;
                 continue;
@@ -724,6 +749,34 @@ namespace mongo {
             DEBUGUPDATE( "\t\t\t\t appending from mod at end: " << m->second.m->fieldName );
             _appendNewFromMods( root , m->second , b , onedownseen );
         }
+    }
+
+    bool ModSetState::shouldTrim( const char *fieldName ) const {
+        return _trims.find( fieldName ) != _trims.end();
+    }
+
+    template< class Builder >
+    void ModSetState::appendTrimmed( Builder& b, BSONElement& in ){
+        FieldTrimmer::const_iterator ft = _trims.find( in.fieldName() );
+        uassert( 16071 , "$trim can only be applied to an array" , in.type() == Array );
+        uassert( 16072 , "internal error: appending trimmed, but shouldn't trim.", ft != _trims.end() );
+        BSONObjBuilder bb( b.subarrayStart( in.fieldName() ) );
+        int trim_arg = ft->second;
+        int n = 0;
+        int len = trim_arg < 0 ? -trim_arg : trim_arg;
+        int cur_len = in.embeddedObject().nFields();
+        BSONObjIterator i( in.embeddedObject() );
+
+        if ( trim_arg < 0 && len < cur_len ) {
+            for ( int remove = cur_len - len ; remove > 0; remove-- )
+                  i.next();
+        }
+
+        for ( int keep = len; i.more() && keep > 0; keep-- ) {
+            bb.appendAs( i.next(), bb.numStr( len - keep ) );
+            n++;
+        }
+        bb.done();
     }
 
     BSONObj ModSetState::createNewFromMods() {
@@ -813,6 +866,13 @@ namespace mongo {
                 uassert( 15896 ,  "Modified field name may not start with $", fieldName[0] != '$' || op == Mod::UNSET );  // allow remove of invalid field name in case it was inserted before this check was added (~ version 2.1)
                 uassert( 10148 ,  "Mod on _id not allowed", strcmp( fieldName, "_id" ) != 0 );
                 uassert( 10149 ,  "Invalid mod field name, may not end in a period", fieldName[ strlen( fieldName ) - 1 ] != '.' );
+
+                if ( op == Mod::TRIM ) {
+                  uassert( 16073 ,  "$trim can only trim the size represented by an integer" , f.isNumber() );
+                  _trims[fieldName] = f.number();
+                  continue;
+                }
+
                 uassert( 10150 ,  "Field name duplication not allowed with modifiers", ! haveModForField( fieldName ) );
                 uassert( 10151 ,  "have conflicting mods in update" , ! haveConflictingMod( fieldName ) );
                 uassert( 10152 ,  "Modifier $inc allowed for numbers only", f.isNumber() || op != Mod::INC );

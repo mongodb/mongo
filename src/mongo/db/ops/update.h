@@ -23,6 +23,8 @@
 
 namespace mongo {
 
+    typedef map<string,int> FieldTrimmer;
+
     // ---------- public -------------
 
     struct UpdateResult {
@@ -82,7 +84,7 @@ namespace mongo {
     struct Mod {
         // See opFromStr below
         //        0    1    2     3         4     5          6    7      8       9       10    11        12           13
-        enum Op { INC, SET, PUSH, PUSH_ALL, PULL, PULL_ALL , POP, UNSET, BITAND, BITOR , BIT , ADDTOSET, RENAME_FROM, RENAME_TO } op;
+        enum Op { INC, SET, PUSH, PUSH_ALL, PULL, PULL_ALL , POP, UNSET, BITAND, BITOR , BIT , ADDTOSET, RENAME_FROM, RENAME_TO, TRIM } op;
 
         static const char* modNames[];
         static unsigned modNamesNum;
@@ -293,6 +295,8 @@ namespace mongo {
     class ModSet : boost::noncopyable {
         typedef map<string,Mod> ModHolder;
         ModHolder _mods;
+        FieldTrimmer _trims;
+
         int _isIndexed;
         bool _hasDynamicArray;
 
@@ -356,6 +360,12 @@ namespace mongo {
             case 'r': {
                 if ( fn[2] == 'e' && fn[3] == 'n' && fn[4] == 'a' && fn[5] == 'm' && fn[6] =='e' ) {
                     return Mod::RENAME_TO; // with this return code we handle both RENAME_TO and RENAME_FROM
+                }
+                break;
+            }
+            case 't': {
+                if ( fn[2] == 'r' && fn[3] == 'i' && fn[4] == 'm' ) {
+                    return Mod::TRIM;
                 }
                 break;
             }
@@ -532,11 +542,13 @@ namespace mongo {
         typedef map<string,ModState,FieldCmp> ModStateHolder;
         const BSONObj& _obj;
         ModStateHolder _mods;
+        FieldTrimmer _trims;
+
         bool _inPlacePossible;
         BSONObj _newFromMods; // keep this data alive, as oplog generation may depend on it
 
-        ModSetState( const BSONObj& obj )
-            : _obj( obj ) , _inPlacePossible(true) {
+        ModSetState( const BSONObj& obj, FieldTrimmer trims )
+            : _obj( obj ) , _trims( trims ) , _inPlacePossible(true) {
         }
 
         /**
@@ -547,6 +559,11 @@ namespace mongo {
                 _inPlacePossible = false;
             return _inPlacePossible;
         }
+
+        bool shouldTrim( const char *fieldName ) const;
+
+        template< class Builder >
+        void appendTrimmed( Builder& b, BSONElement& in );
 
         template< class Builder >
         void createNewFromMods( const string& root , Builder& b , const BSONObj &obj );
@@ -622,6 +639,11 @@ namespace mongo {
             case Mod::RENAME_TO:
                 ms.handleRename( b, m.shortFieldName );
                 break;
+
+            case Mod::TRIM:
+                // no-op b/c trim of nothing does nothing
+                break;
+
             default:
                 stringstream ss;
                 ss << "unknown mod in appendNewFromMod: " << m.op;
