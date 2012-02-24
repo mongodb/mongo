@@ -538,7 +538,12 @@ def run_old_fails():
     try:
         f = open(failfile, 'r')
         testsAndOptions = pickle.load(f)
+        f.close()
     except Exception:
+        try:
+            f.close()
+        except:
+            pass
         clear_failfile()
         return # This counts as passing so we will run all tests
 
