@@ -1220,13 +1220,14 @@ namespace mongo {
         extern unsigned notesThisLock;
     }
 
+    // this is called during insert (specifically indexRecordUsingTwoSteps) to provide an opportunity 
+    // to upgrade lock state.  we do not yet do anything. there is some discussion of whether upgradable
+    // would be useful or not.
     void upgradeToWritable(bool shouldBeUnlocked) {
-        // todo upgrade!
         DEV {
             // verify we haven't written yet (usually)
-
-            // test binary does special things so this would assert there so don't check there
-            if( shouldBeUnlocked && !cmdLine.binaryName.empty() && cmdLine.binaryName != "test" ) {
+            // the dbtests test binary does special things so this would assert there so don't check there
+            /*if( shouldBeUnlocked && !cmdLine.binaryName.empty() && cmdLine.binaryName != "test" ) {
                 static unsigned long long zeroes;
                 static unsigned long long tot;
                 tot++;
@@ -1235,14 +1236,14 @@ namespace mongo {
                 if( tot > 1000 ) {
                     static int n;
                     DEV if( n++ == 0 ) 
-                        log() << "warning upgradeToWritable: already in writable too often" << endl;
+                        log() << "warning upgradeToWritable: already in writable lock before upgrade call too often" << endl;
                 }
-            }
+            }*/
         }
     }
 
     /** add index keys for a newly inserted record 
-        done in two steps/phases to defer write lock portion
+        done in two steps/phases to allow potential deferal of write lock portion in the future
     */
     static void indexRecordUsingTwoSteps(NamespaceDetails *d, BSONObj obj, DiskLoc loc, bool shouldBeUnlocked) {
         vector<int> multi;
@@ -1266,8 +1267,7 @@ namespace mongo {
             }
         }
 
-        // update lock to writable here.  TODO
-        
+        // update lock to writable here - if we want that behavior.
         upgradeToWritable(shouldBeUnlocked);
 
         IndexInterface::phasedFinish(); // step 2
