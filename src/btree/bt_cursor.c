@@ -254,18 +254,20 @@ retry:	__cursor_func_init(cbt, 1);
 	case BTREE_COL_FIX:
 	case BTREE_COL_VAR:
 		/*
-		 * If WT_CURSTD_APPEND set insert a new record (ignoring the
-		 * application's record number), return the record number.
+		 * If WT_CURSTD_APPEND is set, insert a new record (ignoring
+		 * the application's record number).  First we search for the
+		 * maximum possible record number so the search ends on the
+		 * last page.  The real record number is assigned by the
+		 * serialized append operation.
+		 * __wt_col_append_serial_func
 		 */
-		if (F_ISSET(cursor, WT_CURSTD_APPEND)) {
-			if ((ret =
-			    __wt_col_modify(session, cbt, 1)) == WT_RESTART)
-				goto retry;
-			cbt->iface.recno = cbt->recno;
-			break;
-		}
+		if (F_ISSET(cursor, WT_CURSTD_APPEND))
+			cbt->iface.recno = UINT64_MAX;
 
 		WT_ERR(__wt_col_search(session, cbt, 1));
+
+		if (F_ISSET(cursor, WT_CURSTD_APPEND))
+			cbt->iface.recno = 0;
 
 		/*
 		 * If WT_CURSTD_OVERWRITE set, insert/update the key/value pair.
@@ -284,6 +286,8 @@ retry:	__cursor_func_init(cbt, 1);
 		}
 		if ((ret = __wt_col_modify(session, cbt, 3)) == WT_RESTART)
 			goto retry;
+		if (F_ISSET(cursor, WT_CURSTD_APPEND) && ret == 0)
+			cbt->iface.recno = cbt->recno;
 		break;
 	case BTREE_ROW:
 		/*

@@ -396,25 +396,15 @@ __btree_last(WT_SESSION_IMPL *session)
 
 	btree = session->btree;
 
-	if (btree->type == BTREE_ROW)
-		return (0);
+	if (btree->type != BTREE_ROW) {
+		page = NULL;
+		WT_RET(__wt_tree_np(session, &page, 0, 0));
+		if (page == NULL)
+			return (WT_NOTFOUND);
 
-	page = NULL;
-	WT_RET(__wt_tree_np(session, &page, 0, 0));
-	if (page == NULL)
-		return (WT_NOTFOUND);
-
-	btree->last_page = page;
-	btree->last_recno = __col_last_recno(page);
-
-	F_SET(page, WT_PAGE_LAST_PAGE | WT_PAGE_PINNED);
-
-	/*
-	 * Publish: there must be a barrier to ensure the pinned flag is set
-	 * before we discard our hazard reference.
-	 */
-	WT_WRITE_BARRIER();
-	__wt_hazard_clear(session, page);
+		btree->last_recno = __col_last_recno(page);
+		__wt_page_release(session, page);
+	}
 
 	return (0);
 }

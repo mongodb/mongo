@@ -30,15 +30,11 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 
 	btree = cbt->btree;
 	page = cbt->page;
+	recno = cbt->iface.recno;
+
+	WT_ASSERT(session, op != 1);
 
 	switch (op) {
-	case 1:						/* Append */
-		page = btree->last_page;
-		__cursor_search_clear(cbt);
-
-		value = &cbt->iface.value;
-		recno = 0;				/* Engine allocates */
-		break;
 	case 2:						/* Remove */
 		if (btree->type == BTREE_COL_FIX) {
 			value = &_value;
@@ -46,12 +42,10 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 			value->size = 1;
 		} else
 			value = NULL;
-		recno = cbt->iface.recno;		/* App specified */
 		break;
 	case 3:						/* Insert/Update */
 	default:
 		value = &cbt->iface.value;
-		recno = cbt->iface.recno;		/* App specified */
 
 		/*
 		 * There's some chance the application specified a record past
@@ -59,7 +53,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 		 * inserting a new WT_INSERT/WT_UPDATE pair, it goes on the
 		 * append list, not the update list.
 		 */
-		if (recno > __col_last_recno(page))
+		if (recno == 0 || recno > __col_last_recno(page))
 			op = 1;
 		break;
 	}
@@ -156,13 +150,12 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 			ins_copy = ins;
 
 			WT_ERR(__wt_col_append_serial(session,
-			    inshead, cbt->ins_stack,
+			    page, inshead, cbt->ins_stack,
 			    &new_inslist, new_inslist_size,
 			    &new_inshead, new_inshead_size,
 			    &ins, ins_size, skipdepth));
 
-			/* Set up the cursor for the inserted page and value. */
-			cbt->page = btree->last_page;
+			/* Put the new recno into the cursor. */
 			cbt->recno = WT_INSERT_RECNO(ins_copy);
 		} else
 			WT_ERR(__wt_insert_serial(session,
@@ -228,10 +221,9 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 	int ret;
 
 	btree = session->btree;
-	page = btree->last_page;
 	ret = 0;
 
-	__wt_col_append_unpack(session, &inshead, &ins_stack,
+	__wt_col_append_unpack(session, &page, &inshead, &ins_stack,
 	    &new_inslist, &new_inshead, &new_ins, &skipdepth);
 
 	/*
@@ -241,6 +233,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 	if (btree->append == NULL) {
 		btree->append = new_inslist;
 		__wt_col_append_new_inslist_taken(session, page);
+		F_SET(page, WT_PAGE_LAST_PAGE);
 	}
 
 	/*
@@ -260,7 +253,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 	 * record didn't exist at some point, it can only have been created
 	 * on this list.  Search for the record, if specified.
 	 */
-	if ((recno = WT_INSERT_RECNO(new_ins)) == 0)
+	if ((recno = WT_INSERT_RECNO(new_ins)) == 0 || recno == UINT64_MAX)
 		recno = WT_INSERT_RECNO(new_ins) = ++btree->last_recno;
 	ins = __col_insert_search(*inshead, ins_stack, recno);
 

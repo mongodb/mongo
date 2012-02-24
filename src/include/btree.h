@@ -90,12 +90,6 @@ struct __wt_btree {
 	void *huffman_key;		/* Key huffman encoding */
 	void *huffman_value;		/* Value huffman encoding */
 
-	/*
-	 * Column-store: track the last record in the file, and keep the last
-	 * page pinned in memory for fast appends, to a skiplist of appended
-	 * entries.
-	 */
-	WT_PAGE *last_page;		/* Col-store append, last page */
 	uint64_t last_recno;		/* Col-store append, last recno */
 	WT_INSERT_HEAD **append;	/* Appended items */
 
