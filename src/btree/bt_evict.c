@@ -350,19 +350,14 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 		if (F_ISSET(er, WT_EVICT_REQ_PAGE)) {
 			WT_VERBOSE(session, evictserver,
 			    "forcing eviction of page %p", er->page);
-			for (;;) {
-				ret = __wt_rec_evict(session, er->page, 0);
-				if (ret != EBUSY)
-					break;
-				__wt_yield();
-			}
+			ret = __wt_rec_evict(session, er->page, 0);
 		} else
 			ret = __evict_file(session, er);
 
+		__wt_spin_unlock(session, &cache->lru_lock);
+
 		/* Clear the reference to the btree handle. */
 		WT_CLEAR_BTREE_IN_SESSION(session);
-
-		__wt_spin_unlock(session, &cache->lru_lock);
 
 		/*
 		 * Resolve the request and clear the slot.
@@ -374,7 +369,11 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 		if (!F_ISSET(er, WT_EVICT_REQ_PAGE))
 			__wt_session_serialize_wrapup(
 			    request_session, NULL, ret);
-
+		else if (ret == EBUSY) {
+			/* Don't rest until this request is handled. */
+			__wt_cond_signal(session, cache->evict_cond);
+			continue;
+		}
 		__evict_req_clr(session, er);
 	}
 	return (0);
