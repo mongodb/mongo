@@ -240,12 +240,13 @@ namespace mongo {
         MongoDataFile* p = 0;
         if ( !preallocateOnly ) {
             while ( n >= (int) _files.size() ) {
-                DEV if( !d.dbMutex.isWriteLocked() ) { 
+                assert(this);
+                if( !Lock::isWriteLocked(this->name) ) {
                     log() << "error: getFile() called in a read lock, yet file to return is not yet open" << endl;
                     log() << "       getFile(" << n << ") _files.size:" <<_files.size() << ' ' << fileName(n).string() << endl;
                     log() << "       context ns: " << cc().ns() << " openallfiles:" << _openAllFiles << endl;
+                    assert(false);
                 }
-                assertDbWriteLocked(this);
                 _files.push_back(0);
             }
             p = _files[n];
