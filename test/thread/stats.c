@@ -40,7 +40,7 @@ stats(void)
 		die("cursor.next", ret);
 	if ((ret = cursor->close(cursor)) != 0)
 		die("cursor.close", ret);
-	
+
 	/* File statistics. */
 	if ((ret = session->open_cursor(session,
 	    "statistics:" FNAME, NULL, NULL, &cursor)) != 0)

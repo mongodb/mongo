@@ -19,7 +19,7 @@ key_gen(void *keyp, uint32_t *sizep, uint64_t keyno, int insert)
 	 */
 	len = insert ?
 	    sprintf(g.key_gen_buf, "%010" PRIu64 ".%02d", keyno,
-                (int)MMRAND(1, 15)) :
+		(int)MMRAND(1, 15)) :
 	    sprintf(g.key_gen_buf, "%010" PRIu64 ".00", keyno);
 
 	/*
@@ -55,7 +55,7 @@ key_gen_setup(void)
 	}
 	for (i = 0; i < sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]); ++i)
 		g.key_rand_len[i] = (uint16_t)MMRAND(g.c_key_min, g.c_key_max);
-		
+
 	if ((g.key_gen_buf = malloc(g.c_key_max)) == NULL)
 		die("malloc", errno);
 	for (i = 0; i < g.c_key_max; ++i)

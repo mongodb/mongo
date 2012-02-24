@@ -159,7 +159,7 @@ wts_startup(int open_cursors)
 		if (g.c_huffman_key)
 			p += snprintf(p, (size_t)(end - p),
 			    ",huffman_key=english");
-                if (g.c_reverse)
+		if (g.c_reverse)
 			p += snprintf(p, (size_t)(end - p),
 			    ",collator=reverse");
 		/* FALLTHROUGH */
@@ -262,15 +262,15 @@ wts_bulk_load(void)
 	int ret;
 
 	session = g.wts_session;
-	key = value = NULL;	/* -Wuninitialized */
+	key = NULL;		/* -Wuninitialized */
 
-        /*
-         * Avoid bulk load with a custom collator, because the order of
-         * insertion will not match the collation order.
-         */
+	/*
+	 * Avoid bulk load with a custom collator, because the order of
+	 * insertion will not match the collation order.
+	 */
 	if ((ret = session->open_cursor(session, WT_TABLENAME, NULL,
-            (g.c_file_type == ROW && g.c_reverse) ? NULL : "bulk",
-            &cursor)) != 0) {
+	    (g.c_file_type == ROW && g.c_reverse) ? NULL : "bulk",
+	    &cursor)) != 0) {
 		fprintf(stderr, "%s: cursor open failed: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
@@ -278,10 +278,10 @@ wts_bulk_load(void)
 
 	insert_count = 0;
 	while (bulk(&key, &value) == 0) {
-                /* Report on progress every 100 inserts. */
-                if (++insert_count % 100 == 0)
-                        track("bulk load", insert_count);
-	
+		/* Report on progress every 100 inserts. */
+		if (++insert_count % 100 == 0)
+			track("bulk load", insert_count);
+
 		if (key != NULL)
 			cursor->set_key(cursor, key);
 		if (g.c_file_type == FIX)
@@ -426,7 +426,7 @@ wts_stats(void)
 		die("cursor.next", ret);
 	if ((ret = cursor->close(cursor)) != 0)
 		die("cursor.close", ret);
-	
+
 	/* File statistics. */
 	if ((ret = session->open_cursor(session,
 	    "statistics:" WT_TABLENAME, NULL, NULL, &cursor)) != 0) {
@@ -453,7 +453,7 @@ wts_stats(void)
 
 /*
  * bulk --
- *	WiredTiger bulk load routine. 
+ *	WiredTiger bulk load routine.
  */
 static int
 bulk(WT_ITEM **keyp, WT_ITEM **valuep)
@@ -857,7 +857,7 @@ wts_row_put(uint64_t keyno, int insert)
 	ret = cursor->insert(cursor);
 	if (ret != 0 && ret != WT_NOTFOUND) {
 		fprintf(stderr,
-                    "%s: wts_row_put: %s row %" PRIu64 " by key: %s\n",
+		    "%s: wts_row_put: %s row %" PRIu64 " by key: %s\n",
 		    g.progname, insert ? "insert" : "update",
 		    keyno, wiredtiger_strerror(ret));
 		return (1);
@@ -907,7 +907,7 @@ wts_col_put(uint64_t keyno)
 	ret = cursor->insert(cursor);
 	if (ret != 0 && ret != WT_NOTFOUND) {
 		fprintf(stderr,
-                    "%s: wts_col_put: %" PRIu64 " : %s\n",
+		    "%s: wts_col_put: %" PRIu64 " : %s\n",
 		    g.progname, keyno, wiredtiger_strerror(ret));
 		return (1);
 	}
@@ -1008,7 +1008,7 @@ wts_row_del(uint64_t keyno, int *notfoundp)
 	ret = cursor->remove(cursor);
 	if (ret != 0 && ret != WT_NOTFOUND) {
 		fprintf(stderr,
-                    "%s: wts_row_del: remove %" PRIu64 " by key: %s\n",
+		    "%s: wts_row_del: remove %" PRIu64 " by key: %s\n",
 		    g.progname, keyno, wiredtiger_strerror(ret));
 		return (1);
 	}
@@ -1055,7 +1055,7 @@ wts_col_del(uint64_t keyno, int *notfoundp)
 	ret = cursor->remove(cursor);
 	if (ret != 0 && ret != WT_NOTFOUND) {
 		fprintf(stderr,
-                    "%s: wts_col_del: remove %" PRIu64 " by key: %s\n",
+		    "%s: wts_col_del: remove %" PRIu64 " by key: %s\n",
 		    g.progname, keyno, wiredtiger_strerror(ret));
 		return (1);
 	}

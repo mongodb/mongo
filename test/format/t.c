@@ -125,7 +125,7 @@ main(int argc, char *argv[])
 		}
 
 		track("shutting down BDB", 0ULL);
-		bdb_teardown();	
+		bdb_teardown();
 
 		if (wts_dump("standard", 1))	/* Dump the file */
 			goto err;
@@ -214,7 +214,7 @@ onint(int signo)
 	(void)system("rm -rf WiredTiger WiredTiger.* __[a-qs-z]* __run");
 
 	fprintf(stderr, "\n");
-	exit (EXIT_FAILURE);
+	exit(EXIT_FAILURE);
 }
 
 /*
@@ -225,7 +225,7 @@ void
 die(const char *m, int e)
 {
 	fprintf(stderr, "%s: %s: %s\n", g.progname, m, wiredtiger_strerror(e));
-	exit (EXIT_FAILURE);
+	exit(EXIT_FAILURE);
 }
 
 /*

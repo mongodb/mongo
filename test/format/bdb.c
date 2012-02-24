@@ -11,15 +11,15 @@
 static int
 bdb_compare_reverse(DB *dbp, const DBT *k1, const DBT *k2)
 {
-        int cmp;
-        size_t len;
+	int cmp;
+	size_t len;
 
-        UNUSED(dbp);
+	UNUSED(dbp);
 
-        len = (k1->size < k2->size) ? k1->size : k2->size;
+	len = (k1->size < k2->size) ? k1->size : k2->size;
 	if ((cmp = memcmp(k2->data, k1->data, len)) == 0)
-	        cmp = ((int)k1->size - (int)k2->size);
-        return (cmp);
+		cmp = ((int)k1->size - (int)k2->size);
+	return (cmp);
 }
 
 void
@@ -41,8 +41,8 @@ bdb_startup(void)
 	    DB_INIT_MPOOL | DB_PRIVATE, 0) == 0);
 	assert(db_create(&db, dbenv, 0) == 0);
 
-        if (g.c_file_type == ROW && g.c_reverse)
-                assert(db->set_bt_compare(db, bdb_compare_reverse) == 0);
+	if (g.c_file_type == ROW && g.c_reverse)
+		assert(db->set_bt_compare(db, bdb_compare_reverse) == 0);
 
 	assert(db->open(db, NULL, "__bdb", NULL, DB_BTREE, DB_CREATE, 0) == 0);
 	g.bdb = db;

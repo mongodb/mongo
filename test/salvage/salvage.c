@@ -407,7 +407,7 @@ run(int r)
 		break;
 	default:
 		fprintf(stderr, "salvage: %d: no such test\n", r);
-		exit (EXIT_FAILURE);
+		exit(EXIT_FAILURE);
 	}
 
 	assert(fclose(res_fp) == 0);
@@ -418,7 +418,7 @@ run(int r)
 	if (system(buf)) {
 		fprintf(stderr,
 		    "check failed, salvage results were incorrect\n");
-		exit (EXIT_FAILURE);
+		exit(EXIT_FAILURE);
 	}
 }
 
@@ -563,7 +563,7 @@ copy(u_int gen, u_int recno)
 
 	assert(fclose(ifp) == 0);
 	assert(fclose(ofp) == 0);
-}	
+}
 
 /*
  * process --

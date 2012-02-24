@@ -164,7 +164,6 @@ config_clear(void)
 		cp->flags &= ~(uint32_t)C_TEMP;
 }
 
-
 /*
  * config_single --
  *	Set a single configuration structure value.
@@ -193,7 +192,7 @@ config_single(const char *s, int perm)
 		}
 	} else if (*cp->v < cp->min || *cp->v > cp->max) {
 		fprintf(stderr, "%s: %s: value of %" PRIu32
-                    " outside min/max values of %" PRIu32 "-%" PRIu32 "\n",
+		    " outside min/max values of %" PRIu32 "-%" PRIu32 "\n",
 		    g.progname, s, *cp->v, cp->min, cp->max);
 		exit(EXIT_FAILURE);
 	}

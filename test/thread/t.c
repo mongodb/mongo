@@ -200,7 +200,7 @@ onint(int signo)
 	shutdown();
 
 	fprintf(stderr, "\n");
-	exit (EXIT_FAILURE);
+	exit(EXIT_FAILURE);
 }
 
 /*
@@ -211,7 +211,7 @@ void
 die(const char *m, int e)
 {
 	fprintf(stderr, "%s: %s: %s\n", progname, m, wiredtiger_strerror(e));
-	exit (EXIT_FAILURE);
+	exit(EXIT_FAILURE);
 }
 
 /*

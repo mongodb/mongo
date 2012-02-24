@@ -16,7 +16,7 @@ void check(const char *fmt, ...)
 	va_end(ap);
 
 	assert(len < sizeof buf);
-	
+
 	va_start(ap, fmt);
 	assert(wiredtiger_struct_packv(buf, sizeof buf, fmt, ap) == 0);
 	va_end(ap);
