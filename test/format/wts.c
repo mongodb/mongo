@@ -596,6 +596,11 @@ wts_ops(void)
 				return (1);
 		}
 
+		if (insert) {
+			WT_CURSOR *cursor = g.wts_cursor_insert;
+			cursor->reset(cursor);
+		}
+
 		/* Then read the value we modified to confirm it worked. */
 		if (wts_read(keyno))
 			return (1);
@@ -931,6 +936,10 @@ wts_col_insert(uint64_t *keynop)
 	WT_SESSION *session;
 	uint64_t keyno;
 	int notfound, ret;
+
+	/* Reset the other cursor so it doesn't keep pages pinned. */
+	cursor = g.wts_cursor;
+	cursor->reset(cursor);
 
 	cursor = g.wts_cursor_insert;
 	session = g.wts_session;
