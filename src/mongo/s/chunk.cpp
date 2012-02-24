@@ -109,6 +109,8 @@ namespace mongo {
     }
 
     BSONObj Chunk::_getExtremeKey( int sort ) const {
+        // We need to use a sharded connection here b/c there could be data left from stale migrations outside
+        // our chunk ranges.
         ShardConnection conn( getShard().getConnString() , _manager->getns() );
         Query q;
         if ( sort == 1 ) {
@@ -132,8 +134,17 @@ namespace mongo {
         }
 
         // find the extreme key
-        BSONObj end = conn->findOne( _manager->getns() , q );
-        conn.done();
+        BSONObj end;
+        try {
+            end = conn->findOne( _manager->getns() , q );
+            conn.done();
+        }
+        catch( StaleConfigException& ){
+            // We need to handle stale config exceptions if using sharded connections
+            // caught and reported above
+            conn.done();
+            throw;
+        }
 
         if ( end.isEmpty() )
             return BSONObj();
