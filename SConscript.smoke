@@ -78,6 +78,9 @@ if shellEnv is not None:
     addSmoketest( "smokeTool", [ add_exe( "mongo" ), add_exe("mongod"), add_exe("mongos"), "tools" ] )
     addSmoketest( "smokeAggregation", [ add_exe( "mongo" ), add_exe( "mongod" ) ] )
 
+    smokeEnv.Alias( "smokeFailingTests", [ add_exe( "mongo" ), add_exe( "mongod" ) ], utils.run_smoke_command('--only-old-fails --continue-on-failure') )
+    smokeEnv.Alias( "smokeResetFails", [ add_exe( "mongo" ), add_exe( "mongod" ) ], utils.run_smoke_command('--reset-old-fails') )
+
 # Note: although the test running logic has been moved to
 # buildscripts/smoke.py, the interface to running the tests has been
 # something like 'scons startMongod <suite>'; startMongod is now a
