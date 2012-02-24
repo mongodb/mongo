@@ -932,16 +932,16 @@ namespace QueryOptimizerTests {
                 {
                     shared_ptr<QueryPlanSet> qps = makeQps( BSON( "a" << 1 ), BSONObj() );
                     ASSERT_EQUALS( 1, qps->nPlans() );
-                    ASSERT( qps->possibleOrderedPlan() );
-                    ASSERT( qps->haveOrderedPlan() );
+                    ASSERT( qps->possibleInOrderPlan() );
+                    ASSERT( qps->haveInOrderPlan() );
                     ASSERT( !qps->possibleOutOfOrderPlan() );
                 }
                 
                 {
                     shared_ptr<QueryPlanSet> qps = makeQps( BSON( "a" << 1 ), BSON( "b" << 1 ) );
                     ASSERT_EQUALS( 3, qps->nPlans() );
-                    ASSERT( qps->possibleOrderedPlan() );
-                    ASSERT( qps->haveOrderedPlan() );
+                    ASSERT( qps->possibleInOrderPlan() );
+                    ASSERT( qps->haveInOrderPlan() );
                     ASSERT( qps->possibleOutOfOrderPlan() );
                 }
                 
@@ -953,8 +953,8 @@ namespace QueryOptimizerTests {
                 {
                     shared_ptr<QueryPlanSet> qps = makeQps( BSON( "a" << 1 ), BSON( "b" << 1 ) );
                     ASSERT_EQUALS( 1, qps->nPlans() );
-                    ASSERT( qps->possibleOrderedPlan() );
-                    ASSERT( !qps->haveOrderedPlan() );
+                    ASSERT( qps->possibleInOrderPlan() );
+                    ASSERT( !qps->haveInOrderPlan() );
                     ASSERT( qps->possibleOutOfOrderPlan() );
                 }
 
@@ -964,16 +964,16 @@ namespace QueryOptimizerTests {
                 {
                     shared_ptr<QueryPlanSet> qps = makeQps( BSON( "a" << 1 ), BSON( "b" << 1 ) );
                     ASSERT_EQUALS( 1, qps->nPlans() );
-                    ASSERT( qps->possibleOrderedPlan() );
-                    ASSERT( qps->haveOrderedPlan() );
+                    ASSERT( qps->possibleInOrderPlan() );
+                    ASSERT( qps->haveInOrderPlan() );
                     ASSERT( qps->possibleOutOfOrderPlan() );
                 }
                 
                 {
                     shared_ptr<QueryPlanSet> qps = makeQps( BSON( "a" << 1 ), BSON( "c" << 1 ) );
                     ASSERT_EQUALS( 2, qps->nPlans() );
-                    ASSERT( !qps->possibleOrderedPlan() );
-                    ASSERT( !qps->haveOrderedPlan() );
+                    ASSERT( !qps->possibleInOrderPlan() );
+                    ASSERT( !qps->haveInOrderPlan() );
                     ASSERT( qps->possibleOutOfOrderPlan() );
                 }                
             }
@@ -1031,8 +1031,8 @@ namespace QueryOptimizerTests {
                 {
                     shared_ptr<MultiPlanScanner> mps = makeMps( BSON( "a" << 1 ), BSONObj() );
                     ASSERT_EQUALS( 1, mps->currentNPlans() );
-                    ASSERT( mps->possibleOrderedPlan() );
-                    ASSERT( mps->haveOrderedPlan() );
+                    ASSERT( mps->possibleInOrderPlan() );
+                    ASSERT( mps->haveInOrderPlan() );
                     ASSERT( !mps->possibleOutOfOrderPlan() );
                 }
                 
@@ -1040,8 +1040,8 @@ namespace QueryOptimizerTests {
                     shared_ptr<MultiPlanScanner> mps =
                     makeMps( BSON( "a" << 1 ), BSON( "b" << 1 ) );
                     ASSERT_EQUALS( 3, mps->currentNPlans() );
-                    ASSERT( mps->possibleOrderedPlan() );
-                    ASSERT( mps->haveOrderedPlan() );
+                    ASSERT( mps->possibleInOrderPlan() );
+                    ASSERT( mps->haveInOrderPlan() );
                     ASSERT( mps->possibleOutOfOrderPlan() );
                 }
                 
@@ -1054,8 +1054,8 @@ namespace QueryOptimizerTests {
                     shared_ptr<MultiPlanScanner> mps =
                     makeMps( BSON( "a" << 1 ), BSON( "b" << 1 ) );
                     ASSERT_EQUALS( 1, mps->currentNPlans() );
-                    ASSERT( mps->possibleOrderedPlan() );
-                    ASSERT( !mps->haveOrderedPlan() );
+                    ASSERT( mps->possibleInOrderPlan() );
+                    ASSERT( !mps->haveInOrderPlan() );
                     ASSERT( mps->possibleOutOfOrderPlan() );
                 }
                 
@@ -1066,8 +1066,8 @@ namespace QueryOptimizerTests {
                     shared_ptr<MultiPlanScanner> mps =
                     makeMps( BSON( "a" << 1 ), BSON( "b" << 1 ) );
                     ASSERT_EQUALS( 1, mps->currentNPlans() );
-                    ASSERT( mps->possibleOrderedPlan() );
-                    ASSERT( mps->haveOrderedPlan() );
+                    ASSERT( mps->possibleInOrderPlan() );
+                    ASSERT( mps->haveInOrderPlan() );
                     ASSERT( mps->possibleOutOfOrderPlan() );
                 }
                 
@@ -1075,8 +1075,8 @@ namespace QueryOptimizerTests {
                     shared_ptr<MultiPlanScanner> mps =
                     makeMps( BSON( "a" << 1 ), BSON( "c" << 1 ) );
                     ASSERT_EQUALS( 2, mps->currentNPlans() );
-                    ASSERT( !mps->possibleOrderedPlan() );
-                    ASSERT( !mps->haveOrderedPlan() );
+                    ASSERT( !mps->possibleInOrderPlan() );
+                    ASSERT( !mps->haveInOrderPlan() );
                     ASSERT( mps->possibleOutOfOrderPlan() );
                 }
                 
@@ -1084,8 +1084,8 @@ namespace QueryOptimizerTests {
                     shared_ptr<MultiPlanScanner> mps =
                     makeMps( fromjson( "{$or:[{a:1}]}" ), BSON( "c" << 1 ) );
                     ASSERT_EQUALS( 1, mps->currentNPlans() );
-                    ASSERT( !mps->possibleOrderedPlan() );
-                    ASSERT( !mps->haveOrderedPlan() );
+                    ASSERT( !mps->possibleInOrderPlan() );
+                    ASSERT( !mps->haveInOrderPlan() );
                     ASSERT( mps->possibleOutOfOrderPlan() );
                 }
 
@@ -1093,8 +1093,8 @@ namespace QueryOptimizerTests {
                     shared_ptr<MultiPlanScanner> mps =
                     makeMps( fromjson( "{$or:[{a:1,b:1}]}" ), BSONObj() );
                     ASSERT_EQUALS( 0, mps->currentNPlans() );
-                    ASSERT( mps->possibleOrderedPlan() );
-                    ASSERT( mps->haveOrderedPlan() );
+                    ASSERT( mps->possibleInOrderPlan() );
+                    ASSERT( mps->haveInOrderPlan() );
                     ASSERT( !mps->possibleOutOfOrderPlan() );
                 }
             }

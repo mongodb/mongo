@@ -64,14 +64,15 @@ namespace mongo {
          * query ops for all cursors.
          */
         QueryOptimizerCursorOp( long long &aggregateNscanned, const QueryPlanSelectionPolicy &selectionPolicy,
-                               const bool &requireOrder, int cumulativeCount = 0 ) :
+                               const bool &requireOrder, bool alwaysCountMatches, int cumulativeCount = 0 ) :
         _matchCounter( aggregateNscanned, cumulativeCount ),
         _countingMatches(),
         _mustAdvance(),
         _capped(),
         _yieldRecoveryFailed(),
         _selectionPolicy( selectionPolicy ),
-        _requireOrder( requireOrder ) {
+        _requireOrder( requireOrder ),
+        _alwaysCountMatches( alwaysCountMatches ) {
         }
         
         virtual void _init() {
@@ -94,7 +95,7 @@ namespace mongo {
             // TODO This violates the current Cursor interface abstraction, but for now it's simpler to keep our own set of
             // dups rather than avoid poisoning the cursor's dup set with unreturned documents.  Deduping documents
             // matched in this QueryOptimizerCursorOp will run against the takeover cursor.
-            _matchCounter.setCheckDups( _c->isMultiKey() );
+            _matchCounter.setCheckDups( countMatches() && _c->isMultiKey() );
             // TODO ok if cursor becomes multikey later?
 
             _matchCounter.updateNscanned( _c->nscanned() );
@@ -159,7 +160,7 @@ namespace mongo {
 
             mayAdvance();
             
-            if ( !qp().scanAndOrderRequired() && _matchCounter.enoughCumulativeMatchesToChooseAPlan() ) {
+            if ( countMatches() && _matchCounter.enoughCumulativeMatchesToChooseAPlan() ) {
                 setStop();
                 if ( _explainPlanInfo ) _explainPlanInfo->notePicked();
                 return;
@@ -173,7 +174,7 @@ namespace mongo {
             _mustAdvance = true;
         }
         virtual QueryOp *_createChild() const {
-            return new QueryOptimizerCursorOp( _matchCounter.aggregateNscanned(), _selectionPolicy, _requireOrder, _matchCounter.cumulativeCount() );
+            return new QueryOptimizerCursorOp( _matchCounter.aggregateNscanned(), _selectionPolicy, _requireOrder, _alwaysCountMatches, _matchCounter.cumulativeCount() );
         }
         DiskLoc currLoc() const { return _c ? _c->currLoc() : DiskLoc(); }
         BSONObj currKey() const { return _c ? _c->currKey() : BSONObj(); }
@@ -234,13 +235,19 @@ namespace mongo {
             }
             _matchCounter.updateNscanned( _c->nscanned() );
         }
-        // Don't count matches on the first call to next(), which occurs before the first result is returned.
         bool countingMatches() {
             if ( _countingMatches ) {
                 return true;
             }
-            _countingMatches = true;
+            if ( countMatches() ) {
+                // Only count matches after the first call to next(), which occurs before the first
+                // result is returned.
+                _countingMatches = true;
+            }
             return false;
+        }
+        bool countMatches() const {
+            return _alwaysCountMatches || !qp().scanAndOrderRequired();
         }
 
         void recordCursorLocation() {
@@ -277,6 +284,7 @@ namespace mongo {
         const QueryPlanSelectionPolicy &_selectionPolicy;
         const bool &_requireOrder; // TODO don't use a ref for this, but signal change explicitly
         shared_ptr<ExplainPlanInfo> _explainPlanInfo;
+        bool _alwaysCountMatches;
     };
     
     /**
@@ -290,9 +298,11 @@ namespace mongo {
         QueryOptimizerCursorImpl( auto_ptr<MultiPlanScanner> &mps, const QueryPlanSelectionPolicy &planPolicy, bool requireOrder ) :
         _requireOrder( requireOrder ),
         _mps( mps ),
-        _originalOp( new QueryOptimizerCursorOp( _nscanned, planPolicy, _requireOrder ) ),
+        _initialCandidatePlans( _mps->possibleInOrderPlan(), _mps->possibleOutOfOrderPlan() ),
+        _originalOp( new QueryOptimizerCursorOp( _nscanned, planPolicy, _requireOrder,
+                                                !_initialCandidatePlans.hybridPlanSet() ) ),
         _currOp(),
-        _completeOp(),
+        _completePlanOfHybridSetScanAndOrderRequired(),
         _nscanned() {
             _mps->initialOp( _originalOp );
             _explainQueryInfo = _mps->generateExplainInfo();
@@ -462,6 +472,14 @@ namespace mongo {
             return _currOp->matcher( _currOp->cursor() ).get();
         }
 
+        virtual const FieldRangeSet *initialFieldRangeSet() const {
+            if ( _takeover ) {
+                return 0;
+            }
+            assertOk();
+            return &_currOp->qp().multikeyFrs();
+        }
+        
         virtual bool currentMatches( MatchDetails *details = 0 ) {
             if ( _takeover ) {
                 return _takeover->currentMatches( details );
@@ -470,46 +488,38 @@ namespace mongo {
             return _currOp->currentMatches( details );
         }
         
-        virtual const QueryPlan *queryPlan() const {
+        virtual bool currentPlanScanAndOrderRequired() const {
             if ( _takeover ) {
-                return _takeover->queryPlan();
+                return _takeover->queryPlan()->scanAndOrderRequired();
             }
-            return _currOp ? &_currOp->qp() : 0;
+            assertOk();
+            return _currOp->qp().scanAndOrderRequired();
         }
 
-        virtual const QueryPlan *completeQueryPlan() const {
-            return _completeOp ? &_completeOp->qp() : 0;
+        virtual bool completePlanOfHybridSetScanAndOrderRequired() const {
+            return _completePlanOfHybridSetScanAndOrderRequired;
         }
 
         virtual const Projection::KeyOnly *keyFieldsOnly() const {
             if ( _takeover ) {
                 return _takeover->keyFieldsOnly();
             }
-            return _currOp ? _currOp->keyFieldsOnly() : 0;
+            assertOk();
+            return _currOp->keyFieldsOnly();
         }
 
-        virtual bool mayFailOverToInOrderPlans() const {
+        virtual bool runningInitialInOrderPlan() const {
             if ( _takeover ) {
                 return false;
             }
-            return _mps->possibleOrderedPlan();
+            return _mps->haveInOrderPlan();
         }
 
-        virtual bool mayRunInOrderPlans() const {
-            if ( _takeover ) {
-                return true;
-            }
-            return _mps->possibleOrderedPlan() || _mps->usingCachedPlan();
+        virtual CandidatePlans initialCandidatePlans() const {
+            return _initialCandidatePlans;
         }
         
-        virtual bool mayRunOutOfOrderPlans() const {
-            if ( _takeover ) {
-                return true;
-            }
-            return _mps->possibleOutOfOrderPlan() || _mps->usingCachedPlan();
-        }
-        
-        virtual bool mayRetryQuery() const {
+        virtual bool runningInitialCachedPlan() const {
             if ( _takeover ) {
                 return false;
             }
@@ -584,8 +594,9 @@ namespace mongo {
                 }
             }
             else {
-                // TODO not set if takeover
-                _completeOp = qocop;
+                if ( _initialCandidatePlans.hybridPlanSet() ) {
+                    _completePlanOfHybridSetScanAndOrderRequired = op->qp().scanAndOrderRequired();
+                }
             }
 
             return ok();
@@ -614,9 +625,10 @@ namespace mongo {
         
         bool _requireOrder;
         auto_ptr<MultiPlanScanner> _mps;
+        CandidatePlans _initialCandidatePlans;
         shared_ptr<QueryOptimizerCursorOp> _originalOp;
         QueryOptimizerCursorOp *_currOp;
-        QueryOptimizerCursorOp *_completeOp;
+        bool _completePlanOfHybridSetScanAndOrderRequired;
         shared_ptr<MultiCursor> _takeover;
         long long _nscanned;
         // Using a SmallDupSet seems a bit hokey, but I've measured a 5% performance improvement

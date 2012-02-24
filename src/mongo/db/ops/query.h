@@ -137,8 +137,6 @@ namespace mongo {
         virtual bool handleMatch();
         virtual int rewriteMatches();
     private:
-        bool iterateNeedsSort() const;
-        bool resultsNeedSort() const;
         void handleReorderMatch();
         bool handleOrderedMatch();
         SmallDupSet _scanAndOrderDups;

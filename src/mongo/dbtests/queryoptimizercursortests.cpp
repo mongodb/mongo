@@ -2274,6 +2274,30 @@ namespace QueryOptimizerCursorTests {
         }
     };
     
+    /** If no in order plans are possible, an out of order plan may take over. */
+    class OutOfOrderOnlyTakeover : public Base {
+    public:
+        void run() {
+            _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+            for( int i = 0; i < 300; ++i ) {
+                _cli.insert( ns(), BSON( "a" << 1 ) );
+                _cli.insert( ns(), BSON( "a" << 2 ) );
+            }
+            
+            dblock lk;
+            Client::Context ctx( ns() );
+            shared_ptr<Cursor> c =
+            newQueryOptimizerCursor( ns(), BSON( "a" << 1 ),
+                                    shared_ptr<Projection>(), BSON( "b" << 1 ),
+                                    QueryPlanSelectionPolicy::any(), false );
+            ASSERT( c );
+            while( c->advance() );
+            // Check that one of the plans took over, and we didn't scan both plans until the a:1
+            // index completed (which would yield an nscanned near 600).
+            ASSERT( c->nscanned() < 500 );
+        }
+    };
+    
     class CoveredIndex : public Base {
     public:
         void run() {
@@ -2349,7 +2373,34 @@ namespace QueryOptimizerCursorTests {
         }
     };
     
-    class SaveGoodIndex : public Base {
+    class PlanChecking : public Base {
+    public:
+        virtual ~PlanChecking() {}
+    protected:
+        void nPlans( int n, const BSONObj &query, const BSONObj &order ) {
+            auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), query ) );
+            auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
+            QueryPlanSet s( ns(), frsp, frspOrig, query, shared_ptr<Projection>(), order );
+            ASSERT_EQUALS( n, s.nPlans() );
+        }
+        shared_ptr<QueryOptimizerCursor> getCursor( const BSONObj &query, const BSONObj &order ) {
+            ParsedQuery parsedQuery( ns(), 0, 0, 0,
+                                    BSON( "$query" << query << "$orderby" << order ), BSONObj() );
+            shared_ptr<Cursor> cursor =
+            NamespaceDetailsTransient::getCursor( ns(), query, order,
+                                                 QueryPlanSelectionPolicy::any(), 0, &parsedQuery );
+            shared_ptr<QueryOptimizerCursor> ret =
+            dynamic_pointer_cast<QueryOptimizerCursor>( cursor );
+            ASSERT( ret );
+            return ret;
+        }
+        void runQuery( const BSONObj &query, const BSONObj &order ) {
+            shared_ptr<QueryOptimizerCursor> cursor = getCursor( query, order );
+            while( cursor->advance() );
+        }
+    };
+    
+    class SaveGoodIndex : public PlanChecking {
     public:
         void run() {
             _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
@@ -2410,16 +2461,349 @@ namespace QueryOptimizerCursorTests {
         }
     private:
         void nPlans( int n ) {
-            auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 4 ) ) );
-            auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-            QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 4 ), shared_ptr<Projection>(),
-                           BSON( "b" << 1 ) );
-            ASSERT_EQUALS( n, s.nPlans() );
+            return PlanChecking::nPlans( n, BSON( "a" << 4 ), BSON( "b" << 1 ) );
         }
         void runQuery() {
-            shared_ptr<Cursor> cursor =
-            NamespaceDetailsTransient::getCursor( ns(), BSON( "a" << 4 ), BSON( "b" << 1 ) );
-            while( cursor->advance() );
+            return PlanChecking::runQuery( BSON( "a" << 4 ), BSON( "b" << 1 ) );
+        }
+    };
+    
+    class PossiblePlans : public PlanChecking {
+    protected:
+        void checkCursor( bool mayRunInOrderPlan, bool mayRunOutOfOrderPlan,
+                         bool runningInitialInOrderPlan, bool runningInitialCachedPlan ) {
+            QueryOptimizerCursor::CandidatePlans plans = _cursor->initialCandidatePlans();
+            ASSERT_EQUALS( mayRunInOrderPlan, plans._mayRunInOrderPlan );
+            ASSERT_EQUALS( mayRunOutOfOrderPlan, plans._mayRunOutOfOrderPlan );
+            ASSERT_EQUALS( runningInitialInOrderPlan, _cursor->runningInitialInOrderPlan() );
+            ASSERT_EQUALS( runningInitialCachedPlan, _cursor->runningInitialCachedPlan() );            
+        }
+        void setCursor( const BSONObj &query, const BSONObj &order ) {
+            _cursor = PlanChecking::getCursor( query, order );
+        }
+        void runCursor( bool completePlanOfHybridSetScanAndOrderRequired = false ) {
+            while( _cursor->ok() ) {
+                checkIterate( _cursor );
+                _cursor->advance();
+            }
+            ASSERT_EQUALS( completePlanOfHybridSetScanAndOrderRequired,
+                          _cursor->completePlanOfHybridSetScanAndOrderRequired() );
+        }
+        void runCursorUntilTakeover() {
+            // This is a bit of a hack, relying on initialFieldRangeSet() being nonzero before
+            // takeover and zero after takeover.
+            while( _cursor->ok() && _cursor->initialFieldRangeSet() ) {
+                checkIterate( _cursor );
+                _cursor->advance();
+            }
+        }
+        void checkTakeoverCursor( bool currentPlanScanAndOrderRequired ) {
+            ASSERT( !_cursor->initialFieldRangeSet() );
+            ASSERT_EQUALS( currentPlanScanAndOrderRequired,
+                          _cursor->currentPlanScanAndOrderRequired() );
+            ASSERT( !_cursor->completePlanOfHybridSetScanAndOrderRequired() );
+            ASSERT( !_cursor->runningInitialInOrderPlan() );
+            ASSERT( !_cursor->runningInitialCachedPlan() );
+        }
+        virtual void checkIterate( const shared_ptr<QueryOptimizerCursor> &cursor ) const = 0;
+        shared_ptr<QueryOptimizerCursor> _cursor;
+    };
+    
+    class PossibleInOrderPlans : public PossiblePlans {
+    public:
+        void run() {
+            _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+            _cli.insert( ns(), BSON( "a" << 1 ) );
+            for( int i = 0; i < 20; ++i ) {
+                _cli.insert( ns(), BSON( "a" << 2 ) );
+            }
+            
+            dblock lk;
+            Client::Context ctx( ns() );
+            nPlans( 2, BSON( "a" << 1 << "x" << 1 ), BSONObj() );
+            setCursor( BSON( "a" << 1 << "x" << 1 ), BSONObj() );
+            checkCursor( false );
+            ASSERT( _cursor->initialFieldRangeSet()->range( "a" ).equality() );
+            ASSERT( !_cursor->initialFieldRangeSet()->range( "b" ).equality() );
+            ASSERT( _cursor->initialFieldRangeSet()->range( "x" ).equality() );
+
+            // Without running the (nonempty) cursor, no cached plan is recorded.
+            setCursor( BSON( "a" << 1 << "x" << 1 ), BSONObj() );
+            checkCursor( false );
+
+            // Running the cursor records the plan.
+            runCursor();
+            nPlans( 1, BSON( "a" << 1 << "x" << 1 ), BSONObj() );
+            setCursor( BSON( "a" << 1 << "x" << 1 ), BSONObj() );
+            checkCursor( true );
+
+            // Other plans may be added.
+            setCursor( BSON( "a" << 2 << "x" << 1 ), BSONObj() );
+            checkCursor( true );
+            for( int i = 0; i < 10; ++i, _cursor->advance() );
+            // The natural plan has been added in.
+            checkCursor( false );
+            nPlans( 1, BSON( "a" << 2 << "x" << 1 ), BSONObj() );
+            runCursor();
+
+            // The a:1 plan was recorded again.
+            nPlans( 1, BSON( "a" << 2 << "x" << 1 ), BSONObj() );
+            setCursor( BSON( "a" << 2 << "x" << 1 ), BSONObj() );
+            checkCursor( true );
+            
+            // Clear the recorded plan manually.
+            _cursor->clearIndexesForPatterns();
+            nPlans( 2, BSON( "a" << 2 << "x" << 1 ), BSONObj() );
+            setCursor( BSON( "a" << 2 << "x" << 1 ), BSONObj() );
+            checkCursor( false );
+            
+            // Add more data, and run until takeover occurs.
+            for( int i = 0; i < 120; ++i ) {
+                _cli.insert( ns(), BSON( "a" << 3 << "x" << 1 ) );
+            }
+            
+            setCursor( BSON( "a" << 3 << "x" << 1 ), BSONObj() );
+            checkCursor( false );
+            runCursorUntilTakeover();
+            ASSERT( _cursor->ok() );
+            checkTakeoverCursor( false );
+            
+            // Try again, with a cached plan this time.
+            setCursor( BSON( "a" << 3 << "x" << 1 ), BSONObj() );
+            checkCursor( true );
+            runCursorUntilTakeover();
+            checkTakeoverCursor( false );
+        }
+    private:
+        void checkCursor( bool runningInitialCachedPlan ) {
+            return PossiblePlans::checkCursor( true, false, true, runningInitialCachedPlan );
+        }
+        virtual void checkIterate( const shared_ptr<QueryOptimizerCursor> &cursor ) const {
+            ASSERT( !cursor->currentPlanScanAndOrderRequired() );
+            ASSERT( !cursor->completePlanOfHybridSetScanAndOrderRequired() );
+        }
+    };
+    
+    class PossibleOutOfOrderPlans : public PossiblePlans {
+    public:
+        void run() {
+            _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+            _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
+            _cli.insert( ns(), BSON( "a" << 1 << "b" << 1 ) );
+            for( int i = 0; i < 20; ++i ) {
+                _cli.insert( ns(), BSON( "a" << 2 ) );
+            }
+            _cli.insert( ns(), BSON( "b" << 2 ) );
+            
+            dblock lk;
+            Client::Context ctx( ns() );
+            nPlans( 3, BSON( "a" << 1 << "b" << 1 ), BSON( "x" << 1 ) );
+            setCursor( BSON( "a" << 1 << "b" << 1 ), BSON( "x" << 1 ) );
+            checkCursor( false );
+            ASSERT( _cursor->initialFieldRangeSet()->range( "a" ).equality() );
+            ASSERT( _cursor->initialFieldRangeSet()->range( "b" ).equality() );
+            ASSERT( !_cursor->initialFieldRangeSet()->range( "x" ).equality() );
+            
+            // Without running the (nonempty) cursor, no cached plan is recorded.
+            setCursor( BSON( "a" << 1 << "b" << 1 ), BSON( "x" << 1 ) );
+            checkCursor( false );
+            
+            // Running the cursor records the plan.
+            runCursor();
+            nPlans( 1, BSON( "a" << 1 << "b" << 1 ), BSON( "x" << 1 ) );
+            setCursor( BSON( "a" << 1 << "b" << 1 ), BSON( "x" << 1 ) );
+            checkCursor( true );
+            
+            // Other plans may be added.
+            setCursor( BSON( "a" << 2 << "b" << 2 ), BSON( "x" << 1 ) );
+            checkCursor( true );
+            for( int i = 0; i < 10; ++i, _cursor->advance() );
+            // The other plans have been added in.
+            checkCursor( false );
+            runCursor();
+            
+            // The b:1 plan was recorded.
+            setCursor( BSON( "a" << 1 << "b" << 1 ), BSON( "x" << 1 ) );
+            checkCursor( true );
+            
+            // Clear the recorded plan manually.
+            _cursor->clearIndexesForPatterns();
+            setCursor( BSON( "a" << 2 << "x" << 1 ), BSON( "x" << 1 ) );
+            checkCursor( false );
+            
+            // Add more data, and run until takeover occurs.
+            for( int i = 0; i < 120; ++i ) {
+                _cli.insert( ns(), BSON( "a" << 3 << "b" << 3 ) );
+            }
+            
+            setCursor( BSON( "a" << 3 << "b" << 3 ), BSON( "x" << 1 ) );
+            checkCursor( false );
+            runCursorUntilTakeover();
+            ASSERT( _cursor->ok() );
+            checkTakeoverCursor( true );
+            
+            // Try again, with a cached plan this time.
+            setCursor( BSON( "a" << 3 << "b" << 3 ), BSON( "x" << 1 ) );
+            checkCursor( true );
+            runCursorUntilTakeover();
+            checkTakeoverCursor( true );
+        }
+    private:
+        void checkCursor( bool runningInitialCachedPlan ) {
+            return PossiblePlans::checkCursor( false, true, false, runningInitialCachedPlan );
+        }
+        virtual void checkIterate( const shared_ptr<QueryOptimizerCursor> &cursor ) const {
+            ASSERT( cursor->currentPlanScanAndOrderRequired() );
+            ASSERT( !cursor->completePlanOfHybridSetScanAndOrderRequired() );
+        }
+    };
+    
+    class PossibleBothPlans : public PossiblePlans {
+    public:
+        void run() {
+            _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+            _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
+            _cli.insert( ns(), BSON( "a" << 1 << "b" << 1 ) );
+            _cli.insert( ns(), BSON( "a" << 2 << "b" << 1 ) );
+            for( int i = 0; i < 20; ++i ) {
+                _cli.insert( ns(), BSON( "a" << 2 ) );
+                if ( i % 10 == 0 ) {
+                    _cli.insert( ns(), BSON( "b" << 2 ) );                    
+                }
+            }
+            
+            dblock lk;
+            Client::Context ctx( ns() );
+            nPlans( 3, BSON( "a" << 1 << "b" << 1 ), BSON( "b" << 1 ) );
+            setCursor( BSON( "a" << 1 << "b" << 1 ), BSON( "b" << 1 ) );
+            checkCursor( true, false );
+            ASSERT( _cursor->initialFieldRangeSet()->range( "a" ).equality() );
+            ASSERT( _cursor->initialFieldRangeSet()->range( "b" ).equality() );
+            ASSERT( !_cursor->initialFieldRangeSet()->range( "x" ).equality() );
+            
+            // Without running the (nonempty) cursor, no cached plan is recorded.
+            setCursor( BSON( "a" << 1 << "b" << 1 ), BSON( "b" << 1 ) );
+            checkCursor( true, false );
+            
+            // Running the cursor records the a:1 plan.
+            runCursor( true );
+            nPlans( 1, BSON( "a" << 1 << "b" << 1 ), BSON( "b" << 1 ) );
+            setCursor( BSON( "a" << 1 << "b" << 1 ), BSON( "b" << 1 ) );
+            checkCursor( false, true );
+            
+            // Other plans may be added.
+            setCursor( BSON( "a" << 2 << "b" << 2 ), BSON( "b" << 1 ) );
+            checkCursor( false, true );
+            for( int i = 0; i < 10; ++i, _cursor->advance() );
+            // The other plans have been added in (including ordered b:1).
+            checkCursor( true, false );
+            runCursor( false );
+            
+            // The b:1 plan was recorded.
+            setCursor( BSON( "a" << 1 << "b" << 1 ), BSON( "b" << 1 ) );
+            checkCursor( true, true );
+            
+            // Clear the recorded plan manually.
+            _cursor->clearIndexesForPatterns();
+            setCursor( BSON( "a" << 2 << "b" << 1 ), BSON( "b" << 1 ) );
+            checkCursor( true, false );
+            
+            // Add more data, and run until takeover occurs.
+            for( int i = 0; i < 120; ++i ) {
+                _cli.insert( ns(), BSON( "a" << 3 << "b" << 3 ) );
+            }
+            
+            setCursor( BSON( "a" << 3 << "b" << 3 ), BSON( "b" << 1 ) );
+            checkCursor( true, false );
+            runCursorUntilTakeover();
+            ASSERT( _cursor->ok() );
+            checkTakeoverCursor( false );
+            ASSERT_EQUALS( BSON( "b" << 1 ), _cursor->indexKeyPattern() );
+            
+            // Try again, with a cached plan this time.
+            setCursor( BSON( "a" << 3 << "b" << 3 ), BSON( "b" << 1 ) );
+            checkCursor( true, true );
+            runCursorUntilTakeover();
+            checkTakeoverCursor( false );
+            ASSERT_EQUALS( BSON( "b" << 1 ), _cursor->indexKeyPattern() );
+        }
+    private:
+        void checkCursor( bool runningInitialInOrderPlan, bool runningInitialCachedPlan ) {
+            return PossiblePlans::checkCursor( true, true, runningInitialInOrderPlan,
+                                              runningInitialCachedPlan );
+        }
+        virtual void checkIterate( const shared_ptr<QueryOptimizerCursor> &cursor ) const {
+            if ( cursor->indexKeyPattern() == BSON( "b" << 1 ) ) {
+                ASSERT( !cursor->currentPlanScanAndOrderRequired() );
+            }
+            else {
+                ASSERT( cursor->currentPlanScanAndOrderRequired() );                
+            }
+            ASSERT( !cursor->completePlanOfHybridSetScanAndOrderRequired() );
+        }
+    };
+    
+    class AbortUnorderedPlans : public PlanChecking {
+    public:
+        void run() {
+            _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+            for( int i = 0; i < 10; ++i ) {
+                _cli.insert( ns(), BSON( "a" << 1 ) );
+            }
+            
+            dblock lk;
+            Client::Context ctx( ns() );
+            
+            shared_ptr<QueryOptimizerCursor> c = getCursor( BSON( "a" << 1 << "b" << BSONNULL ),
+                                                           BSON( "a" << 1 ) );
+            // Wait until a $natural plan result is returned.
+            while( c->indexKeyPattern() != BSONObj() ) {
+                c->advance();
+            }
+            // Abort the natural plan.
+            c->abortUnorderedPlans();
+            c->advance();
+            // Check that no more results from the natural plan are returned.
+            ASSERT( c->ok() );
+            while( c->ok() ) {
+                ASSERT_EQUALS( BSON( "a" << 1 ), c->indexKeyPattern() );
+                c->advance();
+            }
+            ASSERT( !c->completePlanOfHybridSetScanAndOrderRequired() );
+        }
+    };
+    
+    class AbortUnorderedPlanOnLastMatch : public PlanChecking {
+    public:
+        void run() {
+            _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+            for( int i = 0; i < 10; ++i ) {
+                _cli.insert( ns(), BSON( "a" << BSON_ARRAY( 1 << 2 ) ) );
+            }
+            
+            dblock lk;
+            Client::Context ctx( ns() );
+            
+            shared_ptr<QueryOptimizerCursor> c =
+            getCursor( BSON( "a" << GTE << 1 << "b" << BSONNULL ), BSON( "a" << 1 ) );
+            // Wait until 10 (all) $natural plan results are returned.
+            for( int i = 0; i < 10; ++i ) {
+                while( c->indexKeyPattern() != BSONObj() ) {
+                    c->advance();
+                }
+                c->advance();
+            }
+            // Abort the natural plan.
+            c->abortUnorderedPlans();
+            c->advance();
+            // Check that no more results from the natural plan are returned, and the cursor is not
+            // done iterating.
+            ASSERT( c->ok() );
+            while( c->ok() ) {
+                ASSERT_EQUALS( BSON( "a" << 1 ), c->indexKeyPattern() );
+                c->advance();
+            }
+            ASSERT( !c->completePlanOfHybridSetScanAndOrderRequired() );
         }
     };
     
@@ -3435,9 +3819,15 @@ namespace QueryOptimizerCursorTests {
             add<TimeoutClientCursorHolder>();
             add<AllowOutOfOrderPlan>();
             add<NoTakeoverByOutOfOrderPlan>();
+            add<OutOfOrderOnlyTakeover>();
             add<CoveredIndex>();
             add<CoveredIndexTakeover>();
             add<SaveGoodIndex>();
+            add<PossibleInOrderPlans>();
+            add<PossibleOutOfOrderPlans>();
+            add<PossibleBothPlans>();
+            add<AbortUnorderedPlans>();
+            add<AbortUnorderedPlanOnLastMatch>();
             add<GetCursor::NoConstraints>();
             add<GetCursor::SimpleId>();
             add<GetCursor::OptimalIndex>();

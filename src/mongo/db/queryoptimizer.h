@@ -335,8 +335,8 @@ namespace mongo {
         const FieldRangeSetPair &frsp() const { return *_frsp; }
         BSONObj order() const { return _order; }
         
-        bool haveOrderedPlan() const;
-        bool possibleOrderedPlan() const;
+        bool haveInOrderPlan() const;
+        bool possibleInOrderPlan() const;
         bool possibleOutOfOrderPlan() const;
 
         bool prepareToRetryQuery();
@@ -527,8 +527,8 @@ namespace mongo {
         
         void clearIndexesForPatterns() const;
 
-        bool haveOrderedPlan() const;
-        bool possibleOrderedPlan() const;
+        bool haveInOrderPlan() const;
+        bool possibleInOrderPlan() const;
         bool possibleOutOfOrderPlan() const;
         
         string toString() const;

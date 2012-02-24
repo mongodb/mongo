@@ -685,7 +685,7 @@ doneCheckOrder:
         return _plans[0];
     }
     
-    bool QueryPlanSet::haveOrderedPlan() const {
+    bool QueryPlanSet::haveInOrderPlan() const {
         for( PlanSet::const_iterator i = _plans.begin(); i != _plans.end(); ++i ) {
             if ( !(*i)->scanAndOrderRequired() ) {
                 return true;
@@ -694,8 +694,8 @@ doneCheckOrder:
         return false;
     }
 
-    bool QueryPlanSet::possibleOrderedPlan() const {
-        if ( haveOrderedPlan() ) {
+    bool QueryPlanSet::possibleInOrderPlan() const {
+        if ( haveInOrderPlan() ) {
             return true;
         }
         for( PlanSet::const_iterator i = _fallbackPlans.begin(); i != _fallbackPlans.end(); ++i ) {
@@ -1185,12 +1185,12 @@ doneCheckOrder:
         QueryUtilIndexed::clearIndexesForPatterns( _currentQps->frsp(), _currentQps->order() );
     }
     
-    bool MultiPlanScanner::haveOrderedPlan() const {
-        return _or ? true : _currentQps->haveOrderedPlan();
+    bool MultiPlanScanner::haveInOrderPlan() const {
+        return _or ? true : _currentQps->haveInOrderPlan();
     }
 
-    bool MultiPlanScanner::possibleOrderedPlan() const {
-        return _or ? true : _currentQps->possibleOrderedPlan();
+    bool MultiPlanScanner::possibleInOrderPlan() const {
+        return _or ? true : _currentQps->possibleInOrderPlan();
     }
 
     bool MultiPlanScanner::possibleOutOfOrderPlan() const {

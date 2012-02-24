@@ -811,9 +811,9 @@ namespace mongo {
             fieldRangeSet = queryPlan._fieldRangeSetMulti.get();
         }
         else {
-            QueryOptimizerCursor *cursor = dynamic_cast<QueryOptimizerCursor*>( _cursor.get() );
-            verify( 16080, cursor );
-            fieldRangeSet = &cursor->queryPlan()->multikeyFrs();
+            verify( 16080, _queryOptimizerCursor );
+            fieldRangeSet = _queryOptimizerCursor->initialFieldRangeSet();
+            verify( 16084, fieldRangeSet );
         }
         return new ScanAndOrder( _parsedQuery.getSkip(),
                                 _parsedQuery.getNumToReturn(),
@@ -825,38 +825,16 @@ namespace mongo {
                                              const shared_ptr<QueryOptimizerCursor> &cursor,
                                              BufBuilder &buf ) :
     ResponseBuildStrategy( parsedQuery, cursor, buf, QueryPlan::Summary() ),
-    _orderedBuild( parsedQuery, cursor, buf, QueryPlan::Summary() ),
+    _orderedBuild( _parsedQuery, _cursor, _buf, QueryPlan::Summary() ),
     _reorderBuild( _parsedQuery, _cursor, _buf, QueryPlan::Summary() ) {
     }
     
     bool HybridBuildStrategy::handleMatch() {
-        if ( !iterateNeedsSort() ) {
+        if ( !_queryOptimizerCursor->currentPlanScanAndOrderRequired() ) {
             return _orderedBuild.handleMatch();
         }
         handleReorderMatch();
         return false;
-    }
-    
-    bool HybridBuildStrategy::iterateNeedsSort() const {
-        const QueryPlan *queryPlan = _queryOptimizerCursor->queryPlan();
-        if ( !queryPlan ) {
-            return false;
-        }
-        if ( !queryPlan->scanAndOrderRequired() ) {
-            return false;
-        }
-        return true;
-    }
-    
-    bool HybridBuildStrategy::resultsNeedSort() const {
-        const QueryPlan *queryPlan = _queryOptimizerCursor->completeQueryPlan();
-        if ( !queryPlan ) {
-            return false;
-        }
-        if ( !queryPlan->scanAndOrderRequired() ) {
-            return false;
-        }
-        return true;            
     }
     
     void HybridBuildStrategy::handleReorderMatch() {
@@ -869,11 +847,11 @@ namespace mongo {
             _reorderBuild._handleMatchNoDedup();
         } catch ( const UserException &e ) {
             if ( e.getCode() == ScanAndOrderMemoryLimitExceededAssertionCode ) {
-                if ( _queryOptimizerCursor->mayRetryQuery() ) {
+                if ( _queryOptimizerCursor->runningInitialCachedPlan() ) {
                     _queryOptimizerCursor->clearIndexesForPatterns();
                     throw QueryRetryException();
                 }
-                else if ( _queryOptimizerCursor->mayFailOverToInOrderPlans() ) {
+                else if ( _queryOptimizerCursor->runningInitialInOrderPlan() ) {
                     _queryOptimizerCursor->abortUnorderedPlans();
                     return;
                 }
@@ -883,7 +861,7 @@ namespace mongo {
     }
     
     int HybridBuildStrategy::rewriteMatches() {
-        if ( !resultsNeedSort() ) {
+        if ( !_queryOptimizerCursor->completePlanOfHybridSetScanAndOrderRequired() ) {
             return _orderedBuild.rewriteMatches();
         }
         _buf.reset();
@@ -995,12 +973,16 @@ namespace mongo {
     ( const QueryPlan::Summary &queryPlan ) {
         bool singlePlan = !_queryOptimizerCursor;
         bool singleOrderedPlan = singlePlan && ( !queryPlan.valid() || !queryPlan._scanAndOrderRequired );
+        QueryOptimizerCursor::CandidatePlans queryOptimizerPlans;
+        if ( _queryOptimizerCursor ) {
+            queryOptimizerPlans = _queryOptimizerCursor->initialCandidatePlans();
+        }
         if ( _parsedQuery.getOrder().isEmpty() || !_cursor->ok() || singleOrderedPlan ||
-            ( _queryOptimizerCursor && !_queryOptimizerCursor->mayRunOutOfOrderPlans() ) ) {
+            ( queryOptimizerPlans.valid() && !queryOptimizerPlans._mayRunOutOfOrderPlan ) ) {
             return shared_ptr<ResponseBuildStrategy>
             ( new OrderedBuildStrategy( _parsedQuery, _cursor, _buf, queryPlan ) );
         }
-        if ( singlePlan || !_queryOptimizerCursor->mayRunInOrderPlans() ) {
+        if ( singlePlan || !queryOptimizerPlans._mayRunInOrderPlan ) {
             return shared_ptr<ResponseBuildStrategy>
             ( new ReorderBuildStrategy( _parsedQuery, _cursor, _buf, queryPlan ) );
         }
