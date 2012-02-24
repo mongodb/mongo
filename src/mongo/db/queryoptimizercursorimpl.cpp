@@ -464,7 +464,7 @@ namespace mongo {
             return _currOp->matcher( _currOp->cursor() );
         }
 
-        virtual CoveredIndexMatcher* matcher() const {
+        virtual CoveredIndexMatcher *matcher() const {
             if ( _takeover ) {
                 return _takeover->matcher();
             }
@@ -472,20 +472,24 @@ namespace mongo {
             return _currOp->matcher( _currOp->cursor() ).get();
         }
 
-        virtual const FieldRangeSet *initialFieldRangeSet() const {
-            if ( _takeover ) {
-                return 0;
-            }
-            assertOk();
-            return &_currOp->qp().multikeyFrs();
-        }
-        
         virtual bool currentMatches( MatchDetails *details = 0 ) {
             if ( _takeover ) {
                 return _takeover->currentMatches( details );
             }
             assertOk();
             return _currOp->currentMatches( details );
+        }
+        
+        virtual CandidatePlans initialCandidatePlans() const {
+            return _initialCandidatePlans;
+        }
+        
+        virtual const FieldRangeSet *initialFieldRangeSet() const {
+            if ( _takeover ) {
+                return 0;
+            }
+            assertOk();
+            return &_currOp->qp().multikeyFrs();
         }
         
         virtual bool currentPlanScanAndOrderRequired() const {
@@ -495,11 +499,7 @@ namespace mongo {
             assertOk();
             return _currOp->qp().scanAndOrderRequired();
         }
-
-        virtual bool completePlanOfHybridSetScanAndOrderRequired() const {
-            return _completePlanOfHybridSetScanAndOrderRequired;
-        }
-
+        
         virtual const Projection::KeyOnly *keyFieldsOnly() const {
             if ( _takeover ) {
                 return _takeover->keyFieldsOnly();
@@ -507,7 +507,7 @@ namespace mongo {
             assertOk();
             return _currOp->keyFieldsOnly();
         }
-
+        
         virtual bool runningInitialInOrderPlan() const {
             if ( _takeover ) {
                 return false;
@@ -515,10 +515,6 @@ namespace mongo {
             return _mps->haveInOrderPlan();
         }
 
-        virtual CandidatePlans initialCandidatePlans() const {
-            return _initialCandidatePlans;
-        }
-        
         virtual bool runningInitialCachedPlan() const {
             if ( _takeover ) {
                 return false;
@@ -526,6 +522,10 @@ namespace mongo {
             return _mps->usingCachedPlan();
         }
 
+        virtual bool completePlanOfHybridSetScanAndOrderRequired() const {
+            return _completePlanOfHybridSetScanAndOrderRequired;
+        }
+        
         virtual void clearIndexesForPatterns() {
             if ( !_takeover ) {
                 _mps->clearIndexesForPatterns();

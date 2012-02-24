@@ -978,11 +978,11 @@ namespace mongo {
             queryOptimizerPlans = _queryOptimizerCursor->initialCandidatePlans();
         }
         if ( _parsedQuery.getOrder().isEmpty() || !_cursor->ok() || singleOrderedPlan ||
-            ( queryOptimizerPlans.valid() && !queryOptimizerPlans._mayRunOutOfOrderPlan ) ) {
+            ( queryOptimizerPlans.valid() && !queryOptimizerPlans.mayRunOutOfOrderPlan() ) ) {
             return shared_ptr<ResponseBuildStrategy>
             ( new OrderedBuildStrategy( _parsedQuery, _cursor, _buf, queryPlan ) );
         }
-        if ( singlePlan || !queryOptimizerPlans._mayRunInOrderPlan ) {
+        if ( singlePlan || !queryOptimizerPlans.mayRunInOrderPlan() ) {
             return shared_ptr<ResponseBuildStrategy>
             ( new ReorderBuildStrategy( _parsedQuery, _cursor, _buf, queryPlan ) );
         }

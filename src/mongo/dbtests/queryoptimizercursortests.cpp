@@ -2473,8 +2473,8 @@ namespace QueryOptimizerCursorTests {
         void checkCursor( bool mayRunInOrderPlan, bool mayRunOutOfOrderPlan,
                          bool runningInitialInOrderPlan, bool runningInitialCachedPlan ) {
             QueryOptimizerCursor::CandidatePlans plans = _cursor->initialCandidatePlans();
-            ASSERT_EQUALS( mayRunInOrderPlan, plans._mayRunInOrderPlan );
-            ASSERT_EQUALS( mayRunOutOfOrderPlan, plans._mayRunOutOfOrderPlan );
+            ASSERT_EQUALS( mayRunInOrderPlan, plans.mayRunInOrderPlan() );
+            ASSERT_EQUALS( mayRunOutOfOrderPlan, plans.mayRunOutOfOrderPlan() );
             ASSERT_EQUALS( runningInitialInOrderPlan, _cursor->runningInitialInOrderPlan() );
             ASSERT_EQUALS( runningInitialCachedPlan, _cursor->runningInitialCachedPlan() );            
         }

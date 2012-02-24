@@ -84,11 +84,8 @@ namespace mongo {
     
     class QueryOptimizerCursor : public Cursor {
     public:
-        virtual const FieldRangeSet *initialFieldRangeSet() const = 0;
-        virtual bool currentPlanScanAndOrderRequired() const = 0;
-        virtual bool completePlanOfHybridSetScanAndOrderRequired() const = 0;
-        virtual const Projection::KeyOnly *keyFieldsOnly() const = 0;
-        struct CandidatePlans {
+        class CandidatePlans {
+        public:
             CandidatePlans( bool mayRunInOrderPlan, bool mayRunOutOfOrderPlan ) :
             _mayRunInOrderPlan( mayRunInOrderPlan ),
             _mayRunOutOfOrderPlan( mayRunOutOfOrderPlan ) {
@@ -97,16 +94,28 @@ namespace mongo {
             _mayRunInOrderPlan(),
             _mayRunOutOfOrderPlan() {
             }
+            bool mayRunInOrderPlan() const { return _mayRunInOrderPlan; }
+            bool mayRunOutOfOrderPlan() const { return _mayRunOutOfOrderPlan; }
+            bool valid() const { return mayRunInOrderPlan() || mayRunOutOfOrderPlan(); }
+            bool hybridPlanSet() const { return mayRunInOrderPlan() && mayRunOutOfOrderPlan(); }
+        private:
             bool _mayRunInOrderPlan;
             bool _mayRunOutOfOrderPlan;
-            bool valid() const { return _mayRunInOrderPlan || _mayRunOutOfOrderPlan; }
-            bool hybridPlanSet() const { return _mayRunInOrderPlan && _mayRunOutOfOrderPlan; }
         };
         virtual CandidatePlans initialCandidatePlans() const = 0;
+        virtual const FieldRangeSet *initialFieldRangeSet() const = 0;
+
+        virtual bool currentPlanScanAndOrderRequired() const = 0;
+        virtual const Projection::KeyOnly *keyFieldsOnly() const = 0;
+
         virtual bool runningInitialInOrderPlan() const = 0;
         virtual bool runningInitialCachedPlan() const = 0;
+
+        virtual bool completePlanOfHybridSetScanAndOrderRequired() const = 0;
+
         virtual void clearIndexesForPatterns() = 0;
         virtual void abortUnorderedPlans() = 0;
+
         virtual void noteIterate( bool match, bool loadedDocument, bool chunkSkip ) = 0;
         virtual shared_ptr<ExplainQueryInfo> explainQueryInfo() const = 0;
     };
