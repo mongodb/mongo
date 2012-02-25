@@ -295,7 +295,10 @@ namespace mongo {
      */
     class QueryOptimizerCursorImpl : public QueryOptimizerCursor {
     public:
-        QueryOptimizerCursorImpl( auto_ptr<MultiPlanScanner> &mps, const QueryPlanSelectionPolicy &planPolicy, bool requireOrder ) :
+        QueryOptimizerCursorImpl( auto_ptr<MultiPlanScanner> &mps,
+                                 const QueryPlanSelectionPolicy &planPolicy,
+                                 bool requireOrder,
+                                 bool explain ) :
         _requireOrder( requireOrder ),
         _mps( mps ),
         _initialCandidatePlans( _mps->possibleInOrderPlan(), _mps->possibleOutOfOrderPlan() ),
@@ -305,7 +308,9 @@ namespace mongo {
         _completePlanOfHybridSetScanAndOrderRequired(),
         _nscanned() {
             _mps->initialOp( _originalOp );
-            _explainQueryInfo = _mps->generateExplainInfo();
+            if ( explain ) {
+                _explainQueryInfo = _mps->generateExplainInfo();
+            }
             shared_ptr<QueryOp> op = _mps->nextOp();
             rethrowOnError( op );
             if ( !op->complete() ) {
@@ -641,10 +646,10 @@ namespace mongo {
     
     shared_ptr<Cursor> newQueryOptimizerCursor( auto_ptr<MultiPlanScanner> mps,
                                                const QueryPlanSelectionPolicy &planPolicy,
-                                               bool requireOrder ) {
+                                               bool requireOrder, bool explain ) {
         try {
             return shared_ptr<Cursor>( new QueryOptimizerCursorImpl( mps, planPolicy,
-                                                                    requireOrder ) );
+                                                                    requireOrder, explain ) );
         } catch( const AssertionException &e ) {
             if ( e.getCode() == OutOfOrderDocumentsAssertionCode ) {
                 // If no indexes follow the requested sort order, return an
@@ -789,10 +794,7 @@ namespace mongo {
             return cursor;
         }
         
-        if ( explain() ) {
-            _mps->generateExplainInfo();
-        }
-        return newQueryOptimizerCursor( _mps, _planPolicy, requireOrder() );
+        return newQueryOptimizerCursor( _mps, _planPolicy, requireOrder(), explain() );
     }
 
     /** This interface is just available for testing. */
@@ -801,7 +803,7 @@ namespace mongo {
      const BSONObj &order, const QueryPlanSelectionPolicy &planPolicy, bool requireOrder ) {
         auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, fields,
                                                              order ) ); // mayYield == false
-        return newQueryOptimizerCursor( mps, planPolicy, requireOrder );
+        return newQueryOptimizerCursor( mps, planPolicy, requireOrder, false );
     }
         
 } // namespace mongo;

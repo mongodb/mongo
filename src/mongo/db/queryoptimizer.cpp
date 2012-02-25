@@ -1156,7 +1156,6 @@ doneCheckOrder:
     }
 
     const QueryPlan *MultiPlanScanner::singlePlan() const {
-//        log() << "_or: " << _or << endl;
         if ( _or ||
             _currentQps->nPlans() != 1 ||
             _currentQps->usingCachedPlan() ) {

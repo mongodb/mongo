@@ -112,7 +112,6 @@ namespace mongo {
     BSONObj ExplainClauseInfo::bson() const {
         BSONObjBuilder bb;
         bb.appendElements( virtualPickedPlan().pickedPlanBson( *this ) );
-        // TODO won't include plans w/ no cursor iterates.
         BSONArrayBuilder allPlans( bb.subarrayStart( "allPlans" ) );
         for( list<shared_ptr<const ExplainPlanInfo> >::const_iterator i = _plans.begin();
             i != _plans.end(); ++i ) {
@@ -185,7 +184,7 @@ namespace mongo {
             }
         }
         verify( 16076, false );
-        return *(new ExplainPlanInfo());  // TODO better
+        return *(new ExplainPlanInfo());
     }
     
     void ExplainQueryInfo::noteIterate( bool match, bool loadedObject, bool chunkSkip ) {

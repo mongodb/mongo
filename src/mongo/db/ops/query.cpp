@@ -774,6 +774,7 @@ namespace mongo {
             --_skip;
             return false;
         }
+        // Explain does not obey soft limits, so matches should not be buffered if enabled.
         if ( !_parsedQuery.isExplain() ) {
             fillQueryResultFromObj( _buf, _parsedQuery.getFields(), current( true ),
                                    ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );

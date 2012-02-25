@@ -57,7 +57,6 @@ namespace mongo {
         bool picked() const { return _picked; }
         bool done() const { return _done; }
         long long n() const { return _n; }
-        long long nscannedObjects() const { return _nscannedObjects; }
         long long nscanned() const { return _nscanned; }
 
     private:

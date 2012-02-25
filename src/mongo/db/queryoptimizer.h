@@ -426,7 +426,6 @@ namespace mongo {
         bool _mayYield;
         ElapsedTracker _yieldSometimesTracker;
         bool _mustAssertOnYieldFailure;
-        shared_ptr<ExplainClauseInfo> _explainClauseInfo;
     };
 
     /** Handles $or type queries by generating a QueryPlanSet for each $or clause. */
