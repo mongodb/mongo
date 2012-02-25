@@ -558,8 +558,8 @@ namespace QueryOptimizerTests {
         public:
             void run() {
                 BSONObj obj = BSON( "a" << 1 );
-                auto_ptr<FieldRangeSetPair> fieldRangeSetPair( new FieldRangeSetPair( "", obj ) );
-                QueryPlanSet queryPlanSet( "", fieldRangeSetPair, auto_ptr<FieldRangeSetPair>(),
+                auto_ptr<FieldRangeSetPair> fieldRangeSetPair( new FieldRangeSetPair( ns(), obj ) );
+                QueryPlanSet queryPlanSet( ns(), fieldRangeSetPair, auto_ptr<FieldRangeSetPair>(),
                                           obj, shared_ptr<Projection>(), BSONObj() );
                 queryPlanSet.toString(); // Just test that we don't crash.
             }
