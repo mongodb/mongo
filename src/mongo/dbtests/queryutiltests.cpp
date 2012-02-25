@@ -906,7 +906,7 @@ namespace QueryUtilTests {
         class Namespace {
         public:
             void run() {
-                shared_ptr<FieldRangeSet> frs;
+                boost::shared_ptr<FieldRangeSet> frs;
                 {
                     string ns = str::stream() << "foo";
                     frs.reset( new FieldRangeSet( ns.c_str(), BSONObj(), true ) );

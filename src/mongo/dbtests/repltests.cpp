@@ -1085,7 +1085,7 @@ namespace ReplTests {
             BSONObj query = BSON( "ts" << b.obj() );
             FieldRangeSetPair frsp( cllNS(), query );
             BSONObj order = BSON( "$natural" << 1 );
-            QueryPlan qp( nsd, -1, frsp, &frsp, query, shared_ptr<Projection>(), order );
+            QueryPlan qp( nsd, -1, frsp, &frsp, query, boost::shared_ptr<Projection>(), order );
             FindingStartCursor fsc( qp );
             ASSERT( fsc.done() );
             ASSERT_EQUALS( 0, fsc.cursor()->current()[ "o" ].Obj()[ "_id" ].Int() );
@@ -1107,7 +1107,7 @@ namespace ReplTests {
             BSONObj query = BSON( "ts" << b.obj() );
             FieldRangeSetPair frsp( cllNS(), query );
             BSONObj order = BSON( "$natural" << 1 );
-            QueryPlan qp( nsd, -1, frsp, &frsp, query, shared_ptr<Projection>(), order );
+            QueryPlan qp( nsd, -1, frsp, &frsp, query, boost::shared_ptr<Projection>(), order );
             FindingStartCursor fsc( qp );
             ASSERT( !fsc.done() );
             fsc.next();
