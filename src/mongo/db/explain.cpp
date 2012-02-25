@@ -39,7 +39,7 @@ namespace mongo {
 
     void ExplainPlanInfo::notePlan( const Cursor &cursor, bool scanAndOrder, bool indexOnly ) {
         _cursorName = const_cast<Cursor&>(cursor).toString();
-        _indexBounds = cursor.prettyIndexBounds();
+        _indexBounds = cursor.prettyIndexBounds().getOwned();
         _scanAndOrder = scanAndOrder;
         _indexOnly = indexOnly;
         noteCursorUpdate( cursor );
