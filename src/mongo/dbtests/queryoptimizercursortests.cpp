@@ -2827,10 +2827,16 @@ namespace QueryOptimizerCursorTests {
                      MsgAssertionException );
                     return;
                 }
-                ParsedQuery parsedQuery( ns(), skip(), limit(), 0, query(), BSONObj() );
+                _query = query();
+                _parsedQuery.reset( new ParsedQuery( ns(), skip(), limit(), 0, _query,
+                                                    BSONObj() ) );
+                BSONObj extractedQuery = _query;
+                if ( !_query["$query"].eoo() ) {
+                    extractedQuery = _query["$query"].Obj();
+                }
                 shared_ptr<Cursor> c =
-                NamespaceDetailsTransient::getCursor( ns(), query(), order(), planPolicy(),
-                                                     &simpleEqualityMatch, &parsedQuery );
+                NamespaceDetailsTransient::getCursor( ns(), extractedQuery, order(), planPolicy(),
+                                                     &simpleEqualityMatch, _parsedQuery.get() );
                 ASSERT_EQUALS( expectSimpleEquality(), simpleEqualityMatch );
                 string type = c->toString().substr( 0, expectedType().length() );
                 ASSERT_EQUALS( expectedType(), type );
@@ -2853,6 +2859,9 @@ namespace QueryOptimizerCursorTests {
                 ASSERT_EQUALS( 5, c->current().getIntField( "_id" ) );
                 ASSERT( !c->advance() );
             }
+        private:
+            BSONObj _query;
+            shared_ptr<ParsedQuery> _parsedQuery;
         };
         
         class NoConstraints : public Base {
@@ -3036,6 +3045,68 @@ namespace QueryOptimizerCursorTests {
             string expectedType() const { return "QueryOptimizerCursor"; }
             BSONObj query() const { return BSON( "_id" << GT << 0 << "a" << GT << 0 ); }
             void check( const shared_ptr<Cursor> &c ) {}
+        };
+        
+        class Hint : public Base {
+        public:
+            Hint() {
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+            }
+            string expectedType() const { return "BtreeCursor a_1"; }
+            BSONObj query() const {
+                return BSON( "$query" << BSON( "_id" << 1 ) << "$hint" << BSON( "a" << 1 ) );
+            }
+            void check( const shared_ptr<Cursor> &c ) {}
+        };
+        
+        class Snapshot : public Base {
+        public:
+            Snapshot() {
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+            }
+            string expectedType() const { return "BtreeCursor _id_"; }
+            BSONObj query() const {
+                return BSON( "$query" << BSON( "a" << 1 ) << "$snapshot" << true );
+            }
+            void check( const shared_ptr<Cursor> &c ) {}            
+        };
+        
+        class SnapshotWithoutIdIndex : public Base {
+        public:
+            SnapshotWithoutIdIndex() {
+                _cli.dropCollection( ns() );
+                _cli.createCollection( ns(), 1000, true );
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+            }
+            string expectedType() const { return "BtreeCursor a_1"; }
+            BSONObj query() const {
+                return BSON( "$query" << BSON( "a" << 1 ) << "$snapshot" << true );
+            }
+            void check( const shared_ptr<Cursor> &c ) {}            
+        };
+        
+        class Min : public Base {
+        public:
+            Min() {
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+            }
+            string expectedType() const { return "BtreeCursor a_1"; }
+            BSONObj query() const {
+                return BSON( "$query" << BSONObj() << "$min" << BSON( "a" << 1 ) );
+            }
+            void check( const shared_ptr<Cursor> &c ) {}            
+        };
+        
+        class Max : public Base {
+        public:
+            Max() {
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+            }
+            string expectedType() const { return "BtreeCursor a_1"; }
+            BSONObj query() const {
+                return BSON( "$query" << BSONObj() << "$max" << BSON( "a" << 1 ) );
+            }
+            void check( const shared_ptr<Cursor> &c ) {}            
         };
         
         namespace RequireIndex {
@@ -3840,6 +3911,11 @@ namespace QueryOptimizerCursorTests {
             add<GetCursor::BestSavedOptimal>();
             add<GetCursor::BestSavedNotOptimal>();
             add<GetCursor::MultiIndex>();
+            add<GetCursor::Hint>();
+            add<GetCursor::Snapshot>();
+            add<GetCursor::SnapshotWithoutIdIndex>();
+            add<GetCursor::Min>();
+            add<GetCursor::Max>();
             add<GetCursor::RequireIndex::NoConstraints>();
             add<GetCursor::RequireIndex::SimpleId>();
             add<GetCursor::RequireIndex::UnindexedQuery>();
