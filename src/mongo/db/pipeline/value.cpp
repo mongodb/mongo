@@ -169,9 +169,6 @@ namespace mongo {
         case BinData:
         case Symbol:
         case CodeWScope:
-            uassert(16002, str::stream() <<
-                    "can't create Value of type " << type, false);
-            break;
 
             /* these shouldn't happen in this context */
         case MinKey:
@@ -180,7 +177,8 @@ namespace mongo {
         case DBRef:
         case Code:
         case MaxKey:
-            assert(false); // CW TODO better message
+            uassert(16002, str::stream() <<
+                    "can't create Value of BSON type " << type, false);
             break;
         }
     }
