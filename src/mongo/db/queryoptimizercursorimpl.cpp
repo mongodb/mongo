@@ -586,7 +586,6 @@ namespace mongo {
                 _currOp = qocop;
             }
             else if ( op->stopRequested() ) {
-//                log() << "stop requested" << endl;
                 if ( qocop->cursor() ) {
                     // Ensure that prepareToTouchEarlierIterate() may be called safely when a BasicCursor takes over.
                     if ( !prevLoc.isNull() && prevLoc == qocop->currLoc() ) {
@@ -739,7 +738,8 @@ namespace mongo {
                 if ( idxNo >= 0 ) {
                     IndexDetails& i = d->idx( idxNo );
                     BSONObj key = i.getKeyFromQuery( _query );
-                    return shared_ptr<Cursor>( BtreeCursor::make( d, idxNo, i, key, key, true, 1 ) );
+                    return shared_ptr<Cursor>( BtreeCursor::make( d, idxNo, i, key, key, true,
+                                                                 1 ) );
                 }
             }
         }
