@@ -431,6 +431,8 @@ namespace QueryTests {
             client().dropCollection( "unittests.querytests.OplogReplaySlaveReadTill" );
         }
         void run() {
+            dblock lk;
+            
             const char *ns = "unittests.querytests.OplogReplaySlaveReadTill";
             BSONObj info;
             client().runCommand( "unittests",
