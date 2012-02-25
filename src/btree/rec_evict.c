@@ -44,7 +44,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	if (F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE) ||
 	    (!WT_PAGE_IS_ROOT(page) &&
 		F_ISSET(page, WT_PAGE_REC_EMPTY | WT_PAGE_REC_SPLIT)))
-		WT_ERR_MSG(session, EINVAL,
+		WT_RET_MSG(session, EINVAL,
 		    "attempt to evict an empty or split page that should "
 		    "have been merged into its parent");
 
