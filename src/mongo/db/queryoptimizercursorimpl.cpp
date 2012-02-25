@@ -512,6 +512,7 @@ namespace mongo {
             if ( _takeover ) {
                 return false;
             }
+            assertOk();
             return _mps->haveInOrderPlan();
         }
 
@@ -519,6 +520,7 @@ namespace mongo {
             if ( _takeover ) {
                 return false;
             }
+            assertOk();
             return _mps->usingCachedPlan();
         }
 

@@ -255,7 +255,9 @@ namespace QueryOptimizerCursorTests {
         void run() {
             dblock lk;
             Client::Context ctx( ns() );
-            shared_ptr<Cursor> c = newQueryOptimizerCursor( ns(), BSONObj() );
+            shared_ptr<QueryOptimizerCursor> c =
+            dynamic_pointer_cast<QueryOptimizerCursor>
+            ( newQueryOptimizerCursor( ns(), BSONObj() ) );
             ASSERT( !c->ok() );
             ASSERT_THROWS( c->_current(), AssertionException );
             ASSERT_THROWS( c->current(), AssertionException );
@@ -265,6 +267,20 @@ namespace QueryOptimizerCursorTests {
             ASSERT_THROWS( c->getsetdup( DiskLoc() ), AssertionException );
             ASSERT_THROWS( c->isMultiKey(), AssertionException );
             ASSERT_THROWS( c->matcher(), AssertionException );
+            
+            ASSERT_THROWS( c->initialFieldRangeSet(), AssertionException );
+            ASSERT_THROWS( c->currentPlanScanAndOrderRequired(), AssertionException );
+            ASSERT_THROWS( c->keyFieldsOnly(), AssertionException );
+            ASSERT_THROWS( c->runningInitialInOrderPlan(), AssertionException );
+            ASSERT_THROWS( c->runningInitialCachedPlan(), AssertionException );
+
+            // ok
+            c->initialCandidatePlans();
+            c->completePlanOfHybridSetScanAndOrderRequired();
+            c->clearIndexesForPatterns();
+            c->abortUnorderedPlans();
+            c->noteIterate( false, false, false );
+            c->explainQueryInfo();
         }
     };
     
