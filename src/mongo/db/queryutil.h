@@ -25,62 +25,16 @@ namespace mongo {
     
     extern const int MaxBytesToReturnToClientAtOnce;
 
-    /** Dup tracking class, optimizing one common case with small set and few initial reads. */
-    class SmallDupSet {
+    class DiskLocDupSet {
     public:
-        SmallDupSet() : _accesses() {
-            _vec.reserve( 250 );
-        }
-        /** @return true if @param 'loc' already added to the set, false if adding to the set in this call. */
         bool getsetdup( const DiskLoc &loc ) {
-            access();
-            return vec() ? getsetdupVec( loc ) : getsetdupSet( loc );
-        }
-        /** @return true when @param loc in the set. */
-        bool getdup( const DiskLoc &loc ) {
-            access();
-            return vec() ? getdupVec( loc ) : getdupSet( loc );
-        }            
-    private:
-        void access() {
-            ++_accesses;
-            mayUpgrade();
-        }
-        void mayUpgrade() {
-            if ( vec() && _accesses > 500 ) {
-                _set.insert( _vec.begin(), _vec.end() );
-            }
-        }
-        bool vec() const {
-            return _set.size() == 0;
-        }
-        bool getsetdupVec( const DiskLoc &loc ) {
-            if ( getdupVec( loc ) ) {
-                return true;
-            }
-            _vec.push_back( loc );
-            return false;
-        }
-        bool getdupVec( const DiskLoc &loc ) const {
-            for( vector<DiskLoc>::const_iterator i = _vec.begin(); i != _vec.end(); ++i ) {
-                if ( *i == loc ) {
-                    return true;
-                }
-            }
-            return false;
-        }
-        bool getsetdupSet( const DiskLoc &loc ) {
-            pair<set<DiskLoc>::iterator, bool> p = _set.insert(loc);
+            pair<set<DiskLoc>::iterator, bool> p = _dups.insert(loc);
             return !p.second;
         }
-        bool getdupSet( const DiskLoc &loc ) {
-            return _set.count( loc ) > 0;
-        }
-        vector<DiskLoc> _vec;
-        set<DiskLoc> _set;
-        long long _accesses;
+    private:
+        set<DiskLoc> _dups;
     };
-
+    
     /* This is for languages whose "objects" are not well ordered (JSON is well ordered).
      [ { a : ... } , { b : ... } ] -> { a : ..., b : ... }
      */

@@ -142,7 +142,7 @@ namespace mongo {
     private:
         void handleReorderMatch();
         bool handleOrderedMatch();
-        SmallDupSet _scanAndOrderDups;
+        DiskLocDupSet _scanAndOrderDups;
         OrderedBuildStrategy _orderedBuild;
         ReorderBuildStrategy _reorderBuild;
     };
