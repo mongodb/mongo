@@ -312,17 +312,6 @@ namespace mongo {
         /** @return number of candidate plans. */
         int nPlans() const { return _plans.size(); }
 
-        /**
-         * Clone op for each query plan, and @return the first cloned op to call
-         * setComplete() or setStop().
-         */
-
-//        shared_ptr<QueryOp> runOp( QueryOp &op );
-//        template<class T>
-//        shared_ptr<T> runOp( T &op ) {
-//            return dynamic_pointer_cast<T>( runOp( static_cast<QueryOp&>( op ) ) );
-//        }
-
         QueryPlanPtr firstPlan() const { return _plans[ 0 ]; }
         
         /** @return metadata about cursors and index bounds for all plans, suitable for explain output. */
@@ -369,9 +358,6 @@ namespace mongo {
             
             bool prepareToYield();
             void recoverFromYield();
-            
-            /** Run until first op completes. */
-            shared_ptr<QueryOp> runUntilFirstCompletes();
             
             void mayYield();
             QueryOp &_op;
@@ -440,28 +426,6 @@ namespace mongo {
                           const BSONObj &min = BSONObj(),
                           const BSONObj &max = BSONObj(),
                           bool mayYield = false);
-
-        /**
-         * Clone op for each query plan of a single $or clause, and @return the first cloned op
-         * to call setComplete() or setStop().
-         */
-
-//        shared_ptr<QueryOp> runOpOnce( QueryOp &op );
-//        template<class T>
-//        shared_ptr<T> runOpOnce( T &op ) {
-//            return dynamic_pointer_cast<T>( runOpOnce( static_cast<QueryOp&>( op ) ) );
-//        }
-
-        /**
-         * For each $or clause, calls runOpOnce on the child QueryOp cloned from the winning QueryOp
-         * of the previous $or clause (or from the supplied 'op' for the first $or clause).
-         */
-
-//        shared_ptr<QueryOp> runOp( QueryOp &op );
-//        template<class T>
-//        shared_ptr<T> runOp( T &op ) {
-//            return dynamic_pointer_cast<T>( runOp( static_cast<QueryOp&>( op ) ) );
-//        }
 
         /** Initialize or iterate a runner generated from @param originalOp. */
         
