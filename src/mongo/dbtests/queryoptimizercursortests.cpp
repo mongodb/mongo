@@ -2846,6 +2846,84 @@ namespace QueryOptimizerCursorTests {
         }
     };
     
+    class TakeoverOrRangeElimination : public PlanChecking {
+    public:
+        void run() {
+            _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+            for( int i = 0; i < 120; ++i ) {
+                _cli.insert( ns(), BSON( "a" << 1 ) );
+            }
+            for( int i = 0; i < 20; ++i ) {
+                _cli.insert( ns(), BSON( "a" << 2 ) );
+            }
+            for( int i = 0; i < 20; ++i ) {
+                _cli.insert( ns(), BSON( "a" << 3 ) );
+            }
+
+            dblock lk;
+            Client::Context ctx( ns() );
+            
+            shared_ptr<QueryOptimizerCursor> c =
+            getCursor( fromjson( "{$or:[{a:{$lte:2}},{a:{$gte:2}},{a:9}]}" ), BSONObj() );
+
+            int count = 0;
+            while( c->ok() ) {
+                c->advance();
+                ++count;
+            }
+            ASSERT_EQUALS( 160, count );
+        }
+    };
+    
+    class TakeoverOrDedups : public PlanChecking {
+    public:
+        void run() {
+            _cli.ensureIndex( ns(), BSON( "a" << 1 << "b" << 1 ) );
+            for( int i = 0; i < 120; ++i ) {
+                _cli.insert( ns(), BSON( "a" << 1 << "b" << 1 ) );
+            }
+            for( int i = 0; i < 20; ++i ) {
+                _cli.insert( ns(), BSON( "a" << 2 << "b" << 2 ) );
+            }
+            for( int i = 0; i < 20; ++i ) {
+                _cli.insert( ns(), BSON( "a" << 3 << "b" << 3 ) );
+            }
+            
+            dblock lk;
+            Client::Context ctx( ns() );
+            
+            BSONObj query =
+            BSON(
+                 "$or" << BSON_ARRAY(
+                                     BSON(
+                                          "a" << GTE << 0 << LTE << 2 <<
+                                          "b" << GTE << 0 << LTE << 2
+                                          ) <<
+                                     BSON(
+                                          "a" << GTE << 1 << LTE << 3 <<
+                                          "b" << GTE << 1 << LTE << 3
+                                          ) <<
+                                     BSON(
+                                          "a" << GTE << 1 << LTE << 4 <<
+                                          "b" << GTE << 1 << LTE << 4
+                                          )
+                                     )
+                 );
+                                     
+            shared_ptr<QueryOptimizerCursor> c = getCursor( query, BSONObj() );
+            
+            int count = 0;
+            while( c->ok() ) {
+                if ( ( c->indexKeyPattern() == BSON( "a" << 1 << "b" << 1 ) ) &&
+                    c->currentMatches() ) {
+                    ++count;
+                }
+                c->advance();
+            }
+            ASSERT_EQUALS( 160, count );
+        }
+    };
+    
     namespace GetCursor {
         
         class Base : public QueryOptimizerCursorTests::Base {
@@ -3939,6 +4017,8 @@ namespace QueryOptimizerCursorTests {
             add<AbortUnorderedPlans>();
             add<AbortUnorderedPlanOnLastMatch>();
             add<TakeoverOrCheckScanAndOrder>();
+            add<TakeoverOrRangeElimination>();
+            add<TakeoverOrDedups>();
             add<GetCursor::NoConstraints>();
             add<GetCursor::SimpleId>();
             add<GetCursor::OptimalIndex>();
