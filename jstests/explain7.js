@@ -1,5 +1,7 @@
 // Basic test for special explain fields of a geo cursor.
 
+if ( typeof _threadInject == "undefined" ) { // don't run in v8 mode SERVER-5034
+
 t = db.jstests_explain7;
 t.drop();
 
@@ -47,3 +49,5 @@ checkFields( {
             pointsRemovedOnYield:0
             },
             t.find( { loc:[ 1, 5 ] } ).limit( 1 ).explain( true ) );
+
+}

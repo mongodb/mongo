@@ -1,5 +1,7 @@
 // Basic validation of explain output fields
 
+if ( typeof _threadInject == "undefined" ) { // don't run in v8 mode SERVER-5034
+
 t = db.jstests_explain4;
 t.drop();
 
@@ -50,3 +52,5 @@ checkFields( 1, true );
 t.save( {} );
 checkFields( 1, false, 1 );
 checkFields( 2, true, 1 );
+
+}
