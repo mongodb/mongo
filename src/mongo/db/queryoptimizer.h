@@ -616,9 +616,15 @@ namespace mongo {
         
         void noteYield();
         
-        const QueryPlan *queryPlan() const { return _queryPlan; }
+        const QueryPlan &queryPlan() const {
+            verify( 16085, _c->ok() && _queryPlan );
+            return *_queryPlan;
+        }
         
-        const Projection::KeyOnly *keyFieldsOnly() const { return _queryPlan->keyFieldsOnly().get(); }
+        const Projection::KeyOnly *keyFieldsOnly() const {
+            verify( 16086, _c->ok() && _queryPlan );
+            return _queryPlan->keyFieldsOnly().get();
+        }
     private:
         void nextClause();
         auto_ptr<MultiPlanScanner> _mps;

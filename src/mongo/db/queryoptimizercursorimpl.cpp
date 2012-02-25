@@ -494,7 +494,7 @@ namespace mongo {
         
         virtual bool currentPlanScanAndOrderRequired() const {
             if ( _takeover ) {
-                return _takeover->queryPlan()->scanAndOrderRequired();
+                return _takeover->queryPlan().scanAndOrderRequired();
             }
             assertOk();
             return _currOp->qp().scanAndOrderRequired();

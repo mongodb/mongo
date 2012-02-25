@@ -2807,6 +2807,29 @@ namespace QueryOptimizerCursorTests {
         }
     };
     
+    class TakeoverOrCheckScanAndOrder : public PlanChecking {
+    public:
+        void run() {
+            _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+            for( int i = 0; i < 120; ++i ) {
+                _cli.insert( ns(), BSON( "a" << 1 ) );
+            }
+            for( int i = 0; i < 20; ++i ) {
+                _cli.insert( ns(), BSON( "a" << 2 ) );
+            }
+            
+            dblock lk;
+            Client::Context ctx( ns() );
+            
+            shared_ptr<QueryOptimizerCursor> c =
+            getCursor( fromjson( "{$or:[{a:1},{a:2}]}" ), BSONObj() );
+            
+            while( c->advance() );
+            ASSERT_THROWS( c->currentPlanScanAndOrderRequired(), AssertionException );
+            ASSERT_THROWS( c->keyFieldsOnly(), AssertionException );
+        }
+    };
+    
     namespace GetCursor {
         
         class Base : public QueryOptimizerCursorTests::Base {
@@ -3899,6 +3922,7 @@ namespace QueryOptimizerCursorTests {
             add<PossibleBothPlans>();
             add<AbortUnorderedPlans>();
             add<AbortUnorderedPlanOnLastMatch>();
+            add<TakeoverOrCheckScanAndOrder>();
             add<GetCursor::NoConstraints>();
             add<GetCursor::SimpleId>();
             add<GetCursor::OptimalIndex>();

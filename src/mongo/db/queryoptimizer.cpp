@@ -1243,12 +1243,10 @@ doneCheckOrder:
         _matcher->advanceOrClause( _queryPlan->originalFrv() );
         shared_ptr<CoveredIndexMatcher> newMatcher
         ( _matcher->nextClauseMatcher( _queryPlan->indexKey() ) );
-        const QueryPlan *nextPlan = _mps->nextClauseBestGuessPlan( *_queryPlan );
-        // TODO leave _queryPlan invalid otherwise?
-        if ( nextPlan ) {
-            _queryPlan = nextPlan;
+        _queryPlan = _mps->nextClauseBestGuessPlan( *_queryPlan );
+        if ( _queryPlan ) {
             _matcher = newMatcher;
-            _c = nextPlan->newCursor();
+            _c = _queryPlan->newCursor();
             if ( _explainPlanInfo ) {
                 _explainPlanInfo.reset( new ExplainPlanInfo() );
                 _explainPlanInfo->notePlan( *_c, _queryPlan->scanAndOrderRequired(),
