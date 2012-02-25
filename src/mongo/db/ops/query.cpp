@@ -725,6 +725,11 @@ namespace mongo {
     _planKeyFieldsOnly( queryPlan._keyFieldsOnly ) {
     }
 
+    void ResponseBuildStrategy::resetBuf() {
+        _buf.reset();
+        _buf.skip( sizeof( QueryResult ) );
+    }
+
     BSONObj ResponseBuildStrategy::current( bool allowCovered ) const {
         if ( _parsedQuery.returnKey() ) {
             BSONObjBuilder bob;
@@ -770,7 +775,8 @@ namespace mongo {
             return false;
         }
         if ( !_parsedQuery.isExplain() ) {
-            fillQueryResultFromObj( _buf, _parsedQuery.getFields(), current( true ), ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
+            fillQueryResultFromObj( _buf, _parsedQuery.getFields(), current( true ),
+                                   ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
         }
         return true;
     }
@@ -803,7 +809,8 @@ namespace mongo {
         return ret;
     }
     
-    ScanAndOrder *ReorderBuildStrategy::newScanAndOrder( const QueryPlan::Summary &queryPlan ) const {
+    ScanAndOrder *
+    ReorderBuildStrategy::newScanAndOrder( const QueryPlan::Summary &queryPlan ) const {
         verify( 16078, !_parsedQuery.getOrder().isEmpty() );
         verify( 16079, _cursor->ok() );
         const FieldRangeSet *fieldRangeSet = 0;
@@ -813,8 +820,8 @@ namespace mongo {
         else {
             verify( 16080, _queryOptimizerCursor );
             fieldRangeSet = _queryOptimizerCursor->initialFieldRangeSet();
-            verify( 16084, fieldRangeSet );
         }
+        verify( 16084, fieldRangeSet );
         return new ScanAndOrder( _parsedQuery.getSkip(),
                                 _parsedQuery.getNumToReturn(),
                                 _parsedQuery.getOrder(),
@@ -838,7 +845,6 @@ namespace mongo {
     }
     
     void HybridBuildStrategy::handleReorderMatch() {
-        // todo improve
         DiskLoc loc = _cursor->currLoc();
         if ( _scanAndOrderDups.getsetdup( loc ) ) {
             return;
@@ -864,8 +870,7 @@ namespace mongo {
         if ( !_queryOptimizerCursor->completePlanOfHybridSetScanAndOrderRequired() ) {
             return _orderedBuild.rewriteMatches();
         }
-        _buf.reset();
-        _buf.skip( sizeof( QueryResult ) );
+        resetBuf();
         return _reorderBuild.rewriteMatches();
     }
     
@@ -881,7 +886,7 @@ namespace mongo {
     _explain( newExplainRecordingStrategy( queryPlan, oldPlan ) ),
     _builder( newResponseBuildStrategy( queryPlan ) ),
     _bufferedMatches() {
-        _buf.skip( sizeof( QueryResult ) );
+        _builder->resetBuf();
     }
 
     bool QueryResponseBuilder::addMatch() {
@@ -904,14 +909,15 @@ namespace mongo {
     }
 
     bool QueryResponseBuilder::enoughForFirstBatch() const {
-        return !_parsedQuery.isExplain() && _parsedQuery.enoughForFirstBatch( _bufferedMatches, _buf.len() );
+        return _parsedQuery.enoughForFirstBatch( _bufferedMatches, _buf.len() );
     }
 
     bool QueryResponseBuilder::enoughTotalResults() const {
         if ( _parsedQuery.isExplain() ) {
             return _parsedQuery.enough( _bufferedMatches ) && !_parsedQuery.wantMore();
         }
-        return ( _parsedQuery.enough( _bufferedMatches ) || _buf.len() >= MaxBytesToReturnToClientAtOnce );
+        return ( _parsedQuery.enough( _bufferedMatches ) ||
+                _buf.len() >= MaxBytesToReturnToClientAtOnce );
     }
 
     void QueryResponseBuilder::finishedFirstBatch() {
@@ -930,8 +936,7 @@ namespace mongo {
             if ( rewriteCount != -1 ) {
                 explainInfo->reviseN( rewriteCount );
             }
-            _buf.reset();
-            _buf.skip( sizeof( QueryResult ) );
+            _builder->resetBuf();
             fillQueryResultFromObj( _buf, 0, explainInfo->bson() );
             result.appendData( _buf.buf(), _buf.len() );
             _buf.decouple();
@@ -964,25 +969,31 @@ namespace mongo {
         }
         shared_ptr<ExplainRecordingStrategy> ret
         ( new SimpleCursorExplainStrategy( ancillaryInfo, _cursor ) );
-        ret->notePlan( queryPlan.valid() ? queryPlan._scanAndOrderRequired : false,
+        ret->notePlan( queryPlan.valid() && queryPlan._scanAndOrderRequired,
                       queryPlan._keyFieldsOnly );
         return ret;
     }
 
     shared_ptr<ResponseBuildStrategy> QueryResponseBuilder::newResponseBuildStrategy
     ( const QueryPlan::Summary &queryPlan ) {
+        bool unordered = _parsedQuery.getOrder().isEmpty();
+        bool empty = !_cursor->ok();
         bool singlePlan = !_queryOptimizerCursor;
-        bool singleOrderedPlan = singlePlan && ( !queryPlan.valid() || !queryPlan._scanAndOrderRequired );
+        bool singleOrderedPlan =
+        singlePlan && ( !queryPlan.valid() || !queryPlan._scanAndOrderRequired );
         QueryOptimizerCursor::CandidatePlans queryOptimizerPlans;
         if ( _queryOptimizerCursor ) {
             queryOptimizerPlans = _queryOptimizerCursor->initialCandidatePlans();
         }
-        if ( _parsedQuery.getOrder().isEmpty() || !_cursor->ok() || singleOrderedPlan ||
-            ( queryOptimizerPlans.valid() && !queryOptimizerPlans.mayRunOutOfOrderPlan() ) ) {
+        if ( unordered ||
+            empty ||
+            singleOrderedPlan ||
+            ( !singlePlan && !queryOptimizerPlans.mayRunOutOfOrderPlan() ) ) {
             return shared_ptr<ResponseBuildStrategy>
             ( new OrderedBuildStrategy( _parsedQuery, _cursor, _buf, queryPlan ) );
         }
-        if ( singlePlan || !queryOptimizerPlans.mayRunInOrderPlan() ) {
+        if ( singlePlan ||
+            !queryOptimizerPlans.mayRunInOrderPlan() ) {
             return shared_ptr<ResponseBuildStrategy>
             ( new ReorderBuildStrategy( _parsedQuery, _cursor, _buf, queryPlan ) );
         }

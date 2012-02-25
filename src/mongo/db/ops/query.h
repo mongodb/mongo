@@ -93,6 +93,7 @@ namespace mongo {
         virtual ~ResponseBuildStrategy() {}
         virtual bool handleMatch() = 0;
         virtual int rewriteMatches() { return -1; }
+        void resetBuf();
     protected:
         BSONObj current( bool allowCovered ) const;
         const ParsedQuery &_parsedQuery;
