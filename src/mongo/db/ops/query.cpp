@@ -268,7 +268,7 @@ namespace mongo {
 
     QueryOptimizerCursorExplainStrategy::QueryOptimizerCursorExplainStrategy
     ( const ExplainQueryInfo::AncillaryInfo &ancillaryInfo,
-     const shared_ptr<QueryOptimizerCursor> cursor ) :
+     const shared_ptr<QueryOptimizerCursor> &cursor ) :
     ExplainRecordingStrategy( ancillaryInfo ),
     _cursor( cursor ) {
     }
@@ -310,7 +310,7 @@ namespace mongo {
             }
         }
         BSONObj ret = _cursor->current();
-        assert( ret.isValid() );
+        verify( 16087, ret.isValid() );
         return ret;
     }
 
@@ -341,7 +341,7 @@ namespace mongo {
             --_skip;
             return false;
         }
-        // Explain does not obey soft limits, so matches should not be buffered if enabled.
+        // Explain does not obey soft limits, so matches should not be buffered.
         if ( !_parsedQuery.isExplain() ) {
             fillQueryResultFromObj( _buf, _parsedQuery.getFields(), current( true ),
                                    ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
@@ -599,7 +599,7 @@ namespace mongo {
                                         const BSONObj &oldPlan,
                                         const ConfigVersion &shardingVersionAtStart,
                                         Message &result ) {
-        const ParsedQuery& pq( *pq_shared );
+        const ParsedQuery &pq( *pq_shared );
         shared_ptr<Cursor> cursor;
         QueryPlan::Summary queryPlan;
         if ( pq.hasOption( QueryOption_OplogReplay ) ) {
@@ -614,7 +614,7 @@ namespace mongo {
         
         QueryResponseBuilder queryResponseBuilder( pq, cursor, queryPlan, oldPlan );
         bool saveClientCursor = false;
-        const char * exhaust = 0;
+        const char *exhaust = 0;
         OpTime slaveReadTill;
         ClientCursor::CleanupPointer ccPointer;
         ccPointer.reset( new ClientCursor( QueryOption_NoCursorTimeout, cursor, ns ) );
@@ -876,7 +876,7 @@ namespace mongo {
                 return queryWithQueryOptimizer( m, queryOptions, ns, jsobj, curop, query, order,
                                                pq_shared, oldPlan, shardingVersionAtStart, result );
             } catch ( const QueryRetryException & ) {
-                verify( 16083, retry == 0 );
+                verify( 16088, retry == 0 );
             }
         }
         verify( 16082, false );

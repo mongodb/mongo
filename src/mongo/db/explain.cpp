@@ -1,4 +1,4 @@
-// @file explain.h - Helper classes for generating query explain output.
+// @file explain.cpp - Helper classes for generating query explain output.
 
 /*    Copyright 2012 10gen Inc.
  *
@@ -170,7 +170,8 @@ namespace mongo {
             }
         }
         // Return a plan with the highest match count.
-        int maxN = 0;
+        // TODO simplify
+        long long maxN = 0;
         for( list<shared_ptr<const ExplainPlanInfo> >::const_iterator i = _plans.begin();
             i != _plans.end(); ++i ) {
             if ( (*i)->n() > maxN ) {

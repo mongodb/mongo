@@ -304,7 +304,7 @@ namespace mongo {
                       const BSONObj &order,
                       bool mustAssertOnYieldFailure = true,
                       const BSONObj &hint = BSONObj(),
-                      RecordedPlanPolicy RecordedPlanPolicy = Use,
+                      RecordedPlanPolicy recordedPlanPolicy = Use,
                       const BSONObj &min = BSONObj(),
                       const BSONObj &max = BSONObj(),
                       bool mayYield = false);

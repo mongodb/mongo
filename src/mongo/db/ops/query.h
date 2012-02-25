@@ -39,7 +39,10 @@ namespace mongo {
 
     class QueryRetryException : public DBException {
     public:
-        QueryRetryException() : DBException( "query retry exception" , 16083 ) {}
+        QueryRetryException() : DBException( "query retry exception" , 16083 ) {
+            return;
+            verify( 16083, true ); // Reserve 16083.
+        }
     };
 
     class ExplainRecordingStrategy {
@@ -79,7 +82,7 @@ namespace mongo {
     class QueryOptimizerCursorExplainStrategy : public ExplainRecordingStrategy {
     public:
         QueryOptimizerCursorExplainStrategy( const ExplainQueryInfo::AncillaryInfo &ancillaryInfo,
-                                            const shared_ptr<QueryOptimizerCursor> cursor );
+                                            const shared_ptr<QueryOptimizerCursor> &cursor );
     private:
         virtual void noteIterate( bool match, bool loadedObject, bool chunkSkip );
         virtual shared_ptr<ExplainQueryInfo> _doneQueryInfo();

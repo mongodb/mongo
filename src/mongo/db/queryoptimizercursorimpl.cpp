@@ -107,7 +107,7 @@ namespace mongo {
         
         virtual bool prepareToYield() {
             if ( _c && !_cc ) {
-                _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , _c , qp().ns() ) );
+                _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout, _c, qp().ns() ) );
             }
             if ( _cc ) {
                 recordCursorLocation();
@@ -454,6 +454,7 @@ namespace mongo {
             return _currOp->cursor()->isMultiKey();
         }
         
+        // TODO fix
         virtual bool modifiedKeys() const { return true; }
 
         /** Initial capped wrapping cases (before takeover) are handled internally by a component ClientCursor. */
@@ -782,7 +783,6 @@ namespace mongo {
     shared_ptr<Cursor> CursorGenerator::generate() {
 
         setArgumentsHint();
-        
         shared_ptr<Cursor> cursor = shortcutCursor();
         if ( cursor ) {
             return cursor;

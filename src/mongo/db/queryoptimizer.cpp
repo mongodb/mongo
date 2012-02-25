@@ -1152,7 +1152,7 @@ doneCheckOrder:
         _mps->clearRunner();
         _mps->setRecordedPlanPolicy( QueryPlanSet::UseIfInOrder );
         if ( !ok() ) {
-            // If supplied cursor exhausted, try to advance.
+            // If the supplied cursor is exhausted, try to advance it.
             advance();
         }
     }
