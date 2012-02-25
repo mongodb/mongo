@@ -34,3 +34,16 @@ checkFields( {
             pointsRemovedOnYield:0
             },
             t.find( { loc:[ 1, 5 ] } ).explain( true ) );
+
+t.save( { loc: [ 1, 5 ] } );
+checkFields( {
+            n:1,
+            lookedAt:2,
+            matchesPerfd:0,
+            objectsLoaded:2,
+            pointsLoaded:2,
+            pointsSavedForYield:0,
+            pointsChangedOnYield:0,
+            pointsRemovedOnYield:0
+            },
+            t.find( { loc:[ 1, 5 ] } ).limit( 1 ).explain( true ) );
