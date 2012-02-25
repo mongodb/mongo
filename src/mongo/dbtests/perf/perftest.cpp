@@ -663,8 +663,8 @@ namespace Plan {
         }
         void run() {
             for( int i = 0; i < 10000; ++i )
-                MultiPlanScanner s( ns_.c_str(), BSONObj(), shared_ptr<Projection>(), BSONObj(),
-                                   hint_ );
+                MultiPlanScanner s( ns_.c_str(), BSONObj(),
+                                   boost::shared_ptr<Projection>(), BSONObj(), hint_ );
         }
         string ns_;
         scoped_ptr<dblock> _lk;
@@ -685,8 +685,8 @@ namespace Plan {
         void run() {
             Client::Context ctx( ns_ );
             for( int i = 0; i < 10000; ++i )
-                MultiPlanScanner s( ns_.c_str(), BSONObj(), shared_ptr<Projection>(),
-                                   BSON( "a" << 1 ) );
+                MultiPlanScanner s( ns_.c_str(), BSONObj(),
+                                   boost::shared_ptr<Projection>(), BSON( "a" << 1 ) );
         }
         string ns_;
         auto_ptr< dblock > lk_;
@@ -705,8 +705,8 @@ namespace Plan {
         void run() {
             Client::Context ctx( ns_.c_str() );
             for( int i = 0; i < 10000; ++i )
-                MultiPlanScanner s( ns_.c_str(), BSON( "a" << 1 ), shared_ptr<Projection>(),
-                                   BSONObj() );
+                MultiPlanScanner s( ns_.c_str(), BSON( "a" << 1 ),
+                                   boost::shared_ptr<Projection>(), BSONObj() );
         }
         string ns_;
         auto_ptr< dblock > lk_;
