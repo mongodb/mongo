@@ -637,9 +637,12 @@ namespace mongo {
         shared_ptr<ExplainQueryInfo> _explainQueryInfo;
     };
     
-    shared_ptr<Cursor> newQueryOptimizerCursor( auto_ptr<MultiPlanScanner> mps, const QueryPlanSelectionPolicy &planPolicy, bool requireOrder ) {
+    shared_ptr<Cursor> newQueryOptimizerCursor( auto_ptr<MultiPlanScanner> mps,
+                                               const QueryPlanSelectionPolicy &planPolicy,
+                                               bool requireOrder ) {
         try {
-            return shared_ptr<Cursor>( new QueryOptimizerCursorImpl( mps, planPolicy, requireOrder ) );
+            return shared_ptr<Cursor>( new QueryOptimizerCursorImpl( mps, planPolicy,
+                                                                    requireOrder ) );
         } catch( const AssertionException &e ) {
             if ( e.getCode() == OutOfOrderDocumentsAssertionCode ) {
                 // If no indexes follow the requested sort order, return an
@@ -651,109 +654,143 @@ namespace mongo {
         return shared_ptr<Cursor>();
     }
     
-    shared_ptr<Cursor> NamespaceDetailsTransient::getCursor( const char *ns, const BSONObj &query,
-                                                            const BSONObj &order,
-                                                            const QueryPlanSelectionPolicy
-                                                            &planPolicy,
-                                                            bool *simpleEqualityMatch,
-                                                            const ParsedQuery *parsedQuery,
-                                                            QueryPlan::Summary *singlePlanSummary ) {
-        if ( simpleEqualityMatch ) {
-            *simpleEqualityMatch = false;
-        }
-        if ( singlePlanSummary ) {
-            *singlePlanSummary = QueryPlan::Summary();
-        }
+    shared_ptr<Cursor>
+    NamespaceDetailsTransient::getCursor( const char *ns,
+                                         const BSONObj &query,
+                                         const BSONObj &order,
+                                         const QueryPlanSelectionPolicy &planPolicy,
+                                         bool *simpleEqualityMatch,
+                                         const ParsedQuery *parsedQuery,
+                                         QueryPlan::Summary *singlePlanSummary ) {
 
-        BSONObj hint;
-        if ( useHints && parsedQuery ) {
-            hint = parsedQuery->getHint();
+        CursorGenerator generator( ns, query, order, planPolicy, simpleEqualityMatch, parsedQuery,
+                        singlePlanSummary );
+        return generator.generate();
+    }
+    
+    CursorGenerator::CursorGenerator( const char *ns,
+                                     const BSONObj &query,
+                                     const BSONObj &order,
+                                     const QueryPlanSelectionPolicy &planPolicy,
+                                     bool *simpleEqualityMatch,
+                                     const ParsedQuery *parsedQuery,
+                                     QueryPlan::Summary *singlePlanSummary ) :
+    _ns( ns ),
+    _query( query ),
+    _order( order ),
+    _planPolicy( planPolicy ),
+    _simpleEqualityMatch( simpleEqualityMatch ),
+    _parsedQuery( parsedQuery ),
+    _singlePlanSummary( singlePlanSummary ) {
+        // Initialize optional return variables.
+        if ( _simpleEqualityMatch ) {
+            *_simpleEqualityMatch = false;
         }
-        bool snapshot = parsedQuery && parsedQuery->isSnapshot();
-
-        if( snapshot ) {
-            NamespaceDetails *d = nsdetails(ns);
+        if ( _singlePlanSummary ) {
+            *_singlePlanSummary = QueryPlan::Summary();
+        }
+    }
+    
+    void CursorGenerator::setArgumentsHint() {
+        if ( useHints && _parsedQuery ) {
+            _argumentsHint = _parsedQuery->getHint();
+        }
+        
+        if ( snapshot() ) {
+            NamespaceDetails *d = nsdetails( _ns );
             if ( d ) {
                 int i = d->findIdIndex();
                 if( i < 0 ) {
-                    if ( strstr( ns , ".system." ) == 0 )
-                        log() << "warning: no _id index on $snapshot query, ns:" << ns << endl;
+                    if ( strstr( _ns , ".system." ) == 0 )
+                        log() << "warning: no _id index on $snapshot query, ns:" << _ns << endl;
                 }
                 else {
-                    /* [dm] the name of an _id index tends to vary, so we build the hint the hard way here.
-                     probably need a better way to specify "use the _id index" as a hint.  if someone is
-                     in the query optimizer please fix this then!
+                    /* [dm] the name of an _id index tends to vary, so we build the hint the hard
+                     way here. probably need a better way to specify "use the _id index" as a hint.
+                     if someone is in the query optimizer please fix this then!
                      */
-                    hint = BSON( "$hint" << d->idx(i).indexName() );
+                    _argumentsHint = BSON( "$hint" << d->idx(i).indexName() );
                 }
             }
         }
+    }
+    
+    shared_ptr<Cursor> CursorGenerator::shortcutCursor() const {
+        if ( !mayShortcutQueryOptimizer() ) {
+            return shared_ptr<Cursor>();
+        }
+        
+        if ( _planPolicy.permitOptimalNaturalPlan() && _query.isEmpty() && _order.isEmpty() ) {
+            return theDataFileMgr.findAll( _ns );
+        }
+        if ( _planPolicy.permitOptimalIdPlan() && isSimpleIdQuery( _query ) ) {
+            Database *database = cc().database();
+            verify( 15985, database );
+            NamespaceDetails *d = database->namespaceIndex.details( _ns );
+            if ( d ) {
+                int idxNo = d->findIdIndex();
+                if ( idxNo >= 0 ) {
+                    IndexDetails& i = d->idx( idxNo );
+                    BSONObj key = i.getKeyFromQuery( _query );
+                    return shared_ptr<Cursor>( BtreeCursor::make( d, idxNo, i, key, key, true, 1 ) );
+                }
+            }
+        }
+        
+        return shared_ptr<Cursor>();
+    }
+    
+    void CursorGenerator::setMultiPlanScanner() {
+        _mps.reset( new MultiPlanScanner( _ns, _query, fieldsPtr(), _order, hint(),
+                                         explain() ? QueryPlanSet::Ignore : QueryPlanSet::Use,
+                                         min(), max() ) ); // mayYield == false
+    }
+    
+    shared_ptr<Cursor> CursorGenerator::singlePlanCursor() {
+        const QueryPlan *singlePlan = _mps->singlePlan();
+        if ( !singlePlan || ( requireOrder() && singlePlan->scanAndOrderRequired() ) ) {
+            return shared_ptr<Cursor>();
+        }
+        if ( !_planPolicy.permitPlan( *singlePlan ) ) {
+            return shared_ptr<Cursor>();
+        }
+        
+        if ( _singlePlanSummary ) {
+            *_singlePlanSummary = singlePlan->summary();
+        }
+        shared_ptr<Cursor> single = singlePlan->newCursor( DiskLoc(), numWanted() );
+        if ( !_query.isEmpty() && !single->matcher() ) {
+            shared_ptr<CoveredIndexMatcher> matcher
+            ( new CoveredIndexMatcher( _query, single->indexKeyPattern() ) );
+            single->setMatcher( matcher );
+        }
+        if ( _simpleEqualityMatch ) {
+            if ( singlePlan->exactKeyMatch() && !single->matcher()->needRecord() ) {
+                *_simpleEqualityMatch = true;
+            }
+        }
+        return single;
+    }
+    
+    shared_ptr<Cursor> CursorGenerator::generate() {
 
-        bool mayShortcutQueryOptimizer =
-        ( !parsedQuery ||
-         ( parsedQuery->getMin().isEmpty() &&
-          parsedQuery->getMax().isEmpty() &&
-          !parsedQuery->getFields() ) ) &&
-        hint.isEmpty();
-        if ( mayShortcutQueryOptimizer ) {
-            if ( planPolicy.permitOptimalNaturalPlan() && query.isEmpty() && order.isEmpty() ) {
-                // TODO This will not use a covered index currently.
-                return theDataFileMgr.findAll( ns );
-            }
-            if ( planPolicy.permitOptimalIdPlan() && isSimpleIdQuery( query ) ) {
-                Database *database = cc().database();
-                verify( 15985, database );
-                NamespaceDetails *d = database->namespaceIndex.details(ns);
-                if ( d ) {
-                    int idxNo = d->findIdIndex();
-                    if ( idxNo >= 0 ) {
-                        IndexDetails& i = d->idx( idxNo );
-                        BSONObj key = i.getKeyFromQuery( query );
-                        return shared_ptr<Cursor>( BtreeCursor::make( d, idxNo, i, key, key, true, 1 ) );
-                    }
-                }
-            }
+        setArgumentsHint();
+        
+        shared_ptr<Cursor> cursor = shortcutCursor();
+        if ( cursor ) {
+            return cursor;
         }
         
-        if ( hint.isEmpty() ) {
-            hint = planPolicy.planHint( ns );
+        setMultiPlanScanner();
+        cursor = singlePlanCursor();
+        if ( cursor ) {
+            return cursor;
         }
         
-        auto_ptr<MultiPlanScanner> mps
-        ( new MultiPlanScanner
-         ( ns, query, ( parsedQuery ? parsedQuery->getFieldPtr() : shared_ptr<Projection>() ),
-          order, hint,
-          ( parsedQuery && parsedQuery->isExplain() ) ? QueryPlanSet::Ignore : QueryPlanSet::Use,
-          parsedQuery ? parsedQuery->getMin() : BSONObj(),
-          parsedQuery ? parsedQuery->getMax() : BSONObj() ) ); // mayYield == false
-        const QueryPlan *singlePlan = mps->singlePlan();
-        bool requireOrder = ( parsedQuery == 0 ); // TODO more clear
-        if ( singlePlan && !( requireOrder && singlePlan->scanAndOrderRequired() ) ) {
-            if ( planPolicy.permitPlan( *singlePlan ) ) {
-                if ( singlePlanSummary ) {
-                    *singlePlanSummary = singlePlan->summary();
-                }
-                int numWanted = 0;
-                if ( parsedQuery ) {
-                    numWanted = parsedQuery->getSkip() + parsedQuery->getNumToReturn();
-                }
-                shared_ptr<Cursor> single = singlePlan->newCursor( DiskLoc(), numWanted );
-                if ( !query.isEmpty() && !single->matcher() ) {
-                    shared_ptr<CoveredIndexMatcher> matcher( new CoveredIndexMatcher( query, single->indexKeyPattern() ) );
-                    single->setMatcher( matcher );
-                }
-                if ( simpleEqualityMatch ) {
-                    if ( singlePlan->exactKeyMatch() && !single->matcher()->needRecord() ) {
-                        *simpleEqualityMatch = true;
-                    }
-                }
-                return single;
-            }
+        if ( explain() ) {
+            _mps->generateExplainInfo();
         }
-        if ( parsedQuery && parsedQuery->isExplain() ) {
-            mps->generateExplainInfo();
-        }
-        return newQueryOptimizerCursor( mps, planPolicy, requireOrder );
+        return newQueryOptimizerCursor( _mps, _planPolicy, requireOrder() );
     }
 
     /** This interface is just available for testing. */

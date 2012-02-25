@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "queryoptimizer.h"
 #include "queryoptimizercursor.h"
 
 namespace mongo {
@@ -108,6 +109,56 @@ namespace mongo {
         MatchState _match;
         bool _counted;
         set<DiskLoc> _dups;
+    };
+    
+    class CursorGenerator {
+    public:
+        CursorGenerator( const char *ns,
+                        const BSONObj &query,
+                        const BSONObj &order,
+                        const QueryPlanSelectionPolicy &planPolicy,
+                        bool *simpleEqualityMatch,
+                        const ParsedQuery *parsedQuery,
+                        QueryPlan::Summary *singlePlanSummary );
+        
+        shared_ptr<Cursor> generate();
+        
+    private:
+        bool snapshot() const { return _parsedQuery && _parsedQuery->isSnapshot(); }
+        bool explain() const { return _parsedQuery && _parsedQuery->isExplain(); }
+        BSONObj min() const { return _parsedQuery ? _parsedQuery->getMin() : BSONObj(); }
+        BSONObj max() const { return _parsedQuery ? _parsedQuery->getMax() : BSONObj(); }
+        shared_ptr<Projection> fieldsPtr() const {
+            return _parsedQuery ? _parsedQuery->getFieldPtr() : shared_ptr<Projection>();
+        }
+        int numWanted() const {
+            return _parsedQuery ? ( _parsedQuery->getSkip() + _parsedQuery->getNumToReturn() ) : 0;
+        }
+        
+        /** If no ParsedQuery was supplied, it's assumed no reordering will be applied. */
+        bool requireOrder() const { return _parsedQuery == 0; }
+        bool mayShortcutQueryOptimizer() const {
+            return min().isEmpty() && max().isEmpty() && !fieldsPtr() && _argumentsHint.isEmpty();
+        }
+        BSONObj hint() const {
+            return _argumentsHint.isEmpty() ? _planPolicy.planHint( _ns ) : _argumentsHint;
+        }
+        
+        void setArgumentsHint();
+        shared_ptr<Cursor> shortcutCursor() const;
+        void setMultiPlanScanner();
+        shared_ptr<Cursor> singlePlanCursor();
+        
+        const char *_ns;
+        BSONObj _query;
+        BSONObj _order;
+        const QueryPlanSelectionPolicy &_planPolicy;
+        bool *_simpleEqualityMatch;
+        const ParsedQuery *_parsedQuery;
+        QueryPlan::Summary *_singlePlanSummary;
+        
+        BSONObj _argumentsHint;
+        auto_ptr<MultiPlanScanner> _mps;
     };
     
 } // namespace mongo
