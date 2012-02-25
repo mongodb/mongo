@@ -50,5 +50,3 @@ checkFields( 1, true );
 t.save( {} );
 checkFields( 1, false, 1 );
 checkFields( 2, true, 1 );
-//
-//// check all other fields, eg oldPlan
