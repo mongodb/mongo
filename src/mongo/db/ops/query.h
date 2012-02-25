@@ -93,6 +93,7 @@ namespace mongo {
         virtual ~ResponseBuildStrategy() {}
         virtual bool handleMatch() = 0;
         virtual int rewriteMatches() { return -1; }
+        virtual void finishedFirstBatch() {}
         void resetBuf();
     protected:
         BSONObj current( bool allowCovered ) const;
@@ -137,6 +138,7 @@ namespace mongo {
                             BufBuilder &buf );
         virtual bool handleMatch();
         virtual int rewriteMatches();
+        virtual void finishedFirstBatch();
     private:
         void handleReorderMatch();
         bool handleOrderedMatch();

@@ -874,6 +874,10 @@ namespace mongo {
         return _reorderBuild.rewriteMatches();
     }
     
+    void HybridBuildStrategy::finishedFirstBatch() {
+        _queryOptimizerCursor->abortUnorderedPlans();
+    }
+    
     QueryResponseBuilder::QueryResponseBuilder( const ParsedQuery &parsedQuery,
                                                const shared_ptr<Cursor> &cursor,
                                                const QueryPlan::Summary &queryPlan,
@@ -921,9 +925,7 @@ namespace mongo {
     }
 
     void QueryResponseBuilder::finishedFirstBatch() {
-        if ( _queryOptimizerCursor ) {
-            _queryOptimizerCursor->abortUnorderedPlans();
-        }            
+        _builder->finishedFirstBatch();
     }
 
     long long QueryResponseBuilder::handoff( Message &result ) {
