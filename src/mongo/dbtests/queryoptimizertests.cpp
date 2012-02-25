@@ -42,6 +42,8 @@ namespace mongo {
 
 namespace QueryOptimizerTests {
 
+    using boost::shared_ptr;
+    
     void dropCollection( const char *ns ) {
      	string errmsg;
         BSONObjBuilder result;
@@ -50,8 +52,6 @@ namespace QueryOptimizerTests {
     
     namespace QueryPlanTests {
 
-        using boost::shared_ptr;
-        
         class ToString {
         public:
             void run() {
