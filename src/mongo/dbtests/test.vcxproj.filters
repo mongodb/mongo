@@ -235,12 +235,6 @@
     <ClInclude Include="..\db\durop.h">
       <Filter>dur</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\jsobjmanipulator.h">
-      <Filter>db</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\mongomutex.h">
-      <Filter>db</Filter>
-    </ClInclude>
     <ClInclude Include="..\util\mongoutils\hash.h">
       <Filter>util\h</Filter>
     </ClInclude>
@@ -286,15 +280,6 @@
     <ClInclude Include="..\bson\stringdata.h">
       <Filter>bson</Filter>
     </ClInclude>
-    <ClInclude Include="..\db\ops\delete.h">
-      <Filter>db\cpp</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\ops\update.h">
-      <Filter>db\cpp</Filter>
-    </ClInclude>
-    <ClInclude Include="..\db\ops\query.h">
-      <Filter>db\cpp</Filter>
-    </ClInclude>
     <ClInclude Include="..\server.h">
       <Filter>db\h</Filter>
     </ClInclude>
@@ -335,6 +320,27 @@
     </ClInclude>
     <ClInclude Include="..\client\dbclientmockcursor.h" />
     <ClInclude Include="..\db\pagefault.h" />
+    <ClInclude Include="..\db\ops\delete.h">
+      <Filter>db\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\ops\update.h">
+      <Filter>db\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\ops\query.h">
+      <Filter>db\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\queryoptimizercursorimpl.h">
+      <Filter>db\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\jsobjmanipulator.h">
+      <Filter>db\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\mongomutex.h">
+      <Filter>db\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\explain.h">
+      <Filter>db\h</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\..\..\js\js32d.lib">
@@ -362,9 +368,6 @@
     </ClCompile>
     <ClCompile Include="..\client\syncclusterconnection.cpp">
       <Filter>client</Filter>
-    </ClCompile>
-    <ClCompile Include="..\pch.cpp">
-      <Filter>db</Filter>
     </ClCompile>
     <ClCompile Include="..\db\client.cpp">
       <Filter>db\cpp</Filter>
@@ -453,21 +456,6 @@
     <ClCompile Include="..\db\tests.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\cmdline.cpp">
-      <Filter>db\h</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\matcher_covered.cpp">
-      <Filter>db\h</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\oplog.cpp">
-      <Filter>db\h</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\queryutil.cpp">
-      <Filter>db\h</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\repl_block.cpp">
-      <Filter>db\h</Filter>
-    </ClCompile>
     <ClCompile Include="..\util\assert_util.cpp">
       <Filter>util\cpp</Filter>
     </ClCompile>
@@ -475,9 +463,6 @@
       <Filter>util\cpp</Filter>
     </ClCompile>
     <ClCompile Include="..\util\base64.cpp">
-      <Filter>util\cpp</Filter>
-    </ClCompile>
-    <ClCompile Include="..\util\md5.c">
       <Filter>util\cpp</Filter>
     </ClCompile>
     <ClCompile Include="..\util\md5main.cpp">
@@ -729,9 +714,6 @@
     <ClCompile Include="..\util\alignedbuilder.cpp">
       <Filter>util</Filter>
     </ClCompile>
-    <ClCompile Include="..\bson\oid.cpp">
-      <Filter>db</Filter>
-    </ClCompile>
     <ClCompile Include="..\util\concurrency\synchronization.cpp">
       <Filter>util</Filter>
     </ClCompile>
@@ -759,9 +741,6 @@
     <ClCompile Include="..\db\dbcommands_admin.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\querypattern.cpp">
-      <Filter>db</Filter>
-    </ClCompile>
     <ClCompile Include="..\util\ramlog.cpp">
       <Filter>util</Filter>
     </ClCompile>
@@ -770,9 +749,6 @@
     </ClCompile>
     <ClCompile Include="..\db\btreebuilder.cpp">
       <Filter>btree</Filter>
-    </ClCompile>
-    <ClCompile Include="..\db\queryoptimizercursor.cpp">
-      <Filter>db</Filter>
     </ClCompile>
     <ClCompile Include="..\db\record.cpp">
       <Filter>db\cpp</Filter>
@@ -921,13 +897,47 @@
     <ClCompile Include="..\db\pagefault.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
-    <ClCompile Include="..\db\d_globals.cpp">
-      <Filter>db</Filter>
-    </ClCompile>
     <ClCompile Include="..\db\curop.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
     <ClCompile Include="..\util\concurrency\rwlockimpl.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\memconcept.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\md5.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\queryoptimizercursorimpl.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\cmdline.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\matcher_covered.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\queryutil.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\oplog.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\repl_block.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\d_globals.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\bson\oid.cpp">
+      <Filter>bson</Filter>
+    </ClCompile>
+    <ClCompile Include="..\pch.cpp" />
+    <ClCompile Include="..\db\querypattern.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\explain.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
   </ItemGroup>

@@ -126,7 +126,7 @@
     <ClCompile Include="..\util\ramlog.cpp" />
     <ClCompile Include="key.cpp" />
     <ClCompile Include="btreebuilder.cpp" />
-    <ClCompile Include="queryoptimizercursor.cpp" />
+    <ClCompile Include="queryoptimizercursorimpl.cpp" />
     <ClCompile Include="record.cpp" />
     <ClCompile Include="ops\delete.cpp" />
     <ClCompile Include="ops\update.cpp" />
@@ -223,6 +223,7 @@
     <ClCompile Include="pipeline\dependency_tracker.cpp" />
     <ClCompile Include="..\util\trace.cpp" />
     <ClCompile Include="interrupt_status_mongod.cpp" />
+    <ClCompile Include="explain.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\dbclientcursor.h" />
@@ -404,6 +405,8 @@
     <ClInclude Include="..\util\trace.h" />
     <ClInclude Include="interrupt_status.h" />
     <ClInclude Include="interrupt_status_mongod.h" />
+    <ClInclude Include="queryoptimizercursorimpl.h" />
+    <ClInclude Include="explain.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="db.rc" />

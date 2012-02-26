@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -430,6 +430,7 @@
     <ClInclude Include="..\db\dur.h" />
     <ClInclude Include="..\db\durop.h" />
     <ClInclude Include="..\db\dur_journal.h" />
+    <ClInclude Include="..\db\explain.h" />
     <ClInclude Include="..\db\jsobjmanipulator.h" />
     <ClInclude Include="..\db\mongommf.h" />
     <ClInclude Include="..\db\mongomutex.h" />
@@ -540,6 +541,16 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">Use</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="..\db\d_globals.cpp" />
+    <ClCompile Include="..\db\explain.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\db\geo\2d.cpp" />
     <ClCompile Include="..\db\geo\haystack.cpp" />
     <ClCompile Include="..\db\key.cpp" />
@@ -559,7 +570,8 @@
     <ClCompile Include="..\db\ops\update.cpp" />
     <ClCompile Include="..\db\pagefault.cpp" />
     <ClCompile Include="..\db\projection.cpp" />
-    <ClCompile Include="..\db\queryoptimizercursor.cpp" />
+    <ClCompile Include="..\db\queryoptimizercursorimpl.cpp" />
+    <ClInclude Include="..\db\queryoptimizercursorimpl.h" />
     <ClCompile Include="..\db\querypattern.cpp">
       <PrecompiledHeader />
     </ClCompile>

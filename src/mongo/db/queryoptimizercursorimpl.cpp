@@ -16,9 +16,9 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "queryoptimizercursorimpl.h"
 
 #include "pch.h"
+#include "queryoptimizercursorimpl.h"
 #include "pdfile.h"
 #include "clientcursor.h"
 #include "btree.h"

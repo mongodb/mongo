@@ -554,6 +554,9 @@
     <ClCompile Include="..\util\version.cpp">
       <Filter>Shared Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\db\projection.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\..\..\js\js32d.lib" />
@@ -621,6 +624,9 @@
     </ClInclude>
     <ClInclude Include="..\util\version.h">
       <Filter>Header Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\projection.h">
+      <Filter>Shared Source Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
