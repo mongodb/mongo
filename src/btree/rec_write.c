@@ -1509,7 +1509,6 @@ static int
 __rec_col_var(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_SALVAGE_COOKIE *salvage)
 {
-	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
@@ -1524,7 +1523,6 @@ __rec_col_var(
 	const void *data;
 
 	r = session->reconcile;
-	btree = session->btree;
 	last = r->last;
 	unpack = &_unpack;
 
