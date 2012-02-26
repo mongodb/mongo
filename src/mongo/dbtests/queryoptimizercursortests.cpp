@@ -3292,8 +3292,9 @@ namespace QueryOptimizerCursorTests {
                 RecordedUnindexedPlan() {
                     _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
                     _cli.insert( ns(), BSON( "a" << BSON_ARRAY( 1 << 2 << 3 ) << "b" << 1 ) );
-                    BSONObj explain =
-                    _cli.query( ns(), QUERY( "a" << GT << 0 << "b" << 1 ).explain() )->next();
+                    auto_ptr<DBClientCursor> cursor =
+                    _cli.query( ns(), QUERY( "a" << GT << 0 << "b" << 1 ).explain() );
+                    BSONObj explain = cursor->next();
                     ASSERT_EQUALS( "BasicCursor", explain[ "cursor" ].String() );
                 }
                 string expectedType() const { return "QueryOptimizerCursor"; }
