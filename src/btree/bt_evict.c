@@ -328,10 +328,9 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 	cache = S2C(session)->cache;
 
 	/*
-	 * Walk the eviction request queue, looking for sync or close requests
-	 * (defined by a valid WT_SESSION_IMPL handle).  If we find a request,
-	 * perform it, flush the result and clear the request slot, then wake
-	 * up the requesting thread.
+	 * Walk the eviction request queue, looking for sync/close or page flush
+	 * requests.  If we find a request, perform it, clear the request slot
+	 * and wake up the requesting thread if necessary.
 	 */
 	WT_EVICT_REQ_FOREACH(er, er_end, cache) {
 		if ((request_session = er->session) == NULL)
