@@ -252,7 +252,7 @@ __wt_col_append_serial_func(WT_SESSION_IMPL *session)
 	 * record didn't exist at some point, it can only have been created
 	 * on this list.  Search for the record, if specified.
 	 */
-	if ((recno = WT_INSERT_RECNO(new_ins)) == 0 || recno == UINT64_MAX)
+	if ((recno = WT_INSERT_RECNO(new_ins)) == 0)
 		recno = WT_INSERT_RECNO(new_ins) = ++btree->last_recno;
 	ins = __col_insert_search(*inshead, ins_stack, recno);
 
