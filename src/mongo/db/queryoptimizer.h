@@ -78,7 +78,7 @@ namespace mongo {
 
         int direction() const { return _direction; }
         BSONObj indexKey() const;
-        bool indexed() const { return _index; }
+        bool indexed() const { return _index != 0; }
         const IndexDetails *index() const { return _index; }
         int idxNo() const { return _idxNo; }
         const char *ns() const { return _frs.ns(); }

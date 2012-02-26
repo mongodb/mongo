@@ -85,7 +85,7 @@ namespace mongo {
         int getNumToReturn() const { return _ntoreturn; }
         bool wantMore() const { return _wantMore; }
         int getOptions() const { return _options; }
-        bool hasOption( int x ) const { return x & _options; }
+        bool hasOption( int x ) const { return ( x & _options ) != 0; }
         
         bool isExplain() const { return _explain; }
         bool isSnapshot() const { return _snapshot; }
