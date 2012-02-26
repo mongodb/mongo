@@ -205,6 +205,8 @@ namespace QueryTests {
 
             {
                 // Check internal server handoff to getmore.
+                dblock lk;
+                Client::Context ctx( ns );
                 ClientCursor::Pointer clientCursor( cursorId );
                 ASSERT( clientCursor.c()->pq );
                 ASSERT_EQUALS( 2, clientCursor.c()->pq->getNumToReturn() );
@@ -431,9 +433,10 @@ namespace QueryTests {
             client().dropCollection( "unittests.querytests.OplogReplaySlaveReadTill" );
         }
         void run() {
-            dblock lk;
-            
             const char *ns = "unittests.querytests.OplogReplaySlaveReadTill";
+            dblock lk;
+            Client::Context ctx( ns );
+            
             BSONObj info;
             client().runCommand( "unittests",
                                 BSON( "create" << "querytests.OplogReplaySlaveReadTill" <<
@@ -1237,9 +1240,20 @@ namespace QueryTests {
         }
     };
     
-    class Exhaust : public CollectionBase {
+    class CollectionInternalBase : public CollectionBase {
     public:
-        Exhaust() : CollectionBase( "exhaust" ) {}
+        CollectionInternalBase( const char *nsLeaf ) :
+        CollectionBase( nsLeaf ),
+        _ctx( ns() ) {
+        }
+    private:
+        dblock _lk;
+        Client::Context _ctx;
+    };
+    
+    class Exhaust : public CollectionInternalBase {
+    public:
+        Exhaust() : CollectionInternalBase( "exhaust" ) {}
         void run() {
             BSONObj info;
             ASSERT( client().runCommand( "unittests",
@@ -1260,17 +1274,14 @@ namespace QueryTests {
         }
     };
 
-    class QueryCursorTimeout : public ClientBase {
+    class QueryCursorTimeout : public CollectionInternalBase {
     public:
-        ~QueryCursorTimeout() {
-            client().dropCollection( "unittests.querytests.QueryCursorTimeout" );
-        }
+        QueryCursorTimeout() : CollectionInternalBase( "querycursortimeout" ) {}
         void run() {
-            const char *ns = "unittests.querytests.QueryCursorTimeout";
             for( int i = 0; i < 150; ++i ) {
-                insert( ns, BSONObj() );
+                insert( ns(), BSONObj() );
             }
-            auto_ptr<DBClientCursor> c = client().query( ns, Query() );
+            auto_ptr<DBClientCursor> c = client().query( ns(), Query() );
             ASSERT( c->more() );
             long long cursorId = c->getCursorId();
             
@@ -1284,17 +1295,14 @@ namespace QueryTests {
         }
     };
 
-    class QueryReadsAll : public ClientBase {
+    class QueryReadsAll : public CollectionBase {
     public:
-        ~QueryReadsAll() {
-            client().dropCollection( "unittests.querytests.QueryReadsAll" );
-        }
+        QueryReadsAll() : CollectionBase( "queryreadsall" ) {}
         void run() {
-            const char *ns = "unittests.querytests.QueryReadsAll";
             for( int i = 0; i < 5; ++i ) {
-                insert( ns, BSONObj() );
+                insert( ns(), BSONObj() );
             }
-            auto_ptr<DBClientCursor> c = client().query( ns, Query(), 5 );
+            auto_ptr<DBClientCursor> c = client().query( ns(), Query(), 5 );
             ASSERT( c->more() );
             // With five results and a batch size of 5, no cursor is created.
             ASSERT_EQUALS( 0, c->getCursorId() );
