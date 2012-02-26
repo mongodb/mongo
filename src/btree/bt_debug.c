@@ -613,7 +613,6 @@ __debug_page_col_int(WT_DBG *ds, WT_PAGE *page, uint32_t flags)
 static int
 __debug_page_col_var(WT_DBG *ds, WT_PAGE *page)
 {
-	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
@@ -622,7 +621,6 @@ __debug_page_col_var(WT_DBG *ds, WT_PAGE *page)
 	uint32_t i;
 	char tag[64];
 
-	btree = ds->session->btree;
 	unpack = &_unpack;
 	recno = page->u.col_var.recno;
 
