@@ -98,8 +98,14 @@ public:
                 try {
                     e.validate();
                     if ( e.isABSONObj() ) {
-                        if ( ! debug( e.Obj() , depth + 1 ) )
-                            return false;
+                        if ( ! debug( e.Obj() , depth + 1 ) ) {
+                            //return false;
+                            cout << prefix << "\t\t\t BAD BAD BAD" << endl;
+                            
+                            if ( e.size() < 1000 ) {
+                                cout << "---\n" << e.Obj().hexDump() << "\n---" << endl;
+                            }
+                        }
                     }
                     else if ( e.type() == String && ! isValidUTF8( e.valuestr() ) ) {
                         cout << prefix << "\t\t\t" << "bad utf8 String!" << endl;
