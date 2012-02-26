@@ -14,6 +14,8 @@ namespace mongo {
 
     namespace dur {
 
+        void releasedWriteLock();
+
         // a smaller limit is likely better on 32 bit
 #if defined(__i386__) || defined(_M_IX86)
         const unsigned UncommittedBytesLimit = 50 * 1024 * 1024;

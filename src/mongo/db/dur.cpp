@@ -280,24 +280,35 @@ namespace mongo {
             return commitJob.bytes() > UncommittedBytesLimit;
         }
 
+        /** we may need to commit earlier than normal if data are being written at 
+            very high rates. 
+        
+            note you can call this unlocked, and that is a good idea as if you are in 
+            say, a 'w' lock state, we can't do the commit
+        */
         bool DurableImpl::commitIfNeeded() {
-            if( !Lock::somethingWriteLocked() )
-                return false;
             unspoolWriteIntents();
-            bool needed = commitJob.bytes() > UncommittedBytesLimit;
-            if( Lock::isLocked() == 'w' ) { 
-                if( needed ) {
-                    wassert(false); // can't commit early in a 'w' lock
-                }
+            DEV commitJob._nSinceCommitIfNeededCall = 0;
+            if( commitJob.bytes() < UncommittedBytesLimit ) {
                 return false;
             }
-            DEV commitJob._nSinceCommitIfNeededCall = 0;
-            if (needed) { // should this also fire if CmdLine::DurAlwaysCommit?
-                stats.curr->_earlyCommits++;
-                groupCommit(0);
-                return true;
+            if( Lock::isLocked() == 'w' ) { 
+                log() << "can't commit early in a w lock" << endl;
+                dassert(false);
+                return false;
             }
-            return false;
+            if( !Lock::isLocked() ) {
+                Lock::GlobalRead r;
+                if( commitJob.bytes() < UncommittedBytesLimit ) {
+                    // someone else beat us to it
+                    return false;
+                }
+                commitNow();
+            }
+            else { 
+                commitNow();
+            }
+            return true;
         }
 
         /** Used in _DEBUG builds to check that we didn't overwrite the last intent
@@ -720,7 +731,7 @@ namespace mongo {
                 return;
 
             if( d.dbMutex.atLeastReadLocked() ) {
-                groupCommit();
+                getDur().commitNow();
             }
             else {
                 assert( inShutdown() );
@@ -781,23 +792,15 @@ namespace mongo {
 
         void recover();
 
+        // this is for upgradeToWritable _DEBUG mode verification - although that code is off right now
         unsigned notesThisLock = 0;
 
-        void releasingWriteLock() {
+        void releasedWriteLock() {
             unspoolWriteIntents();
 
-            // SERVER-4328 todo this isn't quite what we want for notesThisLock with db level concurrency:
+            // SERVER-4328 this isn't quite what we want for notesThisLock with db level concurrency,
+            //             but notesThisLock is "off" right now anyway
             DEV notesThisLock = 0;
-
-            // SERVER-4328 todo commitIfNeeded won't work with 'w' locks
-
-            // implicit commitIfNeeded check on each global write unlock
-            DEV commitJob._nSinceCommitIfNeededCall = 0; // implicit commit if needed
-            if( commitJob.bytes() > UncommittedBytesLimit || cmdLine.durOptions & CmdLine::DurAlwaysCommit ) {
-                assert( Lock::isW() ); // todo
-                stats.curr->_earlyCommits++;
-                groupCommit();
-            }
         }
 
         void preallocateFiles();
@@ -846,7 +849,7 @@ namespace mongo {
                 SimpleMutex::scoped_lock lk(commitJob.groupCommitMutex);
             }
 
-            groupCommit();
+            commitNow();
             MongoFile::flushAll(true);
             journalCleanup();
 

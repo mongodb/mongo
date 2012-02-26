@@ -39,7 +39,8 @@ namespace mongo {
     SimpleRWLock localDBLock("localDBLock");
 
     static void locked_W();
-    static void unlocking_w();
+    static void unlocked_w();
+    static void unlocked_W();
     static void unlocking_W();
     static QLock& q = *new QLock();
     TSP_DEFINE(LockState,ls);
@@ -107,6 +108,7 @@ namespace mongo {
     static void lock_W() { 
         LockState& ls = lockState();
         massert(0, str::stream() << "can't lock_W, threadState=" << (int) threadState, ls.threadState == 0);
+        getDur().commitIfNeeded(); // check before locking - will use an R lock for the commit if need to do one, which is better than W
         threadState() = 'W';
         q.lock_W();
         locked_W();
@@ -116,6 +118,7 @@ namespace mongo {
         unlocking_W();
         threadState() = 0;
         q.unlock_W();
+        unlocked_W();
     }
     static void lock_R() { 
         LockState& ls = lockState();
@@ -130,14 +133,15 @@ namespace mongo {
     }
     static void lock_w() { 
         assert( threadState() == 0 );
+        getDur().commitIfNeeded();
         threadState() = 'w';
         q.lock_w();
     }
     static void unlock_w() { 
         wassert( threadState() == 'w' );
-        unlocking_w();
         threadState() = 0;
         q.unlock_w();
+        unlocked_w();
     }
     static void lock_r() {
         assert( threadState() == 0 );
@@ -621,27 +625,26 @@ namespace mongo {
         }
     }
 
-    namespace dur {
-        void releasingWriteLock(); // because it's hard to include dur.h here
-    }
     void curopGotLock(Client*);
     void locked_W() {
         Client& c = cc();
         curopGotLock(&c);
         d.dbMutex._minfo.entered(); // hopefully eliminate one day 
     }
-    void unlocking_w() { 
+    void unlocked_w() { 
         // we can't commit early in this case; so a bit more to do here.
-        dur::releasingWriteLock();
+        dur::releasedWriteLock();
     }
     void unlocking_W() {
-        dur::releasingWriteLock();
         d.dbMutex._minfo.leaving();
+    }
+    void unlocked_W() {
+        dur::releasedWriteLock();
     }
 
     MongoMutex::MongoMutex() {
         static int n = 0;
-        assert( ++n == 1 ); // below releasingWriteLock we assume MongoMutex is a singleton, and uses dbMutex ref above
+        assert( ++n == 1 );
     }
 
 }
