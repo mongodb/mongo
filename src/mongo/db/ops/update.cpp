@@ -33,7 +33,7 @@
 namespace mongo {
 
     const char* Mod::modNames[] = { "$inc", "$set", "$push", "$pushAll", "$pull", "$pullAll" , "$pop", "$unset" ,
-                                    "$bitand" , "$bitor" , "$bit" , "$addToSet", "$rename", "$rename", "$trim",
+                                    "$bitand" , "$bitor" , "$bit" , "$addToSet", "$rename", "$rename", "$slice",
                                   };
     unsigned Mod::modNamesNum = sizeof(Mod::modNames)/sizeof(char*);
 
@@ -358,7 +358,7 @@ namespace mongo {
 
     auto_ptr<ModSetState> ModSet::prepare(const BSONObj &obj) const {
         DEBUGUPDATE( "\t start prepare" );
-        auto_ptr<ModSetState> mss( new ModSetState( obj, _trims ) );
+        auto_ptr<ModSetState> mss( new ModSetState( obj, _slices ) );
 
         // Perform this check first, so that we don't leave a partially modified object on uassert.
         for ( ModHolder::const_iterator i = _mods.begin(); i != _mods.end(); ++i ) {
@@ -577,7 +577,7 @@ namespace mongo {
             case Mod::PULL_ALL:
                 // this should have been handled by prepare
                 break;
-            case Mod::TRIM:
+            case Mod::SLICE:
                 // this should have been handled by prepare
                 break;
             case Mod::POP:
@@ -620,15 +620,15 @@ namespace mongo {
             bb.done();
         }
         else {
-            if ( shouldTrim( temp ) ) {
-                // Update the field into a temporary object and re-trim it
+            if ( shouldSlice( temp ) ) {
+                // Update the field into a temporary object and re-slice it
                 // into the resulting object
                 BSONObjBuilder bbb;
                 appendNewFromMod( m , bbb );
                 BSONObj bob = bbb.obj();
                 BSONObjIterator bes( bob );
                 BSONElement be = bes.next();
-                appendTrimmed( b, be );
+                appendSliced( b, be );
             } else {
                 appendNewFromMod( m , b );
             }
@@ -709,15 +709,15 @@ namespace mongo {
             case SAME:
                 DEBUGUPDATE( "\t\t\t\t applying mod on: " << m->second.m->fieldName );
 
-                if ( shouldTrim( e.fieldName() ) ) {
-                    // Update the field into a temporary object and re-trim it
+                if ( shouldSlice( e.fieldName() ) ) {
+                    // Update the field into a temporary object and re-slice it
                     // into the resulting object
                     BSONObjBuilder bbb;
                     m->second.apply( bbb , e );
                     BSONObj bob = bbb.obj();
                     BSONObjIterator bes( bob );
                     BSONElement be = bes.next();
-                    appendTrimmed( b, be );
+                    appendSliced( b, be );
                 } else {
                     m->second.apply( b, e );
                 }
@@ -751,23 +751,23 @@ namespace mongo {
         }
     }
 
-    bool ModSetState::shouldTrim( const char *fieldName ) const {
-        return _trims.find( fieldName ) != _trims.end();
+    bool ModSetState::shouldSlice( const char *fieldName ) const {
+        return _slices.find( fieldName ) != _slices.end();
     }
 
     template< class Builder >
-    void ModSetState::appendTrimmed( Builder& b, BSONElement& in ){
-        FieldTrimmer::const_iterator ft = _trims.find( in.fieldName() );
-        uassert( 16071 , "$trim can only be applied to an array" , in.type() == Array );
-        uassert( 16072 , "internal error: appending trimmed, but shouldn't trim.", ft != _trims.end() );
+    void ModSetState::appendSliced( Builder& b, BSONElement& in ){
+        FieldSlicer::const_iterator ft = _slices.find( in.fieldName() );
+        uassert( 16071 , "$slice can only be applied to an array" , in.type() == Array );
+        uassert( 16072 , "internal error: appending sliced, but shouldn't slice.", ft != _slices.end() );
         BSONObjBuilder bb( b.subarrayStart( in.fieldName() ) );
-        int trim_arg = ft->second;
+        int slice_arg = ft->second;
         int n = 0;
-        int len = trim_arg < 0 ? -trim_arg : trim_arg;
+        int len = slice_arg < 0 ? -slice_arg : slice_arg;
         int cur_len = in.embeddedObject().nFields();
         BSONObjIterator i( in.embeddedObject() );
 
-        if ( trim_arg < 0 && len < cur_len ) {
+        if ( slice_arg < 0 && len < cur_len ) {
             for ( int remove = cur_len - len ; remove > 0; remove-- )
                   i.next();
         }
@@ -867,9 +867,9 @@ namespace mongo {
                 uassert( 10148 ,  "Mod on _id not allowed", strcmp( fieldName, "_id" ) != 0 );
                 uassert( 10149 ,  "Invalid mod field name, may not end in a period", fieldName[ strlen( fieldName ) - 1 ] != '.' );
 
-                if ( op == Mod::TRIM ) {
-                  uassert( 16073 ,  "$trim can only trim the size represented by an integer" , f.isNumber() );
-                  _trims[fieldName] = f.number();
+                if ( op == Mod::SLICE ) {
+                  uassert( 16073 ,  "slice can only slice the size represented by an integer" , f.isNumber() );
+                  _slices[fieldName] = f.number();
                   continue;
                 }
 
