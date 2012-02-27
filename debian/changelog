@@ -1,3 +1,10 @@
+mongodb (2.0.3) unstable; urgency=low
+
+  * see http://www.mongodb.org/display/DOCS/2.0+Release+Notes
+  * see http://jira.mongodb.org/browse/SERVER/fixforversion/11001
+
+ -- Richard Kreuter <richard@10gen.com>  Mon, 27 Feb 2012 16:56:28 -0500
+
 mongodb (2.0.2) unstable; urgency=low
 
   * see http://www.mongodb.org/display/DOCS/2.0+Release+Notes
