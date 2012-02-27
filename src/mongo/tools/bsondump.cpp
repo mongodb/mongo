@@ -121,7 +121,8 @@ public:
             }
         }
         catch ( std::exception& e ) {
-            cout << prefix << "\t" << e.what() << endl;
+            cout << prefix << "\tbad\t" << e.what() << endl;
+            cout << "----\n" << o.hexDump() << "\n---" << endl;
         }
         return true;
     }
