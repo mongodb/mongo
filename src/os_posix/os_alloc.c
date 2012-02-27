@@ -126,6 +126,8 @@ __wt_realloc_aligned(WT_SESSION_IMPL *session,
 
 		p = *(void **)retp;
 
+		WT_ASSERT(session, p == NULL || bytes_allocated == 0);
+
 		if (p == NULL && session != NULL && S2C(session)->stats != NULL)
 			WT_CSTAT_INCR(session, memalloc);
 
@@ -134,7 +136,8 @@ __wt_realloc_aligned(WT_SESSION_IMPL *session,
 		    bytes_to_allocate)) != 0)
 			WT_RET_MSG(session, ret, "memory allocation");
 
-		memcpy(newp, p, bytes_allocated);
+		if (p != NULL)
+			memcpy(newp, p, bytes_allocated);
 		__wt_free(session, p);
 		p = newp;
 
