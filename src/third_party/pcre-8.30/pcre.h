@@ -53,14 +53,14 @@ don't change existing definitions of PCRE_EXP_DECL and PCRECPP_EXP_DECL. */
 
 #if defined(_WIN32) && !defined(PCRE_STATIC)
 #  ifndef PCRE_EXP_DECL
-#    define PCRE_EXP_DECL  extern __declspec(dllimport)
+#    define PCRE_EXP_DECL  extern 
 #  endif
 #  ifdef __cplusplus
 #    ifndef PCRECPP_EXP_DECL
-#      define PCRECPP_EXP_DECL  extern __declspec(dllimport)
+#      define PCRECPP_EXP_DECL  extern 
 #    endif
 #    ifndef PCRECPP_EXP_DEFN
-#      define PCRECPP_EXP_DEFN  __declspec(dllimport)
+#      define PCRECPP_EXP_DEFN  
 #    endif
 #  endif
 #endif
