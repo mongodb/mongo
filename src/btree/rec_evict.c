@@ -36,19 +36,6 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	    "page %p (%s)", page, __wt_page_type_string(page->type));
 
 	/*
-	 * We don't separately evict pages which are expected to be merged into
-	 * their parents when the parent is evicted.  The exception is root
-	 * pages that split (the eviction code calls this function with a split
-	 * page when closing a file where the root page has split).
-	 */
-	if (F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE) ||
-	    (!WT_PAGE_IS_ROOT(page) &&
-		F_ISSET(page, WT_PAGE_REC_EMPTY | WT_PAGE_REC_SPLIT)))
-		WT_RET_MSG(session, EINVAL,
-		    "attempt to evict an empty or split page that should "
-		    "have been merged into its parent");
-
-	/*
 	 * Get exclusive access to the page and review the page and its subtree
 	 * for conditions that would block our eviction of the page.  If the
 	 * check fails (for example, we find a child page that can't be merged),
@@ -349,7 +336,7 @@ __rec_excl(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t flags)
 			break;
 		case WT_REF_LOCKED:			/* Being evicted */
 		case WT_REF_READING:			/* Being read */
-			return (WT_ERROR);
+			return (EBUSY);
 		}
 		WT_RET(__rec_excl_page(session, ref, flags));
 
@@ -399,21 +386,6 @@ __rec_excl_page(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	page = ref->page;
 
 	/*
-	 * If we find a page that can't be merged into its parent, we're done:
-	 * you can't evict a page that references other in-memory pages, those
-	 * pages must be evicted first.  While the test is necessary, it should
-	 * not happen much: reading an internal page increments its read
-	 * generation, and so internal pages shouldn't be selected for eviction
-	 * until after their children have been evicted.
-	 *
-	 * A cheap test: if the child page doesn't at least have a chance of a
-	 * merge, we're done.
-	 */
-	if (!F_ISSET(page,
-	    WT_PAGE_REC_EMPTY | WT_PAGE_REC_SPLIT | WT_PAGE_REC_SPLIT_MERGE))
-		return (EBUSY);
-
-	/*
 	 * Next, if our caller doesn't have the tree locked down, get exclusive
 	 * access to the page.
 	 */
@@ -431,7 +403,14 @@ __rec_excl_page(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
 	if (__wt_page_is_modified(page))
 		WT_RET(__wt_rec_write(session, page, NULL));
 
-	/* Repeat the cheap test: an empty page might no longer be "empty". */
+	/*
+	 * If we find a page that can't be merged into its parent, we're done:
+	 * you can't evict a page that references other in-memory pages, those
+	 * pages must be evicted first.  While the test is necessary, it should
+	 * not happen much: reading an internal page increments its read
+	 * generation, and so internal pages shouldn't be selected for eviction
+	 * until after their children have been evicted.
+	 */
 	if (!F_ISSET(page,
 	    WT_PAGE_REC_EMPTY | WT_PAGE_REC_SPLIT | WT_PAGE_REC_SPLIT_MERGE))
 		return (EBUSY);
