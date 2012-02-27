@@ -283,6 +283,70 @@ __rec_root_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
+ * __rec_discard --
+ *	Discard any pages merged into an evicted page, then the page itself.
+ */
+static int
+__rec_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_REF *ref;
+	uint32_t i;
+
+	switch (page->type) {
+	case WT_PAGE_COL_INT:
+	case WT_PAGE_ROW_INT:
+		/* For each entry in the page... */
+		WT_REF_FOREACH(page, ref, i)
+			if (ref->state != WT_REF_DISK)
+				WT_RET(__rec_discard(session, ref->page));
+		/* FALLTHROUGH */
+	default:
+		WT_RET(__rec_discard_page(session, page));
+		break;
+	}
+	return (0);
+}
+
+/*
+ * __rec_discard_page --
+ *	Process the page's list of tracked objects, and discard it.
+ */
+static int
+__rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_PAGE_MODIFY *mod;
+
+	mod = page->modify;
+
+	/*
+	 * or if the page was split and later merged, discard it.
+	 */
+	if (mod != NULL) {
+		/*
+		 * If the page has been modified and was tracking objects,
+		 * resolve them.
+		 */
+		WT_RET(__wt_rec_track_wrapup(session, page, 1));
+
+		/*
+		 * If the page was split and eventually merged into the parent,
+		 * discard the split page; if the split page was promoted into
+		 * a split-merge page, then the reference must be cleared before
+		 * the page is discarded.
+		 */
+		if (F_ISSET(
+		    page, WT_PAGE_REC_MASK) == WT_PAGE_REC_SPLIT &&
+		    mod->u.split != NULL)
+			__wt_page_out(session, mod->u.split, 0);
+	}
+
+	/* Discard the page itself. */
+	__wt_page_out(session, page, 0);
+
+	return (0);
+}
+
+/*
  * __rec_excl --
  *	Get exclusive access to the page and review the page and its subtree
  *	for conditions that would block our eviction of the page.
@@ -379,70 +443,6 @@ __rec_excl_clear(WT_SESSION_IMPL *session)
 		ref->state = WT_REF_MEM;
 	}
 	session->excl_next = 0;
-}
-
-/*
- * __rec_discard --
- *	Discard any pages merged into an evicted page, then the page itself.
- */
-static int
-__rec_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_REF *ref;
-	uint32_t i;
-
-	switch (page->type) {
-	case WT_PAGE_COL_INT:
-	case WT_PAGE_ROW_INT:
-		/* For each entry in the page... */
-		WT_REF_FOREACH(page, ref, i)
-			if (ref->state != WT_REF_DISK)
-				WT_RET(__rec_discard(session, ref->page));
-		/* FALLTHROUGH */
-	default:
-		WT_RET(__rec_discard_page(session, page));
-		break;
-	}
-	return (0);
-}
-
-/*
- * __rec_discard_page --
- *	Process the page's list of tracked objects, and discard it.
- */
-static int
-__rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page)
-{
-	WT_PAGE_MODIFY *mod;
-
-	mod = page->modify;
-
-	/*
-	 * or if the page was split and later merged, discard it.
-	 */
-	if (mod != NULL) {
-		/*
-		 * If the page has been modified and was tracking objects,
-		 * resolve them.
-		 */
-		WT_RET(__wt_rec_track_wrapup(session, page, 1));
-
-		/*
-		 * If the page was split and eventually merged into the parent,
-		 * discard the split page; if the split page was promoted into
-		 * a split-merge page, then the reference must be cleared before
-		 * the page is discarded.
-		 */
-		if (F_ISSET(
-		    page, WT_PAGE_REC_MASK) == WT_PAGE_REC_SPLIT &&
-		    mod->u.split != NULL)
-			__wt_page_out(session, mod->u.split, 0);
-	}
-
-	/* Discard the page itself. */
-	__wt_page_out(session, page, 0);
-
-	return (0);
 }
 
 /*
