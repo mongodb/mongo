@@ -13,6 +13,13 @@ def add_exe( v ):
 
 smokeEnv = testEnv.Clone()
 smokeEnv['ENV']['PATH']=os.environ['PATH']
+
+# copy in any envrionment variables beginning with MONGO_; these
+# are used by buildscripts/buildlogger.py
+for name, value in os.environ.items():
+    if name.startswith('MONGO_'):
+        smokeEnv['ENV'][name] = value
+
 smokeEnv.Alias( "dummySmokeSideEffect", [], [] )
 
 smokeFlags = []

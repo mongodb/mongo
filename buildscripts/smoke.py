@@ -87,6 +87,19 @@ class Nothing(object):
     def __exit__(self, type, value, traceback):
         return not isinstance(value, Exception)
 
+def buildlogger(cmd, is_global=False):
+    # if the environment variable MONGO_USE_BUILDLOGGER
+    # is set to 'true', then wrap the command with a call
+    # to buildlogger.py, which sends output to the buidlogger
+    # machine; otherwise, return as usual.
+    if os.environ.get('MONGO_USE_BUILDLOGGER', '').lower().strip() == 'true':
+        if is_global:
+            return [utils.find_python(), 'buildscripts/buildlogger.py', '-g'] + cmd
+        else:
+            return [utils.find_python(), 'buildscripts/buildlogger.py'] + cmd
+    return cmd
+
+
 class mongod(object):
     def __init__(self, **kwargs):
         self.kwargs = kwargs
@@ -155,9 +168,9 @@ class mongod(object):
             self.slave = True
         if os.path.exists(dir_name):
             if 'slave' in self.kwargs:
-                argv = ["python", "buildscripts/cleanbb.py", '--nokill', dir_name]
+                argv = [utils.find_python(), "buildscripts/cleanbb.py", '--nokill', dir_name]
             else:
-                argv = ["python", "buildscripts/cleanbb.py", dir_name]
+                argv = [utils.find_python(), "buildscripts/cleanbb.py", dir_name]
             call(argv)
         utils.ensureDir(dir_name)
         argv = [mongod_executable, "--port", str(self.port), "--dbpath", dir_name]
@@ -173,7 +186,7 @@ class mongod(object):
             argv += ['--auth']
             self.auth = True
         print "running " + " ".join(argv)
-        self.proc = Popen(argv)
+        self.proc = Popen(buildlogger(argv, is_global=True))
         if not self.did_mongod_start(self.port):
             raise Exception("Failed to start mongod")
 
@@ -317,10 +330,13 @@ def runTest(test):
     else:
         keyFileData = None
 
-    sys.stderr.write( "starting test : %s \n" % os.path.basename(path) )
-    sys.stderr.flush()
-    print " *******************************************"
-    print "         Test : " + os.path.basename(path) + " ..."
+
+    # sys.stdout.write() is more atomic than print, so using it prevents
+    # lines being interrupted by, e.g., child processes
+    sys.stdout.write(" *******************************************\n")
+    sys.stdout.write("         Test : %s ...\n" % os.path.basename(path))
+    sys.stdout.flush()
+
     # FIXME: we don't handle the case where the subprocess
     # hangs... that's bad.
     if ( argv[0].endswith( 'mongo' ) or argv[0].endswith( 'mongo.exe' ) ) and not '--eval' in argv :
@@ -348,11 +364,18 @@ def runTest(test):
         argv = argv + [ '--nopreallocj' ]
     
     
-    print argv
+    sys.stdout.write("      Command : %s\n" % ' '.join(argv))
+    sys.stdout.flush()
+
+    os.environ['MONGO_TEST_FILENAME'] = os.path.basename(path)
     t1 = time.time()
-    r = call(argv, cwd=test_path)
+    r = call(buildlogger(argv), cwd=test_path)
     t2 = time.time()
-    print "                " + str((t2 - t1) * 1000) + "ms"
+    del os.environ['MONGO_TEST_FILENAME']
+
+    sys.stdout.write("                %fms\n" % ((t2 - t1) * 1000))
+    sys.stdout.flush()
+
     if r != 0:
         raise TestExitFailure(path, r)
     
@@ -645,8 +668,6 @@ def main():
 
     global tests
     (options, tests) = parser.parse_args()
-
-    print tests
 
     set_globals(options)
 
