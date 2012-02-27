@@ -74,6 +74,14 @@ namespace mongo {
     void startReplication();
     void exitCleanly( ExitCode code );
 
+#ifdef _WIN32
+    ntServiceDefaultStrings defaultServiceStrings = {
+        L"MongoDB",
+        L"Mongo DB",
+        L"Mongo DB Server"
+    };
+#endif
+
     CmdLine cmdLine;
     static bool scriptingEnabled = true;
     bool noHttpInterface = false;
@@ -546,6 +554,7 @@ namespace mongo {
 #if defined(_WIN32)
     bool initService() {
         ServiceController::reportStatus( SERVICE_RUNNING );
+        log() << "Service running" << endl;
         initAndListen( cmdLine.port );
         return true;
     }
@@ -668,7 +677,6 @@ int main(int argc, char* argv[]) {
     ("arbiter", "DEPRECATED")
     ("opIdMem", "DEPRECATED")
     ;
-
 
     positional_options.add("command", 3);
     visible_options.add(general_options);
@@ -1066,11 +1074,15 @@ int main(int argc, char* argv[]) {
 #endif
 
 #if defined(_WIN32)
-        if (serviceParamsCheck( params, dbpath, argc, argv )) {
-            return 0;
+        vector<string> disallowedOptions;
+        if (serviceParamsCheck( params, dbpath, defaultServiceStrings, disallowedOptions, argc, argv )) {
+            return 0;   // this means that we are running as a service, and we won't
+                        // reach this statement until initService() has run and returned,
+                        // but it usually exits directly so we never actually get here
         }
+        // if we reach here, then we are not running as a service.  service installation
+        // exits directly and so never reaches here either.
 #endif
-
 
         if (sizeof(void*) == 4 && !journalExplicit){
             // trying to make this stand out more like startup warnings

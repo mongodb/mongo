@@ -39,14 +39,28 @@
 #include "grid.h"
 #include "cursors.h"
 #include "shard_version.h"
+#include "../util/processinfo.h"
+
+#if defined(_WIN32)
+# include "../util/ntservice.h"
+#endif
 
 namespace mongo {
+
+#if defined(_WIN32)
+    ntServiceDefaultStrings defaultServiceStrings = {
+        L"MongoS",
+        L"Mongo DB Router",
+        L"Mongo DB Sharding Router"
+    };
+#endif
 
     CmdLine cmdLine;
     Database *database = 0;
     string mongosCommand;
     bool dbexitCalled = false;
     static bool scriptingEnabled = true;
+    static vector<string> configdbs;
 
     bool inShutdown() {
         return dbexitCalled;
@@ -59,14 +73,6 @@ namespace mongo {
     bool haveLocalShardingInfo( const string& ns ) {
         assert( 0 );
         return false;
-    }
-
-    void usage( char * argv[] ) {
-        out() << argv[0] << " usage:\n\n";
-        out() << " -v+  verbose 1: general 2: more 3: per request 4: more\n";
-        out() << " --port <portno>\n";
-        out() << " --configdb <configdbname>,[<configdbname>,<configdbname>]\n";
-        out() << endl;
     }
 
     void ShardingConnectionHook::onHandedOut( DBClientBase * conn ) {
@@ -162,8 +168,6 @@ namespace mongo {
     }
 
     void start( const MessageServer::Options& opts ) {
-        setThreadName( "mongosMain" );
-
         balancer.go();
         cursorCache.startTimeoutThread();
         PeriodicTask::theRunner->go();
@@ -179,15 +183,21 @@ namespace mongo {
         return 0;
     }
 
-    void printShardingVersionInfo(bool out) {
-        if (out) {
-          cout << mongosCommand << " " << mongodVersion() << " starting (--help for usage)" << endl;
-          cout << "git version: " << gitVersion() << endl;
-          cout <<  "build sys info: " << sysInfo() << endl;
-        } else {
-          log() << mongosCommand << " " << mongodVersion() << " starting (--help for usage)" << endl;
-          printGitVersion();
-          printSysInfo();
+    void printShardingVersionInfo( bool out ) {
+        if ( out ) {
+            cout << "MongoS version " << versionString << " starting: pid=" << getpid() << " port=" << cmdLine.port <<
+                    ( sizeof(int*) == 4 ? " 32" : " 64" ) << "-bit host=" << getHostNameCached() << " (--help for usage)" << endl;
+            DEV cout << "_DEBUG build" << endl;
+            cout << "git version: " << gitVersion() << endl;
+            cout <<  "build sys info: " << sysInfo() << endl;
+        } else
+        {
+            log() << "MongoS version " << versionString << " starting: pid=" << getpid() << " port=" << cmdLine.port <<
+                    ( sizeof( int* ) == 4 ? " 32" : " 64" ) << "-bit host=" << getHostNameCached() << " (--help for usage)" << endl;
+            DEV log() << "_DEBUG build" << endl;
+            printGitVersion();
+            printSysInfo();
+            printCommandLineOpts();
         }
     }
 
@@ -197,6 +207,73 @@ namespace mongo {
 
 using namespace mongo;
 
+static bool runMongosServer( bool doUpgrade ) {
+
+    setThreadName( "mongosMain" );
+    printShardingVersionInfo( false );
+
+    // set some global state
+
+    pool.addHook( new ShardingConnectionHook( false ) );
+    pool.setName( "mongos connectionpool" );
+
+    shardConnectionPool.addHook( new ShardingConnectionHook( true ) );
+    shardConnectionPool.setName( "mongos shardconnection connectionpool" );
+
+    // Mongos shouldn't lazily kill cursors, otherwise we can end up with extras from migration
+    DBClientConnection::setLazyKillCursor( false );
+
+    ReplicaSetMonitor::setConfigChangeHook( boost::bind( &ConfigServer::replicaSetChange , &configServer , _1 ) );
+
+    if ( ! configServer.init( configdbs ) ) {
+        log() << "couldn't resolve config db address" << endl;
+        return false;
+    }
+
+    if ( ! configServer.ok( true ) ) {
+        log() << "configServer connection startup check failed" << endl;
+        return false;
+    }
+
+    {
+        class CheckConfigServers : public task::Task {
+            virtual string name() const { return "CheckConfigServers"; }
+            virtual void doWork() { configServer.ok(true); }
+        };
+
+        task::repeat(new CheckConfigServers, 60*1000);
+    }
+
+    int configError = configServer.checkConfigVersion( doUpgrade );
+    if ( configError ) {
+        if ( configError > 0 ) {
+            log() << "upgrade success!" << endl;
+        }
+        else {
+            log() << "config server error: " << configError << endl;
+        }
+        return false;
+    }
+    configServer.reloadSettings();
+
+    init();
+
+#if !defined(_WIN32)
+    CmdLine::launchOk();
+#endif
+
+    boost::thread web( boost::bind(&webServerThread, new NoAdminAccess() /* takes ownership */) );
+
+    MessageServer::Options opts;
+    opts.port = cmdLine.port;
+    opts.ipList = cmdLine.bind_ip;
+    start(opts);
+
+    // listen() will return when exit code closes its socket.
+    dbexit( EXIT_NET_ERROR );
+    return true;
+}
+
 #include <boost/program_options.hpp>
 
 namespace po = boost::program_options;
@@ -205,12 +282,20 @@ int _main(int argc, char* argv[]) {
     static StaticObserver staticObserver;
     mongosCommand = argv[0];
 
-    po::options_description options("General options");
+    po::options_description general_options("General options");
+#if defined(_WIN32)
+    po::options_description windows_scm_options("Windows Service Control Manager options");
+#endif
     po::options_description sharding_options("Sharding options");
-    po::options_description hidden("Hidden options");
-    po::positional_options_description positional;
+    po::options_description visible_options("Allowed options");
+    po::options_description hidden_options("Hidden options");
+    po::positional_options_description positional_options;
 
-    CmdLine::addGlobalOptions( options , hidden );
+    CmdLine::addGlobalOptions( general_options, hidden_options );
+
+#if defined(_WIN32)
+    CmdLine::addWindowsOptions( windows_scm_options, hidden_options );
+#endif
 
     sharding_options.add_options()
     ( "configdb" , po::value<string>() , "1 or 3 comma separated config servers" )
@@ -219,13 +304,18 @@ int _main(int argc, char* argv[]) {
     ( "chunkSize" , po::value<int>(), "maximum amount of data per chunk" )
     ( "ipv6", "enable IPv6 support (disabled by default)" )
     ( "jsonp","allow JSONP access via http (has security implications)" )
-    ("noscripting", "disable scripting engine")
+    ( "noscripting", "disable scripting engine" )
     ;
 
-    options.add(sharding_options);
+    visible_options.add(general_options);
+#if defined(_WIN32)
+    visible_options.add(windows_scm_options);
+#endif
+    visible_options.add(sharding_options);
+
     // parse options
     po::variables_map params;
-    if ( ! CmdLine::store( argc , argv , options , hidden , positional , params ) )
+    if ( ! CmdLine::store( argc, argv, visible_options, hidden_options, positional_options, params ) )
         return 0;
 
     // The default value may vary depending on compile options, but for mongos
@@ -233,7 +323,7 @@ int _main(int argc, char* argv[]) {
     cmdLine.dur = false;
 
     if ( params.count( "help" ) ) {
-        cout << options << endl;
+        cout << visible_options << endl;
         return 0;
     }
 
@@ -283,7 +373,6 @@ int _main(int argc, char* argv[]) {
         cloudCmdLineParamIs(s);
     }
 
-    vector<string> configdbs;
     splitStringDelim( params["configdb"].as<string>() , &configdbs , ',' );
     if ( configdbs.size() != 1 && configdbs.size() != 3 ) {
         out() << "need either 1 or 3 configdbs" << endl;
@@ -311,97 +400,55 @@ int _main(int argc, char* argv[]) {
             return 9;
         }
     }
-    
-    // set some global state
 
-    pool.addHook( new ShardingConnectionHook( false ) );
-    pool.setName( "mongos connectionpool" );
-
-    shardConnectionPool.addHook( new ShardingConnectionHook( true ) );
-    shardConnectionPool.setName( "mongos shardconnection connectionpool" );
-
-    // Mongos shouldn't lazily kill cursors, otherwise we can end up with extras from migration
-    DBClientConnection::setLazyKillCursor( false );
-
-    ReplicaSetMonitor::setConfigChangeHook( boost::bind( &ConfigServer::replicaSetChange , &configServer , _1 ) );
-    
-    if ( argc <= 1 ) {
-        usage( argv );
-        return 3;
+#if defined(_WIN32)
+    vector<string> disallowedOptions;
+    disallowedOptions.push_back( "upgrade" );
+    if ( serviceParamsCheck( params, "", defaultServiceStrings, disallowedOptions, argc, argv ) ) {
+        return 0;   // this means that we are running as a service, and we won't
+                    // reach this statement until initService() has run and returned,
+                    // but it usually exits directly so we never actually get here
     }
-
-    bool ok = cmdLine.port != 0 && configdbs.size();
-
-    if ( !ok ) {
-        usage( argv );
-        return 1;
-    }
-
-    printShardingVersionInfo(false);
-
-    if ( ! configServer.init( configdbs ) ) {
-        cout << "couldn't resolve config db address" << endl;
-        return 7;
-    }
-
-    if ( ! configServer.ok( true ) ) {
-        cout << "configServer connection startup check failed" << endl;
-        return 8;
-    }
-
-    {
-        class CheckConfigServers : public task::Task {
-            virtual string name() const { return "CheckConfigServers"; }
-            virtual void doWork() { configServer.ok(true); }
-        };
-
-        task::repeat(new CheckConfigServers, 60*1000);
-    }
-
-    int configError = configServer.checkConfigVersion( params.count( "upgrade" ) );
-    if ( configError ) {
-        if ( configError > 0 ) {
-            cout << "upgrade success!" << endl;
-        }
-        else {
-            cout << "config server error: " << configError << endl;
-        }
-        return configError;
-    }
-    configServer.reloadSettings();
-    
-    init();
-
-#ifndef _WIN32
-    CmdLine::launchOk();
+    // if we reach here, then we are not running as a service.  service installation
+    // exits directly and so never reaches here either.
 #endif
 
-    boost::thread web( boost::bind(&webServerThread, new NoAdminAccess() /* takes ownership */) );
-
-    MessageServer::Options opts;
-    opts.port = cmdLine.port;
-    opts.ipList = cmdLine.bind_ip;
-    start(opts);
-    
-    // listen() will return when exit code closes its socket.
-    dbexit( EXIT_NET_ERROR );
+    runMongosServer( params.count( "upgrade" ) > 0 );
     return 0;
 }
+
+#if defined(_WIN32)
+namespace mongo {
+
+    bool initService() {
+        ServiceController::reportStatus( SERVICE_RUNNING );
+        log() << "Service running" << endl;
+        runMongosServer( false );
+        return true;
+    }
+
+} // namespace mongo
+#endif
+
 int main(int argc, char* argv[]) {
     try {
         doPreServerStartupInits();
         return _main(argc, argv);
     }
+    catch(SocketException& e) { 
+        cout << "uncaught SocketException in mongos main:" << endl;
+        cout << e.toString() << endl;
+    }
     catch(DBException& e) { 
-        cout << "uncaught exception in mongos main:" << endl;
+        cout << "uncaught DBException in mongos main:" << endl;
         cout << e.toString() << endl;
     }
     catch(std::exception& e) { 
-        cout << "uncaught exception in mongos main:" << endl;
+        cout << "uncaught std::exception in mongos main:" << endl;
         cout << e.what() << endl;
     }
     catch(...) { 
-        cout << "uncaught exception in mongos main" << endl;
+        cout << "uncaught unknown exception in mongos main" << endl;
     }
     return 20;
 }
@@ -415,6 +462,12 @@ void mongo::exitCleanly( ExitCode code ) {
 
 void mongo::dbexit( ExitCode rc, const char *why, bool tryToGetLock ) {
     dbexitCalled = true;
+#if defined(_WIN32)
+    if ( rc == EXIT_WINDOWS_SERVICE_STOP ) {
+        log() << "dbexit: exiting because Windows service was stopped" << endl;
+        return;
+    }
+#endif
     log() << "dbexit: " << why
           << " rc:" << rc
           << " " << ( why ? why : "" )

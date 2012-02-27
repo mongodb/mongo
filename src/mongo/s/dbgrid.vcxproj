@@ -476,6 +476,7 @@
     <ClCompile Include="..\util\log.cpp" />
     <ClCompile Include="..\util\net\miniwebserver.cpp" />
     <ClCompile Include="..\util\net\listen.cpp" />
+    <ClCompile Include="..\util\ntservice.cpp" />
     <ClCompile Include="..\util\processinfo.cpp" />
     <ClCompile Include="..\util\ramlog.cpp" />
     <ClCompile Include="..\util\signal_handlers.cpp" />
@@ -1045,6 +1046,7 @@
     <ClInclude Include="..\db\pipeline\value.h" />
     <ClInclude Include="..\db\projection.h" />
     <ClInclude Include="..\util\intrusive_counter.h" />
+    <ClInclude Include="..\util\ntservice.h" />
     <ClInclude Include="..\util\processinfo.h" />
     <ClInclude Include="..\util\signal_handlers.h" />
     <ClInclude Include="..\util\systeminfo.h" />

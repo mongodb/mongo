@@ -86,18 +86,17 @@ namespace mongo {
 
     }
 
-
 #if defined(_WIN32)
     void CmdLine::addWindowsOptions( boost::program_options::options_description& windows ,
                                      boost::program_options::options_description& hidden ) {
         windows.add_options()
-        ("install", "install mongodb service")
-        ("remove", "remove mongodb service")
-        ("reinstall", "reinstall mongodb service (equivilant of mongod --remove followed by mongod --install)")
-        ("serviceName", po::value<string>(), "windows service name")
-        ("serviceDisplayName", po::value<string>(), "windows service display name")
-        ("serviceDescription", po::value<string>(), "windows service description")
-        ("serviceUser", po::value<string>(), "user name service executes as")
+        ("install", "install Windows service")
+        ("remove", "remove Windows service")
+        ("reinstall", "reinstall Windows service (equivalent to --remove followed by --install)")
+        ("serviceName", po::value<string>(), "Windows service name")
+        ("serviceDisplayName", po::value<string>(), "Windows service display name")
+        ("serviceDescription", po::value<string>(), "Windows service description")
+        ("serviceUser", po::value<string>(), "account for service execution")
         ("servicePassword", po::value<string>(), "password used to authenticate serviceUser")
         ;
         hidden.add_options()("service", "start mongodb service");
@@ -440,8 +439,14 @@ namespace mongo {
                     if (type == typeid(string)){
                         if (value.as<string>().empty())
                             b.appendBool(key, true); // boost po uses empty string for flags like --quiet
-                        else
-                            b.append(key, value.as<string>());
+                        else {
+                            if ( key == "servicePassword" ) {
+                                b.append( key, "<password>" );
+                            }
+                            else {
+                                b.append( key, value.as<string>() );
+                            }
+                        }
                     }
                     else if (type == typeid(int))
                         b.append(key, value.as<int>());
