@@ -45,7 +45,8 @@ them both to 0; an emulation function will be used. */
 #define HAVE_BZLIB_H 1
 
 /* Define to 1 if you have the <dirent.h> header file. */
-#define HAVE_DIRENT_H 1
+// disabled for mongodb build
+// #define HAVE_DIRENT_H 1
 
 /* Define to 1 if you have the <dlfcn.h> header file. */
 #define HAVE_DLFCN_H 1
@@ -93,10 +94,13 @@ them both to 0; an emulation function will be used. */
 /* #undef HAVE_STRTOIMAX */
 
 /* Define to 1 if you have `strtoll'. */
-/* #undef HAVE_STRTOLL */
+#ifndef _WIN32
+#define HAVE_STRTOLL 1
+#endif
 
 /* Define to 1 if you have `strtoq'. */
-#define HAVE_STRTOQ 1
+// modified for mongodb build
+//#define HAVE_STRTOQ 1
 
 /* Define to 1 if you have the <sys/stat.h> header file. */
 #define HAVE_SYS_STAT_H 1
@@ -108,7 +112,8 @@ them both to 0; an emulation function will be used. */
 /* #undef HAVE_TYPE_TRAITS_H */
 
 /* Define to 1 if you have the <unistd.h> header file. */
-#define HAVE_UNISTD_H 1
+// for mongodb build
+//#define HAVE_UNISTD_H 1
 
 /* Define to 1 if the system has the type `unsigned long long'. */
 #define HAVE_UNSIGNED_LONG_LONG 1
@@ -120,7 +125,10 @@ them both to 0; an emulation function will be used. */
 #define HAVE_ZLIB_H 1
 
 /* Define to 1 if you have `_strtoi64'. */
-/* #undef HAVE__STRTOI64 */
+// for mongodb build
+#ifdef _WIN32
+#define HAVE__STRTOI64 1
+#endif
 
 /* The value of LINK_SIZE determines the number of bytes used to store links
    as offsets within the compiled regex. The default is 2, which allows for
@@ -141,7 +149,7 @@ them both to 0; an emulation function will be used. */
    for ever to determine that they do not match. The default is set very large
    so that it does not accidentally catch legitimate cases. On systems that
    support it, "configure" can be used to override this default default. */
-#define MATCH_LIMIT 10000000
+#define MATCH_LIMIT 200000
 
 /* The above limit applies to all calls of match(), whether or not they
    increase the recursion depth. In some environments it is desirable to limit
@@ -152,7 +160,7 @@ them both to 0; an emulation function will be used. */
    MATCH_LIMIT. The default is to use the same value as MATCH_LIMIT. There is
    a runtime method for setting a different limit. On systems that support it,
    "configure" can be used to override the default. */
-#define MATCH_LIMIT_RECURSION MATCH_LIMIT
+#define MATCH_LIMIT_RECURSION 4000
 
 /* This limit is parameterized just in case anybody ever wants to change it.
    Care must be taken if it is increased, because it guards against integer
@@ -179,6 +187,11 @@ them both to 0; an emulation function will be used. */
    that support it, "configure" can be used to set this in the Makefile (use
    --disable-stack-for-recursion). */
 /* #undef NO_RECURSE */
+/* mongodb: don't recurse, don't want to use much stack or blow stack */
+#ifndef __sunos__
+/* TODO this doesn't compile on sunos?? */
+#define NO_RECURSE 1
+#endif
 
 /* Name of package */
 #define PACKAGE "pcre"
@@ -223,6 +236,10 @@ them both to 0; an emulation function will be used. */
 
 /* Define if linking statically (TODO: make nice with Libtool) */
 /* #undef PCRE_STATIC */
+/* mongodb */
+#define PCRE_STATIC 
+#define PCRECPP_STATIC
+
 
 /* When calling PCRE via the POSIX interface, additional working storage is
    required for holding the pointers to capturing substrings because PCRE
@@ -261,13 +278,13 @@ them both to 0; an emulation function will be used. */
 /* #undef SUPPORT_PCREGREP_JIT */
 
 /* Define to enable support for Unicode properties. */
-/* #undef SUPPORT_UCP */
+#define SUPPORT_UCP
 
 /* Define to enable support for the UTF-8/16 Unicode encoding. This will work
    even in an EBCDIC environment, but it is incompatible with the EBCDIC
    macro. That is, PCRE can support *either* EBCDIC code *or* ASCII/UTF-8/16,
    but not both at once. */
-/* #undef SUPPORT_UTF */
+#define SUPPORT_UTF
 
 /* Version number of package */
 #define VERSION "8.30"
