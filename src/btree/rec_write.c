@@ -202,8 +202,8 @@ __wt_rec_write(
 	WT_ASSERT(session, __wt_page_is_modified(page));
 
 	/*
-	 * We can't do anything with a previously split page, that has to
-	 * be merged into its parent.
+	 * We can't do anything with a split-merge page, that has to be merged
+	 * merged into its parent.
 	 */
 	if (F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE))
 		return (0);
