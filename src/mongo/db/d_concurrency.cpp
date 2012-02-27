@@ -107,16 +107,22 @@ namespace mongo {
     }
     static void lock_W() { 
         LockState& ls = lockState();
-        massert(0, str::stream() << "can't lock_W, threadState=" << (int) threadState, ls.threadState == 0);
+        if( ls.threadState == 't' ) { 
+            DEV warning() << "W locking inside a temprelease, seems nonideal" << endl;
+        }
+        else {
+            massert(0, str::stream() << "can't lock_W, threadState=" << (int) ls.threadState, ls.threadState == 0 );
+        }
         getDur().commitIfNeeded(); // check before locking - will use an R lock for the commit if need to do one, which is better than W
         threadState() = 'W';
         q.lock_W();
         locked_W();
     }
-    static void unlock_W() { 
+    static void unlock_W(char oldState = 0) { 
         wassert( threadState() == 'W' );
         unlocking_W();
-        threadState() = 0;
+        dassert( oldState == 0 ||  oldState == 't' );
+        threadState() = oldState;
         q.unlock_W();
         unlocked_W();
     }
@@ -303,17 +309,19 @@ namespace mongo {
         )
     }
     Lock::GlobalWrite::GlobalWrite(bool sg) : stopGreed(sg) {
-        if( threadState() == 'W' ) { 
+        old = threadState();
+        if( old == 'W' ) { 
             recursive()++;
             DEV if( stopGreed ) { 
                 log() << "info Lock::GlobalWrite does not stop greed on recursive invocation" << endl;
             }
         }
         else {
-            if( stopGreed )
+            if( stopGreed ) {
                 lock_W_stop_greed();
-            else
+            } else {
                 lock_W();
+            }
         }
     }
     Lock::GlobalWrite::~GlobalWrite() {
@@ -324,7 +332,7 @@ namespace mongo {
             if( threadState() == 'R' ) // downgraded
                 unlock_R();
             else
-                unlock_W();
+                unlock_W(old);
             if( stopGreed )
                 q.start_greed();
         }

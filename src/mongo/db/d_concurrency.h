@@ -32,6 +32,7 @@ namespace mongo {
         };
         class GlobalWrite : boost::noncopyable { // recursive is ok
             const bool stopGreed;
+            char old;
         public:
             GlobalWrite(bool stopGreed = false); 
             ~GlobalWrite();
