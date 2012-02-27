@@ -11,11 +11,10 @@ static int  __hazard_exclusive(WT_SESSION_IMPL *, WT_REF *);
 static int  __rec_discard(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_discard_page(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_excl(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
+static int  __rec_excl_int(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
 static void __rec_excl_clear(WT_SESSION_IMPL *);
-static int  __rec_excl_page(WT_SESSION_IMPL *, WT_REF *, uint32_t);
 static int  __rec_page_clean_update(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_page_dirty_update(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __rec_review(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
 static int  __rec_root_addr_update(WT_SESSION_IMPL *, uint8_t *, uint32_t);
 static int  __rec_root_clean_update(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_root_dirty_update(WT_SESSION_IMPL *, WT_PAGE *);
@@ -35,6 +34,8 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	WT_VERBOSE(session, evict,
 	    "page %p (%s)", page, __wt_page_type_string(page->type));
 
+	WT_ASSERT(session, session->excl_next == 0);
+
 	/*
 	 * Get exclusive access to the page and review the page and its subtree
 	 * for conditions that would block our eviction of the page.  If the
@@ -43,11 +44,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 * unlikely eviction would choose an internal page with children, it's
 	 * not disallowed anywhere.
 	 */
-	WT_ERR(__rec_review(session, page, flags));
-
-	/* If the page is dirty, write it. */
-	if (__wt_page_is_modified(page))
-		WT_ERR(__wt_rec_write(session, page, NULL));
+	WT_ERR(__rec_excl(session, page, flags));
 
 	/* Count evictions of internal pages during normal operation. */
 	if (!LF_ISSET(WT_REC_SINGLE) &&
@@ -71,6 +68,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 			WT_ERR(__rec_page_dirty_update(session, page));
 	}
 
+	session->excl_next = 0;
 	return (0);
 
 err:	/*
@@ -285,15 +283,13 @@ __rec_root_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __rec_review --
+ * __rec_excl --
  *	Get exclusive access to the page and review the page and its subtree
- * for conditions that would block our eviction of the page.
+ *	for conditions that would block our eviction of the page.
  */
 static int
-__rec_review(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
+__rec_excl(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 {
-	session->excl_next = 0;			/* Track the pages we lock. */
-
 	/*
 	 * Get exclusive access to the page if our caller doesn't have the tree
 	 * locked down.
@@ -305,24 +301,47 @@ __rec_review(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_ROW_INT:
-		WT_RET(__rec_excl(session, page, flags));
+		WT_RET(__rec_excl_int(session, page, flags));
 		break;
 	default:
 		break;
 	}
 
+	/*
+	 * If the page is dirty, try and write it.   This is because once a page
+	 * is flagged for a merge into its parent, the eviction server no longer
+	 * makes any attempt to evict it, it only attempts to evict its parent.
+	 * If a parent page is blocked from eviction because of a dirty child
+	 * page, we would never write the child page and never evict the parent.
+	 * This prevents that from happening.
+	 */
+	if (__wt_page_is_modified(page))
+		WT_RET(__wt_rec_write(session, page, NULL));
+
+	/*
+	 * If we find a page that can't be merged into its parent, we're done:
+	 * you can't evict a page that references other in-memory pages, the
+	 * child pages must be evicted first.  Merge-split pages are OK, no
+	 * matter if they're clean or dirty, we can always merge them into the
+	 * parent.  Clean split or empty pages are OK too.  Dirty split or
+	 * empty pages are not OK, they must be written first so we know what
+	 * they're going to look like to the parent.
+	 */
+	if (F_ISSET(page, WT_PAGE_REC_SPLIT | WT_PAGE_REC_EMPTY) &&
+	    __wt_page_is_modified(page))
+		return (EBUSY);
+
 	return (0);
 }
 
 /*
- * __rec_excl --
+ * __rec_excl_int --
  *	Walk an internal page's subtree, getting exclusive access as necessary,
- * and checking if the subtree can be evicted.
+ *	and checking if the subtree can be evicted.
  */
 static int
-__rec_excl(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t flags)
+__rec_excl_int(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t flags)
 {
-	WT_PAGE *page;
 	WT_REF *ref;
 	uint32_t i;
 
@@ -338,18 +357,7 @@ __rec_excl(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t flags)
 		case WT_REF_READING:			/* Being read */
 			return (EBUSY);
 		}
-		WT_RET(__rec_excl_page(session, ref, flags));
-
-		/* Recurse down the tree. */
-		page = ref->page;
-		switch (page->type) {
-		case WT_PAGE_COL_INT:
-		case WT_PAGE_ROW_INT:
-			WT_RET(__rec_excl(session, page, flags));
-			break;
-		default:
-			break;
-		}
+		WT_RET(__rec_excl(session, ref->page, flags));
 	}
 	return (0);
 }
@@ -371,63 +379,6 @@ __rec_excl_clear(WT_SESSION_IMPL *session)
 		ref->state = WT_REF_MEM;
 	}
 	session->excl_next = 0;
-}
-
-/*
- * __rec_excl_page --
- *	Acquire exclusive access to a page as necessary, and check if the page
- * can be evicted.
- */
-static int
-__rec_excl_page(WT_SESSION_IMPL *session, WT_REF *ref, uint32_t flags)
-{
-	WT_PAGE *page;
-
-	page = ref->page;
-
-	/*
-	 * Next, if our caller doesn't have the tree locked down, get exclusive
-	 * access to the page.
-	 */
-	if (!LF_ISSET(WT_REC_SINGLE))
-		WT_RET(__hazard_exclusive(session, ref));
-
-	/*
-	 * If the page is dirty, try and write it.   This is because once a page
-	 * is flagged for a merge into its parent, the eviction server no longer
-	 * makes any attempt to evict it, it only attempts to evict its parent.
-	 * If a parent page is blocked from eviction because of a dirty child
-	 * page, we would never write the child page and never evict the parent.
-	 * This prevents that from happening.
-	 */
-	if (__wt_page_is_modified(page))
-		WT_RET(__wt_rec_write(session, page, NULL));
-
-	/*
-	 * If we find a page that can't be merged into its parent, we're done:
-	 * you can't evict a page that references other in-memory pages, those
-	 * pages must be evicted first.  While the test is necessary, it should
-	 * not happen much: reading an internal page increments its read
-	 * generation, and so internal pages shouldn't be selected for eviction
-	 * until after their children have been evicted.
-	 */
-	if (!F_ISSET(page,
-	    WT_PAGE_REC_EMPTY | WT_PAGE_REC_SPLIT | WT_PAGE_REC_SPLIT_MERGE))
-		return (EBUSY);
-
-	/*
-	 * Finally, a more careful test: merge-split pages are OK, no matter if
-	 * they're clean or dirty, we can always merge them into the parent.
-	 * Clean split or empty pages are OK too.  Dirty split or empty pages
-	 * are not OK, they must be written first so we know what they're going
-	 * to look like to the parent.
-	 */
-	if (F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE) ||
-	    (F_ISSET(page, WT_PAGE_REC_SPLIT | WT_PAGE_REC_EMPTY) &&
-	    !__wt_page_is_modified(page)))
-		return (0);
-
-	return (EBUSY);
 }
 
 /*
