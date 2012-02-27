@@ -11,7 +11,6 @@ static int  __hazard_exclusive(WT_SESSION_IMPL *, WT_REF *);
 static int  __rec_discard(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_discard_page(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_excl(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
-static int  __rec_excl_int(WT_SESSION_IMPL *, WT_PAGE *, uint32_t);
 static void __rec_excl_clear(WT_SESSION_IMPL *);
 static int  __rec_page_clean_update(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_page_dirty_update(WT_SESSION_IMPL *, WT_PAGE *);
@@ -355,6 +354,9 @@ __rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 static int
 __rec_excl(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 {
+	WT_REF *ref;
+	uint32_t i;
+
 	/*
 	 * Get exclusive access to the page if our caller doesn't have the tree
 	 * locked down.
@@ -365,8 +367,20 @@ __rec_excl(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	/* Walk the page's subtree and make sure we can evict this page. */
 	switch (page->type) {
 	case WT_PAGE_COL_INT:
-	case WT_PAGE_ROW_INT:
-		WT_RET(__rec_excl_int(session, page, flags));
+	case WT_PAGE_ROW_INT:		/* For each entry in the page... */
+		WT_REF_FOREACH(page, ref, i) {
+			switch (ref->state) {
+			case WT_REF_DISK:		/* On-disk */
+				continue;
+			case WT_REF_EVICTING:		/* Being evaluated */
+			case WT_REF_MEM:		/* In-memory */
+				break;
+			case WT_REF_LOCKED:		/* Being evicted */
+			case WT_REF_READING:		/* Being read */
+				return (EBUSY);
+			}
+			WT_RET(__rec_excl(session, ref->page, flags));
+		}
 		break;
 	default:
 		break;
@@ -396,34 +410,6 @@ __rec_excl(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	    __wt_page_is_modified(page))
 		return (EBUSY);
 
-	return (0);
-}
-
-/*
- * __rec_excl_int --
- *	Walk an internal page's subtree, getting exclusive access as necessary,
- *	and checking if the subtree can be evicted.
- */
-static int
-__rec_excl_int(WT_SESSION_IMPL *session, WT_PAGE *parent, uint32_t flags)
-{
-	WT_REF *ref;
-	uint32_t i;
-
-	/* For each entry in the page... */
-	WT_REF_FOREACH(parent, ref, i) {
-		switch (ref->state) {
-		case WT_REF_DISK:			/* On-disk */
-			continue;
-		case WT_REF_EVICTING:			/* Being evaluated */
-		case WT_REF_MEM:			/* In-memory */
-			break;
-		case WT_REF_LOCKED:			/* Being evicted */
-		case WT_REF_READING:			/* Being read */
-			return (EBUSY);
-		}
-		WT_RET(__rec_excl(session, ref->page, flags));
-	}
 	return (0);
 }
 
