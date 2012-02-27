@@ -583,12 +583,11 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 			goto skip;
 
 		/*
-		 * Skip pages expected to be merged into their parents.
-		 *
-		 * Don't skip pages marked WT_PAGE_REC_EMPTY or SPLIT: updates
-		 * since the last reconciliation may have changed their state
-		 * and only the eviction code can check whether they should
-		 * really be skipped.
+		 * Skip pages that must be merged into their parents.  Don't
+		 * skip pages marked WT_PAGE_REC_EMPTY or SPLIT: updates after
+		 * their last reconciliation may have changed their state and
+		 * only the eviction code can check whether they should really
+		 * be skipped.
 		 */
 		if (F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE))
 			goto skip;
