@@ -1,0 +1,561 @@
+/-- These tests for Unicode property support test PCRE's API and show some of
+    the compiled code. They are not Perl-compatible. --/
+
+/[\p{L}]/DZ
+
+/[\p{^L}]/DZ
+
+/[\P{L}]/DZ
+
+/[\P{^L}]/DZ
+
+/[abc\p{L}\x{0660}]/8DZ
+
+/[\p{Nd}]/8DZ
+    1234
+
+/[\p{Nd}+-]+/8DZ
+    1234
+    12-34
+    12+\x{661}-34  
+    ** Failers
+    abcd  
+
+/[\x{105}-\x{109}]/8iDZ
+    \x{104}
+    \x{105}
+    \x{109}  
+    ** Failers
+    \x{100}
+    \x{10a} 
+    
+/[z-\x{100}]/8iDZ 
+    Z
+    z
+    \x{39c}
+    \x{178}
+    |
+    \x{80}
+    \x{ff}
+    \x{100}
+    \x{101} 
+    ** Failers
+    \x{102}
+    Y
+    y           
+
+/[z-\x{100}]/8DZi
+
+/(?:[\PPa*]*){8,}/
+
+/[\P{Any}]/BZ
+
+/[\P{Any}\E]/BZ
+
+/(\P{Yi}+\277)/
+
+/(\P{Yi}+\277)?/
+
+/(?<=\P{Yi}{3}A)X/
+
+/\p{Yi}+(\P{Yi}+)(?1)/
+
+/(\P{Yi}{2}\277)?/
+
+/[\P{Yi}A]/
+
+/[\P{Yi}\P{Yi}\P{Yi}A]/
+
+/[^\P{Yi}A]/
+
+/[^\P{Yi}\P{Yi}\P{Yi}A]/
+
+/(\P{Yi}*\277)*/
+
+/(\P{Yi}*?\277)*/
+
+/(\p{Yi}*+\277)*/
+
+/(\P{Yi}?\277)*/
+
+/(\P{Yi}??\277)*/
+
+/(\p{Yi}?+\277)*/
+
+/(\P{Yi}{0,3}\277)*/
+
+/(\P{Yi}{0,3}?\277)*/
+
+/(\p{Yi}{0,3}+\277)*/
+
+/\p{Zl}{2,3}+/8BZ
+    \xe2\x80\xa8\xe2\x80\xa8
+    \x{2028}\x{2028}\x{2028}
+    
+/\p{Zl}/8BZ
+
+/\p{Lu}{3}+/8BZ
+
+/\pL{2}+/8BZ
+
+/\p{Cc}{2}+/8BZ
+
+/^\p{Cs}/8
+    \?\x{dfff}
+    ** Failers
+    \x{09f} 
+  
+/^\p{Sc}+/8
+    $\x{a2}\x{a3}\x{a4}\x{a5}\x{a6}
+    \x{9f2}
+    ** Failers
+    X
+    \x{2c2}
+  
+/^\p{Zs}/8
+    \ \
+    \x{a0}
+    \x{1680}
+    \x{180e}
+    \x{2000}
+    \x{2001}     
+    ** Failers
+    \x{2028}
+    \x{200d} 
+  
+/-- These four are here rather than in test 6 because Perl has problems with
+    the negative versions of the properties. --/
+      
+/\p{^Lu}/8i
+    1234
+    ** Failers
+    ABC 
+
+/\P{Lu}/8i
+    1234
+    ** Failers
+    ABC 
+
+/\p{Ll}/8i 
+    a
+    Az
+    ** Failers
+    ABC   
+
+/\p{Lu}/8i
+    A
+    a\x{10a0}B 
+    ** Failers 
+    a
+    \x{1d00}  
+
+/[\x{c0}\x{391}]/8i
+    \x{c0}
+    \x{e0} 
+
+/-- The next two are special cases where the lengths of the different cases of
+the same character differ. The first went wrong with heap frame storage; the
+second was broken in all cases. --/
+
+/^\x{023a}+?(\x{0130}+)/8i
+  \x{023a}\x{2c65}\x{0130}
+  
+/^\x{023a}+([^X])/8i
+  \x{023a}\x{2c65}X
+
+/\x{c0}+\x{116}+/8i
+    \x{c0}\x{e0}\x{116}\x{117}
+
+/[\x{c0}\x{116}]+/8i
+    \x{c0}\x{e0}\x{116}\x{117}
+
+/(\x{de})\1/8i
+    \x{de}\x{de}
+    \x{de}\x{fe}
+    \x{fe}\x{fe}
+    \x{fe}\x{de}
+
+/^\x{c0}$/8i
+    \x{c0}
+    \x{e0} 
+
+/^\x{e0}$/8i
+    \x{c0}
+    \x{e0} 
+
+/-- The next two should be Perl-compatible, but it fails to match \x{e0}. PCRE
+will match it only with UCP support, because without that it has no notion
+of case for anything other than the ASCII letters. --/ 
+
+/((?i)[\x{c0}])/8
+    \x{c0}
+    \x{e0} 
+
+/(?i:[\x{c0}])/8
+    \x{c0}
+    \x{e0} 
+
+/-- This should be Perl-compatible but Perl 5.11 gets \x{300} wrong. --/8
+    
+/^\X/8
+    A
+    A\x{300}BC 
+    A\x{300}\x{301}\x{302}BC 
+    *** Failers
+    \x{300}  
+    
+/-- These are PCRE's extra properties to help with Unicodizing \d etc. --/
+
+/^\p{Xan}/8
+    ABCD
+    1234
+    \x{6ca}
+    \x{a6c}
+    \x{10a7}   
+    ** Failers
+    _ABC   
+
+/^\p{Xan}+/8
+    ABCD1234\x{6ca}\x{a6c}\x{10a7}_
+    ** Failers
+    _ABC   
+
+/^\p{Xan}+?/8
+    \x{6ca}\x{a6c}\x{10a7}_
+
+/^\p{Xan}*/8
+    ABCD1234\x{6ca}\x{a6c}\x{10a7}_
+    
+/^\p{Xan}{2,9}/8
+    ABCD1234\x{6ca}\x{a6c}\x{10a7}_
+    
+/^\p{Xan}{2,9}?/8
+    \x{6ca}\x{a6c}\x{10a7}_
+    
+/^[\p{Xan}]/8
+    ABCD1234_
+    1234abcd_
+    \x{6ca}
+    \x{a6c}
+    \x{10a7}   
+    ** Failers
+    _ABC   
+ 
+/^[\p{Xan}]+/8
+    ABCD1234\x{6ca}\x{a6c}\x{10a7}_
+    ** Failers
+    _ABC   
+
+/^>\p{Xsp}/8
+    >\x{1680}\x{2028}\x{0b}
+    >\x{a0} 
+    ** Failers
+    \x{0b} 
+
+/^>\p{Xsp}+/8
+    > \x{09}\x{0a}\x{0c}\x{0d}\x{a0}\x{1680}\x{2028}\x{0b}
+
+/^>\p{Xsp}+?/8
+    >\x{1680}\x{2028}\x{0b}
+
+/^>\p{Xsp}*/8
+    > \x{09}\x{0a}\x{0c}\x{0d}\x{a0}\x{1680}\x{2028}\x{0b}
+    
+/^>\p{Xsp}{2,9}/8
+    > \x{09}\x{0a}\x{0c}\x{0d}\x{a0}\x{1680}\x{2028}\x{0b}
+    
+/^>\p{Xsp}{2,9}?/8
+    > \x{09}\x{0a}\x{0c}\x{0d}\x{a0}\x{1680}\x{2028}\x{0b}
+    
+/^>[\p{Xsp}]/8
+    >\x{2028}\x{0b}
+ 
+/^>[\p{Xsp}]+/8
+    > \x{09}\x{0a}\x{0c}\x{0d}\x{a0}\x{1680}\x{2028}\x{0b}
+
+/^>\p{Xps}/8
+    >\x{1680}\x{2028}\x{0b}
+    >\x{a0} 
+    ** Failers
+    \x{0b} 
+
+/^>\p{Xps}+/8
+    > \x{09}\x{0a}\x{0c}\x{0d}\x{a0}\x{1680}\x{2028}\x{0b}
+
+/^>\p{Xps}+?/8
+    >\x{1680}\x{2028}\x{0b}
+
+/^>\p{Xps}*/8
+    > \x{09}\x{0a}\x{0c}\x{0d}\x{a0}\x{1680}\x{2028}\x{0b}
+    
+/^>\p{Xps}{2,9}/8
+    > \x{09}\x{0a}\x{0c}\x{0d}\x{a0}\x{1680}\x{2028}\x{0b}
+    
+/^>\p{Xps}{2,9}?/8
+    > \x{09}\x{0a}\x{0c}\x{0d}\x{a0}\x{1680}\x{2028}\x{0b}
+    
+/^>[\p{Xps}]/8
+    >\x{2028}\x{0b}
+ 
+/^>[\p{Xps}]+/8
+    > \x{09}\x{0a}\x{0c}\x{0d}\x{a0}\x{1680}\x{2028}\x{0b}
+
+/^\p{Xwd}/8
+    ABCD
+    1234
+    \x{6ca}
+    \x{a6c}
+    \x{10a7}
+    _ABC    
+    ** Failers
+    [] 
+
+/^\p{Xwd}+/8
+    ABCD1234\x{6ca}\x{a6c}\x{10a7}_
+
+/^\p{Xwd}+?/8
+    \x{6ca}\x{a6c}\x{10a7}_
+
+/^\p{Xwd}*/8
+    ABCD1234\x{6ca}\x{a6c}\x{10a7}_
+    
+/^\p{Xwd}{2,9}/8
+    A_B12\x{6ca}\x{a6c}\x{10a7}
+    
+/^\p{Xwd}{2,9}?/8
+    \x{6ca}\x{a6c}\x{10a7}_
+    
+/^[\p{Xwd}]/8
+    ABCD1234_
+    1234abcd_
+    \x{6ca}
+    \x{a6c}
+    \x{10a7}   
+    _ABC 
+    ** Failers
+    []   
+ 
+/^[\p{Xwd}]+/8
+    ABCD1234\x{6ca}\x{a6c}\x{10a7}_
+
+/-- A check not in UTF-8 mode --/
+
+/^[\p{Xwd}]+/
+    ABCD1234_
+    
+/-- Some negative checks --/
+
+/^[\P{Xwd}]+/8
+    !.+\x{019}\x{35a}AB
+
+/^[\p{^Xwd}]+/8
+    !.+\x{019}\x{35a}AB
+
+/[\D]/WBZ8
+    1\x{3c8}2
+
+/[\d]/WBZ8
+    >\x{6f4}<
+
+/[\S]/WBZ8
+    \x{1680}\x{6f4}\x{1680}
+
+/[\s]/WBZ8
+    >\x{1680}<
+
+/[\W]/WBZ8
+    A\x{1712}B
+
+/[\w]/WBZ8
+    >\x{1723}<
+
+/\D/WBZ8
+    1\x{3c8}2
+
+/\d/WBZ8
+    >\x{6f4}<
+
+/\S/WBZ8
+    \x{1680}\x{6f4}\x{1680}
+
+/\s/WBZ8
+    >\x{1680}>
+
+/\W/WBZ8
+    A\x{1712}B
+
+/\w/WBZ8
+    >\x{1723}<
+
+/[[:alpha:]]/WBZ
+
+/[[:lower:]]/WBZ
+
+/[[:upper:]]/WBZ
+
+/[[:alnum:]]/WBZ
+
+/[[:ascii:]]/WBZ
+
+/[[:cntrl:]]/WBZ
+
+/[[:digit:]]/WBZ
+
+/[[:graph:]]/WBZ
+
+/[[:print:]]/WBZ
+
+/[[:punct:]]/WBZ
+
+/[[:space:]]/WBZ
+
+/[[:word:]]/WBZ
+
+/[[:xdigit:]]/WBZ
+
+/-- Unicode properties for \b abd \B --/
+
+/\b...\B/8W
+    abc_
+    \x{37e}abc\x{376} 
+    \x{37e}\x{376}\x{371}\x{393}\x{394} 
+    !\x{c0}++\x{c1}\x{c2} 
+    !\x{c0}+++++ 
+
+/-- Without PCRE_UCP, non-ASCII always fail, even if < 256  --/
+
+/\b...\B/8
+    abc_
+    ** Failers 
+    \x{37e}abc\x{376} 
+    \x{37e}\x{376}\x{371}\x{393}\x{394} 
+    !\x{c0}++\x{c1}\x{c2} 
+    !\x{c0}+++++ 
+
+/-- With PCRE_UCP, non-UTF8 chars that are < 256 still check properties  --/
+
+/\b...\B/W
+    abc_
+    !\x{c0}++\x{c1}\x{c2} 
+    !\x{c0}+++++ 
+
+/-- Some of these are silly, but they check various combinations --/
+
+/[[:^alpha:][:^cntrl:]]+/8WBZ
+    123
+    abc 
+
+/[[:^cntrl:][:^alpha:]]+/8WBZ
+    123
+    abc 
+
+/[[:alpha:]]+/8WBZ
+    abc
+
+/[[:^alpha:]\S]+/8WBZ
+    123
+    abc 
+
+/[^\d]+/8WBZ
+    abc123
+    abc\x{123}
+    \x{660}abc   
+
+/\p{Lu}+9\p{Lu}+B\p{Lu}+b/BZ
+
+/\p{^Lu}+9\p{^Lu}+B\p{^Lu}+b/BZ
+
+/\P{Lu}+9\P{Lu}+B\P{Lu}+b/BZ
+
+/\p{Han}+X\p{Greek}+\x{370}/BZ8
+
+/\p{Xan}+!\p{Xan}+A/BZ
+
+/\p{Xsp}+!\p{Xsp}\t/BZ
+
+/\p{Xps}+!\p{Xps}\t/BZ
+
+/\p{Xwd}+!\p{Xwd}_/BZ
+
+/A+\p{N}A+\dB+\p{N}*B+\d*/WBZ
+
+/-- These behaved oddly in Perl, so they are kept in this test --/
+
+/(\x{23a}\x{23a}\x{23a})?\1/8i
+    \x{23a}\x{23a}\x{23a}\x{2c65}\x{2c65}
+
+/(ȺȺȺ)?\1/8i
+    ȺȺȺⱥⱥ
+
+/(\x{23a}\x{23a}\x{23a})?\1/8i
+    \x{23a}\x{23a}\x{23a}\x{2c65}\x{2c65}\x{2c65}
+
+/(ȺȺȺ)?\1/8i
+    ȺȺȺⱥⱥⱥ
+
+/(\x{23a}\x{23a}\x{23a})\1/8i
+    \x{23a}\x{23a}\x{23a}\x{2c65}\x{2c65}
+
+/(ȺȺȺ)\1/8i
+    ȺȺȺⱥⱥ
+
+/(\x{23a}\x{23a}\x{23a})\1/8i
+    \x{23a}\x{23a}\x{23a}\x{2c65}\x{2c65}\x{2c65}
+
+/(ȺȺȺ)\1/8i
+    ȺȺȺⱥⱥⱥ
+
+/(\x{2c65}\x{2c65})\1/8i
+    \x{2c65}\x{2c65}\x{23a}\x{23a}
+    
+/(ⱥⱥ)\1/8i
+    ⱥⱥȺȺ 
+    
+/(\x{23a}\x{23a}\x{23a})\1Y/8i
+    X\x{23a}\x{23a}\x{23a}\x{2c65}\x{2c65}\x{2c65}YZ
+
+/(\x{2c65}\x{2c65})\1Y/8i
+    X\x{2c65}\x{2c65}\x{23a}\x{23a}YZ
+
+/-- --/ 
+
+/-- These scripts weren't yet in Perl when I added Unicode 6.0.0 to PCRE --/
+
+/^[\p{Batak}]/8
+    \x{1bc0}
+    \x{1bff}
+    ** Failers
+    \x{1bf4}
+    
+/^[\p{Brahmi}]/8
+    \x{11000}
+    \x{1106f}
+    ** Failers
+    \x{1104e}
+    
+/^[\p{Mandaic}]/8
+    \x{840}
+    \x{85e}
+    ** Failers
+    \x{85c}
+    \x{85d}    
+
+/-- --/ 
+
+/(\X*)(.)/s8
+    A\x{300}
+
+/^S(\X*)e(\X*)$/8
+    Stéréo
+    
+/^\X/8 
+    ́réo
+
+/^a\X41z/<JS>
+    aX41z
+    *** Failers
+    aAz
+
+/(?<=ab\Cde)X/8
+
+/-- End of testinput7 --/

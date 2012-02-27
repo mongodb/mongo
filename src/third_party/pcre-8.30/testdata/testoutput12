@@ -1,0 +1,51 @@
+/-- This test is run only when JIT support is available. It checks for a
+successful and an unsuccessful JIT compile and save and restore behaviour,
+and a couple of things that are different with JIT. --/
+
+/abc/S+I
+Capturing subpattern count = 0
+No options
+First char = 'a'
+Need char = 'c'
+Subject length lower bound = 3
+No set of starting bytes
+JIT study was successful
+
+/ab(*COMMIT)/S+I
+Capturing subpattern count = 0
+No options
+First char = 'a'
+Need char = 'b'
+Subject length lower bound = 2
+No set of starting bytes
+JIT study was not successful
+
+/abc/S+I>testsavedregex
+Capturing subpattern count = 0
+No options
+First char = 'a'
+Need char = 'c'
+Subject length lower bound = 3
+No set of starting bytes
+JIT study was successful
+Compiled pattern written to testsavedregex
+Study data written to testsavedregex
+
+<testsavedregex
+Compiled pattern loaded from testsavedregex
+Study data loaded from testsavedregex
+    abc
+ 0: abc
+
+/a*/SI
+Capturing subpattern count = 0
+No options
+No first char
+No need char
+Study returned NULL
+
+/(?(R)a*(?1)|((?R))b)/S+
+    aaaabcde
+Error -27 (JIT stack limit reached)
+
+/-- End of testinput12 --/

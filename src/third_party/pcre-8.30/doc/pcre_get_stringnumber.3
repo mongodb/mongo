@@ -1,0 +1,41 @@
+.TH PCRE_GET_STRINGNUMBER 3
+.SH NAME
+PCRE - Perl-compatible regular expressions
+.SH SYNOPSIS
+.rs
+.sp
+.B #include <pcre.h>
+.PP
+.SM
+.B int pcre_get_stringnumber(const pcre *\fIcode\fP,
+.ti +5n
+.B const char *\fIname\fP);
+.PP
+.B int pcre16_get_stringnumber(const pcre16 *\fIcode\fP,
+.ti +5n
+.B PCRE_SPTR16 \fIname\fP);
+.
+.SH DESCRIPTION
+.rs
+.sp
+This convenience function finds the number of a named substring capturing
+parenthesis in a compiled pattern. Its arguments are:
+.sp
+  \fIcode\fP    Compiled regular expression
+  \fIname\fP    Name whose number is required
+.sp
+The yield of the function is the number of the parenthesis if the name is
+found, or PCRE_ERROR_NOSUBSTRING otherwise. When duplicate names are allowed
+(PCRE_DUPNAMES is set), it is not defined which of the numbers is returned by
+\fBpcre[16]_get_stringnumber()\fP. You can obtain the complete list by calling
+\fBpcre[16]_get_stringtable_entries()\fP.
+.P
+There is a complete description of the PCRE native API in the
+.\" HREF
+\fBpcreapi\fP
+.\"
+page and a description of the POSIX API in the
+.\" HREF
+\fBpcreposix\fP
+.\"
+page.
