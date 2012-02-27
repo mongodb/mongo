@@ -70,7 +70,6 @@ namespace mongo {
          */
         void getAllShortNames( bool locked, set<string>& all ) const {
             SimpleMutex::scoped_lock lk(_m);
-            assert( Lock::isReadLocked() );
             for ( Paths::const_iterator i=_paths.begin(); i!=_paths.end(); i++ ) {
                 DBs m = i->second;
                 for( DBs::const_iterator j=m.begin(); j!=m.end(); j++ ) {
