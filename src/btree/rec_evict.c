@@ -30,6 +30,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	int ret;
 
 	conn = S2C(session);
+	ret = 0;
 
 	WT_VERBOSE(session, evict,
 	    "page %p (%s)", page, __wt_page_type_string(page->type));
@@ -68,14 +69,14 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 			WT_ERR(__rec_page_dirty_update(session, page));
 	}
 
+	if (0) {
+err:		/*
+		 * If unable to evict this page, release exclusive reference(s)
+		 * we've acquired.
+		 */
+		__rec_excl_clear(session);
+	}
 	session->excl_next = 0;
-	return (0);
-
-err:	/*
-	 * If unable to evict this page, release exclusive reference(s) we've
-	 * acquired.
-	 */
-	__rec_excl_clear(session);
 	return (ret);
 }
 
@@ -442,7 +443,6 @@ __rec_excl_clear(WT_SESSION_IMPL *session)
 		WT_ASSERT(session, ref->state == WT_REF_LOCKED);
 		ref->state = WT_REF_MEM;
 	}
-	session->excl_next = 0;
 }
 
 /*
