@@ -30,7 +30,7 @@ namespace mongo {
      * @return if this name has an increasing counter associated, return the value
      *         otherwise 0
      */
-    unsigned setThreadName(const char * name);
+    long long setThreadName(const char * name);
     string getThreadName();
 
     template<class T>
