@@ -185,10 +185,10 @@ namespace mongo {
         return threadState();
     }
     int Lock::isReadLocked() {
-        return threadState() & 'R'; // ascii assumed
+        return threadState() == 'R' || threadState() == 'r';
     }
-    int Lock::somethingWriteLocked() { // w or W
-        return threadState() & 'W'; // ascii assumed
+    int Lock::somethingWriteLocked() {
+        return threadState() == 'W' || threadState() == 'w';
     }
     bool Lock::isRW() {
         return threadState() == 'W' || threadState() == 'R';
