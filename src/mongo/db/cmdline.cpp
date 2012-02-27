@@ -292,12 +292,17 @@ namespace mongo {
                 if ( logpath[0] != '/' ) {
                     logpath = cmdLine.cwd + "/" + logpath;
                 }
+                bool exists = boost::filesystem::exists( logpath );
                 FILE * test = fopen( logpath.c_str() , "a" );
                 if ( ! test ) {
                     cout << "can't open [" << logpath << "] for log file: " << errnoWithDescription() << endl;
                     ::exit(-1);
                 }
                 fclose( test );
+                // if we created a file, unlink it (to avoid confusing log rotation code)
+                if ( ! exists ) {
+                    unlink( logpath.c_str() );
+                }
             }
 
             cout.flush();
