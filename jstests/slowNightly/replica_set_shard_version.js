@@ -57,8 +57,7 @@ mongosA.getDB("admin").runCommand({ setParameter : 1, traceExceptions : false })
 
 print( "time to work for primary: " + ( ( end.getTime() - start.getTime() ) / 1000 ) + " seconds" );
 
-// not sure how many iterations are needed in general, tends to be 3
-assert.lt( iterations, 4 );
+assert.lt( iterations, 3 );
 
 // now check secondary
 
