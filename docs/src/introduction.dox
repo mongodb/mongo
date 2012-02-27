@@ -6,8 +6,12 @@ Open Source extensible platform for data management.
 WiredTiger supports both traditional row-oriented storage, where all
 columns of a row are stored together, and column-oriented storage, where
 one or more columns can be stored individually, allowing more efficient
-access and storage.  For more information on the WiredTiger architecture
-and why it might be right for your project, see @ref architecture.
+access and storage.
+
+For more information on the WiredTiger architecture and why it might be
+right for your project, see:
+
+- @subpage architecture.
 
 This documentation describes the programming interface to WiredTiger
 used by developers to construct applications.  We follow SQL
