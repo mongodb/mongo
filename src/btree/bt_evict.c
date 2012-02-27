@@ -584,15 +584,14 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 			goto skip;
 
 		/*
-		 * Skip pages expected to be merged into their parents.  The
-		 * problem is if a parent and its child are both added to the
-		 * eviction list and the child is merged into the parent when
-		 * the parent is evicted, the child is left corrupted on the
-		 * list (and might have already been selected for eviction by
-		 * another thread).
+		 * Skip pages expected to be merged into their parents.
+		 *
+		 * Don't skip pages marked WT_PAGE_REC_EMPTY or SPLIT: updates
+		 * since the last reconciliation may have changed their state
+		 * and only the eviction code can check whether they should
+		 * really be skipped.
 		 */
-		if (F_ISSET(page, WT_PAGE_REC_EMPTY |
-		    WT_PAGE_REC_SPLIT | WT_PAGE_REC_SPLIT_MERGE))
+		if (F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE))
 			goto skip;
 
 		WT_VERBOSE(session, evictserver,
