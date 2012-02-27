@@ -514,7 +514,12 @@ namespace mongo {
 
             // this is so the mutexdebugger doesn't get confused.  we are actually single threaded 
             // at this point in the program so it wouldn't have been a true problem (I think)
-            SimpleMutex::scoped_lock lk2(commitJob.groupCommitMutex);
+            
+            // can't lock groupCommitMutex here as 
+            //   MongoMMF::close()->closingFileNotication()->groupCommit() will lock it
+            //   and that would be recursive.
+            //   
+            // SimpleMutex::scoped_lock lk2(commitJob.groupCommitMutex);
 
             _recover(); // throws on interruption
         }
