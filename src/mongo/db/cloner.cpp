@@ -51,7 +51,7 @@ namespace mongo {
     }
     
     class Cloner: boost::noncopyable {
-        auto_ptr< DBClientWithCommands > conn;
+        auto_ptr< DBClientBase > conn;
         void copy(const char *from_ns, const char *to_ns, bool isindex, bool logForRepl,
                   bool masterSameProcess, bool slaveOk, bool mayYield, bool mayBeInterrupted, Query q = Query());
         struct Fun;
@@ -63,7 +63,7 @@ namespace mongo {
            snapshot    - use $snapshot mode for copying collections.  note this should not be used when it isn't required, as it will be slower.
                          for example repairDatabase need not use it.
         */
-        void setConnection( DBClientWithCommands *c ) { conn.reset( c ); }
+        void setConnection( DBClientBase *c ) { conn.reset( c ); }
 
         /** copy the entire database */
         bool go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk, bool useReplAuth, bool snapshot, bool mayYield, bool mayBeInterrupted, int *errCode = 0);
@@ -212,19 +212,7 @@ namespace mongo {
             f.context = cc().getContext();
             mayInterrupt( mayBeInterrupted );
             dbtempreleaseif r( mayYield );
-            DBClientConnection *remote = dynamic_cast< DBClientConnection* >( conn.get() );
-            if ( remote ) {
-                remote->query( boost::function<void(DBClientCursorBatchIterator &)>( f ), from_collection, query, 0, options );
-            }
-            else {
-                // there is no exhaust mode for direct client, so we have this hack
-                auto_ptr<DBClientCursor> c = conn->query( from_collection, query, 0, 0, 0, options );
-                assert( c.get() );
-                while( c->more() ) {
-                    DBClientCursorBatchIterator i( *c );
-                    f( i );
-                }
-            }
+            conn->query( boost::function<void(DBClientCursorBatchIterator &)>( f ), from_collection, query, 0, options );
         }
 
         if ( storedForLater.size() ) {

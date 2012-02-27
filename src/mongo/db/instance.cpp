@@ -819,6 +819,11 @@ namespace mongo {
         return false;
     }
 
+    QueryOptions DBDirectClient::_lookupAvailableOptions() {
+        // Exhaust mode is not available in DBDirectClient.
+        return QueryOptions(DBClientBase::_lookupAvailableOptions() & ~QueryOption_Exhaust);
+    }
+
     bool DBDirectClient::call( Message &toSend, Message &response, bool assertOk , string * actualServer ) {
         if ( lastError._get() )
             lastError.startRequest( toSend, lastError._get() );

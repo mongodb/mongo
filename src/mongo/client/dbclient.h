@@ -778,7 +778,13 @@ namespace mongo {
 
         BSONObj _countCmd(const string &ns, const BSONObj& query, int options, int limit, int skip );
 
-        enum QueryOptions availableOptions();
+        /**
+         * Look up the options available on this client.  Caches the answer from
+         * _lookupAvailableOptions(), below.
+         */
+        QueryOptions availableOptions();
+
+        virtual QueryOptions _lookupAvailableOptions();
 
     private:
         enum QueryOptions _cachedAvailableOptions;
@@ -816,6 +822,28 @@ namespace mongo {
         */
         virtual auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
                                                const BSONObj *fieldsToReturn = 0, int queryOptions = 0 , int batchSize = 0 );
+
+
+        /** Uses QueryOption_Exhaust, when available.
+
+            Exhaust mode sends back all data queries as fast as possible, with no back-and-forth for
+            OP_GETMORE.  If you are certain you will exhaust the query, it could be useful.
+
+            Use the DBClientCursorBatchIterator version, below, if you want to do items in large
+            blocks, perhaps to avoid granular locking and such.
+         */
+        virtual unsigned long long query( boost::function<void(const BSONObj&)> f,
+                                          const string& ns,
+                                          Query query,
+                                          const BSONObj *fieldsToReturn = 0,
+                                          int queryOptions = 0 );
+
+        virtual unsigned long long query( boost::function<void(DBClientCursorBatchIterator&)> f,
+                                          const string& ns,
+                                          Query query,
+                                          const BSONObj *fieldsToReturn = 0,
+                                          int queryOptions = 0 );
+
 
         /** don't use this - called automatically by DBClientCursor for you
             @param cursorId id of cursor to retrieve
@@ -871,6 +899,8 @@ namespace mongo {
     */
     class DBClientConnection : public DBClientBase {
     public:
+        using DBClientBase::query;
+
         /**
            @param _autoReconnect if true, automatically reconnect on a connection failure
            @param cp used by DBClientReplicaSet.  You do not need to specify this parameter
@@ -936,14 +966,11 @@ namespace mongo {
             return DBClientBase::query( ns, query, nToReturn, nToSkip, fieldsToReturn, queryOptions , batchSize );
         }
 
-        /** Uses QueryOption_Exhaust
-            Exhaust mode sends back all data queries as fast as possible, with no back-and-for for OP_GETMORE.  If you are certain
-            you will exhaust the query, it could be useful.
-
-            Use DBClientCursorBatchIterator version if you want to do items in large blocks, perhaps to avoid granular locking and such.
-         */
-        unsigned long long query( boost::function<void(const BSONObj&)> f, const string& ns, Query query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
-        unsigned long long query( boost::function<void(DBClientCursorBatchIterator&)> f, const string& ns, Query query, const BSONObj *fieldsToReturn = 0, int queryOptions = 0);
+        virtual unsigned long long query( boost::function<void(DBClientCursorBatchIterator &)> f,
+                                          const string& ns,
+                                          Query query,
+                                          const BSONObj *fieldsToReturn,
+                                          int queryOptions );
 
         virtual bool runCommand(const string &dbname, const BSONObj& cmd, BSONObj &info, int options=0);
 
