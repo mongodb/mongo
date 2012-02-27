@@ -12,6 +12,7 @@ t.drop();
 t.ensureIndex( { a: 1, b: 1 } );
 addData();
 
+printjson( t.find().min( { a: 1, b: 2 } ).max( { a: 2, b: 1 } ).toArray() );
 assert.eq( 1, t.find().min( { a: 1, b: 2 } ).max( { a: 2, b: 1 } ).toArray().length );
 assert.eq( 2, t.find().min( { a: 1, b: 2 } ).max( { a: 2, b: 1.5 } ).toArray().length );
 assert.eq( 2, t.find().min( { a: 1, b: 2 } ).max( { a: 2, b: 2 } ).toArray().length );

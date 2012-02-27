@@ -1,6 +1,10 @@
 
 t = db.queryoptimizer2;
 
+function debug( x ) {
+//    printjson( x );
+}
+
 function doTest( f1, f2 ) {
 
     t.drop()

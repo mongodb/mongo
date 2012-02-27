@@ -101,6 +101,9 @@ namespace mongo {
                 }
             }
         }
+        
+        static shared_ptr<Cursor> getCursor( const char *ns, const BSONObj &query, const BSONObj &order );
+
     private:
         enum FindingStartMode { Initial, FindExtent, InExtent };
         const QueryPlan &_qp;

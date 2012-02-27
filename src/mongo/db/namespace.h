@@ -27,6 +27,7 @@
 #include "mongommf.h"
 #include "d_concurrency.h"
 #include "queryoptimizercursor.h"
+#include "queryoptimizer.h"
 
 namespace mongo {
 
@@ -474,16 +475,19 @@ namespace mongo {
                                             const BSONObj &order = BSONObj(),
                                             const QueryPlanSelectionPolicy &planPolicy =
                                             QueryPlanSelectionPolicy::any(),
-                                            bool *simpleEqualityMatch = 0 );
+                                            bool *simpleEqualityMatch = 0,
+                                            const ParsedQuery *parsedQuery = 0,
+                                            QueryPlan::Summary *singlePlanSummary = 0 );
 
         /**
-         * @return a single cursor that may work well for the given query.
+         * @return a single cursor that may work well for the given query.  A $or style query will
+         * produce a single cursor, not a MultiCursor.
          * It is possible no cursor is returned if the sort is not supported by an index.  Clients are responsible
          * for checking this if they are not sure an index for a sort exists, and defaulting to a non-sort if
          * no suitable indices exist.
          */
         static shared_ptr<Cursor> bestGuessCursor( const char *ns, const BSONObj &query, const BSONObj &sort );
-        
+
         /* indexKeys() cache ---------------------------------------------------- */
         /* assumed to be in write lock for this */
     private:

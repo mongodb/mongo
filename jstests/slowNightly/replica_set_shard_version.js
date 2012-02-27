@@ -8,17 +8,8 @@ var mongosA = st.s0
 var mongosB = st.s1
 var shard = st.shard0
 
-var sadmin = shard.getDB( "admin" )
-assert.throws(function() { sadmin.runCommand({ replSetStepDown : 3000, force : true }); });
-try { sadmin.getLastError(); } catch (e) { print("reconnecting: "+e); }
-
-st.rs0.getMaster();
-
 coll = mongosA.getCollection( jsTestName() + ".coll" );
 iterations = 0;
-
-// sleep a bit to let servers allocate journals
-sleep(30);
 
 // make sure there is a master
 assert.soon(
@@ -29,9 +20,16 @@ assert.soon(
             return true;
         }
         catch ( e ){
+            print("Exception: " + e);
             return false;
         }
     } );
+
+var sadmin = shard.getDB( "admin" )
+assert.throws(function() { sadmin.runCommand({ replSetStepDown : 3000, force : true }); });
+try { sadmin.getLastError(); } catch (e) { print("reconnecting: "+e); }
+
+st.rs0.getMaster();
 
 mongosA.getDB("admin").runCommand({ setParameter : 1, traceExceptions : true })
 
@@ -46,6 +44,7 @@ assert.soon(
             return true;
         }
         catch ( e ){
+            print("Exception: " + e);
             return false;
         }
     } );
@@ -58,8 +57,7 @@ mongosA.getDB("admin").runCommand({ setParameter : 1, traceExceptions : false })
 
 print( "time to work for primary: " + ( ( end.getTime() - start.getTime() ) / 1000 ) + " seconds" );
 
-// not sure how long it takes to elect primary, seen it as low as 2
-//assert.gt( 2 , iterations );
+assert.lt( iterations, 3 );
 
 // now check secondary
 

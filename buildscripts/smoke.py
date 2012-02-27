@@ -334,7 +334,6 @@ def runTest(test):
                      'TestData.keyFile = ' + ternary( keyFile , '"' + str(keyFile) + '"' , 'null' ) + ";" + \
                      'TestData.keyFileData = ' + ternary( keyFile , '"' + str(keyFileData) + '"' , 'null' ) + ";"
         if auth and usedb:
-            evalString += 'db.getSiblingDB("admin").addUser("admin","password");'
             evalString += 'jsTest.authenticate(db.getMongo());'
         argv = argv + [ '--eval', evalString]
 
@@ -538,7 +537,12 @@ def run_old_fails():
     try:
         f = open(failfile, 'r')
         testsAndOptions = pickle.load(f)
+        f.close()
     except Exception:
+        try:
+            f.close()
+        except:
+            pass
         clear_failfile()
         return # This counts as passing so we will run all tests
 

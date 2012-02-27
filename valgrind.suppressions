@@ -6,17 +6,9 @@
    ...
 }
 {
-   mongod-writes-uninitialized-data-for-preallocate
+   mongod-writes-uninitialized-data-for-journal
    Memcheck:Param
    write(buf)
    obj:/lib64/libpthread-2.14.90.so
    fun:_ZN5mongo7LogFile17synchronousAppendEPKvm
-   fun:_ZN5mongo3dur20_preallocateIsFasterEv
-   fun:_ZN5mongo3dur19preallocateIsFasterEv
-   fun:_ZN5mongo3dur16preallocateFilesEv
-   fun:_ZN5mongo3dur7startupEv
-   fun:_ZN5mongo14_initAndListenEi
-   fun:_ZN5mongo13initAndListenEi
-   fun:main
 }
-

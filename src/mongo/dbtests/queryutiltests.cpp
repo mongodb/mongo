@@ -26,7 +26,27 @@
 
 namespace QueryUtilTests {
 
+    namespace FieldIntervalTests {
+        class ToString {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << 1 );
+                FieldInterval fieldInterval( obj.firstElement() );
+                fieldInterval.toString(); // Just test that we don't crash.
+            }
+        };
+    } // namespace FieldIntervalTests
+    
     namespace FieldRangeTests {
+        class ToString {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << 1 );
+                FieldRange fieldRange( obj.firstElement(), true );
+                fieldRange.toString(); // Just test that we don't crash.
+            }
+        };        
+        
         class Base {
         public:
             virtual ~Base() {}
@@ -874,6 +894,27 @@ namespace QueryUtilTests {
 
     namespace FieldRangeSetTests {
 
+        class ToString {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << 1 );
+                FieldRangeSet fieldRangeSet( "", obj, true );
+                fieldRangeSet.toString(); // Just test that we don't crash.
+            }
+        };
+        
+        class Namespace {
+        public:
+            void run() {
+                boost::shared_ptr<FieldRangeSet> frs;
+                {
+                    string ns = str::stream() << "foo";
+                    frs.reset( new FieldRangeSet( ns.c_str(), BSONObj(), true ) );
+                }
+                ASSERT_EQUALS( string( "foo" ), frs->ns() );
+            }
+        };
+
         class Intersect {
         public:
             void run() {
@@ -995,6 +1036,15 @@ namespace QueryUtilTests {
     
     namespace FieldRangeSetPairTests {
 
+        class ToString {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << 1 );
+                FieldRangeSetPair FieldRangeSetPair( "", obj );
+                FieldRangeSetPair.toString(); // Just test that we don't crash.
+            }
+        };
+
         class NoNonUniversalRanges {
         public:
             void run() {
@@ -1089,120 +1139,139 @@ namespace QueryUtilTests {
         
     } // namespace FieldRangeSetPairTests
     
+    namespace FieldRangeVectorTests {
+        class ToString {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << 1 );
+                FieldRangeSet fieldRangeSet( "", obj, true );
+                IndexSpec indexSpec( BSON( "a" << 1 ) );
+                FieldRangeVector fieldRangeVector( fieldRangeSet, indexSpec, 1 );
+                fieldRangeVector.toString(); // Just test that we don't crash.
+            }
+        };
+    } // namespace FieldRangeVectorTests
+    
     class All : public Suite {
     public:
         All() : Suite( "queryutil" ) {}
 
         void setupTests() {
-            add< FieldRangeTests::EmptyQuery >();
-            add< FieldRangeTests::Eq >();
-            add< FieldRangeTests::DupEq >();
-            add< FieldRangeTests::Lt >();
-            add< FieldRangeTests::Lte >();
-            add< FieldRangeTests::Gt >();
-            add< FieldRangeTests::Gte >();
-            add< FieldRangeTests::TwoLt >();
-            add< FieldRangeTests::TwoGt >();
-            add< FieldRangeTests::EqGte >();
-            add< FieldRangeTests::EqGteInvalid >();
-            add< FieldRangeTests::Regex >();
-            add< FieldRangeTests::RegexObj >();
-            add< FieldRangeTests::UnhelpfulRegex >();
-            add< FieldRangeTests::In >();
-            add< FieldRangeTests::And >();
-            add< FieldRangeTests::Empty >();
-            add< FieldRangeTests::Equality >();
-            add< FieldRangeTests::SimplifiedQuery >();
-            add< FieldRangeTests::QueryPatternTest >();
-            add< FieldRangeTests::QueryPatternEmpty >();
-            add< FieldRangeTests::QueryPatternNeConstraint >();
-            add< FieldRangeTests::QueryPatternOptimizedBounds >();
-            add< FieldRangeTests::NoWhere >();
-            add< FieldRangeTests::Numeric >();
-            add< FieldRangeTests::InLowerBound >();
-            add< FieldRangeTests::InUpperBound >();
-            add< FieldRangeTests::BoundUnion >();
-            add< FieldRangeTests::BoundUnionFullyContained >();
-            add< FieldRangeTests::BoundUnionOverlapWithInclusivity >();
-            add< FieldRangeTests::BoundUnionEmpty >();
-            add< FieldRangeTests::MultiBound >();
-            add< FieldRangeTests::Diff1 >();
-            add< FieldRangeTests::Diff2 >();
-            add< FieldRangeTests::Diff3 >();
-            add< FieldRangeTests::Diff4 >();
-            add< FieldRangeTests::Diff5 >();
-            add< FieldRangeTests::Diff6 >();
-            add< FieldRangeTests::Diff7 >();
-            add< FieldRangeTests::Diff8 >();
-            add< FieldRangeTests::Diff9 >();
-            add< FieldRangeTests::Diff10 >();
-            add< FieldRangeTests::Diff11 >();
-            add< FieldRangeTests::Diff12 >();
-            add< FieldRangeTests::Diff13 >();
-            add< FieldRangeTests::Diff14 >();
-            add< FieldRangeTests::Diff15 >();
-            add< FieldRangeTests::Diff16 >();
-            add< FieldRangeTests::Diff17 >();
-            add< FieldRangeTests::Diff18 >();
-            add< FieldRangeTests::Diff19 >();
-            add< FieldRangeTests::Diff20 >();
-            add< FieldRangeTests::Diff21 >();
-            add< FieldRangeTests::Diff22 >();
-            add< FieldRangeTests::Diff23 >();
-            add< FieldRangeTests::Diff24 >();
-            add< FieldRangeTests::Diff25 >();
-            add< FieldRangeTests::Diff26 >();
-            add< FieldRangeTests::Diff27 >();
-            add< FieldRangeTests::Diff28 >();
-            add< FieldRangeTests::Diff29 >();
-            add< FieldRangeTests::Diff30 >();
-            add< FieldRangeTests::Diff31 >();
-            add< FieldRangeTests::Diff32 >();
-            add< FieldRangeTests::Diff33 >();
-            add< FieldRangeTests::Diff34 >();
-            add< FieldRangeTests::Diff35 >();
-            add< FieldRangeTests::Diff36 >();
-            add< FieldRangeTests::Diff37 >();
-            add< FieldRangeTests::Diff38 >();
-            add< FieldRangeTests::Diff39 >();
-            add< FieldRangeTests::Diff40 >();
-            add< FieldRangeTests::Diff41 >();
-            add< FieldRangeTests::Diff42 >();
-            add< FieldRangeTests::Diff43 >();
-            add< FieldRangeTests::Diff44 >();
-            add< FieldRangeTests::Diff45 >();
-            add< FieldRangeTests::Diff46 >();
-            add< FieldRangeTests::Diff47 >();
-            add< FieldRangeTests::Diff48 >();
-            add< FieldRangeTests::Diff49 >();
-            add< FieldRangeTests::Diff50 >();
-            add< FieldRangeTests::Diff51 >();
-            add< FieldRangeTests::Diff52 >();
-            add< FieldRangeTests::Diff53 >();
-            add< FieldRangeTests::Diff54 >();
-            add< FieldRangeTests::Diff55 >();
-            add< FieldRangeTests::Diff56 >();
-            add< FieldRangeTests::Diff57 >();
-            add< FieldRangeTests::Diff58 >();
-            add< FieldRangeTests::Diff59 >();
-            add< FieldRangeTests::Diff60 >();
-            add< FieldRangeTests::Diff61 >();
-            add< FieldRangeTests::Diff62 >();
-            add< FieldRangeTests::Diff63 >();
-            add< FieldRangeTests::Diff64 >();
-            add< FieldRangeTests::DiffMulti1 >();
-            add< FieldRangeTests::DiffMulti2 >();
-            add< FieldRangeTests::Universal >();
-            add< FieldRangeSetTests::Intersect >();
-            add< FieldRangeSetTests::MultiKeyIntersect >();
-            add< FieldRangeSetTests::EmptyMultiKeyIntersect >();
-            add< FieldRangeSetTests::MultiKeyDiff >();
-            add< FieldRangeSetTests::MatchPossible >();
-            add< FieldRangeSetTests::MatchPossibleForIndex >();
-            add< FieldRangeSetTests::Subset >();
-            add< FieldRangeSetPairTests::NoNonUniversalRanges >();
-            add< FieldRangeSetPairTests::MatchPossible >();
-            add< FieldRangeSetPairTests::MatchPossibleForIndex >();
+            add<FieldIntervalTests::ToString>();
+            add<FieldRangeTests::ToString>();
+            add<FieldRangeTests::EmptyQuery>();
+            add<FieldRangeTests::Eq>();
+            add<FieldRangeTests::DupEq>();
+            add<FieldRangeTests::Lt>();
+            add<FieldRangeTests::Lte>();
+            add<FieldRangeTests::Gt>();
+            add<FieldRangeTests::Gte>();
+            add<FieldRangeTests::TwoLt>();
+            add<FieldRangeTests::TwoGt>();
+            add<FieldRangeTests::EqGte>();
+            add<FieldRangeTests::EqGteInvalid>();
+            add<FieldRangeTests::Regex>();
+            add<FieldRangeTests::RegexObj>();
+            add<FieldRangeTests::UnhelpfulRegex>();
+            add<FieldRangeTests::In>();
+            add<FieldRangeTests::And>();
+            add<FieldRangeTests::Empty>();
+            add<FieldRangeTests::Equality>();
+            add<FieldRangeTests::SimplifiedQuery>();
+            add<FieldRangeTests::QueryPatternTest>();
+            add<FieldRangeTests::QueryPatternEmpty>();
+            add<FieldRangeTests::QueryPatternNeConstraint>();
+            add<FieldRangeTests::QueryPatternOptimizedBounds>();
+            add<FieldRangeTests::NoWhere>();
+            add<FieldRangeTests::Numeric>();
+            add<FieldRangeTests::InLowerBound>();
+            add<FieldRangeTests::InUpperBound>();
+            add<FieldRangeTests::BoundUnion>();
+            add<FieldRangeTests::BoundUnionFullyContained>();
+            add<FieldRangeTests::BoundUnionOverlapWithInclusivity>();
+            add<FieldRangeTests::BoundUnionEmpty>();
+            add<FieldRangeTests::MultiBound>();
+            add<FieldRangeTests::Diff1>();
+            add<FieldRangeTests::Diff2>();
+            add<FieldRangeTests::Diff3>();
+            add<FieldRangeTests::Diff4>();
+            add<FieldRangeTests::Diff5>();
+            add<FieldRangeTests::Diff6>();
+            add<FieldRangeTests::Diff7>();
+            add<FieldRangeTests::Diff8>();
+            add<FieldRangeTests::Diff9>();
+            add<FieldRangeTests::Diff10>();
+            add<FieldRangeTests::Diff11>();
+            add<FieldRangeTests::Diff12>();
+            add<FieldRangeTests::Diff13>();
+            add<FieldRangeTests::Diff14>();
+            add<FieldRangeTests::Diff15>();
+            add<FieldRangeTests::Diff16>();
+            add<FieldRangeTests::Diff17>();
+            add<FieldRangeTests::Diff18>();
+            add<FieldRangeTests::Diff19>();
+            add<FieldRangeTests::Diff20>();
+            add<FieldRangeTests::Diff21>();
+            add<FieldRangeTests::Diff22>();
+            add<FieldRangeTests::Diff23>();
+            add<FieldRangeTests::Diff24>();
+            add<FieldRangeTests::Diff25>();
+            add<FieldRangeTests::Diff26>();
+            add<FieldRangeTests::Diff27>();
+            add<FieldRangeTests::Diff28>();
+            add<FieldRangeTests::Diff29>();
+            add<FieldRangeTests::Diff30>();
+            add<FieldRangeTests::Diff31>();
+            add<FieldRangeTests::Diff32>();
+            add<FieldRangeTests::Diff33>();
+            add<FieldRangeTests::Diff34>();
+            add<FieldRangeTests::Diff35>();
+            add<FieldRangeTests::Diff36>();
+            add<FieldRangeTests::Diff37>();
+            add<FieldRangeTests::Diff38>();
+            add<FieldRangeTests::Diff39>();
+            add<FieldRangeTests::Diff40>();
+            add<FieldRangeTests::Diff41>();
+            add<FieldRangeTests::Diff42>();
+            add<FieldRangeTests::Diff43>();
+            add<FieldRangeTests::Diff44>();
+            add<FieldRangeTests::Diff45>();
+            add<FieldRangeTests::Diff46>();
+            add<FieldRangeTests::Diff47>();
+            add<FieldRangeTests::Diff48>();
+            add<FieldRangeTests::Diff49>();
+            add<FieldRangeTests::Diff50>();
+            add<FieldRangeTests::Diff51>();
+            add<FieldRangeTests::Diff52>();
+            add<FieldRangeTests::Diff53>();
+            add<FieldRangeTests::Diff54>();
+            add<FieldRangeTests::Diff55>();
+            add<FieldRangeTests::Diff56>();
+            add<FieldRangeTests::Diff57>();
+            add<FieldRangeTests::Diff58>();
+            add<FieldRangeTests::Diff59>();
+            add<FieldRangeTests::Diff60>();
+            add<FieldRangeTests::Diff61>();
+            add<FieldRangeTests::Diff62>();
+            add<FieldRangeTests::Diff63>();
+            add<FieldRangeTests::Diff64>();
+            add<FieldRangeTests::DiffMulti1>();
+            add<FieldRangeTests::DiffMulti2>();
+            add<FieldRangeTests::Universal>();
+            add<FieldRangeSetTests::ToString>();
+            add<FieldRangeSetTests::Namespace>();
+            add<FieldRangeSetTests::Intersect>();
+            add<FieldRangeSetTests::MultiKeyIntersect>();
+            add<FieldRangeSetTests::EmptyMultiKeyIntersect>();
+            add<FieldRangeSetTests::MultiKeyDiff>();
+            add<FieldRangeSetTests::MatchPossible>();
+            add<FieldRangeSetTests::MatchPossibleForIndex>();
+            add<FieldRangeSetTests::Subset>();
+            add<FieldRangeSetPairTests::ToString>();
+            add<FieldRangeSetPairTests::NoNonUniversalRanges>();
+            add<FieldRangeSetPairTests::MatchPossible>();
+            add<FieldRangeSetPairTests::MatchPossibleForIndex>();
+            add<FieldRangeVectorTests::ToString>();
         }
     } myall;
 

@@ -14,5 +14,5 @@ assert.eq( t.find({a:1}, {a: 1, _id: 0}).explain().indexOnly, true, "Find is not
 
 // add multikey
 t.save({a:[3,4]})
-assert.eq( t.find({a:1}, {ln: 1, _id: 0}).explain().indexOnly, false, "Find is using covered index even after multikey insert");
+assert.eq( t.find({a:1}, {a: 1, _id: 0}).explain().indexOnly, false, "Find is using covered index even after multikey insert");
 

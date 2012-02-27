@@ -85,6 +85,9 @@ namespace mongo {
 
         BSONObj _obj;
         bool _modified;
+        list<string> _extra;
+        set<string> _removed;
+
     };
 
     class V8Scope : public Scope {

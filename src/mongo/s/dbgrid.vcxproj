@@ -440,6 +440,7 @@
     <ClCompile Include="..\db\pipeline\expression_context.cpp" />
     <ClCompile Include="..\db\pipeline\field_path.cpp" />
     <ClCompile Include="..\db\pipeline\value.cpp" />
+    <ClCompile Include="..\db\projection.cpp" />
     <ClCompile Include="..\db\querypattern.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">NotUsing</PrecompiledHeader>
@@ -1042,6 +1043,7 @@
     <ClInclude Include="..\db\pipeline\expression_context.h" />
     <ClInclude Include="..\db\pipeline\field_path.h" />
     <ClInclude Include="..\db\pipeline\value.h" />
+    <ClInclude Include="..\db\projection.h" />
     <ClInclude Include="..\util\intrusive_counter.h" />
     <ClInclude Include="..\util\processinfo.h" />
     <ClInclude Include="..\util\signal_handlers.h" />

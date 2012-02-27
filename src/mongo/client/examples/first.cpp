@@ -82,5 +82,4 @@ int main( int argc, const char **argv ) {
         cout << res.isEmpty() << "\t" << res.jsonString() << endl;
     }
 
-
 }

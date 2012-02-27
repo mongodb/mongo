@@ -1,4 +1,4 @@
-// @file queryoptimizercursor.cpp
+// @file queryoptimizercursorimpl.cpp
 
 /**
  *    Copyright (C) 2011 10gen Inc.
@@ -16,14 +16,17 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+
 #include "pch.h"
-#include "queryoptimizercursor.h"
-#include "queryoptimizer.h"
+#include "queryoptimizercursorimpl.h"
 #include "pdfile.h"
 #include "clientcursor.h"
 #include "btree.h"
+#include "explain.h"
 
 namespace mongo {
+    
+    extern bool useHints;
     
     static const int OutOfOrderDocumentsAssertionCode = 14810;
         
@@ -60,21 +63,20 @@ namespace mongo {
          * @param aggregateNscanned - shared long long counting total nscanned for
          * query ops for all cursors.
          */
-        QueryOptimizerCursorOp( long long &aggregateNscanned,
-                               const QueryPlanSelectionPolicy &selectionPolicy,
-                               int cumulativeCount = 0 ) :
+        QueryOptimizerCursorOp( long long &aggregateNscanned, const QueryPlanSelectionPolicy &selectionPolicy,
+                               const bool &requireOrder, bool alwaysCountMatches, int cumulativeCount = 0 ) :
         _matchCounter( aggregateNscanned, cumulativeCount ),
         _countingMatches(),
         _mustAdvance(),
         _capped(),
         _yieldRecoveryFailed(),
-        _selectionPolicy( selectionPolicy ) {
+        _selectionPolicy( selectionPolicy ),
+        _requireOrder( requireOrder ),
+        _alwaysCountMatches( alwaysCountMatches ) {
         }
         
         virtual void _init() {
-            if ( qp().scanAndOrderRequired() ) {
-                throw MsgAssertionException( OutOfOrderDocumentsAssertionCode, "order spec cannot be satisfied with index" );
-            }
+            checkCursorOrdering();
             if ( !_selectionPolicy.permitPlan( qp() ) ) {
                 throw MsgAssertionException( 9011,
                                             str::stream()
@@ -82,6 +84,8 @@ namespace mongo {
                                             << _selectionPolicy.name()
                                             << "'" );
             }
+            
+            // No geo cursor could be generated here, and we do not specify numWanted.
             _c = qp().newCursor();
 
             // The QueryOptimizerCursor::prepareToTouchEarlierIterate() implementation requires _c->prepareToYield() to work.
@@ -91,7 +95,8 @@ namespace mongo {
             // TODO This violates the current Cursor interface abstraction, but for now it's simpler to keep our own set of
             // dups rather than avoid poisoning the cursor's dup set with unreturned documents.  Deduping documents
             // matched in this QueryOptimizerCursorOp will run against the takeover cursor.
-            _matchCounter.setCheckDups( _c->isMultiKey() );
+            _matchCounter.setCheckDups( countMatches() && _c->isMultiKey() );
+            // TODO ok if cursor becomes multikey later?
 
             _matchCounter.updateNscanned( _c->nscanned() );
         }
@@ -102,7 +107,7 @@ namespace mongo {
         
         virtual bool prepareToYield() {
             if ( _c && !_cc ) {
-                _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , _c , qp().ns() ) );
+                _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout, _c, qp().ns() ) );
             }
             if ( _cc ) {
                 recordCursorLocation();
@@ -113,6 +118,7 @@ namespace mongo {
         }
         
         virtual void recoverFromYield() {
+            if ( _explainPlanInfo ) _explainPlanInfo->noteYield();
             if ( _cc && !ClientCursor::recoverFromYield( _yieldData ) ) {
                 _yieldRecoveryFailed = true;
                 _c.reset();
@@ -127,6 +133,7 @@ namespace mongo {
                 else {
                     // we don't fail query since we're fine with returning partial data if collection dropped
                     // also, see SERVER-2454
+                    // todo: this is wrong.  the cursor could be gone if closeAllDatabases command just ran
                 }
             }
             else {
@@ -149,13 +156,17 @@ namespace mongo {
         }
         
         virtual void next() {
+            checkCursorOrdering();
+
             mayAdvance();
             
-            if ( _matchCounter.enoughCumulativeMatchesToChooseAPlan() ) {
+            if ( countMatches() && _matchCounter.enoughCumulativeMatchesToChooseAPlan() ) {
                 setStop();
+                if ( _explainPlanInfo ) _explainPlanInfo->notePicked();
                 return;
             }
             if ( !_c || !_c->ok() ) {
+                if ( _explainPlanInfo && _c ) _explainPlanInfo->noteDone( *_c );
                 setComplete();
                 return;
             }
@@ -163,21 +174,49 @@ namespace mongo {
             _mustAdvance = true;
         }
         virtual QueryOp *_createChild() const {
-            return new QueryOptimizerCursorOp( _matchCounter.aggregateNscanned(), _selectionPolicy,
-                                              _matchCounter.cumulativeCount() );
+            return new QueryOptimizerCursorOp( _matchCounter.aggregateNscanned(), _selectionPolicy, _requireOrder, _alwaysCountMatches, _matchCounter.cumulativeCount() );
         }
         DiskLoc currLoc() const { return _c ? _c->currLoc() : DiskLoc(); }
         BSONObj currKey() const { return _c ? _c->currKey() : BSONObj(); }
         bool currentMatches( MatchDetails *details ) {
-            bool ret = ( _c && _c->ok() ) ? matcher( _c.get() )->matchesCurrent( _c.get(), details ) : false;
+            if ( !_c || !_c->ok() ) {
+                _matchCounter.setMatch( false );
+                return false;
+            }
+            
+            MatchDetails myDetails;
+            bool wantDetails = details || _explainPlanInfo;
+
+            bool match = matcher( _c.get() )->matchesCurrent( _c.get(),
+                                                             wantDetails ? &myDetails : 0 );
             // Cache the match, so we can count it in mayAdvance().
-            _matchCounter.setMatch( ret );
-            return ret;
+            bool newMatch = _matchCounter.setMatch( match );
+
+            if ( _explainPlanInfo ) {
+                bool countableMatch = newMatch && _matchCounter.wouldCountMatch( _c->currLoc() );
+                _explainPlanInfo->noteIterate( countableMatch,
+                                              countableMatch || myDetails._loadedObject, *_c );
+            }
+            if ( details ) *details = myDetails;
+
+            return match;
         }
         virtual bool mayRecordPlan() const {
             return !_yieldRecoveryFailed && complete() && ( !stopRequested() || _matchCounter.enoughMatchesToRecordPlan() );
         }
         shared_ptr<Cursor> cursor() const { return _c; }
+        virtual shared_ptr<ExplainPlanInfo> generateExplainInfo() {
+            if ( !_c ) {
+                return QueryOp::generateExplainInfo();
+            }
+            _explainPlanInfo.reset( new ExplainPlanInfo() );
+            _explainPlanInfo->notePlan( *_c, qp().scanAndOrderRequired(), qp().keyFieldsOnly() );
+            return _explainPlanInfo;
+        }
+        shared_ptr<ExplainPlanInfo> explainInfo() const { return _explainPlanInfo; }
+        
+        const Projection::KeyOnly *keyFieldsOnly() const { return qp().keyFieldsOnly().get(); }
+        
     private:
         void mayAdvance() {
             if ( !_c ) {
@@ -196,13 +235,19 @@ namespace mongo {
             }
             _matchCounter.updateNscanned( _c->nscanned() );
         }
-        // Don't count matches on the first call to next(), which occurs before the first result is returned.
         bool countingMatches() {
             if ( _countingMatches ) {
                 return true;
             }
-            _countingMatches = true;
+            if ( countMatches() ) {
+                // Only count matches after the first call to next(), which occurs before the first
+                // result is returned.
+                _countingMatches = true;
+            }
             return false;
+        }
+        bool countMatches() const {
+            return _alwaysCountMatches || !qp().scanAndOrderRequired();
         }
 
         void recordCursorLocation() {
@@ -221,6 +266,11 @@ namespace mongo {
             _mustAdvance = false;
             _matchCounter.resetMatch();
         }
+        void checkCursorOrdering() {
+            if ( _requireOrder && qp().scanAndOrderRequired() ) {
+                throw MsgAssertionException( OutOfOrderDocumentsAssertionCode, "order spec cannot be satisfied with index" );
+            }
+        }
 
         CachedMatchCounter _matchCounter;
         bool _countingMatches;
@@ -232,6 +282,9 @@ namespace mongo {
         ClientCursor::YieldData _yieldData;
         bool _yieldRecoveryFailed;
         const QueryPlanSelectionPolicy &_selectionPolicy;
+        const bool &_requireOrder; // TODO don't use a ref for this, but signal change explicitly
+        shared_ptr<ExplainPlanInfo> _explainPlanInfo;
+        bool _alwaysCountMatches;
     };
     
     /**
@@ -240,15 +293,24 @@ namespace mongo {
      * a single plan, this cursor becomes a simple wrapper around that single
      * plan's cursor (called the 'takeover' cursor).
      */
-    class QueryOptimizerCursor : public Cursor {
+    class QueryOptimizerCursorImpl : public QueryOptimizerCursor {
     public:
-        QueryOptimizerCursor( auto_ptr<MultiPlanScanner> &mps,
-                             const QueryPlanSelectionPolicy &planPolicy ) :
+        QueryOptimizerCursorImpl( auto_ptr<MultiPlanScanner> &mps,
+                                 const QueryPlanSelectionPolicy &planPolicy,
+                                 bool requireOrder,
+                                 bool explain ) :
+        _requireOrder( requireOrder ),
         _mps( mps ),
-        _originalOp( new QueryOptimizerCursorOp( _nscanned, planPolicy ) ),
+        _initialCandidatePlans( _mps->possibleInOrderPlan(), _mps->possibleOutOfOrderPlan() ),
+        _originalOp( new QueryOptimizerCursorOp( _nscanned, planPolicy, _requireOrder,
+                                                !_initialCandidatePlans.hybridPlanSet() ) ),
         _currOp(),
+        _completePlanOfHybridSetScanAndOrderRequired(),
         _nscanned() {
             _mps->initialOp( _originalOp );
+            if ( explain ) {
+                _explainQueryInfo = _mps->generateExplainInfo();
+            }
             shared_ptr<QueryOp> op = _mps->nextOp();
             rethrowOnError( op );
             if ( !op->complete() ) {
@@ -307,7 +369,7 @@ namespace mongo {
             return _currOp->cursor()->indexKeyPattern();
         }
         
-        virtual bool supportGetMore() { return false; }
+        virtual bool supportGetMore() { return true; }
 
         virtual bool supportYields() { return _takeover ? _takeover->supportYields() : true; }
         
@@ -363,7 +425,7 @@ namespace mongo {
             if ( _currOp ) {
                 _mps->recoverFromYield();
                 if ( _currOp->error() || !ok() ) {
-                    // Advance to a non error op if on of the ops errored out.
+                    // Advance to a non error op if one of the ops errored out.
                     // Advance to a following $or clause if the $or clause returned all results.
                     _advance( true );
                 }
@@ -392,6 +454,7 @@ namespace mongo {
             return _currOp->cursor()->isMultiKey();
         }
         
+        // TODO fix
         virtual bool modifiedKeys() const { return true; }
 
         /** Initial capped wrapping cases (before takeover) are handled internally by a component ClientCursor. */
@@ -407,7 +470,7 @@ namespace mongo {
             return _currOp->matcher( _currOp->cursor() );
         }
 
-        virtual CoveredIndexMatcher* matcher() const {
+        virtual CoveredIndexMatcher *matcher() const {
             if ( _takeover ) {
                 return _takeover->matcher();
             }
@@ -422,7 +485,78 @@ namespace mongo {
             assertOk();
             return _currOp->currentMatches( details );
         }
+        
+        virtual CandidatePlans initialCandidatePlans() const {
+            return _initialCandidatePlans;
+        }
+        
+        virtual const FieldRangeSet *initialFieldRangeSet() const {
+            if ( _takeover ) {
+                return 0;
+            }
+            assertOk();
+            return &_currOp->qp().multikeyFrs();
+        }
+        
+        virtual bool currentPlanScanAndOrderRequired() const {
+            if ( _takeover ) {
+                return _takeover->queryPlan().scanAndOrderRequired();
+            }
+            assertOk();
+            return _currOp->qp().scanAndOrderRequired();
+        }
+        
+        virtual const Projection::KeyOnly *keyFieldsOnly() const {
+            if ( _takeover ) {
+                return _takeover->keyFieldsOnly();
+            }
+            assertOk();
+            return _currOp->keyFieldsOnly();
+        }
+        
+        virtual bool runningInitialInOrderPlan() const {
+            if ( _takeover ) {
+                return false;
+            }
+            assertOk();
+            return _mps->haveInOrderPlan();
+        }
 
+        virtual bool runningInitialCachedPlan() const {
+            if ( _takeover ) {
+                return false;
+            }
+            assertOk();
+            return _mps->usingCachedPlan();
+        }
+
+        virtual bool completePlanOfHybridSetScanAndOrderRequired() const {
+            return _completePlanOfHybridSetScanAndOrderRequired;
+        }
+        
+        virtual void clearIndexesForPatterns() {
+            if ( !_takeover ) {
+                _mps->clearIndexesForPatterns();
+            }
+        }
+        
+        virtual void abortUnorderedPlans() {
+            _requireOrder = true;
+        }
+        
+        virtual void noteIterate( bool match, bool loadedDocument, bool chunkSkip ) {
+            if ( _explainQueryInfo ) {
+                _explainQueryInfo->noteIterate( match, loadedDocument, chunkSkip );
+            }
+            if ( _takeover ) {
+                _takeover->noteIterate( match, loadedDocument );
+            }
+        }
+        
+        virtual shared_ptr<ExplainQueryInfo> explainQueryInfo() const {
+            return _explainQueryInfo;
+        }
+        
     private:
         /**
          * Advances the QueryPlanSet::Runner.
@@ -458,13 +592,17 @@ namespace mongo {
                     if ( !prevLoc.isNull() && prevLoc == qocop->currLoc() ) {
                         qocop->cursor()->advance();
                     }
-                    // Clear the Runner and any unnecessary QueryOps and their ClientCursors.
-                    _mps->clearRunner();
                     _takeover.reset( new MultiCursor( _mps,
                                                      qocop->cursor(),
                                                      op->matcher( qocop->cursor() ),
+                                                     qocop->explainInfo(),
                                                      *op,
                                                      _nscanned - qocop->cursor()->nscanned() ) );
+                }
+            }
+            else {
+                if ( _initialCandidatePlans.hybridPlanSet() ) {
+                    _completePlanOfHybridSetScanAndOrderRequired = op->qp().scanAndOrderRequired();
                 }
             }
 
@@ -492,19 +630,26 @@ namespace mongo {
             return _dups.getdup( loc );
         }
         
+        bool _requireOrder;
         auto_ptr<MultiPlanScanner> _mps;
+        CandidatePlans _initialCandidatePlans;
         shared_ptr<QueryOptimizerCursorOp> _originalOp;
         QueryOptimizerCursorOp *_currOp;
-        shared_ptr<Cursor> _takeover;
+        bool _completePlanOfHybridSetScanAndOrderRequired;
+        shared_ptr<MultiCursor> _takeover;
         long long _nscanned;
-        // Using a SmallDupSet seems a bit hokey, but I've measured a 5% performance improvement with ~100 document non multi key scans.
+        // Using a SmallDupSet seems a bit hokey, but I've measured a 5% performance improvement
+        // with ~100 document non multi key scans.
         SmallDupSet _dups;
+        shared_ptr<ExplainQueryInfo> _explainQueryInfo;
     };
     
     shared_ptr<Cursor> newQueryOptimizerCursor( auto_ptr<MultiPlanScanner> mps,
-                                               const QueryPlanSelectionPolicy &planPolicy ) {
+                                               const QueryPlanSelectionPolicy &planPolicy,
+                                               bool requireOrder, bool explain ) {
         try {
-            return shared_ptr<Cursor>( new QueryOptimizerCursor( mps, planPolicy ) );
+            return shared_ptr<Cursor>( new QueryOptimizerCursorImpl( mps, planPolicy,
+                                                                    requireOrder, explain ) );
         } catch( const AssertionException &e ) {
             if ( e.getCode() == OutOfOrderDocumentsAssertionCode ) {
                 // If no indexes follow the requested sort order, return an
@@ -516,58 +661,149 @@ namespace mongo {
         return shared_ptr<Cursor>();
     }
     
-    shared_ptr<Cursor> NamespaceDetailsTransient::getCursor( const char *ns, const BSONObj &query,
-                                                            const BSONObj &order,
-                                                            const QueryPlanSelectionPolicy
-                                                            &planPolicy,
-                                                            bool *simpleEqualityMatch ) {
-        if ( simpleEqualityMatch ) {
-            *simpleEqualityMatch = false;
+    shared_ptr<Cursor>
+    NamespaceDetailsTransient::getCursor( const char *ns,
+                                         const BSONObj &query,
+                                         const BSONObj &order,
+                                         const QueryPlanSelectionPolicy &planPolicy,
+                                         bool *simpleEqualityMatch,
+                                         const ParsedQuery *parsedQuery,
+                                         QueryPlan::Summary *singlePlanSummary ) {
+
+        CursorGenerator generator( ns, query, order, planPolicy, simpleEqualityMatch, parsedQuery,
+                        singlePlanSummary );
+        return generator.generate();
+    }
+    
+    CursorGenerator::CursorGenerator( const char *ns,
+                                     const BSONObj &query,
+                                     const BSONObj &order,
+                                     const QueryPlanSelectionPolicy &planPolicy,
+                                     bool *simpleEqualityMatch,
+                                     const ParsedQuery *parsedQuery,
+                                     QueryPlan::Summary *singlePlanSummary ) :
+    _ns( ns ),
+    _query( query ),
+    _order( order ),
+    _planPolicy( planPolicy ),
+    _simpleEqualityMatch( simpleEqualityMatch ),
+    _parsedQuery( parsedQuery ),
+    _singlePlanSummary( singlePlanSummary ) {
+        // Initialize optional return variables.
+        if ( _simpleEqualityMatch ) {
+            *_simpleEqualityMatch = false;
         }
-        if ( planPolicy.permitOptimalNaturalPlan() && query.isEmpty() && order.isEmpty() ) {
-            // TODO This will not use a covered index currently.
-            return theDataFileMgr.findAll( ns );
+        if ( _singlePlanSummary ) {
+            *_singlePlanSummary = QueryPlan::Summary();
         }
-        if ( planPolicy.permitOptimalIdPlan() && isSimpleIdQuery( query ) ) {
+    }
+    
+    void CursorGenerator::setArgumentsHint() {
+        if ( useHints && _parsedQuery ) {
+            _argumentsHint = _parsedQuery->getHint();
+        }
+        
+        if ( snapshot() ) {
+            NamespaceDetails *d = nsdetails( _ns );
+            if ( d ) {
+                int i = d->findIdIndex();
+                if( i < 0 ) {
+                    if ( strstr( _ns , ".system." ) == 0 )
+                        log() << "warning: no _id index on $snapshot query, ns:" << _ns << endl;
+                }
+                else {
+                    /* [dm] the name of an _id index tends to vary, so we build the hint the hard
+                     way here. probably need a better way to specify "use the _id index" as a hint.
+                     if someone is in the query optimizer please fix this then!
+                     */
+                    _argumentsHint = BSON( "$hint" << d->idx(i).indexName() );
+                }
+            }
+        }
+    }
+    
+    shared_ptr<Cursor> CursorGenerator::shortcutCursor() const {
+        if ( !mayShortcutQueryOptimizer() ) {
+            return shared_ptr<Cursor>();
+        }
+        
+        if ( _planPolicy.permitOptimalNaturalPlan() && _query.isEmpty() && _order.isEmpty() ) {
+            return theDataFileMgr.findAll( _ns );
+        }
+        if ( _planPolicy.permitOptimalIdPlan() && isSimpleIdQuery( _query ) ) {
             Database *database = cc().database();
             verify( 15985, database );
-            NamespaceDetails *d = database->namespaceIndex.details(ns);
+            NamespaceDetails *d = database->namespaceIndex.details( _ns );
             if ( d ) {
                 int idxNo = d->findIdIndex();
                 if ( idxNo >= 0 ) {
                     IndexDetails& i = d->idx( idxNo );
-                    BSONObj key = i.getKeyFromQuery( query );
-                    return shared_ptr<Cursor>( BtreeCursor::make( d, idxNo, i, key, key, true, 1 ) );
+                    BSONObj key = i.getKeyFromQuery( _query );
+                    return shared_ptr<Cursor>( BtreeCursor::make( d, idxNo, i, key, key, true,
+                                                                 1 ) );
                 }
             }
         }
-        auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order,
-                                                             planPolicy.planHint( ns ) ) ); // mayYield == false
-        const QueryPlan *singlePlan = mps->singlePlan();
-        if ( singlePlan ) {
-            if ( planPolicy.permitPlan( *singlePlan ) ) {
-                shared_ptr<Cursor> single = singlePlan->newCursor();
-                if ( !query.isEmpty() && !single->matcher() ) {
-                    shared_ptr<CoveredIndexMatcher> matcher( new CoveredIndexMatcher( query, single->indexKeyPattern() ) );
-                    single->setMatcher( matcher );
-                }
-                if ( simpleEqualityMatch ) {
-                    if ( singlePlan->exactKeyMatch() && !single->matcher()->needRecord() ) {
-                        *simpleEqualityMatch = true;
-                    }
-                }
-                return single;
+        
+        return shared_ptr<Cursor>();
+    }
+    
+    void CursorGenerator::setMultiPlanScanner() {
+        _mps.reset( new MultiPlanScanner( _ns, _query, fieldsPtr(), _order, hint(),
+                                         explain() ? QueryPlanSet::Ignore : QueryPlanSet::Use,
+                                         min(), max() ) ); // mayYield == false
+    }
+    
+    shared_ptr<Cursor> CursorGenerator::singlePlanCursor() {
+        const QueryPlan *singlePlan = _mps->singlePlan();
+        if ( !singlePlan || ( requireOrder() && singlePlan->scanAndOrderRequired() ) ) {
+            return shared_ptr<Cursor>();
+        }
+        if ( !_planPolicy.permitPlan( *singlePlan ) ) {
+            return shared_ptr<Cursor>();
+        }
+        
+        if ( _singlePlanSummary ) {
+            *_singlePlanSummary = singlePlan->summary();
+        }
+        shared_ptr<Cursor> single = singlePlan->newCursor( DiskLoc(), numWanted() );
+        if ( !_query.isEmpty() && !single->matcher() ) {
+            shared_ptr<CoveredIndexMatcher> matcher
+            ( new CoveredIndexMatcher( _query, single->indexKeyPattern() ) );
+            single->setMatcher( matcher );
+        }
+        if ( _simpleEqualityMatch ) {
+            if ( singlePlan->exactKeyMatch() && !single->matcher()->needRecord() ) {
+                *_simpleEqualityMatch = true;
             }
         }
-        return newQueryOptimizerCursor( mps, planPolicy );
+        return single;
+    }
+    
+    shared_ptr<Cursor> CursorGenerator::generate() {
+
+        setArgumentsHint();
+        shared_ptr<Cursor> cursor = shortcutCursor();
+        if ( cursor ) {
+            return cursor;
+        }
+        
+        setMultiPlanScanner();
+        cursor = singlePlanCursor();
+        if ( cursor ) {
+            return cursor;
+        }
+        
+        return newQueryOptimizerCursor( _mps, _planPolicy, requireOrder(), explain() );
     }
 
-    /** This interface just available for testing. */
-    shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query,
-                                               const BSONObj &order,
-                                               const QueryPlanSelectionPolicy &planPolicy ) {
-        auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order ) ); // mayYield == false
-        return newQueryOptimizerCursor( mps, planPolicy );
+    /** This interface is just available for testing. */
+    shared_ptr<Cursor> newQueryOptimizerCursor
+    ( const char *ns, const BSONObj &query, const shared_ptr<Projection> &fields,
+     const BSONObj &order, const QueryPlanSelectionPolicy &planPolicy, bool requireOrder ) {
+        auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, fields,
+                                                             order ) ); // mayYield == false
+        return newQueryOptimizerCursor( mps, planPolicy, requireOrder, false );
     }
         
 } // namespace mongo;

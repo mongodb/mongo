@@ -536,6 +536,30 @@ namespace mongo {
         _findingStartMode = Initial;
     }
     
+    shared_ptr<Cursor> FindingStartCursor::getCursor( const char *ns, const BSONObj &query, const BSONObj &order ) {
+        NamespaceDetails *d = nsdetails(ns);
+        if ( !d ) {
+            return shared_ptr<Cursor>( new BasicCursor( DiskLoc() ) );
+        }
+        FieldRangeSetPair frsp( ns, query );
+        QueryPlan oplogPlan( d, -1, frsp, 0, query, shared_ptr<Projection>(), order, false );
+        FindingStartCursor finder( oplogPlan );
+        ElapsedTracker yieldCondition( 256, 20 );
+        while( !finder.done() ) {
+            if ( yieldCondition.intervalHasElapsed() ) {
+                if ( finder.prepareToYield() ) {
+                    ClientCursor::staticYield( -1, ns, 0 );
+                    finder.recoverFromYield();
+                }
+            }
+            finder.next();
+        }
+        shared_ptr<Cursor> ret = finder.cursor();
+        shared_ptr<CoveredIndexMatcher> matcher( new CoveredIndexMatcher( query, BSONObj() ) );
+        ret->setMatcher( matcher );
+        return ret;
+    }
+    
     // -------------------------------------
 
     struct TestOpTime : public UnitTest {

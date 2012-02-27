@@ -743,7 +743,11 @@ namespace mongo {
                 DBClientConnection conn;
                 try {
                     conn.connect("127.0.0.1:" + BSONObjBuilder::numStr(port));
-                    conn.simpleCommand("admin", NULL, "shutdown");
+                    BSONObj info;
+                    BSONObjBuilder b;
+                    b.append( "shutdown", 1 );
+                    b.append( "force", 1 );
+                    conn.runCommand( "admin", b.done(), info );
                 }
                 catch (...) {
                     //Do nothing. This command never returns data to the client and the driver doesn't like that.
@@ -781,7 +785,7 @@ namespace mongo {
 
             int i = 0;
             for( ; i < 130; ++i ) {
-                if ( i == 30 ) {
+                if ( i == 60 ) {
                     char now[64];
                     time_t_to_String(time(0), now);
                     now[ 20 ] = 0;

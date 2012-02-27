@@ -151,6 +151,7 @@ coreServerFiles = [ "util/version.cpp",
                     ] + env['MONGO_SCRIPTING_FILES']
 
 clientFiles = commonFiles + [
+    'client/clientAndShell.cpp',
     'client/clientOnly.cpp',
     'client/gridfs.cpp',
     'db/commands.cpp',
@@ -249,10 +250,11 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/cursor.cpp",
                     "db/security.cpp",
                     "db/queryoptimizer.cpp",
-                    "db/queryoptimizercursor.cpp",
+                    "db/queryoptimizercursorimpl.cpp",
                     "db/extsort.cpp",
                     "db/index.cpp",
                     "db/scanandorder.cpp",
+                    "db/explain.cpp",
                     "db/geo/2d.cpp",
                     "db/geo/haystack.cpp",
                     "db/ops/count.cpp",
@@ -540,7 +542,7 @@ env.Alias( "mongoclient", '#/%s' % ( has_option( "sharedclient" ) and sharedClie
 
 # client dist
 def build_and_test_client(env, target, source):
-    from subprocess import call
+    import subprocess
 
     installDir = env.subst('$INSTALL_DIR', target=target, source=source)
     installDir = env.GetBuildPath(installDir)
@@ -549,9 +551,14 @@ def build_and_test_client(env, target, source):
     else:
         scons_command = ["scons"]
 
-    call(scons_command + ["libmongoclient.a", "clientTests"], cwd=installDir)
+    exit_code = subprocess.call(scons_command + ["clientTests"], cwd=installDir)
+    if exit_code:
+        return exit_code
 
-    return bool(call(utils.smoke_command([
-                      "--test-path", installDir, "client"])))
+    smoke_cmd = utils.smoke_command("--test-path", installDir, "client")
+    exit_code = subprocess.call(smoke_cmd)
+    if exit_code:
+        return exit_code
+
 env.Alias("clientBuild", [mongod, '$INSTALL_DIR'], [build_and_test_client])
 env.AlwaysBuild("clientBuild")

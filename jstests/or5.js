@@ -69,10 +69,10 @@ assert.eq.automsg( "6", "t.find( {$or:[{a:2},{b:3},{c:4}]} ).batchSize( 1 ).itco
 assert.eq.automsg( "6", "t.find( {$or:[{a:2},{b:3},{c:4}]} ).batchSize( 2 ).itcount()" );
 
 c = t.find( {$or:[{a:2},{b:3},{c:4}]} ).batchSize( 2 );
-c.next();
+c.next(); // Trigger initial query.
 t.remove( {b:3} );
 db.getLastError();
-assert.eq.automsg( "3", c.itcount() );
+assert.eq.automsg( "3", c.itcount() ); // The remaining [{a:2},{c:4},{c:4}] comprise 3 results.
 
 reset();
 

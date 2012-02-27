@@ -273,14 +273,13 @@ namespace mongo {
         {
             scoped_lock lk( _lock );
             
-            CollectionInfo& ci = _collections[ns];
-            
-            bool earlyReload = ! ci.isSharded() && ( shouldReload || forceReload );
+            bool earlyReload = ! _collections[ns].isSharded() && ( shouldReload || forceReload );
             if ( earlyReload ) {
                 // this is to catch cases where there this is a new sharded collection
                 _reload();
-                ci = _collections[ns];
             }
+
+            CollectionInfo& ci = _collections[ns];
             uassert( 10181 ,  (string)"not sharded:" + ns , ci.isSharded() );
             assert( ! ci.key().isEmpty() );
             

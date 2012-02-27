@@ -17,6 +17,11 @@ assert.eq( t.find({ln: "doe"}).explain().indexOnly, false, "Find using covered i
 assert.eq( t.find({ln: "doe"}, {ln: 1}).explain().indexOnly, false, "Find using covered index but _id is returned");
 assert.eq( t.find({ln: "doe"}, {ln: 1, _id: 0}).explain().indexOnly, true, "Find is not using covered index");
 
+// this time, without a query spec
+// SERVER-2109
+//assert.eq( t.find({}, {ln: 1, _id: 0}).explain().indexOnly, true, "Find is not using covered index");
+assert.eq( t.find({}, {ln: 1, _id: 0}).hint({ln: 1}).explain().indexOnly, true, "Find is not using covered index");
+
 // use compound index
 t.dropIndex({ln: 1})
 t.ensureIndex({ln: 1, fn: 1});

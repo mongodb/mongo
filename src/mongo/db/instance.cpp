@@ -608,10 +608,11 @@ namespace mongo {
         curop.debug().ntoreturn = ntoreturn;
         curop.debug().cursorid = cursorid;
 
+        shared_ptr<AssertionException> ex;
         time_t start = 0;
         int pass = 0;
         bool exhaust = false;
-        QueryResult* msgdata;
+        QueryResult* msgdata = 0;
         OpTime last;
         while( 1 ) {
             try {
@@ -622,14 +623,17 @@ namespace mongo {
                     else
                         last.waitForDifferent(1000/*ms*/);
                 }
+
+                // call this readlocked so state can't change
+                replVerifyReadsOk();
                 msgdata = processGetMore(ns, ntoreturn, cursorid, curop, pass, exhaust);
             }
             catch ( AssertionException& e ) {
-                exhaust = false;
-                curop.debug().exceptionInfo = e.getInfo();
-                msgdata = emptyMoreResult(cursorid);
+                ex.reset( new AssertionException( e.getInfo().msg, e.getCode() ) );
                 ok = false;
+                break;
             }
+
             if (msgdata == 0) {
                 exhaust = false;
                 massert(13073, "shutting down", !inShutdown() );
@@ -652,6 +656,27 @@ namespace mongo {
             }
             break;
         };
+
+        if (ex) {
+            exhaust = false;
+
+            BSONObjBuilder err;
+            ex->getInfo().append( err );
+            BSONObj errObj = err.done();
+
+            log() << errObj << endl;
+
+            curop.debug().exceptionInfo = ex->getInfo();
+
+            if (ex->getCode() == 13436) {
+                replyToQuery(ResultFlag_ErrSet, m, dbresponse, errObj);
+                curop.debug().responseLength = dbresponse.response->header()->dataLen();
+                curop.debug().nreturned = 1;
+                return ok;
+            }
+
+            msgdata = emptyMoreResult(cursorid);
+        }
 
         Message *resp = new Message();
         resp->setData(msgdata, true);

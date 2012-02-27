@@ -34,7 +34,7 @@ def addTest(name, deps, actions):
     # Prevent smoke tests from running in parallel
     smokeEnv.SideEffect( "dummySmokeSideEffect", name )
 
-def addSmoketest( name, deps ):
+def addSmoketest( name, deps, extraSmokeArgs=[] ):
     # Convert from smoke to test, smokeJs to js, and foo to foo
     target = name
     if name.startswith("smoke"):
@@ -43,8 +43,8 @@ def addSmoketest( name, deps ):
         else:
             target = name[5].lower() + name[6:]
 
-    smokeArgs = smokeFlags + [target]
-    addTest(name, deps, utils.smoke_command(*smokeArgs))
+    smokeArgs = smokeFlags + [target] + extraSmokeArgs
+    addTest(name, deps, utils.run_smoke_command(*smokeArgs))
 
 addSmoketest( "smoke", [ add_exe( "test" ), add_exe( "mongod" ), add_exe( "mongo" ) ] )
 addSmoketest( "smokePerf", [ add_exe("perftest") ]  )
@@ -77,6 +77,9 @@ if shellEnv is not None:
     addSmoketest( "smokeQuota", [ add_exe("mongo") ] )
     addSmoketest( "smokeTool", [ add_exe( "mongo" ), add_exe("mongod"), add_exe("mongos"), "tools" ] )
     addSmoketest( "smokeAggregation", [ add_exe( "mongo" ), add_exe( "mongod" ) ] )
+
+    addSmoketest( "smokeFailingTests", [ add_exe( "mongo" ), add_exe( "mongod" ) ], ['--only-old-fails', '--continue-on-failure'] )
+    addSmoketest( "smokeResetFails", [ add_exe( "mongo" ), add_exe( "mongod" ) ], ['--reset-old-fails'] )
 
 # Note: although the test running logic has been moved to
 # buildscripts/smoke.py, the interface to running the tests has been

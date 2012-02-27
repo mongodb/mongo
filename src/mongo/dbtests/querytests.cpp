@@ -34,6 +34,8 @@
 
 namespace mongo {
     extern int __findingStartInitialTimeout;
+    void assembleRequest( const string &ns, BSONObj query, int nToReturn, int nToSkip,
+                         const BSONObj *fieldsToReturn, int queryOptions, Message &toSend );
 }
 
 namespace QueryTests {
@@ -200,6 +202,17 @@ namespace QueryTests {
             long long cursorId = cursor->getCursorId();
             cursor->decouple();
             cursor.reset();
+
+            {
+                // Check internal server handoff to getmore.
+                dblock lk;
+                Client::Context ctx( ns );
+                ClientCursor::Pointer clientCursor( cursorId );
+                ASSERT( clientCursor.c()->pq );
+                ASSERT_EQUALS( 2, clientCursor.c()->pq->getNumToReturn() );
+                ASSERT_EQUALS( 2, clientCursor.c()->pos() );
+            }
+            
             cursor = client().getMore( ns, cursorId );
             ASSERT( cursor->more() );
             ASSERT_EQUALS( 3, cursor->next().getIntField( "a" ) );
@@ -411,6 +424,39 @@ namespace QueryTests {
             ASSERT( c->more() );
             ASSERT_EQUALS( 2, c->next().getIntField( "ts" ) );
             ASSERT( c->more() );
+        }
+    };
+
+    class OplogReplaySlaveReadTill : public ClientBase {
+    public:
+        ~OplogReplaySlaveReadTill() {
+            client().dropCollection( "unittests.querytests.OplogReplaySlaveReadTill" );
+        }
+        void run() {
+            const char *ns = "unittests.querytests.OplogReplaySlaveReadTill";
+            dblock lk;
+            Client::Context ctx( ns );
+            
+            BSONObj info;
+            client().runCommand( "unittests",
+                                BSON( "create" << "querytests.OplogReplaySlaveReadTill" <<
+                                     "capped" << true << "size" << 8192 ),
+                                info );
+            Date_t one = OpTime::now().asDate();
+            Date_t two = OpTime::now().asDate();
+            Date_t three = OpTime::now().asDate();
+            insert( ns, BSON( "ts" << one ) );
+            insert( ns, BSON( "ts" << two ) );
+            insert( ns, BSON( "ts" << three ) );
+            auto_ptr<DBClientCursor> c =
+            client().query( ns, QUERY( "ts" << GTE << two ).hint( BSON( "$natural" << 1 ) ),
+                           0, 0, 0, QueryOption_OplogReplay | QueryOption_CursorTailable );
+            ASSERT( c->more() );
+            ASSERT_EQUALS( two, c->next()["ts"].Date() );
+            long long cursorId = c->getCursorId();
+            
+            ClientCursor::Pointer clientCursor( cursorId );
+            ASSERT_EQUALS( three.millis, clientCursor.c()->getSlaveReadTill().asDate() );
         }
     };
 
@@ -1161,7 +1207,11 @@ namespace QueryTests {
 
         void run() {
             unsigned startNumCursors = ClientCursor::numCursors();
-            
+
+            // Check OplogReplay mode with missing collection.
+            auto_ptr< DBClientCursor > c0 = client().query( ns(), QUERY( "ts" << GTE << 50 ), 0, 0, 0, QueryOption_OplogReplay );
+            ASSERT( !c0->more() );
+
             BSONObj info;
             ASSERT( client().runCommand( "unittests", BSON( "create" << "querytests.findingstart" << "capped" << true << "$nExtents" << 5 << "autoIndexId" << false ), info ) );
             
@@ -1187,6 +1237,75 @@ namespace QueryTests {
             BSONObj result;
             client().runCommand( "admin", BSON( "whatsmyuri" << 1 ), result );
             ASSERT_EQUALS( unknownAddress.toString(), result[ "you" ].str() );
+        }
+    };
+    
+    class CollectionInternalBase : public CollectionBase {
+    public:
+        CollectionInternalBase( const char *nsLeaf ) :
+        CollectionBase( nsLeaf ),
+        _ctx( ns() ) {
+        }
+    private:
+        dblock _lk;
+        Client::Context _ctx;
+    };
+    
+    class Exhaust : public CollectionInternalBase {
+    public:
+        Exhaust() : CollectionInternalBase( "exhaust" ) {}
+        void run() {
+            BSONObj info;
+            ASSERT( client().runCommand( "unittests",
+                                        BSON( "create" << "querytests.exhaust" <<
+                                             "capped" << true << "size" << 8192 ), info ) );
+            client().insert( ns(), BSON( "ts" << 0 ) );
+            Message message;
+            assembleRequest( ns(), BSON( "ts" << GTE << 0 ), 0, 0, 0,
+                            QueryOption_OplogReplay | QueryOption_CursorTailable |
+                            QueryOption_Exhaust,
+                            message );
+            DbMessage dbMessage( message );
+            QueryMessage queryMessage( dbMessage );
+            Message result;
+            const char *exhaust = runQuery( message, queryMessage, *cc().curop(), result );
+            ASSERT( exhaust );
+            ASSERT_EQUALS( string( ns() ), exhaust );
+        }
+    };
+
+    class QueryCursorTimeout : public CollectionInternalBase {
+    public:
+        QueryCursorTimeout() : CollectionInternalBase( "querycursortimeout" ) {}
+        void run() {
+            for( int i = 0; i < 150; ++i ) {
+                insert( ns(), BSONObj() );
+            }
+            auto_ptr<DBClientCursor> c = client().query( ns(), Query() );
+            ASSERT( c->more() );
+            long long cursorId = c->getCursorId();
+            
+            ClientCursor *clientCursor = 0;
+            {
+                ClientCursor::Pointer clientCursorPointer( cursorId );
+                clientCursor = clientCursorPointer.c();
+                // clientCursorPointer destructor unpins the cursor.
+            }
+            ASSERT( clientCursor->shouldTimeout( 600001 ) );
+        }
+    };
+
+    class QueryReadsAll : public CollectionBase {
+    public:
+        QueryReadsAll() : CollectionBase( "queryreadsall" ) {}
+        void run() {
+            for( int i = 0; i < 5; ++i ) {
+                insert( ns(), BSONObj() );
+            }
+            auto_ptr<DBClientCursor> c = client().query( ns(), Query(), 5 );
+            ASSERT( c->more() );
+            // With five results and a batch size of 5, no cursor is created.
+            ASSERT_EQUALS( 0, c->getCursorId() );
         }
     };
 
@@ -1431,6 +1550,7 @@ namespace QueryTests {
             add< TailCappedOnly >();
             add< TailableQueryOnId >();
             add< OplogReplayMode >();
+            add< OplogReplaySlaveReadTill >();
             add< ArrayId >();
             add< UnderscoreNs >();
             add< EmptyFieldSpec >();
@@ -1460,6 +1580,9 @@ namespace QueryTests {
             add< FindingStartPartiallyFull >();
             add< FindingStartStale >();
             add< WhatsMyUri >();
+            add< Exhaust >();
+            add< QueryCursorTimeout >();
+            add< QueryReadsAll >();
 
             add< parsedtests::basic1 >();
 
