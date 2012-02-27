@@ -6213,7 +6213,7 @@ per recursive call of match(). */
 if (re == NULL && extra_data == NULL && subject == NULL && length == -999 &&
     start_offset == -999)
 #ifdef NO_RECURSE
-  return -sizeof(heapframe);
+return (int)-sizeof(heapframe);
 #else
   return match(NULL, NULL, NULL, 0, NULL, NULL, 0);
 #endif
