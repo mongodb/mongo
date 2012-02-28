@@ -78,6 +78,7 @@ namespace mongo {
                 if ( e.eoo() )
                     break;
                 if ( e.type() == Timestamp ) {
+                    // performance note, this locks a mutex:
                     BSONElementManipulator( e ).initTimestamp();
                     break;
                 }

@@ -125,7 +125,7 @@ namespace mongo {
     // on every logop call.
     static BufBuilder logopbufbuilder(8*1024);
     static void _logOpRS(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, bool fromMigrate ) {
-        DEV assertInWriteLock();
+        Lock::DBWrite lk1("local");
 
         if ( strncmp(ns, "local.", 6) == 0 ) {
             if ( strncmp(ns, "local.slaves", 12) == 0 )
@@ -133,7 +133,9 @@ namespace mongo {
             return;
         }
 
-        const OpTime ts = OpTime::now();
+        mutex::scoped_lock lk2(OpTime::m);
+
+        const OpTime ts = OpTime::now(lk2);
         long long hashNew;
         if( theReplSet ) {
             massert(13312, "replSet error : logOp() but not primary?", theReplSet->box.getState().primary());
@@ -222,7 +224,7 @@ namespace mongo {
     */
     static void _logOpOld(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, bool fromMigrate ) {
         Lock::DBWrite lk("local");
-        static BufBuilder bufbuilder(8*1024);
+        static BufBuilder bufbuilder(8*1024); // todo there is likely a mutex on this constructor
 
         if ( strncmp(ns, "local.", 6) == 0 ) {
             if ( strncmp(ns, "local.slaves", 12) == 0 ) {
@@ -231,7 +233,9 @@ namespace mongo {
             return;
         }
 
-        const OpTime ts = OpTime::now();
+        mutex::scoped_lock lk2(OpTime::m);
+
+        const OpTime ts = OpTime::now(lk2);
         Client::Context context("",0,false);
 
         /* we jump through a bunch of hoops here to avoid copying the obj buffer twice --
@@ -565,7 +569,7 @@ namespace mongo {
         void run() {
             OpTime t;
             for ( int i = 0; i < 10; i++ ) {
-                OpTime s = OpTime::now_inlock();
+                OpTime s = OpTime::_now();
                 assert( s != t );
                 t = s;
             }

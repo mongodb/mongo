@@ -639,8 +639,8 @@ namespace mongo {
         virtual LockType locktype() const { return NONE; }
         CmdGetOpTime() : Command("getoptime") { }
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
-            writelock l( "" );
-            result.appendDate("optime", OpTime::now().asDate());
+            mutex::scoped_lock lk(OpTime::m);
+            result.appendDate("optime", OpTime::now(lk).asDate());
             return true;
         }
     } cmdgetoptime;

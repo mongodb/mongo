@@ -442,9 +442,9 @@ namespace QueryTests {
                                 BSON( "create" << "querytests.OplogReplaySlaveReadTill" <<
                                      "capped" << true << "size" << 8192 ),
                                 info );
-            Date_t one = OpTime::now().asDate();
-            Date_t two = OpTime::now().asDate();
-            Date_t three = OpTime::now().asDate();
+            Date_t one = OpTime::_now().asDate();
+            Date_t two = OpTime::_now().asDate();
+            Date_t three = OpTime::_now().asDate();
             insert( ns, BSON( "ts" << one ) );
             insert( ns, BSON( "ts" << two ) );
             insert( ns, BSON( "ts" << three ) );
@@ -1243,11 +1243,12 @@ namespace QueryTests {
     class CollectionInternalBase : public CollectionBase {
     public:
         CollectionInternalBase( const char *nsLeaf ) :
-        CollectionBase( nsLeaf ),
-        _ctx( ns() ) {
+          CollectionBase( nsLeaf ),
+          _lk( ns() ),
+          _ctx( ns() ) {
         }
     private:
-        //dblock _lk;
+        Lock::DBWrite _lk;
         Client::Context _ctx;
     };
     

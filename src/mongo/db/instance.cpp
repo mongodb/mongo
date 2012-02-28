@@ -17,6 +17,7 @@
 */
 
 #include "pch.h"
+#include "../util/time_support.h"
 #include "db.h"
 #include "../bson/util/atomic_int.h"
 #include "introspect.h"
@@ -77,21 +78,40 @@ namespace mongo {
     // see FSyncCommand:
     extern bool lockedForWriting();
 
-    OpTime OpTime::now() {
-        DEV d.dbMutex.assertWriteLocked();
-        return now_inlock();
-    }
-    OpTime OpTime::last_inlock(){
-        DEV d.dbMutex.assertAtLeastReadLocked();
+    /*static*/ OpTime OpTime::_now() {
+        OpTime result;
+        unsigned t = (unsigned) time(0);
+        if ( last.secs == t ) {
+            last.i++;
+            result = last;
+        }
+        else if ( t < last.secs ) {
+            result = skewed(); // separate function to keep out of the hot code path
+        }
+        else { 
+            last = OpTime(t, 1);
+            result = last;
+        }
+        notifier.notify_all();
         return last;
     }
+    OpTime OpTime::now(const mongo::mutex::scoped_lock&) {
+        return _now();
+    }
+    OpTime OpTime::getLast(const mongo::mutex::scoped_lock&) {
+        return last;
+    }
+    boost::condition OpTime::notifier;
+    mongo::mutex OpTime::m("optime");
 
-    // OpTime::now() uses dbMutex, thus it is in this file not in the cpp files used by drivers and such
+    // OpTime::now() uses mutex, thus it is in this file not in the cpp files used by drivers and such
     void BSONElementManipulator::initTimestamp() {
         massert( 10332 ,  "Expected CurrentTime type", _element.type() == Timestamp );
         unsigned long long &timestamp = *( reinterpret_cast< unsigned long long* >( value() ) );
-        if ( timestamp == 0 )
-            timestamp = OpTime::now().asDate();
+        if ( timestamp == 0 ) {
+            mutex::scoped_lock lk(OpTime::m);
+            timestamp = OpTime::now(lk).asDate();
+        }
     }
     void BSONElementManipulator::SetNumber(double d) {
         if ( _element.type() == NumberDouble )
@@ -578,19 +598,10 @@ namespace mongo {
 
         if (*this != last) return; // check early
 
-        boost::xtime timeout;
-        boost::xtime_get(&timeout, boost::TIME_UTC);
-
-        timeout.nsec += millis * 1000*1000;
-        if (timeout.nsec >= 1000*1000*1000){
-            timeout.nsec -= 1000*1000*1000;
-            timeout.sec += 1;
-        }
-
         do {
             dbtemprelease tmp;
-            boost::mutex::scoped_lock lk(notifyMutex());
-            if (!notifier().timed_wait(lk, timeout))
+            mutex::scoped_lock lk(m);
+            if (!notifier.timed_wait(lk.boost(), boost::posix_time::milliseconds(millis)))
                 return; // timed out
         } while (*this != last);
     }
@@ -618,10 +629,13 @@ namespace mongo {
             try {
                 Client::ReadContext ctx(ns);
                 if (str::startsWith(ns, "local.oplog.")){
-                    if (pass == 0)
-                        last = OpTime::last_inlock();
-                    else
+                    if (pass == 0) {
+                        mutex::scoped_lock lk(OpTime::m);
+                        last = OpTime::getLast(lk);
+                    }
+                    else {
                         last.waitForDifferent(1000/*ms*/);
+                    }
                 }
 
                 // call this readlocked so state can't change

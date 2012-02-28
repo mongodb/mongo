@@ -314,9 +314,9 @@ namespace JsobjTests {
                 e = i.next();
                 ASSERT( e.eoo() );
 
-                OpTime before = OpTime::now();
+                OpTime before = OpTime::_now();
                 BSONElementManipulator( o.firstElement() ).initTimestamp();
-                OpTime after = OpTime::now();
+                OpTime after = OpTime::_now();
 
                 OpTime test = OpTime( o.firstElement().date() );
                 ASSERT( before < test && test < after );

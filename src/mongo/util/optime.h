@@ -42,8 +42,7 @@ namespace mongo {
         static OpTime skewed();
     public:
         static void setLast(const Date_t &date) {
-            notifier().notify_all(); // won't really do anything until write-lock released
-
+            notifier.notify_all(); // won't really do anything until write-lock released
             last = OpTime(date);
         }
         unsigned getSecs() const {
@@ -75,22 +74,13 @@ namespace mongo {
             i = 0;
         }
         // it isn't generally safe to not be locked for this. so use now(). some tests use this.
-        static OpTime now_inlock() {
-            notifier().notify_all(); // won't really do anything until write-lock released
+        static OpTime _now();
 
-            unsigned t = (unsigned) time(0);
-            if ( last.secs == t ) {
-                last.i++;
-                return last;
-            }
-            if ( t < last.secs ) {
-                return skewed(); // separate function to keep out of the hot code path
-            }
-            last = OpTime(t, 1);
-            return last;
-        }
-        static OpTime now();
-        static OpTime last_inlock();
+        static mongo::mutex m;
+
+        static OpTime now(const mongo::mutex::scoped_lock&);
+
+        static OpTime getLast(const mongo::mutex::scoped_lock&);
 
         // Waits for global OpTime to be different from *this
         // Must be atLeastReadLocked
@@ -154,16 +144,7 @@ namespace mongo {
             return !(*this < r);
         }
     private:
-
-        // The following functions are to get around the need to define class-level statics in a cpp
-        static boost::condition& notifier() {
-            static boost::condition* holder = new boost::condition();
-            return *holder;
-        };
-        static boost::mutex& notifyMutex() {
-            static boost::mutex* holder = new boost::mutex();
-            return *holder;
-        };
+        static boost::condition notifier;
     };
 #pragma pack()
 
