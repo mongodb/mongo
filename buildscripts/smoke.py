@@ -553,7 +553,9 @@ def run_old_fails():
             # SERVER-5102: until we can figure out a better way to manage
             # dependencies of the --only-old-fails build phase, just skip
             # tests which we can't safely run at this point
-            if test in ('test', 'test.exe') or test.endswith('.js'):
+            path, usedb = test
+            filename = os.path.basename(path)
+            if filename in ('test', 'test.exe') or filename.endswith('.js'):
                 set_globals(options)
                 oldWinners = len(winners)
                 run_tests([test])
