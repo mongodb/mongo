@@ -138,9 +138,10 @@ namespace mongo {
         q.unlock_R();
     }
     static void lock_w() { 
-        assert( threadState() == 0 );
+        char &ts = threadState();
+        assert( ts == 0 || ts == 't' );
         getDur().commitIfNeeded();
-        threadState() = 'w';
+        ts = 'w';
         q.lock_w();
     }
     static void unlock_w() { 
@@ -286,7 +287,7 @@ namespace mongo {
         LockState& ls = lockState();
         dassert( ls.recursive == 0 );
         DESTRUCTOR_GUARD( 
-            fassert(0, ls.threadState == 't');
+            fassert(0, ls.threadState == 't' || ls.threadState == 0);
             ls.threadState = 0;
             switch( type ) {
             case 'W':
@@ -382,6 +383,7 @@ namespace mongo {
             break;
         default: // 't'
             assert(false);
+        case 't':
         case  0  : 
             lock_w();
             locked_w = true;
