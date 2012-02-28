@@ -1247,7 +1247,7 @@ namespace QueryTests {
         _ctx( ns() ) {
         }
     private:
-        dblock _lk;
+        //dblock _lk;
         Client::Context _ctx;
     };
     
