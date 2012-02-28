@@ -549,11 +549,7 @@ namespace QueryOptimizerTests {
             static NamespaceDetails *nsd() { return nsdetails( ns() ); }
             DBDirectClient &client() { return _client; }
         private:
-<<<<<<< HEAD
             Lock::GlobalWrite lk_;
-=======
-            dblock _lk;
->>>>>>> main_readonly/master
             Client::Context _context;
             DBDirectClient _client;
         };

@@ -2245,7 +2245,7 @@ namespace QueryOptimizerCursorTests {
     class AllowOutOfOrderPlan : public Base {
     public:
         void run() {
-            dblock lk;
+            Lock::DBWrite lk(ns());
             Client::Context ctx( ns() );
             shared_ptr<Cursor> c =
             newQueryOptimizerCursor( ns(), BSONObj(), shared_ptr<Projection>(), BSON( "a" << 1 ),
@@ -2272,7 +2272,7 @@ namespace QueryOptimizerCursorTests {
             for( int i = 0; i < 150; ++i ) {
                 _cli.insert( ns(), BSON( "a" << 3 << "b" << 10 ) );
             }            
-            dblock lk;
+            Lock::DBWrite lk(ns());
             Client::Context ctx( ns() );
             shared_ptr<Cursor> c =
             newQueryOptimizerCursor( ns(), BSON( "a" << LT << 3 << "b" << 1 ),
@@ -2300,7 +2300,7 @@ namespace QueryOptimizerCursorTests {
                 _cli.insert( ns(), BSON( "a" << 2 ) );
             }
             
-            dblock lk;
+            Lock::DBWrite lk(ns());
             Client::Context ctx( ns() );
             shared_ptr<Cursor> c =
             newQueryOptimizerCursor( ns(), BSON( "a" << 1 ),
@@ -2321,7 +2321,7 @@ namespace QueryOptimizerCursorTests {
             _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
             _cli.insert( ns(), BSON( "a" << 1 << "b" << 10 ) );
             
-            dblock lk;
+            Lock::DBWrite lk(ns());
             Client::Context ctx( ns() );
             shared_ptr<Projection> fields( new Projection() );
             fields->init( BSON( "_id" << 0 << "a" << 1 ) );
@@ -2359,7 +2359,7 @@ namespace QueryOptimizerCursorTests {
             }
             _cli.insert( ns(), BSON( "a" << 2 ) );
             
-            dblock lk;
+            Lock::DBWrite lk(ns());
             Client::Context ctx( ns() );
             shared_ptr<Projection> fields( new Projection() );
             fields->init( BSON( "_id" << 0 << "a" << 1 ) );
@@ -2422,7 +2422,7 @@ namespace QueryOptimizerCursorTests {
             _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
             _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
 
-            dblock lk;
+            Lock::DBWrite lk(ns());
             Client::Context ctx( ns() );
             
             // No best plan - all must be tried.
@@ -2534,7 +2534,7 @@ namespace QueryOptimizerCursorTests {
                 _cli.insert( ns(), BSON( "a" << 2 ) );
             }
             
-            dblock lk;
+            Lock::DBWrite lk(ns());
             Client::Context ctx( ns() );
             nPlans( 2, BSON( "a" << 1 << "x" << 1 ), BSONObj() );
             setCursor( BSON( "a" << 1 << "x" << 1 ), BSONObj() );
@@ -2611,7 +2611,7 @@ namespace QueryOptimizerCursorTests {
             }
             _cli.insert( ns(), BSON( "b" << 2 ) );
             
-            dblock lk;
+            Lock::DBWrite lk(ns());
             Client::Context ctx( ns() );
             nPlans( 3, BSON( "a" << 1 << "b" << 1 ), BSON( "x" << 1 ) );
             setCursor( BSON( "a" << 1 << "b" << 1 ), BSON( "x" << 1 ) );
@@ -2688,7 +2688,7 @@ namespace QueryOptimizerCursorTests {
                 }
             }
             
-            dblock lk;
+            Lock::DBWrite lk(ns());
             Client::Context ctx( ns() );
             nPlans( 3, BSON( "a" << 1 << "b" << 1 ), BSON( "b" << 1 ) );
             setCursor( BSON( "a" << 1 << "b" << 1 ), BSON( "b" << 1 ) );
@@ -2767,7 +2767,7 @@ namespace QueryOptimizerCursorTests {
                 _cli.insert( ns(), BSON( "a" << 1 ) );
             }
             
-            dblock lk;
+            Lock::DBWrite lk(ns());
             Client::Context ctx( ns() );
             
             shared_ptr<QueryOptimizerCursor> c = getCursor( BSON( "a" << 1 << "b" << BSONNULL ),
@@ -2797,7 +2797,7 @@ namespace QueryOptimizerCursorTests {
                 _cli.insert( ns(), BSON( "a" << BSON_ARRAY( 1 << 2 ) ) );
             }
             
-            dblock lk;
+            Lock::DBWrite lk(ns());
             Client::Context ctx( ns() );
             
             shared_ptr<QueryOptimizerCursor> c =
@@ -2837,7 +2837,7 @@ namespace QueryOptimizerCursorTests {
                 _cli.insert( ns(), BSON( "a" << 3 ) );
             }
 
-            dblock lk;
+            Lock::DBWrite lk(ns());
             Client::Context ctx( ns() );
             
             shared_ptr<QueryOptimizerCursor> c =
@@ -2866,7 +2866,7 @@ namespace QueryOptimizerCursorTests {
                 _cli.insert( ns(), BSON( "a" << 3 << "b" << 3 ) );
             }
             
-            dblock lk;
+            Lock::DBWrite lk(ns());
             Client::Context ctx( ns() );
             
             BSONObj query =
@@ -3062,7 +3062,7 @@ namespace QueryOptimizerCursorTests {
         class AllowOutOfOrderPlan : public Base {
         public:
             void run() {
-                dblock lk;
+                Lock::DBWrite lk(ns());
                 Client::Context ctx( ns() );
                 ParsedQuery parsedQuery
                 ( ns(), 0, 0, 0, BSON( "$query" << BSONObj() << "$orderby" << BSON( "a" << 1 ) ),
@@ -3389,7 +3389,7 @@ namespace QueryOptimizerCursorTests {
                 _cli.insert( ns(), BSON( "a" << 1 << "b" << 1 ) );
                 _cli.insert( ns(), BSON( "a" << 1 << "b" << 1 ) );
                 
-                dblock lk;
+                Lock::DBWrite lk(ns());
                 Client::Context ctx( ns() );
                 BSONObj query = BSON( "a" << 1 << "b" << 1 );
                 shared_ptr<Cursor> c =
@@ -3415,7 +3415,7 @@ namespace QueryOptimizerCursorTests {
             void run() {
                 setupCollection();
                 
-                dblock lk;
+                Lock::DBWrite lk(ns());
                 Client::Context ctx( ns() );
                 ParsedQuery parsedQuery( ns(), 0, 0, 0,
                                         BSON( "$query" << query() << "$explain" << true ),

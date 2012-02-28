@@ -221,7 +221,7 @@ namespace mongo {
        note this is used for single collection logging even when --replSet is enabled.
     */
     static void _logOpOld(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, bool fromMigrate ) {
-        DEV assertInWriteLock();
+        Lock::DBWrite lk("local");
         static BufBuilder bufbuilder(8*1024);
 
         if ( strncmp(ns, "local.", 6) == 0 ) {
@@ -282,7 +282,6 @@ namespace mongo {
             BSONObj temp(r);
             log( 6 ) << "logging op:" << temp << endl;
         }
-
     }
 
     static void (*_logOp)(const char *opstr, const char *ns, const char *logNS, const BSONObj& obj, BSONObj *o2, bool *bb, bool fromMigrate ) = _logOpOld;

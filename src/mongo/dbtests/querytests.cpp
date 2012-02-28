@@ -205,7 +205,7 @@ namespace QueryTests {
 
             {
                 // Check internal server handoff to getmore.
-                dblock lk;
+                Lock::DBWrite lk(ns);
                 Client::Context ctx( ns );
                 ClientCursor::Pointer clientCursor( cursorId );
                 ASSERT( clientCursor.c()->pq );
@@ -434,7 +434,7 @@ namespace QueryTests {
         }
         void run() {
             const char *ns = "unittests.querytests.OplogReplaySlaveReadTill";
-            dblock lk;
+            Lock::DBWrite lk(ns);
             Client::Context ctx( ns );
             
             BSONObj info;
@@ -1247,7 +1247,7 @@ namespace QueryTests {
         _ctx( ns() ) {
         }
     private:
-        dblock _lk;
+        //dblock _lk;
         Client::Context _ctx;
     };
     
