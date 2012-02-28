@@ -141,7 +141,8 @@ sh.waitForDLock = function( lockId, onOrNot, timeout, interval ){
     
     var beginTS = undefined
     if( state == undefined ){
-        var beginTS = db.getSisterDB( "config" ).locks.findOne({ _id : lockId }).ts
+        var currLock = db.getSisterDB( "config" ).locks.findOne({ _id : lockId })
+        if( currLock != null ) beginTS = currLock.ts
     }
         
     var lockStateOk = function(){
