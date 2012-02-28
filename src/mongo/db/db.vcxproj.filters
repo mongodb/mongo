@@ -86,12 +86,9 @@
     <ClCompile Include="querypattern.cpp" />
     <ClCompile Include="..\util\ramlog.cpp" />
     <ClCompile Include="key.cpp" />
-<<<<<<< HEAD
     <ClCompile Include="queryoptimizercursor.cpp" />
-=======
     <ClCompile Include="btreebuilder.cpp" />
     <ClCompile Include="queryoptimizercursorimpl.cpp" />
->>>>>>> main_readonly/master
     <ClCompile Include="record.cpp" />
     <ClCompile Include="ops\update.cpp" />
     <ClCompile Include="security_common.cpp" />
@@ -169,7 +166,6 @@
     <ClCompile Include="..\util\md5.cpp" />
     <ClCompile Include="..\util\trace.cpp" />
     <ClCompile Include="interrupt_status_mongod.cpp" />
-<<<<<<< HEAD
     <ClCompile Include="commands\cloud.cpp">
       <Filter>x</Filter>
     </ClCompile>
@@ -347,9 +343,7 @@
     <ClCompile Include="repl\consensus.cpp">
       <Filter>z</Filter>
     </ClCompile>
-=======
     <ClCompile Include="explain.cpp" />
->>>>>>> main_readonly/master
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\distlock.h" />
@@ -481,7 +475,6 @@
     <ClInclude Include="..\util\trace.h" />
     <ClInclude Include="interrupt_status.h" />
     <ClInclude Include="interrupt_status_mongod.h" />
-<<<<<<< HEAD
     <ClInclude Include="..\util\concurrency\qlock.h" />
     <ClInclude Include="pipeline\accumulator.h">
       <Filter>x</Filter>
@@ -636,10 +629,8 @@
     <ClInclude Include="ops\delete.h">
       <Filter>z</Filter>
     </ClInclude>
-=======
     <ClInclude Include="queryoptimizercursorimpl.h" />
     <ClInclude Include="explain.h" />
->>>>>>> main_readonly/master
   </ItemGroup>
   <ItemGroup>
     <None Include="..\jstests\dur\dur1.js" />
