@@ -74,6 +74,9 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 		__wt_free(session, page->modify);
 	}
 
+#ifdef HAVE_DIAGNOSTIC
+	memset(page, WT_DEBUG_BYTE, sizeof(WT_PAGE));
+#endif
 	__wt_free(session, page);
 }
 

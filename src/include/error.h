@@ -6,6 +6,7 @@
  */
 
 #define	WT_DEBUG_POINT	((void *)0xdeadbeef)
+#define	WT_DEBUG_BYTE	(0xab)
 
 /* Return and branch-to-err-label cases for switch statements. */
 #define	WT_ILLEGAL_VALUE(session)					\
