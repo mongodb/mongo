@@ -1,0 +1,41 @@
+WiredTiger release 1.1.0, 2012-02-28
+------------------------------------
+
+Add checks to the session.truncate method to ensure the start/stop
+cursors reference the same object and have been initialized.
+
+Implement cursor duplication via WT_SESSION::open_cursor.  [#161]
+
+Switch to quiet builds by default.
+
+Fix with automake version < 1.11, use foreign mode so that fewer
+top-level files are required.
+
+If a session or connection method is about to return WT_NOTFOUND (some
+underlying object was not found), map it to ENOENT, only cursor methods
+return WT_NOTFOUND. [#163]
+
+Save and restore session->btree in schema ops to simplify calling code.
+[#164]
+
+Note the wiredtiger_open config string "multiprocess" is not yet
+supported.
+
+Move "root:F" and "version:F" entries for files into the value for
+"file:F", so there is only a single record per file.
+[NOTE: SCHEMA CHANGE]
+
+When parsing config strings, continue to the end of the string in case
+of repeated keys. [#124]
+
+Don't require shared libraries unless Python is configured.
+
+Add support for direct I/O, with the config "direct_io=(data,log)".
+Build with _GNU_SOURCE on Linux to enable O_DIRECT.
+
+Don't keep the last page of column stores pinned: it prevented eviction
+of large trees created from scratch.
+
+Allow application threads to evict pages from any tree: maintain a count
+of threads doing LRU in each tree and wait for activity to drain when
+closing.

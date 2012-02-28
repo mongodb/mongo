@@ -1,6 +1,6 @@
-WiredTiger 1.0.0: (February  9, 2012)
+WiredTiger 1.1.0: (February 28, 2012)
 
-This is version 1.0.0 of WiredTiger.
+This is version 1.1.0 of WiredTiger.
 
 See the file LICENSE for redistribution information.
 
@@ -10,8 +10,8 @@ To view release and installation documentation, open
 
 or docs/index.html in your web browser.
 
-To build in a POSIX environment (for example, Linux or other UNIX-like
-system), run:
+To build in a POSIX environment (for example, Linux or another
+UNIX-like system), run:
 
 	./configure && make
 
