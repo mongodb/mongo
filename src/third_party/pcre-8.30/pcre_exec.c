@@ -481,7 +481,7 @@ register unsigned int c;   /* Character values not kept over RMATCH() calls */
 register BOOL utf;         /* Local copy of UTF flag for speed */
 
 BOOL minimize, possessive; /* Quantifier options */
-BOOL caseless;
+BOOL caseless = 0;
 int condcode;
 
 /* When recursion is not being used, all "local" variables that have to be
