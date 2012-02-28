@@ -25,6 +25,10 @@
 
 namespace mongo {
 
+#if defined(_DEBUG) && (defined(_WIN64) || !defined(_WIN32))
+#define CHECK_SPOOLING 1
+#endif
+
     namespace dur {
         extern unsigned notesThisLock;
         void ThreadLocalIntents::push(const WriteIntent& x) { 
@@ -33,14 +37,18 @@ namespace mongo {
             if( n == 21 )
                 unspool();
             i[n++] = x;
-            DEV nSpooled++;
+#if( CHECK_SPOOLING )
+            nSpooled++;
+#endif
         }
         void ThreadLocalIntents::_unspool() {
             if( n ) { 
                 DEV notesThisLock += n;
                 for( int j = 0; j < n; j++ )
                     commitJob.note(i[j].start(), i[j].length());
-                DEV nSpooled.signedAdd(-n);
+#if( CHECK_SPOOLING )
+                nSpooled.signedAdd(-n);
+#endif
                 n = 0;
                 dassert( cmdLine.dur );
             }
@@ -59,7 +67,8 @@ namespace mongo {
     namespace dur {
 
         void assertNothingSpooled() { 
-            DEV if( ThreadLocalIntents::nSpooled != 0 ) {
+#if( CHECK_SPOOLING )
+            if( ThreadLocalIntents::nSpooled != 0 ) {
                 log() << ThreadLocalIntents::nSpooled.get() << endl;
                 if( tlIntents.get() )
                     log() << "me:" << tlIntents.get()->n_informational() << endl;
@@ -67,6 +76,7 @@ namespace mongo {
                     log() << "no tlIntent for my thread" << endl;
                 assert(false);
             }
+#endif
         }
         // when we release our w or W lock this is invoked
         void unspoolWriteIntents() { 

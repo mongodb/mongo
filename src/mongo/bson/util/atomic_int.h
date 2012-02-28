@@ -56,9 +56,12 @@ namespace mongo {
     AtomicUInt AtomicUInt::operator--(int) {
         return InterlockedDecrement((volatile long*)&x)+1;
     }
+# if defined(_WIN64)
+    // don't see an InterlockedAdd for _WIN32...hmmm
     void AtomicUInt::signedAdd(int by) {
         InterlockedAdd((volatile long *)&x,by);
     }
+# endif
 #elif defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
     // this is in GCC >= 4.1
     inline void AtomicUInt::zero() { x = 0; } // TODO: this isn't thread safe - maybe
