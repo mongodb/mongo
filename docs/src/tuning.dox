@@ -79,7 +79,7 @@ maximum page size.  This value should be selected to avoid creating a
 large number of tiny pages or repeatedly splitting whenever new entries
 are inserted.  For example, if the maximum page size is 1MB, a \c
 split_pct value of 10% would potentially result in creating a large
-number of 10KB pages, which may not be optimal for future I/O.   Or, if
+number of 100KB pages, which may not be optimal for future I/O.   Or, if
 the maximum page size is 1MB, a \c split_pct value of 90% would
 potentially result in repeatedly splitting pages as the split pages grow
 to 1MB over and over.  The default value for \c split_pct is 75%,
