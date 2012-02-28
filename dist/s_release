@@ -2,9 +2,11 @@
 # Build a WiredTiger release package.
 
 set -e
-RELEASE_DIR=../releases
 
 . ./RELEASE || exit 1
+
+RELEASE_DIR=`pwd`/../releases
+mkdir -p $RELEASE_DIR
 
 pkgver="$1"
 if test -z "$pkgver" ; then
@@ -13,12 +15,19 @@ fi
 PKG="wiredtiger-$pkgver"
 DEST="$RELEASE_DIR/$PKG"
 
-rm -rf "$DEST"
+rm -rf $DEST ; mkdir -p $DEST
+EXCLUSIONS=`sed -e '/^#/d' -e 's/^/--exclude /' < s_release.list`
 
-echo "Running 'hg archive' to copy the tree"
-hg archive \
-    `sed -e '/^#/d' -e 's/^/--exclude ..\//' < s_release.list` \
-    "$DEST"
+if [ -d ../.hg ] ; then
+	echo "Running 'hg archive' to copy the tree"
+	(cd .. && hg archive $EXCLUSIONS $DEST)
+elif [ -d ../.git ] ; then
+	echo "Running 'git archive' to copy the tree"
+	(cd .. && git archive HEAD) | (cd $DEST && tar xf - $EXCLUSIONS)
+else
+	echo "$0 must be run in a Git or Mercurial tree"
+	exit 1
+fi
 
 echo "Running 'dist/s_all' in the release tree"
 (cd "$DEST/dist" && env WT_RELEASE_BUILD=yes sh s_all -A > /dev/null)
