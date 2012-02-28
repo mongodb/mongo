@@ -71,6 +71,7 @@ __wt_block_read(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * necessary, there will only be one buffer.
 	 */
 	if (block->compressor == NULL) {
+		F_SET(buf, WT_ITEM_ALIGNED);
 		WT_RET(__wt_buf_init(session, buf, size));
 		buf->size = size;
 		dsk = buf->mem;
