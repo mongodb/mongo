@@ -68,7 +68,7 @@ check()
 	echo "$1: copyright information is incorrect"
 }
 
-l="`cd .. && \
+l=`cd .. && \
     echo LICENSE \
 	 COPYING \
 	 examples/c/*.c \
@@ -79,11 +79,9 @@ l="`cd .. && \
 	 lang/python/*pack*.py \
 	 src/include/*.[hi] \
 	 src/include/*.in \
-	 src/utilities/*.[ch] \
-	 test/format/*.[ch] \
-	 test/salvage/*.[ch] \
-	 test/suite/*.py \
-	 test/thread/*.[ch]`"
+	 src/utilities/*.[ch] && \
+    find test/format test/salvage test/suite test/thread \
+    	-name '*.[ch]' -o -name '*.py' -print`
 
 for i in $l `sed -e '/^[a-z]/! d' filelist`; do
 	check $i

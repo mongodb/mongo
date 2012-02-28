@@ -4,12 +4,13 @@
 t=__wt.$$
 trap 'rm -f $t; exit 0' 0 1 2 3 13 15
 
-inc=`cd .. && echo src/include/*.[hi] src/include/*.in test/*/*.[ch] dist/*.py dist/s_*`
-(
+inc=`cd .. && echo dist/*.py dist/s_* src/include/*.[hi] src/include/*.in &&
+	find test -name '*.[ch]' -print`
+
 for f in `sed -e '/^[a-z]/! d' filelist` $inc; do
 	f="../$f"
 	sed -e 's/[	 ][	 ]*$//' \
 	    -e '/^$/N' \
 	    -e '/\n$/D' < $f > $t
 	cmp $t $f > /dev/null 2>&1 || (echo "$f" && cp $t $f)
-done)
+done
