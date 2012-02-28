@@ -550,11 +550,15 @@ def run_old_fails():
     passed = []
     try:
         for (i, (test, options)) in enumerate(testsAndOptions):
-            set_globals(options)
-            oldWinners = len(winners)
-            run_tests([test])
-            if len(winners) != oldWinners: # can't use return value due to continue_on_failure
-                passed.append(i)
+            # SERVER-5102: until we can figure out a better way to manage
+            # dependencies of the --only-old-fails build phase, just skip
+            # tests which we can't safely run at this point
+            if test in ('test', 'test.exe') or test.endswith('.js'):
+                set_globals(options)
+                oldWinners = len(winners)
+                run_tests([test])
+                if len(winners) != oldWinners: # can't use return value due to continue_on_failure
+                    passed.append(i)
     finally:
         for offset, i in enumerate(passed):
             testsAndOptions.pop(i - offset)
