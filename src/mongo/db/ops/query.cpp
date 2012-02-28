@@ -681,7 +681,7 @@ namespace mongo {
             // we might be missing some data
             // and its safe to send this as mongos can resend
             // at this point
-            throw SendStaleConfigException( ns , "version changed during initial query" );
+            throw SendStaleConfigException( ns , "version changed during initial query", shardingVersionAtStart, shardingState.getVersion( ns ) );
         }
 
         long long nReturned = queryResponseBuilder.handoff( result );

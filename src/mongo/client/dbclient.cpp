@@ -574,8 +574,11 @@ namespace mongo {
 
         uassert( 10276 ,  str::stream() << "DBClientBase::findN: transport error: " << getServerAddress() << " ns: " << ns << " query: " << query.toString(), c.get() );
 
-        if ( c->hasResultFlag( ResultFlag_ShardConfigStale ) )
-            throw RecvStaleConfigException( ns , "findN stale config" );
+        if ( c->hasResultFlag( ResultFlag_ShardConfigStale ) ){
+            BSONObj error;
+            c->peekError( &error );
+            throw RecvStaleConfigException( "findN stale config", error );
+        }
 
         for( int i = 0; i < nToReturn; i++ ) {
             if ( !c->more() )

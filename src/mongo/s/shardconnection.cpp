@@ -226,7 +226,7 @@ namespace mongo {
         if ( ! ok ) {
             if ( res["code"].numberInt() == SendStaleConfigCode ) {
                 done();
-                throw RecvStaleConfigException( res["ns"].String() , res["errmsg"].String() );
+                throw RecvStaleConfigException( res["errmsg"].String(), res );
             }
         }
         return ok;

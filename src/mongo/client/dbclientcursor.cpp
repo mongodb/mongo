@@ -181,8 +181,7 @@ namespace mongo {
         if( qr->resultFlags() & ResultFlag_ShardConfigStale ) {
             BSONObj error;
             assert( peekError( &error ) );
-            throw RecvStaleConfigException( error["ns"].String(),
-                                            (string)"stale config on lazy receive" + causedBy( getErrField( error ) ) );
+            throw RecvStaleConfigException( (string)"stale config on lazy receive" + causedBy( getErrField( error ) ), error );
         }
 
         /* this assert would fire the way we currently work:

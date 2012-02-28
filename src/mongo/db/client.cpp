@@ -248,10 +248,12 @@ namespace mongo {
             break;
         default: {
             string errmsg;
-            if ( ! shardVersionOk( _ns , errmsg ) ) {
+            ShardChunkVersion received;
+            ShardChunkVersion wanted;
+            if ( ! shardVersionOk( _ns , errmsg, received, wanted ) ) {
                 ostringstream os;
                 os << "[" << _ns << "] shard version not ok in Client::Context: " << errmsg;
-                throw SendStaleConfigException( _ns, os.str() );
+                throw SendStaleConfigException( _ns, os.str(), received, wanted );
             }
         }
         }

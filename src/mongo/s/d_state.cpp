@@ -692,7 +692,7 @@ namespace mongo {
      * @ return true if not in sharded mode
                      or if version for this client is ok
      */
-    bool shardVersionOk( const string& ns , string& errmsg ) {
+    bool shardVersionOk( const string& ns , string& errmsg, ConfigVersion& received, ConfigVersion& wanted ) {
         if ( ! shardingState.enabled() )
             return true;
 
@@ -724,10 +724,13 @@ namespace mongo {
             return true;
         }
 
+        // The versions we're going to compare, saved for future use
+        received = clientVersion;
+        wanted = version;
 
         if ( version == 0 && clientVersion > 0 ) {
             stringstream ss;
-            ss << "collection was dropped or this shard no longer valid version: " << version << " clientVersion: " << clientVersion;
+            ss << "collection was dropped or this shard no longer valid version";
             errmsg = ss.str();
             return false;
         }
@@ -738,7 +741,7 @@ namespace mongo {
 
         if ( clientVersion == 0 ) {
             stringstream ss;
-            ss << "client in sharded mode, but doesn't have version set for this collection: " << ns << " myVersion: " << version;
+            ss << "client in sharded mode, but doesn't have version set for this collection";
             errmsg = ss.str();
             return false;
         }
@@ -751,7 +754,7 @@ namespace mongo {
         }
 
         stringstream ss;
-        ss << "your version is too old  ns: " + ns << " global: " << version << " client: " << clientVersion;
+        ss << "your version is too old";
         errmsg = ss.str();
         return false;
     }
