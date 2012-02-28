@@ -71,7 +71,9 @@ namespace mongo {
     void ReplSetImpl::assumePrimary() {
         LOG(2) << "replSet assuming primary" << endl;
         assert( iAmPotentiallyHot() );
-        writelock lk("admin."); // so we are synchronized with _logOp()
+        // so we are synchronized with _logOp().  perhaps locking local db only would suffice, but until proven 
+        // will take this route, and this is very rare so it doesn't matter anyway
+        Lock::GlobalWrite lk; 
 
         // Make sure that new OpTimes are higher than existing ones even with clock skew
         DBDirectClient c;
