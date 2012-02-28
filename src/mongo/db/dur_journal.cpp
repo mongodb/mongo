@@ -727,7 +727,7 @@ namespace mongo {
                 // must already be open -- so that _curFileId is correct for previous buffer building
                 assert( _curLogFile );
 
-                stats.curr->_uncompressedBytes += b.len();
+                stats.curr->_uncompressedBytes += uncompressed.len();
                 unsigned w = b.len();
                 _written += w;
                 assert( w <= L );
