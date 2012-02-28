@@ -29,12 +29,24 @@ mongod=${MONGOD-/usr/bin/mongod}
 MONGO_USER=mongod
 MONGO_GROUP=mongod
 
-. "$SYSCONFIG" || true
+if [ -f "$SYSCONFIG" ]; then
+    . "$SYSCONFIG"
+fi
+
+# Handle NUMA access to CPUs (SERVER-3574)
+# This verifies the existence of numactl as well as testing that the command works
+NUMACTL_ARGS="--interleave=all"
+if which numactl >/dev/null 2>/dev/null && numactl $NUMACTL_ARGS ls / >/dev/null 2>/dev/null
+then
+    NUMACTL="numactl $NUMACTL_ARGS"
+else
+    NUMACTL=""
+fi
 
 start()
 {
   echo -n $"Starting mongod: "
-  daemon --user "$MONGO_USER" $mongod $OPTIONS
+  daemon --user "$MONGO_USER" $NUMACTL $mongod $OPTIONS
   RETVAL=$?
   echo
   [ $RETVAL -eq 0 ] && touch /var/lock/subsys/mongod

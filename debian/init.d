@@ -64,6 +64,16 @@ if [ -f /etc/default/$NAME ] ; then
 	. /etc/default/$NAME
 fi
 
+# Handle NUMA access to CPUs (SERVER-3574)
+# This verifies the existence of numactl as well as testing that the command works
+NUMACTL_ARGS="--interleave=all"
+if which numactl >/dev/null 2>/dev/null && numactl $NUMACTL_ARGS ls / >/dev/null 2>/dev/null
+then
+    NUMACTL="numactl $NUMACTL_ARGS"
+else
+    NUMACTL=""
+fi
+
 if test ! -x $DAEMON; then
     echo "Could not find $DAEMON"
     exit 0
@@ -119,7 +129,7 @@ start_server() {
 # Start the process using the wrapper
             start-stop-daemon --background --start --quiet --pidfile $PIDFILE \
                         --make-pidfile --chuid $DAEMONUSER \
-                        --exec $DAEMON -- $DAEMON_OPTS
+                        --exec $NUMACTL $DAEMON -- $DAEMON_OPTS
             errcode=$?
 	return $errcode
 }
