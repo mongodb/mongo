@@ -300,8 +300,14 @@ namespace mongo {
             }
         }
 
-        if ( fileIndexExceedsQuota( ns, numFiles(), enforceQuota ) )
-            uasserted(12501, "quota exceeded");
+        if ( fileIndexExceedsQuota( ns, numFiles(), enforceQuota ) ) {
+            if ( cc().hasWrittenThisPass() ) {
+                warning() << "quota exceeded, but can't assert, probably going over quota for: " << ns << endl;
+            }
+            else {
+                uasserted(12501, "quota exceeded");
+            }
+        }
 
         // allocate files until we either get one big enough or hit maxSize
         for ( int i = 0; i < 8; i++ ) {
