@@ -112,8 +112,9 @@ them both to 0; an emulation function will be used. */
 /* #undef HAVE_TYPE_TRAITS_H */
 
 /* Define to 1 if you have the <unistd.h> header file. */
-// for mongodb build
-//#define HAVE_UNISTD_H 1
+#ifndef _WIN32
+#define HAVE_UNISTD_H 1
+#endif
 
 /* Define to 1 if the system has the type `unsigned long long'. */
 #define HAVE_UNSIGNED_LONG_LONG 1
