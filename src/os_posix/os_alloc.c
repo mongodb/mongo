@@ -126,7 +126,7 @@ __wt_realloc_aligned(WT_SESSION_IMPL *session,
 
 		p = *(void **)retp;
 
-		WT_ASSERT(session, p == NULL || bytes_allocated == 0);
+		WT_ASSERT(session, p == NULL || bytes_allocated != 0);
 
 		if (p == NULL && session != NULL && S2C(session)->stats != NULL)
 			WT_CSTAT_INCR(session, memalloc);

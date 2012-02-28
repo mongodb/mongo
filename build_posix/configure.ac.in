@@ -46,21 +46,6 @@ else
 	fi
 fi
 
-# Linux requires _GNU_SOURCE to be defined and buffers aligned to 512 byte
-# boundaries for O_DIRECT to work.
-BUFFER_ALIGNMENT=0
-if test "$ac_cv_func_posix_memalign" = "yes" ; then
-	case "`uname -s`" in
-	Linux)	AM_CFLAGS="$AM_CFLAGS -D_GNU_SOURCE"
-		BUFFER_ALIGNMENT=512
-		;;
-	esac
-fi
-AC_DEFINE_UNQUOTED(WT_BUFFER_ALIGNMENT_DEFAULT, $BUFFER_ALIGNMENT,
-	[Default alignment of bufffers used for I/O])
-
-AC_SUBST(AM_CFLAGS)
-
 AM_CONDITIONAL([DEBUG], [test "$wt_cv_enable_debug" = "yes"])
 
 # Python API
@@ -80,6 +65,21 @@ AC_CHECK_FUNCS([fcntl posix_memalign])
 AC_SYS_LARGEFILE
 
 AC_C_BIGENDIAN
+
+# Linux requires _GNU_SOURCE to be defined and buffers aligned to 512 byte
+# boundaries for O_DIRECT to work.
+BUFFER_ALIGNMENT=0
+if test "$ac_cv_func_posix_memalign" = "yes" ; then
+	case "`uname -s`" in
+	Linux)	AM_CFLAGS="$AM_CFLAGS -D_GNU_SOURCE"
+		BUFFER_ALIGNMENT=512
+		;;
+	esac
+fi
+AC_DEFINE_UNQUOTED(WT_BUFFER_ALIGNMENT_DEFAULT, $BUFFER_ALIGNMENT,
+	[Default alignment of bufffers used for I/O])
+
+AC_SUBST(AM_CFLAGS)
 
 # Is there a link to a BDB tree that we can use for test/format?
 AM_CONDITIONAL([HAVE_BDB], [test -d ../test/format && test -e db])
