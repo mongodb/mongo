@@ -445,7 +445,7 @@ namespace mongo {
             else {
                 writelock lk;
                 if ( dbHolder()._isLoaded( nsToDatabase( currentOp.getNS() ) , dbpath ) ) {
-                    Client::Context cx( currentOp.getNS() );
+                    Client::Context cx( currentOp.getNS(), dbpath, false );
                     profile(c , currentOp );
                 }
                 else {
