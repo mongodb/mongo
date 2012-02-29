@@ -49,6 +49,14 @@ namespace mongo {
         return false;
     }
 
+    void ProcessInfo::SystemInfo::collectSystemInfo() {
+
+    }
+
+    void ProcessInfo::getExtraInfo( BSONObjBuilder& info ) {
+        
+    }
+
     bool ProcessInfo::blockInMemory( char * start ) {
         assert(0);
         return true;
