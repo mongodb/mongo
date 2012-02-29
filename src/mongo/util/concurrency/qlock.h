@@ -46,12 +46,12 @@ namespace mongo {
         boost::mutex m;
         Z r,w,R,W;
         int greed;           // >0 if someone wants to acquire a write lock
-        int greedyWrites;
-        int stopped;         // greed stopped?
+        int greedyWrites;    // 0=no, 1=true
+        int greedSuspended;
         void _stop_greed();  // we are already inlock for these underscore methods
         void _lock_W();
     public:
-        QLock() : greedyWrites(1), greed(0), stopped(0) { }
+        QLock() : greedyWrites(1), greed(0), greedSuspended(0) { }
         void lock_r();
         void lock_w();
         void lock_R();
@@ -70,7 +70,7 @@ namespace mongo {
     };
 
     inline void QLock::_stop_greed() {
-        if( ++stopped == 1 ) // recursion on stop_greed/start_greed is ok
+        if( ++greedSuspended == 1 ) // recursion on stop_greed/start_greed is ok
             greedyWrites = 0;
     }
     inline void QLock::stop_greed() {
@@ -80,7 +80,7 @@ namespace mongo {
 
     inline void QLock::start_greed() { 
         boost::mutex::scoped_lock lk(m);
-        if( --stopped == 0 ) 
+        if( --greedSuspended == 0 ) 
             greedyWrites = 1;
     }
 
