@@ -330,6 +330,7 @@ DB.prototype.help = function() {
     print("\tdb.getProfilingStatus() - returns if profiling is on and slow threshold");
     print("\tdb.getReplicationInfo()");
     print("\tdb.getSiblingDB(name) get the db at the same server as this one");
+    print("\tdb.hostInfo() get details about the server's host"); 
     print("\tdb.isMaster() check replica primary status");
     print("\tdb.killOp(opid) kills the current operation in the db");
     print("\tdb.listCommands() lists all the db commands");
@@ -803,6 +804,10 @@ DB.prototype.serverBuildInfo = function(){
 
 DB.prototype.serverStatus = function(){
     return this._adminCommand( "serverStatus" );
+}
+
+DB.prototype.hostInfo = function(){
+    return this._adminCommand( "hostInfo" );
 }
 
 DB.prototype.serverCmdLineOpts = function(){
