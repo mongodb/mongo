@@ -645,22 +645,28 @@ namespace mongo {
     }
     
     void NamespaceDetailsTransient::clearForPrefix(const char *prefix) {
-        assertInWriteLock();
+        SimpleMutex::scoped_lock lk(_qcMutex);
         vector< string > found;
-        for( ouriter i = _nsdMap.begin(); i != _nsdMap.end(); ++i )
-            if ( strncmp( i->first.c_str(), prefix, strlen( prefix ) ) == 0 )
+        for( ouriter i = _nsdMap.begin(); i != _nsdMap.end(); ++i ) {
+            if ( strncmp( i->first.c_str(), prefix, strlen( prefix ) ) == 0 ) {
                 found.push_back( i->first );
+                Lock::assertWriteLocked(i->first);
+            }
+        }
         for( vector< string >::iterator i = found.begin(); i != found.end(); ++i ) {
             _nsdMap[ *i ].reset();
         }
     }
 
     void NamespaceDetailsTransient::eraseForPrefix(const char *prefix) {
-        assertInWriteLock();
+        SimpleMutex::scoped_lock lk(_qcMutex);
         vector< string > found;
-        for( ouriter i = _nsdMap.begin(); i != _nsdMap.end(); ++i )
-            if ( strncmp( i->first.c_str(), prefix, strlen( prefix ) ) == 0 )
+        for( ouriter i = _nsdMap.begin(); i != _nsdMap.end(); ++i ) {
+            if ( strncmp( i->first.c_str(), prefix, strlen( prefix ) ) == 0 ) {
                 found.push_back( i->first );
+                Lock::assertWriteLocked(i->first);
+            }
+        }
         for( vector< string >::iterator i = found.begin(); i != found.end(); ++i ) {
             _nsdMap.erase(*i);
         }

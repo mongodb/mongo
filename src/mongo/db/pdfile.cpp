@@ -2161,13 +2161,12 @@ namespace mongo {
 
     void dropDatabase(string db) {
         log(1) << "dropDatabase " << db << endl;
+        Lock::assertWriteLocked(db);
         Database *d = cc().database();
         assert( d );
         assert( d->name == db );
 
         BackgroundOperation::assertNoBgOpInProgForDb(d->name.c_str());
-
-        mongo::d.dbMutex.assertWriteLocked();
 
         // Not sure we need this here, so removed.  If we do, we need to move it down 
         // within other calls both (1) as they could be called from elsewhere and 
