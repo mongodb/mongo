@@ -37,7 +37,7 @@ namespace mongo {
             GlobalWrite(bool stopGreed = false); 
             ~GlobalWrite();
             void downgrade(); // W -> R
-            void upgrade();   // caution see notes
+            bool upgrade();   // caution see notes
         };
         struct GlobalRead : boost::noncopyable { // recursive is ok
             GlobalRead(); 

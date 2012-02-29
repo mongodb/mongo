@@ -652,8 +652,12 @@ namespace mongo {
                 // to be in W the entire time we were committing about (in particular for WRITETOJOURNAL() which takes time).
                 if( lgw ) { 
                     LOG(4) << "_groupCommit upgrade" << endl;
-                    lgw->upgrade();
-                    REMAPPRIVATEVIEW();
+                    if( lgw->upgrade() ) {
+                        REMAPPRIVATEVIEW();
+                    }
+                    else {
+                        log() << "info timeout on lock upgrade for REMAPPRIVATEVIEW" << endl;
+                    }
                 }
             }
             else {

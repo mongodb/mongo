@@ -346,11 +346,14 @@ namespace mongo {
         threadState() = 'R';
     }
     // you will deadlock if 2 threads doing this
-    void Lock::GlobalWrite::upgrade() { 
+    bool Lock::GlobalWrite::upgrade() { 
         assert( !recursive() );
         assert( threadState() == 'R' );
-        q.R_to_W();
-        threadState() = 'W';
+        if( q.R_to_W() ) {
+            threadState() = 'W';
+            return true;
+        }
+        return false;
     }
 
     Lock::GlobalRead::GlobalRead() {

@@ -113,7 +113,7 @@ namespace ThreadedTests {
                         Lock::TempRelease t;
                     }
                 }
-                else if( i % 7 == 2 ) {
+                else if( i == 2 ) {
                     Lock::GlobalWrite w;
                     ASSERT( d.dbMutex.isWriteLocked() );
                     ASSERT( Lock::isW() );
@@ -124,6 +124,14 @@ namespace ThreadedTests {
                         w.downgrade();
                         sleepmillis(0);
                         w.upgrade();
+                    }
+                }
+                else if( i % 7 == 2 ) {
+                    Lock::GlobalWrite w;
+                    ASSERT( d.dbMutex.isWriteLocked() );
+                    ASSERT( Lock::isW() );
+                    if( sometimes ) {
+                        Lock::TempRelease t;
                     }
                 }
                 else if( i % 7 == 3 ) {

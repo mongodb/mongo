@@ -72,7 +72,7 @@ namespace mongo {
         void start_greed();
         void stop_greed();
         void W_to_R();
-        void R_to_W(); // caution see notes below
+        bool R_to_W(); // caution see notes below
     };
 
     inline bool QLock::i_block(char me, char them) {
@@ -214,18 +214,25 @@ namespace mongo {
     // upgrade from R to W state.
     // there is no "upgradable" state so this is NOT a classic upgrade - 
     // if two threads try to do this you will deadlock.
-    inline void QLock::R_to_W() { 
+    inline bool QLock::R_to_W() { 
         boost::mutex::scoped_lock lk(m);
         assert( R.n > 0 && W.n == 0 );
         U.n++;
         R.n--;
         fassert( 0, U.n == 1 ); // for now we only allow one upgrade attempter
+        int pass = 0;
         while( W.n + R.n + w.n + r.n ) {
-            U.c.wait(m);
+            if( ++pass >= 3 ) {
+                R.n++;
+                U.n--;
+                return false;
+            }
+            U.c.timed_wait(m, boost::posix_time::milliseconds(300));
         }
         W.n++;
         U.n--;
         assert( R.n == 0 && W.n == 1 && U.n == 0 );
+        return true;
     }
 
     // "i will be writing. i will coordinate with no one. you better stop them all"
