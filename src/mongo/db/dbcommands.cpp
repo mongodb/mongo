@@ -333,6 +333,11 @@ namespace mongo {
         virtual LockType locktype() const { return WRITE; }
         CmdDropDatabase() : Command("dropDatabase") {}
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            // disallow dropping the config database
+            if ( cmdLine.configsvr && ( dbname == "config" ) ) {
+                errmsg = "Cannot drop 'config' database if mongod started with --configsvr";
+                return false;
+            }
             BSONElement e = cmdObj.firstElement();
             log() << "dropDatabase " << dbname << endl;
             int p = (int) e.number();
