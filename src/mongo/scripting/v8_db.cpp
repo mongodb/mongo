@@ -23,6 +23,7 @@
 #include "util/text.h"
 #include "../client/syncclusterconnection.h"
 #include "../s/d_logic.h"
+#include "../db/namespacestring.h"
 #include <iostream>
 
 using namespace std;
@@ -566,6 +567,10 @@ namespace mongo {
         for ( int i=0; i<args.Length(); i++ )
             assert( ! args[i]->IsUndefined() );
 
+        if ( !NamespaceString::validDBName( toSTLString( args[1] ))) {
+            return v8::ThrowException( v8::String::New( "invalid database name" ));
+        }
+        
         return v8::Undefined();
     }
 
