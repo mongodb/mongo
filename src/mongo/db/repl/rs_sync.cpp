@@ -487,6 +487,7 @@ namespace mongo {
                             replset::SyncTail tail("");
                             tail.syncApply(o);
                             _logOpObjRS(o);   // with repl sets we write the ops to our oplog too
+                            getDur().commitIfNeeded();
                         }
                         catch (DBException& e) {
                             sethbmsg(str::stream() << "syncTail: " << e.toString() << ", syncing: " << o);
