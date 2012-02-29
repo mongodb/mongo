@@ -37,7 +37,9 @@ namespace mongo {
         // only makes sense for commands where 1st parm is the collection.
         virtual string parseNs(const string& dbname, const BSONObj& cmdObj) const;
 
-        enum LockType { READ = -1 , NONE = 0 , WRITE = 1, GLOBAL = 2 };
+        // warning: isAuthorized uses the lockType() return values, and values are being passed 
+        // around as ints so be careful as it isn't really typesafe and will need cleanup later
+        enum LockType { READ = -1 , NONE = 0 , WRITE = 1 };
 
         const string name;
 
@@ -52,11 +54,16 @@ namespace mongo {
         virtual bool run(const string& db, BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool fromRepl = false ) = 0;
 
         /*
-           note: logTheTop() MUST be false if READ
+           note: logTheOp() MUST be false if READ
            if NONE, can't use Client::Context setup
                     use with caution
          */
         virtual LockType locktype() const = 0;
+
+        /** if true, lock globally instead of just the one database. by default only the one 
+            database will be locked. 
+        */
+        virtual bool lockGlobally() const { return false; }
 
         /* Return true if only the admin ns has privileges to run this command. */
         virtual bool adminOnly() const {

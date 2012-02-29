@@ -106,6 +106,7 @@ namespace mongo {
         return true;
     }
 
+    // SERVER-4328 todo review for concurrency
     class CmdEval : public Command {
     public:
         virtual bool slaveOk() const {

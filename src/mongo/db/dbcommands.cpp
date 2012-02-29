@@ -330,6 +330,11 @@ namespace mongo {
         virtual bool slaveOk() const {
             return false;
         }
+
+        // this is suboptimal but syncDataAndTruncateJournal is called from dropDatabase, and that 
+        // may need a global lock.
+        virtual bool lockGlobally() const { return true; }
+
         virtual LockType locktype() const { return WRITE; }
         CmdDropDatabase() : Command("dropDatabase") {}
         bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
@@ -1051,6 +1056,7 @@ namespace mongo {
         virtual bool adminOnly() const { return true; }
         virtual bool slaveOk() const { return false; }
         virtual LockType locktype() const { return WRITE; }
+        virtual bool lockGlobally() const { return true; }
 
         CmdCloseAllDatabases() : Command( "closeAllDatabases" ) {}
         bool run(const string& dbname , BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool /*fromRepl*/) {
@@ -1864,6 +1870,8 @@ namespace mongo {
 
         bool retval = false;
         if ( c->locktype() == Command::NONE ) {
+            assert( !c->lockGlobally() );
+
             // we also trust that this won't crash
             retval = true;
 
@@ -1884,13 +1892,16 @@ namespace mongo {
             // read lock
             assert( ! c->logTheOp() );
             string ns = c->parseNs(dbname, cmdObj);
+            scoped_ptr<Lock::GlobalRead> lk;
+            if( c->lockGlobally() )
+                lk.reset( new Lock::GlobalRead() );
             Client::ReadContext ctx( ns , dbpath, c->requiresAuth() ); // read locks
             client.curop()->ensureStarted();
             retval = _execCommand(c, dbname , cmdObj , queryOptions, result , fromRepl );
         }
         else {
             dassert( c->locktype() == Command::WRITE );
-            writelock lk;
+            writelock lk( c->lockGlobally() ? "" : dbname );
             client.curop()->ensureStarted();
             Client::Context ctx( dbname , dbpath , c->requiresAuth() );
             retval = _execCommand(c, dbname , cmdObj , queryOptions, result , fromRepl );

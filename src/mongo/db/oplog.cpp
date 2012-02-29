@@ -838,6 +838,7 @@ namespace mongo {
         return failedUpdate;
     }
 
+    // SERVER-4328 todo review for concurrency
     class ApplyOpsCmd : public Command {
     public:
         virtual bool slaveOk() const { return false; }

@@ -74,6 +74,8 @@ namespace mongo {
             ss << "S ";
         if( adminOnly() )
             ss << "A";
+        if( lockGlobally() ) 
+            ss << " lockGlobally ";
         ss << "</td>";
         ss << "<td>";
         if( helpStr != "no help defined" ) {

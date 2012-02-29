@@ -540,6 +540,7 @@ namespace mongo {
     } cmdclonecollection;
 
 
+    // SERVER-4328 todo review for concurrency
     thread_specific_ptr< DBClientConnection > authConn_;
     /* Usage:
      admindb.$cmd.findOne( { copydbgetnonce: 1, fromhost: <hostname> } );
@@ -603,6 +604,9 @@ namespace mongo {
             bool slaveOk = cmdObj["slaveOk"].trueValue();
             string fromhost = cmdObj.getStringField("fromhost");
             if ( fromhost.empty() ) {
+                // SERVER-4328 TODO local globally in this case?  or just lock the two databases, but need to lock them in a well-defined order perhaps, 
+                //                  and the d_concurrency code doesn't allow that yet.
+
                 /* copy from self */
                 stringstream ss;
                 ss << "localhost:" << cmdLine.port;

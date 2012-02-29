@@ -88,7 +88,8 @@ namespace mongo {
             return true;
         }
         virtual bool logTheOp() { return false; }
-        virtual LockType locktype() const { return GLOBAL; }
+        virtual bool lockGlobally() const { return true; }
+        virtual LockType locktype() const { return WRITE; }
         void help(stringstream&h) const { h << "resync (from scratch) an out of date replica slave.\nhttp://www.mongodb.org/display/DOCS/Master+Slave"; }
         CmdResync() : Command("resync") { }
         virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {

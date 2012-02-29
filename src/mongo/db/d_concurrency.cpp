@@ -625,12 +625,14 @@ namespace mongo {
     void MongoMutex::assertWriteLocked() const { 
         if( !isWriteLocked() ) { 
             lockState().dump();
+            dassert(false); // dassert will terminate buildbot
             msgasserted(0, "expected write lock");
         }
     }
     void MongoMutex::assertAtLeastReadLocked() const { 
         if( !atLeastReadLocked() ) { 
             lockState().dump();
+            dassert(false); // dassert will terminate buildbot
             msgasserted(0, "expected read lock");
         }
     }
