@@ -1,0 +1,19 @@
+/-- This test is run only when JIT support is available. It checks for a
+successful and an unsuccessful JIT compile and save and restore behaviour,
+and a couple of things that are different with JIT. --/
+
+/abc/S+I
+
+/ab(*COMMIT)/S+I
+
+/abc/S+I>testsavedregex
+
+<testsavedregex
+    abc
+
+/a*/SI
+
+/(?(R)a*(?1)|((?R))b)/S+
+    aaaabcde
+
+/-- End of testinput12 --/

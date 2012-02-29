@@ -120,6 +120,7 @@ namespace mongo {
         
         bool hasWrittenThisPass() const { return _hasWrittenThisPass; }
         void writeHappened() { _hasWrittenThisPass = true; }
+        void newTopLevelRequest() { _hasWrittenThisPass = false; }
         
         bool allowedToThrowPageFaultException() const;
 

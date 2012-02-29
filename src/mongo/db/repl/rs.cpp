@@ -108,17 +108,20 @@ namespace mongo {
         lock lk(this);
 
         Member *max = 0;
-
-        for (set<unsigned>::iterator it = _electableSet.begin(); it != _electableSet.end(); it++) {
+        set<unsigned>::iterator it = _electableSet.begin();
+        while ( it != _electableSet.end() ) {
             const Member *temp = findById(*it);
             if (!temp) {
                 log() << "couldn't find member: " << *it << endl;
-                _electableSet.erase(*it);
+                set<unsigned>::iterator it_delete = it;
+                it++;
+                _electableSet.erase(it_delete);
                 continue;
             }
             if (!max || max->config().priority < temp->config().priority) {
                 max = (Member*)temp;
             }
+            it++;
         }
 
         return max;

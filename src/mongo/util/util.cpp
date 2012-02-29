@@ -54,20 +54,24 @@ namespace mongo {
 
     boost::thread_specific_ptr<string> _threadName;
 
-    unsigned _setThreadName( const char * name ) {
+    long long _setThreadName( const char * name ) {
         if ( ! name ) name = "NONE";
 
-        static unsigned N = 0;
+        static long long N = 0;
 
         if ( strcmp( name , "conn" ) == 0 ) {
             string* x = _threadName.get();
             if ( x && mongoutils::str::startsWith( *x , "conn" ) ) {
-                int n = atoi( x->c_str() + 4 );
+#if defined(_WIN32)
+                long long n = _atoi64( x->c_str() + 4 );
+#else
+                long long n = atoll( x->c_str() + 4 );
+#endif
                 if ( n > 0 )
                     return n;
                 warning() << "unexpected thread name [" << *x << "] parsed to " << n << endl;
             }
-            unsigned n = ++N;
+            long long n = ++N;
             stringstream ss;
             ss << name << n;
             _threadName.reset( new string( ss.str() ) );
@@ -105,8 +109,8 @@ namespace mongo {
         }
     }
 
-    unsigned setThreadName(const char *name) {
-        unsigned n = _setThreadName( name );
+    long long setThreadName(const char *name) {
+        long long n = _setThreadName( name );
 #if !defined(_DEBUG)
         // naming might be expensive so don't do "conn*" over and over
         if( string("conn") == name )
@@ -118,7 +122,7 @@ namespace mongo {
 
 #else
 
-    unsigned setThreadName(const char * name ) {
+    long long setThreadName(const char * name ) {
         return _setThreadName( name );
     }
 

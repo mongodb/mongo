@@ -290,6 +290,43 @@ namespace mongo {
 
     } featuresCmd;
 
+    class HostInfoCmd : public Command {
+    public:
+        HostInfoCmd() : Command("hostInfo", true) {}
+        virtual bool slaveOk() const {
+            return true;
+        }
+
+        virtual LockType locktype() const { return NONE; }
+
+        virtual void help( stringstream& help ) const {
+            help << "returns information about the daemon's host";
+        }
+
+        bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            ProcessInfo p;
+            BSONObjBuilder bSys, bOs;
+
+            bSys.appendDate( "currentTime" , jsTime() );
+            bSys.append( "hostname" , prettyHostName() );
+            bSys.append( "cpuAddrSize", p.getAddrSize() );
+            bSys.append( "memSizeMB", static_cast <unsigned>( p.getMemSizeMB() ) );
+            bSys.append( "numCores", p.getNumCores() );
+            bSys.append( "cpuArch", p.getArch() );
+            bSys.append( "numaEnabled", p.hasNumaEnabled() );
+            bOs.append( "type", p.getOsType() );
+            bOs.append( "name", p.getOsName() );
+            bOs.append( "version", p.getOsVersion() );
+
+            result.append( StringData( "system" ), bSys.obj() );
+            result.append( StringData( "os" ), bOs.obj() );
+            p.appendSystemDetails( result );
+
+            return true;
+        }
+
+    } hostInfoCmd;
+
     class LogRotateCmd : public Command {
     public:
         LogRotateCmd() : Command( "logRotate" ) {}

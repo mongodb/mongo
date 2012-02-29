@@ -1,16 +1,13 @@
 // testing closealldatabases concurrency
 // this is also a test of recoverFromYield() as that will get exercised by the update
 
-function f() {
-    var variant = (new Date()) % 4;
+function f(variant, quickCommits, paranoid) {
     var path = "/data/db/closeall";
     var path2 = "/data/db/closeall_slave";
     var ourdb = "closealltest";
 
     print("closeall.js start mongod variant:" + variant);
-    var R = (new Date()-0)%2;
-    var QuickCommits = (new Date()-0)%3 == 0;
-    var options = R==0 ? 8 : 0; // 8 is DurParanoid
+    var options = (paranoid==1 ? 8 : 0); // 8 is DurParanoid
     print("closeall.js --durOptions " + options);
     var N = 1000;
     if (options) 
@@ -25,7 +22,7 @@ function f() {
     // we'll use two connections to make a little parallelism
     var db1 = conn.getDB(ourdb);
     var db2 = new Mongo(db1.getMongo().host).getDB(ourdb);
-    if( QuickCommits ) {
+    if( quickCommits ) {
         print("closeall.js QuickCommits variant (using a small syncdelay)");
         assert( db2.adminCommand({setParameter:1, syncdelay:5}).ok );
     }
@@ -92,6 +89,12 @@ function f() {
     stopMongod(30001);
 }
 
-f();
-sleep(500);
+for (var variant=0; variant < 4; variant++){
+    for (var quickCommits=0; quickCommits <= 1; quickCommits++){ // false then true
+        for (var paranoid=0; paranoid <= 1; paranoid++){ // false then true
+            f(variant, quickCommits, paranoid);
+            sleep(500);
+        }
+    }
+}
 print("SUCCESS closeall.js");

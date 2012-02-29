@@ -272,7 +272,7 @@ env = Environment( BUILD_DIR=variantDir,
                    tools=["default", "gch", "jsheader", "mergelib" ],
                    PYSYSPLATFORM=os.sys.platform,
 
-                   PCRE_VERSION='7.4',
+                   PCRE_VERSION='8.30',
                    )
 
 

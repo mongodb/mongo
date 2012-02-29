@@ -47,4 +47,8 @@ namespace mongo {
         pidFileWiper.write( path );
     }
 
+#if !defined(_WIN32)
+    // static system data
+    ProcessInfo::SystemInfo ProcessInfo::_sysInfo;
+#endif
 }

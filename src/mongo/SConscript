@@ -150,6 +150,9 @@ coreServerFiles = [ "util/version.cpp",
                     "scripting/bench.cpp",
                     ] + env['MONGO_SCRIPTING_FILES']
 
+if "win32" == os.sys.platform:
+    coreServerFiles.append( "util/ntservice.cpp" )
+
 clientFiles = commonFiles + [
     'client/clientAndShell.cpp',
     'client/clientOnly.cpp',
@@ -325,8 +328,6 @@ modules = []
 moduleNames = []
 
 mongodOnlyFiles = [ "db/db.cpp", "db/compact.cpp" ]
-if "win32" == os.sys.platform:
-    mongodOnlyFiles.append( "util/ntservice.cpp" )
 
 # ----- TARGETS ------
 

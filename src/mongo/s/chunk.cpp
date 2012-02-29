@@ -431,9 +431,9 @@ namespace mongo {
             return true;
 
         }
-        catch ( std::exception& e ) {
+        catch ( DBException& e ) {
             // if the collection lock is taken (e.g. we're migrating), it is fine for the split to fail.
-            warning() << "could have autosplit on collection: " << _manager->getns() << " but: " << e.what() << endl;
+            warning() << "could not autosplit collection " << _manager->getns() << causedBy( e ) << endl;
             return false;
         }
     }
@@ -524,8 +524,8 @@ namespace mongo {
             conn->update( chunkMetadataNS , BSON( "_id" << genID() ) , BSON( "$set" << BSON( "jumbo" << true ) ) );
             conn.done();
         }
-        catch ( std::exception& ) {
-            warning() << "couldn't set jumbo for chunk: " << genID() << endl;
+        catch ( DBException& e ) {
+            warning() << "couldn't set jumbo for chunk: " << genID() << causedBy( e ) << endl;
         }
     }
 

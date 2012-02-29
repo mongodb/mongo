@@ -1,0 +1,158 @@
+.TH PCRE 3
+.SH NAME
+PCRE - Perl-compatible regular expressions
+.SH INTRODUCTION
+.rs
+.sp
+The PCRE library is a set of functions that implement regular expression
+pattern matching using the same syntax and semantics as Perl, with just a few
+differences. Some features that appeared in Python and PCRE before they
+appeared in Perl are also available using the Python syntax, there is some
+support for one or two .NET and Oniguruma syntax items, and there is an option
+for requesting some minor changes that give better JavaScript compatibility.
+.P
+Starting with release 8.30, it is possible to compile two separate PCRE
+libraries: the original, which supports 8-bit character strings (including
+UTF-8 strings), and a second library that supports 16-bit character strings
+(including UTF-16 strings). The build process allows either one or both to be
+built. The majority of the work to make this possible was done by Zoltan
+Herczeg.
+.P
+The two libraries contain identical sets of functions, except that the names in
+the 16-bit library start with \fBpcre16_\fP instead of \fBpcre_\fP. To avoid
+over-complication and reduce the documentation maintenance load, most of the
+documentation describes the 8-bit library, with the differences for the 16-bit
+library described separately in the
+.\" HREF
+\fBpcre16\fP
+.\"
+page. References to functions or structures of the form \fIpcre[16]_xxx\fP
+should be read as meaning "\fIpcre_xxx\fP when using the 8-bit library and
+\fIpcre16_xxx\fP when using the 16-bit library".
+.P
+The current implementation of PCRE corresponds approximately with Perl 5.12,
+including support for UTF-8/16 encoded strings and Unicode general category
+properties. However, UTF-8/16 and Unicode support has to be explicitly enabled;
+it is not the default. The Unicode tables correspond to Unicode release 6.0.0.
+.P
+In addition to the Perl-compatible matching function, PCRE contains an
+alternative function that matches the same compiled patterns in a different
+way. In certain circumstances, the alternative function has some advantages.
+For a discussion of the two matching algorithms, see the
+.\" HREF
+\fBpcrematching\fP
+.\"
+page.
+.P
+PCRE is written in C and released as a C library. A number of people have
+written wrappers and interfaces of various kinds. In particular, Google Inc.
+have provided a comprehensive C++ wrapper for the 8-bit library. This is now
+included as part of the PCRE distribution. The
+.\" HREF
+\fBpcrecpp\fP
+.\"
+page has details of this interface. Other people's contributions can be found
+in the \fIContrib\fP directory at the primary FTP site, which is:
+.sp
+.\" HTML <a href="ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre">
+.\" </a>
+ftp://ftp.csx.cam.ac.uk/pub/software/programming/pcre
+.P
+Details of exactly which Perl regular expression features are and are not
+supported by PCRE are given in separate documents. See the
+.\" HREF
+\fBpcrepattern\fP
+.\"
+and
+.\" HREF
+\fBpcrecompat\fP
+.\"
+pages. There is a syntax summary in the
+.\" HREF
+\fBpcresyntax\fP
+.\"
+page.
+.P
+Some features of PCRE can be included, excluded, or changed when the library is
+built. The
+.\" HREF
+\fBpcre_config()\fP
+.\"
+function makes it possible for a client to discover which features are
+available. The features themselves are described in the
+.\" HREF
+\fBpcrebuild\fP
+.\"
+page. Documentation about building PCRE for various operating systems can be
+found in the \fBREADME\fP and \fBNON-UNIX-USE\fP files in the source
+distribution.
+.P
+The libraries contains a number of undocumented internal functions and data
+tables that are used by more than one of the exported external functions, but
+which are not intended for use by external callers. Their names all begin with
+"_pcre_" or "_pcre16_", which hopefully will not provoke any name clashes. In
+some environments, it is possible to control which external symbols are
+exported when a shared library is built, and in these cases the undocumented
+symbols are not exported.
+.
+.
+.SH "USER DOCUMENTATION"
+.rs
+.sp
+The user documentation for PCRE comprises a number of different sections. In
+the "man" format, each of these is a separate "man page". In the HTML format,
+each is a separate page, linked from the index page. In the plain text format,
+all the sections, except the \fBpcredemo\fP section, are concatenated, for ease
+of searching. The sections are as follows:
+.sp
+  pcre              this document
+  pcre16            details of the 16-bit library
+  pcre-config       show PCRE installation configuration information
+  pcreapi           details of PCRE's native C API
+  pcrebuild         options for building PCRE
+  pcrecallout       details of the callout feature
+  pcrecompat        discussion of Perl compatibility
+  pcrecpp           details of the C++ wrapper for the 8-bit library
+  pcredemo          a demonstration C program that uses PCRE
+  pcregrep          description of the \fBpcregrep\fP command (8-bit only)
+  pcrejit           discussion of the just-in-time optimization support
+  pcrelimits        details of size and other limits
+  pcrematching      discussion of the two matching algorithms
+  pcrepartial       details of the partial matching facility
+.\" JOIN
+  pcrepattern       syntax and semantics of supported
+                      regular expressions
+  pcreperform       discussion of performance issues
+  pcreposix         the POSIX-compatible C API for the 8-bit library
+  pcreprecompile    details of saving and re-using precompiled patterns
+  pcresample        discussion of the pcredemo program
+  pcrestack         discussion of stack usage
+  pcresyntax        quick syntax reference
+  pcretest          description of the \fBpcretest\fP testing command
+  pcreunicode       discussion of Unicode and UTF-8/16 support
+.sp
+In addition, in the "man" and HTML formats, there is a short page for each
+8-bit C library function, listing its arguments and results.
+.
+.
+.SH AUTHOR
+.rs
+.sp
+.nf
+Philip Hazel
+University Computing Service
+Cambridge CB2 3QH, England.
+.fi
+.P
+Putting an actual email address here seems to have been a spam magnet, so I've
+taken it away. If you want to email me, use my two initials, followed by the
+two digits 10, at the domain cam.ac.uk.
+.
+.
+.SH REVISION
+.rs
+.sp
+.nf
+Last updated: 10 January 2012
+Copyright (c) 1997-2012 University of Cambridge.
+.fi

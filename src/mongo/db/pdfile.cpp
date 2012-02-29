@@ -2403,6 +2403,7 @@ namespace mongo {
     bool DatabaseHolder::closeAll( const string& path , BSONObjBuilder& result , bool force ) {
         log() << "DatabaseHolder::closeAll path:" << path << endl;
         d.dbMutex.assertWriteLocked();
+        getDur().commitNow(); // bad things happen if we close a DB with outstanding writes
 
         map<string,Database*>& m = _paths[path];
         _size -= m.size();

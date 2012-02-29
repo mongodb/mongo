@@ -1,0 +1,59 @@
+/-- Tests for reloading pre-compile patterns with UTF-16 support. */
+
+/-- Generated from: (?P<cbra1>[aZ\x{400}-\x{10ffff}]{4,}[\x{f123}\x{10039}\x{20000}-\x{21234}]?|[A-Cx-z\x{100000}-\x{1000a7}\x{101234}])(?<cb2>[^az]) --/8
+
+<!testsaved16LE-2
+Compiled pattern loaded from testsaved16LE-2
+Study data loaded from testsaved16LE-2
+------------------------------------------------------------------
+  0 101 Bra
+  2  45 CBra 1
+  5     [Za\x{400}-\x{10ffff}]{4,}
+ 32     [\x{f123}\x{10039}\x{20000}-\x{21234}]?
+ 47  30 Alt
+ 49     [A-Cx-z\x{100000}-\x{1000a7}\x{101234}]
+ 77  75 Ket
+ 79  20 CBra 2
+ 82     [\x00-`b-y{-\xff] (neg)
+ 99  20 Ket
+101 101 Ket
+103     End
+------------------------------------------------------------------
+Capturing subpattern count = 2
+Named capturing subpatterns:
+  cb2     2
+  cbra1   1
+Options: utf
+No first char
+No need char
+Subject length lower bound = 2
+No set of starting bytes
+
+<!testsaved16BE-2
+Compiled pattern loaded from testsaved16BE-2
+Study data loaded from testsaved16BE-2
+------------------------------------------------------------------
+  0 101 Bra
+  2  45 CBra 1
+  5     [Za\x{400}-\x{10ffff}]{4,}
+ 32     [\x{f123}\x{10039}\x{20000}-\x{21234}]?
+ 47  30 Alt
+ 49     [A-Cx-z\x{100000}-\x{1000a7}\x{101234}]
+ 77  75 Ket
+ 79  20 CBra 2
+ 82     [\x00-`b-y{-\xff] (neg)
+ 99  20 Ket
+101 101 Ket
+103     End
+------------------------------------------------------------------
+Capturing subpattern count = 2
+Named capturing subpatterns:
+  cb2     2
+  cbra1   1
+Options: utf
+No first char
+No need char
+Subject length lower bound = 2
+No set of starting bytes
+
+/-- End of testinput22 --/

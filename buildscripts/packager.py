@@ -686,7 +686,8 @@ binary-arch: build install
 #\tdh_installinfo
 \tdh_installman
 \tdh_link
-\tdh_strip
+# Appears to be broken on Ubuntu 11.10...?
+#\tdh_strip
 \tdh_compress
 \tdh_fixperms
 \tdh_installdeb

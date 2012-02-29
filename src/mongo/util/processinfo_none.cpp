@@ -41,10 +41,20 @@ namespace mongo {
         return -1;
     }
 
-    void ProcessInfo::getExtraInfo(BSONObjBuilder& info) {}
+    bool ProcessInfo::checkNumaEnabled() { 
+        return false;
+    }
 
     bool ProcessInfo::blockCheckSupported() {
         return false;
+    }
+
+    void ProcessInfo::SystemInfo::collectSystemInfo() {
+
+    }
+
+    void ProcessInfo::getExtraInfo( BSONObjBuilder& info ) {
+        
     }
 
     bool ProcessInfo::blockInMemory( char * start ) {
