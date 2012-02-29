@@ -331,13 +331,18 @@ namespace mongo {
         globalOpCounters.gotOp( op , isCommand );
 
         Client& c = cc();
-
+        
+        
         auto_ptr<CurOp> nestedOp;
         CurOp* currentOpP = c.curop();
         if ( currentOpP->active() ) {
             nestedOp.reset( new CurOp( &c , currentOpP ) );
             currentOpP = nestedOp.get();
         }
+        else {
+            c.newTopLevelRequest();
+        }
+
         CurOp& currentOp = *currentOpP;
         currentOp.reset(remote,op);
 
