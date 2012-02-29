@@ -66,6 +66,7 @@ namespace ThreadedTests {
     };
 
     const int nthr=135;
+    //const int nthr=7;
     class MongoMutexTest : public ThreadedTest<nthr> {
 #if defined(_DEBUG)
         enum { N = 5000 };
@@ -118,6 +119,11 @@ namespace ThreadedTests {
                     ASSERT( Lock::isW() );
                     if( sometimes ) {
                         Lock::TempRelease t;
+                    }
+                    if( sometimes ) { 
+                        w.downgrade();
+                        sleepmillis(0);
+                        w.upgrade();
                     }
                 }
                 else if( i % 7 == 3 ) {

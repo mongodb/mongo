@@ -44,12 +44,18 @@ namespace mongo {
             int n;
         };
         boost::mutex m;
-        Z r,w,R,W;
+        Z r,w,R,W,U;
         int greed;           // >0 if someone wants to acquire a write lock
         int greedyWrites;    // 0=no, 1=true
         int greedSuspended;
         void _stop_greed();  // we are already inlock for these underscore methods
         void _lock_W();
+        bool W_legal() const { return r.n + w.n + R.n + W.n == 0; }
+        bool R_legal() const { return       w.n +     + W.n == 0; }
+        bool w_legal() const { return             R.n + W.n == 0; }
+        bool r_legal() const { return                   W.n == 0; }
+        void notifyWeUnlocked(char me);
+        static bool i_block(char me, char them);
     public:
         QLock() : greedyWrites(1), greed(0), greedSuspended(0) { }
         void lock_r();
@@ -68,6 +74,42 @@ namespace mongo {
         void W_to_R();
         void R_to_W(); // caution see notes below
     };
+
+    inline bool QLock::i_block(char me, char them) {
+        switch( me ) {
+        case 'W' : return true;
+        case 'R' : return them == 'W' || them == 'w';
+        case 'w' : return them == 'W' || them == 'R';
+        case 'r' : return them == 'W';
+        default  : assert(false);
+        }
+        return false;
+    }
+
+    inline void QLock::notifyWeUnlocked(char me) {
+        assert( W.n == 0 );
+        if( U.n ) {
+            // U is highest priority
+            if( W_legal() )
+                U.c.notify_one();
+            return;
+        }
+        if( W_legal() /*&& i_block(me,'W')*/ ) {
+            int g = greed;
+            W.c.notify_one();
+            if( g ) // g>0 indicates someone was definitely waiting for W, so we can stop here
+                return;
+        }
+        if( R_legal() && i_block(me,'R') ) {
+            R.c.notify_all();
+        }
+        if( w_legal() && i_block(me,'w') ) { 
+            w.c.notify_all();
+        }
+        if( r_legal() && i_block(me,'r') ) { 
+            r.c.notify_all();
+        }
+    }
 
     inline void QLock::_stop_greed() {
         if( ++greedSuspended == 1 ) // recursion on stop_greed/start_greed is ok
@@ -145,9 +187,10 @@ namespace mongo {
                 // timed out
                 dassert( greed > 0 );
                 greed -= g;
-                // we do notify_one on W.c so we should be careful not to leave someone 
-                // else waiting when we give up here perhaps
-                W.c.notify_one();
+                // should we do notify_one on W.c so we should be careful not to leave someone 
+                // else waiting when we give up here perhaps. it is very possible this code
+                // is unnecessary:
+                //   W.c.notify_one();
                 return false;
             }
         }
@@ -160,19 +203,12 @@ namespace mongo {
     // downgrade from W state to R state
     inline void QLock::W_to_R() { 
         boost::mutex::scoped_lock lk(m);
+        assert( U.n == 0 );
         assert( W.n == 1 );
         assert( R.n == 0 );
         W.n = 0;
         R.n = 1;
-        if( greed ) {
-            // writers await (greedily) but our R state stops them,
-            // so no need to notify anyone
-        }
-        else {
-            // no need to W.c.notify, you can't do W while R state is engaged
-            R.c.notify_all();
-            r.c.notify_all();
-        }
+        notifyWeUnlocked('W');
     }
 
     // upgrade from R to W state.
@@ -181,15 +217,15 @@ namespace mongo {
     inline void QLock::R_to_W() { 
         boost::mutex::scoped_lock lk(m);
         assert( R.n > 0 && W.n == 0 );
-        int g = greedyWrites;
-        greed += g;
-        while( W.n + R.n + w.n + r.n > 1 ) {
-            W.c.wait(m);
+        U.n++;
+        R.n--;
+        fassert( 0, U.n == 1 ); // for now we only allow one upgrade attempter
+        while( W.n + R.n + w.n + r.n ) {
+            U.c.wait(m);
         }
         W.n++;
-        R.n--;
-        greed -= g;
-        assert( R.n == 0 && W.n == 1 );
+        U.n--;
+        assert( R.n == 0 && W.n == 1 && U.n == 0 );
     }
 
     // "i will be writing. i will coordinate with no one. you better stop them all"
@@ -215,45 +251,26 @@ namespace mongo {
     inline void QLock::unlock_r() {
         boost::mutex::scoped_lock lk(m);
         fassert(0, r.n > 0);
-        r.n--;
-        // we may need to notify here even if R.n != 0 as the R thread could be 
-        // attempting R_to_W, and it leaves R.n set while it waits. (It does that 
-        // so that no writers can interleave in.)
-        if( w.n + r.n == 0 )
-            W.c.notify_one(); // only thing we would have blocked would be a W or a R_to_W
+        if( --r.n == 0 )
+            notifyWeUnlocked('r');
     }
     inline void QLock::unlock_w() {
         boost::mutex::scoped_lock lk(m);
         fassert(0, w.n > 0);
-        w.n--;
-        if( w.n == 0 ) {
-            W.c.notify_one();
-            R.c.notify_all();
-        }
+        if( --w.n == 0 )
+            notifyWeUnlocked('w');
     }
     inline void QLock::unlock_R() {
         boost::mutex::scoped_lock lk(m);
         fassert(0, R.n > 0);
-        R.n--;
-        if( R.n == 0 ) {
-            W.c.notify_one();
-            w.c.notify_all();
-        }
+        if( --R.n == 0 )
+            notifyWeUnlocked('R');
     }    
     inline void QLock::unlock_W() {
         boost::mutex::scoped_lock lk(m);
+        fassert(0, W.n == 1);
         W.n--;
-        dassert( W.n == 0 );
-        int writersWereQueued = greed;
-        W.c.notify_one();
-        if( writersWereQueued ) {
-            // someone else would like to write, no need to notify further
-        }
-        else {
-            R.c.notify_all();
-            w.c.notify_all();
-            r.c.notify_all();
-        }
+        notifyWeUnlocked('W');
     }
 
 }
