@@ -479,7 +479,15 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	WT_CONNECTION_IMPL *conn;
 	uint32_t elem, i;
-	int ret, was_evicting;
+
+	/*
+	 * Make sure there is space to track exclusive access so we can unlock
+	 * to clean up.
+	 */
+	if (session->excl_next * sizeof(WT_REF *) == session->excl_allocated)
+		WT_RET(__wt_realloc(session, &session->excl_allocated,
+		    (session->excl_next + 50) * sizeof(WT_REF *),
+		    &session->excl));
 
 	/*
 	 * Hazard references are acquired down the tree, which means we can't
@@ -496,11 +504,11 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * to force out.  Without this, application threads can starve eviction
 	 * and heap usage grows without bounds.
 	 */
-	was_evicting = 0;
-	if (WT_ATOMIC_CAS(ref->state, WT_REF_EVICTING, WT_REF_LOCKED))
-		was_evicting = 1;
-	else if (!WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED))
+	if (!WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED) &&
+	    !WT_ATOMIC_CAS(ref->state, WT_REF_EVICTING, WT_REF_LOCKED))
 		return (EBUSY);	/* We couldn't change the state. */
+
+	session->excl[session->excl_next++] = ref;
 
 	/* Walk the list of hazard references to search for a match. */
 	conn = S2C(session);
@@ -512,19 +520,8 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
 
 			WT_VERBOSE(session,
 			    evict, "page %p hazard request failed", ref->page);
-			WT_ERR(EBUSY);
+			return (EBUSY);
 		}
 
-	/* We have exclusive access, track that so we can unlock to clean up. */
-	if (session->excl_next * sizeof(WT_REF *) == session->excl_allocated)
-		WT_ERR(__wt_realloc(session, &session->excl_allocated,
-		    (session->excl_next + 50) * sizeof(WT_REF *),
-		    &session->excl));
-	session->excl[session->excl_next++] = ref;
-
 	return (0);
-
-	/* Restore to the original state on error. */
-err:	ref->state = (was_evicting ? WT_REF_EVICTING : WT_REF_MEM);
-	return (ret);
 }

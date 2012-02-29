@@ -364,7 +364,24 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 
 			WT_VERBOSE(session, evictserver,
 			    "forcing eviction of page %p", er->page);
-			ret = __wt_rec_evict(session, er->page, 0);
+
+			/*
+			 * At this point, the page is marked with
+			 * WT_REF_EVICTING, which stalls new readers.  Take a
+			 * brief pause before attempting to evict it to give
+			 * existing readers a chance to drop their references.
+			 */
+			__wt_yield();
+
+			/*
+			 * If eviction fails, free up the page and hope it
+			 * works next time.  Application threads may be holding
+			 * a reference while trying to get another (e.g., if
+			 * they have two cursors open), so blocking
+			 * indefinitely leads to deadlock.
+			 */
+			if ((ret = __wt_rec_evict(session, er->page, 0)) != 0)
+				er->page->ref->state = WT_REF_MEM;
 		} else {
 			/*
 			 * If we're about to do a walk of the file tree (and
@@ -391,11 +408,7 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 		if (!F_ISSET(er, WT_EVICT_REQ_PAGE))
 			__wt_session_serialize_wrapup(
 			    request_session, NULL, ret);
-		else if (ret == EBUSY) {
-			/* Don't rest until this request is handled. */
-			__wt_cond_signal(session, cache->evict_cond);
-			continue;
-		}
+
 		__evict_req_clr(session, er);
 	}
 	return (0);
