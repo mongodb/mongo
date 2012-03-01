@@ -1,4 +1,4 @@
-// @file queryoptimizercursor.h
+// @file queryoptimizercursor.h - Interface for a cursor interleaving multiple candidate cursors.
 
 /**
  *    Copyright (C) 2011 10gen Inc.
@@ -82,8 +82,14 @@ namespace mongo {
     class FieldRangeSet;
     class ExplainQueryInfo;
     
+    /**
+     * Adds functionality to Cursor for running multiple plans, running out of order plans,
+     * utilizing covered indexes, and generating explain output.
+     */
     class QueryOptimizerCursor : public Cursor {
     public:
+        
+        /** Summarizes the candidate plans that may run for a query. */
         class CandidatePlans {
         public:
             CandidatePlans( bool mayRunInOrderPlan, bool mayRunOutOfOrderPlan ) :
@@ -102,22 +108,38 @@ namespace mongo {
             bool _mayRunInOrderPlan;
             bool _mayRunOutOfOrderPlan;
         };
+        /** Candidate plans for the query before it begins running. */
         virtual CandidatePlans initialCandidatePlans() const = 0;
+        /** FieldRangeSet for the query before it begins running. */
         virtual const FieldRangeSet *initialFieldRangeSet() const = 0;
 
+        /** @return true if the plan for the current iterate is out of order. */
         virtual bool currentPlanScanAndOrderRequired() const = 0;
+        /** @return the covered index projector for the current iterate (may be 0). */
         virtual const Projection::KeyOnly *keyFieldsOnly() const = 0;
 
+        /** @return true when there may be multiple plans running and some are in order. */
         virtual bool runningInitialInOrderPlan() const = 0;
+        /**
+         * @return true when a cached plan is running, but it has not been selected for the
+         * remainder of the query.
+         */
         virtual bool runningInitialCachedPlan() const = 0;
 
+        /**
+         * @return true when both in order and out of order candidate plans were available, and
+         * an out of order candidate plan completed iteration.
+         */
         virtual bool completePlanOfHybridSetScanAndOrderRequired() const = 0;
 
+        /** Clear recorded indexes for the current clause's query patterns. */
         virtual void clearIndexesForPatterns() = 0;
         /** Stop returning results from out of order plans and do not allow them to complete. */
         virtual void abortOutOfOrderPlans() = 0;
 
+        /** Note match information for the current iterate, to generate explain output. */
         virtual void noteIterate( bool match, bool loadedDocument, bool chunkSkip ) = 0;
+        /** @return explain output for the query run by this cursor. */
         virtual shared_ptr<ExplainQueryInfo> explainQueryInfo() const = 0;
     };
     

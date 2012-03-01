@@ -25,8 +25,10 @@ namespace mongo {
     
     extern const int MaxBytesToReturnToClientAtOnce;
 
+    /** Helper class for deduping DiskLocs */
     class DiskLocDupSet {
     public:
+        /** @return true if dup, otherwise return false and insert. */
         bool getsetdup( const DiskLoc &loc ) {
             pair<set<DiskLoc>::iterator, bool> p = _dups.insert(loc);
             return !p.second;

@@ -1,4 +1,4 @@
-// @file queryoptimizercursorimpl.cpp
+// @file queryoptimizercursorimpl.cpp - A cursor interleaving multiple candidate cursors.
 
 /**
  *    Copyright (C) 2011 10gen Inc.

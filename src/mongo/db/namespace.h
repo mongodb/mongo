@@ -442,30 +442,39 @@ namespace mongo {
         static void eraseForPrefix(const char *prefix);
 
         /**
-         * @return a cursor interface to the query optimizer.  The implementation may
-         * utilize a single query plan or interleave results from multiple query
-         * plans before settling on a single query plan.  Note that the schema of
-         * currKey() documents, the matcher(), and the isMultiKey() nature of the
-         * cursor may change over the course of iteration.
+         * @return a cursor interface to the query optimizer.  The implementation may utilize a
+         * single query plan or interleave results from multiple query plans before settling on a
+         * single query plan.  Note that the schema of currKey() documents, indexKeyPattern(), the
+         * matcher(), and the isMultiKey() nature of the cursor may change over the course of
+         * iteration.
          *
-         * @param query - Query used to select indexes and populate matchers; this is not copied, and must outlive the Cursor
+         * @param query - Query used to select indexes and populate matchers; not copied if unowned
+         * (see bsonobj.h).
          *
-         * @param order - Required ordering spec for documents produced by this cursor,
-         * empty object default indicates no order requirement.  If no index exists that
-         * satisfies the required sort order, an empty shared_ptr is returned.  This is nit copied, and must outlive the Cursor
+         * @param order - Required ordering spec for documents produced by this cursor, empty object
+         * default indicates no order requirement.  If no index exists that satisfies the required
+         * sort order, an empty shared_ptr is returned unless parsedQuery is also provided.  This is
+         * not copied if unowned.
          *
-         * @param requireIndex - If true, no unindexed (ie collection scan) cursors are
-         * used to generate the returned cursor.  If an unindexed cursor is required, an
-         * assertion is raised by the cursor during iteration.
+         * @param planPolicy - A policy for selecting query plans - see queryoptimizercursor.h
          *
-         * @param simpleEqualityMatch - Set to true for certain simple queries -
-         * see queryoptimizer.cpp.
+         * @param simpleEqualityMatch - Set to true for certain simple queries - see
+         * queryoptimizer.cpp.
          *
-         * The returned cursor may @throw inside of advance() or recoverFromYield() in
-         * certain error cases, for example if a capped overrun occurred during a yield.
-         * This indicates that the cursor was unable to perform a complete scan.
+         * @param parsedQuery - Additional query parameters, as from a client query request.  If
+         * specified, the resulting cursor may return results from out of order plans.  See
+         * queryoptimizercursor.h for information on handling these results.
          *
-         * This is a work in progress.  Partial list of features not yet implemented:
+         * @param singlePlanSummary - Query plan summary information that may be provided when a
+         * cursor running a single plan is returned.
+         *
+         * The returned cursor may @throw inside of advance() or recoverFromYield() in certain error
+         * cases, for example if a capped overrun occurred during a yield.  This indicates that the
+         * cursor was unable to perform a complete scan.
+         *
+         * This is a work in progress.  Partial list of features not yet implemented through this
+         * interface:
+         * 
          * - covered indexes
          * - in memory sorting
          */

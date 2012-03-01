@@ -582,6 +582,10 @@ namespace mongo {
         return false;
     }
     
+    /**
+     * Run a query with a cursor provided by the query optimizer, or FindingStartCursor.
+     * @yields the db lock.
+     */
     const char *queryWithQueryOptimizer( Message &m, int queryOptions, const char *ns,
                                         const BSONObj &jsobj, CurOp& curop,
                                         const BSONObj &query, const BSONObj &order,
@@ -618,6 +622,8 @@ namespace mongo {
                 !cursor->ok() ) {
                 cursor.reset();
                 queryResponseBuilder.noteYield();
+                // !!! TODO The queryResponseBuilder still holds cursor.  Currently it will not do
+                // anything unsafe with the cursor in handoff(), but this is very fragile.
                 break;
             }
 
@@ -633,6 +639,7 @@ namespace mongo {
                 continue;
             }
             
+            // Note slave's position in the oplog.
             if ( pq.hasOption( QueryOption_OplogReplay ) ) {
                 BSONObj current = cursor->current();
                 BSONElement e = current["ts"];
@@ -682,6 +689,7 @@ namespace mongo {
         ccPointer.reset();
         long long cursorid = 0;
         if ( saveClientCursor ) {
+            // Create a new ClientCursor, with a default timeout.
             ccPointer.reset( new ClientCursor( queryOptions, cursor, ns,
                                               jsobj.getOwned() ) );
             cursorid = ccPointer->cursorid();
@@ -694,8 +702,10 @@ namespace mongo {
                 ccPointer->updateLocation();
             }
             
+            // !!! Save the original message buffer, so it can be referenced in getMore.
             ccPointer->originalMessage = m;
-            
+
+            // Save slave's position in the oplog.
             if ( pq.hasOption( QueryOption_OplogReplay ) && !slaveReadTill.isNull() ) {
                 ccPointer->slaveReadTill( slaveReadTill );
             }
@@ -709,6 +719,7 @@ namespace mongo {
                 curop.debug().exhaust = true;
             }
             
+            // Set attributes for getMore.
             ccPointer->setChunkManager( queryResponseBuilder.chunkManager() );
             ccPointer->setPos( nReturned );
             ccPointer->pq = pq_shared;
@@ -737,9 +748,13 @@ namespace mongo {
         return exhaust;
     }
     
-    /* run a query -- includes checking for and running a Command \
-       @return points to ns if exhaust mode. 0=normal mode
-    */
+    /**
+     * Run a query -- includes checking for and running a Command.
+     * @return points to ns if exhaust mode. 0=normal mode
+     * @locks the db mutex for reading (and potentially for writing temporarily to create a new db).
+     * @yields the db mutex periodically after acquiring it.
+     * @asserts on scan and order memory exhaustion and other cases.
+     */
     const char *runQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result) {
         shared_ptr<ParsedQuery> pq_shared( new ParsedQuery(q) );
         ParsedQuery& pq( *pq_shared );
@@ -755,6 +770,8 @@ namespace mongo {
         curop.debug().query = jsobj;
         curop.setQuery(jsobj);
 
+        // Run a command.
+        
         if ( pq.couldBeCommand() ) {
             BufBuilder bb;
             bb.skip(sizeof(QueryResult));
@@ -781,8 +798,6 @@ namespace mongo {
             }
             return 0;
         }
-
-        /* --- regular query --- */
 
         bool explain = pq.isExplain();
         BSONObj order = pq.getOrder();
@@ -816,6 +831,8 @@ namespace mongo {
             }
         }
 
+        // Run a simple id query.
+        
         if ( ! (explain || pq.showDiskLoc()) && isSimpleIdQuery( query ) && !pq.hasOption( QueryOption_CursorTailable ) ) {
 
             int n = 0;
@@ -850,9 +867,8 @@ namespace mongo {
             }
         }
         
-        // regular, not QO bypass query
+        // Run a regular query.
         
-        // TODO clean this up a bit.
         BSONObj oldPlan;
         if ( explain && ! pq.hasIndexSpecifier() ) {
             MultiPlanScanner mps( ns, query, shared_ptr<Projection>(), order );
@@ -863,6 +879,7 @@ namespace mongo {
             }
         }
 
+        // In some cases the query may be retried if there is an in memory sort size assertion.
         for( int retry = 0; retry < 2; ++retry ) {
             try {
                 return queryWithQueryOptimizer( m, queryOptions, ns, jsobj, curop, query, order,
