@@ -3899,7 +3899,7 @@ namespace QueryOptimizerCursorTests {
         class VirtualPickedPlan : public Base {
         public:
             void run() {
-                dblock lk;
+                writelock lk(ns());
                 Client::Context ctx( ns() );
                 
                 _cli.ensureIndex( ns(), BSON( "a" << 1 ) );

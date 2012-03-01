@@ -1324,7 +1324,7 @@ namespace QueryTests {
             long long cursorId = cursor->getCursorId();
             
             {
-                dblock lk;
+                writelock lk(ns());
                 Client::Context ctx( ns() );
                 ClientCursor::Pointer pinCursor( cursorId );
   
