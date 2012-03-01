@@ -2942,8 +2942,8 @@ namespace QueryOptimizerCursorTests {
             virtual bool expectSimpleEquality() const { return false; }
             virtual BSONObj query() const { return BSONObj(); }
             virtual BSONObj order() const { return BSONObj(); }
-            virtual long long skip() const { return 0; }
-            virtual long long limit() const { return 0; }
+            virtual int skip() const { return 0; }
+            virtual int limit() const { return 0; }
             virtual const QueryPlanSelectionPolicy &planPolicy() const {
                 return QueryPlanSelectionPolicy::any();
             }
@@ -3044,8 +3044,8 @@ namespace QueryOptimizerCursorTests {
                 }
                 ASSERT_EQUALS( 130, count );
             }
-            long long skip() const { return 27; }
-            long long limit() const { return 103; }
+            int skip() const { return 27; }
+            int limit() const { return 103; }
         };
         
         class PreventOutOfOrderPlan : public QueryOptimizerCursorTests::Base {
