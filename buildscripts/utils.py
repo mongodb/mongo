@@ -134,3 +134,26 @@ def didMongodStart( port=27017 , timeout=20 ):
             timeout = timeout - 1
     return False
 
+def smoke_python_name():
+    # if this script is being run by py2.5 or greater,
+    # then we assume that "python" points to a 2.5 or
+    # greater python VM. otherwise, explicitly use 2.5
+    # which we assume to be installed.
+    import subprocess
+    version = re.compile(r'[Pp]ython ([\d\.]+)', re.MULTILINE)
+    binaries = ['python2.5', 'python2.6', 'python2.7', 'python25', 'python26', 'python27', 'python']
+    for binary in binaries:
+        try:
+            # py-2.4 compatible replacement for shell backticks
+            out, err = subprocess.Popen([binary, '-V'], stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
+            for stream in (out, err):
+                match = version.search(stream)
+                if match:
+                    versiontuple = tuple(map(int, match.group(1).split('.')))
+                    if versiontuple >= (2, 5):
+                        return binary
+        except:
+            pass
+    # if that all fails, fall back to "python"
+    return "python"
+

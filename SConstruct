@@ -817,29 +817,6 @@ def add_exe(target):
         return target + ".exe"
     return target
 
-def smoke_python_name():
-    # if this script is being run by py2.5 or greater,
-    # then we assume that "python" points to a 2.5 or
-    # greater python VM. otherwise, explicitly use 2.5
-    # which we assume to be installed.
-    import subprocess
-    version = re.compile(r'[Pp]ython ([\d\.]+)', re.MULTILINE)
-    binaries = ['python2.5', 'python2.6', 'python2.7', 'python25', 'python26', 'python27', 'python']
-    for binary in binaries:
-        try:
-            # py-2.4 compatible replacement for shell backticks
-            out, err = subprocess.Popen([binary, '-V'], stdout=subprocess.PIPE, stderr=subprocess.PIPE).communicate()
-            for stream in (out, err):
-                match = version.search(stream)
-                if match:
-                    versiontuple = tuple(map(int, match.group(1).split('.')))
-                    if versiontuple >= (2, 5):
-                        return binary
-        except:
-            pass
-    # if that all fails, fall back to "python"
-    return "python"
-
 def setupBuildInfoFile( outFile ):
     version = utils.getGitVersion()
     if len(moduleNames) > 0:
@@ -1253,7 +1230,7 @@ def addSmoketest( name, deps ):
         else:
             target = name[5].lower() + name[6:]
 
-    addTest(name, deps, [ smoke_python_name() + " buildscripts/smoke.py " + " ".join(smokeFlags) + ' ' + target ])
+    addTest(name, deps, [ utils.smoke_python_name() + " buildscripts/smoke.py " + " ".join(smokeFlags) + ' ' + target ])
 
 addSmoketest( "smoke", [ add_exe( "test" ) ] )
 addSmoketest( "smokePerf", [ "perftest" ]  )
@@ -1651,7 +1628,7 @@ def build_and_test_client(env, target, source):
 
     call(scons_command + ["libmongoclient.a", "clientTests"], cwd=installDir)
 
-    return bool(call([smoke_python_name(), "buildscripts/smoke.py",
+    return bool(call([utils.smoke_python_name(), "buildscripts/smoke.py",
                       "--test-path", installDir, "client"]))
 env.Alias("clientBuild", [mongod, installDir], [build_and_test_client])
 env.AlwaysBuild("clientBuild")
