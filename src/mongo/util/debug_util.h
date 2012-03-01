@@ -96,11 +96,4 @@ namespace mongo {
 #endif
     }
 
-
-    // conditional breakpoint
-    inline void breakif(bool test) {
-        if (test)
-            breakpoint();
-    }
-
 } // namespace mongo
