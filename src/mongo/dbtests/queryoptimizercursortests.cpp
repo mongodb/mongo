@@ -3934,6 +3934,26 @@ namespace QueryOptimizerCursorTests {
             }
         };
 
+        /** Simple check that an explain result can contain a large value of n. */
+        class LargeN : public Base {
+        public:
+            void run() {
+                dblock lk;
+                Client::Context ctx( ns() );
+                
+                shared_ptr<Cursor> cursor
+                ( NamespaceDetailsTransient::getCursor( ns(), BSONObj() ) );
+                ExplainSinglePlanQueryInfo explainHelper;
+                explainHelper.notePlan( *cursor, false, false );
+                explainHelper.noteIterate( false, false, false, *cursor );
+
+                shared_ptr<ExplainQueryInfo> explain = explainHelper.queryInfo();
+                explain->reviseN( 3000000000LL );
+                
+                ASSERT_EQUALS( 3000000000LL, explain->bson()[ "n" ].Long() );
+            }
+        };
+        
         // test takeover w/ mixed plan clause ? necessary?
 
     } // namespace Explain
@@ -4089,6 +4109,7 @@ namespace QueryOptimizerCursorTests {
             add<Explain::CoveredIndex>();
             add<Explain::CoveredIndexTakeover>();
             add<Explain::VirtualPickedPlan>();
+            add<Explain::LargeN>();
         }
     } myall;
     
