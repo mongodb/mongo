@@ -1308,6 +1308,35 @@ namespace QueryTests {
             ASSERT_EQUALS( 0, c->getCursorId() );
         }
     };
+    
+    /**
+     * Check that an attempt to kill a pinned cursor fails and produces an appropriate assertion.
+     */
+    class KillPinnedCursor : public CollectionBase {
+    public:
+        KillPinnedCursor() : CollectionBase( "killpinnedcursor" ) {
+        }
+        void run() {
+            client().insert( ns(), vector<BSONObj>( 3, BSONObj() ) );
+            auto_ptr<DBClientCursor> cursor = client().query( ns(), BSONObj(), 0, 0, 0, 0, 2 );
+            ASSERT_EQUALS( 2, cursor->objsLeftInBatch() );
+            long long cursorId = cursor->getCursorId();
+            
+            {
+                dblock lk;
+                Client::Context ctx( ns() );
+                ClientCursor::Pointer pinCursor( cursorId );
+  
+                ASSERT_THROWS( client().killCursor( cursorId ), MsgAssertionException );
+                string expectedAssertion =
+                        str::stream() << "Cannot kill active cursor " << cursorId;
+                ASSERT_EQUALS( expectedAssertion, client().getLastError() );
+            }
+            
+            // Verify that the remaining document is read from the cursor.
+            ASSERT_EQUALS( 3, cursor->itcount() );
+        }
+    };
 
     namespace parsedtests {
         class basic1 {
@@ -1583,6 +1612,7 @@ namespace QueryTests {
             add< Exhaust >();
             add< QueryCursorTimeout >();
             add< QueryReadsAll >();
+            add< KillPinnedCursor >();
 
             add< parsedtests::basic1 >();
 
