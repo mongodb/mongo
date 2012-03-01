@@ -838,8 +838,9 @@ namespace mongo {
         // it (meaning it is ineligible for reuse).
         memset(this, 0, Size());
 #else
+        // Mark the bucket as deallocated, see SERVER-4575.
+        this->n = this->INVALID_N_SENTINEL;
         // defensive:
-        this->n = -1;
         this->parent.Null();
         string ns = id.indexNamespace();
         theDataFileMgr._deleteRecord(nsdetails(ns.c_str()), ns.c_str(), thisLoc.rec(), thisLoc);

@@ -180,6 +180,8 @@ namespace mongo {
 
         // largest key size we allow.  note we very much need to support bigger keys (somehow) in the future.
         static const int KeyMax = OldBucketSize / 10;
+        // A sentinel value sometimes used to identify a deallocated bucket.
+        static const int INVALID_N_SENTINEL = -1;
     };
 
     // a a a ofs ofs ofs ofs
@@ -262,6 +264,8 @@ namespace mongo {
         enum { BucketSize = 8192-16 }; // leave room for Record header
         // largest key size we allow.  note we very much need to support bigger keys (somehow) in the future.
         static const int KeyMax = 1024;
+        // A sentinel value sometimes used to identify a deallocated bucket.
+        static const unsigned short INVALID_N_SENTINEL = 0xffff;
     protected:
         /** Parent bucket of this bucket, which isNull() for the root bucket. */
         Loc parent;
