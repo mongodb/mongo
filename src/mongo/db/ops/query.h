@@ -128,8 +128,7 @@ namespace mongo {
         virtual ~ResponseBuildStrategy() {}
         /**
          * Handle the current iterate of the supplied cursor as a (possibly duplicate) match.
-         * @return true if the match is added to the buffer (or would be if not an explain query).
-         * If a match is saved for later use but not added to the buffer, @return false.
+         * @return true if an ordered match is found.
          */
         virtual bool handleMatch() = 0;
         /**

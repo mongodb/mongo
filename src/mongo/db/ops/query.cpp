@@ -482,8 +482,8 @@ namespace mongo {
         if ( !chunkMatches() ) {
             return false;
         }
-        bool bufferedMatch = _builder->handleMatch();
-        _explain->noteIterate( bufferedMatch, true, false );
+        bool orderedMatch = _builder->handleMatch();
+        _explain->noteIterate( orderedMatch, true, false );
         return true;
     }
 
