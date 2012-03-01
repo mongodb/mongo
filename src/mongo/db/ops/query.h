@@ -24,8 +24,8 @@
 #include "../jsobj.h"
 #include "../diskloc.h"
 #include "../explain.h"
-#include "../queryoptimizercursor.h"
 #include "../queryoptimizer.h"
+#include "../queryoptimizercursor.h"
 #include "../../s/d_chunk_manager.h"
 
 // struct QueryOptions, QueryResult, QueryResultFlags in:
@@ -139,10 +139,10 @@ namespace mongo {
         HybridBuildStrategy( const ParsedQuery &parsedQuery,
                             const shared_ptr<QueryOptimizerCursor> &cursor,
                             BufBuilder &buf );
+    private:
         virtual bool handleMatch();
         virtual int rewriteMatches();
         virtual void finishedFirstBatch();
-    private:
         void handleReorderMatch();
         bool handleOrderedMatch();
         DiskLocDupSet _scanAndOrderDups;

@@ -27,7 +27,6 @@
 #include <list>
 #include "json.h"
 #include "ops/delete.h"
-#include "ops/query.h"
 
 #include <boost/filesystem/operations.hpp>
 

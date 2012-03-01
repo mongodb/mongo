@@ -540,7 +540,7 @@ namespace mongo {
             }
         }
         
-        virtual void abortUnorderedPlans() {
+        virtual void abortOutOfOrderPlans() {
             _requireOrder = true;
         }
         

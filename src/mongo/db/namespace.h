@@ -26,8 +26,8 @@
 #include "../util/hashtab.h"
 #include "mongommf.h"
 #include "d_concurrency.h"
-#include "queryoptimizercursor.h"
 #include "queryoptimizer.h"
+#include "queryoptimizercursor.h"
 
 namespace mongo {
 

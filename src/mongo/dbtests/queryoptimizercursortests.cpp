@@ -278,7 +278,7 @@ namespace QueryOptimizerCursorTests {
             c->initialCandidatePlans();
             c->completePlanOfHybridSetScanAndOrderRequired();
             c->clearIndexesForPatterns();
-            c->abortUnorderedPlans();
+            c->abortOutOfOrderPlans();
             c->noteIterate( false, false, false );
             c->explainQueryInfo();
         }
@@ -2759,7 +2759,7 @@ namespace QueryOptimizerCursorTests {
         }
     };
     
-    class AbortUnorderedPlans : public PlanChecking {
+    class AbortOutOfOrderPlans : public PlanChecking {
     public:
         void run() {
             _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
@@ -2777,7 +2777,7 @@ namespace QueryOptimizerCursorTests {
                 c->advance();
             }
             // Abort the natural plan.
-            c->abortUnorderedPlans();
+            c->abortOutOfOrderPlans();
             c->advance();
             // Check that no more results from the natural plan are returned.
             ASSERT( c->ok() );
@@ -2789,7 +2789,7 @@ namespace QueryOptimizerCursorTests {
         }
     };
     
-    class AbortUnorderedPlanOnLastMatch : public PlanChecking {
+    class AbortOutOfOrderPlanOnLastMatch : public PlanChecking {
     public:
         void run() {
             _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
@@ -2810,7 +2810,7 @@ namespace QueryOptimizerCursorTests {
                 c->advance();
             }
             // Abort the natural plan.
-            c->abortUnorderedPlans();
+            c->abortOutOfOrderPlans();
             c->advance();
             // Check that no more results from the natural plan are returned, and the cursor is not
             // done iterating.
@@ -4034,8 +4034,8 @@ namespace QueryOptimizerCursorTests {
             add<PossibleInOrderPlans>();
             add<PossibleOutOfOrderPlans>();
             add<PossibleBothPlans>();
-            add<AbortUnorderedPlans>();
-            add<AbortUnorderedPlanOnLastMatch>();
+            add<AbortOutOfOrderPlans>();
+            add<AbortOutOfOrderPlanOnLastMatch>();
             add<TakeoverOrRangeElimination>();
             add<TakeoverOrDedups>();
             add<GetCursor::NoConstraints>();

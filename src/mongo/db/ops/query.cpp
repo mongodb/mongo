@@ -19,26 +19,16 @@
 #include "pch.h"
 #include "query.h"
 #include "../pdfile.h"
-#include "../jsobjmanipulator.h"
+#include "../clientcursor.h"
+#include "../oplog.h"
 #include "../../bson/util/builder.h"
-#include <time.h>
-#include "../introspect.h"
-#include "../btree.h"
-#include "../../util/lruishmap.h"
-#include "../json.h"
-#include "../repl.h"
 #include "../replutil.h"
 #include "../scanandorder.h"
-#include "../security.h"
-#include "../curop-inl.h"
 #include "../commands.h"
 #include "../queryoptimizer.h"
-#include "../lasterror.h"
 #include "../../s/d_logic.h"
-#include "../repl_block.h"
 #include "../../server.h"
-#include "../d_concurrency.h"
-#include "../queryoptimizercursorimpl.h"
+#include "../queryoptimizercursor.h"
 
 namespace mongo {
 
@@ -426,7 +416,7 @@ namespace mongo {
                     throw QueryRetryException();
                 }
                 else if ( _queryOptimizerCursor->runningInitialInOrderPlan() ) {
-                    _queryOptimizerCursor->abortUnorderedPlans();
+                    _queryOptimizerCursor->abortOutOfOrderPlans();
                     return;
                 }
             }
@@ -443,7 +433,7 @@ namespace mongo {
     }
     
     void HybridBuildStrategy::finishedFirstBatch() {
-        _queryOptimizerCursor->abortUnorderedPlans();
+        _queryOptimizerCursor->abortOutOfOrderPlans();
     }
     
     QueryResponseBuilder::QueryResponseBuilder( const ParsedQuery &parsedQuery,
@@ -528,11 +518,11 @@ namespace mongo {
 
     shared_ptr<ExplainRecordingStrategy> QueryResponseBuilder::newExplainRecordingStrategy
     ( const QueryPlan::Summary &queryPlan, const BSONObj &oldPlan ) const {
-        ExplainQueryInfo::AncillaryInfo ancillaryInfo;
-        ancillaryInfo._oldPlan = oldPlan;
         if ( !_parsedQuery.isExplain() ) {
             return shared_ptr<ExplainRecordingStrategy>( new NoExplainStrategy() );
         }
+        ExplainQueryInfo::AncillaryInfo ancillaryInfo;
+        ancillaryInfo._oldPlan = oldPlan;
         if ( _queryOptimizerCursor ) {
             return shared_ptr<ExplainRecordingStrategy>
             ( new QueryOptimizerCursorExplainStrategy( ancillaryInfo, _queryOptimizerCursor ) );
@@ -599,9 +589,11 @@ namespace mongo {
                                         const BSONObj &oldPlan,
                                         const ConfigVersion &shardingVersionAtStart,
                                         Message &result ) {
+
         const ParsedQuery &pq( *pq_shared );
         shared_ptr<Cursor> cursor;
         QueryPlan::Summary queryPlan;
+        
         if ( pq.hasOption( QueryOption_OplogReplay ) ) {
             cursor = FindingStartCursor::getCursor( ns, query, order );
         }

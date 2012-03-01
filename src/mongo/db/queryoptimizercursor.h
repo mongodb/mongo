@@ -114,7 +114,8 @@ namespace mongo {
         virtual bool completePlanOfHybridSetScanAndOrderRequired() const = 0;
 
         virtual void clearIndexesForPatterns() = 0;
-        virtual void abortUnorderedPlans() = 0;
+        /** Stop returning results from out of order plans and do not allow them to complete. */
+        virtual void abortOutOfOrderPlans() = 0;
 
         virtual void noteIterate( bool match, bool loadedDocument, bool chunkSkip ) = 0;
         virtual shared_ptr<ExplainQueryInfo> explainQueryInfo() const = 0;
