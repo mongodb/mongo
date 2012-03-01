@@ -79,7 +79,7 @@ namespace mongo {
         if ( tlogLevel < 0 )
             return;
 #ifdef _WIN32
-        //DEV DebugBreak();
+        DEV DebugBreak();
 #endif
 #ifndef _WIN32
         // code to raise a breakpoint in GDB
