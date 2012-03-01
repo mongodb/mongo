@@ -177,6 +177,8 @@ namespace mongo {
             return;
         }
         void PREPLOGBUFFER(/*out*/ JSectHeader& h, AlignedBuilder& ab) {
+            fassert( 0, Lock::isRW() );
+
             Timer t;
             j.assureLogFileOpen(); // so fileId is set
             _PREPLOGBUFFER(h, ab);

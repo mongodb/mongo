@@ -185,7 +185,7 @@ namespace mongo {
 
         void DurableImpl::setNoJournal(void *dst, void *src, unsigned len) {
             // we are at least read locked, so we need not worry about REMAPPRIVATEVIEW herein.
-            DEV d.dbMutex.assertAtLeastReadLocked();
+            dassert( Lock::isLocked() );
 
             MemoryMappedFile::makeWritable(dst, len);
 

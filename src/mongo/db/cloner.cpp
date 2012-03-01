@@ -651,6 +651,7 @@ namespace mongo {
             return false;
         }
         virtual LockType locktype() const { return WRITE; }
+        virtual bool lockGlobally() const { return true; }
         virtual bool logTheOp() {
             return true; // can't log steps when doing fast rename within a db, so always log the op rather than individual steps comprising it.
         }

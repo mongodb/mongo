@@ -56,7 +56,7 @@ namespace mongo {
         todo : make _logOpRS() call this so we don't repeat ourself?
         */
     void _logOpObjRS(const BSONObj& op) {
-        DEV assertInWriteLock();
+        Lock::DBWrite lk("local");
 
         const OpTime ts = op["ts"]._opTime();
         long long h = op["h"].numberLong();
@@ -711,7 +711,6 @@ namespace mongo {
         @return true if was and update should have happened and the document DNE.  see replset initial sync code.
      */
     bool applyOperation_inlock(const BSONObj& op , bool fromRepl ) {
-        assertInWriteLock();
         LOG(6) << "applying op: " << op << endl;
         bool failedUpdate = false;
 
@@ -726,6 +725,9 @@ namespace mongo {
             o = fields[0].embeddedObject();
             
         const char *ns = fields[1].valuestrsafe();
+
+        Lock::assertWriteLocked(ns);
+
         NamespaceDetails *nsd = nsdetails(ns);
 
         // operation type -- see logOp() comments for types
@@ -838,11 +840,11 @@ namespace mongo {
         return failedUpdate;
     }
 
-    // SERVER-4328 todo review for concurrency
     class ApplyOpsCmd : public Command {
     public:
         virtual bool slaveOk() const { return false; }
         virtual LockType locktype() const { return WRITE; }
+        virtual bool lockGlobally() const { return true; } // SERVER-4328 todo : is global ok or does this take a long time? i believe multiple ns used so locking individually requires more analysis
         ApplyOpsCmd() : Command( "applyOps" ) {}
         virtual void help( stringstream &help ) const {
             help << "internal (sharding)\n{ applyOps : [ ] , preCondition : [ { ns : ... , q : ... , res : ... } ] }";

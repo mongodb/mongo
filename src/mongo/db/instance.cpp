@@ -541,12 +541,11 @@ namespace mongo {
         
         op.debug().query = query;
         op.setQuery(query);
-
         
         PageFaultRetryableSection s;
         while ( 1 ) {
             try {
-                writelock lk;
+                Lock::DBWrite lk(ns);
                 
                 // void ReplSetImpl::relinquish() uses big write lock so 
                 // this is thus synchronized given our lock above.
@@ -599,12 +598,11 @@ namespace mongo {
     QueryResult* emptyMoreResult(long long);
 
     void OpTime::waitForDifferent(unsigned millis){
-        DEV d.dbMutex.assertAtLeastReadLocked();
+        dassert( !Lock::isLocked() );
 
         if (*this != last) return; // check early
 
         do {
-            dbtemprelease tmp;
             mutex::scoped_lock lk(m);
             if (!notifier.timed_wait(lk.boost(), boost::posix_time::milliseconds(millis)))
                 return; // timed out
@@ -632,7 +630,6 @@ namespace mongo {
         OpTime last;
         while( 1 ) {
             try {
-                Client::ReadContext ctx(ns);
                 if (str::startsWith(ns, "local.oplog.")){
                     if (pass == 0) {
                         mutex::scoped_lock lk(OpTime::m);
@@ -642,6 +639,8 @@ namespace mongo {
                         last.waitForDifferent(1000/*ms*/);
                     }
                 }
+
+                Client::ReadContext ctx(ns);
 
                 // call this readlocked so state can't change
                 replVerifyReadsOk();
@@ -764,7 +763,6 @@ namespace mongo {
         }
 
         writelock lk(ns);
-        //LockCollectionExclusively lk(ns);
 
         // CONCURRENCY TODO: is being read locked in big log sufficient here?
         // writelock is used to synchronize stepdowns w/ writes

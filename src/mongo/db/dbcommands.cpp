@@ -1901,7 +1901,13 @@ namespace mongo {
         }
         else {
             dassert( c->locktype() == Command::WRITE );
-            writelock lk( c->lockGlobally() ? "" : dbname );
+            bool global = c->lockGlobally();
+            DEV {
+                if( !global && Lock::isW() ) { 
+                    log() << "\ndebug have W lock but w would suffice for command " << c->name << endl;
+                }
+            }
+            writelock lk( global ? "" : dbname );
             client.curop()->ensureStarted();
             Client::Context ctx( dbname , dbpath , c->requiresAuth() );
             retval = _execCommand(c, dbname , cmdObj , queryOptions, result , fromRepl );

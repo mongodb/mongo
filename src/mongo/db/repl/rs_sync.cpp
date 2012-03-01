@@ -402,12 +402,14 @@ namespace mongo {
         }
 
         while( 1 ) {
+            assert( !Lock::isLocked() );
             {
                 Timer timeInWriteLock;
-                writelock lk("");
+                scoped_ptr<writelock> lk;
                 while( 1 ) {
                     if( !r.moreInCurrentBatch() ) {
-                        dbtemprelease tempRelease;
+                        lk.reset();
+                        timeInWriteLock.reset();
                         {
                             // we need to occasionally check some things. between
                             // batches is probably a good time.                            
@@ -430,7 +432,7 @@ namespace mongo {
                         r.more(); // to make the requestmore outside the db lock, which obviously is quite important
                     }
                     if( timeInWriteLock.micros() > 1000 ) {
-                        dbtemprelease tempRelease;
+                        lk.reset();
                         timeInWriteLock.reset();
                     }
                     if( !r.more() )
@@ -448,7 +450,7 @@ namespace mongo {
                             long long lag = b - a;
                             long long sleeptime = sd - lag;
                             if( sleeptime > 0 ) {
-                                dbtemprelease tempRelease;
+                                lk.reset();
                                 uassert(12000, "rs slaveDelay differential too big check clocks and systems", sleeptime < 0x40000000);
                                 if( sleeptime < 60 ) {
                                     sleepsecs((int) sleeptime);
@@ -473,7 +475,23 @@ namespace mongo {
                             }
                         } // endif slaveDelay
 
-                        d.dbMutex.assertWriteLocked();
+                        const char *ns = o.getStringField("ns");
+                        if( ns ) {
+                            if( str::contains(ns, ".$cmd") ) { 
+                                // a command may need a global write lock. so we will conservatively go ahead and grab one here. suboptimal. :-( 
+                                lk.reset();
+                                assert( !Lock::isLocked() );
+                                lk.reset( new writelock() );
+                            }
+                            else if( !Lock::isWriteLocked(ns) || Lock::isW() ) {
+                                // we don't relock on every single op to try to be faster. however if switching collections, we have to.
+                                // note here we must reset to 0 first to assure the old object is destructed before our new operator invocation.
+                                lk.reset();
+                                assert( !Lock::isLocked() );
+                                lk.reset( new writelock(ns) );
+                            }
+                        }
+
                         try {
                             /* if we have become primary, we dont' want to apply things from elsewhere
                                anymore. assumePrimary is in the db lock so we are safe as long as
@@ -491,7 +509,7 @@ namespace mongo {
                         catch (DBException& e) {
                             sethbmsg(str::stream() << "syncTail: " << e.toString() << ", syncing: " << o);
                             veto(target->fullName(), 300);
-                            dbtemprelease tempRelease;
+                            lk.reset();
                             sleepsecs(30);
                             return;
                         }
@@ -547,6 +565,8 @@ namespace mongo {
             if( myConfig().arbiterOnly ) {
                 return;
             }
+
+            fassert(0, !Lock::isLocked());
 
             try {
                 _syncThread();

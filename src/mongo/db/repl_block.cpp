@@ -33,7 +33,7 @@ namespace mongo {
 
     using namespace mongoutils;
 
-    class SlaveTracking : public BackgroundJob {
+    class SlaveTracking : public BackgroundJob { // SERVER-4328 todo review
     public:
         string name() const { return "SlaveTracking"; }
 
@@ -133,7 +133,7 @@ namespace mongo {
                 return;
             }
 
-            d.dbMutex.assertAtLeastReadLocked();
+            Lock::assertAtLeastReadLocked(NS);
 
             BSONObj res;
             if ( Helpers::findOne( NS , ident.obj , res ) ) {
