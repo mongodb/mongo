@@ -319,7 +319,8 @@ namespace mongo {
                                                BufBuilder &buf,
                                                const QueryPlan::Summary &queryPlan ) :
     ResponseBuildStrategy( parsedQuery, cursor, buf, queryPlan ),
-    _skip( _parsedQuery.getSkip() ) {
+    _skip( _parsedQuery.getSkip() ),
+    _bufferedMatches() {
     }
     
     bool OrderedBuildStrategy::handleMatch() {
@@ -336,6 +337,7 @@ namespace mongo {
             fillQueryResultFromObj( _buf, _parsedQuery.getFields(), current( true ),
                                    ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
         }
+        ++_bufferedMatches;
         return true;
     }
     
@@ -344,7 +346,8 @@ namespace mongo {
                                                BufBuilder &buf,
                                                const QueryPlan::Summary &queryPlan ) :
     ResponseBuildStrategy( parsedQuery, cursor, buf, queryPlan ),
-    _scanAndOrder( newScanAndOrder( queryPlan ) ) {
+    _scanAndOrder( newScanAndOrder( queryPlan ) ),
+    _bufferedMatches() {
     }
 
     bool ReorderBuildStrategy::handleMatch() {
@@ -364,6 +367,7 @@ namespace mongo {
         cc().curop()->debug().scanAndOrder = true;
         int ret = 0;
         _scanAndOrder->fill( _buf, _parsedQuery.getFields(), ret );
+        _bufferedMatches = ret;
         return ret;
     }
     
@@ -391,7 +395,8 @@ namespace mongo {
                                              BufBuilder &buf ) :
     ResponseBuildStrategy( parsedQuery, cursor, buf, QueryPlan::Summary() ),
     _orderedBuild( _parsedQuery, _cursor, _buf, QueryPlan::Summary() ),
-    _reorderBuild( _parsedQuery, _cursor, _buf, QueryPlan::Summary() ) {
+    _reorderBuild( _parsedQuery, _cursor, _buf, QueryPlan::Summary() ),
+    _reorderedMatches() {
     }
     
     bool HybridBuildStrategy::handleMatch() {
@@ -428,10 +433,17 @@ namespace mongo {
         if ( !_queryOptimizerCursor->completePlanOfHybridSetScanAndOrderRequired() ) {
             return _orderedBuild.rewriteMatches();
         }
+        _reorderedMatches = true;
         resetBuf();
         return _reorderBuild.rewriteMatches();
     }
-    
+
+    long long HybridBuildStrategy::bufferedMatches() const {
+        return _reorderedMatches ?
+                _reorderBuild.bufferedMatches() :
+                _orderedBuild.bufferedMatches();
+    }
+
     void HybridBuildStrategy::finishedFirstBatch() {
         _queryOptimizerCursor->abortOutOfOrderPlans();
     }
@@ -446,8 +458,7 @@ namespace mongo {
     _buf( 32768 ), // TODO be smarter here
     _chunkManager( newChunkManager() ),
     _explain( newExplainRecordingStrategy( queryPlan, oldPlan ) ),
-    _builder( newResponseBuildStrategy( queryPlan ) ),
-    _bufferedMatches() {
+    _builder( newResponseBuildStrategy( queryPlan ) ) {
         _builder->resetBuf();
     }
 
@@ -460,9 +471,6 @@ namespace mongo {
         }
         bool bufferedMatch = _builder->handleMatch();
         _explain->noteIterate( bufferedMatch, true, false );
-        if ( bufferedMatch ) {
-            ++_bufferedMatches;
-        }
         return true;
     }
 
@@ -471,14 +479,14 @@ namespace mongo {
     }
 
     bool QueryResponseBuilder::enoughForFirstBatch() const {
-        return _parsedQuery.enoughForFirstBatch( _bufferedMatches, _buf.len() );
+        return _parsedQuery.enoughForFirstBatch( _builder->bufferedMatches(), _buf.len() );
     }
 
     bool QueryResponseBuilder::enoughTotalResults() const {
         if ( _parsedQuery.isExplain() ) {
-            return _parsedQuery.enough( _bufferedMatches ) && !_parsedQuery.wantMore();
+            return _parsedQuery.enough( _builder->bufferedMatches() ) && !_parsedQuery.wantMore();
         }
-        return ( _parsedQuery.enough( _bufferedMatches ) ||
+        return ( _parsedQuery.enough( _builder->bufferedMatches() ) ||
                 _buf.len() >= MaxBytesToReturnToClientAtOnce );
     }
 
@@ -488,9 +496,6 @@ namespace mongo {
 
     long long QueryResponseBuilder::handoff( Message &result ) {
         int rewriteCount = _builder->rewriteMatches();
-        if ( rewriteCount != -1 ) {
-            _bufferedMatches = rewriteCount;
-        }
         if ( _parsedQuery.isExplain() ) {
             shared_ptr<ExplainQueryInfo> explainInfo = _explain->doneQueryInfo();
             if ( rewriteCount != -1 ) {
@@ -506,7 +511,7 @@ namespace mongo {
             result.appendData( _buf.buf(), _buf.len() );
             _buf.decouple();
         }
-        return _bufferedMatches;
+        return _builder->bufferedMatches();
     }
 
     ShardChunkManagerPtr QueryResponseBuilder::newChunkManager() const {
