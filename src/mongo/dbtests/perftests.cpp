@@ -766,7 +766,7 @@ namespace PerfTests {
         void timed() {
             char *p = new char[128];
             if( dontOptimizeOutHopefully++ > 0 )
-                delete p;
+                delete[] p;
         }
         virtual bool showDurStats() { return false; }
     };
@@ -778,7 +778,7 @@ namespace PerfTests {
         void timed() {
             char *p = new char[8];
             if( dontOptimizeOutHopefully++ > 0 )
-                delete p;
+                delete[] p;
         }
         virtual bool showDurStats() { return false; }
     };
