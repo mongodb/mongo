@@ -139,7 +139,7 @@ namespace mongo {
             : AssertionException(
                     str::stream() << raw << " ( ns : " << error["ns"].String() << // Note, this will fail if we don't have a ns
                                              ", received : " << ShardChunkVersion( error["vReceived"] ).toString() <<
-                                             ", wanted : " << ShardChunkVersion( error["vReceived"] ).toString() <<
+                                             ", wanted : " << ShardChunkVersion( error["vWanted"] ).toString() <<
                                              ", " << ( code == SendStaleConfigCode ? "send" : "recv" ) << " )",
                     code ),
               _justConnection(justConnection) ,
