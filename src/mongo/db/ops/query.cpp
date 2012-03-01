@@ -231,10 +231,23 @@ namespace mongo {
         return shared_ptr<ExplainQueryInfo>();
     }
     
+    MatchCountingExplainStrategy::MatchCountingExplainStrategy
+    ( const ExplainQueryInfo::AncillaryInfo &ancillaryInfo ) :
+    ExplainRecordingStrategy( ancillaryInfo ),
+    _matches() {
+    }
+    
+    void MatchCountingExplainStrategy::noteIterate( bool match, bool loadedObject, bool chunkSkip ) {
+        _noteIterate( match, loadedObject, chunkSkip );
+        if ( match ) {
+            ++_matches;
+        }
+    }
+    
     SimpleCursorExplainStrategy::SimpleCursorExplainStrategy
     ( const ExplainQueryInfo::AncillaryInfo &ancillaryInfo,
      const shared_ptr<Cursor> &cursor ) :
-    ExplainRecordingStrategy( ancillaryInfo ),
+    MatchCountingExplainStrategy( ancillaryInfo ),
     _cursor( cursor ),
     _explainInfo( new ExplainSinglePlanQueryInfo() ) {
     }
@@ -243,7 +256,7 @@ namespace mongo {
         _explainInfo->notePlan( *_cursor, scanAndOrder, indexOnly );
     }
 
-    void SimpleCursorExplainStrategy::noteIterate( bool match, bool loadedObject, bool chunkSkip ) {
+    void SimpleCursorExplainStrategy::_noteIterate( bool match, bool loadedObject, bool chunkSkip ) {
         _explainInfo->noteIterate( match, loadedObject, chunkSkip, *_cursor );
     }
 
@@ -259,11 +272,11 @@ namespace mongo {
     QueryOptimizerCursorExplainStrategy::QueryOptimizerCursorExplainStrategy
     ( const ExplainQueryInfo::AncillaryInfo &ancillaryInfo,
      const shared_ptr<QueryOptimizerCursor> &cursor ) :
-    ExplainRecordingStrategy( ancillaryInfo ),
+    MatchCountingExplainStrategy( ancillaryInfo ),
     _cursor( cursor ) {
     }
     
-    void QueryOptimizerCursorExplainStrategy::noteIterate( bool match, bool loadedObject,
+    void QueryOptimizerCursorExplainStrategy::_noteIterate( bool match, bool loadedObject,
                                                           bool chunkSkip ) {
         _cursor->noteIterate( match, loadedObject, chunkSkip );
     }
@@ -336,8 +349,8 @@ namespace mongo {
         if ( !_parsedQuery.isExplain() ) {
             fillQueryResultFromObj( _buf, _parsedQuery.getFields(), current( true ),
                                    ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
+            ++_bufferedMatches;
         }
-        ++_bufferedMatches;
         return true;
     }
     
@@ -484,7 +497,7 @@ namespace mongo {
 
     bool QueryResponseBuilder::enoughTotalResults() const {
         if ( _parsedQuery.isExplain() ) {
-            return _parsedQuery.enough( _builder->bufferedMatches() ) && !_parsedQuery.wantMore();
+            return _parsedQuery.enough( _explain->matches() ) && !_parsedQuery.wantMore();
         }
         return ( _parsedQuery.enough( _builder->bufferedMatches() ) ||
                 _buf.len() >= MaxBytesToReturnToClientAtOnce );

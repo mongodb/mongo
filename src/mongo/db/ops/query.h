@@ -57,6 +57,8 @@ namespace mongo {
         virtual void noteIterate( bool match, bool loadedObject, bool chunkSkip ) {}
         /** Note that the query yielded. */
         virtual void noteYield() {}
+        /** @return number of matches noted. */
+        virtual long long matches() const { return 0; }
         /** @return ExplainQueryInfo for a complete query. */
         shared_ptr<ExplainQueryInfo> doneQueryInfo();
     protected:
@@ -75,14 +77,25 @@ namespace mongo {
         virtual shared_ptr<ExplainQueryInfo> _doneQueryInfo();
     };
     
+    class MatchCountingExplainStrategy : public ExplainRecordingStrategy {
+    public:
+        MatchCountingExplainStrategy( const ExplainQueryInfo::AncillaryInfo &ancillaryInfo );
+    protected:
+        virtual void _noteIterate( bool match, bool loadedObject, bool chunkSkip ) = 0;
+    private:
+        virtual void noteIterate( bool match, bool loadedObject, bool chunkSkip );
+        virtual long long matches() const { return _matches; }
+        long long _matches;
+    };
+    
     /** Record explain events for a simple cursor representing a single clause and plan. */
-    class SimpleCursorExplainStrategy : public ExplainRecordingStrategy {
+    class SimpleCursorExplainStrategy : public MatchCountingExplainStrategy {
     public:
         SimpleCursorExplainStrategy( const ExplainQueryInfo::AncillaryInfo &ancillaryInfo,
                                     const shared_ptr<Cursor> &cursor );
     private:
         virtual void notePlan( bool scanAndOrder, bool indexOnly );
-        virtual void noteIterate( bool match, bool loadedObject, bool chunkSkip );
+        virtual void _noteIterate( bool match, bool loadedObject, bool chunkSkip );
         virtual void noteYield();
         virtual shared_ptr<ExplainQueryInfo> _doneQueryInfo();
         shared_ptr<Cursor> _cursor;
@@ -93,12 +106,12 @@ namespace mongo {
      * Record explain events for a QueryOptimizerCursor, which may record some explain information
      * for multiple clauses and plans through an internal implementation.
      */
-    class QueryOptimizerCursorExplainStrategy : public ExplainRecordingStrategy {
+    class QueryOptimizerCursorExplainStrategy : public MatchCountingExplainStrategy {
     public:
         QueryOptimizerCursorExplainStrategy( const ExplainQueryInfo::AncillaryInfo &ancillaryInfo,
                                             const shared_ptr<QueryOptimizerCursor> &cursor );
     private:
-        virtual void noteIterate( bool match, bool loadedObject, bool chunkSkip );
+        virtual void _noteIterate( bool match, bool loadedObject, bool chunkSkip );
         virtual shared_ptr<ExplainQueryInfo> _doneQueryInfo();
         shared_ptr<QueryOptimizerCursor> _cursor;
     };
