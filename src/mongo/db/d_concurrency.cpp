@@ -204,8 +204,9 @@ namespace mongo {
         return recursive() != 0;
     }
     static bool weLocked(const LockState &ls, const StringData& ns) { 
-        string db = nsToDatabase(ns.data());
-        if( db == "local" ) {
+        char db[MaxDatabaseNameLen];
+        nsToDatabase(ns.data(), db);
+        if( str::equals(db,"local") ) {
             return ls.local;
         }
         return db == ls.otherName && ls.other;
@@ -444,10 +445,12 @@ namespace mongo {
     }
     Lock::DBWrite::DBWrite(const StringData& ns) {
         locked_w=false; weLocked=0; ourCounter = 0;
-        if( str::equals(ns.data(),"local") ) {
+        char db[MaxDatabaseNameLen];
+        nsToDatabase(ns.data(), db);
+        if( str::equals(db,"local") ) {
             lockLocal();
         } else { 
-            lock(nsToDatabase(ns.data()));
+            lock(db);
         }
     }
     Lock::DBWrite::~DBWrite() {
@@ -534,10 +537,12 @@ namespace mongo {
     }
     Lock::DBRead::DBRead(const StringData& ns) {
         locked_r=false; weLocked=0; ourCounter = 0;
-        if( str::equals(ns.data(),"local") ) {
+        char db[MaxDatabaseNameLen];
+        nsToDatabase(ns.data(), db);
+        if( str::equals(db,"local") ) {
             lockLocal();
         } else { 
-            lock(nsToDatabase(ns.data()));
+            lock(db);
         }
     }
     Lock::DBRead::~DBRead() {
