@@ -137,7 +137,7 @@ namespace mongo {
          */
         virtual int rewriteMatches() { return -1; }
         /** @return the number of matches that have been written to the buffer. */
-        virtual long long bufferedMatches() const = 0;
+        virtual int bufferedMatches() const = 0;
         /**
          * Callback when enough results have been read for the first batch, with potential handoff
          * to getMore.
@@ -166,10 +166,10 @@ namespace mongo {
         OrderedBuildStrategy( const ParsedQuery &parsedQuery, const shared_ptr<Cursor> &cursor,
                              BufBuilder &buf, const QueryPlan::Summary &queryPlan );
         virtual bool handleMatch();
-        virtual long long bufferedMatches() const { return _bufferedMatches; }
+        virtual int bufferedMatches() const { return _bufferedMatches; }
     private:
-        long long _skip;
-        long long _bufferedMatches;
+        int _skip;
+        int _bufferedMatches;
     };
     
     class ScanAndOrder;
@@ -185,11 +185,11 @@ namespace mongo {
         /** Handle a match without performing deduping. */
         bool _handleMatchNoDedup();
         virtual int rewriteMatches();
-        virtual long long bufferedMatches() const { return _bufferedMatches; }
+        virtual int bufferedMatches() const { return _bufferedMatches; }
     private:
         ScanAndOrder *newScanAndOrder( const QueryPlan::Summary &queryPlan ) const;
         shared_ptr<ScanAndOrder> _scanAndOrder;
-        long long _bufferedMatches;
+        int _bufferedMatches;
     };
 
     /**
@@ -204,7 +204,7 @@ namespace mongo {
     private:
         virtual bool handleMatch();
         virtual int rewriteMatches();
-        virtual long long bufferedMatches() const;
+        virtual int bufferedMatches() const;
         virtual void finishedFirstBatch();
         void handleReorderMatch();
         bool handleOrderedMatch();
@@ -243,7 +243,7 @@ namespace mongo {
          * Set the data portion of the supplied Message to a buffer containing the query results.
          * @return the number of results in the buffer.
          */
-        long long handoff( Message &result );
+        int handoff( Message &result );
         /** A chunk manager found at the beginning of the query. */
         ShardChunkManagerPtr chunkManager() const { return _chunkManager; }
     private:

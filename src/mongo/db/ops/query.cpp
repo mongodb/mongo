@@ -451,7 +451,7 @@ namespace mongo {
         return _reorderBuild.rewriteMatches();
     }
 
-    long long HybridBuildStrategy::bufferedMatches() const {
+    int HybridBuildStrategy::bufferedMatches() const {
         return _reorderedMatches ?
                 _reorderBuild.bufferedMatches() :
                 _orderedBuild.bufferedMatches();
@@ -497,7 +497,7 @@ namespace mongo {
 
     bool QueryResponseBuilder::enoughTotalResults() const {
         if ( _parsedQuery.isExplain() ) {
-            return _parsedQuery.enough( _explain->matches() ) && !_parsedQuery.wantMore();
+            return _parsedQuery.enoughForExplain( _explain->matches() );
         }
         return ( _parsedQuery.enough( _builder->bufferedMatches() ) ||
                 _buf.len() >= MaxBytesToReturnToClientAtOnce );
@@ -507,7 +507,7 @@ namespace mongo {
         _builder->finishedFirstBatch();
     }
 
-    long long QueryResponseBuilder::handoff( Message &result ) {
+    int QueryResponseBuilder::handoff( Message &result ) {
         int rewriteCount = _builder->rewriteMatches();
         if ( _parsedQuery.isExplain() ) {
             shared_ptr<ExplainQueryInfo> explainInfo = _explain->doneQueryInfo();
@@ -702,7 +702,7 @@ namespace mongo {
             throw SendStaleConfigException( ns , "version changed during initial query", shardingVersionAtStart, shardingState.getVersion( ns ) );
         }
 
-        long long nReturned = queryResponseBuilder.handoff( result );
+        int nReturned = queryResponseBuilder.handoff( result );
 
         ccPointer.reset();
         long long cursorid = 0;
