@@ -943,6 +943,7 @@ def doConfigure( myenv , shell=False ):
             m.configure( conf , myenv )
 
     if solaris:
+        conf.CheckLib( "rt" )
         conf.CheckLib( "nsl" )
 
     if usev8:
