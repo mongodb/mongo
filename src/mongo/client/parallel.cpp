@@ -86,7 +86,9 @@ namespace mongo {
         assert( cursor );
         
         if ( cursor->hasResultFlag( ResultFlag_ShardConfigStale ) ) {
-            throw RecvStaleConfigException( _ns , "ClusteredCursor::_checkCursor" );
+            BSONObj error;
+            cursor->peekError( &error );
+            throw RecvStaleConfigException( "ClusteredCursor::_checkCursor", error );
         }
         
         if ( cursor->hasResultFlag( ResultFlag_ErrSet ) ) {
@@ -109,7 +111,8 @@ namespace mongo {
             
             if ( conn.setVersion() ) {
                 conn.done();
-                throw RecvStaleConfigException( _ns , "ClusteredCursor::query" , true );
+                // Deprecated, so we don't care about versions here
+                throw RecvStaleConfigException( _ns , "ClusteredCursor::query" , true, ShardChunkVersion( 0 ), ShardChunkVersion( 0 ) );
             }
             
             LOG(5) << "ClusteredCursor::query (" << type() << ") server:" << server
@@ -638,7 +641,7 @@ namespace mongo {
         finishInit();
     }
 
-    void ParallelSortClusteredCursor::_markStaleNS( const NamespaceString& staleNS, bool& forceReload, bool& fullReload ){
+    void ParallelSortClusteredCursor::_markStaleNS( const NamespaceString& staleNS, const StaleConfigException& e, bool& forceReload, bool& fullReload ){
         if( _staleNSMap.find( staleNS ) == _staleNSMap.end() ){
             forceReload = false;
             fullReload = false;
@@ -647,7 +650,8 @@ namespace mongo {
         else{
             int tries = ++_staleNSMap[ staleNS ];
 
-            if( tries >= 5 ) throw SendStaleConfigException( staleNS, str::stream() << "too many retries of stale version info" );
+            if( tries >= 5 ) throw SendStaleConfigException( staleNS, str::stream() << "too many retries of stale version info",
+                                                             e.getVersionReceived(), e.getVersionWanted() );
 
             forceReload = tries > 1;
             fullReload = tries > 2;
@@ -869,10 +873,10 @@ namespace mongo {
 
                 // Probably need to retry fully
                 bool forceReload, fullReload;
-                _markStaleNS( staleNS, forceReload, fullReload );
+                _markStaleNS( staleNS, e, forceReload, fullReload );
 
                 int logLevel = fullReload ? 0 : 1;
-                log( pc + logLevel ) << "stale config of ns " << staleNS << " during initialization, will retry with forced : " << forceReload << ", full : " << fullReload << endl;
+                log( pc + logLevel ) << "stale config of ns " << staleNS << " during initialization, will retry with forced : " << forceReload << ", full : " << fullReload << causedBy( e ) << endl;
 
                 // This is somewhat strange
                 if( staleNS != ns )
@@ -938,7 +942,6 @@ namespace mongo {
 
     }
 
-
     void ParallelSortClusteredCursor::finishInit(){
 
         bool returnPartial = ( _qSpec.options() & QueryOption_PartialResults );
@@ -946,7 +949,7 @@ namespace mongo {
         string ns = specialVersion ? _cInfo.versionedNS : _qSpec.ns();
 
         bool retry = false;
-        set< string > staleNSes;
+        map< string, StaleConfigException > staleNSExceptions;
 
         log( pc ) << "finishing over " << _cursorMap.size() << " shards" << endl;
 
@@ -1013,7 +1016,7 @@ namespace mongo {
                 retry = true;
 
                 // Will retry all at once
-                staleNSes.insert( e.getns() );
+                staleNSExceptions[ e.getns() ] = e;
 
                 // Fully clear this cursor, as it needs to be re-established
                 mdata.cleanup();
@@ -1050,16 +1053,17 @@ namespace mongo {
         if( retry ){
 
             // Refresh stale namespaces
-            if( staleNSes.size() ){
-                for( set<string>::iterator i = staleNSes.begin(), end = staleNSes.end(); i != end; ++i ){
+            if( staleNSExceptions.size() ){
+                for( map<string,StaleConfigException>::iterator i = staleNSExceptions.begin(), end = staleNSExceptions.end(); i != end; ++i ){
 
-                    const string& staleNS = *i;
+                    const string& staleNS = i->first;
+                    const StaleConfigException& exception = i->second;
 
                     bool forceReload, fullReload;
-                    _markStaleNS( staleNS, forceReload, fullReload );
+                    _markStaleNS( staleNS, exception, forceReload, fullReload );
 
                     int logLevel = fullReload ? 0 : 1;
-                    log( pc + logLevel ) << "stale config of ns " << staleNS << " on finishing query, will retry with forced : " << forceReload << ", full : " << fullReload << endl;
+                    log( pc + logLevel ) << "stale config of ns " << staleNS << " on finishing query, will retry with forced : " << forceReload << ", full : " << fullReload << causedBy( exception ) << endl;
 
                     // This is somewhat strange
                     if( staleNS != ns )
@@ -1249,7 +1253,8 @@ namespace mongo {
 
                 if ( conns[i]->setVersion() ) {
                     conns[i]->done();
-                    staleConfigExs.push_back( (string)"stale config detected for " + RecvStaleConfigException( _ns , "ParallelCursor::_init" , true ).what() + errLoc );
+                    // Version is zero b/c this is deprecated codepath
+                    staleConfigExs.push_back( (string)"stale config detected for " + RecvStaleConfigException( _ns , "ParallelCursor::_init" , ShardChunkVersion( 0 ), ShardChunkVersion( 0 ), true ).what() + errLoc );
                     break;
                 }
 
@@ -1401,8 +1406,10 @@ namespace mongo {
                 errMsg << *i;
             }
 
-            if( throwException && staleConfigExs.size() > 0 )
-                throw RecvStaleConfigException( _ns , errMsg.str() , ! allConfigStale );
+            if( throwException && staleConfigExs.size() > 0 ){
+                // Version is zero b/c this is deprecated codepath
+                throw RecvStaleConfigException( _ns , errMsg.str() , ! allConfigStale, ShardChunkVersion( 0 ), ShardChunkVersion( 0 ) );
+            }
             else if( throwException )
                 throw DBException( errMsg.str(), 14827 );
             else

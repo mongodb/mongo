@@ -278,7 +278,7 @@ namespace QueryOptimizerCursorTests {
             c->initialCandidatePlans();
             c->completePlanOfHybridSetScanAndOrderRequired();
             c->clearIndexesForPatterns();
-            c->abortUnorderedPlans();
+            c->abortOutOfOrderPlans();
             c->noteIterate( false, false, false );
             c->explainQueryInfo();
         }
@@ -2759,7 +2759,7 @@ namespace QueryOptimizerCursorTests {
         }
     };
     
-    class AbortUnorderedPlans : public PlanChecking {
+    class AbortOutOfOrderPlans : public PlanChecking {
     public:
         void run() {
             _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
@@ -2777,7 +2777,7 @@ namespace QueryOptimizerCursorTests {
                 c->advance();
             }
             // Abort the natural plan.
-            c->abortUnorderedPlans();
+            c->abortOutOfOrderPlans();
             c->advance();
             // Check that no more results from the natural plan are returned.
             ASSERT( c->ok() );
@@ -2789,7 +2789,7 @@ namespace QueryOptimizerCursorTests {
         }
     };
     
-    class AbortUnorderedPlanOnLastMatch : public PlanChecking {
+    class AbortOutOfOrderPlanOnLastMatch : public PlanChecking {
     public:
         void run() {
             _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
@@ -2810,7 +2810,7 @@ namespace QueryOptimizerCursorTests {
                 c->advance();
             }
             // Abort the natural plan.
-            c->abortUnorderedPlans();
+            c->abortOutOfOrderPlans();
             c->advance();
             // Check that no more results from the natural plan are returned, and the cursor is not
             // done iterating.
@@ -3891,6 +3891,48 @@ namespace QueryOptimizerCursorTests {
                 ASSERT( clause1[ "indexOnly" ].Bool() );
             }
         };
+        
+        /**
+         * Check that the plan with the most matches is reported at the top of the explain output
+         * in the absence of a done or picked plan.
+         */
+        class VirtualPickedPlan : public Base {
+        public:
+            void run() {
+                dblock lk;
+                Client::Context ctx( ns() );
+                
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
+                _cli.ensureIndex( ns(), BSON( "c" << 1 ) );
+                
+                shared_ptr<Cursor> aCursor
+                ( NamespaceDetailsTransient::getCursor( ns(), BSON( "a" << 1 ) ) );
+                shared_ptr<Cursor> bCursor
+                ( NamespaceDetailsTransient::getCursor( ns(), BSON( "b" << 1 ) ) );
+                shared_ptr<Cursor> cCursor
+                ( NamespaceDetailsTransient::getCursor( ns(), BSON( "c" << 1 ) ) );
+                
+                shared_ptr<ExplainPlanInfo> aPlan( new ExplainPlanInfo() );
+                aPlan->notePlan( *aCursor, false, false );
+                shared_ptr<ExplainPlanInfo> bPlan( new ExplainPlanInfo() );
+                bPlan->notePlan( *bCursor, false, false );
+                shared_ptr<ExplainPlanInfo> cPlan( new ExplainPlanInfo() );
+                cPlan->notePlan( *cCursor, false, false );
+                
+                aPlan->noteIterate( true, false, *aCursor ); // one match a
+                bPlan->noteIterate( true, false, *bCursor ); // two matches b
+                bPlan->noteIterate( true, false, *bCursor );
+                cPlan->noteIterate( true, false, *cCursor ); // one match c
+                
+                shared_ptr<ExplainClauseInfo> clause( new ExplainClauseInfo() );
+                clause->addPlanInfo( aPlan );
+                clause->addPlanInfo( bPlan );
+                clause->addPlanInfo( cPlan );
+                
+                ASSERT_EQUALS( "BtreeCursor b_1", clause->bson()[ "cursor" ].String() );
+            }
+        };
 
         // test takeover w/ mixed plan clause ? necessary?
 
@@ -3992,8 +4034,8 @@ namespace QueryOptimizerCursorTests {
             add<PossibleInOrderPlans>();
             add<PossibleOutOfOrderPlans>();
             add<PossibleBothPlans>();
-            add<AbortUnorderedPlans>();
-            add<AbortUnorderedPlanOnLastMatch>();
+            add<AbortOutOfOrderPlans>();
+            add<AbortOutOfOrderPlanOnLastMatch>();
             add<TakeoverOrRangeElimination>();
             add<TakeoverOrDedups>();
             add<GetCursor::NoConstraints>();
@@ -4046,6 +4088,7 @@ namespace QueryOptimizerCursorTests {
             add<Explain::NChunkSkipsTakeover>();
             add<Explain::CoveredIndex>();
             add<Explain::CoveredIndexTakeover>();
+            add<Explain::VirtualPickedPlan>();
         }
     } myall;
     

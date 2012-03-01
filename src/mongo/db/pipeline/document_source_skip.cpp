@@ -107,14 +107,17 @@ namespace mongo {
     intrusive_ptr<DocumentSource> DocumentSourceSkip::createFromBson(
         BSONElement *pBsonElement,
         const intrusive_ptr<ExpressionContext> &pExpCtx) {
-        uassert(15972, str::stream() << "the value to " <<
-                skipName << " must be a number", pBsonElement->isNumber());
+        uassert(15972, str::stream() << DocumentSourceSkip::skipName <<
+                ":  the value to skip must be a number",
+                pBsonElement->isNumber());
 
         intrusive_ptr<DocumentSourceSkip> pSkip(
             DocumentSourceSkip::create(pExpCtx));
 
-        pSkip->skip = (int)pBsonElement->numberLong();
-        assert(pSkip->skip > 0); // CW TODO error code
+        pSkip->skip = pBsonElement->numberLong();
+        uassert(15956, str::stream() << DocumentSourceSkip::skipName <<
+                ":  the number to skip cannot be negative",
+                pSkip->skip >= 0);
 
         return pSkip;
     }

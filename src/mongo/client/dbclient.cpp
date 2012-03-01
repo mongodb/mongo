@@ -253,13 +253,18 @@ namespace mongo {
 
     enum QueryOptions DBClientWithCommands::availableOptions() {
         if ( !_haveCachedAvailableOptions ) {
-            BSONObj ret;
-            if ( runCommand( "admin", BSON( "availablequeryoptions" << 1 ), ret ) ) {
-                _cachedAvailableOptions = ( enum QueryOptions )( ret.getIntField( "options" ) );
-            }
+            _cachedAvailableOptions = _lookupAvailableOptions();
             _haveCachedAvailableOptions = true;
         }
         return _cachedAvailableOptions;
+    }
+
+    enum QueryOptions DBClientWithCommands::_lookupAvailableOptions() {
+        BSONObj ret;
+        if ( runCommand( "admin", BSON( "availablequeryoptions" << 1 ), ret ) ) {
+            return QueryOptions( ret.getIntField( "options" ) );
+        }
+        return QueryOptions(0);
     }
 
     inline bool DBClientWithCommands::runCommand(const string &dbname, const BSONObj& cmd, BSONObj &info, int options) {
@@ -574,8 +579,11 @@ namespace mongo {
 
         uassert( 10276 ,  str::stream() << "DBClientBase::findN: transport error: " << getServerAddress() << " ns: " << ns << " query: " << query.toString(), c.get() );
 
-        if ( c->hasResultFlag( ResultFlag_ShardConfigStale ) )
-            throw RecvStaleConfigException( ns , "findN stale config" );
+        if ( c->hasResultFlag( ResultFlag_ShardConfigStale ) ){
+            BSONObj error;
+            c->peekError( &error );
+            throw RecvStaleConfigException( "findN stale config", error );
+        }
 
         for( int i = 0; i < nToReturn; i++ ) {
             if ( !c->more() )
@@ -700,33 +708,55 @@ namespace mongo {
         boost::function<void(const BSONObj &)> _f;
     };
 
-    unsigned long long DBClientConnection::query( boost::function<void(const BSONObj&)> f, const string& ns, Query query, const BSONObj *fieldsToReturn, int queryOptions ) {
+    unsigned long long DBClientBase::query( boost::function<void(const BSONObj&)> f, const string& ns, Query query, const BSONObj *fieldsToReturn, int queryOptions ) {
         DBClientFunConvertor fun;
         fun._f = f;
         boost::function<void(DBClientCursorBatchIterator &)> ptr( fun );
-        return DBClientConnection::query( ptr, ns, query, fieldsToReturn, queryOptions );
+        return this->query( ptr, ns, query, fieldsToReturn, queryOptions );
     }
 
-    unsigned long long DBClientConnection::query( boost::function<void(DBClientCursorBatchIterator &)> f, const string& ns, Query query, const BSONObj *fieldsToReturn, int queryOptions ) {
+    unsigned long long DBClientBase::query(
+            boost::function<void(DBClientCursorBatchIterator &)> f,
+            const string& ns,
+            Query query,
+            const BSONObj *fieldsToReturn,
+            int queryOptions ) {
+
         // mask options
         queryOptions &= (int)( QueryOption_NoCursorTimeout | QueryOption_SlaveOk );
+
+        auto_ptr<DBClientCursor> c( this->query(ns, query, 0, 0, fieldsToReturn, queryOptions) );
+        uassert( 16090, "socket error for mapping query", c.get() );
+
         unsigned long long n = 0;
 
-        bool doExhaust = ( availableOptions() & QueryOption_Exhaust );
-        if ( doExhaust ) {
-            queryOptions |= (int)QueryOption_Exhaust;
+        while ( c->more() ) {
+            DBClientCursorBatchIterator i( *c );
+            f( i );
+            n += i.n();
         }
+        return n;
+    }
+
+    unsigned long long DBClientConnection::query(
+            boost::function<void(DBClientCursorBatchIterator &)> f,
+            const string& ns,
+            Query query,
+            const BSONObj *fieldsToReturn,
+            int queryOptions ) {
+
+        if ( ! availableOptions() & QueryOption_Exhaust ) {
+            return DBClientBase::query( f, ns, query, fieldsToReturn, queryOptions );
+        }
+
+        // mask options
+        queryOptions &= (int)( QueryOption_NoCursorTimeout | QueryOption_SlaveOk );
+        queryOptions |= (int)QueryOption_Exhaust;
+
         auto_ptr<DBClientCursor> c( this->query(ns, query, 0, 0, fieldsToReturn, queryOptions) );
         uassert( 13386, "socket error for mapping query", c.get() );
 
-        if ( !doExhaust ) {
-            while( c->more() ) {
-                DBClientCursorBatchIterator i( *c );
-                f( i );
-                n += i.n();
-            }
-            return n;
-        }
+        unsigned long long n = 0;
 
         try {
             while( 1 ) {

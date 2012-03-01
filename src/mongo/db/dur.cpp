@@ -374,11 +374,10 @@ namespace mongo {
                     _bytes += mmf->length();
 
                     assert( mmf->length() == (unsigned) mmf->length() );
-                    {
-                        scoped_lock lk( privateViews._mutex() ); // see setNoJournal
-                        if (memcmp(p, w, (unsigned) mmf->length()) == 0)
-                            return; // next file
-                    }
+
+                    scoped_lock lk( privateViews._mutex() ); // see setNoJournal
+                    if (memcmp(p, w, (unsigned) mmf->length()) == 0)
+                        return; // next file
 
                     unsigned low = 0xffffffff;
                     unsigned high = 0;

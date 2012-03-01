@@ -21,6 +21,7 @@
 #include "../util/base64.h"
 #include "../util/text.h"
 #include "../util/hex.h"
+#include "../db/namespacestring.h"
 
 #if( BOOST_VERSION >= 104200 )
 //#include <boost/uuid/uuid.hpp>
@@ -513,6 +514,12 @@ namespace mongo {
 
     JSBool db_constructor( JSContext *cx, JSObject *obj, uintN argc, jsval *argv, jsval *rval ) {
         smuassert( cx,  "wrong number of arguments to DB" , argc == 2 );
+
+        Convertor convertor( cx );
+        string dbName = convertor.toString( argv[1] );
+        smuassert( cx, "invalid database name",
+                   NamespaceString::validDBName( dbName ) );
+
         assert( JS_SetProperty( cx , obj , "_mongo" , &(argv[0]) ) );
         assert( JS_SetProperty( cx , obj , "_name" , &(argv[1]) ) );
 

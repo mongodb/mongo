@@ -1,4 +1,4 @@
-// @file queryoptimizercursorimpl.h
+// @file queryoptimizercursorimpl.h - A cursor interleaving multiple candidate cursors.
 
 /**
  *    Copyright (C) 2011 10gen Inc.
@@ -167,6 +167,11 @@ namespace mongo {
         long long _accesses;
     };
     
+    /**
+     * Helper class for generating a simple Cursor or QueryOptimizerCursor from a set of query
+     * parameters.  This class was refactored from a single function call and is not expected to
+     * outlive its constructor arguments.
+     */
     class CursorGenerator {
     public:
         CursorGenerator( const char *ns,

@@ -19,26 +19,16 @@
 #include "pch.h"
 #include "query.h"
 #include "../pdfile.h"
-#include "../jsobjmanipulator.h"
+#include "../clientcursor.h"
+#include "../oplog.h"
 #include "../../bson/util/builder.h"
-#include <time.h>
-#include "../introspect.h"
-#include "../btree.h"
-#include "../../util/lruishmap.h"
-#include "../json.h"
-#include "../repl.h"
 #include "../replutil.h"
 #include "../scanandorder.h"
-#include "../security.h"
-#include "../curop-inl.h"
 #include "../commands.h"
 #include "../queryoptimizer.h"
-#include "../lasterror.h"
 #include "../../s/d_logic.h"
-#include "../repl_block.h"
 #include "../../server.h"
-#include "../d_concurrency.h"
-#include "../queryoptimizercursorimpl.h"
+#include "../queryoptimizercursor.h"
 
 namespace mongo {
 
@@ -426,7 +416,7 @@ namespace mongo {
                     throw QueryRetryException();
                 }
                 else if ( _queryOptimizerCursor->runningInitialInOrderPlan() ) {
-                    _queryOptimizerCursor->abortUnorderedPlans();
+                    _queryOptimizerCursor->abortOutOfOrderPlans();
                     return;
                 }
             }
@@ -443,7 +433,7 @@ namespace mongo {
     }
     
     void HybridBuildStrategy::finishedFirstBatch() {
-        _queryOptimizerCursor->abortUnorderedPlans();
+        _queryOptimizerCursor->abortOutOfOrderPlans();
     }
     
     QueryResponseBuilder::QueryResponseBuilder( const ParsedQuery &parsedQuery,
@@ -528,11 +518,11 @@ namespace mongo {
 
     shared_ptr<ExplainRecordingStrategy> QueryResponseBuilder::newExplainRecordingStrategy
     ( const QueryPlan::Summary &queryPlan, const BSONObj &oldPlan ) const {
-        ExplainQueryInfo::AncillaryInfo ancillaryInfo;
-        ancillaryInfo._oldPlan = oldPlan;
         if ( !_parsedQuery.isExplain() ) {
             return shared_ptr<ExplainRecordingStrategy>( new NoExplainStrategy() );
         }
+        ExplainQueryInfo::AncillaryInfo ancillaryInfo;
+        ancillaryInfo._oldPlan = oldPlan;
         if ( _queryOptimizerCursor ) {
             return shared_ptr<ExplainRecordingStrategy>
             ( new QueryOptimizerCursorExplainStrategy( ancillaryInfo, _queryOptimizerCursor ) );
@@ -592,6 +582,10 @@ namespace mongo {
         return false;
     }
     
+    /**
+     * Run a query with a cursor provided by the query optimizer, or FindingStartCursor.
+     * @yields the db lock.
+     */
     const char *queryWithQueryOptimizer( Message &m, int queryOptions, const char *ns,
                                         const BSONObj &jsobj, CurOp& curop,
                                         const BSONObj &query, const BSONObj &order,
@@ -599,9 +593,11 @@ namespace mongo {
                                         const BSONObj &oldPlan,
                                         const ConfigVersion &shardingVersionAtStart,
                                         Message &result ) {
+
         const ParsedQuery &pq( *pq_shared );
         shared_ptr<Cursor> cursor;
         QueryPlan::Summary queryPlan;
+        
         if ( pq.hasOption( QueryOption_OplogReplay ) ) {
             cursor = FindingStartCursor::getCursor( ns, query, order );
         }
@@ -626,6 +622,8 @@ namespace mongo {
                 !cursor->ok() ) {
                 cursor.reset();
                 queryResponseBuilder.noteYield();
+                // !!! TODO The queryResponseBuilder still holds cursor.  Currently it will not do
+                // anything unsafe with the cursor in handoff(), but this is very fragile.
                 break;
             }
 
@@ -641,6 +639,7 @@ namespace mongo {
                 continue;
             }
             
+            // Note slave's position in the oplog.
             if ( pq.hasOption( QueryOption_OplogReplay ) ) {
                 BSONObj current = cursor->current();
                 BSONElement e = current["ts"];
@@ -682,7 +681,7 @@ namespace mongo {
             // we might be missing some data
             // and its safe to send this as mongos can resend
             // at this point
-            throw SendStaleConfigException( ns , "version changed during initial query" );
+            throw SendStaleConfigException( ns , "version changed during initial query", shardingVersionAtStart, shardingState.getVersion( ns ) );
         }
 
         long long nReturned = queryResponseBuilder.handoff( result );
@@ -690,6 +689,7 @@ namespace mongo {
         ccPointer.reset();
         long long cursorid = 0;
         if ( saveClientCursor ) {
+            // Create a new ClientCursor, with a default timeout.
             ccPointer.reset( new ClientCursor( queryOptions, cursor, ns,
                                               jsobj.getOwned() ) );
             cursorid = ccPointer->cursorid();
@@ -702,8 +702,10 @@ namespace mongo {
                 ccPointer->updateLocation();
             }
             
+            // !!! Save the original message buffer, so it can be referenced in getMore.
             ccPointer->originalMessage = m;
-            
+
+            // Save slave's position in the oplog.
             if ( pq.hasOption( QueryOption_OplogReplay ) && !slaveReadTill.isNull() ) {
                 ccPointer->slaveReadTill( slaveReadTill );
             }
@@ -717,6 +719,7 @@ namespace mongo {
                 curop.debug().exhaust = true;
             }
             
+            // Set attributes for getMore.
             ccPointer->setChunkManager( queryResponseBuilder.chunkManager() );
             ccPointer->setPos( nReturned );
             ccPointer->pq = pq_shared;
@@ -745,9 +748,13 @@ namespace mongo {
         return exhaust;
     }
     
-    /* run a query -- includes checking for and running a Command \
-       @return points to ns if exhaust mode. 0=normal mode
-    */
+    /**
+     * Run a query -- includes checking for and running a Command.
+     * @return points to ns if exhaust mode. 0=normal mode
+     * @locks the db mutex for reading (and potentially for writing temporarily to create a new db).
+     * @yields the db mutex periodically after acquiring it.
+     * @asserts on scan and order memory exhaustion and other cases.
+     */
     const char *runQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result) {
         shared_ptr<ParsedQuery> pq_shared( new ParsedQuery(q) );
         ParsedQuery& pq( *pq_shared );
@@ -763,6 +770,8 @@ namespace mongo {
         curop.debug().query = jsobj;
         curop.setQuery(jsobj);
 
+        // Run a command.
+        
         if ( pq.couldBeCommand() ) {
             BufBuilder bb;
             bb.skip(sizeof(QueryResult));
@@ -789,8 +798,6 @@ namespace mongo {
             }
             return 0;
         }
-
-        /* --- regular query --- */
 
         bool explain = pq.isExplain();
         BSONObj order = pq.getOrder();
@@ -824,6 +831,8 @@ namespace mongo {
             }
         }
 
+        // Run a simple id query.
+        
         if ( ! (explain || pq.showDiskLoc()) && isSimpleIdQuery( query ) && !pq.hasOption( QueryOption_CursorTailable ) ) {
 
             int n = 0;
@@ -858,9 +867,8 @@ namespace mongo {
             }
         }
         
-        // regular, not QO bypass query
+        // Run a regular query.
         
-        // TODO clean this up a bit.
         BSONObj oldPlan;
         if ( explain && ! pq.hasIndexSpecifier() ) {
             MultiPlanScanner mps( ns, query, shared_ptr<Projection>(), order );
@@ -871,6 +879,7 @@ namespace mongo {
             }
         }
 
+        // In some cases the query may be retried if there is an in memory sort size assertion.
         for( int retry = 0; retry < 2; ++retry ) {
             try {
                 return queryWithQueryOptimizer( m, queryOptions, ns, jsobj, curop, query, order,

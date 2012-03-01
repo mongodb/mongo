@@ -222,6 +222,4 @@ namespace mongo {
         return false;
     }
 
-    // Static symbols
-    ProcessInfo::SystemInfo ProcessInfo::_sysInfo;
 }

@@ -49,48 +49,48 @@ namespace mongo {
         /**
          * Get the type of os (e.g. Windows, Linux, Mac OS)
          */
-        const string& getOsType() const { return _sysInfo.osType; }
+        const string& getOsType() const { return sysInfo().osType; }
 
         /**
          * Get the os Name (e.g. Ubuntu, Gentoo, Windows Server 2008)
          */
-        const string& getOsName() const { return _sysInfo.osName; }
+        const string& getOsName() const { return sysInfo().osName; }
 
         /**
          * Get the os version (e.g. 10.04, 11.3.0, 6.1 (build 7600))
          */
-        const string& getOsVersion() const { return _sysInfo.osVersion; }
+        const string& getOsVersion() const { return sysInfo().osVersion; }
 
         /**
          * Get the cpu address size (e.g. 32, 36, 64)
          */
-        const unsigned getAddrSize() const { return _sysInfo.addrSize; }
+        const unsigned getAddrSize() const { return sysInfo().addrSize; }
 
         /**
          * Get the total amount of system memory in MB
          */
-        const unsigned long long getMemSizeMB() const { return _sysInfo.memSize / (1024 * 1024); }
+        const unsigned long long getMemSizeMB() const { return sysInfo().memSize / (1024 * 1024); }
 
         /**
          * Get the number of CPUs
          */
-        const unsigned getNumCores() const { return _sysInfo.numCores; }
+        const unsigned getNumCores() const { return sysInfo().numCores; }
 
         /**
          * Get the CPU architecture (e.g. x86, x86_64)
          */
-        const string& getArch() const { return _sysInfo.cpuArch; }
+        const string& getArch() const { return sysInfo().cpuArch; }
 
         /**
          * Determine if NUMA is enabled (interleaved) for this process
          */
-        bool hasNumaEnabled() const { return _sysInfo.hasNuma; }
+        bool hasNumaEnabled() const { return sysInfo().hasNuma; }
 
         /**
          * Get extra system stats
          */
         void appendSystemDetails( BSONObjBuilder& details ) const {
-            details.append( StringData("extra"), _sysInfo._extraStats.copy() );
+            details.append( StringData("extra"), sysInfo()._extraStats.copy() );
         }
 
         /**
@@ -133,9 +133,12 @@ namespace mongo {
         };
 
         pid_t _pid;
-        static SystemInfo _sysInfo;
-
         static bool checkNumaEnabled();
+        const SystemInfo& sysInfo() const {
+            // initialize and collect sysInfo on first call
+            static ProcessInfo::SystemInfo *initSysInfo = new SystemInfo();
+            return *initSysInfo;
+        }
 
     };
 

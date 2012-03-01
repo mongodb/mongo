@@ -903,6 +903,7 @@ def doConfigure( myenv , shell=False ):
     removeIfInList( myenv["LIBS"] , "wpcap" )
 
     if solaris:
+        conf.CheckLib( "rt" )
         conf.CheckLib( "nsl" )
 
     if usev8:

@@ -214,8 +214,9 @@ namespace mongo {
        an exception) before the failover is complete.  Operations are not retried.
     */
     class DBClientReplicaSet : public DBClientBase {
-
     public:
+        using DBClientBase::query;
+
         /** Call connect() after constructing. autoReconnect is always on for DBClientReplicaSet connections. */
         DBClientReplicaSet( const string& name , const vector<HostAndPort>& servers, double so_timeout=0 );
         virtual ~DBClientReplicaSet();

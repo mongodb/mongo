@@ -40,6 +40,9 @@ namespace mongo {
      */
     class SyncClusterConnection : public DBClientBase {
     public:
+
+        using DBClientBase::query;
+
         /**
          * @param commaSeparated should be 3 hosts comma separated
          */

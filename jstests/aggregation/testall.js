@@ -2,22 +2,11 @@
   Run all the aggregation tests
 */
 
-// TestData is set by the smoketest framework; if it is not defined,
-// then loaded files are assumed to be in in the current directory
-if (typeof TestData !== "undefined" && typeof TestData.testPath !== "undefined") {
-    var mydir = TestData.testPath.substr(0, TestData.testPath.lastIndexOf("/"))
-    if (mydir[mydir.length - 1] !== '/') {
-        mydir += '/';
-    }
-} else {
-    var mydir = '';
-}
-
 /* load the test documents */
-load(mydir + 'articles.js');
+load('jstests/aggregation/articles.js');
 
 /* load the test utilities */
-load(mydir + 'utils.js');
+load('jstests/aggregation/utils.js');
 
 // make sure we're using the right db; this is the same as "use mydb;" in shell
 db = db.getSiblingDB("aggdb");

@@ -97,6 +97,8 @@ namespace mongo {
     template< class Builder >
     void Mod::apply( Builder& b , BSONElement in , ModState& ms ) const {
         if ( ms.dontApply ) {
+            // Pass the original element through unchanged.
+            b << in;
             return;
         }
 

@@ -102,6 +102,12 @@ namespace mongo {
             }
         }
         
+        /**
+         * @return a BasicCursor constructed using a FindingStartCursor with the provided query and
+         * order parameters.
+         * @yields the db lock.
+         * @asserts on yield recovery failure.
+         */
         static shared_ptr<Cursor> getCursor( const char *ns, const BSONObj &query, const BSONObj &order );
 
     private:

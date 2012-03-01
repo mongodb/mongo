@@ -94,6 +94,10 @@ namespace mongo {
 
         shared_ptr<Projection::KeyOnly> keyFieldsOnly() const { return _keyFieldsOnly; }
         
+        /**
+         * A QueryPlan::Summary owns its own attributes and may be shared.  Currently a QueryPlan
+         * should only be owned by a QueryPlanSet.
+         */
         struct Summary {
             Summary() :
             _scanAndOrderRequired() {
@@ -287,10 +291,11 @@ namespace mongo {
         typedef boost::shared_ptr<QueryPlan> QueryPlanPtr;
         typedef vector<QueryPlanPtr> PlanSet;
 
+        /** Policies for utilizing recorded plans. */
         typedef enum {
-            Ignore,
-            UseIfInOrder,
-            Use
+            Ignore, // Ignore the recorded plan and try all candidate plans.
+            UseIfInOrder, // Use the recorded plan if it is properly ordered.
+            Use // Always use the recorded plan.
         } RecordedPlanPolicy;
         
         /**
@@ -324,8 +329,11 @@ namespace mongo {
         const FieldRangeSetPair &frsp() const { return *_frsp; }
         BSONObj order() const { return _order; }
         
+        /** @return true if an active plan is in order. */
         bool haveInOrderPlan() const;
+        /** @return true if an active or fallback plan is in order. */
         bool possibleInOrderPlan() const;
+        /** @return true if an active or fallback plan is out of order. */
         bool possibleOutOfOrderPlan() const;
 
         bool prepareToRetryQuery();
@@ -438,7 +446,8 @@ namespace mongo {
          * @return best guess query plan of the next $or clause
          */
         const QueryPlan *nextClauseBestGuessPlan( const QueryPlan &currentPlan );
-        
+
+        /** Add explain information for a new clause. */
         void addClauseInfo( const shared_ptr<ExplainClauseInfo> &clauseInfo ) {
             verify( 16072, _explainQueryInfo );
             _explainQueryInfo->addClauseInfo( clauseInfo );
@@ -488,10 +497,14 @@ namespace mongo {
         bool modifiedKeys() const { return _currentQps->modifiedKeys(); }
         bool hasMultiKey() const { return _currentQps->hasMultiKey(); }
         
+        /** Clear recorded indexes for the current QueryPlanSet's patterns. */
         void clearIndexesForPatterns() const;
 
+        /** @return true if an active plan of _currentQps is in order. */
         bool haveInOrderPlan() const;
+        /** @return true if an active or fallback plan of _currentQps is in order. */
         bool possibleInOrderPlan() const;
+        /** @return true if an active or fallback plan of _currentQps is out of order. */
         bool possibleOutOfOrderPlan() const;
         
         string toString() const;

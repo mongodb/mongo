@@ -23,7 +23,7 @@
 
 namespace mongo {
     
-    // TODO get rid of const casts
+    // !!! TODO get rid of const casts
 
     ExplainPlanInfo::ExplainPlanInfo() :
     _isMultiKey(),
@@ -170,22 +170,18 @@ namespace mongo {
             }
         }
         // Return a plan with the highest match count.
-        // TODO simplify
-        long long maxN = 0;
+        long long maxN = -1;
+        shared_ptr<const ExplainPlanInfo> ret;
         for( list<shared_ptr<const ExplainPlanInfo> >::const_iterator i = _plans.begin();
             i != _plans.end(); ++i ) {
-            if ( (*i)->n() > maxN ) {
-                maxN = (*i)->n();
+            long long n = ( *i )->n();
+            if ( n > maxN ) {
+                maxN = n;
+                ret = *i;
             }
         }
-        for( list<shared_ptr<const ExplainPlanInfo> >::const_iterator i = _plans.begin();
-            i != _plans.end(); ++i ) {
-            if ( (*i)->n() == maxN ) {
-                return **i;
-            }
-        }
-        verify( 16076, false );
-        return *(new ExplainPlanInfo());
+        verify( 16076, ret );
+        return *ret;
     }
     
     void ExplainQueryInfo::noteIterate( bool match, bool loadedObject, bool chunkSkip ) {

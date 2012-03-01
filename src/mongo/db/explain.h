@@ -28,6 +28,7 @@ namespace mongo {
      * edit the JS to make sure everything gets filtered.
      */
     
+    /** The timer starts on construction and provides the duration since then or until stopped. */
     class DurationTimer {
     public:
         DurationTimer() : _running( true ), _duration() {}
@@ -41,17 +42,25 @@ namespace mongo {
     
     class ExplainClauseInfo;
     
+    /** Data describing execution of a query plan. */
     class ExplainPlanInfo {
     public:
         ExplainPlanInfo();
-        
+
+        /** Note information about the plan. */
         void notePlan( const Cursor &cursor, bool scanAndOrder, bool indexOnly );
+        /** Note an iteration of the plan. */
         void noteIterate( bool match, bool loadedObject, const Cursor &cursor );
+        /** Note that the plan yielded. */
         void noteYield();
+        /** Note that the plan finished execution. */
         void noteDone( const Cursor &cursor );
+        /** Note that the plan was chosen over others by the query optimizer. */
         void notePicked();
 
+        /** BSON summary of the plan. */
         BSONObj bson() const;
+        /** Combined details of both the plan and its clause. */
         BSONObj pickedPlanBson( const ExplainClauseInfo &clauseInfo ) const;
 
         bool picked() const { return _picked; }
@@ -75,14 +84,19 @@ namespace mongo {
         BSONObj _details;
     };
     
+    /** Data describing execution of a query clause. */
     class ExplainClauseInfo {
     public:
         ExplainClauseInfo();
 
+        /** Note an iteration of the clause. */
         void noteIterate( bool match, bool loadedObject, bool chunkSkip );
+        /** Revise the total number of documents returned to match an external count. */
         void reviseN( long long n );
+        /** Stop the clauses's timer. */
         void stopTimer();
 
+        /** Add information about a plan to this clause. */
         void addPlanInfo( const shared_ptr<ExplainPlanInfo> &info );
         BSONObj bson() const;
 
@@ -101,16 +115,21 @@ namespace mongo {
         DurationTimer _timer;
     };
     
+    /** Data describing execution of a query. */
     class ExplainQueryInfo {
     public:
+        /** Note an iteration of the query's current clause. */
         void noteIterate( bool match, bool loadedObject, bool chunkSkip );
+        /** Revise the number of documents returned by the current clause. */
         void reviseN( long long n );
 
+        /* Additional information describing the query. */
         struct AncillaryInfo {
             BSONObj _oldPlan;
         };
         void setAncillaryInfo( const AncillaryInfo &ancillaryInfo );
         
+        /* Add information about a clause to this query. */
         void addClauseInfo( const shared_ptr<ExplainClauseInfo> &info );
         BSONObj bson() const;
 
@@ -120,24 +139,30 @@ namespace mongo {
         DurationTimer _timer;
     };
     
+    /** Data describing execution of a query with a single clause and plan. */
     class ExplainSinglePlanQueryInfo {
     public:
         ExplainSinglePlanQueryInfo();
 
+        /** Note information about the plan. */
         void notePlan( const Cursor &cursor, bool scanAndOrder, bool indexOnly ) {
             _planInfo->notePlan( cursor, scanAndOrder, indexOnly );
         }
+        /** Note an iteration of the plan and the clause. */
         void noteIterate( bool match, bool loadedObject, bool chunkSkip, const Cursor &cursor ) {
             _planInfo->noteIterate( match, loadedObject, cursor );
             _queryInfo->noteIterate( match, loadedObject, chunkSkip );
         }
+        /** Note that the plan yielded. */
         void noteYield() {
             _planInfo->noteYield();
         }
+        /** Note that the plan finished execution. */
         void noteDone( const Cursor &cursor ) {
             _planInfo->noteDone( cursor );
         }
 
+        /** Return the corresponding ExplainQueryInfo for further use. */
         shared_ptr<ExplainQueryInfo> queryInfo() const {
             return _queryInfo;
         }

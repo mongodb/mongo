@@ -140,6 +140,7 @@ namespace mongo {
             }
             operator bool() { return _c; }
             ClientCursor * operator-> () { return _c; }
+            /** Release ownership of the ClientCursor. */
             void release() {
                 _c = 0;
                 _id = -1;

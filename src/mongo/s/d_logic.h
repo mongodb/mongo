@@ -223,8 +223,9 @@ namespace mongo {
 
     /**
      * @return true if the current threads shard version is ok, or not in sharded version
+     * Also returns an error message and the Config/ShardChunkVersions causing conflicts
      */
-    bool shardVersionOk( const string& ns , string& errmsg );
+    bool shardVersionOk( const string& ns , string& errmsg, ConfigVersion& received, ConfigVersion& wanted );
 
     /**
      * @return true if we took care of the message and nothing else should be done

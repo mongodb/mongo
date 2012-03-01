@@ -56,7 +56,9 @@ namespace mongo {
         DbMessage d(m);
         const char *ns = d.getns();
         string errmsg;
-        if ( shardVersionOk( ns , errmsg ) ) {
+        // We don't care about the version here, since we're returning it later in the writeback
+        ConfigVersion received, wanted;
+        if ( shardVersionOk( ns , errmsg, received, wanted ) ) {
             return false;
         }
 

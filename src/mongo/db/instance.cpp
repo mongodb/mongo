@@ -243,7 +243,7 @@ namespace mongo {
             assert( !resp->empty() );
         }
         catch ( SendStaleConfigException& e ){
-            ex.reset( new SendStaleConfigException( e.getns(), e.getInfo().msg ) );
+            ex.reset( new SendStaleConfigException( e.getns(), e.getInfo().msg, e.getVersionReceived(), e.getVersionWanted() ) );
             ok = false;
         }
         catch ( AssertionException& e ) {
@@ -266,7 +266,11 @@ namespace mongo {
 
             BSONObjBuilder err;
             ex->getInfo().append( err );
-            if( scex ) err.append( "ns", scex->getns() );
+            if( scex ){
+                err.append( "ns", scex->getns() );
+                err.appendTimestamp( "vReceived", scex->getVersionReceived() );
+                err.appendTimestamp( "vWanted", scex->getVersionWanted() );
+            }
             BSONObj errObj = err.done();
 
             log() << errObj << endl;
@@ -458,7 +462,7 @@ namespace mongo {
             else {
                 writelock lk;
                 if ( dbHolder()._isLoaded( nsToDatabase( currentOp.getNS() ) , dbpath ) ) {
-                    Client::Context cx( currentOp.getNS() );
+                    Client::Context cx( currentOp.getNS(), dbpath, false );
                     profile(c , currentOp );
                 }
                 else {
@@ -822,6 +826,11 @@ namespace mongo {
             }
         }
         return false;
+    }
+
+    QueryOptions DBDirectClient::_lookupAvailableOptions() {
+        // Exhaust mode is not available in DBDirectClient.
+        return QueryOptions(DBClientBase::_lookupAvailableOptions() & ~QueryOption_Exhaust);
     }
 
     bool DBDirectClient::call( Message &toSend, Message &response, bool assertOk , string * actualServer ) {

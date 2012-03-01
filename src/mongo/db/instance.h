@@ -85,6 +85,8 @@ namespace mongo {
      */
     class DBDirectClient : public DBClientBase {
     public:
+        using DBClientBase::query;
+
         virtual auto_ptr<DBClientCursor> query(const string &ns, Query query, int nToReturn = 0, int nToSkip = 0,
                                                const BSONObj *fieldsToReturn = 0, int queryOptions = 0, int batchSize = 0);
 
@@ -117,6 +119,9 @@ namespace mongo {
         double getSoTimeout() const { return 0; }
 
         virtual bool lazySupported() const { return true; }
+
+        virtual QueryOptions _lookupAvailableOptions();
+
     private:
         static HostAndPort _clientHost;
     };

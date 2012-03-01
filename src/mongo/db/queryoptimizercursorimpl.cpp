@@ -1,4 +1,4 @@
-// @file queryoptimizercursorimpl.cpp
+// @file queryoptimizercursorimpl.cpp - A cursor interleaving multiple candidate cursors.
 
 /**
  *    Copyright (C) 2011 10gen Inc.
@@ -540,7 +540,7 @@ namespace mongo {
             }
         }
         
-        virtual void abortUnorderedPlans() {
+        virtual void abortOutOfOrderPlans() {
             _requireOrder = true;
         }
         

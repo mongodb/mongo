@@ -27,6 +27,7 @@
 #include "../db/dbmessage.h"
 #include "../db/matcher.h"
 #include "../util/concurrency/mvar.h"
+#include "../s/util.h"
 
 namespace mongo {
 
@@ -375,7 +376,7 @@ namespace mongo {
 
         virtual void _explain( map< string,list<BSONObj> >& out );
 
-        void _markStaleNS( const NamespaceString& staleNS, bool& forceReload, bool& fullReload );
+        void _markStaleNS( const NamespaceString& staleNS, const StaleConfigException& e, bool& forceReload, bool& fullReload );
         void _handleStaleNS( const NamespaceString& staleNS, bool forceReload, bool fullReload );
 
         set<Shard> _qShards;

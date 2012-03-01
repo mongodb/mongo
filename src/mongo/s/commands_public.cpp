@@ -87,7 +87,7 @@ namespace mongo {
                 bool ok = conn->runCommand( db , cmdObj , res , passOptions() ? options : 0 );
                 if ( ! ok && res["code"].numberInt() == SendStaleConfigCode ) {
                     conn.done();
-                    throw RecvStaleConfigException( res["ns"].toString(),"command failed because of stale config");
+                    throw RecvStaleConfigException( "command failed because of stale config", res );
                 }
                 result.appendElements( res );
                 conn.done();
@@ -683,7 +683,7 @@ namespace mongo {
                 conn.done();
 
                 if (!ok && res.getIntField("code") == RecvStaleConfigCode) { // code for RecvStaleConfigException
-                    throw RecvStaleConfigException(fullns, "FindAndModify"); // Command code traps this and re-runs
+                    throw RecvStaleConfigException( "FindAndModify", res ); // Command code traps this and re-runs
                 }
 
                 result.appendElements(res);

@@ -52,7 +52,7 @@ namespace mongo {
             assert( !bucket.isNull() );
             const BtreeBucket<V> *b = bucket.btree<V>();
             int n = b->getN();
-            if( n == 0xffff ) { 
+            if( n == b->INVALID_N_SENTINEL ) {
                 throw UserException(15850, "keyAt bucket deleted");
             }
             dassert( n >= 0 && n < 10000 );
