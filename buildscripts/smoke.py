@@ -333,10 +333,16 @@ def runTest(test):
                      'TestData.auth = ' + ternary( auth ) + ";" + \
                      'TestData.keyFile = ' + ternary( keyFile , '"' + str(keyFile) + '"' , 'null' ) + ";" + \
                      'TestData.keyFileData = ' + ternary( keyFile , '"' + str(keyFileData) + '"' , 'null' ) + ";"
+        if os.sys.platform == "win32":
+            # double quotes in the evalString on windows; this
+            # prevents the backslashes from being removed when
+            # the shell (i.e. bash) evaluates this string. yuck.
+            evalString = evalString.replace('\\', '\\\\')
+
         if auth and usedb:
             evalString += 'jsTest.authenticate(db.getMongo());'
-        argv = argv + [ '--eval', evalString]
 
+        argv = argv + [ '--eval', evalString]
     
     if argv[0].endswith( 'test' ) and no_preallocj :
         argv = argv + [ '--nopreallocj' ]
@@ -493,6 +499,7 @@ def expand_suites(suites):
             else:
                 loc = ''
             globstr = os.path.join(mongo_repo, (os.path.join(loc, globstr)))
+            globstr = os.path.normpath(globstr)
             paths = glob.glob(globstr)
             paths.sort()
             tests += [(path, usedb) for path in paths]
