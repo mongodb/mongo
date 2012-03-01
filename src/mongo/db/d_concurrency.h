@@ -28,11 +28,12 @@ namespace mongo {
             ~TempRelease();
             bool cant; // true if couldn't because of recursive locking
         private:
-            const char type;
+            char type;
+            int local;
         };
         class GlobalWrite : boost::noncopyable { // recursive is ok
             const bool stopGreed;
-            char old;
+            const char old;
         public:
             GlobalWrite(bool stopGreed = false); 
             ~GlobalWrite();

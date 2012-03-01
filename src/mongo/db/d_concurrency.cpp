@@ -110,8 +110,9 @@ namespace mongo {
         if( ls.threadState == 't' ) { 
             DEV warning() << "W locking inside a temprelease, seems nonideal" << endl;
         }
-        else {
-            massert(0, str::stream() << "can't lock_W, threadState=" << (int) ls.threadState, ls.threadState == 0 );
+        else if(  ls.threadState ) {
+            log() << "can't lock_W, threadState=" << (int) ls.threadState << endl;
+            fassert(0,false);
         }
         getDur().commitIfNeeded(); // check before locking - will use an R lock for the commit if need to do one, which is better than W
         threadState() = 'W';
@@ -136,7 +137,7 @@ namespace mongo {
         wassert( threadState() == 'R' );
         threadState() = 0;
         q.unlock_R();
-    }
+    }    
     static void lock_w() { 
         char &ts = threadState();
         assert( ts == 0 || ts == 't' );
@@ -245,10 +246,14 @@ namespace mongo {
     Lock::TempRelease::TempRelease() : 
         cant( recursive() ), type(threadState())
     {
+        LockState& ls = lockState();
+        cant = ls.recursive;
+        type = ls.threadState;
+        local = ls.local;
+
         if( cant )
             return;
 
-        LockState& ls = lockState();
         switch(type) {
         case 'W':
             unlock_W();
@@ -257,21 +262,29 @@ namespace mongo {
             unlock_R();
             break;
         case 'w':
-            if( ls.local ) {
-                log() << "can't TempRelease w lock when local db is locked" << endl;
-                dassert(false);
+            if( local ) {
+                assert(local==1);
+                assert(ls.other==0);
+                localDBLock.unlock();
             }
-            assert(ls.other>0);
-            ls.otherLock->unlock();
+            else {
+                assert(local==0);
+                assert(ls.other==1);
+                ls.otherLock->unlock();
+            }
             unlock_w();
             break;
         case 'r':
-            if( ls.local ) {
-                log() << "TempRelease r lock when local db is locked" << endl;
-                dassert(false);
+            if( local ) {
+                assert(local==-1);
+                assert(ls.other==0);
+                localDBLock.unlock_shared();
             }
-            assert(ls.other<0);
-            ls.otherLock->unlock_shared();
+            else {
+                assert(local==0);
+                assert(ls.other==-1);
+                ls.otherLock->unlock_shared();
+            }
             unlock_r();
             break;
         default:
@@ -299,19 +312,24 @@ namespace mongo {
                 break;
             case 'w':
                 lock_w();
-                ls.otherLock->lock();
+                if( local ) 
+                    localDBLock.lock();
+                else
+                    ls.otherLock->lock();
                 break;
             case 'r':
                 lock_r();
-                ls.otherLock->lock_shared();
+                if( local ) 
+                    localDBLock.lock_shared();
+                else
+                    ls.otherLock->lock_shared();
                 break;
             default:
                 wassert(false);
             }
         )
     }
-    Lock::GlobalWrite::GlobalWrite(bool sg) : stopGreed(sg) {
-        old = threadState();
+    Lock::GlobalWrite::GlobalWrite(bool sg) : stopGreed(sg), old(threadState()) {
         if( old == 'W' ) { 
             recursive()++;
             DEV if( stopGreed ) { 
@@ -331,12 +349,16 @@ namespace mongo {
             recursive()--;
         }
         else {
-            if( threadState() == 'R' ) // downgraded
+            LockState& ls = lockState();
+            if( threadState() == 'R' ) { // downgraded
                 unlock_R();
-            else
+            }
+            else {
                 unlock_W(old);
-            if( stopGreed )
+            }
+            if( stopGreed ) {
                 q.start_greed();
+            }
         }
         fassert( 0, recursive() < 1000 );
     }
