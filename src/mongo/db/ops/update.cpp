@@ -1048,7 +1048,7 @@ namespace mongo {
         int numModded = 0;
         debug.nscanned = 0;
         shared_ptr<Cursor> c =
-        NamespaceDetailsTransient::getCursor( ns, patternOrig, BSONObj(), planPolicy );
+            NamespaceDetailsTransient::getCursor( ns, patternOrig, BSONObj(), planPolicy );
         d = nsdetails(ns);
         nsdt = &NamespaceDetailsTransient::get(ns);
         bool autoDedup = c->autoDedup();
