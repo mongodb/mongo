@@ -197,6 +197,7 @@ add_option( "clang" , "use clang++ rather than g++ (experimental)" , 0 , True )
 add_option( "tcmalloc" , "link against tcmalloc" , 0 , False )
 add_option( "gdbserver" , "build in gdb server support" , 0 , True )
 add_option( "heapcheck", "link to heap-checking malloc-lib and look for memory leaks during tests" , 0 , False )
+add_option( "gcov" , "compile with flags for gcov" , 0 , True )
 
 add_option("smokedbprefix", "prefix to dbpath et al. for smoke tests", 1 , False )
 add_option("smokeauth", "run smoke tests with --auth", 0 , False )
@@ -715,6 +716,10 @@ if nix:
 
     if linux and has_option( "sharedclient" ):
         env.Append( LINKFLAGS=" -Wl,--as-needed -Wl,-zdefs " )
+
+    if linux and has_option( "gcov" ):
+        env.Append( CXXFLAGS=" -fprofile-arcs -ftest-coverage " )
+        env.Append( LINKFLAGS=" -fprofile-arcs -ftest-coverage " )
 
     if debugBuild:
         env.Append( CPPFLAGS=" -O0 -fstack-protector " );
