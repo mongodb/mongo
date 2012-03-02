@@ -189,6 +189,8 @@ namespace mongo {
         /** if this op is running */
         bool active() const { return _active; }
 
+        bool displayInCurop() const { return _active && ! _suppressFromCurop; }
+
         int getLockType() const { return _lockType; }
         bool isWaitingForLock() const { return _waitingForLock; }
         int getOp() const { return _op; }
@@ -226,6 +228,8 @@ namespace mongo {
             strncpy(_ns, ns, Namespace::MaxNsLen);
             _ns[Namespace::MaxNsLen] = 0;
         }
+        
+        void suppressFromCurop() { _suppressFromCurop = true; }
 
     private:
         friend class Client;
@@ -238,6 +242,7 @@ namespace mongo {
         unsigned long long _checkpoint;
         unsigned long long _end;
         bool _active;
+        bool _suppressFromCurop; // unless $all is set
         int _op;
         bool _command;
         int _lockType;                   // see concurrency.h for values

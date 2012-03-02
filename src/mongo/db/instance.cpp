@@ -144,7 +144,7 @@ namespace mongo {
                         continue;
                     }
                     assert( co );
-                    if( all || co->active() ) {
+                    if( all || co->displayInCurop() ) {
                         BSONObj info = co->infoNoauth();
                         if ( all || m->matches( info )) {
                             vals.push_back( info );

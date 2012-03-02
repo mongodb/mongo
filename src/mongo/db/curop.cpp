@@ -39,6 +39,7 @@ namespace mongo {
     }
 
     void CurOp::_reset() {
+        _suppressFromCurop = false;
         _command = false;
         _lockType = 0;
         _dbprofile = 0;
