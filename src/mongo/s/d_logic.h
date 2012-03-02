@@ -149,6 +149,10 @@ namespace mongo {
 
         // protects state below
         mutable mongo::mutex _mutex;
+        // protects accessing the config server
+        // can't use default _mutex b/c it's possible this shard is also the config server,
+        // and we need to access the ShardingState to process new connections
+        mutable mongo::mutex _configServerMutex;
 
         // map from a namespace into the ensemble of chunk ranges that are stored in this mongod
         // a ShardChunkManager carries all state we need for a collection at this shard, including its version information
