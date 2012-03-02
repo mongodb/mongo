@@ -22,6 +22,7 @@
 #include "cursors.h"
 #include "stats.h"
 #include "client.h"
+#include "../bson/util/builder.h"
 
 #include "../client/connpool.h"
 #include "../db/commands.h"
@@ -84,12 +85,17 @@ namespace mongo {
             if( cursor->isSharded() ){
                 ShardedClientCursorPtr cc (new ShardedClientCursor( q , cursor ));
 
-                if ( ! cc->sendNextBatch( r, q.ntoreturn ) ) {
-                    return;
+                BufBuilder buffer( ShardedClientCursor::INIT_REPLY_BUFFER_SIZE );
+                int docCount = 0;
+                bool hasMore = cc->sendNextBatch( r, q.ntoreturn, buffer, docCount );
+
+                if ( hasMore ) {
+                    LOG(5) << "storing cursor : " << cc->getId() << endl;
+                    cursorCache.store( cc );
                 }
 
-                LOG(5) << "storing cursor : " << cc->getId() << endl;
-                cursorCache.store( cc );
+                replyToQuery( 0, r.p(), r.m(), buffer.buf(), buffer.len(), docCount,
+                        cc->getTotalSent(), hasMore ? cc->getId() : 0 );
             }
             else{
                 // TODO:  Better merge this logic.  We potentially can now use the same cursor logic for everything.
@@ -142,15 +148,23 @@ namespace mongo {
                     replyToQuery( ResultFlag_CursorNotFound , r.p() , r.m() , 0 , 0 , 0 );
                     return;
                 }
+
                 // TODO: Try to match logic of mongod, where on subsequent getMore() we pull lots more data?
-                if ( cursor->sendNextBatch( r , ntoreturn ) ) {
+                BufBuilder buffer( ShardedClientCursor::INIT_REPLY_BUFFER_SIZE );
+                int docCount = 0;
+                bool hasMore = cursor->sendNextBatch( r, ntoreturn, buffer, docCount );
+
+                if ( hasMore ) {
                     // still more data
                     cursor->accessed();
-                    return;
+                }
+                else {
+                    // we've exhausted the cursor
+                    cursorCache.remove( id );
                 }
 
-                // we've exhausted the cursor
-                cursorCache.remove( id );
+                replyToQuery( 0, r.p(), r.m(), buffer.buf(), buffer.len(), docCount,
+                        cursor->getTotalSent(), hasMore ? cursor->getId() : 0 );
             }
         }
 
