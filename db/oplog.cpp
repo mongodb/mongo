@@ -629,16 +629,16 @@ namespace mongo {
         OplogReader missingObjReader;
         const char *ns = o.getStringField("ns");
 
+        // should already have write lock
+        Client::Context ctx(ns);
+
         // capped collections
         NamespaceDetails *nsd = nsdetails(ns);
         if (nsd && nsd->capped) {
             log() << "replication missing doc, but this is okay for a capped collection (" << ns << ")" << endl;
             return false;
         }
-
-        // should already have write lock
-        Client::Context ctx(ns);
-
+        
         // we don't have the object yet, which is possible on initial sync.  get it.
         log() << "replication info adding missing object" << endl; // rare enough we can log
         uassert(15916, str::stream() << "Can no longer connect to initial sync source: " << hn, missingObjReader.connect(hn));
