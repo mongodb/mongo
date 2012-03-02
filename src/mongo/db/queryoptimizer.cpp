@@ -725,29 +725,35 @@ doneCheckOrder:
     }
     
     shared_ptr<QueryOp> MultiPlanScanner::iterateRunner( QueryOp &originalOp, bool retried ) {
-        if ( !_runner ) {
-            _runner.reset( new QueryPlanSet::Runner( *_currentQps, originalOp ) );
-            if ( _explainQueryInfo ) {
-                _explainQueryInfo->addClauseInfo( _runner->generateExplainInfo() );
-            }
-            shared_ptr<QueryOp> op = _runner->init();
-            if ( op->complete() ) {
-                return op;   
-            }
-        }
-        shared_ptr<QueryOp> op = _runner->nextNonError();
-        if ( !op->error() ) {
-            return op;
-        }
-        if ( !_currentQps->prepareToRetryQuery() ) {
-            return op;
+
+        if ( _runner ) {
+            return _runner->nextNonError();
         }
         
-        // Avoid an infinite loop here - this should never occur.
-        verify( 15878, !retried );
+        _runner.reset( new QueryPlanSet::Runner( *_currentQps, originalOp ) );
+        shared_ptr<ExplainClauseInfo> explainClause;
+        if ( _explainQueryInfo ) {
+            explainClause = _runner->generateExplainInfo();
+        }
         
-        _runner.reset();
-        return iterateRunner( originalOp, true );
+        shared_ptr<QueryOp> op = _runner->init();
+        if ( !op->complete() ) {
+
+            op = _runner->nextNonError();
+            if ( op->error() &&
+                _currentQps->prepareToRetryQuery() ) {
+
+                // Avoid an infinite loop here - this should never occur.
+                verify( 15878, !retried );                    
+                _runner.reset();
+                return iterateRunner( originalOp, true );
+            }
+        }
+        
+        if ( explainClause ) {
+            _explainQueryInfo->addClauseInfo( explainClause );
+        }
+        return op;
     }
 
     void MultiPlanScanner::updateCurrentQps( QueryPlanSet *qps ) {
