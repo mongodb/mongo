@@ -207,6 +207,8 @@ for shortName in getThirdPartyShortNames():
 
 add_option( "use-system-pcre", "use system version of pcre library", 0, True )
 
+add_option( "use-system-boost", "use system version of boost libraries", 0, True )
+
 add_option( "use-system-all" , "use all system libraries", 0 , True )
 
 add_option( "use-cpu-profiler",
@@ -485,14 +487,14 @@ if "darwin" == os.sys.platform:
 
     nix = True
 
-    if force64:
-        env.Append( EXTRACPPPATH=["/usr/64/include"] )
-        env.Append( EXTRALIBPATH=["/usr/64/lib"] )
-        if installDir == DEFAULT_INSTALL_DIR and not distBuild:
-            installDir = "/usr/64/"
-    else:
-        env.Append( EXTRACPPPATH=filterExists(["/sw/include" , "/opt/local/include"]) )
-        env.Append( EXTRALIBPATH=filterExists(["/sw/lib/", "/opt/local/lib"]) )
+    #if force64:
+    #    env.Append( EXTRACPPPATH=["/usr/64/include"] )
+    #    env.Append( EXTRALIBPATH=["/usr/64/lib"] )
+    #    if installDir == DEFAULT_INSTALL_DIR and not distBuild:
+    #        installDir = "/usr/64/"
+    #else:
+    #    env.Append( EXTRACPPPATH=filterExists(["/sw/include" , "/opt/local/include"]) )
+    #    env.Append( EXTRALIBPATH=filterExists(["/sw/lib/", "/opt/local/lib"]) )
 
 elif os.sys.platform.startswith("linux"):
     linux = True
@@ -552,29 +554,6 @@ elif "win32" == os.sys.platform:
 	#use current environment
 	env['ENV'] = dict(os.environ)
 
-    def find_boost():
-        for x in ('', ' (x86)'):	
-            boostDir = "C:/Program Files" + x + "/boost/latest"
-            if os.path.exists( boostDir ):
-                return boostDir
-            for bv in reversed( range(33,50) ):
-	            for extra in ('', '_0', '_1'):
-		            boostDir = "C:/Program Files" + x + "/Boost/boost_1_" + str(bv) + extra
-		            if os.path.exists( boostDir ):
-		                return boostDir
-        if os.path.exists( "C:/boost" ):
-	        return "C:/boost"
-        if os.path.exists( "/boost" ):
-	        return "/boost"
-        return None
-
-    boostDir = find_boost()
-    if boostDir is None:
-        print( "can't find boost" )
-        Exit(1)
-    else:
-        print( "boost found at '" + boostDir + "'" )
-
     boostLibs = []
 
     env.Append( CPPDEFINES=[ "_UNICODE" ] )
@@ -584,7 +563,7 @@ elif "win32" == os.sys.platform:
                               [ "v7.1", "v7.0A", "v7.0", "v6.1", "v6.0a", "v6.0" ] )
     print( "Windows SDK Root '" + winSDKHome + "'" )
 
-    env.Append( EXTRACPPPATH=[ boostDir , winSDKHome + "/Include" ] )
+    env.Append( EXTRACPPPATH=[ winSDKHome + "/Include" ] )
 
     # consider adding /MP build with multiple processes option.
 
@@ -643,13 +622,6 @@ elif "win32" == os.sys.platform:
             
         if debugLogging:
             env.Append( CPPDEFINES=[ "_DEBUG" ] )
-
-    if force64 and os.path.exists( boostDir + "/lib/vs2010_64" ):
-        env.Append( EXTRALIBPATH=[ boostDir + "/lib/vs2010_64" ] )
-    elif not force64 and os.path.exists( boostDir + "/lib/vs2010_32" ):
-        env.Append( EXTRALIBPATH=[ boostDir + "/lib/vs2010_32" ] )
-    else:
-        env.Append( EXTRALIBPATH=[ boostDir + "/Lib" ] )
 
     if force64:
         env.Append( EXTRALIBPATH=[ winSDKHome + "/Lib/x64" ] )
@@ -812,6 +784,10 @@ for shortName in getThirdPartyShortNames():
 if not has_option("use-system-all") and not has_option("use-system-pcre"):
     env.Append(CPPPATH=[ '$BUILD_DIR/third_party/pcre-${PCRE_VERSION}' ])
 
+if not has_option('use-system-all') and not has_option('use-system-boost'):
+    env.Append(CPPPATH=['$BUILD_DIR/third_party/boost'],
+               CPPDEFINES=['BOOST_ALL_NO_LIB'])
+
 env.Append( CPPPATH=['$EXTRACPPPATH'],
             LIBPATH=['$EXTRALIBPATH'] )
 
@@ -880,28 +856,29 @@ def doConfigure( myenv , shell=False ):
 
         return False
 
-    if not conf.CheckCXXHeader( "boost/filesystem/operations.hpp" ):
-        print( "can't find boost headers" )
-        if shell:
-            print( "\tshell might not compile" )
-        else:
-            Exit(1)
+    if has_option('use-system-all') or has_option('use-system-boost'):
+        if not conf.CheckCXXHeader( "boost/filesystem/operations.hpp" ):
+            print( "can't find boost headers" )
+            if shell:
+                print( "\tshell might not compile" )
+            else:
+                Exit(1)
 
-    if asio:
-        if conf.CheckCXXHeader( "boost/asio.hpp" ):
-            myenv.Append( CPPDEFINES=[ "USE_ASIO" ] )
-        else:
-            print( "WARNING: old version of boost - you should consider upgrading" )
+        if asio:
+            if conf.CheckCXXHeader( "boost/asio.hpp" ):
+                myenv.Append( CPPDEFINES=[ "USE_ASIO" ] )
+            else:
+                print( "WARNING: old version of boost - you should consider upgrading" )
 
-    # this will add it if it exists and works
-    myCheckLib( [ "boost_system" + boostCompiler + "-mt" + boostVersion ,
-                  "boost_system" + boostCompiler + boostVersion ] )
+        # this will add it if it exists and works
+        myCheckLib( [ "boost_system" + boostCompiler + "-mt" + boostVersion ,
+                      "boost_system" + boostCompiler + boostVersion ] )
 
-    for b in boostLibs:
-        l = "boost_" + b
-        myCheckLib( [ l + boostCompiler + "-mt" + boostVersion ,
-                      l + boostCompiler + boostVersion ] ,
-                    release or not shell)
+        for b in boostLibs:
+            l = "boost_" + b
+            myCheckLib( [ l + boostCompiler + "-mt" + boostVersion ,
+                          l + boostCompiler + boostVersion ] ,
+                        release or not shell)
 
     if not conf.CheckCXXHeader( "execinfo.h" ):
         myenv.Append( CPPDEFINES=[ "NOEXECINFO" ] )
