@@ -367,8 +367,9 @@ namespace mongo {
                 }
 
             }
-
-            int left = 5;
+            
+            const int LEFT_START = 5;
+            int left = LEFT_START;
             while ( true ) {
                 try {
                     Shard shard;
@@ -406,9 +407,9 @@ namespace mongo {
                 catch ( StaleConfigException& e ) {
                     if ( left <= 0 )
                         throw e;
+                    log( left == LEFT_START ) << "update will be retried b/c sharding config info is stale, "
+                                              << " left:" << left - 1 << " ns: " << r.getns() << " query: " << query << endl;
                     left--;
-                    log() << "update will be retried b/c sharding config info is stale, "
-                          << " left:" << left << " ns: " << r.getns() << " query: " << query << endl;
                     r.reset();
                     manager = r.getChunkManager();
                     uassert(14806, "collection no longer sharded", manager);
@@ -424,8 +425,9 @@ namespace mongo {
             uassert( 10203 ,  "bad delete message" , d.moreJSObjs() );
             BSONObj pattern = d.nextJsObj();
             uassert( 13505 ,  "$atomic not supported sharded" , pattern["$atomic"].eoo() );
-
-            int left = 5;
+            
+            const int LEFT_START = 5;
+            int left = LEFT_START;
             while ( true ) {
                 try {
                     set<Shard> shards;
@@ -449,16 +451,16 @@ namespace mongo {
                 catch ( StaleConfigException& e ) {
                     if ( left <= 0 )
                         throw e;
+                    log( left == LEFT_START ) << "delete will be retried b/c of StaleConfigException, "
+                                              << " left:" << left - 1 << " ns: " << r.getns() << " patt: " << pattern << endl;
                     left--;
-                    log() << "delete will be retried b/c of StaleConfigException, "
-                          << " left:" << left << " ns: " << r.getns() << " patt: " << pattern << endl;
                     r.reset();
                     manager = r.getChunkManager();
                     uassert(14805, "collection no longer sharded", manager);
                 }
             }
         }
-
+        
         virtual void writeOp( int op , Request& r ) {
 
             ChunkManagerPtr info;
