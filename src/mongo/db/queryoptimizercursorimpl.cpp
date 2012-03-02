@@ -136,6 +136,9 @@ namespace mongo {
                     // we don't fail query since we're fine with returning partial data if collection dropped
                     // also, see SERVER-2454
                     // todo: this is wrong.  the cursor could be gone if closeAllDatabases command just ran
+
+                    // !!! The collection may be gone at this point, and any namespace or index
+                    // specific memory may have become invalid.
                 }
             }
             else {
