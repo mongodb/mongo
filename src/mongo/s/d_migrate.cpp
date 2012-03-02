@@ -57,8 +57,8 @@ namespace mongo {
 
     class MoveTimingHelper {
     public:
-        MoveTimingHelper( const string& where , const string& ns , BSONObj min , BSONObj max , int total )
-            : _where( where ) , _ns( ns ) , _next( 0 ) , _total( total ) {
+        MoveTimingHelper( const string& where , const string& ns , BSONObj min , BSONObj max , int total , string& cmdErrmsg )
+            : _where( where ) , _ns( ns ) , _next( 0 ) , _total( total ) , _cmdErrmsg( cmdErrmsg ) {
             _nextNote = 0;
             _b.append( "min" , min );
             _b.append( "max" , max );
@@ -71,6 +71,11 @@ namespace mongo {
                 if ( _next != _total ) {
                     note( "aborted" );
                 }
+                if ( _cmdErrmsg.size() ) {
+                    note( _cmdErrmsg );
+                    warning() << "got error doing chunk migrate: " << _cmdErrmsg << endl;
+                }
+                    
                 configServer.logChange( (string)"moveChunk." + _where , _ns, _b.obj() );
             }
             catch ( const std::exception& e ) {
@@ -126,6 +131,8 @@ namespace mongo {
         int _next;
         int _total; // expected # of steps
         int _nextNote;
+
+        string _cmdErrmsg;
 
         BSONObjBuilder _b;
 
@@ -766,7 +773,7 @@ namespace mongo {
                 configServer.init( configdb );
             }
 
-            MoveTimingHelper timing( "from" , ns , min , max , 6 /* steps */);
+            MoveTimingHelper timing( "from" , ns , min , max , 6 /* steps */ , errmsg );
 
             Shard fromShard( from );
             Shard toShard( to );
@@ -1278,7 +1285,8 @@ namespace mongo {
             
             slaveCount = ( getSlaveCount() / 2 ) + 1;
 
-            MoveTimingHelper timing( "to" , ns , min , max , 5 /* steps */ );
+            string errmsg;
+            MoveTimingHelper timing( "to" , ns , min , max , 5 /* steps */ , errmsg );
 
             ScopedDbConnection conn( from );
             conn->getLastError(); // just test connection
