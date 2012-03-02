@@ -1,6 +1,6 @@
 // Tests splitting a chunk twice
 
-s = new ShardingTest( "shard1" , 2, 0, 1, /* chunkSize */1);
+s = new ShardingTest( "shard_keycount" , 2, 0, 1, /* chunkSize */1);
 
 dbName = "test"
 collName = "foo"
