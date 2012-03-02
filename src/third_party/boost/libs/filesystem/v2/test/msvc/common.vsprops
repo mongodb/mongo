@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="Windows-1252"?>
+<VisualStudioPropertySheet
+	ProjectType="Visual C++"
+	Version="8.00"
+	Name="common"
+	>
+	<Tool
+		Name="VCCLCompilerTool"
+		AdditionalIncludeDirectories="../../../../../.."
+		PreprocessorDefinitions="BOOST_ALL_NO_LIB;BOOST_SYSTEM_DYN_LINK;BOOST_FILESYSTEM_DYN_LINK"
+		ExceptionHandling="2"
+		WarningLevel="4"
+	/>
+</VisualStudioPropertySheet>

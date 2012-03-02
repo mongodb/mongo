@@ -1,0 +1,263 @@
+# Copyright Vladimir Prus 2002-2006.
+# Copyright Dave Abrahams 2005-2006.
+# Copyright Rene Rivera 2005-2007.
+# Copyright Douglas Gregor 2005.
+#
+# Distributed under the Boost Software License, Version 1.0.
+#    (See accompanying file LICENSE_1_0.txt or copy at
+#          http://www.boost.org/LICENSE_1_0.txt)
+
+# Usage:
+#
+#   bjam [options] [properties] [install|stage]
+#
+#   Builds and installs Boost.
+#
+# Targets and Related Options:
+#
+#   install                 Install headers and compiled library files to the
+#   =======                 configured locations (below).
+#
+#   --prefix=<PREFIX>       Install architecture independent files here.
+#                           Default; C:\Boost on Win32
+#                           Default; /usr/local on Unix. Linux, etc.
+#
+#   --exec-prefix=<EPREFIX> Install architecture dependent files here.
+#                           Default; <PREFIX>
+#
+#   --libdir=<DIR>          Install library files here.
+#                           Default; <EPREFIX>/lib
+#
+#   --includedir=<HDRDIR>   Install header files here.
+#                           Default; <PREFIX>/include
+#
+#   stage                   Build and install only compiled library files
+#   =====                   to the stage directory.
+#
+#   --stagedir=<STAGEDIR>   Install library files here
+#                           Default; ./stage
+#
+# Other Options:
+#
+#   --build-type=<type>     Build the specified pre-defined set of variations
+#                           of the libraries. Note, that which variants get
+#                           built depends on what each library supports.
+#
+#                               minimal (default) - Builds a minimal set of 
+#                               variants. On Windows, these are static 
+#                               multithreaded libraries in debug and release
+#                               modes, using shared runtime. On Linux, these
+#                               are static and shared multithreaded libraries
+#                               in release mode.
+#
+#                               complete - Build all possible variations.
+#
+#   --build-dir=DIR         Build in this location instead of building
+#                           within the distribution tree. Recommended!
+#
+#   --show-libraries        Displays the list of Boost libraries that require
+#                           build and installation steps, then exit.
+#
+#   --layout=<layout>       Determines whether to choose library names
+#                           and header locations such that multiple
+#                           versions of Boost or multiple compilers can
+#                           be used on the same system.
+#
+#                               versioned - Names of boost binaries
+#                               include the Boost version number, name and
+#                               version of the compiler and encoded build
+#                               properties.  Boost headers are installed in a
+#                               subdirectory of <HDRDIR> whose name contains
+#                               the Boost version number.
+#
+#                               tagged -- Names of boost binaries include the
+#                               encoded build properties such as variant and
+#                               threading, but do not including compiler name
+#                               and version, or Boost version. This option is
+#                               useful if you build several variants of Boost,
+#                               using the same compiler.
+#
+#                               system - Binaries names do not include the
+#                               Boost version number or the name and version
+#                               number of the compiler.  Boost headers are
+#                               installed directly into <HDRDIR>.  This option
+#                               is intended for system integrators who are
+#                               building distribution packages.
+#
+#                           The default value is 'versioned' on Windows, and
+#                           'system' on Unix.
+#
+#   --buildid=ID            Adds the specified ID to the name of built
+#                           libraries.  The default is to not add anything.
+#
+#   --python-buildid=ID     Adds the specified ID to the name of built
+#                           libraries that depend on Python.  The default 
+#                           is to not add anything. This ID is added in 
+#                           addition to --buildid.
+#
+#
+#   --help                  This message.
+#
+#   --with-<library>        Build and install the specified <library>
+#                           If this option is used, only libraries
+#                           specified using this option will be built.
+#
+#   --without-<library>     Do not build, stage, or install the specified
+#                           <library>. By default, all libraries are built.
+#
+# Properties:
+#
+#   toolset=toolset         Indicates the toolset to build with.
+#
+#   variant=debug|release   Select the build variant
+#
+#   link=static|shared      Whether to build static or shared libraries
+#
+#   threading=single|multi  Whether to build single or multithreaded binaries
+# 
+#   runtime-link=static|shared      
+#                           Whether to link to static or shared C and C++ runtime.
+#   
+
+# TODO:
+#  - handle boost version
+#  - handle python options such as pydebug
+
+import boostcpp ;
+import package ;
+
+import sequence ;
+import xsltproc ;
+import set ;
+import path ;
+
+path-constant BOOST_ROOT : . ;
+constant BOOST_VERSION : 1.49.0 ;
+constant BOOST_JAMROOT_MODULE : $(__name__) ;
+
+boostcpp.set-version $(BOOST_VERSION) ;
+
+project boost
+    : requirements <include>.
+      # Disable auto-linking for all targets here, primarily because it caused
+      # troubles with V2.
+      <define>BOOST_ALL_NO_LIB=1
+      # Used to encode variant in target name. See the 'tag' rule below.
+      <tag>@$(__name__).tag
+      <conditional>@handle-static-runtime
+      # The standard library Sun compilers use by default has no chance
+      # of working with Boost. Override it.
+      <toolset>sun:<stdlib>sun-stlport
+      # Comeau does not support shared lib
+      <toolset>como:<link>static
+      <toolset>como-linux:<define>_GNU_SOURCE=1
+      # When building docs within Boost, we want the standard Boost style
+      <xsl:param>boost.defaults=Boost
+    : usage-requirements <include>.
+    : build-dir bin.v2
+    ;
+
+# This rule is called by Boost.Build to determine the name of target. We use it
+# to encode the build variant, compiler name and boost version in the target
+# name.
+#
+rule tag ( name : type ? : property-set )
+{
+    return [ boostcpp.tag $(name) : $(type) : $(property-set) ] ;
+}
+   
+rule handle-static-runtime ( properties * )
+{
+    # Using static runtime with shared libraries is impossible on Linux,
+    # and dangerous on Windows. Therefore, we disallow it. This might
+    # be drastic, but it was disabled for a while with nobody complaining.
+
+    # For CW, static runtime is needed so that std::locale works.
+    if <link>shared in $(properties) && <runtime-link>static in $(properties) &&
+        ! ( <toolset>cw in $(properties) )
+    {
+        ECHO "error: link=shared together with runtime-link=static is not allowed" ;
+        ECHO "error: such property combination is either impossible " ;
+        ECHO "error: or too dangerious to be of any use" ;
+        EXIT ;
+    }
+}
+
+all-libraries = [ MATCH .*libs/(.*)/build/.* : [ glob libs/*/build/Jamfile.v2 ]
+    [ glob libs/*/build/Jamfile ] ]
+    ;
+
+all-libraries = [ sequence.unique $(all-libraries) ] ;
+# The function_types library has a Jamfile, but it's used for maintenance
+# purposes, there's no library to build and install.
+all-libraries = [ set.difference $(all-libraries) : function_types ] ;
+
+# Setup convenient aliases for all libraries.
+
+local rule explicit-alias ( id : targets + )
+{
+    alias $(id) : $(targets) ;
+    explicit $(id) ;
+}
+
+# First, the complicated libraries: where the target name in Jamfile is
+# different from its directory name.
+explicit-alias prg_exec_monitor : libs/test/build//_prg_exec_monitor ;
+explicit-alias test_exec_monitor : libs/test/build//_test_exec_monitor ;
+explicit-alias unit_test_framework : libs/test/build//_unit_test_framework ;
+explicit-alias bgl-vis : libs/graps/build//bgl-vis ;
+explicit-alias serialization : libs/serialization/build//_serialization ;
+explicit-alias wserialization : libs/serialization/build//_wserialization ;
+for local l in $(all-libraries)
+{
+    if ! $(l) in test graph serialization
+    {
+        explicit-alias $(l) : libs/$(l)/build//_$(l) ;
+    }
+}
+
+alias headers : : : : <include>. ;
+explicit headers ;
+
+# Make project ids of all libraries known.
+for local l in $(all-libraries)
+{
+    use-project /boost/$(l) : libs/$(l)/build ;
+}
+
+# This rule should be called from libraries' Jamfiles and will create two
+# targets, "install" and "stage", that will install or stage that library. The
+# --prefix option is respected, but --with and --without options, naturally, are
+# ignored.
+#
+# - libraries -- list of library targets to install.
+#
+rule boost-install ( libraries * )
+{
+    package.install install
+        : <dependency>/boost//install-proper-headers $(install-requirements)
+        : # No binaries
+        : $(libraries)
+        : # No headers, it is handled by the dependency.
+    ;
+
+    install stage : $(libraries) : <location>$(BOOST_STAGE_LOCATE) ;
+
+    module [ CALLER_MODULE ]
+    {
+        explicit stage ;
+        explicit install ;
+    }
+}
+
+headers =
+    # The .SUNWCCh files are present in tr1 include directory and have to be installed,
+    # see http://lists.boost.org/Archives/boost/2007/05/121430.php
+    [ path.glob-tree $(BOOST_ROOT)/boost : *.hpp *.ipp *.h *.inc *.SUNWCCh : CVS .svn ]
+    [ path.glob-tree $(BOOST_ROOT)/boost/compatibility/cpp_c_headers : c* : CVS .svn ] 
+    [ path.glob boost/tr1/tr1 : * : bcc32 sun CVS .svn ]
+    ;
+
+# Declare special top-level targets that build and install the desired variants
+# of the libraries.
+boostcpp.declare-targets $(all-libraries) : $(headers) ;

@@ -1,0 +1,43 @@
+# Boost Filesystem Library test Jamfile
+
+# (C) Copyright Beman Dawes 2002-2006
+# Distributed under the Boost Software License, Version 1.0.
+# (See accompanying file LICENSE_1_0.txt or www.boost.org/LICENSE_1_0.txt)
+
+project 
+    : requirements
+      <library>/boost/filesystem//boost_filesystem
+      <toolset>msvc:<asynch-exceptions>on
+    ;
+
+   test-suite "filesystem" :
+       [ run path_test.cpp
+         :  :  : <link>static
+       ]                  
+       [ run path_test.cpp
+         :  :  :  : path_test_dll
+       ]
+       [ run operations_test.cpp
+         :  :  : <link>static
+       ]
+       [ run operations_test.cpp
+         :  :  :  : operations_test_dll
+       ]
+       [ run fstream_test.cpp
+         :  :  : <link>static
+       ]
+       [ run convenience_test.cpp
+         :  :  : <link>static                   
+       ]
+       [ run large_file_support_test.cpp
+         :  :  : <link>static
+       ]
+       [ run wide_test.cpp
+          :  :  : <link>static
+       ]
+
+       [ compile deprecated_test.cpp ]                  
+       [ compile ../example/mbcopy.cpp ]
+       [ compile ../example/mbpath.cpp ]
+       [ compile ../example/simple_ls.cpp ]
+       ;

@@ -1,0 +1,353 @@
+<html>
+
+<head>
+<meta http-equiv="Content-Language" content="en-us">
+<meta name="GENERATOR" content="Microsoft FrontPage 5.0">
+<meta name="ProgId" content="FrontPage.Editor.Document">
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+<title>Boost Filesystem Library Design</title>
+</head>
+
+<body bgcolor="#FFFFFF">
+
+<h1>
+<img border="0" src="../../../../boost.png" align="center" width="277" height="86">Filesystem 
+Library Design</h1>
+
+<p><a href="#Introduction">Introduction</a><br>
+<a href="#Requirements">Requirements</a><br>
+<a href="#Realities">Realities</a><br>
+<a href="#Rationale">Rationale</a><br>
+<a href="#Abandoned_Designs">Abandoned_Designs</a><br>
+<a href="#References">References</a></p>
+
+<h2><a name="Introduction">Introduction</a></h2>
+
+<p>The primary motivation for beginning work on the Filesystem Library was 
+frustration with Boost administrative tools.&nbsp; Scripts were written in 
+Python, Perl, Bash, and Windows command languages.&nbsp; There was no single 
+scripting language familiar and acceptable to all Boost administrators. Yet they 
+were all skilled C++ programmers - why couldn't C++ be used as the scripting 
+language?</p>
+
+<p>The key feature C++ lacked for script-like applications was the ability to 
+perform portable filesystem operations on directories and their contents. The 
+Filesystem Library was developed to fill that void.</p>
+
+<p>The intent is not to compete with traditional scripting languages, but to 
+provide a solution for situations where C++ is already the language 
+of choice..</p>
+
+<h2><a name="Requirements">Requirements</a></h2>
+<ul>
+  <li>Be able to write portable script-style filesystem operations in modern 
+  C++.<br>
+  <br>
+  Rationale: This is a common programming need. It is both an 
+  embarrassment and a hardship that this is not possible with either the current 
+  C++ or Boost libraries.&nbsp; The need is particularly acute 
+  when C++ is the only toolset allowed in the tool chain.&nbsp; File system 
+  operations are provided by many languages&nbsp;used on multiple platforms, 
+  such as Perl and Python, as well as by many platform specific scripting 
+  languages. All operating systems provide some form of API for filesystem 
+  operations, and the POSIX bindings are increasingly available even on 
+  operating systems not normally associated with POSIX, such as the Mac, z/OS, 
+  or OS/390.<br>
+&nbsp;</li>
+  <li>Work within the <a href="#Realities">realities</a> described below.<br>
+  <br>
+  Rationale: This isn't a research project. The need is for something that works on 
+  today's platforms, including some of the embedded operating systems 
+  with limited file systems. Because of the emphasis on portability, such a 
+  library would be much more useful if standardized. That means being able to 
+  work with a much wider range of platforms that just Unix or Windows and their 
+  clones.<br>
+&nbsp;</li>
+  <li>Avoid dangerous programming practices. Particularly, all-too-easy-to-ignore error notifications 
+  and use of global variables.&nbsp;If a dangerous feature is provided, identify it as such.<br>
+  <br>
+  Rationale: Normally this would be covered by &quot;the usual Boost requirements...&quot;, 
+  but it is mentioned explicitly because the equivalent native platform and 
+  scripting language interfaces often depend on all-too-easy-to-ignore error 
+  notifications and global variables like &quot;current 
+  working directory&quot;.<br>
+&nbsp;</li>
+  <li>Structure the library so that it is still useful even if some functionality 
+  does not map well onto a given platform or directory tree. Particularly, much 
+  useful functionality should be portable even to flat 
+(non-hierarchical) filesystems.<br>
+  <br>
+  Rationale: Much functionality which does not 
+  require a hierarchical directory structure is still useful on flat-structure 
+  filesystems.&nbsp; There are many systems, particularly embedded systems, 
+  where even very limited functionality is still useful.</li>
+</ul>
+<ul>
+  <li>Interface smoothly with current C++ Standard Library input/output 
+  facilities.&nbsp; For example, paths should be 
+  easy to use in std::basic_fstream constructors.<br>
+  <br>
+  Rationale: One of the most common uses of file system functionality is to 
+  manipulate paths for eventual use in input/output operations.&nbsp; 
+  Thus the need to interface smoothly with standard library I/O.<br>
+&nbsp;</li>
+  <li>Suitable for eventual standardization. The implication of this requirement 
+  is that the interface be close to minimal, and that great care be take 
+  regarding portability.<br>
+  <br>
+  Rationale: The lack of file system operations is a serious hole 
+  in the current standard, with no other known candidates to fill that hole. 
+  Libraries with elaborate interfaces and difficult to port specifications are much less likely to be accepted for 
+  standardization.<br>
+&nbsp;</li>
+  <li>The usual Boost <a href="http://www.boost.org/more/lib_guide.htm">requirements and 
+  guidelines</a> apply.<br>
+&nbsp;</li>
+  <li>Encourage, but do not require, portability in path names.<br>
+  <br>
+  Rationale: For paths which originate from user input it is unreasonable to 
+  require portable path syntax.<br>
+&nbsp;</li>
+  <li>Avoid giving the illusion of portability where portability in fact does not 
+  exist.<br>
+  <br>
+  Rationale: Leaving important behavior unspecified or &quot;implementation defined&quot; does a 
+  great disservice to programmers using a library because it makes it appear 
+  that code relying on the behavior is portable, when in fact there is nothing 
+  portable about it. The only case where such under-specification is acceptable is when both users and implementors know from 
+  other sources exactly what behavior is required, yet for some reason it isn't 
+  possible to specify it exactly.</li>
+</ul>
+<h2><a name="Realities">Realities</a></h2>
+<ul>
+  <li>Some operating systems have a single directory tree root, others have 
+  multiple roots.<br>
+&nbsp;</li>
+  <li>Some file systems provide both a long and short form of filenames.<br>
+&nbsp;</li>
+  <li>Some file systems have different syntax for file paths and directory 
+  paths.<br>
+&nbsp;</li>
+  <li>Some file systems have different rules for valid file names and valid 
+  directory names.<br>
+&nbsp;</li>
+  <li>Some file systems (ISO-9660, level 1, for example) use very restricted 
+  (so-called 8.3) file names.<br>
+&nbsp;</li>
+  <li>Some operating systems allow file systems with different 
+  characteristics to be &quot;mounted&quot; within a directory tree.&nbsp; Thus a 
+  ISO-9660 or Windows 
+  file system may end up as a sub-tree of a POSIX directory tree.<br>
+&nbsp;</li>
+  <li>Wide-character versions of directory and file operations are available on some operating 
+  systems, and not available on others.<br>
+&nbsp;</li>
+  <li>There is no law that says directory hierarchies have to be specified in 
+  terms of left-to-right decent from the root.<br>
+&nbsp;</li>
+  <li>Some file systems have a concept of file &quot;version number&quot; or &quot;generation 
+  number&quot;.&nbsp; Some don't.<br>
+&nbsp;</li>
+  <li>Not all operating systems use single character separators in path names.&nbsp; Some use 
+  paired notations. A typical fully-specified OpenVMS filename
+  might look something like this:<br>
+  <br>
+  <code>&nbsp;&nbsp; DISK$SCRATCH:[GEORGE.PROJECT1.DAT]BIG_DATA_FILE.NTP;5<br>
+  </code><br>
+  The general OpenVMS format is:<br>
+  <br>
+&nbsp;&nbsp;&nbsp;&nbsp; 
+  <i>Device:[directories.dot.separated]filename.extension;version_number</i><br>
+&nbsp;</li>
+  <li>For common file systems, determining if two descriptors are for same 
+  entity is extremely difficult or impossible.&nbsp; For example, the concept of 
+  equality can be different for each portion of a path - some portions may be 
+  case or locale sensitive, others not. Case sensitivity is a property of the 
+  pathname itself, and not the platform. Determining collating sequence is even 
+  worse.<br>
+&nbsp;</li>
+  <li>Race-conditions may occur. Directory trees, directories, files, and file attributes are in effect shared between all threads, processes, and computers which have access to the 
+  filesystem.&nbsp; That may well include computers on the other side of the 
+  world or in orbit around the world. This implies that file system operations 
+  may fail in unexpected ways.&nbsp;For example:<br>
+  <br>
+  <code>&nbsp;&nbsp;&nbsp;&nbsp; assert( exists(&quot;foo&quot;) == exists(&quot;foo&quot;) ); 
+  // may fail!<br>
+&nbsp;&nbsp;&nbsp;&nbsp; assert( is_directory(&quot;foo&quot;) == is_directory(&quot;foo&quot;); 
+  // may fail!<br>
+  </code><br>
+  In the first example, the file may have been deleted between calls to 
+  exists().&nbsp; In the second example, the file may have been deleted and then 
+  replaced by a directory of the same name between the calls to is_directory().<br>
+&nbsp;</li>
+  <li>Even though an application may be portable, it still will have to traffic 
+  in system specific paths occasionally; user provided input is a common 
+  example.<br>
+&nbsp;</li>
+  <li><a name="symbolic-link-use-case">Symbolic</a> links cause canonical and 
+  normal form of some paths to represent different files or directories. For 
+  example, given the directory hierarchy <code>/a/b/c</code>, with a symbolic 
+  link in <code>/a</code> named <code>x</code>&nbsp; pointing to <code>b/c</code>, 
+  then under POSIX Pathname Resolution rules a path of <code>&quot;/a/x/..&quot;</code> 
+  should resolve to <code>&quot;/a/b&quot;</code>. If <code>&quot;/a/x/..&quot;</code> were first 
+  normalized to <code>&quot;/a&quot;</code>, it would resolve incorrectly. (Case supplied 
+  by Walter Landry.)</li>
+</ul>
+
+<h2><a name="Rationale">Rationale</a></h2>
+
+<p>The <a href="#Requirements">Requirements</a> and <a href="#Realities">
+Realities</a> above drove much of the C++ interface design.&nbsp; In particular, 
+the desire to make script-like code straightforward caused a great deal of 
+effort to go into ensuring that apparently simple expressions like <i>exists( &quot;foo&quot; 
+)</i> work as expected.</p>
+
+<p>See the <a href="faq.htm">FAQ</a> for the rationale behind many detailed 
+design decisions.</p>
+
+<p>Several key insights went into the <i>path</i> class design:</p>
+<ul>
+  <li>Decoupling of the input formats, internal conceptual (<i>vector&lt;string&gt;</i> 
+  or other sequence) 
+  model, and output formats.</li>
+  <li>Providing two input formats (generic and O/S specific) broke a major 
+  design deadlock.</li>
+  <li>Providing several output formats solved another set of previously 
+  intractable problems.</li>
+  <li>Several non-obvious functions (particularly decomposition and composition) 
+  are required to support portable code. (Peter Dimov, Thomas Witt, Glen 
+  Knowles, others.)</li>
+</ul>
+
+<p>Error checking was a particularly difficult area. One key insight was that 
+with file and directory names, portability isn't a universal truth.&nbsp; 
+Rather, the programmer must think out the question &quot;What operating systems do I 
+want this path to be portable to?&quot;&nbsp; By providing support for several 
+answers to that question, the Filesystem Library alerts programmers of the need 
+to ask it in the first place.</p>
+<h2><a name="Abandoned_Designs">Abandoned Designs</a></h2>
+<h3>operations.hpp</h3>
+<p>Dietmar Kühl's original dir_it design and implementation supported 
+wide-character file and directory names. It was abandoned after extensive 
+discussions among Library Working Group members failed to identify portable 
+semantics for wide-character names on systems not providing native support. See
+<a href="faq.htm#wide-character_names">FAQ</a>.</p>
+<p>Previous iterations of the interface design used explicitly named functions providing a 
+large number of convenience operations, with no compile-time or run-time 
+options. There were so many function names that they were very confusing to use, 
+and the interface was much larger. Any benefits seemed theoretical rather than 
+real. </p>
+<p>Designs based on compile time (rather than runtime) flag and option selection 
+(via policy, enum, or int template parameters) became so complicated that they 
+were abandoned, often after investing quite a bit of time and effort. The need 
+to qualify attribute or option names with namespaces, even aliases, made use in 
+template parameters ugly; that wasn't fully appreciated until actually writing 
+real code.</p>
+<p>Yet another set of convenience functions ( for example, <i>remove</i> with 
+permissive, prune, recurse, and other options, plus predicate, and possibly 
+other, filtering features) were abandoned because the details became both 
+complex and contentious.</p>
+
+<p>What is left is a toolkit of low-level operations from which the user can 
+create more complex convenience operations, plus a very small number of 
+convenience functions which were found to be useful enough to justify inclusion.</p>
+
+<h3>path.hpp</h3>
+
+<p>There were so many abandoned path designs, I've lost track. Policy-based 
+class templates in several flavors, constructor supplied runtime policies, 
+operation specific runtime policies, they were all considered, often 
+implemented, and ultimately abandoned as far too complicated for any small 
+benefits observed.</p>
+
+<p>Additional design considerations apply to <a href="i18n.html">
+Internationalization</a>. </p>
+
+<h3>error checking</h3>
+
+<p>A number of designs for the error checking machinery were abandoned, some 
+after experiments with implementations. Totally automatic error checking was 
+attempted in particular. But automatic error checking tended to make the overall 
+library design much more complicated.</p>
+
+<p>Some designs associated error checking mechanisms with paths.&nbsp; Some with 
+operations functions.&nbsp; A policy-based error checking template design was 
+partially implemented, then abandoned as too complicated for everyday 
+script-like programs.</p>
+
+<p>The final design, which depends partially on explicit error checking function 
+calls,&nbsp; is much simpler and straightforward, although it does depend to 
+some extent on programmer discipline.&nbsp; But it should allow programmers who 
+are concerned about portability to be reasonably sure that their programs will 
+work correctly on their choice of target systems.</p>
+
+<h2><a name="References">References</a></h2>
+
+<table border="0" cellpadding="5" cellspacing="0" style="border-collapse: collapse" bordercolor="#111111" width="100%">
+  <tr>
+    <td width="13%" valign="top">[<a name="IBM-01">IBM-01</a>]</td>
+    <td width="87%">IBM Corporation, <i>z/OS V1R3.0 C/C++ Run-Time 
+Library Reference</i>, SA22-7821-02, 2001,
+<a href="http://www-1.ibm.com/servers/eserver/zseries/zos/bkserv/">
+    www-1.ibm.com/servers/eserver/zseries/zos/bkserv/</a></td>
+  </tr>
+  <tr>
+    <td width="13%" valign="top">[<a name="ISO-9660">ISO-9660</a>]</td>
+    <td width="87%">International Standards Organization, 1988</td>
+  </tr>
+  <tr>
+    <td width="13%" valign="top">[<a name="Kuhn">Kuhn</a>]</td>
+    <td width="87%">UTF-8 and Unicode FAQ for Unix/Linux,
+<a href="http://www.cl.cam.ac.uk/~mgk25/unicode.html">
+    www.cl.cam.ac.uk/~mgk25/unicode.html</a></td>
+  </tr>
+  <tr>
+    <td width="13%" valign="top">[<a name="MSDN">MSDN</a>] </td>
+    <td width="87%">Microsoft Platform SDK for Windows, Storage Start 
+Page,
+<a href="http://msdn.microsoft.com/library/en-us/fileio/base/storage_start_page.asp">
+    msdn.microsoft.com/library/en-us/fileio/base/storage_start_page.asp</a></td>
+  </tr>
+  <tr>
+    <td width="13%" valign="top">[<a name="POSIX-01">POSIX-01</a>]</td>
+    <td width="87%">IEEE&nbsp;Std&nbsp;1003.1-2001, ISO/IEC 9945:2002, and The Open Group Base Specifications, Issue 6. Also known as The 
+    Single Unix<font face="Times New Roman">® Specification, Version 3. 
+    Available from each of the organizations involved in its creation. For 
+    example, read online or download from
+    <a href="http://www.unix.org/single_unix_specification/">
+    www.unix.org/single_unix_specification/</a>.</font> The ISO JTC1/SC22/WG15 - POSIX 
+homepage is <a href="http://www.open-std.org/jtc1/sc22/WG15/">
+    www.open-std.org/jtc1/sc22/WG15/</a></td>
+  </tr>
+  <tr>
+    <td width="13%" valign="top">[<a name="URI">URI</a>]</td>
+    <td width="87%">RFC-2396, Uniform Resource Identifiers (URI): Generic 
+Syntax, <a href="http://www.ietf.org/rfc/rfc2396.txt">
+    www.ietf.org/rfc/rfc2396.txt</a></td>
+  </tr>
+  <tr>
+    <td width="13%" valign="top">[<a name="UTF-16">UTF-16</a>]</td>
+    <td width="87%">Wikipedia, UTF-16,
+<a href="http://en.wikipedia.org/wiki/UTF-16">
+    en.wikipedia.org/wiki/UTF-16</a></td>
+  </tr>
+  <tr>
+    <td width="13%" valign="top">[<a name="Wulf-Shaw-73">Wulf-Shaw-73</a>]</td>
+    <td width="87%">William Wulf, Mary Shaw, <i>Global 
+Variable Considered Harmful</i>, ACM SIGPLAN Notices, 8, 2, 1973, pp. 23-34</td>
+  </tr>
+</table>
+
+<hr>
+<p>Revised
+<!--webbot bot="Timestamp" S-Type="EDITED" S-Format="%d %B, %Y" startspan -->02 August, 2005<!--webbot bot="Timestamp" endspan i-checksum="34600" --></p>
+
+<p>© Copyright Beman Dawes, 2002</p>
+<p> Use, modification, and distribution are subject to the Boost Software 
+License, Version 1.0. (See accompanying file <a href="../../../../LICENSE_1_0.txt">
+LICENSE_1_0.txt</a> or copy at <a href="http://www.boost.org/LICENSE_1_0.txt">
+www.boost.org/LICENSE_1_0.txt</a>)</p>
+
+</body>
+
+</html>

@@ -1,0 +1,147 @@
+<html>
+
+<head>
+<meta http-equiv="Content-Language" content="en-us">
+<meta name="GENERATOR" content="Microsoft FrontPage 5.0">
+<meta name="ProgId" content="FrontPage.Editor.Document">
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+<title>Filesystem FAQ</title>
+<link rel="stylesheet" type="text/css" href="../../../../doc/src/minimal.css">
+</head>
+
+<body>
+
+<table border="0" cellpadding="5" cellspacing="0" style="border-collapse: collapse" bordercolor="#111111">
+  <tr>
+    <td width="277">
+<a href="../../../../index.htm">
+<img src="../../../../boost.png" alt="boost.png (6897 bytes)" align="middle" width="300" height="86" border="0"></a></td>
+    <td align="middle">
+    <font size="7">Filesystem FAQ</font>
+    </td>
+  </tr>
+</table>
+
+<table border="0" cellpadding="5" cellspacing="0" style="border-collapse: collapse" bordercolor="#111111" bgcolor="#D7EEFF" width="100%">
+  <tr>
+    <td><a href="index.htm">Filesystem Home</a> &nbsp;&nbsp;
+    <a href="release_history.html">Releases</a> &nbsp;&nbsp;
+    <a href="reference.html">Reference</a> &nbsp;&nbsp;
+    <a href="tutorial.html">Tutorial</a> &nbsp;&nbsp;
+    <a href="faq.htm">FAQ</a> &nbsp;&nbsp;
+    <a href="portability_guide.htm">Portability</a> &nbsp;&nbsp;
+    <a href="v3.html">V3 Intro</a> &nbsp;&nbsp;
+    <a href="v3_design.html">V3 Design</a> &nbsp;&nbsp;
+    <a href="deprecated.html">Deprecated</a> &nbsp;&nbsp;
+    </td>
+  </tr>
+</table>
+
+<h1 dir="ltr">
+Frequently Asked Questions</h1>
+<h2>General questions</h2>
+<p><b>Why not support a  concept of specific kinds of file systems, such as posix_file_system or windows_file_system.</b></p>
+<p>Portability is one of the most important requirements for the 
+library.&nbsp;Features specific to a particular operating system or file system 
+can always be accessed by using the operating system's API.</p>
+
+<h2 dir="ltr">
+Class <code><font size="6">path</font></code> questions </h2>
+<p><b>Why base the generic pathname format on POSIX?</b></p>
+<p><a href="design.htm#POSIX-01">POSIX</a> is an ISO Standard. It is the basis for the most familiar 
+pathname formats, 
+not just for POSIX-based operating systems but also for Windows  and the 
+URL portion of URI's. It is ubiquitous and 
+familiar.&nbsp; On many systems, it is very easy to implement because it is 
+either the native operating system format (Unix and Windows) or via a 
+operating system supplied 
+POSIX library (z/OS, OS/390, and many more.)</p>
+<p><b>Why not use a full URI (Universal Resource Identifier) based path?</b></p>
+<p><a href="design.htm#URI">URI's</a> would promise more than the Filesystem Library can actually deliver, 
+since URI's extend far beyond what most operating systems consider a file or a 
+directory.&nbsp; Thus for the primary &quot;portable script-style file system 
+operations&quot; requirement of the Filesystem Library, full URI's appear to be over-specification.</p>
+<p><b>Why isn't <i>path</i> a base class with derived <i>directory_path</i> and
+<i>file_path</i> classes?</b></p>
+<p>Why bother?&nbsp; The behavior of all three classes is essentially identical. 
+Several early versions did require users to identify each path as a file or 
+directory path, and this seemed to increase coding errors and decrease code 
+readability. There was no apparent upside benefit.</p>
+<p><b>Why do path decomposition functions yielding a single element return a 
+path rather than a string?</b></p>
+<p>Interface simplicity. If they returned strings, flavors would be needed for
+<code>string</code>, <code>wstring</code>, <code>u16string</code>, <code>
+u32string</code>, and generic strings.</p>
+<p><b>Why don't path member functions have overloads with error_code&amp; arguments?</b></p>
+<p>They have not been requested by users; the need for error reporting via 
+error_code seems limited to operations failures rather than path failures.</p>
+<h2>Operations function questions</h2>
+<p><b>Why not supply a 'handle' type, and let the file and directory operations 
+traffic in it?</b></p>
+<p>It isn't clear there is any feasible way to meet the &quot;portable script-style 
+file system operations&quot; requirement with such a system. File systems exist where operations are usually performed on 
+  some non-string handle type. The classic Mac OS has been mentioned explicitly as a case where 
+trafficking in paths isn't always natural.&nbsp;&nbsp;&nbsp; </p>
+<p>The case for the &quot;handle&quot; (opaque data type to identify a file) 
+style may be strongest for directory iterator value type.&nbsp; (See Jesse Jones' Jan 28, 
+2002, Boost postings). However, as class path has evolved, it seems sufficient 
+even as the directory iterator value type.</p>
+<p><b>Why are the operations functions so low-level?</b></p>
+<p>To provide a toolkit from which higher-level functionality can be created.</p>
+<p>An 
+extended attempt to add convenience functions on top of, or as a replacement 
+for, the low-level functionality failed because there is no widely acceptable 
+set of simple semantics for most convenience functions considered.&nbsp; 
+Attempts to provide alternate semantics via either run-time options or 
+compile-time polices became overly complicated in relation to the value 
+delivered, or became contentious.&nbsp; OTOH, the specific functionality needed for several trial 
+applications was very easy for the user to construct from the lower-level 
+toolkit functions.&nbsp; See <a href="design.htm#Abandoned_Designs">Failed 
+Attempts</a>.</p>
+<p><b>Isn't it inconsistent then to provide a few convenience functions?</b></p>
+<p>Yes, but experience with both this library, POSIX, and Windows, indicates 
+the utility of certain convenience functions, and that it is possible to provide 
+simple, yet widely acceptable, semantics for them. For example, <code>remove_all()</code>.</p>
+<p><b>Why are there directory_iterator overloads for operations.hpp 
+predicate functions? Isn't two ways to do the same thing poor design?</b></p>
+<p>Yes, two ways to do the same thing is often a poor design practice. But the 
+iterator versions are often much more efficient. Calling status() during 
+iteration over a directory containing 15,000 files took 6 seconds for the path 
+overload, and 1 second for the iterator overload, for tests on a freshly booted 
+machine. Times were .90 seconds and .30 seconds, for tests after prior use of 
+the directory. This performance gain is large enough to justify deviating from 
+preferred design practices. Neither overload alone meets all needs.</p>
+<p><b>Why are the operations functions so picky about errors?</b></p>
+<p>Safety. The default is to be safe rather than sorry. This is particularly 
+important given the reality that on many computer systems files and directories 
+are globally shared resources, and thus subject to 
+race conditions.</p>
+<p><b>Why are attributes accessed via named functions rather than property maps?</b></p>
+<p>For  commonly used attributes (existence, directory or file, emptiness), 
+simple syntax and guaranteed presence outweigh other considerations. Because 
+access to many other attributes is inherently system dependent, 
+property maps are viewed as the best hope for access and modification, but it is 
+better design to provide such functionality in a separate library. (Historical 
+note: even the apparently simple attribute &quot;read-only&quot; turned out to be so 
+system depend as to be disqualified as a &quot;guaranteed presence&quot; operation.)</p>
+<p><b>Why isn't automatic name portability error detection provided?</b></p>
+<p>A number (at least six) of designs for  name validity error 
+detection were evaluated, including at least four complete implementations.&nbsp; 
+While the details for rejection differed, all of the more powerful name validity checking 
+designs distorted other 
+otherwise simple aspects of the library. Even the simple name checking provided 
+in prior library versions was a constant source of user complaints. While name checking can be helpful, it 
+isn't important enough to justify added a lot of additional complexity.</p>
+<p><b>Why are paths sometimes manipulated by member functions and sometimes by 
+non-member functions?</b></p>
+<p>The design rule is that purely lexical operations are supplied as <i>class 
+path</i> member 
+functions, while operations performed by the operating system are provided as 
+free functions.</p>
+<hr>
+<p>Revised
+<!--webbot bot="Timestamp" S-Type="EDITED" S-Format="%d %B, %Y" startspan -->20 February, 2011<!--webbot bot="Timestamp" endspan i-checksum="40524" --></p>
+<p>© Copyright Beman Dawes, 2002</p>
+<p> Use, modification, and distribution are subject to the Boost Software 
+License, Version 1.0. See <a href="http://www.boost.org/LICENSE_1_0.txt">
+www.boost.org/LICENSE_1_0.txt</a></p>

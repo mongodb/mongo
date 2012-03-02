@@ -1,0 +1,151 @@
+<html>
+
+<head>
+<meta name="GENERATOR" content="Microsoft FrontPage 5.0">
+<meta name="ProgId" content="FrontPage.Editor.Document">
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+<title>Filesystem V3 Intro</title>
+<link rel="stylesheet" type="text/css" href="../../../../doc/src/minimal.css">
+
+<body>
+
+<table border="0" cellpadding="5" cellspacing="0" style="border-collapse: collapse" bordercolor="#111111">
+  <tr>
+    <td width="277">
+<a href="../../../../index.htm">
+<img src="../../../../boost.png" alt="boost.png (6897 bytes)" align="middle" width="300" height="86" border="0"></a></td>
+    <td align="middle">
+    <font size="7">Filesystem
+    Version 3<br>
+    Introduction</font></td>
+  </tr>
+</table>
+
+<table border="0" cellpadding="5" cellspacing="0" style="border-collapse: collapse" bordercolor="#111111" bgcolor="#D7EEFF" width="100%">
+  <tr>
+    <td><a href="index.htm">Filesystem Home</a> &nbsp;&nbsp;
+    <a href="release_history.html">Releases</a> &nbsp;&nbsp;
+    <a href="reference.html">Reference</a> &nbsp;&nbsp;
+    <a href="tutorial.html">Tutorial</a> &nbsp;&nbsp;
+    <a href="faq.htm">FAQ</a> &nbsp;&nbsp;
+    <a href="portability_guide.htm">Portability</a> &nbsp;&nbsp;
+    <a href="v3.html">V3 Intro</a> &nbsp;&nbsp;
+    <a href="v3_design.html">V3 Design</a> &nbsp;&nbsp;
+    <a href="deprecated.html">Deprecated</a> &nbsp;&nbsp;
+    </td>
+  </tr>
+</table>
+
+<h1>Boost Filesystem Version 3</h1>
+
+<p>Version 3 is a major revision of the Boost Filesystem library. Important 
+changes include:</p>
+
+<ul>
+  <li>A single class <code>path</code> handles all aspects of 
+  internationalization, replacing the previous template and its <code>path</code> 
+  and <code>wpath</code> instantiations. Character types <code>char</code>,
+  <code>wchar_t</code>, <code>char16_t</code>, and <code>char32_t</code> are 
+  supported. This is a major simplification of the path abstraction, 
+  particularly for functions that take path arguments.<br>
+&nbsp;</li>
+  <li>New <code>class path</code> members include:<br>
+&nbsp;<ul>
+  <li><code><a href="reference.html#path-has_stem">has_stem</a>()</code></li>
+  <li><code><a href="reference.html#path-has_extension">has_extension</a>()</code></li>
+  <li><code><a href="reference.html#path-is_absolute">is_absolute</a>()</code>. This renames <code>is_complete()</code>, which 
+  is now deprecated.</li>
+  <li><code><a href="reference.html#path-is_relative">is_relative</a>()</code></li>
+  <li><code><a href="reference.html#path-make_preferred">make_preferred</a>()<br>
+&nbsp;</code></li>
+</ul>
+
+  </li>
+  <li>New or improved operations functions include:<br>
+&nbsp;<ul>
+    <li><code><a href="reference.html#absolute">absolute</a>()</code>. This replaces the operations function <code>
+  complete()</code>, which is now deprecated. Semantics are now provided for a 
+    Windows corner case where the <code>base</code> argument was not an absolute 
+    path. Previously this resulted in an exception being thrown.</li>
+    <li><code><a href="reference.html#create_symlink">create_symlink</a>()</code> now supported on both POSIX and Windows.</li>
+    <li><code><a href="reference.html#read_symlink">read_symlink</a>()</code> function added. Supported on both POSIX and 
+    Windows. Used to read the contents of a symlink itself.</li>
+    <li><code><a href="reference.html#resize_file">resize_file</a>()</code> function added. Supported on both POSIX and 
+    Windows. Used to shrink or grow a regular file.</li>
+    <li><code><a href="reference.html#unique_path">unique_path</a>()</code> function added. Supported on both POSIX and 
+    Windows. Used to generate a secure temporary pathname.<br>
+&nbsp;</li>
+  </ul>
+  </li>
+  <li>Support for error reporting via <code>error_code</code> is now uniform 
+  throughout the operations functions.<br>
+&nbsp;</li>
+  <li>Documentation has been reworked, including re-writes of major portions.<br>
+&nbsp;</li>
+  <li>A new <a href="tutorial.html">Tutorial</a> provides a hopefully much 
+  gentler and more complete introduction for new users. Current users might want 
+  to review the <a href="tutorial.html">three sections related to class path</a>.</li>
+</ul>
+
+<h2>Deprecated names and other features</h2>
+
+<p>See the <a href="deprecated.html">Deprecated Features page</a> for transition 
+aids that allow much existing code to compile without change using Version 3.</p>
+
+<h2>Breaking changes</h2>
+
+<p>To ease the transition, Versions 2 and 3 will both be included in the next 
+several Boost releases. Version 2 will be the default version for one release 
+cycle, and then Version 3 will become the default version.</p>
+<h3>Class <code>path</code></h3>
+<ul>
+  <li>Class template <code>basic_path</code> and its specializations are 
+  replaced by a single <code>class path</code>. Thus any code, such as 
+  overloaded functions, that depends on <code>path</code> and <code>wpath</code> 
+  being two distinct types will fail to compile and must be restructured. 
+  Restructuring may be as simple as removing one of the overloads, but also 
+  might require more complex redesign.<br>
+&nbsp;</li>
+  <li>Certain functions now return <code>path</code> objects rather than <code>
+  string or wstring</code> objects:<ul>
+    <li><code>root_name()</code></li>
+    <li><code>root_directory()</code></li>
+    <li><code>filename()</code></li>
+    <li><code>stem()</code></li>
+    <li><code>extension()</code></li>
+  </ul>
+  <p>Not all uses will fail; if the function is being called in a context that 
+  accepts a <code>path</code>, all is well. If the result is being used in a 
+  context requiring a <code>std::string</code> or <code>std::wstring</code>, 
+  then <code>.string()</code> or <code>.wstring()</code> respectively must be 
+  appended to the function call.<br>
+&nbsp;</li>
+  <li>&nbsp;<code>path::iterator::value_type</code> and&nbsp; <code>
+  path::const_iterator::value_type</code> is <code>path</code> rather than <code>
+  basic_string</code>.</li>
+</ul>
+<h3>Compiler support</h3>
+<ul>
+  <li>Compilers and standard libraries that do not fully support wide characters 
+  and wide character strings (<code>std::wstring</code>) are no longer 
+  supported.<br>
+&nbsp;</li>
+  <li>Cygwin versions prior to 1.7 are no longer supported because they lack 
+  wide string support. Cygwin now compiles only for the Windows API and path 
+  syntax.<br>
+&nbsp;</li>
+  <li>MinGW versions not supporting wide strings are no longer supported.<br>
+&nbsp;</li>
+  <li>Microsoft VC++ 7.1 and earlier are no longer supported.</li>
+</ul>
+
+<hr>
+<p>© Copyright Beman Dawes, 2009</p>
+<p>Distributed under the Boost Software License, Version 1.0. See
+<a href="http://www.boost.org/LICENSE_1_0.txt">www.boost.org/LICENSE_1_0.txt</a></p>
+<p>Revised
+<!--webbot bot="Timestamp" S-Type="EDITED" S-Format="%d %B %Y" startspan -->20 February 2011<!--webbot bot="Timestamp" endspan i-checksum="40667" --></p>
+
+</body>
+
+</html>

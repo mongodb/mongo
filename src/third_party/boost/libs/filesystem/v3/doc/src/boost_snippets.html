@@ -1,0 +1,124 @@
+<html>
+
+<head>
+<meta name="GENERATOR" content="Microsoft FrontPage 5.0">
+<meta name="ProgId" content="FrontPage.Editor.Document">
+<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">
+<title>New Page 1</title>
+</head>
+
+<body>
+$id frontmatter=
+
+<table border="0" cellpadding="5" cellspacing="0" style="border-collapse: collapse" bordercolor="#111111">
+  <tr>
+    <td width="277">
+<a href="../../../../index.htm">
+<img src="../../../../boost.png" alt="boost.png (6897 bytes)" align="middle" width="300" height="86" border="0"></a></td>
+    <td align="middle">
+    <font size="7">Filesystem Library<br>
+    </font>
+    <font size="6">Version 3</font></td>
+  </tr>
+</table>
+
+<table border="0" cellpadding="5" cellspacing="0" style="border-collapse: collapse" bordercolor="#111111" bgcolor="#D7EEFF" width="100%">
+  <tr>
+    <td><a href="index.htm">Filesystem Home</a> &nbsp;&nbsp;
+    <a href="release_history.html">Releases</a> &nbsp;&nbsp;
+    <a href="reference.html">Reference</a> &nbsp;&nbsp;
+    <a href="tutorial.html">Tutorial</a> &nbsp;&nbsp;
+    <a href="faq.htm">FAQ</a> &nbsp;&nbsp;
+    <a href="portability_guide.htm">Portability</a> &nbsp;&nbsp;
+    <a href="v3.html">V3 Intro</a> &nbsp;&nbsp;
+    <a href="v3_design.html">V3 Design</a> &nbsp;&nbsp;
+    <a href="deprecated.html">Deprecated</a> &nbsp;&nbsp;
+    </td>
+    </td>
+  </tr>
+</table>
+
+<h1>Reference Documentation</h1>
+
+$endid
+
+$id wording_prefix=
+<h2><a name="Introduction">Introduction</a></h2>
+
+<p>This reference documentation describes components that C++ programs may use 
+to perform operations involving file systems, including paths, regular files, 
+and directories.</p>
+$endid
+
+$id wording_suffix=
+<h3><a name="File-streams">File streams</a> -
+<a href="../../../../boost/filesystem/fstream.hpp">&lt;boost/filesystem/fstream.hpp&gt;</a></h3>
+<p>Replacements are provided for the file stream classes from the C++ standard 
+library's <code>&lt;fstream&gt;</code> header. These replacement classes 
+publicly inherit from the standard library classes. In the Boost.Filesystem 
+version, constructors and open functions take <code>const path&amp;</code> arguments 
+instead of <code>
+const char*</code> arguments. There are no other differences in syntax or 
+semantics.</p>
+<pre>$NAMESPACE_BEGIN;
+    template &lt; class charT, class traits = std::char_traits&lt;charT&gt; &gt;
+    class basic_filebuf : public std::basic_filebuf&lt;charT,traits&gt;
+    {
+    public:
+      basic_filebuf&lt;charT,traits&gt;*
+        open(const path&amp; p, std::ios_base::openmode mode);
+    };
+
+    template &lt; class charT, class traits = std::char_traits&lt;charT&gt; &gt;
+    class basic_ifstream : public std::basic_ifstream&lt;charT,traits&gt;
+    {
+    public:
+      explicit basic_ifstream(const path&amp; p, std::ios_base::openmode mode=std::ios_base::in)
+      void open(const path&amp; p, std::ios_base::openmode mode=std::ios_base::in);
+    };
+
+    template &lt; class charT, class traits = std::char_traits&lt;charT&gt; &gt;
+    class basic_ofstream : public std::basic_ofstream&lt;charT,traits&gt;
+    {
+    public:
+      explicit basic_ofstream(const path&amp; p, std::ios_base::openmode mode=std::ios_base::out);
+      void open(const path&amp; p, std::ios_base::openmode mode=std::ios_base::out);
+    };
+
+    template &lt; class charT, class traits = std::char_traits&lt;charT&gt; &gt;
+    class basic_fstream : public std::basic_fstream&lt;charT,traits&gt;
+    {
+    public:
+      explicit basic_fstream(const path&amp; p,
+        std::ios_base::openmode mode=std::ios_base::in | std::ios_base::out);
+      void open(const path&amp; p,
+        std::ios_base::openmode mode=std::ios_base::in | std::ios_base::out);
+    };
+
+    typedef basic_filebuf&lt;char&gt; filebuf;
+    typedef basic_ifstream&lt;char&gt; ifstream;
+    typedef basic_ofstream&lt;char&gt; ofstream;
+    typedef basic_fstream&lt;char&gt; fstream;
+
+    typedef basic_filebuf&lt;wchar_t&gt; wfilebuf;
+    typedef basic_ifstream&lt;wchar_t&gt; wifstream;
+    typedef basic_fstream&lt;wchar_t&gt; wfstream;
+    typedef basic_ofstream&lt;wchar_t&gt; wofstream;
+    
+$NAMESPACE_END;</pre>
+
+$endid
+
+$id backmatter=>
+<p><font size="2">© Copyright Beman Dawes, 2002, 2006, 2007, 2009, 2010, 2011</font></p>
+<p><font size="2">Distributed under the Boost Software License, Version 1.0. See
+</font>
+<a href="http://www.boost.org/LICENSE_1_0.txt"><font size="2">www.boost.org/LICENSE_1_0.txt</font></a></p>
+<p><font size="2">Revised
+<!--webbot bot="Timestamp" S-Type="EDITED" S-Format="%d %B %Y" startspan -->13 January 2012<!--webbot bot="Timestamp" endspan i-checksum="32267" --></font></p>
+
+$endid
+
+</body>
+
+</html>
