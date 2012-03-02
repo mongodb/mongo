@@ -436,6 +436,7 @@ doneCheckOrder:
     void QueryPlanSet::init() {
         DEBUGQO( "QueryPlanSet::init " << ns << "\t" << _originalQuery );
         _plans.clear();
+        _fallbackPlans.clear();
         _usingCachedPlan = false;
 
         const char *ns = _frsp->ns();
