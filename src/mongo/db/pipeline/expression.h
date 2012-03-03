@@ -821,7 +821,7 @@ namespace mongo {
            @returns the integer value
            @throws uassert if the value is out of range
          */
-        int checkIntRange(const char *pName, long value) const;
+        int checkIntRange(const char *pName, long long value) const;
     };
 
 

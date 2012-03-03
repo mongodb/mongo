@@ -2066,7 +2066,7 @@ namespace mongo {
         ExpressionNary::addOperand(pExpression);
     }
 
-    int ExpressionIsoDate::checkIntRange(const char *pName, long value) const {
+    int ExpressionIsoDate::checkIntRange(const char *pName, long long value) const {
         uassert(16027, str::stream() << getOpName() <<
                 ":  \"" << pName <<
                 "\" value outside of range INT_MIN to INT_MAX",
