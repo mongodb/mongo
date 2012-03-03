@@ -109,6 +109,7 @@ namespace mongo {
         bExtra.append( "pageSize", static_cast< int >(ntsysinfo.dwPageSize) );
 
         // get memory info
+        mse.dwLength = sizeof( mse );
         if ( GlobalMemoryStatusEx( &mse ) ) {
             memSize = mse.ullTotalPhys;
         }
