@@ -184,9 +184,8 @@ namespace mongo {
             if( W.n + R.n + w.n + r.n == 0 )
                 break;
             if( curTimeMillis64() >= end ) {
-                // timed out
-                dassert( greed > 0 );
                 greed -= g;
+                dassert( greed >= 0 );
                 // should we do notify_one on W.c so we should be careful not to leave someone 
                 // else waiting when we give up here perhaps. it is very possible this code
                 // is unnecessary:
