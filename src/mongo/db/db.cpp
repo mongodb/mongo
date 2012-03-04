@@ -1262,29 +1262,26 @@ namespace mongo {
     }
 
     LPTOP_LEVEL_EXCEPTION_FILTER filtLast = 0;
-    ::HANDLE standardOut = GetStdHandle(STD_OUTPUT_HANDLE);
-    LONG WINAPI exceptionFilter(struct _EXCEPTION_POINTERS *ExceptionInfo) { 
-        {
-            // given the severity of the event we write to console in addition to the --logFile
-            // (rawOut writes to the logfile, if a special one were specified)
-            DWORD written;
-            WriteFile(standardOut, "unhandled windows exception\n", 20, &written, 0);
-            FlushFileBuffers(standardOut);
-        }
 
-        DWORD ec = ExceptionInfo->ExceptionRecord->ExceptionCode;
-        if( ec == EXCEPTION_ACCESS_VIOLATION ) {
-            rawOut("access violation");
-        } 
-        else {
-            rawOut("unhandled windows exception");
-            char buf[64];
-            strcpy(buf, "ec=0x");
-            _ui64toa(ec, buf+5, 16);
-            rawOut(buf);
-        }
+    LONG WINAPI exceptionFilter( struct _EXCEPTION_POINTERS *excPointers ) {
+        char exceptionString[128];
+        sprintf_s( exceptionString, sizeof( exceptionString ),
+                ( excPointers->ExceptionRecord->ExceptionCode == EXCEPTION_ACCESS_VIOLATION ) ?
+                "(access violation)" : "0x%08X", excPointers->ExceptionRecord->ExceptionCode );
+        char addressString[128];
+        sprintf_s( addressString, sizeof( addressString ), "0x%p",
+                 excPointers->ExceptionRecord->ExceptionAddress );
+        log() << "*** unhandled exception " << exceptionString <<
+                " at " << addressString << ", terminating" << endl;
+
+        // In release builds, let dbexit() try to shut down cleanly
+#if !defined(_DEBUG)
+        dbexit( EXIT_UNCAUGHT, "unhandled exception" );
+#endif
+
+        // In debug builds, give debugger a chance to run
         if( filtLast ) 
-            return filtLast(ExceptionInfo);
+            return filtLast( excPointers );
         return EXCEPTION_EXECUTE_HANDLER;
     }
 
