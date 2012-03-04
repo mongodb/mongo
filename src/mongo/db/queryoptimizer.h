@@ -493,11 +493,15 @@ namespace mongo {
         /** @return true if an active or fallback plan of _currentQps is out of order. */
         bool possibleOutOfOrderPlan() const;
         
+        int i() const { return _i; }
+        
         string toString() const;
 
     private:
         /** Initialize or iterate a runner generated from @param originalOp. */
         shared_ptr<QueryOp> iterateRunner( QueryOp &originalOp, bool retried = false );
+
+        shared_ptr<QueryOp> nextOpOr();
         
         void updateCurrentQps( QueryPlanSet *qps );
         
@@ -508,11 +512,11 @@ namespace mongo {
             massert( 13271, "can't run more ops", mayRunMore() );
         }
         
-        shared_ptr<QueryOp> nextOpBeginningClause();
-        shared_ptr<QueryOp> nextOpHandleEndOfClause();
-
         void handleEndOfClause( const QueryPlan &clausePlan );
         void handleBeginningOfClause();
+
+        shared_ptr<QueryOp> nextOpBeginningClause();
+
         bool haveUselessOr() const;
 
         const string _ns;

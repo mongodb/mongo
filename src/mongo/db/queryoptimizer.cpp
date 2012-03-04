@@ -953,23 +953,16 @@ doneCheckOrder:
         }
     }
 
-    shared_ptr<QueryOp> MultiPlanScanner::nextOpHandleEndOfClause() {
-        shared_ptr<QueryOp> op = iterateRunner( *_baseOp );
-        if ( op->completeWithoutStop() ) {
-            handleEndOfClause( op->qp() );
-        }
-        return op;
-    }
-    
     shared_ptr<QueryOp> MultiPlanScanner::nextOpBeginningClause() {
         assertMayRunMore();
         shared_ptr<QueryOp> op;
         while( mayRunMore() ) {
             handleBeginningOfClause();
-            op = nextOpHandleEndOfClause();
+            op = iterateRunner( *_baseOp );
             if ( !op->completeWithoutStop() ) {
              	return op;
             }
+            handleEndOfClause( op->qp() );
             _baseOp = op;
         }
         return op;
@@ -995,20 +988,25 @@ doneCheckOrder:
     }
 
     shared_ptr<QueryOp> MultiPlanScanner::nextOp() {
-        if ( !_or ) {
-            if ( _i == 0 ) {
-                assertMayRunMore();
-	         	++_i;
-            }
-            return iterateRunner( *_baseOp );
+        if ( _or ) {
+            return nextOpOr();
         }
+        if ( _i == 0 ) {
+            assertMayRunMore();
+            ++_i;
+        }
+        return iterateRunner( *_baseOp );
+    }
+    
+    shared_ptr<QueryOp> MultiPlanScanner::nextOpOr() {
         if ( _i == 0 ) {
             return nextOpBeginningClause();
         }
-        shared_ptr<QueryOp> op = nextOpHandleEndOfClause();
+        shared_ptr<QueryOp> op = iterateRunner( *_baseOp );
         if ( !op->completeWithoutStop() ) {
             return op;   
         }
+        handleEndOfClause( op->qp() );
         if ( mayRunMore() ) {
             // Finished scanning the clause, but stop hasn't been requested.
             // Start scanning the next clause.
