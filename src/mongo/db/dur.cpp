@@ -798,7 +798,7 @@ namespace mongo {
         // this is for upgradeToWritable _DEBUG mode verification - although that code is off right now
         unsigned notesThisLock = 0;
 
-        void releasedWriteLock() {
+        void releasingWriteLock() {
             unspoolWriteIntents();
 
             // SERVER-4328 this isn't quite what we want for notesThisLock with db level concurrency,

@@ -84,11 +84,7 @@ namespace mongo {
             if( t ) 
                 t->unspool();
         }
-        /*void _unspoolWriteIntents() { 
-            ThreadLocalIntents *t = tlIntents.get();
-            if( t ) 
-                t->_unspool();
-        }*/
+
         /** base declare write intent function that all the helpers call. */
         /** we batch up our write intents so that we do not have to synchronize too often */
         void DurableImpl::declareWriteIntent(void *p, unsigned len) {
