@@ -1171,9 +1171,7 @@ doneCheckOrder:
     }
     
     void MultiCursor::nextClause() {
-        if ( _nscanned >= 0 ) {
-            _nscanned += _c->nscanned();
-        }
+        _nscanned += _c->nscanned();
         if ( _explainPlanInfo ) _explainPlanInfo->noteDone( *_c );
         _matcher->advanceOrClause( _queryPlan->originalFrv() );
         shared_ptr<CoveredIndexMatcher> newMatcher

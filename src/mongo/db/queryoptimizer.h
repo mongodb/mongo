@@ -542,20 +542,17 @@ namespace mongo {
         shared_ptr<ExplainQueryInfo> _explainQueryInfo;
     };
 
-    /** Provides a cursor interface for certain limited uses of a MultiPlanScanner. */
+    /**
+     * Provides a cursor interface for certain limited uses of a MultiPlanScanner.
+     * Currently used internally by a QueryOptimizerCursor.
+     */
     class MultiCursor : public Cursor {
     public:
-        /**
-         * Used
-         * 1. To handoff a query to a getMore()
-         * 2. To handoff a QueryOptimizerCursor
-         * @param nscanned is an optional initial value, if not supplied nscanned()
-         * will always return -1
-         */
+        /** @param nscanned is the initial nscanned value. */
         MultiCursor( auto_ptr<MultiPlanScanner> mps, const shared_ptr<Cursor> &c,
                     const shared_ptr<CoveredIndexMatcher> &matcher,
                     const shared_ptr<ExplainPlanInfo> &explainPlanInfo,
-                    const QueryOp &op, long long nscanned = -1 );
+                    const QueryOp &op, long long nscanned );
 
         virtual bool ok() { return _c->ok(); }
         virtual Record* _current() { return _c->_current(); }
@@ -585,8 +582,7 @@ namespace mongo {
 
         virtual bool capped() const { return _c->capped(); }
         
-        /** return -1 if we're a getmore handoff */
-        virtual long long nscanned() { return _nscanned >= 0 ? _nscanned + _c->nscanned() : _nscanned; }
+        virtual long long nscanned() { return _nscanned + _c->nscanned(); }
         
         void noteIterate( bool match, bool loadedObject );
         
