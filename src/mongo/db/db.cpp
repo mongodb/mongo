@@ -1172,7 +1172,7 @@ namespace mongo {
     // this will be called in certain c++ error cases, for example if there are two active
     // exceptions
     void myterminate() {
-        rawOut( "terminate() called, printing stack:" );
+        rawOut( "terminate() called, printing stack (if implemented for platform):" );
         printStackTrace();
         ::abort();
     }
