@@ -452,7 +452,7 @@ namespace QueryOptimizerTests {
                 QueryPlan p( nsd(), INDEXNO( "a" << 1 << "b" << 1 ), FRSP( BSON( "b" << 1 ) ),
                             FRSP2( BSON( "b" << 1 ) ), BSON( "b" << 1 ), shared_ptr<Projection>(),
                             BSONObj() );
-                ASSERT( p.range( "a" ).universal() );
+                ASSERT( p.multikeyFrs().range( "a" ).universal() );
                 ASSERT( p.unhelpful() );
                 QueryPlan p2( nsd(), INDEXNO( "a" << 1 << "b" << 1 ),
                              FRSP( BSON( "b" << 1 << "c" << 1 ) ),
@@ -460,18 +460,18 @@ namespace QueryOptimizerTests {
                              BSON( "b" << 1 << "c" << 1 ), shared_ptr<Projection>(),
                              BSON( "a" << 1 ) );
                 ASSERT( !p2.scanAndOrderRequired() );
-                ASSERT( p2.range( "a" ).universal() );
+                ASSERT( p2.multikeyFrs().range( "a" ).universal() );
                 ASSERT( !p2.unhelpful() );
                 QueryPlan p3( nsd(), INDEXNO( "b" << 1 ), FRSP( BSON( "b" << 1 << "c" << 1 ) ),
                              FRSP2( BSON( "b" << 1 << "c" << 1 ) ), BSON( "b" << 1 << "c" << 1 ),
                              shared_ptr<Projection>(), BSONObj() );
-                ASSERT( !p3.range( "b" ).universal() );
+                ASSERT( !p3.multikeyFrs().range( "b" ).universal() );
                 ASSERT( !p3.unhelpful() );
                 QueryPlan p4( nsd(), INDEXNO( "b" << 1 << "c" << 1 ),
                              FRSP( BSON( "c" << 1 << "d" << 1 ) ),
                              FRSP2( BSON( "c" << 1 << "d" << 1 ) ), BSON( "c" << 1 << "d" << 1 ),
                              shared_ptr<Projection>(), BSONObj() );
-                ASSERT( p4.range( "b" ).universal() );
+                ASSERT( p4.multikeyFrs().range( "b" ).universal() );
                 ASSERT( p4.unhelpful() );
             }
         };

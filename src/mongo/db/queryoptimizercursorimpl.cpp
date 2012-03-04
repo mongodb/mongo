@@ -755,7 +755,7 @@ namespace mongo {
     void CursorGenerator::setMultiPlanScanner() {
         _mps.reset( new MultiPlanScanner( _ns, _query, fieldsPtr(), _order, hint(),
                                          explain() ? QueryPlanSet::Ignore : QueryPlanSet::Use,
-                                         min(), max() ) ); // mayYield == false
+                                         min(), max() ) );
     }
     
     shared_ptr<Cursor> CursorGenerator::singlePlanCursor() {
@@ -806,7 +806,7 @@ namespace mongo {
     ( const char *ns, const BSONObj &query, const shared_ptr<Projection> &fields,
      const BSONObj &order, const QueryPlanSelectionPolicy &planPolicy, bool requireOrder ) {
         auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, fields,
-                                                             order ) ); // mayYield == false
+                                                             order ) );
         return newQueryOptimizerCursor( mps, planPolicy, requireOrder, false );
     }
         

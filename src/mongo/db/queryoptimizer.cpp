@@ -342,7 +342,7 @@ doneCheckOrder:
             _matcher.reset( _oldMatcher->nextClauseMatcher( qp().indexKey() ) );
         }
         else {
-            _matcher.reset( new CoveredIndexMatcher( qp().originalQuery(), qp().indexKey(), alwaysUseRecord() ) );
+            _matcher.reset( new CoveredIndexMatcher( qp().originalQuery(), qp().indexKey(), false ) );
         }
         _init();
     }    
@@ -353,7 +353,7 @@ doneCheckOrder:
                                const BSONObj &order,
                                bool mustAssertOnYieldFailure, const BSONObj &hint,
                                QueryPlanSet::RecordedPlanPolicy recordedPlanPolicy,
-                               const BSONObj &min, const BSONObj &max, bool mayYield ) :
+                               const BSONObj &min, const BSONObj &max ) :
         _ns(ns),
         _originalQuery( originalQuery ),
         _fields( fields ),
@@ -367,17 +367,9 @@ doneCheckOrder:
         _recordedPlanPolicy( recordedPlanPolicy ),
         _min( min.getOwned() ),
         _max( max.getOwned() ),
-        _mayYield( mayYield ),
 	    _yieldSometimesTracker( 256, 20 ),
         _mustAssertOnYieldFailure( mustAssertOnYieldFailure ) {
         init();
-    }
-
-    bool QueryPlanSet::modifiedKeys() const {
-        for( PlanSet::const_iterator i = _plans.begin(); i != _plans.end(); ++i )
-            if ( (*i)->isMultiKey() )
-                return true;
-        return false;
     }
 
     bool QueryPlanSet::hasMultiKey() const {
@@ -779,23 +771,6 @@ doneCheckOrder:
         }        
     }
 
-    void QueryPlanSet::Runner::mayYield() {
-        if ( ! _plans._mayYield ) 
-            return;
-        
-        if ( ! _plans._yieldSometimesTracker.intervalHasElapsed() ) 
-            return;
-        
-        int micros = ClientCursor::suggestYieldMicros();
-        if ( micros <= 0 ) 
-            return;
-
-        prepareToYield();
-        
-        ClientCursor::staticYield( micros , _plans._ns , 0 );
-        recoverFromYield();
-    }
-
     shared_ptr<QueryOp> QueryPlanSet::Runner::init() {
         massert( 10369 ,  "no plans", _plans._plans.size() > 0 );
         
@@ -844,7 +819,6 @@ doneCheckOrder:
     }
     
     shared_ptr<QueryOp> QueryPlanSet::Runner::next() {
-        mayYield();
         dassert( !_queue.empty() );
         OpHolder holder = _queue.pop();
         QueryOp &op = *holder._op;
@@ -943,8 +917,7 @@ doneCheckOrder:
                                         const BSONObj &hint,
                                         QueryPlanSet::RecordedPlanPolicy recordedPlanPolicy,
                                         const BSONObj &min,
-                                        const BSONObj &max,
-                                        bool mayYield ) :
+                                        const BSONObj &max ) :
         _ns( ns ),
         _or( !query.getField( "$or" ).eoo() ),
         _query( query.getOwned() ),
@@ -952,7 +925,6 @@ doneCheckOrder:
         _i(),
         _recordedPlanPolicy( recordedPlanPolicy ),
         _hint( hint.getOwned() ),
-        _mayYield( mayYield ),
         _tableScanned() {
         if ( !order.isEmpty() || !min.isEmpty() || !max.isEmpty() ) {
             _or = false;
@@ -973,7 +945,7 @@ doneCheckOrder:
             updateCurrentQps( new QueryPlanSet( _ns.c_str(), frsp, auto_ptr<FieldRangeSetPair>(),
                                                 _query, _fields, order, false, hint,
                                                 _recordedPlanPolicy,
-                                                min, max, _mayYield ) );
+                                                min, max ) );
         }
         else {
             BSONElement e = _query.getField( "$or" );
@@ -1019,7 +991,7 @@ doneCheckOrder:
         auto_ptr<FieldRangeSetPair> originalFrsp( _org->topFrspOriginal() );
         updateCurrentQps( new QueryPlanSet( _ns.c_str(), frsp, originalFrsp, _query, _fields,
                                            BSONObj(), true, _hint, _recordedPlanPolicy,
-                                           BSONObj(), BSONObj(), _mayYield ) );
+                                           BSONObj(), BSONObj() ) );
     }
 
     shared_ptr<QueryOp> MultiPlanScanner::nextOp() {
@@ -1078,17 +1050,6 @@ doneCheckOrder:
     
     int MultiPlanScanner::currentNPlans() const {
         return _currentQps.get() ? _currentQps->nPlans() : 0;
-    }
-
-    shared_ptr<Cursor> MultiPlanScanner::singleCursor() const {
-        const QueryPlan *qp = singlePlan();
-        if ( !qp ) {
-            return shared_ptr<Cursor>();            
-        }
-        // If there is only one plan and it does not require an in memory
-        // sort, we do not expect its cursor op to throw an exception and
-        // so do not need a QueryOptimizerCursor to handle this case.
-        return qp->newCursor();
     }
 
     const QueryPlan *MultiPlanScanner::singlePlan() const {

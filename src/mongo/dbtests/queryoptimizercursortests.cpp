@@ -2111,7 +2111,7 @@ namespace QueryOptimizerCursorTests {
             }
         };
 
-        /* Test 'touch earlier iterate' with undexed cursor takeover and deletes. */
+        /* Test 'touch earlier iterate' with unindexed cursor takeover and deletes. */
         class UnindexedTakeoverDeleteMultiple : public Base {
         public:
             void run() {

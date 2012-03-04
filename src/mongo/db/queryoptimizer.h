@@ -84,8 +84,6 @@ namespace mongo {
         const char *ns() const { return _frs.ns(); }
         NamespaceDetails *nsd() const { return _d; }
         BSONObj originalQuery() const { return _originalQuery; }
-        BSONObj simplifiedQuery( const BSONObj& fields = BSONObj() ) const { return _frs.simplifiedQuery( fields ); }
-        const FieldRange &range( const char *fieldName ) const { return _frs.range( fieldName ); }
         shared_ptr<FieldRangeVector> originalFrv() const { return _originalFrv; }
 
         const FieldRangeSet &multikeyFrs() const { return _frsMulti; }
@@ -242,8 +240,6 @@ namespace mongo {
         /** @return a copy of the inheriting class, which will be run with its own query plan. */
         virtual QueryOp *_createChild() const = 0;
 
-        virtual bool alwaysUseRecord() const { return false; }
-
     private:
         bool _complete;
         bool _stopRequested;
@@ -311,8 +307,7 @@ namespace mongo {
                       const BSONObj &hint = BSONObj(),
                       RecordedPlanPolicy recordedPlanPolicy = Use,
                       const BSONObj &min = BSONObj(),
-                      const BSONObj &max = BSONObj(),
-                      bool mayYield = false);
+                      const BSONObj &max = BSONObj() );
 
         /** @return number of candidate plans. */
         int nPlans() const { return _plans.size(); }
@@ -356,18 +351,12 @@ namespace mongo {
             
             /** @return a plan that has completed, otherwise an arbitrary plan. */
             shared_ptr<QueryOp> init();
-            /**
-             * Move the Runner forward one iteration, and @return the plan for
-             * this iteration.
-             */
-            shared_ptr<QueryOp> next();
             /** @return next non error op if there is one, otherwise an error op. */
             shared_ptr<QueryOp> nextNonError();
             
             void prepareToYield();
             void recoverFromYield();
             
-            void mayYield();
             QueryOp &_op;
             QueryPlanSet &_plans;
             static void initOp( QueryOp &op );
@@ -381,6 +370,12 @@ namespace mongo {
                 return _explainClauseInfo;
             }
         private:
+            /**
+             * Move the Runner forward one iteration, and @return the plan for
+             * this iteration.
+             */
+            shared_ptr<QueryOp> next();
+
             vector<shared_ptr<QueryOp> > _ops;
             struct OpHolder {
                 OpHolder( const shared_ptr<QueryOp> &op ) : _op( op ), _offset() {}
@@ -417,7 +412,6 @@ namespace mongo {
         BSONObj _min;
         BSONObj _max;
         string _special;
-        bool _mayYield;
         ElapsedTracker _yieldSometimesTracker;
         bool _mustAssertOnYieldFailure;
     };
@@ -432,8 +426,7 @@ namespace mongo {
                           const BSONObj &hint = BSONObj(),
                           QueryPlanSet::RecordedPlanPolicy recordedPlanPolicy = QueryPlanSet::Use,
                           const BSONObj &min = BSONObj(),
-                          const BSONObj &max = BSONObj(),
-                          bool mayYield = false);
+                          const BSONObj &max = BSONObj() );
 
         /** Initialize or iterate a runner generated from @param originalOp. */
         
@@ -474,12 +467,6 @@ namespace mongo {
         int currentNPlans() const;
 
         /**
-         * @return a single simple cursor if the scanner would run a single cursor
-         * for this query, otherwise return an empty shared_ptr.
-         */
-        shared_ptr<Cursor> singleCursor() const;
-
-        /**
          * @return the query plan that would be used if the scanner would run a single
          * cursor for this query, otherwise 0.  The returned plan is invalid if this
          * MultiPlanScanner is destroyed, hence we return a raw pointer.
@@ -494,7 +481,6 @@ namespace mongo {
         BSONObj oldExplain() const { assertNotOr(); return _currentQps->explain(); }
         /** @return true iff this is not a $or query and a plan is selected based on previous success of this plan. */
         bool usingCachedPlan() const { return !_or && _currentQps->usingCachedPlan(); }
-        bool modifiedKeys() const { return _currentQps->modifiedKeys(); }
         bool hasMultiKey() const { return _currentQps->hasMultiKey(); }
         
         /** Clear recorded indexes for the current QueryPlanSet's patterns. */
@@ -521,11 +507,14 @@ namespace mongo {
         void assertMayRunMore() const {
             massert( 13271, "can't run more ops", mayRunMore() );
         }
+        
         shared_ptr<QueryOp> nextOpBeginningClause();
         shared_ptr<QueryOp> nextOpHandleEndOfClause();
+
         void handleEndOfClause( const QueryPlan &clausePlan );
         void handleBeginningOfClause();
         bool haveUselessOr() const;
+
         const string _ns;
         bool _or;
         BSONObj _query;
@@ -535,7 +524,6 @@ namespace mongo {
         int _i;
         QueryPlanSet::RecordedPlanPolicy _recordedPlanPolicy;
         BSONObj _hint;
-        bool _mayYield;
         bool _tableScanned;
         shared_ptr<QueryOp> _baseOp;
         shared_ptr<QueryPlanSet::Runner> _runner;
@@ -573,7 +561,7 @@ namespace mongo {
 
         virtual bool autoDedup() const { return _c->autoDedup(); }
 
-        virtual bool modifiedKeys() const { return _mps->modifiedKeys(); }
+        virtual bool modifiedKeys() const { return true; }
 
         virtual bool isMultiKey() const { return _mps->hasMultiKey(); }
 
