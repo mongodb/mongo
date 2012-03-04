@@ -583,7 +583,7 @@ namespace mongo {
         virtual bool slaveOk() const {
             return false;
         }
-        virtual LockType locktype() const { return WRITE; }
+        virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream &help ) const {
             help << "copy a database from another host to this host\n";
             help << "usage: {copydb: 1, fromhost: <hostname>, fromdb: <db>, todb: <db>[, slaveOk: <bool>, username: <username>, nonce: <nonce>, key: <key>]}";
@@ -591,10 +591,8 @@ namespace mongo {
         virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             bool slaveOk = cmdObj["slaveOk"].trueValue();
             string fromhost = cmdObj.getStringField("fromhost");
-            if ( fromhost.empty() ) {
-                // SERVER-4328 TODO local globally in this case?  or just lock the two databases, but need to lock them in a well-defined order perhaps, 
-                //                  and the d_concurrency code doesn't allow that yet.
-
+            bool fromSelf = fromhost.empty();
+            if ( fromSelf ) {
                 /* copy from self */
                 stringstream ss;
                 ss << "localhost:" << cmdLine.port;
@@ -606,6 +604,10 @@ namespace mongo {
                 errmsg = "parms missing - {copydb: 1, fromhost: <hostname>, fromdb: <db>, todb: <db>}";
                 return false;
             }
+
+            // SERVER-4328 todo lock just the two db's not everything for the fromself case
+            writelock lk( fromSelf ? "" : dbname );
+
             Cloner c;
             string username = cmdObj.getStringField( "username" );
             string nonce = cmdObj.getStringField( "nonce" );

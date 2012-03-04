@@ -1516,6 +1516,8 @@ namespace mongo {
         CmdConvertToCapped() : Command( "convertToCapped" ) {}
         virtual bool slaveOk() const { return false; }
         virtual LockType locktype() const { return WRITE; }
+        // calls renamecollection which does a global lock, so we must too:
+        virtual bool lockGlobally() const { return true; }
         virtual void help( stringstream &help ) const {
             help << "{ convertToCapped:<fromCollectionName>, size:<sizeInBytes> }";
         }
@@ -1905,6 +1907,10 @@ namespace mongo {
             DEV {
                 if( !global && Lock::isW() ) { 
                     log() << "\ndebug have W lock but w would suffice for command " << c->name << endl;
+                }
+                if( global && Lock::isLocked() == 'w' ) { 
+                    // can't go w->W
+                    log() << "need glboal W lock but already have w on command : " << cmdObj.toString() << endl;
                 }
             }
             writelock lk( global ? "" : dbname );
