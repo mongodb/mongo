@@ -190,8 +190,8 @@ namespace mongo {
             DEV cout << "_DEBUG build" << endl;
             cout << "git version: " << gitVersion() << endl;
             cout <<  "build sys info: " << sysInfo() << endl;
-        } else
-        {
+        }
+        else {
             log() << "MongoS version " << versionString << " starting: pid=" << getpid() << " port=" << cmdLine.port <<
                     ( sizeof( int* ) == 4 ? " 32" : " 64" ) << "-bit host=" << getHostNameCached() << " (--help for usage)" << endl;
             DEV log() << "_DEBUG build" << endl;
