@@ -278,7 +278,7 @@ namespace mongo {
             cmdLine.noUnixSocket = true;
         }
 
-        if (params.count("fork")) {
+        if (params.count("fork") && !params.count("shutdown")) {
             cmdLine.doFork = true;
             if ( ! params.count( "logpath" ) && ! params.count( "syslog" ) ) {
                 cout << "--fork has to be used with --logpath or --syslog" << endl;
@@ -374,7 +374,7 @@ namespace mongo {
             Logstream::useSyslog( sb.str().c_str() );
         }
 #endif
-        if (params.count("logpath")) {
+        if (params.count("logpath") && !params.count("shutdown")) {
             if ( params.count("syslog") ) {
                 cout << "Cant use both a logpath and syslog " << endl;
                 ::exit(-1);
