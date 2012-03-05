@@ -212,7 +212,7 @@ namespace mongo {
             bool inDB( const string& db , const string& path=dbpath ) const;
 
             void _clear() { // this is sort of an "early destruct" indication, _ns can never be uncleared
-                const_cast<string&>(_ns).empty();
+                const_cast<string&>(_ns).clear();
                 _db = 0;
             }
 
