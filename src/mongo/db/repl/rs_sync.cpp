@@ -15,10 +15,10 @@
 */
 
 #include "pch.h"
-#include "../client.h"
-#include "../../client/dbclient.h"
+#include "mongo/db/client.h"
+#include "mongo/client/dbclient.h"
 #include "rs.h"
-#include "../repl.h"
+#include "mongo/db/repl.h"
 #include "connections.h"
 
 namespace mongo {

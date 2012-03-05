@@ -15,15 +15,15 @@
 */
 
 #include "pch.h"
-#include "../repl.h"
-#include "../client.h"
-#include "../../client/dbclient.h"
+#include "mongo/db/repl.h"
+#include "mongo/db/client.h"
+#include "mongo/client/dbclient.h"
 #include "rs.h"
-#include "../oplogreader.h"
-#include "../../util/mongoutils/str.h"
-#include "../dbhelpers.h"
+#include "mongo/db/oplogreader.h"
+#include "mongo/util/mongoutils/str.h"
+#include "mongo/db/dbhelpers.h"
 #include "rs_optime.h"
-#include "../oplog.h"
+#include "mongo/db/oplog.h"
 
 namespace mongo {
 
@@ -80,8 +80,7 @@ namespace mongo {
     }
 
     Member* ReplSetImpl::getMemberToSyncTo() {
-        Member *closest = 0;
-        time_t now = 0;
+
         bool buildIndexes = true;
 
         // wait for 2N pings before choosing a sync target
@@ -96,6 +95,8 @@ namespace mongo {
             buildIndexes = myConfig().buildIndexes;
         }
 
+        Member *closest = 0;
+        time_t now = 0;
         // find the member with the lowest ping time that has more data than me
         for (Member *m = _members.head(); m; m = m->next()) {
             if (m->hbinfo().up() &&
@@ -103,7 +104,8 @@ namespace mongo {
                 (!buildIndexes || (buildIndexes && m->config().buildIndexes)) &&
                 (m->state() == MemberState::RS_PRIMARY ||
                  (m->state() == MemberState::RS_SECONDARY && m->hbinfo().opTime > lastOpTimeWritten)) &&
-                (!closest || m->hbinfo().ping < closest->hbinfo().ping)) {
+                (!closest || m->hbinfo().ping < closest->hbinfo().ping) &&
+                ( myConfig().slaveDelay >= m->config().slaveDelay )) {
 
                 map<string,time_t>::iterator vetoed = _veto.find(m->fullName());
                 if (vetoed == _veto.end()) {
