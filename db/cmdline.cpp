@@ -239,7 +239,7 @@ namespace mongo {
             cmdLine.noUnixSocket = true;
         }
 
-        if (params.count("fork")) {
+        if (params.count("fork") && !params.count("shutdown")) {
             if ( ! params.count( "logpath" ) ) {
                 cout << "--fork has to be used with --logpath" << endl;
                 ::exit(-1);
@@ -304,7 +304,7 @@ namespace mongo {
         }
 
 #endif
-        if (params.count("logpath")) {
+        if (params.count("logpath") && !params.count("shutdown")) {
             if ( logpath.size() == 0 )
                 logpath = params["logpath"].as<string>();
             uassert( 10033 ,  "logpath has to be non-zero" , logpath.size() );
