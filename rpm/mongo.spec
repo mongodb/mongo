@@ -24,6 +24,10 @@ client utilities.
 Summary: mongodb server, sharding server, and support scripts
 Group: Applications/Databases
 Requires: mongo
+Requires(pre): /usr/sbin/useradd
+Requires(pre): /usr/sbin/groupadd
+Requires(post): chkconfig
+Requires(preun): chkconfig
 
 %description server
 MongoDB (from "huMONGOus") is a schema-free document-oriented database.
