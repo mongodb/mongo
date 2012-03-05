@@ -358,7 +358,7 @@ namespace mongo {
         return c->toString();
     }
 
-    Client* curopWaitingForLock( int type ) {
+    Client* curopWaitingForLock( char type ) {
         Client * c = currentClient.get();
         assert( c );
         CurOp * co = c->curop();
@@ -367,6 +367,7 @@ namespace mongo {
         }
         return c;
     }
+
     void curopGotLock(Client *c) {
         assert(c);
         CurOp * co = c->curop();
@@ -486,11 +487,8 @@ namespace mongo {
                     tablecell( ss , co.opNum() );
                     tablecell( ss , co.active() );
                     {
-                        int lt = co.getLockType();
-                        if( lt == -1 ) tablecell(ss, "R");
-                        else if( lt == 1 ) tablecell(ss, "W");
-                        else
-                            tablecell( ss ,  lt);
+                        char lt = co.lockType();
+                        tablecell(ss, lt ? lt : ' ');
                     }
                     tablecell( ss , co.isWaitingForLock() );
                     if ( co.active() )
@@ -529,7 +527,8 @@ namespace mongo {
                 Client* c = *i;
                 if ( c->curop()->isWaitingForLock() ) {
                     num++;
-                    if ( c->curop()->getLockType() > 0 )
+                    char lt = c->curop()->lockType();
+                    if( lt == 'w' || lt == 'W' )
                         w++;
                     else
                         r++;
@@ -566,12 +565,11 @@ namespace mongo {
             if ( ! c->curop()->active() )
                 continue;
 
-            int l = c->curop()->getLockType();
-            if ( l > 0 )
+            char lt = c->curop()->lockType();
+            if ( lt == 'w' || lt == 'W' )
                 writers++;
-            else if ( l < 0 )
+            else if ( lt == 'r' || lt == 'R' )
                 readers++;
-
         }
 
         return writers + readers;

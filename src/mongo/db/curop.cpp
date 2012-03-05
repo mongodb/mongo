@@ -26,6 +26,7 @@ namespace mongo {
         _client(client), 
         _wrapped(wrapped) 
     {
+        _lockType = 0;
         if ( _wrapped )
             _client->_curOp = this;
         _start = _checkpoint = 0;
@@ -119,8 +120,12 @@ namespace mongo {
         b.append("opid", _opNum);
         bool a = _active && _start;
         b.append("active", a);
-        if ( _lockType )
-            b.append("lockType" , _lockType > 0 ? "write" : "read"  );
+        if ( _lockType ) {
+            char str[2];
+            str[0] = _lockType;
+            str[1] = 0;
+            b.append("lockType" , str);
+        }
         b.append("waitingForLock" , _waitingForLock );
 
         if( a ) {
