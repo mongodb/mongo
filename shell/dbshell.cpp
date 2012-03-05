@@ -126,8 +126,11 @@ void shellHistoryAdd( const char * line ) {
         return;
     lastLine = line;
 
-    if ((strstr(line, ".auth")) == NULL)
+    if ( strstr( line, ".auth") == NULL &&
+         strstr( line, ".addUser") == NULL )
+    {
         linenoiseHistoryAdd( line );
+    }
 #endif
 }
 
