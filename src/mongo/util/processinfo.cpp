@@ -47,4 +47,7 @@ namespace mongo {
         pidFileWiper.write( path );
     }
 
+    // static lock for sysinfo initialization
+    mongo::mutex ProcessInfo::_sysInfoLock( "hostInfo" );
+
 }
