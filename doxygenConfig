@@ -101,7 +101,7 @@ WARN_LOGFILE           =
 #---------------------------------------------------------------------------
 # configuration options related to the input files
 #---------------------------------------------------------------------------
-INPUT                  = client db/jsobj.h db/json.h bson util
+INPUT                  = src/mongo/client src/mongo/db/jsobj.h src/mongo/db/json.h src/mongo/bson src/mongo/util
 INPUT_ENCODING         = UTF-8
 FILE_PATTERNS          = *.c \
                          *.cc \
