@@ -104,6 +104,9 @@ namespace mongo {
         }
 
     private:
+        
+        class ElementFieldCmp;
+        
         const char ** _fields;
         int _nfields;
         int _cur;

@@ -351,7 +351,7 @@ namespace mongo {
             const string& c = l.substr( lstart , lend - lstart );
             const string& d = r.substr( rstart , rend - rstart );
 
-            int x = lexNumCmp( c.c_str(), d.c_str() );
+            int x = LexNumCmp::cmp( c.c_str(), d.c_str() );
 
             if ( x < 0 )
                 return LEFT_BEFORE;
@@ -1186,13 +1186,6 @@ namespace mongo {
         uassert( 14853 ,  "type not supported for appendMaxElementForType" , false );
     }
 
-    int BSONElementFieldSorter( const void * a , const void * b ) {
-        const char * x = *((const char**)a);
-        const char * y = *((const char**)b);
-        x++; y++;
-        return lexNumCmp( x , y );
-    }
-
     bool fieldsMatch(const BSONObj& lhs, const BSONObj& rhs) {
         BSONObjIterator l(lhs);
         BSONObjIterator r(rhs);
@@ -1206,6 +1199,20 @@ namespace mongo {
         return !(l.more() || r.more()); // false if lhs and rhs have diff nFields()
     }
 
+    /** Compare two bson elements, provided as const char *'s, by their field names. */
+    class BSONObjIteratorSorted::ElementFieldCmp {
+    public:
+        bool operator()( const char *s1, const char *s2 ) const;
+    private:
+        LexNumCmp _cmp;
+    };
+    
+    bool BSONObjIteratorSorted::ElementFieldCmp::operator()( const char *s1, const char *s2 )
+    const {
+        // Skip type byte and compare field names.
+        return _cmp( s1 + 1, s2 + 1 );
+    }        
+    
     BSONObjIteratorSorted::BSONObjIteratorSorted( const BSONObj& o ) {
         _nfields = o.nFields();
         _fields = new const char*[_nfields];
@@ -1216,7 +1223,8 @@ namespace mongo {
             assert( _fields[x-1] );
         }
         assert( x == _nfields );
-        qsort( _fields , _nfields , sizeof(char*) , BSONElementFieldSorter );
+        ElementFieldCmp cmp;
+        std::sort( _fields , _fields + _nfields , cmp );
         _cur = 0;
     }
 

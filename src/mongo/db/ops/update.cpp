@@ -23,7 +23,6 @@
 #include "../queryutil.h"
 #include "../repl.h"
 #include "../btree.h"
-#include "../../util/stringutils.h"
 #include "update.h"
 #include "../pagefault.h"
 
@@ -740,10 +739,6 @@ namespace mongo {
             ss << "\t\t" << i->first << "\t" << i->second.toString() << "\n";
         }
         return ss.str();
-    }
-
-    bool ModSetState::FieldCmp::operator()( const string &l, const string &r ) const {
-        return lexNumCmp( l.c_str(), r.c_str() ) < 0;
     }
 
     BSONObj ModSet::createNewFromQuery( const BSONObj& query ) {

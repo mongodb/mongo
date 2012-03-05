@@ -19,6 +19,7 @@
 #include "../../pch.h"
 #include "../jsobj.h"
 #include "../../util/embedded_builder.h"
+#include "../../util/stringutils.h"
 #include "../matcher.h"
 
 namespace mongo {
@@ -526,10 +527,7 @@ namespace mongo {
      * the goal is to make ModSet const so its re-usable
      */
     class ModSetState : boost::noncopyable {
-        struct FieldCmp {
-            bool operator()( const string &l, const string &r ) const;
-        };
-        typedef map<string,ModState,FieldCmp> ModStateHolder;
+        typedef map<string,ModState,LexNumCmp> ModStateHolder;
         const BSONObj& _obj;
         ModStateHolder _mods;
         bool _inPlacePossible;

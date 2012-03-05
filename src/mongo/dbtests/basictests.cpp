@@ -334,99 +334,105 @@ namespace BasicTests {
 
     class LexNumCmp {
     public:
+        static void assertCmp( int expected, const char *s1, const char *s2 ) {
+            mongo::LexNumCmp cmp;
+            ASSERT_EQUALS( expected, cmp.cmp( s1, s2 ) );
+            ASSERT_EQUALS( expected < 0, cmp( s1, s2 ) );
+            ASSERT_EQUALS( expected < 0, cmp( string( s1 ), string( s2 ) ) );
+        }
         void run() {
 
             ASSERT( ! isNumber( (char)255 ) );
 
-            ASSERT_EQUALS( 0, lexNumCmp( "a", "a" ) );
-            ASSERT_EQUALS( -1, lexNumCmp( "a", "aa" ) );
-            ASSERT_EQUALS( 1, lexNumCmp( "aa", "a" ) );
-            ASSERT_EQUALS( -1, lexNumCmp( "a", "b" ) );
-            ASSERT_EQUALS( 1, lexNumCmp( "100", "50" ) );
-            ASSERT_EQUALS( -1, lexNumCmp( "50", "100" ) );
-            ASSERT_EQUALS( 1, lexNumCmp( "b", "a" ) );
-            ASSERT_EQUALS( 0, lexNumCmp( "aa", "aa" ) );
-            ASSERT_EQUALS( -1, lexNumCmp( "aa", "ab" ) );
-            ASSERT_EQUALS( 1, lexNumCmp( "ab", "aa" ) );
-            ASSERT_EQUALS( 1, lexNumCmp( "0", "a" ) );
-            ASSERT_EQUALS( 1, lexNumCmp( "a0", "aa" ) );
-            ASSERT_EQUALS( -1, lexNumCmp( "a", "0" ) );
-            ASSERT_EQUALS( -1, lexNumCmp( "aa", "a0" ) );
-            ASSERT_EQUALS( 0, lexNumCmp( "0", "0" ) );
-            ASSERT_EQUALS( 0, lexNumCmp( "10", "10" ) );
-            ASSERT_EQUALS( -1, lexNumCmp( "1", "10" ) );
-            ASSERT_EQUALS( 1, lexNumCmp( "10", "1" ) );
-            ASSERT_EQUALS( 1, lexNumCmp( "11", "10" ) );
-            ASSERT_EQUALS( -1, lexNumCmp( "10", "11" ) );
-            ASSERT_EQUALS( 1, lexNumCmp( "f11f", "f10f" ) );
-            ASSERT_EQUALS( -1, lexNumCmp( "f10f", "f11f" ) );
-            ASSERT_EQUALS( -1, lexNumCmp( "f11f", "f111" ) );
-            ASSERT_EQUALS( 1, lexNumCmp( "f111", "f11f" ) );
-            ASSERT_EQUALS( -1, lexNumCmp( "f12f", "f12g" ) );
-            ASSERT_EQUALS( 1, lexNumCmp( "f12g", "f12f" ) );
-            ASSERT_EQUALS( 1, lexNumCmp( "aa{", "aab" ) );
-            ASSERT_EQUALS( -1, lexNumCmp( "aa{", "aa1" ) );
-            ASSERT_EQUALS( -1, lexNumCmp( "a1{", "a11" ) );
-            ASSERT_EQUALS( 1, lexNumCmp( "a1{a", "a1{" ) );
-            ASSERT_EQUALS( -1, lexNumCmp( "a1{", "a1{a" ) );
-            ASSERT_EQUALS( 1, lexNumCmp("21", "11") );
-            ASSERT_EQUALS( -1, lexNumCmp("11", "21") );
+            assertCmp( 0, "a", "a" );
+            assertCmp( -1, "a", "aa" );
+            assertCmp( 1, "aa", "a" );
+            assertCmp( -1, "a", "b" );
+            assertCmp( 1, "100", "50" );
+            assertCmp( -1, "50", "100" );
+            assertCmp( 1, "b", "a" );
+            assertCmp( 0, "aa", "aa" );
+            assertCmp( -1, "aa", "ab" );
+            assertCmp( 1, "ab", "aa" );
+            assertCmp( 1, "0", "a" );
+            assertCmp( 1, "a0", "aa" );
+            assertCmp( -1, "a", "0" );
+            assertCmp( -1, "aa", "a0" );
+            assertCmp( 0, "0", "0" );
+            assertCmp( 0, "10", "10" );
+            assertCmp( -1, "1", "10" );
+            assertCmp( 1, "10", "1" );
+            assertCmp( 1, "11", "10" );
+            assertCmp( -1, "10", "11" );
+            assertCmp( 1, "f11f", "f10f" );
+            assertCmp( -1, "f10f", "f11f" );
+            assertCmp( -1, "f11f", "f111" );
+            assertCmp( 1, "f111", "f11f" );
+            assertCmp( -1, "f12f", "f12g" );
+            assertCmp( 1, "f12g", "f12f" );
+            assertCmp( 1, "aa{", "aab" );
+            assertCmp( -1, "aa{", "aa1" );
+            assertCmp( -1, "a1{", "a11" );
+            assertCmp( 1, "a1{a", "a1{" );
+            assertCmp( -1, "a1{", "a1{a" );
+            assertCmp( 1, "21", "11" );
+            assertCmp( -1, "11", "21" );
 
-            ASSERT_EQUALS( -1 , lexNumCmp( "a.0" , "a.1" ) );
-            ASSERT_EQUALS( -1 , lexNumCmp( "a.0.b" , "a.1" ) );
+            assertCmp( -1 , "a.0" , "a.1" );
+            assertCmp( -1 , "a.0.b" , "a.1" );
 
-            ASSERT_EQUALS( -1 , lexNumCmp( "b." , "b.|" ) );
-            ASSERT_EQUALS( -1 , lexNumCmp( "b.0e" , (string("b.") + (char)255).c_str() ) );
-            ASSERT_EQUALS( -1 , lexNumCmp( "b." , "b.0e" ) );
+            assertCmp( -1 , "b." , "b.|" );
+            assertCmp( -1 , "b.0e" , (string("b.") + (char)255).c_str() );
+            assertCmp( -1 , "b." , "b.0e" );
 
-            ASSERT_EQUALS( 0, lexNumCmp( "238947219478347782934718234", "238947219478347782934718234"));
-            ASSERT_EQUALS( 0, lexNumCmp( "000238947219478347782934718234", "238947219478347782934718234"));
-            ASSERT_EQUALS( 1, lexNumCmp( "000238947219478347782934718235", "238947219478347782934718234"));
-            ASSERT_EQUALS( -1, lexNumCmp( "238947219478347782934718234", "238947219478347782934718234.1"));
-            ASSERT_EQUALS( 0, lexNumCmp( "238", "000238"));
-            ASSERT_EQUALS( 0, lexNumCmp( "002384", "0002384"));
-            ASSERT_EQUALS( 0, lexNumCmp( "00002384", "0002384"));
-            ASSERT_EQUALS( 0, lexNumCmp( "0", "0"));
-            ASSERT_EQUALS( 0, lexNumCmp( "0000", "0"));
-            ASSERT_EQUALS( 0, lexNumCmp( "0", "000"));
-            ASSERT_EQUALS( -1, lexNumCmp( "0000", "0.0"));
-            ASSERT_EQUALS( 1, lexNumCmp( "2380", "238"));
-            ASSERT_EQUALS( 1, lexNumCmp( "2385", "2384"));
-            ASSERT_EQUALS( 1, lexNumCmp( "2385", "02384"));
-            ASSERT_EQUALS( 1, lexNumCmp( "2385", "002384"));
-            ASSERT_EQUALS( -1, lexNumCmp( "123.234.4567", "00238"));
-            ASSERT_EQUALS( 0, lexNumCmp( "123.234", "00123.234"));
-            ASSERT_EQUALS( 0, lexNumCmp( "a.123.b", "a.00123.b"));
-            ASSERT_EQUALS( 1, lexNumCmp( "a.123.b", "a.b.00123.b"));
-            ASSERT_EQUALS( -1, lexNumCmp( "a.00.0", "a.0.1"));
-            ASSERT_EQUALS( 0, lexNumCmp( "01.003.02", "1.3.2"));
-            ASSERT_EQUALS( -1, lexNumCmp( "1.3.2", "10.300.20"));
-            ASSERT_EQUALS( 0, lexNumCmp( "10.300.20", "000000000000010.0000300.000000020"));
-            ASSERT_EQUALS( 0, lexNumCmp( "0000a", "0a"));
-            ASSERT_EQUALS( -1, lexNumCmp( "a", "0a"));
-            ASSERT_EQUALS( -1, lexNumCmp( "000a", "001a"));
-            ASSERT_EQUALS( 0, lexNumCmp( "010a", "0010a"));
+            assertCmp( 0, "238947219478347782934718234", "238947219478347782934718234");
+            assertCmp( 0, "000238947219478347782934718234", "238947219478347782934718234");
+            assertCmp( 1, "000238947219478347782934718235", "238947219478347782934718234");
+            assertCmp( -1, "238947219478347782934718234", "238947219478347782934718234.1");
+            assertCmp( 0, "238", "000238");
+            assertCmp( 0, "002384", "0002384");
+            assertCmp( 0, "00002384", "0002384");
+            assertCmp( 0, "0", "0");
+            assertCmp( 0, "0000", "0");
+            assertCmp( 0, "0", "000");
+            assertCmp( -1, "0000", "0.0");
+            assertCmp( 1, "2380", "238");
+            assertCmp( 1, "2385", "2384");
+            assertCmp( 1, "2385", "02384");
+            assertCmp( 1, "2385", "002384");
+            assertCmp( -1, "123.234.4567", "00238");
+            assertCmp( 0, "123.234", "00123.234");
+            assertCmp( 0, "a.123.b", "a.00123.b");
+            assertCmp( 1, "a.123.b", "a.b.00123.b");
+            assertCmp( -1, "a.00.0", "a.0.1");
+            assertCmp( 0, "01.003.02", "1.3.2");
+            assertCmp( -1, "1.3.2", "10.300.20");
+            assertCmp( 0, "10.300.20", "000000000000010.0000300.000000020");
+            assertCmp( 0, "0000a", "0a");
+            assertCmp( -1, "a", "0a");
+            assertCmp( -1, "000a", "001a");
+            assertCmp( 0, "010a", "0010a");
             
-            ASSERT_EQUALS( -1 , lexNumCmp( "a0" , "a00" ) );
-            ASSERT_EQUALS( 0 , lexNumCmp( "a.0" , "a.00" ) );
-            ASSERT_EQUALS( -1 , lexNumCmp( "a.b.c.d0" , "a.b.c.d00" ) );
-            ASSERT_EQUALS( 1 , lexNumCmp( "a.b.c.0.y" , "a.b.c.00.x" ) );
+            assertCmp( -1 , "a0" , "a00" );
+            assertCmp( 0 , "a.0" , "a.00" );
+            assertCmp( -1 , "a.b.c.d0" , "a.b.c.d00" );
+            assertCmp( 1 , "a.b.c.0.y" , "a.b.c.00.x" );
             
-            ASSERT_EQUALS( -1, lexNumCmp( "a", "a-" ) );
-            ASSERT_EQUALS( 1, lexNumCmp( "a-", "a" ) );
-            ASSERT_EQUALS( 0, lexNumCmp( "a-", "a-" ) );
+            assertCmp( -1, "a", "a-" );
+            assertCmp( 1, "a-", "a" );
+            assertCmp( 0, "a-", "a-" );
 
-            ASSERT_EQUALS( -1, lexNumCmp( "a", "a-c" ) );
-            ASSERT_EQUALS( 1, lexNumCmp( "a-c", "a" ) );
-            ASSERT_EQUALS( 0, lexNumCmp( "a-c", "a-c" ) );
+            assertCmp( -1, "a", "a-c" );
+            assertCmp( 1, "a-c", "a" );
+            assertCmp( 0, "a-c", "a-c" );
 
-            ASSERT_EQUALS( 1, lexNumCmp( "a-c.t", "a.t" ) );
-            ASSERT_EQUALS( -1, lexNumCmp( "a.t", "a-c.t" ) );
-            ASSERT_EQUALS( 0, lexNumCmp( "a-c.t", "a-c.t" ) );
+            assertCmp( 1, "a-c.t", "a.t" );
+            assertCmp( -1, "a.t", "a-c.t" );
+            assertCmp( 0, "a-c.t", "a-c.t" );
 
-            ASSERT_EQUALS( 1, lexNumCmp( "ac.t", "a.t" ) );
-            ASSERT_EQUALS( -1, lexNumCmp( "a.t", "ac.t" ) );
-            ASSERT_EQUALS( 0, lexNumCmp( "ac.t", "ac.t" ) );            
+            assertCmp( 1, "ac.t", "a.t" );
+            assertCmp( -1, "a.t", "ac.t" );
+            assertCmp( 0, "ac.t", "ac.t" );            
         }
     };
 
