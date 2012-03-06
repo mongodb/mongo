@@ -113,9 +113,9 @@ namespace mongo {
         we match array # positions with their vector position, and ignore
         any fields with non-numeric field names.
         */
-    inline vector<BSONElement> BSONElement::Array() const {
+    inline std::vector<BSONElement> BSONElement::Array() const {
         chk(mongo::Array);
-        vector<BSONElement> v;
+        std::vector<BSONElement> v;
         BSONObjIterator i(Obj());
         while( i.more() ) {
             BSONElement e = i.next();

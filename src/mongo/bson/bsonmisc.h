@@ -38,7 +38,7 @@ namespace mongo {
         BSONObj _order;
     };
 
-    typedef set<BSONObj,BSONObjCmp> BSONObjSet;
+    typedef std::set<BSONObj,BSONObjCmp> BSONObjSet;
 
     enum FieldCompareResult {
         LEFT_SUBFIELD = -2,
@@ -48,7 +48,7 @@ namespace mongo {
         RIGHT_SUBFIELD = 2
     };
 
-    FieldCompareResult compareDottedFieldNames( const string& l , const string& r );
+    FieldCompareResult compareDottedFieldNames( const std::string& l , const std::string& r );
 
     /** Use BSON macro to build a BSONObj from a stream
 
@@ -74,25 +74,25 @@ namespace mongo {
 
     /* Utility class to auto assign object IDs.
        Example:
-         cout << BSON( GENOID << "z" << 3 ); // { _id : ..., z : 3 }
+         std::cout << BSON( GENOID << "z" << 3 ); // { _id : ..., z : 3 }
     */
     extern struct GENOIDLabeler { } GENOID;
 
     /* Utility class to add a Date element with the current time
        Example:
-         cout << BSON( "created" << DATENOW ); // { created : "2009-10-09 11:41:42" }
+         std::cout << BSON( "created" << DATENOW ); // { created : "2009-10-09 11:41:42" }
     */
     extern struct DateNowLabeler { } DATENOW;
 
     /* Utility class to assign a NULL value to a given attribute
        Example:
-         cout << BSON( "a" << BSONNULL ); // { a : null }
+         std::cout << BSON( "a" << BSONNULL ); // { a : null }
     */
     extern struct NullLabeler { } BSONNULL;
 
     /* Utility class to add the minKey (minus infinity) to a given attribute
        Example:
-         cout << BSON( "a" << MINKEY ); // { "a" : { "$minKey" : 1 } }
+         std::cout << BSON( "a" << MINKEY ); // { "a" : { "$minKey" : 1 } }
     */
     extern struct MinKeyLabeler { } MINKEY;
     extern struct MaxKeyLabeler { } MAXKEY;
@@ -165,7 +165,7 @@ namespace mongo {
 
         bool haveSubobj() const { return _subobj.get() != 0; }
         BSONObjBuilder *subobj();
-        auto_ptr< BSONObjBuilder > _subobj;
+        std::auto_ptr< BSONObjBuilder > _subobj;
     };
 
     /**

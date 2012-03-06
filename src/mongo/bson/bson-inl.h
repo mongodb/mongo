@@ -121,7 +121,7 @@ dodouble:
                 // we use memcmp as we allow zeros in UTF8 strings
                 int lsz = l.valuestrsize();
                 int rsz = r.valuestrsize();
-                int common = min(lsz, rsz);
+                int common = std::min(lsz, rsz);
                 int res = memcmp(l.valuestr(), r.valuestr(), common);
                 if( res ) 
                     return res;
@@ -193,7 +193,7 @@ dodouble:
     inline BSONObj BSONElement::embeddedObjectUserCheck() const {
         if ( MONGO_likely(isABSONObj()) )
             return BSONObj(value());
-        stringstream ss;
+        std::stringstream ss;
         ss << "invalid parameter: expected an object (" << fieldName() << ")";
         uasserted( 10065 , ss.str() );
         return BSONObj(); // never reachable
@@ -318,7 +318,7 @@ dodouble:
 
     /* add all the fields from the object specified to this object if they don't exist */
     inline BSONObjBuilder& BSONObjBuilder::appendElementsUnique(BSONObj x) {
-        set<string> have;
+        std::set<std::string> have;
         {
             BSONObjIterator i = iterator();
             while ( i.more() )
@@ -399,7 +399,7 @@ dodouble:
     }
 
     // {a: {b:1}} -> {a.b:1}
-    void nested2dotted(BSONObjBuilder& b, const BSONObj& obj, const string& base="");
+    void nested2dotted(BSONObjBuilder& b, const BSONObj& obj, const std::string& base="");
     inline BSONObj nested2dotted(const BSONObj& obj) {
         BSONObjBuilder b;
         nested2dotted(b, obj);
@@ -433,7 +433,7 @@ dodouble:
      * also, dotted2nested ignores order
      */
 
-    typedef map<string, BSONElement> BSONMap;
+    typedef std::map<std::string, BSONElement> BSONMap;
     inline BSONMap bson2map(const BSONObj& obj) {
         BSONMap m;
         BSONObjIterator it(obj);
@@ -450,7 +450,7 @@ dodouble:
         }
     };
 
-    typedef set<BSONElement, BSONElementFieldNameCmp> BSONSortedElements;
+    typedef std::set<BSONElement, BSONElementFieldNameCmp> BSONSortedElements;
     inline BSONSortedElements bson2set( const BSONObj& obj ) {
         BSONSortedElements s;
         BSONObjIterator it(obj);
@@ -459,7 +459,7 @@ dodouble:
         return s;
     }
 
-    inline string BSONObj::toString( bool isArray, bool full ) const {
+    inline std::string BSONObj::toString( bool isArray, bool full ) const {
         if ( isEmpty() ) return "{}";
         StringBuilder s;
         toString(s, isArray, full);
@@ -609,7 +609,7 @@ dodouble:
         default: {
             StringBuilder ss;
             ss << "BSONElement: bad type " << (int) type();
-            string msg = ss.str();
+            std::string msg = ss.str();
             massert( 13655 , msg.c_str(),false);
         }
         }
@@ -675,7 +675,7 @@ dodouble:
             {
                 StringBuilder ss;
                 ss << "BSONElement: bad type " << (int) type();
-                string msg = ss.str();
+                std::string msg = ss.str();
                 massert(10320 , msg.c_str(),false);
             }
         }
@@ -684,7 +684,7 @@ dodouble:
         return totalSize;
     }
 
-    inline string BSONElement::toString( bool includeFieldName, bool full ) const {
+    inline std::string BSONElement::toString( bool includeFieldName, bool full ) const {
         StringBuilder s;
         toString(s, includeFieldName, full);
         return s.str();
@@ -796,7 +796,7 @@ dodouble:
         if ( e.eoo() ) {
             const char *p = strchr(name, '.');
             if ( p ) {
-                string left(name, p-name);
+                std::string left(name, p-name);
                 BSONObj sub = getObjectField(left.c_str());
                 return sub.isEmpty() ? BSONElement() : sub.getFieldDotted(p+1);
             }
@@ -834,25 +834,25 @@ dodouble:
 
     inline BSONObj BSONElement::Obj() const { return embeddedObjectUserCheck(); }
 
-    inline BSONElement BSONElement::operator[] (const string& field) const {
+    inline BSONElement BSONElement::operator[] (const std::string& field) const {
         BSONObj o = Obj();
         return o[field];
     }
 
-    inline void BSONObj::elems(vector<BSONElement> &v) const {
+    inline void BSONObj::elems(std::vector<BSONElement> &v) const {
         BSONObjIterator i(*this);
         while( i.more() )
             v.push_back(i.next());
     }
 
-    inline void BSONObj::elems(list<BSONElement> &v) const {
+    inline void BSONObj::elems(std::list<BSONElement> &v) const {
         BSONObjIterator i(*this);
         while( i.more() )
             v.push_back(i.next());
     }
 
     template <class T>
-    void BSONObj::Vals(vector<T>& v) const {
+    void BSONObj::Vals(std::vector<T>& v) const {
         BSONObjIterator i(*this);
         while( i.more() ) {
             T t;
@@ -861,7 +861,7 @@ dodouble:
         }
     }
     template <class T>
-    void BSONObj::Vals(list<T>& v) const {
+    void BSONObj::Vals(std::list<T>& v) const {
         BSONObjIterator i(*this);
         while( i.more() ) {
             T t;
@@ -871,7 +871,7 @@ dodouble:
     }
 
     template <class T>
-    void BSONObj::vals(vector<T>& v) const {
+    void BSONObj::vals(std::vector<T>& v) const {
         BSONObjIterator i(*this);
         while( i.more() ) {
             try {
@@ -883,7 +883,7 @@ dodouble:
         }
     }
     template <class T>
-    void BSONObj::vals(list<T>& v) const {
+    void BSONObj::vals(std::list<T>& v) const {
         BSONObjIterator i(*this);
         while( i.more() ) {
             try {
@@ -895,11 +895,11 @@ dodouble:
         }
     }
 
-    inline ostream& operator<<( ostream &s, const BSONObj &o ) {
+    inline std::ostream& operator<<( std::ostream &s, const BSONObj &o ) {
         return s << o.toString();
     }
 
-    inline ostream& operator<<( ostream &s, const BSONElement &e ) {
+    inline std::ostream& operator<<( std::ostream &s, const BSONElement &e ) {
         return s << e.toString();
     }
 
@@ -923,9 +923,9 @@ dodouble:
     }
 
     // used by jsonString()
-    inline string escape( string s , bool escape_slash=false) {
+    inline std::string escape( std::string s , bool escape_slash=false) {
         StringBuilder ret;
-        for ( string::iterator i = s.begin(); i != s.end(); ++i ) {
+        for ( std::string::iterator i = s.begin(); i != s.end(); ++i ) {
             switch ( *i ) {
             case '"':
                 ret << "\\\"";
@@ -965,14 +965,14 @@ dodouble:
         return ret.str();
     }
 
-    inline string BSONObj::hexDump() const {
-        stringstream ss;
+    inline std::string BSONObj::hexDump() const {
+        std::stringstream ss;
         const char *d = objdata();
         int size = objsize();
         for( int i = 0; i < size; ++i ) {
             ss.width( 2 );
             ss.fill( '0' );
-            ss << hex << (unsigned)(unsigned char)( d[ i ] ) << dec;
+            ss << std::hex << (unsigned)(unsigned char)( d[ i ] ) << std::dec;
             if ( ( d[ i ] >= '0' && d[ i ] <= '9' ) || ( d[ i ] >= 'A' && d[ i ] <= 'z' ) )
                 ss << '\'' << d[ i ] << '\'';
             if ( i != size - 1 )

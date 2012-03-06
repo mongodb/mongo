@@ -24,8 +24,6 @@
 
 namespace mongo {
 
-    using namespace std;
-
     inline void time_t_to_String(time_t t, char *buf) {
 #if defined(_WIN32)
         ctime_s(buf, 32, &t);
@@ -35,7 +33,7 @@ namespace mongo {
         buf[24] = 0; // don't want the \n
     }
 
-    inline string time_t_to_String(time_t t = time(0) ) {
+    inline std::string time_t_to_String(time_t t = time(0) ) {
         char buf[64];
 #if defined(_WIN32)
         ctime_s(buf, sizeof(buf), &t);
@@ -46,7 +44,7 @@ namespace mongo {
         return buf;
     }
 
-    inline string time_t_to_String_no_year(time_t t) {
+    inline std::string time_t_to_String_no_year(time_t t) {
         char buf[64];
 #if defined(_WIN32)
         ctime_s(buf, sizeof(buf), &t);
@@ -57,7 +55,7 @@ namespace mongo {
         return buf;
     }
 
-    inline string time_t_to_String_short(time_t t) {
+    inline std::string time_t_to_String_short(time_t t) {
         char buf[64];
 #if defined(_WIN32)
         ctime_s(buf, sizeof(buf), &t);
@@ -85,7 +83,7 @@ namespace mongo {
             gmtime_r(&dtime, buf);
 #endif
         }
-        string toString() const {
+        std::string toString() const {
             char buf[64];
             time_t_to_String(toTimeT(), buf);
             return buf;
@@ -93,7 +91,7 @@ namespace mongo {
         time_t toTimeT() const {
             // cant use uassert from bson/util
             assert((long long)millis >= 0); // TODO when millis is signed, delete
-            assert(((long long)millis/1000) < (numeric_limits<time_t>::max)());
+            assert(((long long)millis/1000) < (std::numeric_limits<time_t>::max)());
             return millis / 1000;
         }
     };

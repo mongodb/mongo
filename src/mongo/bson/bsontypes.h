@@ -23,8 +23,6 @@ namespace bson { }
 
 namespace mongo {
 
-    using namespace std;
-
     class BSONArrayBuilder;
     class BSONElement;
     class BSONObj;
