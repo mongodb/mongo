@@ -52,37 +52,34 @@ initial: { count: 0 }
 
 assert.eq( 1000, t.group( p ).length , "A5" );
 
-if ( db.runCommand( "features" ).readlock ){
-    print( "doing readonly test" );
-    assert( db.auth( "guest", "guest" ), "auth failed 2" );
-    
-    assert.eq( 1000, t.count() , "B1" );
-    assert.eq( 1000, t.find().toArray().length , "B2" ); // make sure we have a getMore in play
-    assert.commandWorked( db.runCommand( {ismaster:1} ) , "B3" );
-    
-    assert( !db.getLastError() , "B4" );
-    t.save( {} ); // fail
-    assert( db.getLastError() , "B5: " + tojson( db.getLastErrorObj() ) );
-    assert.eq( 1000, t.count() , "B6" );
-    
-    assert.eq( 2, db.system.users.count() , "B7" );
-    assert( !db.getLastError() , "B8" );
-    db.addUser( "a", "b" );
-    assert( db.getLastError() , "B9" );
-    assert.eq( 2, db.system.users.count() , "B10");
-    
-    assert.eq( 1000, db.eval( function() { return db[ "jstests_auth_auth1" ].count(); } ) , "C1" );
-    assert.eq( 1000, db.eval( function() { return db[ "jstests_auth_auth1" ].find().toArray().length; } ) , "C2" );
-    db.eval( function() { db[ "jstests_auth_auth1" ].save( {i:1} ) } , "C3" );
-    assert.eq( 1000, db.eval( function() { return db[ "jstests_auth_auth1" ].count(); } ) , "C4" );
-    
-    assert.eq( 1000, t.group( p ).length , "C5" );
-    
-    var p = { key : { i : true } , 
-        reduce : function(obj,prev) { db.jstests_auth_auth1.save( {i:10000} ); prev.count++; },
-              initial: { count: 0 }
-            };
-    
-    assert.throws( function() { return t.group( p ) }, null , "write reduce didn't fail" );
-}
+assert( db.auth( "guest", "guest" ), "auth failed 2" );
+
+assert.eq( 1000, t.count() , "B1" );
+assert.eq( 1000, t.find().toArray().length , "B2" ); // make sure we have a getMore in play
+assert.commandWorked( db.runCommand( {ismaster:1} ) , "B3" );
+
+assert( !db.getLastError() , "B4" );
+t.save( {} ); // fail
+assert( db.getLastError() , "B5: " + tojson( db.getLastErrorObj() ) );
+assert.eq( 1000, t.count() , "B6" );
+
+assert.eq( 2, db.system.users.count() , "B7" );
+assert( !db.getLastError() , "B8" );
+db.addUser( "a", "b" );
+assert( db.getLastError() , "B9" );
+assert.eq( 2, db.system.users.count() , "B10");
+
+assert.eq( 1000, db.eval( function() { return db[ "jstests_auth_auth1" ].count(); } ) , "C1" );
+assert.eq( 1000, db.eval( function() { return db[ "jstests_auth_auth1" ].find().toArray().length; } ) , "C2" );
+db.eval( function() { db[ "jstests_auth_auth1" ].save( {i:1} ) } , "C3" );
+assert.eq( 1000, db.eval( function() { return db[ "jstests_auth_auth1" ].count(); } ) , "C4" );
+
+assert.eq( 1000, t.group( p ).length , "C5" );
+
+var p = { key : { i : true } , 
+          reduce : function(obj,prev) { db.jstests_auth_auth1.save( {i:10000} ); prev.count++; },
+          initial: { count: 0 }
+        };
+
+assert.throws( function() { return t.group( p ) }, null , "write reduce didn't fail" );
 
