@@ -6,10 +6,6 @@ for (var i = 0; i < 10000; ++i) {
     db.eval(function(col) { for (var i = 0; i < 100; ++i) {db[col + "_" + i].find();} }, name);
 }
 
-// JS engine should recover and allow more querying
-// but doesnt work with v8, all calls fail afterwards even form a different context
-if ( typeof _threadInject == "undefined" ) {
-
 // test recovery of JS engine after out of memory
 db.system.js.save( { "_id" : "f1", "value" : function(n) {
     a = [];
@@ -28,4 +24,3 @@ assert.throws(function() { db.eval("f1(100000000)"); } );
 db.eval("f1(10)");
 db.eval("f1(1000000)");
 
-}
