@@ -154,11 +154,6 @@ namespace mongo {
             h.fileId = j.curFileId();
         }
 
-        void assertLockedForCommitting() { 
-            // make better:
-            char t = Lock::isLocked();
-            fassert( 0, t == 'w' || t == 'R' || t == 'W' );
-        }
         /** we will build an output buffer ourself and then use O_DIRECT
             we could be in read lock for this
             caller handles locking

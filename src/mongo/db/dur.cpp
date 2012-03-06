@@ -283,10 +283,29 @@ namespace mongo {
             return commitJob.bytes() > UncommittedBytesLimit;
         }
 
+        static int in_f;
         void f() { 
-            assertNothingSpooled();
-            getDur().commitNow();
-            assertNothingSpooled(); // a light sanity check that we truly were exclusive
+            dassert( in_f == 0 );
+            in_f++;
+            try { 
+                assertNothingSpooled();
+                getDur().commitNow();
+                assertNothingSpooled(); // a light sanity check that we truly were exclusive
+            }
+            catch(...) { 
+                in_f--;
+                throw;
+            }
+            in_f--;
+        }
+
+        void assertLockedForCommitting() { 
+            char t = Lock::isLocked();
+            if(  t == 'R' || t == 'W' )
+                return;
+            // 'w' case we use runExclusively
+            fassert( 0, t == 'w' );
+            fassert( 0, in_f == 1 );
         }
 
         /** we may need to commit earlier than normal if data are being written at 
