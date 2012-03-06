@@ -159,76 +159,7 @@
     <ClCompile Include="..\..\..\third_party\linenoise\linenoise.cpp">
       <Filter>third_party\linenoise</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_chartables.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcrecpp.cc">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_compile.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_config.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_dfa_exec.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_exec.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_fullinfo.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_get.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_globals.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_info.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_maketables.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_newline.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_ord2utf8.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_refcount.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_stringpiece.cc">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_study.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_tables.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_try_flipped.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_ucp_searchfuncs.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_valid_utf8.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_version.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_xclass.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\util\text.cpp">
-      <Filter>util</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\util\md5.c">
       <Filter>util</Filter>
     </ClCompile>
     <ClCompile Include="..\..\util\debug_util.cpp">
@@ -263,6 +194,75 @@
     </ClCompile>
     <ClCompile Include="..\..\client\clientAndShell.cpp">
       <Filter>client</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-8.30\pcrecpp.cc">
+      <Filter>shell</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_chartables.c">
+      <Filter>shell</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_compile.c">
+      <Filter>shell</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_config.c">
+      <Filter>shell</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_dfa_exec.c">
+      <Filter>shell</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_exec.c">
+      <Filter>shell</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_fullinfo.c">
+      <Filter>shell</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_get.c">
+      <Filter>shell</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_globals.c">
+      <Filter>shell</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_maketables.c">
+      <Filter>shell</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_newline.c">
+      <Filter>shell</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_ord2utf8.c">
+      <Filter>shell</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_refcount.c">
+      <Filter>shell</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_scanner.cc">
+      <Filter>shell</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_stringpiece.cc">
+      <Filter>shell</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_study.c">
+      <Filter>shell</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_tables.c">
+      <Filter>shell</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_ucd.c">
+      <Filter>shell</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_valid_utf8.c">
+      <Filter>shell</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_version.c">
+      <Filter>shell</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_xclass.c">
+      <Filter>shell</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\pcre-8.30\pcreposix.c">
+      <Filter>shell</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\util\md5.cpp">
+      <Filter>shell</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -365,7 +365,7 @@
     <ClInclude Include="..\..\db\concurrency.h">
       <Filter>db</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\third_party\pcre-7.4\config.h">
+    <ClInclude Include="..\..\..\third_party\pcre-8.30\config.h">
       <Filter>third_party\pcre</Filter>
     </ClInclude>
     <ClInclude Include="..\..\client\connpool.h">
@@ -536,19 +536,19 @@
     <ClInclude Include="..\..\db\namespace.h">
       <Filter>db</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\third_party\pcre-7.4\pcrecpp_internal.h">
+    <ClInclude Include="..\..\..\third_party\pcre-8.30\pcrecpp_internal.h">
       <Filter>third_party\pcre</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\third_party\pcre-7.4\pcre.h">
+    <ClInclude Include="..\..\..\third_party\pcre-8.30\pcre.h">
       <Filter>third_party\pcre</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\third_party\pcre-7.4\pcre_internal.h">
+    <ClInclude Include="..\..\..\third_party\pcre-8.30\pcre_internal.h">
       <Filter>third_party\pcre</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\third_party\pcre-7.4\pcre_stringpiece.h">
+    <ClInclude Include="..\..\..\third_party\pcre-8.30\pcre_stringpiece.h">
       <Filter>third_party\pcre</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\third_party\pcre-7.4\pcrecpp.h">
+    <ClInclude Include="..\..\..\third_party\pcre-8.30\pcrecpp.h">
       <Filter>third_party\pcre</Filter>
     </ClInclude>
     <ClInclude Include="..\..\db\namespacestring.h">
@@ -686,13 +686,13 @@
     <ClInclude Include="..\..\db\stats\top.h">
       <Filter>db\stats</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\third_party\pcre-7.4\ucptable.h">
+    <ClInclude Include="..\..\..\third_party\pcre-8.30\ucptable.h">
       <Filter>third_party\pcre</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\third_party\pcre-7.4\ucp.h">
+    <ClInclude Include="..\..\..\third_party\pcre-8.30\ucp.h">
       <Filter>third_party\pcre</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\..\third_party\pcre-7.4\ucpinternal.h">
+    <ClInclude Include="..\..\..\third_party\pcre-8.30\ucpinternal.h">
       <Filter>third_party\pcre</Filter>
     </ClInclude>
     <ClInclude Include="..\..\client\undef_macros.h">
