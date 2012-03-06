@@ -1831,10 +1831,10 @@ namespace mongo {
             else if ( legalClientSystemNS( ns , true ) ) {
                 if ( obuf && strstr( ns , ".system.users" ) ) {
                     BSONObj t( reinterpret_cast<const char *>( obuf ) );
-                    uassert( 14051 , "system.user entry needs 'user' field to be a string" , t["user"].type() == String );
-                    uassert( 14052 , "system.user entry needs 'pwd' field to be a string" , t["pwd"].type() == String );
-                    uassert( 14053 , "system.user entry needs 'user' field to be non-empty" , t["user"].String().size() );
-                    uassert( 14054 , "system.user entry needs 'pwd' field to be non-empty" , t["pwd"].String().size() );
+                    uassert( 14051 , "system.users entry needs 'user' field to be a string" , t["user"].type() == String );
+                    uassert( 14052 , "system.users entry needs 'pwd' field to be a string" , t["pwd"].type() == String );
+                    uassert( 14053 , "system.users entry needs 'user' field to be non-empty" , t["user"].String().size() );
+                    uassert( 14054 , "system.users entry needs 'pwd' field to be non-empty" , t["pwd"].String().size() );
                 }
             }
             else if ( !god ) {
