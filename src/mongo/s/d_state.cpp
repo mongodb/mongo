@@ -45,7 +45,8 @@ namespace mongo {
     // -----ShardingState START ----
 
     ShardingState::ShardingState()
-        : _enabled(false) , _mutex( "ShardingState" ), _configServerMutex( "_configServer_ShardingState" ) {
+        : _enabled(false) , _mutex( "ShardingState" ),
+          _configServerTickets( 3 /* max number of concurrent config server refresh threads */ ) {
     }
 
     void ShardingState::enable( const string& server ) {
@@ -192,7 +193,7 @@ namespace mongo {
         
         LOG( 2 ) << "trying to set shard version of " << version.toString() << " for '" << ns << "'" << endl;
         
-        scoped_lock clk( _configServerMutex );
+        TicketHolderReleaser needTicketFrom( &_configServerTickets );
 
         // fast path - double-check if requested version is at the same version as this chunk manager before verifying
         // against config server
