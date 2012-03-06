@@ -425,7 +425,7 @@ namespace mongo {
             while ( y.more() ) {
                 BSONElement f = y.next();
                 FieldCompareResult res = compareDottedFieldNames( e.fieldName() , f.fieldName() ,
-                                                                 LexNumCmp( false ) );
+                                                                 LexNumCmp( true ) );
                 if ( res == SAME || res == LEFT_SUBFIELD || res == RIGHT_SUBFIELD )
                     return true;
             }
