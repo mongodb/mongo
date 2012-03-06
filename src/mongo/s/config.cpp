@@ -593,6 +593,17 @@ namespace mongo {
         }
     }
 
+    void DBConfig::getAllShardedCollections( set<string>& namespaces ) const {
+
+        scoped_lock lk( _lock );
+
+        for( Collections::const_iterator i = _collections.begin(); i != _collections.end(); i++ ) {
+            log() << "Coll : " << i->first << " sharded? " << i->second.isSharded() << endl;
+            if( i->second.isSharded() ) namespaces.insert( i->first );
+        }
+
+    }
+
     /* --- ConfigServer ---- */
 
     ConfigServer::ConfigServer() : DBConfig( "config" ) {

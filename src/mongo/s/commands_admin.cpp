@@ -257,6 +257,10 @@ namespace mongo {
                     return false;
                 }
 
+                // Flush the configuration
+                // This can't be perfect, but it's better than nothing.
+                grid.flushConfig();
+
                 DBConfigPtr config = grid.getDBConfig( dbname , false );
                 if ( ! config ) {
                     errmsg = "can't find db!";
@@ -302,12 +306,18 @@ namespace mongo {
 	                return false;
                 }
 
+                set<string> shardedColls;
+                config->getAllShardedCollections( shardedColls );
+
+                BSONArrayBuilder barr;
+                barr.append( shardedColls );
+
                 ScopedDbConnection toconn( s.getConnString() );
 
                 // TODO ERH - we need a clone command which replays operations from clone start to now
                 //            can just use local.oplog.$main
                 BSONObj cloneRes;
-                bool worked = toconn->runCommand( dbname.c_str() , BSON( "clone" << config->getPrimary().getConnString() ) , cloneRes );
+                bool worked = toconn->runCommand( dbname.c_str() , BSON( "clone" << config->getPrimary().getConnString() << "collsToIgnore" << barr.arr() ) , cloneRes );
                 toconn.done();
 
                 if ( ! worked ) {
@@ -316,13 +326,54 @@ namespace mongo {
                     return false;
                 }
 
+                string oldPrimary = config->getPrimary().getConnString();
+
                 ScopedDbConnection fromconn( config->getPrimary() );
 
                 config->setPrimary( s.getConnString() );
 
-                log() << "movePrimary:  dropping " << dbname << " from old" << endl;
+                if( shardedColls.empty() ){
 
-                fromconn->dropDatabase( dbname.c_str() );
+                    // TODO: Collections can be created in the meantime, and we should handle in the future.
+                    log() << "movePrimary dropping database on " << oldPrimary << ", no sharded collections in " << dbname << endl;
+
+                    try {
+                        fromconn->dropDatabase( dbname.c_str() );
+                    }
+                    catch( DBException& e ){
+                        e.addContext( str::stream() << "movePrimary could not drop the database " << dbname << " on " << oldPrimary );
+                        throw;
+                    }
+
+                }
+                else if( cloneRes["clonedColls"].type() != Array ){
+
+                    // Legacy behavior from old mongod with sharded collections, *do not* delete database,
+                    // but inform user they can drop manually (or ignore).
+                    log() << "movePrimary legacy mongod behavior detected, user must manually remove unsharded collections in "
+                          << "database " << dbname << " on " << oldPrimary << endl;
+
+                }
+                else {
+
+                    // We moved some unsharded collections, but not all
+                    BSONObjIterator it( cloneRes["clonedColls"].Obj() );
+
+                    while( it.more() ){
+                        BSONElement el = it.next();
+                        if( el.type() == String ){
+                            try {
+                                log() << "movePrimary dropping cloned collection " << el.String() << " on " << oldPrimary << endl;
+                                fromconn->dropCollection( el.String() );
+                            }
+                            catch( DBException& e ){
+                                e.addContext( str::stream() << "movePrimary could not drop the cloned collection " << el.String() << " on " << oldPrimary );
+                                throw;
+                            }
+                        }
+                    }
+                }
+
                 fromconn.done();
 
                 result << "primary " << s.toString();

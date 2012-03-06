@@ -179,6 +179,8 @@ namespace mongo {
 
         void getAllShards(set<Shard>& shards) const;
 
+        void getAllShardedCollections(set<string>& namespaces) const;
+
     protected:
 
         /**

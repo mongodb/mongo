@@ -49,7 +49,29 @@ namespace mongo {
          	killCurrentOp.checkForInterrupt( false );   
         }
     }
-    
+
+    struct CloneOptions {
+
+        CloneOptions() :
+            logForRepl( true ),
+            slaveOk( false ),
+            useReplAuth( false ),
+            snapshot( true ),
+            mayYield( true ),
+            mayBeInterrupted( false ) {}
+
+        string fromDB;
+        set<string> collsToIgnore;
+
+        bool logForRepl;
+        bool slaveOk;
+        bool useReplAuth;
+        bool snapshot;
+        bool mayYield;
+        bool mayBeInterrupted;
+
+    };
+
     class Cloner: boost::noncopyable {
         auto_ptr< DBClientBase > conn;
         void copy(const char *from_ns, const char *to_ns, bool isindex, bool logForRepl,
@@ -67,6 +89,7 @@ namespace mongo {
 
         /** copy the entire database */
         bool go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk, bool useReplAuth, bool snapshot, bool mayYield, bool mayBeInterrupted, int *errCode = 0);
+        bool go(const char *masterHost, const CloneOptions& opts, set<string>& clonedColls, string& errmsg, int *errCode = 0);
 
         bool copyCollection( const string& ns , const BSONObj& query , string& errmsg , bool mayYield, bool mayBeInterrupted, bool copyIndexes = true, bool logForRepl = true );
     };
@@ -196,6 +219,8 @@ namespace mongo {
     void Cloner::copy(const char *from_collection, const char *to_collection, bool isindex, bool logForRepl, bool masterSameProcess, bool slaveOk, bool mayYield, bool mayBeInterrupted, Query query) {
         list<BSONObj> storedForLater;
 
+        LOG(2) << "\t\tcloning collection " << from_collection << " to " << to_collection << " on " << conn->getServerAddress() << " with filter " << query.toString() << endl;
+
         Fun f;
         f.n = 0;
         f.isindex = isindex;
@@ -281,10 +306,28 @@ namespace mongo {
     void ensureIdIndexForNewNs(const char *ns);
 
     bool Cloner::go(const char *masterHost, string& errmsg, const string& fromdb, bool logForRepl, bool slaveOk, bool useReplAuth, bool snapshot, bool mayYield, bool mayBeInterrupted, int *errCode) {
+
+        CloneOptions opts;
+
+        opts.fromDB = fromdb;
+        opts.logForRepl = logForRepl;
+        opts.slaveOk = slaveOk;
+        opts.useReplAuth = useReplAuth;
+        opts.snapshot = snapshot;
+        opts.mayYield = mayYield;
+        opts.mayBeInterrupted = mayBeInterrupted;
+
+        set<string> clonedColls;
+        return go( masterHost, opts, clonedColls, errmsg, errCode );
+
+    }
+
+    bool Cloner::go(const char *masterHost, const CloneOptions& opts, set<string>& clonedColls, string& errmsg, int* errCode ){
+
         if ( errCode ) {
             *errCode = 0;
         }
-        massert( 10289 ,  "useReplAuth is not written to replication log", !useReplAuth || !logForRepl );
+        massert( 10289 ,  "useReplAuth is not written to replication log", !opts.useReplAuth || !opts.logForRepl );
 
         string todb = cc().database()->name;
         stringstream a,b;
@@ -292,7 +335,7 @@ namespace mongo {
         b << "127.0.0.1:" << cmdLine.port;
         bool masterSameProcess = ( a.str() == masterHost || b.str() == masterHost );
         if ( masterSameProcess ) {
-            if ( fromdb == todb && cc().database()->path == dbpath ) {
+            if ( opts.fromDB == todb && cc().database()->path == dbpath ) {
                 // guard against an "infinite" loop
                 /* if you are replicating, the local.sources config may be wrong if you get this */
                 errmsg = "can't clone from self (localhost).";
@@ -302,11 +345,12 @@ namespace mongo {
         /* todo: we can put these releases inside dbclient or a dbclient specialization.
            or just wait until we get rid of global lock anyway.
            */
-        string ns = fromdb + ".system.namespaces";
+        string ns = opts.fromDB + ".system.namespaces";
         list<BSONObj> toClone;
+        clonedColls.clear();
         {
-            mayInterrupt( mayBeInterrupted );
-            dbtempreleaseif r( mayYield );
+            mayInterrupt( opts.mayBeInterrupted );
+            dbtempreleaseif r( opts.mayYield );
 
             // just using exhaust for collection copying right now
             auto_ptr<DBClientCursor> c;
@@ -332,14 +376,14 @@ namespace mongo {
                 //       to exceed a single cursor batch.
                 //       for repl it is probably ok as we apply oplog section after the clone (i.e. repl 
                 //       doesnt not use snapshot=true).
-                c = conn->query( ns.c_str(), BSONObj(), 0, 0, 0, slaveOk ? QueryOption_SlaveOk : 0 );
+                c = conn->query( ns.c_str(), BSONObj(), 0, 0, 0, opts.slaveOk ? QueryOption_SlaveOk : 0 );
             }
 
             if ( c.get() == 0 ) {
                 errmsg = "query failed " + ns;
                 return false;
             }
-            
+
             if ( c->more() ) {
                 BSONObj first = c->next();
                 if( !getErrField(first).eoo() ) {
@@ -375,17 +419,27 @@ namespace mongo {
                     }
                 }
                 if( ! NamespaceString::normal( from_name ) ) {
-                    log(2) << "\t\t not cloning because has $ " << endl;
+                    LOG(2) << "\t\t not cloning because has $ " << endl;
                     continue;
                 }
+
+                if( opts.collsToIgnore.find( string( from_name ) ) != opts.collsToIgnore.end() ){
+                    LOG(2) << "\t\t ignoring collection " << from_name << endl;
+                    continue;
+                }
+                else {
+                    LOG(2) << "\t\t not ignoring collection " << from_name << endl;
+                }
+
+                clonedColls.insert( from_name );
                 toClone.push_back( collection.getOwned() );
             }
         }
 
         for ( list<BSONObj>::iterator i=toClone.begin(); i != toClone.end(); i++ ) {
             {
-                mayInterrupt( mayBeInterrupted );
-                dbtempreleaseif r( mayYield );
+                mayInterrupt( opts.mayBeInterrupted );
+                dbtempreleaseif r( opts.mayYield );
             }
             BSONObj collection = *i;
             log(2) << "  really will clone: " << collection << endl;
@@ -402,13 +456,13 @@ namespace mongo {
                 string err;
                 const char *toname = to_name.c_str();
                 /* we defer building id index for performance - building it in batch is much faster */
-                userCreateNS(toname, options, err, logForRepl, &wantIdIndex);
+                userCreateNS(toname, options, err, opts.logForRepl, &wantIdIndex);
             }
             log(1) << "\t\t cloning " << from_name << " -> " << to_name << endl;
             Query q;
-            if( snapshot )
+            if( opts.snapshot )
                 q.snapshot();
-            copy(from_name, to_name.c_str(), false, logForRepl, masterSameProcess, slaveOk, mayYield, mayBeInterrupted, q);
+            copy(from_name, to_name.c_str(), false, opts.logForRepl, masterSameProcess, opts.slaveOk, opts.mayYield, opts.mayBeInterrupted, q);
 
             if( wantIdIndex ) {
                 /* we need dropDups to be true as we didn't do a true snapshot and this is before applying oplog operations
@@ -429,20 +483,30 @@ namespace mongo {
 
         // now build the indexes
 
-        string system_indexes_from = fromdb + ".system.indexes";
+        string system_indexes_from = opts.fromDB + ".system.indexes";
         string system_indexes_to = todb + ".system.indexes";
         /* [dm]: is the ID index sometimes not called "_id_"?  There is other code in the system that looks for a "_id" prefix
                  rather than this exact value.  we should standardize.  OR, remove names - which is in the bugdb.  Anyway, this
                  is dubious here at the moment.
         */
+
+        // build a $nin query filter for the collections we *don't* want
+        BSONArrayBuilder barr;
+        barr.append( opts.collsToIgnore );
+        BSONArray arr = barr.arr();
+
+        // Also don't copy the _id_ index
+        BSONObj query = BSON( "name" << NE << "_id_" << "ns" << NIN << arr );
+
         // won't need a snapshot of the query of system.indexes as there can never be very many.
-        copy(system_indexes_from.c_str(), system_indexes_to.c_str(), true, logForRepl, masterSameProcess, slaveOk, mayYield, mayBeInterrupted, BSON( "name" << NE << "_id_" ) );
+        copy(system_indexes_from.c_str(), system_indexes_to.c_str(), true, opts.logForRepl, masterSameProcess, opts.slaveOk, opts.mayYield, opts.mayBeInterrupted, query );
 
         return true;
     }
 
     bool cloneFrom(const char *masterHost, string& errmsg, const string& fromdb, bool logForReplication,
-                   bool slaveOk, bool useReplAuth, bool snapshot, bool mayYield, bool mayBeInterrupted, int *errCode) {
+                   bool slaveOk, bool useReplAuth, bool snapshot, bool mayYield, bool mayBeInterrupted,
+                   int *errCode) {
         Cloner c;
         return c.go(masterHost, errmsg, fromdb, logForReplication, slaveOk, useReplAuth, snapshot, mayYield, mayBeInterrupted, errCode);
     }
@@ -465,11 +529,34 @@ namespace mongo {
             string from = cmdObj.getStringField("clone");
             if ( from.empty() )
                 return false;
-            /* replication note: we must logOp() not the command, but the cloned data -- if the slave
-               were to clone it would get a different point-in-time and not match.
-               */
-            return cloneFrom(from.c_str(), errmsg, dbname,
-                             /*logForReplication=*/!fromRepl, /*slaveOk*/false, /*usereplauth*/false, /*snapshot*/true, /*mayYield*/true, /*mayBeInterrupted*/false);
+
+            CloneOptions opts;
+            opts.fromDB = dbname;
+            opts.logForRepl = ! fromRepl;
+
+            // See if there's any collections we should ignore
+            if( cmdObj["collsToIgnore"].type() == Array ){
+                BSONObjIterator it( cmdObj["collsToIgnore"].Obj() );
+
+                while( it.more() ){
+                    BSONElement e = it.next();
+                    if( e.type() == String ){
+                        opts.collsToIgnore.insert( e.String() );
+                    }
+                }
+            }
+
+            Cloner c;
+            set<string> clonedColls;
+            bool rval = c.go( from.c_str(), opts, clonedColls, errmsg );
+
+            BSONArrayBuilder barr;
+            barr.append( clonedColls );
+
+            result.append( "clonedColls", barr.arr() );
+
+            return rval;
+
         }
     } cmdclone;
 

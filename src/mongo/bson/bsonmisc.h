@@ -126,6 +126,7 @@ namespace mongo {
     extern Labeler::Label LT;
     extern Labeler::Label LTE;
     extern Labeler::Label NE;
+    extern Labeler::Label NIN;
     extern Labeler::Label SIZE;
 
 
