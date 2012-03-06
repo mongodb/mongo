@@ -26,11 +26,9 @@ waitForAllMembers(master);
 
 
 replTest.partition(0,2);
-
+replTest.awaitReplication();
 
 master.foo.insert({x:1});
-master.runCommand({getlasterror:1, w:2});
-
 
 // make sure the record never appears in the remote slave
 for (var i=0; i<20; i++) {
