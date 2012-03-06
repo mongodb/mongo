@@ -1831,7 +1831,6 @@ namespace mongo {
         const intrusive_ptr<const Value> &pValue):
         pFieldPath(pTheFieldPath),
         pRange(new Range(cmpOp, pValue)) {
-
     }
 
     void ExpressionFieldRange::intersect(

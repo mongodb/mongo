@@ -447,6 +447,9 @@ namespace mongo {
 // ClientCursor should only be used with auto_ptr because it needs to be
 // release()ed after a yield if stillOk() returns false and these pointer types
 // do not support releasing. This will prevent them from being used accidentally
+// Instead of auto_ptr<>, which still requires some degree of manual management
+// of this, consider using ClientCursor::CleanupPointer which handles
+// ClientCursor's unusual self-deletion mechanics
 namespace boost{
     template<> class scoped_ptr<mongo::ClientCursor> {};
     template<> class shared_ptr<mongo::ClientCursor> {};

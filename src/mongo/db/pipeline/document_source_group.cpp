@@ -395,5 +395,3 @@ namespace mongo {
         return pMerger;
     }
 }
-
-
