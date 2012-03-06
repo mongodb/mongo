@@ -31,6 +31,9 @@ namespace mongo {
     class ReplSetConfig {
         enum { EMPTYCONFIG = -2 };
         struct TagSubgroup;
+
+        // Protects _groups.
+        static mongo::mutex groupMx;
     public:
         /**
          * This contacts the given host and tries to get a config from them.
@@ -76,6 +79,7 @@ namespace mongo {
             bool potentiallyHot() const { return !arbiterOnly && priority > 0; }
             void updateGroups(const OpTime& last) {
                 RACECHECK
+                scoped_lock lk(ReplSetConfig::groupMx);
                 for (set<TagSubgroup*>::const_iterator it = groups().begin(); it != groups().end(); it++) {
                     (*it)->updateLast(last);
                 }
