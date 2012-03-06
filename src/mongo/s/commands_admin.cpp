@@ -350,7 +350,7 @@ namespace mongo {
 
                     // Legacy behavior from old mongod with sharded collections, *do not* delete database,
                     // but inform user they can drop manually (or ignore).
-                    log() << "movePrimary legacy mongod behavior detected, user must manually remove unsharded collections in "
+                    warning() << "movePrimary legacy mongod behavior detected, user must manually remove unsharded collections in "
                           << "database " << dbname << " on " << oldPrimary << endl;
 
                 }
