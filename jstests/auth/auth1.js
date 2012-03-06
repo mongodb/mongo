@@ -65,7 +65,7 @@ assert.eq( 1000, t.count() , "B6" );
 
 assert.eq( 2, db.system.users.count() , "B7" );
 assert( !db.getLastError() , "B8" );
-db.addUser( "a", "b" );
+assert.throws(function(){db.addUser( "a", "b" )});
 assert( db.getLastError() , "B9" );
 assert.eq( 2, db.system.users.count() , "B10");
 
@@ -81,5 +81,8 @@ var p = { key : { i : true } ,
           initial: { count: 0 }
         };
 
-assert.throws( function() { return t.group( p ) }, null , "write reduce didn't fail" );
+// this no longer throws (but the saves silently fail) SERVER-5228
+//assert.throws( function() { return t.group( p ) }, null , "write reduce didn't fail" );
+assert.eq( 1000, t.group( p ).length , "C6" );
+assert.eq( 1000, db.jstests_auth_auth1.count() , "C7" );
 
