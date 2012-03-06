@@ -40,7 +40,7 @@ namespace mongo {
             conn = direct.get();
         }
         else {
-            scoped.reset( new ScopedDbConnection( configServer ) );
+            scoped.reset( new ScopedDbConnection( configServer, 30.0 ) );
             conn = scoped->get();
         }
 
