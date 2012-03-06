@@ -37,14 +37,14 @@ namespace mongo {
         ^
         lock we are requesting
     */
-    class QLock : boost::noncopyable { 
+    class QLock : boost::noncopyable {
         struct Z { 
             Z() : n(0) { }
             boost::condition c;
             int n;
         };
         boost::mutex m;
-        Z r,w,R,W,U;
+        Z r,w,R,W,U,X;
         int greed;           // >0 if someone wants to acquire a write lock
         int greedyWrites;    // 0=no, 1=true
         int greedSuspended;
@@ -73,6 +73,7 @@ namespace mongo {
         void stop_greed();
         void W_to_R();
         bool R_to_W(); // caution see notes below
+        void runExclusively(void (*f)(void));
     };
 
     inline bool QLock::i_block(char me, char them) {

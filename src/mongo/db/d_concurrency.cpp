@@ -22,6 +22,16 @@
 
 namespace mongo { 
 
+    Client* curopWaitingForLock( char type );
+    void curopGotLock(Client*);
+    struct Acquiring { 
+        Client* c;
+        ~Acquiring() { curopGotLock(c); }
+        Acquiring(char type) { 
+            c = curopWaitingForLock(type);
+        }
+    };
+
     namespace dur { 
         void assertNothingSpooled();
         void releasingWriteLock();
@@ -48,6 +58,37 @@ namespace mongo {
     static void unlocking_W();
     static QLock& q = *new QLock();
     TSP_DEFINE(LockState,ls);
+
+    void runExclusively(void (*f)(void)) { 
+        q.runExclusively(f);
+    }
+
+    /** commitIfNeeded(), we have to do work when no one else is writing, and do it at a 
+        point where there is data consistency.  yet we have multiple writers so what to do.
+        this is the solution chosen.  we wait until all writers either finish (quick ones) 
+        or also call commitIfNeeded (long ones) -- a little like a synchronization barrier.
+        a more elegant solution likely is best long term.
+    */
+    void QLock::runExclusively(void (*f)(void)) { 
+        dlog(1) << "QLock::runExclusively" << endl;
+        boost::mutex::scoped_lock lk( q.m );
+        assert( w.n > 0 );
+        greed++; // stop new acquisitions
+        X.n++;
+        while( X.n ) { 
+            if( X.n == w.n ) {
+                // we're all here
+                f();
+                X.n = 0; // sentinel, tell everyone we're done
+                X.c.notify_all();
+            }
+            else { 
+                X.c.wait(lk);
+            }
+        }
+        greed--;
+        dlog(1) << "run exclusively end" << endl;
+    }
 
     inline LockState& lockState() { 
         LockState *p = ls.get();
@@ -106,7 +147,10 @@ namespace mongo {
     static void lock_W_stop_greed() { 
         assert( threadState() == 0 );
         threadState() = 'W';
-        q.lock_W_stop_greed();
+        {
+            Acquiring a('W');
+            q.lock_W_stop_greed();
+        }
         locked_W();
     }
     static void lock_W() { 
@@ -120,7 +164,10 @@ namespace mongo {
         }
         getDur().commitIfNeeded(); // check before locking - will use an R lock for the commit if need to do one, which is better than W
         threadState() = 'W';
-        q.lock_W();
+        {
+            Acquiring a('W');
+            q.lock_W();
+        }
         locked_W();
     }
     static void unlock_W(char oldState = 0) { 
@@ -134,6 +181,7 @@ namespace mongo {
         LockState& ls = lockState();
         massert(0, str::stream() << "can't lock_R, threadState=" << (int) threadState, ls.threadState == 0);
         ls.threadState = 'R';
+        Acquiring a('R');
         q.lock_R();
     }
     static void unlock_R() { 
@@ -146,6 +194,7 @@ namespace mongo {
         assert( ts == 0 || ts == 't' );
         getDur().commitIfNeeded();
         ts = 'w';
+        Acquiring a('w');
         q.lock_w();
     }
     static void unlock_w() { 
@@ -158,6 +207,7 @@ namespace mongo {
         char& ts = threadState();
         assert( ts == 0 || ts == 't' );
         ts = 'r';
+        Acquiring a('r');
         q.lock_r();
     }
     static void unlock_r() { 
@@ -677,10 +727,7 @@ namespace mongo {
         }
     }
 
-    void curopGotLock(Client*);
     void locked_W() {
-        Client& c = cc();
-        curopGotLock(&c);
         d.dbMutex._minfo.entered(); // hopefully eliminate one day 
     }
     void unlocking_w() { 

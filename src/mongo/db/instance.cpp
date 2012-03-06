@@ -319,6 +319,7 @@ namespace mongo {
         int op = m.operation();
         bool isCommand = false;
         const char *ns = m.singleData()->_data + 4;
+
         if ( op == dbQuery ) {
             if( strstr(ns, ".$cmd") ) {
                 isCommand = true;

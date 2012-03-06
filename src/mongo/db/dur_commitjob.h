@@ -30,6 +30,8 @@
 namespace mongo {
     namespace dur {
 
+        void assertLockedForCommitting();
+
         /** Declaration of an intent to write to a region of a memory mapped view
          *  We store the end rather than the start pointer to make operator< faster
          *    since that is heavily used in set lookup.
@@ -140,7 +142,7 @@ namespace mongo {
             void noteOp(shared_ptr<DurOp> p);
 
             vector< shared_ptr<DurOp> >& ops() { 
-                dassert( Lock::isRW() );          // this is just a sanity check
+                dassert( Lock::isLocked() );          // a rather weak check, we require more than that
                 groupCommitMutex.dassertLocked(); // this is what really makes the below safe
                 return _intentsAndDurOps._durOps;                
             }

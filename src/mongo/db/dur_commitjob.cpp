@@ -108,7 +108,7 @@ namespace mongo {
         }
 
         void IntentsAndDurOps::clear() {
-            d.dbMutex.assertAtLeastReadLocked();
+            assertLockedForCommitting();
             commitJob.groupCommitMutex.dassertLocked();
             _alreadyNoted.clear();
             _intents.clear();
@@ -142,7 +142,7 @@ namespace mongo {
         size_t privateMapBytes = 0; // used by _REMAPPRIVATEVIEW to track how much / how fast to remap
 
         void CommitJob::commitingBegin() { 
-            DEV d.dbMutex.assertAtLeastReadLocked();
+            assertLockedForCommitting();
             _commitNumber = _notify.now();
             stats.curr->_commits++;
         }
@@ -213,7 +213,7 @@ namespace mongo {
                         if( _nSinceCommitIfNeededCall >= 80 ) {
                             if( _nSinceCommitIfNeededCall % 40 == 0 ) {
                                 log() << "debug nsincecommitifneeded:" << _nSinceCommitIfNeededCall << " bytes:" << _bytes << endl;
-                                if( _nSinceCommitIfNeededCall == 120 || _nSinceCommitIfNeededCall == 1200 ) {
+                                if( _nSinceCommitIfNeededCall == 240 || _nSinceCommitIfNeededCall == 1200 ) {
                                     log() << "_DEBUG printing stack given high nsinccommitifneeded number" << endl;
                                     printStackTrace();
                                 }

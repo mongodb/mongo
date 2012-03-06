@@ -154,6 +154,11 @@ namespace mongo {
             h.fileId = j.curFileId();
         }
 
+        void assertLockedForCommitting() { 
+            // make better:
+            char t = Lock::isLocked();
+            fassert( 0, t == 'w' || t == 'R' || t == 'W' );
+        }
         /** we will build an output buffer ourself and then use O_DIRECT
             we could be in read lock for this
             caller handles locking
@@ -161,7 +166,7 @@ namespace mongo {
         */
         static void _PREPLOGBUFFER(JSectHeader& h, AlignedBuilder& bb) {
             assert( cmdLine.dur );
-            assert( Lock::isRW() );
+            assertLockedForCommitting();
 
             resetLogBuffer(h, bb); // adds JSectHeader
 
@@ -177,8 +182,7 @@ namespace mongo {
             return;
         }
         void PREPLOGBUFFER(/*out*/ JSectHeader& h, AlignedBuilder& ab) {
-            fassert( 0, Lock::isRW() );
-
+            assertLockedForCommitting();
             Timer t;
             j.assureLogFileOpen(); // so fileId is set
             _PREPLOGBUFFER(h, ab);

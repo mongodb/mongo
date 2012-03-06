@@ -73,9 +73,11 @@ using namespace mongoutils;
 namespace mongo {
 
     bool lockedForWriting();
+    void runExclusively(void (*f)(void));
 
     namespace dur {
 
+        void assertNothingSpooled();
         void unspoolWriteIntents();
 
         void PREPLOGBUFFER(JSectHeader& outParm, AlignedBuilder&);
@@ -183,9 +185,10 @@ namespace mongo {
             cc().writeHappened(); 
         }
 
+        void assertLockedForCommitting();
         void DurableImpl::setNoJournal(void *dst, void *src, unsigned len) {
             // we are at least read locked, so we need not worry about REMAPPRIVATEVIEW herein.
-            dassert( Lock::isLocked() );
+            assertLockedForCommitting();
 
             MemoryMappedFile::makeWritable(dst, len);
 
@@ -280,6 +283,12 @@ namespace mongo {
             return commitJob.bytes() > UncommittedBytesLimit;
         }
 
+        void f() { 
+            assertNothingSpooled();
+            getDur().commitNow();
+            assertNothingSpooled(); // a light sanity check that we truly were exclusive
+        }
+
         /** we may need to commit earlier than normal if data are being written at 
             very high rates. 
         
@@ -292,12 +301,8 @@ namespace mongo {
             if( commitJob.bytes() < UncommittedBytesLimit ) {
                 return false;
             }
-            if( Lock::isLocked() == 'w' ) { 
-                log() << "can't commit early in a w lock" << endl;
-                dassert(false);
-                return false;
-            }
             if( !Lock::isLocked() ) {
+                DEV log() << "commitIfNeeded but we are unlocked that is ok but why do we get here" << endl;
                 Lock::GlobalRead r;
                 if( commitJob.bytes() < UncommittedBytesLimit ) {
                     // someone else beat us to it
@@ -305,7 +310,11 @@ namespace mongo {
                 }
                 commitNow();
             }
+            else if( Lock::isLocked() == 'w' ) {
+                runExclusively(f);
+            }
             else { 
+                // 'W'
                 commitNow();
             }
             return true;
@@ -598,7 +607,10 @@ namespace mongo {
 
         static void _groupCommit(Lock::GlobalWrite *lgw) {
             LOG(4) << "_groupCommit " << endl;
-            d.dbMutex.assertAtLeastReadLocked();
+
+            // runExclusively is in 'w', else we are 'R' or 'W'
+            assertLockedForCommitting();
+
             unspoolWriteIntents(); // in case we were doing some writing ourself
             AlignedBuilder &ab = __theBuilder;
 
@@ -831,6 +843,14 @@ namespace mongo {
             journalMakeDir();
             try {
                 recover();
+            }
+            catch(DBException& e) {
+                log() << "dbexception during recovery: " << e.toString() << endl;
+                throw;
+            }
+            catch(std::exception& e) {
+                log() << "std::exception during recovery: " << e.what() << endl;
+                throw;
             }
             catch(...) {
                 log() << "exception during recovery" << endl;
