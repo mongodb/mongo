@@ -1,4 +1,3 @@
-
 // test creating many collections to make sure no internal cache goes OOM
 for (var i = 0; i < 10000; ++i) {
     name = "foo" + i;
@@ -18,9 +17,18 @@ db.system.js.save( { "_id" : "f1", "value" : function(n) {
     }
 } })
 
+// do mix of calls to make sure OOM is handled with no permanent damage
 db.eval("f1(10)");
 assert.throws(function() { db.eval("f1(100000000)"); } );
-
 db.eval("f1(10)");
+
+assert.throws(function() { db.eval("f1(1000000000)"); } );
+db.eval("f1(1000000)");
+db.eval("f1(1000000)");
+db.eval("f1(1000000)");
+assert.throws(function() { db.eval("f1(100000000)"); } );
+db.eval("f1(10)");
+db.eval("f1(1000000)");
+db.eval("f1(1000000)");
 db.eval("f1(1000000)");
 
