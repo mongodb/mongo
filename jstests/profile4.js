@@ -1,7 +1,5 @@
 // Check debug information recorded for a query.
 
-if ( typeof _threadInject == "undefined" ) { // don't run in v8 mode SERVER-5034
-
 // special db so that it can be run in parallel tests
 var stddb = db;
 var db = db.getSisterDB("profile4");
@@ -70,6 +68,4 @@ try {
 finally {
     db.setProfilingLevel(0);
     db = stddb;
-}
-
 }
