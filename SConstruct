@@ -332,8 +332,8 @@ if has_option( "libpath" ):
 if has_option( "cpppath" ):
     env["CPPPATH"] = [get_option( "cpppath" )]
 
-env.Append( CPPDEFINES=[ "_SCONS" , "MONGO_EXPOSE_MACROS" ],
-            CPPPATH=[ '$BUILD_DIR', "$BUILD_DIR/mongo" ] )
+env.Prepend( CPPDEFINES=[ "_SCONS" , "MONGO_EXPOSE_MACROS" ],
+             CPPPATH=[ '$BUILD_DIR', "$BUILD_DIR/mongo" ] )
 
 if has_option( "safeshell" ):
     env.Append( CPPDEFINES=[ "MONGO_SAFE_SHELL" ] )
@@ -782,11 +782,11 @@ for shortName in getThirdPartyShortNames():
         myModule.configure( env , fileLists , options_topass )
 
 if not has_option("use-system-all") and not has_option("use-system-pcre"):
-    env.Append(CPPPATH=[ '$BUILD_DIR/third_party/pcre-${PCRE_VERSION}' ])
+    env.Prepend(CPPPATH=[ '$BUILD_DIR/third_party/pcre-${PCRE_VERSION}' ])
 
 if not has_option('use-system-all') and not has_option('use-system-boost'):
-    env.Append(CPPPATH=['$BUILD_DIR/third_party/boost'],
-               CPPDEFINES=['BOOST_ALL_NO_LIB'])
+    env.Prepend(CPPPATH=['$BUILD_DIR/third_party/boost'],
+                CPPDEFINES=['BOOST_ALL_NO_LIB'])
 
 env.Append( CPPPATH=['$EXTRACPPPATH'],
             LIBPATH=['$EXTRALIBPATH'] )
