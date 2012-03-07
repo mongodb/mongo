@@ -37,7 +37,18 @@ namespace mongo {
 
         if ( cur == 0 ) {
             ScopedDbConnection conn( _primary );
-            conn->insert( "config.version" , BSON( "_id" << 1 << "version" << VERSION ) );
+
+            // If the cluster has not previously been initialized, we need to set the version before using so
+            // subsequent mongoses use the config data the same way.  This requires all three config servers online
+            // initially.
+            try {
+                conn->insert( "config.version" , BSON( "_id" << 1 << "version" << VERSION ) );
+            }
+            catch( DBException& e ){
+                error() << "All config servers must initially be reachable for the cluster to be initialized." << endl;
+                throw;
+            }
+
             pool.flush();
             verify( VERSION == dbConfigVersion( conn.conn() ) );
             conn.done();
