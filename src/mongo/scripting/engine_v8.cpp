@@ -380,11 +380,11 @@ namespace mongo {
         : _engine( engine ) ,
           _connectState( NOT ) {
 
-        // create new isolate
+        // create new isolate and enter it via a scope
         _isolate = v8::Isolate::New();
-        _isolate->Enter();
+        v8::Isolate::Scope iscope(_isolate);
 
-        // resource constraints must be set on isolate, before any call
+        // resource constraints must be set on isolate, before any call or lock
         int K = 1024;
         v8::ResourceConstraints rc;
 //        rc.set_max_young_space_size(4 * K * K);
@@ -396,7 +396,6 @@ namespace mongo {
         v8::V8::IgnoreOutOfMemoryException();
 //        V8::SetFatalErrorHandler(fatalHandler);
 
-        v8::Isolate::Scope iscope(_isolate);
         v8::Locker l(_isolate);
 
         HandleScope handleScope;
@@ -490,7 +489,6 @@ namespace mongo {
         _context.Dispose();
         }
 
-        _isolate->Exit();
         _isolate->Dispose();
     }
 
