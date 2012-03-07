@@ -695,6 +695,46 @@ namespace mongo {
             return 1;
         }
 
+        /* if the comparisons are numeric, prepare to promote the values */
+        if (((lType == NumberDouble) || (lType == NumberLong) ||
+             (lType == NumberInt)) &&
+            ((rType == NumberDouble) || (rType == NumberLong) ||
+             (rType == NumberInt))) {
+
+            /* if the biggest type of either is a double, compare as doubles */
+            if ((lType == NumberDouble) || (rType == NumberDouble)) {
+                const double left = rL->getDouble();
+                const double right = rR->getDouble();
+                if (left < right)
+                    return -1;
+                if (left > right)
+                    return 1;
+                return 0;
+            }
+
+            /* if the biggest type of either is a long, compare as longs */
+            if ((lType == NumberLong) || (rType == NumberLong)) {
+                const long long left = rL->getLong();
+                const long long right = rR->getLong();
+                if (left < right)
+                    return -1;
+                if (left > right)
+                    return 1;
+                return 0;
+            }
+
+            /* if we got here, they must both be ints; compare as ints */
+            {
+                const int left = rL->getInt();
+                const int right = rR->getInt();
+                if (left < right)
+                    return -1;
+                if (left > right)
+                    return 1;
+                return 0;
+            }
+        }
+
         // CW TODO for now, only compare like values
         uassert(16016, str::stream() <<
                 "can't compare values of BSON types " << lType <<
@@ -703,11 +743,10 @@ namespace mongo {
 
         switch(lType) {
         case NumberDouble:
-            if (rL->simple.doubleValue < rR->simple.doubleValue)
-                return -1;
-            if (rL->simple.doubleValue > rR->simple.doubleValue)
-                return 1;
-            return 0;
+        case NumberInt:
+        case NumberLong:
+            /* these types were handled above */
+            assert(false);
 
         case String:
             return rL->stringValue.compare(rR->stringValue);
@@ -778,24 +817,10 @@ namespace mongo {
         case RegEx:
             return rL->stringValue.compare(rR->stringValue);
 
-        case NumberInt:
-            if (rL->simple.intValue < rR->simple.intValue)
-                return -1;
-            if (rL->simple.intValue > rR->simple.intValue)
-                return 1;
-            return 0;
-
         case Timestamp:
             if (rL->dateValue < rR->dateValue)
                 return -1;
             if (rL->dateValue > rR->dateValue)
-                return 1;
-            return 0;
-
-        case NumberLong:
-            if (rL->simple.longValue < rR->simple.longValue)
-                return -1;
-            if (rL->simple.longValue > rR->simple.longValue)
                 return 1;
             return 0;
 
@@ -819,12 +844,26 @@ namespace mongo {
 
     void Value::hash_combine(size_t &seed) const {
         BSONType type = getType();
-        boost::hash_combine(seed, (int)type);
 
         switch(type) {
+            /*
+              Numbers whose values are equal need to hash to the same thing
+              as well.  Note that Value::compare() promotes numeric values to
+              their largest common form in order for comparisons to work.
+              We must hash all numeric values as if they are doubles so that
+              things like grouping work.  We don't know what values will come
+              down the pipe later, but if we start out with int representations
+              of a value, and later see double representations of it, they need
+              to end up in the same buckets.
+             */
         case NumberDouble:
-            boost::hash_combine(seed, simple.doubleValue);
+        case NumberLong:
+        case NumberInt:
+        {
+            const double d = getDouble();
+            boost::hash_combine(seed, d);
             break;
+        }
 
         case String:
             boost::hash_combine(seed, stringValue);
@@ -867,16 +906,8 @@ namespace mongo {
             boost::hash_combine(seed, stringValue);
             break;
 
-        case NumberInt:
-            boost::hash_combine(seed, simple.intValue);
-            break;
-
         case Timestamp:
             boost::hash_combine(seed, (unsigned long long)dateValue);
-            break;
-
-        case NumberLong:
-            boost::hash_combine(seed, simple.longValue);
             break;
 
         case Undefined:
