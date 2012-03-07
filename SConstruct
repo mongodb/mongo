@@ -594,34 +594,40 @@ elif "win32" == os.sys.platform:
     #env.Append( CPPFLAGS=' /Yu"pch.h" ' ) 
 
     # docs say don't use /FD from command line (minimal rebuild)
-    # /Gy function level linking
-    # /Gm is minimal rebuild, but may not work in parallel mode.
+    # /Gy function level linking (implicit when using /Z7)
+    # /Z7 debug info goes into each individual .obj file -- no .pdb created 
+    env.Append( CPPFLAGS= " /Z7 /errorReport:none " ); 
     if release:
+        # /MT: Causes your application to use the multithread, static version of the run-time library (LIBCMT.lib)
+        # /O2: optimize for speed (as opposed to size)
         env.Append( CPPDEFINES=[ "NDEBUG" ] )
-        env.Append( CPPFLAGS= " /O2 /Gy " )
-        env.Append( CPPFLAGS= " /MT /Zi /TP /errorReport:none " )
+        env.Append( CPPFLAGS= " /O2 /MT " )
+
         # TODO: this has caused some linking problems :
         # /GL whole program optimization
         # /LTCG link time code generation
         env.Append( CPPFLAGS= " /GL " ) 
         env.Append( LINKFLAGS=" /LTCG " )
+        env.Append( ARFLAGS=" /LTCG " ) # for the Library Manager
         # /DEBUG will tell the linker to create a .pdb file
         # which WinDbg and Visual Studio will use to resolve
-        # symbols if you want to debug a release-mode image
+        # symbols if you want to debug a release-mode image.
+        # Note that this means we can't do parallel links in the build.
         env.Append( LINKFLAGS=" /DEBUG " )
     else:
-        # /Od disable optimization
-        # /Z7 debug info goes into each individual .obj file -- no .pdb created 
-        # /TP it's a c++ file
         # /RTC1: - Enable Stack Frame Run-Time Error Checking; Reports when a variable is used without having been initialized
-        env.Append( CPPFLAGS=" /RTC1 /MDd /Z7 /TP /errorReport:none " )
-
+        #        (implies /Od: no optimizations)
+        # /MTd: Defines _DEBUG, _MT, and causes your application to use the
+        #       debug multithread version of the run-time library (LIBCMTD.lib)
+        env.Append( CPPFLAGS=" /RTC1 /Od /MTd " )
         if debugBuild:
+            # If you build without --d, no debug PDB will be generated, and 
+            # linking will be faster. However, you won't be able to debug your code with the debugger.
             env.Append( LINKFLAGS=" /debug " )
-            env.Append( CPPFLAGS=" /Od " )
-            
-        if debugLogging:
-            env.Append( CPPDEFINES=[ "_DEBUG" ] )
+        #if debugLogging:
+            # This is already implicit from /MDd...
+            #env.Append( CPPDEFINES=[ "_DEBUG" ] )
+            # This means --dd is always on unless you say --release
 
     if force64:
         env.Append( EXTRALIBPATH=[ winSDKHome + "/Lib/x64" ] )
