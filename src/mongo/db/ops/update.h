@@ -23,6 +23,8 @@
 
 namespace mongo {
 
+    typedef map<string,int> FieldSlicer;
+
     // ---------- public -------------
 
     struct UpdateResult {
@@ -82,7 +84,7 @@ namespace mongo {
     struct Mod {
         // See opFromStr below
         //        0    1    2     3         4     5          6    7      8       9       10    11        12           13
-        enum Op { INC, SET, PUSH, PUSH_ALL, PULL, PULL_ALL , POP, UNSET, BITAND, BITOR , BIT , ADDTOSET, RENAME_FROM, RENAME_TO } op;
+        enum Op { INC, SET, PUSH, PUSH_ALL, PULL, PULL_ALL , POP, UNSET, BITAND, BITOR , BIT , ADDTOSET, RENAME_FROM, RENAME_TO, SLICE } op;
 
         static const char* modNames[];
         static unsigned modNamesNum;
@@ -293,6 +295,8 @@ namespace mongo {
     class ModSet : boost::noncopyable {
         typedef map<string,Mod> ModHolder;
         ModHolder _mods;
+        FieldSlicer _slices;
+
         int _isIndexed;
         bool _hasDynamicArray;
 
@@ -307,6 +311,8 @@ namespace mongo {
             case 's': {
                 if ( fn[2] == 'e' && fn[3] == 't' && fn[4] == 0 )
                     return Mod::SET;
+                else if ( fn[2] == 'l' && fn[3] == 'i' && fn[4] == 'c' && fn[5] == 'e' )
+                    return Mod::SLICE;
                 break;
             }
             case 'p': {
@@ -532,11 +538,13 @@ namespace mongo {
         typedef map<string,ModState,FieldCmp> ModStateHolder;
         const BSONObj& _obj;
         ModStateHolder _mods;
+        FieldSlicer _slices;
+
         bool _inPlacePossible;
         BSONObj _newFromMods; // keep this data alive, as oplog generation may depend on it
 
-        ModSetState( const BSONObj& obj )
-            : _obj( obj ) , _inPlacePossible(true) {
+        ModSetState( const BSONObj& obj, FieldSlicer slices )
+            : _obj( obj ) , _slices( slices ) , _inPlacePossible(true) {
         }
 
         /**
@@ -547,6 +555,11 @@ namespace mongo {
                 _inPlacePossible = false;
             return _inPlacePossible;
         }
+
+        bool shouldSlice( const char *fieldName ) const;
+
+        template< class Builder >
+        void appendSliced( Builder& b, BSONElement& in );
 
         template< class Builder >
         void createNewFromMods( const string& root , Builder& b , const BSONObj &obj );
@@ -622,6 +635,11 @@ namespace mongo {
             case Mod::RENAME_TO:
                 ms.handleRename( b, m.shortFieldName );
                 break;
+
+            case Mod::SLICE:
+                // no-op b/c slice of nothing does nothing
+                break;
+
             default:
                 stringstream ss;
                 ss << "unknown mod in appendNewFromMod: " << m.op;
