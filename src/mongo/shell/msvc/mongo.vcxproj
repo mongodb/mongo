@@ -616,6 +616,7 @@
     <ClCompile Include="..\..\util\net\sock.cpp" />
     <ClCompile Include="..\..\util\password.cpp" />
     <ClCompile Include="..\..\util\ramlog.cpp" />
+    <ClCompile Include="..\..\util\stringutils.cpp" />
     <ClCompile Include="..\..\util\text.cpp" />
     <ClCompile Include="..\..\util\mmap_win.cpp" />
     <ClCompile Include="..\..\util\processinfo_win32.cpp" />

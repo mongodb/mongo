@@ -264,6 +264,9 @@
     <ClCompile Include="..\..\util\md5.cpp">
       <Filter>shell</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\util\stringutils.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\collection.js">
