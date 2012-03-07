@@ -4,6 +4,8 @@ var name = 'slavedelay3';
 var replTest = new ReplSetTest({ name: name, nodes: 3 });
 var nodes = replTest.startSet();
 var config = replTest.getReplSetConfig();
+// ensure member 0 is primary
+config.members[0].priority = 2;
 config.members[1].priority = 0;
 config.members[1].slaveDelay = 5;
 
