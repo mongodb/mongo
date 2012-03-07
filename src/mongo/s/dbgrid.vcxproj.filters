@@ -12,9 +12,6 @@
     <Filter Include="libs_etc">
       <UniqueIdentifier>{17d48ddf-5c49-4dfd-bafa-16d5fed290cd}</UniqueIdentifier>
     </Filter>
-    <Filter Include="libs_etc\pcre">
-      <UniqueIdentifier>{4c2dd526-4a57-4ff7-862f-2bd7ec4955b3}</UniqueIdentifier>
-    </Filter>
     <Filter Include="client">
       <UniqueIdentifier>{b4f6635b-8c64-4ceb-8077-43203533d0b9}</UniqueIdentifier>
     </Filter>
@@ -23,6 +20,9 @@
     </Filter>
     <Filter Include="Header Shared">
       <UniqueIdentifier>{4048b883-7255-40b3-b0e9-4c1044cff049}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Boost">
+      <UniqueIdentifier>{085b6c08-2d59-488c-84b7-faa9ed25e52b}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -260,9 +260,6 @@
     <ClCompile Include="..\..\third_party\pcre-8.30\pcre_globals.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\third_party\pcre-8.30\pcre_info.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\third_party\pcre-8.30\pcre_maketables.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -285,12 +282,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\third_party\pcre-8.30\pcre_tables.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\third_party\pcre-8.30\pcre_try_flipped.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\third_party\pcre-8.30\pcre_ucp_searchfuncs.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\third_party\pcre-8.30\pcre_valid_utf8.c">
@@ -559,6 +550,87 @@
     </ClCompile>
     <ClCompile Include="..\db\projection.cpp">
       <Filter>Shared Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-8.30\pcre_ucd.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\cmdline.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\winmain.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v3\src\codecvt_error_category.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\config_file.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\convert.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\system\src\error_code.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v3\src\operations.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\options_description.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\parsers.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v3\src\path.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v3\src\path_traits.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v3\src\portability.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\positional_options.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\split.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\thread\src\win32\thread.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\thread\src\win32\tss_dll.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\thread\src\win32\tss_pe.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v3\src\unique_path.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v3\src\utf8_codecvt_facet.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\utf8_codecvt_facet.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v2\src\v2_operations.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v2\src\v2_path.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v2\src\v2_portability.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\value_semantic.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\variables_map.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v3\src\windows_file_codecvt.cpp">
+      <Filter>Boost</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

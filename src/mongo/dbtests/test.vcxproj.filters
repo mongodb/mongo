@@ -59,6 +59,9 @@
     <Filter Include="misc and third party\snappy">
       <UniqueIdentifier>{fbc4416f-ca67-4e63-a1ea-49027de7e080}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Boost">
+      <UniqueIdentifier>{d74d5137-4461-45f3-9851-fd5c813b0ff3}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\boostw\boost_1_34_1\boost\config\auto_link.hpp">
@@ -933,6 +936,84 @@
     </ClCompile>
     <ClCompile Include="..\..\third_party\pcre-8.30\pcre_ucd.c">
       <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\system\src\error_code.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\thread\src\win32\thread.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\thread\src\win32\tss_dll.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\thread\src\win32\tss_pe.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v2\src\v2_operations.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v2\src\v2_path.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v2\src\v2_portability.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v3\src\codecvt_error_category.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v3\src\operations.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v3\src\path.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v3\src\path_traits.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v3\src\portability.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v3\src\unique_path.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v3\src\utf8_codecvt_facet.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v3\src\windows_file_codecvt.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\cmdline.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\config_file.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\convert.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\options_description.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\parsers.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\positional_options.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\split.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\utf8_codecvt_facet.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\value_semantic.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\variables_map.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\winmain.cpp">
+      <Filter>Boost</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
