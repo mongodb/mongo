@@ -25,14 +25,16 @@
 
 #pragma once
 
-#include "../pch.h"
-#include "../util/mmap.h"
-#include "diskloc.h"
-#include "jsobjmanipulator.h"
-#include "namespace-inl.h"
-#include "client.h"
-#include "mongommf.h"
-#include "memconcept.h"
+#include "mongo/db/client.h"
+#include "mongo/db/diskloc.h"
+#include "mongo/db/jsobjmanipulator.h"
+#include "mongo/db/memconcept.h"
+#include "mongo/db/mongommf.h"
+#include "mongo/db/namespace-inl.h"
+#include "mongo/db/namespace_details-inl.h"
+#include "mongo/db/namespacestring.h"
+#include "mongo/pch.h"
+#include "mongo/util/mmap.h"
 
 namespace mongo {
 

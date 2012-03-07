@@ -1,0 +1,45 @@
+# -*- mode: python; -*-
+
+# This SConscript describes construction of buildinfo.cpp, which is independent of the
+# build variant's target.
+
+import os
+import sys
+
+import buildscripts.utils
+
+Import('env windows')
+
+def getSysInfo():
+    if windows:
+        return "windows " + str( sys.getwindowsversion() )
+    else:
+        return " ".join( os.uname() )
+
+buildinfo_filename = '#build/buildinfo.cpp'
+
+buildinfo_template = '''
+#include <string>
+#include <boost/version.hpp>
+
+#include "mongo/util/version.h"
+
+namespace mongo {
+    const char * gitVersion() { return "%(git_version)s"; }
+    std::string sysInfo() { return "%(sys_info)s BOOST_LIB_VERSION=" BOOST_LIB_VERSION ; }
+}  // namespace mongo
+'''
+
+def generate_buildinfo(env, target, source, **kw):
+    contents = str(source[0]) % dict(git_version=buildscripts.utils.getGitVersion(),
+                                     sys_info=getSysInfo())
+    out = open(str(target[0]), 'wb')
+    try:
+        out.write(contents)
+    finally:
+        out.close()
+
+env.Command(buildinfo_filename, Value(buildinfo_template), generate_buildinfo)
+env.AlwaysBuild(buildinfo_filename)
+env.Install('$BUILD_DIR/mongo', buildinfo_filename)
+env.Install('$BUILD_DIR/client_build/mongo', buildinfo_filename)

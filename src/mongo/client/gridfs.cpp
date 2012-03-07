@@ -15,13 +15,15 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
-#include <fcntl.h>
-#include <utility>
-#include <fstream>
+#include "mongo/pch.h"
 
-#include "gridfs.h"
 #include <boost/smart_ptr.hpp>
+#include <fcntl.h>
+#include <fstream>
+#include <utility>
+
+#include "mongo/client/gridfs.h"
+#include "mongo/client/dbclientcursor.h"
 
 #if defined(_WIN32)
 #include <io.h>

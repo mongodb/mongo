@@ -38,6 +38,7 @@
 #include "../util/compress.h"
 #include "../util/progress_meter.h"
 #include "../server.h"
+#include "../util/mmap.h"
 
 using namespace mongoutils;
 

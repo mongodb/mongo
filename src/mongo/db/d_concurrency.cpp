@@ -12,6 +12,7 @@
 #include "d_globals.h"
 #include "mongomutex.h"
 #include "server.h"
+#include "dur.h"
 
 // oplog locking
 // no top level read locks

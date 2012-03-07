@@ -15,18 +15,26 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
-#include "dbclient.h"
-#include "../bson/util/builder.h"
-#include "../db/jsobj.h"
-#include "../db/json.h"
-#include "../db/instance.h"
-#include "../util/md5.hpp"
-#include "../db/dbmessage.h"
-#include "../db/cmdline.h"
-#include "connpool.h"
-#include "../s/util.h"
-#include "syncclusterconnection.h"
+#include "mongo/pch.h"
+
+#include "mongo/client/dbclient.h"
+
+#include "mongo/bson/util/builder.h"
+#include "mongo/client/constants.h"
+#include "mongo/client/dbclient_rs.h"
+#include "mongo/client/dbclientcursor.h"
+#include "mongo/client/syncclusterconnection.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/json.h"
+#include "mongo/db/namespace-inl.h"
+#include "mongo/db/namespacestring.h"
+#include "mongo/s/util.h"
+#include "mongo/util/md5.hpp"
+
+#ifdef MONGO_SSL
+// TODO: Remove references to cmdline from the client.
+#include "mongo/db/cmdline.h"
+#endif  // defined MONGO_SSL
 
 namespace mongo {
 
@@ -147,6 +155,12 @@ namespace mongo {
         return "";
     }
 
+
+    Query::Query( const string &json ) : obj( fromjson( json ) ) {}
+
+    Query::Query( const char *json ) : obj( fromjson( json ) ) {}
+
+    Query& Query::hint(const string &jsonKeyPatt) { return hint( fromjson( jsonKeyPatt ) ); }
 
     Query& Query::where(const string &jscode, BSONObj scope) {
         /* use where() before sort() and hint() and explain(), else this will assert. */

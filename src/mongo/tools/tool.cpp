@@ -16,16 +16,17 @@
 
 // Tool.cpp
 
-#include "tool.h"
+#include "mongo/tools/tool.h"
 
 #include <fstream>
 #include <iostream>
 
 #include "pcrecpp.h"
 
-#include "util/file_allocator.h"
-#include "util/password.h"
-#include "util/version.h"
+#include "mongo/db/namespace_details.h"
+#include "mongo/util/file_allocator.h"
+#include "mongo/util/password.h"
+#include "mongo/util/version.h"
 
 #include <boost/filesystem/operations.hpp>
 

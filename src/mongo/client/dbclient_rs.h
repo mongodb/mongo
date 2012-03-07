@@ -17,8 +17,15 @@
 
 #pragma once
 
-#include "../pch.h"
-#include "dbclient.h"
+#include "mongo/pch.h"
+
+#include <boost/function.hpp>
+#include <boost/shared_ptr.hpp>
+#include <set>
+#include <utility>
+
+#include "mongo/client/dbclientinterface.h"
+#include "mongo/util/net/hostandport.h"
 
 namespace mongo {
 

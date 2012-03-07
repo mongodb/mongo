@@ -15,15 +15,18 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
-#include "mmap.h"
-#include "processinfo.h"
-#include "concurrency/rwlock.h"
-#include "../db/namespace.h"
-#include "../db/cmdline.h"
-#include "progress_meter.h"
+#include "mongo/pch.h"
+
+#include "mongo/util/mmap.h"
 
 #include <boost/filesystem/operations.hpp>
+
+#include "mongo/db/cmdline.h"
+#include "mongo/db/namespace.h"
+#include "mongo/util/concurrency/rwlock.h"
+#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/processinfo.h"
+#include "mongo/util/progress_meter.h"
 
 namespace mongo {
 
@@ -58,7 +61,7 @@ namespace mongo {
             l = boost::filesystem::file_size( filename );
         } 
         catch(boost::filesystem::filesystem_error& e) { 
-            uasserted(15922, str::stream() << "couldn't get file length when opening mapping " << filename << ' ' << e.what() );
+            uasserted(15922, mongoutils::str::stream() << "couldn't get file length when opening mapping " << filename << ' ' << e.what() );
         }
         return map( filename , l );
     }
@@ -68,7 +71,7 @@ namespace mongo {
             l = boost::filesystem::file_size( filename );
         } 
         catch(boost::filesystem::filesystem_error& e) { 
-            uasserted(15923, str::stream() << "couldn't get file length when opening mapping " << filename << ' ' << e.what() );
+            uasserted(15923, mongoutils::str::stream() << "couldn't get file length when opening mapping " << filename << ' ' << e.what() );
         }
         return map( filename , l, options );
     }

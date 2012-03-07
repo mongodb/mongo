@@ -18,30 +18,15 @@
 
 #pragma once
 
-#include "nonce.h"
-#include "concurrency.h"
-#include "security_common.h"
-#include "../util/concurrency/spin_lock.h"
+#include "mongo/db/authlevel.h"
+#include "mongo/db/concurrency.h"
+#include "mongo/db/nonce.h"
+#include "mongo/db/security_common.h"
+#include "mongo/util/concurrency/spin_lock.h"
 
 // this is used by both mongos and mongod
 
 namespace mongo {
-
-    /* 
-     * for a particular db
-     * levels
-     *     0 : none
-     *     1 : read
-     *     2 : write
-     */
-    struct Auth {
-        
-        enum Level { NONE = 0 , READ = 1 , WRITE = 2 };
-
-        Auth() { level = NONE; }
-        Level level;
-        string user;
-    };
 
     class AuthenticationInfo : boost::noncopyable {
     public:

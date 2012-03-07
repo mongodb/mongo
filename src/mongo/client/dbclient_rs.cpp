@@ -15,17 +15,21 @@
  *    limitations under the License.
  */
 
-#include "pch.h"
-#include "dbclient.h"
-#include "../bson/util/builder.h"
-#include "../db/jsobj.h"
-#include "../db/json.h"
-#include "../db/dbmessage.h"
-#include "connpool.h"
-#include "dbclient_rs.h"
-#include "../util/background.h"
-#include "../util/timer.h"
+#include "mongo/pch.h"
+
+#include "mongo/client/dbclient_rs.h"
+
 #include <fstream>
+
+#include "mongo/bson/util/builder.h"
+#include "mongo/client/connpool.h"
+#include "mongo/client/dbclient.h"
+#include "mongo/client/dbclientcursor.h"
+#include "mongo/db/dbmessage.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/json.h"
+#include "mongo/util/background.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 

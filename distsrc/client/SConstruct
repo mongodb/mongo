@@ -1,102 +1,85 @@
+# -*- mode: python -*-
+
 # scons file for MongoDB c++ client library and examples
 
 import os
+import sys
 
-# options 
-AddOption( "--extrapath",
-           dest="extrapath",
-           type="string",
-           nargs=1,
-           action="store",
-           help="comma separated list of add'l paths  (--extrapath /opt/foo/,/foo) static linking" )
+# options
+AddOption("--extrapath",
+          dest="extrapath",
+          type="string",
+          nargs=1,
+          action="store",
+          help="comma separated list of add'l paths  (--extrapath /opt/foo/,/foo) static linking")
 
-AddOption( "--prefix",
-           dest="prefix",
-           type="string",
-           nargs=1,
-           action="store",
-           default="/usr/local",
-           help="installation root" )
+AddOption("--prefix",
+          dest="prefix",
+          type="string",
+          nargs=1,
+          action="store",
+          default="/usr/local",
+          help="installation root")
 
 
-env = Environment( MSVS_ARCH=None )
+env = Environment(BUILD_DIR='#build',
+                  CLIENT_ARCHIVE='${CLIENT_DIST_BASENAME}${DIST_ARCHIVE_SUFFIX}',
+                  CLIENT_DIST_BASENAME='mongo-cxx-driver',
+                  CLIENT_LICENSE='#LICENSE.txt',
+                  CLIENT_SCONSTRUCT='#SConstruct',
+                  MSVS_ARCH=None,
+                  PYTHON=sys.executable)
 
-def addExtraLibs( s ):
+def addExtraLibs(s):
     for x in s.split(","):
-        if os.path.exists( x ):
-            env.Append( CPPPATH=[ x + "/include" ] )
-            env.Append( LIBPATH=[ x + "/lib" ] )
-            env.Append( LIBPATH=[ x + "/lib64" ] )
+        if os.path.exists(x):
+            env.Append(CPPPATH=[x + "/include", x],
+                       LIBPATH=[x + "/lib", x + "/lib64"])
 
 if GetOption( "extrapath" ) is not None:
     addExtraLibs( GetOption( "extrapath" ) )
 
-env.Append( CPPPATH=[ "mongo/" ] )
-
-env.Append( CPPDEFINES=[ "_SCONS" , "MONGO_EXPOSE_MACROS" ] )
+env.Prepend(CPPPATH=["$BUILD_DIR", "$BUILD_DIR/mongo"])
+env.Append(CPPDEFINES=[ "_SCONS", "MONGO_EXPOSE_MACROS" ])
 
 nix = False
 linux = False
 
-if "darwin" == os.sys.platform:
+
+if "darwin" == sys.platform:
     addExtraLibs( "/opt/local/" )
     nix = True
-elif "linux2" == os.sys.platform or "linux3" == os.sys.platform:
+elif sys.platform in ("linux2", "linux3"):
     nix = True
     linux = True
 
-if nix:
-    env.Append( CPPFLAGS=" -O3" )
-    env.Append( LIBS=["pthread"] )
-if linux:
-    env.Append( LINKFLAGS=" -Wl,--as-needed -Wl,-zdefs " )
+if sys.platform is 'win32':
+    env['DIST_ARCHIVE_SUFFIX'] = '.zip'
+else:
+    env['DIST_ARCHIVE_SUFFIX'] = '.tgz'
 
-boostLibs = [ "thread" , "filesystem" , "system", "thread" ]
+if nix:
+    env.Append(CCFLAGS=["-O3", "-pthread"])
+if linux:
+    env.Append(LINKFLAGS=["-Wl,--as-needed", "-Wl,-zdefs"])
+
+boostLibs = ["thread", "filesystem", "system"]
 conf = Configure(env)
 for lib in boostLibs:
-    if not conf.CheckLib("boost_%s-mt" % lib):
-        conf.CheckLib("boost_%s" % lib)
+    if not conf.CheckLib(["boost_%s-mt" % lib, "boost_%s" % lib],
+                         language="C++"):
+        Exit(1)
+conf.Finish()
 
-dirs = [ "" , "bson/" , "bson/util/" , 
-         "client/"  , "s/" , "shell/" , 
-         "db/" , 
-         "scripting/" , 
-         "util/" , "util/concurrency/" , "util/mongoutils/" , "util/net/" ]
+clientEnv = env.Clone()
+clientEnv['CPPDEFINES'].remove('MONGO_EXPOSE_MACROS')
+clientEnv.Prepend(LIBS=['mongoclient'], LIBPATH=['.'])
 
-allClientFiles = []
-for x in dirs:
-    allClientFiles += Glob( "mongo/" + x + "*.cpp" )
-allClientFiles += Glob( "mongo/util/*.c" )
+Export("env clientEnv")
+env.SConscript('src/SConscript.client', variant_dir='$BUILD_DIR', duplicate=False)
 
-libs = env.Library( "mongoclient" , allClientFiles )
+env.Default('${LIBPREFIX}mongoclient${LIBSUFFIX}')
+
 
 # install
-
-prefix = GetOption( "prefix" )
-
-for x in libs:
-    env.Install( prefix + "/lib/" , str(x) )
-
-for x in dirs:
-    x = "mongo/" + x
-    env.Install( prefix + "/include/" + x , Glob( x + "*.h" ) )
-
-env.Alias( "install" , prefix )
-
-# example setup
-
-clientTests = []
-clientEnv = env.Clone();
-clientEnv.Prepend( LIBS=["mongoclient"] )
-clientEnv.Prepend( LIBPATH=["."] )
-
-# examples
-
-clientTests += [ clientEnv.Program( "firstExample" , [ "client/examples/first.cpp" ] ) ]
-clientTests += [ clientEnv.Program( "secondExample" , [ "client/examples/second.cpp" ] ) ]
-clientTests += [ clientEnv.Program( "whereExample" , [ "client/examples/whereExample.cpp" ] ) ]
-clientTests += [ clientEnv.Program( "authTest" , [ "client/examples/authTest.cpp" ] ) ]
-clientTests += [ clientEnv.Program( "httpClientTest" , [ "client/examples/httpClientTest.cpp" ] ) ]
-clientTests += [ clientEnv.Program( "clientTest" , [ "client/examples/clientTest.cpp" ] ) ]
-clientEnv.Alias("clientTests", clientTests, [])
-
+env.Alias("install", GetOption('prefix'))

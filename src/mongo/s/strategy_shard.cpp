@@ -16,16 +16,17 @@
 
 // strategy_sharded.cpp
 
-#include "pch.h"
-#include "request.h"
-#include "chunk.h"
-#include "cursors.h"
-#include "stats.h"
-#include "client.h"
-#include "../bson/util/builder.h"
+#include "mongo/pch.h"
 
-#include "../client/connpool.h"
-#include "../db/commands.h"
+#include "mongo/bson/util/builder.h"
+#include "mongo/client/connpool.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/index.h"
+#include "mongo/s/client.h"
+#include "mongo/s/cursors.h"
+#include "mongo/s/request.h"
+#include "mongo/s/stats.h"
+#include "mongo/s/chunk.h"
 
 // error codes 8010-8040
 

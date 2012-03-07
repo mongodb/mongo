@@ -16,9 +16,12 @@
  */
 
 
-#include "pch.h"
-#include "syncclusterconnection.h"
-#include "../db/dbmessage.h"
+#include "mongo/pch.h"
+
+#include "mongo/client/syncclusterconnection.h"
+
+#include "mongo/client/dbclientcursor.h"
+#include "mongo/db/dbmessage.h"
 
 // error codes 8000-8009
 

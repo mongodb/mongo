@@ -34,6 +34,7 @@
 #include "../util/net/message_port.h"
 #include "../util/concurrency/rwlock.h"
 #include "d_concurrency.h"
+#include "mongo/util/paths.h"
 
 namespace mongo {
 

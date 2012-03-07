@@ -15,21 +15,23 @@
 
 EnsureSConsVersion( 1, 1, 0 )
 
-import os
-import sys
-import imp
-import types
-import re
-import shutil
-import urllib
-import urllib2
 import buildscripts
 import buildscripts.bb
+import datetime
+import imp
+import os
+import re
+import shutil
 import stat
+import sys
+import types
+import urllib
+import urllib2
 from buildscripts import utils
 
 import libdeps
 
+DEFAULT_INSTALL_DIR = "/usr/local"
 
 def _rpartition(string, sep):
     """A replacement for str.rpartition which is missing in Python < 2.5
@@ -64,8 +66,8 @@ options = {}
 
 options_topass = {}
 
-def add_option( name, help , nargs , contributesToVariantDir , dest=None,
-                type="string", choices=None ):
+def add_option( name, help, nargs, contributesToVariantDir,
+                dest=None, default = None, type="string", choices=None ):
 
     if dest is None:
         dest = name
@@ -76,6 +78,7 @@ def add_option( name, help , nargs , contributesToVariantDir , dest=None,
                nargs=nargs,
                action="store",
                choices=choices,
+               default=default,
                help=help )
 
     options[name] = { "help" : help ,
@@ -137,7 +140,7 @@ def get_variant_dir():
     return s
         
 # installation/packaging
-add_option( "prefix" , "installation prefix" , 1 , False )
+add_option( "prefix" , "installation prefix" , 1 , False, default=DEFAULT_INSTALL_DIR )
 add_option( "distname" , "dist name (0.8.0)" , 1 , False )
 add_option( "distmod", "additional piece for full dist name" , 1 , False )
 add_option( "nostrip", "do not strip installed binaries" , 0 , False )
@@ -220,6 +223,9 @@ add_option( "use-cpu-profiler",
 add_option("mongod-concurrency-level", "Concurrency level, \"global\" or \"db\"", 1, True,
            type="choice", choices=["global", "db"])
 
+add_option('client-dist-basename', "Name of the client source archive.", 1, False,
+           default='mongo-cxx-driver')
+
 # don't run configure if user calls --help
 if GetOption('help'):
     Return()
@@ -278,9 +284,16 @@ usePCH = has_option( "usePCH" )
 justClientLib = (COMMAND_LINE_TARGETS == ['mongoclient'])
 
 env = Environment( BUILD_DIR=variantDir,
+                   CLIENT_ARCHIVE='${CLIENT_DIST_BASENAME}${DIST_ARCHIVE_SUFFIX}',
+                   CLIENT_DIST_BASENAME=get_option('client-dist-basename'),
+                   CLIENT_LICENSE='#distsrc/client/LICENSE.txt',
+                   CLIENT_SCONSTRUCT='#distsrc/client/SConstruct',
+                   DIST_ARCHIVE_SUFFIX='.tgz',
                    MSVS_ARCH=msarch ,
+                   PYTHON=utils.find_python(),
+                   SERVER_ARCHIVE='${SERVER_DIST_BASENAME}${DIST_ARCHIVE_SUFFIX}',
                    TARGET_ARCH=msarch ,
-                   tools=["default", "gch", "jsheader", "mergelib" ],
+                   tools=["default", "gch", "jsheader", "mergelib"],
                    PYSYSPLATFORM=os.sys.platform,
 
                    PCRE_VERSION='8.30',
@@ -367,8 +380,6 @@ if ( not ( usesm or usev8 or justClientLib) ):
     usesm = True
     options_topass["usesm"] = True
 
-distBuild = len( COMMAND_LINE_TARGETS ) == 1 and ( str( COMMAND_LINE_TARGETS[0] ) == "s3dist" or str( COMMAND_LINE_TARGETS[0] ) == "dist" )
-
 extraLibPlaces = []
 
 env['EXTRACPPPATH'] = []
@@ -394,38 +405,18 @@ if has_option( "extralib" ):
 
 class InstallSetup:
     binaries = False
-    clientSrc = False
+    libraries = False
     headers = False
-    bannerFiles = tuple()
-    headerRoot = "include"
 
     def __init__(self):
         self.default()
-    
+
     def default(self):
         self.binaries = True
         self.libraries = False
-        self.clientSrc = False
         self.headers = False
-        self.bannerFiles = tuple()
-        self.headerRoot = "include"
-        self.clientTestsDir = None
-
-    def justClient(self):
-        self.binaries = False
-        self.libraries = False
-        self.clientSrc = True
-        self.headers = True
-        self.bannerFiles = [ "#distsrc/client/LICENSE.txt",
-                             "#distsrc/client/SConstruct" ]
-        self.headerRoot = "mongo/"
-        self.clientTestsDir = "#src/mongo/client/examples/"
 
 installSetup = InstallSetup()
-if distBuild:
-    installSetup.bannerFiles = [ "#distsrc/GNU-AGPL-3.0",
-                                 "#distsrc/README",
-                                 "#distsrc/THIRD-PARTY-NOTICES", ]
 
 if has_option( "full" ):
     installSetup.headers = True
@@ -446,24 +437,14 @@ if force64:
 
 env['PROCESSOR_ARCHITECTURE'] = processor
 
-DEFAULT_INSTALL_DIR = "/usr/local"
 installDir = DEFAULT_INSTALL_DIR
 nixLibPrefix = "lib"
 
-distName = GetOption( "distname" )
 dontReplacePackage = False
-
-if distBuild:
-    release = True
-
-def isDriverBuild():
-    return GetOption( "prefix" ) and GetOption( "prefix" ).find( "mongo-cxx-driver" ) >= 0
+isBuildingLatest = False
 
 if has_option( "prefix" ):
     installDir = GetOption( "prefix" )
-    if isDriverBuild():
-        installDir = '#' + installDir
-        installSetup.justClient()
 
 def findVersion( root , choices ):
     if not isinstance(root, list):
@@ -473,12 +454,6 @@ def findVersion( root , choices ):
             if ( os.path.exists( r + c ) ):
                 return r + c
     raise RuntimeError("can't find a version of [" + repr(root) + "] choices: " + repr(choices))
-
-def choosePathExist( choices , default=None):
-    for c in choices:
-        if c != None and os.path.exists( c ):
-            return c
-    return default
 
 def filterExists(paths):
     return filter(os.path.exists, paths)
@@ -497,7 +472,7 @@ if "darwin" == os.sys.platform:
     if force64:
        env.Append( EXTRACPPPATH=["/usr/64/include"] )
        env.Append( EXTRALIBPATH=["/usr/64/lib"] )
-       if installDir == DEFAULT_INSTALL_DIR and not distBuild:
+       if installDir == DEFAULT_INSTALL_DIR:
            installDir = "/usr/64/"
     else:
        env.Append( EXTRACPPPATH=filterExists(["/sw/include" , "/opt/local/include"]) )
@@ -547,8 +522,8 @@ elif os.sys.platform.startswith( "openbsd" ):
 
 elif "win32" == os.sys.platform:
     windows = True
-    #if force64:
-    #    release = True
+
+    env['DIST_ARCHIVE_SUFFIX'] = '.zip'
 
     if has_option( "win2008plus" ):
         env.Append( CPPDEFINES=[ "MONGO_USE_SRW_ON_WINDOWS" ] )
@@ -690,9 +665,9 @@ if nix:
         if not has_option('clang'):
             env.Append( CPPFLAGS=" -fno-builtin-memcmp " ) # glibc's memcmp is faster than gcc's
 
-    env.Append( CPPDEFINES="_FILE_OFFSET_BITS=64" )
-    env.Append( CXXFLAGS=" -Wnon-virtual-dtor -Woverloaded-virtual" )
-    env.Append( LINKFLAGS=" -fPIC -pthread -rdynamic" )
+    env.Append( CPPDEFINES=["_FILE_OFFSET_BITS=64"] )
+    env.Append( CXXFLAGS=["-Wnon-virtual-dtor", "-Woverloaded-virtual"] )
+    env.Append( LINKFLAGS=["-fPIC", "-pthread",  "-rdynamic"] )
     env.Append( LIBS=[] )
 
     #make scons colorgcc friendly
@@ -810,12 +785,6 @@ env['MONGO_SCRIPTING_FILES'] = scriptingFiles
 env['MONGO_MODULE_FILES'] = moduleFiles
 
 # --- check system ---
-
-def getSysInfo():
-    if windows:
-        return "windows " + str( sys.getwindowsversion() )
-    else:
-        return " ".join( os.uname() )
 
 def doConfigure( myenv , shell=False ):
     conf = Configure(myenv)
@@ -1067,37 +1036,23 @@ def getCodeVersion():
         return None
     return allMatches[0]
 
-if getCodeVersion() == None:
+mongoCodeVersion = getCodeVersion()
+if mongoCodeVersion == None:
     Exit(-1)
 
-def getDistName( sofar ):
-    global distName
-    global dontReplacePackage
-
-    if distName is not None:
-        return distName
-
-    if str( COMMAND_LINE_TARGETS[0] ) == "s3dist":
-        version = getCodeVersion()
-        if not version.endswith( "+" ) and not version.endswith("-"):
-            print( "got real code version, doing release build for: " + version )
-            dontReplacePackage = True
-            distName = version
-            return version
+if has_option('distname'):
+    distName = GetOption( "distname" )
+elif mongoCodeVersion[-1] not in ("+", "-"):
+    dontReplacePackage = True
+    distName = mongoCodeVersion
+else:
+    isBuildingLatest = True
+    distName = utils.getGitBranchString("" , "-") + datetime.date.today().strftime("%Y-%m-%d")
 
 
-    return utils.getGitBranchString( "" , "-" ) + today.strftime( "%Y-%m-%d" )
+env['SERVER_DIST_BASENAME'] = 'mongodb-%s-%s' % (getSystemInstallName(), distName)
 
-
-if distBuild:
-    if isDriverBuild():
-        installDir = GetOption( "prefix" )
-    else:
-        from datetime import date
-        today = date.today()
-        installDir = "#mongodb-" + getSystemInstallName() + "-"
-        installDir += getDistName( installDir )
-        print "going to make dist: " + installDir[1:]
+distFile = "${SERVER_ARCHIVE}"
 
 env['NIX_LIB_DIR'] = nixLibPrefix
 env['INSTALL_DIR'] = installDir
@@ -1132,12 +1087,12 @@ env.AlwaysBuild( "push" )
 
 # ---- deploying ---
 
-def s3push( localName , remoteName=None , remotePrefix=None , fixName=True , platformDir=True ):
-
+def s3push( localName , remoteName=None , remotePrefix=None , fixName=True , platformDir=True,
+            isDriverBuild=False ):
     localName = str( localName )
 
     if remotePrefix is None:
-        if distName is None:
+        if isBuildingLatest:
             remotePrefix = utils.getGitBranchString( "-" ) + "-latest"
         else:
             remotePrefix = "-" + distName
@@ -1161,8 +1116,8 @@ def s3push( localName , remoteName=None , remotePrefix=None , fixName=True , pla
         name = name.lower()
     else:
         name = remoteName
-        
-    if isDriverBuild():
+
+    if isDriverBuild:
         name = "cxx-driver/" + name
     elif platformDir:
         name = platform + "/" + name
@@ -1182,19 +1137,15 @@ env.Alias( "s3shell" , [ "mongo" ] , [ s3shellpush ] )
 env.AlwaysBuild( "s3shell" )
 
 def s3dist( env , target , source ):
-    s3push( distFile , "mongodb" )
+    s3push( str(source[0]) , "mongodb" )
 
-env.Append( TARFLAGS=" -z " )
+def s3distclient(env, target, source):
+    s3push(str(source[0]), "cxx-driver/mongodb")
 
-if installDir[-1] != "/":
-    if windows:
-        distFile = env.Zip( installDir + ".zip", installDir )[0]
-    else:
-        distFile = env.Tar( installDir + '.tgz', installDir )[0]
-
-    env.Alias( "dist" , distFile )
-    env.Alias( "s3dist" , [ distFile ] , [ s3dist ] )
-    env.AlwaysBuild( "s3dist" )
+env.Alias( "dist" , '$SERVER_ARCHIVE' )
+env.Alias( "distclient", "$CLIENT_ARCHIVE")
+env.AlwaysBuild(env.Alias( "s3dist" , [ '$SERVER_ARCHIVE' ] , [ s3dist ] ))
+env.AlwaysBuild(env.Alias( "s3distclient" , [ '$CLIENT_ARCHIVE' ] , [ s3distclient ] ))
 
 # --- an uninstall target ---
 if len(COMMAND_LINE_TARGETS) > 0 and 'uninstall' in COMMAND_LINE_TARGETS:
@@ -1203,6 +1154,15 @@ if len(COMMAND_LINE_TARGETS) > 0 and 'uninstall' in COMMAND_LINE_TARGETS:
     # what we want, but changing BUILD_TARGETS does.
     BUILD_TARGETS.remove("uninstall")
     BUILD_TARGETS.append("install")
+
+clientEnv = env.Clone()
+clientEnv['CPPDEFINES'].remove('MONGO_EXPOSE_MACROS')
+
+if not has_option('use-system-all') and not has_option('use-system-boost'):
+    clientEnv.Append(LIBS=['boost_thread', 'boost_filesystem', 'boost_system'])
+    clientEnv.Prepend(LIBPATH=['$BUILD_DIR/third_party/boost/'])
+
+clientEnv.Prepend(LIBS=['mongoclient'], LIBPATH=['.'])
 
 # The following symbols are exported for use in subordinate SConscript files.
 # Ideally, the SConscript files would be purely declarative.  They would only
@@ -1213,15 +1173,17 @@ if len(COMMAND_LINE_TARGETS) > 0 and 'uninstall' in COMMAND_LINE_TARGETS:
 # conditional decision making that hasn't been moved up to this SConstruct file,
 # and they are exported here, as well.
 Export("env")
+Export("clientEnv")
 Export("shellEnv")
 Export("testEnv")
 Export("has_option")
-Export("installSetup getSysInfo")
+Export("installSetup")
 Export("usesm usev8")
 Export("darwin windows solaris linux nix")
 
-env.SConscript( 'src/SConscript', variant_dir=variantDir, duplicate=False )
-env.SConscript( 'SConscript.smoke' )
+env.SConscript( 'src/SConscript', variant_dir='$BUILD_DIR', duplicate=False )
+env.SConscript( 'src/SConscript.client', variant_dir='$BUILD_DIR/client_build', duplicate=False )
+env.SConscript( ['SConscript.buildinfo', 'SConscript.smoke'] )
 
 def clean_old_dist_builds(env, target, source):
     prefix = "mongodb-%s-%s" % (platform, processor)
@@ -1237,3 +1199,5 @@ def clean_old_dist_builds(env, target, source):
 
 env.Alias("dist_clean", [], [clean_old_dist_builds])
 env.AlwaysBuild("dist_clean")
+
+env.Alias('all', ['core', 'tools', 'clientTests'])

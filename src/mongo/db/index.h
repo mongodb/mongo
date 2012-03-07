@@ -23,6 +23,7 @@
 #include "jsobj.h"
 #include "indexkey.h"
 #include "key.h"
+#include "namespace.h"
 
 namespace mongo {
 

@@ -16,19 +16,20 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "../pch.h"
-#include "../client/dbclient.h"
-#include "../util/mmap.h"
-#include "../util/version.h"
-#include "tool.h"
+#include "mongo/pch.h"
 
-#include <boost/program_options.hpp>
-#include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/convenience.hpp>
-
+#include <boost/filesystem/operations.hpp>
+#include <boost/program_options.hpp>
 #include <fcntl.h>
-#include <set>
 #include <fstream>
+#include <set>
+
+#include "mongo/client/dbclient.h"
+#include "mongo/db/namespacestring.h"
+#include "mongo/tools/tool.h"
+#include "mongo/util/mmap.h"
+#include "mongo/util/version.h"
 
 using namespace mongo;
 

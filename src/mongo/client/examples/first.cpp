@@ -21,7 +21,7 @@
 
 #include <iostream>
 
-#include "client/dbclient.h"
+#include "mongo/client/dbclient.h"
 
 using namespace std;
 

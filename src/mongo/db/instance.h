@@ -20,7 +20,7 @@
 #pragma once
 
 
-#include "../client/dbclient.h"
+#include "mongo/client/dbclient.h"
 #include "curop-inl.h"
 #include "security.h"
 #include "cmdline.h"

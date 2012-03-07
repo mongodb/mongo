@@ -10,42 +10,21 @@ Import("shellEnv")
 Import("testEnv")
 Import("has_option")
 Import("usesm usev8")
-Import("installSetup getSysInfo")
+Import("installSetup")
 Import("darwin windows solaris linux nix")
 
 def add_exe( v ):
     return "${PROGPREFIX}%s${PROGSUFFIX}" % v
 
-def setupBuildInfoFile( env, target, source, **kw ):
-    version = utils.getGitVersion()
-    sysInfo = getSysInfo()
-    contents = '\n'.join([
-        '#include "pch.h"',
-        '#include <iostream>',
-        '#include <boost/version.hpp>',
-        'namespace mongo { const char * gitVersion(){ return "' + version + '"; } }',
-        'namespace mongo { string sysInfo(){ return "' + sysInfo + ' BOOST_LIB_VERSION=" BOOST_LIB_VERSION ; } }',
-        ])
-
-    contents += '\n\n';
-
-    out = open( str( target[0] ) , 'wb' )
-    try:
-        out.write( contents )
-    finally:
-        out.close()
-
-env.AlwaysBuild( env.Command( 'buildinfo.cpp', [], setupBuildInfoFile ) )
-
 # ------    SOURCE FILE SETUP -----------
 
 commonFiles = [ "pch.cpp",
                 "buildinfo.cpp",
-                "db/indexkey.cpp",
                 "db/jsobj.cpp",
                 "bson/oid.cpp",
                 "db/json.cpp",
                 "db/lasterror.cpp",
+                "db/namespace.cpp",
                 "db/nonce.cpp",
                 "db/queryutil.cpp",
                 "db/querypattern.cpp",
@@ -111,6 +90,7 @@ coreServerFiles = [ "util/version.cpp",
                     "db/commands/cloud.cpp",
                     "db/dbmessage.cpp",
                     "db/commands/pipeline.cpp",
+                    "db/indexkey.cpp",
                     "db/pipeline/accumulator.cpp",
                     "db/pipeline/accumulator_add_to_set.cpp",
                     "db/pipeline/accumulator_avg.cpp",
@@ -155,14 +135,6 @@ coreServerFiles = [ "util/version.cpp",
 
 if "win32" == os.sys.platform:
     coreServerFiles.append( "util/ntservice.cpp" )
-
-clientFiles = commonFiles + [
-    'client/clientAndShell.cpp',
-    'client/clientOnly.cpp',
-    'client/gridfs.cpp',
-    'db/commands.cpp',
-]
-
 
 if usesm:
     coreServerFiles.append( "scripting/engine_spidermonkey.cpp" )
@@ -243,7 +215,7 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/repl_block.cpp",
                     "db/btreecursor.cpp",
                     "db/cloner.cpp",
-                    "db/namespace.cpp",
+                    "db/namespace_details.cpp",
                     "db/cap.cpp",
                     "db/matcher_covered.cpp",
                     "db/dbeval.cpp",
@@ -375,30 +347,9 @@ env.Install( '#/', mongos )
 
 env.Library("clientandshell", "client/clientAndShell.cpp", LIBDEPS=["mongocommon", "coredb", "defaultversion", "gridfs"])
 env.Library("allclient", "client/clientOnly.cpp", LIBDEPS=["clientandshell"])
-# c++ library
-clientLib = env.MergeLibrary( "mongoclient", ["allclient"] )
-env.Install( '#/', clientLib )
-clientLibName = str( clientLib[0] )
+
 if has_option( "sharedclient" ):
     sharedClientLibName = str( env.SharedLibrary( "mongoclient", [], LIBDEPS=["allclient"], _LIBDEPS='$_LIBDEPS_OBJS' )[0] )
-
-clientEnv = env.Clone();
-clientEnv.Append( CPPPATH=["../"] )
-clientEnv.Prepend( LIBS=[ clientLib ] )
-clientEnv.Prepend( LIBPATH=["."] )
-clientEnv["CPPDEFINES"].remove( "MONGO_EXPOSE_MACROS" )
-l = clientEnv[ "LIBS" ]
-
-# examples
-clientTests = [
-    clientEnv.Program( "firstExample", [ "client/examples/first.cpp" ] ),
-    clientEnv.Program( "rsExample", [ "client/examples/rs.cpp" ] ),
-    clientEnv.Program( "secondExample", [ "client/examples/second.cpp" ] ),
-    clientEnv.Program( "whereExample", [ "client/examples/whereExample.cpp" ] ),
-    clientEnv.Program( "authTest", [ "client/examples/authTest.cpp" ] ),
-    clientEnv.Program( "httpClientTest", [ "client/examples/httpClientTest.cpp" ] ),
-    clientEnv.Program( "bsondemo", [ "bson/bsondemo/bsondemo.cpp" ] ),
-    ]
 
 # dbtests test binary
 env.StaticLibrary('testframework', ['dbtests/framework.cpp'])
@@ -412,13 +363,10 @@ if len(testEnv.subst('$PROGSUFFIX')):
     testEnv.Alias( "test", "#/${PROGPREFIX}test${PROGSUFFIX}" )
 
 env.Install( '#/', testEnv.Program( "perftest", [ "dbtests/perf/perftest.cpp" ], LIBDEPS=["serveronly", "coreserver", "coredb", "testframework" ] ) )
-clientTests += [ clientEnv.Program( "clientTest", [ "client/examples/clientTest.cpp" ] ) ]
-
-env.Install( '#/', clientTests )
 
 # --- sniffer ---
 mongosniff_built = False
-if darwin or clientEnv["_HAVEPCAP"]:
+if darwin or env["_HAVEPCAP"]:
     mongosniff_built = True
     sniffEnv = env.Clone()
     sniffEnv.Append( CPPDEFINES="MONGO_EXPOSE_MACROS" )
@@ -474,36 +422,36 @@ def checkGlibc(target,source,env):
         print( "************* " + str( target[0] ) + " has GLIBC_2.4 dependencies!" )
         Exit(-3)
 
-allBinaries = []
+distBinaries = []
 
 def installBinary( e, name ):
-    if not installSetup.binaries:
-        return
-
-    global allBinaries
+    global distBinaries
 
     name = add_exe( name )
 
-    inst = e.Install( "$INSTALL_DIR/bin", name )
+    if (not has_option( "no-glibc-check" ) and linux and "s3dist" in COMMAND_LINE_TARGETS):
+        e.AddPostAction( name, checkGlibc )
 
-    allBinaries += [ name ]
     if (solaris or linux) and (not has_option("nostrip")):
-        e.AddPostAction( inst, 'strip $TARGET' )
+        name = e.Command('stripped/%s' % name, name, 'strip -o $TARGET $SOURCE')[0]
 
-    if not has_option( "no-glibc-check" ) and linux and len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) == "s3dist":
-        e.AddPostAction( inst, checkGlibc )
+    distBinaries.append(name)
+
+    if not installSetup.binaries:
+        return
+
+    inst = e.Install( "$INSTALL_DIR/bin", name )
 
     if nix:
         e.AddPostAction( inst, 'chmod 755 $TARGET' )
 
-for x in normalTools:
-    installBinary( env, "mongo" + x )
-installBinary( env, "mongofiles" )
-installBinary( env, "bsondump" )
-installBinary( env, "mongoperf" )
+for t in ["mongo" + x for x in normalTools] + ["mongofiles", "bsondump", "mongoperf"]:
+    installBinary( env, t )
+    env.Alias("tools", '#/' + add_exe(t))
 
 if mongosniff_built:
     installBinary(env, "mongosniff")
+    env.Alias("tools", '#/' + add_exe("mongosniff"))
 
 installBinary( env, "mongod" )
 installBinary( env, "mongos" )
@@ -511,61 +459,39 @@ installBinary( env, "mongos" )
 if shellEnv is not None:
     installBinary( env, "mongo" )
 
-env.Alias( "all", ['#/%s' % b for b in allBinaries ] )
 env.Alias( "core", [ '#/%s' % b for b in [ add_exe( "mongo" ), add_exe( "mongod" ), add_exe( "mongos" ) ] ] )
 
 #headers
 if installSetup.headers:
     for id in [ "", "util/", "util/net/", "util/mongoutils/", "util/concurrency/", "db/", "db/stats/", "db/repl/", "db/ops/", "client/", "bson/", "bson/util/", "s/", "scripting/" ]:
-        env.Install( "$INSTALL_DIR/" + installSetup.headerRoot + "/" + id, Glob( id + "*.h" ) )
-        env.Install( "$INSTALL_DIR/" + installSetup.headerRoot + "/" + id, Glob( id + "*.hpp" ) )
-
-if installSetup.clientSrc:
-    for x in clientFiles:
-        if isinstance(x, basestring):
-            x = [x]
-        for path in x:
-            path = str(path)
-            dirname, filename = os.path.split(path)
-            env.Install( "$INSTALL_DIR/mongo/" + dirname , path )
+        env.Install( "$INSTALL_DIR/include/" + id, Glob( id + "*.h" ) )
+        env.Install( "$INSTALL_DIR/include/" + id, Glob( id + "*.hpp" ) )
 
 #lib
 if installSetup.libraries:
-    env.Install( "$INSTALL_DIR/$NIX_LIB_DIR", clientLibName )
+    env.Install('$INSTALL_DIR/$NIX_LIB_DIR', '#${LIBPREFIX}mongoclient${LIBSUFFIX}')
     if has_option( "sharedclient" ):
-        env.Install( "$INSTALL_DIR/$NIX_LIB_DIR", sharedClientLibName )
+        env.Install( "$INSTALL_DIR/$NIX_LIB_DIR",  '#${SHLIBPREFIX}mongoclient${SHLIBSUFFIX}')
 
-#textfiles
-env.Install( "$INSTALL_DIR", installSetup.bannerFiles )
-
-if installSetup.clientTestsDir:
-    env.Install( '$INSTALL_DIR/client/', installSetup.clientTestsDir )
+env.Command(
+    '#/${SERVER_ARCHIVE}',
+    ['#buildscripts/make_archive.py',
+     '#distsrc/GNU-AGPL-3.0',
+     '#distsrc/README',
+     '#distsrc/THIRD-PARTY-NOTICES',
+     distBinaries],
+    '$PYTHON ${SOURCES[0]} -o $TARGET '
+    '--transform distsrc=$SERVER_DIST_BASENAME '
+    '--transform ${str(Dir(BUILD_DIR))}/mongo/stripped=$SERVER_DIST_BASENAME/bin '
+    '--transform ${str(Dir(BUILD_DIR))}/mongo=$SERVER_DIST_BASENAME/bin '
+    '${TEMPFILE(SOURCES[1:])}')
 
 #final alias
 env.Alias( "install", "$INSTALL_DIR" )
 
-# aliases
-env.Alias( "mongoclient", '#/%s' % ( has_option( "sharedclient" ) and sharedClientLibName or clientLibName ) )
-
-# client dist
-def build_and_test_client(env, target, source):
-    import subprocess
-
-    installDir = env.subst('$INSTALL_DIR', target=target, source=source)
-    installDir = env.GetBuildPath(installDir)
-    if GetOption("extrapath") is not None:
-        scons_command = ["scons", "--extrapath=" + GetOption("extrapath")]
-    else:
-        scons_command = ["scons"]
-
-    exit_code = subprocess.call(scons_command + ["clientTests"], cwd=installDir)
-    if exit_code:
-        return exit_code
-
-    smoke_cmd = utils.smoke_command("--test-path", installDir, "client")
-    exit_code = subprocess.call(smoke_cmd)
-    if exit_code:
-        return exit_code
-
-env.Alias("clientBuild", [mongod, '$INSTALL_DIR'], [build_and_test_client])
+env.Alias("clientBuild", ['#buildscripts/build_and_test_client.py',
+                          '#/${PROGPREFIX}mongod${PROGSUFFIX}',
+                          '#$CLIENT_ARCHIVE'],
+          '$PYTHON ${SOURCES[0]} ${SOURCES[2]}'
+          )
 env.AlwaysBuild("clientBuild")

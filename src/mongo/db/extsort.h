@@ -18,11 +18,14 @@
 
 #pragma once
 
-#include "../pch.h"
-#include "jsobj.h"
-#include "namespace-inl.h"
-#include "curop-inl.h"
-#include "../util/array.h"
+#include "mongo/pch.h"
+
+#include "mongo/db/index.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/namespace-inl.h"
+#include "mongo/db/curop-inl.h"
+#include "mongo/util/array.h"
+#include "mongo/util/mmap.h"
 
 namespace mongo {
 

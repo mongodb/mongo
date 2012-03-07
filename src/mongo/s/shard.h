@@ -18,8 +18,10 @@
 
 #pragma once
 
-#include "../pch.h"
-#include "../client/connpool.h"
+#include "mongo/pch.h"
+
+#include "mongo/client/connpool.h"
+#include "mongo/client/dbclient_rs.h"
 
 namespace mongo {
 
