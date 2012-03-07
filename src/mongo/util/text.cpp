@@ -94,6 +94,7 @@ namespace mongo {
 
         msgasserted( 16091 ,
                      mongoutils::str::stream() << "can't wstring to utf8: " << ::GetLastError() );
+        return "";
     }
 
 #if defined(_UNICODE)
