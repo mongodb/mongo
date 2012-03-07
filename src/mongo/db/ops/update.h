@@ -438,7 +438,7 @@ namespace mongo {
     /**
      * stores any information about a single Mod operating on a single Object
      */
-    class ModState {
+    class ModState : boost::noncopyable {
     public:
         const Mod * m;
         BSONElement old;
@@ -527,7 +527,8 @@ namespace mongo {
      * the goal is to make ModSet const so its re-usable
      */
     class ModSetState : boost::noncopyable {
-        typedef map<string,ModState,LexNumCmp> ModStateHolder;
+        typedef map<string,shared_ptr<ModState>,LexNumCmp> ModStateHolder;
+        typedef pair<const ModStateHolder::iterator,const ModStateHolder::iterator> ModStateRange;
         const BSONObj& _obj;
         ModStateHolder _mods;
         bool _inPlacePossible;
@@ -649,7 +650,7 @@ namespace mongo {
 
         bool needOpLogRewrite() const {
             for ( ModStateHolder::const_iterator i = _mods.begin(); i != _mods.end(); i++ )
-                if ( i->second.needOpLogRewrite() )
+                if ( i->second->needOpLogRewrite() )
                     return true;
             return false;
         }
@@ -657,20 +658,20 @@ namespace mongo {
         BSONObj getOpLogRewrite() const {
             BSONObjBuilder b;
             for ( ModStateHolder::const_iterator i = _mods.begin(); i != _mods.end(); i++ )
-                i->second.appendForOpLog( b );
+                i->second->appendForOpLog( b );
             return b.obj();
         }
 
         bool haveArrayDepMod() const {
             for ( ModStateHolder::const_iterator i = _mods.begin(); i != _mods.end(); i++ )
-                if ( i->second.m->arrayDep() )
+                if ( i->second->m->arrayDep() )
                     return true;
             return false;
         }
 
         void appendSizeSpecForArrayDepMods( BSONObjBuilder &b ) const {
             for ( ModStateHolder::const_iterator i = _mods.begin(); i != _mods.end(); i++ ) {
-                const ModState& m = i->second;
+                const ModState& m = *i->second;
                 if ( m.m->arrayDep() ) {
                     if ( m.pushStartSize == -1 )
                         b.appendNull( m.fieldName() );

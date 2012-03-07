@@ -365,7 +365,8 @@ namespace mongo {
         // Perform this check first, so that we don't leave a partially modified object on uassert.
         for ( ModHolder::const_iterator i = _mods.begin(); i != _mods.end(); ++i ) {
             DEBUGUPDATE( "\t\t prepare : " << i->first );
-            ModState& ms = mss->_mods[i->first];
+            mss->_mods[i->first].reset( new ModState() );
+            ModState& ms = *mss->_mods[i->first];
 
             const Mod& m = i->second;
             BSONElement e = obj.getFieldDotted(m.fieldName);
@@ -562,7 +563,7 @@ namespace mongo {
         DEV assert( isOnDisk == ! _obj.isOwned() );
 
         for ( ModStateHolder::iterator i = _mods.begin(); i != _mods.end(); ++i ) {
-            ModState& m = i->second;
+            ModState& m = *i->second;
 
             if ( m.dontApply ) {
                 continue;
@@ -659,7 +660,7 @@ namespace mongo {
             string field = root + e.fieldName();
             FieldCompareResult cmp = compareDottedFieldNames( m->second.m->fieldName , field );
 
-            DEBUGUPDATE( "\t\t\t field:" << field << "\t mod:" << m->second.m->fieldName << "\t cmp:" << cmp << "\t short: " << e.fieldName() );
+            DEBUGUPDATE( "\t\t\t field:" << field << "\t mod:" << m->second->m->fieldName << "\t cmp:" << cmp << "\t short: " << e.fieldName() );
 
             switch ( cmp ) {
 
@@ -690,13 +691,13 @@ namespace mongo {
                 continue;
             }
             case LEFT_BEFORE: // Mod on a field that doesn't exist
-                DEBUGUPDATE( "\t\t\t\t creating new field for: " << m->second.m->fieldName );
-                _appendNewFromMods( root , m->second , b , onedownseen );
+                DEBUGUPDATE( "\t\t\t\t creating new field for: " << m->second->m->fieldName );
+                _appendNewFromMods( root , *m->second , b , onedownseen );
                 m++;
                 continue;
             case SAME:
-                DEBUGUPDATE( "\t\t\t\t applying mod on: " << m->second.m->fieldName );
-                m->second.apply( b , e );
+                DEBUGUPDATE( "\t\t\t\t applying mod on: " << m->second->m->fieldName );
+                m->second->apply( b , e );
                 e = es.next();
                 m++;
                 continue;
@@ -722,8 +723,8 @@ namespace mongo {
 
         // do mods that don't have fields already
         for ( ; m != mend; m++ ) {
-            DEBUGUPDATE( "\t\t\t\t appending from mod at end: " << m->second.m->fieldName );
-            _appendNewFromMods( root , m->second , b , onedownseen );
+            DEBUGUPDATE( "\t\t\t\t appending from mod at end: " << m->second->m->fieldName );
+            _appendNewFromMods( root , *m->second , b , onedownseen );
         }
     }
 
@@ -736,7 +737,7 @@ namespace mongo {
     string ModSetState::toString() const {
         stringstream ss;
         for ( ModStateHolder::const_iterator i=_mods.begin(); i!=_mods.end(); ++i ) {
-            ss << "\t\t" << i->first << "\t" << i->second.toString() << "\n";
+            ss << "\t\t" << i->first << "\t" << i->second->toString() << "\n";
         }
         return ss.str();
     }
