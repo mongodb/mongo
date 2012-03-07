@@ -91,7 +91,8 @@ commonFiles = [ "pch.cpp",
 commonFiles += env['MONGO_COMMON_FILES']
 
 env.StaticLibrary('mongocommon', commonFiles,
-                  LIBDEPS=['$BUILD_DIR/third_party/pcrecpp', '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
+                  LIBDEPS=['$BUILD_DIR/third_party/pcrecpp',
+                           '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
                            '$BUILD_DIR/third_party/mongo_boost'],)
 
 #mmap stuff
