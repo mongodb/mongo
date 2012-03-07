@@ -1385,14 +1385,7 @@ namespace detail
     else if (prms & remove_perms)
       prms = current_status.permissions() & ~prms;
 
-    // Mac OS X Lion and some other platforms don't support fchmodat()  
-#   if defined(AT_FDCWD) && defined(AT_SYMLINK_NOFOLLOW) \
-      && (!defined(__SUNPRO_CC) || __SUNPRO_CC > 0x5100)
-      if (::fchmodat(AT_FDCWD, p.c_str(), mode_cast(prms),
-           !(prms & symlink_perms) ? 0 : AT_SYMLINK_NOFOLLOW))
-#   else  // fallback if fchmodat() not supported
-      if (::chmod(p.c_str(), mode_cast(prms)))
-#   endif
+    if (::chmod(p.c_str(), mode_cast(prms)))
     {
       if (ec == 0)
       BOOST_FILESYSTEM_THROW(filesystem_error(
