@@ -653,6 +653,20 @@ namespace UpdateTests {
             }
         };
    
+        class IncRewriteNestedArray {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << BSON_ARRAY( 2 ) );
+                BSONObj mod = BSON( "$inc" << BSON( "a.0" << 1 ) );
+                ModSet modSet( mod );
+                auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
+                modSetState->createNewFromMods();
+                ASSERT( modSetState->needOpLogRewrite() );
+                ASSERT_EQUALS( BSON( "$set" << BSON( "a.0" << 3 ) ),
+                              modSetState->getOpLogRewrite() );
+            }
+        };
+
     };
 
     namespace basic {
@@ -919,6 +933,7 @@ namespace UpdateTests {
             add< ModSetTests::set1 >();
             add< ModSetTests::push1 >();
             add< ModSetTests::IncRewrite >();
+            add< ModSetTests::IncRewriteNestedArray >();
 
             add< basic::inc1 >();
             add< basic::inc2 >();

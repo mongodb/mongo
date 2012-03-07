@@ -82,11 +82,10 @@ namespace mongo {
         const char* _theend;
     };
 
-    class BSONObjIteratorSorted {
+    /** Base class implementing ordered iteration through BSONElements. */
+    class BSONIteratorSorted {
     public:
-        BSONObjIteratorSorted( const BSONObj& o );
-
-        ~BSONObjIteratorSorted() {
+        ~BSONIteratorSorted() {
             assert( _fields );
             delete[] _fields;
             _fields = 0;
@@ -103,13 +102,30 @@ namespace mongo {
             return BSONElement();
         }
 
-    private:
-        
+    protected:
         class ElementFieldCmp;
+        BSONIteratorSorted( const BSONObj &o, const ElementFieldCmp &cmp );
         
+    private:
         const char ** _fields;
         int _nfields;
         int _cur;
+    };
+
+    /** Provides iteration of a BSONObj's BSONElements in lexical field order. */
+    class BSONObjIteratorSorted : public BSONIteratorSorted {
+    public:
+        BSONObjIteratorSorted( const BSONObj &object );
+    };
+
+    /**
+     * Provides iteration of a BSONArray's BSONElements in numeric field order.
+     * The elements of a bson array should always be numerically ordered by field name, but this
+     * implementation re-sorts them anyway.
+     */
+    class BSONArrayIteratorSorted : public BSONIteratorSorted {
+    public:
+        BSONArrayIteratorSorted( const BSONArray &array );
     };
 
     /** transform a BSON array into a vector of BSONElements.

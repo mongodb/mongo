@@ -334,8 +334,10 @@ namespace BasicTests {
 
     class LexNumCmp {
     public:
-        static void assertCmp( int expected, const char *s1, const char *s2 ) {
-            mongo::LexNumCmp cmp;
+        static void assertCmp( int expected, const char *s1, const char *s2,
+                              bool lexOnly = false ) {
+            mongo::LexNumCmp cmp( lexOnly );
+            ASSERT_EQUALS( expected, cmp.cmp( s1, s2, lexOnly ) );
             ASSERT_EQUALS( expected, cmp.cmp( s1, s2 ) );
             ASSERT_EQUALS( expected < 0, cmp( s1, s2 ) );
             ASSERT_EQUALS( expected < 0, cmp( string( s1 ), string( s2 ) ) );
@@ -433,6 +435,16 @@ namespace BasicTests {
             assertCmp( 1, "ac.t", "a.t" );
             assertCmp( -1, "a.t", "ac.t" );
             assertCmp( 0, "ac.t", "ac.t" );            
+        }
+    };
+    
+    class LexNumCmpLexOnly : public LexNumCmp {
+    public:
+        void run() {
+            assertCmp( -1, "0", "00", true );
+            assertCmp( 1, "1", "01", true );
+            assertCmp( -1, "1", "11", true );
+            assertCmp( 1, "2", "11", true );
         }
     };
 
@@ -674,6 +686,7 @@ namespace BasicTests {
 
             add< ArrayTests::basic1 >();
             add< LexNumCmp >();
+            add< LexNumCmpLexOnly >();
 
             add< DatabaseValidNames >();
             add< DatabaseOwnsNS >();

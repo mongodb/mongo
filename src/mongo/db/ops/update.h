@@ -419,7 +419,8 @@ namespace mongo {
 
             ModHolder::const_iterator start = _mods.lower_bound(fieldName.substr(0,idx));
             for ( ; start != _mods.end(); start++ ) {
-                FieldCompareResult r = compareDottedFieldNames( fieldName , start->first );
+                FieldCompareResult r = compareDottedFieldNames( fieldName , start->first ,
+                                                               LexNumCmp( true ) );
                 switch ( r ) {
                 case LEFT_SUBFIELD: return true;
                 case LEFT_BEFORE: return false;
@@ -535,7 +536,7 @@ namespace mongo {
         BSONObj _newFromMods; // keep this data alive, as oplog generation may depend on it
 
         ModSetState( const BSONObj& obj )
-            : _obj( obj ) , _inPlacePossible(true) {
+            : _obj( obj ) , _mods( LexNumCmp( true ) ) , _inPlacePossible(true) {
         }
 
         /**
@@ -547,8 +548,15 @@ namespace mongo {
             return _inPlacePossible;
         }
 
+        ModStateRange modsForRoot( const string &root );
+        
+        void createNewObjFromMods( const string &root, BSONObjBuilder &b, const BSONObj &obj );
+        void createNewArrayFromMods( const string &root, BSONArrayBuilder &b,
+                                    const BSONArray &arr );
+
         template< class Builder >
-        void createNewFromMods( const string& root , Builder& b , const BSONObj &obj );
+        void createNewFromMods( const string& root , Builder& b , BSONIteratorSorted& es ,
+                               const ModStateRange& modRange , const LexNumCmp& lexNumCmp );
 
         template< class Builder >
         void _appendNewFromMods( const string& root , ModState& m , Builder& b , set<string>& onedownseen );

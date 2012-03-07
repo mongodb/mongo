@@ -334,7 +334,8 @@ namespace mongo {
         return fe.getGtLtOp();
     }
 
-    FieldCompareResult compareDottedFieldNames( const string& l , const string& r ) {
+    FieldCompareResult compareDottedFieldNames( const string& l , const string& r ,
+                                               const LexNumCmp& cmp ) {
         static int maxLoops = 1024 * 1024;
 
         size_t lstart = 0;
@@ -351,7 +352,7 @@ namespace mongo {
             const string& c = l.substr( lstart , lend - lstart );
             const string& d = r.substr( rstart , rend - rstart );
 
-            int x = LexNumCmp::cmp( c.c_str(), d.c_str() );
+            int x = cmp.cmp( c.c_str(), d.c_str() );
 
             if ( x < 0 )
                 return LEFT_BEFORE;
@@ -1199,21 +1200,26 @@ namespace mongo {
         return !(l.more() || r.more()); // false if lhs and rhs have diff nFields()
     }
 
-    /** Compare two bson elements, provided as const char *'s, by their field names. */
-    class BSONObjIteratorSorted::ElementFieldCmp {
+    /** Compare two bson elements, provided as const char *'s, by field name. */
+    class BSONIteratorSorted::ElementFieldCmp {
     public:
+        ElementFieldCmp( bool isArray );
         bool operator()( const char *s1, const char *s2 ) const;
     private:
         LexNumCmp _cmp;
     };
     
-    bool BSONObjIteratorSorted::ElementFieldCmp::operator()( const char *s1, const char *s2 )
+    BSONIteratorSorted::ElementFieldCmp::ElementFieldCmp( bool isArray ) :
+    _cmp( !isArray ) {
+    }
+
+    bool BSONIteratorSorted::ElementFieldCmp::operator()( const char *s1, const char *s2 )
     const {
-        // Skip type byte and compare field names.
+        // Skip the type byte and compare field names.
         return _cmp( s1 + 1, s2 + 1 );
     }        
     
-    BSONObjIteratorSorted::BSONObjIteratorSorted( const BSONObj& o ) {
+    BSONIteratorSorted::BSONIteratorSorted( const BSONObj &o, const ElementFieldCmp &cmp ) {
         _nfields = o.nFields();
         _fields = new const char*[_nfields];
         int x = 0;
@@ -1223,9 +1229,16 @@ namespace mongo {
             assert( _fields[x-1] );
         }
         assert( x == _nfields );
-        ElementFieldCmp cmp;
         std::sort( _fields , _fields + _nfields , cmp );
         _cur = 0;
+    }
+    
+    BSONObjIteratorSorted::BSONObjIteratorSorted( const BSONObj &object ) :
+    BSONIteratorSorted( object, ElementFieldCmp( false ) ) {
+    }
+
+    BSONArrayIteratorSorted::BSONArrayIteratorSorted( const BSONArray &array ) :
+    BSONIteratorSorted( array, ElementFieldCmp( true ) ) {
     }
 
     bool BSONObjBuilder::appendAsNumber( const StringData& fieldName , const string& data ) {

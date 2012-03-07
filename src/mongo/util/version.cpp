@@ -252,7 +252,7 @@ namespace mongo {
                 return -1;
         }
 
-        return LexNumCmp::cmp(rhs.data(), lhs.data());
+        return LexNumCmp::cmp(rhs.data(), lhs.data(), false);
     }
 
     class VersionCmpTest : public UnitTest {

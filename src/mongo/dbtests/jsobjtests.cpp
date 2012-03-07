@@ -25,6 +25,7 @@
 #include "../db/repl.h"
 #include "../db/extsort.h"
 #include "dbtests.h"
+#include "../util/stringutils.h"
 #include "../util/mongoutils/checksum.h"
 #include "../db/key.h"
 #include "../db/btree.h"
@@ -1686,20 +1687,47 @@ namespace JsobjTests {
     class CompareDottedFieldNamesTest {
     public:
         void t( FieldCompareResult res , const string& l , const string& r ) {
-            ASSERT_EQUALS( res , compareDottedFieldNames( l , r ) );
-            ASSERT_EQUALS( -1 * res , compareDottedFieldNames( r , l ) );
+            LexNumCmp cmp( true );
+            ASSERT_EQUALS( res , compareDottedFieldNames( l , r , cmp ) );
+            ASSERT_EQUALS( -1 * res , compareDottedFieldNames( r , l , cmp ) );
         }
 
         void run() {
             t( SAME , "x" , "x" );
             t( SAME , "x.a" , "x.a" );
+            t( SAME , "x.4" , "x.4" );
             t( LEFT_BEFORE , "a" , "b" );
             t( RIGHT_BEFORE , "b" , "a" );
+            t( LEFT_BEFORE , "x.04" , "x.4" );
 
             t( LEFT_SUBFIELD , "a.x" , "a" );
+            t( LEFT_SUBFIELD , "a.4" , "a" );
         }
     };
 
+    class CompareDottedArrayFieldNamesTest {
+    public:
+        void t( FieldCompareResult res , const string& l , const string& r ) {
+            LexNumCmp cmp( false ); // Specify numeric comparison for array field names.
+            ASSERT_EQUALS( res , compareDottedFieldNames( l , r , cmp ) );
+            ASSERT_EQUALS( -1 * res , compareDottedFieldNames( r , l , cmp ) );
+        }
+        
+        void run() {
+            t( SAME , "0" , "0" );
+            t( SAME , "1" , "1" );
+            t( SAME , "0.1" , "0.1" );
+            t( SAME , "0.a" , "0.a" );
+            t( LEFT_BEFORE , "0" , "1" );
+            t( LEFT_BEFORE , "2" , "10" );
+            t( RIGHT_BEFORE , "1" , "0" );
+            t( RIGHT_BEFORE , "10" , "2" );
+            
+            t( LEFT_SUBFIELD , "5.4" , "5" );
+            t( LEFT_SUBFIELD , "5.x" , "5" );
+        }
+    };
+    
     struct NestedDottedConversions {
         void t(const BSONObj& nest, const BSONObj& dot) {
             ASSERT_EQUALS( nested2dotted(nest), dot);
@@ -1820,8 +1848,33 @@ namespace JsobjTests {
                 //unsigned long long tm = t.micros();
                 //cout << "time: " << tm << endl;
             }
+            
+            BSONObj o2 = BSON( "2" << "a" << "11" << "b" );
+            BSONObjIteratorSorted i2( o2 );
+            // First field in sorted order should be "11" due use of a lexical comparison.
+            ASSERT_EQUALS( "11", string( i2.next().fieldName() ) );
         }
 
+    };
+    
+    class BSONArrayIteratorSorted {
+    public:
+        void run() {
+            BSONArrayBuilder bab;
+            for( int i = 0; i < 11; ++i ) {
+                bab << "a";
+            }
+            BSONArray arr = bab.arr();
+            // The sorted iterator should perform numeric comparisons and return results in the same
+            // order as the unsorted iterator.
+            BSONObjIterator unsorted( arr );
+            mongo::BSONArrayIteratorSorted sorted( arr );
+            while( unsorted.more() ) {
+                ASSERT( sorted.more() );
+                ASSERT_EQUALS( string( unsorted.next().fieldName() ), sorted.next().fieldName() );
+            }
+            ASSERT( !sorted.more() );
+        }
     };
 
     class checkForStorageTests {
@@ -2187,11 +2240,13 @@ namespace JsobjTests {
             add< external_sort::D1 >();
             add< CompatBSON >();
             add< CompareDottedFieldNamesTest >();
+            add< CompareDottedArrayFieldNamesTest >();
             add< NestedDottedConversions >();
             add< BSONArrayBuilderTest >();
             add< ArrayMacroTest >();
             add< NumberParsing >();
             add< bson2settest >();
+            add< BSONArrayIteratorSorted >();
             add< checkForStorageTests >();
             add< InvalidIDFind >();
             add< ElementSetTest >();

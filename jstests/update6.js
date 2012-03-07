@@ -10,7 +10,7 @@ assert.eq( "c,d" , Object.keySet( t.findOne().b ).toString() , "B" );
 
 t.update( { a : 1 } , { $inc : { "b.0e" : 1 } } );
 assert.eq( 1 , t.findOne().b["0e"] , "C" );
-assert.eq( "c,d,0e" , Object.keySet( t.findOne().b ).toString() , "D" );
+assert.eq( "0e,c,d" , Object.keySet( t.findOne().b ).toString() , "D" );
 
 // -----
 
