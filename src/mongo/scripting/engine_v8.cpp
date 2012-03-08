@@ -820,7 +820,7 @@ namespace mongo {
 
         if ( result.IsEmpty() ) {
             stringstream ss;
-            if ( try_catch.HasCaught() ) { //&& !try_catch.CanContinue() ) {
+            if ( try_catch.HasCaught() && !try_catch.CanContinue() ) {
                 ss << "error in invoke: " << globalScriptEngine->checkInterrupt();
             }
             else {
