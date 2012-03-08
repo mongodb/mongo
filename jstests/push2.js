@@ -1,3 +1,11 @@
+print( "Temporary diagnostics for 32-bit Windows pushall.js failures" );
+print( "db.hostInfo()" );
+printjson( db.hostInfo() );
+print( "db.serverStatus()" );
+printjson( db.serverStatus() );
+print( "db.stats()" );
+printjson( db.stats() );
+print( "End of temporary diagnostics for 32-bit Windows pushall.js failures" );
 
 t = db.push2
 t.drop()
