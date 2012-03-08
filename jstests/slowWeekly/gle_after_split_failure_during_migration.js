@@ -5,17 +5,23 @@
  * 
  * TODO: SERVER-5175
  * This test relies on the corresponding delays inside (1) WriteBackListener::run
- * and (2) ShardStrategy::_insert to make the bug easier to manifest.
+ * and (2) ShardStrategy::_insert and (3) receivedInsert from instance.cpp
+ * to make the bug easier to manifest.
  * 
  * The purpose of (1) is to make the writebacks slower so the failed inserts won't
  * be reapplied on time.
  * 
  * The purpose of (2) is to make it easier for the moveChunk command from the other
  * mongos to interleave in between the moment the insert has set its shard version and
- * when in tries to autosplit.
+ * when in tries to autosplit (Note: it should be long enough to allow the moveChunk
+ * to actually complete before it tries to proceed to autosplit).
+ * 
+ * The purpose of (3) is to make sure that the insert won't get applied to the
+ * shard right away so when a different connection is used to do the getLastError,
+ * the write will still not be applied.
  */
 function testGleAfterSplitDuringMigration(){
-    var st = new ShardingTest({ shards: 2, verbose: 5, mongos: 2,
+    var st = new ShardingTest({ shards: 2, verbose: 2, mongos: 2,
                                 other: { chunksize: 1 }});
 
     // Stop the balancer to prevent it from contending with the distributed lock.
@@ -109,19 +115,11 @@ function testGleAfterSplitDuringMigration(){
 
     primeForSplitting();
     
-    jsTest.log( "Starting inserts that should trigger auto-split." );
+    jsTest.log( "Starting the insert that should trigger auto-split." );
 
-    for ( var i = 0; i < 10; i++ ) {
-        coll.insert({ _id: docID++, val: data });
-
-        if ( i % 4 == 0 ) {
-            /* It takes about 3 inserts to trigger auto-split and we want
-             * moveChunk to change the shard version just right before the
-             * insert that will trigger the auto-split wakes up.
-             */
-            moveRandomChunk( 3 );
-        }
-    }
+    // TODO: SERVER-5175 Trigger delays here
+    coll.insert({ _id: docID++, val: data });
+    moveRandomChunk( 3 );
 
     // getLastError should wait for all writes to this connection.
     var errObj = coll.getDB().getLastErrorObj();
