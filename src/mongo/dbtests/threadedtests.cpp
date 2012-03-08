@@ -751,6 +751,80 @@ namespace ThreadedTests {
         }
     };
 
+    // Tests waiting on the TicketHolder by running many more threads than can fit into the "hotel", but only
+    // max _nRooms threads should ever get in at once
+    class TicketHolderWaits : public ThreadedTest<10> {
+
+        static const int checkIns = 1000;
+        static const int rooms = 3;
+
+    public:
+        TicketHolderWaits() : _hotel( rooms ), _tickets( _hotel._nRooms ) {}
+
+    private:
+
+        class Hotel {
+        public:
+            Hotel( int nRooms ) : _frontDesk( "frontDesk" ), _nRooms( nRooms ), _checkedIn( 0 ), _maxRooms( 0 ) {}
+
+            void checkIn(){
+                scoped_lock lk( _frontDesk );
+                _checkedIn++;
+                assert( _checkedIn <= _nRooms );
+                if( _checkedIn > _maxRooms ) _maxRooms = _checkedIn;
+            }
+
+            void checkOut(){
+                scoped_lock lk( _frontDesk );
+                _checkedIn--;
+                assert( _checkedIn >= 0 );
+            }
+
+            mongo::mutex _frontDesk;
+            int _nRooms;
+            int _checkedIn;
+            int _maxRooms;
+        };
+
+        Hotel _hotel;
+        TicketHolder _tickets;
+
+        virtual void subthread(int x) {
+
+            string threadName = ( str::stream() << "ticketHolder" << x );
+            Client::initThread( threadName.c_str() );
+
+            for( int i = 0; i < checkIns; i++ ){
+
+                _tickets.waitForTicket();
+                TicketHolderReleaser whenDone( &_tickets );
+
+                _hotel.checkIn();
+
+                sleepalittle();
+                if( i == checkIns - 1 ) sleepsecs( 2 );
+
+                _hotel.checkOut();
+
+                if( ( i % ( checkIns / 10 ) ) == 0 )
+                    log() << "checked in " << i << " times..." << endl;
+
+            }
+
+            cc().shutdown();
+
+        }
+
+        virtual void validate() {
+
+            // This should always be true, assuming that it takes < 1 sec for the hardware to process a check-out/check-in
+            // Time for test is then ~ #threads / _nRooms * 2 seconds
+            assert( _hotel._maxRooms == _hotel._nRooms );
+
+        }
+
+    };
+
     class All : public Suite {
     public:
         All() : Suite( "threading" ) { }
@@ -779,6 +853,7 @@ namespace ThreadedTests {
             add< RWLockTest4 >();
 
             add< MongoMutexTest >();
+            add< TicketHolderWaits >();
         }
     } myall;
 }

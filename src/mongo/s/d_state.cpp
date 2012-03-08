@@ -193,6 +193,7 @@ namespace mongo {
         
         LOG( 2 ) << "trying to set shard version of " << version.toString() << " for '" << ns << "'" << endl;
         
+        _configServerTickets.waitForTicket();
         TicketHolderReleaser needTicketFrom( &_configServerTickets );
 
         // fast path - double-check if requested version is at the same version as this chunk manager before verifying
@@ -207,14 +208,15 @@ namespace mongo {
         //   + two clients reloaded
         //     one triggered the 'slow path' (below)
         //     when the second's request gets here, the version is already current
+        ConfigVersion storedVersion;
         {
             scoped_lock lk( _mutex );
             ChunkManagersMap::const_iterator it = _chunks.find( ns );
-            if ( it != _chunks.end() && it->second->getVersion() == version )
+            if ( it != _chunks.end() && ( storedVersion = it->second->getVersion() ) == version )
                 return true;
         }
         
-        LOG( 2 ) << "verifying remote version against " << version.toString() << " for '" << ns << "'" << endl;
+        LOG( 2 ) << "verifying cached version " << storedVersion.toString() << " and new version " << version.toString() << " for '" << ns << "'" << endl;
 
         // slow path - requested version is different than the current chunk manager's, if one exists, so must check for
         // newest version in the config server
