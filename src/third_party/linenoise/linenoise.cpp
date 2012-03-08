@@ -511,7 +511,7 @@ static int getScreenColumns( void ) {
     int cols;
 #ifdef _WIN32
     CONSOLE_SCREEN_BUFFER_INFO inf;
-    GetConsoleScreenBufferInfo( console_out, &inf );
+    GetConsoleScreenBufferInfo( GetStdHandle( STD_OUTPUT_HANDLE ), &inf );
     cols = inf.dwSize.X;
 #else
     struct winsize ws;
@@ -525,7 +525,7 @@ static int getScreenRows( void ) {
     int rows;
 #ifdef _WIN32
     CONSOLE_SCREEN_BUFFER_INFO inf;
-    GetConsoleScreenBufferInfo( console_out, &inf );
+    GetConsoleScreenBufferInfo( GetStdHandle( STD_OUTPUT_HANDLE ), &inf );
     rows = 1 + inf.srWindow.Bottom - inf.srWindow.Top;
 #else
     struct winsize ws;
@@ -1266,6 +1266,7 @@ int InputBuffer::completeLine( PromptBase& pi ) {
 
     // we got a second tab, maybe show list of possible completions
     bool showCompletions = true;
+    bool onNewLine = false;
     if ( lc.completionCount > completionCountCutoff ) {
         int savePos = pos;  // move cursor to EOL to avoid overwriting the command line
         pos = len;
@@ -1273,6 +1274,7 @@ int InputBuffer::completeLine( PromptBase& pi ) {
         pos = savePos;
         printf( "\nDisplay all %d possibilities? (y or n)", lc.completionCount );
         fflush( stdout );
+        onNewLine = true;
         while ( c != 'y' && c != 'Y' && c != 'n' && c != 'N' && c != ctrlChar( 'C' ) ) {
             do {
                 c = linenoiseReadChar();
@@ -1309,10 +1311,12 @@ int InputBuffer::completeLine( PromptBase& pi ) {
         if ( columnCount < 1) {
             columnCount = 1;
         }
-        int savePos = pos;  // move cursor to EOL to avoid overwriting the command line
-        pos = len;
-        refreshLine( pi );
-        pos = savePos;
+        if ( ! onNewLine ) {    // skip this if we showed "Display all %d possibilities?"
+            int savePos = pos;  // move cursor to EOL to avoid overwriting the command line
+            pos = len;
+            refreshLine( pi );
+            pos = savePos;
+        }
         int pauseRow = getScreenRows() - 1;
         int rowCount = ( lc.completionCount + columnCount - 1) / columnCount;
         for ( int row = 0; row < rowCount; ++row ) {
