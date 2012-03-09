@@ -95,7 +95,7 @@ class test_priv01(wttest.WiredTigerTestCase):
             configarg += ',' + configextra
         if homeenv == None:
             os.unsetenv('WIREDTIGER_HOME')
-	else:
+        else:
             os.putenv('WIREDTIGER_HOME', homeenv)
         self.conn = wiredtiger.wiredtiger_open(homearg, configarg)
         self.session = self.conn.open_session(None)
