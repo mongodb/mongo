@@ -545,9 +545,7 @@ namespace mongo {
     bool ClientCursor::prepareToYield( YieldData &data ) {
         if ( ! _c->supportYields() )
             return false;
-        if ( ! _c->prepareToYield() ) {
-            return false;   
-        }
+        _c->prepareToYield();
         // need to store in case 'this' gets deleted
         data._id = _cursorid;
 

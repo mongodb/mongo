@@ -231,7 +231,7 @@ namespace QueryOptimizerCursorTests {
 //            return _c->currentMatches() && !_c->getsetdup( _c->currLoc() );
             return ( !_c->matcher() || _c->matcher()->matchesCurrent( _c.get() ) ) && !_c->getsetdup( _c->currLoc() );
         }
-        bool prepareToYield() const { return _c->prepareToYield(); }
+        void prepareToYield() const { _c->prepareToYield(); }
         void recoverFromYield() {
             _c->recoverFromYield();
             if ( ok() && !mayReturnCurrent() ) {
@@ -1072,7 +1072,7 @@ namespace QueryOptimizerCursorTests {
                 Client::Context ctx( ns() );
                 setQueryOptimizerCursor( BSON( "_id" << GT << 0 ) );
                 ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
-                ASSERT( prepareToYield() );
+                prepareToYield();
             }
             
             {
@@ -1083,7 +1083,7 @@ namespace QueryOptimizerCursorTests {
                 ASSERT_EQUALS( 2, current().getIntField( "_id" ) );
                 ASSERT( !advance() );
                 ASSERT( !ok() );
-                ASSERT( prepareToYield() );
+                prepareToYield();
                 recoverFromYield();
             }
         }            
@@ -1100,7 +1100,7 @@ namespace QueryOptimizerCursorTests {
                 Client::Context ctx( ns() );
                 setQueryOptimizerCursor( BSON( "_id" << 1 ) );
                 ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
-                ASSERT( prepareToYield() );
+                prepareToYield();
             }
             
             _cli.remove( ns(), BSON( "_id" << 1 ) );
@@ -1127,7 +1127,7 @@ namespace QueryOptimizerCursorTests {
                 Client::Context ctx( ns() );
                 setQueryOptimizerCursor( BSON( "_id" << GT << 0 ) );
                 ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
-                ASSERT( prepareToYield() );
+                prepareToYield();
             }
             
             _cli.remove( ns(), BSON( "_id" << 1 ) );
@@ -1157,7 +1157,7 @@ namespace QueryOptimizerCursorTests {
                 Client::Context ctx( ns() );
                 setQueryOptimizerCursor( BSON( "_id" << GT << 0 ) );
                 ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
-                ASSERT( prepareToYield() );
+                prepareToYield();
             }
             
             _cli.remove( ns(), BSON( "_id" << 1 ) );
@@ -1189,7 +1189,7 @@ namespace QueryOptimizerCursorTests {
                 Client::Context ctx( ns() );
                 setQueryOptimizerCursor( BSON( "a" << GT << 0 ) );
                 ASSERT_EQUALS( 1, current().getIntField( "a" ) );
-                ASSERT( prepareToYield() );
+                prepareToYield();
             }
             
             _cli.update( ns(), BSON( "a" << 1 ), BSON( "$set" << BSON( "a" << 3 ) ) );
@@ -1218,7 +1218,7 @@ namespace QueryOptimizerCursorTests {
                 Client::Context ctx( ns() );
                 setQueryOptimizerCursor( BSON( "_id" << GT << 0 ) );
                 ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
-                ASSERT( prepareToYield() );
+                prepareToYield();
             }
             
             _cli.dropCollection( ns() );
@@ -1244,7 +1244,7 @@ namespace QueryOptimizerCursorTests {
                 Client::Context ctx( ns() );
                 setQueryOptimizerCursor( BSON( "$or" << BSON_ARRAY( BSON( "_id" << 1 ) << BSON( "_id" << 2 ) ) ) );
                 ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
-                ASSERT( prepareToYield() );
+                prepareToYield();
             }
             
             _cli.dropCollection( ns() );
@@ -1270,7 +1270,7 @@ namespace QueryOptimizerCursorTests {
                 Client::Context ctx( ns() );
                 setQueryOptimizerCursor( BSON( "$or" << BSON_ARRAY( BSON( "_id" << 1 ) << BSON( "_id" << 2 ) ) ) );
                 ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
-                ASSERT( prepareToYield() );
+                prepareToYield();
             }
 
             _cli.remove( ns(), BSON( "_id" << 1 ) );
@@ -1297,7 +1297,7 @@ namespace QueryOptimizerCursorTests {
                 Client::Context ctx( ns() );
                 setQueryOptimizerCursor( BSON( "x" << GT << 0 ) );
                 ASSERT_EQUALS( 1, current().getIntField( "x" ) );
-                ASSERT( prepareToYield() );
+                prepareToYield();
             }
             
             int x = 2;
@@ -1326,7 +1326,7 @@ namespace QueryOptimizerCursorTests {
                 Client::Context ctx( ns() );
                 setQueryOptimizerCursor( BSON( "_id" << 1 ) );
                 ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
-                ASSERT( prepareToYield() );
+                prepareToYield();
             }
             
             _cli.dropIndex( ns(), BSON( "a" << 1 ) );
@@ -1353,7 +1353,7 @@ namespace QueryOptimizerCursorTests {
                 Client::Context ctx( ns() );
                 setQueryOptimizerCursor( BSON( "_id" << GT << 0 << "a" << GT << 0 ) );
                 ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
-                ASSERT( prepareToYield() );
+                prepareToYield();
             }
             
             {
@@ -1384,7 +1384,7 @@ namespace QueryOptimizerCursorTests {
                 ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
                 advance();
                 ASSERT_EQUALS( 2, current().getIntField( "_id" ) );
-                ASSERT( prepareToYield() );
+                prepareToYield();
             }
             
             {
@@ -1416,7 +1416,7 @@ namespace QueryOptimizerCursorTests {
                 ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
                 advance();
                 ASSERT_EQUALS( 2, current().getIntField( "_id" ) );
-                ASSERT( prepareToYield() );
+                prepareToYield();
             }
             
             _cli.remove( ns(), BSON( "_id" << 2 ) );
@@ -1451,7 +1451,7 @@ namespace QueryOptimizerCursorTests {
                 Client::Context ctx( ns() );
                 setQueryOptimizerCursor( BSON( "$or" << BSON_ARRAY( BSON( "_id" << 1 << "a" << 2 ) << BSON( "_id" << 2 << "a" << 1 ) ) ) );
                 ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
-                ASSERT( prepareToYield() );
+                prepareToYield();
             }
 
             _cli.remove( ns(), BSON( "_id" << 1 ) );
@@ -1481,7 +1481,7 @@ namespace QueryOptimizerCursorTests {
                 Client::Context ctx( ns() );
                 setQueryOptimizerCursor( BSON( "$or" << BSON_ARRAY( BSON( "_id" << 1 << "a" << 2 ) << BSON( "_id" << 2 << "a" << 1 ) ) ) );
                 ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
-                ASSERT( prepareToYield() );
+                prepareToYield();
                 c()->advance();
                 ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
             }
@@ -1513,7 +1513,7 @@ namespace QueryOptimizerCursorTests {
                 Client::Context ctx( ns() );
                 setQueryOptimizerCursor( BSON( "_id" << GT << 0 << "a" << GT << 0 ) );
                 ASSERT_EQUALS( 1, current().getIntField( "_id" ) );
-                ASSERT( prepareToYield() );
+                prepareToYield();
             }
             
             int i = 1;
@@ -1554,7 +1554,7 @@ namespace QueryOptimizerCursorTests {
                 c->advance();
                 ASSERT_EQUALS( 1, c->current().getIntField( "a" ) );
                 ASSERT( c->getsetdup( c->currLoc() ) );
-                ASSERT( c->prepareToYield() );
+                c->prepareToYield();
             }
             
             int i = 1;
@@ -1592,7 +1592,7 @@ namespace QueryOptimizerCursorTests {
                 c = newQueryOptimizerCursor( ns(), BSON( "_id" << GT << 0 << "a" << GT << 0 ) );
                 ASSERT_EQUALS( 1, c->current().getIntField( "_id" ) );
                 ASSERT( !c->getsetdup( c->currLoc() ) );
-                ASSERT( c->prepareToYield() );
+                c->prepareToYield();
             }
             
             int n = 1;
@@ -1639,7 +1639,7 @@ namespace QueryOptimizerCursorTests {
                 }
                 ASSERT( ok() );
                 ASSERT_EQUALS( 120, current().getIntField( "_id" ) );
-                ASSERT( prepareToYield() );
+                prepareToYield();
             }
             
             _cli.remove( ns(), BSON( "_id" << 120 ) );
@@ -1712,7 +1712,7 @@ namespace QueryOptimizerCursorTests {
                 ASSERT_EQUALS( 9, current().getIntField( "_id" ) );
                 ASSERT( advance() );
                 ASSERT_EQUALS( 2, current().getIntField( "_id" ) );
-                ASSERT( prepareToYield() );
+                prepareToYield();
             }
             
             _cli.remove( ns(), BSON( "_id" << 9 ) );

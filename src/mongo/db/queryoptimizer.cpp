@@ -760,13 +760,10 @@ doneCheckOrder:
         _plans( plans ) {
     }
 
-    bool QueryPlanSet::Runner::prepareToYield() {
+    void QueryPlanSet::Runner::prepareToYield() {
         for( vector<shared_ptr<QueryOp> >::const_iterator i = _ops.begin(); i != _ops.end(); ++i ) {
-            if ( !prepareToYieldOp( **i ) ) {
-                return false;
-            }
+            prepareToYieldOp( **i );
         }
-        return true;
     }
 
     void QueryPlanSet::Runner::recoverFromYield() {
@@ -786,8 +783,7 @@ doneCheckOrder:
         if ( micros <= 0 ) 
             return;
 
-        if ( !prepareToYield() ) 
-            return;   
+        prepareToYield();
         
         ClientCursor::staticYield( micros , _plans._ns , 0 );
         recoverFromYield();
@@ -898,15 +894,8 @@ doneCheckOrder:
         GUARD_OP_EXCEPTION( op, if ( !op.error() ) { op.next(); } );
     }
 
-    bool QueryPlanSet::Runner::prepareToYieldOp( QueryOp &op ) {
-        GUARD_OP_EXCEPTION( op,
-        if ( op.error() ) {
-            return true;
-        }
-        else {
-            return op.prepareToYield();
-        } );
-        return true;
+    void QueryPlanSet::Runner::prepareToYieldOp( QueryOp &op ) {
+        GUARD_OP_EXCEPTION( op, if ( !op.error() ) { op.prepareToYield(); } );
     }
 
     void QueryPlanSet::Runner::recoverFromYieldOp( QueryOp &op ) {
@@ -1060,8 +1049,10 @@ doneCheckOrder:
         return bestGuess.get();
     }
     
-    bool MultiPlanScanner::prepareToYield() {
-        return _runner ? _runner->prepareToYield() : true;   
+    void MultiPlanScanner::prepareToYield() {
+        if ( _runner ) {
+            _runner->prepareToYield();
+        }
     }
     
     void MultiPlanScanner::recoverFromYield() {
@@ -1182,6 +1173,8 @@ doneCheckOrder:
         if ( _queryPlan ) {
             _matcher = newMatcher;
             _c = _queryPlan->newCursor();
+            // All sub cursors must support yields.
+            verify( 16092, _c->supportYields() );
             if ( _explainPlanInfo ) {
                 _explainPlanInfo.reset( new ExplainPlanInfo() );
                 _explainPlanInfo->notePlan( *_c, _queryPlan->scanAndOrderRequired(),

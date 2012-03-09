@@ -184,9 +184,9 @@ namespace mongo {
          */
         virtual long long nscanned() = 0;
         /** Take any steps necessary before the db mutex is yielded. */
-        virtual bool prepareToYield() { massert( 13335, "yield not supported", false ); return false; }
+        virtual void prepareToYield() = 0;
         /** Recover once the db mutex is regained. */
-        virtual void recoverFromYield() { massert( 13336, "yield not supported", false ); }
+        virtual void recoverFromYield() = 0;
         
         /**
          * @return true iff the QueryPlan for this QueryOp may be registered
@@ -364,7 +364,7 @@ namespace mongo {
             /** @return next non error op if there is one, otherwise an error op. */
             shared_ptr<QueryOp> nextNonError();
             
-            bool prepareToYield();
+            void prepareToYield();
             void recoverFromYield();
             
             void mayYield();
@@ -372,7 +372,7 @@ namespace mongo {
             QueryPlanSet &_plans;
             static void initOp( QueryOp &op );
             static void nextOp( QueryOp &op );
-            static bool prepareToYieldOp( QueryOp &op );
+            static void prepareToYieldOp( QueryOp &op );
             static void recoverFromYieldOp( QueryOp &op );
             
             /** @return an ExplainClauseInfo object that will be updated as the query runs. */
@@ -461,7 +461,7 @@ namespace mongo {
         
         /** Yield the runner member. */
         
-        bool prepareToYield();
+        void prepareToYield();
         void recoverFromYield();
         
         /** Clear the runner member. */
@@ -568,7 +568,7 @@ namespace mongo {
         virtual void checkLocation() { _c->checkLocation(); }
         virtual void recoverFromYield();
         virtual bool supportGetMore() { return true; }
-        virtual bool supportYields() { return _c->supportYields(); }
+        virtual bool supportYields() { return true; }
         virtual BSONObj indexKeyPattern() { return _c->indexKeyPattern(); }
 
         /** Deduping documents from a prior cursor is handled by the matcher. */
