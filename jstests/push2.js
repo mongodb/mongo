@@ -1,3 +1,4 @@
+
 t = db.push2
 t.drop()
 
@@ -5,7 +6,7 @@ t.save( { _id : 1 , a : [] } )
 
 var inc = "asdasdasdasdasdasdasasdasdasdasdasdasdasasdasdasdasdasdasdasasdasdasdasdasdasdasasdasdasdasdasdasdas";
 var s = inc;
-while ( s.length < 100000 )
+while ( s.length < 500000 )
     s += s;
 
 gotError = null;
