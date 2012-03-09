@@ -27,8 +27,8 @@
 #
 # test_schema03.py
 # 	Bigger, more 'randomly generated' schemas and data.
-#       This test is complex.  If it fails, rerun with
-#       modified values for SHOW_PYTHON* variables.
+#	This test is complex.  If it fails, rerun with
+#	modified values for SHOW_PYTHON* variables.
 #
 
 import resource
