@@ -2246,6 +2246,123 @@ namespace QueryOptimizerCursorTests {
             }
         };
         
+        /**
+         * Test that a ClientCursor properly recovers a QueryOptimizerCursor after a btree
+         * modification in preparation for a pre delete advance.
+         */
+        class AboutToDeleteRecoverFromYield : public Base {
+        public:
+            void run() {
+                // Create a sparse index, so we can easily remove entries from it with an update.
+                _cli.insert( Namespace( ns() ).getSisterNS( "system.indexes" ).c_str(),
+                            BSON( "ns" << ns() << "key" << BSON( "a" << 1 ) << "name" << "idx" <<
+                                 "sparse" << true ) );
+
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                for( int i = 0; i < 150; ++i ) {
+                    _cli.insert( ns(), BSON( "a" << i << "b" << 0 ) );
+                }
+                dblock lk;
+                Client::Context ctx( ns() );
+                ClientCursor::CleanupPointer p;
+                p.reset
+                ( new ClientCursor
+                 ( QueryOption_NoCursorTimeout,
+                  NamespaceDetailsTransient::getCursor
+                  ( ns(), BSON( "a" << GTE << 0 << "b" << 0 ) ),
+                  ns() ) );
+                
+                // Iterate until after MultiCursor takes over.
+                int readTo = 110;
+                while( p->current()[ "a" ].number() < readTo ) {
+                    p->advance();
+                }
+                
+                // Check that the btree plan was picked.
+                ASSERT_EQUALS( BSON( "a" << 1 ), p->indexKeyPattern() );
+                
+                // Yield the cursor.
+                ClientCursor::YieldData yieldData;
+                ASSERT( p->prepareToYield( yieldData ) );
+                
+                // Remove keys from the a:1 index, invalidating the cursor's position.
+                _cli.update( ns(), BSON( "a" << LT << 100 ), BSON( "$unset" << BSON( "a" << 1 ) ),
+                            false, true );
+                
+                // Delete the cursor's current document.  If the cursor's position is recovered
+                // improperly in preparation for deleting the document, this will cause an
+                // assertion.
+                _cli.remove( ns(), BSON( "a" << readTo ) );
+                
+                // Check that the document was deleted.
+                ASSERT_EQUALS( BSONObj(), _cli.findOne( ns(), BSON( "a" << readTo ) ) );
+                
+                // Recover the cursor.
+                ASSERT( p->recoverFromYield( yieldData ) );
+                
+                // Check that the remaining documents are iterated as expected.
+                for( int i = 111; i < 150; ++i ) {
+                    ASSERT_EQUALS( i, p->current()[ "a" ].number() );
+                    p->advance();
+                }
+                ASSERT( !p->ok() );
+            }
+        };
+
+        /**
+         * Test that a ClientCursor properly prepares a QueryOptimizerCursor to yield after a pre
+         * delete advance.
+         */
+        class AboutToDeletePrepareToYield : public Base {
+        public:
+            void run() {
+                // Create two indexes for serial $or clause traversal.
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
+                for( int i = 0; i < 110; ++i ) {
+                    _cli.insert( ns(), BSON( "a" << i ) );
+                }
+                _cli.insert( ns(), BSON( "b" << 1 ) );
+                dblock lk;
+                Client::Context ctx( ns() );
+                ClientCursor::CleanupPointer p;
+                p.reset
+                ( new ClientCursor
+                 ( QueryOption_NoCursorTimeout,
+                  NamespaceDetailsTransient::getCursor
+                  ( ns(), OR( BSON( "a" << GTE << 0 ), BSON( "b" << 1 ) ) ),
+                  ns() ) );
+                
+                // Iterate until after MultiCursor takes over.
+                int readTo = 109;
+                while( p->current()[ "a" ].number() < readTo ) {
+                    p->advance();
+                }
+                
+                // Check the key pattern.
+                ASSERT_EQUALS( BSON( "a" << 1 ), p->indexKeyPattern() );
+                
+                // Yield the cursor.
+                ClientCursor::YieldData yieldData;
+                ASSERT( p->prepareToYield( yieldData ) );
+                
+                // Delete the cursor's current document.  The cursor should advance to the b:1
+                // index.
+                _cli.remove( ns(), BSON( "a" << readTo ) );
+                
+                // Check that the document was deleted.
+                ASSERT_EQUALS( BSONObj(), _cli.findOne( ns(), BSON( "a" << readTo ) ) );
+
+                // Recover the cursor.  If the cursor was not properly prepared for yielding
+                // after the pre deletion advance, this will assert.
+                ASSERT( p->recoverFromYield( yieldData ) );
+                
+                // Check that the remaining documents are as expected.
+                ASSERT_EQUALS( 1, p->current()[ "b" ].number() );
+                ASSERT( !p->advance() );
+            }
+        };
+
     } // namespace ClientCursor
         
     class AllowOutOfOrderPlan : public Base {
@@ -4051,6 +4168,8 @@ namespace QueryOptimizerCursorTests {
             add<TakeoverCappedWrapYieldRecoveryFailure>();
             add<ClientCursor::Invalidate>();
             add<ClientCursor::Timeout>();
+            add<ClientCursor::AboutToDeleteRecoverFromYield>();
+            add<ClientCursor::AboutToDeletePrepareToYield>();
             add<AllowOutOfOrderPlan>();
             add<NoTakeoverByOutOfOrderPlan>();
             add<OutOfOrderOnlyTakeover>();
