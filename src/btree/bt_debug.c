@@ -444,8 +444,6 @@ __debug_page_hdr(WT_DBG *ds, WT_PAGE *page)
 	__dmsg(ds, " (%s", __wt_page_is_modified(page) ? "dirty" : "clean");
 	if (F_ISSET(page, WT_PAGE_BUILD_KEYS))
 		__dmsg(ds, ", keys-built");
-	if (F_ISSET(page, WT_PAGE_PINNED))
-		__dmsg(ds, ", pinned");
 	if (F_ISSET(page, WT_PAGE_REC_EMPTY))
 		__dmsg(ds, ", empty");
 	if (F_ISSET(page, WT_PAGE_REC_REPLACE))

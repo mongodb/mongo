@@ -7,11 +7,11 @@
 
 #include "wt_internal.h"
 
-static int  __inmem_col_fix(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __inmem_col_int(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __inmem_col_var(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __inmem_row_int(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __inmem_row_leaf(WT_SESSION_IMPL *, WT_PAGE *);
+static int  __inmem_col_fix(WT_SESSION_IMPL *, WT_PAGE *, size_t *);
+static int  __inmem_col_int(WT_SESSION_IMPL *, WT_PAGE *, size_t *);
+static int  __inmem_col_var(WT_SESSION_IMPL *, WT_PAGE *, size_t *);
+static int  __inmem_row_int(WT_SESSION_IMPL *, WT_PAGE *, size_t *);
+static int  __inmem_row_leaf(WT_SESSION_IMPL *, WT_PAGE *, size_t *);
 
 /*
  * __wt_page_in --
@@ -57,12 +57,12 @@ __wt_page_in_func(
 			 * can't get a hazard reference is because the page is
 			 * being evicted; yield and try again.
 			 */
-			if (F_ISSET(ref->page, WT_PAGE_PINNED) ||
-			    __wt_hazard_set(session, ref
+			if (__wt_hazard_set(session, ref
 #ifdef HAVE_DIAGNOSTIC
 			    , file, line
 #endif
 			    ) == 0) {
+				WT_ASSERT(session, !WT_PAGE_IS_ROOT(ref->page));
 				ref->page->read_gen =
 				    __wt_cache_read_gen(session);
 				return (0);
@@ -88,7 +88,8 @@ __wt_page_in_func(
  */
 int
 __wt_page_inmem(WT_SESSION_IMPL *session,
-    WT_PAGE *parent, WT_REF *parent_ref, WT_PAGE_HEADER *dsk, WT_PAGE **pagep)
+    WT_PAGE *parent, WT_REF *parent_ref, WT_PAGE_HEADER *dsk,
+    size_t *inmem_sizep, WT_PAGE **pagep)
 {
 	WT_PAGE *page;
 	int ret;
@@ -102,6 +103,8 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 	 * Set the LRU so the page is not immediately selected for eviction.
 	 */
 	WT_RET(__wt_calloc_def(session, 1, &page));
+	if (inmem_sizep != NULL)
+		*inmem_sizep = sizeof(*page) + dsk->size;
 	page->type = dsk->type;
 	page->parent = parent;
 	page->ref = parent_ref;
@@ -115,21 +118,21 @@ __wt_page_inmem(WT_SESSION_IMPL *session,
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
 		page->u.col_fix.recno = dsk->recno;
-		WT_ERR(__inmem_col_fix(session, page));
+		WT_ERR(__inmem_col_fix(session, page, inmem_sizep));
 		break;
 	case WT_PAGE_COL_INT:
 		page->u.intl.recno = dsk->recno;
-		WT_ERR(__inmem_col_int(session, page));
+		WT_ERR(__inmem_col_int(session, page, inmem_sizep));
 		break;
 	case WT_PAGE_COL_VAR:
 		page->u.col_var.recno = dsk->recno;
-		WT_ERR(__inmem_col_var(session, page));
+		WT_ERR(__inmem_col_var(session, page, inmem_sizep));
 		break;
 	case WT_PAGE_ROW_INT:
-		WT_ERR(__inmem_row_int(session, page));
+		WT_ERR(__inmem_row_int(session, page, inmem_sizep));
 		break;
 	case WT_PAGE_ROW_LEAF:
-		WT_ERR(__inmem_row_leaf(session, page));
+		WT_ERR(__inmem_row_leaf(session, page, inmem_sizep));
 		break;
 	WT_ILLEGAL_VALUE(session);
 	}
@@ -148,8 +151,20 @@ err:	__wt_free(session, page);
 int
 __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	if (page->modify == NULL)
-		WT_RET(__wt_calloc_def(session, 1, &page->modify));
+	WT_PAGE_MODIFY *modify;
+
+	if (page->modify == NULL) {
+		WT_RET(__wt_calloc_def(session, 1, &modify));
+
+		/*
+		 * Multiple threads of control may be searching and deciding
+		 * to modify a page, if we don't do the update, discard the
+		 * memory.
+		 */
+		if (!WT_ATOMIC_CAS(page->modify, NULL, modify))
+			__wt_free(session, modify);
+	}
+
 	return (0);
 }
 
@@ -158,10 +173,12 @@ __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Build in-memory index for fixed-length column-store leaf pages.
  */
 static int
-__inmem_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
+__inmem_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 {
 	WT_BTREE *btree;
 	WT_PAGE_HEADER *dsk;
+
+	WT_UNUSED(inmem_sizep);
 
 	btree = session->btree;
 	dsk = page->dsk;
@@ -176,7 +193,7 @@ __inmem_col_fix(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Build in-memory index for column-store internal pages.
  */
 static int
-__inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
+__inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
@@ -195,6 +212,8 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	WT_RET(__wt_calloc_def(
 	    session, (size_t)dsk->u.entries, &page->u.intl.t));
+	if (inmem_sizep != NULL)
+		*inmem_sizep += dsk->u.entries * sizeof(*page->u.intl.t);
 
 	/*
 	 * Walk the page, building references: the page contains value items.
@@ -218,7 +237,7 @@ __inmem_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	column-store trees.
  */
 static int
-__inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
+__inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 {
 	WT_BTREE *btree;
 	WT_COL *cip;
@@ -243,6 +262,8 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	WT_RET(__wt_calloc_def(
 	    session, (size_t)dsk->u.entries, &page->u.col_var.d));
+	if (inmem_sizep != NULL)
+		*inmem_sizep += dsk->u.entries * sizeof(*page->u.col_var.d);
 
 	/*
 	 * Walk the page, building references: the page contains unsorted value
@@ -279,6 +300,8 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
 	page->u.col_var.repeats = repeats;
 	page->u.col_var.nrepeats = nrepeats;
 	page->entries = dsk->u.entries;
+	if (inmem_sizep != NULL)
+		*inmem_sizep += bytes_allocated;
 	return (0);
 }
 
@@ -287,7 +310,7 @@ __inmem_col_var(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Build in-memory index for row-store internal pages.
  */
 static int
-__inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
+__inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 {
 	WT_BTREE *btree;
 	WT_ITEM *current, *last, *tmp;
@@ -316,6 +339,8 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	nindx = dsk->u.entries / 2;
 	WT_RET((__wt_calloc_def(session, (size_t)nindx, &page->u.intl.t)));
+	if (inmem_sizep != NULL)
+		*inmem_sizep += nindx * sizeof(*page->u.intl.t);
 
 	/*
 	 * Set the number of elements now -- we're about to allocate memory,
@@ -391,6 +416,8 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		WT_ERR(__wt_row_ikey_alloc(session,
 		    WT_PAGE_DISK_OFFSET(page, cell),
 		    current->data, current->size, (WT_IKEY **)&ref->u.key));
+		if (inmem_sizep != NULL)
+			*inmem_sizep += sizeof(WT_IKEY) + current->size;
 
 		/*
 		 * Swap buffers if it's not an overflow key, we have a new
@@ -413,7 +440,7 @@ err:	__wt_scr_free(&current);
  *	Build in-memory index for row-store leaf pages.
  */
 static int
-__inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
+__inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 {
 	WT_BTREE *btree;
 	WT_CELL *cell;
@@ -433,6 +460,8 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	WT_RET((__wt_calloc_def(
 	    session, (size_t)dsk->u.entries * 2, &page->u.row.d)));
+	if (inmem_sizep != NULL)
+		*inmem_sizep += 2 * dsk->u.entries * sizeof(*page->u.row.d);
 
 	/*
 	 * Walk a row-store page of WT_CELLs, building indices and finding the
