@@ -2188,60 +2188,66 @@ namespace QueryOptimizerCursorTests {
         }
     };
 
-    /** Test that a ClientCursor holding a QueryOptimizerCursor may be safely invalidated. */
-    class InvalidateClientCursorHolder : public Base {
-    public:
-        void run() {
-            _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
-            _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
-            _cli.insert( ns(), BSON( "a" << 1 << "b" << 1 ) );
-            dblock lk;
-            Client::Context ctx( ns() );
-            ClientCursor::CleanupPointer p;
-            p.reset
-            ( new ClientCursor
-             ( QueryOption_NoCursorTimeout,
-              NamespaceDetailsTransient::getCursor
-              ( ns(), BSON( "a" << GTE << 0 << "b" << GTE << 0 ) ),
-              ns() ) );
+    namespace ClientCursor {
+        
+        using mongo::ClientCursor;
+        
+        /** Test that a ClientCursor holding a QueryOptimizerCursor may be safely invalidated. */
+        class Invalidate : public Base {
+        public:
+            void run() {
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
+                _cli.insert( ns(), BSON( "a" << 1 << "b" << 1 ) );
+                dblock lk;
+                Client::Context ctx( ns() );
+                ClientCursor::CleanupPointer p;
+                p.reset
+                ( new ClientCursor
+                 ( QueryOption_NoCursorTimeout,
+                  NamespaceDetailsTransient::getCursor
+                  ( ns(), BSON( "a" << GTE << 0 << "b" << GTE << 0 ) ),
+                  ns() ) );
 
-            // Construct component client cursors.
-            ClientCursor::YieldData yieldData;
-            p->prepareToYield( yieldData );
-            ASSERT( nNsCursors() > 1 );
+                // Construct component client cursors.
+                ClientCursor::YieldData yieldData;
+                p->prepareToYield( yieldData );
+                ASSERT( nNsCursors() > 1 );
 
-            ClientCursor::invalidate( ns() );
-            ASSERT_EQUALS( 0U, nNsCursors() );
-        }
-    };
-    
-    /** Test that a ClientCursor holding a QueryOptimizerCursor may be safely timed out. */
-    class TimeoutClientCursorHolder : public Base {
-    public:
-        void run() {
-            _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
-            _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
-            _cli.insert( ns(), BSON( "a" << 1 << "b" << 1 ) );
-            dblock lk;
-            Client::Context ctx( ns() );
-            ClientCursor::CleanupPointer p;
-            p.reset
-            ( new ClientCursor
-             ( 0,
-              NamespaceDetailsTransient::getCursor
-              ( ns(), BSON( "a" << GTE << 0 << "b" << GTE << 0 ) ),
-              ns() ) );
-            
-            // Construct component client cursors.
-            ClientCursor::YieldData yieldData;
-            p->prepareToYield( yieldData );
-            ASSERT( nNsCursors() > 1 );
-            
-            ClientCursor::idleTimeReport( 600001 );
-            ASSERT_EQUALS( 0U, nNsCursors() );
-        }
-    };
-    
+                ClientCursor::invalidate( ns() );
+                ASSERT_EQUALS( 0U, nNsCursors() );
+            }
+        };
+        
+        /** Test that a ClientCursor holding a QueryOptimizerCursor may be safely timed out. */
+        class Timeout : public Base {
+        public:
+            void run() {
+                _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+                _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
+                _cli.insert( ns(), BSON( "a" << 1 << "b" << 1 ) );
+                dblock lk;
+                Client::Context ctx( ns() );
+                ClientCursor::CleanupPointer p;
+                p.reset
+                ( new ClientCursor
+                 ( 0,
+                  NamespaceDetailsTransient::getCursor
+                  ( ns(), BSON( "a" << GTE << 0 << "b" << GTE << 0 ) ),
+                  ns() ) );
+                
+                // Construct component client cursors.
+                ClientCursor::YieldData yieldData;
+                p->prepareToYield( yieldData );
+                ASSERT( nNsCursors() > 1 );
+                
+                ClientCursor::idleTimeReport( 600001 );
+                ASSERT_EQUALS( 0U, nNsCursors() );
+            }
+        };
+        
+    } // namespace ClientCursor
+        
     class AllowOutOfOrderPlan : public Base {
     public:
         void run() {
@@ -4043,8 +4049,8 @@ namespace QueryOptimizerCursorTests {
             add<TouchEarlierIterateTakeoverDeleteMultipleMultiAdvance>();
             add<InitialCappedWrapYieldRecoveryFailure>();
             add<TakeoverCappedWrapYieldRecoveryFailure>();
-            add<InvalidateClientCursorHolder>();
-            add<TimeoutClientCursorHolder>();
+            add<ClientCursor::Invalidate>();
+            add<ClientCursor::Timeout>();
             add<AllowOutOfOrderPlan>();
             add<NoTakeoverByOutOfOrderPlan>();
             add<OutOfOrderOnlyTakeover>();
