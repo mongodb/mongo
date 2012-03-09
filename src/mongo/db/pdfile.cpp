@@ -1504,7 +1504,6 @@ namespace mongo {
                 shared_ptr<Cursor> c = theDataFileMgr.findAll(ns);
                 cc.reset( new ClientCursor(QueryOption_NoCursorTimeout, c, ns) );
             }
-            CursorId id = cc->cursorid();
 
             while ( cc->ok() ) {
                 BSONObj js = cc->current();
@@ -1528,9 +1527,10 @@ namespace mongo {
                     if ( dropDups ) {
                         DiskLoc toDelete = cc->currLoc();
                         bool ok = cc->advance();
-                        cc->updateLocation();
+                        ClientCursor::YieldData yieldData;
+                        cc->prepareToYield( yieldData );
                         theDataFileMgr.deleteRecord( ns, toDelete.rec(), toDelete, false, true , true );
-                        if( ClientCursor::find(id, false) == 0 ) {
+                        if( !cc->recoverFromYield( yieldData ) ) {
                             cc.release();
                             if( !ok ) {
                                 /* we were already at the end. normal. */
