@@ -2,7 +2,7 @@
 //
 
 /**
- *    Copyright (C) 2008 10gen Inc.
+ *    Copyright (C) 2012 10gen Inc.
  *
  *    This program is free software: you can redistribute it and/or  modify
  *    it under the terms of the GNU Affero General Public License, version 3,
@@ -45,7 +45,7 @@ namespace RemoveTests {
                 Helpers::removeRange( ns, BSON( "_id" << _min ), BSON( "_id" << _max ) );
             }
 
-            // Check that the expected documents were removed.
+            // Check that the expected documents remain.
             ASSERT_EQUALS( expected(), docs() );
         }
     private:
