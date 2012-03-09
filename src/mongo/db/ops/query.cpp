@@ -191,7 +191,7 @@ namespace mongo {
                     assert( cc->prepareToYield( data ) );
                 }
                 else {
-                    cc->updateLocation();
+                    cc->c()->noteLocation();
                 }
                 cc->mayUpgradeStorage();
                 cc->storeOpForSlave( last );
@@ -717,7 +717,7 @@ namespace mongo {
                 ccPointer->prepareToYield( data );
             }
             else {
-                ccPointer->updateLocation();
+                ccPointer->c()->noteLocation();
             }
             
             // !!! Save the original message buffer, so it can be referenced in getMore.
