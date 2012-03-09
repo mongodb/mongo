@@ -49,7 +49,8 @@ class test_util04(wttest.WiredTigerTestCase, suite_subprocess):
 
         self.assertFalse(os.path.exists(self.tablename + ".wt"))
         self.assertRaises(wiredtiger.WiredTigerError,
-			lambda: self.session.open_cursor('table:' + self.tablename, None, None))
+                          lambda: self.session.open_cursor(
+                              'table:' + self.tablename, None, None))
 
 
 if __name__ == '__main__':

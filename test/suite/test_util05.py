@@ -141,7 +141,8 @@ class test_util05(wttest.WiredTigerTestCase, suite_subprocess):
         self.conn = self.setUpConnectionOpen(".")
         self.session = self.setUpSessionOpen(self.conn)
         self.assertRaises(wiredtiger.WiredTigerError,
-			lambda: self.session.verify('table:' + self.tablename, None))
+                          lambda: self.session.verify(
+                              'table:' + self.tablename, None))
 
     def test_verify_process_75pct_null(self):
         """
