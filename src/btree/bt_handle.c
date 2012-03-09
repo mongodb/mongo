@@ -252,7 +252,7 @@ __wt_btree_root_init(WT_SESSION_IMPL *session, WT_ITEM *addr)
 	WT_RET(__wt_bm_read(session, &tmp, addr->data, addr->size));
 
 	/* Build the in-memory version of the page. */
-	WT_ERR(__wt_page_inmem(session, NULL, NULL, tmp.mem, &page));
+	WT_ERR(__wt_page_inmem(session, NULL, NULL, tmp.mem, NULL, &page));
 
 	/* This page can never leave memory. */
 	F_SET(page, WT_PAGE_PINNED);
