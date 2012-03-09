@@ -277,7 +277,7 @@ __wt_buf_catfmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
 int
 __wt_scr_alloc(WT_SESSION_IMPL *session, uint32_t size, WT_ITEM **scratchp)
 {
-	WT_ITEM *buf, **p, *small, **slot;
+	WT_ITEM *buf, **p, *best, **slot;
 	size_t allocated;
 	u_int i;
 	int ret;
@@ -294,7 +294,7 @@ __wt_scr_alloc(WT_SESSION_IMPL *session, uint32_t size, WT_ITEM **scratchp)
 	 *
 	 * Walk the array, looking for a buffer we can use.
 	 */
-	for (i = 0, small = NULL, slot = NULL,
+	for (i = 0, best = NULL, slot = NULL,
 	    p = session->scratch; i < session->scratch_alloc; ++i, ++p) {
 		/* If we find an empty slot, remember it. */
 		if ((buf = *p) == NULL) {
@@ -307,61 +307,53 @@ __wt_scr_alloc(WT_SESSION_IMPL *session, uint32_t size, WT_ITEM **scratchp)
 			continue;
 
 		/*
-		 * If we find a buffer that's not in-use, check its size: if it
-		 * is large enough, and we'd only waste 4KB by taking it, take
-		 * it.  If we don't want this one, remember it -- if we have two
-		 * buffers we can "remember", then remember the smallest one.
+		 * If we find a buffer that's not in-use, check its size: we
+		 * want the the smallest buffer larger than the requested size,
+		 * or the largest buffer if none are large enough.
 		 */
-		if (buf->memsize >= size &&
-		    (buf->memsize - size) < 4 * 1024) {
-			WT_ERR(__wt_buf_init(session, buf, size));
-			F_SET(buf, WT_ITEM_INUSE);
-			*scratchp = buf;
-			return (0);
-		}
-		if (small == NULL)
-			small = buf;
-		else if (small->memsize > buf->memsize)
-			small = buf;
+		if (best == NULL ||
+		    (best->memsize < size && buf->memsize > best->memsize) ||
+		    (buf->memsize >= size && buf->memsize < best->memsize))
+			best = buf;
+		/* If we find a perfect match, use it. */
+		if (best->memsize == size)
+			break;
 	}
 
 	/*
-	 * If small is non-NULL, we found a buffer but it wasn't large enough.
-	 * Try and grow it.
+	 * If we didn't find a free buffer, extend the array and use the first
+	 * slot we allocated.
 	 */
-	if (small != NULL) {
-		WT_ERR(__wt_buf_init(session, small, size));
-		F_SET(small, WT_ITEM_INUSE);
-
-		*scratchp = small;
-		return (0);
+	if (best == NULL && slot == NULL) {
+		allocated = session->scratch_alloc * sizeof(WT_ITEM *);
+		WT_ERR(__wt_realloc(session, &allocated,
+		    (session->scratch_alloc + 10) * sizeof(WT_ITEM *),
+		    &session->scratch));
+		slot = session->scratch + session->scratch_alloc;
+		session->scratch_alloc += 10;
 	}
 
 	/*
 	 * If slot is non-NULL, we found an empty slot, try and allocate a
-	 * buffer and call recursively to find and grow the buffer.
+	 * buffer.
 	 */
-	if (slot != NULL) {
+	if (best == NULL) {
+		WT_ASSERT(session, slot != NULL);
 		WT_ERR(__wt_calloc_def(session, 1, slot));
+		best = *slot;
 
 		/* Scratch buffers must be aligned. */
-		F_SET(*slot, WT_ITEM_ALIGNED);
-		return (__wt_scr_alloc(session, size, scratchp));
+		F_SET(best, WT_ITEM_ALIGNED);
 	}
 
-	/*
-	 * Resize the array, we need more scratch buffers, then call recursively
-	 * to find the empty slot, and so on and so forth.
-	 */
-	allocated = session->scratch_alloc * sizeof(WT_ITEM *);
-	WT_ERR(__wt_realloc(session, &allocated,
-	    (session->scratch_alloc + 10) * sizeof(WT_ITEM *),
-	    &session->scratch));
-	session->scratch_alloc += 10;
-	return (__wt_scr_alloc(session, size, scratchp));
+	/* Grow the buffer as necessary and return. */
+	WT_ERR(__wt_buf_init(session, best, size));
+	F_SET(best, WT_ITEM_INUSE);
+	*scratchp = best;
+	return (0);
 
 err:	WT_RET_MSG(session, ret,
-	    "session unable to allocate more scratch buffers");
+	    "session unable to allocate a scratch buffer");
 }
 
 /*
