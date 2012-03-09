@@ -315,6 +315,13 @@ namespace mongo {
             }
             return it->second;
         }
+        
+        /* call when cursor's location changes so that we can update the
+         cursorsbylocation map.  if you are locked and internally iterating, only
+         need to call when you are ready to "unlock".
+         */
+        void updateLocation();
+
     public:
         static ClientCursor* find(CursorId id, bool warn = true) {
             recursive_scoped_lock lock(ccmutex);
@@ -335,12 +342,6 @@ namespace mongo {
          * @return number of cursors found
          */
         static int erase( int n , long long * ids );
-
-        /* call when cursor's location changes so that we can update the
-           cursorsbylocation map.  if you are locked and internally iterating, only
-           need to call when you are ready to "unlock".
-           */
-        void updateLocation();
 
         void mayUpgradeStorage() {
             /* if ( !ids_.get() )
