@@ -151,8 +151,20 @@ err:	__wt_free(session, page);
 int
 __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	if (page->modify == NULL)
-		WT_RET(__wt_calloc_def(session, 1, &page->modify));
+	WT_PAGE_MODIFY *modify;
+
+	if (page->modify == NULL) {
+		WT_RET(__wt_calloc_def(session, 1, &modify));
+
+		/*
+		 * Multiple threads of control may be searching and deciding
+		 * to modify a page, if we don't do the update, discard the
+		 * memory.
+		 */
+		if (!WT_ATOMIC_CAS(page->modify, NULL, modify))
+			__wt_free(session, modify);
+	}
+
 	return (0);
 }
 
