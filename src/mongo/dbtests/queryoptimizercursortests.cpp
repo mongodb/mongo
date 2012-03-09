@@ -2009,6 +2009,45 @@ namespace QueryOptimizerCursorTests {
             }
         };
 
+        /* Test 'touch earlier iterate' after an earlier yield. */
+        class DeleteAfterYield : public Base {
+        public:
+            void run() {
+                for( int i = 0; i < 3; ++i ) {
+                    _cli.insert( ns(), BSON( "b" << i ) );                    
+                }
+                
+                dblock lk;
+                Client::Context ctx( ns() );
+                setQueryOptimizerCursor( BSONObj() );
+                ASSERT( ok() );
+                ASSERT_EQUALS( 0, c()->current()[ "b" ].Int() );
+
+                // Record the position of document b:0 in the cursor's component ClientCursor.
+                c()->prepareToYield();
+                c()->recoverFromYield();
+                ASSERT( ok() );
+
+                // Advance the cursor past document b:0.
+                ASSERT( c()->advance() );
+                ASSERT_EQUALS( 1, current()[ "b" ].Int() );
+
+                // Remove document b:0.
+                c()->prepareToTouchEarlierIterate();
+                // A warning message will be logged for the component ClientCursor if it is not
+                // configured with 'doing deletes'.
+                _cli.remove( ns(), BSON( "b" << 0 ), true );
+                c()->recoverFromTouchingEarlierIterate();
+                
+                // Check that the cursor recovers properly after b:0 is deleted.
+                ASSERT( ok() );
+                ASSERT_EQUALS( 1, current()[ "b" ].Int() );
+                ASSERT( c()->advance() );
+                ASSERT_EQUALS( 2, current()[ "b" ].Int() );
+                ASSERT( !c()->advance() );
+            }
+        };
+        
         /* Test 'touch earlier iterate' with takeover. */
         class Takeover : public Base {
         public:
@@ -4179,6 +4218,7 @@ namespace QueryOptimizerCursorTests {
             add<TouchEarlierIterate::Basic>();
             add<TouchEarlierIterate::Delete>();
             add<TouchEarlierIterate::DeleteMultiple>();
+            add<TouchEarlierIterate::DeleteAfterYield>();
             add<TouchEarlierIterate::Takeover>();
             add<TouchEarlierIterate::TakeoverDeleteMultiple>();
             add<TouchEarlierIterate::UnindexedTakeoverDeleteMultiple>();
