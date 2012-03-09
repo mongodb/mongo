@@ -57,12 +57,12 @@ __wt_page_in_func(
 			 * can't get a hazard reference is because the page is
 			 * being evicted; yield and try again.
 			 */
-			if (F_ISSET(ref->page, WT_PAGE_PINNED) ||
-			    __wt_hazard_set(session, ref
+			if (__wt_hazard_set(session, ref
 #ifdef HAVE_DIAGNOSTIC
 			    , file, line
 #endif
 			    ) == 0) {
+				WT_ASSERT(session, !WT_PAGE_IS_ROOT(ref->page));
 				ref->page->read_gen =
 				    __wt_cache_read_gen(session);
 				return (0);

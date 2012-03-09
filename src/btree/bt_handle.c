@@ -254,9 +254,6 @@ __wt_btree_root_init(WT_SESSION_IMPL *session, WT_ITEM *addr)
 	/* Build the in-memory version of the page. */
 	WT_ERR(__wt_page_inmem(session, NULL, NULL, tmp.mem, NULL, &page));
 
-	/* This page can never leave memory. */
-	F_SET(page, WT_PAGE_PINNED);
-
 	btree->root_page = page;
 	return (0);
 
@@ -340,7 +337,6 @@ __btree_root_init_empty(WT_SESSION_IMPL *session)
 	root->entries = 1;
 	root->parent = NULL;
 	root->ref = NULL;
-	F_SET(root, WT_PAGE_PINNED);
 
 	leaf->ref = ref;
 	leaf->parent = root;

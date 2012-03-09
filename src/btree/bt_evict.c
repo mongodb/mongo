@@ -585,7 +585,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		 * It's still in flux if root pages are pinned or not, test for
 		 * both cases for now.
 		 */
-		if (WT_PAGE_IS_ROOT(page) || F_ISSET(page, WT_PAGE_PINNED))
+		if (WT_PAGE_IS_ROOT(page))
 			goto skip;
 
 		/*

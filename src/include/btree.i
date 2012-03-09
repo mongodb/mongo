@@ -203,7 +203,7 @@ __wt_get_addr(
 static inline void
 __wt_page_release(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	if (page != NULL && !F_ISSET(page, WT_PAGE_PINNED))
+	if (page != NULL && !WT_PAGE_IS_ROOT(page))
 		__wt_hazard_clear(session, page);
 }
 
