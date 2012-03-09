@@ -31,9 +31,9 @@
 
 # If unittest2 is available, use it in preference to (the old) unittest
 try:
-	import unittest2 as unittest
+    import unittest2 as unittest
 except ImportError:
-	import unittest
+    import unittest
 
 import sys, time, traceback, os
 import wiredtiger

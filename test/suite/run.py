@@ -25,8 +25,8 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 #
-# WiredTigerTestCase
-#	parent class for all test cases
+# run.py
+#      Command line test runner
 #
 
 import glob, json, os, re, sys
