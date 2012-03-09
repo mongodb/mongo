@@ -88,7 +88,7 @@ namespace mongo {
                 break; // if we yielded, could have hit the end
             }
 
-            // this way we can avoid calling updateLocation() every time (expensive)
+            // this way we can avoid calling prepareToYield() every time (expensive)
             // as well as some other nuances handled
             cc->setDoingDeletes( true );
 
