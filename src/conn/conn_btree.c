@@ -155,6 +155,29 @@ __wt_conn_close_btree(WT_SESSION_IMPL *session)
 }
 
 /*
+ * __conn_btree_remove --
+ *	Discard a single btree file handle structure.
+ */
+static int
+__conn_btree_remove(WT_SESSION_IMPL *session, WT_BTREE *btree)
+{
+	int ret;
+
+	ret = 0;
+
+	WT_SET_BTREE_IN_SESSION(session, btree);
+	WT_TRET(__wt_btree_close(session));
+	WT_TRET(__wt_rwlock_destroy(session, btree->rwlock));
+	__wt_free(session, btree->filename);
+	__wt_free(session, btree->name);
+	__wt_free(session, btree->config);
+	__wt_free(session, btree);
+	WT_CLEAR_BTREE_IN_SESSION(session);
+
+	return (ret);
+}
+
+/*
  * __wt_conn_remove_btree --
  *	Discard the btree file handle structures.
  */
@@ -162,36 +185,55 @@ int
 __wt_conn_remove_btree(WT_CONNECTION_IMPL *conn)
 {
 	WT_BTREE *btree;
+	WT_BTREE_SESSION *btree_session;
 	WT_SESSION_IMPL *session;
 	int ret;
 
 	ret = 0;
 
 	/*
-	 * Close open btree handles.
-	 *
 	 * We need a session handle because we're potentially reading/writing
-	 * pages.  Start with the default session to keep error handling simple.
+	 * pages.
 	 */
-	session = &conn->default_session;
 	WT_RET(__wt_open_session(conn, 1, NULL, NULL, &session));
 
+	/*
+	 * Close open btree handles: first, everything but the schema file (as
+	 * closing a normal file may open and write the schema file), then the
+	 * schema file.  This function isn't called often, and I don't want to
+	 * "know" anything about the schema file's position on the list, so we
+	 * do it the hard way.
+	 */
+restart:
+	TAILQ_FOREACH(btree, &conn->btqh, q) {
+		if (strcmp(btree->filename, WT_SCHEMA_FILENAME) == 0)
+			continue;
+
+		TAILQ_REMOVE(&conn->btqh, btree, q);
+		--conn->btqcnt;
+		WT_TRET(__conn_btree_remove(session, btree));
+		goto restart;
+	}
+
+	/*
+	 * Closing the files may have resulted in entries on our session's list
+	 * of open btree handles, specifically, we added the schema file if any
+	 * of the files were dirty.  Clean up that list before we shut down the
+	 * schema file entry, for good.
+	 */
+	while ((btree_session = TAILQ_FIRST(&session->btrees)) != NULL)
+		WT_TRET(__wt_session_remove_btree(session, btree_session));
+
+	/* Close the schema file handle. */
 	while ((btree = TAILQ_FIRST(&conn->btqh)) != NULL) {
 		TAILQ_REMOVE(&conn->btqh, btree, q);
 		--conn->btqcnt;
-
-		WT_SET_BTREE_IN_SESSION(session, btree);
-		WT_TRET(__wt_btree_close(session));
-		F_CLR(btree, WT_BTREE_OPEN);
-
-		WT_TRET(__wt_rwlock_destroy(session, btree->rwlock));
-		__wt_free(session, btree->filename);
-		__wt_free(session, btree->name);
-		__wt_free(session, btree->config);
-		__wt_free(session, session->btree);
+		WT_TRET(__conn_btree_remove(session, btree));
 	}
-	if (session != &conn->default_session)
-		(void)session->iface.close(&session->iface, NULL);
+
+	/* Discard our session. */
+	WT_TRET(session->iface.close(&session->iface, NULL));
+
 	return (ret);
 }
 
