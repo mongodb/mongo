@@ -9,7 +9,7 @@ AC_CONFIG_MACRO_DIR([build_posix/aclocal])
 AC_CONFIG_SRCDIR([dist/RELEASE])
 
 AM_INIT_AUTOMAKE([foreign])
-m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
+m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([no])])
 AM_OPTIONS
 
 # If CFLAGS was not set on entry and we are not debugging, default to -O3
