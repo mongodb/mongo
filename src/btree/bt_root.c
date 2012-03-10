@@ -178,7 +178,8 @@ __btree_get_turtle(
 	path = NULL;
 
 	WT_RET(__wt_filename(session, WT_SCHEMA_TURTLE, &path));
-	WT_RET_TEST((fp = fopen(path, "r")) == NULL, 0);
+	if ((fp = fopen(path, "r")) == NULL)
+		goto done;
 	while (fgets(line, (int)sizeof(line), fp) != NULL) {
 		if ((p = strchr(line, '\n')) == NULL)
 			break;
