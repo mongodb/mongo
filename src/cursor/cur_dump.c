@@ -85,17 +85,11 @@ __curdump_get_key(WT_CURSOR *cursor, ...)
 	CURSOR_API_CALL(cursor, session, get_key, NULL);
 
 	if (WT_CURSOR_RECNO(cursor) && !F_ISSET(cursor, WT_CURSTD_RAW)) {
-		if (F_ISSET(cursor, WT_CURSTD_TABLE))
-			WT_ERR(__wt_curtable_get_key(cursor, &recno));
-		else
-			WT_ERR(__wt_cursor_get_key(cursor, &recno));
+		WT_ERR(cursor->get_key(cursor, &recno));
 
 		WT_ERR(__wt_buf_fmt(session, &cursor->key, "%" PRIu64, recno));
 	} else {
-		if (F_ISSET(cursor, WT_CURSTD_TABLE))
-			WT_ERR(__wt_curtable_get_key(cursor, &item));
-		else
-			WT_ERR(__wt_cursor_get_key(cursor, &item));
+		WT_ERR(cursor->get_key(cursor, &item));
 
 		WT_ERR(__raw_to_dump(session, &item,
 		    &cursor->key, F_ISSET(cursor, WT_CURSTD_DUMP_HEX) ? 1 : 0));
@@ -169,18 +163,12 @@ __curdump_set_key(WT_CURSOR *cursor, ...)
 	if (WT_CURSOR_RECNO(cursor) && !F_ISSET(cursor, WT_CURSTD_RAW)) {
 		WT_ERR(str2recno(session, p, &recno));
 
-		if (F_ISSET(cursor, WT_CURSTD_TABLE))
-			__wt_curtable_set_key(cursor, recno);
-		else
-			__wt_cursor_set_key(cursor, recno);
+		cursor->set_key(cursor, recno);
 	} else {
 		WT_ERR(__dump_to_raw(session,
 		    p, &item, F_ISSET(cursor, WT_CURSTD_DUMP_HEX) ? 1 : 0));
 
-		if (F_ISSET(cursor, WT_CURSTD_TABLE))
-			__wt_curtable_set_key(cursor, &item);
-		else
-			__wt_cursor_set_key(cursor, &item);
+		cursor->set_key(cursor, &item);
 	}
 
 	if (0) {
@@ -205,10 +193,7 @@ __curdump_get_value(WT_CURSOR *cursor, ...)
 
 	CURSOR_API_CALL(cursor, session, get_value, NULL);
 
-	if (F_ISSET(cursor, WT_CURSTD_TABLE))
-		WT_ERR(__wt_curtable_get_value(cursor, &item));
-	else
-		WT_ERR(__wt_cursor_get_value(cursor, &item));
+	WT_ERR(cursor->get_value(cursor, &item));
 
 	WT_ERR(__raw_to_dump(session, &item,
 	    &cursor->value, F_ISSET(cursor, WT_CURSTD_DUMP_HEX) ? 1 : 0));
@@ -251,10 +236,7 @@ __curdump_set_value(WT_CURSOR *cursor, ...)
 	WT_ERR(__dump_to_raw(session,
 	    p, &item, F_ISSET(cursor, WT_CURSTD_DUMP_HEX) ? 1 : 0));
 
-	if (F_ISSET(cursor, WT_CURSTD_TABLE))
-		__wt_curtable_set_value(cursor, &item);
-	else
-		__wt_cursor_set_value(cursor, &item);
+	cursor->set_value(cursor, &item);
 
 	if (0) {
 err:		cursor->saved_err = ret;

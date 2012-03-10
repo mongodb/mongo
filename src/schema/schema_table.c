@@ -56,7 +56,7 @@ __wt_schema_table_cursor(
 
 	WT_RET(__open_schema_table(session));
 	session->btree = session->schematab;
-	return (__wt_curfile_create(session, cfg, cursorp));
+	return (__wt_curfile_create(session, NULL, cfg, cursorp));
 }
 
 /*

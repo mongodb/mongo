@@ -319,7 +319,8 @@ __curindex_open_colgroups(
 		    cp[arg] != NULL)
 			continue;
 		session->btree = table->colgroup[arg];
-		WT_RET(__wt_curfile_create(session, cfg, &cp[arg]));
+		WT_RET(__wt_curfile_create(
+		    session, &cindex->cbt.iface, cfg, &cp[arg]));
 	}
 
 	return (0);
@@ -426,7 +427,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 	/* Open the column groups needed for this index cursor. */
 	WT_ERR(__curindex_open_colgroups(session, cindex, cfg));
 
-	WT_ERR(__wt_cursor_init(cursor, cursor->uri, 1, 1, cfg));
+	WT_ERR(__wt_cursor_init(cursor, cursor->uri, 0, cfg));
 	*cursorp = cursor;
 
 	if (0) {

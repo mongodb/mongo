@@ -464,7 +464,8 @@ __curtable_open_colgroups(WT_CURSOR_TABLE *ctable, const char *cfg[])
 	    i < WT_COLGROUPS(table);
 	    i++, cp++) {
 		session->btree = table->colgroup[i];
-		WT_RET(__wt_curfile_create(session, cfg_no_overwrite, cp));
+		WT_RET(__wt_curfile_create(
+		    session, &ctable->iface, cfg_no_overwrite, cp));
 	}
 	return (0);
 }
@@ -493,7 +494,7 @@ __curtable_open_indices(WT_CURSOR_TABLE *ctable)
 	WT_RET(__wt_calloc_def(session, table->nindices, &ctable->idx_cursors));
 	for (i = 0, cp = ctable->idx_cursors; i < table->nindices; i++, cp++) {
 		session->btree = table->index[i];
-		WT_RET(__wt_curfile_create(session, cfg, cp));
+		WT_RET(__wt_curfile_create(session, &ctable->iface, cfg, cp));
 	}
 	return (0);
 }
@@ -571,7 +572,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		 * table cursor.
 		 */
 		session->btree = table->colgroup[0];
-		return (__wt_curfile_create(session, cfg, cursorp));
+		return (__wt_curfile_create(session, NULL, cfg, cursorp));
 	}
 
 	WT_RET(__wt_calloc_def(session, 1, &ctable));
@@ -582,7 +583,6 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	cursor->uri = table->name;
 	cursor->key_format = table->key_format;
 	cursor->value_format = table->value_format;
-	F_SET(cursor, WT_CURSTD_TABLE);
 
 	ctable->table = table;
 	ctable->plan = table->plan;
@@ -621,15 +621,19 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	if (cval.val != 0)
 		F_SET(cursor, WT_CURSTD_OVERWRITE);
 
+	STATIC_ASSERT(offsetof(WT_CURSOR_TABLE, iface) == 0);
+	WT_ERR(__wt_cursor_init(cursor, cursor->uri, NULL, cfg));
+
 	/*
 	 * Open the colgroup cursors immediately: we're going to need them for
 	 * any operation.  We defer opening index cursors until we need them
-	 * for an update.
+	 * for an update.  Note that this must come after the call to
+	 * __wt_cursor_init: the table cursor must already be on the list of
+	 * session cursors or we can't work out where to put the colgroup
+	 * cursor(s).
 	 */
 	WT_ERR(__curtable_open_colgroups(ctable, cfg));
 
-	STATIC_ASSERT(offsetof(WT_CURSOR_TABLE, iface) == 0);
-	WT_ERR(__wt_cursor_init(cursor, cursor->uri, 0, 1, cfg));
 	*cursorp = cursor;
 
 	if (0) {

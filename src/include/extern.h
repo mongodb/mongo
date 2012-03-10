@@ -457,6 +457,7 @@ extern int __wt_curconfig_open(WT_SESSION_IMPL *session,
     WT_CURSOR **cursorp);
 extern void __wt_curdump_init(WT_CURSOR *cursor);
 extern int __wt_curfile_create(WT_SESSION_IMPL *session,
+    WT_CURSOR *owner,
     const char *cfg[],
     WT_CURSOR **cursorp);
 extern int __wt_curfile_open(WT_SESSION_IMPL *session,
@@ -485,8 +486,7 @@ extern int __wt_cursor_dup(WT_SESSION_IMPL *session,
     WT_CURSOR **cursorp);
 extern int __wt_cursor_init(WT_CURSOR *cursor,
     const char *uri,
-    int is_file,
-    int is_public,
+    WT_CURSOR *owner,
     const char *cfg[]);
 extern int __wt_cursor_kv_not_set(WT_CURSOR *cursor, int key);
 extern int __wt_curtable_get_key(WT_CURSOR *cursor, ...);

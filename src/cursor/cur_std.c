@@ -293,10 +293,8 @@ __wt_cursor_close(WT_CURSOR *cursor)
 	__wt_buf_free(session, &cursor->key);
 	__wt_buf_free(session, &cursor->value);
 
-	if (F_ISSET(cursor, WT_CURSTD_PUBLIC))
-		TAILQ_REMOVE(&session->public_cursors, cursor, q);
-	else if (F_ISSET(cursor, WT_CURSTD_FILE))
-		TAILQ_REMOVE(&session->file_cursors, cursor, q);
+	if (F_ISSET(cursor, WT_CURSTD_OPEN))
+		TAILQ_REMOVE(&session->cursors, cursor, q);
 
 	__wt_free(session, cursor->uri);
 	__wt_free(session, cursor);
@@ -373,7 +371,7 @@ err:		if (cursor != NULL)
  */
 int
 __wt_cursor_init(WT_CURSOR *cursor,
-    const char *uri, int is_file, int is_public, const char *cfg[])
+    const char *uri, WT_CURSOR *owner, const char *cfg[])
 {
 	WT_SESSION_IMPL *session;
 
@@ -399,13 +397,18 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	WT_CLEAR(cursor->key);
 	WT_CLEAR(cursor->value);
 
-	if (is_file) {
-		F_SET(cursor, WT_CURSTD_FILE);
-		TAILQ_INSERT_HEAD(&session->file_cursors, cursor, q);
-	} else if (is_public) {
-		F_SET(cursor, WT_CURSTD_PUBLIC);
-		TAILQ_INSERT_HEAD(&session->public_cursors, cursor, q);
-	}
+	/*
+	 * Cursors that are internal to some other cursor (such as file cursors
+	 * inside a table cursor) should be closed after the containing cursor.
+	 * Arrange for that to happen by putting internal cursors after their
+	 * owners on the queue.
+	 */
+	if (owner != NULL)
+		TAILQ_INSERT_AFTER(&session->cursors, owner, cursor, q);
+	else
+		TAILQ_INSERT_HEAD(&session->cursors, cursor, q);
+
+	F_SET(cursor, WT_CURSTD_OPEN);
 
 	return (0);
 }

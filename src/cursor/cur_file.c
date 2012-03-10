@@ -197,7 +197,7 @@ __curfile_close(WT_CURSOR *cursor)
  */
 int
 __wt_curfile_create(WT_SESSION_IMPL *session,
-    const char *cfg[], WT_CURSOR **cursorp)
+    WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
 {
 	static WT_CURSOR iface = {
 		NULL,
@@ -284,7 +284,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 		F_SET(cursor, WT_CURSTD_OVERWRITE);
 
 	STATIC_ASSERT(offsetof(WT_CURSOR_BTREE, iface) == 0);
-	WT_ERR(__wt_cursor_init(cursor, cursor->uri, 1, 0, cfg));
+	WT_ERR(__wt_cursor_init(cursor, cursor->uri, owner, cfg));
 	*cursorp = cursor;
 
 	if (0) {
@@ -313,5 +313,5 @@ __wt_curfile_open(WT_SESSION_IMPL *session,
 	else
 		return (EINVAL);
 
-	return (__wt_curfile_create(session, cfg, cursorp));
+	return (__wt_curfile_create(session, NULL, cfg, cursorp));
 }
