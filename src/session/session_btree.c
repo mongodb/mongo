@@ -71,7 +71,7 @@ __wt_session_lock_btree(
 }
 
 /*
- * __wt_session_unlock_btree --
+ * __wt_session_release_btree --
  *	Unlock a btree handle.
  */
 int
