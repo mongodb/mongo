@@ -314,7 +314,7 @@ __btree_set_root(WT_SESSION_IMPL *session, const char *filename, const char *v)
 	int ret;
 
 	key = newv = NULL;
-	newcfg = NULL;
+	cfg[0] = newcfg = NULL;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &key));
 	WT_ERR(__wt_buf_fmt(session, key, "file:%s", filename));
@@ -328,6 +328,7 @@ __btree_set_root(WT_SESSION_IMPL *session, const char *filename, const char *v)
 
 err:	__wt_scr_free(&key);
 	__wt_scr_free(&newv);
+	__wt_free(session, cfg[0]);
 	__wt_free(session, newcfg);
 	return (ret);
 }
