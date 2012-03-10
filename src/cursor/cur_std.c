@@ -373,6 +373,7 @@ int
 __wt_cursor_init(WT_CURSOR *cursor,
     const char *uri, WT_CURSOR *owner, const char *cfg[])
 {
+	WT_CONFIG_ITEM cval;
 	WT_SESSION_IMPL *session;
 
 	WT_UNUSED(cfg);
@@ -396,6 +397,29 @@ __wt_cursor_init(WT_CURSOR *cursor,
 
 	WT_CLEAR(cursor->key);
 	WT_CLEAR(cursor->value);
+
+	/* The append flag is only relevant to column stores. */
+	if (WT_CURSOR_RECNO(cursor)) {
+		WT_RET(__wt_config_gets(session, cfg, "append", &cval));
+		if (cval.val != 0)
+			F_SET(cursor, WT_CURSTD_APPEND);
+	}
+
+	WT_RET(__wt_config_gets(session, cfg, "dump", &cval));
+	if (cval.len != 0) {
+		__wt_curdump_init(cursor);
+		F_SET(cursor,
+		    strncmp(cval.str, "print", cval.len) == 0 ?
+		    WT_CURSTD_DUMP_PRINT : WT_CURSTD_DUMP_HEX);
+	}
+
+	WT_RET(__wt_config_gets(session, cfg, "raw", &cval));
+	if (cval.val != 0)
+		F_SET(cursor, WT_CURSTD_RAW);
+
+	WT_RET(__wt_config_gets(session, cfg, "overwrite", &cval));
+	if (cval.val != 0)
+		F_SET(cursor, WT_CURSTD_OVERWRITE);
 
 	/*
 	 * Cursors that are internal to some other cursor (such as file cursors

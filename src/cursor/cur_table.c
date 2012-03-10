@@ -534,7 +534,6 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		0,			/* int saved_err */
 		0			/* uint32_t flags */
 	};
-	WT_CONFIG_ITEM cval;
 	WT_CURSOR *cursor;
 	WT_CURSOR_TABLE *ctable;
 	WT_ITEM fmt, plan;
@@ -597,29 +596,6 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 		    columns, strlen(columns), 0, &plan));
 		ctable->plan = __wt_buf_steal(session, &plan, NULL);
 	}
-
-	/* The append flag is only relevant to column stores. */
-	if (WT_CURSOR_RECNO(cursor)) {
-		WT_ERR(__wt_config_gets(session, cfg, "append", &cval));
-		if (cval.val != 0)
-			F_SET(cursor, WT_CURSTD_APPEND);
-	}
-
-	WT_ERR(__wt_config_gets(session, cfg, "dump", &cval));
-	if (cval.len != 0) {
-		__wt_curdump_init(cursor);
-		F_SET(cursor,
-		    strncmp(cval.str, "print", cval.len) == 0 ?
-		    WT_CURSTD_DUMP_PRINT : WT_CURSTD_DUMP_HEX);
-	}
-
-	WT_ERR(__wt_config_gets(session, cfg, "raw", &cval));
-	if (cval.val != 0)
-		F_SET(cursor, WT_CURSTD_RAW);
-
-	WT_ERR(__wt_config_gets(session, cfg, "overwrite", &cval));
-	if (cval.val != 0)
-		F_SET(cursor, WT_CURSTD_OVERWRITE);
 
 	STATIC_ASSERT(offsetof(WT_CURSOR_TABLE, iface) == 0);
 	WT_ERR(__wt_cursor_init(cursor, cursor->uri, NULL, cfg));

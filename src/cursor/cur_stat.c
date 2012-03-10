@@ -309,10 +309,10 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 		NULL,
 		NULL,
 		NULL,
-		NULL,
-		NULL,
-		NULL,
-		NULL,
+		__curstat_get_key,
+		__curstat_get_value,
+		__curstat_set_key,
+		__curstat_set_value,
 		NULL,
 		__curstat_next,
 		__curstat_prev,
@@ -338,7 +338,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	WT_CURSOR *cursor;
 	WT_STATS *stats_first;
 	void (*clear_func)(WT_STATS *);
-	int clear_on_close, raw, ret, stats_count;
+	int clear_on_close, ret, stats_count;
 
 	btree = NULL;
 	clear_func = NULL;
@@ -347,9 +347,6 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 
 	WT_RET(__wt_config_gets(session, cfg, "clear_on_close", &cval));
 	clear_on_close = (cval.val != 0);
-
-	WT_RET(__wt_config_gets(session, cfg, "raw", &cval));
-	raw = (cval.val != 0);
 
 	if (!WT_PREFIX_SKIP(uri, "statistics:"))
 		return (EINVAL);
@@ -371,27 +368,9 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	}
 
 	WT_ERR(__wt_calloc_def(session, 1, &cst));
-	cst->stats_first = stats_first;
-	cst->stats_count = stats_count;
-	cst->notpositioned = 1;
-	cst->clear_func = clear_func;
-
 	cursor = &cst->iface;
 	*cursor = iface;
 	cursor->session = &session->iface;
-
-	cursor->get_key = __curstat_get_key;
-	cursor->set_key = __curstat_set_key;
-	cursor->get_value = __curstat_get_value;
-	cursor->set_value = __curstat_set_value;
-
-	cst->btree = btree;
-	if (raw)
-		F_SET(cursor, WT_CURSTD_RAW);
-
-	STATIC_ASSERT(offsetof(WT_CURSOR_STAT, iface) == 0);
-	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg));
-
 	/*
 	 * We return the statistics field's offset as the key, and a string
 	 * description, a string value,  and a uint64_t value as the value
@@ -399,6 +378,15 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	 */
 	cursor->key_format = "i";
 	cursor->value_format = "SSq";
+
+	cst->btree = btree;
+	cst->stats_first = stats_first;
+	cst->stats_count = stats_count;
+	cst->notpositioned = 1;
+	cst->clear_func = clear_func;
+
+	STATIC_ASSERT(offsetof(WT_CURSOR_STAT, iface) == 0);
+	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg));
 
 	*cursorp = cursor;
 

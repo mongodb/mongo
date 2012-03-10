@@ -260,29 +260,6 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 	if (bulk)
 		WT_ERR(__wt_curbulk_init((WT_CURSOR_BULK *)cbt));
 
-	/* The append flag is only relevant to column stores. */
-	if (WT_CURSOR_RECNO(cursor)) {
-		WT_ERR(__wt_config_gets(session, cfg, "append", &cval));
-		if (cval.val != 0)
-			F_SET(cursor, WT_CURSTD_APPEND);
-	}
-
-	WT_ERR(__wt_config_gets(session, cfg, "dump", &cval));
-	if (cval.len != 0) {
-		__wt_curdump_init(cursor);
-		F_SET(cursor,
-		    strncmp(cval.str, "print", cval.len) == 0 ?
-		    WT_CURSTD_DUMP_PRINT : WT_CURSTD_DUMP_HEX);
-	}
-
-	WT_ERR(__wt_config_gets(session, cfg, "raw", &cval));
-	if (cval.val != 0)
-		F_SET(cursor, WT_CURSTD_RAW);
-
-	WT_ERR(__wt_config_gets(session, cfg, "overwrite", &cval));
-	if (cval.val != 0)
-		F_SET(cursor, WT_CURSTD_OVERWRITE);
-
 	STATIC_ASSERT(offsetof(WT_CURSOR_BTREE, iface) == 0);
 	WT_ERR(__wt_cursor_init(cursor, cursor->uri, owner, cfg));
 	*cursorp = cursor;
