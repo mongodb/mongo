@@ -145,7 +145,7 @@ namespace mongo {
                 }
 
                 // in some cases (clone collection) there won't be a matcher
-                if ( c->matcher() && !c->matcher()->matchesCurrent( c ) ) {
+                if ( !c->currentMatches() ) {
                 }
                 else if ( manager && ! manager->belongsToMe( cc ) ){
                     LOG(2) << "cursor skipping document in un-owned chunk: " << c->current() << endl;
