@@ -631,6 +631,11 @@ extern int __wt_log_printf(WT_SESSION_IMPL *session,
     2,
     3)));
 extern WT_LOGREC_DESC __wt_logdesc_debug;
+extern int __wt_clsm_open(WT_SESSION_IMPL *session,
+    const char *uri,
+    const char *cfg[],
+    WT_CURSOR **cursorp);
+extern int __wt_lsm_init(WT_CONNECTION *wt_conn, const char *config);
 extern int __wt_metadata_get(WT_SESSION *session,
     const char *uri,
     const char **valuep);

@@ -121,6 +121,7 @@ static int
 __session_open_cursor(WT_SESSION *wt_session,
     const char *uri, WT_CURSOR *to_dup, const char *config, WT_CURSOR **cursorp)
 {
+	WT_DATA_SOURCE *dsrc;
 	WT_DECL_RET;
 	WT_SESSION_IMPL *session;
 
@@ -155,8 +156,9 @@ __session_open_cursor(WT_SESSION *wt_session,
 		ret = __wt_curstat_open(session, uri, cfg, cursorp);
 	else if (WT_PREFIX_MATCH(uri, "table:"))
 		ret = __wt_curtable_open(session, uri, cfg, cursorp);
-	else
-		ret = __wt_bad_object_type(session, uri);
+	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
+		ret = dsrc->open_cursor(dsrc, &session->iface,
+		    uri, config, cursorp);
 
 err:	API_END_NOTFOUND_MAP(session, ret);
 }

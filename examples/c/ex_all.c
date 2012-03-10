@@ -480,15 +480,13 @@ my_drop(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
 /*! [WT_DATA_SOURCE open_cursor] */
 static int
 my_open_cursor(WT_DATA_SOURCE *dsrc, WT_SESSION *session,
-    const char *obj, WT_CURSOR *old_cursor, const char *config,
-    WT_CURSOR **new_cursor)
+    const char *obj, const char *config, WT_CURSOR **new_cursor)
 {
 	/* Unused parameters */
 	(void)dsrc;
 
 	(void)session;
 	(void)obj;
-	(void)old_cursor;
 	(void)config;
 	(void)new_cursor;
 

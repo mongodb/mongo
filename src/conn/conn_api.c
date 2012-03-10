@@ -929,6 +929,12 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	/* If there's a hot-backup file, load it. */
 	WT_ERR(__wt_metadata_load_backup(session));
 
+	/*
+	 * XXX LSM initialization.
+	 * This is structured so that it could be moved to an extension.
+	 */
+	WT_ERR(__wt_lsm_init(&conn->iface, NULL));
+
 	STATIC_ASSERT(offsetof(WT_CONNECTION_IMPL, iface) == 0);
 	*wt_connp = &conn->iface;
 

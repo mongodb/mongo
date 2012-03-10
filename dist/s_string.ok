@@ -92,8 +92,8 @@ Kounavis
 LF
 LRU
 LSB
+LSM
 LSN
-LSN's
 LSNs
 LeafGreen
 Llqr
@@ -247,6 +247,7 @@ ckptfrag
 ckptlist
 cksum
 clr
+clsm
 cmp
 cnt
 colcheck
@@ -426,7 +427,7 @@ logput
 lookup
 lookups
 lru
-lsn
+lsm
 lu
 majorp
 malloc

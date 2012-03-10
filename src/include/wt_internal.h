@@ -98,6 +98,8 @@ struct __wt_cursor_dump;
     typedef struct __wt_cursor_dump WT_CURSOR_DUMP;
 struct __wt_cursor_index;
     typedef struct __wt_cursor_index WT_CURSOR_INDEX;
+struct __wt_cursor_lsm;
+    typedef struct __wt_cursor_lsm WT_CURSOR_LSM;
 struct __wt_cursor_stat;
     typedef struct __wt_cursor_stat WT_CURSOR_STAT;
 struct __wt_cursor_table;
@@ -122,6 +124,10 @@ struct __wt_insert;
     typedef struct __wt_insert WT_INSERT;
 struct __wt_insert_head;
     typedef struct __wt_insert_head WT_INSERT_HEAD;
+struct __wt_lsm_data_source;
+    typedef struct __wt_lsm_data_source WT_LSM_DATA_SOURCE;
+struct __wt_lsm_tree;
+    typedef struct __wt_lsm_tree WT_LSM_TREE;
 struct __wt_named_collator;
     typedef struct __wt_named_collator WT_NAMED_COLLATOR;
 struct __wt_named_compressor;
@@ -190,6 +196,7 @@ struct __wt_update;
 
 #include "api.h"
 #include "cursor.h"
+#include "lsm.h"
 #include "meta.h"
 #include "schema.h"
 
