@@ -167,7 +167,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		WT_RET(__wt_schema_table_read(session, fileuri, &treeconf));
 	WT_RET(__wt_conn_open_btree(
 	    session, name, filename, treeconf, cfg, flags));
-	WT_RET(__wt_session_lock_btree(session, NULL, flags));
+	WT_RET(__wt_session_lock_btree(session, cfg, flags));
 	WT_RET(__wt_session_add_btree(session, NULL));
 
 	return (0);
