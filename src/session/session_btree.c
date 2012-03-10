@@ -52,18 +52,14 @@ __wt_session_lock_btree(
 		WT_RET(__wt_try_writelock(session, btree->rwlock));
 
 		/*
-		 * Check if the handle needs to be reopened.  If the handle was
-		 * just opened, cfg is NULL, so there is no need to reopen in
-		 * that case.
-		 *
+		 * Check if the handle needs to be reopened for this operation.
 		 * We do need to pick up the flags anyway, for example to set
 		 * WT_BTREE_BULK so the handle is closed correctly.
 		 */
 		if (LF_ISSET(WT_BTREE_BULK |
 		    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
 			return (__wt_conn_btree_reopen(session, cfg, flags));
-		else
-			F_SET(btree, flags);
+		F_SET(btree, flags);
 	} else if (!LF_ISSET(WT_BTREE_NO_LOCK))
 		__wt_readlock(session, btree->rwlock);
 
@@ -175,7 +171,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 
 /*
  * __wt_session_remove_btree --
- *	Remove the btree handle from the session, closing if necessary.
+ *	Discard our reference to the btree.
  */
 int
 __wt_session_remove_btree(
@@ -210,6 +206,7 @@ __wt_session_close_any_open_btree(WT_SESSION_IMPL *session, const char *name)
 		WT_ASSERT(session, btree_session->btree->refcnt == 1);
 		__wt_schema_detach_tree(session, btree_session->btree);
 		ret = __wt_session_remove_btree(session, btree_session);
+		__wt_rwunlock(session, session->btree->rwlock);
 	} else if (ret == WT_NOTFOUND)
 		ret = 0;
 
