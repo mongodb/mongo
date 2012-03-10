@@ -217,11 +217,8 @@ __wt_cache_evict_server(void *arg)
 	cache = conn->cache;
 	ret = 0;
 
-	/*
-	 * We need a session handle because we're reading/writing pages.
-	 * Start with the default session to keep error handling simple.
-	 */
-	session = &conn->default_session;
+	/* We need a session handle because we're reading/writing pages. */
+	session = NULL;
 	WT_ERR(__wt_open_session(conn, 1, NULL, NULL, &session));
 
 	while (F_ISSET(conn, WT_SERVER_RUN)) {
@@ -257,7 +254,7 @@ err:		__wt_err(session, ret, "eviction server error");
 
 	__wt_free(session, cache->evict);
 
-	if (session != &conn->default_session)
+	if (session != NULL)
 		(void)session->iface.close(&session->iface, NULL);
 
 	return (NULL);
