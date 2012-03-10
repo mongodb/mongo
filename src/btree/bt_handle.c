@@ -62,7 +62,6 @@ __wt_btree_open(WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
 		WT_RET(__btree_tree_init(session));
 
-	F_SET(btree, WT_BTREE_OPEN);
 	return (ret);
 }
 

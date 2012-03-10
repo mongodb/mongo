@@ -283,6 +283,9 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 			++tp;
 	}
 
+	/* Close open btrees. */
+	WT_TRET(__wt_conn_remove_btree(conn));
+
 	/* Free memory for collators */
 	while ((ncoll = TAILQ_FIRST(&conn->collqh)) != NULL)
 		__conn_remove_collator(conn, ncoll);

@@ -59,7 +59,7 @@ __wt_session_lock_btree(
 		 * We do need to pick up the flags anyway, for example to set
 		 * WT_BTREE_BULK so the handle is closed correctly.
 		 */
-		if (cfg != NULL && LF_ISSET(WT_BTREE_BULK |
+		if (LF_ISSET(WT_BTREE_BULK |
 		    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
 			return (__wt_conn_reopen_btree(session, cfg, flags));
 		else

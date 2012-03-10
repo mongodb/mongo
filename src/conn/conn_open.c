@@ -60,7 +60,6 @@ err:	(void)__wt_connection_close(conn);
 int
 __wt_connection_close(WT_CONNECTION_IMPL *conn)
 {
-	WT_BTREE *btree;
 	WT_SESSION_IMPL *session;
 	WT_DLH *dlh;
 	WT_FH *fh;
@@ -68,22 +67,6 @@ __wt_connection_close(WT_CONNECTION_IMPL *conn)
 
 	session = &conn->default_session;
 	ret = 0;
-
-	/* Complain if WT_BTREE handles weren't closed. */
-	while ((btree = TAILQ_FIRST(&conn->btqh)) != NULL) {
-		if (F_ISSET(btree, WT_BTREE_OPEN))
-			__wt_errx(session,
-			    "Connection has an open btree handle: %s",
-			    btree->name);
-		WT_SET_BTREE_IN_SESSION(session, btree);
-
-		/*
-		 * XXX
-		 * This won't work, you can't close a btree handle with the
-		 * default session.
-		 */
-		WT_TRET(__wt_conn_close_btree(session));
-	}
 
 	/*
 	 * Complain if files weren't closed (ignoring the lock and logging

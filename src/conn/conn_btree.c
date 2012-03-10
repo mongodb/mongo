@@ -48,7 +48,7 @@ __wt_conn_open_btree(WT_SESSION_IMPL *session,
 
 		/* Check that the handle is open. */
 		__wt_readlock(session, btree->rwlock);
-		matched = F_ISSET(btree, WT_BTREE_OPEN);
+		matched = F_ISSET(btree, WT_BTREE_OPEN) ? 1 : 0;
 		__wt_rwunlock(session, btree->rwlock);
 
 		if (!matched) {
@@ -115,6 +115,8 @@ conf:	session->btree = btree;
 	btree->config = config;
 
 	ret = __wt_btree_open(session, cfg, flags);
+	if (ret == 0)
+		F_SET(btree, WT_BTREE_OPEN);
 	__wt_rwunlock(session, btree->rwlock);
 	if (ret == 0)
 		return (0);
@@ -132,35 +134,64 @@ __wt_conn_close_btree(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
-	int inuse, ret;
+	int inuse;
 
 	btree = session->btree;
 	conn = S2C(session);
-	ret = 0;
 
 	if (F_ISSET(btree, WT_BTREE_OPEN))
 		WT_STAT_DECR(conn->stats, file_open);
 
-	/* Remove from the connection's list. */
+	/* Decrement the reference count. */
 	__wt_spin_lock(session, &conn->spinlock);
-	inuse = (--btree->refcnt > 0);
-	if (!inuse) {
-		TAILQ_REMOVE(&conn->btqh, btree, q);
-		--conn->btqcnt;
-	}
+	inuse = --btree->refcnt > 0;
 	__wt_spin_unlock(session, &conn->spinlock);
 
-	if (inuse)
-		return (0);
+	/* If the file is no longer in use, sync it to disk. */
+	if (!inuse)
+		WT_RET(__wt_btree_sync(session, NULL));
 
-	ret = __wt_btree_close(session);
-	__wt_free(session, btree->name);
-	__wt_free(session, btree->filename);
-	__wt_free(session, btree->config);
+	return (0);
+}
 
-	WT_TRET(__wt_rwlock_destroy(session, btree->rwlock));
-	__wt_free(session, session->btree);
+/*
+ * __wt_conn_remove_btree --
+ *	Discard the btree file handle structures.
+ */
+int
+__wt_conn_remove_btree(WT_CONNECTION_IMPL *conn)
+{
+	WT_BTREE *btree;
+	WT_SESSION_IMPL *session;
+	int ret;
 
+	ret = 0;
+
+	/*
+	 * Close open btree handles.
+	 *
+	 * We need a session handle because we're potentially reading/writing
+	 * pages.  Start with the default session to keep error handling simple.
+	 */
+	session = &conn->default_session;
+	WT_RET(__wt_open_session(conn, 1, NULL, NULL, &session));
+
+	while ((btree = TAILQ_FIRST(&conn->btqh)) != NULL) {
+		TAILQ_REMOVE(&conn->btqh, btree, q);
+		--conn->btqcnt;
+
+		WT_SET_BTREE_IN_SESSION(session, btree);
+		WT_TRET(__wt_btree_close(session));
+		F_CLR(btree, WT_BTREE_OPEN);
+
+		WT_TRET(__wt_rwlock_destroy(session, btree->rwlock));
+		__wt_free(session, btree->filename);
+		__wt_free(session, btree->name);
+		__wt_free(session, btree->config);
+		__wt_free(session, session->btree);
+	}
+	if (session != &conn->default_session)
+		(void)session->iface.close(&session->iface, NULL);
 	return (ret);
 }
 
@@ -172,8 +203,14 @@ int
 __wt_conn_reopen_btree(
     WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
 {
+	WT_BTREE *btree;
+
+	btree = session->btree;
+
 	WT_RET(__wt_btree_close(session));
+	F_CLR(btree, WT_BTREE_OPEN);
 	WT_RET(__wt_btree_open(session, cfg, flags));
+	F_SET(btree, WT_BTREE_OPEN);
 
 	return (0);
 }
