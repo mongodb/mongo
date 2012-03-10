@@ -10,6 +10,7 @@
 WT_CONNECTION *conn;				/* WiredTiger connection */
 __ftype ftype;					/* File type */
 u_int nkeys, nops;				/* Keys, Operations */
+int session_per_op;				/* New session per operation */
 
 static char *progname;				/* Program name */
 static FILE *logfp;				/* Log file */
@@ -38,9 +39,10 @@ main(int argc, char *argv[])
 	nops = 10000;
 	readers = 10;
 	runs = 0;
+	session_per_op = 0;
 	writers = 10;
 
-	while ((ch = getopt(argc, argv, "1C:k:l:n:R:r:t:W:")) != EOF)
+	while ((ch = getopt(argc, argv, "1C:k:l:n:R:r:St:W:")) != EOF)
 		switch (ch) {
 		case '1':			/* One run */
 			runs = 1;
@@ -66,6 +68,9 @@ main(int argc, char *argv[])
 			break;
 		case 'r':			/* runs */
 			runs = atoi(optarg);
+			break;
+		case 'S':			/* new session per operation */
+			session_per_op = 1;
 			break;
 		case 't':
 			switch (optarg[0]) {
@@ -223,8 +228,8 @@ usage(void)
 {
 	fprintf(stderr,
 	    "usage: %s "
-	    "[-1] [-C wiredtiger-config]\n    "
-	    "[-l log] [-R readers] [-r runs] [-t f|r|v] [-W writers]\n",
+	    "[-1S] [-C wiredtiger-config] [-k keys] [-l log]\n\t"
+	    "[-n ops] [-R readers] [-r runs] [-t f|r|v] [-W writers]\n",
 	    progname);
 	fprintf(stderr, "%s",
 	    "\t-1 run once\n"
@@ -234,6 +239,7 @@ usage(void)
 	    "\t-n set number of operations each thread does\n"
 	    "\t-R set number of reading threads\n"
 	    "\t-r set number of runs\n"
+	    "\t-S open/close a session on every operation\n"
 	    "\t-t set a file type (fix | row | var)\n"
 	    "\t-W set number of writing threads\n");
 	return (EXIT_FAILURE);

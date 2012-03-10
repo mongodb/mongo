@@ -31,6 +31,7 @@ extern __ftype ftype;
 
 extern u_int nkeys;				/* Keys to load */
 extern u_int nops;				/* Operations per thread */
+extern int   session_per_op;			/* New session per operation */
 
 #if defined (__GNUC__)
 void die(const char *, int) __attribute__((noreturn));
