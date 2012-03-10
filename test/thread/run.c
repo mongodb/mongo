@@ -126,7 +126,7 @@ reader(void *arg)
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	pthread_t tid;
-	u_int i, keyno;
+	u_int i;
 	int id, ret;
 
 	id = (int)(uintptr_t)arg;
