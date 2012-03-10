@@ -120,19 +120,7 @@ int
 __wt_buf_set_printable(
     WT_SESSION_IMPL *session, WT_ITEM *buf, const void *from_arg, size_t size)
 {
-	uint32_t u32size;
-
-	/*
-	 * In the worst case, every character takes up 3 spaces, plus a
-	 * trailing nul byte.
-	 */
-	WT_RET(__wt_buf_init(session, buf, size * 3 + 10));
-
-	u32size = (uint32_t)size;
-	__wt_raw_to_esc_hex(from_arg, buf->mem, &u32size);
-	buf->size = u32size;
-
-	return (0);
+	return (__wt_raw_to_esc_hex(session, from_arg, size, buf));
 }
 
 /*

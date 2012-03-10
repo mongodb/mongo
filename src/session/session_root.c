@@ -28,7 +28,6 @@ int
 __wt_btree_get_root(WT_SESSION_IMPL *session, WT_ITEM *addr)
 {
 	WT_BTREE *btree;
-	uint32_t size;
 	int majorv, minorv, ret;
 	const char *v;
 
@@ -59,10 +58,8 @@ __wt_btree_get_root(WT_SESSION_IMPL *session, WT_ITEM *addr)
 		    "%s is an unsupported version of a WiredTiger file",
 		    btree->filename);
 
-	if (v != NULL && strlen(v) != 0 && strcmp(v, WT_NOADDR) != 0) {
-		WT_ERR(__wt_hex_to_raw(session, (void *)v, (void *)v, &size));
-		WT_ERR(__wt_buf_set(session, addr, v, size));
-	}
+	if (v != NULL && strlen(v) != 0 && strcmp(v, WT_NOADDR) != 0)
+		WT_ERR(__wt_hex_to_raw(session, v, addr));
 
 err:	if (ret != 0)
 		__wt_errx(session,
@@ -108,7 +105,7 @@ err:	__wt_scr_free(&addr);
  */
 int
 __wt_btree_set_root(WT_SESSION_IMPL *session,
-    const char *filename, uint8_t *addr, uint32_t size)
+    const char *filename, const uint8_t *addr, uint32_t size)
 {
 	WT_ITEM *v;
 	int ret;
@@ -118,7 +115,7 @@ __wt_btree_set_root(WT_SESSION_IMPL *session,
 
 	/*
 	 * Every bytes is encoded as 2 bytes, plus a trailing nul byte,
-	 * and it needs to hold the [NoAddr] string.
+	 * and it needs to hold the "no address" string.
 	 */
 	WT_RET(__wt_scr_alloc(
 	    session, size * 2 + 1 + WT_STORE_SIZE(strlen(WT_NOADDR)), &v));
@@ -133,11 +130,8 @@ __wt_btree_set_root(WT_SESSION_IMPL *session,
 	if (addr == NULL) {
 		v->data = WT_NOADDR;
 		v->size = WT_STORE_SIZE(strlen(WT_NOADDR)) + 1;
-	} else {
-		__wt_raw_to_hex(addr, v->mem, &size);
-		v->data = v->mem;
-		v->size = size;
-	}
+	} else
+		WT_ERR(__wt_raw_to_hex(session, addr, size, v));
 
 	WT_ERR(strcmp(filename, WT_SCHEMA_FILENAME) == 0 ?
 	    __btree_set_turtle(session, v) :

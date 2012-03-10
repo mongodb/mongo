@@ -386,9 +386,7 @@ __wt_curstat_open(WT_SESSION_IMPL *session,
 	cst->clear_func = clear_func;
 
 	STATIC_ASSERT(offsetof(WT_CURSOR_STAT, iface) == 0);
-	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg));
-
-	*cursorp = cursor;
+	WT_ERR(__wt_cursor_init(cursor, uri, NULL, cfg, cursorp));
 
 	if (0) {
 err:		__wt_free(session, cst);

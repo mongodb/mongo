@@ -426,9 +426,7 @@ __wt_curindex_open(WT_SESSION_IMPL *session,
 
 	/* Open the column groups needed for this index cursor. */
 	WT_ERR(__curindex_open_colgroups(session, cindex, cfg));
-
-	WT_ERR(__wt_cursor_init(cursor, cursor->uri, 0, cfg));
-	*cursorp = cursor;
+	WT_ERR(__wt_cursor_init(cursor, cursor->uri, 0, cfg, cursorp));
 
 	if (0) {
 err:		(void)__curindex_close(cursor);

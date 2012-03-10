@@ -598,7 +598,7 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	}
 
 	STATIC_ASSERT(offsetof(WT_CURSOR_TABLE, iface) == 0);
-	WT_ERR(__wt_cursor_init(cursor, cursor->uri, NULL, cfg));
+	WT_ERR(__wt_cursor_init(cursor, cursor->uri, NULL, cfg, cursorp));
 
 	/*
 	 * Open the colgroup cursors immediately: we're going to need them for
@@ -610,10 +610,9 @@ __wt_curtable_open(WT_SESSION_IMPL *session,
 	 */
 	WT_ERR(__curtable_open_colgroups(ctable, cfg));
 
-	*cursorp = cursor;
-
 	if (0) {
 err:		(void)__curtable_close(cursor);
+		*cursorp = NULL;
 	}
 
 	return (ret);

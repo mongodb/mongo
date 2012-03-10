@@ -9,63 +9,36 @@
 
 /*
  * __raw_to_dump --
- *	We have a buffer where the data item contains a raw value, convert it
- * to a printable string.
+ *	We have a buffer where the data item contains a raw value,
+ *	convert it to a printable string.
  */
 static int
 __raw_to_dump(
     WT_SESSION_IMPL *session, WT_ITEM *from, WT_ITEM *to, int hexonly)
 {
-	WT_ITEM *tmp;
-	uint32_t size;
-
-	/*
-	 * In the worst case, every character takes up 3 spaces, plus a
-	 * trailing nul byte.
-	 */
-	WT_RET(__wt_scr_alloc(session, from->size * 3 + 10, &tmp));
-	size = from->size;
 	if (hexonly)
-		__wt_raw_to_hex(from->data, tmp->mem, &size);
+		WT_RET(__wt_raw_to_hex(session, from->data, from->size, to));
 	else
-		__wt_raw_to_esc_hex(from->data, tmp->mem, &size);
-	tmp->size = size;
-
-	__wt_buf_swap(to, tmp);
-	__wt_scr_free(&tmp);
+		WT_RET(
+		    __wt_raw_to_esc_hex(session, from->data, from->size, to));
 
 	return (0);
 }
 
 /*
  * __dump_to_raw --
- *	We have a scratch buffer where the data item contains a dump string,
+ *	We have a buffer containing a dump string,
  *	convert it to a raw value.
  */
 static int
 __dump_to_raw(
     WT_SESSION_IMPL *session, const char *src_arg, WT_ITEM *item, int hexonly)
 {
-	uint32_t size;
-
-	/*
-	 * XXX
-	 * Overwrite the string in place: the underlying cursor set_key and
-	 * set_value functions are going to use the cursor's key and value
-	 * buffers, which means we can't.  This should probably be fixed by
-	 * layering the dump cursor on top of other cursors and then we can
-	 * use the dump cursor's key/value buffers.
-	 */
 	if (hexonly)
-		WT_RET(__wt_hex_to_raw(
-		    session, (void *)src_arg, (void *)src_arg, &size));
+		WT_RET(__wt_hex_to_raw(session, src_arg, item));
 	else
-		WT_RET(__wt_esc_hex_to_raw(
-		    session, (void *)src_arg, (void *)src_arg, &size));
+		WT_RET(__wt_esc_hex_to_raw(session, src_arg, item));
 
-	memset(item, 0, sizeof(WT_ITEM));
-	item->data = src_arg;
-	item->size = size;
 	return (0);
 }
 
@@ -76,20 +49,24 @@ __dump_to_raw(
 static int
 __curdump_get_key(WT_CURSOR *cursor, ...)
 {
+	WT_CURSOR *child;
+	WT_CURSOR_DUMP *cdump;
 	WT_ITEM item, *itemp;
 	WT_SESSION_IMPL *session;
 	int ret;
 	uint64_t recno;
 	va_list ap;
 
+	cdump = (WT_CURSOR_DUMP *)cursor;
+	child = cdump->child;
 	CURSOR_API_CALL(cursor, session, get_key, NULL);
 
 	if (WT_CURSOR_RECNO(cursor) && !F_ISSET(cursor, WT_CURSTD_RAW)) {
-		WT_ERR(cursor->get_key(cursor, &recno));
+		WT_ERR(child->get_key(child, &recno));
 
 		WT_ERR(__wt_buf_fmt(session, &cursor->key, "%" PRIu64, recno));
 	} else {
-		WT_ERR(cursor->get_key(cursor, &item));
+		WT_ERR(child->get_key(child, &item));
 
 		WT_ERR(__raw_to_dump(session, &item,
 		    &cursor->key, F_ISSET(cursor, WT_CURSTD_DUMP_HEX) ? 1 : 0));
@@ -144,13 +121,16 @@ format:		WT_RET_MSG(session, EINVAL, "%s: invalid record number", p);
 static void
 __curdump_set_key(WT_CURSOR *cursor, ...)
 {
-	WT_ITEM item;
+	WT_CURSOR_DUMP *cdump;
+	WT_CURSOR *child;
 	WT_SESSION_IMPL *session;
 	uint64_t recno;
 	va_list ap;
 	const char *p;
 	int ret;
 
+	cdump = (WT_CURSOR_DUMP *)cursor;
+	child = cdump->child;
 	CURSOR_API_CALL(cursor, session, set_key, NULL);
 
 	va_start(ap, cursor);
@@ -163,12 +143,12 @@ __curdump_set_key(WT_CURSOR *cursor, ...)
 	if (WT_CURSOR_RECNO(cursor) && !F_ISSET(cursor, WT_CURSTD_RAW)) {
 		WT_ERR(str2recno(session, p, &recno));
 
-		cursor->set_key(cursor, recno);
+		child->set_key(child, recno);
 	} else {
-		WT_ERR(__dump_to_raw(session,
-		    p, &item, F_ISSET(cursor, WT_CURSTD_DUMP_HEX) ? 1 : 0));
+		WT_ERR(__dump_to_raw(session, p, &cursor->key,
+		    F_ISSET(cursor, WT_CURSTD_DUMP_HEX) ? 1 : 0));
 
-		cursor->set_key(cursor, &item);
+		child->set_key(child, &cursor->key);
 	}
 
 	if (0) {
@@ -186,14 +166,18 @@ err:		cursor->saved_err = ret;
 static int
 __curdump_get_value(WT_CURSOR *cursor, ...)
 {
+	WT_CURSOR_DUMP *cdump;
+	WT_CURSOR *child;
 	WT_ITEM item, *itemp;
 	WT_SESSION_IMPL *session;
 	va_list ap;
 	int ret;
 
+	cdump = (WT_CURSOR_DUMP *)cursor;
+	child = cdump->child;
 	CURSOR_API_CALL(cursor, session, get_value, NULL);
 
-	WT_ERR(cursor->get_value(cursor, &item));
+	WT_ERR(child->get_value(child, &item));
 
 	WT_ERR(__raw_to_dump(session, &item,
 	    &cursor->value, F_ISSET(cursor, WT_CURSTD_DUMP_HEX) ? 1 : 0));
@@ -218,12 +202,15 @@ err:	API_END(session);
 static void
 __curdump_set_value(WT_CURSOR *cursor, ...)
 {
-	WT_ITEM item;
+	WT_CURSOR_DUMP *cdump;
+	WT_CURSOR *child;
 	WT_SESSION_IMPL *session;
 	va_list ap;
 	int ret;
 	const char *p;
 
+	cdump = (WT_CURSOR_DUMP *)cursor;
+	child = cdump->child;
 	CURSOR_API_CALL(cursor, session, set_value, NULL);
 
 	va_start(ap, cursor);
@@ -234,9 +221,9 @@ __curdump_set_value(WT_CURSOR *cursor, ...)
 	va_end(ap);
 
 	WT_ERR(__dump_to_raw(session,
-	    p, &item, F_ISSET(cursor, WT_CURSTD_DUMP_HEX) ? 1 : 0));
+	    p, &cursor->value, F_ISSET(cursor, WT_CURSTD_DUMP_HEX) ? 1 : 0));
 
-	cursor->set_value(cursor, &item);
+	child->set_value(child, &cursor->value);
 
 	if (0) {
 err:		cursor->saved_err = ret;
@@ -246,15 +233,111 @@ err:		cursor->saved_err = ret;
 	API_END(session);
 }
 
+/* Pass through a call to the underlying cursor. */
+#define	CURDUMP_PASS(op)						\
+static int								\
+__curdump_##op(WT_CURSOR *cursor)					\
+{									\
+	WT_CURSOR_DUMP *cdump;						\
+									\
+	cdump = (WT_CURSOR_DUMP *)cursor;				\
+	return (cdump->child->op(cdump->child));			\
+}
+
+CURDUMP_PASS(next)
+CURDUMP_PASS(prev)
+CURDUMP_PASS(reset)
+CURDUMP_PASS(search)
+
+static int
+__curdump_search_near(WT_CURSOR *cursor, int *exact)
+{
+	WT_CURSOR_DUMP *cdump;
+
+	cdump = (WT_CURSOR_DUMP *)cursor;
+	return (cdump->child->search_near(cdump->child, exact));
+}
+
+CURDUMP_PASS(insert)
+CURDUMP_PASS(update)
+CURDUMP_PASS(remove)
+
+static int
+__curdump_close(WT_CURSOR *cursor)
+{
+	WT_CURSOR_DUMP *cdump;
+	WT_CURSOR *child;
+	WT_SESSION_IMPL *session;
+	int ret;
+
+	cdump = (WT_CURSOR_DUMP *)cursor;
+	child = cdump->child;
+	ret = 0;
+
+	CURSOR_API_CALL(cursor, session, get_key, NULL);
+	if (child != NULL)
+		WT_TRET(child->close(child));
+	/* We shared the child's URI. */
+	cursor->uri = NULL;
+	WT_TRET(__wt_cursor_close(cursor));
+	API_END(session);
+
+	return (ret);
+}
+
 /*
  * __wt_curdump_init --
  *	initialize a dump cursor.
  */
-void
-__wt_curdump_init(WT_CURSOR *cursor)
+int
+__wt_curdump_create(WT_CURSOR *child, WT_CURSOR *owner, WT_CURSOR **cursorp)
 {
-	cursor->get_key = __curdump_get_key;
-	cursor->get_value = __curdump_get_value;
-	cursor->set_key = __curdump_set_key;
-	cursor->set_value = __curdump_set_value;
+	static WT_CURSOR iface = {
+		NULL,
+		NULL,
+		NULL,
+		NULL,
+		__curdump_get_key,
+		__curdump_get_value,
+		__curdump_set_key,
+		__curdump_set_value,
+		NULL,
+		__curdump_next,
+		__curdump_prev,
+		__curdump_reset,
+		__curdump_search,
+		__curdump_search_near,
+		__curdump_insert,
+		__curdump_update,
+		__curdump_remove,
+		__curdump_close,
+		{ NULL, NULL },		/* TAILQ_ENTRY q */
+		0,			/* recno key */
+		{ 0 },                  /* recno raw buffer */
+		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM key */
+		{ NULL, 0, 0, NULL, 0 },/* WT_ITEM value */
+		0,			/* int saved_err */
+		0			/* uint32_t flags */
+	};
+	WT_CURSOR *cursor;
+	WT_CURSOR_DUMP *cdump;
+	WT_SESSION_IMPL *session;
+	const char *cfg[] = API_CONF_DEFAULTS(session, open_cursor, NULL);
+
+	session = (WT_SESSION_IMPL *)child->session;
+	WT_RET(__wt_calloc_def(session, 1, &cdump));
+	cursor = &cdump->iface;
+	*cursor = iface;
+	cursor->session = child->session;
+	cursor->uri = child->uri;
+	cursor->key_format = child->key_format;
+	cursor->value_format = child->value_format;
+	cdump->child = child;
+
+	/* Copy the dump flags from the child cursor. */
+	F_SET(cursor,
+	    F_ISSET(child, WT_CURSTD_DUMP_PRINT | WT_CURSTD_DUMP_HEX));
+
+	WT_RET(__wt_cursor_init(cursor, NULL, owner, cfg, cursorp));
+	return (0);
 }

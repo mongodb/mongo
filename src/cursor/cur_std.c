@@ -371,12 +371,12 @@ err:		if (cursor != NULL)
  */
 int
 __wt_cursor_init(WT_CURSOR *cursor,
-    const char *uri, WT_CURSOR *owner, const char *cfg[])
+    const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
 {
+	WT_CURSOR *cdump;
 	WT_CONFIG_ITEM cval;
 	WT_SESSION_IMPL *session;
 
-	WT_UNUSED(cfg);
 	session = (WT_SESSION_IMPL *)cursor->session;
 
 	if (cursor->get_key == NULL)
@@ -407,11 +407,12 @@ __wt_cursor_init(WT_CURSOR *cursor,
 
 	WT_RET(__wt_config_gets(session, cfg, "dump", &cval));
 	if (cval.len != 0) {
-		__wt_curdump_init(cursor);
-		F_SET(cursor,
-		    strncmp(cval.str, "print", cval.len) == 0 ?
+		F_SET(cursor, (strncmp(cval.str, "print", cval.len) == 0) ?
 		    WT_CURSTD_DUMP_PRINT : WT_CURSTD_DUMP_HEX);
-	}
+		WT_RET(__wt_curdump_create(cursor, owner, &cdump));
+		owner = cdump;
+	} else
+		cdump = NULL;
 
 	WT_RET(__wt_config_gets(session, cfg, "raw", &cval));
 	if (cval.val != 0)
@@ -434,6 +435,7 @@ __wt_cursor_init(WT_CURSOR *cursor,
 
 	F_SET(cursor, WT_CURSTD_OPEN);
 
+	*cursorp = (cdump != NULL) ? cdump : cursor;
 	return (0);
 }
 

@@ -455,7 +455,9 @@ extern int __wt_curconfig_open(WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[],
     WT_CURSOR **cursorp);
-extern void __wt_curdump_init(WT_CURSOR *cursor);
+extern int __wt_curdump_create(WT_CURSOR *child,
+    WT_CURSOR *owner,
+    WT_CURSOR **cursorp);
 extern int __wt_curfile_create(WT_SESSION_IMPL *session,
     WT_CURSOR *owner,
     const char *cfg[],
@@ -487,7 +489,8 @@ extern int __wt_cursor_dup(WT_SESSION_IMPL *session,
 extern int __wt_cursor_init(WT_CURSOR *cursor,
     const char *uri,
     WT_CURSOR *owner,
-    const char *cfg[]);
+    const char *cfg[],
+    WT_CURSOR **cursorp);
 extern int __wt_cursor_kv_not_set(WT_CURSOR *cursor, int key);
 extern int __wt_curtable_get_key(WT_CURSOR *cursor, ...);
 extern int __wt_curtable_get_value(WT_CURSOR *cursor, ...);
@@ -771,7 +774,7 @@ extern int __wt_btree_get_root(WT_SESSION_IMPL *session, WT_ITEM *addr);
 extern int __wt_btree_free_root(WT_SESSION_IMPL *session);
 extern int __wt_btree_set_root(WT_SESSION_IMPL *session,
     const char *filename,
-    uint8_t *addr,
+    const uint8_t *addr,
     uint32_t size);
 extern void __wt_eventv(WT_SESSION_IMPL *session,
     int msg_event,
@@ -827,16 +830,20 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref
 extern void __wt_hazard_clear(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern void __wt_hazard_empty(WT_SESSION_IMPL *session);
 extern void __wt_hazard_validate(WT_SESSION_IMPL *session, WT_PAGE *page);
-extern void __wt_raw_to_hex(const void *from, void *to, uint32_t *sizep);
-extern void __wt_raw_to_esc_hex(const void *from, void *to, uint32_t *sizep);
-extern int __wt_hex_to_raw( WT_SESSION_IMPL *session,
-    void *from,
-    void *to,
-    uint32_t *sizep);
-extern int __wt_esc_hex_to_raw( WT_SESSION_IMPL *session,
-    void *from,
-    void *to,
-    uint32_t *sizep);
+extern int __wt_raw_to_hex(WT_SESSION_IMPL *session,
+    const uint8_t *from,
+    uint32_t size,
+    WT_ITEM *to);
+extern int __wt_raw_to_esc_hex(WT_SESSION_IMPL *session,
+    const uint8_t *from,
+    size_t size,
+    WT_ITEM *to);
+extern int __wt_hex_to_raw(WT_SESSION_IMPL *session,
+    const char *from,
+    WT_ITEM *to);
+extern int __wt_esc_hex_to_raw(WT_SESSION_IMPL *session,
+    const char *from,
+    WT_ITEM *to);
 extern int __wt_huffman_open(WT_SESSION_IMPL *session,
     void *symbol_frequency_array,
     u_int symcnt,

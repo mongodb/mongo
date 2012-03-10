@@ -261,8 +261,7 @@ __wt_curfile_create(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_curbulk_init((WT_CURSOR_BULK *)cbt));
 
 	STATIC_ASSERT(offsetof(WT_CURSOR_BTREE, iface) == 0);
-	WT_ERR(__wt_cursor_init(cursor, cursor->uri, owner, cfg));
-	*cursorp = cursor;
+	WT_ERR(__wt_cursor_init(cursor, cursor->uri, owner, cfg, cursorp));
 
 	if (0) {
 err:		__wt_free(session, cbt);

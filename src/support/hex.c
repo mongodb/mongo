@@ -7,44 +7,59 @@
 
 #include "wt_internal.h"
 
-static const u_char hex[] = "0123456789abcdef";
+static const char hex[] = "0123456789abcdef";
 
 /*
  * __wt_raw_to_hex --
  *	Convert a chunk of data to a printable hex string.
  */
-void
-__wt_raw_to_hex(const void *from, void *to, uint32_t *sizep)
+int
+__wt_raw_to_hex(WT_SESSION_IMPL *session,
+    const uint8_t *from, uint32_t size, WT_ITEM *to)
 {
 	uint32_t i;
 	const uint8_t *p;
-	uint8_t *t, *t_start;
+	char *t;
 
-	for (p = from, t = t_start = to, i = *sizep; i > 0; --i, ++p) {
+	/*
+	 * In the worst case, every character takes up 2 spaces, plus a
+	 * trailing nul byte.
+	 */
+	WT_RET(__wt_buf_init(session, to, size * 2 + 1));
+
+	for (p = from, t = to->mem, i = size; i > 0; --i, ++p) {
 		*t++ = hex[(*p & 0xf0) >> 4];
 		*t++ = hex[*p & 0x0f];
 	}
 	*t++ = '\0';
-	*sizep = WT_PTRDIFF32(t, t_start);
+	to->size = WT_PTRDIFF32(t, to->mem);
+	return (0);
 }
 
 /*
  * __wt_raw_to_esc_hex --
  *	Convert a chunk of data to an printable string using escaped hex as
- * necessary.
+ *	necessary.
  */
-void
-__wt_raw_to_esc_hex(const void *from, void *to, uint32_t *sizep)
+int
+__wt_raw_to_esc_hex(WT_SESSION_IMPL *session,
+    const uint8_t *from, size_t size, WT_ITEM *to)
 {
-	uint32_t i;
+	size_t i;
 	const uint8_t *p;
-	uint8_t *t, *t_start;
+	uint8_t *t;
 
 	/*
 	 * In the worst case, every character takes up 3 spaces, plus a
 	 * trailing nul byte.
 	 */
-	for (p = from, t = t_start = to, i = *sizep; i > 0; --i, ++p)
+	WT_RET(__wt_buf_init(session, to, size * 3 + 1));
+
+	/*
+	 * In the worst case, every character takes up 3 spaces, plus a
+	 * trailing nul byte.
+	 */
+	for (p = from, t = to->mem, i = size; i > 0; --i, ++p)
 		if (isprint((int)*p)) {
 			if (*p == '\\')
 				*t++ = '\\';
@@ -55,7 +70,8 @@ __wt_raw_to_esc_hex(const void *from, void *to, uint32_t *sizep)
 			*t++ = hex[*p & 0x0f];
 		}
 	*t++ = '\0';
-	*sizep = WT_PTRDIFF32(t, t_start);
+	to->size = WT_PTRDIFF32(t, to->mem);
+	return (0);
 }
 
 /*
@@ -63,7 +79,7 @@ __wt_raw_to_esc_hex(const void *from, void *to, uint32_t *sizep)
  *	Convert a pair of hex characters into a byte.
  */
 static inline int
-hex2byte(uint8_t *from, uint8_t *to)
+hex2byte(const char *from, uint8_t *to)
 {
 	uint8_t byte;
 
@@ -123,34 +139,40 @@ __hex_fmterr(WT_SESSION_IMPL *session)
  *	Convert a printable hex string to a chunk of data.
  */
 int
-__wt_hex_to_raw(
-    WT_SESSION_IMPL *session, void *from, void *to, uint32_t *sizep)
+__wt_hex_to_raw(WT_SESSION_IMPL *session, const char *from, WT_ITEM *to)
 {
-	uint8_t *p, *t, *t_start;
+	const char *p;
+	uint8_t *t;
+	size_t size;
 
-	if (strlen(from) % 2 != 0)
+	size = strlen(from);
+	if (size % 2 != 0)
 		return (__hex_fmterr(session));
 
-	for (p = from, t = t_start = to; *p != '\0'; p += 2, ++t)
+	WT_RET(__wt_buf_init(session, to, size / 2));
+
+	for (p = from, t = to->mem; *p != '\0'; p += 2, ++t)
 		if (hex2byte(p, t))
 			return (__hex_fmterr(session));
 
-	*sizep = WT_PTRDIFF32(t, t_start);
+	to->size = WT_PTRDIFF32(t, to->mem);
 	return (0);
 }
 
 /*
  * __wt_esc_hex_to_raw --
  *	Convert a printable string using escaped hex as necessary to a chunk
- * of data.
+ *	of data.
  */
 int
-__wt_esc_hex_to_raw(
-    WT_SESSION_IMPL *session, void *from, void *to, uint32_t *sizep)
+__wt_esc_hex_to_raw(WT_SESSION_IMPL *session, const char *from, WT_ITEM *to)
 {
-	uint8_t *p, *t, *t_start;
+	const char *p;
+	uint8_t *t;
 
-	for (p = from, t = t_start = to; *p != '\0'; ++p, ++t) {
+	WT_RET(__wt_buf_init(session, to, strlen(from)));
+
+	for (p = from, t = to->mem; *p != '\0'; ++p, ++t) {
 		if ((*t = *p) != '\\')
 			continue;
 		++p;
@@ -160,6 +182,6 @@ __wt_esc_hex_to_raw(
 			++p;
 		}
 	}
-	*sizep = WT_PTRDIFF32(t, t_start);
+	to->size = WT_PTRDIFF32(t, to->mem);
 	return (0);
 }
