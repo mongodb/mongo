@@ -8,12 +8,12 @@
 #include "wt_internal.h"
 
 /*
- * __wt_conn_open_btree --
+ * __wt_conn_btree_open --
  *	Find an open btree file handle, otherwise create a new one and link it
  * into the connection's list.
  */
 int
-__wt_conn_open_btree(WT_SESSION_IMPL *session,
+__wt_conn_btree_open(WT_SESSION_IMPL *session,
     const char *name, const char *filename, const char *config,
     const char *cfg[], uint32_t flags)
 {
@@ -121,16 +121,16 @@ conf:	session->btree = btree;
 	if (ret == 0)
 		return (0);
 
-	(void)__wt_conn_close_btree(session);
+	(void)__wt_conn_btree_close(session);
 	return (ret);
 }
 
 /*
- * __wt_conn_close_btree --
+ * __wt_conn_btree_close --
  *	Discard a reference to an open btree file handle.
  */
 int
-__wt_conn_close_btree(WT_SESSION_IMPL *session)
+__wt_conn_btree_close(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
@@ -178,11 +178,11 @@ __conn_btree_remove(WT_SESSION_IMPL *session, WT_BTREE *btree)
 }
 
 /*
- * __wt_conn_remove_btree --
+ * __wt_conn_btree_remove --
  *	Discard the btree file handle structures.
  */
 int
-__wt_conn_remove_btree(WT_CONNECTION_IMPL *conn)
+__wt_conn_btree_remove(WT_CONNECTION_IMPL *conn)
 {
 	WT_BTREE *btree;
 	WT_BTREE_SESSION *btree_session;
@@ -238,11 +238,11 @@ restart:
 }
 
 /*
- * __wt_conn_reopen_btree --
+ * __wt_conn_btree_reopen --
  *	Reset an open btree handle back to its initial state.
  */
 int
-__wt_conn_reopen_btree(
+__wt_conn_btree_reopen(
     WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
 {
 	WT_BTREE *btree;

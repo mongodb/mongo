@@ -61,7 +61,7 @@ __wt_session_lock_btree(
 		 */
 		if (LF_ISSET(WT_BTREE_BULK |
 		    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
-			return (__wt_conn_reopen_btree(session, cfg, flags));
+			return (__wt_conn_btree_reopen(session, cfg, flags));
 		else
 			F_SET(btree, flags);
 	} else if (!LF_ISSET(WT_BTREE_NO_LOCK))
@@ -91,7 +91,7 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	if (F_ISSET(btree, WT_BTREE_BULK |
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)) {
 		WT_ASSERT(session, F_ISSET(btree, WT_BTREE_EXCLUSIVE));
-		ret = __wt_conn_reopen_btree(session, NULL, 0);
+		ret = __wt_conn_btree_reopen(session, NULL, 0);
 	} else if (F_ISSET(btree, WT_BTREE_EXCLUSIVE))
 		F_CLR(btree, WT_BTREE_EXCLUSIVE);
 
@@ -165,7 +165,7 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
 		WT_RET(__wt_strdup(session, tconfig, &treeconf));
 	else
 		WT_RET(__wt_schema_table_read(session, fileuri, &treeconf));
-	WT_RET(__wt_conn_open_btree(
+	WT_RET(__wt_conn_btree_open(
 	    session, name, filename, treeconf, cfg, flags));
 	WT_RET(__wt_session_lock_btree(session, cfg, flags));
 	WT_RET(__wt_session_add_btree(session, NULL));
@@ -185,7 +185,7 @@ __wt_session_remove_btree(
 	session->btree = btree_session->btree;
 	__wt_free(session, btree_session);
 
-	return (__wt_conn_close_btree(session));
+	return (__wt_conn_btree_close(session));
 }
 
 /*

@@ -432,15 +432,15 @@ extern const char *__wt_confdfl_table_meta;
 extern const char *__wt_confchk_table_meta;
 extern const char *__wt_confdfl_wiredtiger_open;
 extern const char *__wt_confchk_wiredtiger_open;
-extern int __wt_conn_open_btree(WT_SESSION_IMPL *session,
+extern int __wt_conn_btree_open(WT_SESSION_IMPL *session,
     const char *name,
     const char *filename,
     const char *config,
     const char *cfg[],
     uint32_t flags);
-extern int __wt_conn_close_btree(WT_SESSION_IMPL *session);
-extern int __wt_conn_remove_btree(WT_CONNECTION_IMPL *conn);
-extern int __wt_conn_reopen_btree( WT_SESSION_IMPL *session,
+extern int __wt_conn_btree_close(WT_SESSION_IMPL *session);
+extern int __wt_conn_btree_remove(WT_CONNECTION_IMPL *conn);
+extern int __wt_conn_btree_reopen( WT_SESSION_IMPL *session,
     const char *cfg[],
     uint32_t flags);
 extern int __wt_connection_init(WT_CONNECTION_IMPL *conn);
