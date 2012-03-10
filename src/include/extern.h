@@ -448,8 +448,8 @@ extern const char *__wt_confdfl_connection_add_collator;
 extern const char *__wt_confchk_connection_add_collator;
 extern const char *__wt_confdfl_connection_add_compressor;
 extern const char *__wt_confchk_connection_add_compressor;
-extern const char *__wt_confdfl_connection_add_cursor_type;
-extern const char *__wt_confchk_connection_add_cursor_type;
+extern const char *__wt_confdfl_connection_add_data_source;
+extern const char *__wt_confchk_connection_add_data_source;
 extern const char *__wt_confdfl_connection_add_extractor;
 extern const char *__wt_confchk_connection_add_extractor;
 extern const char *__wt_confdfl_connection_close;
@@ -817,6 +817,9 @@ extern int __wt_schema_rename(WT_SESSION_IMPL *session,
 extern int __wt_schema_truncate( WT_SESSION_IMPL *session,
     const char *uri,
     const char *cfg[]);
+extern int __wt_schema_get_source( WT_SESSION_IMPL *session,
+    const char *name,
+    WT_DATA_SOURCE **dsrcp);
 extern int __wt_schema_name_check(WT_SESSION_IMPL *session, const char *uri);
 extern int __wt_schema_worker(WT_SESSION_IMPL *session,
     const char *uri,

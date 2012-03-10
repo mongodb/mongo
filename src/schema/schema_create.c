@@ -370,6 +370,7 @@ __wt_schema_create(
     WT_SESSION_IMPL *session, const char *name, const char *config)
 {
 	WT_CONFIG_ITEM cval;
+	WT_DATA_SOURCE *dsrc;
 	WT_DECL_RET;
 	int exclusive;
 
@@ -381,8 +382,8 @@ __wt_schema_create(
 	    cval.val != 0);
 
 	/*
-	 * We track rename operations, if we fail in the middle, we want to
-	 * back it all out.
+	 * We track create operations: if we fail in the middle of creating a
+	 * complex object, we want to back it all out.
 	 */
 	WT_RET(__wt_meta_track_on(session));
 
@@ -394,8 +395,8 @@ __wt_schema_create(
 		ret = __create_index(session, name, exclusive, config);
 	else if (WT_PREFIX_MATCH(name, "table:"))
 		ret = __create_table(session, name, exclusive, config);
-	else
-		ret = __wt_unknown_object_type(session, name);
+	else if ((ret = __wt_schema_get_source(session, name, &dsrc)) == 0)
+		ret = dsrc->create(dsrc, &session->iface, name, config);
 
 	WT_TRET(__wt_meta_track_off(session, ret != 0));
 

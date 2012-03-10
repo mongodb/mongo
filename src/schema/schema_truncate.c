@@ -90,6 +90,7 @@ int
 __wt_schema_truncate(
     WT_SESSION_IMPL *session, const char *uri, const char *cfg[])
 {
+	WT_DATA_SOURCE *dsrc;
 	WT_DECL_RET;
 
 	WT_UNUSED(cfg);
@@ -98,8 +99,9 @@ __wt_schema_truncate(
 		ret = __truncate_file(session, uri);
 	else if (WT_PREFIX_SKIP(uri, "table:"))
 		ret = __truncate_table(session, uri);
-	else
-		return (__wt_unknown_object_type(session, uri));
+	else if ((ret = __wt_schema_get_source(session, uri, &dsrc)) == 0)
+		ret = dsrc->truncate(dsrc,
+		    &session->iface, uri, cfg[1]);
 
 	/* If we didn't find a metadata entry, map that error to ENOENT. */
 	return (ret == WT_NOTFOUND ? ENOENT : ret);

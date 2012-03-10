@@ -189,6 +189,7 @@ int
 __wt_schema_rename(WT_SESSION_IMPL *session,
     const char *uri, const char *newuri, const char *cfg[])
 {
+	WT_DATA_SOURCE *dsrc;
 	WT_DECL_RET;
 	const char *oldname, *newname;
 
@@ -218,8 +219,9 @@ __wt_schema_rename(WT_SESSION_IMPL *session,
 			    "rename target type must match URI: %s to %s",
 			    uri, newuri);
 		ret = __rename_table(session, oldname, newname);
-	} else
-		return (__wt_unknown_object_type(session, uri));
+	} else if ((ret = __wt_schema_get_source(session, oldname, &dsrc)) == 0)
+		ret = dsrc->rename(dsrc,
+		    &session->iface, oldname, newname, cfg[1]);
 
 	WT_TRET(__wt_meta_track_off(session, ret != 0));
 

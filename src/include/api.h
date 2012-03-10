@@ -122,6 +122,16 @@ struct __wt_named_compressor {
 };
 
 /*
+ * WT_NAMED_DATA_SOURCE --
+ *	A data source list entry
+ */
+struct __wt_named_data_source {
+	const char *prefix;		/* Name of compressor */
+	WT_DATA_SOURCE *dsrc;		/* User supplied callbacks */
+	TAILQ_ENTRY(__wt_named_data_source) q;	/* Linked list of compressors */
+};
+
+/*
  * WT_CONNECTION_IMPL --
  *	Implementation of WT_CONNECTION
  */
@@ -148,7 +158,6 @@ struct __wt_connection_impl {
 
 					/* Locked: btree list */
 	TAILQ_HEAD(__wt_btree_qh, __wt_btree) btqh;
-
 					/* Locked: file list */
 	TAILQ_HEAD(__wt_fh_qh, __wt_fh) fhqh;
 
@@ -198,6 +207,9 @@ struct __wt_connection_impl {
 
 					/* Locked: compressor list */
 	TAILQ_HEAD(__wt_comp_qh, __wt_named_compressor) compqh;
+
+					/* Locked: data source list */
+	TAILQ_HEAD(__wt_dsrc_qh, __wt_named_data_source) dsrcqh;
 
 	FILE *msgfile;
 	void (*msgcall)(const WT_CONNECTION_IMPL *, const char *);
