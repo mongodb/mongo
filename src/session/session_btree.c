@@ -39,7 +39,6 @@ __wt_session_lock_btree(
 	WT_BTREE *btree;
 
 	btree = session->btree;
-	WT_ASSERT(session, btree != NULL);
 
 	if (LF_ISSET(WT_BTREE_EXCLUSIVE)) {
 		/*
@@ -77,19 +76,18 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	int ret;
 
 	btree = session->btree;
-	WT_ASSERT(session, btree != NULL);
 	ret = 0;
 
 	/*
 	 * If we had exclusive access, reopen the tree without special flags so
-	 * that other threads can use it.
+	 * that other threads can use it (note the reopen call sets the flags).
 	 */
 	if (F_ISSET(btree, WT_BTREE_BULK |
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)) {
 		WT_ASSERT(session, F_ISSET(btree, WT_BTREE_EXCLUSIVE));
 		ret = __wt_conn_btree_reopen(session, NULL, 0);
-	} else if (F_ISSET(btree, WT_BTREE_EXCLUSIVE))
-		F_CLR(btree, WT_BTREE_EXCLUSIVE);
+	}
+	F_CLR(btree, WT_BTREE_EXCLUSIVE);
 
 	__wt_rwunlock(session, session->btree->rwlock);
 
