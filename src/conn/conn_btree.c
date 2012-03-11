@@ -117,11 +117,10 @@ conf:	session->btree = btree;
 	ret = __wt_btree_open(session, cfg, flags);
 	if (ret == 0)
 		F_SET(btree, WT_BTREE_OPEN);
-	__wt_rwunlock(session, btree->rwlock);
-	if (ret == 0)
-		return (0);
+	else
+		(void)__wt_conn_btree_close(session, 1);
 
-	(void)__wt_conn_btree_close(session);
+	__wt_rwunlock(session, btree->rwlock);
 	return (ret);
 }
 
@@ -130,7 +129,7 @@ conf:	session->btree = btree;
  *	Discard a reference to an open btree file handle.
  */
 int
-__wt_conn_btree_close(WT_SESSION_IMPL *session)
+__wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 {
 	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
@@ -157,14 +156,15 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session)
 	 */
 	__wt_spin_lock(session, &conn->spinlock);
 	inuse = --btree->refcnt > 0;
-	if (!inuse)
+	if (!inuse && !locked)
 		__wt_writelock(session, btree->rwlock);
 	__wt_spin_unlock(session, &conn->spinlock);
 
 	if (!inuse) {
 		ret = __wt_btree_close(session);
 		F_CLR(btree, WT_BTREE_OPEN);
-		__wt_rwunlock(session, btree->rwlock);
+		if (!locked)
+			__wt_rwunlock(session, btree->rwlock);
 	}
 
 	return (ret);
@@ -238,7 +238,7 @@ restart:
 	 * schema file entry, for good.
 	 */
 	while ((btree_session = TAILQ_FIRST(&session->btrees)) != NULL)
-		WT_TRET(__wt_session_remove_btree(session, btree_session));
+		WT_TRET(__wt_session_remove_btree(session, btree_session, 0));
 
 	/* Close the schema file handle. */
 	while ((btree = TAILQ_FIRST(&conn->btqh)) != NULL) {

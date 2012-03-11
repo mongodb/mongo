@@ -175,13 +175,13 @@ __wt_session_get_btree(WT_SESSION_IMPL *session,
  */
 int
 __wt_session_remove_btree(
-    WT_SESSION_IMPL *session, WT_BTREE_SESSION *btree_session)
+    WT_SESSION_IMPL *session, WT_BTREE_SESSION *btree_session, int locked)
 {
 	TAILQ_REMOVE(&session->btrees, btree_session, q);
 	session->btree = btree_session->btree;
 	__wt_free(session, btree_session);
 
-	return (__wt_conn_btree_close(session));
+	return (__wt_conn_btree_close(session, locked));
 }
 
 /*
@@ -205,7 +205,7 @@ __wt_session_close_any_open_btree(WT_SESSION_IMPL *session, const char *name)
 		 */
 		WT_ASSERT(session, btree_session->btree->refcnt == 1);
 		__wt_schema_detach_tree(session, btree_session->btree);
-		ret = __wt_session_remove_btree(session, btree_session);
+		ret = __wt_session_remove_btree(session, btree_session, 1);
 		__wt_rwunlock(session, session->btree->rwlock);
 	} else if (ret == WT_NOTFOUND)
 		ret = 0;
