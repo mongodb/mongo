@@ -358,8 +358,11 @@ namespace mongo {
         }
         
         /**
-         * When return value isNull(), our cursor will be ignored for yielding by the client cursor implementation.
-         * In such cases, an internal ClientCursor will update the position of component cursors when necessary.
+         * When return value isNull(), our cursor will be ignored for deletions by the ClientCursor
+         * implementation.  In such cases, internal ClientCursors will update the positions of
+         * component Cursors when necessary.
+         * !!! Use care if changing this behavior, as some ClientCursor functionality may not work
+         * recursively.
          */
         virtual DiskLoc refLoc() { return _takeover ? _takeover->refLoc() : DiskLoc(); }
         
