@@ -474,10 +474,19 @@ string sayReplSetMemberState() {
  */
 static void edit( const string& var ) {
 
-    // EDITOR must be defined in the environment
-    static const char * editor = getenv( "EDITOR" );
-    if ( !editor ) {
-        cout << "please define the EDITOR environment variable" << endl;
+    // EDITOR may be defined in the JavaScript scope or in the environment
+    string editor;
+    if ( shellMainScope->type( "EDITOR" ) == String ) {
+        editor = shellMainScope->getString( "EDITOR" );
+    }
+    else {
+        static const char * editorFromEnv = getenv( "EDITOR" );
+        if ( editorFromEnv ) {
+            editor = editorFromEnv;
+        }
+    }
+    if ( editor.empty() ) {
+        cout << "please define EDITOR as a JavaScript string or as an environment variable" << endl;
         return;
     }
 
