@@ -199,17 +199,16 @@ __wt_hazard_validate(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
-	WT_SESSION_IMPL **tp;
+	uint32_t elem, i;
 
 	conn = S2C(session);
 
-	for (tp = conn->sessions; (session = *tp) != NULL; ++tp)
-		for (hp = session->hazard;
-		    hp < session->hazard + S2C(session)->hazard_size; ++hp)
-			if (hp->page == page)
-				__wt_errx(session,
-				    "discarded page has hazard reference: "
-				    "(%p: %s, line %d)",
-				    hp->page, hp->file, hp->line);
+	elem = conn->session_size * conn->hazard_size;
+	for (i = 0, hp = conn->hazard; i < elem; ++i, ++hp)
+		if (hp->page == page)
+			__wt_errx(session,
+			    "discarded page has hazard reference: "
+			    "(%p: %s, line %d)",
+			    hp->page, hp->file, hp->line);
 }
 #endif

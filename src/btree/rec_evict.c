@@ -478,6 +478,7 @@ static int
 __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
 {
 	WT_CONNECTION_IMPL *conn;
+	WT_HAZARD *hp;
 	uint32_t elem, i;
 
 	/*
@@ -513,8 +514,8 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
 	/* Walk the list of hazard references to search for a match. */
 	conn = S2C(session);
 	elem = conn->session_size * conn->hazard_size;
-	for (i = 0; i < elem; ++i)
-		if (conn->hazard[i].page == ref->page) {
+	for (i = 0, hp = conn->hazard; i < elem; ++i, ++hp)
+		if (hp->page == ref->page) {
 			WT_BSTAT_INCR(session, rec_hazard);
 			WT_CSTAT_INCR(session, cache_evict_hazard);
 
