@@ -112,6 +112,7 @@
 #include "linenoise.h"
 #include <string>
 #include <vector>
+#include <boost/smart_ptr/scoped_array.hpp>
 
 using std::string;
 using std::vector;
@@ -352,6 +353,12 @@ class InputBuffer {
 public:
     InputBuffer( char* buffer, int bufferLen ) : buf( buffer ), buflen( bufferLen - 1 ), len( 0 ), pos( 0 ) {
         buf[0] = 0;
+    }
+    void preloadBuffer( const char* preloadText, int preloadTextLen ) {
+        strncpy( buf, preloadText, buflen );
+        buf[buflen] = 0;    // deal with edge case, note that buflen == bufferLen - 1
+        len = preloadTextLen;
+        pos = preloadTextLen;
     }
     int getInputLine( PromptBase& pi );
 
@@ -1633,7 +1640,7 @@ int InputBuffer::incrementalHistorySearch( PromptBase& pi, int startChar ) {
 int InputBuffer::getInputLine( PromptBase& pi ) {
 
     // The latest history entry is always our current buffer
-    linenoiseHistoryAdd( "" );
+    linenoiseHistoryAdd( buf );
     historyIndex = historyLen - 1;
     historyRecallMostRecent = false;
 
@@ -1654,6 +1661,11 @@ int InputBuffer::getInputLine( PromptBase& pi ) {
 
     // when history search returns control to us, we execute its terminating keystroke
     int terminatingKeystroke = -1;
+
+    // if there is already text in the buffer, display it first
+    if ( len > 0 ) {
+        refreshLine( pi );
+    }
 
     // loop collecting characters, responding to ctrl characters
     while ( true ) {
@@ -2145,6 +2157,70 @@ int InputBuffer::getInputLine( PromptBase& pi ) {
     return len;
 }
 
+string preloadedBufferContents;     // used with linenoisePreloadBuffer
+string preloadErrorMessage;
+
+/**
+ * linenoisePreloadBuffer provides text to be inserted into the command buffer
+ *
+ * the provided text will be processed to be usable and will be used to preload
+ * the input buffer on the next call to linenoise()
+ *
+ * @param preloadText text to begin with on the next call to linenoise()
+ */
+void linenoisePreloadBuffer( const char* preloadText ) {
+
+    if ( ! preloadText ) {
+        return;
+    }
+    int bufferSize = strlen( preloadText ) + 1;
+    boost::scoped_array< char > tempBuffer(new char[ bufferSize ]);
+    strncpy( &tempBuffer[0], preloadText, bufferSize );
+
+    // remove characters that won't display correctly
+    char* pIn = &tempBuffer[0];
+    char* pOut = pIn;
+    bool controlsStripped = false;
+    bool whitespaceSeen = false;
+    while ( *pIn ) {
+        unsigned char c = *pIn++;       // we need unsigned so chars 0x80 and above are allowed
+        if ( '\r' == c ) {              // silently skip CR
+            continue;
+        }
+        if ( '\n' == c || '\t' == c ) { // note newline or tab
+            whitespaceSeen = true;
+            continue;
+        }
+        if ( 0x7F == c || c < ' ' ) {   // remove other control characters, flag for message
+            controlsStripped = true;
+            *pOut++ = ' ';
+            continue;
+        }
+        if ( whitespaceSeen ) {         // convert whitespace to a single space
+            *pOut++ = ' ';
+            whitespaceSeen = false;
+        }
+        *pOut++ = c;
+    }
+    *pOut = 0;
+    int processedLength = pOut - &tempBuffer[0];
+    bool lineTruncated = false;
+    if ( processedLength > ( LINENOISE_MAX_LINE - 1 ) ) {
+        lineTruncated = true;
+        tempBuffer[ LINENOISE_MAX_LINE - 1 ] = 0;
+    }
+    preloadedBufferContents = &tempBuffer[0];
+    if ( controlsStripped ) {
+        preloadErrorMessage += " [Edited line: control characters were converted to spaces]\n";
+    }
+    if ( lineTruncated ) {
+        preloadErrorMessage += " [Edited line: the line length was reduced from ";
+        char buf[128];
+        snprintf( buf, sizeof( buf ), "%d to %d]\n", processedLength, ( LINENOISE_MAX_LINE - 1 ) );
+        preloadErrorMessage += buf;
+    }
+}
+
 /**
  * linenoise is a readline replacement.
  *
@@ -2157,23 +2233,39 @@ char* linenoise( const char* prompt ) {
     char buf[LINENOISE_MAX_LINE];               // buffer for user's input
     int count;
     if ( isatty( STDIN_FILENO ) ) {             // input is from a terminal
+        if ( ! preloadErrorMessage.empty() ) {
+            printf( "%s", preloadErrorMessage.c_str() );
+            fflush( stdout );
+            preloadErrorMessage.clear();
+        }
         PromptInfo pi( prompt, getScreenColumns() );
         if ( isUnsupportedTerm() ) {
             printf( "%s", pi.promptText );
             fflush( stdout );
-            if ( fgets( buf, LINENOISE_MAX_LINE, stdin ) == NULL ) {
-                return NULL;
+            if ( preloadedBufferContents.empty() ) {
+                if ( fgets( buf, LINENOISE_MAX_LINE, stdin ) == NULL ) {
+                    return NULL;
+                }
+                size_t len = strlen( buf );
+                while ( len && ( buf[len - 1] == '\n' || buf[len - 1] == '\r' ) ) {
+                    --len;
+                    buf[len] = '\0';
+                }
             }
-            size_t len = strlen( buf );
-            while ( len && ( buf[len - 1] == '\n' || buf[len - 1] == '\r' ) ) {
-                --len;
-                buf[len] = '\0';
+            else {
+                InputBuffer ib( buf, LINENOISE_MAX_LINE );
+                ib.preloadBuffer( preloadedBufferContents.c_str(), preloadedBufferContents.length() );
+                preloadedBufferContents.clear();
             }
         }
         else {
             if ( enableRawMode() == -1 )
                 return NULL;
             InputBuffer ib( buf, LINENOISE_MAX_LINE );
+            if ( ! preloadedBufferContents.empty() ) {
+                ib.preloadBuffer( preloadedBufferContents.c_str(), preloadedBufferContents.length() );
+                preloadedBufferContents.clear();
+            }
             count = ib.getInputLine( pi );
             disableRawMode();
             printf( "\n" );
