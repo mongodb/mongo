@@ -134,7 +134,7 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
-	int ret;
+	int inuse, ret;
 
 	btree = session->btree;
 	conn = S2C(session);
@@ -144,20 +144,28 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session)
 		WT_STAT_DECR(conn->stats, file_open);
 
 	/*
-	 * If it looks like we are the last reference, sync the file.
-	 * This should mean the close call made while holding the spinlock is
-	 * fast.
+	 * If it looks like we are the last reference, sync the file.  This
+	 * should make the close call fast (while we are holding an exclusive
+	 * lock on the handle).
 	 */
 	if (btree->refcnt == 1)
 		WT_RET(__wt_btree_sync(session, NULL));
 
-	/* Decrement the reference count. */
+	/*
+	 * Decrement the reference count.  If we really are the last reference,
+	 * get an exclusive lock on the handle so that we can close it.
+	 */
 	__wt_spin_lock(session, &conn->spinlock);
-	if (--btree->refcnt == 0) {
+	inuse = --btree->refcnt > 0;
+	if (!inuse)
+		__wt_writelock(session, btree->rwlock);
+	__wt_spin_unlock(session, &conn->spinlock);
+
+	if (!inuse) {
 		ret = __wt_btree_close(session);
 		F_CLR(btree, WT_BTREE_OPEN);
+		__wt_rwunlock(session, btree->rwlock);
 	}
-	__wt_spin_unlock(session, &conn->spinlock);
 
 	return (ret);
 }
