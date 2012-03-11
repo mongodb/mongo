@@ -283,7 +283,7 @@ __conn_close(WT_CONNECTION *wt_conn, const char *config)
 			++tp;
 	}
 
-	/* Close open btrees. */
+	/* Close open btree handles. */
 	WT_TRET(__wt_conn_btree_remove(conn));
 
 	/* Free memory for collators */
