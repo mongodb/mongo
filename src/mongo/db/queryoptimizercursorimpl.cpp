@@ -109,6 +109,8 @@ namespace mongo {
         virtual void prepareToYield() {
             if ( _c && !_cc ) {
                 _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout, _c, qp().ns() ) );
+                // Set 'doing deletes' as deletes may occur; if there are no deletes this has no
+                // effect.
                 _cc->setDoingDeletes( true );
             }
             if ( _cc ) {
