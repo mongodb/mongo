@@ -12,8 +12,8 @@ static int __btree_get_root(
 static int __btree_get_turtle(WT_SESSION_IMPL *, const char **, int *, int *);
 static int __btree_parse_root(
 	WT_SESSION_IMPL *, const char *, const char **, int *, int *);
-static int __btree_set_root(WT_SESSION_IMPL *, const char *, const char *);
-static int __btree_set_turtle(WT_SESSION_IMPL *, const char *);
+static int __btree_set_root(WT_SESSION_IMPL *, const char *, WT_ITEM *);
+static int __btree_set_turtle(WT_SESSION_IMPL *, WT_ITEM *);
 
 #define	WT_TURTLE_MSG		"The turtle."
 
@@ -140,8 +140,8 @@ __wt_btree_set_root(WT_SESSION_IMPL *session,
 	}
 
 	WT_ERR(strcmp(filename, WT_SCHEMA_FILENAME) == 0 ?
-	    __btree_set_turtle(session, v->data) :
-	    __btree_set_root(session, filename, v->data));
+	    __btree_set_turtle(session, v) :
+	    __btree_set_root(session, filename, v));
 
 err:	/*
 	 * If we are unrolling a failed create, we may have already removed
@@ -209,7 +209,7 @@ done:	if (fp != NULL)
  *	Set the schema file's root address.
  */
 static int
-__btree_set_turtle(WT_SESSION_IMPL *session, const char *v)
+__btree_set_turtle(WT_SESSION_IMPL *session, WT_ITEM *v)
 {
 	WT_ITEM *buf;
 	FILE *fp;
@@ -227,8 +227,9 @@ __btree_set_turtle(WT_SESSION_IMPL *session, const char *v)
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf,
 	    "%s\n"
-	    "root=%s,version=(major=%d,minor=%d)\n",
-	    WT_TURTLE_MSG, v, WT_BTREE_MAJOR_VERSION, WT_BTREE_MINOR_VERSION));
+	    "root=%.*s,version=(major=%d,minor=%d)\n", WT_TURTLE_MSG,
+	    (int)v->size, (const char *)v->data,
+	    WT_BTREE_MAJOR_VERSION, WT_BTREE_MINOR_VERSION));
 	len = (size_t)fprintf(fp, "%s", (char *)buf->data);
 	if (len != buf->size)
 		ret = WT_ERROR;
@@ -307,7 +308,7 @@ err:	__wt_scr_free(&key);
  *	Set a non-schema file's root address.
  */
 static int
-__btree_set_root(WT_SESSION_IMPL *session, const char *filename, const char *v)
+__btree_set_root(WT_SESSION_IMPL *session, const char *filename, WT_ITEM *v)
 {
 	WT_ITEM *key, *newv;
 	const char *cfg[3], *newcfg;
@@ -320,7 +321,8 @@ __btree_set_root(WT_SESSION_IMPL *session, const char *filename, const char *v)
 	WT_ERR(__wt_buf_fmt(session, key, "file:%s", filename));
 	WT_ERR(__wt_schema_table_read(session, key->data, &cfg[0]));
 	WT_ERR(__wt_scr_alloc(session, 0, &newv));
-	WT_ERR(__wt_buf_fmt(session, newv, "root=%s", v));
+	WT_ERR(__wt_buf_fmt(session, newv, "root=%.*s",
+	    (int)v->size, (const char *)v->data));
 	cfg[1] = newv->data;
 	cfg[2] = NULL;
 	WT_ERR(__wt_config_collapse(session, cfg, &newcfg));
