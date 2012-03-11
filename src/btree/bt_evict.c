@@ -217,8 +217,11 @@ __wt_cache_evict_server(void *arg)
 	cache = conn->cache;
 	ret = 0;
 
-	/* We need a session handle because we're reading/writing pages. */
-	session = NULL;
+	/*
+	 * We need a session handle because we're reading/writing pages.
+	 * Start with the default session to keep error handling simple.
+	 */
+	session = &conn->default_session;
 	WT_ERR(__wt_open_session(conn, 1, NULL, NULL, &session));
 
 	while (F_ISSET(conn, WT_SERVER_RUN)) {
@@ -254,7 +257,7 @@ err:		__wt_err(session, ret, "eviction server error");
 
 	__wt_free(session, cache->evict);
 
-	if (session != NULL)
+	if (session != &conn->default_session)
 		(void)session->iface.close(&session->iface, NULL);
 
 	return (NULL);
@@ -517,10 +520,10 @@ __evict_walk(WT_SESSION_IMPL *session)
 
 	/*
 	 * Resize the array in which we're tracking pages, as necessary, then
-	 * get some pages from each underlying file.  We hold a mutex for the
-	 * entire time -- it's slow, but (1) how often do new files get added
-	 * or removed to/from the system, and (2) it's all in-memory stuff, so
-	 * it's not that slow.
+	 * get some pages from each underlying file.  We hold a spinlock for
+	 * the entire time -- it's slow, but (1) how often do new files get
+	 * added or removed to/from the system, and (2) it's all in-memory
+	 * stuff, so it's not that slow.
 	 */
 	ret = 0;
 	__wt_spin_lock(session, &conn->spinlock);
