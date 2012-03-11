@@ -428,6 +428,7 @@ namespace mongo {
     void ClientCursor::updateLocation() {
         assert( _cursorid );
         _idleAgeMillis = 0;
+        _c->prepareToYield();
         DiskLoc cl = _c->refLoc();
         if ( lastLoc() == cl ) {
             //log() << "info: lastloc==curloc " << ns << '\n';
@@ -436,7 +437,6 @@ namespace mongo {
             recursive_scoped_lock lock(ccmutex);
             setLastLoc_inlock(cl);
         }
-        _c->prepareToYield();
     }
 
     int ClientCursor::suggestYieldMicros() {
