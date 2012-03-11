@@ -569,6 +569,13 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 	cache = S2C(session)->cache;
 
 	/*
+	 * Wait for application threads doing eviction in this file to drain:
+	 * we're examining pages without holding hazard references.
+	 */
+	while (btree->lru_count > 0)
+		__wt_yield();
+
+	/*
 	 * Get the next WT_EVICT_WALK_PER_TABLE entries.
 	 *
 	 * We can't evict the page just returned to us, it marks our place in
