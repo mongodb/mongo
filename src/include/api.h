@@ -133,7 +133,10 @@ struct __wt_connection_impl {
 	WT_SESSION_IMPL default_session;/* For operations without an
 					   application-supplied session */
 
-	WT_SPINLOCK spinlock;		/* Connection spinlock */
+	WT_SPINLOCK fh_lock;		/* File handle queue spinlock */
+	WT_SPINLOCK serial_lock;	/* Serial function call spinlock */
+	WT_SPINLOCK spinlock;		/* General purpose spinlock */
+
 					/* Connection queue */
 	TAILQ_ENTRY(__wt_connection_impl) q;
 
@@ -142,7 +145,6 @@ struct __wt_connection_impl {
 
 	WT_FH *lock_fh;			/* Lock file handle */
 
-	WT_SPINLOCK serial_lock;	/* Serial function call spinlock */
 	pthread_t cache_evict_tid;	/* Cache eviction server thread ID */
 	pthread_t cache_read_tid;	/* Cache read server thread ID */
 

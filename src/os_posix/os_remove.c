@@ -25,12 +25,12 @@ __wt_remove(WT_SESSION_IMPL *session, const char *name)
 	WT_VERBOSE(session, fileops, "%s: remove", name);
 
 	/* If the file is open, close/free it. */
-	__wt_spin_lock(session, &conn->spinlock);
+	__wt_spin_lock(session, &conn->fh_lock);
 	TAILQ_FOREACH(fh, &conn->fhqh, q) {
 		if (strcmp(name, fh->name) == 0)
 			break;
 	}
-	__wt_spin_unlock(session, &conn->spinlock);
+	__wt_spin_unlock(session, &conn->fh_lock);
 
 	/* This should be caught at a higher level. */
 	WT_ASSERT(session, fh == NULL);

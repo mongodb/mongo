@@ -134,24 +134,32 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session)
 {
 	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
-	int inuse;
+	int ret;
 
 	btree = session->btree;
 	conn = S2C(session);
+	ret = 0;
 
 	if (F_ISSET(btree, WT_BTREE_OPEN))
 		WT_STAT_DECR(conn->stats, file_open);
 
-	/* Decrement the reference count. */
-	__wt_spin_lock(session, &conn->spinlock);
-	inuse = --btree->refcnt > 0;
-	__wt_spin_unlock(session, &conn->spinlock);
-
-	/* If the file is no longer in use, sync it to disk. */
-	if (!inuse)
+	/*
+	 * If it looks like we are the last reference, sync the file.
+	 * This should mean the close call made while holding the spinlock is
+	 * fast.
+	 */
+	if (btree->refcnt == 1)
 		WT_RET(__wt_btree_sync(session, NULL));
 
-	return (0);
+	/* Decrement the reference count. */
+	__wt_spin_lock(session, &conn->spinlock);
+	if (--btree->refcnt == 0) {
+		ret = __wt_btree_close(session);
+		F_CLR(btree, WT_BTREE_OPEN);
+	}
+	__wt_spin_unlock(session, &conn->spinlock);
+
+	return (ret);
 }
 
 /*

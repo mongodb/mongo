@@ -27,10 +27,13 @@ __wt_connection_init(WT_CONNECTION_IMPL *conn)
 	/* Statistics. */
 	WT_RET(__wt_stat_alloc_connection_stats(session, &conn->stats));
 
+	/* File handle spinlock. */
+	__wt_spin_init(session, &conn->fh_lock);
+
 	/* Serialized function call spinlock. */
 	__wt_spin_init(session, &conn->serial_lock);
 
-	/* Connection spinlock. */
+	/* General purpose spinlock. */
 	__wt_spin_init(session, &conn->spinlock);
 
 	return (0);
@@ -67,6 +70,7 @@ __wt_connection_destroy(WT_CONNECTION_IMPL *conn)
 	TAILQ_REMOVE(&__wt_process.connqh, conn, q);
 	__wt_spin_unlock(session, &__wt_process.spinlock);
 
+	__wt_spin_destroy(session, &conn->fh_lock);
 	__wt_spin_destroy(session, &conn->serial_lock);
 	__wt_spin_destroy(session, &conn->spinlock);
 
