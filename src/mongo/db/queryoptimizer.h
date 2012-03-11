@@ -357,6 +357,13 @@ namespace mongo {
             void prepareToYield();
             void recoverFromYield();
             
+            /** @return an ExplainClauseInfo object that will be updated as the query runs. */
+            shared_ptr<ExplainClauseInfo> generateExplainInfo() {
+                _explainClauseInfo.reset( new ExplainClauseInfo() );
+                return _explainClauseInfo;
+            }
+
+        private:
             QueryOp &_op;
             QueryPlanSet &_plans;
             static void initOp( QueryOp &op );
@@ -364,12 +371,6 @@ namespace mongo {
             static void prepareToYieldOp( QueryOp &op );
             static void recoverFromYieldOp( QueryOp &op );
             
-            /** @return an ExplainClauseInfo object that will be updated as the query runs. */
-            shared_ptr<ExplainClauseInfo> generateExplainInfo() {
-                _explainClauseInfo.reset( new ExplainClauseInfo() );
-                return _explainClauseInfo;
-            }
-        private:
             /**
              * Move the Runner forward one iteration, and @return the plan for
              * this iteration.
