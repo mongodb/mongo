@@ -68,22 +68,12 @@ check()
 	echo "$1: copyright information is incorrect"
 }
 
-l=`cd .. && \
-    echo LICENSE \
-	 COPYING \
-	 examples/c/*.c \
-	 examples/python/*.py \
-	 lang/java/src/com/wiredtiger/*.java \
-	 lang/java/src/com/wiredtiger/*/*.java \
-	 lang/python/*.py \
-	 lang/python/*pack*.py \
-	 src/include/*.[hi] \
-	 src/include/*.in \
-	 src/utilities/*.[ch] && \
-    find test/format test/salvage test/suite test/thread \
-    	-name '*.[ch]' -o -name '*.py' -print`
+l="LICENSE COPYING"
 
-for i in $l `sed -e '/^[a-z]/! d' filelist`; do
+# Search for files, ignoring test/3rdparty.
+for i in `cd .. &&
+    find . -name '*.[chi]' -o -name '*.java' -o -name '*.py' |
+    sed -e '/test\/3rdparty\//d' -e 's/^\.\///'`; do
 	check $i
 done
 
