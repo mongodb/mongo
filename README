@@ -16,7 +16,7 @@ UTILITIES
   mongoimport       - Import from JSON or CSV
   mongofiles        - Utility for putting and getting files from MongoDB GridFS
   mongostat         - Show performance statistics
-
+  
 BUILDING
       
   See docs/building.md, also www.mongodb.org search for "Building".
@@ -44,9 +44,9 @@ DRIVERS
 DOCUMENTATION
 
   http://www.mongodb.org/
-
+  
 MAIL LISTS AND IRC
-
+  
   http://www.mongodb.org/display/DOCS/Community
 
 32 BIT BUILD NOTES
