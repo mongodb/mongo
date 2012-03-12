@@ -720,7 +720,7 @@ doneCheckOrder:
     shared_ptr<QueryOp> MultiPlanScanner::iterateRunner( QueryOp &originalOp, bool retried ) {
 
         if ( _runner ) {
-            return _runner->nextNonError();
+            return _runner->next();
         }
         
         _runner.reset( new QueryPlanSet::Runner( *_currentQps, originalOp ) );
@@ -729,21 +729,17 @@ doneCheckOrder:
             explainClause = _runner->generateExplainInfo();
         }
         
-        shared_ptr<QueryOp> op = _runner->init();
-        if ( !op->complete() ) {
+        shared_ptr<QueryOp> op = _runner->next();
+        if ( op->error() &&
+            _currentQps->prepareToRetryQuery() ) {
 
-            op = _runner->nextNonError();
-            if ( op->error() &&
-                _currentQps->prepareToRetryQuery() ) {
-
-                // Avoid an infinite loop here - this should never occur.
-                verify( 15878, !retried );                    
-                _runner.reset();
-                return iterateRunner( originalOp, true );
-            }
+            // Avoid an infinite loop here - this should never occur.
+            verify( 15878, !retried );
+            _runner.reset();
+            return iterateRunner( originalOp, true );
         }
         
-        if ( explainClause ) {
+        if ( _explainQueryInfo ) {
             _explainQueryInfo->addClauseInfo( explainClause );
         }
         return op;
@@ -756,7 +752,8 @@ doneCheckOrder:
 
     QueryPlanSet::Runner::Runner( QueryPlanSet &plans, QueryOp &op ) :
         _op( op ),
-        _plans( plans ) {
+        _plans( plans ),
+        _done() {
     }
 
     void QueryPlanSet::Runner::prepareToYield() {
@@ -804,22 +801,38 @@ doneCheckOrder:
             }
         }
         
-        return *_ops.begin();
-    }
-    
-    shared_ptr<QueryOp> QueryPlanSet::Runner::nextNonError() {
         if ( _queue.empty() ) {
-            return *_ops.begin();   
+            return _ops.front();
         }
-        shared_ptr<QueryOp> ret;
-        do {
-            ret = next();
-        } while( ret->error() && !_queue.empty() );
-        return ret;
+        
+        return shared_ptr<QueryOp>();
     }
     
     shared_ptr<QueryOp> QueryPlanSet::Runner::next() {
-        dassert( !_queue.empty() );
+        verify( 16091, !done() );
+
+        if ( _ops.empty() ) {
+            shared_ptr<QueryOp> initialRet = init();
+            if ( initialRet ) {
+                _done = true;
+                return initialRet;
+            }
+        }
+
+        shared_ptr<QueryOp> ret;
+        do {
+            ret = _next();
+        } while( ret->error() && !_queue.empty() );
+
+        if ( _queue.empty() ) {
+            _done = true;
+        }
+
+        return ret;
+    }
+    
+    shared_ptr<QueryOp> QueryPlanSet::Runner::_next() {
+        verify( 16092, !_queue.empty() );
         OpHolder holder = _queue.pop();
         QueryOp &op = *holder._op;
         nextOp( op );
@@ -829,6 +842,7 @@ doneCheckOrder:
             if ( _plans._mayRecordPlan && op.mayRecordPlan() ) {
                 op.qp().registerSelf( op.nscanned() );
             }
+            _done = true;
             return holder._op;
         }
         if ( op.error() ) {

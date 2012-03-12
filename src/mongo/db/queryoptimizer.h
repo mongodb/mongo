@@ -345,14 +345,13 @@ namespace mongo {
             Runner( QueryPlanSet &plans, QueryOp &op );
             
             /**
-             * Iterate interactively through candidate documents on all plans.
-             * QueryOp objects are returned at each interleaved step.
+             * Advance the runner, if it is not done().
+             * @return the next non error op if there is one, otherwise an error op.
+             * If the returned op is complete() or error(), the Runner becomes done().
              */
-            
-            /** @return a plan that has completed, otherwise an arbitrary plan. */
-            shared_ptr<QueryOp> init();
-            /** @return next non error op if there is one, otherwise an error op. */
-            shared_ptr<QueryOp> nextNonError();
+            shared_ptr<QueryOp> next();
+            /** @return true if done iterating. */
+            bool done() const { return _done; }
             
             void prepareToYield();
             void recoverFromYield();
@@ -371,11 +370,10 @@ namespace mongo {
             static void prepareToYieldOp( QueryOp &op );
             static void recoverFromYieldOp( QueryOp &op );
             
-            /**
-             * Move the Runner forward one iteration, and @return the plan for
-             * this iteration.
-             */
-            shared_ptr<QueryOp> next();
+            /** Initialize the Runner. */
+            shared_ptr<QueryOp> init();
+            /** Move the Runner forward one iteration, and @return the plan for the iteration. */
+            shared_ptr<QueryOp> _next();
 
             vector<shared_ptr<QueryOp> > _ops;
             struct OpHolder {
@@ -388,6 +386,7 @@ namespace mongo {
             };
             our_priority_queue<OpHolder> _queue;
             shared_ptr<ExplainClauseInfo> _explainClauseInfo;
+            bool _done;
         };
 
     private:
