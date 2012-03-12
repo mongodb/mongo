@@ -122,24 +122,19 @@ namespace mongo {
         virtual void recoverFromYield() {
             if ( _explainPlanInfo ) _explainPlanInfo->noteYield();
             if ( _cc && !ClientCursor::recoverFromYield( _yieldData ) ) {
+                // !!! The collection may be gone, and any namespace or index specific memory may
+                // have become invalid.
                 _yieldRecoveryFailed = true;
                 _c.reset();
                 _cc.reset();
                 
                 if ( _capped ) {
-                    msgassertedNoTrace( 13338, str::stream() << "capped cursor overrun: " << qp().ns() );
+                    msgassertedNoTrace( 13338,
+                                       str::stream() << "capped cursor overrun: " << qp().ns() );
                 }
-                else if ( qp().mustAssertOnYieldFailure() ) {
-                    msgassertedNoTrace( 15892, str::stream() << "QueryOptimizerCursorOp::recoverFromYield() failed to recover" );
-                }
-                else {
-                    // we don't fail query since we're fine with returning partial data if collection dropped
-                    // also, see SERVER-2454
-                    // todo: this is wrong.  the cursor could be gone if closeAllDatabases command just ran
-
-                    // !!! The collection may be gone at this point, and any namespace or index
-                    // specific memory may have become invalid.
-                }
+                msgassertedNoTrace( 15892,
+                                   str::stream() <<
+                                   "QueryOptimizerCursorOp::recoverFromYield() failed to recover" );
             }
             else {
                 checkCursorAdvanced();

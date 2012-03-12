@@ -837,8 +837,6 @@ doneCheckOrder:
         QueryOp &op = *holder._op;
         nextOp( op );
         if ( op.complete() ) {
-            // !!! op.mayRecordPlan() must be false if a yield recovery failed, to prevent an
-            // invalid namespace access.
             if ( _plans._mayRecordPlan && op.mayRecordPlan() ) {
                 op.qp().registerSelf( op.nscanned() );
             }
