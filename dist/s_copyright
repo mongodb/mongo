@@ -72,7 +72,7 @@ l="LICENSE COPYING"
 
 # Search for files, ignoring test/3rdparty.
 for i in `cd .. &&
-    find . -name '*.[chi]' -o -name '*.java' -o -name '*.py' |
+    find . -name '*.[chi]' -o -name '*.cxx' -o -name '*.java' -o -name '*.py' |
     sed -e '/test\/3rdparty\//d' -e 's/^\.\///'`; do
 	check $i
 done
