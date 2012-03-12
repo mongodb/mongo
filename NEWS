@@ -1,3 +1,31 @@
+WiredTiger release 1.1.1, 2012-03-12
+------------------------------------
+
+Default to a verbose build: that can be switched off by running "configure --enable-silent-rules").
+
+Account for all memory allocated when reading a page into cache.  Total memory usage is now much closer to the cache size when using many small keys and values.
+
+Have application threads trigger a retry forced page eviction rather than blocking eviction.  This allows rec_evict.c to simply set the WT_REF state to WT_REF_MEM after all failures, and fixes a bug where pages on the forced eviction queue would end up with state WT_REF_MEM, meaning they could be chosen for eviction multiple times.
+
+Grow existing scratch buffers in preference to allocating new ones.
+
+Fix a race between threads reading in and then modifying a page.
+
+Get rid of the pinned flag: it is no longer used.
+
+Fix a race where btree files weren't completely closed before they could be re-opened.  This behavior can be triggered by using a new session on every operation (see the new -S flag to the test/thread program).  [#178]
+
+When connections are closed, create a session and discard the btree handles.  This fixes a long-standing bug in closing a connection: if for any reason there are btree handles still open, we need a real session handle to close them.
+
+Really close btree handles: otherwise we can't safely remove or rename them.  Fixes test failures in test_base02 (among others).
+
+Wait for application threads in LRU eviction to drain before walking a file.
+
+Fix a buffer size calculation when updating the root address of a file.
+
+Documentation fix: 10% of 1MB is 100KB.
+
+
 WiredTiger release 1.1.0, 2012-02-28
 ------------------------------------
 
