@@ -35,7 +35,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 	} else if (
 	    WT_PREFIX_SKIP(uri, "colgroup:") || WT_PREFIX_SKIP(uri, "index:")) {
 		WT_RET(__wt_schema_get_btree(
-		    session, uri, strlen(uri), cfg, 0));
+		    session, uri, strlen(uri), cfg, open_flags));
 		ret = func(session, cfg);
 		WT_TRET(__wt_session_release_btree(session));
 		WT_RET(ret);
@@ -48,7 +48,7 @@ __wt_schema_worker(WT_SESSION_IMPL *session,
 				continue;
 
 			WT_TRET(__wt_schema_get_btree(session,
-			    cg->name, strlen(cg->name), cfg, 0));
+			    cg->name, strlen(cg->name), cfg, open_flags));
 			ret = func(session, cfg);
 			WT_TRET(__wt_session_release_btree(session));
 			WT_RET(ret);

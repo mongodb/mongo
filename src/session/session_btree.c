@@ -88,11 +88,13 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	 * any special flags as required.  The handle stays in our cache, so
 	 * we don't want to go through __wt_conn_btree_close.
 	 */
-	if (F_ISSET(btree, WT_BTREE_EXCLUSIVE)) {
-		ret = __wt_btree_close(session);
-		F_CLR(btree, WT_BTREE_EXCLUSIVE | WT_BTREE_OPEN);
+	if (F_ISSET(btree, WT_BTREE_BULK |
+	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)) {
+		WT_ASSERT(session, F_ISSET(btree, WT_BTREE_EXCLUSIVE));
+		ret = __wt_conn_btree_reopen(session, NULL, 0);
 	}
 
+	F_CLR(btree, WT_BTREE_EXCLUSIVE);
 	__wt_rwunlock(session, btree->rwlock);
 
 	return (ret);
