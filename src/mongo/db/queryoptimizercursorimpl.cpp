@@ -69,7 +69,6 @@ namespace mongo {
         _countingMatches(),
         _mustAdvance(),
         _capped(),
-        _yieldRecoveryFailed(),
         _selectionPolicy( selectionPolicy ),
         _requireOrder( requireOrder ),
         _alwaysCountMatches( alwaysCountMatches ) {
@@ -124,7 +123,6 @@ namespace mongo {
             if ( _cc && !ClientCursor::recoverFromYield( _yieldData ) ) {
                 // !!! The collection may be gone, and any namespace or index specific memory may
                 // have become invalid.
-                _yieldRecoveryFailed = true;
                 _c.reset();
                 _cc.reset();
                 
@@ -202,7 +200,7 @@ namespace mongo {
             return match;
         }
         virtual bool mayRecordPlan() const {
-            return !_yieldRecoveryFailed && complete() && ( !stopRequested() || _matchCounter.enoughMatchesToRecordPlan() );
+            return complete() && ( !stopRequested() || _matchCounter.enoughMatchesToRecordPlan() );
         }
         shared_ptr<Cursor> cursor() const { return _c; }
         virtual shared_ptr<ExplainPlanInfo> generateExplainInfo() {
@@ -280,7 +278,6 @@ namespace mongo {
         ClientCursor::CleanupPointer _cc;
         DiskLoc _posBeforeYield;
         ClientCursor::YieldData _yieldData;
-        bool _yieldRecoveryFailed;
         const QueryPlanSelectionPolicy &_selectionPolicy;
         const bool &_requireOrder; // TODO don't use a ref for this, but signal change explicitly
         shared_ptr<ExplainPlanInfo> _explainPlanInfo;

@@ -624,7 +624,7 @@ namespace QueryOptimizerTests {
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 1 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
                 QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 1 ), shared_ptr<Projection>(),
-                               BSON( "b" << 1 ), true, hint );
+                               BSON( "b" << 1 ), hint );
                 ASSERT_EQUALS( 1, s.nPlans() );
             }
         };
@@ -638,8 +638,7 @@ namespace QueryOptimizerTests {
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 1 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
                 QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 1 ), shared_ptr<Projection>(),
-                               BSON( "b" << 1 ), true,
-                               hint );
+                               BSON( "b" << 1 ), hint );
                 ASSERT_EQUALS( 1, s.nPlans() );
             }
         };
@@ -653,8 +652,7 @@ namespace QueryOptimizerTests {
                 auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), BSON( "a" << 1 ) ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
                 QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 1 ), shared_ptr<Projection>(),
-                               BSON( "b" << 1 ), true,
-                               hint );
+                               BSON( "b" << 1 ), hint );
                 ASSERT_EQUALS( 1, s.nPlans() );
             }
         };
@@ -680,7 +678,7 @@ namespace QueryOptimizerTests {
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
                 ASSERT_THROWS( QueryPlanSet s( ns(), frsp, frspOrig, BSON( "a" << 1 ),
                                               shared_ptr<Projection>(),
-                                              BSON( "b" << 1 ), true, hint ),
+                                              BSON( "b" << 1 ), hint ),
                                   AssertionException );
             }
         };
@@ -816,7 +814,7 @@ namespace QueryOptimizerTests {
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
                 QueryPlanSet s( ns(), frsp, frspOrig, fromjson( "{a:{$in:[2,3,6,9,11]}}" ),
                                shared_ptr<Projection>(),
-                               BSONObj(), true, hint );
+                               BSONObj(), hint );
                 QueryPlan qp( nsd(), 1, s.frsp(), s.originalFrsp(),
                              fromjson( "{a:{$in:[2,3,6,9,11]}}" ), shared_ptr<Projection>(),
                              BSONObj() );
@@ -833,7 +831,7 @@ namespace QueryOptimizerTests {
                     auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
                     QueryPlanSet s( ns(), frsp, frspOrig, fromjson( "{a:{$in:[2,3,6,9,11]}}" ),
                                    shared_ptr<Projection>(),
-                                   BSON( "a" << -1 ), true, hint );
+                                   BSON( "a" << -1 ), hint );
                     QueryPlan qp( nsd(), 1, s.frsp(), s.originalFrsp(),
                                  fromjson( "{a:{$in:[2,3,6,9,11]}}" ), shared_ptr<Projection>(),
                                  BSON( "a" << -1 ) );

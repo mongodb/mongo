@@ -43,7 +43,6 @@ namespace mongo {
                   const BSONObj &originalQuery,
                   const shared_ptr<Projection> &fields,
                   const BSONObj &order,
-                  bool mustAssertOnYieldFailure = true,
                   const BSONObj &startKey = BSONObj(),
                   const BSONObj &endKey = BSONObj(),
                   string special="" );
@@ -88,8 +87,6 @@ namespace mongo {
 
         const FieldRangeSet &multikeyFrs() const { return _frsMulti; }
         
-        bool mustAssertOnYieldFailure() const { return _mustAssertOnYieldFailure; }
-
         shared_ptr<Projection::KeyOnly> keyFieldsOnly() const { return _keyFieldsOnly; }
         
         /**
@@ -143,7 +140,6 @@ namespace mongo {
         string _special;
         IndexType * _type;
         bool _startOrEndSpec;
-        bool _mustAssertOnYieldFailure;
         shared_ptr<Projection::KeyOnly> _keyFieldsOnly;
     };
 
@@ -303,7 +299,6 @@ namespace mongo {
                       const BSONObj &originalQuery,
                       const shared_ptr<Projection> &fields,
                       const BSONObj &order,
-                      bool mustAssertOnYieldFailure = true,
                       const BSONObj &hint = BSONObj(),
                       RecordedPlanPolicy recordedPlanPolicy = Use,
                       const BSONObj &min = BSONObj(),
@@ -413,7 +408,6 @@ namespace mongo {
         BSONObj _max;
         string _special;
         ElapsedTracker _yieldSometimesTracker;
-        bool _mustAssertOnYieldFailure;
     };
 
     /** Handles $or type queries by generating a QueryPlanSet for each $or clause. */
