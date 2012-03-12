@@ -995,6 +995,18 @@ namespace mongo {
     class FieldRangeVector;
     class FieldRangeVectorIterator;
     
+    /**
+     * A Cursor class for Btree iteration.
+     *
+     * A BtreeCursor can record its current btree position (noteLoc()) and then relocate this
+     * position after a write (checkLoc()).  A recorded btree position consists of a btree bucket,
+     * bucket key offset, and unique btree key.  To relocate a unique btree key, a BtreeCursor first
+     * checks the btree key at its recorded btree bucket and bucket key offset.  If the key at that
+     * location does not match the recorded btree key, and an adjacent key also fails to match,
+     * the recorded key (or the next existing key following it) is located in the btree using binary
+     * search.  If the recorded btree bucket is invalidated, the initial recorded bucket check is
+     * not attempted (see SERVER-4575).
+     */
     class BtreeCursor : public Cursor {
     protected:
         BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction );

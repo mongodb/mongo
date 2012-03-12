@@ -290,6 +290,30 @@ namespace mongo {
      * the scanner's cursors as they become available.  Once the scanner chooses
      * a single plan, this cursor becomes a simple wrapper around that single
      * plan's cursor (called the 'takeover' cursor).
+     *
+     * A QueryOptimizerCursor employs a delegation strategy to ensure consistency after writes
+     * during its initial phase when multiple delegate Cursors may be active (before _takeover is
+     * set).
+     *
+     * Before takeover, the return value of refLoc() will be isNull(), causing ClientCursor to
+     * ignore a QueryOptimizerCursor (though not its delegate Cursors) when a delete occurs.
+     * Requests to prepareToYield() or recoverFromYield() will be forwarded to
+     * prepareToYield()/recoverFromYield() on ClientCursors of delegate Cursors.  If a delegate
+     * Cursor becomes eof() or invalid after a yield recovery,
+     * QueryOptimizerCursor::recoverFromYield() may advance _currOp to another delegate Cursor.
+     *
+     * Requests to prepareToTouchEarlierIterate() or recoverFromTouchingEarlierIterate() are
+     * forwarded as prepareToTouchEarlierIterate()/recoverFromTouchingEarlierIterate() to the
+     * delegate Cursor when a single delegate Cursor is active.  If multiple delegate Cursors are
+     * active, the advance() call preceeding prepareToTouchEarlierIterate() may not properly advance
+     * all delegate Cursors, so the calls are forwarded as prepareToYield()/recoverFromYield() to a
+     * ClientCursor for each delegate Cursor.
+     *
+     * If the advance() call preceeding prepareToTouchEarlierIterate() may cause _takeover to be
+     * set, the implemenation will internally call _takeover->advance() if necessary.
+     *
+     * After _takeover is set, consistency after writes is ensured by delegation to the _takeover
+     * MultiCursor.
      */
     class QueryOptimizerCursorImpl : public QueryOptimizerCursor {
     public:

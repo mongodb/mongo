@@ -28,12 +28,53 @@ namespace mongo {
     class Record;
     class CoveredIndexMatcher;
 
-    /* Query cursors, base class.  This is for our internal cursors.  "ClientCursor" is a separate
-       concept and is for the user's cursor.
-
-       WARNING concurrency: the vfunctions below are called back from within a
-       ClientCursor::ccmutex.  Don't cause a deadlock, you've been warned.
-    */
+    /**
+     * Query cursors, base class.  This is for our internal cursors.  "ClientCursor" is a separate
+     * concept and is for the user's cursor.
+     *
+     * WARNING concurrency: the vfunctions below are called back from within a
+     * ClientCursor::ccmutex.  Don't cause a deadlock, you've been warned.
+     *
+     * Two general techniques may be used to ensure a Cursor is in a consistent state after a write.
+     *     - The Cursor may be advanced before the document at its current position is deleted.
+     *     - The Cursor may record its position and then relocate this position.
+     * A particular Cursor may potentially utilize only one of the above techniques, but a client
+     * that is Cursor subclass agnostic must implement a pattern handling both techniques.
+     *
+     * When the document at a Cursor's current position is deleted (or moved to a new location) the
+     * following pattern is used:
+     *     DiskLoc toDelete = cursor->currLoc();
+     *     cursor->advance();
+     *     cursor->prepareToTouchEarlierIterate();
+     *     delete( toDelete );
+     *     cursor->recoverFromTouchingEarlierIterate();
+     * 
+     * When a cursor yields, the following pattern is used:
+     *     cursor->prepareToYield();
+     *     while( Op theOp = nextOp() ) {
+     *         if ( theOp.type() == INSERT || theOp.type() == UPDATE_IN_PLACE ) {
+     *             theOp.run();
+     *         }
+     *         else if ( theOp.type() == DELETE ) {
+     *             if ( cursor->refLoc() == theOp.toDelete() ) {
+     *                 cursor->recoverFromYield();
+     *                 cursor->advance();
+     *                 cursor->prepareToYield();
+     *             }
+     *             theOp.run();
+     *         }
+     *     }
+     *     cursor->recoverFromYield();
+     *     
+     * The break before a getMore request is typically treated as a yield, but if a Cursor supports
+     * getMore but not yield the following pattern is currently used:
+     *     cursor->noteLocation();
+     *     runOtherOps();
+     *     cursor->checkLocation();
+     *
+     * A Cursor may rely on additional callbacks not listed above to relocate its position after a
+     * write.
+     */
     class Cursor : boost::noncopyable {
     public:
         virtual ~Cursor() {}
@@ -165,7 +206,13 @@ namespace mongo {
     const AdvanceStrategy *forward();
     const AdvanceStrategy *reverse();
 
-    /* table-scan style cursor */
+    /**
+     * table-scan style cursor
+     *
+     * A BasicCursor relies on advance() to ensure it is in a consistent state after a write.  If
+     * the document at a BasicCursor's current position will be deleted or relocated, the cursor
+     * must first be advanced.  The same is true of BasicCursor subclasses.
+     */
     class BasicCursor : public Cursor {
     public:
         BasicCursor(DiskLoc dl, const AdvanceStrategy *_s = forward()) : curr(dl), s( _s ), _nscanned() {

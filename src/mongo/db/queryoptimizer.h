@@ -538,8 +538,12 @@ namespace mongo {
     };
 
     /**
-     * Provides a cursor interface for certain limited uses of a MultiPlanScanner.
+     * Provides a cursor interface for serial single Cursor iteration using a MultiPlanScanner.
      * Currently used internally by a QueryOptimizerCursor.
+     *
+     * A MultiCursor is backed by one BasicCursor or BtreeCursor at a time and forwards calls for
+     * ensuring a consistent state after a write to its backing Cursor.  There is a known issue in
+     * some cases when advance() causes a switch to a new BasicCursor backing (SERVER-5198).
      */
     class MultiCursor : public Cursor {
     public:
