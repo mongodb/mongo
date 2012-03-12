@@ -46,22 +46,45 @@ __wt_conn_btree_open(WT_SESSION_IMPL *session,
 	if (matched) {
 		__wt_spin_unlock(session, &conn->spinlock);
 
-		/* Check that the handle is open. */
-		__wt_readlock(session, btree->rwlock);
-		matched = F_ISSET(btree, WT_BTREE_OPEN) ? 1 : 0;
-		__wt_rwunlock(session, btree->rwlock);
+		/*
+		 * Check that the handle is open.  We've already incremented
+		 * the reference count, so once the handle is open it won't be
+		 * closed by another thread.
+		 *
+		 * If we can see the WT_BTREE_OPEN flag set while holding a
+		 * lock on the handle, then it's really open and we can start
+		 * using it.  Alternatively, if we can get an exclusive lock
+		 * and WT_BTREE_OPEN is still not set, we need to do the open.
+		 */
+		for (;;) {
+			__wt_readlock(session, btree->rwlock);
+			if (F_ISSET(btree, WT_BTREE_OPEN))
+				break;
 
-		if (!matched) {
-			__wt_writelock(session, btree->rwlock);
-			if (!F_ISSET(btree, WT_BTREE_OPEN)) {
-				/* We're going to overwrite the old config. */
-				__wt_free(session, btree->config);
+			/*
+			 * Try to upgrade to an exclusive lock.  There is some
+			 * subtlety here: if we race with another thread that
+			 * successfully opens the file, we don't want to block
+			 * waiting to get exclusive access.
+			 */
+			__wt_rwunlock(session, btree->rwlock);
+			if (__wt_try_writelock(session, btree->rwlock) == 0) {
+				/* Was it opened while we waited? */
+				if (F_ISSET(btree, WT_BTREE_OPEN))
+					break;
+
+				/*
+				 * We've got the exclusive handle lock, it's
+				 * our job to open the file.
+				 */
 				goto conf;
 			}
 
-			/* It was opened while we waited. */
-			__wt_rwunlock(session, btree->rwlock);
+			/* Give other threads a chance to make progress. */
+			__wt_yield();
 		}
+
+		__wt_rwunlock(session, btree->rwlock);
 
 		/* The config string will not be needed: free it now. */
 		__wt_free(session, config);
@@ -112,6 +135,8 @@ __wt_conn_btree_open(WT_SESSION_IMPL *session,
 
 	/* Open the underlying file. */
 conf:	session->btree = btree;
+	/* Free any old config. */
+	__wt_free(session, btree->config);
 	btree->config = config;
 
 	ret = __wt_btree_open(session, cfg, flags);
@@ -139,16 +164,17 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 	conn = S2C(session);
 	ret = 0;
 
-	if (F_ISSET(btree, WT_BTREE_OPEN))
+	if (F_ISSET(btree, WT_BTREE_OPEN)) {
 		WT_STAT_DECR(conn->stats, file_open);
 
-	/*
-	 * If it looks like we are the last reference, sync the file.  This
-	 * should make the close call fast (while we are holding an exclusive
-	 * lock on the handle).
-	 */
-	if (btree->refcnt == 1)
-		WT_RET(__wt_btree_sync(session, NULL));
+		/*
+		 * If it looks like we are the last reference, sync the file.
+		 * This should make the close call fast (while we are holding
+		 * an exclusive lock on the handle).
+		 */
+		if (btree->refcnt == 1)
+			WT_RET(__wt_btree_sync(session, NULL));
+	}
 
 	/*
 	 * Decrement the reference count.  If we really are the last reference,
@@ -161,8 +187,10 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 	__wt_spin_unlock(session, &conn->spinlock);
 
 	if (!inuse) {
-		ret = __wt_btree_close(session);
-		F_CLR(btree, WT_BTREE_OPEN);
+		if (F_ISSET(btree, WT_BTREE_OPEN)) {
+			ret = __wt_btree_close(session);
+			F_CLR(btree, WT_BTREE_OPEN);
+		}
 		if (!locked)
 			__wt_rwunlock(session, btree->rwlock);
 	}

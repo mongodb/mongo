@@ -37,8 +37,11 @@ __wt_session_lock_btree(
     WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
 {
 	WT_BTREE *btree;
+	uint32_t open_flags;
+	int ret;
 
 	btree = session->btree;
+	ret = 0;
 
 	if (LF_ISSET(WT_BTREE_EXCLUSIVE)) {
 		/*
@@ -51,18 +54,19 @@ __wt_session_lock_btree(
 		WT_RET(__wt_try_writelock(session, btree->rwlock));
 
 		/*
-		 * Check if the handle needs to be reopened for this operation.
-		 * We do need to pick up the flags anyway, for example to set
-		 * WT_BTREE_BULK so the handle is closed correctly.
+		 * Reopen the handle for this operation to set any special
+		 * flags.  For example, set WT_BTREE_BULK so the handle is
+		 * closed correctly.
 		 */
-		if (LF_ISSET(WT_BTREE_BULK |
-		    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
-			return (__wt_conn_btree_reopen(session, cfg, flags));
-		F_SET(btree, flags);
+		open_flags = LF_ISSET(WT_BTREE_BULK |
+		    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY);
+		if (open_flags != 0)
+			ret = __wt_conn_btree_reopen(session, cfg, open_flags);
+		F_SET(btree, WT_BTREE_EXCLUSIVE);
 	} else if (!LF_ISSET(WT_BTREE_NO_LOCK))
 		__wt_readlock(session, btree->rwlock);
 
-	return (0);
+	return (ret);
 }
 
 /*
@@ -79,17 +83,17 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	ret = 0;
 
 	/*
-	 * If we had exclusive access, reopen the tree without special flags so
-	 * that other threads can use it (note the reopen call sets the flags).
+	 * If we had exclusive access, close the handle so that other threads
+	 * can use it (the next thread to access the handle will open it with
+	 * any special flags as required.  The handle stays in our cache, so
+	 * we don't want to go through __wt_conn_btree_close.
 	 */
-	if (F_ISSET(btree, WT_BTREE_BULK |
-	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)) {
-		WT_ASSERT(session, F_ISSET(btree, WT_BTREE_EXCLUSIVE));
-		ret = __wt_conn_btree_reopen(session, NULL, 0);
+	if (F_ISSET(btree, WT_BTREE_EXCLUSIVE)) {
+		ret = __wt_btree_close(session);
+		F_CLR(btree, WT_BTREE_EXCLUSIVE | WT_BTREE_OPEN);
 	}
-	F_CLR(btree, WT_BTREE_EXCLUSIVE);
 
-	__wt_rwunlock(session, session->btree->rwlock);
+	__wt_rwunlock(session, btree->rwlock);
 
 	return (ret);
 }
