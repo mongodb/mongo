@@ -1082,7 +1082,7 @@ namespace QueryUtilTests {
 
         class IndexBase {
         public:
-            IndexBase() : _ctx( ns() ) , indexNum_( 0 ) {
+            IndexBase() : _ctx( ns() ) , indexNum_( 0 ), lk_(ns()) {
                 string err;
                 userCreateNS( ns(), BSONObj(), err, false );
             }
@@ -1114,7 +1114,7 @@ namespace QueryUtilTests {
             }
             static DBDirectClient client_;
         private:
-            dblock lk_;
+            Lock::DBWrite lk_;
             Client::Context _ctx;
             int indexNum_;
         };

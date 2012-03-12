@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="misc and third party">
@@ -86,9 +86,14 @@
       <Filter>client</Filter>
     </ClInclude>
     <ClInclude Include="..\db\cmdline.h">
-      <Filter>db\h</Filter></ClInclude>
-<ClInclude Include="..\db\commands.h"><Filter>db\h</Filter></ClInclude>
-<ClInclude Include="..\db\concurrency.h"><Filter>db\h</Filter></ClInclude>
+      <Filter>db\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\commands.h">
+      <Filter>db\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\concurrency.h">
+      <Filter>db\h</Filter>
+    </ClInclude>
     <ClInclude Include="..\db\curop.h">
       <Filter>db\h</Filter>
     </ClInclude>
@@ -346,6 +351,7 @@
     <ClInclude Include="..\db\explain.h">
       <Filter>db\h</Filter>
     </ClInclude>
+    <ClInclude Include="..\db\clientcursor.h" />
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\..\..\js\js32d.lib">
@@ -913,7 +919,6 @@
       <Filter>db\x</Filter>
     </ClCompile>
     <ClCompile Include="..\pch.cpp" />
-    <ClCompile Include="..\db\queryoptimizercursor.cpp" />
     <ClCompile Include="..\db\queryoptimizercursorimpl.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
@@ -1025,6 +1030,18 @@
     </ClCompile>
     <ClCompile Include="..\..\third_party\boost\libs\program_options\src\winmain.cpp">
       <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="counttests.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="queryutiltests.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="removetests.cpp">
+      <Filter>dbtests</Filter>
+    </ClCompile>
+    <ClCompile Include="replsettests.cpp">
+      <Filter>dbtests</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

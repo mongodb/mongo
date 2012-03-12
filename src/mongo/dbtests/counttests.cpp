@@ -26,10 +26,10 @@
 namespace CountTests {
 
     class Base {
-        dblock lk;
+        Lock::DBWrite lk;
         Client::Context _context;
     public:
-        Base() : _context( ns() ) {
+        Base() : lk(ns()), _context( ns() ) {
             addIndex( fromjson( "{\"a\":1}" ) );
         }
         ~Base() {

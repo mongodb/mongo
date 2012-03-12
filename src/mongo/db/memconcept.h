@@ -39,7 +39,8 @@ namespace mongo {
             for a file */
         void is(void *p, concept c, std::string desc = "", unsigned len=0);
 
-#if !defined(_DEBUG)
+#if 1
+//#if !defined(_DEBUG)
         inline void invalidate(void *p, unsigned len) { }
         inline void is(void *p, concept c, std::string, unsigned) { }
 #endif

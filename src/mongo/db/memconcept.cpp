@@ -12,9 +12,6 @@
 using namespace std;
 #include "../util/log.h"
 #include "../util/unittest.h"
-//#include "../util/mongoutils/str.h"
-//using namespace mongoutils;
-// concurrency???
 
 namespace mongo {
     namespace memconcept { 
@@ -87,7 +84,7 @@ namespace mongo {
             }
         }
 
-#if defined(_DEBUG)
+#if 0 && defined(_DEBUG)
         bool d = false;
         void is(void *p, concept c, string description, unsigned len) {
             DDD( log() << "is  " << p << ' ' << c.toString() << ' ' << description << ' ' << len << endl; )

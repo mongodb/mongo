@@ -51,7 +51,7 @@ namespace ReplSetTests {
         DBDirectClient *client() const { return &client_; }
 
         static void insert( const BSONObj &o, bool god = false ) {
-            dblock lk;
+            Lock::DBWrite lk(ns());
             Client::Context ctx( ns() );
             theDataFileMgr.insert( ns(), o.objdata(), o.objsize(), god );
         }
@@ -94,8 +94,13 @@ namespace ReplSetTests {
         void run() {
             writelock lk("");
 
-            OpTime o1 = OpTime::now();
-            OpTime o2 = OpTime::now();
+            OpTime o1,o2;
+
+            {
+                mutex::scoped_lock lk2(OpTime::m);
+                OpTime o1 = OpTime::now(lk2);
+                OpTime o2 = OpTime::now(lk2);
+            }
 
             BSONObjBuilder b;
             b.appendTimestamp("ts", o2.asLL());
@@ -140,8 +145,8 @@ namespace ReplSetTests {
         void run() {
             writelock lk("");
 
-            OpTime o1 = OpTime::now();
-            OpTime o2 = OpTime::now();
+            OpTime o1 = OpTime::_now();
+            OpTime o2 = OpTime::_now();
 
             BSONObjBuilder b;
             b.appendTimestamp("ts", o2.asLL());
@@ -188,7 +193,10 @@ namespace ReplSetTests {
 
         BSONObj updateFail() {
             BSONObjBuilder b;
-            b.appendTimestamp("ts", OpTime::now().asLL());
+            {
+                mutex::scoped_lock lk2(OpTime::m);
+                b.appendTimestamp("ts", OpTime::now(lk2).asLL());
+            }
             b.append("op", "u");
             b.append("o", BSON("$set" << BSON("x" << 456)));
             b.append("o2", BSON("_id" << 123 << "x" << 123));
@@ -219,7 +227,7 @@ namespace ReplSetTests {
         }
 
         void run() {
-            writelock lk("");
+            Lock::DBWrite lk(_ns);
 
             BSONObj op = updateFail();
 
@@ -233,7 +241,10 @@ namespace ReplSetTests {
     class CappedUpdate : public CappedInitialSync {
         void updateSucceed() {
             BSONObjBuilder b;
-            b.appendTimestamp("ts", OpTime::now().asLL());
+            {
+                mutex::scoped_lock lk2(OpTime::m);
+                b.appendTimestamp("ts", OpTime::now(lk2).asLL());
+            }
             b.append("op", "u");
             b.append("o", BSON("$set" << BSON("x" << 789)));
             b.append("o2", BSON("x" << 456));
@@ -271,7 +282,10 @@ namespace ReplSetTests {
     class CappedInsert : public CappedInitialSync {
         void insertSucceed() {
             BSONObjBuilder b;
-            b.appendTimestamp("ts", OpTime::now().asLL());
+            {
+                mutex::scoped_lock lk2(OpTime::m);
+                b.appendTimestamp("ts", OpTime::now(lk2).asLL());
+            }
             b.append("op", "i");
             b.append("o", BSON("_id" << 123 << "x" << 456));
             b.append("ns", cappedNs());
