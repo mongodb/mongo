@@ -428,15 +428,22 @@ namespace mongo {
                           const BSONObj &min = BSONObj(),
                           const BSONObj &max = BSONObj() );
 
-        /** Initialize or iterate a runner generated from @param originalOp. */
-        
+        /** Set the initial QueryOp for QueryPlanSet iteration. */
         void initialOp( const shared_ptr<QueryOp> &originalOp ) { _baseOp = originalOp; }
+        /**
+         * Advance to the next QueryOp, if not doneOps().
+         * @return the next non error op if there is one, otherwise an error op.
+         * If the returned op is complete() or error(), the MultiPlanScanner becomes doneOps() and
+         * no further QueryOp iteration is possible.
+         */
         shared_ptr<QueryOp> nextOp();
+        /** @return true if done with QueryOp iteration. */
+        bool doneOps() const { return _doneOps; }
 
         /**
          * Advance to the next $or clause; mayRunMore() must be true.
          * @param currentPlan QueryPlan of the current $or clause
-         * @return best guess query plan of the next $or clause
+         * @return best guess query plan of the next $or clause, 0 if there is no such plan.
          */
         const QueryPlan *nextClauseBestGuessPlan( const QueryPlan &currentPlan );
 
@@ -501,6 +508,7 @@ namespace mongo {
         /** Initialize or iterate a runner generated from @param originalOp. */
         shared_ptr<QueryOp> iterateRunner( QueryOp &originalOp, bool retried = false );
 
+        shared_ptr<QueryOp> nextOpSimple();
         shared_ptr<QueryOp> nextOpOr();
         
         void updateCurrentQps( QueryPlanSet *qps );
@@ -532,6 +540,7 @@ namespace mongo {
         shared_ptr<QueryOp> _baseOp;
         shared_ptr<QueryPlanSet::Runner> _runner;
         shared_ptr<ExplainQueryInfo> _explainQueryInfo;
+        bool _doneOps;
     };
 
     /**

@@ -939,7 +939,8 @@ doneCheckOrder:
         _i(),
         _recordedPlanPolicy( recordedPlanPolicy ),
         _hint( hint.getOwned() ),
-        _tableScanned() {
+        _tableScanned(),
+        _doneOps() {
         if ( !order.isEmpty() || !min.isEmpty() || !max.isEmpty() ) {
             _or = false;
         }
@@ -1002,16 +1003,22 @@ doneCheckOrder:
     }
 
     shared_ptr<QueryOp> MultiPlanScanner::nextOp() {
-        if ( _or ) {
-            return nextOpOr();
+        verify( 16093, !doneOps() );
+        shared_ptr<QueryOp> ret = _or ? nextOpOr() : nextOpSimple();
+        if ( ret->error() || ret->complete() ) {
+            _doneOps = true;
         }
+        return ret;
+    }
+
+    shared_ptr<QueryOp> MultiPlanScanner::nextOpSimple() {
         if ( _i == 0 ) {
             assertMayRunMore();
             ++_i;
         }
         return iterateRunner( *_baseOp );
     }
-    
+
     shared_ptr<QueryOp> MultiPlanScanner::nextOpOr() {
         if ( _i == 0 ) {
             return nextOpBeginningClause();

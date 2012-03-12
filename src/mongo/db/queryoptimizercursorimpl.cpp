@@ -431,6 +431,7 @@ namespace mongo {
                 if ( _currOp->error() || !ok() ) {
                     // Advance to a non error op if one of the ops errored out.
                     // Advance to a following $or clause if the $or clause returned all results.
+                    verify( 16094, !_mps->doneOps() );
                     _advance( true );
                 }
             }
