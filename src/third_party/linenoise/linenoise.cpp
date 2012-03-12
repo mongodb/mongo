@@ -296,18 +296,11 @@ public:
         memcpy( textCopy, text, textLen );
         textCopy[ textLen ] = 0;
         string textCopyString( textCopy );
-        if ( lastAction == actionKill ) {
-            if ( size == 0 ) {
-                indexToSlot[0] = 0;
-                size++;
-                theRing.push_back( textCopyString );
-            }
-            else {
-                int slot = indexToSlot[0];
-                theRing[slot] = forward ?
-                    theRing[slot] + textCopyString :
-                    textCopyString + theRing[slot];
-            }
+        if ( lastAction == actionKill && size > 0 ) {
+            int slot = indexToSlot[0];
+            theRing[slot] = forward ?
+                theRing[slot] + textCopyString :
+                textCopyString + theRing[slot];
         }
         else {
             if ( size < capacity ) {
