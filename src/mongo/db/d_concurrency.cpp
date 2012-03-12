@@ -179,7 +179,7 @@ namespace mongo {
     }
     static void lock_R() { 
         LockState& ls = lockState();
-        massert(0, str::stream() << "can't lock_R, threadState=" << (int) threadState, ls.threadState == 0);
+        massert(16094, str::stream() << "can't lock_R, threadState=" << (int) threadState, ls.threadState == 0);
         ls.threadState = 'R';
         Acquiring a('R');
         q.lock_R();
@@ -289,13 +289,13 @@ namespace mongo {
             LockState &ls = lockState();
             log() << "error expected " << ns << " to be locked " << endl;
             ls.dump();
-            msgasserted(0, str::stream() << "expected to be read locked for " << ns);
+            msgasserted(16095, str::stream() << "expected to be read locked for " << ns);
         }
     }
     void Lock::assertWriteLocked(const StringData& ns) { 
         if( !Lock::isWriteLocked(ns) ) { 
             lockState().dump();
-            msgasserted(0, str::stream() << "expected to be write locked for " << ns);
+            msgasserted(16096, str::stream() << "expected to be write locked for " << ns);
         }
     }
 
@@ -495,7 +495,7 @@ namespace mongo {
         if( ls.other ) { 
             // nested. if/when we do temprelease with DBWrite we will need to increment here
             // (so we can not release or assert if nested).
-            massert(0, str::stream() << "internal error tried to lock two databases at the same time. old:" << ls.otherName << " new:" << db,same);
+            massert(16097, str::stream() << "internal error tried to lock two databases at the same time. old:" << ls.otherName << " new:" << db,same);
 
             // we do the top lock though so its temprelease semantics are preserved:
             lockTop(ls);
@@ -503,7 +503,7 @@ namespace mongo {
         }
 
         // first lock for this db. check consistent order with local db lock so we never deadlock. local always comes last
-        massert(0, str::stream() << "can't dblock:" << db << " when local is already locked", ls.local == 0);
+        massert(16098, str::stream() << "can't dblock:" << db << " when local is already locked", ls.local == 0);
 
         lockTop(ls);
 
@@ -591,7 +591,7 @@ namespace mongo {
         if( ls.other ) { 
             // nested. prev could be read or write. if/when we do temprelease with DBRead/DBWrite we will need to increment/decrement here
             // (so we can not release or assert if nested).  temprelease we should avoid if we can though, it's a bit of an anti-pattern.
-            massert(0, str::stream() << "internal error tried to lock two databases at the same time. old:" << ls.otherName << " new:" << db,same);
+            massert(16099, str::stream() << "internal error tried to lock two databases at the same time. old:" << ls.otherName << " new:" << db,same);
 
             // we do the top lock though so its temprelease semantics are preserved:
             lockTop(ls);
@@ -599,7 +599,7 @@ namespace mongo {
         }
 
         // first lock for this db. check consistent order with local db lock so we never deadlock. local always comes last
-        massert(0, str::stream() << "can't dblock:" << db << " when local is already locked", ls.local == 0);
+        massert(16100, str::stream() << "can't dblock:" << db << " when local is already locked", ls.local == 0);
 
         lockTop(ls);
 
@@ -716,14 +716,14 @@ namespace mongo {
         if( !isWriteLocked() ) { 
             lockState().dump();
             dassert(false); // dassert will terminate buildbot
-            msgasserted(0, "expected write lock");
+            msgasserted(16101, "expected write lock");
         }
     }
     void MongoMutex::assertAtLeastReadLocked() const { 
         if( !atLeastReadLocked() ) { 
             lockState().dump();
             dassert(false); // dassert will terminate buildbot
-            msgasserted(0, "expected read lock");
+            msgasserted(16102, "expected read lock");
         }
     }
 
