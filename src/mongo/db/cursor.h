@@ -92,7 +92,7 @@ namespace mongo {
         virtual bool supportYields() = 0;
 
         /** Called before a ClientCursor yield. */
-        virtual bool prepareToYield() { noteLocation(); return supportYields(); }
+        virtual void prepareToYield() { noteLocation(); }
         
         /** Called after a ClientCursor yield.  Recovers from a previous call to prepareToYield(). */
         virtual void recoverFromYield() { checkLocation(); }

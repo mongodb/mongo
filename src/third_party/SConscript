@@ -3,7 +3,6 @@
 Import( "env has_option" )
 
 env.SConscript( [
-        "pcre-${PCRE_VERSION}/SConscript",
         "murmurhash3/SConscript",
         ] )
 
@@ -11,5 +10,17 @@ if has_option( "use-system-pcre" ) or has_option( "use-system-all" ):
     env.StaticLibrary( "pcrecpp", ['mongo_pcrecpp.cc'],
                        SYSLIBDEPS=[ 'pcre' , 'pcrecpp' ] )
 else:
+    env.SConscript('pcre-${PCRE_VERSION}/SConscript')
     env.StaticLibrary( "pcrecpp", ['mongo_pcrecpp.cc'],
                        LIBDEPS=[ 'pcre-${PCRE_VERSION}/pcrecpp' ] )
+
+if has_option('use-system-all') or has_option('use-system-boost'):
+    env.StaticLibrary("mongo_boost", ['mongo_boost.cpp'])
+else:
+    env.SConscript('boost/SConscript')
+    env.StaticLibrary( "mongo_boost", ['mongo_boost.cpp'],
+                       LIBDEPS=[ 'boost/boost_program_options',
+                                 'boost/boost_filesystem',
+                                 'boost/boost_thread',
+                                 'boost/boost_system',
+                                 ] )

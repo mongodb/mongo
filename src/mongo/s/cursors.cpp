@@ -24,6 +24,7 @@
 #include "../util/net/listen.h"
 
 namespace mongo {
+    const int ShardedClientCursor::INIT_REPLY_BUFFER_SIZE = 32768;
 
     // --------  ShardedCursor -----------
 
@@ -60,6 +61,10 @@ namespace mongo {
         return _id;
     }
 
+    int ShardedClientCursor::getTotalSent() const {
+        return _totalSent;
+    }
+
     void ShardedClientCursor::accessed() {
         if ( _lastAccessMillis > 0 )
             _lastAccessMillis = Listener::getElapsedTimeMillis();
@@ -71,48 +76,64 @@ namespace mongo {
         return now - _lastAccessMillis;
     }
 
-    bool ShardedClientCursor::sendNextBatch( Request& r , int ntoreturn ) {
+    bool ShardedClientCursor::sendNextBatchAndReply( Request& r ){
+        BufBuilder buffer( INIT_REPLY_BUFFER_SIZE );
+        int docCount = 0;
+        bool hasMore = sendNextBatch( r, _ntoreturn, buffer, docCount );
+        replyToQuery( 0, r.p(), r.m(), buffer.buf(), buffer.len(), docCount,
+                _totalSent, hasMore ? getId() : 0 );
+
+        return hasMore;
+    }
+
+    bool ShardedClientCursor::sendNextBatch( Request& r , int ntoreturn ,
+            BufBuilder& buffer, int& docCount ) {
         uassert( 10191 ,  "cursor already done" , ! _done );
 
         int maxSize = 1024 * 1024;
         if ( _totalSent > 0 )
             maxSize *= 3;
 
-        BufBuilder b(32768);
+        docCount = 0;
 
-        int num = 0;
-
-        // Send more if ntoreturn is 0, or any value > 1 (one is assumed to be a single doc return, with no cursor)
+        // Send more if ntoreturn is 0, or any value > 1
+        // (one is assumed to be a single doc return, with no cursor)
         bool sendMore = ntoreturn == 0 || ntoreturn > 1;
         ntoreturn = abs( ntoreturn );
 
         while ( _cursor->more() ) {
             BSONObj o = _cursor->next();
 
-            b.appendBuf( (void*)o.objdata() , o.objsize() );
-            num++;
+            buffer.appendBuf( (void*)o.objdata() , o.objsize() );
+            docCount++;
 
-            if ( b.len() > maxSize ) {
+            if ( buffer.len() > maxSize ) {
                 break;
             }
 
-            if ( num == ntoreturn ) {
+            if ( docCount == ntoreturn ) {
                 // soft limit aka batch size
                 break;
             }
 
-            if ( ntoreturn == 0 && _totalSent == 0 && num >= 100 ) {
+            if ( ntoreturn == 0 && _totalSent == 0 && docCount >= 100 ) {
                 // first batch should be max 100 unless batch size specified
                 break;
             }
         }
 
         bool hasMore = sendMore && _cursor->more();
-        LOG(5) << "\t hasMore: " << hasMore << " sendMore: " << sendMore << " cursorMore: " << _cursor->more() << " ntoreturn: " << ntoreturn
-               << " num: " << num << " wouldSendMoreIfHad: " << sendMore << " id:" << getId() << " totalSent: " << _totalSent << endl;
 
-        replyToQuery( 0 , r.p() , r.m() , b.buf() , b.len() , num , _totalSent , hasMore ? getId() : 0 );
-        _totalSent += num;
+        LOG(5) << "\t hasMore: " << hasMore
+               << " sendMore: " << sendMore
+               << " cursorMore: " << _cursor->more()
+               << " ntoreturn: " << ntoreturn
+               << " num: " << docCount
+               << " wouldSendMoreIfHad: " << sendMore
+               << " id:" << getId()
+               << " totalSent: " << _totalSent << endl;
+
+        _totalSent += docCount;
         _done = ! hasMore;
 
         return hasMore;

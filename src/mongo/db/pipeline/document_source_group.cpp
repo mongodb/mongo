@@ -228,13 +228,13 @@ namespace mongo {
                   add aggregation operators.
                 */
                 uassert(15950, str::stream() <<
-                        "the group aggregate field name " <<
-                        *pFieldName << " cannot be an operator name",
+                        "the group aggregate field name \"" <<
+                        pFieldName << "\" cannot be an operator name",
                         *pFieldName != '$');
 
-                uassert(15951, str::stream() << 
-                        "the group aggregate field " << *pFieldName <<
-                        "must be defined as an expression inside an object",
+                uassert(15951, str::stream() <<
+                        "the group aggregate field \"" << pFieldName <<
+                        "\" must be defined as an expression inside an object",
                         groupField.type() == Object);
 
                 BSONObj subField(groupField.Obj());
@@ -395,5 +395,3 @@ namespace mongo {
         return pMerger;
     }
 }
-
-

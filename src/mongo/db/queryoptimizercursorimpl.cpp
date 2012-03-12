@@ -88,7 +88,8 @@ namespace mongo {
             // No geo cursor could be generated here, and we do not specify numWanted.
             _c = qp().newCursor();
 
-            // The QueryOptimizerCursor::prepareToTouchEarlierIterate() implementation requires _c->prepareToYield() to work.
+            // All candidate cursors must support yields for QueryOptimizerCursorImpl's
+            // prepareToYield() and prepareToTouchEarlierIterate() to work.
             verify( 15940, _c->supportYields() );
             _capped = _c->capped();
 
@@ -105,16 +106,17 @@ namespace mongo {
             return _c ? _c->nscanned() : _matchCounter.nscanned();
         }
         
-        virtual bool prepareToYield() {
+        virtual void prepareToYield() {
             if ( _c && !_cc ) {
                 _cc.reset( new ClientCursor( QueryOption_NoCursorTimeout, _c, qp().ns() ) );
+                // Set 'doing deletes' as deletes may occur; if there are no deletes this has no
+                // effect.
+                _cc->setDoingDeletes( true );
             }
             if ( _cc ) {
                 recordCursorLocation();
-                return _cc->prepareToYield( _yieldData );
+                _cc->prepareToYield( _yieldData );
             }
-            // no active cursor - ok to yield
-            return true;
         }
         
         virtual void recoverFromYield() {
@@ -356,8 +358,11 @@ namespace mongo {
         }
         
         /**
-         * When return value isNull(), our cursor will be ignored for yielding by the client cursor implementation.
-         * In such cases, an internal ClientCursor will update the position of component cursors when necessary.
+         * When return value isNull(), our cursor will be ignored for deletions by the ClientCursor
+         * implementation.  In such cases, internal ClientCursors will update the positions of
+         * component Cursors when necessary.
+         * !!! Use care if changing this behavior, as some ClientCursor functionality may not work
+         * recursively.
          */
         virtual DiskLoc refLoc() { return _takeover ? _takeover->refLoc() : DiskLoc(); }
         
@@ -371,7 +376,7 @@ namespace mongo {
         
         virtual bool supportGetMore() { return true; }
 
-        virtual bool supportYields() { return _takeover ? _takeover->supportYields() : true; }
+        virtual bool supportYields() { return true; }
         
         virtual void prepareToTouchEarlierIterate() {
             if ( _takeover ) {
@@ -385,7 +390,7 @@ namespace mongo {
                 else {
                     // With multiple plans, the 'earlier iterate' could be the current iterate of one of
                     // the component plans.  We do a full yield of all plans, using ClientCursors.
-                    verify( 15941, _mps->prepareToYield() );
+                    _mps->prepareToYield();
                 }
             }
         }
@@ -404,16 +409,12 @@ namespace mongo {
             }
         }
 
-        virtual bool prepareToYield() {
+        virtual void prepareToYield() {
             if ( _takeover ) {
-                return _takeover->prepareToYield();
+                _takeover->prepareToYield();
             }
             else if ( _currOp ) {
-                return _mps->prepareToYield();
-            }
-            else {
-                // No state needs to be protected, so yielding is fine.
-                return true;
+                _mps->prepareToYield();
             }
         }
         

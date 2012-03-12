@@ -118,4 +118,28 @@ assert( x.ok == 1 && x.numFiles > 0 , "fsync failed : " + tojson( x ) )
 x = db._adminCommand( { "fsync" :1, lock:true } )
 assert( ! x.ok , "lock should fail: " + tojson( x ) )
 
+
+// write back stuff
+// SERVER-4194
+
+function countWritebacks( curop ) {
+    var num = 0;
+    for ( var i=0; i<curop.inprog.length; i++ ) {
+        var q = curop.inprog[i].query;
+        if ( q && q.writebacklisten )
+            num++;
+    }
+    return num;
+}
+
+x = db.currentOp();
+assert.eq( 0 , countWritebacks( x ) , "without all" );
+
+x = db.currentOp( true );
+assert.eq( 1 , countWritebacks( x ) , "with all" );
+
+
+
+
+
 s.stop()

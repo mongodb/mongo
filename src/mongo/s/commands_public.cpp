@@ -766,6 +766,17 @@ namespace mongo {
 
         } groupCmd;
 
+        class SplitVectorCmd : public NotAllowedOnShardedCollectionCmd  {
+        public:
+            SplitVectorCmd() : NotAllowedOnShardedCollectionCmd("splitVector") {}
+            virtual bool passOptions() const { return true; }
+            virtual string getFullNS( const string& dbName , const BSONObj& cmdObj ) {
+                return cmdObj.firstElement().valuestrsafe();
+            }
+
+        } splitVectorCmd;
+
+
         class DistinctCmd : public PublicGridCommand {
         public:
             DistinctCmd() : PublicGridCommand("distinct") {}

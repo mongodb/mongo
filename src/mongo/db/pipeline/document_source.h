@@ -21,6 +21,7 @@
 #include <boost/unordered_map.hpp>
 #include "util/intrusive_counter.h"
 #include "client/parallel.h"
+#include "db/clientcursor.h"
 #include "db/jsobj.h"
 #include "db/pipeline/dependency_tracker.h"
 #include "db/pipeline/document.h"
@@ -316,6 +317,7 @@ namespace mongo {
         */
         static intrusive_ptr<DocumentSourceCursor> create(
             const shared_ptr<Cursor> &pCursor,
+            const string &ns,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         /**
@@ -347,7 +349,8 @@ namespace mongo {
         virtual void sourceToBson(BSONObjBuilder *pBuilder) const;
 
     private:
-        DocumentSourceCursor(const shared_ptr<Cursor> &pTheCursor,
+        DocumentSourceCursor(
+            const shared_ptr<Cursor> &pTheCursor, const string &ns,
             const intrusive_ptr<ExpressionContext> &pExpCtx);
 
         void findNext();
@@ -360,6 +363,20 @@ namespace mongo {
          */
         vector<shared_ptr<BSONObj> > bsonDependencies;
         shared_ptr<Cursor> pCursor;
+
+        /*
+          In order to yield, we need a ClientCursor.
+         */
+        ClientCursor::CleanupPointer pClientCursor;
+
+        /*
+          Advance the cursor, and yield sometimes.
+
+          If the state of the world changed during the yield such that we
+          are unable to continue execution of the query, this will release the
+          client cursor, and throw an error.
+         */
+        void advanceAndYield();
 
         /*
           This document source hangs on to the dependency tracker when it

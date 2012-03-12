@@ -567,8 +567,11 @@ namespace mongo {
         for ( int i=0; i<args.Length(); i++ )
             assert( ! args[i]->IsUndefined() );
 
-        if ( !NamespaceString::validDBName( toSTLString( args[1] ))) {
-            return v8::ThrowException( v8::String::New( "invalid database name" ));
+        string dbName = toSTLString( args[1] );
+        if ( !NamespaceString::validDBName( dbName)) {
+            string msg = str::stream() << "[" << dbName << "] is not a "
+                                       << "valid database name";
+            return v8::ThrowException( v8::String::New( msg.c_str() ));
         }
         
         return v8::Undefined();

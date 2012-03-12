@@ -186,6 +186,7 @@ namespace mongo {
         bool active() const { return _active; }
 
         char lockType() const { return _lockType; }
+        bool displayInCurop() const { return _active && ! _suppressFromCurop; }
         bool isWaitingForLock() const { return _waitingForLock; }
         int getOp() const { return _op; }
         unsigned long long startTime() { // micros
@@ -222,6 +223,8 @@ namespace mongo {
             strncpy(_ns, ns, Namespace::MaxNsLen);
             _ns[Namespace::MaxNsLen] = 0;
         }
+        
+        void suppressFromCurop() { _suppressFromCurop = true; }
 
     private:
         friend class Client;
@@ -234,6 +237,7 @@ namespace mongo {
         unsigned long long _checkpoint;
         unsigned long long _end;
         bool _active;
+        bool _suppressFromCurop; // unless $all is set
         int _op;
         bool _command;
         char _lockType;                   // r w R W

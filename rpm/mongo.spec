@@ -24,6 +24,10 @@ client utilities.
 Summary: mongodb server, sharding server, and support scripts
 Group: Applications/Databases
 Requires: mongo
+Requires(pre): /usr/sbin/useradd
+Requires(pre): /usr/sbin/groupadd
+Requires(post): chkconfig
+Requires(preun): chkconfig
 
 %description server
 MongoDB (from "huMONGOus") is a schema-free document-oriented database.
@@ -45,7 +49,7 @@ to develop mongo client software.
 %setup
 
 %build
-scons --prefix=$RPM_BUILD_ROOT/usr all
+scons -%{?_smp_mflags} -prefix=$RPM_BUILD_ROOT/usr all
 # XXX really should have shared library here
 
 %install
@@ -104,6 +108,7 @@ fi
 %{_bindir}/mongofiles
 %{_bindir}/mongoimport
 %{_bindir}/mongorestore
+%{_bindir}/mongosniff
 %{_bindir}/mongostat
 %{_bindir}/bsondump
 %{_bindir}/mongotop
@@ -117,7 +122,7 @@ fi
 %{_mandir}/man1/mongosniff.1*
 %{_mandir}/man1/mongostat.1*
 %{_mandir}/man1/mongorestore.1*
-%{_mandir}/man1/bsondum.1*
+%{_mandir}/man1/bsondump.1*
 
 %files server
 %defattr(-,root,root,-)

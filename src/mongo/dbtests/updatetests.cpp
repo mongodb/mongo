@@ -639,6 +639,33 @@ namespace UpdateTests {
                 test( BSON( "$push" << BSON( "a" << 5 ) ) , fromjson( "{a:[1]}" ) , fromjson( "{a:[1,5]}" ) );
             }
         };
+        
+        class IncRewrite {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << 2 );
+                BSONObj mod = BSON( "$inc" << BSON( "a" << 1 ) );
+                ModSet modSet( mod );
+                auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
+                modSetState->createNewFromMods();
+                ASSERT( modSetState->needOpLogRewrite() );
+                ASSERT_EQUALS( BSON( "$set" << BSON( "a" << 3 ) ), modSetState->getOpLogRewrite() );
+            }
+        };
+   
+        class IncRewriteNestedArray {
+        public:
+            void run() {
+                BSONObj obj = BSON( "a" << BSON_ARRAY( 2 ) );
+                BSONObj mod = BSON( "$inc" << BSON( "a.0" << 1 ) );
+                ModSet modSet( mod );
+                auto_ptr<ModSetState> modSetState = modSet.prepare( obj );
+                modSetState->createNewFromMods();
+                ASSERT( modSetState->needOpLogRewrite() );
+                ASSERT_EQUALS( BSON( "$set" << BSON( "a.0" << 3 ) ),
+                              modSetState->getOpLogRewrite() );
+            }
+        };
 
     };
 
@@ -905,6 +932,8 @@ namespace UpdateTests {
             add< ModSetTests::inc2 >();
             add< ModSetTests::set1 >();
             add< ModSetTests::push1 >();
+            add< ModSetTests::IncRewrite >();
+            add< ModSetTests::IncRewriteNestedArray >();
 
             add< basic::inc1 >();
             add< basic::inc2 >();

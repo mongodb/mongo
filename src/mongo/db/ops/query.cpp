@@ -191,7 +191,7 @@ namespace mongo {
                     assert( cc->prepareToYield( data ) );
                 }
                 else {
-                    cc->updateLocation();
+                    cc->c()->noteLocation();
                 }
                 cc->mayUpgradeStorage();
                 cc->storeOpForSlave( last );
@@ -231,10 +231,23 @@ namespace mongo {
         return shared_ptr<ExplainQueryInfo>();
     }
     
+    MatchCountingExplainStrategy::MatchCountingExplainStrategy
+    ( const ExplainQueryInfo::AncillaryInfo &ancillaryInfo ) :
+    ExplainRecordingStrategy( ancillaryInfo ),
+    _matches() {
+    }
+    
+    void MatchCountingExplainStrategy::noteIterate( bool match, bool loadedObject, bool chunkSkip ) {
+        _noteIterate( match, loadedObject, chunkSkip );
+        if ( match ) {
+            ++_matches;
+        }
+    }
+    
     SimpleCursorExplainStrategy::SimpleCursorExplainStrategy
     ( const ExplainQueryInfo::AncillaryInfo &ancillaryInfo,
      const shared_ptr<Cursor> &cursor ) :
-    ExplainRecordingStrategy( ancillaryInfo ),
+    MatchCountingExplainStrategy( ancillaryInfo ),
     _cursor( cursor ),
     _explainInfo( new ExplainSinglePlanQueryInfo() ) {
     }
@@ -243,7 +256,7 @@ namespace mongo {
         _explainInfo->notePlan( *_cursor, scanAndOrder, indexOnly );
     }
 
-    void SimpleCursorExplainStrategy::noteIterate( bool match, bool loadedObject, bool chunkSkip ) {
+    void SimpleCursorExplainStrategy::_noteIterate( bool match, bool loadedObject, bool chunkSkip ) {
         _explainInfo->noteIterate( match, loadedObject, chunkSkip, *_cursor );
     }
 
@@ -259,11 +272,11 @@ namespace mongo {
     QueryOptimizerCursorExplainStrategy::QueryOptimizerCursorExplainStrategy
     ( const ExplainQueryInfo::AncillaryInfo &ancillaryInfo,
      const shared_ptr<QueryOptimizerCursor> &cursor ) :
-    ExplainRecordingStrategy( ancillaryInfo ),
+    MatchCountingExplainStrategy( ancillaryInfo ),
     _cursor( cursor ) {
     }
     
-    void QueryOptimizerCursorExplainStrategy::noteIterate( bool match, bool loadedObject,
+    void QueryOptimizerCursorExplainStrategy::_noteIterate( bool match, bool loadedObject,
                                                           bool chunkSkip ) {
         _cursor->noteIterate( match, loadedObject, chunkSkip );
     }
@@ -319,7 +332,8 @@ namespace mongo {
                                                BufBuilder &buf,
                                                const QueryPlan::Summary &queryPlan ) :
     ResponseBuildStrategy( parsedQuery, cursor, buf, queryPlan ),
-    _skip( _parsedQuery.getSkip() ) {
+    _skip( _parsedQuery.getSkip() ),
+    _bufferedMatches() {
     }
     
     bool OrderedBuildStrategy::handleMatch() {
@@ -335,6 +349,7 @@ namespace mongo {
         if ( !_parsedQuery.isExplain() ) {
             fillQueryResultFromObj( _buf, _parsedQuery.getFields(), current( true ),
                                    ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
+            ++_bufferedMatches;
         }
         return true;
     }
@@ -344,7 +359,8 @@ namespace mongo {
                                                BufBuilder &buf,
                                                const QueryPlan::Summary &queryPlan ) :
     ResponseBuildStrategy( parsedQuery, cursor, buf, queryPlan ),
-    _scanAndOrder( newScanAndOrder( queryPlan ) ) {
+    _scanAndOrder( newScanAndOrder( queryPlan ) ),
+    _bufferedMatches() {
     }
 
     bool ReorderBuildStrategy::handleMatch() {
@@ -364,6 +380,7 @@ namespace mongo {
         cc().curop()->debug().scanAndOrder = true;
         int ret = 0;
         _scanAndOrder->fill( _buf, _parsedQuery.getFields(), ret );
+        _bufferedMatches = ret;
         return ret;
     }
     
@@ -391,7 +408,8 @@ namespace mongo {
                                              BufBuilder &buf ) :
     ResponseBuildStrategy( parsedQuery, cursor, buf, QueryPlan::Summary() ),
     _orderedBuild( _parsedQuery, _cursor, _buf, QueryPlan::Summary() ),
-    _reorderBuild( _parsedQuery, _cursor, _buf, QueryPlan::Summary() ) {
+    _reorderBuild( _parsedQuery, _cursor, _buf, QueryPlan::Summary() ),
+    _reorderedMatches() {
     }
     
     bool HybridBuildStrategy::handleMatch() {
@@ -428,10 +446,17 @@ namespace mongo {
         if ( !_queryOptimizerCursor->completePlanOfHybridSetScanAndOrderRequired() ) {
             return _orderedBuild.rewriteMatches();
         }
+        _reorderedMatches = true;
         resetBuf();
         return _reorderBuild.rewriteMatches();
     }
-    
+
+    int HybridBuildStrategy::bufferedMatches() const {
+        return _reorderedMatches ?
+                _reorderBuild.bufferedMatches() :
+                _orderedBuild.bufferedMatches();
+    }
+
     void HybridBuildStrategy::finishedFirstBatch() {
         _queryOptimizerCursor->abortOutOfOrderPlans();
     }
@@ -446,8 +471,7 @@ namespace mongo {
     _buf( 32768 ), // TODO be smarter here
     _chunkManager( newChunkManager() ),
     _explain( newExplainRecordingStrategy( queryPlan, oldPlan ) ),
-    _builder( newResponseBuildStrategy( queryPlan ) ),
-    _bufferedMatches() {
+    _builder( newResponseBuildStrategy( queryPlan ) ) {
         _builder->resetBuf();
     }
 
@@ -458,11 +482,8 @@ namespace mongo {
         if ( !chunkMatches() ) {
             return false;
         }
-        bool bufferedMatch = _builder->handleMatch();
-        _explain->noteIterate( bufferedMatch, true, false );
-        if ( bufferedMatch ) {
-            ++_bufferedMatches;
-        }
+        bool orderedMatch = _builder->handleMatch();
+        _explain->noteIterate( orderedMatch, true, false );
         return true;
     }
 
@@ -471,14 +492,14 @@ namespace mongo {
     }
 
     bool QueryResponseBuilder::enoughForFirstBatch() const {
-        return _parsedQuery.enoughForFirstBatch( _bufferedMatches, _buf.len() );
+        return _parsedQuery.enoughForFirstBatch( _builder->bufferedMatches(), _buf.len() );
     }
 
     bool QueryResponseBuilder::enoughTotalResults() const {
         if ( _parsedQuery.isExplain() ) {
-            return _parsedQuery.enough( _bufferedMatches ) && !_parsedQuery.wantMore();
+            return _parsedQuery.enoughForExplain( _explain->matches() );
         }
-        return ( _parsedQuery.enough( _bufferedMatches ) ||
+        return ( _parsedQuery.enough( _builder->bufferedMatches() ) ||
                 _buf.len() >= MaxBytesToReturnToClientAtOnce );
     }
 
@@ -486,11 +507,8 @@ namespace mongo {
         _builder->finishedFirstBatch();
     }
 
-    long long QueryResponseBuilder::handoff( Message &result ) {
+    int QueryResponseBuilder::handoff( Message &result ) {
         int rewriteCount = _builder->rewriteMatches();
-        if ( rewriteCount != -1 ) {
-            _bufferedMatches = rewriteCount;
-        }
         if ( _parsedQuery.isExplain() ) {
             shared_ptr<ExplainQueryInfo> explainInfo = _explain->doneQueryInfo();
             if ( rewriteCount != -1 ) {
@@ -506,7 +524,7 @@ namespace mongo {
             result.appendData( _buf.buf(), _buf.len() );
             _buf.decouple();
         }
-        return _bufferedMatches;
+        return _builder->bufferedMatches();
     }
 
     ShardChunkManagerPtr QueryResponseBuilder::newChunkManager() const {
@@ -684,7 +702,7 @@ namespace mongo {
             throw SendStaleConfigException( ns , "version changed during initial query", shardingVersionAtStart, shardingState.getVersion( ns ) );
         }
 
-        long long nReturned = queryResponseBuilder.handoff( result );
+        int nReturned = queryResponseBuilder.handoff( result );
 
         ccPointer.reset();
         long long cursorid = 0;
@@ -699,7 +717,7 @@ namespace mongo {
                 ccPointer->prepareToYield( data );
             }
             else {
-                ccPointer->updateLocation();
+                ccPointer->c()->noteLocation();
             }
             
             // !!! Save the original message buffer, so it can be referenced in getMore.
@@ -843,6 +861,18 @@ namespace mongo {
             Client& c = cc();
             bool found = Helpers::findById( c, ns , query , resObject , &nsFound , &indexFound );
             if ( nsFound == false || indexFound == true ) {
+                
+                if ( shardingState.needShardChunkManager( ns ) ) {
+                    ShardChunkManagerPtr m = shardingState.getShardChunkManager( ns );
+                    if ( m && ! m->belongsToMe( resObject ) ) {
+                        // I have something this _id
+                        // but it doesn't belong to me
+                        // so return nothing
+                        resObject = BSONObj();
+                        found = false;
+                    }
+                }
+
                 BufBuilder bb(sizeof(QueryResult)+resObject.objsize()+32);
                 bb.skip(sizeof(QueryResult));
                 

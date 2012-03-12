@@ -18,6 +18,7 @@
 
 #include "db/pipeline/document_source.h"
 
+#include "db/clientcursor.h"
 #include "db/cursor.h"
 #include "db/pipeline/document.h"
 
@@ -53,6 +54,22 @@ namespace mongo {
         return pCurrent;
     }
 
+    void DocumentSourceCursor::advanceAndYield() {
+        pCursor->advance();
+        /*
+          TODO ask for index key pattern in order to determine which index
+          was used for this particular document; that will allow us to
+          sometimes use ClientCursor::MaybeCovered.
+          See https://jira.mongodb.org/browse/SERVER-5224 .
+        */
+        bool cursorOk = pClientCursor->yieldSometimes(ClientCursor::WillNeed);
+        if (!cursorOk) {
+            uassert(16028,
+                    "collection or database disappeared when cursor yielded",
+                    false);
+        }
+    }
+
     void DocumentSourceCursor::findNext() {
         /* standard cursor usage pattern */
         while(pCursor->ok()) {
@@ -65,11 +82,11 @@ namespace mongo {
                 BSONObj documentObj(pCursor->current());
                 pCurrent = Document::createFromBsonObj(
                     &documentObj, NULL /* LATER pDependencies.get()*/);
-                pCursor->advance();
+                advanceAndYield();
                 return;
             }
 
-            pCursor->advance();
+            advanceAndYield();
         }
 
         /* if we got here, there aren't any more documents */
@@ -89,19 +106,25 @@ namespace mongo {
 
     DocumentSourceCursor::DocumentSourceCursor(
         const shared_ptr<Cursor> &pTheCursor,
+        const string &ns,
         const intrusive_ptr<ExpressionContext> &pCtx):
         DocumentSource(pCtx),
         pCurrent(),
         bsonDependencies(),
-        pCursor(pTheCursor) {
+        pCursor(pTheCursor),
+        pClientCursor(),
+        pDependencies() {
+        pClientCursor.reset(
+            new ClientCursor(QueryOption_NoCursorTimeout, pTheCursor, ns));
     }
 
     intrusive_ptr<DocumentSourceCursor> DocumentSourceCursor::create(
         const shared_ptr<Cursor> &pCursor,
+        const string &ns,
         const intrusive_ptr<ExpressionContext> &pExpCtx) {
         assert(pCursor.get());
         intrusive_ptr<DocumentSourceCursor> pSource(
-            new DocumentSourceCursor(pCursor, pExpCtx));
+            new DocumentSourceCursor(pCursor, ns, pExpCtx));
             return pSource;
     }
 

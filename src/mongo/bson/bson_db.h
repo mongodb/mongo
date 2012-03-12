@@ -47,15 +47,15 @@ namespace mongo {
         return OpTime();
     }
 
-    inline string BSONElement::_asCode() const {
+    inline std::string BSONElement::_asCode() const {
         switch( type() ) {
         case mongo::String:
         case Code:
-            return string(valuestr(), valuestrsize()-1);
+            return std::string(valuestr(), valuestrsize()-1);
         case CodeWScope:
-            return string(codeWScopeCode(), *(int*)(valuestr())-1);
+            return std::string(codeWScopeCode(), *(int*)(valuestr())-1);
         default:
-            log() << "can't convert type: " << (int)(type()) << " to code" << endl;
+            log() << "can't convert type: " << (int)(type()) << " to code" << std::endl;
         }
         uassert( 10062 ,  "not code" , 0 );
         return "";

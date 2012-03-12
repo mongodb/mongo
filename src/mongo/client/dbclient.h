@@ -607,7 +607,7 @@ namespace mongo {
         bool copyDatabase(const string &fromdb, const string &todb, const string &fromhost = "", BSONObj *info = 0);
 
         /** The Mongo database provides built-in performance profiling capabilities.  Uset setDbProfilingLevel()
-           to enable.  Profiling information is then written to the system.profiling collection, which one can
+           to enable.  Profiling information is then written to the system.profile collection, which one can
            then query.
         */
         enum ProfilingLevel {

@@ -1507,7 +1507,6 @@ namespace mongo {
                 shared_ptr<Cursor> c = theDataFileMgr.findAll(ns);
                 cc.reset( new ClientCursor(QueryOption_NoCursorTimeout, c, ns) );
             }
-            CursorId id = cc->cursorid();
 
             while ( cc->ok() ) {
                 BSONObj js = cc->current();
@@ -1531,9 +1530,10 @@ namespace mongo {
                     if ( dropDups ) {
                         DiskLoc toDelete = cc->currLoc();
                         bool ok = cc->advance();
-                        cc->updateLocation();
+                        ClientCursor::YieldData yieldData;
+                        verify( 16093, cc->prepareToYield( yieldData ) );
                         theDataFileMgr.deleteRecord( ns, toDelete.rec(), toDelete, false, true , true );
-                        if( ClientCursor::find(id, false) == 0 ) {
+                        if( !cc->recoverFromYield( yieldData ) ) {
                             cc.release();
                             if( !ok ) {
                                 /* we were already at the end. normal. */
@@ -1834,10 +1834,10 @@ namespace mongo {
             else if ( legalClientSystemNS( ns , true ) ) {
                 if ( obuf && strstr( ns , ".system.users" ) ) {
                     BSONObj t( reinterpret_cast<const char *>( obuf ) );
-                    uassert( 14051 , "system.user entry needs 'user' field to be a string" , t["user"].type() == String );
-                    uassert( 14052 , "system.user entry needs 'pwd' field to be a string" , t["pwd"].type() == String );
-                    uassert( 14053 , "system.user entry needs 'user' field to be non-empty" , t["user"].String().size() );
-                    uassert( 14054 , "system.user entry needs 'pwd' field to be non-empty" , t["pwd"].String().size() );
+                    uassert( 14051 , "system.users entry needs 'user' field to be a string" , t["user"].type() == String );
+                    uassert( 14052 , "system.users entry needs 'pwd' field to be a string" , t["pwd"].type() == String );
+                    uassert( 14053 , "system.users entry needs 'user' field to be non-empty" , t["user"].String().size() );
+                    uassert( 14054 , "system.users entry needs 'pwd' field to be non-empty" , t["pwd"].String().size() );
                 }
             }
             else if ( !god ) {

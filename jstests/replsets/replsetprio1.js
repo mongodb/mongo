@@ -47,7 +47,7 @@ doTest = function( signal ) {
             print(e);
         }
         return false;
-    }, 'node 2 is master again');
+    }, 'node 2 is master again', 60000);
 
     // make sure nothing was rolled back
     master = replTest.getMaster();

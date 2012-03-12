@@ -267,10 +267,10 @@ namespace mongo {
                 continue;
             }
 
-            c->checkLocation();
+            c->recoverFromYield();
             DiskLoc tmp1 = c->refLoc();
             if ( tmp1 != dl ) {
-                // This might indicate a failure to call ClientCursor::updateLocation() but it can
+                // This might indicate a failure to call ClientCursor::prepareToYield() but it can
                 // also happen during correct operation, see SERVER-2009.
                 problem() << "warning: cursor loc " << tmp1 << " does not match byLoc position " << dl << " !" << endl;
             }
@@ -428,6 +428,7 @@ namespace mongo {
     void ClientCursor::updateLocation() {
         assert( _cursorid );
         _idleAgeMillis = 0;
+        _c->prepareToYield();
         DiskLoc cl = _c->refLoc();
         if ( lastLoc() == cl ) {
             //log() << "info: lastloc==curloc " << ns << '\n';
@@ -436,8 +437,6 @@ namespace mongo {
             recursive_scoped_lock lock(ccmutex);
             setLastLoc_inlock(cl);
         }
-        // may be necessary for MultiCursor even when cl hasn't changed
-        _c->noteLocation();
     }
 
     int ClientCursor::suggestYieldMicros() {
@@ -545,9 +544,7 @@ namespace mongo {
     bool ClientCursor::prepareToYield( YieldData &data ) {
         if ( ! _c->supportYields() )
             return false;
-        if ( ! _c->prepareToYield() ) {
-            return false;   
-        }
+
         // need to store in case 'this' gets deleted
         data._id = _cursorid;
 

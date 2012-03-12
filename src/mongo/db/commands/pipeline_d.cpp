@@ -134,7 +134,7 @@ namespace mongo {
 
         /* wrap the cursor with a DocumentSource and return that */
         intrusive_ptr<DocumentSourceCursor> pSource(
-            DocumentSourceCursor::create(pCursor, pExpCtx));
+            DocumentSourceCursor::create(pCursor, dbName, pExpCtx));
 
         /* record any dependencies we created */
         if (initQuery)

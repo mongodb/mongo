@@ -1,0 +1,31 @@
+# Boost Filesystem Library Build Jamfile
+
+# (C) Copyright Beman Dawes 2002-2006
+# Distributed under the Boost Software License, Version 1.0.
+# (See accompanying file LICENSE_1_0.txt or www.boost.org/LICENSE_1_0.txt)
+
+# See library home page at http://www.boost.org/libs/filesystem
+
+project boost/filesystem
+    : source-location ../src
+    : usage-requirements # pass these requirement to dependents (i.e. users)
+      <link>shared:<define>BOOST_FILESYSTEM_DYN_LINK=1
+    ;
+
+SOURCES =
+    operations path portability utf8_codecvt_facet ;
+
+lib boost_filesystem
+    : $(SOURCES).cpp ../../system/build//boost_system
+    : <link>shared:<define>BOOST_FILESYSTEM_DYN_LINK=1 # tell source we're building dll's
+    :
+    : # Boost.Filesystem uses some of Boost.System functions in inlined/templated
+      # functions, so clients that use Boost.Filesystem will have direct references 
+      # to Boost.System symbols. On Windows, Darwin, and some other platforms, this
+      # means those clients have to be directly linked to Boost.System. For static
+      # linking this happens anyway, but for shared we need to make it happen. Since
+      # doing so is harmless even when not needed, we do it for all platforms.
+      <link>shared:<library>../../system/build//boost_system
+    ;
+
+boost-install boost_filesystem ;

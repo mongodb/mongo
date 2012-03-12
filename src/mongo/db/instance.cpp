@@ -154,7 +154,7 @@ namespace mongo {
             {
                 Client& me = cc();
                 scoped_lock bl(Client::clientsMutex);
-                auto_ptr<Matcher> m(new Matcher(q.query));
+                scoped_ptr<Matcher> m(new Matcher(q.query));
                 for( set<Client*>::iterator i = Client::clients.begin(); i != Client::clients.end(); i++ ) {
                     Client *c = *i;
                     assert( c );
@@ -163,7 +163,7 @@ namespace mongo {
                         continue;
                     }
                     assert( co );
-                    if( all || co->active() ) {
+                    if( all || co->displayInCurop() ) {
                         BSONObj info = co->infoNoauth();
                         if ( all || m->matches( info )) {
                             vals.push_back( info );

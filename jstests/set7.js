@@ -39,6 +39,17 @@ t.update( {}, {$set:{"a.f":1}} );
 assert( db.getLastError() );
 assert.eq( [], t.findOne().a );
 
+// Test requiring proper ordering of multiple mods.
+t.drop();
+t.save( {a:[0,1,2,3,4,5,6,7,8,9,10]} );
+t.update( {}, {$set:{"a.11":11,"a.2":-2}} );
+assert.eq( [0,1,-2,3,4,5,6,7,8,9,10,11], t.findOne().a );
+
+// Test upsert case
+t.drop();
+t.update( {a:[0,1,2,3,4,5,6,7,8,9,10]}, {$set:{"a.11":11} }, true );
+assert.eq( [0,1,2,3,4,5,6,7,8,9,10,11], t.findOne().a );
+
 // SERVER-3750
 t.drop();
 t.save( {a:[]} );

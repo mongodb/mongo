@@ -745,7 +745,7 @@ namespace mongo {
             const BSONObj *fieldsToReturn,
             int queryOptions ) {
 
-        if ( ! availableOptions() & QueryOption_Exhaust ) {
+        if ( ! ( availableOptions() & QueryOption_Exhaust ) ) {
             return DBClientBase::query( f, ns, query, fieldsToReturn, queryOptions );
         }
 

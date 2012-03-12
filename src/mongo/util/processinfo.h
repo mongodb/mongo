@@ -133,10 +133,20 @@ namespace mongo {
         };
 
         pid_t _pid;
+        static mongo::mutex _sysInfoLock;
+
         static bool checkNumaEnabled();
+
         const SystemInfo& sysInfo() const {
             // initialize and collect sysInfo on first call
-            static ProcessInfo::SystemInfo *initSysInfo = new SystemInfo();
+            // TODO: SERVER-5112
+            static ProcessInfo::SystemInfo *initSysInfo = NULL;
+            if ( ! initSysInfo ) {
+                scoped_lock lk( _sysInfoLock );
+                if ( ! initSysInfo ) {
+                    initSysInfo = new SystemInfo();
+                }
+            }
             return *initSysInfo;
         }
 

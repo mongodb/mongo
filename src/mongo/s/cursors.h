@@ -37,14 +37,37 @@ namespace mongo {
         long long getId();
 
         /**
+         * @return the cumulative number of documents seen by this cursor.
+         */
+        int getTotalSent() const;
+
+        /**
+         * Sends queries to the shards, gather the result for this batch and sends the response
+         * to the socket.
+         *
          * @return whether there is more data left
          */
-        bool sendNextBatch( Request& r ) { return sendNextBatch( r , _ntoreturn ); }
-        bool sendNextBatch( Request& r , int ntoreturn );
+        bool sendNextBatchAndReply( Request& r );
+
+        /**
+         * Sends queries to the shards and gather the result for this batch.
+         *
+         * @param r The request object from the client
+         * @param ntoreturn Number of documents to return
+         * @param buffer The buffer to use to store the results.
+         * @param docCount This will contain the number of documents gathered for this batch after
+         *        a successful call.
+         *
+         * @return true if this is not the final batch.
+         */
+        bool sendNextBatch( Request& r, int ntoreturn, BufBuilder& buffer, int& docCount );
 
         void accessed();
         /** @return idle time in ms */
         long long idleTime( long long now );
+
+        // The default initial buffer size for sending responses.
+        static const int INIT_REPLY_BUFFER_SIZE;
 
     protected:
 

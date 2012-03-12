@@ -304,21 +304,36 @@ namespace mongo {
     // --- engine ---
 
 //    void fatalHandler(const char* s1, const char* s2) {
-//        cout << "Fatal handler " << s1 << " " << s2;
+//        cout << "Fatal handler " << s1 << " " << s2 << endl;
 //    }
 
-    V8ScriptEngine::V8ScriptEngine() {
-        v8::V8::Initialize();
-        v8::Locker l;
-//        v8::Locker::StartPreemption( 10 );
+    void gcCallback(GCType type, GCCallbackFlags flags) {
+        HeapStatistics stats;
+        V8::GetHeapStatistics( &stats );
+        log(1) << "V8 GC heap stats - "
+                << " total: " << stats.total_heap_size()
+                << " exec: " << stats.total_heap_size_executable()
+                << " used: " << stats.used_heap_size()<< " limit: "
+                << stats.heap_size_limit()
+                << endl;
+    }
 
+    V8ScriptEngine::V8ScriptEngine() {
+        // set resource contraints before any call
         int K = 1024;
         v8::ResourceConstraints rc;
-        rc.set_max_young_space_size(4 * K * K);
-        rc.set_max_old_space_size(64 * K * K);
-        v8::SetResourceConstraints(&rc);
-//        v8::V8::IgnoreOutOfMemoryException();
+//        rc.set_max_young_space_size(4 * K * K);
+        rc.set_max_old_space_size( 64 * K * K );
+        v8::SetResourceConstraints( &rc );
+
+        // keep engine up after OOM
+        v8::V8::IgnoreOutOfMemoryException();
 //        v8::V8::SetFatalErrorHandler(fatalHandler);
+
+//        v8::Locker l;
+//        v8::Locker::StartPreemption( 10 );
+
+        v8::V8::Initialize();
     }
 
     V8ScriptEngine::~V8ScriptEngine() {
@@ -353,6 +368,7 @@ namespace mongo {
         for( map< unsigned, Isolate* >::const_iterator i = __interruptSpecToIsolate.begin(); i != __interruptSpecToIsolate.end(); ++i ) {
             toKill.push_back( i->second );
         }
+
         for( vector< Isolate* >::const_iterator i = toKill.begin(); i != toKill.end(); ++i ) {
             V8::TerminateExecution( *i );
         }
@@ -364,8 +380,22 @@ namespace mongo {
         : _engine( engine ) ,
           _connectState( NOT ) {
 
+        // create new isolate and enter it via a scope
         _isolate = v8::Isolate::New();
         v8::Isolate::Scope iscope(_isolate);
+
+        // resource constraints must be set on isolate, before any call or lock
+        int K = 1024;
+        v8::ResourceConstraints rc;
+//        rc.set_max_young_space_size(4 * K * K);
+        rc.set_max_old_space_size( 64 * K * K );
+        v8::SetResourceConstraints(&rc);
+        V8::AddGCPrologueCallback(gcCallback, kGCTypeMarkSweepCompact);
+
+        // keep engine up after OOM
+        v8::V8::IgnoreOutOfMemoryException();
+//        V8::SetFatalErrorHandler(fatalHandler);
+
         v8::Locker l(_isolate);
 
         HandleScope handleScope;

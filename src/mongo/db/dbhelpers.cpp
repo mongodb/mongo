@@ -241,13 +241,13 @@ namespace mongo {
                 callback->goingToDelete( c->current() );
 
             c->advance();
-            c->noteLocation();
+            c->prepareToTouchEarlierIterate();
 
             logOp( "d" , ns.c_str() , rloc.obj()["_id"].wrap() , 0 , 0 , fromMigrate );
             theDataFileMgr.deleteRecord(ns.c_str() , rloc.rec(), rloc);
             num++;
 
-            c->checkLocation();
+            c->recoverFromTouchingEarlierIterate();
 
             getDur().commitIfNeeded();
 

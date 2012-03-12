@@ -149,6 +149,9 @@ namespace mongo {
 
         // protects state below
         mutable mongo::mutex _mutex;
+        // protects accessing the config server
+        // Using a ticket holder so we can have multiple redundant tries at any given time
+        mutable TicketHolder _configServerTickets;
 
         // map from a namespace into the ensemble of chunk ranges that are stored in this mongod
         // a ShardChunkManager carries all state we need for a collection at this shard, including its version information

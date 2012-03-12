@@ -517,8 +517,9 @@ namespace mongo {
 
         Convertor convertor( cx );
         string dbName = convertor.toString( argv[1] );
-        smuassert( cx, "invalid database name",
-                   NamespaceString::validDBName( dbName ) );
+        string msg = str::stream() << "[" << dbName << "] is not a "
+                                   << "valid database name";
+        smuassert( cx, msg.c_str(), NamespaceString::validDBName( dbName ) );
 
         assert( JS_SetProperty( cx , obj , "_mongo" , &(argv[0]) ) );
         assert( JS_SetProperty( cx , obj , "_name" , &(argv[1]) ) );

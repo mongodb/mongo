@@ -39,8 +39,6 @@
 
 namespace mongo {
 
-    using namespace std;
-
 #if defined(_WIN32)
 // warning: 'this' : used in base member initializer list
 #pragma warning( disable : 4355 )
@@ -49,26 +47,26 @@ namespace mongo {
     template<typename T>
     class BSONFieldValue {
     public:
-        BSONFieldValue( const string& name , const T& t ) {
+        BSONFieldValue( const std::string& name , const T& t ) {
             _name = name;
             _t = t;
         }
 
         const T& value() const { return _t; }
-        const string& name() const { return _name; }
+        const std::string& name() const { return _name; }
 
     private:
-        string _name;
+        std::string _name;
         T _t;
     };
 
     template<typename T>
     class BSONField {
     public:
-        BSONField( const string& name , const string& longName="" )
+        BSONField( const std::string& name , const std::string& longName="" )
             : _name(name), _longName(longName) {}
-        const string& name() const { return _name; }
-        operator string() const { return _name; }
+        const std::string& name() const { return _name; }
+        operator std::string() const { return _name; }
 
         BSONFieldValue<T> make( const T& t ) const {
             return BSONFieldValue<T>( _name , t );
@@ -84,8 +82,8 @@ namespace mongo {
         }
 
     private:
-        string _name;
-        string _longName;
+        std::string _name;
+        std::string _longName;
     };
 
     /** Utility for creating a BSONObj.
@@ -242,7 +240,7 @@ namespace mongo {
             long long x = n;
             if ( x < 0 )
                 x = x * -1;
-            if ( x < ( (numeric_limits<int>::max)() / 2 ) ) // extra () to avoid max macro on windows
+            if ( x < ( (std::numeric_limits<int>::max)() / 2 ) ) // extra () to avoid max macro on windows
                 append( fieldName , (int)n );
             else
                 append( fieldName , n );
@@ -295,7 +293,7 @@ namespace mongo {
         /** tries to append the data as a number
          * @return true if the data was able to be converted to a number
          */
-        bool appendAsNumber( const StringData& fieldName , const string& data );
+        bool appendAsNumber( const StringData& fieldName , const std::string& data );
 
         /** Append a BSON Object ID (OID type).
             @deprecated Generally, it is preferred to use the append append(name, oid)
@@ -357,7 +355,7 @@ namespace mongo {
             if( dt > 0 && dt <= 0xffffffff ) {
                 static int n;
                 if( n++ == 0 )
-                    log() << "DEV WARNING appendDate() called with a tiny (but nonzero) date" << endl;
+                    log() << "DEV WARNING appendDate() called with a tiny (but nonzero) date" << std::endl;
             }
 #endif
             _b.appendNum((char) Date);
@@ -403,7 +401,7 @@ namespace mongo {
             return append(fieldName, str, (int) strlen(str)+1);
         }
         /** Append a string element */
-        BSONObjBuilder& append(const StringData& fieldName, const string& str) {
+        BSONObjBuilder& append(const StringData& fieldName, const std::string& str) {
             return append(fieldName, str.c_str(), (int) str.size()+1);
         }
 
@@ -533,14 +531,14 @@ namespace mongo {
 
         /** Append an array of values. */
         template < class T >
-        BSONObjBuilder& append( const StringData& fieldName, const vector< T >& vals );
+        BSONObjBuilder& append( const StringData& fieldName, const std::vector< T >& vals );
 
         template < class T >
-        BSONObjBuilder& append( const StringData& fieldName, const list< T >& vals );
+        BSONObjBuilder& append( const StringData& fieldName, const std::list< T >& vals );
 
         /** Append a set of values. */
         template < class T >
-        BSONObjBuilder& append( const StringData& fieldName, const set< T >& vals );
+        BSONObjBuilder& append( const StringData& fieldName, const std::set< T >& vals );
 
         /**
          * destructive
@@ -595,7 +593,7 @@ namespace mongo {
 
         void appendKeys( const BSONObj& keyPattern , const BSONObj& values );
 
-        static string numStr( int i ) {
+        static std::string numStr( int i ) {
             if (i>=0 && i<100 && numStrsReady)
                 return numStrs[i];
             StringBuilder o;
@@ -614,8 +612,8 @@ namespace mongo {
 
         // prevent implicit string conversions which would allow bad things like BSON( BSON( "foo" << 1 ) << 2 )
         struct ForceExplicitString {
-            ForceExplicitString( const string &str ) : str_( str ) {}
-            string str_;
+            ForceExplicitString( const std::string &str ) : str_( str ) {}
+            std::string str_;
         };
 
         /** Stream oriented way to add field names and values. */
@@ -679,7 +677,7 @@ namespace mongo {
         BSONSizeTracker * _tracker;
         bool _doneCalled;
 
-        static const string numStrs[100]; // cache of 0 to 99 inclusive
+        static const std::string numStrs[100]; // cache of 0 to 99 inclusive
         static bool numStrsReady; // for static init safety. see comments in db/jsobj.cpp
     };
 
@@ -775,7 +773,7 @@ namespace mongo {
             char *r;
             long int n = strtol( name.data(), &r, 10 );
             if ( *r )
-                uasserted( 13048, (string)"can't append to array using string field name [" + name.data() + "]" );
+                uasserted( 13048, (std::string)"can't append to array using string field name [" + name.data() + "]" );
             fill(n);
         }
 
@@ -800,13 +798,13 @@ namespace mongo {
             return _b.obj();
         }
 
-        string num() { return _b.numStr(_i++); }
+        std::string num() { return _b.numStr(_i++); }
         int _i;
         BSONObjBuilder _b;
     };
 
     template < class T >
-    inline BSONObjBuilder& BSONObjBuilder::append( const StringData& fieldName, const vector< T >& vals ) {
+    inline BSONObjBuilder& BSONObjBuilder::append( const StringData& fieldName, const std::vector< T >& vals ) {
         BSONObjBuilder arrBuilder;
         for ( unsigned int i = 0; i < vals.size(); ++i )
             arrBuilder.append( numStr( i ), vals[ i ] );
@@ -825,13 +823,13 @@ namespace mongo {
     }
 
     template < class T >
-    inline BSONObjBuilder& BSONObjBuilder::append( const StringData& fieldName, const list< T >& vals ) {
-        return _appendIt< list< T > >( *this, fieldName, vals );
+    inline BSONObjBuilder& BSONObjBuilder::append( const StringData& fieldName, const std::list< T >& vals ) {
+        return _appendIt< std::list< T > >( *this, fieldName, vals );
     }
 
     template < class T >
-    inline BSONObjBuilder& BSONObjBuilder::append( const StringData& fieldName, const set< T >& vals ) {
-        return _appendIt< set< T > >( *this, fieldName, vals );
+    inline BSONObjBuilder& BSONObjBuilder::append( const StringData& fieldName, const std::set< T >& vals ) {
+        return _appendIt< std::set< T > >( *this, fieldName, vals );
     }
 
 

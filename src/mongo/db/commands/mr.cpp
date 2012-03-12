@@ -215,7 +215,9 @@ namespace mongo {
             _reduce( x , key , endSizeEstimate );
         }
 
-        Config::Config( const string& _dbname , const BSONObj& cmdObj ) {
+        Config::Config( const string& _dbname , const BSONObj& cmdObj ) :
+            outNonAtomic(false)
+        {
 
             dbname = _dbname;
             ns = dbname + "." + cmdObj.firstElement().valuestr();

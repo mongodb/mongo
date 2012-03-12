@@ -73,9 +73,18 @@ printjson(x);
 assert.eq(1, x.inprog.length, "never doing update 2");
 assert.eq("update", x.inprog[0].op);
 
-t.findOne(); // should wait for update to finish
+while ( 1 ) {
+    t.findOne(); // should wait for update to finish
+    
+    var x = db.currentOp()
+    if ( x.inprog.length == 0 )
+        break;
 
-var x = db.currentOp()
-assert.eq( [] , x.inprog , "should have been atomic" );
+    assert( x.inprog.length == 1 && x.inprog[0].op == "update" , tojson( x ) );
+    
+    assert( x.inprog[0].numYields == 0 , tojson( x ) );
+
+    sleep( 100 );
+}
 
 join();

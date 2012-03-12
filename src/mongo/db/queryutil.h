@@ -128,6 +128,13 @@ namespace mongo {
             return n >= _ntoreturn;
         }
         
+        bool enoughForExplain( long long n ) const {
+            if ( _wantMore || _ntoreturn == 0 ) {
+                return false;
+            }
+            return n >= _ntoreturn;            
+        }
+        
     private:
         void init( const BSONObj& q ) {
             _reset();

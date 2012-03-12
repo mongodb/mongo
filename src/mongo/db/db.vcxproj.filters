@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="..\bson\oid.cpp" />
@@ -111,30 +111,7 @@
       <Filter>snappy</Filter>
     </ClCompile>
     <ClCompile Include="scanandorder.cpp" />
-    <ClCompile Include="..\..\third_party\pcre-7.4\pcrecpp.cc" />
-    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_chartables.c" />
-    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_compile.c" />
-    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_config.c" />
-    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_dfa_exec.c" />
-    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_exec.c" />
-    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_fullinfo.c" />
-    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_get.c" />
-    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_globals.c" />
-    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_info.c" />
-    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_maketables.c" />
-    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_newline.c" />
-    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_ord2utf8.c" />
-    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_refcount.c" />
-    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_scanner.cc" />
-    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_stringpiece.cc" />
-    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_study.c" />
-    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_tables.c" />
-    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_try_flipped.c" />
-    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_ucp_searchfuncs.c" />
-    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_valid_utf8.c" />
-    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_version.c" />
-    <ClCompile Include="..\..\third_party\pcre-7.4\pcre_xclass.c" />
-    <ClCompile Include="..\..\third_party\pcre-7.4\pcreposix.c" />
+    <ClCompile Include="commands\cloud.cpp" />
     <ClCompile Include="commands\pipeline_command.cpp" />
     <ClCompile Include="commands\pipeline.cpp" />
     <ClCompile Include="pipeline\doc_mem_monitor.cpp" />
@@ -344,6 +321,150 @@
       <Filter>z</Filter>
     </ClCompile>
     <ClCompile Include="explain.cpp" />
+    <ClCompile Include="..\..\third_party\pcre-8.30\pcreposix.c">
+      <Filter>pcre-8.30</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-8.30\pcre_chartables.c">
+      <Filter>pcre-8.30</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-8.30\pcre_compile.c">
+      <Filter>pcre-8.30</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-8.30\pcre_config.c">
+      <Filter>pcre-8.30</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-8.30\pcre_dfa_exec.c">
+      <Filter>pcre-8.30</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-8.30\pcre_exec.c">
+      <Filter>pcre-8.30</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-8.30\pcre_fullinfo.c">
+      <Filter>pcre-8.30</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-8.30\pcre_get.c">
+      <Filter>pcre-8.30</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-8.30\pcre_globals.c">
+      <Filter>pcre-8.30</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-8.30\pcre_maketables.c">
+      <Filter>pcre-8.30</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-8.30\pcre_newline.c">
+      <Filter>pcre-8.30</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-8.30\pcre_ord2utf8.c">
+      <Filter>pcre-8.30</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-8.30\pcre_refcount.c">
+      <Filter>pcre-8.30</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-8.30\pcre_scanner.cc">
+      <Filter>pcre-8.30</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-8.30\pcre_stringpiece.cc">
+      <Filter>pcre-8.30</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-8.30\pcre_study.c">
+      <Filter>pcre-8.30</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-8.30\pcre_tables.c">
+      <Filter>pcre-8.30</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-8.30\pcre_ucd.c">
+      <Filter>pcre-8.30</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-8.30\pcre_valid_utf8.c">
+      <Filter>pcre-8.30</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-8.30\pcre_version.c">
+      <Filter>pcre-8.30</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-8.30\pcre_xclass.c">
+      <Filter>pcre-8.30</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\pcre-8.30\pcrecpp.cc">
+      <Filter>pcre-8.30</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\system\src\error_code.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\thread\src\win32\thread.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\thread\src\win32\tss_dll.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\thread\src\win32\tss_pe.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v2\src\v2_operations.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v2\src\v2_path.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v2\src\v2_portability.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v3\src\codecvt_error_category.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v3\src\operations.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v3\src\path.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v3\src\path_traits.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v3\src\portability.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v3\src\unique_path.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v3\src\utf8_codecvt_facet.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\filesystem\v3\src\windows_file_codecvt.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\cmdline.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\config_file.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\convert.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\options_description.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\parsers.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\positional_options.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\split.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\utf8_codecvt_facet.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\value_semantic.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\variables_map.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\third_party\boost\libs\program_options\src\winmain.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\distlock.h" />
@@ -450,7 +571,7 @@
     <ClInclude Include="..\..\third_party\snappy\snappy.h">
       <Filter>snappy</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\third_party\pcre-7.4\pcre.h" />
+    <ClInclude Include="..\..\third_party\pcre-8.30\config.h" />
     <ClInclude Include="globals.h" />
     <ClInclude Include="..\util\net\hostandport.h" />
     <ClInclude Include="..\util\net\listen.h" />
@@ -631,6 +752,9 @@
     </ClInclude>
     <ClInclude Include="queryoptimizercursorimpl.h" />
     <ClInclude Include="explain.h" />
+    <ClInclude Include="..\..\third_party\pcre-8.30\pcre.h">
+      <Filter>pcre-8.30</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\jstests\dur\dur1.js" />
@@ -682,5 +806,11 @@
     <ResourceCompile Include="db.rc">
       <Filter>z</Filter>
     </ResourceCompile>
+    <Filter Include="pcre-8.30">
+      <UniqueIdentifier>{108f083d-3e32-4e36-9780-36b1ee587860}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Boost">
+      <UniqueIdentifier>{bdc5ddb3-807b-4ded-962d-45b196271d00}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
 </Project>

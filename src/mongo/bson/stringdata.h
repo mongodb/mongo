@@ -42,14 +42,14 @@ namespace mongo {
 
         /** Construct a StringData explicitly, for the case where the length of the string
          * is already known. 'c' must be a pointer to a null-terminated string, and strlenOfc
-         * must be the length that std::strlen(c) would return, a.k.a the index of the
+         * must be the length that strlen(c) would return, a.k.a the index of the
          * terminator in c.
          */
         StringData( const char* c, unsigned len )
             : _data(c), _size(len) {}
 
-        /** Construct a StringData, for the case of a std::string. */
-        StringData( const string& s )
+        /** Construct a StringData, for the case of a string. */
+        StringData( const std::string& s )
             : _data(s.c_str()), _size((unsigned) s.size()) {}
 
         // Construct a StringData explicitly, for the case of a literal whose size is

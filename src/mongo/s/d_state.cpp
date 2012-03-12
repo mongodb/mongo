@@ -45,7 +45,8 @@ namespace mongo {
     // -----ShardingState START ----
 
     ShardingState::ShardingState()
-        : _enabled(false) , _mutex( "ShardingState" ) {
+        : _enabled(false) , _mutex( "ShardingState" ),
+          _configServerTickets( 3 /* max number of concurrent config server refresh threads */ ) {
     }
 
     void ShardingState::enable( const string& server ) {
@@ -183,7 +184,23 @@ namespace mongo {
 
     bool ShardingState::trySetVersion( const string& ns , ConfigVersion& version /* IN-OUT */ ) {
 
-        // fast path - requested version is at the same version as this chunk manager
+        // Currently this function is called after a getVersion(), which is the first "check", and the assumption here
+        // is that we don't do anything nearly as long as a remote query in a thread between then and now.
+        // Otherwise it may be worth adding an additional check without the _configServerMutex below, since then it
+        // would be likely that the version may have changed in the meantime without waiting for or fetching config results.
+
+        // TODO:  Mutex-per-namespace?
+        
+        LOG( 2 ) << "trying to set shard version of " << version.toString() << " for '" << ns << "'" << endl;
+        
+        _configServerTickets.waitForTicket();
+        TicketHolderReleaser needTicketFrom( &_configServerTickets );
+
+        // fast path - double-check if requested version is at the same version as this chunk manager before verifying
+        // against config server
+        //
+        // This path will short-circuit the version set if another thread already managed to update the version in the
+        // meantime.  First check is from getVersion().
         //
         // cases:
         //   + this shard updated the version for a migrate's commit (FROM side)
@@ -191,12 +208,15 @@ namespace mongo {
         //   + two clients reloaded
         //     one triggered the 'slow path' (below)
         //     when the second's request gets here, the version is already current
+        ConfigVersion storedVersion;
         {
             scoped_lock lk( _mutex );
             ChunkManagersMap::const_iterator it = _chunks.find( ns );
-            if ( it != _chunks.end() && it->second->getVersion() == version )
+            if ( it != _chunks.end() && ( storedVersion = it->second->getVersion() ) == version )
                 return true;
         }
+        
+        LOG( 2 ) << "verifying cached version " << storedVersion.toString() << " and new version " << version.toString() << " for '" << ns << "'" << endl;
 
         // slow path - requested version is different than the current chunk manager's, if one exists, so must check for
         // newest version in the config server
@@ -209,8 +229,10 @@ namespace mongo {
         //     the secondary had no state (managers) at all, so every client request will fall here
         //   + a stale client request a version that's not current anymore
 
+        // Can't lock default mutex while creating ShardChunkManager, b/c may have to create a new connection to myself
         const string c = (_configServer == _shardHost) ? "" /* local */ : _configServer;
         ShardChunkManagerPtr p( new ShardChunkManager( c , ns , _shardName ) );
+
         {
             scoped_lock lk( _mutex );
 

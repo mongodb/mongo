@@ -22,6 +22,7 @@
 #include "btree.h"
 #include "ops/query.h"
 #include "background.h"
+#include "../util/stringutils.h"
 #include "../util/text.h"
 
 namespace mongo {
@@ -423,7 +424,8 @@ namespace mongo {
             BSONObjIterator y(b);
             while ( y.more() ) {
                 BSONElement f = y.next();
-                FieldCompareResult res = compareDottedFieldNames( e.fieldName() , f.fieldName() );
+                FieldCompareResult res = compareDottedFieldNames( e.fieldName() , f.fieldName() ,
+                                                                 LexNumCmp( true ) );
                 if ( res == SAME || res == LEFT_SUBFIELD || res == RIGHT_SUBFIELD )
                     return true;
             }

@@ -60,16 +60,16 @@ namespace mongo {
         /** These functions, which start with a capital letter, throw a UserException if the
             element is not of the required type. Example:
 
-            string foo = obj["foo"].String(); // exception if not a string type or DNE
+            std::string foo = obj["foo"].String(); // std::exception if not a std::string type or DNE
         */
-        string String()             const { return chk(mongo::String).valuestr(); }
+        std::string String()        const { return chk(mongo::String).valuestr(); }
         Date_t Date()               const { return chk(mongo::Date).date(); }
         double Number()             const { return chk(isNumber()).number(); }
         double Double()             const { return chk(NumberDouble)._numberDouble(); }
         long long Long()            const { return chk(NumberLong)._numberLong(); }
         int Int()                   const { return chk(NumberInt)._numberInt(); }
         bool Bool()                 const { return chk(mongo::Bool).boolean(); }
-        vector<BSONElement> Array() const; // see implementation for detailed comments
+        std::vector<BSONElement> Array() const; // see implementation for detailed comments
         mongo::OID OID()            const { return chk(jstOID).__oid(); }
         void Null()                 const { chk(isNull()); } // throw UserException if not null
         void OK()                   const { chk(ok()); }     // throw UserException if element DNE
@@ -92,17 +92,17 @@ namespace mongo {
         void Val(mongo::OID& v)     const { v = OID(); }
         void Val(int& v)            const { v = Int(); }
         void Val(double& v)         const { v = Double(); }
-        void Val(string& v)         const { v = String(); }
+        void Val(std::string& v)    const { v = String(); }
 
         /** Use ok() to check if a value is assigned:
             if( myObj["foo"].ok() ) ...
         */
         bool ok() const { return !eoo(); }
 
-        string toString( bool includeFieldName = true, bool full=false) const;
+        std::string toString( bool includeFieldName = true, bool full=false) const;
         void toString(StringBuilder& s, bool includeFieldName = true, bool full=false) const;
-        string jsonString( JsonStringFormat format, bool includeFieldNames = true, int pretty = 0 ) const;
-        operator string() const { return toString(); }
+        std::string jsonString( JsonStringFormat format, bool includeFieldNames = true, int pretty = 0 ) const;
+        operator std::string() const { return toString(); }
 
         /** Returns the type of the element */
         BSONType type() const { return (BSONType) *data; }
@@ -110,7 +110,7 @@ namespace mongo {
         /** retrieve a field within this element
             throws exception if *this is not an embedded object
         */
-        BSONElement operator[] (const string& field) const;
+        BSONElement operator[] (const std::string& field) const;
 
         /** returns the tyoe of the element fixed for the main type
             the main purpose is numbers.  any numeric type will return NumberDouble
@@ -237,8 +237,8 @@ namespace mongo {
             return type() == mongo::String ? valuestr() : "";
         }
         /** Get the string value of the element.  If not a string returns "". */
-        string str() const {
-            return type() == mongo::String ? string(valuestr(), valuestrsize()-1) : string();
+        std::string str() const {
+            return type() == mongo::String ? std::string(valuestr(), valuestrsize()-1) : std::string();
         }
 
         /** Get javascript code of a CodeWScope data element. */
@@ -407,7 +407,7 @@ namespace mongo {
             }
         }
 
-        string _asCode() const;
+        std::string _asCode() const;
         OpTime _opTime() const;
 
     private:

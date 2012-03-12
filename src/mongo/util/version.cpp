@@ -233,6 +233,31 @@ namespace mongo {
         }
 #endif
 
+#if defined(RLIMIT_NPROC) && defined(RLIMIT_NOFILE)
+        //Check that # of files rlmit > 1000 , and # of processes > # of files/2
+        const unsigned int minNumFiles = 1000;
+        const double filesToProcsRatio = 2.0;
+        struct rlimit rlnproc;
+        struct rlimit rlnofile;
+
+        if(!getrlimit(RLIMIT_NPROC,&rlnproc) && !getrlimit(RLIMIT_NOFILE,&rlnofile)){
+            if(rlnofile.rlim_cur < minNumFiles){
+                log() << startupWarningsLog;
+                log() << "** WARNING: soft rlimits too low. Number of files is "
+                        << rlnofile.rlim_cur
+                        << ", should be at least " << minNumFiles << startupWarningsLog;
+            }
+            if(rlnproc.rlim_cur < rlnofile.rlim_cur/filesToProcsRatio){
+                log() << startupWarningsLog;
+                log() << "** WARNING: soft rlimits too low. rlimits set to " << rlnproc.rlim_cur << " processes, "
+                        << rlnofile.rlim_cur << " files. Number of processes should be at least "
+                        << 1/filesToProcsRatio << " times number of files." << startupWarningsLog;
+            }
+        } else {
+            log() << startupWarningsLog;
+            log() << "** WARNING: getrlimit failed. " << errnoWithDescription() << startupWarningsLog;
+        }
+#endif
         if (warned) {
             log() << startupWarningsLog;
         }
@@ -252,7 +277,7 @@ namespace mongo {
                 return -1;
         }
 
-        return lexNumCmp(rhs.data(), lhs.data());
+        return LexNumCmp::cmp(rhs.data(), lhs.data(), false);
     }
 
     class VersionCmpTest : public UnitTest {

@@ -372,7 +372,7 @@ namespace JsonTests {
                 b.append( "c" , "abc" );
                 b.append( "e" , BSON( "x" << 1 ) );
                 b.append( "f" , BSON_ARRAY( 1 << 2 << 3 ) );
-                b.appendBinData( "g" , 5 , bdtCustom , (const char*)this );
+                b.appendBinData( "g" , sizeof(AllTypes) , bdtCustom , (const void*)this );
                 b.appendUndefined( "h" );
                 b.append( "i" , oid );
                 b.appendBool( "j" , 1 );

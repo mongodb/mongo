@@ -15,10 +15,10 @@
 */
 
 #include "pch.h"
-#include "../client.h"
-#include "../../client/dbclient.h"
+#include "mongo/db/client.h"
+#include "mongo/client/dbclient.h"
 #include "rs.h"
-#include "../repl.h"
+#include "mongo/db/repl.h"
 #include "connections.h"
 
 namespace mongo {
@@ -505,6 +505,7 @@ namespace mongo {
                             replset::SyncTail tail("");
                             tail.syncApply(o);
                             _logOpObjRS(o);   // with repl sets we write the ops to our oplog too
+                            getDur().commitIfNeeded();
                         }
                         catch (DBException& e) {
                             sethbmsg(str::stream() << "syncTail: " << e.toString() << ", syncing: " << o);

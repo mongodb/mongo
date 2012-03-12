@@ -16,11 +16,10 @@
  */
 
 #include "pch.h"
-#include "text.h"
-#include "unittest.h"
-#if defined(_WIN32)
-#include <boost/system/system_error.hpp>
-#endif
+
+#include "mongo/util/text.h"
+#include "mongo/util/unittest.h"
+#include "mongo/util/mongoutils/str.h"
 
 namespace mongo {
 
@@ -93,8 +92,9 @@ namespace mongo {
             }
         }
 
-        throw boost::system::system_error(
-            ::GetLastError(), boost::system::system_category);
+        msgasserted( 16091 ,
+                     mongoutils::str::stream() << "can't wstring to utf8: " << ::GetLastError() );
+        return "";
     }
 
 #if defined(_UNICODE)

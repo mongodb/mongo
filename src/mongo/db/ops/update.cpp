@@ -23,7 +23,6 @@
 #include "../queryutil.h"
 #include "../repl.h"
 #include "../btree.h"
-#include "../../util/stringutils.h"
 #include "update.h"
 #include "../pagefault.h"
 
@@ -366,7 +365,8 @@ namespace mongo {
         // Perform this check first, so that we don't leave a partially modified object on uassert.
         for ( ModHolder::const_iterator i = _mods.begin(); i != _mods.end(); ++i ) {
             DEBUGUPDATE( "\t\t prepare : " << i->first );
-            ModState& ms = mss->_mods[i->first];
+            mss->_mods[i->first].reset( new ModState() );
+            ModState& ms = *mss->_mods[i->first];
 
             const Mod& m = i->second;
             BSONElement e = obj.getFieldDotted(m.fieldName);
@@ -563,7 +563,7 @@ namespace mongo {
         DEV assert( isOnDisk == ! _obj.isOwned() );
 
         for ( ModStateHolder::iterator i = _mods.begin(); i != _mods.end(); ++i ) {
-            ModState& m = i->second;
+            ModState& m = *i->second;
 
             if ( m.dontApply ) {
                 continue;
@@ -605,7 +605,8 @@ namespace mongo {
     }
 
     template< class Builder >
-    void ModSetState::_appendNewFromMods( const string& root , ModState& m , Builder& b , set<string>& onedownseen ) {
+    void ModSetState::_appendNewFromMods( const string& root , ModState& m , Builder& b ,
+                                         set<string>& onedownseen ) {
         const char * temp = m.fieldName();
         temp += root.size();
         const char * dot = strchr( temp , '.' );
@@ -616,13 +617,13 @@ namespace mongo {
                 return;
             onedownseen.insert( nf );
             BSONObjBuilder bb ( b.subobjStart( nf ) );
-            createNewFromMods( nr , bb , BSONObj() ); // don't infer an array from name
+            // Always insert an object, even if the field name is numeric.
+            createNewObjFromMods( nr , bb , BSONObj() );
             bb.done();
         }
         else {
             appendNewFromMod( m , b );
         }
-
     }
 
     bool ModSetState::duplicateFieldName( const BSONElement &a, const BSONElement &b ) {
@@ -633,16 +634,40 @@ namespace mongo {
         str::equals( a.fieldName(), b.fieldName() );
     }
 
-    template< class Builder >
-    void ModSetState::createNewFromMods( const string& root , Builder& b , const BSONObj &obj ) {
-        DEBUGUPDATE( "\t\t createNewFromMods root: " << root );
-        BSONObjIteratorSorted es( obj );
-        BSONElement e = es.next();
-
-        ModStateHolder::iterator m = _mods.lower_bound( root );
+    ModSetState::ModStateRange ModSetState::modsForRoot( const string &root ) {
+        ModStateHolder::iterator mstart = _mods.lower_bound( root );
         StringBuilder buf;
         buf << root << (char)255;
         ModStateHolder::iterator mend = _mods.lower_bound( buf.str() );
+        return make_pair( mstart, mend );
+    }
+
+    void ModSetState::createNewObjFromMods( const string &root , BSONObjBuilder &b ,
+                                           const BSONObj &obj ) {
+        BSONObjIteratorSorted es( obj );
+        createNewFromMods( root, b, es, modsForRoot( root ), LexNumCmp( true ) );
+    }
+
+    void ModSetState::createNewArrayFromMods( const string &root , BSONArrayBuilder &b ,
+                                             const BSONArray &arr ) {
+        BSONArrayIteratorSorted es( arr );
+        ModStateRange objectOrderedRange = modsForRoot( root );
+        ModStateHolder arrayOrderedMods( LexNumCmp( false ) );
+        arrayOrderedMods.insert( objectOrderedRange.first, objectOrderedRange.second );
+        ModStateRange arrayOrderedRange( arrayOrderedMods.begin(), arrayOrderedMods.end() );
+        createNewFromMods( root, b, es, arrayOrderedRange, LexNumCmp( false ) );
+    }
+    
+    template< class Builder >
+    void ModSetState::createNewFromMods( const string& root , Builder& b ,
+                                        BSONIteratorSorted& es ,
+                                        const ModStateRange& modRange ,
+                                        const LexNumCmp& lexNumCmp ) {
+
+        DEBUGUPDATE( "\t\t createNewFromMods root: " << root );
+        ModStateHolder::iterator m = modRange.first;
+        const ModStateHolder::const_iterator mend = modRange.second;
+        BSONElement e = es.next();
 
         set<string> onedownseen;
         BSONElement prevE;
@@ -658,9 +683,10 @@ namespace mongo {
             prevE = e;
 
             string field = root + e.fieldName();
-            FieldCompareResult cmp = compareDottedFieldNames( m->second.m->fieldName , field );
+            FieldCompareResult cmp = compareDottedFieldNames( m->second->m->fieldName , field ,
+                                                             lexNumCmp );
 
-            DEBUGUPDATE( "\t\t\t field:" << field << "\t mod:" << m->second.m->fieldName << "\t cmp:" << cmp << "\t short: " << e.fieldName() );
+            DEBUGUPDATE( "\t\t\t field:" << field << "\t mod:" << m->second->m->fieldName << "\t cmp:" << cmp << "\t short: " << e.fieldName() );
 
             switch ( cmp ) {
 
@@ -671,13 +697,13 @@ namespace mongo {
                     if ( e.type() == Object ) {
                         BSONObjBuilder bb( b.subobjStart( e.fieldName() ) );
                         stringstream nr; nr << root << e.fieldName() << ".";
-                        createNewFromMods( nr.str() , bb , e.embeddedObject() );
+                        createNewObjFromMods( nr.str() , bb , e.Obj() );
                         bb.done();
                     }
                     else {
                         BSONArrayBuilder ba( b.subarrayStart( e.fieldName() ) );
                         stringstream nr; nr << root << e.fieldName() << ".";
-                        createNewFromMods( nr.str() , ba , e.embeddedObject() );
+                        createNewArrayFromMods( nr.str() , ba , BSONArray( e.embeddedObject() ) );
                         ba.done();
                     }
                     // inc both as we handled both
@@ -691,13 +717,13 @@ namespace mongo {
                 continue;
             }
             case LEFT_BEFORE: // Mod on a field that doesn't exist
-                DEBUGUPDATE( "\t\t\t\t creating new field for: " << m->second.m->fieldName );
-                _appendNewFromMods( root , m->second , b , onedownseen );
+                DEBUGUPDATE( "\t\t\t\t creating new field for: " << m->second->m->fieldName );
+                _appendNewFromMods( root , *m->second , b , onedownseen );
                 m++;
                 continue;
             case SAME:
-                DEBUGUPDATE( "\t\t\t\t applying mod on: " << m->second.m->fieldName );
-                m->second.apply( b , e );
+                DEBUGUPDATE( "\t\t\t\t applying mod on: " << m->second->m->fieldName );
+                m->second->apply( b , e );
                 e = es.next();
                 m++;
                 continue;
@@ -723,27 +749,23 @@ namespace mongo {
 
         // do mods that don't have fields already
         for ( ; m != mend; m++ ) {
-            DEBUGUPDATE( "\t\t\t\t appending from mod at end: " << m->second.m->fieldName );
-            _appendNewFromMods( root , m->second , b , onedownseen );
+            DEBUGUPDATE( "\t\t\t\t appending from mod at end: " << m->second->m->fieldName );
+            _appendNewFromMods( root , *m->second , b , onedownseen );
         }
     }
 
     BSONObj ModSetState::createNewFromMods() {
         BSONObjBuilder b( (int)(_obj.objsize() * 1.1) );
-        createNewFromMods( "" , b , _obj );
+        createNewObjFromMods( "" , b , _obj );
         return _newFromMods = b.obj();
     }
 
     string ModSetState::toString() const {
         stringstream ss;
         for ( ModStateHolder::const_iterator i=_mods.begin(); i!=_mods.end(); ++i ) {
-            ss << "\t\t" << i->first << "\t" << i->second.toString() << "\n";
+            ss << "\t\t" << i->first << "\t" << i->second->toString() << "\n";
         }
         return ss.str();
-    }
-
-    bool ModSetState::FieldCmp::operator()( const string &l, const string &r ) const {
-        return lexNumCmp( l.c_str(), r.c_str() ) < 0;
     }
 
     BSONObj ModSet::createNewFromQuery( const BSONObj& query ) {
@@ -1048,7 +1070,7 @@ namespace mongo {
         int numModded = 0;
         debug.nscanned = 0;
         shared_ptr<Cursor> c =
-        NamespaceDetailsTransient::getCursor( ns, patternOrig, BSONObj(), planPolicy );
+            NamespaceDetailsTransient::getCursor( ns, patternOrig, BSONObj(), planPolicy );
         d = nsdetails(ns);
         nsdt = &NamespaceDetailsTransient::get(ns);
         bool autoDedup = c->autoDedup();

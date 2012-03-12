@@ -1638,7 +1638,7 @@ namespace mongo {
             BSONObjBuilder bb( result.subobjStart( "collections" ) );
             for ( list<string>::iterator i=colls.begin(); i != colls.end(); i++ ) {
                 string c = *i;
-                if ( c.find( ".system.profil" ) != string::npos )
+                if ( c.find( ".system.profile" ) != string::npos )
                     continue;
 
                 shared_ptr<Cursor> cursor;

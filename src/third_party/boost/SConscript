@@ -1,0 +1,45 @@
+# -*- mode: python; -*-
+
+Import("env")
+
+env.StaticLibrary('boost_system', ['libs/system/src/error_code.cpp'])
+
+boost_thread_source = dict(
+    posix=['libs/thread/src/pthread/once.cpp',
+           'libs/thread/src/pthread/thread.cpp'],
+    win=['libs/thread/src/win32/thread.cpp',
+         'libs/thread/src/win32/tss_dll.cpp',
+         'libs/thread/src/win32/tss_pe.cpp']
+    ).get(env['OS_FAMILY'], 'UNKNOWN_OS_FAMILY_FOR_BOOST_THREADS__%s' % env['OS_FAMILY'])
+
+threadlib_env = env.Clone()
+threadlib_env.Append(CPPDEFINES=['BOOST_THREAD_BUILD_LIB'])
+threadlib_env.StaticLibrary('boost_thread', boost_thread_source)
+
+env.StaticLibrary('boost_filesystem', [
+        'libs/filesystem/v2/src/v2_operations.cpp',
+        'libs/filesystem/v2/src/v2_path.cpp',
+        'libs/filesystem/v2/src/v2_portability.cpp',
+        'libs/filesystem/v3/src/codecvt_error_category.cpp',
+        'libs/filesystem/v3/src/operations.cpp',
+        'libs/filesystem/v3/src/path.cpp',
+        'libs/filesystem/v3/src/path_traits.cpp',
+        'libs/filesystem/v3/src/portability.cpp',
+        'libs/filesystem/v3/src/unique_path.cpp',
+        'libs/filesystem/v3/src/utf8_codecvt_facet.cpp',
+        'libs/filesystem/v3/src/windows_file_codecvt.cpp',
+        ])
+
+env.StaticLibrary('boost_program_options', [
+        'libs/program_options/src/cmdline.cpp',
+        'libs/program_options/src/config_file.cpp',
+        'libs/program_options/src/convert.cpp',
+        'libs/program_options/src/options_description.cpp',
+        'libs/program_options/src/parsers.cpp',
+        'libs/program_options/src/positional_options.cpp',
+        'libs/program_options/src/split.cpp',
+        'libs/program_options/src/utf8_codecvt_facet.cpp',
+        'libs/program_options/src/value_semantic.cpp',
+        'libs/program_options/src/variables_map.cpp',
+        'libs/program_options/src/winmain.cpp',
+        ])

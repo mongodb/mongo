@@ -14,7 +14,56 @@
     <ClCompile Include="..\..\util\logfile.cpp">
       <Filter>shared files</Filter>
     </ClCompile>
+<<<<<<< HEAD
     <ClCompile Include="..\..\db\memconcept.cpp" />
+=======
+    <ClCompile Include="..\..\util\stringutils.cpp">
+      <Filter>shared files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\boost\libs\thread\src\win32\thread.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\boost\libs\thread\src\win32\tss_dll.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\boost\libs\thread\src\win32\tss_pe.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\boost\libs\filesystem\v2\src\v2_operations.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\boost\libs\filesystem\v2\src\v2_path.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\boost\libs\filesystem\v2\src\v2_portability.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\boost\libs\filesystem\v3\src\codecvt_error_category.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\boost\libs\filesystem\v3\src\operations.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\boost\libs\filesystem\v3\src\path.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\boost\libs\filesystem\v3\src\path_traits.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\boost\libs\filesystem\v3\src\portability.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\boost\libs\filesystem\v3\src\unique_path.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\boost\libs\filesystem\v3\src\utf8_codecvt_facet.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\boost\libs\filesystem\v3\src\windows_file_codecvt.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\boost\libs\system\src\error_code.cpp" />
+>>>>>>> main_readonly/master
   </ItemGroup>
   <ItemGroup>
     <Filter Include="shared files">
@@ -23,6 +72,12 @@
     <Filter Include="includes">
       <UniqueIdentifier>{d855a95e-71ad-4f54-ae1b-94e7aa894394}</UniqueIdentifier>
     </Filter>
+<<<<<<< HEAD
+=======
+    <Filter Include="Boost">
+      <UniqueIdentifier>{ed6f2fa2-7139-409b-8a84-0282e680e550}</UniqueIdentifier>
+    </Filter>
+>>>>>>> main_readonly/master
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\bson\bson-inl.h">

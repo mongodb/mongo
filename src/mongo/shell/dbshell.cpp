@@ -468,36 +468,52 @@ string sayReplSetMemberState() {
 }
 
 /**
- * Edit a variable in an external editor -- EDITOR must be defined
+ * Edit a variable or input buffer text in an external editor -- EDITOR must be defined
  *
- * @param var Name of JavaScript variable to be edited
+ * @param whatToEdit Name of JavaScript variable to be edited, or any text string
  */
-static void edit( const string& var ) {
+static void edit( const string& whatToEdit ) {
 
-    // EDITOR must be defined in the environment
-    static const char * editor = getenv( "EDITOR" );
-    if ( !editor ) {
-        cout << "please define the EDITOR environment variable" << endl;
+    // EDITOR may be defined in the JavaScript scope or in the environment
+    string editor;
+    if ( shellMainScope->type( "EDITOR" ) == String ) {
+        editor = shellMainScope->getString( "EDITOR" );
+    }
+    else {
+        static const char * editorFromEnv = getenv( "EDITOR" );
+        if ( editorFromEnv ) {
+            editor = editorFromEnv;
+        }
+    }
+    if ( editor.empty() ) {
+        cout << "please define EDITOR as a JavaScript string or as an environment variable" << endl;
         return;
     }
 
-    // "var" must look like a variable/property name
-    for ( const char* p=var.c_str(); *p; ++p ) {
+    // "whatToEdit" might look like a variable/property name
+    bool editingVariable = true;
+    for ( const char* p = whatToEdit.c_str(); *p; ++p ) {
         if ( ! ( isalnum( *p ) || *p == '_' || *p == '.' ) ) {
-            cout << "can only edit variable or property" << endl;
-            return;
+            editingVariable = false;
+            break;
         }
     }
 
-    // Convert "var" to JavaScript (JSON) text
-    if ( !shellMainScope->exec( "__jsout__ = tojson(" + var + ")", "tojs", false, false, false ) )
-        return; // Error already printed
+    string js;
+    if ( editingVariable ) {
+        // Convert "whatToEdit" to JavaScript (JSON) text
+        if ( !shellMainScope->exec( "__jsout__ = tojson(" + whatToEdit + ")", "tojs", false, false, false ) )
+            return; // Error already printed
 
-    const string js = shellMainScope->getString( "__jsout__" );
+        js = shellMainScope->getString( "__jsout__" );
 
-    if ( strstr( js.c_str(), "[native code]" ) ) {
-        cout << "can't edit native functions" << endl;
-        return;
+        if ( strstr( js.c_str(), "[native code]" ) ) {
+            cout << "can't edit native functions" << endl;
+            return;
+        }
+    }
+    else {
+        js = whatToEdit;
     }
 
     // Pick a name to use for the temp file
@@ -564,7 +580,6 @@ static void edit( const string& var ) {
         return;
     }
     sb.reset();
-    sb << var << " = ";
     int bytes;
     do {
         char buf[1024];
@@ -582,10 +597,15 @@ static void edit( const string& var ) {
     fclose( tempFileStream );
     remove( filename.c_str() );
 
-    // Try to execute assignment to copy edited value back into the variable
-    const string code = sb.str();
-    if ( !shellMainScope->exec( code, "tojs", false, false, false ) )
-        return; // Error already printed
+    if ( editingVariable ) {
+        // Try to execute assignment to copy edited value back into the variable
+        const string code = whatToEdit + string( " = " ) + sb.str();
+        if ( !shellMainScope->exec( code, "tojs", false, false, false ) )
+            return; // Error already printed
+    }
+    else {
+        linenoisePreloadBuffer( sb.str().c_str() );
+    }
 }
 
 int _main( int argc, char* argv[] ) {

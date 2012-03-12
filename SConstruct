@@ -197,6 +197,7 @@ add_option( "clang" , "use clang++ rather than g++ (experimental)" , 0 , True )
 add_option( "tcmalloc" , "link against tcmalloc" , 0 , False )
 add_option( "gdbserver" , "build in gdb server support" , 0 , True )
 add_option( "heapcheck", "link to heap-checking malloc-lib and look for memory leaks during tests" , 0 , False )
+add_option( "gcov" , "compile with flags for gcov" , 0 , True )
 
 add_option("smokedbprefix", "prefix to dbpath et al. for smoke tests", 1 , False )
 add_option("smokeauth", "run smoke tests with --auth", 0 , False )
@@ -205,6 +206,8 @@ for shortName in getThirdPartyShortNames():
     add_option( "use-system-" + shortName , "use system version of library " + shortName , 0 , True )
 
 add_option( "use-system-pcre", "use system version of pcre library", 0, True )
+
+add_option( "use-system-boost", "use system version of boost libraries", 0, True )
 
 add_option( "use-system-all" , "use all system libraries", 0 , True )
 
@@ -242,15 +245,17 @@ windows = False
 freebsd = False
 openbsd = False
 solaris = False
+force32 = has_option( "force32" ) 
 force64 = has_option( "force64" )
-if not force64 and os.getcwd().endswith( "mongo-64" ):
+if not force64 and not force32 and os.getcwd().endswith( "mongo-64" ):
     force64 = True
     print( "*** assuming you want a 64-bit build b/c of directory *** " )
 msarch = None
-if force64:
+if force32:
+    msarch = "x86"
+elif force64:
     msarch = "amd64"
 
-force32 = has_option( "force32" ) 
 release = has_option( "release" )
 static = has_option( "static" )
 
@@ -269,6 +274,7 @@ justClientLib = (COMMAND_LINE_TARGETS == ['mongoclient'])
 
 env = Environment( BUILD_DIR=variantDir,
                    MSVS_ARCH=msarch ,
+                   TARGET_ARCH=msarch ,
                    tools=["default", "gch", "jsheader", "mergelib" ],
                    PYSYSPLATFORM=os.sys.platform,
 
@@ -326,8 +332,8 @@ if has_option( "libpath" ):
 if has_option( "cpppath" ):
     env["CPPPATH"] = [get_option( "cpppath" )]
 
-env.Append( CPPDEFINES=[ "_SCONS" , "MONGO_EXPOSE_MACROS" ],
-            CPPPATH=[ '$BUILD_DIR', "$BUILD_DIR/mongo" ] )
+env.Prepend( CPPDEFINES=[ "_SCONS" , "MONGO_EXPOSE_MACROS" ],
+             CPPPATH=[ '$BUILD_DIR', "$BUILD_DIR/mongo" ] )
 
 if has_option( "safeshell" ):
     env.Append( CPPDEFINES=[ "MONGO_SAFE_SHELL" ] )
@@ -482,13 +488,13 @@ if "darwin" == os.sys.platform:
     nix = True
 
     if force64:
-        env.Append( EXTRACPPPATH=["/usr/64/include"] )
-        env.Append( EXTRALIBPATH=["/usr/64/lib"] )
-        if installDir == DEFAULT_INSTALL_DIR and not distBuild:
-            installDir = "/usr/64/"
+       env.Append( EXTRACPPPATH=["/usr/64/include"] )
+       env.Append( EXTRALIBPATH=["/usr/64/lib"] )
+       if installDir == DEFAULT_INSTALL_DIR and not distBuild:
+           installDir = "/usr/64/"
     else:
-        env.Append( EXTRACPPPATH=filterExists(["/sw/include" , "/opt/local/include"]) )
-        env.Append( EXTRALIBPATH=filterExists(["/sw/lib/", "/opt/local/lib"]) )
+       env.Append( EXTRACPPPATH=filterExists(["/sw/include" , "/opt/local/include"]) )
+       env.Append( EXTRALIBPATH=filterExists(["/sw/lib/", "/opt/local/lib"]) )
 
 elif os.sys.platform.startswith("linux"):
     linux = True
@@ -548,29 +554,6 @@ elif "win32" == os.sys.platform:
 	#use current environment
 	env['ENV'] = dict(os.environ)
 
-    def find_boost():
-        for x in ('', ' (x86)'):	
-            boostDir = "C:/Program Files" + x + "/boost/latest"
-            if os.path.exists( boostDir ):
-                return boostDir
-            for bv in reversed( range(33,50) ):
-	            for extra in ('', '_0', '_1'):
-		            boostDir = "C:/Program Files" + x + "/Boost/boost_1_" + str(bv) + extra
-		            if os.path.exists( boostDir ):
-		                return boostDir
-        if os.path.exists( "C:/boost" ):
-	        return "C:/boost"
-        if os.path.exists( "/boost" ):
-	        return "/boost"
-        return None
-
-    boostDir = find_boost()
-    if boostDir is None:
-        print( "can't find boost" )
-        Exit(1)
-    else:
-        print( "boost found at '" + boostDir + "'" )
-
     boostLibs = []
 
     env.Append( CPPDEFINES=[ "_UNICODE" ] )
@@ -580,7 +563,7 @@ elif "win32" == os.sys.platform:
                               [ "v7.1", "v7.0A", "v7.0", "v6.1", "v6.0a", "v6.0" ] )
     print( "Windows SDK Root '" + winSDKHome + "'" )
 
-    env.Append( EXTRACPPPATH=[ boostDir , winSDKHome + "/Include" ] )
+    env.Append( EXTRACPPPATH=[ winSDKHome + "/Include" ] )
 
     # consider adding /MP build with multiple processes option.
 
@@ -611,41 +594,40 @@ elif "win32" == os.sys.platform:
     #env.Append( CPPFLAGS=' /Yu"pch.h" ' ) 
 
     # docs say don't use /FD from command line (minimal rebuild)
-    # /Gy function level linking
-    # /Gm is minimal rebuild, but may not work in parallel mode.
+    # /Gy function level linking (implicit when using /Z7)
+    # /Z7 debug info goes into each individual .obj file -- no .pdb created 
+    env.Append( CPPFLAGS= " /Z7 /errorReport:none " ); 
     if release:
+        # /MT: Causes your application to use the multithread, static version of the run-time library (LIBCMT.lib)
+        # /O2: optimize for speed (as opposed to size)
         env.Append( CPPDEFINES=[ "NDEBUG" ] )
-        env.Append( CPPFLAGS= " /O2 /Gy " )
-        env.Append( CPPFLAGS= " /MT /Zi /TP /errorReport:none " )
+        env.Append( CPPFLAGS= " /O2 /MT " )
+
         # TODO: this has caused some linking problems :
         # /GL whole program optimization
         # /LTCG link time code generation
         env.Append( CPPFLAGS= " /GL " ) 
         env.Append( LINKFLAGS=" /LTCG " )
+        env.Append( ARFLAGS=" /LTCG " ) # for the Library Manager
         # /DEBUG will tell the linker to create a .pdb file
         # which WinDbg and Visual Studio will use to resolve
-        # symbols if you want to debug a release-mode image
+        # symbols if you want to debug a release-mode image.
+        # Note that this means we can't do parallel links in the build.
         env.Append( LINKFLAGS=" /DEBUG " )
     else:
-        # /Od disable optimization
-        # /Z7 debug info goes into each individual .obj file -- no .pdb created 
-        # /TP it's a c++ file
         # /RTC1: - Enable Stack Frame Run-Time Error Checking; Reports when a variable is used without having been initialized
-        env.Append( CPPFLAGS=" /RTC1 /MDd /Z7 /TP /errorReport:none " )
-
+        #        (implies /Od: no optimizations)
+        # /MTd: Defines _DEBUG, _MT, and causes your application to use the
+        #       debug multithread version of the run-time library (LIBCMTD.lib)
+        env.Append( CPPFLAGS=" /RTC1 /Od /MTd " )
         if debugBuild:
+            # If you build without --d, no debug PDB will be generated, and 
+            # linking will be faster. However, you won't be able to debug your code with the debugger.
             env.Append( LINKFLAGS=" /debug " )
-            env.Append( CPPFLAGS=" /Od " )
-            
-        if debugLogging:
-            env.Append( CPPDEFINES=[ "_DEBUG" ] )
-
-    if force64 and os.path.exists( boostDir + "/lib/vs2010_64" ):
-        env.Append( EXTRALIBPATH=[ boostDir + "/lib/vs2010_64" ] )
-    elif not force64 and os.path.exists( boostDir + "/lib/vs2010_32" ):
-        env.Append( EXTRALIBPATH=[ boostDir + "/lib/vs2010_32" ] )
-    else:
-        env.Append( EXTRALIBPATH=[ boostDir + "/Lib" ] )
+        #if debugLogging:
+            # This is already implicit from /MDd...
+            #env.Append( CPPDEFINES=[ "_DEBUG" ] )
+            # This means --dd is always on unless you say --release
 
     if force64:
         env.Append( EXTRALIBPATH=[ winSDKHome + "/Lib/x64" ] )
@@ -715,6 +697,10 @@ if nix:
 
     if linux and has_option( "sharedclient" ):
         env.Append( LINKFLAGS=" -Wl,--as-needed -Wl,-zdefs " )
+
+    if linux and has_option( "gcov" ):
+        env.Append( CXXFLAGS=" -fprofile-arcs -ftest-coverage " )
+        env.Append( LINKFLAGS=" -fprofile-arcs -ftest-coverage " )
 
     if debugBuild:
         env.Append( CPPFLAGS=" -O0 -fstack-protector " );
@@ -802,7 +788,11 @@ for shortName in getThirdPartyShortNames():
         myModule.configure( env , fileLists , options_topass )
 
 if not has_option("use-system-all") and not has_option("use-system-pcre"):
-    env.Append(CPPPATH=[ '$BUILD_DIR/third_party/pcre-${PCRE_VERSION}' ])
+    env.Prepend(CPPPATH=[ '$BUILD_DIR/third_party/pcre-${PCRE_VERSION}' ])
+
+if not has_option('use-system-all') and not has_option('use-system-boost'):
+    env.Prepend(CPPPATH=['$BUILD_DIR/third_party/boost'],
+                CPPDEFINES=['BOOST_ALL_NO_LIB'])
 
 env.Append( CPPPATH=['$EXTRACPPPATH'],
             LIBPATH=['$EXTRALIBPATH'] )
@@ -872,28 +862,29 @@ def doConfigure( myenv , shell=False ):
 
         return False
 
-    if not conf.CheckCXXHeader( "boost/filesystem/operations.hpp" ):
-        print( "can't find boost headers" )
-        if shell:
-            print( "\tshell might not compile" )
-        else:
-            Exit(1)
+    if has_option('use-system-all') or has_option('use-system-boost'):
+        if not conf.CheckCXXHeader( "boost/filesystem/operations.hpp" ):
+            print( "can't find boost headers" )
+            if shell:
+                print( "\tshell might not compile" )
+            else:
+                Exit(1)
 
-    if asio:
-        if conf.CheckCXXHeader( "boost/asio.hpp" ):
-            myenv.Append( CPPDEFINES=[ "USE_ASIO" ] )
-        else:
-            print( "WARNING: old version of boost - you should consider upgrading" )
+        if asio:
+            if conf.CheckCXXHeader( "boost/asio.hpp" ):
+                myenv.Append( CPPDEFINES=[ "USE_ASIO" ] )
+            else:
+                print( "WARNING: old version of boost - you should consider upgrading" )
 
-    # this will add it if it exists and works
-    myCheckLib( [ "boost_system" + boostCompiler + "-mt" + boostVersion ,
-                  "boost_system" + boostCompiler + boostVersion ] )
+        # this will add it if it exists and works
+        myCheckLib( [ "boost_system" + boostCompiler + "-mt" + boostVersion ,
+                      "boost_system" + boostCompiler + boostVersion ] )
 
-    for b in boostLibs:
-        l = "boost_" + b
-        myCheckLib( [ l + boostCompiler + "-mt" + boostVersion ,
-                      l + boostCompiler + boostVersion ] ,
-                    release or not shell)
+        for b in boostLibs:
+            l = "boost_" + b
+            myCheckLib( [ l + boostCompiler + "-mt" + boostVersion ,
+                          l + boostCompiler + boostVersion ] ,
+                        release or not shell)
 
     if not conf.CheckCXXHeader( "execinfo.h" ):
         myenv.Append( CPPDEFINES=[ "NOEXECINFO" ] )

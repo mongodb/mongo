@@ -316,6 +316,13 @@ namespace mongo {
             }
             return it->second;
         }
+        
+        /* call when cursor's location changes so that we can update the
+         cursorsbylocation map.  if you are locked and internally iterating, only
+         need to call when you are ready to "unlock".
+         */
+        void updateLocation();
+
     public:
         static ClientCursor* find(CursorId id, bool warn = true) {
             recursive_scoped_lock lock(ccmutex);
@@ -336,12 +343,6 @@ namespace mongo {
          * @return number of cursors found
          */
         static int erase( int n , long long * ids );
-
-        /* call when cursor's location changes so that we can update the
-           cursorsbylocation map.  if you are locked and internally iterating, only
-           need to call when you are ready to "unlock".
-           */
-        void updateLocation();
 
         void mayUpgradeStorage() {
             /* if ( !ids_.get() )
@@ -448,6 +449,9 @@ namespace mongo {
 // ClientCursor should only be used with auto_ptr because it needs to be
 // release()ed after a yield if stillOk() returns false and these pointer types
 // do not support releasing. This will prevent them from being used accidentally
+// Instead of auto_ptr<>, which still requires some degree of manual management
+// of this, consider using ClientCursor::CleanupPointer which handles
+// ClientCursor's unusual self-deletion mechanics
 namespace boost{
     template<> class scoped_ptr<mongo::ClientCursor> {};
     template<> class shared_ptr<mongo::ClientCursor> {};

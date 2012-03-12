@@ -32,6 +32,8 @@ using namespace bson;
 
 namespace mongo {
 
+    mongo::mutex ReplSetConfig::groupMx("RS tag group");
+
     void logOpInitiate(const bo&);
 
     void assertOnlyHas(BSONObj o, const set<string>& fields) {
@@ -97,6 +99,7 @@ namespace mongo {
         for (vector<MemberCfg>::const_iterator source = members.begin(); source < members.end(); source++) {
             for( Member *d = dest.head(); d; d = d->next() ) {
                 if (d->fullName() == (*source).h.toString()) {
+                    scoped_lock lk(groupMx);
                     d->configw().groupsw() = (*source).groups();
                 }
             }
@@ -420,6 +423,7 @@ namespace mongo {
                         }
                     }
 
+                    scoped_lock lk(groupMx);
                     for (set<MemberCfg *>::iterator cfg = (*sgs).second->m.begin();
                          !foundMe && cfg != (*sgs).second->m.end(); cfg++) {
                         (*cfg)->groupsw().insert((*sgs).second);

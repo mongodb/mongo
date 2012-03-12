@@ -21,6 +21,8 @@
 #include "../db/commands.h"
 #include "../util/queue.h"
 #include "../util/net/listen.h"
+#include "../db/curop.h"
+#include "../db/client.h"
 
 #include "d_writeback.h"
 
@@ -143,6 +145,8 @@ namespace mongo {
         void help(stringstream& h) const { h<<"internal"; }
 
         bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
+
+            cc().curop()->suppressFromCurop();
 
             BSONElement e = cmdObj.firstElement();
             if ( e.type() != jstOID ) {

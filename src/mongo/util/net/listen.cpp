@@ -307,6 +307,13 @@ namespace mongo {
                 }
                 if (from.getType() != AF_UNIX)
                     disableNagle(s);
+
+#ifdef SO_NOSIGPIPE
+                // ignore SIGPIPE signals on osx, to avoid process exit
+                const int one = 1;
+                setsockopt( s , SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(int));
+#endif
+
                 if ( _logConnect && ! cmdLine.quiet ){
                     int conns = connTicketHolder.used()+1;
                     const char* word = (conns == 1 ? " connection" : " connections");

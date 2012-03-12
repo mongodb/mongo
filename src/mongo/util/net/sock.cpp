@@ -610,7 +610,7 @@ namespace mongo {
             disableNagle(_fd);
 
 #ifdef SO_NOSIGPIPE
-        // osx
+        // ignore SIGPIPE signals on osx, to avoid process exit
         const int one = 1;
         setsockopt( _fd , SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(int));
 #endif

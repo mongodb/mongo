@@ -8,6 +8,7 @@ rs.initiate();
 master = rs.getMaster();
 print("adding user");
 master.getDB("admin").addUser("foo", "bar");
+master.getDB("admin").runCommand({getLastError:1, w:2});
 
 var checkValidState = function(i) {
     assert.soon(function() {
