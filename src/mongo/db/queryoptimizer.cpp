@@ -809,7 +809,7 @@ doneCheckOrder:
     }
     
     shared_ptr<QueryOp> QueryPlanSet::Runner::next() {
-        verify( 16091, !done() );
+        verify( 16097, !done() );
 
         if ( _ops.empty() ) {
             shared_ptr<QueryOp> initialRet = init();
@@ -832,7 +832,7 @@ doneCheckOrder:
     }
     
     shared_ptr<QueryOp> QueryPlanSet::Runner::_next() {
-        verify( 16092, !_queue.empty() );
+        verify( 16096, !_queue.empty() );
         OpHolder holder = _queue.pop();
         QueryOp &op = *holder._op;
         nextOp( op );
@@ -1003,7 +1003,7 @@ doneCheckOrder:
     }
 
     shared_ptr<QueryOp> MultiPlanScanner::nextOp() {
-        verify( 16093, !doneOps() );
+        verify( 16095, !doneOps() );
         shared_ptr<QueryOp> ret = _or ? nextOpOr() : nextOpSimple();
         if ( ret->error() || ret->complete() ) {
             _doneOps = true;
