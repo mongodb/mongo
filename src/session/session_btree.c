@@ -83,10 +83,8 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 	ret = 0;
 
 	/*
-	 * If we had exclusive access, close the handle so that other threads
-	 * can use it (the next thread to access the handle will open it with
-	 * any special flags as required.  The handle stays in our cache, so
-	 * we don't want to go through __wt_conn_btree_close.
+	 * If we had exclusive access, reopen the tree without special flags so
+	 * that other threads can use it (note the reopen call sets the flags).
 	 */
 	if (F_ISSET(btree, WT_BTREE_BULK |
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)) {
@@ -94,7 +92,9 @@ __wt_session_release_btree(WT_SESSION_IMPL *session)
 		ret = __wt_conn_btree_reopen(session, NULL, 0);
 	}
 
-	F_CLR(btree, WT_BTREE_EXCLUSIVE);
+	if (F_ISSET(btree, WT_BTREE_EXCLUSIVE))
+		F_CLR(btree, WT_BTREE_EXCLUSIVE);
+
 	__wt_rwunlock(session, btree->rwlock);
 
 	return (ret);
