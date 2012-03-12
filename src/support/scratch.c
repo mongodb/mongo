@@ -215,8 +215,7 @@ __wt_buf_fmt(WT_SESSION_IMPL *session, WT_ITEM *buf, const char *fmt, ...)
 
 	for (;;) {
 		va_start(ap, fmt);
-		len =
-		    (size_t)vsnprintf(buf->mem, (size_t)buf->memsize, fmt, ap);
+		len = (size_t)vsnprintf(buf->mem, buf->memsize, fmt, ap);
 		va_end(ap);
 
 		/* Check if there was enough space. */

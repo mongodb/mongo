@@ -121,7 +121,7 @@ __wt_btree_set_root(WT_SESSION_IMPL *session,
 	 * and it needs to hold the [NoAddr] string.
 	 */
 	WT_RET(__wt_scr_alloc(
-	    session, size * 2 + WT_STORE_SIZE(strlen(WT_NOADDR)), &v));
+	    session, size * 2 + 1 + WT_STORE_SIZE(strlen(WT_NOADDR)), &v));
 
 	WT_VERBOSE(session, verify, "set %s root %s",
 	    filename, __wt_addr_string(session, v, addr, size));
