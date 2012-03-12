@@ -76,8 +76,8 @@ namespace mongo {
                                &_flags, &_min_flt, &_cmin_flt, &_maj_flt, &_cmaj_flt,
                                &_utime, &_stime, &_cutime, &_cstime,
                                &_priority, &_nice,
-                               &_alarm,
                                &_nlwp,
+                               &_alarm,
                                &_start_time,
                                &_vsize,
                                &_rss,
@@ -158,9 +158,10 @@ namespace mongo {
         long _nice;
 
         long _nlwp; // %ld
-        // The time in jiffies before the next SIGALRM is sent to the process due to an interval timer.
+        // number of threads
 
         unsigned long _alarm;
+        // The time in jiffies before the next SIGALRM is sent to the process due to an interval timer. (unused since 2.6.17)
 
         unsigned long _start_time; // %lu
         // The time in jiffies the process started after system boot.
