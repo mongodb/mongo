@@ -148,14 +148,14 @@ namespace MatcherTests {
         }
 
         void setupTests() {
-            add< Basic >();
-            add< DoubleEqual >();
-            add< MixedNumericEqual >();
-            add< MixedNumericGt >();
-            add< MixedNumericIN >();
-            add< Size >();
-            add< MixedNumericEmbedded >();
-            add< AllTiming >();
+            add<Basic>();
+            add<DoubleEqual>();
+            add<MixedNumericEqual>();
+            add<MixedNumericGt>();
+            add<MixedNumericIN>();
+            add<Size>();
+            add<MixedNumericEmbedded>();
+            add<AllTiming>();
         }
     } dball;
 
