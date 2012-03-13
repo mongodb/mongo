@@ -1273,7 +1273,7 @@ namespace mongo {
         const IndexDetails * _id;
     };
 
-    const shared_ptr< CoveredIndexMatcher > GeoCursorBase::emptyMatcher( new CoveredIndexMatcher( BSONObj(), BSONObj(), false ) );
+    const shared_ptr< CoveredIndexMatcher > GeoCursorBase::emptyMatcher( new CoveredIndexMatcher( BSONObj(), BSONObj() ) );
 
     // TODO: Pull out the cursor bit from the browse, have GeoBrowse as field of cursor to clean up
     // this hierarchy a bit.  Also probably useful to look at whether GeoAccumulator can be a member instead

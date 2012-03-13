@@ -255,7 +255,7 @@ namespace mongo {
     // If match succeeds on index key, then attempt to match full document.
     class CoveredIndexMatcher : boost::noncopyable {
     public:
-        CoveredIndexMatcher(const BSONObj &pattern, const BSONObj &indexKeyPattern , bool alwaysUseRecord=false );
+        CoveredIndexMatcher(const BSONObj &pattern, const BSONObj &indexKeyPattern);
         bool matches(const BSONObj &o) { return _docMatcher->matches( o ); }
         bool matchesWithSingleKeyIndex(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details = 0 ) {
             return matches( key, recLoc, details, true );   
@@ -278,16 +278,16 @@ namespace mongo {
             _docMatcher->popOrClause();
         }
 
-        CoveredIndexMatcher *nextClauseMatcher( const BSONObj &indexKeyPattern, bool alwaysUseRecord=false ) {
-            return new CoveredIndexMatcher( _docMatcher, indexKeyPattern, alwaysUseRecord );
+        CoveredIndexMatcher *nextClauseMatcher( const BSONObj &indexKeyPattern ) {
+            return new CoveredIndexMatcher( _docMatcher, indexKeyPattern );
         }
 
         string toString() const;
 
     private:
         bool matches(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details = 0 , bool keyUsable = true );
-        CoveredIndexMatcher(const shared_ptr< Matcher > &docMatcher, const BSONObj &indexKeyPattern , bool alwaysUseRecord=false );
-        void init( bool alwaysUseRecord );
+        CoveredIndexMatcher(const shared_ptr< Matcher > &docMatcher, const BSONObj &indexKeyPattern);
+        void init();
         shared_ptr< Matcher > _docMatcher;
         Matcher _keyMatcher;
 

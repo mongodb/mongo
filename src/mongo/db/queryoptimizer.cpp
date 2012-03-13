@@ -343,7 +343,7 @@ doneCheckOrder:
             _matcher.reset( _oldMatcher->nextClauseMatcher( qp().indexKey() ) );
         }
         else {
-            _matcher.reset( new CoveredIndexMatcher( qp().originalQuery(), qp().indexKey(), false ) );
+            _matcher.reset( new CoveredIndexMatcher( qp().originalQuery(), qp().indexKey() ) );
         }
         _init();
     }    

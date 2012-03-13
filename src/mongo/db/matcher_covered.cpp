@@ -31,22 +31,20 @@
 
 namespace mongo {
 
-    CoveredIndexMatcher::CoveredIndexMatcher( const BSONObj &jsobj, const BSONObj &indexKeyPattern, bool alwaysUseRecord) :
+    CoveredIndexMatcher::CoveredIndexMatcher( const BSONObj &jsobj, const BSONObj &indexKeyPattern ) :
         _docMatcher( new Matcher( jsobj ) ),
         _keyMatcher( *_docMatcher, indexKeyPattern ) {
-        init( alwaysUseRecord );
+        init();
     }
 
-    CoveredIndexMatcher::CoveredIndexMatcher( const shared_ptr< Matcher > &docMatcher, const BSONObj &indexKeyPattern , bool alwaysUseRecord ) :
+    CoveredIndexMatcher::CoveredIndexMatcher( const shared_ptr< Matcher > &docMatcher, const BSONObj &indexKeyPattern ) :
         _docMatcher( docMatcher ),
         _keyMatcher( *_docMatcher, indexKeyPattern ) {
-        init( alwaysUseRecord );
+        init();
     }
 
-    void CoveredIndexMatcher::init( bool alwaysUseRecord ) {
-        _needRecord =
-            alwaysUseRecord ||
-	        !_keyMatcher.keyMatch( *_docMatcher );
+    void CoveredIndexMatcher::init() {
+        _needRecord = !_keyMatcher.keyMatch( *_docMatcher );
     }
 
     bool CoveredIndexMatcher::matchesCurrent( Cursor * cursor , MatchDetails * details ) {
