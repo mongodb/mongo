@@ -2504,7 +2504,7 @@ namespace QueryOptimizerCursorTests {
                 
                 ClientCursor::YieldData yieldData;
                 {
-                    dblock lk;
+                    Lock::DBWrite lk(ns());
                     Client::Context ctx( ns() );
                     ClientCursor::CleanupPointer p;
                     p.reset
@@ -2525,7 +2525,7 @@ namespace QueryOptimizerCursorTests {
                 _cli.dropCollection( ns() );
                 
                 {
-                    dblock lk;
+                    Lock::DBWrite lk(ns());
                     Client::Context ctx( ns() );
                     ASSERT( !ClientCursor::recoverFromYield( yieldData ) );
                 } 
