@@ -133,6 +133,10 @@ namespace mongo {
             int max = i.next().numberInt();
             
             int x = min + ( rand() % ( max - min ) );
+            
+            if ( i.more() )
+                x *= i.next().numberInt();
+
             b.append( e.fieldName() , x );
         }
         else {
