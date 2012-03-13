@@ -71,7 +71,7 @@ namespace ThreadedTests {
 #if defined(_DEBUG)
         enum { N = 5000 };
 #else
-        enum { N = 40000 };
+        enum { N = 4000/*0*/ };
 #endif
         ProgressMeter pm;
     public:
