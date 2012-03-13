@@ -7,15 +7,15 @@
 
 #include "format.h"
 
-static int  wts_col_del(uint64_t, int *);
-static int  wts_col_insert(uint64_t *);
-static int  wts_col_put(uint64_t);
-static int  wts_notfound_chk(const char *, int, int, uint64_t);
-static int  wts_np(int, int, int *);
-static int  wts_read(uint64_t);
-static int  wts_row_del(uint64_t, int *);
-static int  wts_row_put(uint64_t, int);
-static void wts_stream_item(const char *, WT_ITEM *);
+static int  col_del(uint64_t, int *);
+static int  col_insert(uint64_t *);
+static int  col_put(uint64_t);
+static int  nextprev(int, int, int *);
+static int  notfound_chk(const char *, int, int, uint64_t);
+static int  read_row(uint64_t);
+static int  row_del(uint64_t, int *);
+static int  row_put(uint64_t, int);
+static void print_item(const char *, WT_ITEM *);
 
 /*
  * wts_ops --
@@ -51,24 +51,24 @@ wts_ops(void)
 				 * If deleting a non-existent record, the cursor
 				 * won't be positioned, and so can't do a next.
 				 */
-				if (wts_row_del(keyno, &notfound))
+				if (row_del(keyno, &notfound))
 					return (1);
 				break;
 			case FIX:
 			case VAR:
-				if (wts_col_del(keyno, &notfound))
+				if (col_del(keyno, &notfound))
 					return (1);
 				break;
 			}
 		} else if (op < g.c_delete_pct + g.c_insert_pct) {
 			switch (g.c_file_type) {
 			case ROW:
-				if (wts_row_put(keyno, 1))
+				if (row_put(keyno, 1))
 					return (1);
 				break;
 			case FIX:
 			case VAR:
-				if (wts_col_insert(&keyno))
+				if (col_insert(&keyno))
 					return (1);
 				insert = 1;
 				break;
@@ -77,17 +77,17 @@ wts_ops(void)
 		    op < g.c_delete_pct + g.c_insert_pct + g.c_write_pct) {
 			switch (g.c_file_type) {
 			case ROW:
-				if (wts_row_put(keyno, 0))
+				if (row_put(keyno, 0))
 					return (1);
 				break;
 			case FIX:
 			case VAR:
-				if (wts_col_put(keyno))
+				if (col_put(keyno))
 					return (1);
 				break;
 			}
 		} else {
-			if (wts_read(keyno))
+			if (read_row(keyno))
 				return (1);
 			continue;
 		}
@@ -100,7 +100,7 @@ wts_ops(void)
 		for (np = 0; np < MMRAND(1, 8); ++np) {
 			if (notfound)
 				break;
-			if (wts_np(dir, insert, &notfound))
+			if (nextprev(dir, insert, &notfound))
 				return (1);
 		}
 
@@ -110,7 +110,7 @@ wts_ops(void)
 		}
 
 		/* Then read the value we modified to confirm it worked. */
-		if (wts_read(keyno))
+		if (read_row(keyno))
 			return (1);
 	}
 	return (0);
@@ -135,7 +135,7 @@ wts_read_scan(void)
 			last_cnt = cnt;
 		}
 
-		if (wts_read(cnt))
+		if (read_row(cnt))
 			return (1);
 	}
 	return (0);
@@ -153,11 +153,11 @@ wts_read_scan(void)
 } while (0)
 
 /*
- * wts_read --
+ * read_row --
  *	Read and verify a single element in a row- or column-store file.
  */
 static int
-wts_read(uint64_t keyno)
+read_row(uint64_t keyno)
 {
 	static WT_ITEM key, value, bdb_value;
 	WT_CURSOR *cursor;
@@ -198,7 +198,7 @@ wts_read(uint64_t keyno)
 			ret = cursor->get_value(cursor, &value);
 	}
 	if (ret != 0 && ret != WT_NOTFOUND) {
-		fprintf(stderr, "%s: wts_read: read row %" PRIu64 ": %s\n",
+		fprintf(stderr, "%s: read_row: read row %" PRIu64 ": %s\n",
 		    g.progname, keyno, wiredtiger_strerror(ret));
 		return (1);
 	}
@@ -215,26 +215,26 @@ wts_read(uint64_t keyno)
 		ret = 0;
 	}
 
-	NTF_CHK(wts_notfound_chk("wts_read", ret, notfound, keyno));
+	NTF_CHK(notfound_chk("read_row", ret, notfound, keyno));
 
 	/* Compare the two. */
 	if (value.size != bdb_value.size ||
 	    memcmp(value.data, bdb_value.data, value.size) != 0) {
 		fprintf(stderr,
-		    "wts_read: read row value mismatch %" PRIu64 ":\n", keyno);
-		wts_stream_item("bdb", &bdb_value);
-		wts_stream_item(" wt", &value);
+		    "read_row: read row value mismatch %" PRIu64 ":\n", keyno);
+		print_item("bdb", &bdb_value);
+		print_item(" wt", &value);
 		return (1);
 	}
 	return (0);
 }
 
 /*
- * wts_np --
+ * nextprev --
  *	Read and verify the next/prev element in a row- or column-store file.
  */
 static int
-wts_np(int next, int insert, int *notfoundp)
+nextprev(int next, int insert, int *notfoundp)
 {
 	static WT_ITEM key, value, bdb_key, bdb_value;
 	WT_CURSOR *cursor;
@@ -282,16 +282,16 @@ wts_np(int next, int insert, int *notfoundp)
 		return (1);
 	}
 
-	NTF_CHK(wts_notfound_chk(
-	    next ? "wts_np(next)" : "wts_np(prev)", ret, notfound, keyno));
+	NTF_CHK(notfound_chk(
+	    next ? "nextprev(next)" : "nextprev(prev)", ret, notfound, keyno));
 
 	/* Compare the two. */
 	if (g.c_file_type == ROW) {
 		if (key.size != bdb_key.size ||
 		    memcmp(key.data, bdb_key.data, key.size) != 0) {
-			fprintf(stderr, "wts_np: %s key mismatch:\n", which);
-			wts_stream_item("bdb-key", &bdb_key);
-			wts_stream_item(" wt-key", &key);
+			fprintf(stderr, "nextprev: %s key mismatch:\n", which);
+			print_item("bdb-key", &bdb_key);
+			print_item(" wt-key", &key);
 			return (1);
 		}
 	} else {
@@ -299,7 +299,7 @@ wts_np(int next, int insert, int *notfoundp)
 			if ((p = strchr((char *)bdb_key.data, '.')) != NULL)
 				*p = '\0';
 			fprintf(stderr,
-			    "wts_np: %s key mismatch: %.*s != %" PRIu64 "\n",
+			    "nextprev: %s key mismatch: %.*s != %" PRIu64 "\n",
 			    which,
 			    (int)bdb_key.size, (char *)bdb_key.data, keyno);
 			return (1);
@@ -307,9 +307,9 @@ wts_np(int next, int insert, int *notfoundp)
 	}
 	if (value.size != bdb_value.size ||
 	    memcmp(value.data, bdb_value.data, value.size) != 0) {
-		fprintf(stderr, "wts_np: %s value mismatch:\n", which);
-		wts_stream_item("bdb-value", &bdb_value);
-		wts_stream_item(" wt-value", &value);
+		fprintf(stderr, "nextprev: %s value mismatch:\n", which);
+		print_item("bdb-value", &bdb_value);
+		print_item(" wt-value", &value);
 		return (1);
 	}
 
@@ -337,11 +337,11 @@ wts_np(int next, int insert, int *notfoundp)
 }
 
 /*
- * wts_row_put --
+ * row_put --
  *	Update an element in a row-store file.
  */
 static int
-wts_row_put(uint64_t keyno, int insert)
+row_put(uint64_t keyno, int insert)
 {
 	static WT_ITEM key, value;
 	WT_CURSOR *cursor;
@@ -370,22 +370,22 @@ wts_row_put(uint64_t keyno, int insert)
 	ret = cursor->insert(cursor);
 	if (ret != 0 && ret != WT_NOTFOUND) {
 		fprintf(stderr,
-		    "%s: wts_row_put: %s row %" PRIu64 " by key: %s\n",
+		    "%s: row_put: %s row %" PRIu64 " by key: %s\n",
 		    g.progname, insert ? "insert" : "update",
 		    keyno, wiredtiger_strerror(ret));
 		return (1);
 	}
 
-	NTF_CHK(wts_notfound_chk("wts_row_put", ret, notfound, keyno));
+	NTF_CHK(notfound_chk("row_put", ret, notfound, keyno));
 	return (0);
 }
 
 /*
- * wts_col_put --
+ * col_put --
  *	Update an element in a column-store file.
  */
 static int
-wts_col_put(uint64_t keyno)
+col_put(uint64_t keyno)
 {
 	static WT_ITEM key, value;
 	WT_CURSOR *cursor;
@@ -420,7 +420,7 @@ wts_col_put(uint64_t keyno)
 	ret = cursor->insert(cursor);
 	if (ret != 0 && ret != WT_NOTFOUND) {
 		fprintf(stderr,
-		    "%s: wts_col_put: %" PRIu64 " : %s\n",
+		    "%s: col_put: %" PRIu64 " : %s\n",
 		    g.progname, keyno, wiredtiger_strerror(ret));
 		return (1);
 	}
@@ -428,16 +428,16 @@ wts_col_put(uint64_t keyno)
 	if (bdb_put(key.data, key.size, value.data, value.size, &notfound))
 		return (1);
 
-	NTF_CHK(wts_notfound_chk("wts_col_put", ret, notfound, keyno));
+	NTF_CHK(notfound_chk("col_put", ret, notfound, keyno));
 	return (0);
 }
 
 /*
- * wts_col_insert --
+ * col_insert --
  *	Insert an element in a column-store file.
  */
 static int
-wts_col_insert(uint64_t *keynop)
+col_insert(uint64_t *keynop)
 {
 	static WT_ITEM key, value;
 	WT_CURSOR *cursor;
@@ -460,7 +460,7 @@ wts_col_insert(uint64_t *keynop)
 		cursor->set_value(cursor, &value);
 	ret = cursor->insert(cursor);
 	if (ret != 0) {
-		fprintf(stderr, "%s: wts_col_insert: %s\n",
+		fprintf(stderr, "%s: col_insert: %s\n",
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
@@ -495,11 +495,11 @@ wts_col_insert(uint64_t *keynop)
 }
 
 /*
- * wts_row_del --
+ * row_del --
  *	Delete an element from a row-store file.
  */
 static int
-wts_row_del(uint64_t keyno, int *notfoundp)
+row_del(uint64_t keyno, int *notfoundp)
 {
 	static WT_ITEM key;
 	WT_CURSOR *cursor;
@@ -525,21 +525,21 @@ wts_row_del(uint64_t keyno, int *notfoundp)
 	ret = cursor->remove(cursor);
 	if (ret != 0 && ret != WT_NOTFOUND) {
 		fprintf(stderr,
-		    "%s: wts_row_del: remove %" PRIu64 " by key: %s\n",
+		    "%s: row_del: remove %" PRIu64 " by key: %s\n",
 		    g.progname, keyno, wiredtiger_strerror(ret));
 		return (1);
 	}
 
-	NTF_CHK(wts_notfound_chk("wts_row_del", ret, notfound, keyno));
+	NTF_CHK(notfound_chk("row_del", ret, notfound, keyno));
 	return (0);
 }
 
 /*
- * wts_col_del --
+ * col_del --
  *	Delete an element from a column-store file.
  */
 static int
-wts_col_del(uint64_t keyno, int *notfoundp)
+col_del(uint64_t keyno, int *notfoundp)
 {
 	static WT_ITEM key;
 	WT_CURSOR *cursor;
@@ -572,21 +572,21 @@ wts_col_del(uint64_t keyno, int *notfoundp)
 	ret = cursor->remove(cursor);
 	if (ret != 0 && ret != WT_NOTFOUND) {
 		fprintf(stderr,
-		    "%s: wts_col_del: remove %" PRIu64 " by key: %s\n",
+		    "%s: col_del: remove %" PRIu64 " by key: %s\n",
 		    g.progname, keyno, wiredtiger_strerror(ret));
 		return (1);
 	}
 
-	NTF_CHK(wts_notfound_chk("wts_col_del", ret, notfound, keyno));
+	NTF_CHK(notfound_chk("col_del", ret, notfound, keyno));
 	return (0);
 }
 
 /*
- * wts_notfound_chk --
+ * notfound_chk --
  *	Compare notfound returns for consistency.
  */
 static int
-wts_notfound_chk(const char *f, int wt_ret, int bdb_notfound, uint64_t keyno)
+notfound_chk(const char *f, int wt_ret, int bdb_notfound, uint64_t keyno)
 {
 	/* Check for not found status. */
 	if (bdb_notfound) {
@@ -612,11 +612,11 @@ wts_notfound_chk(const char *f, int wt_ret, int bdb_notfound, uint64_t keyno)
 }
 
 /*
- * wts_stream_item --
- *	Dump a single data/size pair, with a tag.
+ * print_item --
+ *	Display a single data/size pair, with a tag.
  */
 static void
-wts_stream_item(const char *tag, WT_ITEM *item)
+print_item(const char *tag, WT_ITEM *item)
 {
 	static const char hex[] = "0123456789abcdef";
 	const uint8_t *data;
