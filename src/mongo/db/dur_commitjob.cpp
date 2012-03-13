@@ -62,6 +62,7 @@ namespace mongo {
         AtomicUInt ThreadLocalIntents::nSpooled;
     }
 
+    TSP_DECLARE(dur::ThreadLocalIntents,tlIntents)
     TSP_DEFINE(dur::ThreadLocalIntents,tlIntents)
 
     namespace dur {

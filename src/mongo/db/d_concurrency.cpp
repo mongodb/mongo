@@ -57,6 +57,7 @@ namespace mongo {
     static void unlocking_w();
     static void unlocking_W();
     static QLock& q = *new QLock();
+    TSP_DECLARE(LockState,ls);
     TSP_DEFINE(LockState,ls);
 
     void runExclusively(void (*f)(void)) { 
