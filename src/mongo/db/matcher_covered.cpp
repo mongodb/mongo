@@ -62,13 +62,14 @@ namespace mongo {
         dassert( key.isValid() );
 
         if ( details )
-            details->reset();
+            details->resetOutput();
 
         if ( keyUsable ) {
             if ( !_keyMatcher.matches(key, details ) ) {
                 return false;
             }
-            if ( ! _needRecord ) {
+            bool needRecordForDetails = details && details->needRecord();
+            if ( !_needRecord && !needRecordForDetails ) {
                 return true;
             }
         }

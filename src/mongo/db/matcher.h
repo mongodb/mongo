@@ -87,20 +87,31 @@ namespace mongo {
     class Where; // used for $where javascript eval
     class DiskLoc;
 
+    /** Reports information about a match request. */
     class MatchDetails {
     public:
         MatchDetails();
-        void reset();
+        void resetOutput();
         string toString() const;
 
+        /** Request that an elemMatchKey be recorded. */
+        void requestElemMatchKey() { _elemMatchKeyRequested = true; }
+        
+        bool needRecord() const { return _elemMatchKeyRequested; }
+        
         bool loadedObject() const { return _loadedObject; }
         const char *elemMatchKey() const { return _elemMatchKey; }
 
         void setLoadedObject( bool loadedObject ) { _loadedObject = loadedObject; }
-        void setElemMatchKey( const char *elemMatchKey ) { _elemMatchKey = elemMatchKey; }
+        void setElemMatchKey( const char *elemMatchKey ) {
+            if ( _elemMatchKeyRequested ) {
+                _elemMatchKey = elemMatchKey;
+            }
+        }
         
     private:
         bool _loadedObject;
+        bool _elemMatchKeyRequested;
         const char * _elemMatchKey; // warning, this may go out of scope if matched object does
     };
 

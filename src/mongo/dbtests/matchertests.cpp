@@ -133,6 +133,7 @@ namespace MatcherTests {
         void run() {
             Matcher matcher( BSON( "a.b" << 1 ) );
             MatchDetails details;
+            details.requestElemMatchKey();
             ASSERT( matcher.matches( fromjson( "{ a:[ { b:1 } ] }" ), &details ) );
             // The '0' entry of the 'a' array is matched.
             ASSERT_EQUALS( string( "0" ), details.elemMatchKey() );
@@ -153,6 +154,7 @@ namespace MatcherTests {
 
                 CoveredIndexMatcher matcher( BSON( "a.b" << 1 ), BSON( "$natural" << 1 ) );
                 MatchDetails details;
+                details.requestElemMatchKey();
                 shared_ptr<Cursor> cursor = NamespaceDetailsTransient::getCursor( ns, BSONObj() );
                 // Verify that the cursor is unindexed.
                 ASSERT_EQUALS( "BasicCursor", cursor->toString() );
@@ -162,6 +164,9 @@ namespace MatcherTests {
             }
         };
         
+        /**
+         * Test that MatchDetails::elemMatchKey() is set correctly after an indexed cursor match.
+         */
         class ElemMatchKeyIndexed : public CollectionBase {
         public:
             void run() {
@@ -173,12 +178,40 @@ namespace MatcherTests {
                 BSONObj query = BSON( "a.b" << 1 );
                 CoveredIndexMatcher matcher( query, BSON( "a.b" << 1 ) );
                 MatchDetails details;
+                details.requestElemMatchKey();
                 shared_ptr<Cursor> cursor = NamespaceDetailsTransient::getCursor( ns, query );
                 // Verify that the cursor is indexed.
                 ASSERT_EQUALS( "BtreeCursor a.b_1", cursor->toString() );
                 ASSERT( matcher.matchesCurrent( cursor.get(), &details ) );
                 // The '2' entry of the 'a' array is matched.
                 ASSERT_EQUALS( string( "2" ), details.elemMatchKey() );
+            }
+        };
+        
+        /**
+         * Test that MatchDetails::elemMatchKey() is set correctly after an indexed cursor match
+         * on a non multikey index.
+         */
+        class ElemMatchKeyIndexedSingleKey : public CollectionBase {
+        public:
+            void run() {
+                client.ensureIndex( ns, BSON( "a.b" << 1 ) );
+                client.insert( ns, fromjson( "{ a:[ { b:1 } ] }" ) );
+                
+                Client::ReadContext context( ns );
+                
+                BSONObj query = BSON( "a.b" << 1 );
+                CoveredIndexMatcher matcher( query, BSON( "a.b" << 1 ) );
+                MatchDetails details;
+                details.requestElemMatchKey();
+                shared_ptr<Cursor> cursor = NamespaceDetailsTransient::getCursor( ns, query );
+                // Verify that the cursor is indexed.
+                ASSERT_EQUALS( "BtreeCursor a.b_1", cursor->toString() );
+                // Verify that the cursor is not multikey
+                ASSERT( !cursor->isMultiKey() );
+                ASSERT( matcher.matchesCurrent( cursor.get(), &details ) );
+                // The '0' entry of the 'a' array is matched.
+                ASSERT_EQUALS( string( "0" ), details.elemMatchKey() );
             }
         };
         
@@ -222,6 +255,7 @@ namespace MatcherTests {
             add<ElemMatchKey>();
             add<Covered::ElemMatchKeyUnindexed>();
             add<Covered::ElemMatchKeyIndexed>();
+            add<Covered::ElemMatchKeyIndexedSingleKey>();
             add<AllTiming>();
         }
     } dball;

@@ -178,11 +178,12 @@ namespace mongo {
         (_compareOp == BSONObj::NIN && _myset->count( staticNull.firstElement()) == 0 );
     }
 
-    MatchDetails::MatchDetails() {
-        reset();
+    MatchDetails::MatchDetails() :
+    _elemMatchKeyRequested() {
+        resetOutput();
     }
     
-    void MatchDetails::reset() {
+    void MatchDetails::resetOutput() {
         _loadedObject = false;
         _elemMatchKey = 0;
     }
@@ -190,6 +191,7 @@ namespace mongo {
     string MatchDetails::toString() const {
         stringstream ss;
         ss << "loadedObject: " << _loadedObject << " ";
+        ss << "elemMatchKeyRequested: " << _elemMatchKeyRequested << " ";
         ss << "elemMatchKey: " << ( _elemMatchKey ? _elemMatchKey : "NULL" ) << " ";
         return ss.str();
     }
