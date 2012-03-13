@@ -57,7 +57,7 @@ namespace mongo {
         void notifyWeUnlocked(char me);
         static bool i_block(char me, char them);
     public:
-        QLock() : greedyWrites(1), greed(0), greedSuspended(0) { }
+        QLock() : greed(0), greedyWrites(1), greedSuspended(0) { }
         void lock_r();
         void lock_w();
         void lock_R();

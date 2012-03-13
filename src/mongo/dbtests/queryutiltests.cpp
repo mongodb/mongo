@@ -1114,9 +1114,9 @@ namespace QueryUtilTests {
             }
             static DBDirectClient client_;
         private:
-            Lock::DBWrite lk_;
             Client::Context _ctx;
             int indexNum_;
+            Lock::DBWrite lk_;
         };
         DBDirectClient IndexBase::client_;
         

@@ -179,7 +179,7 @@ namespace mongo {
     }
     static void lock_R() { 
         LockState& ls = lockState();
-        massert(16094, str::stream() << "can't lock_R, threadState=" << (int) threadState, ls.threadState == 0);
+        massert(16094, str::stream() << "can't lock_R, threadState=" << (int) ls.threadState, ls.threadState == 0);
         ls.threadState = 'R';
         Acquiring a('R');
         q.lock_R();
@@ -405,7 +405,6 @@ namespace mongo {
             recursive()--;
         }
         else {
-            LockState& ls = lockState();
             if( threadState() == 'R' ) { // downgraded
                 unlock_R();
             }

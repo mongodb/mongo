@@ -141,7 +141,7 @@ namespace mongo {
         size_t i = ns.find( '.' );
         if ( i == string::npos )
             return ns;
-        massert(10088, "nsToDatabase: ns too long", i < MaxDatabaseNameLen);
+        massert(10088, "nsToDatabase: ns too long", i < (size_t)MaxDatabaseNameLen);
         return ns.substr( 0 , i );
     }
 
