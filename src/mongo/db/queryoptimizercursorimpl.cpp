@@ -69,7 +69,6 @@ namespace mongo {
         _countingMatches(),
         _mustAdvance(),
         _capped(),
-        _yieldRecoveryFailed(),
         _selectionPolicy( selectionPolicy ),
         _requireOrder( requireOrder ),
         _alwaysCountMatches( alwaysCountMatches ) {
@@ -122,21 +121,18 @@ namespace mongo {
         virtual void recoverFromYield() {
             if ( _explainPlanInfo ) _explainPlanInfo->noteYield();
             if ( _cc && !ClientCursor::recoverFromYield( _yieldData ) ) {
-                _yieldRecoveryFailed = true;
+                // !!! The collection may be gone, and any namespace or index specific memory may
+                // have become invalid.
                 _c.reset();
                 _cc.reset();
                 
                 if ( _capped ) {
-                    msgassertedNoTrace( 13338, str::stream() << "capped cursor overrun: " << qp().ns() );
+                    msgassertedNoTrace( 13338,
+                                       str::stream() << "capped cursor overrun: " << qp().ns() );
                 }
-                else if ( qp().mustAssertOnYieldFailure() ) {
-                    msgassertedNoTrace( 15892, str::stream() << "QueryOptimizerCursorOp::recoverFromYield() failed to recover" );
-                }
-                else {
-                    // we don't fail query since we're fine with returning partial data if collection dropped
-                    // also, see SERVER-2454
-                    // todo: this is wrong.  the cursor could be gone if closeAllDatabases command just ran
-                }
+                msgassertedNoTrace( 15892,
+                                   str::stream() <<
+                                   "QueryOptimizerCursorOp::recoverFromYield() failed to recover" );
             }
             else {
                 checkCursorAdvanced();
@@ -204,7 +200,7 @@ namespace mongo {
             return match;
         }
         virtual bool mayRecordPlan() const {
-            return !_yieldRecoveryFailed && complete() && ( !stopRequested() || _matchCounter.enoughMatchesToRecordPlan() );
+            return complete() && ( !stopRequested() || _matchCounter.enoughMatchesToRecordPlan() );
         }
         shared_ptr<Cursor> cursor() const { return _c; }
         virtual shared_ptr<ExplainPlanInfo> generateExplainInfo() {
@@ -282,7 +278,6 @@ namespace mongo {
         ClientCursor::CleanupPointer _cc;
         DiskLoc _posBeforeYield;
         ClientCursor::YieldData _yieldData;
-        bool _yieldRecoveryFailed;
         const QueryPlanSelectionPolicy &_selectionPolicy;
         const bool &_requireOrder; // TODO don't use a ref for this, but signal change explicitly
         shared_ptr<ExplainPlanInfo> _explainPlanInfo;
@@ -428,6 +423,7 @@ namespace mongo {
                 if ( _currOp->error() || !ok() ) {
                     // Advance to a non error op if one of the ops errored out.
                     // Advance to a following $or clause if the $or clause returned all results.
+                    verify( 16094, !_mps->doneOps() );
                     _advance( true );
                 }
             }
@@ -752,7 +748,7 @@ namespace mongo {
     void CursorGenerator::setMultiPlanScanner() {
         _mps.reset( new MultiPlanScanner( _ns, _query, fieldsPtr(), _order, hint(),
                                          explain() ? QueryPlanSet::Ignore : QueryPlanSet::Use,
-                                         min(), max() ) ); // mayYield == false
+                                         min(), max() ) );
     }
     
     shared_ptr<Cursor> CursorGenerator::singlePlanCursor() {
@@ -803,7 +799,7 @@ namespace mongo {
     ( const char *ns, const BSONObj &query, const shared_ptr<Projection> &fields,
      const BSONObj &order, const QueryPlanSelectionPolicy &planPolicy, bool requireOrder ) {
         auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, fields,
-                                                             order ) ); // mayYield == false
+                                                             order ) );
         return newQueryOptimizerCursor( mps, planPolicy, requireOrder, false );
     }
         

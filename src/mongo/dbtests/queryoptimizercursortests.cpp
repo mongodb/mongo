@@ -1252,7 +1252,7 @@ namespace QueryOptimizerCursorTests {
                     Lock::GlobalWrite lk;
 
                     Client::Context ctx( ns() );
-                    recoverFromYield();
+                    ASSERT_THROWS( recoverFromYield(), MsgAssertionException );
                     ASSERT( !ok() );
                 }                
             }
@@ -1368,7 +1368,7 @@ namespace QueryOptimizerCursorTests {
                     Lock::GlobalWrite lk;
 
                     Client::Context ctx( ns() );
-                    recoverFromYield();
+                    ASSERT_THROWS( recoverFromYield(), MsgAssertionException );
                     ASSERT( !ok() );
                 }                
             }
@@ -2157,7 +2157,7 @@ namespace QueryOptimizerCursorTests {
             }
         };
 
-        /* Test 'touch earlier iterate' with undexed cursor takeover and deletes. */
+        /* Test 'touch earlier iterate' with unindexed cursor takeover and deletes. */
         class UnindexedTakeoverDeleteMultiple : public Base {
         public:
             void run() {
@@ -2495,6 +2495,43 @@ namespace QueryOptimizerCursorTests {
             }
         };
 
+        /** The collection of a QueryOptimizerCursor stored in a ClientCursor is dropped. */
+        class Drop : public Base {
+        public:
+            void run() {
+                _cli.insert( ns(), BSON( "_id" << 1 ) );
+                _cli.insert( ns(), BSON( "_id" << 2 ) );
+                
+                ClientCursor::YieldData yieldData;
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    ClientCursor::CleanupPointer p;
+                    p.reset
+                    ( new ClientCursor
+                     ( QueryOption_NoCursorTimeout,
+                      NamespaceDetailsTransient::getCursor
+                      ( ns(), BSON( "_id" << GT << 0 << "z" << 0 ) ),
+                      ns() ) );
+
+                    ASSERT_EQUALS( "QueryOptimizerCursor", p->c()->toString() );
+                    ASSERT_EQUALS( 1, p->c()->current().getIntField( "_id" ) );
+                    ASSERT( p->prepareToYield( yieldData ) );
+                }
+                
+                // No assertion is expected when the collection is dropped and the cursor cannot be
+                // recovered.
+                
+                _cli.dropCollection( ns() );
+                
+                {
+                    dblock lk;
+                    Client::Context ctx( ns() );
+                    ASSERT( !ClientCursor::recoverFromYield( yieldData ) );
+                } 
+            }
+        };
+        
     } // namespace ClientCursor
         
     class AllowOutOfOrderPlan : public Base {
@@ -4303,6 +4340,7 @@ namespace QueryOptimizerCursorTests {
             add<ClientCursor::Timeout>();
             add<ClientCursor::AboutToDeleteRecoverFromYield>();
             add<ClientCursor::AboutToDeletePrepareToYield>();
+            add<ClientCursor::Drop>();
             add<AllowOutOfOrderPlan>();
             add<NoTakeoverByOutOfOrderPlan>();
             add<OutOfOrderOnlyTakeover>();

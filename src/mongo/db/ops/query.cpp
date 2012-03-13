@@ -145,7 +145,7 @@ namespace mongo {
                 }
 
                 // in some cases (clone collection) there won't be a matcher
-                if ( c->matcher() && !c->matcher()->matchesCurrent( c ) ) {
+                if ( !c->currentMatches() ) {
                 }
                 else if ( manager && ! manager->belongsToMe( cc ) ){
                     LOG(2) << "cursor skipping document in un-owned chunk: " << c->current() << endl;
@@ -642,6 +642,12 @@ namespace mongo {
                 queryResponseBuilder.noteYield();
                 // !!! TODO The queryResponseBuilder still holds cursor.  Currently it will not do
                 // anything unsafe with the cursor in handoff(), but this is very fragile.
+                //
+                // We don't fail the query since we're fine with returning partial data if the
+                // collection was dropped.
+                // NOTE see SERVER-2454.
+                // TODO This is wrong.  The cursor could be gone if the closeAllDatabases command
+                // just ran.
                 break;
             }
 

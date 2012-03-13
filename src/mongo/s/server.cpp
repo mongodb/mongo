@@ -379,6 +379,10 @@ int _main(int argc, char* argv[]) {
         return 5;
     }
 
+    if( configdbs.size() == 1 ) {
+        warning() << "running with 1 config server should be done only for testing purposes and is not recommended for production" << endl;
+    }
+
     // we either have a setting where all processes are in localhost or none are
     for ( vector<string>::const_iterator it = configdbs.begin() ; it != configdbs.end() ; ++it ) {
         try {
