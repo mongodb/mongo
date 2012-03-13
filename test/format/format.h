@@ -44,8 +44,6 @@ typedef struct {
 	void *dbc;				/* BDB cursor handle */
 
 	void *wts_conn;				/* WT_CONNECTION handle */
-	void *wts_cursor;			/* WT_CURSOR handle */
-	void *wts_cursor_insert;		/* WT_CURSOR insert handle */
 	void *wts_session;			/* WT_SESSION handle */
 
 	FILE *rand_log;				/* Random number log */
@@ -117,7 +115,7 @@ int	 wts_ops(void);
 uint32_t wts_rand(void);
 int	 wts_read_scan(void);
 int	 wts_salvage(void);
-int	 wts_startup(int);
+int	 wts_startup(void);
 int	 wts_stats(void);
 int	 wts_teardown(void);
 int	 wts_verify(const char *);

@@ -7,14 +7,14 @@
 
 #include "format.h"
 
-static int  col_del(uint64_t, int *);
-static int  col_insert(uint64_t *);
-static int  col_put(uint64_t);
-static int  nextprev(int, int, int *);
+static int  col_del(WT_CURSOR *, uint64_t, int *);
+static int  col_insert(WT_CURSOR *, uint64_t *);
+static int  col_put(WT_CURSOR *, uint64_t);
+static int  nextprev(WT_CURSOR *, int, int *);
 static int  notfound_chk(const char *, int, int, uint64_t);
-static int  read_row(uint64_t);
-static int  row_del(uint64_t, int *);
-static int  row_put(uint64_t, int);
+static int  read_row(WT_CURSOR *, uint64_t);
+static int  row_del(WT_CURSOR *, uint64_t, int *);
+static int  row_put(WT_CURSOR *, uint64_t, int);
 static void print_item(const char *, WT_ITEM *);
 
 /*
@@ -24,10 +24,45 @@ static void print_item(const char *, WT_ITEM *);
 int
 wts_ops(void)
 {
+	WT_CONNECTION *conn;
+	WT_SESSION *session;
+	WT_CURSOR *cursor, *cursor_insert;
+	time_t now;
 	uint64_t cnt, keyno;
 	uint32_t op;
 	u_int np;
-	int dir, insert, notfound;
+	int dir, insert, notfound, ret;
+
+	conn = g.wts_conn;
+
+	/* Open a session. */
+	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
+		die("connection.open_session", ret);
+
+	if (g.logging == LOG_OPS) {
+		(void)time(&now);
+		(void)session->msg_printf(session,
+		    "===============\nthread start: %s===============",
+		    ctime(&now));
+	}
+
+	/*
+	 * Open two cursors: one configured for overwriting and one configured
+	 * for append if we're dealing with a column-store.
+	 *
+	 * The reason is when testing with existing records, we don't track if
+	 * a record was deleted or not, which means we must use cursor->insert
+	 * with overwriting configured.  But, in column-store files where we're
+	 * testing with new, appended records, we don't want to have to specify
+	 * the record number, which requires an append configuration.
+	 */
+	if ((ret = session->open_cursor(session,
+	    WT_TABLENAME, NULL, "overwrite", &cursor)) != 0)
+		die("session.open_cursor", ret);
+	if ((g.c_file_type == FIX || g.c_file_type == VAR) &&
+	    (ret = session->open_cursor(session,
+	    WT_TABLENAME, NULL, "append", &cursor_insert)) != 0)
+		die("session.open_cursor", ret);
 
 	for (cnt = 0; cnt < g.c_ops; ++cnt) {
 		if (cnt % 10 == 0)
@@ -51,24 +86,29 @@ wts_ops(void)
 				 * If deleting a non-existent record, the cursor
 				 * won't be positioned, and so can't do a next.
 				 */
-				if (row_del(keyno, &notfound))
+				if (row_del(cursor, keyno, &notfound))
 					return (1);
 				break;
 			case FIX:
 			case VAR:
-				if (col_del(keyno, &notfound))
+				if (col_del(cursor, keyno, &notfound))
 					return (1);
 				break;
 			}
 		} else if (op < g.c_delete_pct + g.c_insert_pct) {
 			switch (g.c_file_type) {
 			case ROW:
-				if (row_put(keyno, 1))
+				if (row_put(cursor, keyno, 1))
 					return (1);
 				break;
 			case FIX:
 			case VAR:
-				if (col_insert(&keyno))
+				/*
+				 * Reset the standard cursor so it doesn't keep
+				 * pages pinned.
+				 */
+				cursor->reset(cursor);
+				if (col_insert(cursor_insert, &keyno))
 					return (1);
 				insert = 1;
 				break;
@@ -77,17 +117,17 @@ wts_ops(void)
 		    op < g.c_delete_pct + g.c_insert_pct + g.c_write_pct) {
 			switch (g.c_file_type) {
 			case ROW:
-				if (row_put(keyno, 0))
+				if (row_put(cursor, keyno, 0))
 					return (1);
 				break;
 			case FIX:
 			case VAR:
-				if (col_put(keyno))
+				if (col_put(cursor, keyno))
 					return (1);
 				break;
 			}
 		} else {
-			if (read_row(keyno))
+			if (read_row(cursor, keyno))
 				return (1);
 			continue;
 		}
@@ -100,19 +140,29 @@ wts_ops(void)
 		for (np = 0; np < MMRAND(1, 8); ++np) {
 			if (notfound)
 				break;
-			if (nextprev(dir, insert, &notfound))
+			if (nextprev(
+			    insert ? cursor_insert : cursor, dir, &notfound))
 				return (1);
 		}
 
-		if (insert) {
-			WT_CURSOR *cursor = g.wts_cursor_insert;
-			cursor->reset(cursor);
-		}
+		if (insert)
+			cursor_insert->reset(cursor_insert);
 
 		/* Then read the value we modified to confirm it worked. */
-		if (read_row(keyno))
+		if (read_row(cursor, keyno))
 			return (1);
 	}
+
+	if (g.logging == LOG_OPS) {
+		(void)time(&now);
+		(void)session->msg_printf(session,
+		    "===============\nthread stop: %s===============",
+		    ctime(&now));
+	}
+
+	if ((ret = session->close(session, NULL)) != 0)
+		die("session.close", ret);
+
 	return (0);
 }
 
@@ -123,7 +173,20 @@ wts_ops(void)
 int
 wts_read_scan(void)
 {
+	WT_CONNECTION *conn;
+	WT_SESSION *session;
+	WT_CURSOR *cursor;
 	uint64_t cnt, last_cnt;
+	int ret;
+
+	conn = g.wts_conn;
+
+	/* Open a session and cursor pair. */
+	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
+		die("connection.open_session", ret);
+	if ((ret = session->open_cursor(
+	    session, WT_TABLENAME, NULL, NULL, &cursor)) != 0)
+		die("session.open_cursor", ret);
 
 	/* Check a random subset of the records using the key. */
 	for (last_cnt = cnt = 0; cnt < g.key_cnt;) {
@@ -135,9 +198,13 @@ wts_read_scan(void)
 			last_cnt = cnt;
 		}
 
-		if (read_row(cnt))
+		if (read_row(cursor, cnt))
 			return (1);
 	}
+
+	if ((ret = session->close(session, NULL)) != 0)
+		die("session.close", ret);
+
 	return (0);
 }
 
@@ -157,16 +224,14 @@ wts_read_scan(void)
  *	Read and verify a single element in a row- or column-store file.
  */
 static int
-read_row(uint64_t keyno)
+read_row(WT_CURSOR *cursor, uint64_t keyno)
 {
 	static WT_ITEM key, value, bdb_value;
-	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	int notfound, ret;
 	uint8_t bitfield;
 
-	cursor = g.wts_cursor;
-	session = g.wts_session;
+	session = cursor->session;
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS)
@@ -234,10 +299,9 @@ read_row(uint64_t keyno)
  *	Read and verify the next/prev element in a row- or column-store file.
  */
 static int
-nextprev(int next, int insert, int *notfoundp)
+nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
 {
 	static WT_ITEM key, value, bdb_key, bdb_value;
-	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	uint64_t keyno;
 	int notfound, ret;
@@ -245,8 +309,7 @@ nextprev(int next, int insert, int *notfoundp)
 	const char *which;
 	char *p;
 
-	cursor = insert ? g.wts_cursor_insert : g.wts_cursor;
-	session = g.wts_session;
+	session = cursor->session;
 	which = next ? "next" : "prev";
 
 	/* Retrieve the BDB value. */
@@ -341,15 +404,13 @@ nextprev(int next, int insert, int *notfoundp)
  *	Update an element in a row-store file.
  */
 static int
-row_put(uint64_t keyno, int insert)
+row_put(WT_CURSOR *cursor, uint64_t keyno, int insert)
 {
 	static WT_ITEM key, value;
-	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	int notfound, ret;
 
-	cursor = g.wts_cursor;
-	session = g.wts_session;
+	session = cursor->session;
 
 	key_gen(&key.data, &key.size, keyno, insert);
 	value_gen(&value.data, &value.size, keyno);
@@ -385,15 +446,13 @@ row_put(uint64_t keyno, int insert)
  *	Update an element in a column-store file.
  */
 static int
-col_put(uint64_t keyno)
+col_put(WT_CURSOR *cursor, uint64_t keyno)
 {
 	static WT_ITEM key, value;
-	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	int notfound, ret;
 
-	cursor = g.wts_cursor;
-	session = g.wts_session;
+	session = cursor->session;
 
 	key_gen(&key.data, &key.size, keyno, 0);
 	value_gen(&value.data, &value.size, keyno);
@@ -437,20 +496,14 @@ col_put(uint64_t keyno)
  *	Insert an element in a column-store file.
  */
 static int
-col_insert(uint64_t *keynop)
+col_insert(WT_CURSOR *cursor, uint64_t *keynop)
 {
 	static WT_ITEM key, value;
-	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	uint64_t keyno;
 	int notfound, ret;
 
-	/* Reset the other cursor so it doesn't keep pages pinned. */
-	cursor = g.wts_cursor;
-	cursor->reset(cursor);
-
-	cursor = g.wts_cursor_insert;
-	session = g.wts_session;
+	session = cursor->session;
 
 	value_gen(&value.data, &value.size, g.rows + 1);
 
@@ -499,16 +552,14 @@ col_insert(uint64_t *keynop)
  *	Delete an element from a row-store file.
  */
 static int
-row_del(uint64_t keyno, int *notfoundp)
+row_del(WT_CURSOR *cursor, uint64_t keyno, int *notfoundp)
 {
 	static WT_ITEM key;
-	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	int notfound, ret;
 
+	session = cursor->session;
 	*notfoundp = 0;
-	cursor = g.wts_cursor;
-	session = g.wts_session;
 
 	key_gen(&key.data, &key.size, keyno, 0);
 
@@ -539,15 +590,14 @@ row_del(uint64_t keyno, int *notfoundp)
  *	Delete an element from a column-store file.
  */
 static int
-col_del(uint64_t keyno, int *notfoundp)
+col_del(WT_CURSOR *cursor, uint64_t keyno, int *notfoundp)
 {
-	static WT_ITEM key;
-	WT_CURSOR *cursor;
 	WT_SESSION *session;
+	static WT_ITEM key;
 	int notfound, ret;
 
-	cursor = g.wts_cursor;
-	session = g.wts_session;
+	session = cursor->session;
+	*notfoundp = 0;
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS)

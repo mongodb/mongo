@@ -102,11 +102,9 @@ wts_close(WT_CONNECTION *conn)
 }
 
 int
-wts_startup(int open_cursors)
+wts_startup(void)
 {
-	time_t now;
 	WT_CONNECTION *conn;
-	WT_CURSOR *cursor, *cursor_insert;
 	WT_SESSION *session;
 	uint32_t maxintlpage, maxintlitem, maxleafpage, maxleafitem;
 	int ret;
@@ -166,44 +164,7 @@ wts_startup(int open_cursors)
 		return (1);
 	}
 
-	cursor = cursor_insert = NULL;
-	if (open_cursors) {
-		/*
-		 * We open two cursors: one configured for overwriting and one
-		 * configured for append if we're dealing with a column-store.
-		 *
-		 * The reason is when testing with existing records, we don't
-		 * track if a record was deleted or not, which means we need to
-		 * use cursor->insert with overwriting configured.  But, in
-		 * column-store files where we're testing with new, appended
-		 * records, we don't want to have to specify the record number,
-		 * which requires an append configuration.
-		 */
-		if ((ret = session->open_cursor(
-		    session, WT_TABLENAME, NULL, "overwrite", &cursor)) != 0) {
-			fprintf(stderr, "%s: open_cursor: %s\n",
-			    g.progname, wiredtiger_strerror(ret));
-			return (1);
-		}
-		if ((g.c_file_type == FIX || g.c_file_type == VAR) &&
-		    (ret = session->open_cursor(session,
-		    WT_TABLENAME, NULL, "append", &cursor_insert)) != 0) {
-			fprintf(stderr, "%s: open_cursor: %s\n",
-			    g.progname, wiredtiger_strerror(ret));
-			return (1);
-		}
-	}
-
-	if (g.logging == LOG_OPS) {
-		(void)time(&now);
-		(void)session->msg_printf(session,
-		    "===============\nWT start: %s===============",
-		    ctime(&now));
-	}
-
 	g.wts_conn = conn;
-	g.wts_cursor = cursor;
-	g.wts_cursor_insert = cursor_insert;
 	g.wts_session = session;
 
 	return (0);
@@ -213,30 +174,9 @@ int
 wts_teardown(void)
 {
 	WT_CONNECTION *conn;
-	WT_CURSOR *cursor, *cursor_insert;
-	WT_SESSION *session;
-	time_t now;
 	int ret;
 
 	conn = g.wts_conn;
-	cursor = g.wts_cursor;
-	cursor_insert = g.wts_cursor_insert;
-	session = g.wts_session;
-
-	if (g.logging == LOG_OPS) {
-		(void)time(&now);
-		(void)session->msg_printf(session,
-		    "===============\nWT stop: %s===============",
-		    ctime(&now));
-	}
-
-	/*
-	 * Close the open cursors -- they will block sync.
-	 */
-	if ((cursor_insert != NULL &&
-	    (ret = cursor_insert->close(cursor_insert)) != 0) ||
-	    (cursor != NULL && (ret = cursor->close(cursor)) != 0))
-		die("cursor.close", ret);
 
 	ret = wts_sync();
 	return (wts_close(conn) ? 1 : ret);
