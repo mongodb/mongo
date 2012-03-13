@@ -238,10 +238,6 @@ read_row(WT_CURSOR *cursor, uint64_t keyno)
 		(void)session->msg_printf(
 		    session, "%-10s%" PRIu64, "read", keyno);
 
-	/* Retrieve the BDB value. */
-	if (bdb_read(keyno, &bdb_value.data, &bdb_value.size, &notfound))
-		return (1);
-
 	/* Retrieve the key/value pair by key. */
 	switch (g.c_file_type) {
 	case FIX:
@@ -267,6 +263,10 @@ read_row(WT_CURSOR *cursor, uint64_t keyno)
 		    g.progname, keyno, wiredtiger_strerror(ret));
 		return (1);
 	}
+
+	/* Retrieve the BDB value. */
+	if (bdb_read(keyno, &bdb_value.data, &bdb_value.size, &notfound))
+		return (1);
 
 	/*
 	 * Check for not-found status.
@@ -312,12 +312,6 @@ nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
 	session = cursor->session;
 	which = next ? "next" : "prev";
 
-	/* Retrieve the BDB value. */
-	if (bdb_np(next, &bdb_key.data, &bdb_key.size,
-	    &bdb_value.data, &bdb_value.size, &notfound))
-		return (1);
-	*notfoundp = notfound;
-
 	keyno = 0;
 	ret = next ? cursor->next(cursor) : cursor->prev(cursor);
 	if (ret == 0)
@@ -344,6 +338,12 @@ nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
 		    g.progname, which, wiredtiger_strerror(ret));
 		return (1);
 	}
+	*notfoundp = ret == WT_NOTFOUND;
+
+	/* Retrieve the BDB value. */
+	if (bdb_np(next, &bdb_key.data, &bdb_key.size,
+	    &bdb_value.data, &bdb_value.size, &notfound))
+		return (1);
 
 	NTF_CHK(notfound_chk(
 	    next ? "nextprev(next)" : "nextprev(prev)", ret, notfound, keyno));
@@ -423,9 +423,6 @@ row_put(WT_CURSOR *cursor, uint64_t keyno, int insert)
 		    insert ? "insertV" : "putV",
 		    (int)value.size, (char *)value.data);
 
-	if (bdb_put(key.data, key.size, value.data, value.size, &notfound))
-		return (1);
-
 	cursor->set_key(cursor, &key);
 	cursor->set_value(cursor, &value);
 	ret = cursor->insert(cursor);
@@ -436,6 +433,9 @@ row_put(WT_CURSOR *cursor, uint64_t keyno, int insert)
 		    keyno, wiredtiger_strerror(ret));
 		return (1);
 	}
+
+	if (bdb_put(key.data, key.size, value.data, value.size, &notfound))
+		return (1);
 
 	NTF_CHK(notfound_chk("row_put", ret, notfound, keyno));
 	return (0);
@@ -559,7 +559,6 @@ row_del(WT_CURSOR *cursor, uint64_t keyno, int *notfoundp)
 	int notfound, ret;
 
 	session = cursor->session;
-	*notfoundp = 0;
 
 	key_gen(&key.data, &key.size, keyno, 0);
 
@@ -567,10 +566,6 @@ row_del(WT_CURSOR *cursor, uint64_t keyno, int *notfoundp)
 	if (g.logging == LOG_OPS)
 		(void)session->msg_printf(
 		    session, "%-10s%" PRIu64, "remove", keyno);
-
-	if (bdb_del(keyno, &notfound))
-		return (1);
-	*notfoundp = notfound;
 
 	cursor->set_key(cursor, &key);
 	ret = cursor->remove(cursor);
@@ -580,6 +575,10 @@ row_del(WT_CURSOR *cursor, uint64_t keyno, int *notfoundp)
 		    g.progname, keyno, wiredtiger_strerror(ret));
 		return (1);
 	}
+	*notfoundp = ret == WT_NOTFOUND;
+
+	if (bdb_del(keyno, &notfound))
+		return (1);
 
 	NTF_CHK(notfound_chk("row_del", ret, notfound, keyno));
 	return (0);
@@ -597,26 +596,11 @@ col_del(WT_CURSOR *cursor, uint64_t keyno, int *notfoundp)
 	int notfound, ret;
 
 	session = cursor->session;
-	*notfoundp = 0;
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS)
 		(void)session->msg_printf(
 		    session, "%-10s%" PRIu64, "remove", keyno);
-
-	/*
-	 * Deleting a fixed-length item is the same as setting the bits to 0;
-	 * do the same thing for the BDB store.
-	 */
-	if (g.c_file_type == FIX) {
-		key_gen(&key.data, &key.size, keyno, 0);
-		if (bdb_put(key.data, key.size, "\0", 1, &notfound))
-			return (1);
-	} else {
-		if (bdb_del(keyno, &notfound))
-			return (1);
-		*notfoundp = notfound;
-	}
 
 	cursor->set_key(cursor, keyno);
 	ret = cursor->remove(cursor);
@@ -626,6 +610,19 @@ col_del(WT_CURSOR *cursor, uint64_t keyno, int *notfoundp)
 		    g.progname, keyno, wiredtiger_strerror(ret));
 		return (1);
 	}
+	*notfoundp = ret == WT_NOTFOUND;
+
+	/*
+	 * Deleting a fixed-length item is the same as setting the bits to 0;
+	 * do the same thing for the BDB store.
+	 */
+	if (g.c_file_type == FIX) {
+		key_gen(&key.data, &key.size, keyno, 0);
+		if (bdb_put(key.data, key.size, "\0", 1, &notfound))
+			return (1);
+	} else
+		if (bdb_del(keyno, &notfound))
+			return (1);
 
 	NTF_CHK(notfound_chk("col_del", ret, notfound, keyno));
 	return (0);
