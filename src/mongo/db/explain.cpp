@@ -70,30 +70,28 @@ namespace mongo {
     }
 
     BSONObj ExplainPlanInfo::bson() const {
-        return BSON(
-                    "cursor" << _cursorName <<
-                    "n" << _n <<
-                    "nscannedObjects" << _nscannedObjects <<
-                    "nscanned" << _nscanned <<
-                    "indexBounds" << _indexBounds
-                    );
+        BSONObjBuilder bob;
+        bob << "cursor" << _cursorName;
+        bob << "n" << _n;
+        bob << "nscannedObjects" << _nscannedObjects;
+        bob << "nscanned" << _nscanned;
+        bob << "indexBounds" << _indexBounds;
+        return bob.obj();
     }
     
     BSONObj ExplainPlanInfo::pickedPlanBson( const ExplainClauseInfo &clauseInfo ) const {
         BSONObjBuilder bob;
-        bob <<
-        "cursor" << _cursorName <<
-        "isMultiKey" << _isMultiKey <<
-        "n" << clauseInfo.n() <<
-        "nscannedObjects" << clauseInfo.nscannedObjects() <<
-        "nscanned" << clauseInfo.nscanned() <<
-        "scanAndOrder" << _scanAndOrder <<
-        "indexOnly" << _indexOnly <<
-        "nYields" << _nYields <<
-        "nChunkSkips" << clauseInfo.nChunkSkips() <<
-        "millis" << clauseInfo.millis() <<
-        "indexBounds" << _indexBounds
-        ;
+        bob << "cursor" << _cursorName;
+        bob << "isMultiKey" << _isMultiKey;
+        bob << "n" << clauseInfo.n();
+        bob << "nscannedObjects" << clauseInfo.nscannedObjects();
+        bob << "nscanned" << clauseInfo.nscanned();
+        bob << "scanAndOrder" << _scanAndOrder;
+        bob << "indexOnly" << _indexOnly;
+        bob << "nYields" << _nYields;
+        bob << "nChunkSkips" << clauseInfo.nChunkSkips();
+        bob << "millis" << clauseInfo.millis();
+        bob << "indexBounds" << _indexBounds;
         bob.appendElements( _details );
         return bob.obj();
     }
@@ -199,15 +197,15 @@ namespace mongo {
     }
     
     BSONObj ExplainQueryInfo::bson() const {
-        BSONObjBuilder bb;
+        BSONObjBuilder bob;
         if ( _clauses.size() == 1 ) {
-            bb.appendElements( _clauses.front()->bson() );
+            bob.appendElements( _clauses.front()->bson() );
         }
         else {
             long long n = 0;
             long long nscannedObjects = 0;
             long long nscanned = 0;
-            BSONArrayBuilder clauseArray( bb.subarrayStart( "clauses" ) );
+            BSONArrayBuilder clauseArray( bob.subarrayStart( "clauses" ) );
             for( list<shared_ptr<ExplainClauseInfo> >::const_iterator i = _clauses.begin();
                 i != _clauses.end(); ++i ) {
                 clauseArray << (*i)->bson();
@@ -216,21 +214,20 @@ namespace mongo {
                 nscanned += (*i)->nscanned();
             }
             clauseArray.done();
-            bb
-            << "n" << n
-            << "nscannedObjects" << nscannedObjects
-            << "nscanned" << nscanned
-            << "millis" << _timer.duration();
+            bob << "n" << n;
+            bob << "nscannedObjects" << nscannedObjects;
+            bob << "nscanned" << nscanned;
+            bob << "millis" << _timer.duration();
         }
         
         if ( !_ancillaryInfo._oldPlan.isEmpty() ) {
-            bb << "oldPlan" << _ancillaryInfo._oldPlan;
+            bob << "oldPlan" << _ancillaryInfo._oldPlan;
         }
-        bb
+        bob
         << "server"
         << (string)( mongoutils::str::stream() << getHostNameCached() << ":" << cmdLine.port );
         
-        return bb.obj();
+        return bob.obj();
     }
     
     void ExplainQueryInfo::addClauseInfo( const shared_ptr<ExplainClauseInfo> &info ) {
