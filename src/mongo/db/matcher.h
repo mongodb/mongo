@@ -252,7 +252,6 @@ namespace mongo {
     class CoveredIndexMatcher : boost::noncopyable {
     public:
         CoveredIndexMatcher(const BSONObj &pattern, const BSONObj &indexKeyPattern);
-        bool matches(const BSONObj &o) { return _docMatcher->matches( o ); }
         bool matchesWithSingleKeyIndex(const BSONObj &key, const DiskLoc &recLoc , MatchDetails * details = 0 ) {
             return matches( key, recLoc, details, true );   
         }
