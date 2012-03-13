@@ -657,7 +657,7 @@ namespace Plan {
                 client_->resetIndexCache();
                 client_->ensureIndex( ns_.c_str(), BSON( ( names + i ) << 1 ), false, names + i );
             }
-            _lk.reset( new dblock );
+            _lk.reset( new writelock );
             _ctx.reset( new Client::Context( ns_ ) );
             hint_ = BSON( "hint" << BSON( "a" << 1 ) );
         }
@@ -667,7 +667,7 @@ namespace Plan {
                                    boost::shared_ptr<Projection>(), BSONObj(), hint_ );
         }
         string ns_;
-        scoped_ptr<dblock> _lk;
+        scoped_ptr<writelock> _lk;
         scoped_ptr<Client::Context> _ctx;
         BSONObj hint_;
     };
@@ -680,7 +680,7 @@ namespace Plan {
                 client_->resetIndexCache();
                 client_->ensureIndex( ns_.c_str(), BSON( ( names + i ) << 1 ), false, names + i );
             }
-            lk_.reset( new dblock );
+            lk_.reset( new writelock );
         }
         void run() {
             Client::Context ctx( ns_ );
@@ -689,7 +689,7 @@ namespace Plan {
                                    boost::shared_ptr<Projection>(), BSON( "a" << 1 ) );
         }
         string ns_;
-        auto_ptr< dblock > lk_;
+        auto_ptr< writelock > lk_;
     };
 
     class Query {
@@ -700,7 +700,7 @@ namespace Plan {
                 client_->resetIndexCache();
                 client_->ensureIndex( ns_.c_str(), BSON( ( names + i ) << 1 ), false, names + i );
             }
-            lk_.reset( new dblock );
+            lk_.reset( new writelock );
         }
         void run() {
             Client::Context ctx( ns_.c_str() );
@@ -709,7 +709,7 @@ namespace Plan {
                                    boost::shared_ptr<Projection>(), BSONObj() );
         }
         string ns_;
-        auto_ptr< dblock > lk_;
+        auto_ptr< writelock > lk_;
     };
 
     class All : public RunnerSuite {
