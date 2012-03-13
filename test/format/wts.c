@@ -9,7 +9,6 @@
 
 static int  wts_close(WT_CONNECTION *);
 static int  wts_open(WT_CONNECTION **, WT_SESSION **session);
-static int  wts_read(uint64_t);
 static int  wts_sync(void);
 
 static int
@@ -242,7 +241,6 @@ wts_teardown(void)
 	ret = wts_sync();
 	return (wts_close(conn) ? 1 : ret);
 }
-
 
 int
 wts_dump(const char *tag, int dump_bdb)
