@@ -86,12 +86,9 @@ err:		/*
 static int
 __rec_page_clean_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	/*
-	 * Update the relevant WT_REF structure; no memory flush is needed,
-	 * the state field is declared volatile.
-	 */
+	/* Update the relevant WT_REF structure. */
+	WT_PUBLISH(page->ref->state, WT_REF_DISK);
 	page->ref->page = NULL;
-	page->ref->state = WT_REF_DISK;
 
 	return (__rec_discard_page(session, page));
 }
@@ -143,8 +140,8 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 		    session, 1, sizeof(WT_ADDR), &parent_ref->addr));
 		((WT_ADDR *)parent_ref->addr)->addr = mod->u.replace.addr;
 		((WT_ADDR *)parent_ref->addr)->size = mod->u.replace.size;
-		parent_ref->page = NULL;
 		WT_PUBLISH(parent_ref->state, WT_REF_DISK);
+		parent_ref->page = NULL;
 		break;
 	case WT_PAGE_REC_SPLIT:				/* Page split */
 		/*

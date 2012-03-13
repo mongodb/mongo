@@ -2683,8 +2683,8 @@ __rec_split_row(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 		((WT_ADDR *)ref->addr)->size = bnd->addr.size;
 		bnd->addr.addr = NULL;
 
+		WT_PUBLISH(ref->state, WT_REF_DISK);
 		ref->page = NULL;
-		ref->state = WT_REF_DISK;
 	}
 
 	*splitp = page;
@@ -2737,8 +2737,8 @@ __rec_split_col(WT_SESSION_IMPL *session, WT_PAGE *orig, WT_PAGE **splitp)
 		((WT_ADDR *)ref->addr)->size = bnd->addr.size;
 		bnd->addr.addr = NULL;
 
+		WT_PUBLISH(ref->state, WT_REF_DISK);
 		ref->page = NULL;
-		ref->state = WT_REF_DISK;
 	}
 
 	*splitp = page;
