@@ -169,7 +169,6 @@ __wt_row_search(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int is_modify)
 
 		WT_ORDERED_READ(cbt->write_gen, page->modify->write_gen);
 	}
-	cbt->page = page;
 
 	/* Do a binary search of the leaf page. */
 	for (base = 0, limit = page->entries; limit != 0; limit >>= 1) {
@@ -219,7 +218,7 @@ retry:		/*
 			}
 		}
 
-		WT_RET(WT_BTREE_CMP(session, btree, srch_key, item, cmp));
+		WT_ERR(WT_BTREE_CMP(session, btree, srch_key, item, cmp));
 		if (cmp == 0)
 			break;
 		if (cmp < 0)
@@ -238,6 +237,7 @@ retry:		/*
 	if (cmp == 0) {
 		WT_ASSERT(session, rip != NULL);
 		cbt->compare = 0;
+		cbt->page = page;
 		cbt->slot = WT_ROW_SLOT(page, rip);
 		return (0);
 	}
@@ -280,6 +280,7 @@ retry:		/*
 	 * Search the insert list for a match; __wt_search_insert sets the
 	 * return insert information appropriately.
 	 */
+	cbt->page = page;
 	cbt->ins = __wt_search_insert(session, cbt, cbt->ins_head, srch_key);
 	return (0);
 
