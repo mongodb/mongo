@@ -7,7 +7,7 @@
 
 #include "wt_internal.h"
 
-static int  __hazard_exclusive(WT_SESSION_IMPL *, WT_REF *);
+static int  __hazard_exclusive(WT_SESSION_IMPL *, WT_REF *, int);
 static int  __rec_discard(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_discard_page(WT_SESSION_IMPL *, WT_PAGE *);
 static void __rec_excl_clear(WT_SESSION_IMPL *);
@@ -356,7 +356,7 @@ __rec_review(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags, int top)
 	 * locked down.
 	 */
 	if (!LF_ISSET(WT_REC_SINGLE))
-		WT_RET(__hazard_exclusive(session, page->ref));
+		WT_RET(__hazard_exclusive(session, page->ref, top));
 
 	/*
 	 * Recurse through the page's subtree: this happens first because we
@@ -368,11 +368,11 @@ __rec_review(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags, int top)
 			switch (ref->state) {
 			case WT_REF_DISK:		/* On-disk */
 				break;
-			case WT_REF_EVICTING:		/* Being evaluated */
 			case WT_REF_MEM:		/* In-memory */
 				WT_RET(
 				    __rec_review(session, ref->page, flags, 0));
 				break;
+			case WT_REF_EVICTING:		/* Being evaluated */
 			case WT_REF_LOCKED:		/* Being evicted */
 			case WT_REF_READING:		/* Being read */
 				return (EBUSY);
@@ -476,7 +476,7 @@ __rec_excl_clear(WT_SESSION_IMPL *session)
  *	Request exclusive access to a page.
  */
 static int
-__hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
+__hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref, int top)
 {
 	WT_CONNECTION_IMPL *conn;
 	WT_HAZARD *hp;
@@ -499,15 +499,9 @@ __hazard_exclusive(WT_SESSION_IMPL *session, WT_REF *ref)
 	 * evicting state (if this is the top-level page for this eviction
 	 * operation), or a child page in memory.  If another thread already
 	 * has this page, give up.
-	 *
-	 * Keep track of the original state: if it was WT_REF_EVICTING and
-	 * we cannot get it exclusive, restore it to that state.  This ensures
-	 * that application threads drain from a page that eviction is trying
-	 * to force out.  Without this, application threads can starve eviction
-	 * and heap usage grows without bounds.
 	 */
-	if (!WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED) &&
-	    !WT_ATOMIC_CAS(ref->state, WT_REF_EVICTING, WT_REF_LOCKED))
+	if (!WT_ATOMIC_CAS(ref->state, WT_REF_MEM, WT_REF_LOCKED) && (!top ||
+	    !WT_ATOMIC_CAS(ref->state, WT_REF_EVICTING, WT_REF_LOCKED)))
 		return (EBUSY);	/* We couldn't change the state. */
 
 	session->excl[session->excl_next++] = ref;
