@@ -1182,8 +1182,8 @@ namespace mongo {
                     bool forceRewrite = false;
 
                     auto_ptr<ModSet> mymodset;
-                    if ( details._elemMatchKey && mods->hasDynamicArray() ) {
-                        useMods = mods->fixDynamicArray( details._elemMatchKey );
+                    if ( details.elemMatchKey() && mods->hasDynamicArray() ) {
+                        useMods = mods->fixDynamicArray( details.elemMatchKey() );
                         mymodset.reset( useMods );
                         forceRewrite = true;
                     }

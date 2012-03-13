@@ -178,6 +178,22 @@ namespace mongo {
         (_compareOp == BSONObj::NIN && _myset->count( staticNull.firstElement()) == 0 );
     }
 
+    MatchDetails::MatchDetails() {
+        reset();
+    }
+    
+    void MatchDetails::reset() {
+        _loadedObject = false;
+        _elemMatchKey = 0;
+    }
+    
+    string MatchDetails::toString() const {
+        stringstream ss;
+        ss << "loadedObject: " << _loadedObject << " ";
+        ss << "elemMatchKey: " << ( _elemMatchKey ? _elemMatchKey : "NULL" ) << " ";
+        return ss.str();
+    }
+    
     void Matcher::addRegex(const char *fieldName, const char *regex, const char *flags, bool isNot) {
 
         RegexMatcher rm;
@@ -729,7 +745,7 @@ namespace mongo {
                         if (valuesMatch(z, toMatch, compareOp, em) ) {
                                 // "field.<n>" array notation was used
                             if ( details )
-                                    details->_elemMatchKey = z.fieldName();
+                                    details->setElemMatchKey( z.fieldName() );
                             return 1;
                         }
                     }
@@ -739,7 +755,7 @@ namespace mongo {
                         int cmp = matchesDotted(fieldName, toMatch, eo, compareOp, em, false, details );
                         if ( cmp > 0 ) {
                             if ( details )
-                                details->_elemMatchKey = z.fieldName();
+                                details->setElemMatchKey( z.fieldName() );
                             return 1;
                         }
                         else if ( cmp < 0 ) {
@@ -780,14 +796,14 @@ namespace mongo {
                     if ( z.type() == Object ) {
                         if ( em._subMatcher->matches( z.embeddedObject() ) ) {
                             if ( details )
-                                details->_elemMatchKey = z.fieldName();
+                                details->setElemMatchKey( z.fieldName() );
                             return 1;
                         }
                     }
                     else if ( em._subMatcherOnPrimitives ) {
                         if ( z.type() && em._subMatcher->matches( z.wrap( "" ) ) ) {
                             if ( details )
-                                details->_elemMatchKey = z.fieldName();
+                                details->setElemMatchKey( z.fieldName() );
                             return 1;
                         }
                     }
@@ -795,7 +811,7 @@ namespace mongo {
                 else {
                     if ( valuesMatch( z, toMatch, compareOp, em) ) {
                         if ( details )
-                            details->_elemMatchKey = z.fieldName();
+                            details->setElemMatchKey( z.fieldName() );
                         return 1;
                     }
                 }

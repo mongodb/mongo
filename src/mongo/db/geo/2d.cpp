@@ -1042,7 +1042,7 @@ namespace mongo {
 
                     _matchesPerfd++;
 
-                    if ( details._loadedObject )
+                    if ( details.loadedObject() )
                         _objectsLoaded++;
 
                     if ( ! good ) {
@@ -1054,7 +1054,7 @@ namespace mongo {
 
                 _matched[ node.recordLoc ] = true;
 
-                if ( ! details._loadedObject ) // don't double count
+                if ( ! details.loadedObject() ) // don't double count
                     _objectsLoaded++;
 
             }

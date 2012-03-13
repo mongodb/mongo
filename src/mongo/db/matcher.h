@@ -87,23 +87,19 @@ namespace mongo {
     class Where; // used for $where javascript eval
     class DiskLoc;
 
-    struct MatchDetails {
-        MatchDetails() {
-            reset();
-        }
+    class MatchDetails {
+    public:
+        MatchDetails();
+        void reset();
+        string toString() const;
 
-        void reset() {
-            _loadedObject = false;
-            _elemMatchKey = 0;
-        }
+        bool loadedObject() const { return _loadedObject; }
+        const char *elemMatchKey() const { return _elemMatchKey; }
 
-        string toString() const {
-            stringstream ss;
-            ss << "loadedObject: " << _loadedObject << " ";
-            ss << "elemMatchKey: " << ( _elemMatchKey ? _elemMatchKey : "NULL" ) << " ";
-            return ss.str();
-        }
-
+        void setLoadedObject( bool loadedObject ) { _loadedObject = loadedObject; }
+        void setElemMatchKey( const char *elemMatchKey ) { _elemMatchKey = elemMatchKey; }
+        
+    private:
         bool _loadedObject;
         const char * _elemMatchKey; // warning, this may go out of scope if matched object does
     };

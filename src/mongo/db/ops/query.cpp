@@ -591,7 +591,7 @@ namespace mongo {
         if ( _cursor->currentMatches( &details ) ) {
             return true;
         }
-        _explain->noteIterate( false, false, details._loadedObject, false );
+        _explain->noteIterate( false, false, details.loadedObject(), false );
         return false;
     }
 

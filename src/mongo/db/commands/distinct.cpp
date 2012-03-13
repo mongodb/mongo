@@ -123,7 +123,7 @@ namespace mongo {
                     }
                 }
 
-                if ( loadedObject || md._loadedObject )
+                if ( loadedObject || md.loadedObject() )
                     nscannedObjects++;
 
                 cursor->advance();
