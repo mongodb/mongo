@@ -23,6 +23,7 @@ namespace mongo {
 
     DocumentSource::DocumentSource(
         const intrusive_ptr<ExpressionContext> &pCtx):
+        pSource(NULL),
         step(-1),
         pExpCtx(pCtx) {
     }
@@ -35,9 +36,8 @@ namespace mongo {
         return unknown;
     }
 
-    void DocumentSource::setSource(
-        const intrusive_ptr<DocumentSource> &pTheSource) {
-        assert(!pSource.get());
+    void DocumentSource::setSource(DocumentSource *pTheSource) {
+        assert(!pSource);
         pSource = pTheSource;
     }
 

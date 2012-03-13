@@ -93,8 +93,7 @@ namespace mongo {
         pCurrent.reset();
     }
 
-    void DocumentSourceCursor::setSource(
-        const intrusive_ptr<DocumentSource> &pSource) {
+    void DocumentSourceCursor::setSource(DocumentSource *pSource) {
         /* this doesn't take a source */
         assert(false);
     }

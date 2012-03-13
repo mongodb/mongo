@@ -357,12 +357,12 @@ namespace mongo {
         pInputSource->manageDependencies(pTracker);
         
         /* chain together the sources we found */
-        intrusive_ptr<DocumentSource> pSource(pInputSource);
+        DocumentSource *pSource = pInputSource.get();
         for(SourceVector::iterator iter(sourceVector.begin()),
                 listEnd(sourceVector.end()); iter != listEnd; ++iter) {
             intrusive_ptr<DocumentSource> pTemp(*iter);
             pTemp->setSource(pSource);
-            pSource = pTemp;
+            pSource = pTemp.get();
         }
         /* pSource is left pointing at the last source in the chain */
 

@@ -110,9 +110,14 @@ namespace mongo {
           prevent changing sources once the original source has been started;
           this could break the state maintained by the DocumentSource.
 
+          This pointer is not reference counted because that has led to
+          some circular references.  As a result, this doesn't keep
+          sources alive, and is only intended to be used temporarily for
+          the lifetime of a Pipeline::run().
+
           @param pSource the underlying source to use
          */
-        virtual void setSource(const intrusive_ptr<DocumentSource> &pSource);
+        virtual void setSource(DocumentSource *pSource);
 
         /**
           Attempt to coalesce this DocumentSource with its successor in the
@@ -186,7 +191,7 @@ namespace mongo {
           need a source, override that to assert().  The default is to
           assert() if this has already been set.
         */
-        intrusive_ptr<DocumentSource> pSource;
+        DocumentSource *pSource;
 
         /*
           The zero-based user-specified pipeline step.  Used for diagnostics.
@@ -207,7 +212,7 @@ namespace mongo {
         virtual bool eof();
         virtual bool advance();
         virtual intrusive_ptr<Document> getCurrent();
-        virtual void setSource(const intrusive_ptr<DocumentSource> &pSource);
+        virtual void setSource(DocumentSource *pSource);
 
         /**
           Create a document source based on a BSON array.
@@ -250,7 +255,7 @@ namespace mongo {
         virtual bool eof();
         virtual bool advance();
         virtual intrusive_ptr<Document> getCurrent();
-        virtual void setSource(const intrusive_ptr<DocumentSource> &pSource);
+        virtual void setSource(DocumentSource *pSource);
 
         /* convenient shorthand for a commonly used type */
         typedef list<shared_ptr<Future::CommandResult> > FuturesList;
@@ -302,7 +307,7 @@ namespace mongo {
         virtual bool eof();
         virtual bool advance();
         virtual intrusive_ptr<Document> getCurrent();
-        virtual void setSource(const intrusive_ptr<DocumentSource> &pSource);
+        virtual void setSource(DocumentSource *pSource);
         virtual void manageDependencies(
             const intrusive_ptr<DependencyTracker> &pTracker);
 
