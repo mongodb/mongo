@@ -155,10 +155,13 @@ namespace mongo {
             _nSinceCommitIfNeededCall = 0;
         }
 
-        CommitJob::CommitJob() : _hasWritten(false), 
-            _bytes(0), _nSinceCommitIfNeededCall(0), groupCommitMutex("groupCommit")
+        CommitJob::CommitJob() : 
+            groupCommitMutex("groupCommit"),
+            _hasWritten(false)
         { 
             _commitNumber = 0;
+            _bytes = 0;
+            _nSinceCommitIfNeededCall = 0;
         }
 
         void CommitJob::note(void* p, int len) {
