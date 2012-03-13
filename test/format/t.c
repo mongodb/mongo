@@ -34,11 +34,14 @@ main(int argc, char *argv[])
 		config_file("CONFIG");
 	}
 
+	/* Default to a single thread. */
+	g.threads = 1;
+
 	/* Track progress unless we're re-directing output to a file. */
 	g.track = isatty(STDOUT_FILENO) ? 1 : 0;
 
 	/* Set values from the command line. */
-	while ((ch = getopt(argc, argv, "1C:c:Llqr")) != EOF)
+	while ((ch = getopt(argc, argv, "1C:c:Llqrt:")) != EOF)
 		switch (ch) {
 		case '1':			/* One run */
 			g.c_runs = 1;
@@ -67,9 +70,18 @@ main(int argc, char *argv[])
 			g.replay = 1;
 			g.c_runs = 1;
 			break;
+		case 't':			/* Threads */
+			g.threads = atoi(optarg);
+			break;
 		default:
 			usage();
 		}
+
+	/* Multi-threaded runs cannot be replayed. */
+	if (g.threads != 1 && g.replay) {
+		fprintf(stderr, "%s: -r and -t are mutually exclusive\n"); 
+		return (EXIT_FAILURE);
+	}
 
 	argc -= optind;
 	argv += optind;
@@ -86,7 +98,8 @@ main(int argc, char *argv[])
 		config_setup();			/* Run configuration */
 		config_print(0);		/* Dump run configuration */
 
-		bdb_startup();			/* Initial file config */
+		if (SINGLETHREADED)
+			bdb_startup();		/* Initial file config */
 		if (wts_startup())
 			return (EXIT_FAILURE);
 
@@ -124,11 +137,13 @@ main(int argc, char *argv[])
 				break;
 		}
 
-		track("shutting down BDB", 0ULL);
-		bdb_teardown();
+		if (SINGLETHREADED) {
+			track("shutting down BDB", 0ULL);
+			bdb_teardown();
 
-		if (wts_dump("standard", 1))	/* Dump the file */
-			goto err;
+			if (wts_dump("standard", 1))	/* Dump the file */
+				goto err;
+		}
 
 		/*
 		 * If we don't delete any records, we can salvage the file.  The
@@ -162,6 +177,7 @@ main(int argc, char *argv[])
 err:		ret = 1;
 	}
 
+	/* Flush/close any logging information. */
 	if (g.logfp != NULL)
 		(void)fclose(g.logfp);
 	if (g.rand_log != NULL)
@@ -224,6 +240,14 @@ onint(int signo)
 void
 die(const char *m, int e)
 {
+	/* Flush/close any logging information. */
+	if (g.logfp != NULL)
+		(void)fclose(g.logfp);
+	if (g.rand_log != NULL)
+		(void)fclose(g.rand_log);
+
+	config_print(1);
+
 	fprintf(stderr, "%s: %s: %s\n", g.progname, m, wiredtiger_strerror(e));
 	exit(EXIT_FAILURE);
 }
@@ -236,8 +260,9 @@ static void
 usage(void)
 {
 	fprintf(stderr,
-	    "usage: %s [-1Llqr] [-C wiredtiger-config] [-c config-file] "
-	    "[name=value ...]\n",
+	    "usage: %s [-1Llqr]\n    "
+	    "[-C wiredtiger-config] [-c config-file] "
+	    "[-t threads] [name=value ...]\n",
 	    g.progname);
 	fprintf(stderr, "%s",
 	    "\t-1 run once\n"
@@ -246,7 +271,8 @@ usage(void)
 	    "\t-L output to a log file\n"
 	    "\t-l log operations (implies -L)\n"
 	    "\t-q run quietly\n"
-	    "\t-r replay the last run\n");
+	    "\t-r replay the last run\n"
+	    "\t-t threads\n");
 
 	fprintf(stderr, "\n");
 

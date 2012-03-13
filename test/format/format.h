@@ -37,6 +37,8 @@
 
 #define	WT_TABLENAME	"file:__wt"
 
+#define	SINGLETHREADED	(g.threads == 1)
+
 typedef struct {
 	char *progname;				/* Program name */
 
@@ -54,10 +56,11 @@ typedef struct {
 	    LOG_FILE=1,				/* Use a log file */
 	    LOG_OPS=2				/* Log all operations */
 	} logging;
-	FILE *logfp;				/* Log file. */
+	FILE *logfp;				/* Log file */
 
 	int replay;				/* Replaying a run. */
 	int track;				/* Track progress */
+	int threads;				/* Threads doing operations */
 
 	char *config_open;			/* Command-line configuration */
 

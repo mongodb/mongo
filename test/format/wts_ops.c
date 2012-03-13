@@ -7,22 +7,70 @@
 
 #include "format.h"
 
-static int  col_del(WT_CURSOR *, uint64_t, int *);
-static int  col_insert(WT_CURSOR *, uint64_t *);
-static int  col_put(WT_CURSOR *, uint64_t);
-static int  nextprev(WT_CURSOR *, int, int *);
-static int  notfound_chk(const char *, int, int, uint64_t);
-static int  read_row(WT_CURSOR *, uint64_t);
-static int  row_del(WT_CURSOR *, uint64_t, int *);
-static int  row_put(WT_CURSOR *, uint64_t, int);
-static void print_item(const char *, WT_ITEM *);
+static int   col_del(WT_CURSOR *, uint64_t, int *);
+static int   col_insert(WT_CURSOR *, uint64_t *);
+static int   col_put(WT_CURSOR *, uint64_t);
+static int   nextprev(WT_CURSOR *, int, int *);
+static int   notfound_chk(const char *, int, int, uint64_t);
+static void *ops(void *);
+static int   read_row(WT_CURSOR *, uint64_t);
+static int   row_del(WT_CURSOR *, uint64_t, int *);
+static int   row_put(WT_CURSOR *, uint64_t, int);
+static void  print_item(const char *, WT_ITEM *);
 
 /*
  * wts_ops --
- *	Perform a number of operations.
+ *	Perform a number of operations in a set of threads.
  */
 int
 wts_ops(void)
+{
+	WT_SESSION *session;
+	pthread_t *tids;
+	time_t now;
+	int i, ret;
+	void *thread_ret;
+
+	session = g.wts_session;
+
+	if (g.logging == LOG_OPS) {
+		(void)time(&now);
+		(void)session->msg_printf(session,
+		    "===============\nthread ops start: %s===============",
+		    ctime(&now));
+	}
+
+	if (g.threads == 1)
+		return (ops(g.wts_conn) == NULL ? 0 : 1);
+
+	/* Create thread structure. */
+	if ((tids = calloc((size_t)g.threads, sizeof(*tids))) == NULL)
+		die("calloc", errno);
+	for (i = 0; i < g.threads; ++i)
+		if ((ret =
+		    pthread_create(&tids[i], NULL, ops, g.wts_conn)) != 0)
+			die("pthread_create", ret);
+
+	/* Wait for the threads. */
+	ret = 0;
+	for (i = 0; i < g.threads; ++i) {
+		(void)pthread_join(tids[i], &thread_ret);
+		if (thread_ret != NULL)
+			ret = 1;
+	}
+
+	if (g.logging == LOG_OPS) {
+		(void)time(&now);
+		(void)session->msg_printf(session,
+		    "===============\nthread ops stop: %s===============",
+		    ctime(&now));
+	}
+
+	return (ret);
+}
+
+static void *
+ops(void *arg)
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
@@ -33,7 +81,7 @@ wts_ops(void)
 	u_int np;
 	int dir, insert, notfound, ret;
 
-	conn = g.wts_conn;
+	conn = arg;
 
 	/* Open a session. */
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
@@ -87,19 +135,19 @@ wts_ops(void)
 				 * won't be positioned, and so can't do a next.
 				 */
 				if (row_del(cursor, keyno, &notfound))
-					return (1);
+					goto err;
 				break;
 			case FIX:
 			case VAR:
 				if (col_del(cursor, keyno, &notfound))
-					return (1);
+					goto err;
 				break;
 			}
 		} else if (op < g.c_delete_pct + g.c_insert_pct) {
 			switch (g.c_file_type) {
 			case ROW:
 				if (row_put(cursor, keyno, 1))
-					return (1);
+					goto err;
 				break;
 			case FIX:
 			case VAR:
@@ -109,7 +157,7 @@ wts_ops(void)
 				 */
 				cursor->reset(cursor);
 				if (col_insert(cursor_insert, &keyno))
-					return (1);
+					goto err;
 				insert = 1;
 				break;
 			}
@@ -118,17 +166,17 @@ wts_ops(void)
 			switch (g.c_file_type) {
 			case ROW:
 				if (row_put(cursor, keyno, 0))
-					return (1);
+					goto err;
 				break;
 			case FIX:
 			case VAR:
 				if (col_put(cursor, keyno))
-					return (1);
+					goto err;
 				break;
 			}
 		} else {
 			if (read_row(cursor, keyno))
-				return (1);
+				goto err;
 			continue;
 		}
 
@@ -142,7 +190,7 @@ wts_ops(void)
 				break;
 			if (nextprev(
 			    insert ? cursor_insert : cursor, dir, &notfound))
-				return (1);
+				goto err;
 		}
 
 		if (insert)
@@ -150,7 +198,7 @@ wts_ops(void)
 
 		/* Then read the value we modified to confirm it worked. */
 		if (read_row(cursor, keyno))
-			return (1);
+			goto err;
 	}
 
 	if (g.logging == LOG_OPS) {
@@ -163,7 +211,9 @@ wts_ops(void)
 	if ((ret = session->close(session, NULL)) != 0)
 		die("session.close", ret);
 
-	return (0);
+	return (NULL);
+
+err:	return ((void *)0x01);
 }
 
 /*
@@ -264,6 +314,9 @@ read_row(WT_CURSOR *cursor, uint64_t keyno)
 		return (1);
 	}
 
+	if (!SINGLETHREADED)
+		return (0);
+
 	/* Retrieve the BDB value. */
 	if (bdb_read(keyno, &bdb_value.data, &bdb_value.size, &notfound))
 		return (1);
@@ -339,6 +392,9 @@ nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
 		return (1);
 	}
 	*notfoundp = ret == WT_NOTFOUND;
+
+	if (!SINGLETHREADED)
+		return (0);
 
 	/* Retrieve the BDB value. */
 	if (bdb_np(next, &bdb_key.data, &bdb_key.size,
@@ -434,6 +490,9 @@ row_put(WT_CURSOR *cursor, uint64_t keyno, int insert)
 		return (1);
 	}
 
+	if (!SINGLETHREADED)
+		return (0);
+
 	if (bdb_put(key.data, key.size, value.data, value.size, &notfound))
 		return (1);
 
@@ -483,6 +542,9 @@ col_put(WT_CURSOR *cursor, uint64_t keyno)
 		    g.progname, keyno, wiredtiger_strerror(ret));
 		return (1);
 	}
+
+	if (!SINGLETHREADED)
+		return (0);
 
 	if (bdb_put(key.data, key.size, value.data, value.size, &notfound))
 		return (1);
@@ -542,6 +604,9 @@ col_insert(WT_CURSOR *cursor, uint64_t *keynop)
 			    (int)value.size, (char *)value.data);
 	}
 
+	if (!SINGLETHREADED)
+		return (0);
+
 	key_gen(&key.data, &key.size, keyno, 0);
 	return (bdb_put(
 	    key.data, key.size, value.data, value.size, &notfound) ? 1 : 0);
@@ -577,6 +642,9 @@ row_del(WT_CURSOR *cursor, uint64_t keyno, int *notfoundp)
 	}
 	*notfoundp = ret == WT_NOTFOUND;
 
+	if (!SINGLETHREADED)
+		return (0);
+
 	if (bdb_del(keyno, &notfound))
 		return (1);
 
@@ -611,6 +679,9 @@ col_del(WT_CURSOR *cursor, uint64_t keyno, int *notfoundp)
 		return (1);
 	}
 	*notfoundp = ret == WT_NOTFOUND;
+
+	if (!SINGLETHREADED)
+		return (0);
 
 	/*
 	 * Deleting a fixed-length item is the same as setting the bits to 0;
