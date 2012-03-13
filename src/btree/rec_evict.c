@@ -329,8 +329,7 @@ __rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * a split-merge page, then the reference must be cleared before
 		 * the page is discarded.
 		 */
-		if (F_ISSET(
-		    page, WT_PAGE_REC_MASK) == WT_PAGE_REC_SPLIT &&
+		if (F_ISSET(page, WT_PAGE_REC_MASK) == WT_PAGE_REC_SPLIT &&
 		    mod->u.split != NULL)
 			__wt_page_out(session, mod->u.split, 0);
 	}
