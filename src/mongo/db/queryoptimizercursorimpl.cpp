@@ -183,19 +183,20 @@ namespace mongo {
             }
             
             MatchDetails myDetails;
-            bool wantDetails = details || _explainPlanInfo;
+            if ( !details && _explainPlanInfo ) {
+                details = &myDetails;
+            }
 
-            bool match = matcher( _c.get() )->matchesCurrent( _c.get(),
-                                                             wantDetails ? &myDetails : 0 );
+            bool match = matcher( _c.get() )->matchesCurrent( _c.get(), details );
             // Cache the match, so we can count it in mayAdvance().
             bool newMatch = _matchCounter.setMatch( match );
 
             if ( _explainPlanInfo ) {
                 bool countableMatch = newMatch && _matchCounter.wouldCountMatch( _c->currLoc() );
                 _explainPlanInfo->noteIterate( countableMatch,
-                                              countableMatch || myDetails.loadedObject(), *_c );
+                                              countableMatch || details->loadedObject(),
+                                              *_c );
             }
-            if ( details ) *details = myDetails;
 
             return match;
         }

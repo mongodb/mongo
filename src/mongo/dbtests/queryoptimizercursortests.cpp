@@ -3289,6 +3289,23 @@ namespace QueryOptimizerCursorTests {
             ASSERT_EQUALS( 200, nextA );
         }
     };
+
+    /** Check that an elemMatchKey can be retrieved from MatchDetails using a qo cursor. */
+    class ElemMatchKey : public Base {
+    public:
+        void run() {
+            _cli.ensureIndex( ns(), BSON( "a.b" << 1 ) );
+            _cli.insert( ns(), fromjson( "{ a:[ { b:1 } ] }" ) );
+
+            Client::ReadContext ctx( ns() );
+            setQueryOptimizerCursor( BSON( "a.b" << 1 ) );
+            MatchDetails details;
+            details.requestElemMatchKey();
+            ASSERT( c()->currentMatches( &details ) );
+            // The '0' entry of the 'a' array is matched.
+            ASSERT_EQUALS( string( "0" ), details.elemMatchKey() );
+        }
+    };
     
     namespace GetCursor {
         
@@ -4453,6 +4470,7 @@ namespace QueryOptimizerCursorTests {
             add<TakeoverOrRangeElimination>();
             add<TakeoverOrDedups>();
             add<TakeoverOrderedPlanDupsOutOfOrderPlan>();
+            add<ElemMatchKey>();
             add<GetCursor::NoConstraints>();
             add<GetCursor::SimpleId>();
             add<GetCursor::OptimalIndex>();
