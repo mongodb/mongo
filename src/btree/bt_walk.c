@@ -109,6 +109,8 @@ descend:	for (;;) {
 			}
 
 			page = ref->page;
+			WT_ASSERT(session, ref->state == WT_REF_MEM);
+			WT_ASSERT(session, page != NULL);
 			slot = next ? 0 : page->entries - 1;
 		}
 	}

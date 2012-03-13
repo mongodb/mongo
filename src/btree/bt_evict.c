@@ -323,6 +323,7 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 	WT_SESSION_IMPL *request_session;
 	WT_CACHE *cache;
 	WT_EVICT_REQ *er, *er_end;
+	WT_REF *ref;
 	int ret;
 
 	cache = S2C(session)->cache;
@@ -362,6 +363,10 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 				(void)__wt_tree_np(
 				    session, &session->btree->evict_page, 1, 1);
 
+			ref = er->page->ref;
+			WT_ASSERT(session, ref->page == er->page);
+			WT_ASSERT(session, ref->state == WT_REF_EVICTING);
+
 			WT_VERBOSE(session, evictserver,
 			    "forcing eviction of page %p", er->page);
 
@@ -380,8 +385,10 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 			 * they have two cursors open), so blocking
 			 * indefinitely leads to deadlock.
 			 */
-			if ((ret = __wt_rec_evict(session, er->page, 0)) != 0)
-				er->page->ref->state = WT_REF_MEM;
+			if ((ret = __wt_rec_evict(session, er->page, 0)) != 0) {
+				WT_ASSERT(session, ref->page == er->page);
+				ref->state = WT_REF_MEM;
+			}
 		} else {
 			/*
 			 * If we're about to do a walk of the file tree (and
@@ -777,8 +784,10 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session)
 		 * If the evicting state of the page was not cleared, clear it
 		 * now to make the page available again.
 		 */
-		if (page->ref->state == WT_REF_EVICTING)
+		if (page->ref->state == WT_REF_EVICTING) {
+			WT_ASSERT(session, page->ref->page == page);
 			page->ref->state = WT_REF_MEM;
+		}
 	}
 
 	WT_ATOMIC_ADD(btree->lru_count, -1);
