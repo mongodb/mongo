@@ -11,6 +11,20 @@ for( i = 0; i < 10; ++i ) {
     t.save( {} );
 }
 
+// Check with a single in order plan.
+
+explain = t.find( {a:{$gt:0}} ).explain( true );
+assert.eq( 1, explain.n );
+assert.eq( 1, explain.allPlans[ 0 ].n );
+
+// Check with a single out of order plan.
+
+explain = t.find( {a:{$gt:0}} ).sort( {z:1} ).hint( {a:1} ).explain( true );
+assert.eq( 1, explain.n );
+assert.eq( 1, explain.allPlans[ 0 ].n );
+
+// Check with multiple plans.
+
 explain = t.find( {a:{$gt:0},b:{$gt:0}} ).explain( true );
 assert.eq( 1, explain.n );
 assert.eq( 1, explain.allPlans[ 0 ].n );

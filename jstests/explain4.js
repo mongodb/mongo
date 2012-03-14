@@ -1,9 +1,9 @@
-// Basic validation of explain output fields
+// Basic validation of explain output fields.
 
 t = db.jstests_explain4;
 t.drop();
 
-function checkField( name, value ) {
+function checkField( explain, name, value ) {
     assert( explain.hasOwnProperty( name ) );
     if ( value != null ) {
         assert.eq( value, explain[ name ], name );
@@ -11,33 +11,33 @@ function checkField( name, value ) {
 }
 
 function checkPlanFields( explain, matches, n ) {
-    checkField( "cursor", "BasicCursor" );
-    checkField( "n", n );
-    checkField( "nscannedObjects", matches );
-    checkField( "nscanned", matches );    
-    checkField( "indexBounds", {} );
+    checkField( explain, "cursor", "BasicCursor" );
+    checkField( explain, "n", n );
+    checkField( explain, "nscannedObjects", matches );
+    checkField( explain, "nscanned", matches );    
+    checkField( explain, "indexBounds", {} );
 }
 
 function checkFields( matches, sort, limit ) {
-    it = t.find();
+    cursor = t.find();
     if ( sort ) {
-        it.sort({a:1});
+        cursor.sort({a:1});
     }
     if ( limit ) {
-        it.limit( limit );
+        cursor.limit( limit );
     }
-    explain = it.explain( true );
+    explain = cursor.explain( true );
 //    printjson( explain );
     checkPlanFields( explain, matches, matches > 0 ? 1 : 0 );
-    checkField( "scanAndOrder", sort );
-    checkField( "millis" );
-    checkField( "nYields" );
-    checkField( "nChunkSkips", 0 );
-    checkField( "isMultiKey", false );
-    checkField( "indexOnly", false );
-    checkField( "server" );
-    checkField( "allPlans" );
-    explain.allPlans.forEach( function( x ) { checkPlanFields( x, matches ); } );
+    checkField( explain, "scanAndOrder", sort );
+    checkField( explain, "millis" );
+    checkField( explain, "nYields" );
+    checkField( explain, "nChunkSkips", 0 );
+    checkField( explain, "isMultiKey", false );
+    checkField( explain, "indexOnly", false );
+    checkField( explain, "server" );
+    checkField( explain, "allPlans" );
+    explain.allPlans.forEach( function( x ) { checkPlanFields( x, matches, matches ); } );
 }
 
 checkFields( 0, false );
