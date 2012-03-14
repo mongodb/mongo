@@ -98,8 +98,8 @@ namespace ReplSetTests {
 
             {
                 mutex::scoped_lock lk2(OpTime::m);
-                OpTime o1 = OpTime::now(lk2);
-                OpTime o2 = OpTime::now(lk2);
+                o1 = OpTime::now(lk2);
+                o2 = OpTime::now(lk2);
             }
 
             BSONObjBuilder b;
