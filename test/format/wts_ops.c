@@ -614,12 +614,15 @@ col_insert(WT_CURSOR *cursor, WT_ITEM *key, uint64_t *keynop)
 		    g.progname, wiredtiger_strerror(ret));
 		return (1);
 	}
-	if (keyno <= g.rows) {
-		fprintf(stderr,
-		    "%s: inserted key did not create new row\n", g.progname);
-		return (1);
-	}
-	*keynop = g.rows = (uint32_t)keyno;
+	*keynop = (uint32_t)keyno;
+
+	/*
+	 * Assign the maximum number of rows to the returned key: that key may
+	 * not be the current maximum value, if we race with another thread,
+	 * but that's OK, we just want it to keep increasing so we don't ignore
+	 * records at the end of the table.
+	 */
+	g.rows = (uint32_t)keyno;
 
 	if (g.logging == LOG_OPS) {
 		if (g.c_file_type == FIX)
