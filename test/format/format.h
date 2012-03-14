@@ -98,8 +98,6 @@ void	 bdb_open(void);
 void	 bdb_put(const void *, uint32_t, const void *, uint32_t, int *);
 void	 bdb_read(uint64_t, void *, uint32_t *, int *);
 
-
-
 void	 config_error(void);
 const char *
 	 config_dtype(void);

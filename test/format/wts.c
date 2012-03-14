@@ -186,7 +186,6 @@ wts_salvage(void)
 	    "cp WiredTiger* __wt __slvg.copy/")) != 0)
 		die(WEXITSTATUS(ret), "salvage cleanup step failed");
 
-
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
 	if ((ret = session->salvage(session, WT_TABLENAME, NULL)) != 0)

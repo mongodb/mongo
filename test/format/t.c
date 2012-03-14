@@ -78,7 +78,7 @@ main(int argc, char *argv[])
 	/* Multi-threaded runs cannot be replayed. */
 	if (g.threads != 1 && g.replay) {
 		fprintf(stderr,
-		    "%s: -r and -t are mutually exclusive\n", g.progname); 
+		    "%s: -r and -t are mutually exclusive\n", g.progname);
 		return (EXIT_FAILURE);
 	}
 
