@@ -335,6 +335,14 @@ __rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 			__wt_page_out(session, mod->u.split, 0);
 	}
 
+	/*
+	 * If we are evicting the file's current eviction point, clear it so
+	 * the walk will be restarted.
+	 *
+	 * !!!
+	 * This check would arguably be cleaner in bt_evict.c, but that level
+	 * isn't aware of all of the pages within a subtree that are evicted.
+	 */
 	if (session->btree->evict_page == page)
 		session->btree->evict_page = NULL;
 
