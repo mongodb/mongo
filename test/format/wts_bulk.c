@@ -20,7 +20,7 @@ wts_load(void)
 	conn = g.wts_conn;
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
-		die("connection.open_session", ret);
+		die(ret, "connection.open_session");
 
 	/*
 	 * Avoid bulk load with a custom collator, because the order of
@@ -29,7 +29,7 @@ wts_load(void)
 	if ((ret = session->open_cursor(session, WT_TABLENAME, NULL,
 	    (g.c_file_type == ROW && g.c_reverse) ? NULL : "bulk",
 	    &cursor)) != 0)
-		die("session.open_cursor", ret);
+		die(ret, "session.open_cursor");
 
 	/* Set up the default key buffer. */
 	memset(&key, 0, sizeof(key));   
@@ -85,7 +85,7 @@ wts_load(void)
 		}
 
 		if ((ret = cursor->insert(cursor)) != 0)
-			die("cursor.insert", ret);
+			die(ret, "cursor.insert");
 
 		if (!SINGLETHREADED)
 			continue;
@@ -95,8 +95,8 @@ wts_load(void)
 	}
 
 	if ((ret = cursor->close(cursor)) != 0)
-		die("cursor.close", ret);
+		die(ret, "cursor.close");
 
 	if ((ret = session->close(session, NULL)) != 0)
-		die("session.close", ret);
+		die(ret, "session.close");
 }

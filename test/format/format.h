@@ -90,32 +90,35 @@ typedef struct {
 } GLOBAL;
 extern GLOBAL g;
 
-int	 bdb_del(uint64_t, int *);
+void	 bdb_close(void);
+void	 bdb_del(uint64_t, int *);
 void	 bdb_insert(const void *, uint32_t, const void *, uint32_t);
-int	 bdb_np(int, void *, uint32_t *, void *, uint32_t *, int *);
-int	 bdb_put(const void *, uint32_t, const void *, uint32_t, int *);
-int	 bdb_read(uint64_t, void *, uint32_t *, int *);
-void	 bdb_startup(void);
-void	 bdb_teardown(void);
+void	 bdb_np(int, void *, uint32_t *, void *, uint32_t *, int *);
+void	 bdb_open(void);
+void	 bdb_put(const void *, uint32_t, const void *, uint32_t, int *);
+void	 bdb_read(uint64_t, void *, uint32_t *, int *);
+
+
+
+void	 config_error(void);
 const char *
 	 config_dtype(void);
-void	 config_error(void);
 void	 config_file(const char *);
 void	 config_print(int);
 void	 config_setup(void);
 void	 config_single(const char *, int);
-void	 die(const char *,  int);
-void	 key_gen(uint8_t *, uint32_t *, uint64_t, int);
+void	 die(int, const char *, ...);
 void	 key_gen_setup(uint8_t **);
+void	 key_gen(uint8_t *, uint32_t *, uint64_t, int);
 void	 track(const char *, uint64_t);
 void	 value_gen(uint8_t *, uint32_t *, uint64_t);
-int	 wts_dump(const char *, int);
+void	 wts_close(void);
+void	 wts_dump(const char *, int);
 void	 wts_load(void);
-int	 wts_ops(void);
+void	 wts_open(void);
+void	 wts_ops(void);
 uint32_t wts_rand(void);
-int	 wts_read_scan(void);
-int	 wts_salvage(void);
-int	 wts_startup(void);
+void	 wts_read_scan(void);
+void	 wts_salvage(void);
 void	 wts_stats(void);
-int	 wts_teardown(void);
-int	 wts_verify(const char *);
+void	 wts_verify(const char *);

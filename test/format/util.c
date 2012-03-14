@@ -32,7 +32,7 @@ key_gen_setup(uint8_t **keyp)
 	size_t i;
 
 	if ((key = malloc(g.c_key_max)) == NULL)
-		die("malloc", errno);
+		die(errno, "malloc");
 	for (i = 0; i < g.c_key_max; ++i)
 		key[i] = "abcdefghijklmnopqrstuvwxyz"[i % 26];
 	*keyp = key;
@@ -79,7 +79,7 @@ val_gen_setup(uint8_t **valp)
 	 */
 	len = g.c_value_max + 20;
 	if ((val = malloc(len)) == NULL)
-		die("malloc", errno);
+		die(errno, "malloc");
 	for (i = 0; i < len; ++i)
 		val[i] = (u_char)"ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i % 26];
 
@@ -194,7 +194,7 @@ wts_rand(void)
 	if (g.rand_log == NULL) {
 		if ((g.rand_log =
 		    fopen("__rand", g.replay ? "r" : "w")) == NULL)
-			die("__rand", errno);
+			die(errno, "fopen: __rand");
 		if (!g.replay) {
 			srand((u_int)(0xdeadbeef ^ (u_int)time(NULL)));
 			(void)setvbuf(g.rand_log, NULL, _IOLBF, 0);
@@ -208,7 +208,7 @@ wts_rand(void)
 				    "exiting\n");
 				exit(EXIT_SUCCESS);
 			}
-			die("random number log", errno);
+			die(errno, "feof: random number log");
 		}
 
 		r = (uint32_t)strtoul(buf, NULL, 10);

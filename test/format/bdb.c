@@ -26,7 +26,7 @@ bdb_compare_reverse(DB *dbp, const DBT *k1, const DBT *k2)
 }
 
 void
-bdb_startup(void)
+bdb_open(void)
 {
 	DB *db;
 	DBC *dbc;
@@ -56,7 +56,7 @@ bdb_startup(void)
 }
 
 void
-bdb_teardown(void)
+bdb_close(void)
 {
 	DB *db;
 	DBC *dbc;
@@ -90,7 +90,7 @@ bdb_insert(
 	assert(dbc->put(dbc, &key, &value, DB_KEYFIRST) == 0);
 }
 
-int
+void
 bdb_np(int next,
     void *keyp, uint32_t *keysizep,
     void *valuep, uint32_t *valuesizep, int *notfoundp)
@@ -100,54 +100,44 @@ bdb_np(int next,
 	int ret;
 
 	*notfoundp = 0;
-
 	if ((ret =
 	    dbc->get(dbc, &key, &value, next ? DB_NEXT : DB_PREV)) != 0) {
-		if (ret == DB_NOTFOUND) {
-			*notfoundp = 1;
-			return (0);
-		}
-		db->err(db, ret,
-		    "dbc->get: %s: {%.*s}",
-		    next ? "DB_NEXT" : "DB_PREV",
-		    (int)key.size, (char *)key.data);
-		return (1);
+		if (ret != DB_NOTFOUND)
+			die(ret, "dbc.get: %s: {%.*s}",
+			    next ? "DB_NEXT" : "DB_PREV",
+			    (int)key.size, (char *)key.data);
+		*notfoundp = 1;
+	} else {
+		*(void **)keyp = key.data;
+		*keysizep = key.size;
+		*(void **)valuep = value.data;
+		*valuesizep = value.size;
 	}
-	*(void **)keyp = key.data;
-	*keysizep = key.size;
-	*(void **)valuep = value.data;
-	*valuesizep = value.size;
-	return (0);
 }
 
-int
+void
 bdb_read(uint64_t keyno, void *valuep, uint32_t *valuesizep, int *notfoundp)
 {
 	DB *db = g.bdb;
 	DBC *dbc = g.dbc;
 	int ret;
 
-	*notfoundp = 0;
-
 	key.data = keybuf;
 	key_gen(key.data, &key.size, keyno, 0);
 
+	*notfoundp = 0;
 	if ((ret = dbc->get(dbc, &key, &value, DB_SET)) != 0) {
-		if (ret == DB_NOTFOUND) {
-			*notfoundp = 1;
-			return (0);
-		}
-		db->err(db, ret,
-		    "dbc->get: DB_SET: {%.*s}",
-		    (int)key.size, (char *)key.data);
-		return (1);
+		if (ret != DB_NOTFOUND)
+			die(ret, "dbc.get: DB_SET: {%.*s}",
+			    (int)key.size, (char *)key.data);
+		*notfoundp = 1;
+	} else {
+		*(void **)valuep = value.data;
+		*valuesizep = value.size;
 	}
-	*(void **)valuep = value.data;
-	*valuesizep = value.size;
-	return (0);
 }
 
-int
+void
 bdb_put(const void *arg_key, uint32_t arg_key_size,
     const void *arg_value, uint32_t arg_value_size, int *notfoundp)
 {
@@ -155,50 +145,40 @@ bdb_put(const void *arg_key, uint32_t arg_key_size,
 	DBC *dbc = g.dbc;
 	int ret;
 
-	*notfoundp = 0;
-
 	key.data = (void *)arg_key;
 	key.size = arg_key_size;
 	value.data = (void *)arg_value;
 	value.size = arg_value_size;
 
+	*notfoundp = 0;
 	if ((ret = dbc->put(dbc, &key, &value, DB_KEYFIRST)) != 0) {
-		if (ret == DB_NOTFOUND) {
-			*notfoundp = 1;
-			return (0);
+		if (ret != DB_NOTFOUND) {
+			die(ret, "dbc.put: DB_KEYFIRST: {%.*s}{%.*s}",
+			    (int)key.size, (char *)key.data,
+			    (int)value.size, (char *)value.data);
 		}
-		db->err(db, ret, "dbc->put: DB_KEYFIRST: {%.*s}{%.*s}",
-		    (int)key.size, (char *)key.data,
-		    (int)value.size, (char *)value.data);
-		return (1);
+		*notfoundp = 1;
 	}
-	return (0);
 }
 
-int
+void
 bdb_del(uint64_t keyno, int *notfoundp)
 {
 	DB *db = g.bdb;
 	DBC *dbc = g.dbc;
 	int ret;
 
-	*notfoundp = 0;
-
 	key.data = keybuf;
 	key_gen(key.data, &key.size, keyno, 0);
 
-	if ((ret = bdb_read(keyno, &value.data, &value.size, notfoundp)) != 0)
-		return (1);
+	bdb_read(keyno, &value.data, &value.size, notfoundp);
 	if (*notfoundp)
-		return (0);
+		return;
+
 	if ((ret = dbc->del(dbc, 0)) != 0) {
-		if (ret == DB_NOTFOUND) {
-			*notfoundp = 1;
-			return (0);
-		}
-		db->err(db, ret,
-		    "dbc->del: {%.*s}", (int)key.size, (char *)key.data);
-		return (1);
+		if (ret != DB_NOTFOUND)
+			die(ret, "dbc.del: {%.*s}",
+			    (int)key.size, (char *)key.data);
+		*notfoundp = 1;
 	}
-	return (0);
 }
