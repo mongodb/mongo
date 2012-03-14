@@ -362,6 +362,8 @@ namespace mongo {
             help << "repair database.  also compacts. note: slow.";
         }
         virtual LockType locktype() const { return WRITE; }
+        // SERVER-4328 todo don't lock globally. currently syncDataAndTruncateJournal is being called within, and that requires a global lock i believe.
+        virtual bool lockGlobally() const { return true; }
         CmdRepairDatabase() : Command("repairDatabase") {}
         bool run(const string& dbname , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             BSONElement e = cmdObj.firstElement();
