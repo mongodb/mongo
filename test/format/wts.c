@@ -9,7 +9,7 @@
 
 static int  wts_close(WT_CONNECTION *);
 static int  wts_open(WT_CONNECTION **, WT_SESSION **session);
-static int  wts_sync(void);
+static void wts_sync(void);
 
 static int
 handle_message(WT_EVENT_HANDLER *handler, const char *message)
@@ -112,6 +112,7 @@ wts_startup(void)
 
 	if (wts_open(&conn, &session))
 		return (1);
+	g.wts_conn = conn;
 
 	maxintlpage = 1U << g.c_intl_page_max;
 	maxintlitem = MMRAND(maxintlpage / 50, maxintlpage / 40);
@@ -164,8 +165,8 @@ wts_startup(void)
 		return (1);
 	}
 
-	g.wts_conn = conn;
-	g.wts_session = session;
+	if ((ret = session->close(session, NULL)) != 0)
+		die("session.close", ret);
 
 	return (0);
 }
@@ -174,12 +175,11 @@ int
 wts_teardown(void)
 {
 	WT_CONNECTION *conn;
-	int ret;
 
 	conn = g.wts_conn;
 
-	ret = wts_sync();
-	return (wts_close(conn) ? 1 : ret);
+	wts_sync();
+	return (wts_close(conn));
 }
 
 int
@@ -231,23 +231,24 @@ wts_salvage(void)
 	return (wts_close(conn));
 }
 
-static int
+static void
 wts_sync(void)
 {
+	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	int ret;
 
-	session = g.wts_session;
+	conn = g.wts_conn;
 
 	track("sync", 0ULL);
 
+	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
+		die("connection.open_session", ret);
 	if ((ret = session->sync(
-	    session, WT_TABLENAME, NULL)) != 0 && ret != EBUSY) {
-		fprintf(stderr, "%s: sync: %s\n",
-		    g.progname, wiredtiger_strerror(ret));
-		return (1);
-	}
-	return (0);
+	    session, WT_TABLENAME, NULL)) != 0 && ret != EBUSY)
+		die("session.sync", ret);
+	if ((ret = session->close(session, NULL)) != 0)
+		die("session.close", ret);
 }
 
 int
@@ -273,9 +274,10 @@ wts_verify(const char *tag)
  * wts_stats --
  *	Dump the run's statistics.
  */
-int
+void
 wts_stats(void)
 {
+	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	FILE *fp;
@@ -283,26 +285,24 @@ wts_stats(void)
 	uint64_t v;
 	int ret;
 
-	session = g.wts_session;
-
 	track("stat", 0ULL);
+
+	conn = g.wts_conn;
+	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
+		die("connection.open_session", ret);
 
 	if ((fp = fopen("__stats", "w")) == NULL)
 		die("__stats", errno);
 
 	/* Connection statistics. */
 	if ((ret = session->open_cursor(session,
-	    "statistics:", NULL, NULL, &cursor)) != 0) {
-		fprintf(stderr, "%s: stat cursor open failed: %s\n",
-		    g.progname, wiredtiger_strerror(ret));
-		return (1);
-	}
+	    "statistics:", NULL, NULL, &cursor)) != 0)
+		die("session.open_cursor", ret);
+
 	while ((ret = cursor->next(cursor)) == 0 &&
 	    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
-		if (fprintf(fp, "%s=%s\n", desc, pval) < 0) {
-			ret = errno;
-			break;
-		}
+		if (fprintf(fp, "%s=%s\n", desc, pval) < 0)
+			die("fprintf", errno);
 
 	if (ret != WT_NOTFOUND)
 		die("cursor.next", ret);
@@ -311,24 +311,22 @@ wts_stats(void)
 
 	/* File statistics. */
 	if ((ret = session->open_cursor(session,
-	    "statistics:" WT_TABLENAME, NULL, NULL, &cursor)) != 0) {
-		fprintf(stderr, "%s: stat cursor open failed: %s\n",
-		    g.progname, wiredtiger_strerror(ret));
-		return (1);
-	}
+	    "statistics:" WT_TABLENAME, NULL, NULL, &cursor)) != 0)
+		die("session.open_cursor", ret);
+
 	while ((ret = cursor->next(cursor)) == 0 &&
 	    (ret = cursor->get_value(cursor, &desc, &pval, &v)) == 0)
-		if (fprintf(fp, "%s=%s\n", desc, pval) < 0) {
-			ret = errno;
-			break;
-		}
+		if (fprintf(fp, "%s=%s\n", desc, pval) < 0)
+			die("fprintf", errno);
 
 	if (ret != WT_NOTFOUND)
 		die("cursor.next", ret);
 	if ((ret = cursor->close(cursor)) != 0)
 		die("cursor.close", ret);
 
-	(void)fclose(fp);
+	if ((ret = fclose(fp)) != 0)
+		die("fclose", ret);
 
-	return (0);
+	if ((ret = session->close(session, NULL)) != 0)
+		die("session.close", ret);
 }

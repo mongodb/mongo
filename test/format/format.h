@@ -46,7 +46,6 @@ typedef struct {
 	void *dbc;				/* BDB cursor handle */
 
 	void *wts_conn;				/* WT_CONNECTION handle */
-	void *wts_session;			/* WT_SESSION handle */
 
 	FILE *rand_log;				/* Random number log */
 
@@ -110,13 +109,13 @@ void	 key_gen(uint8_t *, uint32_t *, uint64_t, int);
 void	 key_gen_setup(uint8_t **);
 void	 track(const char *, uint64_t);
 void	 value_gen(void *, uint32_t *, uint64_t);
-int	 wts_bulk_load(void);
 int	 wts_dump(const char *, int);
+void	 wts_load(void);
 int	 wts_ops(void);
 uint32_t wts_rand(void);
 int	 wts_read_scan(void);
 int	 wts_salvage(void);
 int	 wts_startup(void);
-int	 wts_stats(void);
+void	 wts_stats(void);
 int	 wts_teardown(void);
 int	 wts_verify(const char *);

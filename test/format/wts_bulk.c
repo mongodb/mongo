@@ -7,22 +7,20 @@
 
 #include "format.h"
 
-static int  bulk(WT_ITEM **, WT_ITEM **);
-
-int
-wts_bulk_load(void)
+void
+wts_load(void)
 {
+	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	static WT_ITEM key, value;
 	uint8_t *keybuf;
 	int ret;
 
-	session = g.wts_session;
+	conn = g.wts_conn;
 
-	/* Set up the default key buffer. */
-	memset(&key, 0, sizeof(key));   
-	key_gen_setup(&keybuf);
+	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
+		die("connection.open_session", ret);
 
 	/*
 	 * Avoid bulk load with a custom collator, because the order of
@@ -32,6 +30,10 @@ wts_bulk_load(void)
 	    (g.c_file_type == ROW && g.c_reverse) ? NULL : "bulk",
 	    &cursor)) != 0)
 		die("session.open_cursor", ret);
+
+	/* Set up the default key buffer. */
+	memset(&key, 0, sizeof(key));   
+	key_gen_setup(&keybuf);
 
 	for (;;) {
 		if (++g.key_cnt > g.c_rows) {
@@ -92,5 +94,6 @@ wts_bulk_load(void)
 	if ((ret = cursor->close(cursor)) != 0)
 		die("cursor.close", ret);
 
-	return (ret);
+	if ((ret = session->close(session, NULL)) != 0)
+		die("session.close", ret);
 }

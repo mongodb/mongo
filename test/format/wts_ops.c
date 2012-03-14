@@ -25,15 +25,20 @@ static void  print_item(const char *, WT_ITEM *);
 int
 wts_ops(void)
 {
+	WT_CONNECTION *conn;
 	WT_SESSION *session;
 	pthread_t *tids;
 	time_t now;
 	int i, ret;
 	void *thread_ret;
 
-	session = g.wts_session;
+	conn = g.wts_conn;
 
+	/* Open a session. */
 	if (g.logging == LOG_OPS) {
+		if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
+			die("connection.open_session", ret);
+
 		(void)time(&now);
 		(void)session->msg_printf(session,
 		    "===============\nthread ops start: %s===============",
@@ -41,22 +46,23 @@ wts_ops(void)
 	}
 
 	if (g.threads == 1)
-		return (ops(g.wts_conn) == NULL ? 0 : 1);
+		ret = ops(g.wts_conn) == NULL ? 0 : 1;
+	else {
+		/* Create thread structure. */
+		if ((tids = calloc((size_t)g.threads, sizeof(*tids))) == NULL)
+			die("calloc", errno);
+		for (i = 0; i < g.threads; ++i)
+			if ((ret = pthread_create(
+			    &tids[i], NULL, ops, g.wts_conn)) != 0)
+				die("pthread_create", ret);
 
-	/* Create thread structure. */
-	if ((tids = calloc((size_t)g.threads, sizeof(*tids))) == NULL)
-		die("calloc", errno);
-	for (i = 0; i < g.threads; ++i)
-		if ((ret =
-		    pthread_create(&tids[i], NULL, ops, g.wts_conn)) != 0)
-			die("pthread_create", ret);
-
-	/* Wait for the threads. */
-	ret = 0;
-	for (i = 0; i < g.threads; ++i) {
-		(void)pthread_join(tids[i], &thread_ret);
-		if (thread_ret != NULL)
-			ret = 1;
+		/* Wait for the threads. */
+		ret = 0;
+		for (i = 0; i < g.threads; ++i) {
+			(void)pthread_join(tids[i], &thread_ret);
+			if (thread_ret != NULL)
+				ret = 1;
+		}
 	}
 
 	if (g.logging == LOG_OPS) {
@@ -64,6 +70,9 @@ wts_ops(void)
 		(void)session->msg_printf(session,
 		    "===============\nthread ops stop: %s===============",
 		    ctime(&now));
+
+		if ((ret = session->close(session, NULL)) != 0)
+			die("session.close", ret);
 	}
 
 	return (ret);

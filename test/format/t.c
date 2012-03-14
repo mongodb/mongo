@@ -104,8 +104,7 @@ main(int argc, char *argv[])
 		if (wts_startup())
 			return (EXIT_FAILURE);
 
-		if (wts_bulk_load())		/* Load initial records */
-			goto err;
+		wts_load();			/* Load initial records */
 						/* Close, verify */
 		if (wts_teardown() || wts_verify("post-bulk verify"))
 			goto err;
@@ -122,8 +121,8 @@ main(int argc, char *argv[])
 				goto err;
 
 						/* Statistics */
-			if ((g.c_ops == 0 || reps == 2) && wts_stats())
-				goto err;
+			if (g.c_ops == 0 || reps == 2)
+				wts_stats();
 
 						/* Close, verify */
 			if (wts_teardown() || wts_verify("post-ops verify"))
