@@ -1575,13 +1575,13 @@ namespace mongo {
         set<NamespaceDetails*> bgJobsInProgress;
 
         void prep(const char *ns, NamespaceDetails *d) {
-            assertInWriteLock();
+            Lock::assertWriteLocked(ns);
             uassert( 13130 , "can't start bg index b/c in recursive lock (db.eval?)" , !Lock::nested() );
             bgJobsInProgress.insert(d);
         }
         void done(const char *ns, NamespaceDetails *d) {
             NamespaceDetailsTransient::get(ns).addedIndex(); // clear query optimizer cache
-            assertInWriteLock();
+            Lock::assertWriteLocked(ns);
         }
 
     public:
