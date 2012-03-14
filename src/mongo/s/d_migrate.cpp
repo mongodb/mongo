@@ -499,6 +499,16 @@ namespace mongo {
                         break;
 
                     DiskLoc dl = *i;
+                    
+                    Record* r = dl.rec();
+                    if ( ! r->likelyInPhysicalMemory() ) {
+                        auto_ptr<LockMongoFilesShared> lk( new LockMongoFilesShared() );
+                        dbtemprelease t;
+                        r->touch();
+                        lk.reset(0); // we have to release mmmutex before we can re-acquire dbmutex
+                        break;
+                    }
+
                     BSONObj o = dl.obj();
 
                     // use the builder size instead of accumulating 'o's size so that we take into consideration
