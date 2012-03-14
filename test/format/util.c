@@ -8,35 +8,7 @@
 #include "format.h"
 
 void
-key_gen(void *keyp, uint32_t *sizep, uint64_t keyno, int insert)
-{
-	int len;
-
-	/*
-	 * The key always starts with a 10-digit string (the specified cnt)
-	 * followed by two digits, a random number between 1 and 15 if it's
-	 * an insert, otherwise 00.
-	 */
-	len = insert ?
-	    sprintf(g.key_gen_buf, "%010" PRIu64 ".%02d", keyno,
-		(int)MMRAND(1, 15)) :
-	    sprintf(g.key_gen_buf, "%010" PRIu64 ".00", keyno);
-
-	/*
-	 * In a column-store, the key is only used for BDB, and so it doesn't
-	 * need a random length.
-	 */
-	if (g.c_file_type == ROW) {
-		g.key_gen_buf[len] = '/';
-		len = g.key_rand_len[keyno %
-		    (sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]))];
-	}
-	*(void **)keyp = g.key_gen_buf;
-	*sizep = (uint32_t)len;
-}
-
-void
-key_gen_setup(void)
+key_len_setup()
 {
 	size_t i;
 
@@ -49,17 +21,47 @@ key_gen_setup(void)
 	 *
 	 * Fill in the random key lengths.
 	 */
-	if (g.key_gen_buf != NULL) {
-		free(g.key_gen_buf);
-		g.key_gen_buf = NULL;
-	}
 	for (i = 0; i < sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]); ++i)
 		g.key_rand_len[i] = (uint16_t)MMRAND(g.c_key_min, g.c_key_max);
+}
 
-	if ((g.key_gen_buf = malloc(g.c_key_max)) == NULL)
+void
+key_gen_setup(uint8_t **keyp)
+{
+	uint8_t *key;
+	size_t i;
+
+	if ((key = malloc(g.c_key_max)) == NULL)
 		die("malloc", errno);
 	for (i = 0; i < g.c_key_max; ++i)
-		g.key_gen_buf[i] = "abcdefghijklmnopqrstuvwxyz"[i % 26];
+		key[i] = "abcdefghijklmnopqrstuvwxyz"[i % 26];
+	*keyp = key;
+}
+
+void
+key_gen(uint8_t *key, uint32_t *sizep, uint64_t keyno, int insert)
+{
+	int len;
+
+	/*
+	 * The key always starts with a 10-digit string (the specified cnt)
+	 * followed by two digits, a random number between 1 and 15 if it's
+	 * an insert, otherwise 00.
+	 */
+	len = insert ?
+	    sprintf(key, "%010" PRIu64 ".%02d", keyno, (int)MMRAND(1, 15)) :
+	    sprintf(key, "%010" PRIu64 ".00", keyno);
+
+	/*
+	 * In a column-store, the key is only used for BDB, and so it doesn't
+	 * need a random length.
+	 */
+	if (g.c_file_type == ROW) {
+		key[len] = '/';
+		len = g.key_rand_len[keyno %
+		    (sizeof(g.key_rand_len) / sizeof(g.key_rand_len[0]))];
+	}
+	*sizep = (uint32_t)len;
 }
 
 void

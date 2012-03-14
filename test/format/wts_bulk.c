@@ -15,9 +15,14 @@ wts_bulk_load(void)
 	WT_CURSOR *cursor;
 	WT_SESSION *session;
 	static WT_ITEM key, value;
+	uint8_t *keybuf;
 	int ret;
 
 	session = g.wts_session;
+
+	/* Set up the default key buffer. */
+	memset(&key, 0, sizeof(key));   
+	key_gen_setup(&keybuf);
 
 	/*
 	 * Avoid bulk load with a custom collator, because the order of
@@ -38,7 +43,8 @@ wts_bulk_load(void)
 		if (g.key_cnt % 100 == 0)
 			track("bulk load", g.key_cnt);
 
-		key_gen(&key.data, &key.size, (uint64_t)g.key_cnt, 0);
+		key.data = keybuf;
+		key_gen(keybuf, &key.size, (uint64_t)g.key_cnt, 0);
 		value_gen(&value.data, &value.size, (uint64_t)g.key_cnt);
 
 		switch (g.c_file_type) {

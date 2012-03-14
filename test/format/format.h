@@ -64,8 +64,6 @@ typedef struct {
 
 	char *config_open;			/* Command-line configuration */
 
-	char *key_gen_buf;
-
 	uint32_t c_bitcnt;			/* Config values */
 	uint32_t c_bzip;
 	uint32_t c_cache;
@@ -108,8 +106,8 @@ void	 config_print(int);
 void	 config_setup(void);
 void	 config_single(const char *, int);
 void	 die(const char *,  int);
-void	 key_gen(void *, uint32_t *, uint64_t, int);
-void	 key_gen_setup(void);
+void	 key_gen(uint8_t *, uint32_t *, uint64_t, int);
+void	 key_gen_setup(uint8_t **);
 void	 track(const char *, uint64_t);
 void	 value_gen(void *, uint32_t *, uint64_t);
 int	 wts_bulk_load(void);

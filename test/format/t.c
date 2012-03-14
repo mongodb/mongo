@@ -97,13 +97,13 @@ main(int argc, char *argv[])
 
 		config_setup();			/* Run configuration */
 		config_print(0);		/* Dump run configuration */
+		key_len_setup();		/* Setup keys */
 
 		if (SINGLETHREADED)
 			bdb_startup();		/* Initial file config */
 		if (wts_startup())
 			return (EXIT_FAILURE);
 
-		key_gen_setup();		/* Setup keys */
 		if (wts_bulk_load())		/* Load initial records */
 			goto err;
 						/* Close, verify */

@@ -8,6 +8,8 @@
 #define	BDB	1			/* Berkeley DB header files */
 #include "format.h"
 
+uint8_t *keybuf;
+
 static int
 bdb_compare_reverse(DB *dbp, const DBT *k1, const DBT *k2)
 {
@@ -48,6 +50,8 @@ bdb_startup(void)
 	g.bdb = db;
 	assert(db->cursor(db, NULL, &dbc, 0) == 0);
 	g.dbc = dbc;
+
+	key_gen_setup(&keybuf);
 }
 
 void
@@ -63,6 +67,9 @@ bdb_teardown(void)
 	assert(dbc->close(dbc) == 0);
 	assert(db->close(db, 0) == 0);
 	assert(dbenv->close(dbenv, 0) == 0);
+
+	free(keybuf);
+	keybuf = NULL;
 }
 
 void
@@ -124,7 +131,8 @@ bdb_read(uint64_t keyno, void *valuep, uint32_t *valuesizep, int *notfoundp)
 
 	*notfoundp = 0;
 
-	key_gen(&key.data, &key.size, keyno, 0);
+	key.data = keybuf;
+	key_gen(key.data, &key.size, keyno, 0);
 
 	if ((ret = dbc->get(dbc, &key, &value, DB_SET)) != 0) {
 		if (ret == DB_NOTFOUND) {
@@ -181,7 +189,8 @@ bdb_del(uint64_t keyno, int *notfoundp)
 
 	*notfoundp = 0;
 
-	key_gen(&key.data, &key.size, keyno, 0);
+	key.data = keybuf;
+	key_gen(key.data, &key.size, keyno, 0);
 
 	if ((ret = bdb_read(keyno, &value.data, &value.size, notfoundp)) != 0)
 		return (1);
