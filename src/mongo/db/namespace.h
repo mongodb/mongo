@@ -299,7 +299,6 @@ namespace mongo {
                 double x = paddingFactor - 0.001;
                 if ( x >= 1.0 ) {
                     *getDur().writing(&paddingFactor) = x;
-                    //getDur().setNoJournal(&paddingFactor, &x, sizeof(x));
                 }
             }
         }
@@ -316,7 +315,6 @@ namespace mongo {
                 double x = paddingFactor + (0.001 * N);
                 if ( x <= 2.0 ) {
                     *getDur().writing(&paddingFactor) = x;
-                    //getDur().setNoJournal(&paddingFactor, &x, sizeof(x));
                 }
             }
         }

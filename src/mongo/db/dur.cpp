@@ -177,44 +177,11 @@ namespace mongo {
             return x; 
         }
 
-        void NonDurableImpl::setNoJournal(void *dst, void *src, unsigned len) {
-            memcpy(dst, src, len);
-        }
-
         void NonDurableImpl::declareWriteIntent(void *, unsigned) { 
             cc().writeHappened(); 
         }
 
         void assertLockedForCommitting();
-        void DurableImpl::setNoJournal(void *dst, void *src, unsigned len) {
-            // we are at least read locked, so we need not worry about REMAPPRIVATEVIEW herein.
-            assertLockedForCommitting();
-
-            MemoryMappedFile::makeWritable(dst, len);
-
-            // we enter the RecoveryJob mutex here, so that if WRITETODATAFILES is happening we do not 
-            // conflict with it
-            scoped_lock lk1( RecoveryJob::get()._mx );
-
-            // we stay in this mutex for everything to work with DurParanoid/validateSingleMapMatches
-            //
-            // either of these mutexes also makes setNoJournal threadsafe, which is good as we call it from a read 
-            // (not a write) lock in class SlaveTracking
-            //
-            scoped_lock lk( privateViews._mutex() );
-
-            size_t ofs;
-            MongoMMF *f = privateViews.find_inlock(dst, ofs);
-            assert(f);
-            void *w = (((char *)f->view_write())+ofs);
-            // first write it to the writable (file) view
-            memcpy(w, src, len);
-            if( memcmp(w, dst, len) ) {
-                // if we get here, a copy-on-write had previously occurred. so write it to the private view too
-                // to keep them in sync.  we do this as we do not want to cause a copy on write unnecessarily.
-                memcpy(dst, src, len);
-            }
-        }
 
         static DurableImpl* durableImpl = new DurableImpl();
         static NonDurableImpl* nonDurableImpl = new NonDurableImpl();
@@ -403,7 +370,6 @@ namespace mongo {
 
                     assert( mmf->length() == (unsigned) mmf->length() );
 
-                    scoped_lock lk( privateViews._mutex() ); // see setNoJournal
                     if (memcmp(p, w, (unsigned) mmf->length()) == 0)
                         return; // next file
 
