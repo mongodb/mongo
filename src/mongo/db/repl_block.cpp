@@ -56,17 +56,6 @@ namespace mongo {
             BSONObj obj;
         };
 
-        struct Info {
-            Info() : loc(0) {}
-            ~Info() {
-                if ( loc && owned ) {
-                    delete loc;
-                }
-            }
-            bool owned; // true if loc is a pointer of our creation (and not a pointer into a MMF)
-            OpTime * loc;
-        };
-
         SlaveTracking() : _mutex("SlaveTracking") {
             _dirty = false;
             _started = false;
@@ -81,26 +70,24 @@ namespace mongo {
                 if ( ! _dirty )
                     continue;
 
-                writelock lk(NS);
-
                 list< pair<BSONObj,BSONObj> > todo;
 
                 {
                     scoped_lock mylk(_mutex);
 
-                    for ( map<Ident,Info>::iterator i=_slaves.begin(); i!=_slaves.end(); i++ ) {
+                    for ( map<Ident,OpTime>::iterator i=_slaves.begin(); i!=_slaves.end(); i++ ) {
                         BSONObjBuilder temp;
-                        temp.appendTimestamp( "syncedTo" , i->second.loc[0].asDate() );
+                        temp.appendTimestamp( "syncedTo" , i->second.asDate() );
                         todo.push_back( pair<BSONObj,BSONObj>( i->first.obj.getOwned() ,
                                                                BSON( "$set" << temp.obj() ).getOwned() ) );
                     }
+                    _dirty = false;
                 }
 
                 for ( list< pair<BSONObj,BSONObj> >::iterator i=todo.begin(); i!=todo.end(); i++ ) {
                     db.update( NS , i->first , i->second , true );
                 }
 
-                _dirty = false;
             }
         }
 
@@ -112,41 +99,16 @@ namespace mongo {
         void update( const BSONObj& rid , const string& host , const string& ns , OpTime last ) {
             REPLDEBUG( host << " " << rid << " " << ns << " " << last );
 
+            Ident ident(rid,host,ns);
+
             scoped_lock mylk(_mutex);
 
-#ifdef _DEBUG
-            MongoFileAllowWrites allowWrites;
-#endif
-
-            Ident ident(rid,host,ns);
-            Info& i = _slaves[ ident ];
+            _slaves[ident] = last;
+            _dirty = true;
 
             if (theReplSet && theReplSet->isPrimary()) {
                 theReplSet->ghost->updateSlave(ident.obj["_id"].OID(), last);
             }
-
-            if ( i.loc ) {
-                if( i.owned )
-                    i.loc[0] = last;
-                else
-                    getDur().setNoJournal(i.loc, &last, sizeof(last));
-                return;
-            }
-
-            Lock::assertAtLeastReadLocked(NS);
-
-            BSONObj res;
-            if ( Helpers::findOne( NS , ident.obj , res ) ) {
-                assert( res["syncedTo"].type() );
-                i.owned = false;
-                i.loc = (OpTime*)res["syncedTo"].value();
-                getDur().setNoJournal(i.loc, &last, sizeof(last));
-                return;
-            }
-
-            i.owned = true;
-            i.loc = new OpTime(last);
-            _dirty = true;
 
             if ( ! _started ) {
                 // start background thread here since we definitely need it
@@ -189,8 +151,8 @@ namespace mongo {
 
             w--; // now this is the # of slaves i need
             scoped_lock mylk(_mutex);
-            for ( map<Ident,Info>::iterator i=_slaves.begin(); i!=_slaves.end(); i++) {
-                OpTime s = *(i->second.loc);
+            for ( map<Ident,OpTime>::iterator i=_slaves.begin(); i!=_slaves.end(); i++) {
+                OpTime s = i->second;
                 if ( s < op ) {
                     continue;
                 }
@@ -208,7 +170,7 @@ namespace mongo {
 
         // need to be careful not to deadlock with this
         mutable mongo::mutex _mutex;
-        map<Ident,Info> _slaves;
+        map<Ident,OpTime> _slaves;
         bool _dirty;
         bool _started;
 
