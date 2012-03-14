@@ -372,7 +372,7 @@ public:
     }
     
     int _repair( string dbname ) {
-        dblock lk;
+        writelock lk;
         Client::Context cx( dbname );
         Database * db = cx.db();
         
