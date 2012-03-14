@@ -202,6 +202,7 @@ ops(void *arg)
 		die(ret, "session.close");
 
 	free(keybuf);
+	free(valbuf);
 	return (NULL);
 }
 
@@ -249,6 +250,8 @@ wts_read_scan(void)
 
 	if ((ret = session->close(session, NULL)) != 0)
 		die(ret, "session.close");
+
+	free(keybuf);
 }
 
 #define	NTF_CHK(a) do {							\

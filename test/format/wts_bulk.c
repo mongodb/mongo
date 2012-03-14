@@ -99,4 +99,7 @@ wts_load(void)
 
 	if ((ret = session->close(session, NULL)) != 0)
 		die(ret, "session.close");
+
+	free(keybuf);
+	free(valbuf);
 }
