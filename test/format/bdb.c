@@ -8,7 +8,8 @@
 #define	BDB	1			/* Berkeley DB header files */
 #include "format.h"
 
-uint8_t *keybuf;
+static DBT key, value;
+static uint8_t *keybuf;
 
 static int
 bdb_compare_reverse(DB *dbp, const DBT *k1, const DBT *k2)
@@ -77,7 +78,6 @@ bdb_insert(
     const void *key_data, uint32_t key_size,
     const void *value_data, uint32_t value_size)
 {
-	static DBT key, value;
 	DBC *dbc;
 
 	key.data = (void *)key_data;
@@ -95,7 +95,6 @@ bdb_np(int next,
     void *keyp, uint32_t *keysizep,
     void *valuep, uint32_t *valuesizep, int *notfoundp)
 {
-	static DBT key, value;
 	DB *db = g.bdb;
 	DBC *dbc = g.dbc;
 	int ret;
@@ -124,7 +123,6 @@ bdb_np(int next,
 int
 bdb_read(uint64_t keyno, void *valuep, uint32_t *valuesizep, int *notfoundp)
 {
-	static DBT key, value;
 	DB *db = g.bdb;
 	DBC *dbc = g.dbc;
 	int ret;
@@ -153,7 +151,6 @@ int
 bdb_put(const void *arg_key, uint32_t arg_key_size,
     const void *arg_value, uint32_t arg_value_size, int *notfoundp)
 {
-	static DBT key, value;
 	DB *db = g.bdb;
 	DBC *dbc = g.dbc;
 	int ret;
@@ -181,8 +178,6 @@ bdb_put(const void *arg_key, uint32_t arg_key_size,
 int
 bdb_del(uint64_t keyno, int *notfoundp)
 {
-	static DBT value;
-	static DBT key;
 	DB *db = g.bdb;
 	DBC *dbc = g.dbc;
 	int ret;
