@@ -18,10 +18,12 @@
  * Helper macros to go from a stack pointer at level i, pointing into a next
  * array, to insert node containing that next array.
  */
+#undef	PREV_ITEM
 #define	PREV_ITEM(ins_head, insp, i)					\
 	(((insp) == &(ins_head)->head[i] || (insp) == NULL) ? NULL :	\
 	    (WT_INSERT *)((char *)((insp) - (i)) - offsetof(WT_INSERT, next)))
 
+#undef	PREV_INS
 #define	PREV_INS(cbt, i)						\
 	PREV_ITEM((cbt)->ins_head, (cbt)->ins_stack[(i)], (i))
 
