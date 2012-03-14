@@ -105,6 +105,7 @@ main(int argc, char *argv[])
 			return (EXIT_FAILURE);
 
 		wts_load();			/* Load initial records */
+
 						/* Close, verify */
 		if (wts_teardown() || wts_verify("post-bulk verify"))
 			goto err;
