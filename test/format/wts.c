@@ -162,7 +162,7 @@ wts_dump(const char *tag, int dump_bdb)
 		break;
 	}
 	if ((ret = system(cmd)) != 0)
-		die(WEXITSTATUS(ret), "%s: dump comparison failed", tag);
+		die(ret, "%s: dump comparison failed", tag);
 }
 
 void
@@ -184,7 +184,7 @@ wts_salvage(void)
 	    "rm -rf __slvg.copy && "
 	    "mkdir __slvg.copy && "
 	    "cp WiredTiger* __wt __slvg.copy/")) != 0)
-		die(WEXITSTATUS(ret), "salvage cleanup step failed");
+		die(ret, "salvage cleanup step failed");
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
