@@ -234,13 +234,14 @@ namespace mongo {
     MatchCountingExplainStrategy::MatchCountingExplainStrategy
     ( const ExplainQueryInfo::AncillaryInfo &ancillaryInfo ) :
     ExplainRecordingStrategy( ancillaryInfo ),
-    _matches() {
+    _orderedMatches() {
     }
     
-    void MatchCountingExplainStrategy::noteIterate( bool match, bool loadedObject, bool chunkSkip ) {
-        _noteIterate( match, loadedObject, chunkSkip );
-        if ( match ) {
-            ++_matches;
+    void MatchCountingExplainStrategy::noteIterate( bool match, bool orderedMatch,
+                                                   bool loadedObject, bool chunkSkip ) {
+        _noteIterate( match, orderedMatch, loadedObject, chunkSkip );
+        if ( orderedMatch ) {
+            ++_orderedMatches;
         }
     }
     
@@ -256,7 +257,8 @@ namespace mongo {
         _explainInfo->notePlan( *_cursor, scanAndOrder, indexOnly );
     }
 
-    void SimpleCursorExplainStrategy::_noteIterate( bool match, bool loadedObject, bool chunkSkip ) {
+    void SimpleCursorExplainStrategy::_noteIterate( bool match, bool orderedMatch,
+                                                   bool loadedObject, bool chunkSkip ) {
         _explainInfo->noteIterate( match, loadedObject, chunkSkip, *_cursor );
     }
 
@@ -276,9 +278,11 @@ namespace mongo {
     _cursor( cursor ) {
     }
     
-    void QueryOptimizerCursorExplainStrategy::_noteIterate( bool match, bool loadedObject,
-                                                          bool chunkSkip ) {
-        _cursor->noteIterate( match, loadedObject, chunkSkip );
+    void QueryOptimizerCursorExplainStrategy::_noteIterate( bool match, bool orderedMatch,
+                                                           bool loadedObject, bool chunkSkip ) {
+        // Note ordered matches only; if an unordered plan is selected, the explain result will
+        // be updated with reviseN().
+        _cursor->noteIterate( orderedMatch, loadedObject, chunkSkip );
     }
 
     shared_ptr<ExplainQueryInfo> QueryOptimizerCursorExplainStrategy::_doneQueryInfo() {
@@ -336,14 +340,14 @@ namespace mongo {
     _bufferedMatches() {
     }
     
-    bool OrderedBuildStrategy::handleMatch() {
+    bool OrderedBuildStrategy::handleMatch( bool &orderedMatch ) {
         DiskLoc loc = _cursor->currLoc();
         if ( _cursor->getsetdup( loc ) ) {
-            return false;
+            return orderedMatch = false;
         }
         if ( _skip > 0 ) {
             --_skip;
-            return false;
+            return orderedMatch = false;
         }
         // Explain does not obey soft limits, so matches should not be buffered.
         if ( !_parsedQuery.isExplain() ) {
@@ -351,7 +355,7 @@ namespace mongo {
                                    ( _parsedQuery.showDiskLoc() ? &loc : 0 ) );
             ++_bufferedMatches;
         }
-        return true;
+        return orderedMatch = true;
     }
     
     ReorderBuildStrategy::ReorderBuildStrategy( const ParsedQuery &parsedQuery,
@@ -363,17 +367,18 @@ namespace mongo {
     _bufferedMatches() {
     }
 
-    bool ReorderBuildStrategy::handleMatch() {
+    bool ReorderBuildStrategy::handleMatch( bool &orderedMatch ) {
+        orderedMatch = false;
         if ( _cursor->getsetdup( _cursor->currLoc() ) ) {
             return false;
         }
-        return _handleMatchNoDedup();
+        _handleMatchNoDedup();
+        return true;
     }
     
-    bool ReorderBuildStrategy::_handleMatchNoDedup() {
+    void ReorderBuildStrategy::_handleMatchNoDedup() {
         DiskLoc loc = _cursor->currLoc();
         _scanAndOrder->add( current( false ), _parsedQuery.showDiskLoc() ? &loc : 0 );
-        return false;
     }
 
     int ReorderBuildStrategy::rewriteMatches() {
@@ -412,18 +417,18 @@ namespace mongo {
     _reorderedMatches() {
     }
     
-    bool HybridBuildStrategy::handleMatch() {
+    bool HybridBuildStrategy::handleMatch( bool &orderedMatch ) {
         if ( !_queryOptimizerCursor->currentPlanScanAndOrderRequired() ) {
-            return _orderedBuild.handleMatch();
+            return _orderedBuild.handleMatch( orderedMatch );
         }
-        handleReorderMatch();
-        return false;
+        orderedMatch = false;
+        return handleReorderMatch();
     }
     
-    void HybridBuildStrategy::handleReorderMatch() {
+    bool HybridBuildStrategy::handleReorderMatch() {
         DiskLoc loc = _cursor->currLoc();
         if ( _scanAndOrderDups.getsetdup( loc ) ) {
-            return;
+            return false;
         }
         try {
             _reorderBuild._handleMatchNoDedup();
@@ -435,11 +440,12 @@ namespace mongo {
                 }
                 else if ( _queryOptimizerCursor->runningInitialInOrderPlan() ) {
                     _queryOptimizerCursor->abortOutOfOrderPlans();
-                    return;
+                    return true;
                 }
             }
             throw;
-        }            
+        }
+        return true;
     }
     
     int HybridBuildStrategy::rewriteMatches() {
@@ -482,9 +488,10 @@ namespace mongo {
         if ( !chunkMatches() ) {
             return false;
         }
-        bool orderedMatch = _builder->handleMatch();
-        _explain->noteIterate( orderedMatch, true, false );
-        return true;
+        bool orderedMatch = false;
+        bool match = _builder->handleMatch( orderedMatch );
+        _explain->noteIterate( match, orderedMatch, true, false );
+        return match;
     }
 
     void QueryResponseBuilder::noteYield() {
@@ -497,7 +504,7 @@ namespace mongo {
 
     bool QueryResponseBuilder::enoughTotalResults() const {
         if ( _parsedQuery.isExplain() ) {
-            return _parsedQuery.enoughForExplain( _explain->matches() );
+            return _parsedQuery.enoughForExplain( _explain->orderedMatches() );
         }
         return ( _parsedQuery.enough( _builder->bufferedMatches() ) ||
                 _buf.len() >= MaxBytesToReturnToClientAtOnce );
@@ -584,7 +591,7 @@ namespace mongo {
         if ( _cursor->currentMatches( &details ) ) {
             return true;
         }
-        _explain->noteIterate( false, details._loadedObject, false );
+        _explain->noteIterate( false, false, details._loadedObject, false );
         return false;
     }
 
@@ -596,7 +603,7 @@ namespace mongo {
         if ( _chunkManager->belongsToMe( _cursor->current() ) ) {
             return true;
         }
-        _explain->noteIterate( false, true, true );
+        _explain->noteIterate( false, false, true, true );
         return false;
     }
     
