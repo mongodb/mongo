@@ -180,6 +180,10 @@ wts_rand(void)
 	char buf[64];
 	uint32_t r;
 
+	/* If we're threaded, it's not repeatable, ignore the log. */
+	if (!SINGLETHREADED)
+		return ((uint32_t)rand());
+
 	/*
 	 * We can entirely reproduce a run based on the random numbers used
 	 * in the initial run, plus the configuration files.  It would be
