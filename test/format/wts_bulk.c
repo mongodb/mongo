@@ -12,9 +12,9 @@ wts_load(void)
 {
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor;
+	WT_ITEM key, value;
 	WT_SESSION *session;
-	static WT_ITEM key, value;
-	uint8_t *keybuf;
+	uint8_t *keybuf, *valbuf;
 	int ret;
 
 	conn = g.wts_conn;
@@ -34,6 +34,8 @@ wts_load(void)
 	/* Set up the default key buffer. */
 	memset(&key, 0, sizeof(key));   
 	key_gen_setup(&keybuf);
+	memset(&value, 0, sizeof(value));
+	val_gen_setup(&valbuf);
 
 	for (;;) {
 		if (++g.key_cnt > g.c_rows) {
@@ -45,9 +47,10 @@ wts_load(void)
 		if (g.key_cnt % 100 == 0)
 			track("bulk load", g.key_cnt);
 
-		key.data = keybuf;
 		key_gen(keybuf, &key.size, (uint64_t)g.key_cnt, 0);
-		value_gen(&value.data, &value.size, (uint64_t)g.key_cnt);
+		key.data = keybuf;
+		value_gen(valbuf, &value.size, (uint64_t)g.key_cnt);
+		value.data = valbuf;
 
 		switch (g.c_file_type) {
 		case FIX:

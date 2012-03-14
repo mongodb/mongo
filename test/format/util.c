@@ -65,12 +65,10 @@ key_gen(uint8_t *key, uint32_t *sizep, uint64_t keyno, int insert)
 }
 
 void
-value_gen(void *valuep, uint32_t *sizep, uint64_t keyno)
+val_gen_setup(uint8_t **valp)
 {
-	static size_t blen = 0;
-	static const char *dup_data = "duplicate data item";
-	static u_char *buf = NULL;
-	size_t i;
+	uint8_t *val;
+	size_t i, len;
 
 	/*
 	 * Set initial buffer contents to reconizable text.
@@ -79,17 +77,20 @@ value_gen(void *valuep, uint32_t *sizep, uint64_t keyno)
 	 * into the buffer by a few extra bytes, used to generate different
 	 * data for column-store run-length encoded files.
 	 */
-	if (blen < g.c_value_max + 10) {
-		if (buf != NULL) {
-			free(buf);
-			buf = NULL;
-		}
-		blen = g.c_value_max + 10;
-		if ((buf = malloc(blen)) == NULL)
-			die("malloc", errno);
-		for (i = 0; i < blen; ++i)
-			buf[i] = (u_char)"ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i % 26];
-	}
+	len = g.c_value_max + 20;
+	if ((val = malloc(len)) == NULL)
+		die("malloc", errno);
+	for (i = 0; i < len; ++i)
+		val[i] = (u_char)"ABCDEFGHIJKLMNOPQRSTUVWXYZ"[i % 26];
+
+	*valp = val;
+}
+
+void
+value_gen(uint8_t *val, uint32_t *sizep, uint64_t keyno)
+{
+	static const char *dup_data = "duplicate data item";
+	size_t i;
 
 	/*
 	 * Fixed-length records: take the low N bits from the last digit of
@@ -97,16 +98,15 @@ value_gen(void *valuep, uint32_t *sizep, uint64_t keyno)
 	 */
 	if (g.c_file_type == FIX) {
 		switch (g.c_bitcnt) {
-		case 8: buf[0] = MMRAND(1, 0xff); break;
-		case 7: buf[0] = MMRAND(1, 0x7f); break;
-		case 6: buf[0] = MMRAND(1, 0x3f); break;
-		case 5: buf[0] = MMRAND(1, 0x1f); break;
-		case 4: buf[0] = MMRAND(1, 0x0f); break;
-		case 3: buf[0] = MMRAND(1, 0x07); break;
-		case 2: buf[0] = MMRAND(1, 0x03); break;
-		case 1: buf[0] = 1; break;
+		case 8: val[0] = MMRAND(1, 0xff); break;
+		case 7: val[0] = MMRAND(1, 0x7f); break;
+		case 6: val[0] = MMRAND(1, 0x3f); break;
+		case 5: val[0] = MMRAND(1, 0x1f); break;
+		case 4: val[0] = MMRAND(1, 0x0f); break;
+		case 3: val[0] = MMRAND(1, 0x07); break;
+		case 2: val[0] = MMRAND(1, 0x03); break;
+		case 1: val[0] = 1; break;
 		}
-		*(void **)valuep = buf;
 		*sizep = 1;
 		return;
 	}
@@ -116,7 +116,7 @@ value_gen(void *valuep, uint32_t *sizep, uint64_t keyno)
 	 * test that by inserting a zero-length data item every so often.
 	 */
 	if (++keyno % 63 == 0) {
-		*(void **)valuep = buf;
+		val[0] = '\0';
 		*sizep = 0;
 		return;
 	}
@@ -132,14 +132,13 @@ value_gen(void *valuep, uint32_t *sizep, uint64_t keyno)
 	if (g.c_file_type == VAR &&
 	    g.c_repeat_data_pct != 0 &&
 	    (u_int)wts_rand() % 100 > g.c_repeat_data_pct) {
-		*(void **)valuep = (void *)dup_data;
+		(void)strcpy(val, dup_data);
 		*sizep = (uint32_t)strlen(dup_data);
 		return;
 	}
 
-	snprintf((char *)buf, blen, "%010" PRIu64, keyno);
-	buf[10] = '/';
-	*(void **)valuep = buf;
+	sprintf(val, "%010" PRIu64, keyno);
+	val[10] = '/';
 	*sizep = MMRAND(g.c_value_min, g.c_value_max);
 }
 

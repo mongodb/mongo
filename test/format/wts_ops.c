@@ -8,14 +8,14 @@
 #include "format.h"
 
 static int   col_del(WT_CURSOR *, WT_ITEM *, uint64_t, int *);
-static int   col_insert(WT_CURSOR *, WT_ITEM *, uint64_t *);
-static int   col_put(WT_CURSOR *, WT_ITEM *, uint64_t);
+static int   col_insert(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t *);
+static int   col_put(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
 static int   nextprev(WT_CURSOR *, int, int *);
 static int   notfound_chk(const char *, int, int, uint64_t);
 static void *ops(void *);
 static int   read_row(WT_CURSOR *, WT_ITEM *, uint64_t);
 static int   row_del(WT_CURSOR *, WT_ITEM *, uint64_t, int *);
-static int   row_put(WT_CURSOR *, WT_ITEM *, uint64_t, int);
+static int   row_put(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t, int);
 static void  print_item(const char *, WT_ITEM *);
 
 /*
@@ -84,19 +84,21 @@ ops(void *arg)
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor, *cursor_insert;
 	WT_SESSION *session;
-	WT_ITEM key;
+	WT_ITEM key, value;
 	time_t now;
 	uint64_t cnt, keyno;
 	uint32_t op;
 	u_int np;
 	int dir, insert, notfound, ret;
-	uint8_t *keybuf;
+	uint8_t *keybuf, *valbuf;
 
 	conn = arg;
 
-	/* Set up the default key buffer. */
+	/* Set up the default key and value buffers. */
 	memset(&key, 0, sizeof(key));
 	key_gen_setup(&keybuf);
+	memset(&value, 0, sizeof(value));
+	val_gen_setup(&valbuf);
 
 	/* Open a session. */
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
@@ -133,8 +135,9 @@ ops(void *arg)
 
 		insert = notfound = 0;
 
-		key.data = keybuf;
 		keyno = MMRAND(1, g.rows);
+		key.data = keybuf;
+		value.data = valbuf;
 
 		/*
 		 * Perform some number of operations: the percentage of deletes,
@@ -163,7 +166,7 @@ ops(void *arg)
 		} else if (op < g.c_delete_pct + g.c_insert_pct) {
 			switch (g.c_file_type) {
 			case ROW:
-				if (row_put(cursor, &key, keyno, 1))
+				if (row_put(cursor, &key, &value, keyno, 1))
 					goto err;
 				break;
 			case FIX:
@@ -173,7 +176,8 @@ ops(void *arg)
 				 * pages pinned.
 				 */
 				cursor->reset(cursor);
-				if (col_insert(cursor_insert, &key, &keyno))
+				if (col_insert(
+				    cursor_insert, &key, &value, &keyno))
 					goto err;
 				insert = 1;
 				break;
@@ -182,12 +186,12 @@ ops(void *arg)
 		    op < g.c_delete_pct + g.c_insert_pct + g.c_write_pct) {
 			switch (g.c_file_type) {
 			case ROW:
-				if (row_put(cursor, &key, keyno, 0))
+				if (row_put(cursor, &key, &value, keyno, 0))
 					goto err;
 				break;
 			case FIX:
 			case VAR:
-				if (col_put(cursor, &key, keyno))
+				if (col_put(cursor, &key, &value, keyno))
 					goto err;
 				break;
 			}
@@ -384,7 +388,7 @@ read_row(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 static int
 nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
 {
-	static WT_ITEM key, value, bdb_key, bdb_value;
+	WT_ITEM key, value, bdb_key, bdb_value;
 	WT_SESSION *session;
 	uint64_t keyno;
 	int notfound, ret;
@@ -490,16 +494,16 @@ nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
  *	Update an element in a row-store file.
  */
 static int
-row_put(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int insert)
+row_put(
+    WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno, int insert)
 {
-	static WT_ITEM value;
 	WT_SESSION *session;
 	int notfound, ret;
 
 	session = cursor->session;
 
 	key_gen((uint8_t *)key->data, &key->size, keyno, insert);
-	value_gen(&value.data, &value.size, keyno);
+	value_gen((uint8_t *)value->data, &value->size, keyno);
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS)
@@ -507,10 +511,10 @@ row_put(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int insert)
 		    insert ? "insertK" : "putK",
 		    (int)key->size, (char *)key->data,
 		    insert ? "insertV" : "putV",
-		    (int)value.size, (char *)value.data);
+		    (int)value->size, (char *)value->data);
 
 	cursor->set_key(cursor, key);
-	cursor->set_value(cursor, &value);
+	cursor->set_value(cursor, value);
 	ret = cursor->insert(cursor);
 	if (ret != 0 && ret != WT_NOTFOUND) {
 		fprintf(stderr,
@@ -523,7 +527,7 @@ row_put(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int insert)
 	if (!SINGLETHREADED)
 		return (0);
 
-	if (bdb_put(key->data, key->size, value.data, value.size, &notfound))
+	if (bdb_put(key->data, key->size, value->data, value->size, &notfound))
 		return (1);
 
 	NTF_CHK(notfound_chk("row_put", ret, notfound, keyno));
@@ -535,15 +539,14 @@ row_put(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int insert)
  *	Update an element in a column-store file.
  */
 static int
-col_put(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
+col_put(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 {
-	static WT_ITEM value;
 	WT_SESSION *session;
 	int notfound, ret;
 
 	session = cursor->session;
 
-	value_gen(&value.data, &value.size, keyno);
+	value_gen((uint8_t *)value->data, &value->size, keyno);
 
 	/* Log the operation */
 	if (g.logging == LOG_OPS) {
@@ -551,19 +554,19 @@ col_put(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 			(void)session->msg_printf(session,
 			    "%-10s%" PRIu64 " {0x%02" PRIx8 "}",
 			    "update", keyno,
-			    ((uint8_t *)value.data)[0]);
+			    ((uint8_t *)value->data)[0]);
 		else
 			(void)session->msg_printf(session,
 			    "%-10s%" PRIu64 " {%.*s}",
 			    "update", keyno,
-			    (int)value.size, (char *)value.data);
+			    (int)value->size, (char *)value->data);
 	}
 
 	cursor->set_key(cursor, keyno);
 	if (g.c_file_type == FIX)
-		cursor->set_value(cursor, *(uint8_t *)value.data);
+		cursor->set_value(cursor, *(uint8_t *)value->data);
 	else
-		cursor->set_value(cursor, &value);
+		cursor->set_value(cursor, value);
 	ret = cursor->insert(cursor);
 	if (ret != 0 && ret != WT_NOTFOUND) {
 		fprintf(stderr,
@@ -576,7 +579,7 @@ col_put(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
 		return (0);
 
 	key_gen((uint8_t *)key->data, &key->size, keyno, 0);
-	if (bdb_put(key->data, key->size, value.data, value.size, &notfound))
+	if (bdb_put(key->data, key->size, value->data, value->size, &notfound))
 		return (1);
 
 	NTF_CHK(notfound_chk("col_put", ret, notfound, keyno));
@@ -588,21 +591,20 @@ col_put(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno)
  *	Insert an element in a column-store file.
  */
 static int
-col_insert(WT_CURSOR *cursor, WT_ITEM *key, uint64_t *keynop)
+col_insert(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t *keynop)
 {
-	static WT_ITEM value;
 	WT_SESSION *session;
 	uint64_t keyno;
 	int notfound, ret;
 
 	session = cursor->session;
 
-	value_gen(&value.data, &value.size, g.rows + 1);
+	value_gen((uint8_t *)value->data, &value->size, g.rows + 1);
 
 	if (g.c_file_type == FIX)
-		cursor->set_value(cursor, *(uint8_t *)value.data);
+		cursor->set_value(cursor, *(uint8_t *)value->data);
 	else
-		cursor->set_value(cursor, &value);
+		cursor->set_value(cursor, value);
 	ret = cursor->insert(cursor);
 	if (ret != 0) {
 		fprintf(stderr, "%s: col_insert: %s\n",
@@ -629,12 +631,12 @@ col_insert(WT_CURSOR *cursor, WT_ITEM *key, uint64_t *keynop)
 			(void)session->msg_printf(session,
 			    "%-10s%" PRIu64 " {0x%02" PRIx8 "}",
 			    "insert", keyno,
-			    ((uint8_t *)value.data)[0]);
+			    ((uint8_t *)value->data)[0]);
 		else
 			(void)session->msg_printf(session,
 			    "%-10s%" PRIu64 " {%.*s}",
 			    "insert", keyno,
-			    (int)value.size, (char *)value.data);
+			    (int)value->size, (char *)value->data);
 	}
 
 	if (!SINGLETHREADED)
@@ -642,7 +644,7 @@ col_insert(WT_CURSOR *cursor, WT_ITEM *key, uint64_t *keynop)
 
 	key_gen((uint8_t *)key->data, &key->size, keyno, 0);
 	return (bdb_put(
-	    key->data, key->size, value.data, value.size, &notfound) ? 1 : 0);
+	    key->data, key->size, value->data, value->size, &notfound) ? 1 : 0);
 }
 
 /*
