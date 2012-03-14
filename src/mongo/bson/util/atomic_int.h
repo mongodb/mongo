@@ -108,7 +108,7 @@ namespace mongo {
         return atomic_int_helper(&x, -1);
     }
     void AtomicUInt::signedAdd(int by) {
-        return atomic_int_helper(&x, by);
+        atomic_int_helper(&x, by);
     }
 #else
 #  error "unsupported compiler or platform"
