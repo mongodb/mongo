@@ -353,16 +353,6 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 		memset(cache->evict, 0, cache->evict_allocated);
 
 		if (F_ISSET(er, WT_EVICT_REQ_PAGE)) {
-			/*
-			 * If we are pushing out a page, that page might be our
-			 * eviction location.  If so, try to move on to the
-			 * next page, or restart the walk if that fails
-			 * (evict_page will be set to NULL).
-			 */
-			if (session->btree->evict_page == er->page)
-				(void)__wt_tree_np(
-				    session, &session->btree->evict_page, 1, 1);
-
 			ref = er->page->ref;
 			WT_ASSERT(session, ref->page == er->page);
 			WT_ASSERT(session, ref->state == WT_REF_EVICTING);
@@ -594,19 +584,11 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 			goto skip;
 
 		/*
-		 * Root and pinned pages can't be evicted.
-		 * !!!
-		 * It's still in flux if root pages are pinned or not, test for
-		 * both cases for now.
+		 * Root and pinned pages can't be evicted, nor can locked
+		 * pages: we would skip them later, and they just fill up the
+		 * eviction list for no benefit.
 		 */
-		if (WT_PAGE_IS_ROOT(page))
-			goto skip;
-
-		/*
-		 * Skip locked pages: we would skip them later, and they just
-		 * fill up the eviction list for no benefit.
-		 */
-		if (page->ref->state != WT_REF_MEM)
+		if (WT_PAGE_IS_ROOT(page) || page->ref->state != WT_REF_MEM)
 			goto skip;
 
 		/*
@@ -733,15 +715,6 @@ __evict_get_page(
 
 		*pagep = evict->page;
 		*btreep = evict->btree;
-
-		/*
-		 * If we're evicting our current eviction point in the file,
-		 * try to move on to the next page, or restart the walk if that
-		 * fails (evict_page will be set to NULL).
-		 */
-		if (*pagep == evict->btree->evict_page)
-			(void)__wt_tree_np(
-			    session, &evict->btree->evict_page, 1, 1);
 
 		/*
 		 * Paranoia: remove the entry so we never try and reconcile

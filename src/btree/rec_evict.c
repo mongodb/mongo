@@ -335,6 +335,9 @@ __rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 			__wt_page_out(session, mod->u.split, 0);
 	}
 
+	if (session->btree->evict_page == page)
+		session->btree->evict_page = NULL;
+
 	/* Discard the page itself. */
 	__wt_page_out(session, page, 0);
 
