@@ -560,7 +560,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 	WT_BTREE *btree;
 	WT_CACHE *cache;
 	WT_PAGE *page;
-	int i, restarted_once;
+	int i, restarts, ret;
 
 	btree = session->btree;
 	cache = S2C(session)->cache;
@@ -578,28 +578,29 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 	 * We can't evict the page just returned to us, it marks our place in
 	 * the tree.  So, always stay one page ahead of the page being returned.
 	 */
-	i = restarted_once = 0;
-	do {
-		if ((page = btree->evict_page) == NULL)
-			goto skip;
+	for (i = restarts = ret = 0;
+	    i < WT_EVICT_WALK_PER_TABLE && restarts <= 1 && ret == 0;
+	    ret = __wt_tree_np(session, &btree->evict_page, 1, 1)) {
+		if ((page = btree->evict_page) == NULL) {
+			++restarts;
+			continue;
+		}
 
 		/*
 		 * Root and pinned pages can't be evicted, nor can locked
 		 * pages: we would skip them later, and they just fill up the
 		 * eviction list for no benefit.
-		 */
-		if (WT_PAGE_IS_ROOT(page) || page->ref->state != WT_REF_MEM)
-			goto skip;
-
-		/*
+		 *
 		 * Skip pages that must be merged into their parents.  Don't
 		 * skip pages marked WT_PAGE_REC_EMPTY or SPLIT: updates after
 		 * their last reconciliation may have changed their state and
 		 * only the eviction code can check whether they should really
 		 * be skipped.
 		 */
-		if (F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE))
-			goto skip;
+		if (WT_PAGE_IS_ROOT(page) ||
+		    page->ref->state != WT_REF_MEM ||
+		    F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE))
+			continue;
 
 		WT_VERBOSE(session, evictserver,
 		    "select: %p, size %" PRIu32, page, page->memory_footprint);
@@ -608,13 +609,9 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		cache->evict[*slotp].page = page;
 		cache->evict[*slotp].btree = btree;
 		++*slotp;
+	}
 
-skip:		WT_RET(__wt_tree_np(session, &btree->evict_page, 1, 1));
-		if (btree->evict_page == NULL && restarted_once++ == 1)
-			break;
-	} while (i < WT_EVICT_WALK_PER_TABLE);
-
-	return (0);
+	return (ret);
 }
 
 /*
