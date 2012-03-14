@@ -3860,29 +3860,29 @@ namespace QueryOptimizerCursorTests {
             virtual void checkExplain() {
                 ASSERT( !_explain[ "cursor" ].eoo() );
                 ASSERT( !_explain[ "isMultiKey" ].Bool() );
-                ASSERT_EQUALS( 0, _explain[ "n" ].Long() );
-                ASSERT_EQUALS( 0, _explain[ "nscannedObjects" ].Long() );
-                ASSERT_EQUALS( 2, _explain[ "nscanned" ].Long() );
+                ASSERT_EQUALS( 0, _explain[ "n" ].number() );
+                ASSERT_EQUALS( 0, _explain[ "nscannedObjects" ].number() );
+                ASSERT_EQUALS( 2, _explain[ "nscanned" ].number() );
                 ASSERT( !_explain[ "scanAndOrder" ].Bool() );
                 ASSERT( !_explain[ "indexOnly" ].Bool() );
                 ASSERT_EQUALS( 0, _explain[ "nYields" ].Int() );
-                ASSERT_EQUALS( 0, _explain[ "nChunkSkips" ].Long() );
+                ASSERT_EQUALS( 0, _explain[ "nChunkSkips" ].number() );
                 ASSERT( !_explain[ "millis" ].eoo() );
                 ASSERT( !_explain[ "indexBounds" ].eoo() );
                 ASSERT_EQUALS( 2U, _explain[ "allPlans" ].Array().size() );
 
                 BSONObj plan1 = _explain[ "allPlans" ].Array()[ 0 ].Obj();
                 ASSERT_EQUALS( "BtreeCursor a_1", plan1[ "cursor" ].String() );
-                ASSERT_EQUALS( 0, plan1[ "n" ].Long() );
-                ASSERT_EQUALS( 0, plan1[ "nscannedObjects" ].Long() );
-                ASSERT_EQUALS( 1, plan1[ "nscanned" ].Long() );
+                ASSERT_EQUALS( 0, plan1[ "n" ].number() );
+                ASSERT_EQUALS( 0, plan1[ "nscannedObjects" ].number() );
+                ASSERT_EQUALS( 1, plan1[ "nscanned" ].number() );
                 ASSERT_EQUALS( fromjson( "{a:[[1,1]]}" ), plan1[ "indexBounds" ].Obj() );
 
                 BSONObj plan2 = _explain[ "allPlans" ].Array()[ 1 ].Obj();
                 ASSERT_EQUALS( "BasicCursor", plan2[ "cursor" ].String() );
-                ASSERT_EQUALS( 0, plan2[ "n" ].Long() );
-                ASSERT_EQUALS( 0, plan2[ "nscannedObjects" ].Long() );
-                ASSERT_EQUALS( 1, plan2[ "nscanned" ].Long() );
+                ASSERT_EQUALS( 0, plan2[ "n" ].number() );
+                ASSERT_EQUALS( 0, plan2[ "nscannedObjects" ].number() );
+                ASSERT_EQUALS( 1, plan2[ "nscanned" ].number() );
                 ASSERT_EQUALS( BSONObj(), plan2[ "indexBounds" ].Obj() );
             }
         };
@@ -3897,29 +3897,29 @@ namespace QueryOptimizerCursorTests {
             virtual void checkExplain() {
                 ASSERT( !_explain[ "cursor" ].eoo() );
                 ASSERT( !_explain[ "isMultiKey" ].Bool() );
-                ASSERT_EQUALS( 0, _explain[ "n" ].Long() );
-                ASSERT_EQUALS( 0, _explain[ "nscannedObjects" ].Long() );
-                ASSERT_EQUALS( 0, _explain[ "nscanned" ].Long() );
+                ASSERT_EQUALS( 0, _explain[ "n" ].number() );
+                ASSERT_EQUALS( 0, _explain[ "nscannedObjects" ].number() );
+                ASSERT_EQUALS( 0, _explain[ "nscanned" ].number() );
                 ASSERT( !_explain[ "scanAndOrder" ].Bool() );
                 ASSERT( !_explain[ "indexOnly" ].Bool() );
                 ASSERT_EQUALS( 0, _explain[ "nYields" ].Int() );
-                ASSERT_EQUALS( 0, _explain[ "nChunkSkips" ].Long() );
+                ASSERT_EQUALS( 0, _explain[ "nChunkSkips" ].number() );
                 ASSERT( !_explain[ "millis" ].eoo() );
                 ASSERT( !_explain[ "indexBounds" ].eoo() );
                 ASSERT_EQUALS( 2U, _explain[ "allPlans" ].Array().size() );
                 
                 BSONObj plan1 = _explain[ "allPlans" ].Array()[ 0 ].Obj();
                 ASSERT_EQUALS( "BtreeCursor a_1", plan1[ "cursor" ].String() );
-                ASSERT_EQUALS( 0, plan1[ "n" ].Long() );
-                ASSERT_EQUALS( 0, plan1[ "nscannedObjects" ].Long() );
-                ASSERT_EQUALS( 0, plan1[ "nscanned" ].Long() );
+                ASSERT_EQUALS( 0, plan1[ "n" ].number() );
+                ASSERT_EQUALS( 0, plan1[ "nscannedObjects" ].number() );
+                ASSERT_EQUALS( 0, plan1[ "nscanned" ].number() );
                 ASSERT_EQUALS( fromjson( "{a:[[1,1]]}" ), plan1[ "indexBounds" ].Obj() );
                 
                 BSONObj plan2 = _explain[ "allPlans" ].Array()[ 1 ].Obj();
                 ASSERT_EQUALS( "BasicCursor", plan2[ "cursor" ].String() );
-                ASSERT_EQUALS( 0, plan2[ "n" ].Long() );
-                ASSERT_EQUALS( 0, plan2[ "nscannedObjects" ].Long() );
-                ASSERT_EQUALS( 0, plan2[ "nscanned" ].Long() );
+                ASSERT_EQUALS( 0, plan2[ "n" ].number() );
+                ASSERT_EQUALS( 0, plan2[ "nscannedObjects" ].number() );
+                ASSERT_EQUALS( 0, plan2[ "nscanned" ].number() );
                 ASSERT_EQUALS( BSONObj(), plan2[ "indexBounds" ].Obj() );                
             }
         };
@@ -3940,19 +3940,19 @@ namespace QueryOptimizerCursorTests {
             }
             virtual void checkExplain() {
                 ASSERT_EQUALS( "BtreeCursor a_1", _explain[ "cursor" ].String() );
-                ASSERT_EQUALS( 1, _explain[ "n" ].Long() );
-                ASSERT_EQUALS( 2, _explain[ "nscannedObjects" ].Long() );
-                ASSERT_EQUALS( 2, _explain[ "nscanned" ].Long() );
+                ASSERT_EQUALS( 1, _explain[ "n" ].number() );
+                ASSERT_EQUALS( 2, _explain[ "nscannedObjects" ].number() );
+                ASSERT_EQUALS( 2, _explain[ "nscanned" ].number() );
 
                 BSONObj plan1 = _explain[ "allPlans" ].Array()[ 0 ].Obj();
-                ASSERT_EQUALS( 1, plan1[ "n" ].Long() );
-                ASSERT_EQUALS( 1, plan1[ "nscannedObjects" ].Long() );
-                ASSERT_EQUALS( 1, plan1[ "nscanned" ].Long() );
+                ASSERT_EQUALS( 1, plan1[ "n" ].number() );
+                ASSERT_EQUALS( 1, plan1[ "nscannedObjects" ].number() );
+                ASSERT_EQUALS( 1, plan1[ "nscanned" ].number() );
 
                 BSONObj plan2 = _explain[ "allPlans" ].Array()[ 1 ].Obj();
-                ASSERT_EQUALS( 1, plan2[ "n" ].Long() );
-                ASSERT_EQUALS( 1, plan2[ "nscannedObjects" ].Long() );
-                ASSERT_EQUALS( 1, plan2[ "nscanned" ].Long() );
+                ASSERT_EQUALS( 1, plan2[ "n" ].number() );
+                ASSERT_EQUALS( 1, plan2[ "nscannedObjects" ].number() );
+                ASSERT_EQUALS( 1, plan2[ "nscanned" ].number() );
             }
         };
         
@@ -3965,20 +3965,20 @@ namespace QueryOptimizerCursorTests {
             }
             virtual void checkExplain() {
                 ASSERT_EQUALS( "BtreeCursor a_1", _explain[ "cursor" ].String() );
-                ASSERT_EQUALS( 0, _explain[ "n" ].Long() ); // needs to be set with noteIterate()
-                ASSERT_EQUALS( 0, _explain[ "nscannedObjects" ].Long() );
-                ASSERT_EQUALS( 3, _explain[ "nscanned" ].Long() );
+                ASSERT_EQUALS( 0, _explain[ "n" ].number() ); // needs to be set with noteIterate()
+                ASSERT_EQUALS( 0, _explain[ "nscannedObjects" ].number() );
+                ASSERT_EQUALS( 3, _explain[ "nscanned" ].number() );
 
                 BSONObj plan1 = _explain[ "allPlans" ].Array()[ 0 ].Obj();
-                ASSERT_EQUALS( 2, plan1[ "n" ].Long() );
-                ASSERT_EQUALS( 2, plan1[ "nscannedObjects" ].Long() );
-                ASSERT_EQUALS( 2, plan1[ "nscanned" ].Long() );
+                ASSERT_EQUALS( 2, plan1[ "n" ].number() );
+                ASSERT_EQUALS( 2, plan1[ "nscannedObjects" ].number() );
+                ASSERT_EQUALS( 2, plan1[ "nscanned" ].number() );
                 
                 // Not fully incremented without checking for matches.
                 BSONObj plan2 = _explain[ "allPlans" ].Array()[ 1 ].Obj();
-                ASSERT_EQUALS( 1, plan2[ "n" ].Long() );
-                ASSERT_EQUALS( 1, plan2[ "nscannedObjects" ].Long() );
-                ASSERT_EQUALS( 1, plan2[ "nscanned" ].Long() );                
+                ASSERT_EQUALS( 1, plan2[ "n" ].number() );
+                ASSERT_EQUALS( 1, plan2[ "nscannedObjects" ].number() );
+                ASSERT_EQUALS( 1, plan2[ "nscanned" ].number() );                
             }
         };
         
@@ -3994,20 +3994,20 @@ namespace QueryOptimizerCursorTests {
             }
             virtual void checkExplain() {
                 ASSERT_EQUALS( "BtreeCursor a_1", _explain[ "cursor" ].String() );
-                ASSERT_EQUALS( 0, _explain[ "n" ].Long() ); // needs to be set with noteIterate()
-                ASSERT_EQUALS( 0, _explain[ "nscannedObjects" ].Long() );
-                ASSERT_EQUALS( 4, _explain[ "nscanned" ].Long() );
+                ASSERT_EQUALS( 0, _explain[ "n" ].number() ); // needs to be set with noteIterate()
+                ASSERT_EQUALS( 0, _explain[ "nscannedObjects" ].number() );
+                ASSERT_EQUALS( 4, _explain[ "nscanned" ].number() );
                 
                 BSONObj plan1 = _explain[ "allPlans" ].Array()[ 0 ].Obj();
-                ASSERT_EQUALS( 2, plan1[ "n" ].Long() );
+                ASSERT_EQUALS( 2, plan1[ "n" ].number() );
                 // nscannedObjects are not deduped.
-                ASSERT_EQUALS( 6, plan1[ "nscannedObjects" ].Long() );
-                ASSERT_EQUALS( 2, plan1[ "nscanned" ].Long() );
+                ASSERT_EQUALS( 6, plan1[ "nscannedObjects" ].number() );
+                ASSERT_EQUALS( 2, plan1[ "nscanned" ].number() );
                 
                 BSONObj plan2 = _explain[ "allPlans" ].Array()[ 1 ].Obj();
-                ASSERT_EQUALS( 2, plan2[ "n" ].Long() );
-                ASSERT_EQUALS( 6, plan2[ "nscannedObjects" ].Long() );
-                ASSERT_EQUALS( 2, plan2[ "nscanned" ].Long() );                
+                ASSERT_EQUALS( 2, plan2[ "n" ].number() );
+                ASSERT_EQUALS( 6, plan2[ "nscannedObjects" ].number() );
+                ASSERT_EQUALS( 2, plan2[ "nscanned" ].number() );                
             }
         };
         
@@ -4019,19 +4019,19 @@ namespace QueryOptimizerCursorTests {
             }
             virtual void checkExplain() {
                 ASSERT_EQUALS( "BtreeCursor a_1", _explain[ "cursor" ].String() );
-                ASSERT_EQUALS( 1, _explain[ "n" ].Long() );
-                ASSERT_EQUALS( 1, _explain[ "nscannedObjects" ].Long() );
-                ASSERT_EQUALS( 2, _explain[ "nscanned" ].Long() );
+                ASSERT_EQUALS( 1, _explain[ "n" ].number() );
+                ASSERT_EQUALS( 1, _explain[ "nscannedObjects" ].number() );
+                ASSERT_EQUALS( 2, _explain[ "nscanned" ].number() );
                 
                 BSONObj plan1 = _explain[ "allPlans" ].Array()[ 0 ].Obj();
-                ASSERT_EQUALS( 1, plan1[ "n" ].Long() );
-                ASSERT_EQUALS( 1, plan1[ "nscannedObjects" ].Long() );
-                ASSERT_EQUALS( 1, plan1[ "nscanned" ].Long() );
+                ASSERT_EQUALS( 1, plan1[ "n" ].number() );
+                ASSERT_EQUALS( 1, plan1[ "nscannedObjects" ].number() );
+                ASSERT_EQUALS( 1, plan1[ "nscanned" ].number() );
                 
                 BSONObj plan2 = _explain[ "allPlans" ].Array()[ 1 ].Obj();
-                ASSERT_EQUALS( 0, plan2[ "n" ].Long() );
-                ASSERT_EQUALS( 0, plan2[ "nscannedObjects" ].Long() );
-                ASSERT_EQUALS( 1, plan2[ "nscanned" ].Long() );                
+                ASSERT_EQUALS( 0, plan2[ "n" ].number() );
+                ASSERT_EQUALS( 0, plan2[ "nscannedObjects" ].number() );
+                ASSERT_EQUALS( 1, plan2[ "nscanned" ].number() );                
             }
         };
         
@@ -4106,19 +4106,19 @@ namespace QueryOptimizerCursorTests {
                 ASSERT_EQUALS( _nYields, _explain[ "nYields" ].Int() );
                 
                 ASSERT_EQUALS( "BtreeCursor a_1", _explain[ "cursor" ].String() );
-                ASSERT_EQUALS( 5, _explain[ "n" ].Long() );
-                ASSERT_EQUALS( 10, _explain[ "nscannedObjects" ].Long() );
-                ASSERT_EQUALS( 10, _explain[ "nscanned" ].Long() );
+                ASSERT_EQUALS( 5, _explain[ "n" ].number() );
+                ASSERT_EQUALS( 10, _explain[ "nscannedObjects" ].number() );
+                ASSERT_EQUALS( 10, _explain[ "nscanned" ].number() );
                 
                 BSONObj plan1 = _explain[ "allPlans" ].Array()[ 0 ].Obj();
-                ASSERT_EQUALS( 5, plan1[ "n" ].Long() );
-                ASSERT_EQUALS( 5, plan1[ "nscannedObjects" ].Long() );
-                ASSERT_EQUALS( 5, plan1[ "nscanned" ].Long() );
+                ASSERT_EQUALS( 5, plan1[ "n" ].number() );
+                ASSERT_EQUALS( 5, plan1[ "nscannedObjects" ].number() );
+                ASSERT_EQUALS( 5, plan1[ "nscanned" ].number() );
                 
                 BSONObj plan2 = _explain[ "allPlans" ].Array()[ 1 ].Obj();
-                ASSERT_EQUALS( 5, plan2[ "n" ].Long() );
-                ASSERT_EQUALS( 5, plan2[ "nscannedObjects" ].Long() );
-                ASSERT_EQUALS( 5, plan2[ "nscanned" ].Long() );                
+                ASSERT_EQUALS( 5, plan2[ "n" ].number() );
+                ASSERT_EQUALS( 5, plan2[ "nscannedObjects" ].number() );
+                ASSERT_EQUALS( 5, plan2[ "nscanned" ].number() );                
             }
         protected:
             int _nYields;
@@ -4137,47 +4137,47 @@ namespace QueryOptimizerCursorTests {
             virtual void checkExplain() {
                 ASSERT_EQUALS( 18, _nYields );
 
-                ASSERT_EQUALS( 5, _explain[ "n" ].Long() );
-                ASSERT_EQUALS( 18, _explain[ "nscannedObjects" ].Long() );
-                ASSERT_EQUALS( 18, _explain[ "nscanned" ].Long() );
+                ASSERT_EQUALS( 5, _explain[ "n" ].number() );
+                ASSERT_EQUALS( 18, _explain[ "nscannedObjects" ].number() );
+                ASSERT_EQUALS( 18, _explain[ "nscanned" ].number() );
 
                 BSONObj clause1 = _explain[ "clauses" ].Array()[ 0 ].Obj();
                 ASSERT_EQUALS( "BtreeCursor a_1", clause1[ "cursor" ].String() );
-                ASSERT_EQUALS( 4, clause1[ "n" ].Long() );
-                ASSERT_EQUALS( 8, clause1[ "nscannedObjects" ].Long() );
-                ASSERT_EQUALS( 8, clause1[ "nscanned" ].Long() );
+                ASSERT_EQUALS( 4, clause1[ "n" ].number() );
+                ASSERT_EQUALS( 8, clause1[ "nscannedObjects" ].number() );
+                ASSERT_EQUALS( 8, clause1[ "nscanned" ].number() );
                 ASSERT_EQUALS( 8, clause1[ "nYields" ].Int() );
                 
                 BSONObj c1plan1 = clause1[ "allPlans" ].Array()[ 0 ].Obj();
                 ASSERT_EQUALS( "BtreeCursor a_1", c1plan1[ "cursor" ].String() );
-                ASSERT_EQUALS( 4, c1plan1[ "n" ].Long() );
-                ASSERT_EQUALS( 4, c1plan1[ "nscannedObjects" ].Long() );
-                ASSERT_EQUALS( 4, c1plan1[ "nscanned" ].Long() );
+                ASSERT_EQUALS( 4, c1plan1[ "n" ].number() );
+                ASSERT_EQUALS( 4, c1plan1[ "nscannedObjects" ].number() );
+                ASSERT_EQUALS( 4, c1plan1[ "nscanned" ].number() );
 
                 BSONObj c1plan2 = clause1[ "allPlans" ].Array()[ 1 ].Obj();
                 ASSERT_EQUALS( "BasicCursor", c1plan2[ "cursor" ].String() );
-                ASSERT_EQUALS( 4, c1plan2[ "n" ].Long() );
-                ASSERT_EQUALS( 4, c1plan2[ "nscannedObjects" ].Long() );
-                ASSERT_EQUALS( 4, c1plan2[ "nscanned" ].Long() );
+                ASSERT_EQUALS( 4, c1plan2[ "n" ].number() );
+                ASSERT_EQUALS( 4, c1plan2[ "nscannedObjects" ].number() );
+                ASSERT_EQUALS( 4, c1plan2[ "nscanned" ].number() );
 
                 BSONObj clause2 = _explain[ "clauses" ].Array()[ 1 ].Obj();
                 ASSERT_EQUALS( "BtreeCursor b_1", clause2[ "cursor" ].String() );
-                ASSERT_EQUALS( 1, clause2[ "n" ].Long() );
-                ASSERT_EQUALS( 10, clause2[ "nscannedObjects" ].Long() );
-                ASSERT_EQUALS( 10, clause2[ "nscanned" ].Long() );
+                ASSERT_EQUALS( 1, clause2[ "n" ].number() );
+                ASSERT_EQUALS( 10, clause2[ "nscannedObjects" ].number() );
+                ASSERT_EQUALS( 10, clause2[ "nscanned" ].number() );
                 ASSERT_EQUALS( 10, clause2[ "nYields" ].Int() );
 
                 BSONObj c2plan1 = clause2[ "allPlans" ].Array()[ 0 ].Obj();
                 ASSERT_EQUALS( "BtreeCursor b_1", c2plan1[ "cursor" ].String() );
-                ASSERT_EQUALS( 1, c2plan1[ "n" ].Long() );
-                ASSERT_EQUALS( 5, c2plan1[ "nscannedObjects" ].Long() );
-                ASSERT_EQUALS( 5, c2plan1[ "nscanned" ].Long() );
+                ASSERT_EQUALS( 1, c2plan1[ "n" ].number() );
+                ASSERT_EQUALS( 5, c2plan1[ "nscannedObjects" ].number() );
+                ASSERT_EQUALS( 5, c2plan1[ "nscanned" ].number() );
                 
                 BSONObj c2plan2 = clause2[ "allPlans" ].Array()[ 1 ].Obj();
                 ASSERT_EQUALS( "BasicCursor", c2plan2[ "cursor" ].String() );
-                ASSERT_EQUALS( 1, c2plan2[ "n" ].Long() );
-                ASSERT_EQUALS( 5, c2plan2[ "nscannedObjects" ].Long() );
-                ASSERT_EQUALS( 5, c2plan2[ "nscanned" ].Long() );
+                ASSERT_EQUALS( 1, c2plan2[ "n" ].number() );
+                ASSERT_EQUALS( 5, c2plan2[ "nscannedObjects" ].number() );
+                ASSERT_EQUALS( 5, c2plan2[ "nscanned" ].number() );
             }
         };
         
@@ -4204,21 +4204,21 @@ namespace QueryOptimizerCursorTests {
                     ASSERT_EQUALS( "BtreeCursor a_1", clause[ "cursor" ].String() );
                     ASSERT_EQUALS( BSON( "a" << BSON_ARRAY( BSON_ARRAY( i << i ) ) ),
                                   clause[ "indexBounds" ].Obj() );
-                    ASSERT_EQUALS( i, clause[ "n" ].Long() );
-                    ASSERT_EQUALS( i, clause[ "nscannedObjects" ].Long() );
-                    ASSERT_EQUALS( i, clause[ "nscanned" ].Long() );
+                    ASSERT_EQUALS( i, clause[ "n" ].number() );
+                    ASSERT_EQUALS( i, clause[ "nscannedObjects" ].number() );
+                    ASSERT_EQUALS( i, clause[ "nscanned" ].number() );
                     ASSERT_EQUALS( i, clause[ "nYields" ].Int() );
                     
                     ASSERT_EQUALS( 1U, clause[ "allPlans" ].Array().size() );
                     BSONObj plan = clause[ "allPlans" ].Array()[ 0 ].Obj();
-                    ASSERT_EQUALS( i, plan[ "n" ].Long() );
-                    ASSERT_EQUALS( i, plan[ "nscannedObjects" ].Long() );
-                    ASSERT_EQUALS( i, plan[ "nscanned" ].Long() );                    
+                    ASSERT_EQUALS( i, plan[ "n" ].number() );
+                    ASSERT_EQUALS( i, plan[ "nscannedObjects" ].number() );
+                    ASSERT_EQUALS( i, plan[ "nscanned" ].number() );                    
                 }
                 
-                ASSERT_EQUALS( 210, _explain[ "n" ].Long() );
-                ASSERT_EQUALS( 210, _explain[ "nscannedObjects" ].Long() );
-                ASSERT_EQUALS( 210, _explain[ "nscanned" ].Long() );
+                ASSERT_EQUALS( 210, _explain[ "n" ].number() );
+                ASSERT_EQUALS( 210, _explain[ "nscannedObjects" ].number() );
+                ASSERT_EQUALS( 210, _explain[ "nscanned" ].number() );
             }
         };
         
@@ -4248,12 +4248,12 @@ namespace QueryOptimizerCursorTests {
                 ASSERT( _explain[ "nChunkSkips" ].eoo() );
 
                 BSONObj clause0 = _explain[ "clauses" ].Array()[ 0 ].Obj();
-                ASSERT_EQUALS( 100, clause0[ "nChunkSkips" ].Long() );
+                ASSERT_EQUALS( 100, clause0[ "nChunkSkips" ].number() );
                 BSONObj plan0 = clause0[ "allPlans" ].Array()[ 0 ].Obj();
                 ASSERT( plan0[ "nChunkSkips" ].eoo() );
 
                 BSONObj clause1 = _explain[ "clauses" ].Array()[ 1 ].Obj();
-                ASSERT_EQUALS( 100, clause1[ "nChunkSkips" ].Long() );
+                ASSERT_EQUALS( 100, clause1[ "nChunkSkips" ].number() );
                 BSONObj plan1 = clause1[ "allPlans" ].Array()[ 0 ].Obj();
                 ASSERT( plan1[ "nChunkSkips" ].eoo() );
             }            
@@ -4355,9 +4355,9 @@ namespace QueryOptimizerCursorTests {
                 explainHelper.noteIterate( false, false, false, *cursor );
 
                 shared_ptr<ExplainQueryInfo> explain = explainHelper.queryInfo();
-                explain->reviseN( 3000000000LL );
+                explain->reviseN( 3000000000000LL );
                 
-                ASSERT_EQUALS( 3000000000LL, explain->bson()[ "n" ].Long() );
+                ASSERT_EQUALS( 3000000000000LL, explain->bson()[ "n" ].Long() );
             }
         };
         

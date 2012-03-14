@@ -72,9 +72,9 @@ namespace mongo {
     BSONObj ExplainPlanInfo::bson() const {
         BSONObjBuilder bob;
         bob << "cursor" << _cursorName;
-        bob << "n" << _n;
-        bob << "nscannedObjects" << _nscannedObjects;
-        bob << "nscanned" << _nscanned;
+        bob.appendNumber( "n", _n );
+        bob.appendNumber( "nscannedObjects", _nscannedObjects );
+        bob.appendNumber( "nscanned", _nscanned );
         bob << "indexBounds" << _indexBounds;
         return bob.obj();
     }
@@ -83,13 +83,13 @@ namespace mongo {
         BSONObjBuilder bob;
         bob << "cursor" << _cursorName;
         bob << "isMultiKey" << _isMultiKey;
-        bob << "n" << clauseInfo.n();
-        bob << "nscannedObjects" << clauseInfo.nscannedObjects();
-        bob << "nscanned" << clauseInfo.nscanned();
+        bob.appendNumber( "n", clauseInfo.n() );
+        bob.appendNumber( "nscannedObjects", clauseInfo.nscannedObjects() );
+        bob.appendNumber( "nscanned", clauseInfo.nscanned() );
         bob << "scanAndOrder" << _scanAndOrder;
         bob << "indexOnly" << _indexOnly;
         bob << "nYields" << _nYields;
-        bob << "nChunkSkips" << clauseInfo.nChunkSkips();
+        bob.appendNumber( "nChunkSkips", clauseInfo.nChunkSkips() );
         bob << "millis" << clauseInfo.millis();
         bob << "indexBounds" << _indexBounds;
         bob.appendElements( _details );
@@ -214,9 +214,9 @@ namespace mongo {
                 nscanned += (*i)->nscanned();
             }
             clauseArray.done();
-            bob << "n" << n;
-            bob << "nscannedObjects" << nscannedObjects;
-            bob << "nscanned" << nscanned;
+            bob.appendNumber( "n", n );
+            bob.appendNumber( "nscannedObjects", nscannedObjects );
+            bob.appendNumber( "nscanned", nscanned );
             bob << "millis" << _timer.duration();
         }
         
