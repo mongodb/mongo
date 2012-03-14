@@ -121,6 +121,12 @@ namespace mongo {
     public:
         T* get() const { return tsp.get(); }
         void reset(T* v) { tsp.reset(v); }
+        T* getMake() { 
+            T *t = get();
+            if( t == 0 )
+                reset( t = new T() );
+            return t;
+        }
     };
 
 #  define TSP_DECLARE(T,p) extern TSP<T> p;
