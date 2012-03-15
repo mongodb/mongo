@@ -1,61 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <Filter Include="Resource Files">
-      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
-      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    <Filter Include="_js files">
+      <UniqueIdentifier>{473e7192-9f2a-47c5-ad95-e5b75d4f48f9}</UniqueIdentifier>
     </Filter>
-    <Filter Include="util">
-      <UniqueIdentifier>{2a0d6120-434d-4732-ac31-2a7bf077f6ee}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="util\concurrency">
-      <UniqueIdentifier>{a1e59094-b70c-463a-8dc1-691efe337f14}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="scripting">
-      <UniqueIdentifier>{2d0fd975-0cc9-43dc-ac8e-53cb8c3a0040}</UniqueIdentifier>
+    <Filter Include="Boost">
+      <UniqueIdentifier>{d630f16b-0ee6-4e3a-ae6d-7108f2c1e50a}</UniqueIdentifier>
     </Filter>
     <Filter Include="bson">
       <UniqueIdentifier>{a33442e2-39da-4c70-8310-6de9fa70cd71}</UniqueIdentifier>
     </Filter>
-    <Filter Include="db">
-      <UniqueIdentifier>{1044ce7b-72c4-4892-82c0-f46d8708a6ff}</UniqueIdentifier>
+    <Filter Include="bson\util">
+      <UniqueIdentifier>{27dae3d6-9b4d-4618-824b-96ae899f7f2c}</UniqueIdentifier>
     </Filter>
     <Filter Include="client">
       <UniqueIdentifier>{fc0f6c1a-9627-4254-9b5e-0bcb8b3257f3}</UniqueIdentifier>
     </Filter>
-    <Filter Include="shell">
-      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
-    </Filter>
-    <Filter Include="_js files">
-      <UniqueIdentifier>{473e7192-9f2a-47c5-ad95-e5b75d4f48f9}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="shell\generated_from_js">
-      <UniqueIdentifier>{96e4c411-7ab4-4bcd-b7c6-a33059f5d492}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="third_party">
-      <UniqueIdentifier>{b68efe41-5e2c-4bef-b538-5265a839fc7a}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="third_party\pcre">
-      <UniqueIdentifier>{291e0d72-13ca-42d7-b0fd-2e7b5f89639f}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="third_party\linenoise">
-      <UniqueIdentifier>{2faba381-6961-4e3d-ad8b-086a141bd35b}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="util\net">
-      <UniqueIdentifier>{474e6ad2-cf05-44b1-bfa9-95b86c0177d2}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="bson\util">
-      <UniqueIdentifier>{27dae3d6-9b4d-4618-824b-96ae899f7f2c}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="s">
-      <UniqueIdentifier>{c155f2dc-07c4-4fde-99ca-f8ed2eb5a2c0}</UniqueIdentifier>
+    <Filter Include="db">
+      <UniqueIdentifier>{1044ce7b-72c4-4892-82c0-f46d8708a6ff}</UniqueIdentifier>
     </Filter>
     <Filter Include="db\repl">
       <UniqueIdentifier>{fc91e28f-f11f-4875-b0f5-638e704872d0}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="util\mongoutils">
-      <UniqueIdentifier>{f5c2814a-be7e-47b4-a217-097f47ddd591}</UniqueIdentifier>
     </Filter>
     <Filter Include="db\stats">
       <UniqueIdentifier>{311ce022-bacb-4778-86ec-b17a92107a0c}</UniqueIdentifier>
@@ -66,10 +31,46 @@
     <Filter Include="db\y">
       <UniqueIdentifier>{5a686493-abdf-4529-ae18-1694ccfc7c2e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="s">
+      <UniqueIdentifier>{c155f2dc-07c4-4fde-99ca-f8ed2eb5a2c0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="scripting">
+      <UniqueIdentifier>{2d0fd975-0cc9-43dc-ac8e-53cb8c3a0040}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="shell">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="shell\generated_from_js">
+      <UniqueIdentifier>{96e4c411-7ab4-4bcd-b7c6-a33059f5d492}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party">
+      <UniqueIdentifier>{b68efe41-5e2c-4bef-b538-5265a839fc7a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\linenoise">
+      <UniqueIdentifier>{2faba381-6961-4e3d-ad8b-086a141bd35b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="third_party\pcre">
+      <UniqueIdentifier>{291e0d72-13ca-42d7-b0fd-2e7b5f89639f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="util">
+      <UniqueIdentifier>{2a0d6120-434d-4732-ac31-2a7bf077f6ee}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="util\concurrency">
+      <UniqueIdentifier>{a1e59094-b70c-463a-8dc1-691efe337f14}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="util\net">
+      <UniqueIdentifier>{474e6ad2-cf05-44b1-bfa9-95b86c0177d2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="util\mongoutils">
+      <UniqueIdentifier>{f5c2814a-be7e-47b4-a217-097f47ddd591}</UniqueIdentifier>
+    </Filter>
     <Filter Include="util\x">
       <UniqueIdentifier>{4c151341-5c23-4fae-9f03-bcb91e761512}</UniqueIdentifier>
-    <Filter Include="Boost">
-      <UniqueIdentifier>{d630f16b-0ee6-4e3a-ae6d-7108f2c1e50a}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -128,72 +129,6 @@
     <ClCompile Include="..\..\..\third_party\linenoise\linenoise.cpp">
       <Filter>third_party\linenoise</Filter>
     </ClCompile>
-<<<<<<< HEAD
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_chartables.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcrecpp.cc">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_compile.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_config.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_dfa_exec.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_exec.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_fullinfo.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_get.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_globals.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_info.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_maketables.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_newline.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_ord2utf8.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_refcount.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_stringpiece.cc">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_study.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_tables.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_try_flipped.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_ucp_searchfuncs.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_valid_utf8.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_version.c">
-      <Filter>third_party\pcre</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\..\third_party\pcre-7.4\pcre_xclass.c">
-      <Filter>third_party\pcre</Filter>
     <ClCompile Include="..\..\util\text.cpp">
       <Filter>util</Filter>
     </ClCompile>
@@ -282,70 +217,70 @@
       <Filter>util\x</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\third_party\pcre-8.30\pcrecpp.cc">
-      <Filter>shell</Filter>
+      <Filter>third_party\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_chartables.c">
-      <Filter>shell</Filter>
+      <Filter>third_party\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_compile.c">
-      <Filter>shell</Filter>
+      <Filter>third_party\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_config.c">
-      <Filter>shell</Filter>
+      <Filter>third_party\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_dfa_exec.c">
-      <Filter>shell</Filter>
+      <Filter>third_party\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_exec.c">
-      <Filter>shell</Filter>
+      <Filter>third_party\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_fullinfo.c">
-      <Filter>shell</Filter>
+      <Filter>third_party\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_get.c">
-      <Filter>shell</Filter>
+      <Filter>third_party\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_globals.c">
-      <Filter>shell</Filter>
+      <Filter>third_party\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_maketables.c">
-      <Filter>shell</Filter>
+      <Filter>third_party\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_newline.c">
-      <Filter>shell</Filter>
+      <Filter>third_party\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_ord2utf8.c">
-      <Filter>shell</Filter>
+      <Filter>third_party\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_refcount.c">
-      <Filter>shell</Filter>
+      <Filter>third_party\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_scanner.cc">
-      <Filter>shell</Filter>
+      <Filter>third_party\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_stringpiece.cc">
-      <Filter>shell</Filter>
+      <Filter>third_party\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_study.c">
-      <Filter>shell</Filter>
+      <Filter>third_party\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_tables.c">
-      <Filter>shell</Filter>
+      <Filter>third_party\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_ucd.c">
-      <Filter>shell</Filter>
+      <Filter>third_party\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_valid_utf8.c">
-      <Filter>shell</Filter>
+      <Filter>third_party\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_version.c">
-      <Filter>shell</Filter>
+      <Filter>third_party\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\third_party\pcre-8.30\pcre_xclass.c">
-      <Filter>shell</Filter>
+      <Filter>third_party\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\..\..\third_party\pcre-8.30\pcreposix.c">
-      <Filter>shell</Filter>
+      <Filter>third_party\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\..\util\md5.cpp">
       <Filter>shell</Filter>

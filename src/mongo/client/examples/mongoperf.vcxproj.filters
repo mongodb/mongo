@@ -1,6 +1,17 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
+    <Filter Include="shared files">
+      <UniqueIdentifier>{847e788b-8e8c-48de-829f-6876c9008440}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="includes">
+      <UniqueIdentifier>{d855a95e-71ad-4f54-ae1b-94e7aa894394}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Boost">
+      <UniqueIdentifier>{ed6f2fa2-7139-409b-8a84-0282e680e550}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
     <ClCompile Include="mongoperf.cpp" />
     <ClCompile Include="..\mongo_client_lib.cpp">
       <Filter>shared files</Filter>
@@ -14,9 +25,7 @@
     <ClCompile Include="..\..\util\logfile.cpp">
       <Filter>shared files</Filter>
     </ClCompile>
-<<<<<<< HEAD
     <ClCompile Include="..\..\db\memconcept.cpp" />
-=======
     <ClCompile Include="..\..\util\stringutils.cpp">
       <Filter>shared files</Filter>
     </ClCompile>
@@ -62,22 +71,9 @@
     <ClCompile Include="..\..\..\third_party\boost\libs\filesystem\v3\src\windows_file_codecvt.cpp">
       <Filter>Boost</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\..\third_party\boost\libs\system\src\error_code.cpp" />
->>>>>>> main_readonly/master
-  </ItemGroup>
-  <ItemGroup>
-    <Filter Include="shared files">
-      <UniqueIdentifier>{847e788b-8e8c-48de-829f-6876c9008440}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="includes">
-      <UniqueIdentifier>{d855a95e-71ad-4f54-ae1b-94e7aa894394}</UniqueIdentifier>
-    </Filter>
-<<<<<<< HEAD
-=======
-    <Filter Include="Boost">
-      <UniqueIdentifier>{ed6f2fa2-7139-409b-8a84-0282e680e550}</UniqueIdentifier>
-    </Filter>
->>>>>>> main_readonly/master
+    <ClCompile Include="..\..\..\third_party\boost\libs\system\src\error_code.cpp">
+      <Filter>Boost</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\bson\bson-inl.h">
