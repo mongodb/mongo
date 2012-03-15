@@ -52,7 +52,7 @@ class test_cursor05(wttest.WiredTigerTestCase):
         """ Use the cursor to iterate and check for the expected entries. """
         i = 0
         for ikey, skey, s1, i2, s3, i4 in cursor:
-            print 'forward: ' + str([ikey, skey, s1, i2, s3, i4])
+            #print 'forward: ' + str([ikey, skey, s1, i2, s3, i4])
             self.assertEqual(ikey, i)
             self.assertEqual(skey, 'key' + str(i))
             self.assertEqual(s1, 'val' + str(i))
@@ -69,7 +69,7 @@ class test_cursor05(wttest.WiredTigerTestCase):
             i -= 1
             (ikey, skey) = cursor.get_keys()
             (s1, i2, s3, i4) = cursor.get_values()
-            print 'backward: ' + str([ikey, skey, s1, i2, s3, i4])
+            #print 'backward: ' + str([ikey, skey, s1, i2, s3, i4])
             self.assertEqual(ikey, i)
             self.assertEqual(skey, 'key' + str(i))
             self.assertEqual(s1, 'val' + str(i))
