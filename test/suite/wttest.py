@@ -266,12 +266,12 @@ class WiredTigerTestCase(unittest.TestCase):
         os.makedirs(self.testdir)
         try:
             os.chdir(self.testdir)
+            self.fdSetUp()
             self.conn = self.setUpConnectionOpen(".")
             self.session = self.setUpSessionOpen(self.conn)
         except:
             os.chdir(self.origcwd)
             raise
-        self.fdSetUp()
 
     def tearDown(self):
         try:
