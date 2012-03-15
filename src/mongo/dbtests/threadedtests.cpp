@@ -75,7 +75,10 @@ namespace ThreadedTests {
 #endif
         ProgressMeter pm;
     public:
-        MongoMutexTest() : pm(N * nthreads) {}
+        int upgradeWorked, upgradeFailed;
+        MongoMutexTest() : pm(N * nthreads) {
+            upgradeWorked = upgradeFailed = 0;
+        }
         void run() {
             DEV {
                 // in _DEBUG builds on linux we mprotect each time a writelock
@@ -93,11 +96,12 @@ namespace ThreadedTests {
     private:
         virtual void setup() {
         }
-        virtual void subthread(int) {
+        virtual void subthread(int tnumber) {
             Client::initThread("mongomutextest");
             sleepmillis(0);
             for( int i = 0; i < N; i++ ) {
-                bool sometimes = std::rand() % 16 == 0;
+                int x = std::rand();
+                bool sometimes = (x % 15 == 0);
                 if( i % 7 == 0 ) {
                     Lock::GlobalRead r; // nested test
                     Lock::GlobalRead r2;
@@ -113,17 +117,20 @@ namespace ThreadedTests {
                         Lock::TempRelease t;
                     }
                 }
-                else if( i == 2 ) {
+                else if( i % 7 == 4 && 
+                         tnumber == 1 /*only one upgrader legal*/ ) {
                     Lock::GlobalWrite w;
                     ASSERT( d.dbMutex.isWriteLocked() );
                     ASSERT( Lock::isW() );
-                    if( sometimes ) {
+                    if( i % 7 == 2 ) {
                         Lock::TempRelease t;
                     }
                     if( sometimes ) { 
                         w.downgrade();
                         sleepmillis(0);
-                        w.upgrade();
+                        bool worked = w.upgrade();
+                        if( worked) upgradeWorked++;
+                        else upgradeFailed++;
                     }
                 }
                 else if( i % 7 == 2 ) {
@@ -146,8 +153,6 @@ namespace ThreadedTests {
                         Lock::TempRelease t;
                     }
                 }
-            // _try
-            // _temprelrease
                 else if( i % 7 == 5 ) {
                     {
                         Lock::DBRead r("foo");
@@ -158,9 +163,6 @@ namespace ThreadedTests {
                     {
                         Lock::DBRead r("bar");
                     }
-                    /*if( mm->lock_try(1) ) {
-                        mm->unlock();
-                    }*/
                 }
                 else if( i % 7 == 6 ) {
                     if( i > N/2 ) { 
@@ -189,9 +191,6 @@ namespace ThreadedTests {
                         Lock::DBRead r2("foo");
                         Lock::DBRead r3("local");
                     }
-                    /*if( mm->lock_shared_try(0) ) {
-                        mm->unlock_shared();
-                    }*/
                 }
                 else {
                     Lock::ThreadSpanningOp::setWLockedNongreedy();
@@ -206,6 +205,8 @@ namespace ThreadedTests {
         }
         virtual void validate() {
             ASSERT( !d.dbMutex.atLeastReadLocked() );
+            ASSERT( upgradeWorked > upgradeFailed );
+            ASSERT( upgradeWorked > 4 );
             {
                     Lock::GlobalWrite w;
             }
