@@ -91,7 +91,7 @@ namespace mongo {
         assert( W.n == 0 );
         if( U.n ) {
             // U is highest priority
-            if( W_legal() )
+  	    if( r.n + w.n + W.n == 0 ) 
                 U.c.notify_one();
             return;
         }
@@ -203,9 +203,9 @@ namespace mongo {
     // downgrade from W state to R state
     inline void QLock::W_to_R() { 
         boost::mutex::scoped_lock lk(m);
-        assert( U.n == 0 );
         assert( W.n == 1 );
         assert( R.n == 0 );
+        assert( U.n == 0 );
         W.n = 0;
         R.n = 1;
         notifyWeUnlocked('W');
@@ -218,17 +218,16 @@ namespace mongo {
         boost::mutex::scoped_lock lk(m);
         assert( R.n > 0 && W.n == 0 );
         U.n++;
-        R.n--;
         fassert( 0, U.n == 1 ); // for now we only allow one upgrade attempter
         int pass = 0;
         while( W.n + R.n + w.n + r.n ) {
             if( ++pass >= 3 ) {
-                R.n++;
                 U.n--;
                 return false;
             }
             U.c.timed_wait(m, boost::posix_time::milliseconds(300));
         }
+        R.n--;
         W.n++;
         U.n--;
         assert( R.n == 0 && W.n == 1 && U.n == 0 );
