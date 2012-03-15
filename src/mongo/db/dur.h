@@ -103,7 +103,7 @@ namespace mongo {
                 from growing too large.
                 @return true if commited
             */
-            virtual bool commitIfNeeded() = 0;
+            virtual bool commitIfNeeded(bool force=false) = 0;
 
             /** @return true if time to commit but does NOT do a commit */
             virtual bool aCommitIsNeeded() const = 0;
@@ -173,7 +173,7 @@ namespace mongo {
             void createdFile(string filename, unsigned long long len) { }
             bool awaitCommit() { return false; }
             bool commitNow() { return false; }
-            bool commitIfNeeded() { return false; }
+            bool commitIfNeeded(bool) { return false; }
             bool aCommitIsNeeded() const { return false; }
             void syncDataAndTruncateJournal() {}
         };
@@ -187,7 +187,7 @@ namespace mongo {
             bool awaitCommit();
             bool commitNow();
             bool aCommitIsNeeded() const;
-            bool commitIfNeeded();
+            bool commitIfNeeded(bool);
             void syncDataAndTruncateJournal();
         };
 

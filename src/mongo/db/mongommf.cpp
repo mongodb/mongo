@@ -29,6 +29,7 @@
 #include "mongomutex.h"
 #include "d_globals.h"
 #include "memconcept.h"
+#include "d_concurrency.h"
 
 using namespace mongoutils;
 
@@ -326,7 +327,11 @@ namespace mongo {
             if( cmdLine.dur ) {
                 dur::closingFileNotification();
             }
-            if( !d.dbMutex.isWriteLocked() ) { 
+	    /* todo: is it ok to close files if we are not globally locked exclusively?
+                     probably, but need to review. also note the lock assert below is
+		     rather vague and not checking if the right database is locked 
+	    */
+            if( !Lock::somethingWriteLocked() ) { 
                 assert( inShutdown() );
                 DEV { 
                     log() << "is it really ok to close a mongommf outside a write lock? file:" << filename() << endl;
