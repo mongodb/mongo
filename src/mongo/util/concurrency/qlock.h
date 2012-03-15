@@ -220,7 +220,7 @@ namespace mongo {
         U.n++;
         fassert( 0, U.n == 1 ); // for now we only allow one upgrade attempter
         int pass = 0;
-        while( W.n + R.n + w.n + r.n ) {
+        while( W.n + R.n + w.n + r.n > 1 ) {
             if( ++pass >= 3 ) {
                 U.n--;
                 return false;
