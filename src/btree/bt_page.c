@@ -454,34 +454,40 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 	unpack = &_unpack;
 
 	/*
-	 * Leaf row-store page entries map to a maximum of two-to-one to the
-	 * number of physical entries on the page (each physical entry might
-	 * be a key without any subsequent data item).
-	 */
-	WT_RET((__wt_calloc_def(
-	    session, (size_t)dsk->u.entries * 2, &page->u.row.d)));
-	if (inmem_sizep != NULL)
-		*inmem_sizep += 2 * dsk->u.entries * sizeof(*page->u.row.d);
-
-	/*
-	 * Walk a row-store page of WT_CELLs, building indices and finding the
-	 * end of the page.
+	 * Walk a row-store page of WT_CELLs, counting the number of keys.
 	 *
 	 * The page contains key/data pairs.  Keys are on-page (WT_CELL_KEY) or
 	 * overflow (WT_CELL_KEY_OVFL) items, data are either a single on-page
 	 * (WT_CELL_VALUE) or overflow (WT_CELL_VALUE_OVFL) item.
 	 */
 	nindx = 0;
-	rip = page->u.row.d;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {
 		case WT_CELL_KEY:
 		case WT_CELL_KEY_OVFL:
 			++nindx;
-			if (rip->key != NULL)
-				++rip;
+			break;
+		case WT_CELL_VALUE:
+		case WT_CELL_VALUE_OVFL:
+			break;
+		WT_ILLEGAL_VALUE(session);
+		}
+	}
+
+	WT_RET((__wt_calloc_def(session, (size_t)nindx, &page->u.row.d)));
+	if (inmem_sizep != NULL)
+		*inmem_sizep += nindx * sizeof(*page->u.row.d);
+
+	/* Walk the page again, building indices. */
+	rip = page->u.row.d;
+	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
+		__wt_cell_unpack(cell, unpack);
+		switch (unpack->type) {
+		case WT_CELL_KEY:
+		case WT_CELL_KEY_OVFL:
 			rip->key = cell;
+			++rip;
 			break;
 		case WT_CELL_VALUE:
 		case WT_CELL_VALUE_OVFL:
