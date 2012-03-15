@@ -22,9 +22,9 @@ static int  __evict_worker(WT_SESSION_IMPL *);
  * Tuning constants: I hesitate to call this tuning, but we want to review some
  * number of pages from each file's in-memory tree for each page we evict.
  */
-#define	WT_EVICT_GROUP		10	/* Evict N pages at a time */
-#define	WT_EVICT_WALK_PER_TABLE	20	/* Pages to visit per file */
-#define	WT_EVICT_WALK_BASE	100	/* Pages tracked across file visits */
+#define	WT_EVICT_GROUP		20	/* Evict N pages at a time */
+#define	WT_EVICT_WALK_PER_TABLE	25	/* Pages to visit per file */
+#define	WT_EVICT_WALK_BASE	50	/* Pages tracked across file visits */
 
 /*
  * WT_EVICT_REQ_FOREACH --
