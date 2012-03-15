@@ -179,7 +179,7 @@ namespace mongo {
         assertionCount.condrollover( ++assertionCount.warning );
         tlog() << "Assertion: " << msgid << ":" << msg << endl;
         raiseError(msgid,msg && *msg ? msg : "massert failure");
-        breakpoint();
+        //breakpoint();
         printStackTrace();
         throw MsgAssertionException(msgid, msg);
     }

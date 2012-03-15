@@ -1571,7 +1571,7 @@ namespace mongo {
             log() << "migrate commit succeeded flushing to secondaries for '" << ns << "' " << min << " -> " << max << migrateLog;
 
             {
-                readlock lk(ns);  // commitNow() currently requires it
+                Lock::GlobalRead lk;
 
                 // if durability is on, force a write to journal
                 if ( getDur().commitNow() ) {
