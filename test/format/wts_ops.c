@@ -51,10 +51,12 @@ wts_ops(void)
 		/* Create thread structure. */
 		if ((tinfo = calloc((size_t)g.threads, sizeof(*tinfo))) == NULL)
 			die(errno, "calloc");
-		for (i = 0; i < g.threads; ++i)
+		for (i = 0; i < g.threads; ++i) {
+			tinfo[i].state = TINFO_RUNNING;
 			if ((ret = pthread_create(
 			    &tinfo[i].tid, NULL, ops, &tinfo[i])) != 0)
 				die(ret, "pthread_create");
+		}
 
 		/* Wait for the threads. */
 		for (;;) {
@@ -80,7 +82,7 @@ wts_ops(void)
 			track("read/write ops", 0ULL, &total);
 			if (!running)
 				break;
-			usleep(750000);			/* 3/4 of a second */
+			usleep(100000);			/* 1/10th of a second */
 		}
 	}
 
@@ -112,7 +114,6 @@ ops(void *arg)
 	conn = g.wts_conn;
 
 	tinfo = arg;
-	tinfo->state = TINFO_RUNNING;
 
 	/* Set up the default key and value buffers. */
 	memset(&key, 0, sizeof(key));
