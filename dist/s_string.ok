@@ -278,6 +278,7 @@ getones
 getonesn
 getraw
 gettime
+gettimeofday
 getv
 gobare
 goesc
