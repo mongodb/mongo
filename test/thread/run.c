@@ -7,7 +7,7 @@
 
 #include "thread.h"
 
-static void  print_stats(int);
+static void  print_stats(u_int);
 static void *reader(void *);
 static void *writer(void *);
 
@@ -45,12 +45,13 @@ r(void)
 }
 
 int
-run(int readers, int writers)
+run(u_int readers, u_int writers)
 {
 	clock_t start, stop;
 	double seconds;
 	pthread_t *tids;
-	int i, ret;
+	u_int i;
+	int ret;
 	void *thread_ret;
 
 	/* Create statistics and thread structures. */
@@ -261,10 +262,10 @@ writer(void *arg)
  *	Display reader/writer thread stats.
  */
 static void
-print_stats(int nthreads)
+print_stats(u_int nthreads)
 {
 	STATS *s;
-	int id;
+	u_int id;
 
 	s = run_stats;
 	for (id = 0; id < nthreads; ++id, ++s)

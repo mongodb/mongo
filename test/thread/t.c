@@ -25,7 +25,8 @@ static void wt_shutdown(void);
 int
 main(int argc, char *argv[])
 {
-	int ch, cnt, readers, runs, writers;
+	u_int readers, writers;
+	int ch, cnt, runs;
 	char *config_open;
 
 	if ((progname = strrchr(argv[0], '/')) == NULL)
@@ -64,7 +65,7 @@ main(int argc, char *argv[])
 			nops = (u_int)atoi(optarg);
 			break;
 		case 'R':
-			readers = atoi(optarg);
+			readers = (u_int)atoi(optarg);
 			break;
 		case 'r':			/* runs */
 			runs = atoi(optarg);
@@ -88,7 +89,7 @@ main(int argc, char *argv[])
 			}
 			break;
 		case 'W':
-			writers = atoi(optarg);
+			writers = (u_int)atoi(optarg);
 			break;
 		default:
 			return (usage());
@@ -105,7 +106,7 @@ main(int argc, char *argv[])
 	printf("%s: process %" PRIu64 "\n", progname, (uint64_t)getpid());
 	for (cnt = 1; runs == 0 || cnt <= runs; ++cnt) {
 		printf(
-		    "    %d: %d readers, %d writers\n", cnt, readers, writers);
+		    "    %d: %u readers, %u writers\n", cnt, readers, writers);
 
 		shutdown();			/* Clean up previous runs */
 
