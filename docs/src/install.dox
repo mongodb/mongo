@@ -8,6 +8,7 @@ Skip this step if you are building from a WiredTiger release package,
 and proceed with @ref building.
 
 To build from the WiredTiger GitHub repository requires
+<a href="http://git-scm.com/">git</a>,
 <a href="http://www.gnu.org/software/autoconf/autoconf.html">autoconf</a>,
 <a href="http://www.gnu.org/software/autoconf/automake.html">automake</a>,
 <a href="http://www.gnu.org/software/libtool/libtool.html">libtool</a> and

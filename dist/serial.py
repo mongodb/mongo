@@ -27,7 +27,7 @@ Serial('col_append', 'WT_SERIAL_FUNC', [
 	]),
 
 Serial('evict_file', 'WT_SERIAL_EVICT', [
-		SerialArg('int', 'close_method'),
+		SerialArg('int', 'discard'),
 	]),
 
 Serial('insert', 'WT_SERIAL_FUNC', [

@@ -130,17 +130,17 @@ __wt_col_append_new_ins_taken(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 typedef struct {
-	int close_method;
+	int discard;
 } __wt_evict_file_args;
 
 static inline int
 __wt_evict_file_serial(
-	WT_SESSION_IMPL *session, int close_method)
+	WT_SESSION_IMPL *session, int discard)
 {
 	__wt_evict_file_args _args, *args = &_args;
 	int ret;
 
-	args->close_method = close_method;
+	args->discard = discard;
 
 	ret = __wt_session_serialize_func(session,
 	    WT_SERIAL_EVICT, __wt_evict_file_serial_func, args);
@@ -150,12 +150,12 @@ __wt_evict_file_serial(
 
 static inline void
 __wt_evict_file_unpack(
-	WT_SESSION_IMPL *session, int *close_methodp)
+	WT_SESSION_IMPL *session, int *discardp)
 {
 	__wt_evict_file_args *args =
 	    (__wt_evict_file_args *)session->wq_args;
 
-	*close_methodp = args->close_method;
+	*discardp = args->discard;
 }
 
 typedef struct {

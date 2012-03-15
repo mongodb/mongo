@@ -121,17 +121,17 @@ __wt_evict_file_serial_func(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
 	WT_EVICT_REQ *er, *er_end;
-	int close_method;
+	int discard;
 
-	__wt_evict_file_unpack(session, &close_method);
+	__wt_evict_file_unpack(session, &discard);
 
 	cache = S2C(session)->cache;
 
 	/* Find an empty slot and enter the eviction request. */
 	WT_EVICT_REQ_FOREACH(er, er_end, cache)
 		if (er->session == NULL) {
-			__evict_req_set(session, er, NULL, close_method ?
-			    WT_EVICT_REQ_CLOSE : 0);
+			__evict_req_set(session,
+			    er, NULL, discard ? WT_EVICT_REQ_CLOSE : 0);
 			return;
 		}
 
