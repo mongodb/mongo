@@ -39,6 +39,13 @@ pop_data = [
     ( 'AU', 2008, 21431800 )
 ]
 
+expected_out = [
+    r"['AU\x00\x00\x00', 2008, 21431800]",
+    r"['CAN\x00\x00', 2008, 33311400]",
+    r"['UK\x00\x00\x00', 2008, 61414062]",
+    r"['USA\x00\x00', 2009, 307006550]"
+]
+
 class test_schema01(wttest.WiredTigerTestCase):
     '''Test various tree types becoming empty'''
 
@@ -88,8 +95,10 @@ class test_schema01(wttest.WiredTigerTestCase):
                 self.reopen()
 
             c = self.cursor()
+            expectpos = 0
             for record in c:
-                print record
+                self.assertEqual(str(record), expected_out[expectpos])
+                expectpos += 1
             c.close()
             self.drop_table()
 
