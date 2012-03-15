@@ -91,6 +91,20 @@ typedef struct {
 } GLOBAL;
 extern GLOBAL g;
 
+typedef struct {
+	uint64_t search;
+	uint64_t insert;
+	uint64_t update;
+	uint64_t remove;
+
+	pthread_t tid;					/* thread ID */
+
+#define	TINFO_RUNNING	1				/* Running */
+#define	TINFO_COMPLETE	2				/* Finished */
+#define	TINFO_JOINED	3				/* Resolved */
+	volatile int state;				/* state */
+} TINFO;
+
 void	 bdb_close(void);
 void	 bdb_del(uint64_t, int *);
 void	 bdb_insert(const void *, uint32_t, const void *, uint32_t);
@@ -110,7 +124,7 @@ void	 die(int, const char *, ...);
 void	 key_len_setup(void);
 void	 key_gen_setup(uint8_t **);
 void	 key_gen(uint8_t *, uint32_t *, uint64_t, int);
-void	 track(const char *, uint64_t);
+void	 track(const char *, uint64_t, TINFO *);
 void	 val_gen_setup(uint8_t **);
 void	 value_gen(uint8_t *, uint32_t *, uint64_t);
 void	 wts_close(void);

@@ -45,7 +45,7 @@ wts_load(void)
 
 		/* Report on progress every 100 inserts. */
 		if (g.key_cnt % 100 == 0)
-			track("bulk load", g.key_cnt);
+			track("bulk load", g.key_cnt, NULL);
 
 		key_gen(keybuf, &key.size, (uint64_t)g.key_cnt, 0);
 		key.data = keybuf;

@@ -25,11 +25,11 @@ static void  print_item(const char *, WT_ITEM *);
 void
 wts_ops(void)
 {
+	TINFO *tinfo, total;
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
-	pthread_t *tids;
 	time_t now;
-	int i, ret;
+	int i, ret, running;
 
 	conn = g.wts_conn;
 
@@ -44,20 +44,44 @@ wts_ops(void)
 		    ctime(&now));
 	}
 
-	if (g.threads == 1)
-		(void)ops(g.wts_conn);
-	else {
+	if (g.threads == 1) {
+		memset(&total, 0, sizeof(total));
+		(void)ops(&total);
+	} else {
 		/* Create thread structure. */
-		if ((tids = calloc((size_t)g.threads, sizeof(*tids))) == NULL)
+		if ((tinfo = calloc((size_t)g.threads, sizeof(*tinfo))) == NULL)
 			die(errno, "calloc");
 		for (i = 0; i < g.threads; ++i)
 			if ((ret = pthread_create(
-			    &tids[i], NULL, ops, g.wts_conn)) != 0)
+			    &tinfo[i].tid, NULL, ops, &tinfo[i])) != 0)
 				die(ret, "pthread_create");
 
 		/* Wait for the threads. */
-		for (i = 0; i < g.threads; ++i)
-			(void)pthread_join(tids[i], NULL);
+		for (;;) {
+			total.search =
+			    total.insert = total.remove = total.update = 0;
+			for (i = running = 0; i < g.threads; ++i) {
+				total.search += tinfo[i].search;
+				total.insert += tinfo[i].insert;
+				total.remove += tinfo[i].remove;
+				total.update += tinfo[i].update;
+				switch (tinfo[i].state) {
+				case TINFO_RUNNING:
+					running = 1;
+					break;
+				case TINFO_COMPLETE:
+					tinfo[i].state = TINFO_JOINED;
+					(void)pthread_join(tinfo[i].tid, NULL);
+					break;
+				case TINFO_JOINED:
+					break;
+				}
+			}
+			track("read/write ops", 0ULL, &total);
+			if (!running)
+				break;
+			usleep(100000);
+		}
 	}
 
 	if (g.logging == LOG_OPS) {
@@ -74,6 +98,7 @@ wts_ops(void)
 static void *
 ops(void *arg)
 {
+	TINFO *tinfo;
 	WT_CONNECTION *conn;
 	WT_CURSOR *cursor, *cursor_insert;
 	WT_SESSION *session;
@@ -84,7 +109,10 @@ ops(void *arg)
 	int dir, insert, notfound, ret;
 	uint8_t *keybuf, *valbuf;
 
-	conn = arg;
+	conn = g.wts_conn;
+
+	tinfo = arg;
+	tinfo->state = TINFO_RUNNING;
 
 	/* Set up the default key and value buffers. */
 	memset(&key, 0, sizeof(key));
@@ -115,8 +143,8 @@ ops(void *arg)
 		die(ret, "session.open_cursor");
 
 	for (cnt = 0; cnt < g.c_ops; ++cnt) {
-		if (cnt % 10 == 0)
-			track("read/write ops", cnt);
+		if (SINGLETHREADED && cnt % 100 == 0)
+			track("read/write ops", 0ULL, tinfo);
 
 		insert = notfound = 0;
 
@@ -133,6 +161,7 @@ ops(void *arg)
 		 */
 		op = (uint32_t)(wts_rand() % 100);
 		if (op < g.c_delete_pct) {
+			++tinfo->remove;
 			switch (g.c_file_type) {
 			case ROW:
 				/*
@@ -147,6 +176,7 @@ ops(void *arg)
 				break;
 			}
 		} else if (op < g.c_delete_pct + g.c_insert_pct) {
+			++tinfo->insert;
 			switch (g.c_file_type) {
 			case ROW:
 				row_put(cursor, &key, &value, keyno, 1);
@@ -164,6 +194,7 @@ ops(void *arg)
 			}
 		} else if (
 		    op < g.c_delete_pct + g.c_insert_pct + g.c_write_pct) {
+			++tinfo->update;
 			switch (g.c_file_type) {
 			case ROW:
 				row_put(cursor, &key, &value, keyno, 0);
@@ -174,6 +205,7 @@ ops(void *arg)
 				break;
 			}
 		} else {
+			++tinfo->search;
 			read_row(cursor, &key, keyno);
 			continue;
 		}
@@ -202,6 +234,8 @@ ops(void *arg)
 
 	free(keybuf);
 	free(valbuf);
+
+	tinfo->state = TINFO_COMPLETE;
 	return (NULL);
 }
 
@@ -239,7 +273,7 @@ wts_read_scan(void)
 		if (cnt > g.rows)
 			cnt = g.rows;
 		if (cnt - last_cnt > 1000) {
-			track("read row scan", cnt);
+			track("read row scan", cnt, NULL);
 			last_cnt = cnt;
 		}
 

@@ -128,7 +128,7 @@ main(int argc, char *argv[])
 		}
 
 		if (SINGLETHREADED) {
-			track("shutting down BDB", 0ULL);
+			track("shutting down BDB", 0ULL, NULL);
 			bdb_close();
 
 			wts_close();			/* Dump the file */

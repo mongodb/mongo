@@ -26,12 +26,12 @@ handle_message(WT_EVENT_HANDLER *handler, const char *message)
  *	Default WT_EVENT_HANDLER->handle_progress implementation: ignore.
  */
 static int
-handle_progress(WT_EVENT_HANDLER *handler,
-     const char *operation, uint64_t progress)
+handle_progress(
+    WT_EVENT_HANDLER *handler, const char *operation, uint64_t progress)
 {
 	UNUSED(handler);
 
-	track(operation, progress);
+	track(operation, progress, NULL);
 	return (0);
 }
 
@@ -149,7 +149,7 @@ wts_dump(const char *tag, int dump_bdb)
 	int ret;
 	char cmd[256];
 
-	track("dump files and compare", 0ULL);
+	track("dump files and compare", 0ULL, NULL);
 	switch (g.c_file_type) {
 	case FIX:
 	case VAR:
@@ -174,7 +174,7 @@ wts_salvage(void)
 
 	conn = g.wts_conn;
 
-	track("salvage", 0ULL);
+	track("salvage", 0ULL, NULL);
 
 	/*
 	 * Save a copy of the interesting files so we can replay the salvage
@@ -203,7 +203,7 @@ wts_sync(void)
 
 	conn = g.wts_conn;
 
-	track("sync", 0ULL);
+	track("sync", 0ULL, NULL);
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
@@ -223,7 +223,7 @@ wts_verify(const char *tag)
 
 	conn = g.wts_conn;
 
-	track("verify", 0ULL);
+	track("verify", 0ULL, NULL);
 
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
@@ -248,7 +248,7 @@ wts_stats(void)
 	uint64_t v;
 	int ret;
 
-	track("stat", 0ULL);
+	track("stat", 0ULL, NULL);
 
 	conn = g.wts_conn;
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)

@@ -141,21 +141,26 @@ value_gen(uint8_t *val, uint32_t *sizep, uint64_t keyno)
 }
 
 void
-track(const char *s, uint64_t i)
+track(const char *tag, uint64_t cnt, TINFO *tinfo)
 {
 	static int lastlen = 0;
 	int len;
 	char msg[128];
 
-	if (!g.track || s == NULL)
+	if (!g.track || tag == NULL)
 		return;
 
-	if (i == 0)
-		len = snprintf(msg, sizeof(msg), "%4d: %s",
-		    g.run_cnt, s);
+	if (tinfo == NULL && cnt == 0)
+		len = snprintf(msg, sizeof(msg), "%4d: %s", g.run_cnt, tag);
+	else if (tinfo == NULL)
+		len = snprintf(
+		    msg, sizeof(msg), "%4d: %s: %" PRIu64, g.run_cnt, tag, cnt);
 	else
-		len = snprintf(msg, sizeof(msg), "%4d: %s %" PRIu64,
-		    g.run_cnt, s, i);
+		len = snprintf(msg, sizeof(msg),
+		    "%4d: %s: " "search %" PRIu64
+		    ", insert %" PRIu64 ", update %" PRIu64 ", remove %" PRIu64,
+		    g.run_cnt, tag,
+		    tinfo->search, tinfo->insert, tinfo->update, tinfo->remove);
 
 	if (lastlen > len) {
 		memset(msg + len, ' ', (size_t)(lastlen - len));
