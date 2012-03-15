@@ -67,9 +67,11 @@ class test_base06(wttest.WiredTigerTestCase):
 
     def checkDoesNotExist(self, t):
         self.assertFalse(os.path.exists(t + ".wt"))
-        self.assertRaises(wiredtiger.WiredTigerError, lambda:
-                              self.session.open_cursor('table:' + t,
-                                                       None, None))
+        errpat = "Cannot open cursor.*{}.* on unknown table".format(t)
+        with self.expectedStderrPattern(errpat):
+            self.assertRaises(wiredtiger.WiredTigerError, lambda:
+                                  self.session.open_cursor('table:' + t,
+                                                           None, None))
 
     def setupCursor(self, tablename, value):
         if value == None:

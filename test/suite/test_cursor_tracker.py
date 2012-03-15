@@ -413,14 +413,18 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
     def cur_check_here(self, cursor):
         # Cannot check immediately after a remove, since the K/V in the cursor
         # does not correspond to anything
+        keymsg = 'cursor.get_key: requires key be set: Invalid argument\n'
+        valuemsg = 'cursor.get_value: requires value be set: Invalid argument\n'
         if self.curremoved:
             raise Exception('cur_check_here: cursor.get_key, get_value are not valid')
         elif self.nopos:
             self.traceapi_before('cursor.get_key()')
-            self.assertRaises(wiredtiger.WiredTigerError, cursor.get_key)
+            with self.expectedStderr(keymsg):
+                self.assertRaises(wiredtiger.WiredTigerError, cursor.get_key)
             self.traceapi_after('<unknown>')
             self.traceapi_before('cursor.get_value()')
-            self.assertRaises(wiredtiger.WiredTigerError, cursor.get_value)
+            with self.expectedStderr(valuemsg):
+                self.assertRaises(wiredtiger.WiredTigerError, cursor.get_value)
             self.traceapi_after('<unknown>')
         else:
             bits = self.curbits

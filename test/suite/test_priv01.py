@@ -166,8 +166,10 @@ class test_priv01(wttest.WiredTigerTestCase):
             self.checkfiles(edir)
             self.checknofiles(".")
         else:
-            self.assertRaises(wiredtiger.WiredTigerError,
-                              lambda: self.common_test(None, edir, privarg))
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                lambda: self.common_test(None, edir, privarg),
+                '/WIREDTIGER_HOME environment variable set but\
+ process lacks privileges to use that environment variable/')
 
     def test_env_conf_without_env_var_priv(self):
         # no env var set, so should use current directory

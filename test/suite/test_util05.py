@@ -140,9 +140,9 @@ class test_util05(wttest.WiredTigerTestCase, suite_subprocess):
         # open_and_position closed the session/connection, reopen them now.
         self.conn = self.setUpConnectionOpen(".")
         self.session = self.setUpSessionOpen(self.conn)
-        self.assertRaises(wiredtiger.WiredTigerError,
-                          lambda: self.session.verify(
-                              'table:' + self.tablename, None))
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.session.verify('table:' + self.tablename, None),
+            "/read checksum error/")
 
     def test_verify_process_75pct_null(self):
         """

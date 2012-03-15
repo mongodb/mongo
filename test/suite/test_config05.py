@@ -86,8 +86,10 @@ class test_config05(wttest.WiredTigerTestCase):
     def test_multi_create(self):
         self.conn = wiredtiger.wiredtiger_open('.', 'create')
         self.session = self.conn.open_session(None)
-        self.assertRaises(wiredtiger.WiredTigerError,
-			lambda: wiredtiger.wiredtiger_open('.', 'create'))
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: wiredtiger.wiredtiger_open('.', 'create'),
+            '/WiredTiger database is already being managed by another thread\
+ in this process/')
 
 if __name__ == '__main__':
     wttest.run()
