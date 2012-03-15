@@ -35,8 +35,9 @@ try:
 except ImportError:
     import unittest
 
-import sys, time, traceback, os
+import sys, time, traceback, os, re
 import wiredtiger
+from contextlib import contextmanager
 
 def removeAll(top):
     if not os.path.isdir(top):
@@ -47,6 +48,111 @@ def removeAll(top):
         for name in dirs:
             os.rmdir(os.path.join(root, name))
     os.rmdir(top)
+
+def shortenWithEllipsis(s, maxlen):
+    if len(s) > maxlen:
+        s = s[0:maxlen-3] + '...'
+    return s
+
+class FdWriter(object):
+    def __init__(self, fd):
+        self.fd = fd
+
+    def write(self, text):
+        os.write(self.fd, text)
+
+
+class CapturedFd(object):
+    """
+    CapturedFd encapsulates a file descriptor (e.g. 1 or 2) that is diverted
+    to a file.  We use this to capture and check the C stdout/stderr.
+    Meanwhile we reset Python's sys.stdout, sys.stderr, using duped copies
+    of the original 1, 2 fds.  The end result is that Python's sys.stdout
+    sys.stderr behave normally (e.g. go to the tty), while the C stdout/stderr
+    ends up in a file that we can verify.
+    """
+    def __init__(self, targetFd, originalDupedFd, filename, desc):
+        self.targetFd = targetFd
+        self.originalDupedFd = originalDupedFd
+        self.filename = filename
+        self.desc = desc
+        self.expectpos = 0
+
+    def readFileFrom(self, filename, pos, maxchars):
+        """
+        Read a file starting at a given position,
+        returning the beginning of its contents
+        """
+        with open(filename, 'r') as f:
+            f.seek(pos)
+            return shortenWithEllipsis(f.read(maxchars+1), maxchars)
+
+    def capture(self):
+        """
+        Start capturing the file descriptor.
+        Note that the original targetFd is closed, we expect
+        that the caller has duped it and passed the dup to us
+        in the constructor.
+        """
+        filefd = os.open(self.filename, os.O_RDWR | os.O_CREAT | os.O_APPEND)
+        os.close(self.targetFd)
+        os.dup2(filefd, self.targetFd)
+        os.close(filefd)
+
+    def release(self):
+        """
+        Stop capturing.  Restore the original fd from the duped copy.
+        """
+        os.close(self.targetFd)
+        os.dup2(self.originalDupedFd, self.targetFd)
+
+    def show(self, pfx=None):
+        contents = self.readFileFrom(self.filename, 0, 1000)
+        if pfx != None:
+            pfx = ': ' + pfx
+        else:
+            pfx = ''
+        print self.desc + pfx + ' [pos=' + str(self.expectpos) + '] ' + contents
+
+    def check(self, testcase):
+        """
+        Check to see that there is no unexpected output in the captured output
+        file.  If there is, raise it as a test failure.
+        This is generally called after 'release' is called.
+        """
+        filesize = os.path.getsize(self.filename)
+        if filesize > self.expectpos:
+            contents = self.readFileFrom(self.filename, self.expectpos, 10000)
+            print 'ERROR: ' + self.filename + ' unexpected ' + \
+                self.desc + ', contains:\n"' + contents + '"'
+            testcase.fail('unexpected ' + self.desc + ', contains: "' +
+                      shortenWithEllipsis(contents,100) + '"')
+
+    def checkAdditional(self, testcase, expect):
+        """
+        Check to see that an additional string has been added to the
+        output file.  If it has not, raise it as a test failure.
+        In any case, reset the expected pos to account for the new output.
+        """
+        gotstr = self.readFileFrom(self.filename, self.expectpos, 1000)
+        testcase.assertEqual(gotstr, expect, 'in ' + self.desc +
+                             ', expected "' + expect + '", but got "' +
+                             gotstr + '"')
+        self.expectpos = os.path.getsize(self.filename)
+
+    def checkAdditionalPattern(self, testcase, pat):
+        """
+        Check to see that an additional string has been added to the
+        output file.  If it has not, raise it as a test failure.
+        In any case, reset the expected pos to account for the new output.
+        """
+        gotstr = self.readFileFrom(self.filename, self.expectpos, 1000)
+        if re.search(pat, gotstr) == None:
+            testcase.fail('in ' + self.desc +
+                          ', expected pattern "' + pat + '", but got "' +
+                          gotstr + '"')
+        self.expectpos = os.path.getsize(self.filename)
+
 
 class WiredTigerTestCase(unittest.TestCase):
     _globalSetup = False
@@ -67,7 +173,32 @@ class WiredTigerTestCase(unittest.TestCase):
         WiredTigerTestCase._gdbSubprocess = gdbSub
         WiredTigerTestCase._verbose = verbose
         WiredTigerTestCase._globalSetup = True
-    
+        WiredTigerTestCase._stdout = sys.stdout
+        WiredTigerTestCase._stderr = sys.stderr
+        # newoutfd, newerrfd are dups of the originals
+        WiredTigerTestCase._newoutFd = os.dup(1)
+        WiredTigerTestCase._newerrFd = os.dup(2)
+        # newout, newerr are like stdout, stderr, but using the dups
+        WiredTigerTestCase._newout = FdWriter(WiredTigerTestCase._newoutFd)
+        WiredTigerTestCase._newerr = FdWriter(WiredTigerTestCase._newerrFd)
+
+    def fdSetUp(self):
+        self.captureout = CapturedFd(1, WiredTigerTestCase._newoutFd,
+                                     'stdout.txt', 'standard output')
+        self.captureerr = CapturedFd(2, WiredTigerTestCase._newerrFd,
+                                     'stderr.txt', 'error output')
+        self.captureout.capture()
+        self.captureerr.capture()
+        sys.stdout = WiredTigerTestCase._newout
+        sys.stderr = WiredTigerTestCase._newerr
+        
+    def fdTearDown(self):
+        # restore stderr/stdout
+        self.captureout.release()
+        self.captureerr.release()
+        sys.stdout = WiredTigerTestCase._stdout
+        sys.stderr = WiredTigerTestCase._stderr
+        
     def __init__(self, *args, **kwargs):
         unittest.TestCase.__init__(self, *args, **kwargs)
         if not self._globalSetup:
@@ -140,11 +271,19 @@ class WiredTigerTestCase(unittest.TestCase):
         except:
             os.chdir(self.origcwd)
             raise
+        self.fdSetUp()
 
     def tearDown(self):
-        self.pr('finishing')
-        self.close_conn()
-        os.chdir(self.origcwd)
+        try:
+            self.fdTearDown()
+            self.pr('finishing')
+            self.close_conn()
+            self.captureout.check(self)
+            self.captureerr.check(self)
+        finally:
+            # always get back to original directory
+            os.chdir(self.origcwd)
+
         # Clean up unless there's a failure
         excinfo = sys.exc_info()
         if excinfo == (None, None, None):
@@ -159,6 +298,46 @@ class WiredTigerTestCase(unittest.TestCase):
         if WiredTigerTestCase._verbose > 2:
             self.prhead('TEST COMPLETED')
 
+    @contextmanager
+    def expectedStdout(self, expect):
+        self.captureout.check(self)
+        yield
+        self.captureout.checkAdditional(self, expect)
+
+    @contextmanager
+    def expectedStderr(self, expect):
+        self.captureerr.check(self)
+        yield
+        self.captureerr.checkAdditional(self, expect)
+
+    @contextmanager
+    def expectedStdoutPattern(self, pat):
+        self.captureout.check(self)
+        yield
+        self.captureout.checkAdditionalPattern(self, pat)
+
+    @contextmanager
+    def expectedStderrPattern(self, pat):
+        self.captureerr.check(self)
+        yield
+        self.captureerr.checkAdditionalPattern(self, pat)
+
+    def assertRaisesWithMessage(self, exceptionType, expr, message):
+        """
+        Like TestCase.assertRaises(), but also checks to see
+        that a message is printed on stderr.  If message starts
+        and ends with a slash, it is considered a pattern that
+        must appear in stderr (it need not encompass the entire
+        error output).  Otherwise, the message must match verbatim,
+        including any trailing newlines.
+        """
+        if len(message) > 2 and message[0] == '/' and message[-1] == '/':
+            with self.expectedStderrPattern(message[1:-1]):
+                self.assertRaises(exceptionType, expr)
+        else:
+            with self.expectedStderr(message):
+                self.assertRaises(exceptionType, expr)
+            
     @staticmethod
     def printOnce(msg):
         # There's a race condition with multiple threads,
