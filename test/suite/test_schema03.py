@@ -268,7 +268,9 @@ class test_schema03(wttest.WiredTigerTestCase):
     #   or
     # scenarios = [ scenarios[0], scenarios[30], scenarios[40] ]
 
-    print 'test_schema03: running ' + str(len(scenarios)) + ' scenarios'
+    wttest.WiredTigerTestCase.printVerbose(2, 'test_schema03: running ' + \
+                          str(len(scenarios)) + ' of ' + \
+                          str(len(all_scenarios)) + ' possible scenarios')
 
     # This test requires a large number of open files.
     # Increase our resource limits before we start

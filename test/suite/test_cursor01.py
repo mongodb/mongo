@@ -72,7 +72,7 @@ class test_cursor01(wttest.WiredTigerTestCase):
         else:
             valformat = 'value_format=S'
         create_args = keyformat + ',' + valformat + self.config_string()
-        print('creating session: ' + create_args)
+        self.pr('creating session: ' + create_args)
         self.session_create(tablearg, create_args)
         self.pr('creating cursor')
         return self.session.open_cursor(tablearg, None, None)
