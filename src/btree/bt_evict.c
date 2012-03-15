@@ -198,6 +198,7 @@ __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * thread will see this later.
 	 */
 	WT_VERBOSE(session, evictserver, "eviction server request table full");
+	page->ref->state = WT_REF_MEM;
 	return (WT_RESTART);
 }
 
@@ -369,16 +370,13 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 			__wt_yield();
 
 			/*
-			 * If eviction fails, free up the page and hope it
+			 * If eviction fails, it will free up the page: hope it
 			 * works next time.  Application threads may be holding
 			 * a reference while trying to get another (e.g., if
 			 * they have two cursors open), so blocking
 			 * indefinitely leads to deadlock.
 			 */
-			if ((ret = __wt_rec_evict(session, er->page, 0)) != 0) {
-				WT_ASSERT(session, ref->page == er->page);
-				ref->state = WT_REF_MEM;
-			}
+			ret = __wt_rec_evict(session, er->page, 0);
 		} else {
 			/*
 			 * If we're about to do a walk of the file tree (and
@@ -736,6 +734,8 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session)
 	if (page == NULL)
 		return (WT_NOTFOUND);
 
+	WT_ASSERT(session, page->ref->state == WT_REF_EVICTING);
+
 	/* Reference the correct WT_BTREE handle. */
 	saved_btree = session->btree;
 	WT_SET_BTREE_IN_SESSION(session, btree);
@@ -744,19 +744,14 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session)
 	 * We don't care why eviction failed (maybe the page was dirty and we're
 	 * out of disk space, or the page had an in-memory subtree already being
 	 * evicted).  Regardless, don't pick the same page every time.
+	 *
+	 * We used to bump the page's read_gen only if eviction failed, but
+	 * that isn't safe: at that point, eviction has already unlocked the
+	 * page and some other thread may have evicted it by the time we look
+	 * at it.
 	 */
-	if (__wt_rec_evict(session, page, 0) != 0) {
-		page->read_gen = __wt_cache_read_gen(session);
-
-		/*
-		 * If the evicting state of the page was not cleared, clear it
-		 * now to make the page available again.
-		 */
-		if (page->ref->state == WT_REF_EVICTING) {
-			WT_ASSERT(session, page->ref->page == page);
-			page->ref->state = WT_REF_MEM;
-		}
-	}
+	page->read_gen = __wt_cache_read_gen(session);
+	(void)__wt_rec_evict(session, page, 0);
 
 	WT_ATOMIC_ADD(btree->lru_count, -1);
 
