@@ -105,6 +105,29 @@ __wt_cache_bytes_inuse(WT_CACHE *cache)
 }
 
 /*
+ * __wt_page_modify_init --
+ *	A page is about to be modified, allocate the modification structure.
+ */
+static inline int
+__wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_PAGE_MODIFY *modify;
+
+	if (page->modify != NULL)
+		return (0);
+
+	WT_RET(__wt_calloc_def(session, 1, &modify));
+
+	/*
+	 * Multiple threads of control may be searching and deciding to modify
+	 * a page, if we don't do the update, discard the memory.
+	 */
+	if (!WT_ATOMIC_CAS(page->modify, NULL, modify))
+		__wt_free(session, modify);
+	return (0);
+}
+
+/*
  * __wt_page_modify_set --
  *	Mark the page dirty.
  */

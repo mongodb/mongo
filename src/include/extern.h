@@ -225,7 +225,6 @@ extern int __wt_page_inmem(WT_SESSION_IMPL *session,
     WT_PAGE_HEADER *dsk,
     size_t *inmem_sizep,
     WT_PAGE **pagep);
-extern int __wt_page_modify_init(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_cache_read(WT_SESSION_IMPL *session,
     WT_PAGE *parent,
     WT_REF *ref);

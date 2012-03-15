@@ -59,8 +59,7 @@ __wt_col_modify(WT_SESSION_IMPL *session, WT_CURSOR_BTREE *cbt, int op)
 	}
 
 	/* If we don't yet have a modify structure, we'll need one. */
-	if (page->modify == NULL)
-		WT_RET(__wt_page_modify_init(session, page));
+	WT_RET(__wt_page_modify_init(session, page));
 
 	ins = NULL;
 	new_inshead = NULL;
