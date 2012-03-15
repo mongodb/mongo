@@ -37,17 +37,16 @@ class test_schema02(wttest.WiredTigerTestCase):
     """
     nentries = 1000
 
-    def expect_failure_primary(self, configstr):
-        self.assertRaises(wiredtiger.WiredTigerError,
-                          lambda:self.session.create("table:main", configstr))
-
-    def expect_failure_colgroup(self, name, configstr):
-        self.assertRaises(wiredtiger.WiredTigerError,
-                          lambda:self.session.create("colgroup:" + name, configstr))
+    def expect_failure_colgroup(self, name, configstr, match):
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda:self.session.create("colgroup:" + name, configstr), match)
 
     def test_colgroup_after_failure(self):
         # bogus formats
-        self.expect_failure_primary("key_format=Z,value_format=Y")
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda:self.session.create("table:main",
+                                       "key_format=Z,value_format=Y"),
+            "/Invalid type 'Z' found in format 'Z'/")
 
         # These should succeed
         self.session.create("table:main", "key_format=iS,value_format=SiSi,"
@@ -56,38 +55,56 @@ class test_schema02(wttest.WiredTigerTestCase):
 
     def test_colgroup_failures(self):
         # too many columns
-        #### TEST FAILURE HERE ####
-        self.expect_failure_primary("key_format=S,value_format=,columns=(a,b)")
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda:self.session.create("table:main", "key_format=S,"
+                                       "value_format=,columns=(a,b)"),
+            "/Number of columns in '\(a,b\)' does not match "
+            "key format 'S' plus value format ''/")
         # Note: too few columns is allowed
 
         # expect this to work
         self.session.create("table:main", "key_format=iS,value_format=SiSi,"
-                            "columns=(ikey,Skey,S1,i2,S3,i4),colgroups=(c1,c2)")
+                            "columns=(ikey,Skey,S1,i2,S3,i4),"
+                            "colgroups=(c1,c2)")
 
         # bad table name
-        #### TEST FAILURE HERE ####
-        self.expect_failure_colgroup("nomatch:c", "columns=(S1,i2)")
+        self.expect_failure_colgroup("nomatch:c", "columns=(S1,i2)",
+                                     "/Can't create 'colgroup:nomatch:c'"
+                                     " for non-existent table nomatch/")
         # colgroup not declared in initial create
-        self.expect_failure_colgroup("main:nomatch", "columns=(S1,i2)")
+        self.expect_failure_colgroup("main:nomatch", "columns=(S1,i2)",
+                                     "/Column group 'nomatch' not found"
+                                     " in table 'main'/")
         # bad column
-        self.expect_failure_colgroup("main:c1", "columns=(S1,i2,bad)")
-        # no columns
-        #### TEST FAILURE HERE ####
-        #self.expect_failure_colgroup("main:c1", "columns=()")
+        self.expect_failure_colgroup("main:c1", "columns=(S1,i2,bad)",
+                                     "/Column 'bad' not found/")
+
+        # TODO: no columns allowed, or not?
+        #self.session.create("colgroup:main:c0", "columns=()")
+
         # key in a column group
-        self.expect_failure_colgroup("main:c1", "columns=(ikey,S1,i2)")
+        self.expect_failure_colgroup("main:c1", "columns=(ikey,S1,i2)",
+                                     "/A column group cannot store key column"
+                                     " 'ikey' in its value/")
 
         # expect this to work
         self.session.create("colgroup:main:c1", "columns=(S1,i2)")
 
         # colgroup not declared in initial create
-        self.expect_failure_colgroup("main:c3", "columns=(S3,i4)")
+        self.expect_failure_colgroup("main:c3", "columns=(S3,i4)",
+                                     "/Column group 'c3' not found in"
+                                     " table 'main'/")
 
-        # missing columns
-        self.expect_failure_colgroup("main:c2", "columns=(S1,i4)")
+        # this is the last column group, but there are missing columns
+        self.expect_failure_colgroup("main:c2", "columns=(S1,i4)",
+                                     "/Column 'S3' in 'table:main' does not"
+                                     " appear in a column group/")
+
+        # TODO: is repartitioning column groups allowed?
+        # this does not raise an error
+        # self.expect_failure_colgroup("main:c2", "columns=(S1,S3,i4)"
 
         # expect this to work
-        #### TEST FAILURE HERE ####
         self.session.create("colgroup:main:c2", "columns=(S3,i4)")
 
         # expect these to work - each table name is a separate namespace
