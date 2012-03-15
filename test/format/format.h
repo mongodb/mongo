@@ -122,4 +122,4 @@ uint32_t wts_rand(void);
 void	 wts_read_scan(void);
 void	 wts_salvage(void);
 void	 wts_stats(void);
-void	 wts_verify(void);
+void	 wts_verify(const char *);

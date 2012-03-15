@@ -215,7 +215,7 @@ wts_sync(void)
 }
 
 void
-wts_verify(void)
+wts_verify(const char *tag)
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;
@@ -228,7 +228,7 @@ wts_verify(void)
 	if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 		die(ret, "connection.open_session");
 	if ((ret = session->verify(session, WT_TABLENAME, NULL)) != 0)
-		die(ret, "session.verify: %s", WT_TABLENAME);
+		die(ret, "session.verify: %s: %s", WT_TABLENAME, tag);
 	if ((ret = session->close(session, NULL)) != 0)
 		die(ret, "session.close");
 }
