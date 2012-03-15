@@ -7,8 +7,12 @@ var db = db.getSisterDB("profile4");
 t = db.profile4;
 t.drop();
 
+function profileCursor() {
+    return db.system.profile.find( { user:username } );
+}
+
 function lastOp() {
-    p = db.system.profile.find().sort( { $natural:-1 } ).next();
+    p = profileCursor().sort( { $natural:-1 } ).next();
 //    printjson( p );
     return p;
 }
@@ -22,10 +26,14 @@ function checkLastOp( spec ) {
 }
 
 try {
+    username = "jstests_profile4_user";
+    db.addUser( username, "password" );
+    db.auth( username, "password" );
+    
     db.setProfilingLevel(0);
     
     db.system.profile.drop();
-    assert.eq( 0 , db.system.profile.count() )
+    assert.eq( 0 , profileCursor().count() )
     
     db.setProfilingLevel(2);
 

@@ -6,9 +6,19 @@ var db = db.getSisterDB("profile1");
 
 try {
 
+    username = "jstests_profile1_user";
+    db.addUser( username, "password" );
+    db.auth( username, "password" );
+
+    function profileCursor( query ) {
+        query = query || {};
+        Object.extend( query, { user:username } );
+        return db.system.profile.find( query );
+    }
+    
     function getProfileAString() {
         var s = "\n";
-        db.system.profile.find().forEach( function(z){
+        profileCursor().forEach( function(z){
             s += tojson( z ) + " ,\n" ;
         } );
         return s;
@@ -30,7 +40,7 @@ try {
     
     db.foo.findOne()
     
-    assert.eq( 4 , db.system.profile.find().count() , "E2" );
+    assert.eq( 4 , profileCursor().count() , "E2" );
     
     /* Make sure we can't drop if profiling is still on */
     assert.throws( function(z){ db.getCollection("system.profile").drop(); } )
@@ -70,10 +80,10 @@ try {
     db.eval( "sleep(25)" )
     db.eval( "sleep(120)" )
     
-    assert.eq( 2 , db.system.profile.find( { "command.$eval" : /^sleep/ } ).count() );
+    assert.eq( 2 , profileCursor( { "command.$eval" : /^sleep/ } ).count() );
 
-    assert.lte( 119 , db.system.profile.findOne( { "command.$eval" : "sleep(120)" } ).millis );
-    assert.lte( 24 , db.system.profile.findOne( { "command.$eval" : "sleep(25)" } ).millis );
+    assert.lte( 119 , profileCursor( { "command.$eval" : "sleep(120)" } )[0].millis );
+    assert.lte( 24 , profileCursor( { "command.$eval" : "sleep(25)" } )[0].millis );
 
     /* sleep() could be inaccurate on certain platforms.  let's check */
     print("\nsleep 2 time actual:");
@@ -107,20 +117,20 @@ try {
     var delta = 0;
     delta += evalSleepMoreThan( 15 , 100 );
     delta += evalSleepMoreThan( 120 , 100 );
-    assert.eq( delta , db.system.profile.find( { "command.$eval" : /^sleep/ } ).count() , "X2 : " + getProfileAString() )
+    assert.eq( delta , profileCursor( { "command.$eval" : /^sleep/ } ).count() , "X2 : " + getProfileAString() )
 
     resetProfile(1,20);
     delta = 0;
     delta += evalSleepMoreThan( 5 , 20 );
     delta += evalSleepMoreThan( 120 , 20 );
-    assert.eq( delta , db.system.profile.find( { "command.$eval" : /^sleep/ } ).count() , "X3 : " + getProfileAString() )
+    assert.eq( delta , profileCursor( { "command.$eval" : /^sleep/ } ).count() , "X3 : " + getProfileAString() )
         
     resetProfile(2);
     db.profile1.drop();
     var q = { _id : 5 };
     var u = { $inc : { x : 1 } };
     db.profile1.update( q , u );
-    var r = db.system.profile.find( { ns : db.profile1.getFullName() } ).sort( { $natural : -1 } )[0]
+    var r = profileCursor( { ns : db.profile1.getFullName() } ).sort( { $natural : -1 } )[0]
     assert.eq( q , r.query , "Y1: " + tojson(r) );
     assert.eq( u , r.updateobj , "Y2" );
     assert.eq( "update" , r.op , "Y3" );
