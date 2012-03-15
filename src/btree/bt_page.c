@@ -461,7 +461,11 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 	unpack = &_unpack;
 
 	/*
-	 * Walk a row-store page of WT_CELLs, counting the number of keys.
+	 * Leaf row-store page entries map to a maximum of two-to-one to the
+	 * number of physical entries on the page (each physical entry might be
+	 * a key without a subsequent data item).  To avoid over-allocation in
+	 * workloads with large numbers of empty data items, first walk the page
+	 * counting the number of keys, then allocate the indices.
 	 *
 	 * The page contains key/data pairs.  Keys are on-page (WT_CELL_KEY) or
 	 * overflow (WT_CELL_KEY_OVFL) items, data are either a single on-page
