@@ -575,6 +575,7 @@ extern int __wt_thread_create(pthread_t *tidret,
     void *(*func)(void *),
     void *arg);
 extern int __wt_thread_join(pthread_t tid);
+extern int __wt_epoch(WT_SESSION_IMPL *session, struct timespec *tp);
 extern void __wt_yield(void);
 extern int __wt_struct_check(WT_SESSION_IMPL *session,
     const char *fmt,

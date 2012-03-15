@@ -140,6 +140,7 @@ WiredTiger
 WiredTiger's
 Wuninitialized
 XP
+__wt_epoch
 abcdef
 addfrag
 addl
@@ -276,6 +277,7 @@ getoneraw
 getones
 getonesn
 getraw
+gettime
 getv
 gobare
 goesc

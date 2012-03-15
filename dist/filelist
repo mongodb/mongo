@@ -81,6 +81,7 @@ src/os_posix/os_rename.c
 src/os_posix/os_rw.c
 src/os_posix/os_sleep.c
 src/os_posix/os_thread.c
+src/os_posix/os_time.c
 src/os_posix/os_yield.c
 src/packing/packing.c
 src/packing/packing_api.c
