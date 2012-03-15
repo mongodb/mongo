@@ -189,25 +189,5 @@ namespace mongo {
         ptf = this;
     }
 
-#if defined(_DEBUG)
-    void MongoFile::markAllWritable() {
-      if( cmdLine.dur )
-          return;
-        LockMongoFilesShared lk;
-        for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ) {
-            MongoFile * mmf = *i;
-            if (mmf) mmf->_lock();
-        }
-    }
 
-    void MongoFile::unmarkAllWritable() {
-        if( cmdLine.dur )
-            return;
-        LockMongoFilesShared lk;
-        for ( set<MongoFile*>::iterator i = mmfiles.begin(); i != mmfiles.end(); i++ ) {
-            MongoFile * mmf = *i;
-            if (mmf) mmf->_unlock();
-        }
-    }
-#endif
 } // namespace mongo
