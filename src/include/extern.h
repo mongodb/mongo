@@ -232,12 +232,6 @@ extern int __wt_cache_read(WT_SESSION_IMPL *session,
 extern int __wt_kv_return(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
     int key_ret);
-extern int __wt_btree_get_root(WT_SESSION_IMPL *session, WT_ITEM *addr);
-extern int __wt_btree_free_root(WT_SESSION_IMPL *session);
-extern int __wt_btree_set_root(WT_SESSION_IMPL *session,
-    const char *filename,
-    uint8_t *addr,
-    uint32_t size);
 extern int __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_btree_stat_init(WT_SESSION_IMPL *session);
 extern int __wt_btree_sync(WT_SESSION_IMPL *session, const char *cfg[]);
@@ -762,6 +756,12 @@ extern int __wt_session_remove_btree( WT_SESSION_IMPL *session,
     int locked);
 extern int __wt_session_close_any_open_btree(WT_SESSION_IMPL *session,
     const char *name);
+extern int __wt_btree_get_root(WT_SESSION_IMPL *session, WT_ITEM *addr);
+extern int __wt_btree_free_root(WT_SESSION_IMPL *session);
+extern int __wt_btree_set_root(WT_SESSION_IMPL *session,
+    const char *filename,
+    uint8_t *addr,
+    uint32_t size);
 extern void __wt_eventv(WT_SESSION_IMPL *session,
     int msg_event,
     int error,

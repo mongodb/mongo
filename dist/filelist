@@ -29,7 +29,6 @@ src/btree/bt_ovfl.c
 src/btree/bt_page.c
 src/btree/bt_read.c
 src/btree/bt_ret.c
-src/btree/bt_root.c
 src/btree/bt_slvg.c
 src/btree/bt_stat.c
 src/btree/bt_sync.c
@@ -99,6 +98,7 @@ src/schema/schema_util.c
 src/schema/schema_worker.c
 src/session/session_api.c
 src/session/session_btree.c
+src/session/session_root.c
 src/support/err.c
 src/support/filename.c
 src/support/global.c
