@@ -230,7 +230,7 @@ __wt_cache_evict_server(void *arg)
 		 * whether there is work to do.  If so, evict_cond will
 		 * be signalled and the wait below won't block.
 		 */
-		__wt_eviction_check(session, NULL);
+		__wt_eviction_check(session, NULL, 1);
 
 		WT_VERBOSE(session, evictserver, "sleeping");
 		__wt_cond_wait(session, cache->evict_cond);

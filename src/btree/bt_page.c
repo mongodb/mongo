@@ -26,7 +26,13 @@ __wt_page_in_func(
 #endif
     )
 {
-	int read_lockout;
+	int first, read_lockout;
+
+	/*
+	 * Only wake the eviction server once: after that, we're just wasting
+	 * effort and making a busy mutex busier.
+	 */
+	first = 1;
 
 	for (;;) {
 		switch (ref->state) {
@@ -35,7 +41,8 @@ __wt_page_in_func(
 			 * The page isn't in memory, attempt to set the
 			 * state to WT_REF_READING.  If successful, read it.
 			 */
-			__wt_eviction_check(session, &read_lockout);
+			__wt_eviction_check(session, &read_lockout, first);
+			first = 0;
 			if (read_lockout || !WT_ATOMIC_CAS(
 			    ref->state, WT_REF_DISK, WT_REF_READING))
 				break;
