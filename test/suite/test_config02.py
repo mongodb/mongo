@@ -145,26 +145,24 @@ class test_config02(wttest.WiredTigerTestCase):
 	# env var, but no open configuration string, should fail
         edir = 'envdir'
         os.mkdir(edir)
-        with self.expectedStderrPattern('WIREDTIGER_HOME environment variable\
- set but WiredTiger not configured to use that environment variable'):
-            self.assertRaises(wiredtiger.WiredTigerError,
-                              lambda: self.common_test(None, edir, None))
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: self.common_test(None, edir, None),
+            '/WIREDTIGER_HOME environment variable set but'
+            ' WiredTiger not configured to use that environment variable/')
 
     def test_home_does_not_exist(self):
         dir = 'nondir'
-        with self.expectedStderr('wiredtiger_open: WiredTiger:\
- No such file or directory\n'):
-            self.assertRaises(wiredtiger.WiredTigerError,
-                              lambda: wiredtiger.wiredtiger_open(dir, 'create'))
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: wiredtiger.wiredtiger_open(dir, 'create'),
+            'wiredtiger_open: WiredTiger: No such file or directory\n')
 
     def test_home_not_writeable(self):
         dir = 'subdir'
         os.mkdir(dir)
         os.chmod(dir, 0555)
-        with self.expectedStderr('wiredtiger_open: WiredTiger:\
- Permission denied\n'):
-            self.assertRaises(wiredtiger.WiredTigerError,
-                              lambda: wiredtiger.wiredtiger_open(dir, 'create'))
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: wiredtiger.wiredtiger_open(dir, 'create'),
+            'wiredtiger_open: WiredTiger: Permission denied\n')
 
 if __name__ == '__main__':
     wttest.run()

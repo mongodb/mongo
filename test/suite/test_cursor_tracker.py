@@ -419,12 +419,12 @@ class TestCursorTracker(wttest.WiredTigerTestCase):
             raise Exception('cur_check_here: cursor.get_key, get_value are not valid')
         elif self.nopos:
             self.traceapi_before('cursor.get_key()')
-            with self.expectedStderr(keymsg):
-                self.assertRaises(wiredtiger.WiredTigerError, cursor.get_key)
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                cursor.get_key, keymsg)
             self.traceapi_after('<unknown>')
             self.traceapi_before('cursor.get_value()')
-            with self.expectedStderr(valuemsg):
-                self.assertRaises(wiredtiger.WiredTigerError, cursor.get_value)
+            self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+                cursor.get_value, valuemsg)
             self.traceapi_after('<unknown>')
         else:
             bits = self.curbits

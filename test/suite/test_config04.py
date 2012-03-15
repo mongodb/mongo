@@ -90,10 +90,10 @@ class test_config04(wttest.WiredTigerTestCase):
         self.assertEqual(got_cache, size)
 
     def test_bad_config(self):
-        with self.expectedStderr("wiredtiger_open: Unknown configuration key\
- found: 'not_valid': Invalid argument\n"):
-            self.assertRaises(wiredtiger.WiredTigerError, lambda:
-                wiredtiger.wiredtiger_open('.', 'not_valid,another_bad=10'))
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: wiredtiger.wiredtiger_open('.', 'not_valid,another_bad=10'),
+            "wiredtiger_open: Unknown configuration key"
+            " found: 'not_valid': Invalid argument\n")
 
     def test_cache_size_number(self):
         # Use a number without multipliers
@@ -125,17 +125,16 @@ class test_config04(wttest.WiredTigerTestCase):
         self.common_cache_size_test('2T', 2*self.T)
 
     def test_cache_too_small(self):
-        with self.expectedStderrPattern("Value too small for key\
- 'cache_size' the minimum is"):
-            self.assertRaises(wiredtiger.WiredTigerError, lambda:
-                wiredtiger.wiredtiger_open('.', 'create,cache_size=900000'))
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: wiredtiger.wiredtiger_open('.', 'create,cache_size=900000'),
+            "/Value too small for key 'cache_size' the minimum is/")
 
     def test_cache_too_large(self):
         T11 = 11 * self.T  # 11 Terabytes
-        with self.expectedStderrPattern("Value too large for key\
- 'cache_size' the maximum is"):
-            self.assertRaises(wiredtiger.WiredTigerError, lambda:
-                wiredtiger.wiredtiger_open('.', 'create,cache_size=' + str(T11)))
+        configstr = 'create,cache_size=' + str(T11)
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            lambda: wiredtiger.wiredtiger_open('.', configstr),
+            "/Value too large for key 'cache_size' the maximum is/")
 
     def test_eviction(self):
         self.common_test('eviction_target=84,eviction_trigger=94')

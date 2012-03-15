@@ -142,10 +142,10 @@ class test_cursor04(wttest.WiredTigerTestCase):
         # The key/value should be cleared on NOTFOUND
         keymsg = 'cursor.get_key: requires key be set: Invalid argument\n'
         valuemsg = 'cursor.get_value: requires value be set: Invalid argument\n'
-        with self.expectedStderr(keymsg):
-            self.assertRaises(wiredtiger.WiredTigerError, cursor.get_key)
-        with self.expectedStderr(valuemsg):
-            self.assertRaises(wiredtiger.WiredTigerError, cursor.get_value)
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            cursor.get_key, keymsg)
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            cursor.get_value, valuemsg)
 
         # 2. Calling search_near for a value beyond the end
         cursor.set_key(self.genkey(self.nentries))

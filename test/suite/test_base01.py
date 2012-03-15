@@ -55,10 +55,13 @@ class test_base01(wttest.WiredTigerTestCase):
 
     def test_error(self):
         gotException = False
-        with self.expectedStderr("session.create: Unknown configuration key found: 'expect_this_error': Invalid argument\n"):
+        expectMessage = "session.create: Unknown configuration key found: " + \
+            "'expect_this_error': Invalid argument\n"
+        with self.expectedStderr(expectMessage):
             try:
                 self.pr('expect an error message...')
-                self.session.create('table:' + self.table_name1, 'expect_this_error,okay?')
+                self.session.create('table:' + self.table_name1,
+                                    'expect_this_error,okay?')
             except wiredtiger.WiredTigerError as e:
                 gotException = True
                 self.pr('got expected exception: ' + str(e))

@@ -92,10 +92,10 @@ class test_cursor01(wttest.WiredTigerTestCase):
     def assertCursorHasNoKeyValue(self, cursor):
         keymsg = 'cursor.get_key: requires key be set: Invalid argument\n'
         valuemsg = 'cursor.get_value: requires value be set: Invalid argument\n'
-        with self.expectedStderr(keymsg):
-            self.assertRaises(wiredtiger.WiredTigerError, cursor.get_key)
-        with self.expectedStderr(valuemsg):
-            self.assertRaises(wiredtiger.WiredTigerError, cursor.get_value)
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            cursor.get_key, keymsg)
+        self.assertRaisesWithMessage(wiredtiger.WiredTigerError,
+            cursor.get_value, valuemsg)
         
     def test_forward_iter(self):
         """
