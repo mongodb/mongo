@@ -156,6 +156,7 @@ wts_dump(const char *tag, int dump_bdb)
 		snprintf(cmd, sizeof(cmd),
 		    "sh ./s_dumpcmp%s -c", dump_bdb ? " -b" : "");
 		break;
+	default:
 	case ROW:
 		snprintf(cmd, sizeof(cmd),
 		    "sh ./s_dumpcmp%s", dump_bdb ? " -b" : "");

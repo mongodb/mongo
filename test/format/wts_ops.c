@@ -34,6 +34,7 @@ wts_ops(void)
 	conn = g.wts_conn;
 
 	/* Open a session. */
+	session = NULL;
 	if (g.logging == LOG_OPS) {
 		if ((ret = conn->open_session(conn, NULL, NULL, &session)) != 0)
 			die(ret, "connection.open_session");
@@ -82,11 +83,12 @@ wts_ops(void)
 			track("read/write ops", 0ULL, &total);
 			if (!running)
 				break;
-			usleep(100000);			/* 1/10th of a second */
+			(void)usleep(100000);		/* 1/10th of a second */
 		}
+		free(tinfo);
 	}
 
-	if (g.logging == LOG_OPS) {
+	if (session != NULL) {
 		(void)time(&now);
 		(void)session->msg_printf(session,
 		    "===============\nthread ops stop: %s===============",
@@ -135,6 +137,7 @@ ops(void *arg)
 	 * testing with new, appended records, we don't want to have to specify
 	 * the record number, which requires an append configuration.
 	 */
+	cursor = cursor_insert = NULL;
 	if ((ret = session->open_cursor(session,
 	    WT_TABLENAME, NULL, "overwrite", &cursor)) != 0)
 		die(ret, "session.open_cursor");
@@ -188,7 +191,8 @@ ops(void *arg)
 				 * Reset the standard cursor so it doesn't keep
 				 * pages pinned.
 				 */
-				cursor->reset(cursor);
+				if ((ret = cursor->reset(cursor)) != 0)
+					die(ret, "cursor.reset");
 				col_insert(cursor_insert, &key, &value, &keyno);
 				insert = 1;
 				break;
@@ -223,8 +227,8 @@ ops(void *arg)
 			    insert ? cursor_insert : cursor, dir, &notfound);
 		}
 
-		if (insert)
-			cursor_insert->reset(cursor_insert);
+		if (insert && (ret = cursor_insert->reset(cursor_insert)) != 0)
+			die(ret, "cursor.reset");
 
 		/* Read the value we modified to confirm the operation. */
 		read_row(cursor, &key, keyno);
