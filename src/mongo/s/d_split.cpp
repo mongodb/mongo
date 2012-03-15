@@ -240,7 +240,7 @@ namespace mongo {
     public:
         SplitVector() : Command( "splitVector" , false ) {}
         virtual bool slaveOk() const { return false; }
-        virtual LockType locktype() const { return READ; }
+        virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream &help ) const {
             help <<
                  "Internal command.\n"
@@ -298,7 +298,7 @@ namespace mongo {
 
             {
                 // Get the size estimate for this namespace
-                Client::Context ctx( ns );
+                Client::ReadContext ctx( ns );
                 NamespaceDetails *d = nsdetails( ns );
                 if ( ! d ) {
                     errmsg = "ns not found";
