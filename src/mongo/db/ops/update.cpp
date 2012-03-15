@@ -990,10 +990,11 @@ namespace mongo {
 
                 if( mss->needOpLogRewrite() ) {
                     DEBUGUPDATE( "\t rewrite update: " << mss->getOpLogRewrite() );
-                    logOp("u", ns, mss->getOpLogRewrite() , &pattern );
+                    logOp("u", ns, mss->getOpLogRewrite() , 
+                          &pattern, 0, fromMigrate );
                 }
                 else {
-                    logOp("u", ns, updateobj, &pattern );
+                    logOp("u", ns, updateobj, &pattern, 0, fromMigrate );
                 }
             }
             return UpdateResult( 1 , 1 , 1);
@@ -1005,7 +1006,7 @@ namespace mongo {
         assert(nsdt);
         theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , updateobj.objdata(), updateobj.objsize(), debug );
         if ( logop ) {
-            logOp("u", ns, updateobj, &patternOrig );
+            logOp("u", ns, updateobj, &patternOrig, 0, fromMigrate );
         }
         return UpdateResult( 1 , 0 , 1 );
     }
@@ -1238,10 +1239,11 @@ namespace mongo {
 
                         if ( forceRewrite || mss->needOpLogRewrite() ) {
                             DEBUGUPDATE( "\t rewrite update: " << mss->getOpLogRewrite() );
-                            logOp("u", ns, mss->getOpLogRewrite() , &pattern );
+                            logOp("u", ns, mss->getOpLogRewrite() , 
+                                  &pattern, 0, fromMigrate );
                         }
                         else {
-                            logOp("u", ns, updateobj, &pattern );
+                            logOp("u", ns, updateobj, &pattern, 0, fromMigrate );
                         }
                     }
                     numModded++;
@@ -1278,7 +1280,7 @@ namespace mongo {
                 theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , updateobj.objdata(), updateobj.objsize(), debug, god);
                 if ( logop ) {
                     DEV wassert( !god ); // god doesn't get logged, this would be bad.
-                    logOp("u", ns, updateobj, &pattern );
+                    logOp("u", ns, updateobj, &pattern, 0, fromMigrate );
                 }
                 return UpdateResult( 1 , 0 , 1 );
             } while ( c->ok() );
@@ -1295,7 +1297,7 @@ namespace mongo {
                 debug.fastmodinsert = true;
                 theDataFileMgr.insertWithObjMod(ns, newObj, god);
                 if ( logop )
-                    logOp( "i", ns, newObj );
+                    logOp( "i", ns, newObj, 0, 0, fromMigrate );
 
                 return UpdateResult( 0 , 1 , 1 , newObj );
             }
@@ -1305,7 +1307,7 @@ namespace mongo {
             BSONObj no = updateobj;
             theDataFileMgr.insertWithObjMod(ns, no, god);
             if ( logop )
-                logOp( "i", ns, no );
+                logOp( "i", ns, no, 0, 0, fromMigrate );
             return UpdateResult( 0 , 0 , 1 , no );
         }
 
@@ -1326,7 +1328,8 @@ namespace mongo {
             /* dm: it's very important that system.indexes is never updated as IndexDetails has pointers into it */
             uassert( 10156 , str::stream() << "cannot update system collection: " << ns << " q: " << patternOrig << " u: " << updateobj , legalClientSystemNS( ns , true ) );
         }
-        UpdateResult ur = _updateObjects(false, ns, updateobj, patternOrig, upsert, multi, logop,
+        UpdateResult ur = _updateObjects(false, ns, updateobj, patternOrig, 
+                                         upsert, multi, logop,
                                          debug, 0, fromMigrate, planPolicy );
         debug.nupdated = ur.num;
         return ur;
