@@ -12,6 +12,7 @@
 #include <errno.h>
 #include <inttypes.h>
 #include <limits.h>
+#include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -106,9 +107,11 @@ void	 config_print(int);
 void	 config_setup(void);
 void	 config_single(const char *, int);
 void	 die(int, const char *, ...);
+void	 key_len_setup(void);
 void	 key_gen_setup(uint8_t **);
 void	 key_gen(uint8_t *, uint32_t *, uint64_t, int);
 void	 track(const char *, uint64_t);
+void	 val_gen_setup(uint8_t **);
 void	 value_gen(uint8_t *, uint32_t *, uint64_t);
 void	 wts_close(void);
 void	 wts_dump(const char *, int);
@@ -119,4 +122,4 @@ uint32_t wts_rand(void);
 void	 wts_read_scan(void);
 void	 wts_salvage(void);
 void	 wts_stats(void);
-void	 wts_verify(const char *);
+void	 wts_verify(void);

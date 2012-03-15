@@ -215,7 +215,7 @@ wts_sync(void)
 }
 
 void
-wts_verify(const char *tag)
+wts_verify(void)
 {
 	WT_CONNECTION *conn;
 	WT_SESSION *session;

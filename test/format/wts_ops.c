@@ -78,7 +78,6 @@ ops(void *arg)
 	WT_CURSOR *cursor, *cursor_insert;
 	WT_SESSION *session;
 	WT_ITEM key, value;
-	time_t now;
 	uint64_t cnt, keyno;
 	uint32_t op;
 	u_int np;

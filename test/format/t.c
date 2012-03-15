@@ -103,7 +103,7 @@ main(int argc, char *argv[])
 		wts_open();
 
 		wts_load();			/* Load initial records */
-		wts_verify("post-bulk verify");	/* Verify */
+		wts_verify();			/* Verify */
 
 						/* Loop reading & operations */
 		for (reps = 0; reps < 3; ++reps) {
@@ -116,8 +116,7 @@ main(int argc, char *argv[])
 			if (g.c_ops == 0 || reps == 2)
 				wts_stats();
 
-						/* Verify */
-			wts_verify("post-ops verify");
+			wts_verify();		/* Verify */
 
 			/*
 			 * If no operations scheduled, quit after a single
@@ -146,7 +145,7 @@ main(int argc, char *argv[])
 		 */
 		if (g.c_delete_pct == 0) {
 			wts_salvage();			/* Salvage & verify */
-			wts_verify("post-salvage verify");
+			wts_verify();
 
 			wts_close();			/* Dump the file */
 			wts_dump("salvage", 0);

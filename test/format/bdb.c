@@ -95,7 +95,6 @@ bdb_np(int next,
     void *keyp, uint32_t *keysizep,
     void *valuep, uint32_t *valuesizep, int *notfoundp)
 {
-	DB *db = g.bdb;
 	DBC *dbc = g.dbc;
 	int ret;
 
@@ -118,7 +117,6 @@ bdb_np(int next,
 void
 bdb_read(uint64_t keyno, void *valuep, uint32_t *valuesizep, int *notfoundp)
 {
-	DB *db = g.bdb;
 	DBC *dbc = g.dbc;
 	int ret;
 
@@ -141,7 +139,6 @@ void
 bdb_put(const void *arg_key, uint32_t arg_key_size,
     const void *arg_value, uint32_t arg_value_size, int *notfoundp)
 {
-	DB *db = g.bdb;
 	DBC *dbc = g.dbc;
 	int ret;
 
@@ -164,7 +161,6 @@ bdb_put(const void *arg_key, uint32_t arg_key_size,
 void
 bdb_del(uint64_t keyno, int *notfoundp)
 {
-	DB *db = g.bdb;
 	DBC *dbc = g.dbc;
 	int ret;
 

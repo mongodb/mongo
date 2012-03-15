@@ -41,16 +41,15 @@ key_gen_setup(uint8_t **keyp)
 void
 key_gen(uint8_t *key, uint32_t *sizep, uint64_t keyno, int insert)
 {
-	int len;
+	int len, suffix;
 
 	/*
 	 * The key always starts with a 10-digit string (the specified cnt)
 	 * followed by two digits, a random number between 1 and 15 if it's
 	 * an insert, otherwise 00.
 	 */
-	len = insert ?
-	    sprintf(key, "%010" PRIu64 ".%02d", keyno, (int)MMRAND(1, 15)) :
-	    sprintf(key, "%010" PRIu64 ".00", keyno);
+	suffix = insert ? (int)MMRAND(1, 15) : 0;
+	len = sprintf((char *)key, "%010" PRIu64 ".%02d", keyno, suffix);
 
 	/*
 	 * In a column-store, the key is only used for BDB, and so it doesn't
@@ -90,7 +89,6 @@ void
 value_gen(uint8_t *val, uint32_t *sizep, uint64_t keyno)
 {
 	static const char *dup_data = "duplicate data item";
-	size_t i;
 
 	/*
 	 * Fixed-length records: take the low N bits from the last digit of
@@ -132,12 +130,12 @@ value_gen(uint8_t *val, uint32_t *sizep, uint64_t keyno)
 	if (g.c_file_type == VAR &&
 	    g.c_repeat_data_pct != 0 &&
 	    (u_int)wts_rand() % 100 > g.c_repeat_data_pct) {
-		(void)strcpy(val, dup_data);
+		(void)strcpy((char *)val, dup_data);
 		*sizep = (uint32_t)strlen(dup_data);
 		return;
 	}
 
-	sprintf(val, "%010" PRIu64, keyno);
+	sprintf((char *)val, "%010" PRIu64, keyno);
 	val[10] = '/';
 	*sizep = MMRAND(g.c_value_min, g.c_value_max);
 }
