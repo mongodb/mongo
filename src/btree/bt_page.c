@@ -341,8 +341,8 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 
 	/*
 	 * Internal row-store page entries map one-to-two to the number of
-	 * physical entries on the page (each physical entry is a data item
-	 * and offset object).
+	 * physical entries on the page (each in-memory entry is a key item
+	 * and location coookie).
 	 */
 	nindx = dsk->u.entries / 2;
 	WT_RET((__wt_calloc_def(session, (size_t)nindx, &page->u.intl.t)));
@@ -358,9 +358,8 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 
 	/*
 	 * Walk the page, instantiating keys: the page contains sorted key and
-	 * offpage-reference pairs.  Keys are row store internal pages with
-	 * on-page/overflow (WT_CELL_KEY/KEY_OVFL) items, and offpage references
-	 * are WT_CELL_OFF items.
+	 * location cookie pairs.  Keys are on-page/overflow items and location
+	 * cookies are WT_CELL_ADDR items.
 	 */
 	ref = page->u.intl.t;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
