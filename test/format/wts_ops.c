@@ -80,7 +80,7 @@ wts_ops(void)
 			track("read/write ops", 0ULL, &total);
 			if (!running)
 				break;
-			usleep(100000);
+			usleep(750000);			/* 3/4 of a second */
 		}
 	}
 
