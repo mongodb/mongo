@@ -12,6 +12,7 @@
 #include <errno.h>
 #include <inttypes.h>
 #include <limits.h>
+#include <pthread.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,6 +38,8 @@
 
 #define	WT_TABLENAME	"file:__wt"
 
+#define	SINGLETHREADED	(g.threads == 1)
+
 typedef struct {
 	char *progname;				/* Program name */
 
@@ -44,9 +47,6 @@ typedef struct {
 	void *dbc;				/* BDB cursor handle */
 
 	void *wts_conn;				/* WT_CONNECTION handle */
-	void *wts_cursor;			/* WT_CURSOR handle */
-	void *wts_cursor_insert;		/* WT_CURSOR insert handle */
-	void *wts_session;			/* WT_SESSION handle */
 
 	FILE *rand_log;				/* Random number log */
 
@@ -56,14 +56,13 @@ typedef struct {
 	    LOG_FILE=1,				/* Use a log file */
 	    LOG_OPS=2				/* Log all operations */
 	} logging;
-	FILE *logfp;				/* Log file. */
+	FILE *logfp;				/* Log file */
 
 	int replay;				/* Replaying a run. */
 	int track;				/* Track progress */
+	int threads;				/* Threads doing operations */
 
 	char *config_open;			/* Command-line configuration */
-
-	char *key_gen_buf;
 
 	uint32_t c_bitcnt;			/* Config values */
 	uint32_t c_bzip;
@@ -92,32 +91,49 @@ typedef struct {
 } GLOBAL;
 extern GLOBAL g;
 
-int	 bdb_del(uint64_t, int *);
+typedef struct {
+	uint64_t search;
+	uint64_t insert;
+	uint64_t update;
+	uint64_t remove;
+
+	pthread_t tid;					/* thread ID */
+
+#define	TINFO_RUNNING	1				/* Running */
+#define	TINFO_COMPLETE	2				/* Finished */
+#define	TINFO_JOINED	3				/* Resolved */
+	volatile int state;				/* state */
+} TINFO;
+
+void	 bdb_close(void);
+void	 bdb_del(uint64_t, int *);
 void	 bdb_insert(const void *, uint32_t, const void *, uint32_t);
-int	 bdb_np(int, void *, uint32_t *, void *, uint32_t *, int *);
-int	 bdb_put(const void *, uint32_t, const void *, uint32_t, int *);
-int	 bdb_read(uint64_t, void *, uint32_t *, int *);
-void	 bdb_startup(void);
-void	 bdb_teardown(void);
+void	 bdb_np(int, void *, uint32_t *, void *, uint32_t *, int *);
+void	 bdb_open(void);
+void	 bdb_put(const void *, uint32_t, const void *, uint32_t, int *);
+void	 bdb_read(uint64_t, void *, uint32_t *, int *);
+
+void	 config_error(void);
 const char *
 	 config_dtype(void);
-void	 config_error(void);
 void	 config_file(const char *);
 void	 config_print(int);
 void	 config_setup(void);
 void	 config_single(const char *, int);
-void	 die(const char *,  int);
-void	 key_gen(void *, uint32_t *, uint64_t, int);
-void	 key_gen_setup(void);
-void	 track(const char *, uint64_t);
-void	 value_gen(void *, uint32_t *, uint64_t);
-int	 wts_bulk_load(void);
-int	 wts_dump(const char *, int);
-int	 wts_ops(void);
+void	 die(int, const char *, ...);
+void	 key_len_setup(void);
+void	 key_gen_setup(uint8_t **);
+void	 key_gen(uint8_t *, uint32_t *, uint64_t, int);
+void	 track(const char *, uint64_t, TINFO *);
+void	 val_gen_setup(uint8_t **);
+void	 value_gen(uint8_t *, uint32_t *, uint64_t);
+void	 wts_close(void);
+void	 wts_dump(const char *, int);
+void	 wts_load(void);
+void	 wts_open(void);
+void	 wts_ops(void);
 uint32_t wts_rand(void);
-int	 wts_read_scan(void);
-int	 wts_salvage(void);
-int	 wts_startup(int);
-int	 wts_stats(void);
-int	 wts_teardown(void);
-int	 wts_verify(const char *);
+void	 wts_read_scan(void);
+void	 wts_salvage(void);
+void	 wts_stats(void);
+void	 wts_verify(const char *);

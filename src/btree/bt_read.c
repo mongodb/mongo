@@ -47,7 +47,7 @@ __wt_cache_read(WT_SESSION_IMPL *session, WT_PAGE *parent, WT_REF *ref)
 
 	WT_ASSERT(session, page != NULL);
 	ref->page = page;
-	ref->state = WT_REF_MEM;
+	WT_PUBLISH(ref->state, WT_REF_MEM);
 	return (0);
 
 err:	ref->state = WT_REF_DISK;

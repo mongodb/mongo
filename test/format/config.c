@@ -103,7 +103,7 @@ config_print(int error_display)
 		fp = stdout;
 	else
 		if ((fp = fopen("__run", "w")) == NULL)
-			die("__run", errno);
+			die(errno, "fopen: __run");
 
 	fprintf(fp, "############################################\n");
 	fprintf(fp, "#  RUN PARAMETERS\n");
@@ -138,7 +138,7 @@ config_file(const char *name)
 	char *p, buf[256];
 
 	if ((fp = fopen(name, "r")) == NULL)
-		die(name, errno);
+		die(errno, "fopen: %s", name);
 	while (fgets(buf, sizeof(buf), fp) != NULL) {
 		for (p = buf; *p != '\0' && *p != '\n'; ++p)
 			;

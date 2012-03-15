@@ -16,12 +16,14 @@
  * search item's next array).
  *
  * Helper macros to go from a stack pointer at level i, pointing into a next
- * array, to insert node containing that next array.
+ * array, back to the insert node containing that next array.
  */
+#undef	PREV_ITEM
 #define	PREV_ITEM(ins_head, insp, i)					\
 	(((insp) == &(ins_head)->head[i] || (insp) == NULL) ? NULL :	\
 	    (WT_INSERT *)((char *)((insp) - (i)) - offsetof(WT_INSERT, next)))
 
+#undef	PREV_INS
 #define	PREV_INS(cbt, i)						\
 	PREV_ITEM((cbt)->ins_head, (cbt)->ins_stack[(i)], (i))
 
@@ -39,11 +41,12 @@ __cursor_skip_prev(WT_CURSOR_BTREE *cbt)
 
 	session = (WT_SESSION_IMPL *)cbt->iface.session;
 
+restart:
 	/*
 	 * If the search stack does not point at the current item, fill it in
 	 * with a search.
 	 */
-	if ((current = cbt->ins) != PREV_INS(cbt, 0)) {
+	while ((current = cbt->ins) != PREV_INS(cbt, 0)) {
 		if (cbt->btree->type == BTREE_ROW) {
 			key.data = WT_INSERT_KEY(current);
 			key.size = WT_INSERT_KEY_SIZE(current);
@@ -52,10 +55,6 @@ __cursor_skip_prev(WT_CURSOR_BTREE *cbt)
 		} else
 			cbt->ins = __col_insert_search(cbt->ins_head,
 			    cbt->ins_stack, WT_INSERT_RECNO(current));
-
-		/* Check that we found the expected item. */
-		WT_ASSERT(session, cbt->ins == current);
-		WT_ASSERT(session, PREV_INS(cbt, 0) == current);
 	}
 
 	/*
@@ -91,7 +90,14 @@ __cursor_skip_prev(WT_CURSOR_BTREE *cbt)
 
 	/* Walk any remaining levels until just before the current node. */
 	while (i >= 0) {
-		WT_ASSERT(session, ins != NULL);
+		/*
+		 * If we get to the end of a list without finding the current
+		 * item, we must have raced with an insert.  Restart the search.
+		 */
+		if (ins == NULL) {
+			cbt->ins_stack[0] = NULL;
+			goto restart;
+		}
 		if (ins->next[i] != current)		/* Stay at this level */
 			ins = ins->next[i];
 		else {					/* Drop down a level */

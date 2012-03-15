@@ -22,9 +22,9 @@ static int  __evict_worker(WT_SESSION_IMPL *);
  * Tuning constants: I hesitate to call this tuning, but we want to review some
  * number of pages from each file's in-memory tree for each page we evict.
  */
-#define	WT_EVICT_GROUP		10	/* Evict N pages at a time */
-#define	WT_EVICT_WALK_PER_TABLE	20	/* Pages to visit per file */
-#define	WT_EVICT_WALK_BASE	100	/* Pages tracked across file visits */
+#define	WT_EVICT_GROUP		20	/* Evict N pages at a time */
+#define	WT_EVICT_WALK_PER_TABLE	25	/* Pages to visit per file */
+#define	WT_EVICT_WALK_BASE	50	/* Pages tracked across file visits */
 
 /*
  * WT_EVICT_REQ_FOREACH --
@@ -198,6 +198,7 @@ __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * thread will see this later.
 	 */
 	WT_VERBOSE(session, evictserver, "eviction server request table full");
+	page->ref->state = WT_REF_MEM;
 	return (WT_RESTART);
 }
 
@@ -230,7 +231,7 @@ __wt_cache_evict_server(void *arg)
 		 * whether there is work to do.  If so, evict_cond will
 		 * be signalled and the wait below won't block.
 		 */
-		__wt_eviction_check(session, NULL);
+		__wt_eviction_check(session, NULL, 1);
 
 		WT_VERBOSE(session, evictserver, "sleeping");
 		__wt_cond_wait(session, cache->evict_cond);
@@ -353,16 +354,6 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 		memset(cache->evict, 0, cache->evict_allocated);
 
 		if (F_ISSET(er, WT_EVICT_REQ_PAGE)) {
-			/*
-			 * If we are pushing out a page, that page might be our
-			 * eviction location.  If so, try to move on to the
-			 * next page, or restart the walk if that fails
-			 * (evict_page will be set to NULL).
-			 */
-			if (session->btree->evict_page == er->page)
-				(void)__wt_tree_np(
-				    session, &session->btree->evict_page, 1, 1);
-
 			ref = er->page->ref;
 			WT_ASSERT(session, ref->page == er->page);
 			WT_ASSERT(session, ref->state == WT_REF_EVICTING);
@@ -379,16 +370,13 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 			__wt_yield();
 
 			/*
-			 * If eviction fails, free up the page and hope it
+			 * If eviction fails, it will free up the page: hope it
 			 * works next time.  Application threads may be holding
 			 * a reference while trying to get another (e.g., if
 			 * they have two cursors open), so blocking
 			 * indefinitely leads to deadlock.
 			 */
-			if ((ret = __wt_rec_evict(session, er->page, 0)) != 0) {
-				WT_ASSERT(session, ref->page == er->page);
-				ref->state = WT_REF_MEM;
-			}
+			ret = __wt_rec_evict(session, er->page, 0);
 		} else {
 			/*
 			 * If we're about to do a walk of the file tree (and
@@ -570,7 +558,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 	WT_BTREE *btree;
 	WT_CACHE *cache;
 	WT_PAGE *page;
-	int i, restarted_once;
+	int i, restarts, ret;
 
 	btree = session->btree;
 	cache = S2C(session)->cache;
@@ -588,36 +576,29 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 	 * We can't evict the page just returned to us, it marks our place in
 	 * the tree.  So, always stay one page ahead of the page being returned.
 	 */
-	i = restarted_once = 0;
-	do {
-		if ((page = btree->evict_page) == NULL)
-			goto skip;
+	for (i = restarts = ret = 0;
+	    i < WT_EVICT_WALK_PER_TABLE && restarts <= 1 && ret == 0;
+	    ret = __wt_tree_np(session, &btree->evict_page, 1, 1)) {
+		if ((page = btree->evict_page) == NULL) {
+			++restarts;
+			continue;
+		}
 
 		/*
-		 * Root and pinned pages can't be evicted.
-		 * !!!
-		 * It's still in flux if root pages are pinned or not, test for
-		 * both cases for now.
-		 */
-		if (WT_PAGE_IS_ROOT(page))
-			goto skip;
-
-		/*
-		 * Skip locked pages: we would skip them later, and they just
-		 * fill up the eviction list for no benefit.
-		 */
-		if (page->ref->state != WT_REF_MEM)
-			goto skip;
-
-		/*
+		 * Root and pinned pages can't be evicted, nor can locked
+		 * pages: we would skip them later, and they just fill up the
+		 * eviction list for no benefit.
+		 *
 		 * Skip pages that must be merged into their parents.  Don't
 		 * skip pages marked WT_PAGE_REC_EMPTY or SPLIT: updates after
 		 * their last reconciliation may have changed their state and
 		 * only the eviction code can check whether they should really
 		 * be skipped.
 		 */
-		if (F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE))
-			goto skip;
+		if (WT_PAGE_IS_ROOT(page) ||
+		    page->ref->state != WT_REF_MEM ||
+		    F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE))
+			continue;
 
 		WT_VERBOSE(session, evictserver,
 		    "select: %p, size %" PRIu32, page, page->memory_footprint);
@@ -626,13 +607,9 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		cache->evict[*slotp].page = page;
 		cache->evict[*slotp].btree = btree;
 		++*slotp;
+	}
 
-skip:		WT_RET(__wt_tree_np(session, &btree->evict_page, 1, 1));
-		if (btree->evict_page == NULL && restarted_once++ == 1)
-			break;
-	} while (i < WT_EVICT_WALK_PER_TABLE);
-
-	return (0);
+	return (ret);
 }
 
 /*
@@ -664,7 +641,7 @@ __evict_dup_remove(WT_SESSION_IMPL *session)
 	 */
 	evict = cache->evict;
 	elem = cache->evict_entries;
-	qsort(evict, (size_t)elem, sizeof(WT_EVICT_LIST), __evict_page_cmp);
+	qsort(evict, elem, sizeof(WT_EVICT_LIST), __evict_page_cmp);
 	for (i = 0; i < elem; i = j) {
 		/*
 		 * Once we hit a NULL, we're done, the NULLs all sorted to the
@@ -673,17 +650,15 @@ __evict_dup_remove(WT_SESSION_IMPL *session)
 		if (evict[i].page == NULL)
 			break;
 
-		for (j = i + 1; j < elem; ++j) {
-			/* Delete the second and any subsequent duplicates. */
-			if (evict[i].page == evict[j].page)
-				__evict_clr(&evict[j]);
-			else
-				break;
-		}
+		/* Delete any subsequent duplicates. */
+		for (j = i + 1;
+		    j < elem && evict[j].page == evict[i].page;
+		    ++j)
+			__evict_clr(&evict[j]);
 	}
 
 	/* Sort the array by LRU, then evict the most promising candidates. */
-	qsort(cache->evict, elem, sizeof(WT_EVICT_LIST), __evict_lru_cmp);
+	qsort(evict, i, sizeof(WT_EVICT_LIST), __evict_lru_cmp);
 }
 
 /*
@@ -735,15 +710,6 @@ __evict_get_page(
 		*btreep = evict->btree;
 
 		/*
-		 * If we're evicting our current eviction point in the file,
-		 * try to move on to the next page, or restart the walk if that
-		 * fails (evict_page will be set to NULL).
-		 */
-		if (*pagep == evict->btree->evict_page)
-			(void)__wt_tree_np(
-			    session, &evict->btree->evict_page, 1, 1);
-
-		/*
 		 * Paranoia: remove the entry so we never try and reconcile
 		 * the same page on reconciliation error.
 		 */
@@ -768,6 +734,8 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session)
 	if (page == NULL)
 		return (WT_NOTFOUND);
 
+	WT_ASSERT(session, page->ref->state == WT_REF_EVICTING);
+
 	/* Reference the correct WT_BTREE handle. */
 	saved_btree = session->btree;
 	WT_SET_BTREE_IN_SESSION(session, btree);
@@ -776,19 +744,14 @@ __wt_evict_lru_page(WT_SESSION_IMPL *session)
 	 * We don't care why eviction failed (maybe the page was dirty and we're
 	 * out of disk space, or the page had an in-memory subtree already being
 	 * evicted).  Regardless, don't pick the same page every time.
+	 *
+	 * We used to bump the page's read_gen only if eviction failed, but
+	 * that isn't safe: at that point, eviction has already unlocked the
+	 * page and some other thread may have evicted it by the time we look
+	 * at it.
 	 */
-	if (__wt_rec_evict(session, page, 0) != 0) {
-		page->read_gen = __wt_cache_read_gen(session);
-
-		/*
-		 * If the evicting state of the page was not cleared, clear it
-		 * now to make the page available again.
-		 */
-		if (page->ref->state == WT_REF_EVICTING) {
-			WT_ASSERT(session, page->ref->page == page);
-			page->ref->state = WT_REF_MEM;
-		}
-	}
+	page->read_gen = __wt_cache_read_gen(session);
+	(void)__wt_rec_evict(session, page, 0);
 
 	WT_ATOMIC_ADD(btree->lru_count, -1);
 

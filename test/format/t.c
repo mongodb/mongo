@@ -16,9 +16,7 @@ static void usage(void);
 int
 main(int argc, char *argv[])
 {
-	int ch, reps, ret;
-
-	ret = 0;
+	int ch, reps;
 
 	if ((g.progname = strrchr(argv[0], '/')) == NULL)
 		g.progname = argv[0];
@@ -34,11 +32,14 @@ main(int argc, char *argv[])
 		config_file("CONFIG");
 	}
 
+	/* Default to a single thread. */
+	g.threads = 1;
+
 	/* Track progress unless we're re-directing output to a file. */
 	g.track = isatty(STDOUT_FILENO) ? 1 : 0;
 
 	/* Set values from the command line. */
-	while ((ch = getopt(argc, argv, "1C:c:Llqr")) != EOF)
+	while ((ch = getopt(argc, argv, "1C:c:Llqrt:")) != EOF)
 		switch (ch) {
 		case '1':			/* One run */
 			g.c_runs = 1;
@@ -67,9 +68,19 @@ main(int argc, char *argv[])
 			g.replay = 1;
 			g.c_runs = 1;
 			break;
+		case 't':			/* Threads */
+			g.threads = atoi(optarg);
+			break;
 		default:
 			usage();
 		}
+
+	/* Multi-threaded runs cannot be replayed. */
+	if (g.threads != 1 && g.replay) {
+		fprintf(stderr,
+		    "%s: -r and -t are mutually exclusive\n", g.progname);
+		return (EXIT_FAILURE);
+	}
 
 	argc -= optind;
 	argv += optind;
@@ -85,36 +96,28 @@ main(int argc, char *argv[])
 
 		config_setup();			/* Run configuration */
 		config_print(0);		/* Dump run configuration */
+		key_len_setup();		/* Setup keys */
 
-		bdb_startup();			/* Initial file config */
-		if (wts_startup(0))
-			return (EXIT_FAILURE);
+		if (SINGLETHREADED)
+			bdb_open();		/* Initial file config */
+		wts_open();
 
-		key_gen_setup();		/* Setup keys */
-		if (wts_bulk_load())		/* Load initial records */
-			goto err;
-						/* Close, verify */
-		if (wts_teardown() || wts_verify("post-bulk verify"))
-			goto err;
+		wts_load();			/* Load initial records */
+		wts_verify("post-bulk verify");	/* Verify */
+
 						/* Loop reading & operations */
 		for (reps = 0; reps < 3; ++reps) {
-			if (wts_startup(1))
-				goto err;
+			wts_read_scan();	/* Read scan */
 
-			if (wts_read_scan())	/* Read scan */
-				goto err;
-
-						/* Random operations */
-			if (g.c_ops != 0 && wts_ops())
-				goto err;
+			if (g.c_ops != 0)	/* Random operations */
+				wts_ops();
 
 						/* Statistics */
-			if ((g.c_ops == 0 || reps == 2) && wts_stats())
-				goto err;
+			if (g.c_ops == 0 || reps == 2)
+				wts_stats();
 
-						/* Close, verify */
-			if (wts_teardown() || wts_verify("post-ops verify"))
-				goto err;
+						/* Verify */
+			wts_verify("post-ops verify");
 
 			/*
 			 * If no operations scheduled, quit after a single
@@ -124,11 +127,14 @@ main(int argc, char *argv[])
 				break;
 		}
 
-		track("shutting down BDB", 0ULL);
-		bdb_teardown();
+		if (SINGLETHREADED) {
+			track("shutting down BDB", 0ULL, NULL);
+			bdb_close();
 
-		if (wts_dump("standard", 1))	/* Dump the file */
-			goto err;
+			wts_close();			/* Dump the file */
+			wts_dump("standard", 1);
+			wts_open();
+		}
 
 		/*
 		 * If we don't delete any records, we can salvage the file.  The
@@ -139,36 +145,27 @@ main(int argc, char *argv[])
 		 * Save a copy, salvage, verify, dump.
 		 */
 		if (g.c_delete_pct == 0) {
-			/*
-			 * Save a copy of the interesting files so we can replay
-			 * the salvage step as necessary.
-			 */
-			if (system(
-			    "rm -rf __slvg.copy && "
-			    "mkdir __slvg.copy && "
-			    "cp WiredTiger* __wt __slvg.copy/") != 0)
-				goto err;
+			wts_salvage();			/* Salvage & verify */
+			wts_verify("post-salvage verify");
 
-			if (wts_salvage() ||
-			    wts_verify("post-salvage verify") ||
-			    wts_dump("salvage", 0))
-				goto err;
+			wts_close();			/* Dump the file */
+			wts_dump("salvage", 0);
+			wts_open();
 		}
+
+		wts_close();			/* Close */
 
 		printf("%4d: %-40s\n", g.run_cnt, config_dtype());
 	}
 
-	if (0) {
-err:		ret = 1;
-	}
-
+	/* Flush/close any logging information. */
 	if (g.logfp != NULL)
 		(void)fclose(g.logfp);
 	if (g.rand_log != NULL)
 		(void)fclose(g.rand_log);
 
-	config_print(ret);
-	return (ret == 0 ? EXIT_SUCCESS : EXIT_FAILURE);
+	config_print(0);
+	return (EXIT_SUCCESS);
 }
 
 /*
@@ -196,7 +193,7 @@ startup(void)
 	/* Open/truncate the logging file. */
 	if (g.logging != 0) {
 		if ((g.logfp = fopen("__log", "w")) == NULL)
-			die("__log", errno);
+			die(errno, "fopen: __log");
 		(void)setvbuf(g.logfp, NULL, _IOLBF, 0);
 	}
 }
@@ -222,9 +219,29 @@ onint(int signo)
  *	Report an error and quit.
  */
 void
-die(const char *m, int e)
+die(int e, const char *fmt, ...)
 {
-	fprintf(stderr, "%s: %s: %s\n", g.progname, m, wiredtiger_strerror(e));
+	va_list ap;
+
+	if (fmt != NULL) {				/* Death message. */
+		fprintf(stderr, "%s: ", g.progname);
+		va_start(ap, fmt);
+		vfprintf(stderr, fmt, ap);
+		va_end(ap);
+		if (e != 0)
+			fprintf(stderr, ": %s", wiredtiger_strerror(e));
+		fprintf(stderr, "\n");
+	}
+
+	/* Flush/close any logging information. */
+	if (g.logfp != NULL)
+		(void)fclose(g.logfp);
+	if (g.rand_log != NULL)
+		(void)fclose(g.rand_log);
+
+	/* Display the configuration that failed. */
+	config_print(1);
+
 	exit(EXIT_FAILURE);
 }
 
@@ -236,8 +253,9 @@ static void
 usage(void)
 {
 	fprintf(stderr,
-	    "usage: %s [-1Llqr] [-C wiredtiger-config] [-c config-file] "
-	    "[name=value ...]\n",
+	    "usage: %s [-1Llqr]\n    "
+	    "[-C wiredtiger-config] [-c config-file] "
+	    "[-t threads] [name=value ...]\n",
 	    g.progname);
 	fprintf(stderr, "%s",
 	    "\t-1 run once\n"
@@ -246,7 +264,8 @@ usage(void)
 	    "\t-L output to a log file\n"
 	    "\t-l log operations (implies -L)\n"
 	    "\t-q run quietly\n"
-	    "\t-r replay the last run\n");
+	    "\t-r replay the last run\n"
+	    "\t-t threads\n");
 
 	fprintf(stderr, "\n");
 

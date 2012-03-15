@@ -13,7 +13,7 @@ static int  __rec_discard_page(WT_SESSION_IMPL *, WT_PAGE *);
 static void __rec_excl_clear(WT_SESSION_IMPL *);
 static int  __rec_page_clean_update(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_page_dirty_update(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __rec_review(WT_SESSION_IMPL *, WT_PAGE *, uint32_t, int);
+static int  __rec_review(WT_SESSION_IMPL *, WT_REF *, WT_PAGE *, uint32_t, int);
 static int  __rec_root_addr_update(WT_SESSION_IMPL *, uint8_t *, uint32_t);
 static int  __rec_root_clean_update(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_root_dirty_update(WT_SESSION_IMPL *, WT_PAGE *);
@@ -43,8 +43,12 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	 * we're done.  We have to make this check for clean pages, too: while
 	 * unlikely eviction would choose an internal page with children, it's
 	 * not disallowed anywhere.
+	 *
+	 * Note that page->ref may be NULL in some cases (e.g., for root pages
+	 * or during salvage).  That's OK if WT_REC_SINGLE is set: we won't
+	 * check hazard references in that case.
 	 */
-	WT_ERR(__rec_review(session, page, flags, 1));
+	WT_ERR(__rec_review(session, page->ref, page, flags, 1));
 
 	/* Count evictions of internal pages during normal operation. */
 	if (!LF_ISSET(WT_REC_SINGLE) &&
@@ -325,11 +329,21 @@ __rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * a split-merge page, then the reference must be cleared before
 		 * the page is discarded.
 		 */
-		if (F_ISSET(
-		    page, WT_PAGE_REC_MASK) == WT_PAGE_REC_SPLIT &&
+		if (F_ISSET(page, WT_PAGE_REC_MASK) == WT_PAGE_REC_SPLIT &&
 		    mod->u.split != NULL)
 			__wt_page_out(session, mod->u.split, 0);
 	}
+
+	/*
+	 * If we are evicting the file's current eviction point, clear it so
+	 * the walk will be restarted.
+	 *
+	 * !!!
+	 * This check would arguably be cleaner in bt_evict.c, but that level
+	 * isn't aware of all of the pages within a subtree that are evicted.
+	 */
+	if (session->btree->evict_page == page)
+		session->btree->evict_page = NULL;
 
 	/* Discard the page itself. */
 	__wt_page_out(session, page, 0);
@@ -341,11 +355,17 @@ __rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page)
  * __rec_review --
  *	Get exclusive access to the page and review the page and its subtree
  *	for conditions that would block its eviction.
+ *
+ *	The ref and page arguments may appear to be redundant, because usually
+ *	ref->page == page and page->ref == ref.  However, we need both because
+ *	(a) there are cases where ref == NULL (e.g., for root page or during
+ *	salvage), and (b) we can't safely look at page->ref until we have a
+ *	hazard reference.
  */
 static int
-__rec_review(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags, int top)
+__rec_review(WT_SESSION_IMPL *session,
+    WT_REF *ref, WT_PAGE *page, uint32_t flags, int top)
 {
-	WT_REF *ref;
 	uint32_t i;
 
 	/*
@@ -353,7 +373,7 @@ __rec_review(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags, int top)
 	 * locked down.
 	 */
 	if (!LF_ISSET(WT_REC_SINGLE))
-		WT_RET(__hazard_exclusive(session, page->ref, top));
+		WT_RET(__hazard_exclusive(session, ref, top));
 
 	/*
 	 * Recurse through the page's subtree: this happens first because we
@@ -366,8 +386,8 @@ __rec_review(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags, int top)
 			case WT_REF_DISK:		/* On-disk */
 				break;
 			case WT_REF_MEM:		/* In-memory */
-				WT_RET(
-				    __rec_review(session, ref->page, flags, 0));
+				WT_RET(__rec_review(
+				    session, ref, ref->page, flags, 0));
 				break;
 			case WT_REF_EVICTING:		/* Being evaluated */
 			case WT_REF_LOCKED:		/* Being evicted */

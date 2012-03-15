@@ -26,7 +26,13 @@ __wt_page_in_func(
 #endif
     )
 {
-	int read_lockout;
+	int first, read_lockout;
+
+	/*
+	 * Only wake the eviction server once: after that, we're just wasting
+	 * effort and making a busy mutex busier.
+	 */
+	first = 1;
 
 	for (;;) {
 		switch (ref->state) {
@@ -35,7 +41,8 @@ __wt_page_in_func(
 			 * The page isn't in memory, attempt to set the
 			 * state to WT_REF_READING.  If successful, read it.
 			 */
-			__wt_eviction_check(session, &read_lockout);
+			__wt_eviction_check(session, &read_lockout, first);
+			first = 0;
 			if (read_lockout || !WT_ATOMIC_CAS(
 			    ref->state, WT_REF_DISK, WT_REF_READING))
 				break;
@@ -334,8 +341,8 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 
 	/*
 	 * Internal row-store page entries map one-to-two to the number of
-	 * physical entries on the page (each physical entry is a data item
-	 * and offset object).
+	 * physical entries on the page (each in-memory entry is a key item
+	 * and location coookie).
 	 */
 	nindx = dsk->u.entries / 2;
 	WT_RET((__wt_calloc_def(session, (size_t)nindx, &page->u.intl.t)));
@@ -351,9 +358,8 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 
 	/*
 	 * Walk the page, instantiating keys: the page contains sorted key and
-	 * offpage-reference pairs.  Keys are row store internal pages with
-	 * on-page/overflow (WT_CELL_KEY/KEY_OVFL) items, and offpage references
-	 * are WT_CELL_OFF items.
+	 * location cookie pairs.  Keys are on-page/overflow items and location
+	 * cookies are WT_CELL_ADDR items.
 	 */
 	ref = page->u.intl.t;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
@@ -455,33 +461,43 @@ __inmem_row_leaf(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 
 	/*
 	 * Leaf row-store page entries map to a maximum of two-to-one to the
-	 * number of physical entries on the page (each physical entry might
-	 * be a key without any subsequent data item).
-	 */
-	WT_RET((__wt_calloc_def(
-	    session, (size_t)dsk->u.entries * 2, &page->u.row.d)));
-	if (inmem_sizep != NULL)
-		*inmem_sizep += 2 * dsk->u.entries * sizeof(*page->u.row.d);
-
-	/*
-	 * Walk a row-store page of WT_CELLs, building indices and finding the
-	 * end of the page.
+	 * number of physical entries on the page (each physical entry might be
+	 * a key without a subsequent data item).  To avoid over-allocation in
+	 * workloads with large numbers of empty data items, first walk the page
+	 * counting the number of keys, then allocate the indices.
 	 *
 	 * The page contains key/data pairs.  Keys are on-page (WT_CELL_KEY) or
 	 * overflow (WT_CELL_KEY_OVFL) items, data are either a single on-page
 	 * (WT_CELL_VALUE) or overflow (WT_CELL_VALUE_OVFL) item.
 	 */
 	nindx = 0;
-	rip = page->u.row.d;
 	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
 		__wt_cell_unpack(cell, unpack);
 		switch (unpack->type) {
 		case WT_CELL_KEY:
 		case WT_CELL_KEY_OVFL:
 			++nindx;
-			if (rip->key != NULL)
-				++rip;
+			break;
+		case WT_CELL_VALUE:
+		case WT_CELL_VALUE_OVFL:
+			break;
+		WT_ILLEGAL_VALUE(session);
+		}
+	}
+
+	WT_RET((__wt_calloc_def(session, (size_t)nindx, &page->u.row.d)));
+	if (inmem_sizep != NULL)
+		*inmem_sizep += nindx * sizeof(*page->u.row.d);
+
+	/* Walk the page again, building indices. */
+	rip = page->u.row.d;
+	WT_CELL_FOREACH(btree, dsk, cell, unpack, i) {
+		__wt_cell_unpack(cell, unpack);
+		switch (unpack->type) {
+		case WT_CELL_KEY:
+		case WT_CELL_KEY_OVFL:
 			rip->key = cell;
+			++rip;
 			break;
 		case WT_CELL_VALUE:
 		case WT_CELL_VALUE_OVFL:
