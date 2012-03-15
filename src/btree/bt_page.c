@@ -342,7 +342,7 @@ __inmem_row_int(WT_SESSION_IMPL *session, WT_PAGE *page, size_t *inmem_sizep)
 	/*
 	 * Internal row-store page entries map one-to-two to the number of
 	 * physical entries on the page (each in-memory entry is a key item
-	 * and location coookie).
+	 * and location cookie).
 	 */
 	nindx = dsk->u.entries / 2;
 	WT_RET((__wt_calloc_def(session, (size_t)nindx, &page->u.intl.t)));
