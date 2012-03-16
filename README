@@ -1,26 +1,21 @@
-WiredTiger 1.1.1: (March 12, 2012)
+WiredTiger 1.1.1: (March 16, 2012)
 
 This is version 1.1.1 of WiredTiger.
 
-See the file LICENSE for redistribution information.
-
-To view release and installation documentation, open
+WiredTiger documentation can be found at:
 
 	http://source.wiredtiger.com/
 
-or docs/index.html in your web browser.
+Information on configuring, building and installing WiredTiger can be
+found at:
 
-To build in a POSIX environment (for example, Linux or another
-UNIX-like system), run:
+	http://source.wiredtiger.com/install.html
 
-	./configure && make
+WiredTiger licensing information can be found at:
 
-To install in the standard POSIX environment locations, enter:
+	http://source.wiredtiger.com/license.html
 
-	make install
-
-For more information on build and installation options, see the 
-WiredTiger documentation.  For general questions and discussion,
-please use our mailing list:
+For general questions and discussion, please use the WiredTiger mailing
+list:
 
 	http://groups.google.com/group/wiredtiger-users
