@@ -677,8 +677,14 @@ __evict_get_page(
 	*btreep = NULL;
 	*pagep = NULL;
 
-	if (__wt_spin_trylock(session, &cache->lru_lock) != 0)
-		return;
+	/* Avoid the LRU lock if no pages are available. */
+	for (;;) {
+		if (cache->evict_current == NULL)
+			return;
+		if (__wt_spin_trylock(session, &cache->lru_lock) == 0)
+			break;
+		__wt_yield();
+	}
 
 	/* Get the next page queued for eviction. */
 	while ((evict = cache->evict_current) != NULL &&
@@ -717,6 +723,8 @@ __evict_get_page(
 		break;
 	}
 
+	if (*pagep == NULL)
+		cache->evict_current = NULL;
 	__wt_spin_unlock(session, &cache->lru_lock);
 }
 
