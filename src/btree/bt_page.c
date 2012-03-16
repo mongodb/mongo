@@ -41,8 +41,7 @@ __wt_page_in_func(
 			 * The page isn't in memory, attempt to set the
 			 * state to WT_REF_READING.  If successful, read it.
 			 */
-			__wt_eviction_check(session, &read_lockout, first);
-			first = 0;
+			__wt_eviction_check(session, &read_lockout, 0);
 			if (read_lockout || !WT_ATOMIC_CAS(
 			    ref->state, WT_REF_DISK, WT_REF_READING))
 				break;
@@ -79,13 +78,18 @@ __wt_page_in_func(
 		}
 
 		/*
-		 * Find a page to evict -- if that succeeds,
-		 * try again immediately.  If it fails, we
-		 * don't care why, but give up our slice before
-		 * retrying.
+		 * Find a page to evict -- if that succeeds, try the read again
+		 * immediately.  If it fails, we don't care why, but give up
+		 * our slice before retrying, and wake up the eviction server
+		 * if this is the first time.
 		 */
-		if (__wt_evict_lru_page(session) != 0)
+		if (__wt_evict_lru_page(session) != 0) {
+			if (first) {
+				__wt_evict_server_wake(session);
+				first = 0;
+			}
 			__wt_yield();
+		}
 	}
 }
 
