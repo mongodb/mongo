@@ -384,7 +384,6 @@ __evict_request_walk(WT_SESSION_IMPL *session)
 			 * won't be useful; Discard any page we're holding and
 			 * we can restart our walk as needed.
 			 */
-			session->btree->evict_page = NULL;
 			ret = __evict_file(session, er);
 		}
 
@@ -421,6 +420,13 @@ __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 	WT_VERBOSE(session, evictserver,
 	    "file request: %s",
 	   (F_ISSET(er, WT_EVICT_REQ_CLOSE) ? "close" : "sync"));
+
+	/* Clear the current eviction point. */
+	if ((page = session->btree->evict_page) != NULL &&
+	    !WT_PAGE_IS_ROOT(page))
+		(void)WT_ATOMIC_CAS(page->ref->state,
+		    WT_REF_EVICT_NEXT, WT_REF_MEM);
+	session->btree->evict_page = NULL;
 
 	/* If this is a close, wait for LRU eviction activity to drain. */
 	while (F_ISSET(er, WT_EVICT_REQ_CLOSE) && er->btree->lru_count > 0)
@@ -564,13 +570,6 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 	cache = S2C(session)->cache;
 
 	/*
-	 * Wait for application threads doing eviction in this file to drain:
-	 * we're examining pages without holding hazard references.
-	 */
-	while (btree->lru_count > 0)
-		__wt_yield();
-
-	/*
 	 * Get the next WT_EVICT_WALK_PER_TABLE entries.
 	 *
 	 * We can't evict the page just returned to us, it marks our place in
@@ -585,18 +584,14 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		}
 
 		/*
-		 * Root and pinned pages can't be evicted, nor can locked
-		 * pages: we would skip them later, and they just fill up the
-		 * eviction list for no benefit.
-		 *
-		 * Skip pages that must be merged into their parents.  Don't
-		 * skip pages marked WT_PAGE_REC_EMPTY or SPLIT: updates after
-		 * their last reconciliation may have changed their state and
-		 * only the eviction code can check whether they should really
-		 * be skipped.
+		 * Root pages can't be evicted, nor can skip pages that must be
+		 * merged into their parents.  Don't skip pages marked
+		 * WT_PAGE_REC_EMPTY or SPLIT: updates after their last
+		 * reconciliation may have changed their state and only the
+		 * eviction code can check whether they should really be
+		 * skipped.
 		 */
 		if (WT_PAGE_IS_ROOT(page) ||
-		    page->ref->state != WT_REF_MEM ||
 		    F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE))
 			continue;
 

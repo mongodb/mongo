@@ -794,6 +794,9 @@ __debug_ref(WT_DBG *ds, WT_REF *ref, WT_PAGE *page)
 	case WT_REF_EVICTING:
 		__dmsg(ds, "evicting %p", ref->page);
 		break;
+	case WT_REF_EVICT_NEXT:
+		__dmsg(ds, "evict-next %p", ref->page);
+		break;
 	case WT_REF_LOCKED:
 		__dmsg(ds, "locked %p", ref->page);
 		break;

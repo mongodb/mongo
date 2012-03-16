@@ -56,6 +56,7 @@ __wt_page_in_func(
 			 * wait for that to be resolved.
 			 */
 			break;
+		case WT_REF_EVICT_NEXT:
 		case WT_REF_MEM:
 			/*
 			 * The page is in memory: get a hazard reference, update
