@@ -92,14 +92,6 @@ namespace mongo {
         static long long totalMappedLength();
         static void closeAllFiles( stringstream &message );
 
-#if defined(_DEBUG)
-        static void markAllWritable();
-        static void unmarkAllWritable();
-#else
-        static void markAllWritable() { }
-        static void unmarkAllWritable() { }
-#endif
-
         virtual bool isMongoMMF() { return false; }
 
         string filename() const { return _filename; }
@@ -128,10 +120,6 @@ namespace mongo {
 
         virtual unsigned long long length() const = 0;
 
-        // only supporting on posix mmap
-        virtual void _lock() {}
-        virtual void _unlock() {}
-
         static set<MongoFile*> mmfiles;
     public:
         static map<string,MongoFile*> pathToFile;
@@ -157,15 +145,6 @@ namespace mongo {
 
     private:
         LockMongoFilesShared _lk;
-    };
-
-    struct MongoFileAllowWrites {
-        MongoFileAllowWrites() {
-            MongoFile::markAllWritable();
-        }
-        ~MongoFileAllowWrites() {
-            MongoFile::unmarkAllWritable();
-        }
     };
 
     class MemoryMappedFile : public MongoFile {
@@ -243,9 +222,6 @@ namespace mongo {
 #endif
 
     protected:
-        // only posix mmap implementations will support this
-        virtual void _lock();
-        virtual void _unlock();
 
         /** close the current private view and open a new replacement */
         void* remapPrivateView(void *oldPrivateAddr);

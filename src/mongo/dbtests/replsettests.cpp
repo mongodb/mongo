@@ -97,7 +97,7 @@ namespace ReplSetTests {
             OpTime o1,o2;
 
             {
-                mutex::scoped_lock lk2(OpTime::m);
+                mongo::mutex::scoped_lock lk2(OpTime::m);
                 o1 = OpTime::now(lk2);
                 o2 = OpTime::now(lk2);
             }
@@ -194,7 +194,7 @@ namespace ReplSetTests {
         BSONObj updateFail() {
             BSONObjBuilder b;
             {
-                mutex::scoped_lock lk2(OpTime::m);
+                mongo::mutex::scoped_lock lk2(OpTime::m);
                 b.appendTimestamp("ts", OpTime::now(lk2).asLL());
             }
             b.append("op", "u");
@@ -242,7 +242,7 @@ namespace ReplSetTests {
         void updateSucceed() {
             BSONObjBuilder b;
             {
-                mutex::scoped_lock lk2(OpTime::m);
+                mongo::mutex::scoped_lock lk2(OpTime::m);
                 b.appendTimestamp("ts", OpTime::now(lk2).asLL());
             }
             b.append("op", "u");
@@ -283,7 +283,7 @@ namespace ReplSetTests {
         void insertSucceed() {
             BSONObjBuilder b;
             {
-                mutex::scoped_lock lk2(OpTime::m);
+                mongo::mutex::scoped_lock lk2(OpTime::m);
                 b.appendTimestamp("ts", OpTime::now(lk2).asLL());
             }
             b.append("op", "i");

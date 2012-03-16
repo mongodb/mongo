@@ -133,10 +133,6 @@ namespace mongo {
 
         views.push_back( view );
 
-        DEV if (! d.dbMutex.info().isLocked()) {
-            _unlock();
-        }
-
         return view;
     }
 
@@ -218,15 +214,6 @@ namespace mongo {
         return new PosixFlushable( viewForFlushing() , fd , len );
     }
 
-    void MemoryMappedFile::_lock() {
-        if (! views.empty() && isMongoMMF() ) 
-            assert(mprotect(views[0], len, PROT_READ | PROT_WRITE) == 0);
-    }
-
-    void MemoryMappedFile::_unlock() {
-        if (! views.empty() && isMongoMMF() ) 
-            assert(mprotect(views[0], len, PROT_READ) == 0);
-    }
 
 } // namespace mongo
 

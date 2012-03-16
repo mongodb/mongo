@@ -192,4 +192,11 @@ assert.eq( 1 , res.splitKeys.length , "9b" );
 assert.eq( 2 , res.splitKeys[0].x , "9c" );
 
 
+res = db.adminCommand( { splitVector: "test.jstests_splitvector" , keyPattern: {x:1} , force : true } );
+
+assert.eq( true , res.ok , "9a" );
+assert.eq( 1 , res.splitKeys.length , "9b" );
+assert.eq( 2 , res.splitKeys[0].x , "9c" );
+
+
 print("PASSED");

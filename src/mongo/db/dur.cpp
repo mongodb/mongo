@@ -280,11 +280,14 @@ namespace mongo {
         
             note you can call this unlocked, and that is a good idea as if you are in 
             say, a 'w' lock state, we can't do the commit
+
+	    @param force force a commit now even if seemingly not needed - ie the caller may 
+ 	           know something we don't such as that files will be closed
         */
-        bool DurableImpl::commitIfNeeded() {
+        bool DurableImpl::commitIfNeeded(bool force) {
             unspoolWriteIntents();
             DEV commitJob._nSinceCommitIfNeededCall = 0;
-            if( commitJob.bytes() < UncommittedBytesLimit ) {
+            if( commitJob.bytes() < UncommittedBytesLimit && !force ) {
                 return false;
             }
             if( !Lock::isLocked() ) {
@@ -730,8 +733,8 @@ namespace mongo {
             if (!cmdLine.dur)
                 return;
 
-            if( d.dbMutex.atLeastReadLocked() ) {
-                getDur().commitNow();
+	    if( Lock::isLocked() ) {
+                getDur().commitIfNeeded(true);
             }
             else {
                 assert( inShutdown() );
