@@ -132,7 +132,7 @@ namespace mongo {
     public:
         CheckShardingIndex() : Command( "checkShardingIndex" , false ) {}
         virtual bool slaveOk() const { return false; }
-        virtual LockType locktype() const { return READ; }
+        virtual LockType locktype() const { return NONE; }
         virtual void help( stringstream &help ) const {
             help << "Internal command.\n";
         }
@@ -165,7 +165,7 @@ namespace mongo {
                 return false;
             }
 
-            Client::Context ctx( ns );
+            Client::ReadContext ctx( ns );
             NamespaceDetails *d = nsdetails( ns );
             if ( ! d ) {
                 errmsg = "ns not found";
