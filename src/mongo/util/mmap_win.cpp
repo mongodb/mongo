@@ -199,7 +199,5 @@ namespace mongo {
     MemoryMappedFile::Flushable * MemoryMappedFile::prepareFlush() {
         return new WindowsFlushable( viewForFlushing() , fd , filename() , _flushMutex );
     }
-    void MemoryMappedFile::_lock() {}
-    void MemoryMappedFile::_unlock() {}
 
 }
