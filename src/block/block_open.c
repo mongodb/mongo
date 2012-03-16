@@ -136,8 +136,14 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
 		WT_ERR(__desc_read(session, block, salvage));
 
 	/* If not an open for a salvage operation, read the freelist. */
-	if (!salvage)
-		WT_ERR(__wt_block_freelist_read(session, block));
+	if (!salvage && block->free_offset != WT_BLOCK_INVALID_OFFSET) {
+		WT_ERR(__wt_block_extlist_read(session, block, &block->free,
+		    block->free_offset, block->free_size, block->free_cksum));
+
+		/* Insert the free-list itself into the linked list. */
+		WT_ERR(__wt_block_free(session,
+		    block, block->free_offset, (off_t)block->free_size));
+	}
 
 	F_SET(block, WT_BLOCK_OK);
 	*(void **)retp = block;
@@ -163,7 +169,9 @@ __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	 * file's description.
 	 */
 	if (F_ISSET(block, WT_BLOCK_OK)) {
-		WT_TRET(__wt_block_freelist_write(session, block));
+		WT_TRET(__wt_block_extlist_write(session, block,
+		    &block->free, &block->free_offset,
+		    &block->free_size, &block->free_cksum));
 		WT_TRET(__desc_update(session, block));
 	}
 
