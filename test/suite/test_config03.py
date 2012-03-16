@@ -80,7 +80,7 @@ class test_config03(test_base03.test_base03):
         multiprocess_scenarios, session_max_scenarios,
         transactional_scenarios, verbose_scenarios)
 
-    scenarios = wtscenario.prune_scenarios(all_scenarios, 3)
+    scenarios = wtscenario.prune_scenarios(all_scenarios, 1000)
     scenarios = wtscenario.number_scenarios(scenarios)
 
     wttest.WiredTigerTestCase.printVerbose(2, 'test_config03: running ' + \
