@@ -269,8 +269,11 @@ __wt_rec_write(
 static int
 __rec_write_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
 	WT_RECONCILE *r;
+
+	btree = session->btree;
 
 	/* Update the disk generation before we read anything from the page. */
 	WT_ORDERED_READ(page->modify->disk_gen, page->modify->write_gen);
@@ -289,17 +292,15 @@ __rec_write_init(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 		/* Configuration. */
 		WT_RET(__wt_config_getones(session,
-		    session->btree->config, "split_pct", &cval));
+		    btree->config, "split_pct", &cval));
 		r->btree_split_pct = (uint32_t)cval.val;
 
 		WT_RET(__wt_config_getones(session,
-		    session->btree->config,
-		    "internal_key_truncate", &cval));
+		    btree->config, "internal_key_truncate", &cval));
 		r->key_sfx_compress_conf = (cval.val != 0);
 
 		WT_RET(__wt_config_getones(session,
-		    session->btree->config,
-		    "prefix_compression", &cval));
+		    btree->config, "prefix_compression", &cval));
 		r->key_pfx_compress_conf = (cval.val != 0);
 	}
 
@@ -985,8 +986,7 @@ __wt_rec_bulk_init(WT_CURSOR_BULK *cbulk)
 	WT_ILLEGAL_VALUE(session);
 	}
 
-	WT_RET(__rec_split_init(
-	    session, page, recno, session->btree->maxleafpage));
+	WT_RET(__rec_split_init(session, page, recno, btree->maxleafpage));
 
 	return (0);
 }
@@ -1166,8 +1166,12 @@ __wt_rec_col_var_bulk_insert(WT_CURSOR_BULK *cbulk)
 static int
 __rec_col_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
-	WT_RET(__rec_split_init(session,
-	    page, page->u.intl.recno, session->btree->maxintlpage));
+	WT_BTREE *btree;
+
+	btree = session->btree;
+
+	WT_RET(__rec_split_init(
+	    session, page, page->u.intl.recno, btree->maxintlpage));
 
 	/*
 	 * Walking the row-store internal pages is complicated by the fact that
@@ -1509,6 +1513,7 @@ static int
 __rec_col_var(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_SALVAGE_COOKIE *salvage)
 {
+	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_COL *cip;
@@ -1523,6 +1528,7 @@ __rec_col_var(
 	const void *data;
 
 	r = session->reconcile;
+	btree = session->btree;
 	last = r->last;
 	unpack = &_unpack;
 
@@ -1530,8 +1536,8 @@ __rec_col_var(
 	data = NULL;
 	size = 0;
 
-	WT_RET(__rec_split_init(session,
-	    page, page->u.col_var.recno, session->btree->maxleafpage));
+	WT_RET(__rec_split_init(
+	    session, page, page->u.col_var.recno, btree->maxleafpage));
 
 	/*
 	 * The salvage code may be calling us to reconcile a page where there
@@ -2144,6 +2150,7 @@ static int
 __rec_row_leaf(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_SALVAGE_COOKIE *salvage)
 {
+	WT_BTREE *btree;
 	WT_CELL *cell, *val_cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_IKEY *ikey;
@@ -2158,6 +2165,7 @@ __rec_row_leaf(
 	int ovfl_key, ret;
 
 	r = session->reconcile;
+	btree = session->btree;
 	tmpkey = NULL;
 	unpack = &_unpack;
 	slvg_skip = salvage == NULL ? 0 : salvage->skip;
@@ -2166,8 +2174,7 @@ __rec_row_leaf(
 	key = &r->k;
 	val = &r->v;
 
-	WT_RET(__rec_split_init(session,
-	    page, 0ULL, session->btree->maxleafpage));
+	WT_RET(__rec_split_init(session, page, 0ULL, btree->maxleafpage));
 
 	/*
 	 * Write any K/V pairs inserted into the page before the first from-disk
@@ -2296,12 +2303,12 @@ __rec_row_leaf(
 			if (ikey != NULL) {
 				tmpkey->data = WT_IKEY_DATA(ikey);
 				tmpkey->size = ikey->size;
-			} else if (session->btree->huffman_key == NULL &&
+			} else if (btree->huffman_key == NULL &&
 			    unpack->type == WT_CELL_KEY &&
 			    unpack->prefix == 0) {
 				tmpkey->data = unpack->data;
 				tmpkey->size = unpack->size;
-			} else if (session->btree->huffman_key == NULL &&
+			} else if (btree->huffman_key == NULL &&
 			    unpack->type == WT_CELL_KEY &&
 			    tmpkey->size >= unpack->prefix) {
 				/*
