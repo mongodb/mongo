@@ -45,6 +45,7 @@ ENOMEM
 ENOTSUP
 ETIME
 ETIMEDOUT
+EXTLIST
 Enqueue
 Env
 Eron
@@ -249,6 +250,7 @@ eventv
 evictserver
 exactp
 extern
+extlist
 fcntl
 ffc
 ffs

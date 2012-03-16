@@ -19,36 +19,53 @@
 
 /*
  * The block allocator maintains two primary skiplists: first, the by-offset
- * list linking WT_FREE elements and sorted by file offset (low-to-high):
+ * list linking WT_EXT elements and sorted by file offset (low-to-high):
  * this list has an entry for every free chunk in the file.  The second primary
  * skiplist is the by-size list linking WT_SIZE elements and sorted by chunk
  * size (low-to-high).  This list has an entry for every free chunk size seen
  * since the list was created.
  *	Additionally, each WT_SIZE element has a skiplist of its own, linking
- * WT_FREE elements and sorted by file offset (low-to-high).  This list has an
+ * WT_EXT elements and sorted by file offset (low-to-high).  This list has an
  * entry for every free chunk in the file of a particular size.
- *	The trickiness is that each individual WT_FREE element appears on two
+ *	The trickiness is that each individual WT_EXT element appears on two
  * skiplists.  In order to minimize allocation calls, we allocate a single
- * array of WT_FREE pointers at the end of the WT_FREE structure, for both
- * skiplists, and store the depth of the skiplist in the WT_FREE structure.
- * The skiplist entries for the offset skiplist start at WT_FREE.next[0] and
- * the entries for the size skiplist start at WT_FREE.next[WT_FREE.depth].
- *
- * WT_FREE --
- *	Encapsulation of a free chunk of space.
+ * array of WT_EXT pointers at the end of the WT_EXT structure, for both
+ * skiplists, and store the depth of the skiplist in the WT_EXT structure.
+ * The skiplist entries for the offset skiplist start at WT_EXT.next[0] and
+ * the entries for the size skiplist start at WT_EXT.next[WT_EXT.depth].
  */
-struct __wt_free {
-	off_t	 off;				/* File offset */
-	off_t	 size;				/* Size */
+
+/*
+ * WT_EXTLIST --
+ *	An extent list.
+ */
+struct __wt_extlist {
+	const char *name;			/* Name */
+
+	uint64_t bytes;				/* Byte count */
+	uint32_t entries;			/* Entry count */
+
+	WT_EXT	*off[WT_SKIP_MAXDEPTH];		/* Size/offset skiplists */
+	WT_SIZE *size[WT_SKIP_MAXDEPTH];
+};
+
+/*
+ * WT_EXT --
+ *	Encapsulation of an extent, either allocated or freed within the
+ * snapshot.
+ */
+struct __wt_ext {
+	off_t	 off;				/* Extent's file offset */
+	off_t	 size;				/* Extent's Size */
 
 	uint8_t	 depth;				/* Skip list depth */
 
 	/*
 	 * Variable-length array, sized by the number of skiplist elements.
-	 * The first depth array entries are the offset skiplist elements,
+	 * The first depth array entries are the address skiplist elements,
 	 * the second depth array entries are the size skiplist.
 	 */
-	WT_FREE	*next[0];			/* Offset, size skiplists */
+	WT_EXT	*next[0];			/* Offset, size skiplists */
 };
 
 /*
@@ -60,23 +77,23 @@ struct __wt_size {
 
 	uint8_t	 depth;				/* Skip list depth */
 
-	WT_FREE *foff[WT_SKIP_MAXDEPTH];	/* Per-size offset skiplist */
+	WT_EXT	*off[WT_SKIP_MAXDEPTH];		/* Per-size offset skiplist */
 
 	/* Variable-length array, sized by the number of skiplist elements. */
 	WT_SIZE *next[0];			/* Size skiplist */
 };
 
 /*
- * WT_FREE_FOREACH --
+ * WT_EXT_FOREACH --
  *	Walk a block manager skiplist.
- * WT_FREE_FOREACH_OFF --
- *	Walk a block manager skiplist where the WT_FREE.next entries are offset
+ * WT_EXT_FOREACH_OFF --
+ *	Walk a block manager skiplist where the WT_EXT.next entries are offset
  * by the depth.
  */
-#define	WT_FREE_FOREACH(skip, head)					\
+#define	WT_EXT_FOREACH(skip, head)					\
 	for ((skip) = (head)[0];					\
 	    (skip) != NULL; (skip) = (skip)->next[0])
-#define	WT_FREE_FOREACH_OFF(skip, head)					\
+#define	WT_EXT_FOREACH_OFF(skip, head)					\
 	for ((skip) = (head)[0];					\
 	    (skip) != NULL; (skip) = (skip)->next[(skip)->depth])
 
@@ -99,13 +116,7 @@ struct __wt_block {
 					/* Freelist support */
 	WT_SPINLOCK freelist_lock;	/* Lock to protect the freelist. */
 
-	uint64_t freelist_bytes;	/* Freelist byte count */
-	uint32_t freelist_entries;	/* Freelist entry count */
-	int	 freelist_dirty;	/* Freelist has been modified */
-
-					/* Freelist offset/size skiplists */
-	WT_FREE *foff[WT_SKIP_MAXDEPTH];
-	WT_SIZE *fsize[WT_SKIP_MAXDEPTH];
+	WT_EXTLIST free;		/* Freelist offset/size skiplists */
 
 	off_t	 free_offset;		/* Freelist file location */
 	uint32_t free_size;
@@ -137,7 +148,7 @@ struct __wt_block_desc {
 	uint32_t cksum;			/* 08-11: Description block checksum */
 
 	uint32_t unused;		/* 12-15: Padding */
-#define	WT_BLOCK_FREELIST_MAGIC	071002
+#define	WT_BLOCK_EXTLIST_MAGIC	071002
 	uint64_t free_offset;		/* 16-23: Free list page offset */
 	uint32_t free_size;		/* 24-27: Free list page length */
 	uint32_t free_cksum;		/* 28-31: Free list page checksum */
