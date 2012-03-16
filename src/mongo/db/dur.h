@@ -90,6 +90,8 @@ namespace mongo {
                 You must be at least read locked when you call this.  Ideally, you are not write locked
                 and then read operations can occur concurrently.
 
+                Do not use this. Use commitIfNeeded() instead.
+
                 @return true if --dur is on.
                 @return false if --dur is off. (in which case there is action)
             */

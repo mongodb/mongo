@@ -177,10 +177,8 @@ namespace mongo {
     extern SortPhaseOne *precalced;
 
     bool _compact(const char *ns, NamespaceDetails *d, string& errmsg, bool validate, BSONObjBuilder& result, double pf, int pb) { 
-        //int les = d->lastExtentSize;
-
         // this is a big job, so might as well make things tidy before we start just to be nice.
-        getDur().commitNow();
+        getDur().commitIfNeeded();
 
         list<DiskLoc> extents;
         for( DiskLoc L = d->firstExtent; !L.isNull(); L = L.ext()->xnext ) 
@@ -237,7 +235,7 @@ namespace mongo {
             return false;
         }
 
-        getDur().commitNow();
+        getDur().commitIfNeeded();
 
         long long skipped = 0;
         int n = 0;
@@ -291,7 +289,7 @@ namespace mongo {
 
         bool ok;
         {
-            writelock lk;
+            Lock::DBWrite lk(ns);
             BackgroundOperation::assertNoBgOpInProgForNs(ns.c_str());
             Client::Context ctx(ns);
             NamespaceDetails *d = nsdetails(ns.c_str());
@@ -357,7 +355,7 @@ namespace mongo {
             }
             
             {
-                writelock lk;
+                Lock::DBWrite lk(ns);
                 Client::Context ctx(ns);
                 NamespaceDetails *d = nsdetails(ns.c_str());
                 if( ! d ) {
