@@ -77,6 +77,7 @@ namespace mongo {
             static void W_to_R();
             static void unsetW(); // reverts to greedy
             static void unsetR(); // reverts to greedy
+            static bool isEnabled(); // if the thread spanning lock is enabled
         };
     };
 

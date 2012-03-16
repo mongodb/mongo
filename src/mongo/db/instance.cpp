@@ -460,6 +460,9 @@ namespace mongo {
             if ( Lock::isReadLocked() ) {
                 mongo::log(1) << "note: not profiling because recursive read lock" << endl;
             }
+            else if ( Lock::ThreadSpanningOp::isEnabled() ) {
+                mongo::log(1) << "note: not profiling because in fsync+lock or other ThreadSpanningOp" << endl;
+            }
             else {
                 writelock lk;
                 if ( dbHolder()._isLoaded( nsToDatabase( currentOp.getNS() ) , dbpath ) ) {

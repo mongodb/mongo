@@ -444,7 +444,6 @@ namespace mongo {
                 try { 
                     //uassert(12034, "fsync: can't lock while an unlock is pending", !unlockRequested);
                     uassert(12032, "fsync: sync option must be true when using lock", sync);
-                    uassert(12033, "fsync: profiling must be off to enter locked mode", cc().database()->profile == 0);
                     getDur().syncDataAndTruncateJournal();
                 } catch(...) { 
                     Lock::ThreadSpanningOp::unsetW();
