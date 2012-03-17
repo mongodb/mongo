@@ -236,9 +236,12 @@ namespace mongo {
         threadState() = 0;
     }
     void Lock::ThreadSpanningOp::unsetR() {
-        assert( threadState() == 'R' ); 
+        assert( threadState() == 'R' || threadState() == 0 ); 
         q.unlock_R();
         q.start_greed();
+        threadState() = 0;
+    }
+    void Lock::ThreadSpanningOp::handoffR() {
         threadState() = 0;
     }
 

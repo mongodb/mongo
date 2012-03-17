@@ -464,6 +464,7 @@ namespace mongo {
                 log() << "    For more info see " << FSyncCommand::url() << endl;
                 result.append("info", "now locked against writes, use db.fsyncUnlock() to unlock");
                 result.append("seeAlso", url());
+                Lock::ThreadSpanningOp::handoffR();
             }
             else {
                 // the simple fsync command case
