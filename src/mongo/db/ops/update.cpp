@@ -1116,6 +1116,14 @@ namespace mongo {
 
                 debug.nscanned++;
 
+                if ( mods.get() && mods->hasDynamicArray() ) {
+                    // The Cursor must have a Matcher to record an elemMatchKey.  But currently
+                    // a modifier on a dynamic array field may be applied even if there is no
+                    // elemMatchKey, so a matcher cannot be required.
+                    //verify( 16098, c->matcher() );
+                    details.requestElemMatchKey();
+                }
+                
                 if ( !c->currentMatches( &details ) ) {
                     c->advance();
 
