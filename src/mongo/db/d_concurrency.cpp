@@ -221,22 +221,25 @@ namespace mongo {
     // another unlock
     void Lock::ThreadSpanningOp::setWLockedNongreedy() { 
         assert( threadState() == 0 ); // as this spans threads the tls wouldn't make sense
-        q.lock_W_stop_greed();
+        lock_W_stop_greed();
     }
     void Lock::ThreadSpanningOp::W_to_R() { 
-        assert( threadState() == 0 );
+        assert( threadState() == 'W' );
         dur::assertNothingSpooled();
         q.W_to_R();
+        threadState() = 'R';
     }
     void Lock::ThreadSpanningOp::unsetW() { // note there is no unlocking_W() call here
-        assert( threadState() == 0 );
+        assert( threadState() == 'W' );
         q.unlock_W();
         q.start_greed();
+        threadState() = 0;
     }
     void Lock::ThreadSpanningOp::unsetR() {
-        assert( threadState() == 0 );
+        assert( threadState() == 'R' ); 
         q.unlock_R();
         q.start_greed();
+        threadState() = 0;
     }
 
     int Lock::isLocked() {
