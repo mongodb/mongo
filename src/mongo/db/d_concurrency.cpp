@@ -238,10 +238,6 @@ namespace mongo {
         q.unlock_R();
         q.start_greed();
     }
-    bool Lock::ThreadSpanningOp::isEnabled() {
-        return q.isGreeedSuspended();
-    }
-
 
     int Lock::isLocked() {
         return threadState();

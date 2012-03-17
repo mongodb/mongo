@@ -74,7 +74,6 @@ namespace mongo {
         void W_to_R();
         bool R_to_W(); // caution see notes below
         void runExclusively(void (*f)(void));
-        bool isGreeedSuspended();
     };
 
     inline bool QLock::i_block(char me, char them) {
@@ -279,8 +278,5 @@ namespace mongo {
         W.n--;
         notifyWeUnlocked('W');
     }
-    inline bool QLock::isGreeedSuspended() { 
-        boost::mutex::scoped_lock lk(m);
-        return greedSuspended != 0;
-    }
+
 }
