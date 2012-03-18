@@ -16,6 +16,7 @@ namespace mongo {
     unsigned long long curTimeMicros64();
 
     class RWLockBase : boost::noncopyable {
+        friend class SimpleRWLock;
         SRWLOCK _lock;
     protected:
         RWLockBase() { InitializeSRWLock(&_lock); }
@@ -79,22 +80,20 @@ namespace mongo {
 
 namespace mongo { 
     class RWLockBase : boost::noncopyable {
+        friend class SimpleRWLock;
         pthread_rwlock_t _lock;
         static void check( int x ) {
             assert( x == 0 );
         }        
-
     protected:
         ~RWLockBase() {
             if ( ! StaticObserver::_destroyingStatics ) {
                 wassert( pthread_rwlock_destroy( &_lock ) == 0 ); // wassert as don't want to throw from a destructor
             }
         }
-
         RWLockBase() {
             check( pthread_rwlock_init( &_lock , 0 ) );
         }
-
         void lock() { check( pthread_rwlock_wrlock( &_lock ) ); }
         void unlock() { check( pthread_rwlock_unlock( &_lock ) ); }
         void lock_shared() { check( pthread_rwlock_rdlock( &_lock ) ); }
@@ -143,6 +142,7 @@ namespace mongo { using boost::shared_mutex; }
 
 namespace mongo { 
     class RWLockBase : boost::noncopyable {
+        friend class SimpleRWLock;
         shared_mutex _m;
     protected:
         void lock() {

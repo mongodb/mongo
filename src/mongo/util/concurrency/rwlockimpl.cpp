@@ -31,7 +31,7 @@ namespace mongo {
         int& state = s.getRef();
         dassert( state == 0 );
         state--;
-        RWLockBase::lock();
+        m.lock();
         tid = me; // this is for use in the debugger to see who does have the lock
     }
     void SimpleRWLock::unlock() { 
@@ -39,13 +39,13 @@ namespace mongo {
         dassert( state == -1 );
         state++;
         tid = 0xffffffff;
-        RWLockBase::unlock(); 
+        m.unlock(); 
     }
     void SimpleRWLock::lock_shared() { 
         int& state = s.getRef();
         dassert( state == 0 );
         state++;
-        RWLockBase::lock_shared(); 
+        m.lock_shared(); 
         shares++;
     }
     void SimpleRWLock::unlock_shared() { 
@@ -53,13 +53,13 @@ namespace mongo {
         dassert( state == 1 );
         state--;
         shares--;
-        RWLockBase::unlock_shared(); 
+        m.unlock_shared(); 
     }
 #else
-    void SimpleRWLock::lock() { RWLockBase::lock(); }
-    void SimpleRWLock::unlock() { RWLockBase::unlock(); }
-    void SimpleRWLock::lock_shared() { RWLockBase::lock_shared(); }
-    void SimpleRWLock::unlock_shared() { RWLockBase::unlock_shared(); }
+    void SimpleRWLock::lock() { m.lock(); }
+    void SimpleRWLock::unlock() { m.unlock(); }
+    void SimpleRWLock::lock_shared() { m.lock_shared(); }
+    void SimpleRWLock::unlock_shared() { m.unlock_shared(); }
 #endif
 
 }

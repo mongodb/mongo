@@ -6,7 +6,8 @@ namespace mongo {
     /** separated out as later the implementation of this may be different than RWLock, 
         depending on OS, as there is no upgrade etc. facility herein.
     */
-    class SimpleRWLock : private RWLockBase { 
+    class SimpleRWLock : boost::noncopyable { 
+        RWLockBase m;
 #if defined(_WIN32) && defined(_DEBUG)
         AtomicUInt shares;
         ThreadLocalValue<int> s;
