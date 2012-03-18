@@ -710,18 +710,11 @@ namespace mongo {
                     return;
             }
 
-            // starvation on read locks could occur.  so if read lock acquisition is slow, try to get a
-            // write lock instead.  otherwise journaling could be delayed too long (too much data will 
-            // not accumulate though, as commitIfNeeded logic will have executed in the meantime if there 
-            // has been writes)
-            //
-            // we could greedily get an R lock, but we need to remapprivateview anyway.
-            // todo : 
-            //   greedily get R 
-            //   group commit
-            //   upgrade to W
-            //   remap private view
-            Lock::GlobalWrite w(true);
+            // we get a write lock, downgrade, do work, upgrade, finish work.
+            // getting a write lock is helpful also as we need to be greedy and not be starved here
+            // note our "stopgreed" parm -- to stop greed by others while we are working. you can't write 
+            // anytime soon anyway if we are journaling for a while, that was the idea.
+            Lock::GlobalWrite w(/*stopgreed:*/true);
             w.downgrade();
             groupCommit(&w);
         }

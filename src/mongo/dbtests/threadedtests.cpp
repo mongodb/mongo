@@ -69,7 +69,7 @@ namespace ThreadedTests {
     //const int nthr=7;
     class MongoMutexTest : public ThreadedTest<nthr> {
 #if defined(_DEBUG)
-        enum { N = 5000 };
+        enum { N = 2000 };
 #else
         enum { N = 4000/*0*/ };
 #endif
@@ -166,7 +166,8 @@ namespace ThreadedTests {
                 }
                 else if( i % 7 == 6 ) {
                     if( i > N/2 ) { 
-                        if( i % 11 == 0 ) { 
+                        int q = i % 11;
+                        if( q == 0 ) { 
                             Lock::DBRead r("foo");
                             Lock::DBRead r2("foo");
                             Lock::DBRead r3("local");
@@ -174,7 +175,14 @@ namespace ThreadedTests {
                                 Lock::TempRelease t;
                             }
                         }
-                        else { 
+                        else if( q == 1 ) {
+                            // test locking local only -- with no preceeding lock
+                            // TODO { Lock::DBRead  x("local"); }
+                            //{ Lock::DBWrite x("local"); }
+                        } else if( q == 1 ) {
+                            // TODO { Lock::DBRead  x("admin"); }
+                            //{ Lock::DBWrite x("admin"); }
+                        } else { 
                             Lock::DBWrite w("foo");
                             {
                                 Lock::TempRelease t;

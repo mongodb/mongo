@@ -156,10 +156,7 @@ namespace mongo {
     }
     static void lock_W() { 
         LockState& ls = lockState();
-        if( ls.threadState == 't' ) { 
-            DEV warning() << "W locking inside a temprelease, seems nonideal" << endl;
-        }
-        else if(  ls.threadState ) {
+        if(  ls.threadState ) {
             log() << "can't lock_W, threadState=" << (int) ls.threadState << endl;
             fassert(0,false);
         }
@@ -171,11 +168,10 @@ namespace mongo {
         }
         locked_W();
     }
-    static void unlock_W(char oldState = 0) { 
+    static void unlock_W() { 
         wassert( threadState() == 'W' );
         unlocking_W();
-        dassert( oldState == 0 ||  oldState == 't' );
-        threadState() = oldState;
+        threadState() = 0;
         q.unlock_W();
     }
     static void lock_R() { 
@@ -192,7 +188,7 @@ namespace mongo {
     }    
     static void lock_w() { 
         char &ts = threadState();
-        assert( ts == 0 || ts == 't' );
+        assert( ts == 0 );
         getDur().commitIfNeeded();
         ts = 'w';
         Acquiring a('w');
@@ -206,7 +202,7 @@ namespace mongo {
     }
     static void lock_r() {
         char& ts = threadState();
-        assert( ts == 0 || ts == 't' );
+        assert( ts == 0 );
         ts = 'r';
         Acquiring a('r');
         q.lock_r();
@@ -354,7 +350,7 @@ namespace mongo {
             error() << "TempRelease called but threadState()=" << type << endl;
             assert(false);
         }
-        ls.threadState = 't';
+        ls.threadState = 0;
         dassert( ls.recursive == 0 );
     }
     Lock::TempRelease::~TempRelease() {
@@ -364,7 +360,7 @@ namespace mongo {
         LockState& ls = lockState();
         dassert( ls.recursive == 0 );
         DESTRUCTOR_GUARD( 
-            fassert(0, ls.threadState == 't' || ls.threadState == 0);
+            fassert(0, ls.threadState == 0);
             ls.threadState = 0;
             switch( type ) {
             case 'W':
@@ -392,35 +388,37 @@ namespace mongo {
             }
         )
     }
-    Lock::GlobalWrite::GlobalWrite(bool sg) : stopGreed(sg), old(threadState()) {
-        if( old == 'W' ) { 
+
+    Lock::GlobalWrite::GlobalWrite(bool sg) : 
+        stoppedGreed(sg)
+    {
+        char ts = threadState();
+        if( ts == 'W' ) { 
             recursive()++;
-            DEV if( stopGreed ) { 
+            DEV if( sg ) { 
                 log() << "info Lock::GlobalWrite does not stop greed on recursive invocation" << endl;
             }
+            return;
         }
-        else {
-            if( stopGreed ) {
-                lock_W_stop_greed();
-            } else {
-                lock_W();
-            }
+        if( sg ) {
+            lock_W_stop_greed();
+        } else {
+            lock_W();
         }
     }
     Lock::GlobalWrite::~GlobalWrite() {
         if( recursive() ) { 
             recursive()--;
+            return;
+        }
+        if( threadState() == 'R' ) { // we downgraded
+            unlock_R();
         }
         else {
-            if( threadState() == 'R' ) { // downgraded
-                unlock_R();
-            }
-            else {
-                unlock_W(old);
-            }
-            if( stopGreed ) {
-                q.start_greed();
-            }
+            unlock_W();
+        }
+        if( stoppedGreed ) {
+            q.start_greed();
         }
         fassert( 0, recursive() < 1000 );
     }
@@ -471,9 +469,8 @@ namespace mongo {
         case 'W' :
             ls.recursive++;
             return true; // lock nothing further
-        default: // 't'
+        default:
             assert(false);
-        case 't':
         case  0  : 
             ;
         }
@@ -485,7 +482,6 @@ namespace mongo {
             break;
         default:
             assert(false);
-        case 't':
         case  0  : 
             lock_w();
             locked_w = true;
@@ -579,10 +575,6 @@ namespace mongo {
             return false;
         default:
             assert(false);
-        case 't' :
-            {
-                LOG(2) << "info relocking inside a temprelease" << endl;
-            }
         case  0  : 
             ;
         }
@@ -595,7 +587,6 @@ namespace mongo {
             break;
         default:
             assert(false);
-        case 't' :
         case  0  : 
             lock_r();
             locked_r = true;
@@ -676,9 +667,8 @@ namespace mongo {
    }
 }
 
-// legacy hooks
+// legacy hooks and glue
 namespace mongo { 
-
     writelock::writelock() { 
         lk1.reset( new Lock::GlobalWrite() );
     }
@@ -690,7 +680,6 @@ namespace mongo {
             lk2.reset( new Lock::DBWrite(ns) );
         }
     }
-
     writelocktry::writelocktry( int tryms ) : 
         _got( lock_W_try(tryms) )
     { }
@@ -698,7 +687,6 @@ namespace mongo {
         if( _got )
             unlock_W();
     }
-
     // note: the 'already' concept here might be a bad idea as a temprelease wouldn't notice it is nested then
     readlocktry::readlocktry( int tryms )      
     {
@@ -715,7 +703,6 @@ namespace mongo {
         if( !_already && _got )
             unlock_R();
     }
-
     readlock::readlock() {
         lk1.reset( new Lock::GlobalRead() );
     }
@@ -727,12 +714,6 @@ namespace mongo {
             lk2.reset( new Lock::DBRead(ns) );
         }
     }
-
-}
-
-// legacy MongoMutex glue
-namespace mongo {
-
     /* backward compatible glue. it could be that the assumption was that 
        it's a global read lock, so 'r' and 'w' don't qualify.
        */ 
@@ -757,7 +738,6 @@ namespace mongo {
             msgasserted(16102, "expected read lock");
         }
     }
-
     void locked_W() {
         d.dbMutex._minfo.entered(); // hopefully eliminate one day 
     }
@@ -769,10 +749,8 @@ namespace mongo {
         d.dbMutex._minfo.leaving();
         dur::releasingWriteLock();
     }
-
     MongoMutex::MongoMutex() {
         static int n = 0;
         assert( ++n == 1 );
     }
-
 }

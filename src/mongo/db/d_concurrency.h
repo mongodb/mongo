@@ -32,9 +32,12 @@ namespace mongo {
             int local;
         };
         class GlobalWrite : boost::noncopyable { // recursive is ok
-            const bool stopGreed;
-            const char old;
+            const bool stoppedGreed;
         public:
+            /** @param stopGreed after acquisition stop greediness of other threads for write locks. this should generally not 
+                                 be used it is for exceptional circumstances. journaling uses it. perhaps this should go away, 
+                                 it makes the software more complicated.
+            */
             GlobalWrite(bool stopGreed = false); 
             ~GlobalWrite();
             void downgrade(); // W -> R
