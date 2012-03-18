@@ -1,4 +1,4 @@
-// threadedtests.cpp - Tests for threaded code
+// @file threadedtests.cpp - Tests for threaded code
 //
 
 /**
@@ -204,6 +204,7 @@ namespace ThreadedTests {
             cc().shutdown();
         }
         virtual void validate() {
+            log() << "mongomutextest validate" << endl;
             ASSERT( !d.dbMutex.atLeastReadLocked() );
             ASSERT( upgradeWorked > upgradeFailed );
             ASSERT( upgradeWorked > 4 );
@@ -319,72 +320,50 @@ namespace ThreadedTests {
 
     class RWLockTest2 { 
     public:
-        
         static void worker1( RWLockRecursiveNongreedy * lk , AtomicUInt * x ) {
             (*x)++; // 1
-            //cout << "lock b try" << endl;
             RWLockRecursiveNongreedy::Exclusive b(*lk);
-            //cout << "lock b got" << endl;
             (*x)++; // 2
         }
-
         static void worker2( RWLockRecursiveNongreedy * lk , AtomicUInt * x ) {
-            //cout << "lock c try" << endl;
             RWLockRecursiveNongreedy::Shared c(*lk);
             (*x)++;
-            //cout << "lock c got" << endl;
         }
-
         void run() { 
             /**
              * note: this test will deadlock if the code breaks
-             */
-            
+             */            
             RWLockRecursiveNongreedy lk( "eliot2" , 120 * 1000 );
             cout << "RWLock impl: " << lk.implType() << endl;
-
-            auto_ptr<RWLockRecursiveNongreedy::Shared> a( new RWLockRecursiveNongreedy::Shared(lk) );
-            
+            auto_ptr<RWLockRecursiveNongreedy::Shared> a( new RWLockRecursiveNongreedy::Shared(lk) );            
             AtomicUInt x1 = 0;
             cout << "A : " << &x1 << endl;
             boost::thread t1( boost::bind( worker1 , &lk , &x1 ) );
             while ( ! x1 );
             assert( x1 == 1 );
             sleepmillis( 500 );
-            assert( x1 == 1 );
-            
+            assert( x1 == 1 );            
             AtomicUInt x2 = 0;
-
             boost::thread t2( boost::bind( worker2, &lk , &x2 ) );
             t2.join();
             assert( x2 == 1 );
-
             a.reset();
-
             for ( int i=0; i<2000; i++ ) {
                 if ( x1 == 2 )
                     break;
                 sleepmillis(1);
             }
-
             assert( x1 == 2 );
-            t1.join();
-            
+            t1.join();            
         }
     };
 
-
-
-    /** test of shared lock */
     class RWLockTest3 { 
-    public:
-        
+    public:        
         static void worker2( RWLockRecursiveNongreedy * lk , AtomicUInt * x ) {
     	    assert( ! lk->__lock_try(0) );
-            //cout << "lock c try" << endl;
             RWLockRecursiveNongreedy::Shared c( *lk  );
             (*x)++;
-            //cout << "lock c got" << endl;
         }
 
         void run() { 
@@ -402,8 +381,7 @@ namespace ThreadedTests {
             t2.join();
             assert( x2 == 1 );
 
-            a.reset();
-            
+            a.reset();            
         }
     };
 
@@ -536,39 +514,8 @@ namespace ThreadedTests {
         }
     };
 
-    /*class Hierarchical1 {
-    public:
-        void run() {
-            {
-                LockCollectionForReading x("bar");
-            }
-            {
-                LockCollectionForReading x("foo");
-                LockCollectionForReading y("foo"); // recursion is ok
-            }
-            {
-                LockCollectionForReading x("foo");
-                LockCollectionForReading y("foo.$bar"); 
-            }
-#if defined(CLC)
-            {
-                LockCollectionForWriting x("foo");
-                LockCollectionForWriting y("foo");
-            }
-            {
-                LockCollectionForReading x("foo");
-                ASSERT_THROWS( LockCollectionForWriting y("foo"), DBException )
-            }
-            {
-                LockCollectionForReading x("foo");
-                ASSERT_THROWS( LockCollectionForReading y("bar"), DBException )
-            }
-#endif
-            cout << "temp ok" << endl;
-        }
-    };*/
-
-#if 1
+    // we don't use upgrade so that part is not important currently but the other aspects of this test are 
+    // interesting; it would be nice to do analogous tests for SimpleRWLock and QLock
     class UpgradableTest : public ThreadedTest<7> {
         RWLock m;
     public:
@@ -592,15 +539,16 @@ namespace ThreadedTests {
 
             sleepmillis(100*x);
 
-            log() << x << ' ' << what[x] << " request" << endl;
+            int Z = 1;
+            log(Z) << x << ' ' << what[x] << " request" << endl;
             char ch = what[x];
             switch( ch ) { 
             case 'w':
                 {
                     m.lock();
-                    log() << x << " w got" << endl;
+                    log(Z) << x << " w got" << endl;
                     sleepmillis(100);
-                    log() << x << " w unlock" << endl;
+                    log(Z) << x << " w unlock" << endl;
                     m.unlock();
                 }
                 break;
@@ -609,7 +557,7 @@ namespace ThreadedTests {
                 {
                     Timer t;
                     RWLock::Upgradable u(m);
-                    log() << x << ' ' << ch << " got" << endl;
+                    log(Z) << x << ' ' << ch << " got" << endl;
                     if( ch == 'U' ) {
 #ifdef MONGO_USE_SRW_ON_WINDOWS
                         // SRW locks are neither fair nor FIFO, as per docs
@@ -628,7 +576,7 @@ namespace ThreadedTests {
                         }
                     }
                     sleepsecs(1);
-                    log() << x << ' ' << ch << " unlock" << endl;
+                    log(Z) << x << ' ' << ch << " unlock" << endl;
                 }
                 break;
             case 'r':
@@ -636,14 +584,15 @@ namespace ThreadedTests {
                 {
                     Timer t;
                     m.lock_shared();
-                    log() << x << ' ' << ch << " got " << endl;
+                    log(Z) << x << ' ' << ch << " got " << endl;
                     if( what[x] == 'R' ) {
                         if( t.millis() > 15 ) { 
-                            log() << x << " info: when in upgradable, write locks are still greedy on this platform" << endl;
+                            // commented out for less chatter, we aren't using upgradeable anyway right now: 
+                            // log() << x << " info: when in upgradable, write locks are still greedy on this platform" << endl;
                         }
                     }
                     sleepmillis(200);
-                    log() << x << ' ' << ch << " unlock" << endl;
+                    log(Z) << x << ' ' << ch << " unlock" << endl;
                     m.unlock_shared();
                 }
                 break;
@@ -654,7 +603,6 @@ namespace ThreadedTests {
             cc().shutdown();
         }
     };
-#endif
 
     void sleepalittle() { 
         Timer t;
@@ -694,7 +642,8 @@ namespace ThreadedTests {
                 // <= 1.35 we use a different rwmutex impl so worth noting
                 cout << "Boost version : " << BOOST_VERSION << endl;
             }
-            cout << "Slack useful work fraction: " << ((double)a)/b << " locks:" << locks << endl;
+            cout << typeid(whichmutex).name() <<
+             " Slack useful work fraction: " << ((double)a)/b << " locks:" << locks << endl;
         }
         void watch() {
             while( 1 ) { 
@@ -792,26 +741,27 @@ namespace ThreadedTests {
         RWLock m;
         virtual void validate() { }
         virtual void subthread(int x) {
+            int Z = 1;
             Client::initThread("utest");
             if( x == 1 ) { 
                 cout << mongo::curTimeMillis64() % 10000 << " 1" << endl;
                 rwlock_shared lk(m);
                 sleepmillis(300);
-                cout << mongo::curTimeMillis64() % 10000 << " 1x" << endl;
+                log(Z) << mongo::curTimeMillis64() % 10000 << " 1x" << endl;
             }
             if( x == 2 ) {
                 sleepmillis(100);
-                cout << mongo::curTimeMillis64() % 10000 << " 2" << endl;
+                log(Z) << mongo::curTimeMillis64() % 10000 << " 2" << endl;
                 rwlock lk(m, true);
-                cout << mongo::curTimeMillis64() % 10000 << " 2x" << endl;
+                log(Z) << mongo::curTimeMillis64() % 10000 << " 2x" << endl;
             }
             if( x == 3 ) {
                 sleepmillis(200);
                 Timer t;
-                cout << mongo::curTimeMillis64() % 10000 << " 3" << endl;
+                log(Z) << mongo::curTimeMillis64() % 10000 << " 3" << endl;
                 rwlock_shared lk(m);
-                cout << mongo::curTimeMillis64() % 10000 << " 3x" << endl;
-                cout << t.millis() << endl;
+                log(Z) << mongo::curTimeMillis64() % 10000 << " 3x" << endl;
+                log(Z) << t.millis() << endl;
                 ASSERT( t.millis() > 50 );
             }
             cc().shutdown();
@@ -835,20 +785,21 @@ namespace ThreadedTests {
         QLock m;
         virtual void validate() { }
         virtual void subthread(int x) {
+            int Z = 1;
             Client::initThread("qtest");
             if( x == 1 ) { 
-                cout << mongo::curTimeMillis64() % 10000 << " 1 lock_r()..." << endl;
+                log(Z) << mongo::curTimeMillis64() % 10000 << " 1 lock_r()..." << endl;
                 m.lock_r();
-                cout << mongo::curTimeMillis64() % 10000 << " 1            got" << endl;
+                log(Z) << mongo::curTimeMillis64() % 10000 << " 1            got" << endl;
                 sleepmillis(300);
                 m.unlock_r();
-                cout << mongo::curTimeMillis64() % 10000 << " 1 unlock_r()" << endl;
+                log(Z) << mongo::curTimeMillis64() % 10000 << " 1 unlock_r()" << endl;
             }
             if( x == 2 || x == 4 ) {
                 sleepmillis(x*50);
-                cout << mongo::curTimeMillis64() % 10000 << " 2 lock_W()..." << endl;
+                log(Z) << mongo::curTimeMillis64() % 10000 << " 2 lock_W()..." << endl;
                 m.lock_W();
-                cout << mongo::curTimeMillis64() % 10000 << " 2            got" << endl;
+                log(Z) << mongo::curTimeMillis64() % 10000 << " 2            got" << endl;
                 gotW = true;
                 m.unlock_W();
             }
@@ -856,11 +807,11 @@ namespace ThreadedTests {
                 sleepmillis(200);
 
                 Timer t;
-                cout << mongo::curTimeMillis64() % 10000 << " 3 lock_r()..." << endl;
+                log(Z) << mongo::curTimeMillis64() % 10000 << " 3 lock_r()..." << endl;
                 m.lock_r();
                 assert( gotW );
-                cout << mongo::curTimeMillis64() % 10000 << " 3            got" << gotW << endl;
-                cout << t.millis() << endl;
+                log(Z) << mongo::curTimeMillis64() % 10000 << " 3            got" << gotW << endl;
+                log(Z) << t.millis() << endl;
                 m.unlock_r();
                 ASSERT( t.millis() > 50 );
             }
@@ -954,7 +905,7 @@ namespace ThreadedTests {
             // Slack is a test to see how long it takes for another thread to pick up
             // and begin work after another relinquishes the lock.  e.g. a spin lock 
             // would have very little slack.
-            add< Slack<mongo::mutex,mongo::mutex::scoped_lock> >();
+            add< Slack<mongo::mutex , mongo::mutex::scoped_lock > >();
             add< Slack<SimpleMutex,SimpleMutex::scoped_lock> >();
             add< Slack<SimpleRWLock,SimpleRWLock::Exclusive> >();
             add< CondSlack >();
