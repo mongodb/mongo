@@ -15,4 +15,4 @@ backup:
 	rm -rf BACKUP && mkdir BACKUP && cp -p -r WiredTiger* __* BACKUP/
 
 clean-local:
-	rm -rf WiredTiger WiredTiger.* __*
+	rm -rf WiredTiger WiredTiger.* __* *.core
