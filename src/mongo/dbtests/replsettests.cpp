@@ -269,7 +269,7 @@ namespace ReplSetTests {
             }
 
             DBDirectClient client;
-            int count = client.count(cappedNs(), BSONObj());
+            int count = (int) client.count(cappedNs(), BSONObj());
             assert(count > 1);
 
             // Just to be sure, no _id index, right?
