@@ -7,15 +7,18 @@ namespace mongo {
         depending on OS, as there is no upgrade etc. facility herein.
     */
     class SimpleRWLock : boost::noncopyable { 
+#if defined(_WIN32)
+        SRWLOCK _lock;
+#else
         RWLockBase m;
+#endif
 #if defined(_WIN32) && defined(_DEBUG)
         AtomicUInt shares;
         ThreadLocalValue<int> s;
         unsigned tid;
 #endif
     public:
-        explicit SimpleRWLock(const char *) { }
-        SimpleRWLock() { }
+        SimpleRWLock(const char *p = 0);
         void lock();
         void unlock();
         void lock_shared();

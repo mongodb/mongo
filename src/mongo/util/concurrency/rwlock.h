@@ -21,11 +21,9 @@
 #include "mutex.h"
 #include "../time_support.h"
 #include "rwlockimpl.h"
-
 #if defined(_DEBUG)
 #include "mutexdebugger.h"
 #endif
-
 #include "simplerwlock.h"
 
 namespace mongo {

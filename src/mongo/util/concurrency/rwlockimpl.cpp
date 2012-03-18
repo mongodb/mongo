@@ -22,7 +22,11 @@ using namespace std;
 
 namespace mongo {
 
-#if defined(_WIN32) && defined(_DEBUG)
+#if defined(_WIN32)
+    SimpleRWLock::SimpleRWLock(const char *p) { 
+        InitializeSRWLock(&_lock);
+    }
+# if defined(_DEBUG)
     // the code below in _DEBUG build will check that we don't try to recursively lock, 
     // which is not supported by this class.  also checks that you don't unlock without 
     // having locked
@@ -31,7 +35,7 @@ namespace mongo {
         int& state = s.getRef();
         dassert( state == 0 );
         state--;
-        m.lock();
+        AcquireSRWLockExclusive(&_lock);
         tid = me; // this is for use in the debugger to see who does have the lock
     }
     void SimpleRWLock::unlock() { 
@@ -39,13 +43,13 @@ namespace mongo {
         dassert( state == -1 );
         state++;
         tid = 0xffffffff;
-        m.unlock(); 
+        ReleaseSRWLockExclusive(&_lock);
     }
     void SimpleRWLock::lock_shared() { 
         int& state = s.getRef();
         dassert( state == 0 );
         state++;
-        m.lock_shared(); 
+        AcquireSRWLockShared(&_lock);
         shares++;
     }
     void SimpleRWLock::unlock_shared() { 
@@ -53,9 +57,24 @@ namespace mongo {
         dassert( state == 1 );
         state--;
         shares--;
-        m.unlock_shared(); 
+        ReleaseSRWLockShared(&_lock); 
     }
+# else
+    void SimpleRWLock::lock() {
+        AcquireSRWLockExclusive(&_lock);
+    }
+    void SimpleRWLock::unlock() { 
+        ReleaseSRWLockExclusive(&_lock);
+    }
+    void SimpleRWLock::lock_shared() { 
+        AcquireSRWLockShared(&_lock);
+    }
+    void SimpleRWLock::unlock_shared() { 
+        ReleaseSRWLockShared(&_lock); 
+    }
+# endif
 #else
+    SimpleRWLock::SimpleRWLock(const char *p) { }
     void SimpleRWLock::lock() { m.lock(); }
     void SimpleRWLock::unlock() { m.unlock(); }
     void SimpleRWLock::lock_shared() { m.lock_shared(); }
