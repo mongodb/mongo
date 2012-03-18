@@ -282,6 +282,7 @@ namespace mongo {
         _db = dbHolderUnchecked().getOrCreate( _ns , _path , _justCreated );
         assert(_db);
         if( _doVersion ) checkNotStale();
+        massert( 16107 , str::stream() << "Don't have a lock on: " << _ns , Lock::atLeastReadLocked( _ns ) );
         _client->_context = this;
         _client->_curOp->enter( this );
         checkNsAccess( doauth, writeLocked ? 1 : 0 );
