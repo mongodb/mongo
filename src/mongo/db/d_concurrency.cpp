@@ -440,12 +440,13 @@ namespace mongo {
     }
 
     Lock::GlobalRead::GlobalRead() {
-        if( threadState() == 'R' || threadState() == 'W' ) { 
-            recursive()++;
+        LockState& ls = lockState();
+        char ts = ls.threadState;
+        if( ts == 'R' || ts == 'W' ) { 
+            ls.recursive++;
+            return;
         }
-        else {
-            lock_R();
-        }
+        lock_R(); // we are unlocked in the qlock/top sense.  lock_R will assert if we are in an in compatible state
     }
     Lock::GlobalRead::~GlobalRead() {
         if( recursive() ) { 
