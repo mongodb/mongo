@@ -380,8 +380,12 @@ __wt_scr_discard(WT_SESSION_IMPL *session)
 
 	for (i = 0,
 	    bufp = session->scratch; i < session->scratch_alloc; ++i, ++bufp) {
-		if (*bufp != NULL)
-			__wt_buf_free(session, *bufp);
+		if (*bufp == NULL)
+			continue;
+		if (F_ISSET(*bufp, WT_ITEM_INUSE))
+			__wt_errx(session,
+			    "scratch buffer allocated and never discarded");
+		__wt_buf_free(session, *bufp);
 		__wt_free(session, *bufp);
 	}
 
