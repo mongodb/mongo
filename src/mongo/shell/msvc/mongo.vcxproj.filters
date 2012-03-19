@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <Filter Include="_js files">
@@ -150,14 +150,8 @@
     <ClCompile Include="..\..\scripting\sm_db.cpp">
       <Filter>scripting</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\db\memconcept.cpp">
-      <Filter>shell</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\client\clientAndShell.cpp">
       <Filter>client</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\util\md5.cpp">
-      <Filter>shell</Filter>
     </ClCompile>
     <ClCompile Include="..\..\db\commands.cpp">
       <Filter>db\x</Filter>
@@ -365,6 +359,15 @@
     </ClCompile>
     <ClCompile Include="..\..\..\third_party\boost\libs\program_options\src\winmain.cpp">
       <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\util\progress_meter.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\util\md5.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\db\memconcept.cpp">
+      <Filter>db\x</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
@@ -850,6 +853,9 @@
     </ClInclude>
     <ClInclude Include="..\..\targetver.h">
       <Filter>third_party</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\progress_meter.h">
+      <Filter>util</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

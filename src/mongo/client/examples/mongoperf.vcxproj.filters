@@ -74,6 +74,9 @@
     <ClCompile Include="..\..\..\third_party\boost\libs\system\src\error_code.cpp">
       <Filter>Boost</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\util\progress_meter.cpp">
+      <Filter>shared files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\bson\bson-inl.h">
@@ -120,6 +123,9 @@
     </ClInclude>
     <ClInclude Include="..\..\util\mmap.h">
       <Filter>includes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\progress_meter.h">
+      <Filter>shared files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

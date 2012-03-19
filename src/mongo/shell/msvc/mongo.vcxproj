@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -787,6 +787,7 @@
     <ClCompile Include="..\..\util\net\message_port.cpp" />
     <ClCompile Include="..\..\util\net\sock.cpp" />
     <ClCompile Include="..\..\util\password.cpp" />
+    <ClCompile Include="..\..\util\progress_meter.cpp" />
     <ClCompile Include="..\..\util\ramlog.cpp" />
     <ClCompile Include="..\..\util\stringutils.cpp" />
     <ClCompile Include="..\..\util\text.cpp" />
@@ -800,9 +801,7 @@
     <ClCompile Include="..\..\util\base64.cpp" />
     <ClCompile Include="..\..\util\debug_util.cpp" />
     <ClCompile Include="..\..\client\dbclient.cpp" />
-    <ClCompile Include="..\..\db\memconcept.cpp" >
-      <PrecompiledHeader>NotUsing</PrecompiledHeader>
-    </ClCompile>
+    <ClCompile Include="..\..\db\memconcept.cpp" />
     <ClCompile Include="..\..\client\dbclientcursor.cpp" />
     <ClCompile Include="..\..\db\jsobj.cpp" />
     <ClCompile Include="..\..\db\json.cpp" />
@@ -984,6 +983,7 @@
     <ClInclude Include="..\..\util\password.h" />
     <ClInclude Include="..\..\util\paths.h" />
     <ClInclude Include="..\..\util\processinfo.h" />
+    <ClInclude Include="..\..\util\progress_meter.h" />
     <ClInclude Include="..\..\util\ramlog.h" />
     <ClInclude Include="..\..\util\stringutils.h" />
     <ClInclude Include="..\..\util\text.h" />

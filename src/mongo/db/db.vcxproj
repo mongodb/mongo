@@ -1192,6 +1192,7 @@
     <ClCompile Include="..\util\net\listen.cpp" />
     <ClCompile Include="..\util\net\miniwebserver.cpp" />
     <ClCompile Include="..\util\processinfo.cpp" />
+    <ClCompile Include="..\util\progress_meter.cpp" />
     <ClCompile Include="..\util\ramlog.cpp" />
     <ClCompile Include="..\util\stringutils.cpp" />
     <ClCompile Include="..\util\systeminfo_win32.cpp" />
@@ -1304,6 +1305,7 @@
     <ClCompile Include="pipeline\field_path.cpp" />
     <ClCompile Include="pipeline\value.cpp" />
     <ClCompile Include="projection.cpp" />
+    <ClInclude Include="..\util\progress_meter.h" />
     <ClInclude Include="explain.h" />
     <ClInclude Include="queryoptimizercursorimpl.h" />
     <ClCompile Include="queryoptimizercursorimpl.cpp" />
