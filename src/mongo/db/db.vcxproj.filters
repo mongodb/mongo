@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="..\bson\oid.cpp" />
@@ -465,6 +465,7 @@
     <ClCompile Include="..\..\third_party\boost\libs\program_options\src\winmain.cpp">
       <Filter>Boost</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\progress_meter.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\distlock.h" />
@@ -755,6 +756,7 @@
     <ClInclude Include="..\..\third_party\pcre-8.30\pcre.h">
       <Filter>pcre-8.30</Filter>
     </ClInclude>
+    <ClInclude Include="..\util\progress_meter.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\jstests\dur\dur1.js" />

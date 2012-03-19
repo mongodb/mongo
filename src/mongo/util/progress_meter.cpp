@@ -15,8 +15,8 @@
  *    limitations under the License.
  */
 
-#include "progress_meter.h"
 #include "pch.h" // needed for log.h
+#include "progress_meter.h"
 #include "log.h"
 
 using namespace std;

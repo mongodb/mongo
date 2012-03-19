@@ -178,6 +178,7 @@
     <ClCompile Include="..\..\util\logfile.cpp" />
     <ClCompile Include="..\..\util\mmap.cpp" />
     <ClCompile Include="..\..\util\mmap_win.cpp" />
+    <ClCompile Include="..\..\util\progress_meter.cpp" />
     <ClCompile Include="..\..\util\stringutils.cpp" />
     <ClCompile Include="..\mongo_client_lib.cpp" />
     <ClCompile Include="mongoperf.cpp" />
@@ -198,6 +199,7 @@
     <ClInclude Include="..\..\bson\stringdata.h" />
     <ClInclude Include="..\..\util\logfile.h" />
     <ClInclude Include="..\..\util\mmap.h" />
+    <ClInclude Include="..\..\util\progress_meter.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
