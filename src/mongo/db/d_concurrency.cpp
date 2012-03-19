@@ -20,6 +20,15 @@
 // yielding
 // commitIfNeeded
 
+#define MONGOD_CONCURRENCY_LEVEL_GLOBAL 0
+#define MONGOD_CONCURRENCY_LEVEL_DB 1
+
+#ifndef MONGOD_CONCURRENCY_LEVEL
+#define MONGOD_CONCURRENCY_LEVEL MONGOD_CONCURRENCY_LEVEL_GLOBAL
+#endif
+
+#define DB_LEVEL_LOCKING_ENABLED ( ( MONGOD_CONCURRENCY_LEVEL ) >= MONGOD_CONCURRENCY_LEVEL_DB )
+
 namespace mongo { 
 
     Client* curopWaitingForLock( char type );
@@ -562,14 +571,20 @@ namespace mongo {
         LockState& ls = lockState();
         if( isW(ls) )
             return;
-        char db[MaxDatabaseNameLen];
-        nsToDatabase(ns.data(), db);
-        if( str::equals(db,"local") ) {
-            lockLocal();
-        } else { 
-            lock(db);
+
+        if (DB_LEVEL_LOCKING_ENABLED) {
+            char db[MaxDatabaseNameLen];
+            nsToDatabase(ns.data(), db);
+            if( str::equals(db,"local") ) {
+                lockLocal();
+            } else { 
+                lock(db);
+            }
+            lockTop(ls);
+        } else {
+            lock_W();
+            locked_w = true;
         }
-        lockTop(ls);
     }
     Lock::DBWrite::~DBWrite() {
         if( ourCounter ) {
@@ -581,7 +596,11 @@ namespace mongo {
             weLocked->unlock();
         }
         if( locked_w ) {
-            unlock_w();
+            if (DB_LEVEL_LOCKING_ENABLED) {
+                unlock_w();
+            } else {
+                unlock_W();
+            }
         }
     }
 
@@ -660,14 +679,19 @@ namespace mongo {
         LockState& ls = lockState();
         if( isRW(ls) )
             return;
-        char db[MaxDatabaseNameLen];
-        nsToDatabase(ns.data(), db);
-        if( str::equals(db,"local") ) {
-            lockLocal();
-        } else { 
-            lock(db);
+        if (DB_LEVEL_LOCKING_ENABLED) {
+            char db[MaxDatabaseNameLen];
+            nsToDatabase(ns.data(), db);
+            if( str::equals(db,"local") ) {
+                lockLocal();
+            } else { 
+                lock(db);
+            }
+            lockTop(ls);
+        } else {
+            lock_R();
+            locked_r = true;
         }
-        lockTop(ls);
     }
     Lock::DBRead::~DBRead() {
         if( ourCounter ) {
@@ -679,7 +703,14 @@ namespace mongo {
             weLocked->unlock_shared();
         }
         if( locked_r ) {
-            unlock_r();
+            if (DB_LEVEL_LOCKING_ENABLED) {
+                unlock_r();
+            } else {
+                unlock_R();
+            }
+        } else {
+            recursive()--;
+            dassert( recursive() >= 0 );
         }
    }
 }

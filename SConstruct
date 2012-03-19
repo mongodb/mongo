@@ -64,21 +64,23 @@ options = {}
 
 options_topass = {}
 
-def add_option( name, help , nargs , contibutesToVariantDir , dest=None ):
+def add_option( name, help , nargs , contributesToVariantDir , dest=None,
+                type="string", choices=None ):
 
     if dest is None:
         dest = name
 
     AddOption( "--" + name , 
                dest=dest,
-               type="string",
+               type=type,
                nargs=nargs,
                action="store",
+               choices=choices,
                help=help )
 
     options[name] = { "help" : help ,
                       "nargs" : nargs , 
-                      "contibutesToVariantDir" : contibutesToVariantDir ,
+                      "contributesToVariantDir" : contributesToVariantDir ,
                       "dest" : dest } 
 
 def get_option( name ):
@@ -115,7 +117,7 @@ def get_variant_dir():
         o = options[name]
         if not has_option( o["dest"] ):
             continue
-        if not o["contibutesToVariantDir"]:
+        if not o["contributesToVariantDir"]:
             continue
         
         if o["nargs"] == 0:
@@ -215,6 +217,9 @@ add_option( "use-cpu-profiler",
             "Link against the google-perftools profiler library",
             0, True )
 
+add_option("mongod-concurrency-level", "Concurrency level, \"global\" or \"db\"", 1, True,
+           type="choice", choices=["global", "db"])
+
 # don't run configure if user calls --help
 if GetOption('help'):
     Return()
@@ -281,6 +286,9 @@ env = Environment( BUILD_DIR=variantDir,
                    PCRE_VERSION='8.30',
                    )
 
+if has_option('mongod-concurrency-level'):
+    env.Append(CPPDEFINES=['MONGOD_CONCURRENCY_LEVEL=MONGOD_CONCURRENCY_LEVEL_%s' % get_option('mongod-concurrency-level').upper()])
+    print str(env['CPPDEFINES'])
 
 libdeps.setup_environment( env )
 
