@@ -288,7 +288,6 @@ env = Environment( BUILD_DIR=variantDir,
 
 if has_option('mongod-concurrency-level'):
     env.Append(CPPDEFINES=['MONGOD_CONCURRENCY_LEVEL=MONGOD_CONCURRENCY_LEVEL_%s' % get_option('mongod-concurrency-level').upper()])
-    print str(env['CPPDEFINES'])
 
 libdeps.setup_environment( env )
 
