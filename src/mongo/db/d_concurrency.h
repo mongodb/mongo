@@ -36,9 +36,9 @@ namespace mongo {
         class ScopedLock : boost::noncopyable {
         protected: 
             ScopedLock(); 
-            ~ScopedLock();
-            virtual void tempRelease() = 0;
-            virtual void relock() = 0;
+            virtual ~ScopedLock();
+            virtual void tempRelease() { } // stub
+            virtual void relock() { } // stub
         };
 
         // note that for these classes recursive locking is ok if the recursive locking "makes sense"
@@ -53,7 +53,7 @@ namespace mongo {
                 perhaps this should go away it makes the software more complicated.
             */
             GlobalWrite(bool stopGreed = false); 
-            ~GlobalWrite();
+            virtual ~GlobalWrite();
             void downgrade(); // W -> R
             bool upgrade();   // caution see notes
         };
@@ -61,7 +61,7 @@ namespace mongo {
             bool noop;
         public:
             GlobalRead(); 
-            ~GlobalRead();
+            virtual ~GlobalRead();
         };
         // lock this database. do not shared_lock globally first, that is handledin herein. 
         class DBWrite : private ScopedLock {
@@ -74,7 +74,7 @@ namespace mongo {
             int *ourCounter;
         public:
             DBWrite(const StringData& dbOrNs);
-            ~DBWrite();
+            virtual ~DBWrite();
         };
         // lock this database for reading. do not shared_lock globally first, that is handledin herein. 
         class DBRead : private ScopedLock {
@@ -86,11 +86,9 @@ namespace mongo {
             SimpleRWLock *weLocked;
             int *ourCounter;
             string what;
-            virtual void tempRelease();
-            virtual void relock();
         public:
             DBRead(const StringData& dbOrNs);
-            ~DBRead();
+            virtual ~DBRead();
         };
 
         // specialty things:
@@ -147,10 +145,7 @@ namespace mongo {
 
     // implementation stuff
     struct LockState {
-        LockState() : recursive(0), threadState(0), local(0), other(0), otherLock(0) { 
-            tempReleased = 0;
-            topLock = 0;
-        }
+        LockState();
         void dump();
         static void Dump();
 
@@ -166,8 +161,8 @@ namespace mongo {
         string otherName;             // which database are we locking and working with (besides local)
         SimpleRWLock *otherLock;      // so we don't have to check the map too often (the map has a mutex)
 
-        // temprelease
-        ScopedLock *scopedLk;         // this is it, if not recursive...
+        // for temprelease
+        Lock::ScopedLock *scopedLk;   // for the nonrecursive case. otherwise there would be many
     };
 
 }

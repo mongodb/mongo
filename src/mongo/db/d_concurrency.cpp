@@ -98,6 +98,10 @@ namespace mongo {
         }
         return *p;
     }
+    LockState::LockState() : recursive(0), threadState(0), local(0), other(0), otherLock(0) { 
+        tempReleased = 0;
+        scopedLk = 0;
+    }
     void LockState::Dump() {
         lockState().dump();
     }
