@@ -212,7 +212,7 @@ __wt_cache_evict_server(void *arg)
 	WT_CONNECTION_IMPL *conn;
 	WT_SESSION_IMPL *session;
 	WT_CACHE *cache;
-	int ret;
+	int read_lockout, ret;
 
 	conn = arg;
 	cache = conn->cache;
@@ -231,10 +231,13 @@ __wt_cache_evict_server(void *arg)
 		 * whether there is work to do.  If so, evict_cond will
 		 * be signalled and the wait below won't block.
 		 */
-		__wt_eviction_check(session, NULL, 1);
+		__wt_eviction_check(session, &read_lockout, 0);
 
-		WT_VERBOSE(session, evictserver, "sleeping");
-		__wt_cond_wait(session, cache->evict_cond);
+		if (!read_lockout) {
+			WT_VERBOSE(session, evictserver, "sleeping");
+			__wt_cond_wait(session, cache->evict_cond);
+		}
+
 		if (!F_ISSET(conn, WT_SERVER_RUN))
 			break;
 		WT_VERBOSE(session, evictserver, "waking");
