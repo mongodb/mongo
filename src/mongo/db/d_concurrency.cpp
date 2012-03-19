@@ -699,9 +699,6 @@ namespace mongo {
             } else {
                 unlock_R();
             }
-        } else {
-            recursive()--;
-            dassert( recursive() >= 0 );
         }
         weLocked = 0;
         ourCounter = 0;
