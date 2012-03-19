@@ -469,7 +469,7 @@ namespace mongo {
         }
     }
 
-    bool Lock::DBWrite::prep(LockState& ls) { 
+    bool Lock::DBWrite::isW(LockState& ls) const { 
         switch( ls.threadState ) { 
         case 'R' : 
             assert(false);
@@ -544,7 +544,7 @@ namespace mongo {
     Lock::DBWrite::DBWrite(const StringData& ns) {
         locked_w=false; weLocked=0; ourCounter = 0;
         LockState& ls = lockState();
-        if( prep(ls) )
+        if( isW(ls) )
             return;
         char db[MaxDatabaseNameLen];
         nsToDatabase(ns.data(), db);
@@ -569,7 +569,7 @@ namespace mongo {
         }
     }
 
-    bool Lock::DBRead::prep(LockState& ls) { 
+    bool Lock::DBRead::isRW(LockState& ls) const { 
         switch( ls.threadState ) { 
         case 'W' :
         case 'R' : 
@@ -642,7 +642,7 @@ namespace mongo {
     Lock::DBRead::DBRead(const StringData& ns) {
         locked_r=false; weLocked=0; ourCounter = 0;
         LockState& ls = lockState();
-        if( prep(ls) )
+        if( isRW(ls) )
             return;
         char db[MaxDatabaseNameLen];
         nsToDatabase(ns.data(), db);
