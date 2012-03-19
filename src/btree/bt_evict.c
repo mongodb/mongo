@@ -482,25 +482,23 @@ static int
 __evict_lru(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
-	int ret;
 
 	cache = S2C(session)->cache;
 
-	__wt_spin_lock(session, &cache->lru_lock);
-
 	/* Get some more pages to consider for eviction. */
-	WT_ERR(__evict_walk(session));
+	WT_RET(__evict_walk(session));
 
-	/* Remove duplicates from the list. */
+	/* Sort and remove duplicates from the list, restart. */
+	__wt_spin_lock(session, &cache->lru_lock);
 	__evict_dup_remove(session);
 
-err:	__wt_spin_unlock(session, &cache->lru_lock);
+	cache->evict_current = cache->evict;
+	__wt_spin_unlock(session, &cache->lru_lock);
 
 	/* Reconcile and discard some pages. */
-	if (ret == 0)
-		__evict_pages(session);
+	__evict_pages(session);
 
-	return (ret);
+	return (0);
 }
 
 /*
@@ -535,7 +533,6 @@ __evict_walk(WT_SESSION_IMPL *session)
 		    elem * sizeof(WT_EVICT_LIST), &cache->evict));
 		cache->evict_entries = elem;
 	}
-	cache->evict_current = cache->evict;
 
 	i = WT_EVICT_WALK_BASE;
 	TAILQ_FOREACH(btree, &conn->btqh, q) {
