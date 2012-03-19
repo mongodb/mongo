@@ -1450,6 +1450,9 @@
     <ClCompile Include="..\util\net\miniwebserver.cpp" />
     <ClCompile Include="..\util\mmap.cpp" />
     <ClCompile Include="..\util\processinfo_win32.cpp" />
+    <ClCompile Include="..\util\progress_meter.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\util\ramlog.cpp" />
     <ClCompile Include="..\util\net\sock.cpp" />
     <ClCompile Include="..\util\stringutils.cpp" />

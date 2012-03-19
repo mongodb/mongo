@@ -1043,6 +1043,9 @@
     <ClCompile Include="replsettests.cpp">
       <Filter>dbtests</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\progress_meter.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">
