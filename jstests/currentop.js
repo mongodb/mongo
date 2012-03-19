@@ -35,8 +35,9 @@ print()
 // need to wait for read to start
 print("wait have some ops");
 assert.soon( function(){
-        return ops( { "lockType": "r", "ns": "test.jstests_currentop" } ).length >= 1;
-    }, "have_some_ops");
+    return ops( { "lockType": "r", "ns": "test.jstests_currentop" } ).length + 
+        ops({ "lockType": "R", "ns": "test.jstests_currentop" }).length >= 1;
+}, "have_some_ops");
 print("ok");
     
 s2 = startParallelShell( "db.jstests_currentop.update( { '$where': function() { sleep(1000); } }, { 'num': 1 }, false, true )" );
