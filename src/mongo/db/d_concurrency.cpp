@@ -306,12 +306,24 @@ namespace mongo {
         }
     }
 
-    Lock::ScopedLock::ScopedLock() { 
-        recursive()++;
+    Lock::ScopedLock::ScopedLock() {
+        LockState& ls = lockState();
+        ls.recursive++;
+        if( ls.recursive == 1 ) { 
+            ls.scopedLk = this;
+        }
     }
     Lock::ScopedLock::~ScopedLock() { 
-        recursive()--;
-        dassert( recursive() < 10000 );
+        LockState& ls = lockState();
+        ls.recursive--;
+        dassert( ls.recursive < 10000 );
+        if( ls.recursive == 0 ) { 
+            wassert( ls.scopedLk == this );
+            ls.scopedLk = 0;
+        }
+        else { 
+            wassert( ls.scopedLk != this );
+        }
     }
 
     Lock::TempRelease::TempRelease()

@@ -37,6 +37,8 @@ namespace mongo {
         protected: 
             ScopedLock(); 
             ~ScopedLock();
+            virtual void tempRelease() = 0;
+            virtual void relock() = 0;
         };
 
         // note that for these classes recursive locking is ok if the recursive locking "makes sense"
@@ -83,6 +85,9 @@ namespace mongo {
             bool locked_r;
             SimpleRWLock *weLocked;
             int *ourCounter;
+            string what;
+            virtual void tempRelease();
+            virtual void relock();
         public:
             DBRead(const StringData& dbOrNs);
             ~DBRead();
@@ -144,6 +149,7 @@ namespace mongo {
     struct LockState {
         LockState() : recursive(0), threadState(0), local(0), other(0), otherLock(0) { 
             tempReleased = 0;
+            topLock = 0;
         }
         void dump();
         static void Dump();
@@ -159,6 +165,9 @@ namespace mongo {
         int other;                    //   >0 means write lock, <0 read lock
         string otherName;             // which database are we locking and working with (besides local)
         SimpleRWLock *otherLock;      // so we don't have to check the map too often (the map has a mutex)
+
+        // temprelease
+        ScopedLock *scopedLk;         // this is it, if not recursive...
     };
 
 }
