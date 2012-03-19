@@ -38,8 +38,8 @@ __wt_page_in_func(
 		switch (ref->state) {
 		case WT_REF_DISK:
 			/*
-			 * The page isn't in memory, attempt to set the
-			 * state to WT_REF_READING.  If successful, read it.
+			 * The page isn't in memory, attempt to set the state
+			 * to WT_REF_READING.  If successful, read it.
 			 */
 			__wt_eviction_check(session, &read_lockout, 0);
 			if (read_lockout || !WT_ATOMIC_CAS(
