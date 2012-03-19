@@ -632,6 +632,9 @@
     <ClCompile Include="..\..\third_party\boost\libs\filesystem\v3\src\windows_file_codecvt.cpp">
       <Filter>Boost</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\concurrency\rwlockimpl.cpp">
+      <Filter>Shared Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\..\..\js\js32d.lib" />
@@ -705,6 +708,12 @@
     </ClInclude>
     <ClInclude Include="..\db\projection.h">
       <Filter>Header Shared</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\rwlockimpl.h">
+      <Filter>Shared Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\concurrency\simplerwlock.h">
+      <Filter>Shared Source Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

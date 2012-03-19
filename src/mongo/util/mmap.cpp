@@ -21,6 +21,7 @@
 #include "concurrency/rwlock.h"
 #include "../db/namespace.h"
 #include "../db/cmdline.h"
+#include "progress_meter.h"
 
 #include <boost/filesystem/operations.hpp>
 
