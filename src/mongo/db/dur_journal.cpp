@@ -36,6 +36,7 @@
 #include "../util/checksum.h"
 #include "../util/concurrency/race.h"
 #include "../util/compress.h"
+#include "../util/progress_meter.h"
 #include "../server.h"
 
 using namespace mongoutils;
