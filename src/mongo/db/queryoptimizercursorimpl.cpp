@@ -585,8 +585,14 @@ namespace mongo {
             }
             else if ( op->stopRequested() ) {
                 if ( qocop->cursor() ) {
-                    // Ensure that prepareToTouchEarlierIterate() may be called safely when a BasicCursor takes over.
-                    if ( !prevLoc.isNull() && prevLoc == qocop->currLoc() ) {
+                    // Ensure that prepareToTouchEarlierIterate() may be called safely when a
+                    // BasicCursor takes over.
+                    if ( !prevLoc.isNull() && prevLoc == qocop->currLoc() &&
+                        // If there is an out of order plan, advancing may be incorrect because
+                        // in orer plans must return all results.  And advancing is unnecessary,
+                        // because _mps will not traverse $or clauses.
+                        // TODO Clean this as part of SERVER-5198.
+                        !_mps->possibleOutOfOrderPlan() ) {
                         qocop->cursor()->advance();
                     }
                     _takeover.reset( new MultiCursor( _mps,

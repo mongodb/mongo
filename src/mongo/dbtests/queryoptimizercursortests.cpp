@@ -3193,6 +3193,35 @@ namespace QueryOptimizerCursorTests {
         }
     };
     
+    /**
+     * An ordered plan returns all results, including when it takes over, even when it duplicates an
+     * entry of an out of order plan.
+     */
+    class TakeoverOrderedPlanDupsOutOfOrderPlan : public PlanChecking {
+    public:
+        void run() {
+            _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+            for( int i = 1; i < 200; ++i ) {
+                _cli.insert( ns(), BSON( "a" << i << "b" << 0 ) );
+            }
+            // Insert this document last, so that most documents are read from the $natural cursor
+            // before the a:1 cursor.
+            _cli.insert( ns(), BSON( "a" << 0 << "b" << 0 ) );
+            
+            Client::ReadContext ctx( ns() );
+            shared_ptr<QueryOptimizerCursor> cursor =
+                    getCursor( BSON( "a" << GTE << 0 << "b" << 0 ), BSON( "a" << 1 ) );
+            int nextA = 0;
+            for( ; cursor->ok(); cursor->advance() ) {
+                if ( cursor->indexKeyPattern() == BSON( "a" << 1 ) ) {
+                    // Check that the expected 'a' value is present and in order.
+                    ASSERT_EQUALS( nextA++, cursor->current()[ "a" ].number() );
+                }
+            }
+            ASSERT_EQUALS( 200, nextA );
+        }
+    };
+    
     namespace GetCursor {
         
         class Base : public QueryOptimizerCursorTests::Base {
@@ -4354,6 +4383,7 @@ namespace QueryOptimizerCursorTests {
             add<AbortOutOfOrderPlanOnLastMatch>();
             add<TakeoverOrRangeElimination>();
             add<TakeoverOrDedups>();
+            add<TakeoverOrderedPlanDupsOutOfOrderPlan>();
             add<GetCursor::NoConstraints>();
             add<GetCursor::SimpleId>();
             add<GetCursor::OptimalIndex>();
