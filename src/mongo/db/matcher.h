@@ -100,6 +100,10 @@ namespace mongo {
         bool needRecord() const { return _elemMatchKeyRequested; }
         
         bool loadedObject() const { return _loadedObject; }
+        /**
+         * @return elemMatch key field name.  The pointer may become invalid if the object
+         * containing this field becomes invalid.
+         */
         const char *elemMatchKey() const { return _elemMatchKey; }
 
         void setLoadedObject( bool loadedObject ) { _loadedObject = loadedObject; }
@@ -112,7 +116,7 @@ namespace mongo {
     private:
         bool _loadedObject;
         bool _elemMatchKeyRequested;
-        const char * _elemMatchKey; // warning, this may go out of scope if matched object does
+        const char * _elemMatchKey;
     };
 
     /* Match BSON objects against a query pattern.

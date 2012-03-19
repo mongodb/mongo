@@ -213,7 +213,7 @@ namespace MatcherTests {
                 shared_ptr<Cursor> cursor = NamespaceDetailsTransient::getCursor( ns(), query );
                 // Verify that the cursor is indexed.
                 ASSERT_EQUALS( "BtreeCursor a.b_1", cursor->toString() );
-                // Verify that the cursor is not multikey
+                // Verify that the cursor is not multikey.
                 ASSERT( !cursor->isMultiKey() );
                 ASSERT( matcher.matchesCurrent( cursor.get(), &details ) );
                 // The '0' entry of the 'a' array is matched.
