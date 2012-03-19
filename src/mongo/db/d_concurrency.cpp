@@ -314,6 +314,7 @@ namespace mongo {
         LockState& ls = lockState();
         ls.recursive++;
         if( ls.recursive == 1 ) { 
+            fassert(0, ls.scopedLk == 0);
             ls.scopedLk = this;
         }
     }
@@ -330,93 +331,68 @@ namespace mongo {
         }
     }
 
-    Lock::TempRelease::TempRelease()
+    Lock::TempRelease::TempRelease() : cant( Lock::nested() )
     {
-        LockState& ls = lockState();
-        cant = ls.recursive > 1;
-        type = ls.threadState;
-        local = ls.local;
-        dassert( !ls.tempReleased ); // it may be fine to just do "cant" just want to see what we are doing first
-
         if( cant )
-            return;        
-
-        switch(type) {
-        case 'W':
-            unlock_W();
-            break;
-        case 'R':
-            unlock_R();
-            break;
-        case 'w':
-            if( local ) {
-                assert(local==1);
-                assert(ls.other==0);
-                localDBLock.unlock();
-            }
-            else {
-                assert(local==0);
-                assert(ls.other==1);
-                ls.otherLock->unlock();
-            }
-            unlock_w();
-            break;
-        case 'r':
-            if( local ) {
-                assert(local==-1);
-                assert(ls.other==0);
-                localDBLock.unlock_shared();
-            }
-            else {
-                assert(local==0);
-                assert(ls.other==-1);
-                ls.otherLock->unlock_shared();
-            }
-            unlock_r();
-            break;
-        default:
-            error() << "TempRelease called but threadState()=" << type << endl;
-            assert(false);
-        }
-        ls.threadState = 0;
-        ls.tempReleased++;
-    }
-    Lock::TempRelease::~TempRelease() {
-        LockState& ls = lockState();
-        if( cant ) {
-            dassert( ls.tempReleased == 0 );
             return;
-        }
+        LockState& ls = lockState();
+        fassert( 0, ls.recursive == 1 );
+        fassert( 0, ls.threadState );    
+        fassert( 0, ls.scopedLk );
+        fassert( 0, ls.tempReleased == 0 ); // don't allow nesting them, at least not without us thinking about it and writing some unit tests
+        ls.tempReleased++;
+        ls.scopedLk->tempRelease();
+    }
+    Lock::TempRelease::~TempRelease()
+    {
+        if( cant )
+            return;
+        LockState& ls = lockState();
+        fassert( 0, ls.tempReleased == 1 );
         ls.tempReleased--;
-        dassert( ls.tempReleased == 0 );
-        DESTRUCTOR_GUARD( 
-            fassert(0, ls.threadState == 0);
-            ls.threadState = 0;
-            switch( type ) {
-            case 'W':
-                lock_W();
-                break;
-            case 'R':        
-                lock_R();
-                break;
-            case 'w':
-                if( local ) 
-                    localDBLock.lock();
-                else
-                    ls.otherLock->lock();
-                lock_w();
-                break;
-            case 'r':
-                if( local ) 
-                    localDBLock.lock_shared();
-                else
-                    ls.otherLock->lock_shared();
-                lock_r();
-                break;
-            default:
-                wassert(false);
-            }
-        )
+        fassert( 0, ls.scopedLk );
+        ls.scopedLk->relock();
+    }
+
+    void Lock::GlobalWrite::tempRelease() { 
+        fassert(0, !noop);
+        char ts = threadState();
+        fassert(0, ts != 'R'); // indicates downgraded; not allowed with temprelease
+        fassert(0, ts == 'W');
+        fassert(0, !stoppedGreed); // not allowed with temprelease
+        unlock_W();
+    }
+    void Lock::GlobalWrite::relock() { 
+        fassert(0, !noop);
+        char ts = threadState();
+        fassert(0, ts == 0);
+        lock_W();
+    }
+
+    void Lock::GlobalRead::tempRelease() { 
+        fassert(0, !noop);
+        char ts = threadState();
+        fassert(0, ts == 'R');
+        unlock_R();
+    }
+    void Lock::GlobalRead::relock() { 
+        fassert(0, !noop);
+        char ts = threadState();
+        fassert(0, ts == 0);
+        lock_R();
+    }
+
+    void Lock::DBWrite::tempRelease() { 
+        unlockDB();
+    }
+    void Lock::DBWrite::relock() { 
+        lockDB(what);
+    }
+    void Lock::DBRead::tempRelease() {
+        unlockDB();
+    }
+    void Lock::DBRead::relock() { 
+        lockDB(what);
     }
 
     Lock::GlobalWrite::GlobalWrite(bool sg) : 
@@ -557,7 +533,7 @@ namespace mongo {
         ls.otherLock->lock();
         weLocked = ls.otherLock;
     }
-    Lock::DBWrite::DBWrite(const StringData& ns) {
+    void Lock::DBWrite::lockDB(const string& ns) {
         locked_w=false; weLocked=0; ourCounter = 0;
         LockState& ls = lockState();
         if( isW(ls) )
@@ -571,7 +547,13 @@ namespace mongo {
         }
         lockTop(ls);
     }
+    Lock::DBWrite::DBWrite(const StringData& ns) : what(ns.data()) {
+        lockDB(what);
+    }
     Lock::DBWrite::~DBWrite() {
+        unlockDB();
+    }
+    void Lock::DBWrite::unlockDB() {
         if( ourCounter ) {
             (*ourCounter)--;
             wassert( *ourCounter >= 0 );
@@ -583,6 +565,9 @@ namespace mongo {
         if( locked_w ) {
             unlock_w();
         }
+        ourCounter = 0;
+        weLocked = 0;
+        locked_w = false;
     }
 
     bool Lock::DBRead::isRW(LockState& ls) const { 
@@ -655,7 +640,10 @@ namespace mongo {
         ls.otherLock->lock_shared();
         weLocked = ls.otherLock;
     }
-    Lock::DBRead::DBRead(const StringData& ns) {
+    Lock::DBRead::DBRead(const StringData& ns) : what(ns.data()) {
+        lockDB(what);
+    }
+    void Lock::DBRead::lockDB(const string& ns) {
         locked_r=false; weLocked=0; ourCounter = 0;
         LockState& ls = lockState();
         if( isRW(ls) )
@@ -670,6 +658,9 @@ namespace mongo {
         lockTop(ls);
     }
     Lock::DBRead::~DBRead() {
+        unlockDB();
+    }
+    void Lock::DBRead::unlockDB() {
         if( ourCounter ) {
             (*ourCounter)++;
             wassert( *ourCounter <= 0 );
@@ -681,6 +672,9 @@ namespace mongo {
         if( locked_r ) {
             unlock_r();
         }
+        weLocked = 0;
+        ourCounter = 0;
+        locked_r = false;
    }
 }
 

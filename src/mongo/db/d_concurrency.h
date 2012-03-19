@@ -27,18 +27,16 @@ namespace mongo {
         struct TempRelease {
             TempRelease(); 
             ~TempRelease();
-            bool cant; // true if couldn't because of recursive locking
-        private:
-            char type;
-            int local;
+            const bool cant; // true if couldn't because of recursive locking
         };
 
         class ScopedLock : boost::noncopyable {
         protected: 
+            friend struct TempRelease;
             ScopedLock(); 
             virtual ~ScopedLock();
-            virtual void tempRelease() { } // stub
-            virtual void relock() { } // stub
+            virtual void tempRelease() = 0;
+            virtual void relock() = 0;
         };
 
         // note that for these classes recursive locking is ok if the recursive locking "makes sense"
@@ -47,6 +45,9 @@ namespace mongo {
         class GlobalWrite : private ScopedLock {
             const bool stoppedGreed;
             bool noop;
+        protected:
+            void tempRelease();
+            void relock();
         public:
             /** @param stopGreed after acquisition stop greediness of other threads for write locks. this 
                 should generally not be used it is for exceptional circumstances. journaling uses it. 
@@ -57,8 +58,11 @@ namespace mongo {
             void downgrade(); // W -> R
             bool upgrade();   // caution see notes
         };
-        struct GlobalRead : boost::noncopyable { // recursive is ok
+        struct GlobalRead : private ScopedLock { // recursive is ok
             bool noop;
+        protected:
+            void tempRelease();
+            void relock();
         public:
             GlobalRead(); 
             virtual ~GlobalRead();
@@ -72,6 +76,12 @@ namespace mongo {
             bool locked_w;
             SimpleRWLock *weLocked;
             int *ourCounter;
+            const string what;
+            void lockDB(const string& ns);
+            void unlockDB();
+        protected:
+            void tempRelease();
+            void relock();
         public:
             DBWrite(const StringData& dbOrNs);
             virtual ~DBWrite();
@@ -86,6 +96,11 @@ namespace mongo {
             SimpleRWLock *weLocked;
             int *ourCounter;
             string what;
+            void lockDB(const string& ns);
+            void unlockDB();
+        protected:
+            void tempRelease();
+            void relock();
         public:
             DBRead(const StringData& dbOrNs);
             virtual ~DBRead();
