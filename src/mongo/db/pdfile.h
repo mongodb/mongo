@@ -82,7 +82,7 @@ namespace mongo {
         Extent* createExtent(const char *ns, int approxSize, bool capped = false, int loops = 0);
 
         DataFileHeader *getHeader() { return header(); }
-
+        int getFd() { return mmf.getFd(); }
         unsigned long long length() const { return mmf.length(); }
 
         /* return max size an extent may be */

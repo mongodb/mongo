@@ -81,6 +81,7 @@ namespace mongo {
         }
 
         int fileSuffixNo() const { return _fileSuffixNo; }
+        int getFd() { return MemoryMappedFile::getFd(); }
 
         /** true if we have written.
             set in PREPLOGBUFFER, it is NOT set immediately on write intent declaration.

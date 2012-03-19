@@ -83,8 +83,6 @@ env.StaticLibrary('mongocommon', commonFiles,
                            '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
                            '$BUILD_DIR/third_party/mongo_boost'],)
 
-#mmap stuff
-
 env.StaticLibrary("coredb", [ "db/commands.cpp" ])
 
 coreServerFiles = [ "util/version.cpp",
@@ -158,7 +156,7 @@ elif usev8:
 else:
     env.StaticLibrary('scripting', scripting_common_files + ['scripting/engine_none.cpp'])
 
-mmapFiles = [ "util/mmap.cpp" ]
+mmapFiles = [ "util/mmap.cpp", "util/touch_pages.cpp" ]
 
 if has_option( "mm" ):
     mmapFiles += [ "util/mmap_mm.cpp" ]
@@ -333,7 +331,7 @@ env.StaticLibrary("serveronly", serverOnlyFiles,
 modules = []
 moduleNames = []
 
-mongodOnlyFiles = [ "db/db.cpp", "db/compact.cpp" ]
+mongodOnlyFiles = [ "db/db.cpp", "db/compact.cpp", "db/commands/touch.cpp" ]
 
 # ----- TARGETS ------
 

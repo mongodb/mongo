@@ -19,19 +19,21 @@
 */
 
 #include "pch.h"
-#include "pdfile.h"
-#include "d_concurrency.h"
-#include "commands.h"
-#include "curop-inl.h"
-#include "background.h"
-#include "extsort.h"
-#include "compact.h"
-#include "../util/concurrency/task.h"
-#include "../util/timer.h"
+
+#include "mongo/db/compact.h"
+
+#include "mongo/db/background.h"
+#include "mongo/db/commands.h"
+#include "mongo/db/d_concurrency.h"
+#include "mongo/db/curop-inl.h"
+#include "mongo/db/extsort.h"
+#include "mongo/db/index.h"
+#include "mongo/db/pdfile.h"
+#include "mongo/util/concurrency/task.h"
+#include "mongo/util/timer.h"
+#include "mongo/util/touch_pages.h"
 
 namespace mongo {
-
-    char faux;
 
     void addRecordToRecListInExtent(Record *r, DiskLoc loc);
     DiskLoc allocateSpaceForANewRecord(const char *ns, NamespaceDetails *d, int lenWHdr, bool god);
@@ -49,7 +51,7 @@ namespace mongo {
     }
 
     /** @return number of skipped (invalid) documents */
-    unsigned compactExtent(const char *ns, NamespaceDetails *d, const DiskLoc ext, int n,
+    unsigned compactExtent(const char *ns, NamespaceDetails *d, const DiskLoc diskloc, int n,
                 const scoped_array<IndexSpec> &indexSpecs,
                 scoped_array<SortPhaseOne>& phase1, int nidx, bool validate, 
                 double pf, int pb)
@@ -58,7 +60,7 @@ namespace mongo {
         unsigned oldObjSize = 0; // we'll report what the old padding was
         unsigned oldObjSizeWithPadding = 0;
 
-        Extent *e = ext.ext();
+        Extent *e = diskloc.ext();
         e->assertOk();
         verify( e->validates() );
         unsigned skipped = 0;
@@ -68,11 +70,13 @@ namespace mongo {
             // sequentially
             log() << "compact paging in len=" << e->length/1000000.0 << "MB" << endl;
             Timer t;
-            MAdvise adv(e, e->length, MAdvise::Sequential);
-            const char *p = (const char *) e;
-            for( int i = 0; i < e->length; i += 4096 ) { 
-                faux += p[i];
-            }
+            MongoDataFile* mdf = cc().database()->getFile( diskloc.a() );
+            int fd = mdf->getFd();
+            off64_t offset = diskloc.getOfs();
+            Extent* ext = diskloc.ext();
+            size_t length = ext->length;
+                
+            touch_pages(fd, offset, length, ext);
             int ms = t.millis();
             if( ms > 1000 ) 
                 log() << "compact end paging in " << ms << "ms " << e->length/1000000.0/ms << "MB/sec" << endl;
@@ -145,13 +149,13 @@ namespace mongo {
                 }
             } // if !L.isNull()
 
-            verify( d->firstExtent == ext );
-            verify( d->lastExtent != ext );
+            verify( d->firstExtent == diskloc );
+            verify( d->lastExtent != diskloc );
             DiskLoc newFirst = e->xnext;
             d->firstExtent.writing() = newFirst;
             newFirst.ext()->xprev.writing().Null();
             getDur().writing(e)->markEmpty();
-            freeExtents(ext,ext);
+            freeExtents( diskloc, diskloc );
             // update datasize/record count for this namespace's extent
             {
                 NamespaceDetails::Stats *s = getDur().writing(&d->stats);

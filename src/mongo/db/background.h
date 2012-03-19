@@ -21,6 +21,8 @@
 
 #pragma once
 
+#include "mongo/db/namespacestring.h"
+
 namespace mongo {
 
     /* these are administrative operations / jobs
