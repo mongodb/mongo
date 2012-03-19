@@ -84,7 +84,7 @@ __wt_page_in_func(
 		 * our slice before retrying, and wake up the eviction server
 		 * if this is the first time.
 		 */
-		if (__wt_evict_lru_page(session) != 0) {
+		if (__wt_evict_lru_page(session, 1) != 0) {
 			if (first) {
 				__wt_evict_server_wake(session);
 				first = 0;

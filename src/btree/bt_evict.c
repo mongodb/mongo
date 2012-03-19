@@ -22,8 +22,8 @@ static int  __evict_worker(WT_SESSION_IMPL *);
  * Tuning constants: I hesitate to call this tuning, but we want to review some
  * number of pages from each file's in-memory tree for each page we evict.
  */
-#define	WT_EVICT_GROUP		20	/* Evict N pages at a time */
-#define	WT_EVICT_WALK_PER_TABLE	25	/* Pages to visit per file */
+#define	WT_EVICT_GROUP		30	/* Evict N pages at a time */
+#define	WT_EVICT_WALK_PER_TABLE	35	/* Pages to visit per file */
 #define	WT_EVICT_WALK_BASE	50	/* Pages tracked across file visits */
 
 /*
@@ -662,19 +662,21 @@ __evict_dup_remove(WT_SESSION_IMPL *session)
  */
 static void
 __evict_get_page(
-    WT_SESSION_IMPL *session, WT_BTREE **btreep, WT_PAGE **pagep)
+    WT_SESSION_IMPL *session, int is_app, WT_BTREE **btreep, WT_PAGE **pagep)
 {
 	WT_CACHE *cache;
-	WT_EVICT_LIST *evict;
+	WT_EVICT_LIST *evict, *end;
 	WT_REF *ref;
 
 	cache = S2C(session)->cache;
 	*btreep = NULL;
 	*pagep = NULL;
 
+	end = cache->evict + (is_app ? WT_EVICT_GROUP : WT_EVICT_GROUP / 2);
+
 	/* Avoid the LRU lock if no pages are available. */
 	for (;;) {
-		if (cache->evict_current == NULL)
+		if (cache->evict_current == NULL || cache->evict_current >= end)
 			return;
 		if (__wt_spin_trylock(session, &cache->lru_lock) == 0)
 			break;
@@ -683,7 +685,7 @@ __evict_get_page(
 
 	/* Get the next page queued for eviction. */
 	while ((evict = cache->evict_current) != NULL &&
-	    evict >= cache->evict && evict < cache->evict + WT_EVICT_GROUP &&
+	    evict >= cache->evict && evict < end &&
 	    evict->page != NULL) {
 		WT_ASSERT(session, evict->btree != NULL);
 
@@ -718,7 +720,7 @@ __evict_get_page(
 		break;
 	}
 
-	if (*pagep == NULL)
+	if (is_app && *pagep == NULL)
 		cache->evict_current = NULL;
 	__wt_spin_unlock(session, &cache->lru_lock);
 }
@@ -728,12 +730,12 @@ __evict_get_page(
  *	Called by both eviction and application threads to evict a page.
  */
 int
-__wt_evict_lru_page(WT_SESSION_IMPL *session)
+__wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app)
 {
 	WT_BTREE *btree, *saved_btree;
 	WT_PAGE *page;
 
-	__evict_get_page(session, &btree, &page);
+	__evict_get_page(session, is_app, &btree, &page);
 	if (page == NULL)
 		return (WT_NOTFOUND);
 
@@ -773,8 +775,8 @@ __evict_pages(WT_SESSION_IMPL *session)
 {
 	u_int i;
 
-	for (i = 0; i < WT_EVICT_GROUP; i++)
-		if (__wt_evict_lru_page(session) != 0)
+	for (i = 0; i < WT_EVICT_GROUP / 2; i++)
+		if (__wt_evict_lru_page(session, 0) != 0)
 			break;
 }
 
