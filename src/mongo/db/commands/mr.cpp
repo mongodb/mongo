@@ -748,8 +748,7 @@ namespace mongo {
                 assert( foundIndex );
             }
 
-            readlock rl( _config.incLong.c_str() );
-            Client::Context ctx( _config.incLong );
+            Client::ReadContext ctx( _config.incLong );
 
             BSONObj prev;
             BSONList all;
@@ -872,7 +871,7 @@ namespace mongo {
             if ( ! _onDisk )
                 return;
 
-            writelock l(_config.incLong);
+            Lock::DBWrite kl(_config.incLong);
             Client::Context ctx(_config.incLong);
 
             for ( InMemory::iterator i=_temp->begin(); i!=_temp->end(); i++ ) {
@@ -1023,8 +1022,7 @@ namespace mongo {
                     }
 
                     // Check our version immediately, to avoid migrations happening in the meantime while we do prep
-                    readlock lock( config.ns );
-                    Client::Context ctx( config.ns );
+                    Client::ReadContext ctx( config.ns );
 
                     // Get a very basic cursor, prevents deletion of migrated data while we m/r
                     shared_ptr<Cursor> temp = NamespaceDetailsTransient::getCursor( config.ns.c_str(), BSONObj(), BSONObj() );
