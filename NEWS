@@ -1,11 +1,51 @@
+WiredTiger release 1.1.2, 2012-03-20
+------------------------------------
+
+Add public-domain copyright notices to the extension code.
+
+test/format can now run multi-threaded, fixed two bugs it found:
+(1) When iterating backwards through a skiplist, we could race with an insert.
+(2) If eviction fails for a page, we have to assume that eviction has unlocked
+    the reference.
+
+Scan row-store leaf pages twice when reading to reduce the overhead of the
+index array.
+
+Eviction race fixes:
+(1) Call __rec_review with WT_REFs: don't look at the page until we've checked
+    the state.
+(2) Clear the eviction point if we hit it when discarding a child page, not
+    just the parent.
+
+Eviction tuning changes, particularly for read-only, out-of-cache workloads.
+
+Only notify the eviction server if an application thread doesn't find any pages
+to evict, and then only once.
+
+Only spin on the LRU lock if there might be pages in the LRU queue to evict.
+
+Keep the current eviction point in memory and make the eviction walk run
+concurrent with LRU eviction.
+
+Every test now has err/out captured, and it is checked to assure it is empty at
+the end of every test.
+
+
 WiredTiger release 1.1.1, 2012-03-12
 ------------------------------------
 
-Default to a verbose build: that can be switched off by running "configure --enable-silent-rules").
+Default to a verbose build: that can be switched off by running "configure
+--enable-silent-rules").
 
-Account for all memory allocated when reading a page into cache.  Total memory usage is now much closer to the cache size when using many small keys and values.
+Account for all memory allocated when reading a page into cache.  Total memory
+usage is now much closer to the cache size when using many small keys and
+values.
 
-Have application threads trigger a retry forced page eviction rather than blocking eviction.  This allows rec_evict.c to simply set the WT_REF state to WT_REF_MEM after all failures, and fixes a bug where pages on the forced eviction queue would end up with state WT_REF_MEM, meaning they could be chosen for eviction multiple times.
+Have application threads trigger a retry forced page eviction rather than
+blocking eviction.  This allows rec_evict.c to simply set the WT_REF state to
+WT_REF_MEM after all failures, and fixes a bug where pages on the forced
+eviction queue would end up with state WT_REF_MEM, meaning they could be chosen
+for eviction multiple times.
 
 Grow existing scratch buffers in preference to allocating new ones.
 
@@ -13,11 +53,16 @@ Fix a race between threads reading in and then modifying a page.
 
 Get rid of the pinned flag: it is no longer used.
 
-Fix a race where btree files weren't completely closed before they could be re-opened.  This behavior can be triggered by using a new session on every operation (see the new -S flag to the test/thread program).  [#178]
+Fix a race where btree files weren't completely closed before they could be
+re-opened.  This behavior can be triggered by using a new session on every
+operation (see the new -S flag to the test/thread program).  [#178]
 
-When connections are closed, create a session and discard the btree handles.  This fixes a long-standing bug in closing a connection: if for any reason there are btree handles still open, we need a real session handle to close them.
+When connections are closed, create a session and discard the btree handles.
+This fixes a long-standing bug in closing a connection: if for any reason there
+are btree handles still open, we need a real session handle to close them.
 
-Really close btree handles: otherwise we can't safely remove or rename them.  Fixes test failures in test_base02 (among others).
+Really close btree handles: otherwise we can't safely remove or rename them.
+Fixes test failures in test_base02 (among others).
 
 Wait for application threads in LRU eviction to drain before walking a file.
 
