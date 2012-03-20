@@ -56,9 +56,10 @@ __wt_hazard_set(WT_SESSION_IMPL *session, WT_REF *ref
 
 		/*
 		 * Check to see if the page state is still valid (where valid
-		 * means a state of WT_REF_MEM).
+		 * means a state of WT_REF_MEM or WT_REF_EVICT_WALK).
 		 */
-		if (ref->state == WT_REF_MEM) {
+		if (ref->state == WT_REF_MEM ||
+		    ref->state == WT_REF_EVICT_WALK) {
 			WT_VERBOSE(session, hazard,
 			    "session %p hazard %p: set", session, ref->page);
 			return (0);

@@ -26,13 +26,14 @@ __wt_page_in_func(
 #endif
     )
 {
-	int first, read_lockout;
+	int wake, read_lockout;
 
 	/*
-	 * Only wake the eviction server once: after that, we're just wasting
-	 * effort and making a busy mutex busier.
+	 * Only wake the eviction server the first time through here (if the
+	 * cache is too full), or after we fail to evict a page.  Otherwise, we
+	 * are just wasting effort and making a busy mutex busier.
 	 */
-	first = 1;
+	wake = 1;
 
 	for (;;) {
 		switch (ref->state) {
@@ -41,10 +42,11 @@ __wt_page_in_func(
 			 * The page isn't in memory, attempt to set the
 			 * state to WT_REF_READING.  If successful, read it.
 			 */
-			__wt_eviction_check(session, &read_lockout, first);
-			first = 0;
-			if (read_lockout || !WT_ATOMIC_CAS(
-			    ref->state, WT_REF_DISK, WT_REF_READING))
+			__wt_eviction_check(session, &read_lockout, wake);
+			wake = 0;
+
+			if (read_lockout || !WT_ATOMIC_CAS(ref->state,
+			    WT_REF_DISK, WT_REF_READING))
 				break;
 
 			WT_RET(__wt_cache_read(session, parent, ref));
@@ -57,6 +59,7 @@ __wt_page_in_func(
 			 * wait for that to be resolved.
 			 */
 			break;
+		case WT_REF_EVICT_WALK:
 		case WT_REF_MEM:
 			/*
 			 * The page is in memory: get a hazard reference, update
@@ -79,13 +82,12 @@ __wt_page_in_func(
 		}
 
 		/*
-		 * Find a page to evict -- if that succeeds,
-		 * try again immediately.  If it fails, we
-		 * don't care why, but give up our slice before
-		 * retrying.
+		 * Find a page to evict -- if that fails, we don't care why,
+		 * but we may need to wake the eviction server again if the
+		 * cache is still full.
 		 */
-		if (__wt_evict_lru_page(session) != 0)
-			__wt_yield();
+		if (__wt_evict_lru_page(session, 1) != 0)
+			wake = 1;
 	}
 }
 

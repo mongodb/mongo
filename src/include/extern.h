@@ -196,7 +196,7 @@ extern void __wt_evict_server_wake(WT_SESSION_IMPL *session);
 extern void __wt_evict_file_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern void *__wt_cache_evict_server(void *arg);
-extern int __wt_evict_lru_page(WT_SESSION_IMPL *session);
+extern int __wt_evict_lru_page(WT_SESSION_IMPL *session, int is_app);
 extern int __wt_btree_create(WT_SESSION_IMPL *session, const char *filename);
 extern int __wt_btree_truncate(WT_SESSION_IMPL *session, const char *filename);
 extern int __wt_btree_open(WT_SESSION_IMPL *session,
@@ -252,7 +252,7 @@ extern int __wt_verify_dsk(WT_SESSION_IMPL *session,
     uint32_t size);
 extern int __wt_tree_np(WT_SESSION_IMPL *session,
     WT_PAGE **pagep,
-    int cacheonly,
+    int eviction,
     int next);
 extern int __wt_col_modify(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,

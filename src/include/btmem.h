@@ -343,20 +343,24 @@ struct __wt_ref {
 	 *
 	 * WT_REF_EVICTING:
 	 *	Set by eviction when a page is about to be locked; prevents a
-	 * page from being evicted multiple times concurrently.
+	 *	page from being evicted multiple times concurrently.
+	 *
+	 * WT_REF_EVICT_WALK:
+	 *	The next page to be walked for LRU eviction.  This page is
+	 *	available for reads but not eviction.
 	 *
 	 * WT_REF_LOCKED:
 	 *	Set by eviction; an eviction thread has selected this page or
-	 * a parent for eviction; once hazard references are checked, the page
-	 * will be evicted.
+	 *	a parent for eviction; once hazard references are checked, the
+	 *	page will be evicted.
 	 *
 	 * WT_REF_MEM:
 	 *	Set by a reading thread once the page has been read from disk;
-	 * the page is in the cache and the page reference is OK.
+	 *	the page is in the cache and the page reference is OK.
 	 *
 	 * WT_REF_READING:
 	 *	Set by a reading thread before reading a page from disk; other
-	 * readers of the page wait until the read completes.
+	 *	readers of the page wait until the read completes.
 	 *
 	 * The life cycle of a typical page goes like this: pages are read into
 	 * memory from disk and their state set to WT_REF_MEM.  When the page is
@@ -381,6 +385,7 @@ struct __wt_ref {
 	volatile enum {
 		WT_REF_DISK=0,		/* Page is on disk */
 		WT_REF_EVICTING,	/* Page being evaluated for eviction */
+		WT_REF_EVICT_WALK,	/* Next page for LRU eviction */
 		WT_REF_LOCKED,		/* Page being evicted */
 		WT_REF_MEM,		/* Page is in cache and valid */
 		WT_REF_READING		/* Page being read */
