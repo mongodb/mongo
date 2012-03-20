@@ -536,8 +536,7 @@ __evict_walk(WT_SESSION_IMPL *session)
 	if (elem > cache->evict_entries) {
 		__wt_spin_lock(session, &cache->lru_lock);
 		/* Save the offset of the eviction point. */
-		if (cache->evict_current != NULL)
-			i = (u_int)(cache->evict_current - cache->evict);
+		i = (u_int)(cache->evict_current - cache->evict);
 		WT_ERR(__wt_realloc(session, &cache->evict_allocated,
 		    elem * sizeof(WT_EVICT_LIST), &cache->evict));
 		cache->evict_entries = elem;
