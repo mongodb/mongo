@@ -2691,7 +2691,8 @@ namespace QueryOptimizerCursorTests {
             QueryPlanSet s( ns(), frsp, frspOrig, query, shared_ptr<Projection>(), order );
             ASSERT_EQUALS( n, s.nPlans() );
         }
-        shared_ptr<QueryOptimizerCursor> getCursor( const BSONObj &query, const BSONObj &order ) {
+        static shared_ptr<QueryOptimizerCursor> getCursor( const BSONObj &query,
+                                                          const BSONObj &order ) {
             ParsedQuery parsedQuery( ns(), 0, 0, 0,
                                     BSON( "$query" << query << "$orderby" << order ), BSONObj() );
             shared_ptr<Cursor> cursor =
@@ -3113,6 +3114,73 @@ namespace QueryOptimizerCursorTests {
             }
             ASSERT( !c->completePlanOfHybridSetScanAndOrderRequired() );
         }
+    };
+    
+    /** Out of order plans are not added after abortOutOfOrderPlans() is called. */
+    class AbortOutOfOrderPlansBeforeAddOtherPlans : public PlanChecking {
+    public:
+        void run() {
+            _cli.ensureIndex( ns(), BSON( "a" << 1 ) );
+            _cli.ensureIndex( ns(), BSON( "b" << 1 ) );
+            _cli.insert( ns(), BSON( "a" << -1 << "b" << 0 ) );
+            for( int b = 0; b < 2; ++b ) {
+                for( int a = 0; a < 10; ++a ) {
+                    _cli.insert( ns(), BSON( "a" << a << "b" << b ) );
+                }
+            }
+
+            // Selectivity is better for the a:1 index.
+            _aPreferableQuery = BSON( "a" << GTE << -100 << LTE << -1 << "b" << 0 );
+            // Selectivity is better for the b:1 index.
+            _bPreferableQuery = BSON( "a" << GTE << 0 << LTE << 100 << "b" << 0 );
+
+            Client::ReadContext ctx( ns() );
+            
+            // If abortOutOfOrderPlans() is not set, other plans will be attempted.
+            recordAIndex();
+            _cursor = getCursor( _bPreferableQuery, BSON( "a" << 1 ) );
+            checkInitialIteratePlans();
+            // The b:1 index is attempted later.
+            checkBIndexUsed( true );
+
+            // If abortOutOfOrderPlans() is set, other plans will not be attempted.
+            recordAIndex();
+            _cursor = getCursor( _bPreferableQuery, BSON( "a" << 1 ) );
+            checkInitialIteratePlans();
+            _cursor->abortOutOfOrderPlans();
+            // The b:1 index is not attempted.
+            checkBIndexUsed( false );
+        }
+    private:
+        /** Record the a:1 index for the query pattern of interest. */
+        void recordAIndex() const {
+            NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
+            nsdt.clearQueryCache();
+            shared_ptr<QueryOptimizerCursor> c = getCursor( _aPreferableQuery, BSON( "a" << 1 ) );
+            while( c->advance() );
+            FieldRangeSet aPreferableFields( ns(), _aPreferableQuery, true );
+            ASSERT_EQUALS( BSON( "a" << 1 ),
+                          nsdt.indexForPattern( aPreferableFields.pattern( BSON( "a" << 1 ) ) ) );            
+        }
+        /** The first results come from the recorded index. */
+        void checkInitialIteratePlans() const {
+            for( int i = 0; i < 5; ++i ) {
+                ASSERT_EQUALS( BSON( "a" << 1 ), _cursor->indexKeyPattern() );
+            }            
+        }
+        /** Check if the b:1 index is used during iteration. */
+        void checkBIndexUsed( bool expected ) const {
+            bool bIndexUsed = false;
+            while( _cursor->advance() ) {
+                if ( BSON( "b" << 1 ) == _cursor->indexKeyPattern() ) {
+                    bIndexUsed = true;
+                }
+            }
+            ASSERT_EQUALS( expected, bIndexUsed );            
+        }
+        BSONObj _aPreferableQuery;
+        BSONObj _bPreferableQuery;
+        shared_ptr<QueryOptimizerCursor> _cursor;
     };
     
     class TakeoverOrRangeElimination : public PlanChecking {
@@ -4381,6 +4449,7 @@ namespace QueryOptimizerCursorTests {
             add<PossibleBothPlans>();
             add<AbortOutOfOrderPlans>();
             add<AbortOutOfOrderPlanOnLastMatch>();
+            add<AbortOutOfOrderPlansBeforeAddOtherPlans>();
             add<TakeoverOrRangeElimination>();
             add<TakeoverOrDedups>();
             add<TakeoverOrderedPlanDupsOutOfOrderPlan>();
