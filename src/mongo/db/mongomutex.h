@@ -66,29 +66,6 @@ namespace mongo {
         MutexInfo _minfo;
     };
 
-    class readlocktry : boost::noncopyable {
-        bool _already;
-        bool _got;
-    public:
-        readlocktry( int tryms );
-        ~readlocktry();
-        bool got() const { return _got; }
-    };
-
-    struct writelocktry {
-        const bool _got;
-        writelocktry( int tryms );
-        ~writelocktry();
-        bool got() const { return _got; }
-    };
-
-    struct readlocktryassert : public readlocktry {
-        readlocktryassert(int tryms) :
-            readlocktry(tryms) {
-            uassert(13142, "timeout getting readlock", got());
-        }
-    };
-
     // eliminate this - we should just type "d.dbMutex.assertWriteLocked();" instead
     inline void assertInWriteLock() { d.dbMutex.assertWriteLocked(); }
 

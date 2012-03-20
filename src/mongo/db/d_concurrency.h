@@ -55,18 +55,21 @@ namespace mongo {
                 should generally not be used it is for exceptional circumstances. journaling uses it. 
                 perhaps this should go away it makes the software more complicated.
             */
-            GlobalWrite(bool stopGreed = false); 
+            // timeoutms is only for writelocktry -- deprecated -- do not use
+            GlobalWrite(bool stopGreed = false, int timeoutms = -1 ); 
             virtual ~GlobalWrite();
             void downgrade(); // W -> R
             bool upgrade();   // caution see notes
         };
-        struct GlobalRead : private ScopedLock { // recursive is ok
+        class GlobalRead : private ScopedLock { // recursive is ok
+        public:
             bool noop;
         protected:
             void tempRelease();
             void relock();
         public:
-            GlobalRead(); 
+            // timeoutms is only for readlocktry -- deprecated -- do not use
+            GlobalRead( int timeoutms = -1 ); 
             virtual ~GlobalRead();
         };
         // lock this database. do not shared_lock globally first, that is handledin herein. 
@@ -136,6 +139,32 @@ namespace mongo {
         writelock(const string& ns);
         writelock();
     };
+
+    class readlocktry : boost::noncopyable {
+        bool _got;
+        scoped_ptr<Lock::GlobalRead> _dbrlock;
+    public:
+        readlocktry( int tryms );
+        ~readlocktry();
+        bool got() const { return _got; }
+    };
+
+    class writelocktry : boost::noncopyable {
+        bool _got;
+        scoped_ptr<Lock::GlobalWrite> _dbwlock;
+    public:
+        writelocktry( int tryms );
+        ~writelocktry();
+        bool got() const { return _got; }
+    };
+
+    struct readlocktryassert : public readlocktry {
+        readlocktryassert(int tryms) :
+            readlocktry(tryms) {
+            uassert(13142, "timeout getting readlock", got());
+        }
+    };
+
 
     /** parameterized choice of read or write locking */
     class mongolock {

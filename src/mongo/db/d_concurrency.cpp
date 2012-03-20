@@ -33,6 +33,12 @@
 
 namespace mongo { 
 
+    class DBTryLockTimeoutException : public std::exception {
+    public:
+    	DBTryLockTimeoutException() {}
+    	virtual ~DBTryLockTimeoutException() throw() { }
+    };
+
     struct atstartup { 
         atstartup() { 
             cout << "db level locking enabled: " << ( DB_LEVEL_LOCKING_ENABLED ) << endl;
@@ -418,7 +424,7 @@ namespace mongo {
         lockDB(what);
     }
 
-    Lock::GlobalWrite::GlobalWrite(bool sg) : 
+    Lock::GlobalWrite::GlobalWrite(bool sg, int timeoutms) : 
         stoppedGreed(sg)
     {
         char ts = threadState();
@@ -433,7 +439,12 @@ namespace mongo {
         dassert( ts == 0 );
         if( sg ) {
             lock_W_stop_greed();
-        } else {
+        } 
+        else if ( timeoutms != -1 ) {
+            bool success = lock_W_try( timeoutms );
+            if ( !success ) throw DBTryLockTimeoutException(); 
+        }
+        else {
             lock_W();
         }
     }
@@ -468,7 +479,7 @@ namespace mongo {
         return false;
     }
 
-    Lock::GlobalRead::GlobalRead() {
+    Lock::GlobalRead::GlobalRead( int timeoutms ) {
         LockState& ls = lockState();
         char ts = ls.threadState;
         noop = false;
@@ -476,7 +487,13 @@ namespace mongo {
             noop = true;
             return;
         }
-        lock_R(); // we are unlocked in the qlock/top sense.  lock_R will assert if we are in an in compatible state
+        if ( timeoutms != -1 ) {
+            bool success = lock_R_try( timeoutms );
+            if ( !success ) throw DBTryLockTimeoutException(); 
+        }
+        else {
+            lock_R(); // we are unlocked in the qlock/top sense.  lock_R will assert if we are in an in compatible state
+        }
     }
     Lock::GlobalRead::~GlobalRead() {
         if( !noop ) {
@@ -574,7 +591,8 @@ namespace mongo {
             lockTop(ls);
             if( loc )
                 lockLocal();
-        } else {
+        } 
+        else {
             lock_W();
             locked_w = true;
         }
@@ -593,17 +611,19 @@ namespace mongo {
             lockTop(ls);
             if( loc )
                 lockLocal();
-        } else {
+        } 
+        else {
             lock_R();
             locked_r = true;
         }
     }
 
-    Lock::DBWrite::DBWrite(const StringData& ns) : what(ns.data()) {
-        lockDB(what);
+    Lock::DBWrite::DBWrite( const StringData& ns ) : what(ns.data()) {
+        lockDB( what );
     }
-    Lock::DBRead::DBRead(const StringData& ns)   : what(ns.data()) {
-        lockDB(what);
+
+    Lock::DBRead::DBRead( const StringData& ns )   : what(ns.data()) {
+        lockDB( what );
     }
 
     Lock::DBWrite::~DBWrite() {
@@ -740,27 +760,34 @@ namespace mongo {
         }
     }
     writelocktry::writelocktry( int tryms ) : 
-        _got( lock_W_try(tryms) )
-    { }
-    writelocktry::~writelocktry() { 
-        if( _got )
-            unlock_W();
+        _got( false ),
+        _dbwlock( NULL )
+    { 
+        try { 
+            _dbwlock.reset(new Lock::GlobalWrite( false, tryms ));
+        }
+        catch ( DBTryLockTimeoutException & ) {
+            return;
+        }
+        _got = true;
     }
+    writelocktry::~writelocktry() { 
+    }
+
     // note: the 'already' concept here might be a bad idea as a temprelease wouldn't notice it is nested then
-    readlocktry::readlocktry( int tryms )      
+    readlocktry::readlocktry( int tryms ) :
+        _got( false ),
+        _dbrlock( NULL )
     {
-        if( threadState() == 'R' || threadState() == 'W' ) {
-            _already = true;
-            _got = true;
+        try { 
+            _dbrlock.reset(new Lock::GlobalRead( tryms ));
         }
-        else {
-            _already = false;
-            _got = lock_R_try(tryms);
+        catch ( DBTryLockTimeoutException & ) {
+            return;
         }
+        _got = true;
     }
     readlocktry::~readlocktry() { 
-        if( !_already && _got )
-            unlock_R();
     }
     readlock::readlock() {
         lk1.reset( new Lock::GlobalRead() );
