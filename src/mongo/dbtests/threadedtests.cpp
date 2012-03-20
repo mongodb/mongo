@@ -178,7 +178,7 @@ namespace ThreadedTests {
                         else if( q == 1 ) {
                             // test locking local only -- with no preceeding lock
                             { Lock::DBRead  x("local"); }
-                            //{ Lock::DBWrite x("local"); }
+                            { Lock::DBWrite x("local"); }
                         } else if( q == 1 ) {
                             // TODO { Lock::DBRead  x("admin"); }
                             //{ Lock::DBWrite x("admin"); }
