@@ -252,7 +252,7 @@ extern int __wt_verify_dsk(WT_SESSION_IMPL *session,
     uint32_t size);
 extern int __wt_tree_np(WT_SESSION_IMPL *session,
     WT_PAGE **pagep,
-    int cacheonly,
+    int eviction,
     int next);
 extern int __wt_col_modify(WT_SESSION_IMPL *session,
     WT_CURSOR_BTREE *cbt,
