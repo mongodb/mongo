@@ -393,12 +393,12 @@ namespace mongo {
                mongo/src/mongo/bson/util/builder.h
             */
             if (ae.getCode() != 13548)
-                throw ae;
+                throw;
 
             /* throw the nicer human-readable error */
             uassert(16029, str::stream() <<
                     "aggregation result exceeds maximum document size limit ("
-                    << (int)(BSONObjMaxUserSize / (1024 * 1024)) << "MB)",
+                    << (BSONObjMaxUserSize / (1024 * 1024)) << "MB)",
                     false);
          }
 
