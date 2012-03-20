@@ -62,7 +62,7 @@ addSmoketest( "mongosTest", [ add_exe( 'mongos' ) ])
 
 # These tests require the mongo shell
 if shellEnv is not None:
-    addSmoketest( "smokeJs", [add_exe("mongo")] )
+    addSmoketest( "smokeJs", [add_exe("mongo"), add_exe("mongod")] )
     addSmoketest( "smokeClone", [ add_exe("mongo"), add_exe("mongod") ] )
     addSmoketest( "smokeRepl", [ add_exe("mongo"), add_exe("mongod"), add_exe("mongobridge") ] )
     addSmoketest( "smokeReplSets", [ add_exe("mongo"), add_exe("mongod"), add_exe("mongobridge") ] )
@@ -71,23 +71,15 @@ if shellEnv is not None:
     addSmoketest( "smokeAuth", [ add_exe( "mongo" ), add_exe( "mongod" ) ] )
     addSmoketest( "smokeParallel", [ add_exe( "mongo" ), add_exe( "mongod" ) ] )
     addSmoketest( "smokeSharding", [ add_exe("mongo"), add_exe("mongod"), add_exe("mongos") ] )
-    addSmoketest( "smokeJsPerf", [ add_exe("mongo") ] )
-    addSmoketest( "smokeJsSlowNightly", [add_exe("mongo")])
-    addSmoketest( "smokeJsSlowWeekly", [add_exe("mongo")])
-    addSmoketest( "smokeQuota", [ add_exe("mongo") ] )
+    addSmoketest( "smokeJsPerf", [ add_exe("mongo"), add_exe("mongod") ] )
+    addSmoketest( "smokeJsSlowNightly", [add_exe("mongo"), add_exe("mongod")])
+    addSmoketest( "smokeJsSlowWeekly", [add_exe("mongo"), add_exe("mongod")])
+    addSmoketest( "smokeQuota", [ add_exe("mongo"), add_exe("mongod") ] )
     addSmoketest( "smokeTool", [ add_exe( "mongo" ), add_exe("mongod"), add_exe("mongos"), "tools" ] )
     addSmoketest( "smokeAggregation", [ add_exe( "mongo" ), add_exe( "mongod" ) ] )
 
     addSmoketest( "smokeFailingTests", [ add_exe( "mongo" ), add_exe( "mongod" ) ], ['--only-old-fails', '--continue-on-failure'] )
     addSmoketest( "smokeResetFails", [ add_exe( "mongo" ), add_exe( "mongod" ) ], ['--reset-old-fails'] )
-
-# Note: although the test running logic has been moved to
-# buildscripts/smoke.py, the interface to running the tests has been
-# something like 'scons startMongod <suite>'; startMongod is now a
-# no-op, and should go away eventually.
-smokeEnv.Alias( "startMongod", [add_exe("mongod")]);
-smokeEnv.AlwaysBuild( "startMongod" );
-smokeEnv.SideEffect( "dummySmokeSideEffect", "startMongod" )
 
 smokeEnv.Alias( "startMongodSmallOplog", [add_exe("mongod")], [] );
 smokeEnv.AlwaysBuild( "startMongodSmallOplog" );
