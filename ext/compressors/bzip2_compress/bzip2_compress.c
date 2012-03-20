@@ -158,9 +158,9 @@ bzip2_compress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 		return (bzip2_error(session, "BZ2_bzCompressInit", ret));
 
 	bz.next_in = (char *)src;
-	bz.avail_in = src_len;
+	bz.avail_in = (uint32_t)src_len;
 	bz.next_out = (char *)dst;
-	bz.avail_out = dst_len;
+	bz.avail_out = (uint32_t)dst_len;
 	if ((ret = BZ2_bzCompress(&bz, BZ_FINISH)) == BZ_STREAM_END) {
 		*compression_failed = 0;
 		*result_lenp = dst_len - bz.avail_out;
@@ -193,9 +193,9 @@ bzip2_decompress(WT_COMPRESSOR *compressor, WT_SESSION *session,
 		return (bzip2_error(session, "BZ2_bzDecompressInit", ret));
 
 	bz.next_in = (char *)src;
-	bz.avail_in = src_len;
+	bz.avail_in = (uint32_t)src_len;
 	bz.next_out = (char *)dst;
-	bz.avail_out = dst_len;
+	bz.avail_out = (uint32_t)dst_len;
 	if ((ret = BZ2_bzDecompress(&bz)) == BZ_STREAM_END) {
 		*result_lenp = dst_len - bz.avail_out;
 		ret = 0;
