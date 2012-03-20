@@ -71,27 +71,27 @@ namespace mongo {
 
     BSONObj ExplainPlanInfo::bson() const {
         BSONObjBuilder bob;
-        bob << "cursor" << _cursorName;
+        bob.append( "cursor", _cursorName );
         bob.appendNumber( "n", _n );
         bob.appendNumber( "nscannedObjects", _nscannedObjects );
         bob.appendNumber( "nscanned", _nscanned );
-        bob << "indexBounds" << _indexBounds;
+        bob.append( "indexBounds", _indexBounds );
         return bob.obj();
     }
     
     BSONObj ExplainPlanInfo::pickedPlanBson( const ExplainClauseInfo &clauseInfo ) const {
         BSONObjBuilder bob;
-        bob << "cursor" << _cursorName;
-        bob << "isMultiKey" << _isMultiKey;
+        bob.append( "cursor", _cursorName );
+        bob.append( "isMultiKey", _isMultiKey );
         bob.appendNumber( "n", clauseInfo.n() );
         bob.appendNumber( "nscannedObjects", clauseInfo.nscannedObjects() );
         bob.appendNumber( "nscanned", clauseInfo.nscanned() );
-        bob << "scanAndOrder" << _scanAndOrder;
-        bob << "indexOnly" << _indexOnly;
-        bob << "nYields" << _nYields;
+        bob.append( "scanAndOrder", _scanAndOrder );
+        bob.append( "indexOnly", _indexOnly );
+        bob.appendNumber( "nYields", _nYields );
         bob.appendNumber( "nChunkSkips", clauseInfo.nChunkSkips() );
-        bob << "millis" << clauseInfo.millis();
-        bob << "indexBounds" << _indexBounds;
+        bob.appendNumber( "millis", clauseInfo.millis() );
+        bob.append( "indexBounds", _indexBounds );
         bob.appendElements( _details );
         return bob.obj();
     }
@@ -217,15 +217,13 @@ namespace mongo {
             bob.appendNumber( "n", n );
             bob.appendNumber( "nscannedObjects", nscannedObjects );
             bob.appendNumber( "nscanned", nscanned );
-            bob << "millis" << _timer.duration();
+            bob.appendNumber( "millis", _timer.duration() );
         }
         
         if ( !_ancillaryInfo._oldPlan.isEmpty() ) {
-            bob << "oldPlan" << _ancillaryInfo._oldPlan;
+            bob.append( "oldPlan", _ancillaryInfo._oldPlan );
         }
-        bob
-        << "server"
-        << (string)( mongoutils::str::stream() << getHostNameCached() << ":" << cmdLine.port );
+        bob.append( "server", server() );
         
         return bob.obj();
     }
@@ -235,6 +233,10 @@ namespace mongo {
             _clauses.back()->stopTimer();
         }
         _clauses.push_back( info );
+    }
+    
+    string ExplainQueryInfo::server() {
+        return mongoutils::str::stream() << getHostNameCached() << ":" << cmdLine.port;
     }
 
     ExplainSinglePlanQueryInfo::ExplainSinglePlanQueryInfo() :

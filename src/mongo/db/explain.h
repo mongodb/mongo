@@ -134,6 +134,8 @@ namespace mongo {
         BSONObj bson() const;
 
     private:
+        static string server();
+        
         list<shared_ptr<ExplainClauseInfo> > _clauses;
         AncillaryInfo _ancillaryInfo;
         DurationTimer _timer;
