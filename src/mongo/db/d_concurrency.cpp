@@ -115,10 +115,14 @@ namespace mongo {
         }
         return *p;
     }
-    LockState::LockState() : recursive(0), threadState(0), local(0), other(0), otherLock(0) { 
-        tempReleased = 0;
-        scopedLk = 0;
-    }
+    LockState::LockState() : recursive(0), 
+                             threadState(0), 
+                             local(0), 
+                             other(0), 
+                             otherLock(NULL),
+                             scopedLk(NULL)
+    {}
+
     void LockState::Dump() {
         lockState().dump();
     }
@@ -341,7 +345,7 @@ namespace mongo {
         dassert( ls.recursive < 10000 );
         if( ls.recursive == 0 ) { 
             wassert( ls.scopedLk == this );
-            ls.scopedLk = 0;
+            ls.scopedLk = NULL;
         }
         else { 
             wassert( ls.scopedLk != this );
@@ -356,18 +360,20 @@ namespace mongo {
         fassert( 0, ls.recursive == 1 );
         fassert( 0, ls.threadState );    
         fassert( 0, ls.scopedLk );
-        fassert( 0, ls.tempReleased == 0 ); // don't allow nesting them, at least not without us thinking about it and writing some unit tests
-        ls.tempReleased++;
+        ls.recursive--;
         ls.scopedLk->tempRelease();
+        scopedLk = ls.scopedLk;
+        ls.scopedLk = NULL;  // this must be cleared out for further ScopedLock's to work
     }
     Lock::TempRelease::~TempRelease()
     {
         if( cant )
             return;
         LockState& ls = lockState();
-        fassert( 0, ls.tempReleased == 1 );
-        ls.tempReleased--;
-        fassert( 0, ls.scopedLk );
+        ls.recursive++;
+        fassert( 0, scopedLk );
+        fassert( 0, ls.scopedLk==NULL );
+        ls.scopedLk = scopedLk;
         ls.scopedLk->relock();
     }
 

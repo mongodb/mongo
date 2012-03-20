@@ -23,11 +23,13 @@ namespace mongo {
         static void assertAtLeastReadLocked(const StringData& ns);
         static void assertWriteLocked(const StringData& ns);
 
+        class ScopedLock;
         // avoid TempRelease when possible.
         struct TempRelease {
             TempRelease(); 
             ~TempRelease();
             const bool cant; // true if couldn't because of recursive locking
+            ScopedLock *scopedLk;
         };
 
         class ScopedLock : boost::noncopyable {
@@ -165,7 +167,6 @@ namespace mongo {
         static void Dump();
 
         unsigned recursive;           // nested locking is allowed
-        unsigned tempReleased;        // 0 = no, 1 = yes
 
         // global lock related
         char threadState;             // 0, 'r', 'w', 'R', 'W'
