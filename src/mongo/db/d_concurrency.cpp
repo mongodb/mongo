@@ -89,7 +89,7 @@ namespace mongo {
     */
     void QLock::runExclusively(void (*f)(void)) { 
         dlog(1) << "QLock::runExclusively" << endl;
-        boost::mutex::scoped_lock lk( q.m );
+        boost::mutex::scoped_lock lk( m );
         assert( w.n > 0 );
         greed++; // stop new acquisitions
         X.n++;
