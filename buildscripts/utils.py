@@ -3,6 +3,8 @@ import re
 import socket
 import time
 import os
+import sys
+
 # various utilities that are handy
 
 def getAllSourceFiles( arr=None , prefix="." ):
@@ -139,6 +141,14 @@ def smoke_python_name():
     # then we assume that "python" points to a 2.5 or
     # greater python VM. otherwise, explicitly use 2.5
     # which we assume to be installed.
+    min_version_tuple = (2, 5)
+    try:
+        if sys.version_info >= min_version_tuple:
+            return sys.executable
+    except AttributeError:
+        # In case the version of Python is somehow missing sys.version_info or sys.executable.
+        pass
+
     import subprocess
     version = re.compile(r'[Pp]ython ([\d\.]+)', re.MULTILINE)
     binaries = ['python2.5', 'python2.6', 'python2.7', 'python25', 'python26', 'python27', 'python']
@@ -150,7 +160,7 @@ def smoke_python_name():
                 match = version.search(stream)
                 if match:
                     versiontuple = tuple(map(int, match.group(1).split('.')))
-                    if versiontuple >= (2, 5):
+                    if versiontuple >= min_version_tuple:
                         return binary
         except:
             pass
