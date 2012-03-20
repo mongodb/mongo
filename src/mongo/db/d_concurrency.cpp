@@ -510,6 +510,7 @@ namespace mongo {
         else {
             ourCounter = &ls.local;
             ls.local++;
+            fassert(0,weLocked==0);
             localDBLock.lock();
             weLocked = &localDBLock;
         }
@@ -522,6 +523,7 @@ namespace mongo {
         else {
             ourCounter = &ls.local;
             ls.local--;
+            fassert(0,weLocked==0);
             localDBLock.lock_shared();
             weLocked = &localDBLock;
         }
@@ -553,6 +555,7 @@ namespace mongo {
                 lock = new SimpleRWLock();
             ls.otherLock = lock;
         }
+        fassert(0,weLocked==0);
         ls.otherLock->lock();
         weLocked = ls.otherLock;
     }
@@ -717,6 +720,7 @@ namespace mongo {
                 lock = new SimpleRWLock();
             ls.otherLock = lock;
         }
+        fassert(0,weLocked==0);
         ls.otherLock->lock_shared();
         weLocked = ls.otherLock;
     }
