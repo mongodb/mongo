@@ -382,9 +382,11 @@ __wt_scr_discard(WT_SESSION_IMPL *session)
 	    bufp = session->scratch; i < session->scratch_alloc; ++i, ++bufp) {
 		if (*bufp == NULL)
 			continue;
+#if 0
 		if (F_ISSET(*bufp, WT_ITEM_INUSE))
 			__wt_errx(session,
 			    "scratch buffer allocated and never discarded");
+#endif
 		__wt_buf_free(session, *bufp);
 		__wt_free(session, *bufp);
 	}
