@@ -54,7 +54,7 @@ namespace mongo {
         /** Note information about a single query plan. */
         virtual void notePlan( bool scanAndOrder, bool indexOnly ) {}
         /** Note an iteration of the query. */
-        virtual void noteIterate( bool match, bool orderedMatch, bool loadedObject,
+        virtual void noteIterate( bool match, bool orderedMatch, bool loadedRecord,
                                  bool chunkSkip ) {}
         /** Note that the query yielded. */
         virtual void noteYield() {}
@@ -82,10 +82,10 @@ namespace mongo {
     public:
         MatchCountingExplainStrategy( const ExplainQueryInfo::AncillaryInfo &ancillaryInfo );
     protected:
-        virtual void _noteIterate( bool match, bool orderedMatch, bool loadedObject,
+        virtual void _noteIterate( bool match, bool orderedMatch, bool loadedRecord,
                                   bool chunkSkip ) = 0;
     private:
-        virtual void noteIterate( bool match, bool orderedMatch, bool loadedObject,
+        virtual void noteIterate( bool match, bool orderedMatch, bool loadedRecord,
                                  bool chunkSkip );
         virtual long long orderedMatches() const { return _orderedMatches; }
         long long _orderedMatches;
@@ -98,7 +98,7 @@ namespace mongo {
                                     const shared_ptr<Cursor> &cursor );
     private:
         virtual void notePlan( bool scanAndOrder, bool indexOnly );
-        virtual void _noteIterate( bool match, bool orderedMatch, bool loadedObject,
+        virtual void _noteIterate( bool match, bool orderedMatch, bool loadedRecord,
                                   bool chunkSkip );
         virtual void noteYield();
         virtual shared_ptr<ExplainQueryInfo> _doneQueryInfo();
@@ -115,7 +115,7 @@ namespace mongo {
         QueryOptimizerCursorExplainStrategy( const ExplainQueryInfo::AncillaryInfo &ancillaryInfo,
                                             const shared_ptr<QueryOptimizerCursor> &cursor );
     private:
-        virtual void _noteIterate( bool match, bool orderedMatch, bool loadedObject,
+        virtual void _noteIterate( bool match, bool orderedMatch, bool loadedRecord,
                                   bool chunkSkip );
         virtual shared_ptr<ExplainQueryInfo> _doneQueryInfo();
         shared_ptr<QueryOptimizerCursor> _cursor;

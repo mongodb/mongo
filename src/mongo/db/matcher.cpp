@@ -184,14 +184,14 @@ namespace mongo {
     }
     
     void MatchDetails::resetOutput() {
-        _loadedObject = false;
+        _loadedRecord = false;
         _elemMatchKeyFound = false;
         _elemMatchKey = "";
     }
     
     string MatchDetails::toString() const {
         stringstream ss;
-        ss << "loadedObject: " << _loadedObject << " ";
+        ss << "loadedRecord: " << _loadedRecord << " ";
         ss << "elemMatchKeyRequested: " << _elemMatchKeyRequested << " ";
         ss << "elemMatchKey: " << ( _elemMatchKeyFound ? _elemMatchKey : "NONE" ) << " ";
         return ss.str();

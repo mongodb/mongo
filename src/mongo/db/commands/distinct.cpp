@@ -98,14 +98,14 @@ namespace mongo {
 
             while ( cursor->ok() ) {
                 nscanned++;
-                bool loadedObject = false;
+                bool loadedRecord = false;
 
                 if ( cursor->currentMatches( &md ) && !cursor->getsetdup( cursor->currLoc() ) ) {
                     n++;
 
                     BSONObj holder;
                     BSONElementSet temp;
-                    loadedObject = ! cc->getFieldsDotted( key , temp, holder );
+                    loadedRecord = ! cc->getFieldsDotted( key , temp, holder );
 
                     for ( BSONElementSet::iterator i=temp.begin(); i!=temp.end(); ++i ) {
                         BSONElement e = *i;
@@ -123,7 +123,7 @@ namespace mongo {
                     }
                 }
 
-                if ( loadedObject || md.loadedObject() )
+                if ( loadedRecord || md.hasLoadedRecord() )
                     nscannedObjects++;
 
                 cursor->advance();

@@ -75,7 +75,7 @@ namespace mongo {
         }
 
         if ( details )
-            details->setLoadedObject( true );
+            details->setLoadedRecord( true );
 
         bool res = _docMatcher->matches(recLoc.obj() , details );
         LOG(5) << "CoveredIndexMatcher _docMatcher->matches() returns " << res << endl;

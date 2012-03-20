@@ -579,7 +579,7 @@ namespace mongo {
         
         virtual long long nscanned() { return _nscanned + _c->nscanned(); }
         
-        void noteIterate( bool match, bool loadedObject );
+        void noteIterate( bool match, bool loadedRecord );
         
         void noteYield();
         

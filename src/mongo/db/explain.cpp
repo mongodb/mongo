@@ -45,11 +45,11 @@ namespace mongo {
         noteCursorUpdate( cursor );
     }
     
-    void ExplainPlanInfo::noteIterate( bool match, bool loadedObject, const Cursor &cursor ) {
+    void ExplainPlanInfo::noteIterate( bool match, bool loadedRecord, const Cursor &cursor ) {
         if ( match ) {
             ++_n;
         }
-        if ( loadedObject ) {
+        if ( loadedRecord ) {
             ++_nscannedObjects;
         }
         noteCursorUpdate( cursor );
@@ -125,11 +125,11 @@ namespace mongo {
         _plans.push_back( info );
     }
     
-    void ExplainClauseInfo::noteIterate( bool match, bool loadedObject, bool chunkSkip ) {
+    void ExplainClauseInfo::noteIterate( bool match, bool loadedRecord, bool chunkSkip ) {
         if ( match ) {
             ++_n;
         }
-        if ( loadedObject ) {
+        if ( loadedRecord ) {
             ++_nscannedObjects;
         }
         if ( chunkSkip ) {
@@ -184,9 +184,9 @@ namespace mongo {
         return *ret;
     }
     
-    void ExplainQueryInfo::noteIterate( bool match, bool loadedObject, bool chunkSkip ) {
+    void ExplainQueryInfo::noteIterate( bool match, bool loadedRecord, bool chunkSkip ) {
         verify( 16077, !_clauses.empty() );
-        _clauses.back()->noteIterate( match, loadedObject, chunkSkip );
+        _clauses.back()->noteIterate( match, loadedRecord, chunkSkip );
     }
 
     void ExplainQueryInfo::reviseN( long long n ) {

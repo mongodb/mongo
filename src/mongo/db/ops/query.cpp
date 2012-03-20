@@ -238,8 +238,8 @@ namespace mongo {
     }
     
     void MatchCountingExplainStrategy::noteIterate( bool match, bool orderedMatch,
-                                                   bool loadedObject, bool chunkSkip ) {
-        _noteIterate( match, orderedMatch, loadedObject, chunkSkip );
+                                                   bool loadedRecord, bool chunkSkip ) {
+        _noteIterate( match, orderedMatch, loadedRecord, chunkSkip );
         if ( orderedMatch ) {
             ++_orderedMatches;
         }
@@ -258,8 +258,8 @@ namespace mongo {
     }
 
     void SimpleCursorExplainStrategy::_noteIterate( bool match, bool orderedMatch,
-                                                   bool loadedObject, bool chunkSkip ) {
-        _explainInfo->noteIterate( match, loadedObject, chunkSkip, *_cursor );
+                                                   bool loadedRecord, bool chunkSkip ) {
+        _explainInfo->noteIterate( match, loadedRecord, chunkSkip, *_cursor );
     }
 
     void SimpleCursorExplainStrategy::noteYield() {
@@ -279,10 +279,10 @@ namespace mongo {
     }
     
     void QueryOptimizerCursorExplainStrategy::_noteIterate( bool match, bool orderedMatch,
-                                                           bool loadedObject, bool chunkSkip ) {
+                                                           bool loadedRecord, bool chunkSkip ) {
         // Note ordered matches only; if an unordered plan is selected, the explain result will
         // be updated with reviseN().
-        _cursor->noteIterate( orderedMatch, loadedObject, chunkSkip );
+        _cursor->noteIterate( orderedMatch, loadedRecord, chunkSkip );
     }
 
     shared_ptr<ExplainQueryInfo> QueryOptimizerCursorExplainStrategy::_doneQueryInfo() {
@@ -591,7 +591,7 @@ namespace mongo {
         if ( _cursor->currentMatches( &details ) ) {
             return true;
         }
-        _explain->noteIterate( false, false, details.loadedObject(), false );
+        _explain->noteIterate( false, false, details.hasLoadedRecord(), false );
         return false;
     }
 

@@ -99,14 +99,14 @@ namespace mongo {
         
         bool needRecord() const { return _elemMatchKeyRequested; }
         
-        bool loadedObject() const { return _loadedObject; }
+        bool hasLoadedRecord() const { return _loadedRecord; }
         bool hasElemMatchKey() const { return _elemMatchKeyFound; }
         string elemMatchKey() const {
             verify( 16099, hasElemMatchKey() );
             return _elemMatchKey;
         }
 
-        void setLoadedObject( bool loadedObject ) { _loadedObject = loadedObject; }
+        void setLoadedRecord( bool loadedRecord ) { _loadedRecord = loadedRecord; }
         void setElemMatchKey( const string &elemMatchKey ) {
             if ( _elemMatchKeyRequested ) {
                 _elemMatchKeyFound = true;
@@ -115,7 +115,7 @@ namespace mongo {
         }
         
     private:
-        bool _loadedObject;
+        bool _loadedRecord;
         bool _elemMatchKeyRequested;
         bool _elemMatchKeyFound;
         string _elemMatchKey;

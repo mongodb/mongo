@@ -50,7 +50,7 @@ namespace mongo {
         /** Note information about the plan. */
         void notePlan( const Cursor &cursor, bool scanAndOrder, bool indexOnly );
         /** Note an iteration of the plan. */
-        void noteIterate( bool match, bool loadedObject, const Cursor &cursor );
+        void noteIterate( bool match, bool loadedRecord, const Cursor &cursor );
         /** Note that the plan yielded. */
         void noteYield();
         /** Note that the plan finished execution. */
@@ -90,7 +90,7 @@ namespace mongo {
         ExplainClauseInfo();
 
         /** Note an iteration of the clause. */
-        void noteIterate( bool match, bool loadedObject, bool chunkSkip );
+        void noteIterate( bool match, bool loadedRecord, bool chunkSkip );
         /** Revise the total number of documents returned to match an external count. */
         void reviseN( long long n );
         /** Stop the clauses's timer. */
@@ -119,7 +119,7 @@ namespace mongo {
     class ExplainQueryInfo {
     public:
         /** Note an iteration of the query's current clause. */
-        void noteIterate( bool match, bool loadedObject, bool chunkSkip );
+        void noteIterate( bool match, bool loadedRecord, bool chunkSkip );
         /** Revise the number of documents returned by the current clause. */
         void reviseN( long long n );
 
@@ -149,9 +149,9 @@ namespace mongo {
             _planInfo->notePlan( cursor, scanAndOrder, indexOnly );
         }
         /** Note an iteration of the plan and the clause. */
-        void noteIterate( bool match, bool loadedObject, bool chunkSkip, const Cursor &cursor ) {
-            _planInfo->noteIterate( match, loadedObject, cursor );
-            _queryInfo->noteIterate( match, loadedObject, chunkSkip );
+        void noteIterate( bool match, bool loadedRecord, bool chunkSkip, const Cursor &cursor ) {
+            _planInfo->noteIterate( match, loadedRecord, cursor );
+            _queryInfo->noteIterate( match, loadedRecord, chunkSkip );
         }
         /** Note that the plan yielded. */
         void noteYield() {

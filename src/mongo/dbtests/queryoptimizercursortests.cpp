@@ -3933,7 +3933,7 @@ namespace QueryOptimizerCursorTests {
                         _cursor->noteIterate( true, true, false );
                     }
                     else {
-                        _cursor->noteIterate( false, matchDetails.loadedObject(), false );
+                        _cursor->noteIterate( false, matchDetails.hasLoadedRecord(), false );
                     }
                     _cursor->advance();
                 }
@@ -4096,7 +4096,7 @@ namespace QueryOptimizerCursorTests {
                         _cursor->noteIterate( true, true, false );
                     }
                     else {
-                        _cursor->noteIterate( false, matchDetails.loadedObject(), false );
+                        _cursor->noteIterate( false, matchDetails.hasLoadedRecord(), false );
                     }
                     _cursor->advance();
                 }

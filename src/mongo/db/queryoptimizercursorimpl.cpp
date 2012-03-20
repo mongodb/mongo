@@ -194,7 +194,7 @@ namespace mongo {
             if ( _explainPlanInfo ) {
                 bool countableMatch = newMatch && _matchCounter.wouldCountMatch( _c->currLoc() );
                 _explainPlanInfo->noteIterate( countableMatch,
-                                              countableMatch || details->loadedObject(),
+                                              countableMatch || details->hasLoadedRecord(),
                                               *_c );
             }
 
