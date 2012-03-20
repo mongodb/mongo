@@ -3532,7 +3532,7 @@ namespace QueryOptimizerCursorTests {
             }
         };
         
-        /** If a no optimal plan is a candidate a QueryOptimizerCursor should be returned, even if plan has been recorded. */
+        /** If a non optimal plan is a candidate a QueryOptimizerCursor should be returned, even if plan has been recorded. */
         class BestSavedNotOptimal : public QueryOptimizerCursorTests::Base {
         public:
             void run() {
