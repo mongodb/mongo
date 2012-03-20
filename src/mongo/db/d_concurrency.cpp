@@ -565,12 +565,12 @@ namespace mongo {
         if (DB_LEVEL_LOCKING_ENABLED) {
             char db[MaxDatabaseNameLen];
             nsToDatabase(ns.data(), db);
-            if( str::equals(db,"local") ) {
-                lockLocal();
-            } else { 
+            bool loc = str::equals(db,"local");
+            if( !loc )
                 lock(db);
-            }
             lockTop(ls);
+            if( loc )
+                lockLocal();
         } else {
             lock_W();
             locked_w = true;
@@ -584,12 +584,12 @@ namespace mongo {
         if (DB_LEVEL_LOCKING_ENABLED) {
             char db[MaxDatabaseNameLen];
             nsToDatabase(ns.data(), db);
-            if( str::equals(db,"local") ) {
-                lockLocal();
-            } else { 
+            bool loc = str::equals(db,"local");
+            if( !loc )
                 lock(db);
-            }
             lockTop(ls);
+            if( loc )
+                lockLocal();
         } else {
             lock_R();
             locked_r = true;
