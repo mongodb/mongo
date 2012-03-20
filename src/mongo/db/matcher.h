@@ -100,15 +100,16 @@ namespace mongo {
         bool needRecord() const { return _elemMatchKeyRequested; }
         
         bool loadedObject() const { return _loadedObject; }
-        /**
-         * @return elemMatch key field name.  The pointer may become invalid if the object
-         * containing this field becomes invalid.
-         */
-        const char *elemMatchKey() const { return _elemMatchKey; }
+        bool hasElemMatchKey() const { return _elemMatchKeyFound; }
+        string elemMatchKey() const {
+            verify( 16099, hasElemMatchKey() );
+            return _elemMatchKey;
+        }
 
         void setLoadedObject( bool loadedObject ) { _loadedObject = loadedObject; }
-        void setElemMatchKey( const char *elemMatchKey ) {
+        void setElemMatchKey( const string &elemMatchKey ) {
             if ( _elemMatchKeyRequested ) {
+                _elemMatchKeyFound = true;
                 _elemMatchKey = elemMatchKey;
             }
         }
@@ -116,7 +117,8 @@ namespace mongo {
     private:
         bool _loadedObject;
         bool _elemMatchKeyRequested;
-        const char * _elemMatchKey;
+        bool _elemMatchKeyFound;
+        string _elemMatchKey;
     };
 
     /* Match BSON objects against a query pattern.

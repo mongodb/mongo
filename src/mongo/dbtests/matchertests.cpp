@@ -140,8 +140,10 @@ namespace MatcherTests {
             Matcher matcher( BSON( "a.b" << 1 ) );
             MatchDetails details;
             details.requestElemMatchKey();
+            ASSERT( !details.hasElemMatchKey() );
             ASSERT( matcher.matches( fromjson( "{ a:[ { b:1 } ] }" ), &details ) );
             // The '0' entry of the 'a' array is matched.
+            ASSERT( details.hasElemMatchKey() );
             ASSERT_EQUALS( string( "0" ), details.elemMatchKey() );
         }
     };
@@ -166,6 +168,7 @@ namespace MatcherTests {
                 ASSERT_EQUALS( "BasicCursor", cursor->toString() );
                 ASSERT( matcher.matchesCurrent( cursor.get(), &details ) );
                 // The '1' entry of the 'a' array is matched.
+                ASSERT( details.hasElemMatchKey() );
                 ASSERT_EQUALS( string( "1" ), details.elemMatchKey() );
             }
         };
@@ -190,6 +193,7 @@ namespace MatcherTests {
                 ASSERT_EQUALS( "BtreeCursor a.b_1", cursor->toString() );
                 ASSERT( matcher.matchesCurrent( cursor.get(), &details ) );
                 // The '2' entry of the 'a' array is matched.
+                ASSERT( details.hasElemMatchKey() );
                 ASSERT_EQUALS( string( "2" ), details.elemMatchKey() );
             }
         };
@@ -217,6 +221,7 @@ namespace MatcherTests {
                 ASSERT( !cursor->isMultiKey() );
                 ASSERT( matcher.matchesCurrent( cursor.get(), &details ) );
                 // The '0' entry of the 'a' array is matched.
+                ASSERT( details.hasElemMatchKey() );
                 ASSERT_EQUALS( string( "0" ), details.elemMatchKey() );
             }
         };

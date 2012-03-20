@@ -888,7 +888,7 @@ namespace mongo {
 
     }
 
-    ModSet * ModSet::fixDynamicArray( const char * elemMatchKey ) const {
+    ModSet * ModSet::fixDynamicArray( const string &elemMatchKey ) const {
         ModSet * n = new ModSet();
         n->_isIndexed = _isIndexed;
         n->_hasDynamicArray = _hasDynamicArray;
@@ -1190,7 +1190,7 @@ namespace mongo {
                     bool forceRewrite = false;
 
                     auto_ptr<ModSet> mymodset;
-                    if ( details.elemMatchKey() && mods->hasDynamicArray() ) {
+                    if ( details.hasElemMatchKey() && mods->hasDynamicArray() ) {
                         useMods = mods->fixDynamicArray( details.elemMatchKey() );
                         mymodset.reset( useMods );
                         forceRewrite = true;

@@ -383,7 +383,7 @@ namespace mongo {
               );
 
         // TODO: this is inefficient - should probably just handle when iterating
-        ModSet * fixDynamicArray( const char * elemMatchKey ) const;
+        ModSet * fixDynamicArray( const string &elemMatchKey ) const;
 
         bool hasDynamicArray() const { return _hasDynamicArray; }
 
