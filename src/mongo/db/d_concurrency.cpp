@@ -23,6 +23,8 @@
 #define MONGOD_CONCURRENCY_LEVEL_GLOBAL 0
 #define MONGOD_CONCURRENCY_LEVEL_DB 1
 
+//#define MONGOD_CONCURRENCY_LEVEL 1
+
 #ifndef MONGOD_CONCURRENCY_LEVEL
 #define MONGOD_CONCURRENCY_LEVEL MONGOD_CONCURRENCY_LEVEL_GLOBAL
 #endif
@@ -30,6 +32,12 @@
 #define DB_LEVEL_LOCKING_ENABLED ( ( MONGOD_CONCURRENCY_LEVEL ) >= MONGOD_CONCURRENCY_LEVEL_DB )
 
 namespace mongo { 
+
+    struct atstartup { 
+        atstartup() { 
+            cout << "db level locking enabled: " << ( DB_LEVEL_LOCKING_ENABLED ) << endl;
+        }
+    } atst;
 
     Client* curopWaitingForLock( char type );
     void curopGotLock(Client*);
@@ -487,23 +495,10 @@ namespace mongo {
         }
         return false;
     }
-    void Lock::DBWrite::lockTop(LockState& ls) { 
-        switch( ls.threadState ) { 
-        case 'w':
-            break;
-        default:
-            assert(false);
-        case  0  : 
-            lock_w();
-            locked_w = true;
-        }
-    }
     void Lock::DBWrite::lockLocal() { 
         LockState& ls = lockState();
         if( ls.local ) { 
             // we are nested in our locking of local.
-            // we could increment ls.local here; that would be recommended if 
-            // temprelease is supported here - but it is not yet, so we don't need to.
             assert( ls.local > 0 );
         }
         else {
@@ -513,6 +508,19 @@ namespace mongo {
             weLocked = &localDBLock;
         }
     }
+    void Lock::DBRead::lockLocal() { 
+        LockState& ls = lockState();
+        if( ls.local ) { 
+            // we are nested in our locking of local.  previous lock could be read OR write lock on local.
+        }
+        else {
+            ourCounter = &ls.local;
+            ls.local--;
+            localDBLock.lock_shared();
+            weLocked = &localDBLock;
+        }
+    }
+
     void Lock::DBWrite::lock(const string& db) {
         LockState& ls = lockState();
 
@@ -542,12 +550,12 @@ namespace mongo {
         ls.otherLock->lock();
         weLocked = ls.otherLock;
     }
+
     void Lock::DBWrite::lockDB(const string& ns) {
         locked_w=false; weLocked=0; ourCounter = 0;
         LockState& ls = lockState();
         if( isW(ls) )
             return;
-
         if (DB_LEVEL_LOCKING_ENABLED) {
             char db[MaxDatabaseNameLen];
             nsToDatabase(ns.data(), db);
@@ -562,12 +570,40 @@ namespace mongo {
             locked_w = true;
         }
     }
+    void Lock::DBRead::lockDB(const string& ns) {
+        locked_r=false; weLocked=0; ourCounter = 0;
+        LockState& ls = lockState();
+        if( isRW(ls) )
+            return;
+        if (DB_LEVEL_LOCKING_ENABLED) {
+            char db[MaxDatabaseNameLen];
+            nsToDatabase(ns.data(), db);
+            if( str::equals(db,"local") ) {
+                lockLocal();
+            } else { 
+                lock(db);
+            }
+            lockTop(ls);
+        } else {
+            lock_R();
+            locked_r = true;
+        }
+    }
+
     Lock::DBWrite::DBWrite(const StringData& ns) : what(ns.data()) {
         lockDB(what);
     }
+    Lock::DBRead::DBRead(const StringData& ns)   : what(ns.data()) {
+        lockDB(what);
+    }
+
     Lock::DBWrite::~DBWrite() {
         unlockDB();
     }
+    Lock::DBRead::~DBRead() {
+        unlockDB();
+    }
+
     void Lock::DBWrite::unlockDB() {
         if( ourCounter ) {
             (*ourCounter)--;
@@ -588,6 +624,26 @@ namespace mongo {
         weLocked = 0;
         locked_w = false;
     }
+    void Lock::DBRead::unlockDB() {
+        if( ourCounter ) {
+            (*ourCounter)++;
+            wassert( *ourCounter <= 0 );
+        }
+        if( weLocked ) {
+            wassert( ourCounter && *ourCounter == 0 );
+            weLocked->unlock_shared();
+        }
+        if( locked_r ) {
+            if (DB_LEVEL_LOCKING_ENABLED) {
+                unlock_r();
+            } else {
+                unlock_R();
+            }
+        }
+        ourCounter = 0;
+        weLocked = 0;
+        locked_r = false;
+    }
 
     bool Lock::DBRead::isRW(LockState& ls) const { 
         switch( ls.threadState ) { 
@@ -604,6 +660,18 @@ namespace mongo {
         }
         return false;
     }
+
+    void Lock::DBWrite::lockTop(LockState& ls) { 
+        switch( ls.threadState ) { 
+        case 'w':
+            break;
+        default:
+            assert(false);
+        case  0  : 
+            lock_w();
+            locked_w = true;
+        }
+    }
     void Lock::DBRead::lockTop(LockState& ls) { 
         switch( ls.threadState ) { 
         case 'r':
@@ -616,20 +684,7 @@ namespace mongo {
             locked_r = true;
         }
     }
-    void Lock::DBRead::lockLocal() { 
-        LockState& ls = lockState();
-        if( ls.local ) { 
-            // we are nested in our locking of local.  previous lock could be read or write.
-            // we could increment/decrement ls.local here; that would be recommended if 
-            // temprelease is supported here - but it is not yet, so we don't need to.
-        }
-        else {
-            ourCounter = &ls.local;
-            ls.local--;
-            localDBLock.lock_shared();
-            weLocked = &localDBLock;
-        }
-    }
+
     void Lock::DBRead::lock(const string& db) {
         LockState& ls = lockState();
 
@@ -659,51 +714,6 @@ namespace mongo {
         ls.otherLock->lock_shared();
         weLocked = ls.otherLock;
     }
-    Lock::DBRead::DBRead(const StringData& ns) : what(ns.data()) {
-        lockDB(what);
-    }
-    void Lock::DBRead::lockDB(const string& ns) {
-        locked_r=false; weLocked=0; ourCounter = 0;
-        LockState& ls = lockState();
-        if( isRW(ls) )
-            return;
-        if (DB_LEVEL_LOCKING_ENABLED) {
-            char db[MaxDatabaseNameLen];
-            nsToDatabase(ns.data(), db);
-            if( str::equals(db,"local") ) {
-                lockLocal();
-            } else { 
-                lock(db);
-            }
-            lockTop(ls);
-        } else {
-            lock_R();
-            locked_r = true;
-        }
-    }
-    Lock::DBRead::~DBRead() {
-        unlockDB();
-    }
-    void Lock::DBRead::unlockDB() {
-        if( ourCounter ) {
-            (*ourCounter)++;
-            wassert( *ourCounter <= 0 );
-        }
-        if( weLocked ) {
-            wassert( ourCounter && *ourCounter == 0 );
-            weLocked->unlock_shared();
-        }
-        if( locked_r ) {
-            if (DB_LEVEL_LOCKING_ENABLED) {
-                unlock_r();
-            } else {
-                unlock_R();
-            }
-        }
-        weLocked = 0;
-        ourCounter = 0;
-        locked_r = false;
-   }
 }
 
 // legacy hooks and glue
