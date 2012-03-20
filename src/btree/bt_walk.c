@@ -12,7 +12,7 @@
  *	Move to the next/previous page in the tree.
  */
 int
-__wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int cacheonly, int next)
+__wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int eviction, int next)
 {
 	WT_BTREE *btree;
 	WT_PAGE *page, *t;
@@ -61,13 +61,14 @@ __wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int cacheonly, int next)
 	 * to evict our parent, that fails because the parent has a child page
 	 * that can't be discarded.
 	 */
-	if (cacheonly) {
-		if (!WT_PAGE_IS_ROOT(t))
+	if (eviction) {
+		if (!WT_PAGE_IS_ROOT(t)) {
 			while (!WT_ATOMIC_CAS(t->ref->state,
-			    WT_REF_MEM, WT_REF_EVICT_NEXT))
+			    WT_REF_MEM, WT_REF_EVICT_WALK))
 				__wt_yield();
-		(void)WT_ATOMIC_CAS(page->ref->state,
-		    WT_REF_EVICT_NEXT, WT_REF_MEM);
+		}
+		WT_ASSERT(session, page->ref->state == WT_REF_EVICT_WALK);
+		page->ref->state = WT_REF_MEM;
 	} else {
 		if (!WT_PAGE_IS_ROOT(t))
 			ret = __wt_page_in(session, t, t->ref);
@@ -102,13 +103,15 @@ descend:	for (;;) {
 			}
 
 			/* We may only care about in-memory pages. */
-			if (cacheonly) {
+			if (eviction) {
 				if (!WT_ATOMIC_CAS(ref->state,
-				    WT_REF_MEM, WT_REF_EVICT_NEXT))
+				    WT_REF_MEM, WT_REF_EVICT_WALK))
 					break;
-				if (!WT_PAGE_IS_ROOT(page))
-					(void)WT_ATOMIC_CAS(page->ref->state,
-					    WT_REF_EVICT_NEXT, WT_REF_MEM);
+				if (!WT_PAGE_IS_ROOT(page)) {
+					WT_ASSERT(session, page->ref->state ==
+					    WT_REF_EVICT_WALK);
+					page->ref->state = WT_REF_MEM;
+				}
 			} else {
 				/*
 				 * Swap hazard references at each level (but

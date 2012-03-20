@@ -377,11 +377,11 @@ __rec_review(WT_SESSION_IMPL *session,
 			switch (ref->state) {
 			case WT_REF_DISK:		/* On-disk */
 				break;
-			case WT_REF_EVICT_NEXT:		/* LRU point */
 			case WT_REF_MEM:		/* In-memory */
 				WT_RET(__rec_review(
 				    session, ref, ref->page, flags, 0));
 				break;
+			case WT_REF_EVICT_WALK:		/* Walk point */
 			case WT_REF_EVICTING:		/* Being evaluated */
 			case WT_REF_LOCKED:		/* Being evicted */
 			case WT_REF_READING:		/* Being read */

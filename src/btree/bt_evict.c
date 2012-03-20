@@ -22,7 +22,7 @@ static int  __evict_worker(WT_SESSION_IMPL *);
  * Tuning constants: I hesitate to call this tuning, but we want to review some
  * number of pages from each file's in-memory tree for each page we evict.
  */
-#define	WT_EVICT_GROUP		30	/* Evict N pages at a time */
+#define	WT_EVICT_GROUP		30	/* Consider N pages as LRU candidates */
 #define	WT_EVICT_WALK_PER_TABLE	35	/* Pages to visit per file */
 #define	WT_EVICT_WALK_BASE	50	/* Pages tracked across file visits */
 
@@ -227,9 +227,8 @@ __wt_cache_evict_server(void *arg)
 
 	while (F_ISSET(conn, WT_SERVER_RUN)) {
 		/*
-		 * Use the same logic as application threads to decide
-		 * whether there is work to do.  If so, evict_cond will
-		 * be signalled and the wait below won't block.
+		 * Use the same logic as application threads to decide whether
+		 * there is work to do.
 		 */
 		__wt_eviction_check(session, &read_lockout, 0);
 
@@ -428,7 +427,7 @@ __evict_file(WT_SESSION_IMPL *session, WT_EVICT_REQ *er)
 	if ((page = session->btree->evict_page) != NULL &&
 	    !WT_PAGE_IS_ROOT(page))
 		(void)WT_ATOMIC_CAS(page->ref->state,
-		    WT_REF_EVICT_NEXT, WT_REF_MEM);
+		    WT_REF_EVICT_WALK, WT_REF_MEM);
 	session->btree->evict_page = NULL;
 
 	/* If this is a close, wait for LRU eviction activity to drain. */
@@ -519,22 +518,31 @@ __evict_walk(WT_SESSION_IMPL *session)
 
 	conn = S2C(session);
 	cache = S2C(session)->cache;
+	ret = 0;
+
+	/*
+	 * We hold a spinlock for the entire walk -- it's slow, but (1) how
+	 * often do new files get added or removed to/from the system, and (2)
+	 * it's all in-memory stuff, so it's not that slow.
+	 */
+	__wt_spin_lock(session, &conn->spinlock);
 
 	/*
 	 * Resize the array in which we're tracking pages, as necessary, then
-	 * get some pages from each underlying file.  We hold a spinlock for
-	 * the entire time -- it's slow, but (1) how often do new files get
-	 * added or removed to/from the system, and (2) it's all in-memory
-	 * stuff, so it's not that slow.
+	 * get some pages from each underlying file.  In practice, a realloc
+	 * is rarely needed, so it is worth avoiding the LRU lock.
 	 */
-	ret = 0;
-	__wt_spin_lock(session, &conn->spinlock);
-
 	elem = WT_EVICT_WALK_BASE + (conn->btqcnt * WT_EVICT_WALK_PER_TABLE);
 	if (elem > cache->evict_entries) {
+		__wt_spin_lock(session, &cache->lru_lock);
+		/* Save the offset of the eviction point. */
+		i = (u_int)(cache->evict_current - cache->evict);
 		WT_ERR(__wt_realloc(session, &cache->evict_allocated,
 		    elem * sizeof(WT_EVICT_LIST), &cache->evict));
 		cache->evict_entries = elem;
+		if (cache->evict_current != NULL)
+			cache->evict_current = cache->evict + i;
+		__wt_spin_unlock(session, &cache->lru_lock);
 	}
 
 	i = WT_EVICT_WALK_BASE;
@@ -665,18 +673,26 @@ __evict_get_page(
     WT_SESSION_IMPL *session, int is_app, WT_BTREE **btreep, WT_PAGE **pagep)
 {
 	WT_CACHE *cache;
-	WT_EVICT_LIST *evict, *end;
+	WT_EVICT_LIST *evict;
 	WT_REF *ref;
+	int candidates;
 
 	cache = S2C(session)->cache;
 	*btreep = NULL;
 	*pagep = NULL;
 
-	end = cache->evict + (is_app ? WT_EVICT_GROUP : WT_EVICT_GROUP / 2);
+	candidates = (is_app ? WT_EVICT_GROUP : WT_EVICT_GROUP / 2);
 
-	/* Avoid the LRU lock if no pages are available. */
+	/*
+	 * Avoid the LRU lock if no pages are available.  If there are pages
+	 * available, spin until we get the lock.  If this function returns
+	 * without getting a page to evict, application threads assume there
+	 * are no more pages available and will attempt to wake the eviction
+	 * server.
+	 */
 	for (;;) {
-		if (cache->evict_current == NULL || cache->evict_current >= end)
+		if (cache->evict_current == NULL ||
+		    cache->evict_current >= cache->evict + candidates)
 			return;
 		if (__wt_spin_trylock(session, &cache->lru_lock) == 0)
 			break;
@@ -685,7 +701,7 @@ __evict_get_page(
 
 	/* Get the next page queued for eviction. */
 	while ((evict = cache->evict_current) != NULL &&
-	    evict >= cache->evict && evict < end &&
+	    evict >= cache->evict && evict < cache->evict + candidates &&
 	    evict->page != NULL) {
 		WT_ASSERT(session, evict->btree != NULL);
 
