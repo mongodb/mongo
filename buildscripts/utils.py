@@ -155,10 +155,13 @@ def which(executable):
     return executable
 
 def find_python(min_version=(2, 5)):
-    # if this script is being run by py2.5 or greater,
-    # then we assume that "python" points to a 2.5 or
-    # greater python VM. otherwise, explicitly use 2.5
-    # which we assume to be installed.
+    try:
+        if sys.version_info >= min_version:
+            return sys.executable
+    except AttributeError:
+        # In case the version of Python is somehow missing sys.version_info or sys.executable.
+        pass
+
     version = re.compile(r'[Pp]ython ([\d\.]+)', re.MULTILINE)
     binaries = ('python27', 'python2.7', 'python26', 'python2.6', 'python25', 'python2.5', 'python')
     for binary in binaries:
@@ -168,12 +171,12 @@ def find_python(min_version=(2, 5)):
                 match = version.search(stream)
                 if match:
                     versiontuple = tuple(map(int, match.group(1).split('.')))
-                    if versiontuple >= (2, 5):
+                    if versiontuple >= min_version:
                         return which(binary)
         except:
             pass
 
-    raise Exception('could not find suitable Python (version >= %s)' % '.'.join(min_version))
+    raise Exception('could not find suitable Python (version >= %s)' % '.'.join(str(v) for v in min_version))
 
 def smoke_command(*args):
     # return a list of arguments that comprises a complete
