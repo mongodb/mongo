@@ -606,15 +606,11 @@ namespace mongo {
     QueryResult* emptyMoreResult(long long);
 
     void OpTime::waitForDifferent(unsigned millis){
-        dassert( !Lock::isLocked() );
-
-        if (*this != last) return; // check early
-
-        do {
-            mutex::scoped_lock lk(m);
+        mutex::scoped_lock lk(m);
+        while (*this == last) {
             if (!notifier.timed_wait(lk.boost(), boost::posix_time::milliseconds(millis)))
                 return; // timed out
-        } while (*this != last);
+        }
     }
 
     bool receivedGetMore(DbResponse& dbresponse, Message& m, CurOp& curop ) {
