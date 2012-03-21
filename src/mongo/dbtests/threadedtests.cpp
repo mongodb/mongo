@@ -177,11 +177,22 @@ namespace ThreadedTests {
                         }
                         else if( q == 1 ) {
                             // test locking local only -- with no preceeding lock
-                            { Lock::DBRead  x("local"); }
-                            { Lock::DBWrite x("local"); }
+                            { 
+                                Lock::DBRead x("local"); 
+                                //Lock::DBRead y("q");
+                                if( sometimes ) {
+                                    Lock::TempRelease t; // we don't temprelease (cant=true) here thus this is just a check that nothing weird happens...
+                                }
+                            }
+                            { 
+                                Lock::DBWrite x("local"); 
+                                if( sometimes ) {
+                                    Lock::TempRelease t;
+                                }
+                            }
                         } else if( q == 1 ) {
-                            // TODO { Lock::DBRead  x("admin"); }
-                            //{ Lock::DBWrite x("admin"); }
+                            { Lock::DBRead  x("admin"); }
+                            { Lock::DBWrite x("admin"); }
                         } else { 
                             Lock::DBWrite w("foo");
                             {
