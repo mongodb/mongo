@@ -168,13 +168,23 @@ namespace mongo {
      */
     class ReplSetHealthPollTask : public task::Task {
     private:
+        /**
+         * Each healthpoll task reconnects periodically.  By starting each task at a different
+         * number for "tries", the tasks will reconnect at different times, minimizing the impact
+         * of network blips.
+         */
+        static int s_try_offset;
+
         HostAndPort h;
         HeartbeatInfo m;
         int tries;
         const int threshold;
     public:
         ReplSetHealthPollTask(const HostAndPort& hh, const HeartbeatInfo& mm)
-            : h(hh), m(mm), tries(0), threshold(15) { }
+            : h(hh), m(mm), tries(s_try_offset), threshold(15) {
+            // doesn't need protection, all health tasks are created in a single thread
+            s_try_offset += 7;
+        }
 
         string name() const { return "rsHealthPoll"; }
         void doWork() {
@@ -342,6 +352,8 @@ namespace mongo {
             }
         }
     };
+
+    int ReplSetHealthPollTask::s_try_offset = 0;
 
     void ReplSetImpl::endOldHealthTasks() {
         unsigned sz = healthTasks.size();
