@@ -97,8 +97,6 @@ namespace mongo {
             ( _index->getSpec().getType() &&
              _index->getSpec().getType()->suitability( originalQuery, order ) != USELESS ) ) {
 
-            if( _special.size() ) _optimal = true;
-
             _type  = _index->getSpec().getType();
             if( !_special.size() ) _special = _index->getSpec().getType()->getPlugin()->getName();
 

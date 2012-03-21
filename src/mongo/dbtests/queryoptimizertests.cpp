@@ -615,6 +615,20 @@ namespace QueryOptimizerTests {
             
         } // namespace QueryFiniteSetOrderSuffix
 
+        /** Checks related to 'special' QueryPlans. */
+        class Special : public Base {
+        public:
+            void run() {
+                int idx = INDEXNO( "a" << "2d" );
+                BSONObj query = fromjson( "{ a:{ $near:[ 50, 50 ] } }" );
+                FieldRangeSetPair frsp( ns(), query );
+                QueryPlan plan( nsd(), idx, frsp, FRSP2( query ), query, shared_ptr<Projection>(),
+                               BSONObj(), BSONObj(), BSONObj(), frsp.getSpecial() );
+                // A 'special' plan is not optimal.
+                ASSERT( !plan.optimal() );
+            }
+        };
+
     } // namespace QueryPlanTests
 
     namespace QueryPlanSetTests {
@@ -1302,6 +1316,7 @@ namespace QueryOptimizerTests {
             add<QueryPlanTests::QueryFiniteSetOrderSuffix::TailingIndexField>();
             add<QueryPlanTests::QueryFiniteSetOrderSuffix::EmptySort>();
             add<QueryPlanTests::QueryFiniteSetOrderSuffix::EmptyStringField>();
+            add<QueryPlanTests::Special>();
             add<QueryPlanSetTests::ToString>();
             add<QueryPlanSetTests::NoIndexes>();
             add<QueryPlanSetTests::Optimal>();
