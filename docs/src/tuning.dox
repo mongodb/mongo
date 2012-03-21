@@ -9,7 +9,7 @@ function.
 The effectiveness of the cache can be measured by reviewing the page
 eviction statistics for the database.
 
-An example of setting a cache size to 10MB:
+An example of setting a cache size to 500MB:
 
 @snippet ex_config.c configure cache size
 
@@ -90,6 +90,17 @@ An example of configuring page sizes:
 
 @snippet ex_file.c file create
 
+@section memory Memory allocation
+
+I/O intensive threaded applications, where the working set does not fit
+into the available cache, can be dominated by memory allocation because
+the WiredTiger engine has to free and re-allocate memory as part of many
+queries.  Replacing the system's malloc implementation with one that has
+better threaded performance (for example, Google's
+<a href="http://goog-perftools.sourceforge.net/doc/tcmalloc.html">tcmalloc</a>,
+or <a href="http://www.canonware.com/jemalloc">jemalloc</a>),
+can dramatically improve throughput.
+
 @section statistics Performance monitoring with statistics
 
 WiredTiger maintains a variety of statistics that can be read with a
@@ -115,6 +126,5 @@ statistics until the cursor returns the end of the list.
 
 Note the raw value of the statistic is available from the \c value
 field, as well as a printable string version of the value.
-
 
  */

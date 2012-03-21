@@ -133,6 +133,7 @@ inuse
 io
 ip
 je
+jemalloc
 jni
 json
 keyexist
@@ -154,6 +155,7 @@ lsn
 lt
 mailto
 mainpage
+malloc
 malloc'd
 marshalled
 marshalling
@@ -255,6 +257,7 @@ subpage
 superset
 tablename
 tcl
+tcmalloc
 td
 th
 thang

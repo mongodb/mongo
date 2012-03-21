@@ -46,7 +46,7 @@ int main(void)
 
 	/*! [configure cache size] */
 	if ((ret = wiredtiger_open(home, NULL,
-	    "create,cache_size=10M", &conn)) != 0)
+	    "create,cache_size=500M", &conn)) != 0)
 		fprintf(stderr, "Error connecting to %s: %s\n",
 		    home, wiredtiger_strerror(ret));
 	/*! [configure cache size] */
