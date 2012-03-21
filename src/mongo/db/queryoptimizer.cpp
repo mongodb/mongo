@@ -688,20 +688,6 @@ doneCheckOrder:
         _mayRecordPlan = true;
     }
 
-    BSONObj QueryPlanSet::explain() const {
-        vector<BSONObj> arr;
-        for( PlanSet::const_iterator i = _plans.begin(); i != _plans.end(); ++i ) {
-            shared_ptr<Cursor> c = (*i)->newCursor();
-            BSONObjBuilder explain;
-            explain.append( "cursor", c->toString() );
-            explain.append( "indexBounds", c->prettyIndexBounds() );
-            arr.push_back( explain.obj() );
-        }
-        BSONObjBuilder b;
-        b.append( "allPlans", arr );
-        return b.obj();
-    }
-
     QueryPlanSet::QueryPlanPtr QueryPlanSet::getBestGuess() const {
         verify( _plans.size() );
         if ( _plans[ 0 ]->scanAndOrderRequired() ) {
@@ -1157,6 +1143,16 @@ doneCheckOrder:
             return QueryUtilIndexed::uselessOr( *_org, nsd, nsd->idxNo( *id ) );
         }
         return QueryUtilIndexed::uselessOr( *_org, nsd, -1 );
+    }
+    
+    BSONObj MultiPlanScanner::cachedPlanExplainSummary() const {
+        if ( _or || !_currentQps->usingCachedPlan() ) {
+            return BSONObj();
+        }
+        QueryPlanSet::QueryPlanPtr plan = _currentQps->firstPlan();
+        shared_ptr<Cursor> cursor = plan->newCursor();
+        return BSON( "cursor" << cursor->toString()
+                    << "indexBounds" << cursor->prettyIndexBounds() );
     }
     
     void MultiPlanScanner::clearIndexesForPatterns() const {

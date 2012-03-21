@@ -318,8 +318,6 @@ namespace mongo {
 
         QueryPlanPtr firstPlan() const { return _plans[ 0 ]; }
         
-        /** @return metadata about cursors and index bounds for all plans, suitable for explain output. */
-        BSONObj explain() const;
         /** @return true iff a plan is selected based on previous success of this plan. */
         bool usingCachedPlan() const { return _usingCachedPlan; }
         /** @return a single plan that may work well for the specified query. */
@@ -488,8 +486,11 @@ namespace mongo {
         bool mayRunMore() const {
             return _or ? ( !_tableScanned && !_org->orRangesExhausted() ) : _i == 0;
         }
-        /** @return non-$or version of explain output. */
-        BSONObj oldExplain() const { assertNotOr(); return _currentQps->explain(); }
+        /**
+         * @return plan information if there is a cached plan for a non $or query, otherwise an
+         * empty object.
+         */
+        BSONObj cachedPlanExplainSummary() const;
         /** @return true iff this is not a $or query and a plan is selected based on previous success of this plan. */
         bool usingCachedPlan() const { return !_or && _currentQps->usingCachedPlan(); }
         bool hasMultiKey() const { return _currentQps->hasMultiKey(); }

@@ -915,11 +915,7 @@ namespace mongo {
         BSONObj oldPlan;
         if ( explain && ! pq.hasIndexSpecifier() ) {
             MultiPlanScanner mps( ns, query, order );
-            if ( mps.usingCachedPlan() ) {
-                oldPlan =
-                mps.oldExplain().firstElement().embeddedObject()
-                .firstElement().embeddedObject().getOwned();
-            }
+            oldPlan = mps.cachedPlanExplainSummary();
         }
 
         // In some cases the query may be retried if there is an in memory sort size assertion.
