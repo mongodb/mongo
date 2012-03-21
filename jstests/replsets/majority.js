@@ -10,7 +10,7 @@ var testInsert = function() {
 var num = 7;
 var host = getHostName();
 var name = "tags";
-var timeout = 10000;
+var timeout = 60000;
 
 var replTest = new ReplSetTest( {name: name, nodes: num, startPort:31000} );
 var nodes = replTest.startSet();
