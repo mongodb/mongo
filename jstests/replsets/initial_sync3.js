@@ -66,7 +66,7 @@ try {
     master.getDB("admin").runCommand({replSetReconfig : config});
 }
 catch(e) {
-    print("trying to reconfigure: "+e);
+    assert(e.message == "error doing query: failed");
 }
 
 // wait for a heartbeat, too, just in case sync happens before hb
