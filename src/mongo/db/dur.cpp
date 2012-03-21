@@ -281,7 +281,7 @@ namespace mongo {
             note you can call this unlocked, and that is a good idea as if you are in 
             say, a 'w' lock state, we can't do the commit
 
-	    @param force force a commit now even if seemingly not needed - ie the caller may 
+	        @param force force a commit now even if seemingly not needed - ie the caller may 
  	           know something we don't such as that files will be closed
         */
         bool DurableImpl::commitIfNeeded(bool force) {
@@ -300,7 +300,22 @@ namespace mongo {
                 commitNow();
             }
             else if( Lock::isLocked() == 'w' ) {
-                runExclusively(f);
+                if( Lock::atLeastReadLocked("local") ) { 
+                    error() << "can't commitNow from commitIfNeeded, as we are in local db lock" << endl;
+                    printStackTrace();
+                    dassert(false); // this will make _DEBUG builds terminate. so we will notice in buildbot.
+                    return false;
+                }
+                else if( Lock::atLeastReadLocked("admin") ) { 
+                    error() << "can't commitNow from commitIfNeeded, as we are in local db lock" << endl;
+                    printStackTrace();
+                    dassert(false);
+                    return false;
+                }
+                else {
+                    log(1) << "commitIfNeeded calling runExclusively " << force << endl;
+                    runExclusively(f);
+                }
             }
             else { 
                 // 'W'
