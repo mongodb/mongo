@@ -73,7 +73,7 @@ namespace mongo {
             out << "   mapped   \t- amount of data mmaped (total data size) megabytes\n";
             out << "   vsize    \t- virtual size of process in megabytes\n";
             out << "   res      \t- resident size of process in megabytes\n";
-            out << "   faults   \t- # of pages faults per sec (linux only)\n";
+            out << "   faults   \t- # of pages faults per sec\n";
             out << "   locked   \t- percent of time in global write lock\n";
             out << "   idx miss \t- percent of btree page misses (sampled)\n";
             out << "   qr|qw    \t- queue lengths for clients waiting (read|write)\n";
