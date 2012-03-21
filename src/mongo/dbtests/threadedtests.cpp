@@ -169,11 +169,17 @@ namespace ThreadedTests {
                         int q = i % 11;
                         if( q == 0 ) { 
                             Lock::DBRead r("foo");
+                            ASSERT( Lock::isLocked() == 'r' && Lock::atLeastReadLocked("foo") );
+                            ASSERT( !Lock::nested() );
                             Lock::DBRead r2("foo");
+                            ASSERT( Lock::nested() );
+                            ASSERT( Lock::isLocked() == 'r' && Lock::atLeastReadLocked("foo") );
                             Lock::DBRead r3("local");
                             if( sometimes ) {
                                 Lock::TempRelease t;
                             }
+                            ASSERT( Lock::isLocked() == 'r' && Lock::atLeastReadLocked("foo") );
+                            ASSERT( Lock::isLocked() == 'r' && Lock::atLeastReadLocked("local") );
                         }
                         else if( q == 1 ) {
                             // test locking local only -- with no preceeding lock
@@ -193,7 +199,22 @@ namespace ThreadedTests {
                         } else if( q == 1 ) {
                             { Lock::DBRead  x("admin"); }
                             { Lock::DBWrite x("admin"); }
-                        } else { 
+                        } else if( q == 2 ) { 
+                            Lock::DBWrite x("foo");
+                            Lock::DBWrite y("admin");
+                            { Lock::TempRelease t; }
+                        }
+                        else if( q == 3 ) {
+                            Lock::DBWrite x("foo");
+                            Lock::DBRead y("admin");
+                            { Lock::TempRelease t; }
+                        } 
+                        else if( q == 4 ) { 
+                            Lock::DBRead x("foo2");
+                            Lock::DBRead y("admin");
+                            { Lock::TempRelease t; }
+                        }
+                        else { 
                             Lock::DBWrite w("foo");
                             {
                                 Lock::TempRelease t;

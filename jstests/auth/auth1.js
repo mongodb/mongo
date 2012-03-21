@@ -1,5 +1,7 @@
 // test read/write permissions
 
+print("START auth1.js");
+
 port = allocatePorts( 1 )[ 0 ];
 baseName = "jstests_auth_auth1";
 
@@ -95,3 +97,4 @@ var p = { key : { i : true } ,
 assert.eq( 1000, tRO.group( p ).length , "C6" );
 assert.eq( 1000, dbRO.jstests_auth_auth1.count() , "C7" );
 
+print("SUCCESS auth1.js");

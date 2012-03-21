@@ -74,7 +74,15 @@ namespace mongo {
        then.
     */
     static mapsf<string,SimpleRWLock*> dblocks;
-    SimpleRWLock localDBLock("localDBLock");
+
+    /* we don't want to touch dblocks too much as a mutex is involved.  thus party for that, 
+       this is here...
+    */
+    SimpleRWLock *nestableLocks[] = { 
+        0, 
+        new SimpleRWLock("localDBLock"),
+        new SimpleRWLock("adminDBLock")
+    };
 
     static void locked_W();
     static void unlocking_w();
@@ -123,11 +131,13 @@ namespace mongo {
     }
     LockState::LockState() : recursive(0), 
                              threadState(0), 
-                             local(0), 
-                             other(0), 
+                             nestableCount(0), 
+                             otherCount(0), 
                              otherLock(NULL),
                              scopedLk(NULL)
-    {}
+    {
+        whichNestable = Lock::notnestable;
+    }
 
     void LockState::Dump() {
         lockState().dump();
@@ -144,11 +154,11 @@ namespace mongo {
             if( recursive ) { 
                 ss << " recursive:" << recursive;
             }
-            if( other ) {
+            if( otherCount ) {
                 ss << " db:" << otherName;
             }
-            if( local ) {
-                ss << " local:" << local;
+            if( nestableCount ) {
+                ss << " nestableCount:" << (int) whichNestable;
             }
         }
         log() << ss.str() << endl;
@@ -301,9 +311,16 @@ namespace mongo {
         char db[MaxDatabaseNameLen];
         nsToDatabase(ns.data(), db);
         if( str::equals(db,"local") ) {
-            return ls.local;
+            if( ls.whichNestable == Lock::local ) 
+                return ls.nestableCount;
+            return false;
         }
-        return db == ls.otherName && ls.other;
+        if( str::equals(db,"admin") ) {
+            if( ls.whichNestable == Lock::admin ) 
+                return ls.nestableCount;
+            return false;
+        }
+        return db == ls.otherName && ls.otherCount;
     }
     bool Lock::isWriteLocked(const StringData& ns) { 
         LockState &ls = lockState();
@@ -504,45 +521,55 @@ namespace mongo {
     bool Lock::DBWrite::isW(LockState& ls) const { 
         switch( ls.threadState ) { 
         case 'R' : 
-            assert(false);
+            {
+                error() << "trying to get a w lock after already getting an R lock is not allowed" << endl;
+                assert(false);
+            }
         case 'r' : 
-            assert(false);
-        case 'w' :
+            {
+                error() << "trying to get a w lock after already getting an r lock is not allowed" << endl;
+                assert(false);
+            }
             return false;
         case 'W' :
             return true; // lock nothing further
         default:
             assert(false);
+        case 'w' :
         case  0  : 
-            ;
+            break;
         }
         return false;
     }
-    void Lock::DBWrite::lockLocal() { 
+    void Lock::DBWrite::lockNestable(Nestable db) { 
         LockState& ls = lockState();
-        if( ls.local ) { 
-            // we are nested in our locking of local.
-            assert( ls.local > 0 );
+        if( ls.nestableCount ) { 
+            if( db != ls.whichNestable ) { 
+                error() << "can't lock local and admin db at the same time " << (int) db << ' ' << (int) ls.whichNestable << endl;
+                fassert(0,false);
+            }
+            assert( ls.nestableCount > 0 );
         }
         else {
-            ourCounter = &ls.local;
-            ls.local++;
+            ls.whichNestable = db;
+            ourCounter = &ls.nestableCount;
+            ls.nestableCount++;
             fassert(0,weLocked==0);
-            localDBLock.lock();
-            weLocked = &localDBLock;
+            weLocked = nestableLocks[db];
+            weLocked->lock();
         }
     }
-    void Lock::DBRead::lockLocal() { 
+    void Lock::DBRead::lockNestable(Nestable db) { 
         LockState& ls = lockState();
-        if( ls.local ) { 
+        if( ls.nestableCount ) { 
             // we are nested in our locking of local.  previous lock could be read OR write lock on local.
         }
         else {
-            ourCounter = &ls.local;
-            ls.local--;
+            ourCounter = &ls.nestableCount;
+            ls.nestableCount--;
             fassert(0,weLocked==0);
-            localDBLock.lock_shared();
-            weLocked = &localDBLock;
+            weLocked = nestableLocks[db];
+            weLocked->lock_shared();
         }
     }
 
@@ -551,7 +578,7 @@ namespace mongo {
 
         // we do checks first, as on assert destructor won't be called so don't want to be half finished with our work.
         bool same = (db == ls.otherName);
-        if( ls.other ) { 
+        if( ls.otherCount ) { 
             // nested. if/when we do temprelease with DBWrite we will need to increment here
             // (so we can not release or assert if nested).
             massert(16106, str::stream() << "internal error tried to lock two databases at the same time. old:" << ls.otherName << " new:" << db,same);
@@ -559,11 +586,11 @@ namespace mongo {
         }
 
         // first lock for this db. check consistent order with local db lock so we never deadlock. local always comes last
-        massert(16098, str::stream() << "can't dblock:" << db << " when local is already locked", ls.local == 0);
+        massert(16098, str::stream() << "can't dblock:" << db << " when local or admin is already locked", ls.nestableCount == 0);
 
-        ourCounter = &ls.other;
-        dassert( ls.other == 0 );
-        ls.other++;
+        ourCounter = &ls.otherCount;
+        dassert( ls.otherCount == 0 );
+        ls.otherCount++;
         if( !same ) {
             ls.otherName = db;
             mapsf<string,SimpleRWLock*>::ref r(dblocks);
@@ -577,6 +604,15 @@ namespace mongo {
         weLocked = ls.otherLock;
     }
 
+
+    static Lock::Nestable n(const char *db) { 
+        if( str::equals(db, "local") )
+            return Lock::local;
+        if( str::equals(db, "admin") )
+            return Lock::admin;
+        return Lock::notnestable;
+    }
+
     void Lock::DBWrite::lockDB(const string& ns) {
         locked_w=false; weLocked=0; ourCounter = 0;
         LockState& ls = lockState();
@@ -585,12 +621,12 @@ namespace mongo {
         if (DB_LEVEL_LOCKING_ENABLED) {
             char db[MaxDatabaseNameLen];
             nsToDatabase(ns.data(), db);
-            bool loc = str::equals(db,"local");
-            if( !loc )
+            Nestable nested = n(db);
+            if( !nested )
                 lock(db);
             lockTop(ls);
-            if( loc )
-                lockLocal();
+            if( nested )
+                lockNestable(nested);
         } 
         else {
             lock_W();
@@ -605,12 +641,12 @@ namespace mongo {
         if (DB_LEVEL_LOCKING_ENABLED) {
             char db[MaxDatabaseNameLen];
             nsToDatabase(ns.data(), db);
-            bool loc = str::equals(db,"local");
-            if( !loc )
+            Nestable nested = n(db);
+            if( !nested )
                 lock(db);
             lockTop(ls);
-            if( loc )
-                lockLocal();
+            if( nested )
+                lockNestable(nested);
         } 
         else {
             lock_R();
@@ -719,7 +755,7 @@ namespace mongo {
 
         // we do checks first, as on assert destructor won't be called so don't want to be half finished with our work.
         bool same = (db == ls.otherName);
-        if( ls.other ) { 
+        if( ls.otherCount ) { 
             // nested. prev could be read or write. if/when we do temprelease with DBRead/DBWrite we will need to increment/decrement here
             // (so we can not release or assert if nested).  temprelease we should avoid if we can though, it's a bit of an anti-pattern.
             massert(16099, str::stream() << "internal error tried to lock two databases at the same time. old:" << ls.otherName << " new:" << db,same);
@@ -727,11 +763,11 @@ namespace mongo {
         }
 
         // first lock for this db. check consistent order with local db lock so we never deadlock. local always comes last
-        massert(16100, str::stream() << "can't dblock:" << db << " when local is already locked", ls.local == 0);
+        massert(16100, str::stream() << "can't dblock:" << db << " when local or admin is already locked", ls.nestableCount == 0);
 
-        ourCounter = &ls.other;
-        dassert( ls.other == 0 );
-        ls.other--;
+        ourCounter = &ls.otherCount;
+        dassert( ls.otherCount == 0 );
+        ls.otherCount--;
         if( !same ) {
             ls.otherName = db;
             mapsf<string,SimpleRWLock*>::ref r(dblocks);

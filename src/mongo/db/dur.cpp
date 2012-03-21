@@ -307,7 +307,7 @@ namespace mongo {
                     return false;
                 }
                 else if( Lock::atLeastReadLocked("admin") ) { 
-                    error() << "can't commitNow from commitIfNeeded, as we are in local db lock" << endl;
+                    error() << "can't commitNow from commitIfNeeded, as we are in admin db lock" << endl;
                     printStackTrace();
                     dassert(false);
                     return false;
