@@ -42,6 +42,7 @@ namespace mongo {
         static OpTime skewed();
     public:
         static void setLast(const Date_t &date) {
+            mutex::scoped_lock lk(m);
             notifier.notify_all(); // won't really do anything until write-lock released
             last = OpTime(date);
         }
@@ -83,8 +84,6 @@ namespace mongo {
         static OpTime getLast(const mongo::mutex::scoped_lock&);
 
         // Waits for global OpTime to be different from *this
-        // Must be atLeastReadLocked
-        // Defined in instance.cpp (only current user) as it needs dbtemprelease
         void waitForDifferent(unsigned millis);
 
         /* We store OpTime's in the database as BSON Date datatype -- we needed some sort of
