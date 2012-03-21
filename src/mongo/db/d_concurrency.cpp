@@ -565,6 +565,7 @@ namespace mongo {
             // we are nested in our locking of local.  previous lock could be read OR write lock on local.
         }
         else {
+            ls.whichNestable = db;
             ourCounter = &ls.nestableCount;
             ls.nestableCount--;
             fassert(0,weLocked==0);
