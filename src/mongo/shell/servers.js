@@ -2135,6 +2135,7 @@ ReplSetTest.prototype.awaitReplication = function(timeout) {
                                  synced = (synced && friendlyEqual(this.latest,ts))
                              }
                              else {
+                                 print( "ReplSetTest waiting for " + slave + " to have an oplog built." )
                                  synced = false;
                              }
                          }
