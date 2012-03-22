@@ -111,4 +111,122 @@ int strncmp32( UChar32* first32, UChar32* second32, size_t length );
  */
 int write32( int fileHandle, const UChar32* string32, unsigned int sourceLengthInCharacters );
 
+/**
+ * Template and classes for UChar8 and UChar32 strings
+ */
+template <typename char_type>
+struct UtfStringMixin {
+    typedef char_type char_t; // inherited
+
+    UtfStringMixin() : _len( 0 ), _cap( 0 ), _chars( 0 ) {}
+
+    UtfStringMixin( const UtfStringMixin& other ) // copies like std::string
+        :_len( other._len ), _cap( other._len+1 ), _chars( other._chars ), _str( new char_t[_cap] )
+    {
+        memcpy( _str.get(), other._str.get(), _cap * sizeof( char_t ) );
+    }
+
+    UtfStringMixin& operator= (UtfStringMixin copy) {
+        this->swap( copy );
+        return *this;
+    }
+
+    char_t* get() const { return _str.get(); }
+    char_t& operator[](size_t idx) { return _str[idx]; }
+    const char_t& operator[](size_t idx) const { return _str[idx]; }
+
+    size_t length() const { return _len; }
+    size_t capacity() const { return _cap; }
+    size_t chars() const { return _chars; }
+
+    void swap( UtfStringMixin& other ) {
+        std::swap( _len, other._len );
+        std::swap( _cap, other._cap );
+        std::swap( _chars, other._chars );
+        _str.swap( other._str );
+    }
+
+protected:
+    size_t _len;    // in units of char_t without nul
+    size_t _cap;    // size of _str buffer including nul
+    size_t _chars;  // number of codepoints
+    boost::scoped_array<char_t> _str;
+};
+
+struct Utf32String;
+
+struct Utf8String : public UtfStringMixin<UChar8> {
+    Utf8String() {}
+    explicit Utf8String( const UChar32* s, int chars = -1 ) {
+        if ( chars == -1 ) {
+            initFrom32( s, strlen32( s ) );
+        }
+        else {
+            initFrom32( s, chars );
+        }
+    }
+    explicit Utf8String( const Utf32String& c ); // defined after utf32String
+
+private:
+    void initFrom32( const UChar32* s, int chars ) {
+        _chars = chars;
+        _cap = _chars * sizeof( UChar32 ) + 1;
+        _str.reset( new char_t[_cap] );
+        _len = copyString32to8counted( _str.get(), s, _cap, chars );
+    }
+};
+
+struct Utf32String : public UtfStringMixin<UChar32> {
+    Utf32String() {}
+    explicit Utf32String( const UChar32* s ) {
+        _chars = _len = strlen32( s );
+        _cap = _len + 1;
+        _str.reset( new UChar32[_cap] );
+        memcpy( _str.get(), s, _cap * sizeof( UChar32 ) );
+    }
+    explicit Utf32String( const UChar32* s, int textLen ) {
+        _chars = _len = textLen;
+        _cap = _len + 1;
+        _str.reset( new UChar32[_cap] );
+        memcpy( _str.get(), s, _len * sizeof( UChar32 ) );
+        _str[_len] = 0;
+    }
+    explicit Utf32String( const UChar8* s, int chars = -1 ) {
+        initFrom8( s, chars );
+    }
+    explicit Utf32String( const Utf8String& c ) {
+        initFrom8( c.get(), c.chars() );
+    }
+    explicit Utf32String( size_t reserve ) {
+        _len = 0;
+        _cap = reserve;
+        _chars = 0;
+        _str.reset( new UChar32[_cap] );
+        _str[0] = 0;
+    }
+    void initFromBuffer( void ) {
+        _chars = _len = strlen32( _str.get() );
+    }
+
+private:
+    void initFrom8( const UChar8* s, int chars ) {
+        Utf32String temp;
+        if ( chars == -1 ) {
+            temp._cap = strlen( reinterpret_cast<const char*>( s ) ) + 1; // worst case ASCII
+        }
+        else {
+            temp._cap = chars + 1;
+        }
+        temp._str.reset( new char_t[temp._cap] );
+        int error;
+        copyString8to32( temp._str.get(), s, temp._cap, temp._chars, error );
+        temp._len = temp._chars;
+        this->swap( temp );
+    }
+};
+
+inline Utf8String::Utf8String( const Utf32String& s ) {
+    initFrom32( s.get(), s.chars() );
+}
+
 } // namespace linenoise_utf8

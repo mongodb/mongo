@@ -412,7 +412,8 @@ coreShellFiles = [ "shell/dbshell.cpp",
                    "shell/shell_utils_launcher.cpp",
                    "shell/mongo-server.cpp",
                    "../third_party/linenoise/linenoise.cpp",
-                   "../third_party/linenoise/linenoise_utf8.cpp"]
+                   "../third_party/linenoise/linenoise_utf8.cpp",
+                   "../third_party/linenoise/mk_wcwidth.cpp"]
 
 if shellEnv is not None:
     mongo_shell = shellEnv.Program(
