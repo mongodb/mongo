@@ -243,15 +243,32 @@ namespace mongo {
     }
 
     void Logstream::logLockless( const StringData& s ) {
+
         if ( s.size() == 0 )
             return;
 
         if ( doneSetup == 1717 ) {
-#ifndef _WIN32
+
+#if defined(_WIN32)
+            // fwrite() has a behavior problem in Windows when writing to the console
+            //  when the console is in the UTF-8 code page: fwrite() sends a single
+            //  byte and then the rest of the string.  If the first character is
+            //  non-ASCII, the console then displays two UTF-8 replacement characters
+            //  instead of the single UTF-8 character we want.  write() doesn't have
+            //  this problem.
+            int fd = fileno( logfile );
+            if ( _isatty( fd ) ) {
+                fflush( logfile );
+                _write( fd, s.data(), s.size() );
+                return;
+            }
+#else
             if ( isSyslog ) {
                 syslog( LOG_INFO , "%s" , s.data() );
-            } else
+                return;
+            }
 #endif
+
             if (fwrite(s.data(), s.size(), 1, logfile)) {
                 fflush(logfile);
             }

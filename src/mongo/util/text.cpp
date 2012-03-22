@@ -105,7 +105,30 @@ namespace mongo {
     }
 #endif
 
-#endif
+    WindowsCommandLine::WindowsCommandLine( int argc, wchar_t* argvW[] ) {
+        vector < string >   utf8args;
+        vector < size_t >   utf8argLength;
+        size_t blockSize = argc * sizeof( char * );
+        size_t blockPtr = blockSize;
+        for ( int i = 0; i < argc; ++i ) {
+            utf8args.push_back( toUtf8String( argvW[ i ] ) );
+            size_t argLength = utf8args[ i ].length() + 1;
+            utf8argLength.push_back( argLength );
+            blockSize += argLength;
+        }
+        _argv = reinterpret_cast< char** >( malloc( blockSize ) );
+        for ( int i = 0; i < argc; ++i ) {
+            _argv[ i ] = reinterpret_cast< char * >( _argv ) + blockPtr;
+            strcpy_s( _argv[ i ], utf8argLength[ i ], utf8args[ i ].c_str() );
+            blockPtr += utf8argLength[ i ];
+        }
+    }
+
+    WindowsCommandLine::~WindowsCommandLine() {
+        free( _argv );
+    }
+
+#endif // #if defined(_WIN32)
 
     struct TextUnitTest : public UnitTest {
         void run() {

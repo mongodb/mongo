@@ -277,7 +277,7 @@
       <Filter>third_party\pcre</Filter>
     </ClCompile>
     <ClCompile Include="..\..\util\md5.cpp">
-      <Filter>shell</Filter>
+      <Filter>util</Filter>
     </ClCompile>
     <ClCompile Include="..\..\util\stringutils.cpp">
       <Filter>util</Filter>
@@ -359,6 +359,9 @@
     </ClCompile>
     <ClCompile Include="..\..\..\third_party\boost\libs\program_options\src\winmain.cpp">
       <Filter>Boost</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\third_party\linenoise\linenoise_utf8.cpp">
+      <Filter>third_party\linenoise</Filter>
     </ClCompile>
     <ClCompile Include="..\..\util\progress_meter.cpp">
       <Filter>util</Filter>
@@ -853,6 +856,9 @@
     </ClInclude>
     <ClInclude Include="..\..\targetver.h">
       <Filter>third_party</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\third_party\linenoise\linenoise_utf8.h">
+      <Filter>third_party\linenoise</Filter>
     </ClInclude>
     <ClInclude Include="..\..\util\progress_meter.h">
       <Filter>util</Filter>
