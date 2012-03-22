@@ -770,6 +770,14 @@ namespace mongo {
         public:
             SplitVectorCmd() : NotAllowedOnShardedCollectionCmd("splitVector") {}
             virtual bool passOptions() const { return true; }
+            virtual bool run(const string& dbName , BSONObj& cmdObj, int options, string& errmsg, BSONObjBuilder& result, bool) {
+                string x = cmdObj.firstElement().valuestrsafe();
+                if ( ! str::startsWith( x , dbName ) ) {
+                    errmsg = str::stream() << "doing a splitVector across dbs isn't supported via mongos";
+                    return false;
+                }
+                return NotAllowedOnShardedCollectionCmd::run( dbName , cmdObj , options , errmsg, result, false );
+            }
             virtual string getFullNS( const string& dbName , const BSONObj& cmdObj ) {
                 return cmdObj.firstElement().valuestrsafe();
             }
