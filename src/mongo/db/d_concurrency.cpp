@@ -353,7 +353,10 @@ namespace mongo {
             msgasserted(16105, str::stream() << "expected to be write locked for " << ns);
         }
     }
-
+    bool Lock::dbLevelLockingEnabled() {
+        return DB_LEVEL_LOCKING_ENABLED;
+    }
+    
     Lock::ScopedLock::ScopedLock() {
         LockState& ls = lockState();
         ls.recursive++;

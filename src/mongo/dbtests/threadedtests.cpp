@@ -168,18 +168,19 @@ namespace ThreadedTests {
                     if( i > N/2 ) { 
                         int q = i % 11;
                         if( q == 0 ) { 
+                            char what = Lock::dbLevelLockingEnabled() ? 'r' : 'R';
                             Lock::DBRead r("foo");
-                            ASSERT( Lock::isLocked() == 'r' && Lock::atLeastReadLocked("foo") );
+                            ASSERT( Lock::isLocked() == what && Lock::atLeastReadLocked("foo") );
                             ASSERT( !Lock::nested() );
                             Lock::DBRead r2("foo");
                             ASSERT( Lock::nested() );
-                            ASSERT( Lock::isLocked() == 'r' && Lock::atLeastReadLocked("foo") );
+                            ASSERT( Lock::isLocked() == what && Lock::atLeastReadLocked("foo") );
                             Lock::DBRead r3("local");
                             if( sometimes ) {
                                 Lock::TempRelease t;
                             }
-                            ASSERT( Lock::isLocked() == 'r' && Lock::atLeastReadLocked("foo") );
-                            ASSERT( Lock::isLocked() == 'r' && Lock::atLeastReadLocked("local") );
+                            ASSERT( Lock::isLocked() == what && Lock::atLeastReadLocked("foo") );
+                            ASSERT( Lock::isLocked() == what && Lock::atLeastReadLocked("local") );
                         }
                         else if( q == 1 ) {
                             // test locking local only -- with no preceeding lock

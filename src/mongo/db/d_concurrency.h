@@ -24,6 +24,8 @@ namespace mongo {
         static void assertAtLeastReadLocked(const StringData& ns);
         static void assertWriteLocked(const StringData& ns);
 
+        static bool dbLevelLockingEnabled(); 
+
         class ScopedLock;
 
         // note: avoid TempRelease when possible. not a good thing.
