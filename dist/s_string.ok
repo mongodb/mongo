@@ -251,6 +251,7 @@ evictserver
 exactp
 extern
 extlist
+extlists
 fcntl
 ffc
 ffs

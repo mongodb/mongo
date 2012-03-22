@@ -87,8 +87,12 @@ __wt_bm_create(WT_SESSION_IMPL *session, const char *filename)
  */
 int
 __wt_bm_open(WT_SESSION_IMPL *session,
-    const char *filename, const char *config, const char *cfg[], int salvage)
+    const char *filename, const char *config, const char *cfg[])
 {
+	WT_BTREE *btree;
+
+	btree = session->btree;
+
 	/*
 	 * !!!
 	 * As part of block-manager configuration, we need to return the maximum
@@ -100,8 +104,11 @@ __wt_bm_open(WT_SESSION_IMPL *session,
 	 * we need some way to consider the block manager's maximum cookie size
 	 * vs. the minimum Btree internal node size.
 	 */
-	return (__wt_block_open(
-	    session, filename, config, cfg, salvage, &session->btree->block));
+	WT_RET(__wt_block_open(session, filename, config, cfg, &btree->block));
+
+	btree->block_header = __wt_block_header(session);
+
+	return (0);
 }
 
 /*
@@ -121,6 +128,37 @@ __wt_bm_close(WT_SESSION_IMPL *session)
 	session->btree->block = NULL;
 
 	return (ret);
+}
+
+/*
+ * __wt_bm_snap_load --
+ *	Load a snapshot point.
+ */
+int
+__wt_bm_snap_load(WT_SESSION_IMPL *session,
+    WT_ITEM *buf, const uint8_t *addr, uint32_t addr_size)
+{
+	WT_BLOCK *block;
+
+	if ((block = session->btree->block) == NULL)
+		return (__bm_invalid(session));
+
+	return (__wt_block_snap_load(session, block, buf, addr, addr_size));
+}
+
+/*
+ * __wt_bm_snap_unload --
+ *	Unload a snapshot point.
+ */
+int
+__wt_bm_snap_unload(WT_SESSION_IMPL *session)
+{
+	WT_BLOCK *block;
+
+	if ((block = session->btree->block) == NULL)
+		return (__bm_invalid(session));
+
+	return (__wt_block_snap_unload(session, block));
 }
 
 /*
@@ -165,21 +203,6 @@ __wt_bm_read(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_bm_block_header --
- *	Return the size of the block manager's header.
- */
-int
-__wt_bm_block_header(WT_SESSION_IMPL *session, uint32_t *headerp)
-{
-	WT_BLOCK *block;
-
-	if ((block = session->btree->block) == NULL)
-		return (__bm_invalid(session));
-
-	return (__wt_block_header(session, block, headerp));
-}
-
-/*
  * __wt_bm_write_size --
  *	Return the buffer size required to write a block.
  */
@@ -192,6 +215,21 @@ __wt_bm_write_size(WT_SESSION_IMPL *session, uint32_t *sizep)
 		return (__bm_invalid(session));
 
 	return (__wt_block_write_size(session, block, sizep));
+}
+
+/*
+ * __wt_bm_snap_write --
+ *	Write a buffer into a block, creating a snapshot.
+ */
+int
+__wt_bm_snap_write(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_ITEM *snap)
+{
+	WT_BLOCK *block;
+
+	if ((block = session->btree->block) == NULL)
+		return (__bm_invalid(session));
+
+	return (__wt_block_write_buf_snapshot(session, block, buf, snap));
 }
 
 /*
@@ -278,14 +316,14 @@ __wt_bm_salvage_end(WT_SESSION_IMPL *session, int success)
  *	Start a block manager salvage.
  */
 int
-__wt_bm_verify_start(WT_SESSION_IMPL *session, int *emptyp)
+__wt_bm_verify_start(WT_SESSION_IMPL *session)
 {
 	WT_BLOCK *block;
 
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (__wt_block_verify_start(session, block, emptyp));
+	return (__wt_block_verify_start(session, block));
 }
 
 /*

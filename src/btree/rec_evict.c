@@ -14,7 +14,6 @@ static void __rec_excl_clear(WT_SESSION_IMPL *);
 static int  __rec_page_clean_update(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_page_dirty_update(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_review(WT_SESSION_IMPL *, WT_REF *, WT_PAGE *, uint32_t, int);
-static int  __rec_root_addr_update(WT_SESSION_IMPL *, uint8_t *, uint32_t);
 static int  __rec_root_clean_update(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_root_dirty_update(WT_SESSION_IMPL *, WT_PAGE *);
 
@@ -176,32 +175,6 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __rec_root_addr_update --
- *	Update the root page's address.
- */
-static int
-__rec_root_addr_update(WT_SESSION_IMPL *session, uint8_t *addr, uint32_t size)
-{
-	WT_ADDR *root_addr;
-	WT_BTREE *btree;
-
-	btree = session->btree;
-	root_addr = &btree->root_addr;
-
-	/* Free any previously created root addresses. */
-	if (root_addr->addr != NULL) {
-		WT_RET(__wt_bm_free(session, root_addr->addr, root_addr->size));
-		__wt_free(session, root_addr->addr);
-	}
-	btree->root_update = 1;
-
-	root_addr->addr = addr;
-	root_addr->size = size;
-
-	return (0);
-}
-
-/*
  * __rec_root_dirty_update --
  *	Update the reference for an evicted, dirty root page.
  */
@@ -218,18 +191,8 @@ __rec_root_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 	next = NULL;
 	switch (F_ISSET(page, WT_PAGE_REC_MASK)) {
 	case WT_PAGE_REC_EMPTY:				/* Page is empty */
-		WT_VERBOSE(session, evict, "root page empty");
-
-		/* If the root page is empty, clear the root address. */
-		WT_RET(__rec_root_addr_update(session, NULL, 0));
-		btree->root_page = NULL;
-		break;
 	case WT_PAGE_REC_REPLACE: 			/* 1-for-1 page swap */
-		WT_VERBOSE(session, evict, "root page replaced");
-
-		/* Update the root to its replacement. */
-		WT_RET(__rec_root_addr_update(
-		    session, mod->u.replace.addr, mod->u.replace.size));
+		WT_VERBOSE(session, evict, "root page evicted");
 		btree->root_page = NULL;
 		break;
 	case WT_PAGE_REC_SPLIT:				/* Page split */

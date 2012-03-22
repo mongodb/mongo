@@ -60,8 +60,6 @@ btree_stats = [
 	Stat('file_col_var_pages', 'column-store variable-size leaf pages'),
 	Stat('file_entries', 'total entries'),
 	Stat('file_fixed_len', 'fixed-record size'),
-	Stat('file_freelist_bytes', 'number of bytes in the freelist'),
-	Stat('file_freelist_entries', 'number of entries in the freelist'),
 	Stat('file_magic', 'magic number'),
 	Stat('file_major', 'major version number'),
 	Stat('file_maxintlitem', 'maximum internal page item size'),

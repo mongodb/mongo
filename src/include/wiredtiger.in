@@ -1609,36 +1609,32 @@ extern int wiredtiger_extension_init(WT_SESSION *session,
 #define	WT_STAT_file_maxleafpage			26
 /*! minor version number */
 #define	WT_STAT_file_minor				27
-/*! number of bytes in the freelist */
-#define	WT_STAT_file_freelist_bytes			28
-/*! number of entries in the freelist */
-#define	WT_STAT_file_freelist_entries			29
 /*! overflow pages */
-#define	WT_STAT_file_overflow				30
+#define	WT_STAT_file_overflow				28
 /*! page size allocation unit */
-#define	WT_STAT_file_allocsize				31
+#define	WT_STAT_file_allocsize				29
 /*! reconcile: deleted or temporary pages merged */
-#define	WT_STAT_rec_page_merge				32
+#define	WT_STAT_rec_page_merge				30
 /*! reconcile: internal pages split */
-#define	WT_STAT_rec_split_intl				33
+#define	WT_STAT_rec_split_intl				31
 /*! reconcile: leaf pages split */
-#define	WT_STAT_rec_split_leaf				34
+#define	WT_STAT_rec_split_leaf				32
 /*! reconcile: overflow key */
-#define	WT_STAT_rec_ovfl_key				35
+#define	WT_STAT_rec_ovfl_key				33
 /*! reconcile: overflow value */
-#define	WT_STAT_rec_ovfl_value				36
+#define	WT_STAT_rec_ovfl_value				34
 /*! reconcile: pages deleted */
-#define	WT_STAT_rec_page_delete				37
+#define	WT_STAT_rec_page_delete				35
 /*! reconcile: pages written */
-#define	WT_STAT_rec_written				38
+#define	WT_STAT_rec_written				36
 /*! reconcile: unable to acquire hazard reference */
-#define	WT_STAT_rec_hazard				39
+#define	WT_STAT_rec_hazard				37
 /*! row-store internal pages */
-#define	WT_STAT_file_row_int_pages			40
+#define	WT_STAT_file_row_int_pages			38
 /*! row-store leaf pages */
-#define	WT_STAT_file_row_leaf_pages			41
+#define	WT_STAT_file_row_leaf_pages			39
 /*! total entries */
-#define	WT_STAT_file_entries				42
+#define	WT_STAT_file_entries				40
 /*! @} */
 /*
  * Statistics section: END

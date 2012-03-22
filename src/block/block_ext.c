@@ -9,7 +9,6 @@
 
 static int __block_extend(WT_SESSION_IMPL *, WT_BLOCK *, off_t *, off_t);
 static int __block_merge(WT_SESSION_IMPL *, WT_EXTLIST *, off_t, off_t);
-static int __block_truncate(WT_SESSION_IMPL *, WT_BLOCK *);
 
 #ifdef HAVE_VERBOSE
 static void __block_extlist_dump(WT_SESSION_IMPL *, WT_EXTLIST *);
@@ -253,14 +252,14 @@ __wt_block_alloc(
 		    "a multiple of the allocation size %" PRIu32,
 		    (intmax_t)size, block->allocsize);
 
-	__wt_spin_lock(session, &block->freelist_lock);
+	__wt_spin_lock(session, &block->live_lock);
 
 	/*
 	 * Allocation is first-fit by size: search the by-size skiplist for the
 	 * requested size and take the first entry on the by-size offset list.
 	 * If we don't have anything large enough, extend the file.
 	 */
-	__block_size_srch(block->free.size, size, sstack);
+	__block_size_srch(block->live.avail.size, size, sstack);
 	szp = *sstack[0];
 	if (szp == NULL) {
 		WT_ERR(__block_extend(session, block, offp, size));
@@ -269,7 +268,7 @@ __wt_block_alloc(
 
 	/* Remove the first record, and set the returned offset. */
 	ext = szp->off[0];
-	WT_ERR(__block_off_remove(session, &block->free, ext->off, &ext));
+	WT_ERR(__block_off_remove(session, &block->live.avail, ext->off, &ext));
 	*offp = ext->off;
 
 	/* If doing a partial allocation, adjust the record and put it back. */
@@ -284,7 +283,7 @@ __wt_block_alloc(
 
 		ext->off += size;
 		ext->size -= size;
-		WT_ERR(__block_off_insert(session, &block->free, ext));
+		WT_ERR(__block_off_insert(session, &block->live.avail, ext));
 	} else {
 		WT_VERBOSE(session, block,
 		    "allocate range %" PRIdMAX "-%" PRIdMAX,
@@ -294,7 +293,7 @@ __wt_block_alloc(
 	}
 
 done: err:
-	__wt_spin_unlock(session, &block->freelist_lock);
+	__wt_spin_unlock(session, &block->live_lock);
 	return (ret);
 }
 
@@ -380,9 +379,9 @@ __wt_block_free(
 	WT_VERBOSE(session, block,
 	    "free %" PRIdMAX "/%" PRIdMAX, (intmax_t)off, (intmax_t)size);
 
-	__wt_spin_lock(session, &block->freelist_lock);
-	ret = __block_merge(session, &block->free, off, (off_t)size);
-	__wt_spin_unlock(session, &block->freelist_lock);
+	__wt_spin_lock(session, &block->live_lock);
+	ret = __block_merge(session, &block->live.avail, off, (off_t)size);
+	__wt_spin_unlock(session, &block->live_lock);
 
 	return (ret);
 }
@@ -544,32 +543,6 @@ err:	__wt_scr_free(&tmp);
 }
 
 /*
- * __wt_block_freelist_open --
- *	Initialize the free-list structures.
- */
-void
-__wt_block_freelist_open(WT_SESSION_IMPL *session, WT_BLOCK *block)
-{
-	__wt_spin_init(session, &block->freelist_lock);
-
-	memset(&block->free, 0, sizeof(block->free));
-	block->free.name = "freelist";
-
-	block->free_offset = WT_BLOCK_INVALID_OFFSET;
-	block->free_size = block->free_cksum = 0;
-}
-
-/*
- * __wt_block_freelist_close --
- *	Write the free-list at the tail of the file.
- */
-void
-__wt_block_freelist_close(WT_SESSION_IMPL *session, WT_BLOCK *block)
-{
-	__wt_spin_destroy(session, &block->freelist_lock);
-}
-
-/*
  * __wt_block_extlist_write --
  *	Write an extent list at the tail of the file.
  */
@@ -590,15 +563,12 @@ __wt_block_extlist_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
 
 	WT_VERBOSE_CALL(session, block, __block_extlist_dump(session, el));
 
-	/* If there aren't any free-list entries, we're done. */
+	/* If there aren't any entries, we're done. */
 	if (el->entries == 0) {
 		*offp = WT_BLOCK_INVALID_OFFSET;
 		*sizep = *cksump = 0;
 		return (0);
 	}
-
-	/* Truncate the file if possible. */
-	WT_RET(__block_truncate(session, block));
 
 	/*
 	 * Get a scratch buffer, clear the page's header and data, initialize
@@ -647,8 +617,8 @@ __wt_block_extlist_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * in the write code always extends the file.
 	 */
 	name = el->name;
+	__wt_block_extlist_free(session, el);
 	el = NULL;
-	__wt_block_discard(session, block);
 
 	/* Write the extent list to disk. */
 	WT_ERR(__wt_block_write(session, block, tmp, offp, sizep, cksump));
@@ -661,11 +631,12 @@ err:	__wt_scr_free(&tmp);
 }
 
 /*
- * __block_truncate --
- *	Truncate the file if the last part of the file isn't in use.
+ * __wt_block_extlist_truncate --
+ *	Truncate the file based on the last available extent in the list.
  */
-static int
-__block_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block)
+int
+__wt_block_extlist_truncate(
+    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el)
 {
 	WT_EXT *ext;
 	WT_FH *fh;
@@ -673,10 +644,10 @@ __block_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	fh = block->fh;
 
 	/*
-	 * Check if the last free range is at the end of the file, and if so,
-	 * truncate the file and discard the range.
+	 * Check if the last available extent is at the end of the file, and if
+	 * so, truncate the file and discard the extent.
 	 */
-	if ((ext = __block_extlist_last(block->free.off)) == NULL)
+	if ((ext = __block_extlist_last(el->off)) == NULL)
 		return (0);
 	if (ext->off + ext->size != fh->file_size)
 		return (0);
@@ -688,46 +659,33 @@ __block_truncate(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	fh->file_size = ext->off;
 	WT_RET(__wt_ftruncate(session, fh, fh->file_size));
 
-	WT_RET(__block_off_remove(session, &block->free, ext->off, NULL));
+	WT_RET(__block_off_remove(session, el, ext->off, NULL));
 
 	return (0);
 }
-
 /*
- * __wt_block_discard --
- *	Discard any extent-list entries.
+ * __wt_block_extlist_free --
+ *	Discard an extent list.
  */
 void
-__wt_block_discard(WT_SESSION_IMPL *session, WT_BLOCK *block)
+__wt_block_extlist_free(WT_SESSION_IMPL *session, WT_EXTLIST *el)
 {
 	WT_EXT *ext, *next;
 	WT_SIZE *szp, *nszp;
 
-	for (ext = block->free.off[0]; ext != NULL; ext = next) {
+	for (ext = el->off[0]; ext != NULL; ext = next) {
 		next = ext->next[0];
 		__wt_free(session, ext);
 	}
-	for (szp = block->free.size[0]; szp != NULL; szp = nszp) {
+	memset(el->off, 0, sizeof(el->off));
+	for (szp = el->size[0]; szp != NULL; szp = nszp) {
 		nszp = szp->next[0];
 		__wt_free(session, szp);
 	}
+	memset(el->size, 0, sizeof(el->size));
 
-	memset(&block->free, 0, sizeof(block->free));
-}
-
-/*
- * __wt_block_stat --
- *	Free-list statistics.
- */
-void
-__wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block)
-{
-	WT_BSTAT_SET(session, file_freelist_bytes, block->free.bytes);
-	WT_BSTAT_SET(session, file_freelist_entries, block->free.entries);
-	WT_BSTAT_SET(session, file_size, block->fh->file_size);
-	WT_BSTAT_SET(session, file_magic, WT_BLOCK_MAGIC);
-	WT_BSTAT_SET(session, file_major, WT_BLOCK_MAJOR_VERSION);
-	WT_BSTAT_SET(session, file_minor, WT_BLOCK_MINOR_VERSION);
+	el->bytes = 0;
+	el->entries = 0;
 }
 
 #ifdef HAVE_VERBOSE

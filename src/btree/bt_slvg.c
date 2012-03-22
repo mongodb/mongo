@@ -26,6 +26,8 @@ struct __wt_stuff {
 	uint32_t   ovfl_next;			/* Next empty slot */
 	size_t     ovfl_allocated;		/* Bytes allocated */
 
+	WT_PAGE	  *root_page;			/* Created root page */
+
 	uint8_t    page_type;			/* Page type */
 
 	/* If need to free blocks backing merged page ranges. */
@@ -280,11 +282,30 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(__slvg_merge_block_free(session, ss));
 
 	/*
+	 * Step 10:
+	 * Evict the newly created root page, creating a snapshot.
+	 */
+	WT_ERR(__wt_scr_alloc(session, WT_BM_MAX_ADDR_COOKIE, &btree->snap));
+	WT_ERR(__wt_rec_evict(session, ss->root_page, WT_REC_SINGLE));
+	ss->root_page = NULL;
+	 if (btree->snap->data != NULL && btree->snap->size != 0)
+		 WT_ERR(__wt_btree_set_root(session, btree->filename,
+		     (uint8_t *)btree->snap->data, btree->snap->size));
+
+	/*
 	 * Step 11:
 	 * Inform the underlying block manager that we're done.
 	 */
 err:	if (started)
 		WT_TRET(__wt_bm_salvage_end(session, ret == 0 ? 1 : 0));
+
+	/* Discard any root page we created. */
+	if (ss->root_page != NULL)
+		__wt_page_out(session, ss->root_page, 0);
+
+	/* Discard snapshot information. */
+	__wt_scr_free(&btree->snap);
+	btree->snap = NULL;
 
 	/* Discard the leaf and overflow page memory. */
 	WT_TRET(__slvg_cleanup(session, ss));
@@ -361,8 +382,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		 * see in a corrupted file, like overflow references past the
 		 * end of the file, might as well discard these pages now.
 		 */
-		if (__wt_verify_dsk(session,
-		    (char *)as->data, buf->mem, buf->size) != 0) {
+		if (__wt_verify_dsk(session, (char *)as->data, buf) != 0) {
 			WT_VERBOSE(session, salvage,
 			    "%s page failed verify %s",
 			    __wt_page_type_string(dsk->type), (char *)as->data);
@@ -1049,6 +1069,8 @@ __slvg_col_build_internal(
 	uint32_t i;
 	int ret;
 
+	ret = 0;
+
 	/* Allocate a column-store internal page. */
 	WT_RET(__wt_calloc_def(session, 1, &page));
 	WT_ERR(__wt_calloc_def(session, (size_t)leaf_cnt, &page->u.intl.t));
@@ -1092,10 +1114,11 @@ __slvg_col_build_internal(
 		++ref;
 	}
 
-	/* Write the internal page to disk. */
-	return (__wt_rec_evict(session, page, WT_REC_SINGLE));
+	ss->root_page = page;
 
-err:	__wt_page_out(session, page, 0);
+	if (0) {
+err:		__wt_page_out(session, page, 0);
+	}
 	return (ret);
 }
 
@@ -1636,6 +1659,8 @@ __slvg_row_build_internal(
 	uint32_t i;
 	int ret;
 
+	ret = 0;
+
 	/* Allocate a row-store internal page. */
 	WT_RET(__wt_calloc_def(session, 1, &page));
 	WT_ERR(__wt_calloc_def(session, (size_t)leaf_cnt, &page->u.intl.t));
@@ -1683,10 +1708,11 @@ __slvg_row_build_internal(
 		++ref;
 	}
 
-	/* Write the internal page to disk. */
-	return (__wt_rec_evict(session, page, WT_REC_SINGLE));
+	ss->root_page = page;
 
-err:	__wt_page_out(session, page, 0);
+	if (0) {
+err:		__wt_page_out(session, page, 0);
+	}
 	return (ret);
 }
 

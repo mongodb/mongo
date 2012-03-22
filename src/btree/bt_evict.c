@@ -112,18 +112,18 @@ __wt_evict_server_wake(WT_SESSION_IMPL *session)
 }
 
 /*
- * __evict_file_serial_func --
+ * __sync_file_serial_func --
  *	Eviction serialization function called when a tree is being flushed
  *	or closed.
  */
 void
-__wt_evict_file_serial_func(WT_SESSION_IMPL *session)
+__wt_sync_file_serial_func(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
 	WT_EVICT_REQ *er, *er_end;
 	int discard;
 
-	__wt_evict_file_unpack(session, &discard);
+	__wt_sync_file_unpack(session, &discard);
 
 	cache = S2C(session)->cache;
 

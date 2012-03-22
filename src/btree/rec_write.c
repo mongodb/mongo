@@ -169,7 +169,7 @@ static int  __rec_split_fixup(WT_SESSION_IMPL *);
 static int  __rec_split_init(WT_SESSION_IMPL *, WT_PAGE *, uint64_t, uint32_t);
 static int  __rec_split_row(WT_SESSION_IMPL *, WT_PAGE *, WT_PAGE **);
 static int  __rec_split_row_promote(WT_SESSION_IMPL *, uint8_t);
-static int  __rec_split_write(WT_SESSION_IMPL *, WT_BOUNDARY *, WT_ITEM *);
+static int  __rec_split_write(WT_SESSION_IMPL *, WT_BOUNDARY *, WT_ITEM *, int);
 static int  __rec_write_init(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_write_wrapup(WT_SESSION_IMPL *, WT_PAGE *);
 
@@ -671,7 +671,7 @@ __rec_split(WT_SESSION_IMPL *session)
 		dsk->recno = bnd->recno;
 		dsk->u.entries = r->entries;
 		r->dsk.size = WT_PTRDIFF32(r->first_free, dsk);
-		WT_RET(__rec_split_write(session, bnd, &r->dsk));
+		WT_RET(__rec_split_write(session, bnd, &r->dsk, 0));
 
 		/*
 		 * Set the starting record number and promotion key for the next
@@ -708,6 +708,7 @@ __rec_split_finish(WT_SESSION_IMPL *session)
 	WT_BOUNDARY *bnd;
 	WT_PAGE_HEADER *dsk;
 	WT_RECONCILE *r;
+	int snapshot;
 
 	r = session->reconcile;
 
@@ -745,12 +746,19 @@ __rec_split_finish(WT_SESSION_IMPL *session)
 		bnd->entries = r->entries;
 	}
 
+	/*
+	 * Third, check to see if we're creating a snapshot: any time we write
+	 * the root page of the tree, we tell the underlying block manager so it
+	 * can write and return the additional information a snapshot requires.
+	 */
+	snapshot = r->bnd_next == 1 && WT_PAGE_IS_ROOT(r->page);
+
 	/* Write the remaining information. */
 	dsk = r->dsk.mem;
 	dsk->recno = bnd->recno;
 	dsk->u.entries = r->entries;
 	r->dsk.size = WT_PTRDIFF32(r->first_free, dsk);
-	return (__rec_split_write(session, bnd, &r->dsk));
+	return (__rec_split_write(session, bnd, &r->dsk, snapshot));
 }
 
 /*
@@ -805,7 +813,7 @@ __rec_split_fixup(WT_SESSION_IMPL *session)
 		dsk->recno = bnd->recno;
 		dsk->u.entries = bnd->entries;
 		tmp->size = WT_PAGE_HEADER_BYTE_SIZE(btree) + len;
-		WT_ERR(__rec_split_write(session, bnd, tmp));
+		WT_ERR(__rec_split_write(session, bnd, tmp, 0));
 	}
 
 	/*
@@ -839,12 +847,18 @@ err:	__wt_scr_free(&tmp);
  *	Write a disk block out for the split helper functions.
  */
 static int
-__rec_split_write(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_ITEM *buf)
+__rec_split_write(
+    WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_ITEM *buf, int snapshot)
 {
+	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_PAGE_HEADER *dsk;
+	WT_RECONCILE *r;
 	uint32_t size;
 	uint8_t addr[WT_BM_MAX_ADDR_COOKIE];
+
+	r = session->reconcile;
+	btree = session->btree;
 
 	/*
 	 * We always write an additional byte on row-store leaf pages after the
@@ -870,9 +884,16 @@ __rec_split_write(WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_ITEM *buf)
 
 	/* Write the chunk and save the location information. */
 	WT_VERBOSE(session, write, "%s", __wt_page_type_string(dsk->type));
-	WT_RET(__wt_bm_write(session, buf, addr, &size));
-	WT_RET(__wt_strndup(session, (char *)addr, size, &bnd->addr.addr));
-	bnd->addr.size = size;
+	if (snapshot) {
+		WT_RET(__wt_bm_snap_write(session, buf, btree->snap));
+		bnd->addr.addr = NULL;
+		bnd->addr.size = 0;
+	} else {
+		WT_RET(__wt_bm_write(session, buf, addr, &size));
+		WT_RET(
+		    __wt_strndup(session, (char *)addr, size, &bnd->addr.addr));
+		bnd->addr.size = size;
+	}
 
 	return (0);
 }
@@ -1807,6 +1828,7 @@ err:	__wt_buf_free(session, &orig);
 static int
 __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_IKEY *ikey;
@@ -1818,12 +1840,12 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	int onpage_ovfl, ovfl_key, val_set;
 
 	r = session->reconcile;
+	btree = session->btree;
 	unpack = &_unpack;
 	key = &r->k;
 	val = &r->v;
 
-	WT_RET(__rec_split_init(session,
-	    page, 0ULL, session->btree->maxintlpage));
+	WT_RET(__rec_split_init(session, page, 0ULL, btree->maxintlpage));
 
 	/*
 	 * Ideally, we'd never store the 0th key on row-store internal pages
@@ -2457,6 +2479,7 @@ __rec_row_leaf_insert(WT_SESSION_IMPL *session, WT_INSERT *ins)
 static int
 __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 {
+	WT_BTREE *btree;
 	WT_BOUNDARY *bnd;
 	WT_PAGE_MODIFY *mod;
 	WT_RECONCILE *r;
@@ -2466,6 +2489,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	const uint8_t *addr;
 
 	r = session->reconcile;
+	btree = session->btree;
 	mod = page->modify;
 	ret = 0;
 
@@ -2478,9 +2502,10 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	switch (F_ISSET(page, WT_PAGE_REC_MASK)) {
 	case 0:	/*
 		 * The page has never been reconciled before, track the original
-		 * address blocks (if any).   If we're splitting the root page
-		 * we may schedule the same blocks to be freed repeatedly: that
-		 * is OK, the track function checks for duplicates.
+		 * address blocks (if any).
+		 *
+		 * The exception is root pages are never tracked or free'd, they
+		 * are snapshots, and must be explicitly dropped.
 		 */
 		if (!WT_PAGE_IS_ROOT(page) && page->ref->addr != NULL) {
 			__wt_get_addr(page->parent, page->ref, &addr, &size);
@@ -2491,9 +2516,15 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	case WT_PAGE_REC_EMPTY:				/* Page deleted */
 		break;
 	case WT_PAGE_REC_REPLACE:			/* 1-for-1 page swap */
-		/* Discard the replacement leaf page's blocks. */
-		WT_RET(__wt_rec_track_block(session, WT_PT_BLOCK,
-		    page, mod->u.replace.addr, mod->u.replace.size));
+		/*
+		 * Discard the replacement leaf page's blocks.
+		 *
+		 * The exception is root pages are never tracked or free'd, they
+		 * are snapshots, and must be explicitly dropped.
+		 */
+		if (!WT_PAGE_IS_ROOT(page))
+			WT_RET(__wt_rec_track_block(session, WT_PT_BLOCK,
+			    page, mod->u.replace.addr, mod->u.replace.size));
 
 		/* Discard the replacement page's address. */
 		__wt_free(session, mod->u.replace.addr);
@@ -2526,8 +2557,11 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	switch (r->bnd_next) {
 	case 0:						/* Page delete */
 		WT_VERBOSE(session, reconcile, "page %p empty", page);
-
 		WT_BSTAT_INCR(session, rec_page_delete);
+
+		/* If this is the root page, we need to create a sync point. */
+		if (WT_PAGE_IS_ROOT(page))
+			WT_RET(__wt_bm_snap_write(session, NULL, btree->snap));
 
 		/*
 		 * If the page was empty, we want to discard it from the tree
@@ -2545,16 +2579,6 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * the time.
 		 */
 		bnd = &r->bnd[0];
-#ifdef HAVE_VERBOSE
-		if (WT_VERBOSE_ISSET(session, reconcile)) {
-			WT_ITEM *buf;
-			WT_RET(__wt_scr_alloc(session, 64, &buf));
-			WT_VERBOSE(session, reconcile, "page %p written to %s",
-			    page, __wt_addr_string(
-			    session, buf, bnd->addr.addr, bnd->addr.size));
-			__wt_scr_free(&buf);
-		}
-#endif
 		mod->u.replace = bnd->addr;
 		bnd->addr.addr = NULL;
 

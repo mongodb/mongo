@@ -95,10 +95,9 @@ struct __wt_btree {
 	uint64_t last_recno;		/* Column-store last record number */
 
 	WT_PAGE *root_page;		/* Root page */
-	WT_ADDR  root_addr;		/* Replacement root address */
-	int	 root_update;		/* 0: free original root blocks
-					   1: free saved root blocks and
-					      update on close */
+
+	WT_RWLOCK   *snaplock;		/* Lock for snapshot creation */
+	WT_ITEM	    *snap;		/* Snapshot information */
 
 	void *block;			/* Block manager */
 	u_int block_header;		/* Block manager header length */

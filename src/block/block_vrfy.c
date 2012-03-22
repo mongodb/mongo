@@ -7,16 +7,14 @@
 
 #include "wt_internal.h"
 
-static int __verify_addfrag(WT_SESSION_IMPL *, WT_BLOCK *, off_t, off_t);
 static int __verify_checkfrag(WT_SESSION_IMPL *, WT_BLOCK *);
-static int __verify_freelist(WT_SESSION_IMPL *, WT_BLOCK *);
 
 /*
  * __wt_block_verify_start --
  *	Start file verification.
  */
 int
-__wt_block_verify_start(WT_SESSION_IMPL *session, WT_BLOCK *block, int *emptyp)
+__wt_block_verify_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
 	off_t file_size;
 
@@ -26,11 +24,8 @@ __wt_block_verify_start(WT_SESSION_IMPL *session, WT_BLOCK *block, int *emptyp)
 	 * We're done if the file has no data pages (this is what happens if
 	 * we verify a file immediately after creation).
 	 */
-	if (file_size == WT_BLOCK_DESC_SECTOR) {
-		*emptyp = 1;
+	if (file_size == WT_BLOCK_DESC_SECTOR)
 		return (0);
-	}
-	*emptyp = 0;
 
 	/*
 	 * The file size should be a multiple of the allocsize, offset by the
@@ -54,6 +49,11 @@ __wt_block_verify_start(WT_SESSION_IMPL *session, WT_BLOCK *block, int *emptyp)
 	 * To verify larger files than we can handle in this way, we'd have to
 	 * write parts of the bit array into a disk file.
 	 *
+	 * Alternatively, we could switch to maintaining ranges of the file as
+	 * we do with the extents, but that has its own failure mode, where we
+	 * verify many non-contiguous blocks creating too many entries on the
+	 * list to fit into memory.
+	 *
 	 * We also have a minimum maximum verifiable file size of 16TB because
 	 * the underlying bit package takes a 32-bit count of bits to allocate:
 	 *
@@ -65,9 +65,6 @@ __wt_block_verify_start(WT_SESSION_IMPL *session, WT_BLOCK *block, int *emptyp)
 
 	block->frags = (uint32_t)(file_size / block->allocsize);
 	WT_RET(__bit_alloc(session, block->frags, &block->fragbits));
-
-	/* Verify the free-list. */
-	WT_RET(__verify_freelist(session, block));
 
 	return (0);
 }
@@ -105,35 +102,37 @@ __wt_block_verify_addr(WT_SESSION_IMPL *session,
 	/* Crack the cookie. */
 	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, NULL));
 
-	WT_RET(__verify_addfrag(session, block, offset, (off_t)size));
+	WT_RET(__wt_verify_addfrag(session, block, offset, (off_t)size));
 
 	return (0);
 }
 
 /*
- * __verify_freelist --
- *	Add the freelist fragments to the list of verified fragments.
+ * __wt_verify_extlist --
+ *	Add an extent list's fragments to the list of verified fragments.
  */
-static int
-__verify_freelist(WT_SESSION_IMPL *session, WT_BLOCK *block)
+int
+__wt_verify_extlist(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el)
 {
 	WT_EXT *ext;
 	int ret;
 
 	ret = 0;
 
-	WT_EXT_FOREACH(ext, block->free.off) {
+	WT_EXT_FOREACH(ext, el->off) {
 		if (ext->off + (off_t)ext->size > block->fh->file_size)
 			WT_RET_MSG(session, WT_ERROR,
-			    "free-list entry offset %" PRIuMAX "references "
-			    "non-existent file pages",
-			    (uintmax_t)ext->off);
+			    "%s: extent list entry offset %" PRIuMAX
+			    "references non-existent file pages",
+			    el->name, (uintmax_t)ext->off);
 
 		WT_VERBOSE(session, verify,
-		    "free-list range %" PRIdMAX "-%" PRIdMAX,
+		    "%s: extent list range %" PRIdMAX "-%" PRIdMAX,
+		    el->name,
 		    (intmax_t)ext->off, (intmax_t)(ext->off + ext->size));
 
-		WT_TRET(__verify_addfrag(session, block, ext->off, ext->size));
+		WT_TRET(
+		    __wt_verify_addfrag(session, block, ext->off, ext->size));
 	}
 
 	return (ret);
@@ -146,12 +145,12 @@ __verify_freelist(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	(((off_t)(frag)) * (block)->allocsize + WT_BLOCK_DESC_SECTOR)
 
 /*
- * __verify_addfrag --
+ * __wt_verify_addfrag --
  *	Add the fragments to the list, and complain if we've already verified
  *	this chunk of the file.
  */
-static int
-__verify_addfrag(
+int
+__wt_verify_addfrag(
     WT_SESSION_IMPL *session, WT_BLOCK *block, off_t offset, off_t size)
 {
 	uint32_t frag, frags, i;

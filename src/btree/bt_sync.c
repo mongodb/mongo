@@ -14,9 +14,34 @@
 int
 __wt_btree_sync(WT_SESSION_IMPL *session, const char *cfg[])
 {
+	WT_UNUSED(cfg);
+
+	return (__wt_btree_snapshot(session, NULL, 0));
+}
+
+/*
+ * __wt_btree_snapshot --
+ *	Snapshot the tree.
+ */
+int
+__wt_btree_snapshot(WT_SESSION_IMPL *session, const char *name, int discard)
+{
+	WT_BTREE *btree;
 	int ret;
 
-	WT_UNUSED(cfg);
+	WT_UNUSED(name);
+
+	btree = session->btree;
+	ret = 0;
+
+	/* Allocate a temporary buffer for the snapshot information. */
+	WT_RET(__wt_scr_alloc(session, WT_BM_MAX_ADDR_COOKIE, &btree->snap));
+
+	/* Snapshots are single-threaded. */
+	__wt_readlock(session, btree->snaplock);
+
+	/* Get the current snapshot information. */
+	WT_ERR(__wt_btree_get_root(session, btree->snap));
 
 	/*
 	 * Ask the eviction thread to flush any dirty pages.
@@ -40,8 +65,21 @@ __wt_btree_sync(WT_SESSION_IMPL *session, const char *cfg[])
 	 * I don't see a reason to change at this time, either.
 	 */
 	do {
-		ret = __wt_evict_file_serial(session, 0);
+		ret = __wt_sync_file_serial(session, discard);
 	} while (ret == WT_RESTART);
+	WT_ERR(ret);
+
+	/* If we're discarding the tree, the root page should be gone. */
+	WT_ASSERT(session, !discard || btree->root_page == NULL);
+
+	/* After all pages are evicted, update the snapshot information. */
+	if (btree->snap->data != NULL && btree->snap->size != 0)
+		WT_ERR(__wt_btree_set_root(session, btree->filename,
+		    (uint8_t *)btree->snap->data, btree->snap->size));
+
+err:	__wt_rwunlock(session, btree->snaplock);
+	__wt_scr_free(&btree->snap);
+	btree->snap = NULL;
 
 	return (ret);
 }

@@ -52,14 +52,9 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 int
 __wt_block_salvage_end(WT_SESSION_IMPL *session, WT_BLOCK *block, int success)
 {
-	/*
-	 * If not successful, discard the free-list, it's not useful, and
-	 * don't write back an updated description block.
-	 */
-	if (!success) {
-		F_CLR(block, WT_BLOCK_OK);
-		__wt_block_discard(session, block);
-	}
+	/* If not successful, discard the live snapshot we've created. */
+	if (!success)
+		(void)__wt_block_snap_unload(session, block);
 	return (0);
 }
 
@@ -147,8 +142,8 @@ skip:			WT_VERBOSE(session, salvage,
 	 * writes, done after salvage completes, are preferred to these blocks.
 	 */
 	*write_genp = blk->write_gen;
-	if (block->write_gen < blk->write_gen)
-		block->write_gen = blk->write_gen;
+	if (block->live.write_gen < blk->write_gen)
+		block->live.write_gen = blk->write_gen;
 
 	/* Re-create the address cookie that should reference this block. */
 	endp = addr;

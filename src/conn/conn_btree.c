@@ -19,9 +19,11 @@ __wt_conn_btree_open(WT_SESSION_IMPL *session,
 {
 	WT_BTREE *btree;
 	WT_CONNECTION_IMPL *conn;
+	WT_ITEM *addr;
 	int matched, ret;
 
 	conn = S2C(session);
+	addr = NULL;
 	ret = 0;
 
 	WT_STAT_INCR(conn->stats, file_open);
@@ -135,17 +137,23 @@ __wt_conn_btree_open(WT_SESSION_IMPL *session,
 
 	/* Open the underlying file. */
 conf:	session->btree = btree;
+
 	/* Free any old config. */
 	__wt_free(session, btree->config);
 	btree->config = config;
+	btree->flags = flags;
 
-	ret = __wt_btree_open(session, cfg, flags);
-	if (ret == 0)
-		F_SET(btree, WT_BTREE_OPEN);
-	else
-		(void)__wt_conn_btree_close(session, 1);
+	WT_ERR(__wt_scr_alloc(session, WT_BM_MAX_ADDR_COOKIE, &addr));
+	WT_ERR(__wt_btree_get_root(session, addr));
+	WT_ERR(__wt_btree_open(session, cfg, addr->data, addr->size));
+	F_SET(btree, WT_BTREE_OPEN);
+
+	if (0) {
+err:		(void)__wt_conn_btree_close(session, 1);
+	}
 
 	__wt_rwunlock(session, btree->rwlock);
+	__wt_scr_free(&addr);
 	return (ret);
 }
 
@@ -164,17 +172,8 @@ __wt_conn_btree_close(WT_SESSION_IMPL *session, int locked)
 	conn = S2C(session);
 	ret = 0;
 
-	if (F_ISSET(btree, WT_BTREE_OPEN)) {
+	if (F_ISSET(btree, WT_BTREE_OPEN))
 		WT_STAT_DECR(conn->stats, file_open);
-
-		/*
-		 * If it looks like we are the last reference, sync the file.
-		 * This should make the close call fast (while we are holding
-		 * an exclusive lock on the handle).
-		 */
-		if (btree->refcnt == 1)
-			WT_RET(__wt_btree_sync(session, NULL));
-	}
 
 	/*
 	 * Decrement the reference count.  If we really are the last reference,
@@ -209,14 +208,17 @@ __conn_btree_remove(WT_SESSION_IMPL *session, WT_BTREE *btree)
 
 	ret = 0;
 
-	WT_SET_BTREE_IN_SESSION(session, btree);
-	WT_TRET(__wt_btree_close(session));
+	if (F_ISSET(btree, WT_BTREE_OPEN)) {
+		WT_SET_BTREE_IN_SESSION(session, btree);
+		WT_TRET(__wt_btree_close(session));
+		F_CLR(btree, WT_BTREE_OPEN);
+		WT_CLEAR_BTREE_IN_SESSION(session);
+	}
 	WT_TRET(__wt_rwlock_destroy(session, btree->rwlock));
 	__wt_free(session, btree->filename);
 	__wt_free(session, btree->name);
 	__wt_free(session, btree->config);
 	__wt_free(session, btree);
-	WT_CLEAR_BTREE_IN_SESSION(session);
 
 	return (ret);
 }
@@ -289,14 +291,25 @@ int
 __wt_conn_btree_reopen(
     WT_SESSION_IMPL *session, const char *cfg[], uint32_t flags)
 {
+	WT_ITEM *addr;
 	WT_BTREE *btree;
+	int ret;
 
+	addr = NULL;
 	btree = session->btree;
+	ret = 0;
 
-	WT_RET(__wt_btree_close(session));
-	F_CLR(btree, WT_BTREE_OPEN);
-	WT_RET(__wt_btree_open(session, cfg, flags));
+	if (F_ISSET(btree, WT_BTREE_OPEN)) {
+		WT_RET(__wt_btree_close(session));
+		F_CLR(btree, WT_BTREE_OPEN);
+	}
+
+	WT_RET(__wt_scr_alloc(session, WT_BM_MAX_ADDR_COOKIE, &addr));
+	WT_ERR(__wt_btree_get_root(session, addr));
+	btree->flags = flags;
+	WT_ERR(__wt_btree_open(session, cfg, addr->data, addr->size));
 	F_SET(btree, WT_BTREE_OPEN);
 
-	return (0);
+err:	__wt_scr_free(&addr);
+	return (ret);
 }

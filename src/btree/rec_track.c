@@ -76,6 +76,8 @@ __wt_rec_track_block(WT_SESSION_IMPL *session,
 	WT_PAGE_TRACK *empty, *track;
 	uint32_t i;
 
+	WT_ASSERT(session, addr != NULL);
+
 	mod = page->modify;
 
 	/*

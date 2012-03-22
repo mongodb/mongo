@@ -117,6 +117,14 @@
 	if (WT_VERBOSE_ISSET(session, f))				\
 		func;							\
 } while (0)
+#define	WT_VERBOSE_CALL_ERR(session, f, func) do {			\
+	if (WT_VERBOSE_ISSET(session, f))				\
+		WT_ERR(func);						\
+} while (0)
+#define	WT_VERBOSE_CALL_RET(session, f, func) do {			\
+	if (WT_VERBOSE_ISSET(session, f))				\
+		WT_RET(func);						\
+} while (0)
 #else
 #define	WT_VERBOSE_ISSET(session, f)	0
 #define	WT_VERBOSE(session, f, ...)

@@ -39,11 +39,15 @@ static int __verify_dsk_row(
  *	Verify a single Btree page as read from disk.
  */
 int
-__wt_verify_dsk(WT_SESSION_IMPL *session,
-    const char *addr, WT_PAGE_HEADER *dsk, uint32_t size)
+__wt_verify_dsk(WT_SESSION_IMPL *session, const char *addr, WT_ITEM *buf)
 {
-	u_int i;
+	WT_PAGE_HEADER *dsk;
+	uint32_t size;
 	uint8_t *p;
+	u_int i;
+
+	dsk = buf->mem;
+	size = buf->size;
 
 	/* Check the page type. */
 	switch (dsk->type) {

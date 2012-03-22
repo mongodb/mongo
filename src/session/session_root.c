@@ -73,36 +73,6 @@ err:	if (ret != 0)
 }
 
 /*
- * __wt_btree_free_root --
- *	Free the file's root address.
- */
-int
-__wt_btree_free_root(WT_SESSION_IMPL *session)
-{
-	WT_ITEM *addr, *as;
-	WT_BTREE *btree;
-	int ret;
-
-	btree = session->btree;
-	addr = as = NULL;
-
-	WT_RET(__wt_scr_alloc(session, WT_BM_MAX_ADDR_COOKIE, &addr));
-	WT_ERR(__wt_btree_get_root(session, addr));
-	if (addr->data != NULL) {
-		WT_RET(__wt_scr_alloc(session, 0, &as));
-		WT_VERBOSE(session, verify, "free %s root %s",
-		    btree->filename,
-		    __wt_addr_string(session, as, addr->data, addr->size));
-
-		WT_ERR(__wt_bm_free(session, addr->data, addr->size));
-	}
-
-err:	__wt_scr_free(&addr);
-	__wt_scr_free(&as);
-	return (ret);
-}
-
-/*
  * __wt_btree_set_root --
  *	Set the file's root address.
  */
@@ -122,9 +92,6 @@ __wt_btree_set_root(WT_SESSION_IMPL *session,
 	 */
 	WT_RET(__wt_scr_alloc(
 	    session, size * 2 + 1 + WT_STORE_SIZE(strlen(WT_NOADDR)), &v));
-
-	WT_VERBOSE(session, verify, "set %s root %s",
-	    filename, __wt_addr_string(session, v, addr, size));
 
 	/*
 	 * We're not using the WT_ITEM as a buffer going forward, but fill

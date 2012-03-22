@@ -11,14 +11,12 @@
  * __wt_block_header --
  *	Return the size of the block-specific header.
  */
-int
-__wt_block_header(WT_SESSION_IMPL *session, WT_BLOCK *block, uint32_t *headerp)
+u_int
+__wt_block_header(WT_SESSION_IMPL *session)
 {
 	WT_UNUSED(session);
-	WT_UNUSED(block);
 
-	*headerp = WT_BLOCK_HEADER_SIZE;
-	return (0);
+	return ((u_int)WT_BLOCK_HEADER_SIZE);
 }
 
 /*
@@ -99,7 +97,7 @@ __wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	 * in the file.)
 	 */
 #ifdef HAVE_DIAGNOSTIC
-	WT_RET(__wt_verify_dsk(session, "[write-check]", buf->mem, buf->size));
+	WT_RET(__wt_verify_dsk(session, "[write-check]", buf));
 #endif
 
 	/*
@@ -208,7 +206,7 @@ not_compressed:	/*
 	 * internal page may not have been written to disk after the leaf page
 	 * was updated.  So, write generations it is.)
 	 */
-	blk->write_gen = ++block->write_gen;
+	blk->write_gen = ++block->live.write_gen;
 
 	blk->disk_size = align_size;
 

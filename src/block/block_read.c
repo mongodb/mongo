@@ -34,8 +34,7 @@ __wt_block_read_buf(WT_SESSION_IMPL *session, WT_BLOCK *block,
 
 	WT_RET(__wt_scr_alloc(session, 0, &tmp));
 	WT_ERR(__wt_block_addr_string(session, block, tmp, addr, addr_size));
-	WT_ERR(__wt_verify_dsk(
-	    session, (char *)tmp->data, buf->mem, buf->size));
+	WT_ERR(__wt_verify_dsk(session, (char *)tmp->data, buf));
 
 err:	__wt_scr_free(&tmp);
 
