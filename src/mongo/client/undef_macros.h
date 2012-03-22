@@ -23,7 +23,7 @@
 /** MONGO_EXPOSE_MACROS - when defined, indicates that you are compiling a mongo program rather
                           than just using the C++ driver.
 */
-#if !defined(MONGO_EXPOSE_MACROS) && !defined(MONGO_MACROS_CLEANED)
+#if defined(MONGO_EXPOSE_MACROS) && !defined(MONGO_MACROS_CLEANED)
 
 // util/allocator.h
 #undef malloc
@@ -35,7 +35,6 @@
 #undef wassert
 #undef massert
 #undef uassert
-#undef BOOST_CHECK_EXCEPTION
 #undef DESTRUCTOR_GUARD
 
 // util/goodies.h
