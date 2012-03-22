@@ -120,8 +120,8 @@ try {
     var q = { _id : 5 };
     var u = { $inc : { x : 1 } };
     db.profile1.update( q , u );
-    var r = db.system.profile.find().sort( { $natural : -1 } )[0]
-    assert.eq( q , r.query , "Y1" );
+    var r = db.system.profile.find( { ns : db.profile1.getFullName() } ).sort( { $natural : -1 } )[0]
+    assert.eq( q , r.query , "Y1: " + tojson(r) );
     assert.eq( u , r.updateobj , "Y2" );
     assert.eq( "update" , r.op , "Y3" );
     assert.eq("profile1.profile1", r.ns, "Y4");
