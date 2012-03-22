@@ -40,7 +40,8 @@ namespace mongo {
 
 #if defined(__linux__) || defined(__sunos__) || defined(__APPLE__)
         _devrandom = new ifstream("/dev/urandom", ios::binary|ios::in);
-        massert( 10353 ,  "can't open dev/urandom", _devrandom->is_open() );
+        if ( !_devrandom->is_open() )
+            massert( 10353 , std::string("can't open dev/urandom: ") + strerror(errno), 0 );
 #elif defined(_WIN32)
         srand(curTimeMicros()); // perhaps not relevant for rand_s but we might want elsewhere anyway
 #else
