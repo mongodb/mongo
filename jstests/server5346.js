@@ -10,7 +10,7 @@ t.update({ _id : 1 }, { $inc : { "versions.2_1" : 2 } } )
 t.update({ _id : 1 }, { $inc : { "versions.01" : 3 } } )
 t.update({ _id : 1 }, { $inc : { "versions.1" : 4 } } )
 
-x.versions = { "01" : 3 , "1" : 4 , "2_01" : 1 , "2_1" : 2 }
-
-assert.eq( x , t.findOne() )
-
+// Make sure the correct fields are set, without duplicates.
+// String comparison must be used because V8 reorders numeric fields in objects.
+assert.eq( '{ "_id" : 1, "versions" : { "01" : 3, "1" : 4, "2_01" : 1, "2_1" : 2 } }' ,
+          tojson( t.findOne(), null, true ) )
