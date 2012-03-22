@@ -32,8 +32,11 @@ namespace mongo {
     }
 
 #define MONGO_malloc mongo::ourmalloc
-#define malloc MONGO_malloc
 #define MONGO_realloc mongo::ourrealloc
-#define realloc MONGO_realloc
+
+#ifdef MONGO_EXPOSE_MACROS
+#  define malloc MONGO_malloc
+#  define realloc MONGO_realloc
+#endif
 
 } // namespace mongo
