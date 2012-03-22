@@ -12,7 +12,7 @@ var shardedAggTest = new ShardingTest(
 
 shardedAggTest.adminCommand( { enablesharding : "aggShard" } )
 shardedAggTest.adminCommand( { shardcollection : "aggShard.ts1", key : { "_id" : 1 } } )
-db = s.getDB( "aggShard" );
+db = shardedAggTest.getDB( "aggShard" );
 
 
 /*
@@ -119,7 +119,7 @@ var a4 = db.runCommand({ aggregate:"ts1", pipeline:[
 var a4result = a4.result;
 for(i = 0; i < 6; ++i) {
     c = a4result[i].counter;
-    assert((c == 5) || (c == 1111) || (c == 2222) ||
+    assert((c == 55) || (c == 1111) || (c == 2222) ||
            (c == 33333) || (c = 99999) || (c == 55555),
            'agg sharded test simple match failed');
 }
