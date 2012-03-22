@@ -278,6 +278,9 @@ namespace mongo {
             newShardConn.done();
         }
         catch ( DBException& e ) {
+            if ( servers.type() == ConnectionString::SET ) {
+                ReplicaSetMonitor::remove( servers.getSetName() );
+            }
             ostringstream ss;
             ss << "couldn't connect to new shard ";
             ss << e.what();
