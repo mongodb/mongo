@@ -444,7 +444,8 @@ env.JSHeader( "shell/mongo-server.cpp" , [ "shell/servers.js"] )
 coreShellFiles = [ "shell/dbshell.cpp",
                    "shell/shell_utils.cpp",
                    "shell/mongo-server.cpp",
-                   "../third_party/linenoise/linenoise.cpp"]
+                   "../third_party/linenoise/linenoise.cpp",
+                   "../third_party/linenoise/linenoise_utf8.cpp"]
 
 shellFilesToUse = coreShellFiles
 
@@ -454,7 +455,8 @@ if shellEnv is not None:
          [ "shell/dbshell.cpp",
            "shell/shell_utils.cpp",
            "shell/mongo-server.cpp",
-           "../third_party/linenoise/linenoise.cpp" ],
+           "../third_party/linenoise/linenoise.cpp",
+           "../third_party/linenoise/linenoise_utf8.cpp" ],
         LIBDEPS=["coreserver", "clientandshell",
                  "$BUILD_DIR/third_party/pcrecpp"] )
 
