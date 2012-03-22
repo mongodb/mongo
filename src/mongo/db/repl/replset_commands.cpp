@@ -314,6 +314,25 @@ namespace mongo {
         }
     } cmdReplSetMaintenance;
 
+    class CmdReplSetSyncFrom: public ReplSetCommand {
+    public:
+        virtual void help( stringstream &help ) const {
+            help << "{ replSetSyncFrom : \"host:port\" }\n";
+            help << "Change who this member is syncing from.";
+        }
+
+        CmdReplSetSyncFrom() : ReplSetCommand("replSetSyncFrom") { }
+        virtual bool run(const string& , BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
+            if (!checkAuth(errmsg, result) || !check(errmsg, result)) {
+                return false;
+            }
+
+            string newTarget = cmdObj["replSetSyncFrom"].valuestrsafe();
+            result.append("syncFromRequested", newTarget);
+            return theReplSet->forceSyncFrom(newTarget, errmsg, result);
+        }
+    } cmdReplSetSyncFrom;
+
     using namespace bson;
     using namespace mongoutils::html;
     extern void fillRsLog(stringstream&);

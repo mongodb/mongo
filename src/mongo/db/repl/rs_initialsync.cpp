@@ -83,6 +83,18 @@ namespace mongo {
 
         bool buildIndexes = true;
 
+        {
+            // if we have a target we've requested to sync from, use it
+            lock lk(this);
+
+            if (_forceSyncTarget) {
+                _currentSyncTarget = _forceSyncTarget;
+                _forceSyncTarget = 0;
+                sethbmsg( str::stream() << "syncing to: " << _currentSyncTarget->fullName() << " by request", 0);
+                return _currentSyncTarget;
+            }
+        }
+
         // wait for 2N pings before choosing a sync target
         if (_cfg) {
             int needMorePings = config().members.size()*2 - HeartbeatInfo::numPings;

@@ -355,6 +355,7 @@ namespace mongo {
 
         OpTime lastOpTimeWritten;
         long long lastH; // hash we use to make sure we are reading the right flow of ops and aren't on an out-of-date "fork"
+        bool forceSyncFrom(const string& host, string& errmsg, BSONObjBuilder& result);
     private:
         set<ReplSetHealthPollTask*> healthTasks;
         void endOldHealthTasks();
@@ -377,6 +378,7 @@ namespace mongo {
         Member* getMemberToSyncTo();
         void veto(const string& host, unsigned secs=10);
         Member* _currentSyncTarget;
+        Member* _forceSyncTarget;
 
         bool _blockSync;
         void blockSync(bool block);

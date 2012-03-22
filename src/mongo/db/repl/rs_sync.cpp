@@ -410,6 +410,14 @@ namespace mongo {
                     if( !r.moreInCurrentBatch() ) {
                         lk.reset();
                         timeInWriteLock.reset();
+
+                        {
+                            lock lk(this);
+                            if (_forceSyncTarget) {
+                                return;
+                            }
+                        }
+
                         {
                             // we need to occasionally check some things. between
                             // batches is probably a good time.                            
@@ -530,6 +538,67 @@ namespace mongo {
             }
             // looping back is ok because this is a tailable cursor
         }
+    }
+
+    bool ReplSetImpl::forceSyncFrom(const string& host, string& errmsg, BSONObjBuilder& result) {
+        lock lk(this);
+
+        // initial sanity check
+        if (iAmArbiterOnly()) {
+            errmsg = "arbiters don't sync";
+            return false;
+        }
+
+        // find the member we want to sync from
+        Member *newTarget = 0;
+        for (Member *m = _members.head(); m; m = m->next()) {
+            if (m->fullName() == host) {
+                newTarget = m;
+                break;
+            }
+        }
+
+        // do some more sanity checks
+        if (!newTarget) {
+            // this will also catch if someone tries to sync a member from itself, as _self is not
+            // included in the _members list.
+            errmsg = "could not find member in replica set";
+            return false;
+        }
+        if (newTarget->config().arbiterOnly) {
+            errmsg = "I cannot sync from an arbiter";
+            return false;
+        }
+        if (!newTarget->config().buildIndexes && myConfig().buildIndexes) {
+            errmsg = "I cannot sync from a member who does not build indexes";
+            return false;
+        }
+        if (newTarget->hbinfo().authIssue) {
+            errmsg = "I cannot authenticate against the requested member";
+            return false;
+        }
+        if (newTarget->hbinfo().health == 0) {
+            errmsg = "I cannot reach the requested member";
+            return false;
+        }
+        if (newTarget->hbinfo().opTime.getSecs()+10 < lastOpTimeWritten.getSecs()) {
+            log() << "attempting to sync from " << newTarget->fullName()
+                  << ", but its latest opTime is " << newTarget->hbinfo().opTime.getSecs()
+                  << " and ours is " << lastOpTimeWritten.getSecs() << " so this may not work"
+                  << rsLog;
+            result.append("warning", "requested member is more than 10 seconds behind us");
+            // not returning false, just warning
+        }
+
+        // record the previous member we were syncing from
+        Member *prev = _currentSyncTarget;
+        if (prev) {
+            result.append("prevSyncTarget", prev->fullName());
+        }
+
+        // finally, set the new target
+        _forceSyncTarget = newTarget;
+        return true;
     }
 
     void ReplSetImpl::_syncThread() {

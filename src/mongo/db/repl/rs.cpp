@@ -336,6 +336,7 @@ namespace mongo {
 
     ReplSetImpl::ReplSetImpl(ReplSetCmdline& replSetCmdline) : elect(this),
         _currentSyncTarget(0),
+        _forceSyncTarget(0),
         _blockSync(false),
         _hbmsgTime(0),
         _self(0),
