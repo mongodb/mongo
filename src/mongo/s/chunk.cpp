@@ -807,6 +807,7 @@ namespace mongo {
     }
 
     void ChunkManager::getShardsForQuery( set<Shard>& shards , const BSONObj& query ) const {
+        // TODO Determine if the third argument to OrRangeGenerator() is necessary, see SERVER-5165.
         OrRangeGenerator org(_ns.c_str(), query, false);
 
         const string special = org.getSpecial();
