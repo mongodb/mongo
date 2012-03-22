@@ -59,6 +59,7 @@ namespace mongo {
         SlaveTracking() : _mutex("SlaveTracking") {
             _dirty = false;
             _started = false;
+            _currentlyUpdatingCache = false;
         }
 
         void run() {
@@ -83,15 +84,19 @@ namespace mongo {
                     }
                     _dirty = false;
                 }
-
+                
+                _currentlyUpdatingCache = true;
                 for ( list< pair<BSONObj,BSONObj> >::iterator i=todo.begin(); i!=todo.end(); i++ ) {
                     db.update( NS , i->first , i->second , true );
                 }
+                _currentlyUpdatingCache = false;
 
             }
         }
 
         void reset() {
+            if ( _currentlyUpdatingCache )
+                return;
             scoped_lock mylk(_mutex);
             _slaves.clear();
         }
@@ -173,6 +178,7 @@ namespace mongo {
         map<Ident,OpTime> _slaves;
         bool _dirty;
         bool _started;
+        bool _currentlyUpdatingCache; // this is not thread safe, but ok for our purposes
 
     } slaveTracking;
 
