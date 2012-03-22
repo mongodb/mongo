@@ -102,7 +102,7 @@ namespace mongo {
         bool hasLoadedRecord() const { return _loadedRecord; }
         bool hasElemMatchKey() const { return _elemMatchKeyFound; }
         string elemMatchKey() const {
-            verify( 16099, hasElemMatchKey() );
+            verify( 16108, hasElemMatchKey() );
             return _elemMatchKey;
         }
 
