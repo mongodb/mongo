@@ -606,7 +606,7 @@ namespace mongo {
             }
 
             // SERVER-4328 todo lock just the two db's not everything for the fromself case
-            writelock lk( fromSelf ? "" : dbname );
+            writelock lk( fromSelf ? "" : todb );
 
             Cloner c;
             string username = cmdObj.getStringField( "username" );
