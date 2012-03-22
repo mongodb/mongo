@@ -320,15 +320,6 @@ __block_extend(
 	 * easy way to know the maximum off_t on a system, limit growth to 8B
 	 * bits (we currently check an off_t is 8B in verify_build.h).  I don't
 	 * think we're likely to see anything bigger for awhile.
-	 *
-	 * XXX
-	 * This isn't sufficient: if we grow the file to the end, there isn't
-	 * enough room to write the free-list out when we close the file.  It
-	 * is vanishingly unlikely to happen (we use free blocks where they're
-	 * available to write the free list), but if the free-list is a bunch
-	 * of small blocks, each group of which are insufficient to hold the
-	 * free list, and the file has been fully populated, file close will
-	 * fail because we can't write the free list.
 	 */
 	if (fh->file_size > (off_t)INT64_MAX - size)
 		WT_RET_MSG(session, WT_ERROR,
