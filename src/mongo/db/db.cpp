@@ -521,6 +521,14 @@ namespace mongo {
 #ifndef _WIN32
         CmdLine::launchOk();
 #endif
+
+        if( !noauth ) { 
+            // open admin db in case we need to use it later. TODO this is not the right way to 
+            // resolve this. 
+            writelock lk;
+            Client::Context c("admin",dbpath,false);
+        }
+
         listen(listenPort);
 
         // listen() will return when exit code closes its socket.
