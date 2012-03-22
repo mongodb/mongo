@@ -419,6 +419,7 @@ namespace mongo {
 
             MyAssertionException * e = new MyAssertionException();
             e->ss << "ASSERT FAILED! " << file << ":" << line << endl;
+            cout << e->ss.str() << endl;
             throw e;
         }
 
