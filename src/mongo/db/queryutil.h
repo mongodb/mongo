@@ -249,8 +249,8 @@ namespace mongo {
     };
     
     /**
-     * One side of an interval of valid BSONElements, specified by a value and a
-     * boolean indicating whether the interval includes the value.
+     * One side of an interval of BSONElements, defined by a value and a boolean indicating if the
+     * interval includes the value.
      */
     struct FieldBound {
         BSONElement _bound;
@@ -262,7 +262,7 @@ namespace mongo {
         void flipInclusive() { _inclusive = !_inclusive; }
     };
 
-    /** A closed interval composed of a lower and an upper FieldBound. */
+    /** An interval defined between a lower and an upper FieldBound. */
     struct FieldInterval {
         FieldInterval() : _cachedEquality( -1 ) {}
         FieldInterval( const BSONElement& e ) : _cachedEquality( -1 ) {
