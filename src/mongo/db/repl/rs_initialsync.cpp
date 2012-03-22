@@ -231,7 +231,25 @@ namespace mongo {
 
         /* our cloned copy will be strange until we apply oplog events that occurred
            through the process.  we note that time point here. */
-        BSONObj minValid = r.getLastOp(rsoplog);
+        BSONObj minValid;
+        try {
+            // It may have been a long time since we last used this connection to
+            // query the oplog, depending on the size of the databases we needed to clone.
+            // A common problem is that TCP keepalives are set too infrequent, and thus
+            // our connection here is terminated by a firewall due to inactivity.
+            // Solution is to increase the TCP keepalive frequency.
+            minValid = r.getLastOp(rsoplog);
+        } catch ( SocketException & ) {
+            log() << "connection lost to " << source->h().toString() << "; is your tcp keepalive interval set appropriately?";
+            if( !r.connect(sourceHostname) ) {
+                sethbmsg( str::stream() << "initial sync couldn't connect to " << source->h().toString() , 0);
+                throw;
+            }
+            // retry
+            minValid = r.getLastOp(rsoplog);
+        }
+
+
         isyncassert( "getLastOp is empty ", !minValid.isEmpty() );
         OpTime mvoptime = minValid["ts"]._opTime();
         assert( !mvoptime.isNull() );
