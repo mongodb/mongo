@@ -27,6 +27,7 @@
 #include "db.h"
 #include "instance.h"
 #include "repl.h"
+#include "replutil.h"
 
 namespace mongo {
 
@@ -638,12 +639,12 @@ namespace mongo {
         }
         virtual bool requiresAuth() { return false; } // do our own auth
         virtual bool slaveOk() const {
-            return false;
+            return true; // most of the time, not true, but ok for local -> local renames
         }
         virtual LockType locktype() const { return WRITE; }
         virtual bool lockGlobally() const { return true; }
         virtual bool logTheOp() {
-            return true; // can't log steps when doing fast rename within a db, so always log the op rather than individual steps comprising it.
+            return false; // mostly we will log-the-op, actually.
         }
         virtual void help( stringstream &help ) const {
             help << " example: { renameCollection: foo.a, to: bar.b }";
@@ -651,11 +652,25 @@ namespace mongo {
         virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             string source = cmdObj.getStringField( name.c_str() );
             string target = cmdObj.getStringField( "to" );
+            char fromDb[256];
+            char toDb[256];
+
+
             uassert(15967,"invalid collection name: " + target, NamespaceString::validCollectionName(target.c_str()));
             if ( source.empty() || target.empty() ) {
                 errmsg = "invalid command syntax";
                 return false;
             }
+
+            nsToDatabase( source.c_str(), fromDb );
+            nsToDatabase( target.c_str(), toDb );
+
+            // allow local -> local on a replica, all else fails
+            if ( !isMaster( fromDb ) || !isMaster( toDb ) ) {
+                errmsg = "not master";
+                return false;
+            }
+
 
             bool capped = false;
             long long size = 0;
@@ -683,17 +698,15 @@ namespace mongo {
 
             // if we are renaming in the same database, just
             // rename the namespace and we're done.
-            {
-                char from[256];
-                nsToDatabase( source.c_str(), from );
-                char to[256];
-                nsToDatabase( target.c_str(), to );
-                if ( strcmp( from, to ) == 0 ) {
-                    renameNamespace( source.c_str(), target.c_str(), cmdObj["stayTemp"].trueValue() );
-                    // make sure we drop counters etc
-                    Top::global.collectionDropped( source );
-                    return true;
-                }
+            if ( strcmp( fromDb, toDb ) == 0 ) {
+                renameNamespace( source.c_str(), target.c_str(), cmdObj["stayTemp"].trueValue() );
+                // make sure we drop counters etc
+                Top::global.collectionDropped( source );
+
+                if ( strcmp ( fromDb, "local" ) != 0 ) 
+                    logOp("c", "admin.$cmd", cmdObj);
+
+                return true;
             }
 
             // renaming across databases, so we must copy all
@@ -756,6 +769,7 @@ namespace mongo {
                 Client::Context ctx( source );
                 dropCollection( source, errmsg, result );
             }
+            logOp("c", "admin.$cmd", cmdObj);
             return true;
         }
     } cmdrenamecollection;
