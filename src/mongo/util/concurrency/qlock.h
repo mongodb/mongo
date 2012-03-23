@@ -218,7 +218,7 @@ namespace mongo {
         boost::mutex::scoped_lock lk(m);
         assert( R.n > 0 && W.n == 0 );
         U.n++;
-        fassert( 0, U.n == 1 ); // for now we only allow one upgrade attempter
+        fassert( 16136, U.n == 1 ); // for now we only allow one upgrade attempter
         int pass = 0;
         while( W.n + R.n + w.n + r.n > 1 ) {
             if( ++pass >= 3 ) {
@@ -256,25 +256,25 @@ namespace mongo {
 
     inline void QLock::unlock_r() {
         boost::mutex::scoped_lock lk(m);
-        fassert(0, r.n > 0);
+        fassert(16137, r.n > 0);
         if( --r.n == 0 )
             notifyWeUnlocked('r');
     }
     inline void QLock::unlock_w() {
         boost::mutex::scoped_lock lk(m);
-        fassert(0, w.n > 0);
+        fassert(16138, w.n > 0);
         if( --w.n == 0 )
             notifyWeUnlocked('w');
     }
     inline void QLock::unlock_R() {
         boost::mutex::scoped_lock lk(m);
-        fassert(0, R.n > 0);
+        fassert(16139, R.n > 0);
         if( --R.n == 0 )
             notifyWeUnlocked('R');
     }    
     inline void QLock::unlock_W() {
         boost::mutex::scoped_lock lk(m);
-        fassert(0, W.n == 1);
+        fassert(16140, W.n == 1);
         W.n--;
         notifyWeUnlocked('W');
     }

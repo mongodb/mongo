@@ -35,7 +35,7 @@ def readErrorCodes( callback, replaceZero = False ):
     
     quick = [ "assert" , "Exception" , "verify" ]
 
-    ps = [ re.compile( "(([umsg]asser(t|ted))) *\(( *)(\d+)" ) ,
+    ps = [ re.compile( "(([umsgf]asser(t|ted))) *\(( *)(\d+)" ) ,
            re.compile( "((User|Msg|MsgAssertion)Exceptio(n))\(( *)(\d+)" ) ,
            re.compile( "(((verify))) *\(( *)(\d+)" )
            ]

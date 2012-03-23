@@ -203,7 +203,7 @@ namespace mongo {
         LockState& ls = lockState();
         if(  ls.threadState ) {
             log() << "can't lock_W, threadState=" << (int) ls.threadState << endl;
-            fassert(0,false);
+            fassert(16114,false);
         }
         getDur().commitIfNeeded(); // check before locking - will use an R lock for the commit if need to do one, which is better than W
         threadState() = 'W';
@@ -361,7 +361,7 @@ namespace mongo {
         LockState& ls = lockState();
         ls.recursive++;
         if( ls.recursive == 1 ) { 
-            fassert(0, ls.scopedLk == 0);
+            fassert(16115, ls.scopedLk == 0);
             ls.scopedLk = this;
         }
     }
@@ -383,9 +383,9 @@ namespace mongo {
         if( cant )
             return;
         LockState& ls = lockState();
-        fassert( 0, ls.recursive == 1 );
-        fassert( 0, ls.threadState );    
-        fassert( 0, ls.scopedLk );
+        fassert( 16116, ls.recursive == 1 );
+        fassert( 16117, ls.threadState );    
+        fassert( 16118, ls.scopedLk );
         ls.recursive--;
         ls.scopedLk->tempRelease();
         scopedLk = ls.scopedLk;
@@ -397,37 +397,37 @@ namespace mongo {
             return;
         LockState& ls = lockState();
         ls.recursive++;
-        fassert( 0, scopedLk );
-        fassert( 0, ls.scopedLk==NULL );
+        fassert( 16119, scopedLk );
+        fassert( 16120, ls.scopedLk==NULL );
         ls.scopedLk = scopedLk;
         ls.scopedLk->relock();
     }
 
     void Lock::GlobalWrite::tempRelease() { 
-        fassert(0, !noop);
+        fassert(16121, !noop);
         char ts = threadState();
-        fassert(0, ts != 'R'); // indicates downgraded; not allowed with temprelease
-        fassert(0, ts == 'W');
-        fassert(0, !stoppedGreed); // not allowed with temprelease
+        fassert(16122, ts != 'R'); // indicates downgraded; not allowed with temprelease
+        fassert(16123, ts == 'W');
+        fassert(16124, !stoppedGreed); // not allowed with temprelease
         unlock_W();
     }
     void Lock::GlobalWrite::relock() { 
-        fassert(0, !noop);
+        fassert(16125, !noop);
         char ts = threadState();
-        fassert(0, ts == 0);
+        fassert(16126, ts == 0);
         lock_W();
     }
 
     void Lock::GlobalRead::tempRelease() { 
-        fassert(0, !noop);
+        fassert(16127, !noop);
         char ts = threadState();
-        fassert(0, ts == 'R');
+        fassert(16128, ts == 'R');
         unlock_R();
     }
     void Lock::GlobalRead::relock() { 
-        fassert(0, !noop);
+        fassert(16129, !noop);
         char ts = threadState();
-        fassert(0, ts == 0);
+        fassert(16130, ts == 0);
         lock_R();
     }
 
@@ -549,7 +549,7 @@ namespace mongo {
         if( ls.nestableCount ) { 
             if( db != ls.whichNestable ) { 
                 error() << "can't lock local and admin db at the same time " << (int) db << ' ' << (int) ls.whichNestable << endl;
-                fassert(0,false);
+                fassert(16131,false);
             }
             assert( ls.nestableCount > 0 );
         }
@@ -557,7 +557,7 @@ namespace mongo {
             ls.whichNestable = db;
             ourCounter = &ls.nestableCount;
             ls.nestableCount++;
-            fassert(0,weLocked==0);
+            fassert(16132,weLocked==0);
             weLocked = nestableLocks[db];
             weLocked->lock();
         }
@@ -571,7 +571,7 @@ namespace mongo {
             ls.whichNestable = db;
             ourCounter = &ls.nestableCount;
             ls.nestableCount--;
-            fassert(0,weLocked==0);
+            fassert(16133,weLocked==0);
             weLocked = nestableLocks[db];
             weLocked->lock_shared();
         }
@@ -603,7 +603,7 @@ namespace mongo {
                 lock = new SimpleRWLock();
             ls.otherLock = lock;
         }
-        fassert(0,weLocked==0);
+        fassert(16134,weLocked==0);
         ls.otherLock->lock();
         weLocked = ls.otherLock;
     }
@@ -780,7 +780,7 @@ namespace mongo {
                 lock = new SimpleRWLock();
             ls.otherLock = lock;
         }
-        fassert(0,weLocked==0);
+        fassert(16135,weLocked==0);
         ls.otherLock->lock_shared();
         weLocked = ls.otherLock;
     }

@@ -148,7 +148,7 @@ namespace mongo {
         //privateViews.remove(_view_private);        
         _view_private = remapPrivateView(_view_private);
         //privateViews.add(_view_private, this);
-        fassert( 0, _view_private == old );
+        fassert( 16112, _view_private == old );
     }
 
     /** register view. threadsafe */

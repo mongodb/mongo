@@ -271,8 +271,8 @@ namespace mongo {
             if(  t == 'R' || t == 'W' )
                 return;
             // 'w' case we use runExclusively
-            fassert( 0, t == 'w' );
-            fassert( 0, in_f == 1 );
+            fassert( 16110, t == 'w' );
+            fassert( 16111, in_f == 1 );
         }
 
         /** we may need to commit earlier than normal if data are being written at 

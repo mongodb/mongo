@@ -636,7 +636,7 @@ namespace mongo {
                 return;
             }
 
-            fassert(0, !Lock::isLocked());
+            fassert(16113, !Lock::isLocked());
 
             try {
                 _syncThread();
