@@ -201,9 +201,9 @@ namespace ThreadedTests {
                             { Lock::DBRead  x("admin"); }
                             { Lock::DBWrite x("admin"); }
                         } else if( q == 2 ) { 
-                            Lock::DBWrite x("foo");
+                            /*Lock::DBWrite x("foo");
                             Lock::DBWrite y("admin");
-                            { Lock::TempRelease t; }
+                            { Lock::TempRelease t; }*/
                         }
                         else if( q == 3 ) {
                             Lock::DBWrite x("foo");
