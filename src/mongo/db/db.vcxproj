@@ -1259,6 +1259,7 @@
     <ClCompile Include="interrupt_status_mongod.cpp" />
     <ClCompile Include="key.cpp" />
     <ClCompile Include="mongommf.cpp" />
+    <ClCompile Include="namespace_details.cpp" />
     <ClCompile Include="oplog.cpp" />
     <ClCompile Include="ops\count.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
@@ -1307,6 +1308,8 @@
     <ClCompile Include="projection.cpp" />
     <ClInclude Include="..\util\progress_meter.h" />
     <ClInclude Include="explain.h" />
+    <ClInclude Include="namespace_details-inl.h" />
+    <ClInclude Include="namespace_details.h" />
     <ClInclude Include="queryoptimizercursorimpl.h" />
     <ClCompile Include="queryoptimizercursorimpl.cpp" />
     <ClCompile Include="querypattern.cpp">

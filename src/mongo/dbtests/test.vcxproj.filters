@@ -352,6 +352,12 @@
       <Filter>db\h</Filter>
     </ClInclude>
     <ClInclude Include="..\db\clientcursor.h" />
+    <ClInclude Include="..\db\namespace_details.h">
+      <Filter>db\h</Filter>
+    </ClInclude>
+    <ClInclude Include="..\db\namespace_details-inl.h">
+      <Filter>db\h</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\..\..\js\js32d.lib">
@@ -1044,6 +1050,9 @@
       <Filter>dbtests</Filter>
     </ClCompile>
     <ClCompile Include="..\util\progress_meter.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
+    <ClCompile Include="..\db\namespace_details.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
   </ItemGroup>

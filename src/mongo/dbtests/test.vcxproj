@@ -435,6 +435,8 @@
     <ClInclude Include="..\db\jsobjmanipulator.h" />
     <ClInclude Include="..\db\mongommf.h" />
     <ClInclude Include="..\db\mongomutex.h" />
+    <ClInclude Include="..\db\namespace_details-inl.h" />
+    <ClInclude Include="..\db\namespace_details.h" />
     <ClInclude Include="..\db\ops\count.h" />
     <ClInclude Include="..\db\ops\delete.h" />
     <ClInclude Include="..\db\ops\query.h" />
@@ -849,6 +851,7 @@
     <ClCompile Include="..\db\geo\haystack.cpp" />
     <ClCompile Include="..\db\key.cpp" />
     <ClCompile Include="..\db\mongommf.cpp" />
+    <ClCompile Include="..\db\namespace_details.cpp" />
     <ClCompile Include="..\db\ops\count.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">NotUsing</PrecompiledHeader>

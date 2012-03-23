@@ -86,7 +86,6 @@
     <ClCompile Include="querypattern.cpp" />
     <ClCompile Include="..\util\ramlog.cpp" />
     <ClCompile Include="key.cpp" />
-    <ClCompile Include="queryoptimizercursor.cpp" />
     <ClCompile Include="btreebuilder.cpp" />
     <ClCompile Include="queryoptimizercursorimpl.cpp" />
     <ClCompile Include="record.cpp" />
@@ -466,6 +465,7 @@
       <Filter>Boost</Filter>
     </ClCompile>
     <ClCompile Include="..\util\progress_meter.cpp" />
+    <ClCompile Include="namespace_details.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\distlock.h" />
@@ -685,9 +685,6 @@
     <ClInclude Include="concurrency.h">
       <Filter>y</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\third_party\pcre-7.4\config.h">
-      <Filter>y</Filter>
-    </ClInclude>
     <ClInclude Include="repl\connections.h">
       <Filter>y</Filter>
     </ClInclude>
@@ -757,6 +754,8 @@
       <Filter>pcre-8.30</Filter>
     </ClInclude>
     <ClInclude Include="..\util\progress_meter.h" />
+    <ClInclude Include="namespace_details.h" />
+    <ClInclude Include="namespace_details-inl.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\jstests\dur\dur1.js" />
