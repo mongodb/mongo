@@ -967,9 +967,11 @@ namespace mongo {
 
           @param pResult the Document to add the evaluated expressions to
           @param pDocument the input Document
+          @param excludeId for exclusions, exclude the _id, if present
          */
         void addToDocument(const intrusive_ptr<Document> &pResult,
-                           const intrusive_ptr<Document> &pDocument) const;
+                           const intrusive_ptr<Document> &pDocument,
+            bool excludeId = false) const;
 
         /*
           Estimate the number of fields that will result from evaluating

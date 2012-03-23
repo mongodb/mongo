@@ -1160,16 +1160,11 @@ namespace mongo {
 
     void ExpressionObject::addToDocument(
         const intrusive_ptr<Document> &pResult,
-        const intrusive_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument,
+        bool excludeId) const {
         const size_t pathSize = path.size();
         set<string>::const_iterator end(path.end());
 
-        /*
-          Take care of inclusions or exclusions.  Note that _id is special,
-          that that it is always included, unless it is specifically excluded.
-          we use excludeId for that in case excludePaths if false, which means
-          to include paths.
-        */
         if (pathSize) {
             auto_ptr<FieldIterator> pIter(pDocument->createFieldIterator());
             if (excludePaths) {
@@ -1177,13 +1172,16 @@ namespace mongo {
                     pair<string, intrusive_ptr<const Value> > field(pIter->next());
 
                     /*
+                      If we're excluding _id, and this is it, skip it.
+
                       If the field in the document is not in the exclusion set,
                       add it to the result document.
 
                       Note that exclusions are only allowed on leaves, so we
                       can assume we don't have to descend recursively here.
                      */
-                    if (path.find(field.first) != end)
+                    if ((excludeId && !field.first.compare(Document::idName)) ||
+                        (path.find(field.first) != end))
                         continue; // we found it, so don't add it
 
                     pResult->addField(field.first, field.second);
@@ -1194,10 +1192,6 @@ namespace mongo {
                     pair<string, intrusive_ptr<const Value> > field(
                         pIter->next());
                     /*
-                      If the field in the document is in the inclusion set,
-                      add it to the result document.  Or, if we're not
-                      excluding _id, and it is _id, include it.
-
                       Note that this could be an inclusion along a pathway,
                       so we look for an ExpressionObject in vpExpression; when
                       we find one, we populate the result with the evaluation

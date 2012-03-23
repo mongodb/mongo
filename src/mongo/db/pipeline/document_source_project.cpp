@@ -71,8 +71,13 @@ namespace mongo {
                 pResultDocument->addField(Document::idName, pId);
         }
 
-        /* use the ExpressionObject to create the base result */
-        pEO->addToDocument(pResultDocument, pInDocument);
+        /*
+          Use the ExpressionObject to create the base result.
+
+          If we're excluding fields at the top level, leave out the _id if
+          it is found, because we took care of it above.
+        */
+        pEO->addToDocument(pResultDocument, pInDocument, true);
 
         return pResultDocument;
     }
