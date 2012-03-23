@@ -55,7 +55,7 @@ def parse_options(args):
 
     for input_filename in input_filenames:
         if input_filename.startswith('@'):
-            opts.input_filenames.extend(line.strip() for line in open(input_filename[1:], 'r'))
+            opts.input_filenames.extend(open(input_filename[1:], 'r').split())
         else:
             opts.input_filenames.append(input_filename)
 
