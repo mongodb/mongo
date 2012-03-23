@@ -35,7 +35,6 @@
 #undef wassert
 #undef massert
 #undef uassert
-#undef BOOST_CHECK_EXCEPTION
 #undef DESTRUCTOR_GUARD
 
 // util/goodies.h

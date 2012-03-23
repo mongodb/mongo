@@ -90,7 +90,7 @@ namespace mongo {
         boost::filesystem::path dir( dir_ );
         dir /= database_;
         if ( !boost::filesystem::exists( dir ) )
-            MONGO_BOOST_CHECK_EXCEPTION_WITH_MSG( boost::filesystem::create_directory( dir ), "create dir for db " );
+            MONGO_ASSERT_ON_EXCEPTION_WITH_MSG( boost::filesystem::create_directory( dir ), "create dir for db " );
     }
 
     unsigned lenForNewNsFiles = 16 * 1024 * 1024;
