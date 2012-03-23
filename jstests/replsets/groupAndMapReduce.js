@@ -69,6 +69,10 @@ doTest = function( signal ) {
         reduce = function(key, vals) { var sum = 0; for (var i = 0; i < vals.length; ++i) { sum += vals[i]; } return sum; };
         slave.getDB("foo").foo.mapReduce(map, reduce, {out: { "inline" : 1}});
 
+        print("Calling mr() to local collection with slaveOk=true, must succeed");
+        slave.slaveOk = true;
+        slave.getDB("foo").foo.mapReduce(map, reduce, {out: { "replace" : "something", "db" : "local"}});
+
         print("Calling mr() to collection with slaveOk=true, must fail");
         try {
             slave.getDB("foo").foo.mapReduce(map, reduce, "output");

@@ -1046,9 +1046,11 @@ namespace mongo {
                 }
 
                 if (replSet && state.isOnDisk()) {
+                    const char *out = config.outDB.empty() ? dbname.c_str() : config.outDB.c_str();
+
                     // this means that it will be doing a write operation, make sure we are on Master
                     // ideally this check should be in slaveOk(), but at that point config is not known
-                    if (!isMaster(dbname.c_str())) {
+                    if ( !isMaster(out) ) {
                         errmsg = "not master";
                         return false;
                     }
