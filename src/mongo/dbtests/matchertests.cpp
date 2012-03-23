@@ -27,6 +27,8 @@
 
 namespace MatcherTests {
 
+    using boost::shared_ptr;
+
     class CollectionBase {
     public:
         CollectionBase() :
