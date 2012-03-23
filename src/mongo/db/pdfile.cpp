@@ -201,7 +201,7 @@ namespace mongo {
     void _deleteDataFiles(const char *database) {
         if ( directoryperdb ) {
             FileAllocator::get()->waitUntilFinished();
-            MONGO_BOOST_CHECK_EXCEPTION_WITH_MSG( boost::filesystem::remove_all( boost::filesystem::path( dbpath ) / database ), "delete data files with a directoryperdb" );
+            MONGO_ASSERT_ON_EXCEPTION_WITH_MSG( boost::filesystem::remove_all( boost::filesystem::path( dbpath ) / database ), "delete data files with a directoryperdb" );
             return;
         }
         class : public FileOp {
@@ -2252,7 +2252,7 @@ namespace mongo {
             stringstream ss;
             ss << prefix << "_repairDatabase_" << i++;
             reservedPath = repairPath / ss.str();
-            BOOST_CHECK_EXCEPTION( exists = boost::filesystem::exists( reservedPath ) );
+            MONGO_ASSERT_ON_EXCEPTION( exists = boost::filesystem::exists( reservedPath ) );
         }
         while ( exists );
         return reservedPath;
@@ -2314,7 +2314,7 @@ namespace mongo {
         Path reservedPath =
             uniqueReservedPath( ( preserveClonedFilesOnFailure || backupOriginalFiles ) ?
                                 "backup" : "_tmp" );
-        BOOST_CHECK_EXCEPTION( boost::filesystem::create_directory( reservedPath ) );
+        MONGO_ASSERT_ON_EXCEPTION( boost::filesystem::create_directory( reservedPath ) );
         string reservedPathString = reservedPath.native_directory_string();
 
         bool res;
@@ -2334,7 +2334,7 @@ namespace mongo {
             problem() << errmsg << endl;
 
             if ( !preserveClonedFilesOnFailure )
-                BOOST_CHECK_EXCEPTION( boost::filesystem::remove_all( reservedPath ) );
+                MONGO_ASSERT_ON_EXCEPTION( boost::filesystem::remove_all( reservedPath ) );
 
             getDur().syncDataAndTruncateJournal(); // Must be done before and after repair
 
@@ -2351,13 +2351,13 @@ namespace mongo {
         }
         else {
             _deleteDataFiles( dbName );
-            BOOST_CHECK_EXCEPTION( boost::filesystem::create_directory( Path( dbpath ) / dbName ) );
+            MONGO_ASSERT_ON_EXCEPTION( boost::filesystem::create_directory( Path( dbpath ) / dbName ) );
         }
 
         _replaceWithRecovered( dbName, reservedPathString.c_str() );
 
         if ( !backupOriginalFiles )
-            BOOST_CHECK_EXCEPTION( boost::filesystem::remove_all( reservedPath ) );
+            MONGO_ASSERT_ON_EXCEPTION( boost::filesystem::remove_all( reservedPath ) );
 
         getDur().syncDataAndTruncateJournal(); // Must be done before and after repair
 
@@ -2375,7 +2375,7 @@ namespace mongo {
         boost::filesystem::path q;
         q = p / (c+"ns");
         bool ok = false;
-        BOOST_CHECK_EXCEPTION( ok = fo.apply( q ) );
+        MONGO_ASSERT_ON_EXCEPTION( ok = fo.apply( q ) );
         if ( ok )
             log(2) << fo.op() << " file " << q.string() << endl;
         int i = 0;
@@ -2385,7 +2385,7 @@ namespace mongo {
             stringstream ss;
             ss << c << i;
             q = p / ss.str();
-            BOOST_CHECK_EXCEPTION( ok = fo.apply(q) );
+            MONGO_ASSERT_ON_EXCEPTION( ok = fo.apply(q) );
             if ( ok ) {
                 if ( extra != 10 ) {
                     log(1) << fo.op() << " file " << q.string() << endl;
