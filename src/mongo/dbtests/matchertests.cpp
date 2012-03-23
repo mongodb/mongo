@@ -19,11 +19,10 @@
 
 #include "pch.h"
 #include "../util/timer.h"
-
 #include "../db/matcher.h"
 #include "../db/json.h"
-
 #include "dbtests.h"
+#include "../db/namespace_details.h"
 
 namespace MatcherTests {
 
