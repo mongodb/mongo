@@ -618,6 +618,7 @@ namespace mongo {
     }
 
     void Lock::DBWrite::lockDB(const string& ns) {
+        locked_W=false;
         locked_w=false; weLocked=0; ourCounter = 0;
         LockState& ls = lockState();
         if( isW(ls) )
@@ -626,6 +627,12 @@ namespace mongo {
             char db[MaxDatabaseNameLen];
             nsToDatabase(ns.data(), db);
             Nestable nested = n(db);
+            if( nested == admin ) { 
+                // we can't nestedly lock both admin and local as implemented. so lock_W.
+                lock_W();
+                locked_W = true;
+                return;
+            } 
             if( !nested )
                 lock(db);
             lockTop(ls);
@@ -689,9 +696,12 @@ namespace mongo {
                 unlock_W();
             }
         }
+        if( locked_W ) {
+            unlock_W();
+        }
         ourCounter = 0;
         weLocked = 0;
-        locked_w = false;
+        locked_W = locked_w = false;
     }
     void Lock::DBRead::unlockDB() {
         if( ourCounter ) {

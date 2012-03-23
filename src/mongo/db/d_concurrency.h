@@ -83,6 +83,7 @@ namespace mongo {
             void lockNestable(Nestable db);
             void lock(const string& db);
             bool locked_w;
+            bool locked_W;
             SimpleRWLock *weLocked;
             int *ourCounter;
             const string what;
