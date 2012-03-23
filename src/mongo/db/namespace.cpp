@@ -16,6 +16,8 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "pch.h"
+
 #include "mongo/db/namespace.h"
 
 #include <boost/static_assert.hpp>

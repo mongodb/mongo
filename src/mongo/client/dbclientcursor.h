@@ -17,7 +17,7 @@
 
 #pragma once
 
-#include "mongo/pch.h"
+#include "pch.h"
 
 #include <stack>
 

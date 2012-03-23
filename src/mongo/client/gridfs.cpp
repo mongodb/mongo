@@ -15,7 +15,7 @@
  *    limitations under the License.
  */
 
-#include "mongo/pch.h"
+#include "pch.h"
 
 #include <boost/smart_ptr.hpp>
 #include <fcntl.h>

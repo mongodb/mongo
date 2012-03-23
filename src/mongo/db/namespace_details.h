@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "mongo/pch.h"
+#include "pch.h"
 
 #include "mongo/db/d_concurrency.h"
 #include "mongo/db/diskloc.h"

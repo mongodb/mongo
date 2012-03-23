@@ -16,7 +16,7 @@
 
 // strategy_sharded.cpp
 
-#include "mongo/pch.h"
+#include "pch.h"
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/connpool.h"

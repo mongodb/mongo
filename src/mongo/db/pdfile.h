@@ -33,7 +33,7 @@
 #include "mongo/db/namespace-inl.h"
 #include "mongo/db/namespace_details-inl.h"
 #include "mongo/db/namespacestring.h"
-#include "mongo/pch.h"
+#include "pch.h"
 #include "mongo/util/mmap.h"
 
 namespace mongo {

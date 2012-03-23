@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "mongo/pch.h"
+#include "pch.h"
 
 #include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_rs.h"
