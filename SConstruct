@@ -165,8 +165,6 @@ add_option( "libpath", "Library path if you have libraries in a nonstandard dire
 add_option( "extrapath", "comma separated list of add'l paths  (--extrapath /opt/foo/,/foo) static linking" , 1 , True )
 add_option( "extrapathdyn", "comma separated list of add'l paths  (--extrapath /opt/foo/,/foo) dynamic linking" , 1 , True )
 add_option( "extralib", "comma separated list of libraries  (--extralib js_static,readline" , 1 , True )
-add_option( "staticlib", "comma separated list of libs to link statically (--staticlib js_static,boost_program_options-mt,..." , 1 , True )
-add_option( "staticlibpath", "comma separated list of dirs to search for staticlib arguments" , 1 , True )
 
 add_option( "boost-compiler", "compiler used for boost (gcc41)" , 1 , True , "boostCompiler" )
 add_option( "boost-version", "boost version for linking(1_38)" , 1 , True , "boostVersion" )
@@ -234,10 +232,6 @@ if GetOption('help'):
 
 variantDir = get_variant_dir()
 
-def removeIfInList( lst , thing ):
-    if thing in lst:
-        lst.remove( thing )
-
 def printLocalInfo():
     import sys, SCons
     print( "scons version: " + SCons.__version__ )
@@ -245,7 +239,7 @@ def printLocalInfo():
 
 printLocalInfo()
 
-boostLibs = [ "thread" , "filesystem" , "program_options" ]
+boostLibs = [ "thread" , "filesystem" , "program_options", "system" ]
 
 onlyServer = len( COMMAND_LINE_TARGETS ) == 0 or ( len( COMMAND_LINE_TARGETS ) == 1 and str( COMMAND_LINE_TARGETS[0] ) in [ "mongod" , "mongos" , "test" ] )
 nix = False
@@ -536,8 +530,6 @@ elif "win32" == os.sys.platform:
 	#use current environment
 	env['ENV'] = dict(os.environ)
 
-    boostLibs = []
-
     env.Append( CPPDEFINES=[ "_UNICODE" ] )
     env.Append( CPPDEFINES=[ "UNICODE" ] )
 
@@ -785,88 +777,34 @@ env['MONGO_MODULE_FILES'] = moduleFiles
 
 # --- check system ---
 
-def doConfigure( myenv , shell=False ):
+def doConfigure(myenv):
     conf = Configure(myenv)
-    myenv["LINKFLAGS_CLEAN"] = list( myenv["LINKFLAGS"] )
-    myenv["LIBS_CLEAN"] = list( myenv["LIBS"] )
 
     if 'CheckCXX' in dir( conf ):
         if  not conf.CheckCXX():
             print( "c++ compiler not installed!" )
             Exit(1)
 
-    if nix and not shell:
+    if nix:
         if not conf.CheckLib( "stdc++" ):
             print( "can't find stdc++ library which is needed" );
             Exit(1)
 
-    def myCheckLib( poss , failIfNotFound=False , staticOnly=False):
-
-        if type( poss ) != types.ListType :
-            poss = [poss]
-
-        allPlaces = [];
-        allPlaces += extraLibPlaces
-        if nix and release:
-            allPlaces += myenv.subst( myenv["LIBPATH"] )
-            if not force64:
-                allPlaces += [ "/usr/lib" , "/usr/local/lib" ]
-
-            for p in poss:
-                for loc in allPlaces:
-                    fullPath = loc + "/lib" + p + ".a"
-                    if os.path.exists( fullPath ):
-                        myenv.Append( _LIBFLAGS='${SLIBS}',
-                                      SLIBS=" " + fullPath + " " )
-                        return True
-
-        if release and not windows and failIfNotFound:
-            print( "ERROR: can't find static version of: " + str( poss ) + " in: " + str( allPlaces ) )
-            Exit(1)
-
-        res = not staticOnly and conf.CheckLib( poss )
-        if res:
-            return True
-
-        if failIfNotFound:
-            print( "can't find or link against library " + str( poss ) + " in " + str( myenv["LIBPATH"] ) )
-            print( "see config.log for more information" )
-            if windows:
-                print( "use scons --64 when cl.exe is 64 bit compiler" )
-            Exit(1)
-
-        return False
-
     if has_option('use-system-all') or has_option('use-system-boost'):
         if not conf.CheckCXXHeader( "boost/filesystem/operations.hpp" ):
             print( "can't find boost headers" )
-            if shell:
-                print( "\tshell might not compile" )
-            else:
-                Exit(1)
-
-        if asio:
-            if conf.CheckCXXHeader( "boost/asio.hpp" ):
-                myenv.Append( CPPDEFINES=[ "USE_ASIO" ] )
-            else:
-                print( "WARNING: old version of boost - you should consider upgrading" )
-
-        # this will add it if it exists and works
-        myCheckLib( [ "boost_system" + boostCompiler + "-mt" + boostVersion ,
-                      "boost_system" + boostCompiler + boostVersion ] )
+            Exit(1)
 
         for b in boostLibs:
             l = "boost_" + b
-            myCheckLib( [ l + boostCompiler + "-mt" + boostVersion ,
-                          l + boostCompiler + boostVersion ] ,
-                        release or not shell)
+            if not conf.CheckLib([ l + boostCompiler + "-mt" + boostVersion,
+                                   l + boostCompiler + boostVersion ], language='C++' ):
+                Exit(1)
 
     if not conf.CheckCXXHeader( "execinfo.h" ):
         myenv.Append( CPPDEFINES=[ "NOEXECINFO" ] )
 
-    myenv["_HAVEPCAP"] = myCheckLib( ["pcap", "wpcap"] )
-    removeIfInList( myenv["LIBS"] , "pcap" )
-    removeIfInList( myenv["LIBS"] , "wpcap" )
+    myenv["_HAVEPCAP"] = conf.CheckLib( ["pcap", "wpcap"], autoadd=False )
 
     if solaris:
         conf.CheckLib( "rt" )
@@ -874,44 +812,24 @@ def doConfigure( myenv , shell=False ):
 
     if usev8:
         if debugBuild:
-            myCheckLib( [ "v8_g" , "v8" ] , True )
+            v8_lib_choices = ["v8_g", "v8"]
         else:
-            myCheckLib( "v8" , True )
+            v8_lib_choices = ["v8"]
+        if not conf.CheckLib( v8_lib_choices ):
+            Exit(1)
 
     # requires ports devel/libexecinfo to be installed
     if freebsd or openbsd:
-        myCheckLib( "execinfo", True )
-        env.Append( LIBS=[ "execinfo" ] )
-
-    # Handle staticlib,staticlibpath options.
-    staticlibfiles = []
-    if has_option( "staticlib" ):
-        # FIXME: probably this loop ought to do something clever
-        # depending on whether we want to use 32bit or 64bit
-        # libraries.  For now, we sort of rely on the user supplying a
-        # sensible staticlibpath option. (myCheckLib implements an
-        # analogous search, but it also does other things I don't
-        # understand, so I'm not using it.)
-        if has_option ( "staticlibpath" ):
-            dirs = GetOption ( "staticlibpath" ).split( "," )
-        else:
-            dirs = [ "/usr/lib64", "/usr/lib" ]
-
-        for l in GetOption( "staticlib" ).split( "," ):
-            removeIfInList(myenv["LIBS"], l)
-            found = False
-            for d in dirs:
-                f=  "%s/lib%s.a" % ( d, l )
-                if os.path.exists( f ):
-                    staticlibfiles.append(f)
-                    found = True
-                    break
-            if not found:
-                raise RuntimeError("can't find a static %s" % l)
+        if not conf.CheckLib("execinfo"):
+            Exit(1)
 
     # 'tcmalloc' needs to be the last library linked. Please, add new libraries before this 
     # point.
-    if has_option( "heapcheck" ) and not shell:
+    if has_option("tcmalloc") or has_option("heapcheck"):
+        if not conf.CheckLib("tcmalloc"):
+            Exit(1)
+
+    if has_option("heapcheck"):
         if ( not debugBuild ) and ( not debugLogging ):
             print( "--heapcheck needs --d or --dd" )
             Exit( 1 )
@@ -920,23 +838,8 @@ def doConfigure( myenv , shell=False ):
             print( "--heapcheck neads header 'google/heap-checker.h'" )
             Exit( 1 )
 
-        myCheckLib( "tcmalloc" , True );  # if successful, appedded 'tcmalloc' to myenv[ LIBS ]
         myenv.Append( CPPDEFINES=[ "HEAP_CHECKING" ] )
         myenv.Append( CPPFLAGS="-fno-omit-frame-pointer" )
-
-    # FIXME doConfigure() is being called twice, in the case of the shell. So if it is called 
-    # with shell==True, it'd be on its second call and it would need to rearrange the libraries'
-    # order. The following removes tcmalloc from the LIB's list and reinserts it at the end.
-    if has_option( "heapcheck" ) and shell:
-        removeIfInList( myenv["LIBS"] , "tcmalloc" )
-        myenv.Append( LIBS="tcmalloc" )
-
-    myenv.Append(LINKCOM=" $STATICFILES")
-    myenv.Append(STATICFILES=staticlibfiles)
-
-    if has_option( "tcmalloc" ):
-        myCheckLib( "tcmalloc" , True );  # if successful, appedded 'tcmalloc' to myenv[ LIBS ]
-
 
     return conf.Finish()
 
@@ -952,14 +855,10 @@ elif not onlyServer:
     shellEnv = env.Clone();
 
     if release and ( ( darwin and force64 ) or linux64 ):
-        shellEnv["LINKFLAGS"] = env["LINKFLAGS_CLEAN"]
-        shellEnv["LIBS"] = env["LIBS_CLEAN"]
-        shellEnv["SLIBS"] = ""
+        shellEnv["SLIBS"] = []
 
     if windows:
         shellEnv.Append( LIBS=["winmm.lib"] )
-
-    shellEnv = doConfigure( shellEnv , shell=True )
 
 def checkErrorCodes():
     import buildscripts.errorcodes as x
