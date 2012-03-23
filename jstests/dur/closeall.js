@@ -6,7 +6,7 @@ function f(variant, quickCommits, paranoid) {
     var path2 = "/data/db/closeall_slave";
     var ourdb = "closealltest";
 
-    print("closeall.js start mongod variant:" + variant);
+    print("closeall.js start mongod variant:" + variant + "." + quickCommits + "." + paranoid);
     var options = (paranoid==1 ? 8 : 0); // 8 is DurParanoid
     print("closeall.js --durOptions " + options);
     var N = 1000;
