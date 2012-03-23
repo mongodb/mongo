@@ -244,23 +244,27 @@ namespace mongo {
                 BSONElement e = o.firstElement();
                 string t = e.fieldName();
 
-                if ( t == "normal" || t == "replace" ) {
+                if ( o.hasElement("normal") ) {
                     outType = REPLACE;
-                    finalShort = e.String();
+                    finalShort = o["normal"].String();
+                } 
+                else if ( o.hasElement("replace") ) { 
+                    outType = REPLACE;
+                    finalShort = o["replace"].String();
                 }
-                else if ( t == "merge" ) {
+                else if ( o.hasElement("merge") ) { 
                     outType = MERGE;
-                    finalShort = e.String();
+                    finalShort = o["merge"].String();
                 }
-                else if ( t == "reduce" ) {
+                else if ( o.hasElement("reduce") ) {
                     outType = REDUCE;
-                    finalShort = e.String();
+                    finalShort = o["reduce"].String();
                 }
-                else if ( t == "inline" ) {
+                else if ( o.hasElement("inline") ) {
                     outType = INMEMORY;
                 }
                 else {
-                    uasserted( 13522 , str::stream() << "unknown out specifier [" << t << "]" );
+                    uasserted( 13522 , str::stream() << "please specify one of [replace|merge|reduce|inline] in 'out' object");
                 }
 
                 if (o.hasElement("db")) {
