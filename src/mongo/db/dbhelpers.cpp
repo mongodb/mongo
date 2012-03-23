@@ -209,22 +209,27 @@ namespace mongo {
         assert( keya == keyb );
 
         Client::Context ctx(ns);
-        NamespaceDetails* nsd = nsdetails( ns.c_str() );
-        if ( ! nsd )
-            return 0;
 
-        int ii = nsd->findIndexByKeyPattern( keya );
-        assert( ii >= 0 );
+        shared_ptr<Cursor> c;
+        auto_ptr<ClientCursor> cc;
+        {
+            NamespaceDetails* nsd = nsdetails( ns.c_str() );
+            if ( ! nsd )
+                return 0;
+            
+            int ii = nsd->findIndexByKeyPattern( keya );
+            assert( ii >= 0 );
+            
+            IndexDetails& i = nsd->idx( ii );
+            
+            c.reset( BtreeCursor::make( nsd , ii , i , minClean , maxClean , maxInclusive, 1 ) );
+            cc.reset( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
+            cc->setDoingDeletes( true );
+        }
 
         long long num = 0;
 
-        IndexDetails& i = nsd->idx( ii );
-
-        shared_ptr<Cursor> c( BtreeCursor::make( nsd , ii , i , minClean , maxClean , maxInclusive, 1 ) );
-        auto_ptr<ClientCursor> cc( new ClientCursor( QueryOption_NoCursorTimeout , c , ns ) );
-        cc->setDoingDeletes( true );
-
-        while ( c->ok() ) {
+        while ( cc->ok() ) {
 
             if ( yield && ! cc->yieldSometimes( ClientCursor::WillNeed) ) {
                 // cursor got finished by someone else, so we're done
@@ -232,15 +237,15 @@ namespace mongo {
                 break;
             }
 
-            if ( ! c->ok() )
+            if ( ! cc->ok() )
                 break;
 
-            DiskLoc rloc = c->currLoc();
+            DiskLoc rloc = cc->currLoc();
 
             if ( callback )
-                callback->goingToDelete( c->current() );
+                callback->goingToDelete( cc->current() );
 
-            c->advance();
+            cc->advance();
             c->prepareToTouchEarlierIterate();
 
             logOp( "d" , ns.c_str() , rloc.obj()["_id"].wrap() , 0 , 0 , fromMigrate );
