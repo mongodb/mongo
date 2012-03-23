@@ -21,6 +21,7 @@
 #include "../db/mongommf.h"
 #include "../db/concurrency.h"
 #include "../db/memconcept.h"
+#include "mongo/util/timer.h"
 
 namespace mongo {
 
@@ -169,13 +170,37 @@ namespace mongo {
 
             scoped_lock lk(*_flushMutex);
 
-            BOOL success = FlushViewOfFile(_view, 0); // 0 means whole mapping
-            if (!success) {
-                int err = GetLastError();
-                out() << "FlushViewOfFile failed " << err << " file: " << _filename << endl;
+            int loopCount = 0;
+            bool success = false;
+            int dosError = ERROR_SUCCESS;
+            const int maximumLoopCount = 1000 * 1000;
+            const int maximumTimeInSeconds = 60;
+            Timer t;
+            while ( !success && loopCount < maximumLoopCount && t.seconds() < maximumTimeInSeconds ) {
+                ++loopCount;
+                success = FALSE != FlushViewOfFile( _view, 0 );
+                if ( !success ) {
+                    dosError = GetLastError();
+                    if ( dosError != ERROR_LOCK_VIOLATION ) {
+                        break;
+                    }
+                }
+            }
+            if ( success && loopCount > 1 ) {
+                log() << "FlushViewOfFile for " << _filename
+                        << " succeeded after " << loopCount
+                        << " attempts taking " << t.millis()
+                        << " ms" << endl;
+            }
+            else if ( !success ) {
+                log() << "FlushViewOfFile for " << _filename
+                        << " failed with error " << dosError
+                        << " after " << loopCount
+                        << " attempts taking " << t.millis()
+                        << " ms" << endl;
             }
 
-            success = FlushFileBuffers(_fd);
+            success = FALSE != FlushFileBuffers(_fd);
             if (!success) {
                 int err = GetLastError();
                 out() << "FlushFileBuffers failed " << err << " file: " << _filename << endl;
