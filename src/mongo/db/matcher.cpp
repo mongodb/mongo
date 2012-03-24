@@ -29,6 +29,8 @@
 #include "client.h"
 
 #include "pdfile.h"
+#undef assert
+#define assert MONGO_assert
 
 namespace {
     inline pcrecpp::RE_Options flags2options(const char* flags) {
