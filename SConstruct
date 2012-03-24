@@ -546,7 +546,7 @@ elif "win32" == os.sys.platform:
     # /EHsc exception handling style for visual studio
     # /W3 warning level
     # /WX abort build on compiler warnings
-    env.Append( CPPFLAGS=" /EHsc /W3 " ) #  /WX " )
+    env.Append(CCFLAGS=["/EHsc","/W3"])
 
     # some warnings we don't like:
     # c4355
@@ -561,27 +561,27 @@ elif "win32" == os.sys.platform:
     # c4244
     # 'conversion' conversion from 'type1' to 'type2', possible loss of data
     #  An integer type is converted to a smaller integer type.
-    env.Append( CPPFLAGS=" /wd4355 /wd4800 /wd4267 /wd4244 " )
+    env.Append( CCFLAGS=["/wd4355", "/wd4800", "/wd4267", "/wd4244"] )
     
     # PSAPI_VERSION relates to process api dll Psapi.dll.
     env.Append( CPPDEFINES=["_CONSOLE","_CRT_SECURE_NO_WARNINGS","PSAPI_VERSION=1" ] )
 
     # this would be for pre-compiled headers, could play with it later  
-    #env.Append( CPPFLAGS=' /Yu"pch.h" ' ) 
+    #env.Append( CCFLAGS=['/Yu"pch.h"'] )
 
     # docs say don't use /FD from command line (minimal rebuild)
     # /Gy function level linking (implicit when using /Z7)
     # /Z7 debug info goes into each individual .obj file -- no .pdb created 
-    env.Append( CPPFLAGS= " /Z7 /errorReport:none " ); 
+    env.Append( CCFLAGS= ["/Z7", "/errorReport:none"] )
     if release:
         # /MT: Causes your application to use the multithread, static version of the run-time library (LIBCMT.lib)
         # /O2: optimize for speed (as opposed to size)
-        env.Append( CPPFLAGS= " /O2 /MT " )
+        env.Append( CCFLAGS= ["/O2", "/MT"] )
 
         # TODO: this has caused some linking problems :
         # /GL whole program optimization
         # /LTCG link time code generation
-        env.Append( CPPFLAGS= " /GL " ) 
+        env.Append( CCFLAGS= ["/GL"] )
         env.Append( LINKFLAGS=" /LTCG " )
         env.Append( ARFLAGS=" /LTCG " ) # for the Library Manager
         # /DEBUG will tell the linker to create a .pdb file
@@ -594,7 +594,7 @@ elif "win32" == os.sys.platform:
         #        (implies /Od: no optimizations)
         # /MTd: Defines _DEBUG, _MT, and causes your application to use the
         #       debug multithread version of the run-time library (LIBCMTD.lib)
-        env.Append( CPPFLAGS=" /RTC1 /Od /MTd " )
+        env.Append( CCFLAGS=["/RTC1", "/Od", "/MTd"] )
         if debugBuild:
             # If you build without --d, no debug PDB will be generated, and 
             # linking will be faster. However, you won't be able to debug your code with the debugger.
@@ -650,13 +650,20 @@ if nix:
     if has_option( "distcc" ):
         env["CXX"] = "distcc " + env["CXX"]
 
-    # -Winvalid-pch Warn if a precompiled header (see Precompiled Headers) is found in the search path but can't be used. 
-    env.Append( CPPFLAGS="-fPIC -fno-strict-aliasing -ggdb -pthread -Wall -Wsign-compare -Wno-unknown-pragmas -Winvalid-pch" )
+    # -Winvalid-pch Warn if a precompiled header (see Precompiled Headers) is found in the search path but can't be used.
+    env.Append( CCFLAGS=["-fPIC",
+                         "-fno-strict-aliasing",
+                         "-ggdb",
+                         "-pthread",
+                         "-Wall",
+                         "-Wsign-compare",
+                         "-Wno-unknown-pragmas",
+                         "-Winvalid-pch"] )
     # env.Append( " -Wconversion" ) TODO: this doesn't really work yet
     if linux:
-        env.Append( CPPFLAGS=" -Werror -pipe " )
+        env.Append( CCFLAGS=["-Werror", "-pipe"] )
         if not has_option('clang'):
-            env.Append( CPPFLAGS=" -fno-builtin-memcmp " ) # glibc's memcmp is faster than gcc's
+            env.Append( CCFLAGS=["-fno-builtin-memcmp"] ) # glibc's memcmp is faster than gcc's
 
     env.Append( CPPDEFINES=["_FILE_OFFSET_BITS=64"] )
     env.Append( CXXFLAGS=["-Wnon-virtual-dtor", "-Woverloaded-virtual"] )
@@ -678,27 +685,20 @@ if nix:
         env.Append( LINKFLAGS=" -fprofile-arcs -ftest-coverage " )
 
     if debugBuild:
-        env.Append( CPPFLAGS=" -O0 -fstack-protector " );
+        env.Append( CCFLAGS=["-O0", "-fstack-protector"] )
         env['ENV']['GLIBCXX_FORCE_NEW'] = 1; # play nice with valgrind
     else:
-        env.Append( CPPFLAGS=" -O3 " )
-        #env.Append( CPPFLAGS=" -fprofile-generate" )
-        #env.Append( LINKFLAGS=" -fprofile-generate" )
-        # then:
-        #env.Append( CPPFLAGS=" -fprofile-use" )
-        #env.Append( LINKFLAGS=" -fprofile-use" )
+        env.Append( CCFLAGS=["-O3"] )
 
     if debugLogging:
-        env.Append( CPPFLAGS=" -D_DEBUG" );
+        env.Append( CPPDEFINES=["_DEBUG"] );
 
     if force64:
-        env.Append( CFLAGS="-m64" )
-        env.Append( CXXFLAGS="-m64" )
+        env.Append( CCFLAGS="-m64" )
         env.Append( LINKFLAGS="-m64" )
 
     if force32:
-        env.Append( CFLAGS="-m32" )
-        env.Append( CXXFLAGS="-m32" )
+        env.Append( CCFLAGS="-m32" )
         env.Append( LINKFLAGS="-m32" )
 
     if has_option( "gdbserver" ):
@@ -841,7 +841,7 @@ def doConfigure(myenv):
             Exit( 1 )
 
         myenv.Append( CPPDEFINES=[ "HEAP_CHECKING" ] )
-        myenv.Append( CPPFLAGS="-fno-omit-frame-pointer" )
+        myenv.Append( CCFLAGS=["-fno-omit-frame-pointer"] )
 
     return conf.Finish()
 
