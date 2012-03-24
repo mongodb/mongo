@@ -30,8 +30,6 @@
 #include "btreebuilder.h"
 #include "../util/unittest.h"
 #include "../server.h"
-#undef assert
-#define assert MONGO_assert
 
 namespace mongo {
 
