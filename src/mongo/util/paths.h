@@ -24,9 +24,6 @@
 #include <fcntl.h>
 
 #include <boost/filesystem/path.hpp>
-// Boost defines assert, we need our version
-#undef assert
-#define assert MONGO_assert
 
 namespace mongo {
     
