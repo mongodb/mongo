@@ -59,9 +59,18 @@ config_setup(void)
 			*cp->v = CONF_RAND(cp);
 	}
 
-	/* Periodically, set the delete percentage to 0 so salvage gets run. */
-	if (!g.replay && g.run_cnt % 10 == 0)
-		g.c_delete_pct = 0;
+	/*
+	 * Periodically, set the delete percentage to 0 so salvage gets run,
+	 * as long as the delete percentage isn't nailed down.
+	 */
+	if (!g.replay && g.run_cnt % 10 == 0) {
+		for (cp = c; cp->name != NULL; ++cp)
+			if (strcmp(cp->name, "delete_pct") == 0)
+				break;
+		if (cp->name != NULL &&
+		    !(cp->flags & (C_IGNORE | C_PERM | C_TEMP)))
+			g.c_delete_pct = 0;
+	}
 }
 
 /*
