@@ -111,6 +111,8 @@ def has_option( name ):
 
     return x
 
+def use_system_version_of_library(name):
+    return has_option('use-system-all') or has_option('use-system-' + name)
 
 def get_variant_dir():
     
@@ -754,16 +756,16 @@ for shortName in getThirdPartyShortNames():
     options_topass["windows"] = windows
     options_topass["nix"] = nix
 
-    if has_option( "use-system-" + shortName ) or has_option( "use-system-all" ):
+    if use_system_version_of_library(shortName):
         print( "using system version of: " + shortName )
         myModule.configureSystem( env , fileLists , options_topass )
     else:
         myModule.configure( env , fileLists , options_topass )
 
-if not has_option("use-system-all") and not has_option("use-system-pcre"):
+if not use_system_version_of_library("pcre"):
     env.Prepend(CPPPATH=[ '$BUILD_DIR/third_party/pcre-${PCRE_VERSION}' ])
 
-if not has_option('use-system-all') and not has_option('use-system-boost'):
+if not use_system_version_of_library("boost"):
     env.Prepend(CPPPATH=['$BUILD_DIR/third_party/boost'],
                 CPPDEFINES=['BOOST_ALL_NO_LIB'])
 
@@ -790,7 +792,7 @@ def doConfigure(myenv):
             print( "can't find stdc++ library which is needed" );
             Exit(1)
 
-    if has_option('use-system-all') or has_option('use-system-boost'):
+    if use_system_version_of_library("boost"):
         if not conf.CheckCXXHeader( "boost/filesystem/operations.hpp" ):
             print( "can't find boost headers" )
             Exit(1)
@@ -1056,7 +1058,7 @@ if len(COMMAND_LINE_TARGETS) > 0 and 'uninstall' in COMMAND_LINE_TARGETS:
 clientEnv = env.Clone()
 clientEnv['CPPDEFINES'].remove('MONGO_EXPOSE_MACROS')
 
-if not has_option('use-system-all') and not has_option('use-system-boost'):
+if not use_system_version_of_library("boost"):
     clientEnv.Append(LIBS=['boost_thread', 'boost_filesystem', 'boost_system'])
     clientEnv.Prepend(LIBPATH=['$BUILD_DIR/third_party/boost/'])
 
@@ -1074,7 +1076,7 @@ Export("env")
 Export("clientEnv")
 Export("shellEnv")
 Export("testEnv")
-Export("has_option")
+Export("has_option use_system_version_of_library")
 Export("installSetup")
 Export("usesm usev8")
 Export("darwin windows solaris linux nix")
