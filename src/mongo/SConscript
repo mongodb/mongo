@@ -298,7 +298,11 @@ serverOnlyFiles += [ "s/d_logic.cpp",
 
 env.StaticLibrary("defaultversion", "s/default_version.cpp")
 
-env.StaticLibrary("serveronly", serverOnlyFiles, LIBDEPS=["coreshard", "dbcmdline", "defaultversion"])
+env.StaticLibrary("serveronly", serverOnlyFiles,
+                  LIBDEPS=["coreshard",
+                           "dbcmdline",
+                           "defaultversion",
+                           '$BUILD_DIR/third_party/mongo_snappy'])
 
 modules = []
 moduleNames = []

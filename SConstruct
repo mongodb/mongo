@@ -214,6 +214,8 @@ add_option( "use-system-pcre", "use system version of pcre library", 0, True )
 
 add_option( "use-system-boost", "use system version of boost libraries", 0, True )
 
+add_option( "use-system-snappy", "use system version of snappy library", 0, True )
+
 add_option( "use-system-all" , "use all system libraries", 0 , True )
 
 add_option( "use-cpu-profiler",

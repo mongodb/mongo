@@ -24,3 +24,10 @@ else:
                                  'boost/boost_thread',
                                  'boost/boost_system',
                                  ] )
+if use_system_version_of_library("snappy"):
+    env.StaticLibrary("mongo_snappy", ['mongo_snappy.cpp'],
+                      SYSLIBDEPS=['snappy'])
+else:
+    env.Append(CPPPATH='$BUILD_DIR/third_party/snappy')
+    env.SConscript('snappy/SConscript')
+    env.StaticLibrary('mongo_snappy', ['mongo_snappy.cpp'], LIBDEPS=['snappy/snappy'])
