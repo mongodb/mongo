@@ -334,6 +334,7 @@ namespace mongo {
                     _doBalanceRound( conn.conn() , &candidateChunks );
                     if ( candidateChunks.size() == 0 ) {
                         LOG(1) << "no need to move any chunk" << endl;
+                        _balancedLastTime = 0;
                     }
                     else {
                         _balancedLastTime = _moveChunks( &candidateChunks );
