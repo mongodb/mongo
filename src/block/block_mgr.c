@@ -301,14 +301,14 @@ __wt_bm_salvage_next(WT_SESSION_IMPL *session, WT_ITEM *buf,
  *	End a block manager salvage.
  */
 int
-__wt_bm_salvage_end(WT_SESSION_IMPL *session, int success)
+__wt_bm_salvage_end(WT_SESSION_IMPL *session)
 {
 	WT_BLOCK *block;
 
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (__wt_block_salvage_end(session, block, success));
+	return (__wt_block_salvage_end(session, block));
 }
 
 /*

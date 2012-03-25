@@ -175,14 +175,15 @@ static int  __rec_write_wrapup(WT_SESSION_IMPL *, WT_PAGE *);
 
 /*
  * __rec_track_cell --
- *	If a cell references an overflow chunk, add it to the page's list.
+ *	If a cell we're re-writing references an overflow chunk, add it to the
+ * page's tracking list to be discarded after the write completes.
  */
 static inline int
 __rec_track_cell(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack)
 {
-	return (unpack->ovfl ? __wt_rec_track_block(session,
-	    WT_PT_BLOCK_EVICT, page, unpack->data, unpack->size) : 0);
+	return (unpack->ovfl ? __wt_rec_track_block(
+	    session, page, unpack->data, unpack->size) : 0);
 }
 
 /*
@@ -211,9 +212,6 @@ __wt_rec_write(
 	/* Initialize the reconciliation structures for each new run. */
 	WT_RET(__rec_write_init(session, page));
 
-	/* Initialize the overflow tracking information for each new run. */
-	WT_RET(__wt_rec_track_init(session, page));
-
 	/* Reconcile the page. */
 	switch (page->type) {
 	case WT_PAGE_COL_FIX:
@@ -239,9 +237,6 @@ __wt_rec_write(
 
 	/* Wrap up the page's reconciliation. */
 	WT_RET(__rec_write_wrapup(session, page));
-
-	/* Wrap up overflow tracking, discarding what we can. */
-	WT_RET(__wt_rec_track_wrapup(session, page, 0));
 
 	/*
 	 * If this page has a parent, mark the parent dirty.
@@ -666,7 +661,7 @@ __rec_split(WT_SESSION_IMPL *session)
 		 * boundaries, or the split size was the same as the page size,
 		 * so we never bothered with saving split-point information.
 		 *
-		 * Write the current disk image.
+		 * Finalize the header information and write the page.
 		 */
 		dsk->recno = bnd->recno;
 		dsk->u.entries = r->entries;
@@ -753,7 +748,7 @@ __rec_split_finish(WT_SESSION_IMPL *session)
 	 */
 	snapshot = r->bnd_next == 1 && WT_PAGE_IS_ROOT(r->page);
 
-	/* Write the remaining information. */
+	/* Finalize the header information and write the page. */
 	dsk = r->dsk.mem;
 	dsk->recno = bnd->recno;
 	dsk->u.entries = r->entries;
@@ -809,7 +804,7 @@ __rec_split_fixup(WT_SESSION_IMPL *session)
 		len = WT_PTRDIFF32((bnd + 1)->start, bnd->start);
 		memcpy(dsk_start, bnd->start, len);
 
-		/* Write the page. */
+		/* Finalize the header information and write the page. */
 		dsk->recno = bnd->recno;
 		dsk->u.entries = bnd->entries;
 		tmp->size = WT_PAGE_HEADER_BYTE_SIZE(btree) + len;
@@ -850,15 +845,13 @@ static int
 __rec_split_write(
     WT_SESSION_IMPL *session, WT_BOUNDARY *bnd, WT_ITEM *buf, int snapshot)
 {
-	WT_BTREE *btree;
 	WT_CELL *cell;
 	WT_PAGE_HEADER *dsk;
-	WT_RECONCILE *r;
 	uint32_t size;
 	uint8_t addr[WT_BM_MAX_ADDR_COOKIE];
 
-	r = session->reconcile;
-	btree = session->btree;
+	dsk = buf->mem;
+	WT_VERBOSE(session, write, "%s", __wt_page_type_string(dsk->type));
 
 	/*
 	 * We always write an additional byte on row-store leaf pages after the
@@ -873,7 +866,6 @@ __rec_split_write(
 	 * see it.
 	 */
 #define	WT_TRAILING_KEY_CELL	(sizeof(uint8_t))
-	dsk = buf->mem;
 	if (dsk->type == WT_PAGE_ROW_LEAF) {
 		WT_ASSERT_RET(session, buf->size < buf->memsize);
 
@@ -882,10 +874,18 @@ __rec_split_write(
 		++buf->size;
 	}
 
-	/* Write the chunk and save the location information. */
-	WT_VERBOSE(session, write, "%s", __wt_page_type_string(dsk->type));
+	/*
+	 * Write the chunk and save the location information.  There is one big
+	 * question: if this is a snapshot, then we're going to have to wrap up
+	 * our tracking information (freeing blocks we no longer need) before we
+	 * can create the snapshot, because snapshots write extent lists, that
+	 * is, the whole system has to be consistent.   We have to handle empty
+	 * tree snapshots elsewhere (because we don't write anything for empty
+	 * tree snapshots, they don't come through this path).  Given that fact,
+	 * clear the boundary information as a reminder, and do the snapshot at
+	 * a later time, during wrapup.
+	 */
 	if (snapshot) {
-		WT_RET(__wt_bm_snap_write(session, buf, btree->snap));
 		bnd->addr.addr = NULL;
 		bnd->addr.size = 0;
 	} else {
@@ -2509,8 +2509,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 */
 		if (!WT_PAGE_IS_ROOT(page) && page->ref->addr != NULL) {
 			__wt_get_addr(page->parent, page->ref, &addr, &size);
-			WT_RET(__wt_rec_track_block(
-			    session, WT_PT_BLOCK, page, addr, size));
+			WT_RET(__wt_rec_track_block(session, page, addr, size));
 		}
 		break;
 	case WT_PAGE_REC_EMPTY:				/* Page deleted */
@@ -2523,7 +2522,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * are snapshots, and must be explicitly dropped.
 		 */
 		if (!WT_PAGE_IS_ROOT(page))
-			WT_RET(__wt_rec_track_block(session, WT_PT_BLOCK,
+			WT_RET(__wt_rec_track_block(session,
 			    page, mod->u.replace.addr, mod->u.replace.size));
 
 		/* Discard the replacement page's address. */
@@ -2534,8 +2533,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	case WT_PAGE_REC_SPLIT:				/* Page split */
 		/* Discard the split page's leaf-page blocks. */
 		WT_REF_FOREACH(mod->u.split, ref, i)
-			WT_RET(__wt_rec_track_block(
-			    session, WT_PT_BLOCK, page,
+			WT_RET(__wt_rec_track_block(session, page,
 			    ((WT_ADDR *)ref->addr)->addr,
 			    ((WT_ADDR *)ref->addr)->size));
 
@@ -2553,6 +2551,15 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_ILLEGAL_VALUE(session);
 	}
 	F_CLR(page, WT_PAGE_REC_MASK);
+
+	/*
+	 * Wrap up discarded block and overflow tracking.  If we are about to
+	 * create a snapshot, the system must be entirely consistent at that
+	 * point, the underlying block manager is presumably going to do some
+	 * action to resolve the list of allocated/free/whatever blocks that
+	 * are associated with the snapshot.
+	 */
+	WT_RET(__wt_rec_track_wrapup(session, page));
 
 	switch (r->bnd_next) {
 	case 0:						/* Page delete */
@@ -2577,10 +2584,19 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * Because WiredTiger's pages grow without splitting, we're
 		 * replacing a single page with another single page most of
 		 * the time.
+		 *
+		 * If this is a root page, then we don't have an address and we
+		 * have to create a sync point.  The address was cleared when
+		 * we were about to write the buffer so we know what to do here.
 		 */
 		bnd = &r->bnd[0];
-		mod->u.replace = bnd->addr;
-		bnd->addr.addr = NULL;
+		if (bnd->addr.addr == NULL)
+			WT_RET(
+			    __wt_bm_snap_write(session, &r->dsk, btree->snap));
+		else {
+			mod->u.replace = bnd->addr;
+			bnd->addr.addr = NULL;
+		}
 
 		F_SET(page, WT_PAGE_REC_REPLACE);
 		break;

@@ -267,7 +267,7 @@ __rec_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 /*
  * __rec_discard_page --
- *	Process the page's list of tracked objects, and discard it.
+ *	Discard the page.
  */
 static int
 __rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page)
@@ -276,29 +276,24 @@ __rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	mod = page->modify;
 
-	/*
-	 * or if the page was split and later merged, discard it.
-	 */
+	/* We should never evict the file's current eviction point. */
+	WT_ASSERT(session, session->btree->evict_page != page);
+
 	if (mod != NULL) {
 		/*
 		 * If the page has been modified and was tracking objects,
-		 * resolve them.
+		 * discard them.
 		 */
-		WT_RET(__wt_rec_track_wrapup(session, page, 1));
+		__wt_rec_track_discard(session, page);
 
 		/*
 		 * If the page was split and eventually merged into the parent,
-		 * discard the split page; if the split page was promoted into
-		 * a split-merge page, then the reference must be cleared before
-		 * the page is discarded.
+		 * discard the split page.
 		 */
 		if (F_ISSET(page, WT_PAGE_REC_MASK) == WT_PAGE_REC_SPLIT &&
 		    mod->u.split != NULL)
 			__wt_page_out(session, mod->u.split, 0);
 	}
-
-	/* We should never evict the file's current eviction point. */
-	WT_ASSERT(session, session->btree->evict_page != page);
 
 	/* Discard the page itself. */
 	__wt_page_out(session, page, 0);

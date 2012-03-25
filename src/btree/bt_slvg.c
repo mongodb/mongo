@@ -297,7 +297,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	 * Inform the underlying block manager that we're done.
 	 */
 err:	if (started)
-		WT_TRET(__wt_bm_salvage_end(session, ret == 0 ? 1 : 0));
+		WT_TRET(__wt_bm_salvage_end(session));
 
 	/* Discard any root page we created. */
 	if (ss->root_page != NULL)
@@ -364,8 +364,8 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 		 * calls don't need them either.
 		 */
 		switch (dsk->type) {
+		case WT_PAGE_BLOCK_MANAGER:
 		case WT_PAGE_COL_INT:
-		case WT_PAGE_FREELIST:
 		case WT_PAGE_ROW_INT:
 			WT_VERBOSE(session, salvage,
 			    "%s page ignored %s",

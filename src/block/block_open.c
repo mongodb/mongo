@@ -157,6 +157,8 @@ __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
 	ret = 0;
 
+	WT_VERBOSE(session, block, "close");
+
 	if (block->live_load) {
 		__wt_errx(session, "snapshot never unloaded");
 		ret = EINVAL;

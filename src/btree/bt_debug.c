@@ -509,17 +509,17 @@ __debug_page_modify(WT_DBG *ds, WT_PAGE *page)
 		__dmsg(ds, "\t" "tracking list:\n");
 	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i) {
 		switch (track->type) {
-		case WT_PT_BLOCK:
-			__dmsg(ds, "\t\t" "block");
+		case WT_PT_DISCARD:
+			__dmsg(ds, "\t\t" "discard");
 			break;
-		case WT_PT_BLOCK_EVICT:
-			__dmsg(ds, "\t\t" "block-evict");
+		case WT_PT_DISCARD_COMPLETE:
+			__dmsg(ds, "\t\t" "discard-complete");
 			break;
 		case WT_PT_OVFL:
-			__dmsg(ds, "\t\t" "overflow (on)");
+			__dmsg(ds, "\t\t" "overflow");
 			break;
-		case WT_PT_OVFL_DISCARD:
-			__dmsg(ds, "\t\t" "overflow (off)");
+		case WT_PT_OVFL_ACTIVE:
+			__dmsg(ds, "\t\t" "overflow-active");
 			break;
 		case WT_PT_EMPTY:
 			continue;

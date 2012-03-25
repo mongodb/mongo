@@ -124,14 +124,22 @@ __wt_block_buffer_to_snapshot(WT_SESSION_IMPL *session,
 	pp = &p;
 	WT_RET(__block_buffer_to_addr(block, pp,
 	    &si->root_offset, &si->root_size, &si->root_cksum));
+
+	si->alloc.name = "snapshot.alloc";
 	WT_RET(__block_buffer_to_addr(block, pp,
 	    &si->alloc_offset, &si->alloc_size, &si->alloc_cksum));
+
+	si->avail.name = "snapshot.avail";
 	WT_RET(__block_buffer_to_addr(block, pp,
 	    &si->avail_offset, &si->avail_size, &si->avail_cksum));
+
+	si->discard.name = "snapshot.discard";
 	WT_RET(__block_buffer_to_addr(block, pp,
 	    &si->discard_offset, &si->discard_size, &si->discard_cksum));
+
 	WT_RET(__wt_vunpack_uint(pp, 0, &a));
 	si->file_size = (off_t)a;
+
 	WT_RET(__wt_vunpack_uint(pp, 0, &a));
 	si->write_gen = a;
 

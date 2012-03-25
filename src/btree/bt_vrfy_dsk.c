@@ -51,10 +51,10 @@ __wt_verify_dsk(WT_SESSION_IMPL *session, const char *addr, WT_ITEM *buf)
 
 	/* Check the page type. */
 	switch (dsk->type) {
+	case WT_PAGE_BLOCK_MANAGER:
 	case WT_PAGE_COL_FIX:
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_COL_VAR:
-	case WT_PAGE_FREELIST:
 	case WT_PAGE_OVFL:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
@@ -76,7 +76,7 @@ __wt_verify_dsk(WT_SESSION_IMPL *session, const char *addr, WT_ITEM *buf)
 		WT_RET_VRFY(session,
 		    "%s page at %s has a record number of zero",
 		    __wt_page_type_string(dsk->type), addr);
-	case WT_PAGE_FREELIST:
+	case WT_PAGE_BLOCK_MANAGER:
 	case WT_PAGE_OVFL:
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
@@ -112,7 +112,7 @@ __wt_verify_dsk(WT_SESSION_IMPL *session, const char *addr, WT_ITEM *buf)
 	case WT_PAGE_ROW_INT:
 	case WT_PAGE_ROW_LEAF:
 		return (__verify_dsk_row(session, addr, dsk));
-	case WT_PAGE_FREELIST:
+	case WT_PAGE_BLOCK_MANAGER:
 	case WT_PAGE_OVFL:
 		return (__verify_dsk_chunk(session, addr, dsk, dsk->u.datalen));
 	WT_ILLEGAL_VALUE(session);

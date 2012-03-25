@@ -149,6 +149,7 @@ struct __wt_block {
 	WT_COMPRESSOR *compressor;	/* Page compressor */
 
 					/* Salvage support */
+	int	 slvg;			/* If performing salvage. */
 	off_t	 slvg_off;		/* Salvage file offset */
 
 					/* Verification support */

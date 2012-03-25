@@ -17,6 +17,9 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	off_t len;
 	uint32_t allocsize;
 
+	/* Reset the live snapshot information. */
+	WT_RET(__wt_block_snap_init(session, block, &block->live, 1));
+
 	/*
 	 * Truncate the file to an initial sector plus N allocation size
 	 * units (bytes trailing the last multiple of an allocation size
@@ -38,10 +41,11 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	block->slvg_off = WT_BLOCK_DESC_SECTOR;
 
 	/*
-	 * We don't currently need to do anything about the freelist because
-	 * we don't read it for salvage operations.
+	 * We don't currently need to do anything about the snapshot extents
+	 * because we don't read them for salvage operations.
 	 */
 
+	block->live_load = block->slvg = 1;
 	return (0);
 }
 
@@ -50,11 +54,13 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
  *	End a file salvage.
  */
 int
-__wt_block_salvage_end(WT_SESSION_IMPL *session, WT_BLOCK *block, int success)
+__wt_block_salvage_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
-	/* If not successful, discard the live snapshot we've created. */
-	if (!success)
-		(void)__wt_block_snap_unload(session, block);
+	/* Discard the live snapshot. */
+	WT_RET(__wt_block_snap_unload(session, block));
+
+	block->slvg = 0;
+
 	return (0);
 }
 
@@ -122,7 +128,7 @@ skip:			WT_VERBOSE(session, salvage,
 			 * than once.
 			 */
 			WT_RET(__wt_block_free(
-			    session, block, offset, (off_t)allocsize));
+			    session, block, offset, (off_t)allocsize, 0));
 			block->slvg_off = offset += allocsize;
 			continue;
 		}

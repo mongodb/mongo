@@ -74,10 +74,10 @@ struct __wt_addr {
  */
 typedef enum {
 	WT_PT_EMPTY=0,			/* Unused slot */
-	WT_PT_BLOCK,			/* Block: inactive */
-	WT_PT_BLOCK_EVICT,		/* Block: inactive on eviction */
-	WT_PT_OVFL,			/* Overflow: active */
-	WT_PT_OVFL_DISCARD		/* Overflow: inactive */
+	WT_PT_DISCARD,			/* Block/overflow to discard */
+	WT_PT_DISCARD_COMPLETE,		/* Block/overflow freed */
+	WT_PT_OVFL,			/* Overflow record not yet in use */
+	WT_PT_OVFL_ACTIVE		/* Overflow record in use */
 } __wt_pt_type_t;
 
 struct __wt_page_modify {
@@ -274,13 +274,13 @@ struct __wt_page {
 	uint32_t memory_footprint;
 
 #define	WT_PAGE_INVALID		0	/* Invalid page */
-#define	WT_PAGE_COL_FIX		1	/* Col-store fixed-len leaf */
-#define	WT_PAGE_COL_INT		2	/* Col-store internal page */
-#define	WT_PAGE_COL_VAR		3	/* Col-store var-length leaf page */
-#define	WT_PAGE_OVFL		4	/* Overflow page */
-#define	WT_PAGE_ROW_INT		5	/* Row-store internal page */
-#define	WT_PAGE_ROW_LEAF	6	/* Row-store leaf page */
-#define	WT_PAGE_FREELIST	7	/* Free-list page */
+#define	WT_PAGE_BLOCK_MANAGER	1	/* Block-manager page */
+#define	WT_PAGE_COL_FIX		2	/* Col-store fixed-len leaf */
+#define	WT_PAGE_COL_INT		3	/* Col-store internal page */
+#define	WT_PAGE_COL_VAR		4	/* Col-store var-length leaf page */
+#define	WT_PAGE_OVFL		5	/* Overflow page */
+#define	WT_PAGE_ROW_INT		6	/* Row-store internal page */
+#define	WT_PAGE_ROW_LEAF	7	/* Row-store leaf page */
 	uint8_t type;			/* Page type */
 
 	/*
