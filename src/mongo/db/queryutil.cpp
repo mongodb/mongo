@@ -863,7 +863,7 @@ namespace mongo {
 
     void FieldRangeSet::processQueryField( const BSONElement &e, bool optimize ) {
         if ( e.fieldName()[ 0 ] == '$' ) {
-            if ( strcmp( e.fieldName(), "$and" ) == 0 ) {
+            if ( str::equals( e.fieldName(), "$and" ) ) {
                 uassert( 14816 , "$and expression must be a nonempty array" , e.type() == Array && e.embeddedObject().nFields() > 0 );
                 BSONObjIterator i( e.embeddedObject() );
                 while( i.more() ) {
@@ -877,32 +877,32 @@ namespace mongo {
                 return;
             }
         
-            if ( strcmp( e.fieldName(), "$where" ) == 0 ) {
+            if ( str::equals( e.fieldName(), "$where" ) ) {
                 return;
             }
         
-            if ( strcmp( e.fieldName(), "$or" ) == 0 ) {
+            if ( str::equals( e.fieldName(), "$or" ) ) {
                 return;
             }
         
-            if ( strcmp( e.fieldName(), "$nor" ) == 0 ) {
+            if ( str::equals( e.fieldName(), "$nor" ) ) {
                 return;
             }
         }
         
         bool equality = ( getGtLtOp( e ) == BSONObj::Equality );
         if ( equality && e.type() == Object ) {
-            equality = ( strcmp( e.embeddedObject().firstElementFieldName(), "$not" ) != 0 );
+            equality = !str::equals( e.embeddedObject().firstElementFieldName(), "$not" );
         }
 
-        if ( equality || ( e.type() == Object && !e.embeddedObject()[ "$regex" ].eoo() ) ) {
+        if ( equality || ( e.type() == Object && e.embeddedObject().hasField( "$regex" ) ) ) {
             range( e.fieldName() ) &= FieldRange( e , _singleKey , false , optimize );
         }
         if ( !equality ) {
             BSONObjIterator j( e.embeddedObject() );
             while( j.more() ) {
                 BSONElement f = j.next();
-                if ( strcmp( f.fieldName(), "$not" ) == 0 ) {
+                if ( str::equals( f.fieldName(), "$not" ) ) {
                     switch( f.type() ) {
                     case Object: {
                         BSONObjIterator k( f.embeddedObject() );
