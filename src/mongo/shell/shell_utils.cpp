@@ -30,6 +30,7 @@
 #include <sstream>
 #include <fstream>
 #include <vector>
+#include <unistd.h>
 #include <fcntl.h>
 
 #ifdef _WIN32
@@ -195,6 +196,12 @@ namespace mongo {
         BSONObj pwd(const BSONObj&, void* data) {
             boost::filesystem::path p = boost::filesystem::current_path();
             return BSON( "" << p.string() );
+        }
+
+        BSONObj isaterminal(const BSONObj& whatever, void* data) {
+            BSONObjBuilder bobjb;
+            bobjb.appendBool( "isatty", isatty(0) );
+            return bobjb.obj();
         }
 
         BSONObj hostname(const BSONObj&, void* data) {
@@ -930,6 +937,7 @@ namespace mongo {
             theScope = &scope;
             scope.injectNative( "quit", Quit );
             scope.injectNative( "getMemInfo" , JSGetMemInfo );
+            scope.injectNative( "isatty", isaterminal );
             scope.injectNative( "_srand" , JSSrand );
             scope.injectNative( "_rand" , JSRand );
             scope.injectNative( "_isWindows" , isWindows );
