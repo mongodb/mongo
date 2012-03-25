@@ -349,7 +349,7 @@ namespace mongo {
     }
 
     bool Grid::knowAboutShard( const string& name ) const {
-        ShardConnection conn( configServer.getPrimary() , "" );
+        ScopedDbConnection conn( configServer.getPrimary()  );
         BSONObj shard = conn->findOne( ShardNS::shard , BSON( "host" << name ) );
         conn.done();
         return ! shard.isEmpty();
@@ -361,7 +361,7 @@ namespace mongo {
         bool ok = false;
         int count = 0;
 
-        ShardConnection conn( configServer.getPrimary() , "" );
+        ScopedDbConnection conn( configServer.getPrimary() );
         BSONObj o = conn->findOne( ShardNS::shard , Query( fromjson ( "{_id: /^shard/}" ) ).sort(  BSON( "_id" << -1 ) ) );
         if ( ! o.isEmpty() ) {
             string last = o["_id"].String();
@@ -386,7 +386,7 @@ namespace mongo {
      */
     bool Grid::shouldBalance( const string& ns ) const {
 
-        ShardConnection conn( configServer.getPrimary() , "" );
+        ScopedDbConnection conn( configServer.getPrimary() );
         BSONObj balancerDoc;
         BSONObj collDoc;
 
