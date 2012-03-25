@@ -812,8 +812,8 @@ __slvg_col_range_overlap(
 	 * #7			AAAAAAAAAAAAAAAA	same as #2
 	 * #8	AAAAAAAAAAAAA				same as #3
 	 * #9		AAAAA				A is a prefix of B
-	 * #10			AAAAAAAAAA		A is a suffix of B
-	 * #11			AAAAAA			A is middle of B
+	 * #10			AAAAAA			A is middle of B
+	 * #11			AAAAAAAAAA		A is a suffix of B
 	 *
 	 * Because the leaf page array was sorted by record number and a_trk
 	 * appears earlier in that array than b_trk, cases #2/7, #10 and #11
@@ -1351,8 +1351,8 @@ __slvg_row_range_overlap(
 	 * #7			AAAAAAAAAAAAAAAA	same as #2
 	 * #8	AAAAAAAAAAAAA				same as #3
 	 * #9		AAAAA				A is a prefix of B
-	 * #10			AAAAAAAAAA		A is a suffix of B
-	 * #11			AAAAAA			A is middle of B
+	 * #10			AAAAAA			A is middle of B
+	 * #11			AAAAAAAAAA		A is a suffix of B
 	 *
 	 * Because the leaf page array was sorted by record number and a_trk
 	 * appears earlier in that array than b_trk, cases #2/7, #10 and #11
