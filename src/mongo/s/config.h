@@ -83,8 +83,8 @@ namespace mongo {
             }
 
             void resetCM( ChunkManager * cm ) {
-                assert(cm);
-                assert(_cm); // this has to be already sharded
+                verify(cm);
+                verify(_cm); // this has to be already sharded
                 _cm.reset( cm );
             }
 
@@ -118,7 +118,7 @@ namespace mongo {
               _shardingEnabled(false),
               _lock("DBConfig") ,
               _hitConfigServerLock( "DBConfig::_hitConfigServerLock" ) {
-            assert( name.size() );
+            verify( name.size() );
         }
         virtual ~DBConfig() {}
 

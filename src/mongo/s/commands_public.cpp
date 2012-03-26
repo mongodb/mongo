@@ -461,7 +461,7 @@ namespace mongo {
 
                     set<Shard> shards;
                     cm->getShardsForQuery( shards , filter );
-                    assert( shards.size() );
+                    verify( shards.size() );
 
                     hadToBreak = false;
 
@@ -1110,7 +1110,7 @@ namespace mongo {
 
                 // modify command to run on shards with output to tmp collection
                 string badShardedField;
-                assert( maxChunkSizeBytes < 0x7fffffff );
+                verify( maxChunkSizeBytes < 0x7fffffff );
                 BSONObj shardedCommand = fixForShards( cmdObj , shardResultCollection , badShardedField, static_cast<int>(maxChunkSizeBytes) );
 
                 if ( ! shardedInput && ! shardedOutput && ! customOutDB ) {
@@ -1317,7 +1317,7 @@ namespace mongo {
                                 for (unsigned int i = 0; i < sizes.size(); i += 2) {
                                     BSONObj key = sizes[i].Obj().getOwned();
                                     long long size = sizes[i+1].numberLong();
-                                    assert( size < 0x7fffffff );
+                                    verify( size < 0x7fffffff );
                                     chunkSizes[key] = static_cast<int>(size);
                                 }
                             }
@@ -1329,7 +1329,7 @@ namespace mongo {
                     for ( map<BSONObj, int>::iterator it = chunkSizes.begin() ; it != chunkSizes.end() ; ++it ) {
                         BSONObj key = it->first;
                         int size = it->second;
-                        assert( size < 0x7fffffff );
+                        verify( size < 0x7fffffff );
 
                         // key reported should be the chunk's minimum
                         ChunkPtr c =  cm->findChunk(key);
@@ -1484,7 +1484,7 @@ namespace mongo {
                  i != end; i++) {
                 boost::shared_ptr<ShardConnection> temp(
                     new ShardConnection(i->getConnString(), fullns));
-                assert(temp->get());
+                verify(temp->get());
                 futures.push_back(
                     Future::spawnCommand(i->getConnString(), dbName,
                                          shardedCommand , 0, temp->get()));

@@ -35,7 +35,7 @@ namespace mongo {
         dbtemprelease() {
             const Client& c = cc();
             _context = c.getContext();
-            assert( Lock::isLocked() );
+            verify( Lock::isLocked() );
             if( Lock::nested() ) {
                 Lock::nested();
                 massert(10298 , "can't temprelease nested lock", false);
@@ -44,7 +44,7 @@ namespace mongo {
                 _context->unlocked();
             }
             tr.reset(new Lock::TempRelease);
-            assert( c.curop() );
+            verify( c.curop() );
             c.curop()->yielded();
         }
         ~dbtemprelease() {
@@ -55,7 +55,7 @@ namespace mongo {
     };
 
     /** must be write locked
-        no assert (and no release) if nested write lock 
+        no verify(and no release) if nested write lock 
         a lot like dbtempreleasecond, eliminate?
     */
     struct dbtempreleasewritelock {
@@ -65,13 +65,13 @@ namespace mongo {
         dbtempreleasewritelock() {
             const Client& c = cc();
             _context = c.getContext();
-            assert( Lock::isW() );
+            verify( Lock::isW() );
             if( Lock::nested() )
                 return;
             if ( _context ) 
                 _context->unlocked();
             tr.reset(new Lock::TempRelease);
-            assert( c.curop() );
+            verify( c.curop() );
             c.curop()->yielded();            
         }
         ~dbtempreleasewritelock() {

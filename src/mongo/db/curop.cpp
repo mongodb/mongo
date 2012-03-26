@@ -75,7 +75,7 @@ namespace mongo {
         if ( progressMeterTotal ) {
             if ( _progressMeter.isActive() ) {
                 cout << "about to assert, old _message: " << _message << " new message:" << msg << endl;
-                assert( ! _progressMeter.isActive() );
+                verify( ! _progressMeter.isActive() );
             }
             _progressMeter.reset( progressMeterTotal , secondsBetween );
         }

@@ -83,7 +83,7 @@ namespace mongo {
     }
 
     bool BackgroundJob::wait( unsigned msTimeOut ) {
-        assert( !_status->deleteSelf ); // you cannot call wait on a self-deleting job
+        verify( !_status->deleteSelf ); // you cannot call wait on a self-deleting job
         scoped_lock l( _status->m );
         while ( _status->state != Done ) {
             if ( msTimeOut ) {

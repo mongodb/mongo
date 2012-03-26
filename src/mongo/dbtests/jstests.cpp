@@ -687,7 +687,7 @@ namespace JSTests {
         BSONObjBuilder result;
         string errmsg;
         dbEval( "test", cmd, result, errmsg);
-        assert(0);
+        verify(0);
     }
 
     DBDirectClient client;
@@ -814,7 +814,7 @@ namespace JSTests {
 
             {
                 BSONObj fromA = client.findOne( _a , BSONObj() );
-                assert( fromA.valid() );
+                verify( fromA.valid() );
                 //cout << "Froma : " << fromA << endl;
                 BSONObjBuilder b;
                 b.append( "b" , 18 );

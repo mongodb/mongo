@@ -45,13 +45,13 @@ namespace mongo {
         bool bad() {return false;}
         bool is_open() {return false;}
         fileofs len() { return 0; }
-        void fsync() { assert(false); }
+        void fsync() { verify(false); }
 
         // shrink file to size bytes. No-op if file already smaller.
         void truncate(fileofs size);
 
         /** @return  -1 if error or unavailable */
-        static boost::intmax_t freeSpace(const string &path) { assert(false); return -1; }
+        static boost::intmax_t freeSpace(const string &path) { verify(false); return -1; }
     };
 
 #if defined(_WIN32)
@@ -210,7 +210,7 @@ namespace mongo {
         void fsync() { ::fsync(fd); }
         static boost::intmax_t freeSpace ( const string &path ) {
             struct statvfs info;
-            assert( !statvfs( path.c_str() , &info ) );
+            verify( !statvfs( path.c_str() , &info ) );
             return boost::intmax_t( info.f_bavail ) * info.f_frsize;
         }
 

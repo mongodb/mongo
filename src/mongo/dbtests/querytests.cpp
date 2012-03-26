@@ -917,7 +917,7 @@ namespace QueryTests {
             auto_ptr< DBClientCursor > cursor = client().query( ns, Query().sort( "7" ) );
             while ( cursor->more() ) {
                 BSONObj o = cursor->next();
-                assert( o.valid() );
+                verify( o.valid() );
                 //cout << " foo " << o << endl;
             }
 

@@ -188,10 +188,10 @@ namespace mongo {
         if ( lastOp.isNull() )
             return;
 
-        assert( str::startsWith(ns, "local.oplog.") );
+        verify( str::startsWith(ns, "local.oplog.") );
 
         Client * c = curop.getClient();
-        assert(c);
+        verify(c);
         BSONObj rid = c->getRemoteID();
         if ( rid.isEmpty() )
             return;

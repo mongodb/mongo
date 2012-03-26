@@ -100,7 +100,7 @@ void workerThread() {
 }
 
 void go() {
-    assert( options["r"].trueValue() || options["w"].trueValue() );
+    verify( options["r"].trueValue() || options["w"].trueValue() );
     MemoryMappedFile f;
     cout << "creating test file size:";
     len = options["fileSizeMB"].numberLong();
@@ -138,7 +138,7 @@ void go() {
         lf = 0;
         mmfFile = new MemoryMappedFile();
         mmf = (char *) mmfFile->map(fname);
-        assert( mmf );
+        verify( mmf );
 
         syncDelaySecs = options["syncDelay"].numberInt();
         if( syncDelaySecs ) {

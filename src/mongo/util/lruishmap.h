@@ -43,7 +43,7 @@ namespace mongo {
 
         int _find(const K& k, bool& found) {
             int h = k.hash();
-            assert( h > 0 );
+            verify( h > 0 );
             int j = h % n;
             int first = j;
             for ( int i = 0; i < MaxChain; i++ ) {

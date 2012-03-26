@@ -22,7 +22,7 @@ namespace mongo {
     string dynHostMyName() { return ""; }
 
     void dynHostResolve(string& name, int& port) {
-        assert(false);
+        verify(false);
     }
 
 }

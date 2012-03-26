@@ -59,7 +59,7 @@ namespace mongo {
         // For capped case, signal that we are doing initial extent allocation.
         if ( capped )
             cappedLastDelRecLastExtent().setInvalid();
-        assert( sizeof(dataFileVersion) == 2 );
+        verify( sizeof(dataFileVersion) == 2 );
         dataFileVersion = 0;
         indexFileVersion = 0;
         multiKeyIndexBits = 0;
@@ -145,7 +145,7 @@ namespace mongo {
     bool checkNsFilesOnLoad = true;
 
     NOINLINE_DECL void NamespaceIndex::_init() {
-        assert( !ht );
+        verify( !ht );
 
         Lock::assertWriteLocked(database_);
 
@@ -182,7 +182,7 @@ namespace mongo {
             if( f.create(pathString, l, true) ) {
                 getDur().createdFile(pathString, l); // always a new file
                 len = l;
-                assert( len == lenForNewNsFiles );
+                verify( len == lenForNewNsFiles );
                 p = f.getView();
             }
         }
@@ -194,7 +194,7 @@ namespace mongo {
         }
 
 
-        assert( len <= 0x7fffffff );
+        verify( len <= 0x7fffffff );
         ht = new HashTable<Namespace,NamespaceDetails>(p, (int) len, "namespace index");
         if( checkNsFilesOnLoad )
             ht->iterAll(namespaceOnLoadCallback);
@@ -206,7 +206,7 @@ namespace mongo {
             l->push_back( (string)k );
     }
     void NamespaceIndex::getNamespaces( list<string>& tofill , bool onlyCollections ) const {
-        assert( onlyCollections ); // TODO: need to implement this
+        verify( onlyCollections ); // TODO: need to implement this
         //                                  need boost::bind or something to make this less ugly
 
         if ( ht )
@@ -288,7 +288,7 @@ namespace mongo {
         to go in a forward direction which is important for performance. */
         int regionlen = r->lengthWithHeaders;
         extentLoc.set(loc.a(), r->extentOfs);
-        assert( r->extentOfs < loc.getOfs() );
+        verify( r->extentOfs < loc.getOfs() );
 
         DEBUGGING out() << "TEMP: alloc() returns " << loc.toString() << ' ' << ns << " lentoalloc:" << lenToAlloc << " ext:" << extentLoc.toString() << endl;
 
@@ -386,7 +386,7 @@ namespace mongo {
             const DeletedRecord *bmr = bestmatch.drec();
             *getDur().writing(bestprev) = bmr->nextDeleted;
             bmr->nextDeleted.writing().setInvalid(); // defensive.
-            assert(bmr->extentOfs < bestmatch.getOfs());
+            verify(bmr->extentOfs < bestmatch.getOfs());
         }
 
         return bestmatch;
@@ -442,7 +442,7 @@ namespace mongo {
                 out() << "    fr: " << e.ext()->firstRecord.toString() <<
                       " lr: " << e.ext()->lastRecord.toString() << " extent->len: " << e.ext()->length << '\n';
             }
-            assert( len * 5 > lastExtentSize ); // assume it is unusually large record; if not, something is broken
+            verify( len * 5 > lastExtentSize ); // assume it is unusually large record; if not, something is broken
         }
     }
 
@@ -486,7 +486,7 @@ namespace mongo {
     /* extra space for indexes when more than 10 */
     NamespaceDetails::Extra* NamespaceIndex::newExtra(const char *ns, int i, NamespaceDetails *d) {
         Lock::assertWriteLocked(ns);
-        assert( i >= 0 && i <= 1 );
+        verify( i >= 0 && i <= 1 );
         Namespace n(ns);
         Namespace extra(n.extraName(i).c_str()); // throws userexception if ns name too long
 
@@ -505,13 +505,13 @@ namespace mongo {
         Extra *e = ni->newExtra(ns, i, this);
         long ofs = e->ofsFrom(this);
         if( i == 0 ) {
-            assert( extraOffset == 0 );
+            verify( extraOffset == 0 );
             *getDur().writing(&extraOffset) = ofs;
-            assert( extra() == e );
+            verify( extra() == e );
         }
         else {
             Extra *hd = extra();
-            assert( hd->next(this) == 0 );
+            verify( hd->next(this) == 0 );
             hd->setNext(ofs);
         }
         return e;
@@ -550,7 +550,7 @@ namespace mongo {
                 e->setNext( nxt->ofsFrom(this) );
                 e = nxt;
             }
-            assert( extraOffset );
+            verify( extraOffset );
         }
     }
 
@@ -571,7 +571,7 @@ namespace mongo {
 
     long long NamespaceDetails::storageSize( int * numExtents , BSONArrayBuilder * extentInfo ) const {
         Extent * e = firstExtent.ext();
-        assert( e );
+        verify( e );
 
         long long total = 0;
         int n = 0;
@@ -617,9 +617,9 @@ namespace mongo {
 
     /*static*/ NOINLINE_DECL NamespaceDetailsTransient& NamespaceDetailsTransient::make_inlock(const char *ns) {
         shared_ptr< NamespaceDetailsTransient > &t = _nsdMap[ ns ];
-        assert( t.get() == 0 );
+        verify( t.get() == 0 );
         Database *database = cc().database();
-        assert( database );
+        verify( database );
         if( _nsdMap.size() % 20000 == 10000 ) { 
             // so we notice if insanely large #s
             log() << "opening namespace " << ns << endl;
@@ -707,9 +707,9 @@ namespace mongo {
 
     void renameNamespace( const char *from, const char *to, bool stayTemp) {
         NamespaceIndex *ni = nsindex( from );
-        assert( ni );
-        assert( ni->details( from ) );
-        assert( ! ni->details( to ) );
+        verify( ni );
+        verify( ni->details( from ) );
+        verify( ! ni->details( to ) );
 
         // Our namespace and index details will move to a different
         // memory location.  The only references to namespace and
@@ -737,7 +737,7 @@ namespace mongo {
         nsToDatabase(from, database);
         string s = database;
         s += ".system.namespaces";
-        assert( Helpers::findOne( s.c_str(), BSON( "name" << from ), oldSpec ) );
+        verify( Helpers::findOne( s.c_str(), BSON( "name" << from ), oldSpec ) );
 
         BSONObjBuilder newSpecB;
         BSONObjIterator i( oldSpec.getObjectField( "options" ) );

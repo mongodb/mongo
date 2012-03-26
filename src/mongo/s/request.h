@@ -53,16 +53,16 @@ namespace mongo {
         }
 
         DBConfigPtr getConfig() const {
-            assert( _didInit );
+            verify( _didInit );
             return _config;
         }
         bool isShardingEnabled() const {
-            assert( _didInit );
+            verify( _didInit );
             return _config->isShardingEnabled();
         }
 
         ChunkManagerPtr getChunkManager() const {
-            assert( _didInit );
+            verify( _didInit );
             return _chunkManager;
         }
 

@@ -164,7 +164,7 @@ namespace ReplSetTests {
             sync.applyOp(obj, o1);
 
             BSONObj fin = findOne();
-            assert(fin["x"].Number() == 456);
+            verify(fin["x"].Number() == 456);
         }
     };
 
@@ -203,7 +203,7 @@ namespace ReplSetTests {
             b.append("ns", _ns);
             BSONObj o = b.obj();
 
-            assert(!apply(o));
+            verify(!apply(o));
             return o;
         }
     public:
@@ -232,7 +232,7 @@ namespace ReplSetTests {
             BSONObj op = updateFail();
 
             Sync s("");
-            assert(!s.shouldRetry(op));
+            verify(!s.shouldRetry(op));
         }
     };
 
@@ -250,14 +250,14 @@ namespace ReplSetTests {
             b.append("o2", BSON("x" << 456));
             b.append("ns", cappedNs());
 
-            assert(apply(b.obj()));
+            verify(apply(b.obj()));
         }
 
         void insert() {
             Client::Context ctx( cappedNs() );
             BSONObj o = BSON("x" << 456);
             DiskLoc loc = theDataFileMgr.insert( cappedNs().c_str(), o.objdata(), o.objsize(), false );
-            assert(!loc.isNull());
+            verify(!loc.isNull());
         }
     public:
         virtual ~CappedUpdate() {}
@@ -270,12 +270,12 @@ namespace ReplSetTests {
 
             DBDirectClient client;
             int count = (int) client.count(cappedNs(), BSONObj());
-            assert(count > 1);
+            verify(count > 1);
 
             // Just to be sure, no _id index, right?
             Client::Context ctx(cappedNs());
             NamespaceDetails *nsd = nsdetails(cappedNs().c_str());
-            assert(nsd->findIdIndex() == -1);
+            verify(nsd->findIdIndex() == -1);
         }
     };
 
@@ -289,7 +289,7 @@ namespace ReplSetTests {
             b.append("op", "i");
             b.append("o", BSON("_id" << 123 << "x" << 456));
             b.append("ns", cappedNs());
-            assert(apply(b.obj()));
+            verify(apply(b.obj()));
         }
     public:
         virtual ~CappedInsert() {}
@@ -302,7 +302,7 @@ namespace ReplSetTests {
             // Just to be sure, no _id index, right?
             Client::Context ctx(cappedNs());
             NamespaceDetails *nsd = nsdetails(cappedNs().c_str());
-            assert(nsd->findIdIndex() == -1);
+            verify(nsd->findIdIndex() == -1);
         }
     };
 

@@ -41,7 +41,7 @@ namespace mongo {
         void *p = map(filename.c_str(), len);
         if( p && zero ) {
             size_t sz = (size_t) len;
-            assert( len == sz );
+            verify( len == sz );
             memset(p, 0, sz);
         }
         return p;
@@ -186,7 +186,7 @@ namespace mongo {
 
     void MongoFile::setFilename(string fn) {
         LockMongoFilesExclusive lk;
-        assert( _filename.empty() );
+        verify( _filename.empty() );
         _filename = fn;
         MongoFile *&ptf = pathToFile[fn];
         massert(13617, "MongoFile : multiple opens of same filename", ptf == 0);

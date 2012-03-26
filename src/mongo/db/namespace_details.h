@@ -114,8 +114,8 @@ namespace mongo {
         private:
             unsigned reserved2;
             unsigned reserved3;
-            Extra(const Extra&) { assert(false); }
-            Extra& operator=(const Extra& r) { assert(false); return *this; }
+            Extra(const Extra&) { verify(false); }
+            Extra& operator=(const Extra& r) { verify(false); return *this; }
         public:
             Extra() { }
             long ofsFrom(NamespaceDetails *d) {
@@ -190,7 +190,7 @@ namespace mongo {
 
         /** get the IndexDetails for the index currently being built in the background. (there is at most one) */
         IndexDetails& inProgIdx() {
-            DEV assert(indexBuildInProgress);
+            DEV verify(indexBuildInProgress);
             return idx(nIndexes);
         }
 
@@ -479,7 +479,7 @@ namespace mongo {
                 SimpleMutex::scoped_lock lk(_isMutex);
                 if ( ! spec._finishedInit ) {
                     spec.reset( details );
-                    assert( spec._finishedInit );
+                    verify( spec._finishedInit );
                 }
             }
             return spec;

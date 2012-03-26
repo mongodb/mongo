@@ -82,7 +82,7 @@ namespace mongo {
 
             JEntry e;
             e.len = min(i->length(), (unsigned)(mmf->length() - ofs)); //dont write past end of file
-            assert( ofs <= 0x80000000 );
+            verify( ofs <= 0x80000000 );
             e.ofs = (unsigned) ofs;
             e.setFileNo( mmf->fileSuffixNo() );
             if( mmf->relativePath() == local ) {
@@ -128,7 +128,7 @@ namespace mongo {
 
             assertNothingSpooled();
             const vector<WriteIntent>& _intents = commitJob.getIntentsSorted();
-            assert( !_intents.empty() );
+            verify( !_intents.empty() );
 
             WriteIntent last;
             for( vector<WriteIntent>::const_iterator i = _intents.begin(); i != _intents.end(); i++ ) { 
@@ -160,7 +160,7 @@ namespace mongo {
             @return partially populated sectheader and _ab set
         */
         static void _PREPLOGBUFFER(JSectHeader& h, AlignedBuilder& bb) {
-            assert( cmdLine.dur );
+            verify( cmdLine.dur );
             assertLockedForCommitting();
 
             resetLogBuffer(h, bb); // adds JSectHeader

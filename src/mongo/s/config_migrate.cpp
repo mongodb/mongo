@@ -39,7 +39,7 @@ namespace mongo {
             ScopedDbConnection conn( _primary );
             conn->insert( "config.version" , BSON( "_id" << 1 << "version" << VERSION ) );
             pool.flush();
-            assert( VERSION == dbConfigVersion( conn.conn() ) );
+            verify( VERSION == dbConfigVersion( conn.conn() ) );
             conn.done();
             return 0;
         }
@@ -47,7 +47,7 @@ namespace mongo {
         if ( cur == 2 ) {
 
             // need to upgrade
-            assert( VERSION == 3 );
+            verify( VERSION == 3 );
             if ( ! upgrade ) {
                 log() << "newer version of mongo meta data\n"
                       << "need to --upgrade after shutting all mongos down"
@@ -94,8 +94,8 @@ namespace mongo {
                     n++;
                 }
 
-                assert( n == hostToShard.size() );
-                assert( n == shards.size() );
+                verify( n == hostToShard.size() );
+                verify( n == shards.size() );
 
                 conn->remove( ShardNS::shard , BSONObj() );
 
@@ -138,7 +138,7 @@ namespace mongo {
                     newDBs[old["name"].String()] = x;
                 }
 
-                assert( n == newDBs.size() );
+                verify( n == newDBs.size() );
 
                 conn->remove( ShardNS::database , BSONObj() );
 
@@ -174,7 +174,7 @@ namespace mongo {
                     num++;
                 }
 
-                assert( num == chunks.size() );
+                verify( num == chunks.size() );
 
                 conn->remove( ShardNS::chunk , BSONObj() );
                 for ( map<string,BSONObj>::iterator i=chunks.begin(); i!=chunks.end(); i++ ) {

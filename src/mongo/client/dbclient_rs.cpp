@@ -248,7 +248,7 @@ namespace mongo {
         bool wasMaster = false;
 
         // This is always true, since checked in port()
-        assert( prev.port() >= 0 );
+        verify( prev.port() >= 0 );
         if( prev.host().size() ){
             scoped_lock lk( _lock );
             for ( unsigned i=0; i<_nodes.size(); i++ ) {
@@ -292,7 +292,7 @@ namespace mongo {
         uassert(15899, str::stream() << "No suitable member found for slaveOk query in replica set: " << _name, _master >= 0 && _nodes[_master].ok);
 
         // Fall back to primary
-        assert( static_cast<unsigned>(_master) < _nodes.size() );
+        verify( static_cast<unsigned>(_master) < _nodes.size() );
         LOG(2) << "dbclient_rs getSlave no member in secondary state found, returning primary " << _nodes[ _master ] << endl;
         return _nodes[_master].addr;
     }
@@ -433,7 +433,7 @@ namespace mongo {
         set<string> added = diff.first;
         set<int> removed = diff.second;
 
-        assert( added.size() > 0 || removed.size() > 0 );
+        verify( added.size() > 0 || removed.size() > 0 );
         changed = true;
 
         // Delete from the end so we don't invalidate as we delete, delete indices are ascending
@@ -472,7 +472,7 @@ namespace mongo {
     
 
     bool ReplicaSetMonitor::_checkConnection( DBClientConnection * c , string& maybePrimary , bool verbose , int nodesOffset ) {
-        assert( c );
+        verify( c );
         scoped_lock lk( _checkConnectionLock );
         bool isMaster = false;
         bool changed = false;
@@ -800,7 +800,7 @@ namespace mongo {
         // since we don't know which server it belongs to
         // can't assume master because of slave ok
         // and can have a cursor survive a master change
-        assert(0);
+        verify(0);
     }
 
     void DBClientReplicaSet::isntMaster() { 
@@ -882,7 +882,7 @@ namespace mongo {
 
     bool DBClientReplicaSet::recv( Message& m ) {
 
-        assert( _lazyState._lastClient );
+        verify( _lazyState._lastClient );
 
         // TODO: It would be nice if we could easily wrap a conn error as a result error
         try {
@@ -939,7 +939,7 @@ namespace mongo {
                 }
                 else{
                     (void)wasMaster; // silence set-but-not-used warning
-                    // assert( wasMaster );
+                    // verify( wasMaster );
                     // printStackTrace();
                     log() << "too many retries (" << _lazyState._retries << "), could not get data from replica set" << endl;
                 }

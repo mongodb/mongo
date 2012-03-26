@@ -135,7 +135,7 @@ namespace mongo {
         if ( _shardingEnabled )
             return;
         
-        assert( _name != "config" );
+        verify( _name != "config" );
 
         scoped_lock lk( _lock );
         _shardingEnabled = true;
@@ -249,8 +249,8 @@ namespace mongo {
             }
         }
 
-        assert( manager || primary );
-        assert( ! manager || ! primary );
+        verify( manager || primary );
+        verify( ! manager || ! primary );
 
     }
 
@@ -281,7 +281,7 @@ namespace mongo {
 
             CollectionInfo& ci = _collections[ns];
             uassert( 10181 ,  (string)"not sharded:" + ns , ci.isSharded() );
-            assert( ! ci.key().isEmpty() );
+            verify( ! ci.key().isEmpty() );
             
             if ( ! ( shouldReload || forceReload ) || earlyReload )
                 return ci.getCM();
@@ -292,7 +292,7 @@ namespace mongo {
                 oldVersion = ci.getCM()->getVersion();
         }
         
-        assert( ! key.isEmpty() );
+        verify( ! key.isEmpty() );
         
         BSONObj newest;
         if ( oldVersion > 0 && ! forceReload ) {
@@ -383,7 +383,7 @@ namespace mongo {
 
     void DBConfig::unserialize(const BSONObj& from) {
         LOG(1) << "DBConfig unserialize: " << _name << " " << from << endl;
-        assert( _name == from["_id"].String() );
+        verify( _name == from["_id"].String() );
 
         _shardingEnabled = from.getBoolField("partitioned");
         _primary.reset( from.getStringField("primary") );
@@ -417,7 +417,7 @@ namespace mongo {
         b.appendRegex( "_id" , (string)"^" + pcrecpp::RE::QuoteMeta( _name ) + "\\." );
 
         auto_ptr<DBClientCursor> cursor = conn->query( ShardNS::collection, b.obj() );
-        assert( cursor.get() );
+        verify( cursor.get() );
         while ( cursor->more() ) {
             BSONObj o = cursor->next();
             if( o["dropped"].trueValue() ) _collections.erase( o["_id"].String() );
@@ -792,7 +792,7 @@ namespace mongo {
 
         ScopedDbConnection conn( _primary, 30.0 );
         auto_ptr<DBClientCursor> c = conn->query( ShardNS::settings , BSONObj() );
-        assert( c.get() );
+        verify( c.get() );
         while ( c->more() ) {
             BSONObj o = c->next();
             string name = o["_id"].valuestrsafe();
@@ -871,7 +871,7 @@ namespace mongo {
                                 << "time" << DATENOW << "what" << what << "ns" << ns << "details" << detail );
             log() << "about to log metadata event: " << msg << endl;
 
-            assert( _primary.ok() );
+            verify( _primary.ok() );
 
             ScopedDbConnection conn( _primary, 30.0 );
 

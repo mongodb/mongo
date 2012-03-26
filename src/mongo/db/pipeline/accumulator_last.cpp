@@ -23,7 +23,7 @@ namespace mongo {
 
     intrusive_ptr<const Value> AccumulatorLast::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-        assert(vpOperand.size() == 1);
+        verify(vpOperand.size() == 1);
 
         /* always remember the last value seen */
         pValue = vpOperand[0]->evaluate(pDocument);

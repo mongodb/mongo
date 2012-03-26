@@ -76,7 +76,7 @@ namespace mongo {
         switch ( a ) {
         case Sequential: advice = MADV_SEQUENTIAL; break;
         case Random: advice = MADV_RANDOM; break;
-        default: assert(0);
+        default: verify(0);
         }
         
         if ( madvise(_p,_len,advice ) ) {
@@ -181,7 +181,7 @@ namespace mongo {
             printMemInfo();
             abort();
         }
-        assert( x == oldPrivateAddr );
+        verify( x == oldPrivateAddr );
         return x;
     }
 

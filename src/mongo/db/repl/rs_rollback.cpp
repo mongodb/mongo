@@ -200,10 +200,10 @@ namespace mongo {
         }
         last = time(0);
 
-        assert( d.dbMutex.atLeastReadLocked() );
+        verify( d.dbMutex.atLeastReadLocked() );
         Client::Context c(rsoplog);
         NamespaceDetails *nsd = nsdetails(rsoplog);
-        assert(nsd);
+        verify(nsd);
         ReverseCappedCursor u(nsd);
         if( !u.ok() )
             throw "our oplog empty or unreadable";
@@ -336,7 +336,7 @@ namespace mongo {
             for( set<DocID>::iterator i = h.toRefetch.begin(); i != h.toRefetch.end(); i++ ) {
                 d = *i;
 
-                assert( !d._id.eoo() );
+                verify( !d._id.eoo() );
 
                 {
                     /* TODO : slow.  lots of round trips. */
@@ -375,7 +375,7 @@ namespace mongo {
 
         bool warn = false;
 
-        assert( !h.commonPointOurDiskloc.isNull() );
+        verify( !h.commonPointOurDiskloc.isNull() );
 
         mongo::d.dbMutex.assertWriteLocked();
 
@@ -463,7 +463,7 @@ namespace mongo {
             const DocID& d = i->first;
             bo pattern = d._id.wrap(); // { _id : ... }
             try {
-                assert( d.ns && *d.ns );
+                verify( d.ns && *d.ns );
                 if( h.collectionsToResync.count(d.ns) ) {
                     /* we just synced this entire collection */
                     continue;
@@ -592,8 +592,8 @@ namespace mongo {
     }
 
     unsigned ReplSetImpl::_syncRollback(OplogReader&r) {
-        assert( !lockedByMe() );
-        assert( !d.dbMutex.atLeastReadLocked() );
+        verify( !lockedByMe() );
+        verify( !d.dbMutex.atLeastReadLocked() );
 
         sethbmsg("rollback 0");
 

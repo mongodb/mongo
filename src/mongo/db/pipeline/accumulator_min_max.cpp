@@ -23,7 +23,7 @@ namespace mongo {
 
     intrusive_ptr<const Value> AccumulatorMinMax::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-        assert(vpOperand.size() == 1);
+        verify(vpOperand.size() == 1);
         intrusive_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
 
         /* if this is the first value, just use it */
@@ -42,7 +42,7 @@ namespace mongo {
     AccumulatorMinMax::AccumulatorMinMax(int theSense):
         AccumulatorSingleValue(),
         sense(theSense) {
-        assert((sense == 1) || (sense == -1));
+        verify((sense == 1) || (sense == -1));
     }
 
     intrusive_ptr<Accumulator> AccumulatorMinMax::createMin(

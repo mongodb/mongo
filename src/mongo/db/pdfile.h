@@ -215,7 +215,7 @@ namespace mongo {
         DiskLoc nextInExtent(const DiskLoc& myLoc) { 
             if ( nextOfs == DiskLoc::NullOfs )
                 return DiskLoc();
-            assert( nextOfs );
+            verify( nextOfs );
             return DiskLoc(myLoc.a(), nextOfs);
         }
 
@@ -302,15 +302,15 @@ namespace mongo {
         DiskLoc reuse(const char *nsname, bool newUseIsAsCapped);
 
         bool isOk() const { return magic == 0x41424344; }
-        void assertOk() const { assert(isOk()); }
+        void assertOk() const { verify(isOk()); }
 
         Record* newRecord(int len);
 
         Record* getRecord(DiskLoc dl) {
-            assert( !dl.isNull() );
-            assert( dl.sameFile(myLoc) );
+            verify( !dl.isNull() );
+            verify( dl.sameFile(myLoc) );
             int x = dl.getOfs() - myLoc.getOfs();
-            assert( x > 0 );
+            verify( x > 0 );
             return (Record *) (((char *) this) + x);
         }
 
@@ -398,13 +398,13 @@ namespace mongo {
                 }
 
                 getDur().createdFile(filename, filelength);
-                assert( HeaderSize == 8192 );
+                verify( HeaderSize == 8192 );
                 DataFileHeader *h = getDur().writing(this);
                 h->fileLength = filelength;
                 h->version = PDFILE_VERSION;
                 h->versionMinor = PDFILE_VERSION_MINOR;
                 h->unused.set( fileno, HeaderSize );
-                assert( (data-(char*)this) == HeaderSize );
+                verify( (data-(char*)this) == HeaderSize );
                 h->unusedLength = fileLength - HeaderSize - 16;
             }
         }
@@ -481,7 +481,7 @@ namespace mongo {
         return BSONObj(rec()->accessed());
     }
     inline DeletedRecord* DiskLoc::drec() const {
-        assert( _a != -1 );
+        verify( _a != -1 );
         DeletedRecord* dr = (DeletedRecord*) rec();
         memconcept::is(dr, memconcept::concept::deletedrecord);
         return dr;
@@ -493,7 +493,7 @@ namespace mongo {
     template< class V >
     inline 
     const BtreeBucket<V> * DiskLoc::btree() const {
-        assert( _a != -1 );
+        verify( _a != -1 );
         Record *r = rec();
         memconcept::is(r, memconcept::concept::btreebucket, "", 8192);
         return (const BtreeBucket<V> *) r->data;
@@ -510,7 +510,7 @@ namespace mongo {
 
     inline NamespaceIndex* nsindex(const char *ns) {
         Database *database = cc().database();
-        assert( database );
+        verify( database );
         memconcept::is(database, memconcept::concept::database, ns, sizeof(Database));
         DEV {
             char buf[256];
@@ -519,7 +519,7 @@ namespace mongo {
                 out() << "ERROR: attempt to write to wrong database\n";
                 out() << " ns:" << ns << '\n';
                 out() << " database->name:" << database->name << endl;
-                assert( database->name == buf );
+                verify( database->name == buf );
             }
         }
         return &database->namespaceIndex;
@@ -535,12 +535,12 @@ namespace mongo {
     }
 
     inline Extent* DataFileMgr::getExtent(const DiskLoc& dl) {
-        assert( dl.a() != -1 );
+        verify( dl.a() != -1 );
         return cc().database()->getFile(dl.a())->getExtent(dl);
     }
 
     inline Record* DataFileMgr::getRecord(const DiskLoc& dl) {
-        assert( dl.a() != -1 );
+        verify( dl.a() != -1 );
         Record* r = cc().database()->getFile(dl.a())->recordAt(dl);
         return r;
     }
@@ -548,7 +548,7 @@ namespace mongo {
     BOOST_STATIC_ASSERT( 16 == sizeof(DeletedRecord) );
 
     inline DeletedRecord* DataFileMgr::makeDeletedRecord(const DiskLoc& dl, int len) {
-        assert( dl.a() != -1 );
+        verify( dl.a() != -1 );
         return (DeletedRecord*) cc().database()->getFile(dl.a())->makeRecord(dl, sizeof(DeletedRecord));
     }
 

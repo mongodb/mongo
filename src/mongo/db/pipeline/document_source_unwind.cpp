@@ -143,7 +143,7 @@ namespace mongo {
 
                     /* get the iterator we'll use to unwind the array */
                     pUnwinder = pUnwindArray->getArray();
-                    assert(pUnwinder->more()); // we just checked above...
+                    verify(pUnwinder->more()); // we just checked above...
                     pUnwindValue = pUnwinder->next();
                 }
             }
@@ -169,12 +169,12 @@ namespace mongo {
           For this to be valid, we must already have pNoUnwindDocument set,
           and have set up the vector of indices for that document in fieldIndex.
          */
-        assert(pNoUnwindDocument.get());
+        verify(pNoUnwindDocument.get());
 
         intrusive_ptr<Document> pClone(pNoUnwindDocument->clone());
         intrusive_ptr<Document> pCurrent(pClone);
         const size_t n = fieldIndex.size();
-        assert(n);
+        verify(n);
         for(size_t i = 0; i < n; ++i) {
             const size_t fi = fieldIndex[i];
             Document::FieldPair fp(pCurrent->getField(fi));

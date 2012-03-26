@@ -114,9 +114,9 @@ namespace mongo {
 MiniLex() {
     strhashmap atest;
     atest["foo"] = 3;
-    assert( atest.count("bar") == 0 );
-    assert( atest.count("foo") == 1 );
-    assert( atest["foo"] == 3 );
+    verify( atest.count("bar") == 0 );
+    verify( atest.count("foo") == 1 );
+    verify( atest["foo"] == 3 );
 
     for ( int i = 0; i < 256; i++ ) {
         ic[i] = starter[i] = false;

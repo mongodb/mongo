@@ -32,14 +32,14 @@ namespace mongo {
         AtStartup() {
             LARGE_INTEGER x;
             bool ok = QueryPerformanceFrequency(&x);
-            assert(ok);
+            verify(ok);
             Timer::countsPerSecond = x.QuadPart;
         }
     } atstartuputil;
 #endif
 
     string hexdump(const char *data, unsigned len) {
-        assert( len < 1000000 );
+        verify( len < 1000000 );
         const unsigned char *p = (const unsigned char *) data;
         stringstream ss;
         for( unsigned i = 0; i < 4 && i < len; i++ ) {
@@ -167,19 +167,19 @@ namespace mongo {
 
     struct UtilTest : public UnitTest {
         void run() {
-            assert( isPrime(3) );
-            assert( isPrime(2) );
-            assert( isPrime(13) );
-            assert( isPrime(17) );
-            assert( !isPrime(9) );
-            assert( !isPrime(6) );
-            assert( nextPrime(4) == 5 );
-            assert( nextPrime(8) == 11 );
+            verify( isPrime(3) );
+            verify( isPrime(2) );
+            verify( isPrime(13) );
+            verify( isPrime(17) );
+            verify( !isPrime(9) );
+            verify( !isPrime(6) );
+            verify( nextPrime(4) == 5 );
+            verify( nextPrime(8) == 11 );
 
-            assert( endsWith("abcde", "de") );
-            assert( !endsWith("abcde", "dasdfasdfashkfde") );
+            verify( endsWith("abcde", "de") );
+            verify( !endsWith("abcde", "dasdfasdfashkfde") );
 
-            assert( swapEndian(0x01020304) == 0x04030201 );
+            verify( swapEndian(0x01020304) == 0x04030201 );
 
         }
     } utilTest;

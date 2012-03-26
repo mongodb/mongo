@@ -181,7 +181,7 @@ namespace mongo {
 
                 {
                     RamLog* rl = RamLog::get( "warnings" );
-                    assert(rl);
+                    verify(rl);
                     
                     if (rl->lastWrite() >= time(0)-(10*60)){ // only show warnings from last 10 minutes
                         vector<const char*> lines;
@@ -633,7 +633,7 @@ namespace mongo {
                 ChunkPtr chunk = info->findChunk( find );
                 BSONObj middle = cmdObj.getObjectField( "middle" );
 
-                assert( chunk.get() );
+                verify( chunk.get() );
                 log() << "splitting: " << ns << "  shard: " << chunk << endl;
 
                 BSONObj res;
@@ -1048,7 +1048,7 @@ namespace mongo {
             virtual bool run(const string& dbName, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
                 LastError *le = lastError.disableForCommand();
                 {
-                    assert( le );
+                    verify( le );
                     if ( le->msg.size() && le->nPrev == 1 ) {
                         le->appendSelf( result );
                         return true;

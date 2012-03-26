@@ -471,7 +471,7 @@ namespace BasicTests {
             // if that changes, should put this on the stack
             {
                 Database * db = new Database( "dbtests_basictests_ownsns" , isNew );
-                assert( isNew );
+                verify( isNew );
 
                 ASSERT( db->ownsNS( "dbtests_basictests_ownsns.x" ) );
                 ASSERT( db->ownsNS( "dbtests_basictests_ownsns.x.y" ) );
@@ -657,12 +657,12 @@ namespace BasicTests {
             const char * c = "this is a test";
             std::string s;
             size_t len = compress(c, strlen(c)+1, &s);
-            assert( len > 0 );
+            verify( len > 0 );
             
             std::string out;
             bool ok = uncompress(s.c_str(), s.size(), &out);
-            assert(ok);
-            assert( strcmp(out.c_str(), c) == 0 );
+            verify(ok);
+            verify( strcmp(out.c_str(), c) == 0 );
         }
     } ctest1;
 

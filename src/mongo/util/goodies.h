@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "../bson/util/misc.h"
 #include "concurrency/mutex.h"
+#include "../bson/util/misc.h"
 
 namespace mongo {
 
@@ -112,9 +112,6 @@ namespace mongo {
 #define MONGO_FLOG log() << __FILE__ ":" << __LINE__ << endl
 #define FLOG MONGO_FLOG
 
-#undef assert
-#define assert MONGO_assert
-
     inline bool startsWith(const char *str, const char *prefix) {
         size_t l = strlen(prefix);
         if ( strlen(str) < l ) return false;
@@ -150,7 +147,7 @@ namespace mongo {
 #if !defined(_WIN32)
     typedef int HANDLE;
     inline void strcpy_s(char *dst, unsigned len, const char *src) {
-        assert( strlen(src) < len );
+        verify( strlen(src) < len );
         strcpy(dst, src);
     }
 #else

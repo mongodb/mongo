@@ -292,7 +292,7 @@ public:
             BSONObj obj;
             try {
                 obj = loc.obj();
-                assert( obj.valid() );
+                verify( obj.valid() );
                 LOG(1) << obj << endl;
                 w( obj );
             }
@@ -454,7 +454,7 @@ public:
                 return -1;
             }
 
-            assert(op["ts"].type() == Timestamp);
+            verify(op["ts"].type() == Timestamp);
             opLogStart = op["ts"]._numberLong();
         }
 

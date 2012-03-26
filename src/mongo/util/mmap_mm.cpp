@@ -37,7 +37,7 @@ namespace mongo {
     }
 
     void* MemoryMappedFile::map(const char *filename, long& length , int options ) {
-        assert( length );
+        verify( length );
         view = malloc( length );
         return view;
     }

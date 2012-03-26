@@ -29,8 +29,6 @@
 #include <boost/spirit/utility/loops.hpp>
 #include <boost/spirit/utility/lists.hpp>
 #endif
-#undef assert
-#define assert MONGO_assert
 
 #include "json.h"
 #include "../bson/util/builder.h"
@@ -191,7 +189,7 @@ namespace mongo {
                 o = '\v';
                 break;
             default:
-                assert( false );
+                verify( false );
             }
             b.ss << o;
         }
@@ -642,7 +640,7 @@ namespace mongo {
             msgasserted(10340, "Failure parsing JSON string near: " + string( result.stop, limit ));
         }
         BSONObj ret = b.pop();
-        assert( b.empty() );
+        verify( b.empty() );
         return ret;
     }
 

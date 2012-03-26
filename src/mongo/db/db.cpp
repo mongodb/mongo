@@ -99,7 +99,7 @@ namespace mongo {
 
     struct MyStartupTests {
         MyStartupTests() {
-            assert( sizeof(OID) == 12 );
+            verify( sizeof(OID) == 12 );
         }
     } mystartupdbcpp;
 
@@ -114,12 +114,12 @@ namespace mongo {
         sleepsecs(1);
         unsigned n = 0;
         auto f = [&n](const BSONObj& o) {
-            assert( o.valid() );
+            verify( o.valid() );
             //cout << o << endl;
             n++;
             bool testClosingSocketOnError = false;
             if( testClosingSocketOnError )
-                assert(false);
+                verify(false);
         };
         DBClientConnection db(false);
         db.connect("localhost");
@@ -190,7 +190,7 @@ namespace mongo {
                         QueryResult *qr = (QueryResult *) header;
                         long long cursorid = qr->cursorId;
                         if( cursorid ) {
-                            assert( dbresponse.exhaust && *dbresponse.exhaust != 0 );
+                            verify( dbresponse.exhaust && *dbresponse.exhaust != 0 );
                             string ns = dbresponse.exhaust; // before reset() free's it...
                             m.reset();
                             BufBuilder b(512);
@@ -246,8 +246,8 @@ namespace mongo {
         static DBDirectClient db;
 
         if ( h->version == 4 && h->versionMinor == 4 ) {
-            assert( PDFILE_VERSION == 4 );
-            assert( PDFILE_VERSION_MINOR == 5 );
+            verify( PDFILE_VERSION == 4 );
+            verify( PDFILE_VERSION_MINOR == 5 );
 
             list<string> colls = db.getCollectionNames( dbName );
             for ( list<string>::iterator i=colls.begin(); i!=colls.end(); i++) {
@@ -276,7 +276,7 @@ namespace mongo {
         Client::GodScope gs;
         log(1) << "enter repairDatabases (to check pdfile version #)" << endl;
 
-        //assert(checkNsFilesOnLoad);
+        //verify(checkNsFilesOnLoad);
         checkNsFilesOnLoad = false; // we are mainly just checking the header - don't scan the whole .ns file for every db here.
 
         Lock::GlobalWrite lk;
@@ -304,7 +304,7 @@ namespace mongo {
                     // QUESTION: Repair even if file format is higher version than code?
                     log() << "\t starting upgrade" << endl;
                     string errmsg;
-                    assert( doDBUpgrade( dbName , errmsg , h ) );
+                    verify( doDBUpgrade( dbName , errmsg , h ) );
                 }
                 else {
                     log() << "\t Not upgrading, exiting" << endl;
@@ -573,8 +573,6 @@ namespace mongo {
 using namespace mongo;
 
 #include <boost/program_options.hpp>
-#undef assert
-#define assert MONGO_assert
 
 namespace po = boost::program_options;
 
@@ -838,7 +836,7 @@ int main(int argc, char* argv[]) {
         }
         if (params.count("smallfiles")) {
             cmdLine.smallfiles = true;
-            assert( dur::DataLimitPerJournalFile >= 128 * 1024 * 1024 );
+            verify( dur::DataLimitPerJournalFile >= 128 * 1024 * 1024 );
             dur::DataLimitPerJournalFile = 128 * 1024 * 1024;
         }
         if (params.count("diaglog")) {
@@ -914,7 +912,7 @@ int main(int argc, char* argv[]) {
                 dbexit( EXIT_BADOPTIONS );
             }
             lenForNewNsFiles = x * 1024 * 1024;
-            assert(lenForNewNsFiles > 0);
+            verify(lenForNewNsFiles > 0);
         }
         if (params.count("oplogSize")) {
             long long x = params["oplogSize"].as<int>();
@@ -928,7 +926,7 @@ int main(int argc, char* argv[]) {
                 dbexit( EXIT_BADOPTIONS );
             }
             cmdLine.oplogSize = x * 1024 * 1024;
-            assert(cmdLine.oplogSize > 0);
+            verify(cmdLine.oplogSize > 0);
         }
         if (params.count("cacheSize")) {
             long x = params["cacheSize"].as<long>();
@@ -1201,27 +1199,27 @@ namespace mongo {
         sigemptyset( &addrSignals.sa_mask );
         addrSignals.sa_flags = SA_SIGINFO;
        
-        assert( sigaction(SIGSEGV, &addrSignals, 0) == 0 );
-        assert( sigaction(SIGBUS, &addrSignals, 0) == 0 );
-        assert( sigaction(SIGILL, &addrSignals, 0) == 0 );
-        assert( sigaction(SIGFPE, &addrSignals, 0) == 0 );
+        verify( sigaction(SIGSEGV, &addrSignals, 0) == 0 );
+        verify( sigaction(SIGBUS, &addrSignals, 0) == 0 );
+        verify( sigaction(SIGILL, &addrSignals, 0) == 0 );
+        verify( sigaction(SIGFPE, &addrSignals, 0) == 0 );
         
-        assert( signal(SIGABRT, abruptQuit) != SIG_ERR );
-        assert( signal(SIGQUIT, abruptQuit) != SIG_ERR );
-        assert( signal(SIGPIPE, pipeSigHandler) != SIG_ERR );
+        verify( signal(SIGABRT, abruptQuit) != SIG_ERR );
+        verify( signal(SIGQUIT, abruptQuit) != SIG_ERR );
+        verify( signal(SIGPIPE, pipeSigHandler) != SIG_ERR );
 
         setupSIGTRAPforGDB();
 
         sigemptyset( &asyncSignals );
 
         if ( inFork )
-            assert( signal( SIGHUP , setupSignals_ignoreHelper ) != SIG_ERR );
+            verify( signal( SIGHUP , setupSignals_ignoreHelper ) != SIG_ERR );
         else
             sigaddset( &asyncSignals, SIGHUP );
 
         sigaddset( &asyncSignals, SIGINT );
         sigaddset( &asyncSignals, SIGTERM );
-        assert( pthread_sigmask( SIG_SETMASK, &asyncSignals, 0 ) == 0 );
+        verify( pthread_sigmask( SIG_SETMASK, &asyncSignals, 0 ) == 0 );
         boost::thread it( interruptThread );
 
         set_terminate( myterminate );

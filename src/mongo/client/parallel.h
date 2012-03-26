@@ -417,12 +417,12 @@ namespace mongo {
             bool isDone() const { return _done; }
 
             bool ok() const {
-                assert( _done );
+                verify( _done );
                 return _ok;
             }
 
             BSONObj result() const {
-                assert( _done );
+                verify( _done );
                 return _res;
             }
 

@@ -411,7 +411,7 @@ namespace mongo {
     }
 
     inline size_t Value::getArrayLength() const {
-        assert(getType() == Array);
+        verify(getType() == Array);
         return vpValue.size();
     }
 

@@ -43,7 +43,7 @@ namespace mongo {
 
             setThreadName( "conn" );
             
-            assert( inPort );
+            verify( inPort );
             inPort->psock->setLogLevel(1);
             scoped_ptr<MessagingPort> p( inPort );
 
@@ -141,7 +141,7 @@ namespace mongo {
                 static const size_t STACK_SIZE = 1024*1024; // if we change this we need to update the warning
 
                 struct rlimit limits;
-                assert(getrlimit(RLIMIT_STACK, &limits) == 0);
+                verify(getrlimit(RLIMIT_STACK, &limits) == 0);
                 if (limits.rlim_cur > STACK_SIZE) {
                     pthread_attr_setstacksize(&attrs, (DEBUG_BUILD
                                                         ? (STACK_SIZE / 2)

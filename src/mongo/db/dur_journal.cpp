@@ -28,8 +28,6 @@
 #include "../util/net/listen.h" // getelapsedtimemillis
 #include <boost/static_assert.hpp>
 #include <boost/filesystem.hpp>
-#undef assert
-#define assert MONGO_assert
 #include "../util/mongoutils/str.h"
 #include "dur_journalimpl.h"
 #include "../util/file.h"
@@ -96,7 +94,7 @@ namespace mongo {
                 (2b) refuse to do a recovery startup if that is there without manual override.
             */
             log() << "journaling failure/error: " << msg << endl;
-            assert(false);
+            verify(false);
         }
 
         JSectFooter::JSectFooter() { 
@@ -214,7 +212,7 @@ namespace mongo {
                 log() << "error removing journal files " << e.what() << endl;
                 throw;
             }
-            assert(!haveJournalFiles());
+            verify(!haveJournalFiles());
 
             flushMyDirectory(getJournalDir() / "file"); // flushes parent of argument (in this case journal dir)
 
@@ -293,7 +291,7 @@ namespace mongo {
             log() << "preallocating a journal file " << p.string() << endl;
 
             const unsigned BLKSZ = 1024 * 1024;
-            assert( len % BLKSZ == 0 );
+            verify( len % BLKSZ == 0 );
 
             AlignedBuilder b(BLKSZ);            
             memset((void*)b.buf(), 0, BLKSZ);
@@ -302,21 +300,21 @@ namespace mongo {
 
             File f;
             f.open( p.string().c_str() , /*read-only*/false , /*direct-io*/false );
-            assert( f.is_open() );
+            verify( f.is_open() );
             fileofs loc = 0;
             while ( loc < len ) {
                 f.write( loc , b.buf() , BLKSZ );
                 loc += BLKSZ;
                 m.hit(BLKSZ);
             }
-            assert( loc == len );
+            verify( loc == len );
             f.fsync();
         }
 
         const int NUM_PREALLOC_FILES = 3;
         inline boost::filesystem::path preallocPath(int n) {
-            assert(n >= 0);
-            assert(n < NUM_PREALLOC_FILES);
+            verify(n >= 0);
+            verify(n < NUM_PREALLOC_FILES);
             string fn = str::stream() << "prealloc." << n;
             return getJournalDir() / fn;
         }
@@ -447,7 +445,7 @@ namespace mongo {
 
         void Journal::_open() {
             _curFileId = 0;
-            assert( _curLogFile == 0 );
+            verify( _curLogFile == 0 );
             boost::filesystem::path fname = getFilePathFor(_nextFileNumber);
 
             // if we have a prealloced file, use it 
@@ -476,7 +474,7 @@ namespace mongo {
             {
                 JHeader h(fname.string());
                 _curFileId = h.fileId;
-                assert(_curFileId);
+                verify(_curFileId);
                 AlignedBuilder b(8192);
                 b.appendStruct(h);
                 _curLogFile->synchronousAppend(b.buf(), b.len());
@@ -484,13 +482,13 @@ namespace mongo {
         }
 
         void Journal::init() {
-            assert( _curLogFile == 0 );
+            verify( _curLogFile == 0 );
             MongoFile::notifyPreFlush = preFlush;
             MongoFile::notifyPostFlush = postFlush;
         }
 
         void Journal::open() {
-            assert( MongoFile::notifyPreFlush == preFlush );
+            verify( MongoFile::notifyPreFlush == preFlush );
             SimpleMutex::scoped_lock lk(_curLogFileMutex);
             _open();
         }
@@ -527,7 +525,7 @@ namespace mongo {
                 LSNFile L;
                 File f;
                 f.open(lsnPath().string().c_str());
-                assert(f.is_open());
+                verify(f.is_open());
                 if( f.len() == 0 ) { 
                     // this could be 'normal' if we crashed at the right moment
                     log() << "info lsn file is zero bytes long" << endl;
@@ -700,15 +698,15 @@ namespace mongo {
 
             size_t compressedLength = 0;
             rawCompress(uncompressed.buf(), uncompressed.len(), b.cur(), &compressedLength);
-            assert( compressedLength < 0xffffffff );
-            assert( compressedLength < max );
+            verify( compressedLength < 0xffffffff );
+            verify( compressedLength < max );
             b.skip(compressedLength);
 
             // footer
             unsigned L = 0xffffffff;
             {
                 // pad to alignment, and set the total section length in the JSectHeader
-                assert( 0xffffe000 == (~(Alignment-1)) );
+                verify( 0xffffe000 == (~(Alignment-1)) );
                 unsigned lenUnpadded = b.len() + sizeof(JSectFooter);
                 L = (lenUnpadded + Alignment-1) & (~(Alignment-1));
                 dassert( L >= lenUnpadded );
@@ -727,12 +725,12 @@ namespace mongo {
                 SimpleMutex::scoped_lock lk(_curLogFileMutex);
 
                 // must already be open -- so that _curFileId is correct for previous buffer building
-                assert( _curLogFile );
+                verify( _curLogFile );
 
                 stats.curr->_uncompressedBytes += uncompressed.len();
                 unsigned w = b.len();
                 _written += w;
-                assert( w <= L );
+                verify( w <= L );
                 stats.curr->_journaledBytes += L;
                 _curLogFile->synchronousAppend((const void *) b.buf(), L);
                 _rotate();

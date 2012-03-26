@@ -279,7 +279,7 @@ namespace mongo {
             }
 
             ms.pushStartSize = n;
-            assert( ms.pushStartSize == in.embeddedObject().nFields() );
+            verify( ms.pushStartSize == in.embeddedObject().nFields() );
             bb.done();
             break;
         }
@@ -300,14 +300,14 @@ namespace mongo {
                     switch( in.type() ) {
                     case NumberInt: x = x&e.numberInt(); break;
                     case NumberLong: y = y&e.numberLong(); break;
-                    default: assert( 0 );
+                    default: verify( 0 );
                     }
                 }
                 else if ( str::equals(e.fieldName(), "or") ) {
                     switch( in.type() ) {
                     case NumberInt: x = x|e.numberInt(); break;
                     case NumberLong: y = y|e.numberLong(); break;
-                    default: assert( 0 );
+                    default: verify( 0 );
                     }
                 }
                 else {
@@ -318,7 +318,7 @@ namespace mongo {
             switch( in.type() ) {
             case NumberInt: b.append( shortFieldName , x ); break;
             case NumberLong: b.append( shortFieldName , y ); break;
-            default: assert( 0 );
+            default: verify( 0 );
             }
 
             break;
@@ -552,7 +552,7 @@ namespace mongo {
         newObjBuilder.appendAs( newVal , shortFieldName );
         BSONObjBuilder b;
         b.appendAs( newVal, shortFieldName );
-        assert( _objData.isEmpty() );
+        verify( _objData.isEmpty() );
         _objData = b.obj();
         newVal = _objData.firstElement();
     }
@@ -560,7 +560,7 @@ namespace mongo {
     void ModSetState::applyModsInPlace( bool isOnDisk ) {
         // TODO i think this assert means that we can get rid of the isOnDisk param
         //      and just use isOwned as the determination
-        DEV assert( isOnDisk == ! _obj.isOwned() );
+        DEV verify( isOnDisk == ! _obj.isOwned() );
 
         for ( ModStateHolder::iterator i = _mods.begin(); i != _mods.end(); ++i ) {
             ModState& m = *i->second;
@@ -581,7 +581,7 @@ namespace mongo {
                 // this should have been handled by prepare
                 break;
             case Mod::POP:
-                assert( m.old.eoo() || ( m.old.isABSONObj() && m.old.Obj().isEmpty() ) );
+                verify( m.old.eoo() || ( m.old.isABSONObj() && m.old.Obj().isEmpty() ) );
                 break;
                 // [dm] the BSONElementManipulator statements below are for replication (correct?)
             case Mod::INC:
@@ -973,12 +973,12 @@ namespace mongo {
             else {
                 BSONObj newObj = mss->createNewFromMods();
                 checkTooLarge(newObj);
-                assert(nsdt);
+                verify(nsdt);
                 theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , newObj.objdata(), newObj.objsize(), debug);
             }
 
             if ( logop ) {
-                DEV assert( mods->size() );
+                DEV verify( mods->size() );
 
                 BSONObj pattern = patternOrig;
                 if ( mss->haveArrayDepMod() ) {
@@ -1003,7 +1003,7 @@ namespace mongo {
         // regular update
         BSONElementManipulator::lookForTimestamps( updateobj );
         checkNoMods( updateobj );
-        assert(nsdt);
+        verify(nsdt);
         theDataFileMgr.updateRecord(ns, d, nsdt, r, loc , updateobj.objdata(), updateobj.objsize(), debug );
         if ( logop ) {
             logOp("u", ns, updateobj, &patternOrig, 0, fromMigrate );
@@ -1120,7 +1120,7 @@ namespace mongo {
                     // The Cursor must have a Matcher to record an elemMatchKey.  But currently
                     // a modifier on a dynamic array field may be applied even if there is no
                     // elemMatchKey, so a matcher cannot be required.
-                    //assert( c->matcher() );
+                    //verify( c->matcher() );
                     details.requestElemMatchKey();
                 }
                 
@@ -1236,7 +1236,7 @@ namespace mongo {
                     }
 
                     if ( logop ) {
-                        DEV assert( mods->size() );
+                        DEV verify( mods->size() );
 
                         if ( mss->haveArrayDepMod() ) {
                             BSONObjBuilder patternBuilder;

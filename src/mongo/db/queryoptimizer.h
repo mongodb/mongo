@@ -201,7 +201,7 @@ namespace mongo {
         /** To be called by QueryPlanSet::Runner only. */
         
         QueryOp *createChild();
-        void setQueryPlan( const QueryPlan *qp ) { _qp = qp; assert( _qp != NULL ); }
+        void setQueryPlan( const QueryPlan *qp ) { _qp = qp; verify( _qp != NULL ); }
         void init();        
         void setException( const DBException &e ) {
             _error = true;
@@ -443,7 +443,7 @@ namespace mongo {
 
         /** Add explain information for a new clause. */
         void addClauseInfo( const shared_ptr<ExplainClauseInfo> &clauseInfo ) {
-            assert( _explainQueryInfo );
+            verify( _explainQueryInfo );
             _explainQueryInfo->addClauseInfo( clauseInfo );
         }
         
@@ -588,12 +588,12 @@ namespace mongo {
         void noteYield();
         
         const QueryPlan &queryPlan() const {
-            assert( _c->ok() && _queryPlan );
+            verify( _c->ok() && _queryPlan );
             return *_queryPlan;
         }
         
         const Projection::KeyOnly *keyFieldsOnly() const {
-            assert( _c->ok() && _queryPlan );
+            verify( _c->ok() && _queryPlan );
             return _queryPlan->keyFieldsOnly().get();
         }
     private:

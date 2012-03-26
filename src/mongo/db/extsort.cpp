@@ -236,7 +236,7 @@ namespace mongo {
 
         }
 
-        assert( slot >= 0 );
+        verify( slot >= 0 );
         _stash[slot].second = false;
 
         return best;
@@ -248,7 +248,7 @@ namespace mongo {
         unsigned long long length;
         _buf = (char*)_file.map( file.c_str() , length , MemoryMappedFile::SEQUENTIAL );
         massert( 10308 ,  "mmap failed" , _buf );
-        assert( length == (unsigned long long)boost::filesystem::file_size( file ) );
+        verify( length == (unsigned long long)boost::filesystem::file_size( file ) );
         _end = _buf + length;
     }
     BSONObjExternalSorter::FileIterator::~FileIterator() {}

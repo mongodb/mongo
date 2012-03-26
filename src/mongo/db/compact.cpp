@@ -60,7 +60,7 @@ namespace mongo {
 
         Extent *e = ext.ext();
         e->assertOk();
-        assert( e->validates() );
+        verify( e->validates() );
         unsigned skipped = 0;
 
         {
@@ -145,8 +145,8 @@ namespace mongo {
                 }
             } // if !L.isNull()
 
-            assert( d->firstExtent == ext );
-            assert( d->lastExtent != ext );
+            verify( d->firstExtent == ext );
+            verify( d->lastExtent != ext );
             DiskLoc newFirst = e->xnext;
             d->firstExtent.writing() = newFirst;
             newFirst.ext()->xprev.writing().Null();
@@ -257,7 +257,7 @@ namespace mongo {
             result.append("invalidObjects", skipped);
         }
 
-        assert( d->firstExtent.ext()->xprev.isNull() );
+        verify( d->firstExtent.ext()->xprev.isNull() );
 
         // indexes will do their own progress meter?
         pm.finished();
@@ -373,11 +373,11 @@ namespace mongo {
             int pb = 0;
             if( cmdObj.hasElement("paddingFactor") ) {
                 pf = cmdObj["paddingFactor"].Number();
-                assert( pf >= 1.0 && pf <= 4.0 );
+                verify( pf >= 1.0 && pf <= 4.0 );
             }
             if( cmdObj.hasElement("paddingBytes") ) {
                 pb = (int) cmdObj["paddingBytes"].Number();
-                assert( pb >= 0 && pb <= 1024 * 1024 );
+                verify( pb >= 0 && pb <= 1024 * 1024 );
             }
 
             bool validate = !cmdObj.hasElement("validate") || cmdObj["validate"].trueValue(); // default is true at the moment

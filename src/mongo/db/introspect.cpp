@@ -33,7 +33,7 @@ namespace mongo {
         assertInWriteLock();
 
         Database *db = c.database();
-        DEV assert( db );
+        DEV verify( db );
         const char *ns = db->profileName.c_str();
         
         // build object

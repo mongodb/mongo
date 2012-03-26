@@ -89,7 +89,7 @@ namespace mongo {
             ClientCursor * c() { return _c; }
             void release() {
                 if( _c ) {
-                    assert( _c->_pinValue >= 100 );
+                    verify( _c->_pinValue >= 100 );
                     _c->_pinValue -= 100;
                     _c = 0;
                 }

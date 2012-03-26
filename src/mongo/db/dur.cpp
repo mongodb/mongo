@@ -188,12 +188,12 @@ namespace mongo {
         DurableInterface* DurableInterface::_impl = nonDurableImpl;
 
         void DurableInterface::enableDurability() {
-            assert(_impl == nonDurableImpl);
+            verify(_impl == nonDurableImpl);
             _impl = durableImpl;
         }
 
         void DurableInterface::disableDurability() {
-            assert(_impl == durableImpl);
+            verify(_impl == durableImpl);
             massert(13616, "can't disable durability with pending writes", !commitJob.hasWritten());
             _impl = nonDurableImpl;
         }
@@ -337,7 +337,7 @@ namespace mongo {
             static int n;
             ++n;
 
-            assert(debug && cmdLine.dur);
+            verify(debug && cmdLine.dur);
             if (commitJob.writes().empty())
                 return;
             const WriteIntent &i = commitJob.lastWrite();
@@ -386,7 +386,7 @@ namespace mongo {
 
                     _bytes += mmf->length();
 
-                    assert( mmf->length() == (unsigned) mmf->length() );
+                    verify( mmf->length() == (unsigned) mmf->length() );
 
                     if (memcmp(p, w, (unsigned) mmf->length()) == 0)
                         return; // next file
@@ -457,7 +457,7 @@ namespace mongo {
             LOG(4) << "journal REMAPPRIVATEVIEW" << endl;
 
             d.dbMutex.assertWriteLocked();
-            assert( !commitJob.hasWritten() );
+            verify( !commitJob.hasWritten() );
 
             // we want to remap all private views about every 2 seconds.  there could be ~1000 views so
             // we do a little each pass; beyond the remap time, more significantly, there will be copy on write
@@ -505,7 +505,7 @@ namespace mongo {
                 dassert( i != e );
                 if( (*i)->isMongoMMF() ) {
                     MongoMMF *mmf = (MongoMMF*) *i;
-                    assert(mmf);
+                    verify(mmf);
                     if( mmf->willNeedRemap() ) {
                         mmf->willNeedRemap() = false;
                         mmf->remapThePrivateView();
@@ -535,7 +535,7 @@ namespace mongo {
             unspoolWriteIntents(); // in case we were doing some writing ourself (likely impossible with limitedlocks version)
             AlignedBuilder &ab = __theBuilder;
 
-            assert( !d.dbMutex.atLeastReadLocked() );
+            verify( !d.dbMutex.atLeastReadLocked() );
 
             // do we need this to be greedy, so that it can start working fairly soon?
             // probably: as this is a read lock, it wouldn't change anything if only reads anyway.
@@ -560,7 +560,7 @@ namespace mongo {
 
             unsigned abLen = ab.len();
             commitJob.committingReset(); // must be reset before allowing anyone to write
-            DEV assert( !commitJob.hasWritten() );
+            DEV verify( !commitJob.hasWritten() );
 
             // release the readlock -- allowing others to now write while we are writing to the journal (etc.)
             lk1.reset();
@@ -568,14 +568,14 @@ namespace mongo {
             // ****** now other threads can do writes ******
 
             WRITETOJOURNAL(h, ab);
-            assert( abLen == ab.len() ); // a check that no one touched the builder while we were doing work. if so, our locking is wrong.
+            verify( abLen == ab.len() ); // a check that no one touched the builder while we were doing work. if so, our locking is wrong.
 
             // data is now in the journal, which is sufficient for acknowledging getLastError.
             // (ok to crash after that)
             commitJob.committingNotifyCommitted();
 
             WRITETODATAFILES(h, ab);
-            assert( abLen == ab.len() ); // check again wasn't modded
+            verify( abLen == ab.len() ); // check again wasn't modded
             ab.reset();
 
             // can't : d.dbMutex._remapPrivateViewRequested = true;
@@ -652,7 +652,7 @@ namespace mongo {
             // remapping private views must occur after WRITETODATAFILES otherwise
             // we wouldn't see newly written data on reads.
             //
-            DEV assert( !commitJob.hasWritten() );
+            DEV verify( !commitJob.hasWritten() );
             if( !Lock::isW() ) {
                 // REMAPPRIVATEVIEW needs done in a write lock (as there is a short window during remapping when each view 
                 // might not exist) thus we do it later.
@@ -745,7 +745,7 @@ namespace mongo {
                 getDur().commitIfNeeded(true);
             }
             else {
-                assert( inShutdown() );
+                verify( inShutdown() );
                 if( commitJob.hasWritten() ) {
                     log() << "journal warning files are closing outside locks with writes pending" << endl;
                 }
@@ -872,7 +872,7 @@ namespace mongo {
             MongoFile::flushAll(true);
             journalCleanup();
 
-            assert(!haveJournalFiles()); // Double check post-conditions
+            verify(!haveJournalFiles()); // Double check post-conditions
         }
 
     } // namespace dur

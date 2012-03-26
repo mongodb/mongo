@@ -23,7 +23,7 @@
 namespace mongo {
     intrusive_ptr<const Value> AccumulatorAddToSet::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-        assert(vpOperand.size() == 1);
+        verify(vpOperand.size() == 1);
         intrusive_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
 
         if (prhs->getType() == Undefined)
@@ -37,7 +37,7 @@ namespace mongo {
               If we didn't, then we'd get an array of arrays, with one array
               from each shard that responds.
              */
-            assert(prhs->getType() == Array);
+            verify(prhs->getType() == Array);
             
             intrusive_ptr<ValueIterator> pvi(prhs->getArray());
             while(pvi->more()) {

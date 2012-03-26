@@ -34,7 +34,7 @@ namespace mongo {
             Lock::assertAtLeastReadLocked(db->name);
         }
         else {
-            assert( Lock::isLocked() );
+            verify( Lock::isLocked() );
         }
     }
 
@@ -150,13 +150,13 @@ namespace mongo {
     }
 
     bool Database::openExistingFile( int n ) { 
-        assert(this);
+        verify(this);
         Lock::assertWriteLocked(name);
         {
             // must not yet be visible to others as we aren't in the db's write lock and 
             // we will write to _files vector - thus this assert.
             bool loaded = dbHolder().__isLoaded(name, path);
-            assert( !loaded );
+            verify( !loaded );
         }
         // additionally must be in the dbholder mutex (no assert for that yet)
 
@@ -202,7 +202,7 @@ namespace mongo {
     //        repair purposes yet we do not.
     void Database::openAllFiles() {
         //log() << "TEMP openallfiles " << path << ' ' << name << endl;
-        assert(this);
+        verify(this);
         int n = 0;
         while( openExistingFile(n) ) {
             n++;
@@ -224,7 +224,7 @@ namespace mongo {
 
     // todo: this is called a lot. streamline the common case
     MongoDataFile* Database::getFile( int n, int sizeNeeded , bool preallocateOnly) {
-        assert(this);
+        verify(this);
         DEV assertDbAtLeastReadLocked(this);
 
         namespaceIndex.init();
@@ -240,12 +240,12 @@ namespace mongo {
         MongoDataFile* p = 0;
         if ( !preallocateOnly ) {
             while ( n >= (int) _files.size() ) {
-                assert(this);
+                verify(this);
                 if( !Lock::isWriteLocked(this->name) ) {
                     log() << "error: getFile() called in a read lock, yet file to return is not yet open" << endl;
                     log() << "       getFile(" << n << ") _files.size:" <<_files.size() << ' ' << fileName(n).string() << endl;
                     log() << "       context ns: " << cc().ns() << " openallfiles:" << _openAllFiles << endl;
-                    assert(false);
+                    verify(false);
                 }
                 _files.push_back(0);
             }
@@ -368,7 +368,7 @@ namespace mongo {
             return true;
         }
 
-        assert( cc().database() == this );
+        verify( cc().database() == this );
 
         if ( ! namespaceIndex.details( profileName.c_str() ) ) {
             log() << "creating profile collection: " << profileName << endl;
@@ -437,7 +437,7 @@ namespace mongo {
         {
             SimpleMutex::scoped_lock lk(_m);
             DBs& m = _paths[path];
-            assert( m[dbname] == 0 );
+            verify( m[dbname] == 0 );
             m[dbname] = db;
             _size++;
         }

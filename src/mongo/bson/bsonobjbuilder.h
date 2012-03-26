@@ -26,9 +26,7 @@
 #include <cmath>
 #include <boost/static_assert.hpp>
 #if defined(MONGO_EXPOSE_MACROS)
-// boost changed it
-#undef assert
-#define assert MONGO_assert
+#define verify MONGO_verify
 #endif
 #include "bsonelement.h"
 #include "bsonobj.h"
@@ -123,14 +121,14 @@ namespace mongo {
 
         /** append element to the object we are building */
         BSONObjBuilder& append( const BSONElement& e) {
-            assert( !e.eoo() ); // do not append eoo, that would corrupt us. the builder auto appends when done() is called.
+            verify( !e.eoo() ); // do not append eoo, that would corrupt us. the builder auto appends when done() is called.
             _b.appendBuf((void*) e.rawdata(), e.size());
             return *this;
         }
 
         /** append an element but with a new name */
         BSONObjBuilder& appendAs(const BSONElement& e, const StringData& fieldName) {
-            assert( !e.eoo() ); // do not append eoo, that would corrupt us. the builder auto appends when done() is called.
+            verify( !e.eoo() ); // do not append eoo, that would corrupt us. the builder auto appends when done() is called.
             _b.appendNum((char) e.type());
             _b.appendStr(fieldName);
             _b.appendBuf((void *) e.value(), e.valuesize());
@@ -147,12 +145,12 @@ namespace mongo {
 
         /** add a subobject as a member */
         BSONObjBuilder& appendObject(const StringData& fieldName, const char * objdata , int size = 0 ) {
-            assert( objdata );
+            verify( objdata );
             if ( size == 0 ) {
                 size = *((int*)objdata);
             }
 
-            assert( size > 4 && size < 100000000 );
+            verify( size > 4 && size < 100000000 );
 
             _b.appendNum((char) Object);
             _b.appendStr(fieldName);
@@ -582,7 +580,7 @@ namespace mongo {
         /* assume ownership of the buffer - you must then free it (with free()) */
         char* decouple(int& l) {
             char *x = _done();
-            assert( x );
+            verify( x );
             l = _b.len();
             _b.decouple();
             return x;

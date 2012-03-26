@@ -156,44 +156,44 @@ namespace mongo {
         void testIsPrefixOf() {
             {
                 ShardKeyPattern k( BSON( "x" << 1 ) );
-                assert( ! k.isPrefixOf( BSON( "a" << 1 ) ) );
-                assert( k.isPrefixOf( BSON( "x" << 1 ) ) );
-                assert( k.isPrefixOf( BSON( "x" << 1 << "a" << 1 ) ) );
-                assert( ! k.isPrefixOf( BSON( "a" << 1 << "x" << 1 ) ) );
+                verify( ! k.isPrefixOf( BSON( "a" << 1 ) ) );
+                verify( k.isPrefixOf( BSON( "x" << 1 ) ) );
+                verify( k.isPrefixOf( BSON( "x" << 1 << "a" << 1 ) ) );
+                verify( ! k.isPrefixOf( BSON( "a" << 1 << "x" << 1 ) ) );
             }
             {
                 ShardKeyPattern k( BSON( "x" << 1 << "y" << 1 ) );
-                assert( ! k.isPrefixOf( BSON( "x" << 1 ) ) );
-                assert( ! k.isPrefixOf( BSON( "x" << 1 << "z" << 1 ) ) );
-                assert( k.isPrefixOf( BSON( "x" << 1 << "y" << 1 ) ) );
-                assert( k.isPrefixOf( BSON( "x" << 1 << "y" << 1 << "z" << 1 ) ) );
+                verify( ! k.isPrefixOf( BSON( "x" << 1 ) ) );
+                verify( ! k.isPrefixOf( BSON( "x" << 1 << "z" << 1 ) ) );
+                verify( k.isPrefixOf( BSON( "x" << 1 << "y" << 1 ) ) );
+                verify( k.isPrefixOf( BSON( "x" << 1 << "y" << 1 << "z" << 1 ) ) );
             }
         }
 
         void hasshardkeytest() {
             BSONObj x = fromjson("{ zid : \"abcdefg\", num: 1.0, name: \"eliot\" }");
             ShardKeyPattern k( BSON( "num" << 1 ) );
-            assert( k.hasShardKey(x) );
-            assert( !k.hasShardKey( fromjson("{foo:'a'}") ) );
-            assert( !k.hasShardKey( fromjson("{x: {$gt: 1}}") ) );
+            verify( k.hasShardKey(x) );
+            verify( !k.hasShardKey( fromjson("{foo:'a'}") ) );
+            verify( !k.hasShardKey( fromjson("{x: {$gt: 1}}") ) );
 
             // try compound key
             {
                 ShardKeyPattern k( fromjson("{a:1,b:-1,c:1}") );
-                assert( k.hasShardKey( fromjson("{foo:'a',a:'b',c:'z',b:9,k:99}") ) );
-                assert( !k.hasShardKey( fromjson("{foo:'a',a:'b',c:'z',bb:9,k:99}") ) );
-                assert( !k.hasShardKey( fromjson("{k:99}") ) );
+                verify( k.hasShardKey( fromjson("{foo:'a',a:'b',c:'z',b:9,k:99}") ) );
+                verify( !k.hasShardKey( fromjson("{foo:'a',a:'b',c:'z',bb:9,k:99}") ) );
+                verify( !k.hasShardKey( fromjson("{k:99}") ) );
             }
 
             // try dotted key
             {
                 ShardKeyPattern k( fromjson("{'a.b':1}") );
-                assert( k.hasShardKey( fromjson("{a:{b:1,c:1},d:1}") ) );
-                assert( k.hasShardKey( fromjson("{'a.b':1}") ) );
-                assert( !k.hasShardKey( fromjson("{'a.c':1}") ) );
-                assert( !k.hasShardKey( fromjson("{a:{c:1},d:1}") ) );
-                assert( !k.hasShardKey( fromjson("{a:1}") ) );
-                assert( !k.hasShardKey( fromjson("{b:1}") ) );
+                verify( k.hasShardKey( fromjson("{a:{b:1,c:1},d:1}") ) );
+                verify( k.hasShardKey( fromjson("{'a.b':1}") ) );
+                verify( !k.hasShardKey( fromjson("{'a.c':1}") ) );
+                verify( !k.hasShardKey( fromjson("{a:{c:1},d:1}") ) );
+                verify( !k.hasShardKey( fromjson("{a:1}") ) );
+                verify( !k.hasShardKey( fromjson("{b:1}") ) );
             }
 
         }
@@ -202,8 +202,8 @@ namespace mongo {
             ShardKeyPattern k( fromjson("{a:1,'sub.b':-1,'sub.c':1}") );
 
             BSONObj x = fromjson("{a:1,'sub.b':2,'sub.c':3}");
-            assert( k.extractKey( fromjson("{a:1,sub:{b:2,c:3}}") ).binaryEqual(x) );
-            assert( k.extractKey( fromjson("{sub:{b:2,c:3},a:1}") ).binaryEqual(x) );
+            verify( k.extractKey( fromjson("{a:1,sub:{b:2,c:3}}") ).binaryEqual(x) );
+            verify( k.extractKey( fromjson("{sub:{b:2,c:3},a:1}") ).binaryEqual(x) );
         }
         void moveToFrontTest() {
             ShardKeyPattern sk (BSON("a" << 1 << "b" << 1));
@@ -211,13 +211,13 @@ namespace mongo {
             BSONObj ret;
 
             ret = sk.moveToFront(BSON("z" << 1 << "_id" << 1 << "y" << 1 << "a" << 1 << "x" << 1 << "b" << 1 << "w" << 1));
-            assert(ret.binaryEqual(BSON("_id" << 1 << "a" << 1 << "b" << 1 << "z" << 1 << "y" << 1 << "x" << 1 << "w" << 1)));
+            verify(ret.binaryEqual(BSON("_id" << 1 << "a" << 1 << "b" << 1 << "z" << 1 << "y" << 1 << "x" << 1 << "w" << 1)));
 
             ret = sk.moveToFront(BSON("_id" << 1 << "a" << 1 << "b" << 1 << "z" << 1 << "y" << 1 << "x" << 1 << "w" << 1));
-            assert(ret.binaryEqual(BSON("_id" << 1 << "a" << 1 << "b" << 1 << "z" << 1 << "y" << 1 << "x" << 1 << "w" << 1)));
+            verify(ret.binaryEqual(BSON("_id" << 1 << "a" << 1 << "b" << 1 << "z" << 1 << "y" << 1 << "x" << 1 << "w" << 1)));
 
             ret = sk.moveToFront(BSON("z" << 1 << "y" << 1 << "a" << 1 << "b" << 1 << "Z" << 1 << "Y" << 1));
-            assert(ret.binaryEqual(BSON("a" << 1 << "b" << 1 << "z" << 1 << "y" << 1 << "Z" << 1 << "Y" << 1)));
+            verify(ret.binaryEqual(BSON("a" << 1 << "b" << 1 << "z" << 1 << "y" << 1 << "Z" << 1 << "Y" << 1)));
 
         }
 
@@ -255,19 +255,19 @@ namespace mongo {
 
             BSONObj k1 = BSON( "key" << 5 );
 
-            assert( k.compare( min , max ) < 0 );
-            assert( k.compare( min , k1 ) < 0 );
-            assert( k.compare( max , min ) > 0 );
-            assert( k.compare( min , min ) == 0 );
+            verify( k.compare( min , max ) < 0 );
+            verify( k.compare( min , k1 ) < 0 );
+            verify( k.compare( max , min ) > 0 );
+            verify( k.compare( min , min ) == 0 );
 
             hasshardkeytest();
-            assert( k.hasShardKey( k1 ) );
-            assert( ! k.hasShardKey( BSON( "key2" << 1 ) ) );
+            verify( k.hasShardKey( k1 ) );
+            verify( ! k.hasShardKey( BSON( "key2" << 1 ) ) );
 
             BSONObj a = k1;
             BSONObj b = BSON( "key" << 999 );
 
-            assert( k.compare(a,b) < 0 );
+            verify( k.compare(a,b) < 0 );
 
             testIsPrefixOf();
             // add middle multitype tests

@@ -54,7 +54,7 @@ namespace mongo {
             QuerySpec qSpec( (string)q.ns, q.query, q.fields, q.ntoskip, q.ntoreturn, q.queryOptions );
 
             ParallelSortClusteredCursor * cursor = new ParallelSortClusteredCursor( qSpec, CommandInfo() );
-            assert( cursor );
+            verify( cursor );
 
             // TODO:  Move out to Request itself, not strategy based
             try {
@@ -411,7 +411,7 @@ namespace mongo {
                         shard = c->getShard();
                     }
 
-                    assert(shard != Shard());
+                    verify(shard != Shard());
                     doWrite( dbUpdate , r , shard );
 
                     if ( c &&r.getClientInfo()->autoSplitOk() )
@@ -543,7 +543,7 @@ namespace mongo {
                                  r.getConfig()->getChunkManager( ns )->getShardKey().isPrefixOf( newIndexKey ) );
 
                         ChunkManagerPtr cm = r.getConfig()->getChunkManager( ns );
-                        assert( cm );
+                        verify( cm );
 
                         set<Shard> shards;
                         cm->getAllShards(shards);

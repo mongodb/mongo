@@ -47,13 +47,13 @@ namespace mongo {
             ClientCursor *cc = clientCursorsById.begin()->second;
             log() << "first one: " << cc->_cursorid << ' ' << cc->_ns << endl;
             clientCursorsById.clear();
-            assert(false);
+            verify(false);
         }
     }
 
 
     void ClientCursor::setLastLoc_inlock(DiskLoc L) {
-        assert( _pos != -2 ); // defensive - see ~ClientCursor
+        verify( _pos != -2 ); // defensive - see ~ClientCursor
 
         if ( L == _lastLoc )
             return;
@@ -80,15 +80,15 @@ namespace mongo {
         Lock::assertWriteLocked(ns);
         int len = strlen(ns);
         const char* dot = strchr(ns, '.');
-        assert( len > 0 && dot);
+        verify( len > 0 && dot);
 
         bool isDB = (dot == &ns[len-1]); // first (and only) dot is the last char
 
         {
             //cout << "\nTEMP invalidate " << ns << endl;
             Database *db = cc().database();
-            assert(db);
-            assert( str::startsWith(ns, db->name) );
+            verify(db);
+            verify( str::startsWith(ns, db->name) );
 
             for( LockedIterator i; i.ok(); ) {
                 ClientCursor *cc = i.current();
@@ -123,7 +123,7 @@ namespace mongo {
             for ( CCByLoc::iterator i = bl.begin(); i != bl.end(); ++i ) {
                 ClientCursor *cc = i->second;
                 if ( strncmp(ns, cc->ns.c_str(), len) == 0 ) {
-                    assert( cc->_db == db );
+                    verify( cc->_db == db );
                     toDelete.push_back(i->second);
                 }
             }*/
@@ -214,7 +214,7 @@ namespace mongo {
         recursive_scoped_lock lock(ccmutex);
 
         Database *db = cc().database();
-        assert(db);
+        verify(db);
 
         aboutToDeleteForSharding( db , dl );
 
@@ -228,7 +228,7 @@ namespace mongo {
 
         while ( 1 ) {
             toAdvance.push_back(j->second);
-            DEV assert( j->first.loc == dl );
+            DEV verify( j->first.loc == dl );
             ++j;
             if ( j == stop )
                 break;
@@ -306,8 +306,8 @@ namespace mongo {
 
         Lock::assertAtLeastReadLocked(ns);
 
-        assert( _db );
-        assert( str::startsWith(_ns, _db->name) );
+        verify( _db );
+        verify( str::startsWith(_ns, _db->name) );
         if( queryOptions & QueryOption_NoCursorTimeout )
             noTimeout();
         recursive_scoped_lock lock(ccmutex);
@@ -367,7 +367,7 @@ namespace mongo {
             it.next();
             x--;
         }
-        assert( x == 0 );
+        verify( x == 0 );
         ret.insert( it.next() );
         return true;
     }
@@ -390,7 +390,7 @@ namespace mongo {
             it.next();
             x--;
         }
-        assert( x == 0 );
+        verify( x == 0 );
 
         if ( fromKey )
             *fromKey = true;
@@ -426,7 +426,7 @@ namespace mongo {
        need to call when you are ready to "unlock".
     */
     void ClientCursor::updateLocation() {
-        assert( _cursorid );
+        verify( _cursorid );
         _idleAgeMillis = 0;
         _c->prepareToYield();
         DiskLoc cl = _c->refLoc();

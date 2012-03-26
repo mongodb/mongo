@@ -227,7 +227,7 @@ namespace mongo {
 
         ~dist_lock_try() {
             if ( _got ) {
-                assert( ! _other.isEmpty() );
+                verify( ! _other.isEmpty() );
                 _lock->unlock( &_other );
             }
         }
@@ -237,9 +237,9 @@ namespace mongo {
         }
 
         bool retry() {
-            assert( _lock );
-            assert( _got );
-            assert( ! _other.isEmpty() );
+            verify( _lock );
+            verify( _got );
+            verify( ! _other.isEmpty() );
 
             return _got = _lock->lock_try( _why , true, &_other );
         }

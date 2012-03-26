@@ -62,7 +62,7 @@ namespace mongo {
                     cout << "logpath [" << lp << "] should be a filename, not a directory" << endl;
                     
                     dbexit( EXIT_BADOPTIONS );
-                    assert( 0 );
+                    verify( 0 );
                 }
 
                 if ( ! append ) {
@@ -78,7 +78,7 @@ namespace mongo {
                             cout << "log file [" << lp << "] exists and couldn't make backup; run with --logappend or manually remove file (" << strerror(errno) << ")" << endl;
                             
                             dbexit( EXIT_BADOPTIONS );
-                            assert( 0 );
+                            verify( 0 );
                         }
                     }
                 }
@@ -88,7 +88,7 @@ namespace mongo {
             if ( ! test ) {
                 cout << "can't open [" << lp << "] for log file: " << errnoWithDescription() << endl;
                 dbexit( EXIT_BADOPTIONS );
-                assert( 0 );
+                verify( 0 );
             }
 
             if (append && exists){
@@ -150,7 +150,7 @@ namespace mongo {
             if ( !tmp ) {
                 cerr << "can't open: " << _path.c_str() << " for log file" << endl;
                 dbexit( EXIT_BADOPTIONS );
-                assert( 0 );
+                verify( 0 );
             }
 
             // redirect stdout and stderr to log file
@@ -334,7 +334,7 @@ namespace mongo {
             }
 
             string out( b.buf() , b.len() - 1);
-            assert( b.len() < spaceNeeded );
+            verify( b.len() < spaceNeeded );
 
             scoped_lock lk(mutex);
 

@@ -162,7 +162,7 @@ dodouble:
             return 0;
         }
         default:
-            assert( false);
+            verify( false);
         }
         return -1;
     }
@@ -200,12 +200,12 @@ dodouble:
     }
 
     inline BSONObj BSONElement::embeddedObject() const {
-        assert( isABSONObj() );
+        verify( isABSONObj() );
         return BSONObj(value());
     }
 
     inline BSONObj BSONElement::codeWScopeObject() const {
-        assert( type() == CodeWScope );
+        verify( type() == CodeWScope );
         int strSizeWNull = *(int *)( value() + 4 );
         return BSONObj( value() + 4 + 4 + strSizeWNull );
     }
@@ -599,7 +599,7 @@ dodouble:
                 len2 = strlen( p );
             else {
                 size_t x = remain - len1 - 1;
-                assert( x <= 0x7fffffff );
+                verify( x <= 0x7fffffff );
                 len2 = mongo::strnlen( p, (int) x );
             }
             //massert( 10319 ,  "Invalid regex options string", len2 != -1 ); // ERH - 4/28/10 - don't think this does anything
@@ -989,8 +989,8 @@ dodouble:
             appendAs( j.next() , i.next().fieldName() );
         }
 
-        assert( ! i.more() );
-        assert( ! j.more() );
+        verify( ! i.more() );
+        verify( ! j.more() );
     }
 
     inline BSONObj BSONObj::removeField(const StringData& name) const { 

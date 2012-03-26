@@ -234,7 +234,7 @@ namespace mongo {
         */
     /*static*/
     bool ReplSetConfig::legalChange(const ReplSetConfig& o, const ReplSetConfig& n, string& errmsg) {
-        assert( theReplSet );
+        verify( theReplSet );
 
         if( o._id != n._id ) {
             errmsg = "set name may not change";

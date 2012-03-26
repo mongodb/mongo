@@ -37,7 +37,7 @@ namespace mongo {
 
     SnapshotDelta::SnapshotDelta( const SnapshotData& older , const SnapshotData& newer )
         : _older( older ) , _newer( newer ) {
-        assert( _newer._created > _older._created );
+        verify( _newer._created > _older._created );
         _elapsed = _newer._created - _older._created;
     }
 
@@ -45,7 +45,7 @@ namespace mongo {
         return Top::CollectionData( _older._globalUsage , _newer._globalUsage );
     }
     Top::UsageMap SnapshotDelta::collectionUsageDiff() {
-        assert( _newer._created > _older._created );
+        verify( _newer._created > _older._created );
         Top::UsageMap u;
 
         for ( Top::UsageMap::const_iterator i=_newer._usage.begin(); i != _newer._usage.end(); i++ ) {

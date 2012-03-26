@@ -37,7 +37,7 @@ namespace mongo {
     }
 
     void DocumentSource::setSource(DocumentSource *pTheSource) {
-        assert(!pSource);
+        verify(!pSource);
         pSource = pTheSource;
     }
 
@@ -52,7 +52,7 @@ namespace mongo {
     void DocumentSource::manageDependencies(
         const intrusive_ptr<DependencyTracker> &pTracker) {
 #ifdef MONGO_LATER_SERVER_4644
-        assert(false); // identify any sources that need this but don't have it
+        verify(false); // identify any sources that need this but don't have it
 #endif /* MONGO_LATER_SERVER_4644 */
     }
 

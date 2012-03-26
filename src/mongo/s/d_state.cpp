@@ -51,11 +51,11 @@ namespace mongo {
 
     void ShardingState::enable( const string& server ) {
         _enabled = true;
-        assert( server.size() );
+        verify( server.size() );
         if ( _configServer.size() == 0 )
             _configServer = server;
         else {
-            assert( server == _configServer );
+            verify( server == _configServer );
         }
     }
 
@@ -147,7 +147,7 @@ namespace mongo {
         scoped_lock lk( _mutex );
 
         ChunkManagersMap::const_iterator it = _chunks.find( ns );
-        assert( it != _chunks.end() ) ;
+        verify( it != _chunks.end() ) ;
         ShardChunkManagerPtr p = it->second;
 
         // empty shards should have version 0
@@ -161,7 +161,7 @@ namespace mongo {
         scoped_lock lk( _mutex );
 
         ChunkManagersMap::const_iterator it = _chunks.find( ns );
-        assert( it != _chunks.end() ) ;
+        verify( it != _chunks.end() ) ;
         ShardChunkManagerPtr p( it->second->clonePlus( min , max , version ) );
         _chunks[ns] = p;
     }
@@ -171,7 +171,7 @@ namespace mongo {
         scoped_lock lk( _mutex );
 
         ChunkManagersMap::const_iterator it = _chunks.find( ns );
-        assert( it != _chunks.end() ) ;
+        verify( it != _chunks.end() ) ;
         ShardChunkManagerPtr p( it->second->cloneSplit( min , max , splitKeys , version ) );
         _chunks[ns] = p;
     }

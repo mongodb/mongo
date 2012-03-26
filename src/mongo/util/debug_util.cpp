@@ -51,7 +51,7 @@ namespace mongo {
     }
 
     void setupSIGTRAPforGDB() {
-        assert( signal(SIGTRAP , launchGDB ) != SIG_ERR );
+        verify( signal(SIGTRAP , launchGDB ) != SIG_ERR );
     }
 #else
     void setupSIGTRAPforGDB() {

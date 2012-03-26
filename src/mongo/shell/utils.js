@@ -66,6 +66,10 @@ assert = function( b , msg ){
     doassert( msg == undefined ? "assert failed" : "assert failed : " + msg );
 }
 
+// the mongo code uses verify
+// so this is to be nice to mongo devs
+verify = assert;
+
 assert.automsg = function( b ) {
     assert( eval( b ), b );
 }

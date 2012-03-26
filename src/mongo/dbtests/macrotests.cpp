@@ -22,26 +22,26 @@
 # error malloc defined 0
 #endif
 
-#ifdef assert
-# error assert defined 1
+#ifdef verify
+# error verify defined 1
 #endif
 
-#include "../client/parallel.h" //uses assert
+#include "../client/parallel.h" //uses verify
 
-#ifdef assert
-# error assert defined 2
+#ifdef verify
+# error verify defined 2
 #endif
 
 #include "../client/redef_macros.h"
 
-#ifndef assert
-# error assert not defined 3
+#ifndef verify
+# error verify not defined 3
 #endif
 
 #include "../client/undef_macros.h"
 
-#ifdef assert
-# error assert defined 3
+#ifdef verify
+# error verify defined 3
 #endif
 
 

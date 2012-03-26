@@ -78,7 +78,7 @@ namespace mongo {
     }
 
     void LogFile::truncate() {
-        assert(_fd != INVALID_HANDLE_VALUE);
+        verify(_fd != INVALID_HANDLE_VALUE);
 
         if (!SetEndOfFile(_fd)){
             msgasserted(15871, "Couldn't truncate file: " + errnoWithDescription());
@@ -91,7 +91,7 @@ namespace mongo {
         memset(&o,0,sizeof(o));
         (unsigned long long&) o.Offset = offset; 
         BOOL ok= WriteFile(_fd, _buf, _len, 0, &o);
-        assert(ok);
+        verify(ok);
     }
 
     void LogFile::readAt(unsigned long long offset, void *_buf, size_t _len) { 
@@ -105,14 +105,14 @@ namespace mongo {
             string e = errnoWithDescription();
             //DWORD e = GetLastError();
             log() << "LogFile readAt(" << offset << ") len:" << _len << "errno:" << e << endl;
-            assert(false);
+            verify(false);
         }
     }
 
     void LogFile::synchronousAppend(const void *_buf, size_t _len) {
         const size_t BlockSize = 8 * 1024 * 1024;
-        assert(_fd);
-        assert(_len % 4096 == 0);
+        verify(_fd);
+        verify(_len % 4096 == 0);
         const char *buf = (const char *) _buf;
         size_t left = _len;
         while( left ) {
@@ -184,7 +184,7 @@ namespace mongo {
     }
 
     void LogFile::truncate() {
-        assert(_fd >= 0);
+        verify(_fd >= 0);
 
         BOOST_STATIC_ASSERT(sizeof(off_t) == 8); // we don't want overflow here
         const off_t pos = lseek(_fd, 0, SEEK_CUR); // doesn't actually seek
@@ -196,7 +196,7 @@ namespace mongo {
     }
 
     void LogFile::writeAt(unsigned long long offset, const void *buf, size_t len) { 
-        assert(((size_t)buf)%4096==0); // aligned
+        verify(((size_t)buf)%4096==0); // aligned
         ssize_t written = pwrite(_fd, buf, len, offset);
         if( written != (ssize_t) len ) {
             log() << "writeAt fails " << errnoWithDescription() << endl;
@@ -209,9 +209,9 @@ namespace mongo {
     }
 
     void LogFile::readAt(unsigned long long offset, void *_buf, size_t _len) { 
-        assert(((size_t)_buf)%4096==0); // aligned
+        verify(((size_t)_buf)%4096==0); // aligned
         ssize_t rd = pread(_fd, _buf, _len, offset);
-        assert( rd != -1 );
+        verify( rd != -1 );
     }
 
     void LogFile::synchronousAppend(const void *b, size_t len) {
@@ -220,11 +220,11 @@ namespace mongo {
 #endif
 
         const char *buf = (char *) b;
-        assert(_fd);
-        assert(((size_t)buf)%4096==0); // aligned
+        verify(_fd);
+        verify(((size_t)buf)%4096==0); // aligned
         if( len % 4096 != 0 ) {
             log() << len << ' ' << len % 4096 << endl;
-            assert(false);
+            verify(false);
         }
         ssize_t written = write(_fd, buf, len);
         if( written != (ssize_t) len ) {

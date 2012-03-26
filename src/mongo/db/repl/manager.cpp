@@ -35,7 +35,7 @@ namespace mongo {
         Member *m = rs->head();
         Member *p = 0;
         while( m ) {
-            DEV assert( m != rs->_self );
+            DEV verify( m != rs->_self );
             if( m->state().primary() && m->hbinfo().up() ) {
                 if( p ) {
                     two = true;

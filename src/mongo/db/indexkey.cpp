@@ -75,7 +75,7 @@ namespace mongo {
     }
 
     void IndexSpec::_init() {
-        assert( keyPattern.objsize() );
+        verify( keyPattern.objsize() );
 
         // some basics
         _nFields = keyPattern.nFields();
@@ -233,7 +233,7 @@ namespace mongo {
             }
             else {
                 // nonterminal array element to expand, so recurse
-                assert( !arrElt.eoo() );
+                verify( !arrElt.eoo() );
                 BSONObjIterator i( arrElt.embeddedObject() );
                 if ( i.more() ) {
                     while( i.more() ) {

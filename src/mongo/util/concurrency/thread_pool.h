@@ -19,8 +19,6 @@
 
 #include <boost/function.hpp>
 #include <boost/bind.hpp>
-#undef assert
-#define assert MONGO_assert
 
 namespace mongo {
 

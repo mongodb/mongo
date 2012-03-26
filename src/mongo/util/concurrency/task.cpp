@@ -46,7 +46,7 @@ namespace mongo {
         void Task::halt() { repeat = 0; }
 
         void Task::run() {
-            assert( n == 0 );
+            verify( n == 0 );
             while( 1 ) {
                 n++;
                 try {

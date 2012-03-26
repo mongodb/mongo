@@ -159,7 +159,7 @@ namespace mongo {
         }
 
         /* NOTREACHED */
-        assert(false);
+        verify(false);
         return false;
     }
 

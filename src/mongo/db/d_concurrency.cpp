@@ -105,7 +105,7 @@ namespace mongo {
     void QLock::runExclusively(void (*f)(void)) { 
         dlog(1) << "QLock::runExclusively" << endl;
         boost::mutex::scoped_lock lk( m );
-        assert( w.n > 0 );
+        verify( w.n > 0 );
         greed++; // stop new acquisitions
         X.n++;
         while( X.n ) { 
@@ -183,14 +183,14 @@ namespace mongo {
     }
 
     static bool lock_R_try(int ms) { 
-        assert( threadState() == 0 );
+        verify( threadState() == 0 );
         bool got = q.lock_R_try(ms);
         if( got ) 
             threadState() = 'R';
         return got;
     }
     static bool lock_W_try(int ms) { 
-        assert( threadState() == 0 );
+        verify( threadState() == 0 );
         bool got = q.lock_W_try(ms);
         if( got ) {
             threadState() = 'W';
@@ -199,7 +199,7 @@ namespace mongo {
         return got;
     }
     static void lock_W_stop_greed() { 
-        assert( threadState() == 0 );
+        verify( threadState() == 0 );
         threadState() = 'W';
         {
             Acquiring a('W');
@@ -241,7 +241,7 @@ namespace mongo {
     }    
     static void lock_w() { 
         char &ts = threadState();
-        assert( ts == 0 );
+        verify( ts == 0 );
         getDur().commitIfNeeded();
         ts = 'w';
         Acquiring a('w');
@@ -255,7 +255,7 @@ namespace mongo {
     }
     static void lock_r() {
         char& ts = threadState();
-        assert( ts == 0 );
+        verify( ts == 0 );
         ts = 'r';
         Acquiring a('r');
         q.lock_r();
@@ -269,23 +269,23 @@ namespace mongo {
     // these are safe for use ACROSS threads.  i.e. one thread can lock and 
     // another unlock
     void Lock::ThreadSpanningOp::setWLockedNongreedy() { 
-        assert( threadState() == 0 ); // as this spans threads the tls wouldn't make sense
+        verify( threadState() == 0 ); // as this spans threads the tls wouldn't make sense
         lock_W_stop_greed();
     }
     void Lock::ThreadSpanningOp::W_to_R() { 
-        assert( threadState() == 'W' );
+        verify( threadState() == 'W' );
         dur::assertNothingSpooled();
         q.W_to_R();
         threadState() = 'R';
     }
     void Lock::ThreadSpanningOp::unsetW() { // note there is no unlocking_W() call here
-        assert( threadState() == 'W' );
+        verify( threadState() == 'W' );
         q.unlock_W();
         q.start_greed();
         threadState() = 0;
     }
     void Lock::ThreadSpanningOp::unsetR() {
-        assert( threadState() == 'R' || threadState() == 0 ); 
+        verify( threadState() == 'R' || threadState() == 0 ); 
         q.unlock_R();
         q.start_greed();
         threadState() = 0;
@@ -491,15 +491,15 @@ namespace mongo {
         }
     }
     void Lock::GlobalWrite::downgrade() { 
-        assert( !noop );
-        assert( threadState() == 'W' );
+        verify( !noop );
+        verify( threadState() == 'W' );
         q.W_to_R();
         threadState() = 'R';
     }
     // you will deadlock if 2 threads doing this
     bool Lock::GlobalWrite::upgrade() { 
-        assert( !noop );
-        assert( threadState() == 'R' );
+        verify( !noop );
+        verify( threadState() == 'R' );
         if( q.R_to_W() ) {
             threadState() = 'W';
             return true;
@@ -534,18 +534,18 @@ namespace mongo {
         case 'R' : 
             {
                 error() << "trying to get a w lock after already getting an R lock is not allowed" << endl;
-                assert(false);
+                verify(false);
             }
         case 'r' : 
             {
                 error() << "trying to get a w lock after already getting an r lock is not allowed" << endl;
-                assert(false);
+                verify(false);
             }
             return false;
         case 'W' :
             return true; // lock nothing further
         default:
-            assert(false);
+            verify(false);
         case 'w' :
         case  0  : 
             break;
@@ -559,7 +559,7 @@ namespace mongo {
                 error() << "can't lock local and admin db at the same time " << (int) db << ' ' << (int) ls.whichNestable << endl;
                 fassert(16131,false);
             }
-            assert( ls.nestableCount > 0 );
+            verify( ls.nestableCount > 0 );
         }
         else {
             ls.whichNestable = db;
@@ -741,7 +741,7 @@ namespace mongo {
         case 'w' :
             return false;
         default:
-            assert(false);
+            verify(false);
         case  0  : 
             ;
         }
@@ -753,7 +753,7 @@ namespace mongo {
         case 'w':
             break;
         default:
-            assert(false);
+            verify(false);
         case  0  : 
             lock_w();
             locked_w = true;
@@ -765,7 +765,7 @@ namespace mongo {
         case 'w':
             break;
         default:
-            assert(false);
+            verify(false);
         case  0  : 
             lock_r();
             locked_r = true;
@@ -895,6 +895,6 @@ namespace mongo {
     }
     MongoMutex::MongoMutex() {
         static int n = 0;
-        assert( ++n == 1 );
+        verify( ++n == 1 );
     }
 }

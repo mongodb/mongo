@@ -155,7 +155,7 @@ namespace mongo {
             BSONObj o = e.embeddedObject();
             return simpleRegex(o["$regex"].valuestrsafe(), o["$options"].valuestrsafe());
         }
-        default: assert(false); return ""; //return squashes compiler warning
+        default: verify(false); return ""; //return squashes compiler warning
         }
     }
 
@@ -675,7 +675,7 @@ namespace mongo {
     }
 
     void FieldRange::reverse( FieldRange &ret ) const {
-        assert( _special.empty() );
+        verify( _special.empty() );
         ret._intervals.clear();
         ret._objData = _objData;
         for( vector<FieldInterval>::const_reverse_iterator i = _intervals.rbegin(); i != _intervals.rend(); ++i ) {
@@ -939,14 +939,14 @@ namespace mongo {
     FieldRangeVector::FieldRangeVector( const FieldRangeSet &frs, const IndexSpec &indexSpec,
                                        int direction )
     :_indexSpec( indexSpec ), _direction( direction >= 0 ? 1 : -1 ) {
-        assert(  frs.matchPossibleForIndex( _indexSpec.keyPattern ) );
+        verify(  frs.matchPossibleForIndex( _indexSpec.keyPattern ) );
         _queries = frs._queries;
         BSONObjIterator i( _indexSpec.keyPattern );
         set< string > baseObjectNonUniversalPrefixes;
         while( i.more() ) {
             BSONElement e = i.next();
             const FieldRange *range = &frs.range( e.fieldName() );
-            assert(  !range->empty() );
+            verify(  !range->empty() );
             if ( !frs.singleKey() ) {
                 string prefix = str::before( e.fieldName(), '.' );
                 if ( baseObjectNonUniversalPrefixes.count( prefix ) > 0 ) {
@@ -969,7 +969,7 @@ namespace mongo {
                                               true ) );
                 range->reverse( _ranges.back() );
             }
-            assert( !_ranges.back().empty() );
+            verify( !_ranges.back().empty() );
         }
         uassert( 13385, "combinatorial limit of $in partitioning of result set exceeded",
                 size() < maxCombinations );
@@ -1032,7 +1032,7 @@ namespace mongo {
             BSONElement e = i.next();
             const char *name = e.fieldName();
             const FieldRange &eRange = range( name );
-            assert( !eRange.empty() );
+            verify( !eRange.empty() );
             if ( eRange.equality() )
                 b.appendAs( eRange.min(), name );
             else if ( !eRange.universal() ) {
@@ -1236,7 +1236,7 @@ namespace mongo {
                 return ret;
             }
         }
-        assert( l + 1 == h );
+        verify( l + 1 == h );
         return l;
     }
 
@@ -1278,7 +1278,7 @@ namespace mongo {
 
     BSONObj FieldRangeVector::firstMatch( const BSONObj &obj ) const {
         // NOTE Only works in forward direction.
-        assert( _direction >= 0 );
+        verify( _direction >= 0 );
         BSONObjSet keys( BSONObjCmp( _indexSpec.keyPattern ) );
         _indexSpec.getKeys( obj, keys );
         for( BSONObjSet::const_iterator i = keys.begin(); i != keys.end(); ++i ) {
@@ -1550,64 +1550,64 @@ namespace mongo {
                 BSONObjBuilder b;
                 b.appendRegex("r", "^foo");
                 BSONObj o = b.done();
-                assert( simpleRegex(o.firstElement()) == "foo" );
+                verify( simpleRegex(o.firstElement()) == "foo" );
             }
             {
                 BSONObjBuilder b;
                 b.appendRegex("r", "^f?oo");
                 BSONObj o = b.done();
-                assert( simpleRegex(o.firstElement()) == "" );
+                verify( simpleRegex(o.firstElement()) == "" );
             }
             {
                 BSONObjBuilder b;
                 b.appendRegex("r", "^fz?oo");
                 BSONObj o = b.done();
-                assert( simpleRegex(o.firstElement()) == "f" );
+                verify( simpleRegex(o.firstElement()) == "f" );
             }
             {
                 BSONObjBuilder b;
                 b.appendRegex("r", "^f", "");
                 BSONObj o = b.done();
-                assert( simpleRegex(o.firstElement()) == "f" );
+                verify( simpleRegex(o.firstElement()) == "f" );
             }
             {
                 BSONObjBuilder b;
                 b.appendRegex("r", "\\Af", "");
                 BSONObj o = b.done();
-                assert( simpleRegex(o.firstElement()) == "f" );
+                verify( simpleRegex(o.firstElement()) == "f" );
             }
             {
                 BSONObjBuilder b;
                 b.appendRegex("r", "^f", "m");
                 BSONObj o = b.done();
-                assert( simpleRegex(o.firstElement()) == "" );
+                verify( simpleRegex(o.firstElement()) == "" );
             }
             {
                 BSONObjBuilder b;
                 b.appendRegex("r", "\\Af", "m");
                 BSONObj o = b.done();
-                assert( simpleRegex(o.firstElement()) == "f" );
+                verify( simpleRegex(o.firstElement()) == "f" );
             }
             {
                 BSONObjBuilder b;
                 b.appendRegex("r", "\\Af", "mi");
                 BSONObj o = b.done();
-                assert( simpleRegex(o.firstElement()) == "" );
+                verify( simpleRegex(o.firstElement()) == "" );
             }
             {
                 BSONObjBuilder b;
                 b.appendRegex("r", "\\Af \t\vo\n\ro  \\ \\# #comment", "mx");
                 BSONObj o = b.done();
-                assert( simpleRegex(o.firstElement()) == "foo #" );
+                verify( simpleRegex(o.firstElement()) == "foo #" );
             }
             {
-                assert( simpleRegex("^\\Qasdf\\E", "", NULL) == "asdf" );
-                assert( simpleRegex("^\\Qasdf\\E.*", "", NULL) == "asdf" );
-                assert( simpleRegex("^\\Qasdf", "", NULL) == "asdf" ); // PCRE supports this
-                assert( simpleRegex("^\\Qasdf\\\\E", "", NULL) == "asdf\\" );
-                assert( simpleRegex("^\\Qas.*df\\E", "", NULL) == "as.*df" );
-                assert( simpleRegex("^\\Qas\\Q[df\\E", "", NULL) == "as\\Q[df" );
-                assert( simpleRegex("^\\Qas\\E\\\\E\\Q$df\\E", "", NULL) == "as\\E$df" ); // quoted string containing \E
+                verify( simpleRegex("^\\Qasdf\\E", "", NULL) == "asdf" );
+                verify( simpleRegex("^\\Qasdf\\E.*", "", NULL) == "asdf" );
+                verify( simpleRegex("^\\Qasdf", "", NULL) == "asdf" ); // PCRE supports this
+                verify( simpleRegex("^\\Qasdf\\\\E", "", NULL) == "asdf\\" );
+                verify( simpleRegex("^\\Qas.*df\\E", "", NULL) == "as.*df" );
+                verify( simpleRegex("^\\Qas\\Q[df\\E", "", NULL) == "as\\Q[df" );
+                verify( simpleRegex("^\\Qas\\E\\\\E\\Q$df\\E", "", NULL) == "as\\E$df" ); // quoted string containing \E
             }
 
         }

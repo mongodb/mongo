@@ -33,11 +33,10 @@ codes = []
 
 def readErrorCodes( callback, replaceZero = False ):
     
-    quick = [ "assert" , "Exception" , "verify" ]
+    quick = [ "assert" , "Exception"]
 
     ps = [ re.compile( "(([umsgf]asser(t|ted))) *\(( *)(\d+)" ) ,
-           re.compile( "((User|Msg|MsgAssertion)Exceptio(n))\(( *)(\d+)" ) ,
-           re.compile( "(((verify))) *\(( *)(\d+)" )
+           re.compile( "((User|Msg|MsgAssertion)Exceptio(n))\(( *)(\d+)" )
            ]
     
     for x in utils.getAllSourceFiles():

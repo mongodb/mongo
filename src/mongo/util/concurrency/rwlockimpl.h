@@ -83,7 +83,7 @@ namespace mongo {
         friend class SimpleRWLock;
         pthread_rwlock_t _lock;
         static void check( int x ) {
-            assert( x == 0 );
+            verify( x == 0 );
         }        
     protected:
         ~RWLockBase() {
@@ -137,8 +137,6 @@ namespace mongo { typedef boost::modified_shared_mutex shared_mutex; }
 #  include <boost/thread/shared_mutex.hpp>
 namespace mongo { using boost::shared_mutex; }
 # endif
-# undef assert
-# define assert MONGO_assert
 
 namespace mongo { 
     class RWLockBase : boost::noncopyable {

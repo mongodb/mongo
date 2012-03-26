@@ -121,10 +121,10 @@ namespace mongo {
     }
     
     static void _fixField( BSONObjBuilder& b , const BSONElement& e ) {
-        assert( e.type() == Object );
+        verify( e.type() == Object );
         
         BSONObj sub = e.Obj();
-        assert( sub.nFields() == 1 );
+        verify( sub.nFields() == 1 );
         
         BSONElement f = sub.firstElement();
         if ( str::equals( "#RAND_INT" , f.fieldName() ) ) {
@@ -213,7 +213,7 @@ namespace mongo {
                 if( check ){
                     if ( e["check"].type() == CodeWScope || e["check"].type() == Code || e["check"].type() == String ) {
                         scope = globalScriptEngine->getPooledScope( ns );
-                        assert( scope.get() );
+                        verify( scope.get() );
 
                         if ( e.type() == CodeWScope ) {
                             scopeFunc = scope->createFunction( e["check"].codeWScopeCode() );
@@ -224,7 +224,7 @@ namespace mongo {
                         }
 
                         scope->init( &scopeObj );
-                        assert( scopeFunc );
+                        verify( scopeFunc );
                     }
                     else {
                         warning() << "Invalid check type detected in benchRun op : " << e << endl;
@@ -288,7 +288,7 @@ namespace mongo {
 
                         if ( expected >= 0 &&  count != expected ) {
                             cout << "bench query on: " << ns << " expected: " << expected << " got: " << cout << endl;
-                            assert(false);
+                            verify(false);
                         }
 
                         if( check ){
@@ -663,7 +663,7 @@ namespace mongo {
      * benchRun( { ops : [] , host : XXX , db : XXXX , parallel : 5 , seconds : 5 }
      */
     BSONObj benchRun( const BSONObj& argsFake, void* data ) {
-        assert( argsFake.firstElement().isABSONObj() );
+        verify( argsFake.firstElement().isABSONObj() );
         BSONObj args = argsFake.firstElement().Obj();
 
         // setup
@@ -757,7 +757,7 @@ namespace mongo {
      */
     BSONObj benchRunSync( const BSONObj& argsFake, void* data ) {
 
-        assert( argsFake.firstElement().isABSONObj() );
+        verify( argsFake.firstElement().isABSONObj() );
         BSONObj args = argsFake.firstElement().Obj();
 
         // Get new BenchRunner object
@@ -774,7 +774,7 @@ namespace mongo {
      */
     BSONObj benchStart( const BSONObj& argsFake, void* data ) {
 
-        assert( argsFake.firstElement().isABSONObj() );
+        verify( argsFake.firstElement().isABSONObj() );
         BSONObj args = argsFake.firstElement().Obj();
 
         // Get new BenchRunner object

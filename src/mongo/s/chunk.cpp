@@ -57,7 +57,7 @@ namespace mongo {
         _shard.reset( from.getStringField( "shard" ) );
 
         _lastmod = from["lastmod"];
-        assert( _lastmod > 0 );
+        verify( _lastmod > 0 );
 
         _min = from.getObjectField( "min" ).getOwned();
         _max = from.getObjectField( "max" ).getOwned();
@@ -83,7 +83,7 @@ namespace mongo {
     }
 
     string Chunk::getns() const {
-        assert( _manager );
+        verify( _manager );
         return _manager->getns();
     }
 
@@ -477,11 +477,11 @@ namespace mongo {
             to.appendTimestamp( "lastmod" , myLastMod );
         }
         else if ( _lastmod.isSet() ) {
-            assert( _lastmod > 0 && _lastmod < 1000 );
+            verify( _lastmod > 0 && _lastmod < 1000 );
             to.appendTimestamp( "lastmod" , _lastmod );
         }
         else {
-            assert(0);
+            verify(0);
         }
 
         to << "ns" << _manager->getns();
@@ -614,7 +614,7 @@ namespace mongo {
         // TODO really need the sort?
         auto_ptr<DBClientCursor> cursor = conn->query( Chunk::chunkMetadataNS, QUERY("ns" << _ns).sort("lastmod",-1), 0, 0, 0, 0,
                                           (DEBUG_BUILD ? 2 : 1000000)); // batch size. Try to induce potential race conditions in debug builds
-        assert( cursor.get() );
+        verify( cursor.get() );
         while ( cursor->more() ) {
             BSONObj d = cursor->next();
             if ( d["isMaxMarker"].trueValue() ) {
@@ -678,7 +678,7 @@ namespace mongo {
 
     void ChunkManager::createFirstChunks( const Shard& primary , vector<BSONObj>* initPoints , vector<Shard>* initShards ) const {
         // TODO distlock?
-        assert( _chunkMap.size() == 0 );
+        verify( _chunkMap.size() == 0 );
 
         vector<BSONObj> splitPoints;
         vector<Shard> shards;
@@ -996,22 +996,22 @@ namespace mongo {
         try {
             // No Nulls
             for (ChunkRangeMap::const_iterator it=_ranges.begin(), end=_ranges.end(); it != end; ++it) {
-                assert(it->second);
+                verify(it->second);
             }
 
             // Check endpoints
-            assert(allOfType(MinKey, _ranges.begin()->second->getMin()));
-            assert(allOfType(MaxKey, boost::prior(_ranges.end())->second->getMax()));
+            verify(allOfType(MinKey, _ranges.begin()->second->getMin()));
+            verify(allOfType(MaxKey, boost::prior(_ranges.end())->second->getMax()));
 
             // Make sure there are no gaps or overlaps
             for (ChunkRangeMap::const_iterator it=boost::next(_ranges.begin()), end=_ranges.end(); it != end; ++it) {
                 ChunkRangeMap::const_iterator last = boost::prior(it);
-                assert(it->second->getMin() == last->second->getMax());
+                verify(it->second->getMin() == last->second->getMax());
             }
 
             // Check Map keys
             for (ChunkRangeMap::const_iterator it=_ranges.begin(), end=_ranges.end(); it != end; ++it) {
-                assert(it->first == it->second->getMax());
+                verify(it->first == it->second->getMax());
             }
 
             // Make sure we match the original chunks
@@ -1022,12 +1022,12 @@ namespace mongo {
                 ChunkRangeMap::const_iterator min = _ranges.upper_bound(chunk->getMin());
                 ChunkRangeMap::const_iterator max = _ranges.lower_bound(chunk->getMax());
 
-                assert(min != _ranges.end());
-                assert(max != _ranges.end());
-                assert(min == max);
-                assert(min->second->getShard() == chunk->getShard());
-                assert(min->second->contains( chunk->getMin() ));
-                assert(min->second->contains( chunk->getMax() ) || (min->second->getMax() == chunk->getMax()));
+                verify(min != _ranges.end());
+                verify(max != _ranges.end());
+                verify(min == max);
+                verify(min->second->getShard() == chunk->getShard());
+                verify(min->second->contains( chunk->getMin() ));
+                verify(min->second->contains( chunk->getMax() ) || (min->second->getMax() == chunk->getMax()));
             }
 
         }
@@ -1105,7 +1105,7 @@ namespace mongo {
 
             for ( unsigned i=0; i<all.size(); i++ ) {
                 for ( unsigned j=i+1; j<all.size(); j++ ) {
-                    assert( all[i] < all[j] );
+                    verify( all[i] < all[j] );
                 }
             }
 

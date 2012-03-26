@@ -29,7 +29,7 @@ namespace mongo {
     // --------  ShardedCursor -----------
 
     ShardedClientCursor::ShardedClientCursor( QueryMessage& q , ClusteredCursor * cursor ) {
-        assert( cursor );
+        verify( cursor );
         _cursor = cursor;
 
         _skip = q.ntoskip;
@@ -48,7 +48,7 @@ namespace mongo {
     }
 
     ShardedClientCursor::~ShardedClientCursor() {
-        assert( _cursor );
+        verify( _cursor );
         delete _cursor;
         _cursor = 0;
     }
@@ -56,7 +56,7 @@ namespace mongo {
     long long ShardedClientCursor::getId() {
         if ( _id <= 0 ) {
             _id = cursorCache.genId();
-            assert( _id >= 0 );
+            verify( _id >= 0 );
         }
         return _id;
     }
@@ -174,26 +174,26 @@ namespace mongo {
 
     void CursorCache::store( ShardedClientCursorPtr cursor ) {
         LOG(_myLogLevel) << "CursorCache::store cursor " << " id: " << cursor->getId() << endl;
-        assert( cursor->getId() );
+        verify( cursor->getId() );
         scoped_lock lk( _mutex );
         _cursors[cursor->getId()] = cursor;
         _shardedTotal++;
     }
     void CursorCache::remove( long long id ) {
-        assert( id );
+        verify( id );
         scoped_lock lk( _mutex );
         _cursors.erase( id );
     }
     
     void CursorCache::storeRef( const string& server , long long id ) {
         LOG(_myLogLevel) << "CursorCache::storeRef server: " << server << " id: " << id << endl;
-        assert( id );
+        verify( id );
         scoped_lock lk( _mutex );
         _refs[id] = server;
     }
 
     string CursorCache::getRef( long long id ) const {
-        assert( id );
+        verify( id );
         scoped_lock lk( _mutex );
         MapNormal::const_iterator i = _refs.find( id );
 
@@ -270,7 +270,7 @@ namespace mongo {
 
             LOG(_myLogLevel) << "CursorCache::found gotKillCursors id: " << id << " server: " << server << endl;
 
-            assert( server.size() );
+            verify( server.size() );
             ScopedDbConnection conn( server );
             conn->killCursor( id );
             conn.done();

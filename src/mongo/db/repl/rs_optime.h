@@ -38,7 +38,7 @@ namespace mongo {
         bool initiated() const { return ord > 0; }
 
         void initiate() {
-            assert( !initiated() );
+            verify( !initiated() );
             ord = 1000000;
         }
 

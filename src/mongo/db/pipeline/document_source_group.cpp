@@ -48,7 +48,7 @@ namespace mongo {
         if (!populated)
             populate();
 
-        assert(groupsIterator != groups.end());
+        verify(groupsIterator != groups.end());
 
         ++groupsIterator;
         if (groupsIterator == groups.end()) {

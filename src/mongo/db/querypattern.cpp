@@ -51,7 +51,7 @@ namespace mongo {
     bool QueryPattern::operator==( const QueryPattern &other ) const {
         bool less = operator<( other );
         bool more = other.operator<( *this );
-        assert( !( less && more ) );
+        verify( !( less && more ) );
         return !( less || more );
     }
     

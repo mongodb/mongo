@@ -57,7 +57,7 @@ namespace mongo {
         }
     public:
         void upgrade() { // upgradable -> exclusive lock
-            assert( x == UpgradableState );
+            verify( x == UpgradableState );
             RWLockBase::upgrade();
             x = Exclusive;
         }
@@ -83,7 +83,7 @@ namespace mongo {
         public:
             Upgradable(RWLock& r) : _r(r) { 
                 r.lockAsUpgradable();
-                assert( _r.x == NilState );
+                verify( _r.x == NilState );
                 _r.x = RWLock::UpgradableState;
             }
             ~Upgradable() {
@@ -92,7 +92,7 @@ namespace mongo {
                     _r.unlockFromUpgradable();
                 }
                 else {
-                    //TEMP                     assert( _r.x == Exclusive ); // has been upgraded
+                    //TEMP                     verify( _r.x == Exclusive ); // has been upgraded
                     _r.x = NilState;
                     _r.unlock();
                 }
@@ -164,7 +164,7 @@ namespace mongo {
         RWLockRecursive(const char *name) : _name(name) { }
 
         void assertExclusivelyLocked() { 
-            assert( _state.get() < 0 );
+            verify( _state.get() < 0 );
         }
 
         class Exclusive : boost::noncopyable { 

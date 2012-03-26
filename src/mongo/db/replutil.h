@@ -66,7 +66,7 @@ namespace mongo {
             return true;
         if ( ! dbname ) {
             Database *database = cc().database();
-            assert( database );
+            verify( database );
             dbname = database->name.c_str();
         }
         return strcmp( dbname , "local" ) == 0;
@@ -74,7 +74,7 @@ namespace mongo {
     inline bool isMasterNs( const char *ns ) {
         if ( _isMaster() )
             return true;
-        assert( ns );
+        verify( ns );
         if ( ! str::startsWith( ns , "local" ) )
             return false;
         return ns[5] == 0 || ns[5] == '.';

@@ -91,7 +91,7 @@ namespace mongo {
            return &( set->masterConn() );
         }
 
-        assert( false );
+        verify( false );
         return NULL;
     }
 
@@ -102,7 +102,7 @@ namespace mongo {
         WriteBackListener::init( *conn_in );
 
         DBClientBase* conn = getVersionable( conn_in );
-        assert( conn ); // errors thrown above
+        verify( conn ); // errors thrown above
 
         BSONObjBuilder cmdBuilder;
 
@@ -159,7 +159,7 @@ namespace mongo {
             return false;
 
         DBClientBase* conn = getVersionable( conn_in );
-        assert(conn); // errors thrown above
+        verify(conn); // errors thrown above
 
         unsigned long long officialSequenceNumber = 0;
 

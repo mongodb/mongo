@@ -71,7 +71,7 @@ namespace mongo {
     }
 
     bool haveLocalShardingInfo( const string& ns ) {
-        assert( 0 );
+        verify( 0 );
         return false;
     }
 
@@ -90,10 +90,10 @@ namespace mongo {
         }
 
         virtual void process( Message& m , AbstractMessagingPort* p , LastError * le) {
-            assert( p );
+            verify( p );
             Request r( m , p );
 
-            assert( le );            
+            verify( le );            
             lastError.startRequest( m , le );
 
             try {

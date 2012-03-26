@@ -84,7 +84,7 @@ namespace mongo {
             }
 
             _drain( _queues[toDrain] );
-            assert( _queues[toDrain].empty() );
+            verify( _queues[toDrain].empty() );
         }
 
     private:
@@ -102,7 +102,7 @@ namespace mongo {
                 MT::go(v);
             }
             queue.clear();
-            DEV assert( queue.capacity() == oldCap ); // just checking that clear() doesn't deallocate, we don't want that
+            DEV verify( queue.capacity() == oldCap ); // just checking that clear() doesn't deallocate, we don't want that
         }
     };
 

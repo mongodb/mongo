@@ -27,10 +27,10 @@ void play( string url ) {
 
     HttpClient c;
     HttpClient::Result r;
-    MONGO_assert( c.get( url , &r ) == 200 );
+    MONGO_verify( c.get( url , &r ) == 200 );
 
     HttpClient::Headers h = r.getHeaders();
-    MONGO_assert( h["Content-Type"].find( "text/html" ) == 0 );
+    MONGO_verify( h["Content-Type"].find( "text/html" ) == 0 );
 
     cout << "\tHeaders" << endl;
     for ( HttpClient::Headers::iterator i = h.begin() ; i != h.end(); ++i ) {

@@ -39,7 +39,7 @@ namespace mongo {
     void Accumulator::opToBson(
         BSONObjBuilder *pBuilder, string opName,
         string fieldName, unsigned depth) const {
-        assert(vpOperand.size() == 1);
+        verify(vpOperand.size() == 1);
         BSONObjBuilder builder;
         vpOperand[0]->addToBsonObj(&builder, opName, depth);
         pBuilder->append(fieldName, builder.done());
@@ -52,7 +52,7 @@ namespace mongo {
 
     void Accumulator::addToBsonArray(
         BSONArrayBuilder *pBuilder, unsigned depth) const {
-        assert(false); // these can't appear in arrays
+        verify(false); // these can't appear in arrays
     }
 
     void agg_framework_reservedErrors() {

@@ -89,8 +89,6 @@
 #include <boost/thread/condition.hpp>
 #include <boost/thread/recursive_mutex.hpp>
 #include <boost/thread/xtime.hpp>
-#undef assert
-#define assert MONGO_assert
 
 namespace mongo {
 
@@ -145,7 +143,7 @@ namespace mongo {
 
 // TODO: Rework the headers so we don't need this craziness
 #include "bson/inline_decls.h"
-#define MONGO_assert(_Expression) (void)( MONGO_likely(!!(_Expression)) || (mongo::asserted(#_Expression, __FILE__, __LINE__), 0) )
+#define MONGO_verify(_Expression) (void)( MONGO_likely(!!(_Expression)) || (mongo::asserted(#_Expression, __FILE__, __LINE__), 0) )
 
 #include "util/debug_util.h"
 #include "util/goodies.h"

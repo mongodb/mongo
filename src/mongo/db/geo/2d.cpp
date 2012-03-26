@@ -355,7 +355,7 @@ namespace mongo {
         unsigned _convert( double in ) const {
             uassert( 13027 , str::stream() << "point not in interval of [ " << _min << ", " << _max << " )", in < _max && in >= _min );
             in -= _min;
-            assert( in >= 0 );
+            verify( in >= 0 );
             return (unsigned)(in * _scaling);
         }
 
@@ -489,8 +489,8 @@ namespace mongo {
         }
 
         bool mid( double amin , double amax , double bmin , double bmax , bool min , double& res ) const {
-            assert( amin <= amax );
-            assert( bmin <= bmax );
+            verify( amin <= amax );
+            verify( bmin <= bmax );
 
             if ( amin < bmin ) {
                 if ( amax < bmin )
@@ -858,7 +858,7 @@ namespace mongo {
         }
 
         DiskLoc loc() const {
-            assert( ! _dirty );
+            verify( ! _dirty );
             return _loc;
         }
 
@@ -888,8 +888,8 @@ namespace mongo {
         // Definitely need to re-find our current max/min locations too
         bool unDirty( const Geo2dType* g, DiskLoc& oldLoc ){
 
-            assert( _dirty );
-            assert( ! _id.isEmpty() );
+            verify( _dirty );
+            verify( ! _id.isEmpty() );
 
             oldLoc = _loc;
             _loc = DiskLoc();
@@ -952,9 +952,9 @@ namespace mongo {
 
         bool makeDirty(){
             if( ! _dirty ){
-                assert( ! obj()["_id"].eoo() );
-                assert( ! _bucket.isNull() );
-                assert( _pos >= 0 );
+                verify( ! obj()["_id"].eoo() );
+                verify( ! _bucket.isNull() );
+                verify( _pos >= 0 );
 
                 if( _id.isEmpty() ){
                     _id = obj()["_id"].wrap( "" ).getOwned();
@@ -1398,7 +1398,7 @@ namespace mongo {
                 LOG( CDEBUG ) << "Undirtying stack point with id " << i->_id << endl;
 
                 if( i->makeDirty() ) _nDirtied++;
-                assert( i->isDirty() );
+                verify( i->isDirty() );
             }
 
             // Check current item
@@ -1469,7 +1469,7 @@ namespace mongo {
 
                     _nRemovedOnYield++;
                     _found--;
-                    assert( _found >= 0 );
+                    verify( _found >= 0 );
 
                     // Can't find our key again, remove
                     i = _stack.erase( i );
@@ -1504,9 +1504,9 @@ namespace mongo {
             _noted = false;
         }
 
-        virtual Record* _current() { assert(ok()); LOG( CDEBUG + 1 ) << "_current " << _cur._loc.obj()["_id"] << endl; return _cur._loc.rec(); }
-        virtual BSONObj current() { assert(ok()); LOG( CDEBUG + 1 ) << "current " << _cur._o << endl; return _cur._o; }
-        virtual DiskLoc currLoc() { assert(ok()); LOG( CDEBUG + 1 ) << "currLoc " << _cur._loc << endl; return _cur._loc; }
+        virtual Record* _current() { verify(ok()); LOG( CDEBUG + 1 ) << "_current " << _cur._loc.obj()["_id"] << endl; return _cur._loc.rec(); }
+        virtual BSONObj current() { verify(ok()); LOG( CDEBUG + 1 ) << "current " << _cur._o << endl; return _cur._o; }
+        virtual DiskLoc currLoc() { verify(ok()); LOG( CDEBUG + 1 ) << "currLoc " << _cur._loc << endl; return _cur._loc; }
         virtual BSONObj currKey() const { return _cur._key; }
 
         virtual CoveredIndexMatcher* matcher() const {
@@ -1536,11 +1536,11 @@ namespace mongo {
 
             if( maxToAdd < 0 ) maxToAdd = maxToCheck;
             int maxFound = _foundInExp + maxToCheck;
-            assert( maxToCheck > 0 );
-            assert( maxFound > 0 );
-            assert( _found <= 0x7fffffff ); // conversion to int
+            verify( maxToCheck > 0 );
+            verify( maxFound > 0 );
+            verify( _found <= 0x7fffffff ); // conversion to int
             int maxAdded = static_cast<int>(_found) + maxToAdd;
-            assert( maxAdded >= 0 ); // overflow check
+            verify( maxAdded >= 0 ); // overflow check
 
             bool isNeighbor = _centerPrefix.constrains();
 
@@ -1682,7 +1682,7 @@ namespace mongo {
                     }
 
                     // Make sure we've got a reasonable center
-                    assert( _centerPrefix.constrains() );
+                    verify( _centerPrefix.constrains() );
 
                     GeoHash _neighborPrefix = _centerPrefix;
                     _neighborPrefix.move( i, j );
@@ -1727,9 +1727,9 @@ namespace mongo {
                         // Restart our search from a diff box.
                         _state = START;
 
-                        assert( ! onlyExpand );
+                        verify( ! onlyExpand );
 
-                        assert( _found <= 0x7fffffff );
+                        verify( _found <= 0x7fffffff );
                         fillStack( maxFound - _foundInExp, maxAdded - static_cast<int>(_found) );
 
                         // When we return from the recursive fillStack call, we'll either have checked enough points or
@@ -1738,12 +1738,12 @@ namespace mongo {
                         // If we're maxed out on points, return
                         if( _foundInExp >= maxFound || _found >= maxAdded ) {
                             // Make sure we'll come back to add more points
-                            assert( _state == DOING_EXPAND );
+                            verify( _state == DOING_EXPAND );
                             return;
                         }
 
                         // Otherwise we must be finished to return
-                        assert( _state == DONE );
+                        verify( _state == DONE );
                         return;
 
                     }
@@ -1817,7 +1817,7 @@ namespace mongo {
                     // if the exact checks are more expensive.
                     bool needExact = true;
                     if( expensiveExact ){
-                        assert( false );
+                        verify( false );
                         KeyResult result = approxKeyCheck( p, d );
                         if( result == BAD ) continue;
                         else if( result == GOOD ) needExact = false;
@@ -1939,9 +1939,9 @@ namespace mongo {
                 checkEarthBounds( p );
                 d = spheredist_deg( _near, p );
                 break;
-            default: assert( false );
+            default: verify( false );
             }
-            assert( d >= 0 );
+            verify( d >= 0 );
 
             GEODEBUG( "\t\t\t\t\t\t\t checkDistance " << _near.toString()
                       << "\t" << p.toString() << "\t" << d
@@ -1970,7 +1970,7 @@ namespace mongo {
                 d = spheredist_deg( _near, p );
                 within = ( d <= _maxDistance );
                 break;
-            default: assert( false );
+            default: verify( false );
             }
 
             return within;
@@ -2013,7 +2013,7 @@ namespace mongo {
 
             GEODEBUG( "\t\tInserted new point " << newPoint.toString() << " approx : " << keyD );
 
-            assert( _max > 0 );
+            verify( _max > 0 );
 
             Holder::iterator lastPtIt = _points.end();
             lastPtIt--;
@@ -2050,7 +2050,7 @@ namespace mongo {
                 GEODEBUG( "\t\tNot erasing point " << startErase->toString() );
                 numToErase--;
                 startErase++;
-                assert( startErase != _points.end() || numToErase == 0 );
+                verify( startErase != _points.end() || numToErase == 0 );
             }
 
             if( _uniqueDocs ){
@@ -2092,7 +2092,7 @@ namespace mongo {
              _type(type)
         {
 
-           assert( g->getDetails() );
+           verify( g->getDetails() );
             _nscanned = 0;
             _found = 0;
 
@@ -2108,7 +2108,7 @@ namespace mongo {
                 _scanDistance = computeXScanDistance( startPt._y, rad2deg( _maxDistance ) + _spec->_error );
             }
 
-            assert( _scanDistance > 0 );
+            verify( _scanDistance > 0 );
 
         }
 
@@ -2143,7 +2143,7 @@ namespace mongo {
            {
                do {
                    long long f = found();
-                   assert( f <= 0x7fffffff );
+                   verify( f <= 0x7fffffff );
                    fillStack( maxPointsHeuristic, _numWanted - static_cast<int>(f) , true );
                    processExtraPoints();
                } while( _state != DONE && _state != DONE_NEIGHBOR &&
@@ -2182,7 +2182,7 @@ namespace mongo {
                    // Enough found, but need to search neighbor boxes
                     farDist = std::min( _scanDistance, computeXScanDistance( _near._y, rad2deg( farDist ) ) + 2 * _spec->_error );
                 }
-                assert( farDist >= 0 );
+                verify( farDist >= 0 );
                 GEODEBUGPRINT( farDist );
 
                 // Find the box that includes all the points we need to return
@@ -2317,7 +2317,7 @@ namespace mongo {
                     GEODEBUG( "\t\tEnding search at point " << ( _points.size() == 0 ? "(beginning)" : maybePointIt->toString() ) );
 
                     int numToAddBack = erased - numToErase;
-                    assert( numToAddBack >= 0 );
+                    verify( numToAddBack >= 0 );
 
                     GEODEBUG( "\t\tNum tested valid : " << tested.size() << " erased : " << erased << " added back : " << numToAddBack );
 
@@ -2440,9 +2440,9 @@ namespace mongo {
             return _cur != _end;
         }
 
-        virtual Record* _current() { assert(ok()); return _cur->_loc.rec(); }
-        virtual BSONObj current() { assert(ok()); return _cur->_o; }
-        virtual DiskLoc currLoc() { assert(ok()); return _cur->_loc; }
+        virtual Record* _current() { verify(ok()); return _cur->_loc.rec(); }
+        virtual BSONObj current() { verify(ok()); return _cur->_o; }
+        virtual DiskLoc currLoc() { verify(ok()); return _cur->_loc; }
         virtual bool advance() {
             if( ok() ){
                 _cur++;
@@ -2570,7 +2570,7 @@ namespace mongo {
                 error = _g->_errorSphere;
                 break;
             }
-            default: assert( false );
+            default: verify( false );
             }
 
             // If our distance is in the error bounds...
@@ -2589,7 +2589,7 @@ namespace mongo {
                 checkEarthBounds( p );
                 if( spheredist_deg( _startPt , p ) <= _maxDistance ) return true;
                 break;
-            default: assert( false );
+            default: verify( false );
             }
 
             return false;
@@ -2898,12 +2898,12 @@ namespace mongo {
 
             IndexDetails& id = d->idx( geoIdx );
             Geo2dType * g = (Geo2dType*)id.getSpec().getType();
-            assert( &id == g->getDetails() );
+            verify( &id == g->getDetails() );
 
             int numWanted = 100;
             if ( cmdObj["num"].isNumber() ) {
                 numWanted = cmdObj["num"].numberInt();
-                assert( numWanted >= 0 );
+                verify( numWanted >= 0 );
             }
 
             bool uniqueDocs = false;
@@ -3019,7 +3019,7 @@ namespace mongo {
 
             IndexDetails& id = d->idx( geoIdx );
             Geo2dType * g = (Geo2dType*)id.getSpec().getType();
-            assert( &id == g->getDetails() );
+            verify( &id == g->getDetails() );
 
             int max = 100000;
 
@@ -3048,12 +3048,12 @@ namespace mongo {
             return (int)(.5+(d*1000));
         }
 
-#define GEOHEQ(a,b) if ( a.toString() != b ){ cout << "[" << a.toString() << "] != [" << b << "]" << endl; assert( a == GeoHash(b) ); }
+#define GEOHEQ(a,b) if ( a.toString() != b ){ cout << "[" << a.toString() << "] != [" << b << "]" << endl; verify( a == GeoHash(b) ); }
 
         void run() {
-            assert( ! GeoHash::isBitSet( 0 , 0 ) );
-            assert( ! GeoHash::isBitSet( 0 , 31 ) );
-            assert( GeoHash::isBitSet( 1 , 31 ) );
+            verify( ! GeoHash::isBitSet( 0 , 0 ) );
+            verify( ! GeoHash::isBitSet( 0 , 31 ) );
+            verify( GeoHash::isBitSet( 1 , 31 ) );
 
             IndexSpec i( BSON( "loc" << "2d" ) );
             Geo2dType g( &geo2dplugin , &i );
@@ -3063,10 +3063,10 @@ namespace mongo {
                 BSONObj in = BSON( "x" << x << "y" << y );
                 GeoHash h = g._hash( in );
                 BSONObj out = g._unhash( h );
-                assert( round(x) == round( out["x"].number() ) );
-                assert( round(y) == round( out["y"].number() ) );
-                assert( round( in["x"].number() ) == round( out["x"].number() ) );
-                assert( round( in["y"].number() ) == round( out["y"].number() ) );
+                verify( round(x) == round( out["x"].number() ) );
+                verify( round(y) == round( out["y"].number() ) );
+                verify( round( in["x"].number() ) == round( out["x"].number() ) );
+                verify( round( in["y"].number() ) == round( out["y"].number() ) );
             }
 
             {
@@ -3075,10 +3075,10 @@ namespace mongo {
                 BSONObj in = BSON( "x" << x << "y" << y );
                 GeoHash h = g._hash( in );
                 BSONObj out = g._unhash( h );
-                assert( round(x) == round( out["x"].number() ) );
-                assert( round(y) == round( out["y"].number() ) );
-                assert( round( in["x"].number() ) == round( out["x"].number() ) );
-                assert( round( in["y"].number() ) == round( out["y"].number() ) );
+                verify( round(x) == round( out["x"].number() ) );
+                verify( round(y) == round( out["y"].number() ) );
+                verify( round( in["x"].number() ) == round( out["x"].number() ) );
+                verify( round( in["y"].number() ) == round( out["y"].number() ) );
             }
 
             {
@@ -3102,26 +3102,26 @@ namespace mongo {
 
             {
                 Box b( 5 , 5 , 2 );
-                assert( "(5,5) -->> (7,7)" == b.toString() );
+                verify( "(5,5) -->> (7,7)" == b.toString() );
             }
 
             {
                 GeoHash a = g.hash( 1 , 1 );
                 GeoHash b = g.hash( 4 , 5 );
-                assert( 5 == (int)(g.distance( a , b ) ) );
+                verify( 5 == (int)(g.distance( a , b ) ) );
                 a = g.hash( 50 , 50 );
                 b = g.hash( 42 , 44 );
-                assert( round(10) == round(g.distance( a , b )) );
+                verify( round(10) == round(g.distance( a , b )) );
             }
 
             {
                 GeoHash x("0000");
-                assert( 0 == x.getHash() );
+                verify( 0 == x.getHash() );
                 x.init( 0 , 1 , 32 );
                 GEOHEQ( x , "0000000000000000000000000000000000000000000000000000000000000001" )
-
-                assert( GeoHash( "1100").hasPrefix( GeoHash( "11" ) ) );
-                assert( ! GeoHash( "1000").hasPrefix( GeoHash( "11" ) ) );
+                    
+                verify( GeoHash( "1100").hasPrefix( GeoHash( "11" ) ) );
+                verify( ! GeoHash( "1000").hasPrefix( GeoHash( "11" ) ) );
             }
 
             {
@@ -3153,8 +3153,8 @@ namespace mongo {
                 cout << "b: " << ob.hexDump() << endl;
                 cout << "c: " << oc.hexDump() << endl;
                 */
-                assert( oa.woCompare( ob ) < 0 );
-                assert( oa.woCompare( oc ) < 0 );
+                verify( oa.woCompare( ob ) < 0 );
+                verify( oa.woCompare( oc ) < 0 );
 
             }
 
@@ -3171,32 +3171,32 @@ namespace mongo {
             {
                 GeoHash prefix( "110011000000" );
                 GeoHash entry(  "1100110000011100000111000001110000011100000111000001000000000000" );
-                assert( ! entry.hasPrefix( prefix ) );
+                verify( ! entry.hasPrefix( prefix ) );
 
                 entry = GeoHash("1100110000001100000111000001110000011100000111000001000000000000");
-                assert( entry.toString().find( prefix.toString() ) == 0 );
-                assert( entry.hasPrefix( GeoHash( "1100" ) ) );
-                assert( entry.hasPrefix( prefix ) );
+                verify( entry.toString().find( prefix.toString() ) == 0 );
+                verify( entry.hasPrefix( GeoHash( "1100" ) ) );
+                verify( entry.hasPrefix( prefix ) );
             }
 
             {
                 GeoHash a = g.hash( 50 , 50 );
                 GeoHash b = g.hash( 48 , 54 );
-                assert( round( 4.47214 ) == round( g.distance( a , b ) ) );
+                verify( round( 4.47214 ) == round( g.distance( a , b ) ) );
             }
 
 
             {
                 Box b( Point( 29.762283 , -95.364271 ) , Point( 29.764283000000002 , -95.36227099999999 ) );
-                assert( b.inside( 29.763 , -95.363 ) );
-                assert( ! b.inside( 32.9570255 , -96.1082497 ) );
-                assert( ! b.inside( 32.9570255 , -96.1082497 , .01 ) );
+                verify( b.inside( 29.763 , -95.363 ) );
+                verify( ! b.inside( 32.9570255 , -96.1082497 ) );
+                verify( ! b.inside( 32.9570255 , -96.1082497 , .01 ) );
             }
 
             {
                 GeoHash a( "11001111" );
-                assert( GeoHash( "11" ) == a.commonPrefix( GeoHash("11") ) );
-                assert( GeoHash( "11" ) == a.commonPrefix( GeoHash("11110000") ) );
+                verify( GeoHash( "11" ) == a.commonPrefix( GeoHash("11") ) );
+                verify( GeoHash( "11" ) == a.commonPrefix( GeoHash("11110000") ) );
             }
 
             {
@@ -3209,8 +3209,8 @@ namespace mongo {
                         GeoHash h( x , y );
                         unsigned a,b;
                         h.unhash_slow( a,b );
-                        assert( a == x );
-                        assert( b == y );
+                        verify( a == x );
+                        verify( b == y );
                     }
                     //cout << "slow: " << t.millis() << endl;
                 }
@@ -3223,8 +3223,8 @@ namespace mongo {
                         GeoHash h( x , y );
                         unsigned a,b;
                         h.unhash_fast( a,b );
-                        assert( a == x );
-                        assert( b == y );
+                        verify( a == x );
+                        verify( b == y );
                     }
                     //cout << "fast: " << t.millis() << endl;
                 }
@@ -3242,8 +3242,8 @@ namespace mongo {
                     double dist2 = spheredist_deg(LAX, BNA);
 
                     // target is 0.45306
-                    assert( 0.45305 <= dist1 && dist1 <= 0.45307 );
-                    assert( 0.45305 <= dist2 && dist2 <= 0.45307 );
+                    verify( 0.45305 <= dist1 && dist1 <= 0.45307 );
+                    verify( 0.45305 <= dist2 && dist2 <= 0.45307 );
                 }
                 {
                     Point BNA (-1.5127, 0.6304);
@@ -3253,32 +3253,32 @@ namespace mongo {
                     double dist2 = spheredist_rad(LAX, BNA);
 
                     // target is 0.45306
-                    assert( 0.45305 <= dist1 && dist1 <= 0.45307 );
-                    assert( 0.45305 <= dist2 && dist2 <= 0.45307 );
+                    verify( 0.45305 <= dist1 && dist1 <= 0.45307 );
+                    verify( 0.45305 <= dist2 && dist2 <= 0.45307 );
                 }
                 {
                     Point JFK (-73.77694444, 40.63861111 );
                     Point LAX (-118.40, 33.94);
 
                     double dist = spheredist_deg(JFK, LAX) * EARTH_RADIUS_MILES;
-                    assert( dist > 2469 && dist < 2470 );
+                    verify( dist > 2469 && dist < 2470 );
                 }
 
                 {
                     Point BNA (-86.67, 36.12);
                     Point LAX (-118.40, 33.94);
                     Point JFK (-73.77694444, 40.63861111 );
-                    assert( spheredist_deg(BNA, BNA) < 1e-6);
-                    assert( spheredist_deg(LAX, LAX) < 1e-6);
-                    assert( spheredist_deg(JFK, JFK) < 1e-6);
+                    verify( spheredist_deg(BNA, BNA) < 1e-6);
+                    verify( spheredist_deg(LAX, LAX) < 1e-6);
+                    verify( spheredist_deg(JFK, JFK) < 1e-6);
 
                     Point zero (0, 0);
                     Point antizero (0,-180);
 
                     // these were known to cause NaN
-                    assert( spheredist_deg(zero, zero) < 1e-6);
-                    assert( fabs(M_PI-spheredist_deg(zero, antizero)) < 1e-6);
-                    assert( fabs(M_PI-spheredist_deg(antizero, zero)) < 1e-6);
+                    verify( spheredist_deg(zero, zero) < 1e-6);
+                    verify( fabs(M_PI-spheredist_deg(zero, antizero)) < 1e-6);
+                    verify( fabs(M_PI-spheredist_deg(antizero, zero)) < 1e-6);
                 }
             }
         }

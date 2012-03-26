@@ -73,7 +73,7 @@ namespace mongo {
             if( !ok ) {
                 DWORD e = GetLastError();
                 log() << "VirtualProtect failed (mcw) " << mmf->filename() << ' ' << chunkno << hex << protectStart << ' ' << protectSize << ' ' << errnoWithDescription(e) << endl;
-                assert(false);
+                verify(false);
             }
         }
 
@@ -81,7 +81,7 @@ namespace mongo {
     }
 
     void* MemoryMappedFile::createPrivateMap() {
-        assert( maphandle );
+        verify( maphandle );
         scoped_lock lk(mapViewMutex);
         void *p = MapViewOfFile(maphandle, FILE_MAP_READ, 0, 0, 0);
         if ( p == 0 ) {
@@ -113,14 +113,14 @@ namespace mongo {
         if( !ok ) {
             DWORD e = GetLastError();
             log() << "VirtualProtect failed in remapPrivateView " << filename() << hex << oldPrivateAddr << ' ' << len << ' ' << errnoWithDescription(e) << endl;
-            assert(false);
+            verify(false);
         }
         return oldPrivateAddr;
 #else
         if( !UnmapViewOfFile(oldPrivateAddr) ) {
             DWORD e = GetLastError();
             log() << "UnMapViewOfFile failed " << filename() << ' ' << errnoWithDescription(e) << endl;
-            assert(false);
+            verify(false);
         }
 
         // we want the new address to be the same as the old address in case things keep pointers around (as namespaceindex does).
@@ -131,16 +131,16 @@ namespace mongo {
         if ( p == 0 ) {
             DWORD e = GetLastError();
             log() << "MapViewOfFileEx failed " << filename() << " " << errnoWithDescription(e) << endl;
-            assert(p);
+            verify(p);
         }
-        assert(p == oldPrivateAddr);
+        verify(p == oldPrivateAddr);
         return p;
 #endif
     }
 #endif
 
     void MongoMMF::remapThePrivateView() {
-        assert( cmdLine.dur );
+        verify( cmdLine.dur );
 
         // todo 1.9 : it turns out we require that we always remap to the same address.
         // so the remove / add isn't necessary and can be removed?
@@ -153,8 +153,8 @@ namespace mongo {
 
     /** register view. threadsafe */
     void PointerToMMF::add(void *view, MongoMMF *f) {
-        assert(view);
-        assert(f);
+        verify(view);
+        verify(f);
         mutex::scoped_lock lk(_m);
         _views.insert( pair<void*,MongoMMF*>(view,f) );
     }
@@ -173,7 +173,7 @@ namespace mongo {
 #else
         size_t max = ~((size_t)0);
 #endif
-        assert( max > (size_t) this ); // just checking that no one redef'd SIZE_MAX and that it is sane
+        verify( max > (size_t) this ); // just checking that no one redef'd SIZE_MAX and that it is sane
 
         // this way we don't need any boundary checking in _find()
         _views.insert( pair<void*,MongoMMF*>((void*)0,(MongoMMF*)0) );
@@ -217,8 +217,8 @@ namespace mongo {
     PointerToMMF privateViews;
 
     /* void* MongoMMF::switchToPrivateView(void *readonly_ptr) {
-        assert( cmdLine.dur );
-        assert( testIntent );
+        verify( cmdLine.dur );
+        verify( testIntent );
 
         void *p = readonly_ptr;
 
@@ -253,7 +253,7 @@ namespace mongo {
     void* MongoMMF::_switchToWritableView(void *p) {
         size_t ofs;
         MongoMMF *f = privateViews.find(p, ofs);
-        assert( f );
+        verify( f );
         return (((char *)f->_view_write)+ofs);
     }
 
@@ -332,7 +332,7 @@ namespace mongo {
 		     rather vague and not checking if the right database is locked 
 	    */
             if( !Lock::somethingWriteLocked() ) { 
-                assert( inShutdown() );
+                verify( inShutdown() );
                 DEV { 
                     log() << "is it really ok to close a mongommf outside a write lock? file:" << filename() << endl;
                 }

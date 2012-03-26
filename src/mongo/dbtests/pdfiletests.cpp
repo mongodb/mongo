@@ -348,7 +348,7 @@ namespace PdfileTests {
 
             bool isnew;
             Database * d = dbHolderW().getOrCreate( dbname , dbpath , isnew );
-            assert( d );
+            verify( d );
 
             int big = 10 * 1024;
             //int small = 1024;

@@ -217,7 +217,7 @@ namespace mongo {
         }
 
         void markReset() {
-            assert( mark );
+            verify( mark );
             nextjsobj = mark;
         }
 

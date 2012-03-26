@@ -188,8 +188,8 @@ namespace mongo {
           from.  This is a convenience for them.
 
           The default implementation of setSource() sets this; if you don't
-          need a source, override that to assert().  The default is to
-          assert() if this has already been set.
+          need a source, override that to verify().  The default is to
+          verify() if this has already been set.
         */
         DocumentSource *pSource;
 

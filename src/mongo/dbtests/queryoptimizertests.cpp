@@ -88,7 +88,7 @@ namespace QueryOptimizerTests {
                     if ( d->idx(i).keyPattern() == key /*indexName() == name*/ || ( d->idx(i).isIdIndex() && IndexDetails::isIdIndexPattern( key ) ) )
                         return &d->idx(i);
                 }
-                assert( false );
+                verify( false );
                 return 0;
             }
             int indexno( const BSONObj &key ) {

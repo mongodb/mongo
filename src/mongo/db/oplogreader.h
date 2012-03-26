@@ -50,7 +50,7 @@ namespace mongo {
            is needed; if not fine, but if so, need to change.
         *//*
         void query(const char *ns, const BSONObj& query) {
-            assert( !haveCursor() );
+            verify( !haveCursor() );
             cursor.reset( _conn->query(ns, query, 0, 0, 0, QueryOption_SlaveOk).release() );
         }*/
 

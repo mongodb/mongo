@@ -30,8 +30,8 @@
             _context( ns() ) {
             {
                 bool f = false;
-                assert( f = true );
-                massert( 10402 , "assert is misdefined", f);
+                verify( f = true );
+                massert( 10402 , "verify is misdefined", f);
             }
         }
         virtual ~Base() {}
@@ -53,7 +53,7 @@
         }
         IndexDetails& id() {
             NamespaceDetails *nsd = nsdetails( ns() );
-            assert( nsd );
+            verify( nsd );
             return nsd->idx( 1 );
         }
         void checkValid( int nKeys ) {
@@ -112,7 +112,7 @@
             return id().keyPattern();
         }
         const BtreeBucket *child( const BtreeBucket *b, int i ) {
-            assert( i <= b->nKeys() );
+            verify( i <= b->nKeys() );
             DiskLoc d;
             if ( i == b->nKeys() ) {
                 d = b->getNextChild();
@@ -120,7 +120,7 @@
             else {
                 d = b->keyNode( i ).prevChildBucket;
             }
-            assert( !d.isNull() );
+            verify( !d.isNull() );
             return d.btree();
         }
         void checkKey( char i ) {
@@ -621,7 +621,7 @@
             ASSERT_EQUALS( 7, nsdetails( ns.c_str() )->stats.nrecords );
 
             BSONObj k = BSON( "" << "bb" );
-            assert( unindex( k ) );
+            verify( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 7, bt()->fullValidate( dl(), order(), 0, true ) );
             ASSERT_EQUALS( 5, nsdetails( ns.c_str() )->stats.nrecords );
@@ -639,7 +639,7 @@
             ASSERT_EQUALS( 7, nsdetails( ns.c_str() )->stats.nrecords );
 
             BSONObj k = BSON( "" << "bb" );
-            assert( unindex( k ) );
+            verify( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 9, bt()->fullValidate( dl(), order(), 0, true ) );
             ASSERT_EQUALS( 5, nsdetails( ns.c_str() )->stats.nrecords );
@@ -657,7 +657,7 @@
             ASSERT_EQUALS( 4, bt()->fullValidate( dl(), order(), 0, true ) );
             ASSERT_EQUALS( 3, nsdetails( ns.c_str() )->stats.nrecords );
             BSONObj k = BSON( "" << "c" );
-            assert( unindex( k ) );
+            verify( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 3, bt()->fullValidate( dl(), order(), 0, true ) );
             ASSERT_EQUALS( 3, nsdetails( ns.c_str() )->stats.nrecords );
@@ -675,7 +675,7 @@
             ASSERT_EQUALS( 7, nsdetails( ns.c_str() )->stats.nrecords );
 
             BSONObj k = BSON( "" << "bb" );
-            assert( unindex( k ) );
+            verify( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 10, bt()->fullValidate( dl(), order(), 0, true ) );
             // child does not currently replace parent in this case
@@ -694,7 +694,7 @@
             ASSERT_EQUALS( 7, nsdetails( ns.c_str() )->stats.nrecords );
 
             BSONObj k = BSON( "" << "ff" );
-            assert( unindex( k ) );
+            verify( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 10, bt()->fullValidate( dl(), order(), 0, true ) );
             // child does not currently replace parent in this case
@@ -713,7 +713,7 @@
             ASSERT_EQUALS( 7, nsdetails( ns.c_str() )->stats.nrecords );
 
             BSONObj k = BSON( "" << "bb" );
-            assert( unindex( k ) );
+            verify( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 10, bt()->fullValidate( dl(), order(), 0, true ) );
             ASSERT_EQUALS( 7, nsdetails( ns.c_str() )->stats.nrecords );
@@ -731,7 +731,7 @@
             ASSERT_EQUALS( 5, nsdetails( ns.c_str() )->stats.nrecords );
 
             BSONObj k = BSON( "" << "g" );
-            assert( unindex( k ) );
+            verify( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 6, bt()->fullValidate( dl(), order(), 0, true ) );
             ASSERT_EQUALS( 5, nsdetails( ns.c_str() )->stats.nrecords );
@@ -749,7 +749,7 @@
             ASSERT_EQUALS( 7, nsdetails( ns.c_str() )->stats.nrecords );
 
             BSONObj k = BSON( "" << "ee" );
-            assert( unindex( k ) );
+            verify( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 8, bt()->fullValidate( dl(), order(), 0, true ) );
             ASSERT_EQUALS( 6, nsdetails( ns.c_str() )->stats.nrecords );
@@ -767,7 +767,7 @@
             ASSERT_EQUALS( 7, nsdetails( ns.c_str() )->stats.nrecords );
 
             BSONObj k = BSON( "" << "ee" );
-            assert( unindex( k ) );
+            verify( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 9, bt()->fullValidate( dl(), order(), 0, true ) );
             ASSERT_EQUALS( 6, nsdetails( ns.c_str() )->stats.nrecords );
@@ -785,7 +785,7 @@
             ASSERT_EQUALS( 7, nsdetails( ns.c_str() )->stats.nrecords );
 
             BSONObj k = BSON( "" << "ee" );
-            assert( unindex( k ) );
+            verify( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 9, bt()->fullValidate( dl(), order(), 0, true ) );
             ASSERT_EQUALS( 6, nsdetails( ns.c_str() )->stats.nrecords );
@@ -803,7 +803,7 @@
             ASSERT_EQUALS( 6, nsdetails( ns.c_str() )->stats.nrecords );
 
             BSONObj k = BSON( "" << "c" );
-            assert( unindex( k ) );
+            verify( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 9, bt()->fullValidate( dl(), order(), 0, true ) );
             ASSERT_EQUALS( 4, nsdetails( ns.c_str() )->stats.nrecords );
@@ -822,7 +822,7 @@
             ASSERT_EQUALS( 6, nsdetails( ns.c_str() )->stats.nrecords );
 
             BSONObj k = BSON( "" << "c" );
-            assert( unindex( k ) );
+            verify( unindex( k ) );
 //            dump();
             ASSERT_EQUALS( 8, bt()->fullValidate( dl(), order(), 0, true ) );
             ASSERT_EQUALS( 3, nsdetails( ns.c_str() )->stats.nrecords );
@@ -838,7 +838,7 @@
             ASSERT_EQUALS( 8, bt()->fullValidate( dl(), order(), 0, true ) );
             ASSERT_EQUALS( 6, nsdetails( ns.c_str() )->stats.nrecords );
             BSONObj k = BSON( "" << "c" );
-            assert( unindex( k ) );
+            verify( unindex( k ) );
             long long keyCount = bt()->fullValidate( dl(), order(), 0, true );
             ASSERT_EQUALS( 7, keyCount );
             ASSERT_EQUALS( 4, nsdetails( ns.c_str() )->stats.nrecords );
@@ -926,7 +926,7 @@
             while( size < targetSize ) {
                 int space = targetSize - size;
                 int nextSize = space - sizeof( _KeyNode );
-                assert( nextSize > 0 );
+                verify( nextSize > 0 );
                 BSONObj newKey = key( startKey++, nextSize );
                 t->push( newKey, DiskLoc() );
                 size += BtreeBucket::KeyOwned(newKey).dataSize() + sizeof( _KeyNode );

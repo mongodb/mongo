@@ -110,7 +110,7 @@ namespace mongo {
         string toString() const;
         void gotHandshake( const BSONObj& o );
         bool hasRemote() const { return _mp; }
-        HostAndPort getRemote() const { assert( _mp ); return _mp->remote(); }
+        HostAndPort getRemote() const { verify( _mp ); return _mp->remote(); }
         BSONObj getRemoteID() const { return _remoteId; }
         BSONObj getHandshake() const { return _handshake; }
         AbstractMessagingPort * port() const { return _mp; }
@@ -240,7 +240,7 @@ namespace mongo {
     /** get the Client object for this thread. */
     inline Client& cc() {
         Client * c = currentClient.get();
-        assert( c );
+        verify( c );
         return *c;
     }
 

@@ -65,5 +65,5 @@ int main( int argc, const char **argv ) {
         cout << "\t" << obj.jsonString() << endl;
         num++;
     }
-    MONGO_assert( num == 1 );
+    MONGO_verify( num == 1 );
 }

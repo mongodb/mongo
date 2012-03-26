@@ -112,7 +112,7 @@ namespace mongo {
         breakpoint();
 #if defined(_DEBUG) || defined(_DURABLEDEFAULTON) || defined(_DURABLEDEFAULTOFF)
         // this is so we notice in buildbot
-        log() << "\n\n***aborting after assert() failure as this is a debug/test build\n\n" << endl;
+        log() << "\n\n***aborting after verify() failure as this is a debug/test build\n\n" << endl;
         abort();
 #endif
         throw e;
@@ -219,7 +219,7 @@ namespace mongo {
 
     NOINLINE_DECL ErrorMsg::ErrorMsg(const char *msg, char ch) {
         int l = strlen(msg);
-        assert( l < 128);
+        verify( l < 128);
         memcpy(buf, msg, l);
         char *p = buf + l;
         p[0] = ch;
@@ -228,7 +228,7 @@ namespace mongo {
 
     NOINLINE_DECL ErrorMsg::ErrorMsg(const char *msg, unsigned val) {
         int l = strlen(msg);
-        assert( l < 128);
+        verify( l < 128);
         memcpy(buf, msg, l);
         char *p = buf + l;
         sprintf(p, "%u", val);

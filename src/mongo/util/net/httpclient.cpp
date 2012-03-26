@@ -121,7 +121,7 @@ namespace mongo {
 
         int rc;
         char version[32];
-        assert( sscanf( buf , "%s %d" , version , &rc ) == 2 );
+        verify( sscanf( buf , "%s %d" , version , &rc ) == 2 );
         HD( "rc: " << rc );
 
         StringBuilder sb;

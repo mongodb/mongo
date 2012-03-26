@@ -114,7 +114,7 @@ namespace mongo {
         // Deprecated
         virtual void writeOp( int op , Request& r ) {
             // Don't use anymore, requires single-step detection of chunk manager or primary
-            assert( 0 );
+            verify( 0 );
         }
 
         bool handleSpecialNamespaces( Request& r , QueryMessage& q ) {

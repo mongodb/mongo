@@ -174,7 +174,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
         return;
     }
 
-    assert( ip->ip_p == IPPROTO_TCP );
+    verify( ip->ip_p == IPPROTO_TCP );
 
     const struct sniff_tcp* tcp = (struct sniff_tcp*)(packet + captureHeaderSize + size_ip);
     int size_tcp = TH_OFF(tcp)*4;
@@ -191,7 +191,7 @@ void got_packet(u_char *args, const struct pcap_pkthdr *header, const u_char *pa
     const u_char * payload = (const u_char*)(packet + captureHeaderSize + size_ip + size_tcp);
 
     unsigned totalSize = ntohs(ip->ip_len);
-    assert( totalSize <= header->caplen );
+    verify( totalSize <= header->caplen );
 
     int size_payload = totalSize - (size_ip + size_tcp);
     if (size_payload <= 0 )
@@ -404,10 +404,10 @@ void processDiagLog( const char * file ) {
     long length;
     unsigned long long L = 0;
     char * root = (char*)f.map( file , L, MemoryMappedFile::SEQUENTIAL );
-    assert( L < 0x80000000 );
+    verify( L < 0x80000000 );
     length = (long) L;
-    assert( root );
-    assert( length > 0 );
+    verify( root );
+    verify( length > 0 );
 
     char * pos = root;
 
@@ -548,8 +548,8 @@ int main(int argc, char **argv) {
         cerr << "don't know how to handle datalink type: " << pcap_datalink( handle ) << endl;
     }
 
-    assert( pcap_compile(handle, &fp, const_cast< char * >( "tcp" ) , 0, net) != -1 );
-    assert( pcap_setfilter(handle, &fp) != -1 );
+    verify( pcap_compile(handle, &fp, const_cast< char * >( "tcp" ) , 0, net) != -1 );
+    verify( pcap_setfilter(handle, &fp) != -1 );
 
     cout << "sniffing... ";
     for ( set<int>::iterator i = serverPorts.begin(); i != serverPorts.end(); i++ )

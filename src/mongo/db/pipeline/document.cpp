@@ -16,8 +16,6 @@
 
 #include "pch.h"
 #include <boost/functional/hash.hpp>
-#undef assert
-#define assert MONGO_assert
 #include "db/jsobj.h"
 #include "db/pipeline/dependency_tracker.h"
 #include "db/pipeline/document.h"
@@ -204,7 +202,7 @@ namespace mongo {
         }
 
         /* NOTREACHED */
-        assert(false);
+        verify(false);
         return 0;
     }
 
@@ -220,7 +218,7 @@ namespace mongo {
     }
 
     pair<string, intrusive_ptr<const Value> > FieldIterator::next() {
-        assert(more());
+        verify(more());
         pair<string, intrusive_ptr<const Value> > result(
             pDocument->vFieldName[index], pDocument->vpValue[index]);
         ++index;
