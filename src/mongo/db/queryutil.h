@@ -582,14 +582,21 @@ namespace mongo {
         FieldRangeVectorIterator( const FieldRangeVector &v ) : _v( v ), _i( _v._ranges.size(), -1 ), _cmp( _v._ranges.size(), 0 ), _inc( _v._ranges.size(), false ), _after() {
         }
         /**
-         * @return Suggested advance method, based on current key.
-         *   -2 Iteration is complete, no need to advance.
-         *   -1 Advance to the next key, without skipping.
-         *  >=0 Skip parameter.  If @return is r, skip to the key comprised
-         *      of the first r elements of curr followed by the (r+1)th and
-         *      remaining elements of cmp() (with inclusivity specified by
-         *      the (r+1)th and remaining elements of inc()).  If after() is
-         *      true, skip past this key not to it.
+         * @return Suggested advance method through an ordered list of keys with lookup support
+         *      (generally a btree).
+         *   -2 Iteration is complete, no need to advance further.
+         *   -1 Advance to the next ordered key, without skipping.
+         *  >=0 Skip parameter, let's call it 'r'.  If after() is true, skip past the key prefix
+         *      comprised of the first r elements of curr.  For example, if curr is {a:1,b:1}, the
+         *      index is {a:1,b:1}, the direction is 1, and r == 1, skip past {a:1,b:MaxKey}.  If
+         *      after() is false, skip to the key comprised of the first r elements of curr followed
+         *      by the (r+1)th and greater elements of cmp() (with inclusivity specified by the
+         *      (r+1)th and greater elements of inc()).  For example, if curr is {a:1,b:1}, the
+         *      index is {a:1,b:1}, the direction is 1, r == 1, cmp()[1] == b:4, and inc()[1] ==
+         *      true, then skip to {a:1,b:4}.  Note that the element field names in curr and cmp()
+         *      should generally be ignored when performing index key comparisons.
+         * @param curr The key at the current position in the list of keys.  Values of curr must be
+         *      supplied in order.
          */
         int advance( const BSONObj &curr );
         const vector<const BSONElement *> &cmp() const { return _cmp; }
