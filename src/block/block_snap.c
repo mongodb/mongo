@@ -29,13 +29,13 @@ __wt_block_snap_init(WT_SESSION_IMPL *session,
 	memset(si, 0, sizeof(*si));
 
 	si->alloc.name = "alloc";
-	si->alloc_offset = WT_BLOCK_INVALID_OFFSET;
+	si->alloc.offset = WT_BLOCK_INVALID_OFFSET;
 
 	si->avail.name = "avail";
-	si->avail_offset = WT_BLOCK_INVALID_OFFSET;
+	si->avail.offset = WT_BLOCK_INVALID_OFFSET;
 
 	si->discard.name = "discard";
-	si->discard_offset = WT_BLOCK_INVALID_OFFSET;
+	si->discard.offset = WT_BLOCK_INVALID_OFFSET;
 
 	return (0);
 }
@@ -100,9 +100,8 @@ __wt_block_snap_load(WT_SESSION_IMPL *session,
 	 * If the snapshot can be written, read the avail list (the list of
 	 * blocks from which we can allocate on write).
 	 */
-	if (!readonly && si->avail_offset != WT_BLOCK_INVALID_OFFSET)
-		WT_ERR(__wt_block_extlist_read(session, block, &si->avail,
-		    si->avail_offset, si->avail_size, si->avail_cksum));
+	if (!readonly && si->avail.offset != WT_BLOCK_INVALID_OFFSET)
+		WT_ERR(__wt_block_extlist_read(session, block, &si->avail));
 
 	/*
 	 * If the snapshot can be written, that means anything written after
@@ -256,20 +255,14 @@ __block_snap_extlists_write(
 	WT_RET(__wt_block_extlist_truncate(session, block, &si->avail));
 
 	/* Write and discard the allocation and discard extent lists. */
-	WT_RET(__wt_block_extlist_write(
-	    session, block, &si->alloc,
-	    &si->alloc_offset, &si->alloc_size, &si->alloc_cksum));
+	WT_RET(__wt_block_extlist_write(session, block, &si->alloc));
 	__wt_block_extlist_free(session, &si->alloc);
 
-	WT_RET(__wt_block_extlist_write(
-	    session, block, &si->discard,
-	    &si->discard_offset, &si->discard_size, &si->discard_cksum));
+	WT_RET(__wt_block_extlist_write(session, block, &si->discard));
 	__wt_block_extlist_free(session, &si->discard);
 
 	/* Write the available list, but don't discard it. */
-	WT_RET(__wt_block_extlist_write(
-	    session, block, &si->avail,
-	    &si->avail_offset, &si->avail_size, &si->avail_cksum));
+	WT_RET(__wt_block_extlist_write(session, block, &si->avail));
 
 	return (0);
 }
@@ -314,9 +307,9 @@ __block_snap_delete(
 	 * The avail list is an extent: extent blocks must be freed directly to
 	 * the live system's avail list, they were never on any alloc list.
 	 */
-	if (si->avail_offset != WT_BLOCK_INVALID_OFFSET)
+	if (si->avail.offset != WT_BLOCK_INVALID_OFFSET)
 		WT_RET(__wt_block_free(
-		    session, block, si->avail_offset, si->avail_size, 1));
+		    session, block, si->avail.offset, si->avail.size, 1));
 
 	/*
 	 * Migrate the allocation and deletion lists forward, in this case,
@@ -329,23 +322,21 @@ __block_snap_delete(
 	 * directly to the live system's avail list, they were never on any
 	 * alloc list.
 	 */
-	if (si->alloc_offset != WT_BLOCK_INVALID_OFFSET) {
-		WT_RET(__wt_block_extlist_read(session, block, &si->alloc,
-		    si->alloc_offset, si->alloc_size, si->alloc_cksum));
+	if (si->alloc.offset != WT_BLOCK_INVALID_OFFSET) {
+		WT_RET(__wt_block_extlist_read(session, block, &si->alloc));
 		WT_RET(__wt_block_extlist_merge(
 		    session, &si->alloc, &live->alloc));
 		__wt_block_extlist_free(session, &si->alloc);
 		WT_RET(__wt_block_free(
-		    session, block, si->alloc_offset, si->alloc_size, 1));
+		    session, block, si->alloc.offset, si->alloc.size, 1));
 	}
-	if (si->discard_offset != WT_BLOCK_INVALID_OFFSET) {
-		WT_RET(__wt_block_extlist_read(session, block, &si->discard,
-		    si->discard_offset, si->discard_size, si->discard_cksum));
+	if (si->discard.offset != WT_BLOCK_INVALID_OFFSET) {
+		WT_RET(__wt_block_extlist_read(session, block, &si->discard));
 		WT_RET(__wt_block_extlist_merge(
 		    session, &si->discard, &live->discard));
 		__wt_block_extlist_free(session, &si->discard);
 		WT_RET(__wt_block_free(
-		    session, block, si->discard_offset, si->discard_size, 1));
+		    session, block, si->discard.offset, si->discard.size, 1));
 	}
 
 	/*
@@ -393,33 +384,33 @@ __wt_block_snapshot_string(WT_SESSION_IMPL *session,
 		    (uintmax_t)si->root_offset,
 		    (uintmax_t)(si->root_offset + si->root_size),
 		    si->root_size, si->root_cksum));
-	if (si->alloc_offset == WT_BLOCK_INVALID_OFFSET)
+	if (si->alloc.offset == WT_BLOCK_INVALID_OFFSET)
 		WT_ERR(__wt_buf_catfmt(session, tmp, ", alloc=[Empty]"));
 	else
 		WT_ERR(__wt_buf_catfmt(session, tmp,
 		    ", alloc=[%"
 		    PRIuMAX "-%" PRIuMAX ", %" PRIu32 ", %" PRIu32 "]",
-		    (uintmax_t)si->alloc_offset,
-		    (uintmax_t)(si->alloc_offset + si->alloc_size),
-		    si->alloc_size, si->alloc_cksum));
-	if (si->avail_offset == WT_BLOCK_INVALID_OFFSET)
+		    (uintmax_t)si->alloc.offset,
+		    (uintmax_t)(si->alloc.offset + si->alloc.size),
+		    si->alloc.size, si->alloc.cksum));
+	if (si->avail.offset == WT_BLOCK_INVALID_OFFSET)
 		WT_ERR(__wt_buf_catfmt(session, tmp, ", avail=[Empty]"));
 	else
 		WT_ERR(__wt_buf_catfmt(session, tmp,
 		    ", avail=[%"
 		    PRIuMAX "-%" PRIuMAX ", %" PRIu32 ", %" PRIu32 "]",
-		    (uintmax_t)si->avail_offset,
-		    (uintmax_t)(si->avail_offset + si->avail_size),
-		    si->avail_size, si->avail_cksum));
-	if (si->discard_offset == WT_BLOCK_INVALID_OFFSET)
+		    (uintmax_t)si->avail.offset,
+		    (uintmax_t)(si->avail.offset + si->avail.size),
+		    si->avail.size, si->avail.cksum));
+	if (si->discard.offset == WT_BLOCK_INVALID_OFFSET)
 		WT_ERR(__wt_buf_catfmt(session, tmp, ", discard=[Empty]"));
 	else
 		WT_ERR(__wt_buf_catfmt(session, tmp,
 		    ", discard=[%"
 		    PRIuMAX "-%" PRIuMAX ", %" PRIu32 ", %" PRIu32 "]",
-		    (uintmax_t)si->discard_offset,
-		    (uintmax_t)(si->discard_offset + si->discard_size),
-		    si->discard_size, si->discard_cksum));
+		    (uintmax_t)si->discard.offset,
+		    (uintmax_t)(si->discard.offset + si->discard.size),
+		    si->discard.size, si->discard.cksum));
 	WT_ERR(__wt_buf_catfmt(session, tmp,
 	    ", file size=%" PRIuMAX
 	    ", write generation=%" PRIu64,

@@ -145,7 +145,7 @@ __block_off_insert(WT_SESSION_IMPL *session, WT_EXTLIST *el, WT_EXT *ext)
 	 * If we are inserting a new size onto the size skiplist, we'll need
 	 * a new WT_EXT structure for that skiplist.
 	 */
-	__block_size_srch(el->size, ext->size, sstack);
+	__block_size_srch(el->sz, ext->size, sstack);
 	szp = *sstack[0];
 	if (szp == NULL || szp->size != ext->size) {
 		WT_RET(__wt_calloc(session, 1,
@@ -205,7 +205,7 @@ __block_off_remove(
 	 * Find and remove the record from the size's offset skiplist; if that
 	 * empties the by-size skiplist entry, remove it as well.
 	 */
-	__block_size_srch(el->size, ext->size, sstack);
+	__block_size_srch(el->sz, ext->size, sstack);
 	szp = *sstack[0];
 	if (szp == NULL || szp->size != ext->size)
 		return (EINVAL);
@@ -261,7 +261,7 @@ __wt_block_alloc(
 	 * requested size and take the first entry on the by-size offset list.
 	 * If we don't have anything large enough, extend the file.
 	 */
-	__block_size_srch(block->live.avail.size, size, sstack);
+	__block_size_srch(block->live.avail.sz, size, sstack);
 	szp = *sstack[0];
 	if (szp == NULL) {
 		WT_ERR(__wt_block_extend(session, block, offp, size));
@@ -775,19 +775,20 @@ __block_merge(WT_SESSION_IMPL *session, WT_EXTLIST *el, off_t off, off_t size)
  *	Read an extent list.
  */
 int
-__wt_block_extlist_read(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, WT_EXTLIST *el, off_t off, uint32_t size, uint32_t cksum)
+__wt_block_extlist_read(
+    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el)
 {
 	WT_ITEM *tmp;
-	off_t loff, lsize;
+	off_t off, size;
 	uint8_t *p;
 	int ret;
 
 	tmp = NULL;
 	ret = 0;
 
-	WT_RET(__wt_scr_alloc(session, size, &tmp));
-	WT_ERR(__wt_block_read(session, block, tmp, off, size, cksum));
+	WT_RET(__wt_scr_alloc(session, el->size, &tmp));
+	WT_ERR(__wt_block_read(
+	    session, block, tmp, el->offset, el->size, el->cksum));
 
 #define	WT_EXTLIST_READ(p, v) do {					\
 	(v) = *(off_t *)(p);						\
@@ -795,14 +796,14 @@ __wt_block_extlist_read(WT_SESSION_IMPL *session,
 } while (0)
 
 	p = WT_BLOCK_HEADER_BYTE(tmp->mem);
-	WT_EXTLIST_READ(p, loff);
-	WT_EXTLIST_READ(p, lsize);
-	if (loff != WT_BLOCK_EXTLIST_MAGIC || lsize != 0)
+	WT_EXTLIST_READ(p, off);
+	WT_EXTLIST_READ(p, size);
+	if (off != WT_BLOCK_EXTLIST_MAGIC || size != 0)
 		goto corrupted;
 	for (;;) {
-		WT_EXTLIST_READ(p, loff);
-		WT_EXTLIST_READ(p, lsize);
-		if (loff == WT_BLOCK_INVALID_OFFSET)
+		WT_EXTLIST_READ(p, off);
+		WT_EXTLIST_READ(p, size);
+		if (off == WT_BLOCK_INVALID_OFFSET)
 			break;
 
 		/*
@@ -812,21 +813,21 @@ __wt_block_extlist_read(WT_SESSION_IMPL *session,
 		 * and easy test to do here and we'd have to do the check as
 		 * part of file verification, regardless.
 		 */
-		if ((loff - WT_BLOCK_DESC_SECTOR) % block->allocsize != 0 ||
-		    lsize % block->allocsize != 0 ||
-		    loff + lsize > block->fh->file_size)
+		if ((off - WT_BLOCK_DESC_SECTOR) % block->allocsize != 0 ||
+		    size % block->allocsize != 0 ||
+		    off + size > block->fh->file_size)
 corrupted:		WT_ERR_MSG(session, WT_ERROR,
 			    "file contains a corrupted %s extent list, range %"
 			    PRIdMAX "-%" PRIdMAX " past end-of-file",
 			    el->name,
-			    (intmax_t)loff, (intmax_t)(loff + lsize));
+			    (intmax_t)off, (intmax_t)(off + size));
 
 		/*
 		 * We could insert instead of merge, because ranges shouldn't
 		 * overlap, but merge knows how to allocate WT_EXT structures,
 		 * and a little paranoia is a good thing.
 		 */
-		WT_ERR(__block_merge(session, el, loff, lsize));
+		WT_ERR(__block_merge(session, el, off, size));
 	}
 
 	WT_VERBOSE_CALL(session,
@@ -841,8 +842,8 @@ err:	__wt_scr_free(&tmp);
  *	Write an extent list at the tail of the file.
  */
 int
-__wt_block_extlist_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
-    WT_EXTLIST *el, off_t *offp, uint32_t *sizep, uint32_t *cksump)
+__wt_block_extlist_write(
+    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el)
 {
 	WT_EXT *ext;
 	WT_ITEM *tmp;
@@ -850,7 +851,6 @@ __wt_block_extlist_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	uint32_t datasize, size;
 	uint8_t *p;
 	int ret;
-	const char *name;
 
 	tmp = NULL;
 	ret = 0;
@@ -860,8 +860,8 @@ __wt_block_extlist_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
 
 	/* If there aren't any entries, we're done. */
 	if (el->entries == 0) {
-		*offp = WT_BLOCK_INVALID_OFFSET;
-		*sizep = *cksump = 0;
+		el->offset = WT_BLOCK_INVALID_OFFSET;
+		el->cksum = el->size = 0;
 		return (0);
 	}
 
@@ -900,26 +900,13 @@ __wt_block_extlist_write(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	WT_EXTLIST_WRITE(p, WT_BLOCK_INVALID_OFFSET);	/* Ending value */
 	WT_EXTLIST_WRITE(p, 0);
 
-	/*
-	 * XXX
-	 * Discard the in-memory free-list: this has to happen before writing
-	 * the free-list because the underlying block write function is going
-	 * to allocate file space for the free-list block(s), and allocating
-	 * from the blocks on the free-list we just wrote won't work out well.
-	 * A workaround would be to not compress the free-list, which implies
-	 * some kind of "write but don't compress" code path, and that's more
-	 * complex than ordering these operations so the eventual allocation
-	 * in the write code always extends the file.
-	 */
-	name = el->name;
-	__wt_block_extlist_free(session, el);
-	el = NULL;
-
 	/* Write the extent list to disk. */
-	WT_ERR(__wt_block_write(session, block, tmp, offp, sizep, cksump, 1));
+	WT_ERR(__wt_block_write(
+	    session, block, tmp, &el->offset, &el->size, &el->cksum, 1));
 
 	WT_VERBOSE(session, block,
-	    "%s written %" PRIdMAX "/%" PRIu32, name, (intmax_t)*offp, *sizep);
+	    "%s written %" PRIdMAX "/%" PRIu32,
+	    el->name, (intmax_t)el->offset, el->size);
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
@@ -973,11 +960,11 @@ __wt_block_extlist_free(WT_SESSION_IMPL *session, WT_EXTLIST *el)
 		__wt_free(session, ext);
 	}
 	memset(el->off, 0, sizeof(el->off));
-	for (szp = el->size[0]; szp != NULL; szp = nszp) {
+	for (szp = el->sz[0]; szp != NULL; szp = nszp) {
 		nszp = szp->next[0];
 		__wt_free(session, szp);
 	}
-	memset(el->size, 0, sizeof(el->size));
+	memset(el->sz, 0, sizeof(el->sz));
 
 	el->bytes = 0;
 	el->entries = 0;
@@ -1009,7 +996,7 @@ __block_extlist_dump(
 	if (el->entries == 0)
 		return;
 
-	WT_EXT_FOREACH(szp, el->size) {
+	WT_EXT_FOREACH(szp, el->sz) {
 		WT_VERBOSE(session, block,
 		    "\t{%" PRIuMAX "}",
 		    (uintmax_t)szp->size);

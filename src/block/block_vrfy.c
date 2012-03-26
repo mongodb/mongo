@@ -101,30 +101,28 @@ __wt_verify_snap_load(
 	 * If we're verifying, add the disk blocks used to store extent lists to
 	 * the list of blocks we've "seen".
 	 */
-	if (si->avail_offset != WT_BLOCK_INVALID_OFFSET)
+	if (si->avail.offset != WT_BLOCK_INVALID_OFFSET)
 		WT_RET(__wt_verify_addfrag(session, block,
-		    si->avail_offset, (off_t)si->avail_size));
-	if (si->alloc_offset != WT_BLOCK_INVALID_OFFSET)
+		    si->avail.offset, (off_t)si->avail.size));
+	if (si->alloc.offset != WT_BLOCK_INVALID_OFFSET)
 		WT_RET(__wt_verify_addfrag(session, block,
-		    si->alloc_offset, (off_t)si->alloc_size));
-	if (si->discard_offset != WT_BLOCK_INVALID_OFFSET)
+		    si->alloc.offset, (off_t)si->alloc.size));
+	if (si->discard.offset != WT_BLOCK_INVALID_OFFSET)
 		WT_RET(__wt_verify_addfrag(session, block,
-		    si->discard_offset, (off_t)si->discard_size));
+		    si->discard.offset, (off_t)si->discard.size));
 
 	/*
 	 * If we're verifying the file, we'll need to read the avail and discard
 	 * lists (blocks that are "available" to the tree for allocation or have
 	 * been deleted should not appear in the tree).
 	 */
-	if (si->avail_offset != WT_BLOCK_INVALID_OFFSET) {
-		 WT_RET(__wt_block_extlist_read(session, block, &si->avail,
-		     si->avail_offset, si->avail_size, si->avail_cksum));
+	if (si->avail.offset != WT_BLOCK_INVALID_OFFSET) {
+		 WT_RET(__wt_block_extlist_read(session, block, &si->avail));
 		WT_RET(__verify_extlist(session, block, &si->avail));
 		__wt_block_extlist_free(session, &si->avail);
 	}
-	if (si->discard_offset != WT_BLOCK_INVALID_OFFSET) {
-		 WT_RET(__wt_block_extlist_read(session, block, &si->discard,
-		     si->discard_offset, si->discard_size, si->discard_cksum));
+	if (si->discard.offset != WT_BLOCK_INVALID_OFFSET) {
+		 WT_RET(__wt_block_extlist_read(session, block, &si->discard));
 		WT_RET(__verify_extlist(session, block, &si->discard));
 		__wt_block_extlist_free(session, &si->discard);
 	}

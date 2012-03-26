@@ -127,15 +127,15 @@ __wt_block_buffer_to_snapshot(WT_SESSION_IMPL *session,
 
 	si->alloc.name = "snapshot.alloc";
 	WT_RET(__block_buffer_to_addr(block, pp,
-	    &si->alloc_offset, &si->alloc_size, &si->alloc_cksum));
+	    &si->alloc.offset, &si->alloc.size, &si->alloc.cksum));
 
 	si->avail.name = "snapshot.avail";
 	WT_RET(__block_buffer_to_addr(block, pp,
-	    &si->avail_offset, &si->avail_size, &si->avail_cksum));
+	    &si->avail.offset, &si->avail.size, &si->avail.cksum));
 
 	si->discard.name = "snapshot.discard";
 	WT_RET(__block_buffer_to_addr(block, pp,
-	    &si->discard_offset, &si->discard_size, &si->discard_cksum));
+	    &si->discard.offset, &si->discard.size, &si->discard.cksum));
 
 	WT_RET(__wt_vunpack_uint(pp, 0, &a));
 	si->file_size = (off_t)a;
@@ -165,11 +165,11 @@ __wt_block_snapshot_to_buffer(WT_SESSION_IMPL *session,
 	WT_RET(__wt_block_addr_to_buffer(block, pp,
 	    si->root_offset, si->root_size, si->root_cksum));
 	WT_RET(__wt_block_addr_to_buffer(block, pp,
-	    si->alloc_offset, si->alloc_size, si->alloc_cksum));
+	    si->alloc.offset, si->alloc.size, si->alloc.cksum));
 	WT_RET(__wt_block_addr_to_buffer(block, pp,
-	    si->avail_offset, si->avail_size, si->avail_cksum));
+	    si->avail.offset, si->avail.size, si->avail.cksum));
 	WT_RET(__wt_block_addr_to_buffer(block, pp,
-	    si->discard_offset, si->discard_size, si->discard_cksum));
+	    si->discard.offset, si->discard.size, si->discard.cksum));
 	a = (uint64_t)si->file_size;
 	WT_RET(__wt_vpack_uint(pp, 0, a));
 	a = si->write_gen;

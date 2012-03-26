@@ -51,18 +51,12 @@ extern int __wt_block_extlist_match( WT_SESSION_IMPL *session,
 extern int __wt_block_extlist_merge(WT_SESSION_IMPL *session,
     WT_EXTLIST *a,
     WT_EXTLIST *b);
-extern int __wt_block_extlist_read(WT_SESSION_IMPL *session,
+extern int __wt_block_extlist_read( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
-    WT_EXTLIST *el,
-    off_t off,
-    uint32_t size,
-    uint32_t cksum);
-extern int __wt_block_extlist_write(WT_SESSION_IMPL *session,
+    WT_EXTLIST *el);
+extern int __wt_block_extlist_write( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
-    WT_EXTLIST *el,
-    off_t *offp,
-    uint32_t *sizep,
-    uint32_t *cksump);
+    WT_EXTLIST *el);
 extern int __wt_block_extlist_truncate( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_EXTLIST *el);

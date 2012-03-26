@@ -44,8 +44,11 @@ struct __wt_extlist {
 	uint64_t bytes;				/* Byte count */
 	uint32_t entries;			/* Entry count */
 
+	off_t	 offset;			/* Written extent offset */
+	uint32_t cksum, size;			/* Written extent cksum, size */
+
 	WT_EXT	*off[WT_SKIP_MAXDEPTH];		/* Size/offset skiplists */
-	WT_SIZE *size[WT_SKIP_MAXDEPTH];
+	WT_SIZE *sz[WT_SKIP_MAXDEPTH];
 };
 
 /*
@@ -113,16 +116,8 @@ struct __wt_block_snapshot {
 	uint32_t root_cksum, root_size;
 
 	WT_EXTLIST  alloc;			/* Extents allocated */
-	off_t	 alloc_offset;			/* Written allocation list */
-	uint32_t alloc_cksum, alloc_size;
-
 	WT_EXTLIST  avail;			/* Extents available */
-	off_t	 avail_offset;			/* Written available list */
-	uint32_t avail_cksum, avail_size;
-
 	WT_EXTLIST  discard;			/* Extents discarded */
-	off_t	 discard_offset;		/* Written discard list */
-	uint32_t discard_cksum, discard_size;
 
 	off_t	 file_size;			/* File size */
 
