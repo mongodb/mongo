@@ -939,14 +939,14 @@ namespace mongo {
     FieldRangeVector::FieldRangeVector( const FieldRangeSet &frs, const IndexSpec &indexSpec,
                                        int direction )
     :_indexSpec( indexSpec ), _direction( direction >= 0 ? 1 : -1 ) {
-        verify( 16059, frs.matchPossibleForIndex( _indexSpec.keyPattern ) );
+        assert(  frs.matchPossibleForIndex( _indexSpec.keyPattern ) );
         _queries = frs._queries;
         BSONObjIterator i( _indexSpec.keyPattern );
         set< string > baseObjectNonUniversalPrefixes;
         while( i.more() ) {
             BSONElement e = i.next();
             const FieldRange *range = &frs.range( e.fieldName() );
-            verify( 16058, !range->empty() );
+            assert(  !range->empty() );
             if ( !frs.singleKey() ) {
                 string prefix = str::before( e.fieldName(), '.' );
                 if ( baseObjectNonUniversalPrefixes.count( prefix ) > 0 ) {
@@ -1032,7 +1032,7 @@ namespace mongo {
             BSONElement e = i.next();
             const char *name = e.fieldName();
             const FieldRange &eRange = range( name );
-            verify( 16057, !eRange.empty() );
+            assert( !eRange.empty() );
             if ( eRange.equality() )
                 b.appendAs( eRange.min(), name );
             else if ( !eRange.universal() ) {
