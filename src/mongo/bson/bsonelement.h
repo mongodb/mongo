@@ -105,7 +105,7 @@ namespace mongo {
         operator std::string() const { return toString(); }
 
         /** Returns the type of the element */
-        BSONType type() const { return (BSONType) *data; }
+        BSONType type() const { return (BSONType) *reinterpret_cast< const signed char * >(data); }
 
         /** retrieve a field within this element
             throws exception if *this is not an embedded object
