@@ -32,6 +32,14 @@
 #define	WT_BTREE_MAX_OBJECT_SIZE	(UINT32_MAX - 512)
 
 /*
+ * A location in a file is a variable-length cookie, but it has a maximum size
+ * so it's easy to create temporary space in which to store them.  (Locations
+ * can't be much larger than this anyway, they must fit onto the minimum size
+ * page because a reference to an overflow page is itself a location.)
+ */
+#define	WT_BTREE_MAX_ADDR_COOKIE	255	/* Maximum address cookie */
+
+/*
  * Split page size calculation -- we don't want to repeatedly split every time
  * a new entry is added, so we split to a smaller-than-maximum page size.
  */

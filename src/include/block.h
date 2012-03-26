@@ -8,7 +8,6 @@
 /*
  * WiredTiger's block manager interface.
  */
-#define	WT_BM_MAX_ADDR_COOKIE		255	/* Maximum address cookie */
 
 /*
  * The file's description is written into the first 512B of the file, which

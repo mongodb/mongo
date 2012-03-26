@@ -285,7 +285,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	 * Step 10:
 	 * Evict the newly created root page, creating a snapshot.
 	 */
-	WT_ERR(__wt_scr_alloc(session, WT_BM_MAX_ADDR_COOKIE, &btree->snap));
+	WT_ERR(__wt_scr_alloc(session, WT_BTREE_MAX_ADDR_COOKIE, &btree->snap));
 	WT_ERR(__wt_rec_evict(session, ss->root_page, WT_REC_SINGLE));
 	ss->root_page = NULL;
 	 if (btree->snap->data != NULL && btree->snap->size != 0)
@@ -331,7 +331,7 @@ __slvg_read(WT_SESSION_IMPL *session, WT_STUFF *ss)
 	WT_PAGE_HEADER *dsk;
 	uint64_t gen;
 	uint32_t addrbuf_size;
-	uint8_t addrbuf[WT_BM_MAX_ADDR_COOKIE];
+	uint8_t addrbuf[WT_BTREE_MAX_ADDR_COOKIE];
 	int eof, ret;
 
 	ret = 0;

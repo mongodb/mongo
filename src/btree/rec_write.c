@@ -848,7 +848,7 @@ __rec_split_write(
 	WT_CELL *cell;
 	WT_PAGE_HEADER *dsk;
 	uint32_t size;
-	uint8_t addr[WT_BM_MAX_ADDR_COOKIE];
+	uint8_t addr[WT_BTREE_MAX_ADDR_COOKIE];
 
 	dsk = buf->mem;
 	WT_VERBOSE(session, write, "%s", __wt_page_type_string(dsk->type));
@@ -2980,7 +2980,7 @@ __rec_cell_build_ovfl(
 	WT_RECONCILE *r;
 	uint32_t size;
 	int ret;
-	uint8_t *addr, buf[WT_BM_MAX_ADDR_COOKIE];
+	uint8_t *addr, buf[WT_BTREE_MAX_ADDR_COOKIE];
 
 	r = session->reconcile;
 	btree = session->btree;
