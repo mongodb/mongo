@@ -30,9 +30,11 @@
 #endif
 
 #include "jsapi.h"
+#if JS_VERSION < 180
 #include "jsobj.h"
 #include "jsdate.h"
 #include "jsregexp.h"
+#endif
 
 // END inc hacking
 
@@ -74,7 +76,11 @@ namespace mongo {
     extern boost::thread_specific_ptr<SMScope> currentScope;
 
     // bson
+#if JS_VERSION < 185
     JSBool resolveBSONField( JSContext *cx, JSObject *obj, jsval id, uintN flags, JSObject **objp );
+#else
+    JSBool resolveBSONField( JSContext *cx, JSObject *obj, jsid id, uintN flags, JSObject **objp );
+#endif
 
 
     // mongo
