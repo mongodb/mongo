@@ -40,8 +40,8 @@ namespace mongo {
             }
 
             void set_task(Task& func) {
-                assert(!func.empty());
-                assert(_is_done);
+                verify(!func.empty());
+                verify(_is_done);
                 _is_done = false;
 
                 _task.put(func);
@@ -87,10 +87,10 @@ namespace mongo {
         ThreadPool::~ThreadPool() {
             join();
 
-            assert(_tasks.empty());
+            verify(_tasks.empty());
 
             // O(n) but n should be small
-            assert(_freeWorkers.size() == (unsigned)_nThreads);
+            verify(_freeWorkers.size() == (unsigned)_nThreads);
 
             while(!_freeWorkers.empty()) {
                 delete _freeWorkers.front();

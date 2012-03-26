@@ -90,12 +90,12 @@ namespace mongo {
         unsigned short _kdo;
         void setKeyDataOfs(short s) {
             _kdo = s;
-            assert(s>=0);
+            verify(s>=0);
         }
         /** Seems to be redundant. */
         void setKeyDataOfsSavingUse(short s) {
             _kdo = s;
-            assert(s>=0);
+            verify(s>=0);
         }
         /**
          * Unused keys are not returned by read operations.  Keys may be marked
@@ -240,9 +240,9 @@ namespace mongo {
         void operator=(const DiskLoc& loc) {
             ofs = loc.getOfs();
             int la = loc.a();
-            assert( la <= 0xffffff ); // must fit in 3 bytes
+            verify( la <= 0xffffff ); // must fit in 3 bytes
             if( la < 0 ) {
-                assert( la == -1 );
+                verify( la == -1 );
                 la = 0;
                 ofs = OurNullOfs;
             }
@@ -412,7 +412,7 @@ namespace mongo {
         bool _pushBack(const DiskLoc recordLoc, const Key& key, const Ordering &order, const DiskLoc prevChild);
         void pushBack(const DiskLoc recordLoc, const Key& key, const Ordering &order, const DiskLoc prevChild) {
             bool ok = _pushBack( recordLoc , key , order , prevChild );
-            assert(ok);
+            verify(ok);
         }
 
         /**
@@ -1045,9 +1045,9 @@ namespace mongo {
         virtual bool isMultiKey() const { return _multikey; }
 
         /*const _KeyNode& _currKeyNode() const {
-            assert( !bucket.isNull() );
+            verify( !bucket.isNull() );
             const _KeyNode& kn = keyNode(keyOfs);
-            assert( kn.isUsed() );
+            verify( kn.isUsed() );
             return kn;
         }*/
 
@@ -1176,7 +1176,7 @@ namespace mongo {
      */
     template< class V >
     BtreeBucket<V> * DiskLoc::btreemod() const {
-        assert( _a != -1 );
+        verify( _a != -1 );
         BtreeBucket<V> *b = const_cast< BtreeBucket<V> * >( btree<V>() );
         return static_cast< BtreeBucket<V>* >( getDur().writingPtr( b, V::BucketSize ) );
     }

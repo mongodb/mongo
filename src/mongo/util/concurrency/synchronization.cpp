@@ -34,7 +34,7 @@ namespace mongo {
 
     void Notification::notifyOne() {
         scoped_lock lock( _mutex );
-        assert( cur != lookFor );
+        verify( cur != lookFor );
         cur++;
         _condition.notify_one();
     }

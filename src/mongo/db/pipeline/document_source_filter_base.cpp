@@ -75,7 +75,7 @@ namespace mongo {
         if (unstarted)
             findNext();
 
-        assert(pCurrent.get() != NULL);
+        verify(pCurrent.get() != NULL);
         return pCurrent;
     }
 

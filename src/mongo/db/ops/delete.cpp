@@ -104,7 +104,7 @@ namespace mongo {
             if ( ! match )
                 continue;
 
-            assert( !dup ); // can't be a dup, we deleted it!
+            verify( !dup ); // can't be a dup, we deleted it!
 
             if ( !justOne ) {
                 /* NOTE: this is SLOW.  this is not good, noteLocation() was designed to be called across getMore

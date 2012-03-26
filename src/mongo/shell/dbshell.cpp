@@ -363,25 +363,25 @@ using mongo::asserted;
 struct BalancedTest : public mongo::UnitTest {
 public:
     void run() {
-        assert( isBalanced( "x = 5" ) );
-        assert( isBalanced( "function(){}" ) );
-        assert( isBalanced( "function(){\n}" ) );
-        assert( ! isBalanced( "function(){" ) );
-        assert( isBalanced( "x = \"{\";" ) );
-        assert( isBalanced( "// {" ) );
-        assert( ! isBalanced( "// \n {" ) );
-        assert( ! isBalanced( "\"//\" {" ) );
-        assert( isBalanced( "{x:/x\\//}" ) );
-        assert( ! isBalanced( "{ \\/// }" ) );
-        assert( isBalanced( "x = 5 + y ") );
-        assert( ! isBalanced( "x = ") );
-        assert( ! isBalanced( "x = // hello") );
-        assert( ! isBalanced( "x = 5 +") );
-        assert( isBalanced( " x ++") );
-        assert( isBalanced( "-- x") );
-        assert( !isBalanced( "a.") );
-        assert( !isBalanced( "a. ") );
-        assert( isBalanced( "a.b") );
+        verify( isBalanced( "x = 5" ) );
+        verify( isBalanced( "function(){}" ) );
+        verify( isBalanced( "function(){\n}" ) );
+        verify( ! isBalanced( "function(){" ) );
+        verify( isBalanced( "x = \"{\";" ) );
+        verify( isBalanced( "// {" ) );
+        verify( ! isBalanced( "// \n {" ) );
+        verify( ! isBalanced( "\"//\" {" ) );
+        verify( isBalanced( "{x:/x\\//}" ) );
+        verify( ! isBalanced( "{ \\/// }" ) );
+        verify( isBalanced( "x = 5 + y ") );
+        verify( ! isBalanced( "x = ") );
+        verify( ! isBalanced( "x = // hello") );
+        verify( ! isBalanced( "x = 5 +") );
+        verify( isBalanced( " x ++") );
+        verify( isBalanced( "-- x") );
+        verify( !isBalanced( "a.") );
+        verify( !isBalanced( "a. ") );
+        verify( isBalanced( "a.b") );
     }
 } balanced_test;
 

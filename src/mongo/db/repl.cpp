@@ -322,7 +322,7 @@ namespace mongo {
 
     void ReplSource::save() {
         BSONObjBuilder b;
-        assert( !hostName.empty() );
+        verify( !hostName.empty() );
         b.append("host", hostName);
         // todo: finish allowing multiple source configs.
         // this line doesn't work right when source is null, if that is allowed as it is now:
@@ -336,8 +336,8 @@ namespace mongo {
             OpDebug debug;
             Client::Context ctx("local.sources");
             UpdateResult res = updateObjects("local.sources", o, pattern, true/*upsert for pair feature*/, false,false,debug);
-            assert( ! res.mod );
-            assert( res.num == 1 );
+            verify( ! res.mod );
+            verify( res.num == 1 );
         }
     }
 
@@ -672,7 +672,7 @@ namespace mongo {
             if( cmdLine.pretouch > 1 ) {
                 /* note: this is bad - should be put in ReplSource.  but this is first test... */
                 static int countdown;
-                assert( countdown >= 0 );
+                verify( countdown >= 0 );
                 if( countdown > 0 ) {
                     countdown--; // was pretouched on a prev pass
                 }
@@ -910,7 +910,7 @@ namespace mongo {
                     log() << "repl ASSERTION failed : syncedTo < nextOpTime" << endl;
                     log() << "repl syncTo:     " << syncedTo.toStringLong() << endl;
                     log() << "repl nextOpTime: " << nextOpTime.toStringLong() << endl;
-                    assert(false);
+                    verify(false);
                 }
                 oplogReader.putBack( op ); // op will be processed in the loop below
                 nextOpTime = OpTime(); // will reread the op below
@@ -928,7 +928,7 @@ namespace mongo {
                 log() << "repl:   tailing: " << tailing << '\n';
                 log() << "repl:   data too stale, halting replication" << endl;
                 replInfo = replAllDead = "data too stale halted replication";
-                assert( syncedTo < nextOpTime );
+                verify( syncedTo < nextOpTime );
                 throw SyncException();
             }
             else {
@@ -1006,7 +1006,7 @@ namespace mongo {
                         uassert( 10123 , "replication error last applied optime at slave >= nextOpTime from master", false);
                     }
                     if ( replSettings.slavedelay && ( unsigned( time( 0 ) ) < nextOpTime.getSecs() + replSettings.slavedelay ) ) {
-                        assert( justOne );
+                        verify( justOne );
                         oplogReader.putBack( op );
                         _sleepAdviceTime = nextOpTime.getSecs() + replSettings.slavedelay + 1;
                         Lock::GlobalWrite lk;
@@ -1183,7 +1183,7 @@ namespace mongo {
     }
 
     void OplogReader::tailingQuery(const char *ns, const BSONObj& query, const BSONObj* fields ) {
-        assert( !haveCursor() );
+        verify( !haveCursor() );
         LOG(2) << "repl: " << ns << ".find(" << query.toString() << ')' << endl;
         cursor.reset( _conn->query( ns, query, 0, 0, fields, _tailingQueryOptions ).release() );
     }
@@ -1334,7 +1334,7 @@ namespace mongo {
                         break;
                     }
                 }
-                assert( syncing == 0 ); // i.e., there is only one sync thread running. we will want to change/fix this.
+                verify( syncing == 0 ); // i.e., there is only one sync thread running. we will want to change/fix this.
                 syncing++;
             }
             try {
@@ -1355,7 +1355,7 @@ namespace mongo {
             }
             {
                 Lock::GlobalWrite lk;
-                assert( syncing == 1 );
+                verify( syncing == 1 );
                 syncing--;
             }
 
@@ -1484,7 +1484,7 @@ namespace mongo {
         }
 
         if ( replSettings.slave ) {
-            assert( replSettings.slave == SimpleSlave );
+            verify( replSettings.slave == SimpleSlave );
             log(1) << "slave=true" << endl;
             boost::thread repl_thread(replSlaveThread);
         }

@@ -152,7 +152,7 @@ namespace mongo {
         virtual void* viewForFlushing() { 
             if( views.size() == 0 )
                 return 0;
-            assert( views.size() == 1 );
+            verify( views.size() == 1 );
             return views[0];
         }
     public:
@@ -246,18 +246,18 @@ namespace mongo {
         }
         bool get(unsigned i) const { 
             unsigned x = i / 32;
-            assert( x < MemoryMappedFile::NChunks );
+            verify( x < MemoryMappedFile::NChunks );
             return (bits[x] & (1 << (i%32))) != 0;
         }
         void set(unsigned i) { 
             unsigned x = i / 32;
             wassert( x < (MemoryMappedFile::NChunks*2/3) ); // warn if getting close to limit
-            assert( x < MemoryMappedFile::NChunks );
+            verify( x < MemoryMappedFile::NChunks );
             bits[x] |= (1 << (i%32));
         }
         void clear(unsigned i) { 
             unsigned x = i / 32;
-            assert( x < MemoryMappedFile::NChunks );
+            verify( x < MemoryMappedFile::NChunks );
             bits[x] &= ~(1 << (i%32));
         }
     };

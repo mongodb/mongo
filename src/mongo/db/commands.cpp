@@ -33,8 +33,8 @@ namespace mongo {
         string s = cmdObj.firstElement().valuestr();
         NamespaceString nss(s);
         // these are for security, do not remove:
-        verify(15966, dbname == nss.db || dbname == "admin" );
-        verify(15962, !nss.db.empty() );
+        massert(15962, "need to specify namespace" , !nss.db.empty() );
+        massert(15966, str::stream() << "dbname not ok in Command::parseNsFullyQualified: " << dbname , dbname == nss.db || dbname == "admin" );
         return s;
     }
 

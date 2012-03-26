@@ -341,7 +341,7 @@ namespace mongo {
     }
     
     void Listener::acceptedMP(MessagingPort *mp) {
-        assert(!"You must overwrite one of the accepted methods");
+        verify(!"You must overwrite one of the accepted methods");
     }
 
     // ----- ListeningSockets -------
@@ -362,7 +362,7 @@ namespace mongo {
         return DEFAULT_MAX_CONN;
 #else
         struct rlimit limit;
-        assert( getrlimit(RLIMIT_NOFILE,&limit) == 0 );
+        verify( getrlimit(RLIMIT_NOFILE,&limit) == 0 );
 
         int max = (int)(limit.rlim_cur * .8);
 

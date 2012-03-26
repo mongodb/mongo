@@ -63,7 +63,7 @@ namespace mongo {
 
     /* future : this doesn't need to be an inline. */
     inline string Namespace::getSisterNS( const char * local ) const {
-        assert( local && local[0] != '.' );
+        verify( local && local[0] != '.' );
         string old(buf);
         if ( old.find( "." ) != string::npos )
             old = old.substr( 0 , old.find( "." ) );

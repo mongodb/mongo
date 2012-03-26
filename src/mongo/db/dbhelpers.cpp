@@ -97,7 +97,7 @@ namespace mongo {
                            bool * nsFound , bool * indexFound ) {
         Lock::assertAtLeastReadLocked(ns);
         Database *database = c.database();
-        assert( database );
+        verify( database );
         NamespaceDetails *d = database->namespaceIndex.details(ns);
         if ( ! d )
             return false;
@@ -122,7 +122,7 @@ namespace mongo {
     }
 
     DiskLoc Helpers::findById(NamespaceDetails *d, BSONObj idquery) {
-        assert(d);
+        verify(d);
         int idxNo = d->findIdIndex();
         uassert(13430, "no _id index", idxNo>=0);
         IndexDetails& i = d->idx( idxNo );
@@ -166,7 +166,7 @@ namespace mongo {
 
     void Helpers::upsert( const string& ns , const BSONObj& o, bool fromMigrate ) {
         BSONElement e = o["_id"];
-        assert( e.type() );
+        verify( e.type() );
         BSONObj id = e.wrap();
 
         OpDebug debug;
@@ -206,7 +206,7 @@ namespace mongo {
         BSONObj keya , keyb;
         BSONObj minClean = toKeyFormat( min , keya );
         BSONObj maxClean = toKeyFormat( max , keyb );
-        assert( keya == keyb );
+        verify( keya == keyb );
 
         Client::Context ctx(ns);
 
@@ -218,7 +218,7 @@ namespace mongo {
                 return 0;
             
             int ii = nsd->findIndexByKeyPattern( keya );
-            assert( ii >= 0 );
+            verify( ii >= 0 );
             
             IndexDetails& i = nsd->idx( ii );
             
@@ -275,7 +275,7 @@ namespace mongo {
             _root /= a;
         if ( b.size() )
             _root /= b;
-        assert( a.size() || b.size() );
+        verify( a.size() || b.size() );
 
         _file = _root;
 

@@ -75,7 +75,7 @@ namespace mongo {
                     log() << "me:" << tlIntents.get()->n_informational() << endl;
                 else 
                     log() << "no tlIntent for my thread" << endl;
-                assert(false);
+                verify(false);
             }
 #endif
         }

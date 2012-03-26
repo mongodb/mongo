@@ -26,7 +26,7 @@ namespace mongo {
             return c - 'a' + 10;
         if ( 'A' <= c && c <= 'F' )
             return c - 'A' + 10;
-        assert( false );
+        verify( false );
         return 0xff;
     }
     inline char fromHex( const char *c ) {

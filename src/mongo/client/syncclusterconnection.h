@@ -125,7 +125,7 @@ namespace mongo {
     public:
         UpdateNotTheSame( int code , const string& msg , const vector<string>& addrs , const vector<BSONObj>& lastErrors )
             : UserException( code , msg ) , _addrs( addrs ) , _lastErrors( lastErrors ) {
-            assert( _addrs.size() == _lastErrors.size() );
+            verify( _addrs.size() == _lastErrors.size() );
         }
 
         virtual ~UpdateNotTheSame() throw() {

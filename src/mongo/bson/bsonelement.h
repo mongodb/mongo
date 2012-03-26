@@ -262,7 +262,7 @@ namespace mongo {
         /** Get raw binary data.  Element must be of type BinData. Doesn't handle type 2 specially */
         const char *binData(int& len) const {
             // BinData: <int len> <byte subtype> <byte[len] data>
-            assert( type() == BinData );
+            verify( type() == BinData );
             len = valuestrsize();
             return value() + 5;
         }
@@ -281,14 +281,14 @@ namespace mongo {
 
         BinDataType binDataType() const {
             // BinData: <int len> <byte subtype> <byte[len] data>
-            assert( type() == BinData );
+            verify( type() == BinData );
             unsigned char c = (value() + 4)[0];
             return (BinDataType)c;
         }
 
         /** Retrieve the regex string for a Regex element */
         const char *regex() const {
-            assert(type() == RegEx);
+            verify(type() == RegEx);
             return value();
         }
 
@@ -480,7 +480,7 @@ namespace mongo {
         case CodeWScope:
             return 65;
         default:
-            assert(0);
+            verify(0);
             return -1;
         }
     }

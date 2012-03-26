@@ -66,7 +66,7 @@ namespace mongo {
             if ( rsOplogDetails == 0 ) {
                 Client::Context ctx( logns , dbpath, false);
                 localDB = ctx.db();
-                assert( localDB );
+                verify( localDB );
                 rsOplogDetails = nsdetails(logns);
                 massert(13389, "local.oplog.rs missing. did you drop it? if so restart server", rsOplogDetails);
             }
@@ -143,7 +143,7 @@ namespace mongo {
         }
         else {
             // must be initiation
-            assert( *ns == 0 );
+            verify( *ns == 0 );
             hashNew = 0;
         }
 
@@ -168,13 +168,13 @@ namespace mongo {
         int len = posz + obj.objsize() + 1 + 2 /*o:*/;
 
         Record *r;
-        DEV assert( logNS == 0 );
+        DEV verify( logNS == 0 );
         {
             const char *logns = rsoplog;
             if ( rsOplogDetails == 0 ) {
                 Client::Context ctx( logns , dbpath, false);
                 localDB = ctx.db();
-                assert( localDB );
+                verify( localDB );
                 rsOplogDetails = nsdetails(logns);
                 massert(13347, "local.oplog.rs missing. did you drop it? if so restart server", rsOplogDetails);
             }
@@ -264,16 +264,16 @@ namespace mongo {
             if ( localOplogMainDetails == 0 ) {
                 Client::Context ctx( logNS , dbpath, false);
                 localDB = ctx.db();
-                assert( localDB );
+                verify( localDB );
                 localOplogMainDetails = nsdetails(logNS);
-                assert( localOplogMainDetails );
+                verify( localOplogMainDetails );
             }
             Client::Context ctx( logNS , localDB, false );
             r = theDataFileMgr.fast_oplog_insert(localOplogMainDetails, logNS, len);
         }
         else {
             Client::Context ctx( logNS, dbpath, false );
-            assert( nsdetails( logNS ) );
+            verify( nsdetails( logNS ) );
             // first we allocate the space, then we fill it below.
             r = theDataFileMgr.fast_oplog_insert( nsdetails( logNS ), logNS, len);
         }
@@ -570,19 +570,19 @@ namespace mongo {
             OpTime t;
             for ( int i = 0; i < 10; i++ ) {
                 OpTime s = OpTime::_now();
-                assert( s != t );
+                verify( s != t );
                 t = s;
             }
             OpTime q = t;
-            assert( q == t );
-            assert( !(q != t) );
+            verify( q == t );
+            verify( !(q != t) );
         }
     } testoptime;
 
     int _dummy_z;
 
     void pretouchN(vector<BSONObj>& v, unsigned a, unsigned b) {
-        DEV assert( !d.dbMutex.isWriteLocked() );
+        DEV verify( !d.dbMutex.isWriteLocked() );
 
         Client *c = currentClient.get();
         if( c == 0 ) {
@@ -823,7 +823,7 @@ namespace mongo {
             if ( opType[1] == 0 )
                 deleteObjects(ns, o, /*justOne*/ fields[3].booleanSafe());
             else
-                assert( opType[1] == 'b' ); // "db" advertisement
+                verify( opType[1] == 'b' ); // "db" advertisement
         }
         else if ( *opType == 'c' ) {
             opCounters->gotCommand();

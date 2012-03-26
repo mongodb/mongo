@@ -84,8 +84,8 @@ namespace mongo {
         }
 
         void done( int step ) {
-            assert( step == ++_next );
-            assert( step <= _total );
+            verify( step == ++_next );
+            verify( step <= _total );
 
             stringstream ss;
             ss << "step" << step;
@@ -228,20 +228,20 @@ namespace mongo {
             scoped_lock ll(_workLock);
             scoped_lock l(_m); // reads and writes _active
 
-            assert( ! _active );
+            verify( ! _active );
 
-            assert( ! min.isEmpty() );
-            assert( ! max.isEmpty() );
-            assert( ns.size() );
+            verify( ! min.isEmpty() );
+            verify( ! max.isEmpty() );
+            verify( ns.size() );
 
             _ns = ns;
             _min = min;
             _max = max;
 
-            assert( _cloneLocs.size() == 0 );
-            assert( _deleted.size() == 0 );
-            assert( _reload.size() == 0 );
-            assert( _memoryUsed == 0 );
+            verify( _cloneLocs.size() == 0 );
+            verify( _deleted.size() == 0 );
+            verify( _reload.size() == 0 );
+            verify( _memoryUsed == 0 );
 
             _active = true;
         }
@@ -481,7 +481,7 @@ namespace mongo {
                 readlock l(_ns);
                 Client::Context ctx( _ns );
                 NamespaceDetails *d = nsdetails( _ns.c_str() );
-                assert( d );
+                verify( d );
                 scoped_spinlock lk( _trackerLocks );
                 allocSize = std::min(BSONObjMaxUserSize, (int)((12 + d->averageObjectSize()) * _cloneLocs.size()));
             }
@@ -532,7 +532,7 @@ namespace mongo {
         }
 
         void aboutToDelete( const Database* db , const DiskLoc& dl ) {
-            assert(db);
+            verify(db);
             Lock::assertWriteLocked(db->name);
 
             if ( ! _getActive() )
@@ -621,7 +621,7 @@ namespace mongo {
         int loops = 0;
         Timer t;
         while ( t.seconds() < 900 ) { // 15 minutes
-            assert( !Lock::isLocked() );
+            verify( !Lock::isLocked() );
             sleepmillis( 20 );
 
             set<CursorId> now;
@@ -838,9 +838,9 @@ namespace mongo {
                 }
 
                 maxVersion = x["lastmod"];
-                assert( currChunk["shard"].type() );
-                assert( currChunk["min"].type() );
-                assert( currChunk["max"].type() );
+                verify( currChunk["shard"].type() );
+                verify( currChunk["min"].type() );
+                verify( currChunk["max"].type() );
                 myOldShard = currChunk["shard"].String();
                 conn.done();
 
@@ -918,7 +918,7 @@ namespace mongo {
 
                 if ( ! ok ) {
                     errmsg = "moveChunk failed to engage TO-shard in the data transfer: ";
-                    assert( res["errmsg"].type() );
+                    verify( res["errmsg"].type() );
                     errmsg += res["errmsg"].String();
                     result.append( "cause" , res );
                     return false;
@@ -929,7 +929,7 @@ namespace mongo {
 
             // 4.
             for ( int i=0; i<86400; i++ ) { // don't want a single chunk move to take more than a day
-                assert( !Lock::isLocked() );
+                verify( !Lock::isLocked() );
                 sleepsecs( 1 );
                 ScopedDbConnection conn( toShard.getConnString() );
                 BSONObj res;
@@ -987,7 +987,7 @@ namespace mongo {
 
                 {
                     writelock lk( ns );
-                    assert( myVersion > shardingState.getVersion( ns ) );
+                    verify( myVersion > shardingState.getVersion( ns ) );
 
                     // bump the chunks manager's version up and "forget" about the chunk being moved
                     // this is not the commit point but in practice the state in this shard won't until the commit it done
@@ -1259,7 +1259,7 @@ namespace mongo {
         void prepare() {
             scoped_lock l(m_active); // reading and writing 'active'
 
-            assert( ! active );
+            verify( ! active );
             state = READY;
             errmsg = "";
 
@@ -1289,10 +1289,10 @@ namespace mongo {
         }
 
         void _go() {
-            assert( getActive() );
-            assert( state == READY );
-            assert( ! min.isEmpty() );
-            assert( ! max.isEmpty() );
+            verify( getActive() );
+            verify( state == READY );
+            verify( ! min.isEmpty() );
+            verify( ! max.isEmpty() );
             
             slaveCount = ( getSlaveCount() / 2 ) + 1;
 
@@ -1593,7 +1593,7 @@ namespace mongo {
             case FAIL: return "fail";
             case ABORT: return "abort";
             }
-            assert(0);
+            verify(0);
             return "";
         }
 
@@ -1734,12 +1734,12 @@ namespace mongo {
             BSONObj min = BSON( "x" << 1 );
             BSONObj max = BSON( "x" << 5 );
 
-            assert( ! isInRange( BSON( "x" << 0 ) , min , max ) );
-            assert( isInRange( BSON( "x" << 1 ) , min , max ) );
-            assert( isInRange( BSON( "x" << 3 ) , min , max ) );
-            assert( isInRange( BSON( "x" << 4 ) , min , max ) );
-            assert( ! isInRange( BSON( "x" << 5 ) , min , max ) );
-            assert( ! isInRange( BSON( "x" << 6 ) , min , max ) );
+            verify( ! isInRange( BSON( "x" << 0 ) , min , max ) );
+            verify( isInRange( BSON( "x" << 1 ) , min , max ) );
+            verify( isInRange( BSON( "x" << 3 ) , min , max ) );
+            verify( isInRange( BSON( "x" << 4 ) , min , max ) );
+            verify( ! isInRange( BSON( "x" << 5 ) , min , max ) );
+            verify( ! isInRange( BSON( "x" << 6 ) , min , max ) );
 
             LOG(1) << "isInRangeTest passed" << migrateLog;
         }

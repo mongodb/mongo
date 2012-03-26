@@ -49,10 +49,10 @@ namespace MMapTests {
             {
                 MongoMMF f;
                 unsigned long long len = 256 * 1024 * 1024;
-                assert( f.create(fn, len, /*sequential*/false) );
+                verify( f.create(fn, len, /*sequential*/false) );
                 {
                     char *p = (char *) f.getView();
-                    assert(p);
+                    verify(p);
                     // write something to the private view as a test
                     if( cmdLine.dur ) 
                         MemoryMappedFile::makeWritable(p, 6);
@@ -81,10 +81,10 @@ namespace MMapTests {
             Timer t;
             for( int i = 0; i < N; i++ ) {
                 MongoMMF f;
-                assert( f.open(fn, i%4==1) );
+                verify( f.open(fn, i%4==1) );
                 {
                     char *p = (char *) f.getView();
-                    assert(p);
+                    verify(p);
                     if( cmdLine.dur ) 
                         MemoryMappedFile::makeWritable(p, 4);
                     strcpy(p, "zzz");
@@ -93,7 +93,7 @@ namespace MMapTests {
                     char *w = (char *) f.view_write();
                     if( i % 2 == 0 )
                         ++(*w);
-                    assert( w[6] == 'w' );
+                    verify( w[6] == 'w' );
                 }
             }
             if( t.millis() > 10000 ) {
@@ -122,7 +122,7 @@ namespace MMapTests {
 
             MemoryMappedFile f;
             char *p = (char *) f.create(fn, 1024 * 1024 * 1024, true);
-            assert(p);
+            verify(p);
             strcpy(p, "hello");
 
             {
@@ -141,7 +141,7 @@ namespace MMapTests {
                 char *q;
                 for( int i = 0; i < 1000; i++ ) {
                     q = (char *) f.testGetCopyOnWriteView();
-                    assert( q );
+                    verify( q );
                     if( i == 999 ) {
                         strcpy(q+2, "there");
                     }
@@ -169,7 +169,7 @@ namespace MMapTests {
                 Timer t;
                 char *q = (char *) f.testGetCopyOnWriteView();
                 for( int i = 0; i < 10; i++ ) {
-                    assert( q );
+                    verify( q );
                     memset(q+100, 'c', 200 * 1024 * 1024);
                 }
                 f.testCloseCopyOnWriteView(q);
@@ -182,7 +182,7 @@ namespace MMapTests {
                 Timer t;
                 for( int i = 0; i < 10; i++ ) {
                     char *q = (char *) f.testGetCopyOnWriteView();
-                    assert( q );
+                    verify( q );
                     memset(q+100, 'c', 200 * 1024 * 1024);
                     f.testCloseCopyOnWriteView(q);
                 }
@@ -195,7 +195,7 @@ namespace MMapTests {
                 Timer t;
                 for( int i = 0; i < 100; i++ ) {
                     char *q = (char *) f.testGetCopyOnWriteView();
-                    assert( q );
+                    verify( q );
                     memset(q+100, 'c', 20 * 1024 * 1024);
                     f.testCloseCopyOnWriteView(q);
                 }

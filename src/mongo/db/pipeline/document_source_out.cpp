@@ -48,7 +48,7 @@ namespace mongo {
         BSONElement *pBsonElement,
         const intrusive_ptr<ExpressionContext> &pExpCtx):
         DocumentSource(pExpCtx) {
-        assert(false && "unimplemented");
+        verify(false && "unimplemented");
     }
 
     intrusive_ptr<DocumentSourceOut> DocumentSourceOut::createFromBson(
@@ -61,6 +61,6 @@ namespace mongo {
     }
 
     void DocumentSourceOut::sourceToBson(BSONObjBuilder *pBuilder) const {
-        assert(false); // CW TODO
+        verify(false); // CW TODO
     }
 }

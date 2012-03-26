@@ -75,16 +75,16 @@ namespace mongo {
     }
 
     void Shard::getAllShards( vector<Shard>& all ) {
-        assert(0);
+        verify(0);
     }
 
     bool Shard::isAShardNode( const string& ident ) {
-        assert(0);
+        verify(0);
         return false;
     }
 
     string prettyHostName() {
-        assert(0);
+        verify(0);
         return "";
     }
 

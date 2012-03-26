@@ -56,7 +56,7 @@ namespace mongo {
         case dbKillCursors: return "killcursors";
         default:
             PRINT(op);
-            assert(0);
+            verify(0);
             return "";
         }
     }
@@ -79,7 +79,7 @@ namespace mongo {
 
         default:
             PRINT(op);
-            assert(0);
+            verify(0);
             return "";
         }
 
@@ -129,8 +129,8 @@ namespace mongo {
         }
 
         long long getCursor() {
-            assert( responseTo > 0 );
-            assert( _operation == opReply );
+            verify( responseTo > 0 );
+            verify( _operation == opReply );
             long long * l = (long long *)(_data + 4);
             return l[0];
         }
@@ -161,7 +161,7 @@ namespace mongo {
         SockAddr _from;
 
         MsgData *header() const {
-            assert( !empty() );
+            verify( !empty() );
             return _buf ? _buf : reinterpret_cast< MsgData* > ( _data[ 0 ].first );
         }
         int operation() const { return header()->operation(); }
@@ -195,7 +195,7 @@ namespace mongo {
                 return;
             }
 
-            assert( _freeIt );
+            verify( _freeIt );
             int totalSize = 0;
             for( vector< pair< char *, int > >::const_iterator i = _data.begin(); i != _data.end(); ++i ) {
                 totalSize += i->second;
@@ -212,8 +212,8 @@ namespace mongo {
 
         // vector swap() so this is fast
         Message& operator=(Message& r) {
-            assert( empty() );
-            assert( r._freeIt );
+            verify( empty() );
+            verify( r._freeIt );
             _buf = r._buf;
             r._buf = 0;
             if ( r._data.size() > 0 ) {
@@ -250,7 +250,7 @@ namespace mongo {
                 _setData( md, true );
                 return;
             }
-            assert( _freeIt );
+            verify( _freeIt );
             if ( _buf ) {
                 _data.push_back( make_pair( (char*)_buf, _buf->len ) );
                 _buf = 0;
@@ -261,14 +261,14 @@ namespace mongo {
 
         // use to set first buffer if empty
         void setData(MsgData *d, bool freeIt) {
-            assert( empty() );
+            verify( empty() );
             _setData( d, freeIt );
         }
         void setData(int operation, const char *msgtxt) {
             setData(operation, msgtxt, strlen(msgtxt)+1);
         }
         void setData(int operation, const char *msgdata, size_t len) {
-            assert( empty() );
+            verify( empty() );
             size_t dataLen = len + sizeof(MsgData) - 4;
             MsgData *d = (MsgData *) malloc(dataLen);
             memcpy(d->_data, msgdata, len);

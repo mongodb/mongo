@@ -54,7 +54,7 @@ namespace mongo {
        (or 3...there will be a little unused sliver at the end of the extent.)
     */
     void NamespaceDetails::compact() {
-        assert(capped);
+        verify(capped);
 
         list<DiskLoc> drecs;
 
@@ -69,7 +69,7 @@ namespace mongo {
         drecs.sort();
 
         list<DiskLoc>::iterator j = drecs.begin();
-        assert( j != drecs.end() );
+        verify( j != drecs.end() );
         DiskLoc a = *j;
         while ( 1 ) {
             j++;
@@ -105,7 +105,7 @@ namespace mongo {
 
     void NamespaceDetails::cappedCheckMigrate() {
         // migrate old NamespaceDetails format
-        assert( capped );
+        verify( capped );
         if ( capExtent.a() == 0 && capExtent.getOfs() == 0 ) {
             //capFirstNewRecord = DiskLoc();
             capFirstNewRecord.writing().setInvalid();
@@ -128,18 +128,18 @@ namespace mongo {
     }
 
     bool NamespaceDetails::inCapExtent( const DiskLoc &dl ) const {
-        assert( !dl.isNull() );
+        verify( !dl.isNull() );
         // We could have a rec or drec, doesn't matter.
         bool res = dl.drec()->myExtentLoc(dl) == capExtent;
         DEV {
             // old implementation. this check is temp to test works the same.  new impl should be a little faster.
-            assert( res == (dl.drec()->myExtent( dl ) == capExtent.ext()) );
+            verify( res == (dl.drec()->myExtent( dl ) == capExtent.ext()) );
         }
         return res;
     }
 
     bool NamespaceDetails::nextIsInCapExtent( const DiskLoc &dl ) const {
-        assert( !dl.isNull() );
+        verify( !dl.isNull() );
         DiskLoc next = dl.drec()->nextDeleted;
         if ( next.isNull() )
             return false;
@@ -186,7 +186,7 @@ namespace mongo {
             else
                 prev.drec()->nextDeleted.writing() = ret.drec()->nextDeleted;
             ret.drec()->nextDeleted.writing().setInvalid(); // defensive.
-            assert( ret.drec()->extentOfs < ret.getOfs() );
+            verify( ret.drec()->extentOfs < ret.getOfs() );
         }
 
         return ret;
@@ -197,7 +197,7 @@ namespace mongo {
         if ( !cappedLastDelRecLastExtent().isValid() )
             getDur().writingDiskLoc( cappedLastDelRecLastExtent() ) = DiskLoc();
 
-        assert( len < 400000000 );
+        verify( len < 400000000 );
         int passes = 0;
         int maxPasses = ( len / 30 ) + 2; // 30 is about the smallest entry that could go in the oplog
         if ( maxPasses < 5000 ) {
@@ -209,7 +209,7 @@ namespace mongo {
         // delete records until we have room and the max # objects limit achieved.
 
         /* this fails on a rename -- that is ok but must keep commented out */
-        //assert( theCapExtent()->ns == ns );
+        //verify( theCapExtent()->ns == ns );
 
         theCapExtent()->assertOk();
         DiskLoc firstEmptyExtent;
@@ -306,14 +306,14 @@ namespace mongo {
             // deleted record.  Here we check that 'i' is not the last deleted
             // record.  (We expect that there will be deleted records in the new
             // capExtent as well.)
-            assert( !i.drec()->nextDeleted.isNull() );
+            verify( !i.drec()->nextDeleted.isNull() );
             cappedLastDelRecLastExtent().writing() = i;
         }
     }
 
     void NamespaceDetails::cappedTruncateAfter(const char *ns, DiskLoc end, bool inclusive) {
-        DEV assert( this == nsdetails(ns) );
-        assert( cappedLastDelRecLastExtent().isValid() );
+        DEV verify( this == nsdetails(ns) );
+        verify( cappedLastDelRecLastExtent().isValid() );
 
         // We iteratively remove the newest document until the newest document
         // is 'end', then we remove 'end' if requested.
@@ -326,7 +326,7 @@ namespace mongo {
             getDur().commitIfNeeded();
             // 'curr' will point to the newest document in the collection.
             DiskLoc curr = theCapExtent()->lastRecord;
-            assert( !curr.isNull() );
+            verify( !curr.isNull() );
             if ( curr == end ) {
                 if ( inclusive ) {
                     // 'end' has been found, so break next iteration.
@@ -358,7 +358,7 @@ namespace mongo {
                 // the 'capExtent' can't be empty, so we set 'capExtent' to
                 // capExtent's prev extent.
                 if ( theCapExtent()->lastRecord.isNull() ) {
-                    assert( !theCapExtent()->xprev.isNull() );
+                    verify( !theCapExtent()->xprev.isNull() );
                     // NOTE Because we didn't delete the last document, and
                     // capLooped() is false, capExtent is not the first extent
                     // so xprev will be nonnull.
@@ -407,7 +407,7 @@ namespace mongo {
     }
 
     void NamespaceDetails::emptyCappedCollection( const char *ns ) {
-        DEV assert( this == nsdetails(ns) );
+        DEV verify( this == nsdetails(ns) );
         massert( 13424, "collection must be capped", capped );
         massert( 13425, "background index build in progress", !indexBuildInProgress );
         massert( 13426, "indexes present", nIndexes == 0 );

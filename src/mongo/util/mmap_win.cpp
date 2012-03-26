@@ -35,7 +35,7 @@ namespace mongo {
     void MemoryMappedFile::clearWritableBits(void *p) {
         for( unsigned i = ((size_t)p)/ChunkSize; i <= (((size_t)p)+len)/ChunkSize; i++ ) {
             writable.clear(i);
-            assert( !writable.get(i) );
+            verify( !writable.get(i) );
         }
     }
 
@@ -67,7 +67,7 @@ namespace mongo {
     unsigned long long mapped = 0;
 
     void* MemoryMappedFile::createReadOnlyMap() {
-        assert( maphandle );
+        verify( maphandle );
         scoped_lock lk(mapViewMutex);
         void *p = MapViewOfFile(maphandle, FILE_MAP_READ, /*f ofs hi*/0, /*f ofs lo*/ 0, /*dwNumberOfBytesToMap 0 means to eof*/0);
         if ( p == 0 ) {
@@ -82,7 +82,7 @@ namespace mongo {
     }
 
     void* MemoryMappedFile::map(const char *filenameIn, unsigned long long &length, int options) {
-        assert( fd == 0 && len == 0 ); // can't open more than once
+        verify( fd == 0 && len == 0 ); // can't open more than once
         setFilename(filenameIn);
         /* big hack here: Babble uses db names with colons.  doesn't seem to work on windows.  temporary perhaps. */
         char filename[256];

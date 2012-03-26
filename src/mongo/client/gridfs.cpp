@@ -117,7 +117,7 @@ namespace mongo {
                 chunkLen += readLen;
                 bufPos += readLen;
 
-                assert(chunkLen <= _chunkSize);
+                verify(chunkLen <= _chunkSize);
             }
 
             GridFSChunk c(idObj, chunkNumber, buf, chunkLen);

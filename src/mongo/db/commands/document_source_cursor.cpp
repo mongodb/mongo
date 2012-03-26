@@ -95,12 +95,12 @@ namespace mongo {
 
     void DocumentSourceCursor::setSource(DocumentSource *pSource) {
         /* this doesn't take a source */
-        assert(false);
+        verify(false);
     }
 
     void DocumentSourceCursor::sourceToBson(BSONObjBuilder *pBuilder) const {
         /* this has no analog in the BSON world */
-        assert(false);
+        verify(false);
     }
 
     DocumentSourceCursor::DocumentSourceCursor(
@@ -121,7 +121,7 @@ namespace mongo {
         const shared_ptr<Cursor> &pCursor,
         const string &ns,
         const intrusive_ptr<ExpressionContext> &pExpCtx) {
-        assert(pCursor.get());
+        verify(pCursor.get());
         intrusive_ptr<DocumentSourceCursor> pSource(
             new DocumentSourceCursor(pCursor, ns, pExpCtx));
             return pSource;

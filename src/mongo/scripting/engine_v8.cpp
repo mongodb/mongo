@@ -1486,7 +1486,7 @@ namespace mongo {
                     b.appendMaxKey( sname );
                     return;
                 default:
-                    assert( "invalid internal field" == 0 );
+                    verify( "invalid internal field" == 0 );
                 }
             }
             string s = toSTLString( value );

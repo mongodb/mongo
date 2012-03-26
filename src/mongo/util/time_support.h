@@ -23,8 +23,6 @@
 #include <boost/thread/tss.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
 #include <boost/thread/xtime.hpp>
-#undef assert
-#define assert MONGO_assert
 #include "../bson/util/misc.h"  // Date_t
 
 namespace mongo {
@@ -51,7 +49,7 @@ namespace mongo {
 
         const char* fmt = (colonsOk ? "%Y-%m-%dT%H:%M:%S" : "%Y-%m-%dT%H-%M-%S");
         char buf[32];
-        assert(strftime(buf, sizeof(buf), fmt, &t) == 19);
+        verify(strftime(buf, sizeof(buf), fmt, &t) == 19);
         return buf;
     }
 
@@ -61,7 +59,7 @@ namespace mongo {
 
         const char* fmt = "%Y-%m-%dT%H:%M:%SZ";
         char buf[32];
-        assert(strftime(buf, sizeof(buf), fmt, &t) == 20);
+        verify(strftime(buf, sizeof(buf), fmt, &t) == 20);
         return buf;
     }
 
@@ -104,7 +102,7 @@ namespace mongo {
         Sleep(s*1000);
     }
     inline void sleepmillis(long long s) {
-        assert( s <= 0xffffffff );
+        verify( s <= 0xffffffff );
         Sleep((DWORD) s);
     }
     inline void sleepmicros(long long s) {

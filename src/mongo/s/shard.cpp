@@ -274,7 +274,7 @@ namespace mongo {
     }
 
     void Shard::setAddress( const ConnectionString& cs) {
-        assert( _name.size() );
+        verify( _name.size() );
         _addr = cs.toString();
         _cs = cs;
         _rsInit();

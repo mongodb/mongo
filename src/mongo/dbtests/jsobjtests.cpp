@@ -1414,11 +1414,11 @@ namespace JsobjTests {
     public:
         void run() {
             BSONObj x = BSON( "a" << 10 << "b" << 11 );
-            assert( BSON( "a" << 10 ).woCompare( x.extractFields( BSON( "a" << 1 ) ) ) == 0 );
-            assert( BSON( "b" << 11 ).woCompare( x.extractFields( BSON( "b" << 1 ) ) ) == 0 );
-            assert( x.woCompare( x.extractFields( BSON( "a" << 1 << "b" << 1 ) ) ) == 0 );
+            verify( BSON( "a" << 10 ).woCompare( x.extractFields( BSON( "a" << 1 ) ) ) == 0 );
+            verify( BSON( "b" << 11 ).woCompare( x.extractFields( BSON( "b" << 1 ) ) ) == 0 );
+            verify( x.woCompare( x.extractFields( BSON( "a" << 1 << "b" << 1 ) ) ) == 0 );
 
-            assert( (string)"a" == x.extractFields( BSON( "a" << 1 << "c" << 1 ) ).firstElementFieldName() );
+            verify( (string)"a" == x.extractFields( BSON( "a" << 1 << "c" << 1 ) ).firstElementFieldName() );
         }
     };
 
@@ -1488,12 +1488,12 @@ namespace JsobjTests {
                 while ( i->more() ) {
                     pair<BSONObj,DiskLoc> p = i->next();
                     if ( num == 0 )
-                        assert( p.first["x"].number() == 2 );
+                        verify( p.first["x"].number() == 2 );
                     else if ( num <= 2 ) {
-                        assert( p.first["x"].number() == 5 );
+                        verify( p.first["x"].number() == 5 );
                     }
                     else if ( num == 3 )
-                        assert( p.first["x"].number() == 10 );
+                        verify( p.first["x"].number() == 10 );
                     else
                         ASSERT( 0 );
                     num++;
@@ -1520,13 +1520,13 @@ namespace JsobjTests {
                 while ( i->more() ) {
                     pair<BSONObj,DiskLoc> p = i->next();
                     if ( num == 0 ) {
-                        assert( p.first["x"].number() == 2 );
+                        verify( p.first["x"].number() == 2 );
                         ASSERT_EQUALS( p.second.toString() , "3:1" );
                     }
                     else if ( num <= 2 )
-                        assert( p.first["x"].number() == 5 );
+                        verify( p.first["x"].number() == 5 );
                     else if ( num == 3 ) {
-                        assert( p.first["x"].number() == 10 );
+                        verify( p.first["x"].number() == 10 );
                         ASSERT_EQUALS( p.second.toString() , "5:b" );
                     }
                     else
@@ -1544,7 +1544,7 @@ namespace JsobjTests {
                 sorter.sort();
 
                 auto_ptr<BSONObjExternalSorter::Iterator> i = sorter.iterator();
-                assert( ! i->more() );
+                verify( ! i->more() );
 
             }
         };
@@ -1567,12 +1567,12 @@ namespace JsobjTests {
                 while ( i->more() ) {
                     pair<BSONObj,DiskLoc> p = i->next();
                     if ( num == 0 )
-                        assert( p.first["x"].number() == 2 );
+                        verify( p.first["x"].number() == 2 );
                     else if ( num <= 3 ) {
-                        assert( p.first["x"].number() == 5 );
+                        verify( p.first["x"].number() == 5 );
                     }
                     else if ( num == 4 )
-                        assert( p.first["x"].number() == 10 );
+                        verify( p.first["x"].number() == 10 );
                     else
                         ASSERT( 0 );
                     ASSERT_EQUALS( num , p.second.getOfs() );
@@ -1601,10 +1601,10 @@ namespace JsobjTests {
                     pair<BSONObj,DiskLoc> p = i->next();
                     num++;
                     double cur = p.first["x"].number();
-                    assert( cur >= prev );
+                    verify( cur >= prev );
                     prev = cur;
                 }
-                assert( num == 10000 );
+                verify( num == 10000 );
             }
         };
 
@@ -1626,10 +1626,10 @@ namespace JsobjTests {
                     pair<BSONObj,DiskLoc> p = i->next();
                     num++;
                     double cur = p.first["x"].number();
-                    assert( cur >= prev );
+                    verify( cur >= prev );
                     prev = cur;
                 }
-                assert( num == total );
+                verify( num == total );
                 ASSERT( sorter.numFiles() > 2 );
             }
         };

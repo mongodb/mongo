@@ -52,7 +52,7 @@ namespace mongo {
             flushMyDirectory(parent); // flushes grandparent to ensure parent exists after crash
         }
         
-        assert(boost::filesystem::is_directory(parent));
+        verify(boost::filesystem::is_directory(parent));
         return parent;
     }
 

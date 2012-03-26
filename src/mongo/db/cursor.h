@@ -224,7 +224,7 @@ namespace mongo {
         }
         bool ok() { return !curr.isNull(); }
         Record* _current() {
-            assert( ok() );
+            verify( ok() );
             return curr.rec();
         }
         BSONObj current() {

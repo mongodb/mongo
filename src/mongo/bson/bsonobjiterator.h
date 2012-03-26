@@ -58,13 +58,13 @@ namespace mongo {
 
         /** @return the next element in the object. For the final element, element.eoo() will be true. */
         BSONElement next( bool checkEnd ) {
-            assert( _pos <= _theend );
+            verify( _pos <= _theend );
             BSONElement e( _pos, checkEnd ? (int)(_theend + 1 - _pos) : -1 );
             _pos += e.size( checkEnd ? (int)(_theend + 1 - _pos) : -1 );
             return e;
         }
         BSONElement next() {
-            assert( _pos <= _theend );
+            verify( _pos <= _theend );
             BSONElement e(_pos);
             _pos += e.size();
             return e;
@@ -73,7 +73,7 @@ namespace mongo {
         void operator++(int) { next(); }
 
         BSONElement operator*() {
-            assert( _pos <= _theend );
+            verify( _pos <= _theend );
             return BSONElement(_pos);
         }
 
@@ -86,7 +86,7 @@ namespace mongo {
     class BSONIteratorSorted {
     public:
         ~BSONIteratorSorted() {
-            assert( _fields );
+            verify( _fields );
             delete[] _fields;
             _fields = 0;
         }
@@ -96,7 +96,7 @@ namespace mongo {
         }
 
         BSONElement next() {
-            assert( _fields );
+            verify( _fields );
             if ( _cur < _nfields )
                 return BSONElement( _fields[_cur++] );
             return BSONElement();
@@ -141,7 +141,7 @@ namespace mongo {
             const char *f = e.fieldName();
             try {
                 unsigned u = stringToNum(f);
-                assert( u < 1000000 );
+                verify( u < 1000000 );
                 if( u >= v.size() )
                     v.resize(u+1);
                 v[u] = e;

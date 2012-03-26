@@ -70,7 +70,7 @@ namespace mongo {
 
     void ReplSetImpl::assumePrimary() {
         LOG(2) << "replSet assuming primary" << endl;
-        assert( iAmPotentiallyHot() );
+        verify( iAmPotentiallyHot() );
         // so we are synchronized with _logOp().  perhaps locking local db only would suffice, but until proven 
         // will take this route, and this is very rare so it doesn't matter anyway
         Lock::GlobalWrite lk; 
@@ -215,7 +215,7 @@ namespace mongo {
     }
 
     void ReplSetImpl::_fillIsMasterHost(const Member *m, vector<string>& hosts, vector<string>& passives, vector<string>& arbiters) {
-        assert( m );
+        verify( m );
         if( m->config().hidden )
             return;
 
@@ -248,7 +248,7 @@ namespace mongo {
             _fillIsMasterHost(_self, hosts, passives, arbiters);
 
             for( Member *m = _members.head(); m; m = m->next() ) {
-                assert( m );
+                verify( m );
                 _fillIsMasterHost(m, hosts, passives, arbiters);
             }
 
@@ -449,7 +449,7 @@ namespace mongo {
                     const Member *old = findById(m._id);
                     if( old ) {
                         nfound++;
-                        assert( (int) old->id() == m._id );
+                        verify( (int) old->id() == m._id );
                         if( old->config() != m ) {
                             additive = false;
                         }
@@ -493,10 +493,10 @@ namespace mongo {
 
         _cfg = new ReplSetConfig(c);
         dassert( &config() == _cfg ); // config() is same thing but const, so we use that when we can for clarity below
-        assert( config().ok() );
-        assert( _name.empty() || _name == config()._id );
+        verify( config().ok() );
+        verify( _name.empty() || _name == config()._id );
         _name = config()._id;
-        assert( !_name.empty() );
+        verify( !_name.empty() );
 
         // this is a shortcut for simple changes
         if( additive ) {
@@ -546,7 +546,7 @@ namespace mongo {
             Member *mi;
             members += ( members == "" ? "" : ", " ) + m.h.toString();
             if( m.h.isSelf() ) {
-                assert( me++ == 0 );
+                verify( me++ == 0 );
                 mi = new Member(m.h, m._id, &m, true);
                 if (!reconf) {
                     log() << "replSet I am " << m.h.toString() << rsLog;
@@ -592,7 +592,7 @@ namespace mongo {
                 v = cfg.version;
             }
         }
-        assert( highest );
+        verify( highest );
 
         if( !initFromConfig(*highest) )
             return false;
@@ -727,7 +727,7 @@ namespace mongo {
             if( e.getCode() == 13497 /* removed from set */ ) {
                 cc().shutdown();
                 dbexit( EXIT_CLEAN , "removed from replica set" ); // never returns
-                assert(0);
+                verify(0);
             }
             log() << "replSet error unexpected exception in haveNewConfig() : " << e.toString() << rsLog;
             _fatal();
@@ -757,9 +757,9 @@ namespace mongo {
     void startReplSets(ReplSetCmdline *replSetCmdline) {
         Client::initThread("rsStart");
         try {
-            assert( theReplSet == 0 );
+            verify( theReplSet == 0 );
             if( replSetCmdline == 0 ) {
-                assert(!replSet);
+                verify(!replSet);
                 return;
             }
             replLocalAuth();

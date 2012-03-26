@@ -87,7 +87,7 @@ namespace mongo {
                       CP_UTF8, 0, wide.c_str(), static_cast<int>(wide.size()),
                       &buffer[0], static_cast<int>(buffer.size()), NULL, NULL);
             if (len > 0) {
-                assert(len == static_cast<int>(buffer.size()));
+                verify(len == static_cast<int>(buffer.size()));
                 return std::string(&buffer[0], buffer.size());
             }
         }
@@ -132,8 +132,8 @@ namespace mongo {
 
     struct TextUnitTest : public UnitTest {
         void run() {
-            assert( parseLL("123") == 123 );
-            assert( parseLL("-123000000000") == -123000000000LL );
+            verify( parseLL("123") == 123 );
+            verify( parseLL("-123000000000") == -123000000000LL );
         }
     } textUnitTest;
 

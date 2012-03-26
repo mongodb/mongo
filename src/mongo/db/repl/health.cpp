@@ -301,7 +301,7 @@ namespace mongo {
         }
 
         const Member *_self = this->_self;
-        assert(_self);
+        verify(_self);
         {
             stringstream s;
             /* self row */
@@ -368,7 +368,7 @@ namespace mongo {
         vector<BSONObj> v;
 
         const Member *_self = this->_self;
-        assert( _self );
+        verify( _self );
 
         MemberState myState = box.getState();
 
@@ -451,8 +451,8 @@ namespace mongo {
     static struct Test : public UnitTest {
         void run() {
             HealthOptions a,b;
-            assert( a == b );
-            assert( a.isDefault() );
+            verify( a == b );
+            verify( a.isDefault() );
         }
     } test;
 

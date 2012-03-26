@@ -100,7 +100,7 @@ namespace mongo {
         if ( ! exists( p ) ) {
             log() << "file [" << filename << "] doesn't exist" << endl;
             if ( assertOnError )
-                assert( 0 );
+                verify( 0 );
             return false;
         }
 
@@ -120,7 +120,7 @@ namespace mongo {
             if (empty) {
                 log() << "directory [" << filename << "] doesn't have any *.js files" << endl;
                 if ( assertOnError )
-                    assert( 0 );
+                    verify( 0 );
                 return false;
             }
 
@@ -133,7 +133,7 @@ namespace mongo {
         unsigned L;
         {
             fileofs fo = f.len();
-            assert( fo <= 0x7ffffffe );
+            verify( fo <= 0x7ffffffe );
             L = (unsigned) fo;
         }
         boost::scoped_array<char> data (new char[L+1]);
@@ -186,7 +186,7 @@ namespace mongo {
 
         static DBClientBase * db = createDirectClient();
         auto_ptr<DBClientCursor> c = db->query( coll , Query(), 0, 0, NULL, QueryOption_SlaveOk, 0 );
-        assert( c.get() );
+        verify( c.get() );
 
         set<string> thisTime;
 
@@ -274,7 +274,7 @@ namespace mongo {
         }
 
         ~ScopeCache() {
-            assert( _magic == 17 );
+            verify( _magic == 17 );
             _magic = 1;
 
             if ( inShutdown() )
@@ -323,7 +323,7 @@ namespace mongo {
             for ( PoolToScopes::iterator i=_pools.begin() ; i != _pools.end(); i++ ) {
                 for ( list<Scope*>::iterator j=i->second.begin(); j != i->second.end(); j++ ) {
                     Scope * s = *j;
-                    assert( ! seen.count( s ) );
+                    verify( ! seen.count( s ) );
                     delete s;
                     seen.insert( s );
                 }

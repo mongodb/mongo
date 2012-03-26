@@ -123,7 +123,7 @@ public:
             return "";
         }
         // Can never get here
-        assert(false);
+        verify(false);
         return "";
     }
 

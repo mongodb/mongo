@@ -381,20 +381,20 @@ namespace ThreadedTests {
             cout << "A : " << &x1 << endl;
             boost::thread t1( boost::bind( worker1 , &lk , &x1 ) );
             while ( ! x1 );
-            assert( x1 == 1 );
+            verify( x1 == 1 );
             sleepmillis( 500 );
-            assert( x1 == 1 );            
+            verify( x1 == 1 );            
             AtomicUInt x2 = 0;
             boost::thread t2( boost::bind( worker2, &lk , &x2 ) );
             t2.join();
-            assert( x2 == 1 );
+            verify( x2 == 1 );
             a.reset();
             for ( int i=0; i<2000; i++ ) {
                 if ( x1 == 2 )
                     break;
                 sleepmillis(1);
             }
-            assert( x1 == 2 );
+            verify( x1 == 2 );
             t1.join();            
         }
     };
@@ -402,7 +402,7 @@ namespace ThreadedTests {
     class RWLockTest3 { 
     public:        
         static void worker2( RWLockRecursiveNongreedy * lk , AtomicUInt * x ) {
-    	    assert( ! lk->__lock_try(0) );
+    	    verify( ! lk->__lock_try(0) );
             RWLockRecursiveNongreedy::Shared c( *lk  );
             (*x)++;
         }
@@ -420,7 +420,7 @@ namespace ThreadedTests {
 
             boost::thread t2( boost::bind( worker2, &lk , &x2 ) );
             t2.join();
-            assert( x2 == 1 );
+            verify( x2 == 1 );
 
             a.reset();            
         }
@@ -460,23 +460,23 @@ namespace ThreadedTests {
             
             // create
             pthread_rwlock_t lk;
-            assert( pthread_rwlock_init( &lk , 0 ) == 0 );
+            verify( pthread_rwlock_init( &lk , 0 ) == 0 );
             
             // read lock
-            assert( pthread_rwlock_rdlock( &lk ) == 0 );
+            verify( pthread_rwlock_rdlock( &lk ) == 0 );
             
             AtomicUInt x1 = 0;
             boost::thread t1( boost::bind( worker1 , &lk , &x1 ) );
             while ( ! x1 );
-            assert( x1 == 1 );
+            verify( x1 == 1 );
             sleepmillis( 500 );
-            assert( x1 == 1 );
+            verify( x1 == 1 );
             
             AtomicUInt x2 = 0;
 
             boost::thread t2( boost::bind( worker2, &lk , &x2 ) );
             t2.join();
-            assert( x2 == 1 );
+            verify( x2 == 1 );
 
             pthread_rwlock_unlock( &lk );
 
@@ -486,7 +486,7 @@ namespace ThreadedTests {
                 sleepmillis(1);
             }
 
-            assert( x1 == 2 );
+            verify( x1 == 2 );
             t1.join();
 #endif            
         }
@@ -761,7 +761,7 @@ namespace ThreadedTests {
             Timer t;
             while( 1 ) {
                 n.waitToBeNotified();
-                assert( k == 0 );
+                verify( k == 0 );
                 k = 1;
                 // not very long, we'd like to simulate about 100K locks per second
                 sleepalittle();
@@ -850,7 +850,7 @@ namespace ThreadedTests {
                 Timer t;
                 log(Z) << mongo::curTimeMillis64() % 10000 << " 3 lock_r()..." << endl;
                 m.lock_r();
-                assert( gotW );
+                verify( gotW );
                 log(Z) << mongo::curTimeMillis64() % 10000 << " 3            got" << gotW << endl;
                 log(Z) << t.millis() << endl;
                 m.unlock_r();
@@ -879,14 +879,14 @@ namespace ThreadedTests {
             void checkIn(){
                 scoped_lock lk( _frontDesk );
                 _checkedIn++;
-                assert( _checkedIn <= _nRooms );
+                verify( _checkedIn <= _nRooms );
                 if( _checkedIn > _maxRooms ) _maxRooms = _checkedIn;
             }
 
             void checkOut(){
                 scoped_lock lk( _frontDesk );
                 _checkedIn--;
-                assert( _checkedIn >= 0 );
+                verify( _checkedIn >= 0 );
             }
 
             mongo::mutex _frontDesk;
@@ -928,7 +928,7 @@ namespace ThreadedTests {
 
             // This should always be true, assuming that it takes < 1 sec for the hardware to process a check-out/check-in
             // Time for test is then ~ #threads / _nRooms * 2 seconds
-            assert( _hotel._maxRooms == _hotel._nRooms );
+            verify( _hotel._maxRooms == _hotel._nRooms );
 
         }
 

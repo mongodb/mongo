@@ -142,14 +142,14 @@ namespace mongo {
     }
 
     void setupLaunchSignals() {
-        assert( signal(SIGUSR2 , launchSignal ) != SIG_ERR );
+        verify( signal(SIGUSR2 , launchSignal ) != SIG_ERR );
     }
 
 
     void CmdLine::launchOk() {
         if ( cmdLine.doFork ) {
             // killing leader will propagate to parent
-            assert( kill( cmdLine.leaderProc, SIGUSR2 ) == 0 );
+            verify( kill( cmdLine.leaderProc, SIGUSR2 ) == 0 );
         }
     }
 #endif
@@ -171,9 +171,9 @@ namespace mongo {
             // setup cwd
             char buffer[1024];
 #ifdef _WIN32
-            assert( _getcwd( buffer , 1000 ) );
+            verify( _getcwd( buffer , 1000 ) );
 #else
-            assert( getcwd( buffer , 1000 ) );
+            verify( getcwd( buffer , 1000 ) );
 #endif
             cmdLine.cwd = buffer;
         }
@@ -288,7 +288,7 @@ namespace mongo {
             if ( params.count( "logpath" ) ) {
                 // test logpath
                 logpath = params["logpath"].as<string>();
-                assert( logpath.size() );
+                verify( logpath.size() );
                 if ( logpath[0] != '/' ) {
                     logpath = cmdLine.cwd + "/" + logpath;
                 }
@@ -487,8 +487,8 @@ namespace mongo {
 
     void setupCoreSignals() {
 #if !defined(_WIN32)
-        assert( signal(SIGUSR1 , rotateLogs ) != SIG_ERR );
-        assert( signal(SIGHUP , ignoreSignal ) != SIG_ERR );
+        verify( signal(SIGUSR1 , rotateLogs ) != SIG_ERR );
+        verify( signal(SIGHUP , ignoreSignal ) != SIG_ERR );
 #endif
     }
 

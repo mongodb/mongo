@@ -168,12 +168,12 @@ namespace mongo {
     }
 
     int ElementMatcher::inverseOfNegativeCompareOp() const {
-        verify( 15892, negativeCompareOp() );
+        verify( negativeCompareOp() );
         return _compareOp == BSONObj::NE ? BSONObj::Equality : BSONObj::opIN;
     }
 
     bool ElementMatcher::negativeCompareOpContainsNull() const {
-        verify( 15893, negativeCompareOp() );
+        verify( negativeCompareOp() );
         return (_compareOp == BSONObj::NE && _toMatch.type() != jstNULL) ||
         (_compareOp == BSONObj::NIN && _myset->count( staticNull.firstElement()) == 0 );
     }
@@ -547,7 +547,7 @@ namespace mongo {
     }
 
     inline int Matcher::valuesMatch(const BSONElement& l, const BSONElement& r, int op, const ElementMatcher& bm) const {
-        assert( op != BSONObj::NE && op != BSONObj::NIN );
+        verify( op != BSONObj::NE && op != BSONObj::NIN );
 
         if ( op == BSONObj::Equality ) {
             return l.valuesEqual(r);
@@ -713,7 +713,7 @@ namespace mongo {
                 cout << "obj: " << obj << endl;
                 cout << "fieldName: " << fieldName << endl;
                 cout << "_constrainIndexKey: " << _constrainIndexKey << endl;
-                assert( !e.eoo() );
+                verify( !e.eoo() );
             }
         }
         else {
@@ -1236,7 +1236,7 @@ namespace mongo {
             {
                 // a quick check that we are using our mongo assert macro
                 int x = 1;
-                assert( ++x );
+                verify( ++x );
                 if( x != 2 ) { 
                     log() << "bad build - wrong assert macro" << endl;
                     ::abort();    
@@ -1246,18 +1246,18 @@ namespace mongo {
             BSONObj j1((const char *) &js1);
             BSONObj j2((const char *) &js2);
             Matcher m(j2);
-            assert( m.matches(j1) );
+            verify( m.matches(j1) );
             js2.sval[0] = 'z';
-            assert( !m.matches(j1) );
+            verify( !m.matches(j1) );
             Matcher n(j1);
-            assert( n.matches(j1) );
-            assert( !n.matches(j2) );
+            verify( n.matches(j1) );
+            verify( !n.matches(j2) );
 
             BSONObj j0 = BSONObj();
 //      BSONObj j0((const char *) &js0);
             Matcher p(j0);
-            assert( p.matches(j1) );
-            assert( p.matches(j2) );
+            verify( p.matches(j1) );
+            verify( p.matches(j2) );
         }
     } jsunittest;
 
@@ -1283,14 +1283,14 @@ namespace mongo {
 
             pcrecpp::RE re1(")({a}h.*o");
             pcrecpp::RE re("h.llo");
-            assert( re.FullMatch("hello") );
-            assert( !re1.FullMatch("hello") );
+            verify( re.FullMatch("hello") );
+            verify( !re1.FullMatch("hello") );
 
 
             pcrecpp::RE_Options options;
             options.set_utf8(true);
             pcrecpp::RE part("dwi", options);
-            assert( part.PartialMatch("dwight") );
+            verify( part.PartialMatch("dwight") );
 
             pcre_config( PCRE_CONFIG_UNICODE_PROPERTIES , &ret );
             if ( ! ret )

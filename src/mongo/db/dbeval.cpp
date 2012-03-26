@@ -51,9 +51,9 @@ namespace mongo {
             code = e.codeWScopeCode();
             break;
         default:
-            assert(0);
+            verify(0);
         }
-        assert( code );
+        verify( code );
 
         if ( ! globalScriptEngine ) {
             errmsg = "db side execution is disabled";

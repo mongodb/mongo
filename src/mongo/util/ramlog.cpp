@@ -132,7 +132,7 @@ namespace mongo {
 
         s << "<pre>\n";
         for( int i = 0; i < (int)v.size(); i++ ) {
-            assert( strlen(v[i]) > 20 );
+            verify( strlen(v[i]) > 20 );
             int r = repeats(v, i);
             if( r < 0 ) {
                 s << color( linkify( clean(v,i).c_str() ) ) << '\n';

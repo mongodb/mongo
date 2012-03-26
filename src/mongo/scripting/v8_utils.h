@@ -29,7 +29,7 @@ namespace mongo {
 
     void ReportException(v8::TryCatch* handler);
 
-#define jsassert(x,msg) assert(x)
+#define jsassert(x,msg) verify(x)
 
     std::ostream& operator<<( std::ostream &s, const v8::Handle<v8::Value> & o );
     std::ostream& operator<<( std::ostream &s, const v8::Handle<v8::TryCatch> * try_catch );

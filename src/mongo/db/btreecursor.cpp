@@ -49,7 +49,7 @@ namespace mongo {
         }
 
         virtual BSONObj keyAt(int ofs) const { 
-            assert( !bucket.isNull() );
+            verify( !bucket.isNull() );
             const BtreeBucket<V> *b = bucket.btree<V>();
             int n = b->getN();
             if( n == b->INVALID_N_SENTINEL ) {
@@ -60,7 +60,7 @@ namespace mongo {
         }
 
         virtual BSONObj currKey() const { 
-            assert( !bucket.isNull() );
+            verify( !bucket.isNull() );
             return bucket.btree<V>()->keyNode(keyOfs).key.toBson();
         }
 
@@ -102,7 +102,7 @@ namespace mongo {
             _multikey = d->isMultikey(idxNo);
 
             if ( keyOfs >= 0 ) {
-                assert( !keyAtKeyOfs.isEmpty() );
+                verify( !keyAtKeyOfs.isEmpty() );
 
                 try {
                     // Note keyAt() returns an empty BSONObj if keyOfs is now out of range,
@@ -173,7 +173,7 @@ namespace mongo {
 
     private:
         const KeyNode currKeyNode() const {
-            assert( !bucket.isNull() );
+            verify( !bucket.isNull() );
             const BtreeBucket<V> *b = bucket.btree<V>();
             return b->keyNode(keyOfs);
         }
@@ -205,7 +205,7 @@ namespace mongo {
         }
 
         virtual BSONObj currKey() const { 
-            assert( !bucket.isNull() );
+            verify( !bucket.isNull() );
             return bucket.btree<V1>()->keyNode(keyOfs).key.toBson();
         }
 
@@ -227,7 +227,7 @@ namespace mongo {
 
     private:
         const KeyNode currKeyNode() const {
-            assert( !bucket.isNull() );
+            verify( !bucket.isNull() );
             const BtreeBucket<V1> *b = bucket.btree<V1>();
             return b->keyNode(keyOfs);
         }
@@ -310,7 +310,7 @@ namespace mongo {
         _order( _id.keyPattern() ),
         _ordering( Ordering::make( _order ) ),
         _direction( _direction ),
-        _bounds( ( assert( _bounds.get() ), _bounds ) ),
+        _bounds( ( verify( _bounds.get() ), _bounds ) ),
         _boundsIterator( new FieldRangeVectorIterator( *_bounds  ) ),
         _independentFieldRanges( true ),
         _nscanned( 0 ) {
@@ -450,7 +450,7 @@ namespace mongo {
 
     struct BtreeCursorUnitTest {
         BtreeCursorUnitTest() {
-            assert( minDiskLoc.compare(maxDiskLoc) < 0 );
+            verify( minDiskLoc.compare(maxDiskLoc) < 0 );
         }
     } btut;
 

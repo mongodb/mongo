@@ -29,7 +29,7 @@
 #define realloc MONGO_realloc
 
 // util/assert_util.h
-#define assert MONGO_assert
+#define verify MONGO_verify
 #define dassert MONGO_dassert
 #define wassert MONGO_wassert
 #define massert MONGO_massert

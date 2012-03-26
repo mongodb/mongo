@@ -45,7 +45,7 @@ namespace mongo {
     }
 
     intrusive_ptr<Document> DocumentSourceBsonArray::getCurrent() {
-        assert(haveCurrent);
+        verify(haveCurrent);
         BSONObj documentObj(currentElement.Obj());
         intrusive_ptr<Document> pDocument(
             Document::createFromBsonObj(&documentObj));
@@ -54,7 +54,7 @@ namespace mongo {
 
     void DocumentSourceBsonArray::setSource(DocumentSource *pSource) {
         /* this doesn't take a source */
-        assert(false);
+        verify(false);
     }
 
     DocumentSourceBsonArray::DocumentSourceBsonArray(
@@ -74,7 +74,7 @@ namespace mongo {
         BSONElement *pBsonElement,
         const intrusive_ptr<ExpressionContext> &pExpCtx) {
 
-        assert(pBsonElement->type() == Array);
+        verify(pBsonElement->type() == Array);
         intrusive_ptr<DocumentSourceBsonArray> pSource(
             new DocumentSourceBsonArray(pBsonElement, pExpCtx));
 
@@ -82,6 +82,6 @@ namespace mongo {
     }
 
     void DocumentSourceBsonArray::sourceToBson(BSONObjBuilder *pBuilder) const {
-        assert(false); // this has no analog in the BSON world
+        verify(false); // this has no analog in the BSON world
     }
 }

@@ -23,7 +23,7 @@ namespace mongo {
 
     intrusive_ptr<const Value> AccumulatorFirst::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-        assert(vpOperand.size() == 1);
+        verify(vpOperand.size() == 1);
 
         /* only remember the first value seen */
         if (!pValue.get())

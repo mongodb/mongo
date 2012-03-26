@@ -48,7 +48,7 @@ namespace mongo {
 
         void JSFunction::init( State * state ) {
             _scope = state->scope();
-            assert( _scope );
+            verify( _scope );
             _scope->init( &_wantedScope );
 
             _func = _scope->createFunction( _code.c_str() );
@@ -68,7 +68,7 @@ namespace mongo {
          */
         void JSMapper::map( const BSONObj& o ) {
             Scope * s = _func.scope();
-            assert( s );
+            verify( s );
             if ( s->invoke( _func.func() , &_params, &o , 0 , true, false, true ) )
                 throw UserException( 9014, str::stream() << "map invoke failed: " + s->getError() );
         }
@@ -176,14 +176,14 @@ namespace mongo {
                 uassert( 13070 , "value too large to reduce" , ee.size() < ( BSONObjMaxUserSize / 2 ) );
 
                 if ( sizeSoFar + ee.size() > BSONObjMaxUserSize ) {
-                    assert( n > 1 ); // if not, inf. loop
+                    verify( n > 1 ); // if not, inf. loop
                     break;
                 }
 
                 valueBuilder->append( ee );
                 sizeSoFar += ee.size();
             }
-            assert(valueBuilder);
+            verify(valueBuilder);
             valueBuilder->done();
             BSONObj args = reduceArgs.obj();
 
@@ -438,7 +438,7 @@ namespace mongo {
                 BSONObj key = i->first;
                 BSONList& all = i->second;
 
-                assert( all.size() == 1 );
+                verify( all.size() == 1 );
 
                 BSONObjIterator vi( all[0] );
                 vi.next();
@@ -543,7 +543,7 @@ namespace mongo {
          * Insert doc in collection
          */
         void State::insert( const string& ns , const BSONObj& o ) {
-            assert( _onDisk );
+            verify( _onDisk );
 
             writelock l( ns );
             Client::Context ctx( ns );
@@ -564,7 +564,7 @@ namespace mongo {
          * Insert doc into the inc collection
          */
         void State::_insertToInc( BSONObj& o ) {
-            assert( _onDisk );
+            verify( _onDisk );
             theDataFileMgr.insertWithObjMod( _config.incLong.c_str() , o , true );
             getDur().commitIfNeeded();
         }
@@ -717,7 +717,7 @@ namespace mongo {
                         BSONObj key = i->first;
                         BSONList& all = i->second;
 
-                        assert( all.size() == 1 );
+                        verify( all.size() == 1 );
 
                         BSONObj res = _config.finalizer->finalize( all[0] );
 
@@ -731,7 +731,7 @@ namespace mongo {
             }
 
             // use index on "0" to pull sorted data
-            assert( _temp->size() == 0 );
+            verify( _temp->size() == 0 );
             BSONObj sortKey = BSON( "0" << 1 );
             {
                 bool foundIndex = false;
@@ -745,7 +745,7 @@ namespace mongo {
                     }
                 }
 
-                assert( foundIndex );
+                verify( foundIndex );
             }
 
             Client::ReadContext ctx( _config.incLong );
@@ -753,7 +753,7 @@ namespace mongo {
             BSONObj prev;
             BSONList all;
 
-            assert( pm == op->setMessage( "m/r: (3/3) final reduce to collection" , _db.count( _config.incLong, BSONObj(), QueryOption_SlaveOk ) ) );
+            verify( pm == op->setMessage( "m/r: (3/3) final reduce to collection" , _db.count( _config.incLong, BSONObj(), QueryOption_SlaveOk ) ) );
 
             shared_ptr<Cursor> temp =
             NamespaceDetailsTransient::bestGuessCursor( _config.incLong.c_str() , BSONObj() ,

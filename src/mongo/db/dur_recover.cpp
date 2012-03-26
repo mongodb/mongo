@@ -106,7 +106,7 @@ namespace mongo {
                 _lastDbName(0)
                 , _doDurOps(doDurOpsRecovering)
             {
-                assert( doDurOpsRecovering );
+                verify( doDurOpsRecovering );
                 bool ok = uncompress((const char *)compressed, compressedLen, &_uncompressed);
                 if( !ok ) { 
                     // it should always be ok (i think?) as there is a previous check to see that the JSectFooter is ok
@@ -114,7 +114,7 @@ namespace mongo {
                     msgasserted(15874, "couldn't uncompress journal section");
                 }
                 const char *p = _uncompressed.c_str();
-                assert( compressedLen == _h.sectionLen() - sizeof(JSectFooter) - sizeof(JSectHeader) );
+                verify( compressedLen == _h.sectionLen() - sizeof(JSectFooter) - sizeof(JSectHeader) );
                 _entries = auto_ptr<BufReader>( new BufReader(p, _uncompressed.size()) );
             }
 
@@ -142,7 +142,7 @@ namespace mongo {
                     switch( lenOrOpCode ) {
 
                     case JEntry::OpCode_Footer: {
-                        assert( false );
+                        verify( false );
                     }
 
                     case JEntry::OpCode_FileCreated:
@@ -172,11 +172,11 @@ namespace mongo {
                 }
 
                 // JEntry - a basic write
-                assert( lenOrOpCode && lenOrOpCode < JEntry::OpCode_Min );
+                verify( lenOrOpCode && lenOrOpCode < JEntry::OpCode_Min );
                 _entries->rewind(4);
                 e.e = (JEntry *) _entries->skip(sizeof(JEntry));
                 e.dbName = e.e->isLocalDbContext() ? "local" : _lastDbName;
-                assert( e.e->len == lenOrOpCode );
+                verify( e.e->len == lenOrOpCode );
                 _entries->skip(e.e->len);
             }
 
@@ -185,7 +185,7 @@ namespace mongo {
         static string fileName(const char* dbName, int fileNo) {
             stringstream ss;
             ss << dbName << '.';
-            assert( fileNo >= 0 );
+            verify( fileNo >= 0 );
             if( fileNo == JEntry::DotNsSuffix )
                 ss << "ns";
             else
@@ -216,9 +216,9 @@ namespace mongo {
 
         void RecoveryJob::write(const ParsedJournalEntry& entry) {
             //TODO(mathias): look into making some of these dasserts
-            assert(entry.e);
-            assert(entry.dbName);
-            assert(strnlen(entry.dbName, MaxDatabaseNameLen) < MaxDatabaseNameLen);
+            verify(entry.e);
+            verify(entry.dbName);
+            verify(strnlen(entry.dbName, MaxDatabaseNameLen) < MaxDatabaseNameLen);
 
             const string fn = fileName(entry.dbName, entry.e->getFileNo());
             MongoFile* file;
@@ -229,23 +229,23 @@ namespace mongo {
 
             MongoMMF* mmf;
             if (file) {
-                assert(file->isMongoMMF());
+                verify(file->isMongoMMF());
                 mmf = (MongoMMF*)file;
             }
             else {
                 if( !_recovering ) {
                     log() << "journal error applying writes, file " << fn << " is not open" << endl;
-                    assert(false);
+                    verify(false);
                 }
                 boost::shared_ptr<MongoMMF> sp (new MongoMMF);
-                assert(sp->open(fn, false));
+                verify(sp->open(fn, false));
                 _mmfs.push_back(sp);
                 mmf = sp.get();
             }
 
             if ((entry.e->ofs + entry.e->len) <= mmf->length()) {
-                assert(mmf->view_write());
-                assert(entry.e->srcData());
+                verify(mmf->view_write());
+                verify(entry.e->srcData());
 
                 void* dest = (char*)mmf->view_write() + entry.e->ofs;
                 memcpy(dest, entry.e->srcData(), entry.e->len);
@@ -353,7 +353,7 @@ namespace mongo {
 
             // after the entries check the footer checksum
             if( _recovering ) {
-                assert( ((const char *)h) + sizeof(JSectHeader) == p );
+                verify( ((const char *)h) + sizeof(JSectHeader) == p );
                 if( !f->checkHash(h, len + sizeof(JSectHeader)) ) { 
                     msgasserted(13594, "journal checksum doesn't match");
                 }
@@ -482,7 +482,7 @@ namespace mongo {
         }
 
         void _recover() {
-            assert( cmdLine.dur );
+            verify( cmdLine.dur );
 
             boost::filesystem::path p = getJournalDir();
             if( !exists(p) ) {
@@ -532,10 +532,10 @@ namespace mongo {
                 char x;
                 BufReaderY y;
                 r.read(x); //cout << x; // a
-                assert( x == 'a' );
+                verify( x == 'a' );
                 r.read(y);
                 r.read(x);
-                assert( x == 'b' );
+                verify( x == 'b' );
             }
         } brunittest;
 

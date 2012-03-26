@@ -206,7 +206,7 @@ namespace mongo {
                     // all we're going to report is the first
                     // since that's the current write
                     // but we block for all
-                    assert( v.size() >= 1 );
+                    verify( v.size() >= 1 );
                     result.appendElements( v[0] );
                     result.appendElementsUnique( res );
                     result.append( "writebackGLE" , v[0] );

@@ -286,7 +286,7 @@ namespace mongo {
         Member *target = 0, *stale = 0;
         BSONObj oldest;
 
-        assert(r.conn() == 0);
+        verify(r.conn() == 0);
 
         while ((target = getMemberToSyncTo()) != 0) {
             string current = target->fullName();
@@ -402,7 +402,7 @@ namespace mongo {
         }
 
         while( 1 ) {
-            assert( !Lock::isLocked() );
+            verify( !Lock::isLocked() );
             {
                 Timer timeInWriteLock;
                 scoped_ptr<writelock> lk;
@@ -488,14 +488,14 @@ namespace mongo {
                             if( str::contains(ns, ".$cmd") ) { 
                                 // a command may need a global write lock. so we will conservatively go ahead and grab one here. suboptimal. :-( 
                                 lk.reset();
-                                assert( !Lock::isLocked() );
+                                verify( !Lock::isLocked() );
                                 lk.reset( new writelock() );
                             }
                             else if( !Lock::isWriteLocked(ns) || Lock::isW() ) {
                                 // we don't relock on every single op to try to be faster. however if switching collections, we have to.
                                 // note here we must reset to 0 first to assure the old object is destructed before our new operator invocation.
                                 lk.reset();
-                                assert( !Lock::isLocked() );
+                                verify( !Lock::isLocked() );
                                 lk.reset( new writelock(ns) );
                             }
                         }
@@ -666,7 +666,7 @@ namespace mongo {
         static int n;
         if( n != 0 ) {
             log() << "replSet ERROR : more than one sync thread?" << rsLog;
-            assert( n == 0 );
+            verify( n == 0 );
         }
         n++;
 
@@ -751,7 +751,7 @@ namespace mongo {
             }
         }
 
-        assert(slave->slave);
+        verify(slave->slave);
 
         const Member *target = rs->_currentSyncTarget;
         if (!target || rs->box.getState().primary()

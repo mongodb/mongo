@@ -63,7 +63,7 @@ namespace mongo {
         T* head() const { return (T*) _head; }
 
         void push(T* t) {
-            assert( t->_next == 0 );
+            verify( t->_next == 0 );
             scoped_lock lk(_m);
             t->_next = (T*) _head;
             _head = t;

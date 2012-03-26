@@ -124,7 +124,7 @@ namespace mongo {
         }
         default:
             out() << "oldCompareElementValues: bad type " << (int) l.type() << endl;
-            assert(false);
+            verify(false);
         }
         return -1;
     }
@@ -314,7 +314,7 @@ namespace mongo {
                     long long m = 2LL << 52;
                     DEV {
                         long long d = m-1;
-                        assert( ((long long) ((double) -d)) == -d );
+                        verify( ((long long) ((double) -d)) == -d );
                     }
                     if( n >= m || n <= -m ) {
                         // can't represent exactly as a double
@@ -351,7 +351,7 @@ namespace mongo {
     }
 
     BSONObj KeyV1::toBson() const { 
-        assert( _keyData != 0 );
+        verify( _keyData != 0 );
         if( !isCompactFormat() )
             return bson();
 
@@ -413,7 +413,7 @@ namespace mongo {
                     p += sizeof(double);
                     break;
                 default:
-                    assert(false);
+                    verify(false);
             }
 
             if( (bits & cHASMORE) == 0 )
@@ -577,7 +577,7 @@ namespace mongo {
                 sz = ((unsigned) p[1]) + 2;
             }
             else {
-                assert( type == cbindata );
+                verify( type == cbindata );
                 sz = binDataCodeToLength(p[1]) + 2;
             }
         }
@@ -655,7 +655,7 @@ namespace mongo {
             case cmaxkey:
                 break;
             default:
-                assert(false);
+                verify(false);
             }
             if( (lval&cHASMORE) == 0 )
                 break;
@@ -671,7 +671,7 @@ namespace mongo {
             a[1] = 0;
             b[0] = 3;
             b[1] = 0;
-            assert( strcmp(a,b)>0 && memcmp(a,b,2)>0 );
+            verify( strcmp(a,b)>0 && memcmp(a,b,2)>0 );
         }
     } cunittest;
 

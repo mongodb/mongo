@@ -91,7 +91,7 @@ namespace mongo {
             }
 
             
-            assert( cursor );
+            verify( cursor );
             string cursorName = cursor->toString();
             
             auto_ptr<ClientCursor> cc (new ClientCursor(QueryOption_NoCursorTimeout, cursor, ns));
@@ -136,7 +136,7 @@ namespace mongo {
                 RARELY killCurrentOp.checkForInterrupt();
             }
 
-            assert( start == bb.buf() );
+            verify( start == bb.buf() );
 
             result.appendArray( "values" , arr.done() );
 

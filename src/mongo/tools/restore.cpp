@@ -307,7 +307,7 @@ public:
                 ns = "test";
         }
 
-        assert( ns.size() );
+        verify( ns.size() );
 
         string oldCollName = root.leaf(); // Name of the collection that was dumped from
         oldCollName = oldCollName.substr( 0 , oldCollName.find_last_of( "." ) );

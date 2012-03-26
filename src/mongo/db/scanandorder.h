@@ -34,7 +34,7 @@ namespace mongo {
         FieldRangeVector _keyCutter;
     public:
         KeyType(const BSONObj &pattern, const FieldRangeSet &frs):
-        _spec((assert(!pattern.isEmpty()),pattern)),
+        _spec((verify(!pattern.isEmpty()),pattern)),
         _keyCutter(frs, _spec, 1) {
         }
 

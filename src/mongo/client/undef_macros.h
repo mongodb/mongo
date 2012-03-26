@@ -30,11 +30,11 @@
 #undef realloc
 
 // util/assert_util.h
-#undef assert
 #undef dassert
 #undef wassert
 #undef massert
 #undef uassert
+#undef verify
 #undef DESTRUCTOR_GUARD
 
 // util/goodies.h

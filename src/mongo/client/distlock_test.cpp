@@ -264,7 +264,7 @@ namespace mongo {
                         }
                         else {
                             log() << "**** Not unlocking for thread " << threadId << endl;
-                            assert( DistributedLock::killPinger( *myLock ) );
+                            verify( DistributedLock::killPinger( *myLock ) );
                             // We're simulating a crashed process...
                             break;
                         }

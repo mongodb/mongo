@@ -252,8 +252,8 @@ namespace mongo {
 
         isyncassert( "getLastOp is empty ", !minValid.isEmpty() );
         OpTime mvoptime = minValid["ts"]._opTime();
-        assert( !mvoptime.isNull() );
-        assert( mvoptime >= startingTS );
+        verify( !mvoptime.isNull() );
+        verify( mvoptime >= startingTS );
 
         // apply startingTS..mvoptime portion of the oplog
         {
@@ -283,7 +283,7 @@ namespace mongo {
 
         sethbmsg("initial sync finishing up",0);
 
-        assert( !box.getState().primary() ); // wouldn't make sense if we were.
+        verify( !box.getState().primary() ); // wouldn't make sense if we were.
 
         {
             writelock lk("local.");

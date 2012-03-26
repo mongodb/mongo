@@ -237,7 +237,7 @@ namespace mongo {
 
     void setDifference(BSONObjSet &l, BSONObjSet &r, vector<BSONObj*> &diff) {
         // l and r must use the same ordering spec.
-        verify( 14819, l.key_comp().order() == r.key_comp().order() );
+        verify( l.key_comp().order() == r.key_comp().order() );
         BSONObjSet::iterator i = l.begin();
         BSONObjSet::iterator j = r.begin();
         while ( 1 ) {
@@ -342,7 +342,7 @@ namespace mongo {
             }
             sourceCollection = nsdetails(sourceNS.c_str());
             tlog() << "info: creating collection " << sourceNS << " on add index" << endl;
-            assert( sourceCollection );
+            verify( sourceCollection );
         }
 
         if ( sourceCollection->findIndexByName(name) >= 0 ) {
@@ -438,7 +438,7 @@ namespace mongo {
         keyPattern = info["key"].embeddedObjectUserCheck();
         if ( keyPattern.objsize() == 0 ) {
             out() << info.toString() << endl;
-            assert(false);
+            verify(false);
         }
         _init();
     }

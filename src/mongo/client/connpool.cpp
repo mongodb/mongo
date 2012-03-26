@@ -60,7 +60,7 @@ namespace mongo {
                 continue;
             }
             
-            assert( sc.conn->getSoTimeout() == socketTimeout );
+            verify( sc.conn->getSoTimeout() == socketTimeout );
 
             return sc.conn;
 
@@ -133,7 +133,7 @@ namespace mongo {
     }
 
     DBClientBase* DBConnectionPool::_get(const string& ident , double socketTimeout ) {
-        assert( ! inShutdown() );
+        verify( ! inShutdown() );
         scoped_lock L(_mutex);
         PoolForHost& p = _pools[PoolKey(ident,socketTimeout)];
         return p.get( this , socketTimeout );
@@ -347,7 +347,7 @@ namespace mongo {
             ++ap;
             ++bp;
         }
-        assert(false);
+        verify(false);
     }
     
     bool DBConnectionPool::poolKeyCompare::operator()( const PoolKey& a , const PoolKey& b ) const {
@@ -387,7 +387,7 @@ namespace mongo {
     // ------ ScopedDbConnection ------
 
     ScopedDbConnection * ScopedDbConnection::steal() {
-        assert( _conn );
+        verify( _conn );
         ScopedDbConnection * n = new ScopedDbConnection( _host , _conn, _socketTimeout );
         _conn = 0;
         return n;

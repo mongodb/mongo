@@ -9,3 +9,4 @@ load('jstests/aggregation/server4508.js');
 load('jstests/aggregation/server4738.js');
 load('jstests/aggregation/server5012.js');
 load('jstests/aggregation/server5209.js');
+load('jstests/aggregation/server5369.js');

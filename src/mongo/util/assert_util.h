@@ -18,6 +18,7 @@
 #pragma once
 
 #include "../bson/inline_decls.h"
+#include <typeinfo>
 
 // MONGO_NORETURN undefed at end of file
 #ifdef __GNUC__
@@ -152,7 +153,6 @@ namespace mongo {
 
     void asserted(const char *msg, const char *file, unsigned line) MONGO_NORETURN;
     void wasserted(const char *msg, const char *file, unsigned line);
-    void verifyFailed( int msgid );
     void fassertFailed( int msgid );
     
     /** a "user assertion".  throws UserAssertion.  logs.  typically used for errors that a user
@@ -178,18 +178,12 @@ namespace mongo {
     inline std::string causedBy( const std::exception& e ){ return causedBy( e.what() ); }
     inline std::string causedBy( const std::string& e ){ return causedBy( e.c_str() ); }
 
-    /** in the mongodb source, use verify() instead of assert().  verify is always evaluated even in release builds. */
-    inline void verify( int msgid , bool testOK ) { if ( ! testOK ) verifyFailed( msgid ); }
-
     /** abends on condition failure */
     inline void fassert( int msgid , bool testOK ) { if ( ! testOK ) fassertFailed( msgid ); }
 
-#ifdef assert
-#undef assert
-#endif
 
-#define MONGO_assert(_Expression) (void)( MONGO_likely(!!(_Expression)) || (mongo::asserted(#_Expression, __FILE__, __LINE__), 0) )
-#define assert MONGO_assert
+#define MONGO_verify(_Expression) (void)( MONGO_likely(!!(_Expression)) || (mongo::asserted(#_Expression, __FILE__, __LINE__), 0) )
+#define verify MONGO_verify
 
     /* "user assert".  if asserts, user did something wrong, not our code */
 #define MONGO_uassert(msgid, msg, expr) (void)( MONGO_likely(!!(expr)) || (mongo::uasserted(msgid, msg), 0) )
@@ -211,7 +205,7 @@ namespace mongo {
        could be slow.
     */
 #if defined(_DEBUG)
-# define MONGO_dassert assert
+# define MONGO_dassert verify
 #else
 # define MONGO_dassert(x)
 #endif

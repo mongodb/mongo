@@ -40,12 +40,12 @@ namespace mongo {
              */
             intrusive_ptr<const Value> prhs(
                 vpOperand[0]->evaluate(pDocument));
-            assert(prhs->getType() == Object);
+            verify(prhs->getType() == Object);
             intrusive_ptr<Document> pShardDoc(prhs->getDocument());
 
             intrusive_ptr<const Value> pSubTotal(
                 pShardDoc->getValue(subTotalName));
-            assert(pSubTotal.get());
+            verify(pSubTotal.get());
             BSONType subTotalType = pSubTotal->getType();
             if ((totalType == NumberLong) || (subTotalType == NumberLong))
                 totalType = NumberLong;

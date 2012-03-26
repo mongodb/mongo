@@ -116,7 +116,7 @@ namespace mongo {
                     if( !initial && failures <= allowableFailures ) {
                         const Member* m = theReplSet->findById( i->_id );
                         if( m ) {
-                            assert( m->h().toString() == i->h.toString() );
+                            verify( m->h().toString() == i->h.toString() );
                         }
                         // it's okay if the down member isn't part of the config,
                         // we might be adding a new member that isn't up yet

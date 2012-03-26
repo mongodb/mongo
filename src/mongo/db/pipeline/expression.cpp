@@ -33,7 +33,7 @@ namespace mongo {
 
     void Expression::toMatcherBson(
         BSONObjBuilder *pBuilder, unsigned depth) const {
-        assert(false && "Expression::toMatcherBson()");
+        verify(false && "Expression::toMatcherBson()");
     }
 
     Expression::ObjectCtx::ObjectCtx(int theOptions):
@@ -42,9 +42,9 @@ namespace mongo {
     }
 
     void Expression::ObjectCtx::unwind(string fieldName) {
-        assert(unwindOk());
-        assert(!unwindUsed());
-        assert(fieldName.size());
+        verify(unwindOk());
+        verify(!unwindUsed());
+        verify(fieldName.size());
         unwindField = fieldName;
     }
 
@@ -105,7 +105,7 @@ namespace mongo {
 
                 /* if it's our first time, create the document expression */
                 if (!pExpression.get()) {
-                    assert(pCtx->documentOk());
+                    verify(pCtx->documentOk());
                     // CW TODO error: document not allowed in this context
 
                     pExpressionObject = ExpressionObject::create();
@@ -343,7 +343,7 @@ namespace mongo {
         } // switch(type)
 
         /* NOTREACHED */
-        assert(false);
+        verify(false);
         return intrusive_ptr<Expression>();
     }
 
@@ -589,7 +589,7 @@ namespace mongo {
             expressions.  Direct equality is a degenerate range expression;
             range expressions can be open-ended.
         */
-        assert(false && "unimplemented");
+        verify(false && "unimplemented");
     }
 
     intrusive_ptr<ExpressionNary> (*ExpressionAnd::getFactory() const)() {
@@ -648,12 +648,12 @@ namespace mongo {
 
     void ExpressionCoerceToBool::addToBsonObj(
         BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const {
-        assert(false && "not possible"); // no equivalent of this
+        verify(false && "not possible"); // no equivalent of this
     }
 
     void ExpressionCoerceToBool::addToBsonArray(
         BSONArrayBuilder *pBuilder, unsigned depth) const {
-        assert(false && "not possible"); // no equivalent of this
+        verify(false && "not possible"); // no equivalent of this
     }
 
     /* ----------------------- ExpressionCompare --------------------------- */
@@ -855,7 +855,7 @@ namespace mongo {
                 return Value::getOne();
 
             default:
-                assert(false); // CW TODO internal error
+                verify(false); // CW TODO internal error
                 return Value::getNull();
             }
         }
@@ -982,7 +982,7 @@ namespace mongo {
     }
 
     const char *ExpressionConstant::getOpName() const {
-        assert(false); // this has no name
+        verify(false); // this has no name
         return NULL;
     }
 
@@ -1160,16 +1160,11 @@ namespace mongo {
 
     void ExpressionObject::addToDocument(
         const intrusive_ptr<Document> &pResult,
-        const intrusive_ptr<Document> &pDocument) const {
+        const intrusive_ptr<Document> &pDocument,
+        bool excludeId) const {
         const size_t pathSize = path.size();
         set<string>::const_iterator end(path.end());
 
-        /*
-          Take care of inclusions or exclusions.  Note that _id is special,
-          that that it is always included, unless it is specifically excluded.
-          we use excludeId for that in case excludePaths if false, which means
-          to include paths.
-        */
         if (pathSize) {
             auto_ptr<FieldIterator> pIter(pDocument->createFieldIterator());
             if (excludePaths) {
@@ -1177,13 +1172,16 @@ namespace mongo {
                     pair<string, intrusive_ptr<const Value> > field(pIter->next());
 
                     /*
+                      If we're excluding _id, and this is it, skip it.
+
                       If the field in the document is not in the exclusion set,
                       add it to the result document.
 
                       Note that exclusions are only allowed on leaves, so we
                       can assume we don't have to descend recursively here.
                      */
-                    if (path.find(field.first) != end)
+                    if ((excludeId && !field.first.compare(Document::idName)) ||
+                        (path.find(field.first) != end))
                         continue; // we found it, so don't add it
 
                     pResult->addField(field.first, field.second);
@@ -1194,10 +1192,6 @@ namespace mongo {
                     pair<string, intrusive_ptr<const Value> > field(
                         pIter->next());
                     /*
-                      If the field in the document is in the inclusion set,
-                      add it to the result document.  Or, if we're not
-                      excluding _id, and it is _id, include it.
-
                       Note that this could be an inclusion along a pathway,
                       so we look for an ExpressionObject in vpExpression; when
                       we find one, we populate the result with the evaluation
@@ -1228,7 +1222,7 @@ namespace mongo {
 
                         ExpressionObject *pChild =
                             dynamic_cast<ExpressionObject *>(pE);
-                        assert(pChild);
+                        verify(pChild);
 
                         /*
                           Check on the type of the result object.  If it's an
@@ -1328,7 +1322,7 @@ namespace mongo {
     void ExpressionObject::addField(const string &fieldName,
                                     const intrusive_ptr<Expression> &pExpression) {
         /* must have an expression */
-        assert(pExpression.get());
+        verify(pExpression.get());
 
         /* parse the field path */
         FieldPath fieldPath(fieldName);
@@ -1403,7 +1397,7 @@ namespace mongo {
         if (i < n) {
             /* the intermediate child already exists */
             pChild = dynamic_cast<ExpressionObject *>(vpExpression[i].get());
-            assert(pChild);
+            verify(pChild);
         }
         else {
             /*
@@ -1502,7 +1496,7 @@ namespace mongo {
                 */
                 Expression *pE = vpExpression[iField].get();
                 ExpressionObject *pEO = dynamic_cast<ExpressionObject *>(pE);
-                assert(pEO);
+                verify(pEO);
 
                 /*
                   Add the current field name to the path being built up,
@@ -1789,7 +1783,7 @@ namespace mongo {
 
     void ExpressionFieldRange::toMatcherBson(
         BSONObjBuilder *pBuilder, unsigned depth) const {
-        assert(pRange.get()); // otherwise, we can't do anything
+        verify(pRange.get()); // otherwise, we can't do anything
 
         /* if there are no endpoints, then every value is accepted */
         if (!pRange->pBottom.get() && !pRange->pTop.get())
@@ -1879,7 +1873,7 @@ namespace mongo {
             break;
 
         case CMP:
-            assert(false); // not allowed
+            verify(false); // not allowed
             break;
         }
     }
@@ -2572,7 +2566,7 @@ namespace mongo {
     void ExpressionNary::toBson(
         BSONObjBuilder *pBuilder, const char *pOpName, unsigned depth) const {
         const size_t nOperand = vpOperand.size();
-        assert(nOperand > 0);
+        verify(nOperand > 0);
         if (nOperand == 1) {
             vpOperand[0]->addToBsonObj(pBuilder, pOpName, depth + 1);
             return;

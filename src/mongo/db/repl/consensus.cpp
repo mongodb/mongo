@@ -168,7 +168,7 @@ namespace mongo {
     void Consensus::electionFailed(unsigned meid) {
         SimpleMutex::scoped_lock lk(lyMutex);
         LastYea &L = ly.ref(lk);
-        DEV assert( L.who == meid ); // this may not always always hold, so be aware, but adding for now as a quick sanity test
+        DEV verify( L.who == meid ); // this may not always always hold, so be aware, but adding for now as a quick sanity test
         if( L.who == meid )
             L.when = 0;
     }
@@ -261,7 +261,7 @@ namespace mongo {
     bool Consensus::weAreFreshest(bool& allUp, int& nTies) {
         const OpTime ord = theReplSet->lastOpTimeWritten;
         nTies = 0;
-        assert( !ord.isNull() );
+        verify( !ord.isNull() );
         BSONObj cmd = BSON(
                           "replSetFresh" << 1 <<
                           "set" << rs.name() <<
@@ -291,7 +291,7 @@ namespace mongo {
                 OpTime remoteOrd( i->result["opTime"].Date() );
                 if( remoteOrd == ord )
                     nTies++;
-                assert( remoteOrd <= ord );
+                verify( remoteOrd <= ord );
 
                 if( i->result["veto"].trueValue() ) {
                     BSONElement msg = i->result["errmsg"];
@@ -311,14 +311,14 @@ namespace mongo {
             }
         }
         LOG(1) << "replSet dev we are freshest of up nodes, nok:" << nok << " nTies:" << nTies << rsLog;
-        assert( ord <= theReplSet->lastOpTimeWritten ); // <= as this may change while we are working...
+        verify( ord <= theReplSet->lastOpTimeWritten ); // <= as this may change while we are working...
         return true;
     }
 
     extern time_t started;
 
     void Consensus::multiCommand(BSONObj cmd, list<Target>& L) {
-        assert( !rs.lockedByMe() );
+        verify( !rs.lockedByMe() );
         mongo::multiCommand(cmd, L);
     }
 
@@ -361,7 +361,7 @@ namespace mongo {
                 // todo: biggest / highest priority nodes should be the ones that get to not sleep
             }
             else {
-                assert( !rs.lockedByMe() ); // bad to go to sleep locked
+                verify( !rs.lockedByMe() ); // bad to go to sleep locked
                 unsigned ms = ((unsigned) rand()) % 1000 + 50;
                 DEV log() << "replSet tie " << nTies << " sleeping a little " << ms << "ms" << rsLog;
                 sleptLast = true;
@@ -426,9 +426,9 @@ namespace mongo {
     }
 
     void Consensus::electSelf() {
-        assert( !rs.lockedByMe() );
-        assert( !rs.myConfig().arbiterOnly );
-        assert( rs.myConfig().slaveDelay == 0 );
+        verify( !rs.lockedByMe() );
+        verify( !rs.myConfig().arbiterOnly );
+        verify( rs.myConfig().slaveDelay == 0 );
         try {
             _electSelf();
         }

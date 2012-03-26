@@ -356,7 +356,7 @@ namespace mongo {
     }
 
     bool Grid::_getNewShardName( string* name ) const {
-        DEV assert( name );
+        DEV verify( name );
 
         bool ok = false;
         int count = 0;
@@ -524,10 +524,10 @@ namespace mongo {
             BSONObj w3 = BSON( "activeWindow" << BSON( "start" << T1 << "stop" << T2 ) ); // open now
             BSONObj w4 = BSON( "activeWindow" << BSON( "start" << T3 << "stop" << T2 ) ); // open since last day
 
-            assert( ! Grid::_inBalancingWindow( w1 , now ) );
-            assert( ! Grid::_inBalancingWindow( w2 , now ) );
-            assert( Grid::_inBalancingWindow( w3 , now ) );
-            assert( Grid::_inBalancingWindow( w4 , now ) );
+            verify( ! Grid::_inBalancingWindow( w1 , now ) );
+            verify( ! Grid::_inBalancingWindow( w2 , now ) );
+            verify( Grid::_inBalancingWindow( w3 , now ) );
+            verify( Grid::_inBalancingWindow( w4 , now ) );
 
             // bad input should not stop the balancer
 
@@ -537,11 +537,11 @@ namespace mongo {
             BSONObj w8 = BSON( "wrongMarker" << 1 << "start" << 1 << "stop" << 1 ); // active window marker missing
             BSONObj w9 = BSON( "activeWindow" << BSON( "start" << T3 << "stop" << E ) ); // garbage in window
 
-            assert( Grid::_inBalancingWindow( w5 , now ) );
-            assert( Grid::_inBalancingWindow( w6 , now ) );
-            assert( Grid::_inBalancingWindow( w7 , now ) );
-            assert( Grid::_inBalancingWindow( w8 , now ) );
-            assert( Grid::_inBalancingWindow( w9 , now ) );
+            verify( Grid::_inBalancingWindow( w5 , now ) );
+            verify( Grid::_inBalancingWindow( w6 , now ) );
+            verify( Grid::_inBalancingWindow( w7 , now ) );
+            verify( Grid::_inBalancingWindow( w8 , now ) );
+            verify( Grid::_inBalancingWindow( w9 , now ) );
 
             LOG(1) << "BalancingWidowObjTest passed" << endl;
         }

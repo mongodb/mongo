@@ -106,7 +106,7 @@ namespace PerfTests {
                 d.defer(v);
             }
             d.invoke();
-            assert( x == tot );
+            verify( x == tot );
         }
     };
     int TaskQueueTest::tot;
@@ -155,7 +155,7 @@ namespace PerfTests {
                 if( c->connect("perfdb.10gen.cc", err) ) {
                     if( !c->auth("perf", "perf", pwd, err) ) {
                         cout << "info: authentication with stats db failed: " << err << endl;
-                        assert(false);
+                        verify(false);
                     }
                     conn = c;
 
@@ -469,8 +469,8 @@ namespace PerfTests {
           {}
         virtual bool showDurStats() { return false; }
         void timed() {
-            assert( a.woEqual(b) );
-            assert( !a.woEqual(c) );
+            verify( a.woEqual(b) );
+            verify( !a.woEqual(c) );
         }
     };
 
@@ -907,7 +907,7 @@ namespace PerfTests {
             client().insert( ns(), o );
         }
         void post() {
-            assert( client().count(ns()) == 1 );
+            verify( client().count(ns()) == 1 );
         }
     };
 
@@ -938,7 +938,7 @@ namespace PerfTests {
         }
         void post() {
 #if !defined(_DEBUG)
-            assert( client().count(ns()) > 50 );
+            verify( client().count(ns()) > 50 );
 #endif
         }
     };
@@ -1026,10 +1026,10 @@ namespace PerfTests {
             string fn = "/tmp/t1";
             MongoMMF f;
             unsigned long long len = 1 * 1024 * 1024;
-            assert( f.create(fn, len, /*sequential*/rand()%2==0) );
+            verify( f.create(fn, len, /*sequential*/rand()%2==0) );
             {
                 char *p = (char *) f.getView();
-                assert(p);
+                verify(p);
                 // write something to the private view as a test
                 strcpy(p, "hello");
             }

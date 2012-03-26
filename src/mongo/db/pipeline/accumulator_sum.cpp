@@ -23,7 +23,7 @@ namespace mongo {
 
     intrusive_ptr<const Value> AccumulatorSum::evaluate(
         const intrusive_ptr<Document> &pDocument) const {
-        assert(vpOperand.size() == 1);
+        verify(vpOperand.size() == 1);
         intrusive_ptr<const Value> prhs(vpOperand[0]->evaluate(pDocument));
 
         /* upgrade to the widest type required to hold the result */

@@ -127,7 +127,7 @@ namespace mongo {
             string s;
             s.reserve(Namespace::MaxNsLen);
             s = io.getStringField("ns");
-            assert( !s.empty() );
+            verify( !s.empty() );
             s += ".$";
             s += io.getStringField("name");
             return s;

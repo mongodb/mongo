@@ -98,7 +98,7 @@ namespace mongo {
             if ( e.type() == BinData ) {
                 int len = 0;
                 _copy( (char*)&_hash , e.binData( len ) );
-                assert( len == 8 );
+                verify( len == 8 );
                 _bits = bits;
             }
             else {
@@ -123,7 +123,7 @@ namespace mongo {
         }
 
         void init( unsigned x , unsigned y , unsigned bits ) {
-            assert( bits <= 32 );
+            verify( bits <= 32 );
             _hash = 0;
             _bits = bits;
             for ( unsigned i=0; i<bits; i++ ) {
@@ -172,7 +172,7 @@ namespace mongo {
         }
 
         bool hasPrefix( const GeoHash& other ) const {
-            assert( other._bits <= _bits );
+            verify( other._bits <= _bits );
             if ( other._bits == 0 )
                 return true;
             long long x = other._hash ^ _hash;
@@ -203,7 +203,7 @@ namespace mongo {
         }
 
         void setBit( unsigned pos , bool one ) {
-            assert( pos < _bits * 2 );
+            verify( pos < _bits * 2 );
             if ( one )
                 _hash |= geoBitSets.masks64[pos];
             else if ( _hash & geoBitSets.masks64[pos] )
@@ -215,12 +215,12 @@ namespace mongo {
         }
 
         bool getBitX( unsigned pos ) const {
-            assert( pos < 32 );
+            verify( pos < 32 );
             return getBit( pos * 2 );
         }
 
         bool getBitY( unsigned pos ) const {
-            assert( pos < 32 );
+            verify( pos < 32 );
             return getBit( ( pos * 2 ) + 1 );
         }
 
@@ -228,7 +228,7 @@ namespace mongo {
             BSONObjBuilder b(20);
             append( b , name );
             BSONObj o = b.obj();
-            if( ! strlen( name ) ) assert( o.objsize() == 20 );
+            if( ! strlen( name ) ) verify( o.objsize() == 20 );
             return o;
         }
 
@@ -258,7 +258,7 @@ namespace mongo {
         }
 
         void move( int x , int y ) {
-            assert( _bits );
+            verify( _bits );
             _move( 0 , x );
             _move( 1 , y );
         }
@@ -266,7 +266,7 @@ namespace mongo {
         void _move( unsigned offset , int d ) {
             if ( d == 0 )
                 return;
-            assert( d <= 1 && d>= -1 ); // TEMP
+            verify( d <= 1 && d>= -1 ); // TEMP
 
             bool from, to;
             if ( d > 0 ) {
@@ -299,7 +299,7 @@ namespace mongo {
                 pos -= 2;
             }
 
-            assert(0);
+            verify(0);
         }
 
         GeoHash& operator=(const GeoHash& h) {
@@ -324,7 +324,7 @@ namespace mongo {
         GeoHash& operator+=( const char * s ) {
             unsigned pos = _bits * 2;
             _bits += strlen(s) / 2;
-            assert( _bits <= 32 );
+            verify( _bits <= 32 );
             while ( s[0] ) {
                 if ( s[0] == '1' )
                     setBit( pos , 1 );
@@ -532,7 +532,7 @@ namespace mongo {
 
         if (cross_prod >= 1 || cross_prod <= -1) {
             // fun with floats
-            assert( fabs(cross_prod)-1 < 1e-6 );
+            verify( fabs(cross_prod)-1 < 1e-6 );
             return cross_prod > 0 ? 0 : M_PI;
         }
 

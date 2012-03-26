@@ -196,7 +196,7 @@ namespace mongo {
         char host[255];
 
         if ( args.Length() > 0 && args[0]->IsString() ) {
-            assert( args[0]->ToString()->Utf8Length() < 250 );
+            verify( args[0]->ToString()->Utf8Length() < 250 );
             args[0]->ToString()->WriteAscii( host );
         }
         else {
@@ -266,7 +266,7 @@ namespace mongo {
     DBClientBase * getConnection( const Arguments& args ) {
         Local<External> c = External::Cast( *(args.This()->GetInternalField( 0 )) );
         DBClientBase * conn = (DBClientBase*)(c->Value());
-        assert( conn );
+        verify( conn );
         return conn;
     }
 
@@ -559,13 +559,13 @@ namespace mongo {
     // --- DB ----
 
     v8::Handle<v8::Value> dbInit(V8Scope* scope, const v8::Arguments& args) {
-        assert( args.Length() == 2 );
+        verify( args.Length() == 2 );
 
         args.This()->Set( scope->getV8Str( "_mongo" ) , args[0] );
         args.This()->Set( scope->getV8Str( "_name" ) , args[1] );
 
         for ( int i=0; i<args.Length(); i++ )
-            assert( ! args[i]->IsUndefined() );
+            verify( ! args[i]->IsUndefined() );
 
         string dbName = toSTLString( args[1] );
         if ( !NamespaceString::validDBName( dbName)) {
@@ -578,7 +578,7 @@ namespace mongo {
     }
 
     v8::Handle<v8::Value> collectionInit( V8Scope* scope, const v8::Arguments& args ) {
-        assert( args.Length() == 4 );
+        verify( args.Length() == 4 );
 
         args.This()->Set( scope->getV8Str( "_mongo" ) , args[0] );
         args.This()->Set( scope->getV8Str( "_db" ) , args[1] );
@@ -589,7 +589,7 @@ namespace mongo {
             return v8::ThrowException( v8::String::New( "can't use sharded collection from db.eval" ) );
 
         for ( int i=0; i<args.Length(); i++ )
-            assert( ! args[i]->IsUndefined() );
+            verify( ! args[i]->IsUndefined() );
 
         return v8::Undefined();
     }
@@ -598,7 +598,7 @@ namespace mongo {
 
         v8::Handle<v8::Object> t = args.This();
 
-        assert( args.Length() >= 4 );
+        verify( args.Length() >= 4 );
 
         t->Set( scope->getV8Str( "_mongo" ) , args[0] );
         t->Set( scope->getV8Str( "_db" ) , args[1] );
@@ -680,7 +680,7 @@ namespace mongo {
 
         // no hit, create new collection
         v8::Handle<v8::Value> getCollection = info.This()->GetPrototype()->ToObject()->Get( v8::String::New( "getCollection" ) );
-        assert( getCollection->IsFunction() );
+        verify( getCollection->IsFunction() );
 
         TryCatch tryCatch;
         v8::Function * f = (v8::Function*)(*getCollection);
@@ -701,7 +701,7 @@ namespace mongo {
 
     v8::Handle<v8::Value> dbQueryIndexAccess( unsigned int index , const v8::AccessorInfo& info ) {
         v8::Handle<v8::Value> arrayAccess = info.This()->GetPrototype()->ToObject()->Get( v8::String::New( "arrayAccess" ) );
-        assert( arrayAccess->IsFunction() );
+        verify( arrayAccess->IsFunction() );
 
         v8::Function * f = (v8::Function*)(*arrayAccess);
         v8::Handle<v8::Value> argv[1];

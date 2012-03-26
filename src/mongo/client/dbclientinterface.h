@@ -150,17 +150,17 @@ namespace mongo {
 
             switch ( _type ) {
             case MASTER:
-                assert( _servers.size() == 1 );
+                verify( _servers.size() == 1 );
                 break;
             case SET:
-                assert( _setName.size() );
-                assert( _servers.size() >= 1 ); // 1 is ok since we can derive
+                verify( _setName.size() );
+                verify( _servers.size() >= 1 ); // 1 is ok since we can derive
                 break;
             case PAIR:
-                assert( _servers.size() == 2 );
+                verify( _servers.size() == 2 );
                 break;
             default:
-                assert( _servers.size() > 0 );
+                verify( _servers.size() > 0 );
             }
 
             _finishInit();
@@ -178,7 +178,7 @@ namespace mongo {
             }
             else {
                 _type = favoredMultipleType;
-                assert( _type == SET || _type == SYNC );
+                verify( _type == SET || _type == SYNC );
             }
             _finishInit();
         }
@@ -408,7 +408,7 @@ namespace mongo {
         virtual void say( Message &toSend, bool isRetry = false , string * actualServer = 0 ) = 0;
         virtual void sayPiggyBack( Message &toSend ) = 0;
         /* used by QueryOption_Exhaust.  To use that your subclass must implement this. */
-        virtual bool recv( Message& m ) { assert(false); return false; }
+        virtual bool recv( Message& m ) { verify(false); return false; }
         // In general, for lazy queries, we'll need to say, recv, then checkResponse
         virtual void checkResponse( const char* data, int nReturned, bool* retry = NULL, string* targetHost = NULL ) {
             if( retry ) *retry = false; if( targetHost ) *targetHost = "";
@@ -977,7 +977,7 @@ namespace mongo {
          */
         bool isFailed() const { return _failed; }
 
-        MessagingPort& port() { assert(p); return *p; }
+        MessagingPort& port() { verify(p); return *p; }
 
         string toStringLong() const {
             stringstream ss;

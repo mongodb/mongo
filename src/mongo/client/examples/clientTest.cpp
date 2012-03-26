@@ -24,8 +24,8 @@
 
 #include <iostream>
 
-#ifndef assert
-#  define assert(x) MONGO_assert(x)
+#ifndef verify
+#  define verify(x) MONGO_verify(x)
 #endif
 
 using namespace std;
@@ -53,24 +53,24 @@ int main( int argc, const char **argv ) {
 
     // clean up old data from any previous tests
     conn.remove( ns, BSONObj() );
-    assert( conn.findOne( ns , BSONObj() ).isEmpty() );
+    verify( conn.findOne( ns , BSONObj() ).isEmpty() );
 
     // test insert
     conn.insert( ns ,BSON( "name" << "eliot" << "num" << 1 ) );
-    assert( ! conn.findOne( ns , BSONObj() ).isEmpty() );
+    verify( ! conn.findOne( ns , BSONObj() ).isEmpty() );
 
     // test remove
     conn.remove( ns, BSONObj() );
-    assert( conn.findOne( ns , BSONObj() ).isEmpty() );
+    verify( conn.findOne( ns , BSONObj() ).isEmpty() );
 
 
     // insert, findOne testing
     conn.insert( ns , BSON( "name" << "eliot" << "num" << 1 ) );
     {
         BSONObj res = conn.findOne( ns , BSONObj() );
-        assert( strstr( res.getStringField( "name" ) , "eliot" ) );
-        assert( ! strstr( res.getStringField( "name2" ) , "eliot" ) );
-        assert( 1 == res.getIntField( "num" ) );
+        verify( strstr( res.getStringField( "name" ) , "eliot" ) );
+        verify( ! strstr( res.getStringField( "name2" ) , "eliot" ) );
+        verify( 1 == res.getIntField( "num" ) );
     }
 
 
@@ -83,7 +83,7 @@ int main( int argc, const char **argv ) {
             count++;
             BSONObj obj = cursor->next();
         }
-        assert( count == 2 );
+        verify( count == 2 );
     }
 
     {
@@ -93,7 +93,7 @@ int main( int argc, const char **argv ) {
             count++;
             BSONObj obj = cursor->next();
         }
-        assert( count == 1 );
+        verify( count == 1 );
     }
 
     {
@@ -103,45 +103,45 @@ int main( int argc, const char **argv ) {
             count++;
             BSONObj obj = cursor->next();
         }
-        assert( count == 0 );
+        verify( count == 0 );
     }
 
     // update
     {
         BSONObj res = conn.findOne( ns , BSONObjBuilder().append( "name" , "eliot" ).obj() );
-        assert( ! strstr( res.getStringField( "name2" ) , "eliot" ) );
+        verify( ! strstr( res.getStringField( "name2" ) , "eliot" ) );
 
         BSONObj after = BSONObjBuilder().appendElements( res ).append( "name2" , "h" ).obj();
 
         conn.update( ns , BSONObjBuilder().append( "name" , "eliot2" ).obj() , after );
         res = conn.findOne( ns , BSONObjBuilder().append( "name" , "eliot" ).obj() );
-        assert( ! strstr( res.getStringField( "name2" ) , "eliot" ) );
-        assert( conn.findOne( ns , BSONObjBuilder().append( "name" , "eliot2" ).obj() ).isEmpty() );
+        verify( ! strstr( res.getStringField( "name2" ) , "eliot" ) );
+        verify( conn.findOne( ns , BSONObjBuilder().append( "name" , "eliot2" ).obj() ).isEmpty() );
 
         conn.update( ns , BSONObjBuilder().append( "name" , "eliot" ).obj() , after );
         res = conn.findOne( ns , BSONObjBuilder().append( "name" , "eliot" ).obj() );
-        assert( strstr( res.getStringField( "name" ) , "eliot" ) );
-        assert( strstr( res.getStringField( "name2" ) , "h" ) );
-        assert( conn.findOne( ns , BSONObjBuilder().append( "name" , "eliot2" ).obj() ).isEmpty() );
+        verify( strstr( res.getStringField( "name" ) , "eliot" ) );
+        verify( strstr( res.getStringField( "name2" ) , "h" ) );
+        verify( conn.findOne( ns , BSONObjBuilder().append( "name" , "eliot2" ).obj() ).isEmpty() );
 
         // upsert
         conn.update( ns , BSONObjBuilder().append( "name" , "eliot2" ).obj() , after , 1 );
-        assert( ! conn.findOne( ns , BSONObjBuilder().append( "name" , "eliot" ).obj() ).isEmpty() );
+        verify( ! conn.findOne( ns , BSONObjBuilder().append( "name" , "eliot" ).obj() ).isEmpty() );
 
     }
 
     {
         // ensure index
-        assert( conn.ensureIndex( ns , BSON( "name" << 1 ) ) );
-        assert( ! conn.ensureIndex( ns , BSON( "name" << 1 ) ) );
+        verify( conn.ensureIndex( ns , BSON( "name" << 1 ) ) );
+        verify( ! conn.ensureIndex( ns , BSON( "name" << 1 ) ) );
     }
 
     {
         // hint related tests
-        assert( conn.findOne(ns, "{}")["name"].str() == "sara" );
+        verify( conn.findOne(ns, "{}")["name"].str() == "sara" );
 
-        assert( conn.findOne(ns, "{ name : 'eliot' }")["name"].str() == "eliot" );
-        assert( conn.getLastError() == "" );
+        verify( conn.findOne(ns, "{ name : 'eliot' }")["name"].str() == "eliot" );
+        verify( conn.getLastError() == "" );
 
         // nonexistent index test
         bool asserted = false;
@@ -151,13 +151,13 @@ int main( int argc, const char **argv ) {
         catch ( ... ) {
             asserted = true;
         }
-        assert( asserted );
+        verify( asserted );
 
         //existing index
-        assert( conn.findOne(ns, Query("{name:'eliot'}").hint("{name:1}")).hasElement("name") );
+        verify( conn.findOne(ns, Query("{name:'eliot'}").hint("{name:1}")).hasElement("name") );
 
         // run validate
-        assert( conn.validate( ns ) );
+        verify( conn.validate( ns ) );
     }
 
     {
@@ -189,14 +189,14 @@ int main( int argc, const char **argv ) {
 
         BSONObj found = conn.findOne( tsns , mongo::BSONObj() );
         cout << "old: " << out << "\nnew: " << found << endl;
-        assert( ( oldTime < found["ts"].timestampTime() ) ||
+        verify( ( oldTime < found["ts"].timestampTime() ) ||
                 ( oldTime == found["ts"].timestampTime() && oldInc < found["ts"].timestampInc() ) );
 
     }
 
     {
         // check that killcursors doesn't affect last error
-        assert( conn.getLastError().empty() );
+        verify( conn.getLastError().empty() );
 
         BufBuilder b;
         b.appendNum( (int)0 ); // reserved
@@ -209,7 +209,7 @@ int main( int argc, const char **argv ) {
         // say() is protected in DBClientConnection, so get superclass
         static_cast< DBConnector* >( &conn )->say( m );
 
-        assert( conn.getLastError().empty() );
+        verify( conn.getLastError().empty() );
     }
 
     {
@@ -258,7 +258,7 @@ int main( int argc, const char **argv ) {
         BSONObj res;
         
         bool gotError = false;
-        assert( conn.eval( "test" , "return db.totest.findOne().x" , res ) );
+        verify( conn.eval( "test" , "return db.totest.findOne().x" , res ) );
         try {
             conn.eval( "test" , "sleep(5000); return db.totest.findOne().x" , res );
         }
@@ -266,11 +266,11 @@ int main( int argc, const char **argv ) {
             gotError = true;
             log() << e.what() << endl;
         }
-        assert( gotError );
+        verify( gotError );
         // sleep so the server isn't locked anymore
         sleepsecs( 4 );
         
-        assert( conn.eval( "test" , "return db.totest.findOne().x" , res ) );
+        verify( conn.eval( "test" , "return db.totest.findOne().x" , res ) );
         
         
     }

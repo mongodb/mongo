@@ -56,7 +56,7 @@ namespace mongo {
             }
 
             State get( int regionHash , size_t region  , short offset ) {
-                DEV assert( hash( region ) == regionHash );
+                DEV verify( hash( region ) == regionHash );
                 
                 Entry * e = _get( regionHash , region , false );
                 if ( ! e )
@@ -69,7 +69,7 @@ namespace mongo {
              * @return true if added, false if full
              */
             bool in( int regionHash , size_t region , short offset ) {
-                DEV assert( hash( region ) == regionHash );
+                DEV verify( hash( region ) == regionHash );
                 
                 Entry * e = _get( regionHash , region , true );
                 if ( ! e )

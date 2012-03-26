@@ -82,13 +82,13 @@ namespace mongo {
         case 'R' : return them == 'W' || them == 'w';
         case 'w' : return them == 'W' || them == 'R';
         case 'r' : return them == 'W';
-        default  : assert(false);
+        default  : verify(false);
         }
         return false;
     }
 
     inline void QLock::notifyWeUnlocked(char me) {
-        assert( W.n == 0 );
+        verify( W.n == 0 );
         if( U.n ) {
             // U is highest priority
   	    if( r.n + w.n + W.n == 0 ) 
@@ -203,9 +203,9 @@ namespace mongo {
     // downgrade from W state to R state
     inline void QLock::W_to_R() { 
         boost::mutex::scoped_lock lk(m);
-        assert( W.n == 1 );
-        assert( R.n == 0 );
-        assert( U.n == 0 );
+        verify( W.n == 1 );
+        verify( R.n == 0 );
+        verify( U.n == 0 );
         W.n = 0;
         R.n = 1;
         notifyWeUnlocked('W');
@@ -216,7 +216,7 @@ namespace mongo {
     // if two threads try to do this you will deadlock.
     inline bool QLock::R_to_W() { 
         boost::mutex::scoped_lock lk(m);
-        assert( R.n > 0 && W.n == 0 );
+        verify( R.n > 0 && W.n == 0 );
         U.n++;
         fassert( 16136, U.n == 1 ); // for now we only allow one upgrade attempter
         int pass = 0;
@@ -230,7 +230,7 @@ namespace mongo {
         R.n--;
         W.n++;
         U.n--;
-        assert( R.n == 0 && W.n == 1 && U.n == 0 );
+        verify( R.n == 0 && W.n == 1 && U.n == 0 );
         return true;
     }
 

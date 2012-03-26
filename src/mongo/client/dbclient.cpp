@@ -111,7 +111,7 @@ namespace mongo {
             break;
         }
 
-        assert( 0 );
+        verify( 0 );
         return 0;
     }
 
@@ -151,7 +151,7 @@ namespace mongo {
         case SYNC:
             return "sync";
         }
-        assert(0);
+        verify(0);
         return "";
     }
 
@@ -164,7 +164,7 @@ namespace mongo {
 
     Query& Query::where(const string &jscode, BSONObj scope) {
         /* use where() before sort() and hint() and explain(), else this will assert. */
-        assert( ! isComplex() );
+        verify( ! isComplex() );
         BSONObjBuilder b;
         b.appendElements(obj);
         b.appendWhere(jscode, scope);
@@ -395,7 +395,7 @@ namespace mongo {
         }
         {
             BSONElement e = info.getField("nonce");
-            assert( e.type() == String );
+            verify( e.type() == String );
             nonce = e.valuestr();
         }
 
@@ -443,7 +443,7 @@ namespace mongo {
     }
 
     bool DBClientWithCommands::createCollection(const string &ns, long long size, bool capped, int max, BSONObj *info) {
-        assert(!capped||size);
+        verify(!capped||size);
         BSONObj o;
         if ( info == 0 )    info = &o;
         BSONObjBuilder b;
@@ -1068,7 +1068,7 @@ namespace mongo {
         *host = _serverString;
 
         if ( clientSet && nReturned ) {
-            assert(data);
+            verify(data);
             BSONObj o(data);
             if ( isNotMasterErrorString( getErrField(o) ) ) {
                 clientSet->isntMaster();

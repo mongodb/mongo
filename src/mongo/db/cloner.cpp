@@ -155,7 +155,7 @@ namespace mongo {
 
                 BSONObj js = tmp;
                 if ( isindex ) {
-                    assert( strstr(from_collection, "system.indexes") );
+                    verify( strstr(from_collection, "system.indexes") );
                     js = fixindex(tmp);
                     storedForLater->push_back( js.getOwned() );
                     continue;
@@ -362,8 +362,8 @@ namespace mongo {
                     string s = "bad system.namespaces object " + collection.toString();
                     massert( 10290 , s.c_str(), false);
                 }
-                assert( !e.eoo() );
-                assert( e.type() == String );
+                verify( !e.eoo() );
+                verify( e.type() == String );
                 const char *from_name = e.valuestr();
 
                 if( strstr(from_name, ".system.") ) {
@@ -394,7 +394,7 @@ namespace mongo {
 
             /* change name "<fromdb>.collection" -> <todb>.collection */
             const char *p = strchr(from_name, '.');
-            assert(p);
+            verify(p);
             string to_name = todb + p;
 
             bool wantIdIndex = false;

@@ -105,7 +105,7 @@ namespace mongo {
 
             MsgData * data = (MsgData*)raw;
             memcpy( data , &_inHeader , sizeof( _inHeader ) );
-            assert( data->len == _inHeader.len );
+            verify( data->len == _inHeader.len );
 
             uassert( 10273 ,  "_cur not empty! pipelining requests not supported" , ! _cur.data );
 
@@ -127,7 +127,7 @@ namespace mongo {
             if (!_myThread) // pool is empty
                 _myThread.reset(new StickyThread());
 
-            assert(_myThread);
+            verify(_myThread);
 
             _myThread->ready(shared_from_this());
         }
@@ -150,7 +150,7 @@ namespace mongo {
             {
                 // return thread to pool after we have sent data to the client
                 mongo::mutex::scoped_lock(tp_mutex);
-                assert(_myThread);
+                verify(_myThread);
                 thread_pool.push_back(_myThread);
                 _myThread.reset();
             }

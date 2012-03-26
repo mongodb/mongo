@@ -440,7 +440,7 @@ namespace mongo {
             log() << "CMD fsync: sync:" << sync << " lock:" << lock << endl;
             if( lock ) {
                 Lock::ThreadSpanningOp::setWLockedNongreedy();
-                assert( !locked ); // impossible to get here if locked is true
+                verify( !locked ); // impossible to get here if locked is true
                 try { 
                     //uassert(12034, "fsync: can't lock while an unlock is pending", !unlockRequested);
                     uassert(12032, "fsync: sync option must be true when using lock", sync);
@@ -458,7 +458,7 @@ namespace mongo {
                     Lock::ThreadSpanningOp::unsetR();
                     throw;
                 }
-                assert( !locked );
+                verify( !locked );
                 locked = true;
                 log() << "db is now locked for snapshotting, no writes allowed. db.fsyncUnlock() to unlock" << endl;
                 log() << "    For more info see " << FSyncCommand::url() << endl;

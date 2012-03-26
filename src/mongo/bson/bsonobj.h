@@ -433,7 +433,7 @@ namespace mongo {
         BSONObjIterator begin() const;
 
         void appendSelfToBufBuilder(BufBuilder& b) const {
-            assert( objsize() );
+            verify( objsize() );
             b.appendBuf(reinterpret_cast<const void *>( objdata() ), objsize());
         }
 
@@ -451,12 +451,12 @@ namespace mongo {
             friend void intrusive_ptr_add_ref(Holder* h) { h->refCount++; }
             friend void intrusive_ptr_release(Holder* h) {
 #if defined(_DEBUG) // cant use dassert or DEV here
-                assert((int)h->refCount > 0); // make sure we haven't already freed the buffer
+                verify((int)h->refCount > 0); // make sure we haven't already freed the buffer
 #endif
                 if(--(h->refCount) == 0){
 #if defined(_DEBUG)
                     unsigned sz = (unsigned&) *h->data;
-                    assert(sz < BSONObjMaxInternalSize * 3);
+                    verify(sz < BSONObjMaxInternalSize * 3);
                     memset(h->data, 0xdd, sz);
 #endif
                     free(h);

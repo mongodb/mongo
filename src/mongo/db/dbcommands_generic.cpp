@@ -197,13 +197,13 @@ namespace mongo {
                     return false;
                 }
                 int x = (int) cmdObj["journalCommitInterval"].Number();
-                assert( x > 1 && x < 500 );
+                verify( x > 1 && x < 500 );
                 cmdLine.journalCommitInterval = x;
                 log() << "setParameter journalCommitInterval=" << x << endl;
                 s++;
             }
             if( cmdObj.hasElement("notablescan") ) {
-                assert( !cmdLine.isMongos() );
+                verify( !cmdLine.isMongos() );
                 if( s == 0 )
                     result.append("was", cmdLine.noTableScan);
                 cmdLine.noTableScan = cmdObj["notablescan"].Bool();
@@ -216,7 +216,7 @@ namespace mongo {
                 s++;
             }
             if( cmdObj.hasElement("syncdelay") ) {
-                assert( !cmdLine.isMongos() );
+                verify( !cmdLine.isMongos() );
                 if( s == 0 )
                     result.append("was", cmdLine.syncdelay );
                 cmdLine.syncdelay = cmdObj["syncdelay"].Number();
@@ -233,7 +233,7 @@ namespace mongo {
                     result.append("was", replApplyBatchSize );
                 BSONElement e = cmdObj["replApplyBatchSize"];
                 ParameterValidator * v = ParameterValidator::get( e.fieldName() );
-                assert( v );
+                verify( v );
                 if ( ! v->isValid( e , errmsg ) )
                     return false;
                 replApplyBatchSize = e.numberInt();
@@ -386,7 +386,7 @@ namespace mongo {
         log() << "terminating, shutdown command received" << endl;
 
         dbexit( EXIT_CLEAN , "shutdown called" , true ); // this never returns
-        assert(0);
+        verify(0);
         return true;
     }
 

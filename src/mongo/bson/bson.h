@@ -71,8 +71,8 @@ namespace bson {
 }
 
 namespace mongo {
-#if !defined(assert)
-    inline void assert(bool expr) {
+#if !defined(verify)
+    inline void verify(bool expr) {
         if(!expr) {
             throw bson::assertion( 0 , "assertion failure in bson library" );
         }

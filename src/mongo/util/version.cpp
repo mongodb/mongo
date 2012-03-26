@@ -63,7 +63,7 @@ namespace mongo {
             }
             catch (...){ // not a number
                 if (curPart.empty()){
-                    assert(*c == '\0');
+                    verify(*c == '\0');
                     break;
                 }
                 else if (startsWith(curPart, "rc")){
@@ -283,16 +283,16 @@ namespace mongo {
     class VersionCmpTest : public UnitTest {
     public:
         void run() {
-            assert( versionCmp("1.2.3", "1.2.3") == 0 );
-            assert( versionCmp("1.2.3", "1.2.4") < 0 );
-            assert( versionCmp("1.2.3", "1.2.20") < 0 );
-            assert( versionCmp("1.2.3", "1.20.3") < 0 );
-            assert( versionCmp("2.2.3", "10.2.3") < 0 );
-            assert( versionCmp("1.2.3", "1.2.3-") > 0 );
-            assert( versionCmp("1.2.3", "1.2.3-pre") > 0 );
-            assert( versionCmp("1.2.3", "1.2.4-") < 0 );
-            assert( versionCmp("1.2.3-", "1.2.3") < 0 );
-            assert( versionCmp("1.2.3-pre", "1.2.3") < 0 );
+            verify( versionCmp("1.2.3", "1.2.3") == 0 );
+            verify( versionCmp("1.2.3", "1.2.4") < 0 );
+            verify( versionCmp("1.2.3", "1.2.20") < 0 );
+            verify( versionCmp("1.2.3", "1.20.3") < 0 );
+            verify( versionCmp("2.2.3", "10.2.3") < 0 );
+            verify( versionCmp("1.2.3", "1.2.3-") > 0 );
+            verify( versionCmp("1.2.3", "1.2.3-pre") > 0 );
+            verify( versionCmp("1.2.3", "1.2.4-") < 0 );
+            verify( versionCmp("1.2.3-", "1.2.3") < 0 );
+            verify( versionCmp("1.2.3-pre", "1.2.3") < 0 );
 
             log(1) << "versionCmpTest passed" << endl;
         }
@@ -301,22 +301,22 @@ namespace mongo {
     class VersionArrayTest : public UnitTest {
     public:
         void run() {
-            assert( _versionArray("1.2.3") == BSON_ARRAY(1 << 2 << 3 << 0) );
-            assert( _versionArray("1.2.0") == BSON_ARRAY(1 << 2 << 0 << 0) );
-            assert( _versionArray("2.0.0") == BSON_ARRAY(2 << 0 << 0 << 0) );
+            verify( _versionArray("1.2.3") == BSON_ARRAY(1 << 2 << 3 << 0) );
+            verify( _versionArray("1.2.0") == BSON_ARRAY(1 << 2 << 0 << 0) );
+            verify( _versionArray("2.0.0") == BSON_ARRAY(2 << 0 << 0 << 0) );
 
-            assert( _versionArray("1.2.3-pre-") == BSON_ARRAY(1 << 2 << 3 << -100) );
-            assert( _versionArray("1.2.0-pre-") == BSON_ARRAY(1 << 2 << 0 << -100) );
-            assert( _versionArray("2.0.0-pre-") == BSON_ARRAY(2 << 0 << 0 << -100) );
+            verify( _versionArray("1.2.3-pre-") == BSON_ARRAY(1 << 2 << 3 << -100) );
+            verify( _versionArray("1.2.0-pre-") == BSON_ARRAY(1 << 2 << 0 << -100) );
+            verify( _versionArray("2.0.0-pre-") == BSON_ARRAY(2 << 0 << 0 << -100) );
 
-            assert( _versionArray("1.2.3-rc0") == BSON_ARRAY(1 << 2 << 3 << -10) );
-            assert( _versionArray("1.2.0-rc1") == BSON_ARRAY(1 << 2 << 0 << -9) );
-            assert( _versionArray("2.0.0-rc2") == BSON_ARRAY(2 << 0 << 0 << -8) );
+            verify( _versionArray("1.2.3-rc0") == BSON_ARRAY(1 << 2 << 3 << -10) );
+            verify( _versionArray("1.2.0-rc1") == BSON_ARRAY(1 << 2 << 0 << -9) );
+            verify( _versionArray("2.0.0-rc2") == BSON_ARRAY(2 << 0 << 0 << -8) );
 
             // Note that the pre of an rc is the same as the rc itself
-            assert( _versionArray("1.2.3-rc3-pre-") == BSON_ARRAY(1 << 2 << 3 << -7) );
-            assert( _versionArray("1.2.0-rc4-pre-") == BSON_ARRAY(1 << 2 << 0 << -6) );
-            assert( _versionArray("2.0.0-rc5-pre-") == BSON_ARRAY(2 << 0 << 0 << -5) );
+            verify( _versionArray("1.2.3-rc3-pre-") == BSON_ARRAY(1 << 2 << 3 << -7) );
+            verify( _versionArray("1.2.0-rc4-pre-") == BSON_ARRAY(1 << 2 << 0 << -6) );
+            verify( _versionArray("2.0.0-rc5-pre-") == BSON_ARRAY(2 << 0 << 0 << -5) );
 
             log(1) << "versionArrayTest passed" << endl;
         }

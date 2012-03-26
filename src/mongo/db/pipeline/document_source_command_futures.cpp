@@ -44,19 +44,19 @@ namespace mongo {
     }
 
     intrusive_ptr<Document> DocumentSourceCommandFutures::getCurrent() {
-        assert(!eof());
+        verify(!eof());
         return pCurrent;
     }
 
     void DocumentSourceCommandFutures::setSource(DocumentSource *pSource) {
         /* this doesn't take a source */
-        assert(false);
+        verify(false);
     }
 
     void DocumentSourceCommandFutures::sourceToBson(
         BSONObjBuilder *pBuilder) const {
         /* this has no BSON equivalent */
-        assert(false);
+        verify(false);
     }
 
     DocumentSourceCommandFutures::DocumentSourceCommandFutures(

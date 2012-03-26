@@ -21,8 +21,7 @@
 #include "../db/nonce.h"
 #include "bsonobjbuilder.h"
 #include <boost/functional/hash.hpp>
-#undef assert
-#define assert MONGO_assert
+#define verify MONGO_verify
 
 BOOST_STATIC_ASSERT( sizeof(mongo::OID) == 12 );
 
@@ -71,7 +70,7 @@ namespace mongo {
             nonce64 a = Security::getNonceDuringInit();
             nonce64 b = Security::getNonceDuringInit();
             nonce64 c = Security::getNonceDuringInit();
-            assert( !(a==b && b==c) );
+            verify( !(a==b && b==c) );
         }
 
         unsigned long long n = Security::getNonceDuringInit();
@@ -106,7 +105,7 @@ namespace mongo {
         // xor in the pid into _pid.  this reduces the probability of collisions.
         foldInPid(x);
         ourMachineAndPid = genMachineAndPid();
-        assert( x != ourMachineAndPid );
+        verify( x != ourMachineAndPid );
         ourMachineAndPid = x;
     }
 
@@ -134,7 +133,7 @@ namespace mongo {
     }
 
     void OID::init( string s ) {
-        assert( s.size() == 24 );
+        verify( s.size() == 24 );
         const char *p = s.c_str();
         for( int i = 0; i < 12; i++ ) {
             data[i] = fromHex(p);

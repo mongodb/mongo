@@ -305,10 +305,10 @@ namespace mongo {
          * be extracted.
          */
         
-        BSONElement min() const { assert( !empty() ); return _intervals[ 0 ]._lower._bound; }
-        BSONElement max() const { assert( !empty() ); return _intervals[ _intervals.size() - 1 ]._upper._bound; }
-        bool minInclusive() const { assert( !empty() ); return _intervals[ 0 ]._lower._inclusive; }
-        bool maxInclusive() const { assert( !empty() ); return _intervals[ _intervals.size() - 1 ]._upper._inclusive; }
+        BSONElement min() const { verify( !empty() ); return _intervals[ 0 ]._lower._bound; }
+        BSONElement max() const { verify( !empty() ); return _intervals[ _intervals.size() - 1 ]._upper._bound; }
+        bool minInclusive() const { verify( !empty() ); return _intervals[ 0 ]._lower._inclusive; }
+        bool maxInclusive() const { verify( !empty() ); return _intervals[ _intervals.size() - 1 ]._upper._inclusive; }
 
         /** @return true iff this range expresses a single equality interval. */
         bool equality() const;

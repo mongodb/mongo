@@ -50,7 +50,7 @@ namespace mongo {
         if (!populated)
             populate();
 
-        assert(listIterator != documents.end());
+        verify(listIterator != documents.end());
 
         ++listIterator;
         if (listIterator == documents.end()) {
@@ -149,7 +149,7 @@ namespace mongo {
 
     void DocumentSourceSort::populate() {
         /* make sure we've got a sort key */
-        assert(vSortKey.size());
+        verify(vSortKey.size());
 
         /* track and warn about how much physical memory has been used */
         DocMemMonitor dmm(this);
@@ -215,7 +215,7 @@ namespace mongo {
     bool DocumentSourceSort::Carrier::lessThan(
         const Carrier &rL, const Carrier &rR) {
         /* make sure these aren't from different lists */
-        assert(rL.pSort == rR.pSort);
+        verify(rL.pSort == rR.pSort);
 
         /* compare the documents according to the sort key */
         return (rL.pSort->compare(rL.pDocument, rR.pDocument) < 0);

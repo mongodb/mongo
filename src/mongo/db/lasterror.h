@@ -114,7 +114,7 @@ namespace mongo {
             LastError * le = get(false);
             if ( ! le ) {
                 error() << " no LastError!" << endl;
-                assert( le );
+                verify( le );
             }
             return le;
         }

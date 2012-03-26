@@ -215,7 +215,7 @@ namespace mongo {
     class RSBase : boost::noncopyable {
     public:
         const unsigned magic;
-        void assertValid() { assert( magic == 0x12345677 ); }
+        void assertValid() { verify( magic == 0x12345677 ); }
     private:
         mongo::mutex m;
         int _locked;
@@ -237,14 +237,14 @@ namespace mongo {
                     return; // recursive is ok...
 
                 sl.reset( new scoped_lock(rsbase.m) );
-                DEV assert(rsbase._locked == 0);
+                DEV verify(rsbase._locked == 0);
                 rsbase._locked++;
                 rsbase._lockedByMe.set(true);
             }
             ~lock() {
                 if( sl.get() ) {
-                    assert( rsbase._lockedByMe.get() );
-                    DEV assert(rsbase._locked == 1);
+                    verify( rsbase._lockedByMe.get() );
+                    DEV verify(rsbase._locked == 1);
                     rsbase._lockedByMe.set(false);
                     rsbase._locked--;
                 }
@@ -305,7 +305,7 @@ namespace mongo {
         void setSelfPrimary(const Member *self) { change(MemberState::RS_PRIMARY, self); }
         void setOtherPrimary(const Member *mem) {
             rwlock lk(m, true);
-            assert( !sp.state.primary() );
+            verify( !sp.state.primary() );
             sp.primary = mem;
         }
         void noteRemoteIsPrimary(const Member *remote) {
@@ -555,7 +555,7 @@ namespace mongo {
         bool freeze(int secs) { return _freeze(secs); }
 
         string selfFullName() {
-            assert( _self );
+            verify( _self );
             return _self->fullName();
         }
 
@@ -661,7 +661,7 @@ namespace mongo {
 
     inline Member::Member(HostAndPort h, unsigned ord, const ReplSetConfig::MemberCfg *c, bool self) :
         _config(*c), _h(h), _hbinfo(ord) {
-        assert(c);
+        verify(c);
         if( self )
             _hbinfo.health = 1.0;
     }

@@ -38,11 +38,11 @@ namespace mongo {
             if ( locked == 0 )
                 enter = curTimeMicros64();
             locked++;
-            assert( locked >= 1 );
+            verify( locked >= 1 );
         }
         void leaving() {
             locked--;
-            assert( locked >= 0 );
+            verify( locked >= 0 );
             if ( locked == 0 )
                 timeLocked += curTimeMicros64() - enter;
         }

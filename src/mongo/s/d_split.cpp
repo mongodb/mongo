@@ -397,7 +397,7 @@ namespace mongo {
                         currCount++;
                         BSONObj currKey = c->currKey();
                         
-                        DEV assert( currKey.woCompare( max ) <= 0 );
+                        DEV verify( currKey.woCompare( max ) <= 0 );
                         
                         if ( currCount > keyCount ) {
                             // Do not use this split key if it is the same used in the previous split point.
@@ -462,7 +462,7 @@ namespace mongo {
                 
                 // Remove the sentinel at the beginning before returning and add fieldnames.
                 splitKeys.erase( splitKeys.begin() );
-                assert( c.get() );
+                verify( c.get() );
                 for ( vector<BSONObj>::iterator it = splitKeys.begin(); it != splitKeys.end() ; ++it ) {
                     *it = bc->prettyKey( *it );
                 }
@@ -633,9 +633,9 @@ namespace mongo {
                 maxVersion = x["lastmod"];
 
                 BSONObj currChunk = conn->findOne( ShardNS::chunk , shardId.wrap( "_id" ) ).getOwned();
-                assert( currChunk["shard"].type() );
-                assert( currChunk["min"].type() );
-                assert( currChunk["max"].type() );
+                verify( currChunk["shard"].type() );
+                verify( currChunk["min"].type() );
+                verify( currChunk["max"].type() );
                 shard = currChunk["shard"].String();
                 conn.done();
 
@@ -774,7 +774,7 @@ namespace mongo {
                 stringstream ss;
                 ss << "saving chunks failed.  cmd: " << cmd << " result: " << cmdResult;
                 error() << ss.str() << endl;
-                msgasserted( 13593 , ss.str() ); // assert(13593)
+                msgasserted( 13593 , ss.str() );
             }
 
             // install a chunk manager with knowledge about newly split chunks in this shard's state

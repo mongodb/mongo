@@ -201,7 +201,7 @@ namespace mongo {
             }
             else {
                 //TODO: handle other addresses in linked list;
-                assert(addrs->ai_addrlen <= sizeof(sa));
+                verify(addrs->ai_addrlen <= sizeof(sa));
                 memcpy(&sa, addrs->ai_addr, addrs->ai_addrlen);
                 addressSize = addrs->ai_addrlen;
                 freeaddrinfo(addrs);
@@ -216,7 +216,7 @@ namespace mongo {
         case AF_UNIX: return true;
         default: return false;
         }
-        assert(false);
+        verify(false);
         return false;
     }
 
@@ -541,9 +541,9 @@ namespace mongo {
     
 #ifdef MONGO_SSL
     void Socket::secure( SSLManager * ssl ) {
-        assert( ssl );
-        assert( ! _ssl );
-        assert( _fd >= 0 );
+        verify( ssl );
+        verify( ! _ssl );
+        verify( _fd >= 0 );
         _ssl = ssl->secure( _fd );
         SSL_connect( _ssl );
     }
@@ -556,7 +556,7 @@ namespace mongo {
     void Socket::postFork() {
 #ifdef MONGO_SSL
         if ( _sslAccepted ) {
-            assert( _fd );
+            verify( _fd );
             _ssl = _sslAccepted->secure( _fd );
             SSL_accept( _ssl );
             _sslAccepted = 0;
@@ -682,7 +682,7 @@ namespace mongo {
             else {
                 _bytesOut += ret;
 
-                assert( ret <= len );
+                verify( ret <= len );
                 len -= ret;
                 data += ret;
             }
@@ -766,7 +766,7 @@ namespace mongo {
             if ( ret > 0 ) {
                 if ( len <= 4 && ret != len )
                     log(_logLevel) << "Socket recv() got " << ret << " bytes wanted len=" << len << endl;
-                assert( ret <= len );
+                verify( ret <= len );
                 len -= ret;
                 buf += ret;
             }

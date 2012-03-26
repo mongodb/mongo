@@ -79,7 +79,7 @@ namespace mongo {
         bool done() const { return !_findingStart; }
 
         /** @return cursor pointing to the first matching op, if done(). */
-        shared_ptr<Cursor> cursor() { verify( 14835, done() ); return _c; }
+        shared_ptr<Cursor> cursor() { verify( done() ); return _c; }
 
         /** Iterate the cursor, to continue trying to find matching op. */
         void next();

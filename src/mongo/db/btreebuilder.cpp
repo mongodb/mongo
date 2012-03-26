@@ -172,7 +172,7 @@ namespace mongo {
                     x = next;
                     getDur().commitIfNeeded();
                 }
-                assert( idx.head.isNull() );
+                verify( idx.head.isNull() );
                 log(2) << "done rollback" << endl;
             }
         )

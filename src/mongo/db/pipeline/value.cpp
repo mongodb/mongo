@@ -274,17 +274,17 @@ namespace mongo {
         if (type == NumberLong)
             return static_cast< double >( simple.longValue );
 
-        assert(type == NumberDouble);
+        verify(type == NumberDouble);
         return simple.doubleValue;
     }
 
     string Value::getString() const {
-        assert(getType() == String);
+        verify(getType() == String);
         return stringValue;
     }
 
     intrusive_ptr<Document> Value::getDocument() const {
-        assert(getType() == Object);
+        verify(getType() == Object);
         return pDocumentValue;
     }
 
@@ -299,7 +299,7 @@ namespace mongo {
     }
 
     intrusive_ptr<const Value> Value::vi::next() {
-        assert(more());
+        verify(more());
         return (*pvpValue)[nextIndex++];
     }
 
@@ -311,44 +311,44 @@ namespace mongo {
     }
 
     intrusive_ptr<ValueIterator> Value::getArray() const {
-        assert(getType() == Array);
+        verify(getType() == Array);
         intrusive_ptr<ValueIterator> pVI(
             new vi(intrusive_ptr<const Value>(this), &vpValue));
         return pVI;
     }
 
     OID Value::getOid() const {
-        assert(getType() == jstOID);
+        verify(getType() == jstOID);
         return oidValue;
     }
 
     bool Value::getBool() const {
-        assert(getType() == Bool);
+        verify(getType() == Bool);
         return simple.boolValue;
     }
 
     Date_t Value::getDate() const {
-        assert(getType() == Date);
+        verify(getType() == Date);
         return dateValue;
     }
 
     string Value::getRegex() const {
-        assert(getType() == RegEx);
+        verify(getType() == RegEx);
         return stringValue;
     }
 
     string Value::getSymbol() const {
-        assert(getType() == Symbol);
+        verify(getType() == Symbol);
         return stringValue;
     }
 
     int Value::getInt() const {
-        assert(getType() == NumberInt);
+        verify(getType() == NumberInt);
         return simple.intValue;
     }
 
     unsigned long long Value::getTimestamp() const {
-        assert(getType() == Timestamp);
+        verify(getType() == Timestamp);
         return dateValue;
     }
 
@@ -357,7 +357,7 @@ namespace mongo {
         if (type == NumberInt)
             return simple.intValue;
 
-        assert(type == NumberLong);
+        verify(type == NumberLong);
         return simple.longValue;
     }
 
@@ -393,7 +393,7 @@ namespace mongo {
 
         case BinData:
             // pBuilder->appendBinData(fieldName, ...);
-            assert(false); // CW TODO unimplemented
+            verify(false); // CW TODO unimplemented
             break;
 
         case jstOID:
@@ -417,7 +417,7 @@ namespace mongo {
             break;
 
         case CodeWScope:
-            assert(false); // CW TODO unimplemented
+            verify(false); // CW TODO unimplemented
             break;
 
         case NumberInt:
@@ -443,7 +443,7 @@ namespace mongo {
         case DBRef:
         case Code:
         case MaxKey:
-            assert(false); // CW TODO better message
+            verify(false); // CW TODO better message
             break;
         }
     }
@@ -483,7 +483,7 @@ namespace mongo {
             break;
 
         case CodeWScope:
-            assert(false); // CW TODO unimplemented
+            verify(false); // CW TODO unimplemented
             break;
 
         case NumberInt:
@@ -507,7 +507,7 @@ namespace mongo {
         case DBRef:
         case Code:
         case MaxKey:
-            assert(false); // CW TODO better message
+            verify(false); // CW TODO better message
             break;
         }
 
@@ -618,7 +618,7 @@ namespace mongo {
                     false);
         } // switch(type)
 
-            assert(false); // CW TODO no conversion available
+            verify(false); // CW TODO no conversion available
         return jstNULL; 
     }
 
@@ -746,7 +746,7 @@ namespace mongo {
         case NumberInt:
         case NumberLong:
             /* these types were handled above */
-            assert(false);
+            verify(false);
 
         case String:
             return rL->stringValue.compare(rR->stringValue);
@@ -780,7 +780,7 @@ namespace mongo {
             }
 
             /* NOTREACHED */
-            assert(false);
+            verify(false);
             break;
         }
 
@@ -834,7 +834,7 @@ namespace mongo {
         case DBRef:
         case Code:
         case MaxKey:
-            assert(false);
+            verify(false);
             break;
         } // switch(lType)
 
@@ -920,7 +920,7 @@ namespace mongo {
         case DBRef:
         case Code:
         case MaxKey:
-            assert(false); // CW TODO better message
+            verify(false); // CW TODO better message
             break;
         } // switch(type)
     }
@@ -1029,7 +1029,7 @@ namespace mongo {
         case DBRef:
         case Code:
         case MaxKey:
-            assert(false); // CW TODO better message
+            verify(false); // CW TODO better message
             return sizeof(Value);
         }
 
@@ -1040,7 +1040,7 @@ namespace mongo {
           default.  However, not all the compilers seem to do that.  Therefore,
           this final catch-all is here.
          */
-        assert(false);
+        verify(false);
         return sizeof(Value);
     }
 

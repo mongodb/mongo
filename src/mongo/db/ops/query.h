@@ -42,7 +42,7 @@ namespace mongo {
     public:
         QueryRetryException() : DBException( "query retry exception" , 16083 ) {
             return;
-            verify( 16083, true ); // Reserve 16083.
+            massert( 16083, "reserve 16083", true ); // Reserve 16083.
         }
     };
 

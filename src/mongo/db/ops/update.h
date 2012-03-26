@@ -136,7 +136,7 @@ namespace mongo {
                 manip.setInt( elt.numberInt() + in.numberInt() );
                 break;
             default:
-                assert(0);
+                verify(0);
             }
         }
         void IncrementMe( BSONElement& in ) const {
@@ -152,7 +152,7 @@ namespace mongo {
                 manip.SetInt( elt.numberInt() + in.numberInt() );
                 break;
             default:
-                assert(0);
+                verify(0);
             }
         }
 
@@ -298,7 +298,7 @@ namespace mongo {
         bool _hasDynamicArray;
 
         static Mod::Op opFromStr( const char *fn ) {
-            assert( fn[0] == '$' );
+            verify( fn[0] == '$' );
             switch( fn[1] ) {
             case 'i': {
                 if ( fn[2] == 'n' && fn[3] == 'c' && fn[4] == 0 )
@@ -513,7 +513,7 @@ namespace mongo {
             case NumberInt:
                 b.append( n , incint ); break;
             default:
-                assert(0);
+                verify(0);
             }
         }
 

@@ -62,10 +62,10 @@ namespace mongo {
 
     WrapperHolder * getWrapper( v8::Handle<v8::Object> o ) {
         Handle<v8::Value> t = o->GetRealNamedProperty( v8::String::New( "_wrapper" ) );
-        assert( t->IsExternal() );
+        verify( t->IsExternal() );
         Local<External> c = External::Cast( *t );
         WrapperHolder * w = (WrapperHolder*)(c->Value());
-        assert( w );
+        verify( w );
         return w;
     }
 

@@ -75,7 +75,7 @@ namespace ReplTests {
         }
         void checkAll( const BSONObj &o ) const {
             auto_ptr< DBClientCursor > c = client()->query( ns(), o );
-            assert( c->more() );
+            verify( c->more() );
             while( c->more() ) {
                 check( o, c->next() );
             }
@@ -1123,17 +1123,17 @@ namespace ReplTests {
     public:
         void run() {
             ReplSetConfig::MemberCfg m1, m2;
-            assert(m1 == m2);
+            verify(m1 == m2);
             m1.tags["x"] = "foo";
-            assert(m1 != m2);
+            verify(m1 != m2);
             m2.tags["y"] = "bar";
-            assert(m1 != m2);
+            verify(m1 != m2);
             m1.tags["y"] = "bar";
-            assert(m1 != m2);
+            verify(m1 != m2);
             m2.tags["x"] = "foo";
-            assert(m1 == m2);
+            verify(m1 == m2);
             m1.tags.clear();
-            assert(m1 != m2);
+            verify(m1 != m2);
         }
     };
 
@@ -1165,16 +1165,16 @@ namespace ReplTests {
             catch (DBException&) {
                 threw = true;
             }
-            assert(threw);
+            verify(threw);
 
             // now this should succeed
             SyncTest t;
-            assert(t.shouldRetry(o));
-            assert(!client()->findOne(ns(), BSON("_id" << "on remote")).isEmpty());
+            verify(t.shouldRetry(o));
+            verify(!client()->findOne(ns(), BSON("_id" << "on remote")).isEmpty());
 
             // force it not to find an obj
             t.returnEmpty = true;
-            assert(!t.shouldRetry(o));
+            verify(!t.shouldRetry(o));
         }
     };
 

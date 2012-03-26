@@ -45,7 +45,7 @@ namespace mongo {
             throw;
         }
         catch ( AssertionException& e ) {
-            assert( e.getCode() != SendStaleConfigCode && e.getCode() != RecvStaleConfigCode );
+            verify( e.getCode() != SendStaleConfigCode && e.getCode() != RecvStaleConfigCode );
 
             e.getInfo().append( anObjBuilder , "assertion" , "assertionCode" );
             curop.debug().exceptionInfo = e.getInfo();
@@ -138,7 +138,7 @@ namespace mongo {
                     }
                     p.release();
                     bool ok = ClientCursor::erase(cursorid);
-                    assert(ok);
+                    verify(ok);
                     cursorid = 0;
                     cc = 0;
                     break;
@@ -188,7 +188,7 @@ namespace mongo {
             if ( cc ) {
                 if ( c->supportYields() ) {
                     ClientCursor::YieldData data;
-                    assert( cc->prepareToYield( data ) );
+                    verify( cc->prepareToYield( data ) );
                 }
                 else {
                     cc->c()->noteLocation();
@@ -227,7 +227,7 @@ namespace mongo {
     }
 
     shared_ptr<ExplainQueryInfo> NoExplainStrategy::_doneQueryInfo() {
-        verify( 16071, false );
+        verify( false );
         return shared_ptr<ExplainQueryInfo>();
     }
     
@@ -317,7 +317,7 @@ namespace mongo {
             }
         }
         BSONObj ret = _cursor->current();
-        verify( 16087, ret.isValid() );
+        verify( ret.isValid() );
         return ret;
     }
 
@@ -391,17 +391,17 @@ namespace mongo {
     
     ScanAndOrder *
     ReorderBuildStrategy::newScanAndOrder( const QueryPlan::Summary &queryPlan ) const {
-        verify( 16078, !_parsedQuery.getOrder().isEmpty() );
-        verify( 16079, _cursor->ok() );
+        verify( !_parsedQuery.getOrder().isEmpty() );
+        verify( _cursor->ok() );
         const FieldRangeSet *fieldRangeSet = 0;
         if ( queryPlan.valid() ) {
             fieldRangeSet = queryPlan._fieldRangeSetMulti.get();
         }
         else {
-            verify( 16080, _queryOptimizerCursor );
+            verify( _queryOptimizerCursor );
             fieldRangeSet = _queryOptimizerCursor->initialFieldRangeSet();
         }
-        verify( 16084, fieldRangeSet );
+        verify( fieldRangeSet );
         return new ScanAndOrder( _parsedQuery.getSkip(),
                                 _parsedQuery.getNumToReturn(),
                                 _parsedQuery.getOrder(),
@@ -631,7 +631,7 @@ namespace mongo {
             NamespaceDetailsTransient::getCursor( ns, query, order, QueryPlanSelectionPolicy::any(),
                                                  0, &pq, &queryPlan );
         }
-        verify( 16081, cursor );
+        verify( cursor );
         
         QueryResponseBuilder queryResponseBuilder( pq, cursor, queryPlan, oldPlan );
         bool saveClientCursor = false;
@@ -928,10 +928,10 @@ namespace mongo {
                 return queryWithQueryOptimizer( m, queryOptions, ns, jsobj, curop, query, order,
                                                pq_shared, oldPlan, shardingVersionAtStart, result );
             } catch ( const QueryRetryException & ) {
-                verify( 16088, retry == 0 );
+                verify( retry == 0 );
             }
         }
-        verify( 16082, false );
+        verify( false );
         return 0;
     }
 

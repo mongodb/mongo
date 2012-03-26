@@ -58,7 +58,7 @@ namespace mongo {
     }
 
     bool ProcessInfo::blockInMemory( char * start ) {
-        assert(0);
+        verify(0);
         return true;
     }
 

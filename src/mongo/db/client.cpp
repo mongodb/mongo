@@ -83,7 +83,7 @@ namespace mongo {
 #if defined _DEBUG
     static unsigned long long nThreads = 0;
     void assertStartingUp() { 
-        assert( nThreads <= 1 );
+        verify( nThreads <= 1 );
     }
 #else
     void assertStartingUp() { }
@@ -99,7 +99,7 @@ namespace mongo {
             }
         }
 #endif
-        assert( currentClient.get() == 0 );
+        verify( currentClient.get() == 0 );
         Client *c = new Client(desc, mp);
         currentClient.reset(c);
         mongo::lastError.initThread();
@@ -179,7 +179,7 @@ namespace mongo {
         _ns( ns ), 
         _db(db)
     {
-        assert( db == 0 || db->isOk() );
+        verify( db == 0 || db->isOk() );
         _client->_context = this;
         checkNsAccess( doauth );
     }
@@ -266,7 +266,7 @@ namespace mongo {
         _ns( ns ), 
         _db(db)
     {
-        assert(_db);
+        verify(_db);
         checkNotStale();
         _client->_context = this;
         _client->_curOp->enter( this );
@@ -281,7 +281,7 @@ namespace mongo {
         }
         
         _db = dbHolderUnchecked().getOrCreate( _ns , _path , _justCreated );
-        assert(_db);
+        verify(_db);
         if( _doVersion ) checkNotStale();
         massert( 16107 , str::stream() << "Don't have a lock on: " << _ns , Lock::atLeastReadLocked( _ns ) );
         _client->_context = this;
@@ -305,7 +305,7 @@ namespace mongo {
     }
     
     Client::Context::~Context() {
-        DEV assert( _client == currentClient.get() );
+        DEV verify( _client == currentClient.get() );
         _client->_curOp->leave( this );
         _client->_context = _oldContext; // note: _oldContext may be null
     }
@@ -365,7 +365,7 @@ namespace mongo {
 
     Client* curopWaitingForLock( char type ) {
         Client * c = currentClient.get();
-        assert( c );
+        verify( c );
         CurOp * co = c->curop();
         if ( co ) {
             co->waitingForLock( type );
@@ -374,7 +374,7 @@ namespace mongo {
     }
 
     void curopGotLock(Client *c) {
-        assert(c);
+        verify(c);
         CurOp * co = c->curop();
         if ( co )
             co->gotLock();
@@ -422,7 +422,7 @@ namespace mongo {
 
         {
             BSONElement id = i.next();
-            assert( id.type() );
+            verify( id.type() );
             _remoteId = id.wrap( "_id" );
         }
 

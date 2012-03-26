@@ -66,7 +66,7 @@ namespace mongo {
     void Trace::setTraces(const string &names) {
         /* create a new map, and replace the existing one */
         NameMap *pM;
-        assert(false);
+        verify(false);
     }
 #endif
 

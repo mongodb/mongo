@@ -245,7 +245,7 @@ namespace mongo {
     }
     
     inline Document::FieldPair Document::getField(size_t index) const {
-        assert( index < vFieldName.size() );
+        verify( index < vFieldName.size() );
         return FieldPair(vFieldName[index], vpValue[index]);
     }
 

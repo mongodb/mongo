@@ -118,14 +118,14 @@ namespace mongo {
             *getDur().writing( reinterpret_cast< double * >( value() )  ) = d;
         else if ( _element.type() == NumberInt )
             *getDur().writing( reinterpret_cast< int * >( value() ) ) = (int) d;
-        else assert(0);
+        else verify(0);
     }
     void BSONElementManipulator::SetLong(long long n) {
-        assert( _element.type() == NumberLong );
+        verify( _element.type() == NumberLong );
         *getDur().writing( reinterpret_cast< long long * >(value()) ) = n;
     }
     void BSONElementManipulator::SetInt(int n) {
-        assert( _element.type() == NumberInt );
+        verify( _element.type() == NumberInt );
         getDur().writingInt( *reinterpret_cast< int * >( value() ) ) = n;
     }
     /* dur:: version */
@@ -157,12 +157,12 @@ namespace mongo {
                 scoped_ptr<Matcher> m(new Matcher(q.query));
                 for( set<Client*>::iterator i = Client::clients.begin(); i != Client::clients.end(); i++ ) {
                     Client *c = *i;
-                    assert( c );
+                    verify( c );
                     CurOp* co = c->curop();
                     if ( c == &me && !co ) {
                         continue;
                     }
-                    assert( co );
+                    verify( co );
                     if( all || co->displayInCurop() ) {
                         BSONObj info = co->infoNoauth();
                         if ( all || m->matches( info )) {
@@ -240,7 +240,7 @@ namespace mongo {
 
         try {
             dbresponse.exhaust = runQuery(m, q, op, *resp);
-            assert( !resp->empty() );
+            verify( !resp->empty() );
         }
         catch ( SendStaleConfigException& e ){
             ex.reset( new SendStaleConfigException( e.getns(), e.getInfo().msg, e.getVersionReceived(), e.getVersionWanted() ) );
@@ -489,7 +489,7 @@ namespace mongo {
 
         if ( n > 2000 ) {
             log( n < 30000 ? LL_WARNING : LL_ERROR ) << "receivedKillCursors, n=" << n << endl;
-            assert( n < 30000 );
+            verify( n < 30000 );
         }
 
         int found = ClientCursor::erase(n, (long long *) x);
@@ -507,10 +507,10 @@ namespace mongo {
         assertInWriteLock();
 
         Client::Context * ctx = cc().getContext();
-        assert( ctx );
-        assert( ctx->inDB( db , path ) );
+        verify( ctx );
+        verify( ctx->inDB( db , path ) );
         Database *database = ctx->db();
-        assert( database->name == db );
+        verify( database->name == db );
 
         oplogCheckCloseDatabase( database ); // oplog caches some things, dirty its caches
 
@@ -537,12 +537,12 @@ namespace mongo {
         int flags = d.pullInt();
         BSONObj query = d.nextJsObj();
 
-        assert( d.moreJSObjs() );
-        assert( query.objsize() < m.header()->dataLen() );
+        verify( d.moreJSObjs() );
+        verify( query.objsize() < m.header()->dataLen() );
         BSONObj toupdate = d.nextJsObj();
         uassert( 10055 , "update object too large", toupdate.objsize() <= BSONObjMaxUserSize);
-        assert( toupdate.objsize() < m.header()->dataLen() );
-        assert( query.objsize() + toupdate.objsize() < m.header()->dataLen() );
+        verify( toupdate.objsize() < m.header()->dataLen() );
+        verify( query.objsize() + toupdate.objsize() < m.header()->dataLen() );
         bool upsert = flags & UpdateOption_Upsert;
         bool multi = flags & UpdateOption_Multi;
         bool broadcast = flags & UpdateOption_Broadcast;
@@ -582,7 +582,7 @@ namespace mongo {
         int flags = d.pullInt();
         bool justOne = flags & RemoveOption_JustOne;
         bool broadcast = flags & RemoveOption_Broadcast;
-        assert( d.moreJSObjs() );
+        verify( d.moreJSObjs() );
         BSONObj pattern = d.nextJsObj();
         
         op.debug().query = pattern;
@@ -838,7 +838,7 @@ namespace mongo {
             lastError.startRequest( toSend, lastError._get() );
         DbResponse dbResponse;
         assembleResponse( toSend, dbResponse , _clientHost );
-        assert( dbResponse.response );
+        verify( dbResponse.response );
         dbResponse.response->concat(); // can get rid of this if we make response handling smarter
         response = *dbResponse.response;
         getDur().commitIfNeeded();
@@ -859,7 +859,7 @@ namespace mongo {
         //if ( ! query.obj.isEmpty() || nToReturn != 0 || nToSkip != 0 || fieldsToReturn || queryOptions )
         return DBClientBase::query( ns , query , nToReturn , nToSkip , fieldsToReturn , queryOptions , batchSize );
         //
-        //assert( query.obj.isEmpty() );
+        //verify( query.obj.isEmpty() );
         //throw UserException( (string)"yay:" + ns );
     }
 
@@ -1055,9 +1055,9 @@ namespace mongo {
         string s = ss.str();
         const char * data = s.c_str();
 #ifdef _WIN32
-        assert ( _write( fd, data, strlen( data ) ) );
+        verify( _write( fd, data, strlen( data ) ) );
 #else
-        assert ( write( fd, data, strlen( data ) ) );
+        verify( write( fd, data, strlen( data ) ) );
 #endif
     }
 
@@ -1191,7 +1191,7 @@ namespace mongo {
     }
 
     void DiagLog::openFile() {
-        assert( f == 0 );
+        verify( f == 0 );
         stringstream ss;
         ss << dbpath << "/diaglog." << hex << time(0);
         string name = ss.str();
@@ -1238,7 +1238,7 @@ namespace mongo {
             OCCASIONALLY log = true;
             if ( log ) {
                 scoped_lock lk(mutex);
-                assert( f );
+                verify( f );
                 f->write(data,len);
             }
         }

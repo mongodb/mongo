@@ -89,7 +89,7 @@ namespace mongo {
         CmdResetError() : Command("resetError", false, "reseterror") {}
         bool run(const string& db, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl) {
             LastError *le = lastError.get();
-            assert( le );
+            verify( le );
             le->reset();
             return true;
         }
@@ -223,7 +223,7 @@ namespace mongo {
                         return true;
                     }
 
-                    assert( sprintf( buf , "w block pass: %lld" , ++passes ) < 30 );
+                    verify( sprintf( buf , "w block pass: %lld" , ++passes ) < 30 );
                     c.curop()->setMessage( buf );
                     sleepmillis(1);
                     killCurrentOp.checkForInterrupt();
@@ -610,7 +610,7 @@ namespace mongo {
 
             {
                 RamLog* rl = RamLog::get( "warnings" );
-                verify(15880, rl);
+                massert(15880, "no ram log for warnings?" , rl);
                 
                 if (rl->lastWrite() >= time(0)-(10*60)){ // only show warnings from last 10 minutes
                     vector<const char*> lines;
@@ -698,12 +698,12 @@ namespace mongo {
 
     struct DBCommandsUnitTest {
         DBCommandsUnitTest() {
-            assert( removeBit(1, 0) == 0 );
-            assert( removeBit(2, 0) == 1 );
-            assert( removeBit(2, 1) == 0 );
-            assert( removeBit(255, 1) == 127 );
-            assert( removeBit(21, 2) == 9 );
-            assert( removeBit(0x4000000000000001ULL, 62) == 1 );
+            verify( removeBit(1, 0) == 0 );
+            verify( removeBit(2, 0) == 1 );
+            verify( removeBit(2, 1) == 0 );
+            verify( removeBit(255, 1) == 127 );
+            verify( removeBit(21, 2) == 9 );
+            verify( removeBit(0x4000000000000001ULL, 62) == 1 );
         }
     } dbc_unittest;
 
@@ -1127,7 +1127,7 @@ namespace mongo {
                 cursor->advance();
 
                 BSONElement ne = obj["n"];
-                assert(ne.isNumber());
+                verify(ne.isNumber());
                 int myn = ne.numberInt();
                 if ( n != myn ) {
                     log() << "should have chunk: " << n << " have:" << myn << endl;
@@ -1874,7 +1874,7 @@ namespace mongo {
 
         bool retval = false;
         if ( c->locktype() == Command::NONE ) {
-            assert( !c->lockGlobally() );
+            verify( !c->lockGlobally() );
 
             // we also trust that this won't crash
             retval = true;
@@ -1894,7 +1894,7 @@ namespace mongo {
         }
         else if( c->locktype() != Command::WRITE ) { 
             // read lock
-            assert( ! c->logTheOp() );
+            verify( ! c->logTheOp() );
             string ns = c->parseNs(dbname, cmdObj);
             scoped_ptr<Lock::GlobalRead> lk;
             if( c->lockGlobally() )

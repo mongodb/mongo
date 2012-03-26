@@ -127,7 +127,7 @@ namespace mongo {
         */
         class CommitJob : boost::noncopyable {
             void _committingReset();
-            ~CommitJob(){ assert(!"shouldn't destroy CommitJob!"); }
+            ~CommitJob(){ verify(!"shouldn't destroy CommitJob!"); }
 
             /** record/note an intent to write */
             void note(void* p, int len);

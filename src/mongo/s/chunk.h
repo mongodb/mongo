@@ -235,11 +235,11 @@ namespace mongo {
             , _shard(begin->second->getShard())
             , _min(begin->second->getMin())
             , _max(boost::prior(end)->second->getMax()) {
-            assert( begin != end );
+            verify( begin != end );
 
             DEV while (begin != end) {
-                assert(begin->second->getManager() == _manager);
-                assert(begin->second->getShard() == _shard);
+                verify(begin->second->getManager() == _manager);
+                verify(begin->second->getShard() == _shard);
                 ++begin;
             }
         }
@@ -250,9 +250,9 @@ namespace mongo {
             , _shard(min.getShard())
             , _min(min.getMin())
             , _max(max.getMax()) {
-            assert(min.getShard() == max.getShard());
-            assert(min.getManager() == max.getManager());
-            assert(min.getMax() == max.getMin());
+            verify(min.getShard() == max.getShard());
+            verify(min.getManager() == max.getManager());
+            verify(min.getMax() == max.getMin());
         }
 
         friend ostream& operator<<(ostream& out, const ChunkRange& cr) {

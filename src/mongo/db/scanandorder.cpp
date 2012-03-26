@@ -26,7 +26,7 @@ namespace mongo {
     const unsigned ScanAndOrder::MaxScanAndOrderBytes = 32 * 1024 * 1024;
 
     void ScanAndOrder::add(const BSONObj& o, const DiskLoc* loc) {
-        assert( o.isValid() );
+        verify( o.isValid() );
         BSONObj k;
         try {
             k = _order.getKeyFromObject(o);
@@ -48,7 +48,7 @@ namespace mongo {
             return;
         }
         BestMap::iterator i;
-        assert( _best.end() != _best.begin() );
+        verify( _best.end() != _best.begin() );
         i = _best.end();
         i--;
         _addIfBetter(k, o, i, loc);
@@ -98,7 +98,7 @@ namespace mongo {
     void ScanAndOrder::_validateAndUpdateApproxSize( const int approxSizeDelta ) {
         // note : adjust when bson return limit adjusts. note this limit should be a bit higher.
         int newApproxSize = _approxSize + approxSizeDelta;
-        assert( newApproxSize >= 0 );
+        verify( newApproxSize >= 0 );
         uassert( ScanAndOrderMemoryLimitExceededAssertionCode,
                 "too much data for sort() with no index.  add an index or specify a smaller limit",
                 (unsigned)newApproxSize < MaxScanAndOrderBytes );

@@ -290,8 +290,8 @@ namespace mongo {
             const int maxSize = 32; 
             char * start = _buf.grow( maxSize );
             int z = mongo_snprintf( start , maxSize , "%.16g" , x );
-            assert( z >= 0 );
-            assert( z < maxSize );
+            verify( z >= 0 );
+            verify( z < maxSize );
             _buf.l = prev + z;
             if( strchr(start, '.') == 0 && strchr(start, 'E') == 0 && strchr(start, 'N') == 0 ) {
                 write( ".0" , 2 );
@@ -324,8 +324,8 @@ namespace mongo {
         StringBuilder& SBNUM(T val,int maxSize,const char *macro)  {
             int prev = _buf.l;
             int z = mongo_snprintf( _buf.grow(maxSize) , maxSize , macro , (val) );
-            assert( z >= 0 );
-            assert( z < maxSize );
+            verify( z >= 0 );
+            verify( z < maxSize );
             _buf.l = prev + z;
             return *this;
         }

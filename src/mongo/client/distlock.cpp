@@ -55,7 +55,7 @@ namespace mongo {
     string getDistLockProcess() {
         if (!_cachedProcessString)
             initModule();
-        assert( _cachedProcessString );
+        verify( _cachedProcessString );
         return *_cachedProcessString;
     }
 
@@ -275,7 +275,7 @@ namespace mongo {
 
             string pingId = pingThreadId( conn, processId );
 
-            assert( _seen.count( pingId ) > 0 );
+            verify( _seen.count( pingId ) > 0 );
             _kill.insert( pingId );
 
         }
@@ -483,7 +483,7 @@ namespace mongo {
         }
 
         // This should always be true, if not, we are using the lock incorrectly.
-        assert( _name != "" );
+        verify( _name != "" );
 
         // write to dummy if 'other' is null
         BSONObj dummyOther;
@@ -638,7 +638,7 @@ namespace mongo {
                 }
                 else {
 
-                    assert( canReenter );
+                    verify( canReenter );
 
                     // Lock may be re-entered, reset our timer if succeeds or fails
                     // Not strictly necessary, but helpful for small timeouts where thread scheduling is significant.
@@ -776,7 +776,7 @@ namespace mongo {
 
                         // Our lock should now be set until forcing.
                         // It's possible another lock has won entirely by now, so state could be 1 or 2 here
-                        assert( indUpdate["state"].numberInt() > 0 );
+                        verify( indUpdate["state"].numberInt() > 0 );
 
                     }
                     // else our lock is the same, in which case we're safe, or it's a bigger lock,
@@ -790,7 +790,7 @@ namespace mongo {
                                          << up[1].first << causedBy( e ), 13661 );
                 }
 
-                assert( !indUpdate.isEmpty() );
+                verify( !indUpdate.isEmpty() );
 
                 // Find max TS value
                 if ( currLock.isEmpty() || currLock["ts"] < indUpdate["ts"] ) {
@@ -891,7 +891,7 @@ namespace mongo {
     // and so cannot tell you what lock ts you should try later.
     void DistributedLock::unlock( BSONObj* oldLockPtr ) {
 
-        assert( _name != "" );
+        verify( _name != "" );
 
         string lockName = _name + string("/") + _processId;
 

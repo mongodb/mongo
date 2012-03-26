@@ -49,7 +49,7 @@ namespace mongo {
     Client& Client::initThread(const char *desc, AbstractMessagingPort *mp) {
         DEV nThreads++; // never decremented.  this is for casi class asserts
         setThreadName(desc);
-        assert( currentClient.get() == 0 );
+        verify( currentClient.get() == 0 );
         Client *c = new Client(desc, mp);
         currentClient.reset(c);
         mongo::lastError.initThread();
@@ -68,7 +68,7 @@ namespace mongo {
                       const char *ns, BSONObj& cmdObj ,
                       BSONObjBuilder& result,
                       bool fromRepl ) {
-        assert(c);
+        verify(c);
 
         string dbname = nsToDatabase( ns );
 

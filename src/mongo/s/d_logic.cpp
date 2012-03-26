@@ -44,7 +44,7 @@ using namespace std;
 namespace mongo {
 
     bool _handlePossibleShardedMessage( Message &m, DbResponse* dbresponse ) {
-        DEV assert( shardingState.enabled() );
+        DEV verify( shardingState.enabled() );
 
         int op = m.operation();
         if ( op < 2000
@@ -65,7 +65,7 @@ namespace mongo {
         LOG(1) << "connection meta data too old - will retry ns:(" << ns << ") op:(" << opToString(op) << ") " << errmsg << endl;
 
         if ( doesOpGetAResponse( op ) ) {
-            assert( dbresponse );
+            verify( dbresponse );
             BufBuilder b( 32768 );
             b.skip( sizeof( QueryResult ) );
             {

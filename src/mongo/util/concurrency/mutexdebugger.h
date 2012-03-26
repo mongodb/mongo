@@ -46,7 +46,7 @@ namespace mongo {
 
         void entering(mid m) {
             if( this == 0 || m == 0 ) return;
-            assert( magic == 0x12345678 );
+            verify( magic == 0x12345678 );
 
             Preceeding *_preceeding = us.get();
             if( _preceeding == 0 )
@@ -57,7 +57,7 @@ namespace mongo {
                 aBreakPoint();
                 if( preceeding[b.c_str()] ) {
                     cout << "****** MutexDebugger error! warning " << b << " was locked before " << a << endl;
-                    assert(false);
+                    verify(false);
                 }
             }
 
@@ -101,7 +101,7 @@ namespace mongo {
             }
             if( failed ) {
                 cout << err << endl;
-                assert( 0 );
+                verify( 0 );
             }
         }
         void leaving(mid m) {
@@ -110,7 +110,7 @@ namespace mongo {
             preceeding[m]--;
             if( preceeding[m] < 0 ) {
                 cout << "ERROR: lock count for " << m << " is " << preceeding[m] << endl;
-                assert( preceeding[m] >= 0 );
+                verify( preceeding[m] >= 0 );
             }
         }
     };
