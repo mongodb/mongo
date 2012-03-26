@@ -581,14 +581,6 @@ namespace mongo {
     public:
         FieldRangeVectorIterator( const FieldRangeVector &v ) : _v( v ), _i( _v._ranges.size(), -1 ), _cmp( _v._ranges.size(), 0 ), _inc( _v._ranges.size(), false ), _after() {
         }
-        static BSONObj minObject() {
-            BSONObjBuilder b; b.appendMinKey( "" );
-            return b.obj();
-        }
-        static BSONObj maxObject() {
-            BSONObjBuilder b; b.appendMaxKey( "" );
-            return b.obj();
-        }
         /**
          * @return Suggested advance method, based on current key.
          *   -2 Iteration is complete, no need to advance.
@@ -604,13 +596,9 @@ namespace mongo {
         const vector<bool> &inc() const { return _inc; }
         bool after() const { return _after; }
         void prepDive();
+    private:
         void setZero( int i ) { for( int j = i; j < (int)_i.size(); ++j ) _i[ j ] = 0; }
         void setMinus( int i ) { for( int j = i; j < (int)_i.size(); ++j ) _i[ j ] = -1; }
-        bool ok() { return _i[ 0 ] < (int)_v._ranges[ 0 ].intervals().size(); }
-        BSONObj startKey();
-        // temp
-        BSONObj endKey();
-    private:
         const FieldRangeVector &_v;
         vector<int> _i;
         vector<const BSONElement*> _cmp;

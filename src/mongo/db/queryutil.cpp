@@ -1448,25 +1448,6 @@ namespace mongo {
         }
     }
 
-    BSONObj FieldRangeVectorIterator::startKey() {
-        BSONObjBuilder b;
-        for( unsigned i = 0; i < _i.size(); ++i ) {
-            const FieldInterval &fi = _v._ranges[ i ].intervals()[ _i[ i ] ];
-            b.appendAs( fi._lower._bound, "" );
-        }
-        return b.obj();
-    }
-
-    // temp
-    BSONObj FieldRangeVectorIterator::endKey() {
-        BSONObjBuilder b;
-        for( unsigned i = 0; i < _i.size(); ++i ) {
-            const FieldInterval &fi = _v._ranges[ i ].intervals()[ _i[ i ] ];
-            b.appendAs( fi._upper._bound, "" );
-        }
-        return b.obj();
-    }
-    
     OrRangeGenerator::OrRangeGenerator( const char *ns, const BSONObj &query , bool optimize )
     : _baseSet( ns, query, optimize ), _orFound() {
         
