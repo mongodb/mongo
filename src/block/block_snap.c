@@ -64,7 +64,7 @@ __wt_block_snap_load(WT_SESSION_IMPL *session,
 		    session, block, addr, "load-snapshot", NULL));
 
 	si = &block->live;
-	WT_RET(__wt_block_snap_init(session, block, si, 1));
+	WT_RET(__wt_block_snap_init(session, block, si, readonly ? 0 : 1));
 
 	/* If not loading a snapshot from disk, we're done. */
 	if (addr == NULL || addr_size == 0)
@@ -114,7 +114,8 @@ __wt_block_snap_load(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_ftruncate(session, block->fh, si->file_size));
 	}
 
-done:	block->live_load = 1;
+done:	if (!readonly)
+		block->live_load = 1;
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
