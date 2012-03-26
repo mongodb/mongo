@@ -140,16 +140,11 @@ namespace mongo {
 }
 
 
-
-// TODO: Rework the headers so we don't need this craziness
-#include "bson/inline_decls.h"
-#define MONGO_verify(_Expression) (void)( MONGO_likely(!!(_Expression)) || (mongo::asserted(#_Expression, __FILE__, __LINE__), 0) )
-
+#include "util/assert_util.h"
 #include "util/debug_util.h"
 #include "util/goodies.h"
 #include "util/log.h"
 #include "util/allocator.h"
-#include "util/assert_util.h"
 
 namespace mongo {
 
