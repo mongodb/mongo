@@ -56,6 +56,9 @@ namespace mongo {
          */
         DBClientBase * get( DBConnectionPool * pool , double socketTimeout );
 
+        // Deletes all connections in the pool
+        void clear();
+
         void done( DBConnectionPool * pool , DBClientBase * c );
 
         void flush();

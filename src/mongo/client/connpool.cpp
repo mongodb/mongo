@@ -22,12 +22,17 @@
 #include "connpool.h"
 #include "syncclusterconnection.h"
 #include "../s/shard.h"
+#include "mongo/client/dbclient_rs.h"
 
 namespace mongo {
 
     // ------ PoolForHost ------
 
     PoolForHost::~PoolForHost() {
+        clear();
+    }
+
+    void PoolForHost::clear() {
         while ( ! _pool.empty() ) {
             StoredConnection sc = _pool.top();
             delete sc.conn;

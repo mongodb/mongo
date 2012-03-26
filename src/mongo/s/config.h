@@ -25,6 +25,7 @@
 
 #include "../db/namespace.h"
 #include "../client/model.h"
+#include "mongo/client/dbclient_rs.h"
 
 #include "chunk.h"
 #include "shard.h"

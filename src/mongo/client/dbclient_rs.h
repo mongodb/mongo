@@ -119,6 +119,7 @@ namespace mongo {
             bool hidden;
 
             int pingTimeMillis;
+
         };
 
         /**
@@ -145,14 +146,16 @@ namespace mongo {
                 int& nextNodeIndex );
 
         /**
-         * gets a cached Monitor per name or will create if doesn't exist
+         * Creates a new ReplicaSetMonitor, if it doesn't already exist.
          */
-        static ReplicaSetMonitorPtr get( const string& name , const vector<HostAndPort>& servers );
+        static void createIfNeeded( const string& name , const vector<HostAndPort>& servers );
 
         /**
-         * gets a cached Monitor per name or will return none if it doesn't exist
+         * gets a cached Monitor per name. If the monitor is not found and createFromSeed is false,
+         * it will return none. If createFromSeed is true, it will try to look up the last known
+         * servers list for this set and will create a new monitor using that as the seed list.
          */
-        static ReplicaSetMonitorPtr get( const string& name );
+        static ReplicaSetMonitorPtr get( const string& name, const bool createFromSeed = false );
 
 
         /**
@@ -162,9 +165,14 @@ namespace mongo {
         static void checkAll( bool checkAllSecondaries );
 
         /**
-         * deletes the ReplicaSetMonitor for the given set name.
+         * Removes the ReplicaSetMonitor for the given set name from _sets, which will delete it.
+         * If clearSeedCache is true, then the cached seed string for this Replica Set will be removed
+         * from _setServers.
          */
-        static void remove( const string& name );
+        static void remove( const string& name, bool clearSeedCache = false );
+
+        static int getMaxFailedChecks() { return _maxFailedChecks; };
+        static void setMaxFailedChecks(int numChecks) { _maxFailedChecks = numChecks; };
 
         /**
          * this is called whenever the config of any replica set changes
@@ -221,11 +229,13 @@ namespace mongo {
     private:
         /**
          * This populates a list of hosts from the list of seeds (discarding the
-         * seed list).
+         * seed list). Should only be called from within _setsLock.
          * @param name set name
          * @param servers seeds
          */
         ReplicaSetMonitor( const string& name , const vector<HostAndPort>& servers );
+
+        static void _remove_inlock( const string& name, bool clearSeedCache = false );
 
         /**
          * Checks all connections from the host list and sets the current
@@ -265,6 +275,13 @@ namespace mongo {
          */
         bool _checkConnection( DBClientConnection* conn, string& maybePrimary,
                 bool verbose, int nodesOffset );
+
+        /**
+         * Save the seed list for the current set into the _setServers map
+         * Should only be called if you're already holding _setsLock and this
+         * monitor's _lock.
+         */
+        void _cacheServerAddresses_inlock();
 
         string _getServerAddress_inlock() const;
 
@@ -335,11 +352,17 @@ namespace mongo {
 
         int _master; // which node is the current master.  -1 means no master is known
         int _nextSlave; // which node is the current slave
+        // The number of consecutive times the set has been checked and every member in the set was down.
+        int _failedChecks;
 
-        static mongo::mutex _setsLock; // protects _sets
+        static mongo::mutex _setsLock; // protects _sets and _setServers
         static map<string,ReplicaSetMonitorPtr> _sets; // set name to Monitor
+        static map<string,vector<HostAndPort> > _setServers; // set name to seed list. Used to rebuild the monitor if it is cleaned up but then the set is accessed again.
+
         static ConfigChangeHook _hook;
         int _localThresholdMillis; // local ping latency threshold (protected by _lock)
+
+        static int _maxFailedChecks;
     };
 
     /** Use this class to connect to a replica set of servers.  The class will manage
@@ -421,7 +444,7 @@ namespace mongo {
 
         string toString() { return getServerAddress(); }
 
-        string getServerAddress() const { return _monitor->getServerAddress(); }
+        string getServerAddress() const;
 
         virtual ConnectionString::ConnectionType type() const { return ConnectionString::SET; }
         virtual bool lazySupported() const { return true; }
@@ -445,7 +468,10 @@ namespace mongo {
 
         void _auth( DBClientConnection * conn );
 
-        ReplicaSetMonitorPtr _monitor;
+        // Throws a DBException if the monitor doesn't exist and there isn't a cached seed to use.
+        ReplicaSetMonitorPtr _getMonitor() const;
+
+        string _setName;
 
         HostAndPort _masterHost;
         scoped_ptr<DBClientConnection> _master;

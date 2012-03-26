@@ -1008,6 +1008,7 @@ namespace mongo {
                     }
 
                     Shard::removeShard( shardDoc[ "_id" ].str() );
+                    ReplicaSetMonitor::remove( shardDoc[ "_id" ].str(), true );
                     Shard::reloadShardInfo();
 
                     result.append( "msg"   , "removeshard completed successfully" );

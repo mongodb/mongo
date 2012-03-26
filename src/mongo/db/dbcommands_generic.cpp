@@ -22,6 +22,7 @@
 #include <time.h>
 #include "introspect.h"
 #include "btree.h"
+#include "../client/dbclient_rs.h"
 #include "../util/lruishmap.h"
 #include "../util/md5.hpp"
 #include "../util/processinfo.h"
@@ -241,6 +242,11 @@ namespace mongo {
             if( cmdObj.hasElement( "traceExceptions" ) ) {
                 if( s == 0 ) result.append( "was", DBException::traceExceptions );
                 DBException::traceExceptions = cmdObj["traceExceptions"].Bool();
+                s++;
+            }
+            if( cmdObj.hasElement( "replMonitorMaxFailedChecks" ) ) {
+                if( s == 0 ) result.append( "was", ReplicaSetMonitor::getMaxFailedChecks() );
+                ReplicaSetMonitor::setMaxFailedChecks( cmdObj["replMonitorMaxFailedChecks"].Number() );
                 s++;
             }
 

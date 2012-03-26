@@ -22,6 +22,7 @@
 #include "request.h"
 #include "client_info.h"
 #include "../db/commands.h"
+#include "mongo/client/dbclient_rs.h"
 #include "mongo/client/dbclientcursor.h"
 #include <set>
 
@@ -263,15 +264,6 @@ namespace mongo {
         _addr = addr;
         if ( !_addr.empty() ) {
             _cs = ConnectionString( addr , ConnectionString::SET );
-            _rsInit();
-        }
-    }
-
-    void Shard::_rsInit() {
-        if ( _cs.type() == ConnectionString::SET ) {
-            string x = _cs.getSetName();
-            massert( 14807 , str::stream() << "no set name for shard: " << _name << " " << _cs.toString() , x.size() );
-            _rs = ReplicaSetMonitor::get( x , _cs.getServers() );
         }
     }
 
@@ -279,22 +271,21 @@ namespace mongo {
         verify( _name.size() );
         _addr = cs.toString();
         _cs = cs;
-        _rsInit();
         staticShardInfo.set( _name , *this , true , false );
     }
 
     void Shard::reset( const string& ident ) {
         *this = staticShardInfo.findCopy( ident );
-        _rs.reset();
-        _rsInit();
     }
 
     bool Shard::containsNode( const string& node ) const {
         if ( _addr == node )
             return true;
 
-        if ( _rs && _rs->contains( node ) )
-            return true;
+        if ( _cs.type() == ConnectionString::SET ) {
+            ReplicaSetMonitorPtr rs = ReplicaSetMonitor::get( _cs.getSetName(), true );
+            return rs->contains( node );
+        }
 
         return false;
     }
