@@ -582,7 +582,6 @@ elif "win32" == os.sys.platform:
     if release:
         # /MT: Causes your application to use the multithread, static version of the run-time library (LIBCMT.lib)
         # /O2: optimize for speed (as opposed to size)
-        env.Append( CPPDEFINES=[ "NDEBUG" ] )
         env.Append( CPPFLAGS= " /O2 /MT " )
 
         # TODO: this has caused some linking problems :
