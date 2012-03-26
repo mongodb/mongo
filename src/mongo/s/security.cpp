@@ -63,8 +63,13 @@ namespace mongo {
         return true;
     }
 
+    void AuthenticationInfo::setIsALocalHostConnectionWithSpecialAuthPowers() {
+        verify(!_isLocalHost);
+        _isLocalHost = true;
+    }
+
     bool AuthenticationInfo::_isAuthorizedSpecialChecks( const string& dbname ) const {
-        if ( !isLocalHost ) {
+        if ( !_isLocalHost ) {
             return false;
         }
 

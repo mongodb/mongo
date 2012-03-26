@@ -1555,7 +1555,7 @@ namespace mongo {
                 errmsg = "unauthorized";
                 anObjBuilder.append( "note" , str::stream() << "need to authorized on db: " << cl << " for command: " << e.fieldName() );
             }
-            else if( c->adminOnly() && c->localHostOnlyIfNoAuth( jsobj ) && noauth && !ai->isLocalHost ) {
+            else if( c->adminOnly() && c->localHostOnlyIfNoAuth( jsobj ) && noauth && !ai->isLocalHost() ) {
                 ok = false;
                 errmsg = "unauthorized: this command must run from localhost when running db without auth";
                 log() << "command denied: " << jsobj.toString() << endl;

@@ -168,7 +168,8 @@ namespace mongo {
     public:
         virtual void connected( AbstractMessagingPort* p ) {
             Client& c = Client::initThread("conn", p);
-            c.getAuthenticationInfo()->isLocalHost = p->remote().isLocalHost();
+            if( p->remote().isLocalHost() )
+                c.getAuthenticationInfo()->setIsALocalHostConnectionWithSpecialAuthPowers();
         }
 
         virtual void process( Message& m , AbstractMessagingPort* port , LastError * le) {

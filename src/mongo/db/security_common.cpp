@@ -33,7 +33,9 @@
 
 namespace mongo {
 
+    // this is a config setting, set at startup and not changing after initialization.
     bool noauth = true;
+
     AuthInfo internalSecurity;
 
     bool setUpSecurityKey(const string& filename) {

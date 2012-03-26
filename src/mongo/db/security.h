@@ -30,11 +30,16 @@ namespace mongo {
 
     /** An AuthenticationInfo object is present within every mongo::Client object */
     class AuthenticationInfo : boost::noncopyable {
+        bool _isLocalHost;
+        bool _isLocalHostAndLocalHostIsAuthorizedForAll;
     public:
-        bool isLocalHost;
-        
-        AuthenticationInfo(){ isLocalHost = false; }
+        void setIsALocalHostConnectionWithSpecialAuthPowers(); // called, if localhost, when conneciton established.
+        AuthenticationInfo() {
+            _isLocalHost = false; 
+            _isLocalHostAndLocalHostIsAuthorizedForAll = false;
+        }
         ~AuthenticationInfo() {}
+        bool isLocalHost() const { return _isLocalHost; } // why are you calling this? makes no sense to be externalized
 
         // -- modifiers ----
         
@@ -92,6 +97,7 @@ namespace mongo {
         // it too thus we need this
         mutable SpinLock _lock;
 
+        // todo: caching should not last forever
         typedef map<string,Auth> MA;
         MA _dbs; // dbname -> auth
 

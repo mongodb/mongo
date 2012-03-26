@@ -1600,7 +1600,7 @@ namespace mongo {
         virtual bool run(const string& dbname, BSONObj& cmdObj, int, string& errmsg, BSONObjBuilder& result, bool) {
 
             AuthenticationInfo *ai = cc().getAuthenticationInfo();
-            if ( ! ai->isLocalHost ) {
+            if ( ! ai->isLocalHost() ) {
                 errmsg = "godinsert only works locally";
                 return false;
             }
@@ -1824,7 +1824,7 @@ namespace mongo {
 
         AuthenticationInfo *ai = client.getAuthenticationInfo();
 
-        if( c->adminOnly() && c->localHostOnlyIfNoAuth( cmdObj ) && noauth && !ai->isLocalHost ) {
+        if( c->adminOnly() && c->localHostOnlyIfNoAuth( cmdObj ) && noauth && !ai->isLocalHost() ) {
             result.append( "errmsg" ,
                            "unauthorized: this command must run from localhost when running db without auth" );
             log() << "command denied: " << cmdObj.toString() << endl;

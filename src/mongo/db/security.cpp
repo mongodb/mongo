@@ -54,8 +54,13 @@ namespace mongo {
     bool AuthenticationInfo::_isAuthorizedSpecialChecks( const string& dbname ) const {
         if ( cc().isGod() ) 
             return true;
+        return _isLocalHostAndLocalHostIsAuthorizedForAll;
+    }
 
-        if ( isLocalHost ) {
+    void AuthenticationInfo::setIsALocalHostConnectionWithSpecialAuthPowers() {
+        verify(!_isLocalHost);
+        _isLocalHost = true;
+        {
             Client::GodScope gs;
             Client::ReadContext ctx("admin.system.users");
             BSONObj result;
@@ -65,11 +70,9 @@ namespace mongo {
                     _warned = true;
                     log() << "note: no users configured in admin.system.users, allowing localhost access" << endl;
                 }
-                return true;
+                _isLocalHostAndLocalHostIsAuthorizedForAll = true;
             }
         }
-
-        return false;
     }
 
     bool CmdAuthenticate::getUserObj(const string& dbname, const string& user, BSONObj& userObj, string& pwd) {

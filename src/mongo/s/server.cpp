@@ -86,7 +86,8 @@ namespace mongo {
         virtual void connected( AbstractMessagingPort* p ) {
             ClientInfo *c = ClientInfo::get();
             massert(15849, "client info not defined", c);
-            c->getAuthenticationInfo()->isLocalHost = p->remote().isLocalHost();
+            if( p->remote().isLocalHost() )
+                c->getAuthenticationInfo()->setIsALocalHostConnectionWithSpecialAuthPowers();
         }
 
         virtual void process( Message& m , AbstractMessagingPort* p , LastError * le) {
