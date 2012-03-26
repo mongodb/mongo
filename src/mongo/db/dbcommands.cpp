@@ -610,7 +610,7 @@ namespace mongo {
 
             {
                 RamLog* rl = RamLog::get( "warnings" );
-                verify(15880, rl);
+                massert(15880, "no ram log for warnings?" , rl);
                 
                 if (rl->lastWrite() >= time(0)-(10*60)){ // only show warnings from last 10 minutes
                     vector<const char*> lines;

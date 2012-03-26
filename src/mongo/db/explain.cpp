@@ -178,17 +178,17 @@ namespace mongo {
                 ret = *i;
             }
         }
-        verify( 16076, ret );
+        assert( ret );
         return *ret;
     }
     
     void ExplainQueryInfo::noteIterate( bool match, bool loadedRecord, bool chunkSkip ) {
-        verify( 16077, !_clauses.empty() );
+        assert( !_clauses.empty() );
         _clauses.back()->noteIterate( match, loadedRecord, chunkSkip );
     }
 
     void ExplainQueryInfo::reviseN( long long n ) {
-        verify( 16073, !_clauses.empty() );
+        assert( !_clauses.empty() );
         _clauses.back()->reviseN( n );
     }
 

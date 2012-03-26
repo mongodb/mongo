@@ -78,7 +78,7 @@ namespace mongo {
     }
     
     void DBClientCursor::initLazy( bool isRetry ) {
-        verify( 15875 , _client->lazySupported() );
+        massert( 15875 , "DBClientCursor::initLazy called on a client that doesn't support lazy" , _client->lazySupported() );
         Message toSend;
         _assembleInit( toSend );
         _client->say( toSend, isRetry, &_originalHost );

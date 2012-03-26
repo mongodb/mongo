@@ -168,12 +168,12 @@ namespace mongo {
     }
 
     int ElementMatcher::inverseOfNegativeCompareOp() const {
-        verify( 15892, negativeCompareOp() );
+        assert( negativeCompareOp() );
         return _compareOp == BSONObj::NE ? BSONObj::Equality : BSONObj::opIN;
     }
 
     bool ElementMatcher::negativeCompareOpContainsNull() const {
-        verify( 15893, negativeCompareOp() );
+        assert( negativeCompareOp() );
         return (_compareOp == BSONObj::NE && _toMatch.type() != jstNULL) ||
         (_compareOp == BSONObj::NIN && _myset->count( staticNull.firstElement()) == 0 );
     }
