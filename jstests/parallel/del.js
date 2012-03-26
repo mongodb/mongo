@@ -1,17 +1,18 @@
 
-
 N = 1000;
-
 HOST = db.getMongo().host
 
-DONE = false;
+a = db.getSisterDB( "fooa" )
+b = db.getSisterDB( "foob" )
+a.dropDatabase();
+b.dropDatabase();
 
 function del1( dbname, host, max ){
     var m = new Mongo( host )
     var db = m.getDB( "foo" + dbname );
     var t = db.del
 
-    while ( 1 ){
+    while ( !db.del_parallel.count() ){
         var r = Math.random();
         var n = Math.floor( Math.random() * max );
         if ( r < .9 ){
@@ -36,7 +37,7 @@ function del2( dbname, host, max ){
     var db = m.getDB( "foo" + dbname );
     var t = db.del
 
-    while ( 1 ){
+    while ( !db.del_parallel.count() ){
         var r = Math.random();
         var n = Math.floor( Math.random() * max );
         var s = Math.random() > .5 ? 1 : -1;
@@ -63,9 +64,6 @@ all.push( fork( del2 , "b", HOST, N ) )
 for ( i=0; i<all.length; i++ )
     all[i].start()
 
-a = db.getSisterDB( "fooa" )
-b = db.getSisterDB( "foob" )
-
 for ( i=0; i<10; i++ ){
     sleep( 2000 )
     print( "dropping" )
@@ -73,7 +71,8 @@ for ( i=0; i<10; i++ ){
     b.dropDatabase();
 }
 
-DONE = true;
+a.del_parallel.save({done: 1})
+b.del_parallel.save({done: 1})
 
 all[0].join()
 
