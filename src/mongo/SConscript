@@ -68,8 +68,6 @@ commonFiles = [ "pch.cpp",
                 "client/distlock.cpp",
                 "s/shardconnection.cpp"]
 
-commonFiles += env['MONGO_COMMON_FILES']
-
 env.StaticLibrary('mongocommon', commonFiles,
                   LIBDEPS=['$BUILD_DIR/third_party/pcrecpp',
                            '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
@@ -128,20 +126,26 @@ coreServerFiles = [ "util/version.cpp",
                     "db/commands/isself.cpp",
                     "db/security_common.cpp",
                     "db/security_commands.cpp",
-                    "scripting/engine.cpp",
-                    "scripting/utils.cpp",
-                    "scripting/bench.cpp",
-                    ] + env['MONGO_SCRIPTING_FILES']
+                    ]
 
 if "win32" == os.sys.platform:
     coreServerFiles.append( "util/ntservice.cpp" )
 
+scripting_common_files = [ "scripting/engine.cpp",
+                           "scripting/utils.cpp",
+                           "scripting/bench.cpp",
+                           ]
+
 if usesm:
-    coreServerFiles.append( "scripting/engine_spidermonkey.cpp" )
+    env.StaticLibrary('scripting', scripting_common_files + ['scripting/engine_spidermonkey.cpp'],
+                      LIBDEPS=['$BUILD_DIR/third_party/js-1.7/js'])
 elif usev8:
-    coreServerFiles.append( Glob( "scripting/*v8*.cpp" ) )
+    env.StaticLibrary('scripting', scripting_common_files + ['scripting/engine_v8.cpp',
+                                                             'scripting/v8_db.cpp',
+                                                             'scripting/v8_utils.cpp',
+                                                             'scripting/v8_wrapper.cpp'])
 else:
-    coreServerFiles.append( "scripting/engine_none.cpp"  )
+    env.StaticLibrary('scripting', scripting_common_files + ['scripting/engine_none.cpp'])
 
 mmapFiles = [ "util/mmap.cpp" ]
 
@@ -251,7 +255,7 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/commands/pipeline_command.cpp",
                     "db/commands/pipeline_d.cpp",
                     "db/commands/document_source_cursor.cpp",
-                    "db/driverHelpers.cpp" ] + env['MONGO_SERVER_ONLY_FILES']
+                    "db/driverHelpers.cpp" ]
 
 env.Library( "dbcmdline", "db/cmdline.cpp" )
 
@@ -317,7 +321,7 @@ if has_option( 'use-cpu-profiler' ):
     coreServerFiles.append( 'db/commands/cpuprofile.cpp' )
     env.Append( LIBS=['profiler'] )
 
-env.StaticLibrary("coreserver", coreServerFiles, LIBDEPS=["mongocommon"])
+env.StaticLibrary("coreserver", coreServerFiles, LIBDEPS=["mongocommon", "scripting"])
 
 # main db target
 mongod = env.Install( '#/', env.Program( "mongod", mongodOnlyFiles,

@@ -50,15 +50,6 @@ def findSettingsSetup():
     sys.path.append( ".." )
     sys.path.append( "../../" )
 
-def getThirdPartyShortNames():
-    lst = []
-    for x in os.listdir( "src/third_party" ):
-        if not x.endswith( ".py" ) or x.find( "#" ) >= 0:
-            continue
-
-        lst.append( _rpartition( x, "." )[0] )
-    return lst
-
 
 # --- options ----
 
@@ -207,14 +198,13 @@ add_option( "gcov" , "compile with flags for gcov" , 0 , True )
 add_option("smokedbprefix", "prefix to dbpath et al. for smoke tests", 1 , False )
 add_option("smokeauth", "run smoke tests with --auth", 0 , False )
 
-for shortName in getThirdPartyShortNames():
-    add_option( "use-system-" + shortName , "use system version of library " + shortName , 0 , True )
-
 add_option( "use-system-pcre", "use system version of pcre library", 0, True )
 
 add_option( "use-system-boost", "use system version of boost libraries", 0, True )
 
 add_option( "use-system-snappy", "use system version of snappy library", 0, True )
+
+add_option( "use-system-sm", "use system version of spidermonkey library", 0, True )
 
 add_option( "use-system-all" , "use all system libraries", 0 , True )
 
@@ -746,24 +736,6 @@ if not windows:
         keyfile = "jstests/libs/key%s" % keysuffix
         os.chmod( keyfile , stat.S_IWUSR|stat.S_IRUSR )
 
-moduleFiles = {}
-commonFiles = []
-serverOnlyFiles = []
-scriptingFiles = []
-for shortName in getThirdPartyShortNames():
-    path = "src/third_party/%s.py" % shortName
-    myModule = imp.load_module( "src/third_party_%s" % shortName , open( path , "r" ) , path , ( ".py" , "r" , imp.PY_SOURCE ) )
-    fileLists = { "commonFiles" : commonFiles , "serverOnlyFiles" : serverOnlyFiles , "scriptingFiles" : scriptingFiles, "moduleFiles" : moduleFiles }
-
-    options_topass["windows"] = windows
-    options_topass["nix"] = nix
-
-    if use_system_version_of_library(shortName):
-        print( "using system version of: " + shortName )
-        myModule.configureSystem( env , fileLists , options_topass )
-    else:
-        myModule.configure( env , fileLists , options_topass )
-
 if not use_system_version_of_library("pcre"):
     env.Prepend(CPPPATH=[ '$BUILD_DIR/third_party/pcre-${PCRE_VERSION}' ])
 
@@ -773,11 +745,6 @@ if not use_system_version_of_library("boost"):
 
 env.Append( CPPPATH=['$EXTRACPPPATH'],
             LIBPATH=['$EXTRALIBPATH'] )
-
-env['MONGO_COMMON_FILES'] = commonFiles
-env['MONGO_SERVER_ONLY_FILES' ] = serverOnlyFiles
-env['MONGO_SCRIPTING_FILES'] = scriptingFiles
-env['MONGO_MODULE_FILES'] = moduleFiles
 
 # --- check system ---
 

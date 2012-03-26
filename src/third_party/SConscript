@@ -1,6 +1,6 @@
 # -*- mode: python -*-
 
-Import( "env use_system_version_of_library" )
+Import( "env use_system_version_of_library windows" )
 
 env.SConscript( [
         "murmurhash3/SConscript",
@@ -31,3 +31,14 @@ else:
     env.Append(CPPPATH='$BUILD_DIR/third_party/snappy')
     env.SConscript('snappy/SConscript')
     env.StaticLibrary('mongo_snappy', ['mongo_snappy.cpp'], LIBDEPS=['snappy/snappy'])
+
+if use_system_version_of_library("sm"):
+    env.StaticLibrary("mongo_spidermonkey", ['mongo_spidermonkey.cpp'], SYSLIBDEPS=['js'])
+else:
+    if windows:
+        env.Append(CPPDEFINES=['XP_WIN'])
+    else:
+        env.Append(CPPDEFINES=['XP_UNIX'])
+    env.Append(CPPPATH='$BUILD_DIR/third_party/js-1.7')
+    env.SConscript('js-1.7/SConscript')
+    env.StaticLibrary('mongo_spidermonkey', ['mongo_spidermonkey.cpp'], LIBDEPS=['js-1.7/js'])
