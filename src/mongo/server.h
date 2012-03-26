@@ -12,8 +12,6 @@
 # error this file is for mongo server programs not client lib
 #endif
 
-#define BOOST_ENABLE_ASSERT_HANDLER 1
-
 #include <map>
 #include <vector>
 #include <set>

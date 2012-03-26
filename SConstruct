@@ -352,7 +352,7 @@ if has_option( "libpath" ):
 if has_option( "cpppath" ):
     env["CPPPATH"] = [get_option( "cpppath" )]
 
-env.Prepend( CPPDEFINES=[ "_SCONS" , "MONGO_EXPOSE_MACROS" , "BOOST_ENABLE_ASSERT_HANDLER" ],
+env.Prepend( CPPDEFINES=[ "_SCONS" , "MONGO_EXPOSE_MACROS" ],
              CPPPATH=[ '$BUILD_DIR', "$BUILD_DIR/mongo" ] )
 
 if has_option( "safeshell" ):

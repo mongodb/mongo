@@ -22,8 +22,6 @@
 #define MONGO_PCH_H
 
 #if defined(MONGO_EXPOSE_MACROS)
-// this is defined in server.h for non-MONGO_EXPOSE_MACROS
-# define BOOST_ENABLE_ASSERT_HANDLER 1
 
 # define JS_C_STRINGS_ARE_UTF8
 # undef  SUPPORT_UCP
