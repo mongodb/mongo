@@ -60,10 +60,18 @@ replTest.stopSet();
 replTest2 = new ReplSetTest({name : 'testSet2', nodes : 1});
 nodes = replTest2.startSet();
 
-result = nodes[0].getDB("admin").runCommand({replSetInitiate : {_id : "testSet2", members : [
-    {_id : 0, tags : ["member0"]}
-   ]}});
-
-assert(result.errmsg.match(/bad or missing host field/) , "error message doesn't match, got result:" + tojson(result) );
+assert.soon(function() {
+    try {
+        result = nodes[0].getDB("admin").runCommand({replSetInitiate : {_id : "testSet2", members : [
+            {_id : 0, tags : ["member0"]}
+        ]}});
+        printjson(result);
+        return result.errmsg.match(/bad or missing host field/);
+    }
+    catch (e) {
+        print(e);
+    }
+    return false;
+});
 
 replTest2.stopSet();
