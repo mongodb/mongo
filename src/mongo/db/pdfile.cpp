@@ -2311,6 +2311,8 @@ namespace mongo {
             return false;
         }
 
+        killCurrentOp.checkForInterrupt();
+
         Path reservedPath =
             uniqueReservedPath( ( preserveClonedFilesOnFailure || backupOriginalFiles ) ?
                                 "backup" : "_tmp" );
