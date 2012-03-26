@@ -38,6 +38,8 @@ def readErrorCodes( callback, replaceZero = False ):
     ps = [ re.compile( "(([umsgf]asser(t|ted))) *\(( *)(\d+)" ) ,
            re.compile( "((User|Msg|MsgAssertion)Exceptio(n))\(( *)(\d+)" )
            ]
+
+    bad = [ re.compile( "\sassert *\(" ) ]
     
     for x in utils.getAllSourceFiles():
         
@@ -55,6 +57,14 @@ def readErrorCodes( callback, replaceZero = False ):
                     break
 
             if found:
+                
+                if x.find( "src/mongo/" ) >= 0:
+                    for b in bad:
+                        if len(b.findall( line )) > 0:
+                            print( x )
+                            print( line )
+                            raise Exception( "you can't use a bare assert" )
+
                 for p in ps:               
 
                     def repl( m ):
