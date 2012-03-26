@@ -123,20 +123,24 @@ assert( ! x.ok , "lock should fail: " + tojson( x ) )
 // SERVER-4194
 
 function countWritebacks( curop ) {
+    print( "---------------" );
     var num = 0;
     for ( var i=0; i<curop.inprog.length; i++ ) {
         var q = curop.inprog[i].query;
-        if ( q && q.writebacklisten )
+        if ( q && q.writebacklisten ) {
+            printjson( curop.inprog[i] );
             num++;
+        }
     }
     return num;
 }
 
 x = db.currentOp();
-assert.eq( 0 , countWritebacks( x ) , "without all: " + tojson(x) );
+assert.eq( 0 , countWritebacks( x ) , "without all");
 
 x = db.currentOp( true );
-assert.eq( 1 , countWritebacks( x ) , "with all: " + tojson(x) );
+y = countWritebacks( x )
+assert( y == 1 || y == 2  , "with all: "  + y );
 
 
 
