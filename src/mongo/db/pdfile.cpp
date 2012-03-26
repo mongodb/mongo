@@ -73,9 +73,9 @@ namespace mongo {
         const char * x = strchr( ns.data() , '.' );
         if ( ! x )
             return false;
-
-        x++;
-        return *x > 0;
+        return true;
+        //x++;
+        //return *x > 0;
     }
 
     // TODO SERVER-4328
