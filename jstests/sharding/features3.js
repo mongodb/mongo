@@ -133,10 +133,10 @@ function countWritebacks( curop ) {
 }
 
 x = db.currentOp();
-assert.eq( 0 , countWritebacks( x ) , "without all" );
+assert.eq( 0 , countWritebacks( x ) , "without all: " + tojson(x) );
 
 x = db.currentOp( true );
-assert.eq( 1 , countWritebacks( x ) , "with all" );
+assert.eq( 1 , countWritebacks( x ) , "with all: " + tojson(x) );
 
 
 
