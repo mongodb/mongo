@@ -211,6 +211,7 @@ namespace mongo {
 
         // we usually don't get here, so doesn't matter how fast this part is
         {
+            DEV log() << "_DEBUG ReadContext db wasn't open, will try to open " << ns << endl;
             if( Lock::isW() ) { 
                 // write locked already
                 DEV RARELY log() << "write locked on ReadContext construction " << ns << endl;

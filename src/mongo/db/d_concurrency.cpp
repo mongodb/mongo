@@ -155,11 +155,18 @@ namespace mongo {
             if( recursive ) { 
                 ss << " recursive:" << recursive;
             }
+            ss << " otherCount:" << otherCount;
             if( otherCount ) {
-                ss << " db:" << otherName;
+                ss << " otherdb:" << otherName;
             }
             if( nestableCount ) {
-                ss << " nestableCount:" << (int) whichNestable;
+                ss << " nestableCount:" << nestableCount << " which:";
+                if( whichNestable == Lock::local ) 
+                    ss << "local";
+                else if( whichNestable == Lock::admin ) 
+                    ss << "admin";
+                else 
+                    ss << (int) whichNestable;
             }
         }
         log() << ss.str() << endl;
