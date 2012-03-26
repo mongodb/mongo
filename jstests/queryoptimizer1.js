@@ -1,6 +1,6 @@
 
 t = db.queryoptimizer1;
-t.drop()
+t.drop();
 
 for ( i=0; i<1000; i++ )
     for ( j=0; j<20; j++ )
@@ -22,5 +22,6 @@ for ( var i=0; i<10000; i++ ){
 }
 
 printjson( t.find( { a : 50 , b : 50 , c : 6 } ).explain() );
-assert.eq( 1 , t.find( { a : 50 , b : 50 , c : 6 } ).count() )
+assert.eq( 1 , t.find( { a : 50 , b : 50 , c : 6 } ).count() );
 
+t.drop();
