@@ -89,7 +89,7 @@ namespace mongo {
 
             // All candidate cursors must support yields for QueryOptimizerCursorImpl's
             // prepareToYield() and prepareToTouchEarlierIterate() to work.
-            verify( 15940, _c->supportYields() );
+            assert( _c->supportYields() );
             _capped = _c->capped();
 
             // TODO This violates the current Cursor interface abstraction, but for now it's simpler to keep our own set of
@@ -448,7 +448,7 @@ namespace mongo {
                 if ( _currOp->error() || !ok() ) {
                     // Advance to a non error op if one of the ops errored out.
                     // Advance to a following $or clause if the $or clause returned all results.
-                    verify( 16094, !_mps->doneOps() );
+                    assert( !_mps->doneOps() );
                     _advance( true );
                 }
             }
@@ -760,7 +760,7 @@ namespace mongo {
         }
         if ( _planPolicy.permitOptimalIdPlan() && isSimpleIdQuery( _query ) ) {
             Database *database = cc().database();
-            verify( 15985, database );
+            assert( database );
             NamespaceDetails *d = database->namespaceIndex.details( _ns );
             if ( d ) {
                 int idxNo = d->findIdIndex();

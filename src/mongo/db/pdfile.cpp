@@ -1531,7 +1531,7 @@ namespace mongo {
                         DiskLoc toDelete = cc->currLoc();
                         bool ok = cc->advance();
                         ClientCursor::YieldData yieldData;
-                        verify( 16093, cc->prepareToYield( yieldData ) );
+                        massert( 16093, "after yield cursor deleted" , cc->prepareToYield( yieldData ) );
                         theDataFileMgr.deleteRecord( ns, toDelete.rec(), toDelete, false, true , true );
                         if( !cc->recoverFromYield( yieldData ) ) {
                             cc.release();

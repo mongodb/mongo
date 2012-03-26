@@ -729,7 +729,7 @@ doneCheckOrder:
             _currentQps->prepareToRetryQuery() ) {
 
             // Avoid an infinite loop here - this should never occur.
-            verify( 15878, !retried );
+            assert( !retried );
             _runner.reset();
             return iterateRunner( originalOp, true );
         }
@@ -804,7 +804,7 @@ doneCheckOrder:
     }
     
     shared_ptr<QueryOp> QueryPlanSet::Runner::next() {
-        verify( 16097, !done() );
+        assert( !done() );
 
         if ( _ops.empty() ) {
             shared_ptr<QueryOp> initialRet = init();
@@ -827,7 +827,7 @@ doneCheckOrder:
     }
     
     shared_ptr<QueryOp> QueryPlanSet::Runner::_next() {
-        verify( 16096, !_queue.empty() );
+        assert( !_queue.empty() );
         OpHolder holder = _queue.pop();
         QueryOp &op = *holder._op;
         nextOp( op );
@@ -996,7 +996,7 @@ doneCheckOrder:
     }
 
     shared_ptr<QueryOp> MultiPlanScanner::nextOp() {
-        verify( 16095, !doneOps() );
+        assert( !doneOps() );
         shared_ptr<QueryOp> ret = _or ? nextOpOr() : nextOpSimple();
         if ( ret->error() || ret->complete() ) {
             _doneOps = true;
@@ -1038,7 +1038,7 @@ doneCheckOrder:
         }
         handleBeginningOfClause();
         shared_ptr<QueryPlan> bestGuess = _currentQps->getBestGuess();
-        verify( 16075, bestGuess );
+        assert( bestGuess );
         return bestGuess.get();
     }
     
@@ -1154,7 +1154,7 @@ doneCheckOrder:
             _matcher = newMatcher;
             _c = _queryPlan->newCursor();
             // All sub cursors must support yields.
-            verify( 16092, _c->supportYields() );
+            assert( _c->supportYields() );
             if ( _explainPlanInfo ) {
                 _explainPlanInfo.reset( new ExplainPlanInfo() );
                 _explainPlanInfo->notePlan( *_c, _queryPlan->scanAndOrderRequired(),

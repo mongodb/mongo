@@ -443,7 +443,7 @@ namespace mongo {
 
         /** Add explain information for a new clause. */
         void addClauseInfo( const shared_ptr<ExplainClauseInfo> &clauseInfo ) {
-            verify( 16072, _explainQueryInfo );
+            assert( _explainQueryInfo );
             _explainQueryInfo->addClauseInfo( clauseInfo );
         }
         
@@ -588,12 +588,12 @@ namespace mongo {
         void noteYield();
         
         const QueryPlan &queryPlan() const {
-            verify( 16085, _c->ok() && _queryPlan );
+            assert( _c->ok() && _queryPlan );
             return *_queryPlan;
         }
         
         const Projection::KeyOnly *keyFieldsOnly() const {
-            verify( 16086, _c->ok() && _queryPlan );
+            assert( _c->ok() && _queryPlan );
             return _queryPlan->keyFieldsOnly().get();
         }
     private:
