@@ -29,7 +29,7 @@ __wt_block_read_buf(WT_SESSION_IMPL *session, WT_BLOCK *block,
 	WT_RET(__wt_block_read(session, block, buf, offset, size, cksum));
 
 	/* Optionally verify the page. */
-	if (block->fragbits == NULL)
+	if (!block->verify)
 		return (0);
 
 	WT_RET(__wt_scr_alloc(session, 0, &tmp));

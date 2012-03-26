@@ -8,6 +8,7 @@
 #include "wt_internal.h"
 
 static int __verify_checkfrag(WT_SESSION_IMPL *, WT_BLOCK *);
+static int __verify_extlist(WT_SESSION_IMPL *, WT_BLOCK *, WT_EXTLIST *);
 
 /*
  * __wt_block_verify_start --
@@ -66,6 +67,7 @@ __wt_block_verify_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	block->frags = (uint32_t)(file_size / block->allocsize);
 	WT_RET(__bit_alloc(session, block->frags, &block->fragbits));
 
+	block->verify = 1;
 	return (0);
 }
 
@@ -83,36 +85,59 @@ __wt_block_verify_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
 
 	__wt_free(session, block->fragbits);
 
+	block->verify = 0;
 	return (ret);
 }
 
 /*
- * __wt_block_verify_addr --
- *	Verify an address.
+ * __wt_verify_snap_load --
+ *	Verify work done when a snapshot is loaded.
  */
 int
-__wt_block_verify_addr(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, const uint8_t *addr, uint32_t addr_size)
+__wt_verify_snap_load(
+    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_BLOCK_SNAPSHOT *si)
 {
-	off_t offset;
-	uint32_t size;
+	/*
+	 * If we're verifying, add the disk blocks used to store extent lists to
+	 * the list of blocks we've "seen".
+	 */
+	if (si->avail_offset != WT_BLOCK_INVALID_OFFSET)
+		WT_RET(__wt_verify_addfrag(session, block,
+		    si->avail_offset, (off_t)si->avail_size));
+	if (si->alloc_offset != WT_BLOCK_INVALID_OFFSET)
+		WT_RET(__wt_verify_addfrag(session, block,
+		    si->alloc_offset, (off_t)si->alloc_size));
+	if (si->discard_offset != WT_BLOCK_INVALID_OFFSET)
+		WT_RET(__wt_verify_addfrag(session, block,
+		    si->discard_offset, (off_t)si->discard_size));
 
-	WT_UNUSED(addr_size);
-
-	/* Crack the cookie. */
-	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, NULL));
-
-	WT_RET(__wt_verify_addfrag(session, block, offset, (off_t)size));
+	/*
+	 * If we're verifying the file, we'll need to read the avail and discard
+	 * lists (blocks that are "available" to the tree for allocation or have
+	 * been deleted should not appear in the tree).
+	 */
+	if (si->avail_offset != WT_BLOCK_INVALID_OFFSET) {
+		 WT_RET(__wt_block_extlist_read(session, block, &si->avail,
+		     si->avail_offset, si->avail_size, si->avail_cksum));
+		WT_RET(__verify_extlist(session, block, &si->avail));
+		__wt_block_extlist_free(session, &si->avail);
+	}
+	if (si->discard_offset != WT_BLOCK_INVALID_OFFSET) {
+		 WT_RET(__wt_block_extlist_read(session, block, &si->discard,
+		     si->discard_offset, si->discard_size, si->discard_cksum));
+		WT_RET(__verify_extlist(session, block, &si->discard));
+		__wt_block_extlist_free(session, &si->discard);
+	}
 
 	return (0);
 }
 
 /*
- * __wt_verify_extlist --
+ * __verify_extlist --
  *	Add an extent list's fragments to the list of verified fragments.
  */
-int
-__wt_verify_extlist(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el)
+static int
+__verify_extlist(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el)
 {
 	WT_EXT *ext;
 	int ret;
@@ -136,6 +161,27 @@ __wt_verify_extlist(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el)
 	}
 
 	return (ret);
+}
+
+/*
+ * __wt_block_verify_addr --
+ *	Verify an address.
+ */
+int
+__wt_block_verify_addr(WT_SESSION_IMPL *session,
+    WT_BLOCK *block, const uint8_t *addr, uint32_t addr_size)
+{
+	off_t offset;
+	uint32_t size;
+
+	WT_UNUSED(addr_size);
+
+	/* Crack the cookie. */
+	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, NULL));
+
+	WT_RET(__wt_verify_addfrag(session, block, offset, (off_t)size));
+
+	return (0);
 }
 
 /* The bit list ignores the first sector: convert to/from an frag/offset. */

@@ -86,7 +86,8 @@ extern int __wt_bm_close(WT_SESSION_IMPL *session);
 extern int __wt_bm_snap_load(WT_SESSION_IMPL *session,
     WT_ITEM *buf,
     const uint8_t *addr,
-    uint32_t addr_size);
+    uint32_t addr_size,
+    int readonly);
 extern int __wt_bm_snap_unload(WT_SESSION_IMPL *session);
 extern int __wt_bm_truncate(WT_SESSION_IMPL *session, const char *filename);
 extern int __wt_bm_free(WT_SESSION_IMPL *session,
@@ -156,7 +157,8 @@ extern int __wt_block_snap_load(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_ITEM *dsk,
     const uint8_t *addr,
-    uint32_t addr_size);
+    uint32_t addr_size,
+    int readonly);
 extern int __wt_block_snap_unload(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_block_write_buf_snapshot( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
@@ -169,13 +171,13 @@ extern int __wt_block_snapshot_string(WT_SESSION_IMPL *session,
     WT_ITEM **retp);
 extern int __wt_block_verify_start(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_block_verify_end(WT_SESSION_IMPL *session, WT_BLOCK *block);
+extern int __wt_verify_snap_load( WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    WT_BLOCK_SNAPSHOT *si);
 extern int __wt_block_verify_addr(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     const uint8_t *addr,
     uint32_t addr_size);
-extern int __wt_verify_extlist(WT_SESSION_IMPL *session,
-    WT_BLOCK *block,
-    WT_EXTLIST *el);
 extern int __wt_verify_addfrag( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     off_t offset,

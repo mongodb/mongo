@@ -136,14 +136,15 @@ __wt_bm_close(WT_SESSION_IMPL *session)
  */
 int
 __wt_bm_snap_load(WT_SESSION_IMPL *session,
-    WT_ITEM *buf, const uint8_t *addr, uint32_t addr_size)
+    WT_ITEM *buf, const uint8_t *addr, uint32_t addr_size, int readonly)
 {
 	WT_BLOCK *block;
 
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (__wt_block_snap_load(session, block, buf, addr, addr_size));
+	return (__wt_block_snap_load(
+	    session, block, buf, addr, addr_size, readonly));
 }
 
 /*

@@ -117,7 +117,7 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 		 */
 		WT_CLEAR(dsk);
 		WT_ERR(__wt_bm_snap_load(
-		    session, &dsk, vs->tmp1->data, vs->tmp1->size));
+		    session, &dsk, vs->tmp1->data, vs->tmp1->size, 1));
 		if (dsk.size != 0) {
 			/* Verify, then discard the snapshot from the cache. */
 			if ((ret = __wt_btree_tree_open(session, &dsk)) == 0) {

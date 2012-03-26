@@ -71,7 +71,7 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	 * being created), or second, the load call returns no root page (the
 	 * snapshot is empty).
 	 */
-	WT_ERR(__wt_bm_snap_load(session, &dsk, addr, addr_size));
+	WT_ERR(__wt_bm_snap_load(session, &dsk, addr, addr_size, 0));
 	if (addr == NULL || addr_size == 0 || dsk.size == 0)
 		WT_ERR(__btree_tree_open_empty(session));
 	else {

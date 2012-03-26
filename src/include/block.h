@@ -152,7 +152,7 @@ struct __wt_block {
 	int	 slvg;			/* If performing salvage. */
 	off_t	 slvg_off;		/* Salvage file offset */
 
-					/* Verification support */
+	int	 verify;		/* Verification support */
 	uint32_t frags;			/* Total frags */
 	uint8_t *fragbits;		/* Frag tracking bit list */
 
