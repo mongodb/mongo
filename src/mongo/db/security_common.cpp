@@ -122,13 +122,13 @@ namespace mongo {
 
 
     bool AuthenticationInfo::_isAuthorized(const string& dbname, Auth::Level level) const {
+        if ( noauth ) {
+            return true;
+        }
         {
             scoped_spinlock lk(_lock);
 
             if ( _isAuthorizedSingle_inlock( dbname , level ) )
-                return true;
-
-            if ( noauth )
                 return true;
 
             if ( _isAuthorizedSingle_inlock( "admin" , level ) )
