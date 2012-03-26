@@ -21,7 +21,7 @@ function killRepair() {
     while( 1 ) {
      	p = db.currentOp().inprog;
         for( var i in p ) {
-         	var o = p[ i ];
+            var o = p[ i ];
             printjson( o );
             // Find the active 'repairDatabase' op and kill it.
             if ( o.active && o.query.repairDatabase ) {
@@ -33,6 +33,8 @@ function killRepair() {
 }
 
 s = startParallelShell( killRepair.toString() + "; killRepair();" );
+
+sleep(100); // make sure shell is actually running, lame
 
 // Repair should fail due to killOp.
 assert.commandFailed( db.runCommand( {repairDatabase:1, backupOriginalFiles:true} ) );
