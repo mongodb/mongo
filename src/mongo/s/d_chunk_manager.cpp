@@ -139,7 +139,7 @@ namespace mongo {
     }
     
     bool ShardChunkManager::belongsToMe( ClientCursor* cc ) const {
-        verify( 15851 , cc );
+        assert( cc );
         if ( _rangesMap.size() == 0 )
             return false;
         

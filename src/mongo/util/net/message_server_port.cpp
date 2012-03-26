@@ -141,7 +141,7 @@ namespace mongo {
                 static const size_t STACK_SIZE = 1024*1024; // if we change this we need to update the warning
 
                 struct rlimit limits;
-                verify(15887, getrlimit(RLIMIT_STACK, &limits) == 0);
+                assert(getrlimit(RLIMIT_STACK, &limits) == 0);
                 if (limits.rlim_cur > STACK_SIZE) {
                     pthread_attr_setstacksize(&attrs, (DEBUG_BUILD
                                                         ? (STACK_SIZE / 2)

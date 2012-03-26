@@ -406,12 +406,12 @@ namespace mongo {
                         }
                     }
                     else {
-                        verify(16066, sk.hasShardKey(key));
+                        uassert(16066, "", sk.hasShardKey(key));
                         c = manager->findChunk( key );
                         shard = c->getShard();
                     }
 
-                    verify(16067, shard != Shard());
+                    assert(shard != Shard());
                     doWrite( dbUpdate , r , shard );
 
                     if ( c &&r.getClientInfo()->autoSplitOk() )

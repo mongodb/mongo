@@ -78,7 +78,7 @@ namespace mongo {
     }
 
     void LogFile::truncate() {
-        verify(15870, _fd != INVALID_HANDLE_VALUE);
+        assert(_fd != INVALID_HANDLE_VALUE);
 
         if (!SetEndOfFile(_fd)){
             msgasserted(15871, "Couldn't truncate file: " + errnoWithDescription());
@@ -184,7 +184,7 @@ namespace mongo {
     }
 
     void LogFile::truncate() {
-        verify(15872, _fd >= 0);
+        assert(_fd >= 0);
 
         BOOST_STATIC_ASSERT(sizeof(off_t) == 8); // we don't want overflow here
         const off_t pos = lseek(_fd, 0, SEEK_CUR); // doesn't actually seek
