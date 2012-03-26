@@ -28,6 +28,7 @@
 
 namespace mongo {
 
+    /** An AuthenticationInfo object is present within every mongo::Client object */
     class AuthenticationInfo : boost::noncopyable {
     public:
         bool isLocalHost;
@@ -77,7 +78,7 @@ namespace mongo {
 
         void print() const;
 
-    protected:
+    private:
         /** takes a lock */
         bool _isAuthorized(const string& dbname, Auth::Level level) const;
 
@@ -87,6 +88,8 @@ namespace mongo {
         bool _isAuthorizedSpecialChecks( const string& dbname ) const ;
 
     private:
+        // while most access to _dbs is from our thread (the TLS thread), currentOp() inspects
+        // it too thus we need this
         mutable SpinLock _lock;
 
         typedef map<string,Auth> MA;
