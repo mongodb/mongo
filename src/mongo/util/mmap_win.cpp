@@ -172,11 +172,12 @@ namespace mongo {
 
             int loopCount = 0;
             bool success = false;
+            bool timeout = false;
             int dosError = ERROR_SUCCESS;
             const int maximumLoopCount = 1000 * 1000;
             const int maximumTimeInSeconds = 60;
             Timer t;
-            while ( !success && loopCount < maximumLoopCount && t.seconds() < maximumTimeInSeconds ) {
+            while ( !success && !timeout && loopCount < maximumLoopCount ) {
                 ++loopCount;
                 success = FALSE != FlushViewOfFile( _view, 0 );
                 if ( !success ) {
@@ -184,6 +185,7 @@ namespace mongo {
                     if ( dosError != ERROR_LOCK_VIOLATION ) {
                         break;
                     }
+                    timeout = t.seconds() > maximumTimeInSeconds;
                 }
             }
             if ( success && loopCount > 1 ) {
