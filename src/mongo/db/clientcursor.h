@@ -221,30 +221,21 @@ namespace mongo {
         struct YieldData { CursorId _id; bool _doingDeletes; };
         bool prepareToYield( YieldData &data );
         static bool recoverFromYield( const YieldData &data );
-
+        
         struct YieldLock : boost::noncopyable {
-            explicit YieldLock( ptr<ClientCursor> cc )
-                : _canYield(cc->_c->supportYields()) {
-                if ( _canYield ) {
-                    cc->prepareToYield( _data );
-                    _unlock.reset(new dbtempreleasecond());
-                }
-            }
-            ~YieldLock() {
-                if ( _unlock ) {
-                    log( LL_WARNING ) << "ClientCursor::YieldLock not closed properly" << endl;
-                    relock();
-                }
-            }
-            bool stillOk() {
-                if ( ! _canYield )
-                    return true;
-                relock();
-                return ClientCursor::recoverFromYield( _data );
-            }
-            void relock() {
-                _unlock.reset();
-            }
+            
+            explicit YieldLock( ptr<ClientCursor> cc );
+            
+            ~YieldLock();
+            
+            /**
+             * @return if the cursor is still ok
+             *         if it is, we also relock
+             */
+            bool stillOk();
+
+            void relock();
+
         private:
             const bool _canYield;
             YieldData _data;

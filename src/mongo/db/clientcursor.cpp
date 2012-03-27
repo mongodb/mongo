@@ -766,6 +766,35 @@ namespace mongo {
 
     }
 
+    ClientCursor::YieldLock::YieldLock( ptr<ClientCursor> cc )
+        : _canYield(cc->_c->supportYields()) {
+     
+        if ( _canYield ) {
+            cc->prepareToYield( _data );
+            _unlock.reset(new dbtempreleasecond());
+        }
+
+    }
+    
+    ClientCursor::YieldLock::~YieldLock() {
+        if ( _unlock ) {
+            warning() << "ClientCursor::YieldLock not closed properly" << endl;
+            relock();
+        }
+    }
+    
+    bool ClientCursor::YieldLock::stillOk() {
+        if ( ! _canYield )
+            return true;
+        relock();
+        return ClientCursor::recoverFromYield( _data );
+    }
+    
+    void ClientCursor::YieldLock::relock() {
+        _unlock.reset();
+    }
+
+
     ClientCursorMonitor clientCursorMonitor;
 
 } // namespace mongo
