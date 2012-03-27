@@ -2,17 +2,21 @@
 > ShardingTest
 function (testName, numShards, verboseLevel, numMongos, otherParams) {
 */
-var shardedAggTest = new ShardingTest(
-    /* testName */ "shardedAggTest",
-    /* numShards */ 2,
-    /* verboseLevel */ 1,
-    /* numMongos */ 1,
-    /* otherParams */ { chunksize : 1 }
+var shardedAggTest = new ShardingTest({
+    shards: 2,
+    verbose: 1,
+    mongos: 1,
+    other: { chunksize: 1}
+    }
 );
 
-shardedAggTest.adminCommand( { enablesharding : "aggShard" } )
-shardedAggTest.adminCommand( { shardcollection : "aggShard.ts1", key : { "_id" : 1 } } )
+shardedAggTest.adminCommand( { enablesharding : "aggShard" } );
 db = shardedAggTest.getDB( "aggShard" );
+
+/* make sure its cleaned up */
+db.ts1.drop();
+
+shardedAggTest.adminCommand( { shardcollection : "aggShard.ts1", key : { "_id" : 1 } } );
 
 
 /*
@@ -50,12 +54,11 @@ var strings = [
     "twenty"
 ];
 
-db.ts1.drop();
-
-var nItems = 100000;
+var nItems = 200000;
 for(i = 1; i <= nItems; ++i) {
     db.ts1.save(
-        {counter: ++count, number: strings[i % 20]});
+        {counter: ++count, number: strings[i % 20],
+         filler: "0123456789012345678901234567890123456789"});
 }
 
 // a project and group in shards, result combined in mongos
