@@ -60,30 +60,37 @@ namespace mongo {
     void AuthenticationInfo::setIsALocalHostConnectionWithSpecialAuthPowers() {
         verify(!_isLocalHost);
         _isLocalHost = true;
-        {
+        _isLocalHostAndLocalHostIsAuthorizedForAll = true;
+        _checkLocalHostSpecialAdmin();
+    }
+
+    void AuthenticationInfo::_checkLocalHostSpecialAdmin() {
+        if ( ! _isLocalHost )
+            return;
+        
+        if ( ! _isLocalHostAndLocalHostIsAuthorizedForAll )
+            return;
+        
+        if ( ! noauth ) {
             Client::GodScope gs;
             Client::ReadContext ctx("admin.system.users");
             BSONObj result;
-            if( ! Helpers::getSingleton("admin.system.users", result) ) {
-                if( ! _warned ) {
-                    // you could get a few of these in a race, but that's ok
-                    _warned = true;
-                    log() << "note: no users configured in admin.system.users, allowing localhost access" << endl;
-                }
-                _isLocalHostAndLocalHostIsAuthorizedForAll = true;
+            if( Helpers::getSingleton("admin.system.users", result) ) {
+                _isLocalHostAndLocalHostIsAuthorizedForAll = false;
+            }
+            else if ( ! _warned ) {
+                // you could get a few of these in a race, but that's ok
+                _warned = true;
+                log() << "note: no users configured in admin.system.users, allowing localhost access" << endl;
             }
         }
+        
+        
     }
 
     void AuthenticationInfo::startRequest() {
-        if ( _isLocalHost && _isLocalHostAndLocalHostIsAuthorizedForAll ) {
-            if ( ! Lock::isLocked() ) {
-                // we can't do this if we're already locked
-                // as then we can deadlock
-                _isLocalHost = false;
-                _isLocalHostAndLocalHostIsAuthorizedForAll = false;
-                setIsALocalHostConnectionWithSpecialAuthPowers();
-            }
+        if ( ! Lock::isLocked() ) {
+            _checkLocalHostSpecialAdmin();
         }
     }
 

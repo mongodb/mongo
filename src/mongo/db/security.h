@@ -85,6 +85,8 @@ namespace mongo {
         void print() const;
 
     private:
+        void _checkLocalHostSpecialAdmin();
+
         /** takes a lock */
         bool _isAuthorized(const string& dbname, Auth::Level level) const;
 
