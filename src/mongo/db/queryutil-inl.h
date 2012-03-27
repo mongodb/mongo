@@ -74,10 +74,14 @@ namespace mongo {
         return true;
     }
 
-    inline long long FieldRangeVector::size() {
-        long long ret = 1;
+    inline unsigned FieldRangeVector::size() {
+        unsigned ret = 1;
         for( vector<FieldRange>::const_iterator i = _ranges.begin(); i != _ranges.end(); ++i ) {
-            ret *= i->intervals().size();
+            unsigned long long product =
+                    (unsigned long long)ret * (unsigned long long)i->intervals().size();
+            // Check for overflow SERVER-5415.
+            verify( 16110, ( product >> 32 ) == 0 );
+            ret = product;
         }
         return ret;
     }

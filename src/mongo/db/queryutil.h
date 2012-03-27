@@ -536,7 +536,7 @@ namespace mongo {
         FieldRangeVector( const FieldRangeSet &frs, const IndexSpec &indexSpec, int direction );
 
         /** @return the number of index ranges represented by 'this' */
-        long long size();
+        unsigned size();
         /** @return starting point for an index traversal. */
         BSONObj startKey() const;
         /** @return end point for an index traversal. */
