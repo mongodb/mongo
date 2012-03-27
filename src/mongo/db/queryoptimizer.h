@@ -529,14 +529,14 @@ namespace mongo {
         bool _or;
         BSONObj _query;
         shared_ptr<const ParsedQuery> _parsedQuery;
-        shared_ptr<OrRangeGenerator> _org; // May be null in certain non $or query cases.
+        scoped_ptr<OrRangeGenerator> _org; // May be null in certain non $or query cases.
         auto_ptr<QueryPlanSet> _currentQps;
         int _i;
         QueryPlanSet::RecordedPlanPolicy _recordedPlanPolicy;
         BSONObj _hint;
         bool _tableScanned;
         shared_ptr<QueryOp> _baseOp;
-        shared_ptr<QueryPlanSet::Runner> _runner;
+        scoped_ptr<QueryPlanSet::Runner> _runner;
         shared_ptr<ExplainQueryInfo> _explainQueryInfo;
         bool _doneOps;
     };
