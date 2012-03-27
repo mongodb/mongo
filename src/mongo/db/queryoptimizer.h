@@ -70,7 +70,7 @@ namespace mongo {
         const string &special() const { return _special; }
                 
         /** @return a new cursor based on this QueryPlan's index and FieldRangeSet. */
-        shared_ptr<Cursor> newCursor( const DiskLoc &startLoc = DiskLoc() , int numWanted=0 ) const;
+        shared_ptr<Cursor> newCursor( const DiskLoc &startLoc = DiskLoc() ) const;
         /** @return a new reverse cursor if this is an unindexed plan. */
         shared_ptr<Cursor> newReverseCursor() const;
         /** Register this plan as a winner for its QueryPattern, with specified 'nscanned'. */

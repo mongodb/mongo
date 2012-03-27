@@ -795,7 +795,7 @@ namespace mongo {
         if ( _singlePlanSummary ) {
             *_singlePlanSummary = singlePlan->summary();
         }
-        shared_ptr<Cursor> single = singlePlan->newCursor( DiskLoc(), numWanted() );
+        shared_ptr<Cursor> single = singlePlan->newCursor();
         if ( !_query.isEmpty() && !single->matcher() ) {
             shared_ptr<CoveredIndexMatcher> matcher
             ( new CoveredIndexMatcher( _query, single->indexKeyPattern() ) );

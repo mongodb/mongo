@@ -208,10 +208,14 @@ doneCheckOrder:
         }
     }
 
-    shared_ptr<Cursor> QueryPlan::newCursor( const DiskLoc &startLoc , int numWanted ) const {
+    shared_ptr<Cursor> QueryPlan::newCursor( const DiskLoc &startLoc ) const {
 
         if ( _type ) {
             // hopefully safe to use original query in these contexts - don't think we can mix type with $or clause separation yet
+            int numWanted = 0;
+            if ( _parsedQuery ) {
+                numWanted = _parsedQuery->getSkip() + _parsedQuery->getNumToReturn();
+            }
             return _type->newCursor( _originalQuery , _order , numWanted );
         }
 

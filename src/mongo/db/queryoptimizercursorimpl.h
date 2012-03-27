@@ -190,9 +190,6 @@ namespace mongo {
         BSONObj min() const { return _parsedQuery ? _parsedQuery->getMin() : BSONObj(); }
         BSONObj max() const { return _parsedQuery ? _parsedQuery->getMax() : BSONObj(); }
         bool hasFields() const { return _parsedQuery && _parsedQuery->getFieldPtr(); }
-        int numWanted() const {
-            return _parsedQuery ? ( _parsedQuery->getSkip() + _parsedQuery->getNumToReturn() ) : 0;
-        }
         
         /** If no ParsedQuery was supplied, it's assumed no reordering will be applied. */
         bool requireOrder() const { return !_parsedQuery; }
