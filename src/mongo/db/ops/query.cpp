@@ -629,7 +629,7 @@ namespace mongo {
         else {
             cursor =
             NamespaceDetailsTransient::getCursor( ns, query, order, QueryPlanSelectionPolicy::any(),
-                                                 0, &pq, &queryPlan );
+                                                 0, pq_shared, &queryPlan );
         }
         verify( cursor );
         

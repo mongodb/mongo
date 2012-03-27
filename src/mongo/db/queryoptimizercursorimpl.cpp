@@ -696,7 +696,7 @@ namespace mongo {
                                          const BSONObj &order,
                                          const QueryPlanSelectionPolicy &planPolicy,
                                          bool *simpleEqualityMatch,
-                                         const ParsedQuery *parsedQuery,
+                                         const shared_ptr<const ParsedQuery> &parsedQuery,
                                          QueryPlan::Summary *singlePlanSummary ) {
 
         CursorGenerator generator( ns, query, order, planPolicy, simpleEqualityMatch, parsedQuery,
@@ -709,7 +709,7 @@ namespace mongo {
                                      const BSONObj &order,
                                      const QueryPlanSelectionPolicy &planPolicy,
                                      bool *simpleEqualityMatch,
-                                     const ParsedQuery *parsedQuery,
+                                     const shared_ptr<const ParsedQuery> &parsedQuery,
                                      QueryPlan::Summary *singlePlanSummary ) :
     _ns( ns ),
     _query( query ),

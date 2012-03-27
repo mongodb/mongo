@@ -179,7 +179,7 @@ namespace mongo {
                         const BSONObj &order,
                         const QueryPlanSelectionPolicy &planPolicy,
                         bool *simpleEqualityMatch,
-                        const ParsedQuery *parsedQuery,
+                        const shared_ptr<const ParsedQuery> &parsedQuery,
                         QueryPlan::Summary *singlePlanSummary );
         
         shared_ptr<Cursor> generate();
@@ -197,7 +197,7 @@ namespace mongo {
         }
         
         /** If no ParsedQuery was supplied, it's assumed no reordering will be applied. */
-        bool requireOrder() const { return _parsedQuery == 0; }
+        bool requireOrder() const { return !_parsedQuery; }
         bool mayShortcutQueryOptimizer() const {
             return min().isEmpty() && max().isEmpty() && !fieldsPtr() && _argumentsHint.isEmpty();
         }
@@ -215,7 +215,7 @@ namespace mongo {
         BSONObj _order;
         const QueryPlanSelectionPolicy &_planPolicy;
         bool *_simpleEqualityMatch;
-        const ParsedQuery *_parsedQuery;
+        shared_ptr<const ParsedQuery> _parsedQuery;
         QueryPlan::Summary *_singlePlanSummary;
         
         BSONObj _argumentsHint;

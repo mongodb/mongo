@@ -471,7 +471,8 @@ namespace mongo {
                                             const QueryPlanSelectionPolicy &planPolicy =
                                             QueryPlanSelectionPolicy::any(),
                                             bool *simpleEqualityMatch = 0,
-                                            const ParsedQuery *parsedQuery = 0,
+                                            const shared_ptr<const ParsedQuery> &parsedQuery =
+                                            shared_ptr<const ParsedQuery>(),
                                             QueryPlan::Summary *singlePlanSummary = 0 );
 
         /**
