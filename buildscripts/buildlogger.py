@@ -25,6 +25,7 @@ test, in order to let the buildlogs web app display the full output sensibly.)
 import functools
 import os
 import os.path
+import signal
 import subprocess
 import sys
 import time
@@ -293,9 +294,25 @@ def loop_and_callback(command, callback):
         stderr=subprocess.STDOUT,
     )
 
+    def handle_sigterm(signum, frame):
+        proc.send_signal(signum)
+
+    # register a handler to delegate SIGTERM
+    # to the child process
+    orig_handler = signal.signal(signal.SIGTERM, handle_sigterm)
+
     while proc.poll() is None:
-        line = proc.stdout.readline().strip('\r\n')
-        callback(line)
+        try:
+            line = proc.stdout.readline().strip('\r\n')
+            callback(line)
+        except IOError:
+            # if the signal handler is called while
+            # we're waiting for readline() to return,
+            # don't show a traceback
+            break
+
+    # restore the original signal handler, if any
+    signal.signal(signal.SIGTERM, orig_handler)
 
     callback(None)
     return proc.returncode
