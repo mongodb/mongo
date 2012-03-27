@@ -75,6 +75,18 @@ namespace mongo {
         }
     }
 
+    void AuthenticationInfo::startRequest() {
+        if ( _isLocalHost && _isLocalHostAndLocalHostIsAuthorizedForAll ) {
+            if ( ! Lock::isLocked() ) {
+                // we can't do this if we're already locked
+                // as then we can deadlock
+                _isLocalHost = false;
+                _isLocalHostAndLocalHostIsAuthorizedForAll = false;
+                setIsALocalHostConnectionWithSpecialAuthPowers();
+            }
+        }
+    }
+
     bool CmdAuthenticate::getUserObj(const string& dbname, const string& user, BSONObj& userObj, string& pwd) {
         if (user == internalSecurity.user) {
             uassert(15889, "key file must be used to log in with internal user", cmdLine.keyFile);

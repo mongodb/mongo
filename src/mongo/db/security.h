@@ -33,6 +33,7 @@ namespace mongo {
         bool _isLocalHost;
         bool _isLocalHostAndLocalHostIsAuthorizedForAll;
     public:
+        void startRequest(); // need to call at the beginning of each request
         void setIsALocalHostConnectionWithSpecialAuthPowers(); // called, if localhost, when conneciton established.
         AuthenticationInfo() {
             _isLocalHost = false; 

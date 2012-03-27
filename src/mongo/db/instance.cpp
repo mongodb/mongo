@@ -353,7 +353,8 @@ namespace mongo {
         globalOpCounters.gotOp( op , isCommand );
 
         Client& c = cc();
-        
+        if ( c.getAuthenticationInfo() )
+            c.getAuthenticationInfo()->startRequest();
         
         auto_ptr<CurOp> nestedOp;
         CurOp* currentOpP = c.curop();
