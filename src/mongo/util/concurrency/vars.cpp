@@ -27,7 +27,7 @@ namespace mongo {
     scoped_lock::PostStaticCheck::PostStaticCheck() {
         if ( StaticObserver::_destroyingStatics ) {
             cout << "_DEBUG warning trying to lock a mongo::mutex during static shutdown" << endl;
-            printStackTrace( cout );
+            //printStackTrace( cout ); // TODO: re-enable when we're ready to debug
         }
     }
 
