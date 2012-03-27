@@ -546,7 +546,7 @@ namespace mongo {
             return shared_ptr<Cursor>( new BasicCursor( DiskLoc() ) );
         }
         FieldRangeSetPair frsp( ns, query );
-        QueryPlan oplogPlan( d, -1, frsp, 0, query, shared_ptr<Projection>(), order );
+        QueryPlan oplogPlan( d, -1, frsp, 0, query, order );
         FindingStartCursor finder( oplogPlan );
         ElapsedTracker yieldCondition( 256, 20 );
         while( !finder.done() ) {

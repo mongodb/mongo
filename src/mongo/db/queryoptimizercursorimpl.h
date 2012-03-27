@@ -189,9 +189,7 @@ namespace mongo {
         bool explain() const { return _parsedQuery && _parsedQuery->isExplain(); }
         BSONObj min() const { return _parsedQuery ? _parsedQuery->getMin() : BSONObj(); }
         BSONObj max() const { return _parsedQuery ? _parsedQuery->getMax() : BSONObj(); }
-        shared_ptr<Projection> fieldsPtr() const {
-            return _parsedQuery ? _parsedQuery->getFieldPtr() : shared_ptr<Projection>();
-        }
+        bool hasFields() const { return _parsedQuery && _parsedQuery->getFieldPtr(); }
         int numWanted() const {
             return _parsedQuery ? ( _parsedQuery->getSkip() + _parsedQuery->getNumToReturn() ) : 0;
         }
@@ -199,7 +197,7 @@ namespace mongo {
         /** If no ParsedQuery was supplied, it's assumed no reordering will be applied. */
         bool requireOrder() const { return !_parsedQuery; }
         bool mayShortcutQueryOptimizer() const {
-            return min().isEmpty() && max().isEmpty() && !fieldsPtr() && _argumentsHint.isEmpty();
+            return min().isEmpty() && max().isEmpty() && !hasFields() && _argumentsHint.isEmpty();
         }
         BSONObj hint() const {
             return _argumentsHint.isEmpty() ? _planPolicy.planHint( _ns ) : _argumentsHint;

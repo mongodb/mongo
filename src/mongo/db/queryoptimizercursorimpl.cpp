@@ -778,7 +778,7 @@ namespace mongo {
     }
     
     void CursorGenerator::setMultiPlanScanner() {
-        _mps.reset( new MultiPlanScanner( _ns, _query, fieldsPtr(), _order, hint(),
+        _mps.reset( new MultiPlanScanner( _ns, _query, _order, _parsedQuery, hint(),
                                          explain() ? QueryPlanSet::Ignore : QueryPlanSet::Use,
                                          min(), max() ) );
     }
@@ -828,10 +828,10 @@ namespace mongo {
 
     /** This interface is just available for testing. */
     shared_ptr<Cursor> newQueryOptimizerCursor
-    ( const char *ns, const BSONObj &query, const shared_ptr<Projection> &fields,
-     const BSONObj &order, const QueryPlanSelectionPolicy &planPolicy, bool requireOrder ) {
-        auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, fields,
-                                                             order ) );
+    ( const char *ns, const BSONObj &query, const BSONObj &order,
+     const QueryPlanSelectionPolicy &planPolicy, bool requireOrder,
+     const shared_ptr<const ParsedQuery> &parsedQuery ) {
+        auto_ptr<MultiPlanScanner> mps( new MultiPlanScanner( ns, query, order, parsedQuery ) );
         return newQueryOptimizerCursor( mps, planPolicy, requireOrder, false );
     }
         

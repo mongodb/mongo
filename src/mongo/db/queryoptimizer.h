@@ -41,8 +41,9 @@ namespace mongo {
                   const FieldRangeSetPair &frsp,
                   const FieldRangeSetPair *originalFrsp,
                   const BSONObj &originalQuery,
-                  const shared_ptr<Projection> &fields,
                   const BSONObj &order,
+                  const shared_ptr<const ParsedQuery> &parsedQuery =
+                          shared_ptr<const ParsedQuery>(),
                   const BSONObj &startKey = BSONObj(),
                   const BSONObj &endKey = BSONObj(),
                   string special="" );
@@ -125,6 +126,7 @@ namespace mongo {
         const FieldRangeSet &_frsMulti;
         const BSONObj &_originalQuery;
         const BSONObj &_order;
+        shared_ptr<const ParsedQuery> _parsedQuery;
         const IndexDetails * _index;
         bool _optimal;
         bool _scanAndOrderRequired;
@@ -297,8 +299,9 @@ namespace mongo {
                       auto_ptr<FieldRangeSetPair> frsp,
                       auto_ptr<FieldRangeSetPair> originalFrsp,
                       const BSONObj &originalQuery,
-                      const shared_ptr<Projection> &fields,
                       const BSONObj &order,
+                      const shared_ptr<const ParsedQuery> &parsedQuery =
+                              shared_ptr<const ParsedQuery>(),
                       const BSONObj &hint = BSONObj(),
                       RecordedPlanPolicy recordedPlanPolicy = Use,
                       const BSONObj &min = BSONObj(),
@@ -393,7 +396,6 @@ namespace mongo {
 
         const char *_ns;
         BSONObj _originalQuery;
-        shared_ptr<Projection> _fields;
         auto_ptr<FieldRangeSetPair> _frsp;
         auto_ptr<FieldRangeSetPair> _originalFrsp;
         PlanSet _plans;
@@ -402,6 +404,7 @@ namespace mongo {
         bool _usingCachedPlan;
         BSONObj _hint;
         BSONObj _order;
+        shared_ptr<const ParsedQuery> _parsedQuery;
         long long _oldNScanned;
         RecordedPlanPolicy _recordedPlanPolicy;
         BSONObj _min;
@@ -415,8 +418,9 @@ namespace mongo {
     public:
         MultiPlanScanner( const char *ns,
                           const BSONObj &query,
-                          const shared_ptr<Projection> &fields,
                           const BSONObj &order,
+                          const shared_ptr<const ParsedQuery> &parsedQuery =
+                                  shared_ptr<const ParsedQuery>(),
                           const BSONObj &hint = BSONObj(),
                           QueryPlanSet::RecordedPlanPolicy recordedPlanPolicy = QueryPlanSet::Use,
                           const BSONObj &min = BSONObj(),
@@ -524,7 +528,7 @@ namespace mongo {
         const string _ns;
         bool _or;
         BSONObj _query;
-        shared_ptr<Projection> _fields;
+        shared_ptr<const ParsedQuery> _parsedQuery;
         shared_ptr<OrRangeGenerator> _org; // May be null in certain non $or query cases.
         auto_ptr<QueryPlanSet> _currentQps;
         int _i;

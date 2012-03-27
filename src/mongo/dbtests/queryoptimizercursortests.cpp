@@ -30,12 +30,12 @@
 namespace mongo {
     void __forceLinkGeoPlugin();
     shared_ptr<Cursor> newQueryOptimizerCursor( const char *ns, const BSONObj &query,
-                                               const shared_ptr<Projection> &fields =
-                                               shared_ptr<Projection>(),
                                                const BSONObj &order = BSONObj(),
                                                const QueryPlanSelectionPolicy &planPolicy =
                                                QueryPlanSelectionPolicy::any(),
-                                               bool requireOrder = true );
+                                               bool requireOrder = true,
+                                               const shared_ptr<const ParsedQuery> &parsedQuery =
+                                               shared_ptr<const ParsedQuery>() );
 } // namespace mongo
 
 namespace QueryOptimizerCursorTests {
@@ -221,7 +221,7 @@ namespace QueryOptimizerCursorTests {
             }
         }
         void setQueryOptimizerCursorWithoutAdvancing( const BSONObj &query, const BSONObj &order = BSONObj() ) {
-            _c = newQueryOptimizerCursor( ns(), query, shared_ptr<Projection>(), order );
+            _c = newQueryOptimizerCursor( ns(), query, order );
         }
         bool ok() const { return _c->ok(); }
         /** Handles matching and deduping. */
@@ -1879,8 +1879,7 @@ namespace QueryOptimizerCursorTests {
         void run() {
             Lock::GlobalWrite lk;
             Client::Context ctx( ns() );
-            ASSERT( !newQueryOptimizerCursor( ns(), BSONObj(), shared_ptr<Projection>(),
-                                             BSON( "a" << 1 ) ).get() );
+            ASSERT( !newQueryOptimizerCursor( ns(), BSONObj(), BSON( "a" << 1 ) ).get() );
         }
     };
     
@@ -1898,7 +1897,6 @@ namespace QueryOptimizerCursorTests {
             Lock::GlobalWrite lk;
             Client::Context ctx( ns() );
             shared_ptr<Cursor> c = newQueryOptimizerCursor( ns(), BSON( "a" << 2 ),
-                                                           shared_ptr<Projection>(),
                                                            BSON( "b" << 1 ) );
             // Check that we are scanning {b:1} not {a:1}, since {a:1} is not properly ordered.
             for( int i = 0; i < 3; ++i ) {
@@ -2542,7 +2540,7 @@ namespace QueryOptimizerCursorTests {
             Lock::DBWrite lk(ns());
             Client::Context ctx( ns() );
             shared_ptr<Cursor> c =
-            newQueryOptimizerCursor( ns(), BSONObj(), shared_ptr<Projection>(), BSON( "a" << 1 ),
+            newQueryOptimizerCursor( ns(), BSONObj(), BSON( "a" << 1 ),
                                     QueryPlanSelectionPolicy::any(), false );
             ASSERT( c );
         }
@@ -2569,8 +2567,7 @@ namespace QueryOptimizerCursorTests {
             Lock::DBWrite lk(ns());
             Client::Context ctx( ns() );
             shared_ptr<Cursor> c =
-            newQueryOptimizerCursor( ns(), BSON( "a" << LT << 3 << "b" << 1 ),
-                                    shared_ptr<Projection>(), BSON( "a" << 1 ),
+            newQueryOptimizerCursor( ns(), BSON( "a" << LT << 3 << "b" << 1 ), BSON( "a" << 1 ),
                                     QueryPlanSelectionPolicy::any(), false );
             ASSERT( c );
             BSONObj idxKey;
@@ -2597,8 +2594,7 @@ namespace QueryOptimizerCursorTests {
             Lock::DBWrite lk(ns());
             Client::Context ctx( ns() );
             shared_ptr<Cursor> c =
-            newQueryOptimizerCursor( ns(), BSON( "a" << 1 ),
-                                    shared_ptr<Projection>(), BSON( "b" << 1 ),
+            newQueryOptimizerCursor( ns(), BSON( "a" << 1 ), BSON( "b" << 1 ),
                                     QueryPlanSelectionPolicy::any(), false );
             ASSERT( c );
             while( c->advance() );
@@ -2617,13 +2613,13 @@ namespace QueryOptimizerCursorTests {
             
             Lock::DBWrite lk(ns());
             Client::Context ctx( ns() );
-            shared_ptr<Projection> fields( new Projection() );
-            fields->init( BSON( "_id" << 0 << "a" << 1 ) );
+            shared_ptr<ParsedQuery> parsedQuery
+                    ( new ParsedQuery( ns(), 0, 0, 0, BSONObj(), BSON( "_id" << 0 << "a" << 1 ) ) );
             shared_ptr<QueryOptimizerCursor> c =
             dynamic_pointer_cast<QueryOptimizerCursor>
             ( newQueryOptimizerCursor( ns(), BSON( "a" << GTE << 0 << "b" << GTE << 0 ),
-                                      fields, BSON( "a" << 1 ),
-                                      QueryPlanSelectionPolicy::any(), false ) );
+                                      BSON( "a" << 1 ), QueryPlanSelectionPolicy::any(), false,
+                                      parsedQuery ) );
             bool foundA = false;
             bool foundB = false;
             while( c->ok() ) {
@@ -2655,14 +2651,12 @@ namespace QueryOptimizerCursorTests {
             
             Lock::DBWrite lk(ns());
             Client::Context ctx( ns() );
-            shared_ptr<Projection> fields( new Projection() );
-            fields->init( BSON( "_id" << 0 << "a" << 1 ) );
+            shared_ptr<ParsedQuery> parsedQuery
+                    ( new ParsedQuery( ns(), 0, 0, 0, BSONObj(), BSON( "_id" << 0 << "a" << 1 ) ) );
             shared_ptr<QueryOptimizerCursor> c =
             dynamic_pointer_cast<QueryOptimizerCursor>
-            ( newQueryOptimizerCursor( ns(),
-                                      fromjson( "{$or:[{a:1},{b:1},{a:2}]}" ),
-                                      fields, BSONObj(),
-                                      QueryPlanSelectionPolicy::any(), false ) );
+            ( newQueryOptimizerCursor( ns(), fromjson( "{$or:[{a:1},{b:1},{a:2}]}" ), BSONObj(),
+                                      QueryPlanSelectionPolicy::any(), false, parsedQuery ) );
             bool foundA = false;
             bool foundB = false;
             while( c->ok() ) {
@@ -2690,7 +2684,7 @@ namespace QueryOptimizerCursorTests {
         void nPlans( int n, const BSONObj &query, const BSONObj &order ) {
             auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), query ) );
             auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-            QueryPlanSet s( ns(), frsp, frspOrig, query, shared_ptr<Projection>(), order );
+            QueryPlanSet s( ns(), frsp, frspOrig, query, order );
             ASSERT_EQUALS( n, s.nPlans() );
         }
         static shared_ptr<QueryOptimizerCursor> getCursor( const BSONObj &query,

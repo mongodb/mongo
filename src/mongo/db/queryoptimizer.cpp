@@ -56,14 +56,14 @@ namespace mongo {
 
     QueryPlan::QueryPlan( NamespaceDetails *d, int idxNo, const FieldRangeSetPair &frsp,
                          const FieldRangeSetPair *originalFrsp, const BSONObj &originalQuery,
-                         const shared_ptr<Projection> &fields,
-                         const BSONObj &order,
+                         const BSONObj &order, const shared_ptr<const ParsedQuery> &parsedQuery,
                          const BSONObj &startKey, const BSONObj &endKey , string special ) :
         _d(d), _idxNo(idxNo),
         _frs( frsp.frsForIndex( _d, _idxNo ) ),
         _frsMulti( frsp.frsForIndex( _d, -1 ) ),
         _originalQuery( originalQuery ),
         _order( order ),
+        _parsedQuery( parsedQuery ),
         _index( 0 ),
         _optimal( false ),
         _scanAndOrderRequired( true ),
@@ -203,8 +203,8 @@ doneCheckOrder:
             _unhelpful = true;
         }
             
-        if ( fields && !d->isMultikey( _idxNo ) ) { // Does not check modifiedKeys()
-            _keyFieldsOnly.reset( fields->checkKey( _index->keyPattern() ) );
+        if ( _parsedQuery && _parsedQuery->getFields() && !d->isMultikey( _idxNo ) ) { // Does not check modifiedKeys()
+            _keyFieldsOnly.reset( _parsedQuery->getFields()->checkKey( _index->keyPattern() ) );
         }
     }
 
@@ -351,20 +351,21 @@ doneCheckOrder:
 
     QueryPlanSet::QueryPlanSet( const char *ns, auto_ptr<FieldRangeSetPair> frsp,
                                auto_ptr<FieldRangeSetPair> originalFrsp,
-                               const BSONObj &originalQuery, const shared_ptr<Projection> &fields,
+                               const BSONObj &originalQuery,
                                const BSONObj &order,
+                               const shared_ptr<const ParsedQuery> &parsedQuery,
                                const BSONObj &hint,
                                QueryPlanSet::RecordedPlanPolicy recordedPlanPolicy,
                                const BSONObj &min, const BSONObj &max ) :
         _ns(ns),
         _originalQuery( originalQuery ),
-        _fields( fields ),
         _frsp( frsp ),
         _originalFrsp( originalFrsp ),
         _mayRecordPlan( false ),
         _usingCachedPlan( false ),
         _hint( hint.getOwned() ),
         _order( order.getOwned() ),
+        _parsedQuery( parsedQuery ),
         _oldNScanned( 0 ),
         _recordedPlanPolicy( recordedPlanPolicy ),
         _min( min.getOwned() ),
@@ -390,7 +391,7 @@ doneCheckOrder:
         }
         NamespaceDetails *d = nsdetails(_ns);
         _plans.push_back( QueryPlanPtr( new QueryPlan( d, d->idxNo(id), *_frsp, _originalFrsp.get(),
-                                                      _originalQuery, _fields, _order,
+                                                      _originalQuery, _order, _parsedQuery,
                                                       _min, _max ) ) );
     }
 
@@ -437,7 +438,8 @@ doneCheckOrder:
         if ( !d || !_frsp->matchPossible() ) {
             // Table scan plan, when no matches are possible
             _plans.push_back( QueryPlanPtr( new QueryPlan( d, -1, *_frsp, _originalFrsp.get(),
-                                                          _originalQuery, _fields, _order ) ) );
+                                                          _originalQuery, _order,
+                                                          _parsedQuery ) ) );
             return;
         }
 
@@ -451,7 +453,8 @@ doneCheckOrder:
                 uassert( 10366 ,  "natural order cannot be specified with $min/$max", _min.isEmpty() && _max.isEmpty() );
                 // Table scan plan
                 _plans.push_back( QueryPlanPtr( new QueryPlan( d, -1, *_frsp, _originalFrsp.get(),
-                                                              _originalQuery, _fields, _order ) ) );
+                                                              _originalQuery, _order,
+                                                              _parsedQuery ) ) );
             }
             return;
         }
@@ -463,7 +466,7 @@ doneCheckOrder:
             uassert( 10367 ,  errmsg, idx );
             _plans.push_back( QueryPlanPtr( new QueryPlan( d, d->idxNo(*idx), *_frsp,
                                                           _originalFrsp.get(), _originalQuery,
-                                                          _fields, _order,
+                                                          _order, _parsedQuery,
                                                           _min, _max ) ) );
             return;
         }
@@ -473,14 +476,15 @@ doneCheckOrder:
             if ( idx >= 0 ) {
                 _plans.push_back( QueryPlanPtr( new QueryPlan( d , idx , *_frsp ,
                                                               _originalFrsp.get() , _originalQuery,
-                                                              _fields, _order ) ) );
+                                                              _order, _parsedQuery ) ) );
                 return;
             }
         }
 
         if ( _originalQuery.isEmpty() && _order.isEmpty() ) {
             _plans.push_back( QueryPlanPtr( new QueryPlan( d, -1, *_frsp, _originalFrsp.get(),
-                                                          _originalQuery, _fields, _order ) ) );
+                                                          _originalQuery, _order,
+                                                          _parsedQuery ) ) );
             return;
         }
 
@@ -495,7 +499,8 @@ doneCheckOrder:
                 if ( spec.getTypeName() == _special && spec.suitability( _originalQuery , _order ) ) {
                     _plans.push_back( QueryPlanPtr( new QueryPlan( d , j , *_frsp ,
                                                                   _originalFrsp.get() ,
-                                                                  _originalQuery, _fields, _order ,
+                                                                  _originalQuery, _order,
+                                                                  _parsedQuery,
                                                                   BSONObj() , BSONObj() ,
                                                                   _special ) ) );
                     return;
@@ -514,7 +519,7 @@ doneCheckOrder:
                 if ( !strcmp( bestIndex.firstElementFieldName(), "$natural" ) ) {
                     // Table scan plan
                     p.reset( new QueryPlan( d, -1, *_frsp, _originalFrsp.get(), _originalQuery,
-                                           _fields, _order ) );
+                                           _order, _parsedQuery ) );
                 }
 
                 NamespaceDetails::IndexIterator i = d->ii();
@@ -523,7 +528,7 @@ doneCheckOrder:
                     IndexDetails& ii = i.next();
                     if( ii.keyPattern().woCompare(bestIndex) == 0 ) {
                         p.reset( new QueryPlan( d, j, *_frsp, _originalFrsp.get(), _originalQuery,
-                                               _fields, _order ) );
+                                               _order, _parsedQuery ) );
                     }
                 }
 
@@ -566,8 +571,8 @@ doneCheckOrder:
                 ( !_order.isEmpty() && !strcmp( _order.firstElementFieldName(), "$natural" ) ) ) {
             // Table scan plan
             QueryPlanPtr plan
-            ( new QueryPlan( d, -1, *_frsp, _originalFrsp.get(), _originalQuery, _fields,
-                            _order ) );
+            ( new QueryPlan( d, -1, *_frsp, _originalFrsp.get(), _originalQuery,
+                            _order, _parsedQuery ) );
             addPlan( plan, planSet );
             return;
         }
@@ -582,7 +587,7 @@ doneCheckOrder:
             }
 
             QueryPlanPtr p( new QueryPlan( d, i, *_frsp, _originalFrsp.get(), _originalQuery,
-                                          _fields, _order ) );
+                                          _order, _parsedQuery ) );
             if ( p->impossible() ) {
                 addPlan( p, planSet );
                 return;
@@ -617,7 +622,7 @@ doneCheckOrder:
 
         // Table scan plan
         addPlan( QueryPlanPtr( new QueryPlan( d, -1, *_frsp, _originalFrsp.get(), _originalQuery,
-                                             _fields, _order ) ), planSet );
+                                             _order, _parsedQuery ) ), planSet );
 
         _mayRecordPlan = true;
     }
@@ -923,8 +928,8 @@ doneCheckOrder:
     
     MultiPlanScanner::MultiPlanScanner( const char *ns,
                                         const BSONObj &query,
-                                        const shared_ptr<Projection> &fields,
                                         const BSONObj &order,
+                                        const shared_ptr<const ParsedQuery> &parsedQuery,
                                         const BSONObj &hint,
                                         QueryPlanSet::RecordedPlanPolicy recordedPlanPolicy,
                                         const BSONObj &min,
@@ -932,7 +937,7 @@ doneCheckOrder:
         _ns( ns ),
         _or( !query.getField( "$or" ).eoo() ),
         _query( query.getOwned() ),
-        _fields( fields ),
+        _parsedQuery( parsedQuery ),
         _i(),
         _recordedPlanPolicy( recordedPlanPolicy ),
         _hint( hint.getOwned() ),
@@ -955,7 +960,7 @@ doneCheckOrder:
         if ( !_or ) {
             auto_ptr<FieldRangeSetPair> frsp( new FieldRangeSetPair( _ns.c_str(), _query, true ) );
             updateCurrentQps( new QueryPlanSet( _ns.c_str(), frsp, auto_ptr<FieldRangeSetPair>(),
-                                                _query, _fields, order, hint,
+                                                _query, order, _parsedQuery, hint,
                                                 _recordedPlanPolicy,
                                                 min, max ) );
         }
@@ -994,8 +999,8 @@ doneCheckOrder:
         ++_i;
         auto_ptr<FieldRangeSetPair> frsp( _org->topFrsp() );
         auto_ptr<FieldRangeSetPair> originalFrsp( _org->topFrspOriginal() );
-        updateCurrentQps( new QueryPlanSet( _ns.c_str(), frsp, originalFrsp, _query, _fields,
-                                           BSONObj(), _hint, _recordedPlanPolicy,
+        updateCurrentQps( new QueryPlanSet( _ns.c_str(), frsp, originalFrsp, _query,
+                                           BSONObj(), _parsedQuery, _hint, _recordedPlanPolicy,
                                            BSONObj(), BSONObj() ) );
     }
 
@@ -1336,7 +1341,7 @@ doneCheckOrder:
         auto_ptr<FieldRangeSetPair> frsp( new FieldRangeSetPair( ns, query, true ) );
         auto_ptr<FieldRangeSetPair> origFrsp( new FieldRangeSetPair( *frsp ) );
 
-        QueryPlanSet qps( ns, frsp, origFrsp, query, shared_ptr<Projection>(), sort,
+        QueryPlanSet qps( ns, frsp, origFrsp, query, sort, shared_ptr<const ParsedQuery>(),
                          BSONObj(), QueryPlanSet::UseIfInOrder );
         QueryPlanSet::QueryPlanPtr qpp = qps.getBestGuess();
         if( ! qpp.get() ) return shared_ptr<Cursor>();

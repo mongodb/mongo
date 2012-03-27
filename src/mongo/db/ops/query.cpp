@@ -914,7 +914,7 @@ namespace mongo {
         
         BSONObj oldPlan;
         if ( explain && ! pq.hasIndexSpecifier() ) {
-            MultiPlanScanner mps( ns, query, shared_ptr<Projection>(), order );
+            MultiPlanScanner mps( ns, query, order );
             if ( mps.usingCachedPlan() ) {
                 oldPlan =
                 mps.oldExplain().firstElement().embeddedObject()
