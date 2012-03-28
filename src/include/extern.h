@@ -881,7 +881,6 @@ extern int __wt_buf_set_printable( WT_SESSION_IMPL *session,
 extern void *__wt_buf_steal(WT_SESSION_IMPL *session,
     WT_ITEM *buf,
     uint32_t *sizep);
-extern void __wt_buf_swap(WT_ITEM *a, WT_ITEM *b);
 extern void __wt_buf_free(WT_SESSION_IMPL *session, WT_ITEM *buf);
 extern int __wt_buf_fmt(WT_SESSION_IMPL *session,
     WT_ITEM *buf,

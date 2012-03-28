@@ -166,20 +166,6 @@ __wt_buf_steal(WT_SESSION_IMPL *session, WT_ITEM *buf, uint32_t *sizep)
 }
 
 /*
- * __wt_buf_swap --
- *	Swap a pair of buffers.
- */
-void
-__wt_buf_swap(WT_ITEM *a, WT_ITEM *b)
-{
-	WT_ITEM tmp;
-
-	tmp = *a;
-	*a = *b;
-	*b = tmp;
-}
-
-/*
  * __wt_buf_free --
  *	Free a buffer.
  */
