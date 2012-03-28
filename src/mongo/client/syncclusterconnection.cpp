@@ -92,6 +92,7 @@ namespace mongo {
                 errmsg += e.what();
             }
             catch ( ... ) {
+                warning() << "unknown exception in SyncClusterConnection::fsync" << endl;
             }
             ok = false;
             errmsg += " " + _conns[i]->toString() + ":" + res.toString();
