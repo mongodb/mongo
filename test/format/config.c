@@ -59,6 +59,12 @@ config_setup(void)
 			*cp->v = CONF_RAND(cp);
 	}
 
+	/* Clear operations values if the whole run is read-only. */
+	if (g.c_ops == 0)
+		for (cp = c; cp->name != NULL; ++cp)
+			if (cp->flags & C_OPS)
+				*cp->v = 0;
+
 	/*
 	 * Periodically, set the delete percentage to 0 so salvage gets run,
 	 * as long as the delete percentage isn't nailed down.
