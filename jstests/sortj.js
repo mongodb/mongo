@@ -14,3 +14,4 @@ for( i = 0; i < 1000; ++i ) {
 assert.throws( function() {
               t.find( { a:{ $gte:0 }, c:null } ).sort( { d:1 } ).itcount();
               } );
+t.drop();

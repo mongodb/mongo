@@ -72,3 +72,5 @@ for( z = 0; z < 2; z++ ) {
     
     debug( "done iter" );
 }
+
+t.drop();
