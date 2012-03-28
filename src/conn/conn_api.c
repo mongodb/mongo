@@ -464,7 +464,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_ERR(__wt_config_gets(session, cfg, "logging", &cval));
 	if (cval.val != 0)
 		WT_ERR(__wt_open(
-		   session, WT_LOG_FILENAME, 1, 0, &conn->log_fh));
+		   session, WT_LOG_FILENAME, 1, 0, 0, &conn->log_fh));
 
 	/* Configure direct I/O and buffer alignment. */
 	WT_ERR(__wt_config_gets(session, cfg, "buffer_alignment", &cval));
@@ -606,7 +606,7 @@ __conn_single(WT_CONNECTION_IMPL *conn, const char **cfg)
 	 */
 	WT_RET(__wt_config_gets(session, cfg, "create", &cval));
 	WT_RET(__wt_open(session,
-	    WT_FLAGFILE, cval.val == 0 ? 0 : 1, 0, &conn->lock_fh));
+	    WT_FLAGFILE, cval.val == 0 ? 0 : 1, 0, 0, &conn->lock_fh));
 
 	/*
 	 * Lock a byte of the file: if we don't get the lock, some other process
@@ -698,7 +698,7 @@ __conn_config(WT_CONNECTION_IMPL *conn, const char **cfg, WT_ITEM **cbufp)
 		return (0);
 
 	/* Open the configuration file. */
-	WT_RET(__wt_open(session, WT_CONFIGFILE, 0, 0, &fh));
+	WT_RET(__wt_open(session, WT_CONFIGFILE, 0, 0, 0, &fh));
 	WT_ERR(__wt_filesize(session, fh, &size));
 	if (size == 0)
 		goto err;

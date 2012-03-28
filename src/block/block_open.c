@@ -21,7 +21,7 @@ __wt_block_truncate(WT_SESSION_IMPL *session, const char *filename)
 	int ret;
 
 	/* Open the underlying file handle. */
-	WT_RET(__wt_open(session, filename, 0, 1, &fh));
+	WT_RET(__wt_open(session, filename, 0, 0, 1, &fh));
 
 	/* Truncate the file. */
 	WT_ERR(__wt_ftruncate(session, fh, (off_t)0));
@@ -43,18 +43,10 @@ int
 __wt_block_create(WT_SESSION_IMPL *session, const char *filename)
 {
 	WT_FH *fh;
-	int exist, ret;
+	int ret;
 
-	/* Check to see if the file exists -- we don't want to overwrite it. */
-	WT_RET(__wt_exist(session, filename, &exist));
-	if (exist)
-		WT_RET_MSG(session, WT_ERROR,
-		    "the file %s already exists; to re-create it, remove it "
-		    "first, then create it",
-		    filename);
-
-	/* Open the underlying file handle. */
-	WT_RET(__wt_open(session, filename, 1, 1, &fh));
+	/* Create the underlying file and open a handle. */
+	WT_RET(__wt_open(session, filename, 1, 1, 1, &fh));
 
 	/* Write out the file's meta-data. */
 	ret = __wt_desc_init(session, fh);
@@ -96,7 +88,7 @@ __wt_block_open(WT_SESSION_IMPL *session, const char *filename,
 	__wt_block_freelist_open(session, block);
 
 	/* Open the underlying file handle. */
-	WT_ERR(__wt_open(session, filename, 1, 1, &block->fh));
+	WT_ERR(__wt_open(session, filename, 0, 0, 1, &block->fh));
 
 	/* Get the allocation size. */
 	WT_ERR(__wt_config_getones(session, config, "allocation_size", &cval));

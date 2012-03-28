@@ -70,7 +70,7 @@ class test_schema02(wttest.WiredTigerTestCase):
         # bad table name
         self.expect_failure_colgroup("nomatch:c", "columns=(S1,i2)",
                                      "/Can't create 'colgroup:nomatch:c'"
-                                     " for non-existent table nomatch/")
+                                     " for non-existent table 'nomatch'/")
         # colgroup not declared in initial create
         self.expect_failure_colgroup("main:nomatch", "columns=(S1,i2)",
                                      "/Column group 'nomatch' not found"

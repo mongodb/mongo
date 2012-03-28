@@ -560,6 +560,7 @@ extern int __wt_rwlock_destroy(WT_SESSION_IMPL *session, WT_RWLOCK *rwlock);
 extern int __wt_open(WT_SESSION_IMPL *session,
     const char *name,
     int ok_create,
+    int exclusive,
     int is_tree,
     WT_FH **fhp);
 extern int __wt_close(WT_SESSION_IMPL *session, WT_FH *fh);
@@ -617,6 +618,7 @@ extern int __wt_struct_unpack(WT_SESSION_IMPL *session,
 extern int __wt_create_file(WT_SESSION_IMPL *session,
     const char *name,
     const char *fileuri,
+    int exclusive,
     const char *config);
 extern int __wt_schema_create( WT_SESSION_IMPL *session,
     const char *name,
