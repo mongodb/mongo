@@ -28,6 +28,8 @@ __wt_block_snap_init(WT_SESSION_IMPL *session,
 
 	memset(si, 0, sizeof(*si));
 
+	si->root_offset = WT_BLOCK_INVALID_OFFSET;
+
 	si->alloc.name = "alloc";
 	si->alloc.offset = WT_BLOCK_INVALID_OFFSET;
 
@@ -148,7 +150,7 @@ __wt_block_snap_unload(WT_SESSION_IMPL *session, WT_BLOCK *block)
 }
 
 /*
- * __wt_block_write_snapshot --
+ * __wt_block_write_buf_snapshot --
  *	Write a buffer into a block and create a new snapshot.
  */
 int
@@ -277,15 +279,15 @@ __block_snap_delete(
 {
 	WT_BLOCK_SNAPSHOT *live, *si, __si;
 
+	live = &block->live;
+
 	WT_VERBOSE_CALL_RET(session, block,
 	    __wt_block_snapshot_string(
 	    session, block, addr, "delete-snapshot", NULL));
 
-	live = &block->live;
+	/* Initialize the snapshot, crack the cookie. */
 	si = &__si;
 	WT_RET(__wt_block_snap_init(session, block, si, 0));
-
-	/* If there's a snapshot, crack the cookie. */
 	WT_RET(__wt_block_buffer_to_snapshot(session, block, addr, si));
 
 	/*
@@ -362,11 +364,12 @@ __wt_block_snapshot_string(WT_SESSION_IMPL *session,
 	WT_ITEM *tmp;
 	int ret;
 
-	si = &_si;
 	tmp = NULL;
 	ret = 0;
 
-	/* Crack the cookie. */
+	/* Initialize the snapshot, crack the cookie. */
+	si = &_si;
+	WT_RET(__wt_block_snap_init(session, block, si, 0));
 	WT_RET(__wt_block_buffer_to_snapshot(session, block, addr, si));
 
 	/* Allocate a buffer. */
