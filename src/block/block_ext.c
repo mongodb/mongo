@@ -813,7 +813,8 @@ __wt_block_extlist_read(
 		 * and easy test to do here and we'd have to do the check as
 		 * part of file verification, regardless.
 		 */
-		if ((off - WT_BLOCK_DESC_SECTOR) % block->allocsize != 0 ||
+		if (off < WT_BLOCK_DESC_SECTOR ||
+		    (off - WT_BLOCK_DESC_SECTOR) % block->allocsize != 0 ||
 		    size % block->allocsize != 0 ||
 		    off + size > block->fh->file_size)
 corrupted:		WT_ERR_MSG(session, WT_ERROR,
