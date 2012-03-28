@@ -141,12 +141,12 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_BTREE *btree;
 	WT_STUFF *ss, stuff;
 	uint32_t i, leaf_cnt;
-	int ret, started;
+	int ret;
 
 	WT_UNUSED(cfg);
 
 	btree = session->btree;
-	ret = started = 0;
+	ret = 0;
 
 	WT_CLEAR(stuff);
 	ss = &stuff;
@@ -162,23 +162,28 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	 * Step 1:
 	 * Clear the salvaged file's root address, we're done with this file
 	 * until it's salvaged.  We do this first because salvage writes a
-	 * root page when it wraps up, and the eviction of that page updates
-	 * the root's address: if the root address were still set, eviction
-	 * would also free the previous root page, which would collide with
-	 * salvage freeing the previous root page when it reads those blocks
-	 * from the file.
+	 * root page when it wraps up, and the eviction of that page creates
+	 * a snapshot and updates the root's address: if the root address were
+	 * still set, eviction attempt to free the previous root page, which
+	 * would collide with salvage freeing the previous root page when it
+	 * reads those blocks from the file.
 	 */
 	WT_ERR(__wt_btree_set_root(session, btree->filename, NULL, 0));
 
 	/*
 	 * Step 2:
-	 * Inform the underlying block manager that we're salvaging the file.
+	 * Load an empty snapshot, for modification.
 	 */
-	WT_ERR(__wt_bm_salvage_start(session));
-	started = 1;
+	WT_ERR(__wt_bm_snap_load(session, NULL, NULL, 0, 0));
 
 	/*
 	 * Step 3:
+	 * Inform the underlying block manager that we're salvaging the file.
+	 */
+	WT_ERR(__wt_bm_salvage_start(session));
+
+	/*
+	 * Step 4:
 	 * Read the file and build in-memory structures that reference any leaf
 	 * or overflow page.  Any pages other than leaf or overflow pages are
 	 * added to the free list.
@@ -192,10 +197,10 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	WT_ERR(ret);
 
 	/*
-	 * Step 4:
+	 * Step 5:
 	 * Review the relationships between the pages and the overflow items.
 	 *
-	 * Step 5:
+	 * Step 6:
 	 * Add unreferenced overflow page blocks to the free list.
 	 */
 	if (ss->ovfl_next != 0) {
@@ -204,7 +209,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 
 	/*
-	 * Step 6:
+	 * Step 7:
 	 * Walk the list of pages looking for overlapping ranges to resolve.
 	 * If we find a range that needs to be resolved, set a global flag
 	 * and a per WT_TRACK flag on the pages requiring modification.
@@ -230,7 +235,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(__slvg_col_range(session, ss));
 
 	/*
-	 * Step 7:
+	 * Step 8:
 	 * We may have lost key ranges in column-store databases, that is, some
 	 * part of the record number space is gone.   Look for missing ranges.
 	 */
@@ -244,7 +249,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	}
 
 	/*
-	 * Step 8:
+	 * Step 9:
 	 * Build an internal page that references all of the leaf pages,
 	 * and write it, as well as any merged pages, to the file.
 	 *
@@ -268,7 +273,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 		}
 
 	/*
-	 * Step 9:
+	 * Step 10:
 	 * If we had to merge key ranges, we have to do a final pass through
 	 * the leaf page array and discard file pages used during key merges.
 	 * We can't do it earlier: if we free'd the leaf pages we're merging as
@@ -282,7 +287,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 		WT_ERR(__slvg_merge_block_free(session, ss));
 
 	/*
-	 * Step 10:
+	 * Step 11:
 	 * Evict the newly created root page, creating a snapshot.
 	 */
 	WT_ERR(__wt_scr_alloc(session, WT_BTREE_MAX_ADDR_COOKIE, &btree->snap));
@@ -293,11 +298,16 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 		     (uint8_t *)btree->snap->data, btree->snap->size));
 
 	/*
-	 * Step 11:
+	 * Step 12:
 	 * Inform the underlying block manager that we're done.
 	 */
-err:	if (started)
-		WT_TRET(__wt_bm_salvage_end(session));
+err:	WT_TRET(__wt_bm_salvage_end(session));
+
+	/*
+	 * Step 13:
+	 * Discard the live snapshot.
+	 */
+	WT_TRET(__wt_bm_snap_unload(session));
 
 	/* Discard any root page we created. */
 	if (ss->root_page != NULL)

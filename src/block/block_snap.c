@@ -114,8 +114,7 @@ __wt_block_snap_load(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_ftruncate(session, block->fh, si->file_size));
 	}
 
-done:	if (!readonly)
-		block->live_load = 1;
+done:	block->live_load = 1;
 
 err:	__wt_scr_free(&tmp);
 	return (ret);

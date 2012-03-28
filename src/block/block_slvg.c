@@ -17,9 +17,6 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	off_t len;
 	uint32_t allocsize;
 
-	/* Reset the live snapshot information. */
-	WT_RET(__wt_block_snap_init(session, block, &block->live, 1));
-
 	/*
 	 * Truncate the file to an initial sector plus N allocation size
 	 * units (bytes trailing the last multiple of an allocation size
@@ -45,7 +42,7 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	 * because we don't read them for salvage operations.
 	 */
 
-	block->live_load = block->slvg = 1;
+	block->slvg = 1;
 	return (0);
 }
 
@@ -56,8 +53,7 @@ __wt_block_salvage_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 int
 __wt_block_salvage_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
-	/* Discard the live snapshot. */
-	WT_RET(__wt_block_snap_unload(session, block));
+	WT_UNUSED(session);
 
 	block->slvg = 0;
 
