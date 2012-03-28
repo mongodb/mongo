@@ -35,20 +35,12 @@ __block_buffer_to_addr(WT_BLOCK *block,
 	 * the place.
 	 */
 	if (s == 0) {
-		if (offsetp != NULL)
-			*offsetp = 0;
-		if (sizep != NULL)
-			*sizep = 0;
-		if (cksump != NULL)
-			*cksump = 0;
+		*offsetp = 0;
+		*sizep = *cksump = 0;
 	} else {
-		if (offsetp != NULL)
-			*offsetp =
-			    (off_t)o * block->allocsize + WT_BLOCK_DESC_SECTOR;
-		if (sizep != NULL)
-			*sizep = (uint32_t)s * block->allocsize;
-		if (cksump != NULL)
-			*cksump = (uint32_t)c;
+		*offsetp = (off_t)o * block->allocsize + WT_BLOCK_DESC_SECTOR;
+		*sizep = (uint32_t)s * block->allocsize;
+		*cksump = (uint32_t)c;
 	}
 	return (0);
 }
@@ -100,13 +92,13 @@ __wt_block_addr_valid(WT_SESSION_IMPL *session,
     WT_BLOCK *block, const uint8_t *addr, uint32_t addr_size)
 {
 	off_t offset;
-	uint32_t size;
+	uint32_t cksum, size;
 
 	WT_UNUSED(session);
 	WT_UNUSED(addr_size);
 
 	/* Crack the cookie. */
-	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, NULL));
+	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
 
 	/* All we care about is if it's past the end of the file. */
 	return (offset + size > block->fh->file_size ? 0 : 1);

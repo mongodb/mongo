@@ -170,12 +170,12 @@ __wt_block_verify_addr(WT_SESSION_IMPL *session,
     WT_BLOCK *block, const uint8_t *addr, uint32_t addr_size)
 {
 	off_t offset;
-	uint32_t size;
+	uint32_t cksum, size;
 
 	WT_UNUSED(addr_size);
 
 	/* Crack the cookie. */
-	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, NULL));
+	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
 
 	WT_RET(__wt_verify_addfrag(session, block, offset, (off_t)size));
 

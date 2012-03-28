@@ -350,12 +350,12 @@ __wt_block_free_buf(WT_SESSION_IMPL *session,
     WT_BLOCK *block, const uint8_t *addr, uint32_t addr_size)
 {
 	off_t off;
-	uint32_t size;
+	uint32_t cksum, size;
 
 	WT_UNUSED(addr_size);
 
 	/* Crack the cookie. */
-	WT_RET(__wt_block_buffer_to_addr(block, addr, &off, &size, NULL));
+	WT_RET(__wt_block_buffer_to_addr(block, addr, &off, &size, &cksum));
 	WT_RET(__wt_block_free(session, block, off, size, 0));
 
 	return (0);
