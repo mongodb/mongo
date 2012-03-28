@@ -490,41 +490,52 @@ namespace mongo {
             while ( 1 ) {
                 bool filledBuffer = false;
                 
-                readlock l( _ns );
-                Client::Context ctx( _ns );
-                scoped_spinlock lk( _trackerLocks );
-                set<DiskLoc>::iterator i = _cloneLocs.begin();
-                for ( ; i!=_cloneLocs.end(); ++i ) {
-                    if (tracker.intervalHasElapsed()) // should I yield?
-                        break;
+                auto_ptr<LockMongoFilesShared> fileLock;
+                Record* recordToTouch = 0;
 
-                    DiskLoc dl = *i;
+                {
+                    Client::ReadContext ctx( _ns );
+                    scoped_spinlock lk( _trackerLocks );
+                    set<DiskLoc>::iterator i = _cloneLocs.begin();
+                    for ( ; i!=_cloneLocs.end(); ++i ) {
+                        if (tracker.intervalHasElapsed()) // should I yield?
+                            break;
+                        
+                        DiskLoc dl = *i;
+                        
+                        Record* r = dl.rec();
+                        if ( ! r->likelyInPhysicalMemory() ) {
+                            fileLock.reset( new LockMongoFilesShared() );
+                            recordToTouch = r;
+                            break;
+                        }
+                        
+                        BSONObj o = dl.obj();
+                        
+                        // use the builder size instead of accumulating 'o's size so that we take into consideration
+                        // the overhead of BSONArray indices
+                        if ( a.len() + o.objsize() + 1024 > BSONObjMaxUserSize ) {
+                            filledBuffer = true; // break out of outer while loop
+                            break;
+                        }
+                        
+                        a.append( o );
+                    }
                     
-                    Record* r = dl.rec();
-                    if ( ! r->likelyInPhysicalMemory() ) {
-                        auto_ptr<LockMongoFilesShared> lk( new LockMongoFilesShared() );
-                        dbtemprelease t;
-                        r->touch();
-                        lk.reset(0); // we have to release mmmutex before we can re-acquire dbmutex
+                    _cloneLocs.erase( _cloneLocs.begin() , i );
+                    
+                    if ( _cloneLocs.empty() || filledBuffer )
                         break;
-                    }
-
-                    BSONObj o = dl.obj();
-
-                    // use the builder size instead of accumulating 'o's size so that we take into consideration
-                    // the overhead of BSONArray indices
-                    if ( a.len() + o.objsize() + 1024 > BSONObjMaxUserSize ) {
-                        filledBuffer = true; // break out of outer while loop
-                        break;
-                    }
-
-                    a.append( o );
                 }
-
-                _cloneLocs.erase( _cloneLocs.begin() , i );
-
-                if ( _cloneLocs.empty() || filledBuffer )
-                    break;
+                
+                if ( recordToTouch ) {
+                    // its safe to touch here bceause we have a LockMongoFilesShared
+                    // we can't do where we get the lock because we would have to unlock the main readlock and tne _trackerLocks
+                    // simpler to handle this out there
+                    recordToTouch->touch();
+                    recordToTouch = 0;
+                }
+                
             }
 
             result.appendArray( "objects" , a.arr() );
