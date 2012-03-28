@@ -1021,6 +1021,7 @@ namespace mongo {
                  an exception.  we should make it return void and just throw an exception anytime
                  it fails
         */
+        checkConnection();
         try {
             if ( !port().call(toSend, response) ) {
                 _failed = true;
