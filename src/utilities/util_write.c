@@ -102,7 +102,7 @@ usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: %s %s "
-	    "read [-ao] uri key ...\n",
+	    "write [-ao] uri key ...\n",
 	    progname, usage_prefix);
 	return (1);
 }
