@@ -1,15 +1,15 @@
 /* DO NOT EDIT: automatically built by dist/s_prototypes. */
 
-extern int __wt_block_buffer_to_addr(WT_BLOCK *block,
-    const uint8_t *p,
-    off_t *offsetp,
-    uint32_t *sizep,
-    uint32_t *cksump);
 extern int __wt_block_addr_to_buffer(WT_BLOCK *block,
     uint8_t **pp,
     off_t offset,
     uint32_t size,
     uint32_t cksum);
+extern int __wt_block_buffer_to_addr(WT_BLOCK *block,
+    const uint8_t *p,
+    off_t *offsetp,
+    uint32_t *sizep,
+    uint32_t *cksump);
 extern int __wt_block_addr_valid(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     const uint8_t *addr,
