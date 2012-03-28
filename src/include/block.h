@@ -17,7 +17,7 @@
 #define	WT_BLOCK_INVALID_OFFSET		0
 
 /*
- * The block manager maintains three per-snapshot extent lists: 
+ * The block manager maintains three per-snapshot extent lists:
  *	alloc:	 the extents allocated in this snapshot
  *	avail:	 the extents available for allocation
  *	discard: the extents freed in this snapshot
