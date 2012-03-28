@@ -50,7 +50,7 @@ namespace mongo {
     ThreadLocalValue<StackChecker *> checker;
 
     struct StackChecker { 
-        enum { SZ = 256 * 1024 };
+        enum { SZ = 192 * 1024 };
         char buf[SZ];
         StackChecker() { 
             checker.set(this);
