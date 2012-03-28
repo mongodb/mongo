@@ -293,10 +293,8 @@ __wt_cursor_close(WT_CURSOR *cursor)
 	__wt_buf_free(session, &cursor->key);
 	__wt_buf_free(session, &cursor->value);
 
-	if (F_ISSET(cursor, WT_CURSTD_PUBLIC))
-		TAILQ_REMOVE(&session->public_cursors, cursor, q);
-	else if (F_ISSET(cursor, WT_CURSTD_FILE))
-		TAILQ_REMOVE(&session->file_cursors, cursor, q);
+	if (F_ISSET(cursor, WT_CURSTD_OPEN))
+		TAILQ_REMOVE(&session->cursors, cursor, q);
 
 	__wt_free(session, cursor->uri);
 	__wt_free(session, cursor);
@@ -373,11 +371,12 @@ err:		if (cursor != NULL)
  */
 int
 __wt_cursor_init(WT_CURSOR *cursor,
-    const char *uri, int is_file, int is_public, const char *cfg[])
+    const char *uri, WT_CURSOR *owner, const char *cfg[], WT_CURSOR **cursorp)
 {
+	WT_CURSOR *cdump;
+	WT_CONFIG_ITEM cval;
 	WT_SESSION_IMPL *session;
 
-	WT_UNUSED(cfg);
 	session = (WT_SESSION_IMPL *)cursor->session;
 
 	if (cursor->get_key == NULL)
@@ -399,14 +398,44 @@ __wt_cursor_init(WT_CURSOR *cursor,
 	WT_CLEAR(cursor->key);
 	WT_CLEAR(cursor->value);
 
-	if (is_file) {
-		F_SET(cursor, WT_CURSTD_FILE);
-		TAILQ_INSERT_HEAD(&session->file_cursors, cursor, q);
-	} else if (is_public) {
-		F_SET(cursor, WT_CURSTD_PUBLIC);
-		TAILQ_INSERT_HEAD(&session->public_cursors, cursor, q);
+	/* The append flag is only relevant to column stores. */
+	if (WT_CURSOR_RECNO(cursor)) {
+		WT_RET(__wt_config_gets(session, cfg, "append", &cval));
+		if (cval.val != 0)
+			F_SET(cursor, WT_CURSTD_APPEND);
 	}
 
+	WT_RET(__wt_config_gets(session, cfg, "dump", &cval));
+	if (cval.len != 0) {
+		F_SET(cursor, (strncmp(cval.str, "print", cval.len) == 0) ?
+		    WT_CURSTD_DUMP_PRINT : WT_CURSTD_DUMP_HEX);
+		WT_RET(__wt_curdump_create(cursor, owner, &cdump));
+		owner = cdump;
+	} else
+		cdump = NULL;
+
+	WT_RET(__wt_config_gets(session, cfg, "raw", &cval));
+	if (cval.val != 0)
+		F_SET(cursor, WT_CURSTD_RAW);
+
+	WT_RET(__wt_config_gets(session, cfg, "overwrite", &cval));
+	if (cval.val != 0)
+		F_SET(cursor, WT_CURSTD_OVERWRITE);
+
+	/*
+	 * Cursors that are internal to some other cursor (such as file cursors
+	 * inside a table cursor) should be closed after the containing cursor.
+	 * Arrange for that to happen by putting internal cursors after their
+	 * owners on the queue.
+	 */
+	if (owner != NULL)
+		TAILQ_INSERT_AFTER(&session->cursors, owner, cursor, q);
+	else
+		TAILQ_INSERT_HEAD(&session->cursors, cursor, q);
+
+	F_SET(cursor, WT_CURSTD_OPEN);
+
+	*cursorp = (cdump != NULL) ? cdump : cursor;
 	return (0);
 }
 

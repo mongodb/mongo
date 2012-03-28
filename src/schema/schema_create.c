@@ -9,7 +9,7 @@
 
 int
 __wt_create_file(WT_SESSION_IMPL *session,
-    const char *name, const char *fileuri, const char *config)
+    const char *name, const char *fileuri, int exclusive, const char *config)
 {
 	WT_ITEM *val;
 	const char *cfg[] = API_CONF_DEFAULTS(session, create, config);
@@ -34,8 +34,12 @@ __wt_create_file(WT_SESSION_IMPL *session,
 
 	/* If the file exists, don't try to recreate it. */
 	if ((ret = __wt_session_get_btree(session, name, fileuri,
-	    is_schema ? config : NULL, NULL, WT_BTREE_NO_LOCK)) != WT_NOTFOUND)
+	    is_schema ? config : NULL,
+	    NULL, WT_BTREE_NO_LOCK)) != WT_NOTFOUND) {
+		if (ret == 0 && exclusive)
+			ret = EEXIST;
 		return (ret);
+	}
 
 	WT_RET(__wt_btree_create(session, filename));
 	WT_ERR(__wt_schema_table_track_fileop(session, NULL, filename));
@@ -84,8 +88,8 @@ err:	__wt_scr_free(&val);
 }
 
 static int
-__create_colgroup(
-    WT_SESSION_IMPL *session, const char *name, const char *config)
+__create_colgroup(WT_SESSION_IMPL *session,
+    const char *name, int exclusive, const char *config)
 {
 	WT_CONFIG_ITEM cval;
 	WT_ITEM fmt, namebuf, uribuf;
@@ -93,11 +97,12 @@ __create_colgroup(
 	const char *cfg[] = { __wt_confdfl_colgroup_meta, config, NULL, NULL };
 	const char *filecfg[] = { config, NULL, NULL };
 	const char **cfgp;
-	const char *cgconf, *cgname, *fileconf, *filename, *fileuri, *tablename;
+	const char *cgconf, *cgname, *fileconf, *filename, *fileuri;
+	const char *oldconf, *tablename;
 	size_t tlen;
 	int ret;
 
-	cgconf = fileconf = NULL;
+	cgconf = fileconf = oldconf = NULL;
 	WT_CLEAR(fmt);
 	WT_CLEAR(namebuf);
 	WT_CLEAR(uribuf);
@@ -115,7 +120,7 @@ __create_colgroup(
 	if ((ret =
 	    __wt_schema_get_table(session, tablename, tlen, &table)) != 0)
 		WT_RET_MSG(session, (ret == WT_NOTFOUND) ? ENOENT : ret,
-		    "Can't create '%s' for non-existent table %.*s",
+		    "Can't create '%s' for non-existent table '%.*s'",
 		    name, (int)tlen, tablename);
 
 	/* Make sure the column group is referenced from the table. */
@@ -167,13 +172,22 @@ __create_colgroup(
 	WT_ERR(__wt_buf_fmt(session, &uribuf, "file:%s", filename));
 	fileuri = uribuf.data;
 
-	WT_ERR(__wt_schema_table_insert(session, name, cgconf));
-	WT_ERR(__wt_create_file(session, name, fileuri, fileconf));
+	if ((ret = __wt_schema_table_insert(session, name, cgconf)) != 0) {
+		/*
+		 * If the entry already exists in the schema table, we're done.
+		 * This is an error for exclusive creates but okay otherwise.
+		 */
+		if (ret == WT_DUPLICATE_KEY)
+			ret = exclusive ? EEXIST : 0;
+		goto err;
+	}
+	WT_ERR(__wt_create_file(session, name, fileuri, exclusive, fileconf));
 
 	WT_ERR(__wt_schema_open_colgroups(session, table));
 
 err:    __wt_free(session, cgconf);
 	__wt_free(session, fileconf);
+	__wt_free(session, oldconf);
 	__wt_buf_free(session, &fmt);
 	__wt_buf_free(session, &namebuf);
 	__wt_buf_free(session, &uribuf);
@@ -181,7 +195,8 @@ err:    __wt_free(session, cgconf);
 }
 
 static int
-__create_index(WT_SESSION_IMPL *session, const char *name, const char *config)
+__create_index(WT_SESSION_IMPL *session,
+    const char *name, int exclusive, const char *config)
 {
 	WT_CONFIG pkcols;
 	WT_CONFIG_ITEM ckey, cval, icols;
@@ -266,8 +281,16 @@ __create_index(WT_SESSION_IMPL *session, const char *name, const char *config)
 	WT_ERR(__wt_buf_fmt(session, &uribuf, "file:%s", filename));
 	fileuri = uribuf.data;
 
-	WT_ERR(__wt_create_file(session, name, fileuri, fileconf));
-	WT_ERR(__wt_schema_table_insert(session, name, idxconf));
+	if ((ret = __wt_schema_table_insert(session, name, idxconf)) != 0) {
+		/*
+		 * If the entry already exists in the schema table, we're done.
+		 * This is an error for exclusive creates but okay otherwise.
+		 */
+		if (ret == WT_DUPLICATE_KEY)
+			ret = exclusive ? EEXIST : 0;
+		goto err;
+	}
+	WT_ERR(__wt_create_file(session, name, fileuri, exclusive, fileconf));
 
 err:	__wt_free(session, fileconf);
 	__wt_free(session, idxconf);
@@ -279,7 +302,8 @@ err:	__wt_free(session, fileconf);
 }
 
 static int
-__create_table(WT_SESSION_IMPL *session, const char *name, const char *config)
+__create_table(WT_SESSION_IMPL *session,
+    const char *name, int exclusive, const char *config)
 {
 	WT_CONFIG conf;
 	WT_CONFIG_ITEM cgkey, cgval, cval;
@@ -300,10 +324,8 @@ __create_table(WT_SESSION_IMPL *session, const char *name, const char *config)
 
 	if ((ret = __wt_schema_get_table(session,
 	    tablename, strlen(tablename), &table)) == 0) {
-		if (__wt_config_getones(session,
-		    config, "exclusive", &cval) == 0 && cval.val)
-			WT_RET_MSG(
-			    session, EEXIST, "Table exists: %s", tablename);
+		if (exclusive)
+			ret = EEXIST;
 		return (0);
 	}
 	if (ret != WT_NOTFOUND)
@@ -329,7 +351,7 @@ __create_table(WT_SESSION_IMPL *session, const char *name, const char *config)
 		cgsize = strlen("colgroup:") + strlen(tablename) + 1;
 		WT_ERR(__wt_calloc_def(session, cgsize, &cgname));
 		snprintf(cgname, cgsize, "colgroup:%s", tablename);
-		WT_ERR(__create_colgroup(session, cgname, config));
+		WT_ERR(__create_colgroup(session, cgname, exclusive, config));
 	}
 
 	if (0) {
@@ -345,11 +367,15 @@ int
 __wt_schema_create(
     WT_SESSION_IMPL *session, const char *name, const char *config)
 {
-
-	int ret;
+	WT_CONFIG_ITEM cval;
+	int exclusive, ret;
 
 	/* Disallow objects in the WiredTiger name space. */
 	WT_RET(__wt_schema_name_check(session, name));
+
+	exclusive = (
+	    __wt_config_getones(session, config, "exclusive", &cval) == 0 &&
+	    cval.val != 0);
 
 	/*
 	 * We track rename operations, if we fail in the middle, we want to
@@ -358,13 +384,13 @@ __wt_schema_create(
 	WT_RET(__wt_schema_table_track_on(session));
 
 	if (WT_PREFIX_MATCH(name, "colgroup:"))
-		ret = __create_colgroup(session, name, config);
+		ret = __create_colgroup(session, name, exclusive, config);
 	else if (WT_PREFIX_MATCH(name, "file:"))
-		ret = __wt_create_file(session, name, name, config);
+		ret = __wt_create_file(session, name, name, exclusive, config);
 	else if (WT_PREFIX_MATCH(name, "index:"))
-		ret = __create_index(session, name, config);
+		ret = __create_index(session, name, exclusive, config);
 	else if (WT_PREFIX_MATCH(name, "table:"))
-		ret = __create_table(session, name, config);
+		ret = __create_table(session, name, exclusive, config);
 	else
 		ret = __wt_unknown_object_type(session, name);
 

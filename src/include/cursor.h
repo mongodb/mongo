@@ -120,6 +120,12 @@ struct __wt_cursor_config {
 	WT_CURSOR iface;
 };
 
+struct __wt_cursor_dump {
+	WT_CURSOR iface;
+
+	WT_CURSOR *child;
+};
+
 struct __wt_cursor_index {
 	WT_CURSOR_BTREE cbt;
 

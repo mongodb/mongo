@@ -43,7 +43,7 @@ __wt_session_dump(WT_SESSION_IMPL *session)
 	    session->name == NULL ? "" : " ", session);
 
 	first = 0;
-	TAILQ_FOREACH(cursor, &session->file_cursors, q) {
+	TAILQ_FOREACH(cursor, &session->cursors, q) {
 		if (++first == 1)
 			__wt_msg(session, "\tcursors:");
 		__wt_msg(session, "\t\t%p", cursor);

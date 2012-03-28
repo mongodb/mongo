@@ -36,7 +36,7 @@ __open_schema_table(WT_SESSION_IMPL *session)
 		__wt_schema_table_track_off(session, 0);
 	WT_ERR(__wt_create_file(session,
 	    "file:" WT_SCHEMA_FILENAME,
-	    "file:" WT_SCHEMA_FILENAME, schemaconf));
+	    "file:" WT_SCHEMA_FILENAME, 0, schemaconf));
 	session->schematab = session->btree;
 err:	__wt_free(session, schemaconf);
 	if (tracking)
@@ -56,7 +56,7 @@ __wt_schema_table_cursor(
 
 	WT_RET(__open_schema_table(session));
 	session->btree = session->schematab;
-	return (__wt_curfile_create(session, cfg, cursorp));
+	return (__wt_curfile_create(session, NULL, cfg, cursorp));
 }
 
 /*

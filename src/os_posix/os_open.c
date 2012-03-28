@@ -13,7 +13,7 @@
  */
 int
 __wt_open(WT_SESSION_IMPL *session,
-    const char *name, int ok_create, int is_tree, WT_FH **fhp)
+    const char *name, int ok_create, int exclusive, int is_tree, WT_FH **fhp)
 {
 	const char *path;
 	WT_CONNECTION_IMPL *conn;
@@ -52,6 +52,8 @@ __wt_open(WT_SESSION_IMPL *session,
 #endif
 	if (ok_create) {
 		f |= O_CREAT;
+		if (exclusive)
+			f |= O_EXCL;
 		mode = 0666;
 	} else
 		mode = 0;

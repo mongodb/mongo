@@ -12,7 +12,6 @@ skip	dist/serial.py
 skip	dist/stat_data.py
 skip	dist/stat.py
 skip	docs/tools/doxypy.py
-skip	docs/tools/fixlinks.py
 skip	lang/python/setup.py
 skip	lang/python/src/wiredtiger/service/constants.py
 skip	lang/python/src/wiredtiger/service/__init__.py
