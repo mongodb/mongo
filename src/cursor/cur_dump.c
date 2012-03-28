@@ -234,7 +234,7 @@ err:		cursor->saved_err = ret;
 }
 
 /* Pass through a call to the underlying cursor. */
-#define	CURDUMP_PASS(op)						\
+#define	WT_CURDUMP_PASS(op)						\
 static int								\
 __curdump_##op(WT_CURSOR *cursor)					\
 {									\
@@ -244,10 +244,10 @@ __curdump_##op(WT_CURSOR *cursor)					\
 	return (cdump->child->op(cdump->child));			\
 }
 
-CURDUMP_PASS(next)
-CURDUMP_PASS(prev)
-CURDUMP_PASS(reset)
-CURDUMP_PASS(search)
+WT_CURDUMP_PASS(next)
+WT_CURDUMP_PASS(prev)
+WT_CURDUMP_PASS(reset)
+WT_CURDUMP_PASS(search)
 
 static int
 __curdump_search_near(WT_CURSOR *cursor, int *exact)
@@ -258,9 +258,9 @@ __curdump_search_near(WT_CURSOR *cursor, int *exact)
 	return (cdump->child->search_near(cdump->child, exact));
 }
 
-CURDUMP_PASS(insert)
-CURDUMP_PASS(update)
-CURDUMP_PASS(remove)
+WT_CURDUMP_PASS(insert)
+WT_CURDUMP_PASS(update)
+WT_CURDUMP_PASS(remove)
 
 static int
 __curdump_close(WT_CURSOR *cursor)
