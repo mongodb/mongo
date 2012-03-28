@@ -117,12 +117,12 @@ __wt_verify_snap_load(
 	 * been deleted should not appear in the tree).
 	 */
 	if (si->avail.offset != WT_BLOCK_INVALID_OFFSET) {
-		 WT_RET(__wt_block_extlist_read(session, block, &si->avail));
+		WT_RET(__wt_block_extlist_read(session, block, &si->avail));
 		WT_RET(__verify_extlist(session, block, &si->avail));
 		__wt_block_extlist_free(session, &si->avail);
 	}
 	if (si->discard.offset != WT_BLOCK_INVALID_OFFSET) {
-		 WT_RET(__wt_block_extlist_read(session, block, &si->discard));
+		WT_RET(__wt_block_extlist_read(session, block, &si->discard));
 		WT_RET(__verify_extlist(session, block, &si->discard));
 		__wt_block_extlist_free(session, &si->discard);
 	}
