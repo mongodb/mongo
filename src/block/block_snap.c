@@ -158,21 +158,21 @@ __wt_block_write_buf_snapshot(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, WT_ITEM *snap)
 {
 	WT_BLOCK_SNAPSHOT *si;
+	int ret;
+
+	ret = 0;
 
 	si = &block->live;
 	si->version = WT_BM_SNAPSHOT_VERSION;
 
-	/* Delete any no-longer-needed snapshots. */
-	if (snap->data != NULL && snap->size != 0) {
-		WT_RET(__block_snap_delete(session, block, snap->data));
-
-		/* UPDATE FLAG !? XXX */
-		snap->data = NULL;
-	}
-
 	/*
 	 * Write the root page: it's possible for there to be a snapshot of
 	 * an empty tree, in which case, we store an illegal root offset.
+	 *
+	 * XXX
+	 * We happen to know that snapshots are single-threaded above us in
+	 * the btree engine.  That's probably something we want to guarantee
+	 * for any WiredTiger block manager.
 	 */
 	if (buf == NULL) {
 		si->root_offset = WT_BLOCK_INVALID_OFFSET;
@@ -181,32 +181,36 @@ __wt_block_write_buf_snapshot(
 		WT_RET(__wt_block_write(session, block, buf,
 		    &si->root_offset, &si->root_size, &si->root_cksum, 0));
 
-#if 0
 	/*
-	 * We hold the lock so the live extent lists and the file size doesn't
-	 * change underneath us.  This will probably eventually need fixing: we
-	 * could read all the snapshot information without a lock, and we could
-	 * merge and re-write all of the deleted snapshot information except for
-	 * ranges merged into the live tree, without a lock.
+	 * Hold a lock so the live extent lists and the file size can't change
+	 * underneath us.  I suspect we'll tighten this if snapshots take too
+	 * much time away from real work: we could read the historic snapshot
+	 * information without a lock, and we could merge and re-write all of
+	 * the deleted snapshot information except for ranges merged into the
+	 * live tree, without a lock.
 	 */
 	__wt_spin_lock(session, &block->live_lock);
-#endif
-
-	/* Write the live extent lists. */
-	WT_RET(__block_snap_extlists_write(session, block, si));
-
-	/* Set the file size. */
-	WT_RET(__wt_filesize(session, block->fh, &si->file_size));
-
-#if 0
-	__wt_spin_unlock(session, &block->live_lock);
-#endif
 
 	/*
-	 * Snapshots have to hit disk (it would be reasonable to configure for
-	 * lazy snapshots, but we don't support them yet).
+	 * Delete any no-longer-needed snapshots: we do this first as it frees
+	 * blocks to the live lists, and the freed blocks will then be included
+	 * when writing the live extent lists.
 	 */
-	WT_RET(__wt_fsync(session, block->fh));
+	if (snap->data != NULL && snap->size != 0) {
+		WT_ERR(__block_snap_delete(session, block, snap->data));
+
+		/* WTF -- UPDATE FLAG NOT NULL FIELD!? XXX */
+		snap->data = NULL;
+	}
+
+	/* Write the live extent lists. */
+	WT_ERR(__block_snap_extlists_write(session, block, si));
+
+	/* Set the file size. */
+	WT_ERR(__wt_filesize(session, block->fh, &si->file_size));
+
+err:	__wt_spin_unlock(session, &block->live_lock);
+	WT_RET(ret);
 
 #if 0
 	uint8_t *endp;
@@ -241,6 +245,13 @@ __wt_block_write_buf_snapshot(
 	    snap->data, "create-snapshot", NULL));
 	}
 #endif
+
+	/*
+	 * Snapshots have to hit disk (it would be reasonable to configure for
+	 * lazy snapshots, but we don't support them yet).  Regardless, we're
+	 * not holding any locks, other writers can proceed while we wait.
+	 */
+	WT_RET(__wt_fsync(session, block->fh));
 
 	return (0);
 }
