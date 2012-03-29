@@ -170,21 +170,29 @@ namespace mongo {
     }
 
     void LogFile::synchronousAppend(const void *b, size_t len) {
+
+        const char *buf = static_cast<const char *>( b );
+        ssize_t charsToWrite = static_cast<ssize_t>( len );
+
+        if (charsToWrite < 0 || _fd < 0) {
+            log() << "LogFile::synchronousAppend preconditions not met.";
+            ::abort();
+        }
+
 #ifdef POSIX_FADV_DONTNEED
         const off_t pos = lseek(_fd, 0, SEEK_CUR); // doesn't actually seek
 #endif
 
-        const char *buf = (char *) b;
-        assert(_fd);
-        assert(((size_t)buf)%4096==0); // aligned
-        if( len % 4096 != 0 ) {
-            log() << len << ' ' << len % 4096 << endl;
-            assert(false);
-        }
-        ssize_t written = write(_fd, buf, len);
-        if( written != (ssize_t) len ) {
-            log() << "write fails written:" << written << " len:" << len << " buf:" << buf << ' ' << errnoWithDescription() << endl;
-            uasserted(13515, str::stream() << "error appending to file " << _fd  << ' ' << errnoWithDescription());
+        while ( charsToWrite > 0 ) {
+            const ssize_t written = write( _fd, buf, static_cast<size_t>( charsToWrite ) );
+            if ( -1 == written ) {
+                log() << "LogFile::synchronousAppend failed with " << charsToWrite
+                      << " bytes unwritten out of " << len << " bytes;  b=" << b << ' '
+                      << errnoWithDescription() << std::endl;
+                ::abort();
+            }
+            buf += written;
+            charsToWrite -= written;
         }
 
         if( 
@@ -194,7 +202,8 @@ namespace mongo {
            fsync(_fd)
 #endif
             ) {
-            uasserted(13514, str::stream() << "error appending to file on fsync " << ' ' << errnoWithDescription());
+            log() << "error appending to file on fsync " << ' ' << errnoWithDescription();
+            ::abort();
         }
 
 #ifdef POSIX_FADV_DONTNEED
