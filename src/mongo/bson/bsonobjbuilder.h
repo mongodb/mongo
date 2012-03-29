@@ -723,10 +723,10 @@ namespace mongo {
         }
 
         template < class T >
-        BSONArrayBuilder& append( const list< T >& vals );
+        BSONArrayBuilder& append( const std::list< T >& vals );
 
         template < class T >
-        BSONArrayBuilder& append( const set< T >& vals );
+        BSONArrayBuilder& append( const std::set< T >& vals );
 
         // These two just use next position
         BufBuilder &subobjStart() { return _b.subobjStart( num() ); }
@@ -844,13 +844,13 @@ namespace mongo {
     }
 
     template < class T >
-    inline BSONArrayBuilder& BSONArrayBuilder::append( const list< T >& vals ) {
-        return _appendArrayIt< list< T > >( *this, vals );
+    inline BSONArrayBuilder& BSONArrayBuilder::append( const std::list< T >& vals ) {
+        return _appendArrayIt< std::list< T > >( *this, vals );
     }
 
     template < class T >
-    inline BSONArrayBuilder& BSONArrayBuilder::append( const set< T >& vals ) {
-        return _appendArrayIt< set< T > >( *this, vals );
+    inline BSONArrayBuilder& BSONArrayBuilder::append( const std::set< T >& vals ) {
+        return _appendArrayIt< std::set< T > >( *this, vals );
     }
 
 
