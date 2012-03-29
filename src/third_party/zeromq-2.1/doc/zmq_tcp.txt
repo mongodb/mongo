@@ -1,0 +1,162 @@
+zmq_tcp(7)
+==========
+
+
+NAME
+----
+zmq_tcp - 0MQ unicast transport using TCP
+
+
+SYNOPSIS
+--------
+TCP is an ubiquitous, reliable, unicast transport. When connecting distributed
+applications over a network with 0MQ, using the TCP transport will likely be
+your first choice.
+
+
+ADDRESSING
+----------
+A 0MQ address string consists of two parts as follows:
+'transport'`://`'endpoint'. The 'transport' part specifies the underlying
+transport protocol to use, and for the TCP transport shall be set to `tcp`.
+The meaning of the 'endpoint' part for the TCP transport is defined below.
+
+
+Assigning a local address to a socket
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When assigning a local address to a socket using _zmq_bind()_ with the 'tcp'
+transport, the 'endpoint' shall be interpreted as an 'interface' followed by a
+colon and the TCP port number to use.
+
+An 'interface' may be specified by either of the following:
+
+* The wild-card `*`, meaning all available interfaces.
+* The primary IPv4 address assigned to the interface, in its numeric
+  representation.
+* The interface name as defined by the operating system.
+
+NOTE: Interface names are not standardised in any way and should be assumed to
+be arbitrary and platform dependent. On Win32 platforms no short interface
+names exist, thus only the primary IPv4 address may be used to specify an
+'interface'.
+
+Connecting a socket
+~~~~~~~~~~~~~~~~~~~
+When connecting a socket to a peer address using _zmq_connect()_ with the 'tcp'
+transport, the 'endpoint' shall be interpreted as a 'peer address' followed by
+a colon and the TCP port number to use.
+
+A 'peer address' may be specified by either of the following:
+
+* The DNS name of the peer.
+* The IPv4 address of the peer, in its numeric representation.
+
+
+WIRE FORMAT
+-----------
+0MQ messages are transmitted over TCP in frames consisting of an encoded
+'payload length', followed by a 'flags' field and the message body. The 'payload
+length' is defined as the combined length in octets of the message body and the
+'flags' field.
+
+For frames with a 'payload length' not exceeding 254 octets, the 'payload
+length' shall be encoded as a single octet.  The minimum valid 'payload length'
+of a frame is 1 octet, thus a 'payload length' of 0 octets is invalid and such
+frames SHOULD be ignored.
+
+For frames with a 'payload length' exceeding 254 octets, the 'payload length'
+shall be encoded as a single octet with the value `255` followed by the
+'payload length' represented as a 64-bit unsigned integer in network byte
+order.
+
+The 'flags' field consists of a single octet containing various control flags:
+
+Bit 0 (MORE): _More message parts to follow_. A value of 0 indicates that there
+are no more message parts to follow; or that the message being sent is not a
+multi-part message. A value of 1 indicates that the message being sent is a
+multi-part message and more message parts are to follow.
+
+Bits 1-7: _Reserved_. Bits 1-7 are reserved for future expansion and MUST be
+set to zero.
+
+The following ABNF grammar represents a single 'frame':
+
+....
+    frame           = (length flags data)
+    length          = OCTET / (escape 8OCTET)
+    flags           = OCTET
+    escape          = %xFF
+    data            = *OCTET
+....
+
+The following diagram illustrates the layout of a frame with a 'payload length'
+not exceeding 254 octets:
+
+....
+0                   1                   2                   3
+0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+| Payload length|     Flags     |       Message body        ... |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+| Message body ...
++-+-+-+-+-+-+- ...
+....
+
+The following diagram illustrates the layout of a frame with a 'payload length'
+exceeding 254 octets:
+
+....
+0                   1                   2                   3
+0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|     0xff      |               Payload length              ... |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|                       Payload length                      ... |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+| Payload length|     Flags     |        Message body       ... |
++-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+|  Message body ...
++-+-+-+-+-+-+-+ ...
+....
+
+
+EXAMPLES
+--------
+.Assigning a local address to a socket
+----
+/* TCP port 5555 on all available interfaces */
+rc = zmq_bind(socket, "tcp://*:5555");
+assert (rc == 0);
+/* TCP port 5555 on the local loop-back interface on all platforms */
+rc = zmq_bind(socket, "tcp://127.0.0.1:5555");
+assert (rc == 0);
+/* TCP port 5555 on the first Ethernet network interface on Linux */
+rc = zmq_bind(socket, "tcp://eth0:5555");
+assert (rc == 0);
+----
+
+.Connecting a socket
+----
+/* Connecting using an IP address */
+rc = zmq_connect(socket, "tcp://192.168.1.1:5555");
+assert (rc == 0);
+/* Connecting using a DNS name */
+rc = zmq_connect(socket, "tcp://server1:5555");
+assert (rc == 0);
+----
+
+
+SEE ALSO
+--------
+linkzmq:zmq_bind[3]
+linkzmq:zmq_connect[3]
+linkzmq:zmq_pgm[7]
+linkzmq:zmq_ipc[7]
+linkzmq:zmq_inproc[7]
+linkzmq:zmq[7]
+
+
+AUTHORS
+-------
+This 0MQ manual page was written by Martin Sustrik <sustrik@250bpm.com> and
+Martin Lucina <mato@kotelna.sk>.

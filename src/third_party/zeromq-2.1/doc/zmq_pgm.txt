@@ -1,0 +1,162 @@
+zmq_pgm(7)
+==========
+
+
+NAME
+----
+zmq_pgm - 0MQ reliable multicast transport using PGM
+
+
+SYNOPSIS
+--------
+PGM (Pragmatic General Multicast) is a protocol for reliable multicast
+transport of data over IP networks.
+
+
+DESCRIPTION
+-----------
+0MQ implements two variants of PGM, the standard protocol where PGM datagrams
+are layered directly on top of IP datagrams as defined by RFC 3208 (the 'pgm'
+transport) and "Encapsulated PGM" where PGM datagrams are encapsulated inside
+UDP datagrams (the 'epgm' transport).
+
+The 'pgm' and 'epgm' transports can only be used with the 'ZMQ_PUB' and
+'ZMQ_SUB' socket types.
+
+Further, PGM sockets are rate limited by default and incur a performance
+penalty when used over a loop-back interface. For details, refer to the
+'ZMQ_RATE', 'ZMQ_RECOVERY_IVL' and 'ZMQ_MCAST_LOOP' options documented in
+linkzmq:zmq_setsockopt[3].
+
+CAUTION: The 'pgm' transport implementation requires access to raw IP sockets.
+Additional privileges may be required on some operating systems for this
+operation. Applications not requiring direct interoperability with other PGM
+implementations are encouraged to use the 'epgm' transport instead which does
+not require any special privileges.
+
+
+ADDRESSING
+----------
+A 0MQ address string consists of two parts as follows:
+'transport'`://`'endpoint'. The 'transport' part specifies the underlying
+transport protocol to use. For the standard PGM protocol, 'transport' shall be
+set to `pgm`. For the "Encapsulated PGM" protocol 'transport' shall be set to
+`epgm`. The meaning of the 'endpoint' part for both the 'pgm' and 'epgm'
+transport is defined below.
+
+
+Connecting a socket
+~~~~~~~~~~~~~~~~~~~
+When connecting a socket to a peer address using _zmq_connect()_ with the 'pgm'
+or 'epgm' transport, the 'endpoint' shall be interpreted as an 'interface'
+followed by a semicolon, followed by a 'multicast address', followed by a colon
+and a port number.
+
+An 'interface' may be specified by either of the following:
+
+* The interface name as defined by the operating system.
+* The primary IPv4 address assigned to the interface, in its numeric
+  representation.
+
+NOTE: Interface names are not standardised in any way and should be assumed to
+be arbitrary and platform dependent. On Win32 platforms no short interface
+names exist, thus only the primary IPv4 address may be used to specify an
+'interface'.
+
+A 'multicast address' is specified by an IPv4 multicast address in its numeric
+representation.
+
+
+WIRE FORMAT
+-----------
+Consecutive PGM datagrams are interpreted by 0MQ as a single continuous stream
+of data where 0MQ messages are not necessarily aligned with PGM datagram
+boundaries and a single 0MQ message may span several PGM datagrams. This stream
+of data consists of 0MQ messages encapsulated in 'frames' as described in
+linkzmq:zmq_tcp[7].
+
+
+PGM datagram payload
+~~~~~~~~~~~~~~~~~~~~
+The following ABNF grammar represents the payload of a single PGM datagram as
+used by 0MQ:
+
+....
+datagram               = (offset data)
+offset                 = 2OCTET
+data                   = *OCTET
+....
+
+In order for late joining consumers to be able to identify message boundaries,
+each PGM datagram payload starts with a 16-bit unsigned integer in network byte
+order specifying either the offset of the first message 'frame' in the datagram
+or containing the value `0xFFFF` if the datagram contains solely an
+intermediate part of a larger message.
+
+Note that offset specifies where the first message begins rather than the first
+message part. Thus, if there are trailing message parts at the beginning of
+the packet the offset ignores them and points to first initial message part
+in the packet.
+
+The following diagram illustrates the layout of a single PGM datagram payload:
+
+....
++------------------+----------------------+
+| offset (16 bits) |         data         |
++------------------+----------------------+
+....
+
+The following diagram further illustrates how three example 0MQ frames are laid
+out in consecutive PGM datagram payloads:
+
+....
+First datagram payload
++--------------+-------------+---------------------+
+| Frame offset |   Frame 1   |   Frame 2, part 1   |
+|    0x0000    | (Message 1) | (Message 2, part 1) |
++--------------+-------------+---------------------+
+
+Second datagram payload
++--------------+---------------------+
+| Frame offset |   Frame 2, part 2   |
+| 0xFFFF       | (Message 2, part 2) |
++--------------+---------------------+
+
+Third datagram payload
++--------------+----------------------------+-------------+
+| Frame offset |   Frame 2, final 8 bytes   |   Frame 3   |
+| 0x0008       | (Message 2, final 8 bytes) | (Message 3) |
++--------------+----------------------------+-------------+
+....
+
+
+EXAMPLE
+-------
+.Connecting a socket
+----
+/* Connecting to the multicast address 239.192.1.1, port 5555, */
+/* using the first Ethernet network interface on Linux */
+/* and the Encapsulated PGM protocol */
+rc = zmq_connect(socket, "epgm://eth0;239.192.1.1:5555");
+assert (rc == 0);
+/* Connecting to the multicast address 239.192.1.1, port 5555, */
+/* using the network interface with the address 192.168.1.1 */
+/* and the standard PGM protocol */
+rc = zmq_connect(socket, "pgm://192.168.1.1;239.192.1.1:5555");
+assert (rc == 0);
+----
+
+
+SEE ALSO
+--------
+linkzmq:zmq_connect[3]
+linkzmq:zmq_setsockopt[3]
+linkzmq:zmq_tcp[7]
+linkzmq:zmq_ipc[7]
+linkzmq:zmq_inproc[7]
+linkzmq:zmq[7]
+
+AUTHORS
+-------
+This 0MQ manual page was written by Martin Sustrik <sustrik@250bpm.com> and
+Martin Lucina <mato@kotelna.sk>.

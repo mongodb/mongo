@@ -1,0 +1,382 @@
+zmq_setsockopt(3)
+=================
+
+
+NAME
+----
+
+zmq_setsockopt - set 0MQ socket options
+
+
+SYNOPSIS
+--------
+*int zmq_setsockopt (void '*socket', int 'option_name', const void '*option_value', size_t 'option_len');*
+
+Caution: All options, with the exception of ZMQ_SUBSCRIBE, ZMQ_UNSUBSCRIBE and
+ZMQ_LINGER, only take effect for subsequent socket bind/connects.
+
+DESCRIPTION
+-----------
+The _zmq_setsockopt()_ function shall set the option specified by the
+'option_name' argument to the value pointed to by the 'option_value' argument
+for the 0MQ socket pointed to by the 'socket' argument. The 'option_len'
+argument is the size of the option value in bytes.
+
+The following socket options can be set with the _zmq_setsockopt()_ function:
+
+
+ZMQ_HWM: Set high water mark
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_HWM' option shall set the high water mark for the specified 'socket'.
+The high water mark is a hard limit on the maximum number of outstanding
+messages 0MQ shall queue in memory for any single peer that the specified
+'socket' is communicating with.
+
+If this limit has been reached the socket shall enter an exceptional state and
+depending on the socket type, 0MQ shall take appropriate action such as
+blocking or dropping sent messages. Refer to the individual socket descriptions
+in linkzmq:zmq_socket[3] for details on the exact action taken for each socket
+type.
+
+The default 'ZMQ_HWM' value of zero means "no limit".
+
+[horizontal]
+Option value type:: uint64_t
+Option value unit:: messages
+Default value:: 0
+Applicable socket types:: all
+
+
+ZMQ_SWAP: Set disk offload size
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_SWAP' option shall set the disk offload (swap) size for the specified
+'socket'. A socket which has 'ZMQ_SWAP' set to a non-zero value may exceed its
+high water mark; in this case outstanding messages shall be offloaded to
+storage on disk rather than held in memory.
+
+The value of 'ZMQ_SWAP' defines the maximum size of the swap space in bytes.
+
+[horizontal]
+Option value type:: int64_t
+Option value unit:: bytes
+Default value:: 0
+Applicable socket types:: all
+
+
+ZMQ_AFFINITY: Set I/O thread affinity
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_AFFINITY' option shall set the I/O thread affinity for newly created
+connections on the specified 'socket'.
+
+Affinity determines which threads from the 0MQ I/O thread pool associated with
+the socket's _context_ shall handle newly created connections.  A value of zero
+specifies no affinity, meaning that work shall be distributed fairly among all
+0MQ I/O threads in the thread pool. For non-zero values, the lowest bit
+corresponds to thread 1, second lowest bit to thread 2 and so on.  For example,
+a value of 3 specifies that subsequent connections on 'socket' shall be handled
+exclusively by I/O threads 1 and 2.
+
+See also linkzmq:zmq_init[3] for details on allocating the number of I/O
+threads for a specific _context_.
+
+[horizontal]
+Option value type:: uint64_t
+Option value unit:: N/A (bitmap)
+Default value:: 0
+Applicable socket types:: N/A
+
+
+ZMQ_IDENTITY: Set socket identity
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_IDENTITY' option shall set the identity of the specified 'socket'.
+Socket identity determines if existing 0MQ infrastructure (_message queues_,
+_forwarding devices_) shall be identified with a specific application and
+persist across multiple runs of the application.
+
+If the socket has no identity, each run of an application is completely
+separate from other runs. However, with identity set the socket shall re-use
+any existing 0MQ infrastructure configured by the previous run(s). Thus the
+application may receive messages that were sent in the meantime, _message
+queue_ limits shall be shared with previous run(s) and so on.
+
+Identity should be at least one byte and at most 255 bytes long. Identities
+starting with binary zero are reserved for use by 0MQ infrastructure.
+
+[horizontal]
+Option value type:: binary data
+Option value unit:: N/A
+Default value:: NULL
+Applicable socket types:: all
+
+
+ZMQ_SUBSCRIBE: Establish message filter
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_SUBSCRIBE' option shall establish a new message filter on a 'ZMQ_SUB'
+socket. Newly created 'ZMQ_SUB' sockets shall filter out all incoming messages,
+therefore you should call this option to establish an initial message filter.
+
+An empty 'option_value' of length zero shall subscribe to all incoming
+messages. A non-empty 'option_value' shall subscribe to all messages beginning
+with the specified prefix. Multiple filters may be attached to a single
+'ZMQ_SUB' socket, in which case a message shall be accepted if it matches at
+least one filter.
+
+[horizontal]
+Option value type:: binary data
+Option value unit:: N/A
+Default value:: N/A
+Applicable socket types:: ZMQ_SUB
+
+
+ZMQ_UNSUBSCRIBE: Remove message filter
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_UNSUBSCRIBE' option shall remove an existing message filter on a
+'ZMQ_SUB' socket. The filter specified must match an existing filter previously
+established with the 'ZMQ_SUBSCRIBE' option. If the socket has several
+instances of the same filter attached the 'ZMQ_UNSUBSCRIBE' option shall remove
+only one instance, leaving the rest in place and functional.
+
+[horizontal]
+Option value type:: binary data
+Option value unit:: N/A
+Default value:: N/A
+Applicable socket types:: ZMQ_SUB
+
+
+ZMQ_RATE: Set multicast data rate
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_RATE' option shall set the maximum send or receive data rate for
+multicast transports such as linkzmq:zmq_pgm[7] using the specified 'socket'.
+
+[horizontal]
+Option value type:: int64_t
+Option value unit:: kilobits per second
+Default value:: 100
+Applicable socket types:: all, when using multicast transports
+
+
+ZMQ_RECOVERY_IVL: Set multicast recovery interval
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_RECOVERY_IVL' option shall set the recovery interval for multicast
+transports using the specified 'socket'. The recovery interval determines the
+maximum time in seconds that a receiver can be absent from a multicast group
+before unrecoverable data loss will occur.
+
+CAUTION: Exercise care when setting large recovery intervals as the data
+needed for recovery will be held in memory. For example, a 1 minute recovery
+interval at a data rate of 1Gbps requires a 7GB in-memory buffer.
+
+[horizontal]
+Option value type:: int64_t
+Option value unit:: seconds
+Default value:: 10
+Applicable socket types:: all, when using multicast transports
+
+
+ZMQ_RECOVERY_IVL_MSEC: Set multicast recovery interval in milliseconds
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_RECOVERY_IVL_MSEC' option shall set the recovery interval, specified
+in milliseconds (ms) for multicast transports using the specified 'socket'.
+The recovery interval determines the maximum time in milliseconds that a
+receiver can be absent from a multicast group before unrecoverable data loss
+will occur.
+
+A non-zero value of the 'ZMQ_RECOVERY_IVL_MSEC' option will take precedence
+over the 'ZMQ_RECOVERY_IVL' option, but since the default for the
+'ZMQ_RECOVERY_IVL_MSEC' is -1, the default is to use the 'ZMQ_RECOVERY_IVL'
+option value.
+
+CAUTION: Exercise care when setting large recovery intervals as the data
+needed for recovery will be held in memory. For example, a 1 minute recovery
+interval at a data rate of 1Gbps requires a 7GB in-memory buffer.
+
+[horizontal]
+Option value type:: int64_t
+Option value unit:: milliseconds
+Default value:: -1
+Applicable socket types:: all, when using multicast transports
+
+
+ZMQ_MCAST_LOOP: Control multicast loop-back
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_MCAST_LOOP' option shall control whether data sent via multicast
+transports using the specified 'socket' can also be received by the sending
+host via loop-back. A value of zero disables the loop-back functionality, while
+the default value of 1 enables the loop-back functionality. Leaving multicast
+loop-back enabled when it is not required can have a negative impact on
+performance. Where possible, disable 'ZMQ_MCAST_LOOP' in production
+environments.
+
+[horizontal]
+Option value type:: int64_t
+Option value unit:: boolean
+Default value:: 1
+Applicable socket types:: all, when using multicast transports
+
+
+ZMQ_SNDBUF: Set kernel transmit buffer size
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_SNDBUF' option shall set the underlying kernel transmit buffer size
+for the 'socket' to the specified size in bytes.  A value of zero means leave
+the OS default unchanged. For details please refer to your operating system
+documentation for the 'SO_SNDBUF' socket option.
+
+[horizontal]
+Option value type:: uint64_t
+Option value unit:: bytes
+Default value:: 0
+Applicable socket types:: all
+
+
+ZMQ_RCVBUF: Set kernel receive buffer size
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_RCVBUF' option shall set the underlying kernel receive buffer size for
+the 'socket' to the specified size in bytes.  A value of zero means leave the
+OS default unchanged. For details refer to your operating system documentation
+for the 'SO_RCVBUF' socket option.
+
+[horizontal]
+Option value type:: uint64_t
+Option value unit:: bytes
+Default value:: 0
+Applicable socket types:: all
+
+
+ZMQ_LINGER: Set linger period for socket shutdown
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_LINGER' option shall set the linger period for the specified 'socket'.
+The linger period determines how long pending messages which have yet to be
+sent to a peer shall linger in memory after a socket is closed with
+linkzmq:zmq_close[3], and further affects the termination of the socket's
+context with linkzmq:zmq_term[3]. The following outlines the different
+behaviours:
+
+* The default value of '-1' specifies an infinite linger period. Pending
+  messages shall not be discarded after a call to _zmq_close()_; attempting to
+  terminate the socket's context with _zmq_term()_ shall block until all
+  pending messages have been sent to a peer.
+
+* The value of '0' specifies no linger period. Pending messages shall be
+  discarded immediately when the socket is closed with _zmq_close()_.
+
+* Positive values specify an upper bound for the linger period in milliseconds.
+  Pending messages shall not be discarded after a call to _zmq_close()_;
+  attempting to terminate the socket's context with _zmq_term()_ shall block
+  until either all pending messages have been sent to a peer, or the linger
+  period expires, after which any pending messages shall be discarded.
+
+[horizontal]
+Option value type:: int
+Option value unit:: milliseconds
+Default value:: -1 (infinite)
+Applicable socket types:: all
+
+
+ZMQ_RECONNECT_IVL: Set reconnection interval
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_RECONNECT_IVL' option shall set the initial reconnection interval for
+the specified 'socket'.  The reconnection interval is the period 0MQ
+shall wait between attempts to reconnect disconnected peers when using
+connection-oriented transports.
+
+NOTE: The reconnection interval may be randomized by 0MQ to prevent
+reconnection storms in topologies with a large number of peers per socket.
+
+[horizontal]
+Option value type:: int
+Option value unit:: milliseconds
+Default value:: 100
+Applicable socket types:: all, only for connection-oriented transports
+
+
+ZMQ_RECONNECT_IVL_MAX: Set maximum reconnection interval
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_RECONNECT_IVL_MAX' option shall set the maximum reconnection interval 
+for the specified 'socket'.  This is the maximum period 0MQ shall wait between
+attempts to reconnect. On each reconnect attempt, the previous interval shall be
+doubled untill ZMQ_RECONNECT_IVL_MAX is reached. This allows for exponential
+backoff strategy. Default value means no exponential backoff is performed and
+reconnect interval calculations are only based on ZMQ_RECONNECT_IVL.
+
+NOTE:  Values less than ZMQ_RECONNECT_IVL will be ignored.
+
+[horizontal]
+Option value type:: int
+Option value unit:: milliseconds
+Default value:: 0 (only use ZMQ_RECONNECT_IVL)
+Applicable socket types:: all, only for connection-oriented transports
+
+
+ZMQ_BACKLOG: Set maximum length of the queue of outstanding connections
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_BACKLOG' option shall set the maximum length of the queue of
+outstanding peer connections for the specified 'socket'; this only applies to
+connection-oriented transports. For details refer to your operating system
+documentation for the 'listen' function.
+
+[horizontal]
+Option value type:: int
+Option value unit:: connections
+Default value:: 100
+Applicable socket types:: all, only for connection-oriented transports.
+
+
+RETURN VALUE
+------------
+The _zmq_setsockopt()_ function shall return zero if successful. Otherwise it
+shall return `-1` and set 'errno' to one of the values defined below.
+
+
+ERRORS
+------
+*EINVAL*::
+The requested option _option_name_ is unknown, or the requested _option_len_ or
+_option_value_ is invalid.
+*ETERM*::
+The 0MQ 'context' associated with the specified 'socket' was terminated.
+*ENOTSOCK*::
+The provided 'socket' was invalid.
+*EINTR*::
+The operation was interrupted by delivery of a signal.
+
+
+EXAMPLE
+-------
+.Subscribing to messages on a 'ZMQ_SUB' socket
+----
+/* Subscribe to all messages */
+rc = zmq_setsockopt (socket, ZMQ_SUBSCRIBE, "", 0);
+assert (rc == 0);
+/* Subscribe to messages prefixed with "ANIMALS.CATS" */
+rc = zmq_setsockopt (socket, ZMQ_SUBSCRIBE, "ANIMALS.CATS", 12);
+----
+
+.Setting I/O thread affinity
+----
+int64_t affinity;
+/* Incoming connections on TCP port 5555 shall be handled by I/O thread 1 */
+affinity = 1;
+rc = zmq_setsockopt (socket, ZMQ_AFFINITY, &affinity, sizeof affinity);
+assert (rc);
+rc = zmq_bind (socket, "tcp://lo:5555");
+assert (rc);
+/* Incoming connections on TCP port 5556 shall be handled by I/O thread 2 */
+affinity = 2;
+rc = zmq_setsockopt (socket, ZMQ_AFFINITY, &affinity, sizeof affinity);
+assert (rc);
+rc = zmq_bind (socket, "tcp://lo:5556");
+assert (rc);
+----
+
+
+SEE ALSO
+--------
+linkzmq:zmq_getsockopt[3]
+linkzmq:zmq_socket[3]
+linkzmq:zmq[7]
+
+
+AUTHORS
+-------
+This 0MQ manual page was written by Martin Sustrik <sustrik@250bpm.com> and
+Martin Lucina <mato@kotelna.sk>.

@@ -129,7 +129,9 @@ namespace mongo {
 
         SSLManager* sslServerManager; // currently leaks on close
 #endif
-        
+
+		string notifierProto;
+
         static void launchOk();
 
         static void addGlobalOptions( boost::program_options::options_description& general ,

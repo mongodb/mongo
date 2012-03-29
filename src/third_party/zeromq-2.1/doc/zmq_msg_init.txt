@@ -1,0 +1,65 @@
+zmq_msg_init(3)
+===============
+
+
+NAME
+----
+zmq_msg_init - initialise empty 0MQ message
+
+
+SYNOPSIS
+--------
+*int zmq_msg_init (zmq_msg_t '*msg');*
+
+
+DESCRIPTION
+-----------
+The _zmq_msg_init()_ function shall initialise the message object referenced by
+'msg' to represent an empty message.  This function is most useful when called
+before receiving a message with _zmq_recv()_.
+
+CAUTION: Never access 'zmq_msg_t' members directly, instead always use the
+_zmq_msg_ family of functions.
+
+CAUTION: The functions _zmq_msg_init()_, _zmq_msg_init_data()_ and
+_zmq_msg_init_size()_ are mutually exclusive. Never initialize the same
+'zmq_msg_t' twice.
+
+
+RETURN VALUE
+------------
+The _zmq_msg_init()_ function shall return zero if successful. Otherwise it
+shall return `-1` and set 'errno' to one of the values defined below.
+
+
+ERRORS
+------
+No errors are defined.
+
+
+EXAMPLE
+-------
+.Receiving a message from a socket
+----
+zmq_msg_t msg;
+rc = zmq_msg_init (&msg);
+assert (rc == 0);
+rc = zmq_recv (socket, &msg, 0);
+assert (rc == 0);
+----
+
+
+SEE ALSO
+--------
+linkzmq:zmq_msg_init_size[3]
+linkzmq:zmq_msg_init_data[3]
+linkzmq:zmq_msg_close[3]
+linkzmq:zmq_msg_data[3]
+linkzmq:zmq_msg_size[3]
+linkzmq:zmq[7]
+
+
+AUTHORS
+-------
+This 0MQ manual page was written by Martin Sustrik <sustrik@250bpm.com> and
+Martin Lucina <mato@kotelna.sk>.

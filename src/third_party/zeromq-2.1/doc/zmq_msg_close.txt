@@ -1,0 +1,55 @@
+zmq_msg_close(3)
+================
+
+
+NAME
+----
+zmq_msg_close - release 0MQ message
+
+
+SYNOPSIS
+--------
+*int zmq_msg_close (zmq_msg_t '*msg');*
+
+
+DESCRIPTION
+-----------
+The _zmq_msg_close()_ function shall inform the 0MQ infrastructure that any
+resources associated with the message object referenced by 'msg' are no longer
+required and may be released. Actual release of resources associated with the
+message object shall be postponed by 0MQ until all users of the message or
+underlying data buffer have indicated it is no longer required.
+
+Applications should ensure that _zmq_msg_close()_ is called once a message is
+no longer required, otherwise memory leaks may occur.
+
+CAUTION: Never access 'zmq_msg_t' members directly, instead always use the
+_zmq_msg_ family of functions.
+
+
+RETURN VALUE
+------------
+The _zmq_msg_close()_ function shall return zero if successful. Otherwise
+it shall return `-1` and set 'errno' to one of the values defined below.
+
+
+ERRORS
+------
+*EFAULT*::
+Invalid message.
+
+
+SEE ALSO
+--------
+linkzmq:zmq_msg_init[3]
+linkzmq:zmq_msg_init_size[3]
+linkzmq:zmq_msg_init_data[3]
+linkzmq:zmq_msg_data[3]
+linkzmq:zmq_msg_size[3]
+linkzmq:zmq[7]
+
+
+AUTHORS
+-------
+This 0MQ manual page was written by Martin Sustrik <sustrik@250bpm.com> and
+Martin Lucina <mato@kotelna.sk>.

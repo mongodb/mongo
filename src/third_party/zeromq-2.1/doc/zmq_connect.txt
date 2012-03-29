@@ -1,0 +1,91 @@
+zmq_connect(3)
+==============
+
+
+NAME
+----
+zmq_connect - connect a socket
+
+
+SYNOPSIS
+--------
+*int zmq_connect (void '*socket', const char '*endpoint');*
+
+
+DESCRIPTION
+-----------
+The _zmq_connect()_ function shall connect the socket referenced by the
+'socket' argument to the endpoint specified by the 'endpoint' argument.
+
+The 'endpoint' argument is a string consisting of two parts as follows:
+'transport'`://`'address'. The 'transport' part specifies the underlying
+transport protocol to use. The meaning of the 'address' part is specific to
+the underlying transport protocol selected.
+
+The following transports are defined:
+
+'inproc':: local in-process (inter-thread) communication transport, see linkzmq:zmq_inproc[7]
+'ipc':: local inter-process communication transport, see linkzmq:zmq_ipc[7]
+'tcp':: unicast transport using TCP, see linkzmq:zmq_tcp[7]
+'pgm', 'epgm':: reliable multicast transport using PGM, see linkzmq:zmq_pgm[7]
+
+With the exception of 'ZMQ_PAIR' sockets, a single socket may be connected to
+multiple endpoints using _zmq_connect()_, while simultaneously accepting
+incoming connections from multiple endpoints bound to the socket using
+_zmq_bind()_. Refer to linkzmq:zmq_socket[3] for a description of the exact
+semantics involved when connecting or binding a socket to multiple endpoints.
+
+NOTE: The connection will not be performed immediately but as needed by 0MQ.
+Thus a successful invocation of _zmq_connect()_ does not indicate that a
+physical connection was or can actually be established.
+
+
+RETURN VALUE
+------------
+The _zmq_connect()_ function shall return zero if successful. Otherwise it
+shall return `-1` and set 'errno' to one of the values defined below.
+
+
+ERRORS
+------
+*EINVAL*::
+The endpoint supplied is invalid.
+*EPROTONOSUPPORT*::
+The requested 'transport' protocol is not supported.
+*ENOCOMPATPROTO*::
+The requested 'transport' protocol is not compatible with the socket type.
+*ETERM*::
+The 0MQ 'context' associated with the specified 'socket' was terminated.
+*ENOTSOCK*::
+The provided 'socket' was invalid.
+*EMTHREAD*::
+No I/O thread is available to accomplish the task.
+
+
+EXAMPLE
+-------
+.Connecting a subscriber socket to an in-process and a TCP transport
+----
+/* Create a ZMQ_SUB socket */
+void *socket = zmq_socket (context, ZMQ_SUB);
+assert (socket);
+/* Connect it to an in-process transport with the address 'my_publisher' */
+int rc = zmq_connect (socket, "inproc://my_publisher");
+assert (rc == 0);
+/* Connect it to the host server001, port 5555 using a TCP transport */
+rc = zmq_connect (socket, "tcp://server001:5555");
+assert (rc == 0);
+----
+
+
+SEE ALSO
+--------
+linkzmq:zmq_bind[3]
+linkzmq:zmq_socket[3]
+linkzmq:zmq[7]
+
+
+AUTHORS
+-------
+This 0MQ manual page was written by Martin Sustrik <sustrik@250bpm.com> and
+Martin Lucina <mato@kotelna.sk>.

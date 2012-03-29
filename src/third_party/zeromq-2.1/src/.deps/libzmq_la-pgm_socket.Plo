@@ -1,0 +1,4 @@
+libzmq_la-pgm_socket.lo libzmq_la-pgm_socket.o: pgm_socket.cpp \
+  platform.hpp
+
+platform.hpp:

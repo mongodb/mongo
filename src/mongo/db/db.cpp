@@ -55,6 +55,8 @@
 #include <fstream>
 #include <boost/filesystem/operations.hpp>
 
+#include "notifications/notifier.hpp"
+
 namespace mongo {
 
     namespace dur { 
@@ -439,6 +441,8 @@ namespace mongo {
 
         Logstream::get().addGlobalTee( new RamLog("global") );
 
+		MongodbChangeNotifier::Instance()->start(cmdLine.notifierProto);
+
         bool is32bit = sizeof(int*) == 4;
 
         {
@@ -595,7 +599,7 @@ int main(int argc, char* argv[]) {
     po::options_description sharding_options("Sharding options");
     po::options_description visible_options("Allowed options");
     po::options_description hidden_options("Hidden options");
-
+	po::options_description notifier_options("Notifier options");
     po::positional_options_description positional_options;
 
     CmdLine::addGlobalOptions( general_options , hidden_options );
@@ -678,6 +682,8 @@ int main(int argc, char* argv[]) {
     ("opIdMem", "DEPRECATED")
     ;
 
+	notifier_options.add_options()("proto",po::value<string>(),"specify the publish protocol, e.g. tcp://*:5556");
+
     positional_options.add("command", 3);
     visible_options.add(general_options);
 #if defined(_WIN32)
@@ -687,6 +693,7 @@ int main(int argc, char* argv[]) {
     visible_options.add(ms_options);
     visible_options.add(rs_options);
     visible_options.add(sharding_options);
+	visible_options.add(notifier_options);
     Module::addOptions( visible_options );
 
     setupCoreSignals();
@@ -976,6 +983,10 @@ int main(int argc, char* argv[]) {
             out() << "<http://www.mongodb.org/display/DOCS/Replica+Pairs>" << endl;
             out() << "****" << endl;
             dbexit( EXIT_BADOPTIONS );
+        }
+
+		if (params.count("proto")) {
+            	cmdLine.notifierProto = params["proto"].as<string>();
         }
 
         // needs to be after things like --configsvr parsing, thus here.

@@ -1,0 +1,80 @@
+zmq_ipc(7)
+==========
+
+
+NAME
+----
+zmq_ipc - 0MQ local inter-process communication transport
+
+
+SYNOPSIS
+--------
+The inter-process transport passes messages between local processes using a
+system-dependent IPC mechanism.
+
+NOTE: The inter-process transport is currently only implemented on operating
+systems that provide UNIX domain sockets.
+
+
+ADDRESSING
+----------
+A 0MQ address string consists of two parts as follows:
+'transport'`://`'endpoint'. The 'transport' part specifies the underlying
+transport protocol to use, and for the inter-process transport shall be set to
+`ipc`.  The meaning of the 'endpoint' part for the inter-process transport is
+defined below.
+
+
+Assigning a local address to a socket
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When assigning a local address to a 'socket' using _zmq_bind()_ with the 'ipc'
+transport, the 'endpoint' shall be interpreted as an arbitrary string
+identifying the 'pathname' to create. The 'pathname' must be unique within the
+operating system namespace used by the 'ipc' implementation, and must fulfill
+any restrictions placed by the operating system on the format and length of a
+'pathname'.
+
+Connecting a socket
+~~~~~~~~~~~~~~~~~~~
+When connecting a 'socket' to a peer address using _zmq_connect()_ with the
+'ipc' transport, the 'endpoint' shall be interpreted as an arbitrary string
+identifying the 'pathname' to connect to.  The 'pathname' must have been
+previously created within the operating system namespace by assigning it to a
+'socket' with _zmq_bind()_.
+
+
+WIRE FORMAT
+-----------
+Not applicable.
+
+
+EXAMPLES
+--------
+.Assigning a local address to a socket
+----
+/* Assign the pathname "/tmp/feeds/0" */
+rc = zmq_bind(socket, "ipc:///tmp/feeds/0");
+assert (rc == 0);
+----
+
+.Connecting a socket
+----
+/* Connect to the pathname "/tmp/feeds/0" */
+rc = zmq_connect(socket, "ipc:///tmp/feeds/0");
+assert (rc == 0);
+----
+
+SEE ALSO
+--------
+linkzmq:zmq_bind[3]
+linkzmq:zmq_connect[3]
+linkzmq:zmq_inproc[7]
+linkzmq:zmq_tcp[7]
+linkzmq:zmq_pgm[7]
+linkzmq:zmq[7]
+
+
+AUTHORS
+-------
+This 0MQ manual page was written by Martin Sustrik <sustrik@250bpm.com> and
+Martin Lucina <mato@kotelna.sk>.

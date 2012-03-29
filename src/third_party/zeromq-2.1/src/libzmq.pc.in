@@ -1,0 +1,10 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: libzmq
+Description: 0MQ c++ library
+Version: @VERSION@
+Libs: -L${libdir} -lzmq
+Cflags: -I${includedir}

@@ -94,7 +94,8 @@ commonFiles += env['MONGO_COMMON_FILES']
 env.StaticLibrary('mongocommon', commonFiles,
                   LIBDEPS=['$BUILD_DIR/third_party/pcrecpp',
                            '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
-                           '$BUILD_DIR/third_party/mongo_boost'],)
+                           '$BUILD_DIR/third_party/mongo_boost',
+			   '$BUILD_DIR/third_party/mongo_zeromq'],)
 
 #mmap stuff
 
@@ -279,7 +280,9 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/commands/pipeline_command.cpp",
                     "db/commands/pipeline_d.cpp",
                     "db/commands/document_source_cursor.cpp",
-                    "db/driverHelpers.cpp" ] + env['MONGO_SERVER_ONLY_FILES']
+                    "db/driverHelpers.cpp",
+                    "db/notifications/notifier.cpp"
+ ] + env['MONGO_SERVER_ONLY_FILES']
 
 env.Library( "dbcmdline", "db/cmdline.cpp" )
 

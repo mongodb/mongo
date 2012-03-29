@@ -48,7 +48,7 @@
 #include <fstream>
 #include <boost/filesystem/operations.hpp>
 #include "dur_commitjob.h"
-
+#include "notifications/notifier.hpp"
 namespace mongo {
     
     // for diaglog
@@ -728,6 +728,7 @@ namespace mongo {
         }
         theDataFileMgr.insertWithObjMod(ns, js, false); // js may be modified in the call to add an _id field.
         logOp("i", ns, js);
+		NOTIFY_INSERTION(ns,js);
     }
 
     NOINLINE_DECL void insertMulti(bool keepGoing, const char *ns, vector<BSONObj>& objs) {
@@ -1043,6 +1044,7 @@ namespace mongo {
             return;
         }
 #endif
+		MongodbChangeNotifier::Instance()->stop();
         tryToOutputFatal( "dbexit: really exiting now" );
         if ( c ) c->shutdown();
         ::exit(rc);

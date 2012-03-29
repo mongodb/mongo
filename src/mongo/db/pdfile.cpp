@@ -48,6 +48,7 @@ _ disallow system* manipulations from the database.
 #include "memconcept.h"
 
 #include <boost/filesystem/operations.hpp>
+#include "notifications/notifier.hpp"
 
 namespace mongo {
 
@@ -1061,6 +1062,13 @@ namespace mongo {
 
         if ( ! toDelete.isEmpty() ) {
             logOp( "d" , ns , toDelete );
+			BSONElement e;
+            if( toDelete.getObjectID( e ) ) {
+				BSONObjBuilder b;
+                b.append( e );
+				MongodbChangeNotifier::Instance()->postNotification(DELETE,ns,b.done(),toDelete);
+            }
+
         }
     }
 
@@ -1737,6 +1745,7 @@ namespace mongo {
         BSONObj tmp = o;
         insertWithObjMod( ns, tmp, god );
         logOp( "i", ns, tmp, 0, 0, fromMigrate );
+		NOTIFY_INSERTION(ns,tmp);
     }
 
     /** @param o the object to insert. can be modified to add _id and thus be an in/out param

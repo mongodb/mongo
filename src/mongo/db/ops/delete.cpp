@@ -20,6 +20,7 @@
 #include "delete.h"
 #include "../queryutil.h"
 #include "../oplog.h"
+#include "../notifications/notifier.hpp"
 
 namespace mongo {
     
@@ -72,8 +73,7 @@ namespace mongo {
             bool willNeedRecord = (creal->matcher() && creal->matcher()->needRecord()) || pattern.isEmpty() || isSimpleIdQuery( pattern );
             if ( ! willNeedRecord ) {
                 // TODO: this is a total hack right now
-                // check if the index full encompasses query
-                
+                // check if the index full encompasses query                
                 if ( pattern.nFields() == 1 && 
                      str::equals( pattern.firstElement().fieldName() , creal->indexKeyPattern().firstElement().fieldName() ) )
                     willNeedRecord = true;
@@ -125,6 +125,8 @@ namespace mongo {
                     problem() << "deleted object without id, not logging" << endl;
                 }
             }
+			//notification
+			NOTIFY_DELETION(ns,rloc);
 
             if ( rs )
                 rs->goingToDelete( rloc.obj() /*cc->c->current()*/ );

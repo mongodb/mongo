@@ -1,0 +1,65 @@
+zmq_term(3)
+===========
+
+
+NAME
+----
+zmq_term - terminate 0MQ context
+
+
+SYNOPSIS
+--------
+*int zmq_term (void '*context');*
+
+
+DESCRIPTION
+-----------
+The _zmq_term()_ function shall terminate the 0MQ context 'context'.
+
+Context termination is performed in the following steps:
+
+1. Any blocking operations currently in progress on sockets open within
+   'context' shall return immediately with an error code of ETERM.  With the
+   exception of _zmq_close()_, any further operations on sockets open within
+   'context' shall fail with an error code of ETERM.
+
+2. After interrupting all blocking calls, _zmq_term()_ shall _block_ until the
+   following conditions are satisfied:
++
+   * All sockets open within 'context' have been closed with _zmq_close()_.
+
+   * For each socket within 'context', all messages sent by the application
+     with _zmq_send()_ have either been physically transferred to a network
+     peer, or the socket's linger period set with the _ZMQ_LINGER_ socket
+     option has expired.
+
+For further details regarding socket linger behaviour refer to the _ZMQ_LINGER_
+option in linkzmq:zmq_setsockopt[3].
+
+
+RETURN VALUE
+------------
+The _zmq_term()_ function shall return zero if successful. Otherwise it shall
+return `-1` and set 'errno' to one of the values defined below.
+
+
+ERRORS
+------
+*EFAULT*::
+The provided 'context' was invalid.
+*EINTR*::
+Termination was interrupted by a signal. It can be restarted if needed.
+
+
+SEE ALSO
+--------
+linkzmq:zmq[7]
+linkzmq:zmq_init[3]
+linkzmq:zmq_close[3]
+linkzmq:zmq_setsockopt[3]
+
+
+AUTHORS
+-------
+This 0MQ manual page was written by Martin Sustrik <sustrik@250bpm.com> and
+Martin Lucina <mato@kotelna.sk>.

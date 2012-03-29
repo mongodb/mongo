@@ -209,7 +209,8 @@ for shortName in getThirdPartyShortNames():
 
 add_option( "use-system-pcre", "use system version of pcre library", 0, True )
 
-add_option( "use-system-boost", "use system version of boost libraries", 0, True )
+add_option( "use-system-boost", "use system version of boost libraries", 0, True)
+add_option( "use-system-zeromq", "use system version of zeromq libraries", 0, True)
 
 add_option( "use-system-all" , "use all system libraries", 0 , True )
 
@@ -284,6 +285,7 @@ env = Environment( BUILD_DIR=variantDir,
                    PYSYSPLATFORM=os.sys.platform,
 
                    PCRE_VERSION='8.30',
+                   ZEROMQ_VERSION='2.1',
                    )
 
 if has_option('mongod-concurrency-level'):
@@ -800,6 +802,9 @@ if not has_option("use-system-all") and not has_option("use-system-pcre"):
 if not has_option('use-system-all') and not has_option('use-system-boost'):
     env.Prepend(CPPPATH=['$BUILD_DIR/third_party/boost'],
                 CPPDEFINES=['BOOST_ALL_NO_LIB'])
+if not has_option('use-system-all') and not has_option('use-system-zeromq'):
+    env.Prepend(CPPPATH=['$BUILD_DIR/third_party/zeromq-${ZEROMQ_VERSION}/include'])
+
 
 env.Append( CPPPATH=['$EXTRACPPPATH'],
             LIBPATH=['$EXTRALIBPATH'] )

@@ -227,7 +227,8 @@ namespace mongo {
         if (params.count("verbose")) {
             logLevel = 1;
         }
-
+		
+		
         for (string s = "vv"; s.length() <= 12; s.append("v")) {
             if (params.count(s)) {
                 logLevel = s.length();

@@ -1,0 +1,218 @@
+zmq(7)
+======
+
+
+NAME
+----
+zmq - 0MQ lightweight messaging kernel
+
+
+SYNOPSIS
+--------
+*#include <zmq.h>*
+
+*cc* ['flags'] 'files' *-lzmq* ['libraries']
+
+
+DESCRIPTION
+-----------
+The 0MQ lightweight messaging kernel is a library which extends the standard
+socket interfaces with features traditionally provided by specialised
+_messaging middleware_ products. 0MQ sockets provide an abstraction of
+asynchronous  _message queues_, multiple _messaging patterns_, message
+filtering (_subscriptions_), seamless access to multiple _transport protocols_
+and more.
+
+This documentation presents an overview of 0MQ concepts, describes how 0MQ
+abstracts standard sockets and provides a reference manual for the functions
+provided by the 0MQ library.
+
+
+Context
+~~~~~~~
+Before using any 0MQ library functions the caller must initialise a 0MQ
+'context' using _zmq_init()_. The following functions are provided to handle
+initialisation and termination of a 'context':
+
+Initialise 0MQ context::
+    linkzmq:zmq_init[3]
+
+Terminate 0MQ context::
+    linkzmq:zmq_term[3]
+
+
+Thread safety
+^^^^^^^^^^^^^
+A 0MQ 'context' is thread safe and may be shared among as many application
+threads as necessary, without any additional locking required on the part of
+the caller.
+
+Individual 0MQ 'sockets' are _not_ thread safe except in the case where full
+memory barriers are issued when migrating a socket from one thread to another.
+In practice this means applications can create a socket in one thread with
+_zmq_socket()_ and then pass it to a _newly created_ thread as part of thread
+initialization, for example via a structure passed as an argument to
+_pthread_create()_.
+
+
+Multiple contexts
+^^^^^^^^^^^^^^^^^
+Multiple 'contexts' may coexist within a single application. Thus, an
+application can use 0MQ directly and at the same time make use of any number of
+additional libraries or components which themselves make use of 0MQ as long as
+the above guidelines regarding thread safety are adhered to.
+
+
+Messages
+~~~~~~~~
+A 0MQ message is a discrete unit of data passed between applications or
+components of the same application. 0MQ messages have no internal structure and
+from the point of view of 0MQ itself they are considered to be opaque binary
+data.
+
+The following functions are provided to work with messages:
+
+Initialise a message::
+    linkzmq:zmq_msg_init[3]
+    linkzmq:zmq_msg_init_size[3]
+    linkzmq:zmq_msg_init_data[3]
+
+Release a message::
+    linkzmq:zmq_msg_close[3]
+
+Access message content::
+    linkzmq:zmq_msg_data[3]
+    linkzmq:zmq_msg_size[3]
+
+Message manipulation::
+    linkzmq:zmq_msg_copy[3]
+    linkzmq:zmq_msg_move[3]
+
+
+Sockets
+~~~~~~~
+0MQ sockets present an abstraction of a asynchronous _message queue_, with the
+exact queueing semantics depending on the socket type in use. See
+linkzmq:zmq_socket[3] for the socket types provided.
+
+The following functions are provided to work with sockets:
+
+Creating a socket::
+    linkzmq:zmq_socket[3]
+
+Closing a socket::
+    linkzmq:zmq_close[3]
+
+Manipulating socket options::
+    linkzmq:zmq_getsockopt[3]
+    linkzmq:zmq_setsockopt[3]
+
+Establishing a message flow::
+    linkzmq:zmq_bind[3]
+    linkzmq:zmq_connect[3]
+
+Sending and receiving messages::
+    linkzmq:zmq_send[3]
+    linkzmq:zmq_recv[3]
+
+.Input/output multiplexing
+0MQ provides a mechanism for applications to multiplex input/output events over
+a set containing both 0MQ sockets and standard sockets. This mechanism mirrors
+the standard _poll()_ system call, and is described in detail in
+linkzmq:zmq_poll[3].
+
+
+Transports
+~~~~~~~~~~
+A 0MQ socket can use multiple different underlying transport mechanisms.
+Each transport mechanism is suited to a particular purpose and has its own
+advantages and drawbacks.
+
+The following transport mechanisms are provided:
+
+Unicast transport using TCP::
+    linkzmq:zmq_tcp[7]
+
+Reliable multicast transport using PGM::
+    linkzmq:zmq_pgm[7]
+
+Local inter-process communication transport::
+    linkzmq:zmq_ipc[7]
+
+Local in-process (inter-thread) communication transport::
+    linkzmq:zmq_inproc[7]
+
+
+Devices
+~~~~~~~
+0MQ provides 'devices', which are building blocks that act as intermediate
+nodes in complex messaging topologies. Devices can act as brokers that other
+nodes connect to, proxies that connect through to other nodes, or any mix of
+these two models.
+
+You can start a device in an application thread, see linkzmq:zmq_device[3].
+
+
+ERROR HANDLING
+--------------
+The 0MQ library functions handle errors using the standard conventions found on
+POSIX systems. Generally, this means that upon failure a 0MQ library function
+shall return either a NULL value (if returning a pointer) or a negative value
+(if returning an integer), and the actual error code shall be stored in the
+'errno' variable.
+
+On non-POSIX systems some users may experience issues with retrieving the
+correct value of the 'errno' variable. The _zmq_errno()_ function is provided
+to assist in these cases; for details refer to linkzmq:zmq_errno[3].
+
+The _zmq_strerror()_ function is provided to translate 0MQ-specific error codes
+into error message strings; for details refer to linkzmq:zmq_strerror[3].
+
+
+MISCELLANEOUS
+-------------
+The following miscellaneous functions are provided:
+
+Report 0MQ library version::
+    linkzmq:zmq_version[3]
+
+
+LANGUAGE BINDINGS
+-----------------
+The 0MQ library provides interfaces suitable for calling from programs in any
+language; this documentation documents those interfaces as they would be used
+by C programmers. The intent is that programmers using 0MQ from other languages
+shall refer to this documentation alongside any documentation provided by the
+vendor of their language binding.
+
+
+C++ language binding
+~~~~~~~~~~~~~~~~~~~~
+The 0MQ distribution includes a $$C++$$ language binding, which is documented
+separately in linkzmq:zmq_cpp[7].
+
+
+Other language bindings
+~~~~~~~~~~~~~~~~~~~~~~~
+Other language bindings (Python, Ruby, Java and more) are provided by members
+of the 0MQ community and pointers can be found on the 0MQ website.
+
+
+AUTHORS
+-------
+This 0MQ manual page was written by Martin Sustrik <sustrik@250bpm.com> and
+Martin Lucina <mato@kotelna.sk>.
+
+
+RESOURCES
+---------
+Main web site: <http://www.zeromq.org/>
+
+Report bugs to the 0MQ development mailing list: <zeromq-dev@lists.zeromq.org>
+
+
+COPYING
+-------
+Free use of this software is granted under the terms of the GNU Lesser General
+Public License (LGPL). For details see the files `COPYING` and `COPYING.LESSER`
+included with the 0MQ distribution.

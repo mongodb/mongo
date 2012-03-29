@@ -1,0 +1,407 @@
+zmq_getsockopt(3)
+=================
+
+
+NAME
+----
+
+zmq_getsockopt - get 0MQ socket options
+
+
+SYNOPSIS
+--------
+*int zmq_getsockopt (void '*socket', int 'option_name', void '*option_value', size_t '*option_len');*
+
+
+DESCRIPTION
+-----------
+The _zmq_getsockopt()_ function shall retrieve the value for the option
+specified by the 'option_name' argument for the 0MQ socket pointed to by the
+'socket' argument, and store it in the buffer pointed to by the 'option_value'
+argument. The 'option_len' argument is the size in bytes of the buffer pointed
+to by 'option_value'; upon successful completion _zmq_getsockopt()_ shall
+modify the 'option_len' argument to indicate the actual size of the option
+value stored in the buffer.
+
+The following options can be retrieved with the _zmq_getsockopt()_ function:
+
+
+ZMQ_TYPE: Retrieve socket type
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_TYPE' option shall retrieve the socket type for the specified
+'socket'.  The socket type is specified at socket creation time and
+cannot be modified afterwards.
+
+[horizontal]
+Option value type:: int
+Option value unit:: N/A
+Default value:: N/A
+Applicable socket types:: all
+
+
+ZMQ_RCVMORE: More message parts to follow
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_RCVMORE' option shall return a boolean value indicating if the
+multi-part message currently being read from the specified 'socket' has more
+message parts to follow. If there are no message parts to follow or if the
+message currently being read is not a multi-part message a value of zero shall
+be returned. Otherwise, a value of 1 shall be returned.
+
+Refer to linkzmq:zmq_send[3] and linkzmq:zmq_recv[3] for a detailed description
+of sending/receiving multi-part messages.
+
+[horizontal]
+Option value type:: int64_t
+Option value unit:: boolean
+Default value:: N/A
+Applicable socket types:: all
+
+
+ZMQ_HWM: Retrieve high water mark
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_HWM' option shall retrieve the high water mark for the specified
+'socket'.  The high water mark is a hard limit on the maximum number of
+outstanding messages 0MQ shall queue in memory for any single peer that the
+specified 'socket' is communicating with.
+
+If this limit has been reached the socket shall enter an exceptional state and
+depending on the socket type, 0MQ shall take appropriate action such as
+blocking or dropping sent messages. Refer to the individual socket descriptions
+in linkzmq:zmq_socket[3] for details on the exact action taken for each socket
+type.
+
+The default 'ZMQ_HWM' value of zero means "no limit".
+
+[horizontal]
+Option value type:: uint64_t
+Option value unit:: messages
+Default value:: 0
+Applicable socket types:: all
+
+
+ZMQ_SWAP: Retrieve disk offload size
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_SWAP' option shall retrieve the disk offload (swap) size for the
+specified 'socket'. A socket which has 'ZMQ_SWAP' set to a non-zero value may
+exceed its high water mark; in this case outstanding messages shall be
+offloaded to storage on disk rather than held in memory.
+
+The value of 'ZMQ_SWAP' defines the maximum size of the swap space in bytes.
+
+[horizontal]
+Option value type:: int64_t
+Option value unit:: bytes
+Default value:: 0
+Applicable socket types:: all
+
+
+ZMQ_AFFINITY: Retrieve I/O thread affinity
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_AFFINITY' option shall retrieve the I/O thread affinity for newly
+created connections on the specified 'socket'.
+
+Affinity determines which threads from the 0MQ I/O thread pool associated with
+the socket's _context_ shall handle newly created connections.  A value of zero
+specifies no affinity, meaning that work shall be distributed fairly among all
+0MQ I/O threads in the thread pool. For non-zero values, the lowest bit
+corresponds to thread 1, second lowest bit to thread 2 and so on.  For example,
+a value of 3 specifies that subsequent connections on 'socket' shall be handled
+exclusively by I/O threads 1 and 2.
+
+See also linkzmq:zmq_init[3] for details on allocating the number of I/O
+threads for a specific _context_.
+
+[horizontal]
+Option value type:: uint64_t
+Option value unit:: N/A (bitmap)
+Default value:: 0
+Applicable socket types:: N/A
+
+
+ZMQ_IDENTITY: Retrieve socket identity
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_IDENTITY' option shall retrieve the identity of the specified
+'socket'. Socket identity determines if existing 0MQ infrastructure (_message
+queues_, _forwarding devices_) shall be identified with a specific application
+and persist across multiple runs of the application.
+
+If the socket has no identity, each run of an application is completely
+separate from other runs. However, with identity set the socket shall re-use
+any existing 0MQ infrastructure configured by the previous run(s). Thus the
+application may receive messages that were sent in the meantime, _message
+queue_ limits shall be shared with previous run(s) and so on.
+
+Identity can be at least one byte and at most 255 bytes long. Identities
+starting with binary zero are reserved for use by 0MQ infrastructure.
+
+[horizontal]
+Option value type:: binary data
+Option value unit:: N/A
+Default value:: NULL
+Applicable socket types:: all
+
+
+ZMQ_RATE: Retrieve multicast data rate
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_RATE' option shall retrieve the maximum send or receive data rate for
+multicast transports using the specified 'socket'.
+
+[horizontal]
+Option value type:: int64_t
+Option value unit:: kilobits per second
+Default value:: 100
+Applicable socket types:: all, when using multicast transports
+
+
+ZMQ_RECOVERY_IVL: Get multicast recovery interval
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_RECOVERY_IVL' option shall retrieve the recovery interval for
+multicast transports using the specified 'socket'.  The recovery interval
+determines the maximum time in seconds that a receiver can be absent from a
+multicast group before unrecoverable data loss will occur.
+
+[horizontal]
+Option value type:: int64_t
+Option value unit:: seconds
+Default value:: 10
+Applicable socket types:: all, when using multicast transports
+
+
+ZMQ_RECOVERY_IVL_MSEC: Get multicast recovery interval in milliseconds
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_RECOVERY_IVL'_MSEC option shall retrieve the recovery interval, in
+milliseconds, for multicast transports using the specified 'socket'.  The
+recovery interval determines the maximum time in seconds that a receiver
+can be absent from a multicast group before unrecoverable data loss will
+occur.
+
+For backward compatibility, the default value of 'ZMQ_RECOVERY_IVL_MSEC' is
+-1 indicating that the recovery interval should be obtained from the
+'ZMQ_RECOVERY_IVL' option. However, if the 'ZMQ_RECOVERY_IVL_MSEC' value is
+not zero, then it will take precedence, and be used.
+
+[horizontal]
+Option value type:: int64_t
+Option value unit:: milliseconds
+Default value:: -1
+Applicable socket types:: all, when using multicast transports
+
+
+ZMQ_MCAST_LOOP: Control multicast loop-back
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_MCAST_LOOP' option controls whether data sent via multicast
+transports can also be received by the sending host via loop-back.  A value of
+zero indicates that the loop-back functionality is disabled, while the default
+value of 1 indicates that the loop-back functionality is enabled.  Leaving
+multicast loop-back enabled when it is not required can have a negative impact
+on performance. Where possible, disable 'ZMQ_MCAST_LOOP' in production
+environments.
+
+[horizontal]
+Option value type:: int64_t
+Option value unit:: boolean
+Default value:: 1
+Applicable socket types:: all, when using multicast transports
+
+
+ZMQ_SNDBUF: Retrieve kernel transmit buffer size
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_SNDBUF' option shall retrieve the underlying kernel transmit buffer
+size for the specified 'socket'. A value of zero means that the OS default is
+in effect. For details refer to your operating system documentation for the
+'SO_SNDBUF' socket option.
+
+[horizontal]
+Option value type:: uint64_t
+Option value unit:: bytes
+Default value:: 0
+Applicable socket types:: all
+
+
+ZMQ_RCVBUF: Retrieve kernel receive buffer size
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_RCVBUF' option shall retrieve the underlying kernel receive buffer
+size for the specified 'socket'. A value of zero means that the OS default is
+in effect. For details refer to your operating system documentation for the
+'SO_RCVBUF' socket option.
+
+[horizontal]
+Option value type:: uint64_t
+Option value unit:: bytes
+Default value:: 0
+Applicable socket types:: all
+
+
+ZMQ_LINGER: Retrieve linger period for socket shutdown
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_LINGER' option shall retrieve the linger period for the specified
+'socket'.  The linger period determines how long pending messages which have
+yet to be sent to a peer shall linger in memory after a socket is closed with
+linkzmq:zmq_close[3], and further affects the termination of the socket's
+context with linkzmq:zmq_term[3]. The following outlines the different
+behaviours:
+
+* The default value of '-1' specifies an infinite linger period. Pending
+  messages shall not be discarded after a call to _zmq_close()_; attempting to
+  terminate the socket's context with _zmq_term()_ shall block until all
+  pending messages have been sent to a peer.
+
+* The value of '0' specifies no linger period. Pending messages shall be
+  discarded immediately when the socket is closed with _zmq_close()_.
+
+* Positive values specify an upper bound for the linger period in milliseconds.
+  Pending messages shall not be discarded after a call to _zmq_close()_;
+  attempting to terminate the socket's context with _zmq_term()_ shall block
+  until either all pending messages have been sent to a peer, or the linger
+  period expires, after which any pending messages shall be discarded.
+
+[horizontal]
+Option value type:: int
+Option value unit:: milliseconds
+Default value:: -1 (infinite)
+Applicable socket types:: all
+
+
+ZMQ_RECONNECT_IVL: Retrieve reconnection interval
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_RECONNECT_IVL' option shall retrieve the initial reconnection interval
+for the specified 'socket'.  The reconnection interval is the period 0MQ shall
+wait between attempts to reconnect disconnected peers when using
+connection-oriented transports.
+
+NOTE: The reconnection interval may be randomized by 0MQ to prevent
+reconnection storms in topologies with a large number of peers per socket.
+
+[horizontal]
+Option value type:: int
+Option value unit:: milliseconds
+Default value:: 100
+Applicable socket types:: all, only for connection-oriented transports
+
+
+ZMQ_RECONNECT_IVL_MAX: Retrieve maximum reconnection interval
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_RECONNECT_IVL_MAX' option shall retrieve the maximum reconnection 
+interval for the specified 'socket'.  This is the maximum period 0MQ shall wait 
+between attempts to reconnect. On each reconnect attempt, the previous interval 
+shall be doubled untill ZMQ_RECONNECT_IVL_MAX is reached. This allows for 
+exponential backoff strategy. Default value means no exponential backoff is 
+performed and reconnect interval calculations are only based on ZMQ_RECONNECT_IVL.
+
+NOTE:  Values less than ZMQ_RECONNECT_IVL will be ignored.
+
+[horizontal]
+Option value type:: int
+Option value unit:: milliseconds
+Default value:: 0 (only use ZMQ_RECONNECT_IVL)
+Applicable socket types:: all, only for connection-oriented transport
+
+
+ZMQ_BACKLOG: Retrieve maximum length of the queue of outstanding connections
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_BACKLOG' option shall retrieve the maximum length of the queue of
+outstanding peer connections for the specified 'socket'; this only applies to
+connection-oriented transports. For details refer to your operating system
+documentation for the 'listen' function.
+
+[horizontal]
+Option value type:: int
+Option value unit:: connections
+Default value:: 100
+Applicable socket types:: all, only for connection-oriented transports
+
+
+ZMQ_FD: Retrieve file descriptor associated with the socket
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_FD' option shall retrieve the file descriptor associated with the
+specified 'socket'. The returned file descriptor can be used to integrate the
+socket into an existing event loop; the 0MQ library shall signal any pending
+events on the socket in an _edge-triggered_ fashion by making the file
+descriptor become ready for reading.
+
+NOTE: The ability to read from the returned file descriptor does not
+necessarily indicate that messages are available to be read from, or can be
+written to, the underlying socket; applications must retrieve the actual event
+state with a subsequent retrieval of the 'ZMQ_EVENTS' option.
+
+CAUTION: The returned file descriptor is intended for use with a 'poll' or
+similar system call only. Applications must never attempt to read or write data
+to it directly, neither should they try to close it.
+
+[horizontal]
+Option value type:: int on POSIX systems, SOCKET on Windows
+Option value unit:: N/A
+Default value:: N/A
+Applicable socket types:: all
+
+
+ZMQ_EVENTS: Retrieve socket event state
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+The 'ZMQ_EVENTS' option shall retrieve the event state for the specified
+'socket'.  The returned value is a bit mask constructed by OR'ing a combination
+of the following event flags:
+
+*ZMQ_POLLIN*::
+Indicates that at least one message may be received from the specified socket
+without blocking.
+
+*ZMQ_POLLOUT*::
+Indicates that at least one message may be sent to the specified socket without
+blocking.
+
+The combination of a file descriptor returned by the 'ZMQ_FD' option being
+ready for reading but no actual events returned by a subsequent retrieval of
+the 'ZMQ_EVENTS' option is valid; applications should simply ignore this case
+and restart their polling operation/event loop.
+
+[horizontal]
+Option value type:: uint32_t
+Option value unit:: N/A (flags)
+Default value:: N/A
+Applicable socket types:: all
+
+
+RETURN VALUE
+------------
+The _zmq_getsockopt()_ function shall return zero if successful. Otherwise it
+shall return `-1` and set 'errno' to one of the values defined below.
+
+
+ERRORS
+------
+*EINVAL*::
+The requested option _option_name_ is unknown, or the requested _option_len_ or
+_option_value_ is invalid, or the size of the buffer pointed to by
+_option_value_, as specified by _option_len_, is insufficient for storing the
+option value.
+*ETERM*::
+The 0MQ 'context' associated with the specified 'socket' was terminated.
+*ENOTSOCK*::
+The provided 'socket' was invalid.
+*EINTR*::
+The operation was interrupted by delivery of a signal.
+
+
+EXAMPLE
+-------
+.Retrieving the high water mark
+----
+/* Retrieve high water mark into hwm */
+int64_t hwm;
+size_t hwm_size = sizeof (hwm);
+rc = zmq_getsockopt (socket, ZMQ_HWM, &hwm, &hwm_size);
+assert (rc == 0);
+----
+
+
+SEE ALSO
+--------
+linkzmq:zmq_setsockopt[3]
+linkzmq:zmq_socket[3]
+linkzmq:zmq[7]
+
+
+AUTHORS
+-------
+This 0MQ manual page was written by Martin Sustrik <sustrik@250bpm.com> and
+Martin Lucina <mato@kotelna.sk>.

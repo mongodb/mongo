@@ -1,0 +1,121 @@
+zmq_recv(3)
+===========
+
+
+NAME
+----
+zmq_recv - receive a message from a socket
+
+
+SYNOPSIS
+--------
+*int zmq_recv (void '*socket', zmq_msg_t '*msg', int 'flags');*
+
+
+DESCRIPTION
+-----------
+The _zmq_recv()_ function shall receive a message from the socket referenced by
+the 'socket' argument and store it in the message referenced by the 'msg'
+argument. Any content previously stored in 'msg' shall be properly deallocated.
+If there are no messages available on the specified 'socket' the _zmq_recv()_
+function shall block until the request can be satisfied. The 'flags' argument
+is a combination of the flags defined below:
+
+*ZMQ_NOBLOCK*::
+Specifies that the operation should be performed in non-blocking mode. If there
+are no messages available on the specified 'socket', the _zmq_recv()_ function
+shall fail with 'errno' set to EAGAIN.
+
+
+Multi-part messages
+~~~~~~~~~~~~~~~~~~~
+A 0MQ message is composed of 1 or more message parts; each message part is an
+independent 'zmq_msg_t' in its own right. 0MQ ensures atomic delivery of
+messages; peers shall receive either all _message parts_ of a message or none
+at all.
+
+The total number of message parts is unlimited.
+
+An application wishing to determine if a message is composed of multiple parts
+does so by retrieving the value of the _ZMQ_RCVMORE_ socket option on the
+'socket' it is receiving the message from. If there are no message parts to
+follow, or if the message is not composed of multiple parts, _ZMQ_RCVMORE_
+shall report a value of zero. Otherwise, _ZMQ_RCVMORE_ shall report a value of
+1, indicating that more message parts are to follow.
+
+
+RETURN VALUE
+------------
+The _zmq_recv()_ function shall return zero if successful. Otherwise it shall
+return `-1` and set 'errno' to one of the values defined below.
+
+
+ERRORS
+------
+*EAGAIN*::
+Non-blocking mode was requested and no messages are available at the moment.
+*ENOTSUP*::
+The _zmq_recv()_ operation is not supported by this socket type.
+*EFSM*::
+The _zmq_recv()_ operation cannot be performed on this socket at the moment due
+to the socket not being in the appropriate state.  This error may occur with
+socket types that switch between several states, such as ZMQ_REP.  See the
+_messaging patterns_ section of linkzmq:zmq_socket[3] for more information.
+*ETERM*::
+The 0MQ 'context' associated with the specified 'socket' was terminated.
+*ENOTSOCK*::
+The provided 'socket' was invalid.
+*EINTR*::
+The operation was interrupted by delivery of a signal before a message was
+available.
+*EFAULT*::
+The message passed to the function was invalid.
+
+
+EXAMPLE
+-------
+.Receiving a message from a socket
+----
+/* Create an empty 0MQ message */
+zmq_msg_t msg;
+int rc = zmq_msg_init (&msg);
+assert (rc == 0);
+/* Block until a message is available to be received from socket */
+rc = zmq_recv (socket, &msg, 0);
+assert (rc == 0);
+/* Release message */
+zmq_msg_close (&msg);
+----
+
+.Receiving a multi-part message
+----
+int64_t more;
+size_t more_size = sizeof more;
+do {
+    /* Create an empty 0MQ message to hold the message part */
+    zmq_msg_t part;
+    int rc = zmq_msg_init (&part);
+    assert (rc == 0);
+    /* Block until a message is available to be received from socket */
+    rc = zmq_recv (socket, &part, 0);
+    assert (rc == 0);
+    /* Determine if more message parts are to follow */
+    rc = zmq_getsockopt (socket, ZMQ_RCVMORE, &more, &more_size);
+    assert (rc == 0);
+    zmq_msg_close (&part);
+} while (more);
+----
+
+
+SEE ALSO
+--------
+linkzmq:zmq_send[3]
+linkzmq:zmq_getsockopt[3]
+linkzmq:zmq_socket[7]
+linkzmq:zmq[7]
+
+
+AUTHORS
+-------
+This 0MQ manual page was written by Martin Sustrik <sustrik@250bpm.com> and
+Martin Lucina <mato@kotelna.sk>.

@@ -1,0 +1,58 @@
+zmq_msg_init_size(3)
+====================
+
+
+NAME
+----
+zmq_msg_init_size - initialise 0MQ message of a specified size
+
+
+SYNOPSIS
+--------
+*int zmq_msg_init_size (zmq_msg_t '*msg', size_t 'size');*
+
+
+DESCRIPTION
+-----------
+The _zmq_msg_init_size()_ function shall allocate any resources required to
+store a message 'size' bytes long and initialise the message object referenced
+by 'msg' to represent the newly allocated message.
+
+The implementation shall choose whether to store message content on the stack
+(small messages) or on the heap (large messages). For performance reasons
+_zmq_msg_init_size()_ shall not clear the message data.
+
+CAUTION: Never access 'zmq_msg_t' members directly, instead always use the
+_zmq_msg_ family of functions.
+
+CAUTION: The functions _zmq_msg_init()_, _zmq_msg_init_data()_ and
+_zmq_msg_init_size()_ are mutually exclusive. Never initialize the same
+'zmq_msg_t' twice.
+
+
+RETURN VALUE
+------------
+The _zmq_msg_init_size()_ function shall return zero if successful. Otherwise
+it shall return `-1` and set 'errno' to one of the values defined below.
+
+
+ERRORS
+------
+*ENOMEM*::
+Insufficient storage space is available.
+
+
+SEE ALSO
+--------
+linkzmq:zmq_msg_init_data[3]
+linkzmq:zmq_msg_init[3]
+linkzmq:zmq_msg_close[3]
+linkzmq:zmq_msg_data[3]
+linkzmq:zmq_msg_size[3]
+linkzmq:zmq[7]
+
+
+AUTHORS
+-------
+This 0MQ manual page was written by Martin Sustrik <sustrik@250bpm.com> and
+Martin Lucina <mato@kotelna.sk>.

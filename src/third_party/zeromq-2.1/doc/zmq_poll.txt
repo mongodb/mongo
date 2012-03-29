@@ -1,0 +1,132 @@
+zmq_poll(3)
+===========
+
+
+NAME
+----
+zmq_poll - input/output multiplexing
+
+
+SYNOPSIS
+--------
+
+*int zmq_poll (zmq_pollitem_t '*items', int 'nitems', long 'timeout');*
+
+
+DESCRIPTION
+-----------
+The _zmq_poll()_ function provides a mechanism for applications to multiplex
+input/output events in a level-triggered fashion over a set of sockets. Each
+member of the array pointed to by the 'items' argument is a *zmq_pollitem_t*
+structure. The 'nitems' argument specifies the number of items in the 'items'
+array. The *zmq_pollitem_t* structure is defined as follows:
+
+["literal", subs="quotes"]
+typedef struct
+{
+    void '*socket';
+    int 'fd';
+    short 'events';
+    short 'revents';
+} zmq_pollitem_t;
+
+For each *zmq_pollitem_t* item, _zmq_poll()_ shall examine either the 0MQ
+socket referenced by 'socket' *or* the standard socket specified by the file
+descriptor 'fd', for the event(s) specified in 'events'. If both 'socket' and
+'fd' are set in a single *zmq_pollitem_t*, the 0MQ socket referenced by
+'socket' shall take precedence and the value of 'fd' shall be ignored.
+
+NOTE: All 0MQ sockets passed to the _zmq_poll()_ function must share the
+same 0MQ 'context' and must belong to the thread calling _zmq_poll()_.
+
+For each *zmq_pollitem_t* item, _zmq_poll()_ shall first clear the 'revents'
+member, and then indicate any requested events that have occurred by setting the
+bit corresponding to the event condition in the 'revents' member.
+
+If none of the requested events have occurred on any *zmq_pollitem_t* item,
+_zmq_poll()_ shall wait 'timeout' microseconds for an event to occur on
+any of the requested items. If the value of 'timeout' is `0`, _zmq_poll()_
+shall return immediately. If the value of 'timeout' is `-1`, _zmq_poll()_ shall
+block indefinitely until a requested event has occurred on at least one
+*zmq_pollitem_t*. The resolution of 'timeout' is 1 millisecond.
+
+The 'events' and 'revents' members of *zmq_pollitem_t* are bit masks constructed
+by OR'ing a combination of the following event flags:
+
+*ZMQ_POLLIN*::
+For 0MQ sockets, at least one message may be received from the 'socket' without
+blocking. For standard sockets this is equivalent to the 'POLLIN' flag of the
+_poll()_ system call and generally means that at least one byte of data may be
+read from 'fd' without blocking.
+
+*ZMQ_POLLOUT*::
+For 0MQ sockets, at least one message may be sent to the 'socket' without
+blocking. For standard sockets this is equivalent to the 'POLLOUT' flag of the
+_poll()_ system call and generally means that at least one byte of data may be
+written to 'fd' without blocking.
+
+*ZMQ_POLLERR*::
+For standard sockets, this flag is passed through _zmq_poll()_ to the
+underlying _poll()_ system call and generally means that some sort of error
+condition is present on the socket specified by 'fd'. For 0MQ sockets this flag
+has no effect if set in 'events', and shall never be returned in 'revents' by
+_zmq_poll()_.
+
+NOTE: The _zmq_poll()_ function may be implemented or emulated using operating
+system interfaces other than _poll()_, and as such may be subject to the limits
+of those interfaces in ways not defined in this documentation.
+
+
+RETURN VALUE
+------------
+Upon successful completion, the _zmq_poll()_ function shall return the number
+of *zmq_pollitem_t* structures with events signaled in 'revents' or `0` if no
+events have been signaled. Upon failure, _zmq_poll()_ shall return `-1` and set
+'errno' to one of the values defined below.
+
+
+ERRORS
+------
+*ETERM*::
+At least one of the members of the 'items' array refers to a 'socket' whose
+associated 0MQ 'context' was terminated.
+*EFAULT*::
+The provided 'items' was not valid (NULL).
+*EINTR*::
+The operation was interrupted by delivery of a signal before any events were
+available.
+
+
+EXAMPLE
+-------
+.Polling indefinitely for input events on both a 0MQ socket and a standard socket.
+----
+zmq_pollitem_t items [2];
+/* First item refers to 0MQ socket 'socket' */
+items[0].socket = socket;
+items[0].events = ZMQ_POLLIN;
+/* Second item refers to standard socket 'fd' */
+items[1].socket = NULL;
+items[1].fd = fd;
+items[1].events = ZMQ_POLLIN;
+/* Poll for events indefinitely */
+int rc = zmq_poll (items, 2, -1);
+assert (rc >= 0);
+/* Returned events will be stored in items[].revents */
+----
+
+
+SEE ALSO
+--------
+linkzmq:zmq_socket[3]
+linkzmq:zmq_send[3]
+linkzmq:zmq_recv[3]
+linkzmq:zmq[7]
+
+Your operating system documentation for the _poll()_ system call.
+
+
+AUTHORS
+-------
+This 0MQ manual page was written by Martin Sustrik <sustrik@250bpm.com> and
+Martin Lucina <mato@kotelna.sk>.

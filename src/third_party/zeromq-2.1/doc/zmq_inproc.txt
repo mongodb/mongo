@@ -1,0 +1,89 @@
+zmq_inproc(7)
+=============
+
+
+NAME
+----
+zmq_inproc - 0MQ local in-process (inter-thread) communication transport
+
+
+SYNOPSIS
+--------
+The in-process transport passes messages via memory directly between threads
+sharing a single 0MQ 'context'.
+
+NOTE: No I/O threads are involved in passing messages using the 'inproc'
+transport. Therefore, if you are using a 0MQ 'context' for in-process messaging
+only you can initialise the 'context' with zero I/O threads. See
+linkzmq:zmq_init[3] for details.
+
+
+ADDRESSING
+----------
+A 0MQ address string consists of two parts as follows:
+'transport'`://`'endpoint'. The 'transport' part specifies the underlying
+transport protocol to use, and for the in-process transport shall be set to
+`inproc`.  The meaning of the 'endpoint' part for the in-process transport is
+defined below.
+
+
+Assigning a local address to a socket
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+When assigning a local address to a 'socket' using _zmq_bind()_ with the
+'inproc' transport, the 'endpoint' shall be interpreted as an arbitrary string
+identifying the 'name' to create. The 'name' must be unique within the 0MQ
+'context' associated with the 'socket' and may be up to 256 characters in
+length.  No other restrictions are placed on the format of the 'name'.
+
+
+Connecting a socket
+~~~~~~~~~~~~~~~~~~~
+When connecting a 'socket' to a peer address using _zmq_connect()_ with the
+'inproc' transport, the 'endpoint' shall be interpreted as an arbitrary string
+identifying the 'name' to connect to.  The 'name' must have been previously
+created by assigning it to at least one 'socket' within the same 0MQ 'context'
+as the 'socket' being connected.
+
+
+WIRE FORMAT
+-----------
+Not applicable.
+
+
+EXAMPLES
+--------
+.Assigning a local address to a socket
+----
+/* Assign the in-process name "#1" */
+rc = zmq_bind(socket, "inproc://#1");
+assert (rc == 0);
+/* Assign the in-process name "my-endpoint" */
+rc = zmq_bind(socket, "inproc://my-endpoint");
+assert (rc == 0);
+----
+
+.Connecting a socket
+----
+/* Connect to the in-process name "#1" */
+rc = zmq_connect(socket, "inproc://#1");
+assert (rc == 0);
+/* Connect to the in-process name "my-endpoint" */
+rc = zmq_connect(socket, "inproc://my-endpoint");
+assert (rc == 0);
+----
+
+
+SEE ALSO
+--------
+linkzmq:zmq_bind[3]
+linkzmq:zmq_connect[3]
+linkzmq:zmq_ipc[7]
+linkzmq:zmq_tcp[7]
+linkzmq:zmq_pgm[7]
+linkzmq:zmq[7]
+
+
+AUTHORS
+-------
+This 0MQ manual page was written by Martin Sustrik <sustrik@250bpm.com> and
+Martin Lucina <mato@kotelna.sk>.

@@ -1,0 +1,50 @@
+zmq_errno(3)
+============
+
+
+NAME
+----
+zmq_errno - retrieve value of errno for the calling thread
+
+
+SYNOPSIS
+--------
+*int zmq_errno (void);*
+
+
+DESCRIPTION
+-----------
+The _zmq_errno()_ function shall retrieve the value of the 'errno' variable for
+the calling thread.
+
+The _zmq_errno()_ function is provided to assist users on non-POSIX systems who
+are experiencing issues with retrieving the correct value of 'errno' directly.
+Specifically, users on Win32 systems whose application is using a different C
+run-time library from the C run-time library in use by 0MQ will need to use
+_zmq_errno()_ for correct operation.
+
+IMPORTANT: Users not experiencing issues with retrieving the correct value of
+'errno' should not use this function and should instead access the 'errno'
+variable directly.
+
+
+RETURN VALUE
+------------
+The _zmq_errno()_ function shall return the value of the 'errno' variable for
+the calling thread.
+
+
+ERRORS
+------
+No errors are defined.
+
+
+SEE ALSO
+--------
+linkzmq:zmq[7]
+
+
+AUTHORS
+-------
+This 0MQ manual page was written by Martin Sustrik <sustrik@250bpm.com> and
+Martin Lucina <mato@kotelna.sk>.

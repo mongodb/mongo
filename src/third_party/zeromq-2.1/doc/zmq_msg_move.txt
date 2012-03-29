@@ -1,0 +1,52 @@
+zmq_msg_move(3)
+===============
+
+
+NAME
+----
+zmq_msg_move - move content of a message to another message
+
+
+SYNOPSIS
+--------
+*int zmq_msg_move (zmq_msg_t '*dest', zmq_msg_t '*src');*
+
+
+DESCRIPTION
+-----------
+The _zmq_msg_move()_ function shall move the content of the message object
+referenced by 'src' to the message object referenced by 'dest'. No actual
+copying of message content is performed, 'dest' is simply updated to reference
+the new content. 'src' becomes an empty message after calling _zmq_msg_move()_.
+The original content of 'dest', if any, shall be released.
+
+CAUTION: Never access 'zmq_msg_t' members directly, instead always use the
+_zmq_msg_ family of functions.
+
+
+RETURN VALUE
+------------
+The _zmq_msg_move()_ function shall return zero if successful. Otherwise it
+shall return `-1` and set 'errno' to one of the values defined below.
+
+
+ERRORS
+------
+*EFAULT*::
+Invalid message.
+
+
+SEE ALSO
+--------
+linkzmq:zmq_msg_copy[3]
+linkzmq:zmq_msg_init[3]
+linkzmq:zmq_msg_init_size[3]
+linkzmq:zmq_msg_init_data[3]
+linkzmq:zmq_msg_close[3]
+linkzmq:zmq[7]
+
+
+AUTHORS
+-------
+This 0MQ manual page was written by Martin Sustrik <sustrik@250bpm.com> and
+Martin Lucina <mato@kotelna.sk>.

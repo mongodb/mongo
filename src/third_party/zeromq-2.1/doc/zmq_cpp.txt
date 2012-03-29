@@ -1,0 +1,212 @@
+zmq_cpp(7)
+==========
+
+
+NAME
+----
+zmq_cpp - interface between 0MQ and C++ applications
+
+
+SYNOPSIS
+--------
+*#include <zmq.hpp>*
+
+*c$$++$$* ['flags'] 'files' *-lzmq* ['libraries']
+
+
+DESCRIPTION
+-----------
+This manual page describes how the 0MQ C++ language binding maps to the
+underlying 0MQ C library functions. 
+
+All 0MQ constants defined by _zmq.h_ are also available to the C++ language
+binding.
+
+The following classes are provided in the 'zmq' namespace:
+
+
+Context
+~~~~~~~
+The 'context_t' class encapsulates functionality dealing with the
+initialisation and termination of a 0MQ _context_.
+
+
+Constructor
+^^^^^^^^^^^
+[verse]
+*context_t::context_t(int 'io_threads')*
+
+Maps to the _zmq_init()_ function, as described in linkzmq:zmq_init[3].
+
+Destructor
+^^^^^^^^^^
+[verse]
+*context_t::~context_t(void)*
+
+Maps to the _zmq_term()_ function, as described in linkzmq:zmq_term[3].
+
+
+Methods
+^^^^^^^
+None.
+
+
+Socket
+~~~~~~
+The 'socket_t' class encapsulates a 0MQ socket.
+
+
+Constructor
+^^^^^^^^^^^
+[verse]
+*socket_t::socket_t(context_t '&context', int 'type')*
+
+Maps to the _zmq_socket()_ function, as described in linkzmq:zmq_socket[3].
+
+
+Destructor
+^^^^^^^^^^
+[verse]
+*socket_t::~socket_t(void)*
+
+Calls the _zmq_close()_ function, as described in linkzmq:zmq_close[3].
+
+
+Methods
+^^^^^^^
+[verse]
+*void socket_t::getsockopt(int 'option_name', void '*option_value', size_t
+'*option_len')*
+
+Maps to the _zmq_getsockopt()_ function, as described in
+linkzmq:zmq_getsockopt[3].
+
+[verse]
+*void socket_t::setsockopt(int 'option_name', const void '*option_value', size_t
+'option_len')*
+
+Maps to the _zmq_setsockopt()_ function, as described in
+linkzmq:zmq_setsockopt[3].
+
+[verse]
+*void socket_t::bind(const char '*endpoint')*
+
+Maps to the _zmq_bind()_ function, as described in linkzmq:zmq_bind[3].
+
+[verse]
+*void socket_t::connect(const char '*endpoint')*
+
+Maps to the _zmq_connect()_ function, as described in linkzmq:zmq_connect[3].
+
+[verse]
+*bool socket_t::send(message_t '&msg', int 'flags' = 0)*
+
+Maps to the _zmq_send()_ function, as described in linkzmq:zmq_send[3].
+Returns true if message is successfully sent, false if it is not.
+
+[verse]
+*bool socket_t::recv(message_t '*msg', int 'flags' = 0)*
+
+Maps to the _zmq_recv()_ function, as described in linkzmq:zmq_recv[3].
+Returns true if message is successfully received, false if it is not.
+
+
+Message
+~~~~~~~
+The 'zmq::message_t' class encapsulates the 'zmq_msg_t' structure and
+functions to construct, destruct and manipulate 0MQ messages.
+
+
+Constructor
+^^^^^^^^^^^
+[verse]
+*message_t::message_t(void)*
+*message_t::message_t(size_t 'size')*
+*message_t::message_t(void '*data', size_t 'size', free_fn '*ffn')*
+
+These map to the _zmq_msg_init()_, _zmq_msg_init_size()_ and
+_zmq_msg_init_data()_ functions, described in linkzmq:zmq_msg_init[3],
+linkzmq:zmq_msg_init_size[3] and linkzmq:zmq_msg_init_data[3] respectively.
+
+
+Destructor
+^^^^^^^^^^
+[verse]
+*message_t::~message_t(void)*
+
+Calls the _zmq_msg_close()_ function, as described in linkzmq:zmq_msg_close[3].
+
+
+Methods
+^^^^^^^
+[verse]
+*void *message_t::data (void)*
+
+Maps to the _zmq_msg_data()_ function, as described in linkzmq:zmq_msg_data[3].
+
+[verse]
+*size_t message_t::size (void)*
+
+Maps to the _zmq_msg_size()_ function, as described in linkzmq:zmq_msg_size[3].
+
+[verse]
+*void message_t::copy (message_t '*src')*
+
+Maps to the _zmq_msg_copy()_ function, as described in linkzmq:zmq_msg_copy[3].
+
+[verse]
+*void message_t::move (message_t '*src')*
+
+Maps to the _zmq_msg_move()_ function, as described in linkzmq:zmq_msg_move[3].
+
+[verse]
+*message_t::rebuild(void)*
+*message_t::rebuild(size_t 'size')*
+*message_t::rebuild(void '*data', size_t 'size', free_fn '*ffn')*
+
+Equivalent to calling the _zmq_msg_close()_ function followed by the
+corresponding _zmq_msg_init()_ function.
+
+
+Input/output multiplexing
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+[verse]
+*int poll (zmq_pollitem_t *items, int nitems, long timeout = -1)*
+
+The _poll()_ function is a namespaced equivalent of the _zmq_poll()_ function,
+as described in linkzmq:zmq_poll[3].
+
+NOTE: To obtain a 0MQ _socket_ for use in a _zmq_pollitem_t_ structure, you
+should cast an instance of the _socket_t_ class to `(void *)`.
+
+
+ERROR HANDLING
+--------------
+All errors reported by the underlying 0MQ C library functions are automatically
+converted to exceptions by the C++ language binding.  The 'zmq::error_t' class
+is derived from the 'std::exception' class and uses the _zmq_strerror()_
+function to convert the error code to human-readable string.
+
+
+EXAMPLE
+-------
+----
+zmq::context_t ctx (1);
+zmq::socket_t s (ctx, ZMQ_PUB);
+s.connect ("tcp://192.168.0.115:5555");
+zmq::message_t msg (100);
+memset (msg.data (), 0, 100);
+s.send (msg);
+----
+
+
+SEE ALSO
+--------
+linkzmq:zmq[7]
+
+
+AUTHORS
+-------
+This 0MQ manual page was written by Martin Sustrik <sustrik@250bpm.com> and
+Martin Lucina <mato@kotelna.sk>.

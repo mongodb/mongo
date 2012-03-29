@@ -31,7 +31,7 @@
 
 #include <boost/filesystem/convenience.hpp>
 #include <boost/filesystem/operations.hpp>
-
+#include "notifications/notifier.hpp"
 namespace mongo {
 
     void Helpers::ensureIndex(const char *ns, BSONObj keyPattern, bool unique, const char *name) {
@@ -245,6 +245,7 @@ namespace mongo {
 
             logOp( "d" , ns.c_str() , rloc.obj()["_id"].wrap() , 0 , 0 , fromMigrate );
             theDataFileMgr.deleteRecord(ns.c_str() , rloc.rec(), rloc);
+			NOTIFY_DELETION(ns,rloc);
             num++;
 
             c->recoverFromTouchingEarlierIterate();

@@ -1,0 +1,4 @@
+libzmq_la-pgm_sender.lo libzmq_la-pgm_sender.o: pgm_sender.cpp \
+  platform.hpp
+
+platform.hpp:

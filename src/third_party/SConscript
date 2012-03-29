@@ -24,3 +24,10 @@ else:
                                  'boost/boost_thread',
                                  'boost/boost_system',
                                  ] )
+if has_option('use-system-all') or has_option('use-system-zeromq'):
+    env.StaticLibrary("mongo_zeromq", ['mongo_zeromq.cpp'],
+                      SYSLIBDEPS=["zeromq"])
+else:
+    env.SConscript('zeromq-${ZEROMQ_VERSION}/SConscript')
+    env.StaticLibrary( "mongo_zeromq", ['mongo_zeromq.cpp'],
+                       LIBDEPS=[ 'zeromq-${ZEROMQ_VERSION}/zeromq'] )

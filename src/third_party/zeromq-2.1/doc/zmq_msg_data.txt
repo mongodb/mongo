@@ -1,0 +1,48 @@
+zmq_msg_data(3)
+===============
+
+
+NAME
+----
+zmq_msg_data - retrieve pointer to message content
+
+
+SYNOPSIS
+--------
+*void *zmq_msg_data (zmq_msg_t '*msg');*
+
+
+DESCRIPTION
+-----------
+The _zmq_msg_data()_ function shall return a pointer to the message content of
+the message object referenced by 'msg'.
+
+CAUTION: Never access 'zmq_msg_t' members directly, instead always use the
+_zmq_msg_ family of functions.
+
+
+RETURN VALUE
+------------
+Upon successful completion, _zmq_msg_data()_ shall return a pointer to the
+message content.
+
+
+ERRORS
+------
+No errors are defined.
+
+
+SEE ALSO
+--------
+linkzmq:zmq_msg_size[3]
+linkzmq:zmq_msg_init[3]
+linkzmq:zmq_msg_init_size[3]
+linkzmq:zmq_msg_init_data[3]
+linkzmq:zmq_msg_close[3]
+linkzmq:zmq[7]
+
+
+AUTHORS
+-------
+This 0MQ manual page was written by Martin Sustrik <sustrik@250bpm.com> and
+Martin Lucina <mato@kotelna.sk>.

@@ -1,0 +1,388 @@
+0MQ version 2.1.12 (Stable), released on 2012/01/xx
+===================================================
+
+Bug fixes
+---------
+
+* Fixed issue 301, Fix builds on HP-UX 11iv3 when using either gcc or aCC.
+
+
+
+0MQ version 2.1.11 (Stable), released on 2011/12/18
+===================================================
+
+Bug fixes
+---------
+
+* Fixed issue 290, zmq_poll was using system time instead of monotonic
+  clock (Mika Fischer).
+
+* Fixed issue 281, crash on heavy socket creation - assertion failure in
+  mutex.hpp:91. (Mika Fischer).
+
+* Fixed issue 273, O_CLOEXEC flag used in ip.cpp:192 is supported only 
+  on Linux kernels 2.6.27+
+
+* Fixed issue 261, assertion failure in kqueue.cpp:76.
+
+* Fixed issue 269, faulty diagnostic code in 2.1.10.
+
+* Fixed issue 254, assertion failure at tcp_socket.cpp:229 on ENOTCONN.
+
+Changes
+-------
+
+* Now builds properly on AIX 6.1 (AJ Lewis).
+
+* Builds using libdcekt on HP-UX (AJ Lewis).
+
+* New upstream OpenPGM maintenance release 5.1.118.
+
+* Enabled debugging on assertion failure on Windows (Paul Betts).
+
+
+0MQ version 2.1.10 (Stable), released on 2011/10/03
+===================================================
+
+Bug fixes
+---------
+
+* Fixed issue 140, SWAP failed with assertion failure in pipe.cpp:187
+  if the current directory was not writeable. Behavior now is to return
+  -1 at zmq_setsockopt in this situation.
+
+* Fixed issue 207, assertion failure in zmq_connecter.cpp:48, when an
+  invalid zmq_connect() string was used, or the hostname could not be
+  resolved. The zmq_connect() call now returns -1 in both those cases.
+
+* Fixed issue 218, sockets not opened with SOCK_CLOEXEC, causing fork/exec
+  to sit on sockets unnecessarily.
+
+* Fixed issue 250, build errors on Windows (Mikko Koppanen).
+
+* Fixed issue 252, assertion failure in req.cpp:87 and req.cpp:88 (Mikko
+  Koppanen).
+
+
+0MQ version 2.1.9 (Stable), released on 2011/08/29
+==================================================
+
+Bug fixes
+---------
+
+* Fixed issue 240, assertion failure in pgm_socket.cpp:437.
+
+* Fixed issue 238, assertion failure in zmq.cpp:655, when zmq_poll is
+  used on an empty set, on Windows.
+
+* Fixed issue 239, assertion failure in zmq.cpp:223, when ZMQ_SWAP was
+  used with explicit identities and multiple SUB sockets.
+
+* Fixed issue 236, zmq_send() and zmq_recv() did not always return
+  error conditions such as EFSM properly. This bug was introduced in
+  version 2.1.8 by the backport of changes for issue 231.
+
+Building
+--------
+
+* 0MQ support for Android added (Bill Roberts, Mikko Koppanen).
+
+
+0MQ version 2.1.8 (RC), released on 2011/07/28
+==============================================
+
+Bug fixes
+---------
+
+* Fixed issue 223, assertion failure in tcp_connecter.cpp:300 when
+  connecting to a server that is on an unreachable network (errno is
+  equal to ENETUNREACH).
+
+* Fixed issue 228, assertion failure at rep.cpp:88 when HWM was reached.
+
+* Fixed issue 231, assertion failure at mailbox.cpp:183 when too many
+  pending socketpair operations were queued (major backport from 3.0).
+
+* Fixed issue 234, assertion failure at mailbox.cpp:77 when Ctrl-C was
+  used (only affected git master following backport for 231).
+
+* Fixed issue 230, SIGPIPE killing servers when client disconnected, hit
+  OS/X only.
+
+Note: this release was renamed "release candidate" due to issue 236,
+fixed in 2.1.9.
+
+
+0MQ version 2.1.7 (Stable), released on 2011/05/12
+==================================================
+
+Bug fixes
+---------
+
+* Fixed issue 188, assert when closing socket that had unread multipart
+  data still on it (affected PULL, SUB, ROUTER, and DEALER sockets).
+
+* Fixed issue 191, message atomicity issue with PUB sockets (an old issue).
+
+* Fixed issue 199 (affected ROUTER/XREP sockets, an old issue).
+
+* Fixed issue 206, assertion failure in zmq.cpp:223, affected all sockets
+  (bug was introduced in 2.1.6 as part of message validity checking).
+
+* Fixed issue 211, REP socket asserted if sent malformed envelope (old issue
+  due to abuse of assertions for error checking).
+
+* Fixed issue 212, reconnect failing after resume from sleep on Windows
+  (due to not handling WSAENETDOWN).
+
+* Properly handle WSAENETUNREACH on Windows (e.g. if client connects
+  before server binds).
+
+* Fixed memory leak with threads on Windows.
+
+Changes
+-------
+
+* Checks zmq_msg_t validity at each operation.
+
+* Inproc performance tests now work on Windows.
+
+* PGM wire format specification improved in zmq_pgm(7)
+
+* Added thread latency/throughput performance examples.
+
+* Added "--with-system-pgm" configure option to use already installed
+  OpenPGM.
+
+* Runtime checking of socket and context validity, to catch e.g. using a
+  socket after closing it, or passing an invalid pointer to context/socket
+  methods.
+
+* Test cases moved off port 5555, which conflicts with other services.
+
+* Clarified zmq_poll man page that the resolution of the timeout is 1msec.
+
+
+0MQ version 2.1.6 (Broken), released on 2011/04/26
+==================================================
+
+Note that this version contained a malformed patch and is not usable.
+It is not available for download, but is available in the git via the
+2.1.6 tag.
+
+0MQ version 2.1.5 (Broken), released on 2011/04/20
+==================================================
+
+Note that this version contained a malformed patch and is not usable.
+It is not available for download, but is available in the git via the
+2.1.5 tag.
+
+
+0MQ version 2.1.4 (Stable), released on 2011/03/30
+==================================================
+
+Bug fixes
+---------
+
+* Fix to OpenPGM which was asserting on small messages (Steven McCoy).
+
+Changes
+-------
+
+* Upgraded OpenPGM to version 5.1.115 (Pieter Hintjens).
+
+* OpenPGM build changed to not install OpenPGM artifacts.
+
+
+0MQ version 2.1.3 (Stable), released on 2011/03/21
+==================================================
+
+Bug fixes
+---------
+
+* Fix to PUSH sockets, which would sometimes deliver tail frames of a
+  multipart message to new subscribers (Martin Sustrik).
+
+* Fix to PUB sockets, which would sometimes deliver tail frames of a
+  multipart message to new subscribers (Martin Sustrik).
+
+* Windows build was broken due to EPROTONOSUPPORT not being defined. This
+  has now been fixed (Martin Sustrik).
+
+* Various fixes to make OpenVMS port work (Brett Cameron).
+
+* Corrected Reference Manual to note that ZMQ_LINGER socket option may be
+  set at any time, not just before connecting/binding (Pieter Hintjens).
+
+* Fix to C++ binding to properly close sockets (Guido Goldstein).
+
+* Removed obsolete assert from pgm_socket.cpp (Martin Sustrik).
+
+Changes
+-------
+
+* Removed stand-alone devices (/devices subdirectory) from distribution.
+  These undocumented programs remain available in older packages (Pieter
+  Hintjens).
+
+* OpenPGM default rate raised to 40mbps by default (Steven McCoy).
+
+* ZMQ_DEALER and ZMQ_ROUTER macros provided to ease upgrade to 0MQ/3.0.
+  These are scheduled to replace ZMQ_XREQ and ZMQ_XREP (Pieter Hintjens).
+
+* Added man page for zmq_device(3) which was hereto undocumented (Pieter
+  Hintjens).
+
+* Removed zmq_queue(3), zmq_forwarder(3), zmq_streamer(3) man pages
+  (Pieter Hintjens).
+
+OpenPGM Integration
+-------------------
+
+* Upgraded OpenPGM to version 5.1.114 (Steven McCoy, Mikko Koppanen).
+
+* Build system now calls OpenPGM build process directly, allowing easier
+  future upgrades of OpenPGM (Mikko Koppanen).
+
+* Build system allows configuration with arbitrary versions of OpenPGM
+  (./configure --with-pgm=libpgm-x.y.z) (Mikko Koppanen).
+
+* OpenPGM uses new PGM_ODATA_MAX_RTE controlling original data instead of
+  PGM_TXW_MAX_RTE covering entire channel (Steven McCoy).
+
+Building
+--------
+
+* 0MQ builds properly on FreeBSD (Mikko Koppanen).
+
+
+0MQ version 2.1.2 (rc2), released on 2011/03/06
+===============================================
+
+Bug fixes
+---------
+
+* 0MQ now correctly handles durable inproc sockets; previously it ignored
+  explicit identities on inproc sockets.
+
+* Various memory leaks were fixed.
+
+* OpenPGM sender/receiver creation fixed.
+
+
+0MQ version 2.1.1 (rc1), released on 2011/02/23
+===============================================
+
+New functionality
+-----------------
+
+* New socket option ZMQ_RECONNECT_IVL_MAX added, allows for exponential
+  back-off strategy when reconnecting.
+
+* New socket option ZMQ_RECOVERY_IVL_MSEC added, as a fine-grained
+  counterpart to ZMQ_RECOVERY_IVL (for multicast transports).
+
+* If memory is exhausted, 0MQ warns with an explicit message before
+  aborting the process.
+
+* Size of inproc HWM and SWAP is sum of peers' HWMs and SWAPs (Douglas
+  Greager, Martin Sustrik).
+
+Bug fixes
+---------
+
+* 0MQ no longer asserts in mailbox.cpp when multiple peers connect with
+  the same identity.
+
+* 0MQ no longer asserts when rejecting an oversized message.
+
+* 0MQ no longer asserts in pipe.cpp when the swap fills up.
+
+* zmq_poll now works correctly with an empty poll set.
+
+* Many more.
+
+Building
+--------
+
+* 0MQ now builds correctly on CentOS, Debian 6, and SunOS/gcc3.
+
+* Added WithOpenPGM configuration into MSVC builds.
+
+Known issues
+------------
+
+* OpenPGM integration is still not fully stable.
+
+
+0MQ version 2.1.0 (Beta), released on 2010/12/01
+================================================
+
+New functionality
+-----------------
+
+* New semantics for zmq_close () and zmq_term () ensure that all messages
+  are sent before the application terminates. This behaviour may be
+  modified using the new ZMQ_LINGER socket option; for further details
+  refer to the reference manual.
+
+* The new socket options ZMQ_FD and ZMQ_EVENTS provide a way to integrate
+  0MQ sockets into existing poll/event loops.
+
+* Sockets may now be migrated between OS threads, as long as the
+  application ensures that a full memory barrier is issued.
+
+* The 0MQ ABI exported by libzmq.so has been formalised; DSO symbol
+  visibility is used on supported platforms to ensure that only public ABI
+  symbols are exported. The library ABI version has been set to 1.0.0 for
+  this release.
+
+* OpenPGM has been updated to version 5.0.92. This version no longer
+  depends on GLIB, and integration with 0MQ should be much improved.
+
+* zmq_poll() now honors timeouts precisely, and no longer returns if no
+  events are signaled.
+
+* Blocking calls now return EINTR if interrupted by the delivery of a
+  signal; this also means that language bindings which previously had
+  problems with handling SIGINT/^C should now work correctly.
+
+* The ZMQ_TYPE socket option was added; this allows retrieval of the socket
+  type after creation.
+
+* Added a ZMQ_VERSION macro to zmq.h for compile-time API version
+  detection.
+
+* The ZMQ_RECONNECT_IVL and ZMQ_BACKLOG socket options have been added.
+
+Bug fixes
+---------
+
+* Forwarder and streamer devices now handle multi-part messages correctly.
+
+* 0MQ no longer asserts when malformed data is received on the wire.
+
+* 0MQ internal timers now work correctly if the TSC jumps backwards.
+
+* The internal signalling functionality (mailbox) has been improved
+  to automatically resize socket buffers on POSIX systems.
+
+* Many more.
+
+Building
+--------
+
+* 0MQ now builds correctly with many more non-GCC compilers (Sun Studio,
+  Intel ICC, CLang).
+
+* AIX and HP-UX builds should work now.
+
+* FD_SETSIZE has been set to 1024 by default for MSVC builds.
+
+* Windows builds using GCC (MinGW) now work out of the box.
+
+Distribution
+------------
+
+* A simple framework for regression tests has been added, along with a few
+  basic self-tests. The tests can be run using "make check".

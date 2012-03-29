@@ -25,9 +25,11 @@
 #include "../btree.h"
 #include "update.h"
 #include "../pagefault.h"
+#include "../notifications/notifier.hpp"
 
 //#define DEBUGUPDATE(x) cout << x << endl;
 #define DEBUGUPDATE(x)
+#define NOTIFY_UPDATE(ns,id,change) do { MongodbChangeNotifier::Instance()->postNotification(UPDATE,ns,id,change); }while(0)
 
 namespace mongo {
 
@@ -994,7 +996,26 @@ namespace mongo {
                 }
                 else {
                     logOp("u", ns, updateobj, &pattern );
+		        }
+            }
+			//notifications
+			{
+                DEV assert( mods->size() );
+
+                BSONObj pattern = patternOrig;
+                if ( mss->haveArrayDepMod() ) {
+                    BSONObjBuilder patternBuilder;
+                    patternBuilder.appendElements( pattern );
+                    mss->appendSizeSpecForArrayDepMods( patternBuilder );
+                    pattern = patternBuilder.obj();
                 }
+
+                if( mss->needOpLogRewrite() ) {
+					NOTIFY_UPDATE(ns,pattern,mss->getOpLogRewrite());
+                }
+                else {
+					NOTIFY_UPDATE(ns,pattern,updateobj);
+		        }
             }
             return UpdateResult( 1 , 1 , 1);
         } // end $operator update
@@ -1007,6 +1028,8 @@ namespace mongo {
         if ( logop ) {
             logOp("u", ns, updateobj, &patternOrig );
         }
+	
+		NOTIFY_UPDATE(ns,patternOrig,updateobj);
         return UpdateResult( 1 , 0 , 1 );
     }
 
@@ -1243,7 +1266,28 @@ namespace mongo {
                         else {
                             logOp("u", ns, updateobj, &pattern );
                         }
+					
                     }
+
+					//notifications
+					{
+                        DEV assert( mods->size() );
+
+                        if ( mss->haveArrayDepMod() ) {
+                            BSONObjBuilder patternBuilder;
+                            patternBuilder.appendElements( pattern );
+                            mss->appendSizeSpecForArrayDepMods( patternBuilder );
+                            pattern = patternBuilder.obj();
+                        }
+
+                        if ( forceRewrite || mss->needOpLogRewrite() ) {
+							NOTIFY_UPDATE(ns,pattern,mss->getOpLogRewrite());
+                        } else {
+							NOTIFY_UPDATE(ns,pattern,updateobj);
+                        }
+						
+                    }
+
                     numModded++;
                     if ( ! multi )
                         return UpdateResult( 1 , 1 , numModded );
@@ -1280,6 +1324,7 @@ namespace mongo {
                     DEV wassert( !god ); // god doesn't get logged, this would be bad.
                     logOp("u", ns, updateobj, &pattern );
                 }
+				NOTIFY_UPDATE(ns,pattern,updateobj);
                 return UpdateResult( 1 , 0 , 1 );
             } while ( c->ok() );
         } // endif
@@ -1296,7 +1341,7 @@ namespace mongo {
                 theDataFileMgr.insertWithObjMod(ns, newObj, god);
                 if ( logop )
                     logOp( "i", ns, newObj );
-
+				NOTIFY_INSERTION(ns,newObj);
                 return UpdateResult( 0 , 1 , 1 , newObj );
             }
             uassert( 10159 ,  "multi update only works with $ operators" , ! multi );
@@ -1306,9 +1351,9 @@ namespace mongo {
             theDataFileMgr.insertWithObjMod(ns, no, god);
             if ( logop )
                 logOp( "i", ns, no );
+			NOTIFY_INSERTION(ns,no);
             return UpdateResult( 0 , 0 , 1 , no );
         }
-
         return UpdateResult( 0 , isOperatorUpdate , 0 );
     }
 

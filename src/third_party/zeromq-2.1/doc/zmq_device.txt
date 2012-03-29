@@ -1,0 +1,138 @@
+zmq_device(3)
+=============
+
+NAME
+----
+zmq_device - start built-in 0MQ device
+
+
+SYNOPSIS
+--------
+*int zmq_device (int 'device', const void '*frontend', const void '*backend');*
+
+
+DESCRIPTION
+-----------
+The _zmq_device()_ function starts a built-in 0MQ device. The 'device' argument
+is one of:
+
+'ZMQ_QUEUE'::
+    starts a queue device
+'ZMQ_FORWARDER'::
+    starts a forwarder device
+'ZMQ_STREAMER'::
+    starts a streamer device
+
+The device connects a frontend socket to a backend socket. Conceptually, data
+flows from frontend to backend. Depending on the socket types, replies may flow
+in the opposite direction.
+
+Before calling _zmq_device()_ you must set any socket options, and connect or
+bind both frontend and backend sockets. The two conventional device models are:
+
+*proxy*::
+    bind frontend socket to an endpoint, and connect backend socket to
+    downstream components. A proxy device model does not require changes to
+    the downstream topology but that topology is static (any changes require
+    reconfiguring the device).
+*broker*::
+    bind frontend socket to one endpoint and bind backend socket to a second
+    endpoint. Downstream components must now connect into the device. A broker
+    device model allows a dynamic downstream topology (components can come and 
+    go at any time).
+
+_zmq_device()_ runs in the current thread and returns only if/when the current
+context is closed.
+
+
+QUEUE DEVICE
+------------
+'ZMQ_QUEUE' creates a shared queue that collects requests from a set of clients,
+and distributes these fairly among a set of services. Requests are fair-queued
+from frontend connections and load-balanced between backend connections. 
+Replies automatically return to the client that made the original request.
+
+This device is part of the 'request-reply' pattern. The frontend speaks to
+clients and the backend speaks to services. You should use 'ZMQ_QUEUE' with a
+'ZMQ_XREP' socket for the frontend and a 'ZMQ_XREQ' socket for the backend. 
+Other combinations are not documented.
+
+Refer to linkzmq:zmq_socket[3] for a description of these socket types.
+
+
+FORWARDER DEVICE
+----------------
+'ZMQ_FORWARDER' collects messages from a set of publishers and forwards these to
+a set of subscribers. You will generally use this to bridge networks, e.g. read
+on TCP unicast and forward on multicast.
+
+This device is part of the 'publish-subscribe' pattern. The frontend speaks to
+publishers and the backend speaks to subscribers. You should use
+'ZMQ_FORWARDER' with a 'ZMQ_SUB' socket for the frontend and a 'ZMQ_PUB' socket
+for the backend. Other combinations are not documented.
+
+Refer to linkzmq:zmq_socket[3] for a description of these socket types.
+
+
+STREAMER DEVICE
+---------------
+'ZMQ_STREAMER' collects tasks from a set of pushers and forwards these to a set
+of pullers. You will generally use this to bridge networks. Messages are
+fair-queued from pushers and load-balanced to pullers.
+
+This device is part of the 'pipeline' pattern. The frontend speaks to pushers
+and the backend speaks to pullers. You should use 'ZMQ_STREAMER' with a
+'ZMQ_PULL' socket for the frontend and a 'ZMQ_PUSH' socket for the backend. 
+Other combinations are not documented.
+
+Refer to linkzmq:zmq_socket[3] for a description of these socket types.
+
+
+RETURN VALUE
+------------
+The _zmq_device()_ function always returns `-1` and 'errno' set to *ETERM* (the
+0MQ 'context' associated with either of the specified sockets was terminated).
+
+
+EXAMPLE
+-------
+.Creating a queue broker
+----
+//  Create frontend and backend sockets
+void *frontend = zmq_socket (context, ZMQ_XREP);
+assert (backend);
+void *backend = zmq_socket (context, ZMQ_XREQ);
+assert (frontend);
+//  Bind both sockets to TCP ports
+assert (zmq_bind (frontend, "tcp://*:5555") == 0);
+assert (zmq_bind (backend, "tcp://*:5556") == 0);
+//  Start a queue device
+zmq_device (ZMQ_QUEUE, frontend, backend);
+----
+
+
+SEE ALSO
+--------
+linkzmq:zmq_bind[3]
+linkzmq:zmq_connect[3]
+linkzmq:zmq_socket[3]
+linkzmq:zmq[7]
+
+
+AUTHORS
+-------
+This 0MQ manual page was written by Pieter Hintjens <ph@imatix.com>
+
+
+RESOURCES
+---------
+Main web site: <http://www.zeromq.org/>
+
+Report bugs to the 0MQ development mailing list: <zeromq-dev@lists.zeromq.org>
+
+
+COPYING
+-------
+Free use of this software is granted under the terms of the GNU Lesser General
+Public License (LGPL). For details see the files `COPYING` and `COPYING.LESSER`
+included with the 0MQ distribution.

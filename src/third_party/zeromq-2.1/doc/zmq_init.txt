@@ -1,0 +1,51 @@
+zmq_init(3)
+===========
+
+
+NAME
+----
+zmq_init - initialise 0MQ context
+
+
+SYNOPSIS
+--------
+*void *zmq_init (int 'io_threads');*
+
+
+DESCRIPTION
+-----------
+The _zmq_init()_ function initialises a 0MQ 'context'.
+
+The 'io_threads' argument specifies the size of the 0MQ thread pool to handle
+I/O operations. If your application is using only the 'inproc' transport for
+messaging you may set this to zero, otherwise set it to at least one.
+
+.Thread safety
+A 0MQ 'context' is thread safe and may be shared among as many application
+threads as necessary, without any additional locking required on the part of
+the caller.
+
+
+RETURN VALUE
+------------
+The _zmq_init()_ function shall return an opaque handle to the initialised
+'context' if successful. Otherwise it shall return NULL and set 'errno' to one
+of the values defined below.
+
+
+ERRORS
+------
+*EINVAL*::
+An invalid number of 'io_threads' was requested.
+
+
+SEE ALSO
+--------
+linkzmq:zmq[7]
+linkzmq:zmq_term[3]
+
+
+AUTHORS
+-------
+This 0MQ manual page was written by Martin Sustrik <sustrik@250bpm.com> and
+Martin Lucina <mato@kotelna.sk>.
