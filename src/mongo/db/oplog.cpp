@@ -42,6 +42,7 @@ namespace mongo {
     static Database *localDB = 0;
     static NamespaceDetails *rsOplogDetails = 0;
     void oplogCheckCloseDatabase( Database * db ) {
+        assertInWriteLock();
         localDB = 0;
         localOplogMainDetails = 0;
         rsOplogDetails = 0;
