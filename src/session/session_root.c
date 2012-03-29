@@ -188,7 +188,7 @@ __btree_set_turtle(WT_SESSION_IMPL *session, WT_ITEM *v)
 	WT_RET(__wt_scr_alloc(session, 0, &buf));
 	WT_ERR(__wt_buf_fmt(session, buf,
 	    "%s\n"
-	    "root=%.*s,version=(major=%d,minor=%d)\n", WT_TURTLE_MSG,
+	    "root=\"%.*s\",version=(major=%d,minor=%d)\n", WT_TURTLE_MSG,
 	    (int)v->size, (const char *)v->data,
 	    WT_BTREE_MAJOR_VERSION, WT_BTREE_MINOR_VERSION));
 	len = (size_t)fprintf(fp, "%s", (char *)buf->data);
@@ -282,7 +282,7 @@ __btree_set_root(WT_SESSION_IMPL *session, const char *filename, WT_ITEM *v)
 	WT_ERR(__wt_buf_fmt(session, key, "file:%s", filename));
 	WT_ERR(__wt_schema_table_read(session, key->data, &cfg[0]));
 	WT_ERR(__wt_scr_alloc(session, 0, &newv));
-	WT_ERR(__wt_buf_fmt(session, newv, "root=%.*s",
+	WT_ERR(__wt_buf_fmt(session, newv, "root=\"%.*s\"",
 	    (int)v->size, (const char *)v->data));
 	cfg[1] = newv->data;
 	cfg[2] = NULL;
