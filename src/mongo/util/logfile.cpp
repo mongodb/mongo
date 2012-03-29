@@ -215,21 +215,28 @@ namespace mongo {
     }
 
     void LogFile::synchronousAppend(const void *b, size_t len) {
+
+        const char *buf = static_cast<const char *>( b );
+        ssize_t charsToWrite = static_cast<ssize_t>( len );
+
+        fassert( 16141, charsToWrite >= 0 );
+        fassert( 16142, _fd >= 0 );
+        fassert( 16143, reinterpret_cast<ssize_t>( buf ) % 4096 == 0 );  // aligned
+
 #ifdef POSIX_FADV_DONTNEED
         const off_t pos = lseek(_fd, 0, SEEK_CUR); // doesn't actually seek, just get current position
 #endif
 
-        const char *buf = (char *) b;
-        verify(_fd);
-        verify(((size_t)buf)%4096==0); // aligned
-        if( len % 4096 != 0 ) {
-            log() << len << ' ' << len % 4096 << endl;
-            verify(false);
-        }
-        ssize_t written = write(_fd, buf, len);
-        if( written != (ssize_t) len ) {
-            log() << "write fails written:" << written << " len:" << len << " buf:" << buf << ' ' << errnoWithDescription() << endl;
-            uasserted(13515, str::stream() << "error appending to file " << _fd  << ' ' << errnoWithDescription());
+        while ( charsToWrite > 0 ) {
+            const ssize_t written = write( _fd, buf, static_cast<size_t>( charsToWrite ) );
+            if ( -1 == written ) {
+                log() << "LogFile::synchronousAppend failed with " << charsToWrite
+                      << " bytes unwritten out of " << len << " bytes;  b=" << b << ' '
+                      << errnoWithDescription() << std::endl;
+                fassertFailed( 13515 );
+            }
+            buf += written;
+            charsToWrite -= written;
         }
 
         if( 
@@ -239,7 +246,8 @@ namespace mongo {
            fsync(_fd)
 #endif
             ) {
-            uasserted(13514, str::stream() << "error appending to file on fsync " << ' ' << errnoWithDescription());
+            log() << "error appending to file on fsync " << ' ' << errnoWithDescription();
+            fassertFailed( 13514 );
         }
 
 #ifdef POSIX_FADV_DONTNEED
