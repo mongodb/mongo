@@ -55,8 +55,7 @@ namespace mongo {
         case dbDelete: return "remove";
         case dbKillCursors: return "killcursors";
         default:
-            PRINT(op);
-            verify(0);
+            massert( 16141, str::stream() << "cannot translate opcode " << op, !op );
             return "";
         }
     }
