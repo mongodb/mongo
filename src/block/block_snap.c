@@ -19,12 +19,25 @@ int
 __wt_block_snap_init(WT_SESSION_IMPL *session,
     WT_BLOCK *block, WT_BLOCK_SNAPSHOT *si, int is_live)
 {
+	int ret;
+
 	/*
-	 * If we're loading a new live snapshot, there shouldn't be one
-	 * already loaded.
+	 * If we're loading a new live snapshot, there shouldn't be one already
+	 * loaded.  The btree engine should prevent this from ever happening,
+	 * but paranoia is a healthy thing.
 	 */
-	if (is_live && block->live_load)
-		WT_RET_MSG(session, EINVAL, "snapshot already loaded");
+	if (is_live) {
+		__wt_spin_lock(session, &block->live_lock);
+		if (block->live_load)
+			ret = EINVAL;
+		else {
+			block->live_load = 1;
+			ret = 0;
+		}
+		__wt_spin_unlock(session, &block->live_lock);
+		if (ret)
+			WT_RET_MSG(session, EINVAL, "snapshot already loaded");
+	}
 
 	memset(si, 0, sizeof(*si));
 
@@ -66,11 +79,11 @@ __wt_block_snap_load(WT_SESSION_IMPL *session,
 		    session, block, addr, "load-snapshot", NULL));
 
 	si = &block->live;
-	WT_RET(__wt_block_snap_init(session, block, si, readonly ? 0 : 1));
+	WT_RET(__wt_block_snap_init(session, block, si, 1));
 
 	/* If not loading a snapshot from disk, we're done. */
 	if (addr == NULL || addr_size == 0)
-		goto done;
+		return (0);
 
 	/* Crack the snapshot cookie. */
 	WT_ERR(__wt_block_buffer_to_snapshot(session, block, addr, si));
@@ -116,9 +129,11 @@ __wt_block_snap_load(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_ftruncate(session, block->fh, si->file_size));
 	}
 
-done:	block->live_load = 1;
+	if (0) {
+err:		block->live_load = 0;
+	}
 
-err:	__wt_scr_free(&tmp);
+	__wt_scr_free(&tmp);
 	return (ret);
 }
 
@@ -136,15 +151,14 @@ __wt_block_snap_unload(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	/* Work on the "live" snapshot. */
 	if (!block->live_load)
 		WT_RET_MSG(session, EINVAL, "no snapshot to unload");
-	block->live_load = 0;
-	si = &block->live;
 
 	/* Discard the extent lists. */
+	si = &block->live;
 	__wt_block_extlist_free(session, &si->alloc);
 	__wt_block_extlist_free(session, &si->avail);
 	__wt_block_extlist_free(session, &si->discard);
 
-	WT_RET(__wt_block_snap_init(session, block, si, 0));
+	block->live_load = 0;
 
 	return (0);
 }
