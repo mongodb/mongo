@@ -1300,7 +1300,7 @@ namespace mongo {
         return bob.obj().jsonString();
     }
     
-    // TODO optimize more
+    // TODO optimize more SERVER-5450.
     int FieldRangeVectorIterator::advance( const BSONObj &curr ) {
         BSONObjIterator j( curr );
         BSONObjIterator o( _v._indexSpec.keyPattern );

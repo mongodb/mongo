@@ -1153,6 +1153,170 @@ namespace QueryUtilTests {
         };
     } // namespace FieldRangeVectorTests
     
+    // These are currently descriptive, not normative tests.  SERVER-5450
+    namespace FieldRangeVectorIteratorTests {
+        
+        class Base {
+        public:
+            virtual ~Base() {}
+            void run() {
+                FieldRangeSet fieldRangeSet( "", query(), true );
+                IndexSpec indexSpec( index(), BSONObj() );
+                FieldRangeVector fieldRangeVector( fieldRangeSet, indexSpec, 1 );
+                _iterator.reset( new FieldRangeVectorIterator( fieldRangeVector ) );
+                _iterator->advance( fieldRangeVector.startKey() );
+                _iterator->prepDive();
+                check();
+            }
+        protected:
+            virtual BSONObj query() = 0;
+            virtual BSONObj index() = 0;
+            virtual void check() = 0;
+            void assertAdvanceToNext( const BSONObj &current ) {
+                ASSERT_EQUALS( -1, advance( current ) );
+            }
+            void assertAdvanceTo( const BSONObj &current, const BSONObj &target ) {
+                int partition = advance( current );
+                ASSERT( !iterator().after() );
+                BSONObjBuilder advanceToBuilder;
+                advanceToBuilder.appendElements( currentPrefix( current, partition ) );
+                for( int i = partition; i < (int)iterator().cmp().size(); ++i ) {
+                    advanceToBuilder << *iterator().cmp()[ i ];
+                }
+                assertEqualWithoutFieldNames( target, advanceToBuilder.obj() );
+            }
+            void assertAdvanceToAfter( const BSONObj &current, const BSONObj &target ) {
+                int partition = advance( current );
+                ASSERT( iterator().after() );
+                assertEqualWithoutFieldNames( target, currentPrefix( current, partition ) );
+            }
+            void assertDoneAdvancing( const BSONObj &current ) {
+                ASSERT_EQUALS( -2, advance( current ) );                    
+            }
+        private:
+            static void assertEqualWithoutFieldNames( const BSONObj &one, const BSONObj &two ) {
+                ASSERT( one.woCompare( two, BSONObj(), false ) == 0 );
+            }
+            BSONObj currentPrefix( const BSONObj &current, int partition ) {
+                ASSERT( partition >= 0 );
+                BSONObjIterator currentIter( current );
+                BSONObjBuilder prefixBuilder;
+                for( int i = 0; i < partition; ++i ) {
+                    prefixBuilder << currentIter.next();
+                }
+                return prefixBuilder.obj();                
+            }
+            FieldRangeVectorIterator &iterator() { return *_iterator; }
+            int advance( const BSONObj &current ) {
+                return iterator().advance( current );
+            }
+            scoped_ptr<FieldRangeVectorIterator> _iterator;
+        };
+        
+        class AdvanceToNextIntervalEquality : public Base {
+            BSONObj query() { return fromjson( "{a:{$in:[0,1]}}" ); }
+            BSONObj index() { return BSON( "a" << 1 ); }
+            void check() {
+                assertAdvanceToNext( BSON( "a" << 0 ) );
+                assertAdvanceTo( BSON( "a" << 0.5 ), BSON( "a" << 1 ) );
+            }
+        };
+
+        class AdvanceToNextIntervalEqualityCompound : public Base {
+            BSONObj query() { return fromjson( "{a:{$in:[0,1]},b:{$in:[4,5]}}" ); }
+            BSONObj index() { return BSON( "a" << 1 << "b" << 1 ); }
+            void check() {
+                assertAdvanceToNext( BSON( "a" << 0 << "b" << 5 ) );
+                assertAdvanceToAfter( BSON( "a" << 0 << "b" << 6 ), BSON( "a" << 0 ) );
+                assertAdvanceTo( BSON( "a" << 1 << "b" << 2 ), BSON( "a" << 1 << "b" << 4 ) );
+                assertAdvanceToNext( BSON( "a" << 1 << "b" << 4 ) );
+                assertDoneAdvancing( BSON( "a" << 1 << "b" << 5.1 ) );
+            }            
+        };
+
+        class AdvanceToNextIntervalIntermediateEqualityCompound : public Base {
+            BSONObj query() { return fromjson( "{a:{$in:[0,1]},b:{$in:[4,5]}}" ); }
+            BSONObj index() { return BSON( "a" << 1 << "b" << 1 ); }
+            void check() {
+                assertAdvanceToNext( BSON( "a" << 0 << "b" << 5 ) );
+                assertAdvanceTo( BSON( "a" << 0.5 << "b" << 6 ), BSON( "a" << 1 << "b" << 4 ) );
+                assertAdvanceToNext( BSON( "a" << 1 << "b" << 4 ) );
+            }            
+        };
+
+        class BeforeLowerBound : public Base {
+            BSONObj query() { return fromjson( "{a:{$in:[0,1]},b:{$in:[4,5]}}" ); }
+            BSONObj index() { return BSON( "a" << 1 << "b" << 1 ); }
+            void check() {
+                assertAdvanceTo( BSON( "a" << 0 << "b" << 1 ), BSON( "a" << 0 << "b" << 4 ) );
+                assertAdvanceToNext( BSON( "a" << 0 << "b" << 4 ) );
+            }            
+        };
+        
+        class AdvanceToNextExclusiveIntervalCompound : public Base {
+            BSONObj query() { return fromjson( "{a:{$in:['x',/^y/],$ne:'y'},b:{$in:[0,1]}}" ); }
+            BSONObj index() { return fromjson( "{a:1,b:1}" ); }
+            void check() {
+                assertAdvanceToNext( BSON( "a" << "x" << "b" << 1 ) );
+                assertAdvanceToAfter( BSON( "a" << "y" << "b" << 0 ), BSON( "a" << "y" ) );
+                assertAdvanceToNext( BSON( "a" << "yy" << "b" << 0 ) );
+            }
+        };
+        
+        class AdvanceRangeIn : public Base {
+            BSONObj query() { return fromjson( "{a:{$gt:2,$lt:8},b:{$in:[0,1]}}" ); }
+            BSONObj index() { return fromjson( "{a:1,b:1}" ); }
+            void check() {
+                assertAdvanceToNext( BSON( "a" << 4 << "b" << 1 ) );
+                assertAdvanceToNext( BSON( "a" << 5 << "b" << 0 ) );
+            }
+        };
+
+        class AdvanceRangeRange : public Base {
+            BSONObj query() { return fromjson( "{a:{$gt:2,$lt:8},b:{$gt:1,$lt:4}}" ); }
+            BSONObj index() { return fromjson( "{a:1,b:1}" ); }
+            void check() {
+                assertAdvanceTo( BSON( "a" << 4 << "b" << 0 ), BSON( "a" << 4 << "b" << 1 ) );
+                assertAdvanceToAfter( BSON( "a" << 4 << "b" << 6 ), BSON( "a" << 4 ) );
+            }
+        };
+
+        class AdvanceRangeRangeIn : public Base {
+            BSONObj query() { return fromjson( "{a:{$gt:2,$lt:8},b:{$gt:1,$lt:4},c:{$in:[6,7]}}" ); }
+            BSONObj index() { return fromjson( "{a:1,b:1,c:1}" ); }
+            void check() {
+                assertAdvanceToNext( BSON( "a" << 4 << "b" << 3 << "c" << 7 ) );
+                assertAdvanceToAfter( BSON( "a" << 4 << "b" << 6 << "c" << 7 ), BSON( "a" << 4 ) );
+                assertAdvanceToNext( BSON( "a" << 5 << "b" << 3 << "c" << 6 ) );
+            }
+        };
+        
+        class AdvanceRangeMixedIn : public Base {
+            BSONObj query() {
+                return fromjson( "{a:{$gt:2,$lt:8},b:{$in:[/^a/,'c']},c:{$in:[6,7]}}" );
+            }
+            BSONObj index() { return fromjson( "{a:1,b:1,c:1}" ); }
+            void check() {
+                assertAdvanceToNext( BSON( "a" << 4 << "b" << "aa" << "c" << 7 ) );
+                assertAdvanceToAfter( fromjson( "{a:4,b:/^q/,c:7}" ), BSON( "a" << 4 ) );
+                assertAdvanceToNext( BSON( "a" << 5 << "b" << "c" << "c" << 6 ) );
+            }
+        };
+
+        class AdvanceMixedMixedIn : public Base {
+            BSONObj query() {
+                return fromjson( "{a:{$in:[/^a/,'c']},b:{$in:[/^a/,'c']},c:{$in:[6,7]}}" );
+            }
+            BSONObj index() { return fromjson( "{a:1,b:1,c:1}" ); }
+            void check() {
+                assertAdvanceToNext( BSON( "a" << "a" << "b" << "aa" << "c" << 7 ) );
+                assertAdvanceToAfter( fromjson( "{a:'a',b:/^q/,c:7}" ), BSON( "a" << "a" ) );
+                assertAdvanceToNext( BSON( "a" << "c" << "b" << "c" << "c" << 6 ) );
+            }
+        };
+
+    } // namespace FieldRangeVectorIteratorTests
+    
     class All : public Suite {
     public:
         All() : Suite( "queryutil" ) {}
@@ -1273,6 +1437,16 @@ namespace QueryUtilTests {
             add<FieldRangeSetPairTests::MatchPossible>();
             add<FieldRangeSetPairTests::MatchPossibleForIndex>();
             add<FieldRangeVectorTests::ToString>();
+            add<FieldRangeVectorIteratorTests::AdvanceToNextIntervalEquality>();
+            add<FieldRangeVectorIteratorTests::AdvanceToNextIntervalEqualityCompound>();
+            add<FieldRangeVectorIteratorTests::AdvanceToNextIntervalIntermediateEqualityCompound>();
+            add<FieldRangeVectorIteratorTests::BeforeLowerBound>();
+            add<FieldRangeVectorIteratorTests::AdvanceToNextExclusiveIntervalCompound>();
+            add<FieldRangeVectorIteratorTests::AdvanceRangeIn>();
+            add<FieldRangeVectorIteratorTests::AdvanceRangeRange>();
+            add<FieldRangeVectorIteratorTests::AdvanceRangeRangeIn>();
+            add<FieldRangeVectorIteratorTests::AdvanceRangeMixedIn>();
+            add<FieldRangeVectorIteratorTests::AdvanceMixedMixedIn>();
         }
     } myall;
 
