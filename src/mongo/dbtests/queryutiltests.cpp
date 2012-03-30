@@ -1263,6 +1263,26 @@ namespace QueryUtilTests {
             }
         };
         
+        class AdvanceRange : public Base {
+            BSONObj query() { return fromjson( "{a:{$gt:2,$lt:8}}" ); }
+            BSONObj index() { return fromjson( "{a:1}" ); }
+            void check() {
+                assertAdvanceToNext( BSON( "a" << 2 ) );
+                assertAdvanceToNext( BSON( "a" << 4 ) );
+                assertAdvanceToNext( BSON( "a" << 5 ) );
+                assertDoneAdvancing( BSON( "a" << 9 ) );
+            }
+        };
+        
+        class AdvanceInRange : public Base {
+            BSONObj query() { return fromjson( "{a:{$in:[0,1]},b:{$gt:2,$lt:8}}" ); }
+            BSONObj index() { return fromjson( "{a:1,b:1}" ); }
+            void check() {
+                assertAdvanceToNext( BSON( "a" << 0 << "b" << 5 ) );
+                assertAdvanceToNext( BSON( "a" << 0 << "b" << 5 ) );
+            }
+        };
+        
         class AdvanceRangeIn : public Base {
             BSONObj query() { return fromjson( "{a:{$gt:2,$lt:8},b:{$in:[0,1]}}" ); }
             BSONObj index() { return fromjson( "{a:1,b:1}" ); }
@@ -1278,6 +1298,15 @@ namespace QueryUtilTests {
             void check() {
                 assertAdvanceTo( BSON( "a" << 4 << "b" << 0 ), BSON( "a" << 4 << "b" << 1 ) );
                 assertAdvanceToAfter( BSON( "a" << 4 << "b" << 6 ), BSON( "a" << 4 ) );
+            }
+        };
+
+        class AdvanceRangeRangeMultiple : public Base {
+            BSONObj query() { return fromjson( "{a:{$gt:2,$lt:8},b:{$gt:1,$lt:4}}" ); }
+            BSONObj index() { return fromjson( "{a:1,b:1}" ); }
+            void check() {
+                assertAdvanceToNext( BSON( "a" << 4 << "b" << 3 ) );
+                assertAdvanceToNext( BSON( "a" << 4 << "b" << 3 ) );
             }
         };
 
@@ -1481,8 +1510,11 @@ namespace QueryUtilTests {
             add<FieldRangeVectorIteratorTests::AdvanceToNextIntervalIntermediateEqualityCompound>();
             add<FieldRangeVectorIteratorTests::BeforeLowerBound>();
             add<FieldRangeVectorIteratorTests::AdvanceToNextExclusiveIntervalCompound>();
+            add<FieldRangeVectorIteratorTests::AdvanceRange>();
+            add<FieldRangeVectorIteratorTests::AdvanceInRange>();
             add<FieldRangeVectorIteratorTests::AdvanceRangeIn>();
             add<FieldRangeVectorIteratorTests::AdvanceRangeRange>();
+            add<FieldRangeVectorIteratorTests::AdvanceRangeRangeMultiple>();
             add<FieldRangeVectorIteratorTests::AdvanceRangeRangeIn>();
             add<FieldRangeVectorIteratorTests::AdvanceRangeMixedIn>();
             add<FieldRangeVectorIteratorTests::AdvanceMixedMixedIn>();

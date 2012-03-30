@@ -622,6 +622,15 @@ namespace mongo {
         };
 
     private:
+        /**
+         * @return values similar to advance()
+         *   -2 Iteration is complete for the current interval.
+         *   -1 Iteration is not complete for the current interval.
+         *  >=0 Return value to be forwarded by advance().
+         */
+        int validateCurrentInterval( int i, const BSONElement &jj, bool reverse, bool first,
+                                    bool &eq );
+        
         const FieldRangeVector &_v;
         CompoundRangeCounter _i;
         vector<const BSONElement*> _cmp;

@@ -1369,55 +1369,15 @@ namespace mongo {
             // which serves as a lower/equal bound on the first iteration -
             // we advance from this interval to find a matching interval
             while( _i.get( i ) < (int)_v._ranges[ i ].intervals().size() ) {
-                // compare to current interval's upper bound
-                int x = _v._ranges[ i ].intervals()[ _i.get( i ) ]._upper._bound.woCompare( jj, false );
-                if ( reverse ) {
-                    x = -x;
+
+                int advanceMethod = validateCurrentInterval( i, jj, reverse, first, eq );
+                if ( advanceMethod >= 0 ) {
+                    return advanceMethod;
                 }
-                if ( x == 0 && _v._ranges[ i ].intervals()[ _i.get( i ) ]._upper._inclusive ) {
-                    eq = true;
+                if ( advanceMethod == -1 ) {
                     break;
                 }
-                // see if we're less than the upper bound
-                if ( x > 0 ) {
-                    if ( i == 0 && first ) {
-                        // the value of 1st field won't go backward, so don't check lower bound
-                        // TODO maybe we can check first only?
-                        break;
-                    }
-                    // if it's an equality interval, don't need to compare separately to lower bound
-                    if ( !_v._ranges[ i ].intervals()[ _i.get( i ) ].equality() ) {
-                        // compare to current interval's lower bound
-                        x = _v._ranges[ i ].intervals()[ _i.get( i ) ]._lower._bound.woCompare( jj, false );
-                        if ( reverse ) {
-                            x = -x;
-                        }
-                    }
-                    // if we're equal to and not inclusive the lower bound, advance
-                    if ( ( x == 0 && !_v._ranges[ i ].intervals()[ _i.get( i ) ]._lower._inclusive ) ) {
-                        _i.setZeroes( i + 1 );
-                        // skip to curr / i + 1 / superlative
-                        _after = true;
-                        return i + 1;
-                    }
-                    // if we're less than the lower bound, advance
-                    if ( x > 0 ) {
-                        _i.setZeroes( i + 1 );
-                        // skip to curr / i / nextbounds
-                        _cmp[ i ] = &_v._ranges[ i ].intervals()[ _i.get( i ) ]._lower._bound;
-                        _inc[ i ] = _v._ranges[ i ].intervals()[ _i.get( i ) ]._lower._inclusive;
-                        for( int j = i + 1; j < _i.size(); ++j ) {
-                            _cmp[ j ] = &_v._ranges[ j ].intervals().front()._lower._bound;
-                            _inc[ j ] = _v._ranges[ j ].intervals().front()._lower._inclusive;
-                        }
-                        _after = false;
-                        return i;
-                    }
-                    else {
-                        break;
-                    }
-                }
-                // we're above the upper bound, so try next interval and reset remaining fields
+                // we're past the current interval, so try next interval and reset remaining fields
                 _i.inc( i );
                 _i.setZeroes( i + 1 );
                 first = false;
@@ -1447,6 +1407,61 @@ namespace mongo {
             _inc[ j ] = _v._ranges[ j ].intervals().front()._lower._inclusive;
         }
     }
+    
+    int FieldRangeVectorIterator::validateCurrentInterval( int i, const BSONElement &jj,
+                                                          bool reverse, bool first, bool &eq ) {
+        // compare to current interval's upper bound
+        int x = _v._ranges[ i ].intervals()[ _i.get( i ) ]._upper._bound.woCompare( jj, false );
+        if ( reverse ) {
+            x = -x;
+        }
+        if ( x == 0 && _v._ranges[ i ].intervals()[ _i.get( i ) ]._upper._inclusive ) {
+            eq = true;
+            return -1;
+        }
+        // see if we're less than the upper bound
+        if ( x > 0 ) {
+            if ( i == 0 && first ) {
+                // the value of 1st field won't go backward, so don't check lower bound
+                // TODO maybe we can check first only?
+                return -1;
+            }
+            // if it's an equality interval, don't need to compare separately to lower bound
+            if ( !_v._ranges[ i ].intervals()[ _i.get( i ) ].equality() ) {
+                // compare to current interval's lower bound
+                x = _v._ranges[ i ].intervals()[ _i.get( i ) ]._lower._bound.woCompare( jj, false );
+                if ( reverse ) {
+                    x = -x;
+                }
+            }
+            // if we're equal to and not inclusive the lower bound, advance
+            if ( ( x == 0 && !_v._ranges[ i ].intervals()[ _i.get( i ) ]._lower._inclusive ) ) {
+                _i.setZeroes( i + 1 );
+                // skip to curr / i + 1 / superlative
+                _after = true;
+                return i + 1;
+            }
+            // if we're less than the lower bound, advance
+            if ( x > 0 ) {
+                _i.setZeroes( i + 1 );
+                // skip to curr / i / nextbounds
+                _cmp[ i ] = &_v._ranges[ i ].intervals()[ _i.get( i ) ]._lower._bound;
+                _inc[ i ] = _v._ranges[ i ].intervals()[ _i.get( i ) ]._lower._inclusive;
+                for( int j = i + 1; j < _i.size(); ++j ) {
+                    _cmp[ j ] = &_v._ranges[ j ].intervals().front()._lower._bound;
+                    _inc[ j ] = _v._ranges[ j ].intervals().front()._lower._inclusive;
+                }
+                _after = false;
+                return i;
+            }
+            else {
+                return -1;
+            }
+        }
+        // we're above the upper bound
+        return -2;
+    }
+
 
     OrRangeGenerator::OrRangeGenerator( const char *ns, const BSONObj &query , bool optimize )
     : _baseSet( ns, query, optimize ), _orFound() {
