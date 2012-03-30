@@ -219,7 +219,7 @@ namespace mongo {
         const char *buf = static_cast<const char *>( b );
         ssize_t charsToWrite = static_cast<ssize_t>( len );
 
-        fassert( 16141, charsToWrite >= 0 );
+        fassert( 16144, charsToWrite >= 0 );
         fassert( 16142, _fd >= 0 );
         fassert( 16143, reinterpret_cast<ssize_t>( buf ) % 4096 == 0 );  // aligned
 
