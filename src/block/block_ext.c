@@ -482,10 +482,10 @@ __block_overlap(WT_SESSION_IMPL *session,
     WT_BLOCK *block, WT_EXTLIST *ael, WT_EXT **ap, WT_EXTLIST *bel, WT_EXT **bp)
 {
 	WT_EXT *a, *b, **ext;
-	WT_EXTLIST *el, *live;
+	WT_EXTLIST *avail, *el;
 	off_t off, size;
 
-	live = &block->live.avail;
+	avail = &block->live.avail;
 
 	/*
 	 * The ranges overlap, choose the range we're going to take from each.
@@ -544,7 +544,7 @@ __block_overlap(WT_SESSION_IMPL *session,
 			 */
 			*ap = (*ap)->next[0];
 			*bp = (*bp)->next[0];
-			WT_RET(__block_merge(session, live, b->off, b->size));
+			WT_RET(__block_merge(session, avail, b->off, b->size));
 			WT_RET(__block_off_remove(session, ael, a->off, NULL));
 			WT_RET(__block_off_remove(session, bel, b->off, NULL));
 		}
@@ -565,7 +565,7 @@ __block_overlap(WT_SESSION_IMPL *session,
 			 * Delete B
 			 */
 			*bp = (*bp)->next[0];
-			WT_RET(__block_merge(session, live, b->off, b->size));
+			WT_RET(__block_merge(session, avail, b->off, b->size));
 			WT_RET(__block_off_remove(session, bel, b->off, NULL));
 		} else {				/* Case #9 */
 			/*
@@ -584,7 +584,7 @@ __block_overlap(WT_SESSION_IMPL *session,
 			 * Delete A
 			 */
 			*ap = (*ap)->next[0];
-			WT_RET(__block_merge(session, live, a->off, a->size));
+			WT_RET(__block_merge(session, avail, a->off, a->size));
 			WT_RET(__block_off_remove(session, ael, a->off, NULL));
 		}					/* Case #6 */
 	} else if (a->off + a->size == b->off + b->size) {
@@ -603,7 +603,7 @@ __block_overlap(WT_SESSION_IMPL *session,
 		 * Delete B
 		 */
 		*bp = (*bp)->next[0];
-		WT_RET(__block_merge(session, live, b->off, b->size));
+		WT_RET(__block_merge(session, avail, b->off, b->size));
 		WT_RET(__block_off_remove(session, bel, b->off, NULL));
 	} else if					/* Case #3, #8 */
 	    (a->off + a->size < b->off + b->size) {
@@ -612,7 +612,7 @@ __block_overlap(WT_SESSION_IMPL *session,
 		 */
 		off = b->off;
 		size = (a->off + a->size) - b->off;
-		WT_RET(__block_merge(session, live, off, size));
+		WT_RET(__block_merge(session, avail, off, size));
 
 		/*
 		 * Remove A from its list
@@ -655,7 +655,7 @@ __block_overlap(WT_SESSION_IMPL *session,
 		 * Delete B
 		 */
 		*bp = (*bp)->next[0];
-		WT_RET(__block_merge(session, live, b->off, b->size));
+		WT_RET(__block_merge(session, avail, b->off, b->size));
 		WT_RET(__block_off_remove(session, bel, b->off, NULL));
 	}
 
