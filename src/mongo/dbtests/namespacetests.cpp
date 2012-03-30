@@ -983,7 +983,7 @@ namespace NamespaceTests {
                     if ( fileNo == -1 )
                         continue;
                     for ( int j = i.ext()->firstRecord.getOfs(); j != DiskLoc::NullOfs;
-                            j = DiskLoc( fileNo, j ).rec()->nextOfs ) {
+                          j = DiskLoc( fileNo, j ).rec()->nextOfs() ) {
                         ++count;
                     }
                 }

@@ -262,7 +262,7 @@ namespace mongo {
                         }
 
                         Record *r = c->_current();
-                        len += r->lengthWithHeaders;
+                        len += r->lengthWithHeaders();
                         nlen += r->netLength();
 
                         if (full){

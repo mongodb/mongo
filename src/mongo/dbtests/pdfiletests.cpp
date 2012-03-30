@@ -76,19 +76,19 @@ namespace PdfileTests {
                 if ( e->lastRecord.isNull() )
                     ofs = ext.getOfs() + ( e->_extentData - (char *)e );
                 else
-                    ofs = e->lastRecord.getOfs() + e->lastRecord.rec()->lengthWithHeaders;
+                    ofs = e->lastRecord.getOfs() + e->lastRecord.rec()->lengthWithHeaders();
                 DiskLoc dl( ext.a(), ofs );
                 Record *r = dl.rec();
                 r = (Record*) getDur().writingPtr(r, Record::HeaderSize + len);
-                r->lengthWithHeaders = Record::HeaderSize + len;
-                r->extentOfs = e->myLoc.getOfs();
-                r->nextOfs = DiskLoc::NullOfs;
-                r->prevOfs = e->lastRecord.isNull() ? DiskLoc::NullOfs : e->lastRecord.getOfs();
-                memcpy( r->data, o.objdata(), len );
+                r->lengthWithHeaders() = Record::HeaderSize + len;
+                r->extentOfs() = e->myLoc.getOfs();
+                r->nextOfs() = DiskLoc::NullOfs;
+                r->prevOfs() = e->lastRecord.isNull() ? DiskLoc::NullOfs : e->lastRecord.getOfs();
+                memcpy( r->data(), o.objdata(), len );
                 if ( e->firstRecord.isNull() )
                     e->firstRecord = dl;
                 else
-                    getDur().writingInt(e->lastRecord.rec()->nextOfs) = ofs;
+                    getDur().writingInt(e->lastRecord.rec()->nextOfs()) = ofs;
                 e->lastRecord = dl;
                 return dl;
             }

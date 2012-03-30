@@ -112,7 +112,7 @@ namespace mongo {
                         datasize += recNew->netLength();
                         recNew = (Record *) getDur().writingPtr(recNew, lenWHdr);
                         addRecordToRecListInExtent(recNew, loc);
-                        memcpy(recNew->data, objOld.objdata(), sz);
+                        memcpy(recNew->data(), objOld.objdata(), sz);
 
                         {
                             // extract keys for all indexes we will be rebuilding
@@ -138,7 +138,7 @@ namespace mongo {
                     if( stopping || getDur().aCommitIsNeeded() ) {
                         e->firstRecord.writing() = L;
                         Record *r = L.rec();
-                        getDur().writingInt(r->prevOfs) = DiskLoc::NullOfs;
+                        getDur().writingInt(r->prevOfs()) = DiskLoc::NullOfs;
                         getDur().commitIfNeeded();
                         killCurrentOp.checkForInterrupt(false);
                     }

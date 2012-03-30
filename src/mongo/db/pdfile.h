@@ -190,40 +190,46 @@ namespace mongo {
     class Record {
     public:
         enum HeaderSizeValue { HeaderSize = 16 };
-        int lengthWithHeaders;
-        int extentOfs;
-        int nextOfs;
-        int prevOfs;
 
-        /** be careful when referencing this that your write intent was correct */
-        char data[4];
+        int lengthWithHeaders() const {  _accessing(); return _lengthWithHeaders; }
+        int& lengthWithHeaders() {  _accessing(); return _lengthWithHeaders; }
 
-        int netLength() {
-            return lengthWithHeaders - HeaderSize;
-        }
-        //void setNewLength(int netlen) { lengthWithHeaders = netlen + HeaderSize; }
+        int extentOfs() const { _accessing(); return _extentOfs; }
+        int& extentOfs() { _accessing(); return _extentOfs; }
+        
+        int nextOfs() const { _accessing(); return _nextOfs; }
+        int& nextOfs() { _accessing(); return _nextOfs; }
+
+        int prevOfs() const {  _accessing(); return _prevOfs; }
+        int& prevOfs() {  _accessing(); return _prevOfs; }
+
+        const char * data() const { _accessing(); return _data; }
+        char * data() { _accessing(); return _data; }
+
+        int netLength() const { _accessing(); return _lengthWithHeaders - HeaderSize; }
 
         /* use this when a record is deleted. basically a union with next/prev fields */
         DeletedRecord& asDeleted() { return *((DeletedRecord*) this); }
 
-        Extent* myExtent(const DiskLoc& myLoc) { return DataFileMgr::getExtent(DiskLoc(myLoc.a(), extentOfs)); }
+        Extent* myExtent(const DiskLoc& myLoc) { return DataFileMgr::getExtent(DiskLoc(myLoc.a(), extentOfs() ) ); }
 
         /* get the next record in the namespace, traversing extents as necessary */
         DiskLoc getNext(const DiskLoc& myLoc);
         DiskLoc getPrev(const DiskLoc& myLoc);
 
         DiskLoc nextInExtent(const DiskLoc& myLoc) { 
-            if ( nextOfs == DiskLoc::NullOfs )
+            _accessing();
+            if ( _nextOfs == DiskLoc::NullOfs )
                 return DiskLoc();
-            verify( nextOfs );
-            return DiskLoc(myLoc.a(), nextOfs);
+            verify( _nextOfs );
+            return DiskLoc(myLoc.a(), _nextOfs);
         }
 
         struct NP {
             int nextOfs;
             int prevOfs;
         };
-        NP* np() { return (NP*) &nextOfs; }
+        NP* np() { return (NP*) &_nextOfs; }
 
         // ---------------------
         // memory cache
@@ -234,7 +240,7 @@ namespace mongo {
          * @param entireRecrd if false, only the header and first byte is touched
          *                    if true, the entire record is touched
          * */
-        void touch( bool entireRecrd = false );
+        void touch( bool entireRecrd = false ) const;
 
         /**
          * @return if this record is likely in physical memory
@@ -247,6 +253,23 @@ namespace mongo {
          * @return this, for simple chaining
          */
         Record* accessed();
+
+    private:
+        
+        /**
+         * call this when accessing a field which could hit disk
+         */
+        void _accessing() const;
+
+        int _lengthWithHeaders;
+        int _extentOfs;
+        int _nextOfs;
+        int _prevOfs;
+
+        /** be careful when referencing this that your write intent was correct */
+        char _data[4];
+
+    public:
 
         static bool MemoryTrackingEnabled;
     };
@@ -448,14 +471,15 @@ namespace mongo {
     }
 
     inline DiskLoc Record::getNext(const DiskLoc& myLoc) {
-        if ( nextOfs != DiskLoc::NullOfs ) {
+        _accessing();
+        if ( _nextOfs != DiskLoc::NullOfs ) {
             /* defensive */
-            if ( nextOfs >= 0 && nextOfs < 10 ) {
+            if ( _nextOfs >= 0 && _nextOfs < 10 ) {
                 sayDbContext("Assertion failure - Record::getNext() referencing a deleted record?");
                 return DiskLoc();
             }
 
-            return DiskLoc(myLoc.a(), nextOfs);
+            return DiskLoc(myLoc.a(), _nextOfs);
         }
         Extent *e = myExtent(myLoc);
         while ( 1 ) {
@@ -469,8 +493,9 @@ namespace mongo {
         return e->firstRecord;
     }
     inline DiskLoc Record::getPrev(const DiskLoc& myLoc) {
-        if ( prevOfs != DiskLoc::NullOfs )
-            return DiskLoc(myLoc.a(), prevOfs);
+        _accessing();
+        if ( _prevOfs != DiskLoc::NullOfs )
+            return DiskLoc(myLoc.a(), _prevOfs);
         Extent *e = myExtent(myLoc);
         if ( e->xprev.isNull() )
             return DiskLoc();
@@ -496,7 +521,7 @@ namespace mongo {
         verify( _a != -1 );
         Record *r = rec();
         memconcept::is(r, memconcept::concept::btreebucket, "", 8192);
-        return (const BtreeBucket<V> *) r->data;
+        return (const BtreeBucket<V> *) r->data();
     }
 
 } // namespace mongo
@@ -557,7 +582,7 @@ namespace mongo {
     bool dropIndexes( NamespaceDetails *d, const char *ns, const char *name, string &errmsg, BSONObjBuilder &anObjBuilder, bool maydeleteIdIndex );
 
     inline BSONObj::BSONObj(const Record *r) {
-        init(r->data);
+        init(r->data());
     }
 
 } // namespace mongo

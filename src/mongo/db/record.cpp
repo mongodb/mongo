@@ -184,10 +184,10 @@ namespace mongo {
     bool Record::MemoryTrackingEnabled = true;
     
     volatile int __record_touch_dummy = 1; // this is used to make sure the compiler doesn't get too smart on us
-    void Record::touch( bool entireRecrd ) {
-        if ( lengthWithHeaders > HeaderSize ) { // this also makes sure lengthWithHeaders is in memory
-            char * addr = data;
-            char * end = data + netLength();
+    void Record::touch( bool entireRecrd ) const {
+        if ( _lengthWithHeaders > HeaderSize ) { // this also makes sure lengthWithHeaders is in memory
+            const char * addr = _data;
+            const char * end = _data + netLength();
             for ( ; addr <= end ; addr += 2048 ) {
                 __record_touch_dummy += addr[0];
 
@@ -212,7 +212,7 @@ namespace mongo {
         if ( ! MemoryTrackingEnabled )
             return true;
 
-        const size_t page = (size_t)data >> 12;
+        const size_t page = (size_t)_data >> 12;
         const size_t region = page >> 6;
         const size_t offset = page & 0x3f;
         
@@ -232,12 +232,12 @@ namespace mongo {
             return false;
         }
 
-        return ProcessInfo::blockInMemory( data );
+        return ProcessInfo::blockInMemory( _data );
     }
 
 
     Record* Record::accessed() {
-        const size_t page = (size_t)data >> 12;
+        const size_t page = (size_t)_data >> 12;
         const size_t region = page >> 6;
         const size_t offset = page & 0x3f;        
         ps::rolling.access( region , offset , true );
@@ -267,6 +267,10 @@ namespace mongo {
         }
 #endif
         return r;
+    }
+
+    void Record::_accessing() const {
+
     }
 
 }

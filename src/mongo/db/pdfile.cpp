@@ -983,26 +983,26 @@ namespace mongo {
     void DataFileMgr::_deleteRecord(NamespaceDetails *d, const char *ns, Record *todelete, const DiskLoc& dl) {
         /* remove ourself from the record next/prev chain */
         {
-            if ( todelete->prevOfs != DiskLoc::NullOfs )
-                getDur().writingInt( todelete->getPrev(dl).rec()->nextOfs ) = todelete->nextOfs;
-            if ( todelete->nextOfs != DiskLoc::NullOfs )
-                getDur().writingInt( todelete->getNext(dl).rec()->prevOfs ) = todelete->prevOfs;
+            if ( todelete->prevOfs() != DiskLoc::NullOfs )
+                getDur().writingInt( todelete->getPrev(dl).rec()->nextOfs() ) = todelete->nextOfs();
+            if ( todelete->nextOfs() != DiskLoc::NullOfs )
+                getDur().writingInt( todelete->getNext(dl).rec()->prevOfs() ) = todelete->prevOfs();
         }
 
         /* remove ourself from extent pointers */
         {
             Extent *e = getDur().writing( todelete->myExtent(dl) );
             if ( e->firstRecord == dl ) {
-                if ( todelete->nextOfs == DiskLoc::NullOfs )
+                if ( todelete->nextOfs() == DiskLoc::NullOfs )
                     e->firstRecord.Null();
                 else
-                    e->firstRecord.set(dl.a(), todelete->nextOfs);
+                    e->firstRecord.set(dl.a(), todelete->nextOfs() );
             }
             if ( e->lastRecord == dl ) {
-                if ( todelete->prevOfs == DiskLoc::NullOfs )
+                if ( todelete->prevOfs() == DiskLoc::NullOfs )
                     e->lastRecord.Null();
                 else
-                    e->lastRecord.set(dl.a(), todelete->prevOfs);
+                    e->lastRecord.set(dl.a(), todelete->prevOfs() );
             }
         }
 
@@ -1020,11 +1020,11 @@ namespace mongo {
                    to this disk location.  so an incorrectly done remove would cause
                    a lot of problems.
                 */
-                memset(getDur().writingPtr(todelete, todelete->lengthWithHeaders), 0, todelete->lengthWithHeaders);
+                memset(getDur().writingPtr(todelete, todelete->lengthWithHeaders() ), 0, todelete->lengthWithHeaders() );
             }
             else {
                 DEV {
-                    unsigned long long *p = (unsigned long long *) todelete->data;
+                    unsigned long long *p = reinterpret_cast<unsigned long long *>( todelete->data() );
                     *getDur().writing(p) = 0;
                     //DEV memset(todelete->data, 0, todelete->netLength()); // attempt to notice invalid reuse.
                 }
@@ -1161,7 +1161,7 @@ namespace mongo {
 
         //  update in place
         int sz = objNew.objsize();
-        memcpy(getDur().writingPtr(toupdate->data, sz), objNew.objdata(), sz);
+        memcpy(getDur().writingPtr(toupdate->data(), sz), objNew.objdata(), sz);
         return dl;
     }
 
@@ -1782,13 +1782,13 @@ namespace mongo {
         if ( e->lastRecord.isNull() ) {
             Extent::FL *fl = getDur().writing(e->fl());
             fl->firstRecord = fl->lastRecord = loc;
-            r->prevOfs = r->nextOfs = DiskLoc::NullOfs;
+            r->prevOfs() = r->nextOfs() = DiskLoc::NullOfs;
         }
         else {
             Record *oldlast = e->lastRecord.rec();
-            r->prevOfs = e->lastRecord.getOfs();
-            r->nextOfs = DiskLoc::NullOfs;
-            getDur().writingInt(oldlast->nextOfs) = loc.getOfs();
+            r->prevOfs() = e->lastRecord.getOfs();
+            r->nextOfs() = DiskLoc::NullOfs;
+            getDur().writingInt(oldlast->nextOfs()) = loc.getOfs();
             getDur().writingDiskLoc(e->lastRecord) = loc;
         }
     }
@@ -2032,17 +2032,17 @@ namespace mongo {
 
         Record *r = loc.rec();
         {
-            verify( r->lengthWithHeaders >= lenWHdr );
+            verify( r->lengthWithHeaders() >= lenWHdr );
             r = (Record*) getDur().writingPtr(r, lenWHdr);
             if( addID ) {
                 /* a little effort was made here to avoid a double copy when we add an ID */
-                ((int&)*r->data) = *((int*) obuf) + idToInsert.size();
-                memcpy(r->data+4, idToInsert.rawdata(), idToInsert.size());
-                memcpy(r->data+4+idToInsert.size(), ((char *)obuf)+4, addID-4);
+                ((int&)*r->data()) = *((int*) obuf) + idToInsert.size();
+                memcpy(r->data()+4, idToInsert.rawdata(), idToInsert.size());
+                memcpy(r->data()+4+idToInsert.size(), ((char *)obuf)+4, addID-4);
             }
             else {
                 if( obuf ) // obuf can be null from internal callers
-                    memcpy(r->data, obuf, len);
+                    memcpy(r->data(), obuf, len);
             }
         }
 
@@ -2066,7 +2066,7 @@ namespace mongo {
         /* add this record to our indexes */
         if ( !earlyIndex && d->nIndexes ) {
             try {
-                BSONObj obj(r->data);
+                BSONObj obj(r->data());
                 // not sure which of these is better -- either can be used.  oldIndexRecord may be faster, 
                 // but twosteps handles dup key errors more efficiently.
                 //oldIndexRecord(d, obj, loc);
@@ -2109,7 +2109,7 @@ namespace mongo {
         verify( !loc.isNull() );
 
         Record *r = loc.rec();
-        verify( r->lengthWithHeaders >= lenWHdr );
+        verify( r->lengthWithHeaders() >= lenWHdr );
 
         Extent *e = r->myExtent(loc);
         if ( e->lastRecord.isNull() ) {
@@ -2124,7 +2124,7 @@ namespace mongo {
             Record::NP *np = getDur().writing(r->np());
             np->prevOfs = e->lastRecord.getOfs();
             np->nextOfs = DiskLoc::NullOfs;
-            getDur().writingInt( oldlast->nextOfs ) = loc.getOfs();
+            getDur().writingInt( oldlast->nextOfs() ) = loc.getOfs();
             e->lastRecord.writing() = loc;
         }
 

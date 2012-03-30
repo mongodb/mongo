@@ -75,7 +75,7 @@ namespace mongo {
             {
                 int len = op.objsize();
                 Record *r = theDataFileMgr.fast_oplog_insert(rsOplogDetails, logns, len);
-                memcpy(getDur().writingPtr(r->data, len), op.objdata(), len);
+                memcpy(getDur().writingPtr(r->data(), len), op.objdata(), len);
             }
             /* todo: now() has code to handle clock skew.  but if the skew server to server is large it will get unhappy.
                      this code (or code in now() maybe) should be improved.
@@ -195,7 +195,7 @@ namespace mongo {
             }
         }
 
-        append_O_Obj(r->data, partial, obj);
+        append_O_Obj(r->data(), partial, obj);
 
         if ( logLevel >= 6 ) {
             BSONObj temp(r);
@@ -279,7 +279,7 @@ namespace mongo {
             r = theDataFileMgr.fast_oplog_insert( nsdetails( logNS ), logNS, len);
         }
 
-        append_O_Obj(r->data, partial, obj);
+        append_O_Obj(r->data(), partial, obj);
 
         context.getClient()->setLastOp( ts );
 
