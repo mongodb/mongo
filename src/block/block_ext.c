@@ -346,14 +346,19 @@ __wt_block_free_buf(WT_SESSION_IMPL *session,
 {
 	off_t off;
 	uint32_t cksum, size;
+	int ret;
 
 	WT_UNUSED(addr_size);
 
 	/* Crack the cookie. */
 	WT_RET(__wt_block_buffer_to_addr(block, addr, &off, &size, &cksum));
-	WT_RET(__wt_block_free(session, block, off, size, 0));
 
-	return (0);
+	/* Lock the system and free the extent. */
+	__wt_spin_lock(session, &block->live_lock);
+	ret = __wt_block_free(session, block, off, size, 0);
+	__wt_spin_unlock(session, &block->live_lock);
+
+	return (ret);
 }
 
 /*
@@ -365,15 +370,15 @@ __wt_block_free(WT_SESSION_IMPL *session,
     WT_BLOCK *block, off_t off, off_t size, int free_extent)
 {
 	WT_EXTLIST *el;
-	int ret;
 
 	WT_BSTAT_INCR(session, free);
 	WT_VERBOSE(session, block,
 	    "free %" PRIdMAX "/%" PRIdMAX, (intmax_t)off, (intmax_t)size);
 
-	__wt_spin_lock(session, &block->live_lock);
-
 	/*
+	 * Callers of this function are expected to be holding any locks
+	 * required to free the buffer.
+	 *
 	 * If performing salvage, snapshots no longer apply, and so blocks are
 	 * immediately re-used where possible.  Free to the live system's avail
 	 * list.
@@ -385,11 +390,7 @@ __wt_block_free(WT_SESSION_IMPL *session,
 	el = free_extent || block->slvg ?
 	    &block->live.avail : &block->live.discard;
 
-	ret = __block_merge(session, el, off, (off_t)size);
-
-	__wt_spin_unlock(session, &block->live_lock);
-
-	return (ret);
+	return (__block_merge(session, el, off, (off_t)size));
 }
 
 /*

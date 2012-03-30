@@ -335,45 +335,39 @@ __block_snap_delete(
 		    session, block, si->root_offset, si->root_size, 0));
 
 	/*
-	 * Discard the avail list: snapshot avail lists are only useful if we
-	 * are rolling forward from the particular snapshot and they represent
-	 * our best understanding of what blocks can be allocated.  If we're
-	 * not operating on the live snapshot, subsequent snapshots may have
-	 * allocated those blocks, and the avail list is useless.
-	 *
-	 * The avail list is an extent: extent blocks must be freed directly to
-	 * the live system's avail list, they were never on any alloc list.
+	 * Free the blocks used to hold the extent lists directly to the live
+	 * system's avail list, they were never on any alloc list.
 	 */
+	if (si->alloc.offset != WT_BLOCK_INVALID_OFFSET)
+		WT_RET(__wt_block_free(
+		    session, block, si->alloc.offset, si->alloc.size, 1));
 	if (si->avail.offset != WT_BLOCK_INVALID_OFFSET)
 		WT_RET(__wt_block_free(
 		    session, block, si->avail.offset, si->avail.size, 1));
+	if (si->discard.offset != WT_BLOCK_INVALID_OFFSET)
+		WT_RET(__wt_block_free(
+		    session, block, si->discard.offset, si->discard.size, 1));
 
 	/*
-	 * Migrate the allocation and deletion lists forward, in this case,
-	 * into the live system.  This is done by (1) first reading the
-	 * extent list, (2) merging into the corresponding live system's
-	 * extent list, (3) deleting the free list and (4) discarding the
-	 * blocks that made up the list.
+	 * Ignore the avail list: snapshot avail lists are only useful if we
+	 * are rolling forward from the particular snapshot and they represent
+	 * our best understanding of what blocks can be allocated.  If we are
+	 * not operating on the live snapshot, subsequent snapshots might have
+	 * allocated those blocks, and the avail list is useless.
 	 *
-	 * The alloc and discard lists are extents: extent blocks must be freed
-	 * directly to the live system's avail list, they were never on any
-	 * alloc list.
+	 * Roll the allocation and deletion extents into the live system.
 	 */
 	if (si->alloc.offset != WT_BLOCK_INVALID_OFFSET) {
 		WT_RET(__wt_block_extlist_read(session, block, &si->alloc));
 		WT_RET(__wt_block_extlist_merge(
 		    session, &si->alloc, &live->alloc));
 		__wt_block_extlist_free(session, &si->alloc);
-		WT_RET(__wt_block_free(
-		    session, block, si->alloc.offset, si->alloc.size, 1));
 	}
 	if (si->discard.offset != WT_BLOCK_INVALID_OFFSET) {
 		WT_RET(__wt_block_extlist_read(session, block, &si->discard));
 		WT_RET(__wt_block_extlist_merge(
 		    session, &si->discard, &live->discard));
 		__wt_block_extlist_free(session, &si->discard);
-		WT_RET(__wt_block_free(
-		    session, block, si->discard.offset, si->discard.size, 1));
 	}
 
 	/*
