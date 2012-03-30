@@ -273,4 +273,8 @@ namespace mongo {
 
     }
 
+    void DeletedRecord::_accessing() const {
+
+    }
+
 }

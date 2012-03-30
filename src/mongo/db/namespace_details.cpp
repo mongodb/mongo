@@ -222,32 +222,32 @@ namespace mongo {
             // defensive code: try to make us notice if we reference a deleted record
             reinterpret_cast<unsigned*>( r->data() )[0] = 0xeeeeeeee;
         }
-        DEBUGGING log() << "TEMP: add deleted rec " << dloc.toString() << ' ' << hex << d->extentOfs << endl;
+        DEBUGGING log() << "TEMP: add deleted rec " << dloc.toString() << ' ' << hex << d->extentOfs() << endl;
         if ( capped ) {
             if ( !cappedLastDelRecLastExtent().isValid() ) {
                 // Initial extent allocation.  Insert at end.
-                d->nextDeleted = DiskLoc();
+                d->nextDeleted() = DiskLoc();
                 if ( cappedListOfAllDeletedRecords().isNull() )
                     getDur().writingDiskLoc( cappedListOfAllDeletedRecords() ) = dloc;
                 else {
                     DiskLoc i = cappedListOfAllDeletedRecords();
-                    for (; !i.drec()->nextDeleted.isNull(); i = i.drec()->nextDeleted )
+                    for (; !i.drec()->nextDeleted().isNull(); i = i.drec()->nextDeleted() )
                         ;
-                    i.drec()->nextDeleted.writing() = dloc;
+                    i.drec()->nextDeleted().writing() = dloc;
                 }
             }
             else {
-                d->nextDeleted = cappedFirstDeletedInCurExtent();
+                d->nextDeleted() = cappedFirstDeletedInCurExtent();
                 getDur().writingDiskLoc( cappedFirstDeletedInCurExtent() ) = dloc;
                 // always compact() after this so order doesn't matter
             }
         }
         else {
-            int b = bucket(d->lengthWithHeaders);
+            int b = bucket(d->lengthWithHeaders());
             DiskLoc& list = deletedList[b];
             DiskLoc oldHead = list;
             getDur().writingDiskLoc(list) = dloc;
-            d->nextDeleted = oldHead;
+            d->nextDeleted() = oldHead;
         }
     }
 
@@ -281,14 +281,14 @@ namespace mongo {
         if ( loc.isNull() )
             return loc;
 
-        const DeletedRecord *r = loc.drec();
+        DeletedRecord *r = loc.drec();
         //r = getDur().writing(r);
 
         /* note we want to grab from the front so our next pointers on disk tend
         to go in a forward direction which is important for performance. */
-        int regionlen = r->lengthWithHeaders;
-        extentLoc.set(loc.a(), r->extentOfs);
-        verify( r->extentOfs < loc.getOfs() );
+        int regionlen = r->lengthWithHeaders();
+        extentLoc.set(loc.a(), r->extentOfs());
+        verify( r->extentOfs() < loc.getOfs() );
 
         DEBUGGING out() << "TEMP: alloc() returns " << loc.toString() << ' ' << ns << " lentoalloc:" << lenToAlloc << " ext:" << extentLoc.toString() << endl;
 
@@ -301,14 +301,14 @@ namespace mongo {
         }
 
         /* split off some for further use. */
-        getDur().writingInt(r->lengthWithHeaders) = lenToAlloc;
+        getDur().writingInt(r->lengthWithHeaders()) = lenToAlloc;
         DiskLoc newDelLoc = loc;
         newDelLoc.inc(lenToAlloc);
         DeletedRecord *newDel = DataFileMgr::makeDeletedRecord(newDelLoc, left);
         DeletedRecord *newDelW = getDur().writing(newDel);
-        newDelW->extentOfs = r->extentOfs;
-        newDelW->lengthWithHeaders = left;
-        newDelW->nextDeleted.Null();
+        newDelW->extentOfs() = r->extentOfs();
+        newDelW->lengthWithHeaders() = left;
+        newDelW->nextDeleted().Null();
 
         addDeletedRec(newDel, newDelLoc);
 
@@ -355,9 +355,9 @@ namespace mongo {
                 continue;
             }
             DeletedRecord *r = cur.drec();
-            if ( r->lengthWithHeaders >= len &&
-                    r->lengthWithHeaders < bestmatchlen ) {
-                bestmatchlen = r->lengthWithHeaders;
+            if ( r->lengthWithHeaders() >= len &&
+                 r->lengthWithHeaders() < bestmatchlen ) {
+                bestmatchlen = r->lengthWithHeaders();
                 bestmatch = cur;
                 bestprev = prev;
             }
@@ -376,17 +376,17 @@ namespace mongo {
                     " b:" << b << " chain:" << chain << ", fixing.\n";
                     r->nextDeleted.Null();
                 }*/
-                cur = r->nextDeleted;
-                prev = &r->nextDeleted;
+                cur = r->nextDeleted();
+                prev = &r->nextDeleted();
             }
         }
 
         /* unlink ourself from the deleted list */
         if( !peekOnly ) {
-            const DeletedRecord *bmr = bestmatch.drec();
-            *getDur().writing(bestprev) = bmr->nextDeleted;
-            bmr->nextDeleted.writing().setInvalid(); // defensive.
-            verify(bmr->extentOfs < bestmatch.getOfs());
+            DeletedRecord *bmr = bestmatch.drec();
+            *getDur().writing(bestprev) = bmr->nextDeleted();
+            bmr->nextDeleted().writing().setInvalid(); // defensive.
+            verify(bmr->extentOfs() < bestmatch.getOfs());
         }
 
         return bestmatch;
@@ -397,15 +397,15 @@ namespace mongo {
             DiskLoc dl = deletedList[i];
             while ( !dl.isNull() ) {
                 DeletedRecord *r = dl.drec();
-                DiskLoc extLoc(dl.a(), r->extentOfs);
+                DiskLoc extLoc(dl.a(), r->extentOfs());
                 if ( extents == 0 || extents->count(extLoc) <= 0 ) {
                     out() << "  bucket " << i << endl;
                     out() << "   " << dl.toString() << " ext:" << extLoc.toString();
                     if ( extents && extents->count(extLoc) <= 0 )
                         out() << '?';
-                    out() << " len:" << r->lengthWithHeaders << endl;
+                    out() << " len:" << r->lengthWithHeaders() << endl;
                 }
-                dl = r->nextDeleted;
+                dl = r->nextDeleted();
             }
         }
     }

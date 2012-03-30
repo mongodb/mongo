@@ -342,8 +342,8 @@ namespace mongo {
                             }
 
                             DeletedRecord *d = loc.drec();
-                            delSize += d->lengthWithHeaders;
-                            loc = d->nextDeleted;
+                            delSize += d->lengthWithHeaders();
+                            loc = d->nextDeleted();
                             k++;
                             killCurrentOp.checkForInterrupt();
                         }

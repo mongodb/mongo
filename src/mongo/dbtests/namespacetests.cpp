@@ -1165,8 +1165,8 @@ namespace NamespaceTests {
         public:
             void run() {
                 create();
-                nsd()->deletedList[ 2 ] = nsd()->cappedListOfAllDeletedRecords().drec()->nextDeleted.drec()->nextDeleted;
-                nsd()->cappedListOfAllDeletedRecords().drec()->nextDeleted.drec()->nextDeleted.writing() = DiskLoc();
+                nsd()->deletedList[ 2 ] = nsd()->cappedListOfAllDeletedRecords().drec()->nextDeleted().drec()->nextDeleted();
+                nsd()->cappedListOfAllDeletedRecords().drec()->nextDeleted().drec()->nextDeleted().writing() = DiskLoc();
                 nsd()->cappedLastDelRecLastExtent().Null();
                 NamespaceDetails *d = nsd();
                 zero( &d->capExtent );
@@ -1178,7 +1178,7 @@ namespace NamespaceTests {
                 ASSERT( nsd()->capExtent.getOfs() != 0 );
                 ASSERT( !nsd()->capFirstNewRecord.isValid() );
                 int nDeleted = 0;
-                for ( DiskLoc i = nsd()->cappedListOfAllDeletedRecords(); !i.isNull(); i = i.drec()->nextDeleted, ++nDeleted );
+                for ( DiskLoc i = nsd()->cappedListOfAllDeletedRecords(); !i.isNull(); i = i.drec()->nextDeleted(), ++nDeleted );
                 ASSERT_EQUALS( 10, nDeleted );
                 ASSERT( nsd()->cappedLastDelRecLastExtent().isNull() );
             }

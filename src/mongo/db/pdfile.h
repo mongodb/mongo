@@ -165,15 +165,31 @@ namespace mongo {
 
     class DeletedRecord {
     public:
-        int lengthWithHeaders;
-        int extentOfs;
-        DiskLoc nextDeleted;
+
+        int lengthWithHeaders() const { _accessing(); return _lengthWithHeaders; }
+        int& lengthWithHeaders() { _accessing(); return _lengthWithHeaders; }
+        
+        int extentOfs() const { _accessing(); return _extentOfs; }
+        int& extentOfs() { _accessing(); return _extentOfs; }
+
+        // TODO: we need to not const_cast here but problem is DiskLoc::writing
+        DiskLoc& nextDeleted() const { _accessing(); return const_cast<DiskLoc&>(_nextDeleted); }
+
         DiskLoc myExtentLoc(const DiskLoc& myLoc) const {
-            return DiskLoc(myLoc.a(), extentOfs);
+            _accessing();
+            return DiskLoc(myLoc.a(), _extentOfs);
         }
         Extent* myExtent(const DiskLoc& myLoc) {
-            return DataFileMgr::getExtent(DiskLoc(myLoc.a(), extentOfs));
+            _accessing();
+            return DataFileMgr::getExtent(DiskLoc(myLoc.a(), _extentOfs));
         }
+    private:
+
+        void _accessing() const;
+
+        int _lengthWithHeaders;
+        int _extentOfs;
+        DiskLoc _nextDeleted;
     };
 
     /* Record is a record in a datafile.  DeletedRecord is similar but for deleted space.
