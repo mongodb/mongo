@@ -292,10 +292,11 @@ struct __wt_page {
 	 * the threads could race.
 	 */
 #define	WT_PAGE_BUILD_KEYS	0x001	/* Keys have been built in memory */
-#define	WT_PAGE_REC_EMPTY	0x002	/* Reconciliation: page empty */
-#define	WT_PAGE_REC_REPLACE	0x004	/* Reconciliation: page replaced */
-#define	WT_PAGE_REC_SPLIT	0x008	/* Reconciliation: page split */
-#define	WT_PAGE_REC_SPLIT_MERGE	0x010	/* Reconciliation: page split merge */
+#define	WT_PAGE_EVICT_LRU	0x002	/* Page is on the LRU queue */
+#define	WT_PAGE_REC_EMPTY	0x004	/* Reconciliation: page empty */
+#define	WT_PAGE_REC_REPLACE	0x008	/* Reconciliation: page replaced */
+#define	WT_PAGE_REC_SPLIT	0x010	/* Reconciliation: page split */
+#define	WT_PAGE_REC_SPLIT_MERGE	0x020	/* Reconciliation: page split merge */
 	uint8_t flags;			/* Page flags */
 };
 

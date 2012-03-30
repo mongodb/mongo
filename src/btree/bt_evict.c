@@ -59,6 +59,10 @@ __wt_evict_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_EVICT_LIST *evict;
 	int i, elem;
 
+	/* Fast path: if the page isn't on the queue, don't bother searching. */
+	if (!F_ISSET(page, WT_PAGE_EVICT_LRU))
+		return;
+
 	cache = S2C(session)->cache;
 	__wt_spin_lock(session, &cache->lru_lock);
 
@@ -66,6 +70,7 @@ __wt_evict_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 	for (evict = cache->evict, i = 0; i < elem; i++, evict++)
 		if (evict->page == page) {
 			__evict_clr(evict);
+			F_CLR(page, WT_PAGE_EVICT_LRU);
 			break;
 		}
 
@@ -632,6 +637,9 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		WT_VERBOSE(session, evictserver,
 		    "select: %p, size %" PRIu32, page, page->memory_footprint);
 
+		/* Mark the page on the list */
+		F_SET(page, WT_PAGE_EVICT_LRU);
+
 		++i;
 		cache->evict[*slotp].page = page;
 		cache->evict[*slotp].btree = btree;
@@ -751,8 +759,9 @@ __evict_get_page(
 		 */
 		WT_ATOMIC_ADD(evict->btree->lru_count, 1);
 
-		*pagep = evict->page;
 		*btreep = evict->btree;
+		*pagep = evict->page;
+		F_CLR(evict->page, WT_PAGE_EVICT_LRU);
 
 		/*
 		 * Paranoia: remove the entry so we never try and reconcile

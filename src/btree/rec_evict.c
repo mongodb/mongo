@@ -295,6 +295,8 @@ __rec_discard(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 		WT_REF_FOREACH(page, ref, i) {
 			if (ref->state == WT_REF_DISK)
 				continue;
+			WT_ASSERT(session,
+			    single || ref->state == WT_REF_LOCKED);
 			WT_RET(__rec_discard(session, ref->page, single));
 		}
 		/* FALLTHROUGH */
