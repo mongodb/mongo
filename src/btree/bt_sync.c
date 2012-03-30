@@ -34,11 +34,11 @@ __wt_btree_snapshot(WT_SESSION_IMPL *session, const char *name, int discard)
 	btree = session->btree;
 	ret = 0;
 
+	/* Snapshots are single-threaded. */
+	__wt_writelock(session, btree->snaplock);
+
 	/* Allocate a temporary buffer for the snapshot information. */
 	WT_RET(__wt_scr_alloc(session, WT_BTREE_MAX_ADDR_COOKIE, &btree->snap));
-
-	/* Snapshots are single-threaded. */
-	__wt_readlock(session, btree->snaplock);
 
 	/* Get the current snapshot information. */
 	WT_ERR(__wt_btree_get_root(session, btree->snap));
