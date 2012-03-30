@@ -142,7 +142,7 @@ __wt_bm_snapshot(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_ITEM *snap)
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (__wt_block_write_snapshot(session, block, buf, snap));
+	return (__wt_block_snapshot(session, block, buf, snap));
 }
 
 /*
@@ -158,7 +158,7 @@ __wt_bm_snapshot_load(WT_SESSION_IMPL *session,
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (__wt_block_snap_load(
+	return (__wt_block_snapshot_load(
 	    session, block, buf, addr, addr_size, readonly));
 }
 
@@ -174,7 +174,7 @@ __wt_bm_snapshot_unload(WT_SESSION_IMPL *session)
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (__wt_block_snap_unload(session, block));
+	return (__wt_block_snapshot_unload(session, block));
 }
 
 /*

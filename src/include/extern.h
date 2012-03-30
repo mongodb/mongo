@@ -154,14 +154,15 @@ extern int __wt_block_snap_init(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_BLOCK_SNAPSHOT *si,
     int is_live);
-extern int __wt_block_snap_load(WT_SESSION_IMPL *session,
+extern int __wt_block_snapshot_load(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_ITEM *dsk,
     const uint8_t *addr,
     uint32_t addr_size,
     int readonly);
-extern int __wt_block_snap_unload(WT_SESSION_IMPL *session, WT_BLOCK *block);
-extern int __wt_block_write_snapshot( WT_SESSION_IMPL *session,
+extern int __wt_block_snapshot_unload(WT_SESSION_IMPL *session,
+    WT_BLOCK *block);
+extern int __wt_block_snapshot( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_ITEM *buf,
     WT_ITEM *snap);

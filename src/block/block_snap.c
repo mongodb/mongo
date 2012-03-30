@@ -8,8 +8,8 @@
 #include "wt_internal.h"
 
 static int __block_snap_delete(WT_SESSION_IMPL *, WT_BLOCK *, const uint8_t *);
-static int __block_snap_extlists_write(
-    WT_SESSION_IMPL *, WT_BLOCK *, WT_BLOCK_SNAPSHOT *);
+static int __block_snap_extlists(
+	WT_SESSION_IMPL *, WT_BLOCK *, WT_BLOCK_SNAPSHOT *);
 
 /*
  * __wt_block_snap_init --
@@ -56,11 +56,11 @@ __wt_block_snap_init(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_block_snap_load --
+ * __wt_block_snapshot_load --
  *	Load a snapshot.
  */
 int
-__wt_block_snap_load(WT_SESSION_IMPL *session,
+__wt_block_snapshot_load(WT_SESSION_IMPL *session,
     WT_BLOCK *block, WT_ITEM *dsk, const uint8_t *addr, uint32_t addr_size,
     int readonly)
 {
@@ -138,11 +138,11 @@ err:		block->live_load = 0;
 }
 
 /*
- * __wt_block_snap_unload --
+ * __wt_block_snapshot_unload --
  *	Unload a snapshot.
  */
 int
-__wt_block_snap_unload(WT_SESSION_IMPL *session, WT_BLOCK *block)
+__wt_block_snapshot_unload(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
 	WT_BLOCK_SNAPSHOT *si;
 
@@ -164,11 +164,11 @@ __wt_block_snap_unload(WT_SESSION_IMPL *session, WT_BLOCK *block)
 }
 
 /*
- * __wt_block_write_snapshot --
- *	Write a buffer into a block and create a new snapshot.
+ * __wt_block_snapshot --
+ *	Create a new snapshot.
  */
 int
-__wt_block_write_snapshot(
+__wt_block_snapshot(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, WT_ITEM *snap)
 {
 	WT_BLOCK_SNAPSHOT *si;
@@ -217,8 +217,8 @@ __wt_block_write_snapshot(
 		snap->data = NULL;
 	}
 
-	/* Write the live extent lists. */
-	WT_ERR(__block_snap_extlists_write(session, block, si));
+	/* Resolve the live extent lists. */
+	WT_ERR(__block_snap_extlists(session, block, si));
 
 	/* Set the file size. */
 	WT_ERR(__wt_filesize(session, block->fh, &si->file_size));
@@ -271,11 +271,11 @@ err:	__wt_spin_unlock(session, &block->live_lock);
 }
 
 /*
- * __block_snap_extlists_write --
- *	Write the extent lists.
+ * __block_snap_extlists --
+ *	Extent list handling for the snapshot.
  */
 static int
-__block_snap_extlists_write(
+__block_snap_extlists(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_BLOCK_SNAPSHOT *si)
 {
 	/* Truncate the file if possible. */
@@ -291,15 +291,14 @@ __block_snap_extlists_write(
 	WT_RET(__wt_block_extlist_check(session, si));
 #endif
 
-	/* Write and discard the allocation and discard extent lists. */
+	/* Write the extent lists. */
 	WT_RET(__wt_block_extlist_write(session, block, &si->alloc));
-	__wt_block_extlist_free(session, &si->alloc);
-
-	WT_RET(__wt_block_extlist_write(session, block, &si->discard));
-	__wt_block_extlist_free(session, &si->discard);
-
-	/* Write the available list, but don't discard it. */
 	WT_RET(__wt_block_extlist_write(session, block, &si->avail));
+	WT_RET(__wt_block_extlist_write(session, block, &si->discard));
+
+	/* Discard the alloc and discard extent lists. */
+	__wt_block_extlist_free(session, &si->alloc);
+	__wt_block_extlist_free(session, &si->discard);
 
 	return (0);
 }
