@@ -11,11 +11,6 @@ static int __block_merge(WT_SESSION_IMPL *, WT_EXTLIST *, off_t, off_t);
 static int __block_overlap(WT_SESSION_IMPL *,
     WT_BLOCK *, WT_EXTLIST *, WT_EXT **, WT_EXTLIST *, WT_EXT **);
 
-#ifdef HAVE_VERBOSE
-static void __block_extlist_dump(
-    WT_SESSION_IMPL *, const char *, WT_EXTLIST *, int);
-#endif
-
 /*
  * __block_off_srch --
  *	Search a by-offset skiplist (either the primary by-offset list, or the
@@ -297,8 +292,8 @@ __wt_block_alloc(
 	/* Add the newly allocated extent to the list of allocations. */
 done:	WT_RET(__block_merge(
 	    session, &block->live.alloc, *offp, (off_t)size));
-err:
-	__wt_spin_unlock(session, &block->live_lock);
+
+err:	__wt_spin_unlock(session, &block->live_lock);
 	return (ret);
 }
 
@@ -398,6 +393,50 @@ __wt_block_free(WT_SESSION_IMPL *session,
 }
 
 /*
+ * __wt_block_extlist_check, __block_extlist_check2 --
+ *	Fail if any of the extent lists overlap.
+ */
+static int
+__block_extlist_check2(
+    WT_SESSION_IMPL *session, WT_EXTLIST *al, WT_EXTLIST *bl, const char *tag)
+{
+	WT_EXT *a, *b;
+
+	a = al->off[0];
+	b = bl->off[0];
+
+	/* Walk the lists in parallel, looking for overlaps. */
+	while (a != NULL && b != NULL) {
+		/*
+		 * If there's no overlap, move the lower-offset entry to the
+		 * next entry in its list.
+		 */
+		if (a->off + a->size <= b->off) {
+			a = a->next[0];
+			continue;
+		}
+		if (b->off + b->size <= a->off) {
+			b = b->next[0];
+			continue;
+		}
+		WT_RET_MSG(session, EINVAL,
+		    "%s: %s list overlaps the %s list",
+		    tag, al->name, bl->name);
+	}
+	return (0);
+}
+
+int
+__wt_block_extlist_check(
+    WT_SESSION_IMPL *session, WT_BLOCK_SNAPSHOT *si, const char *tag)
+{
+	WT_RET(__block_extlist_check2(session, &si->alloc, &si->avail, tag));
+	WT_RET(__block_extlist_check2(session, &si->alloc, &si->discard, tag));
+	WT_RET(__block_extlist_check2(session, &si->avail, &si->discard, tag));
+	return (0);
+}
+
+/*
  * __wt_block_extlist_match --
  *	Review a snapshot's alloc/discard extent lists, move overlaps into the
  * live system's avail list.
@@ -417,54 +456,19 @@ __wt_block_extlist_match(
 		 * If there's no overlap, move the lower-offset entry to the
 		 * next entry in its list.
 		 */
-		if (alloc->off + alloc->size < discard->off ||
-		    discard->off + alloc->size < alloc->off) {
-			if (alloc->off < discard->off)
-				alloc = alloc->next[0];
-			else
-				discard = discard->next[0];
+		if (alloc->off + alloc->size <= discard->off) {
+			alloc = alloc->next[0];
 			continue;
 		}
-
-		WT_VERBOSE(session, block,
-		    "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=");
-
-		WT_VERBOSE_CALL(session, block,
-		    __block_extlist_dump(
-		    session, "initial live alloc",  &block->live.avail, 0));
-		WT_VERBOSE_CALL(session,
-		    block, __block_extlist_dump(
-		    session, "initial snapshot alloc", &si->alloc, 0));
-		WT_VERBOSE_CALL(session,
-		    block, __block_extlist_dump(
-		    session, "initial snapshot discard", &si->discard, 0));
-
-		WT_VERBOSE(session, block,
-		    "overlap %" PRIuMAX "/%" PRIuMAX " vs. %" PRIuMAX "/%"
-		    PRIuMAX,
-		    (uintmax_t)alloc->off, (uintmax_t)alloc->size,
-		    (uintmax_t)discard->off, (uintmax_t)discard->size);
+		if (discard->off + discard->size <= alloc->off) {
+			discard = discard->next[0];
+			continue;
+		}
 
 		/* Reconcile the overlap. */
 		WT_RET(__block_overlap(session, block,
 		    &si->alloc, &alloc, &si->discard, &discard));
-
-		WT_VERBOSE(session, block,
-		    "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=");
-		WT_VERBOSE_CALL(session, block,
-		    __block_extlist_dump(
-		    session, "result live alloc",  &block->live.avail, 0));
-		WT_VERBOSE_CALL(session,
-		    block, __block_extlist_dump(
-		    session, "result snapshot alloc", &si->alloc, 0));
-		WT_VERBOSE_CALL(session,
-		    block, __block_extlist_dump(
-		    session, "result snapshot discard", &si->discard, 0));
-
-		WT_VERBOSE(session, block,
-		    "=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=");
 	}
-
 	return (0);
 }
 
@@ -832,7 +836,7 @@ corrupted:		WT_ERR_MSG(session, WT_ERROR,
 	}
 
 	WT_VERBOSE_CALL(session,
-	    block, __block_extlist_dump(session, "read extlist", el, 0));
+	    block, __wt_block_extlist_dump(session, "read extlist", el, 0));
 
 err:	__wt_scr_free(&tmp);
 	return (ret);
@@ -857,7 +861,7 @@ __wt_block_extlist_write(
 	ret = 0;
 
 	WT_VERBOSE_CALL(session,
-	    block, __block_extlist_dump(session, "write extlist", el, 0));
+	    block, __wt_block_extlist_dump(session, "write extlist", el, 0));
 
 	/* If there aren't any entries, we're done. */
 	if (el->entries == 0) {
@@ -972,37 +976,37 @@ __wt_block_extlist_free(WT_SESSION_IMPL *session, WT_EXTLIST *el)
 }
 
 #ifdef HAVE_VERBOSE
-static void
-__block_extlist_dump(
+void
+__wt_block_extlist_dump(
     WT_SESSION_IMPL *session, const char *tag, WT_EXTLIST *el, int show_size)
 {
 	WT_EXT *ext;
 	WT_SIZE *szp;
 
-	WT_VERBOSE(session, block, "%s: %s: by offset:%s",
+	__wt_verbose(session, "%s: %s: by offset:%s",
 	    tag, el->name, el->entries == 0 ? " [Empty]" : "");
 	if (el->entries == 0)
 		return;
 
 	WT_EXT_FOREACH(ext, el->off)
-		WT_VERBOSE(session, block,
+		__wt_verbose(session,
 		    "\t{%" PRIuMAX "/%" PRIuMAX "}",
 		    (uintmax_t)ext->off, (uintmax_t)ext->size);
 
 	if (!show_size)
 		return;
 
-	WT_VERBOSE(session, block, "%s: %s: by size:%s",
+	__wt_verbose(session, "%s: %s: by size:%s",
 	    tag, el->name, el->entries == 0 ? " [Empty]" : "");
 	if (el->entries == 0)
 		return;
 
 	WT_EXT_FOREACH(szp, el->sz) {
-		WT_VERBOSE(session, block,
+		__wt_verbose(session,
 		    "\t{%" PRIuMAX "}",
 		    (uintmax_t)szp->size);
 		WT_EXT_FOREACH_OFF(ext, szp->off)
-			WT_VERBOSE(session, block,
+			__wt_verbose(session,
 			    "\t\t{%" PRIuMAX "/%" PRIuMAX "}",
 			    (uintmax_t)ext->off, (uintmax_t)ext->size);
 	}

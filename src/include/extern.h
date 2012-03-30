@@ -45,6 +45,9 @@ extern int __wt_block_free(WT_SESSION_IMPL *session,
     off_t off,
     off_t size,
     int free_extent);
+extern int __wt_block_extlist_check( WT_SESSION_IMPL *session,
+    WT_BLOCK_SNAPSHOT *si,
+    const char *tag);
 extern int __wt_block_extlist_match( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_BLOCK_SNAPSHOT *si);
@@ -61,6 +64,10 @@ extern int __wt_block_extlist_truncate( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_EXTLIST *el);
 extern void __wt_block_extlist_free(WT_SESSION_IMPL *session, WT_EXTLIST *el);
+extern void __wt_block_extlist_dump( WT_SESSION_IMPL *session,
+    const char *tag,
+    WT_EXTLIST *el,
+    int show_size);
 extern int __wt_bm_addr_valid( WT_SESSION_IMPL *session,
     const uint8_t *addr,
     uint32_t addr_size);

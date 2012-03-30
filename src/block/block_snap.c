@@ -213,7 +213,7 @@ __wt_block_write_buf_snapshot(
 	if (snap->data != NULL && snap->size != 0) {
 		WT_ERR(__block_snap_delete(session, block, snap->data));
 
-		/* WTF -- UPDATE FLAG NOT NULL FIELD!? XXX */
+		/* XXX -- UPDATE FLAG NOT NULL FIELD!? XXX */
 		snap->data = NULL;
 	}
 
@@ -280,6 +280,16 @@ __block_snap_extlists_write(
 {
 	/* Truncate the file if possible. */
 	WT_RET(__wt_block_extlist_truncate(session, block, &si->avail));
+
+#if 0
+	/*
+	 * Currently, we do not check if a freed block can be immediately put
+	 * on the avail list (that is, if it was allocated during the current
+	 * snapshot -- once that change is made, we should check for overlaps
+	 * here.
+	 */
+	WT_RET(__wt_block_extlist_check(session, si));
+#endif
 
 	/* Write and discard the allocation and discard extent lists. */
 	WT_RET(__wt_block_extlist_write(session, block, &si->alloc));
@@ -373,6 +383,10 @@ __block_snap_delete(
 	 * re-used immediately.
 	 */
 	WT_RET(__wt_block_extlist_match(session, block, live));
+
+#ifdef HAVE_DIAGNOSTIC
+	WT_RET(__wt_block_extlist_check(session, live, "live after merge"));
+#endif
 
 	return (0);
 }
