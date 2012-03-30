@@ -579,8 +579,9 @@ namespace mongo {
      */
     class FieldRangeVectorIterator {
     public:
-        FieldRangeVectorIterator( const FieldRangeVector &v ) : _v( v ), _i( _v._ranges.size(), -1 ), _cmp( _v._ranges.size(), 0 ), _inc( _v._ranges.size(), false ), _after() {
+        FieldRangeVectorIterator( const FieldRangeVector &v ) : _v( v ), _i( _v._ranges.size() ), _cmp( _v._ranges.size(), 0 ), _inc( _v._ranges.size(), false ), _after() {
         }
+
         /**
          * @return Suggested advance method through an ordered list of keys with lookup support
          *      (generally a btree).
@@ -603,11 +604,26 @@ namespace mongo {
         const vector<bool> &inc() const { return _inc; }
         bool after() const { return _after; }
         void prepDive();
+
+        /**
+         * Helper class representing a position within a vector of ranges.  Public for testing.
+         */
+        class CompoundRangeCounter {
+        public:
+            CompoundRangeCounter( int size ) : _i( size, -1 ) {}
+            int size() const { return (int)_i.size(); }
+            int get( int i ) const { return _i[ i ]; }
+            void set( int i, int newVal ) { _i[ i ] = newVal; }
+            void inc( int i ) { set( i, get( i ) + 1 ); }
+            void setZeroes( int i ) { for( int j = i; j < (int)_i.size(); ++j ) _i[ j ] = 0; }
+            void setUnknowns( int i ) { for( int j = i; j < (int)_i.size(); ++j ) _i[ j ] = -1; }
+        private:
+            vector<int> _i;
+        };
+
     private:
-        void setZero( int i ) { for( int j = i; j < (int)_i.size(); ++j ) _i[ j ] = 0; }
-        void setMinus( int i ) { for( int j = i; j < (int)_i.size(); ++j ) _i[ j ] = -1; }
         const FieldRangeVector &_v;
-        vector<int> _i;
+        CompoundRangeCounter _i;
         vector<const BSONElement*> _cmp;
         vector<bool> _inc;
         bool _after;

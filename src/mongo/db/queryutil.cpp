@@ -1308,28 +1308,28 @@ namespace mongo {
         // since we may need to advance from the key prefix ending with this field
         int latestNonEndpoint = -1;
         // iterate over fields to determine appropriate advance method
-        for( int i = 0; i < (int)_i.size(); ++i ) {
-            if ( i > 0 && !_v._ranges[ i - 1 ].intervals()[ _i[ i - 1 ] ].equality() ) {
+        for( int i = 0; i < _i.size(); ++i ) {
+            if ( i > 0 && !_v._ranges[ i - 1 ].intervals()[ _i.get( i - 1 ) ].equality() ) {
                 // if last bound was inequality, we don't know anything about where we are for this field
                 // TODO if possible avoid this certain cases when value in previous field of the previous
                 // key is the same as value of previous field in current key
-                setMinus( i );
+                _i.setUnknowns( i );
             }
             bool eq = false;
             BSONElement oo = o.next();
             bool reverse = ( ( oo.number() < 0 ) ^ ( _v._direction < 0 ) );
             BSONElement jj = j.next();
-            if ( _i[ i ] == -1 ) { // unknown position for this field, do binary search
+            if ( _i.get( i ) == -1 ) { // unknown position for this field, do binary search
                 bool lowEquality;
                 int l = _v.matchingLowElement( jj, i, !reverse, lowEquality );
                 if ( l % 2 == 0 ) { // we are in a valid range for this field
-                    _i[ i ] = l / 2;
-                    int diff = (int)_v._ranges[ i ].intervals().size() - _i[ i ];
+                    _i.set( i, l / 2 );
+                    int diff = (int)_v._ranges[ i ].intervals().size() - _i.get( i );
                     if ( diff > 1 ) {
                         latestNonEndpoint = i;
                     }
                     else if ( diff == 1 ) {
-                        int x = _v._ranges[ i ].intervals()[ _i[ i ] ]._upper._bound.woCompare( jj, false );
+                        int x = _v._ranges[ i ].intervals()[ _i.get( i ) ]._upper._bound.woCompare( jj, false );
                         if ( x != 0 ) {
                             latestNonEndpoint = i;
                         }
@@ -1342,21 +1342,21 @@ namespace mongo {
                         if ( latestNonEndpoint == -1 ) {
                             return -2;
                         }
-                        setZero( latestNonEndpoint + 1 );
+                        _i.setZeroes( latestNonEndpoint + 1 );
                         // skip to curr / latestNonEndpoint + 1 / superlative
                         _after = true;
                         return latestNonEndpoint + 1;
                     }
-                    _i[ i ] = ( l + 1 ) / 2;
+                    _i.set( i, ( l + 1 ) / 2 );
                     if ( lowEquality ) {
                         // skip to curr / i + 1 / superlative
                         _after = true;
                         return i + 1;
                     }
                     // skip to curr / i / nextbounds
-                    _cmp[ i ] = &_v._ranges[ i ].intervals()[ _i[ i ] ]._lower._bound;
-                    _inc[ i ] = _v._ranges[ i ].intervals()[ _i[ i ] ]._lower._inclusive;
-                    for( int j = i + 1; j < (int)_i.size(); ++j ) {
+                    _cmp[ i ] = &_v._ranges[ i ].intervals()[ _i.get( i ) ]._lower._bound;
+                    _inc[ i ] = _v._ranges[ i ].intervals()[ _i.get( i ) ]._lower._inclusive;
+                    for( int j = i + 1; j < _i.size(); ++j ) {
                         _cmp[ j ] = &_v._ranges[ j ].intervals().front()._lower._bound;
                         _inc[ j ] = _v._ranges[ j ].intervals().front()._lower._inclusive;
                     }
@@ -1365,16 +1365,16 @@ namespace mongo {
                 }
             }
             bool first = true;
-            // _i[ i ] != -1, so we have a starting interval for this field
+            // _i.get( i ) != -1, so we have a starting interval for this field
             // which serves as a lower/equal bound on the first iteration -
             // we advance from this interval to find a matching interval
-            while( _i[ i ] < (int)_v._ranges[ i ].intervals().size() ) {
+            while( _i.get( i ) < (int)_v._ranges[ i ].intervals().size() ) {
                 // compare to current interval's upper bound
-                int x = _v._ranges[ i ].intervals()[ _i[ i ] ]._upper._bound.woCompare( jj, false );
+                int x = _v._ranges[ i ].intervals()[ _i.get( i ) ]._upper._bound.woCompare( jj, false );
                 if ( reverse ) {
                     x = -x;
                 }
-                if ( x == 0 && _v._ranges[ i ].intervals()[ _i[ i ] ]._upper._inclusive ) {
+                if ( x == 0 && _v._ranges[ i ].intervals()[ _i.get( i ) ]._upper._inclusive ) {
                     eq = true;
                     break;
                 }
@@ -1386,27 +1386,27 @@ namespace mongo {
                         break;
                     }
                     // if it's an equality interval, don't need to compare separately to lower bound
-                    if ( !_v._ranges[ i ].intervals()[ _i[ i ] ].equality() ) {
+                    if ( !_v._ranges[ i ].intervals()[ _i.get( i ) ].equality() ) {
                         // compare to current interval's lower bound
-                        x = _v._ranges[ i ].intervals()[ _i[ i ] ]._lower._bound.woCompare( jj, false );
+                        x = _v._ranges[ i ].intervals()[ _i.get( i ) ]._lower._bound.woCompare( jj, false );
                         if ( reverse ) {
                             x = -x;
                         }
                     }
                     // if we're equal to and not inclusive the lower bound, advance
-                    if ( ( x == 0 && !_v._ranges[ i ].intervals()[ _i[ i ] ]._lower._inclusive ) ) {
-                        setZero( i + 1 );
+                    if ( ( x == 0 && !_v._ranges[ i ].intervals()[ _i.get( i ) ]._lower._inclusive ) ) {
+                        _i.setZeroes( i + 1 );
                         // skip to curr / i + 1 / superlative
                         _after = true;
                         return i + 1;
                     }
                     // if we're less than the lower bound, advance
                     if ( x > 0 ) {
-                        setZero( i + 1 );
+                        _i.setZeroes( i + 1 );
                         // skip to curr / i / nextbounds
-                        _cmp[ i ] = &_v._ranges[ i ].intervals()[ _i[ i ] ]._lower._bound;
-                        _inc[ i ] = _v._ranges[ i ].intervals()[ _i[ i ] ]._lower._inclusive;
-                        for( int j = i + 1; j < (int)_i.size(); ++j ) {
+                        _cmp[ i ] = &_v._ranges[ i ].intervals()[ _i.get( i ) ]._lower._bound;
+                        _inc[ i ] = _v._ranges[ i ].intervals()[ _i.get( i ) ]._lower._inclusive;
+                        for( int j = i + 1; j < _i.size(); ++j ) {
                             _cmp[ j ] = &_v._ranges[ j ].intervals().front()._lower._bound;
                             _inc[ j ] = _v._ranges[ j ].intervals().front()._lower._inclusive;
                         }
@@ -1418,11 +1418,11 @@ namespace mongo {
                     }
                 }
                 // we're above the upper bound, so try next interval and reset remaining fields
-                ++_i[ i ];
-                setZero( i + 1 );
+                _i.inc( i );
+                _i.setZeroes( i + 1 );
                 first = false;
             }
-            int diff = (int)_v._ranges[ i ].intervals().size() - _i[ i ];
+            int diff = (int)_v._ranges[ i ].intervals().size() - _i.get( i );
             if ( diff > 1 || ( !eq && diff == 1 ) ) {
                 // check if we're not at the end of valid values for this field
                 latestNonEndpoint = i;
@@ -1432,7 +1432,7 @@ namespace mongo {
                     return -2;
                 }
                 // more values possible, skip...
-                setZero( latestNonEndpoint + 1 );
+                _i.setZeroes( latestNonEndpoint + 1 );
                 // skip to curr / latestNonEndpoint + 1 / superlative
                 _after = true;
                 return latestNonEndpoint + 1;
@@ -1442,7 +1442,7 @@ namespace mongo {
     }
 
     void FieldRangeVectorIterator::prepDive() {
-        for( int j = 0; j < (int)_i.size(); ++j ) {
+        for( int j = 0; j < _i.size(); ++j ) {
             _cmp[ j ] = &_v._ranges[ j ].intervals().front()._lower._bound;
             _inc[ j ] = _v._ranges[ j ].intervals().front()._lower._inclusive;
         }

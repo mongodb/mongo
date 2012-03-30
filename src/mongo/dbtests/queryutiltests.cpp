@@ -1315,6 +1315,45 @@ namespace QueryUtilTests {
             }
         };
 
+        class CompoundRangeCounter {
+        public:
+            CompoundRangeCounter() : _counter( 2 ) {}
+            void run() {
+                ASSERT_EQUALS( 2, _counter.size() );
+                checkValues( -1, -1 );
+                
+                _counter.setZeroes( 0 );
+                checkValues( 0, 0 );
+                
+                _counter.setUnknowns( 1 );
+                checkValues( 0, -1 );
+                
+                _counter.setZeroes( 1 );
+                checkValues( 0, 0 );
+
+                _counter.setUnknowns( 0 );
+                checkValues( -1, -1 );
+                
+                _counter.set( 0, 3 );
+                checkValues( 3, -1 );
+
+                _counter.inc( 0 );
+                checkValues( 4, -1 );
+
+                _counter.set( 1, 5 );
+                checkValues( 4, 5 );
+                
+                _counter.inc( 1 );
+                checkValues( 4, 6 );
+        }
+        private:
+            void checkValues( int first, int second ) {
+                ASSERT_EQUALS( first, _counter.get( 0 ) );
+                ASSERT_EQUALS( second, _counter.get( 1 ) );                
+            }
+            FieldRangeVectorIterator::CompoundRangeCounter _counter;
+        };
+        
     } // namespace FieldRangeVectorIteratorTests
     
     class All : public Suite {
@@ -1447,6 +1486,7 @@ namespace QueryUtilTests {
             add<FieldRangeVectorIteratorTests::AdvanceRangeRangeIn>();
             add<FieldRangeVectorIteratorTests::AdvanceRangeMixedIn>();
             add<FieldRangeVectorIteratorTests::AdvanceMixedMixedIn>();
+            add<FieldRangeVectorIteratorTests::CompoundRangeCounter>();
         }
     } myall;
 
