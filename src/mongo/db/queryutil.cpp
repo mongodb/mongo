@@ -1419,47 +1419,45 @@ namespace mongo {
             eq = true;
             return -1;
         }
-        // see if we're less than the upper bound
-        if ( x > 0 ) {
-            if ( i == 0 && first ) {
-                // the value of 1st field won't go backward, so don't check lower bound
-                // TODO maybe we can check first only?
-                return -1;
-            }
-            // if it's an equality interval, don't need to compare separately to lower bound
-            if ( !_v._ranges[ i ].intervals()[ _i.get( i ) ].equality() ) {
-                // compare to current interval's lower bound
-                x = _v._ranges[ i ].intervals()[ _i.get( i ) ]._lower._bound.woCompare( jj, false );
-                if ( reverse ) {
-                    x = -x;
-                }
-            }
-            // if we're equal to and not inclusive the lower bound, advance
-            if ( ( x == 0 && !_v._ranges[ i ].intervals()[ _i.get( i ) ]._lower._inclusive ) ) {
-                _i.setZeroes( i + 1 );
-                // skip to curr / i + 1 / superlative
-                _after = true;
-                return i + 1;
-            }
-            // if we're less than the lower bound, advance
-            if ( x > 0 ) {
-                _i.setZeroes( i + 1 );
-                // skip to curr / i / nextbounds
-                _cmp[ i ] = &_v._ranges[ i ].intervals()[ _i.get( i ) ]._lower._bound;
-                _inc[ i ] = _v._ranges[ i ].intervals()[ _i.get( i ) ]._lower._inclusive;
-                for( int j = i + 1; j < _i.size(); ++j ) {
-                    _cmp[ j ] = &_v._ranges[ j ].intervals().front()._lower._bound;
-                    _inc[ j ] = _v._ranges[ j ].intervals().front()._lower._inclusive;
-                }
-                _after = false;
-                return i;
-            }
-            else {
-                return -1;
+        // see if we're greater than the upper bound
+        if ( x <= 0 ) {
+            return -2;
+        }
+        // we're less than the upper bound
+        if ( i == 0 && first ) {
+            // the value of 1st field won't go backward, so don't check lower bound
+            // TODO maybe we can check first only?
+            return -1;
+        }
+        // if it's an equality interval, don't need to compare separately to lower bound
+        if ( !_v._ranges[ i ].intervals()[ _i.get( i ) ].equality() ) {
+            // compare to current interval's lower bound
+            x = _v._ranges[ i ].intervals()[ _i.get( i ) ]._lower._bound.woCompare( jj, false );
+            if ( reverse ) {
+                x = -x;
             }
         }
-        // we're above the upper bound
-        return -2;
+        // if we're equal to and not inclusive the lower bound, advance
+        if ( ( x == 0 && !_v._ranges[ i ].intervals()[ _i.get( i ) ]._lower._inclusive ) ) {
+            _i.setZeroes( i + 1 );
+            // skip to curr / i + 1 / superlative
+            _after = true;
+            return i + 1;
+        }
+        // if we're less than the lower bound, advance
+        if ( x > 0 ) {
+            _i.setZeroes( i + 1 );
+            // skip to curr / i / nextbounds
+            _cmp[ i ] = &_v._ranges[ i ].intervals()[ _i.get( i ) ]._lower._bound;
+            _inc[ i ] = _v._ranges[ i ].intervals()[ _i.get( i ) ]._lower._inclusive;
+            for( int j = i + 1; j < _i.size(); ++j ) {
+                _cmp[ j ] = &_v._ranges[ j ].intervals().front()._lower._bound;
+                _inc[ j ] = _v._ranges[ j ].intervals().front()._lower._inclusive;
+            }
+            _after = false;
+            return i;
+        }
+        return -1;
     }
 
 
