@@ -32,6 +32,8 @@ __wt_page_out(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	page->parent = NULL;
 	page->ref = NULL;
 
+	WT_ASSERT(session, !F_ISSET(page, WT_PAGE_EVICT_LRU));
+
 	/* If not a split merged into its parent, the page must be clean. */
 	WT_ASSERT(session,
 	    !__wt_page_is_modified(page) ||
