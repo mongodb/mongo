@@ -503,15 +503,15 @@ __block_overlap(WT_SESSION_IMPL *session,
 	 * and:
 	 *
 	 *		BBBBBBBBBBBBBBBBBB
-	 * #7			AAAAAAAAAAAAAAAA	same as #2
-	 * #8	AAAAAAAAAAAAA				same as #3
+	 * #7	AAAAAAAAAAAAA				same as #3
+	 * #8			AAAAAAAAAAAAAAAA	same as #2
 	 * #9		AAAAA				A is a prefix of B
 	 * #10			AAAAAA			A is middle of B
 	 * #11			AAAAAAAAAA		A is a suffix of B
 	 *
 	 *
 	 * By swapping the arguments so "A" is always the lower range, we can
-	 * eliminate cases #2, #7, #10 and #11, and only handle 7 cases:
+	 * eliminate cases #2, #8, #10 and #11, and only handle 7 cases:
 	 *
 	 *		AAAAAAAAAAAAAAAAAA
 	 * #1		BBBBBBBBBBBBBBBBBB		ranges are are the same
@@ -523,7 +523,7 @@ __block_overlap(WT_SESSION_IMPL *session,
 	 * and:
 	 *
 	 *		BBBBBBBBBBBBBBBBBB
-	 * #8	AAAAAAAAAAAAA				same as #3
+	 * #7	AAAAAAAAAAAAA				same as #3
 	 * #9		AAAAA				A is a prefix of B
 	 */
 	a = *ap;
@@ -605,7 +605,7 @@ __block_overlap(WT_SESSION_IMPL *session,
 		*bp = (*bp)->next[0];
 		WT_RET(__block_merge(session, avail, b->off, b->size));
 		WT_RET(__block_off_remove(session, bel, b->off, NULL));
-	} else if					/* Case #3, #8 */
+	} else if					/* Case #3, #7 */
 	    (a->off + a->size < b->off + b->size) {
 		/*
 		 * Add overlap to the avail list

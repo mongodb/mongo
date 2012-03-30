@@ -842,23 +842,21 @@ __slvg_col_range_overlap(
 	 * and:
 	 *
 	 *		BBBBBBBBBBBBBBBBBB
-	 * #7			AAAAAAAAAAAAAAAA	same as #2
-	 * #8	AAAAAAAAAAAAA				same as #3
+	 * #7	AAAAAAAAAAAAA				same as #3
+	 * #8			AAAAAAAAAAAAAAAA	same as #2
 	 * #9		AAAAA				A is a prefix of B
 	 * #10			AAAAAA			A is middle of B
 	 * #11			AAAAAAAAAA		A is a suffix of B
 	 *
 	 * Because the leaf page array was sorted by record number and a_trk
-	 * appears earlier in that array than b_trk, cases #2/7, #10 and #11
+	 * appears earlier in that array than b_trk, cases #2/8, #10 and #11
 	 * are impossible.
 	 *
 	 * Finally, there's one additional complicating factor -- final ranges
 	 * are assigned based on the page's LSN.
 	 */
-	if (a_trk->col_start == b_trk->col_start) {
+	if (a_trk->col_start == b_trk->col_start) {	/* Case #1, #4 and #9 */
 		/*
-		 * Case #1, #4 and #9.
-		 *
 		 * The secondary sort of the leaf page array was the page's LSN,
 		 * in high-to-low order, which means a_trk has a higher LSN, and
 		 * is more desirable, than b_trk.  In cases #1 and #4 and #9,
@@ -884,8 +882,7 @@ __slvg_col_range_overlap(
 		goto merge;
 	}
 
-	if (a_trk->col_stop == b_trk->col_stop) {
-		/* Case #6. */
+	if (a_trk->col_stop == b_trk->col_stop) {	/* Case #6 */
 		if (a_trk->gen > b_trk->gen)
 			/*
 			 * Case #6: a_trk is a superset of b_trk and a_trk is
@@ -902,8 +899,7 @@ __slvg_col_range_overlap(
 		goto merge;
 	}
 
-	if  (a_trk->col_stop < b_trk->col_stop) {
-		/* Case #3/8. */
+	if  (a_trk->col_stop < b_trk->col_stop) {	/* Case #3/7 */
 		if (a_trk->gen > b_trk->gen) {
 			/*
 			 * Case #3/8: a_trk is more desirable, delete a_trk's
@@ -1384,14 +1380,14 @@ __slvg_row_range_overlap(
 	 * and:
 	 *
 	 *		BBBBBBBBBBBBBBBBBB
-	 * #7			AAAAAAAAAAAAAAAA	same as #2
-	 * #8	AAAAAAAAAAAAA				same as #3
+	 * #7	AAAAAAAAAAAAA				same as #3
+	 * #8			AAAAAAAAAAAAAAAA	same as #2
 	 * #9		AAAAA				A is a prefix of B
 	 * #10			AAAAAA			A is middle of B
 	 * #11			AAAAAAAAAA		A is a suffix of B
 	 *
 	 * Because the leaf page array was sorted by record number and a_trk
-	 * appears earlier in that array than b_trk, cases #2/7, #10 and #11
+	 * appears earlier in that array than b_trk, cases #2/8, #10 and #11
 	 * are impossible.
 	 *
 	 * Finally, there's one additional complicating factor -- final ranges
@@ -1406,10 +1402,8 @@ __slvg_row_range_overlap(
 	__wt_buf_set(session, dst, (src)->data, (src)->size)
 
 	WT_RET(WT_BTREE_CMP(session, btree, A_TRK_START, B_TRK_START, cmp));
-	if (cmp == 0) {
+	if (cmp == 0) {					/* Case #1, #4, #9 */
 		/*
-		 * Case #1, #4 and #9.
-		 *
 		 * The secondary sort of the leaf page array was the page's LSN,
 		 * in high-to-low order, which means a_trk has a higher LSN, and
 		 * is more desirable, than b_trk.  In cases #1 and #4 and #9,
@@ -1438,8 +1432,7 @@ __slvg_row_range_overlap(
 	}
 
 	WT_RET(WT_BTREE_CMP(session, btree, A_TRK_STOP, B_TRK_STOP, cmp));
-	if (cmp == 0) {
-		/* Case #6. */
+	if (cmp == 0) {					/* Case #6 */
 		if (a_trk->gen > b_trk->gen)
 			/*
 			 * Case #6: a_trk is a superset of b_trk and a_trk is
@@ -1457,8 +1450,7 @@ __slvg_row_range_overlap(
 	}
 
 	WT_RET(WT_BTREE_CMP(session, btree, A_TRK_STOP, B_TRK_STOP, cmp));
-	if (cmp < 0) {
-		/* Case #3/8. */
+	if (cmp < 0) {					/* Case #3/7 */
 		if (a_trk->gen > b_trk->gen) {
 			/*
 			 * Case #3/8: a_trk is more desirable, delete a_trk's
