@@ -195,7 +195,7 @@ __wt_debug_addr(
 	ret = 0;
 
 	WT_RET(__wt_scr_alloc(session, size, &buf));
-	WT_ERR(__wt_block_read(
+	WT_ERR(__wt_block_read_off(
 	    session, session->btree->block, buf, addr, size, 0));
 	ret = __wt_debug_disk(session, buf->mem, ofile);
 err:	__wt_scr_free(&buf);

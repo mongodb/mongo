@@ -71,7 +71,7 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	 * being created), or second, the load call returns no root page (the
 	 * snapshot is empty).
 	 */
-	WT_ERR(__wt_bm_snap_load(session, &dsk, addr, addr_size, 0));
+	WT_ERR(__wt_bm_snapshot_load(session, &dsk, addr, addr_size, 0));
 	if (addr == NULL || addr_size == 0 || dsk.size == 0)
 		WT_ERR(__btree_tree_open_empty(session));
 	else {
@@ -111,7 +111,7 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	    !F_ISSET(btree,
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)) {
 		ret = __wt_btree_snapshot(session, NULL, 1);
-		WT_TRET(__wt_bm_snap_unload(session));
+		WT_TRET(__wt_bm_snapshot_unload(session));
 	}
 
 	/* Close the underlying block manager reference. */

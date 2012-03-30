@@ -34,11 +34,11 @@ __wt_block_write_size(
 }
 
 /*
- * __wt_block_write_buf --
+ * __wt_block_write --
  *	Write a buffer into a block, returning the block's address cookie.
  */
 int
-__wt_block_write_buf(WT_SESSION_IMPL *session,
+__wt_block_write(WT_SESSION_IMPL *session,
     WT_BLOCK *block, WT_ITEM *buf, uint8_t *addr, uint32_t *addr_size)
 {
 	off_t offset;
@@ -47,8 +47,8 @@ __wt_block_write_buf(WT_SESSION_IMPL *session,
 
 	WT_UNUSED(addr_size);
 
-	WT_RET(
-	    __wt_block_write(session, block, buf, &offset, &size, &cksum, 0));
+	WT_RET(__wt_block_write_off(
+	    session, block, buf, &offset, &size, &cksum, 0));
 
 	endp = addr;
 	WT_RET(__wt_block_addr_to_buffer(block, &endp, offset, size, cksum));
@@ -58,12 +58,12 @@ __wt_block_write_buf(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_block_write --
+ * __wt_block_write_off --
  *	Write a buffer into a block, returning the block's addr/size and
  * checksum.
  */
 int
-__wt_block_write(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf,
+__wt_block_write_off(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf,
     off_t *offsetp, uint32_t *sizep, uint32_t *cksump, int force_extend)
 {
 	WT_BLOCK_HEADER *blk;

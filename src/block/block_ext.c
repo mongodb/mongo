@@ -337,11 +337,11 @@ __wt_block_extend(
 }
 
 /*
- * __wt_block_free_buf --
+ * __wt_block_free --
  *	Free a cookie-referenced chunk of space to the underlying file.
  */
 int
-__wt_block_free_buf(WT_SESSION_IMPL *session,
+__wt_block_free(WT_SESSION_IMPL *session,
     WT_BLOCK *block, const uint8_t *addr, uint32_t addr_size)
 {
 	off_t off;
@@ -355,18 +355,18 @@ __wt_block_free_buf(WT_SESSION_IMPL *session,
 
 	/* Lock the system and free the extent. */
 	__wt_spin_lock(session, &block->live_lock);
-	ret = __wt_block_free(session, block, off, size, 0);
+	ret = __wt_block_free_ext(session, block, off, size, 0);
 	__wt_spin_unlock(session, &block->live_lock);
 
 	return (ret);
 }
 
 /*
- * __wt_block_free --
+ * __wt_block_free_ext --
  *	Free a chunk of space to the underlying file.
  */
 int
-__wt_block_free(WT_SESSION_IMPL *session,
+__wt_block_free_ext(WT_SESSION_IMPL *session,
     WT_BLOCK *block, off_t off, off_t size, int free_extent)
 {
 	WT_EXTLIST *el;
@@ -792,7 +792,7 @@ __wt_block_extlist_read(
 	ret = 0;
 
 	WT_RET(__wt_scr_alloc(session, el->size, &tmp));
-	WT_ERR(__wt_block_read(
+	WT_ERR(__wt_block_read_off(
 	    session, block, tmp, el->offset, el->size, el->cksum));
 
 #define	WT_EXTLIST_READ(p, v) do {					\
@@ -907,7 +907,7 @@ __wt_block_extlist_write(
 	WT_EXTLIST_WRITE(p, 0);
 
 	/* Write the extent list to disk. */
-	WT_ERR(__wt_block_write(
+	WT_ERR(__wt_block_write_off(
 	    session, block, tmp, &el->offset, &el->size, &el->cksum, 1));
 
 	WT_VERBOSE(session, block,

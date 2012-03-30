@@ -131,11 +131,26 @@ __wt_bm_close(WT_SESSION_IMPL *session)
 }
 
 /*
- * __wt_bm_snap_load --
+ * __wt_bm_snapshot --
+ *	Write a buffer into a block, creating a snapshot.
+ */
+int
+__wt_bm_snapshot(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_ITEM *snap)
+{
+	WT_BLOCK *block;
+
+	if ((block = session->btree->block) == NULL)
+		return (__bm_invalid(session));
+
+	return (__wt_block_write_snapshot(session, block, buf, snap));
+}
+
+/*
+ * __wt_bm_snapshot_load --
  *	Load a snapshot point.
  */
 int
-__wt_bm_snap_load(WT_SESSION_IMPL *session,
+__wt_bm_snapshot_load(WT_SESSION_IMPL *session,
     WT_ITEM *buf, const uint8_t *addr, uint32_t addr_size, int readonly)
 {
 	WT_BLOCK *block;
@@ -148,11 +163,11 @@ __wt_bm_snap_load(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_bm_snap_unload --
+ * __wt_bm_snapshot_unload --
  *	Unload a snapshot point.
  */
 int
-__wt_bm_snap_unload(WT_SESSION_IMPL *session)
+__wt_bm_snapshot_unload(WT_SESSION_IMPL *session)
 {
 	WT_BLOCK *block;
 
@@ -184,7 +199,7 @@ __wt_bm_free(WT_SESSION_IMPL *session, const uint8_t *addr, uint32_t addr_size)
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (__wt_block_free_buf(session, block, addr, addr_size));
+	return (__wt_block_free(session, block, addr, addr_size));
 }
 
 /*
@@ -200,7 +215,7 @@ __wt_bm_read(WT_SESSION_IMPL *session,
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (__wt_block_read_buf(session, block, buf, addr, addr_size));
+	return (__wt_block_read(session, block, buf, addr, addr_size));
 }
 
 /*
@@ -219,21 +234,6 @@ __wt_bm_write_size(WT_SESSION_IMPL *session, uint32_t *sizep)
 }
 
 /*
- * __wt_bm_snap_write --
- *	Write a buffer into a block, creating a snapshot.
- */
-int
-__wt_bm_snap_write(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_ITEM *snap)
-{
-	WT_BLOCK *block;
-
-	if ((block = session->btree->block) == NULL)
-		return (__bm_invalid(session));
-
-	return (__wt_block_write_buf_snapshot(session, block, buf, snap));
-}
-
-/*
  * __wt_bm_write --
  *	Write a buffer into a block, returning the block's address cookie.
  */
@@ -246,7 +246,7 @@ __wt_bm_write(
 	if ((block = session->btree->block) == NULL)
 		return (__bm_invalid(session));
 
-	return (__wt_block_write_buf(session, block, buf, addr, addr_size));
+	return (__wt_block_write(session, block, buf, addr, addr_size));
 }
 
 /*

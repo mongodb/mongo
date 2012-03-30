@@ -36,11 +36,11 @@ extern int __wt_block_extend( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     off_t *offp,
     off_t size);
-extern int __wt_block_free_buf(WT_SESSION_IMPL *session,
+extern int __wt_block_free(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     const uint8_t *addr,
     uint32_t addr_size);
-extern int __wt_block_free(WT_SESSION_IMPL *session,
+extern int __wt_block_free_ext(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     off_t off,
     off_t size,
@@ -84,12 +84,15 @@ extern int __wt_bm_open(WT_SESSION_IMPL *session,
     const char *config,
     const char *cfg[]);
 extern int __wt_bm_close(WT_SESSION_IMPL *session);
-extern int __wt_bm_snap_load(WT_SESSION_IMPL *session,
+extern int __wt_bm_snapshot(WT_SESSION_IMPL *session,
+    WT_ITEM *buf,
+    WT_ITEM *snap);
+extern int __wt_bm_snapshot_load(WT_SESSION_IMPL *session,
     WT_ITEM *buf,
     const uint8_t *addr,
     uint32_t addr_size,
     int readonly);
-extern int __wt_bm_snap_unload(WT_SESSION_IMPL *session);
+extern int __wt_bm_snapshot_unload(WT_SESSION_IMPL *session);
 extern int __wt_bm_truncate(WT_SESSION_IMPL *session, const char *filename);
 extern int __wt_bm_free(WT_SESSION_IMPL *session,
     const uint8_t *addr,
@@ -99,9 +102,6 @@ extern int __wt_bm_read(WT_SESSION_IMPL *session,
     const uint8_t *addr,
     uint32_t addr_size);
 extern int __wt_bm_write_size(WT_SESSION_IMPL *session, uint32_t *sizep);
-extern int __wt_bm_snap_write(WT_SESSION_IMPL *session,
-    WT_ITEM *buf,
-    WT_ITEM *snap);
 extern int __wt_bm_write( WT_SESSION_IMPL *session,
     WT_ITEM *buf,
     uint8_t *addr,
@@ -130,12 +130,12 @@ extern int __wt_block_open(WT_SESSION_IMPL *session,
 extern int __wt_block_close(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_desc_init(WT_SESSION_IMPL *session, WT_FH *fh);
 extern void __wt_block_stat(WT_SESSION_IMPL *session, WT_BLOCK *block);
-extern int __wt_block_read_buf(WT_SESSION_IMPL *session,
+extern int __wt_block_read(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_ITEM *buf,
     const uint8_t *addr,
     uint32_t addr_size);
-extern int __wt_block_read(WT_SESSION_IMPL *session,
+extern int __wt_block_read_off(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_ITEM *buf,
     off_t offset,
@@ -161,7 +161,7 @@ extern int __wt_block_snap_load(WT_SESSION_IMPL *session,
     uint32_t addr_size,
     int readonly);
 extern int __wt_block_snap_unload(WT_SESSION_IMPL *session, WT_BLOCK *block);
-extern int __wt_block_write_buf_snapshot( WT_SESSION_IMPL *session,
+extern int __wt_block_write_snapshot( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_ITEM *buf,
     WT_ITEM *snap);
@@ -187,12 +187,12 @@ extern u_int __wt_block_header(WT_SESSION_IMPL *session);
 extern int __wt_block_write_size( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     uint32_t *sizep);
-extern int __wt_block_write_buf(WT_SESSION_IMPL *session,
+extern int __wt_block_write(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_ITEM *buf,
     uint8_t *addr,
     uint32_t *addr_size);
-extern int __wt_block_write(WT_SESSION_IMPL *session,
+extern int __wt_block_write_off(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_ITEM *buf,
     off_t *offsetp,

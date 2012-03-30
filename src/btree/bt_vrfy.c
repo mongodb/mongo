@@ -116,7 +116,7 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 		 * file is empty.
 		 */
 		WT_CLEAR(dsk);
-		WT_ERR(__wt_bm_snap_load(
+		WT_ERR(__wt_bm_snapshot_load(
 		    session, &dsk, vs->tmp1->data, vs->tmp1->size, 1));
 		if (dsk.size != 0) {
 			/* Verify, then discard the snapshot from the cache. */
@@ -128,7 +128,7 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 		}
 
 		/* Unload the snapshot. */
-		WT_TRET(__wt_bm_snap_unload(session));
+		WT_TRET(__wt_bm_snapshot_unload(session));
 		WT_ERR(ret);
 	}
 

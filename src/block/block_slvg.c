@@ -114,7 +114,8 @@ __wt_block_salvage_next(
 		 * needed.  If reading the page fails, it's probably corruption,
 		 * we ignore this block.
 		 */
-		if (__wt_block_read(session, block, buf, offset, size, cksum)) {
+		if (__wt_block_read_off(
+		    session, block, buf, offset, size, cksum)) {
 skip:			WT_VERBOSE(session, salvage,
 			    "skipping %" PRIu32 "B at file offset %" PRIuMAX,
 			    allocsize, (uintmax_t)offset);
@@ -123,7 +124,7 @@ skip:			WT_VERBOSE(session, salvage,
 			 * Free the block and make sure we don't return it more
 			 * than once.
 			 */
-			WT_RET(__wt_block_free(
+			WT_RET(__wt_block_free_ext(
 			    session, block, offset, (off_t)allocsize, 0));
 			block->slvg_off = offset += allocsize;
 			continue;

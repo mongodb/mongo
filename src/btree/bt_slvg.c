@@ -174,7 +174,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	 * Step 2:
 	 * Load an empty snapshot, for modification.
 	 */
-	WT_ERR(__wt_bm_snap_load(session, NULL, NULL, 0, 0));
+	WT_ERR(__wt_bm_snapshot_load(session, NULL, NULL, 0, 0));
 
 	/*
 	 * Step 3:
@@ -310,7 +310,7 @@ err:	WT_TRET(__wt_bm_salvage_end(session));
 	 * Step 13:
 	 * Discard the live snapshot.
 	 */
-	WT_TRET(__wt_bm_snap_unload(session));
+	WT_TRET(__wt_bm_snapshot_unload(session));
 
 	/* Discard any root page we created. */
 	if (ss->root_page != NULL)

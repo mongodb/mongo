@@ -99,7 +99,7 @@ __wt_block_snap_load(WT_SESSION_IMPL *session,
 	if (si->root_offset == WT_BLOCK_INVALID_OFFSET)
 		dsk->size = 0;
 	else {
-		WT_ERR(__wt_block_read(session, block,
+		WT_ERR(__wt_block_read_off(session, block,
 		    dsk, si->root_offset, si->root_size, si->root_cksum));
 		if (block->verify) {
 			WT_ERR(__wt_block_snapshot_string(
@@ -164,11 +164,11 @@ __wt_block_snap_unload(WT_SESSION_IMPL *session, WT_BLOCK *block)
 }
 
 /*
- * __wt_block_write_buf_snapshot --
+ * __wt_block_write_snapshot --
  *	Write a buffer into a block and create a new snapshot.
  */
 int
-__wt_block_write_buf_snapshot(
+__wt_block_write_snapshot(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf, WT_ITEM *snap)
 {
 	WT_BLOCK_SNAPSHOT *si;
@@ -192,7 +192,7 @@ __wt_block_write_buf_snapshot(
 		si->root_offset = WT_BLOCK_INVALID_OFFSET;
 		si->root_size = si->root_cksum = 0;
 	} else
-		WT_RET(__wt_block_write(session, block, buf,
+		WT_RET(__wt_block_write_off(session, block, buf,
 		    &si->root_offset, &si->root_size, &si->root_cksum, 0));
 
 	/*
@@ -331,7 +331,7 @@ __block_snap_delete(
 	 * from the avail list, and was entered on the alloc list at that time.
 	 */
 	if (si->root_offset != WT_BLOCK_INVALID_OFFSET)
-		WT_RET(__wt_block_free(
+		WT_RET(__wt_block_free_ext(
 		    session, block, si->root_offset, si->root_size, 0));
 
 	/*
@@ -339,13 +339,13 @@ __block_snap_delete(
 	 * system's avail list, they were never on any alloc list.
 	 */
 	if (si->alloc.offset != WT_BLOCK_INVALID_OFFSET)
-		WT_RET(__wt_block_free(
+		WT_RET(__wt_block_free_ext(
 		    session, block, si->alloc.offset, si->alloc.size, 1));
 	if (si->avail.offset != WT_BLOCK_INVALID_OFFSET)
-		WT_RET(__wt_block_free(
+		WT_RET(__wt_block_free_ext(
 		    session, block, si->avail.offset, si->avail.size, 1));
 	if (si->discard.offset != WT_BLOCK_INVALID_OFFSET)
-		WT_RET(__wt_block_free(
+		WT_RET(__wt_block_free_ext(
 		    session, block, si->discard.offset, si->discard.size, 1));
 
 	/*

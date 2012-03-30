@@ -2568,7 +2568,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 		/* If this is the root page, we need to create a sync point. */
 		if (WT_PAGE_IS_ROOT(page))
-			WT_RET(__wt_bm_snap_write(session, NULL, btree->snap));
+			WT_RET(__wt_bm_snapshot(session, NULL, btree->snap));
 
 		/*
 		 * If the page was empty, we want to discard it from the tree
@@ -2591,8 +2591,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 */
 		bnd = &r->bnd[0];
 		if (bnd->addr.addr == NULL)
-			WT_RET(
-			    __wt_bm_snap_write(session, &r->dsk, btree->snap));
+			WT_RET(__wt_bm_snapshot(session, &r->dsk, btree->snap));
 		else {
 			mod->u.replace = bnd->addr;
 			bnd->addr.addr = NULL;
