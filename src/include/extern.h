@@ -180,10 +180,6 @@ extern int __wt_block_verify_addr(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     const uint8_t *addr,
     uint32_t addr_size);
-extern int __wt_verify_addfrag( WT_SESSION_IMPL *session,
-    WT_BLOCK *block,
-    off_t offset,
-    off_t size);
 extern u_int __wt_block_header(WT_SESSION_IMPL *session);
 extern int __wt_block_write_size( WT_SESSION_IMPL *session,
     WT_BLOCK *block,

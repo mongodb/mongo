@@ -7,6 +7,7 @@
 
 #include "wt_internal.h"
 
+static int __verify_addfrag(WT_SESSION_IMPL *, WT_BLOCK *, off_t, off_t);
 static int __verify_checkfrag(WT_SESSION_IMPL *, WT_BLOCK *);
 static int __verify_extlist(WT_SESSION_IMPL *, WT_BLOCK *, WT_EXTLIST *);
 
@@ -98,18 +99,22 @@ __wt_verify_snap_load(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_BLOCK_SNAPSHOT *si)
 {
 	/*
-	 * If we're verifying, add the disk blocks used to store extent lists to
-	 * the list of blocks we've "seen".
+	 * If we're verifying, add the disk blocks used to store the root page
+	 * and the extent lists to the list of blocks we've "seen".
 	 */
+	if (si->root_offset != WT_BLOCK_INVALID_OFFSET)
+		WT_RET(__verify_addfrag(session,
+		    block, si->root_offset, (off_t)si->root_size));
+
 	if (si->avail.offset != WT_BLOCK_INVALID_OFFSET)
-		WT_RET(__wt_verify_addfrag(session, block,
-		    si->avail.offset, (off_t)si->avail.size));
+		WT_RET(__verify_addfrag(session,
+		    block, si->avail.offset, (off_t)si->avail.size));
 	if (si->alloc.offset != WT_BLOCK_INVALID_OFFSET)
-		WT_RET(__wt_verify_addfrag(session, block,
-		    si->alloc.offset, (off_t)si->alloc.size));
+		WT_RET(__verify_addfrag(session,
+		    block, si->alloc.offset, (off_t)si->alloc.size));
 	if (si->discard.offset != WT_BLOCK_INVALID_OFFSET)
-		WT_RET(__wt_verify_addfrag(session, block,
-		    si->discard.offset, (off_t)si->discard.size));
+		WT_RET(__verify_addfrag(session,
+		    block, si->discard.offset, (off_t)si->discard.size));
 
 	/*
 	 * If we're verifying the file, we'll need to read the avail and discard
@@ -154,8 +159,7 @@ __verify_extlist(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el)
 		    el->name,
 		    (intmax_t)ext->off, (intmax_t)(ext->off + ext->size));
 
-		WT_TRET(
-		    __wt_verify_addfrag(session, block, ext->off, ext->size));
+		WT_TRET(__verify_addfrag(session, block, ext->off, ext->size));
 	}
 
 	return (ret);
@@ -177,7 +181,7 @@ __wt_block_verify_addr(WT_SESSION_IMPL *session,
 	/* Crack the cookie. */
 	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
 
-	WT_RET(__wt_verify_addfrag(session, block, offset, (off_t)size));
+	WT_RET(__verify_addfrag(session, block, offset, (off_t)size));
 
 	return (0);
 }
@@ -189,12 +193,12 @@ __wt_block_verify_addr(WT_SESSION_IMPL *session,
 	(((off_t)(frag)) * (block)->allocsize + WT_BLOCK_DESC_SECTOR)
 
 /*
- * __wt_verify_addfrag --
+ * __verify_addfrag --
  *	Add the fragments to the list, and complain if we've already verified
  *	this chunk of the file.
  */
-int
-__wt_verify_addfrag(
+static int
+__verify_addfrag(
     WT_SESSION_IMPL *session, WT_BLOCK *block, off_t offset, off_t size)
 {
 	uint32_t frag, frags, i;

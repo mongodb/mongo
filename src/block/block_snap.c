@@ -104,8 +104,6 @@ __wt_block_snapshot_load(WT_SESSION_IMPL *session,
 		if (block->verify) {
 			WT_ERR(__wt_block_snapshot_string(
 			    session, block, addr, NULL, &tmp));
-			WT_ERR(__wt_verify_addfrag(session,
-			    block, si->root_offset, (off_t)si->root_size));
 			WT_ERR(
 			    __wt_verify_dsk(session, (char *)tmp->data, dsk));
 		}
