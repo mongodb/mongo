@@ -45,9 +45,10 @@ extern int __wt_block_free_ext(WT_SESSION_IMPL *session,
     off_t off,
     off_t size,
     int free_extent);
-extern int __wt_block_extlist_check( WT_SESSION_IMPL *session,
+extern int __wt_block_extlist_check(WT_SESSION_IMPL *session,
     WT_BLOCK_SNAPSHOT *si,
-    const char *tag);
+    const char *tag,
+    int alloc_discard);
 extern int __wt_block_extlist_match( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_BLOCK_SNAPSHOT *si);
@@ -312,8 +313,11 @@ extern int __wt_col_search(WT_SESSION_IMPL *session,
 extern int __wt_rec_evict(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     uint32_t flags);
-extern int __wt_rec_track_block( WT_SESSION_IMPL *session,
+extern int __wt_rec_track_addr( WT_SESSION_IMPL *session,
     WT_PAGE *page,
+    const uint8_t *addr,
+    uint32_t size);
+extern int __wt_rec_track_addr_discarded(WT_PAGE *page,
     const uint8_t *addr,
     uint32_t size);
 extern int __wt_rec_track_ovfl(WT_SESSION_IMPL *session,

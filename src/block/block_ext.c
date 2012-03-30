@@ -393,6 +393,7 @@ __wt_block_free_ext(WT_SESSION_IMPL *session,
 	return (__block_merge(session, el, off, (off_t)size));
 }
 
+#ifdef HAVE_DIAGNOSTIC
 /*
  * __wt_block_extlist_check, __block_extlist_check2 --
  *	Fail if any of the extent lists overlap.
@@ -428,14 +429,19 @@ __block_extlist_check2(
 }
 
 int
-__wt_block_extlist_check(
-    WT_SESSION_IMPL *session, WT_BLOCK_SNAPSHOT *si, const char *tag)
+__wt_block_extlist_check(WT_SESSION_IMPL *session,
+    WT_BLOCK_SNAPSHOT *si, const char *tag, int alloc_discard)
 {
+	/* Check the extent list combinations for overlaps. */
 	WT_RET(__block_extlist_check2(session, &si->alloc, &si->avail, tag));
-	WT_RET(__block_extlist_check2(session, &si->alloc, &si->discard, tag));
-	WT_RET(__block_extlist_check2(session, &si->avail, &si->discard, tag));
+	WT_RET(__block_extlist_check2(session, &si->discard, &si->avail, tag));
+
+	if (alloc_discard)
+		WT_RET(__block_extlist_check2(
+		    session, &si->alloc, &si->discard, tag));
 	return (0);
 }
+#endif
 
 /*
  * __wt_block_extlist_match --

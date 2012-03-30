@@ -279,14 +279,14 @@ __block_snap_extlists(
 	/* Truncate the file if possible. */
 	WT_RET(__wt_block_extlist_truncate(session, block, &si->avail));
 
-#if 0
+#ifdef HAVE_DIAGNOSTIC
 	/*
 	 * Currently, we do not check if a freed block can be immediately put
 	 * on the avail list (that is, if it was allocated during the current
 	 * snapshot -- once that change is made, we should check for overlaps
-	 * here.
+	 * between the alloc and discard lists.
 	 */
-	WT_RET(__wt_block_extlist_check(session, si));
+	WT_RET(__wt_block_extlist_check(session, si, "snapshot", 0));
 #endif
 
 	/* Write the extent lists. */
@@ -376,7 +376,7 @@ __block_snap_delete(
 	WT_RET(__wt_block_extlist_match(session, block, live));
 
 #ifdef HAVE_DIAGNOSTIC
-	WT_RET(__wt_block_extlist_check(session, live, "live after merge"));
+	WT_RET(__wt_block_extlist_check(session, live, "live after merge", 1));
 #endif
 
 	return (0);

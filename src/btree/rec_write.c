@@ -182,7 +182,7 @@ static inline int
 __rec_track_cell(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack)
 {
-	return (unpack->ovfl ? __wt_rec_track_block(
+	return (unpack->ovfl ? __wt_rec_track_addr(
 	    session, page, unpack->data, unpack->size) : 0);
 }
 
@@ -2299,12 +2299,17 @@ __rec_row_leaf(
 
 		/*
 		 * Build key cell.
+		 *
+		 * There's some risk an overflow key's blocks were discarded by
+		 * a previous reconciliation, so we have to check.
 		 */
 		__wt_cell_unpack(cell, unpack);
-		if (unpack->type == WT_CELL_KEY_OVFL) {
+		if (unpack->type == WT_CELL_KEY_OVFL &&
+		    !__wt_rec_track_addr_discarded(
+		    page, unpack->data, unpack->size)) {
 			/*
-			 * If the key is an overflow item, assume prefix
-			 * compression won't make things better, and copy it.
+			 * If an overflow key, assume prefix compression won't
+			 * make things better, and copy it.
 			 */
 			key->buf.data = cell;
 			key->buf.size = unpack->len;
@@ -2509,7 +2514,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 */
 		if (!WT_PAGE_IS_ROOT(page) && page->ref->addr != NULL) {
 			__wt_get_addr(page->parent, page->ref, &addr, &size);
-			WT_RET(__wt_rec_track_block(session, page, addr, size));
+			WT_RET(__wt_rec_track_addr(session, page, addr, size));
 		}
 		break;
 	case WT_PAGE_REC_EMPTY:				/* Page deleted */
@@ -2522,7 +2527,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * are snapshots, and must be explicitly dropped.
 		 */
 		if (!WT_PAGE_IS_ROOT(page))
-			WT_RET(__wt_rec_track_block(session,
+			WT_RET(__wt_rec_track_addr(session,
 			    page, mod->u.replace.addr, mod->u.replace.size));
 
 		/* Discard the replacement page's address. */
@@ -2533,7 +2538,7 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	case WT_PAGE_REC_SPLIT:				/* Page split */
 		/* Discard the split page's leaf-page blocks. */
 		WT_REF_FOREACH(mod->u.split, ref, i)
-			WT_RET(__wt_rec_track_block(session, page,
+			WT_RET(__wt_rec_track_addr(session, page,
 			    ((WT_ADDR *)ref->addr)->addr,
 			    ((WT_ADDR *)ref->addr)->size));
 

@@ -31,6 +31,16 @@
  * WT_PT_DISCARD blocks are freed to the underlying block manager and the type
  * is set to WT_PT_DISCARD_COMPLETE.  That allows us to find the block on the
  * page's list again, but only physically free it once.
+ *	Additionally, in the case of discarded overflow records we may have to
+ * find them again in order to determine if an overflow key is needed again.
+ * If an overflow key references a deleted value during the reconciliation of
+ * a row-store page, the overflow key would be discarded and underlying blocks
+ * freed when the reconciliation completed.  If the value were to be replaced,
+ * a subsequent reconciliation would write the key, referencing those original
+ * overflow blocks, causing corruption.  To avoid this, when writing overflow
+ * keys, we have to check if a previous reconciliation has discarded the key's
+ * blocks, in which case we have to write the full key from scratch.  This is
+ * painful, but not common.
  *
  * WT_PT_OVFL:
  * WT_PT_OVFL_ACTIVE:
@@ -102,11 +112,11 @@ __rec_track_extend(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __wt_rec_track_block --
+ * __wt_rec_track_addr --
  *	Add an addr/size pair to the page's list of tracked objects.
  */
 int
-__wt_rec_track_block(
+__wt_rec_track_addr(
     WT_SESSION_IMPL *session, WT_PAGE *page, const uint8_t *addr, uint32_t size)
 {
 	WT_PAGE_MODIFY *mod;
@@ -148,6 +158,35 @@ __wt_rec_track_block(
 
 	WT_VERBOSE_CALL(
 	    session, reconcile, __track_print(session, page, track));
+	return (0);
+}
+
+/*
+ * __wt_rec_track_addr_discarded --
+ *	Search for a discarded block record; if the address references discarded
+ * blocks it cannot be re-used.
+ */
+int
+__wt_rec_track_addr_discarded(WT_PAGE *page, const uint8_t *addr, uint32_t size)
+{
+	WT_PAGE_MODIFY *mod;
+	WT_PAGE_TRACK *track;
+	uint32_t i;
+
+	mod = page->modify;
+	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i)
+		switch (track->type) {
+		case WT_PT_EMPTY:
+		case WT_PT_OVFL:
+		case WT_PT_OVFL_ACTIVE:
+			break;
+		case WT_PT_DISCARD:
+		case WT_PT_DISCARD_COMPLETE:
+			if (track->addr.size == size &&
+			    memcmp(addr, track->addr.addr, size) == 0)
+				return (1);
+			break;
+		}
 	return (0);
 }
 
