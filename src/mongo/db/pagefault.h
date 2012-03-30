@@ -8,10 +8,10 @@ namespace mongo {
 
     class PageFaultException /*: public DBException*/ { 
         unsigned era;
-        Record *r;
+        const Record *r;
     public:
         PageFaultException(const PageFaultException& rhs) : era(rhs.era), r(rhs.r) { }
-        explicit PageFaultException(Record*);
+        explicit PageFaultException(const Record*);
         void touch();
     };
 

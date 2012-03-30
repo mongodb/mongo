@@ -9,7 +9,7 @@
 
 namespace mongo { 
 
-    PageFaultException::PageFaultException(Record *_r)
+    PageFaultException::PageFaultException(const Record *_r)
     {
         verify( cc().allowedToThrowPageFaultException() );
         cc().getPageFaultRetryableSection()->didLap();

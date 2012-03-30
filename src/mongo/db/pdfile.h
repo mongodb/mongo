@@ -262,7 +262,7 @@ namespace mongo {
          * @return if this record is likely in physical memory
          *         its not guaranteed because its possible it gets swapped out in a very unlucky windows
          */
-        bool likelyInPhysicalMemory();
+        bool likelyInPhysicalMemory() const ;
 
         /**
          * tell the cache this Record was accessed

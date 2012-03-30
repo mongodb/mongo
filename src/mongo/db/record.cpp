@@ -206,7 +206,7 @@ namespace mongo {
 
     const bool blockSupported = ProcessInfo::blockCheckSupported();
 
-    bool Record::likelyInPhysicalMemory() {
+    bool Record::likelyInPhysicalMemory() const {
         DEV if ( rand() % 100 == 0 ) return false;
 
         if ( ! MemoryTrackingEnabled )
@@ -232,7 +232,7 @@ namespace mongo {
             return false;
         }
 
-        return ProcessInfo::blockInMemory( _data );
+        return ProcessInfo::blockInMemory( const_cast<char*>(_data) );
     }
 
 
@@ -247,30 +247,18 @@ namespace mongo {
     Record* DiskLoc::rec() const {
         Record *r = DataFileMgr::getRecord(*this);
         memconcept::is(r, memconcept::concept::record);
-#if defined(_PAGEFAULTEXCEPTION)
-        DEV ONCE { 
-            log() << "_DEBUG info _PAGEFAULTEXCEPTION is ON -- experimental at this time" << endl;
-        }
-        bool fault = !r->likelyInPhysicalMemory();
-        if( cc().allowedToThrowPageFaultException() && 
-            ! r->likelyInPhysicalMemory() ) {
-            if( cc().getPageFaultRetryableSection()->laps() > 100 ) { 
-                log() << "info pagefaultexception _laps > 100" << endl;
-            }
-            else {
-                throw PageFaultException(r);
-            }
-        }
-#else 
-        DEV ONCE { 
-            log() << "_DEBUG info _PAGEFAULTEXCEPTION is off" << endl;
-        }
-#endif
         return r;
     }
 
     void Record::_accessing() const {
-
+        if ( cc().allowedToThrowPageFaultException() && ! likelyInPhysicalMemory() ) {
+            if( cc().getPageFaultRetryableSection()->laps() > 100 ) { 
+                log() << "info pagefaultexception _laps > 100" << endl;
+            }
+            else {
+                throw PageFaultException(this);
+            }
+        }
     }
 
     void DeletedRecord::_accessing() const {
