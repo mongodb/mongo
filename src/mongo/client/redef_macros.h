@@ -25,6 +25,7 @@
 #if defined(MONGO_MACROS_CLEANED)
 
 // util/allocator.h
+#pragma push_macro("malloc")
 #define malloc MONGO_malloc
 #define realloc MONGO_realloc
 

@@ -5,6 +5,9 @@
    ./mongoperf -h
 */
 
+
+// note: mongoperf is an internal mongodb utility
+// so we define the following macro
 #define MONGO_EXPOSE_MACROS 1
 
 #include <iostream>
@@ -211,7 +214,7 @@ cout <<
 "\n"
 
 << endl;
-            return 0;
+            return EXIT_SUCCESS;
         }
 
         cout << "use -h for help" << endl;
@@ -221,7 +224,7 @@ cout <<
         cin.read(input, 1000);
         if( *input == 0 ) { 
             cout << "error no options found on stdin for mongoperf" << endl;
-            return 2;
+            return EXIT_FAILURE;
         }
 
         string s = input;
@@ -231,7 +234,7 @@ cout <<
         }
         catch(...) { 
             cout << "couldn't parse json options. input was:\n|" << s << "|" << endl;
-            return -1;
+            return EXIT_FAILURE;
         }
         cout << "parsed options:\n" << options.toString() << endl;
 
@@ -262,9 +265,9 @@ cout <<
     } 
     catch(DBException& e) { 
         cout << "caught DBException " << e.toString() << endl;
-        return 1;
+        return EXIT_FAILURE;
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
 

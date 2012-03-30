@@ -26,7 +26,8 @@
 #if !defined(MONGO_EXPOSE_MACROS) && !defined(MONGO_MACROS_CLEANED)
 
 // util/allocator.h
-#undef malloc
+#pragma pop_macro("malloc")
+//#undef malloc
 #undef realloc
 
 // util/assert_util.h
