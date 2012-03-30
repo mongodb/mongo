@@ -71,6 +71,9 @@ namespace mongo {
                 if ( ! _dirty )
                     continue;
 
+                if ( inShutdown() )
+                    return;
+
                 list< pair<BSONObj,BSONObj> > todo;
 
                 {
