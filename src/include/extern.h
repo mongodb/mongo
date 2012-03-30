@@ -192,6 +192,7 @@ extern int __wt_debug_page(WT_SESSION_IMPL *session,
 extern void __wt_page_out(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     uint32_t flags);
+extern void __wt_evict_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern void __wt_evict_server_wake(WT_SESSION_IMPL *session);
 extern void __wt_evict_file_serial_func(WT_SESSION_IMPL *session);
 extern int __wt_evict_page_request(WT_SESSION_IMPL *session, WT_PAGE *page);

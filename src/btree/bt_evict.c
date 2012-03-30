@@ -47,6 +47,32 @@ __evict_clr(WT_EVICT_LIST *e)
 }
 
 /*
+ * __wt_evict_clr_page --
+ *	Make sure a page is not in the eviction request list.  This called
+ *	from inside __rec_review to make sure there is no attempt to evict
+ *	child pages multiple times.
+ */
+void
+__wt_evict_clr_page(WT_SESSION_IMPL *session, WT_PAGE *page)
+{
+	WT_CACHE *cache;
+	WT_EVICT_LIST *evict;
+	int i, elem;
+
+	cache = S2C(session)->cache;
+	__wt_spin_lock(session, &cache->lru_lock);
+
+	elem = cache->evict_entries;
+	for (evict = cache->evict, i = 0; i < elem; i++, evict++)
+		if (evict->page == page) {
+			__evict_clr(evict);
+			break;
+		}
+
+	__wt_spin_unlock(session, &cache->lru_lock);
+}
+
+/*
  * __evict_req_set --
  *	Set an entry in the eviction request list.
  */
