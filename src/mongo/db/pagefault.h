@@ -1,7 +1,5 @@
 // @file pagefault.h
 
-// define this : _PAGEFAULTEXCEPTION
-
 #pragma once
 
 namespace mongo {
