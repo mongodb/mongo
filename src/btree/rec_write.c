@@ -1643,32 +1643,90 @@ __rec_col_var(
 			}
 
 			nrepeat = __wt_cell_rle(unpack);
-			orig_deleted = unpack->type == WT_CELL_DEL ? 1 : 0;
-
-			/* Get a copy of the cell. */
-			if (!orig_deleted)
-				WT_ERR(__wt_cell_unpack_copy(
-				    session, unpack, &orig));
 
 			/*
-			 * If we're re-writing a cell's reference of an overflow
-			 * value, free the underlying file space.
-			 *
-			 * !!!
-			 * We could optimize here by using the original overflow
-			 * information for some set of the column values.  (For
-			 * example, if column cells #10-17 reference overflow X,
-			 * and cell #12 is updated with a new record: we could
-			 * use the original overflow X for either cells #10-11
-			 * or cells #13-17.)  We don't do that, instead we write
-			 * new overflow records for both groups.  I'm skipping
-			 * that work because I don't want the complexity, and
-			 * overflow records should be rare.
+			 * If the original value is "deleted", there's no value
+			 * to compare, we're done.
 			 */
-			WT_ERR(__rec_track_cell(session, page, unpack));
+			orig_deleted = unpack->type == WT_CELL_DEL ? 1 : 0;
+			if (orig_deleted)
+				goto value_loop;
+
+			/*
+			 * If we're updating a single cell, we never look at the
+			 * original value.  If the original cell was an overflow
+			 * value, discard it.
+			 */
+			if (nrepeat == 1 && ins != NULL) {
+				WT_ASSERT(
+				    session, WT_INSERT_RECNO(ins) == src_recno);
+
+				WT_ERR(__rec_track_cell(session, page, unpack));
+				goto value_loop;
+			}
+
+			/*
+			 * We need a copy of the original value.  Check for the
+			 * common case where the underlying value is simple and
+			 * avoid a copy.
+			 */
+			if (!unpack->ovfl && btree->huffman_value == NULL) {
+				orig.data = unpack->data;
+				orig.size = unpack->size;
+				goto value_loop;
+			}
+
+			/*
+			 * We either have an encoded value, an overflow value,
+			 * or both.  If the underlying cell is not an overflow
+			 * value, decode it and we're good to go.
+			 */
+			if (!unpack->ovfl) {
+				WT_ERR(__wt_cell_unpack_copy(
+				    session, unpack, &orig));
+				goto value_loop;
+			}
+
+			/*
+			 * Special handling when re-writing an overflow cell's
+			 * value.  The problem is the original overflow pages:
+			 * we'd like to reuse them for some set of the column
+			 * values.  For example, if columns #10-17 reference
+			 * overflow A, and cell 12 is updated with a new value:
+			 * we could use the original overflow pages for cells
+			 * #10-11 or cells #13-17.  Insert the overflow cell's
+			 * value into the tracking system as an overflow page
+			 * so we can find it and re-use it.
+			 *    Two additional concerns: First, we don't want to
+			 * repeatedly add the overflow cell into the tracking
+			 * system, so we check to see if it's already there.
+			 * Second, we can't get a copy of the original value
+			 * if the overflow cell's blocks have been discarded.
+			 * That's almost OK, if the overflow cell's blocks have
+			 * been discarded, all of them must have been replaced
+			 * and we'll never look at them by definition, our only
+			 * concern is to detect the event has occurred.  It is
+			 * non-trivial to detect the event has occurred (we'd
+			 * need new states in the tracking system), so instead
+			 * we ensure the tracking system can always give us a
+			 * copy.
+			 *    Search for the blocks in the tracking system: if
+			 * found, we don't add them again and are returned a
+			 * copy of the original value.  Otherwise, get a copy
+			 * of the overflow value and enter it into the tracking
+			 * system.
+			 */
+			WT_ERR(__wt_rec_track_ovfl_srch(session,
+			    page, unpack->data, unpack->size, &orig));
+			if (orig.size != 0)
+				goto value_loop;
+
+			WT_ERR(__wt_cell_unpack_copy(session, unpack, &orig));
+			WT_ERR(__wt_rec_track_ovfl(session, page,
+			    unpack->data, unpack->size, orig.data, orig.size));
 		}
 
-		/*
+value_loop:	/*
 		 * Generate on-page entries: loop repeat records, looking for
 		 * WT_INSERT entries matching the record number.  The WT_INSERT
 		 * lists are in sorted order, so only need check the next one.

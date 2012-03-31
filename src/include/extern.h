@@ -322,7 +322,7 @@ extern int __wt_rec_track_addr_discarded(WT_PAGE *page,
     uint32_t size);
 extern int __wt_rec_track_ovfl(WT_SESSION_IMPL *session,
     WT_PAGE *page,
-    uint8_t *addr,
+    const uint8_t *addr,
     uint32_t addr_size,
     const void *data,
     uint32_t data_size);
@@ -332,6 +332,11 @@ extern int __wt_rec_track_ovfl_reuse(WT_SESSION_IMPL *session,
     uint32_t size,
     uint8_t **addrp,
     uint32_t *sizep);
+extern int __wt_rec_track_ovfl_srch(WT_SESSION_IMPL *session,
+    WT_PAGE *page,
+    const uint8_t *addr,
+    uint32_t size,
+    WT_ITEM *copy);
 extern int __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern void __wt_rec_track_discard(WT_SESSION_IMPL *session, WT_PAGE *page);
 extern int __wt_rec_write( WT_SESSION_IMPL *session,
