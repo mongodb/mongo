@@ -301,9 +301,9 @@ namespace mongo {
      * notify the monitor that server has faild
      */
     void ReplicaSetMonitor::notifySlaveFailure( const HostAndPort& server ) {
-        int x = _find( server );
+        scoped_lock lk( _lock );
+        int x = _find_inlock( server );
         if ( x >= 0 ) {
-            scoped_lock lk( _lock );
             _nodes[x].ok = false;
         }
     }
