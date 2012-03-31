@@ -218,7 +218,7 @@ namespace mongo {
         
         if ( ps::rolling.access( region , offset , false ) ) {
 #ifdef _DEBUG
-            if ( blockSupported && ! ProcessInfo::blockInMemory( _data ) ) {
+            if ( blockSupported && ! ProcessInfo::blockInMemory( const_cast<char*>(_data) ) ) {
                 warning() << "we think data is in ram but system says no"  << endl;
             }
 #endif
