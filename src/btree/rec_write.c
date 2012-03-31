@@ -932,8 +932,8 @@ __rec_split_row_promote(WT_SESSION_IMPL *session, uint8_t type)
 		/*
 		 * The cell had better have a zero-length prefix: it's the first
 		 * key on the page.  (If it doesn't have a zero-length prefix,
-		 * __wt_cell_update_copy() won't be sufficient any way, we'd
-		 * only copy the non-prefix-compressed portion of the key.)
+		 * __wt_cell_unpack() won't be sufficient anyway, we'd only copy
+		 * the non-prefix-compressed portion of the key.)
 		 */
 		cell = WT_PAGE_HEADER_BYTE(btree, r->dsk.mem);
 		__wt_cell_unpack(cell, unpack);
