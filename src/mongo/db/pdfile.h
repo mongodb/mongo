@@ -222,7 +222,7 @@ namespace mongo {
         const char * data() const { _accessing(); return _data; }
         char * data() { _accessing(); return _data; }
 
-        int netLength() const { _accessing(); return _lengthWithHeaders - HeaderSize; }
+        int netLength() const { _accessing(); return _netLength(); }
 
         /* use this when a record is deleted. basically a union with next/prev fields */
         DeletedRecord& asDeleted() { return *((DeletedRecord*) this); }
@@ -272,6 +272,8 @@ namespace mongo {
 
     private:
         
+        int _netLength() const { return _lengthWithHeaders - HeaderSize; }
+
         /**
          * call this when accessing a field which could hit disk
          */

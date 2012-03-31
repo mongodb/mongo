@@ -187,7 +187,7 @@ namespace mongo {
     void Record::touch( bool entireRecrd ) const {
         if ( _lengthWithHeaders > HeaderSize ) { // this also makes sure lengthWithHeaders is in memory
             const char * addr = _data;
-            const char * end = _data + netLength();
+            const char * end = _data + _netLength();
             for ( ; addr <= end ; addr += 2048 ) {
                 __record_touch_dummy += addr[0];
 
