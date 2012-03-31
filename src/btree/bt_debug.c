@@ -508,20 +508,26 @@ __debug_page_modify(WT_DBG *ds, WT_PAGE *page)
 	if (mod->track_entries != 0)
 		__dmsg(ds, "\t" "tracking list:\n");
 	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i) {
-		switch (track->type) {
-		case WT_PT_DISCARD:
-			__dmsg(ds, "\t\t" "discard");
+		if (WT_TRK_TYPE(track) == WT_TRK_EMPTY)
+			continue;
+
+		__dmsg(ds, "\t\t");
+		if (F_ISSET(track, WT_TRK_PERM))
+			__dmsg(ds, "permanent ");
+		switch (WT_TRK_TYPE(track)) {
+		case WT_TRK_DISCARD:
+			__dmsg(ds, "discard");
 			break;
-		case WT_PT_DISCARD_COMPLETE:
-			__dmsg(ds, "\t\t" "discard-complete");
+		case WT_TRK_DISCARD_COMPLETE:
+			__dmsg(ds, "discard-complete");
 			break;
-		case WT_PT_OVFL:
-			__dmsg(ds, "\t\t" "overflow");
+		case WT_TRK_OVFL:
+			__dmsg(ds, "overflow");
 			break;
-		case WT_PT_OVFL_ACTIVE:
-			__dmsg(ds, "\t\t" "overflow-active");
+		case WT_TRK_OVFL_ACTIVE:
+			__dmsg(ds, "overflow-active");
 			break;
-		case WT_PT_EMPTY:
+		case WT_TRK_EMPTY:
 			continue;
 		WT_ILLEGAL_VALUE(session);
 		}

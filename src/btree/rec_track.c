@@ -11,28 +11,38 @@
  * A page in memory has a list of associated blocks and overflow items.  For
  * example, when an overflow item is modified, the original overflow blocks
  * must be freed at some point.  Or, when a page is split, then written again,
- * the first split must be freed.  This code tracks those objects: they are
- * called from the routines in rec_write.c, which update the objects each time
- * a page is reconciled.
+ * the first split must be freed.  Additionally, created overflow objects (by
+ * created, I mean built based on an update to a page, as opposed to taken
+ * from the original disk image) may be re-created on each reconciliation of a
+ * page, we need a way to find the previous write of the created overflow value
+ * so we simply re-use those blocks and don't re-write the overflow value on
+ * every reconciliation.  This code tracks those objects, these functions are
+ * called from the routines in rec_write.c, which updates tracking information
+ * each time a page is reconciled.
  *
- * An object has one of 4 types, plus there's a "slot not in use" type.
+ * An object has one of 4 types, plus there's a "slot not in use" type.  Each
+ * type can also be associated with a "permanent" flag, which means the entry
+ * can't be discarded when it's resolved, it has to remain in the table for as
+ * long as the page is in cache.
  *
- * WT_PT_EMPTY:
+ * WT_TRK_EMPTY:
  *	Empty slot.
  *
- * WT_PT_DISCARD:
- * WT_PT_DISCARD_COMPLETE:
- *	The key fact about a discarded block or overflow record is it may be
- * discarded multiple times.  For example, an internal page with an overflow
- * key referencing a page that's empty or split: each time a page is written,
- * we'll figure out the key's overflow blocks are no longer useful, but we have
- * no way to know we've figured that same thing out several times already.
- *	The type is initially set to WT_PT_DISCARD.  After the page is written,
- * WT_PT_DISCARD blocks are freed to the underlying block manager and the type
- * is set to WT_PT_DISCARD_COMPLETE.  That allows us to find the block on the
- * page's list again, but only physically free it once.
- *	Additionally, in the case of discarded overflow records we may have to
- * find them again in order to determine if an overflow key is needed again.
+ * WT_TRK_DISCARD:
+ * WT_TRK_DISCARD_COMPLETE:
+ *	A block being discarded has its type initially set to WT_TRK_DISCARD.
+ * After the page is written, WT_TRK_DISCARD blocks are freed to the underlying
+ * block manager.  If the entry is not permanent, the slot is then cleared,
+ * otherwise the type is set to WT_TRK_DISCARD_COMPLETE.  That allows us to
+ * find the block on the page's list again, but only physically free it once.
+ *	There are a few cases where a discarded block has to be "permanent"
+ * and remembered for the life of the page.  For example, an internal page
+ * with an overflow key referencing a page that's empty or split: each time
+ * the page is written, we'll figure out the key's overflow blocks are no
+ * longer useful, but we have no way to know we've figured that same thing out
+ * several times already.
+ *	Additionally, in the case of discarded overflow keys we may have to
+ * find them again in order to determine if an overflow key must be written.
  * If an overflow key references a deleted value during the reconciliation of
  * a row-store page, the overflow key would be discarded and underlying blocks
  * freed when the reconciliation completed.  If the value were to be replaced,
@@ -41,15 +51,21 @@
  * keys, we have to check if a previous reconciliation has discarded the key's
  * blocks, in which case we have to write the full key from scratch.  This is
  * painful, but not common.
+ *	Additionally, in the case of overflow values on column-store pages, we
+ * need a copy of the original value during each reconciliation for comparison
+ * against other values.  If the original record is deleted, we still need to
+ * know that fact, otherwise we'd attempt to retrieve it from the filesystem.
  *
- * WT_PT_OVFL:
- * WT_PT_OVFL_ACTIVE:
+ * WT_TRK_OVFL:
+ * WT_TRK_OVFL_ACTIVE:
  *	The key facts about a created overflow record are first that it may be
  * re-used during subsequent reconciliations, and second the blocks must be
  * physically discarded if a reconciliation of the page does not re-use the
  * previously created overflow records.  (Note this is different from overflow
- * records that appeared on the on-disk version of the page: they can only be
- * deleted, not re-used, and so they are handled by the WT_PT_DISCARD type.)
+ * records that cannot be re-used, for example, row-store leaf overflow values:
+ * they can only be deleted, and so the WT_TRK_DISCARD type is used instead of
+ * WT_TRK_OVFL.  Column-store leaf overflow values are re-used in some cases,
+ * and might use either the WT_TRK_DISCARD or WT_TRK_OVFL types.)
  *	An example of re-use is an inserted key/value pair where the value is
  * an overflow item.  The overflow record will be re-created as part of each
  * reconciliation.  We don't want to physically write the overflow record every
@@ -58,9 +74,16 @@
  *	However, if a created overflow record is not re-used in reconciliation,
  * the physical blocks must be discarded to the block manager since they are no
  * longer in use.
- *	The type is first set to WT_PT_OVFL_ACTIVE; after page reconciliation
- * completes, any records with a type of WT_PT_OVFL are discarded, and records
- * with a type of WT_PT_OVFL_ACTIVE are reset to WT_PT_OVFL.
+ *	The type is first set to WT_TRK_OVFL_ACTIVE; after page reconciliation
+ * completes, any records with a type of WT_TRK_OVFL are discarded, and records
+ * with a type of WT_TRK_OVFL_ACTIVE are reset to WT_TRK_OVFL.
+ *
+ * In summary: if it's an overflow item we can re-use, it's WT_TRK_OVFL, and
+ * as long it's re-used, the type will cycle between WT_TRK_OVFL_ACTIVE and
+ * WT_TRK_OVFL.   If it's not reused, then it will be discarded and depending
+ * on the "permanent" flag, cleared or retained as WT_TRK_DISCARD_COMPLETE.
+ * If it's a block, it will start out as WT_TRK_DISCARD, and depending on the
+ * "permanent" flag, cleared or retained as WT_TRK_DISCARD_COMPLETE.
  */
 
 #ifdef HAVE_VERBOSE
@@ -98,12 +121,12 @@ __rec_track_extend(WT_SESSION_IMPL *session, WT_PAGE *page)
 }
 
 /*
- * __wt_rec_track_addr --
- *	Add an addr/size pair to the page's list of tracked objects.
+ * __wt_rec_track_block --
+ *	Add an addr/size pair to the page's list of tracked blocks.
  */
 int
-__wt_rec_track_addr(
-    WT_SESSION_IMPL *session, WT_PAGE *page, const uint8_t *addr, uint32_t size)
+__wt_rec_track_block(WT_SESSION_IMPL *session,
+    WT_PAGE *page, const uint8_t *addr, uint32_t size, int permanent)
 {
 	WT_PAGE_MODIFY *mod;
 	WT_PAGE_TRACK *empty, *track;
@@ -113,19 +136,24 @@ __wt_rec_track_addr(
 
 	empty = NULL;
 	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i)
-		switch (track->type) {
-		case WT_PT_EMPTY:
+		switch (WT_TRK_TYPE(track)) {
+		case WT_TRK_EMPTY:
 			empty = track;
 			break;
-		case WT_PT_DISCARD:
-		case WT_PT_DISCARD_COMPLETE:
+		case WT_TRK_DISCARD_COMPLETE:
 			/* We've discarded this block already, ignore. */
 			if (track->addr.size == size &&
 			    memcmp(addr, track->addr.addr, size) == 0)
 				return (0);
 			break;
-		case WT_PT_OVFL:
-		case WT_PT_OVFL_ACTIVE:
+		case WT_TRK_DISCARD:
+		case WT_TRK_OVFL:
+		case WT_TRK_OVFL_ACTIVE:
+			/*
+			 * Checking other entry types would only be useful for
+			 * diagnostics, if we find the address associated with
+			 * another entry type, something has gone badly wrong.
+			 */
 			break;
 		}
 
@@ -136,7 +164,9 @@ __wt_rec_track_addr(
 	}
 
 	track = empty;
-	track->type = WT_PT_DISCARD;
+	track->flags = WT_TRK_DISCARD;
+	if (permanent)
+		F_SET(track, WT_TRK_PERM);
 	track->data = NULL;
 	track->size = 0;
 	WT_RET(__wt_strndup(session, (char *)addr, size, &track->addr.addr));
@@ -148,12 +178,13 @@ __wt_rec_track_addr(
 }
 
 /*
- * __wt_rec_track_addr_discarded --
+ * __wt_rec_track_block_discarded --
  *	Search for a discarded block record; if the address references discarded
  * blocks it cannot be re-used.
  */
 int
-__wt_rec_track_addr_discarded(WT_PAGE *page, const uint8_t *addr, uint32_t size)
+__wt_rec_track_block_discarded(
+    WT_PAGE *page, const uint8_t *addr, uint32_t size)
 {
 	WT_PAGE_MODIFY *mod;
 	WT_PAGE_TRACK *track;
@@ -161,22 +192,21 @@ __wt_rec_track_addr_discarded(WT_PAGE *page, const uint8_t *addr, uint32_t size)
 
 	mod = page->modify;
 	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i)
-		switch (track->type) {
-		case WT_PT_DISCARD:
-		case WT_PT_EMPTY:
-		case WT_PT_OVFL:
-		case WT_PT_OVFL_ACTIVE:
+		switch (WT_TRK_TYPE(track)) {
+		case WT_TRK_DISCARD_COMPLETE:
+			if (track->addr.size == size &&
+			    memcmp(addr, track->addr.addr, size) == 0)
+				return (1);
 			break;
-		case WT_PT_DISCARD_COMPLETE:
+		case WT_TRK_DISCARD:
+		case WT_TRK_EMPTY:
+		case WT_TRK_OVFL:
+		case WT_TRK_OVFL_ACTIVE:
 			/*
-			 * Only check WT_PT_DISCARD_COMPLETE entries.
 			 * Checking other entry types would only be useful for
 			 * diagnostics, if we find the address associated with
 			 * another entry type, something has gone badly wrong.
 			 */
-			if (track->addr.size == size &&
-			    memcmp(addr, track->addr.addr, size) == 0)
-				return (1);
 			break;
 		}
 	return (0);
@@ -189,7 +219,7 @@ __wt_rec_track_addr_discarded(WT_PAGE *page, const uint8_t *addr, uint32_t size)
 int
 __wt_rec_track_ovfl(WT_SESSION_IMPL *session, WT_PAGE *page,
     const uint8_t *addr, uint32_t addr_size,
-    const void *data, uint32_t data_size)
+    const void *data, uint32_t data_size, int permanent)
 {
 	WT_PAGE_MODIFY *mod;
 	WT_PAGE_TRACK *empty, *track;
@@ -202,7 +232,7 @@ __wt_rec_track_ovfl(WT_SESSION_IMPL *session, WT_PAGE *page,
 
 	empty = NULL;
 	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i)
-		if (track->type == WT_PT_EMPTY) {
+		if (track->flags == WT_TRK_EMPTY) {
 			empty = track;
 			break;
 		}
@@ -220,7 +250,9 @@ __wt_rec_track_ovfl(WT_SESSION_IMPL *session, WT_PAGE *page,
 	WT_RET(__wt_calloc_def(session, addr_size + data_size, &p));
 
 	track = empty;
-	track->type = WT_PT_OVFL_ACTIVE;
+	track->flags = WT_TRK_OVFL_ACTIVE;
+	if (permanent)
+		F_SET(track, WT_TRK_PERM);
 	track->addr.addr = p;
 	track->addr.size = addr_size;
 	memcpy(track->addr.addr, addr, addr_size);
@@ -251,12 +283,13 @@ __wt_rec_track_ovfl_reuse(WT_SESSION_IMPL *session, WT_PAGE *page,
 	mod = page->modify;
 	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i) {
 		/* Check for a match. */
-		if (track->type != WT_PT_OVFL ||
+		if (!F_ISSET(track, WT_TRK_OVFL) ||
 		    size != track->size || memcmp(data, track->data, size) != 0)
 			continue;
 
 		/* Found a match, return the record to use. */
-		track->type = WT_PT_OVFL_ACTIVE;
+		F_CLR(track, WT_TRK_OVFL);
+		F_SET(track, WT_TRK_OVFL_ACTIVE);
 
 		/* Return the block addr/size pair to our caller. */
 		*addrp = track->addr.addr;
@@ -281,38 +314,27 @@ __wt_rec_track_ovfl_srch(WT_SESSION_IMPL *session,
 	WT_PAGE_TRACK *track;
 	uint32_t i;
 
-	copy->size = 0;				/* By default, not found. */
-
 	mod = page->modify;
 	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i)
-		switch (track->type) {
-		case WT_PT_DISCARD:
-		case WT_PT_EMPTY:
-		case WT_PT_OVFL_ACTIVE:
-			break;
-		case WT_PT_DISCARD_COMPLETE:
-		case WT_PT_OVFL:
+		switch (WT_TRK_TYPE(track)) {
+		case WT_TRK_DISCARD_COMPLETE:
+		case WT_TRK_OVFL:
 			/*
 			 * This function is used to track overflow column-store
-			 * values, there are special considerations, review the
-			 * calling code for more detail.
+			 * values, review the calling code for more detail.
 			 *
-			 * Check WT_PT_DISCARD_COMPLETE and WT_PT_OVFL entries.
-			 * If it's a WT_PT_DISCARD_COMPLETE entry, we discarded
+			 * If it's a WT_TRK_DISCARD_COMPLETE entry, we discarded
 			 * the underlying overflow blocks, and the page is being
 			 * reconciled after that discard.  We still copy out the
 			 * original key to our caller, even though they should
 			 * not need it (we get here because all of the keys on
 			 * the page that originally referenced this item were
-			 * updated, which means our callers reconciliation loop
-			 * won't need the original value).  If it's a WT_PT_OVFL
-			 * entry, the underlying blocks have not been discarded
-			 * and are likely to be re-used -- our caller definitely
-			 * needs a copy of the original key.
+			 * updated, which means our caller's reconciliation loop
+			 * won't need the original value).
 			 *
-			 * Checking other entry types would only be useful for
-			 * diagnostics, if we find the address associated with
-			 * another entry type, something has gone badly wrong.
+			 * If it's a WT_TRK_OVFL entry, underlying blocks have
+			 * not been discarded and are likely to be re-used, our
+			 * caller requires a copy of the original key.
 			 */
 			if (track->addr.size == size &&
 			    memcmp(addr, track->addr.addr, size) == 0) {
@@ -320,6 +342,15 @@ __wt_rec_track_ovfl_srch(WT_SESSION_IMPL *session,
 				    session, copy, track->data, track->size));
 				return (0);
 			}
+			break;
+		case WT_TRK_DISCARD:
+		case WT_TRK_EMPTY:
+		case WT_TRK_OVFL_ACTIVE:
+			/*
+			 * Checking other entry types would only be useful for
+			 * diagnostics, if we find the address associated with
+			 * another entry type, something has gone badly wrong.
+			 */
 			break;
 		}
 	return (0);
@@ -344,31 +375,40 @@ __wt_rec_track_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 */
 	for (track = page->modify->track,
 	    i = 0; i < page->modify->track_entries; ++track, ++i)
-		switch (track->type) {
-		case WT_PT_EMPTY:
-		case WT_PT_DISCARD_COMPLETE:
+		switch (WT_TRK_TYPE(track)) {
+		case WT_TRK_DISCARD_COMPLETE:
+		case WT_TRK_EMPTY:
 			continue;
-		case WT_PT_DISCARD:
-		case WT_PT_OVFL:
+		case WT_TRK_DISCARD:
+		case WT_TRK_OVFL:
 			WT_VERBOSE_CALL(session, reconcile, __track_msg(
 			    session, page, "discard block", &track->addr));
 
-			/* We no longer need these blocks. */
+			/* We no longer need the underlying blocks. */
 			WT_RET(__wt_bm_free(
 			    session, track->addr.addr, track->addr.size));
 
 			/*
-			 * There are page and overflow blocks we track anew as
-			 * part of each reconciliation, we need to know about
-			 * them so we don't free them more than once.  Set the
-			 * type -- we no longer care if it's an overflow item
-			 * or not, we just care that the slot exists.
+			 * There are page and overflow blocks we track anew in
+			 * each page reconciliation, we need to know about them
+			 * even if the underlying blocks are no longer in use.
 			 */
-			track->type = WT_PT_DISCARD_COMPLETE;
+			if (F_ISSET(track, WT_TRK_PERM))
+				track->flags = WT_TRK_DISCARD_COMPLETE;
+			else {
+				__wt_free(session, track->addr.addr);
+
+				track->data = NULL;
+				track->size = 0;
+				track->addr.addr = NULL;
+				track->addr.size = 0;
+				track->flags = WT_TRK_EMPTY;
+			}
 			break;
-		case WT_PT_OVFL_ACTIVE:
-			/* Reset the type to prepare for the next reconcile. */
-			track->type = WT_PT_OVFL;
+		case WT_TRK_OVFL_ACTIVE:
+			/* Reset to prepare for the next page reconciliation. */
+			F_CLR(track, WT_TRK_OVFL_ACTIVE);
+			F_SET(track, WT_TRK_OVFL);
 			break;
 		}
 	return (0);
@@ -419,20 +459,20 @@ __track_dump(WT_SESSION_IMPL *session, WT_PAGE *page, const char *tag)
 static void
 __track_print(WT_SESSION_IMPL *session, WT_PAGE *page, WT_PAGE_TRACK *track)
 {
-	switch (track->type) {
-	case WT_PT_DISCARD:
+	switch (WT_TRK_TYPE(track)) {
+	case WT_TRK_DISCARD:
 		__track_msg(session, page, "discard", &track->addr);
 		break;
-	case WT_PT_DISCARD_COMPLETE:
+	case WT_TRK_DISCARD_COMPLETE:
 		__track_msg(session, page, "discard-complete", &track->addr);
 		break;
-	case WT_PT_OVFL:
+	case WT_TRK_OVFL:
 		__track_msg(session, page, "overflow", &track->addr);
 		break;
-	case WT_PT_OVFL_ACTIVE:
+	case WT_TRK_OVFL_ACTIVE:
 		__track_msg(session, page, "overflow-active", &track->addr);
 		break;
-	case WT_PT_EMPTY:
+	case WT_TRK_EMPTY:
 	default:				/* Not possible. */
 		break;
 	}

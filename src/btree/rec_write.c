@@ -182,8 +182,8 @@ static inline int
 __rec_track_cell(
     WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack)
 {
-	return (unpack->ovfl ? __wt_rec_track_addr(
-	    session, page, unpack->data, unpack->size) : 0);
+	return (unpack->ovfl ? __wt_rec_track_block(
+	    session, page, unpack->data, unpack->size, 1) : 0);
 }
 
 /*
@@ -1716,14 +1716,16 @@ __rec_col_var(
 			 * of the overflow value and enter it into the tracking
 			 * system.
 			 */
+			orig.size = 0;
 			WT_ERR(__wt_rec_track_ovfl_srch(session,
 			    page, unpack->data, unpack->size, &orig));
 			if (orig.size != 0)
 				goto value_loop;
 
 			WT_ERR(__wt_cell_unpack_copy(session, unpack, &orig));
-			WT_ERR(__wt_rec_track_ovfl(session, page,
-			    unpack->data, unpack->size, orig.data, orig.size));
+			WT_ERR(__wt_rec_track_ovfl(
+			    session, page, unpack->data,
+			    unpack->size, orig.data, orig.size, 1));
 		}
 
 value_loop:	/*
@@ -2035,7 +2037,7 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 *
 		 * Truncate any 0th key, internal pages don't need 0th keys.
 		 */
-		if (onpage_ovfl) {
+		if (0) {
 			key->buf.data = cell;
 			key->buf.size = unpack->len;
 			key->cell_len = 0;
@@ -2363,7 +2365,7 @@ __rec_row_leaf(
 		 */
 		__wt_cell_unpack(cell, unpack);
 		if (unpack->type == WT_CELL_KEY_OVFL &&
-		    !__wt_rec_track_addr_discarded(
+		    !__wt_rec_track_block_discarded(
 		    page, unpack->data, unpack->size)) {
 			/*
 			 * If an overflow key, assume prefix compression won't
@@ -2572,7 +2574,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 */
 		if (!WT_PAGE_IS_ROOT(page) && page->ref->addr != NULL) {
 			__wt_get_addr(page->parent, page->ref, &addr, &size);
-			WT_RET(__wt_rec_track_addr(session, page, addr, size));
+			WT_RET(
+			    __wt_rec_track_block(session, page, addr, size, 1));
 		}
 		break;
 	case WT_PAGE_REC_EMPTY:				/* Page deleted */
@@ -2585,8 +2588,8 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * are snapshots, and must be explicitly dropped.
 		 */
 		if (!WT_PAGE_IS_ROOT(page))
-			WT_RET(__wt_rec_track_addr(session,
-			    page, mod->u.replace.addr, mod->u.replace.size));
+			WT_RET(__wt_rec_track_block(session,
+			    page, mod->u.replace.addr, mod->u.replace.size, 0));
 
 		/* Discard the replacement page's address. */
 		__wt_free(session, mod->u.replace.addr);
@@ -2596,9 +2599,9 @@ __rec_write_wrapup(WT_SESSION_IMPL *session, WT_PAGE *page)
 	case WT_PAGE_REC_SPLIT:				/* Page split */
 		/* Discard the split page's leaf-page blocks. */
 		WT_REF_FOREACH(mod->u.split, ref, i)
-			WT_RET(__wt_rec_track_addr(session, page,
+			WT_RET(__wt_rec_track_block(session, page,
 			    ((WT_ADDR *)ref->addr)->addr,
-			    ((WT_ADDR *)ref->addr)->size));
+			    ((WT_ADDR *)ref->addr)->size, 0));
 
 		/* Discard the split page itself. */
 		__wt_page_out(session, mod->u.split, 0);
@@ -3076,7 +3079,7 @@ __rec_cell_build_ovfl(
 
 		/* Track the overflow record. */
 		WT_ERR(__wt_rec_track_ovfl(
-		    session, page, addr, size, kv->buf.data, kv->buf.size));
+		    session, page, addr, size, kv->buf.data, kv->buf.size, 0));
 	}
 
 	/* Set the callers K/V to reference the overflow record's address. */

@@ -72,14 +72,6 @@ struct __wt_addr {
  *	When a page is modified, there's additional information maintained as it
  * is written to disk.
  */
-typedef enum {
-	WT_PT_EMPTY=0,			/* Unused slot */
-	WT_PT_DISCARD,			/* Block/overflow to discard */
-	WT_PT_DISCARD_COMPLETE,		/* Block/overflow freed */
-	WT_PT_OVFL,			/* Overflow record not yet in use */
-	WT_PT_OVFL_ACTIVE		/* Overflow record in use */
-} __wt_pt_type_t;
-
 struct __wt_page_modify {
 	/*
 	 * The write generation is incremented after a page is modified.  That
@@ -164,15 +156,26 @@ struct __wt_page_modify {
 	 * write them once.
 	 */
 	struct __wt_page_track {
-		__wt_pt_type_t type;	/* Type */
-
 		WT_ADDR  addr;		/* Overflow or block location */
 
 		uint8_t *data;		/* Overflow data reference */
 		uint32_t size;		/* Overflow data length */
+
+#define	WT_TRK_EMPTY		0x00	/* Unused slot */
+#define	WT_TRK_DISCARD		0x01	/* Block/overflow to discard */
+#define	WT_TRK_DISCARD_COMPLETE	0x02	/* Block/overflow freed */
+#define	WT_TRK_OVFL		0x04	/* Overflow record not yet in use */
+#define	WT_TRK_OVFL_ACTIVE	0x08	/* Overflow record in use */
+#define	WT_TRK_PERM		0x80	/* Overflow record that must remain */
+		uint8_t  flags;
 	} *track;			/* Array of tracked objects */
 	uint32_t track_entries;		/* Total track slots */
 };
+
+#define	WT_TRK_TYPE(track)						\
+	((track)->flags &						\
+	    (WT_TRK_DISCARD |						\
+	    WT_TRK_DISCARD_COMPLETE | WT_TRK_OVFL | WT_TRK_OVFL_ACTIVE))
 
 /*
  * WT_PAGE --
