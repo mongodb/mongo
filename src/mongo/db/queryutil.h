@@ -631,6 +631,13 @@ namespace mongo {
         int validateCurrentInterval( int i, const BSONElement &jj, bool reverse, bool first,
                                     bool &eq );
         
+        /** Skip to curr / i / nextbounds. */
+        int advanceToLowerBound( int i );
+        /** Skip to curr / i / superlative. */
+        int advancePast( int i );
+        /** Skip to curr / i / superlative and reset following interval counters. */
+        int advancePastZeroed( int i );
+        
         const FieldRangeVector &_v;
         CompoundRangeCounter _i;
         vector<const BSONElement*> _cmp;

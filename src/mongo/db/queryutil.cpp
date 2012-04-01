@@ -1342,26 +1342,13 @@ namespace mongo {
                         if ( latestNonEndpoint == -1 ) {
                             return -2;
                         }
-                        _i.setZeroes( latestNonEndpoint + 1 );
-                        // skip to curr / latestNonEndpoint + 1 / superlative
-                        _after = true;
-                        return latestNonEndpoint + 1;
+                        return advancePastZeroed( latestNonEndpoint + 1 );
                     }
                     _i.set( i, ( l + 1 ) / 2 );
                     if ( lowEquality ) {
-                        // skip to curr / i + 1 / superlative
-                        _after = true;
-                        return i + 1;
+                        return advancePast( i + 1 );
                     }
-                    // skip to curr / i / nextbounds
-                    _cmp[ i ] = &_v._ranges[ i ].intervals()[ _i.get( i ) ]._lower._bound;
-                    _inc[ i ] = _v._ranges[ i ].intervals()[ _i.get( i ) ]._lower._inclusive;
-                    for( int j = i + 1; j < _i.size(); ++j ) {
-                        _cmp[ j ] = &_v._ranges[ j ].intervals().front()._lower._bound;
-                        _inc[ j ] = _v._ranges[ j ].intervals().front()._lower._inclusive;
-                    }
-                    _after = false;
-                    return i;
+                    return advanceToLowerBound( i );
                 }
             }
             bool first = true;
@@ -1392,10 +1379,7 @@ namespace mongo {
                     return -2;
                 }
                 // more values possible, skip...
-                _i.setZeroes( latestNonEndpoint + 1 );
-                // skip to curr / latestNonEndpoint + 1 / superlative
-                _after = true;
-                return latestNonEndpoint + 1;
+                return advancePastZeroed( latestNonEndpoint + 1 );
             }
         }
         return -1;
@@ -1439,25 +1423,35 @@ namespace mongo {
         }
         // if we're equal to and not inclusive the lower bound, advance
         if ( ( x == 0 && !_v._ranges[ i ].intervals()[ _i.get( i ) ]._lower._inclusive ) ) {
-            _i.setZeroes( i + 1 );
-            // skip to curr / i + 1 / superlative
-            _after = true;
-            return i + 1;
+            return advancePastZeroed( i + 1 );
         }
         // if we're less than the lower bound, advance
         if ( x > 0 ) {
             _i.setZeroes( i + 1 );
-            // skip to curr / i / nextbounds
-            _cmp[ i ] = &_v._ranges[ i ].intervals()[ _i.get( i ) ]._lower._bound;
-            _inc[ i ] = _v._ranges[ i ].intervals()[ _i.get( i ) ]._lower._inclusive;
-            for( int j = i + 1; j < _i.size(); ++j ) {
-                _cmp[ j ] = &_v._ranges[ j ].intervals().front()._lower._bound;
-                _inc[ j ] = _v._ranges[ j ].intervals().front()._lower._inclusive;
-            }
-            _after = false;
-            return i;
+            return advanceToLowerBound( i );
         }
         return -1;
+    }
+    
+    int FieldRangeVectorIterator::advanceToLowerBound( int i ) {
+        _cmp[ i ] = &_v._ranges[ i ].intervals()[ _i.get( i ) ]._lower._bound;
+        _inc[ i ] = _v._ranges[ i ].intervals()[ _i.get( i ) ]._lower._inclusive;
+        for( int j = i + 1; j < _i.size(); ++j ) {
+            _cmp[ j ] = &_v._ranges[ j ].intervals().front()._lower._bound;
+            _inc[ j ] = _v._ranges[ j ].intervals().front()._lower._inclusive;
+        }
+        _after = false;
+        return i;
+    }
+    
+    int FieldRangeVectorIterator::advancePast( int i ) {
+        _after = true;
+        return i;
+    }
+    
+    int FieldRangeVectorIterator::advancePastZeroed( int i ) {
+        _i.setZeroes( i );
+        return advancePast( i );
     }
 
 
