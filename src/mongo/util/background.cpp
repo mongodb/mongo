@@ -180,7 +180,7 @@ namespace mongo {
                 }
                 
                 int ms = timer.millis();
-                LOG( ms <= 3 ? 1 : 0 ) << "task: " << t->taskName() << " took: " << ms << "ms" << endl;
+                LOG( ms <= 3 ? 3 : 0 ) << "task: " << t->taskName() << " took: " << ms << "ms" << endl;
             }
         }
     }
