@@ -497,6 +497,7 @@ namespace mongo {
     }
 
     Extent* MongoDataFile::createExtent(const char *ns, int approxSize, bool newCapped, int loops) {
+        verify( approxSize < Extent::maxSize() );
         {
             // make sizes align with VM page size
             int newSize = (approxSize + 0xfff) & 0xfffff000;
@@ -553,6 +554,10 @@ namespace mongo {
             if( high <= 0 ) {
                 // overflowed
                 high = max(approxSize, Extent::maxSize());
+            }
+            if ( high <= Extent::minSize() ) {
+                // the minimum extent size is 4097
+                high = Extent::minSize() + 1;
             }
             int n = 0;
             Extent *best = 0;
