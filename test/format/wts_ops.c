@@ -13,10 +13,10 @@ static void  col_put(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
 static void  nextprev(WT_CURSOR *, int, int *);
 static int   notfound_chk(const char *, int, int, uint64_t);
 static void *ops(void *);
+static void  print_item(const char *, WT_ITEM *);
 static void  read_row(WT_CURSOR *, WT_ITEM *, uint64_t);
 static void  row_del(WT_CURSOR *, WT_ITEM *, uint64_t, int *);
 static void  row_put(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t, int);
-static void  print_item(const char *, WT_ITEM *);
 
 /*
  * wts_ops --
@@ -107,7 +107,7 @@ ops(void *arg)
 	WT_CURSOR *cursor, *cursor_insert;
 	WT_SESSION *session;
 	WT_ITEM key, value;
-	uint64_t cnt, keyno;
+	uint64_t cnt, keyno, sync_op;
 	uint32_t op;
 	u_int np;
 	int dir, insert, notfound, ret;
@@ -146,9 +146,16 @@ ops(void *arg)
 	    WT_TABLENAME, NULL, "append", &cursor_insert)) != 0)
 		die(ret, "session.open_cursor");
 
+	/* Pick an operation where we'll do a sync instead. */
+	sync_op = MMRAND(1, g.c_ops);
+
 	for (cnt = 0; cnt < g.c_ops; ++cnt) {
 		if (SINGLETHREADED && cnt % 100 == 0)
 			track("read/write ops", 0ULL, tinfo);
+
+		if (cnt == sync_op &&
+		    (ret = session->sync(session, WT_TABLENAME, NULL)) != 0)
+			die(ret, "session.sync: %s", WT_TABLENAME);
 
 		insert = notfound = 0;
 
@@ -219,7 +226,7 @@ ops(void *arg)
 		 * If we did any operation, we've set the cursor, do a small
 		 * number of next/prev cursor operations in a random direction.
 		 */
-		dir = MMRAND(0, 1);
+		dir = (int)MMRAND(0, 1);
 		for (np = 0; np < MMRAND(1, 8); ++np) {
 			if (notfound)
 				break;
