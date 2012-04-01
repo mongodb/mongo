@@ -2281,7 +2281,7 @@ __rec_row_leaf(
 	WT_UPDATE *upd;
 	uint64_t slvg_skip;
 	uint32_t i;
-	int ovfl_key, ret;
+	int onpage_ovfl, ovfl_key, ret;
 
 	r = session->reconcile;
 	btree = session->btree;
@@ -2415,7 +2415,8 @@ __rec_row_leaf(
 		 * things better, and simply copy the key from the disk image.
 		 */
 		__wt_cell_unpack(cell, unpack);
-		if (unpack->ovfl) {
+		onpage_ovfl = unpack->ovfl;
+		if (onpage_ovfl) {
 			tmpkey->size = 0;
 			WT_ERR(__wt_rec_track_ovfl_srch(
 			    session, page, unpack->data, unpack->size, tmpkey));
@@ -2436,9 +2437,17 @@ __rec_row_leaf(
 				 * a place to hang this comment.
 				 */
 				tmpkey->size = 0;
-			} else
+			} else {
 				WT_ERR(__rec_cell_build_key(session,
 				    tmpkey->data, tmpkey->size, 0, &ovfl_key));
+
+				/*
+				 * Clear the on-page overflow key flag: we've
+				 * built a real key, we're not copying from a
+				 * page.
+				 */
+				onpage_ovfl = 0;
+			}
 		} else {
 			/*
 			 * If the key is already instantiated, use it.
@@ -2503,10 +2512,12 @@ __rec_row_leaf(
 		while (key->len +
 		    val->len + WT_TRAILING_KEY_CELL > r->space_avail) {
 			/*
-			 * We have to have a copy of any overflow key because
-			 * we're about to promote it.
+			 * In one path above, we copied the key from the page
+			 * rather than building the actual key.  In that case,
+			 * we have to build the actual key now because we are
+			 * about to promote it.
 			 */
-			if (ovfl_key && unpack->ovfl)
+			if (onpage_ovfl)
 				WT_RET(__wt_cell_unpack_copy(
 				    session, unpack, r->cur));
 			WT_ERR(__rec_split(session));
@@ -2989,13 +3000,13 @@ __rec_cell_build_key(WT_SESSION_IMPL *session,
 	/* Create an overflow object if the data won't fit. */
 	if (key->buf.size >
 	    (is_internal ? btree->maxintlitem : btree->maxleafitem)) {
-		WT_BSTAT_INCR(session, rec_ovfl_key);
-
 		/*
 		 * Overflow objects aren't prefix compressed -- rebuild any
 		 * object that was prefix compressed.
 		 */
 		if (pfx == 0) {
+			WT_BSTAT_INCR(session, rec_ovfl_key);
+
 			*is_ovflp = 1;
 			return (__rec_cell_build_ovfl(
 			    session, key, WT_CELL_KEY_OVFL, (uint64_t)0));
