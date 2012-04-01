@@ -1,6 +1,7 @@
 // Tests the dropping of a sharded database SERVER-3471 SERVER-1726
 
 var st = new ShardingTest({ name : jsTestName() })
+st.stopBalancer()
 
 var mongos = st.s0
 var config = mongos.getDB( "config" )
