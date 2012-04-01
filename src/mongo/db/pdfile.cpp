@@ -497,7 +497,7 @@ namespace mongo {
     }
 
     Extent* MongoDataFile::createExtent(const char *ns, int approxSize, bool newCapped, int loops) {
-        verify( approxSize < Extent::maxSize() );
+        verify( approxSize <= Extent::maxSize() );
         {
             // make sizes align with VM page size
             int newSize = (approxSize + 0xfff) & 0xfffff000;
