@@ -24,6 +24,7 @@
 #include "cmdline.h"
 #include "clientcursor.h"
 #include "../server.h"
+#include "pagefault.h"
 
 //#define DEBUGQO(x) cout << x << endl;
 #define DEBUGQO(x)
@@ -870,6 +871,9 @@ doneCheckOrder:
     } \
     catch ( const std::exception &e ) { \
         op.setException( ExceptionInfo( e.what() , 0 ) ); \
+    } \
+    catch ( PageFaultException& pfe ) { \
+        throw pfe; \
     } \
     catch ( ... ) { \
         op.setException( ExceptionInfo( "Caught unknown exception" , 0 ) ); \
