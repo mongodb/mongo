@@ -1,10 +1,10 @@
 
 
-db = db.getSisterDB( "test_extent2" );
-db.dropDatabase();
+mydb = db.getSisterDB( "test_extent2" );
+mydb.dropDatabase();
 
-t = db.foo;
-e = db["$freelist"]
+t = mydb.foo;
+e = mydb["$freelist"]
 
 function insert(){
     t.insert( { _id : 1 , x : 1 } )
