@@ -681,7 +681,8 @@ namespace mongo {
                     }
 
                     log( logLvl - 1 ) << "re-entered distributed lock '" << lockName << "'" << endl;
-                    *other = o; other->getOwned(); conn.done();
+                    *other = o.getOwned(); 
+                    conn.done();
                     return true;
 
                 }
