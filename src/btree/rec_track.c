@@ -140,13 +140,19 @@ __wt_rec_track_block(WT_SESSION_IMPL *session,
 		case WT_TRK_EMPTY:
 			empty = track;
 			break;
+		case WT_TRK_DISCARD:
 		case WT_TRK_DISCARD_COMPLETE:
-			/* We've discarded this block already, ignore. */
+			/*
+			 * We've discarded this block already, ignore it; the
+			 * expected type is WT_TRK_DISCARD_COMPLETE (the block
+			 * was discarded in a previous reconciliation), but if
+			 * we decide to discard a block twice in some code, it
+			 * isn't necessarily wrong.
+			 */
 			if (track->addr.size == size &&
 			    memcmp(addr, track->addr.addr, size) == 0)
 				return (0);
 			break;
-		case WT_TRK_DISCARD:
 		case WT_TRK_OVFL:
 		case WT_TRK_OVFL_ACTIVE:
 			/*
@@ -178,48 +184,13 @@ __wt_rec_track_block(WT_SESSION_IMPL *session,
 }
 
 /*
- * __wt_rec_track_block_discarded --
- *	Search for a discarded block record; if the address references discarded
- * blocks it cannot be re-used.
- */
-int
-__wt_rec_track_block_discarded(
-    WT_PAGE *page, const uint8_t *addr, uint32_t size)
-{
-	WT_PAGE_MODIFY *mod;
-	WT_PAGE_TRACK *track;
-	uint32_t i;
-
-	mod = page->modify;
-	for (track = mod->track, i = 0; i < mod->track_entries; ++track, ++i)
-		switch (WT_TRK_TYPE(track)) {
-		case WT_TRK_DISCARD_COMPLETE:
-			if (track->addr.size == size &&
-			    memcmp(addr, track->addr.addr, size) == 0)
-				return (1);
-			break;
-		case WT_TRK_DISCARD:
-		case WT_TRK_EMPTY:
-		case WT_TRK_OVFL:
-		case WT_TRK_OVFL_ACTIVE:
-			/*
-			 * Checking other entry types would only be useful for
-			 * diagnostics, if we find the address associated with
-			 * another entry type, something has gone badly wrong.
-			 */
-			break;
-		}
-	return (0);
-}
-
-/*
  * __wt_rec_track_ovfl --
  *	Add an overflow object to the page's list of tracked objects.
  */
 int
 __wt_rec_track_ovfl(WT_SESSION_IMPL *session, WT_PAGE *page,
     const uint8_t *addr, uint32_t addr_size,
-    const void *data, uint32_t data_size, int permanent)
+    const void *data, uint32_t data_size, uint32_t flags)
 {
 	WT_PAGE_MODIFY *mod;
 	WT_PAGE_TRACK *empty, *track;
@@ -250,9 +221,7 @@ __wt_rec_track_ovfl(WT_SESSION_IMPL *session, WT_PAGE *page,
 	WT_RET(__wt_calloc_def(session, addr_size + data_size, &p));
 
 	track = empty;
-	track->flags = WT_TRK_OVFL_ACTIVE;
-	if (permanent)
-		F_SET(track, WT_TRK_PERM);
+	track->flags = (uint8_t)flags;
 	track->addr.addr = p;
 	track->addr.size = addr_size;
 	memcpy(track->addr.addr, addr, addr_size);

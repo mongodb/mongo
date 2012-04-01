@@ -174,19 +174,6 @@ static int  __rec_write_init(WT_SESSION_IMPL *, WT_PAGE *);
 static int  __rec_write_wrapup(WT_SESSION_IMPL *, WT_PAGE *);
 
 /*
- * __rec_track_cell --
- *	If a cell we're re-writing references an overflow chunk, add it to the
- * page's tracking list to be discarded after the write completes.
- */
-static inline int
-__rec_track_cell(
-    WT_SESSION_IMPL *session, WT_PAGE *page, WT_CELL_UNPACK *unpack)
-{
-	return (unpack->ovfl ? __wt_rec_track_block(
-	    session, page, unpack->data, unpack->size, 1) : 0);
-}
-
-/*
  * __wt_rec_write --
  *	Reconcile an in-memory page into its on-disk format, and write it.
  */
@@ -1527,6 +1514,42 @@ __rec_col_var_helper(
 }
 
 /*
+ * __rec_track_cell_ovfl --
+ *	Get/set overflow cells we need to track over the life of the page.
+ */
+static int
+__rec_track_cell_ovfl(WT_SESSION_IMPL *session,
+    WT_PAGE *page, WT_CELL_UNPACK *unpack, WT_ITEM *buf)
+{
+	/*
+	 * We're dealing with an overflow cell we may encounter repeatedly and
+	 * which we can re-use (unless it's deleted).  If it's deleted, we
+	 * still, at least in the case of page keys, need to know the original
+	 * value so we can re-create it.  As we can't get the original value of
+	 * the overflow cell's blocks from disk if the blocks were discarded,
+	 * we have to be able to get a copy from the tracking system.
+	 *
+	 * Try and get a copy from the tracking system.
+	 */
+	buf->size = 0;
+	WT_RET(__wt_rec_track_ovfl_srch(
+	    session, page, unpack->data, unpack->size, buf));
+	if (buf->size != 0)
+		return (0);
+
+	/*
+	 * Read the original value from disk, and enter it into the tracking
+	 * system.  Mark it permanent, we may need it repeatedly over the life
+	 * of the page, even after the underlying blocks are discarded.
+	 */
+	WT_RET(__wt_cell_unpack_copy(session, unpack, buf));
+	WT_RET(__wt_rec_track_ovfl(session, page,
+	    unpack->data, unpack->size,
+	    buf->data, buf->size, WT_TRK_OVFL | WT_TRK_PERM));
+	return (0);
+}
+
+/*
  * __rec_col_var --
  *	Reconcile a variable-width column-store leaf page.
  */
@@ -1654,14 +1677,22 @@ __rec_col_var(
 
 			/*
 			 * If we're updating a single cell, we never look at the
-			 * original value.  If the original cell was an overflow
-			 * value, discard it.
+			 * original value.
 			 */
 			if (nrepeat == 1 && ins != NULL) {
 				WT_ASSERT(
 				    session, WT_INSERT_RECNO(ins) == src_recno);
 
-				WT_ERR(__rec_track_cell(session, page, unpack));
+				/*
+				 * If the original cell was an overflow value,
+				 * discard it; we will discard it again on each
+				 * page reconciliation, so mark it permanent so
+				 * subsequent discards are ignored.
+				 */
+				if (unpack->ovfl)
+					WT_ERR(
+					    __wt_rec_track_block(session, page,
+					    unpack->data, unpack->size, 1));
 				goto value_loop;
 			}
 
@@ -1692,40 +1723,14 @@ __rec_col_var(
 			 * value.  The problem is the original overflow pages:
 			 * we'd like to reuse them for some set of the column
 			 * values.  For example, if columns #10-17 reference
-			 * overflow A, and cell 12 is updated with a new value:
+			 * overflow A, and cell 12 is updated with a new value,
 			 * we could use the original overflow pages for cells
 			 * #10-11 or cells #13-17.  Insert the overflow cell's
 			 * value into the tracking system as an overflow page
 			 * so we can find it and re-use it.
-			 *    Two additional concerns: First, we don't want to
-			 * repeatedly add the overflow cell into the tracking
-			 * system, so we check to see if it's already there.
-			 * Second, we can't get a copy of the original value
-			 * if the overflow cell's blocks have been discarded.
-			 * That's almost OK, if the overflow cell's blocks have
-			 * been discarded, all of them must have been replaced
-			 * and we'll never look at them by definition, our only
-			 * concern is to detect the event has occurred.  It is
-			 * non-trivial to detect the event has occurred (we'd
-			 * need new states in the tracking system), so instead
-			 * we ensure the tracking system can always give us a
-			 * copy.
-			 *    Search for the blocks in the tracking system: if
-			 * found, we don't add them again and are returned a
-			 * copy of the original value.  Otherwise, get a copy
-			 * of the overflow value and enter it into the tracking
-			 * system.
 			 */
-			orig.size = 0;
-			WT_ERR(__wt_rec_track_ovfl_srch(session,
-			    page, unpack->data, unpack->size, &orig));
-			if (orig.size != 0)
-				goto value_loop;
-
-			WT_ERR(__wt_cell_unpack_copy(session, unpack, &orig));
-			WT_ERR(__wt_rec_track_ovfl(
-			    session, page, unpack->data,
-			    unpack->size, orig.data, orig.size, 1));
+			WT_ERR(__rec_track_cell_ovfl(
+			    session, page, unpack, &orig));
 		}
 
 value_loop:	/*
@@ -1892,16 +1897,19 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	WT_CELL *cell;
 	WT_CELL_UNPACK *unpack, _unpack;
 	WT_IKEY *ikey;
+	WT_ITEM orig;
 	WT_KV *key, *val;
 	WT_PAGE *rp;
 	WT_RECONCILE *r;
 	WT_REF *ref;
 	uint32_t i;
-	int onpage_ovfl, ovfl_key, val_set;
+	int onpage_ovfl, ovfl_key, ret, val_set;
 
 	r = session->reconcile;
 	btree = session->btree;
 	unpack = &_unpack;
+
+	WT_CLEAR(orig);
 	key = &r->k;
 	val = &r->v;
 
@@ -1933,19 +1941,19 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 * references one.
 		 */
 		ikey = ref->u.key;
-		if (ikey->cell_offset == 0) {
+		if (ikey->cell_offset == 0)
 			cell = NULL;
-			/*
-			 * We need to know if we're using on-page overflow cell
-			 * in a few places below, initialize the unpacked cell's
-			 * overflow value so there's an easy test.
-			 */
-			onpage_ovfl = 0;
-		} else {
+		else {
 			cell = WT_PAGE_REF_OFFSET(page, ikey->cell_offset);
 			__wt_cell_unpack(cell, unpack);
-			onpage_ovfl = unpack->ovfl;
 		}
+
+		/*
+		 * We need to know if we're using on-page overflow key cell in
+		 * a few places below, initialize the unpacked cell's overflow
+		 * value so there's an easy test.
+		 */
+		onpage_ovfl = cell != NULL && unpack->ovfl == 1 ? 1 : 0;
 
 		/*
 		 * The page may be deleted or internally created during a split.
@@ -1989,11 +1997,13 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 			case WT_PAGE_REC_EMPTY:
 				/*
 				 * Overflow keys referencing discarded pages are
-				 * no longer useful.
+				 * no longer useful.  They may be necessary for
+				 * a subsequent reconciliation, enter them into
+				 * the tracking system.
 				 */
 				if (onpage_ovfl)
-					WT_RET(__rec_track_cell(
-					    session, page, unpack));
+					WT_ERR(__rec_track_cell_ovfl(
+					    session, page, unpack, &orig));
 				continue;
 			case WT_PAGE_REC_REPLACE:
 				__rec_cell_build_addr(session,
@@ -2006,14 +2016,16 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 				/*
 				 * Overflow keys referencing split pages are no
 				 * no longer useful (the interesting key is the
-				 * key for the split page).
+				 * key for the split page).  They may be
+				 * necessary for a subsequent reconciliation,
+				 * enter them into the tracking system.
 				 */
 				if (onpage_ovfl)
-					WT_RET(__rec_track_cell(
-					    session, page, unpack));
+					WT_ERR(__rec_track_cell_ovfl(
+					    session, page, unpack, &orig));
 
 				r->merge_ref = ref;
-				WT_RET(__rec_row_merge(session,
+				WT_ERR(__rec_row_merge(session,
 				    F_ISSET(rp, WT_PAGE_REC_MASK) ==
 				    WT_PAGE_REC_SPLIT_MERGE ?
 				    rp : rp->modify->u.split));
@@ -2024,29 +2036,49 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		/*
 		 * Build key cell.
 		 *
-		 * If the key is an overflow item, assume prefix compression
-		 * won't make things better, and simply copy it.
+		 * If the key is an overflow item, check to see if it's been
+		 * entered into the tracking system (if an overflow key were
+		 * to reference an empty page during a previous reconciliation,
+		 * its blocks would have been discarded, and the only copy that
+		 * remains is in the tracking system).  If we don't find it in
+		 * the tracking system, assume prefix compression won't make
+		 * things better, and simply copy the key from the disk image.
 		 *
-		 * XXX
 		 * We have the key in-hand (we instantiate all internal page
 		 * keys when the page is brought into memory), so it would be
 		 * easy to check prefix compression, I'm just not bothering.
 		 * If we did gain by prefix compression, we'd have to discard
-		 * the old overflow key and write a new one, and this isn't a
-		 * likely path anyway.
+		 * the old overflow key and write a new one to make it worth
+		 * doing, and this isn't a likely path anyway.
 		 *
 		 * Truncate any 0th key, internal pages don't need 0th keys.
 		 */
-		if (0) {
-			key->buf.data = cell;
-			key->buf.size = unpack->len;
-			key->cell_len = 0;
-			key->len = key->buf.size;
-			ovfl_key = 1;
+		if (onpage_ovfl) {
+			orig.size = 0;
+			WT_ERR(__wt_rec_track_ovfl_srch(
+			    session, page, unpack->data, unpack->size, &orig));
+			if (orig.size == 0) {
+				key->buf.data = cell;
+				key->buf.size = unpack->len;
+				key->cell_len = 0;
+				key->len = key->buf.size;
+				ovfl_key = 1;
+			} else {
+				WT_ERR(__rec_cell_build_key(session,
+				    orig.data, r->cell_zero ? 1 : orig.size,
+				    1, &ovfl_key));
+
+				/*
+				 * Clear the on-page overflow key flag: we've
+				 * built a real key, we're not copying from a
+				 * page.
+				 */
+				onpage_ovfl = 0;
+			}
 		} else
-			WT_RET(__rec_cell_build_key(session,
-			    WT_IKEY_DATA(ikey),
-			    r->cell_zero ? 1 : ikey->size, 1, &ovfl_key));
+			WT_ERR(__rec_cell_build_key(session,
+			    WT_IKEY_DATA(ikey), r->cell_zero ? 1 : ikey->size,
+			    1, &ovfl_key));
 		r->cell_zero = 0;
 
 		/*
@@ -2079,16 +2111,18 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 		 */
 		while (key->len + val->len > r->space_avail) {
 			/*
-			 * We have to have a copy of any overflow key because
-			 * we're about to promote it.
+			 * In one path above, we copied the key from the page
+			 * rather than building the actual key.  In that case,
+			 * we have to build the actual key now because we are
+			 * about to promote it.
 			 */
-			if (ovfl_key && onpage_ovfl)
+			if (onpage_ovfl)
 				WT_RET(__wt_cell_copy(session, cell, r->cur));
-			WT_RET(__rec_split(session));
+			WT_ERR(__rec_split(session));
 
 			r->key_pfx_compress = 0;
 			if (!ovfl_key)
-				WT_RET(__rec_cell_build_key(
+				WT_ERR(__rec_cell_build_key(
 				    session, NULL, 0, 1, &ovfl_key));
 		}
 
@@ -2101,7 +2135,10 @@ __rec_row_int(WT_SESSION_IMPL *session, WT_PAGE *page)
 	}
 
 	/* Write the remnant page. */
-	return (__rec_split_finish(session));
+	ret = __rec_split_finish(session);
+
+err:	__wt_buf_free(session, &orig);
+	return (ret);
 }
 
 /*
@@ -2320,27 +2357,36 @@ __rec_row_leaf(
 			val->len = val->buf.size;
 		} else {
 			/*
-			 * If we updated an overflow value, free the underlying
-			 * file space.
+			 * If the original cell was an overflow value, discard
+			 * it; we will discard it again during subsequent page
+			 * reconciliations, so mark it permanent.
 			 */
-			if (val_cell != NULL)
-				WT_ERR(__rec_track_cell(session, page, unpack));
+			if (val_cell != NULL && unpack->ovfl)
+				WT_ERR(__wt_rec_track_block(session,
+				    page, unpack->data, unpack->size, 1));
 
-			/*
-			 * If this key/value pair was deleted, we're done.  If
-			 * we deleted an overflow key, free the underlying file
-			 * space.
-			 */
+			/* If this key/value pair was deleted, we're done. */
 			if (WT_UPDATE_DELETED_ISSET(upd)) {
+				/*
+				 * Overflow keys referencing discarded values
+				 * are no longer useful.  They may be necessary
+				 * for a subsequent reconciliation though, the
+				 * value might be replaced, so enter them into
+				 * the tracking system.
+				 */
 				__wt_cell_unpack(cell, unpack);
-				WT_ERR(__rec_track_cell(session, page, unpack));
+				if (unpack->ovfl)
+					WT_ERR(__rec_track_cell_ovfl(
+					    session, page, unpack, tmpkey));
 
 				/*
-				 * We skip creating the key, don't try to use
-				 * the last valid key in prefix calculations.
+				 * We aren't actually creating the key so we
+				 * can't use bytes from this key to provide
+				 * prefix information for a subsequent key.
 				 */
 				tmpkey->size = 0;
 
+				/* Proceed with appended key/value pairs. */
 				goto leaf_insert;
 			}
 
@@ -2360,25 +2406,39 @@ __rec_row_leaf(
 		/*
 		 * Build key cell.
 		 *
-		 * There's some risk an overflow key's blocks were discarded by
-		 * a previous reconciliation, so we have to check.
+		 * If the key is an overflow item, check to see if it's been
+		 * entered into the tracking system (if an overflow key were
+		 * referenced a deleted value during a previous reconciliation,
+		 * its blocks would have been discarded, and the only copy that
+		 * remains is in the tracking system).  If we don't find it in
+		 * the tracking system, assume prefix compression won't make
+		 * things better, and simply copy the key from the disk image.
 		 */
 		__wt_cell_unpack(cell, unpack);
-		if (unpack->type == WT_CELL_KEY_OVFL &&
-		    !__wt_rec_track_block_discarded(
-		    page, unpack->data, unpack->size)) {
-			/*
-			 * If an overflow key, assume prefix compression won't
-			 * make things better, and copy it.
-			 */
-			key->buf.data = cell;
-			key->buf.size = unpack->len;
-			key->cell_len = 0;
-			key->len = key->buf.size;
-			ovfl_key = 1;
-
-			/* Don't try to use a prefix across an overflow key. */
+		if (unpack->ovfl) {
 			tmpkey->size = 0;
+			WT_ERR(__wt_rec_track_ovfl_srch(
+			    session, page, unpack->data, unpack->size, tmpkey));
+			if (tmpkey->size == 0) {
+				key->buf.data = cell;
+				key->buf.size = unpack->len;
+				key->cell_len = 0;
+				key->len = key->buf.size;
+				ovfl_key = 1;
+
+				/*
+				 * We aren't actually creating the key so we
+				 * can't use bytes from this key to provide
+				 * prefix information for a subsequent key.
+				 *
+				 * This is already true, based on the test and
+				 * and code above, but I'm leaving the code as
+				 * a place to hang this comment.
+				 */
+				tmpkey->size = 0;
+			} else
+				WT_ERR(__rec_cell_build_key(session,
+				    tmpkey->data, tmpkey->size, 0, &ovfl_key));
 		} else {
 			/*
 			 * If the key is already instantiated, use it.
@@ -2446,7 +2506,7 @@ __rec_row_leaf(
 			 * We have to have a copy of any overflow key because
 			 * we're about to promote it.
 			 */
-			if (ovfl_key && unpack->type == WT_CELL_KEY_OVFL)
+			if (ovfl_key && unpack->ovfl)
 				WT_RET(__wt_cell_unpack_copy(
 				    session, unpack, r->cur));
 			WT_ERR(__rec_split(session));
@@ -3078,8 +3138,8 @@ __rec_cell_build_ovfl(
 		WT_ERR(__wt_bm_write(session, tmp, addr, &size));
 
 		/* Track the overflow record. */
-		WT_ERR(__wt_rec_track_ovfl(
-		    session, page, addr, size, kv->buf.data, kv->buf.size, 0));
+		WT_ERR(__wt_rec_track_ovfl(session, page, addr,
+		    size, kv->buf.data, kv->buf.size, WT_TRK_OVFL_ACTIVE));
 	}
 
 	/* Set the callers K/V to reference the overflow record's address. */

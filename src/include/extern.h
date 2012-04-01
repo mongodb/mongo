@@ -318,16 +318,13 @@ extern int __wt_rec_track_block(WT_SESSION_IMPL *session,
     const uint8_t *addr,
     uint32_t size,
     int permanent);
-extern int __wt_rec_track_block_discarded( WT_PAGE *page,
-    const uint8_t *addr,
-    uint32_t size);
 extern int __wt_rec_track_ovfl(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const uint8_t *addr,
     uint32_t addr_size,
     const void *data,
     uint32_t data_size,
-    int permanent);
+    uint32_t flags);
 extern int __wt_rec_track_ovfl_reuse(WT_SESSION_IMPL *session,
     WT_PAGE *page,
     const void *data,
