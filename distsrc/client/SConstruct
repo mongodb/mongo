@@ -53,8 +53,9 @@ elif sys.platform in ("linux2", "linux3"):
     nix = True
     linux = True
 
-if sys.platform is 'win32':
+if sys.platform == 'win32':
     env['DIST_ARCHIVE_SUFFIX'] = '.zip'
+    env.Append(CCFLAGS=['/EHsc', '/O2'])
 else:
     env['DIST_ARCHIVE_SUFFIX'] = '.tgz'
 
