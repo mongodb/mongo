@@ -77,9 +77,8 @@ __wt_btree_snapshot(WT_SESSION_IMPL *session, const char *name, int discard)
 		WT_ERR(__wt_btree_set_root(session, btree->filename,
 		    (uint8_t *)btree->snap->data, btree->snap->size));
 
-err:	__wt_rwunlock(session, btree->snaplock);
-	__wt_scr_free(&btree->snap);
-	btree->snap = NULL;
+err:	__wt_scr_free(&btree->snap);
+	__wt_rwunlock(session, btree->snaplock);
 
 	return (ret);
 }

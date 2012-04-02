@@ -301,7 +301,6 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 			 ret = __wt_btree_set_root(session, btree->filename,
 			     (uint8_t *)btree->snap->data, btree->snap->size);
 		__wt_scr_free(&btree->snap);
-		btree->snap = NULL;
 		WT_ERR(ret);
 	}
 
