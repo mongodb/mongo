@@ -203,11 +203,14 @@ def wrap_test(command):
     if not test_id:
         return run_and_echo(command)
 
-    buf = []
+    start_time = time.time()
+    buf = [(start_time, '*** beginning test %r ***' % test_filename)]
     def callback(line):
-        if line is None and buf:
+        if line is None:
             # callback is called with None when the
             # command is finished
+            end_time = time.time()
+            buf.append((end_time, '*** finished test %r in %f seconds ***' % (test_filename, end_time - start_time)))
             append_test_logs(build_id, test_id, buf)
 
         buf.append((time.time(), line))
