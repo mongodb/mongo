@@ -107,9 +107,10 @@ def traceback_to_stderr(func):
             return func(*args, **kwargs)
         except urllib2.HTTPError, err:
             sys.stderr.write('error: HTTP code %d\n----\n' % err.code)
-            for k, v in dict(err.info()).items():
-                sys.stderr.write("%s: %s\n" % (k, v))
-            sys.stderr.write('\n')
+            if hasattr(err, 'hdrs'):
+                for k, v in err.hdrs.items():
+                    sys.stderr.write("%s: %s\n" % (k, v))
+                sys.stderr.write('\n')
             sys.stderr.write(err.read())
             sys.stderr.write('\n----\n')
             sys.stderr.flush()
