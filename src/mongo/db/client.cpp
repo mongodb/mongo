@@ -584,7 +584,7 @@ namespace mongo {
         return 
             _hasWrittenThisPass == false && 
             _pageFaultRetryableSection != 0 && 
-            _pageFaultRetryableSection->laps() < 1000; 
+            _pageFaultRetryableSection->laps() < 100; 
     }
 
     void OpDebug::reset() {

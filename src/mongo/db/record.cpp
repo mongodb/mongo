@@ -252,12 +252,7 @@ namespace mongo {
 
     void Record::_accessing() const {
         if ( cc().allowedToThrowPageFaultException() && ! likelyInPhysicalMemory() ) {
-            if( cc().getPageFaultRetryableSection()->laps() > 100 ) { 
-                log() << "info pagefaultexception _laps > 100" << endl;
-            }
-            else {
-                throw PageFaultException(this);
-            }
+            throw PageFaultException(this);
         }
     }
 
