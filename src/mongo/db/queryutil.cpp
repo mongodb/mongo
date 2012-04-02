@@ -165,12 +165,14 @@ namespace mongo {
     }
 
 
-    FieldRange::FieldRange( const BSONElement &e, bool singleKey, bool isNot, bool optimize )
-    : _singleKey( singleKey ) {
+    FieldRange::FieldRange( const BSONElement &e, bool singleKey, bool isNot, bool optimize ) :
+    _singleKey( singleKey ),
+    _simpleFiniteSet() {
         int op = e.getGtLtOp();
 
         // NOTE with $not, we could potentially form a complementary set of intervals.
         if ( !isNot && !e.eoo() && e.type() != RegEx && op == BSONObj::opIN ) {
+            bool exactMatchesOnly = true;
             set<BSONElement,element_lt> vals;
             vector<FieldRange> regexes;
             uassert( 12580 , "invalid query" , e.isABSONObj() );
@@ -181,6 +183,7 @@ namespace mongo {
                          ie.type() != Object ||
                          ie.embeddedObject().firstElement().getGtLtOp() != BSONObj::opELEM_MATCH );
                 if ( ie.type() == RegEx ) {
+                    exactMatchesOnly = false;
                     regexes.push_back( FieldRange( ie, singleKey, false, optimize ) );
                 }
                 else {
@@ -189,6 +192,7 @@ namespace mongo {
                     // array.
                     vals.insert( ie );                        
                     if ( ie.type() == Array ) {
+                        exactMatchesOnly = false;
                         BSONElement temp = ie.embeddedObject().firstElement();
                         if ( temp.eoo() ) {
                             temp = staticUndefined.firstElement();
@@ -198,6 +202,7 @@ namespace mongo {
                 }
             }
 
+            _simpleFiniteSet = exactMatchesOnly;
             for( set<BSONElement,element_lt>::const_iterator i = vals.begin(); i != vals.end(); ++i )
                 _intervals.push_back( FieldInterval(*i) );
 
@@ -283,6 +288,12 @@ namespace mongo {
             }
             return;
         }
+        
+        if ( op == BSONObj::Equality && !isNot ) {
+            // e.type() != Array here; that case was handled above.
+            _simpleFiniteSet = true;
+        }
+
         if ( isNot ) {
             switch( op ) {
             case BSONObj::Equality:
@@ -442,12 +453,14 @@ namespace mongo {
 
     }
 
-    void FieldRange::finishOperation( const vector<FieldInterval> &newIntervals, const FieldRange &other ) {
+    void FieldRange::finishOperation( const vector<FieldInterval> &newIntervals,
+                                     const FieldRange &other, bool simpleFiniteSet ) {
         _intervals = newIntervals;
         for( vector<BSONObj>::const_iterator i = other._objData.begin(); i != other._objData.end(); ++i )
             _objData.push_back( *i );
         if ( _special.size() == 0 && other._special.size() )
             _special = other._special;
+        _simpleFiniteSet = simpleFiniteSet;
     }
 
     // as called, these functions find the max/min of a bound in the
@@ -480,6 +493,7 @@ namespace mongo {
             if ( other <= *this ) {
              	*this = other;
             }
+            _simpleFiniteSet = false;
             return *this;
         }
         vector<FieldInterval> newIntervals;
@@ -497,7 +511,9 @@ namespace mongo {
                 ++j;
             }
         }
-        finishOperation( newIntervals, other );
+        // Forward simpleFiniteSet() when other is copied to *this.
+        bool simpleFiniteSet = universal() && other.simpleFiniteSet();
+        finishOperation( newIntervals, other, simpleFiniteSet );
         return *this;
     }
 
@@ -567,7 +583,7 @@ namespace mongo {
             b.nextOrderedInterval( *j++ );
         }
         b.done();
-        finishOperation( b.unionIntervals(), other );
+        finishOperation( b.unionIntervals(), other, false );
         return *this;
     }
 
@@ -631,7 +647,7 @@ namespace mongo {
             newIntervals.push_back( *i );
             ++i;
         }
-        finishOperation( newIntervals, other );
+        finishOperation( newIntervals, other, false );
         return *this;
     }
 
@@ -837,6 +853,7 @@ namespace mongo {
             }
         }
         if ( op2 == BSONObj::opELEM_MATCH ) {
+            adjustMatchField();
             BSONObjIterator k( g.embeddedObjectUserCheck() );
             while ( k.more() ) {
                 BSONElement h = k.next();
@@ -846,18 +863,18 @@ namespace mongo {
 
                 int op3 = getGtLtOp( h );
                 if ( op3 == BSONObj::Equality ) {
-                    range( fullname.c_str() ) &= FieldRange( h , _singleKey , isNot , optimize );
+                    intersectMatchField( fullname.c_str(), h, isNot, optimize );
                 }
                 else {
                     BSONObjIterator l( h.embeddedObject() );
                     while ( l.more() ) {
-                        range( fullname.c_str() ) &= FieldRange( l.next() , _singleKey , isNot , optimize );
+                        intersectMatchField( fullname.c_str(), l.next(), isNot, optimize );
                     }
                 }
             }
         }
         else {
-            range( fieldName ) &= FieldRange( f , _singleKey , isNot , optimize );
+            intersectMatchField( fieldName, f, isNot, optimize );
         }
     }
 
@@ -877,6 +894,8 @@ namespace mongo {
                 return;
             }
         
+            adjustMatchField();
+
             if ( str::equals( e.fieldName(), "$where" ) ) {
                 return;
             }
@@ -896,7 +915,7 @@ namespace mongo {
         }
 
         if ( equality || ( e.type() == Object && e.embeddedObject().hasField( "$regex" ) ) ) {
-            range( e.fieldName() ) &= FieldRange( e , _singleKey , false , optimize );
+            intersectMatchField( e.fieldName(), e, false, optimize );
         }
         if ( !equality ) {
             BSONObjIterator j( e.embeddedObject() );
@@ -927,8 +946,12 @@ namespace mongo {
         }
     }
 
-    FieldRangeSet::FieldRangeSet( const char *ns, const BSONObj &query, bool singleKey, bool optimize )
-        : _ns( ns ), _queries( 1, query.getOwned() ), _singleKey( singleKey ) {
+    FieldRangeSet::FieldRangeSet( const char *ns, const BSONObj &query, bool singleKey,
+                                 bool optimize ) :
+    _ns( ns ),
+    _queries( 1, query.getOwned() ),
+    _singleKey( singleKey ),
+    _simpleFiniteSet( true ) {
         BSONObjIterator i( _queries[ 0 ] );
 
         while( i.more() ) {
@@ -936,6 +959,23 @@ namespace mongo {
         }
     }
     
+    /**
+     * TODO When operators are refactored to a standard interface, a version of this should be
+     * part of that interface.
+     */
+    void FieldRangeSet::adjustMatchField() {
+        _simpleFiniteSet = false;
+    }
+    
+    void FieldRangeSet::intersectMatchField( const char *fieldName, const BSONElement &matchElement,
+                                            bool isNot, bool optimize ) {
+        FieldRange &selectedRange = range( fieldName );
+        selectedRange &= FieldRange( matchElement, _singleKey, isNot, optimize );
+        if ( !selectedRange.simpleFiniteSet() ) {
+            _simpleFiniteSet = false;
+        }
+    }
+
     FieldRangeVector::FieldRangeVector( const FieldRangeSet &frs, const IndexSpec &indexSpec,
                                        int direction )
     :_indexSpec( indexSpec ), _direction( direction >= 0 ? 1 : -1 ) {
@@ -1300,6 +1340,15 @@ namespace mongo {
         return bob.obj().jsonString();
     }
     
+    FieldRangeVectorIterator::FieldRangeVectorIterator( const FieldRangeVector &v,
+                                                       int singleIntervalLimit ) :
+    _v( v ),
+    _i( _v._ranges.size(), singleIntervalLimit ),
+    _cmp( _v._ranges.size(), 0 ),
+    _inc( _v._ranges.size(), false ),
+    _after() {
+    }
+    
     // TODO optimize more SERVER-5450.
     int FieldRangeVectorIterator::advance( const BSONObj &curr ) {
         BSONObjIterator j( curr );
@@ -1315,7 +1364,6 @@ namespace mongo {
                 // key is the same as value of previous field in current key
                 _i.setUnknowns( i );
             }
-            bool eq = false;
             BSONElement oo = o.next();
             bool reverse = ( ( oo.number() < 0 ) ^ ( _v._direction < 0 ) );
             BSONElement jj = j.next();
@@ -1352,6 +1400,7 @@ namespace mongo {
                 }
             }
             bool first = true;
+            bool eq = false;
             // _i.get( i ) != -1, so we have a starting interval for this field
             // which serves as a lower/equal bound on the first iteration -
             // we advance from this interval to find a matching interval
@@ -1361,10 +1410,10 @@ namespace mongo {
                 if ( advanceMethod >= 0 ) {
                     return advanceMethod;
                 }
-                if ( advanceMethod == -1 ) {
+                if ( advanceMethod == -1 && !hasReachedLimitForLastInterval( i ) ) {
                     break;
                 }
-                // we're past the current interval, so try next interval and reset remaining fields
+                // advance to next interval and reset remaining fields
                 _i.inc( i );
                 _i.setZeroes( i + 1 );
                 first = false;
@@ -1382,6 +1431,7 @@ namespace mongo {
                 return advancePastZeroed( latestNonEndpoint + 1 );
             }
         }
+        _i.incSingleIntervalCount();
         return -1;
     }
 
@@ -1390,6 +1440,7 @@ namespace mongo {
             _cmp[ j ] = &_v._ranges[ j ].intervals().front()._lower._bound;
             _inc[ j ] = _v._ranges[ j ].intervals().front()._lower._inclusive;
         }
+        _i.resetIntervalCount();
     }
     
     int FieldRangeVectorIterator::validateCurrentInterval( int intervalIdx,

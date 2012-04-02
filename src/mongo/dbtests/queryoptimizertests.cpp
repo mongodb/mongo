@@ -58,7 +58,8 @@ namespace QueryOptimizerTests {
             void run() {
                 BSONObj obj = BSON( "a" << 1 );
                 FieldRangeSetPair fieldRangeSetPair( "", obj );
-                QueryPlan queryPlan( 0, -1, fieldRangeSetPair, 0, obj, BSONObj() );
+                BSONObj order = BSON( "b" << 1 );
+                QueryPlan queryPlan( 0, -1, fieldRangeSetPair, 0, obj, order );
                 queryPlan.toString(); // Just test that we don't crash.
             }
         };
@@ -504,6 +505,115 @@ namespace QueryOptimizerTests {
                 ASSERT( !p3.keyFieldsOnly() );
             }
         };
+        
+        namespace QueryFiniteSetOrderSuffix {
+            
+            class Base : public QueryPlanTests::Base {
+            public:
+                virtual ~Base() {}
+                void run() {
+                    BSONObj planQuery = query();
+                    BSONObj planOrder = order();
+                    QueryPlan plan( nsd(), indexIdx(), FRSP( planQuery ), FRSP2( planQuery ),
+                                   planQuery, planOrder );
+                    ASSERT_EQUALS( queryFiniteSetOrderSuffix(), plan.queryFiniteSetOrderSuffix() );
+                }
+            protected:
+                virtual bool queryFiniteSetOrderSuffix() = 0;
+                virtual int indexIdx() { return indexno( index() ); }
+                virtual BSONObj index() = 0;
+                virtual BSONObj query() = 0;
+                virtual BSONObj order() = 0;                
+            };
+            
+            class True : public Base {
+                bool queryFiniteSetOrderSuffix() { return true; }
+            };
+            
+            class False : public Base {
+                bool queryFiniteSetOrderSuffix() { return false; }
+            };
+            
+            class Unindexed : public False {
+                int indexIdx() { return -1; }
+                BSONObj index() { return BSON( "wrong" << 1 ); }
+                BSONObj query() { return BSON( "a" << 1 ); }
+                BSONObj order() { return BSON( "b" << 1 ); }
+            };
+            
+            class RangeQuery : public False {
+                BSONObj index() { return BSON( "a" << 1 << "b" << 1 ); }
+                BSONObj query() { return BSON( "a" << GT << 1 ); }
+                BSONObj order() { return BSON( "b" << 1 ); }                
+            };
+
+            class EqualSort : public True {
+                BSONObj index() { return BSON( "a" << 1 << "b" << 1 ); }
+                BSONObj query() { return BSON( "a" << 1 ); }
+                BSONObj order() { return BSON( "b" << 1 ); }                
+            };
+
+            class InSort : public True {
+                BSONObj index() { return BSON( "a" << 1 << "b" << 1 ); }
+                BSONObj query() { return fromjson( "{a:{$in:[0,1]}}" ); }
+                BSONObj order() { return BSON( "b" << 1 ); }                
+            };
+            
+            class EqualInSort : public True {
+                BSONObj index() { return BSON( "a" << 1 << "b" << 1 << "c" << 1 ); }
+                BSONObj query() { return fromjson( "{a:10,b:{$in:[0,1]}}" ); }
+                BSONObj order() { return BSON( "c" << 1 ); }                
+            };
+            
+            class InInSort : public True {
+                BSONObj index() { return BSON( "a" << 1 << "b" << 1 << "c" << 1 ); }
+                BSONObj query() { return fromjson( "{a:{$in:[5,6]},b:{$in:[0,1]}}" ); }
+                BSONObj order() { return BSON( "c" << 1 ); }
+            };
+            
+            class NonCoveredRange : public False {
+                BSONObj index() { return BSON( "a" << 1 << "b" << 1 ); }
+                BSONObj query() { return fromjson( "{a:{$in:[5,6]},z:4}" ); }
+                BSONObj order() { return BSON( "b" << 1 ); }
+            };
+            
+            class QuerySortOverlap : public True {
+                BSONObj index() { return BSON( "a" << 1 << "b" << 1 << "c" << 1 ); }
+                BSONObj query() { return fromjson( "{a:10,b:{$in:[0,1]}}" ); }
+                BSONObj order() { return BSON( "b" << 1 << "c" << 1 ); }
+            };
+            
+            class OrderDirection : public False {
+                BSONObj index() { return BSON( "a" << 1 << "b" << 1 ); }
+                BSONObj query() { return fromjson( "{a:{$in:[0,1]}}" ); }
+                BSONObj order() { return BSON( "a" << 1 << "b" << -1 ); }
+            };
+            
+            class InterveningIndexField : public False {
+                BSONObj index() { return BSON( "a" << 1 << "b" << 1 << "c" << 1 ); }
+                BSONObj query() { return fromjson( "{a:{$in:[0,1]}}" ); }
+                BSONObj order() { return BSON( "c" << 1 ); }
+            };
+
+            class TailingIndexField : public True {
+                BSONObj index() { return BSON( "a" << 1 << "b" << 1 << "c" << 1 ); }
+                BSONObj query() { return fromjson( "{a:{$in:[0,1]}}" ); }
+                BSONObj order() { return BSON( "b" << 1 ); }
+            };
+
+            class EmptySort : public True {
+                BSONObj index() { return BSON( "a" << 1 << "b" << 1 ); }
+                BSONObj query() { return fromjson( "{a:{$in:[0,1]}}" ); }
+                BSONObj order() { return BSONObj(); }
+            };
+            
+            class EmptyStringField : public True {
+                BSONObj index() { return BSON( "a" << 1 << "" << 1 ); }
+                BSONObj query() { return fromjson( "{a:4,'':{$in:[0,1]}}" ); }
+                BSONObj order() { return BSONObj(); }                
+            };
+            
+        } // namespace QueryFiniteSetOrderSuffix
 
     } // namespace QueryPlanTests
 
@@ -811,12 +921,13 @@ namespace QueryOptimizerTests {
                     theDataFileMgr.insertWithObjMod( ns(), temp );
                 }
                 BSONObj hint = fromjson( "{$hint:{a:1}}" );
-                auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), fromjson( "{a:{$in:[2,3,6,9,11]}}" ) ) );
+                BSONObj query = fromjson( "{a:{$in:[2,3,6,9,11]}}" );
+                BSONObj order = BSONObj();
+                auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), query ) );
                 auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                QueryPlanSet s( ns(), frsp, frspOrig, fromjson( "{a:{$in:[2,3,6,9,11]}}" ),
-                               BSONObj(), shared_ptr<const ParsedQuery>(), hint );
-                QueryPlan qp( nsd(), 1, s.frsp(), s.originalFrsp(),
-                             fromjson( "{a:{$in:[2,3,6,9,11]}}" ), BSONObj() );
+                QueryPlanSet s( ns(), frsp, frspOrig, query, order,
+                               shared_ptr<const ParsedQuery>(), hint );
+                QueryPlan qp( nsd(), 1, s.frsp(), s.originalFrsp(), query, order );
                 boost::shared_ptr<Cursor> c = qp.newCursor();
                 double expected[] = { 2, 3, 6, 9 };
                 for( int i = 0; i < 4; ++i, c->advance() ) {
@@ -826,13 +937,12 @@ namespace QueryOptimizerTests {
 
                 // now check reverse
                 {
-                    auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), fromjson( "{a:{$in:[2,3,6,9,11]}}" ) ) );
+                    order = BSON( "a" << -1 );
+                    auto_ptr< FieldRangeSetPair > frsp( new FieldRangeSetPair( ns(), query ) );
                     auto_ptr< FieldRangeSetPair > frspOrig( new FieldRangeSetPair( *frsp ) );
-                    QueryPlanSet s( ns(), frsp, frspOrig, fromjson( "{a:{$in:[2,3,6,9,11]}}" ),
-                                   BSON( "a" << -1 ), shared_ptr<const ParsedQuery>(), hint );
-                    QueryPlan qp( nsd(), 1, s.frsp(), s.originalFrsp(),
-                                 fromjson( "{a:{$in:[2,3,6,9,11]}}" ),
-                                 BSON( "a" << -1 ) );
+                    QueryPlanSet s( ns(), frsp, frspOrig, query, order,
+                                   shared_ptr<const ParsedQuery>(), hint );
+                    QueryPlan qp( nsd(), 1, s.frsp(), s.originalFrsp(), query, order );
                     boost::shared_ptr<Cursor> c = qp.newCursor();
                     double expected[] = { 9, 6, 3, 2 };
                     for( int i = 0; i < 4; ++i, c->advance() ) {
@@ -1158,6 +1268,19 @@ namespace QueryOptimizerTests {
             add<QueryPlanTests::ExactKeyQueryTypes>();
             add<QueryPlanTests::Unhelpful>();
             add<QueryPlanTests::KeyFieldsOnly>();
+            add<QueryPlanTests::QueryFiniteSetOrderSuffix::Unindexed>();
+            add<QueryPlanTests::QueryFiniteSetOrderSuffix::RangeQuery>();
+            add<QueryPlanTests::QueryFiniteSetOrderSuffix::EqualSort>();
+            add<QueryPlanTests::QueryFiniteSetOrderSuffix::InSort>();
+            add<QueryPlanTests::QueryFiniteSetOrderSuffix::EqualInSort>();
+            add<QueryPlanTests::QueryFiniteSetOrderSuffix::InInSort>();
+            add<QueryPlanTests::QueryFiniteSetOrderSuffix::NonCoveredRange>();
+            add<QueryPlanTests::QueryFiniteSetOrderSuffix::QuerySortOverlap>();
+            add<QueryPlanTests::QueryFiniteSetOrderSuffix::OrderDirection>();
+            add<QueryPlanTests::QueryFiniteSetOrderSuffix::InterveningIndexField>();
+            add<QueryPlanTests::QueryFiniteSetOrderSuffix::TailingIndexField>();
+            add<QueryPlanTests::QueryFiniteSetOrderSuffix::EmptySort>();
+            add<QueryPlanTests::QueryFiniteSetOrderSuffix::EmptyStringField>();
             add<QueryPlanSetTests::ToString>();
             add<QueryPlanSetTests::NoIndexes>();
             add<QueryPlanSetTests::Optimal>();

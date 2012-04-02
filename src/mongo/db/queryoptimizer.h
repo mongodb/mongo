@@ -110,15 +110,17 @@ namespace mongo {
         };
         Summary summary() const { return Summary( *this ); }
 
-        /** The following member functions are just for testing. */
+        /** The following member functions are for testing, or public for testing. */
         
         shared_ptr<FieldRangeVector> frv() const { return _frv; }
         bool isMultiKey() const;
-        string toString() const;        
-        
+        string toString() const;
+        bool queryFiniteSetOrderSuffix() const;
+
     private:
         void checkTableScanAllowed() const;
         void warnOnCappedIdTableScan() const;
+        int independentRangesSingleIntervalLimit() const;
 
         NamespaceDetails * _d;
         int _idxNo;

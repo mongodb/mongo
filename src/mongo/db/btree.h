@@ -1013,14 +1013,18 @@ namespace mongo {
     class BtreeCursor : public Cursor {
     protected:
         BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction );
-        BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction );
+        BtreeCursor( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id,
+                    const shared_ptr< FieldRangeVector > &_bounds, int singleIntervalLimit,
+                    int _direction );
     public:
         virtual ~BtreeCursor();
         /** makes an appropriate subclass depending on the index version */
         static BtreeCursor* make( NamespaceDetails *_d, const IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction );
         static BtreeCursor* make( NamespaceDetails *_d, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction );
         static BtreeCursor* make( NamespaceDetails *_d, int _idxNo, const IndexDetails&, const BSONObj &startKey, const BSONObj &endKey, bool endKeyInclusive, int direction );
-        static BtreeCursor* make( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id, const shared_ptr< FieldRangeVector > &_bounds, int _direction );
+        static BtreeCursor* make( NamespaceDetails *_d, int _idxNo, const IndexDetails& _id,
+                                 const shared_ptr< FieldRangeVector > &_bounds,
+                                 int singleIntervalLimit, int _direction );
 
         virtual bool ok() { return !bucket.isNull(); }
         virtual bool advance();

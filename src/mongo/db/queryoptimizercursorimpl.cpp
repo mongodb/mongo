@@ -85,7 +85,6 @@ namespace mongo {
                                             << "'" );
             }
             
-            // No geo cursor could be generated here, and we do not specify numWanted.
             _c = qp().newCursor();
 
             // All candidate cursors must support yields for QueryOptimizerCursorImpl's
