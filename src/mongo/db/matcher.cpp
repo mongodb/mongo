@@ -539,6 +539,16 @@ namespace mongo {
                 return rm._re->PartialMatch(e.valuestr());
             else
                 return !strncmp(e.valuestr(), rm._prefix.c_str(), rm._prefix.size());
+        case BinData: {
+            int len;
+            const char *ptr = e.binData(len);
+            if (rm._prefix.empty())
+                return rm._re->PartialMatch(pcrecpp::StringPiece(ptr, len));
+            else if (size_t(len) >= rm._prefix.size())
+                return !strncmp(ptr, rm._prefix.c_str(), rm._prefix.size());
+            else
+                return false;
+        }
         case RegEx:
             return !strcmp(rm._regex, e.regex()) && !strcmp(rm._flags, e.regexFlags());
         default:
