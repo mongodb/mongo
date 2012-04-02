@@ -621,6 +621,45 @@ namespace mongo {
             vector<int> _i;
         };
 
+        /**
+         * Helper class for matching a BSONElement with the bounds of a FieldInterval.  Some
+         * internal comparison results are cached. Public for testing.
+         */
+        class FieldIntervalMatcher {
+        public:
+            FieldIntervalMatcher( const FieldInterval &interval, const BSONElement &element,
+                                 bool reverse );
+            bool isEqInclusiveUpperBound() const {
+                return upperCmp() == 0 && _interval._upper._inclusive;
+            }
+            bool isGteUpperBound() const { return upperCmp() >= 0; }
+            bool isEqExclusiveLowerBound() const {
+                return lowerCmp() == 0 && !_interval._lower._inclusive;
+            }
+            bool isLtLowerBound() const { return lowerCmp() < 0; }
+        private:
+            struct BoundCmp {
+                BoundCmp() : _cmp(), _valid() {}
+                void set( int cmp ) { _cmp = cmp; _valid = true; }
+                int _cmp;
+                bool _valid;
+            };
+            int mayReverse( int val ) const { return _reverse ? -val : val; }
+            int cmp( const BSONElement &bound ) const {
+                return mayReverse( _element.woCompare( bound, false ) );
+            }
+            void setCmp( BoundCmp &boundCmp, const BSONElement &bound ) const {
+                boundCmp.set( cmp( bound ) );
+            }
+            int lowerCmp() const;
+            int upperCmp() const;
+            const FieldInterval &_interval;
+            const BSONElement &_element;
+            bool _reverse;
+            mutable BoundCmp _lowerCmp;
+            mutable BoundCmp _upperCmp;
+        };
+
     private:
         /**
          * @return values similar to advance()

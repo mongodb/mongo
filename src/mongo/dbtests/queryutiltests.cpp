@@ -1229,6 +1229,26 @@ namespace QueryUtilTests {
                 assertAdvanceTo( BSON( "a" << 0.5 ), BSON( "a" << 1 ) );
             }
         };
+        
+        class AdvanceToNextIntervalExclusiveInequality : public Base {
+            BSONObj query() { return fromjson( "{a:{$in:['a',/^q/,'z']}}" ); }
+            BSONObj index() { return BSON( "a" << 1 ); }
+            void check() {
+                assertAdvanceToNext( BSON( "a" << "a" ) );
+                assertAdvanceToNext( BSON( "a" << "q" ) );
+                assertAdvanceTo( BSON( "a" << "r" ), BSON( "a" << "z" ) );
+                assertAdvanceToNext( BSON( "a" << "z" ) );
+            }            
+        };
+
+        class AdvanceToNextIntervalEqualityReverse : public Base {
+            BSONObj query() { return fromjson( "{a:{$in:[0,1]}}" ); }
+            BSONObj index() { return BSON( "a" << -1 ); }
+            void check() {
+                assertAdvanceToNext( BSON( "a" << 1 ) );
+                assertAdvanceTo( BSON( "a" << 0.5 ), BSON( "a" << 0 ) );
+            }
+        };
 
         class AdvanceToNextIntervalEqualityCompound : public Base {
             BSONObj query() { return fromjson( "{a:{$in:[0,1]},b:{$in:[4,5]}}" ); }
@@ -1451,6 +1471,143 @@ namespace QueryUtilTests {
             FieldRangeVectorIterator::CompoundRangeCounter _counter;
         };
         
+        namespace FieldIntervalMatcher {
+            
+            class IsEqInclusiveUpperBound {
+            public:
+                void run() {
+                    BSONObj exclusiveInterval = BSON( "$lt" << 5 );
+                    for ( int i = 4; i <= 6; ++i ) {
+                        for ( int reverse = 0; reverse < 2; ++reverse ) {
+                            ASSERT( !isEqInclusiveUpperBound( exclusiveInterval, BSON( "" << i ),
+                                                             reverse ) );
+                        }
+                    }
+                    BSONObj inclusiveInterval = BSON( "$lte" << 4 );
+                    for ( int i = 3; i <= 5; i += 2 ) {
+                        for ( int reverse = 0; reverse < 2; ++reverse ) {
+                            ASSERT( !isEqInclusiveUpperBound( inclusiveInterval, BSON( "" << i ),
+                                                             reverse ) );
+                        }
+                    }
+                    ASSERT( isEqInclusiveUpperBound( inclusiveInterval, BSON( "" << 4 ), true ) );
+                    ASSERT( isEqInclusiveUpperBound( inclusiveInterval, BSON( "" << 4 ), false ) );
+                }
+            private:
+                bool isEqInclusiveUpperBound( const BSONObj &intervalSpec,
+                                             const BSONObj &elementSpec,
+                                             bool reverse ) {
+                    FieldRange range( intervalSpec.firstElement(), true );
+                    FieldRangeVectorIterator::FieldIntervalMatcher matcher
+                            ( range.intervals()[ 0 ], elementSpec.firstElement(), reverse );
+                    return matcher.isEqInclusiveUpperBound();
+                }
+            };
+            
+            class IsGteUpperBound {
+            public:
+                void run() {
+                    BSONObj exclusiveInterval = BSON( "$lt" << 5 );
+                    ASSERT( !isGteUpperBound( exclusiveInterval, BSON( "" << 4 ), false ) );
+                    ASSERT( isGteUpperBound( exclusiveInterval, BSON( "" << 5 ), false ) );
+                    ASSERT( isGteUpperBound( exclusiveInterval, BSON( "" << 6 ), false ) );
+                    ASSERT( isGteUpperBound( exclusiveInterval, BSON( "" << 4 ), true ) );
+                    ASSERT( isGteUpperBound( exclusiveInterval, BSON( "" << 5 ), true ) );
+                    ASSERT( !isGteUpperBound( exclusiveInterval, BSON( "" << 6 ), true ) );
+                    BSONObj inclusiveInterval = BSON( "$lte" << 4 );
+                    ASSERT( !isGteUpperBound( inclusiveInterval, BSON( "" << 3 ), false ) );
+                    ASSERT( isGteUpperBound( inclusiveInterval, BSON( "" << 4 ), false ) );
+                    ASSERT( isGteUpperBound( inclusiveInterval, BSON( "" << 5 ), false ) );
+                    ASSERT( isGteUpperBound( inclusiveInterval, BSON( "" << 3 ), true ) );
+                    ASSERT( isGteUpperBound( inclusiveInterval, BSON( "" << 4 ), true ) );
+                    ASSERT( !isGteUpperBound( inclusiveInterval, BSON( "" << 5 ), true ) );
+                }
+            private:
+                bool isGteUpperBound( const BSONObj &intervalSpec, const BSONObj &elementSpec,
+                                     bool reverse ) {
+                    FieldRange range( intervalSpec.firstElement(), true );
+                    FieldRangeVectorIterator::FieldIntervalMatcher matcher
+                            ( range.intervals()[ 0 ], elementSpec.firstElement(), reverse );
+                    return matcher.isGteUpperBound();
+                }
+            };
+
+            class IsEqExclusiveLowerBound {
+            public:
+                void run() {
+                    BSONObj exclusiveInterval = BSON( "$gt" << 5 );
+                    for ( int i = 4; i <= 6; i += 2 ) {
+                        for ( int reverse = 0; reverse < 2; ++reverse ) {
+                            ASSERT( !isEqExclusiveLowerBound( exclusiveInterval, BSON( "" << i ),
+                                                             reverse ) );
+                        }
+                    }
+                    ASSERT( isEqExclusiveLowerBound( exclusiveInterval, BSON( "" << 5 ), true ) );
+                    ASSERT( isEqExclusiveLowerBound( exclusiveInterval, BSON( "" << 5 ), false ) );
+                    BSONObj inclusiveInterval = BSON( "$gte" << 4 );
+                    for ( int i = 3; i <= 5; ++i ) {
+                        for ( int reverse = 0; reverse < 2; ++reverse ) {
+                            ASSERT( !isEqExclusiveLowerBound( inclusiveInterval, BSON( "" << i ),
+                                                             reverse ) );
+                        }
+                    }
+                }
+            private:
+                bool isEqExclusiveLowerBound( const BSONObj &intervalSpec,
+                                             const BSONObj &elementSpec,
+                                             bool reverse ) {
+                    FieldRange range( intervalSpec.firstElement(), true );
+                    FieldRangeVectorIterator::FieldIntervalMatcher matcher
+                            ( range.intervals()[ 0 ], elementSpec.firstElement(), reverse );
+                    return matcher.isEqExclusiveLowerBound();
+                }
+            };
+
+            class IsLtLowerBound {
+            public:
+                void run() {
+                    BSONObj exclusiveInterval = BSON( "$gt" << 5 );
+                    ASSERT( isLtLowerBound( exclusiveInterval, BSON( "" << 4 ), false ) );
+                    ASSERT( !isLtLowerBound( exclusiveInterval, BSON( "" << 5 ), false ) );
+                    ASSERT( !isLtLowerBound( exclusiveInterval, BSON( "" << 6 ), false ) );
+                    ASSERT( !isLtLowerBound( exclusiveInterval, BSON( "" << 4 ), true ) );
+                    ASSERT( !isLtLowerBound( exclusiveInterval, BSON( "" << 5 ), true ) );
+                    ASSERT( isLtLowerBound( exclusiveInterval, BSON( "" << 6 ), true ) );
+                    BSONObj inclusiveInterval = BSON( "$gte" << 4 );
+                    ASSERT( isLtLowerBound( inclusiveInterval, BSON( "" << 3 ), false ) );
+                    ASSERT( !isLtLowerBound( inclusiveInterval, BSON( "" << 4 ), false ) );
+                    ASSERT( !isLtLowerBound( inclusiveInterval, BSON( "" << 5 ), false ) );
+                    ASSERT( !isLtLowerBound( inclusiveInterval, BSON( "" << 3 ), true ) );
+                    ASSERT( !isLtLowerBound( inclusiveInterval, BSON( "" << 4 ), true ) );
+                    ASSERT( isLtLowerBound( inclusiveInterval, BSON( "" << 5 ), true ) );
+                }
+            private:
+                bool isLtLowerBound( const BSONObj &intervalSpec, const BSONObj &elementSpec,
+                                     bool reverse ) {
+                    FieldRange range( intervalSpec.firstElement(), true );
+                    FieldRangeVectorIterator::FieldIntervalMatcher matcher
+                            ( range.intervals()[ 0 ], elementSpec.firstElement(), reverse );
+                    return matcher.isLtLowerBound();
+                }
+            };
+            
+            class CheckLowerAfterUpper {
+            public:
+                void run() {
+                    BSONObj intervalSpec = BSON( "$in" << BSON_ARRAY( 1 << 2 ) );
+                    BSONObj elementSpec = BSON( "" << 1 );
+                    FieldRange range( intervalSpec.firstElement(), true );
+                    FieldRangeVectorIterator::FieldIntervalMatcher matcher
+                            ( range.intervals()[ 0 ], elementSpec.firstElement(), false );
+                    ASSERT( matcher.isEqInclusiveUpperBound() );
+                    ASSERT( matcher.isGteUpperBound() );
+                    ASSERT( !matcher.isEqExclusiveLowerBound() );
+                    ASSERT( !matcher.isLtLowerBound() );
+                }
+            };
+
+        } // namespace FieldIntervalMatcher
+        
     } // namespace FieldRangeVectorIteratorTests
     
     class All : public Suite {
@@ -1574,6 +1731,8 @@ namespace QueryUtilTests {
             add<FieldRangeSetPairTests::MatchPossibleForIndex>();
             add<FieldRangeVectorTests::ToString>();
             add<FieldRangeVectorIteratorTests::AdvanceToNextIntervalEquality>();
+            add<FieldRangeVectorIteratorTests::AdvanceToNextIntervalExclusiveInequality>();
+            add<FieldRangeVectorIteratorTests::AdvanceToNextIntervalEqualityReverse>();
             add<FieldRangeVectorIteratorTests::AdvanceToNextIntervalEqualityCompound>();
             add<FieldRangeVectorIteratorTests::AdvanceToNextIntervalIntermediateEqualityCompound>();
             add<FieldRangeVectorIteratorTests::AdvanceToNextIntervalIntermediateInMixed>();
@@ -1592,6 +1751,11 @@ namespace QueryUtilTests {
             add<FieldRangeVectorIteratorTests::AdvanceRangeMixedMixed>();
             add<FieldRangeVectorIteratorTests::AdvanceMixedMixedIn>();
             add<FieldRangeVectorIteratorTests::CompoundRangeCounter>();
+            add<FieldRangeVectorIteratorTests::FieldIntervalMatcher::IsEqInclusiveUpperBound>();
+            add<FieldRangeVectorIteratorTests::FieldIntervalMatcher::IsGteUpperBound>();
+            add<FieldRangeVectorIteratorTests::FieldIntervalMatcher::IsEqExclusiveLowerBound>();
+            add<FieldRangeVectorIteratorTests::FieldIntervalMatcher::IsLtLowerBound>();
+            add<FieldRangeVectorIteratorTests::FieldIntervalMatcher::CheckLowerAfterUpper>();
         }
     } myall;
 

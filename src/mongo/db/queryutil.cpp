@@ -1394,42 +1394,32 @@ namespace mongo {
     
     int FieldRangeVectorIterator::validateCurrentInterval( int i, const BSONElement &jj,
                                                           bool reverse, bool first, bool &eq ) {
-        // compare to current interval's upper bound
-        int x = _v._ranges[ i ].intervals()[ _i.get( i ) ]._upper._bound.woCompare( jj, false );
-        if ( reverse ) {
-            x = -x;
-        }
-        if ( x == 0 && _v._ranges[ i ].intervals()[ _i.get( i ) ]._upper._inclusive ) {
+        FieldIntervalMatcher matcher( _v._ranges[ i ].intervals()[ _i.get( i ) ], jj, reverse );
+
+        if ( matcher.isEqInclusiveUpperBound() ) {
             eq = true;
             return -1;
         }
-        // see if we're greater than the upper bound
-        if ( x <= 0 ) {
+        if ( matcher.isGteUpperBound() ) {
             return -2;
         }
-        // we're less than the upper bound
+
+        // below the upper bound
+
         if ( i == 0 && first ) {
             // the value of 1st field won't go backward, so don't check lower bound
-            // TODO maybe we can check first only?
+            // TODO maybe we can check 'first' only?
             return -1;
         }
-        // if it's an equality interval, don't need to compare separately to lower bound
-        if ( !_v._ranges[ i ].intervals()[ _i.get( i ) ].equality() ) {
-            // compare to current interval's lower bound
-            x = _v._ranges[ i ].intervals()[ _i.get( i ) ]._lower._bound.woCompare( jj, false );
-            if ( reverse ) {
-                x = -x;
-            }
-        }
-        // if we're equal to and not inclusive the lower bound, advance
-        if ( ( x == 0 && !_v._ranges[ i ].intervals()[ _i.get( i ) ]._lower._inclusive ) ) {
+
+        if ( matcher.isEqExclusiveLowerBound() ) {
             return advancePastZeroed( i + 1 );
         }
-        // if we're less than the lower bound, advance
-        if ( x > 0 ) {
+        if ( matcher.isLtLowerBound() ) {
             _i.setZeroes( i + 1 );
             return advanceToLowerBound( i );
         }
+
         return -1;
     }
     

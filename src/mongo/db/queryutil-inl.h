@@ -86,6 +86,30 @@ namespace mongo {
         return ret;
     }
 
+    inline FieldRangeVectorIterator::FieldIntervalMatcher::FieldIntervalMatcher
+            ( const FieldInterval &interval, const BSONElement &element, bool reverse ) :
+    _interval( interval ),
+    _element( element ),
+    _reverse( reverse ) {
+    }
+    
+    inline int FieldRangeVectorIterator::FieldIntervalMatcher::lowerCmp() const {
+        if ( !_lowerCmp._valid ) {
+            setCmp( _lowerCmp, _interval._lower._bound );
+        }
+        return _lowerCmp._cmp;
+    }
+
+    inline int FieldRangeVectorIterator::FieldIntervalMatcher::upperCmp() const {
+        if ( !_upperCmp._valid ) {
+            setCmp( _upperCmp, _interval._upper._bound );
+            if ( _interval.equality() ) {
+                _lowerCmp = _upperCmp;
+            }
+        }
+        return _upperCmp._cmp;
+    }
+
     inline FieldRangeSetPair *OrRangeGenerator::topFrsp() const {
         FieldRangeSetPair *ret = new FieldRangeSetPair( _baseSet );
         if (_orSets.size()) {
