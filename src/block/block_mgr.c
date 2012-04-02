@@ -93,6 +93,8 @@ __wt_bm_open(WT_SESSION_IMPL *session,
 
 	btree = session->btree;
 
+	WT_RET(__wt_block_open(session, filename, config, cfg, &btree->block));
+
 	/*
 	 * !!!
 	 * As part of block-manager configuration, we need to return the maximum
@@ -104,8 +106,6 @@ __wt_bm_open(WT_SESSION_IMPL *session,
 	 * consider the block manager's maximum cookie size versus the minimum
 	 * Btree internal node size.
 	 */
-	WT_RET(__wt_block_open(session, filename, config, cfg, &btree->block));
-
 	btree->block_header = __wt_block_header(session);
 
 	return (0);
