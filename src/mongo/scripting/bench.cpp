@@ -179,8 +179,8 @@ namespace mongo {
     }
 
 
-    static void _benchThread( BenchRunConfig * config, ScopedDbConnection& conn ){
-
+    static void _benchThread( BenchRunConfig * config, DBClientBase* conn ){
+        verify( conn );
         long long count = 0;
         while ( config->active || ! config->loopCommands ) {
             BSONObjIterator i( config->ops );
@@ -204,7 +204,7 @@ namespace mongo {
 
                 if (config->username != "") {
                     string errmsg;
-                    if (!conn.get()->auth(config->db, config->username, config->password, errmsg)) {
+                    if (!conn->auth(config->db, config->username, config->password, errmsg)) {
                         uasserted(15931, "Authenticating to connection for _benchThread failed: " + errmsg);
                     }
                 }
@@ -474,7 +474,7 @@ namespace mongo {
                 }
             }
 
-            _benchThread( config, conn );
+            _benchThread( config, conn.get() );
         }
         catch( DBException& e ){
             error() << "DBException not handled in benchRun thread" << causedBy( e ) << endl;
