@@ -288,16 +288,21 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 
 	/*
 	 * Step 11:
-	 * Evict the newly created root page, creating a snapshot.
+	 * Evict the newly created root page, creating a snapshot, and update
+	 * the schema table with the new snapshot's location.
 	 */
 	if (ss->root_page != NULL) {
 		WT_ERR(__wt_scr_alloc(
 		    session, WT_BTREE_MAX_ADDR_COOKIE, &btree->snap));
-		WT_ERR(__wt_rec_evict(session, ss->root_page, WT_REC_SINGLE));
+		ret = __wt_rec_evict(session, ss->root_page, WT_REC_SINGLE);
 		ss->root_page = NULL;
-		 if (btree->snap->data != NULL && btree->snap->size != 0)
-			 WT_ERR(__wt_btree_set_root(session, btree->filename,
-			     (uint8_t *)btree->snap->data, btree->snap->size));
+		if (ret == 0 &&
+		    btree->snap->data != NULL && btree->snap->size != 0)
+			 ret = __wt_btree_set_root(session, btree->filename,
+			     (uint8_t *)btree->snap->data, btree->snap->size);
+		__wt_scr_free(&btree->snap);
+		btree->snap = NULL;
+		WT_ERR(ret);
 	}
 
 	/*
@@ -315,10 +320,6 @@ err:	WT_TRET(__wt_bm_salvage_end(session));
 	/* Discard any root page we created. */
 	if (ss->root_page != NULL)
 		__wt_page_out(session, ss->root_page, 0);
-
-	/* Discard snapshot information. */
-	__wt_scr_free(&btree->snap);
-	btree->snap = NULL;
 
 	/* Discard the leaf and overflow page memory. */
 	WT_TRET(__slvg_cleanup(session, ss));
