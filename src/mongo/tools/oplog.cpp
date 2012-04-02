@@ -17,7 +17,6 @@
 */
 
 #include "pch.h"
-#include "client/dbclient.h"
 #include "db/json.h"
 #include "db/oplogreader.h"
 

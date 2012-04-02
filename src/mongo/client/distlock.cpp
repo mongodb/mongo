@@ -19,7 +19,6 @@
 
 #include "mongo/client/distlock.h"
 
-#include "mongo/client/dbclient.h"
 #include "mongo/client/dbclientcursor.h"
 
 

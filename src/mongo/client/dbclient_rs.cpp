@@ -23,7 +23,6 @@
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/connpool.h"
-#include "mongo/client/dbclient.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/jsobj.h"

@@ -38,7 +38,6 @@
 #include "../util/net/message.h"
 #include "../util/mmap.h"
 #include "../db/dbmessage.h"
-#include "../client/dbclient.h"
 
 #include <stdio.h>
 #include <string.h>

@@ -20,6 +20,7 @@
 
 #include "../db/cursor.h"
 #include "../db/pdfile.h"
+#include "mongo/db/json.h"
 
 #include "dbtests.h"
 

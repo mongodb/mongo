@@ -20,6 +20,7 @@
 #include "delete.h"
 #include "../queryutil.h"
 #include "../oplog.h"
+#include "mongo/client/dbclientinterface.h"
 
 namespace mongo {
     

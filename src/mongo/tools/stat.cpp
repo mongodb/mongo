@@ -17,10 +17,10 @@
 */
 
 #include "pch.h"
-#include "client/dbclient.h"
 #include "db/json.h"
 #include "../util/net/httpclient.h"
 #include "../util/text.h"
+#include "mongo/client/dbclientcursor.h"
 #include "tool.h"
 #include "stat_util.h"
 #include <fstream>

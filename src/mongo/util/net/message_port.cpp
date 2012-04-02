@@ -28,7 +28,6 @@
 #include "../background.h"
 #include "../time_support.h"
 #include "../../db/cmdline.h"
-#include "../../client/dbclient.h"
 #include "../scopeguard.h"
 
 

@@ -19,7 +19,6 @@
 #include "pch.h"
 #include "cloner.h"
 #include "pdfile.h"
-#include "../client/dbclient.h"
 #include "../bson/util/builder.h"
 #include "jsobj.h"
 #include "ops/query.h"

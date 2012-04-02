@@ -23,6 +23,7 @@
 #include "clientcursor.h"
 #include "btree.h"
 #include "explain.h"
+#include "mongo/client/dbclientinterface.h"
 
 namespace mongo {
     

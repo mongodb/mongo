@@ -26,6 +26,7 @@
 #include "ops/update.h"
 #include "ops/delete.h"
 #include "queryoptimizercursor.h"
+#include "mongo/client/dbclientinterface.h"
 
 #include <fstream>
 

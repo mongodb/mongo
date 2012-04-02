@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include "../client/dbclient.h"
-
 namespace mongo {
 
     class Chunk;

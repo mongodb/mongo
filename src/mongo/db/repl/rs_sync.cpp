@@ -16,7 +16,6 @@
 
 #include "pch.h"
 #include "mongo/db/client.h"
-#include "mongo/client/dbclient.h"
 #include "rs.h"
 #include "mongo/db/repl.h"
 #include "connections.h"

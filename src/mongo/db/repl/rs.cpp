@@ -18,7 +18,6 @@
 #include "../cmdline.h"
 #include "../../util/net/sock.h"
 #include "../client.h"
-#include "../../client/dbclient.h"
 #include "../dbhelpers.h"
 #include "../../s/d_logic.h"
 #include "rs.h"

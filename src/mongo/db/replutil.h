@@ -19,7 +19,6 @@
 #include "db.h"
 #include "dbhelpers.h"
 #include "json.h"
-#include "../client/dbclient.h"
 #include "repl.h"
 #include "cmdline.h"
 #include "repl/rs.h"

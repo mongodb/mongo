@@ -21,6 +21,8 @@
 #ifndef MONGO_PCH_H
 #define MONGO_PCH_H
 
+// MONGO_EXPOSE_MACROS is defined for internal mongo programs.
+// C++ driver consumers do not define this.
 #if defined(MONGO_EXPOSE_MACROS)
 
 # define JS_C_STRINGS_ARE_UTF8
@@ -30,7 +32,12 @@
 # define SUPPORT_UTF8
 # undef  _CRT_SECURE_NO_WARNINGS
 # define _CRT_SECURE_NO_WARNINGS
+
 #endif
+
+// our #define macros must not be active when we include
+// system headers and boost headers
+#include "mongo/client/undef_macros.h"
 
 #if defined(_WIN32)
 // for rand_s() usage:
@@ -38,14 +45,14 @@
 # ifndef NOMINMAX
 #  define NOMINMAX
 # endif
-#define WIN32_LEAN_AND_MEAN
+# define WIN32_LEAN_AND_MEAN
 # include <winsock2.h> //this must be included before the first windows.h include
 # include <ws2tcpip.h>
 # include <wspiapi.h>
 # include <windows.h>
 #endif
 
-#if defined(__linux__) && defined(MONGO_EXPOSE_MACROS)
+#if defined(__linux__)
 // glibc's optimized versions are better than g++ builtins
 # define __builtin_strcmp strcmp
 # define __builtin_strlen strlen
@@ -55,7 +62,6 @@
 # define __builtin_memset memset
 # define __builtin_memmove memmove
 #endif
-
 
 #include <ctime>
 #include <cstring>
@@ -87,6 +93,8 @@
 #include <boost/thread/condition.hpp>
 #include <boost/thread/recursive_mutex.hpp>
 #include <boost/thread/xtime.hpp>
+
+#include "mongo/client/redef_macros.h"
 
 namespace mongo {
 
@@ -141,8 +149,8 @@ namespace mongo {
 #include "util/assert_util.h"
 #include "util/debug_util.h"
 #include "util/goodies.h"
-#include "util/log.h"
 #include "util/allocator.h"
+#include "util/log.h"
 
 namespace mongo {
 

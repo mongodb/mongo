@@ -19,11 +19,12 @@
 
 #include "pch.h"
 
-#include "../../client/dbclient.h"
 #include "../../db/instance.h"
 #include "../../db/ops/query.h"
 #include "../../db/queryoptimizer.h"
 #include "../../util/file_allocator.h"
+#include "mongo/db/json.h"
+#include "mongo/client/dbclientcursor.h"
 
 #include "../framework.h"
 #include <boost/date_time/posix_time/posix_time.hpp>

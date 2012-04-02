@@ -23,7 +23,6 @@
 #include <cstdlib>
 
 #include "engine_v8.h"
-#include "../client/dbclient.h"
 
 namespace mongo {
 

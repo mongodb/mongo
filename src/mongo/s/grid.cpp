@@ -23,6 +23,7 @@
 #include "../util/stringutils.h"
 #include "../util/unittest.h"
 #include "../db/namespacestring.h"
+#include "mongo/db/json.h"
 
 #include "grid.h"
 #include "shard.h"

@@ -19,6 +19,7 @@
 #include "pch.h"
 
 #include "../s/chunk.h"
+#include "mongo/db/json.h"
 
 #include "dbtests.h"
 

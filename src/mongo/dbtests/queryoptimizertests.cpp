@@ -23,6 +23,7 @@
 #include "../db/ops/count.h"
 #include "../db/ops/query.h"
 #include "../db/ops/delete.h"
+#include "mongo/db/json.h"
 #include "dbtests.h"
 
 

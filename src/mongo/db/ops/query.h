@@ -29,7 +29,6 @@
 #include "../../s/d_chunk_manager.h"
 
 // struct QueryOptions, QueryResult, QueryResultFlags in:
-#include "../../client/dbclient.h"
 
 namespace mongo {
 

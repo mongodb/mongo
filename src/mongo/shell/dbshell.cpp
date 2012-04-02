@@ -21,15 +21,14 @@
 
 #include "../third_party/linenoise/linenoise.h"
 #include "../scripting/engine.h"
-#include "../client/dbclient.h"
 #include "../util/unittest.h"
 #include "../db/cmdline.h"
 #include "utils.h"
 #include "../util/password.h"
 #include "../util/version.h"
-#include "../util/goodies.h"
 #include "../util/file.h"
 #include "../db/repl/rs_member.h"
+#include "mongo/client/dbclientinterface.h"
 
 #include <boost/filesystem/operations.hpp>
 

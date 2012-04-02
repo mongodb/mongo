@@ -26,6 +26,7 @@
 #include "../db/instance.h"
 #include "../db/queryoptimizer.h"
 #include "../db/clientcursor.h"
+#include "mongo/client/dbclientcursor.h"
 
 #include "../client/connpool.h"
 #include "../client/distlock.h"

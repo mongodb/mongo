@@ -22,6 +22,7 @@
 #include "../clientcursor.h"
 #include "../namespace.h"
 #include "../queryutil.h"
+#include "mongo/client/dbclientinterface.h"
 
 namespace mongo {
     

@@ -127,7 +127,7 @@ namespace mongo {
     extern Labeler::Label LTE;
     extern Labeler::Label NE;
     extern Labeler::Label NIN;
-    extern Labeler::Label SIZE;
+    extern Labeler::Label BSIZE;
 
 
     // $or helper: OR(BSON("x" << GT << 7), BSON("y" << LT << 6));

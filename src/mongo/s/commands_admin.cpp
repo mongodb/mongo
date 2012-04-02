@@ -34,6 +34,7 @@
 #include "../util/timer.h"
 
 #include "../client/connpool.h"
+#include "mongo/client/dbclientcursor.h"
 
 #include "../db/dbmessage.h"
 #include "../db/commands.h"

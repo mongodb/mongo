@@ -71,11 +71,7 @@ namespace mongo {
         public:
             try_lock( mongo::mutex &m , int millis = 0 )
                 : _l( m.boost() , incxtimemillis( millis ) ) ,
-#if BOOST_VERSION >= 103500
                   ok( _l.owns_lock() )
-#else
-                  ok( _l.locked() )
-#endif
             { }
         private:
             boost::timed_mutex::scoped_timed_lock _l;

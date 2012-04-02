@@ -22,6 +22,7 @@
 #include "request.h"
 #include "client.h"
 #include "../db/commands.h"
+#include "mongo/client/dbclientcursor.h"
 #include <set>
 
 namespace mongo {

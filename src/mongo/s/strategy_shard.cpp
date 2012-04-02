@@ -20,6 +20,7 @@
 
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/connpool.h"
+#include "mongo/client/dbclientcursor.h"
 #include "mongo/db/commands.h"
 #include "mongo/db/index.h"
 #include "mongo/s/client.h"

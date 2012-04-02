@@ -18,7 +18,7 @@
 
 #include "pch.h"
 #include "client/gridfs.h"
-#include "client/dbclient.h"
+#include "mongo/client/dbclientcursor.h"
 
 #include "tool.h"
 #include "pcrecpp.h"

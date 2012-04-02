@@ -19,6 +19,7 @@
 #include "pch.h"
 #include "chunk.h"
 #include "../db/jsobj.h"
+#include "mongo/db/json.h"
 #include "../util/unittest.h"
 #include "../util/timer.h"
 

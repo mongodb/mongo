@@ -19,9 +19,10 @@
  * example of using replica sets from c++
  */
 
-#include "client/dbclient.h"
 #include <iostream>
 #include <vector>
+
+#include "mongo/client/dbclient.h"
 
 using namespace mongo;
 using namespace std;

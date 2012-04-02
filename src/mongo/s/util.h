@@ -18,10 +18,9 @@
 
 #pragma once
 
-#include "../pch.h"
-#include "../client/dbclient.h"
-#include "../db/jsobj.h"
-
+#include "mongo/pch.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/util/mongoutils/str.h"
 /**
    some generic sharding utils that can be used in mongod or mongos
  */
@@ -105,7 +104,7 @@ namespace mongo {
                 _combined = 0;
                 break;
             default:
-                massert( 13657 , str::stream() << "unknown type for ShardChunkVersion: " << elem , 0 );
+                massert( 13657 , mongoutils::str::stream() << "unknown type for ShardChunkVersion: " << elem , 0 );
             }
             return *this;
         }
@@ -123,7 +122,7 @@ namespace mongo {
     public:
         StaleConfigException( const string& ns , const string& raw , int code, ShardChunkVersion received, ShardChunkVersion wanted, bool justConnection = false )
             : AssertionException(
-                    str::stream() << raw << " ( ns : " << ns <<
+                    mongoutils::str::stream() << raw << " ( ns : " << ns <<
                                              ", received : " << received.toString() <<
                                              ", wanted : " << wanted.toString() <<
                                              ", " << ( code == SendStaleConfigCode ? "send" : "recv" ) << " )",
@@ -137,7 +136,7 @@ namespace mongo {
         // Preferred if we're rebuilding this from a thrown exception
         StaleConfigException( const string& raw , int code, const BSONObj& error, bool justConnection = false )
             : AssertionException(
-                    str::stream() << raw << " ( ns : " << error["ns"].String() << // Note, this will fail if we don't have a ns
+                    mongoutils::str::stream() << raw << " ( ns : " << error["ns"].String() << // Note, this will fail if we don't have a ns
                                              ", received : " << ShardChunkVersion( error["vReceived"] ).toString() <<
                                              ", wanted : " << ShardChunkVersion( error["vWanted"] ).toString() <<
                                              ", " << ( code == SendStaleConfigCode ? "send" : "recv" ) << " )",
@@ -210,6 +209,7 @@ namespace mongo {
     };
 
     class ShardConnection;
+    class DBClientBase;
     class VersionManager {
     public:
         VersionManager(){};

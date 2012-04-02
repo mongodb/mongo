@@ -3,8 +3,9 @@
 #include "pch.h"
 #include "../../util/net/listen.h"
 #include "../commands.h"
-#include "../../client/dbclient.h"
 #include "../security.h"
+#include "mongo/util/net/hostandport.h"
+#include "mongo/client/dbclientinterface.h"
 
 #include <boost/algorithm/string.hpp>
 

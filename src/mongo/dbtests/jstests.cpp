@@ -19,6 +19,7 @@
 
 #include "pch.h"
 #include "../db/instance.h"
+#include "mongo/db/json.h"
 
 #include "../pch.h"
 #include "../scripting/engine.h"

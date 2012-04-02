@@ -18,7 +18,6 @@
 
 #include "pch.h"
 #include "rs.h"
-#include "../../client/dbclient.h"
 #include "../../client/syncclusterconnection.h"
 #include "../../util/net/hostandport.h"
 #include "../dbhelpers.h"

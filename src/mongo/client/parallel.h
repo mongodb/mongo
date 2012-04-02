@@ -21,12 +21,6 @@
 
 #pragma once
 
-#include "pch.h"
-
-#include "mongo/client/dbclient.h"
-
-#include "mongo/client/redef_macros.h"
-
 #include "mongo/db/dbmessage.h"
 #include "mongo/db/matcher.h"
 #include "mongo/db/namespacestring.h"
@@ -466,4 +460,3 @@ namespace mongo {
 
 }
 
-#include "mongo/client/undef_macros.h"

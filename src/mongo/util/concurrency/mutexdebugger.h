@@ -2,6 +2,20 @@
 
 #pragma once
 
+#include "mongo/client/undef_macros.h"
+
+#include <iostream>
+#include <map>
+#include <set>
+#include <sstream>
+#include <string>
+
+#include "boost/thread/mutex.hpp"
+
+#include "mongo/client/redef_macros.h"
+
+#include "mongo/util/assert_util.h"
+
 namespace mongo {
 
     /** only used on _DEBUG builds.
@@ -10,10 +24,10 @@ namespace mongo {
     */
     class MutexDebugger {
         typedef const char * mid; // mid = mutex ID
-        typedef map<mid,int> Preceeding;
-        map< mid, int > maxNest;
+        typedef std::map<mid,int> Preceeding;
+        std::map< mid, int > maxNest;
         boost::thread_specific_ptr< Preceeding > us;
-        map< mid, set<mid> > followers;
+        std::map< mid, std::set<mid> > followers;
         boost::mutex &x;
         unsigned magic;
         void aBreakPoint() { } // for debugging
@@ -24,19 +38,19 @@ namespace mongo {
         //     a.lock(); b.lock(); is fine
         //     b.lock(); alone is fine too
         //   only checked on _DEBUG builds.
-        string a,b;
+        std::string a,b;
 
         /** outputs some diagnostic info on mutexes (on _DEBUG builds) */
         void programEnding();
 
         MutexDebugger();
 
-        string currentlyLocked() const { 
+        std::string currentlyLocked() const { 
             Preceeding *_preceeding = us.get();
             if( _preceeding == 0 )
                 return "";
             Preceeding &preceeding = *_preceeding;
-            stringstream q;
+            std::stringstream q;
             for( Preceeding::const_iterator i = preceeding.begin(); i != preceeding.end(); i++ ) {
                 if( i->second > 0 )
                     q << "  " << i->first << ' ' << i->second << '\n';
@@ -56,7 +70,7 @@ namespace mongo {
             if( a == m ) {
                 aBreakPoint();
                 if( preceeding[b.c_str()] ) {
-                    cout << "****** MutexDebugger error! warning " << b << " was locked before " << a << endl;
+                    std::cout << "****** MutexDebugger error! warning " << b << " was locked before " << a << std::endl;
                     verify(false);
                 }
             }
@@ -70,7 +84,7 @@ namespace mongo {
             }
 
             bool failed = false;
-            string err;
+            std::string err;
             {
                 boost::mutex::scoped_lock lk(x);
                 followers[m];
@@ -79,18 +93,18 @@ namespace mongo {
                         followers[i->first].insert(m);
                         if( followers[m].count(i->first) != 0 ) {
                             failed = true;
-                            stringstream ss;
+                            std::stringstream ss;
                             mid bad = i->first;
                             ss << "mutex problem" <<
                                "\n  when locking " << m <<
                                "\n  " << bad << " was already locked and should not be."
                                "\n  set a and b above to debug.\n";
-                            stringstream q;
+                            std::stringstream q;
                             for( Preceeding::iterator i = preceeding.begin(); i != preceeding.end(); i++ ) {
                                 if( i->first != m && i->first != bad && i->second > 0 )
                                     q << "  " << i->first << '\n';
                             }
-                            string also = q.str();
+                            std::string also = q.str();
                             if( !also.empty() )
                                 ss << "also locked before " << m << " in this thread (no particular order):\n" << also;
                             err = ss.str();
@@ -100,7 +114,7 @@ namespace mongo {
                 }
             }
             if( failed ) {
-                cout << err << endl;
+                std::cout << err << std::endl;
                 verify( 0 );
             }
         }
@@ -109,7 +123,7 @@ namespace mongo {
             Preceeding& preceeding = *us.get();
             preceeding[m]--;
             if( preceeding[m] < 0 ) {
-                cout << "ERROR: lock count for " << m << " is " << preceeding[m] << endl;
+                std::cout << "ERROR: lock count for " << m << " is " << preceeding[m] << std::endl;
                 verify( preceeding[m] >= 0 );
             }
         }

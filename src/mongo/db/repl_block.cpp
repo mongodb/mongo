@@ -23,7 +23,6 @@
 #include "dbhelpers.h"
 #include "../util/background.h"
 #include "../util/mongoutils/str.h"
-#include "../client/dbclient.h"
 #include "replutil.h"
 
 //#define REPLDEBUG(x) log() << "replBlock: "  << x << endl;

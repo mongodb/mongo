@@ -20,7 +20,6 @@
 
 #include "../pch.h"
 #include "../util/background.h"
-#include "../client/dbclient.h"
 #include "balancer_policy.h"
 
 namespace mongo {

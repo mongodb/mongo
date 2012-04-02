@@ -20,8 +20,8 @@
 #include "engine.h"
 #include "../util/md5.hpp"
 #include "../util/version.h"
-#include "../client/dbclient.h"
 #include "../client/connpool.h"
+#include "mongo/client/dbclientcursor.h"
 #include <pcrecpp.h>
 
 // ---------------------------------

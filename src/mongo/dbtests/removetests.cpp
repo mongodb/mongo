@@ -18,6 +18,7 @@
  */
 
 #include "../db/dbhelpers.h"
+#include "mongo/client/dbclientcursor.h"
 
 #include "dbtests.h"
 

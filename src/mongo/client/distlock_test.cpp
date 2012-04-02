@@ -1,4 +1,4 @@
-// distlock_test.h
+// distlock_test.cpp
 
 /*    Copyright 2009 10gen Inc.
  *
@@ -16,8 +16,7 @@
  */
 
 #include <iostream>
-#include "../pch.h"
-#include "dbclient.h"
+#include "pch.h"
 #include "distlock.h"
 #include "../db/commands.h"
 #include "../util/bson_util.h"

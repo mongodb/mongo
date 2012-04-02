@@ -22,6 +22,7 @@
 #include "../db/cmdline.h"
 
 #include "../client/distlock.h"
+#include "mongo/client/dbclientcursor.h"
 
 #include "balance.h"
 #include "server.h"

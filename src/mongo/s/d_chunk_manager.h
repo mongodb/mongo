@@ -26,7 +26,7 @@
 namespace mongo {
 
     class ClientCursor;
-
+    class DBClientCursorInterface;
     /**
      * Controls the boundaries of all the chunks for a given collection that live in this shard.
      *

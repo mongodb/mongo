@@ -22,8 +22,10 @@
 #include "../util/unittest.h"
 #include "../client/connpool.h"
 #include "../client/model.h"
+#include "mongo/client/dbclientcursor.h"
 #include "../db/pdfile.h"
 #include "../db/cmdline.h"
+
 
 #include "chunk.h"
 #include "config.h"
