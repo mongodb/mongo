@@ -50,6 +50,7 @@ namespace mongo {
         _progressMeter.finished();
         _killed = false;
         _numYields = 0;
+        _expectedLatencyMs = 0;
     }
 
     void CurOp::reset() {

@@ -226,6 +226,9 @@ namespace mongo {
         }
         
         void suppressFromCurop() { _suppressFromCurop = true; }
+        
+        long long getExpectedLatencyMs() const { return _expectedLatencyMs; }
+        void setExpectedLatencyMs( long long latency ) { _expectedLatencyMs = latency; }
 
     private:
         friend class Client;
@@ -253,6 +256,13 @@ namespace mongo {
         ProgressMeter _progressMeter;
         volatile bool _killed;
         int _numYields;
+
+        // this is how much "extra" time a query might take
+        // a writebacklisten for example will block for 30s 
+        // so this should be 30000 in that case
+        long long _expectedLatencyMs; 
+                                     
+
     };
 
     /* _globalKill: we are shutting down
