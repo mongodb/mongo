@@ -44,12 +44,14 @@
 using namespace bson;
 
 namespace mongo {
-    namespace regression {
+    namespace dbtests {
         extern unsigned perfHist;
     }
 }
 
 namespace PerfTests {
+
+    using mongo::dbtests::perfHist;
 
     const bool profiling = false;
 

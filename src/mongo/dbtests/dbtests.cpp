@@ -18,12 +18,14 @@
  */
 
 #include "pch.h"
-#include "dbtests.h"
-#include "../util/unittest.h"
+
+#include "mongo/dbtests/dbtests.h"
+#include "mongo/dbtests/framework.h"
+#include "mongo/util/unittest.h"
 
 int main( int argc, char** argv ) {
     static StaticObserver StaticObserver;
     doPreServerStartupInits();
     UnitTest::runTests();
-    return Suite::run(argc, argv, "/tmp/unittest");
+    return mongo::dbtests::runDbTests( argc, argv, "/tmp/unittest" );
 }

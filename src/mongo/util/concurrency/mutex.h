@@ -17,6 +17,9 @@
 
 #pragma once
 
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/xtime.hpp>
+
 #include "../heapcheck.h"
 #include "threadlocal.h"
 #if defined(_DEBUG)

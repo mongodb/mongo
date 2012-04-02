@@ -43,6 +43,14 @@ namespace mongo {
 
     thread_specific_ptr<Logstream> Logstream::tsp;
 
+    Nullstream& tlog( int level ) {
+        if ( !debug && level > tlogLevel )
+            return nullstream;
+        if ( level > logLevel )
+            return nullstream;
+        return Logstream::get().prolog();
+    }
+
     class LoggingManager {
     public:
         LoggingManager()

@@ -13,6 +13,8 @@ Import("usesm usev8")
 Import("installSetup")
 Import("darwin windows solaris linux nix")
 
+env.SConscript('unittest/SConscript')
+
 def add_exe( v ):
     return "${PROGPREFIX}%s${PROGSUFFIX}" % v
 
@@ -360,7 +362,7 @@ if has_option( "sharedclient" ):
     sharedClientLibName = str( env.SharedLibrary( "mongoclient", [], LIBDEPS=["allclient"], _LIBDEPS='$_LIBDEPS_OBJS' )[0] )
 
 # dbtests test binary
-env.StaticLibrary('testframework', ['dbtests/framework.cpp'])
+env.StaticLibrary('testframework', ['dbtests/framework.cpp'], LIBDEPS=['unittest/unittest'])
 
 test = testEnv.Install(
     '#/',

@@ -17,9 +17,12 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "framework.h"
+#pragma once
+
+#include "mongo/db/instance.h"
+#include "mongo/unittest/unittest.h"
 
 using namespace mongo;
-using namespace mongo::regression;
+using namespace mongo::unittest;
 using boost::shared_ptr;
 
