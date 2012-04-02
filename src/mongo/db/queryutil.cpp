@@ -1392,12 +1392,17 @@ namespace mongo {
         }
     }
     
-    int FieldRangeVectorIterator::validateCurrentInterval( int i, const BSONElement &jj,
-                                                          bool reverse, bool first, bool &eq ) {
-        FieldIntervalMatcher matcher( _v._ranges[ i ].intervals()[ _i.get( i ) ], jj, reverse );
+    int FieldRangeVectorIterator::validateCurrentInterval( int intervalIdx,
+                                                          const BSONElement &currElt,
+                                                          bool reverse, bool first,
+                                                          bool &eqInclusiveUpperBound ) {
+        eqInclusiveUpperBound = false;
+        FieldIntervalMatcher matcher
+                ( _v._ranges[ intervalIdx ].intervals()[ _i.get( intervalIdx ) ], currElt,
+                 reverse );
 
         if ( matcher.isEqInclusiveUpperBound() ) {
-            eq = true;
+            eqInclusiveUpperBound = true;
             return -1;
         }
         if ( matcher.isGteUpperBound() ) {
@@ -1406,18 +1411,18 @@ namespace mongo {
 
         // below the upper bound
 
-        if ( i == 0 && first ) {
+        if ( intervalIdx == 0 && first ) {
             // the value of 1st field won't go backward, so don't check lower bound
             // TODO maybe we can check 'first' only?
             return -1;
         }
 
         if ( matcher.isEqExclusiveLowerBound() ) {
-            return advancePastZeroed( i + 1 );
+            return advancePastZeroed( intervalIdx + 1 );
         }
         if ( matcher.isLtLowerBound() ) {
-            _i.setZeroes( i + 1 );
-            return advanceToLowerBound( i );
+            _i.setZeroes( intervalIdx + 1 );
+            return advanceToLowerBound( intervalIdx );
         }
 
         return -1;

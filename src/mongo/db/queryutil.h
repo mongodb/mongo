@@ -667,14 +667,14 @@ namespace mongo {
          *   -1 Iteration is not complete for the current interval.
          *  >=0 Return value to be forwarded by advance().
          */
-        int validateCurrentInterval( int i, const BSONElement &jj, bool reverse, bool first,
-                                    bool &eq );
+        int validateCurrentInterval( int intervalIdx, const BSONElement &currElt,
+                                    bool reverse, bool first, bool &eqInclusiveUpperBound );
         
         /** Skip to curr / i / nextbounds. */
         int advanceToLowerBound( int i );
         /** Skip to curr / i / superlative. */
         int advancePast( int i );
-        /** Skip to curr / i / superlative and reset following interval counters. */
+        /** Skip to curr / i / superlative and reset following interval positions. */
         int advancePastZeroed( int i );
         
         const FieldRangeVector &_v;
