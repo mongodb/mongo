@@ -33,6 +33,7 @@
 #   off all mongods on a box, which means you can't run two smoke.py
 #   jobs on the same host at once.  So something's gotta change.
 
+from datetime import datetime
 import glob
 from optparse import OptionParser
 import os
@@ -365,6 +366,7 @@ def runTest(test):
     
     
     sys.stdout.write("      Command : %s\n" % ' '.join(argv))
+    sys.stdout.write("         Date : %s\n" % datetime.now().ctime())
     sys.stdout.flush()
 
     os.environ['MONGO_TEST_FILENAME'] = os.path.basename(path)
