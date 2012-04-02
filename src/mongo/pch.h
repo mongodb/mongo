@@ -94,7 +94,10 @@
 #include <boost/thread/recursive_mutex.hpp>
 #include <boost/thread/xtime.hpp>
 
+
 #include "mongo/client/redef_macros.h"
+
+#include "mongo/util/exit_code.h"
 
 namespace mongo {
 
@@ -110,27 +113,6 @@ namespace mongo {
     // pdfile versions
     const int PDFILE_VERSION = 4;
     const int PDFILE_VERSION_MINOR = 5;
-
-    enum ExitCode {
-        EXIT_CLEAN = 0 ,
-        EXIT_BADOPTIONS = 2 ,
-        EXIT_REPLICATION_ERROR = 3 ,
-        EXIT_NEED_UPGRADE = 4 ,
-        EXIT_SHARDING_ERROR = 5 ,
-        EXIT_KILL = 12 ,
-        EXIT_ABRUPT = 14 ,
-        EXIT_NTSERVICE_ERROR = 20 ,
-        EXIT_JAVA = 21 ,
-        EXIT_OOM_MALLOC = 42 ,
-        EXIT_OOM_REALLOC = 43 ,
-        EXIT_FS = 45 ,
-        EXIT_CLOCK_SKEW = 47 ,
-        EXIT_NET_ERROR = 48 ,
-        EXIT_WINDOWS_SERVICE_STOP = 49 ,
-        EXIT_POSSIBLE_CORRUPTION = 60 , // this means we detected a possible corruption situation, like a buf overflow
-        EXIT_UNCAUGHT = 100 , // top level exception that wasn't caught
-        EXIT_TEST = 101
-    };
 
     void dbexit( ExitCode returnCode, const char *whyMsg = "", bool tryToGetLock = false);
 
