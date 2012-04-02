@@ -49,14 +49,21 @@ possible_paths = [
     os.path.abspath(os.path.join(here, '..', '..')),
     os.path.abspath(os.path.join(here, '..', '..', '..')),
 ]
-sys.path.extend(possible_paths)
-try:
-    from settings import buildlogger_secret
-except ImportError:
-    buildlogger_secret = None
 
+username, password = None, None
 for path in possible_paths:
-    sys.path.remove(path)
+    buildbot_tac = os.path.join(path, 'buildbot.tac')
+    if os.path.isfile(buildbot_tac):
+        tac_globals = {}
+        tac_locals = {}
+        try:
+            execfile(buildbot_tac, tac_globals, tac_locals)
+            tac_globals.update(tac_locals)
+            username = tac_globals['slavename']
+            password = tac_globals['passwd']
+            break
+        except:
+            traceback.print_exc()
 
 
 URL_ROOT = 'http://buildlogs.mongodb.org/'
@@ -66,8 +73,8 @@ digest_handler = urllib2.HTTPDigestAuthHandler()
 digest_handler.add_password(
     realm='buildlogs',
     uri=URL_ROOT,
-    user='buildbot',
-    passwd=buildlogger_secret)
+    user=username,
+    passwd=password)
 url_opener = urllib2.build_opener(digest_handler)
 
 def url(endpoint):
@@ -343,8 +350,8 @@ if __name__ == '__main__':
         sys.stderr.flush()
         wrapper = run_and_echo
 
-    elif buildlogger_secret is None:
-        sys.stderr.write('buildlogger: could not find settings.py with buildlogger_secret\n')
+    elif username is None or password is None:
+        sys.stderr.write('buildlogger: could not find or import buildbot.tac for authentication\n')
         sys.stderr.flush()
         wrapper = run_and_echo
 
