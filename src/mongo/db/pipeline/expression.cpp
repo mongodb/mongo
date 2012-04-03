@@ -645,7 +645,8 @@ namespace mongo {
     }
 
     void ExpressionCoerceToBool::addToBsonObj(
-        BSONObjBuilder *pBuilder, string fieldName) const {
+        BSONObjBuilder *pBuilder, string fieldName,
+        bool requireExpression) const {
         verify(false && "not possible"); // no equivalent of this
     }
 
