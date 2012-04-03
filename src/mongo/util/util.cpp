@@ -17,7 +17,7 @@
 
 #include "pch.h"
 #include "goodies.h"
-#include "unittest.h"
+#include "mongo/util/startup_test.h"
 #include "file_allocator.h"
 #include "optime.h"
 #include "time_support.h"
@@ -135,9 +135,6 @@ namespace mongo {
         return "";
     }
 
-    vector<UnitTest*> *UnitTest::tests = 0;
-    bool UnitTest::running = false;
-
     const char *default_getcurns() { return ""; }
     const char * (*getcurns)() = default_getcurns;
 
@@ -165,7 +162,7 @@ namespace mongo {
         return n;
     }
 
-    struct UtilTest : public UnitTest {
+    struct UtilTest : public StartupTest {
         void run() {
             verify( isPrime(3) );
             verify( isPrime(2) );

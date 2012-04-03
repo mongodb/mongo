@@ -22,7 +22,7 @@
 #include <sstream>
 #include <string>
 #include <fstream>
-#include "unittest.h"
+#include "mongo/util/startup_test.h"
 #include "version.h"
 #include "stringutils.h"
 #include "../db/jsobj.h"
@@ -280,7 +280,7 @@ namespace mongo {
         return LexNumCmp::cmp(rhs.data(), lhs.data(), false);
     }
 
-    class VersionCmpTest : public UnitTest {
+    class VersionCmpTest : public StartupTest {
     public:
         void run() {
             verify( versionCmp("1.2.3", "1.2.3") == 0 );
@@ -298,7 +298,7 @@ namespace mongo {
         }
     } versionCmpTest;
 
-    class VersionArrayTest : public UnitTest {
+    class VersionArrayTest : public StartupTest {
     public:
         void run() {
             verify( _versionArray("1.2.3") == BSON_ARRAY(1 << 2 << 3 << 0) );

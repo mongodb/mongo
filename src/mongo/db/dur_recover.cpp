@@ -31,7 +31,7 @@
 #include "pdfile.h"
 #include "database.h"
 #include "db.h"
-#include "../util/unittest.h"
+#include "../util/startup_test.h"
 #include "../util/checksum.h"
 #include "cmdline.h"
 #include "curop.h"
@@ -525,7 +525,7 @@ namespace mongo {
         }
 
         struct BufReaderY { int a,b; };
-        class BufReaderUnitTest : public UnitTest {
+        class BufReaderUnitTest : public StartupTest {
         public:
             void run() {
                 BufReader r((void*) "abcdabcdabcd", 12);

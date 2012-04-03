@@ -21,7 +21,7 @@
 #include "pch.h"
 #include "matcher.h"
 #include "../util/goodies.h"
-#include "../util/unittest.h"
+#include "../util/startup_test.h"
 #include "diskloc.h"
 #include "../scripting/engine.h"
 #include "db.h"
@@ -1230,7 +1230,7 @@ namespace mongo {
         char eoo;
     } js2;
 
-    struct JSUnitTest : public UnitTest {
+    struct JSUnitTest : public StartupTest {
         void run() {
 
             {
@@ -1263,7 +1263,7 @@ namespace mongo {
 
 #pragma pack()
 
-    struct RXTest : public UnitTest {
+    struct RXTest : public StartupTest {
 
         RXTest() {
         }

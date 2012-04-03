@@ -20,7 +20,6 @@
 #include "../namespace-inl.h"
 #include "../jsobj.h"
 #include "../index.h"
-#include "../../util/unittest.h"
 #include "../commands.h"
 #include "../pdfile.h"
 #include "../btree.h"

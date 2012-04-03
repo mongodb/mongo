@@ -28,7 +28,6 @@
 #include "../../util/ramlog.h"
 #include "../helpers/dblogger.h"
 #include "connections.h"
-#include "../../util/unittest.h"
 #include "../instance.h"
 #include "../repl.h"
 

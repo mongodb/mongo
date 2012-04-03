@@ -22,7 +22,7 @@
 
 #include "task.h"
 #include "../goodies.h"
-#include "../unittest.h"
+#include "../startup_test.h"
 #include "../time_support.h"
 
 namespace mongo {
@@ -161,7 +161,7 @@ namespace mongo {
             cout << "Hello " << i << endl;
             s->requeue();
         }
-        class TaskUnitTest : public mongo::UnitTest {
+        class TaskUnitTest : public mongo::StartupTest {
         public:
             virtual void run() {
                 lam f = boost::bind(abc, 3);

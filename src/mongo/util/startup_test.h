@@ -1,4 +1,4 @@
-// unittest.h
+// mongo/util/startup_test.h
 
 /*    Copyright 2009 10gen Inc.
  *
@@ -17,9 +17,11 @@
 
 #pragma once
 
+#include <vector>
+
 namespace mongo {
 
-    /* The idea here is to let all initialization of global variables (classes inheriting from UnitTest)
+    /* The idea here is to let all initialization of global variables (classes inheriting from StartupTest)
        complete before we run the tests -- otherwise order of initilization being arbitrary may mess
        us up.  The app's main() function should call runTests().
 
@@ -29,33 +31,25 @@ namespace mongo {
        These tests are ran on *every* startup of mongod, so they have to be very lightweight.  But it is a
        good quick check for a bad build.
     */
-    struct UnitTest {
-        UnitTest() {
-            registerTest(this);
-        }
-        virtual ~UnitTest() {}
+    class StartupTest {
+    public:
+        static void runTests();
+
+        static bool testsInProgress() { return running; }
+
+    protected:
+        StartupTest();
+        virtual ~StartupTest();
+
+    private:
+        static std::vector<StartupTest*> *tests;
+        static bool running;
+
+        static void registerTest(StartupTest *t);
 
         // assert if fails
         virtual void run() = 0;
 
-        static bool testsInProgress() { return running; }
-    private:
-        static vector<UnitTest*> *tests;
-        static bool running;
-    public:
-        static void registerTest(UnitTest *t) {
-            if ( tests == 0 )
-                tests = new vector<UnitTest*>();
-            tests->push_back(t);
-        }
-
-        static void runTests() {
-            running = true;
-            for ( vector<UnitTest*>::iterator i = tests->begin(); i != tests->end(); i++ ) {
-                (*i)->run();
-            }
-            running = false;
-        }
     };
 
 

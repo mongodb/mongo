@@ -18,7 +18,7 @@
 
 #include "pch.h"
 #include "../util/net/message.h"
-#include "../util/unittest.h"
+#include "../util/startup_test.h"
 #include "../client/connpool.h"
 #include "../util/net/message_server.h"
 #include "../util/stringutils.h"
@@ -355,7 +355,7 @@ int _main(int argc, char* argv[]) {
 
     if ( params.count( "test" ) ) {
         logLevel = 5;
-        UnitTest::runTests();
+        StartupTest::runTests();
         cout << "tests passed" << endl;
         return 0;
     }

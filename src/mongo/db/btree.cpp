@@ -28,7 +28,7 @@
 #include "stats/counters.h"
 #include "dur_commitjob.h"
 #include "btreebuilder.h"
-#include "../util/unittest.h"
+#include "mongo/util/startup_test.h"
 #include "../server.h"
 
 namespace mongo {
@@ -1954,7 +1954,7 @@ namespace mongo {
     template struct __KeyNode<DiskLoc>;
     template struct __KeyNode<DiskLoc56Bit>;
 
-    struct BTUnitTest : public UnitTest {
+    struct BTUnitTest : public StartupTest {
         void run() {
             DiskLoc big(0xf12312, 0x70001234);
             DiskLoc56Bit bigl;

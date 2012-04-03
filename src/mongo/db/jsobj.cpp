@@ -26,7 +26,7 @@
 #include "../util/md5.hpp"
 #include <limits>
 #include <cmath>
-#include "../util/unittest.h"
+#include "../util/startup_test.h"
 #include "../util/embedded_builder.h"
 #include "../util/stringutils.h"
 #include "../util/mongoutils/str.h"
@@ -939,7 +939,7 @@ namespace mongo {
     */
 #pragma pack()
 
-    struct BsonUnitTest : public UnitTest {
+    struct BsonUnitTest : public StartupTest {
         void testRegex() {
 
             BSONObjBuilder b;

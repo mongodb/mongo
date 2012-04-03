@@ -19,7 +19,6 @@
 #include "pch.h"
 #include "../util/net/message.h"
 #include "../util/stringutils.h"
-#include "../util/unittest.h"
 #include "../client/connpool.h"
 #include "../client/model.h"
 #include "mongo/client/dbclientcursor.h"

@@ -21,7 +21,6 @@
 #include "config.h"
 
 #include "../util/stringutils.h"
-#include "../util/unittest.h"
 
 #include "balancer_policy.h"
 

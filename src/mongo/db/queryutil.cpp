@@ -21,7 +21,7 @@
 #include "matcher.h"
 #include "pdfile.h"
 #include "queryoptimizer.h"
-#include "../util/unittest.h"
+#include "../util/startup_test.h"
 #include "dbmessage.h"
 #include "indexkey.h"
 #include "../util/mongoutils/str.h"
@@ -1544,7 +1544,7 @@ namespace mongo {
         _originalOrSets.pop_front();
     }
     
-    struct SimpleRegexUnitTest : UnitTest {
+    struct SimpleRegexUnitTest : StartupTest {
         void run() {
             {
                 BSONObjBuilder b;

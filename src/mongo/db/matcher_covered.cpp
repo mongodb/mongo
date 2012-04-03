@@ -21,7 +21,6 @@
 #include "pch.h"
 #include "matcher.h"
 #include "../util/goodies.h"
-#include "../util/unittest.h"
 #include "diskloc.h"
 #include "../scripting/engine.h"
 #include "db.h"

@@ -20,7 +20,7 @@
 #include "chunk.h"
 #include "../db/jsobj.h"
 #include "mongo/db/json.h"
-#include "../util/unittest.h"
+#include "../util/startup_test.h"
 #include "../util/timer.h"
 
 namespace mongo {
@@ -151,7 +151,7 @@ namespace mongo {
     /* things to test for compound :
        \ middle (deprecating?)
     */
-    class ShardKeyUnitTest : public UnitTest {
+    class ShardKeyUnitTest : public StartupTest {
     public:
 
         void testIsPrefixOf() {

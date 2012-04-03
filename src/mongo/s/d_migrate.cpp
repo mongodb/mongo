@@ -41,7 +41,7 @@
 #include "mongo/client/dbclientcursor.h"
 
 #include "../util/queue.h"
-#include "../util/unittest.h"
+#include "../util/startup_test.h"
 #include "../util/processinfo.h"
 #include "../util/ramlog.h"
 
@@ -1740,7 +1740,7 @@ namespace mongo {
     } recvChunkAboortCommand;
 
 
-    class IsInRangeTest : public UnitTest {
+    class IsInRangeTest : public StartupTest {
     public:
         void run() {
             BSONObj min = BSON( "x" << 1 );

@@ -24,7 +24,7 @@
 #include "repl/rs.h"
 #include "stats/counters.h"
 #include "../util/file.h"
-#include "../util/unittest.h"
+#include "../util/startup_test.h"
 #include "queryoptimizer.h"
 #include "ops/update.h"
 #include "ops/delete.h"
@@ -566,7 +566,7 @@ namespace mongo {
     
     // -------------------------------------
 
-    struct TestOpTime : public UnitTest {
+    struct TestOpTime : public StartupTest {
         void run() {
             OpTime t;
             for ( int i = 0; i < 10; i++ ) {

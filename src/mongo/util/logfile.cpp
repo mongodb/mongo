@@ -20,12 +20,12 @@
 #include "logfile.h"
 #include "text.h"
 #include "mongoutils/str.h"
-#include "unittest.h"
+#include "mongo/util/startup_test.h"
 
 using namespace mongoutils;
 
 namespace mongo {
-    struct LogfileTest : public UnitTest {
+    struct LogfileTest : public StartupTest {
         LogfileTest() { }
         void run() {
             if( 0 && debug ) {

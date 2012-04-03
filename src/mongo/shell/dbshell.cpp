@@ -21,7 +21,7 @@
 
 #include "../third_party/linenoise/linenoise.h"
 #include "../scripting/engine.h"
-#include "../util/unittest.h"
+#include "../util/startup_test.h"
 #include "../db/cmdline.h"
 #include "utils.h"
 #include "../util/password.h"
@@ -359,7 +359,7 @@ bool isBalanced( string code ) {
 
 using mongo::asserted;
 
-struct BalancedTest : public mongo::UnitTest {
+struct BalancedTest : public mongo::StartupTest {
 public:
     void run() {
         verify( isBalanced( "x = 5" ) );
@@ -768,7 +768,7 @@ int _main( int argc, char* argv[] ) {
     if ( ! mongo::cmdLine.quiet )
         cout << "MongoDB shell version: " << mongo::versionString << endl;
 
-    mongo::UnitTest::runTests();
+    mongo::StartupTest::runTests();
 
     if ( !nodb ) { // connect to db
         //if ( ! mongo::cmdLine.quiet ) cout << "url: " << url << endl;

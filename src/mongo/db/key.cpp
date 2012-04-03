@@ -18,7 +18,7 @@
 
 #include "pch.h"
 #include "key.h"
-#include "../util/unittest.h"
+#include "mongo/util/startup_test.h"
 
 namespace mongo {
 
@@ -663,7 +663,7 @@ namespace mongo {
         return true;
     }
 
-    struct CmpUnitTest : public UnitTest {
+    struct CmpUnitTest : public StartupTest {
         void run() {
             char a[2];
             char b[2];

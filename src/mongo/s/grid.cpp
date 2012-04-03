@@ -21,7 +21,7 @@
 #include <iomanip>
 #include "../client/connpool.h"
 #include "../util/stringutils.h"
-#include "../util/unittest.h"
+#include "../util/startup_test.h"
 #include "../db/namespacestring.h"
 #include "mongo/db/json.h"
 
@@ -505,7 +505,7 @@ namespace mongo {
 
     // unit tests
 
-    class BalancingWindowUnitTest : public UnitTest {
+    class BalancingWindowUnitTest : public StartupTest {
     public:
         void run() {
             

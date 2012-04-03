@@ -20,7 +20,7 @@
 #include "db.h"
 #include "introspect.h"
 #include "repl.h"
-#include "../util/unittest.h"
+#include "../util/startup_test.h"
 #include "../util/file_allocator.h"
 #include "../util/background.h"
 #include "../util/text.h"
@@ -1100,7 +1100,7 @@ int main(int argc, char* argv[]) {
 
     }
 
-    UnitTest::runTests();
+    StartupTest::runTests();
     initAndListen(cmdLine.port);
     dbexit(EXIT_CLEAN);
     return 0;

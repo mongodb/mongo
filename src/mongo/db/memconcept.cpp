@@ -11,7 +11,7 @@
 #include <boost/functional/hash.hpp>
 using namespace std;
 #include "../util/log.h"
-#include "../util/unittest.h"
+#include "../util/startup_test.h"
 
 namespace mongo {
     namespace memconcept { 
@@ -32,7 +32,7 @@ namespace mongo {
         concept concept::deletedrecord("deletedrecord");
         concept concept::btreebucket("btreebucket");
 
-        class X : public UnitTest { 
+        class X : public StartupTest { 
         public:
             virtual void run() {
             }

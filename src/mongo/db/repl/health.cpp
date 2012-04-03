@@ -27,7 +27,7 @@
 #include "../../util/ramlog.h"
 #include "../helpers/dblogger.h"
 #include "connections.h"
-#include "../../util/unittest.h"
+#include "../../util/startup_test.h"
 #include "../dbhelpers.h"
 
 namespace mongo {
@@ -447,7 +447,7 @@ namespace mongo {
             b.append("blind",true); // to avoid confusion if set...normally never set except for testing.
     }
 
-    static struct Test : public UnitTest {
+    static struct Test : public StartupTest {
         void run() {
             HealthOptions a,b;
             verify( a == b );

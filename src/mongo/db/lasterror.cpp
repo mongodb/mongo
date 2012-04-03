@@ -17,9 +17,7 @@
 
 #include "pch.h"
 
-#include "../util/unittest.h"
-#include "../util/net/message.h"
-
+#include "mongo/util/net/message.h"
 
 #include "lasterror.h"
 #include "jsobj.h"

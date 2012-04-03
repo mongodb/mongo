@@ -21,7 +21,7 @@
 #include "../client/connpool.h"
 #include "../db/querypattern.h"
 #include "../db/queryutil.h"
-#include "../util/unittest.h"
+#include "../util/startup_test.h"
 #include "../util/timer.h"
 #include "mongo/client/dbclientcursor.h"
 
@@ -1095,7 +1095,7 @@ namespace mongo {
     _splitTickets( 0 ){
     }
 
-    class ChunkObjUnitTest : public UnitTest {
+    class ChunkObjUnitTest : public StartupTest {
     public:
         void runShardChunkVersion() {
             vector<ShardChunkVersion> all;

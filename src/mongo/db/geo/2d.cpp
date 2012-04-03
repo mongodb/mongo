@@ -20,7 +20,7 @@
 #include "../namespace-inl.h"
 #include "../jsobj.h"
 #include "../index.h"
-#include "../../util/unittest.h"
+#include "../../util/startup_test.h"
 #include "../commands.h"
 #include "../pdfile.h"
 #include "../btree.h"
@@ -3042,7 +3042,7 @@ namespace mongo {
 
     } geoWalkCmd;
 
-    struct GeoUnitTest : public UnitTest {
+    struct GeoUnitTest : public StartupTest {
 
         int round( double d ) {
             return (int)(.5+(d*1000));
