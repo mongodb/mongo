@@ -1804,7 +1804,7 @@ namespace mongo {
     NOINLINE_DECL DiskLoc outOfSpace(const char *ns, NamespaceDetails *d, int lenWHdr, bool god, DiskLoc extentLoc) {
         DiskLoc loc;
         if ( d->capped == 0 ) { // size capped doesn't grow
-            log(1) << "allocating new extent for " << ns << " padding:" << d->paddingFactor << " lenWHdr: " << lenWHdr << endl;
+            log(1) << "allocating new extent for " << ns << " padding:" << d->paddingFactor() << " lenWHdr: " << lenWHdr << endl;
             cc().database()->allocExtent(ns, Extent::followupSize(lenWHdr, d->lastExtentSize), false, !god);
             loc = d->alloc(ns, lenWHdr, extentLoc);
             if ( loc.isNull() ) {
@@ -1983,11 +1983,13 @@ namespace mongo {
         }
 
         int lenWHdr = len + Record::HeaderSize;
-        lenWHdr = (int) (lenWHdr * d->paddingFactor);
+        lenWHdr = (int) (lenWHdr * d->paddingFactor());
         if ( lenWHdr == 0 ) {
             // old datafiles, backward compatible here.
-            verify( d->paddingFactor == 0 );
-            *getDur().writing(&d->paddingFactor) = 1.0;
+            // this is _very_ old, < 0.8
+            warning() << "implicit updgrade of paddingFactor of very old collection" << endl;
+            verify( d->paddingFactor() == 0 );
+            d->setPaddingFactor(1.0);
             lenWHdr = len + Record::HeaderSize;
         }
 

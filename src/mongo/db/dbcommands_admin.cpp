@@ -224,7 +224,7 @@ namespace mongo {
             result.appendNumber("datasize", d->stats.datasize);
             result.appendNumber("nrecords", d->stats.nrecords);
             result.appendNumber("lastExtentSize", d->lastExtentSize);
-            result.appendNumber("padding", d->paddingFactor);
+            result.appendNumber("padding", d->paddingFactor());
             
 
             try {

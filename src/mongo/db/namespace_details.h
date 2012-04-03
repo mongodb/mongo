@@ -82,7 +82,9 @@ namespace mongo {
         // ofs 352 (16 byte aligned)
         int capped;
         int max;                              // max # of objects for a capped table.  TODO: should this be 64 bit?
-        double paddingFactor;                 // 1.0 = no padding.
+    private:
+        double _paddingFactor;                 // 1.0 = no padding.
+    public:
         // ofs 386 (16)
         int flags;
         DiskLoc capExtent;
@@ -241,6 +243,12 @@ namespace mongo {
         /* returns index of the first index in which the field is present. -1 if not present. */
         int fieldIsIndexed(const char *fieldName);
 
+        double paddingFactor() const { return _paddingFactor; }
+
+        void setPaddingFactor( double paddingFactor ) {
+            *getDur().writing(&_paddingFactor) = paddingFactor;
+        }
+
         /* called to indicate that an update fit in place.  
            fits also called on an insert -- idea there is that if you had some mix and then went to
            pure inserts it would adapt and PF would trend to 1.0.  note update calls insert on a move
@@ -252,9 +260,9 @@ namespace mongo {
         */
         void paddingFits() {
             MONGO_SOMETIMES(sometimes, 4) { // do this on a sampled basis to journal less
-                double x = paddingFactor - 0.001;
+                double x = _paddingFactor - 0.001;
                 if ( x >= 1.0 ) {
-                    *getDur().writing(&paddingFactor) = x;
+                    setPaddingFactor( x );
                 }
             }
         }
@@ -268,9 +276,9 @@ namespace mongo {
                    this should be an adequate starting point.
                 */
                 double N = min(nIndexes,7) + 3;
-                double x = paddingFactor + (0.001 * N);
+                double x = _paddingFactor + (0.001 * N);
                 if ( x <= 2.0 ) {
-                    *getDur().writing(&paddingFactor) = x;
+                    setPaddingFactor( x );
                 }
             }
         }

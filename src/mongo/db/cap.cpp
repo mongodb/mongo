@@ -430,7 +430,7 @@ namespace mongo {
         // nIndexes preserve 0
         // capped preserve true
         // max preserve
-        t->paddingFactor = 1.0;
+        t->_paddingFactor = 1.0;
         t->flags = 0;
         t->capFirstNewRecord = DiskLoc();
         t->capFirstNewRecord.setInvalid();

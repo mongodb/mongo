@@ -51,7 +51,7 @@ namespace mongo {
         nIndexes = 0;
         capped = _capped;
         max = 0x7fffffff;
-        paddingFactor = 1.0;
+        _paddingFactor = 1.0;
         flags = 0;
         capFirstNewRecord = DiskLoc();
         // Signal that we are on first allocation iteration through extents.

@@ -1353,7 +1353,7 @@ namespace mongo {
             result.append( "numExtents" , numExtents );
             result.append( "nindexes" , nsd->nIndexes );
             result.append( "lastExtentSize" , nsd->lastExtentSize / scale );
-            result.append( "paddingFactor" , nsd->paddingFactor );
+            result.append( "paddingFactor" , nsd->paddingFactor() );
             result.append( "flags" , nsd->flags );
 
             BSONObjBuilder indexSizes;
