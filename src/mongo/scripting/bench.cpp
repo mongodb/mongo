@@ -16,13 +16,21 @@
  *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+
+
 #include "pch.h"
-#include "engine.h"
-#include "../util/md5.hpp"
-#include "../util/version.h"
-#include "../client/connpool.h"
-#include "mongo/client/dbclientcursor.h"
+
+
 #include <pcrecpp.h>
+
+#include "mongo/client/connpool.h"
+
+#include "mongo/scripting/engine.h"
+#include "mongo/util/md5.h"
+#include "mongo/util/timer.h"
+#include "mongo/util/version.h"
+#include "mongo/client/dbclientcursor.h"
+
 
 // ---------------------------------
 // ---- benchmarking system --------
@@ -104,6 +112,39 @@ namespace mongo {
         BSONArrayBuilder trapped;
     };
 
+    struct BenchRunStats {
+        BenchRunStats() :
+            findOneTotalTimeMicros( 0 ),
+            updateTotalTimeMicros( 0 ),
+            insertTotalTimeMicros( 0 ),
+            deleteTotalTimeMicros( 0 ),
+            queryTotalTimeMicros( 0 ),
+            findOneTotalOps( 0 ),
+            updateTotalOps( 0 ),
+            insertTotalOps( 0 ),
+            deleteTotalOps( 0 ),
+            queryTotalOps( 0 ),
+            _mutex( "BenchRunStats" )
+         { }
+
+        unsigned long long findOneTotalTimeMicros;
+        unsigned long long updateTotalTimeMicros;
+        unsigned long long insertTotalTimeMicros;
+        unsigned long long deleteTotalTimeMicros;
+        unsigned long long queryTotalTimeMicros;
+
+        unsigned long long findOneTotalOps;
+        unsigned long long updateTotalOps;
+        unsigned long long insertTotalOps;
+        unsigned long long deleteTotalOps;
+        unsigned long long queryTotalOps;
+
+        mongo::mutex _mutex;
+    };
+
+    BSONObj benchStart( const BSONObj& , void* );
+    BSONObj benchFinish( const BSONObj& , void* );
+
     static bool _hasSpecial( const BSONObj& obj ) {
         BSONObjIterator i( obj );
         while ( i.more() ) {
@@ -179,9 +220,12 @@ namespace mongo {
     }
 
 
-    static void _benchThread( BenchRunConfig * config, DBClientBase* conn ){
+
+    static void _benchThread( BenchRunConfig * config, BenchRunStats* stats, DBClientBase* conn ) {
         verify( conn );
         long long count = 0;
+        mongo::Timer timer;
+
         while ( config->active || ! config->loopCommands ) {
             BSONObjIterator i( config->ops );
             while ( i.more() ) {
@@ -235,7 +279,14 @@ namespace mongo {
                 try {
                     if ( op == "findOne" ) {
 
-                        BSONObj result = conn->findOne( ns , fixQuery( e["query"].Obj() ) );
+                        BSONObj result;
+                        {
+                            scoped_lock lock( stats->_mutex);
+                            unsigned long long startTime = timer.micros();
+                            result = conn->findOne( ns , fixQuery( e["query"].Obj() ) );
+                            stats->findOneTotalTimeMicros  += timer.micros() - startTime;
+                            stats->findOneTotalOps++;
+                        }
 
                         if( check ){
                             int err = scope->invoke( scopeFunc , 0 , &result,  1000 * 60 , false );
@@ -282,7 +333,14 @@ namespace mongo {
                         BSONObj filter = e["filter"].eoo() ? BSONObj() : e["filter"].Obj();
                         int expected = e["expected"].eoo() ? -1 : e["expected"].Int();
 
-                        auto_ptr<DBClientCursor> cursor = conn->query( ns, fixQuery( e["query"].Obj() ), limit, skip, &filter, options, batchSize );
+                        auto_ptr<DBClientCursor> cursor;
+                        {
+                            scoped_lock lock( stats->_mutex);
+                            unsigned long long startTime = timer.micros();
+                            cursor = conn->query( ns, fixQuery( e["query"].Obj() ), limit, skip, &filter, options, batchSize );
+                            stats->queryTotalTimeMicros += timer.micros() - startTime;
+                            stats->queryTotalOps++;
+                        }
 
                         int count = cursor->itcount();
 
@@ -314,7 +372,13 @@ namespace mongo {
                         BSONObj query = e["query"].eoo() ? BSONObj() : e["query"].Obj();
                         BSONObj update = e["update"].Obj();
 
-                        conn->update( ns, fixQuery( query ), update, upsert , multi );
+                        {
+                            scoped_lock lock( stats->_mutex);
+                            unsigned long long startTime = timer.micros();
+                            conn->update( ns, fixQuery( query ), update, upsert , multi );
+                            stats->updateTotalTimeMicros  += timer.micros() - startTime;
+                            stats->updateTotalOps++;
+                        }
 
                         bool safe = e["safe"].trueValue();
                         if( safe ){
@@ -340,8 +404,13 @@ namespace mongo {
                         }
                     }
                     else if( op == "insert" ) {
-
-                        conn->insert( ns, fixQuery( e["doc"].Obj() ) );
+                        {
+                            scoped_lock lock( stats->_mutex);
+                            unsigned long long startTime = timer.micros();
+                            conn->insert( ns, fixQuery( e["doc"].Obj() ) );
+                            stats->insertTotalTimeMicros  += timer.micros() - startTime;
+                            stats->insertTotalOps++;
+                        }
 
                         bool safe = e["safe"].trueValue();
                         if( safe ){
@@ -370,8 +439,13 @@ namespace mongo {
 
                         bool multi = e["multi"].eoo() ? true : e["multi"].trueValue();
                         BSONObj query = e["query"].eoo() ? BSONObj() : e["query"].Obj();
-
-                        conn->remove( ns, fixQuery( query ), ! multi );
+                        {
+                            scoped_lock lock( stats->_mutex);
+                            unsigned long long startTime = timer.micros();
+                            conn->remove( ns, fixQuery( query ), ! multi );
+                            stats->deleteTotalTimeMicros  += timer.micros() - startTime;
+                            stats->deleteTotalOps++;
+                        }
 
                         bool safe = e["safe"].trueValue();
                         if( safe ){
@@ -460,7 +534,7 @@ namespace mongo {
         }
     }
 
-    static void benchThread( BenchRunConfig * config ) {
+    static void benchThread( BenchRunConfig * config, BenchRunStats * stats ) {
 
         ScopedDbConnection conn( config->host );
         config->threadsReady++;
@@ -473,8 +547,7 @@ namespace mongo {
                     uasserted(15932, "Authenticating to connection for benchThread failed: " + errmsg);
                 }
             }
-
-            _benchThread( config, conn.get() );
+            _benchThread( config, stats, conn.get() );
         }
         catch( DBException& e ){
             error() << "DBException not handled in benchRun thread" << causedBy( e ) << endl;
@@ -565,7 +638,7 @@ namespace mongo {
 
             // Start threads
             for ( unsigned i = 0; i < config.parallel; i++ )
-                threads.push_back( shared_ptr< boost::thread >( new boost::thread( boost::bind( benchThread , &config ) ) ) );
+                threads.push_back( shared_ptr< boost::thread >( new boost::thread( boost::bind( benchThread , &config, &stats ) ) ) );
 
             // Give them time to init
             while ( config.threadsReady < config.parallel ) sleepmillis( 1 );
@@ -628,6 +701,21 @@ namespace mongo {
             buf.append( "note" , "values per second" );
             buf.append( "errCount", (long long) runner->config.errCount );
             buf.append( "trapped", runner->config.trapped.arr() );
+            if( runner->stats.findOneTotalOps )
+                buf.append( "findOneLatencyAverageMs",
+                        static_cast<double> ( ( runner->stats.findOneTotalTimeMicros/1000 ) / runner->stats.findOneTotalOps ) );
+            if( runner->stats.insertTotalOps )
+                buf.append( "insertLatencyAverageMs",
+                        static_cast<double> ( ( runner->stats.insertTotalTimeMicros/1000 ) / runner->stats.insertTotalOps ) );
+            if( runner->stats.deleteTotalOps )
+                buf.append( "deleteLatencyAverageMs",
+                        static_cast<double> ( ( runner->stats.deleteTotalTimeMicros/1000 ) / runner->stats.deleteTotalOps ) );
+            if( runner->stats.updateTotalOps )
+                buf.append( "updateLatencyAverageMs",
+                        static_cast<double> ( ( runner->stats.updateTotalTimeMicros/1000 ) / runner->stats.updateTotalOps ) );
+            if( runner->stats.queryTotalOps )
+                buf.append( "queryLatencyAverageMs",
+                        static_cast<double> ( ( runner->stats.queryTotalTimeMicros/1000 ) / runner->stats.queryTotalOps ) );
             {
                 BSONObjIterator i( after );
                 while ( i.more() ) {
@@ -648,6 +736,7 @@ namespace mongo {
 
         OID oid;
         BenchRunConfig config;
+        BenchRunStats stats;
         vector< shared_ptr< boost::thread > > threads;
 
         shared_ptr< ScopedDbConnection > conn;
@@ -658,115 +747,12 @@ namespace mongo {
 
     map< OID, BenchRunner* > BenchRunner::activeRuns;
 
-
-    /**
-     * benchRun( { ops : [] , host : XXX , db : XXXX , parallel : 5 , seconds : 5 }
-     */
-    BSONObj benchRun( const BSONObj& argsFake, void* data ) {
-        verify( argsFake.firstElement().isABSONObj() );
-        BSONObj args = argsFake.firstElement().Obj();
-
-        // setup
-
-        BenchRunConfig config;
-
-        if ( args["host"].type() == String )
-            config.host = args["host"].String();
-        if ( args["db"].type() == String )
-            config.db = args["db"].String();
-        if ( args["username"].type() == String )
-            config.username = args["username"].String();
-        if ( args["password"].type() == String )
-            config.password = args["password"].String();
-
-        if ( args["parallel"].isNumber() )
-            config.parallel = args["parallel"].numberInt();
-        if ( args["seconds"].isNumber() )
-            config.seconds = args["seconds"].number();
-
-
-        config.ops = args["ops"].Obj();
-
-        // execute
-
-        ScopedDbConnection conn( config.host );
-
-        if (config.username != "") {
-            string errmsg;
-            if (!conn.get()->auth(config.db, config.username, config.password, errmsg)) {
-                uasserted(15930, "Authenticating to connection for bench run failed: " + errmsg);
-            }
-        }
-
-
-        //    start threads
-        vector<boost::thread*> all;
-        for ( unsigned i=0; i<config.parallel; i++ )
-            all.push_back( new boost::thread( boost::bind( benchThread , &config ) ) );
-
-        //    give them time to init
-        while ( config.threadsReady < config.parallel )
-            sleepmillis( 1 );
-
-        BSONObj before;
-        conn->simpleCommand( "admin" , &before , "serverStatus" );
-
-        sleepmillis( (int)(1000.0 * config.seconds) );
-
-        BSONObj after;
-        conn->simpleCommand( "admin" , &after , "serverStatus" );
-
-        conn.done();
-
-        config.active = false;
-
-        for ( unsigned i=0; i<all.size(); i++ )
-            all[i]->join();
-
-        if ( config.error )
-            return BSON( "err" << 1 );
-
-        // compute actual ops/sec
-
-        before = before["opcounters"].Obj().copy();
-        after = after["opcounters"].Obj().copy();
-        
-        bool totals = args["totals"].trueValue();
-
-        BSONObjBuilder buf;
-        if ( ! totals )
-            buf.append( "note" , "values per second" );
-
-        {
-            BSONObjIterator i( after );
-            while ( i.more() ) {
-                BSONElement e = i.next();
-                double x = e.number();
-                x = x - before[e.fieldName()].number();
-                if ( ! totals )
-                    x = x / config.seconds;
-                buf.append( e.fieldName() , x );
-            }
-        }
-        BSONObj zoo = buf.obj();
-        return BSON( "" << zoo );
-    }
-
     /**
      * benchRun( { ops : [] , host : XXX , db : XXXX , parallel : 5 , seconds : 5 }
      */
     BSONObj benchRunSync( const BSONObj& argsFake, void* data ) {
 
-        verify( argsFake.firstElement().isABSONObj() );
-        BSONObj args = argsFake.firstElement().Obj();
-
-        // Get new BenchRunner object
-        BenchRunner* runner = BenchRunner::get( args );
-
-        sleepsecs( static_cast<int>( runner->config.seconds ) );
-
-        return BenchRunner::finish( runner );
-
+        return benchFinish( benchStart( argsFake, data ), data );
     }
 
     /**
@@ -794,7 +780,7 @@ namespace mongo {
 
         log() << "Getting status for benchRun test " << oid << endl;
 
-        // Get new BenchRunner object
+        // Get BenchRunner object
         BenchRunner* runner = BenchRunner::get( oid );
 
         BSONObj statusObj = runner->status();
@@ -820,7 +806,7 @@ namespace mongo {
     }
 
     void installBenchmarkSystem( Scope& scope ) {
-        scope.injectNative( "benchRun" , benchRun );
+        scope.injectNative( "benchRun" , benchRunSync );
         scope.injectNative( "benchRunSync" , benchRunSync );
         scope.injectNative( "benchStart" , benchStart );
         scope.injectNative( "benchStatus" , benchStatus );
