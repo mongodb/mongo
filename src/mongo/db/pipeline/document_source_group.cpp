@@ -71,14 +71,14 @@ namespace mongo {
         BSONObjBuilder insides;
 
         /* add the _id */
-        pIdExpression->addToBsonObj(&insides, Document::idName.c_str(), 0);
+        pIdExpression->addToBsonObj(&insides, Document::idName.c_str(), false);
 
         /* add the remaining fields */
         const size_t n = vFieldName.size();
         for(size_t i = 0; i < n; ++i) {
             intrusive_ptr<Accumulator> pA((*vpAccumulatorFactory[i])(pExpCtx));
             pA->addOperand(vpExpression[i]);
-            pA->addToBsonObj(&insides, vFieldName[i], 0);
+            pA->addToBsonObj(&insides, vFieldName[i], false);
         }
 
         pBuilder->append(groupName, insides.done());

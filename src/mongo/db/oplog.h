@@ -27,7 +27,6 @@
 #include "db.h"
 #include "dbhelpers.h"
 #include "clientcursor.h"
-#include "../client/dbclient.h"
 #include "../util/optime.h"
 #include "../util/timer.h"
 

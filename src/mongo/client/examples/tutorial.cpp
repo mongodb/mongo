@@ -16,10 +16,9 @@
  */
 
 #include <iostream>
-#include "../../client/dbclient.h"
+#include "mongo/client/dbclient.h"
 
-// g++ tutorial.cpp -lmongoclient -lboost_thread -lboost_filesystem -o tutorial
-// Might need a variant of the above compile line.  This worked for me:
+// g++ src/mongo/client/examples/tutorial.cpp -pthread -Isrc -Isrc/mongo -lmongoclient -lboost_thread-mt -lboost_system -lboost_filesystem -L[path to libmongoclient.a] -o tutorial
 //g++ tutorial.cpp -L[mongo directory] -L/opt/local/lib -lmongoclient -lboost_thread-mt -lboost_filesystem -lboost_system -I/opt/local/include  -o tutorial
 
 using namespace mongo;

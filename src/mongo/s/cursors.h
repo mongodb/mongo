@@ -22,7 +22,6 @@
 
 #include "../db/jsobj.h"
 #include "../db/dbmessage.h"
-#include "../client/dbclient.h"
 #include "../client/parallel.h"
 
 #include "request.h"

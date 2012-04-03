@@ -44,7 +44,6 @@
 #endif
 
 #include "utils.h"
-#include "../client/dbclient.h"
 #include "../util/md5.hpp"
 #include "../util/processinfo.h"
 #include "../util/text.h"
@@ -52,6 +51,8 @@
 #include "../util/time_support.h"
 #include "../util/file.h"
 #include "../client/clientOnly-private.h"
+#include "mongo/util/net/sock.h"
+#include "mongo/client/dbclientinterface.h"
 
 namespace mongo {
 

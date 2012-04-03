@@ -20,7 +20,6 @@
 #include "../instance.h"
 #include "../commands.h"
 #include "../../scripting/engine.h"
-#include "../../client/dbclient.h"
 #include "../../client/connpool.h"
 #include "../../client/parallel.h"
 #include "../matcher.h"

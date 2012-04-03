@@ -91,7 +91,7 @@ namespace mongo {
         BSONObjBuilder insides;
         if (excludeId)
             insides.append(Document::idName, false);
-        pEO->documentToBson(&insides, 0);
+        pEO->documentToBson(&insides, true);
         pBuilder->append(projectName, insides.done());
     }
 

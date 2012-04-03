@@ -21,6 +21,7 @@
 #include "../util/unittest.h"
 #include "../client/connpool.h"
 #include "../client/model.h"
+#include "mongo/client/dbclientcursor.h"
 #include "../db/pdfile.h"
 #include "../db/cmdline.h"
 
@@ -44,7 +45,7 @@ namespace mongo {
             try {
                 conn->insert( "config.version" , BSON( "_id" << 1 << "version" << VERSION ) );
             }
-            catch( DBException& e ){
+            catch( DBException& ){
                 error() << "All config servers must initially be reachable for the cluster to be initialized." << endl;
                 throw;
             }

@@ -17,6 +17,9 @@
 
 #pragma once
 
+// we need the "real" malloc here
+#include "mongo/client/undef_macros.h"
+
 namespace mongo {
 
     inline void * ourmalloc(size_t size) {
@@ -34,9 +37,8 @@ namespace mongo {
 #define MONGO_malloc mongo::ourmalloc
 #define MONGO_realloc mongo::ourrealloc
 
-#ifdef MONGO_EXPOSE_MACROS
-#  define malloc MONGO_malloc
-#  define realloc MONGO_realloc
-#endif
+// this redefines 'malloc' to 'MONGO_malloc', etc
+#include "mongo/client/redef_macros.h"
+
 
 } // namespace mongo

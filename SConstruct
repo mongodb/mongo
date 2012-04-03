@@ -132,6 +132,9 @@ def get_variant_dir():
         s += "normal/"
     return s
         
+# build output
+add_option( "mute" , "do not display commandlines for compiling and linking, to reduce screen noise", 0, False )
+
 # installation/packaging
 add_option( "prefix" , "installation prefix" , 1 , False, default=DEFAULT_INSTALL_DIR )
 add_option( "distname" , "dist name (0.8.0)" , 1 , False )
@@ -288,6 +291,12 @@ env = Environment( BUILD_DIR=variantDir,
                    PCRE_VERSION='8.30',
                    )
 
+if has_option('mute'):
+    env.Append( CCCOMSTR = "Compiling $TARGET" )
+    env.Append( CXXCOMSTR = env["CCCOMSTR"] )
+    env.Append( LINKCOMSTR = "Linking $TARGET" )
+    env.Append( ARCOMSTR = "Generating library $TARGET" )
+
 if has_option('mongod-concurrency-level'):
     env.Append(CPPDEFINES=['MONGOD_CONCURRENCY_LEVEL=MONGOD_CONCURRENCY_LEVEL_%s' % get_option('mongod-concurrency-level').upper()])
 
@@ -341,7 +350,11 @@ if has_option( "libpath" ):
 if has_option( "cpppath" ):
     env["CPPPATH"] = [get_option( "cpppath" )]
 
-env.Prepend( CPPDEFINES=[ "_SCONS" , "MONGO_EXPOSE_MACROS" ],
+env.Prepend( CPPDEFINES=[ "_SCONS" , 
+                          "MONGO_EXPOSE_MACROS" ,
+                          "SUPPORT_UTF8" ],  # for pcre
+
+
              CPPPATH=[ '$BUILD_DIR', "$BUILD_DIR/mongo" ] )
 
 if has_option( "safeshell" ):
@@ -534,8 +547,6 @@ elif "win32" == os.sys.platform:
 
     env.Append( EXTRACPPPATH=[ winSDKHome + "/Include" ] )
 
-    # consider adding /MP build with multiple processes option.
-
     # /EHsc exception handling style for visual studio
     # /W3 warning level
     # /WX abort build on compiler warnings
@@ -603,7 +614,6 @@ elif "win32" == os.sys.platform:
         env.Append( EXTRALIBPATH=[ winSDKHome + "/Lib" ] )
 
     if release:
-        #env.Append( LINKFLAGS=" /NODEFAULTLIB:MSVCPRT  /NODEFAULTLIB:MSVCRTD " )
         env.Append( LINKFLAGS=" /NODEFAULTLIB:MSVCPRT  " )
     else:
         env.Append( LINKFLAGS=" /NODEFAULTLIB:MSVCPRT  /NODEFAULTLIB:MSVCRT  " )
@@ -613,7 +623,6 @@ elif "win32" == os.sys.platform:
     if force64:
 
         winLibString += ""
-        #winLibString += " LIBCMT LIBCPMT "
 
     else:
         winLibString += " user32.lib gdi32.lib winspool.lib comdlg32.lib  shell32.lib ole32.lib oleaut32.lib "
@@ -624,12 +633,6 @@ elif "win32" == os.sys.platform:
         winLibString += " winmm.lib "
 
     env.Append( LIBS=Split(winLibString) )
-
-    # dm these should automatically be defined by the compiler. commenting out to see if works. jun2010
-    #if force64:
-    #    env.Append( CPPDEFINES=["_AMD64_=1"] )
-    #else:
-    #    env.Append( CPPDEFINES=["_X86_=1"] )
 
     env.Append( EXTRACPPPATH=["#/../winpcap/Include"] )
     env.Append( EXTRALIBPATH=["#/../winpcap/Lib"] )
@@ -715,6 +718,9 @@ if nix:
 if usev8:
     env.Prepend( EXTRACPPPATH=["#/../v8/include/"] )
     env.Prepend( EXTRALIBPATH=["#/../v8/"] )
+
+if usesm:
+    env.Append( CPPDEFINES=["JS_C_STRINGS_ARE_UTF8"] )
 
 if "uname" in dir(os):
     hacks = buildscripts.findHacks( os.uname() )

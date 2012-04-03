@@ -19,9 +19,10 @@
  * example of using replica sets from c++
  */
 
-#include "client/dbclient.h"
 #include <iostream>
 #include <vector>
+
+#include "mongo/client/dbclient.h"
 
 using namespace mongo;
 using namespace std;
@@ -72,7 +73,7 @@ int main( int argc , const char ** argv ) {
         }
         else {
             cerr << "unknown option: " << argv[i] << endl;
-            return 1;
+            return EXIT_FAILURE;
         }
             
     }
@@ -81,13 +82,13 @@ int main( int argc , const char ** argv ) {
     ConnectionString cs = ConnectionString::parse( "foo/127.0.0.1" , errmsg );
     if ( ! cs.isValid() ) {
         cout << "error parsing url: " << errmsg << endl;
-        return 1;
+        return EXIT_FAILURE;
     }
 
-    DBClientReplicaSet * conn = dynamic_cast<DBClientReplicaSet*>(cs.connect( errmsg, testTimeout ? 10 : 0 ));
+    DBClientReplicaSet * conn = static_cast<DBClientReplicaSet*>( cs.connect( errmsg, testTimeout ? 10 : 0 ) );
     if ( ! conn ) {
         cout << "error connecting: " << errmsg << endl;
-        return 2;
+        return EXIT_FAILURE;
     }
 
     string collName = "test.rs1";
@@ -99,16 +100,21 @@ int main( int argc , const char ** argv ) {
         try {
             conn->count( collName, BSON( "$where" << "sleep(40000)" ) );
         } catch( DBException& ) {
-            return 0;
+            return EXIT_SUCCESS;
         }
         cout << "expected socket exception" << endl;
-        return 1;
+        return EXIT_FAILURE;
     }
     
     vector<boost::shared_ptr<boost::thread> > threads;
     for ( unsigned i=0; i<nThreads; i++ ) {
         string errmsg;
-        threads.push_back( boost::shared_ptr<boost::thread>( new boost::thread( boost::bind( workerThread , collName , print , (DBClientReplicaSet*)cs.connect(errmsg) ) ) ) );
+        threads.push_back( boost::shared_ptr<boost::thread>( 
+                               new boost::thread( 
+                                   boost::bind( workerThread , 
+                                                collName , 
+                                                print , 
+                                                static_cast<DBClientReplicaSet*>( cs.connect(errmsg) ) ) ) ) );
     }
     
     for ( unsigned i=0; i<threads.size(); i++ ) {

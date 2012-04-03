@@ -15,7 +15,6 @@
  */
 
 #include "pch.h"
-#include "../client/dbclient.h"
 #include "dbtests.h"
 #include "../db/concurrency.h"
 

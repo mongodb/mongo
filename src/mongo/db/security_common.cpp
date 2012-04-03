@@ -22,14 +22,17 @@
  */
 
 #include "pch.h"
+
+#include <sys/stat.h>
+
 #include "security.h"
 #include "security_common.h"
-#include "../client/dbclient.h"
 #include "commands.h"
 #include "nonce.h"
 #include "../util/md5.hpp"
 #include "client_common.h"
-#include <sys/stat.h>
+#include "mongo/client/dbclientinterface.h"
+
 
 namespace mongo {
 

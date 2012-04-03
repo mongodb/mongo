@@ -17,7 +17,6 @@
 
 #include "pch.h"
 #include "../client.h"
-#include "../../client/dbclient.h"
 #include "rs.h"
 #include "../repl.h"
 #include "../ops/query.h"

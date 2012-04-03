@@ -55,14 +55,15 @@ clientSource = [
     ]
 
 exampleSourceMap = [
+        ('authTest', 'mongo/client/examples/authTest.cpp'),
+        ('clientTest', 'mongo/client/examples/clientTest.cpp'),
         ('firstExample', 'mongo/client/examples/first.cpp'),
+        ('httpClientTest', 'mongo/client/examples/httpClientTest.cpp'),
         ('rsExample', 'mongo/client/examples/rs.cpp'),
         ('secondExample', 'mongo/client/examples/second.cpp'),
+        ('tutorial', 'mongo/client/examples/tutorial.cpp'),
         ('whereExample', 'mongo/client/examples/whereExample.cpp'),
-        ('authTest', 'mongo/client/examples/authTest.cpp'),
-        ('httpClientTest', 'mongo/client/examples/httpClientTest.cpp'),
         ('bsondemo', 'mongo/bson/bsondemo/bsondemo.cpp'),
-        ('clientTest', 'mongo/client/examples/clientTest.cpp'),
         ]
 
 clientHeaders = []

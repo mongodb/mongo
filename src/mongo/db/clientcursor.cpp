@@ -31,6 +31,7 @@
 #include "repl_block.h"
 #include "../util/processinfo.h"
 #include "../util/timer.h"
+#include "mongo/client/dbclientinterface.h"
 
 namespace mongo {
 

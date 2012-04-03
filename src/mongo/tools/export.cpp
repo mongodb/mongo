@@ -17,8 +17,8 @@
 */
 
 #include "pch.h"
-#include "client/dbclient.h"
 #include "db/json.h"
+#include "mongo/client/dbclientcursor.h"
 
 #include "tool.h"
 

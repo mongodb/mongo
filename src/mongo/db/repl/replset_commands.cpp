@@ -23,7 +23,6 @@
 #include "rs_config.h"
 #include "../dbwebserver.h"
 #include "../../util/mongoutils/html.h"
-#include "../../client/dbclient.h"
 #include "../repl_block.h"
 
 using namespace bson;

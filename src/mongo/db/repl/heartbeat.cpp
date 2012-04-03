@@ -18,7 +18,7 @@
 #include "rs.h"
 #include "health.h"
 #include "../../util/background.h"
-#include "../../client/dbclient.h"
+
 #include "../commands.h"
 #include "../../util/concurrency/value.h"
 #include "../../util/concurrency/task.h"

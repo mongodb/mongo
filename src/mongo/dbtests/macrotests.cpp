@@ -16,7 +16,7 @@
 
 #undef MONGO_EXPOSE_MACROS
 
-#include "../client/dbclient.h"
+#include "mongo/client/dbclient.h"
 
 #ifdef malloc
 # error malloc defined 0
@@ -26,19 +26,13 @@
 # error verify defined 1
 #endif
 
-#include "../client/parallel.h" //uses verify
-
-#ifdef verify
-# error verify defined 2
-#endif
-
-#include "../client/redef_macros.h"
+#include "mongo/client/redef_macros.h"
 
 #ifndef verify
 # error verify not defined 3
 #endif
 
-#include "../client/undef_macros.h"
+#include "mongo/client/undef_macros.h"
 
 #ifdef verify
 # error verify defined 3

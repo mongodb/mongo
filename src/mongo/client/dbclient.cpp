@@ -17,8 +17,6 @@
 
 #include "pch.h"
 
-#include "mongo/client/dbclient.h"
-
 #include "mongo/bson/util/builder.h"
 #include "mongo/client/constants.h"
 #include "mongo/client/dbclient_rs.h"

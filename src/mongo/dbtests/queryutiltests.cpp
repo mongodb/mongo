@@ -22,6 +22,7 @@
 #include "../db/querypattern.h"
 #include "../db/instance.h"
 #include "../db/pdfile.h"
+#include "mongo/db/json.h"
 #include "dbtests.h"
 
 namespace QueryUtilTests {

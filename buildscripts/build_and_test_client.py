@@ -19,6 +19,7 @@ import subprocess
 import sys
 import tempfile
 import tarfile
+import zipfile
 
 import utils
 
@@ -27,21 +28,36 @@ def main(args):
     scons_args = args[2:]
     build_and_test(archive_file, scons_args)
 
-def build_and_test(archive, scons_args):
+def build_and_test(archive_name, scons_args):
     work_dir = tempfile.mkdtemp()
     try:
+        archive = open_archive(archive_name)
         extracted_root = extract_archive(work_dir, archive)
         run_scons(extracted_root, scons_args)
         smoke_client(extracted_root)
     finally:
         shutil.rmtree(work_dir)
 
-def extract_archive(work_dir, archive):
-    tf = tarfile.open(archive, 'r')
-    tf.extractall(path=work_dir)
+def open_tar(archive_name):
+    return tarfile.open(archive_name, 'r')
+
+def open_zip(archive_name):
+    class ZipWrapper(zipfile.ZipFile):
+        def getnames(self):
+            return self.namelist()
+    return ZipWrapper(archive_name, 'r')
+
+def open_archive(archive_name):
+    try:
+        return open_tar(archive_name)
+    except:
+        return open_zip(archive_name)
+
+def extract_archive(work_dir, archive_file):
+    archive_file.extractall(path=work_dir)
     return os.path.join(
         work_dir,
-        os.path.dirname([n for n in tf.getnames() if n.endswith('SConstruct')][0])
+        os.path.dirname([n for n in archive_file.getnames() if n.endswith('SConstruct')][0])
         )
 
 def run_scons(extracted_root, scons_args):

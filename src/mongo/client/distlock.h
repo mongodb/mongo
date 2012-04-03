@@ -18,9 +18,7 @@
 #pragma once
 
 #include "../pch.h"
-#include "dbclient.h"
 #include "connpool.h"
-#include "redef_macros.h"
 #include "syncclusterconnection.h"
 
 #define LOCK_TIMEOUT (15 * 60 * 1000)

@@ -26,7 +26,7 @@
 #include "listen.h"
 
 #include "../goodies.h"
-#include "../../client/dbclient.h"
+
 
 namespace mongo {
 

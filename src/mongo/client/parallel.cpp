@@ -25,6 +25,7 @@
 #include "../s/chunk.h"
 #include "../s/config.h"
 #include "../s/grid.h"
+#include "mongo/client/dbclientcursor.h"
 
 namespace mongo {
 

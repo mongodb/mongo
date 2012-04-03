@@ -19,43 +19,59 @@
 
 // #pragma once // this file is intended to be processed multiple times
 
-
-/** MONGO_EXPOSE_MACROS - when defined, indicates that you are compiling a mongo program rather
-                          than just using the C++ driver.
-*/
-#if !defined(MONGO_EXPOSE_MACROS) && !defined(MONGO_MACROS_CLEANED)
+#ifdef MONGO_MACROS_PUSHED
 
 // util/allocator.h
+#undef malloc
 #pragma pop_macro("malloc")
-//#undef malloc
 #undef realloc
+#pragma pop_macro("realloc")
 
 // util/assert_util.h
 #undef dassert
+#pragma pop_macro("dassert")
 #undef wassert
+#pragma pop_macro("wassert")
 #undef massert
+#pragma pop_macro("massert")
 #undef uassert
+#pragma pop_macro("uassert")
 #undef verify
+#pragma pop_macro("verify")
 #undef DESTRUCTOR_GUARD
+#pragma pop_macro("DESTRUCTOR_GUARD")
 
 // util/goodies.h
 #undef PRINT
+#pragma pop_macro("PRINT")
 #undef PRINTFL
+#pragma pop_macro("PRINTFL")
 #undef asctime
+#pragma pop_macro("asctime")
 #undef gmtime
+#pragma pop_macro("gmtime")
 #undef localtime
+#pragma pop_macro("localtime")
 #undef ctime
+#pragma pop_macro("ctime")
 
 // util/debug_util.h
 #undef DEV
+#pragma pop_macro("DEV")
 #undef DEBUGGING
+#pragma pop_macro("DEBUGGING")
 #undef SOMETIMES
+#pragma pop_macro("SOMETIMES")
 #undef OCCASIONALLY
+#pragma pop_macro("OCCASIONALLY")
 #undef RARELY
+#pragma pop_macro("RARELY")
 #undef ONCE
+#pragma pop_macro("ONCE")
 
 // util/log.h
 #undef LOG
+#pragma pop_macro("LOG")
 
-#define MONGO_MACROS_CLEANED
+#undef MONGO_MACROS_PUSHED
 #endif

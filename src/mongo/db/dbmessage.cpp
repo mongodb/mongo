@@ -18,7 +18,6 @@
 
 #include "pch.h"
 #include "dbmessage.h"
-#include "../client/dbclient.h"
 
 namespace mongo {
 

@@ -59,7 +59,7 @@ namespace mongo {
     }
 
     void DocumentSourceFilter::sourceToBson(BSONObjBuilder *pBuilder) const {
-        pFilter->addToBsonObj(pBuilder, filterName, 0);
+        pFilter->addToBsonObj(pBuilder, filterName, false);
     }
 
     bool DocumentSourceFilter::accept(
@@ -99,6 +99,6 @@ namespace mongo {
     }
 
     void DocumentSourceFilter::toMatcherBson(BSONObjBuilder *pBuilder) const {
-        pFilter->toMatcherBson(pBuilder, 0);
+        pFilter->toMatcherBson(pBuilder);
     }
 }

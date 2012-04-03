@@ -18,9 +18,10 @@
 
 #pragma once
 
-#include "../pch.h"
-#include "dbclient.h"
-#include "redef_macros.h"
+
+#include "mongo/bson/bsonelement.h"
+#include "mongo/bson/bsonobj.h"
+#include "mongo/client/dbclientinterface.h"
 
 namespace mongo {
 
@@ -146,5 +147,3 @@ namespace mongo {
     };
 
 };
-
-#include "undef_macros.h"

@@ -17,9 +17,9 @@
 // client.cpp
 
 #include "pch.h"
-#include "../client/dbclient.h"
 #include "dbtests.h"
 #include "../db/concurrency.h"
+#include "mongo/client/dbclientcursor.h"
 
 namespace ClientTests {
 

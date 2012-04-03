@@ -372,8 +372,8 @@ namespace mongo {
         OpDebug& debug = currentOp.debug();
         debug.op = op;
 
-        int logThreshold = cmdLine.slowMS;
-        bool log = logLevel >= 1;
+        long long logThreshold = cmdLine.slowMS;
+        bool shouldLog = logLevel >= 1;
 
         if ( op == dbQuery ) {
             if ( handlePossibleShardedMessage( m , &dbresponse ) )
@@ -382,7 +382,7 @@ namespace mongo {
         }
         else if ( op == dbGetMore ) {
             if ( ! receivedGetMore(dbresponse, m, currentOp) )
-                log = true;
+                shouldLog = true;
         }
         else if ( op == dbMsg ) {
             // deprecated - replaced by commands
@@ -427,7 +427,7 @@ namespace mongo {
                 else {
                     mongo::log() << "    operation isn't supported: " << op << endl;
                     currentOp.done();
-                    log = true;
+                    shouldLog = true;
                 }
             }
             catch ( UserException& ue ) {
@@ -439,21 +439,17 @@ namespace mongo {
                 tlog(3) << " Caught Assertion in " << opToString(op) << ", continuing "
                         << e.toString() << endl;
                 debug.exceptionInfo = e.getInfo();
-                log = true;
+                shouldLog = true;
             }
         }
         currentOp.ensureStarted();
         currentOp.done();
         debug.executionTime = currentOp.totalTimeMillis();
 
-        //DEV log = true;
-        if ( log || debug.executionTime > logThreshold ) {
-            if( logLevel < 3 && op == dbGetMore && strstr(ns, ".oplog.") && debug.executionTime < 4300 && !log ) {
-                /* it's normal for getMore on the oplog to be slow because of use of awaitdata flag. */
-            }
-            else {
-                mongo::tlog() << debug << endl;
-            }
+        logThreshold += currentOp.getExpectedLatencyMs();
+
+        if ( shouldLog || debug.executionTime > logThreshold ) {
+            mongo::tlog() << debug << endl;
         }
 
         if ( currentOp.shouldDBProfile( debug.executionTime ) ) {
@@ -628,7 +624,7 @@ namespace mongo {
         curop.debug().cursorid = cursorid;
 
         shared_ptr<AssertionException> ex;
-        time_t start = 0;
+        scoped_ptr<Timer> timer;
         int pass = 0;
         bool exhaust = false;
         QueryResult* msgdata = 0;
@@ -656,15 +652,16 @@ namespace mongo {
                 ok = false;
                 break;
             }
-
+            
             if (msgdata == 0) {
+                // this should only happen with QueryOption_AwaitData
                 exhaust = false;
                 massert(13073, "shutting down", !inShutdown() );
-                if( pass == 0 ) {
-                    start = time(0);
+                if ( ! timer ) {
+                    timer.reset( new Timer() );
                 }
                 else {
-                    if( time(0) - start >= 4 ) {
+                    if ( timer->seconds() >= 4 ) {
                         // after about 4 seconds, return. pass stops at 1000 normally.
                         // we want to return occasionally so slave can checkpoint.
                         pass = 10000;
@@ -675,6 +672,11 @@ namespace mongo {
                     sleepmillis(20);
                 else
                     sleepmillis(2);
+                
+                // note: the 1100 is beacuse of the waitForDifferent above
+                // should eventually clean this up a bit
+                curop.setExpectedLatencyMs( 1100 + timer->millis() );
+                
                 continue;
             }
             break;

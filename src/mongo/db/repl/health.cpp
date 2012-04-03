@@ -18,7 +18,6 @@
 #include "rs.h"
 #include "health.h"
 #include "../../util/background.h"
-#include "../../client/dbclient.h"
 #include "../../client/connpool.h"
 #include "../commands.h"
 #include "../../util/concurrency/value.h"

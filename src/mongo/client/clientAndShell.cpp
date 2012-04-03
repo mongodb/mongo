@@ -16,7 +16,6 @@
  */
 
 #include "pch.h"
-#include "../client/dbclient.h"
 #include "../db/cmdline.h"
 #include "../db/client_common.h"
 #include "../s/shard.h"

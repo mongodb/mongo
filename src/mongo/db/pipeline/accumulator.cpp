@@ -38,20 +38,20 @@ namespace mongo {
 
     void Accumulator::opToBson(
         BSONObjBuilder *pBuilder, string opName,
-        string fieldName, unsigned depth) const {
+        string fieldName) const {
         verify(vpOperand.size() == 1);
         BSONObjBuilder builder;
-        vpOperand[0]->addToBsonObj(&builder, opName, depth);
+        vpOperand[0]->addToBsonObj(&builder, opName, false);
         pBuilder->append(fieldName, builder.done());
     }
 
     void Accumulator::addToBsonObj(
-        BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const {
-        opToBson(pBuilder, getOpName(), fieldName, depth);
+        BSONObjBuilder *pBuilder, string fieldName,
+        bool requireExpression) const {
+        opToBson(pBuilder, getOpName(), fieldName);
     }
 
-    void Accumulator::addToBsonArray(
-        BSONArrayBuilder *pBuilder, unsigned depth) const {
+    void Accumulator::addToBsonArray(BSONArrayBuilder *pBuilder) const {
         verify(false); // these can't appear in arrays
     }
 

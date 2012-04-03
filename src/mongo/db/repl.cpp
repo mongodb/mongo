@@ -32,7 +32,6 @@
 #include "repl.h"
 #include "../util/net/message.h"
 #include "../util/background.h"
-#include "../client/dbclient.h"
 #include "../client/connpool.h"
 #include "pdfile.h"
 #include "ops/query.h"

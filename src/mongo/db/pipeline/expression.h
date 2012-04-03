@@ -85,10 +85,14 @@ namespace mongo {
 
           @param pBuilder the builder to add the expression to
           @param fieldName the name the object should be given
+          @param requireExpression specify true if the value must appear
+            as an expression; this is used by DocumentSources like
+            $project which distinguish between field inclusion and virtual
+            field specification;  See ExpressionConstant.
          */
         virtual void addToBsonObj(
             BSONObjBuilder *pBuilder, string fieldName,
-            unsigned depth) const = 0;
+            bool requireExpression) const = 0;
 
         /*
           Add the Expression (and any descendant Expressions) into a BSON
@@ -100,8 +104,7 @@ namespace mongo {
 
           @param pBuilder the builder to add the expression to
          */
-        virtual void addToBsonArray(BSONArrayBuilder *pBuilder,
-            unsigned depth) const = 0;
+        virtual void addToBsonArray(BSONArrayBuilder *pBuilder) const = 0;
 
         /*
           Convert the expression into a BSONObj that corresponds to the
@@ -121,8 +124,7 @@ namespace mongo {
 
           @param pBuilder the builder to add the expression to.
          */
-        virtual void toMatcherBson(
-            BSONObjBuilder *pBuilder, unsigned depth) const;
+        virtual void toMatcherBson(BSONObjBuilder *pBuilder) const;
 
         /*
           Utility class for parseObject() below.
@@ -228,9 +230,9 @@ namespace mongo {
         // virtuals from Expression
         virtual intrusive_ptr<Expression> optimize();
         virtual void addToBsonObj(
-            BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const;
-        virtual void addToBsonArray(
-            BSONArrayBuilder *pBuilder, unsigned depth) const;
+            BSONObjBuilder *pBuilder, string fieldName,
+            bool requireExpression) const;
+        virtual void addToBsonArray(BSONArrayBuilder *pBuilder) const;
         virtual void addDependencies(
             const intrusive_ptr<DependencyTracker> &pTracker,
             const DocumentSource *pSource) const;
@@ -285,7 +287,7 @@ namespace mongo {
           @param pOpName the name of the operator
          */
         virtual void toBson(BSONObjBuilder *pBuilder,
-                            const char *pOpName, unsigned depth) const;
+                            const char *pOpName) const;
 
         /*
           Checks the current size of vpOperand; if the size equal to or
@@ -337,7 +339,7 @@ namespace mongo {
     protected:
         // virtuals from ExpressionNary
         virtual void toBson(BSONObjBuilder *pBuilder,
-                            const char *pOpName, unsigned depth) const;
+                            const char *pOpName) const;
 
     private:
         ExpressionAdd();
@@ -363,8 +365,7 @@ namespace mongo {
         virtual intrusive_ptr<const Value> evaluate(
             const intrusive_ptr<Document> &pDocument) const;
         virtual const char *getOpName() const;
-        virtual void toMatcherBson(
-            BSONObjBuilder *pBuilder, unsigned depth) const;
+        virtual void toMatcherBson(BSONObjBuilder *pBuilder) const;
 
         // virtuals from ExpressionNary
         virtual intrusive_ptr<ExpressionNary> (*getFactory() const)();
@@ -397,9 +398,9 @@ namespace mongo {
         virtual intrusive_ptr<const Value> evaluate(
             const intrusive_ptr<Document> &pDocument) const;
         virtual void addToBsonObj(
-            BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const;
-        virtual void addToBsonArray(
-            BSONArrayBuilder *pBuilder, unsigned depth) const;
+            BSONObjBuilder *pBuilder, string fieldName,
+            bool requireExpression) const;
+        virtual void addToBsonArray(BSONArrayBuilder *pBuilder) const;
 
         static intrusive_ptr<ExpressionCoerceToBool> create(
             const intrusive_ptr<Expression> &pExpression);
@@ -476,9 +477,9 @@ namespace mongo {
             const intrusive_ptr<Document> &pDocument) const;
         virtual const char *getOpName() const;
         virtual void addToBsonObj(
-            BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const;
-        virtual void addToBsonArray(
-            BSONArrayBuilder *pBuilder, unsigned depth) const;
+            BSONObjBuilder *pBuilder, string fieldName,
+            bool requireExpression) const;
+        virtual void addToBsonArray(BSONArrayBuilder *pBuilder) const;
 
         static intrusive_ptr<ExpressionConstant> createFromBsonElement(
             BSONElement *pBsonElement);
@@ -580,9 +581,9 @@ namespace mongo {
         virtual intrusive_ptr<const Value> evaluate(
             const intrusive_ptr<Document> &pDocument) const;
         virtual void addToBsonObj(
-            BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const;
-        virtual void addToBsonArray(
-            BSONArrayBuilder *pBuilder, unsigned depth) const;
+            BSONObjBuilder *pBuilder, string fieldName,
+            bool requireExpression) const;
+        virtual void addToBsonArray(BSONArrayBuilder *pBuilder) const;
 
         /*
           Create a field path expression.
@@ -652,11 +653,10 @@ namespace mongo {
         virtual intrusive_ptr<const Value> evaluate(
             const intrusive_ptr<Document> &pDocument) const;
         virtual void addToBsonObj(
-            BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const;
-        virtual void addToBsonArray(
-            BSONArrayBuilder *pBuilder, unsigned depth) const;
-        virtual void toMatcherBson(
-            BSONObjBuilder *pBuilder, unsigned depth) const;
+            BSONObjBuilder *pBuilder, string fieldName,
+            bool requireExpression) const;
+        virtual void addToBsonArray(BSONArrayBuilder *pBuilder) const;
+        virtual void toMatcherBson(BSONObjBuilder *pBuilder) const;
 
         /*
           Create a field range expression.
@@ -732,7 +732,7 @@ namespace mongo {
           always looks the same, and then implement addToBsonObj() and
           addToBsonArray() by using the common method.
          */
-        void addToBson(Builder *pBuilder, unsigned depth) const;
+        void addToBson(Builder *pBuilder) const;
     };
 
 
@@ -947,9 +947,9 @@ namespace mongo {
         virtual intrusive_ptr<const Value> evaluate(
             const intrusive_ptr<Document> &pDocument) const;
         virtual void addToBsonObj(
-            BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const;
-        virtual void addToBsonArray(
-            BSONArrayBuilder *pBuilder, unsigned depth) const;
+            BSONObjBuilder *pBuilder, string fieldName,
+            bool requireExpression) const;
+        virtual void addToBsonArray(BSONArrayBuilder *pBuilder) const;
 
         /*
           evaluate(), but return a Document instead of a Value-wrapped
@@ -1061,8 +1061,10 @@ namespace mongo {
           be added to a containing object with a name
 
           @param pBuilder where to write the object to
+          @param requireExpression see Expression::addToBsonObj
          */
-        void documentToBson(BSONObjBuilder *pBuilder, unsigned depth) const;
+        void documentToBson(BSONObjBuilder *pBuilder,
+                            bool requireExpression) const;
 
         /*
           Visitor abstraction used by emitPaths().  Each path is recorded by
@@ -1167,8 +1169,7 @@ namespace mongo {
         virtual intrusive_ptr<const Value> evaluate(
             const intrusive_ptr<Document> &pDocument) const;
         virtual const char *getOpName() const;
-        virtual void toMatcherBson(
-            BSONObjBuilder *pBuilder, unsigned depth) const;
+        virtual void toMatcherBson(BSONObjBuilder *pBuilder) const;
 
         // virtuals from ExpressionNary
         virtual intrusive_ptr<ExpressionNary> (*getFactory() const)();

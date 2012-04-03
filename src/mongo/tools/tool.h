@@ -26,7 +26,6 @@
 #include <io.h>
 #endif
 
-#include "client/dbclient.h"
 #include "db/instance.h"
 #include "db/matcher.h"
 #include "db/security.h"

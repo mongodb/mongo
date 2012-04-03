@@ -23,6 +23,8 @@
 #include "../db/queryoptimizer.h"
 #include "../db/instance.h"
 #include "../db/ops/delete.h"
+#include "mongo/db/json.h"
+#include "mongo/client/dbclientcursor.h"
 #include "dbtests.h"
 
 namespace mongo {

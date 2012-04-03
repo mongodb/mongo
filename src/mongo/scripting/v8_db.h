@@ -23,10 +23,9 @@
 #include <cstdlib>
 
 #include "engine_v8.h"
-#include "../client/dbclient.h"
 
 namespace mongo {
-
+    class DBClientBase;
     // These functions may depend on the caller creating a handle scope and context scope.
 
     v8::Handle<v8::FunctionTemplate> getMongoFunctionTemplate( V8Scope * scope, bool local );

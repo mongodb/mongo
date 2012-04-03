@@ -31,8 +31,6 @@
 #include "../pch.h"
 #include "../bson/util/builder.h"
 #include "../util/optime.h"
-//#include "boost/utility.hpp"
-//#include <set>
 #include "../bson/bsontypes.h"
 #include "../bson/oid.h"
 #include "../bson/bsonelement.h"

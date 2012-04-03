@@ -18,10 +18,9 @@
 #pragma once
 
 #include <stack>
-#include "dbclient.h"
-#include "redef_macros.h"
 
-#include "../util/background.h"
+#include "mongo/util/background.h"
+#include "mongo/client/dbclientinterface.h"
 
 namespace mongo {
 
@@ -287,5 +286,3 @@ namespace mongo {
     };
 
 } // namespace mongo
-
-#include "undef_macros.h"

@@ -10,16 +10,21 @@
 // so we define the following macro
 #define MONGO_EXPOSE_MACROS 1
 
+#include "pch.h"
+
 #include <iostream>
-#include "../dbclient.h" // the mongo c++ driver
-#include "../../util/mmap.h"
-#include <assert.h>
-#include "../../util/logfile.h"
-#include "../../util/timer.h"
-#include "../../util/time_support.h"
-#include "../../bson/util/atomic_int.h"
 
 #include <boost/filesystem/operations.hpp>
+
+#include "mongo/bson/util/atomic_int.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/json.h"
+#include "mongo/util/logfile.h"
+#include "mongo/util/mmap.h"
+#include "mongo/util/mongoutils/str.h"
+#include "mongo/util/time_support.h"
+#include "mongo/util/timer.h"
+
 
 using namespace std;
 using namespace mongo;
@@ -228,7 +233,7 @@ cout <<
         }
 
         string s = input;
-        str::stripTrailing(s, " \n\r\0x1a");
+        mongoutils::str::stripTrailing(s, " \n\r\0x1a");
         try { 
             options = fromjson(s);
         }

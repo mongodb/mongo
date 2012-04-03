@@ -17,8 +17,10 @@
 
 #pragma once
 
-#include "../bson/inline_decls.h"
+#include <iostream>
 #include <typeinfo>
+
+#include "mongo/bson/inline_decls.h"
 
 // MONGO_NORETURN undefed at end of file
 #ifdef __GNUC__
@@ -182,16 +184,11 @@ namespace mongo {
     inline void fassert( int msgid , bool testOK ) { if ( ! testOK ) fassertFailed( msgid ); }
 
 
-#define MONGO_verify(_Expression) (void)( MONGO_likely(!!(_Expression)) || (mongo::asserted(#_Expression, __FILE__, __LINE__), 0) )
-#define verify MONGO_verify
-
     /* "user assert".  if asserts, user did something wrong, not our code */
 #define MONGO_uassert(msgid, msg, expr) (void)( MONGO_likely(!!(expr)) || (mongo::uasserted(msgid, msg), 0) )
-#define uassert MONGO_uassert
 
     /* warning only - keeps going */
 #define MONGO_wassert(_Expression) (void)( MONGO_likely(!!(_Expression)) || (mongo::wasserted(#_Expression, __FILE__, __LINE__), 0) )
-#define wassert MONGO_wassert
 
     /* display a message, no context, and throw assertionexception
 
@@ -199,7 +196,8 @@ namespace mongo {
        display happening.
     */
 #define MONGO_massert(msgid, msg, expr) (void)( MONGO_likely(!!(expr)) || (mongo::msgasserted(msgid, msg), 0) )
-#define massert MONGO_massert
+    /* same as massert except no msgid */
+#define MONGO_verify(_Expression) (void)( MONGO_likely(!!(_Expression)) || (mongo::asserted(#_Expression, __FILE__, __LINE__), 0) )
 
     /* dassert is 'debug assert' -- might want to turn off for production as these
        could be slow.
@@ -209,7 +207,15 @@ namespace mongo {
 #else
 # define MONGO_dassert(x)
 #endif
-#define dassert MONGO_dassert
+
+
+#ifdef MONGO_EXPOSE_MACROS
+# define dassert MONGO_dassert
+# define verify MONGO_verify
+# define uassert MONGO_uassert
+# define wassert MONGO_wassert
+# define massert MONGO_massert
+#endif
 
     // some special ids that we want to duplicate
 
@@ -225,7 +231,7 @@ namespace mongo {
         if( !myios.good() ) streamNotGood(msgid, msg, myios);
     }
 
-    std::string demangleName( const type_info& typeinfo );
+    std::string demangleName( const std::type_info& typeinfo );
 
 } // namespace mongo
 

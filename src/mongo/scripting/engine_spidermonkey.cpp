@@ -17,7 +17,7 @@
 
 #include "pch.h"
 #include "engine_spidermonkey.h"
-#include "../client/dbclient.h"
+#include "mongo/util/mongoutils/str.h"
 
 #ifndef _WIN32
 #include <boost/date_time/posix_time/posix_time.hpp>
@@ -1553,7 +1553,7 @@ namespace mongo {
                 }
             }
 
-            uassert( 10228 ,  str::stream() << name + " exec failed: " << _error , worked || ! assertOnError );
+            uassert( 10228 ,  mongoutils::str::stream() << name + " exec failed: " << _error , worked || ! assertOnError );
 
             if ( reportError && ! _error.empty() ) {
                 // cout << "exec error: " << _error << endl;
@@ -1760,5 +1760,5 @@ namespace mongo {
     }
 
 }
-
+#include "mongo/client/dbclientcursor.h"
 #include "sm_db.cpp"

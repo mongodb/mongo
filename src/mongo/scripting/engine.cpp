@@ -18,8 +18,8 @@
 #include "pch.h"
 #include "engine.h"
 #include "../util/file.h"
-#include "../client/dbclient.h"
-
+#include "mongo/client/dbclientinterface.h"
+#include "mongo/client/dbclientcursor.h"
 #include <boost/filesystem/operations.hpp>
 
 namespace mongo {

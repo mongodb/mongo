@@ -17,6 +17,9 @@
 
 #pragma once
 
+#include <string>
+#include <vector>
+
 #include "concurrency/spin_lock.h"
 
 namespace mongo {
@@ -50,7 +53,7 @@ namespace mongo {
          */
         explicit BackgroundJob(bool selfDelete = false);
 
-        virtual string name() const = 0;
+        virtual std::string name() const = 0;
 
         /**
          * define this to do your work.
@@ -110,7 +113,7 @@ namespace mongo {
      * instantiate statically
      * class MyTask : public PeriodicTask {
      * public:
-     *   virtual string name() const { return "MyTask; " }
+     *   virtual std::string name() const { return "MyTask; " }
      *   virtual void doWork() { log() << "hi" << endl; }
      * } myTask;
      */
@@ -120,13 +123,13 @@ namespace mongo {
         virtual ~PeriodicTask();
 
         virtual void taskDoWork() = 0;
-        virtual string taskName() const = 0;
+        virtual std::string taskName() const = 0;
 
         class Runner : public BackgroundJob {
         public:
             virtual ~Runner(){}
 
-            virtual string name() const { return "PeriodicTask::Runner"; }
+            virtual std::string name() const { return "PeriodicTask::Runner"; }
             
             virtual void run();
             
@@ -141,7 +144,7 @@ namespace mongo {
             // Runner will not delete these
             // this never gets smaller
             // only fields replaced with nulls
-            vector<PeriodicTask*> _tasks;
+            std::vector< PeriodicTask* > _tasks;
 
         };
 

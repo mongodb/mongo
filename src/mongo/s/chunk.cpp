@@ -23,6 +23,7 @@
 #include "../db/queryutil.h"
 #include "../util/unittest.h"
 #include "../util/timer.h"
+#include "mongo/client/dbclientcursor.h"
 
 #include "chunk.h"
 #include "config.h"

@@ -27,6 +27,8 @@
 #include "mongo/util/file_allocator.h"
 #include "mongo/util/password.h"
 #include "mongo/util/version.h"
+#include "mongo/client/dbclient_rs.h"
+#include "mongo/db/json.h"
 
 #include <boost/filesystem/operations.hpp>
 

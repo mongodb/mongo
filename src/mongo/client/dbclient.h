@@ -21,10 +21,20 @@
 
 #pragma once
 
+#ifdef MONGO_EXPOSE_MACROS
+#error dbclient.h is for C++ driver consumer use only
+#endif
+
 #include "mongo/client/redef_macros.h"
 
+#include "pch.h"
+
+#include "mongo/client/connpool.h"
 #include "mongo/client/dbclient_rs.h"
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/client/gridfs.h"
+#include "mongo/client/model.h"
+#include "mongo/client/syncclusterconnection.h"
 
 #include "mongo/client/undef_macros.h"

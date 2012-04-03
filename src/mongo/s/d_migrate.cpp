@@ -38,6 +38,7 @@
 
 #include "../client/connpool.h"
 #include "../client/distlock.h"
+#include "mongo/client/dbclientcursor.h"
 
 #include "../util/queue.h"
 #include "../util/unittest.h"

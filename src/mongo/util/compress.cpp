@@ -2,7 +2,7 @@
 
 #include "mongo/util/compress.h"
 
-#include "snappy.h"
+#include "third_party/snappy/snappy.h"
 
 namespace mongo {
 

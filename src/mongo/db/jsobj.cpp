@@ -1072,7 +1072,7 @@ namespace mongo {
     Labeler::Label LTE( "$lte" );
     Labeler::Label NE( "$ne" );
     Labeler::Label NIN( "$nin" );
-    Labeler::Label SIZE( "$size" );
+    Labeler::Label BSIZE( "$size" );
 
     void BSONObjBuilder::appendMinForType( const StringData& fieldName , int t ) {
         switch ( t ) {

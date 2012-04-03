@@ -20,7 +20,6 @@
 
 #include "config.h"
 
-#include "../client/dbclient.h"
 #include "../util/stringutils.h"
 #include "../util/unittest.h"
 

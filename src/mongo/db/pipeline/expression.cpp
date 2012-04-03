@@ -31,8 +31,7 @@ namespace mongo {
 
     /* --------------------------- Expression ------------------------------ */
 
-    void Expression::toMatcherBson(
-        BSONObjBuilder *pBuilder, unsigned depth) const {
+    void Expression::toMatcherBson(BSONObjBuilder *pBuilder) const {
         verify(false && "Expression::toMatcherBson()");
     }
 
@@ -197,7 +196,6 @@ namespace mongo {
         {"$and", ExpressionAnd::create, 0},
         {"$cmp", ExpressionCompare::createCmp, OpDesc::FIXED_COUNT, 2},
         {"$cond", ExpressionCond::create, OpDesc::FIXED_COUNT, 3},
-        {"$const", ExpressionNoOp::create, 0},
         {"$dayOfMonth", ExpressionDayOfMonth::create, OpDesc::FIXED_COUNT, 1},
         {"$dayOfWeek", ExpressionDayOfWeek::create, OpDesc::FIXED_COUNT, 1},
         {"$dayOfYear", ExpressionDayOfYear::create, OpDesc::FIXED_COUNT, 1},
@@ -216,6 +214,7 @@ namespace mongo {
         {"$month", ExpressionMonth::create, OpDesc::FIXED_COUNT, 1},
         {"$multiply", ExpressionMultiply::create, 0},
         {"$ne", ExpressionCompare::createNe, OpDesc::FIXED_COUNT, 2},
+        {"$noOp", ExpressionNoOp::create, OpDesc::FIXED_COUNT, 1},
         {"$not", ExpressionNot::create, OpDesc::FIXED_COUNT, 1},
         {"$or", ExpressionOr::create, 0},
         {"$second", ExpressionSecond::create, OpDesc::FIXED_COUNT, 1},
@@ -485,12 +484,12 @@ namespace mongo {
     }
 
     void ExpressionAdd::toBson(
-        BSONObjBuilder *pBuilder, const char *pOpName, unsigned depth) const {
+        BSONObjBuilder *pBuilder, const char *pOpName) const {
 
         if (pAdd)
-            pAdd->toBson(pBuilder, pOpName, depth);
+            pAdd->toBson(pBuilder, pOpName);
         else
-            ExpressionNary::toBson(pBuilder, pOpName, depth);
+            ExpressionNary::toBson(pBuilder, pOpName);
     }
 
 
@@ -579,8 +578,7 @@ namespace mongo {
         return "$and";
     }
 
-    void ExpressionAnd::toMatcherBson(
-        BSONObjBuilder *pBuilder, unsigned depth) const {
+    void ExpressionAnd::toMatcherBson(BSONObjBuilder *pBuilder) const {
         /*
           There are two patterns we can handle:
           (1) one or two comparisons on the same field: { a:{$gte:3, $lt:7} }
@@ -647,12 +645,13 @@ namespace mongo {
     }
 
     void ExpressionCoerceToBool::addToBsonObj(
-        BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const {
+        BSONObjBuilder *pBuilder, string fieldName,
+        bool requireExpression) const {
         verify(false && "not possible"); // no equivalent of this
     }
 
     void ExpressionCoerceToBool::addToBsonArray(
-        BSONArrayBuilder *pBuilder, unsigned depth) const {
+        BSONArrayBuilder *pBuilder) const {
         verify(false && "not possible"); // no equivalent of this
     }
 
@@ -947,43 +946,57 @@ namespace mongo {
     }
 
     void ExpressionConstant::addToBsonObj(
-        BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const {
-
+        BSONObjBuilder *pBuilder, string fieldName,
+        bool requireExpression) const {
         /*
-          For depth greater than one, do the regular thing
+          If we don't need an expression, but can use a naked scalar,
+          do the regular thing.
 
-          This will be one because any top level expression will actually
-          be an operator node, so by the time we get to an expression
-          constant, we're at level 1 (counting up as we go down the
-          expression tree).
+          This is geared to handle $project, which uses expressions as a cue
+          that the field is a new virtual field rather than just an
+          inclusion (or exclusion):
+          { $project : {
+              x : true, // include
+              y : { $const: true }
+          }}
 
-          See the comment below for more on why this happens.
+          This can happen as a result of optimizations.  For example, the
+          above may have originally been
+          { $project : {
+              x : true, // include
+              y : { $eq:["foo", "foo"] }
+          }}
+          When this is optimized, the $eq will be replaced with true.  However,
+          if the pipeline is rematerialized (as happens for a split for
+          sharding) and sent to another node, it will now have
+              y : true
+          which will look like an inclusion rather than a computed field.
         */
-        if (depth > 1) {
+        if (!requireExpression) {
             pValue->addToBsonObj(pBuilder, fieldName);
             return;
         }
 
         /*
-          If this happens at the top level, we don't have any direct way
-          to express it.  However, we may need to if constant folding
-          reduced expressions to constants, and we need to re-materialize
-          the pipeline in order to ship it to a shard server.  This has
-          forced the introduction of {$const: ...}.
-         */
+          We require an expression, so build one here, and use that.
+
+          Note we emit a $noOp expression.  This is because the table-driven
+          expression parser requires an ExpressionNary factory, and
+          ExpressionConstant isn't an ExpressionNary.  However, the generated
+          NoOp will go away in its ::optimize() phase.
+        */
         BSONObjBuilder constBuilder;
-        pValue->addToBsonObj(&constBuilder, "$const");
+        pValue->addToBsonObj(&constBuilder, "$noOp");
         pBuilder->append(fieldName, constBuilder.done());
     }
 
     void ExpressionConstant::addToBsonArray(
-        BSONArrayBuilder *pBuilder, unsigned depth) const {
+        BSONArrayBuilder *pBuilder) const {
         pValue->addToBsonArray(pBuilder);
     }
 
     const char *ExpressionConstant::getOpName() const {
-        verify(false); // this has no name
-        return NULL;
+        return "$const";
     }
 
     /* ---------------------- ExpressionDayOfMonth ------------------------- */
@@ -1509,7 +1522,7 @@ namespace mongo {
     }
 
     void ExpressionObject::documentToBson(
-        BSONObjBuilder *pBuilder, unsigned depth) const {
+        BSONObjBuilder *pBuilder, bool requireExpression) const {
 
         /* emit any inclusion/exclusion paths */
         BuilderPathSink builderPathSink(pBuilder);
@@ -1525,23 +1538,25 @@ namespace mongo {
             if (path.find(fieldName) != pathEnd)
                 continue;
 
-            vpExpression[iField]->addToBsonObj(pBuilder, fieldName, depth + 1);
+            vpExpression[iField]->addToBsonObj(
+                pBuilder, fieldName, requireExpression);
         }
     }
 
     void ExpressionObject::addToBsonObj(
-        BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const {
+        BSONObjBuilder *pBuilder, string fieldName,
+        bool requireExpression) const {
 
         BSONObjBuilder objBuilder;
-        documentToBson(&objBuilder, depth);
+        documentToBson(&objBuilder, requireExpression);
         pBuilder->append(fieldName, objBuilder.done());
     }
 
     void ExpressionObject::addToBsonArray(
-        BSONArrayBuilder *pBuilder, unsigned depth) const {
+        BSONArrayBuilder *pBuilder) const {
 
         BSONObjBuilder objBuilder;
-        documentToBson(&objBuilder, depth);
+        documentToBson(&objBuilder, false);
         pBuilder->append(objBuilder.done());
     }
 
@@ -1649,12 +1664,13 @@ namespace mongo {
     }
 
     void ExpressionFieldPath::addToBsonObj(
-        BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const {
+        BSONObjBuilder *pBuilder, string fieldName,
+        bool requireExpression) const {
         pBuilder->append(fieldName, fieldPath.getPath(true));
     }
 
     void ExpressionFieldPath::addToBsonArray(
-        BSONArrayBuilder *pBuilder, unsigned depth) const {
+        BSONArrayBuilder *pBuilder) const {
         pBuilder->append(getFieldPath(true));
     }
 
@@ -1706,8 +1722,7 @@ namespace mongo {
         return Value::getFalse();
     }
 
-    void ExpressionFieldRange::addToBson(
-        Builder *pBuilder, unsigned depth) const {
+    void ExpressionFieldRange::addToBson(Builder *pBuilder) const {
         if (!pRange.get()) {
             /* nothing will satisfy this predicate */
             pBuilder->append(false);
@@ -1722,7 +1737,7 @@ namespace mongo {
 
         if (pRange->pTop.get() == pRange->pBottom.get()) {
             BSONArrayBuilder operands;
-            pFieldPath->addToBsonArray(&operands, depth);
+            pFieldPath->addToBsonArray(&operands);
             pRange->pTop->addToBsonArray(&operands);
             
             BSONObjBuilder equals;
@@ -1734,7 +1749,7 @@ namespace mongo {
         BSONObjBuilder leftOperator;
         if (pRange->pBottom.get()) {
             BSONArrayBuilder leftOperands;
-            pFieldPath->addToBsonArray(&leftOperands, depth);
+            pFieldPath->addToBsonArray(&leftOperands);
             pRange->pBottom->addToBsonArray(&leftOperands);
             leftOperator.append(
                 (pRange->bottomOpen ? "$gt" : "$gte"),
@@ -1749,7 +1764,7 @@ namespace mongo {
         BSONObjBuilder rightOperator;
         if (pRange->pTop.get()) {
             BSONArrayBuilder rightOperands;
-            pFieldPath->addToBsonArray(&rightOperands, depth);
+            pFieldPath->addToBsonArray(&rightOperands);
             pRange->pTop->addToBsonArray(&rightOperands);
             rightOperator.append(
                 (pRange->topOpen ? "$lt" : "$lte"),
@@ -1770,19 +1785,20 @@ namespace mongo {
     }
 
     void ExpressionFieldRange::addToBsonObj(
-        BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const {
+        BSONObjBuilder *pBuilder, string fieldName,
+        bool requireExpression) const {
         BuilderObj builder(pBuilder, fieldName);
-        addToBson(&builder, depth);
+        addToBson(&builder);
     }
 
     void ExpressionFieldRange::addToBsonArray(
-        BSONArrayBuilder *pBuilder, unsigned depth) const {
+        BSONArrayBuilder *pBuilder) const {
         BuilderArray builder(pBuilder);
-        addToBson(&builder, depth);
+        addToBson(&builder);
     }
 
     void ExpressionFieldRange::toMatcherBson(
-        BSONObjBuilder *pBuilder, unsigned depth) const {
+        BSONObjBuilder *pBuilder) const {
         verify(pRange.get()); // otherwise, we can't do anything
 
         /* if there are no endpoints, then every value is accepted */
@@ -2564,33 +2580,34 @@ namespace mongo {
     }
 
     void ExpressionNary::toBson(
-        BSONObjBuilder *pBuilder, const char *pOpName, unsigned depth) const {
+        BSONObjBuilder *pBuilder, const char *pOpName) const {
         const size_t nOperand = vpOperand.size();
         verify(nOperand > 0);
         if (nOperand == 1) {
-            vpOperand[0]->addToBsonObj(pBuilder, pOpName, depth + 1);
+            vpOperand[0]->addToBsonObj(pBuilder, pOpName, false);
             return;
         }
 
         /* build up the array */
         BSONArrayBuilder arrBuilder;
         for(size_t i = 0; i < nOperand; ++i)
-            vpOperand[i]->addToBsonArray(&arrBuilder, depth + 1);
+            vpOperand[i]->addToBsonArray(&arrBuilder);
 
         pBuilder->append(pOpName, arrBuilder.arr());
     }
 
     void ExpressionNary::addToBsonObj(
-        BSONObjBuilder *pBuilder, string fieldName, unsigned depth) const {
+        BSONObjBuilder *pBuilder, string fieldName,
+        bool requireExpression) const {
         BSONObjBuilder exprBuilder;
-        toBson(&exprBuilder, getOpName(), depth);
+        toBson(&exprBuilder, getOpName());
         pBuilder->append(fieldName, exprBuilder.done());
     }
 
     void ExpressionNary::addToBsonArray(
-        BSONArrayBuilder *pBuilder, unsigned depth) const {
+        BSONArrayBuilder *pBuilder) const {
         BSONObjBuilder exprBuilder;
-        toBson(&exprBuilder, getOpName(), depth);
+        toBson(&exprBuilder, getOpName());
         pBuilder->append(exprBuilder.done());
     }
 
@@ -2628,7 +2645,8 @@ namespace mongo {
         ExpressionNary() {
     }
 
-    void ExpressionNoOp::addOperand(const intrusive_ptr<Expression> &pExpression) {
+    void ExpressionNoOp::addOperand(
+        const intrusive_ptr<Expression> &pExpression) {
         checkArgLimit(1);
         ExpressionNary::addOperand(pExpression);
     }
@@ -2705,11 +2723,11 @@ namespace mongo {
     }
 
     void ExpressionOr::toMatcherBson(
-        BSONObjBuilder *pBuilder, unsigned depth) const {
+        BSONObjBuilder *pBuilder) const {
         BSONObjBuilder opArray;
         const size_t n = vpOperand.size();
         for(size_t i = 0; i < n; ++i)
-            vpOperand[i]->toMatcherBson(&opArray, depth + 1);
+            vpOperand[i]->toMatcherBson(&opArray);
 
         pBuilder->append("$or", opArray.done());
     }
