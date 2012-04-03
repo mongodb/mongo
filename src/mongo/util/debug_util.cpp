@@ -16,10 +16,31 @@
  */
 
 #include "pch.h"
-#include "../db/cmdline.h"
-#include "../db/jsobj.h"
+#ifndef _WIN32
+#include <signal.h>
+#endif
+#include "mongo/db/cmdline.h"
+#include "mongo/db/jsobj.h"
 
 namespace mongo {
+    void mongo_breakpoint() {
+#ifdef _WIN32
+        DEV DebugBreak();
+#endif
+#ifndef _WIN32
+        // code to raise a breakpoint in GDB
+        ONCE {
+            //prevent SIGTRAP from crashing the program if default action is specified and we are not in gdb
+            struct sigaction current;
+            sigaction(SIGTRAP, NULL, &current);
+            if (current.sa_handler == SIG_DFL) {
+                signal(SIGTRAP, SIG_IGN);
+            }
+        }
+
+        raise(SIGTRAP);
+#endif
+    }
 
 #if defined(USE_GDBSERVER)
     /* Magic gdb trampoline
