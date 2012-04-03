@@ -356,9 +356,6 @@ __process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
 	} else if (value->type == ITEM_NUM) {
 		errno = 0;
 		value->val = strtoll(value->str, &endptr, 10);
-		if (errno == ERANGE)
-			return (
-			    __config_err(conf, "Number out of range", ERANGE));
 
 		/* Check any leftover characters. */
 		while (endptr < value->str + value->len)
@@ -396,7 +393,17 @@ __process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
 				value->type = ITEM_ID;
 				break;
 			}
-	}
+	
+		/*
+		 * If we parsed the the whole string but the number is out of
+		 * range, report an error.  Don't report an error for strings
+		 * that aren't well-formed integers: if an integer is expected,
+		 * that will be caught by __wt_config_check.
+		 */
+		if (value->type == ITEM_NUM && errno == ERANGE)
+			return (
+			    __config_err(conf, "Number out of range", ERANGE));
+}
 
 	return (0);
 }
