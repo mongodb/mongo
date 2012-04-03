@@ -70,7 +70,7 @@ namespace CountTests {
         }
     };
     
-    class CountBasic : public Base {
+    class Basic : public Base {
     public:
         void run() {
             insert( "{\"a\":\"b\"}" );
@@ -80,7 +80,7 @@ namespace CountTests {
         }
     };
     
-    class CountQuery : public Base {
+    class Query : public Base {
     public:
         void run() {
             insert( "{\"a\":\"b\"}" );
@@ -92,7 +92,7 @@ namespace CountTests {
         }
     };
     
-    class CountFields : public Base {
+    class Fields : public Base {
     public:
         void run() {
             insert( "{\"a\":\"b\"}" );
@@ -103,7 +103,7 @@ namespace CountTests {
         }
     };
     
-    class CountQueryFields : public Base {
+    class QueryFields : public Base {
     public:
         void run() {
             insert( "{\"a\":\"b\"}" );
@@ -115,7 +115,7 @@ namespace CountTests {
         }
     };
     
-    class CountIndexedRegex : public Base {
+    class IndexedRegex : public Base {
     public:
         void run() {
             insert( "{\"a\":\"b\"}" );
@@ -132,11 +132,11 @@ namespace CountTests {
         }
         
         void setupTests() {
-            add<CountBasic>();
-            add<CountQuery>();
-            add<CountFields>();
-            add<CountQueryFields>();
-            add<CountIndexedRegex>();
+            add<Basic>();
+            add<Query>();
+            add<Fields>();
+            add<QueryFields>();
+            add<IndexedRegex>();
         }
     } myall;
     
