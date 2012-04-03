@@ -139,13 +139,15 @@ int
 __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_BTREE *btree;
+	WT_SNAPSHOT *snapbase;
 	WT_STUFF *ss, stuff;
-	uint32_t i, leaf_cnt;
 	int ret;
+	uint32_t i, leaf_cnt;
 
 	WT_UNUSED(cfg);
 
 	btree = session->btree;
+	snapbase = NULL;
 	ret = 0;
 
 	WT_CLEAR(stuff);
@@ -168,7 +170,7 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	 * would collide with salvage freeing the previous root page when it
 	 * reads those blocks from the file.
 	 */
-	WT_ERR(__wt_btree_set_root(session, btree->filename, NULL, 0));
+	WT_ERR(__wt_session_snap_clear(session, btree->filename));
 
 	/*
 	 * Step 2:
@@ -292,16 +294,16 @@ __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[])
 	 * the schema table with the new snapshot's location.
 	 */
 	if (ss->root_page != NULL) {
-		WT_ERR(__wt_scr_alloc(
-		    session, WT_BTREE_MAX_ADDR_COOKIE, &btree->snap));
+		WT_ERR(__wt_session_snap_list_get(session, NULL, &snapbase));
+		WT_ERR(__wt_strdup(
+		    session, WT_INTERNAL_SNAPSHOT, &snapbase[0].name));
+		FLD_SET(snapbase[0].flags, WT_SNAP_ADD);
+		btree->snap = snapbase;
 		ret = __wt_rec_evict(session, ss->root_page, WT_REC_SINGLE);
 		ss->root_page = NULL;
-		if (ret == 0 &&
-		    btree->snap->data != NULL && btree->snap->size != 0)
-			 ret = __wt_btree_set_root(session, btree->filename,
-			     (uint8_t *)btree->snap->data, btree->snap->size);
-		__wt_scr_free(&btree->snap);
-		WT_ERR(ret);
+		btree->snap = NULL;
+		if (snapbase[0].raw.data != NULL)
+			WT_ERR(__wt_session_snap_list_set(session, snapbase));
 	}
 
 	/*
@@ -319,6 +321,9 @@ err:	WT_TRET(__wt_bm_salvage_end(session));
 	/* Discard any root page we created. */
 	if (ss->root_page != NULL)
 		__wt_page_out(session, ss->root_page, 0);
+
+	/* Discard any snapshot information we allocated. */
+	__wt_session_snap_list_free(session, snapbase);
 
 	/* Discard the leaf and overflow page memory. */
 	WT_TRET(__slvg_cleanup(session, ss));

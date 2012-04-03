@@ -140,6 +140,7 @@ WIREDTIGER
 WinNT
 WiredTiger
 WiredTiger's
+WiredTigerInternal
 Wuninitialized
 XP
 __wt_epoch
@@ -317,6 +318,7 @@ keycmp
 keyname
 keyv
 kv
+ld
 len
 lenp
 lex
@@ -359,6 +361,7 @@ nbits
 nclr
 negint
 newname
+nhex
 nl
 nlpo
 nocase

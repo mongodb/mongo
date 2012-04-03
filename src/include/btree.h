@@ -105,7 +105,7 @@ struct __wt_btree {
 	WT_PAGE *root_page;		/* Root page */
 
 	WT_RWLOCK   *snaplock;		/* Lock for snapshot creation */
-	WT_ITEM	    *snap;		/* Snapshot information */
+	WT_SNAPSHOT *snap;		/* Snapshot information */
 
 	void *block;			/* Block manager */
 	u_int block_header;		/* Block manager header length */
@@ -146,4 +146,25 @@ struct __wt_salvage_cookie {
 	uint64_t take;				/* Items to take */
 
 	int	 done;				/* Ignore the rest */
+};
+
+/*
+ * WT_SNAPSHOT --
+ *	Encapsulation of snapshot information, shared with the block manager.
+ */
+#define	WT_INTERNAL_SNAPSHOT	"WiredTigerInternal"
+#define	WT_SNAPSHOT_FOREACH(snapbase, snap)				\
+	for ((snap) = (snapbase); (snap)->name != NULL; ++(snap))
+struct __wt_snapshot {
+	char	*name;				/* Name or NULL */
+	char	*t;				/* Time stamp */
+
+	WT_ITEM  addr;				/* Snapshot cookie string */
+	WT_ITEM  raw;				/* Snapshot cookie raw */
+
+	void	*bpriv;				/* Block manager's private */
+
+#define	WT_SNAP_ADD	0x01			/* Snapshot to be added */
+#define	WT_SNAP_DELETE	0x02			/* Snapshot to be deleted */
+	uint32_t flags;
 };

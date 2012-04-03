@@ -797,6 +797,10 @@ __wt_block_extlist_read(
 	tmp = NULL;
 	ret = 0;
 
+	/* If there isn't a list, we're done. */
+	if (el->offset == WT_BLOCK_INVALID_OFFSET)
+		return (0);
+
 	WT_RET(__wt_scr_alloc(session, el->size, &tmp));
 	WT_ERR(__wt_block_read_off(
 	    session, block, tmp, el->offset, el->size, el->cksum));

@@ -14,9 +14,35 @@
 int
 __wt_btree_sync(WT_SESSION_IMPL *session, const char *cfg[])
 {
-	WT_UNUSED(cfg);
+	WT_BTREE *btree;
+	WT_CONFIG_ITEM cval;
+	char *name;
+	int ret;
 
-	return (__wt_btree_snapshot(session, NULL, 0));
+	btree = session->btree;
+
+	/* This may be a named snapshot, check the configuration. */
+	ret = __wt_config_gets(session, cfg, "snapshot", &cval);
+	if (ret == WT_NOTFOUND || cval.len == 0)
+		name = NULL;
+	else {
+		WT_RET(ret);
+
+		WT_ERR(__wt_strndup(session, cval.str, cval.len, &name));
+
+		/*
+		 * If it's a named snapshot and there's nothing dirty, we won't
+		 * write any pages: mark the root page dirty to ensure a write.
+		 */
+		WT_ERR(__wt_page_modify_init(session, btree->root_page));
+		__wt_page_modify_set(btree->root_page);
+
+	}
+
+	ret = __wt_btree_snapshot(session, name, 0);
+
+err:	__wt_free(session, name);
+	return (ret);
 }
 
 /*
@@ -26,22 +52,31 @@ __wt_btree_sync(WT_SESSION_IMPL *session, const char *cfg[])
 int
 __wt_btree_snapshot(WT_SESSION_IMPL *session, const char *name, int discard)
 {
+	WT_SNAPSHOT *snapbase, *snap;
 	WT_BTREE *btree;
 	int ret;
 
-	WT_UNUSED(name);
-
 	btree = session->btree;
+	snapbase = NULL;
 	ret = 0;
 
 	/* Snapshots are single-threaded. */
 	__wt_writelock(session, btree->snaplock);
 
-	/* Allocate a temporary buffer for the snapshot information. */
-	WT_RET(__wt_scr_alloc(session, WT_BTREE_MAX_ADDR_COOKIE, &btree->snap));
+	/* Get the list of snapshots for this file. */
+	WT_ERR(__wt_session_snap_list_get(session, NULL, &snapbase));
 
-	/* Get the current snapshot information. */
-	WT_ERR(__wt_btree_get_root(session, btree->snap));
+	/*
+	 * Review the existing snapshots, deleting any with matching names, and
+	 * add the new snapshot entry at the end of the list.
+	 */
+	if (name == NULL)
+		name = WT_INTERNAL_SNAPSHOT;
+	WT_SNAPSHOT_FOREACH(snapbase, snap)
+		if (strcmp(name, snap->name) == 0)
+			FLD_SET(snap->flags, WT_SNAP_DELETE);
+	WT_ERR(__wt_strdup(session, name, &snap->name));
+	FLD_SET(snap->flags, WT_SNAP_ADD);
 
 	/*
 	 * Ask the eviction thread to flush any dirty pages.
@@ -64,20 +99,22 @@ __wt_btree_snapshot(WT_SESSION_IMPL *session, const char *name, int discard)
 	 * already works that way.   None of these problems can't be fixed, but
 	 * I don't see a reason to change at this time, either.
 	 */
+	btree->snap = snapbase;
 	do {
 		ret = __wt_sync_file_serial(session, discard);
 	} while (ret == WT_RESTART);
+	btree->snap = NULL;
 	WT_ERR(ret);
 
 	/* If we're discarding the tree, the root page should be gone. */
 	WT_ASSERT(session, !discard || btree->root_page == NULL);
 
-	/* After all pages are evicted, update the snapshot information. */
-	if (btree->snap->data != NULL && btree->snap->size != 0)
-		WT_ERR(__wt_btree_set_root(session, btree->filename,
-		    (uint8_t *)btree->snap->data, btree->snap->size));
+	/* If there was a snapshot, update the schema table. */
+	if (snap->raw.data != NULL)
+		WT_ERR(__wt_session_snap_list_set(session, snapbase));
 
-err:	__wt_scr_free(&btree->snap);
+err:	__wt_session_snap_list_free(session, snapbase);
+
 	__wt_rwunlock(session, btree->snaplock);
 
 	return (ret);

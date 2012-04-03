@@ -80,15 +80,18 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 {
 	WT_BTREE *btree;
 	WT_ITEM dsk;
+	WT_SNAPSHOT *snapbase, *snap;
 	WT_VSTUFF *vs, _vstuff;
 	int ret;
 
 	btree = session->btree;
+	snapbase = NULL;
 	ret = 0;
+
+	WT_CLEAR(dsk);
 
 	WT_CLEAR(_vstuff);
 	vs = &_vstuff;
-
 	vs->dumpfile = dumpfile;
 	WT_ERR(__wt_scr_alloc(session, 0, &vs->max_key));
 	WT_ERR(__wt_scr_alloc(session, 0, &vs->max_addr));
@@ -98,15 +101,13 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 	/* Inform the underlying block manager we're verifying. */
 	WT_ERR(__wt_bm_verify_start(session));
 
-	/*
-	 * Verify the tree, starting at the root: if there is no root, that's
-	 * still possibly a legal file, but all of the pages must be on the
-	 * free-list.
-	 */
-	WT_ERR(__wt_btree_get_root(session, vs->tmp1));
-	if (vs->tmp1->data != NULL && vs->tmp1->size != 0) {
+	/* Get a list of the snapshots for this file. */
+	WT_ERR(__wt_session_snap_list_get(session, NULL, &snapbase));
+
+	/* Loop through the file's snapshots, verifying each one. */
+	WT_SNAPSHOT_FOREACH(snapbase, snap) {
 		WT_VERBOSE(session, verify,
-		    "%s: snapshot [XXX]", btree->filename);
+		    "%s: snapshot %s", btree->filename, snap->name);
 
 		/* House-keeping between snapshots. */
 		__verify_snapshot_reset(vs);
@@ -115,9 +116,8 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 		 * Load the snapshot -- if the size of the root page is 0, the
 		 * file is empty.
 		 */
-		WT_CLEAR(dsk);
 		WT_ERR(__wt_bm_snapshot_load(
-		    session, &dsk, vs->tmp1->data, vs->tmp1->size, 1));
+		    session, &dsk, snap->raw.data, snap->raw.size, 1));
 		if (dsk.size != 0) {
 			/* Verify, then discard the snapshot from the cache. */
 			if ((ret = __wt_btree_tree_open(session, &dsk)) == 0) {
@@ -132,7 +132,13 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 		WT_ERR(ret);
 	}
 
-err:	if (vs != NULL) {
+	/* Discard the list of snapshots. */
+err:	__wt_session_snap_list_free(session, snapbase);
+
+	/* Inform the underlying block manager we're done. */
+	WT_TRET(__wt_bm_verify_end(session));
+
+	if (vs != NULL) {
 		/* Wrap up reporting. */
 		__wt_progress(session, NULL, vs->fcnt);
 
@@ -142,8 +148,6 @@ err:	if (vs != NULL) {
 		__wt_scr_free(&vs->tmp1);
 		__wt_scr_free(&vs->tmp2);
 	}
-
-	WT_TRET(__wt_bm_verify_end(session));
 
 	return (ret);
 }

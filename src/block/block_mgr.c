@@ -135,7 +135,7 @@ __wt_bm_close(WT_SESSION_IMPL *session)
  *	Write a buffer into a block, creating a snapshot.
  */
 int
-__wt_bm_snapshot(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_ITEM *snap)
+__wt_bm_snapshot(WT_SESSION_IMPL *session, WT_ITEM *buf, WT_SNAPSHOT *snap)
 {
 	WT_BLOCK *block;
 

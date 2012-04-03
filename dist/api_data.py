@@ -157,8 +157,8 @@ file_config = format_meta + [
 
 # File metadata, including both configurable and non-configurable (internal)
 file_meta = file_config + [
-	Config('root', '', r'''
-		the root page address'''),
+	Config('snapshot', '', r'''
+		the file snapshot entries'''),
 	Config('version', '(major=0,minor=0)', r'''
 		the file version'''),
 ]
@@ -208,6 +208,7 @@ methods = {
 		type='boolean'),
 	]),
 
+'session.dumpfile' : Method([]),
 'session.log_printf' : Method([]),
 
 'session.open_cursor' : Method([
@@ -243,6 +244,8 @@ methods = {
 		ignore the encodings for the key and value, manage data as if
 		the formats were \c "u".  See @ref cursor_raw for details''',
 		type='boolean'),
+	Config('snapshot', '', r'''
+		the name of a snapshot to open'''),
 	Config('statistics', 'false', r'''
 		configure the cursor for statistics''',
 		type='boolean'),
@@ -255,11 +258,13 @@ methods = {
 		files''',
 		type='boolean'),
 ]),
-'session.sync' : Method([]),
+'session.sync' : Method([
+	Config('snapshot', '', r'''
+		name of the snapshot'''),
+]),
 'session.truncate' : Method([]),
 'session.upgrade' : Method([]),
 'session.verify' : Method([]),
-'session.dumpfile' : Method([]),
 
 'session.begin_transaction' : Method([
 	Config('isolation', 'read-committed', r'''

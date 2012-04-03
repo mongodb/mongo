@@ -61,7 +61,6 @@ struct __wt_page_header {
  * WT_ADDR --
  *	A block location.
  */
-#define	WT_NOADDR	""		/* No address */
 struct __wt_addr {
 	uint8_t *addr;			/* Cookie */
 	uint32_t size;			/* Cookie length */

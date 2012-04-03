@@ -514,6 +514,8 @@ struct __wt_session {
 	 * @config{raw, ignore the encodings for the key and value\, manage data
 	 * as if the formats were \c "u".  See @ref cursor_raw for details.,a
 	 * boolean flag; default \c false.}
+	 * @config{snapshot, the name of a snapshot to open.,a string; default
+	 * empty.}
 	 * @config{statistics, configure the cursor for statistics.,a boolean
 	 * flag; default \c false.}
 	 * @configend
@@ -698,7 +700,9 @@ struct __wt_session {
 	 *
 	 * @param session the session handle
 	 * @param name the URI of the file or table to sync
-	 * @configempty{session.sync, see dist/api_data.py}
+	 * @configstart{session.sync, see dist/api_data.py}
+	 * @config{snapshot, name of the snapshot.,a string; default empty.}
+	 * @configend
 	 * @errors
 	 */
 	int __F(sync)(WT_SESSION *session,
