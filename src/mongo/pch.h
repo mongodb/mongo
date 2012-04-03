@@ -21,20 +21,6 @@
 #ifndef MONGO_PCH_H
 #define MONGO_PCH_H
 
-// MONGO_EXPOSE_MACROS is defined for internal mongo programs.
-// C++ driver consumers do not define this.
-#if defined(MONGO_EXPOSE_MACROS)
-
-# define JS_C_STRINGS_ARE_UTF8
-# undef  SUPPORT_UCP
-# define SUPPORT_UCP
-# undef  SUPPORT_UTF8
-# define SUPPORT_UTF8
-# undef  _CRT_SECURE_NO_WARNINGS
-# define _CRT_SECURE_NO_WARNINGS
-
-#endif
-
 // our #define macros must not be active when we include
 // system headers and boost headers
 #include "mongo/client/undef_macros.h"
