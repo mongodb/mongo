@@ -1315,7 +1315,7 @@ namespace mongo {
                         BSONObj res = config.reducer->finalReduce( values , config.finalizer.get());
                         chunkSize += res.objsize();
                         if (state.isOnDisk())
-                            state.insertToInc(res);
+                            state.insert( config.tempLong , res );
                         else
                             state.emit(res);
                         values.clear();

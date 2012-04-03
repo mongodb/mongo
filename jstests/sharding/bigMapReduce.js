@@ -1,4 +1,4 @@
-s = new ShardingTest( "bigMapReduce" , 2 , 1 , 1 , { chunksize : 1 } );
+s = new ShardingTest( "bigMapReduce" , 2 , 1 , 1 , { rs: true, numReplicas: 2, chunksize : 1 } );
 
 // reduce chunk size to split
 var config = s.getDB("config");
@@ -128,6 +128,14 @@ printjson(out);
 assert.eq( 51200 , out.counts.emit , "Received wrong result" );
 assert.eq( 51200 , out.counts.output , "Received wrong result" );
 assert.eq( 2 , db[outcol].findOne().value , "Received wrong result" );
+
+// verify that data is also on secondary
+var primary = s._rs[0].test.liveNodes.master
+var secondaries = s._rs[0].test.liveNodes.slaves
+assert.eq( 51200 , primary.getDB("test")[outcol].count() , "Wrong count" );
+for (var i = 0; i < secondaries.length; ++i) {
+	assert.eq( 51200 , secondaries[i].getDB("test")[outcol].count() , "Wrong count" );
+}
 
 s.stop()
 
