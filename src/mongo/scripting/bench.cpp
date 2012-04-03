@@ -591,7 +591,7 @@ namespace mongo {
             if ( args["parallel"].isNumber() )
                 config.parallel = args["parallel"].numberInt();
             if ( args["seconds"].isNumber() )
-                config.seconds = args["seconds"].numberInt();
+                config.seconds = args["seconds"].number();
             if ( ! args["hideResults"].eoo() )
                 config.hideResults = args["hideResults"].trueValue();
             if ( ! args["handleErrors"].eoo() )
