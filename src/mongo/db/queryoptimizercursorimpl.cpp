@@ -509,7 +509,7 @@ namespace mongo {
             return _currOp->currentMatches( details );
         }
         
-        virtual CandidatePlans initialCandidatePlans() const {
+        virtual CandidatePlanCharacter initialCandidatePlans() const {
             return _initialCandidatePlans;
         }
         
@@ -661,7 +661,7 @@ namespace mongo {
         
         bool _requireOrder;
         auto_ptr<MultiPlanScanner> _mps;
-        CandidatePlans _initialCandidatePlans;
+        CandidatePlanCharacter _initialCandidatePlans;
         shared_ptr<QueryOptimizerCursorOp> _originalOp;
         QueryOptimizerCursorOp *_currOp;
         bool _completePlanOfHybridSetScanAndOrderRequired;

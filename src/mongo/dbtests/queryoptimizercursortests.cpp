@@ -2838,7 +2838,7 @@ namespace QueryOptimizerCursorTests {
     protected:
         void checkCursor( bool mayRunInOrderPlan, bool mayRunOutOfOrderPlan,
                          bool runningInitialInOrderPlan, bool possiblyExcludedPlans ) {
-            QueryOptimizerCursor::CandidatePlans plans = _cursor->initialCandidatePlans();
+            CandidatePlanCharacter plans = _cursor->initialCandidatePlans();
             ASSERT_EQUALS( mayRunInOrderPlan, plans.mayRunInOrderPlan() );
             ASSERT_EQUALS( mayRunOutOfOrderPlan, plans.mayRunOutOfOrderPlan() );
             ASSERT_EQUALS( runningInitialInOrderPlan, _cursor->runningInitialInOrderPlan() );

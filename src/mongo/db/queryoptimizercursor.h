@@ -89,27 +89,8 @@ namespace mongo {
     class QueryOptimizerCursor : public Cursor {
     public:
         
-        /** Summarizes the candidate plans that may run for a query. */
-        class CandidatePlans {
-        public:
-            CandidatePlans( bool mayRunInOrderPlan, bool mayRunOutOfOrderPlan ) :
-            _mayRunInOrderPlan( mayRunInOrderPlan ),
-            _mayRunOutOfOrderPlan( mayRunOutOfOrderPlan ) {
-            }
-            CandidatePlans() :
-            _mayRunInOrderPlan(),
-            _mayRunOutOfOrderPlan() {
-            }
-            bool mayRunInOrderPlan() const { return _mayRunInOrderPlan; }
-            bool mayRunOutOfOrderPlan() const { return _mayRunOutOfOrderPlan; }
-            bool valid() const { return mayRunInOrderPlan() || mayRunOutOfOrderPlan(); }
-            bool hybridPlanSet() const { return mayRunInOrderPlan() && mayRunOutOfOrderPlan(); }
-        private:
-            bool _mayRunInOrderPlan;
-            bool _mayRunOutOfOrderPlan;
-        };
         /** Candidate plans for the query before it begins running. */
-        virtual CandidatePlans initialCandidatePlans() const = 0;
+        virtual CandidatePlanCharacter initialCandidatePlans() const = 0;
         /** FieldRangeSet for the query before it begins running. */
         virtual const FieldRangeSet *initialFieldRangeSet() const = 0;
 

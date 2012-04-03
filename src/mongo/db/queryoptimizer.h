@@ -282,6 +282,26 @@ namespace mongo {
         }
     };
 
+    /** Summarizes the candidate plans that may run for a query. */
+    class CandidatePlanCharacter {
+    public:
+        CandidatePlanCharacter( bool mayRunInOrderPlan, bool mayRunOutOfOrderPlan ) :
+        _mayRunInOrderPlan( mayRunInOrderPlan ),
+        _mayRunOutOfOrderPlan( mayRunOutOfOrderPlan ) {
+        }
+        CandidatePlanCharacter() :
+        _mayRunInOrderPlan(),
+        _mayRunOutOfOrderPlan() {
+        }
+        bool mayRunInOrderPlan() const { return _mayRunInOrderPlan; }
+        bool mayRunOutOfOrderPlan() const { return _mayRunOutOfOrderPlan; }
+        bool valid() const { return mayRunInOrderPlan() || mayRunOutOfOrderPlan(); }
+        bool hybridPlanSet() const { return mayRunInOrderPlan() && mayRunOutOfOrderPlan(); }
+    private:
+        bool _mayRunInOrderPlan;
+        bool _mayRunOutOfOrderPlan;
+    };
+    
     /**
      * A set of candidate query plans for a query.  This class can return a best guess plan or run a
      * QueryOp on all the plans.

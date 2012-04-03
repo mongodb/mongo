@@ -566,7 +566,7 @@ namespace mongo {
         bool singlePlan = !_queryOptimizerCursor;
         bool singleOrderedPlan =
         singlePlan && ( !queryPlan.valid() || !queryPlan._scanAndOrderRequired );
-        QueryOptimizerCursor::CandidatePlans queryOptimizerPlans;
+        CandidatePlanCharacter queryOptimizerPlans;
         if ( _queryOptimizerCursor ) {
             queryOptimizerPlans = _queryOptimizerCursor->initialCandidatePlans();
         }
