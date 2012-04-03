@@ -393,7 +393,7 @@ __process_value(WT_CONFIG *conf, WT_CONFIG_ITEM *value)
 				value->type = ITEM_ID;
 				break;
 			}
-	
+
 		/*
 		 * If we parsed the the whole string but the number is out of
 		 * range, report an error.  Don't report an error for strings
