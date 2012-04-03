@@ -33,37 +33,28 @@ namespace mongo {
     public:
 
         OpCounters();
-
-        AtomicUInt * getInsert() { return _insert; }
-        AtomicUInt * getQuery() { return _query; }
-        AtomicUInt * getUpdate() { return _update; }
-        AtomicUInt * getDelete() { return _delete; }
-        AtomicUInt * getGetMore() { return _getmore; }
-        AtomicUInt * getCommand() { return _command; }
-
-        void incInsertInWriteLock(int n) { _insert->x += n; }
-        void gotInsert() { _insert[0]++; }
-        void gotQuery() { _query[0]++; }
-        void gotUpdate() { _update[0]++; }
-        void gotDelete() { _delete[0]++; }
-        void gotGetMore() { _getmore[0]++; }
-        void gotCommand() { _command[0]++; }
+        void incInsertInWriteLock(int n) { _insert.x += n; }
+        void gotInsert() { _insert++; }
+        void gotQuery() { _query++; }
+        void gotUpdate() { _update++; }
+        void gotDelete() { _delete++; }
+        void gotGetMore() { _getmore++; }
+        void gotCommand() { _command++; }
 
         void gotOp( int op , bool isCommand );
 
-        BSONObj& getObj();
+        BSONObj getObj();
 
     private:
-        BSONObj _obj;
 
         // todo: there will be a lot of cache line contention on these.  need to do something 
         //       else eventually.
-        AtomicUInt * _insert;
-        AtomicUInt * _query;
-        AtomicUInt * _update;
-        AtomicUInt * _delete;
-        AtomicUInt * _getmore;
-        AtomicUInt * _command;
+        AtomicUInt _insert;
+        AtomicUInt _query;
+        AtomicUInt _update;
+        AtomicUInt _delete;
+        AtomicUInt _getmore;
+        AtomicUInt _command;
     };
 
     extern OpCounters globalOpCounters;
