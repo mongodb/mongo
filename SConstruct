@@ -132,6 +132,9 @@ def get_variant_dir():
         s += "normal/"
     return s
         
+# build output
+add_option( "mute" , "do not display commandlines for compiling and linking, to reduce screen noise", 0, False )
+
 # installation/packaging
 add_option( "prefix" , "installation prefix" , 1 , False, default=DEFAULT_INSTALL_DIR )
 add_option( "distname" , "dist name (0.8.0)" , 1 , False )
@@ -287,6 +290,12 @@ env = Environment( BUILD_DIR=variantDir,
 
                    PCRE_VERSION='8.30',
                    )
+
+if has_option('mute'):
+    env.Append( CCCOMSTR = "Compiling $TARGET" )
+    env.Append( CXXCOMSTR = env["CCCOMSTR"] )
+    env.Append( LINKCOMSTR = "Linking $TARGET" )
+    env.Append( ARCOMSTR = "Generating library $TARGET" )
 
 if has_option('mongod-concurrency-level'):
     env.Append(CPPDEFINES=['MONGOD_CONCURRENCY_LEVEL=MONGOD_CONCURRENCY_LEVEL_%s' % get_option('mongod-concurrency-level').upper()])
