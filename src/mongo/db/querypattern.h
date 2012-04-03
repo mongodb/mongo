@@ -55,6 +55,20 @@ namespace mongo {
         map<string,Type> _fieldTypes;
         BSONObj _sort;
     };
+    
+    /** Information about a query plan that ran successfully for a QueryPattern. */
+    class CachedQueryPlan {
+    public:
+        CachedQueryPlan() :
+        _nScanned() {
+        }
+        CachedQueryPlan( const BSONObj &indexKey, long long nScanned );
+        BSONObj indexKey() const { return _indexKey; }
+        long long nScanned() const { return _nScanned; }
+    private:
+        BSONObj _indexKey;
+        long long _nScanned;
+    };
 
     inline bool QueryPattern::operator<( const QueryPattern &other ) const {
         map<string,Type>::const_iterator i = _fieldTypes.begin();

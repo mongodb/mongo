@@ -522,7 +522,7 @@ namespace mongo {
         /* query cache (for query optimizer) ------------------------------------- */
     private:
         int _qcWriteCount;
-        map< QueryPattern, pair< BSONObj, long long > > _qcCache;
+        map<QueryPattern,CachedQueryPlan> _qcCache;
         static NamespaceDetailsTransient& make_inlock(const char *ns);
     public:
         static SimpleMutex _qcMutex;
@@ -552,14 +552,12 @@ namespace mongo {
             if ( ++_qcWriteCount >= 100 )
                 clearQueryCache();
         }
-        BSONObj indexForPattern( const QueryPattern &pattern ) {
-            return _qcCache[ pattern ].first;
+        CachedQueryPlan cachedQueryPlanForPattern( const QueryPattern &pattern ) {
+            return _qcCache[ pattern ];
         }
-        long long nScannedForPattern( const QueryPattern &pattern ) {
-            return _qcCache[ pattern ].second;
-        }
-        void registerIndexForPattern( const QueryPattern &pattern, const BSONObj &indexKey, long long nScanned ) {
-            _qcCache[ pattern ] = make_pair( indexKey, nScanned );
+        void registerCachedQueryPlanForPattern( const QueryPattern &pattern,
+                                               const CachedQueryPlan &cachedQueryPlan ) {
+            _qcCache[ pattern ] = cachedQueryPlan;
         }
 
     }; /* NamespaceDetailsTransient */

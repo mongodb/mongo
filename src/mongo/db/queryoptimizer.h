@@ -619,6 +619,8 @@ namespace mongo {
     /** NOTE min, max, and keyPattern will be updated to be consistent with the selected index. */
     IndexDetails *indexDetailsForRange( const char *ns, string &errmsg, BSONObj &min, BSONObj &max, BSONObj &keyPattern );
 
+    class CachedQueryPlan;
+    
     /**
      * Add-on functionality for queryutil classes requiring access to indexing
      * functionality not currently linked to mongos.
@@ -632,7 +634,7 @@ namespace mongo {
         /** Clear any indexes recorded as the best for either the single or multi key pattern. */
         static void clearIndexesForPatterns( const FieldRangeSetPair &frsp, const BSONObj &order );
         /** Return a recorded best index for the single or multi key pattern. */
-        static pair< BSONObj, long long > bestIndexForPatterns( const FieldRangeSetPair &frsp, const BSONObj &order );        
+        static CachedQueryPlan bestIndexForPatterns( const FieldRangeSetPair &frsp, const BSONObj &order );        
         static bool uselessOr( const OrRangeGenerator& org, NamespaceDetails *d, int hintIdx );
     };
     

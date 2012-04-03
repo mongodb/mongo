@@ -875,8 +875,12 @@ namespace QueryOptimizerTests {
                 theDataFileMgr.insertWithObjMod( ns(), one );
                 BSONObj delSpec = BSON( "a" << 1 << "_id" << NE << 0 );
                 deleteObjects( ns(), delSpec, false );
-                ASSERT( BSON( "a" << 1 ).woCompare( NamespaceDetailsTransient::get_inlock( ns() ).indexForPattern( FieldRangeSet( ns(), delSpec, true ).pattern() ) ) == 0 );
-                ASSERT_EQUALS( 1, NamespaceDetailsTransient::get_inlock( ns() ).nScannedForPattern( FieldRangeSet( ns(), delSpec, true ).pattern() ) );
+                
+                NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
+                QueryPattern queryPattern = FieldRangeSet( ns(), delSpec, true ).pattern();
+                CachedQueryPlan cachedQueryPlan = nsdt.cachedQueryPlanForPattern( queryPattern ); 
+                ASSERT_EQUALS( BSON( "a" << 1 ), cachedQueryPlan.indexKey() );
+                ASSERT_EQUALS( 1, cachedQueryPlan.nScanned() );
             }
         };
 
@@ -1053,8 +1057,9 @@ namespace QueryOptimizerTests {
                 
                 NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
                 
-                nsdt.registerIndexForPattern
-                ( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ), BSON( "a" << 1 ), 1 );
+                nsdt.registerCachedQueryPlanForPattern
+                        ( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ),
+                         CachedQueryPlan( BSON( "a" << 1 ), 1 ) );
 
                 {
                     shared_ptr<QueryPlanSet> qps = makeQps( BSON( "a" << 1 ), BSON( "b" << 1 ) );
@@ -1064,8 +1069,9 @@ namespace QueryOptimizerTests {
                     ASSERT( qps->possibleOutOfOrderPlan() );
                 }
 
-                nsdt.registerIndexForPattern
-                ( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ), BSON( "b" << 1 ), 1 );
+                nsdt.registerCachedQueryPlanForPattern
+                        ( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ),
+                         CachedQueryPlan( BSON( "b" << 1 ), 1 ) );
                 
                 {
                     shared_ptr<QueryPlanSet> qps = makeQps( BSON( "a" << 1 ), BSON( "b" << 1 ) );
@@ -1152,8 +1158,9 @@ namespace QueryOptimizerTests {
                 
                 NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
                 
-                nsdt.registerIndexForPattern
-                ( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ), BSON( "a" << 1 ), 1 );
+                nsdt.registerCachedQueryPlanForPattern
+                        ( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ),
+                         CachedQueryPlan( BSON( "a" << 1 ), 1 ) );
                 
                 {
                     shared_ptr<MultiPlanScanner> mps =
@@ -1164,8 +1171,9 @@ namespace QueryOptimizerTests {
                     ASSERT( mps->possibleOutOfOrderPlan() );
                 }
                 
-                nsdt.registerIndexForPattern
-                ( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ), BSON( "b" << 1 ), 1 );
+                nsdt.registerCachedQueryPlanForPattern
+                        ( makePattern( BSON( "a" << 1 ), BSON( "b" << 1 ) ),
+                         CachedQueryPlan( BSON( "b" << 1 ), 1 ) );
                 
                 {
                     shared_ptr<MultiPlanScanner> mps =
@@ -1237,7 +1245,8 @@ namespace QueryOptimizerTests {
             {
                 SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
                 NamespaceDetailsTransient::get_inlock( ns() ).
-                registerIndexForPattern( frs.pattern( BSON( "b" << 1 ) ), BSON( "a" << 1 ), 0 );
+                        registerCachedQueryPlanForPattern( frs.pattern( BSON( "b" << 1 ) ),
+                                                          CachedQueryPlan( BSON( "a" << 1 ), 0 ) );
             }
             
             c = NamespaceDetailsTransient::bestGuessCursor( ns(), fromjson( "{a:1,$or:[{y:1}]}" ),

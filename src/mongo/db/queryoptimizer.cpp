@@ -272,7 +272,10 @@ doneCheckOrder:
         }
 
         SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
-        NamespaceDetailsTransient::get_inlock( ns() ).registerIndexForPattern( _frs.pattern( _order ), indexKey(), nScanned );
+        QueryPattern queryPattern = _frs.pattern( _order );
+        CachedQueryPlan cachedQueryPlan( indexKey(), nScanned );
+        NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get_inlock( ns() );
+        nsdt.registerCachedQueryPlanForPattern( queryPattern, cachedQueryPlan );
     }
     
     void QueryPlan::checkTableScanAllowed() const {
@@ -568,9 +571,9 @@ doneCheckOrder:
         }
 
         if ( _recordedPlanPolicy != Ignore ) {
-            pair< BSONObj, long long > best = QueryUtilIndexed::bestIndexForPatterns( *_frsp, _order );
-            BSONObj bestIndex = best.first;
-            long long oldNScanned = best.second;
+            CachedQueryPlan best = QueryUtilIndexed::bestIndexForPatterns( *_frsp, _order );
+            BSONObj bestIndex = best.indexKey();
+            long long oldNScanned = best.nScanned();
             if ( !bestIndex.isEmpty() ) {
                 QueryPlanPtr p;
                 _oldNScanned = oldNScanned;
@@ -1426,33 +1429,32 @@ doneCheckOrder:
     
     void QueryUtilIndexed::clearIndexesForPatterns( const FieldRangeSetPair &frsp, const BSONObj &order ) {
         SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
-        NamespaceDetailsTransient& nsd = NamespaceDetailsTransient::get_inlock( frsp.ns() );
-        nsd.registerIndexForPattern( frsp._singleKey.pattern( order ), BSONObj(), 0 );
-        nsd.registerIndexForPattern( frsp._multiKey.pattern( order ), BSONObj(), 0 );
+        NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get_inlock( frsp.ns() );
+        CachedQueryPlan noCachedPlan;
+        nsdt.registerCachedQueryPlanForPattern( frsp._singleKey.pattern( order ), noCachedPlan );
+        nsdt.registerCachedQueryPlanForPattern( frsp._multiKey.pattern( order ), noCachedPlan );
     }
     
-    pair< BSONObj, long long > QueryUtilIndexed::bestIndexForPatterns( const FieldRangeSetPair &frsp, const BSONObj &order ) {
+    CachedQueryPlan QueryUtilIndexed::bestIndexForPatterns( const FieldRangeSetPair &frsp, const BSONObj &order ) {
         SimpleMutex::scoped_lock lk(NamespaceDetailsTransient::_qcMutex);
-        NamespaceDetailsTransient& nsd = NamespaceDetailsTransient::get_inlock( frsp.ns() );
+        NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get_inlock( frsp.ns() );
         // TODO Maybe it would make sense to return the index with the lowest
         // nscanned if there are two possibilities.
         {
             QueryPattern pattern = frsp._singleKey.pattern( order );
-            BSONObj oldIdx = nsd.indexForPattern( pattern );
-            if ( !oldIdx.isEmpty() ) {
-                long long oldNScanned = nsd.nScannedForPattern( pattern );
-                return make_pair( oldIdx, oldNScanned );
+            CachedQueryPlan cachedQueryPlan = nsdt.cachedQueryPlanForPattern( pattern );
+            if ( !cachedQueryPlan.indexKey().isEmpty() ) {
+                return cachedQueryPlan;
             }
         }
         {
             QueryPattern pattern = frsp._multiKey.pattern( order );
-            BSONObj oldIdx = nsd.indexForPattern( pattern );
-            if ( !oldIdx.isEmpty() ) {
-                long long oldNScanned = nsd.nScannedForPattern( pattern );
-                return make_pair( oldIdx, oldNScanned );
+            CachedQueryPlan cachedQueryPlan = nsdt.cachedQueryPlanForPattern( pattern );
+            if ( !cachedQueryPlan.indexKey().isEmpty() ) {
+                return cachedQueryPlan;
             }
         }
-        return make_pair( BSONObj(), 0 );
+        return CachedQueryPlan();
     }
     
     bool QueryUtilIndexed::uselessOr( const OrRangeGenerator &org, NamespaceDetails *d, int hintIdx ) {

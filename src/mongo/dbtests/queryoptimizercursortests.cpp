@@ -260,6 +260,11 @@ namespace QueryOptimizerCursorTests {
             ClientCursor::find( ns(), nsCursors );
             return nsCursors.size();
         }
+        BSONObj cachedIndexForQuery( const BSONObj &query ) {
+            QueryPattern queryPattern = FieldRangeSet( ns(), query, true ).pattern();
+            NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
+            return nsdt.cachedQueryPlanForPattern( queryPattern ).indexKey();
+        }
     private:
         shared_ptr<Cursor> _c;
     };
@@ -3163,7 +3168,8 @@ namespace QueryOptimizerCursorTests {
             while( c->advance() );
             FieldRangeSet aPreferableFields( ns(), _aPreferableQuery, true );
             ASSERT_EQUALS( BSON( "a" << 1 ),
-                          nsdt.indexForPattern( aPreferableFields.pattern( BSON( "a" << 1 ) ) ) );            
+                          nsdt.cachedQueryPlanForPattern
+                          ( aPreferableFields.pattern( BSON( "a" << 1 ) ) ).indexKey() );
         }
         /** The first results come from the recorded index. */
         void checkInitialIteratePlans() const {
@@ -3519,7 +3525,7 @@ namespace QueryOptimizerCursorTests {
                 Lock::GlobalWrite lk;
                 Client::Context ctx( ns() );
                 // Check that no plan was recorded for this query.
-                ASSERT( BSONObj().woCompare( NamespaceDetailsTransient::get_inlock( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "_id" << GT << 0 ), true ).pattern() ) ) == 0 );
+                ASSERT_EQUALS( BSONObj(), cachedIndexForQuery( BSON( "_id" << GT << 0 ) ) );
                 shared_ptr<Cursor> c = NamespaceDetailsTransient::getCursor( ns(), BSON( "_id" << GT << 0 ) );
                 // No need for query optimizer cursor since the plan is optimal.
                 ASSERT_EQUALS( "BtreeCursor _id_", c->toString() );
@@ -3536,7 +3542,8 @@ namespace QueryOptimizerCursorTests {
                 ASSERT( _cli.query( ns(), QUERY( "q" << 1 << "_id" << 1 ) )->more() );
                 Lock::GlobalWrite lk;
                 Client::Context ctx( ns() );
-                ASSERT( BSON( "_id" << 1 ).woCompare( NamespaceDetailsTransient::get_inlock( ns() ).indexForPattern( FieldRangeSet( ns(), BSON( "q" << 1 << "_id" << 1 ), true ).pattern() ) ) == 0 );
+                ASSERT_EQUALS( BSON( "_id" << 1 ),
+                              cachedIndexForQuery( BSON( "q" << 1 << "_id" << 1 ) ) );
                 shared_ptr<Cursor> c = NamespaceDetailsTransient::getCursor( ns(), BSON( "q" << 1 << "_id" << 1 ) );
                 // Need query optimizer cursor since the cached plan is not optimal.
                 ASSERT_EQUALS( "QueryOptimizerCursor", c->toString() );
