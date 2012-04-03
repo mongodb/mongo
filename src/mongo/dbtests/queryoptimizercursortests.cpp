@@ -292,7 +292,7 @@ namespace QueryOptimizerCursorTests {
             ASSERT_THROWS( c->currentPlanScanAndOrderRequired(), AssertionException );
             ASSERT_THROWS( c->keyFieldsOnly(), AssertionException );
             ASSERT_THROWS( c->runningInitialInOrderPlan(), AssertionException );
-            ASSERT_THROWS( c->runningInitialCachedPlan(), AssertionException );
+            ASSERT_THROWS( c->hasPossiblyExcludedPlans(), AssertionException );
 
             // ok
             c->initialCandidatePlans();
@@ -2788,12 +2788,12 @@ namespace QueryOptimizerCursorTests {
     class PossiblePlans : public PlanChecking {
     protected:
         void checkCursor( bool mayRunInOrderPlan, bool mayRunOutOfOrderPlan,
-                         bool runningInitialInOrderPlan, bool runningInitialCachedPlan ) {
+                         bool runningInitialInOrderPlan, bool possiblyExcludedPlans ) {
             QueryOptimizerCursor::CandidatePlans plans = _cursor->initialCandidatePlans();
             ASSERT_EQUALS( mayRunInOrderPlan, plans.mayRunInOrderPlan() );
             ASSERT_EQUALS( mayRunOutOfOrderPlan, plans.mayRunOutOfOrderPlan() );
             ASSERT_EQUALS( runningInitialInOrderPlan, _cursor->runningInitialInOrderPlan() );
-            ASSERT_EQUALS( runningInitialCachedPlan, _cursor->runningInitialCachedPlan() );            
+            ASSERT_EQUALS( possiblyExcludedPlans, _cursor->hasPossiblyExcludedPlans() );            
         }
         void setCursor( const BSONObj &query, const BSONObj &order ) {
             _cursor = PlanChecking::getCursor( query, order );
@@ -2820,7 +2820,7 @@ namespace QueryOptimizerCursorTests {
                           _cursor->currentPlanScanAndOrderRequired() );
             ASSERT( !_cursor->completePlanOfHybridSetScanAndOrderRequired() );
             ASSERT( !_cursor->runningInitialInOrderPlan() );
-            ASSERT( !_cursor->runningInitialCachedPlan() );
+            ASSERT( !_cursor->hasPossiblyExcludedPlans() );
         }
         virtual void checkIterate( const shared_ptr<QueryOptimizerCursor> &cursor ) const = 0;
         shared_ptr<QueryOptimizerCursor> _cursor;

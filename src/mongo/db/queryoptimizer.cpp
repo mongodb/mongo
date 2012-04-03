@@ -688,6 +688,10 @@ doneCheckOrder:
         _mayRecordPlan = true;
     }
 
+    bool QueryPlanSet::hasPossiblyExcludedPlans() const {
+        return _usingCachedPlan;
+    }
+    
     QueryPlanSet::QueryPlanPtr QueryPlanSet::getBestGuess() const {
         verify( _plans.size() );
         if ( _plans[ 0 ]->scanAndOrderRequired() ) {
@@ -746,7 +750,7 @@ doneCheckOrder:
     }
 
     bool QueryPlanSet::prepareToRetryQuery() {
-        if ( !_usingCachedPlan || _plans.size() > 1 ) {
+        if ( !hasPossiblyExcludedPlans() || _plans.size() > 1 ) {
             return false;
         }
         
@@ -894,7 +898,9 @@ doneCheckOrder:
         if ( op.error() ) {
             return holder._op;
         }
-        if ( _plans._usingCachedPlan && op.nscanned() > _plans._oldNScanned * 10 && _plans._special.empty() ) {
+        if ( _plans.hasPossiblyExcludedPlans() &&
+            op.nscanned() > _plans._oldNScanned * 10 &&
+            _plans._special.empty() ) {
             holder._offset = -op.nscanned();
             _plans.addFallbackPlans();
             PlanSet::iterator i = _plans._plans.begin();
@@ -1123,7 +1129,7 @@ doneCheckOrder:
     const QueryPlan *MultiPlanScanner::singlePlan() const {
         if ( _or ||
             _currentQps->nPlans() != 1 ||
-            _currentQps->usingCachedPlan() ) {
+            _currentQps->hasPossiblyExcludedPlans() ) {
             return 0;
         }
         return _currentQps->firstPlan().get();

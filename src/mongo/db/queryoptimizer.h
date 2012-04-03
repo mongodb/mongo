@@ -318,8 +318,10 @@ namespace mongo {
 
         QueryPlanPtr firstPlan() const { return _plans[ 0 ]; }
         
-        /** @return true iff a plan is selected based on previous success of this plan. */
+        /** @return true if a plan is selected based on previous success of this plan. */
         bool usingCachedPlan() const { return _usingCachedPlan; }
+        /** @return true if some candidate plans may have been excluded due to plan caching. */
+        bool hasPossiblyExcludedPlans() const;
         /** @return a single plan that may work well for the specified query. */
         QueryPlanPtr getBestGuess() const;
 
@@ -491,8 +493,13 @@ namespace mongo {
          * empty object.
          */
         BSONObj cachedPlanExplainSummary() const;
-        /** @return true iff this is not a $or query and a plan is selected based on previous success of this plan. */
-        bool usingCachedPlan() const { return !_or && _currentQps->usingCachedPlan(); }
+        /**
+         * @return true if this is not a $or query and some candidate plans may have been excluded
+         * due to plan caching.
+         */
+        bool hasPossiblyExcludedPlans() const {
+            return !_or && _currentQps->hasPossiblyExcludedPlans();
+        }
         bool hasMultiKey() const { return _currentQps->hasMultiKey(); }
         
         /** Clear recorded indexes for the current QueryPlanSet's patterns. */

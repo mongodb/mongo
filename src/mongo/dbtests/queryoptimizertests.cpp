@@ -1045,6 +1045,7 @@ namespace QueryOptimizerTests {
                     ASSERT( qps->possibleInOrderPlan() );
                     ASSERT( qps->haveInOrderPlan() );
                     ASSERT( !qps->possibleOutOfOrderPlan() );
+                    ASSERT( !qps->hasPossiblyExcludedPlans() );
                 }
                 
                 {
@@ -1053,6 +1054,7 @@ namespace QueryOptimizerTests {
                     ASSERT( qps->possibleInOrderPlan() );
                     ASSERT( qps->haveInOrderPlan() );
                     ASSERT( qps->possibleOutOfOrderPlan() );
+                    ASSERT( !qps->hasPossiblyExcludedPlans() );
                 }
                 
                 NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
@@ -1067,6 +1069,7 @@ namespace QueryOptimizerTests {
                     ASSERT( qps->possibleInOrderPlan() );
                     ASSERT( !qps->haveInOrderPlan() );
                     ASSERT( qps->possibleOutOfOrderPlan() );
+                    ASSERT( qps->hasPossiblyExcludedPlans() );
                 }
 
                 nsdt.registerCachedQueryPlanForPattern
@@ -1079,6 +1082,7 @@ namespace QueryOptimizerTests {
                     ASSERT( qps->possibleInOrderPlan() );
                     ASSERT( qps->haveInOrderPlan() );
                     ASSERT( qps->possibleOutOfOrderPlan() );
+                    ASSERT( qps->hasPossiblyExcludedPlans() );
                 }
                 
                 {
@@ -1087,10 +1091,11 @@ namespace QueryOptimizerTests {
                     ASSERT( !qps->possibleInOrderPlan() );
                     ASSERT( !qps->haveInOrderPlan() );
                     ASSERT( qps->possibleOutOfOrderPlan() );
+                    ASSERT( !qps->hasPossiblyExcludedPlans() );
                 }                
             }
         };
-
+        
     } // namespace QueryPlanSetTests
 
     class Base {
@@ -1145,6 +1150,7 @@ namespace QueryOptimizerTests {
                     ASSERT( mps->possibleInOrderPlan() );
                     ASSERT( mps->haveInOrderPlan() );
                     ASSERT( !mps->possibleOutOfOrderPlan() );
+                    ASSERT( !mps->hasPossiblyExcludedPlans() );
                 }
                 
                 {
@@ -1154,6 +1160,7 @@ namespace QueryOptimizerTests {
                     ASSERT( mps->possibleInOrderPlan() );
                     ASSERT( mps->haveInOrderPlan() );
                     ASSERT( mps->possibleOutOfOrderPlan() );
+                    ASSERT( !mps->hasPossiblyExcludedPlans() );
                 }
                 
                 NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
@@ -1169,6 +1176,7 @@ namespace QueryOptimizerTests {
                     ASSERT( mps->possibleInOrderPlan() );
                     ASSERT( !mps->haveInOrderPlan() );
                     ASSERT( mps->possibleOutOfOrderPlan() );
+                    ASSERT( mps->hasPossiblyExcludedPlans() );
                 }
                 
                 nsdt.registerCachedQueryPlanForPattern
@@ -1182,6 +1190,7 @@ namespace QueryOptimizerTests {
                     ASSERT( mps->possibleInOrderPlan() );
                     ASSERT( mps->haveInOrderPlan() );
                     ASSERT( mps->possibleOutOfOrderPlan() );
+                    ASSERT( mps->hasPossiblyExcludedPlans() );
                 }
                 
                 {
@@ -1191,6 +1200,7 @@ namespace QueryOptimizerTests {
                     ASSERT( !mps->possibleInOrderPlan() );
                     ASSERT( !mps->haveInOrderPlan() );
                     ASSERT( mps->possibleOutOfOrderPlan() );
+                    ASSERT( !mps->hasPossiblyExcludedPlans() );
                 }
                 
                 {
@@ -1200,6 +1210,7 @@ namespace QueryOptimizerTests {
                     ASSERT( !mps->possibleInOrderPlan() );
                     ASSERT( !mps->haveInOrderPlan() );
                     ASSERT( mps->possibleOutOfOrderPlan() );
+                    ASSERT( !mps->hasPossiblyExcludedPlans() );
                 }
 
                 {
@@ -1209,6 +1220,7 @@ namespace QueryOptimizerTests {
                     ASSERT( mps->possibleInOrderPlan() );
                     ASSERT( mps->haveInOrderPlan() );
                     ASSERT( !mps->possibleOutOfOrderPlan() );
+                    ASSERT( !mps->hasPossiblyExcludedPlans() );
                 }
             }
         };

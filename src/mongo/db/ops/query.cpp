@@ -434,7 +434,7 @@ namespace mongo {
             _reorderBuild._handleMatchNoDedup();
         } catch ( const UserException &e ) {
             if ( e.getCode() == ScanAndOrderMemoryLimitExceededAssertionCode ) {
-                if ( _queryOptimizerCursor->runningInitialCachedPlan() ) {
+                if ( _queryOptimizerCursor->hasPossiblyExcludedPlans() ) {
                     _queryOptimizerCursor->clearIndexesForPatterns();
                     throw QueryRetryException();
                 }

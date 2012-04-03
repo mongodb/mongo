@@ -545,12 +545,12 @@ namespace mongo {
             return _mps->haveInOrderPlan();
         }
 
-        virtual bool runningInitialCachedPlan() const {
+        virtual bool hasPossiblyExcludedPlans() const {
             if ( _takeover ) {
                 return false;
             }
             assertOk();
-            return _mps->usingCachedPlan();
+            return _mps->hasPossiblyExcludedPlans();
         }
 
         virtual bool completePlanOfHybridSetScanAndOrderRequired() const {

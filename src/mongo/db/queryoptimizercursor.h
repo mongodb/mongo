@@ -121,10 +121,10 @@ namespace mongo {
         /** @return true when there may be multiple plans running and some are in order. */
         virtual bool runningInitialInOrderPlan() const = 0;
         /**
-         * @return true when a cached plan is running, but it has not been selected for the
-         * remainder of the query.
+         * @return true when some query plans may have been excluded due to plan caching, for a
+         * non-$or query.
          */
-        virtual bool runningInitialCachedPlan() const = 0;
+        virtual bool hasPossiblyExcludedPlans() const = 0;
 
         /**
          * @return true when both in order and out of order candidate plans were available, and
