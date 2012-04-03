@@ -239,7 +239,7 @@ namespace PerfTests {
                         for( vector<BSONObj>::iterator i = v.begin(); i != v.end(); i++ ) {
                             BSONObj o = *i;
                             double lastrps = o["rps"].Number();
-                            if( lastrps ) {
+                            if( 0 && lastrps ) {
                                 cout << "stats " << setw(42) << right << "new/old:" << ' ' << setw(9);
                                 cout << fixed << setprecision(2) << rps / lastrps;
                                 if( needver ) {
