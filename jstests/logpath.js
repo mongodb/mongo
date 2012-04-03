@@ -3,17 +3,21 @@
 var name = "logpath";
 var token = "logpath_token";
 
-var logdir = "/tmp/" + name + "/";
-var testdir = logdir + "testdir"
-var dbdir = "/data/db/" + name;
-var sfile = "/dev/null";
+var dbdir = "/data/db/" + name + "/"; // this will work under windows as well as linux
+var basedir = "/data/db/" + name + "files" + "/";
+var logdir = basedir + "logdir/";
+var testdir = basedir + "testdir/"
+var sfile = _isWindows() ? "NUL:" : "/dev/null";
 
 var logs = [token + "1", token + "2"];
 var port = allocatePorts(6);
 
+print("------ Creating directories");
+
 // ensure log directory exists
-mkdir(logdir);
-mkdir(testdir);
+assert(mkdir(basedir));
+assert(mkdir(logdir));
+assert(mkdir(testdir));
 
 var cleanupFiles = function() { 
     var files = listFiles(logdir);
@@ -99,6 +103,6 @@ if ( false ) {
     print("------ Confirm that launch fails with directory");
     assert.throws(function() { MongoRunner.runMongod({ port: port[4], dbpath: dbdir, logpath: testdir }); });
 
-    print("------ Confirm that launch fails with special file (/dev/null)");
+    print("------ Confirm that launch fails with special file");
     assert.throws(function() { MongoRunner.runMongod({ port: port[5], dbpath: dbdir, logpath: sfile }); });
 }
