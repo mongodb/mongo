@@ -17,7 +17,7 @@
 
 #include <iostream>
 
-#include "client/dbclient.h"
+#include "mongo/client/dbclient.h"
 #include "util/net/httpclient.h"
 
 using namespace mongo;

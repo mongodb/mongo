@@ -17,8 +17,7 @@
 
 #include <iostream>
 
-#include "client/dbclient.h"
-#include "client/connpool.h"
+#include "mongo/client/dbclient.h"
 
 using namespace std;
 using namespace mongo;
@@ -27,8 +26,10 @@ int main( int argc, const char **argv ) {
 
     const char *port = "27017";
     if ( argc != 1 ) {
-        if ( argc != 3 )
-            throw -12;
+        if ( argc != 3 ) {
+            cout << "need to pass port as second param" << endl;
+            return EXIT_FAILURE;
+        }
         port = argv[ 2 ];
     }
 
@@ -41,7 +42,7 @@ int main( int argc, const char **argv ) {
     conn->insert( ns , BSON( "name" << "eliot" << "num" << 17 ) );
     conn->insert( ns , BSON( "name" << "sara" << "num" << 24 ) );
 
-    auto_ptr<DBClientCursor> cursor = conn->query( ns , BSONObj() );
+    std::auto_ptr<DBClientCursor> cursor = conn->query( ns , BSONObj() );
     cout << "using cursor" << endl;
     while ( cursor->more() ) {
         BSONObj obj = cursor->next();
