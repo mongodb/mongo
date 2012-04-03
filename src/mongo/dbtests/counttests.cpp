@@ -36,10 +36,10 @@ namespace CountTests {
         ~Base() {
             try {
                 boost::shared_ptr<Cursor> c = theDataFileMgr.findAll( ns() );
-                vector< DiskLoc > toDelete;
+                vector<DiskLoc> toDelete;
                 for(; c->ok(); c->advance() )
                     toDelete.push_back( c->currLoc() );
-                for( vector< DiskLoc >::iterator i = toDelete.begin(); i != toDelete.end(); ++i )
+                for( vector<DiskLoc>::iterator i = toDelete.begin(); i != toDelete.end(); ++i )
                     theDataFileMgr.deleteRecord( ns(), i->rec(), *i, false );
                 DBDirectClient cl;
                 cl.dropIndexes( ns() );
@@ -132,11 +132,11 @@ namespace CountTests {
         }
         
         void setupTests() {
-            add< CountBasic >();
-            add< CountQuery >();
-            add< CountFields >();
-            add< CountQueryFields >();
-            add< CountIndexedRegex >();
+            add<CountBasic>();
+            add<CountQuery>();
+            add<CountFields>();
+            add<CountQueryFields>();
+            add<CountIndexedRegex>();
         }
     } myall;
     
