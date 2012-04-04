@@ -1,4 +1,5 @@
 PACKAGE=wiredtiger
+AC_PREREQ(2.68)
 AC_INIT(WiredTiger, m4_normalize(m4_include([build_posix/aclocal/version.m4])),
 	[support@wiredtiger.com])
 
@@ -8,7 +9,7 @@ AC_CONFIG_AUX_DIR([build_posix/gnu-support])
 AC_CONFIG_MACRO_DIR([build_posix/aclocal])
 AC_CONFIG_SRCDIR([dist/RELEASE])
 
-AM_INIT_AUTOMAKE([foreign])
+AM_INIT_AUTOMAKE([1.10 foreign])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([no])])
 AM_OPTIONS
 
@@ -20,6 +21,7 @@ fi
 
 define([AC_LIBTOOL_LANG_CXX_CONFIG], [:])dnl
 define([AC_LIBTOOL_LANG_F77_CONFIG], [:])dnl
+LT_PREREQ(2.4)
 LT_INIT([pic-only])
 AC_SUBST([LIBTOOL_DEPS])
 
