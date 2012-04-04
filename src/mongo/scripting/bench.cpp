@@ -280,13 +280,14 @@ namespace mongo {
                     if ( op == "findOne" ) {
 
                         BSONObj result;
+                        unsigned long long startTime = timer.micros();
+                        result = conn->findOne( ns , fixQuery( e["query"].Obj() ) );
                         {
                             scoped_lock lock( stats->_mutex);
-                            unsigned long long startTime = timer.micros();
-                            result = conn->findOne( ns , fixQuery( e["query"].Obj() ) );
                             stats->findOneTotalTimeMicros  += timer.micros() - startTime;
                             stats->findOneTotalOps++;
                         }
+
 
                         if( check ){
                             int err = scope->invoke( scopeFunc , 0 , &result,  1000 * 60 , false );
@@ -334,10 +335,10 @@ namespace mongo {
                         int expected = e["expected"].eoo() ? -1 : e["expected"].Int();
 
                         auto_ptr<DBClientCursor> cursor;
+                        unsigned long long startTime = timer.micros();
+                        cursor = conn->query( ns, fixQuery( e["query"].Obj() ), limit, skip, &filter, options, batchSize );
                         {
                             scoped_lock lock( stats->_mutex);
-                            unsigned long long startTime = timer.micros();
-                            cursor = conn->query( ns, fixQuery( e["query"].Obj() ), limit, skip, &filter, options, batchSize );
                             stats->queryTotalTimeMicros += timer.micros() - startTime;
                             stats->queryTotalOps++;
                         }
@@ -371,11 +372,11 @@ namespace mongo {
                         bool upsert = e["upsert"].trueValue();
                         BSONObj query = e["query"].eoo() ? BSONObj() : e["query"].Obj();
                         BSONObj update = e["update"].Obj();
+                        unsigned long long startTime = timer.micros();
+                        conn->update( ns, fixQuery( query ), update, upsert , multi );
 
                         {
                             scoped_lock lock( stats->_mutex);
-                            unsigned long long startTime = timer.micros();
-                            conn->update( ns, fixQuery( query ), update, upsert , multi );
                             stats->updateTotalTimeMicros  += timer.micros() - startTime;
                             stats->updateTotalOps++;
                         }
@@ -404,10 +405,10 @@ namespace mongo {
                         }
                     }
                     else if( op == "insert" ) {
+                        unsigned long long startTime = timer.micros();
+                        conn->insert( ns, fixQuery( e["doc"].Obj() ) );
                         {
                             scoped_lock lock( stats->_mutex);
-                            unsigned long long startTime = timer.micros();
-                            conn->insert( ns, fixQuery( e["doc"].Obj() ) );
                             stats->insertTotalTimeMicros  += timer.micros() - startTime;
                             stats->insertTotalOps++;
                         }
@@ -439,10 +440,10 @@ namespace mongo {
 
                         bool multi = e["multi"].eoo() ? true : e["multi"].trueValue();
                         BSONObj query = e["query"].eoo() ? BSONObj() : e["query"].Obj();
+                        unsigned long long startTime = timer.micros();
+                        conn->remove( ns, fixQuery( query ), ! multi );
                         {
                             scoped_lock lock( stats->_mutex);
-                            unsigned long long startTime = timer.micros();
-                            conn->remove( ns, fixQuery( query ), ! multi );
                             stats->deleteTotalTimeMicros  += timer.micros() - startTime;
                             stats->deleteTotalOps++;
                         }
@@ -752,7 +753,13 @@ namespace mongo {
      */
     BSONObj benchRunSync( const BSONObj& argsFake, void* data ) {
 
-        return benchFinish( benchStart( argsFake, data ), data );
+        BSONObj start = benchStart( argsFake, data );
+
+        OID oid = OID( start.firstElement().String() );
+        BenchRunner* runner = BenchRunner::get( oid );
+        sleepmillis( (int)(1000.0 * runner->config.seconds) );
+
+        return benchFinish( start, data );
     }
 
     /**
