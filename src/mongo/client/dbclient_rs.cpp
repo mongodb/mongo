@@ -518,10 +518,8 @@ namespace mongo {
                 _nodes[nodesOffset].lastIsMaster = o.copy();
             }
 
-            if ( verbose ) {
-                log() << "ReplicaSetMonitor::_checkConnection: " << conn->toString()
-                      << ' ' << o << endl;
-            }
+            log( ! verbose ) << "ReplicaSetMonitor::_checkConnection: " << conn->toString()
+                             << ' ' << o << endl;
             
             // add other nodes
             BSONArrayBuilder b;
@@ -543,10 +541,8 @@ namespace mongo {
 
         }
         catch ( std::exception& e ) {
-            if ( verbose ) {
-                log() << "ReplicaSetMonitor::_checkConnection: caught exception "
-                      << conn->toString() << ' ' << e.what() << endl;
-            }
+            log( ! verbose ) << "ReplicaSetMonitor::_checkConnection: caught exception "
+                             << conn->toString() << ' ' << e.what() << endl;
 
             errorOccured = true;
         }
