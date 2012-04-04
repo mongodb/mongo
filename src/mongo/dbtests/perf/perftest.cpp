@@ -18,16 +18,16 @@
  */
 
 #include "pch.h"
-
-#include "../../db/instance.h"
-#include "../../db/ops/query.h"
-#include "../../db/queryoptimizer.h"
-#include "../../util/file_allocator.h"
-#include "mongo/db/json.h"
-#include "mongo/client/dbclientcursor.h"
-
-#include "../framework.h"
 #include <boost/date_time/posix_time/posix_time.hpp>
+
+#include "mongo/client/dbclientcursor.h"
+#include "mongo/db/instance.h"
+#include "mongo/db/json.h"
+#include "mongo/db/ops/query.h"
+#include "mongo/db/queryoptimizer.h"
+#include "mongo/dbtests/framework.h"
+#include "mongo/util/file_allocator.h"
+#include "mongo/unittest/unittest.h"
 
 namespace mongo {
     extern string dbpath;
@@ -35,7 +35,7 @@ namespace mongo {
 
 
 using namespace mongo;
-using namespace mongo::regression;
+using namespace mongo::unittest;
 
 DBClientBase *client_;
 
@@ -759,6 +759,6 @@ int main( int argc, char **argv ) {
     logLevel = -1;
     client_ = new DBDirectClient();
 
-    return Suite::run(argc, argv, "/data/db/perftest");
+    return mongo::dbtests::runDbTests(argc, argv, "/data/db/perftest");
 }
 
