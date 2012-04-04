@@ -21,26 +21,7 @@
 #include "counters.h"
 
 namespace mongo {
-
-    OpCounters::OpCounters() {
-        int zero = 0;
-
-        BSONObjBuilder b;
-        b.append( "insert" , zero );
-        b.append( "query" , zero );
-        b.append( "update" , zero );
-        b.append( "delete" , zero );
-        b.append( "getmore" , zero );
-        b.append( "command" , zero );
-        _obj = b.obj();
-
-        _insert = (AtomicUInt*)_obj["insert"].value();
-        _query = (AtomicUInt*)_obj["query"].value();
-        _update = (AtomicUInt*)_obj["update"].value();
-        _delete = (AtomicUInt*)_obj["delete"].value();
-        _getmore = (AtomicUInt*)_obj["getmore"].value();
-        _command = (AtomicUInt*)_obj["command"].value();
-    }
+    OpCounters::OpCounters() {}
 
     void OpCounters::gotOp( int op , bool isCommand ) {
         switch ( op ) {
@@ -63,28 +44,37 @@ namespace mongo {
         }
     }
 
-    BSONObj& OpCounters::getObj() {
+    BSONObj OpCounters::getObj() {
         const unsigned MAX = 1 << 30;
         RARELY {
             bool wrap =
-            _insert->get() > MAX ||
-            _query->get() > MAX ||
-            _update->get() > MAX ||
-            _delete->get() > MAX ||
-            _getmore->get() > MAX ||
-            _command->get() > MAX;
+            _insert.get() > MAX ||
+            _query.get() > MAX ||
+            _update.get() > MAX ||
+            _delete.get() > MAX ||
+            _getmore.get() > MAX ||
+            _command.get() > MAX;
 
             if ( wrap ) {
-                _insert->zero();
-                _query->zero();
-                _update->zero();
-                _delete->zero();
-                _getmore->zero();
-                _command->zero();
+                _insert.zero();
+                _query.zero();
+                _update.zero();
+                _delete.zero();
+                _getmore.zero();
+                _command.zero();
             }
 
         }
-        return _obj;
+        BSONObjBuilder b;
+        {
+            b.append( "insert" , _insert.get() );
+            b.append( "query" , _query.get() );
+            b.append( "update" , _update.get() );
+            b.append( "delete" , _delete.get() );
+            b.append( "getmore" , _getmore.get() );
+            b.append( "command" , _command.get() );
+        }
+        return b.obj();
     }
 
     IndexCounters::IndexCounters() {
