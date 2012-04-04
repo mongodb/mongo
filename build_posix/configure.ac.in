@@ -1,5 +1,5 @@
 PACKAGE=wiredtiger
-AC_PREREQ(2.68)
+AC_PREREQ(2.63)
 AC_INIT(WiredTiger, m4_normalize(m4_include([build_posix/aclocal/version.m4])),
 	[support@wiredtiger.com])
 
@@ -21,7 +21,7 @@ fi
 
 define([AC_LIBTOOL_LANG_CXX_CONFIG], [:])dnl
 define([AC_LIBTOOL_LANG_F77_CONFIG], [:])dnl
-LT_PREREQ(2.4)
+LT_PREREQ(2.2.6)
 LT_INIT([pic-only])
 AC_SUBST([LIBTOOL_DEPS])
 
