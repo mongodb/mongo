@@ -1,40 +1,48 @@
-// Drop a collection while a count operation is yielding, in both fast and normal count modes.
+// Test count yielding, in both fast and normal count modes.
 
 t = db.jstests_count8;
 t.drop();
 
-function assertCollectionMissing( query ) {
-    assert.commandFailed( t.stats() );
-    assert.eq( 0, t.count( query ) );    
-}
+function checkYield( dropCollection, fastCount, query ) {
 
-function checkDrop( fastCount, query ) {
-
-    obj = fastCount ? { a:true } : { a:1 };
+    obj = fastCount ? {a:true} : {a:1};
     query = query || obj;
     
-    nDocs = 40000;
+    passed = false;
+    for( nDocs = 20000; nDocs < 2000000; nDocs *= 2 ) {
 
-    t.drop();
-    t.ensureIndex( { a:1 } );
-    for( i = 0; i < nDocs; ++i ) {
-        t.insert( obj );
+        t.drop();
+        t.ensureIndex( {a:1} );
+        for( i = 0; i < nDocs; ++i ) {
+            t.insert( obj );
+        }
+        db.getLastError();
+
+        if ( dropCollection ) {
+            p = startParallelShell( 'sleep( 30 ); db.jstests_count8.drop(); db.getLastError();' );
+        } else {
+            p = startParallelShell( 'sleep( 30 ); db.jstests_count8.update( {$atomic:true}, {$set:{a:-1}}, false, true ); db.getLastError();' );
+        }
+
+        printjson( query );
+        count = t.count( query );
+        // We test that count yields by requesting a concurrent operation modifying the collection
+        // and checking that the count result is modified.
+        print( 'count: ' + count + ', nDocs: ' + nDocs );
+        if ( count < nDocs ) {
+            passed = true;
+            p();
+            break;
+        }
+    
+        p();
     }
-    db.getLastError();
 
-    // Trigger an imminent collection drop.  If the drop operation runs while the count operation
-    // yields, count returns a valid result.  Additionally mongod continues running and indicates
-    // the collection is no longer present.  The same will be true if, in an alternative timing
-    // scenario, the drop operation runs before count starts or after count finishes. 
-    p = startParallelShell( 'sleep( 15 ); db.jstests_count8.drop(); db.getLastError();' );
-
-    // The count command runs successfully so count() does not assert.
-    t.count( query );
-    p();
-
-    assertCollectionMissing( query );
+    assert( passed );
 }
 
-checkDrop( true );
-checkDrop( false );
-checkDrop( false, {$or:[{a:1},{a:2}]} );
+checkYield( true, false );
+checkYield( false, false );
+checkYield( true, true );
+checkYield( false, true );
+checkYield( true, false, {$or:[{a:1},{a:2}]} );
