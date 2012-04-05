@@ -72,7 +72,8 @@ commonFiles = [ "pch.cpp",
                 "s/shardconnection.cpp"]
 
 env.StaticLibrary('mongocommon', commonFiles,
-                  LIBDEPS=['$BUILD_DIR/third_party/pcrecpp',
+                  LIBDEPS=['stacktrace',
+                           '$BUILD_DIR/third_party/pcrecpp',
                            '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
                            '$BUILD_DIR/third_party/mongo_boost'],)
 
@@ -261,6 +262,8 @@ serverOnlyFiles = [ "db/curop.cpp",
                     "db/driverHelpers.cpp" ]
 
 env.Library( "dbcmdline", "db/cmdline.cpp" )
+
+env.Library('stacktrace', 'util/stacktrace.cpp')
 
 serverOnlyFiles += mmapFiles
 

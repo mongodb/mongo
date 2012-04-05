@@ -779,8 +779,11 @@ def doConfigure(myenv):
                                    l + boostCompiler + boostVersion ], language='C++' ):
                 Exit(1)
 
-    if not conf.CheckCXXHeader( "execinfo.h" ):
-        myenv.Append( CPPDEFINES=[ "NOEXECINFO" ] )
+    if (conf.CheckCXXHeader( "execinfo.h" ) and
+        conf.CheckDeclaration('backtrace', includes='#include <execinfo.h>') and
+        conf.CheckDeclaration('backtrace_symbols', includes='#include <execinfo.h>')):
+
+        myenv.Append( CPPDEFINES=[ "MONGO_HAVE_EXECINFO_BACKTRACE" ] )
 
     myenv["_HAVEPCAP"] = conf.CheckLib( ["pcap", "wpcap"], autoadd=False )
 

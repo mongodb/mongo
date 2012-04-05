@@ -26,7 +26,7 @@
 #include <unistd.h>
 #endif
 
-#if !defined(_WIN32) && !defined(NOEXECINFO)
+#ifdef MONGO_HAVE_EXECINFO_BACKTRACE
 #include <execinfo.h>
 #endif
 
@@ -84,7 +84,7 @@ namespace mongo {
 
     static void formattedBacktrace( int fd ) {
 
-#if !defined(_WIN32) && !defined(NOEXECINFO)
+#ifdef MONGO_HAVE_EXECINFO_BACKTRACE
 
         int numFrames;
         const int MAX_DEPTH = 20;
