@@ -44,7 +44,7 @@ namespace mongo {
             int n;
         };
         boost::mutex m;
-        Z r,w,R,W,U,X;
+        Z r,w,R,W,U,X;       // X is used by QLock::runExclusively 
         int greed;           // >0 if someone wants to acquire a write lock
         int greedyWrites;    // 0=no, 1=true
         int greedSuspended;
