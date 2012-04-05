@@ -42,13 +42,13 @@ namespace mongo {
 
             static BSONObj userPattern = BSON("user" << 1);
 
-            ShardConnection conn( s, systemUsers );
+            ScopedDbConnection conn( s, 30.0 );
             OCCASIONALLY conn->ensureIndex(systemUsers, userPattern, false, "user_1");
             {
                 BSONObjBuilder b;
                 b << "user" << user;
                 BSONObj query = b.done();
-                userObj = conn->findOne(systemUsers, query);
+                userObj = conn->findOne(systemUsers, query, 0, QueryOption_SlaveOk);
                 if( userObj.isEmpty() ) {
                     log() << "auth: couldn't find user " << user << ", " << systemUsers << endl;
                     conn.done(); // return to pool
