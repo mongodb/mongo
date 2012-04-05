@@ -187,7 +187,7 @@ namespace mongo {
 
         string name() const { return "rsHealthPoll"; }
 
-        void setUp() { Client::initThread( name() ); }
+        void setUp() { Client::initThread( name().c_str() ); }
 
         void doWork() {
             if ( !theReplSet ) {

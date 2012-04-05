@@ -387,7 +387,7 @@ namespace mongo {
     public:
         string name() const { return "DataFileSync"; }
         void run() {
-            Client::initThread( name() );
+            Client::initThread( name().c_str() );
             if( cmdLine.syncdelay == 0 )
                 log() << "warning: --syncdelay 0 is not recommended and can have strange performance" << endl;
             else if( cmdLine.syncdelay == 1 )
