@@ -963,8 +963,7 @@ env.AlwaysBuild( "push" )
 
 # ---- deploying ---
 
-def s3push( localName , remoteName=None , remotePrefix=None , fixName=True , platformDir=True,
-            isDriverBuild=False ):
+def s3push( localName , remoteName=None , remotePrefix=None , fixName=True , platformDir=True ):
     localName = str( localName )
 
     if remotePrefix is None:
@@ -993,9 +992,7 @@ def s3push( localName , remoteName=None , remotePrefix=None , fixName=True , pla
     else:
         name = remoteName
 
-    if isDriverBuild:
-        name = "cxx-driver/" + name
-    elif platformDir:
+    if platformDir:
         name = platform + "/" + name
 
     print( "uploading " + localName + " to http://s3.amazonaws.com/" + s.name + "/" + name )
@@ -1016,7 +1013,7 @@ def s3dist( env , target , source ):
     s3push( str(source[0]) , "mongodb" )
 
 def s3distclient(env, target, source):
-    s3push(str(source[0]), "cxx-driver/mongodb")
+    s3push(str(source[0]), "cxx-driver/mongodb", platformDir=False)
 
 env.Alias( "dist" , '$SERVER_ARCHIVE' )
 env.Alias( "distclient", "$CLIENT_ARCHIVE")
