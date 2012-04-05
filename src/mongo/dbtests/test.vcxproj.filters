@@ -1055,6 +1055,12 @@
     <ClCompile Include="..\db\namespace_details.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\debug_util.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\unittest\unittest.cpp">
+      <Filter>db\cpp</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">

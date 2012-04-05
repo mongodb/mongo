@@ -1356,6 +1356,16 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="..\unittest\unittest.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\util\alignedbuilder.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">NotUsing</PrecompiledHeader>
@@ -1388,6 +1398,7 @@
     <ClCompile Include="..\util\concurrency\task.cpp" />
     <ClCompile Include="..\util\concurrency\thread_pool.cpp" />
     <ClCompile Include="..\util\concurrency\vars.cpp" />
+    <ClCompile Include="..\util\debug_util.cpp" />
     <ClCompile Include="..\util\file_allocator.cpp" />
     <ClCompile Include="..\util\log.cpp" />
     <ClCompile Include="..\util\logfile.cpp" />
