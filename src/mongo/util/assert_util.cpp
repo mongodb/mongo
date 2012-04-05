@@ -24,7 +24,8 @@ using namespace std;
 #include <sys/file.h>
 #endif
 
-#include "../bson/bsonobjbuilder.h"
+#include "mongo/bson/bsonobjbuilder.h"
+#include "mongo/util/util.h"
 
 namespace mongo {
 

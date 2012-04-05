@@ -445,5 +445,6 @@ namespace mongo {
     extern Tee* const warnings; // Things put here go in serverStatus
 
     string errnoWithDescription(int errorcode = -1);
+    void rawOut( const string &s );
 
 } // namespace mongo

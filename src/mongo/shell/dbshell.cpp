@@ -19,18 +19,19 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "../third_party/linenoise/linenoise.h"
-#include "../scripting/engine.h"
-#include "../util/startup_test.h"
-#include "../db/cmdline.h"
-#include "utils.h"
-#include "../util/password.h"
-#include "../util/version.h"
-#include "../util/file.h"
-#include "../db/repl/rs_member.h"
-#include "mongo/client/dbclientinterface.h"
-
 #include <boost/filesystem/operations.hpp>
+
+#include "mongo/client/dbclientinterface.h"
+#include "mongo/db/cmdline.h"
+#include "mongo/db/repl/rs_member.h"
+#include "mongo/scripting/engine.h"
+#include "mongo/shell/utils.h"
+#include "mongo/util/file.h"
+#include "mongo/util/password.h"
+#include "mongo/util/startup_test.h"
+#include "mongo/util/util.h"
+#include "mongo/util/version.h"
+#include "third_party/linenoise/linenoise.h"
 
 using namespace std;
 using namespace mongo;

@@ -25,7 +25,6 @@
 
 int main( int argc, char** argv ) {
     static StaticObserver StaticObserver;
-    doPreServerStartupInits();
     StartupTest::runTests();
     return mongo::dbtests::runDbTests( argc, argv, "/tmp/unittest" );
 }

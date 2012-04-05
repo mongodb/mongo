@@ -93,16 +93,6 @@ namespace mongo {
     using namespace std;
     using boost::shared_ptr;
 
-#if defined(_DEBUG)
-    const bool debug=true;
-#else
-    const bool debug=false;
-#endif
-
-    // pdfile versions
-    const int PDFILE_VERSION = 4;
-    const int PDFILE_VERSION_MINOR = 5;
-
     void dbexit( ExitCode returnCode, const char *whyMsg = "", bool tryToGetLock = false);
 
     /**
@@ -113,31 +103,13 @@ namespace mongo {
     void exit( ExitCode returnCode );
     bool inShutdown();
 
-    void asserted(const char *msg, const char *file, unsigned line);
 }
 
 
-#include "util/assert_util.h"
-#include "util/debug_util.h"
-#include "util/goodies.h"
-#include "util/allocator.h"
-#include "util/log.h"
-
-namespace mongo {
-
-    void sayDbContext(const char *msg = 0);
-    void rawOut( const string &s );
-
-    typedef char _TCHAR;
-
-    using boost::uint32_t;
-    using boost::uint64_t;
-
-    /** called by mongos, mongod, test. do not call from clients and such. 
-        invoked before about everything except global var construction.
-     */
-    void doPreServerStartupInits();
-
-} // namespace mongo
+#include "mongo/util/assert_util.h"
+#include "mongo/util/debug_util.h"
+#include "mongo/util/goodies.h"
+#include "mongo/util/allocator.h"
+#include "mongo/util/log.h"
 
 #endif // MONGO_PCH_H

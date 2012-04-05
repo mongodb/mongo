@@ -33,10 +33,14 @@
 #include "mongo/db/namespace-inl.h"
 #include "mongo/db/namespace_details-inl.h"
 #include "mongo/db/namespacestring.h"
-#include "pch.h"
 #include "mongo/util/mmap.h"
+#include "mongo/util/util.h"
 
 namespace mongo {
+
+    // pdfile versions
+    const int PDFILE_VERSION = 4;
+    const int PDFILE_VERSION_MINOR = 5;
 
     class DataFileHeader;
     class Extent;

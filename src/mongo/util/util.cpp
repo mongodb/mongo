@@ -193,24 +193,6 @@ namespace mongo {
         printStackTrace();
     }
 
-    /* note: can't use malloc herein - may be in signal handler.
-             logLockless() likely does not comply and should still be fixed todo
-             likewise class string?
-    */
-    void rawOut( const string &s ) {
-        if( s.empty() ) return;
-
-        char buf[64];
-        time_t_to_String( time(0) , buf );
-        /* truncate / don't show the year: */
-        buf[19] = ' ';
-        buf[20] = 0;
-
-        Logstream::logLockless(buf);
-        Logstream::logLockless(s);
-        Logstream::logLockless("\n");
-    }
-
     ostream& operator<<( ostream &s, const ThreadSafeString &o ) {
         s << o.toString();
         return s;

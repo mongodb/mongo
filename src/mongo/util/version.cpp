@@ -30,6 +30,7 @@
 #include "ramlog.h"
 #include "../db/cmdline.h"
 #include "processinfo.h"
+#include "mongo/db/pdfile.h"
 
 #include <boost/filesystem/operations.hpp>
 

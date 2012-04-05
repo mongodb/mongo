@@ -40,6 +40,7 @@
 #include "cursors.h"
 #include "shard_version.h"
 #include "../util/processinfo.h"
+#include "mongo/util/util.h"
 
 #if defined(_WIN32)
 # include "../util/ntservice.h"
@@ -437,7 +438,6 @@ namespace mongo {
 
 int main(int argc, char* argv[]) {
     try {
-        doPreServerStartupInits();
         return _main(argc, argv);
     }
     catch(SocketException& e) { 

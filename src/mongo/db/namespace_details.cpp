@@ -1,5 +1,3 @@
-// namespace.cpp
-
 /**
 *    Copyright (C) 2008 10gen Inc.
 *
@@ -17,18 +15,25 @@
 */
 
 #include "pch.h"
-#include "pdfile.h"
-#include "db.h"
-#include "mongommf.h"
-#include "../util/hashtab.h"
-#include "../scripting/engine.h"
-#include "btree.h"
+
+#include "mongo/db/namespace_details.h"
+
 #include <algorithm>
 #include <list>
-#include "json.h"
-#include "ops/delete.h"
 
 #include <boost/filesystem/operations.hpp>
+
+#include "mongo/db/btree.h"
+#include "mongo/db/db.h"
+#include "mongo/db/json.h"
+#include "mongo/db/mongommf.h"
+#include "mongo/db/ops/delete.h"
+#include "mongo/db/pdfile.h"
+#include "mongo/scripting/engine.h"
+#include "mongo/util/hashtab.h"
+#include "mongo/util/util.h"
+
+
 
 namespace mongo {
 

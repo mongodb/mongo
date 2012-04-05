@@ -38,8 +38,10 @@ namespace mongo {
 
 #if defined(_DEBUG)
     enum {DEBUG_BUILD = 1};
+    const bool debug=true;
 #else
     enum {DEBUG_BUILD = 0};
+    const bool debug=false;
 #endif
 
 #define MONGO_DEV if( DEBUG_BUILD )
