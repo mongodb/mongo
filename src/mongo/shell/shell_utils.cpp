@@ -43,7 +43,7 @@
 # include <sys/wait.h>
 #endif
 
-#include "utils.h"
+#include "shell_utils.h"
 #include "../util/md5.hpp"
 #include "../util/processinfo.h"
 #include "../util/text.h"

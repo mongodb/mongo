@@ -1,4 +1,4 @@
-// utils.h
+// mongo/shell/shell_utils.h
 /*
  *    Copyright 2010 10gen Inc.
  *
