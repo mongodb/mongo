@@ -184,12 +184,17 @@ namespace mongo {
             }
         }
         else if( refManager ){
-
             Shard shard = Shard::make( conn->getServerAddress() );
-            throw SendStaleConfigException( ns, str::stream() << "not sharded (" << ( (manager.get() == 0) ? ( str::stream() << manager->getSequenceNumber() << ") " ) : (string)"<none>) " ) <<
-                                                                     "but has reference manager (" << refManager->getSequenceNumber() << ") "
-                                                                  << "on conn " << conn->getServerAddress() << " (" << conn_in->getServerAddress() << ")",
-                                            refManager->getVersion( shard ), ShardChunkVersion( 0 ) );
+            string msg( str::stream() << "not sharded ("
+                        << ( (manager.get() == 0) ? string( "<none>" ) :
+                                str::stream() << manager->getSequenceNumber() )
+                        << ") but has reference manager ("
+                        << refManager->getSequenceNumber() << ") "
+                        << "on conn " << conn->getServerAddress() << " ("
+                        << conn_in->getServerAddress() << ")" );
+
+            throw SendStaleConfigException( ns, msg,
+                    refManager->getVersion( shard ), ShardChunkVersion( 0 ));
         }
 
         // has the ChunkManager been reloaded since the last time we updated the connection-level version?
