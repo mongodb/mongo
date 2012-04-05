@@ -322,7 +322,7 @@ doneCheckOrder:
             !_parsedQuery->wantMore() &&
             !isMultiKey() &&
             queryFiniteSetOrderSuffix() ) {
-            verify( 16111, _direction == 0 );
+            verify( _direction == 0 );
             // Limit the results for each compound interval. SERVER-5063
             return _parsedQuery->getSkip() + _parsedQuery->getNumToReturn();
         }
