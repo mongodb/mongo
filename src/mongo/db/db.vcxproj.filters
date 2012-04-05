@@ -466,6 +466,7 @@
     </ClCompile>
     <ClCompile Include="..\util\progress_meter.cpp" />
     <ClCompile Include="namespace_details.cpp" />
+    <ClCompile Include="..\util\debug_util.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\client\distlock.h" />
