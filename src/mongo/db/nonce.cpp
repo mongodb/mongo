@@ -73,7 +73,6 @@ namespace mongo {
 
     SimpleMutex nonceMutex("nonce");
     nonce64 Security::_getNonce() {
-        // not good this is a static as gcc will mutex protect it which costs time
         SimpleMutex::scoped_lock lk(nonceMutex);
         if( !_initialized )
             init();
