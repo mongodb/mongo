@@ -242,7 +242,6 @@ namespace mongo {
         verify( ts == 0 );
         getDur().commitIfNeeded();
         ts = 'w';
-        Acquiring a('w');
         q.lock_w();
     }
     static void unlock_w() { 
@@ -255,7 +254,6 @@ namespace mongo {
         char& ts = threadState();
         verify( ts == 0 );
         ts = 'r';
-        Acquiring a('r');
         q.lock_r();
     }
     static void unlock_r() { 
@@ -672,10 +670,12 @@ namespace mongo {
     }
 
     Lock::DBWrite::DBWrite( const StringData& ns ) : what(ns.data()) {
+        Acquiring a( 'w' );
         lockDB( what );
     }
 
     Lock::DBRead::DBRead( const StringData& ns )   : what(ns.data()) {
+        Acquiring a( 'r' );
         lockDB( what );
     }
 
