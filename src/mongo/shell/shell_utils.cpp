@@ -77,10 +77,6 @@ namespace mongo {
         }
         const BSONObj undefined_ = makeUndefined();
 
-        BSONObj encapsulate( const BSONObj &obj ) {
-            return BSON( "" << obj );
-        }
-
         // real methods
 
         void goingAwaySoon();
