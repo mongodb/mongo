@@ -1500,6 +1500,36 @@ namespace mongo {
         return advancePast( i );
     }
 
+    FieldRangeVectorIterator::CompoundRangeCounter::CompoundRangeCounter( int size,
+                                                                         int singleIntervalLimit ) :
+    _i( size, -1 ),
+    _singleIntervalCount(),
+    _singleIntervalLimit( singleIntervalLimit ) {
+    }
+    
+    FieldRangeVectorIterator::FieldIntervalMatcher::FieldIntervalMatcher
+    ( const FieldInterval &interval, const BSONElement &element, bool reverse ) :
+    _interval( interval ),
+    _element( element ),
+    _reverse( reverse ) {
+    }
+    
+    int FieldRangeVectorIterator::FieldIntervalMatcher::lowerCmp() const {
+        if ( !_lowerCmp._valid ) {
+            setCmp( _lowerCmp, _interval._lower._bound );
+        }
+        return _lowerCmp._cmp;
+    }
+    
+    int FieldRangeVectorIterator::FieldIntervalMatcher::upperCmp() const {
+        if ( !_upperCmp._valid ) {
+            setCmp( _upperCmp, _interval._upper._bound );
+            if ( _interval.equality() ) {
+                _lowerCmp = _upperCmp;
+            }
+        }
+        return _upperCmp._cmp;
+    }
 
     OrRangeGenerator::OrRangeGenerator( const char *ns, const BSONObj &query , bool optimize )
     : _baseSet( ns, query, optimize ), _orFound() {
