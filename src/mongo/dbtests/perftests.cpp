@@ -202,7 +202,7 @@ namespace PerfTests {
         virtual string name() = 0;
 
         // how long to run test.  0 is a sentinel which means just run the timed() method once and time it.
-        virtual int howLongMillis() { return profiling ? 60000 : 5000; }
+        virtual int howLongMillis() { return profiling ? 30000 : 5000; }
 
         /* override if your test output doesn't need that */
         virtual bool showDurStats() { return true; }
@@ -929,13 +929,15 @@ namespace PerfTests {
         void timed() {
             BSONObj o = BSON( "_id" << i++ << "x" << 99 );
             client().insert( ns(), o );
-            //client().insert( ns(), x );
         }
-        virtual bool testThreaded() { return true; }
+        virtual bool testThreaded() { 
+            if( profiling ) 
+                return false;
+            return true; 
+        }
         string timed2(DBClientBase& c) {
-            Query q = QUERY( "_id" << (unsigned) Security::getNonce() % i );
+            Query q = QUERY( "_id" << (unsigned) (rand() % i) );
             c.findOne(ns(), q);
-            //client().findOne(ns(), query);
             return "findOne_by_id";
         }
         void post() {
@@ -1061,8 +1063,7 @@ namespace PerfTests {
                 << "stats test                                       rps------  time-- "
                 << dur::stats.curr->_CSVHeader() << endl;
             if( profiling ) {
-                add< New8 >();
-                add< New128 >();
+                add< Insert1 >();
             }
             else {
                 add< Dummy >();
