@@ -18,7 +18,8 @@ namespace mongo {
         unsigned tid;
 #endif
     public:
-        SimpleRWLock(const char *p = 0);
+        const string name;
+        SimpleRWLock(const char *name = 0);
         void lock();
         void unlock();
         void lock_shared();

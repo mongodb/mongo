@@ -150,6 +150,7 @@ namespace mongo {
                 b.append( "threadId" , _client->_threadId );
             if ( _client->_connectionId )
                 b.appendNumber( "connectionId" , _client->_connectionId );
+            _client->_ls.reportState(b);
         }
         
         if ( ! _message.empty() ) {

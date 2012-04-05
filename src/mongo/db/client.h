@@ -56,6 +56,8 @@ namespace mongo {
     class Client : public ClientBasic {
         static Client *syncThread;
     public:
+        LockState _ls;
+
         // always be in clientsMutex when manipulating this. killop stuff uses these.
         static set<Client*>& clients;
         static mongo::mutex& clientsMutex;

@@ -23,7 +23,7 @@ using namespace std;
 namespace mongo {
 
 #if defined(_WIN32)
-    SimpleRWLock::SimpleRWLock(const char *p) { 
+    SimpleRWLock::SimpleRWLock(const char *p) : name(p?p:"") { 
         InitializeSRWLock(&_lock);
     }
 # if defined(_DEBUG)
@@ -74,7 +74,7 @@ namespace mongo {
     }
 # endif
 #else
-    SimpleRWLock::SimpleRWLock(const char *p) { }
+    SimpleRWLock::SimpleRWLock(const char *p) : name(p?p:"") { }
     void SimpleRWLock::lock() { m.lock(); }
     void SimpleRWLock::unlock() { m.unlock(); }
     void SimpleRWLock::lock_shared() { m.lock_shared(); }

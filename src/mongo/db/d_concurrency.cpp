@@ -87,8 +87,8 @@ namespace mongo {
     static void unlocking_w();
     static void unlocking_W();
     static QLock& q = *new QLock();
-    TSP_DECLARE(LockState,ls);
-    TSP_DEFINE(LockState,ls);
+    //TSP_DECLARE(LockState,ls);
+    //TSP_DEFINE(LockState,ls);
 
     void runExclusively(void (*f)(void)) { 
         q.runExclusively(f);
@@ -122,20 +122,44 @@ namespace mongo {
     }
 
     inline LockState& lockState() { 
-        LockState *p = ls.get();
-        if( unlikely( p == 0 ) ) { 
-            ls.reset(p = new LockState());
-        }
-        return *p;
+        return cc()._ls;
     }
-    LockState::LockState() : recursive(0), 
-                             threadState(0), 
-                             nestableCount(0), 
-                             otherCount(0), 
-                             otherLock(NULL),
-                             scopedLk(NULL)
-    {
-        whichNestable = Lock::notnestable;
+
+    static string kind(int n) { 
+        if( n > 0 )
+            return "W";
+        if( n < 0 ) 
+            return "R";
+        return "?";
+    }
+    /** Note: this is is called by the currentOp command, which is a different 
+              thread. So be careful about thread safety here. For example reading 
+              this->otherName would not be safe as-is!
+    */
+    void LockState::reportState(BSONObjBuilder& res) {
+        BSONObjBuilder b;
+        if( threadState ) {
+            char buf[2];
+            buf[0] = threadState; buf[1] = 0;
+            b.append("^", buf);
+        }
+        if( nestableCount ) {
+            string s = "?";
+            if( whichNestable == Lock::local ) 
+                s = "local";
+            else if( whichNestable == Lock::admin ) 
+                s = "admin";
+            b.append(s, kind(nestableCount));
+        }
+        if( otherCount ) { 
+            SimpleRWLock *k = otherLock;
+            if( k ) {
+                b.append(k->name, kind(otherCount));
+            }
+        }
+        BSONObj o = b.obj();
+        if( !o.isEmpty() ) 
+            res.append("locks", o);
     }
 
     void LockState::Dump() {
@@ -604,7 +628,7 @@ namespace mongo {
             mapsf<string,SimpleRWLock*>::ref r(dblocks);
             SimpleRWLock*& lock = r[db];
             if( lock == 0 )
-                lock = new SimpleRWLock();
+                lock = new SimpleRWLock(db.c_str());
             ls.otherLock = lock;
         }
         fassert(16134,weLocked==0);

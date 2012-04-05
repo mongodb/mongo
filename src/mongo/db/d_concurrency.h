@@ -199,6 +199,7 @@ namespace mongo {
         LockState();
         void dump();
         static void Dump();
+        void reportState(BSONObjBuilder& b);
 
         unsigned recursive;           // we allow recursively asking for a lock; we track that here
 
@@ -216,4 +217,13 @@ namespace mongo {
         Lock::ScopedLock *scopedLk;   // for the nonrecursive case. otherwise there would be many
     };
 
+    inline LockState::LockState() : recursive(0), 
+                             threadState(0), 
+                             nestableCount(0), 
+                             otherCount(0), 
+                             otherLock(NULL),
+                             scopedLk(NULL)
+    {
+        whichNestable = Lock::notnestable;
+    }
 }
