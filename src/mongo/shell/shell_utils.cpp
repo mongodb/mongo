@@ -175,10 +175,8 @@ namespace mongo {
                 return BSONObj();
 #else
             string dir = args.firstElement().String();
-            /*            if( chdir(dir.c_str) ) == 0 )
-                            return BSONObj();
-                            */
-            if( 1 ) return BSON(""<<"implementation not done for posix");
+            if( chdir( dir.c_str() ) == 0 )
+                return BSONObj();
 #endif
             return BSON( "" << "change directory failed" );
         }
