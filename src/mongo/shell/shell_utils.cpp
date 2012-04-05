@@ -1,4 +1,4 @@
-// utils.cpp
+// mongo/shell/shell_utils.cpp
 /*
  *    Copyright 2010 10gen Inc.
  *
@@ -17,20 +17,14 @@
 
 #include "pch.h"
 
-#include <boost/thread/xtime.hpp>
 #include <boost/filesystem/operations.hpp>
 #include <boost/filesystem/convenience.hpp>
 
-#include <cstring>
-#include <cstdio>
-#include <cstdlib>
-#include <assert.h>
 #include <iostream>
 #include <map>
 #include <sstream>
 #include <fstream>
 #include <vector>
-#include <fcntl.h>
 
 #ifdef _WIN32
 # include <io.h>
@@ -46,12 +40,8 @@
 #include "shell_utils.h"
 #include "../util/md5.hpp"
 #include "../util/processinfo.h"
-#include "../util/text.h"
-#include "../util/heapcheck.h"
-#include "../util/time_support.h"
 #include "../util/file.h"
 #include "../client/clientOnly-private.h"
-#include "mongo/util/net/sock.h"
 #include "mongo/client/dbclientinterface.h"
 
 namespace mongo {
