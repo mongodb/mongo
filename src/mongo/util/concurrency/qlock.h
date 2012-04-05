@@ -265,6 +265,7 @@ namespace mongo {
         fassert(16138, w.n > 0);
         if( --w.n == 0 )
             notifyWeUnlocked('w');
+        X.c.notify_one();
     }
     inline void QLock::unlock_R() {
         boost::mutex::scoped_lock lk(m);
