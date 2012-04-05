@@ -54,7 +54,9 @@ namespace mongo {
         for ( int i=0; i<1000; i++ ) {            
             if ( pthread_spin_trylock( &_lock ) == 0 )
                 return;
+#if defined(__i386__) || defined(__x86_64__)
             asm volatile ( "pause" ) ; // maybe trylock does this; just in case.
+#endif
         }
 
         for ( int i=0; i<1000; i++ ) {
@@ -82,7 +84,9 @@ namespace mongo {
         // wait for lock
         int wait = 1000;
         while ((wait-- > 0) && (_locked)) {
+#if defined(__i386__) || defined(__x86_64__)
             asm volatile ( "pause" ) ;
+#endif
         }
 
         // if failed to grab lock, sleep
