@@ -42,8 +42,9 @@ function init(server) {
     return res;
 }
 
-_path = '../../db/Debug/';
-print("_path var set to " + _path);
+mongodPath = '../../db/Debug/';
+print("Setting current directory to " + mongodPath);
+cd(mongodPath);
 
 print("go() to run");
 print("init() to initiate");
