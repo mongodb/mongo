@@ -45,8 +45,13 @@ namespace mongo {
 
         void Task::halt() { repeat = 0; }
 
+        void Task::setUp() {}
+
         void Task::run() {
             verify( n == 0 );
+
+            setUp();
+
             while( 1 ) {
                 n++;
                 try {

@@ -186,6 +186,9 @@ namespace mongo {
         }
 
         string name() const { return "rsHealthPoll"; }
+
+        void setUp() { Client::initThread( name() ); }
+
         void doWork() {
             if ( !theReplSet ) {
                 LOG(2) << "replSet not initialized yet, skipping health poll this round" << rsLog;
