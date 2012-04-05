@@ -62,8 +62,6 @@ namespace mongo {
     // these functions have not been audited for thread safety - currently they are called with an exclusive js mutex
     namespace shellUtils {
 
-        Scope* theScope = 0;
-
         std::string _dbConnect;
         std::string _dbAuth;
 
@@ -343,16 +341,6 @@ namespace mongo {
                     boost::filesystem::path t = boost::filesystem::current_path() / p;
                     if( boost::filesystem::exists(t)  ) return t;
                 }
-                try {
-                    if( theScope->type("_path") == String ) {
-                        string path = theScope->getString("_path");
-                        if( !path.empty() ) {
-                            boost::filesystem::path t = boost::filesystem::path(path) / p;
-                            if( boost::filesystem::exists(t) ) return t;
-                        }
-                    }
-                }
-                catch(...) { }
                 {
                     boost::filesystem::path t = boost::filesystem::initial_path() / p;
                     if( boost::filesystem::exists(t)  ) return t;
@@ -916,7 +904,6 @@ namespace mongo {
         }
 
         void installShellUtils( Scope& scope ) {
-            theScope = &scope;
             scope.injectNative( "quit", Quit );
             scope.injectNative( "getMemInfo" , JSGetMemInfo );
             scope.injectNative( "_srand" , JSSrand );
