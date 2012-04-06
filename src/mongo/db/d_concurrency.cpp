@@ -40,7 +40,7 @@ namespace mongo {
 
     struct atstartup { 
         atstartup() { 
-            cout << "db level locking enabled: " << ( DB_LEVEL_LOCKING_ENABLED ) << endl;
+            cerr << "db level locking enabled: " << ( DB_LEVEL_LOCKING_ENABLED ) << endl;
         }
     } atst;
 
