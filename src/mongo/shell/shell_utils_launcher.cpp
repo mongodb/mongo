@@ -115,25 +115,23 @@ namespace mongo {
             return p; // not found; might find via system path
         }
 
-        ProgramRunner::ProgramRunner( const BSONObj &args , bool isMongoProgram) {
+        ProgramRunner::ProgramRunner( const BSONObj &args ) {
             verify( !args.isEmpty() );
 
             string program( args.firstElement().valuestrsafe() );
             verify( !program.empty() );
             boost::filesystem::path programPath = find(program);
 
-            if (isMongoProgram) {
 #if 0
-                if (program == "mongos") {
-                    argv_.push_back("valgrind");
-                    argv_.push_back("--log-file=/tmp/mongos-%p.valgrind");
-                    argv_.push_back("--leak-check=yes");
-                    argv_.push_back("--suppressions=valgrind.suppressions");
-                    //argv_.push_back("--error-exitcode=1");
-                    argv_.push_back("--");
-                }
-#endif
+            if (program == "mongos") {
+                argv_.push_back("valgrind");
+                argv_.push_back("--log-file=/tmp/mongos-%p.valgrind");
+                argv_.push_back("--leak-check=yes");
+                argv_.push_back("--suppressions=valgrind.suppressions");
+                //argv_.push_back("--error-exitcode=1");
+                argv_.push_back("--");
             }
+#endif
 
             argv_.push_back( programPath.native_file_string() );
 
@@ -423,7 +421,7 @@ namespace mongo {
         }
 
         BSONObj RunProgram(const BSONObj &a, void* data) {
-            ProgramRunner r( a, false );
+            ProgramRunner r( a );
             r.start();
             boost::thread t( r );
             int exit_code;

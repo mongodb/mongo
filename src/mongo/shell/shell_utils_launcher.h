@@ -41,7 +41,7 @@ namespace mongo {
         class ProgramRunner {
         public:
             /** @param args The program's arguments, including the program name. */
-            ProgramRunner( const BSONObj &args , bool isMongoProgram=true);
+            ProgramRunner( const BSONObj &args );
             /** Launch the program. */
             void start();                        
             /** Continuously read the program's output, generally from a new thread. */
