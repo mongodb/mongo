@@ -321,8 +321,12 @@ namespace mongo {
 
         bool worked = fromconn->runCommand( "admin" ,
                                             BSON( "moveChunk" << _manager->getns() <<
-                                                    "from" << from.getName() <<
-                                                    "to" << to.getName() <<
+                                                    "from" << from.getAddress().toString() <<
+                                                    "to" << to.getAddress().toString() <<
+                                                    // NEEDED FOR 2.0 COMPATIBILITY
+                                                    "fromShard" << from.getName() <<
+                                                    "toShard" << to.getName() <<
+                                                    ///////////////////////////////
                                                     "min" << _min <<
                                                     "max" << _max <<
                                                     "maxChunkSizeBytes" << chunkSize <<
@@ -331,7 +335,6 @@ namespace mongo {
                                                 ) ,
                                             res
                                           );
-
         fromconn.done();
 
         log( worked ) << "moveChunk result: " << res << endl;

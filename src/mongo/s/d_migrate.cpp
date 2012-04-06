@@ -746,6 +746,16 @@ namespace mongo {
             string ns = cmdObj.firstElement().str();
             string to = cmdObj["to"].str();
             string from = cmdObj["from"].str(); // my public address, a tad redundant, but safe
+
+            // fromShard and toShard needed so that 2.2 mongos can interact with either 2.0 or 2.2 mongod
+            if( ! cmdObj["fromShard"].type() == String ){
+                from = cmdObj["fromShard"].String();
+            }
+
+            if( ! cmdObj["toShard"].type() == String ){
+                to = cmdObj["toShard"].String();
+            }
+
             BSONObj min  = cmdObj["min"].Obj();
             BSONObj max  = cmdObj["max"].Obj();
             BSONElement shardId = cmdObj["shardId"];
@@ -797,6 +807,11 @@ namespace mongo {
             }
 
             MoveTimingHelper timing( "from" , ns , min , max , 6 /* steps */ , errmsg );
+
+
+            // Also, so 2.2 mongod can interact with 2.0 mongos, mongod needs to handle either a conn string or a
+            // shard in the to/from fields.  The Shard constructor handles this, eventually we should break the
+            // compatibility.
 
             Shard fromShard( from );
             Shard toShard( to );
