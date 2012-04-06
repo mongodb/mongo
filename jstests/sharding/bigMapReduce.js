@@ -132,6 +132,7 @@ assert.eq( 2 , db[outcol].findOne().value , "Received wrong result" );
 // verify that data is also on secondary
 var primary = s._rs[0].test.liveNodes.master
 var secondaries = s._rs[0].test.liveNodes.slaves
+s._rs[0].test.awaitReplication();
 assert.eq( 51200 , primary.getDB("test")[outcol].count() , "Wrong count" );
 for (var i = 0; i < secondaries.length; ++i) {
 	assert.eq( 51200 , secondaries[i].getDB("test")[outcol].count() , "Wrong count" );

@@ -551,15 +551,6 @@ namespace mongo {
         }
 
         /**
-         * Insert doc into the inc collection, taking proper lock
-         */
-        void State::insertToInc( BSONObj& o ) {
-            writelock l(_config.incLong);
-            Client::Context ctx(_config.incLong);
-            _insertToInc(o);
-        }
-
-        /**
          * Insert doc into the inc collection
          */
         void State::_insertToInc( BSONObj& o ) {
