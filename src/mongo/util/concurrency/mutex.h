@@ -19,10 +19,10 @@
 
 #ifdef _WIN32
 # include <concrt.h>
-#else
-# include <boost/thread/mutex.hpp>
 #endif
 
+#include <boost/noncopyable.hpp>
+#include <boost/thread/mutex.hpp>
 #include <boost/thread/xtime.hpp>
 
 #include "mongo/util/assert_util.h"
