@@ -17,6 +17,9 @@
 
 #pragma once
 
+#include <boost/thread/recursive_mutex.hpp>
+#include <boost/thread/condition.hpp>
+
 namespace mongo {
 
     /* This is based on haskell's MVar synchronization primitive:

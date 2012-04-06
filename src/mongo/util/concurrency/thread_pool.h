@@ -17,8 +17,11 @@
 
 #pragma once
 
-#include <boost/function.hpp>
+#include <list>
+
 #include <boost/bind.hpp>
+#include <boost/function.hpp>
+#include <boost/thread/condition.hpp>
 
 namespace mongo {
 
@@ -63,8 +66,8 @@ namespace mongo {
             mongo::mutex _mutex;
             boost::condition _condition;
 
-            list<Worker*> _freeWorkers; //used as LIFO stack (always front)
-            list<Task> _tasks; //used as FIFO queue (push_back, pop_front)
+            std::list<Worker*> _freeWorkers; //used as LIFO stack (always front)
+            std::list<Task> _tasks; //used as FIFO queue (push_back, pop_front)
             int _tasksRemaining; // in queue + currently processing
             int _nThreads; // only used for sanity checking. could be removed in the future.
 

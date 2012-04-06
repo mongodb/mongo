@@ -30,6 +30,7 @@
 #include "../util/concurrency/synchronization.h"
 #include "../util/concurrency/qlock.h"
 #include "dbtests.h"
+#include "mongo/util/concurrency/ticketholder.h"
 
 namespace mongo { 
     void testNonGreedy();

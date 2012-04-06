@@ -18,6 +18,7 @@
 #pragma once
 
 #include "sock.h"
+#include "mongo/util/concurrency/ticketholder.h"
 
 namespace mongo {
 

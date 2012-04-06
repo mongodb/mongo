@@ -24,7 +24,10 @@
 
 #pragma once
 
-#include "../pch.h"
+#include "pch.h"
+
+#include <boost/thread/recursive_mutex.hpp>
+
 #include "cursor.h"
 #include "jsobj.h"
 #include "../util/net/message.h"

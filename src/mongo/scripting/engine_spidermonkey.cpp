@@ -16,7 +16,11 @@
  */
 
 #include "pch.h"
-#include "engine_spidermonkey.h"
+
+#include "mongo/scripting/engine_spidermonkey.h"
+
+#include <boost/thread/recursive_mutex.hpp>
+
 #include "mongo/util/mongoutils/str.h"
 
 #ifndef _WIN32

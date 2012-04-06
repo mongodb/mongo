@@ -26,6 +26,7 @@
 #include "shardkey.h"
 #include "shard.h"
 #include "util.h"
+#include "mongo/util/concurrency/ticketholder.h"
 
 namespace mongo {
 

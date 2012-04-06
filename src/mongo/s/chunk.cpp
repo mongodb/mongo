@@ -31,6 +31,7 @@
 #include "grid.h"
 #include "strategy.h"
 #include "client.h"
+#include "mongo/util/concurrency/ticketholder.h"
 
 namespace mongo {
 

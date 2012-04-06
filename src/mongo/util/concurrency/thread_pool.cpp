@@ -17,6 +17,9 @@
  */
 
 #include "pch.h"
+
+#include <boost/thread/thread.hpp>
+
 #include "thread_pool.h"
 #include "mvar.h"
 

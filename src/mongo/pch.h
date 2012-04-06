@@ -74,14 +74,7 @@
 #include <boost/smart_ptr.hpp>
 #include <boost/function.hpp>
 #include <boost/bind.hpp>
-#include <boost/thread/tss.hpp>
-#include <boost/detail/endian.hpp>
 #include <boost/version.hpp>
-#include <boost/thread/thread.hpp>
-#include <boost/thread/condition.hpp>
-#include <boost/thread/recursive_mutex.hpp>
-#include <boost/thread/xtime.hpp>
-
 
 #include "mongo/client/redef_macros.h"
 

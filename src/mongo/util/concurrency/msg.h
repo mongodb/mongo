@@ -19,6 +19,8 @@
 #pragma once
 
 #include <deque>
+
+#include <boost/thread/condition.hpp>
 #include "task.h"
 
 namespace mongo {

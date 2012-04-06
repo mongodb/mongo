@@ -24,6 +24,7 @@
 
 #include "d_chunk_manager.h"
 #include "util.h"
+#include "mongo/util/concurrency/ticketholder.h"
 
 namespace mongo {
 

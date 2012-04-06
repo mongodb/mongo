@@ -37,6 +37,7 @@
 #include "shard.h"
 #include "d_logic.h"
 #include "config.h"
+#include "mongo/util/concurrency/ticketholder.h"
 
 using namespace std;
 
