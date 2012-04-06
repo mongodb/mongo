@@ -56,14 +56,14 @@ namespace mongo {
         map< pid_t, HANDLE > handles;
 #endif
 
-        stringstream mongoProgramOutput_;
-
+        ProgramOutputMultiplexer programOutputLogger;
+        
         void goingAwaySoon() {
             mongo::mutex::scoped_lock lk( mongoProgramOutputMutex );
             mongo::dbexitCalled = true;
         }
 
-        void writeMongoProgramOutputLine( int port, int pid, const char *line ) {
+        void ProgramOutputMultiplexer::appendLine( int port, int pid, const char *line ) {
             mongo::mutex::scoped_lock lk( mongoProgramOutputMutex );
             if( mongo::dbexitCalled ) throw "program is terminating";
             stringstream buf;
@@ -72,25 +72,24 @@ namespace mongo {
             else
                 buf << "sh" << pid << "| " << line;
             printf( "%s\n", buf.str().c_str() ); // cout << buf.str() << endl;
-            mongoProgramOutput_ << buf.str() << endl;
+            _buffer << buf.str() << endl;
         }
 
-        // only returns last 100000 characters
-        BSONObj RawMongoProgramOutput( const BSONObj &args, void* data ) {
+        string ProgramOutputMultiplexer::str() const {
             mongo::mutex::scoped_lock lk( mongoProgramOutputMutex );
-            string out = mongoProgramOutput_.str();
-            size_t len = out.length();
-            if ( len > 100000 )
-                out = out.substr( len - 100000, 100000 );
-            return BSON( "" << out );
+            string ret = _buffer.str();
+            size_t len = ret.length();
+            if ( len > 100000 ) {
+                ret = ret.substr( len - 100000, 100000 );
+            }
+            return ret;
         }
-
-        BSONObj ClearRawMongoProgramOutput( const BSONObj &args, void* data ) {
+        
+        void ProgramOutputMultiplexer::clear() {
             mongo::mutex::scoped_lock lk( mongoProgramOutputMutex );
-            mongoProgramOutput_.str( "" );
-            return undefined_;
+            _buffer.str( "" );            
         }
-
+        
         ProgramRunner::ProgramRunner( const BSONObj &args ) {
             verify( !args.isEmpty() );
 
@@ -191,15 +190,15 @@ namespace mongo {
                     verify( ret != -1 );
                     start[ ret ] = '\0';
                     if ( strlen( start ) != unsigned( ret ) )
-                        writeMongoProgramOutputLine( _port, _pid, "WARNING: mongod wrote null bytes to output" );
+                        programOutputLogger.appendLine( _port, _pid, "WARNING: mongod wrote null bytes to output" );
                     char *last = buf;
                     for( char *i = strchr( buf, '\n' ); i; last = i + 1, i = strchr( last, '\n' ) ) {
                         *i = '\0';
-                        writeMongoProgramOutputLine( _port, _pid, last );
+                        programOutputLogger.appendLine( _port, _pid, last );
                     }
                     if ( ret == 0 ) {
                         if ( *last )
-                            writeMongoProgramOutputLine( _port, _pid, last );
+                            programOutputLogger.appendLine( _port, _pid, last );
                         close( _pipe );
                         break;
                     }
@@ -377,6 +376,15 @@ namespace mongo {
             return ret;
 
 #endif
+        }
+
+        BSONObj RawMongoProgramOutput( const BSONObj &args, void* data ) {
+            return BSON( "" << programOutputLogger.str() );
+        }
+        
+        BSONObj ClearRawMongoProgramOutput( const BSONObj &args, void* data ) {
+            programOutputLogger.clear();
+            return undefined_;
         }
 
         BSONObj WaitProgram( const BSONObj& a, void* data ) {

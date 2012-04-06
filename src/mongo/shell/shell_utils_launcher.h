@@ -37,6 +37,17 @@ namespace mongo {
         void goingAwaySoon();
         void installShellUtilsLauncher( Scope& scope );
         
+        /** Record log lines from concurrent programs.  All public members are thread safe. */
+        class ProgramOutputMultiplexer {
+        public:
+            void appendLine( int port, int pid, const char *line );
+            /** @return up to 100000 characters of the most recent log output. */
+            string str() const;
+            void clear();
+        private:
+            stringstream _buffer;
+        };
+        
         /** Helper class for launching a program and logging its output. */
         class ProgramRunner {
         public:
