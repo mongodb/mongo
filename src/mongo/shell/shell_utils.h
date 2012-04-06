@@ -18,10 +18,13 @@
 
 #pragma once
 
-#include "../scripting/engine.h"
+#include "mongo/db/jsobj.h"
 
 namespace mongo {
 
+    class Scope;
+    class DBClientWithCommands;
+    
     namespace shellUtils {
 
         extern std::string _dbConnect;

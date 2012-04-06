@@ -1,4 +1,4 @@
-// mongo/shell/shell_utils_launcher.h
+// mongo/shell/shell_utils_extended.h
 /*
  *    Copyright 2010 10gen Inc.
  *
@@ -23,16 +23,6 @@ namespace mongo {
     class Scope;
     
     namespace shellUtils {
-
-        // Scoped management of mongo program instances.  Simple implementation:
-        // destructor kills all mongod instances created by the shell.
-        struct MongoProgramScope {
-            MongoProgramScope() {} // Avoid 'unused variable' warning.
-            ~MongoProgramScope();
-        };
-        void KillMongoProgramInstances();
-        
-        void goingAwaySoon();
-        void installShellUtilsLauncher( Scope& scope );
+        void installShellUtilsExtended( Scope& scope );
     }
 }

@@ -37,6 +37,7 @@
 #include "shell_utils.h"
 #include "shell_utils_launcher.h"
 #include "../client/clientOnly-private.h"
+#include "mongo/scripting/engine.h"
 
 namespace mongo {
 
@@ -637,7 +638,7 @@ namespace mongo {
             )
         }
 
-        void installShellLauncher( Scope& scope ) {
+        void installShellUtilsLauncher( Scope& scope ) {
             scope.injectNative( "_startMongoProgram", StartMongoProgram );
             scope.injectNative( "runProgram", RunProgram );
             scope.injectNative( "run", RunProgram );

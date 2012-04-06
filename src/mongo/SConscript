@@ -402,6 +402,7 @@ env.JSHeader( "shell/mongo-server.cpp" , [ "shell/servers.js"] )
 
 coreShellFiles = [ "shell/dbshell.cpp",
                    "shell/shell_utils.cpp",
+                   "shell/shell_utils_extended.cpp",
                    "shell/shell_utils_launcher.cpp",
                    "shell/mongo-server.cpp",
                    "../third_party/linenoise/linenoise.cpp",
