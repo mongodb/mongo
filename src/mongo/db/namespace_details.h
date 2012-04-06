@@ -185,7 +185,8 @@ namespace mongo {
                  this isn't thread safe.  TODO
         */
         enum NamespaceFlags {
-            Flag_HaveIdIndex = 1 << 0 // set when we have _id index (ONLY if ensureIdIndex was called -- 0 if that has never been called)
+            Flag_HaveIdIndex = 1 << 0 , // set when we have _id index (ONLY if ensureIdIndex was called -- 0 if that has never been called)
+            Flag_UsePowerOf2Sizes = 1 << 1
         };
 
         IndexDetails& idx(int idxNo, bool missingExpected = false );

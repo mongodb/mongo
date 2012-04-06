@@ -699,6 +699,14 @@ namespace mongo {
             setPaddingFactor(1.0);
         }
         verify( _paddingFactor >= 1 );
+
+        
+        if ( isFlagSet( Flag_UsePowerOf2Sizes ) ) {
+            int x = bucket( minRecordSize );
+            x = bucketSizes[x];
+            return x;
+        }
+
         return static_cast<int>(minRecordSize * _paddingFactor);
     }
 

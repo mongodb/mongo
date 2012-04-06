@@ -1372,6 +1372,35 @@ namespace mongo {
         }
     } cmdCollectionStats;
 
+    class CollectionModCommand : public Command {
+    public:
+        CollectionModCommand() : Command( "collMod" ){}
+        virtual bool slaveOk() const { return true; }
+        virtual LockType locktype() const { return WRITE; }
+        
+        bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
+            string ns = dbname + "." + jsobj.firstElement().valuestr();
+            Client::Context ctx( ns );
+            NamespaceDetails* nsd = nsdetails( ns.c_str() );
+            if ( ! nsd ) {
+                errmsg = "ns does not exist";
+                return false;
+            }
+
+            if ( jsobj["usePowerOf2Sizes"].type() ) {
+                result.appendBool( "usePowerOf2Sizes_old" , nsd->isFlagSet( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
+                if ( jsobj["usePowerOf2Sizes"].trueValue() ) {
+                    nsd->setFlag( NamespaceDetails::Flag_UsePowerOf2Sizes );
+                }
+                else {
+                    nsd->clearFlag( NamespaceDetails::Flag_UsePowerOf2Sizes );
+                }
+            }
+
+            return true;
+        }
+    } collectionModCommand;
+
     class DBStats : public Command {
     public:
         DBStats() : Command( "dbStats", false, "dbstats" ) {}
