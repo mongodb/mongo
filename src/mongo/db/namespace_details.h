@@ -84,9 +84,9 @@ namespace mongo {
         int max;                              // max # of objects for a capped table.  TODO: should this be 64 bit?
     private:
         double _paddingFactor;                 // 1.0 = no padding.
-    public:
         // ofs 386 (16)
-        int flags;
+        int _flags;
+    public:
         DiskLoc capExtent;
         DiskLoc capFirstNewRecord;
         unsigned short dataFileVersion;       // NamespaceDetails version.  So we can do backward compatibility in the future. See filever.h
@@ -237,7 +237,7 @@ namespace mongo {
         IndexDetails& addIndex(const char *thisns, bool resetTransient=true);
 
         void aboutToDeleteAnIndex() { 
-            *getDur().writing(&flags) = flags & ~Flag_HaveIdIndex;
+            clearFlag( Flag_HaveIdIndex );
         }
 
         /* returns index of the first index in which the field is present. -1 if not present. */
@@ -297,6 +297,11 @@ namespace mongo {
             }
         }
 
+        const int flags() const { return _flags; }
+        bool isFlagSet( int flag ) const { return _flags & flag; }
+        void setFlag( int flag );
+        void clearFlag( int flag );
+
         /* @return -1 = not found
            generally id is first index, so not that expensive an operation (assuming present).
         */
@@ -310,7 +315,7 @@ namespace mongo {
         }
 
         bool haveIdIndex() { 
-            return (flags & NamespaceDetails::Flag_HaveIdIndex) || findIdIndex() >= 0;
+            return isFlagSet( NamespaceDetails::Flag_HaveIdIndex ) || findIdIndex() >= 0;
         }
 
         /* return which "deleted bucket" for this size object */

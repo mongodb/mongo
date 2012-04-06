@@ -57,7 +57,7 @@ namespace mongo {
         capped = _capped;
         max = 0x7fffffff;
         _paddingFactor = 1.0;
-        flags = 0;
+        _flags = 0;
         capFirstNewRecord = DiskLoc();
         // Signal that we are on first allocation iteration through extents.
         capFirstNewRecord.setInvalid();
@@ -685,6 +685,13 @@ namespace mongo {
         _keysComputed = true;
     }
 
+    void NamespaceDetails::setFlag( int flag ) {
+        getDur().writingInt(_flags) |= flag;
+    }
+
+    void NamespaceDetails::clearFlag( int flag ) {
+        getDur().writingInt(_flags) &= ~flag;
+    }
 
     /* ------------------------------------------------------------------------- */
 

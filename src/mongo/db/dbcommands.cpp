@@ -1354,7 +1354,7 @@ namespace mongo {
             result.append( "nindexes" , nsd->nIndexes );
             result.append( "lastExtentSize" , nsd->lastExtentSize / scale );
             result.append( "paddingFactor" , nsd->paddingFactor() );
-            result.append( "flags" , nsd->flags );
+            result.append( "flags" , nsd->flags() );
 
             BSONObjBuilder indexSizes;
             result.appendNumber( "totalIndexSize" , getIndexSizeForCollection(dbname, ns, &indexSizes, scale) / scale );
