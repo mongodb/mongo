@@ -71,6 +71,7 @@
 
 #define BOOST_FILESYSTEM_VERSION 2
 #include <boost/shared_ptr.hpp>
+#include <boost/detail/endian.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/function.hpp>
 #include <boost/bind.hpp>
