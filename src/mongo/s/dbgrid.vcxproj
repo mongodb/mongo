@@ -187,7 +187,7 @@
       <TargetMachine>MachineX86</TargetMachine>
     </Link>
     <PreBuildEvent>
-      <Command>cscript //Nologo ..\shell\msvc\createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
+      <Command>cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
       <Message>Create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -214,7 +214,7 @@
       <TargetMachine>MachineX86</TargetMachine>
     </Link>
     <PreBuildEvent>
-      <Command>cscript //Nologo ..\shell\msvc\createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
+      <Command>cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
       <Message>Create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -240,7 +240,7 @@
       <SubSystem>Console</SubSystem>
     </Link>
     <PreBuildEvent>
-      <Command>cscript //Nologo ..\shell\msvc\createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
+      <Command>cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
       <Message>Create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -266,7 +266,7 @@
       <SubSystem>Console</SubSystem>
     </Link>
     <PreBuildEvent>
-      <Command>cscript //Nologo ..\shell\msvc\createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
+      <Command>cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
       <Message>Create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -296,7 +296,7 @@
       <TargetMachine>MachineX86</TargetMachine>
     </Link>
     <PreBuildEvent>
-      <Command>cscript //Nologo ..\shell\msvc\createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
+      <Command>cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
       <Message>Create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -326,7 +326,7 @@
       <TargetMachine>MachineX86</TargetMachine>
     </Link>
     <PreBuildEvent>
-      <Command>cscript //Nologo ..\shell\msvc\createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
+      <Command>cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
       <Message>Create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -355,7 +355,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>cscript //Nologo ..\shell\msvc\createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
+      <Command>cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
       <Message>Create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
@@ -384,7 +384,7 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
     </Link>
     <PreBuildEvent>
-      <Command>cscript //Nologo ..\shell\msvc\createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
+      <Command>cscript //Nologo ..\shell\createCPPfromJavaScriptFiles.js "$(ProjectDir).."</Command>
       <Message>Create mongo.cpp and mongo-server.cpp from JavaScript source files</Message>
     </PreBuildEvent>
   </ItemDefinitionGroup>
