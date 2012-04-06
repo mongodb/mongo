@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <boost/detail/endian.hpp>
 #include "concurrency/mutex.h"
 #include "../bson/util/misc.h"
 
@@ -138,10 +139,12 @@ namespace mongo {
     inline unsigned long fixEndian(unsigned long x) {
         return x;
     }
-#else
+#elif defined(BOOST_BIG_ENDIAN)
     inline unsigned long fixEndian(unsigned long x) {
         return swapEndian(x);
     }
+#else
+#error no boost endian header defined
 #endif
 
 #if !defined(_WIN32)
