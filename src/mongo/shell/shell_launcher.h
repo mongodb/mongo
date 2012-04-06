@@ -1,4 +1,4 @@
-// mongo/shell/shell_utils.h
+// mongo/shell/shell_launcher.h
 /*
  *    Copyright 2010 10gen Inc.
  *
@@ -24,20 +24,15 @@ namespace mongo {
 
     namespace shellUtils {
 
-        extern std::string _dbConnect;
-        extern std::string _dbAuth;
-        extern map< string, set<string> > _allMyUris;
-        extern bool _nokillop;
-
-        void RecordMyLocation( const char *_argv0 );
-        void installShellUtils( Scope& scope );
-
-        void initScope( Scope &scope );
-        void onConnect( DBClientWithCommands &c );
-
-        const char* getUserDir();
+        // Scoped management of mongo program instances.  Simple implementation:
+        // destructor kills all mongod instances created by the shell.
+        struct MongoProgramScope {
+            MongoProgramScope() {} // Avoid 'unused variable' warning.
+            ~MongoProgramScope();
+        };
+        void KillMongoProgramInstances();
         
-        BSONElement oneArg(const BSONObj& args);
-        extern const BSONObj undefined_;
+        void goingAwaySoon();
+        void installShellLauncher( Scope& scope );
     }
 }

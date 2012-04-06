@@ -26,6 +26,7 @@
 #include "mongo/db/repl/rs_member.h"
 #include "mongo/scripting/engine.h"
 #include "mongo/shell/shell_utils.h"
+#include "mongo/shell/shell_launcher.h"
 #include "mongo/util/file.h"
 #include "mongo/util/password.h"
 #include "mongo/util/startup_test.h"
