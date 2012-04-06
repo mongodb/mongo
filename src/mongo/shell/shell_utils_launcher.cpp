@@ -52,8 +52,6 @@ namespace mongo {
     // these functions have not been audited for thread safety - currently they are called with an exclusive js mutex
     namespace shellUtils {
 
-#ifndef MONGO_SAFE_SHELL
-
         map< int, pair< pid_t, int > > dbs;
         map< pid_t, int > shells;
 #ifdef _WIN32
@@ -621,15 +619,6 @@ namespace mongo {
             for( vector< pid_t >::iterator i = pids.begin(); i != pids.end(); ++i )
                 killDb( 0, *i, SIGTERM );
         }
-#else // #ifndef MONGO_SAFE_SHELL
-        void KillMongoProgramInstances() {}
-        BSONObj ClearRawMongoProgramOutput( const BSONObj &args, void* data ) {
-            return undefined_;
-        }
-        void goingAwaySoon() {
-            mongo::dbexitCalled = true;
-        }
-#endif
 
         MongoProgramScope::~MongoProgramScope() {
             DESTRUCTOR_GUARD(

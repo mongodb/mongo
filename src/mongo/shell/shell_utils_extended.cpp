@@ -34,8 +34,6 @@ namespace mongo {
     // these functions have not been audited for thread safety - currently they are called with an exclusive js mutex
     namespace shellUtils {
 
-#ifndef MONGO_SAFE_SHELL
-
         BSONObj listFiles(const BSONObj& _args, void* data) {
             static BSONObj cd = BSON( "0" << "." );
             BSONObj args = _args.isEmpty() ? cd : _args;
@@ -208,8 +206,6 @@ namespace mongo {
             return BSON("" << buf);
             
         }
-
-#endif // #ifndef MONGO_SAFE_SHELL
 
         void installShellUtilsExtended( Scope& scope ) {
             scope.injectNative( "getHostName" , getHostName );
