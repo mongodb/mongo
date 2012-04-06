@@ -345,6 +345,5 @@ namespace mongo {
     using boost::scoped_ptr;
     using boost::scoped_array;
     using boost::intrusive_ptr;
-    using boost::bad_lexical_cast;
     using boost::dynamic_pointer_cast;
 } // namespace mongo
