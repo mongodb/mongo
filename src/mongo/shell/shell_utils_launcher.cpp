@@ -1,4 +1,4 @@
-// mongo/shell/shell_launcher.cpp
+// mongo/shell/shell_utils_launcher.cpp
 /*
  *    Copyright 2010 10gen Inc.
  *
@@ -34,8 +34,8 @@
 # include <sys/wait.h>
 #endif
 
-#include "shell_launcher.h"
 #include "shell_utils.h"
+#include "shell_utils_launcher.h"
 #include "../client/clientOnly-private.h"
 
 namespace mongo {

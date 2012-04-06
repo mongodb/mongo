@@ -1,4 +1,4 @@
-// mongo/shell/shell_launcher.h
+// mongo/shell/shell_utils_launcher.h
 /*
  *    Copyright 2010 10gen Inc.
  *
