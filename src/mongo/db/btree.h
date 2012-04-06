@@ -18,11 +18,11 @@
 
 #pragma once
 
-#include "../pch.h"
-#include "jsobj.h"
-#include "diskloc.h"
-#include "pdfile.h"
-#include "key.h"
+#include "pch.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/diskloc.h"
+#include "mongo/db/pdfile.h"
+#include "mongo/db/key.h"
 
 namespace mongo {
 
@@ -242,7 +242,10 @@ namespace mongo {
             int la = loc.a();
             verify( la <= 0xffffff ); // must fit in 3 bytes
             if( la < 0 ) {
-                verify( la == -1 );
+                if ( la != -1 ) {
+                    log() << "btree diskloc isn't negative 1: " << la << endl;
+                    verify ( la != -1 );
+                }
                 la = 0;
                 ofs = OurNullOfs;
             }
