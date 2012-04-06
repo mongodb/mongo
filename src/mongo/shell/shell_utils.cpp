@@ -837,8 +837,14 @@ namespace mongo {
             for( vector< pid_t >::iterator i = pids.begin(); i != pids.end(); ++i )
                 killDb( 0, *i, SIGTERM );
         }
-#else // ndef MONGO_SAFE_SHELL
+#else // #ifndef MONGO_SAFE_SHELL
         void KillMongoProgramInstances() {}
+        BSONObj ClearRawMongoProgramOutput( const BSONObj &args, void* data ) {
+            return undefined_;
+        }
+        void goingAwaySoon() {
+            mongo::dbexitCalled = true;
+        }
 #endif
 
         MongoProgramScope::~MongoProgramScope() {
