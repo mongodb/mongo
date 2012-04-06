@@ -86,15 +86,6 @@ namespace mongo {
         return true;
     }
 
-#define MONGO_asctime _asctime_not_threadsafe_
-#define asctime MONGO_asctime
-#define MONGO_gmtime _gmtime_not_threadsafe_
-#define gmtime MONGO_gmtime
-#define MONGO_localtime _localtime_not_threadsafe_
-#define localtime MONGO_localtime
-#define MONGO_ctime _ctime_is_not_threadsafe_
-#define ctime MONGO_ctime
-
 #if defined(_WIN32)
     inline void sleepsecs(int s) {
         // todo : add an assert here that we are not locked in d.dbMutex.  there may be debugging things where we 
@@ -252,5 +243,12 @@ namespace mongo {
         return secs*1000*1000 + tv.tv_usec;
     }
 #endif
+
+
+    // these are so that if you use one of them compilation will fail
+    char *asctime(const struct tm *tm);
+    char *ctime(const time_t *timep);
+    struct tm *gmtime(const time_t *timep);
+    struct tm *localtime(const time_t *timep);
 
 }  // namespace mongo

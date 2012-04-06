@@ -47,14 +47,6 @@
 #define PRINT MONGO_PRINT
 #pragma push_macro("PRINTFL")
 #define PRINTFL MONGO_PRINTFL
-#pragma push_macro("asctime")
-#define asctime MONGO_asctime
-#pragma push_macro("gmtime")
-#define gmtime MONGO_gmtime
-#pragma push_macro("localtime")
-#define localtime MONGO_localtime
-#pragma push_macro("ctime")
-#define ctime MONGO_ctime
 
 // util/debug_util.h
 #pragma push_macro("DEV")

@@ -46,14 +46,6 @@
 #pragma pop_macro("PRINT")
 #undef PRINTFL
 #pragma pop_macro("PRINTFL")
-#undef asctime
-#pragma pop_macro("asctime")
-#undef gmtime
-#pragma pop_macro("gmtime")
-#undef localtime
-#pragma pop_macro("localtime")
-#undef ctime
-#pragma pop_macro("ctime")
 
 // util/debug_util.h
 #undef DEV
