@@ -17,8 +17,6 @@
 
 #include "pch.h"
 
-#include <boost/filesystem/convenience.hpp>
-
 #include <iostream>
 #include <map>
 #include <vector>
@@ -93,272 +91,262 @@ namespace mongo {
             return undefined_;
         }
 
-        class ProgramRunner {
-            vector<string> argv_;
-            int port_;
-            int pipe_;
-            pid_t pid_;
-        public:
-            pid_t pid() const { return pid_; }
-            int port() const { return port_; }
-
-            boost::filesystem::path find(string prog) {
-                boost::filesystem::path p = prog;
+        boost::filesystem::path ProgramRunner::find(string prog) {
+            boost::filesystem::path p = prog;
 #ifdef _WIN32
-                p = change_extension(p, ".exe");
+            p = change_extension(p, ".exe");
 #endif
 
-                if( boost::filesystem::exists(p) ) {
+            if( boost::filesystem::exists(p) ) {
 #ifndef _WIN32
-                    p = boost::filesystem::initial_path() / p;
+                p = boost::filesystem::initial_path() / p;
 #endif
-                    return p;
-                }
-
-                {
-                    boost::filesystem::path t = boost::filesystem::current_path() / p;
-                    if( boost::filesystem::exists(t)  ) return t;
-                }
-                {
-                    boost::filesystem::path t = boost::filesystem::initial_path() / p;
-                    if( boost::filesystem::exists(t)  ) return t;
-                }
-                return p; // not found; might find via system path
+                return p;
             }
 
-            ProgramRunner( const BSONObj &args , bool isMongoProgram=true) {
-                verify( !args.isEmpty() );
+            {
+                boost::filesystem::path t = boost::filesystem::current_path() / p;
+                if( boost::filesystem::exists(t)  ) return t;
+            }
+            {
+                boost::filesystem::path t = boost::filesystem::initial_path() / p;
+                if( boost::filesystem::exists(t)  ) return t;
+            }
+            return p; // not found; might find via system path
+        }
 
-                string program( args.firstElement().valuestrsafe() );
-                verify( !program.empty() );
-                boost::filesystem::path programPath = find(program);
+        ProgramRunner::ProgramRunner( const BSONObj &args , bool isMongoProgram) {
+            verify( !args.isEmpty() );
 
-                if (isMongoProgram) {
+            string program( args.firstElement().valuestrsafe() );
+            verify( !program.empty() );
+            boost::filesystem::path programPath = find(program);
+
+            if (isMongoProgram) {
 #if 0
-                    if (program == "mongos") {
-                        argv_.push_back("valgrind");
-                        argv_.push_back("--log-file=/tmp/mongos-%p.valgrind");
-                        argv_.push_back("--leak-check=yes");
-                        argv_.push_back("--suppressions=valgrind.suppressions");
-                        //argv_.push_back("--error-exitcode=1");
-                        argv_.push_back("--");
-                    }
+                if (program == "mongos") {
+                    argv_.push_back("valgrind");
+                    argv_.push_back("--log-file=/tmp/mongos-%p.valgrind");
+                    argv_.push_back("--leak-check=yes");
+                    argv_.push_back("--suppressions=valgrind.suppressions");
+                    //argv_.push_back("--error-exitcode=1");
+                    argv_.push_back("--");
+                }
 #endif
+            }
+
+            argv_.push_back( programPath.native_file_string() );
+
+            port_ = -1;
+
+            BSONObjIterator j( args );
+            j.next(); // skip program name (handled above)
+            while(j.more()) {
+                BSONElement e = j.next();
+                string str;
+                if ( e.isNumber() ) {
+                    stringstream ss;
+                    ss << e.number();
+                    str = ss.str();
                 }
-
-                argv_.push_back( programPath.native_file_string() );
-
-                port_ = -1;
-
-                BSONObjIterator j( args );
-                j.next(); // skip program name (handled above)
-                while(j.more()) {
-                    BSONElement e = j.next();
-                    string str;
-                    if ( e.isNumber() ) {
-                        stringstream ss;
-                        ss << e.number();
-                        str = ss.str();
-                    }
-                    else {
-                        verify( e.type() == mongo::String );
-                        str = e.valuestr();
-                    }
-                    if ( str == "--port" )
-                        port_ = -2;
-                    else if ( port_ == -2 )
-                        port_ = strtol( str.c_str(), 0, 10 );
-                    argv_.push_back(str);
-                }
-
-                if ( program != "mongod" && program != "mongos" && program != "mongobridge" )
-                    port_ = 0;
                 else {
-                    if ( port_ <= 0 )
-                        cout << "error: a port number is expected when running mongod (etc.) from the shell" << endl;
-                    verify( port_ > 0 );
+                    verify( e.type() == mongo::String );
+                    str = e.valuestr();
                 }
-                if ( port_ > 0 && dbs.count( port_ ) != 0 ) {
-                    cerr << "count for port: " << port_ << " is not 0 is: " << dbs.count( port_ ) << endl;
-                    verify( dbs.count( port_ ) == 0 );
-                }
+                if ( str == "--port" )
+                    port_ = -2;
+                else if ( port_ == -2 )
+                    port_ = strtol( str.c_str(), 0, 10 );
+                argv_.push_back(str);
             }
 
-            void start() {
-                int pipeEnds[ 2 ];
-                verify( pipe( pipeEnds ) != -1 );
-
-                fflush( 0 );
-                launch_process(pipeEnds[1]); //sets pid_
-
-                {
-                    stringstream ss;
-                    ss << "shell: started program";
-                    for (unsigned i=0; i < argv_.size(); i++)
-                        ss << " " << argv_[i];
-                    ss << '\n';
-                    cout << ss.str(); cout.flush();
-                }
-
-                if ( port_ > 0 )
-                    dbs.insert( make_pair( port_, make_pair( pid_, pipeEnds[ 1 ] ) ) );
-                else
-                    shells.insert( make_pair( pid_, pipeEnds[ 1 ] ) );
-                pipe_ = pipeEnds[ 0 ];
+            if ( program != "mongod" && program != "mongos" && program != "mongobridge" )
+                port_ = 0;
+            else {
+                if ( port_ <= 0 )
+                    cout << "error: a port number is expected when running mongod (etc.) from the shell" << endl;
+                verify( port_ > 0 );
             }
-
-            // Continue reading output
-            void operator()() {
-                try {
-                    // This assumes there aren't any 0's in the mongo program output.
-                    // Hope that's ok.
-                    const unsigned bufSize = 128 * 1024;
-                    char buf[ bufSize ];
-                    char temp[ bufSize ];
-                    char *start = buf;
-                    while( 1 ) {
-                        int lenToRead = ( bufSize - 1 ) - ( start - buf );
-                        if ( lenToRead <= 0 ) {
-                            cout << "error: lenToRead: " << lenToRead << endl;
-                            cout << "first 300: " << string(buf,0,300) << endl;
-                        }
-                        verify( lenToRead > 0 );
-                        int ret = read( pipe_, (void *)start, lenToRead );
-                        if( mongo::dbexitCalled )
-                            break;
-                        verify( ret != -1 );
-                        start[ ret ] = '\0';
-                        if ( strlen( start ) != unsigned( ret ) )
-                            writeMongoProgramOutputLine( port_, pid_, "WARNING: mongod wrote null bytes to output" );
-                        char *last = buf;
-                        for( char *i = strchr( buf, '\n' ); i; last = i + 1, i = strchr( last, '\n' ) ) {
-                            *i = '\0';
-                            writeMongoProgramOutputLine( port_, pid_, last );
-                        }
-                        if ( ret == 0 ) {
-                            if ( *last )
-                                writeMongoProgramOutputLine( port_, pid_, last );
-                            close( pipe_ );
-                            break;
-                        }
-                        if ( last != buf ) {
-                            strcpy( temp, last );
-                            strcpy( buf, temp );
-                        }
-                        else {
-                            verify( strlen( buf ) < bufSize );
-                        }
-                        start = buf + strlen( buf );
-                    }
-                }
-                catch(...) {
-                }
+            if ( port_ > 0 && dbs.count( port_ ) != 0 ) {
+                cerr << "count for port: " << port_ << " is not 0 is: " << dbs.count( port_ ) << endl;
+                verify( dbs.count( port_ ) == 0 );
             }
-            void launch_process(int child_stdout) {
-#ifdef _WIN32
+        }
+
+        void ProgramRunner::start() {
+            int pipeEnds[ 2 ];
+            verify( pipe( pipeEnds ) != -1 );
+
+            fflush( 0 );
+            launch_process(pipeEnds[1]); //sets pid_
+
+            {
                 stringstream ss;
-                for( unsigned i=0; i < argv_.size(); i++ ) {
-                    if (i) ss << ' ';
-                    if (argv_[i].find(' ') == string::npos)
-                        ss << argv_[i];
-                    else {
-                        ss << '"';
-                        // escape all embedded quotes
-                        for (size_t j=0; j<argv_[i].size(); ++j) {
-                            if (argv_[i][j]=='"') ss << '"';
-                            ss << argv_[i][j];
-                        }
-                        ss << '"';
+                ss << "shell: started program";
+                for (unsigned i=0; i < argv_.size(); i++)
+                    ss << " " << argv_[i];
+                ss << '\n';
+                cout << ss.str(); cout.flush();
+            }
+
+            if ( port_ > 0 )
+                dbs.insert( make_pair( port_, make_pair( pid_, pipeEnds[ 1 ] ) ) );
+            else
+                shells.insert( make_pair( pid_, pipeEnds[ 1 ] ) );
+            pipe_ = pipeEnds[ 0 ];
+        }
+
+        void ProgramRunner::operator()() {
+            try {
+                // This assumes there aren't any 0's in the mongo program output.
+                // Hope that's ok.
+                const unsigned bufSize = 128 * 1024;
+                char buf[ bufSize ];
+                char temp[ bufSize ];
+                char *start = buf;
+                while( 1 ) {
+                    int lenToRead = ( bufSize - 1 ) - ( start - buf );
+                    if ( lenToRead <= 0 ) {
+                        cout << "error: lenToRead: " << lenToRead << endl;
+                        cout << "first 300: " << string(buf,0,300) << endl;
                     }
+                    verify( lenToRead > 0 );
+                    int ret = read( pipe_, (void *)start, lenToRead );
+                    if( mongo::dbexitCalled )
+                        break;
+                    verify( ret != -1 );
+                    start[ ret ] = '\0';
+                    if ( strlen( start ) != unsigned( ret ) )
+                        writeMongoProgramOutputLine( port_, pid_, "WARNING: mongod wrote null bytes to output" );
+                    char *last = buf;
+                    for( char *i = strchr( buf, '\n' ); i; last = i + 1, i = strchr( last, '\n' ) ) {
+                        *i = '\0';
+                        writeMongoProgramOutputLine( port_, pid_, last );
+                    }
+                    if ( ret == 0 ) {
+                        if ( *last )
+                            writeMongoProgramOutputLine( port_, pid_, last );
+                        close( pipe_ );
+                        break;
+                    }
+                    if ( last != buf ) {
+                        strcpy( temp, last );
+                        strcpy( buf, temp );
+                    }
+                    else {
+                        verify( strlen( buf ) < bufSize );
+                    }
+                    start = buf + strlen( buf );
                 }
-
-                string args = ss.str();
-
-                boost::scoped_array<TCHAR> args_tchar (new TCHAR[args.size() + 1]);
-                size_t i;
-                for(i=0; i < args.size(); i++)
-                    args_tchar[i] = args[i];
-                args_tchar[i] = 0;
-
-                HANDLE h = (HANDLE)_get_osfhandle(child_stdout);
-                verify(h != INVALID_HANDLE_VALUE);
-                verify(SetHandleInformation(h, HANDLE_FLAG_INHERIT, 1));
-
-                STARTUPINFO si;
-                ZeroMemory(&si, sizeof(si));
-                si.cb = sizeof(si);
-                si.hStdError = h;
-                si.hStdOutput = h;
-                si.dwFlags |= STARTF_USESTDHANDLES;
-
-                PROCESS_INFORMATION pi;
-                ZeroMemory(&pi, sizeof(pi));
-
-                bool success = CreateProcess( NULL, args_tchar.get(), NULL, NULL, true, 0, NULL, NULL, &si, &pi) != 0;
-                if (!success) {
-                    LPSTR lpMsgBuf=0;
-                    DWORD dw = GetLastError();
-                    FormatMessageA(
-                        FORMAT_MESSAGE_ALLOCATE_BUFFER |
-                        FORMAT_MESSAGE_FROM_SYSTEM |
-                        FORMAT_MESSAGE_IGNORE_INSERTS,
-                        NULL,
-                        dw,
-                        MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-                        (LPSTR)&lpMsgBuf,
-                        0, NULL );
-                    stringstream ss;
-                    ss << "couldn't start process " << argv_[0] << "; " << lpMsgBuf;
-                    uassert(14042, ss.str(), success);
-                    LocalFree(lpMsgBuf);
+            }
+            catch(...) {
+            }
+        }
+        
+        void ProgramRunner::launch_process(int child_stdout) {
+#ifdef _WIN32
+            stringstream ss;
+            for( unsigned i=0; i < argv_.size(); i++ ) {
+                if (i) ss << ' ';
+                if (argv_[i].find(' ') == string::npos)
+                    ss << argv_[i];
+                else {
+                    ss << '"';
+                    // escape all embedded quotes
+                    for (size_t j=0; j<argv_[i].size(); ++j) {
+                        if (argv_[i][j]=='"') ss << '"';
+                        ss << argv_[i][j];
+                    }
+                    ss << '"';
                 }
+            }
 
-                CloseHandle(pi.hThread);
+            string args = ss.str();
 
-                pid_ = pi.dwProcessId;
-                handles.insert( make_pair( pid_, pi.hProcess ) );
+            boost::scoped_array<TCHAR> args_tchar (new TCHAR[args.size() + 1]);
+            size_t i;
+            for(i=0; i < args.size(); i++)
+                args_tchar[i] = args[i];
+            args_tchar[i] = 0;
+
+            HANDLE h = (HANDLE)_get_osfhandle(child_stdout);
+            verify(h != INVALID_HANDLE_VALUE);
+            verify(SetHandleInformation(h, HANDLE_FLAG_INHERIT, 1));
+
+            STARTUPINFO si;
+            ZeroMemory(&si, sizeof(si));
+            si.cb = sizeof(si);
+            si.hStdError = h;
+            si.hStdOutput = h;
+            si.dwFlags |= STARTF_USESTDHANDLES;
+
+            PROCESS_INFORMATION pi;
+            ZeroMemory(&pi, sizeof(pi));
+
+            bool success = CreateProcess( NULL, args_tchar.get(), NULL, NULL, true, 0, NULL, NULL, &si, &pi) != 0;
+            if (!success) {
+                LPSTR lpMsgBuf=0;
+                DWORD dw = GetLastError();
+                FormatMessageA(
+                    FORMAT_MESSAGE_ALLOCATE_BUFFER |
+                    FORMAT_MESSAGE_FROM_SYSTEM |
+                    FORMAT_MESSAGE_IGNORE_INSERTS,
+                    NULL,
+                    dw,
+                    MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+                    (LPSTR)&lpMsgBuf,
+                    0, NULL );
+                stringstream ss;
+                ss << "couldn't start process " << argv_[0] << "; " << lpMsgBuf;
+                uassert(14042, ss.str(), success);
+                LocalFree(lpMsgBuf);
+            }
+
+            CloseHandle(pi.hThread);
+
+            pid_ = pi.dwProcessId;
+            handles.insert( make_pair( pid_, pi.hProcess ) );
 
 #else
 
-                pid_ = fork();
-                verify( pid_ != -1 );
+            pid_ = fork();
+            verify( pid_ != -1 );
 
-                if ( pid_ == 0 ) {
-                    // DON'T ASSERT IN THIS BLOCK - very bad things will happen
+            if ( pid_ == 0 ) {
+                // DON'T ASSERT IN THIS BLOCK - very bad things will happen
 
-                    const char** argv = new const char* [argv_.size()+1]; // don't need to free - in child
-                    for (unsigned i=0; i < argv_.size(); i++) {
-                        argv[i] = argv_[i].c_str();
-                    }
-                    argv[argv_.size()] = 0;
+                const char** argv = new const char* [argv_.size()+1]; // don't need to free - in child
+                for (unsigned i=0; i < argv_.size(); i++) {
+                    argv[i] = argv_[i].c_str();
+                }
+                argv[argv_.size()] = 0;
 
-                    if ( dup2( child_stdout, STDOUT_FILENO ) == -1 ||
-                            dup2( child_stdout, STDERR_FILENO ) == -1 ) {
-                        cout << "Unable to dup2 child output: " << errnoWithDescription() << endl;
-                        ::_Exit(-1); //do not pass go, do not call atexit handlers
-                    }
-
-                    const char** env = new const char* [2]; // don't need to free - in child
-                    env[0] = NULL;
-#if defined(HEAP_CHECKING)
-                    env[0] = "HEAPCHECK=normal";
-                    env[1] = NULL;
-
-                    // Heap-check for mongos only. 'argv[0]' must be in the path format.
-                    if ( argv_[0].find("mongos") != string::npos) {
-                        execvpe( argv[ 0 ], const_cast<char**>(argv) , const_cast<char**>(env) );
-                    }
-#endif // HEAP_CHECKING
-
-                    execvp( argv[ 0 ], const_cast<char**>(argv) );
-
-                    cout << "Unable to start program " << argv[0] << ' ' << errnoWithDescription() << endl;
-                    ::_Exit(-1);
+                if ( dup2( child_stdout, STDOUT_FILENO ) == -1 ||
+                        dup2( child_stdout, STDERR_FILENO ) == -1 ) {
+                    cout << "Unable to dup2 child output: " << errnoWithDescription() << endl;
+                    ::_Exit(-1); //do not pass go, do not call atexit handlers
                 }
 
-#endif
+                const char** env = new const char* [2]; // don't need to free - in child
+                env[0] = NULL;
+#if defined(HEAP_CHECKING)
+                env[0] = "HEAPCHECK=normal";
+                env[1] = NULL;
+
+                // Heap-check for mongos only. 'argv[0]' must be in the path format.
+                if ( argv_[0].find("mongos") != string::npos) {
+                    execvpe( argv[ 0 ], const_cast<char**>(argv) , const_cast<char**>(env) );
+                }
+#endif // HEAP_CHECKING
+
+                execvp( argv[ 0 ], const_cast<char**>(argv) );
+
+                cout << "Unable to start program " << argv[0] << ' ' << errnoWithDescription() << endl;
+                ::_Exit(-1);
             }
-        };
+
+#endif
+        }
 
         //returns true if process exited
         bool wait_for_pid(pid_t pid, bool block=true, int* exit_code=NULL) {

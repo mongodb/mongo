@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <boost/filesystem/convenience.hpp>
+
 namespace mongo {
 
     class Scope;
@@ -34,5 +36,27 @@ namespace mongo {
         
         void goingAwaySoon();
         void installShellUtilsLauncher( Scope& scope );
+        
+        /** Helper class for launching a program and logging its output. */
+        class ProgramRunner {
+        public:
+            /** @param args The program's arguments, including the program name. */
+            ProgramRunner( const BSONObj &args , bool isMongoProgram=true);
+            /** Launch the program. */
+            void start();                        
+            /** Continuously read the program's output, generally from a new thread. */
+            void operator()();
+            pid_t pid() const { return pid_; }
+            int port() const { return port_; }
+
+        private:
+            boost::filesystem::path find(string prog);
+            void launch_process(int child_stdout);
+            
+            vector<string> argv_;
+            int port_;
+            int pipe_;
+            pid_t pid_;
+        };
     }
 }
