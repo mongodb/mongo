@@ -44,19 +44,19 @@ namespace mongo {
             ProgramRunner( const BSONObj &args );
             /** Launch the program. */
             void start();                        
-            /** Continuously read the program's output, generally from a new thread. */
+            /** Continuously read the program's output, generally from a special purpose thread. */
             void operator()();
-            pid_t pid() const { return pid_; }
-            int port() const { return port_; }
+            pid_t pid() const { return _pid; }
+            int port() const { return _port; }
 
         private:
-            boost::filesystem::path find(string prog);
-            void launch_process(int child_stdout);
+            boost::filesystem::path findProgram( const string &prog );
+            void launchProcess( int child_stdout );
             
-            vector<string> argv_;
-            int port_;
-            int pipe_;
-            pid_t pid_;
+            vector<string> _argv;
+            int _port;
+            int _pipe;
+            pid_t _pid;
         };
     }
 }

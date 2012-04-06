@@ -91,51 +91,27 @@ namespace mongo {
             return undefined_;
         }
 
-        boost::filesystem::path ProgramRunner::find(string prog) {
-            boost::filesystem::path p = prog;
-#ifdef _WIN32
-            p = change_extension(p, ".exe");
-#endif
-
-            if( boost::filesystem::exists(p) ) {
-#ifndef _WIN32
-                p = boost::filesystem::initial_path() / p;
-#endif
-                return p;
-            }
-
-            {
-                boost::filesystem::path t = boost::filesystem::current_path() / p;
-                if( boost::filesystem::exists(t)  ) return t;
-            }
-            {
-                boost::filesystem::path t = boost::filesystem::initial_path() / p;
-                if( boost::filesystem::exists(t)  ) return t;
-            }
-            return p; // not found; might find via system path
-        }
-
         ProgramRunner::ProgramRunner( const BSONObj &args ) {
             verify( !args.isEmpty() );
 
             string program( args.firstElement().valuestrsafe() );
             verify( !program.empty() );
-            boost::filesystem::path programPath = find(program);
+            boost::filesystem::path programPath = findProgram(program);
 
 #if 0
             if (program == "mongos") {
-                argv_.push_back("valgrind");
-                argv_.push_back("--log-file=/tmp/mongos-%p.valgrind");
-                argv_.push_back("--leak-check=yes");
-                argv_.push_back("--suppressions=valgrind.suppressions");
-                //argv_.push_back("--error-exitcode=1");
-                argv_.push_back("--");
+                _argv.push_back("valgrind");
+                _argv.push_back("--log-file=/tmp/mongos-%p.valgrind");
+                _argv.push_back("--leak-check=yes");
+                _argv.push_back("--suppressions=valgrind.suppressions");
+                //_argv.push_back("--error-exitcode=1");
+                _argv.push_back("--");
             }
 #endif
 
-            argv_.push_back( programPath.native_file_string() );
+            _argv.push_back( programPath.native_file_string() );
 
-            port_ = -1;
+            _port = -1;
 
             BSONObjIterator j( args );
             j.next(); // skip program name (handled above)
@@ -152,22 +128,22 @@ namespace mongo {
                     str = e.valuestr();
                 }
                 if ( str == "--port" )
-                    port_ = -2;
-                else if ( port_ == -2 )
-                    port_ = strtol( str.c_str(), 0, 10 );
-                argv_.push_back(str);
+                    _port = -2;
+                else if ( _port == -2 )
+                    _port = strtol( str.c_str(), 0, 10 );
+                _argv.push_back(str);
             }
 
             if ( program != "mongod" && program != "mongos" && program != "mongobridge" )
-                port_ = 0;
+                _port = 0;
             else {
-                if ( port_ <= 0 )
+                if ( _port <= 0 )
                     cout << "error: a port number is expected when running mongod (etc.) from the shell" << endl;
-                verify( port_ > 0 );
+                verify( _port > 0 );
             }
-            if ( port_ > 0 && dbs.count( port_ ) != 0 ) {
-                cerr << "count for port: " << port_ << " is not 0 is: " << dbs.count( port_ ) << endl;
-                verify( dbs.count( port_ ) == 0 );
+            if ( _port > 0 && dbs.count( _port ) != 0 ) {
+                cerr << "count for port: " << _port << " is not 0 is: " << dbs.count( _port ) << endl;
+                verify( dbs.count( _port ) == 0 );
             }
         }
 
@@ -176,22 +152,22 @@ namespace mongo {
             verify( pipe( pipeEnds ) != -1 );
 
             fflush( 0 );
-            launch_process(pipeEnds[1]); //sets pid_
+            launchProcess(pipeEnds[1]); //sets _pid
 
             {
                 stringstream ss;
                 ss << "shell: started program";
-                for (unsigned i=0; i < argv_.size(); i++)
-                    ss << " " << argv_[i];
+                for (unsigned i=0; i < _argv.size(); i++)
+                    ss << " " << _argv[i];
                 ss << '\n';
                 cout << ss.str(); cout.flush();
             }
 
-            if ( port_ > 0 )
-                dbs.insert( make_pair( port_, make_pair( pid_, pipeEnds[ 1 ] ) ) );
+            if ( _port > 0 )
+                dbs.insert( make_pair( _port, make_pair( _pid, pipeEnds[ 1 ] ) ) );
             else
-                shells.insert( make_pair( pid_, pipeEnds[ 1 ] ) );
-            pipe_ = pipeEnds[ 0 ];
+                shells.insert( make_pair( _pid, pipeEnds[ 1 ] ) );
+            _pipe = pipeEnds[ 0 ];
         }
 
         void ProgramRunner::operator()() {
@@ -209,22 +185,22 @@ namespace mongo {
                         cout << "first 300: " << string(buf,0,300) << endl;
                     }
                     verify( lenToRead > 0 );
-                    int ret = read( pipe_, (void *)start, lenToRead );
+                    int ret = read( _pipe, (void *)start, lenToRead );
                     if( mongo::dbexitCalled )
                         break;
                     verify( ret != -1 );
                     start[ ret ] = '\0';
                     if ( strlen( start ) != unsigned( ret ) )
-                        writeMongoProgramOutputLine( port_, pid_, "WARNING: mongod wrote null bytes to output" );
+                        writeMongoProgramOutputLine( _port, _pid, "WARNING: mongod wrote null bytes to output" );
                     char *last = buf;
                     for( char *i = strchr( buf, '\n' ); i; last = i + 1, i = strchr( last, '\n' ) ) {
                         *i = '\0';
-                        writeMongoProgramOutputLine( port_, pid_, last );
+                        writeMongoProgramOutputLine( _port, _pid, last );
                     }
                     if ( ret == 0 ) {
                         if ( *last )
-                            writeMongoProgramOutputLine( port_, pid_, last );
-                        close( pipe_ );
+                            writeMongoProgramOutputLine( _port, _pid, last );
+                        close( _pipe );
                         break;
                     }
                     if ( last != buf ) {
@@ -241,19 +217,43 @@ namespace mongo {
             }
         }
         
-        void ProgramRunner::launch_process(int child_stdout) {
+        boost::filesystem::path ProgramRunner::findProgram( const string &prog ) {
+            boost::filesystem::path p = prog;
+#ifdef _WIN32
+            p = change_extension(p, ".exe");
+#endif
+            
+            if( boost::filesystem::exists(p) ) {
+#ifndef _WIN32
+                p = boost::filesystem::initial_path() / p;
+#endif
+                return p;
+            }
+            
+            {
+                boost::filesystem::path t = boost::filesystem::current_path() / p;
+                if( boost::filesystem::exists(t)  ) return t;
+            }
+            {
+                boost::filesystem::path t = boost::filesystem::initial_path() / p;
+                if( boost::filesystem::exists(t)  ) return t;
+            }
+            return p; // not found; might find via system path
+        }
+
+        void ProgramRunner::launchProcess( int child_stdout ) {
 #ifdef _WIN32
             stringstream ss;
-            for( unsigned i=0; i < argv_.size(); i++ ) {
+            for( unsigned i=0; i < _argv.size(); i++ ) {
                 if (i) ss << ' ';
-                if (argv_[i].find(' ') == string::npos)
-                    ss << argv_[i];
+                if (_argv[i].find(' ') == string::npos)
+                    ss << _argv[i];
                 else {
                     ss << '"';
                     // escape all embedded quotes
-                    for (size_t j=0; j<argv_[i].size(); ++j) {
-                        if (argv_[i][j]=='"') ss << '"';
-                        ss << argv_[i][j];
+                    for (size_t j=0; j<_argv[i].size(); ++j) {
+                        if (_argv[i][j]=='"') ss << '"';
+                        ss << _argv[i][j];
                     }
                     ss << '"';
                 }
@@ -295,29 +295,29 @@ namespace mongo {
                     (LPSTR)&lpMsgBuf,
                     0, NULL );
                 stringstream ss;
-                ss << "couldn't start process " << argv_[0] << "; " << lpMsgBuf;
+                ss << "couldn't start process " << _argv[0] << "; " << lpMsgBuf;
                 uassert(14042, ss.str(), success);
                 LocalFree(lpMsgBuf);
             }
 
             CloseHandle(pi.hThread);
 
-            pid_ = pi.dwProcessId;
-            handles.insert( make_pair( pid_, pi.hProcess ) );
+            _pid = pi.dwProcessId;
+            handles.insert( make_pair( _pid, pi.hProcess ) );
 
 #else
 
-            pid_ = fork();
-            verify( pid_ != -1 );
+            _pid = fork();
+            verify( _pid != -1 );
 
-            if ( pid_ == 0 ) {
+            if ( _pid == 0 ) {
                 // DON'T ASSERT IN THIS BLOCK - very bad things will happen
 
-                const char** argv = new const char* [argv_.size()+1]; // don't need to free - in child
-                for (unsigned i=0; i < argv_.size(); i++) {
-                    argv[i] = argv_[i].c_str();
+                const char** argv = new const char* [_argv.size()+1]; // don't need to free - in child
+                for (unsigned i=0; i < _argv.size(); i++) {
+                    argv[i] = _argv[i].c_str();
                 }
-                argv[argv_.size()] = 0;
+                argv[_argv.size()] = 0;
 
                 if ( dup2( child_stdout, STDOUT_FILENO ) == -1 ||
                         dup2( child_stdout, STDERR_FILENO ) == -1 ) {
@@ -332,7 +332,7 @@ namespace mongo {
                 env[1] = NULL;
 
                 // Heap-check for mongos only. 'argv[0]' must be in the path format.
-                if ( argv_[0].find("mongos") != string::npos) {
+                if ( _argv[0].find("mongos") != string::npos) {
                     execvpe( argv[ 0 ], const_cast<char**>(argv) , const_cast<char**>(env) );
                 }
 #endif // HEAP_CHECKING
