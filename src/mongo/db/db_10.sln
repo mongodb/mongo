@@ -8,7 +8,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "examples", "examples", "{40
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tools", "tools", "{2B262D59-9DC7-4BF1-A431-1BD4966899A5}"
 	ProjectSection(SolutionItems) = preProject
-		..\shell\msvc\createCPPfromJavaScriptFiles.js = ..\shell\msvc\createCPPfromJavaScriptFiles.js
+		..\shell\createCPPfromJavaScriptFiles.js = ..\shell\createCPPfromJavaScriptFiles.js
 	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "unix files", "unix files", "{2F760952-C71B-4865-998F-AABAE96D1373}"
@@ -32,7 +32,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mongoutils test program", "
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "simple_client_demo", "..\client\examples\simple_client_demo.vcxproj", "{89C30BC3-2874-4F2C-B4DA-EB04E9782236}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mongo", "..\shell\msvc\mongo.vcxproj", "{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mongo", "..\shell\mongo.vcxproj", "{FE959BD8-8EE2-4555-AE59-9FA14FFD410E}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "mongoperf", "..\client\examples\mongoperf.vcxproj", "{79D4E297-BFB7-4FF2-9B13-08A146582E46}"
 EndProject
