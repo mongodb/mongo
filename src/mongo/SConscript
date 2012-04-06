@@ -411,11 +411,7 @@ shellFilesToUse = coreShellFiles
 if shellEnv is not None:
     mongo_shell = shellEnv.Program(
         "mongo",
-         [ "shell/dbshell.cpp",
-           "shell/shell_utils.cpp",
-           "shell/mongo-server.cpp",
-           "../third_party/linenoise/linenoise.cpp",
-           "../third_party/linenoise/linenoise_utf8.cpp" ],
+        shellFilesToUse,
         LIBDEPS=["coreserver", "clientandshell",
                  "$BUILD_DIR/third_party/pcrecpp"] )
 
