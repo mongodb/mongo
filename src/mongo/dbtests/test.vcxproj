@@ -1469,6 +1469,9 @@
     </ClCompile>
     <ClCompile Include="..\util\ramlog.cpp" />
     <ClCompile Include="..\util\net\sock.cpp" />
+    <ClCompile Include="..\util\startup_test.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\util\stringutils.cpp" />
     <ClCompile Include="..\util\text.cpp" />
     <ClCompile Include="..\util\util.cpp" />

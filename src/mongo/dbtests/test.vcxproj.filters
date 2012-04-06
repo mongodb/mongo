@@ -1061,6 +1061,9 @@
     <ClCompile Include="..\unittest\unittest.cpp">
       <Filter>db\cpp</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\startup_test.cpp">
+      <Filter>util</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\SConstruct">
