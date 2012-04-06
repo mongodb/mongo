@@ -693,6 +693,15 @@ namespace mongo {
         getDur().writingInt(_flags) &= ~flag;
     }
 
+    int NamespaceDetails::getRecordAllocationSize( int minRecordSize ) {
+        if ( _paddingFactor == 0 ) {
+            warning() << "implicit updgrade of paddingFactor of very old collection" << endl;
+            setPaddingFactor(1.0);
+        }
+        verify( _paddingFactor >= 1 );
+        return static_cast<int>(minRecordSize * _paddingFactor);
+    }
+
     /* ------------------------------------------------------------------------- */
 
     /* add a new namespace to the system catalog (<dbname>.system.namespaces).

@@ -243,6 +243,13 @@ namespace mongo {
         /* returns index of the first index in which the field is present. -1 if not present. */
         int fieldIsIndexed(const char *fieldName);
 
+        /**
+         * @return the actual size to create
+         *         will be >= oldRecordSize
+         *         based on padding and any other flags
+         */
+        int getRecordAllocationSize( int minRecordSize );
+
         double paddingFactor() const { return _paddingFactor; }
 
         void setPaddingFactor( double paddingFactor ) {

@@ -1982,16 +1982,7 @@ namespace mongo {
             BSONElementManipulator::lookForTimestamps( io );
         }
 
-        int lenWHdr = len + Record::HeaderSize;
-        lenWHdr = (int) (lenWHdr * d->paddingFactor());
-        if ( lenWHdr == 0 ) {
-            // old datafiles, backward compatible here.
-            // this is _very_ old, < 0.8
-            warning() << "implicit updgrade of paddingFactor of very old collection" << endl;
-            verify( d->paddingFactor() == 0 );
-            d->setPaddingFactor(1.0);
-            lenWHdr = len + Record::HeaderSize;
-        }
+        int lenWHdr = d->getRecordAllocationSize( len + Record::HeaderSize );
 
         // If the collection is capped, check if the new object will violate a unique index
         // constraint before allocating space.
