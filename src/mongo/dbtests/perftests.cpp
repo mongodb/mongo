@@ -517,7 +517,17 @@ namespace PerfTests {
     SimpleMutex m("simptst");
     mongo::mutex mtest("mtest");
     SpinLock s;
+    boost::condition c;
 
+    class NotifyOne : public B {
+    public:
+        string name() { return "notify_one"; }
+        virtual int howLongMillis() { return 500; }
+        virtual bool showDurStats() { return false; }
+        void timed() {
+            c.notify_one();
+        }
+    };
     class mutexspeed : public B {
     public:
         string name() { return "mutex"; }
@@ -1088,6 +1098,7 @@ namespace PerfTests {
                 add< wlock >();
                 add< qlock >();
                 //add< ulock >();
+                add< NotifyOne >();
                 add< mutexspeed >();
                 add< simplemutexspeed >();
                 add< spinlockspeed >();
