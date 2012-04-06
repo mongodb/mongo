@@ -1,5 +1,3 @@
-// histogram.cc
-
 /**
 *    Copyright (C) 2010 10gen Inc.
 *
@@ -16,11 +14,11 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "histogram.h"
+
 #include <iomanip>
 #include <limits>
 #include <sstream>
-
-#include "histogram.h"
 
 namespace mongo {
 
@@ -70,7 +68,7 @@ namespace mongo {
         _buckets[ _findBucket(element) ] += 1;
     }
 
-    string Histogram::toHTML() const {
+    std::string Histogram::toHTML() const {
         uint64_t max = 0;
         for ( uint32_t i = 0; i < _numBuckets; i++ ) {
             if ( _buckets[i] > max ) {
@@ -86,7 +84,7 @@ namespace mongo {
         ostringstream ss;
         for ( uint32_t i = 0; i < _numBuckets; i++ ) {
             int barSize = _buckets[i] * maxBar / max;
-            ss << string( barSize,'*' )
+            ss << std::string( barSize,'*' )
                << setfill(' ') << setw( maxBar-barSize + 12 )
                << _boundaries[i] << '\n';
         }
