@@ -593,12 +593,22 @@ namespace PerfTests {
 
     class qlock : public B {
     public:
-        string name() { return "qlock"; }
+        string name() { return "qlockr"; }
         //virtual int howLongMillis() { return 500; }
         virtual bool showDurStats() { return false; }
         void timed() {
             _qlock.lock_r();
             _qlock.unlock_r();
+        }
+    };
+    class qlockw : public B {
+    public:
+        string name() { return "qlockw"; }
+        //virtual int howLongMillis() { return 500; }
+        virtual bool showDurStats() { return false; }
+        void timed() {
+            _qlock.lock_w();
+            _qlock.unlock_w();
         }
     };
 
@@ -1097,7 +1107,7 @@ namespace PerfTests {
                 add< rlock >();
                 add< wlock >();
                 add< qlock >();
-                //add< ulock >();
+                add< qlockw >();
                 add< NotifyOne >();
                 add< mutexspeed >();
                 add< simplemutexspeed >();
