@@ -19,6 +19,7 @@
 #include "pch.h"
 #include "key.h"
 #include "mongo/util/startup_test.h"
+#include "mongo/bson/util/builder.h"
 
 namespace mongo {
 
@@ -405,11 +406,11 @@ namespace mongo {
                     p += sizeof(double);
                     break;
                 case cint:
-                    b.append("", (int) ((double&) *p));
+                    b.append("", static_cast< int >((reinterpret_cast< const PackedDouble& >(*p)).d));
                     p += sizeof(double);
                     break;
                 case clong:
-                    b.append("", (long long) ((double&) *p));
+                    b.append("", static_cast< long long>((reinterpret_cast< const PackedDouble& >(*p)).d));
                     p += sizeof(double);
                     break;
                 default:
@@ -435,8 +436,8 @@ namespace mongo {
         switch( lt ) { 
         case cdouble:
             {
-                double L = *((double *) l);
-                double R = *((double *) r);
+                double L = (reinterpret_cast< const PackedDouble* >(l))->d;
+                double R = (reinterpret_cast< const PackedDouble* >(r))->d;
                 if( L < R )
                     return -1;
                 if( L != R )
@@ -624,7 +625,7 @@ namespace mongo {
                 l += 8; r += 8;
                 break;
             case cdouble:
-                if( *((double *) l) != *((double *) r) )
+                if( (reinterpret_cast< const PackedDouble* > (l))->d != (reinterpret_cast< const PackedDouble* >(r))->d )
                     return false;
                 l += 8; r += 8;
                 break;

@@ -20,14 +20,17 @@
 #if defined(__GNUC__)
 
 #define NOINLINE_DECL __attribute__((noinline))
+#define PACKED_DECL __attribute__((packed))
 
 #elif defined(_MSC_VER)
 
 #define NOINLINE_DECL __declspec(noinline)
+#define PACKED_DECL
 
 #else
 
 #define NOINLINE_DECL
+#define PACKED_DECL
 
 #endif
 

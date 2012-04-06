@@ -184,7 +184,7 @@ namespace mongo {
         bool isNumber() const;
 
         /** Return double value for this field. MUST be NumberDouble type. */
-        double _numberDouble() const {return *reinterpret_cast< const double* >( value() ); }
+        double _numberDouble() const {return (reinterpret_cast< const PackedDouble* >( value() ))->d; }
         /** Return int value for this field. MUST be NumberInt type. */
         int _numberInt() const {return *reinterpret_cast< const int* >( value() ); }
         /** Return long long value for this field. MUST be NumberLong type. */
@@ -490,7 +490,7 @@ namespace mongo {
         case NumberLong:
             return *reinterpret_cast< const long long* >( value() ) != 0;
         case NumberDouble:
-            return *reinterpret_cast< const double* >( value() ) != 0;
+            return (reinterpret_cast < const PackedDouble* >(value ()))->d != 0;
         case NumberInt:
             return *reinterpret_cast< const int* >( value() ) != 0;
         case mongo::Bool:
