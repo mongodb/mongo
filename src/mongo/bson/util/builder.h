@@ -27,6 +27,15 @@
 #include "../stringdata.h"
 
 namespace mongo {
+    /* Accessing unaligned doubles on ARM generates an alignment trap and aborts with SIGBUS on Linux.
+       Wrapping the double in a packed struct forces gcc to generate code that works with unaligned values too.
+       The generated code for other architectures (which already allow unaligned accesses) is the same as if
+       there was a direct pointer access.
+    */
+    struct PackedDouble {
+        double d;
+    } PACKED_DECL;
+
 
     /* Note the limit here is rather arbitrary and is simply a standard. generally the code works
        with any object that fits in ram.
@@ -158,7 +167,7 @@ namespace mongo {
             *((bool*)grow(sizeof(bool))) = j;
         }
         void appendNum(double j) {
-            *((double*)grow(sizeof(double))) = j;
+            (reinterpret_cast< PackedDouble* >(grow(sizeof(double))))->d = j;
         }
         void appendNum(long long j) {
             *((long long*)grow(sizeof(long long))) = j;
