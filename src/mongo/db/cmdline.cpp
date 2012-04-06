@@ -242,11 +242,11 @@ namespace mongo {
             int newSize = params["maxConns"].as<int>();
             if ( newSize < 5 ) {
                 out() << "maxConns has to be at least 5" << endl;
-                dbexit( EXIT_BADOPTIONS );
+                ::exit( EXIT_BADOPTIONS );
             }
             else if ( newSize >= 10000000 ) {
                 out() << "maxConns can't be greater than 10000000" << endl;
-                dbexit( EXIT_BADOPTIONS );
+                ::exit( EXIT_BADOPTIONS );
             }
             connTicketHolder.resize( newSize );
         }
@@ -282,7 +282,7 @@ namespace mongo {
             cmdLine.doFork = true;
             if ( ! params.count( "logpath" ) && ! params.count( "syslog" ) ) {
                 cout << "--fork has to be used with --logpath or --syslog" << endl;
-                ::exit(-1);
+                ::exit(EXIT_BADOPTIONS);
             }
 
             if ( params.count( "logpath" ) ) {
@@ -382,7 +382,7 @@ namespace mongo {
         if (params.count("logpath") && !params.count("shutdown")) {
             if ( params.count("syslog") ) {
                 cout << "Cant use both a logpath and syslog " << endl;
-                ::exit(-1);
+                ::exit(EXIT_BADOPTIONS);
             }
             
             if ( logpath.size() == 0 )
@@ -400,7 +400,7 @@ namespace mongo {
 
             if (!setUpSecurityKey(f)) {
                 // error message printed in setUpPrivateKey
-                dbexit(EXIT_BADOPTIONS);
+                ::exit(EXIT_BADOPTIONS);
             }
 
             cmdLine.keyFile = true;
@@ -416,12 +416,12 @@ namespace mongo {
 
             if ( cmdLine.sslPEMKeyPassword.size() == 0 ) {
                 log() << "need sslPEMKeyPassword" << endl;
-                dbexit(EXIT_BADOPTIONS);
+                ::exit(EXIT_BADOPTIONS);
             }
             
             if ( cmdLine.sslPEMKeyFile.size() == 0 ) {
                 log() << "need sslPEMKeyFile" << endl;
-                dbexit(EXIT_BADOPTIONS);
+                ::exit(EXIT_BADOPTIONS);
             }
             
             cmdLine.sslServerManager = new SSLManager( false );
@@ -429,7 +429,7 @@ namespace mongo {
         }
         else if ( cmdLine.sslPEMKeyFile.size() || cmdLine.sslPEMKeyPassword.size() ) {
             log() << "need to enable sslOnNormalPorts" << endl;
-            dbexit(EXIT_BADOPTIONS);
+            ::exit(EXIT_BADOPTIONS);
         }
 #endif
         
