@@ -50,6 +50,11 @@ namespace mongo {
         }
         const BSONObj undefined_ = makeUndefined();
 
+        BSONElement oneArg(const BSONObj& args) {
+            uassert( 12597 , "need to specify 1 argument" , args.nFields() == 1 );
+            return args.firstElement();
+        }
+
         // real methods
 
         BSONObj Quit(const BSONObj& args, void* data) {

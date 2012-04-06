@@ -112,11 +112,6 @@ namespace mongo {
             return BSON( "" << getHostName() );
         }
 
-        BSONElement oneArg(const BSONObj& args) {
-            uassert( 12597 , "need to specify 1 argument" , args.nFields() == 1 );
-            return args.firstElement();
-        }
-
         const int CANT_OPEN_FILE = 13300;
 
         BSONObj cat(const BSONObj& args, void* data) {
