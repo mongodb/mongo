@@ -1750,8 +1750,9 @@ namespace QueryUtilTests {
                                              const BSONObj &elementSpec,
                                              bool reverse ) {
                     FieldRange range( intervalSpec.firstElement(), true );
+                    BSONElement element = elementSpec.firstElement();
                     FieldRangeVectorIterator::FieldIntervalMatcher matcher
-                            ( range.intervals()[ 0 ], elementSpec.firstElement(), reverse );
+                            ( range.intervals()[ 0 ], element, reverse );
                     return matcher.isEqInclusiveUpperBound();
                 }
             };
@@ -1778,8 +1779,9 @@ namespace QueryUtilTests {
                 bool isGteUpperBound( const BSONObj &intervalSpec, const BSONObj &elementSpec,
                                      bool reverse ) {
                     FieldRange range( intervalSpec.firstElement(), true );
+                    BSONElement element = elementSpec.firstElement();
                     FieldRangeVectorIterator::FieldIntervalMatcher matcher
-                            ( range.intervals()[ 0 ], elementSpec.firstElement(), reverse );
+                            ( range.intervals()[ 0 ], element, reverse );
                     return matcher.isGteUpperBound();
                 }
             };
@@ -1809,8 +1811,9 @@ namespace QueryUtilTests {
                                              const BSONObj &elementSpec,
                                              bool reverse ) {
                     FieldRange range( intervalSpec.firstElement(), true );
+                    BSONElement element = elementSpec.firstElement();
                     FieldRangeVectorIterator::FieldIntervalMatcher matcher
-                            ( range.intervals()[ 0 ], elementSpec.firstElement(), reverse );
+                            ( range.intervals()[ 0 ], element, reverse );
                     return matcher.isEqExclusiveLowerBound();
                 }
             };
@@ -1837,8 +1840,9 @@ namespace QueryUtilTests {
                 bool isLtLowerBound( const BSONObj &intervalSpec, const BSONObj &elementSpec,
                                      bool reverse ) {
                     FieldRange range( intervalSpec.firstElement(), true );
+                    BSONElement element = elementSpec.firstElement();
                     FieldRangeVectorIterator::FieldIntervalMatcher matcher
-                            ( range.intervals()[ 0 ], elementSpec.firstElement(), reverse );
+                            ( range.intervals()[ 0 ], element, reverse );
                     return matcher.isLtLowerBound();
                 }
             };
@@ -1849,8 +1853,9 @@ namespace QueryUtilTests {
                     BSONObj intervalSpec = BSON( "$in" << BSON_ARRAY( 1 << 2 ) );
                     BSONObj elementSpec = BSON( "" << 1 );
                     FieldRange range( intervalSpec.firstElement(), true );
+                    BSONElement element = elementSpec.firstElement();
                     FieldRangeVectorIterator::FieldIntervalMatcher matcher
-                            ( range.intervals()[ 0 ], elementSpec.firstElement(), false );
+                            ( range.intervals()[ 0 ], element, false );
                     ASSERT( matcher.isEqInclusiveUpperBound() );
                     ASSERT( matcher.isGteUpperBound() );
                     ASSERT( !matcher.isEqExclusiveLowerBound() );
