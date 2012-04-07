@@ -24,18 +24,6 @@
 namespace mongo {
     
     extern const int MaxBytesToReturnToClientAtOnce;
-
-    /** Helper class for deduping DiskLocs */
-    class DiskLocDupSet {
-    public:
-        /** @return true if dup, otherwise return false and insert. */
-        bool getsetdup( const DiskLoc &loc ) {
-            pair<set<DiskLoc>::iterator, bool> p = _dups.insert(loc);
-            return !p.second;
-        }
-    private:
-        set<DiskLoc> _dups;
-    };
     
     /* This is for languages whose "objects" are not well ordered (JSON is well ordered).
      [ { a : ... } , { b : ... } ] -> { a : ..., b : ... }
@@ -59,7 +47,7 @@ namespace mongo {
         
         return b.obj();
     }
-    
+
     class QueryMessage;
     
     /**
