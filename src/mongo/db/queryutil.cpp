@@ -17,13 +17,10 @@
 
 #include "pch.h"
 
-#include "btree.h"
-#include "matcher.h"
+#include "mongo/db/queryutil.h"
 #include "pdfile.h"
-#include "queryoptimizer.h"
 #include "../util/startup_test.h"
 #include "dbmessage.h"
-#include "indexkey.h"
 #include "../util/mongoutils/str.h"
 
 namespace mongo {

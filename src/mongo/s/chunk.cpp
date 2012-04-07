@@ -19,7 +19,6 @@
 #include "pch.h"
 
 #include "../client/connpool.h"
-#include "../db/querypattern.h"
 #include "../db/queryutil.h"
 #include "../util/startup_test.h"
 #include "../util/timer.h"

@@ -34,7 +34,6 @@
 #include "../util/background.h"
 #include "../client/connpool.h"
 #include "pdfile.h"
-#include "ops/query.h"
 #include "db.h"
 #include "commands.h"
 #include "security.h"
@@ -45,6 +44,7 @@
 #include "repl/connections.h"
 #include "ops/update.h"
 #include "pcrecpp.h"
+#include "mongo/db/instance.h"
 
 namespace mongo {
 

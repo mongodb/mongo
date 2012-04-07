@@ -26,7 +26,6 @@
 #include "db/pipeline/document_source.h"
 #include "db/pipeline/expression.h"
 #include "db/pipeline/expression_context.h"
-#include "db/queryoptimizer.h"
 
 namespace mongo {
 

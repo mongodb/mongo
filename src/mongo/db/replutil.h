@@ -22,7 +22,7 @@
 #include "repl.h"
 #include "cmdline.h"
 #include "repl/rs.h"
-#include "ops/query.h"
+#include "mongo/db/queryutil.h"
 
 namespace mongo {
 

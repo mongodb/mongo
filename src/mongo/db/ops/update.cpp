@@ -17,14 +17,13 @@
  */
 
 #include "pch.h"
-#include "query.h"
 #include "../pdfile.h"
 #include "../jsobjmanipulator.h"
 #include "../queryutil.h"
-#include "../repl.h"
-#include "../btree.h"
+#include "mongo/db/oplog.h"
 #include "update.h"
 #include "../pagefault.h"
+#include "mongo/client/dbclientinterface.h"
 
 //#define DEBUGUPDATE(x) cout << x << endl;
 #define DEBUGUPDATE(x)

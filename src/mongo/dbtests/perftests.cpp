@@ -24,12 +24,10 @@
 
 #include "pch.h"
 #include <fstream>
-#include "../db/ops/query.h"
 #include "../db/db.h"
 #include "../db/instance.h"
 #include "../db/json.h"
 #include "../db/lasterror.h"
-#include "../db/ops/update.h"
 #include "../db/taskqueue.h"
 #include "../util/timer.h"
 #include "dbtests.h"

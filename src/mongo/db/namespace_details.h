@@ -26,7 +26,6 @@
 #include "mongo/db/jsobj.h"
 #include "mongo/db/mongommf.h"
 #include "mongo/db/namespace.h"
-#include "mongo/db/queryoptimizer.h"
 #include "mongo/db/queryoptimizercursor.h"
 #include "mongo/db/querypattern.h"
 #include "mongo/util/hashtab.h"
@@ -396,6 +395,9 @@ namespace mongo {
     }; // NamespaceDetails
 #pragma pack()
 
+    class ParsedQuery;
+    class QueryPlanSummary;
+    
     /* NamespaceDetailsTransient
 
        these are things we know / compute about a namespace that are transient -- things

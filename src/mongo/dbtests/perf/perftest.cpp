@@ -23,7 +23,6 @@
 #include "mongo/client/dbclientcursor.h"
 #include "mongo/db/instance.h"
 #include "mongo/db/json.h"
-#include "mongo/db/ops/query.h"
 #include "mongo/db/queryoptimizer.h"
 #include "mongo/dbtests/framework.h"
 #include "mongo/util/file_allocator.h"

@@ -18,10 +18,11 @@
 #pragma once
 
 #include "jsobj.h"
-#include "queryutil.h"
 
 namespace mongo {
 
+    class FieldRangeSet;
+    
     /**
      * Implements query pattern matching, used to determine if a query is
      * similar to an earlier query and should use the same plan.

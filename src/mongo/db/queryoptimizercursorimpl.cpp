@@ -24,6 +24,7 @@
 #include "btree.h"
 #include "explain.h"
 #include "mongo/client/dbclientinterface.h"
+#include "mongo/db/queryoptimizer.h"
 
 namespace mongo {
     

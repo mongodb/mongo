@@ -16,6 +16,7 @@
  */
 
 #include "querypattern.h"
+#include "mongo/db/queryutil.h"
 
 namespace mongo {
 

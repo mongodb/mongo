@@ -24,14 +24,17 @@
 #include "../jsobj.h"
 #include "../diskloc.h"
 #include "../explain.h"
-#include "../queryoptimizer.h"
-#include "../queryoptimizercursor.h"
+#include "mongo/db/projection.h"
 #include "../../s/d_chunk_manager.h"
 
 // struct QueryOptions, QueryResult, QueryResultFlags in:
 
 namespace mongo {
 
+    class ParsedQuery;
+    class QueryOptimizerCursor;
+    class QueryPlanSummary;
+    
     QueryResult* processGetMore(const char *ns, int ntoreturn, long long cursorid , CurOp& op, int pass, bool& exhaust);
 
     const char * runQuery(Message& m, QueryMessage& q, CurOp& curop, Message &result);

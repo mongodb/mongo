@@ -17,12 +17,10 @@
 */
 
 #include "pch.h"
+#include "mongo/db/queryoptimizer.h"
 #include "db.h"
 #include "btree.h"
-#include "pdfile.h"
-#include "queryoptimizer.h"
 #include "cmdline.h"
-#include "clientcursor.h"
 #include "../server.h"
 #include "pagefault.h"
 

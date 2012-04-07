@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "queryoptimizer.h"
+#include "mongo/db/queryutil.h"
 #include "queryoptimizercursor.h"
 
 namespace mongo {
@@ -166,6 +166,9 @@ namespace mongo {
         set<DiskLoc> _set;
         long long _accesses;
     };
+    
+    class QueryPlanSummary;
+    class MultiPlanScanner;
     
     /**
      * Helper class for generating a simple Cursor or QueryOptimizerCursor from a set of query

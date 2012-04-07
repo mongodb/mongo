@@ -19,7 +19,6 @@
 #include "../client.h"
 #include "rs.h"
 #include "../repl.h"
-#include "../ops/query.h"
 #include "../cloner.h"
 #include "../ops/update.h"
 #include "../ops/delete.h"

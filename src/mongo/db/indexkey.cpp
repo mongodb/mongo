@@ -20,7 +20,6 @@
 #include "namespace-inl.h"
 #include "index.h"
 #include "btree.h"
-#include "ops/query.h"
 #include "background.h"
 #include "../util/stringutils.h"
 #include "../util/text.h"

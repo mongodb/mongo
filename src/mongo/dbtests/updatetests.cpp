@@ -18,7 +18,6 @@
  */
 
 #include "pch.h"
-#include "../db/ops/query.h"
 #include "mongo/client/dbclientcursor.h"
 
 #include "../db/db.h"
