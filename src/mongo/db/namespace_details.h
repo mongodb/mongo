@@ -99,14 +99,7 @@ namespace mongo {
         int indexBuildInProgress;             // 1 if in prog
     private:
         int _userFlags;
-    public:
-        // ofs 424 (8)
-        struct Capped2 {
-            unsigned long long cc2_ptr;       // see capped.cpp
-            unsigned fileNumber;
-        } capped2;
-    private:
-        char reserved[60];
+        char reserved[72];
         /*-------- end data 496 bytes */
     public:
         explicit NamespaceDetails( const DiskLoc &loc, bool _capped );

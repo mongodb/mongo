@@ -72,8 +72,6 @@ namespace mongo {
         reservedA = 0;
         extraOffset = 0;
         indexBuildInProgress = 0;
-        capped2.cc2_ptr = 0;
-        capped2.fileNumber = 0;
         memset(reserved, 0, sizeof(reserved));
     }
 
@@ -132,14 +130,12 @@ namespace mongo {
             return;
         }
 
-        if( indexBuildInProgress || capped2.cc2_ptr ) {
+        if( indexBuildInProgress ) {
             assertInWriteLock();
             if( indexBuildInProgress ) {
                 log() << "indexBuildInProgress was " << indexBuildInProgress << " for " << k << ", indicating an abnormal db shutdown" << endl;
                 getDur().writingInt( indexBuildInProgress ) = 0;
             }
-            if( capped2.cc2_ptr )
-                *getDur().writing(&capped2.cc2_ptr) = 0;
         }
     }
 
