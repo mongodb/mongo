@@ -1700,10 +1700,10 @@ namespace mongo {
 
     void ensureHaveIdIndex(const char *ns) {
         NamespaceDetails *d = nsdetails(ns);
-        if ( d == 0 || d->isFlagSet(NamespaceDetails::Flag_HaveIdIndex) )
+        if ( d == 0 || d->isSystemFlagSet(NamespaceDetails::Flag_HaveIdIndex) )
             return;
 
-        d->setFlag( NamespaceDetails::Flag_HaveIdIndex );
+        d->setSystemFlag( NamespaceDetails::Flag_HaveIdIndex );
 
         {
             NamespaceDetails::IndexIterator i = d->ii();

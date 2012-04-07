@@ -1354,7 +1354,8 @@ namespace mongo {
             result.append( "nindexes" , nsd->nIndexes );
             result.append( "lastExtentSize" , nsd->lastExtentSize / scale );
             result.append( "paddingFactor" , nsd->paddingFactor() );
-            result.append( "flags" , nsd->flags() );
+            result.append( "systemFlags" , nsd->systemFlags() );
+            result.append( "userFlags" , nsd->userFlags() );
 
             BSONObjBuilder indexSizes;
             result.appendNumber( "totalIndexSize" , getIndexSizeForCollection(dbname, ns, &indexSizes, scale) / scale );
@@ -1377,6 +1378,7 @@ namespace mongo {
         CollectionModCommand() : Command( "collMod" ){}
         virtual bool slaveOk() const { return true; }
         virtual LockType locktype() const { return WRITE; }
+        virtual bool logTheOp() { return true; }
         
         bool run(const string& dbname, BSONObj& jsobj, int, string& errmsg, BSONObjBuilder& result, bool fromRepl ) {
             string ns = dbname + "." + jsobj.firstElement().valuestr();
@@ -1388,12 +1390,12 @@ namespace mongo {
             }
 
             if ( jsobj["usePowerOf2Sizes"].type() ) {
-                result.appendBool( "usePowerOf2Sizes_old" , nsd->isFlagSet( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
+                result.appendBool( "usePowerOf2Sizes_old" , nsd->isUserFlagSet( NamespaceDetails::Flag_UsePowerOf2Sizes ) );
                 if ( jsobj["usePowerOf2Sizes"].trueValue() ) {
-                    nsd->setFlag( NamespaceDetails::Flag_UsePowerOf2Sizes );
+                    nsd->setUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes );
                 }
                 else {
-                    nsd->clearFlag( NamespaceDetails::Flag_UsePowerOf2Sizes );
+                    nsd->clearUserFlag( NamespaceDetails::Flag_UsePowerOf2Sizes );
                 }
             }
 

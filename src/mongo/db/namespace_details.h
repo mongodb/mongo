@@ -85,7 +85,7 @@ namespace mongo {
     private:
         double _paddingFactor;                 // 1.0 = no padding.
         // ofs 386 (16)
-        int _flags;
+        int _systemFlags; // things that the system sets/cares about
     public:
         DiskLoc capExtent;
         DiskLoc capFirstNewRecord;
@@ -98,15 +98,18 @@ namespace mongo {
         long long extraOffset;                // where the $extra info is located (bytes relative to this)
     public:
         int indexBuildInProgress;             // 1 if in prog
-        unsigned reservedB;
+    private:
+        int _userFlags;
+    public:
         // ofs 424 (8)
         struct Capped2 {
             unsigned long long cc2_ptr;       // see capped.cpp
             unsigned fileNumber;
         } capped2;
+    private:
         char reserved[60];
         /*-------- end data 496 bytes */
-
+    public:
         explicit NamespaceDetails( const DiskLoc &loc, bool _capped );
 
         class Extra {
@@ -184,9 +187,12 @@ namespace mongo {
         /* NOTE: be careful with flags.  are we manipulating them in read locks?  if so,
                  this isn't thread safe.  TODO
         */
-        enum NamespaceFlags {
-            Flag_HaveIdIndex = 1 << 0 , // set when we have _id index (ONLY if ensureIdIndex was called -- 0 if that has never been called)
-            Flag_UsePowerOf2Sizes = 1 << 1
+        enum SystemFlags {
+            Flag_HaveIdIndex = 1 << 0 // set when we have _id index (ONLY if ensureIdIndex was called -- 0 if that has never been called)
+        };
+
+        enum UserFlags {
+            Flag_UsePowerOf2Sizes = 1 << 0
         };
 
         IndexDetails& idx(int idxNo, bool missingExpected = false );
@@ -238,7 +244,7 @@ namespace mongo {
         IndexDetails& addIndex(const char *thisns, bool resetTransient=true);
 
         void aboutToDeleteAnIndex() { 
-            clearFlag( Flag_HaveIdIndex );
+            clearSystemFlag( Flag_HaveIdIndex );
         }
 
         /* returns index of the first index in which the field is present. -1 if not present. */
@@ -305,10 +311,15 @@ namespace mongo {
             }
         }
 
-        const int flags() const { return _flags; }
-        bool isFlagSet( int flag ) const { return _flags & flag; }
-        void setFlag( int flag );
-        void clearFlag( int flag );
+        const int systemFlags() const { return _systemFlags; }
+        bool isSystemFlagSet( int flag ) const { return _systemFlags & flag; }
+        void setSystemFlag( int flag );
+        void clearSystemFlag( int flag );
+
+        const int userFlags() const { return _userFlags; }
+        bool isUserFlagSet( int flag ) const { return _userFlags & flag; }
+        void setUserFlag( int flag );
+        void clearUserFlag( int flag );
 
         /* @return -1 = not found
            generally id is first index, so not that expensive an operation (assuming present).
@@ -323,7 +334,7 @@ namespace mongo {
         }
 
         bool haveIdIndex() { 
-            return isFlagSet( NamespaceDetails::Flag_HaveIdIndex ) || findIdIndex() >= 0;
+            return isSystemFlagSet( NamespaceDetails::Flag_HaveIdIndex ) || findIdIndex() >= 0;
         }
 
         /* return which "deleted bucket" for this size object */

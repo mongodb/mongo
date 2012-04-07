@@ -57,7 +57,8 @@ namespace mongo {
         capped = _capped;
         max = 0x7fffffff;
         _paddingFactor = 1.0;
-        _flags = 0;
+        _systemFlags = 0;
+        _userFlags = 0;
         capFirstNewRecord = DiskLoc();
         // Signal that we are on first allocation iteration through extents.
         capFirstNewRecord.setInvalid();
@@ -71,7 +72,6 @@ namespace mongo {
         reservedA = 0;
         extraOffset = 0;
         indexBuildInProgress = 0;
-        reservedB = 0;
         capped2.cc2_ptr = 0;
         capped2.fileNumber = 0;
         memset(reserved, 0, sizeof(reserved));
@@ -118,7 +118,7 @@ namespace mongo {
 
         cout << "ns         " << firstExtent.toString() << ' ' << lastExtent.toString() << " nidx:" << nIndexes << '\n';
         cout << "ns         " << stats.datasize << ' ' << stats.nrecords << ' ' << nIndexes << '\n';
-        cout << "ns         " << capped << ' ' << _paddingFactor << ' ' << _flags << ' ' << dataFileVersion << '\n';
+        cout << "ns         " << capped << ' ' << _paddingFactor << ' ' << _systemFlags << ' ' << _userFlags << ' ' << dataFileVersion << '\n';
         cout << "ns         " << multiKeyIndexBits << ' ' << indexBuildInProgress << '\n';
         cout << "ns         " << (int) reserved[0] << ' ' << (int) reserved[59];
         cout << endl;
@@ -685,13 +685,22 @@ namespace mongo {
         _keysComputed = true;
     }
 
-    void NamespaceDetails::setFlag( int flag ) {
-        getDur().writingInt(_flags) |= flag;
+    void NamespaceDetails::setSystemFlag( int flag ) {
+        getDur().writingInt(_systemFlags) |= flag;
     }
 
-    void NamespaceDetails::clearFlag( int flag ) {
-        getDur().writingInt(_flags) &= ~flag;
+    void NamespaceDetails::clearSystemFlag( int flag ) {
+        getDur().writingInt(_systemFlags) &= ~flag;
     }
+
+    void NamespaceDetails::setUserFlag( int flag ) {
+        getDur().writingInt(_userFlags) |= flag;
+    }
+
+    void NamespaceDetails::clearUserFlag( int flag ) {
+        getDur().writingInt(_userFlags) &= ~flag;
+    }
+
 
     int NamespaceDetails::getRecordAllocationSize( int minRecordSize ) {
         if ( _paddingFactor == 0 ) {
@@ -701,7 +710,7 @@ namespace mongo {
         verify( _paddingFactor >= 1 );
 
         
-        if ( isFlagSet( Flag_UsePowerOf2Sizes ) ) {
+        if ( isUserFlagSet( Flag_UsePowerOf2Sizes ) ) {
             int x = bucket( minRecordSize );
             x = bucketSizes[x];
             return x;

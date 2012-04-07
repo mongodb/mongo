@@ -431,7 +431,7 @@ namespace mongo {
         // capped preserve true
         // max preserve
         t->_paddingFactor = 1.0;
-        t->_flags = 0;
+        t->_systemFlags = 0;
         t->capFirstNewRecord = DiskLoc();
         t->capFirstNewRecord.setInvalid();
         t->cappedLastDelRecLastExtent().setInvalid();
