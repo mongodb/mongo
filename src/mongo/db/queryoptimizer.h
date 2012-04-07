@@ -135,7 +135,8 @@ namespace mongo {
      * A QueryPlanSummary owns its own attributes and may be shared.  Currently a QueryPlan
      * should only be owned by a QueryPlanSet.
      */
-    struct QueryPlanSummary {
+    class QueryPlanSummary {
+    public:
         QueryPlanSummary() :
         _scanAndOrderRequired() {
         }
