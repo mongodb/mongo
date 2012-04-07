@@ -255,12 +255,12 @@ namespace mongo {
         uassert( 10083 , "create collection invalid size spec", size > 0 );
 
         bool newCapped = false;
-        int mx = 0;
+        long long mx = 0;
         if( options["capped"].trueValue() ) {
             newCapped = true;
             BSONElement e = options.getField("max");
             if ( e.isNumber() ) {
-                mx = e.numberInt();
+                mx = e.numberLong();
             }
         }
 
