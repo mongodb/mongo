@@ -300,7 +300,7 @@ doneCheckOrder:
         // and it's a capped collection
         // we warn /*disallow*/ as it's a common user error
         // .system. and local collections are exempt
-        if ( _d && _d->capped && !_frs.range( "_id" ).universal() ) {
+        if ( _d && _d->isCapped() && !_frs.range( "_id" ).universal() ) {
             if ( cc().isSyncThread() ||
                 str::contains( _frs.ns() , ".system." ) ||
                 str::startsWith( _frs.ns() , "local." ) ) {

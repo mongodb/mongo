@@ -54,7 +54,7 @@ namespace mongo {
        (or 3...there will be a little unused sliver at the end of the extent.)
     */
     void NamespaceDetails::compact() {
-        verify(capped);
+        verify( isCapped() );
 
         list<DiskLoc> drecs;
 
@@ -105,7 +105,7 @@ namespace mongo {
 
     void NamespaceDetails::cappedCheckMigrate() {
         // migrate old NamespaceDetails format
-        verify( capped );
+        verify( isCapped() );
         if ( capExtent.a() == 0 && capExtent.getOfs() == 0 ) {
             //capFirstNewRecord = DiskLoc();
             capFirstNewRecord.writing().setInvalid();
@@ -214,7 +214,7 @@ namespace mongo {
         theCapExtent()->assertOk();
         DiskLoc firstEmptyExtent;
         while ( 1 ) {
-            if ( stats.nrecords < max ) {
+            if ( stats.nrecords < maxCappedDocs() ) {
                 loc = __capAlloc( len );
                 if ( !loc.isNull() )
                     break;
@@ -254,7 +254,7 @@ namespace mongo {
             compact();
             if( ++passes > maxPasses ) {
                 log() << "passes ns:" << ns << " len:" << len << " maxPasses: " << maxPasses << '\n';
-                log() << "passes max:" << max << " nrecords:" << stats.nrecords << " datasize: " << stats.datasize << endl;
+                log() << "passes max:" << maxCappedDocs() << " nrecords:" << stats.nrecords << " datasize: " << stats.datasize << endl;
                 massert( 10345 ,  "passes >= maxPasses in capped collection alloc", false );
             }
         }
@@ -408,7 +408,7 @@ namespace mongo {
 
     void NamespaceDetails::emptyCappedCollection( const char *ns ) {
         DEV verify( this == nsdetails(ns) );
-        massert( 13424, "collection must be capped", capped );
+        massert( 13424, "collection must be capped", isCapped() );
         massert( 13425, "background index build in progress", !indexBuildInProgress );
         massert( 13426, "indexes present", nIndexes == 0 );
 

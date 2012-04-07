@@ -327,9 +327,9 @@ namespace mongo {
             else
                 ensureIdIndexForNewNs( ns );
         }
-
+        
         if ( mx > 0 )
-            getDur().writingInt( d->max ) = mx;
+            d->setMaxCappedDocs( mx );
 
         bool isFreeList = strstr(ns, FREELIST_NS) != 0;
         if( !isFreeList )
@@ -777,7 +777,7 @@ namespace mongo {
             d->dumpDeleted(&extents);
         }
 
-        if ( d->capped )
+        if ( d->isCapped() )
             return shared_ptr<Cursor>( new ForwardCappedCursor( d , startLoc ) );
 
         if ( !startLoc.isNull() )
@@ -810,7 +810,7 @@ namespace mongo {
         if ( !d )
             return shared_ptr<Cursor>(new BasicCursor(DiskLoc()));
 
-        if ( !d->capped ) {
+        if ( !d->isCapped() ) {
             if ( !startLoc.isNull() )
                 return shared_ptr<Cursor>(new ReverseCursor( startLoc ));
             Extent *e = d->lastExtent.ext();
@@ -1042,7 +1042,7 @@ namespace mongo {
         dassert( todelete == dl.rec() );
 
         NamespaceDetails* d = nsdetails(ns);
-        if ( d->capped && !cappedOK ) {
+        if ( d->isCapped() && !cappedOK ) {
             out() << "failing remove on a capped ns " << ns << endl;
             uassert( 10089 ,  "can't remove from a capped collection" , 0 );
             return;
@@ -1110,7 +1110,7 @@ namespace mongo {
 
         if ( toupdate->netLength() < objNew.objsize() ) {
             // doesn't fit.  reallocate -----------------------------------------------------
-            uassert( 10003 , "failing update: objects in a capped ns cannot grow", !(d && d->capped));
+            uassert( 10003 , "failing update: objects in a capped ns cannot grow", !(d && d->isCapped()));
             d->paddingTooSmall();
             deleteRecord(ns, toupdate, dl);
             DiskLoc res = insert(ns, objNew.objdata(), objNew.objsize(), god);
@@ -1803,7 +1803,7 @@ namespace mongo {
 
     NOINLINE_DECL DiskLoc outOfSpace(const char *ns, NamespaceDetails *d, int lenWHdr, bool god, DiskLoc extentLoc) {
         DiskLoc loc;
-        if ( d->capped == 0 ) { // size capped doesn't grow
+        if ( ! d->isCapped() ) { // size capped doesn't grow
             log(1) << "allocating new extent for " << ns << " padding:" << d->paddingFactor() << " lenWHdr: " << lenWHdr << endl;
             cc().database()->allocExtent(ns, Extent::followupSize(lenWHdr, d->lastExtentSize), false, !god);
             loc = d->alloc(ns, lenWHdr, extentLoc);
@@ -1986,13 +1986,13 @@ namespace mongo {
 
         // If the collection is capped, check if the new object will violate a unique index
         // constraint before allocating space.
-        if ( d->nIndexes && d->capped && !god ) {
+        if ( d->nIndexes && d->isCapped() && !god ) {
             checkNoIndexConflicts( d, BSONObj( reinterpret_cast<const char *>( obuf ) ) );
         }
 
         bool earlyIndex = true;
         DiskLoc loc;
-        if( addID || tableToIndex || d->capped ) {
+        if( addID || tableToIndex || d->isCapped() ) {
             // if need id, we don't do the early indexing. this is not the common case so that is sort of ok
             earlyIndex = false;
             loc = allocateSpaceForANewRecord(ns, d, lenWHdr, god);
@@ -2006,8 +2006,8 @@ namespace mongo {
             }
         }
         if ( loc.isNull() ) {
-            log() << "insert: couldn't alloc space for object ns:" << ns << " capped:" << d->capped << endl;
-            verify(d->capped);
+            log() << "insert: couldn't alloc space for object ns:" << ns << " capped:" << d->isCapped() << endl;
+            verify(d->isCapped());
             return DiskLoc();
         }
 
@@ -2021,7 +2021,7 @@ namespace mongo {
                 }
                 catch( AssertionException& ) {
                     // should be a dup key error on _id index
-                    dassert( !tableToIndex && !d->capped );
+                    dassert( !tableToIndex && !d->isCapped() );
                     // no need to delete/rollback the record as it was not added yet
                     throw;
                 }
@@ -2076,8 +2076,8 @@ namespace mongo {
             }
             catch( AssertionException& e ) {
                 // should be a dup key error on _id index
-                if( tableToIndex || d->capped ) {
-                    massert( 12583, "unexpected index insertion failure on capped collection", !d->capped );
+                if( tableToIndex || d->isCapped() ) {
+                    massert( 12583, "unexpected index insertion failure on capped collection", !d->isCapped() );
                     string s = e.toString();
                     s += " : on addIndex/capped - collection and its index will not match";
                     uassert_nothrow(s.c_str());

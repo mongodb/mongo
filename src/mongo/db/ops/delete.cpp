@@ -48,7 +48,7 @@ namespace mongo {
             NamespaceDetails *d = nsdetails( ns );
             if ( ! d )
                 return 0;
-            uassert( 10101 ,  "can't remove from a capped collection" , ! d->capped );
+            uassert( 10101 ,  "can't remove from a capped collection" , ! d->isCapped() );
         }
 
         long long nDeleted = 0;

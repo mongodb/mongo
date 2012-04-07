@@ -184,9 +184,9 @@ namespace mongo {
 
             bool valid = true;
             BSONArrayBuilder errors; // explanation(s) for why valid = false
-            if ( d->capped ){
-                result.append("capped", d->capped);
-                result.append("max", d->max);
+            if ( d->isCapped() ){
+                result.append("capped", d->isCapped());
+                result.appendNumber("max", d->maxCappedDocs());
             }
 
             result.append("firstExtent", str::stream() << d->firstExtent.toString() << " ns:" << d->firstExtent.ext()->nsDiagnostic.toString());
@@ -255,7 +255,7 @@ namespace mongo {
                         DiskLoc cl = c->currLoc();
                         if ( n < 1000000 )
                             recs.insert(cl);
-                        if ( d->capped ) {
+                        if ( d->isCapped() ) {
                             if ( cl < cl_last )
                                 outOfOrder++;
                             cl_last = cl;
@@ -290,7 +290,7 @@ namespace mongo {
 
                         c->advance();
                     }
-                    if ( d->capped && !d->capLooped() ) {
+                    if ( d->isCapped() && !d->capLooped() ) {
                         result.append("cappedOutOfOrder", outOfOrder);
                         if ( outOfOrder > 1 ) {
                             valid = false;
@@ -325,7 +325,7 @@ namespace mongo {
                             ndel++;
 
                             if ( loc.questionable() ) {
-                                if( d->capped && !loc.isValid() && i == 1 ) {
+                                if( d->isCapped() && !loc.isValid() && i == 1 ) {
                                     /* the constructor for NamespaceDetails intentionally sets deletedList[1] to invalid
                                        see comments in namespace.h
                                     */

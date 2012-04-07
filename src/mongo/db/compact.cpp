@@ -294,7 +294,7 @@ namespace mongo {
             Client::Context ctx(ns);
             NamespaceDetails *d = nsdetails(ns.c_str());
             massert( 13660, str::stream() << "namespace " << ns << " does not exist", d );
-            massert( 13661, "cannot compact capped collection", !d->capped );
+            massert( 13661, "cannot compact capped collection", !d->isCapped() );
             log() << "compact " << ns << " begin" << endl;
             if( pf != 0 || pb != 0 ) { 
                 log() << "paddingFactor:" << pf << " paddingBytes:" << pb << endl;
@@ -363,7 +363,7 @@ namespace mongo {
                     return false;
                 }
 
-                if ( d->capped ) {
+                if ( d->isCapped() ) {
                     errmsg = "cannot compact a capped collection";
                     return false;
                 }

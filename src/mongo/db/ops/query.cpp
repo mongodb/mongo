@@ -852,7 +852,7 @@ namespace mongo {
 
         if ( pq.hasOption( QueryOption_CursorTailable ) ) {
             NamespaceDetails *d = nsdetails( ns );
-            uassert( 13051, "tailable cursor requested on non capped collection", d && d->capped );
+            uassert( 13051, "tailable cursor requested on non capped collection", d && d->isCapped() );
             const BSONObj nat1 = BSON( "$natural" << 1 );
             if ( order.isEmpty() ) {
                 order = nat1;

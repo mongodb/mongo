@@ -77,11 +77,11 @@ namespace mongo {
     private:
         // ofs 192
         IndexDetails _indexes[NIndexesBase];
-    public:
+
         // ofs 352 (16 byte aligned)
-        int capped;
-        int max;                              // max # of objects for a capped table.  TODO: should this be 64 bit?
-    private:
+        int _isCapped;                         // there is wasted space here if I'm right (ERH)
+        int _maxDocsInCapped;                  // max # of objects for a capped table.  TODO: should this be 64 bit?
+
         double _paddingFactor;                 // 1.0 = no padding.
         // ofs 386 (16)
         int _systemFlags; // things that the system sets/cares about
@@ -155,10 +155,16 @@ namespace mongo {
         bool nextIsInCapExtent( const DiskLoc &dl ) const;
 
     public:
+
+        bool isCapped() const { return _isCapped; }
+        long long maxCappedDocs() const { verify( isCapped() ); return _maxDocsInCapped; }
+        void setMaxCappedDocs( long long max );
+
+
         DiskLoc& cappedListOfAllDeletedRecords() { return deletedList[0]; }
         DiskLoc& cappedLastDelRecLastExtent()    { return deletedList[1]; }
         void cappedDumpDelInfo();
-        bool capLooped() const { return capped && capFirstNewRecord.isValid();  }
+        bool capLooped() const { return _isCapped && capFirstNewRecord.isValid();  }
         bool inCapExtent( const DiskLoc &dl ) const;
         void cappedCheckMigrate();
         /**
@@ -591,7 +597,7 @@ namespace mongo {
                 return 0;
             Namespace n(ns);
             NamespaceDetails *d = ht->get(n);
-            if ( d && d->capped )
+            if ( d && d->isCapped() )
                 d->cappedCheckMigrate();
             return d;
         }

@@ -1360,9 +1360,9 @@ namespace mongo {
             result.appendNumber( "totalIndexSize" , getIndexSizeForCollection(dbname, ns, &indexSizes, scale) / scale );
             result.append("indexSizes", indexSizes.obj());
 
-            if ( nsd->capped ) {
-                result.append( "capped" , nsd->capped );
-                result.append( "max" , nsd->max );
+            if ( nsd->isCapped() ) {
+                result.append( "capped" , nsd->isCapped() );
+                result.appendNumber( "max" , nsd->maxCappedDocs() );
             }
 
             if ( verbose )
@@ -1696,7 +1696,7 @@ namespace mongo {
                 else if ( c.find( ".system." ) != string::npos ) {
                     continue;
                 }
-                else if ( nsd->capped ) {
+                else if ( nsd->isCapped() ) {
                     cursor = findTableScan( c.c_str() , BSONObj() );
                 }
                 else {

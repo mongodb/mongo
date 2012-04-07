@@ -48,14 +48,14 @@ namespace mongo {
         0x400000, 0x800000
     };
 
-    NamespaceDetails::NamespaceDetails( const DiskLoc &loc, bool _capped ) {
+    NamespaceDetails::NamespaceDetails( const DiskLoc &loc, bool capped ) {
         /* be sure to initialize new fields here -- doesn't default to zeroes the way we use it */
         firstExtent = lastExtent = capExtent = loc;
         stats.datasize = stats.nrecords = 0;
         lastExtentSize = 0;
         nIndexes = 0;
-        capped = _capped;
-        max = 0x7fffffff;
+        _isCapped = capped;
+        _maxDocsInCapped = 0x7fffffff;
         _paddingFactor = 1.0;
         _systemFlags = 0;
         _userFlags = 0;
@@ -116,7 +116,7 @@ namespace mongo {
 
         cout << "ns         " << firstExtent.toString() << ' ' << lastExtent.toString() << " nidx:" << nIndexes << '\n';
         cout << "ns         " << stats.datasize << ' ' << stats.nrecords << ' ' << nIndexes << '\n';
-        cout << "ns         " << capped << ' ' << _paddingFactor << ' ' << _systemFlags << ' ' << _userFlags << ' ' << dataFileVersion << '\n';
+        cout << "ns         " << isCapped() << ' ' << _paddingFactor << ' ' << _systemFlags << ' ' << _userFlags << ' ' << dataFileVersion << '\n';
         cout << "ns         " << multiKeyIndexBits << ' ' << indexBuildInProgress << '\n';
         cout << "ns         " << (int) reserved[0] << ' ' << (int) reserved[59];
         cout << endl;
@@ -224,7 +224,7 @@ namespace mongo {
             reinterpret_cast<unsigned*>( r->data() )[0] = 0xeeeeeeee;
         }
         DEBUGGING log() << "TEMP: add deleted rec " << dloc.toString() << ' ' << hex << d->extentOfs() << endl;
-        if ( capped ) {
+        if ( isCapped() ) {
             if ( !cappedLastDelRecLastExtent().isValid() ) {
                 // Initial extent allocation.  Insert at end.
                 d->nextDeleted() = DiskLoc();
@@ -256,7 +256,7 @@ namespace mongo {
         if cannot predetermine returns null (so still call alloc() then)
     */
     DiskLoc NamespaceDetails::allocWillBeAt(const char *ns, int lenToAlloc) {
-        if ( !capped ) {
+        if ( ! isCapped() ) {
             lenToAlloc = (lenToAlloc + 3) & 0xfffffffc;
             return __stdAlloc(lenToAlloc, true);
         }
@@ -294,7 +294,7 @@ namespace mongo {
         DEBUGGING out() << "TEMP: alloc() returns " << loc.toString() << ' ' << ns << " lentoalloc:" << lenToAlloc << " ext:" << extentLoc.toString() << endl;
 
         int left = regionlen - lenToAlloc;
-        if ( capped == 0 ) {
+        if ( ! isCapped() ) {
             if ( left < 24 || left < (lenToAlloc >> 3) ) {
                 // you get the whole thing.
                 return loc;
@@ -449,7 +449,7 @@ namespace mongo {
 
     /* alloc with capped table handling. */
     DiskLoc NamespaceDetails::_alloc(const char *ns, int len) {
-        if ( !capped )
+        if ( ! isCapped() )
             return __stdAlloc(len, false);
 
         return cappedAlloc(ns,len);
@@ -600,6 +600,11 @@ namespace mongo {
             writeRanges.push_back( make_pair( (char*)e - (char*)this, sizeof( Extra ) ) );
         }
         return reinterpret_cast< NamespaceDetails* >( getDur().writingRangesAtOffsets( this, writeRanges ) );
+    }
+
+    void NamespaceDetails::setMaxCappedDocs( long long max ) {
+        verify( max <= 0x7fffffffLL ); // TODO: this is temp
+        _maxDocsInCapped = static_cast<int>(max);
     }
 
     /* ------------------------------------------------------------------------- */

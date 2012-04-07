@@ -483,7 +483,7 @@ namespace mongo {
 
                     NamespaceDetails *nsd = nsdetails(d.ns);
                     if( nsd ) {
-                        if( nsd->capped ) {
+                        if( nsd->isCapped() ) {
                             /* can't delete from a capped collection - so we truncate instead. if this item must go,
                             so must all successors!!! */
                             try {
