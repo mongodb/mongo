@@ -128,7 +128,7 @@ namespace mongo {
          * results must be sorted or read with a covered index.
          */
         ResponseBuildStrategy( const ParsedQuery &parsedQuery, const shared_ptr<Cursor> &cursor,
-                              BufBuilder &buf, const QueryPlan::Summary &queryPlan );
+                              BufBuilder &buf, const QueryPlanSummary &queryPlan );
         virtual ~ResponseBuildStrategy() {}
         /**
          * Handle the current iterate of the supplied cursor as a (possibly duplicate) match.
@@ -169,7 +169,7 @@ namespace mongo {
     class OrderedBuildStrategy : public ResponseBuildStrategy {
     public:
         OrderedBuildStrategy( const ParsedQuery &parsedQuery, const shared_ptr<Cursor> &cursor,
-                             BufBuilder &buf, const QueryPlan::Summary &queryPlan );
+                             BufBuilder &buf, const QueryPlanSummary &queryPlan );
         virtual bool handleMatch( bool &orderedMatch );
         virtual int bufferedMatches() const { return _bufferedMatches; }
     private:
@@ -185,14 +185,14 @@ namespace mongo {
         ReorderBuildStrategy( const ParsedQuery &parsedQuery,
                              const shared_ptr<Cursor> &cursor,
                              BufBuilder &buf,
-                             const QueryPlan::Summary &queryPlan );
+                             const QueryPlanSummary &queryPlan );
         virtual bool handleMatch( bool &orderedMatch );
         /** Handle a match without performing deduping. */
         void _handleMatchNoDedup();
         virtual int rewriteMatches();
         virtual int bufferedMatches() const { return _bufferedMatches; }
     private:
-        ScanAndOrder *newScanAndOrder( const QueryPlan::Summary &queryPlan ) const;
+        ScanAndOrder *newScanAndOrder( const QueryPlanSummary &queryPlan ) const;
         shared_ptr<ScanAndOrder> _scanAndOrder;
         int _bufferedMatches;
     };
@@ -241,7 +241,7 @@ namespace mongo {
          * results must be sorted or read with a covered index.
          */
         QueryResponseBuilder( const ParsedQuery &parsedQuery, const shared_ptr<Cursor> &cursor,
-                             const QueryPlan::Summary &queryPlan, const BSONObj &oldPlan );
+                             const QueryPlanSummary &queryPlan, const BSONObj &oldPlan );
         /** @return true if the current iterate matches and is added. */
         bool addMatch();
         /** Note that a yield occurred. */
@@ -265,9 +265,9 @@ namespace mongo {
     private:
         ShardChunkManagerPtr newChunkManager() const;
         shared_ptr<ExplainRecordingStrategy> newExplainRecordingStrategy
-        ( const QueryPlan::Summary &queryPlan, const BSONObj &oldPlan ) const;
+        ( const QueryPlanSummary &queryPlan, const BSONObj &oldPlan ) const;
         shared_ptr<ResponseBuildStrategy> newResponseBuildStrategy
-        ( const QueryPlan::Summary &queryPlan );
+        ( const QueryPlanSummary &queryPlan );
         bool currentMatches();
         bool chunkMatches();
         const ParsedQuery &_parsedQuery;

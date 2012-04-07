@@ -31,6 +31,8 @@
 
 namespace mongo {
 
+    QueryPlanSummary QueryPlan::summary() const { return QueryPlanSummary( *this ); }
+
     double elementDirection( const BSONElement &e ) {
         if ( e.isNumber() )
             return e.number();

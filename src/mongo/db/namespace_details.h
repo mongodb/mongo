@@ -473,7 +473,7 @@ namespace mongo {
                                             bool *simpleEqualityMatch = 0,
                                             const shared_ptr<const ParsedQuery> &parsedQuery =
                                             shared_ptr<const ParsedQuery>(),
-                                            QueryPlan::Summary *singlePlanSummary = 0 );
+                                            QueryPlanSummary *singlePlanSummary = 0 );
 
         /**
          * @return a single cursor that may work well for the given query.  A $or style query will

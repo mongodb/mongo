@@ -28,7 +28,9 @@ namespace mongo {
 
     class IndexDetails;
     class IndexType;
-
+    
+    class QueryPlanSummary;
+    
     /** A plan for executing a query using the given index spec and FieldRangeSet. */
     class QueryPlan : boost::noncopyable {
     public:
@@ -90,25 +92,7 @@ namespace mongo {
         
         shared_ptr<Projection::KeyOnly> keyFieldsOnly() const { return _keyFieldsOnly; }
         
-        /**
-         * A QueryPlan::Summary owns its own attributes and may be shared.  Currently a QueryPlan
-         * should only be owned by a QueryPlanSet.
-         */
-        struct Summary {
-            Summary() :
-            _scanAndOrderRequired() {
-            }
-            Summary( const QueryPlan &queryPlan ) :
-            _fieldRangeSetMulti( new FieldRangeSet( queryPlan._frsMulti ) ),
-            _keyFieldsOnly( queryPlan._keyFieldsOnly ),
-            _scanAndOrderRequired( queryPlan._scanAndOrderRequired ) {
-            }
-            bool valid() const { return _fieldRangeSetMulti; }
-            shared_ptr<FieldRangeSet> _fieldRangeSetMulti;
-            shared_ptr<Projection::KeyOnly> _keyFieldsOnly;
-            bool _scanAndOrderRequired;
-        };
-        Summary summary() const { return Summary( *this ); }
+        QueryPlanSummary summary() const;
 
         /** The following member functions are for testing, or public for testing. */
         
@@ -145,6 +129,25 @@ namespace mongo {
         IndexType * _type;
         bool _startOrEndSpec;
         shared_ptr<Projection::KeyOnly> _keyFieldsOnly;
+    };
+
+    /**
+     * A QueryPlanSummary owns its own attributes and may be shared.  Currently a QueryPlan
+     * should only be owned by a QueryPlanSet.
+     */
+    struct QueryPlanSummary {
+        QueryPlanSummary() :
+        _scanAndOrderRequired() {
+        }
+        QueryPlanSummary( const QueryPlan &queryPlan ) :
+        _fieldRangeSetMulti( new FieldRangeSet( queryPlan.multikeyFrs() ) ),
+        _keyFieldsOnly( queryPlan.keyFieldsOnly() ),
+        _scanAndOrderRequired( queryPlan.scanAndOrderRequired() ) {
+        }
+        bool valid() const { return _fieldRangeSetMulti; }
+        shared_ptr<FieldRangeSet> _fieldRangeSetMulti;
+        shared_ptr<Projection::KeyOnly> _keyFieldsOnly;
+        bool _scanAndOrderRequired;
     };
 
     /**

@@ -180,7 +180,7 @@ namespace mongo {
                         const QueryPlanSelectionPolicy &planPolicy,
                         bool *simpleEqualityMatch,
                         const shared_ptr<const ParsedQuery> &parsedQuery,
-                        QueryPlan::Summary *singlePlanSummary );
+                        QueryPlanSummary *singlePlanSummary );
         
         shared_ptr<Cursor> generate();
         
@@ -211,7 +211,7 @@ namespace mongo {
         const QueryPlanSelectionPolicy &_planPolicy;
         bool *_simpleEqualityMatch;
         shared_ptr<const ParsedQuery> _parsedQuery;
-        QueryPlan::Summary *_singlePlanSummary;
+        QueryPlanSummary *_singlePlanSummary;
         
         BSONObj _argumentsHint;
         auto_ptr<MultiPlanScanner> _mps;

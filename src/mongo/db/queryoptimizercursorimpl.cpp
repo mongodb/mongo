@@ -696,7 +696,7 @@ namespace mongo {
                                          const QueryPlanSelectionPolicy &planPolicy,
                                          bool *simpleEqualityMatch,
                                          const shared_ptr<const ParsedQuery> &parsedQuery,
-                                         QueryPlan::Summary *singlePlanSummary ) {
+                                         QueryPlanSummary *singlePlanSummary ) {
 
         CursorGenerator generator( ns, query, order, planPolicy, simpleEqualityMatch, parsedQuery,
                         singlePlanSummary );
@@ -709,7 +709,7 @@ namespace mongo {
                                      const QueryPlanSelectionPolicy &planPolicy,
                                      bool *simpleEqualityMatch,
                                      const shared_ptr<const ParsedQuery> &parsedQuery,
-                                     QueryPlan::Summary *singlePlanSummary ) :
+                                     QueryPlanSummary *singlePlanSummary ) :
     _ns( ns ),
     _query( query ),
     _order( order ),
@@ -722,7 +722,7 @@ namespace mongo {
             *_simpleEqualityMatch = false;
         }
         if ( _singlePlanSummary ) {
-            *_singlePlanSummary = QueryPlan::Summary();
+            *_singlePlanSummary = QueryPlanSummary();
         }
     }
     

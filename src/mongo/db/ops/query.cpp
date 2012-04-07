@@ -291,7 +291,7 @@ namespace mongo {
 
     ResponseBuildStrategy::ResponseBuildStrategy( const ParsedQuery &parsedQuery,
                                                  const shared_ptr<Cursor> &cursor, BufBuilder &buf,
-                                                 const QueryPlan::Summary &queryPlan ) :
+                                                 const QueryPlanSummary &queryPlan ) :
     _parsedQuery( parsedQuery ),
     _cursor( cursor ),
     _queryOptimizerCursor( dynamic_pointer_cast<QueryOptimizerCursor>( _cursor ) ),
@@ -334,7 +334,7 @@ namespace mongo {
     OrderedBuildStrategy::OrderedBuildStrategy( const ParsedQuery &parsedQuery,
                                                const shared_ptr<Cursor> &cursor,
                                                BufBuilder &buf,
-                                               const QueryPlan::Summary &queryPlan ) :
+                                               const QueryPlanSummary &queryPlan ) :
     ResponseBuildStrategy( parsedQuery, cursor, buf, queryPlan ),
     _skip( _parsedQuery.getSkip() ),
     _bufferedMatches() {
@@ -361,7 +361,7 @@ namespace mongo {
     ReorderBuildStrategy::ReorderBuildStrategy( const ParsedQuery &parsedQuery,
                                                const shared_ptr<Cursor> &cursor,
                                                BufBuilder &buf,
-                                               const QueryPlan::Summary &queryPlan ) :
+                                               const QueryPlanSummary &queryPlan ) :
     ResponseBuildStrategy( parsedQuery, cursor, buf, queryPlan ),
     _scanAndOrder( newScanAndOrder( queryPlan ) ),
     _bufferedMatches() {
@@ -390,7 +390,7 @@ namespace mongo {
     }
     
     ScanAndOrder *
-    ReorderBuildStrategy::newScanAndOrder( const QueryPlan::Summary &queryPlan ) const {
+    ReorderBuildStrategy::newScanAndOrder( const QueryPlanSummary &queryPlan ) const {
         verify( !_parsedQuery.getOrder().isEmpty() );
         verify( _cursor->ok() );
         const FieldRangeSet *fieldRangeSet = 0;
@@ -411,9 +411,9 @@ namespace mongo {
     HybridBuildStrategy::HybridBuildStrategy( const ParsedQuery &parsedQuery,
                                              const shared_ptr<QueryOptimizerCursor> &cursor,
                                              BufBuilder &buf ) :
-    ResponseBuildStrategy( parsedQuery, cursor, buf, QueryPlan::Summary() ),
-    _orderedBuild( _parsedQuery, _cursor, _buf, QueryPlan::Summary() ),
-    _reorderBuild( _parsedQuery, _cursor, _buf, QueryPlan::Summary() ),
+    ResponseBuildStrategy( parsedQuery, cursor, buf, QueryPlanSummary() ),
+    _orderedBuild( _parsedQuery, _cursor, _buf, QueryPlanSummary() ),
+    _reorderBuild( _parsedQuery, _cursor, _buf, QueryPlanSummary() ),
     _reorderedMatches() {
     }
     
@@ -469,7 +469,7 @@ namespace mongo {
     
     QueryResponseBuilder::QueryResponseBuilder( const ParsedQuery &parsedQuery,
                                                const shared_ptr<Cursor> &cursor,
-                                               const QueryPlan::Summary &queryPlan,
+                                               const QueryPlanSummary &queryPlan,
                                                const BSONObj &oldPlan ) :
     _parsedQuery( parsedQuery ),
     _cursor( cursor ),
@@ -542,7 +542,7 @@ namespace mongo {
     }
 
     shared_ptr<ExplainRecordingStrategy> QueryResponseBuilder::newExplainRecordingStrategy
-    ( const QueryPlan::Summary &queryPlan, const BSONObj &oldPlan ) const {
+    ( const QueryPlanSummary &queryPlan, const BSONObj &oldPlan ) const {
         if ( !_parsedQuery.isExplain() ) {
             return shared_ptr<ExplainRecordingStrategy>( new NoExplainStrategy() );
         }
@@ -560,7 +560,7 @@ namespace mongo {
     }
 
     shared_ptr<ResponseBuildStrategy> QueryResponseBuilder::newResponseBuildStrategy
-    ( const QueryPlan::Summary &queryPlan ) {
+    ( const QueryPlanSummary &queryPlan ) {
         bool unordered = _parsedQuery.getOrder().isEmpty();
         bool empty = !_cursor->ok();
         bool singlePlan = !_queryOptimizerCursor;
@@ -621,7 +621,7 @@ namespace mongo {
 
         const ParsedQuery &pq( *pq_shared );
         shared_ptr<Cursor> cursor;
-        QueryPlan::Summary queryPlan;
+        QueryPlanSummary queryPlan;
         
         if ( pq.hasOption( QueryOption_OplogReplay ) ) {
             cursor = FindingStartCursor::getCursor( ns, query, order );
