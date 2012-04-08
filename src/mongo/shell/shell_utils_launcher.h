@@ -47,6 +47,51 @@ namespace mongo {
         private:
             stringstream _buffer;
         };
+
+        // todo in lock validations
+        class ProgramRegistry {
+        public:
+            bool haveDb( int port ) const { return dbs.count( port ) == 1; }
+            void insertDb( int port, pid_t pid, int output ) {
+                dbs.insert( make_pair( port, make_pair( pid, output ) ) );
+            }
+            void eraseDb( int port ) {
+                dbs.erase( port );
+            }
+            pid_t pidForDb( int port ) const {
+                uassert( 13621, "no known mongo program on port", haveDb( port ) );
+                return dbs.find( port )->second.first;
+            }
+            int outputForDb( int port ) const {
+                return haveDb( port ) ? dbs.find( port )->second.second : 0;
+            }
+            void getDbPorts( vector<int> &ports ) {
+                for( map<int,pair<pid_t,int> >::const_iterator i = dbs.begin(); i != dbs.end(); ++i ) {
+                    ports.push_back( i->first );
+                }
+            }
+            void insertShell( pid_t pid, int output ) {
+                shells.insert( make_pair( pid, output ) );
+            }
+            void eraseShell( pid_t pid ) {
+                shells.erase( pid );
+            }
+            int outputForShell( pid_t pid ) {
+                return ( shells.count( pid ) == 1 ) ? shells.find( pid )->second : 0;
+            }
+            void getShellPids( vector<pid_t> &pids ) {
+                for( map<pid_t,int>::const_iterator i = shells.begin(); i != shells.end(); ++i ) {
+                    pids.push_back( i->first );
+                }
+            }
+        private:
+            map<int,pair<pid_t,int> > dbs;
+            map<pid_t,int> shells;
+#ifdef _WIN32
+        public:
+            map<pid_t,HANDLE> handles;
+#endif
+        };
         
         /** Helper class for launching a program and logging its output. */
         class ProgramRunner {

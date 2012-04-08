@@ -50,12 +50,8 @@ namespace mongo {
     // these functions have not been audited for thread safety - currently they are called with an exclusive js mutex
     namespace shellUtils {
 
-        map< int, pair< pid_t, int > > dbs;
-        map< pid_t, int > shells;
-#ifdef _WIN32
-        map< pid_t, HANDLE > handles;
-#endif
-
+        ProgramRegistry registry;
+        
         ProgramOutputMultiplexer programOutputLogger;
         
         void goingAwaySoon() {
@@ -140,9 +136,12 @@ namespace mongo {
                     cout << "error: a port number is expected when running mongod (etc.) from the shell" << endl;
                 verify( _port > 0 );
             }
-            if ( _port > 0 && dbs.count( _port ) != 0 ) {
-                cerr << "count for port: " << _port << " is not 0 is: " << dbs.count( _port ) << endl;
-                verify( dbs.count( _port ) == 0 );
+            if ( _port > 0 ) {
+                bool haveDbForPort = registry.haveDb( _port );
+                if ( haveDbForPort ) {
+                    cerr << "already have db for port: " << _port << endl;
+                    verify( !haveDbForPort );
+                }
             }
         }
 
@@ -163,9 +162,9 @@ namespace mongo {
             }
 
             if ( _port > 0 )
-                dbs.insert( make_pair( _port, make_pair( _pid, pipeEnds[ 1 ] ) ) );
+                registry.insertDb( _port, _pid, pipeEnds[ 1 ] );
             else
-                shells.insert( make_pair( _pid, pipeEnds[ 1 ] ) );
+                registry.insertShell( _pid, pipeEnds[ 1 ] );
             _pipe = pipeEnds[ 0 ];
         }
 
@@ -302,7 +301,7 @@ namespace mongo {
             CloseHandle(pi.hThread);
 
             _pid = pi.dwProcessId;
-            handles.insert( make_pair( _pid, pi.hProcess ) );
+            registry.handles.insert( make_pair( _pid, pi.hProcess ) );
 
 #else
 
@@ -348,8 +347,8 @@ namespace mongo {
         //returns true if process exited
         bool wait_for_pid(pid_t pid, bool block=true, int* exit_code=NULL) {
 #ifdef _WIN32
-            verify(handles.count(pid));
-            HANDLE h = handles[pid];
+            verify(registry.handles.count(pid));
+            HANDLE h = registry.handles[pid];
 
             if (block)
                 WaitForSingleObject(h, INFINITE);
@@ -360,7 +359,7 @@ namespace mongo {
                     return false;
                 }
                 CloseHandle(h);
-                handles.erase(pid);
+                registry.handles.erase(pid);
                 if (exit_code)
                     *exit_code = tmp;
                 return true;
@@ -390,17 +389,17 @@ namespace mongo {
         BSONObj WaitProgram( const BSONObj& a, void* data ) {
             int pid = singleArg( a ).numberInt();
             BSONObj x = BSON( "" << wait_for_pid( pid ) );
-            shells.erase( pid );
+            registry.eraseShell( pid );
             return x;
         }
 
         BSONObj WaitMongoProgramOnPort( const BSONObj &a, void* data ) {
             int port = singleArg( a ).numberInt();
-            uassert( 13621, "no known mongo program on port", dbs.count( port ) != 0 );
-            log() << "waiting port: " << port << ", pid: " << dbs[ port ].first << endl;
-            bool ret = wait_for_pid( dbs[ port ].first );
+            pid_t pid = registry.pidForDb( port );
+            log() << "waiting port: " << port << ", pid: " << pid << endl;
+            bool ret = wait_for_pid( pid );
             if ( ret ) {
-                dbs.erase( port );
+                registry.eraseDb( port );
             }
             return BSON( "" << ret );
         }
@@ -420,10 +419,10 @@ namespace mongo {
             int exit_code;
             wait_for_pid( r.pid(), true, &exit_code );
             if ( r.port() > 0 ) {
-                dbs.erase( r.port() );
+                registry.eraseDb( r.port() );
             }
             else {
-                shells.erase( r.pid() );
+                registry.eraseShell( r.pid() );
             }
             return BSON( string( "" ) << exit_code );
         }
@@ -434,7 +433,7 @@ namespace mongo {
             boost::thread t( r );
             int exit_code;
             wait_for_pid(r.pid(), true,  &exit_code);
-            shells.erase( r.pid() );
+            registry.eraseShell( r.pid() );
             return BSON( string( "" ) << exit_code );
         }
 
@@ -485,8 +484,8 @@ namespace mongo {
         inline void kill_wrapper(pid_t pid, int sig, int port) {
 #ifdef _WIN32
             if (sig == SIGKILL || port == 0) {
-                verify( handles.count(pid) );
-                TerminateProcess(handles[pid], 1); // returns failure for "zombie" processes.
+                verify( registry.handles.count(pid) );
+                TerminateProcess(registry.handles[pid], 1); // returns failure for "zombie" processes.
             }
             else {
                 DBClientConnection conn;
@@ -520,11 +519,11 @@ namespace mongo {
             pid_t pid;
             int exitCode = 0;
             if ( port > 0 ) {
-                if( dbs.count( port ) != 1 ) {
+                if( !registry.haveDb( port ) ) {
                     cout << "No db started on port: " << port << endl;
                     return 0;
                 }
-                pid = dbs[ port ].first;
+                pid = registry.pidForDb( port );
             }
             else {
                 pid = _pid;
@@ -554,12 +553,12 @@ namespace mongo {
             }
 
             if ( port > 0 ) {
-                close( dbs[ port ].second );
-                dbs.erase( port );
+                close( registry.outputForDb( port ) );
+                registry.eraseDb( port );
             }
             else {
-                close( shells[ pid ] );
-                shells.erase( pid );
+                close( registry.outputForShell( pid ) );
+                registry.eraseShell( pid );
             }
             // FIXME I think the intention here is to do an extra sleep only when SIGKILL is sent to the child process.
             // We may want to change the 4 below to 29, since values of i greater than that indicate we sent a SIGKILL.
@@ -603,13 +602,11 @@ namespace mongo {
 
         void KillMongoProgramInstances() {
             vector< int > ports;
-            for( map< int, pair< pid_t, int > >::iterator i = dbs.begin(); i != dbs.end(); ++i )
-                ports.push_back( i->first );
+            registry.getDbPorts( ports );
             for( vector< int >::iterator i = ports.begin(); i != ports.end(); ++i )
                 killDb( *i, 0, SIGTERM );
             vector< pid_t > pids;
-            for( map< pid_t, int >::iterator i = shells.begin(); i != shells.end(); ++i )
-                pids.push_back( i->first );
+            registry.getShellPids( pids );
             for( vector< pid_t >::iterator i = pids.begin(); i != pids.end(); ++i )
                 killDb( 0, *i, SIGTERM );
         }
