@@ -39,8 +39,8 @@ namespace mongo {
 
         const char* getUserDir();
         
-        BSONElement oneArg(const BSONObj& args);
-        extern const BSONObj undefined_;
+        BSONElement singleArg(const BSONObj& args);
+        extern const BSONObj undefinedReturn;
         
         /** Prompt for confirmation from cin. */
         class Prompter {

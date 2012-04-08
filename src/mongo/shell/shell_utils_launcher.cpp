@@ -384,18 +384,18 @@ namespace mongo {
         
         BSONObj ClearRawMongoProgramOutput( const BSONObj &args, void* data ) {
             programOutputLogger.clear();
-            return undefined_;
+            return undefinedReturn;
         }
 
         BSONObj WaitProgram( const BSONObj& a, void* data ) {
-            int pid = oneArg( a ).numberInt();
+            int pid = singleArg( a ).numberInt();
             BSONObj x = BSON( "" << wait_for_pid( pid ) );
             shells.erase( pid );
             return x;
         }
 
         BSONObj WaitMongoProgramOnPort( const BSONObj &a, void* data ) {
-            int port = oneArg( a ).numberInt();
+            int port = singleArg( a ).numberInt();
             uassert( 13621, "no known mongo program on port", dbs.count( port ) != 0 );
             log() << "waiting port: " << port << ", pid: " << dbs[ port ].first << endl;
             bool ret = wait_for_pid( dbs[ port ].first );
@@ -445,7 +445,7 @@ namespace mongo {
             if ( boost::filesystem::exists( path ) )
                 boost::filesystem::remove_all( path );
             boost::filesystem::create_directory( path );
-            return undefined_;
+            return undefinedReturn;
         }
 
         void copyDir( const boost::filesystem::path &from, const boost::filesystem::path &to ) {
@@ -479,7 +479,7 @@ namespace mongo {
                 boost::filesystem::remove_all( to );
             boost::filesystem::create_directory( to );
             copyDir( from, to );
-            return undefined_;
+            return undefinedReturn;
         }
 
         inline void kill_wrapper(pid_t pid, int sig, int port) {

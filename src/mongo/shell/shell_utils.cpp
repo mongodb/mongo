@@ -46,9 +46,9 @@ namespace mongo {
             b.appendUndefined( "" );
             return b.obj();
         }
-        const BSONObj undefined_ = makeUndefined();
+        const BSONObj undefinedReturn = makeUndefined();
 
-        BSONElement oneArg(const BSONObj& args) {
+        BSONElement singleArg(const BSONObj& args) {
             uassert( 12597 , "need to specify 1 argument" , args.nFields() == 1 );
             return args.firstElement();
         }
@@ -61,7 +61,7 @@ namespace mongo {
             goingAwaySoon();
             int exit_code = int( args.firstElement().number() );
             ::exit(exit_code);
-            return undefined_;
+            return undefinedReturn;
         }
 
         BSONObj JSGetMemInfo( const BSONObj& args, void* data ) {
@@ -90,7 +90,7 @@ namespace mongo {
 #else
             srand( static_cast< unsigned int >( a.firstElement().numberLong() ) );
 #endif
-            return undefined_;
+            return undefinedReturn;
         }
 
         BSONObj JSRand( const BSONObj &a, void* data ) {

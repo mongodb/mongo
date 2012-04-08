@@ -115,7 +115,7 @@ namespace mongo {
         const int CANT_OPEN_FILE = 13300;
 
         BSONObj cat(const BSONObj& args, void* data) {
-            BSONElement e = oneArg(args);
+            BSONElement e = singleArg(args);
             stringstream ss;
             ifstream f(e.valuestrsafe());
             uassert(CANT_OPEN_FILE, "couldn't open file", f.is_open() );
@@ -134,7 +134,7 @@ namespace mongo {
         }
 
         BSONObj md5sumFile(const BSONObj& args, void* data) {
-            BSONElement e = oneArg(args);
+            BSONElement e = singleArg(args);
             stringstream ss;
             FILE* f = fopen(e.valuestrsafe(), "rb");
             uassert(CANT_OPEN_FILE, "couldn't open file", f );
@@ -160,7 +160,7 @@ namespace mongo {
         }
 
         BSONObj removeFile(const BSONObj& args, void* data) {
-            BSONElement e = oneArg(args);
+            BSONElement e = singleArg(args);
             bool found = false;
 
             boost::filesystem::path root( e.valuestrsafe() );
@@ -189,7 +189,7 @@ namespace mongo {
             c = ~c;
             f->write( args.getIntField( "1" ), &c, 1 );
 
-            return undefined_;
+            return undefinedReturn;
             // f close is implicit
         }
 
