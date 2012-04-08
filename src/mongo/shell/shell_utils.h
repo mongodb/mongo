@@ -29,7 +29,6 @@ namespace mongo {
 
         extern std::string _dbConnect;
         extern std::string _dbAuth;
-        extern map< string, set<string> > _allMyUris;
         extern bool _nokillop;
 
         void RecordMyLocation( const char *_argv0 );
@@ -42,5 +41,29 @@ namespace mongo {
         
         BSONElement oneArg(const BSONObj& args);
         extern const BSONObj undefined_;
+        
+        /** Prompt for confirmation from cin. */
+        class Prompter {
+        public:
+            Prompter( const string &prompt );
+            /** @return prompted confirmation or cached confirmation. */
+            bool confirm();
+        private:
+            const string _prompt;
+            bool _confirmed;
+        };
+
+        /** Registry of server connections. */
+        class ConnectionRegistry {
+        public:
+            ConnectionRegistry();
+            void registerConnection( DBClientWithCommands &client );
+            void killOperationsOnAllConnections( bool withPrompt ) const;
+        private:
+            map<string,set<string> > _connectionUris;
+            mutable mongo::mutex _mutex;
+        };
+        
+        extern ConnectionRegistry connectionRegistry;
     }
 }

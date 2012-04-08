@@ -126,7 +126,7 @@ void intr( int sig ) {
 #endif
 
 void killOps() {
-    if ( mongo::shellUtils::_nokillop || mongo::shellUtils::_allMyUris.size() == 0 )
+    if ( mongo::shellUtils::_nokillop )
         return;
 
     if ( atPrompt )
@@ -134,33 +134,7 @@ void killOps() {
 
     sleepmillis(10); // give current op a chance to finish
 
-    for( map< string, set<string> >::const_iterator i = shellUtils::_allMyUris.begin(); i != shellUtils::_allMyUris.end(); ++i ) {
-        string errmsg;
-        ConnectionString cs = ConnectionString::parse( i->first, errmsg );
-        if (!cs.isValid()) continue;
-        boost::scoped_ptr<DBClientWithCommands> conn( cs.connect( errmsg ) );
-        if (!conn) continue;
-
-        const set<string>& uris = i->second;
-
-        BSONObj inprog =  conn->findOne( "admin.$cmd.sys.inprog", Query() )["inprog"].embeddedObject().getOwned();
-        BSONForEach( op, inprog ) {
-            if ( uris.count( op["client"].String() ) ) {
-                ONCE if ( !autoKillOp ) {
-                    cout << endl << "do you want to kill the current op(s) on the server? (y/n): ";
-                    cout.flush();
-
-                    char yn;
-                    cin >> yn;
-
-                    if ( yn != 'y' && yn != 'Y' )
-                        return;
-                }
-
-                conn->findOne( "admin.$cmd.sys.killop", QUERY( "op"<< op["opid"] ) );
-            }
-        }
-    }
+    mongo::shellUtils::connectionRegistry.killOperationsOnAllConnections( !autoKillOp );
 }
 
 void quitNicely( int sig ) {

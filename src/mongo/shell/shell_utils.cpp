@@ -149,20 +149,78 @@ namespace mongo {
             }
         }
 
-        //   connstr, myuris
-        map< string, set<string> > _allMyUris;
-        mongo::mutex _allMyUrisMutex("_allMyUrisMutex");
+        Prompter::Prompter( const string &prompt ) :
+            _prompt( prompt ),
+            _confirmed() {
+        }
+
+        bool Prompter::confirm() {
+            if ( _confirmed ) {
+                return true;
+            }
+            
+            cout << endl << _prompt << " (y/n): ";
+            cout.flush();
+            
+            char yn;
+            cin >> yn;
+            
+            return _confirmed = ( yn == 'y' || yn == 'Y' );
+        }
+
+        ConnectionRegistry::ConnectionRegistry() :
+            _mutex( "connectionRegistryMutex" ) {
+        }
+        
+        void ConnectionRegistry::registerConnection( DBClientWithCommands &client ) {
+            BSONObj info;
+            if ( client.runCommand( "admin", BSON( "whatsmyuri" << 1 ), info ) ) {
+                string connstr = dynamic_cast<DBClientBase&>( client ).getServerAddress();
+                mongo::mutex::scoped_lock lk( _mutex );
+                _connectionUris[ connstr ].insert( info[ "you" ].str() );
+            }            
+        }
+
+        void ConnectionRegistry::killOperationsOnAllConnections( bool withPrompt ) const {
+            Prompter prompter( "do you want to kill the current op(s) on the server?" );
+            mongo::mutex::scoped_lock lk( _mutex );
+            for( map<string,set<string> >::const_iterator i = _connectionUris.begin();
+                i != _connectionUris.end(); ++i ) {
+                string errmsg;
+                ConnectionString cs = ConnectionString::parse( i->first, errmsg );
+                if ( !cs.isValid() ) {
+                    continue;   
+                }
+                boost::scoped_ptr<DBClientWithCommands> conn( cs.connect( errmsg ) );
+                if ( !conn ) {
+                    continue;
+                }
+                
+                const set<string>& uris = i->second;
+                
+                BSONObj inprog = conn->findOne( "admin.$cmd.sys.inprog", Query() )[ "inprog" ]
+                        .embeddedObject().getOwned();
+                BSONForEach( op, inprog ) {
+                    if ( uris.count( op[ "client" ].String() ) ) {
+                        if ( !withPrompt || prompter.confirm() ) {
+                            conn->findOne( "admin.$cmd.sys.killop", QUERY( "op"<< op[ "opid" ] ) );                        
+                        }
+                        else {
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+        
+        ConnectionRegistry connectionRegistry;
+
         bool _nokillop = false;
         void onConnect( DBClientWithCommands &c ) {
             if ( _nokillop ) {
                 return;
             }
-            BSONObj info;
-            if ( c.runCommand( "admin", BSON( "whatsmyuri" << 1 ), info ) ) {
-                string connstr = dynamic_cast<DBClientBase&>(c).getServerAddress();
-                mongo::mutex::scoped_lock lk( _allMyUrisMutex );
-                _allMyUris[connstr].insert(info[ "you" ].str());
-            }
+            connectionRegistry.registerConnection( c );
         }
     }
 }
