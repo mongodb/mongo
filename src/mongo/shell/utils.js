@@ -1187,6 +1187,30 @@ jsTest.attempt = function( opts, func ) {
     return result;
 }
 
+replSetMemberStatePrompt = function() {
+    var state = '';
+    var stateInfo = db.getSiblingDB( 'admin' ).runCommand( { replSetGetStatus:1, forShell:1 } );
+    if ( stateInfo.ok ) {
+        // Report the self member's stateStr if it's present.
+        stateInfo.members.forEach( function( member ) {
+                                      if ( member.self ) {
+                                          state = member.stateStr;
+                                      }
+                                  } );
+        // Otherwise fall back to reporting the numeric myState field (mongodb 1.6).
+        if ( !state ) {
+            state = stateInfo.myState;
+        }
+        state = '' + stateInfo.set + ':' + state;
+    }
+    else {
+        var info = stateInfo.info;
+        if ( info && info.length < 20 ) {
+            state = info; // "mongos", "configsvr"
+        }
+    }
+    return state + '> ';
+}
 
 shellPrintHelper = function (x) {
     if (typeof (x) == "undefined") {

@@ -441,31 +441,15 @@ namespace mongo {
     extern DBClientWithCommands *latestConn;
 }
 
-string sayReplSetMemberState() {
-    try {
-        if( latestConn ) {
-            BSONObj info;
-            if( latestConn->runCommand( "admin", BSON( "replSetGetStatus" << 1 << "forShell" << 1 ) , info ) ) {
-                stringstream ss;
-                ss << info["set"].String() << ':';
-                
-                int s = info["myState"].Int();
-                MemberState ms( s );
-                ss << ms.toString();
-
-                return ss.str();
-            }
-            else {
-                string s = info.getStringField( "info" );
-                if( s.size() < 20 )
-                    return s; // "mongos", "configsvr"
-            }
-        }
+bool execPrompt( mongo::Scope &scope, const char *promptFunction, string &prompt ) {
+    string execStatement = string( "__prompt__ = " ) + promptFunction + "();";
+    scope.exec( "delete __prompt__;", "", false, false, false, 0 );
+    scope.exec( execStatement, "", false, false, false, 0 );
+    if ( scope.type( "__prompt__" ) == String ) {
+        prompt = scope.getString( "__prompt__" );
+        return true;
     }
-    catch( std::exception& e ) {
-        log( 1 ) << "error in sayReplSetMemberState:" << e.what() << endl;
-    }
-    return "";
+    return false;
 }
 
 /**
@@ -856,22 +840,18 @@ int _main( int argc, char* argv[] ) {
 //            shellMainScope->localConnect;
             //DBClientWithCommands *c = getConnection( JSContext *cx, JSObject *obj );
 
-            bool haveStringPrompt = false;
             promptType = scope->type( "prompt" );
-            if( promptType == String ) {
+            if ( promptType == String ) {
                 prompt = scope->getString( "prompt" );
-                haveStringPrompt = true;
             }
-            else if( promptType == Code ) {
-                scope->exec( "delete __prompt__;", "", false, false, false, 0 );
-                scope->exec( "__prompt__ = prompt();", "", false, false, false, 0 );
-                if( scope->type( "__prompt__" ) == String ) {
-                    prompt = scope->getString( "__prompt__" );
-                    haveStringPrompt = true;
-                }
+            else if ( ( promptType == Code ) &&
+                     execPrompt( *scope, "prompt", prompt ) ) {
             }
-            if( !haveStringPrompt )
-                prompt = sayReplSetMemberState() + "> ";
+            else if ( execPrompt( *scope, "replSetMemberStatePrompt", prompt ) ) {
+            }
+            else {
+                prompt = "> ";
+            }
 
             char * line = shellReadline( prompt.c_str() );
 
