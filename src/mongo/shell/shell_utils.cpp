@@ -26,8 +26,6 @@
 
 namespace mongo {
 
-    DBClientWithCommands *latestConn = 0;
-
     namespace JSFiles {
         extern const JSFile servers;
     }
@@ -156,7 +154,6 @@ namespace mongo {
         mongo::mutex _allMyUrisMutex("_allMyUrisMutex");
         bool _nokillop = false;
         void onConnect( DBClientWithCommands &c ) {
-            latestConn = &c;
             if ( _nokillop ) {
                 return;
             }

@@ -438,7 +438,6 @@ bool fileExists( string file ) {
 
 namespace mongo {
     extern bool isShell;
-    extern DBClientWithCommands *latestConn;
 }
 
 bool execPrompt( mongo::Scope &scope, const char *promptFunction, string &prompt ) {
