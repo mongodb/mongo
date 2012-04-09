@@ -41,7 +41,7 @@ __wt_btree_truncate(WT_SESSION_IMPL *session, const char *filename)
  */
 int
 __wt_btree_open(WT_SESSION_IMPL *session,
-    const char *cfg[], const uint8_t *addr, uint32_t addr_size)
+    const char *cfg[], const uint8_t *addr, uint32_t addr_size, int readonly)
 {
 	WT_BTREE *btree;
 	WT_ITEM dsk;
@@ -58,20 +58,19 @@ __wt_btree_open(WT_SESSION_IMPL *session,
 	WT_ERR(__wt_bm_open(session, btree->filename, btree->config, cfg));
 
 	/*
-	 * Open the last tree snapshot recorded for the underlying object unless
-	 * it's a special command.
+	 * Open the specified snapshot unless it's a special command (special
+	 * commands are responsible for loading their own snapshots, if any).
 	 */
 	if (F_ISSET(btree,
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY))
 		return (0);
 
 	/*
-	 * Load the last snapshot: there are two reasons we load an empty tree
-	 * rather than a snapshot: either there may be no snapshot (the file is
-	 * being created), or second, the load call returns no root page (the
-	 * snapshot is empty).
+	 * There are two reasons to load an empty tree rather than a snapshot:
+	 * either there is no snapshot (the file is being created), or the load
+	 * call returns no root page (the snapshot is empty).
 	 */
-	WT_ERR(__wt_bm_snapshot_load(session, &dsk, addr, addr_size, 0));
+	WT_ERR(__wt_bm_snapshot_load(session, &dsk, addr, addr_size, readonly));
 	if (addr == NULL || addr_size == 0 || dsk.size == 0)
 		WT_ERR(__btree_tree_open_empty(session));
 	else {

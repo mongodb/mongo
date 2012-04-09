@@ -285,7 +285,7 @@ __wt_curfile_open(WT_SESSION_IMPL *session,
 		    uri, strlen(uri), NULL, WT_BTREE_NO_LOCK));
 	else if (WT_PREFIX_MATCH(uri, "file:"))
 		WT_RET(__wt_session_get_btree(session,
-		     uri, uri, NULL, NULL, WT_BTREE_NO_LOCK));
+		     uri, uri, NULL, cfg, WT_BTREE_NO_LOCK));
 	else
 		return (EINVAL);
 

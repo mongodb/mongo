@@ -68,7 +68,7 @@ which can be re-loaded into a new table using the \c load command.
 See @subpage dump_formats for details of the dump file formats.
 
 @subsection utility_dump_synopsis Synopsis
-<code>wt [-Vv] [-C config] [-h directory] dump [-rx] [-f output] uri</code>
+<code>wt [-Vv] [-C config] [-h directory] dump [-rx] [-f output] [-s snapshot] uri</code>
 
 @subsection utility_dump_options Options
 The following are command-specific options for the \c dump command:
@@ -79,6 +79,10 @@ the \c -f option re-directs the output to the specified file.
 
 @par <code>-r</code>
 Dump in reverse order, from largest to smallest.
+
+@par <code>-s</code>
+By default, the \c dump command opens the most recent snapshot of the object;
+the \c -s option changes the \c dump command to open the named snapshot.
 
 @par <code>-x</code>
 Dump all characters in a hexadecimal encoding (the default is to leave

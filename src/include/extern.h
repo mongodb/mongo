@@ -248,7 +248,8 @@ extern int __wt_btree_truncate(WT_SESSION_IMPL *session, const char *filename);
 extern int __wt_btree_open(WT_SESSION_IMPL *session,
     const char *cfg[],
     const uint8_t *addr,
-    uint32_t addr_size);
+    uint32_t addr_size,
+    int readonly);
 extern int __wt_btree_close(WT_SESSION_IMPL *session);
 extern int __wt_btree_tree_open(WT_SESSION_IMPL *session, WT_ITEM *dsk);
 extern int __wt_btree_root_empty(WT_SESSION_IMPL *session, WT_PAGE **leafp);

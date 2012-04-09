@@ -40,7 +40,6 @@ __wt_conn_btree_open(WT_SESSION_IMPL *session,
 	 * name plus the snapshot, if any.
 	 */
 	cval.len = 0;
-	snapshot = NULL;
 	if (cfg != NULL) {
 		ret = __wt_config_gets(session, cfg, "snapshot", &cval);
 		if (ret != 0 && ret != WT_NOTFOUND)\
@@ -174,7 +173,8 @@ conf:	session->btree = btree;
 
 	WT_ERR(__wt_scr_alloc(session, WT_BTREE_MAX_ADDR_COOKIE, &addr));
 	WT_ERR(__wt_session_snap_get(session, snapshot, addr));
-	WT_ERR(__wt_btree_open(session, cfg, addr->data, addr->size));
+	WT_ERR(__wt_btree_open(
+	    session, cfg, addr->data, addr->size, snapshot == NULL ? 0 : 1));
 	F_SET(btree, WT_BTREE_OPEN);
 
 	if (0) {
@@ -339,7 +339,7 @@ __wt_conn_btree_reopen(
 	WT_RET(__wt_scr_alloc(session, WT_BTREE_MAX_ADDR_COOKIE, &addr));
 	WT_ERR(__wt_session_snap_get(session, NULL, addr));
 	btree->flags = flags;
-	WT_ERR(__wt_btree_open(session, cfg, addr->data, addr->size));
+	WT_ERR(__wt_btree_open(session, cfg, addr->data, addr->size, 0));
 	F_SET(btree, WT_BTREE_OPEN);
 
 err:	__wt_scr_free(&addr);
