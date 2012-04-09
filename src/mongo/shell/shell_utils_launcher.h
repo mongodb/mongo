@@ -19,6 +19,7 @@
 #pragma once
 
 #include <boost/filesystem/convenience.hpp>
+#include <boost/thread/recursive_mutex.hpp>
 
 namespace mongo {
 

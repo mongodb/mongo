@@ -32,9 +32,9 @@
 # include <sys/wait.h>
 #endif
 
-#include "shell_utils.h"
-#include "shell_utils_launcher.h"
-#include "../client/clientOnly-private.h"
+#include "mongo/shell/shell_utils.h"
+#include "mongo/shell/shell_utils_launcher.h"
+#include "mongo/client/clientOnly-private.h"
 #include "mongo/scripting/engine.h"
 
 namespace mongo {

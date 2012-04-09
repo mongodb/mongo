@@ -23,10 +23,10 @@
 
 #include "mongo/util/net/sock.h"
 
-#include "shell_utils.h"
-#include "shell_utils_launcher.h"
-#include "../util/md5.hpp"
-#include "../util/file.h"
+#include "mongo/shell/shell_utils.h"
+#include "mongo/shell/shell_utils_launcher.h"
+#include "mongo/util/md5.hpp"
+#include "mongo/util/file.h"
 #include "mongo/scripting/engine.h"
 
 namespace mongo {

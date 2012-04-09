@@ -17,10 +17,10 @@
 
 #include "pch.h"
 
-#include "shell_utils.h"
-#include "shell_utils_extended.h"
-#include "shell_utils_launcher.h"
-#include "../util/processinfo.h"
+#include "mongo/shell/shell_utils.h"
+#include "mongo/shell/shell_utils_extended.h"
+#include "mongo/shell/shell_utils_launcher.h"
+#include "mongo/util/processinfo.h"
 #include "mongo/client/dbclientinterface.h"
 #include "mongo/scripting/engine.h"
 
