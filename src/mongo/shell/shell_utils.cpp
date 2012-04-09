@@ -53,10 +53,18 @@ namespace mongo {
             return args.firstElement();
         }
 
+        const char* getUserDir() {
+#ifdef _WIN32
+            return getenv( "USERPROFILE" );
+#else
+            return getenv( "HOME" );
+#endif
+        }
+
         // real methods
 
         BSONObj Quit(const BSONObj& args, void* data) {
-            // If not arguments are given first element will be EOO, which
+            // If no arguments are given first element will be EOO, which
             // converts to the integer value 0.
             goingAwaySoon();
             int exit_code = int( args.firstElement().number() );
@@ -110,14 +118,6 @@ namespace mongo {
             return BSON( "" << true );
 #else
             return BSON( "" << false );
-#endif
-        }
-
-        const char* getUserDir() {
-#ifdef _WIN32
-            return getenv( "USERPROFILE" );
-#else
-            return getenv( "HOME" );
 #endif
         }
 
