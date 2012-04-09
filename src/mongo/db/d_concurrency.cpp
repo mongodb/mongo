@@ -141,20 +141,22 @@ namespace mongo {
         if( threadState ) {
             char buf[2];
             buf[0] = threadState; buf[1] = 0;
-            b.append("^", buf);
+            b.append(".", buf);
         }
         if( nestableCount ) {
             string s = "?";
             if( whichNestable == Lock::local ) 
-                s = "local";
+                s = ".local";
             else if( whichNestable == Lock::admin ) 
-                s = "admin";
+                s = ".admin";
             b.append(s, kind(nestableCount));
         }
         if( otherCount ) { 
             SimpleRWLock *k = otherLock;
             if( k ) {
-                b.append(k->name, kind(otherCount));
+                string s = ".";
+                s += k->name;
+                b.append(s, kind(otherCount));
             }
         }
         BSONObj o = b.obj();
