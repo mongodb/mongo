@@ -32,8 +32,6 @@ waitParallel = function() {
 print( "index11.js host:" );
 print( db.getMongo().host );
 
-if (1) {
-
 size = 500000;
 while( 1 ) { // if indexing finishes before we can run checks, try indexing w/ more data
     print( "size: " + size );
@@ -42,12 +40,10 @@ while( 1 ) { // if indexing finishes before we can run checks, try indexing w/ m
     t = db[ baseName ];
     t.drop();
 
-    db.eval( function( size ) {
-                for( i = 0; i < size; ++i ) {
-                    db.jstests_index11.save( {i:i} );
-                }
-            },
-            size );
+    for( i = 0; i < size; ++i ) {
+        db.jstests_index11.save( {i:i} );
+    }
+    db.getLastError();
     assert.eq( size, t.count() );
     
     doParallel( fullName + ".ensureIndex( {i:1}, {background:true} )" );
@@ -63,7 +59,10 @@ while( 1 ) { // if indexing finishes before we can run checks, try indexing w/ m
             q.next();
             assert( q.hasNext(), "no next" );
         }
-        assert.eq( "BasicCursor", t.find( {i:100} ).explain().cursor, "used btree cursor" );
+        var ex = t.find( {i:100} ).limit(-1).explain()
+        printjson(ex)
+        assert.eq( "BasicCursor", ex.cursor, "used btree cursor" );
+        assert( ex.nscanned < 1000 , "took to long to find 100: " + tojson( ex ) );
         t.remove( {i:40} );
         t.update( {i:10}, {i:-10} );
         id = t.find().hint( {$natural:-1} ).next()._id;
@@ -87,7 +86,7 @@ while( 1 ) { // if indexing finishes before we can run checks, try indexing w/ m
     } catch( e ) {
         // only a failure if we're still indexing
         // wait for parallel status to update to reflect indexing status
-        print("caught exception");
+        print("caught exception: " + e );
         sleep( 1000 );
         if ( !doneParallel() ) {
             throw e;
@@ -117,7 +116,5 @@ print("about to drop index");
 t.dropIndex( {i:1} );
 printjson( db.getLastError() );
 assert( !db.getLastError() );
-
-} // if 1
 
 testServer.stop();
