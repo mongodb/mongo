@@ -1,4 +1,8 @@
 
+load( "jstests/libs/slow_weekly_util.js" )
+testServer = new SlowWeeklyMongod( "query_yield2" )
+db = testServer.getDB( "test" );
+
 t = db.query_yield2;
 t.drop()
 
@@ -71,3 +75,4 @@ join();
 var x = db.currentOp()
 assert.eq( 0 , x.inprog.length , "weird 2" );
 
+testServer.stop();

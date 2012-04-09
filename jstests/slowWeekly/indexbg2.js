@@ -1,5 +1,10 @@
 // Test background index creation w/ constraints
 
+load( "jstests/libs/slow_weekly_util.js" )
+
+testServer = new SlowWeeklyMongod( "indexbg2" )
+db = testServer.getDB( "test" );
+
 parallel = function() {
     return db[ baseName + "_parallelStatus" ];
 }
@@ -81,3 +86,5 @@ doTest = function(dropDups) {
 
 doTest( "false" );
 doTest( "true" );
+
+testServer.stop();

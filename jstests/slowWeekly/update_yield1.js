@@ -1,4 +1,8 @@
 
+load( "jstests/libs/slow_weekly_util.js" )
+testServer = new SlowWeeklyMongod( "update_yield1" )
+db = testServer.getDB( "test" );
+
 t = db.update_yield1;
 t.drop()
 
@@ -88,3 +92,5 @@ while ( 1 ) {
 }
 
 join();
+
+testServer.stop();

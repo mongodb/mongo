@@ -3,6 +3,11 @@
  * can be dropped on restart.
  */
 
+load( "jstests/libs/slow_weekly_util.js" )
+
+testServer = new SlowWeeklyMongod( "indexbg_dur" )
+db = testServer.getDB( "test" );
+
 function countFields( x ) {
     var count = 0;
     for( var i in x ) {
@@ -65,3 +70,5 @@ while( 1 ) {
     
     break;
 }   
+
+testServer.stop();

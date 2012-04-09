@@ -1,5 +1,10 @@
 // Test background index creation
 
+load( "jstests/libs/slow_weekly_util.js" )
+
+testServer = new SlowWeeklyMongod( "indexbg1" )
+db = testServer.getDB( "test" );
+
 parallel = function() {
     return db[ baseName + "_parallelStatus" ];
 }
@@ -115,3 +120,4 @@ assert( !db.getLastError() );
 
 } // if 1
 
+testServer.stop();
