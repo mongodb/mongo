@@ -553,12 +553,10 @@ namespace mongo {
             }
 
             if ( port > 0 ) {
-                close( registry.outputForDb( port ) );
-                registry.eraseDb( port );
+                registry.eraseDbAndClosePipe( port );
             }
             else {
-                close( registry.outputForShell( pid ) );
-                registry.eraseShell( pid );
+                registry.eraseShellAndClosePipe( pid );
             }
             // FIXME I think the intention here is to do an extra sleep only when SIGKILL is sent to the child process.
             // We may want to change the 4 below to 29, since values of i greater than that indicate we sent a SIGKILL.

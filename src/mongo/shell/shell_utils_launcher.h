@@ -58,12 +58,16 @@ namespace mongo {
             void eraseDb( int port ) {
                 dbs.erase( port );
             }
+            void eraseDbAndClosePipe( int port ) {
+                if ( !haveDb( port ) ) {
+                    return;
+                }
+                close( dbs.find( port )->second.second );
+                dbs.erase( port );
+            }
             pid_t pidForDb( int port ) const {
                 uassert( 13621, "no known mongo program on port", haveDb( port ) );
                 return dbs.find( port )->second.first;
-            }
-            int outputForDb( int port ) const {
-                return haveDb( port ) ? dbs.find( port )->second.second : 0;
             }
             void getDbPorts( vector<int> &ports ) {
                 for( map<int,pair<pid_t,int> >::const_iterator i = dbs.begin(); i != dbs.end(); ++i ) {
@@ -76,8 +80,12 @@ namespace mongo {
             void eraseShell( pid_t pid ) {
                 shells.erase( pid );
             }
-            int outputForShell( pid_t pid ) {
-                return ( shells.count( pid ) == 1 ) ? shells.find( pid )->second : 0;
+            void eraseShellAndClosePipe( pid_t pid ) {
+                if ( shells.count( pid ) == 0 ) {
+                    return;
+                }
+                close( shells.find( pid )->second );
+                shells.erase( pid );
             }
             void getShellPids( vector<pid_t> &pids ) {
                 for( map<pid_t,int>::const_iterator i = shells.begin(); i != shells.end(); ++i ) {
