@@ -389,7 +389,7 @@ namespace mongo {
         BSONObj WaitProgram( const BSONObj& a, void* data ) {
             int pid = singleArg( a ).numberInt();
             BSONObj x = BSON( "" << wait_for_pid( pid ) );
-            registry.eraseShell( pid );
+            registry.eraseShellAndClosePipe( pid );
             return x;
         }
 
@@ -408,10 +408,10 @@ namespace mongo {
             int exit_code;
             wait_for_pid( r.pid(), true, &exit_code );
             if ( r.port() > 0 ) {
-                registry.eraseDb( r.port() );
+                registry.eraseDbAndClosePipe( r.port() );
             }
             else {
-                registry.eraseShell( r.pid() );
+                registry.eraseShellAndClosePipe( r.pid() );
             }
             return BSON( string( "" ) << exit_code );
         }
@@ -422,7 +422,7 @@ namespace mongo {
             boost::thread t( r );
             int exit_code;
             wait_for_pid(r.pid(), true,  &exit_code);
-            registry.eraseShell( r.pid() );
+            registry.eraseShellAndClosePipe( r.pid() );
             return BSON( string( "" ) << exit_code );
         }
 

@@ -55,9 +55,6 @@ namespace mongo {
             void insertDb( int port, pid_t pid, int output ) {
                 dbs.insert( make_pair( port, make_pair( pid, output ) ) );
             }
-            void eraseDb( int port ) {
-                dbs.erase( port );
-            }
             void eraseDbAndClosePipe( int port ) {
                 if ( !haveDb( port ) ) {
                     return;
@@ -76,9 +73,6 @@ namespace mongo {
             }
             void insertShell( pid_t pid, int output ) {
                 shells.insert( make_pair( pid, output ) );
-            }
-            void eraseShell( pid_t pid ) {
-                shells.erase( pid );
             }
             void eraseShellAndClosePipe( pid_t pid ) {
                 if ( shells.count( pid ) == 0 ) {
