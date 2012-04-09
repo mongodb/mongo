@@ -177,6 +177,17 @@ extern int __wt_block_verify_end(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_verify_snap_load( WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_BLOCK_SNAPSHOT *si);
+extern int __wt_verify_snap_unload( WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    WT_BLOCK_SNAPSHOT *si);
+extern int __wt_verify_frag_notset( WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    off_t offset,
+    off_t size);
+extern int __wt_verify_frag_set( WT_SESSION_IMPL *session,
+    WT_BLOCK *block,
+    off_t offset,
+    off_t size);
 extern int __wt_block_verify_addr(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     const uint8_t *addr,

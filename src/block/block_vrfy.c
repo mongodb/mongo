@@ -9,7 +9,7 @@
 
 static int __verify_addfrag(WT_SESSION_IMPL *, WT_BLOCK *, off_t, off_t);
 static int __verify_checkfrag(WT_SESSION_IMPL *, WT_BLOCK *);
-static int __verify_extlist(WT_SESSION_IMPL *, WT_BLOCK *, WT_EXTLIST *);
+static int __verify_eof(WT_SESSION_IMPL *, WT_BLOCK *, off_t, off_t);
 
 /*
  * __wt_block_verify_start --
@@ -66,7 +66,7 @@ __wt_block_verify_start(WT_SESSION_IMPL *session, WT_BLOCK *block)
 		    session, WT_ERROR, "the file is too large to verify");
 
 	block->frags = (uint32_t)(file_size / block->allocsize);
-	WT_RET(__bit_alloc(session, block->frags, &block->fragbits));
+	WT_RET(__bit_alloc(session, block->frags, &block->fragfile));
 
 	block->verify = 1;
 	return (0);
@@ -84,7 +84,8 @@ __wt_block_verify_end(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	/* Verify we read every file block. */
 	ret = __verify_checkfrag(session, block);
 
-	__wt_free(session, block->fragbits);
+	__wt_free(session, block->fragfile);
+	__wt_free(session, block->fragsnap);
 
 	block->verify = 0;
 	return (ret);
@@ -98,6 +99,13 @@ int
 __wt_verify_snap_load(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_BLOCK_SNAPSHOT *si)
 {
+	WT_EXTLIST *el;
+	WT_EXT *ext;
+
+	/* Allocate the per-snapshot bit map. */
+	__wt_free(session, block->fragsnap);
+	WT_RET(__bit_alloc(session, block->frags, &block->fragsnap));
+
 	/*
 	 * If we're verifying, add the disk blocks used to store the root page
 	 * and the extent lists to the list of blocks we've "seen".
@@ -117,52 +125,134 @@ __wt_verify_snap_load(
 		    block, si->discard.offset, (off_t)si->discard.size));
 
 	/*
-	 * If we're verifying the file, we'll need to read the avail and discard
-	 * lists (blocks that are "available" to the tree for allocation or have
-	 * been deleted should not appear in the tree).
+	 * Read the avail and discard lists (blocks that are "available" to the
+	 * tree for allocation or have been deleted should not appear in the
+	 * snapshot's blocks).
 	 */
-	if (si->avail.offset != WT_BLOCK_INVALID_OFFSET) {
-		WT_RET(__wt_block_extlist_read(session, block, &si->avail));
-		WT_RET(__verify_extlist(session, block, &si->avail));
-		__wt_block_extlist_free(session, &si->avail);
+	el = &si->avail;
+	if (el->offset != WT_BLOCK_INVALID_OFFSET) {
+		WT_RET(__wt_block_extlist_read(session, block, el));
+		WT_EXT_FOREACH(ext, el->off)
+			WT_RET(__verify_addfrag(
+			    session, block, ext->off, ext->size));
+		__wt_block_extlist_free(session, el);
 	}
-	if (si->discard.offset != WT_BLOCK_INVALID_OFFSET) {
-		WT_RET(__wt_block_extlist_read(session, block, &si->discard));
-		WT_RET(__verify_extlist(session, block, &si->discard));
-		__wt_block_extlist_free(session, &si->discard);
+	el = &si->discard;
+	if (el->offset != WT_BLOCK_INVALID_OFFSET) {
+		WT_RET(__wt_block_extlist_read(session, block, el));
+		WT_EXT_FOREACH(ext, el->off)
+			WT_RET(__verify_addfrag(
+			    session, block, ext->off, ext->size));
+		__wt_block_extlist_free(session, el);
 	}
 
 	return (0);
 }
 
 /*
- * __verify_extlist --
- *	Add an extent list's fragments to the list of verified fragments.
+ * __wt_verify_snap_unload --
+ *	Verify work done when a snapshot is unloaded.
  */
-static int
-__verify_extlist(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_EXTLIST *el)
+int
+__wt_verify_snap_unload(
+    WT_SESSION_IMPL *session, WT_BLOCK *block, WT_BLOCK_SNAPSHOT *si)
 {
+	WT_EXTLIST *el;
 	WT_EXT *ext;
-	int ret;
 
-	ret = 0;
-
-	WT_EXT_FOREACH(ext, el->off) {
-		if (ext->off + (off_t)ext->size > block->fh->file_size)
-			WT_RET_MSG(session, WT_ERROR,
-			    "%s: extent list entry offset %" PRIuMAX
-			    "references non-existent file pages",
-			    el->name, (uintmax_t)ext->off);
-
-		WT_VERBOSE(session, verify,
-		    "%s: extent list range %" PRIdMAX "-%" PRIdMAX,
-		    el->name,
-		    (intmax_t)ext->off, (intmax_t)(ext->off + ext->size));
-
-		WT_TRET(__verify_addfrag(session, block, ext->off, ext->size));
+	/*
+	 * Read the alloc list (blocks that were allocated in the snapshot must
+	 * appear in the snapshot).
+	 */
+	el = &si->alloc;
+	if (el->offset != WT_BLOCK_INVALID_OFFSET) {
+		WT_RET(__wt_block_extlist_read(session, block, el));
+		WT_EXT_FOREACH(ext, el->off)
+			WT_RET(__wt_verify_frag_set(
+			    session, block, ext->off, ext->size));
+		__wt_block_extlist_free(session, el);
 	}
 
-	return (ret);
+	/* Discard the per-snapshot fragment list. */
+	__wt_free(session, block->fragsnap);
+
+	return (0);
+}
+
+/*
+ * __verify_eof --
+ *	Check each fragment against the total file size.
+ */
+static int
+__verify_eof(
+    WT_SESSION_IMPL *session, WT_BLOCK *block, off_t offset, off_t size)
+{
+	/*
+	 * Check each fragment against the total file size: this test is usually
+	 * not necessary, but for some fragments, like extent lists, corruption
+	 * could lead to random offsets, and paranoia in verify is a good thing.
+	 */
+	if (offset + size > block->fh->file_size)
+		WT_RET_MSG(session, WT_ERROR,
+		    "fragment %" PRIuMAX "-%" PRIuMAX " references "
+		    "non-existent file pages",
+		    (uintmax_t)offset, (uintmax_t)(offset + size));
+	return (0);
+}
+
+/* The bit list ignores the first sector: convert to/from a frag/offset. */
+#define	WT_OFF_TO_FRAG(block, off)					\
+	(((off) - WT_BLOCK_DESC_SECTOR) / (block)->allocsize)
+#define	WT_FRAG_TO_OFF(block, frag)					\
+	(((off_t)(frag)) * (block)->allocsize + WT_BLOCK_DESC_SECTOR)
+
+/*
+ * __wt_verify_frag_notset --
+ *	Confirm we have NOT seen this chunk of the file.
+ */
+int
+__wt_verify_frag_notset(
+    WT_SESSION_IMPL *session, WT_BLOCK *block, off_t offset, off_t size)
+{
+	uint32_t frag, frags, i;
+
+	WT_RET(__verify_eof(session, block, offset, size));
+
+	frag = (uint32_t)WT_OFF_TO_FRAG(block, offset);
+	frags = (uint32_t)(size / block->allocsize);
+
+	for (i = 0; i < frags; ++i)
+		if (__bit_test(block->fragsnap, frag + i))
+			WT_RET_MSG(session, WT_ERROR,
+			    "file fragment at offset %" PRIuMAX
+			    " referenced multiple times in a single snapshot",
+			    (uintmax_t)offset);
+
+	return (0);
+}
+/*
+ * __wt_verify_frag_set --
+ *	Confirm we have seen this chunk of the file.
+ */
+int
+__wt_verify_frag_set(
+    WT_SESSION_IMPL *session, WT_BLOCK *block, off_t offset, off_t size)
+{
+	uint32_t frag, frags, i;
+
+	WT_RET(__verify_eof(session, block, offset, size));
+
+	frag = (uint32_t)WT_OFF_TO_FRAG(block, offset);
+	frags = (uint32_t)(size / block->allocsize);
+
+	for (i = 0; i < frags; ++i)
+		if (!__bit_test(block->fragsnap, frag + i))
+			WT_RET_MSG(session, WT_ERROR,
+			    "file fragment at offset %" PRIuMAX " should have "
+			    " been referenced in the snapshot but was not",
+			    (uintmax_t)offset);
+
+	return (0);
 }
 
 /*
@@ -186,12 +276,6 @@ __wt_block_verify_addr(WT_SESSION_IMPL *session,
 	return (0);
 }
 
-/* The bit list ignores the first sector: convert to/from an frag/offset. */
-#define	WT_OFF_TO_FRAG(block, off)					\
-	(((off) - WT_BLOCK_DESC_SECTOR) / (block)->allocsize)
-#define	WT_FRAG_TO_OFF(block, frag)					\
-	(((off_t)(frag)) * (block)->allocsize + WT_BLOCK_DESC_SECTOR)
-
 /*
  * __verify_addfrag --
  *	Add the fragments to the list, and complain if we've already verified
@@ -201,19 +285,17 @@ static int
 __verify_addfrag(
     WT_SESSION_IMPL *session, WT_BLOCK *block, off_t offset, off_t size)
 {
-	uint32_t frag, frags, i;
+	uint32_t frag, frags;
 
 	frag = (uint32_t)WT_OFF_TO_FRAG(block, offset);
 	frags = (uint32_t)(size / block->allocsize);
 
-	for (i = 0; i < frags; ++i)
-		if (__bit_test(block->fragbits, frag + i))
-			WT_RET_MSG(session, WT_ERROR,
-			    "file fragment at offset %" PRIuMAX
-			    " already verified",
-			    (uintmax_t)offset);
+	/* We should not have seen these fragments in this snapshot. */
+	WT_RET(__wt_verify_frag_notset(session, block, offset, size));
 
-	__bit_nset(block->fragbits, frag, frag + (frags - 1));
+	/* Add fragments to the snapshot and total fragment lists. */
+	__bit_nset(block->fragsnap, frag, frag + (frags - 1));
+	__bit_nset(block->fragfile, frag, frag + (frags - 1));
 	return (0);
 }
 
@@ -224,12 +306,9 @@ __verify_addfrag(
 static int
 __verify_checkfrag(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
-	uint32_t first, last, frags;
-	uint8_t *fragbits;
+	uint32_t first, last;
 	int ret;
 
-	fragbits = block->fragbits;
-	frags = block->frags;
 	ret = 0;
 
 	/*
@@ -239,13 +318,13 @@ __verify_checkfrag(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	 * supposed to happen a lot.
 	 */
 	for (;;) {
-		if (__bit_ffc(fragbits, frags, &first) != 0)
+		if (__bit_ffc(block->fragfile, block->frags, &first) != 0)
 			break;
-		__bit_set(fragbits, first);
-		for (last = first + 1; last < frags; ++last) {
-			if (__bit_test(fragbits, last))
+		__bit_set(block->fragfile, first);
+		for (last = first + 1; last < block->frags; ++last) {
+			if (__bit_test(block->fragfile, last))
 				break;
-			__bit_set(fragbits, last);
+			__bit_set(block->fragfile, last);
 		}
 
 		__wt_errx(session,

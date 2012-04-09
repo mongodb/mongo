@@ -154,7 +154,8 @@ struct __wt_block {
 
 	int	 verify;		/* Verification support */
 	uint32_t frags;			/* Total frags */
-	uint8_t *fragbits;		/* Frag tracking bit list */
+	uint8_t *fragfile;		/* Per-file frag tracking list */
+	uint8_t *fragsnap;		/* Per-snapshot frag tracking list */
 
 };
 

@@ -143,6 +143,9 @@ int
 __wt_block_snapshot_unload(WT_SESSION_IMPL *session, WT_BLOCK *block)
 {
 	WT_BLOCK_SNAPSHOT *si;
+	int ret;
+
+	ret = 0;
 
 	WT_VERBOSE(session, block, "%s: unload snapshot", block->name);
 
@@ -150,15 +153,20 @@ __wt_block_snapshot_unload(WT_SESSION_IMPL *session, WT_BLOCK *block)
 	if (!block->live_load)
 		WT_RET_MSG(session, EINVAL, "no snapshot to unload");
 
-	/* Discard the extent lists. */
 	si = &block->live;
+
+	/* Verify cleanup. */
+	if (block->verify)
+		ret = __wt_verify_snap_unload(session, block, si);
+
+	/* Discard the extent lists. */
 	__wt_block_extlist_free(session, &si->alloc);
 	__wt_block_extlist_free(session, &si->avail);
 	__wt_block_extlist_free(session, &si->discard);
 
 	block->live_load = 0;
 
-	return (0);
+	return (ret);
 }
 
 /*
