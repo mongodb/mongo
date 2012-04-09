@@ -216,7 +216,7 @@ namespace mongo {
         }
 
         if ( obj.hasElement( "$query" ) ) {
-            if ( hasDollar )
+            if ( !hasDollar )
                 hasDollar[0] = true;
             return true;
         }
