@@ -158,12 +158,13 @@ namespace mongo {
             if ( _confirmed ) {
                 return true;
             }
+
+            // The printf and scanf functions provide thread safe i/o.
             
-            cout << endl << _prompt << " (y/n): ";
-            cout.flush();
+            printf( "\n%s (y/n): ", _prompt.c_str() );
             
-            char yn;
-            cin >> yn;
+            char yn = '\0';
+            scanf( "%c", &yn );
             
             return _confirmed = ( yn == 'y' || yn == 'Y' );
         }

@@ -201,7 +201,6 @@ namespace mongo {
             verify(gethostname(buf, 260) == 0);
             buf[259] = '\0';
             return BSON("" << buf);
-            
         }
 
         void installShellUtilsExtended( Scope& scope ) {

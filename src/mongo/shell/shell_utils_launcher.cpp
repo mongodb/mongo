@@ -194,13 +194,13 @@ namespace mongo {
                 _port = 0;
             else {
                 if ( _port <= 0 )
-                    cout << "error: a port number is expected when running mongod (etc.) from the shell" << endl;
+                    log() << "error: a port number is expected when running mongod (etc.) from the shell" << endl;
                 verify( _port > 0 );
             }
             if ( _port > 0 ) {
                 bool haveDbForPort = registry.isPortRegistered( _port );
                 if ( haveDbForPort ) {
-                    cerr << "already have db for port: " << _port << endl;
+                    log() << "already have db for port: " << _port << endl;
                     verify( !haveDbForPort );
                 }
             }
@@ -218,8 +218,7 @@ namespace mongo {
                 ss << "shell: started program";
                 for (unsigned i=0; i < _argv.size(); i++)
                     ss << " " << _argv[i];
-                ss << '\n';
-                cout << ss.str(); cout.flush();
+                log() << ss.str() << endl;
             }
 
             if ( _port > 0 )
@@ -240,8 +239,8 @@ namespace mongo {
                 while( 1 ) {
                     int lenToRead = ( bufSize - 1 ) - ( start - buf );
                     if ( lenToRead <= 0 ) {
-                        cout << "error: lenToRead: " << lenToRead << endl;
-                        cout << "first 300: " << string(buf,0,300) << endl;
+                        log() << "error: lenToRead: " << lenToRead << endl;
+                        log() << "first 300: " << string(buf,0,300) << endl;
                     }
                     verify( lenToRead > 0 );
                     int ret = read( _pipe, (void *)start, lenToRead );
@@ -557,7 +556,7 @@ namespace mongo {
                 if ( errno == ESRCH ) {
                 }
                 else {
-                    cout << "killFailed: " << errnoWithDescription() << endl;
+                    log() << "killFailed: " << errnoWithDescription() << endl;
                     verify( x == 0 );
                 }
             }
@@ -570,7 +569,7 @@ namespace mongo {
             int exitCode = 0;
             if ( port > 0 ) {
                 if( !registry.isPortRegistered( port ) ) {
-                    cout << "No db started on port: " << port << endl;
+                    log() << "No db started on port: " << port << endl;
                     return 0;
                 }
                 pid = registry.pidForPort( port );
@@ -587,7 +586,7 @@ namespace mongo {
                     char now[64];
                     time_t_to_String(time(0), now);
                     now[ 20 ] = 0;
-                    cout << now << " process on port " << port << ", with pid " << pid << " not terminated, sending sigkill" << endl;
+                    log() << now << " process on port " << port << ", with pid " << pid << " not terminated, sending sigkill" << endl;
                     kill_wrapper( pid, SIGKILL, port );
                 }
                 if(wait_for_pid(pid, false, &exitCode))
@@ -598,7 +597,7 @@ namespace mongo {
                 char now[64];
                 time_t_to_String(time(0), now);
                 now[ 20 ] = 0;
-                cout << now << " failed to terminate process on port " << port << ", with pid " << pid << endl;
+                log() << now << " failed to terminate process on port " << port << ", with pid " << pid << endl;
                 verify( "Failed to terminate process" == 0 );
             }
 
@@ -635,7 +634,7 @@ namespace mongo {
             uassert( 15853 , "stopMongo needs a number" , a.firstElement().isNumber() );
             int port = int( a.firstElement().number() );
             int code = killDb( port, 0, getSignal( a ) );
-            cout << "shell: stopped mongo program on port " << port << endl;
+            log() << "shell: stopped mongo program on port " << port << endl;
             return BSON( "" << (double)code );
         }
 
@@ -644,7 +643,7 @@ namespace mongo {
             uassert( 15852 , "stopMongoByPid needs a number" , a.firstElement().isNumber() );
             int pid = int( a.firstElement().number() );
             int code = killDb( 0, pid, getSignal( a ) );
-            cout << "shell: stopped mongo program on pid " << pid << endl;
+            log() << "shell: stopped mongo program on pid " << pid << endl;
             return BSON( "" << (double)code );
         }
 
