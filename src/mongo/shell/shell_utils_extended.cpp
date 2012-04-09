@@ -77,17 +77,19 @@ namespace mongo {
         }
 
         BSONObj ls(const BSONObj& args, void* data) {
+            BSONArrayBuilder ret;
             BSONObj o = listFiles(args, data);
             if( !o.isEmpty() ) {
                 for( BSONObj::iterator i = o.firstElement().Obj().begin(); i.more(); ) {
                     BSONObj f = i.next().Obj();
-                    cout << f["name"].String();
-                    if( f["isDirectory"].trueValue() ) cout << '/';
-                    cout << '\n';
+                    string name = f["name"].String();
+                    if( f["isDirectory"].trueValue() ) {
+                        name += '/';
+                    }
+                    ret << name;
                 }
-                cout.flush();
             }
-            return BSONObj();
+            return BSON( "" << ret.arr() );
         }
 
         BSONObj cd(const BSONObj& args, void* data) {
