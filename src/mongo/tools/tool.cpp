@@ -489,42 +489,20 @@ namespace mongo {
         m.setUnits( "bytes" );
 
         while ( read < fileLength ) {
-            size_t amt = fread(buf, 1, 4, file);
-            verify( amt == 4 );
+            BSONObj* o = readDocument(file, buf, BUF_SIZE);
+            verify( o != NULL );
 
-            int size = ((int*)buf)[0];
-            uassert( 10264 , str::stream() << "invalid object size: " << size , size < BUF_SIZE );
-
-            amt = fread(buf+4, 1, size-4, file);
-            verify( amt == (size_t)( size - 4 ) );
-
-            BSONObj o( buf );
-            if ( _objcheck && ! o.valid() ) {
-                cerr << "INVALID OBJECT - going try and pring out " << endl;
-                cerr << "size: " << size << endl;
-                BSONObjIterator i(o);
-                while ( i.more() ) {
-                    BSONElement e = i.next();
-                    try {
-                        e.validate();
-                    }
-                    catch ( ... ) {
-                        cerr << "\t\t NEXT ONE IS INVALID" << endl;
-                    }
-                    cerr << "\t name : " << e.fieldName() << " " << e.type() << endl;
-                    cerr << "\t " << e << endl;
-                }
-            }
-
-            if ( _matcher.get() == 0 || _matcher->matches( o ) ) {
-                gotObject( o );
+            if ( _matcher.get() == 0 || _matcher->matches( *o ) ) {
+                gotObject( *o );
                 processed++;
             }
 
-            read += o.objsize();
+            read += o->objsize();
             num++;
 
-            m.hit( o.objsize() );
+            m.hit( o->objsize() );
+
+            delete o;
         }
 
         fclose( file );
@@ -536,6 +514,47 @@ namespace mongo {
         return processed;
     }
 
+    long long BSONTool::processFifo( const boost::filesystem::path& root ) {
+        _fileName = root.string();
+
+        FILE* file = fopen( _fileName.c_str() , "rb" );
+        if ( ! file ) {
+            log() << "error opening file: " << _fileName << " " << errnoWithDescription() << endl;
+            return 0;
+        }
+
+        unsigned long long read = 0;
+        unsigned long long num = 0;
+        unsigned long long processed = 0;
+
+        const int BUF_SIZE = BSONObjMaxUserSize + ( 1024 * 1024 );
+        boost::scoped_array<char> buf_holder(new char[BUF_SIZE]);
+        char * buf = buf_holder.get();
+
+        while ( true ) {
+            BSONObj* o = readDocument(file, buf, BUF_SIZE);
+            if ( !o ) {
+                break;
+            }
+
+            if ( _matcher.get() == 0 || _matcher->matches( *o ) ) {
+                gotObject( *o );
+                processed++;
+            }
+
+            read += o->objsize();
+            num++;
+
+            delete o;
+        }
+
+        fclose( file );
+
+        (_usesstdout ? cout : cerr ) << num << " objects found" << endl;
+        if ( _matcher.get() )
+            (_usesstdout ? cout : cerr ) << processed << " objects processed" << endl;
+        return processed;
+    }
 
 
     void setupSignals( bool inFork ) {}

@@ -280,8 +280,10 @@ public:
             return;
         }
 
+        boost::filesystem::file_status fileStatus = boost::filesystem::status(root);
         if ( ! ( endsWith( root.string().c_str() , ".bson" ) ||
-                 endsWith( root.string().c_str() , ".bin" ) ) ) {
+                 endsWith( root.string().c_str() , ".bin" ) ) &&
+             ! ( fileStatus.type() == boost::filesystem::fifo_file ) ) {
             error() << "don't know what to do with file [" << root.string() << "]" << endl;
             return;
         }
@@ -359,7 +361,12 @@ public:
             createCollectionWithOptions(metadataObject["options"].Obj());
         }
 
-        processFile( root );
+        if (fileStatus.type() == boost::filesystem::fifo_file) {
+            processFifo( root );
+        } else {
+            processFile( root );
+        }
+
         if (_drop && root.leaf() == "system.users.bson") {
             // Delete any users that used to exist but weren't in the dump file
             for (set<string>::iterator it = _users.begin(); it != _users.end(); ++it) {
