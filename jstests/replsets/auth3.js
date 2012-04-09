@@ -28,12 +28,19 @@ var safeInsert = function() {
 }
 
 print("authing");
-for (var i=0; i<2; i++) {
-    checkValidState(i);
+assert.soon(function() {
+    for (var i=0; i<2; i++) {
+        checkValidState(i);
 
-    // if this is run before initial sync finishes, we won't be logged in
-    rs.nodes[i].getDB("admin").auth("foo", "bar");
-}
+        // if this is run before initial sync finishes, we won't be logged in
+        var res = rs.nodes[i].getDB("admin").auth("foo", "bar");
+        if (res != 1) {
+            print("couldn't log into "+rs.nodes[i].host);
+            return false;
+        }
+    }
+    return true;
+});
 
 print("make common point");
 
