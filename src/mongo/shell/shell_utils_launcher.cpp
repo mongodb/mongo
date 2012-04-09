@@ -50,10 +50,61 @@ namespace mongo {
     // these functions have not been audited for thread safety - currently they are called with an exclusive js mutex
     namespace shellUtils {
 
-        ProgramRegistry registry;
-        
         ProgramOutputMultiplexer programOutputLogger;
+
+        bool ProgramRegistry::haveDb( int port ) const {
+            return dbs.count( port ) == 1;
+        }
         
+        pid_t ProgramRegistry::pidForDb( int port ) const {
+            verify( haveDb( port ) );
+            return dbs.find( port )->second.first;
+        }
+        
+        void ProgramRegistry::insertDb( int port, pid_t pid, int output ) {
+            verify( !haveDb( port ) );
+            dbs.insert( make_pair( port, make_pair( pid, output ) ) );
+        }
+        
+        void ProgramRegistry::eraseDbAndClosePipe( int port ) {
+            if ( !haveDb( port ) ) {
+                return;
+            }
+            close( dbs.find( port )->second.second );
+            dbs.erase( port );
+        }
+        
+        void ProgramRegistry::getDbPorts( vector<int> &ports ) {
+            for( map<int,pair<pid_t,int> >::const_iterator i = dbs.begin(); i != dbs.end(); ++i ) {
+                ports.push_back( i->first );
+            }
+        }
+        
+        bool ProgramRegistry::haveShell( pid_t pid ) const {
+            return shells.count( pid ) == 1;
+        }
+        
+        void ProgramRegistry::insertShell( pid_t pid, int output ) {
+            verify( !haveShell( pid ) );
+            shells.insert( make_pair( pid, output ) );
+        }
+        
+        void ProgramRegistry::eraseShellAndClosePipe( pid_t pid ) {
+            if ( !haveShell( pid ) ) {
+                return;
+            }
+            close( shells.find( pid )->second );
+            shells.erase( pid );
+        }
+        
+        void ProgramRegistry::getShellPids( vector<pid_t> &pids ) {
+            for( map<pid_t,int>::const_iterator i = shells.begin(); i != shells.end(); ++i ) {
+                pids.push_back( i->first );
+            }
+        }
+        
+        ProgramRegistry registry;
+
         void goingAwaySoon() {
             mongo::mutex::scoped_lock lk( mongoProgramOutputMutex );
             mongo::dbexitCalled = true;

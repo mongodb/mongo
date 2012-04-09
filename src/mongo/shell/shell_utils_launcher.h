@@ -51,44 +51,17 @@ namespace mongo {
         // todo in lock validations
         class ProgramRegistry {
         public:
-            bool haveDb( int port ) const { return dbs.count( port ) == 1; }
-            void insertDb( int port, pid_t pid, int output ) {
-                verify( !haveDb( port ) );
-                dbs.insert( make_pair( port, make_pair( pid, output ) ) );
-            }
-            void eraseDbAndClosePipe( int port ) {
-                if ( !haveDb( port ) ) {
-                    return;
-                }
-                close( dbs.find( port )->second.second );
-                dbs.erase( port );
-            }
-            pid_t pidForDb( int port ) const {
-                verify( haveDb( port ) );
-                return dbs.find( port )->second.first;
-            }
-            void getDbPorts( vector<int> &ports ) {
-                for( map<int,pair<pid_t,int> >::const_iterator i = dbs.begin(); i != dbs.end(); ++i ) {
-                    ports.push_back( i->first );
-                }
-            }
-            bool haveShell( pid_t pid ) const { return shells.count( pid ) == 1; }
-            void insertShell( pid_t pid, int output ) {
-                verify( !haveShell( pid ) );
-                shells.insert( make_pair( pid, output ) );
-            }
-            void eraseShellAndClosePipe( pid_t pid ) {
-                if ( !haveShell( pid ) ) {
-                    return;
-                }
-                close( shells.find( pid )->second );
-                shells.erase( pid );
-            }
-            void getShellPids( vector<pid_t> &pids ) {
-                for( map<pid_t,int>::const_iterator i = shells.begin(); i != shells.end(); ++i ) {
-                    pids.push_back( i->first );
-                }
-            }
+
+            bool haveDb( int port ) const;
+            pid_t pidForDb( int port ) const;
+            void insertDb( int port, pid_t pid, int output );
+            void eraseDbAndClosePipe( int port );
+            void getDbPorts( vector<int> &ports );
+
+            bool haveShell( pid_t pid ) const;
+            void insertShell( pid_t pid, int output );
+            void eraseShellAndClosePipe( pid_t pid );
+            void getShellPids( vector<pid_t> &pids );
         private:
             map<int,pair<pid_t,int> > dbs;
             map<pid_t,int> shells;
