@@ -365,38 +365,54 @@ namespace mongo {
 
 #else
 
+            scoped_array<const char *> argvStorage( new const char* [_argv.size()+1] );
+            const char** argv = argvStorage.get();
+            for (unsigned i=0; i < _argv.size(); i++) {
+                argv[i] = _argv[i].c_str();
+            }
+            argv[_argv.size()] = 0;
+
+            scoped_array<const char *> envStorage( new const char* [2] );
+            const char** env = envStorage.get();
+            env[0] = NULL;
+            env[1] = NULL;
+
+            bool isMongos = ( _argv[0].find( "mongos" ) != string::npos );
+            
             _pid = fork();
-            verify( _pid != -1 );
+            // Async signal unsafe functions should not be called in the child process.
 
-            if ( _pid == 0 ) {
+            if ( _pid == -1 ) {
+                verify( _pid != -1 );
+            }
+            else if ( _pid == 0 ) {
                 // DON'T ASSERT IN THIS BLOCK - very bad things will happen
-
-                const char** argv = new const char* [_argv.size()+1]; // don't need to free - in child
-                for (unsigned i=0; i < _argv.size(); i++) {
-                    argv[i] = _argv[i].c_str();
-                }
-                argv[_argv.size()] = 0;
 
                 if ( dup2( child_stdout, STDOUT_FILENO ) == -1 ||
                         dup2( child_stdout, STDERR_FILENO ) == -1 ) {
+
+                    // Async signal unsafe code reporting a terminal error condition.
                     cout << "Unable to dup2 child output: " << errnoWithDescription() << endl;
                     ::_Exit(-1); //do not pass go, do not call atexit handlers
                 }
 
-                const char** env = new const char* [2]; // don't need to free - in child
-                env[0] = NULL;
 #if defined(HEAP_CHECKING)
                 env[0] = "HEAPCHECK=normal";
                 env[1] = NULL;
 
                 // Heap-check for mongos only. 'argv[0]' must be in the path format.
-                if ( _argv[0].find("mongos") != string::npos) {
+                if ( isMongos ) {
+                    // NOTE execve is async signal safe, but it is not clear that execvpe is async
+                    // signal safe.
                     execvpe( argv[ 0 ], const_cast<char**>(argv) , const_cast<char**>(env) );
                 }
 #endif // HEAP_CHECKING
 
+                // NOTE execve is async signal safe, but it is not clear that execvp is async
+                // signal safe.
                 execvp( argv[ 0 ], const_cast<char**>(argv) );
 
+                // Async signal unsafe code reporting a terminal error condition.
                 cout << "Unable to start program " << argv[0] << ' ' << errnoWithDescription() << endl;
                 ::_Exit(-1);
             }
