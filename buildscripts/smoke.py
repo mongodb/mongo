@@ -504,7 +504,7 @@ def expand_suites(suites):
                                   "jsPerf": ("perf/*.js", True),
                                   "disk": ("disk/*.js", True),
                                   "jsSlowNightly": ("slowNightly/*.js", True),
-                                  "jsSlowWeekly": ("slowWeekly/*.js", True),
+                                  "jsSlowWeekly": ("slowWeekly/*.js", False),
                                   "parallel": ("parallel/*.js", True),
                                   "clone": ("clone/*.js", False),
                                   "repl": ("repl/*.js", False),
