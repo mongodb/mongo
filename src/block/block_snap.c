@@ -71,6 +71,13 @@ __wt_block_snapshot_load(WT_SESSION_IMPL *session,
 	tmp = NULL;
 	ret = 0;
 
+	/*
+	 * Sometimes we don't find a root page (we weren't given a snapshot,
+	 * or the referenced snapshot was empty).  In that case we return a
+	 * size of 0.  Set that up now.
+	 */
+	dsk->size = 0;
+
 	if (addr == NULL)
 		WT_VERBOSE(session, block, "load-snapshot: [Empty]");
 	else
@@ -96,9 +103,7 @@ __wt_block_snapshot_load(WT_SESSION_IMPL *session,
 		WT_ERR(__wt_verify_snap_load(session, block, si));
 
 	/* Read, and optionally verify, any root page. */
-	if (si->root_offset == WT_BLOCK_INVALID_OFFSET)
-		dsk->size = 0;
-	else {
+	if (si->root_offset != WT_BLOCK_INVALID_OFFSET) {
 		WT_ERR(__wt_block_read_off(session, block,
 		    dsk, si->root_offset, si->root_size, si->root_cksum));
 		if (block->verify) {

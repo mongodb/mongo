@@ -88,8 +88,6 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 	snapbase = NULL;
 	ret = 0;
 
-	WT_CLEAR(dsk);
-
 	WT_CLEAR(_vstuff);
 	vs = &_vstuff;
 	vs->dumpfile = dumpfile;
@@ -115,7 +113,14 @@ __verify_int(WT_SESSION_IMPL *session, int dumpfile)
 		/*
 		 * Load the snapshot -- if the size of the root page is 0, the
 		 * file is empty.
+		 *
+		 * Clearing the root page reference here is not an error: any
+		 * root page we read will be discarded as part of calling the
+		 * underlying eviction thread to discard the in-cache version
+		 * of the tree.   Since our reference disappears in that call,
+		 * we can't ever use it again.
 		 */
+		WT_CLEAR(dsk);
 		WT_ERR(__wt_bm_snapshot_load(
 		    session, &dsk, snap->raw.data, snap->raw.size, 1));
 		if (dsk.size != 0) {
