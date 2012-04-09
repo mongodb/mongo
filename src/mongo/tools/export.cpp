@@ -190,7 +190,7 @@ public:
         }
 
         Query q( getParam( "query" , "" ) );
-        if ( q.getFilter().isEmpty() && !hasParam("dbpath"))
+        if ( ( q.getSort().isEmpty() && q.getFilter().isEmpty() ) && !hasParam("dbpath"))
             q.snapshot();
 
         bool slaveOk = _params["slaveOk"].as<bool>();
