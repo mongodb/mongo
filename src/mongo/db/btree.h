@@ -244,7 +244,7 @@ namespace mongo {
             if( la < 0 ) {
                 if ( la != -1 ) {
                     log() << "btree diskloc isn't negative 1: " << la << endl;
-                    verify ( la != -1 );
+                    verify ( la == -1 );
                 }
                 la = 0;
                 ofs = OurNullOfs;
