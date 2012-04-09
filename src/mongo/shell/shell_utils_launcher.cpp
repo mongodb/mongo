@@ -396,17 +396,17 @@ namespace mongo {
                     ::_Exit(-1); //do not pass go, do not call atexit handlers
                 }
 
-#if defined(HEAP_CHECKING)
-                env[0] = "HEAPCHECK=normal";
-                env[1] = NULL;
-
                 // Heap-check for mongos only. 'argv[0]' must be in the path format.
                 if ( isMongos ) {
+#if defined(HEAP_CHECKING)
+                    env[0] = "HEAPCHECK=normal";
+                    env[1] = NULL;
+
                     // NOTE execve is async signal safe, but it is not clear that execvpe is async
                     // signal safe.
                     execvpe( argv[ 0 ], const_cast<char**>(argv) , const_cast<char**>(env) );
-                }
 #endif // HEAP_CHECKING
+                }
 
                 // NOTE execve is async signal safe, but it is not clear that execvp is async
                 // signal safe.
