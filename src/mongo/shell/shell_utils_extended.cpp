@@ -182,7 +182,7 @@ namespace mongo {
          */
         BSONObj fuzzFile(const BSONObj& args, void* data) {
             uassert( 13619, "fuzzFile takes 2 arguments", args.nFields() == 2 );
-            shared_ptr< File > f( new File() );
+            scoped_ptr< File > f( new File() );
             f->open( args.getStringField( "0" ) );
             uassert( 13620, "couldn't open file to fuzz", !f->bad() && f->is_open() );
 
