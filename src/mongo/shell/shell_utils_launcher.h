@@ -53,6 +53,7 @@ namespace mongo {
         public:
             bool haveDb( int port ) const { return dbs.count( port ) == 1; }
             void insertDb( int port, pid_t pid, int output ) {
+                verify( !haveDb( port ) );
                 dbs.insert( make_pair( port, make_pair( pid, output ) ) );
             }
             void eraseDbAndClosePipe( int port ) {
@@ -63,7 +64,7 @@ namespace mongo {
                 dbs.erase( port );
             }
             pid_t pidForDb( int port ) const {
-                uassert( 13621, "no known mongo program on port", haveDb( port ) );
+                verify( haveDb( port ) );
                 return dbs.find( port )->second.first;
             }
             void getDbPorts( vector<int> &ports ) {
@@ -71,11 +72,13 @@ namespace mongo {
                     ports.push_back( i->first );
                 }
             }
+            bool haveShell( pid_t pid ) const { return shells.count( pid ) == 1; }
             void insertShell( pid_t pid, int output ) {
+                verify( !haveShell( pid ) );
                 shells.insert( make_pair( pid, output ) );
             }
             void eraseShellAndClosePipe( pid_t pid ) {
-                if ( shells.count( pid ) == 0 ) {
+                if ( !haveShell( pid ) ) {
                     return;
                 }
                 close( shells.find( pid )->second );
