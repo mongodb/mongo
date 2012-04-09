@@ -76,7 +76,8 @@ __wt_block_snapshot_load(WT_SESSION_IMPL *session,
 	 * or the referenced snapshot was empty).  In that case we return a
 	 * size of 0.  Set that up now.
 	 */
-	dsk->size = 0;
+	if (dsk != NULL)
+		dsk->size = 0;
 
 	if (addr == NULL)
 		WT_VERBOSE(session, block, "load-snapshot: [Empty]");
