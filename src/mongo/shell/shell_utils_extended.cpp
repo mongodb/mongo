@@ -31,7 +31,11 @@
 
 namespace mongo {
 
-    // these functions have not been audited for thread safety - currently they are called with an exclusive js mutex
+    /**
+     * These utilities are thread safe but do not provide mutually exclusive access to resources
+     * identified by the caller.  Dependent filesystem paths should not be accessed by different
+     * threads.
+     */
     namespace shellUtils {
 
         BSONObj listFiles(const BSONObj& _args, void* data) {
@@ -92,6 +96,7 @@ namespace mongo {
             return BSON( "" << ret.arr() );
         }
 
+        /** Set process wide current working directory. */
         BSONObj cd(const BSONObj& args, void* data) {
 #if defined(_WIN32)
             std::wstring dir = toWideString( args.firstElement().String().c_str() );

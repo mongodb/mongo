@@ -30,7 +30,6 @@ namespace mongo {
         extern const JSFile servers;
     }
 
-    // these functions have not been audited for thread safety - currently they are called with an exclusive js mutex
     namespace shellUtils {
 
         std::string _dbConnect;

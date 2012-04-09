@@ -47,7 +47,12 @@ namespace mongo {
     inline int pipe(int fds[2]) { return _pipe(fds, 4096, _O_TEXT | _O_NOINHERIT); }
 #endif
 
-    // these functions have not been audited for thread safety - currently they are called with an exclusive js mutex
+    /**
+     * These utilities are thread safe but do not provide mutually exclusive access to resources
+     * identified by the caller.  Resources identified by a pid or port should not be accessed
+     * by different threads.  Dependent filesystem paths should not be accessed by different
+     * threads.
+     */
     namespace shellUtils {
 
         ProgramOutputMultiplexer programOutputLogger;
