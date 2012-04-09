@@ -440,7 +440,7 @@ namespace mongo {
 
             bool authed = cc().getAuthenticationInfo()->isAuthorizedReads("admin");
 
-            result.append( "host" , prettyHostName() );
+            result.append("host", prettyHostName() );
             result.append("version", versionString);
             result.append("process","mongod");
             result.append("pid", (int)getpid());
@@ -487,7 +487,6 @@ namespace mongo {
             timeBuilder.appendNumber( "after basic" , Listener::getElapsedTimeMillis() - start );
 
             {
-
                 BSONObjBuilder t( result.subobjStart( "mem" ) );
 
                 t.append("bits",  ( sizeof(int*) == 4 ? 32 : 64 ) );

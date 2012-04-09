@@ -650,6 +650,33 @@ namespace PerfTests {
                 cout << "      avg timer granularity: " << ((double)delts)/n << "ms " << endl;
         }
     };
+    class CTMicros : public B {
+    public:
+        CTMicros() : last(0), delts(0), n(0) { }
+        string name() { return "curTimeMicros64"; }
+        virtual int howLongMillis() { return 500; }
+        virtual bool showDurStats() { return false; }
+        unsigned long long last;
+        unsigned long long delts;
+        unsigned n;
+        void timed() {
+            unsigned long long x = curTimeMicros64();
+            aaa += x;
+            if( last ) {
+                unsigned long long delt = x-last;
+                if( delt ) {
+                    delts += delt;
+                    n++;
+                }
+            }
+            last = x;
+        }
+        void post() {
+            // we need to know if timing is highly ungranular - that could be relevant in some places
+            if( n )
+                cout << "      avg timer granularity: " << ((double)delts)/n << "ms " << endl;
+        }
+    };
 
     class Bldr : public B {
     public:
@@ -1114,6 +1141,7 @@ namespace PerfTests {
                 add< casspeed >();
 #endif
                 add< CTM >();
+                add< CTMicros >();
                 add< KeyTest >();
                 add< Bldr >();
                 add< StkBldr >();
