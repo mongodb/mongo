@@ -393,17 +393,6 @@ namespace mongo {
             return x;
         }
 
-        BSONObj WaitMongoProgramOnPort( const BSONObj &a, void* data ) {
-            int port = singleArg( a ).numberInt();
-            pid_t pid = registry.pidForDb( port );
-            log() << "waiting port: " << port << ", pid: " << pid << endl;
-            bool ret = wait_for_pid( pid );
-            if ( ret ) {
-                registry.eraseDb( port );
-            }
-            return BSON( "" << ret );
-        }
-
         BSONObj StartMongoProgram( const BSONObj &a, void* data ) {
             _nokillop = true;
             ProgramRunner r( a );
@@ -627,7 +616,6 @@ namespace mongo {
             scope.injectNative( "rawMongoProgramOutput", RawMongoProgramOutput );
             scope.injectNative( "clearRawMongoProgramOutput", ClearRawMongoProgramOutput );
             scope.injectNative( "waitProgram" , WaitProgram );
-            scope.injectNative( "waitMongoProgramOnPort" , WaitMongoProgramOnPort );
             scope.injectNative( "resetDbpath", ResetDbpath );
             scope.injectNative( "copyDbpath", CopyDbpath );
         }
