@@ -294,13 +294,18 @@ namespace mongo {
     }
 
     long long BSONTool::processFile( const boost::filesystem::path& root ) {
+        bool isFifoFile = boost::filesystem::status(root).type() == boost::filesystem::fifo_file;
+
         std::string fileName = root.string();
 
-        unsigned long long fileLength = file_size( root );
+        unsigned long long fileLength = 0;
+        if (!isFifoFile) {
+            fileLength = file_size( root );
 
-        if ( fileLength == 0 ) {
-            toolInfoOutput() << "file " << fileName << " empty, skipping" << std::endl;
-            return 0;
+            if ( fileLength == 0 ) {
+                toolInfoOutput() << "file " << fileName << " empty, skipping" << std::endl;
+                return 0;
+            }
         }
 
 
@@ -311,15 +316,16 @@ namespace mongo {
             return 0;
         }
 
+        if (!isFifoFile) {
 #ifdef POSIX_FADV_SEQUENTIAL
-        posix_fadvise(fileno(file), 0, fileLength, POSIX_FADV_SEQUENTIAL);
+            posix_fadvise(fileno(file), 0, fileLength, POSIX_FADV_SEQUENTIAL);
 #endif
 
-        if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1))) {
-            toolInfoOutput() << "\t file size: " << fileLength << std::endl;
+            if (logger::globalLogDomain()->shouldLog(logger::LogSeverity::Debug(1))) {
+                toolInfoOutput() << "\t file size: " << fileLength << std::endl;
+            }
         }
 
-        unsigned long long read = 0;
         unsigned long long num = 0;
         unsigned long long processed = 0;
 
@@ -327,13 +333,21 @@ namespace mongo {
         boost::scoped_array<char> buf_holder(new char[BUF_SIZE]);
         char * buf = buf_holder.get();
 
-        ProgressMeter m(fileLength);
-        if (!toolGlobalParams.quiet) {
-            m.setUnits( "bytes" );
+        // no progress is available for FIFO
+        // only for regular files
+        boost::scoped_ptr<ProgressMeter> m;
+        if (!toolGlobalParams.quiet && !isFifoFile) {
+            m.reset(new ProgressMeter( fileLength ));
+            // boost::scoped_ptr<ProgressMeter> m( fileLength );
+            m->setUnits( "bytes" );
         }
 
-        while ( read < fileLength ) {
+        while ( true ) {
             size_t amt = fread(buf, 1, 4, file);
+            // end of fifo/file
+            if ( feof(file) ) {
+                break;
+            }
             verify( amt == 4 );
 
             int size = ((int*)buf)[0];
@@ -368,17 +382,18 @@ namespace mongo {
                 processed++;
             }
 
-            read += o.objsize();
             num++;
 
-            if (!toolGlobalParams.quiet) {
-                m.hit(o.objsize());
+            if (m.get()) {
+                m->hit(o.objsize());
             }
         }
 
         fclose( file );
 
-        uassert(10265, "counts don't match", read == fileLength);
+        if (m.get()) {
+            uassert(10265, "counts don't match", m->done() == fileLength);
+        }
         toolInfoOutput() << num << ((num == 1) ? " document" : " documents")
                          << " found" << std::endl;
         if (bsonToolGlobalParams.hasFilter) {

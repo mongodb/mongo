@@ -410,8 +410,10 @@ public:
             return;
         }
 
+        boost::filesystem::file_status fileStatus = boost::filesystem::status(root);
         if ( ! ( endsWith( root.string().c_str() , ".bson" ) ||
-                 endsWith( root.string().c_str() , ".bin" ) ) ) {
+                 endsWith( root.string().c_str() , ".bin" ) ) &&
+             ! ( fileStatus.type() == boost::filesystem::fifo_file ) ) {
             toolError() << "don't know what to do with file [" << root.string() << "]" << std::endl;
             return;
         }
@@ -492,7 +494,9 @@ public:
 
         // 2) Create collection with options from metadata file if present
         BSONObj metadataObject;
-        if (mongoRestoreGlobalParams.restoreOptions || mongoRestoreGlobalParams.restoreIndexes) {
+        boost::filesystem::file_status fileStatus = boost::filesystem::status(root);
+        if (fileStatus.type() != boost::filesystem::fifo_file &&
+            (mongoRestoreGlobalParams.restoreOptions || mongoRestoreGlobalParams.restoreIndexes)) {
             string oldCollName = root.leaf().string(); // Name of collection that was dumped from
             oldCollName = oldCollName.substr( 0 , oldCollName.find_last_of( "." ) );
             boost::filesystem::path metadataFile = (root.branch_path() / (oldCollName + ".metadata.json"));
