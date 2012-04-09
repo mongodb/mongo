@@ -290,16 +290,15 @@ __snap_get_last(
     WT_SESSION_IMPL *session, const char *config, WT_ITEM *addr)
 {
 	WT_CONFIG snapconf;
-	WT_CONFIG_ITEM a, k, curtime, v;
-	int found;
+	WT_CONFIG_ITEM a, k, v;
+	int64_t found;
 
 	WT_RET(__wt_config_getones(session, config, "snapshot", &v));
 	WT_RET(__wt_config_subinit(session, &snapconf, &v));
 	for (found = 0; __wt_config_next(&snapconf, &k, &v) == 0;) {
 		if (found) {
-			WT_RET(__wt_config_subgets(session, &v, "time", &a));
-			if (strncmp(
-			    curtime.str, a.str, WT_MIN(a.len, curtime.len)) > 0)
+			WT_RET(__wt_config_subgets(session, &v, "order", &a));
+			if (a.val < found)
 				continue;
 		}
 
@@ -309,8 +308,8 @@ __snap_get_last(
 
 		/* Our caller wants the raw cookie, not the hex. */
 		WT_RET(__wt_nhex_to_raw(session, a.str, a.len, addr));
-		WT_RET(__wt_config_subgets(session, &v, "time", &curtime));
-		found = 1;
+		WT_RET(__wt_config_subgets(session, &v, "order", &a));
+		found = a.val;
 	}
 
 	return (found ? 0 : WT_NOTFOUND);
@@ -394,13 +393,13 @@ __wt_session_snap_list_get(
 				    &snapbase));
 			snap = &snapbase[slot];
 
-			/* Copy the name, time and address into the slot. */
+			/*
+			 * Copy the name, address (raw and hex), order and time
+			 * into the slot.
+			 */
 			WT_ERR(
 			    __wt_strndup(session, k.str, k.len, &snap->name));
-			WT_ERR(__wt_config_subgets(session, &v, "time", &a));
-			if (a.len == 0)
-				goto format;
-			WT_ERR(__wt_strndup(session, a.str, a.len, &snap->t));
+
 			WT_ERR(__wt_config_subgets(session, &v, "addr", &a));
 			if (a.len == 0)
 				goto format;
@@ -408,6 +407,16 @@ __wt_session_snap_list_get(
 			    session, &snap->addr, a.str, a.len));
 			WT_ERR(__wt_nhex_to_raw(
 			    session, a.str, a.len, &snap->raw));
+
+			WT_ERR(__wt_config_subgets(session, &v, "order", &a));
+			if (a.val == 0)
+				goto format;
+			snap->order = a.val;
+
+			WT_ERR(__wt_config_subgets(session, &v, "time", &a));
+			if (a.len == 0)
+				goto format;
+			WT_ERR(__wt_strndup(session, a.str, a.len, &snap->t));
 		}
 
 	/*
@@ -453,6 +462,7 @@ __wt_session_snap_list_set(WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase)
 	WT_ITEM *buf;
 	WT_SNAPSHOT *snap;
 	time_t sec;
+	int64_t order;
 	long nsec;
 	int ret;
 	const char *sep;
@@ -461,12 +471,27 @@ __wt_session_snap_list_set(WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase)
 	buf = NULL;
 
 	WT_ERR(__wt_scr_alloc(session, 0, &buf));
-	WT_ERR(__wt_buf_fmt(session, buf, "snapshot=("));
+	order = 0;
 	sep = "";
+	WT_ERR(__wt_buf_fmt(session, buf, "snapshot=("));
 	WT_SNAPSHOT_FOREACH(snapbase, snap) {
 		/* Skip deleted snapshots. */
 		if (FLD_ISSET(snap->flags, WT_SNAP_DELETE))
 			continue;
+
+		/*
+		 * Track the largest active snapshot counter: it's not really
+		 * a generational number or an ID because we reset it to 1 if
+		 * the snapshot we're writing is the only snapshot the file has.
+		 * The problem we're solving is when two snapshots are taken
+		 * quickly, the timer may not be unique and/or we can even see
+		 * the second snapshot with a timestamp earlier than the first
+		 * one if we get the time in-between nanoseconds rolling over.
+		 * All we need to know is the real snapshot order so we don't
+		 * accidentally take the wrong "last" snapshot.
+		 */
+		if (snap->order > order)
+			order = snap->order;
 
 		if (FLD_ISSET(snap->flags, WT_SNAP_ADD)) {
 			/* Convert the raw value to a hex string. */
@@ -475,16 +500,17 @@ __wt_session_snap_list_set(WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase)
 
 			WT_ERR(__wt_epoch(session, &sec, &nsec));
 			WT_ERR(__wt_buf_catfmt(session, buf,
-			    "%s%s=(addr=\"%s\",time=%" PRIuMAX ".%ld)",
+			    "%s%s=(addr=\"%s\",order=%lu,time=%" PRIuMAX
+			    ".%ld)",
 			    sep, snap->name,
-			    (char *)snap->addr.data,
+			    (char *)snap->addr.data, order + 1,
 			    (uintmax_t)sec, nsec));
 		} else
 			WT_ERR(__wt_buf_catfmt(session, buf,
-			    "%s%s=(addr=\"%.*s\",time=%s)",
+			    "%s%s=(addr=\"%.*s\",order=%lu,time=%s)",
 			    sep, snap->name,
 			    (int)snap->addr.size,
-			    (char *)snap->addr.data, snap->t));
+			    (char *)snap->addr.data, snap->order, snap->t));
 		sep = ",";
 	}
 	WT_ERR(__wt_buf_catfmt(session, buf, ")"));

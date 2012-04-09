@@ -162,6 +162,8 @@ struct __wt_snapshot {
 	WT_ITEM  addr;				/* Snapshot cookie string */
 	WT_ITEM  raw;				/* Snapshot cookie raw */
 
+	int64_t	 order;				/* Snapshot order */
+
 	void	*bpriv;				/* Block manager's private */
 
 #define	WT_SNAP_ADD	0x01			/* Snapshot to be added */
