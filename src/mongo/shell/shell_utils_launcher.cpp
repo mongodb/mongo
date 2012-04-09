@@ -52,62 +52,63 @@ namespace mongo {
 
         ProgramOutputMultiplexer programOutputLogger;
 
-        bool ProgramRegistry::haveDb( int port ) const {
+        bool ProgramRegistry::isPortRegistered( int port ) const {
             boost::recursive_mutex::scoped_lock lk( _mutex );
-            return dbs.count( port ) == 1;
+            return _ports.count( port ) == 1;
         }
         
-        pid_t ProgramRegistry::pidForDb( int port ) const {
+        pid_t ProgramRegistry::pidForPort( int port ) const {
             boost::recursive_mutex::scoped_lock lk( _mutex );
-            verify( haveDb( port ) );
-            return dbs.find( port )->second.first;
+            verify( isPortRegistered( port ) );
+            return _ports.find( port )->second.first;
         }
         
-        void ProgramRegistry::insertDb( int port, pid_t pid, int output ) {
+        void ProgramRegistry::registerPort( int port, pid_t pid, int output ) {
             boost::recursive_mutex::scoped_lock lk( _mutex );
-            verify( !haveDb( port ) );
-            dbs.insert( make_pair( port, make_pair( pid, output ) ) );
+            verify( !isPortRegistered( port ) );
+            _ports.insert( make_pair( port, make_pair( pid, output ) ) );
         }
         
-        void ProgramRegistry::eraseDbAndClosePipe( int port ) {
+        void ProgramRegistry::deletePort( int port ) {
             boost::recursive_mutex::scoped_lock lk( _mutex );
-            if ( !haveDb( port ) ) {
+            if ( !isPortRegistered( port ) ) {
                 return;
             }
-            close( dbs.find( port )->second.second );
-            dbs.erase( port );
+            close( _ports.find( port )->second.second );
+            _ports.erase( port );
         }
         
-        void ProgramRegistry::getDbPorts( vector<int> &ports ) {
+        void ProgramRegistry::getRegisteredPorts( vector<int> &ports ) {
             boost::recursive_mutex::scoped_lock lk( _mutex );
-            for( map<int,pair<pid_t,int> >::const_iterator i = dbs.begin(); i != dbs.end(); ++i ) {
+            for( map<int,pair<pid_t,int> >::const_iterator i = _ports.begin(); i != _ports.end();
+                ++i ) {
                 ports.push_back( i->first );
             }
         }
         
-        bool ProgramRegistry::haveShell( pid_t pid ) const {
+        bool ProgramRegistry::isPidRegistered( pid_t pid ) const {
             boost::recursive_mutex::scoped_lock lk( _mutex );
-            return shells.count( pid ) == 1;
+            return _pids.count( pid ) == 1;
         }
         
-        void ProgramRegistry::insertShell( pid_t pid, int output ) {
+        void ProgramRegistry::registerPid( pid_t pid, int output ) {
             boost::recursive_mutex::scoped_lock lk( _mutex );
-            verify( !haveShell( pid ) );
-            shells.insert( make_pair( pid, output ) );
+            verify( !isPidRegistered( pid ) );
+            _pids.insert( make_pair( pid, output ) );
         }
         
-        void ProgramRegistry::eraseShellAndClosePipe( pid_t pid ) {
+        void ProgramRegistry::deletePid( pid_t pid ) {
             boost::recursive_mutex::scoped_lock lk( _mutex );
-            if ( !haveShell( pid ) ) {
+            if ( !isPidRegistered( pid ) ) {
                 return;
             }
-            close( shells.find( pid )->second );
-            shells.erase( pid );
+            close( _pids.find( pid )->second );
+            _pids.erase( pid );
         }
         
-        void ProgramRegistry::getShellPids( vector<pid_t> &pids ) {
+        void ProgramRegistry::getRegisteredPids( vector<pid_t> &pids ) {
             boost::recursive_mutex::scoped_lock lk( _mutex );
-            for( map<pid_t,int>::const_iterator i = shells.begin(); i != shells.end(); ++i ) {
+            for( map<pid_t,int>::const_iterator i = _pids.begin(); i != _pids.end(); ++i ) {
                 pids.push_back( i->first );
             }
         }
@@ -197,7 +198,7 @@ namespace mongo {
                 verify( _port > 0 );
             }
             if ( _port > 0 ) {
-                bool haveDbForPort = registry.haveDb( _port );
+                bool haveDbForPort = registry.isPortRegistered( _port );
                 if ( haveDbForPort ) {
                     cerr << "already have db for port: " << _port << endl;
                     verify( !haveDbForPort );
@@ -222,9 +223,9 @@ namespace mongo {
             }
 
             if ( _port > 0 )
-                registry.insertDb( _port, _pid, pipeEnds[ 1 ] );
+                registry.registerPort( _port, _pid, pipeEnds[ 1 ] );
             else
-                registry.insertShell( _pid, pipeEnds[ 1 ] );
+                registry.registerPid( _pid, pipeEnds[ 1 ] );
             _pipe = pipeEnds[ 0 ];
         }
 
@@ -361,7 +362,7 @@ namespace mongo {
             CloseHandle(pi.hThread);
 
             _pid = pi.dwProcessId;
-            registry.handles.insert( make_pair( _pid, pi.hProcess ) );
+            registry._handles.insert( make_pair( _pid, pi.hProcess ) );
 
 #else
 
@@ -407,8 +408,8 @@ namespace mongo {
         //returns true if process exited
         bool wait_for_pid(pid_t pid, bool block=true, int* exit_code=NULL) {
 #ifdef _WIN32
-            verify(registry.handles.count(pid));
-            HANDLE h = registry.handles[pid];
+            verify(registry._handles.count(pid));
+            HANDLE h = registry._handles[pid];
 
             if (block)
                 WaitForSingleObject(h, INFINITE);
@@ -419,7 +420,7 @@ namespace mongo {
                     return false;
                 }
                 CloseHandle(h);
-                registry.handles.erase(pid);
+                registry._handles.erase(pid);
                 if (exit_code)
                     *exit_code = tmp;
                 return true;
@@ -449,7 +450,7 @@ namespace mongo {
         BSONObj WaitProgram( const BSONObj& a, void* data ) {
             int pid = singleArg( a ).numberInt();
             BSONObj x = BSON( "" << wait_for_pid( pid ) );
-            registry.eraseShellAndClosePipe( pid );
+            registry.deletePid( pid );
             return x;
         }
 
@@ -468,10 +469,10 @@ namespace mongo {
             int exit_code;
             wait_for_pid( r.pid(), true, &exit_code );
             if ( r.port() > 0 ) {
-                registry.eraseDbAndClosePipe( r.port() );
+                registry.deletePort( r.port() );
             }
             else {
-                registry.eraseShellAndClosePipe( r.pid() );
+                registry.deletePid( r.pid() );
             }
             return BSON( string( "" ) << exit_code );
         }
@@ -482,7 +483,7 @@ namespace mongo {
             boost::thread t( r );
             int exit_code;
             wait_for_pid(r.pid(), true,  &exit_code);
-            registry.eraseShellAndClosePipe( r.pid() );
+            registry.deletePid( r.pid() );
             return BSON( string( "" ) << exit_code );
         }
 
@@ -533,8 +534,8 @@ namespace mongo {
         inline void kill_wrapper(pid_t pid, int sig, int port) {
 #ifdef _WIN32
             if (sig == SIGKILL || port == 0) {
-                verify( registry.handles.count(pid) );
-                TerminateProcess(registry.handles[pid], 1); // returns failure for "zombie" processes.
+                verify( registry._handles.count(pid) );
+                TerminateProcess(registry._handles[pid], 1); // returns failure for "zombie" processes.
             }
             else {
                 DBClientConnection conn;
@@ -568,11 +569,11 @@ namespace mongo {
             pid_t pid;
             int exitCode = 0;
             if ( port > 0 ) {
-                if( !registry.haveDb( port ) ) {
+                if( !registry.isPortRegistered( port ) ) {
                     cout << "No db started on port: " << port << endl;
                     return 0;
                 }
-                pid = registry.pidForDb( port );
+                pid = registry.pidForPort( port );
             }
             else {
                 pid = _pid;
@@ -602,10 +603,10 @@ namespace mongo {
             }
 
             if ( port > 0 ) {
-                registry.eraseDbAndClosePipe( port );
+                registry.deletePort( port );
             }
             else {
-                registry.eraseShellAndClosePipe( pid );
+                registry.deletePid( pid );
             }
             // FIXME I think the intention here is to do an extra sleep only when SIGKILL is sent to the child process.
             // We may want to change the 4 below to 29, since values of i greater than that indicate we sent a SIGKILL.
@@ -649,11 +650,11 @@ namespace mongo {
 
         void KillMongoProgramInstances() {
             vector< int > ports;
-            registry.getDbPorts( ports );
+            registry.getRegisteredPorts( ports );
             for( vector< int >::iterator i = ports.begin(); i != ports.end(); ++i )
                 killDb( *i, 0, SIGTERM );
             vector< pid_t > pids;
-            registry.getShellPids( pids );
+            registry.getRegisteredPids( pids );
             for( vector< pid_t >::iterator i = pids.begin(); i != pids.end(); ++i )
                 killDb( 0, *i, SIGTERM );
         }

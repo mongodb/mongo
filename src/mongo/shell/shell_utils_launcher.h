@@ -48,28 +48,35 @@ namespace mongo {
             stringstream _buffer;
         };
 
+        /**
+         * A registry of spawned programs that are identified by a bound port or else a system pid.
+         * All public member functions are thread safe.
+         */
         class ProgramRegistry {
         public:
 
-            bool haveDb( int port ) const;
-            pid_t pidForDb( int port ) const;
-            void insertDb( int port, pid_t pid, int output );
-            void eraseDbAndClosePipe( int port );
-            void getDbPorts( vector<int> &ports );
+            bool isPortRegistered( int port ) const;
+            /** @return pid for a registered port. */
+            pid_t pidForPort( int port ) const;
+            /** Register an unregistered port. */
+            void registerPort( int port, pid_t pid, int output );
+            void deletePort( int port );
+            void getRegisteredPorts( vector<int> &ports );
 
-            bool haveShell( pid_t pid ) const;
-            void insertShell( pid_t pid, int output );
-            void eraseShellAndClosePipe( pid_t pid );
-            void getShellPids( vector<pid_t> &pids );
+            bool isPidRegistered( pid_t pid ) const;
+            /** Register an unregistered pid. */
+            void registerPid( pid_t pid, int output );
+            void deletePid( pid_t pid );
+            void getRegisteredPids( vector<pid_t> &pids );
 
         private:
-            map<int,pair<pid_t,int> > dbs;
-            map<pid_t,int> shells;
+            map<int,pair<pid_t,int> > _ports;
+            map<pid_t,int> _pids;
             mutable boost::recursive_mutex _mutex;
 
 #ifdef _WIN32
         public:
-            map<pid_t,HANDLE> handles;
+            map<pid_t,HANDLE> _handles;
 #endif
         };
         
