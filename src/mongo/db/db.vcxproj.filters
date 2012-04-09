@@ -758,6 +758,7 @@
     <ClInclude Include="..\util\progress_meter.h" />
     <ClInclude Include="namespace_details.h" />
     <ClInclude Include="namespace_details-inl.h" />
+    <ClInclude Include="..\util\concurrency\remap_lock.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\jstests\dur\dur1.js" />

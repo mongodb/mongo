@@ -718,5 +718,8 @@
     <ClInclude Include="..\util\concurrency\simplerwlock.h">
       <Filter>Shared Source Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\util\concurrency\remap_lock.h">
+      <Filter>Shared Source Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -22,6 +22,7 @@
 #include "../db/concurrency.h"
 #include "../db/memconcept.h"
 #include "mongo/util/timer.h"
+#include "mongo/util/concurrency/remap_lock.h"
 
 namespace mongo {
 
@@ -30,6 +31,17 @@ namespace mongo {
 
     MAdvise::MAdvise(void *,unsigned, Advice) { }
     MAdvise::~MAdvise() { }
+
+    // SERVER-2942 -- We do it this way because RemapLock is used in both mongod and mongos but
+    // we need different effects.  When called in mongod it needs to be a mutex and in mongos it
+    // needs to be a no-op.  This is the mongod version, the no-op mongos version is in server.cpp.
+    SimpleMutex _remapLock( "remapLock" );
+    RemapLock::RemapLock() {
+        _remapLock.lock();
+    }
+    RemapLock::~RemapLock() {
+        _remapLock.unlock();
+    }
 
     /** notification on unmapping so we can clear writable bits */
     void MemoryMappedFile::clearWritableBits(void *p) {
@@ -224,40 +236,29 @@ namespace mongo {
     void* MemoryMappedFile::remapPrivateView(void *oldPrivateAddr) {
         d.dbMutex.assertWriteLocked(); // short window where we are unmapped so must be exclusive
 
-        // the mapViewMutex is to assure we get the same address on the remap
-        scoped_lock lk(mapViewMutex);
+        RemapLock lk;   // Interlock with PortMessageServer::acceptedMP() to stop thread creation
 
         clearWritableBits(oldPrivateAddr);
-#if 1
-        // https://jira.mongodb.org/browse/SERVER-2942
-        DWORD old;
-        bool ok = VirtualProtect(oldPrivateAddr, (SIZE_T) len, PAGE_READONLY, &old);
-        if( !ok ) {
-            DWORD e = GetLastError();
-            log() << "VirtualProtect failed in remapPrivateView " << filename() << hex << oldPrivateAddr << ' ' << len << ' ' << errnoWithDescription(e) << endl;
-            verify(false);
-        }
-        return oldPrivateAddr;
-#else
         if( !UnmapViewOfFile(oldPrivateAddr) ) {
-            DWORD e = GetLastError();
-            log() << "UnMapViewOfFile failed " << filename() << ' ' << errnoWithDescription(e) << endl;
-            verify(false);
+            DWORD dosError = GetLastError();
+            log() << "UnMapViewOfFile for " << filename()
+                    << " failed with error " << errnoWithDescription( dosError ) << endl;
+            fassertFailed( 16147 );
         }
 
-        // we want the new address to be the same as the old address in case things keep pointers around (as namespaceindex does).
-        void *p = MapViewOfFileEx(maphandle, FILE_MAP_READ, 0, 0,
-                                  /*dwNumberOfBytesToMap 0 means to eof*/0 /*len*/,
-                                  oldPrivateAddr);
-        
-        if ( p == 0 ) {
-            DWORD e = GetLastError();
-            log() << "MapViewOfFileEx failed " << filename() << " " << errnoWithDescription(e) << endl;
-            verify(p);
+        void* newPrivateView = MapViewOfFileEx(
+                maphandle,          // file mapping handle
+                FILE_MAP_READ,      // access
+                0, 0,               // file offset, high and low
+                0,                  // bytes to map, 0 == all
+                oldPrivateAddr );   // we want the same address we had before
+        if ( 0 == newPrivateView ) {
+            DWORD dosError = GetLastError();
+            log() << "MapViewOfFileEx for " << filename()
+                    << " failed with error " << errnoWithDescription( dosError ) << endl;
         }
-        verify(p == oldPrivateAddr);
-        return p;
-#endif
+        fassert( 16148, newPrivateView == oldPrivateAddr );
+        return newPrivateView;
     }
 
     class WindowsFlushable : public MemoryMappedFile::Flushable {

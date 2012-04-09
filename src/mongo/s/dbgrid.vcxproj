@@ -1335,6 +1335,7 @@
     <ClInclude Include="..\util\intrusive_counter.h" />
     <ClInclude Include="..\util\ntservice.h" />
     <ClInclude Include="..\util\processinfo.h" />
+    <ClInclude Include="..\util\concurrency\remap_lock.h" />
     <ClInclude Include="..\util\signal_handlers.h" />
     <ClInclude Include="..\util\systeminfo.h" />
     <ClInclude Include="..\util\trace.h" />
