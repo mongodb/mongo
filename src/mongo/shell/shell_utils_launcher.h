@@ -48,7 +48,6 @@ namespace mongo {
             stringstream _buffer;
         };
 
-        // todo in lock validations
         class ProgramRegistry {
         public:
 
@@ -62,9 +61,12 @@ namespace mongo {
             void insertShell( pid_t pid, int output );
             void eraseShellAndClosePipe( pid_t pid );
             void getShellPids( vector<pid_t> &pids );
+
         private:
             map<int,pair<pid_t,int> > dbs;
             map<pid_t,int> shells;
+            mutable boost::recursive_mutex _mutex;
+
 #ifdef _WIN32
         public:
             map<pid_t,HANDLE> handles;
