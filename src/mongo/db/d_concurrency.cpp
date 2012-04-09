@@ -646,6 +646,7 @@ namespace mongo {
     }
 
     void Lock::DBWrite::lockDB(const string& ns) {
+        Acquiring a( 'w' );
         locked_W=false;
         locked_w=false; weLocked=0; ourCounter = 0;
         LockState& ls = lockState();
@@ -673,6 +674,7 @@ namespace mongo {
         }
     }
     void Lock::DBRead::lockDB(const string& ns) {
+        Acquiring a( 'r' );
         locked_r=false; weLocked=0; ourCounter = 0;
         LockState& ls = lockState();
         if( isRW(ls) )
@@ -694,12 +696,10 @@ namespace mongo {
     }
 
     Lock::DBWrite::DBWrite( const StringData& ns ) : what(ns.data()) {
-        Acquiring a( 'w' );
         lockDB( what );
     }
 
     Lock::DBRead::DBRead( const StringData& ns )   : what(ns.data()) {
-        Acquiring a( 'r' );
         lockDB( what );
     }
 
