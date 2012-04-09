@@ -1,6 +1,6 @@
-port = 30201;
-conn = startMongodEmpty("--port", 30201, "--dbpath", "/data/db/query_yield1", "--smallfiles", "--nojournal" );
-db = conn.getDB( "test" );
+load( "jstests/libs/slow_weekly_util.js" )
+test = new SlowWeeklyMongod( "query_yield1" )
+db = test.getDB( "test" );
 
 t = db.query_yield1;
 t.drop()
@@ -80,4 +80,5 @@ join();
 var x = db.currentOp()
 assert.eq( 0 , x.inprog.length , "weird 2" );
 
-stopMongod( port )
+test.stop();
+
