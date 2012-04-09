@@ -17,8 +17,14 @@ var master = r.getMaster();
 
 var members = config.members.map(function(elem) { return elem.host; });
 var shardName = "addshard4/"+members.join(",");
+var invalidShardName = "addshard4/foobar";
 
 print("adding shard "+shardName);
+
+// First try adding shard with the correct replica set name but incorrect hostname
+// This will make sure that the metadata for this replica set name is cleaned up
+// so that the set can be added correctly when it has the proper hostnames.
+assert.throws(function() {s.adminCommand({"addshard" : invalidShardName});});
 
 var result = s.adminCommand({"addshard" : shardName});
 

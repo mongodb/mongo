@@ -180,6 +180,11 @@ namespace mongo {
 
     }
 
+    void ReplicaSetMonitor::remove( const string& name ) {
+        scoped_lock lk( _setsLock );
+        _sets.erase( name );
+    }
+
     void ReplicaSetMonitor::setConfigChangeHook( ConfigChangeHook hook ) {
         massert( 13610 , "ConfigChangeHook already specified" , _hook == 0 );
         _hook = hook;

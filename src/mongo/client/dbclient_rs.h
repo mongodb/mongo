@@ -63,7 +63,12 @@ namespace mongo {
         static void checkAll( bool checkAllSecondaries );
 
         /**
-         * this is called whenever the config of any repclia set changes
+         * deletes the ReplicaSetMonitor for the given set name.
+         */
+        static void remove( const string& name );
+
+        /**
+         * this is called whenever the config of any replica set changes
          * currently only 1 globally
          * asserts if one already exists
          * ownership passes to ReplicaSetMonitor and the hook will actually never be deleted
