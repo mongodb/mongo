@@ -420,6 +420,8 @@ namespace mongo {
         }
     } cmdProfile;
 
+    void reportLockStats(BSONObjBuilder& result);
+
     class CmdServerStatus : public Command {
     public:
         virtual bool slaveOk() const {
@@ -447,6 +449,8 @@ namespace mongo {
             result.append("uptime",(double) (time(0)-cmdLine.started));
             result.append("uptimeEstimate",(double) (start/1000));
             result.appendDate( "localTime" , jsTime() );
+
+            reportLockStats(result);
 
             {
                 BSONObjBuilder t;

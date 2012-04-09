@@ -1,4 +1,4 @@
-// @file d_concurrency.cpp 
+@file d_concurrency.cpp 
 
 #include "pch.h"
 #include "d_concurrency.h"
@@ -13,6 +13,7 @@
 #include "mongomutex.h"
 #include "server.h"
 #include "dur.h"
+#include "lockstat.h"
 
 // oplog locking
 // no top level read locks
@@ -49,7 +50,8 @@ namespace mongo {
     struct Acquiring { 
         Client* c;
         ~Acquiring() { curopGotLock(c); }
-        Acquiring(char type) { 
+        Acquiring(char type)
+        {
             c = curopWaitingForLock(type);
         }
     };
@@ -86,9 +88,42 @@ namespace mongo {
     static void locked_W();
     static void unlocking_w();
     static void unlocking_W();
-    static QLock& q = *new QLock();
-    //TSP_DECLARE(LockState,ls);
-    //TSP_DEFINE(LockState,ls);
+
+    class WrapperForTiming { 
+        QLock q;
+    public:
+        LockStat stats;
+
+        void start_greed()          { q.start_greed(); }
+
+        void lock_r()               { LockStat::Acquiring a(stats,'r'); q.lock_r(); }
+        void lock_w()               { LockStat::Acquiring a(stats,'w'); q.lock_w(); }
+        void lock_R()               { LockStat::Acquiring a(stats,'R'); q.lock_R(); }
+        void lock_W()               { LockStat::Acquiring a(stats,'W'); q.lock_W(); }
+        void lock_W_stop_greed()    { LockStat::Acquiring a(stats,'W'); q.lock_W_stop_greed(); }
+
+        // how to count try's that fail is an interesting question. we should get rid of try().
+        bool lock_R_try(int millis) { LockStat::Acquiring a(stats,'R'); return q.lock_R_try(millis); }
+        bool lock_W_try(int millis) { LockStat::Acquiring a(stats,'W'); return q.lock_W_try(millis); }
+
+        void unlock_r()             { stats.unlocking('r'); q.unlock_r(); }
+        void unlock_w()             { stats.unlocking('w'); q.unlock_w(); }
+        void unlock_R()             { stats.unlocking('R'); q.unlock_R(); }
+        void unlock_W()             { stats.unlocking('W'); q.unlock_W(); }
+
+        // todo timing stats? : 
+        void runExclusively(void (*f)(void)) { q.runExclusively(f); }
+        void W_to_R()                        { q.W_to_R(); }
+        bool R_to_W()                        { return q.R_to_W(); }
+    };
+
+    static WrapperForTiming& q = *new WrapperForTiming();
+
+    void reportLockStats(BSONObjBuilder& result) {
+        BSONObjBuilder b;
+        b.append(".", q.stats.report());
+        result.append("locks", b.obj());
+    }
 
     void runExclusively(void (*f)(void)) { 
         q.runExclusively(f);
