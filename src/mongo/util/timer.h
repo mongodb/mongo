@@ -44,6 +44,12 @@ namespace mongo {
             old = now;
             return m;
         }
+        unsigned long long microsReset() { 
+            unsigned long long now = curTimeMicros64();
+            unsigned long long m = now-old;
+            old = now;
+            return m;
+        }
 
         // note: dubious that the resolution is as anywhere near as high as ethod name implies!
         unsigned long long micros() const {
@@ -85,6 +91,12 @@ namespace mongo {
         int millisReset() { 
             unsigned long long nw = now();
             int m = static_cast<int>((nw - old) * 1000.0 / countsPerSecond);
+            old = nw;
+            return m;
+       } 
+       unsigned long long microsReset() { 
+            unsigned long long nw = now();
+            unsigned long long m = (nw - old) * 1000000.0 / countsPerSecond;
             old = nw;
             return m;
        } 
