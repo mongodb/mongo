@@ -10,6 +10,8 @@
 static int __verify_addfrag(WT_SESSION_IMPL *, WT_BLOCK *, off_t, off_t);
 static int __verify_checkfrag(WT_SESSION_IMPL *, WT_BLOCK *);
 static int __verify_eof(WT_SESSION_IMPL *, WT_BLOCK *, off_t, off_t);
+static int __verify_frag_notset(WT_SESSION_IMPL *, WT_BLOCK *, off_t, off_t);
+static int __verify_frag_set(WT_SESSION_IMPL *, WT_BLOCK *, off_t, off_t);
 
 /*
  * __wt_block_verify_start --
@@ -168,13 +170,85 @@ __wt_verify_snap_unload(
 	if (el->offset != WT_BLOCK_INVALID_OFFSET) {
 		WT_RET(__wt_block_extlist_read(session, block, el));
 		WT_EXT_FOREACH(ext, el->off)
-			WT_RET(__wt_verify_frag_set(
+			WT_RET(__verify_frag_set(
 			    session, block, ext->off, ext->size));
 		__wt_block_extlist_free(session, el);
 	}
 
 	/* Discard the per-snapshot fragment list. */
 	__wt_free(session, block->fragsnap);
+
+	return (0);
+}
+
+/* The bit list ignores the first sector: convert to/from a frag/offset. */
+#define	WT_OFF_TO_FRAG(block, off)					\
+	(((off) - WT_BLOCK_DESC_SECTOR) / (block)->allocsize)
+#define	WT_FRAG_TO_OFF(block, frag)					\
+	(((off_t)(frag)) * (block)->allocsize + WT_BLOCK_DESC_SECTOR)
+
+/*
+ * __wt_block_verify --
+ *	Verify a block found on disk if we haven't already verified it.
+ */
+int
+__wt_block_verify(WT_SESSION_IMPL *session, WT_BLOCK *block, WT_ITEM *buf,
+    const uint8_t *addr, uint32_t addr_size, off_t offset, uint32_t size)
+{
+	WT_ITEM *tmp;
+	uint32_t cnt, frag, frags, i;
+	int ret;
+
+	/*
+	 * If we've already verify this block's physical image, we know it's
+	 * good, we don't have to verify it again.
+	 */
+	frag = (uint32_t)WT_OFF_TO_FRAG(block, offset);
+	frags = (uint32_t)(size / block->allocsize);
+	for (cnt = i = 0; i < frags; ++i)
+		if (__bit_test(block->fragfile, frag++))
+			++cnt;
+	if (cnt == frags) {
+		WT_VERBOSE(session, verify,
+		    "skipping block at %" PRIuMAX "-%" PRIuMAX ", already "
+		    "verified",
+		    (uintmax_t)offset, (uintmax_t)(offset + size));
+		return (0);
+	}
+	if (cnt != 0)
+		WT_RET_MSG(session, WT_ERROR,
+		    "block at %" PRIuMAX "-%" PRIuMAX " partially verified",
+		    (uintmax_t)offset, (uintmax_t)(offset + size));
+
+	/*
+	 * Create a string representation of the address cookie and verify the
+	 * block.
+	 */
+	WT_RET(__wt_scr_alloc(session, 0, &tmp));
+	WT_ERR(__wt_block_addr_string(session, block, tmp, addr, addr_size));
+	WT_ERR(__wt_verify_dsk(session, (char *)tmp->data, buf));
+
+err:	__wt_scr_free(&tmp);
+	return (ret);
+}
+
+/*
+ * __wt_block_verify_addr --
+ *	Verify an address.
+ */
+int
+__wt_block_verify_addr(WT_SESSION_IMPL *session,
+    WT_BLOCK *block, const uint8_t *addr, uint32_t addr_size)
+{
+	off_t offset;
+	uint32_t cksum, size;
+
+	WT_UNUSED(addr_size);
+
+	/* Crack the cookie. */
+	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
+
+	WT_RET(__verify_addfrag(session, block, offset, (off_t)size));
 
 	return (0);
 }
@@ -200,18 +274,12 @@ __verify_eof(
 	return (0);
 }
 
-/* The bit list ignores the first sector: convert to/from a frag/offset. */
-#define	WT_OFF_TO_FRAG(block, off)					\
-	(((off) - WT_BLOCK_DESC_SECTOR) / (block)->allocsize)
-#define	WT_FRAG_TO_OFF(block, frag)					\
-	(((off_t)(frag)) * (block)->allocsize + WT_BLOCK_DESC_SECTOR)
-
 /*
- * __wt_verify_frag_notset --
+ * __verify_frag_notset --
  *	Confirm we have NOT seen this chunk of the file.
  */
-int
-__wt_verify_frag_notset(
+static int
+__verify_frag_notset(
     WT_SESSION_IMPL *session, WT_BLOCK *block, off_t offset, off_t size)
 {
 	uint32_t frag, frags, i;
@@ -220,9 +288,8 @@ __wt_verify_frag_notset(
 
 	frag = (uint32_t)WT_OFF_TO_FRAG(block, offset);
 	frags = (uint32_t)(size / block->allocsize);
-
 	for (i = 0; i < frags; ++i)
-		if (__bit_test(block->fragsnap, frag + i))
+		if (__bit_test(block->fragsnap, frag++))
 			WT_RET_MSG(session, WT_ERROR,
 			    "file fragment at offset %" PRIuMAX
 			    " referenced multiple times in a single snapshot",
@@ -231,11 +298,11 @@ __wt_verify_frag_notset(
 	return (0);
 }
 /*
- * __wt_verify_frag_set --
+ * __verify_frag_set --
  *	Confirm we have seen this chunk of the file.
  */
-int
-__wt_verify_frag_set(
+static int
+__verify_frag_set(
     WT_SESSION_IMPL *session, WT_BLOCK *block, off_t offset, off_t size)
 {
 	uint32_t frag, frags, i;
@@ -244,34 +311,12 @@ __wt_verify_frag_set(
 
 	frag = (uint32_t)WT_OFF_TO_FRAG(block, offset);
 	frags = (uint32_t)(size / block->allocsize);
-
 	for (i = 0; i < frags; ++i)
-		if (!__bit_test(block->fragsnap, frag + i))
+		if (!__bit_test(block->fragsnap, frag++))
 			WT_RET_MSG(session, WT_ERROR,
 			    "file fragment at offset %" PRIuMAX " should have "
 			    " been referenced in the snapshot but was not",
 			    (uintmax_t)offset);
-
-	return (0);
-}
-
-/*
- * __wt_block_verify_addr --
- *	Verify an address.
- */
-int
-__wt_block_verify_addr(WT_SESSION_IMPL *session,
-    WT_BLOCK *block, const uint8_t *addr, uint32_t addr_size)
-{
-	off_t offset;
-	uint32_t cksum, size;
-
-	WT_UNUSED(addr_size);
-
-	/* Crack the cookie. */
-	WT_RET(__wt_block_buffer_to_addr(block, addr, &offset, &size, &cksum));
-
-	WT_RET(__verify_addfrag(session, block, offset, (off_t)size));
 
 	return (0);
 }
@@ -287,15 +332,19 @@ __verify_addfrag(
 {
 	uint32_t frag, frags;
 
-	frag = (uint32_t)WT_OFF_TO_FRAG(block, offset);
-	frags = (uint32_t)(size / block->allocsize);
+	WT_VERBOSE(session, verify,
+	    "adding block at %" PRIuMAX "-%" PRIuMAX,
+	    (uintmax_t)offset, (uintmax_t)(offset + size));
 
 	/* We should not have seen these fragments in this snapshot. */
-	WT_RET(__wt_verify_frag_notset(session, block, offset, size));
+	WT_RET(__verify_frag_notset(session, block, offset, size));
 
 	/* Add fragments to the snapshot and total fragment lists. */
+	frag = (uint32_t)WT_OFF_TO_FRAG(block, offset);
+	frags = (uint32_t)(size / block->allocsize);
 	__bit_nset(block->fragsnap, frag, frag + (frags - 1));
 	__bit_nset(block->fragfile, frag, frag + (frags - 1));
+
 	return (0);
 }
 

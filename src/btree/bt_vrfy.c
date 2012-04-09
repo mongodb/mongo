@@ -318,12 +318,12 @@ recno_chk:	if (parent_recno != recno)
 
 			/* ref references the subtree containing the record */
 			__wt_get_addr(page, ref, &addr, &size);
-			WT_RET(__wt_bm_verify_addr(session, addr, size));
 			WT_RET(__wt_page_in(session, page, ref));
 			ret =
 			    __verify_tree(session, ref->page, ref->u.recno, vs);
 			__wt_page_release(session, ref->page);
 			WT_RET(ret);
+			WT_RET(__wt_bm_verify_addr(session, addr, size));
 		}
 		break;
 	case WT_PAGE_ROW_INT:
@@ -345,12 +345,12 @@ recno_chk:	if (parent_recno != recno)
 
 			/* ref references the subtree containing the record */
 			__wt_get_addr(page, ref, &addr, &size);
-			WT_RET(__wt_bm_verify_addr(session, addr, size));
 			WT_RET(__wt_page_in(session, page, ref));
 			ret =
 			    __verify_tree(session, ref->page, (uint64_t)0, vs);
 			__wt_page_release(session, ref->page);
 			WT_RET(ret);
+			WT_RET(__wt_bm_verify_addr(session, addr, size));
 		}
 		break;
 	}
@@ -516,18 +516,19 @@ __verify_overflow(WT_SESSION_IMPL *session,
 	WT_PAGE_HEADER *dsk;
 
 	/* Read and verify the overflow item. */
-	WT_RET(__wt_bm_verify_addr(session, addr, addr_size));
 	WT_RET(__wt_bm_read(session, vs->tmp1, addr, addr_size));
 
 	/*
-	 * The page has already been verified, but we haven't confirmed that
-	 * it was an overflow page, only that it was a valid page.  Confirm
-	 * it's the type of page we expected.
+	 * The physical page has already been verified, but we haven't confirmed
+	 * it was an overflow page, only that it was a valid page.  Confirm it's
+	 * the type of page we expected.
 	 */
 	dsk = vs->tmp1->mem;
 	if (dsk->type != WT_PAGE_OVFL)
 		WT_RET_MSG(session, WT_ERROR,
 		    "overflow referenced page at %s is not an overflow page",
 		    __wt_addr_string(session, vs->tmp1, addr, addr_size));
+
+	WT_RET(__wt_bm_verify_addr(session, addr, addr_size));
 	return (0);
 }
