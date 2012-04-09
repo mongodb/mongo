@@ -55,7 +55,7 @@ namespace mongo {
         case 'w' : return 3;
         default: ;
         }
-        fassert(0,false);
+        fassert(16146,false);
         return 0;
     }
 
