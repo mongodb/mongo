@@ -191,13 +191,10 @@ __wt_rec_write(
 
 	/*
 	 * We can't do anything with a split-merge page, it must be merged into
-	 * its parent.  Mark the parent dirty, the stack of modified pages must
-	 * climb to the root.
+	 * its parent.
 	 */
-	if (F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE)) {
-		__wt_page_modify_set(page->parent);
+	if (F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE))
 		return (0);
-	}
 
 	/* Initialize the reconciliation structures for each new run. */
 	WT_RET(__rec_write_init(session, page));
@@ -229,20 +226,21 @@ __wt_rec_write(
 	WT_RET(__rec_write_wrapup(session, page));
 
 	/*
-	 * If this page has a parent, mark the parent dirty.
-	 *
-	 * There's no chance we need to flush this write -- the eviction thread
-	 * is the only thread that eventually cares if the page is dirty or not,
-	 * and it's our update making the parent dirty.   (Other threads do have
-	 * to flush their set-page-modified update, of course).
-	 *
-	 * We don't care if we race with updates: the page will still be marked
-	 * dirty and that's all we care about.
+	 * If this page has a parent, mark the parent dirty.  Split-merge pages
+	 * are a special case: they are always dirty and never reconciled, they
+	 * are always merged into their parent.  For that reason, we mark the
+	 * first non-split-merge parent we find dirty, not the split-merge page
+	 * itself, ensuring the chain of dirty pages up the tree isn't broken.
 	 */
-	if (!WT_PAGE_IS_ROOT(page)) {
-		WT_RET(__wt_page_modify_init(session, page->parent));
-		__wt_page_modify_set(page->parent);
+	if (WT_PAGE_IS_ROOT(page))
+		return (0);
+	for (;;) {
+		page = page->parent;
+		if (!F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE))
+			break;
 	}
+	WT_RET(__wt_page_modify_init(session, page));
+	__wt_page_modify_set(page);
 
 	return (0);
 }
