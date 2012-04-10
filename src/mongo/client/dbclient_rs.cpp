@@ -898,7 +898,8 @@ namespace mongo {
     }
 
     auto_ptr<DBClientCursor> DBClientReplicaSet::checkSlaveQueryResult( auto_ptr<DBClientCursor> result ){
-        verify(result.get());
+        if ( result.get() == NULL ) return result;
+
         BSONObj error;
         bool isError = result->peekError( &error );
         if( ! isError ) return result;
