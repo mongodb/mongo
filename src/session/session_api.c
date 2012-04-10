@@ -119,6 +119,22 @@ err:	API_END_NOTFOUND_MAP(session, ret);
 }
 
 /*
+ * __wt_session_create_strip --
+ *	Discard any configuration information from a schema entry that is not
+ * applicable to an session.create call, here for the wt dump command utility,
+ * which only wants to dump the schema information needed for load.
+ */
+int
+__wt_session_create_strip(
+    WT_SESSION *session, const char *value, const char **value_ret)
+{
+	WT_SESSION_IMPL *session_impl = (WT_SESSION_IMPL *)session;
+	const char *cfg[] = { __wt_confdfl_session_create, value, NULL };
+
+	return (__wt_config_collapse(session_impl, cfg, value_ret));
+}
+
+/*
  * __session_create --
  *	WT_SESSION->create method.
  */
