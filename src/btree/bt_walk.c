@@ -62,11 +62,6 @@ __wt_tree_np(WT_SESSION_IMPL *session, WT_PAGE **pagep, int eviction, int next)
 	 * that can't be discarded.
 	 */
 	if (eviction) {
-		if (!WT_PAGE_IS_ROOT(t)) {
-			while (!WT_ATOMIC_CAS(t->ref->state,
-			    WT_REF_MEM, WT_REF_EVICT_WALK))
-				__wt_yield();
-		}
 		WT_ASSERT(session, page->ref->state == WT_REF_EVICT_WALK);
 		page->ref->state = WT_REF_MEM;
 	} else {
@@ -107,11 +102,6 @@ descend:	for (;;) {
 				if (!WT_ATOMIC_CAS(ref->state,
 				    WT_REF_MEM, WT_REF_EVICT_WALK))
 					break;
-				if (!WT_PAGE_IS_ROOT(page)) {
-					WT_ASSERT(session, page->ref->state ==
-					    WT_REF_EVICT_WALK);
-					page->ref->state = WT_REF_MEM;
-				}
 			} else {
 				/*
 				 * Swap hazard references at each level (but

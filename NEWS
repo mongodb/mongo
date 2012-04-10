@@ -1,3 +1,29 @@
+WiredTiger release 1.1.3, 2012-04-04
+------------------------------------
+
+Fix the "exclusive" config for WT_SESSION::create. [#181]
+1. Make it work for files within a single session.
+2. Make it work for files across sessions.
+3. Make other data sources consistent with files.
+
+Fix an eviction bug introduced into 1.1.2: when evicting a page with children,
+remove the children from the LRU eviction queue.  Reduce the impact of clearing
+a page from the LRU queue by marking pages on the queue with a flag
+(WT_PAGE_EVICT_LRU).  
+
+During an eviction walk, pin pages up to the root so there is no need to spin
+when attempting to lock a parent page.  Use the EVICT_LRU page flag to avoid
+putting a page on the LRU queue multiple times.
+
+Layer dump cursors on top of any cursor type.
+
+Add a section on replacing the default system memory allocator to the tuning
+page.
+
+Typo in usage method for "wt write".
+
+Don't report range errors for config values that aren't well-formed integers.
+
 WiredTiger release 1.1.2, 2012-03-20
 ------------------------------------
 

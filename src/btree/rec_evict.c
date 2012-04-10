@@ -8,15 +8,15 @@
 #include "wt_internal.h"
 
 static int  __hazard_exclusive(WT_SESSION_IMPL *, WT_REF *, int);
-static int  __rec_discard(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __rec_discard_page(WT_SESSION_IMPL *, WT_PAGE *);
+static int  __rec_discard(WT_SESSION_IMPL *, WT_PAGE *, int);
+static int  __rec_discard_page(WT_SESSION_IMPL *, WT_PAGE *, int);
 static void __rec_excl_clear(WT_SESSION_IMPL *);
-static int  __rec_page_clean_update(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __rec_page_dirty_update(WT_SESSION_IMPL *, WT_PAGE *);
+static int  __rec_page_clean_update(WT_SESSION_IMPL *, WT_PAGE *, int);
+static int  __rec_page_dirty_update(WT_SESSION_IMPL *, WT_PAGE *, int);
 static int  __rec_review(WT_SESSION_IMPL *, WT_REF *, WT_PAGE *, uint32_t, int);
 static int  __rec_root_addr_update(WT_SESSION_IMPL *, uint8_t *, uint32_t);
-static int  __rec_root_clean_update(WT_SESSION_IMPL *, WT_PAGE *);
-static int  __rec_root_dirty_update(WT_SESSION_IMPL *, WT_PAGE *);
+static int  __rec_root_clean_update(WT_SESSION_IMPL *, WT_PAGE *, int);
+static int  __rec_root_dirty_update(WT_SESSION_IMPL *, WT_PAGE *, int);
 
 /*
  * __wt_rec_evict --
@@ -26,7 +26,7 @@ int
 __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 {
 	WT_CONNECTION_IMPL *conn;
-	int ret;
+	int ret, single;
 
 	conn = S2C(session);
 	ret = 0;
@@ -35,6 +35,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	    "page %p (%s)", page, __wt_page_type_string(page->type));
 
 	WT_ASSERT(session, session->excl_next == 0);
+	single = LF_ISSET(WT_REC_SINGLE) ? 1 : 0;
 
 	/*
 	 * Get exclusive access to the page and review the page and its subtree
@@ -51,7 +52,7 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 	WT_ERR(__rec_review(session, page->ref, page, flags, 1));
 
 	/* Count evictions of internal pages during normal operation. */
-	if (!LF_ISSET(WT_REC_SINGLE) &&
+	if (!single &&
 	    (page->type == WT_PAGE_COL_INT || page->type == WT_PAGE_ROW_INT))
 		WT_STAT_INCR(conn->stats, cache_evict_internal);
 
@@ -60,16 +61,16 @@ __wt_rec_evict(WT_SESSION_IMPL *session, WT_PAGE *page, uint32_t flags)
 		WT_STAT_INCR(conn->stats, cache_evict_unmodified);
 
 		if (WT_PAGE_IS_ROOT(page))
-			WT_ERR(__rec_root_clean_update(session, page));
+			WT_ERR(__rec_root_clean_update(session, page, single));
 		else
-			WT_ERR(__rec_page_clean_update(session, page));
+			WT_ERR(__rec_page_clean_update(session, page, single));
 	} else {
 		WT_STAT_INCR(conn->stats, cache_evict_modified);
 
 		if (WT_PAGE_IS_ROOT(page))
-			WT_ERR(__rec_root_dirty_update(session, page));
+			WT_ERR(__rec_root_dirty_update(session, page, single));
 		else
-			WT_ERR(__rec_page_dirty_update(session, page));
+			WT_ERR(__rec_page_dirty_update(session, page, single));
 	}
 
 	if (0) {
@@ -88,13 +89,13 @@ err:		/*
  *	Update a page's reference for an evicted, clean page.
  */
 static int
-__rec_page_clean_update(WT_SESSION_IMPL *session, WT_PAGE *page)
+__rec_page_clean_update(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 {
 	/* Update the relevant WT_REF structure. */
 	WT_PUBLISH(page->ref->state, WT_REF_DISK);
 	page->ref->page = NULL;
 
-	return (__rec_discard_page(session, page));
+	return (__rec_discard_page(session, page, single));
 }
 
 /*
@@ -102,7 +103,7 @@ __rec_page_clean_update(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Update a page's reference for an evicted, clean page.
  */
 static int
-__rec_root_clean_update(WT_SESSION_IMPL *session, WT_PAGE *page)
+__rec_root_clean_update(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 {
 	WT_BTREE *btree;
 
@@ -110,7 +111,7 @@ __rec_root_clean_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	btree->root_page = NULL;
 
-	return (__rec_discard_page(session, page));
+	return (__rec_discard_page(session, page, single));
 }
 
 /*
@@ -118,7 +119,7 @@ __rec_root_clean_update(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Update a page's reference for an evicted, dirty page.
  */
 static int
-__rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
+__rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 {
 	WT_PAGE_MODIFY *mod;
 	WT_REF *parent_ref;
@@ -170,7 +171,7 @@ __rec_page_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Discard pages which were merged into this page during reconciliation,
 	 * then discard the page itself.
 	 */
-	WT_RET(__rec_discard(session, page));
+	WT_RET(__rec_discard(session, page, single));
 
 	return (0);
 }
@@ -206,7 +207,7 @@ __rec_root_addr_update(WT_SESSION_IMPL *session, uint8_t *addr, uint32_t size)
  *	Update the reference for an evicted, dirty root page.
  */
 static int
-__rec_root_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
+__rec_root_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 {
 	WT_BTREE *btree;
 	WT_PAGE *next;
@@ -248,7 +249,7 @@ __rec_root_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 	 * Discard pages which were merged into this page during reconciliation,
 	 * then discard the page itself.
 	 */
-	WT_RET(__rec_discard(session, page));
+	WT_RET(__rec_discard(session, page, single));
 
 	if (next == NULL)
 		return (0);
@@ -274,7 +275,7 @@ __rec_root_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	WT_RET(__wt_rec_write(session, next, NULL));
 
-	return (__rec_root_dirty_update(session, next));
+	return (__rec_root_dirty_update(session, next, single));
 }
 
 /*
@@ -282,7 +283,7 @@ __rec_root_dirty_update(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Discard any pages merged into an evicted page, then the page itself.
  */
 static int
-__rec_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
+__rec_discard(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 {
 	WT_REF *ref;
 	uint32_t i;
@@ -291,12 +292,16 @@ __rec_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
 	case WT_PAGE_COL_INT:
 	case WT_PAGE_ROW_INT:
 		/* For each entry in the page... */
-		WT_REF_FOREACH(page, ref, i)
-			if (ref->state != WT_REF_DISK)
-				WT_RET(__rec_discard(session, ref->page));
+		WT_REF_FOREACH(page, ref, i) {
+			if (ref->state == WT_REF_DISK)
+				continue;
+			WT_ASSERT(session,
+			    single || ref->state == WT_REF_LOCKED);
+			WT_RET(__rec_discard(session, ref->page, single));
+		}
 		/* FALLTHROUGH */
 	default:
-		WT_RET(__rec_discard_page(session, page));
+		WT_RET(__rec_discard_page(session, page, single));
 		break;
 	}
 	return (0);
@@ -307,7 +312,7 @@ __rec_discard(WT_SESSION_IMPL *session, WT_PAGE *page)
  *	Process the page's list of tracked objects, and discard it.
  */
 static int
-__rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page)
+__rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page, int single)
 {
 	WT_PAGE_MODIFY *mod;
 
@@ -336,6 +341,9 @@ __rec_discard_page(WT_SESSION_IMPL *session, WT_PAGE *page)
 
 	/* We should never evict the file's current eviction point. */
 	WT_ASSERT(session, session->btree->evict_page != page);
+
+	if (!single)
+		__wt_evict_clr_page(session, page);
 
 	/* Discard the page itself. */
 	__wt_page_out(session, page, 0);
