@@ -748,11 +748,11 @@ namespace mongo {
             string from = cmdObj["from"].str(); // my public address, a tad redundant, but safe
 
             // fromShard and toShard needed so that 2.2 mongos can interact with either 2.0 or 2.2 mongod
-            if( ! cmdObj["fromShard"].type() == String ){
+            if( cmdObj["fromShard"].type() == String ){
                 from = cmdObj["fromShard"].String();
             }
 
-            if( ! cmdObj["toShard"].type() == String ){
+            if( cmdObj["toShard"].type() == String ){
                 to = cmdObj["toShard"].String();
             }
 
