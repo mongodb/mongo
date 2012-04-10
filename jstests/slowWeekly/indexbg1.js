@@ -62,7 +62,7 @@ while( 1 ) { // if indexing finishes before we can run checks, try indexing w/ m
         var ex = t.find( {i:100} ).limit(-1).explain()
         printjson(ex)
         assert.eq( "BasicCursor", ex.cursor, "used btree cursor" );
-        assert( ex.nscanned < 1000 , "took to long to find 100: " + tojson( ex ) );
+        assert( ex.nscanned < 1000 , "took too long to find 100: " + tojson( ex ) );
         t.remove( {i:40} );
         t.update( {i:10}, {i:-10} );
         id = t.find().hint( {$natural:-1} ).next()._id;
