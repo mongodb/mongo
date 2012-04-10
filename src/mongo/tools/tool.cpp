@@ -489,7 +489,7 @@ namespace mongo {
         m.setUnits( "bytes" );
 
         while ( read < fileLength ) {
-            BSONObj* o = readDocument(file, buf, BUF_SIZE);
+            boost::scoped_ptr<BSONObj> o(readDocument(file, buf, BUF_SIZE));
             verify( o != NULL );
 
             if ( _matcher.get() == 0 || _matcher->matches( *o ) ) {
@@ -501,8 +501,6 @@ namespace mongo {
             num++;
 
             m.hit( o->objsize() );
-
-            delete o;
         }
 
         fclose( file );
@@ -532,7 +530,7 @@ namespace mongo {
         char * buf = buf_holder.get();
 
         while ( true ) {
-            BSONObj* o = readDocument(file, buf, BUF_SIZE);
+            boost::scoped_ptr<BSONObj> o(readDocument(file, buf, BUF_SIZE));
             if ( !o ) {
                 break;
             }
@@ -544,8 +542,6 @@ namespace mongo {
 
             read += o->objsize();
             num++;
-
-            delete o;
         }
 
         fclose( file );
