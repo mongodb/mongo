@@ -64,9 +64,15 @@
     <ClCompile Include="..\..\..\third_party\boost\libs\filesystem\v3\src\windows_file_codecvt.cpp">
       <Filter>Boost</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\util\debug_util.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\util\stringutils.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\debug_util.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
