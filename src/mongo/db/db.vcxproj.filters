@@ -762,6 +762,9 @@
     <ClInclude Include="index_insertion_continuation.h">
       <Filter>db</Filter>
     </ClInclude>
+    <ClInclude Include="lockstat.h">
+      <Filter>db</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\jstests\dur\dur1.js" />

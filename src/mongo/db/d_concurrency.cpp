@@ -33,6 +33,21 @@
 
 namespace mongo { 
 
+    class WrapperForRWLock : boost::noncopyable { 
+        SimpleRWLock r;
+    public:
+        string name() const { return r.name; }
+        LockStat stats;
+        WrapperForRWLock(const char *name) :
+          r(name)
+        { 
+        }
+        void lock()          { LockStat::Acquiring a(stats,'W'); r.lock();        }
+        void lock_shared()   { LockStat::Acquiring a(stats,'R'); r.lock_shared(); }
+        void unlock()        { stats.unlocking('W'); r.unlock();        }
+        void unlock_shared() { stats.unlocking('R'); r.unlock_shared(); }
+    };
+
     class DBTryLockTimeoutException : public std::exception {
     public:
     	DBTryLockTimeoutException() {}
@@ -74,15 +89,15 @@ namespace mongo {
        in different directories with the same name, it will be ok but they are sharing a lock 
        then.
     */
-    static mapsf<string,SimpleRWLock*> dblocks;
+    static mapsf<string,WrapperForRWLock*> dblocks;
 
     /* we don't want to touch dblocks too much as a mutex is involved.  thus party for that, 
        this is here...
     */
-    SimpleRWLock *nestableLocks[] = { 
+    WrapperForRWLock *nestableLocks[] = { 
         0, 
-        new SimpleRWLock("localDBLock"),
-        new SimpleRWLock("adminDBLock")
+        new WrapperForRWLock("local"),
+        new WrapperForRWLock("admin")
     };
 
     static void locked_W();
@@ -122,6 +137,14 @@ namespace mongo {
     void reportLockStats(BSONObjBuilder& result) {
         BSONObjBuilder b;
         b.append(".", q.stats.report());
+        b.append("admin", nestableLocks[Lock::local]->stats.report());
+        b.append("local", nestableLocks[Lock::local]->stats.report());
+        {
+            mapsf<string,WrapperForRWLock*>::ref r(dblocks);
+            for( map<string,WrapperForRWLock*>::const_iterator i = r.r.begin(); i != r.r.end(); i++ ) {
+                b.append(i->first, i->second->stats.report());
+            }
+        }
         result.append("locks", b.obj());
     }
 
@@ -187,10 +210,10 @@ namespace mongo {
             b.append(s, kind(nestableCount));
         }
         if( otherCount ) { 
-            SimpleRWLock *k = otherLock;
+            WrapperForRWLock *k = otherLock;
             if( k ) {
                 string s = ".";
-                s += k->name;
+                s += k->name();
                 b.append(s, kind(otherCount));
             }
         }
@@ -662,10 +685,10 @@ namespace mongo {
         ls.otherCount++;
         if( !same ) {
             ls.otherName = db;
-            mapsf<string,SimpleRWLock*>::ref r(dblocks);
-            SimpleRWLock*& lock = r[db];
+            mapsf<string,WrapperForRWLock*>::ref r(dblocks);
+            WrapperForRWLock*& lock = r[db];
             if( lock == 0 )
-                lock = new SimpleRWLock(db.c_str());
+                lock = new WrapperForRWLock(db.c_str());
             ls.otherLock = lock;
         }
         fassert(16134,weLocked==0);
@@ -851,10 +874,10 @@ namespace mongo {
         ls.otherCount--;
         if( !same ) {
             ls.otherName = db;
-            mapsf<string,SimpleRWLock*>::ref r(dblocks);
-            SimpleRWLock*& lock = r[db];
+            mapsf<string,WrapperForRWLock*>::ref r(dblocks);
+            WrapperForRWLock*& lock = r[db];
             if( lock == 0 )
-                lock = new SimpleRWLock();
+                lock = new WrapperForRWLock(db.c_str());
             ls.otherLock = lock;
         }
         fassert(16135,weLocked==0);

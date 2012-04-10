@@ -1321,6 +1321,7 @@
     <ClInclude Include="..\util\concurrency\remap_lock.h" />
     <ClInclude Include="explain.h" />
     <ClInclude Include="index_insertion_continuation.h" />
+    <ClInclude Include="lockstat.h" />
     <ClInclude Include="namespace_details-inl.h" />
     <ClInclude Include="namespace_details.h" />
     <ClInclude Include="queryoptimizercursorimpl.h" />

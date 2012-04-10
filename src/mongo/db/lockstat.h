@@ -31,19 +31,23 @@ namespace mongo {
     };
 
     inline BSONObj LockStat::report() const { 
+        BSONObjBuilder x;
+        BSONObjBuilder y;
+        x.append("R", (long long) timeLocked[0]);
+        x.append("W", (long long) timeLocked[1]);
+        if( timeLocked[2] || timeLocked[3] ) {
+            x.append("r", (long long) timeLocked[2]);
+            x.append("w", (long long) timeLocked[3]);
+        }
+        y.append("R", (long long) timeAcquiring[0]);
+        y.append("W", (long long) timeAcquiring[1]);
+        if( timeAcquiring[2] || timeAcquiring[3] ) {
+            y.append("r", (long long) timeAcquiring[2]);
+            y.append("w", (long long) timeAcquiring[3]);
+        }
         return BSON(
-            "timeLocked" << 
-               BSON(
-                 "R" << (long long) timeLocked[0] << 
-                 "W" << (long long) timeLocked[1] << 
-                 "w" << (long long) timeLocked[2] << 
-                 "r" << (long long) timeLocked[3]) << 
-            "timeAcquiring" << 
-               BSON(
-                 "R" << (long long) timeAcquiring[0] << 
-                 "W" << (long long) timeAcquiring[1] << 
-                 "w" << (long long) timeAcquiring[2] << 
-                 "r" << (long long) timeAcquiring[3])
+            "timeLocked" << x.obj() << 
+            "timeAcquiring" << y.obj()
         );
     }
 
