@@ -58,7 +58,7 @@ __evict_clr_all(WT_SESSION_IMPL *session)
 {
 	WT_CACHE *cache;
 	WT_EVICT_LIST *evict;
-	int i, elem;
+	uint32_t i, elem;
 
 	cache = S2C(session)->cache;
 
