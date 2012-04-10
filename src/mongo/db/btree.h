@@ -582,7 +582,7 @@ namespace mongo {
     class IndexInsertionContinuation;
 
     template< class V>
-    class IndexInsertionContinuationImpl;
+    struct IndexInsertionContinuationImpl;
 
     /**
      * This class adds functionality for manipulating buckets that are assembled

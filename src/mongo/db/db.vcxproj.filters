@@ -759,6 +759,9 @@
     <ClInclude Include="namespace_details.h" />
     <ClInclude Include="namespace_details-inl.h" />
     <ClInclude Include="..\util\concurrency\remap_lock.h" />
+    <ClInclude Include="index_insertion_continuation.h">
+      <Filter>db</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\jstests\dur\dur1.js" />
@@ -804,6 +807,9 @@
     </Filter>
     <Filter Include="z">
       <UniqueIdentifier>{263b94d7-3bc6-41e2-9f3e-808558c2a92e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="db">
+      <UniqueIdentifier>{c666c392-87aa-4438-8e2a-e3b31442889f}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
