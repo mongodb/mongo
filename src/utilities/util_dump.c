@@ -9,7 +9,7 @@
 
 static int dump_prefix(int);
 static int dump_suffix(void);
-static int print_uri(WT_SESSION *, const char *, const char *, const char *);
+static int print_config(WT_SESSION *, const char *, const char *, const char *);
 static int schema(WT_SESSION *, const char *);
 static int schema_file(WT_SESSION *, WT_CURSOR *, const char *);
 static int schema_table(WT_SESSION *, WT_CURSOR *, const char *);
@@ -234,8 +234,8 @@ schema_table(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 		return (util_cerr(uri, "get_key", ret));
 	if ((ret = cursor->get_value(cursor, &value)) != 0)
 		return (util_cerr(uri, "get_value", ret));
-	if (print_uri(session, key, NULL, value) != 0)
-		return (1);
+	if (printf("%s\n%s\n", key, value) < 0)
+		return (util_err(EIO, NULL));
 
 	/*
 	 * Second, dump the column group and index key/value pairs: for each
@@ -278,8 +278,9 @@ schema_table(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 		 * The dumped configuration string is the original key plus the
 		 * file's configuration.
 		 */
-		if (print_uri(session, list[i].key, list[i].value, value) != 0)
-			return (util_err(EIO, NULL));
+		if (print_config(
+		    session, list[i].key, list[i].value, value) != 0)
+			return (1);
 	}
 
 	/* Leak the memory, I don't care. */
@@ -305,7 +306,7 @@ schema_file(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 		return (util_cerr(uri, "get_key", ret));
 	if ((ret = cursor->get_value(cursor, &value)) != 0)
 		return (util_cerr(uri, "get_value", ret));
-	return (print_uri(session, key, NULL, value));
+	return (print_config(session, key, NULL, value));
 }
 
 /*
@@ -341,11 +342,12 @@ dump_suffix(void)
 }
 
 /*
- * print_uri --
- *	Output a key/value URI pair.
+ * print_config --
+ *	Output a key/value URI pair for a file after stripping out any values
+ * that aren't appropriate for a subsequent session.create call.
  */
 static int
-print_uri(WT_SESSION *session,
+print_config(WT_SESSION *session,
     const char *key, const char *value_pfx, const char *value)
 {
 	const char *value_ret;
@@ -356,7 +358,7 @@ print_uri(WT_SESSION *session,
 	ret = printf("%s\n%s%s%s\n", key,
 	    value_pfx == NULL ? "" : value_pfx,
 	    value_pfx == NULL ? "" : ",",
-	    value_ret);
+	    value);
 	free((char *)value_ret);
 	if (ret < 0)
 		return (util_err(EIO, NULL));
