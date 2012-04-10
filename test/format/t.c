@@ -27,10 +27,8 @@ main(int argc, char *argv[])
 	(void)setenv("MALLOC_OPTIONS", "AJZ", 1);
 
 	/* Set values from the "CONFIG" file, if it exists. */
-	if (access("CONFIG", R_OK) == 0) {
-		printf("... reading CONFIG file\n");
+	if (access("CONFIG", R_OK) == 0)
 		config_file("CONFIG");
-	}
 
 	/* Default to a single thread. */
 	g.threads = 1;
