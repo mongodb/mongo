@@ -744,6 +744,9 @@ extern int __wt_schema_worker(WT_SESSION_IMPL *session,
     int (*func)(WT_SESSION_IMPL *,
     const char *[]),
     uint32_t open_flags);
+extern int __wt_session_create_strip( WT_SESSION *session,
+    const char *value,
+    const char **value_ret);
 extern int __wt_open_session(WT_CONNECTION_IMPL *conn,
     int internal,
     WT_EVENT_HANDLER *event_handler,

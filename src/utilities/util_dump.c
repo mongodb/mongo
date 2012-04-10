@@ -9,9 +9,10 @@
 
 static int dump_prefix(int);
 static int dump_suffix(void);
+static int print_uri(WT_SESSION *, const char *, const char *, const char *);
 static int schema(WT_SESSION *, const char *);
-static int schema_file(WT_CURSOR *, const char *);
-static int schema_table(WT_CURSOR *, const char *);
+static int schema_file(WT_SESSION *, WT_CURSOR *, const char *);
+static int schema_table(WT_SESSION *, WT_CURSOR *, const char *);
 static int usage(void);
 
 static inline int
@@ -133,9 +134,9 @@ schema(WT_SESSION *session, const char *uri)
 
 	/* Dump the schema. */
 	if (strncmp(uri, "table:", strlen("table:")) == 0)
-		ret = schema_table(cursor, uri);
+		ret = schema_table(session, cursor, uri);
 	else
-		ret = schema_file(cursor, uri);
+		ret = schema_file(session, cursor, uri);
 
 	if ((tret = cursor->close(cursor)) != 0 && ret == 0)
 		ret = tret;
@@ -148,7 +149,7 @@ schema(WT_SESSION *session, const char *uri)
  *	Dump the schema for a table.
  */
 static int
-schema_table(WT_CURSOR *cursor, const char *uri)
+schema_table(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 {
 	struct {
 		char *key;			/* Schema key */
@@ -215,8 +216,8 @@ schema_table(WT_CURSOR *cursor, const char *uri)
 		return (util_cerr(uri, "get_key", ret));
 	if ((ret = cursor->get_value(cursor, &value)) != 0)
 		return (util_cerr(uri, "get_value", ret));
-	if (printf("%s\n%s\n", key, value) < 0)
-		return (util_err(EIO, NULL));
+	if (print_uri(session, key, NULL, value) != 0)
+		return (1);
 
 	/*
 	 * Second, dump the column group and index key/value pairs: for each
@@ -259,8 +260,7 @@ schema_table(WT_CURSOR *cursor, const char *uri)
 		 * The dumped configuration string is the original key plus the
 		 * file's configuration.
 		 */
-		if (printf(
-		    "%s\n%s,%s\n", list[i].key, list[i].value, value) < 0)
+		if (print_uri(session, list[i].key, list[i].value, value) != 0)
 			return (util_err(EIO, NULL));
 	}
 
@@ -273,7 +273,7 @@ schema_table(WT_CURSOR *cursor, const char *uri)
  *	Dump the schema for a file.
  */
 static int
-schema_file(WT_CURSOR *cursor, const char *uri)
+schema_file(WT_SESSION *session, WT_CURSOR *cursor, const char *uri)
 {
 	const char *key, *value;
 	int ret;
@@ -287,10 +287,7 @@ schema_file(WT_CURSOR *cursor, const char *uri)
 		return (util_cerr(uri, "get_key", ret));
 	if ((ret = cursor->get_value(cursor, &value)) != 0)
 		return (util_cerr(uri, "get_value", ret));
-	if (printf("%s\n%s\n", key, value) < 0)
-		return (util_err(EIO, NULL));
-
-	return (0);
+	return (print_uri(session, key, NULL, value));
 }
 
 /*
@@ -321,6 +318,29 @@ static int
 dump_suffix(void)
 {
 	if (printf("Data\n") < 0)
+		return (util_err(EIO, NULL));
+	return (0);
+}
+
+/*
+ * print_uri --
+ *	Output a key/value URI pair.
+ */
+static int
+print_uri(WT_SESSION *session,
+    const char *key, const char *value_pfx, const char *value)
+{
+	const char *value_ret;
+	int ret;
+
+	if ((ret = __wt_session_create_strip(session, value, &value_ret)) != 0)
+		return (util_err(ret, NULL));
+	ret = printf("%s\n%s%s%s\n", key,
+	    value_pfx == NULL ? "" : value_pfx,
+	    value_pfx == NULL ? "" : ",",
+	    value_ret);
+	free((char *)value_ret);
+	if (ret < 0)
 		return (util_err(EIO, NULL));
 	return (0);
 }
