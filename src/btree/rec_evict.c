@@ -14,7 +14,6 @@ static void __rec_excl_clear(WT_SESSION_IMPL *);
 static int  __rec_page_clean_update(WT_SESSION_IMPL *, WT_PAGE *, int);
 static int  __rec_page_dirty_update(WT_SESSION_IMPL *, WT_PAGE *, int);
 static int  __rec_review(WT_SESSION_IMPL *, WT_REF *, WT_PAGE *, uint32_t, int);
-static int  __rec_root_addr_update(WT_SESSION_IMPL *, uint8_t *, uint32_t);
 static int  __rec_root_clean_update(WT_SESSION_IMPL *, WT_PAGE *, int);
 static int  __rec_root_dirty_update(WT_SESSION_IMPL *, WT_PAGE *, int);
 
