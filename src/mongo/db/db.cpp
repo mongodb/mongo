@@ -336,7 +336,7 @@ namespace mongo {
         boost::filesystem::path path( dbpath );
         for ( boost::filesystem::directory_iterator i( path );
                 i != boost::filesystem::directory_iterator(); ++i ) {
-            string fileName = boost::filesystem::path(*i).leaf();
+            string fileName = boost::filesystem::path(*i).filename().string();
             if ( boost::filesystem::is_directory( *i ) &&
                     fileName.length() && fileName[ 0 ] == '$' )
                 boost::filesystem::remove_all( *i );
@@ -702,11 +702,6 @@ int main(int argc, char* argv[]) {
     dbExecCommand = argv[0];
 
     srand(curTimeMicros());
-#if( BOOST_VERSION >= 104500 )
-    boost::filesystem::path::default_name_check( boost::filesystem2::no_check );
-#else
-    boost::filesystem::path::default_name_check( boost::filesystem::no_check );
-#endif
 
     {
         unsigned x = 0x12345678;
@@ -1023,7 +1018,7 @@ int main(int argc, char* argv[]) {
         if (params.count("shutdown")){
             bool failed = false;
 
-            string name = ( boost::filesystem::path( dbpath ) / "mongod.lock" ).native_file_string();
+            string name = ( boost::filesystem::path( dbpath ) / "mongod.lock" ).string();
             if ( !boost::filesystem::exists( name ) || boost::filesystem::file_size( name ) == 0 )
                 failed = true;
 
