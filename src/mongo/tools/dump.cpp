@@ -96,7 +96,7 @@ public:
         int queryOptions = QueryOption_SlaveOk | QueryOption_NoCursorTimeout;
         if (startsWith(coll.c_str(), "local.oplog."))
             queryOptions |= QueryOption_OplogReplay;
-        else if ( _query.isEmpty() && !hasParam("dbpath") && !hasParam("forceTableScan") )
+        else if ( ( _query.isEmpty() && _query.getSort().isEmpty() ) && !hasParam("dbpath") && !hasParam("forceTableScan") )
             q.snapshot();
         
         DBClientBase& connBase = conn(true);
