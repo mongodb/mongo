@@ -7,16 +7,16 @@
 
 #include "format.h"
 
-static void  col_del(WT_CURSOR *, WT_ITEM *, uint64_t, int *);
 static void  col_insert(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t *);
-static void  col_put(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
+static void  col_remove(WT_CURSOR *, WT_ITEM *, uint64_t, int *);
+static void  col_update(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t);
 static void  nextprev(WT_CURSOR *, int, int *);
 static int   notfound_chk(const char *, int, int, uint64_t);
 static void *ops(void *);
 static void  print_item(const char *, WT_ITEM *);
 static void  read_row(WT_CURSOR *, WT_ITEM *, uint64_t);
-static void  row_del(WT_CURSOR *, WT_ITEM *, uint64_t, int *);
-static void  row_put(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t, int);
+static void  row_remove(WT_CURSOR *, WT_ITEM *, uint64_t, int *);
+static void  row_update(WT_CURSOR *, WT_ITEM *, WT_ITEM *, uint64_t, int);
 
 /*
  * wts_ops --
@@ -179,18 +179,18 @@ ops(void *arg)
 				 * If deleting a non-existent record, the cursor
 				 * won't be positioned, and so can't do a next.
 				 */
-				row_del(cursor, &key, keyno, &notfound);
+				row_remove(cursor, &key, keyno, &notfound);
 				break;
 			case FIX:
 			case VAR:
-				col_del(cursor, &key, keyno, &notfound);
+				col_remove(cursor, &key, keyno, &notfound);
 				break;
 			}
 		} else if (op < g.c_delete_pct + g.c_insert_pct) {
 			++tinfo->insert;
 			switch (g.c_file_type) {
 			case ROW:
-				row_put(cursor, &key, &value, keyno, 1);
+				row_update(cursor, &key, &value, keyno, 1);
 				break;
 			case FIX:
 			case VAR:
@@ -209,11 +209,11 @@ ops(void *arg)
 			++tinfo->update;
 			switch (g.c_file_type) {
 			case ROW:
-				row_put(cursor, &key, &value, keyno, 0);
+				row_update(cursor, &key, &value, keyno, 0);
 				break;
 			case FIX:
 			case VAR:
-				col_put(cursor, &key, &value, keyno);
+				col_update(cursor, &key, &value, keyno);
 				break;
 			}
 		} else {
@@ -485,11 +485,11 @@ nextprev(WT_CURSOR *cursor, int next, int *notfoundp)
 }
 
 /*
- * row_put --
- *	Update an element in a row-store file.
+ * row_update --
+ *	Update a row in a row-store file.
  */
 static void
-row_put(
+row_update(
     WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno, int insert)
 {
 	WT_SESSION *session;
@@ -513,22 +513,22 @@ row_put(
 	ret = cursor->insert(cursor);
 	if (ret != 0 && ret != WT_NOTFOUND)
 		die(ret,
-		    "row_put: %s row %" PRIu64 " by key",
+		    "row_update: %s row %" PRIu64 " by key",
 		    insert ? "insert" : "update", keyno);
 
 	if (!SINGLETHREADED)
 		return;
 
-	bdb_put(key->data, key->size, value->data, value->size, &notfound);
-	NTF_CHK(notfound_chk("row_put", ret, notfound, keyno));
+	bdb_update(key->data, key->size, value->data, value->size, &notfound);
+	NTF_CHK(notfound_chk("row_update", ret, notfound, keyno));
 }
 
 /*
- * col_put --
- *	Update an element in a column-store file.
+ * col_update --
+ *	Update a row in a column-store file.
  */
 static void
-col_put(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
+col_update(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 {
 	WT_SESSION *session;
 	int notfound, ret;
@@ -558,14 +558,14 @@ col_put(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t keyno)
 		cursor->set_value(cursor, value);
 	ret = cursor->insert(cursor);
 	if (ret != 0 && ret != WT_NOTFOUND)
-		die(ret, "col_put: %" PRIu64, keyno);
+		die(ret, "col_update: %" PRIu64, keyno);
 
 	if (!SINGLETHREADED)
 		return;
 
 	key_gen((uint8_t *)key->data, &key->size, keyno, 0);
-	bdb_put(key->data, key->size, value->data, value->size, &notfound);
-	NTF_CHK(notfound_chk("col_put", ret, notfound, keyno));
+	bdb_update(key->data, key->size, value->data, value->size, &notfound);
+	NTF_CHK(notfound_chk("col_update", ret, notfound, keyno));
 }
 
 /*
@@ -618,15 +618,15 @@ col_insert(WT_CURSOR *cursor, WT_ITEM *key, WT_ITEM *value, uint64_t *keynop)
 		return;
 
 	key_gen((uint8_t *)key->data, &key->size, keyno, 0);
-	bdb_put(key->data, key->size, value->data, value->size, &notfound);
+	bdb_update(key->data, key->size, value->data, value->size, &notfound);
 }
 
 /*
- * row_del --
- *	Delete an element from a row-store file.
+ * row_remove --
+ *	Remove an row from a row-store file.
  */
 static void
-row_del(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
+row_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 {
 	WT_SESSION *session;
 	int notfound, ret;
@@ -643,22 +643,22 @@ row_del(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 	cursor->set_key(cursor, key);
 	ret = cursor->remove(cursor);
 	if (ret != 0 && ret != WT_NOTFOUND)
-		die(ret, "row_del: remove %" PRIu64 " by key", keyno);
+		die(ret, "row_remove: remove %" PRIu64 " by key", keyno);
 	*notfoundp = ret == WT_NOTFOUND;
 
 	if (!SINGLETHREADED)
 		return;
 
-	bdb_del(keyno, &notfound);
-	NTF_CHK(notfound_chk("row_del", ret, notfound, keyno));
+	bdb_remove(keyno, &notfound);
+	NTF_CHK(notfound_chk("row_remove", ret, notfound, keyno));
 }
 
 /*
- * col_del --
- *	Delete an element from a column-store file.
+ * col_remove --
+ *	Remove a row from a column-store file.
  */
 static void
-col_del(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
+col_remove(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 {
 	WT_SESSION *session;
 	int notfound, ret;
@@ -673,7 +673,7 @@ col_del(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 	cursor->set_key(cursor, keyno);
 	ret = cursor->remove(cursor);
 	if (ret != 0 && ret != WT_NOTFOUND)
-		die(ret, "col_del: remove %" PRIu64 " by key", keyno);
+		die(ret, "col_remove: remove %" PRIu64 " by key", keyno);
 	*notfoundp = ret == WT_NOTFOUND;
 
 	if (!SINGLETHREADED)
@@ -685,11 +685,11 @@ col_del(WT_CURSOR *cursor, WT_ITEM *key, uint64_t keyno, int *notfoundp)
 	 */
 	if (g.c_file_type == FIX) {
 		key_gen((uint8_t *)key->data, &key->size, keyno, 0);
-		bdb_put(key->data, key->size, "\0", 1, &notfound);
+		bdb_update(key->data, key->size, "\0", 1, &notfound);
 	} else
-		bdb_del(keyno, &notfound);
+		bdb_remove(keyno, &notfound);
 
-	NTF_CHK(notfound_chk("col_del", ret, notfound, keyno));
+	NTF_CHK(notfound_chk("col_remove", ret, notfound, keyno));
 }
 
 /*
