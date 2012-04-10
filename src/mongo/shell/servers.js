@@ -162,17 +162,6 @@ MongoRunner.nextOpenPort = function(){
 
 }
 
-/**
- * Converts the args object by pairing all keys with their value and appending
- * dash-dash (--) to the keys. The only exception to this rule are keys that
- * are defined in MongoRunner.logicalOptions, of which they will be ignored.
- * 
- * @param {string} binaryName
- * @param {Object} args
- * 
- * @return {Array.<String>} an array of parameter strings that can be passed
- *   to the binary.
- */
 MongoRunner.arrOptions = function( binaryName , args ){
 
     var fullArgs = [ binaryName ]
@@ -282,21 +271,6 @@ MongoRunner.mongoOptions = function( opts ){
     return opts
 }
 
-/**
- * @option {object} opts
- * 
- *   {
- *     dbpath {string}
- *     useLogFiles {boolean}: use with logFile option.
- *     logFile {string}: path to the log file. If not specified and useLogFiles
- *       is true, automatically creates a log file inside dbpath.
- *     noJournalPrealloc {boolean}
- *     noJournal {boolean}
- *     keyFile
- *     replSet
- *     oplogSize
- *   }
- */
 MongoRunner.mongodOptions = function( opts ){
     
     opts = MongoRunner.mongoOptions( opts )
@@ -351,26 +325,6 @@ MongoRunner.mongosOptions = function( opts ){
     return opts
 }
 
-/**
- * Starts a mongod instance.
- * 
- * @param {Object} opts
- * 
- *   {
- *     useHostName {boolean}: Uses hostname of machine if true
- *     forceLock {boolean}: Deletes the lock file if set to true
- *     dbpath {string}: location of db files
- *     cleanData {boolean}: Removes all files in dbpath if true
- *     startClean {boolean}: same as cleanData
- *     noCleanData {boolean}: Do not clean files (cleanData takes priority)
- * 
- *     @see MongoRunner.mongodOptions for other options
- *   }
- * 
- * @return {Mongo} connection object to the started mongod instance.
- * 
- * @see MongoRunner.arrOptions
- */
 MongoRunner.runMongod = function( opts ){
     
     var useHostName = false
@@ -583,76 +537,6 @@ myPort = function() {
         return 27017;
 }
 
-/**
- * Starts up a sharded cluster with the given specifications. The cluster
- * will be fully operational after the execution of this constructor function.
- * 
- * @param {Object} testName Contains the key value pair for the cluster
- *   configuration. Accpeted keys are:
- * 
- *   {
- *     name {string}: name for this test
- *     verbose {number}: the verbosity for the mongos
- *     keyFile {string}: the location of the keyFile
- *     chunksize {number}:
- *     nopreallocj {boolean|number}:
- *
- *     mongos {number|Object|Array.<Object>}: number of mongos or mongos
- *       configuration object(s). @see MongoRunner.runMongos
- * 
- *     rs {Object|Array.<Object>}: replica set configuration object. Can
- *       contain:
- *       {
- *         nodes {number}: number of replica members. Defaults to 3.
- *         For other options, @see ReplSetTest#start
- *       }
- * 
- *     shards {number|Object|Array.<Object>}: number of shards or shard
- *       configuration object(s). @see MongoRunner.runMongod
- *     
- *     config {number|Object|Array.<Object>}: number of config server or
- *       config server configuration object(s). the presence of this field implies
- *       other.separateConfig = true, and if has 3 or more members, implies
- *       other.sync = true. @see MongoRunner.runMongod
- * 
- *     WARNING: use Array format for shards/config/rs/mongos when used
- *       together as they can overwrite each other's settings.
- * 
- *     other: {
- *       nopreallocj: same as above
- *       rs: same as above
- *       chunksize: same as above
- *
- *       shardOptions {Object}: same as the shards property above.
- *          Can be used to specify options that are common all shards.
- * 
- *       sync {boolean}: Use SyncClusterConnection, and readies
- *          3 config servers.
- *       separateConfig {boolean}: if false, recycle one of the running mongod
- *          as a config server. The config property can override this.
- *       configOptions {Object}: same as the config property above.
- *          Can be used to specify options that are common all config servers.
- *       mongosOptions {Object}: same as the mongos property above.
- *          Can be used to specify options that are common all mongos.
- * 
- *       // replica Set only:
- *       rsOptions {Object}: same as the rs property above. Can be used to
- *         specify options that are common all replica members.
- *       useHostname {boolean}: if true, use hostname of machine,
- *         otherwise use localhost
- *       numReplicas {number} 
- *     }
- *   }
- * 
- * Member variables:
- * s {Mongo} - connection to the first mongos
- * s0, s1, ... {Mongo} - connection to different mongos
- * rs0, rs1, ... {ReplSetTest} - test objects to replica sets
- * shard0, shard1, ... {Mongo} - connection to shards (not available for replica sets)
- * d0, d1, ... {Mongo} - same as shard0, shard1, ...
- * config0, config1, ... {Mongo} - connection to config servers
- * c0, c1, ... {Mongo} - same as config0, config1, ...
- */
 ShardingTest = function( testName , numShards , verboseLevel , numMongos , otherParams ){
     
     this._startTime = new Date();
@@ -1769,49 +1653,6 @@ function skipIfTestingReplication(){
     }
 }
 
-/**
- * Sets up a replica set. To make the set running, call {@link #startSet},
- * followed by {@link #initiate} (and optionally,
- * {@link #awaitSecondaryNodes} to block till the  set is fully operational).
- * Note that some of the replica start up parameters are not passed here,
- * but to the #startSet method.
- * 
- * @param {Object} opts
- * 
- *   {
- *     name {string}: name of this replica set. Default: 'testReplSet'
- *     host {string}: name of the host machine. Hostname will be used
- *        if not specified.
- *     useHostName {boolean}: if true, use hostname of machine,
- *        otherwise use localhost
- *     nodes {number|Object|Array.<Object>}: number of replicas. Default: 0.
- *        Can also be an Object (or Array).
- *        Format for Object:
- *          {
- *            <any string>: replica member option Object. @see MongoRunner.runMongod
- *            <any string2>: and so on...
- *          }
- * 
- *        Format for Array:
- *           An array of replica member option Object. @see MongoRunner.runMongod
- * 
- *        Note: For both formats, a special boolean property 'arbiter' can be
- *          specified to denote a member is an arbiter.
- * 
- *     oplogSize {number}: Default: 40
- *     useSeedList {boolean}: Use the connection string format of this set
- *        as the replica set name (overrides the name property). Default: false
- *     bridged {boolean}: Whether to set a mongobridge between replicas.
- *        Default: false
- *     keyFile {string}
- *     shardSvr {boolean}: Default: false
- *     startPort {number}: port offset to be used for each replica. Default: 31000
- *   }
- * 
- * Member variables:
- * numNodes {number} - number of nodes
- * nodes {Array.<Mongo>} - connection to replica set members
- */
 ReplSetTest = function( opts ){
     this.name  = opts.name || "testReplSet";
     this.host  = opts.host || getHostName();
