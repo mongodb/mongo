@@ -513,7 +513,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 		conn = NULL;
 		WT_ERR(ret);
 	}
-	
+
 	/*
 	 * If this is a new database, create the schema file.  This avoids
 	 * application threads racing to create it later.  We need a real
