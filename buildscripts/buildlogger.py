@@ -220,15 +220,15 @@ def wrap_test(command):
             end_time = time.time()
             buf.append((end_time, '*** finished test %r in %f seconds ***' % (test_filename, end_time - start_time)))
             append_test_logs(build_id, test_id, buf)
+        else:
+            buf.append((time.time(), line))
+            if len(buf) > 100 or (buf and time.time() - buf[0][0] > 10):
+                append_test_logs(build_id, test_id, buf)
 
-        buf.append((time.time(), line))
-        if len(buf) > 100 or (buf and time.time() - buf[0][0] > 10):
-            append_test_logs(build_id, test_id, buf)
-
-            # this is like "buf = []", but doesn't change
-            # the "buf" reference -- necessary to  make
-            # the closure work
-            buf[:] = []
+                # this is like "buf = []", but doesn't change
+                # the "buf" reference -- necessary to  make
+                # the closure work
+                buf[:] = []
 
     # the peculiar formatting here matches what is printed by
     # smoke.py when starting tests
@@ -280,15 +280,15 @@ def wrap_global(command):
             # callback is called with None when the
             # command is finished
             append_global_logs(build_id, buf)
+        else:
+            buf.append((time.time(), line))
+            if len(buf) > 100 or (buf and time.time() - buf[0][0] > 10):
+                append_global_logs(build_id, buf)
 
-        buf.append((time.time(), line))
-        if len(buf) > 100 or (buf and time.time() - buf[0][0] > 10):
-            append_global_logs(build_id, buf)
-
-            # this is like "buf = []", but doesn't change
-            # the "buf" reference -- necessary to  make
-            # the closure work
-            buf[:] = []
+                # this is like "buf = []", but doesn't change
+                # the "buf" reference -- necessary to  make
+                # the closure work
+                buf[:] = []
 
     return loop_and_callback(command, callback)
 
