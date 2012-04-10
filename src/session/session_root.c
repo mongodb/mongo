@@ -485,10 +485,10 @@ __wt_session_snap_list_set(WT_SESSION_IMPL *session, WT_SNAPSHOT *snapbase)
 		 * the snapshot we're writing is the only snapshot the file has.
 		 * The problem we're solving is when two snapshots are taken
 		 * quickly, the timer may not be unique and/or we can even see
-		 * the second snapshot with a timestamp earlier than the first
-		 * one if we get the time in-between nanoseconds rolling over.
-		 * All we need to know is the real snapshot order so we don't
-		 * accidentally take the wrong "last" snapshot.
+		 * time travel on the second snapshot if we read the time
+		 * in-between nanoseconds rolling over.  All we need to know
+		 * is the real snapshot order so we don't accidentally take the
+		 * wrong "last" snapshot.
 		 */
 		if (snap->order > order)
 			order = snap->order;
