@@ -661,7 +661,7 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		 *
 		 * Don't skip pages marked WT_PAGE_REC_EMPTY or SPLIT: updates
 		 * after their last reconciliation may have changed their state
-		 * and only the reconcilation/eviction code can confirm if they
+		 * and only the reconciliation/eviction code can confirm if they
 		 * should really be skipped.
 		 */
 		if (WT_PAGE_IS_ROOT(page) ||
