@@ -72,7 +72,7 @@
             {
                 Continuation c(dl(), recordLoc(), key, Ordering::make(order()), id());
                 b->twoStepInsert(dl(), c, true);
-                c.stepTwo();
+                c.doIndexInsertionWrites();
             }
 #else
             {

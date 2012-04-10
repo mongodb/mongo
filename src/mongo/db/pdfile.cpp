@@ -1195,24 +1195,30 @@ namespace mongo {
         return sz;
     }
 
-    /* step one of adding keys to index idxNo for a new record 
+    /* step one of adding keys to index idxNo for a new record
        @return true means done.  false means multikey involved and more work to do
     */
-    static void _addKeysToIndexStepOneOfTwo(BSONObjSet & /*out*/keys, NamespaceDetails *d, int idxNo, BSONObj& obj, DiskLoc recordLoc, IndexDetails& idx) {
+    static void _addKeysToIndexStepOneOfTwo(BSONObjSet & /*out*/keys,
+                                            IndexInterface::IndexInserter &inserter,
+                                            NamespaceDetails *d,
+                                            int idxNo,
+                                            BSONObj& obj,
+                                            DiskLoc recordLoc) {
+        IndexDetails &idx = d->idx(idxNo);
         idx.getKeysFromObject(obj, keys);
         if( keys.empty() )
             return;
         bool dupsAllowed = !idx.unique();
-        BSONObj order = idx.keyPattern();
-        IndexInterface& ii = idx.idxInterface();
-        Ordering ordering = Ordering::make(order);
+        Ordering ordering = Ordering::make(idx.keyPattern());
 
         verify( !recordLoc.isNull() );
 
         try {
             // we can't do the two step method with multi keys as insertion of one key changes the indexes 
             // structure.  however we can do the first key of the set so we go ahead and do that FWIW
-            ii.phasedQueueItemToInsert(idxNo, idx.head, recordLoc, *keys.begin(), ordering, idx, dupsAllowed);
+            inserter.addInsertionContinuation(
+                    idx.idxInterface().beginInsertIntoIndex(
+                            idxNo, idx, recordLoc, *keys.begin(), ordering, dupsAllowed));
         }
         catch (AssertionException& e) {
             if( e.getCode() == 10287 && idxNo == d->nIndexes ) {
@@ -1224,32 +1230,6 @@ namespace mongo {
         }
     }
 
-    namespace dur { 
-        extern unsigned notesThisLock;
-    }
-
-    // this is called during insert (specifically indexRecordUsingTwoSteps) to provide an opportunity 
-    // to upgrade lock state.  we do not yet do anything. there is some discussion of whether upgradable
-    // would be useful or not.
-    void upgradeToWritable(bool shouldBeUnlocked) {
-        DEV {
-            // verify we haven't written yet (usually)
-            // the dbtests test binary does special things so this would assert there so don't check there
-            /*if( shouldBeUnlocked && !cmdLine.binaryName.empty() && cmdLine.binaryName != "test" ) {
-                static unsigned long long zeroes;
-                static unsigned long long tot;
-                tot++;
-                if( dur::notesThisLock == 0 )
-                    zeroes++;
-                if( tot > 1000 ) {
-                    static int n;
-                    DEV if( n++ == 0 ) 
-                        log() << "warning upgradeToWritable: already in writable lock before upgrade call too often" << endl;
-                }
-            }*/
-        }
-    }
-
     /** add index keys for a newly inserted record 
         done in two steps/phases to allow potential deferal of write lock portion in the future
     */
@@ -1257,15 +1237,15 @@ namespace mongo {
         vector<int> multi;
         vector<BSONObjSet> multiKeys;
 
-        IndexInterface::phasedBegin();
+        IndexInterface::IndexInserter inserter;
 
+        // Step 1, read phase.
         int n = d->nIndexesBeingBuilt();
         {
             BSONObjSet keys;
             for ( int i = 0; i < n; i++ ) {
-                IndexDetails& idx = d->idx(i);
                 // this call throws on unique constraint violation.  we haven't done any writes yet so that is fine.
-                _addKeysToIndexStepOneOfTwo(/*out*/keys, d, i, obj, loc, idx);
+                _addKeysToIndexStepOneOfTwo(/*out*/keys, inserter, d, i, obj, loc);
                 if( keys.size() > 1 ) {
                     multi.push_back(i);
                     multiKeys.push_back(BSONObjSet());
@@ -1275,10 +1255,7 @@ namespace mongo {
             }
         }
 
-        // update lock to writable here - if we want that behavior.
-        upgradeToWritable(shouldBeUnlocked);
-
-        IndexInterface::phasedFinish(); // step 2
+        inserter.finishAllInsertions();  // Step 2, write phase.
 
         // now finish adding multikeys
         for( unsigned j = 0; j < multi.size(); j++ ) {

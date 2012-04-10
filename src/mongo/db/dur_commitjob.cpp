@@ -30,8 +30,7 @@ namespace mongo {
 #endif
 
     namespace dur {
-        extern unsigned notesThisLock;
-        void ThreadLocalIntents::push(const WriteIntent& x) { 
+       void ThreadLocalIntents::push(const WriteIntent& x) { 
             if( !commitJob._hasWritten )
                 commitJob._hasWritten = true;
             if( n == 21 )
@@ -43,7 +42,6 @@ namespace mongo {
         }
         void ThreadLocalIntents::_unspool() {
             if( n ) { 
-                DEV notesThisLock += n;
                 for( int j = 0; j < n; j++ )
                     commitJob.note(i[j].start(), i[j].length());
 #if( CHECK_SPOOLING )

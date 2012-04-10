@@ -18,12 +18,16 @@
 
 #pragma once
 
-#include "../pch.h"
-#include "diskloc.h"
-#include "jsobj.h"
-#include "indexkey.h"
-#include "key.h"
-#include "namespace.h"
+#include "pch.h"
+
+#include <vector>
+
+#include "mongo/db/diskloc.h"
+#include "mongo/db/index_insertion_continuation.h"
+#include "mongo/db/indexkey.h"
+#include "mongo/db/jsobj.h"
+#include "mongo/db/key.h"
+#include "mongo/db/namespace.h"
 
 namespace mongo {
 
@@ -31,12 +35,22 @@ namespace mongo {
     protected:
         virtual ~IndexInterface() { }
     public:
-        static void phasedBegin();
-        virtual void phasedQueueItemToInsert(
+        class IndexInserter : private boost::noncopyable {
+        public:
+            IndexInserter();
+            ~IndexInserter();
+
+            void addInsertionContinuation(IndexInsertionContinuation *c);
+            void finishAllInsertions();
+
+        private:
+            std::vector<IndexInsertionContinuation *> _continuations;
+        };
+
+        virtual IndexInsertionContinuation *beginInsertIntoIndex(
             int idxNo,
-            DiskLoc thisLoc, DiskLoc _recordLoc, const BSONObj &_key,
-            const Ordering& _order, IndexDetails& _idx, bool dupsAllowed) = 0;
-        static void phasedFinish();
+            IndexDetails &_idx, DiskLoc _recordLoc, const BSONObj &_key,
+            const Ordering& _order, bool dupsAllowed) = 0;
 
         virtual int keyCompare(const BSONObj& l,const BSONObj& r, const Ordering &ordering) = 0;
         virtual long long fullValidate(const DiskLoc& thisLoc, const BSONObj &order) = 0;

@@ -16,6 +16,8 @@
 *    along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include <boost/checked_delete.hpp>
+
 #include "pch.h"
 #include "namespace-inl.h"
 #include "index.h"
@@ -23,56 +25,49 @@
 #include "background.h"
 #include "repl/rs.h"
 #include "ops/delete.h"
+#include "mongo/util/scopeguard.h"
 
 
 namespace mongo {
+
+    IndexInterface::IndexInserter::IndexInserter() {}
+    IndexInterface::IndexInserter::~IndexInserter() {
+        for (size_t i = 0; i < _continuations.size(); ++i)
+            delete _continuations[i];
+    }
+
+    void IndexInterface::IndexInserter::addInsertionContinuation(IndexInsertionContinuation *c) {
+        _continuations.push_back(c);
+    }
+
+    void IndexInterface::IndexInserter::finishAllInsertions() {
+        for (size_t i = 0; i < _continuations.size(); ++i) {
+            _continuations[i]->doIndexInsertionWrites();
+        }
+    }
+
 
     template< class V >
     class IndexInterfaceImpl : public IndexInterface { 
     public:
         typedef typename V::KeyOwned KeyOwned;
-        typedef Continuation<V> Cont;
         virtual int keyCompare(const BSONObj& l,const BSONObj& r, const Ordering &ordering);
 
-        Cont *c[NamespaceDetails::NIndexesMax];
-        int n;
-
     public:
-        IndexInterfaceImpl() { n = 0; }
+        IndexInsertionContinuation *beginInsertIntoIndex(
+                int idxNo, IndexDetails &_idx,
+                DiskLoc _recordLoc, const BSONObj &_key,
+                const Ordering& _order, bool dupsAllowed) {
 
-        /* lacking CONCURRENCY WRITE this supports only one writer */
-        void _phasedBegin() {
-            // we do this here as phasedFinish can throw exceptions (we could catch there, but just as easy to do here)
-            for( int i = 0; i < n; i++ ) {
-                delete c[i];
-                c[i] = 0; // defensive
-            }
-            n = 0;
-        }
-        void phasedQueueItemToInsert(
-            int idxNo,
-            DiskLoc thisLoc, DiskLoc _recordLoc, const BSONObj &_key,
-            const Ordering& _order, IndexDetails& _idx, bool dupsAllowed) 
-        { 
-            if( idxNo >= n )
-                n = idxNo + 1;
-            Cont *C = c[idxNo] = new Cont(thisLoc, _recordLoc, _key, _order, _idx);
-            thisLoc.btree<V>()->twoStepInsert(thisLoc, *C, dupsAllowed);
-        }
-        void _phasedFinish() {
-            for( int i = 0; i < n; i++ ) {
-                // if mixing v0 and v1 indexes, in that case (only) there could be nulls in the list
-                if( c[i] ) {
-                    c[i]->stepTwo();
-                }
-            }
+            IndexInsertionContinuationImpl<V> *continuation = new IndexInsertionContinuationImpl<V>(
+                    _idx.head, _recordLoc, _key, _order, _idx);
+            ScopeGuard allocGuard = MakeGuard(boost::checked_delete<IndexInsertionContinuation>,
+                                              continuation);
+            _idx.head.btree<V>()->twoStepInsert(_idx.head, *continuation, dupsAllowed);
+            allocGuard.Dismiss();
+            return continuation;
         }
 
-/*        virtual DiskLoc locate(const IndexDetails &idx , const DiskLoc& thisLoc, const BSONObj& key, const Ordering &order,
-            int& pos, bool& found, const DiskLoc &recordLoc, int direction) { 
-            return thisLoc.btree<V>()->locate(idx, thisLoc, key, order, pos, found, recordLoc, direction);
-        }
-        */
         virtual long long fullValidate(const DiskLoc& thisLoc, const BSONObj &order) { 
             return thisLoc.btree<V>()->fullValidate(thisLoc, order);
         }
@@ -143,15 +138,6 @@ namespace mongo {
     IndexInterfaceImpl<V1> iii_v1;
 
     IndexInterface *IndexDetails::iis[] = { &iii_v0, &iii_v1 };
-
-    void IndexInterface::phasedBegin() { 
-        iii_v0._phasedBegin();
-        iii_v1._phasedBegin();
-    }
-    void IndexInterface::phasedFinish() { 
-        iii_v0._phasedFinish();
-        iii_v1._phasedFinish();
-    }
 
     int removeFromSysIndexes(const char *ns, const char *idxName) {
         string system_indexes = cc().database()->name + ".system.indexes";

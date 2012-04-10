@@ -19,6 +19,7 @@
 #include "pch.h"
 #include "db.h"
 #include "btree.h"
+#include "index_insertion_continuation.h"
 #include "pdfile.h"
 #include "json.h"
 #include "clientcursor.h"
@@ -1701,7 +1702,7 @@ namespace mongo {
     /** @thisLoc disk location of *this */
     template< class V >
     void BtreeBucket<V>::insertStepOne(DiskLoc thisLoc, 
-                             Continuation<V>& c,
+                             IndexInsertionContinuationImpl<V>& c,
                              bool dupsAllowed) const {
         dassert( c.key.dataSize() <= this->KeyMax );
         verify( c.key.dataSize() > 0 );
@@ -1715,7 +1716,7 @@ namespace mongo {
                 log(4) << "btree _insert: reusing unused key" << endl;
                 c.b = this;
                 c.pos = pos;
-                c.op = Continuation<V>::SetUsed;
+                c.op = IndexInsertionContinuation::SetUsed;
                 return;
             }
 
@@ -1737,7 +1738,7 @@ namespace mongo {
             c.bLoc = thisLoc;
             c.b = this;
             c.pos = pos;
-            c.op = Continuation<V>::InsertHere;
+            c.op = IndexInsertionContinuation::InsertHere;
             return;
         }
 
@@ -1820,7 +1821,8 @@ namespace mongo {
     }
 
     template< class V >
-    void BtreeBucket<V>::twoStepInsert(DiskLoc thisLoc, Continuation<V> &c, bool dupsAllowed) const
+    void BtreeBucket<V>::twoStepInsert(DiskLoc thisLoc, IndexInsertionContinuationImpl<V> &c,
+                                       bool dupsAllowed) const
     {
 
         if ( c.key.dataSize() > this->KeyMax ) {
@@ -1977,4 +1979,6 @@ namespace mongo {
         }
     } btunittest;
 
+
+    IndexInsertionContinuation::~IndexInsertionContinuation() {}
 }

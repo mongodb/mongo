@@ -1,7 +1,4 @@
-// test writing to two db's at the same time
-// disabled until SERVER-5531 is fixed.
-
-if (0) {
+// test writing to two db's at the same time.
 
 t1 = db.jstests_basicc;
 var db = db.getSisterDB("test1");
@@ -19,5 +16,3 @@ assert.automsg( "!db.getLastError()" );
 stopMongoProgramByPid( pid );
 t1.drop();
 t2.drop();
-
-}
