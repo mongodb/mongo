@@ -25,6 +25,7 @@ test, in order to let the buildlogs web app display the full output sensibly.)
 import functools
 import os
 import os.path
+import re
 import signal
 import subprocess
 import sys
@@ -84,16 +85,22 @@ def url(endpoint):
     return '%s/%s' % (URL_ROOT.rstrip('/'), endpoint)
 
 def post(endpoint, data, headers=None):
-    data = json.dumps(data)
+    data = json.dumps(data, encoding='utf-8')
 
     headers = headers or {}
-    headers.update({'Content-Type': 'application/json'})
+    headers.update({'Content-Type': 'application/json; charset=utf-8'})
 
     req = urllib2.Request(url=url(endpoint), data=data, headers=headers)
     response = url_opener.open(req, timeout=TIMEOUT_SECONDS)
     response_headers = dict(response.info())
-    if response_headers.get('content-type') == 'application/json':
-        return json.load(response)
+
+    # eg "Content-Type: application/json; charset=utf-8"
+    content_type = response_headers.get('content-type')
+    match = re.match(r'(?P<mimetype>[^;]+).*(?:charset=(?P<charset>[^ ]+))?$', content_type)
+    if match and match.group('mimetype') == 'application/json':
+        encoding = match.group('charset') or 'utf-8'
+        return json.load(response, encoding=encoding)
+
     return response.read()
 
 def traceback_to_stderr(func):
