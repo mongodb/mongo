@@ -52,7 +52,7 @@ class test_util11(wttest.WiredTigerTestCase, suite_subprocess):
         """
 
         # Construct what we think we'll find
-        filelist = ''
+        filelist = 'file:WiredTiger.wt\n'
         outfile = "listout.txt"
         self.runWt(["list"], outfilename=outfile)
         self.check_file_content(outfile, filelist)

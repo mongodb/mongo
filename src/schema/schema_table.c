@@ -10,11 +10,11 @@
 static const char *schematab_config = "key_format=S,value_format=S";
 
 /*
- * __open_schema_table --
+ * __wt_open_schema_table --
  *	Opens the schema table, sets session->schematab.
  */
-static inline int
-__open_schema_table(WT_SESSION_IMPL *session)
+int
+__wt_open_schema_table(WT_SESSION_IMPL *session)
 {
 	const char *cfg[] = API_CONF_DEFAULTS(file, meta, schematab_config);
 	const char *schemaconf;
@@ -54,7 +54,7 @@ __wt_schema_table_cursor(
 {
 	const char *cfg[] = API_CONF_DEFAULTS(session, open_cursor, config);
 
-	WT_RET(__open_schema_table(session));
+	WT_RET(__wt_open_schema_table(session));
 	session->btree = session->schematab;
 	return (__wt_curfile_create(session, NULL, cfg, cursorp));
 }

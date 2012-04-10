@@ -190,11 +190,14 @@ __wt_rec_write(
 	WT_ASSERT(session, __wt_page_is_modified(page));
 
 	/*
-	 * We can't do anything with a split-merge page, that has to be merged
-	 * merged into its parent.
+	 * We can't do anything with a split-merge page, it must be merged into
+	 * its parent.  Mark the parent dirty, the stack of modified pages must
+	 * climb to the root.
 	 */
-	if (F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE))
+	if (F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE)) {
+		__wt_page_modify_set(page->parent);
 		return (0);
+	}
 
 	/* Initialize the reconciliation structures for each new run. */
 	WT_RET(__rec_write_init(session, page));

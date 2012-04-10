@@ -374,6 +374,7 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	WT_CONFIG_ITEM cval, skey, sval;
 	WT_CONNECTION_IMPL *conn;
 	WT_ITEM *cbuf, expath, exconfig;
+	WT_SESSION *wt_session;
 	WT_SESSION_IMPL *session;
 	int ret;
 	const char *cfg[] =
@@ -510,6 +511,19 @@ wiredtiger_open(const char *home, WT_EVENT_HANDLER *event_handler,
 	 */
 	if ((ret = __wt_connection_open(conn, cfg)) != 0) {
 		conn = NULL;
+		WT_ERR(ret);
+	}
+	
+	/*
+	 * If this is a new database, create the schema file.  This avoids
+	 * application threads racing to create it later.  We need a real
+	 * session handle for this: open one.
+	 */
+	if (conn->is_new) {
+		WT_ERR(conn->iface.open_session(&conn->iface,
+		    NULL, NULL, &wt_session));
+		WT_TRET(__wt_open_schema_table((WT_SESSION_IMPL *)wt_session));
+		WT_TRET(wt_session->close(wt_session, NULL));
 		WT_ERR(ret);
 	}
 
