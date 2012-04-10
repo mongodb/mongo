@@ -3,6 +3,50 @@ __magicNoPrint = { __magicNoPrint : 1111 }
 __callLastError = false; 
 _verboseShell = false;
 
+__ansi = {
+    csi: String.fromCharCode(0x1B) + '[',
+    reset: '0',
+    text_prop: 'm',
+    foreground: '3',
+
+    colors: {
+        red: '1',
+        green: '2',
+        yellow: '3',
+        blue: '4',
+        megenta: '5',
+        cyan: '6',   
+    }
+}
+
+controlCode = function(parameters)
+{
+    if (parameters == undefined)
+        parameters = "";
+    else if (typeof(parameters) == 'object' && (parameters instanceof Array))
+        parameters = parameters.join(';');
+    return __ansi.csi + String(parameters) + String(__ansi.text_prop);
+}
+
+applyColorCode = function(string, properties)
+{
+    return controlCode(properties) + String(string) + controlCode();
+}
+
+colorize = function(string, color, nolint)
+{
+    if (__ansi.colors[color] == undefined)
+        return string;
+
+    if (!isatty())
+        return string;
+
+    if (nolint)
+       return string;
+
+    return applyColorCode(string, __ansi.foreground + __ansi.colors[color]);
+}
+
 chatty = function(s){
     if ( ! __quiet )
         print( s );
@@ -578,12 +622,12 @@ NumberInt.prototype.tojson = function() {
 if ( ! ObjectId.prototype )
     ObjectId.prototype = {}
 
-ObjectId.prototype.toString = function(){
-    return "ObjectId(" + tojson(this.str) + ")";
+ObjectId.prototype.toString = function(indent, nolint){
+    return "ObjectId(" + tojson(this.str, indent, nolint) + ")";
 }
 
-ObjectId.prototype.tojson = function(){
-    return this.toString();
+ObjectId.prototype.tojson = function(indent, nolint){
+    return this.toString(indent, nolint);
 }
 
 ObjectId.prototype.valueOf = function(){
@@ -963,20 +1007,24 @@ tojson = function( x, indent , nolint ){
                 }
             }
         }
-        return s + "\"";
+
+        s += "\"";
+        return colorize(s, "green", nolint);
     }
-    case "number": 
+    case "number":
+        return colorize(x, "blue", nolint);
     case "boolean":
-        return "" + x;
-    case "object":{
+        return colorize(x, "red", nolint);
+    case "object": {
         var s = tojsonObject( x, indent , nolint );
+        if (x instanceof Date) return colorize(x, "cyan", nolint);
         if ( ( nolint == null || nolint == true ) && s.length < 80 && ( indent == null || indent.length == 0 ) ){
             s = s.replace( /[\s\r\n ]+/gm , " " );
         }
         return s;
     }
     case "function":
-        return x.toString();
+        return colorize(x, "magenta", nolint);
     default:
         throw "tojson can't handle type " + ( typeof x );
     }
@@ -993,7 +1041,7 @@ tojsonObject = function( x, indent , nolint ){
         indent = "";
     
     if ( typeof( x.tojson ) == "function" && x.tojson != tojson ) {
-        return x.tojson(indent,nolint);
+        return x.tojson(indent, nolint);
     }
     
     if ( x.constructor && typeof( x.constructor.tojson ) == "function" && x.constructor.tojson != tojson ) {
@@ -1026,7 +1074,7 @@ tojsonObject = function( x, indent , nolint ){
         if ( val == DB.prototype || val == DBCollection.prototype )
             continue;
 
-        s += indent + "\"" + k + "\" : " + tojson( val, indent , nolint );
+        s += indent + colorize( "\"" + k + "\"", "yellow", nolint ) + ": " + tojson( val, indent , nolint );
         if (num != total) {
             s += ",";
             num++;
