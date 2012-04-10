@@ -22,7 +22,7 @@ namespace mongo {
 
     class Scope;
     
-    namespace shellUtils {
+    namespace shell_utils {
         void installShellUtilsExtended( Scope& scope );
     }
 }

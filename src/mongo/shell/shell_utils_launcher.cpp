@@ -53,7 +53,7 @@ namespace mongo {
      * by different threads.  Dependent filesystem paths should not be accessed by different
      * threads.
      */
-    namespace shellUtils {
+    namespace shell_utils {
 
         ProgramOutputMultiplexer programOutputLogger;
 

@@ -25,7 +25,7 @@ namespace mongo {
     class Scope;
     class DBClientWithCommands;
     
-    namespace shellUtils {
+    namespace shell_utils {
 
         extern std::string _dbConnect;
         extern std::string _dbAuth;

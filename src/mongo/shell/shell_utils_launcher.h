@@ -25,7 +25,7 @@ namespace mongo {
 
     class Scope;
     
-    namespace shellUtils {
+    namespace shell_utils {
 
         // Scoped management of mongo program instances.  Simple implementation:
         // destructor kills all mongod instances created by the shell.

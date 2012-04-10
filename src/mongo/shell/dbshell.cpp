@@ -88,7 +88,7 @@ void completionHook( const char* text , linenoiseCompletions* lc ) {
 
 void shellHistoryInit() {
     stringstream ss;
-    const char * h = shellUtils::getUserDir();
+    const char * h = shell_utils::getUserDir();
     if ( h )
         ss << h << "/";
     ss << ".dbshell";
@@ -126,7 +126,7 @@ void intr( int sig ) {
 #endif
 
 void killOps() {
-    if ( mongo::shellUtils::_nokillop )
+    if ( mongo::shell_utils::_nokillop )
         return;
 
     if ( atPrompt )
@@ -134,7 +134,7 @@ void killOps() {
 
     sleepmillis(10); // give current op a chance to finish
 
-    mongo::shellUtils::connectionRegistry.killOperationsOnAllConnections( !autoKillOp );
+    mongo::shell_utils::connectionRegistry.killOperationsOnAllConnections( !autoKillOp );
 }
 
 void quitNicely( int sig ) {
@@ -205,7 +205,7 @@ void quitAbruptly( int sig ) {
     mongo::printStackTrace( ossBt );
     mongo::rawOut( ossBt.str() );
 
-    mongo::shellUtils::KillMongoProgramInstances();
+    mongo::shell_utils::KillMongoProgramInstances();
     exit( 14 );
 }
 
@@ -570,7 +570,7 @@ int _main( int argc, char* argv[] ) {
     mongo::isShell = true;
     setupSignals();
 
-    mongo::shellUtils::RecordMyLocation( argv[ 0 ] );
+    mongo::shell_utils::RecordMyLocation( argv[ 0 ] );
 
     string url = "test";
     string dbhost;
@@ -682,7 +682,7 @@ int _main( int argc, char* argv[] ) {
     }
 #endif
     if ( params.count( "nokillop" ) ) {
-        mongo::shellUtils::_nokillop = true;
+        mongo::shell_utils::_nokillop = true;
     }
     if ( params.count( "autokillop" ) ) {
         autoKillOp = true;
@@ -737,7 +737,7 @@ int _main( int argc, char* argv[] ) {
             ss << "__quiet = true;";
         ss << "db = connect( \"" << fixHost( url , dbhost , port ) << "\")";
 
-        mongo::shellUtils::_dbConnect = ss.str();
+        mongo::shell_utils::_dbConnect = ss.str();
 
         if ( params.count( "password" ) && password.empty() )
             password = mongo::askPassword();
@@ -745,13 +745,13 @@ int _main( int argc, char* argv[] ) {
         if ( username.size() && password.size() ) {
             stringstream ss;
             ss << "if ( ! db.auth( \"" << username << "\" , \"" << password << "\" ) ){ throw 'login failed'; }";
-            mongo::shellUtils::_dbAuth = ss.str();
+            mongo::shell_utils::_dbAuth = ss.str();
         }
     }
 
-    mongo::ScriptEngine::setConnectCallback( mongo::shellUtils::onConnect );
+    mongo::ScriptEngine::setConnectCallback( mongo::shell_utils::onConnect );
     mongo::ScriptEngine::setup();
-    mongo::globalScriptEngine->setScopeInitCallback( mongo::shellUtils::initScope );
+    mongo::globalScriptEngine->setScopeInitCallback( mongo::shell_utils::initScope );
     auto_ptr< mongo::Scope > scope( mongo::globalScriptEngine->newScope() );
     shellMainScope = scope.get();
 
@@ -759,13 +759,13 @@ int _main( int argc, char* argv[] ) {
         cout << "type \"help\" for help" << endl;
 
     if ( !script.empty() ) {
-        mongo::shellUtils::MongoProgramScope s;
+        mongo::shell_utils::MongoProgramScope s;
         if ( ! scope->exec( script , "(shell eval)" , true , true , false ) )
             return -4;
     }
 
     for (size_t i = 0; i < files.size(); ++i) {
-        mongo::shellUtils::MongoProgramScope s;
+        mongo::shell_utils::MongoProgramScope s;
 
         if ( files.size() > 1 )
             cout << "loading file: " << files[i] << endl;
@@ -781,7 +781,7 @@ int _main( int argc, char* argv[] ) {
 
     if ( runShell ) {
 
-        mongo::shellUtils::MongoProgramScope s;
+        mongo::shell_utils::MongoProgramScope s;
 
         if ( !norc ) {
             string rcLocation;

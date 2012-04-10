@@ -30,7 +30,7 @@ namespace mongo {
         extern const JSFile servers;
     }
 
-    namespace shellUtils {
+    namespace shell_utils {
 
         std::string _dbConnect;
         std::string _dbAuth;
@@ -136,7 +136,7 @@ namespace mongo {
 
         void initScope( Scope &scope ) {
             scope.externalSetup();
-            mongo::shellUtils::installShellUtils( scope );
+            mongo::shell_utils::installShellUtils( scope );
             scope.execSetup(JSFiles::servers);
 
             if ( !_dbConnect.empty() ) {

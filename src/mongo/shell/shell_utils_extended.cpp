@@ -36,7 +36,7 @@ namespace mongo {
      * identified by the caller.  Dependent filesystem paths should not be accessed by different
      * threads.
      */
-    namespace shellUtils {
+    namespace shell_utils {
 
         BSONObj listFiles(const BSONObj& _args, void* data) {
             BSONObj cd = BSON( "0" << "." );
