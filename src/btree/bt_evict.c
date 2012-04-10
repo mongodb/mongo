@@ -595,9 +595,8 @@ __evict_walk_file(WT_SESSION_IMPL *session, u_int *slotp)
 		 * Root pages can't be evicted, nor can skip pages that must be
 		 * merged into their parents.  Don't skip pages marked
 		 * WT_PAGE_REC_EMPTY or SPLIT: updates after their last
-		 * reconciliation may have changed their state and only the
-		 * eviction code can check whether they should really be
-		 * skipped.
+		 * reconciliation may have changed their state and only a write
+		 * plus eviction test can confirm they should really be skipped.
 		 */
 		if (WT_PAGE_IS_ROOT(page) ||
 		    F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE))
