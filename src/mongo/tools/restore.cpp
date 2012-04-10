@@ -338,8 +338,10 @@ public:
             }
         }
 
+        // process metadata files
+        // but only for regular files
         BSONObj metadataObject;
-        if (_restoreOptions || _restoreIndexes) {
+        if ( fileStatus.type() != boost::filesystem::fifo_file && ( _restoreOptions || _restoreIndexes ) ) {
             boost::filesystem::path metadataFile = (root.branch_path() / (oldCollName + ".metadata.json"));
             if (!boost::filesystem::exists(metadataFile.string())) {
                 // This is fine because dumps from before 2.1 won't have a metadata file, just print a warning.
