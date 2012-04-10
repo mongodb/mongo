@@ -419,9 +419,11 @@ __rec_review(WT_SESSION_IMPL *session,
 	 * We have to write dirty pages to know their final state, a page marked
 	 * empty may have had records added since reconciliation, a page marked
 	 * split may have had records deleted and no longer need to split.
-	 * Split-merge pages are the exception: they can never be change into
-	 * anything other than a split-merge page and are merged regardless of
-	 * being clean or dirty.
+	 * Although split-merge pages never change into anything other than a
+	 * split-merge page, and are merged regardless of being clean or dirty,
+	 * we still reconcile them.  Reconciliation has side-effects (marking
+	 * the parent page dirty, for example, although that's not necessary in
+	 * the specific case of eviction), and having consistency here is cheap.
 	 *
 	 * Writing the page is expensive, do a cheap test first: if it doesn't
 	 * appear a subtree page can be merged, quit.  It's possible the page
@@ -441,8 +443,7 @@ __rec_review(WT_SESSION_IMPL *session,
 		return (EBUSY);
 
 	/* If the page is dirty, write it so we know the final state. */
-	if (__wt_page_is_modified(page) &&
-	    !F_ISSET(page, WT_PAGE_REC_SPLIT_MERGE))
+	if (__wt_page_is_modified(page))
 		WT_RET(__wt_rec_write(session, page, NULL));
 
 	/*
