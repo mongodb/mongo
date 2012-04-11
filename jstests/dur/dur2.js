@@ -36,11 +36,7 @@ function work() {
 
     // go long enough we will have time to kill it later during recovery
     var j = 2;
-    var MaxTime = 15;
-    if (Math.random() < 0.1) {
-        print("dur2.js DOING A LONGER (120 sec) PASS - if an error, try long pass to replicate");
-        MaxTime = 120;
-    }
+    MaxTime = 90;
     while (1) {
         d.foo.insert({ _id: j, z: x });
         d.foo.update({ _id: j }, { $inc: { a: 1} });
