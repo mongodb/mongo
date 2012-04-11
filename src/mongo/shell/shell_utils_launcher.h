@@ -21,6 +21,10 @@
 #include <boost/filesystem/convenience.hpp>
 #include <boost/thread/recursive_mutex.hpp>
 
+#ifdef _WIN32
+typedef int pid_t;
+#endif
+
 namespace mongo {
 
     class Scope;
