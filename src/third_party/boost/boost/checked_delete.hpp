@@ -3,11 +3,6 @@
 
 // MS compatible compilers support #pragma once
 
-// 10gen added.
-#if defined(__GNUC__)
-#pragma GCC system_header
-#endif
-
 #if defined(_MSC_VER) && (_MSC_VER >= 1020)
 # pragma once
 #endif
@@ -25,6 +20,11 @@
 //
 //  See http://www.boost.org/libs/utility/checked_delete.html for documentation.
 //
+
+// 10gen added. Suppresses warnings in gcc 4.7
+#if defined(__GNUC__)
+#pragma GCC system_header
+#endif
 
 namespace boost
 {

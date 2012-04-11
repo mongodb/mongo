@@ -18,7 +18,7 @@
 #include <boost/limits.hpp>
 #include <boost/pending/integer_log2.hpp>
 
-// 10gen added.
+// 10gen added. Suppresses warnings in gcc 4.7
 #if defined(__GNUC__)
 #pragma GCC system_header
 #endif
