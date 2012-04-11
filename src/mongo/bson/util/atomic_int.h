@@ -22,28 +22,38 @@
 #  include <windows.h>
 #endif
 
+#include "mongo/platform/compiler.h"
+
 namespace mongo {
 
-    struct AtomicUInt {
+    /**
+     * An unsigned integer supporting atomic read-modify-write operations.
+     *
+     * Many operations on these types depend on natural alignment (4 byte alignment for 4-byte
+     * words, i.e.).
+     */
+    struct MONGO_COMPILER_ALIGN_TYPE( 4 ) AtomicUInt {
         AtomicUInt() : x(0) {}
         AtomicUInt(unsigned z) : x(z) { }
 
         operator unsigned() const { return x; }
         unsigned get() const { return x; }
+        inline void set(unsigned newX);
 
         inline AtomicUInt operator++(); // ++prefix
         inline AtomicUInt operator++(int);// postfix++
         inline AtomicUInt operator--(); // --prefix
         inline AtomicUInt operator--(int); // postfix--
         inline void signedAdd(int by);
-        inline void zero();
+        inline void zero() { set(0); }
         volatile unsigned x;
     };
 
 #if defined(_WIN32)
-    void AtomicUInt::zero() { 
-        InterlockedExchange((volatile long*)&x, 0);
+    void AtomicUInt::set(unsigned newX) {
+        InterlockedExchange((volatile long *)&x, newX);
     }
+
     AtomicUInt AtomicUInt::operator++() {
         return InterlockedIncrement((volatile long*)&x);
     }
@@ -64,7 +74,7 @@ namespace mongo {
 # endif
 #elif defined(__GCC_HAVE_SYNC_COMPARE_AND_SWAP_4)
     // this is in GCC >= 4.1
-    inline void AtomicUInt::zero() { x = 0; } // TODO: this isn't thread safe - maybe
+    inline void AtomicUInt::set(unsigned newX) { __sync_synchronize(); x = newX; }
     AtomicUInt AtomicUInt::operator++() {
         return __sync_add_and_fetch(&x, 1);
     }
@@ -81,7 +91,11 @@ namespace mongo {
         __sync_fetch_and_add(&x, by);
     }
 #elif defined(__GNUC__)  && (defined(__i386__) || defined(__x86_64__))
-    inline void AtomicUInt::zero() { x = 0; } // TODO: this isn't thread safe
+    inline void AtomicUInt::set(unsigned newX) {
+        asm volatile("mfence" ::: "memory");
+        x = 0;
+    }
+
     // from boost 1.39 interprocess/detail/atomic.hpp
     inline unsigned atomic_int_helper(volatile unsigned *x, int val) {
         int r;
