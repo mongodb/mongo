@@ -18,6 +18,11 @@
 #include <boost/limits.hpp>
 #include <boost/pending/integer_log2.hpp>
 
+// 10gen added.
+#if defined(__GNUC__)
+#pragma GCC system_header
+#endif
+
 namespace boost {
 namespace random {
 namespace detail {

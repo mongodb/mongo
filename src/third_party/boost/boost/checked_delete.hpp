@@ -3,6 +3,11 @@
 
 // MS compatible compilers support #pragma once
 
+// 10gen added.
+#if defined(__GNUC__)
+#pragma GCC system_header
+#endif
+
 #if defined(_MSC_VER) && (_MSC_VER >= 1020)
 # pragma once
 #endif
