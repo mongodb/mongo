@@ -23,6 +23,7 @@
 #include <map>
 #include <limits>
 
+
 #if defined(_WIN32)
 #undef max
 #undef min
@@ -465,7 +466,7 @@ dodouble:
         toString(s, isArray, full);
         return s.str();
     }
-    inline void BSONObj::toString(StringBuilder& s,  bool isArray, bool full ) const {
+    inline void BSONObj::toString( StringBuilder& s,  bool isArray, bool full, int depth ) const {
         if ( isEmpty() ) {
             s << "{}";
             return;
@@ -492,7 +493,7 @@ dodouble:
                 first = false;
             else
                 s << ", ";
-            e.toString(s, !isArray, full );
+            e.toString( s, !isArray, full, depth );
         }
         s << ( isArray ? " ]" : " }" );
     }
@@ -689,7 +690,15 @@ dodouble:
         toString(s, includeFieldName, full);
         return s.str();
     }
-    inline void BSONElement::toString(StringBuilder& s, bool includeFieldName, bool full ) const {
+    inline void BSONElement::toString( StringBuilder& s, bool includeFieldName, bool full, int depth ) const {
+
+        if ( depth > BSONObj::maxToStringRecursionDepth ) {
+            // check if we want the full/complete string
+            uassert(16146, "Reached maximum recursion depth of " + BSONObjBuilder::numStr(BSONObj::maxToStringRecursionDepth), full != true);
+            s << "...";
+            return;
+        }
+
         if ( includeFieldName && type() != EOO )
             s << fieldName() << ": ";
         switch ( type() ) {
@@ -718,10 +727,10 @@ dodouble:
             s << ( boolean() ? "true" : "false" );
             break;
         case Object:
-            embeddedObject().toString(s, false, full);
+            embeddedObject().toString(s, false, full, depth+1);
             break;
         case mongo::Array:
-            embeddedObject().toString(s, true, full);
+            embeddedObject().toString(s, true, full, depth+1);
             break;
         case Undefined:
             s << "undefined";
