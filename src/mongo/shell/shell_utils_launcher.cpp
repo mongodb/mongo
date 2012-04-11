@@ -22,6 +22,7 @@
 #include <vector>
 
 #ifdef _WIN32
+# include <fcntl.h>
 # include <io.h>
 # define SIGKILL 9
 #else
@@ -35,6 +36,7 @@
 #include "mongo/shell/shell_utils.h"
 #include "mongo/shell/shell_utils_launcher.h"
 #include "mongo/client/clientOnly-private.h"
+#include "mongo/client/dbclientinterface.h"
 #include "mongo/scripting/engine.h"
 
 namespace mongo {
