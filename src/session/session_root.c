@@ -316,18 +316,18 @@ __snap_get_last(
 }
 
 /*
- * __snap_compare_time --
+ * __snap_compare_order --
  *	Qsort comparison routine for the snapshot list.
  */
 static int
-__snap_compare_time(const void *a, const void *b)
+__snap_compare_order(const void *a, const void *b)
 {
 	WT_SNAPSHOT *asnap, *bsnap;
 
 	asnap = (WT_SNAPSHOT *)a;
 	bsnap = (WT_SNAPSHOT *)b;
 
-	return (strcmp(asnap->t, bsnap->t));
+	return (asnap->order > bsnap->order ? 1 : -1);
 }
 
 /*
@@ -433,8 +433,8 @@ __wt_session_snap_list_get(
 		WT_ERR(__wt_realloc(session, &allocated,
 		    (slot + 2) * sizeof(WT_SNAPSHOT), &snapbase));
 
-	/* Sort in time-order. */
-	qsort(snapbase, slot, sizeof(WT_SNAPSHOT), __snap_compare_time);
+	/* Sort in creation-order. */
+	qsort(snapbase, slot, sizeof(WT_SNAPSHOT), __snap_compare_order);
 
 	/* Return the array to our caller. */
 	*snapbasep = snapbase;
