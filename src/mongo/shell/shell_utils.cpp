@@ -163,9 +163,10 @@ namespace mongo {
             printf( "\n%s (y/n): ", _prompt.c_str() );
             
             char yn = '\0';
-            scanf( "%c", &yn );
+            int nScanMatches = scanf( "%c", &yn );
+            bool matchedY = ( nScanMatches == 1 && ( yn == 'y' || yn == 'Y' ) );
             
-            return _confirmed = ( yn == 'y' || yn == 'Y' );
+            return _confirmed = matchedY;
         }
 
         ConnectionRegistry::ConnectionRegistry() :
