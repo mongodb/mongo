@@ -1330,6 +1330,8 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="shell_utils.cpp" />
+    <ClCompile Include="shell_utils_extended.cpp" />
+    <ClCompile Include="shell_utils_launcher.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\SConstruct" />
@@ -1517,7 +1519,9 @@
     <ClInclude Include="..\util\timer.h" />
     <ClInclude Include="..\util\time_support.h" />
     <ClInclude Include="..\util\version.h" />
-    <ClInclude Include="utils.h" />
+    <ClInclude Include="shell_utils.h" />
+    <ClInclude Include="shell_utils_extended.h" />
+    <ClInclude Include="shell_utils_launcher.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\db\db.rc" />

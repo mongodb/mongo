@@ -369,6 +369,12 @@
     <ClCompile Include="..\db\commands\cloud.cpp">
       <Filter>db\commands</Filter>
     </ClCompile>
+    <ClCompile Include="shell_utils_launcher.cpp">
+      <Filter>shell</Filter>
+    </ClCompile>
+    <ClCompile Include="shell_utils_extended.cpp">
+      <Filter>shell</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\SConstruct" />
@@ -607,9 +613,6 @@
     </ClInclude>
     <ClInclude Include="..\..\third_party\linenoise\linenoise_utf8.h">
       <Filter>third_party\linenoise</Filter>
-    </ClInclude>
-    <ClInclude Include="utils.h">
-      <Filter>shell</Filter>
     </ClInclude>
     <ClInclude Include="..\db\client.h">
       <Filter>db\Header</Filter>
@@ -859,6 +862,15 @@
     </ClInclude>
     <ClInclude Include="..\util\startup_test.h">
       <Filter>util\Header</Filter>
+    </ClInclude>
+    <ClInclude Include="shell_utils.h">
+      <Filter>shell</Filter>
+    </ClInclude>
+    <ClInclude Include="shell_utils_launcher.h">
+      <Filter>shell</Filter>
+    </ClInclude>
+    <ClInclude Include="shell_utils_extended.h">
+      <Filter>shell</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
