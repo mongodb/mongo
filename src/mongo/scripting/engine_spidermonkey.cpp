@@ -1229,7 +1229,11 @@ namespace mongo {
 
     class SMScope : public Scope {
     public:
-        SMScope() : _this( 0 ) , _externalSetup( false ) , _localConnect( false ) {
+        SMScope() :
+            _this( 0 ),
+            _reportError( true ),
+            _externalSetup( false ),
+            _localConnect( false ) {
             smlock;
             _context = JS_NewContext( globalSMEngine->_runtime , 8192 );
             _convertor = new Convertor( _context );
@@ -1537,6 +1541,8 @@ namespace mongo {
             _error = "";
             currentScope.reset( this );
         }
+        
+        bool isReportingErrors() const { return _reportError; }
 
         bool exec( const StringData& code , const string& name = "(anon)" , bool printResult = false , bool reportError = true , bool assertOnError = true, int timeoutMs = 0 ) {
             smlock;
@@ -1545,7 +1551,9 @@ namespace mongo {
             jsval ret = JSVAL_VOID;
 
             installInterrupt( timeoutMs );
+            _reportError = reportError;
             JSBool worked = JS_EvaluateScript( _context , _global , code.data() , code.size() , name.c_str() , 1 , &ret );
+            _reportError = true;
             uninstallInterrupt( timeoutMs );
 
             if ( ! worked && _error.size() == 0 ) {
@@ -1558,11 +1566,6 @@ namespace mongo {
             }
 
             uassert( 10228 ,  mongoutils::str::stream() << name + " exec failed: " << _error , worked || ! assertOnError );
-
-            if ( reportError && ! _error.empty() ) {
-                // cout << "exec error: " << _error << endl;
-                // already printed in reportError, so... TODO
-            }
 
             if ( worked )
                 _convertor->setProperty( _global , "__lastres__" , ret );
@@ -1668,6 +1671,7 @@ namespace mongo {
         JSObject * _this;
 
         string _error;
+        bool _reportError;
         list<void*> _roots;
 
         bool _externalSetup;
@@ -1690,7 +1694,9 @@ namespace mongo {
             ss << " " << report->filename << ":" << report->lineno;
         }
 
-        tlog() << ss.str() << endl;
+        if ( !currentScope.get() || currentScope->isReportingErrors() ) {
+            tlog() << ss.str() << endl;
+        }
 
         if ( currentScope.get() ) {
             currentScope->gotError( ss.str() );

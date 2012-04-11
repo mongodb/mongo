@@ -132,6 +132,75 @@ namespace JSTests {
         }
     };
 
+    /** Installs a tee for auditing log messages, including those logged with tlog(). */
+    class LogRecordingScope {
+    public:
+        LogRecordingScope() :
+            _oldTLogLevel( tlogLevel ) {
+            tlogLevel = 0;
+            Logstream::get().addGlobalTee( &_tee );
+        }
+        ~LogRecordingScope() {
+            Logstream::get().removeGlobalTee( &_tee );
+            tlogLevel = _oldTLogLevel;
+        }
+        /** @return most recent log entry. */
+        bool logged() const { return _tee.logged(); }
+    private:
+        class Tee : public mongo::Tee {
+        public:
+            Tee() :
+                _logged() {
+            }
+            virtual void write( LogLevel level, const string &str ) { _logged = true; }
+            bool logged() const { return _logged; }
+        private:
+            bool _logged;
+        };
+        int _oldTLogLevel;
+        Tee _tee;
+    };
+    
+    /** Error logging in Scope::exec(). */
+    class ExecLogError {
+    public:
+        void run() {
+            Scope *scope = globalScriptEngine->newScope();
+
+            // No error is logged when reportError == false.
+            ASSERT( !scope->exec( "notAFunction()", "foo", false, false, false ) );
+            ASSERT( !_logger.logged() );
+            
+            // No error is logged for a valid statement.
+            ASSERT( scope->exec( "validStatement = true", "foo", false, true, false ) );
+            ASSERT( !_logger.logged() );
+
+            // An error is logged for an invalid statement when reportError == true.
+            ASSERT( !scope->exec( "notAFunction()", "foo", false, true, false ) );
+            ASSERT( _logger.logged() );
+        }
+    private:
+        LogRecordingScope _logger;
+    };
+    
+    /** Error logging in Scope::invoke(). */
+    class InvokeLogError {
+    public:
+        void run() {
+            Scope *scope = globalScriptEngine->newScope();
+
+            // No error is logged for a valid statement.
+            ASSERT_EQUALS( 0, scope->invoke( "validStatement = true", 0, 0 ) );
+            ASSERT( !_logger.logged() );
+
+            // An error is logged for an invalid statement.
+            ASSERT_NOT_EQUALS( 0, scope->invoke( "notAFunction()", 0, 0 ) );
+            ASSERT( _logger.logged() );
+        }
+    private:
+        LogRecordingScope _logger;
+    };
+
     class ObjectMapping {
     public:
         void run() {
@@ -1018,6 +1087,8 @@ namespace JSTests {
             add< ResetScope >();
             add< FalseTests >();
             add< SimpleFunctions >();
+            add< ExecLogError >();
+            add< InvokeLogError >();
 
             add< ObjectMapping >();
             add< ObjectDecoding >();
