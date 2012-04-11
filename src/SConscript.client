@@ -80,7 +80,8 @@ for id in ["",
            "bson/",
            "bson/util/",
            "s/",
-           "scripting/"]:
+           "scripting/",
+           "platform/"]:
     clientHeaders.extend(Glob('mongo/%s/*.h' % id))
     clientHeaders.extend(Glob('mongo/%s/*.hpp' % id))
 
