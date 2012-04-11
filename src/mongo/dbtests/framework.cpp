@@ -101,8 +101,8 @@ namespace mongo {
             ("bigfiles", "use big datafiles instead of smallfiles which is the default")
             ("filter,f" , po::value<string>() , "string substring filter on test name" )
             ("verbose,v", "verbose")
-            ("dur", "enable journaling")
-            ("nodur", "disable journaling (currently the default)")
+            ("dur", "enable journaling (currently the default)")
+            ("nodur", "disable journaling")
             ("seed", po::value<unsigned long long>(&seed), "random number seed")
             ("perfHist", po::value<unsigned>(&perfHist), "number of back runs of perf stats to display")
             ;
