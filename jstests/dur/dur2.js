@@ -36,7 +36,7 @@ function work() {
 
     // go long enough we will have time to kill it later during recovery
     var j = 2;
-    MaxTime = 90;
+    var MaxTime = 90;
     while (1) {
         d.foo.insert({ _id: j, z: x });
         d.foo.update({ _id: j }, { $inc: { a: 1} });
