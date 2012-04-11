@@ -1,4 +1,5 @@
 
+import codecs
 import re
 import socket
 import time
@@ -190,4 +191,22 @@ def run_smoke_command(*args):
     # Action), the command sequence must be enclosed in a list,
     # otherwise SCons treats it as a list of dependencies.
     return [smoke_command(*args)]
+
+# unicode is a pain. some strings cannot be unicode()'d
+# but we want to just preserve the bytes in a human-readable
+# fashion. this codec error handler will substitute the
+# repr() of the offending bytes into the decoded string
+# at the position they occurred
+def replace_with_repr(unicode_error):
+    offender = unicode_error.object[unicode_error.start:unicode_error.end]
+    return (unicode(repr(offender).strip("'").strip('"')), unicode_error.end)
+
+codecs.register_error('repr', replace_with_repr)
+
+def unicode_dammit(string, encoding='utf8'):
+    # convert a string to a unicode, using the Python
+    # representation of non-ascii bytes when necessary
+    #
+    # name inpsired by BeautifulSoup's "UnicodeDammit"
+    return string.decode(encoding, 'repr')
 
