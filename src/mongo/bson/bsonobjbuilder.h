@@ -147,7 +147,7 @@ namespace mongo {
         BSONObjBuilder& appendObject(const StringData& fieldName, const char * objdata , int size = 0 ) {
             verify( objdata );
             if ( size == 0 ) {
-                size = *((int*)objdata);
+                size = little<int>::ref( objdata );
             }
 
             verify( size > 4 && size < 100000000 );
@@ -662,7 +662,7 @@ namespace mongo {
             _b.appendNum((char) EOO);
             char *data = _b.buf() + _offset;
             int size = _b.len() - _offset;
-            *((int*)data) = size;
+            little<int>::ref( data ) = size;
             if ( _tracker )
                 _tracker->got( size );
             return data;

@@ -87,7 +87,7 @@ namespace mongo {
         short keyDataOfs() const { return (short) _kdo; }
 
         /** Offset within current bucket of the variable width bson key for this _KeyNode. */
-        unsigned short _kdo;
+        little<unsigned short> _kdo;
         void setKeyDataOfs(short s) {
             _kdo = s;
             verify(s>=0);
@@ -161,11 +161,11 @@ namespace mongo {
         /** basicInsert() assumes the next three members are consecutive and in this order: */
 
         /** Size of the empty region. */
-        int emptySize;
+        little<int> emptySize;
         /** Size used for bson storage, including storage of old keys. */
-        int topSize;
+        little<int> topSize;
         /* Number of keys in the bucket. */
-        int n;
+        little<int> n;
 
         int reserved;
         /* Beginning of the bucket's body */
@@ -186,11 +186,11 @@ namespace mongo {
 
     // a a a ofs ofs ofs ofs
     class DiskLoc56Bit {
-        int ofs;
+        little<int> ofs;
         unsigned char _a[3];
         unsigned long long Z() const { 
             // endian
-            return *((unsigned long long*)this) & 0x00ffffffffffffffULL;
+            return little<unsigned long long>::ref(this) & 0x00ffffffffffffffULL;
         }
         enum { 
             // first bit of offsets used in _KeyNode we don't use -1 here.
@@ -208,10 +208,10 @@ namespace mongo {
         operator const DiskLoc() const { 
             // endian
             if( isNull() ) return DiskLoc();
-            unsigned a = *((unsigned *) (_a-1));
+            unsigned a = little<unsigned>::ref( _a - 1 );
             return DiskLoc(a >> 8, ofs);
         }
-        int& GETOFS()      { return ofs; }
+        little<int>& GETOFS()      { return ofs; }
         int getOfs() const { return ofs; }
         bool operator<(const DiskLoc56Bit& rhs) const {
             // the orderering of dup keys in btrees isn't too critical, but we'd like to put items that are 
@@ -275,14 +275,14 @@ namespace mongo {
         /** Given that there are n keys, this is the n index child. */
         Loc nextChild;
 
-        unsigned short flags;
+        little<unsigned short> flags;
 
         /** basicInsert() assumes the next three members are consecutive and in this order: */
 
         /** Size of the empty region. */
-        unsigned short emptySize;
+        little<unsigned short> emptySize;
         /** Size used for bson storage, including storage of old keys. */
-        unsigned short topSize;
+        little<unsigned short> topSize;
         /* Number of keys in the bucket. */
         unsigned short n;
 

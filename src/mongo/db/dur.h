@@ -115,6 +115,7 @@ namespace mongo {
 
             /** Declare write intent for an int */
             inline int& writingInt(int& d) { return *static_cast<int*>(writingPtr( &d, sizeof(d))); }
+            inline little<int>& writingInt( little<int>& d) { return *static_cast<little<int>*>(writingPtr( &d, sizeof(d))); }
 
             /** "assume i've already indicated write intent, let me write"
                 redeclaration is fine too, but this is faster.

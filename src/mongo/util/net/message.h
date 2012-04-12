@@ -27,7 +27,7 @@ namespace mongo {
     class MessagingPort;
     class PiggyBackData;
 
-    typedef AtomicUInt MSGID;
+    typedef unsigned int MSGID;
 
     enum Operations {
         opReply = 1,     /* reply. responseTo is set. */
@@ -115,8 +115,8 @@ namespace mongo {
         }
         char _data[4];
 
-        int& dataAsInt() {
-            return *((int *) _data);
+        little<int>& dataAsInt() {
+            return little<int>::ref( _data );
         }
 
         bool valid() {
@@ -130,8 +130,7 @@ namespace mongo {
         long long getCursor() {
             verify( responseTo > 0 );
             verify( _operation == opReply );
-            long long * l = (long long *)(_data + 4);
-            return l[0];
+            return little<long long>::ref( _data + 4 );
         }
 
         int dataLen(); // len without header

@@ -147,9 +147,9 @@ namespace boost {
         {
           FunctionObj* f;
           if (function_allows_small_object_optimization<FunctionObj>::value)
-            f = reinterpret_cast<FunctionObj*>(&function_obj_ptr.data);
+              f = reinterpret_cast<FunctionObj*>(reinterpret_cast<void*>(&function_obj_ptr.data) );
           else
-            f = reinterpret_cast<FunctionObj*>(function_obj_ptr.obj_ptr);
+              f = reinterpret_cast<FunctionObj*>(reinterpret_cast<void*>(function_obj_ptr.obj_ptr));
           BOOST_FUNCTION_RETURN((*f)(BOOST_FUNCTION_ARGS));
         }
       };

@@ -1918,7 +1918,7 @@ namespace JsobjTests {
             {
                 char * crap = (char*)malloc( x.objsize() );
                 memcpy( crap , x.objdata() , x.objsize() );
-                int * foo = (int*)crap;
+                little<int> * foo = &little<int>::ref( crap );
                 foo[0] = 123123123;
                 int state = 0;
                 try {

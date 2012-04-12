@@ -57,7 +57,7 @@ namespace mongo {
         unsigned p = ourPid();
         x._pid ^= (unsigned short) p;
         // when the pid is greater than 16 bits, let the high bits modulate the machine id field.
-        unsigned short& rest = (unsigned short &) x._machineNumber[1];
+         little<unsigned short>& rest = little<unsigned short>::ref (&x._machineNumber[1]);
         rest ^= p >> 16;
     }
 
@@ -96,7 +96,7 @@ namespace mongo {
         x[1] = ourMachineAndPid._machineNumber[1];
         x[2] = ourMachineAndPid._machineNumber[2];
         x[3] = 0;
-        return (unsigned&) x[0];
+        return little<unsigned>::ref( x );
     }
 
     void OID::justForked() {
@@ -112,23 +112,16 @@ namespace mongo {
     void OID::init() {
         static AtomicUInt inc = (unsigned) Security::getNonce();
 
-        {
-            unsigned t = (unsigned) time(0);
-            unsigned char *T = (unsigned char *) &t;
-            _time[0] = T[3]; // big endian order because we use memcmp() to compare OID's
-            _time[1] = T[2];
-            _time[2] = T[1];
-            _time[3] = T[0];
-        }
+        big<unsigned>::ref( _time ) = time( 0 );
 
         _machineAndPid = ourMachineAndPid;
 
         {
-            int new_inc = inc++;
-            unsigned char *T = (unsigned char *) &new_inc;
-            _inc[0] = T[2];
-            _inc[1] = T[1];
-            _inc[2] = T[0];
+            // 24 bits big endian
+            unsigned int new_inc = inc++;
+            _inc[0] = new_inc >> 16;
+            _inc[1] = new_inc >>  8;
+            _inc[2] = new_inc;
         }
     }
 
@@ -143,26 +136,16 @@ namespace mongo {
 
     void OID::init(Date_t date, bool max) {
         int time = (int) (date / 1000);
-        char* T = (char *) &time;
-        data[0] = T[3];
-        data[1] = T[2];
-        data[2] = T[1];
-        data[3] = T[0];
-
+        big<unsigned>::ref( data ) = time;
+        
         if (max)
-            *(long long*)(data + 4) = 0xFFFFFFFFFFFFFFFFll;
+            little<long long>::ref(data + 4) = 0xFFFFFFFFFFFFFFFFll;
         else
-            *(long long*)(data + 4) = 0x0000000000000000ll;
+            little<long long>::ref(data + 4) = 0x0000000000000000ll;
     }
 
     time_t OID::asTimeT() {
-        int time;
-        char* T = (char *) &time;
-        T[0] = data[3];
-        T[1] = data[2];
-        T[2] = data[1];
-        T[3] = data[0];
-        return time;
+        return big<int>::ref( data );
     }
 
     const string BSONObjBuilder::numStrs[] = {

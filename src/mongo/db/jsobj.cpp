@@ -172,8 +172,8 @@ namespace mongo {
             }
             break;
         case BinData: {
-            int len = *(int *)( value() );
-            BinDataType type = BinDataType( *(char *)( (int *)( value() ) + 1 ) );
+            int len = little<int>::ref( value() );
+            BinDataType type = BinDataType( *reinterpret_cast<const signed char*>( value() + 4 ) );
             s << "{ \"$binary\" : \"";
             char *start = ( char * )( value() ) + sizeof( int ) + 1;
             base64::encode( s , start , len );
@@ -911,7 +911,7 @@ namespace mongo {
             name=0;
             eoo=EOO;
         }
-        int totsize;
+        little<int> totsize;
         char maxkey;
         char name;
         char eoo;
@@ -925,7 +925,7 @@ namespace mongo {
             name=0;
             eoo=EOO;
         }
-        int totsize;
+        little<int> totsize;
         char minkey;
         char name;
         char eoo;

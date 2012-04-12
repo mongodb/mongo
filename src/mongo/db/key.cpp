@@ -398,19 +398,19 @@ namespace mongo {
                         break;
                     }
                 case cdate:
-                    b.appendDate("", (Date_t&) *p);
+                    b.appendDate("", Date_t( little<unsigned long long>::ref( p ) ));
                     p += 8;
                     break;
                 case cdouble:
-                    b.append("", (double&) *p);
+                    b.append("", little<double>::ref( p ));
                     p += sizeof(double);
                     break;
                 case cint:
-                    b.append("", static_cast< int >((reinterpret_cast< const PackedDouble& >(*p)).d));
+                    b.append("", static_cast< int >( little<double>::ref( p ) ) );
                     p += sizeof(double);
                     break;
                 case clong:
-                    b.append("", static_cast< long long>((reinterpret_cast< const PackedDouble& >(*p)).d));
+                    b.append("", static_cast< long long>( little<double>::ref( p ) ) );
                     p += sizeof(double);
                     break;
                 default:
@@ -436,8 +436,8 @@ namespace mongo {
         switch( lt ) { 
         case cdouble:
             {
-                double L = (reinterpret_cast< const PackedDouble* >(l))->d;
-                double R = (reinterpret_cast< const PackedDouble* >(r))->d;
+                double L = little<double>::ref( l );
+                double R = little<double>::ref( r );
                 if( L < R )
                     return -1;
                 if( L != R )
@@ -485,8 +485,8 @@ namespace mongo {
             }
         case cdate:
             {
-                long long L = *((long long *) l);
-                long long R = *((long long *) r);
+                long long L = little<long long>::ref( l );
+                long long R = little<long long>::ref( r );
                 if( L < R )
                     return -1;
                 if( L > R )
@@ -616,16 +616,16 @@ namespace mongo {
             l++; r++;
             switch( lval&cCANONTYPEMASK ) { 
             case coid:
-                if( *((unsigned*) l) != *((unsigned*) r) )
+                if ( little<unsigned>::ref( l ) != little<unsigned>::ref( r ) )
                     return false;
                 l += 4; r += 4;
             case cdate:
-                if( *((unsigned long long *) l) != *((unsigned long long *) r) )
+                if ( little<unsigned long long>::ref( l ) != little<unsigned long long>::ref( r ) )
                     return false;
                 l += 8; r += 8;
                 break;
             case cdouble:
-                if( (reinterpret_cast< const PackedDouble* > (l))->d != (reinterpret_cast< const PackedDouble* >(r))->d )
+                if ( little<double>::ref( l ) != little<double>::ref( r ) )
                     return false;
                 l += 8; r += 8;
                 break;

@@ -22,6 +22,7 @@
 #include "namespace-inl.h"
 #include "client.h"
 #include "../bson/util/atomic_int.h"
+#include "../bson/util/bswap.h"
 #include "../util/concurrency/spin_lock.h"
 #include "../util/time_support.h"
 #include "../util/net/hostandport.h"
@@ -89,7 +90,7 @@ namespace mongo {
         static BSONObj _tooBig; // { $msg : "query not recording (too large)" }
 
         CachedBSONObj() {
-            _size = (int*)_buf;
+            _size = &little<int>::ref( _buf );
             reset();
         }
 
@@ -139,7 +140,7 @@ namespace mongo {
         void _reset( int sz ) { _size[0] = sz; }
 
         mutable SpinLock _lock;
-        int * _size;
+        little<int> * _size;
         char _buf[512];
     };
 

@@ -314,17 +314,17 @@ namespace boost {
         {
           if (op == clone_functor_tag || op == move_functor_tag) {
             const functor_type* in_functor = 
-              reinterpret_cast<const functor_type*>(&in_buffer.data);
+              reinterpret_cast<const functor_type*>((void*)&in_buffer.data);
             new (reinterpret_cast<void*>(&out_buffer.data)) functor_type(*in_functor);
 
             if (op == move_functor_tag) {
-              functor_type* f = reinterpret_cast<functor_type*>(&in_buffer.data);
+              functor_type* f = reinterpret_cast<functor_type*>((void*)&in_buffer.data);
               (void)f; // suppress warning about the value of f not being used (MSVC)
               f->~Functor();
             }
           } else if (op == destroy_functor_tag) {
             // Some compilers (Borland, vc6, ...) are unhappy with ~functor_type.
-             functor_type* f = reinterpret_cast<functor_type*>(&out_buffer.data);
+             functor_type* f = reinterpret_cast<functor_type*>((void*)&out_buffer.data);
              (void)f; // suppress warning about the value of f not being used (MSVC)
              f->~Functor();
           } else if (op == check_functor_type_tag) {

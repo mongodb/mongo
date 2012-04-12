@@ -644,7 +644,7 @@ namespace mongo {
         delRecLength = extentLength - Extent::HeaderSize();
         if( delRecLength >= 32*1024 && str::contains(ns, '$') && !capped ) { 
             // probably an index. so skip forward to keep its records page aligned 
-            int& ofs = emptyLoc.GETOFS();
+            little<int>& ofs = emptyLoc.GETOFS();
             int newOfs = (ofs + 0xfff) & ~0xfff; 
             delRecLength -= (newOfs-ofs);
             dassert( delRecLength > 0 );
@@ -1029,7 +1029,7 @@ namespace mongo {
             }
             else {
                 DEV {
-                    unsigned long long *p = reinterpret_cast<unsigned long long *>( todelete->data() );
+                    little<unsigned long long> *p = &little<unsigned long long >::ref( todelete->data() );
                     *getDur().writing(p) = 0;
                     //DEV memset(todelete->data, 0, todelete->netLength()); // attempt to notice invalid reuse.
                 }
@@ -2037,7 +2037,7 @@ namespace mongo {
             r = (Record*) getDur().writingPtr(r, lenWHdr);
             if( addID ) {
                 /* a little effort was made here to avoid a double copy when we add an ID */
-                ((int&)*r->data()) = *((int*) obuf) + idToInsert.size();
+                little<int>::ref( r->data() ) = little<int>::ref( obuf ) + idToInsert.size();
                 memcpy(r->data()+4, idToInsert.rawdata(), idToInsert.size());
                 memcpy(r->data()+4+idToInsert.size(), ((char *)obuf)+4, addID-4);
             }
