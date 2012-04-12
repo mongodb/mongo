@@ -101,22 +101,22 @@ namespace mongo {
         /**
          * returns a file object matching the query
          */
-        GridFile findFile( BSONObj query ) const;
+        GridFile findFile( BSONObj query , bool slaveOk = false ) const;
 
         /**
          * equiv to findFile( { filename : filename } )
          */
-        GridFile findFile( const string& fileName ) const;
+        GridFile findFile( const string& fileName , bool slaveOk = false ) const;
 
         /**
          * convenience method to get all the files
          */
-        auto_ptr<DBClientCursor> list() const;
+        auto_ptr<DBClientCursor> list( bool slaveOk = false ) const;
 
         /**
          * convenience method to get all the files with a filter
          */
-        auto_ptr<DBClientCursor> list( BSONObj query ) const;
+        auto_ptr<DBClientCursor> list( BSONObj query , bool slaveOk = false ) const;
 
     private:
         DBClientBase& _client;
@@ -192,11 +192,12 @@ namespace mongo {
         gridfs_offset write( const string& where ) const;
 
     private:
-        GridFile(const GridFS * grid , BSONObj obj );
+        GridFile(const GridFS * grid , bool slaveOk , BSONObj obj );
 
         void _exists() const;
 
         const GridFS * _grid;
+        bool           _slaveOk;
         BSONObj        _obj;
 
         friend class GridFS;
