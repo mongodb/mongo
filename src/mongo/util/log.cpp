@@ -370,6 +370,18 @@ namespace mongo {
         }
         _init();
     }
+    
+    void Logstream::removeGlobalTee( Tee * tee ) {
+        if ( !globalTees ) {
+            return;
+        }
+        for( std::vector<Tee*>::iterator i = globalTees->begin(); i != globalTees->end(); ++i ) {
+            if ( *i == tee ) {
+                globalTees->erase( i );
+                return;
+            }
+        }
+    }
 
     void Logstream::setLogFile(FILE* f) {
         scoped_lock lk(mutex);

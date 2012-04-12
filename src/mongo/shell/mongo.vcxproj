@@ -1330,6 +1330,8 @@
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">NotUsing</PrecompiledHeader>
     </ClCompile>
     <ClCompile Include="shell_utils.cpp" />
+    <ClCompile Include="shell_utils_extended.cpp" />
+    <ClCompile Include="shell_utils_launcher.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\SConstruct" />
@@ -1338,7 +1340,11 @@
     <None Include="mongo.js" />
     <None Include="mr.js" />
     <None Include="query.js" />
+    <None Include="replsetbridge.js" />
+    <None Include="replsettest.js" />
     <None Include="servers.js" />
+    <None Include="servers_misc.js" />
+    <None Include="shardingtest.js" />
     <None Include="utils.js" />
     <None Include="utils_sh.js" />
   </ItemGroup>
@@ -1517,7 +1523,9 @@
     <ClInclude Include="..\util\timer.h" />
     <ClInclude Include="..\util\time_support.h" />
     <ClInclude Include="..\util\version.h" />
-    <ClInclude Include="utils.h" />
+    <ClInclude Include="shell_utils.h" />
+    <ClInclude Include="shell_utils_extended.h" />
+    <ClInclude Include="shell_utils_launcher.h" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\db\db.rc" />

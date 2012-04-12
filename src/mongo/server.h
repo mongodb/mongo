@@ -32,21 +32,6 @@
 // prefetch data from memory
 //#define PREFETCH MONGOPREFETCH
 
-#if defined(__GNUC__)
-
-#define CACHEALIGN __attribute__((aligned(64))
-
-#elif defined(_MSC_VER)
-
-#define CACHEALIGN __declspec(align(64)) 
-
-#else
-
-#define CACHEALIGN 
-
-#endif
-
-
 // logs at most once per secs
 #define LOGATMOST(secs) static time_t __last = 0; time_t __now=time(0); if(__last+secs>__now) {} else if ( ( __last = __now ) > 0 ) log() 
 

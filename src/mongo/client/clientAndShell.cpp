@@ -32,7 +32,7 @@ namespace mongo {
     // This mutex helps the shell serialize output on exit,
     // to avoid deadlocks at shutdown.  So it also protects
     // the global dbexitCalled.
-    namespace shellUtils {
+    namespace shell_utils {
         mongo::mutex &mongoProgramOutputMutex(*(new mongo::mutex("mongoProgramOutputMutex")));
     }
 
@@ -42,7 +42,7 @@ namespace mongo {
 
     void dbexit( ExitCode returnCode, const char *whyMsg , bool tryToGetLock ) {
         {
-            mongo::mutex::scoped_lock lk( shellUtils::mongoProgramOutputMutex );
+            mongo::mutex::scoped_lock lk( shell_utils::mongoProgramOutputMutex );
             dbexitCalled = true;
         }
         out() << "dbexit called" << endl;

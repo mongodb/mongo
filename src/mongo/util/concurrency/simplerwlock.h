@@ -1,5 +1,6 @@
+#pragma once
 
-#include "bson/util/atomic_int.h"
+#include "mongo/bson/util/atomic_int.h"
 
 namespace mongo {
 

@@ -21,6 +21,11 @@
 //  See http://www.boost.org/libs/utility/checked_delete.html for documentation.
 //
 
+// 10gen added. Suppresses warnings in gcc 4.7
+#if defined(__GNUC__)
+#pragma GCC system_header
+#endif
+
 namespace boost
 {
 

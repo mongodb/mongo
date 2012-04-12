@@ -72,7 +72,8 @@ commonFiles = [ "pch.cpp",
                 "s/shardconnection.cpp"]
 
 env.StaticLibrary('mongocommon', commonFiles,
-                  LIBDEPS=['$BUILD_DIR/third_party/pcrecpp',
+                  LIBDEPS=['stacktrace',
+                           '$BUILD_DIR/third_party/pcrecpp',
                            '$BUILD_DIR/third_party/murmurhash3/murmurhash3',
                            '$BUILD_DIR/third_party/mongo_boost'],)
 
@@ -262,6 +263,11 @@ serverOnlyFiles = [ "db/curop.cpp",
 
 env.Library( "dbcmdline", "db/cmdline.cpp" )
 
+env.Library('stacktrace', 'util/stacktrace.cpp')
+
+env.Program('lame_stacktrace_test', 'util/lame_stacktrace_test.cpp',
+            LIBDEPS=['stacktrace'])
+
 serverOnlyFiles += mmapFiles
 
 serverOnlyFiles += [ "db/stats/snapshots.cpp" ]
@@ -392,30 +398,26 @@ if darwin or env["_HAVEPCAP"]:
 
 # --- shell ---
 
-# note, if you add a file here, you need to add it in scripting/engine.cpp and shell/msvc/createCPPfromJavaScriptFiles.js as well
-env.Depends( "shell/dbshell.cpp",
-             env.JSHeader( "shell/mongo.cpp" , 
-                           Glob( "shell/utils*.js" ) + 
-                           [ "shell/db.js","shell/mongo.js","shell/mr.js","shell/query.js","shell/collection.js"] ) )
+# if you add a file here, you need to add it in scripting/engine.cpp and shell/createCPPfromJavaScriptFiles.js as well
+env.JSHeader( "shell/mongo.cpp" , 
+              [ "shell/utils.js","shell/utils_sh.js","shell/db.js","shell/mongo.js","shell/mr.js","shell/query.js","shell/collection.js"] )
 
-env.JSHeader( "shell/mongo-server.cpp" , [ "shell/servers.js"] )
+# if you add a file here, you need to add it in shell/shell_utils.cpp and shell/createCPPfromJavaScriptFiles.js as well
+env.JSHeader( "shell/mongo-server.cpp" ,
+              ["shell/servers.js", "shell/shardingtest.js", "shell/servers_misc.js", "shell/replsettest.js", "shell/replsetbridge.js"] )
 
 coreShellFiles = [ "shell/dbshell.cpp",
                    "shell/shell_utils.cpp",
+                   "shell/shell_utils_extended.cpp",
+                   "shell/shell_utils_launcher.cpp",
                    "shell/mongo-server.cpp",
                    "../third_party/linenoise/linenoise.cpp",
                    "../third_party/linenoise/linenoise_utf8.cpp"]
 
-shellFilesToUse = coreShellFiles
-
 if shellEnv is not None:
     mongo_shell = shellEnv.Program(
         "mongo",
-         [ "shell/dbshell.cpp",
-           "shell/shell_utils.cpp",
-           "shell/mongo-server.cpp",
-           "../third_party/linenoise/linenoise.cpp",
-           "../third_party/linenoise/linenoise_utf8.cpp" ],
+        coreShellFiles,
         LIBDEPS=["coreserver", "clientandshell",
                  "$BUILD_DIR/third_party/pcrecpp"] )
 

@@ -25,7 +25,8 @@
 #include "mongo/db/cmdline.h"
 #include "mongo/db/repl/rs_member.h"
 #include "mongo/scripting/engine.h"
-#include "mongo/shell/utils.h"
+#include "mongo/shell/shell_utils.h"
+#include "mongo/shell/shell_utils_launcher.h"
 #include "mongo/util/file.h"
 #include "mongo/util/password.h"
 #include "mongo/util/startup_test.h"
@@ -87,7 +88,7 @@ void completionHook( const char* text , linenoiseCompletions* lc ) {
 
 void shellHistoryInit() {
     stringstream ss;
-    const char * h = shellUtils::getUserDir();
+    const char * h = shell_utils::getUserDir();
     if ( h )
         ss << h << "/";
     ss << ".dbshell";
@@ -125,7 +126,7 @@ void intr( int sig ) {
 #endif
 
 void killOps() {
-    if ( mongo::shellUtils::_nokillop || mongo::shellUtils::_allMyUris.size() == 0 )
+    if ( mongo::shell_utils::_nokillop )
         return;
 
     if ( atPrompt )
@@ -133,33 +134,7 @@ void killOps() {
 
     sleepmillis(10); // give current op a chance to finish
 
-    for( map< string, set<string> >::const_iterator i = shellUtils::_allMyUris.begin(); i != shellUtils::_allMyUris.end(); ++i ) {
-        string errmsg;
-        ConnectionString cs = ConnectionString::parse( i->first, errmsg );
-        if (!cs.isValid()) continue;
-        boost::scoped_ptr<DBClientWithCommands> conn( cs.connect( errmsg ) );
-        if (!conn) continue;
-
-        const set<string>& uris = i->second;
-
-        BSONObj inprog =  conn->findOne( "admin.$cmd.sys.inprog", Query() )["inprog"].embeddedObject().getOwned();
-        BSONForEach( op, inprog ) {
-            if ( uris.count( op["client"].String() ) ) {
-                ONCE if ( !autoKillOp ) {
-                    cout << endl << "do you want to kill the current op(s) on the server? (y/n): ";
-                    cout.flush();
-
-                    char yn;
-                    cin >> yn;
-
-                    if ( yn != 'y' && yn != 'Y' )
-                        return;
-                }
-
-                conn->findOne( "admin.$cmd.sys.killop", QUERY( "op"<< op["opid"] ) );
-            }
-        }
-    }
+    mongo::shell_utils::connectionRegistry.killOperationsOnAllConnections( !autoKillOp );
 }
 
 void quitNicely( int sig ) {
@@ -230,7 +205,7 @@ void quitAbruptly( int sig ) {
     mongo::printStackTrace( ossBt );
     mongo::rawOut( ossBt.str() );
 
-    mongo::shellUtils::KillMongoProgramInstances();
+    mongo::shell_utils::KillMongoProgramInstances();
     exit( 14 );
 }
 
@@ -437,34 +412,17 @@ bool fileExists( string file ) {
 
 namespace mongo {
     extern bool isShell;
-    extern DBClientWithCommands *latestConn;
 }
 
-string sayReplSetMemberState() {
-    try {
-        if( latestConn ) {
-            BSONObj info;
-            if( latestConn->runCommand( "admin", BSON( "replSetGetStatus" << 1 << "forShell" << 1 ) , info ) ) {
-                stringstream ss;
-                ss << info["set"].String() << ':';
-                
-                int s = info["myState"].Int();
-                MemberState ms( s );
-                ss << ms.toString();
-
-                return ss.str();
-            }
-            else {
-                string s = info.getStringField( "info" );
-                if( s.size() < 20 )
-                    return s; // "mongos", "configsvr"
-            }
-        }
+bool execPrompt( mongo::Scope &scope, const char *promptFunction, string &prompt ) {
+    string execStatement = string( "__prompt__ = " ) + promptFunction + "();";
+    scope.exec( "delete __prompt__;", "", false, false, false, 0 );
+    scope.exec( execStatement, "", false, false, false, 0 );
+    if ( scope.type( "__prompt__" ) == String ) {
+        prompt = scope.getString( "__prompt__" );
+        return true;
     }
-    catch( std::exception& e ) {
-        log( 1 ) << "error in sayReplSetMemberState:" << e.what() << endl;
-    }
-    return "";
+    return false;
 }
 
 /**
@@ -612,7 +570,7 @@ int _main( int argc, char* argv[] ) {
     mongo::isShell = true;
     setupSignals();
 
-    mongo::shellUtils::RecordMyLocation( argv[ 0 ] );
+    mongo::shell_utils::RecordMyLocation( argv[ 0 ] );
 
     string url = "test";
     string dbhost;
@@ -724,7 +682,7 @@ int _main( int argc, char* argv[] ) {
     }
 #endif
     if ( params.count( "nokillop" ) ) {
-        mongo::shellUtils::_nokillop = true;
+        mongo::shell_utils::_nokillop = true;
     }
     if ( params.count( "autokillop" ) ) {
         autoKillOp = true;
@@ -779,7 +737,7 @@ int _main( int argc, char* argv[] ) {
             ss << "__quiet = true;";
         ss << "db = connect( \"" << fixHost( url , dbhost , port ) << "\")";
 
-        mongo::shellUtils::_dbConnect = ss.str();
+        mongo::shell_utils::_dbConnect = ss.str();
 
         if ( params.count( "password" ) && password.empty() )
             password = mongo::askPassword();
@@ -787,13 +745,13 @@ int _main( int argc, char* argv[] ) {
         if ( username.size() && password.size() ) {
             stringstream ss;
             ss << "if ( ! db.auth( \"" << username << "\" , \"" << password << "\" ) ){ throw 'login failed'; }";
-            mongo::shellUtils::_dbAuth = ss.str();
+            mongo::shell_utils::_dbAuth = ss.str();
         }
     }
 
-    mongo::ScriptEngine::setConnectCallback( mongo::shellUtils::onConnect );
+    mongo::ScriptEngine::setConnectCallback( mongo::shell_utils::onConnect );
     mongo::ScriptEngine::setup();
-    mongo::globalScriptEngine->setScopeInitCallback( mongo::shellUtils::initScope );
+    mongo::globalScriptEngine->setScopeInitCallback( mongo::shell_utils::initScope );
     auto_ptr< mongo::Scope > scope( mongo::globalScriptEngine->newScope() );
     shellMainScope = scope.get();
 
@@ -801,13 +759,13 @@ int _main( int argc, char* argv[] ) {
         cout << "type \"help\" for help" << endl;
 
     if ( !script.empty() ) {
-        mongo::shellUtils::MongoProgramScope s;
+        mongo::shell_utils::MongoProgramScope s;
         if ( ! scope->exec( script , "(shell eval)" , true , true , false ) )
             return -4;
     }
 
     for (size_t i = 0; i < files.size(); ++i) {
-        mongo::shellUtils::MongoProgramScope s;
+        mongo::shell_utils::MongoProgramScope s;
 
         if ( files.size() > 1 )
             cout << "loading file: " << files[i] << endl;
@@ -823,7 +781,7 @@ int _main( int argc, char* argv[] ) {
 
     if ( runShell ) {
 
-        mongo::shellUtils::MongoProgramScope s;
+        mongo::shell_utils::MongoProgramScope s;
 
         if ( !norc ) {
             string rcLocation;
@@ -855,22 +813,18 @@ int _main( int argc, char* argv[] ) {
 //            shellMainScope->localConnect;
             //DBClientWithCommands *c = getConnection( JSContext *cx, JSObject *obj );
 
-            bool haveStringPrompt = false;
             promptType = scope->type( "prompt" );
-            if( promptType == String ) {
+            if ( promptType == String ) {
                 prompt = scope->getString( "prompt" );
-                haveStringPrompt = true;
             }
-            else if( promptType == Code ) {
-                scope->exec( "delete __prompt__;", "", false, false, false, 0 );
-                scope->exec( "__prompt__ = prompt();", "", false, false, false, 0 );
-                if( scope->type( "__prompt__" ) == String ) {
-                    prompt = scope->getString( "__prompt__" );
-                    haveStringPrompt = true;
-                }
+            else if ( ( promptType == Code ) &&
+                     execPrompt( *scope, "prompt", prompt ) ) {
             }
-            if( !haveStringPrompt )
-                prompt = sayReplSetMemberState() + "> ";
+            else if ( execPrompt( *scope, "replSetMemberStatePrompt", prompt ) ) {
+            }
+            else {
+                prompt = "> ";
+            }
 
             char * line = shellReadline( prompt.c_str() );
 

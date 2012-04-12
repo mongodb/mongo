@@ -1036,22 +1036,6 @@ int main(int argc, char* argv[]) {
                     procPath = (str::stream() << "/proc/" << pid);
                     if (!boost::filesystem::exists(procPath))
                         failed = true;
-
-                    string exePath = procPath + "/exe";
-                    if (boost::filesystem::exists(exePath)){
-                        char buf[256];
-                        int ret = readlink(exePath.c_str(), buf, sizeof(buf)-1);
-                        buf[ret] = '\0'; // readlink doesn't terminate string
-                        if (ret == -1) {
-                            int e = errno;
-                            cerr << "Error resolving " << exePath << ": " << errnoWithDescription(e);
-                            failed = true;
-                        }
-                        else if (!endsWith(buf, "mongod")){
-                            cerr << "Process " << pid << " is running " << buf << " not mongod" << endl;
-                            ::exit(-1);
-                        }
-                    }
                 }
                 catch (const std::exception& e){
                     cerr << "Error reading pid from lock file [" << name << "]: " << e.what() << endl;

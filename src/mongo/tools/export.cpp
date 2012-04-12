@@ -43,6 +43,7 @@ public:
         ("out,o", po::value<string>(), "output file; if not specified, stdout is used")
         ("jsonArray", "output to a json array rather than one object per line")
         ("slaveOk,k", po::value<bool>()->default_value(true) , "use secondaries for export if available, default true")
+        ("forceTableScan", "force a table scan (do not use $snapshot)" )
         ;
         _usesstdout = false;
     }
@@ -190,7 +191,7 @@ public:
         }
 
         Query q( getParam( "query" , "" ) );
-        if ( q.getFilter().isEmpty() && !hasParam("dbpath"))
+        if ( q.getFilter().isEmpty() && !hasParam("dbpath") && !hasParam("forceTableScan") )
             q.snapshot();
 
         bool slaveOk = _params["slaveOk"].as<bool>();

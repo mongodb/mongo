@@ -19,8 +19,10 @@
 #pragma once
 
 #include <boost/detail/endian.hpp>
-#include "concurrency/mutex.h"
-#include "../bson/util/misc.h"
+
+#include "mongo/bson/util/misc.h"
+#include "mongo/util/concurrency/mutex.h"
+#include "mongo/util/stacktrace.h"
 
 namespace mongo {
 
@@ -40,40 +42,6 @@ namespace mongo {
         s << t;
         return s.str();
     }
-
-#if !defined(_WIN32) && !defined(NOEXECINFO) && !defined(__freebsd__) && !defined(__openbsd__) && !defined(__sun__)
-
-} // namespace mongo
-
-#include <pthread.h>
-#include <execinfo.h>
-
-namespace mongo {
-
-    inline pthread_t GetCurrentThreadId() {
-        return pthread_self();
-    }
-
-    /* use "addr2line -CFe <exe>" to parse. */
-    inline void printStackTrace(ostream &o = cout) {
-        void *b[20];
-
-        int size = backtrace(b, 20);
-        for (int i = 0; i < size; i++)
-            o << hex << b[i] << dec << ' ';
-        o << endl;
-
-        char **strings;
-
-        strings = backtrace_symbols(b, size);
-        for (int i = 0; i < size; i++)
-            o << ' ' << strings[i] << '\n';
-        o.flush();
-        free (strings);
-    }
-#else
-    inline void printStackTrace(ostream &o = cout) { }
-#endif
 
     bool isPrime(int n);
     int nextPrime(int n);

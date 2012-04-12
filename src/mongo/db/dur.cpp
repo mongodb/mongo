@@ -803,15 +803,8 @@ namespace mongo {
 
         void recover();
 
-        // this is for upgradeToWritable _DEBUG mode verification - although that code is off right now
-        unsigned notesThisLock = 0;
-
         void releasingWriteLock() {
             unspoolWriteIntents();
-
-            // SERVER-4328 this isn't quite what we want for notesThisLock with db level concurrency,
-            //             but notesThisLock is "off" right now anyway
-            DEV notesThisLock = 0;
         }
 
         void preallocateFiles();

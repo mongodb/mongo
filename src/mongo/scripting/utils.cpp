@@ -50,10 +50,7 @@ namespace mongo {
         verify( args.nFields() == 1 );
         verify( args.firstElement().isNumber() );
         int ms = int( args.firstElement().number() );
-        {
-            auto_ptr< ScriptEngine::Unlocker > u = globalScriptEngine->newThreadUnlocker();
-            sleepmillis( ms );
-        }
+        sleepmillis( ms );
 
         BSONObjBuilder b;
         b.appendUndefined( "" );

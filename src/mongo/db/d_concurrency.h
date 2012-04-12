@@ -6,7 +6,7 @@
 
 namespace mongo {
 
-    class SimpleRWLock;
+    class WrapperForRWLock;
     struct LockState;
 
     class Lock : boost::noncopyable { 
@@ -84,7 +84,7 @@ namespace mongo {
             void lock(const string& db);
             bool locked_w;
             bool locked_W;
-            SimpleRWLock *weLocked;
+            WrapperForRWLock *weLocked;
             int *ourCounter;
             const string what;
             void lockDB(const string& ns);
@@ -103,7 +103,7 @@ namespace mongo {
             void lockNestable(Nestable db);
             void lock(const string& db);
             bool locked_r;
-            SimpleRWLock *weLocked;
+            WrapperForRWLock *weLocked;
             int *ourCounter;
             string what;
             void lockDB(const string& ns);
@@ -211,7 +211,7 @@ namespace mongo {
         int nestableCount;            // recursive lock count on local or admin db
         int otherCount;               //   >0 means write lock, <0 read lock
         string otherName;             // which database are we locking and working with (besides local/admin)
-        SimpleRWLock *otherLock;      // so we don't have to check the map too often (the map has a mutex)
+        WrapperForRWLock *otherLock;  // so we don't have to check the map too often (the map has a mutex)
 
         // for temprelease
         Lock::ScopedLock *scopedLk;   // for the nonrecursive case. otherwise there would be many

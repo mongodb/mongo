@@ -21,13 +21,7 @@
 #include <typeinfo>
 
 #include "mongo/bson/inline_decls.h"
-
-// MONGO_NORETURN undefed at end of file
-#ifdef __GNUC__
-# define MONGO_NORETURN __attribute__((__noreturn__))
-#else
-# define MONGO_NORETURN 
-#endif
+#include "mongo/platform/compiler.h"
 
 namespace mongo {
 
@@ -153,15 +147,15 @@ namespace mongo {
         virtual void appendPrefix( std::stringstream& ss ) const;
     };
 
-    void asserted(const char *msg, const char *file, unsigned line) MONGO_NORETURN;
+    MONGO_COMPILER_NORETURN void asserted(const char *msg, const char *file, unsigned line);
     void wasserted(const char *msg, const char *file, unsigned line);
-    void fassertFailed( int msgid );
+    MONGO_COMPILER_NORETURN void fassertFailed( int msgid );
     
     /** a "user assertion".  throws UserAssertion.  logs.  typically used for errors that a user
         could cause, such as duplicate key, disk full, etc.
     */
-    void uasserted(int msgid, const char *msg) MONGO_NORETURN;
-    void uasserted(int msgid , const std::string &msg);
+    MONGO_COMPILER_NORETURN void uasserted(int msgid, const char *msg);
+    MONGO_COMPILER_NORETURN void uasserted(int msgid , const std::string &msg);
 
     /** reported via lasterror, but don't throw exception */
     void uassert_nothrow(const char *msg);
@@ -169,10 +163,10 @@ namespace mongo {
     /** msgassert and massert are for errors that are internal but have a well defined error text std::string.
         a stack trace is logged.
     */
-    void msgassertedNoTrace(int msgid, const char *msg) MONGO_NORETURN;
+    MONGO_COMPILER_NORETURN void msgassertedNoTrace(int msgid, const char *msg);
     inline void msgassertedNoTrace(int msgid, const std::string& msg) { msgassertedNoTrace( msgid , msg.c_str() ); }
-    void msgasserted(int msgid, const char *msg) MONGO_NORETURN;
-    void msgasserted(int msgid, const std::string &msg);
+    MONGO_COMPILER_NORETURN void msgasserted(int msgid, const char *msg);
+    MONGO_COMPILER_NORETURN void msgasserted(int msgid, const std::string &msg);
 
     /* convert various types of exceptions to strings */
     inline std::string causedBy( const char* e ){ return (std::string)" :: caused by :: " + e; }
@@ -225,7 +219,7 @@ namespace mongo {
     enum { ASSERT_ID_DUPKEY = 11000 };
 
     /* throws a uassertion with an appropriate msg */
-    void streamNotGood( int code , std::string msg , std::ios& myios ) MONGO_NORETURN;
+    MONGO_COMPILER_NORETURN void streamNotGood( int code , std::string msg , std::ios& myios );
 
     inline void assertStreamGood(unsigned msgid, std::string msg, std::ios& myios) {
         if( !myios.good() ) streamNotGood(msgid, msg, myios);
@@ -267,4 +261,3 @@ namespace mongo {
         problem() << "caught unknown exception in destructor (" << __FUNCTION__ << ")" << endl; \
     }
 
-#undef MONGO_NORETURN

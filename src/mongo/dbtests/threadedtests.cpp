@@ -783,10 +783,10 @@ namespace ThreadedTests {
         RWLock m;
         virtual void validate() { }
         virtual void subthread(int x) {
-            int Z = 1;
+            int Z = 0;
             Client::initThread("utest");
             if( x == 1 ) { 
-                cout << mongo::curTimeMillis64() % 10000 << " 1" << endl;
+                log(Z) << mongo::curTimeMillis64() % 10000 << " 1" << endl;
                 rwlock_shared lk(m);
                 sleepmillis(300);
                 log(Z) << mongo::curTimeMillis64() % 10000 << " 1x" << endl;
