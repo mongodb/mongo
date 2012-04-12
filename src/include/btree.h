@@ -155,6 +155,8 @@ struct __wt_salvage_cookie {
 #define	WT_INTERNAL_SNAPSHOT	"WiredTigerInternal"
 #define	WT_SNAPSHOT_FOREACH(snapbase, snap)				\
 	for ((snap) = (snapbase); (snap)->name != NULL; ++(snap))
+#define	WT_SNAPSHOT_CONTINUE(snap)					\
+	for (; (snap)->name != NULL; ++(snap))
 struct __wt_snapshot {
 	char	*name;				/* Name or NULL */
 	char	*t;				/* Time stamp */

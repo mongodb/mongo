@@ -206,6 +206,17 @@ methods = {
 	Config('force', 'false', r'''
 		return success if the object does not exist''',
 		type='boolean'),
+	Config('snapall', 'false', r'''
+		drop all snapshots''',
+		type='boolean'),
+	Config('snapfrom', '', r'''
+		drop all snapshots later than, and including, the named
+		snapshot'''),
+	Config('snapshot', '', r'''
+		the name of a single snapshot to drop'''),
+	Config('snapto', '', r'''
+		drop all snapshots earlier than, and including, the named
+		snapshot'''),
 	]),
 
 'session.dumpfile' : Method([]),
@@ -400,6 +411,7 @@ methods = {
 		    'readserver',
 		    'reconcile',
 		    'salvage',
+		    'snapshot',
 		    'verify',
 		    'write']),
 ]),
@@ -423,6 +435,7 @@ flags = {
 		'VERB_readserver',
 		'VERB_reconcile',
 		'VERB_salvage',
+		'VERB_snapshot',
 		'VERB_verify',
 		'VERB_write'
 	],

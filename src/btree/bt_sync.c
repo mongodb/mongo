@@ -7,12 +7,19 @@
 
 #include "wt_internal.h"
 
+#define	WT_SNAPSHOT_DROP	0x01	/* Drop named snapshot */
+#define	WT_SNAPSHOT_DROP_ALL	0x02	/* Drop all snapshots */
+#define	WT_SNAPSHOT_DROP_FROM	0x04	/* Drop snapshots from name to end */
+#define	WT_SNAPSHOT_DROP_TO	0x08	/* Drop snapshots from start to name */
+
+static int __snapshot_worker(WT_SESSION_IMPL *, const char *, int, uint32_t);
+
 /*
- * __wt_btree_sync --
- *	Sync the tree.
+ * __wt_btree_snapshot --
+ *	Snapshot the tree.
  */
 int
-__wt_btree_sync(WT_SESSION_IMPL *session, const char *cfg[])
+__wt_btree_snapshot(WT_SESSION_IMPL *session, const char *cfg[])
 {
 	WT_BTREE *btree;
 	WT_CONFIG_ITEM cval;
@@ -20,37 +27,108 @@ __wt_btree_sync(WT_SESSION_IMPL *session, const char *cfg[])
 	int ret;
 
 	btree = session->btree;
+	name = NULL;
 
 	/* This may be a named snapshot, check the configuration. */
-	ret = __wt_config_gets(session, cfg, "snapshot", &cval);
-	if (ret == WT_NOTFOUND || cval.len == 0)
-		name = NULL;
-	else {
+	if ((ret = __wt_config_gets(
+	    session, cfg, "snapshot", &cval)) != 0 && ret != WT_NOTFOUND)
 		WT_RET(ret);
-
-		WT_ERR(__wt_strndup(session, cval.str, cval.len, &name));
-
+	if (cval.len != 0) {
 		/*
 		 * If it's a named snapshot and there's nothing dirty, we won't
 		 * write any pages: mark the root page dirty to ensure a write.
 		 */
-		WT_ERR(__wt_page_modify_init(session, btree->root_page));
+		WT_RET(__wt_page_modify_init(session, btree->root_page));
 		__wt_page_modify_set(btree->root_page);
 
+		WT_RET(__wt_strndup(session, cval.str, cval.len, &name));
 	}
 
-	ret = __wt_btree_snapshot(session, name, 0);
+	ret = __snapshot_worker(session, name, 0, 0);
 
-err:	__wt_free(session, name);
+	__wt_free(session, name);
 	return (ret);
 }
 
 /*
- * __wt_btree_snapshot --
- *	Snapshot the tree.
+ * __wt_btree_snapshot_close --
+ *	Snapshot the tree when the handle is closed.
  */
 int
-__wt_btree_snapshot(WT_SESSION_IMPL *session, const char *name, int discard)
+__wt_btree_snapshot_close(WT_SESSION_IMPL *session)
+{
+	return (__snapshot_worker(session, NULL, 1, 0));
+}
+
+/*
+ * __wt_btree_snapshot_drop --
+ *	Snapshot the tree, dropping one or more snapshots.
+ */
+int
+__wt_btree_snapshot_drop(WT_SESSION_IMPL *session, const char *cfg[])
+{
+	WT_BTREE *btree;
+	WT_CONFIG_ITEM cval;
+	int ret;
+	char *name;
+
+	btree = session->btree;
+	name = NULL;
+
+	/*
+	 * If there's nothing dirty, we won't write any pages: mark the root
+	 * page dirty to ensure a write.
+	 */
+	WT_RET(__wt_page_modify_init(session, btree->root_page));
+	__wt_page_modify_set(btree->root_page);
+
+	if ((ret = __wt_config_gets(
+	    session, cfg, "snapall", &cval)) != 0 && ret != WT_NOTFOUND)
+		WT_RET(ret);
+	if (cval.val != 0) {
+		ret = __snapshot_worker(session, name, 0, WT_SNAPSHOT_DROP_ALL);
+		goto done;
+	}
+
+	if ((ret = __wt_config_gets(
+	    session, cfg, "snapfrom", &cval)) != 0 && ret != WT_NOTFOUND)
+		WT_RET(ret);
+	if (cval.len != 0) {
+		WT_RET(__wt_strndup(session, cval.str, cval.len, &name));
+		ret =
+		    __snapshot_worker(session, name, 0, WT_SNAPSHOT_DROP_FROM);
+		goto done;
+	}
+
+	if ((ret = __wt_config_gets(
+	    session, cfg, "snapto", &cval)) != 0 && ret != WT_NOTFOUND)
+		WT_RET(ret);
+	if (cval.len != 0) {
+		WT_RET(__wt_strndup(session, cval.str, cval.len, &name));
+		ret = __snapshot_worker(session, name, 0, WT_SNAPSHOT_DROP_TO);
+		goto done;
+	}
+
+	if ((ret = __wt_config_gets(
+	    session, cfg, "snapshot", &cval)) != 0 && ret != WT_NOTFOUND)
+		WT_RET(ret);
+	if (cval.len != 0) {
+		WT_RET(__wt_strndup(session, cval.str, cval.len, &name));
+		ret = __snapshot_worker(session, name, 0, WT_SNAPSHOT_DROP);
+		goto done;
+	}
+
+done:	__wt_free(session, name);
+	return (ret);
+}
+
+/*
+ * __snapshot_worker --
+ *	Snapshot the tree.
+ */
+static int
+__snapshot_worker(
+    WT_SESSION_IMPL *session, const char *name, int discard, uint32_t flags)
 {
 	WT_SNAPSHOT *snapbase, *snap;
 	WT_BTREE *btree;
@@ -66,20 +144,113 @@ __wt_btree_snapshot(WT_SESSION_IMPL *session, const char *name, int discard)
 	/* Get the list of snapshots for this file. */
 	WT_ERR(__wt_session_snap_list_get(session, NULL, &snapbase));
 
-	/*
-	 * Review the existing snapshots, deleting any with matching names, and
-	 * add the new snapshot entry at the end of the list.
-	 */
-	if (name == NULL)
-		name = WT_INTERNAL_SNAPSHOT;
-	WT_SNAPSHOT_FOREACH(snapbase, snap)
-		if (strcmp(name, snap->name) == 0)
+	switch (flags) {
+	case WT_SNAPSHOT_DROP:
+		/*
+		 * Drop the named snapshot.
+		 * Add a new snapshot with the default name.
+		 */
+		WT_SNAPSHOT_FOREACH(snapbase, snap)
+			if (strcmp(name, snap->name) == 0) {
+				FLD_SET(snap->flags, WT_SNAP_DELETE);
+				break;
+			}
+		WT_SNAPSHOT_CONTINUE(snap)
+			;
+
+		WT_ERR(__wt_strdup(session, WT_INTERNAL_SNAPSHOT, &snap->name));
+		FLD_SET(snap->flags, WT_SNAP_ADD);
+		break;
+	case WT_SNAPSHOT_DROP_ALL:
+		/*
+		 * Drop all snapshots.
+		 * Add a new snapshot with the default name.
+		 */
+		WT_SNAPSHOT_FOREACH(snapbase, snap)
 			FLD_SET(snap->flags, WT_SNAP_DELETE);
-	WT_ERR(__wt_strdup(session, name, &snap->name));
-	FLD_SET(snap->flags, WT_SNAP_ADD);
+
+		WT_ERR(__wt_strdup(session, WT_INTERNAL_SNAPSHOT, &snap->name));
+		FLD_SET(snap->flags, WT_SNAP_ADD);
+		break;
+	case WT_SNAPSHOT_DROP_FROM:
+		/*
+		 * Drop all snapshots after, and including, the named snapshot.
+		 * Add a new snapshot with the default name.
+		 */
+		WT_SNAPSHOT_FOREACH(snapbase, snap)
+			if (strcmp(name, snap->name) == 0)
+				break;
+		WT_SNAPSHOT_CONTINUE(snap)
+			FLD_SET(snap->flags, WT_SNAP_DELETE);
+
+		WT_ERR(__wt_strdup(session, WT_INTERNAL_SNAPSHOT, &snap->name));
+		FLD_SET(snap->flags, WT_SNAP_ADD);
+		break;
+	case WT_SNAPSHOT_DROP_TO:
+		/*
+		 * Drop all snapshots before, and including, the named snapshot.
+		 * Add a new snapshot with the default name.
+		 */
+		WT_SNAPSHOT_FOREACH(snapbase, snap)
+			if (strcmp(name, snap->name) == 0) {
+				FLD_SET(snap->flags, WT_SNAP_DELETE);
+				break;
+			}
+		WT_SNAPSHOT_CONTINUE(snap)
+			;
+
+		WT_ERR(__wt_strdup(session, WT_INTERNAL_SNAPSHOT, &snap->name));
+		FLD_SET(snap->flags, WT_SNAP_ADD);
+		break;
+	case 0:
+	default:
+		/*
+		 * Create a new, possibly named, snapshot.  Review existing
+		 * snapshots, deleting any with matching names, add the new
+		 * snapshot entry at the end of the list.
+		 */
+		if (name == NULL)
+			name = WT_INTERNAL_SNAPSHOT;
+		WT_SNAPSHOT_FOREACH(snapbase, snap)
+			if (strcmp(name, snap->name) == 0)
+				FLD_SET(snap->flags, WT_SNAP_DELETE);
+
+		WT_ERR(__wt_strdup(session, name, &snap->name));
+		FLD_SET(snap->flags, WT_SNAP_ADD);
+		break;
+	}
+
+	btree->snap = snapbase;
+	ret = __wt_btree_cache_flush(session, discard);
+	btree->snap = NULL;
+	WT_ERR(ret);
+
+	/* If we're discarding the tree, the root page should be gone. */
+	WT_ASSERT(session, !discard || btree->root_page == NULL);
+
+	/* If there was a snapshot, update the schema table. */
+	if (snap->raw.data != NULL)
+		WT_ERR(__wt_session_snap_list_set(session, snapbase));
+
+err:	__wt_session_snap_list_free(session, snapbase);
+
+	__wt_rwunlock(session, btree->snaplock);
+
+	return (ret);
+}
+
+/*
+ * __wt_btree_cache_flush --
+ *	Write dirty pages from the cache, optionally discarding the file.
+ */
+int
+__wt_btree_cache_flush(WT_SESSION_IMPL *session, int discard)
+{
+	int ret;
 
 	/*
-	 * Ask the eviction thread to flush any dirty pages.
+	 * Ask the eviction thread to flush any dirty pages, and optionally
+	 * discard the file from the cache.
 	 *
 	 * Reconciliation is just another reader of the page, so it's probably
 	 * possible to do this work in the current thread, rather than poking
@@ -99,23 +270,10 @@ __wt_btree_snapshot(WT_SESSION_IMPL *session, const char *name, int discard)
 	 * already works that way.   None of these problems can't be fixed, but
 	 * I don't see a reason to change at this time, either.
 	 */
-	btree->snap = snapbase;
+
 	do {
 		ret = __wt_sync_file_serial(session, discard);
 	} while (ret == WT_RESTART);
-	btree->snap = NULL;
-	WT_ERR(ret);
-
-	/* If we're discarding the tree, the root page should be gone. */
-	WT_ASSERT(session, !discard || btree->root_page == NULL);
-
-	/* If there was a snapshot, update the schema table. */
-	if (snap->raw.data != NULL)
-		WT_ERR(__wt_session_snap_list_set(session, snapbase));
-
-err:	__wt_session_snap_list_free(session, snapbase);
-
-	__wt_rwunlock(session, btree->snaplock);
 
 	return (ret);
 }

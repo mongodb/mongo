@@ -165,11 +165,12 @@ __wt_confchk_session_create =
 
 const char *
 __wt_confdfl_session_drop =
-    "force=false";
+    "force=false,snapall=false,snapfrom="",snapshot="",snapto=""";
 
 const char *
 __wt_confchk_session_drop =
-    "force=(type=boolean)";
+    "force=(type=boolean),snapall=(type=boolean),snapfrom=(),snapshot=(),"
+    "snapto=()";
 
 const char *
 __wt_confdfl_session_dumpfile =
@@ -284,4 +285,5 @@ __wt_confchk_wiredtiger_open =
     "multiprocess=(type=boolean),session_max=(type=int,min=1),"
     "transactional=(type=boolean),verbose=(type=list,choices=[\"block\","
     "\"evict\",\"evictserver\",\"fileops\",\"hazard\",\"mutex\",\"read\","
-    "\"readserver\",\"reconcile\",\"salvage\",\"verify\",\"write\"])";
+    "\"readserver\",\"reconcile\",\"salvage\",\"snapshot\",\"verify\","
+    "\"write\"])";

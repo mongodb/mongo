@@ -167,11 +167,6 @@ extern int __wt_block_snapshot(WT_SESSION_IMPL *session,
     WT_BLOCK *block,
     WT_ITEM *buf,
     WT_SNAPSHOT *snapbase);
-extern int __wt_block_snapshot_string(WT_SESSION_IMPL *session,
-    WT_BLOCK *block,
-    const uint8_t *addr,
-    const char *tag,
-    WT_ITEM **retp);
 extern int __wt_block_verify_start(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_block_verify_end(WT_SESSION_IMPL *session, WT_BLOCK *block);
 extern int __wt_verify_snap_load( WT_SESSION_IMPL *session,
@@ -301,10 +296,11 @@ extern int __wt_kv_return(WT_SESSION_IMPL *session,
     int key_ret);
 extern int __wt_salvage(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_btree_stat_init(WT_SESSION_IMPL *session);
-extern int __wt_btree_sync(WT_SESSION_IMPL *session, const char *cfg[]);
-extern int __wt_btree_snapshot(WT_SESSION_IMPL *session,
-    const char *name,
-    int discard);
+extern int __wt_btree_snapshot(WT_SESSION_IMPL *session, const char *cfg[]);
+extern int __wt_btree_snapshot_close(WT_SESSION_IMPL *session);
+extern int __wt_btree_snapshot_drop(WT_SESSION_IMPL *session,
+    const char *cfg[]);
+extern int __wt_btree_cache_flush(WT_SESSION_IMPL *session, int discard);
 extern int __wt_upgrade(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_verify(WT_SESSION_IMPL *session, const char *cfg[]);
 extern int __wt_dumpfile(WT_SESSION_IMPL *session, const char *cfg[]);

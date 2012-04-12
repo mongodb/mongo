@@ -643,6 +643,14 @@ struct __wt_session {
 	 * @configstart{session.drop, see dist/api_data.py}
 	 * @config{force, return success if the object does not exist.,a boolean
 	 * flag; default \c false.}
+	 * @config{snapall, drop all snapshots.,a boolean flag; default \c
+	 * false.}
+	 * @config{snapfrom, drop all snapshots later than\, and including\, the
+	 * named snapshot.,a string; default empty.}
+	 * @config{snapshot, the name of a single snapshot to drop.,a string;
+	 * default empty.}
+	 * @config{snapto, drop all snapshots earlier than\, and including\, the
+	 * named snapshot.,a string; default empty.}
 	 * @configend
 	 * @errors
 	 */
@@ -1085,8 +1093,8 @@ struct __wt_connection {
  * list\, such as <code>"verbose=[evictserver\,read]"</code>.,a list\, with
  * values chosen from the following options: \c "block"\, \c "evict"\, \c
  * "evictserver"\, \c "fileops"\, \c "hazard"\, \c "mutex"\, \c "read"\, \c
- * "readserver"\, \c "reconcile"\, \c "salvage"\, \c "verify"\, \c "write";
- * default empty.}
+ * "readserver"\, \c "reconcile"\, \c "salvage"\, \c "snapshot"\, \c "verify"\,
+ * \c "write"; default empty.}
  * @configend
  * Additionally, if a file named \c WiredTiger.config appears in the WiredTiger
  * home directory, it is read for configuration values (see @ref config_file

@@ -429,6 +429,9 @@ sizev
 skiplist
 skiplists
 slvg
+snapall
+snapfrom
+snapto
 snprintf
 sp
 spinlock

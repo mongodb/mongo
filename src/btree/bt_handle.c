@@ -109,7 +109,7 @@ __wt_btree_close(WT_SESSION_IMPL *session)
 	if (F_ISSET(btree, WT_BTREE_OPEN) &&
 	    !F_ISSET(btree,
 	    WT_BTREE_SALVAGE | WT_BTREE_UPGRADE | WT_BTREE_VERIFY)) {
-		ret = __wt_btree_snapshot(session, NULL, 1);
+		ret = __wt_btree_snapshot_close(session);
 		WT_TRET(__wt_bm_snapshot_unload(session));
 	}
 

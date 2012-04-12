@@ -277,16 +277,17 @@ extern WT_PROCESS __wt_process;
 #define	WT_SERVER_RUN					0x00000001
 #define	WT_SESSION_INTERNAL				0x00000002
 #define	WT_SESSION_SALVAGE_QUIET_ERR			0x00000001
-#define	WT_VERB_block					0x00000800
-#define	WT_VERB_evict					0x00000400
-#define	WT_VERB_evictserver				0x00000200
-#define	WT_VERB_fileops					0x00000100
-#define	WT_VERB_hazard					0x00000080
-#define	WT_VERB_mutex					0x00000040
-#define	WT_VERB_read					0x00000020
-#define	WT_VERB_readserver				0x00000010
-#define	WT_VERB_reconcile				0x00000008
-#define	WT_VERB_salvage					0x00000004
+#define	WT_VERB_block					0x00001000
+#define	WT_VERB_evict					0x00000800
+#define	WT_VERB_evictserver				0x00000400
+#define	WT_VERB_fileops					0x00000200
+#define	WT_VERB_hazard					0x00000100
+#define	WT_VERB_mutex					0x00000080
+#define	WT_VERB_read					0x00000040
+#define	WT_VERB_readserver				0x00000020
+#define	WT_VERB_reconcile				0x00000010
+#define	WT_VERB_salvage					0x00000008
+#define	WT_VERB_snapshot				0x00000004
 #define	WT_VERB_verify					0x00000002
 #define	WT_VERB_write					0x00000001
 /*
