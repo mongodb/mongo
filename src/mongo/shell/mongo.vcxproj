@@ -1340,7 +1340,11 @@
     <None Include="mongo.js" />
     <None Include="mr.js" />
     <None Include="query.js" />
+    <None Include="replsetbridge.js" />
+    <None Include="replsettest.js" />
     <None Include="servers.js" />
+    <None Include="servers_misc.js" />
+    <None Include="shardingtest.js" />
     <None Include="utils.js" />
     <None Include="utils_sh.js" />
   </ItemGroup>
