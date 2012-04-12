@@ -317,10 +317,12 @@ ReplSetTest.prototype.callIsMaster = function() {
 }
 
 ReplSetTest.awaitRSClientHosts = function( conn, host, hostOk, rs ) {
-    
-    if( host.length ){
-        for( var i = 0; i < host.length; i++ ) this.awaitOk( conn, host[i] )
-        return
+    var hostCount = host.length;
+    if( hostCount ){
+        for( var i = 0; i < hostCount; i++ ) {
+            ReplSetTest.awaitRSClientHosts( conn, host[i], hostOk, rs );
+        }
+        return;
     }
     
     if( hostOk == undefined ) hostOk = { ok : true }
