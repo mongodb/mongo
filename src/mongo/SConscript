@@ -392,13 +392,13 @@ if darwin or env["_HAVEPCAP"]:
 
 # --- shell ---
 
-# note, if you add a file here, you need to add it in scripting/engine.cpp and shell/createCPPfromJavaScriptFiles.js as well
-env.Depends( "shell/dbshell.cpp",
-             env.JSHeader( "shell/mongo.cpp" , 
-                           Glob( "shell/utils*.js" ) + 
-                           [ "shell/db.js","shell/mongo.js","shell/mr.js","shell/query.js","shell/collection.js"] ) )
+# if you add a file here, you need to add it in scripting/engine.cpp and shell/createCPPfromJavaScriptFiles.js as well
+env.JSHeader( "shell/mongo.cpp" , 
+              [ "shell/utils.js","shell/utils_sh.js","shell/db.js","shell/mongo.js","shell/mr.js","shell/query.js","shell/collection.js"] )
 
-env.JSHeader( "shell/mongo-server.cpp" , ["shell/servers.js", "shell/shardingtest.js", "shell/servers_misc.js", "shell/replsettest.js", "shell/replsetbridge.js"] )
+# if you add a file here, you need to add it in shell/shell_utils.cpp and shell/createCPPfromJavaScriptFiles.js as well
+env.JSHeader( "shell/mongo-server.cpp" ,
+              ["shell/servers.js", "shell/shardingtest.js", "shell/servers_misc.js", "shell/replsettest.js", "shell/replsetbridge.js"] )
 
 coreShellFiles = [ "shell/dbshell.cpp",
                    "shell/shell_utils.cpp",
