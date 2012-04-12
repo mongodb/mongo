@@ -303,12 +303,24 @@ namespace mongo {
         }
     }
 
-    void ReplicaSetMonitor::_checkStatus(DBClientConnection *conn) {
+    void ReplicaSetMonitor::_checkStatus( const string& hostAddr ) {
         BSONObj status;
 
-        if (!conn->runCommand("admin", BSON("replSetGetStatus" << 1), status) ||
-                !status.hasField("members") ||
-                status["members"].type() != Array) {
+        /* replSetGetStatus requires admin auth so use a connection from the pool,
+         * which are authenticated with the keyFile credentials.
+         */
+        ScopedDbConnection authenticatedConn( hostAddr );
+
+        if ( !authenticatedConn->runCommand( "admin", BSON( "replSetGetStatus" << 1 ), status )) {
+            LOG(1) << "dbclient_rs replSetGetStatus failed" << endl;
+            return;
+        }
+        if( !status.hasField("members") ) { 
+            log() << "dbclient_rs error expected members field in replSetGetStatus result" << endl;
+            return;
+        }
+        if( status["members"].type() != Array) {
+            log() << "dbclient_rs error expected members field in replSetGetStatus result to be an array" << endl;
             return;
         }
 
@@ -523,7 +535,7 @@ namespace mongo {
             }
             
             _checkHosts( b.arr(), changed);
-            _checkStatus( conn );
+            _checkStatus( conn->getServerAddress() );
 
         }
         catch ( std::exception& e ) {
