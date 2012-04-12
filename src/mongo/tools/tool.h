@@ -155,11 +155,6 @@ namespace mongo {
         virtual int run();
 
         long long processFile( const boost::filesystem::path& file );
-
-    private:
-
-        BSONObj* readDocument( FILE* file, char* buf, const int bufSize );
-
     };
 
 }
