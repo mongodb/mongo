@@ -155,44 +155,10 @@ namespace mongo {
         virtual int run();
 
         long long processFile( const boost::filesystem::path& file );
-        long long processFifo( const boost::filesystem::path& file );
 
     private:
 
-        inline BSONObj* readDocument( FILE* file, char* buf, const int bufSize ) {
-            size_t amt = fread(buf, 1, 4, file);
-            // end of fifo/file
-            if ( feof(file) ) {
-                return NULL;
-            }
-            verify( amt == 4 );
-
-            int size = ((int*)buf)[0];
-            uassert( 10264 , str::stream() << "invalid object size: " << size , size < bufSize );
-
-            amt = fread(buf+4, 1, size-4, file);
-            verify( amt == (size_t)( size - 4 ) );
-
-            BSONObj* o = new BSONObj( buf );
-            if ( _objcheck && ! o->valid() ) {
-                cerr << "INVALID OBJECT - going try and pring out " << endl;
-                cerr << "size: " << size << endl;
-                BSONObjIterator i(*o);
-                while ( i.more() ) {
-                    BSONElement e = i.next();
-                    try {
-                        e.validate();
-                    }
-                    catch ( ... ) {
-                        cerr << "\t\t NEXT ONE IS INVALID" << endl;
-                    }
-                    cerr << "\t name : " << e.fieldName() << " " << e.type() << endl;
-                    cerr << "\t " << e << endl;
-                }
-            }
-
-            return o;
-        }
+        BSONObj* readDocument( FILE* file, char* buf, const int bufSize );
 
     };
 

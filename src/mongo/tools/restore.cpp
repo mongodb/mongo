@@ -363,11 +363,7 @@ public:
             createCollectionWithOptions(metadataObject["options"].Obj());
         }
 
-        if (fileStatus.type() == boost::filesystem::fifo_file) {
-            processFifo( root );
-        } else {
-            processFile( root );
-        }
+        processFile( root );
 
         if (_drop && root.leaf() == "system.users.bson") {
             // Delete any users that used to exist but weren't in the dump file
