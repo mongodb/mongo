@@ -192,13 +192,13 @@ namespace mongo {
         gridfs_offset write( const string& where ) const;
 
     private:
-        GridFile(const GridFS * grid , bool slaveOk , BSONObj obj );
+        GridFile(const GridFS * grid , BSONObj obj , bool slaveOk = false );
 
         void _exists() const;
 
         const GridFS * _grid;
-        bool           _slaveOk;
         BSONObj        _obj;
+        bool           _slaveOk;
 
         friend class GridFS;
     };
