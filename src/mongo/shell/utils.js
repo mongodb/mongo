@@ -1172,7 +1172,7 @@ jsTest.isMongos = function(conn) {
 jsTest.attempt = function( opts, func ) {
     var timeout = opts.timeout || 1000;
     var tries   = 0;
-    var sleepTime = 500;
+    var sleepTime = 2000;
     var result = null;
     var context = opts.context || this;
 
