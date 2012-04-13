@@ -539,7 +539,7 @@ namespace mongo {
             _qcCache.clear();
             _qcWriteCount = 0;
         }
-        /* you must notify the cache if you are doing writes, as query plan optimality will change */
+        /* you must notify the cache if you are doing writes, as query plan utility will change */
         void notifyOfWriteOp() {
             if ( _qcCache.empty() )
                 return;
