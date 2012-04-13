@@ -557,7 +557,7 @@ namespace mongo {
             errorOccured = true;
         }
 
-        if ( errorOccured ) {
+        if ( errorOccured && nodesOffset >= 0 ) {
             scoped_lock lk( _lock );
             _nodes[nodesOffset].ok = false;
         }
