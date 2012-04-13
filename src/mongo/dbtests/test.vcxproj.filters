@@ -358,6 +358,9 @@
     <ClInclude Include="..\db\namespace_details-inl.h">
       <Filter>db\h</Filter>
     </ClInclude>
+    <ClInclude Include="..\util\stacktrace.h">
+      <Filter>util\h</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Library Include="..\..\..\..\js\js32d.lib">
@@ -1063,6 +1066,9 @@
     </ClCompile>
     <ClCompile Include="..\util\startup_test.cpp">
       <Filter>util</Filter>
+    </ClCompile>
+    <ClCompile Include="..\util\stacktrace.cpp">
+      <Filter>util\cpp</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

@@ -77,6 +77,12 @@
     <ClCompile Include="..\..\util\progress_meter.cpp">
       <Filter>shared files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\util\debug_util.cpp">
+      <Filter>shared files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\util\stacktrace.cpp">
+      <Filter>shared files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\bson\bson-inl.h">
@@ -125,6 +131,12 @@
       <Filter>includes</Filter>
     </ClInclude>
     <ClInclude Include="..\..\util\progress_meter.h">
+      <Filter>shared files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\debug_util.h">
+      <Filter>shared files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\stacktrace.h">
       <Filter>shared files</Filter>
     </ClInclude>
   </ItemGroup>

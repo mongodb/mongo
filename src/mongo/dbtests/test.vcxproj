@@ -509,6 +509,7 @@
     <ClInclude Include="..\util\mmap.h" />
     <ClInclude Include="..\util\mongoutils\hash.h" />
     <ClInclude Include="..\util\sock.h" />
+    <ClInclude Include="..\util\stacktrace.h" />
     <ClInclude Include="..\util\unittest.h" />
     <ClInclude Include="framework.h" />
   </ItemGroup>
@@ -1469,6 +1470,16 @@
     </ClCompile>
     <ClCompile Include="..\util\ramlog.cpp" />
     <ClCompile Include="..\util\net\sock.cpp" />
+    <ClCompile Include="..\util\stacktrace.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|Win32'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Win2008PlusDebug|x64'">NotUsing</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Win2008PlusRelease|x64'">NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="..\util\startup_test.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">NotUsing</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">NotUsing</PrecompiledHeader>

@@ -375,6 +375,9 @@
     <ClCompile Include="shell_utils_extended.cpp">
       <Filter>shell</Filter>
     </ClCompile>
+    <ClCompile Include="..\util\stacktrace.cpp">
+      <Filter>util\Main</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="..\..\..\SConstruct" />
@@ -883,6 +886,9 @@
     </ClInclude>
     <ClInclude Include="shell_utils_extended.h">
       <Filter>shell</Filter>
+    </ClInclude>
+    <ClInclude Include="..\util\stacktrace.h">
+      <Filter>util\Header</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

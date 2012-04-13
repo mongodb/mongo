@@ -67,12 +67,18 @@
     <ClCompile Include="..\..\util\debug_util.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\util\stacktrace.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\util\stringutils.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\util\debug_util.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\util\stacktrace.h">
       <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
