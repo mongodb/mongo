@@ -5,9 +5,9 @@
 // when it doesn't move
 
 
-t = db.indexb;t = db.indexb;
+t = db.indexb;
 db.dropDatabase();
-t.drop();
+
 t.ensureIndex({a:1},true);
 
 t.insert({a:1});
