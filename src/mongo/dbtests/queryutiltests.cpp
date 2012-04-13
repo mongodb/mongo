@@ -19,6 +19,7 @@
 
 #include "pch.h"
 #include "../db/queryutil.h"
+#include "mongo/db/queryoptimizer.h"
 #include "../db/querypattern.h"
 #include "../db/instance.h"
 #include "../db/pdfile.h"
@@ -1320,6 +1321,72 @@ namespace QueryUtilTests {
             }
         };
         
+        /** Check that clearIndexesForPatterns() clears recorded query plans. */
+        class ClearIndexesForPatterns : public IndexBase {
+        public:
+            void run() {
+                index( BSON( "a" << 1 ) );
+                BSONObj query = BSON( "a" << GT << 5 << LT << 5 );
+                BSONObj sort = BSON( "a" << 1 );
+                
+                // Record the a:1 index for the query's single and multi key query patterns.
+                NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
+                QueryPattern singleKey = FieldRangeSet( ns(), query, true ).pattern( sort );
+                nsdt.registerCachedQueryPlanForPattern( singleKey,
+                                                       CachedQueryPlan( BSON( "a" << 1 ), 1 ) );
+                QueryPattern multiKey = FieldRangeSet( ns(), query, false ).pattern( sort );
+                nsdt.registerCachedQueryPlanForPattern( multiKey,
+                                                       CachedQueryPlan( BSON( "a" << 1 ), 5 ) );
+                
+                // The single and multi key fields for this query must differ for the test to be
+                // valid.
+                ASSERT( singleKey != multiKey );
+                
+                // Clear the recorded query plans using clearIndexesForPatterns.
+                FieldRangeSetPair frsp( ns(), query );
+                QueryUtilIndexed::clearIndexesForPatterns( frsp, sort );
+                
+                // Check that the recorded query plans were cleared.
+                ASSERT_EQUALS( BSONObj(), nsdt.cachedQueryPlanForPattern( singleKey ).indexKey() );
+                ASSERT_EQUALS( BSONObj(), nsdt.cachedQueryPlanForPattern( multiKey ).indexKey() );
+            }
+        };
+
+        /** Check query plan returned by bestIndexForPatterns(). */
+        class BestIndexForPatterns : public IndexBase {
+        public:
+            void run() {
+                index( BSON( "a" << 1 ) );
+                index( BSON( "b" << 1 ) );
+                BSONObj query = BSON( "a" << GT << 5 << LT << 5 );
+                BSONObj sort = BSON( "a" << 1 );
+                NamespaceDetailsTransient &nsdt = NamespaceDetailsTransient::get( ns() );
+
+                // No query plan is returned when none has been recorded.
+                FieldRangeSetPair frsp( ns(), query );
+                ASSERT_EQUALS( BSONObj(),
+                              QueryUtilIndexed::bestIndexForPatterns( frsp, sort ).indexKey() );
+                
+                // A multikey index query plan is returned if recorded.
+                QueryPattern multiKey = FieldRangeSet( ns(), query, false ).pattern( sort );
+                nsdt.registerCachedQueryPlanForPattern( multiKey,
+                                                       CachedQueryPlan( BSON( "a" << 1 ), 5 ) );
+                ASSERT_EQUALS( BSON( "a" << 1 ),
+                              QueryUtilIndexed::bestIndexForPatterns( frsp, sort ).indexKey() );
+
+                // A non multikey index query plan is preferentially returned if recorded.
+                QueryPattern singleKey = FieldRangeSet( ns(), query, true ).pattern( sort );
+                nsdt.registerCachedQueryPlanForPattern( singleKey,
+                                                       CachedQueryPlan( BSON( "b" << 1 ), 5 ) );
+                ASSERT_EQUALS( BSON( "b" << 1 ),
+                              QueryUtilIndexed::bestIndexForPatterns( frsp, sort ).indexKey() );
+                
+                // The single and multi key fields for this query must differ for the test to be
+                // valid.
+                ASSERT( singleKey != multiKey );
+            }
+        };
+
     } // namespace FieldRangeSetPairTests
     
     namespace FieldRangeVectorTests {
@@ -2142,6 +2209,8 @@ namespace QueryUtilTests {
             add<FieldRangeSetPairTests::NoNonUniversalRanges>();
             add<FieldRangeSetPairTests::MatchPossible>();
             add<FieldRangeSetPairTests::MatchPossibleForIndex>();
+            add<FieldRangeSetPairTests::ClearIndexesForPatterns>();
+            add<FieldRangeSetPairTests::BestIndexForPatterns>();
             add<FieldRangeVectorTests::ToString>();
             add<FieldRangeVectorIteratorTests::AdvanceToNextIntervalEquality>();
             add<FieldRangeVectorIteratorTests::AdvanceToNextIntervalExclusiveInequality>();
