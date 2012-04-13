@@ -546,7 +546,7 @@ namespace mongo {
         
         op.debug().query = query;
         op.setQuery(query);
-        
+
         PageFaultRetryableSection s;
         while ( 1 ) {
             try {
@@ -585,19 +585,28 @@ namespace mongo {
         op.debug().query = pattern;
         op.setQuery(pattern);
 
-        writelock lk(ns);
-
-        // writelock is used to synchronize stepdowns w/ writes
-        uassert( 10056 ,  "not master", isMasterNs( ns ) );
-
-        // if this ever moves to outside of lock, need to adjust check Client::Context::_finishInit
-        if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
-            return;
-
-        Client::Context ctx(ns);
-
-        long long n = deleteObjects(ns, pattern, justOne, true);
-        lastError.getSafe()->recordDelete( n );
+        PageFaultRetryableSection s;
+        while ( 1 ) {
+            try {
+                writelock lk(ns);
+                
+                // writelock is used to synchronize stepdowns w/ writes
+                uassert( 10056 ,  "not master", isMasterNs( ns ) );
+                
+                // if this ever moves to outside of lock, need to adjust check Client::Context::_finishInit
+                if ( ! broadcast && handlePossibleShardedMessage( m , 0 ) )
+                    return;
+                
+                Client::Context ctx(ns);
+                
+                long long n = deleteObjects(ns, pattern, justOne, true);
+                lastError.getSafe()->recordDelete( n );
+                break;
+            }
+            catch ( PageFaultException& e ) {
+                e.touch();
+            }
+        }
     }
 
     QueryResult* emptyMoreResult(long long);
