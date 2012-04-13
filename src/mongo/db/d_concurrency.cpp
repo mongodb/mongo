@@ -38,14 +38,11 @@ namespace mongo {
     public:
         string name() const { return r.name; }
         LockStat stats;
-        WrapperForRWLock(const char *name) :
-          r(name)
-        { 
-        }
-        void lock()          { LockStat::Acquiring a(stats,'W'); r.lock();        }
-        void lock_shared()   { LockStat::Acquiring a(stats,'R'); r.lock_shared(); }
-        void unlock()        { stats.unlocking('W'); r.unlock();        }
-        void unlock_shared() { stats.unlocking('R'); r.unlock_shared(); }
+        WrapperForRWLock(const char *name) : r(name) { }
+        void lock()          { LockStat::Acquiring a(stats,'W'); r.lock();          }
+        void lock_shared()   { LockStat::Acquiring a(stats,'R'); r.lock_shared();   }
+        void unlock()        { stats.unlocking('W');             r.unlock();        }
+        void unlock_shared() { stats.unlocking('R');             r.unlock_shared(); }
     };
 
     class DBTryLockTimeoutException : public std::exception {

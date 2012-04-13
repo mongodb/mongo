@@ -5,7 +5,7 @@ namespace mongo {
     class LockStat { 
         enum { N = 4 };
     public:
-        Timer t;
+        Timer W_Timer;
         unsigned long long timeAcquiring[N];
         unsigned long long timeLocked[N];
 
@@ -17,6 +17,7 @@ namespace mongo {
         }
 
         struct Acquiring {
+            Timer tmr;
             LockStat& ls;
             unsigned type;
             explicit Acquiring(LockStat&, char type);
@@ -33,12 +34,12 @@ namespace mongo {
     inline BSONObj LockStat::report() const { 
         BSONObjBuilder x;
         BSONObjBuilder y;
-        x.append("R", (long long) timeLocked[0]);
+        //x.append("R", (long long) timeLocked[0]);
         x.append("W", (long long) timeLocked[1]);
-        if( timeLocked[2] || timeLocked[3] ) {
+        /*if( timeLocked[2] || timeLocked[3] ) {
             x.append("r", (long long) timeLocked[2]);
             x.append("w", (long long) timeLocked[3]);
-        }
+        }*/
         y.append("R", (long long) timeAcquiring[0]);
         y.append("W", (long long) timeAcquiring[1]);
         if( timeAcquiring[2] || timeAcquiring[3] ) {
@@ -66,18 +67,20 @@ namespace mongo {
     inline LockStat::Acquiring::Acquiring(LockStat& _ls, char t) : ls(_ls) { 
         type = map(t);
         dassert( type < N );
-        ls.t.reset();
     }
 
     // note: we have race conditions on the following += 
     // hmmm....
 
     inline LockStat::Acquiring::~Acquiring() { 
-        ls.timeAcquiring[type] += ls.t.microsReset(); // reset to time how long we stay locked
+        ls.timeAcquiring[type] += tmr.micros();
+        if( type == 1 ) 
+            ls.W_Timer.reset();
     }
 
     inline void LockStat::unlocking(char tp) { 
         unsigned type = map(tp);
-        timeLocked[type] += t.micros();
+        if( type == 1 ) 
+            timeLocked[type] += W_Timer.micros();
     }
 }
