@@ -167,9 +167,10 @@ namespace mongo {
             break;
 
         case BinData:
-	  binType=pBsonElement->binDataType();
-	  pBinData = pBsonElement->value();
-	  break;
+	    binType=pBsonElement->binDataType();
+	    pBinData = pBsonElement->value();
+	    break;
+	    
         case Symbol:
         case CodeWScope:
 
@@ -811,11 +812,7 @@ namespace mongo {
 		// Compare by lexicographical order, the 3 data types have 16 bytes
 		const char* lData = rL->getBinData();
 		const char* rData = rR->getBinData();
-		for(int i = 0; i < 16; i++){
-		  if( lData[i]==rData[i] )
-		    {
-		      // Do nothing
-		    }
+		for(int i = 0; i < 16; i++){		  
 		  if( lData[i]>rData[i] )
 		    {
 		      return 1;
@@ -825,6 +822,7 @@ namespace mongo {
 		      return -1;
 		    }
 		}
+		return 0;
 		break;
 	      }
 	    case BinDataGeneral:
