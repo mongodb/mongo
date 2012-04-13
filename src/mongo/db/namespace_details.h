@@ -229,12 +229,6 @@ namespace mongo {
             if( multiKeyIndexBits & x ) return;
             *getDur().writing(&multiKeyIndexBits) |= x;
         }
-        void clearIndexIsMultikey(int i) {
-            dassert( i < NIndexesMax );
-            unsigned long long x = ((unsigned long long) 1) << i;
-            if( (multiKeyIndexBits & x) == 0 ) return;
-            *getDur().writing(&multiKeyIndexBits) &= ~x;
-        }
 
         /* add a new index.  does not add to system.indexes etc. - just to NamespaceDetails.
            caller must populate returned object.
