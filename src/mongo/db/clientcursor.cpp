@@ -457,6 +457,10 @@ namespace mongo {
     }
     
     Record* ClientCursor::_recordForYield( ClientCursor::RecordNeeds need ) {
+        
+        if ( ! ok() )
+            return 0;
+
         if ( need == DontNeed ) {
             return 0;
         }
