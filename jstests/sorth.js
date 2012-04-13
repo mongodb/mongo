@@ -18,3 +18,4 @@ function checkIndex( index, n ) {
 
 checkIndex( "BtreeCursor a_1", 100 );
 checkIndex( "BtreeCursor b_1", 500 );
+t.drop();
