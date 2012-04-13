@@ -132,11 +132,11 @@ __snapshot_worker(
 {
 	WT_SNAPSHOT *snapbase, *snap;
 	WT_BTREE *btree;
-	int ret;
+	int match, ret;
 
 	btree = session->btree;
 	snapbase = NULL;
-	ret = 0;
+	match = ret = 0;
 
 	/* Snapshots are single-threaded. */
 	__wt_writelock(session, btree->snaplock);
@@ -150,13 +150,15 @@ __snapshot_worker(
 		 * Drop the named snapshot.
 		 * Add a new snapshot with the default name.
 		 */
-		WT_SNAPSHOT_FOREACH(snapbase, snap)
-			if (strcmp(name, snap->name) == 0) {
+		WT_SNAPSHOT_FOREACH(snapbase, snap) {
+			if (strcmp(snap->name, name) == 0)
+				match = 1;
+			if (strcmp(snap->name, name) == 0 ||
+			    strcmp(snap->name, WT_INTERNAL_SNAPSHOT) == 0)
 				FLD_SET(snap->flags, WT_SNAP_DELETE);
-				break;
-			}
-		WT_SNAPSHOT_CONTINUE(snap)
-			;
+		}
+		if (!match)
+			goto nomatch;
 
 		WT_ERR(__wt_strdup(session, WT_INTERNAL_SNAPSHOT, &snap->name));
 		FLD_SET(snap->flags, WT_SNAP_ADD);
@@ -177,11 +179,18 @@ __snapshot_worker(
 		 * Drop all snapshots after, and including, the named snapshot.
 		 * Add a new snapshot with the default name.
 		 */
-		WT_SNAPSHOT_FOREACH(snapbase, snap)
-			if (strcmp(name, snap->name) == 0)
+		WT_SNAPSHOT_FOREACH(snapbase, snap) {
+			if (strcmp(snap->name, name) == 0) {
+				match = 1;
 				break;
+			}
+			if (strcmp(snap->name, WT_INTERNAL_SNAPSHOT) == 0)
+				FLD_SET(snap->flags, WT_SNAP_DELETE);
+		}
 		WT_SNAPSHOT_CONTINUE(snap)
 			FLD_SET(snap->flags, WT_SNAP_DELETE);
+		if (!match)
+			goto nomatch;
 
 		WT_ERR(__wt_strdup(session, WT_INTERNAL_SNAPSHOT, &snap->name));
 		FLD_SET(snap->flags, WT_SNAP_ADD);
@@ -191,13 +200,20 @@ __snapshot_worker(
 		 * Drop all snapshots before, and including, the named snapshot.
 		 * Add a new snapshot with the default name.
 		 */
-		WT_SNAPSHOT_FOREACH(snapbase, snap)
-			if (strcmp(name, snap->name) == 0) {
-				FLD_SET(snap->flags, WT_SNAP_DELETE);
+		WT_SNAPSHOT_FOREACH(snapbase, snap) {
+			FLD_SET(snap->flags, WT_SNAP_DELETE);
+			if (strcmp(snap->name, name) == 0) {
+				match = 1;
 				break;
 			}
+		}
 		WT_SNAPSHOT_CONTINUE(snap)
-			;
+			if (strcmp(snap->name, WT_INTERNAL_SNAPSHOT) == 0)
+				FLD_SET(snap->flags, WT_SNAP_DELETE);
+		if (!match)
+nomatch:		WT_ERR_MSG(session, EINVAL,
+			    "no snapshot matching specified name %s found",
+			    name);
 
 		WT_ERR(__wt_strdup(session, WT_INTERNAL_SNAPSHOT, &snap->name));
 		FLD_SET(snap->flags, WT_SNAP_ADD);
@@ -212,7 +228,7 @@ __snapshot_worker(
 		if (name == NULL)
 			name = WT_INTERNAL_SNAPSHOT;
 		WT_SNAPSHOT_FOREACH(snapbase, snap)
-			if (strcmp(name, snap->name) == 0)
+			if (strcmp(snap->name, name) == 0)
 				FLD_SET(snap->flags, WT_SNAP_DELETE);
 
 		WT_ERR(__wt_strdup(session, name, &snap->name));
