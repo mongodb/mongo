@@ -1001,6 +1001,8 @@ namespace mongo {
 
                 log(1) << "mr ns: " << config.ns << endl;
 
+                uassert( 16149 , "cannot run map reduce without the js engine", globalScriptEngine );
+
                 auto_ptr<ClientCursor> holdCursor;
                 ShardChunkManagerPtr chunkManager;
 
