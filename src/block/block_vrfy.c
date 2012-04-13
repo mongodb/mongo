@@ -11,7 +11,6 @@ static int __verify_addfrag(WT_SESSION_IMPL *, WT_BLOCK *, off_t, off_t);
 static int __verify_checkfrag(WT_SESSION_IMPL *, WT_BLOCK *);
 static int __verify_eof(WT_SESSION_IMPL *, WT_BLOCK *, off_t, off_t);
 static int __verify_frag_notset(WT_SESSION_IMPL *, WT_BLOCK *, off_t, off_t);
-static int __verify_frag_set(WT_SESSION_IMPL *, WT_BLOCK *, off_t, off_t);
 
 /*
  * __wt_block_verify_start --
@@ -159,21 +158,7 @@ int
 __wt_verify_snap_unload(
     WT_SESSION_IMPL *session, WT_BLOCK *block, WT_BLOCK_SNAPSHOT *si)
 {
-	WT_EXTLIST *el;
-	WT_EXT *ext;
-
-	/*
-	 * Read the alloc list (blocks that were allocated in the snapshot must
-	 * appear in the snapshot).
-	 */
-	el = &si->alloc;
-	if (el->offset != WT_BLOCK_INVALID_OFFSET) {
-		WT_RET(__wt_block_extlist_read(session, block, el));
-		WT_EXT_FOREACH(ext, el->off)
-			WT_RET(__verify_frag_set(
-			    session, block, ext->off, ext->size));
-		__wt_block_extlist_free(session, el);
-	}
+	WT_UNUSED(si);
 
 	/* Discard the per-snapshot fragment list. */
 	__wt_free(session, block->fragsnap);
@@ -293,29 +278,6 @@ __verify_frag_notset(
 			WT_RET_MSG(session, WT_ERROR,
 			    "file fragment at offset %" PRIuMAX
 			    " referenced multiple times in a single snapshot",
-			    (uintmax_t)offset);
-
-	return (0);
-}
-/*
- * __verify_frag_set --
- *	Confirm we have seen this chunk of the file.
- */
-static int
-__verify_frag_set(
-    WT_SESSION_IMPL *session, WT_BLOCK *block, off_t offset, off_t size)
-{
-	uint32_t frag, frags, i;
-
-	WT_RET(__verify_eof(session, block, offset, size));
-
-	frag = (uint32_t)WT_OFF_TO_FRAG(block, offset);
-	frags = (uint32_t)(size / block->allocsize);
-	for (i = 0; i < frags; ++i)
-		if (!__bit_test(block->fragsnap, frag++))
-			WT_RET_MSG(session, WT_ERROR,
-			    "file fragment at offset %" PRIuMAX " should have "
-			    " been referenced in the snapshot but was not",
 			    (uintmax_t)offset);
 
 	return (0);
